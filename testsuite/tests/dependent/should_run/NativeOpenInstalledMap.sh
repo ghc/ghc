@@ -33,22 +33,35 @@ if "${ghc[@]}" -O0 -fenable-rewrite-rules -fforce-recomp -c PreludeMapProof.hs >
     exit 1
 fi
 
-# An ordinary client uses the installed map equation and a recursive proof.
+# An ordinary client uses the installed map and size equations with a recursive proof.
 mkdir "$out"/{length-source,length-client}
 cd "$out/length-source"
-cp "$src/PreludeMapLengthSource.hs" .
-"${ghc[@]}" -O1 -fenable-rewrite-rules -c PreludeMapLengthSource.hs
+cp "$src"/PreludeMapLength{Size,Source}.hs .
+"${ghc[@]}" -O1 -fenable-rewrite-rules -fomit-interface-pragmas -c PreludeMapLengthSize.hs PreludeMapLengthSource.hs
+"${ghc[@]}" --show-iface PreludeMapLengthSize.hi >size.iface
+grep -Fxq '  SourceTable T:size' size.iface
 cd "$out/length-client"
-cp ../length-source/PreludeMapLengthSource.hi "$src/PreludeMapLengthProof.hs" .
+cp ../length-source/PreludeMapLength{Size,Source}.hi "$src/PreludeMapLengthProof.hs" .
 "${ghc[@]}" -O1 -fenable-rewrite-rules -c PreludeMapLengthProof.hs
 
-sed "s/:~: Count xs$/:~: 'Succ (Count xs)/" PreludeMapLengthProof.hs >FalseLength.hs
+sed "s/:~: Count xs$/:~: 'S.Succ (Count xs)/" PreludeMapLengthProof.hs >FalseLength.hs
 line=$(awk '/^lengthMap _ Empty = Refl/ { print NR }' FalseLength.hs)
 if "${ghc[@]}" -O1 -c FalseLength.hs >false-length.log 2>&1 ||
    ! grep -Fq "FalseLength.hs:$line:" false-length.log ||
    ! grep -Fq '[GHC-83865]' false-length.log ||
-   ! grep -Eq 'Zero.*Succ Zero' false-length.log; then
+   ! grep -Eq 'Zero.*Succ.*Zero' false-length.log; then
     cat false-length.log >&2
+    exit 1
+fi
+
+sed -e 's/^lengthMap f (Cons xs) = .*$/lengthMap _ (Cons _) = Refl/' \
+    -e '/^    Refl -> Refl$/d' PreludeMapLengthProof.hs >MissingHypothesis.hs
+line=$(awk '/^lengthMap _ \(Cons _\) = Refl/ { print NR }' MissingHypothesis.hs)
+if "${ghc[@]}" -O1 -c MissingHypothesis.hs >missing-hypothesis.log 2>&1 ||
+   ! grep -Fq "MissingHypothesis.hs:$line:" missing-hypothesis.log ||
+   ! grep -Fq '[GHC-05617]' missing-hypothesis.log ||
+   ! grep -Eq 'S\.size \(map f .*\) ~ S\.size ' missing-hypothesis.log; then
+    cat missing-hypothesis.log >&2
     exit 1
 fi
 
@@ -59,8 +72,8 @@ main :: IO ()
 main = putStrLn showPreludeMapLength
 HS
 "${ghc[@]}" -O1 -c Main.hs
-"${ghc[@]}" Main.o PreludeMapLengthProof.o ../length-source/PreludeMapLengthSource.o -o length-run
-[[ $(./length-run) == '(Refl,2)' ]]
+"${ghc[@]}" Main.o PreludeMapLengthProof.o ../length-source/PreludeMapLength{Size,Source}.o -o length-run
+[[ $(./length-run) == '(Refl,Succ (Succ Zero))' ]]
 
 # The installed filter needs a known predicate result before choosing a branch.
 # The ordinary client has only the producer interface and keeps the tail open.

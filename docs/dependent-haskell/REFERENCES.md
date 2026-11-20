@@ -6232,7 +6232,11 @@ and [Haskell 2010 PreludeList](https://www.haskell.org/onlinereport/haskell2010/
 
 The R16 proof applies the installed map equation and then matches
 the recursive `Refl` to lift the equality through successor.
-GHC checks that match with the ordinary equality GADT.
+GHC checks that match with the ordinary equality GADT. The proof
+uses the checked equations of the same source `size` that runs in
+the example. Peano constructors give an unbounded count.
+`Prelude.length` has an `Int` result.
+[Agda's length definition](https://agda.github.io/agda-stdlib/v1.1/Data.List.Base.html),
 [Data.Type.Equality source](../../libraries/ghc-internal/src/GHC/Internal/Data/Type/Equality.hs)
 and [R16 map length proof](roadmap/R16-open-term-evaluator.md#prove-that-map-preserves-length).
 

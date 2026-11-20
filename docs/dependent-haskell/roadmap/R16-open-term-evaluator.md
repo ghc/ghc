@@ -1148,24 +1148,37 @@ the fresh proof. An ordinary call in that configuration still returns
 ### Prove that map preserves length
 
 An ordinary client proves that the list produced by `Prelude.map`
-has the original length for an arbitrary callback. Its `Spine`
-witness carries the constructors of a finite list and omits its
-elements. The empty case uses the installed map equation. The cons
-case uses that equation once, so it adds a successor on each side.
-Matching the recursive `Refl` supplies the equality for the tails.
-Neither step needs an equation for the callback.
+has the original length for an arbitrary callback. `Count` refers to
+the checked equations of an ordinary `size :: [a] -> Size`. The
+provider enables `ExperimentalDependentTypes` to export those equations.
+The proof uses the equations through `Count`, and the runtime example
+calls the same `size`. Its Peano result uses `Zero` and `Succ`.
 
-The same induction checks a direct retained list at `-O0`. A retained
-`Bool -> Bool` callback works when the proof defines one equation
-and matches the list in its body. A value of the generic retained
-function domain `a -> b` still requires separate support. The
+The `Spine` witness carries the constructors of a finite list and omits
+its elements. The empty case uses the installed map equation and
+returns `Refl`. The cons case adds a successor on each side. Matching
+the recursive `Refl` supplies the equality for the tails. Neither step
+needs an equation for the callback.
+
+An earlier check used the same induction with a direct retained list
+at `-O0`. A retained `Bool -> Bool` callback works when the proof defines
+one equation and matches the list in its body. A value of the generic
+retained function domain `a -> b` still requires separate support. The
 ordinary client can quantify over that arrow in a type or kind.
 
-The ordinary regression imports only the alias interface. It rejects
-an added successor at the empty clause and counts two mapped elements
-with a bottom callback. [Alias](../examples/open-evaluation/PreludeMapLengthSource.hs),
-[proof](../examples/open-evaluation/PreludeMapLengthProof.hs), and
-[prior art](../REFERENCES.md#induction-on-the-spine-of-a-mapped-list).
+The public 308-line compiler at `68357dc283` checks the ordinary client
+using just the provider and alias interfaces, built with `-O1` and
+`-fomit-interface-pragmas`. The provider interface contains the checked
+equations for `size`. Adding a successor to the law gives GHC-83865 at
+the empty clause, where `Zero` and `Succ Zero` differ. Removing the
+induction hypothesis gives GHC-05617 at the cons clause, with
+`size (map f xs1) ~ size xs1` still to prove. At runtime the regression
+prints `(Refl,Succ (Succ Zero))` with a bottom callback.
+[Size definition](../examples/open-evaluation/PreludeMapLengthSize.hs),
+[aliases](../examples/open-evaluation/PreludeMapLengthSource.hs),
+[proof](../examples/open-evaluation/PreludeMapLengthProof.hs),
+[regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh),
+and [prior art](../REFERENCES.md#induction-on-the-spine-of-a-mapped-list).
 
 ### Filter one known head and keep the recursive tail
 
