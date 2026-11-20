@@ -3011,6 +3011,17 @@ rule. The recursive filter tests demand when the package comes from an
 unknown computation. [Agda's erased vector argument](https://agda.readthedocs.io/en/v2.8.0/language/runtime-irrelevance.html)
 provides the comparison for erasing the witness.
 
+Proposal #473 uses a required type argument for the witness of `Pack`.
+In an expression, `Pack _ payload` asks GHC to infer that argument. In
+a pattern, `Pack _ payload` opens the package with a fresh witness and
+binds only the payload name. The explicit type pattern `(type _)` has
+the same meaning. GHC's required argument pattern translation maps a
+wildcard to a type wildcard. Agda also permits an underscore in an index
+position when a dependent pattern already determines the index.
+[Proposal #473](https://github.com/ghc-proposals/ghc-proposals/pull/473),
+[GHC pattern translation](../../compiler/GHC/Tc/Gen/Pat.hs) and
+[Agda dot patterns](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#dot-patterns).
+
 The explicit Core design in the “Alternatives” section of #473 gives
 `ExistsCo` as the congruence rule required by `liftCoSubst`. The vector
 filter needs it even at `-O0` because expanding `Filtered a` substitutes for the

@@ -1132,7 +1132,7 @@ instance Diagnostic TcRnMessage where
         hang (text "The kind argument to GHC.Exists.Pack must match the witness kind" <+> quotes (ppr expected) <> dot)
           2 (text "The argument is" <+> quotes (ppr kind) <> dot)
       ExistsPackInvalidContext ->
-        text "Use GHC.Exists.Pack in an explicit existential application or a sole case alternative with a fresh type variable and a payload pattern."
+        text "Use GHC.Exists.Pack in an explicit existential application or a sole case alternative with a fresh type variable or _ for the witness, followed by a payload pattern."
     TcRnTypeCaseContext
       -> mkSimpleDecorated $ text "A type case is supported only in the right-hand side of a top-level type synonym."
     TcRnTypeLambdaContext

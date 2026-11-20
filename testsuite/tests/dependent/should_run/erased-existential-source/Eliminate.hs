@@ -25,7 +25,7 @@ inspectBare p = case p of
 
 {-# NOINLINE ignoreBottom #-}
 ignoreBottom :: String
-ignoreBottom = case lazyPack of Exists.Pack (type a) _ -> "ignored"
+ignoreBottom = case lazyPack of Exists.Pack _ _ -> "ignored"
 
 {-# NOINLINE ignoreCall #-}
 ignoreCall :: String
@@ -34,7 +34,7 @@ ignoreCall = case error "package forced" :: Hidden of
 
 {-# NOINLINE forceBottom #-}
 forceBottom :: String
-forceBottom = case lazyPack of Exists.Pack (type a) (Just _) -> "present"
+forceBottom = case lazyPack of Exists.Pack (type _) (Just _) -> "present"
 
 {-# NOINLINE unpackLocal #-}
 unpackLocal :: String
