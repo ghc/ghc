@@ -1842,19 +1842,21 @@ pprDefaultUserForAll bndrs ordinary annotated
     getPprDebug $ \debug ->
     sdocOption sdocPrintExplicitKinds $ \print_kinds ->
     sdocOption sdocPrintExplicitMatchabilities $ \explicit ->
-      if userStyle style && not debug && not print_kinds && not explicit
-         && all ((== ifaceUnmatchable) . fst) bndrs
-      then ordinary else annotated
+    sdocOption sdocModifiers $ \modifiers ->
+      let implicit_ma (ma, _) = ma == ifaceUnmatchable
+                             || (not modifiers && ma == ifaceMatchable)
+      in if userStyle style && not debug && not print_kinds && not explicit
+            && all implicit_ma bndrs
+         then ordinary else annotated
 
 {- Note [Default forall matchability in diagnostics]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Ordinary source types default their foralls to U. A telescope containing
-only U annotations uses ordinary forall syntax in user diagnostics.
-Keep the usual rules for when to display its quantifiers. This preserves
-types such as (forall s. ST s a) without internal metadata annotations.
-Mixed, M, and symbolic telescopes retain their existing annotations.
-Debug, dump, and explicit-kind output retain all metadata. The interface
-and coercion representations do not change.
+Without Modifiers, user output omits fixed M and U on forall binders
+as it does on ordinary arrows. For example, an ill-scoped data telescope
+still shows its required binders without exposing their internal matchability.
+Keep symbolic indices visible. With Modifiers, show a fixed M binder.
+The explicit matchability flag, explicit kinds and debug output show the
+annotations. See Note [Ordinary arrow matchability in user output].
 -}
 
 -- | Apply the usual forall display rules when every binder has its contextual default.

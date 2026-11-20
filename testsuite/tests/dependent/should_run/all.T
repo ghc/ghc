@@ -256,7 +256,7 @@ test('NativePercentArrowQuote',
      multimod_compile, ['NativePercentArrowQuote', '-v0 -dcore-lint ' + config.ghc_th_way_flags])
 
 test('NativePercentArrowPpr',
-     [req_interp, only_ways(['normal'])],
+     [req_interp, only_ways(['normal']), extra_files(['../should_fail/BadTelescope.hs'])],
      run_command, ['bash NativePercentArrowPpr.sh "{compiler}" "{libdir}"'])
 
 test('NativeTypeCase',

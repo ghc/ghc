@@ -2,6 +2,7 @@
 set -euo pipefail
 export LC_ALL=C
 
+src=$(cd "$(dirname "$0")" && pwd)
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 cd "$work"
@@ -15,6 +16,13 @@ reject() {
         exit 1
     fi
 }
+
+cp "$src/BadTelescope.hs" .
+for flag in -XModifiers -fprint-explicit-matchabilities -fprint-explicit-kinds; do
+    reject "$flag" -c BadTelescope.hs
+    grep -Fq '[GHC-87279]' err.log
+    grep -Fq 'Matchable' err.log
+done
 
 cat >Mismatch.hs <<'HS'
 {-# LANGUAGE DataKinds, TypeApplications, TypeOperators #-}

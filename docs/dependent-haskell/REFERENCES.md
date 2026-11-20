@@ -156,7 +156,10 @@ and [normative inference rules](https://ghc-proposals.readthedocs.io/en/latest/p
 Proposal #242 also specifies `-fprint-explicit-matchabilities`.
 The flag matters when copying a callback kind from GHCi. Omitting an
 unmatchable index can make a standalone kind signature require a
-matchable callback. [Showing matchabilities](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#showing-matchabilities).
+matchable callback. The same display rule applies to fixed matchabilities
+on forall binders. For example, a telescope scope error shows the inferred
+binder order. Explicit printing still shows which binders are matchable.
+[Showing matchabilities](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#showing-matchabilities).
 
 These pages record the selected implementation sources, open questions and
 unexecuted controls. The paper ledger records additional versions and selective

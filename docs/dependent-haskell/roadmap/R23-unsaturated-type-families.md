@@ -347,6 +347,11 @@ This does not implement source family unsaturation or close R23.
 - [ ] Complete source unsaturation, inference/defaulting, arity rules,
       application, interfaces and the higher-order family examples.
 
+Default diagnostics for an ill-scoped telescope show its binder order without
+fixed matchability annotations. The explicit print flag shows the annotations.
+A matchability mismatch still shows the expected and actual annotations.
+[Display rule in proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#showing-matchabilities).
+
 ## Completion boundary
 
 The first increments establish a shared kernel foundation for R05 and R03.
