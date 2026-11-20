@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
 module PreludeMapProof (preludeNil, preludeNegateHead) where
 

@@ -18,8 +18,11 @@ cd "$out/client"
 cp ../exporter/PreludeMapSource.hi "$src/PreludeMapProof.hs" .
 
 # Only the alias interface is present, and the client has no dependent syntax.
-# Use explicit flags to test policy independently of the optimization level.
-"${ghc[@]}" -O1 -fno-enable-rewrite-rules -c PreludeMapProof.hs
+# The module pragma keeps the proof valid in an optimized build with rules on.
+"${ghc[@]}" -O1 -fenable-rewrite-rules -c PreludeMapProof.hs
+# Remove only the pragma in the negative control and keep the source spans.
+sed 's/^{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}//' PreludeMapProof.hs >Proof.tmp
+mv Proof.tmp PreludeMapProof.hs
 line=$(awk '/^preludeNil =/ { print NR }' PreludeMapProof.hs)
 if "${ghc[@]}" -O0 -fenable-rewrite-rules -fforce-recomp -c PreludeMapProof.hs >rules.log 2>&1 ||
    ! grep -Fq "PreludeMapProof.hs:$line:" rules.log ||
