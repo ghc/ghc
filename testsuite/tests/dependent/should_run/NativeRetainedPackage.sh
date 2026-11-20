@@ -80,7 +80,7 @@ main :: IO ()
 main = print (readInt (pack (error "unused integer witness") 7),
               withPair (pack (error "unused IO" :: IO Int) 'i') (\_ c -> getConst c),
               value (pack (error "unused function" :: Int -> Int) 'f'),
-              withPair (pack (12 :: Int) (error "unused payload" :: Char)) (\x _ -> x),
+              first (pack (12 :: Int) (error "unused payload" :: Char)),
               readFlag (Pair True Yes), readFlag (Pair False No))
 HS
 "${g[@]}" -main-is General -c General.hs
