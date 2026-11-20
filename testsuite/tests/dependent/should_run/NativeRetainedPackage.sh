@@ -399,13 +399,15 @@ cp {StoredVector,ConservedPartition,ListVectorClient}.hi "$out/client/"
 cp "$out/provider/VectorIdentity.hi" "$out/client/"
 cd "$out/client"
 cat >ListVectorMain.hs <<'HS'
-{-# LANGUAGE DataKinds, ExplicitNamespaces, GADTs, NoExperimentalDependentTypes, RequiredTypeArguments #-}
+{-# LANGUAGE DataKinds, ExplicitNamespaces, GADTs, NoExperimentalDependentTypes, RequiredTypeArguments, TypeApplications #-}
 module Main where
 import ConservedPartition (Split, branchContents, partitionVec)
+import Data.IORef (newIORef, readIORef)
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Sigma (Sigma(Pair))
 import ListVectorClient
-import PackedVecLibrary (Nat(..), Vec(..), splitAtVec, toList)
+import PackedVecLibrary (Nat(..), Vec(..), appendNative, dropVec, replicateNative,
+                         splitAtVec, takeVec, toList)
 import StoredVector (ListVector)
 import VectorIdentity (forwardVector, vectorRefl)
 observe :: ListVector Char -> (Int, String)
@@ -447,6 +449,20 @@ main = do
         ((4, [3, 4, 1, 2]), 1, [(0, []), (0, []), (1, [7]), (1, [9])],
          ([7], [9]), (0, 1, 1), ((True, True), (True, True))) -> pure ()
         other -> fail (show other)
+    cut <- newIORef (S (S Z)) >>= readIORef
+    let joined = appendNative @Int cut (S Z) (replicateNative cut 7) (VCons 9 VNil)
+        prefix = takeVec @Int @('S 'Z) cut joined
+        suffix = dropVec @Int @('S 'Z) cut joined
+        takeZero = takeVec Z (error "unused vector at zero cut" :: Vec Int ('S 'Z))
+        dropZero = dropVec Z (VCons (9 :: Int) VNil)
+        firstCell = take 1 (toList (takeVec @Int @'Z (S (S Z))
+                          (VCons 7 (error "unused rest of the prefix"))))
+        onlyPrefix = takeVec (S Z) (VCons (7 :: Int) (error "unused suffix" :: Vec Int ('S 'Z)))
+        onlySuffix = dropVec (S Z) (VCons (error "unused dropped element") (VCons (9 :: Int) VNil))
+    case (toList prefix, toList suffix, toList takeZero, toList dropZero,
+          firstCell, toList onlyPrefix, toList onlySuffix) of
+        ([7, 7], [9], [], [9], [7], [7], [9]) -> pure ()
+        other -> fail (show other)
 HS
 "${g[@]}" -c ListVectorMain.hs
 "${g[@]}" ListVectorMain.o ../projection/ListVectorClient.o \
@@ -458,7 +474,7 @@ module WrongPartition where
 import ConservedPartition (Split, partitionVec)
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Sigma (Sigma(Pair))
-import PackedVecLibrary (Nat(..), Vec(..), splitAtVec)
+import PackedVecLibrary (Nat(..), Vec(..), dropVec, splitAtVec, takeVec)
 
 keepOnly :: Vec Int n -> Vec Int n
 keepOnly xs = case partitionVec even xs of
@@ -472,12 +488,20 @@ badCut = splitAtVec (S (S Z)) (VCons (7 :: Int) VNil)
 
 badSuffix :: (Vec Int ('S 'Z), Vec Int ('S ('S 'Z)))
 badSuffix = splitAtVec (S Z) (VCons (7 :: Int) (VCons 9 VNil))
+
+badTake :: Vec Int 'Z
+badTake = takeVec (S Z) (VCons 7 VNil)
+
+badDrop :: Vec Int 'Z
+badDrop = dropVec (S Z) (VCons 7 (VCons 9 VNil))
 HS
 if "${g[@]}" -ferror-spans -c WrongPartition.hs >split-errors.log 2>&1 ||
    ! grep -Fq 'WrongPartition.hs:10:40-43: error: [GHC-25897]' split-errors.log ||
    ! grep -Fq 'WrongPartition.hs:13:29-46: error: [GHC-83865]' split-errors.log ||
    ! grep -Fq 'WrongPartition.hs:16:32-52: error: [GHC-83865]' split-errors.log ||
-   ! grep -Fq 'WrongPartition.hs:19:31-61: error: [GHC-83865]' split-errors.log; then
+   ! grep -Fq 'WrongPartition.hs:19:31-61: error: [GHC-83865]' split-errors.log ||
+   ! grep -Fq 'WrongPartition.hs:22:11-38: error: [GHC-83865]' split-errors.log ||
+   ! grep -Fq 'WrongPartition.hs:25:26-47: error: [GHC-83865]' split-errors.log; then
     cat split-errors.log >&2
     exit 1
 fi

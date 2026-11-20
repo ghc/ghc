@@ -6475,6 +6475,19 @@ returns a proof that appending the two outputs gives the input.
 [Agda standard library v2.3, Data.Vec.Base](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html)
 and [Haskell implementation](examples/packed-vector/PackedVecLibrary.hs).
 
+Agda projects `take` and `drop` from `splitAt`. Idris 2 defines both
+operations by recursion on the cut and supplies the same result lengths.
+Idris evaluates ordinary arguments eagerly. In Haskell, `dropVec` projects the suffix from `splitAtVec`. `takeVec`
+uses direct recursion so a caller can inspect the first cell before
+forcing the rest of the prefix. A zero cut returns an empty prefix
+without evaluating the input. Dropping walks the discarded spine
+without evaluating its elements. For an abstract cut, `takeVec` accepts an explicit suffix index `@m`
+because the non-injective `Add n m` cannot determine it. The ordinary
+source-hidden test reads its cut from an `IORef`.
+[Agda standard library v2.3, Data.Vec.Base](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html),
+[Idris 2, Data.Vect.take and drop](https://idris-lang.org/Idris2/base/source/Data.Vect.html#99)
+and [Idris 2, Laziness](https://idris2.readthedocs.io/en/latest/tutorial/typesfuns.html#laziness).
+
 The closed evaluator checks reassembly of the written vector
 `VCons True (VCons False VNil)` by running the split and append.
 The witness checks the contents for that input. Swapping the two
