@@ -328,6 +328,15 @@ duplicating a linear package still fail. The paper also accepts
 alpha-equivalent computed package expressions.
 [An Existential Crisis Resolved, Aside 2](https://richarde.dev/papers/2021/exists/exists.pdf#page=21).
 
+The same client can write `snd (supply x) (fst (supply x))` when
+`supply` is a top-level producer with a known monomorphic unrestricted
+arrow to a dot package and both calls use the same local input. The checked producer and input
+must resolve to the same Ids. The opening shares the pure producer
+call as a local `let` would. Ignoring both projections leaves the
+producer unevaluated. Independent calls at different inputs retain
+separate witnesses. The rule covers this fragment of computed
+expressions. [An Existential Crisis Resolved, sections 7.4 and 9.2.2](https://richarde.dev/papers/2021/exists/exists.pdf).
+
 
 ### Constructor cases on the payload
 

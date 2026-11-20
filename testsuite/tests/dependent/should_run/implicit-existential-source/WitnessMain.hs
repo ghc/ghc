@@ -37,6 +37,8 @@ repack p = keep p p
 projected :: ProjectionPair -> Int
 projected p = snd p (fst p)
 
+fromProducer b = snd (projectionPair b) (fst (projectionPair b))
+
 byCase :: ProjectionPair -> Int
 byCase p = case p of (x, k) -> k x
 
@@ -47,12 +49,16 @@ ignoreProjection _ = 19
 skipProjection :: ProjectionPair -> Int
 skipProjection p = ignoreProjection (snd p (fst p))
 
+skipProducer :: Bool -> Int
+skipProducer b = ignoreProjection (snd (projectionPair b) (fst (projectionPair b)))
+
 main :: IO ()
 main = do
     print (fromLet True, fromLet False, fromArg (package True))
     print (bottom (error "forced the package"), take 1 (toList (repack (package True))))
     let inputs = [projectionPair True, projectionPair False, projectionLazy]
     print (map projected inputs, map byCase inputs)
+    print (map fromProducer [True, False], skipProducer (error "forced the producer input"))
     let missing = error "forced the projection package"
     print (skipProjection missing, ignoreProjection (byCase missing))
     result <- try @ErrorCall (evaluate (projected missing))
