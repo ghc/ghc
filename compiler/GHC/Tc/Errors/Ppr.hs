@@ -8033,6 +8033,13 @@ pprTHReifyError = \case
   NoRolesAssociatedWithThing thing
     -> mkSimpleDecorated $
        text "No roles associated with" <+> (ppr thing)
+  CannotRepresentType RetainedFunctionType _
+    -> mkSimpleDecorated $
+       text "Template Haskell cannot represent a retained" <+> quotes (text "foreach") <+>
+       text "binder."
+  CannotRepresentType RetainedRuntimeIndex _
+    -> mkSimpleDecorated $
+       text "Template Haskell cannot represent a runtime index in a type."
   CannotRepresentType sort ty
     -> mkSimpleDecorated $
        (if show_linear then pprWithLinearTypes else id) $
