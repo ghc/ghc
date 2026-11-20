@@ -2722,9 +2722,9 @@ tc_app_ty mode rn_ty exp_kind
                          , Just (table, nullary : recursive) <- indexedProjectionSource fun
                          , (L _ (HsTyVar _ _ (L _ (WithUserRdr _ operand))), left_args) <-
                              splitHsAppTys (unLoc (indexed_operand left))
-                         , (null left_args && (isTyVarName operand || operand == getName nullary)) ||
+                         , (null left_args && (indexed_variable operand || operand == getName nullary)) ||
                            (any ((== operand) . getName) recursive &&
-                            any (isOpenTypeOperand . indexed_operand) args)
+                            any open_indexed_operand args)
                          -> do { sourceTableReferenceUse table
                                ; tc_app_ty_with_head mode rn_ty exp_kind (mkTyConTy table) }
                          | [arg] <- args, isQual rdr
@@ -2760,6 +2760,15 @@ tc_app_ty mode rn_ty exp_kind
                                ; checkExpKind mode rn_ty result result_kind exp_kind }
                        _ -> unsupported name }
            _ -> unsupported name
+    -- See Note [Nullary indexed source projections] in GHC.Tc.Gen.SourceTable.
+    indexed_variable name = isTyVarName name || isJust (lookupNameEnv (mode_indices mode) name)
+    open_indexed_operand ty = case unLoc (indexed_operand ty) of
+      HsTyVar _ NotPromoted (L _ (WithUserRdr _ name)) -> indexed_variable name
+      HsAppTy _ fun arg -> open_indexed_operand fun || open_indexed_operand arg
+      HsExplicitTupleTy _ _ fields -> any open_indexed_operand fields
+      HsExplicitListTy _ _ fields -> any open_indexed_operand fields
+      _ -> False
+
     -- Inspect the constructor head for routing. Check the original operand
     -- and its annotation when applying the selected kind.
     indexed_operand ty = case ignoreParens ty of

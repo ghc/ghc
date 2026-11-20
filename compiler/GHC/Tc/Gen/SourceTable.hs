@@ -1648,7 +1648,10 @@ left operand and leaves argument definedness to the caller.
 Check each published row again in final Core. The typechecker uses the
 family for the nullary constructor, a checked recursive constructor with
 a symbolic operand, or a bare neutral left operand. Closed recursive calls
-keep the executable route. The length index alone cannot select a row.
+keep the executable route. A symbolic field can be either an erased type
+variable or a retained value from the type checker's index environment.
+Check the original operand after selecting the equation. The length index
+alone cannot select a row.
 -}
 
 -- | The owner's telescope, visible types, and one specialized index.
