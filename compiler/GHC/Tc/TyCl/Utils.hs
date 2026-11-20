@@ -618,6 +618,9 @@ irType = go
       | isNativeRetainedBinder v
       = markNominal lcls (varType v) >> go (extendVarSet lcls v) body
       | otherwise = pprPanic "irType: invalid retained binder" (ppr ty)
+    -- Keep existential parameters nominal until Core has an ExistsCo.
+    go lcls (ExistsTy v body)
+      = markNominal lcls (varType v) >> markNominal (extendVarSet lcls v) body
     go lcls (TyVarTy tv)       = unless (tv `elemVarSet` lcls) $
                                  updateRole Representational tv
     go lcls (AppTy t1 t2)      = go lcls t1 >> markNominal lcls t2
@@ -676,6 +679,9 @@ markNominal lcls ty = mapM_ (updateRole Nominal) $
       = get_ty_vars scope (varType v) `unionVarSet`
           get_ty_vars (extendVarSet scope v) body
       | otherwise = pprPanic "markNominal: invalid retained binder" (ppr ty)
+    get_ty_vars scope (ExistsTy v body)
+      = get_ty_vars scope (varType v) `unionVarSet`
+          (get_ty_vars (extendVarSet scope v) body `delVarSet` v)
     get_ty_vars _ (TyVarTy tv) = unitVarSet tv
     get_ty_vars scope (AppTy t1 t2) = get_ty_vars scope t1 `unionVarSet` get_ty_vars scope t2
     get_ty_vars scope (FunTy _ ma w t1 t2)
