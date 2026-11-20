@@ -58,5 +58,6 @@ cat >>LocalRuleProvider.hs <<'SRC'
 
 {-# RULES "ordinary control" observeProof Refl = 8 #-}
 SRC
-reject 'no local RULES' -O1 "${flags[@]}" -c LocalRuleProvider.hs
+reject '[GHC-51063]' -O1 "${flags[@]}" -c LocalRuleProvider.hs
+grep -Fq 'ordinary control' reject.log
 cat client/observed
