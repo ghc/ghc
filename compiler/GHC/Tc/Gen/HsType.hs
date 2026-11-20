@@ -625,11 +625,7 @@ tcCheckRetainedType allow_function = go
           = setSrcSpanA lb $
             case bndr of
               HsTvb _ () (HsBndrVar _ (L _ name)) (HsBndrKind _ domain) ->
-                do { domain_ty <- tc_check_lhs_type mode domain liftedTypeKind
-                   ; domain_ty <- liftZonkM $ zonkTcType domain_ty
-                   ; unless (isNativeRetainedBinderType domain_ty) $
-                       failWithTc $ TcRnRetainedQuantificationError
-                                      (RetainedUnsupportedDomain domain_ty)
+                do { domain_ty <- tcRetainedBinderDomain True mode domain
                    ; unless (allow_function || isNativeIndexType domain_ty) $
                        failWithTc $ TcRnRetainedQuantificationError $
                          if mode_complete_type_arg mode == Just False
@@ -704,12 +700,7 @@ tcCheckRetainedConType validate_domain tc_field_mult = go typeLevelMode
       = setSrcSpanA loc $
         case bndr of
           HsTvb _ () (HsBndrVar _ (L _ name)) (HsBndrKind _ domain) ->
-            do { domain_ty <- tc_check_lhs_type mode domain liftedTypeKind
-               ; domain_ty <- liftZonkM $ zonkTcType domain_ty
-               ; when validate_domain $
-                   unless (isNativeRetainedBinderType domain_ty) $
-                     failWithTc $ TcRnRetainedQuantificationError
-                                    (RetainedUnsupportedDomain domain_ty)
+            do { domain_ty <- tcRetainedBinderDomain validate_domain mode domain
                ; let index = mkLocalId name ManyTy domain_ty
                      mode' = mode { mode_indices = extendNameEnv (mode_indices mode) name index }
                ; (binders, body_ty) <- bind_indices mode' rest body
@@ -718,6 +709,19 @@ tcCheckRetainedConType validate_domain tc_field_mult = go typeLevelMode
 
     unsupported loc = setSrcSpanA loc $
       failWithTc $ TcRnRetainedQuantificationError RetainedPackageDeclaration
+
+-- | Check the domain of a retained binder before bringing it into scope.
+-- Constructor kind inference skips the domain predicate until the datatype
+-- constructor knots are available.
+tcRetainedBinderDomain :: Bool -> TcTyMode -> LHsType GhcRn -> TcM TcType
+tcRetainedBinderDomain validate_domain mode domain
+  = do { domain_ty <- tc_check_lhs_type mode domain liftedTypeKind
+       ; domain_ty <- liftZonkM $ zonkTcType domain_ty
+       ; when validate_domain $
+           unless (isNativeRetainedBinderType domain_ty) $
+             failWithTc $ TcRnRetainedQuantificationError
+                            (RetainedUnsupportedDomain domain_ty)
+       ; return domain_ty }
 
 {- Note [Source retained signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -3,27 +3,14 @@
 Implement dependent types in Haskell through a native extension to Core. Base the
 work on Richard Eisenberg's historical `nokinds-pi` branch. Port its useful changes
 to current GHC and complete the missing rules. The initial retained Boolean
-experiment is implemented. The current work follows the roadmap below.
+experiment is implemented.
 
-Last updated: 2026-11-18. Upstream compiler base:
+This log records the specifications, decisions and acceptance checks for
+individual compiler increments. The upstream base is
 `19ff36f2aede0ca2e554016ff22c71e73aa9803b`.
-
-See [current status](README.md) and [primary references](REFERENCES.md).
-
-## Current priority: roadmap-aligned increments
-
-Use [ROADMAP.md](ROADMAP.md#current-work-queue) as the main work queue. These
-specifications record bounded increments and their historical checkpoints.
-Each new increment must name one owning roadmap card, related cards, required
-prerequisites, acceptance checks and the behavior that remains unsupported.
-
-[M84](#m84-infer-a-nonempty-vectors-tail-at-a-nested-application) lets
-`safeHead` infer the tail of a vector constructed by another call.
-[M94](#m94-infer-a-nonempty-tail-through-local-length-definitions) also
-infers the tail when a local definition names the length. These cases
-use checked source equations under R13 and the numeric syntax from M83.
-[M99](#m99-evaluate-an-imported-closed-call) follows R15's separate mechanism
-for executing an ordinary closed call during type elaboration.
+Use the [roadmap](ROADMAP.md#current-work-queue) for current priorities,
+the [reference ledger](REFERENCES.md) for design provenance, and the
+[verification records](CHECKPOINTS.md) for detailed early test results.
 
 ## Historical source checkpoints
 
@@ -36,7 +23,7 @@ with `Z` and `S` from runtime predicate results.
 
 All 36 package, filter and section observations pass. Sixteen located rejection
 checks, the five focused registered regressions, Core API and bootstrap runtime
-also pass. See [the recorded evidence](README.md#source-vector-filter-checkpoint).
+also pass. See [the recorded evidence](CHECKPOINTS.md#source-vector-filter-checkpoint).
 M12's length-bound proof is verified at `7eae40be91`, with the nested-context
 instantiation fix at `4ad47fdeca`. Both stages pass all 58 source observations;
 the runtime fixtures also check 19 package/bound rejections. Preserve the
@@ -289,7 +276,7 @@ execution are outside M5. M8 adds a separate checked module entry.
 `NativeDependentCoreRun` supplies both Boolean values through one compiled worker.
 It covers `choose`, shared `keep`/`choose`, retained eta expansion, partial
 `keepSelect bottom`, fully applied dictionary-index `keep bottom`, a lazy local
-index from a global thunk, and strict `choose bottom`. See [validation](README.md#native-execution).
+index from a global thunk, and strict `choose bottom`. See [validation](CHECKPOINTS.md#native-execution).
 
 ### M6: preserve dependencies through optimization
 
@@ -320,7 +307,7 @@ body endpoints have kind `Type`. The proof inherits its body's FC role and keeps
 the binder scoped through intermediate proof types. Each endpoint separately
 canonicalizes a vacuous binder to an ordinary arrow. Keep value casts instead
 of eta-expanding a partial function. See
-[the Core rule](CORE.md#fixed-domain-retained-congruence) and
+[the Core rule](CORE.md#retained-congruence-and-nominal-domain-conversion) and
 [the Agda and D/DC provenance](REFERENCES.md#agda-provenance).
 
 - [x] Add binder-aware coercion substitution, lifting, free variables, zonking,
@@ -335,7 +322,7 @@ of eta-expanding a partial function. See
       Five registered regressions pass. Separate CLI checks cover 26 interface
       observations, eight partial/application observations, and nine standalone
       observations. Strictness, diagnostics, format rejection, guide, and ordinary
-      compiler smoke checks pass. See the [checkpoint](README.md#fixed-domain-retained-congruence).
+      compiler smoke checks pass. See the [checkpoint](CHECKPOINTS.md#fixed-domain-retained-congruence).
 
 General Pi matching, ambient-evidence normalization, changed domains or multiplicities,
 dependent erased binder kinds, and native coercion unfolding serialization
@@ -364,7 +351,7 @@ and [the pinned Agda sources](REFERENCES.md#agda-provenance).
 - [x] Complete both-stage, registered, CLI, guide, and ordinary smoke validation.
       The CLI checks the actual RHS lines for GHC-83865 and GHC-40404.
       All five registered regressions pass. See the
-      [verified checkpoint](README.md#family-axiom-normalization).
+      [verified checkpoint](CHECKPOINTS.md#family-axiom-normalization).
 
 This increment leaves ordinary `ForAllTy` binder-kind handling unchanged.
 Family axioms reduce at nominal and representational roles; phantom family
@@ -474,7 +461,7 @@ executable with the shared Boolean and bottom observations. The default
 both-stage build and all five registered normal-way tests pass at compiler
 source commit `300eefffd1`. Eight negative cases require the expected unsupported
 phase instead of accepting a generic failed load or panic. See the validation
-details in [the status](README.md#ordinary-executable-integration).
+details in [the status](CHECKPOINTS.md#ordinary-executable-integration).
 
 Handle native interface signatures and expression unfoldings separately. Encode
 runtime binders and occurrences through the interface's local Id environment,
@@ -511,7 +498,7 @@ cross-module execution in fresh contexts and separate CLI processes, concrete
 constructor applications, and old/new header rejection. Both compiler stages
 build with the new version. The ordinary compatibility smoke and all five
 registered normal-way tests pass. See
-[the validation results](README.md#native-interface-signatures).
+[the validation results](CHECKPOINTS.md#native-interface-signatures).
 
 Use the existing declaration dependency fingerprints for retained signatures.
 The consumer imports `choose` and `keep` without naming `Select`. Rebuild the
@@ -523,7 +510,7 @@ an unchanged independent-function hash, and a located `GHC-83865` when the
 unforced consumer compile rechecks its stale `Int` application. Use fresh
 one-shot contexts and separate producer sources and interface search paths.
 The bootstrap and all five registered normal-way tests pass. See the
-[fingerprint validation](README.md#signature-fingerprints-and-recompilation).
+[fingerprint validation](CHECKPOINTS.md#signature-fingerprints-and-recompilation).
 
 For native unfoldings, first extend expression reconstruction under the existing
 module gate. Reconstruct a Boolean alternative's virtual CoVar from its
@@ -770,7 +757,7 @@ Use ordinary class instances for retained proof and vector types. Follow the
 
 Native maps are implemented at `1b37399cd5`; scoped class consumers at `17740f7135`.
 See [the contract](CORE.md#retained-class-consumers) and the
-[verified results](README.md#ordinary-class-consumers). Source-written native
+[verified results](CHECKPOINTS.md#ordinary-class-consumers). Source-written native
 class contexts are covered by the next increment. General meta-variable scope
 and broader inference remain open.
 
@@ -801,7 +788,7 @@ remain. This case also excludes `Strict`. A trailing context keeps the old prefi
 shapes. Constructor equations keep their existing coverage and pattern limits.
 See [the contract](CORE.md#source-retained-constraints).
 Implementation: `670bcef166`. See the
-[verified results](README.md#source-retained-constraints).
+[verified results](CHECKPOINTS.md#source-retained-constraints).
 
 ### Source case evidence follow-up
 
@@ -829,7 +816,7 @@ GHC's existing evidence representation and checked branch proofs. See
 [the case contract](CORE.md#explicit-case-evidence) and
 [the pinned compiler sources](REFERENCES.md#source-case-evidence).
 Implementation: `fe7329d1b6`. See the
-[verified results](README.md#source-case-evidence). Broader case patterns,
+[verified results](CHECKPOINTS.md#source-case-evidence). Broader case patterns,
 general retained inference, structural Pi unification, native coercion unfolding
 codecs, and ordinary optimization remain open.
 
@@ -856,7 +843,7 @@ Follow [the contract](CORE.md#checked-source-lambdas) and
 This step does not enable retained syntax in new type positions or general native
 metavariable assignment. Keep broader inference and optimizer gates.
 Implementation: `a0c493d5f9`. See the
-[verified checkpoint](README.md#checked-retained-lambdas).
+[verified checkpoint](CHECKPOINTS.md#checked-retained-lambdas).
 
 ### Explicit higher-order arguments follow-up
 
@@ -894,7 +881,7 @@ Agda's expected-argument and scoped-Pi lambda rules provide the checking
 precedent. See [the pinned sources](REFERENCES.md#explicit-higher-order-arguments).
 Follow [the higher-order contract](CORE.md#explicit-higher-order-closure-arguments).
 Implementation `64044341e8` and `94d7d8f2f3` pass the
-[verified checkpoint](README.md#higher-order-retained-closures).
+[verified checkpoint](CHECKPOINTS.md#higher-order-retained-closures).
 
 ### Expected-type instantiation of retained workers
 
@@ -921,7 +908,7 @@ Use an immutable substitution in this GHC increment. Agda's contextual mutable
 metas require separate scope machinery. See
 [the pinned sources](REFERENCES.md#expected-type-instantiation-of-retained-workers).
 Implementation `dae037074c` passes the
-[verified checkpoint](README.md#expected-type-instantiation-of-retained-workers).
+[verified checkpoint](CHECKPOINTS.md#expected-type-instantiation-of-retained-workers).
 
 ### M10: retained constructor field telescopes
 
@@ -955,7 +942,7 @@ withPacked (PackVec n xs) k = k n xs
 - [x] Verify the Core checkpoint in both compiler stages and the bootstrap API,
   registered tests, runtime fixture and standalone compatibility controls.
   Record the corrected source-gate harness separately from the first combined
-  CLI invocation. See [the verified checkpoint](README.md#retained-constructor-field-checkpoint).
+  CLI invocation. See [the verified checkpoint](CHECKPOINTS.md#retained-constructor-field-checkpoint).
 - [x] Preserve the telescope in interface declarations. Reject malformed scope
   and unsupported promotion with interface diagnostics. Version the format if
   the serialized declaration changes. Keep existing archives immutable.
@@ -965,7 +952,7 @@ withPacked (PackVec n xs) k = k n xs
   names after tidying, sibling scope and repeated imports. Preserve an immutable
   version-1 reader before configuring version 2. Verified binary declaration
   round trips, recursive-domain rejection and both header-version directions.
-  See [the interface checkpoint](README.md#retained-constructor-interface-checkpoint).
+  See [the interface checkpoint](CHECKPOINTS.md#retained-constructor-interface-checkpoint).
 The first source checkpoint uses one package constructor, prefix constructor
 syntax, bare variable patterns for retained fields, and one eliminator equation.
 Reject unsupported forms with located diagnostics. Keep pattern coverage checks
@@ -1061,7 +1048,7 @@ The source example implements the bound component of Agda's `Vec≤` result.
 It uses the current constructor and proof forms. Both compiler stages pass
 all 58 source observations. The runtime fixtures check 19 package/bound
 rejections. The focused registered regressions and Core API also pass. See
-[the checkpoint](README.md#source-filter-bound-proof-checkpoint).
+[the checkpoint](CHECKPOINTS.md#source-filter-bound-proof-checkpoint).
 
 ```haskell
 data LE (n :: Nat) (m :: Nat) where
@@ -1168,7 +1155,7 @@ separate work. General projections and constructor patterns in retained index
 fields remain outside this increment.
 
 The implementation and validation are recorded in
-[the checkpoint](README.md#nested-source-package-pattern-checkpoint).
+[the checkpoint](CHECKPOINTS.md#nested-source-package-pattern-checkpoint).
 Next, probe `unconsPacked :: PackedVec a -> Maybe (a, PackedVec a)`. Match the
 stored length with `Z` and `S k`. In the successor branch, match the vector
 and package its tail at actual runtime `k`. Keep the predecessor, head and
@@ -1740,7 +1727,7 @@ failures: `ActionMissingSignature` rejected an unsigned local native action
 with GHC-83605; `ActionNativeResultInference` rejected `pure xs` in an inferred
 local computation with GHC-83865. Both source forms now compile without native
 meta assignment or runtime-index escape. The source example passes 377
-observations; see [M25 evidence](README.md#m25-scoped-native-source-inference).
+observations; see [M25 evidence](CHECKPOINTS.md#m25-scoped-native-source-inference).
 
 - [x] Reuse `tcMonoBinds`' existing single nonrecursive FunBind path at
   `Tc.Gen.Bind:1330`. It calls `runInferRhoFRR` before it allocates the Id.
@@ -2734,7 +2721,7 @@ Source retained-call arguments and new interface wire forms remain gated in
 this first slice. General lazy naming, higher-order retained binders, ordinary
 optimizer admission and the rest of C1/C2 remain open. This milestone is a
 partial implementation of the
-[pinned comparison](REFERENCES.md#opaque-runtime-function-indices-unimplemented-c1-comparison).
+[pinned comparison](REFERENCES.md#opaque-runtime-function-indices-c1-comparison-and-first-kernel).
 
 - [x] Add the call node, forward congruence and complete scoped traversals.
 - [x] Preserve head identity under cloning, substitution and composition.
@@ -3818,7 +3805,7 @@ rejections, the 19 prior public programs, and Showcase 59 from 14 modules.
 The focused API preserves its 1/37 goldens. A separate backend probe checks a
 constructed list input and optional result with two assertions per stage.
 The five registered tests have 39 cases, 34 skips and no unexpected results.
-See the [checkpoint](README.md#m56-closed-parameterized-index-domains) and
+See the [checkpoint](CHECKPOINTS.md#m56-closed-parameterized-index-domains) and
 [domain contract](CORE.md#closed-parameterized-runtime-index-domains).
 
 Source matching uses the full instantiated parent. Family matching uses nominal

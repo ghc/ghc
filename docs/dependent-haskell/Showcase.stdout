@@ -1,0 +1,266 @@
+Dependent Haskell: completed source features
+runtime Bool choice: "42"
+choose True has result Int: 42
+choose False has result Bool: False
+keep ignores bottom index and payload: 42
+three-constructor runtime domain: "'G'"
+empty-domain elimination demands its scrutinee: showcase-empty-domain
+IORef length and dependent vector: (3,[7,7,7])
+nested package/vector patterns: Just 7
+uncons retains the runtime predecessor: (7,(2,[7,7]))
+Refl aligns independent runtime indices: [(7,8),(7,8),(7,8)]
+zip packages: [(7,8),(7,8),(7,8)]
+reverse preserves length: (3,[3,2,1])
+append computes its result length: (6,[1,2,3,7,7,7])
+filter computes a hidden result length: (2,[2,3])
+filter returns a length bound proof: (2,[2,3],2)
+consume a package without its proof: (2,[2,3])
+runtime addition with equality evidence: 6
+arithmetic induction proof: [7,7,7]
+saved IO action runs twice: ([7,7,7],[7,7,7],2)
+native values in tuple sections: [7,7,7]
+checked retained lambda: [7,7,7]
+checked constructor lambda: [42,42,42]
+linear equality witness beneath a retained binder: 42
+equality evidence beneath a retained Pi: [7,7,7]
+immediate index beta reduction: [5,5,5,5]
+explicit erased choices and qualified Pi: [7,7,7]
+known arguments select erased choices: [7,7,7]
+generic consumer of a native function: 42
+qualified native functions in tuples: [7,7,7]
+ignored equality witness stays lazy: [7,7,7]
+demanded equality witness: native-ground-bottom-proof
+opaque call refines its whole result: 3
+constructor argument call index: 4
+signed beta inside an opaque call: 4
+guarded package rows: (3,[1,2,3])
+fresh worker under call evidence: [42,42]
+fresh worker at a constructed index: [42,42,42]
+constant function ignores a bottom predecessor: []
+retained function and payload stay lazy: 42
+stored function, input and dependent payload: (4,[42,42,42,42])
+imported function signature preserves payload: [42,42,42,42]
+generic payload in a function package: (4,"qqqq")
+function package fields stay lazy: 42
+imported function keeps ignored fields lazy: 42
+later retained indices and local shadowing: ((2,[8,8]),(3,[9,9,9]),42)
+leading class dictionary: "([],[8,8])"
+equality context before a later retained index: ([],[9,9,9])
+absent package constructor: Nothing
+present package constructor: Just (2,[42,42])
+opposite constructor declaration order: Just (2,[42,42])
+nested vector pattern in a retained alternative: Just 42
+failed guard preserves lazy fields: 42
+runtime list as retained index: [1,0,1]
+list-indexed package: (3,[1,0,1])
+optional retained Nat: 2
+runtime tree selects nested payload: "(11,False)"
+list package does not force its index: ()
+opaque call ignores retained list: [7,7]
+nominal domain conversion from source: [42,42]
+converted argument application: [7,7]
+payload inference below retained binder: [42,42]
+nominal domain conversion in both directions: [9,9]
+domain cast ignores bottom index: [5,5]
+converted partial function WHNF: ()
+converted bottom function WHNF: showcase-domain-function
+domain cast preserves demanded index: showcase-domain-index
+domain conversion preserves function demand order: showcase-domain-head
+whole function worker selects Int: [42,42]
+preallocated payload below function binder: [42,42]
+runtime successor determines vector length: [42,42,42]
+runtime constant ignores bottom index: [42,42]
+ordinary equality below function binder: [42,42]
+shadowed retained function binders: [42,42]
+whole function worker WHNF: ()
+bottom whole function worker WHNF: showcase-function-body-worker
+partial worker ignores bottom function: ()
+function body preserves head demand order: showcase-function-body-head
+function body preserves index demand: showcase-function-body-index
+runtime checked list position: Just False
+negative position ignores list: Nothing
+out-of-range list position: Nothing
+checked first position ignores tail: Just True
+checked position in cyclic list: Just False
+explicit complete worker runtime application: [42,42]
+explicit complete worker WHNF: ()
+explicit bottom worker WHNF: showcase-explicit-worker
+explicit nested type ignores bottom worker: ()
+constructor kind arrow is matchable: True
+runtime function arrow is unmatchable: True
+matchability distinguishes function types: True
+explicit runtime forall: 42
+family prefix matchability (M is True): [[True,True],[False,True],[False,False]]
+computed forall metadata is retained: True
+computed forall kind supports reflection: True
+function value in an algebraic index: 2
+family-exposed call uses imported proof: 1
+proof retains the stored function identity: True
+algebraic function container stays lazy: 42
+algebraic function leaf stays lazy: 1
+generic Boolean list: [True,False]
+generic inferred Int list: [11,22]
+generic explicit Int list: [11,22]
+generic function elements: [False]
+generic IO elements: [7,9]
+generic boxed elements: [GenericOpaque 11]
+generic newtype elements: [GenericHidden 13]
+generic outer list constructor: True
+generic partial vector prefix: 1
+generic cyclic list prefix: [17,17,17]
+generic runtime-indexed elements: [[23,23]]
+generic refined runtime domain: [[23,23]]
+generic zero runtime domain: [[]]
+generic constructed runtime domain: [[31,31,31]]
+generic opaque head demand: opaque head forced
+generic partial worker WHNF: True
+ordinary module runtime replicate: [7,7]
+ordinary module generic round-trip: [11,22]
+generic checked Int position: Just 22
+generic negative position ignores list: Nothing
+generic checked function position: Just 42
+generic checked runtime-indexed payload: Just [7,7]
+generic checked position ignores head: Just 29
+generic checked position in cyclic list: Just 31
+generic vector lookup through fmap: Just [7,7]
+invisible retained length: 2
+invisible retained length with @Int: 2
+explicit invisible retained length: 2
+explicit invisible retained length with @Int: 2
+invisible retained ignores bottom: 42
+explicit invisible retained ignores bottom: 42
+append with inferred lengths: [7,7,9]
+append with first length written: [7,7,9]
+flipBit at runtime: [True,False]
+payload selected by flipBit: (42,False)
+signal at Green: Go
+dropFirst with a computed result length: [9]
+empty vector stays empty: []
+successor test ignores the field: True
+vector indexed by a recursive source length: [True,False,True]
+list length ignores bottom elements: 2
+first length constructor ignores the tail: True
+Int vector indexed by the same polymorphic length: [11,22]
+source length of a list of functions: 2
+heads of empty and nonempty runtime lists: (Nothing,Just 11)
+safeHead of a known list cell: False
+safeHead at length 1 + n: True
+runtime sum and appended vector: (3,[True,False,False])
+outer successor ignores the second addend: True
+replicate at a computed runtime length: [True,True,True]
+grow at a locally named runtime index: ("xxx",'x')
+ignore a computed runtime length: True
+first cell at a partial runtime length: True
+vector with length 3: [True,False,True]
+replicateAt 3: [True,True,True]
+replicateNative 3: [True,True,True]
+replicateNative (n + 1): [False,False,False]
+vector with length n + 3: [False,False,True,False,True]
+2 + 3 at runtime: 5
+flatten a runtime 2-by-3 rectangle: "xxxxxx"
+replicate at the product of two runtime lengths: "xxxxxx"
+zero rows leave the column count unevaluated: ""
+one cell plus a runtime rectangle: "xxxxxxx"
+safeHead before an unknown product: 'x'
+one plus a let-bound product: 7
+safeHead with a let-bound product: 'x'
+signed length bindings: (7,'x')
+safeHead inferred from a where-bound length: 'x'
+vector at a let-bound numeral: "xxx"
+head after testing the actual length: (Just 'x',Nothing)
+ordinary zip at a checked runtime length: Just [('a',1),('b',2)]
+ordinary zip with a short input: Nothing
+safeHead after checking for exactly one cell: (Just 'x',Nothing,Nothing)
+first cell of a packaged list: Just 'p'
+project the vector at the length stored in its own package: "ab"
+project the length of a known dependent package in a type: Refl
+project from two payload families with the same dependent function: ("xx",7)
+use the stored length and vector in a generic dependent eliminator: (2,"xx")
+use one dependent pair type at two witness types: ((2,"xx"),'i')
+read either package field without demanding its sibling: (7,2)
+checked row prefix with a runtime length: (Just "xab",Nothing)
+ordinary length evaluated while checking the type: 3
+installed Prelude.length converted to a Nat index: 3
+ordinary identity applied to a type variable: 42
+uppercase character and digit proof from Data.Char: ('X',Refl)
+Prelude.const selects the first type variable: 'x'
+Prelude.sum in a type: 10
+title case after the pattern determines the character: 'A'
+Prelude.reverse '[2, 3, 5] equals '[5, 3, 2]: Refl
+sum of a list reversed during type checking: 10
+an imported character case selects between two unknown types: (False,42)
+odd accepts the Natural computed by sum: Refl
+odd applied directly to the literal 5: Refl
+an exported character equality at a mapped and a default input: "X!"
+Unicode code points from an exported Data.Char.toUpper equality: [201,125217]
+greatest common divisor checked in a type: 6
+first and second fields proved through an imported pair equality: (Refl,Refl)
+first and second projections from a pair of unknown types: (False,42)
+quotient and remainder returned during type checking: (3,2)
+listToMaybe at a nonempty list and at an empty list: (2,99)
+readEither at valid and invalid input with a default of 99: (23,99)
+concatenate all suffixes of [1,2,3] during type checking: Refl
+collect the present values from an optional list literal: Refl
+project rigid fields after swapping a known pair: (Refl,Refl)
+project through a swap proved for an unknown pair: (Refl,Refl)
+check a user-defined signal and pass it to another ordinary call: (Refl,Refl)
+project the second copy of an unknown pair's first field: Refl
+read the leaves of a tree returned by an ordinary function: Refl
+select a type with a function defined later in the same module: 'x'
+use a chain of local functions on types and on values: (Refl,'y')
+read the fields of a result indexed by True: Refl
+read the head of an ordinary length-indexed vector: Refl
+ignore a recursive helper in a type and at runtime: (Refl,'x')
+read the cells of a vector packaged with its length: Refl
+select a type with a locally declared route: (Refl,'y')
+select unknown fields from known constructors: ('x',7)
+read a length witness returned by an ordinary function: (Refl,[4,5])
+read one field of a private parcel without forcing the other: (Refl,7)
+construct a result from two symbolic fields: Refl
+use a derived instance beside a dependent type: "Second"
+a literal sibling fixes a nested numeric conversion: Refl
+an ordinary datatype infers the arrow required by Maybe: Just True
+supply the pair to an exported swap after typechecking its definition: Refl
+a computed sibling fixes a nested numeric conversion: Refl
+supply either constructor to a projection checked at an unknown input: (Refl,Refl)
+infer a conversion from the selected field of a computed pair: Refl
+infer the element type of a nested empty list from its sibling: Refl
+supply the inner constructor to a deferred nested match: (Refl,Refl)
+use a local instance whose method checks a dependent input type: ('x',True)
+check an associated type equation before a dependent producer: True
+build an optional head when a client supplies the spine constructor: (Refl,Refl)
+test the selected field of a pair whose other field throws: Refl
+run associated and standalone data instances from a dependent module: (True,False,"StampToken {marked = False}")
+reduce an optional head through a private helper: Refl
+use a local identity in a family equation needed by a later producer: True
+prove a direct projection of a pair with an exceptional field: Refl
+prove each computed field without evaluating its exceptional sibling: (Refl,Refl)
+build a public constructor through three private helpers: Refl
+infer a local function used in an imported family equation: (True,EQ,'x',Just False,LT)
+check a local datatype before an imported family equation: True
+use a closed family in a helper and in the called function's signature: (True,True)
+select the second element through a private case: Refl
+rebuild one spine cell while its tail remains unknown: Refl
+carry the same tag through a recursive spine: Refl
+apply Prelude.map to Prelude.not at a known list: Refl
+pass an unapplied type family to another family: Refl
+pass a type family with an unapplied invisible binder: Refl
+interpret a kind code as an ordinary type constructor: Just True
+apply a type lambda to Maybe, Either String and IO: Refl
+partially apply a two-argument type lambda: Refl
+map a type lambda with a constructor case: Refl
+read fields from two indexed type case branches: (Refl,Refl)
+retain the kind of a matched Nothing: Refl
+name and reuse a type-level intermediate result: Refl
+bind the result of a constructor case: (Right True,Left 'c')
+select the result type by a constructor: (7,False)
+match Bool and Ordering directly in a type: (7,'x')
+use a local type in a constructor case: Just True
+infer one kind for a local type from both case branches: True
+pass a constructor to uncurry with two unknown fields: Refl
+prove one map step for an arbitrary callback and tail: Refl
+map Boolean negation and traffic signals over an unknown tail: (Refl,Refl)
+map an ordinary enumeration callback over an unknown tail: Refl
+use Prelude.not on a known head with an unknown tail: Refl
+use Prelude.map and Prelude.not on an empty list and an unknown tail: (Refl,Refl)
+collect row heads with an ordinary polymorphic callback: Refl

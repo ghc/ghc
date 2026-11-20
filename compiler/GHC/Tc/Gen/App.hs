@@ -971,12 +971,7 @@ tcRetainedDeclaredTypeView ty
     refine ty given
       | isCoVar given
       , Just (index, co) <- orient (mkCoVarCo given)
-      , coercionRole co == Nominal
-      , isNativeIndexId index
-      , TyConApp tc _ <- coreFullView (coercionRKind co)
-      , Just con <- isPromotedDataCon_maybe tc
-      , Just _ <- nativeIndexDataConTyArgs (varType index) con
-      , typeKind (coercionRKind co) `eqType` varType index
+      , isRetainedConstructorProof index co
       , anyFreeVarsOfType (== index) ty
       = do { name <- newSysName (mkTyVarOcc "retained_view")
            ; let template = mkTyVar name (varType index)
