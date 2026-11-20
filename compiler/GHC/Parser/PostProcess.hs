@@ -1038,10 +1038,12 @@ checkRuleTyVarBndrNames :: [LRuleTyTmVar] -> P ()
 checkRuleTyVarBndrNames bndrs
    = sequence_ [ check lname | L _ (RuleTyTmVar _ lname _) <- bndrs ]
   where
-    check (L loc (Unqual occ)) =
-          when (occNameFS occ `elem` [fsLit "family",fsLit "role"]) $
-          addFatalError $ mkPlainErrorMsgEnvelope (locA loc) $
-                          PsErrParseErrorOnInput occ
+    check (L loc (Unqual occ)) = do
+      dependent <- getBit ExperimentalDependentTypesBit
+      let name = occNameFS occ
+      when (name `elem` [fsLit "family",fsLit "role"] || (dependent && name == fsLit "some")) $
+        addFatalError $ mkPlainErrorMsgEnvelope (locA loc) $
+          PsErrParseErrorOnInput occ
     check _ = panic "checkRuleTyVarBndrNames"
 
 -- | Deal with both old-form and new-form specialise pragmas, using the new

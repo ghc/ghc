@@ -992,6 +992,7 @@ data Token
   | ITdocOptions   String              PsSpan -- ^ doc options (prune, ignore-exports, etc)
   | ITlineComment  String              PsSpan -- ^ comment starting by "--"
   | ITblockComment String              PsSpan -- ^ comment in {- -}
+  | ITsome
 
   deriving Show
 
@@ -1081,6 +1082,7 @@ reservedWordsFM = listToUFM $
          ( "forall",         ITforall NormalSyntax, 0),
          ( "foreach",        ITforeach,        xbit ExperimentalDependentTypesBit),
          ( "exists",         ITexists,         xbit ExperimentalDependentTypesBit),
+         ( "some",           ITsome,           xbit ExperimentalDependentTypesBit),
          ( "mdo",            ITmdo Nothing,   xbit RecursiveDoBit),
              -- See Note [Lexing type pseudo-keywords]
          ( "family",         ITfamily,        0 ),

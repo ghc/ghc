@@ -54,7 +54,7 @@ import GHC.Driver.Flags
 import GHC.Data.List.SetOps (findDupsEq)
 import GHC.Parser.PostProcess (setRdrNameSpace)
 
-import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLet, HsTypeCase, HsTypeCaseAlias, HsTypeCaseHead), HsTypeGhcRnExt(..), HsTypeCaseAlt(..))
+import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLet, HsTypeCase, HsTypeCaseAlias, HsTypeCaseHead, HsTypeSome), HsTypeGhcRnExt(..), HsTypeCaseAlt(..))
 import GHC.Hs
 
 import GHC.Rename.Env
@@ -68,6 +68,7 @@ import GHC.Rename.Unbound ( notInScopeErr, WhereLooking(WL_LocalOnly) )
 
 import GHC.Tc.Errors.Types
 import GHC.Tc.Errors.Ppr ( pprHsDocContext )
+import GHC.Types.Error ( mkPlainError )
 import GHC.Tc.Utils.Monad
 
 import GHC.Types.Name.Reader
@@ -995,6 +996,10 @@ rnHsTyKi env ty@(XHsType (HsBangTy _ bang (L _ inner))) = do
 rnHsTyKi _ (XHsType HsTypeLambda{}) = do
   enabled <- xoptM LangExt.ExperimentalDependentTypes
   failWithTc (if enabled then TcRnTypeLambdaContext else TcRnTypeLambdaDisabled)
+
+rnHsTyKi _ (XHsType HsTypeSome{}) =
+  failWithTc (mkTcRnUnknownMessage (mkPlainError []
+    (text "A retained dependent sum is supported in a top-level type synonym right-hand side.")))
 
 -- A bare case pattern prefers a data constructor, as before. Resolve it
 -- after the declaration group is in scope. If the data name is absent,
@@ -2679,6 +2684,9 @@ extract_lty (L _ ty) acc
         filter (\v -> Just (unLoc v) /= (unLoc <$> alias)) (extract_lty body []) ++ acc
       XHsType (HsTypeLet _ binder rhs body)
                                   -> extract_lty rhs
+                                       (filter ((/= unLoc binder) . unLoc) (extract_lty body []) ++ acc)
+      XHsType (HsTypeSome _ binder domain body)
+                                  -> extract_lty domain
                                        (filter ((/= unLoc binder) . unLoc) (extract_lty body []) ++ acc)
       XHsType {}                  -> acc
       -- We deal with these separately in rnLHsTypeWithWildCards

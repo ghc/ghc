@@ -48,7 +48,7 @@ import qualified GHC.Data.BooleanFormula as BF
 import GHC.Data.FastString
 import qualified GHC.Data.Strict as Strict
 import GHC.Hs.Decls.Overlap (OverlapMode(..))
-import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLambda, HsTypeLet, HsTypeCase, HsTypeCaseAlias, HsTypeCaseHead, HsTypeExists), HsTypeCaseAlt(..)) -- Required for HsConDetails type-family instances
+import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLambda, HsTypeLet, HsTypeCase, HsTypeCaseAlias, HsTypeCaseHead, HsTypeExists, HsTypeSome), HsTypeCaseAlt(..)) -- Required for HsConDetails type-family instances
 import GHC.TypeLits
 import GHC.Types.ForeignCall
 import GHC.Types.InlinePragma (ActivationGhc, inlinePragmaActivation, inlinePragmaSource)
@@ -4142,6 +4142,16 @@ instance ExactPrint (HsType GhcPs) where
     return (XHsType (HsTypeCase (case_tok', of_tok') braces' scrutinee' alts'))
   exact (XHsType (HsTypeCaseHead name)) =
     XHsType . HsTypeCaseHead <$> markAnnotated name
+  exact (XHsType (HsTypeSome (some, open, signature, close, bar) binder domain body)) = do
+    some' <- markEpToken some
+    open' <- markEpToken open
+    binder' <- markAnnotated binder
+    signature' <- markEpUniToken signature
+    domain' <- markAnnotated domain
+    close' <- markEpToken close
+    bar' <- markEpToken bar
+    body' <- markAnnotated body
+    return (XHsType (HsTypeSome (some', open', signature', close', bar') binder' domain' body'))
   exact (XHsType (HsTypeCaseAlias generated alias body)) =
     XHsType . HsTypeCaseAlias generated alias <$> markAnnotated body
   exact (XHsType (HsTypeExists (exists, bar) binder body)) = do

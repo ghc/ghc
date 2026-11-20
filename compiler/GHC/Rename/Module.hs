@@ -22,7 +22,7 @@ import {-# SOURCE #-} GHC.Rename.Expr( rnLExpr )
 import {-# SOURCE #-} GHC.Rename.Splice ( rnSpliceDecl, rnTopSpliceDecls )
 
 import GHC.Hs
-import GHC.Hs.Type (mkHsImplicitSigType, HsTypeGhcPsExt(HsTypeCase, HsTypeCaseAlias, HsTypeLet), HsTypeCaseAlt(..))
+import GHC.Hs.Type (mkHsImplicitSigType, HsTypeGhcPsExt(HsTypeCase, HsTypeCaseAlias, HsTypeLet, HsTypeSome), HsTypeCaseAlt(..))
 import GHC.Hs.Decls.Overlap ( OverlapMode(..) )
 import GHC.Iface.Env ( lookupOrig )
 
@@ -126,10 +126,16 @@ equations, so a constructor pattern cannot fix a kind variable for
 every branch. Preserve the written forall binders. Give closed captures
 parameters before that telescope. Keep the normal inference path when
 a capture's kind depends on the enclosing context.
+
+A retained dependent sum uses the same lifting. Lower
+some (x :: A) | B to Sigma A with the lifted lambda for B. The
+name Sigma comes from GHC.Sigma in the configured base unit.
+The witness domain stays outside the lambda scope. Sigma's
+payload parameter checks the kind of the lifted family.
 -}
 -- | Lift type lambdas from synonym right-hand sides. See Note [Lifting type lambdas].
-liftTypeLambdas :: HsGroup GhcPs -> (HsGroup GhcPs, [(OccName, OccName)])
-liftTypeLambdas group =
+liftTypeLambdas :: RdrName -> HsGroup GhcPs -> (HsGroup GhcPs, [(OccName, OccName)])
+liftTypeLambdas sigma group =
   let (groups, hidden) = unzip (map liftGroup (hs_tyclds group))
   in (group { hs_tyclds = groups }, concat hidden)
   where
@@ -165,6 +171,11 @@ liftTypeLambdas group =
       in (L loc (HsKindSig ann body' kind), families, next)
     liftRhs owner captures (L loc (XHsType (HsTypeLambda _ vars body))) salt =
       liftLambdaRhs owner captures loc vars body salt Nothing
+    liftRhs owner captures (L loc (XHsType (HsTypeSome _ binder domain body))) salt =
+      let (schema, families, next) = liftLambdaRhs owner captures loc [binder] body salt Nothing
+          sigma_ty = typeName (L (l2l loc) sigma)
+          app f arg = L loc (HsAppTy noExtField f arg)
+      in (app (app sigma_ty domain) schema, families, next)
     liftRhs owner captures ty salt =
       liftTypeChildren (liftRhs owner captures) ty salt
 
@@ -568,8 +579,11 @@ rnSrcDecls :: HsGroup GhcPs -> RnM (TcGblEnv, HsGroup GhcRn)
 -- Rename a top-level HsGroup; used for normal source files *and* hs-boot files
 rnSrcDecls group = do
   enabled <- xoptM LangExt.ExperimentalDependentTypes
-  let (with_cases, case_names) = if enabled then liftTypeCases group else (group, [])
-      (expanded, lambda_names) = if enabled then liftTypeLambdas with_cases else (group, [])
+  dflags <- getDynFlags
+  let sigma_mod = mkModule (RealUnit (Definite (baseUnitId dflags))) (mkModuleName "GHC.Sigma")
+      sigma = mkOrig sigma_mod (mkTcOcc "Sigma")
+      (with_cases, case_names) = if enabled then liftTypeCases group else (group, [])
+      (expanded, lambda_names) = if enabled then liftTypeLambdas sigma with_cases else (group, [])
   rnSrcDeclsWithLambdas (case_names ++ [(fam, Just owner) | (fam, owner) <- lambda_names]) expanded
 
 -- | Rename the declarations and record the kind-inference edges of private families.

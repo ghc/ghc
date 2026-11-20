@@ -579,6 +579,9 @@ data HsTypeGhcPsExt
   -- An unquoted constructor head in a lifted type-case equation.
   | HsTypeCaseHead (LocatedN RdrName)
 
+  | HsTypeSome (EpToken "some", EpToken "(", EpUniToken "::" "∷", EpToken ")", EpToken "|")
+               (LocatedN RdrName) (LHsType GhcPs) (LHsType GhcPs)
+
 -- | A parsed constructor alternative in a type case.
 data HsTypeCaseAlt
   = HsTypeCaseAlt (LHsType GhcPs) (EpUniToken "->" "→") (LHsType GhcPs)
@@ -1683,6 +1686,9 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
         $$ nest 2 (vcat [ppr_mono_lty pat <+> arrow <+> ppr_mono_lty rhs
                        | L _ (HsTypeCaseAlt pat _ rhs) <- alts])
     HsTypeCaseHead name -> ppr name
+    HsTypeSome _ binder domain body ->
+      text "some" <+> parens (ppr binder <+> dcolon <+> ppr_mono_lty domain)
+        <+> char '|' <+> ppr_mono_lty body
     HsTypeCaseAlias _ _ body -> ppr_mono_lty body
     HsTypeExists _ b body -> text "exists" <+> ppr b <+> vbar <+> ppr_mono_lty body
     HsTypeLet _ v rhs body ->
@@ -1761,6 +1767,7 @@ hsTypeNeedsParens p = go_hs_ty
         HsRecTy{}   -> False
         HsTypeLambda{} -> False
         HsTypeCaseHead{} -> False
+        HsTypeSome{} -> p >= topPrec
         HsTypeCaseAlias{} -> p >= topPrec
         HsTypeExists{} -> p >= funPrec
         HsTypeLet{} -> p >= topPrec
