@@ -353,6 +353,18 @@ requires the kind of each selected variable to refer to earlier
 captures. If that requires a shadowed variable, leave the case in the
 source so the normal context check rejects it.
 
+A foreach telescope starts a new table too. Lift a case whose
+scrutinee names a retained binder. The synonym binds an erased
+index with the written domain as its kind. It receives the original
+runtime index at its application. The retained signature checker
+assigns that occurrence a runtime identity.
+See Note [Source retained signatures] in GHC.Tc.Gen.HsType.
+
+Check copied runtime domains for forms whose checking differs between
+types and kinds. A bare arrow defaults to unmatchable in a retained
+domain and can default to matchable in an erased binder kind. Leave
+the corresponding case at the written occurrence.
+
 For a constructor field, use the constructor's name and count sums
 from left to right. Use a separate prefix for constructor fields.
 The constructor name is unique in the module even when record labels
@@ -362,16 +374,20 @@ Use the same free-variable order as rnConDecl for implicit binders.
 Leave the constructor result and any context to ordinary newtype
 checking. Leave inner forall groups to the ordinary renamer.
 
-Copy only the erased parameters used by the expression and the parameters
+Copy only the parameters used by the expression and the parameters
 used in their written kinds. Keep their original order. Require each
 free variable to be in scope in the source signature or field. Otherwise
 kind inference for the synonym could bind a variable that is out of scope
 at the source occurrence.
 Skip types that contain splices or holes. A wildcard in a case pattern
-is part of the match. The traversal stops at retained binders.
+is part of the match.
 -}
 -- | Select the expressions that can be lifted at a declaration type position.
-data LiftedTypeSite = FieldTypeSite | SignatureTypeSite | ForallTypeSite
+data LiftedTypeSite
+  = FieldTypeSite
+  | SignatureTypeSite
+  | ForallTypeSite
+  | RetainedTypeSite [RdrName]
   deriving Eq
 
 -- | Prepare cases in top-level value signatures and sums in signatures and fields.
@@ -490,10 +506,20 @@ liftDeclarationTypes named_wildcards group
       | copyable ty = Just ("$signature-sum:", Nothing)
     liftedAnchor site (L _ (XHsType (HsTypeCase _ _ scrutinee alts)))
       | site /= FieldTypeSite
+      , caseScrutinee site scrutinee
       , copyable scrutinee
       , all copyableAlt alts
       = Just ("$signature-case:", signatureCaseKey scrutinee alts)
     liftedAnchor _ _ = Nothing
+
+    caseScrutinee (RetainedTypeSite names) scrutinee
+      | L _ (HsTyVar _ NotPromoted name) <- ignoreParens scrutinee
+      = unLoc name `elem` names
+    caseScrutinee RetainedTypeSite{} _ = False
+    caseScrutinee _ _ = True
+
+    retainedNames (RetainedTypeSite names) = names
+    retainedNames _ = []
 
     copyableAlt (L _ (HsTypeCaseAlt pat _ rhs)) =
       isJust (classifyTypeCasePattern pat) && copyable rhs
@@ -510,12 +536,23 @@ liftDeclarationTypes named_wildcards group
     hasWrittenKind (L _ (HsTvb _ _ HsBndrVar{} (HsBndrKind _ kind))) = copyable kind
     hasWrittenKind _ = False
 
+    innerScope site HsForAllTy{hst_tele = tele, hst_body = body}
+      | site == SignatureTypeSite || site == ForallTypeSite
+      , Just locals <- forallCaptures tele
+      = Just (ForallTypeSite, locals, body)
+    innerScope site HsForEachTy{hst_bndrs = binders, hst_body = body}
+      | site /= FieldTypeSite
+      , Just locals <- writtenCaptures binders
+      , not (null locals)
+      = Just (RetainedTypeSite (map (unLoc . snd) locals ++ retainedNames site), locals, body)
+    innerScope _ _ = Nothing
+
     liftBody site owner scope whole@(L loc _) (salt, seen)
       | Just (prefix, key) <- liftedAnchor site whole
       , let free = Set.fromList (map unLoc (extractHsTyRdrTyVars whole))
             (used, missing) = foldr select ([], free) scope
       , Set.null missing
-      , all (copyable . fst) used
+      , all (copyableCapture site) used
       = case key >>= (`lookup` seen) of
           Just occ -> (applyAnchor loc occ used, [], (salt + 1, seen))
           Nothing ->
@@ -525,14 +562,12 @@ liftDeclarationTypes named_wildcards group
                 alias = L loc (SynDecl noAnn name (mkHsQTvs (map fst used)) Prefix whole)
                 seen' = maybe seen (\k -> (k, occ) : seen) key
             in (applyAnchor loc occ used, [(alias, (occ, Nothing))], (salt + 1, seen'))
-    liftBody site owner scope (L loc quantified@HsForAllTy{hst_tele = tele, hst_body = body})
-             (salt, seen)
-      | site /= FieldTypeSite
-      , Just locals <- forallCaptures tele
+    liftBody site owner scope (L loc quantified) (salt, seen)
+      | Just (inner, locals, body) <- innerScope site quantified
       , let names = map (unLoc . snd) locals
       , null (findDupsEq (==) names)
       = let outer = filter (\(_, name) -> unLoc name `notElem` names) scope
-            (body', aliases, (next, _)) = liftBody ForallTypeSite owner
+            (body', aliases, (next, _)) = liftBody inner owner
                                           (outer ++ locals) body (salt, [])
         in (L loc quantified{hst_body = body'}, aliases, (next, seen))
     liftBody site owner scope (L loc (HsFunTy ann arrow arg result)) state =
@@ -564,6 +599,17 @@ liftDeclarationTypes named_wildcards group
       Just (L _ HsSpliceTy{}) -> False
       Just (L _ HsWildCardTy{}) -> False
       _ -> and (gmapQ copyable node)
+
+    copyableCapture site (binder, name) =
+      copyable binder && (unLoc name `notElem` retainedNames site || copyableDomain binder)
+
+    copyableDomain :: Data a => a -> Bool
+    copyableDomain node = case cast node :: Maybe (LHsType GhcPs) of
+      Just (L _ HsFunTy{}) -> False
+      Just (L _ HsOpTy{}) -> False
+      Just (L _ HsForAllTy{}) -> False
+      Just (L _ HsForEachTy{}) -> False
+      _ -> and (gmapQ copyableDomain node)
 
     typeName n = L (l2l (getLoc n)) (HsTyVar noAnn NotPromoted n)
 

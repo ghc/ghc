@@ -13,3 +13,8 @@ wrongShadow :: forall (b :: Bool). Proxy b
             -> (forall (b :: Bool). Proxy b
                 -> (case b of { True -> Int; False -> Char }))
 wrongShadow _ input _ = input
+
+differentRetained :: foreach (left :: Bool) -> foreach (right :: Bool)
+                  -> (case left of { True -> Int; False -> Char })
+                  -> (case right of { True -> Int; False -> Char })
+differentRetained _ _ input = input

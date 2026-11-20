@@ -73,6 +73,7 @@ grep -Fq "BadForall" bad.log
 reject NativeTypeCaseForallResult 4:60 '[GHC-97233]'
 reject NativeTypeCaseSignatureDistinct 9:26 '[GHC-83865]'
 grep -Fq 'NativeTypeCaseSignatureDistinct.hs:15:25: error: [GHC-83865]' bad.log
+grep -Fq 'NativeTypeCaseSignatureDistinct.hs:20:31: error: [GHC-83865]' bad.log
 grep -Fq 'the type case in the signature for' bad.log
 ! grep -Fq '$signature-case:' bad.log
 reject NativeTypeCaseScrutinee 4:15 'Not in scope: type constructor or class'
