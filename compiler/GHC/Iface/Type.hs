@@ -2940,11 +2940,12 @@ instance Binary IfaceMCoercion where
          _ -> panic ("get IfaceMCoercion " ++ show tag)
 
 -- | Minimum reader support for retained evidence in a serialized payload.
--- Later versions include the earlier forms. See Note [Versioning retained evidence]
+-- See Note [Versioning retained evidence]
 -- in GHC.Iface.Binary.
 data IfaceEvidenceVersion
   = NoRetainedEvidence | DepFunCoEvidence | ConstructorCaseEvidence | RetainedSpecRuleEvidence
   | IndexAliasEvidence | ErasedExistentialEvidence
+  | ScopedSigmaEvidence | CombinedScopedSigmaEvidence
   deriving (Eq, Ord)
 
 -- | Record a feature only while writing the full interface.
@@ -3121,6 +3122,8 @@ instance Binary IfaceAxiomRule where
   put_ bh (IfaceAR_X n) = do
     when (ifLclNameFS n `elem` [existsCoRuleName Nominal, existsCoRuleName Representational]) $
       requireIfaceEvidenceVersion bh ErasedExistentialEvidence
+    when (ifLclNameFS n == scopedSigmaClosureName) $
+      requireIfaceEvidenceVersion bh ScopedSigmaEvidence
     putByte bh 0
     put_ bh n
   put_ bh (IfaceAR_U n)   = putByte bh 1 >> put_ bh n

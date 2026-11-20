@@ -25,6 +25,7 @@ module GHC.Core.Coercion.Axiom (
        existsCoRuleName,
 
        CoAxiomRule(.., BuiltInEqRule), BuiltInFamRewrite(..), BuiltInFamInjectivity(..), TypeEqn,
+       scopedSigmaClosureName,
        coAxiomRuleArgRoles, coAxiomRuleRole,
        coAxiomRuleBranch_maybe, isNewtypeAxiomRule_maybe,
        ClosedTyFam(..), closedTyFamCoAxiom_maybe, BuiltinClosedTyFam(..),
@@ -647,6 +648,10 @@ data CoAxiomRule
 -- | The nominal rules for pairs take two nominal premises.
 pattern BuiltInEqRule :: FastString -> ([TypeEqn] -> Maybe TypeEqn) -> CoAxiomRule
 pattern BuiltInEqRule name proves = BuiltInRule name Nominal [Nominal, Nominal] proves
+
+-- | The stable interface key for the scoped retained-sum proof rule.
+scopedSigmaClosureName :: FastString
+scopedSigmaClosureName = fsLit "ScopedSigmaClosure"
 
 instance Eq CoAxiomRule where
   (BuiltInFamRew  bif1)  == (BuiltInFamRew  bif2)  = bifrw_name  bif1 == bifrw_name bif2

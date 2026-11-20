@@ -171,7 +171,8 @@ readBinIfaceHeaderVersion profile checkHiWay traceBinIFace hi_path = do
     wantedGot "Version" our_ver check_ver text
     let evidence = fromMaybe NoRetainedEvidence $
                    find (\v -> evidenceSuffix v `isSuffixOf` check_ver)
-                        [ ErasedExistentialEvidence, IndexAliasEvidence
+                        [ CombinedScopedSigmaEvidence, ScopedSigmaEvidence
+                        , ErasedExistentialEvidence, IndexAliasEvidence
                         , RetainedSpecRuleEvidence, ConstructorCaseEvidence, DepFunCoEvidence ]
         version = take (length check_ver - length (evidenceSuffix evidence)) check_ver
     unless (version `elem` [our_ver, enumCallbackIfaceVersion, finalCoreIfaceVersion,
@@ -322,6 +323,20 @@ evidenceSuffix ConstructorCaseEvidence  = "-retained-constructor-case-v1"
 evidenceSuffix RetainedSpecRuleEvidence = "-retained-specialisation-rule-v1"
 evidenceSuffix IndexAliasEvidence       = "-retained-index-alias-v1"
 evidenceSuffix ErasedExistentialEvidence = "-erased-existentials-v1"
+evidenceSuffix ScopedSigmaEvidence      = "-r04-scoped-sigma-experiment-v1"
+evidenceSuffix CombinedScopedSigmaEvidence = "-scoped-sigma-combined-v1"
+
+-- | Select a version that can read both parts of the interface.
+-- See Note [Versioning retained evidence].
+combineEvidenceVersions :: IfaceEvidenceVersion -> IfaceEvidenceVersion -> IfaceEvidenceVersion
+combineEvidenceVersions a b
+  | newer == ScopedSigmaEvidence
+  , older `elem` [IndexAliasEvidence, ErasedExistentialEvidence]
+  = CombinedScopedSigmaEvidence
+  | otherwise = newer
+  where
+    older = min a b
+    newer = max a b
 
 {- Note [Versioning retained evidence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -353,6 +368,16 @@ another interface. Select the version when writing each existential
 expression tag as well. An existential coercion can serialize an ordinary
 forall premise without an existential type tag. Select the version when
 writing either of its built-in rule names.
+
+A retained-sum codomain uses a scoped family tag. A consumer can also
+publish a proof that refers to the scoped equality rule. Either feature
+requires this reader. Mark each feature when it is written, including
+a proof in a consumer with no scoped family declarations. This
+experiment uses its own version suffix. Its reader supports generated
+specialization rules, constructor case evidence and dependent function
+coercions. It predates index aliases and erased existentials. An interface
+that also uses either feature needs a distinct header in both declaration
+orders. Each historical reader must reject the mixed payload early.
 -}
 
 
@@ -416,7 +441,7 @@ putIfaceWithExtFields traceBinIface compressionLevel bh mod_iface =
         locs -> writeFieldWith sourceTableField
                     (\h -> putWithUserData QuietBinIFace NormalCompression h locs) fields
       found <- newIORef NoRetainedEvidence
-      let notify _ required = modifyIORef' found (max required)
+      let notify _ required = modifyIORef' found (combineEvidenceVersions required)
           feature_bh = addWriterToUserData (mkWriter notify) bh
       forwardPutRel_ feature_bh (\_ -> put_ feature_bh fields') $
         putWithUserData traceBinIface compressionLevel feature_bh mod_iface

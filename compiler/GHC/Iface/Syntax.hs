@@ -2665,7 +2665,8 @@ instance Binary IfaceFamTyConFlav where
       case ctf of
         IfaceClosedTyFamTyCon mb      -> putByte bh 2 >> put_ bh mb
         IfaceAbstractClosedTyFamTyCon -> putByte bh 3
-        IfaceScopedClosedTyFamTyCon owner is_sum ax ->
+        IfaceScopedClosedTyFamTyCon owner is_sum ax -> do
+          requireIfaceEvidenceVersion bh ScopedSigmaEvidence
           putByte bh 4 >> put_ bh owner >> put_ bh is_sum >> put_ bh ax
         IfaceBuiltInClosedTyFamTyCon  ->
           pprPanic "Cannot serialize IfaceBuiltInClosedTyFamTyCon (pretty-printing only)" Outputable.empty

@@ -34,9 +34,6 @@ builtInCoAxiomRules =
       , existsCoRule Nominal, existsCoRule Representational
       , (scopedSigmaClosureName, scopedSigmaClosureRule) ]
 
-scopedSigmaClosureName :: FastString
-scopedSigmaClosureName = fsLit "ScopedSigmaClosure"
-
 scopedSigmaClosureRule :: CoAxiomRule
 scopedSigmaClosureRule = BuiltInEqRule scopedSigmaClosureName proves
   where
