@@ -408,8 +408,13 @@ For an expected `exists t. Bool -> Callback t`, the lambda
 `prepare :: Bool -> Callback PolyId`. GHC matches the invariant result
 types before it checks the lambda patterns. The usual lambda check then
 checks the operands and their usage. A pattern-local type cannot supply
-the outer witness. This case uses a single unguarded lambda and a result
-type available before checking its body.
+the outer witness. A guarded or multi-equation lambda uses the first
+matching result declaration in source order. Every guard and result
+checks against the same witness. For example, a declared consumer that
+takes a polymorphic callback and returns `Payload PolyId` can fix the
+witness for a different branch that constructs `Payload id atTwoTypes`.
+A branch with an incompatible result still reports a type error when
+its guard is unreachable.
 Leading visible type applications can choose input types when the
 declared result type is independent of the supplied type arguments.
 The ordinary checker checks those applications at their source spans.
