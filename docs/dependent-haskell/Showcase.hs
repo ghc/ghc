@@ -931,6 +931,8 @@ main = do
         (Refl :: LocalOpen.LazyFirst Char Bool :~: Char, LocalOpen.lazyFirst 'x' 'y')
     observe "open erased packages and leave an unused payload lazy"
         ErasedPackage.observation
+    observe "filter a vector without forcing the tail to learn the result length"
+        ErasedPackage.filterObservation
     observe "read the cells of a vector packaged with its length"
         (Refl :: E.readSomeVec ('E.SomeVec ('E.SS ('E.SS 'E.SZ))
                     ('IndexedVec.VCons 4 ('IndexedVec.VCons 5 'IndexedVec.VNil))) :~: '[4, 5])

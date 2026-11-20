@@ -1,4 +1,4 @@
--- | Built-in nominal rules that can occur in an interface coercion.
+-- | Built-in rules that can occur in an interface coercion.
 module GHC.Builtin.CoercionRules
   ( builtInCoAxiomRules
   , boxedPairCompositionRule, matchBoxedPairComposition
@@ -10,7 +10,7 @@ import GHC.Prelude
 
 import GHC.Builtin.WiredIn.TypeLits (typeNatCoAxiomRules)
 import GHC.Builtin.WiredIn.Types (promotedTupleDataCon, tupleTyCon)
-import GHC.Core.Coercion (mkNomReflCo, mkSymCo)
+import GHC.Core.Coercion (existsCoRule, mkNomReflCo, mkSymCo)
 import GHC.Core.Coercion.Axiom
 import GHC.Core.TyCo.Rep (Coercion(AxiomCo))
 import GHC.Core.TyCo.Compare (eqType, eqTypes)
@@ -28,8 +28,10 @@ import Control.Monad (guard)
 -- | Resolve the stable names written to the interface by CoreToIface.
 builtInCoAxiomRules :: UniqFM FastString CoAxiomRule
 builtInCoAxiomRules =
-    addToUFM (addToUFM typeNatCoAxiomRules boxedPairCompositionName boxedPairCompositionRule)
-             boxedPairReconstructionName boxedPairReconstructionRule
+    foldl' (\rules (name, rule) -> addToUFM rules name rule) typeNatCoAxiomRules
+      [ (boxedPairCompositionName, boxedPairCompositionRule)
+      , (boxedPairReconstructionName, boxedPairReconstructionRule)
+      , existsCoRule Nominal, existsCoRule Representational ]
 
 {- Note [Strict boxed pair composition]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

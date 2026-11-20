@@ -1405,7 +1405,7 @@ tyConsOfType ty
      go_ax (UnbranchedAxiom ax) = go_tc $ coAxiomTyCon ax
      go_ax (BranchedAxiom ax _) = go_tc $ coAxiomTyCon ax
      go_ax (BuiltInFamRew  bif) = go_tc $ bifrw_fam_tc bif
-     go_ax (BuiltInEqRule {})   = emptyUniqSet
+     go_ax (BuiltInRule {})     = emptyUniqSet
      go_ax (BuiltInFamInj {})   = emptyUniqSet  -- A free-floating axiom
 
 tyConsOfTypes :: [Type] -> UniqSet TyCon

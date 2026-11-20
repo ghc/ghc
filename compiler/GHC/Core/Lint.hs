@@ -886,12 +886,11 @@ lintCoreExpr (Lit lit)
 lintCoreExpr (Pack package_ty witness payload)
   = do { lintType package_ty
        ; lintType witness
-       ; lintL (typeKind witness `eqType` liftedTypeKind) $
-           text "Pack witness must have kind Type:" <+> ppr witness
        ; (payload_ty, usage) <- markAllJoinsBad (lintCoreExpr payload)
        ; case coreFullView package_ty of
            ExistsTy a body ->
-             do { lintL (substTyWith [a] [witness] body `eqType` payload_ty) $
+             do { ensureEqTys (varType a) (typeKind witness) (text "Pack witness has the wrong kind")
+                ; lintL (substTyWith [a] [witness] body `eqType` payload_ty) $
                     text "Pack payload does not match the witness:" <+> ppr payload_ty
                 ; return (package_ty, usage) }
            _ -> failWithL (text "Pack requires an existential type:" <+> ppr package_ty) }
@@ -900,7 +899,7 @@ lintCoreExpr (Unpack witness payload package body)
   = do { (package_ty, usage) <- markAllJoinsBad (lintCoreExpr package)
        ; case coreFullView package_ty of
            ExistsTy a payload_ty ->
-             do { lintL (isTyVar witness && varType witness `eqType` liftedTypeKind) $
+             do { lintL (isTyVar witness && varType witness `eqType` varType a) $
                     text "Invalid Unpack witness:" <+> ppr witness
                 ; lintTyCoBndr witness $
              do { lintL (isNonCoVarId payload && isManyTy (idMult payload) && not (isJoinId payload)) $
@@ -2205,8 +2204,8 @@ lintType (ExistsTy b body)
   = do { lintL (isTyVar b)
            (text "Existential binder is not a type variable:" <+> ppr b)
        ; lintBinder LambdaBind b $
-         do { lintL (varType b `eqType` liftedTypeKind)
-                (text "Existential binder must have kind Type:" <+> ppr b)
+         do { lintL (typeKind (varType b) `eqType` liftedTypeKind)
+                (text "Existential binder kind must itself have type Type:" <+> ppr b)
             ; lintType body
             ; lintL (typeKind body `eqType` liftedTypeKind)
                 (text "Existential payload must have kind Type:" <+> ppr body) } }
@@ -3045,7 +3044,7 @@ lintCoercion this_co@(AxiomCo ax cos)
                   [pr] -> isJust (bifinj_proves bif pr)
                   _    -> False)
                bad_bif
-    lint_ax (BuiltInEqRule _ proves) prs
+    lint_ax (BuiltInRule _ _ _ proves) prs
       = checkL (isJust (proves prs)) bad_bif
     lint_ax (UnbranchedAxiom ax) prs
       = lintBranch this_co (coAxiomTyCon ax) (coAxiomSingleBranch ax) prs

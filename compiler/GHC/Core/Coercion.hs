@@ -36,7 +36,8 @@ module GHC.Core.Coercion (
         mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo,
         mkFunCo, mkFunCo2, mkFunCoNoFTF, mkFunResCo,
         mkNakedFunCo,
-        mkNakedForAllCo, mkForAllCo, mkForAllVisCos,
+        mkNakedForAllCo, mkForAllCo, mkForAllVisCos, existsCoRule, isExistsCoRule,
+        existsCoScope, mkExistsCo,
         mkHomoForAllCo, mkHomoForAllCos, mkDepFunCo, mkDepFunCoWithDomain, mkDepFunCoWithVis, mkTermAppCo,
         nativeIndexCastCo_maybe, mapNativeIndexCastCo, mapNativeIndexCastCoM,
         mkPhantomCo, mkAxiomCo,
@@ -1856,6 +1857,60 @@ extendLiftingContextEx lc@(LC subst env native) ((v,ty):rest)
   = pprPanic "extendLiftingContextEx" (ppr v <+> text "|->" <+> ppr ty)
 
 
+{- Note [Lifting under an erased existential]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Proposal #473 calls the forward congruence for an existential ExistsCo.
+For filterVec, expanding the synonym Hidden a must lift the substitution
+for a under the hidden length binder. The witness remains erased.
+
+Use the existing forall coercion to bind the witness in the payload proof.
+It freshens the binder and transports its kind and occurrences on the right.
+The built-in rule changes the two forall endpoints into existentials. It
+checks the binder shape and requires lifted payloads. A nominal conclusion
+needs a nominal premise. A representational conclusion needs a
+representational premise. Phantom lifting uses mkPhantomCo as usual.
+
+An InstCo on the forall premise can relate the two payloads at any admissible
+witness. The existential uses that same witness on each side and has the
+representation of its payload. This gives only forward congruence. The rule
+cannot recover the witness of an existential package. Using the existing
+coercion binder also gives substitution, Core Lint and interface readback the
+same account of its scope.
+-}
+-- | Return the wire name and checked rule for existential congruence.
+existsCoRule :: Role -> (FastString, CoAxiomRule)
+existsCoRule role = (name, BuiltInRule name role [role] proves)
+  where
+    name = case role of
+      Nominal          -> fsLit "NominalExistsCo"
+      Representational -> fsLit "RepresentationalExistsCo"
+      Phantom          -> panic "existsCoRule: phantom lifting"
+    proves [Pair lhs rhs] = Pair <$> package lhs <*> package rhs
+    proves _ = Nothing
+    package (ForAllTy ma (Bndr tv vis) body)
+      | isTyVar tv
+      , isCoreTyLamForAllTyFlag vis
+      , ma `eqType` unmatchableDataConTy
+      , typeKind (varType tv) `eqType` liftedTypeKind
+      , typeKind body `eqType` liftedTypeKind
+      = Just (ExistsTy tv body)
+    package _ = Nothing
+
+-- | Detect existential congruence even when its premise contains only foralls.
+isExistsCoRule :: CoAxiomRule -> Bool
+isExistsCoRule rule@(BuiltInRule _ role [_] _)
+  | role /= Phantom = rule == snd (existsCoRule role)
+isExistsCoRule _ = False
+
+-- | Bind the common witness in the premise of existential congruence.
+existsCoScope :: TyVar -> Type -> Type
+existsCoScope v = mkForAllTy unmatchableDataConTy (Bndr v coreTyLamForAllTyFlag)
+
+-- | Lift a scoped payload equality at the role of its premise.
+-- See Note [Lifting under an erased existential].
+mkExistsCo :: Role -> Coercion -> Coercion
+mkExistsCo role scoped = AxiomCo (snd (existsCoRule role)) [scoped]
+
 -- | Erase the environments in a lifting context
 zapLiftingContext :: LiftingContext -> LiftingContext
 zapLiftingContext (LC subst _ _) = LC (zapSubst subst) emptyVarEnv emptyVarEnv
@@ -1890,6 +1945,12 @@ ty_co_subst !lc role ty
             -> downgradeRole r Nominal (mkTermAppCo f (go Nominal arg))
           _ -> pprPanic "ty_co_subst: native function head changed" (ppr ty)
     go r (TermVarTy v) = liftCoSubstNative lc r v
+    -- See Note [Lifting under an erased existential].
+    go r ty@(ExistsTy v body)
+      | isReflCo scoped = mkReflCo r (substTy (lcSubstLeft lc) ty)
+      | otherwise = mkExistsCo r scoped
+      where
+        scoped = go r (existsCoScope v body)
     go r (DepFunTy vis b body)
       | isNativeOpaqueValueId b
       = let (lc', b', delta) = liftCoSubstNativeBndrUsing id
@@ -2468,7 +2529,7 @@ coercion_lr_kind which orig_co
     go_ax axr@(BuiltInFamRew  bif) cos  = check_bif_res axr (bifrw_proves  bif (map coercionKind cos))
     go_ax axr@(BuiltInFamInj bif) [co]  = check_bif_res axr (bifinj_proves bif (coercionKind co))
     go_ax axr@(BuiltInFamInj {})  _     = crash axr
-    go_ax axr@(BuiltInEqRule _ proves) cos =
+    go_ax axr@(BuiltInRule _ _ _ proves) cos =
       check_bif_res axr (proves (map coercionKind cos))
     go_ax     (UnbranchedAxiom ax) cos  = go_branch ax (coAxiomSingleBranch ax) cos
     go_ax     (BranchedAxiom ax i) cos  = go_branch ax (coAxiomNthBranch ax i)  cos

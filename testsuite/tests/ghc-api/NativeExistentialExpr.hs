@@ -1,7 +1,7 @@
 module Main (main) where
 
 import Control.Exception (SomeException, displayException, evaluate, try)
-import Control.Monad (unless, void)
+import Control.Monad (forM_, unless, void)
 import Control.Monad.IO.Class (liftIO)
 import Data.List (isInfixOf)
 import Data.Maybe (isNothing)
@@ -9,11 +9,14 @@ import GHC hiding (exprType)
 import GHC.Builtin.KnownOccs (returnIOIdOcc)
 import GHC.Builtin.Modules (gHC_INTERNAL_BASE)
 import GHC.Builtin.WiredIn.Types
-    (boolTy, charTy, liftedTypeKind, manyDataConTy, maybeTyCon, mkListTy, trueDataConId)
+    (boolTy, charTy, liftedTypeKind, manyDataConTy, maybeTyCon, mkBoxedTupleTy, mkListTy, trueDataConId)
 import GHC.Core
     (Alt (..), AltCon (DEFAULT), Bind (NonRec), CoreExpr, Expr (..),
-     Unfolding (CoreUnfolding, uf_tmpl), UnfoldingCache (..), UnfoldingSource (VanillaSrc), mkApps)
+     Unfolding (CoreUnfolding, uf_tmpl), UnfoldingCache (..), UnfoldingSource (VanillaSrc), mkApps, mkLams)
+import GHC.Core.Coercion (liftCoSubst, mkCoVarCo, mkLiftingContext, mkSubCo)
+import GHC.Core.Coercion.Axiom (Role(..))
 import GHC.Core.Lint (lintExpr)
+import GHC.Core.Predicate (mkNomEqPred, mkReprEqPred)
 import GHC.Core.Make (mkCharExpr, mkListExpr, mkNothingExpr, mkRuntimeErrorApp, pAT_ERROR_ID)
 import GHC.Core.TyCo.Compare (eqType)
 import GHC.Core.TyCo.Rep (Type (ExistsTy, TyVarTy))
@@ -41,12 +44,12 @@ import GHC.Stg.Syntax (GenStgBinding (StgNonRec), GenStgExpr (StgApp, StgCase),
                        StgArg (StgVarArg), GenStgRhs (StgRhsClosure), GenStgTopBinding (StgTopLifted), StgTopBinding)
 import GHC.Tc.Utils.Monad (initIfaceLcl, initIfaceLoad)
 import GHC.Types.Id (mkExportedVanillaId, mkSysLocal, realIdUnfolding)
-import GHC.Types.Name (mkExternalName, mkSysTvName)
+import GHC.Types.Name (mkExternalName, mkSysTvName, mkSystemName)
 import GHC.Types.Name.Occurrence (mkVarOcc)
 import GHC.Types.SrcLoc (noSrcSpan)
 import GHC.Types.Unique (Unique, UniqueTag (PluginTag))
 import GHC.Types.Unique.Supply (mkSplitUniqSupply, uniqsFromSupply)
-import GHC.Types.Var (mkTyVar, varType)
+import GHC.Types.Var (mkCoVar, mkTyVar, varType)
 import GHC.Unit.Module (IsBootInterface (NotBoot), mkModule)
 import GHC.Unit.Module.ModIface (emptyFullModIface, mi_decls, set_mi_decls)
 import GHC.Unit.Types (mainUnit)
@@ -85,6 +88,30 @@ main = do
     returns True Defined "imported Unpack returns the body result for a defined package"
     throws False ForcePack "demanding Pack observes payload bottom"
     returns False Computed "Unpack leaves a computed package unevaluated"
+    checkLiftingReadback libdir (interfaceFile ++ ".lift")
+
+-- | Restore a package cast whose only evidence for its free parameter is a Given.
+checkLiftingReadback :: FilePath -> FilePath -> IO ()
+checkLiftingReadback libdir path = forM_ [(Nominal, mkNomEqPred), (Representational, mkReprEqPred)] $
+  \(role, predicate) -> do
+    ids <- uniqsFromSupply <$> mkSplitUniqSupply PluginTag
+    let l:r:w:t:c:x:top:_ = ids
+        tv u n = mkTyVar (mkSysTvName u (fsLit n)) liftedTypeKind
+        lhs = tv l "l"
+        rhs = tv r "r"
+        witness = tv w "w"
+        varying = tv t "t"
+        schema el = ExistsTy witness (mkBoxedTupleTy [TyVarTy witness, TyVarTy el])
+        given = mkCoVar (mkSystemName c (mkVarOcc "cv")) (predicate (TyVarTy lhs) (TyVarTy rhs))
+        co = liftCoSubst role (mkLiftingContext [(varying, mkCoVarCo given)]) (schema varying)
+        box = mkSysLocal (fsLit "box") x manyDataConTy (schema lhs)
+        core = mkLams [lhs, rhs, given, box] (Cast (Var box) (if role == Nominal then mkSubCo co else co))
+    session libdir $ \env _ -> writeConsumer env top path core
+    session libdir $ \env _ -> do
+        imported <- loadConsumer env path top core
+        unless (exprType imported `eqType` exprType core &&
+                isNothing (lintExpr (initLintConfig (hsc_dflags env) []) imported)) $
+            fail "existential congruence changed role or scope across an interface"
 
 session :: FilePath -> (HscEnv -> CoreExpr -> IO a) -> IO a
 session libdir action = runGhc (Just libdir) $ do

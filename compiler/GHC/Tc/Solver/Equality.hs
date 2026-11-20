@@ -609,6 +609,13 @@ can_eq_nc _rewritten _rdr_env _envs ev eq_rel
            s2@ForAllTy{} _
   = can_eq_nc_forall ev eq_rel s1 s2
 
+can_eq_nc _rewritten _rdr_env _envs ev eq_rel
+           s1@ExistsTy{} _
+           s2@ExistsTy{} _
+  | isWanted ev
+  = can_eq_nc_forall ev eq_rel s1 s2
+  -- See Note [Solving existential package equalities].
+
 -- (EQNC4) FunTy
 -- Decompose FunTy: (s -> t) and (c => t)
 -- NB: don't decompose (Int -> blah) ~ (Show a => blah)
@@ -935,12 +942,26 @@ See docs/dependent-haskell/REFERENCES.md#nominal-retained-domain-conversion.
 -}
 
 ---------------------------------
+{- Note [Solving existential package equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider toList (filterVec odd xs), where xs contains Int elements.
+The two functions refer to Filtered a = exists (m :: Nat) | Vec m a.
+Their composition produces a Wanted between Filtered Int and Filtered alpha.
+
+Compare the payloads with a common fresh skolem for m. The ordinary
+forall-equality solver handles the binder kinds, touchability and escape
+checks. In this example it can solve alpha := Int independently of m.
+After zonking, use existential congruence to close the proof and check
+both endpoints against the original packages. Use the original types for
+an unsolved Wanted. Given package equalities do not reveal witnesses.
+See Note [Lifting under an erased existential] in GHC.Core.Coercion.
+-}
 can_eq_nc_forall :: CtEvidence -> EqRel
                  -> Type -> Type    -- LHS and RHS
                  -> TcS (StopOrContinue (Either IrredCt EqCt))
 -- See Note [Solving forall equalities]
 
-can_eq_nc_forall ev eq_rel s1 s2
+can_eq_nc_forall ev eq_rel orig1 orig2
  | CtWanted {} <- ev
  , Just (_, tv1, _) <- splitForAllTyCoVar_maybe s1
  , Just (_, tv2, _) <- splitForAllTyCoVar_maybe s2
@@ -1059,10 +1080,10 @@ can_eq_nc_forall ev eq_rel s1 s2
 
       ; mb_all_co <- if solved
           then do { mb_co <- zonk_forall_co all_co
-                  ; left <- zonkTcType s1
-                  ; right <- zonkTcType s2
+                  ; left <- zonkTcType orig1
+                  ; right <- zonkTcType orig2
                   ; return $ do
-                      co <- mb_co
+                      co <- close <$> mb_co
                       guard (coercionLKind co `tcEqType` left
                              && coercionRKind co `tcEqType` right)
                       return co }
@@ -1079,7 +1100,7 @@ can_eq_nc_forall ev eq_rel s1 s2
                      -- emptyCoHoleSet: fully solved, so all_co has no holes
                 ; stopWith ev "Polytype equality: solved" }
 
-        Nothing -> canEqSoftFailure IrredShapeReason ev s1 s2 } }
+        Nothing -> canEqSoftFailure IrredShapeReason ev orig1 orig2 } }
 
  | otherwise
  = do { traceTcS "Omitting decomposition of given polytype equality" $
@@ -1087,6 +1108,11 @@ can_eq_nc_forall ev eq_rel s1 s2
       ; stopWith ev "Discard given polytype equality" }
 
  where
+    (s1, s2, close) = case (orig1, orig2) of
+      (ExistsTy a t, ExistsTy b u) ->
+        (existsCoScope a t, existsCoScope b u, mkExistsCo (eqRelRole eq_rel))
+      _ -> (orig1, orig2, id)
+
     -- See Note [CoVar forall touchability] in GHC.Tc.Solver.Monad.
     solve_forall_wanteds :: CoVarSet -> Cts -> TcS WantedConstraints
     solve_forall_wanteds cvs wanteds
