@@ -20,6 +20,7 @@ preludeIdentityHead :: Proxy x -> Proxy xs
                    -> PreludeIdentityMap (x ': xs) :~: (x ': PreludeIdentityMap xs)
 preludeIdentityHead _ _ = Refl
 
--- | Inspect both proofs under the rewrite policy that certifies them.
+-- | Show the empty result and both callbacks at a known head.
 showPreludeMapProofs :: String
-showPreludeMapProofs = show (preludeNil, preludeNegateHead (Proxy :: Proxy '[]))
+showPreludeMapProofs = show (preludeNil, preludeNegateHead (Proxy :: Proxy '[]),
+          preludeIdentityHead (Proxy :: Proxy 'True) (Proxy :: Proxy '[]))

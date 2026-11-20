@@ -38,7 +38,10 @@ lazyIdentityHead xs = case Prelude.filter id (True : xs) of
     True : _ -> True
     _ -> False
 
--- | Observe both proofs under the rewrite policy that permits the equations.
+-- | Show both branches and the demand on the tail for each predicate.
 showPreludeFilterProofs :: String
 showPreludeFilterProofs =
-    show (keepFalse (Proxy :: Proxy '[]), skipTrue (Proxy :: Proxy '[]), lazyHead undefined)
+    show ((keepFalse nil, skipTrue nil, lazyHead undefined),
+          (keepTrue nil, skipFalse nil, lazyIdentityHead undefined))
+  where
+    nil = Proxy :: Proxy '[]

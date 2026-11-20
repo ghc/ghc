@@ -1149,9 +1149,9 @@ main = do
         (OpenMapProof.ordinaryRedStops (Proxy @'[]))
     observe "use Prelude.not on a known head with an unknown tail"
         (InstalledNotProof.negateHead (Proxy @'[]))
-    putStrLn ("use Prelude.map and Prelude.not on an empty list and an unknown tail: "
+    putStrLn ("map Prelude.not and Prelude.id over a known head and an unknown tail: "
               ++ PreludeMapProof.showPreludeMapProofs)
-    putStrLn ("filter a known head and leave the tail lazy: "
+    putStrLn ("filter with Prelude.not and Prelude.id without forcing the kept tail: "
               ++ PreludeFilterProof.showPreludeFilterProofs)
     observe "use a checked cons rule without forcing the callback, head or tail"
         (ConsRuleMapProof.negateHead (Proxy @'[]), ConsRuleMapProof.lazySpine)
