@@ -2514,6 +2514,21 @@ However, there are two twists:
 
 -}
 
+{- Note [Callback arrows in inferred synonym kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider `type S f = (f Bool, D (Type %U -> Type) f)`, where D's
+second argument has the kind given by its first argument. Checking
+`f Bool` needs an arrow shape before the enclosing kind solver can
+use the second occurrence of `f` to fix its matchability.
+
+Give the missing arrow a matchability variable. Register it with the
+enclosing kind solver, which solves the constraints on the inferred
+binder kinds and defaults an unresolved kind arrow to M. The nested
+synonym solver still handles RHS metadata separately. An arrow whose
+shape is already known needs no variable. Rechecking the RHS uses the
+inferred kind, including the selected matchability.
+-}
+
 ------------------------------------------------------------------------
 kcLTyClDecl :: Bool -> LTyClDecl GhcRn -> TcM (Maybe (Name, SynonymMetadata))
   -- See Note [Kind checking for type and class decls]
@@ -2525,18 +2540,24 @@ kcLTyClDecl collect_metadata (L loc decl)
        ; metadata <- addVDQNote tycon $   -- See Note [Inferring visible dependent quantification]
          addErrCtxt (tcMkDeclCtxt decl) $
          case decl of
-           SynDecl{tcdRhs = rhs} | collect_metadata -> tcExtendNameTyVarEnv (tcTyConScopedTyVars tycon) $
+           SynDecl{tcdRhs = rhs} | collect_metadata -> tcExtendNameTyVarEnv (tcTyConScopedTyVars tycon) $ do
+             outer_owner <- tcl_kind_arrow_defaults <$> getLclEnv
+             -- See Note [Callback arrows in inferred synonym kinds]
+             let callback_arrow = fmap (\(defaults, _) -> do
+                   ma <- newFlexiTyVar matchabilityTy
+                   updTcRef defaults ((ma, KindLevel) :)
+                   pure (mkTyVarTy ma)) outer_owner
              inferSynonymMatchabilities $ do
-             ref <- newTcRef []
-             let choose name n = do
-                   indices <- replicateM n (newFlexiTyVar matchabilityTy)
-                   owner <- tcl_kind_arrow_defaults <$> getLclEnv
-                   forM_ owner $ \(defaults, _) -> updTcRef defaults (map (, TypeLevel) indices ++)
-                   let vars = mkTyVarTys indices
-                   updTcRef ref ((name, vars) :)
-                   pure vars
-             _ <- tcCheckSynonymMetadata choose rhs (tyConResKind tycon)
-             Just . (tc_name,) . reverse <$> readTcRef ref
+               ref <- newTcRef []
+               let choose name n = do
+                     indices <- replicateM n (newFlexiTyVar matchabilityTy)
+                     owner <- tcl_kind_arrow_defaults <$> getLclEnv
+                     forM_ owner $ \(defaults, _) -> updTcRef defaults (map (, TypeLevel) indices ++)
+                     let vars = mkTyVarTys indices
+                     updTcRef ref ((name, vars) :)
+                     pure vars
+               _ <- tcCheckSynonymMetadata choose callback_arrow rhs (tyConResKind tycon)
+               Just . (tc_name,) . reverse <$> readTcRef ref
            _ -> kcTyClDecl decl tycon >> pure Nothing
        ; traceTc "kcTyClDecl done }" (ppr tc_name)
        ; return metadata }
@@ -3974,7 +3995,7 @@ tcTySynRhs metadata roles_info tc_name hs_ty
                                (owner, tys) : next | owner == name, length tys == n ->
                                  writeTcRef ref next >> pure tys
                                _ -> pprPanic "synonym metadata sites changed" (ppr name)
-                       ty <- tcCheckSynonymMetadata choose hs_ty res_kind
+                       ty <- tcCheckSynonymMetadata choose Nothing hs_ty res_kind
                        rest <- readTcRef ref
                        unless (null rest) $ pprPanic "unused synonym metadata sites" (ppr tc_name)
                        pure ty

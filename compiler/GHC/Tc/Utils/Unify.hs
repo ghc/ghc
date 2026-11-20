@@ -3883,7 +3883,7 @@ causing this wibble in behavior seen here.
 -- | Breaks apart a function kind into its pieces.
 matchExpectedFunKind
   :: TypedThing     -- ^ type, only for errors
-  -> Bool            -- ^ Infer matchabilities of missing arrows
+  -> Maybe (TcM Matchability) -- ^ Create matchabilities for missing arrows
   -> Arity           -- ^ n: number of desired arrows
   -> TcKind          -- ^ fun_kind
   -> TcM Coercion    -- ^ co :: fun_kind ~ (arg1 -> ... -> argn -> res)
@@ -3897,7 +3897,7 @@ Try one nominal family step. Use its coercion only if it exposes a
 visible arrow. The next step then consumes an argument. For a stuck
 family, keep the usual constraint and its source location.
 -}
-matchExpectedFunKind hs_ty infer_matchability n k = go n k
+matchExpectedFunKind hs_ty missing_arrow n k = go n k
   where
     go 0 k = return (mkNomReflCo k)
 
@@ -3931,10 +3931,10 @@ matchExpectedFunKind hs_ty infer_matchability n k = go n k
     defer n k
       = do { arg_kinds <- newMetaKindVars n
            ; res_kind  <- newMetaKindVar
-           ; new_fun <- if infer_matchability
-                        then do { mas <- replicateM n (newFlexiTyVarTy matchabilityTy)
-                                ; return (mkVisFunTysMany (zip mas arg_kinds) res_kind) }
-                        else return (mkVisFunTysManyM arg_kinds res_kind)
+           ; new_fun <- case missing_arrow of
+                          Just fresh -> do { mas <- replicateM n fresh
+                                           ; return (mkVisFunTysMany (zip mas arg_kinds) res_kind) }
+                          Nothing -> return (mkVisFunTysManyM arg_kinds res_kind)
            ; let origin  = TypeEqOrigin { uo_actual    = k
                                         , uo_expected  = new_fun
                                         , uo_thing     = Just hs_ty

@@ -189,6 +189,16 @@ On GHC 9.14.1 the original sources give the following results. Both
 fork compilers give the same outcomes after the source change.
 [Proposal #242 synonym defaults](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#rhs-of-type-synonyms).
 
+The kind of an unsigned synonym's callback parameter can come from a bare
+use of that parameter. In `type AppliedFirst f = (f Bool, D (Type %U -> Type) f)`,
+the second component fixes the arrow of `f` to U. Both component orders
+work with a callback imported through a stripped interface. In
+`type AppliedDefault f = (Proxy f, f Bool)`, neither component fixes
+matchability, so the callback kind keeps its M default. Conflicting
+nominal uses still report GHC-83865.
+[DependentArrowMatchability](../../../testsuite/tests/dependent/diagnostics/DependentArrowMatchability.hs).
+
+
 | Source | Result |
 | --- | --- |
 | [T11523](../../../testsuite/tests/polykinds/T11523.hs), [T12055](../../../testsuite/tests/polykinds/T12055.hs), [T14939](../../../testsuite/tests/polykinds/T14939.hs) | Compile successfully. |

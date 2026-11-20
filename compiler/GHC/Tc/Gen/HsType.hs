@@ -1595,7 +1595,7 @@ data TcTyMode
              , mode_indices :: NameEnv Id
              , mode_pending_calls :: Maybe (NameEnv TcTyVar, PendingSigCalls, TcRef [TcPendingTypeCall])
                -- See Note [Pending calls in partial signatures] in GHC.Tc.Solver.
-             , mode_synonym_metadata :: Maybe (Name -> Int -> TcM [Type])
+             , mode_synonym_metadata :: Maybe (Name -> Int -> TcM [Type], Maybe (TcM Matchability))
              , mode_complete_type_arg :: Maybe Bool }
                -- Nothing outside a visible type argument. Just records
                -- completeness of the whole argument, not the current child.
@@ -2432,11 +2432,12 @@ familyKindUsesMatchability tc b =
       (tyConResKind tc : map (tyVarKind . binderVar) (tyConBinders tc))
 
 -- | Check a synonym RHS with controlled instantiation of metadata.
-tcCheckSynonymMetadata :: (Name -> Int -> TcM [Type])
+tcCheckSynonymMetadata :: (Name -> Int -> TcM [Type]) -> Maybe (TcM Matchability)
                        -> LHsType GhcRn -> TcKind -> TcM TcType
-tcCheckSynonymMetadata get_indices rhs kind =
+tcCheckSynonymMetadata get_indices callback_arrow rhs kind =
   addTypeCtxt rhs $
-    tc_check_lhs_type (typeLevelMode {mode_synonym_metadata = Just get_indices}) rhs kind
+    tc_check_lhs_type
+      (typeLevelMode {mode_synonym_metadata = Just (get_indices, callback_arrow)}) rhs kind
 
 hasInferredMatchability :: TyCon -> Bool
 hasInferredMatchability tc
@@ -4187,7 +4188,7 @@ tcInferTyApps_nosat :: TypeOrKind -> Maybe Kind -> TcTyMode -> LHsType GhcRn -> 
 tcInferTyApps_nosat index_level expected_kind mode orig_hs_ty fun orig_hs_args
   = do { traceTc "tcInferTyApps {" (ppr orig_hs_ty $$ ppr orig_hs_args)
        ; fun <- case (mode_synonym_metadata mode, fun) of
-           (Just get_indices, TyConApp tc []) | hasInferredMatchability tc -> do
+           (Just (get_indices, _), TyConApp tc []) | hasInferredMatchability tc -> do
              args <- get_indices (tyConName tc)
                        (length (takeWhile inferredMatchabilityIndex (tyConBinders tc)))
              pure (mkTyConApp tc args)
@@ -4343,7 +4344,7 @@ tcInferTyApps_nosat index_level expected_kind mode orig_hs_ty fun orig_hs_args
         -> try_again_after_substing_or $
            do { let arrows_needed = n_initial_val_args all_args
               ; co <- matchExpectedFunKind (HsTypeRnThing $ unLoc hs_ty)
-                          (mode_family_arrow mode == InferUnsignedFamilyArrows) arrows_needed substed_fun_ki
+                          missing_arrow arrows_needed substed_fun_ki
 
               ; fun' <- liftZonkM $ zonkTcType (fun `mkCastTy` co)
                      -- This zonk is essential, to expose the fruits
@@ -4454,8 +4455,16 @@ tcInferTyApps_nosat index_level expected_kind mode orig_hs_ty fun orig_hs_args
       let deferred_mode = case mode_synonym_metadata mode of
             Just _ -> mode
             Nothing -> mode {mode_synonym_metadata =
-                       Just (\_ n -> replicateM n (fresh_kind_arrow TypeLevel defaults))}
+                       Just (\_ n -> replicateM n (fresh_kind_arrow TypeLevel defaults), Nothing)}
       in tc_check_lhs_type deferred_mode arg expected
+
+    missing_arrow
+      | InferUnsignedFamilyArrows <- mode_family_arrow mode =
+          Just (newFlexiTyVarTy matchabilityTy)
+      | Just (_, callback_arrow) <- mode_synonym_metadata mode
+      , L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ name))) <- ignoreParens orig_hs_ty
+      , isTyVarName name = callback_arrow
+      | otherwise = Nothing
 
     fresh_kind_arrow level defaults =
       do { ma <- newFlexiTyVar matchabilityTy
@@ -7800,12 +7809,14 @@ tcLHsFamilyResultKindSig = tc_lhs_kind_sig
   (kindLevelMode { mode_synonym_metadata = familyKindMetadata })
 
 -- | Give each checked kind application its own metadata variables.
-familyKindMetadata :: Maybe (Name -> Int -> TcM [Type])
-familyKindMetadata = Just $ \_ n -> do
-  vars <- replicateM n (newFlexiTyVar matchabilityTy)
-  owner <- tcl_kind_arrow_defaults <$> getLclEnv
-  forM_ owner $ \(_, indices) -> updTcRef indices (vars ++)
-  pure (mkTyVarTys vars)
+familyKindMetadata :: Maybe (Name -> Int -> TcM [Type], Maybe (TcM Matchability))
+familyKindMetadata = Just (indices, Nothing)
+  where
+    indices _ n = do
+      vars <- replicateM n (newFlexiTyVar matchabilityTy)
+      owner <- tcl_kind_arrow_defaults <$> getLclEnv
+      forM_ owner $ \(_, ref) -> updTcRef ref (vars ++)
+      pure (mkTyVarTys vars)
 
 tc_lhs_kind_sig :: TcTyMode -> UserTypeCtxt -> LHsKind GhcRn -> TcM Kind
 tc_lhs_kind_sig mode ctxt hs_kind
