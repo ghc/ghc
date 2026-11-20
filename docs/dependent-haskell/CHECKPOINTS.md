@@ -87,6 +87,13 @@ inspect one on the development machine, use `git show` with the full
 ref or commit. The [roadmap](ROADMAP.md#where-this-fork-stands) identifies
 which behavior is available in the published compiler.
 
+At `bbfc594ab3`, the installed filter and the scoped signature cases
+run together. Both stages reproduced the 309-line Showcase at `-O0`,
+default `-O1`, and default `-O2`. The self-hosted compiler also
+reproduced it in GHCi. All 16 focused tests passed. The dependent
+directory recorded 294 passes and 20 unexpected failures.
+[Interface upgrade](examples/open-evaluation/check-filter-scope-upgrade.sh).
+
 At `1928e531f9`, a top-level signature can repeat the same type-level case
 in its argument and result. A checked mapper can appear partially applied
 with a named callback when its object is present or when only its interface

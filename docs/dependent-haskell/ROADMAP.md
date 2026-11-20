@@ -9,6 +9,22 @@ records every edge. The R numbers are local labels for those cards.
 
 ## Where this fork stands
 
+A function can repeat the same type-level case in its argument and result.
+For `caseIdentity`, the result type is `Int` at `True` and `Bool` at
+`False`. The body simply returns its argument even while the index is
+unknown. An ordinary client reads the signature through the provider
+interface and obtains `(42,False)`. A second example checks that an outer
+index under a type family stays distinct from a shadowing pattern binder.
+A staged interpreter can use the arrow kind supplied by its caller to
+produce `(Just 3,Right 3)`.
+Both compiler stages reproduced all 311 Showcase lines at `-O0`,
+default `-O1`, and default `-O2`. The self-hosted compiler also
+reproduced them in GHCi. The finite-spine proof uses the same
+`size` function in the type and at runtime.
+[Value signature](examples/open-evaluation/NativeCase.hs),
+[scoped indices](examples/open-evaluation/NativeNestedCase.hs) and
+[staged interpreter](examples/open-evaluation/InterpretedKindUseSite.hs).
+
 An ordinary module proves that `Prelude.map` preserves the length of
 any finite list spine for any callback. The proof counts constructors
 with the same Haskell `size` function that the program calls at runtime.
@@ -113,9 +129,7 @@ only the producer interface and disables rewrite rules in the module
 that proves the equations. Keeping rewrite rules enabled reports
 GHC-83605 at the proof. A runtime check reads the kept head with an
 undefined tail. The Showcase checks the two proofs and this
-demand behavior. The bootstrap and self-hosted compilers reproduce the
-308-line output at `-O0`. The self-hosted compiler also reproduces it in
-GHCi and at default `-O1` and `-O2`.
+demand behavior.
 [Proof source](examples/open-evaluation/PreludeFilterProof.hs),
 [filter alias](examples/open-evaluation/PreludeFilterSource.hs)
 and [Showcase](Showcase.hs).
