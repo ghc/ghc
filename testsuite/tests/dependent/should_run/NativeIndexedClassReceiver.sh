@@ -60,13 +60,24 @@ cat >LateReceiverClient.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes #-}
 module LateReceiverClient (main) where
 
+import Control.Monad (unless)
+import IndexedMap (getCells)
 import LateReceiver (fromKey, hiddenContents)
 
-cells :: [Maybe Bool]
+direct, cells :: [Maybe Bool]
+direct = getCells (fromKey False)
 cells = hiddenContents (fromKey False)
 
+isTrue :: [Maybe Bool] -> Bool
+isTrue xs = xs == [Just True]
+
+asArgument :: Bool
+asArgument = isTrue (getCells (fromKey False))
+
 main :: IO ()
-main = print cells
+main = do
+    unless (isTrue direct && asArgument) (fail "unexpected direct receiver contents")
+    print cells
 HS
 
 cat >TypedReceiverClient.hs <<'HS'

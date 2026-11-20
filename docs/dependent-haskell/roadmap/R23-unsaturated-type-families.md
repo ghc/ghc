@@ -603,12 +603,13 @@ See [Note [Decomposing AppTy equalities]](../../../compiler/GHC/Tc/Solver/Equali
 
 A separate test hides the result application behind a type family. A
 functional dependency on the receiver's class fixes the index during
-constraint solving. This version checks in both modes. With the direct
-projection `getCells (fromKey False) :: [Maybe Bool]`, Quick Look can
-choose `Maybe` before the class constraint is solved. The direct call
-checks with Quick Look disabled. Its `Choose Bool Maybe` error with
-Quick Look predates the solver change. Section 3.1 describes
-result-directed instantiation in [A Quick Look at Impredicativity](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf).
+constraint solving. The direct projection
+`getCells (fromKey False) :: [Maybe Bool]` and the version with a result
+family check in both modes. Quick Look only splits an application
+comparison when both consumed arrows are matchable. This leaves the
+receiver index open until the functional dependency supplies it. Section
+3.1 describes result-directed instantiation in
+[A Quick Look at Impredicativity](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf).
 
 The Showcase prints `([Just True,Nothing],[Just True,Nothing])` for the
 named family receiver and the named `Maybe` receiver.
