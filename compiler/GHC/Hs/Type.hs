@@ -538,6 +538,7 @@ type HsCoreTy = Type
 -- | Renamed type extensions that need kind checking.
 data HsTypeGhcRnExt
   = HsCoreTyRn HsCoreTy
+  | HsTypeExistsRn (LHsTyVarBndr Specificity GhcRn) (LHsType GhcRn)
   | HsTypeLetRn (LocatedN Name) (LHsType GhcRn) (LHsType GhcRn)
   | HsTypeCaseAliasRn (Name, Int, Maybe (LocatedN Name)) (LHsType GhcRn)
 
@@ -560,6 +561,8 @@ data HsTypeGhcPsExt
   | HsTypeLambda (EpToken "(", EpToken "\\", EpUniToken "->" "→", EpToken ")")
                  [LocatedN RdrName] (LHsType GhcPs)
 
+  | HsTypeExists (EpToken "exists", EpToken "|")
+      (LHsTyVarBndr Specificity GhcPs) (LHsType GhcPs)
   | HsTypeLet (EpToken "let", EpToken "=", EpToken "in") (LocatedN RdrName)
               (LHsType GhcPs) (LHsType GhcPs)
 
@@ -811,6 +814,7 @@ hsTypeHasNoAnonWildcards lty = go lty
       HsTyLit{} -> True
       HsTyVar{} -> True
       HsStarTy{} -> True
+      XHsType (HsTypeExistsRn binder body) -> hsTyVarBndrHasNoAnonWildcards binder && go body
       XHsType{} -> True
 
     gos = all go
@@ -1680,12 +1684,14 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
                        | L _ (HsTypeCaseAlt pat _ rhs) <- alts])
     HsTypeCaseHead name -> ppr name
     HsTypeCaseAlias _ _ body -> ppr_mono_lty body
+    HsTypeExists _ b body -> text "exists" <+> ppr b <+> vbar <+> ppr_mono_lty body
     HsTypeLet _ v rhs body ->
       text "let" <+> ppr v <+> equals <+> ppr_mono_lty rhs
         <+> text "in" <+> ppr_mono_lty body
   GhcRn -> case t of
     HsCoreTyRn ty -> ppr ty
     HsTypeCaseAliasRn _ body -> ppr_mono_lty body
+    HsTypeExistsRn b body -> text "exists" <+> ppr b <+> vbar <+> ppr_mono_lty body
     HsTypeLetRn v rhs body ->
       text "let" <+> ppr v <+> equals <+> ppr_mono_lty rhs
         <+> text "in" <+> ppr_mono_lty body
@@ -1756,11 +1762,13 @@ hsTypeNeedsParens p = go_hs_ty
         HsTypeLambda{} -> False
         HsTypeCaseHead{} -> False
         HsTypeCaseAlias{} -> p >= topPrec
+        HsTypeExists{} -> p >= funPrec
         HsTypeLet{} -> p >= topPrec
         HsTypeCase{} -> p >= topPrec
       GhcRn -> case t of
         HsCoreTyRn ty -> go_core_ty ty
         HsTypeCaseAliasRn{} -> p >= topPrec
+        HsTypeExistsRn{} -> p >= funPrec
         HsTypeLetRn{} -> p >= topPrec
 
     go_core_ty (TyVarTy{})    = False

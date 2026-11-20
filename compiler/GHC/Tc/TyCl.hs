@@ -6879,6 +6879,10 @@ checkValidRoles tc
           check_ty_roles (extendVarEnv env v Nominal) role body
       | otherwise = pprPanic "check_ty_roles: invalid retained binder" (ppr ty)
 
+    check_ty_roles env _ (ExistsTy v body)
+      = check_ty_roles env Nominal (varType v)
+      >> check_ty_roles (extendVarEnv env v Nominal) Nominal body
+
     check_ty_roles env role (TyVarTy tv)
       = case lookupVarEnv env tv of
           Just role' -> unless (role' `ltRole` role || role' == role) $

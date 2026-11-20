@@ -1101,6 +1101,21 @@ zonkExpr (XExpr (ExpandedThingTc (HSE thing e)))
        return $ XExpr (ExpandedThingTc (HSE thing e'))
 
 -- See Note [Checked opaque case alias] in GHC.Hs.Expr.
+zonkExpr (XExpr (NativeExistsPack schema witness payload))
+  = do { schema' <- zonkTcTypeToTypeX schema
+       ; witness' <- zonkTcTypeToTypeX witness
+       ; payload' <- zonkLExpr payload
+       ; return (XExpr (NativeExistsPack schema' witness' payload')) }
+
+zonkExpr (XExpr (NativeExistsUnpack witness payload result_ty package body))
+  = do { result_ty' <- zonkTcTypeToTypeX result_ty
+       ; package' <- zonkLExpr package
+       ; runZonkBndrT (do { witness' <- zonkTyBndrX witness
+                          ; payload' <- zonkIdBndrX payload
+                          ; return (witness', payload') }) $ \(witness', payload') ->
+         do { body' <- zonkLExpr body
+            ; return (XExpr (NativeExistsUnpack witness' payload' result_ty' package' body')) } }
+
 zonkExpr (XExpr (NativeCaseAlias scrut value proof result_ty body))
   = do { scrut' <- zonkLExpr scrut
        ; result_ty' <- zonkTcTypeToTypeX result_ty
@@ -1918,6 +1933,14 @@ zonkCoreExpr (Case scrut b ty alts)
          ; runZonkBndrT (zonkIdBndrX b) $ \ b' ->
       do { alts' <- mapM zonkCoreAlt alts
          ; return $ Case scrut' b' ty' alts' } }
+zonkCoreExpr (Pack schema witness payload)
+    = Pack <$> zonkTcTypeToTypeX schema
+           <*> zonkTcTypeToTypeX witness <*> zonkCoreExpr payload
+zonkCoreExpr (Unpack witness payload package body)
+    = do { package' <- zonkCoreExpr package
+         ; runZonkBndrT (zonkTyBndrX witness) $ \witness' ->
+           runZonkBndrT (zonkIdBndrX payload) $ \payload' ->
+             Unpack witness' payload' package' <$> zonkCoreExpr body }
 
 zonkCoreAlt :: CoreAlt -> ZonkTcM CoreAlt
 zonkCoreAlt (Alt dc bndrs rhs)

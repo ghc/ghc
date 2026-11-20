@@ -838,6 +838,11 @@ rnIfaceExpr (IfaceCo co) = IfaceCo <$> rnIfaceCo co
 rnIfaceExpr (IfaceTuple sort args) = IfaceTuple sort <$> rnIfaceExprs args
 rnIfaceExpr (IfaceLam lam_bndr expr)
     = IfaceLam <$> rnIfaceLamBndr lam_bndr <*> rnIfaceExpr expr
+rnIfaceExpr (IfacePack schema witness payload)
+    = IfacePack <$> rnIfaceType schema <*> rnIfaceType witness <*> rnIfaceExpr payload
+rnIfaceExpr (IfaceUnpack witness value package body)
+    = IfaceUnpack <$> rnIfaceTvBndr witness <*> rnIfaceIdBndr value
+                  <*> rnIfaceExpr package <*> rnIfaceExpr body
 rnIfaceExpr (IfaceApp fun arg)
     = IfaceApp <$> rnIfaceExpr fun <*> rnIfaceExpr arg
 rnIfaceExpr (IfaceCase scrut case_bndr alts)
@@ -952,6 +957,8 @@ rnIfaceType (IfaceTyVar   n)   = pure (IfaceTyVar n)
 rnIfaceType (IfaceTermVar n)   = pure (IfaceTermVar n)
 rnIfaceType (IfaceTermAppTy fun arg) = IfaceTermAppTy fun <$> rnIfaceType arg
 rnIfaceType (IfaceFreeTermAppTy fun arg) = IfaceFreeTermAppTy fun <$> rnIfaceType arg
+rnIfaceType (IfaceExistsTy bndr body)
+    = IfaceExistsTy <$> rnIfaceTvBndr bndr <*> rnIfaceType body
 rnIfaceType (IfaceDepFunTy vis bndr body)
     = IfaceDepFunTy vis <$> rnIfaceIdBndr bndr <*> rnIfaceType body
 rnIfaceType (IfaceAppTy t1 t2)

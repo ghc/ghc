@@ -1843,6 +1843,10 @@ isTauTy ty | Just ty' <- coreView ty = isTauTy ty'
 isTauTy (TyVarTy _)       = True
 isTauTy (TermAppTy _ arg) = isTauTy arg
 isTauTy (TermVarTy _)     = True
+isTauTy ty@(ExistsTy binder body)
+  = isTauTy (varType binder) && isTauTy body
+    && noFreeVarsOfType ty && isFamFreeTy ty
+    -- See Note [Closed existential packages in type inference].
 isTauTy (DepFunTy {})     = False
 isTauTy (LitTy {})        = True
 isTauTy (TyConApp tc tys) = all isTauTy tys && isTauTyCon tc
@@ -1853,6 +1857,20 @@ isTauTy (FunTy { ft_af = af, ft_ma = ma, ft_mult = w, ft_arg = a, ft_res = b })
 isTauTy (ForAllTy {})     = False
 isTauTy (CastTy ty _)     = isTauTy ty
 isTauTy (CoercionTy _)    = False  -- Not sure about this
+
+{- Note [Closed existential packages in type inference]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A first-class existential package does not instantiate its bound witness
+when a polymorphic function returns the package. It is safe to assign
+a result metavariable to a closed package with a tau payload. The binder
+is not a forall, and the payload stays inside its scope.
+
+This first implementation only admits closed, family-free packages. A
+slow unification check can return reflexivity for the whole type.
+There are no free variables to promote or check for escape. The solver
+does not rewrite the payload or use a forall coercion for an existential.
+Continue to reject polymorphic payloads on the ordinary tau path.
+-}
 
 isAtomicTy :: Type -> Bool
 -- True if the type is just a single token, and can be printed compactly
@@ -1954,6 +1972,7 @@ isFamFreeTy ty | Just ty' <- coreView ty = isFamFreeTy ty'
 isFamFreeTy (TyVarTy _)       = True
 isFamFreeTy (TermAppTy _ arg) = isFamFreeTy arg
 isFamFreeTy (TermVarTy _)     = True
+isFamFreeTy (ExistsTy b ty) = isFamFreeTy (varType b) && isFamFreeTy ty
 isFamFreeTy (DepFunTy _ b ty) = isFamFreeTy (varType b) && isFamFreeTy ty
 isFamFreeTy (LitTy {})        = True
 isFamFreeTy (TyConApp tc tys) = all isFamFreeTy tys && isFamFreeTyCon tc
@@ -2728,6 +2747,7 @@ typeKind (TermAppTy f _)        = case nativeIndexFunctionTys_maybe f of
   Just (_, res) -> res
   Nothing -> pprPanic "typeKind: invalid native function" (ppr f)
 typeKind (TermVarTy v)          = varType v
+typeKind (ExistsTy {})           = liftedTypeKind
 typeKind (DepFunTy {})          = liftedTypeKind
 typeKind (CastTy _ty co)        = coercionRKind co
 typeKind (CoercionTy co)        = coercionType co

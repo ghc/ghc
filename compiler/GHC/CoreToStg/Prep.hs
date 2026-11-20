@@ -877,6 +877,17 @@ cpeBodyF env (Tick tickish expr)
              | otherwise
              = tickish
 
+cpeBodyF env (Pack schema witness payload)
+  = do { payload' <- cpeBody env payload
+       ; return (emptyFloats, Pack (cpSubstTy env schema) (cpSubstTy env witness) payload') }
+
+cpeBodyF env (Unpack witness value package body)
+  = do { package' <- cpeBody env package
+       ; (witness_env, witness') <- cpCloneBndr env witness
+       ; (body_env, value') <- cpCloneBndr witness_env value
+       ; body' <- cpeBody body_env body
+       ; return (emptyFloats, Unpack witness' value' package' body') }
+
 cpeBodyF env (Cast expr co)
    = do { (floats, expr') <- cpeBodyF env expr
         ; return (floats, Cast expr' (cpSubstCo env co)) }
@@ -1958,6 +1969,9 @@ Wrinkles:
 -- This is where we arrange that a non-trivial argument is let-bound
 cpeArg :: CorePrepEnv -> Demand
        -> CoreArg -> UniqSM (Floats, CpeArg)
+cpeArg env dmd (Pack schema witness payload)
+  = do { (floats, atom) <- cpeArg env dmd payload
+       ; return (floats, Pack (cpSubstTy env schema) (cpSubstTy env witness) atom) }
 cpeArg env dmd arg
   = do { (floats1, arg1) <- cpeBodyF env arg     -- arg1 can be a lambda
        ; let arg_ty = exprType arg1

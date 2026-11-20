@@ -820,6 +820,13 @@ rewrite_one ty@(DepFunTy vis b body)
   | otherwise
   = liftTcS $ failTcS $ TcRnRetainedQuantificationError (RetainedSolverType ty)
 
+-- Keep the checked package opaque. Rewriting its payload would require
+-- existential coercion evidence. Its outer kind is already Type.
+rewrite_one ty@ExistsTy{}
+  = do { ty' <- liftTcS $ zonkTcType ty
+       ; role <- getRole
+       ; return $! mkReflRedn role ty' }
+
 rewrite_one xi@(LitTy {})
   = do { role <- getRole
        ; return $! mkReflRedn role xi }

@@ -211,6 +211,9 @@ toIfaceTypeX fr (TermAppTy fun arg)
   | otherwise = IfaceTermAppTy (mkIfLclName (occNameFS (getOccName fun))) arg'
   where
     arg' = toIfaceTypeX fr arg
+toIfaceTypeX fr (ExistsTy var body)
+  = IfaceExistsTy (toIfaceTvBndrX fr var)
+                  (toIfaceTypeX (fr `delVarSet` var) body)
 toIfaceTypeX fr (DepFunTy vis var res)
   = IfaceDepFunTy vis (toIfaceIdBndrX fr var)
                   (toIfaceTypeX (fr `delVarSet` var) res)
@@ -665,6 +668,11 @@ toIfaceExpr (Lit l)         = IfaceLit l
 toIfaceExpr (Type ty)       = IfaceType (toIfaceType ty)
 toIfaceExpr (Coercion co)   = IfaceCo   (toIfaceCoercion co)
 toIfaceExpr (Lam x b)       = IfaceLam (toIfaceBndr x, toIfaceOneShot x) (toIfaceExpr b)
+toIfaceExpr (Pack schema witness payload)
+  = IfacePack (toIfaceType schema) (toIfaceType witness) (toIfaceExpr payload)
+toIfaceExpr (Unpack witness value package body)
+  = IfaceUnpack (toIfaceTvBndr witness) (toIfaceIdBndr value)
+                (toIfaceExpr package) (toIfaceExpr body)
 toIfaceExpr (App f a)       = toIfaceApp f [a]
 toIfaceExpr (Case s x ty as)
   | null as                 = IfaceECase (toIfaceExpr s) (toIfaceType ty)

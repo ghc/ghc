@@ -57,7 +57,8 @@ import GHC.Core.Multiplicity
 import GHC.Core.FamInstEnv( normaliseType )
 import GHC.Core.Class   ( Class )
 import GHC.Core.Coercion( mkSymCo )
-import GHC.Core.Type (mkStrLitTy, mkCastTy)
+import GHC.Core.Type (mkStrLitTy, mkCastTy, coreFullView)
+import GHC.Core.TyCo.Rep (Type(ExistsTy))
 import GHC.Core.TyCo.Ppr( pprTyVars )
 import GHC.Core.TyCo.Tidy( tidyOpenTypeX )
 
@@ -1332,10 +1333,15 @@ checkInferredRetainedTypes local_value infos
     check_info info@(MBI { mbi_poly_name = name, mbi_mono_id = mono_id })
       = setSrcSpan (nameSrcSpan name) $
         do { ty <- liftZonkM $ zonkTcType (idType mono_id)
-           ; when (hasNativeDependentExpr (Type ty)) $
+           ; when (hasNativeDependentExpr (Type ty) && not (closed_package ty)) $
                if local_value && isNothing (mbi_sig info) && isTauTy ty
                then checkValidType (InfSigCtxt name) ty
                else failWithTc $ TcRnRetainedQuantificationError (RetainedInference ty) }
+
+    closed_package ty
+      | ExistsTy _ payload <- coreFullView ty
+      = isTauTy ty && not (hasNativeDependentExpr (Type payload))
+      | otherwise = False
 
 {- Note [Inference of retained types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1350,6 +1356,11 @@ bindings too, with the exception in Note [Scoped inferred native values]. Keep
 complete signatures on their checking path, including those in a binding group.
 Ordinary inferred functions whose types contain no native syntax are unchanged.
 See Note [Rigid retained indices] in GHC.Tc.Utils.Unify.
+
+A closed erased package is a monotype when its payload is a family-free
+tau type. Let a saturated Pack with a supplied schema synthesize this type.
+Keep the retained type check for native syntax in its payload. See
+Note [Closed existential packages in type inference] in GHC.Core.Type.
 
 Note [Scoped inferred native values]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

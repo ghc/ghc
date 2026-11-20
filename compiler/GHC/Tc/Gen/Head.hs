@@ -73,6 +73,8 @@ import GHC.Utils.Outputable as Outputable
 
 import GHC.Data.Maybe
 
+import Control.Monad (when)
+
 {- *********************************************************************
 *                                                                      *
               HsExprArg: auxiliary data type
@@ -453,7 +455,9 @@ tcInferAppHead_maybe :: HsExpr GhcRn
 -- XExpr's although complicated needs to be looked through, useful for QL things when
 -- the argument is an XExpr
 tcInferAppHead_maybe fun = case fun of
-      HsVar _ nm              -> Just <$> tcInferId nm
+      HsVar _ nm@(L _ (WithUserRdr _ name)) ->
+        do { pack <- isExistsPackName name
+           ; if pack then return Nothing else Just <$> tcInferId nm }
       ExprWithTySig _ e hs_ty -> Just <$> tcExprWithSig e hs_ty
       HsOverLit _ lit         -> Just <$> tcInferOverLit lit
       XExpr (HsRecSelRn f)    -> Just <$> tcInferRecSelId f
@@ -687,7 +691,9 @@ tcInferId lname@(L loc (WithUserRdr rdr id_name))
 
 tc_infer_id :: LocatedN (WithUserRdr Name) -> TcM (HsExpr GhcTc, TcSigmaType)
 tc_infer_id (L loc (WithUserRdr rdr id_name))
- = do { thing <- tcLookup id_name
+ = do { pack <- isExistsPackName id_name
+      ; when pack $ failWithTc (TcRnExistsPack ExistsPackInvalidContext)
+      ; thing <- tcLookup id_name
       ; (expr,ty) <- case thing of
              ATcId { tct_id = id }
                -> do { check_local_id id

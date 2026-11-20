@@ -262,6 +262,13 @@ substExpr subst expr
     go (Lit lit)       = Lit lit
     go (App fun arg)   = App (go fun) (go arg)
     go (Tick tickish e) = mkTick (substTickish subst tickish) (go e)
+    go (Pack package_ty witness payload)
+      = Pack (substTyUnchecked subst package_ty) (substTyUnchecked subst witness) (go payload)
+    go (Unpack witness payload package body)
+      = Unpack witness' payload' (go package) (substExpr body_subst body)
+      where
+        (witness_subst, witness') = substBndr subst witness
+        (body_subst, payload') = substBndr witness_subst payload
     go (Cast e co)     = Cast (go e) (mapNativeIndexCastCo (substCo subst) co)
        -- Do not optimise even identity coercions
        -- Reason: substitution applies to the LHS of RULES, and

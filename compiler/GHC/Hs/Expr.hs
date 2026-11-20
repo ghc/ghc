@@ -691,6 +691,12 @@ data XXExprGhcTc
 
   | ExpandedThingTc (HsExpansion GhcTc) -- ^ Typechecked expanded expression
 
+  -- | Checked schema, type witness and payload of an explicit package.
+  | NativeExistsPack Type Type (LHsExpr GhcTc)
+
+  -- | Scoped witness and payload binders, outer result type, package and body.
+  | NativeExistsUnpack TyVar Id Type (LHsExpr GhcTc) (LHsExpr GhcTc)
+
   | NativeCaseAlias (LHsExpr GhcTc) Id CoVar Type (LHsExpr GhcTc)
       -- See Note [Checked opaque case alias].
 
@@ -1135,6 +1141,15 @@ instance Outputable XXExprGhcTc where
   ppr (ExpandedThingTc hse)
     = ppr_hse hse
 
+  ppr (NativeExistsPack schema witness payload)
+    = sep [ text "Pack" <+> char '@' <> parens (ppr schema)
+          , parens (text "type" <+> ppr witness), ppr payload ]
+
+  ppr (NativeExistsUnpack witness payload _ package body)
+    = sep [ text "case" <+> ppr package
+          , text "of Pack" <+> parens (text "type" <+> ppr witness)
+                           <+> ppr payload <+> arrow, ppr body ]
+
   ppr (NativeCaseAlias scrut value proof _ body)
     = sep [ text "<native-case-alias>" <+> ppr scrut
           , text "of" <+> ppr value <+> brackets (ppr proof) <+> text "->"
@@ -1182,6 +1197,8 @@ ppr_infix_expr_rn (HsRecSelRn f)            = Just (pprInfixOcc f)
 ppr_infix_expr_tc :: XXExprGhcTc -> Maybe SDoc
 ppr_infix_expr_tc (WrapExpr _ e)    = ppr_infix_expr e
 ppr_infix_expr_tc (ExpandedThingTc (HSE thing _))  = ppr_infix_hs_expansion thing
+ppr_infix_expr_tc (NativeExistsPack {})      = Nothing
+ppr_infix_expr_tc (NativeExistsUnpack {})    = Nothing
 ppr_infix_expr_tc (NativeCaseAlias {})       = Nothing
 ppr_infix_expr_tc (NativeLetAlias {})        = Nothing
 ppr_infix_expr_tc (ConLikeTc con)            = Just (pprInfixOcc (conLikeName con))
@@ -1274,6 +1291,8 @@ hsExprNeedsParens prec = go
     go_x_tc :: XXExprGhcTc -> Bool
     go_x_tc (WrapExpr _ e)                   = hsExprNeedsParens prec e
     go_x_tc (ExpandedThingTc (HSE thing _))  = hsExpandedNeedsParens thing
+    go_x_tc (NativeExistsPack {})            = prec >= appPrec
+    go_x_tc (NativeExistsUnpack {})          = prec > topPrec
     go_x_tc (NativeCaseAlias {})             = prec > topPrec
     go_x_tc (NativeLetAlias {})              = prec > topPrec
     go_x_tc (ConLikeTc {})                   = False
@@ -1328,6 +1347,8 @@ isAtomicHsExpr (XExpr x)
     go_x_tc :: XXExprGhcTc -> Bool
     go_x_tc (WrapExpr _ e)            = isAtomicHsExpr e
     go_x_tc (ExpandedThingTc (HSE thing _)) = isAtomicExpandedThingRn thing
+    go_x_tc (NativeExistsPack {})     = False
+    go_x_tc (NativeExistsUnpack {})   = False
     go_x_tc (NativeCaseAlias {})      = False
     go_x_tc (NativeLetAlias {})       = False
     go_x_tc (ConLikeTc {})            = True

@@ -1,0 +1,7 @@
+imported Unpack ignores a bottom package argument
+named Unpack erases to the original STG Id
+Pack passes the original payload as an STG argument
+imported Unpack demands the payload only when its body does
+imported Unpack returns the body result for a defined package
+demanding Pack observes payload bottom
+Unpack leaves a computed package unevaluated

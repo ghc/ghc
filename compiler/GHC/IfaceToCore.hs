@@ -1721,6 +1721,7 @@ tcIfaceDomainShape (IfaceDepFunTy _vis (mult, _, arg) res)
   = NativePiDomain <$> tcIfaceDomainShape mult
                    <*> tcIfaceDomainShape arg
                    <*> tcIfaceDomainShape res
+tcIfaceDomainShape IfaceExistsTy{} = return NativeInvalidDomain
 tcIfaceDomainShape IfaceForAllTy{} = return NativeInvalidDomain
 tcIfaceDomainShape IfaceLitTy{} = return NativeInvalidDomain
 tcIfaceDomainShape _ = return NativeUnknownDomain
@@ -1927,6 +1928,12 @@ tcIfaceType = go
                         $$ text "Actual type:" <+> ppr (varType v)
                         $$ text "Actual multiplicity:" <+> ppr (idMult v))
            ; return (TermVarTy v) }
+    go (IfaceExistsTy bndr@(name, _) body)
+      = bindIfaceTyVar bndr $ \tv -> do
+          check_exists_kind name (text "binder") (varType tv)
+          body' <- go body
+          check_exists_kind name (text "payload") (typeKind body')
+          return (ExistsTy tv body')
     go (IfaceDepFunTy vis bndr@(mult, name, domain) body)
       -- See Note [Retained binders in interfaces].
       -- See Note [Exported function-valued retained signatures] in GHC.Tc.Gen.HsType.
@@ -2049,15 +2056,28 @@ checkIfaceForAllMatchability ma
       failIfM (text "Invalid forall matchability in interface:" <+> ppr ma
                $$ text "Expected kind Matchability.")
 
+-- | Check the exact lifted kind without printing a possibly recursive Type.
+-- See Note [Positioning of forkM] and Note [Detected recursive native interface domains].
+check_exists_kind :: IfLclName -> SDoc -> Kind -> IfL ()
+check_exists_kind name part kind = do
+    valid <- evaluateIfaceValidation
+      (text "Cannot validate existential type in interface:" <+> ppr name)
+      (kind `eqType` liftedTypeKind)
+    unless valid $
+      failIfM (text "Existential" <+> part <+> text "must have kind Type:" <+> ppr name)
+
 -- | Evaluate native interface eligibility and report detected recursive knots.
 -- See Note [Detected recursive native interface domains].
 evaluateIfaceNativeDomain :: SDoc -> a -> IfL a
-evaluateIfaceNativeDomain name result
+evaluateIfaceNativeDomain name =
+  evaluateIfaceValidation (text "Cannot validate retained type in interface:" <+> name)
+
+evaluateIfaceValidation :: SDoc -> a -> IfL a
+evaluateIfaceValidation description result
   = do { checked <- liftIO (try (evaluate result))
        ; case checked of
            Left NonTermination ->
-             failIfM (text "Cannot validate retained type in interface:" <+> name
-                      $$ text "Validation encountered recursive type information.")
+             failIfM (description $$ text "Validation encountered recursive type information.")
            Right value -> return value }
 
 {- Note [Detected recursive native interface domains]
@@ -2333,6 +2353,40 @@ tcIfaceExpr (IfaceLam (bndr, os) body)
   where
     tcIfaceOneShot IfaceOneShot b = setOneShotLambda b
     tcIfaceOneShot _            b = b
+
+tcIfaceExpr (IfacePack schema witness payload)
+  = do { schema' <- tcIfaceType schema
+       ; witness' <- tcIfaceType witness
+       ; payload' <- tcIfaceExpr payload
+       ; when (isTyCoArg payload') $
+           failIfM (text "An existential Pack payload must be a term in interface.")
+       ; case coreFullView schema' of
+           ExistsTy a body
+             | typeKind witness' `eqType` liftedTypeKind
+             , substTyWith [a] [witness'] body `eqType` exprType payload'
+             -> return (Pack schema' witness' payload')
+           _ -> failIfM (text "Invalid existential Pack in interface.") }
+
+tcIfaceExpr (IfaceUnpack witness@(name, _) value package body)
+  = do { package' <- tcIfaceExpr package
+       ; when (isTyCoArg package') $
+           failIfM (text "An existential package must be a term in interface.")
+       ; case coreFullView (exprType package') of
+           ExistsTy a payload_ty ->
+             bindIfaceTyVar witness $ \witness' ->
+             bindIfaceId value $ \value' ->
+             do { check_exists_kind name (text "Unpack witness") (varType witness')
+                ; unless (isManyTy (idMult value')
+                          && substTyWith [a] [mkTyVarTy witness'] payload_ty `eqType` varType value') $
+                    failIfM (text "Invalid existential payload binder in interface.")
+                ; body' <- tcIfaceExpr body
+                ; when (isTyCoArg body') $
+                    failIfM (text "An existential Unpack body must be a term in interface.")
+                ; let result_fvs = tyCoVarsOfType (exprType body')
+                ; when (witness' `elemVarSet` result_fvs || value' `elemVarSet` result_fvs) $
+                    failIfM (text "Existential Unpack binder escapes its scope in interface.")
+                ; return (Unpack witness' value' package' body') }
+           _ -> failIfM (text "Unpack requires an existential package in interface.") }
 
 tcIfaceExpr (IfaceApp fun arg)
   = App <$> tcIfaceExpr fun <*> tcIfaceExpr arg
