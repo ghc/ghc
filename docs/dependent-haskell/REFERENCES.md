@@ -184,6 +184,13 @@ the manual does not prove those decisions correct in System FC.
   result to the fixed outer result type. Exhaustive proof-bearing Boolean cases
   are required. These checks do not establish termination. Optional totality
   checking is now a separate local task in the roadmap.
+- R05 extends the branch proof to imported constructor patterns with fields.
+  In Agda's `root` example, matching `sq m` determines the index from the
+  field `m`. In GHC, reading the optimized unfolding of `second` binds a
+  fresh witness and payload for `Pair`. It derives the nominal equality
+  from that constructor and those two fields. The interface stores the
+  branch binder names. See `Note [Native constructor evidence in interfaces]`
+  in `GHC.IfaceToCore`. [Agda 2.8.0, dot patterns](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#dot-patterns)
 - [With-abstraction equality](https://agda.readthedocs.io/en/v2.8.0.2/language/with-abstraction.html#with-abstraction-equality)
   explains how `with ... in eq` retains an equation for an inspected expression.
   It motivates keeping explicit refinement evidence until checked lowering.

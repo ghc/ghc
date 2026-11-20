@@ -38,7 +38,7 @@ import GHC.Core.Type
 import GHC.Core.Unfold.Make (mkCoreUnfolding)
 import GHC.Core.Unify (BindFlag (..), MaybeApartReason (..), UnifyResultM (..), alwaysBindFam, alwaysBindTv, tcMatchRetainedTyX_BM, tcMatchTy, tcMatchTyKi, tcMatchTyX_BM, tcMatchTys, tcUnifyTysFG)
 import GHC.Core.Utils (applyTypeToArgs, cheapEqExpr, dataConRepFSInstPat, dataConRepInstPat, exprType)
-import GHC.CoreToIface (toIfaceAlt, toIfaceCoercion, toIfaceExpr, toIfaceType, toIfaceTypeX)
+import GHC.CoreToIface (toIfaceAlt, toIfaceCoercion, toIfaceCoercionX, toIfaceExpr, toIfaceType, toIfaceTypeX)
 import GHC.Data.Bag (bagToList)
 import GHC.Data.FastString (fsLit)
 import GHC.Data.IOEnv (IOEnvFailure)
@@ -2756,6 +2756,36 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                                     Var value -> check (expressionLabel ++ " payload reference") (value == freshPayload)
                                     _ -> fail ("FAIL: " ++ expressionLabel ++ "; branch shape changed")
                     _ -> fail ("FAIL: " ++ expressionLabel ++ "; case expression shape changed")
+        let xs = local 12016 "interface_list" (mkListTy boolTy)
+            listName = mkIfLclName . fsLit
+            hd = listName "hd"
+            tl = listName "tl"
+            co = listName "list_proof"
+            consAlt names rhs = IfaceAlt (IfaceDataAlt (dataConName consDataCon)) names rhs
+            nilAlt = IfaceAlt (IfaceDataAlt (dataConName nilDataCon)) [] (toIfaceExpr trueExpr)
+            listCase alts = IfaceCase (toIfaceExpr (Var xs)) (listName "case_list") alts
+            goodCons = consAlt [hd, tl, co] (IfaceLcl hd)
+        forM_ [NormalCompression, SafeExtraCompression, MaximumCompression] $ \compression -> do
+            encoded <- roundtrip compression (listCase [nilAlt, goodCons])
+            decoded <- restoreExpr [xs] encoded
+            lintAccepts dflags "interface list case with nominal constructor evidence" [xs] decoded
+            case decoded of
+                Case _ _ _ [_, Alt (DataAlt con) [h, t, cv] (Var occurrence)] -> do
+                    check "interface list branch binds its head" (con == consDataCon && h == occurrence)
+                    let evidence = mkCoVarCo cv
+                    check "interface list branch binds nominal evidence" (coercionRole evidence == Nominal)
+                    checkType dflags "interface list branch uses the outer scrutinee" (TermVarTy xs) (coercionLKind evidence)
+                    checkType dflags "interface list branch uses its fresh fields"
+                        (mkTyConApp (promoteDataCon con) [boolTy, TermVarTy h, TermVarTy t]) (coercionRKind evidence)
+                _ -> fail "FAIL: interface list constructor evidence shape changed"
+        rejectsIfaceExpr "proof name collides with a constructor field"
+            "one distinct proof name" [xs] (listCase [nilAlt, consAlt [hd, tl, hd] (IfaceLcl hd)])
+        rejectsIfaceExpr "one constructor cannot read another constructor's field"
+            "Iface id out of scope" [xs] (listCase [IfaceAlt (IfaceDataAlt (dataConName nilDataCon)) [] (IfaceLcl hd), goodCons])
+        rejectsIfaceExpr "a proof must use a constructor of the actual scrutinee"
+            "Unsupported native index constructor domain" [xs]
+            (listCase [IfaceAlt IfaceDefaultAlt [] (toIfaceExpr trueExpr),
+                       IfaceAlt (IfaceDataAlt (dataConName trueDataCon)) [co] (toIfaceExpr trueExpr)])
         case toIfaceExpr variableCase of
             IfaceLam retained (IfaceLam value (IfaceCase scrut caseName [falseAlt, IfaceAlt trueCon [proofName] rhs])) -> do
                 let wrap scrutinee alternatives = IfaceLam retained (IfaceLam value (IfaceCase scrutinee caseName alternatives))
@@ -2764,7 +2794,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                         rejectsIfaceExpr label fragment [] decoded
                 reject
                     "extra interface proof names"
-                    "Native Boolean interface alternative must bind exactly one proof name"
+                    "Native index interface alternative requires constructor fields followed by one distinct proof name"
                     (wrap scrut [falseAlt, IfaceAlt trueCon [proofName, proofName] rhs])
                 forM_ [NormalCompression, SafeExtraCompression, MaximumCompression] $ \compression -> do
                     decoded <- roundtrip compression (wrap (IfaceApp (IfaceLam retained scrut) scrut) [falseAlt, IfaceAlt trueCon [proofName] rhs])
@@ -2780,12 +2810,12 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                         wrap (IfaceApp (toIfaceExpr (Var ifaceOpaqueProducer)) scrut) [falseAlt, IfaceAlt trueCon [proofName] rhs]
                 rejectsIfaceExpr
                     "unsupported opaque interface proof scrutinee"
-                    "Unsupported scrutinee for native Boolean interface evidence"
+                    "Unsupported scrutinee for native index interface evidence"
                     [ifaceOpaqueProducer]
                     opaqueProofCase
                 reject
                     "incomplete interface proof case"
-                    "Native Boolean interface proof alternatives must be exhaustive"
+                    "Native index interface proof alternatives must be exhaustive"
                     (wrap scrut [falseAlt])
                 reject
                     "interface DEFAULT cannot bind proof names"
@@ -2793,7 +2823,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                     (wrap scrut [IfaceAlt IfaceDefaultAlt [proofName] rhs, falseAlt, IfaceAlt trueCon [proofName] rhs])
                 reject
                     "interface literal cannot bind proof names"
-                    "Native Boolean interface literal alternative cannot bind names"
+                    "Interface literal alternative cannot bind names"
                     (wrap scrut [falseAlt, IfaceAlt trueCon [proofName] rhs, IfaceAlt (IfaceLitAlt (LitChar 'x')) [proofName] rhs])
                 reject
                     "interface proof cannot escape another alternative"
@@ -2809,7 +2839,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                     escaping = wrap scrut [falseAlt, IfaceAlt trueCon [proofName] (IfaceLam (escapeBinder, snd value) (IfaceLcl payloadName))]
                 reject
                     "interface result cannot mention the case binder"
-                    "Escaping binder in native Boolean interface result"
+                    "Escaping binder in native index interface result"
                     escaping
                 rejectsImportedUnfolding
                     "native import checks branch types without -dcore-lint"
@@ -3959,9 +3989,9 @@ runDepFunCoChecks dflags = do
     check "retained coercion diagnostics print its runtime binder" ("foreach" `isInfixOf` showSDoc dflags (ppr (toIfaceCoercion lifted)))
     writer <- Binary.openBinMem 16
     rejectsWith
-        "retained coercion diagnostic form cannot enter interface files"
-        "Native dependent coercion interfaces are not implemented"
-        (Binary.put_ writer (toIfaceCoercion lifted))
+        "a free diagnostic index inside a retained coercion cannot enter an interface"
+        "Can't serialise IfaceFreeTermVar"
+        (putWithUserData QuietBinIFace NormalCompression writer (toIfaceCoercionX (unitVarSet free) lifted))
     case mkDepFunCo b (mkNomReflCo (indexed (TermVarTy b))) of
         Refl ty -> checkType dflags "reflexive retained coercion simplifies" (mkDepFunTy b (indexed (TermVarTy b))) ty
         _ -> fail "FAIL: reflexive retained coercion did not simplify"
@@ -5164,7 +5194,7 @@ runCaseChecks dflags = do
     check "interfaces encode one Boolean proof name" $ case toIfaceAlt literalProofAlt of
         IfaceAlt (IfaceDataAlt _) [_] _ -> True
         _ -> False
-    rejectsWith "interface writer rejects extra Boolean proof binders" "toIfaceAlt: invalid native Boolean proof binder" $
+    rejectsWith "interface writer rejects extra Boolean proof binders" "toIfaceAlt: invalid native constructor proof binder" $
         evaluate (toIfaceAlt (Alt (DataAlt trueDataCon) [trueProof, falseProof] (Var payload)))
-    rejectsWith "interface writer rejects a Boolean payload binder" "toIfaceAlt: invalid native Boolean proof binder" $
+    rejectsWith "interface writer rejects a Boolean payload binder" "toIfaceAlt: invalid native constructor proof binder" $
         evaluate (toIfaceAlt (Alt (DataAlt trueDataCon) [payload] (Var payload)))

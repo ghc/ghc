@@ -141,7 +141,7 @@ import GHC.Iface.Errors.Types
 import Language.Haskell.Syntax.BooleanFormula (BooleanFormula)
 import Language.Haskell.Syntax.BooleanFormula qualified as BF(BooleanFormula(..))
 import Language.Haskell.Syntax.Extension (NoExtField (NoExtField))
-import GHC.Builtin.KnownKeys (ioTyConKey, falseDataConKey, trueDataConKey)
+import GHC.Builtin.KnownKeys (ioTyConKey)
 
 {-
 This module takes
@@ -2085,7 +2085,7 @@ native interface domains] for the diagnostic boundary around eligibility.
 
 IfaceFreeTermVar preserves an open Id only for diagnostics. It cannot enter
 this decoding path. Boolean branch proof reconstruction is described in
-Note [Native Boolean evidence in interfaces]. Module unfolding generation
+Note [Native constructor evidence in interfaces]. Module unfolding generation
 remains separately gated.
 -}
 
@@ -2329,28 +2329,25 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
         failIfM (text "Native index alias evidence has no interface codec:" <+> ppr names)
       _ -> return ()
     scrut' <- tcIfaceExpr scrut
-    -- Check before recovering types or decoding branch bodies.
-    -- See Note [Native Boolean evidence in interfaces].
-    let native_alt (IfaceAlt (IfaceDataAlt con) names _)
-          = not (null names) && (con `hasKey` falseDataConKey || con `hasKey` trueDataConKey)
+    -- Resolve each constructor once, before inspecting its representation arity.
+    resolved <- forM alts $ \ (IfaceAlt con names rhs) -> do
+      alt_con <- case con of
+        IfaceDefaultAlt   -> return DEFAULT
+        IfaceLitAlt lit   -> LitAlt <$> tcIfaceLit lit
+        IfaceDataAlt name -> DataAlt <$> tcIfaceDataCon name
+      return (alt_con, names, rhs)
+    let native_alt (DataAlt con, names, _) = isNativeIndexDataAlt con names
         native_alt _ = False
-        has_con key (IfaceAlt (IfaceDataAlt con) _ _) = con `hasKey` key
-        has_con _ _ = False
-        is_default (IfaceAlt IfaceDefaultAlt [] _) = True
-        is_default _ = False
-        native = any native_alt alts
+        has_alt con = any (\(c, _, _) -> c == con) resolved
+        scrut_index = exprToNativeIndex scrut'
+        native = any native_alt resolved
     when native $ do
-      when (isNothing (exprToBoolIndex scrut')) $
-        failIfM (text "Unsupported scrutinee for native Boolean interface evidence:" <+> ppr scrut')
-      unless (any is_default alts || (any (has_con falseDataConKey) alts
-                                     && any (has_con trueDataConKey) alts)) $
-        failIfM (text "Native Boolean interface proof alternatives must be exhaustive:" <+> ppr scrut')
-      forM_ alts $ \ (IfaceAlt con names _) -> case con of
-        IfaceDefaultAlt | not (null names) ->
-          failIfM (text "Native Boolean interface DEFAULT alternative cannot bind names:" <+> ppr names)
-        IfaceLitAlt _ | not (null names) ->
-          failIfM (text "Native Boolean interface literal alternative cannot bind names:" <+> ppr names)
-        _ -> return ()
+      when (isNothing scrut_index) $
+        failIfM (text "Unsupported scrutinee for native index interface evidence:" <+> ppr scrut')
+      unless (has_alt DEFAULT || case splitTyConApp_maybe (exprType scrut') of
+               Just (tc, _) | isAlgTyCon tc -> all (has_alt . DataAlt) (tyConDataCons tc)
+               _ -> False) $
+        failIfM (text "Native index interface proof alternatives must be exhaustive:" <+> ppr scrut')
     case_bndr_name <- newIfaceName (mkVarOccFS (ifLclNameFS case_bndr))
     let
         scrut_ty   = exprType scrut'
@@ -2366,17 +2363,17 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
                 --     corresponds to the datacon in this case alternative
 
     extendIfaceIdEnv [case_bndr'] $ do
-     alts' <- mapM (tcIfaceAlt scrut' case_mult tc_app) alts
+     alts' <- mapM (tcIfaceAlt scrut' scrut_index case_mult tc_app) resolved
      result_ty <- if native
        then do
          -- coreAltType panics on an escaping binder. Report the interface error.
          result_tys <- forM alts' $ \ (Alt con bs rhs) ->
            case occCheckExpand (case_bndr' : bs) (exprType rhs) of
              Just ty -> return ty
-             Nothing -> failIfM (text "Escaping binder in native Boolean interface result:" <+> ppr con)
+             Nothing -> failIfM (text "Escaping binder in native index interface result:" <+> ppr con)
          case result_tys of
            ty : _ -> return ty
-           [] -> failIfM (text "Native Boolean interface case has no alternatives")
+           [] -> failIfM (text "Native index interface case has no alternatives")
        else return (coreAltsType alts')
      return (Case scrut' case_bndr' result_ty alts')
 
@@ -2433,56 +2430,48 @@ tcIfaceLit :: Literal -> IfL Literal
 tcIfaceLit lit = return lit
 
 -------------------------
-tcIfaceAlt :: CoreExpr -> Mult -> (TyCon, [Type])
-           -> IfaceAlt
-           -> IfL CoreAlt
-tcIfaceAlt _ _ _ (IfaceAlt IfaceDefaultAlt names rhs)
-  = do
-    -- See Note [Native index alias evidence in interfaces].
-    unless (null names) $
-      failIfM (text "Native index alias evidence has no interface codec:" <+> ppr names)
-    rhs' <- tcIfaceExpr rhs
-    return (Alt DEFAULT [] rhs')
+tcIfaceAlt :: CoreExpr -> Maybe Type -> Mult -> (TyCon, [Type])
+           -> (AltCon, [IfLclName], IfaceExpr) -> IfL CoreAlt
+tcIfaceAlt _ _ _ _ (DEFAULT, names, rhs) = do
+  unless (null names) $
+    failIfM (text "Native index alias evidence has no interface codec:" <+> ppr names)
+  Alt DEFAULT [] <$> tcIfaceExpr rhs
 
-tcIfaceAlt _ _ _ (IfaceAlt (IfaceLitAlt lit) names rhs)
-  = assert (null names) $ do
-    lit' <- tcIfaceLit lit
-    rhs' <- tcIfaceExpr rhs
-    return (Alt (LitAlt lit') [] rhs')
+tcIfaceAlt _ _ _ _ (con@(LitAlt _), names, rhs) = do
+  unless (null names) $
+    failIfM (text "Interface literal alternative cannot bind names:" <+> ppr names)
+  Alt con [] <$> tcIfaceExpr rhs
 
--- A case alternative is made quite a bit more complicated
--- by the fact that we omit type annotations because we can
--- work them out.  True enough, but its not that easy!
-tcIfaceAlt scrut mult (tycon, inst_tys) (IfaceAlt (IfaceDataAlt data_occ) arg_strs rhs)
-  = do  { con <- tcIfaceDataCon data_occ
-        ; when (debugIsOn && not (con `elem` tyConDataCons tycon))
-               (failIfM (ppr scrut $$ ppr con $$ ppr tycon $$ ppr (tyConDataCons tycon)))
-        ; tcIfaceDataAlt scrut mult con inst_tys arg_strs rhs }
-
-tcIfaceDataAlt :: CoreExpr -> Mult -> DataCon -> [Type] -> [IfLclName] -> IfaceExpr
-               -> IfL CoreAlt
-tcIfaceDataAlt scrut mult con inst_tys arg_strs rhs
-  | not (null arg_strs)
-  , con `hasKey` falseDataConKey || con `hasKey` trueDataConKey
-  = do { proof_name <- case arg_strs of
-           [name] -> newIfaceName (mkVarOccFS (ifLclNameFS name))
-           _ -> failIfM (text "Native Boolean interface alternative must bind exactly one proof name:"
-                         <+> ppr con <+> ppr arg_strs)
-       ; index <- case exprToBoolIndex scrut of
-           Just index -> return index
-           Nothing -> failIfM (text "Unsupported scrutinee for native Boolean interface evidence:" <+> ppr scrut)
-       ; let cv = mkCoVar proof_name (mkNomEqPred index (mkTyConTy (promoteDataCon con)))
-       ; rhs' <- extendIfaceIdEnv [cv] (tcIfaceExpr rhs)
-       ; return (Alt (DataAlt con) [cv] rhs') }
+tcIfaceAlt scrut scrut_index mult (tycon, inst_tys) (DataAlt con, names, rhs)
+  | isNativeIndexDataAlt con names
+  = do { (field_names, proof_name) <- case splitAt (dataConRepArity con) names of
+           (fs, [p]) | p `notElem` fs -> return (fs, p)
+           _ -> failIfM (text "Native index interface alternative requires constructor fields followed by one distinct proof name:"
+                         <+> ppr con <+> ppr names)
+       ; index <- case scrut_index of
+           Just i  -> return i
+           Nothing -> failIfM (text "Unsupported scrutinee for native index interface evidence:" <+> ppr scrut)
+       ; tys <- case nativeIndexDataConTyArgs (exprType scrut) con of
+           Just args -> return args
+           Nothing   -> failIfM (text "Unsupported native index constructor domain:" <+> ppr con <+> ppr (exprType scrut))
+       ; uniqs <- getUniquesM
+       ; let (ex, fields) = dataConRepFSInstPat (map ifLclNameFS field_names) uniqs mult con tys
+             indices = map TermVarTy fields
+       ; unless (null ex && all isNativeOpaqueValueId fields && nativeIndexArgKinds con tys indices) $
+           failIfM (text "Invalid constructor fields in native index interface evidence:" <+> ppr con <+> ppr fields)
+       ; fresh <- newIfaceName (mkVarOccFS (ifLclNameFS proof_name))
+       ; let cv = mkCoVar fresh (mkNomEqPred index (mkTyConApp (promoteDataCon con) (tys ++ indices)))
+             binders = fields ++ [cv]
+       ; rhs' <- extendIfaceIdEnv binders (tcIfaceExpr rhs)
+       ; return (Alt (DataAlt con) binders rhs') }
   | otherwise
-  = do  { uniqs <- getUniquesM
-        ; let (ex_tvs, arg_ids)
-                      = dataConRepFSInstPat (map ifLclNameFS arg_strs) uniqs mult con inst_tys
-
-        ; rhs' <- extendIfaceEnvs  ex_tvs       $
-                  extendIfaceIdEnv arg_ids      $
-                  tcIfaceExpr rhs
-        ; return (Alt (DataAlt con) (ex_tvs ++ arg_ids) rhs') }
+  = do { when (debugIsOn && not (con `elem` tyConDataCons tycon))
+           (failIfM (ppr scrut $$ ppr con $$ ppr tycon $$ ppr (tyConDataCons tycon)))
+       ; uniqs <- getUniquesM
+       ; let (ex_tvs, arg_ids) =
+               dataConRepFSInstPat (map ifLclNameFS names) uniqs mult con inst_tys
+       ; rhs' <- extendIfaceEnvs ex_tvs $ extendIfaceIdEnv arg_ids $ tcIfaceExpr rhs
+       ; return (Alt (DataAlt con) (ex_tvs ++ arg_ids) rhs') }
 
 {- Note [Native index alias evidence in interfaces]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2499,24 +2488,25 @@ before serializing these proofs. See Note [Native index alias evidence]
 in GHC.Core.Lint.
 -}
 
-{- Note [Native Boolean evidence in interfaces]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A wired Boolean alternative has no constructor fields. One local name instead
-denotes its virtual CoVar. Reconstruct the nominal equality from the actual
-scrutinee index and this constructor. Do not accept endpoints from the file or
-derive them from the case binder. Allocate a fresh CoVar and extend only this
-alternative's Id environment. Ordinary binder-free Boolean alternatives keep
-their existing representation. Tidy local names before conversion.
+{- Note [Native constructor evidence in interfaces]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An interface data alternative stores the names of its binders. A native
+alternative has one extra name after its constructor fields. For example,
+a branch matching Pair x payload binds a proof that the scrutinee index
+equals the promoted Pair applied to x and payload.
 
-Require coverage before decoding proof-bearing bodies. Check branch-local and
-case-binder escape before recovering the result type: coreAltType would panic
-on an escaping binder. Native unfolding validation then checks the entire Core
-expression and its declared type. These checks do not validate all malformed
-legacy interface expressions. The module unfolding gate remains separate.
+Instantiate the ordinary representation fields from left to right. This
+gives the payload its type at the fresh x. Derive the promoted result from
+those same field Ids and the structural index of the actual scrutinee.
+Do not inspect an opaque call head to manufacture an index.
+Bind a fresh nominal CoVar
+with these endpoints only while reading the branch body. This also covers
+a nullary constructor such as True. Check branch-local escape before
+recovering the case result, and validate imported unfoldings against
+their declared type.
 
-Agda's constructor splitting refines a context and its case trees retain scoped
-branches. GHC reconstructs explicit FC evidence instead. See the pinned sources
-and Haskell evaluation boundary in docs/dependent-haskell/REFERENCES.md.
+See Note [Instantiating retained constructor fields] in GHC.Core.Utils
+and Note [Native index alias evidence] in GHC.Core.Lint.
 -}
 
 {-

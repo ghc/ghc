@@ -2,7 +2,11 @@
 module Main where
 
 import Control.Exception (ErrorCall, evaluate, try)
+import Data.Functor.Const (Const(..))
+import Data.IORef (newIORef, readIORef)
 import Data.List (isInfixOf)
+import DependentPair (DPair(..))
+import DependentProjection (second)
 import NativeDefaultO1InterfaceProducer
 import System.Environment (getArgs)
 
@@ -17,3 +21,7 @@ main = do
     case bad of
         Left err | "strict ordinary argument" `isInfixOf` show err -> putStrLn "strict argument forced"
         _ -> fail "strict argument should be forced"
+    ref <- newIORef (error "unused IO witness" :: IO Int)
+    witness <- readIORef ref
+    let pair = Pair witness (Const 'i') :: DPair (IO Int) (Const Char)
+    print (getConst (second pair))

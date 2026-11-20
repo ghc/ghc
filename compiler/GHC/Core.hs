@@ -38,7 +38,7 @@ module GHC.Core (
         nativeSourceCallIndex, nativeComputedIndex, retainedArgIndex,
         exprToNativeCaseIndex, nativeIndexFunctionVar_maybe,
         nativeIndexArgKinds,
-        isNativeIndexAlt, isNativeIndexAliasAlt,
+        isNativeIndexAlt, isNativeIndexDataAlt, isNativeIndexAliasAlt,
 
         mkBinds,
 
@@ -2933,14 +2933,19 @@ mapNativeIndex subst expr
 -- | Detect extra proof slots on ordinary algebraic alternatives.
 -- Core Lint checks their instantiated domain, count, scope and nominal type.
 isNativeIndexAlt :: Alt b -> Bool
-isNativeIndexAlt (Alt (DataAlt con) args _)
+isNativeIndexAlt (Alt (DataAlt con) args _) = isNativeIndexDataAlt con args
+isNativeIndexAlt _ = False
+
+-- | Recognize the proof slot from a constructor and its serialized binder names.
+isNativeIndexDataAlt :: DataCon -> [b] -> Bool
+isNativeIndexDataAlt con args
   | length args > dataConRepArity con
   , isVanillaAlgTyCon (dataConTyCon con)
   , isBoxedDataTyCon (dataConTyCon con)
   , null (dataConRepArgBinders con) || dataConHasPromotedRetained con
   , (_, [], [], [], _, _) <- dataConFullSig con
   = True
-isNativeIndexAlt _ = False
+  | otherwise = False
 
 -- | Detect proof binders on a DEFAULT alternative, including malformed proofs.
 -- Core Lint checks their count, scope, and exact nominal equality type.
