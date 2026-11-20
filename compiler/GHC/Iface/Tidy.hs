@@ -51,6 +51,7 @@ import GHC.Core.FVs
 import GHC.Core.Rules (canShareRetainedSpecRule)
 import GHC.Core.Dependent
     ( hasExistentialExpr, hasNativeDependentExprRhs, hasNativeDependentProgram, supportsErasedUserRule
+    , supportsErasedOrphanRule
     , hasNativeDependentUnfolding, isRetainedVanillaDefaultMethod )
 import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.Tidy
@@ -463,6 +464,7 @@ tidyProgram opts (ModGuts { mg_module           = mod
     let heads = mkNameEnv [(idName b, b) | b <- bindersOfBinds trimmed_binds]
     forM_ trimmed_rules $ \ rule ->
       when (not (isAutoRule rule) && hasNativeDependentProgram [] [rule]
+            && not (supportsErasedOrphanRule Nothing rule && ru_origin rule == mod)
             && not (maybe False (`supportsErasedUserRule` rule) (lookupNameEnv heads (ru_fn rule)))) $
         throwGhcExceptionIO $ PprProgramError
           "Cannot export a rewrite rule that contains retained Core."
@@ -867,8 +869,8 @@ when the reader can validate its specialization. See Note [Trimming auto-rules].
 
 A compulsory template cannot be removed. Check it after the simplifier,
 which can change the body that the desugarer checked. Exported RULES must
-also be safe to apply in ordinary importers. The retained driver rejects
-local user RULES before optimization. Keep an optional generated rule
+also be safe to apply in ordinary importers. The retained driver checks
+the supported erased user rules before optimization. Keep an optional generated rule
 private if it can introduce native Core into an ordinary client or if it
 has no supported shape. See Note [Exported retained specialisations] in
 GHC.Core.Rules. Tidy applies the same restriction to disk and --make

@@ -2952,7 +2952,7 @@ data IfaceEvidence
   = DepFunCoEvidence | ConstructorCaseEvidence | RetainedSpecRuleEvidence
   | IndexAliasEvidence | ErasedExistentialEvidence | ScopedSigmaEvidence
   | RetainedDefaultEvidence | ImplicitExistentialEvidence | ErasedUserRuleEvidence
-  | LexicalPackageRuleEvidence
+  | LexicalPackageRuleEvidence | OrphanErasedUserRuleEvidence
   deriving (Bounded, Enum, Eq, Ord)
 
 -- | Requirements of an interface payload. See Note [Versioning retained evidence]

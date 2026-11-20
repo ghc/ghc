@@ -321,7 +321,8 @@ writeBinIface profile traceBinIface compressionLevel hi_path mod_iface = do
 -- | Header suffix required by the retained evidence in the payload.
 evidenceSuffix :: IfaceEvidenceVersion -> String
 evidenceSuffix requirements
-  | needs ErasedUserRuleEvidence || needs LexicalPackageRuleEvidence = feature_set
+  | needs ErasedUserRuleEvidence || needs LexicalPackageRuleEvidence
+    || needs OrphanErasedUserRuleEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -338,6 +339,7 @@ evidenceSuffix requirements
 legacyEvidenceSuffix :: IfaceEvidence -> String
 legacyEvidenceSuffix ErasedUserRuleEvidence = featureSetPrefix ++ "user-rule"
 legacyEvidenceSuffix LexicalPackageRuleEvidence = featureSetPrefix ++ "lexical-rule"
+legacyEvidenceSuffix OrphanErasedUserRuleEvidence = featureSetPrefix ++ "orphan-user-rule"
 legacyEvidenceSuffix DepFunCoEvidence           = "-retained-depfunco-v1"
 legacyEvidenceSuffix ConstructorCaseEvidence   = "-retained-constructor-case-v1"
 legacyEvidenceSuffix RetainedSpecRuleEvidence  = "-retained-specialisation-rule-v1"
@@ -360,7 +362,8 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("implicit", ImplicitExistentialEvidence)
                       , ("scoped", ScopedSigmaEvidence)
                       , ("user-rule", ErasedUserRuleEvidence)
-                      , ("lexical-rule", LexicalPackageRuleEvidence) ]
+                      , ("lexical-rule", LexicalPackageRuleEvidence)
+                      , ("orphan-user-rule", OrphanErasedUserRuleEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion

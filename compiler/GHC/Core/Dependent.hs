@@ -4,6 +4,7 @@ module GHC.Core.Dependent (
     supportsNativeGentle,
     supportsNativeRuleBinds,
     supportsErasedUserRule,
+    supportsErasedOrphanRule,
     supportsQuickLookType,
     hasNativeDependentExpr,
     hasExistentialExpr,
@@ -98,6 +99,19 @@ supportsErasedUserRule fun rule@Rule{ru_auto = False, ru_fn = name,
   = not (runScanFor CheckErasedTypes StableMetadata (scanAnnotations fun <> scanRule rule))
 supportsErasedUserRule _ _ = False
 
+-- | Check a true orphan package rule. Tidy has only the rule and its binders.
+-- The source driver and interface reader also check the resolved head.
+supportsErasedOrphanRule :: Maybe Id -> CoreRule -> Bool
+supportsErasedOrphanRule head_id rule@Rule{ru_auto = False, ru_local = False,
+                                         ru_fn = name, ru_origin = origin,
+                                         ru_orphan = IsOrphan}
+  | Just owner <- nameModule_maybe name
+  , owner /= origin
+  , all (\fun -> varName fun == name && not (isJoinId fun || isImplicitId fun)) head_id
+  = not (runScanFor CheckErasedTypes StableMetadata
+           (foldMap scanAnnotations head_id <> scanRule rule))
+supportsErasedOrphanRule _ _ = False
+
 {- Note [User rules over erased package types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A source rule can call functions whose argument or result is an erased
@@ -111,6 +125,11 @@ A rule from the defining module can travel with its head across an interface.
 Give this rule its own wire tag. The reader resolves the head in the defining
 module, checks the same conditions and lints both sides before using it.
 The user supplies the semantic equality, as for an ordinary Haskell RULE.
+
+A true orphan can use an imported head. Check its type in the source driver
+and again on import. The rule still originates in its own module. The
+ordinary rule environment tests that module against the visible orphans.
+The orphan marker does not change how Pack and Unpack match.
 -}
 
 -- | Check whether Quick Look can traverse a type and its coercions.

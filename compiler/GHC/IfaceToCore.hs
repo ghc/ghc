@@ -75,7 +75,7 @@ import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.Dependent
   ( hasNativeDependentExprRhs, hasNativeDependentUnfolding
-  , isRetainedVanillaDefaultMethod, supportsErasedUserRule )
+  , isRetainedVanillaDefaultMethod, supportsErasedUserRule, supportsErasedOrphanRule )
 import GHC.Core.Predicate ( mkNomEqPred )
 import GHC.Core.Opt.OccurAnal ( occurAnalyseBndrsAndExpr )
 import GHC.Core.Ppr
@@ -1609,13 +1609,21 @@ tcIfaceRule iface_rule@IfaceRule{ifRuleName = name, ifActivation = act, ifRuleBn
                    ; rhs'   <- tcIfaceExpr rhs
                    ; let native = any hasNativeDependentUnfolding (rhs' : args' ++ map varToCoreExpr bndrs')
                    ; let checked = case kind of
+                           IfaceErasedUserRule | isOrphan orph ->
+                             Just (supportsErasedOrphanRule . Just, "Unsupported erased orphan rule shape.")
                            IfaceErasedUserRule -> Just (supportsErasedUserRule, "Unsupported erased user rule shape.")
                            IfaceRetainedAutoRule -> Just (canShareRetainedSpecRule, "Unsupported retained specialization shape.")
                            _ -> Nothing
                    ; case checked of
                        Just (accepts, shape_error) -> do
-                         unless (nameModule_maybe fn == Just this_mod) $
-                           failIfM (retained_doc $$ text "Expected a rule head defined in this module.")
+                         let (owner_ok, owner_error) = case kind of
+                               IfaceErasedUserRule | isOrphan orph ->
+                                 (maybe False (/= this_mod) (nameModule_maybe fn),
+                                  "Expected an imported head for the orphan rule.")
+                               _ -> (nameModule_maybe fn == Just this_mod,
+                                     "Expected a rule head defined in this module.")
+                         unless owner_ok $
+                           failIfM (retained_doc $$ text owner_error)
                          thing <- tcIfaceGlobal fn
                          fun <- case thing of
                            AnId id -> pure id

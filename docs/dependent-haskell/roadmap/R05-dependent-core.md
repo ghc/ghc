@@ -179,8 +179,8 @@ The example provider and a separately compiled client both fire
 `"open/hide" forall x. open (hide x) = x` at default `-O1`. The reader
 checks the rule head, the erased types in the rule and Core Lint.
 The interface records a capability for this rule. The previous compiler
-rejects that capability at the header. Orphan rules and rules over a
-retained function still report GHC-51063. The lexical package checks
+rejects that capability at the header. Rules over unsupported retained
+functions still report GHC-51063. The lexical package checks
 below cover rules that construct or open a package directly.
 [Package rule](../examples/erased-existentials/PackageRules.hs)
 and [source regression](../../../testsuite/tests/dependent/should_run/NativeSimplifier.sh).
@@ -227,6 +227,15 @@ all three interface compression levels with the same target libraries.
 [Four rules](../examples/erased-existentials/LexicalPackageRules.hs),
 [ordinary client](../../../testsuite/tests/dependent/should_run/NativePackageRuleClient.hs)
 and [interface check](../examples/erased-existentials/check-rule-interfaces.sh).
+
+A module can supply a true orphan rule over an imported function. The
+producer and the interface reader check the rule against the imported
+head's type. A rule-only import such as `import OrphanRules ()` brings
+the rule into scope through GHC's ordinary orphan dependencies. This also
+works through a module that imports the orphan. Removing both imports
+keeps the rule out of scope. The package matcher still checks the erased
+witness at the call. The interface records the orphan rule capability
+so that a reader without that capability rejects it at the header.
 
 ### A list fold over a hidden stream state
 

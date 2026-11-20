@@ -2887,6 +2887,8 @@ instance Binary IfaceRule where
             requireIfaceEvidenceVersion bh ErasedUserRuleEvidence
             when (isLexicalPackageRule rule) $
               requireIfaceEvidenceVersion bh LexicalPackageRuleEvidence
+            when (isOrphan (ifRuleOrph rule)) $
+              requireIfaceEvidenceVersion bh OrphanErasedUserRuleEvidence
             putByte bh 3
         put_ bh a8
     get bh = do
