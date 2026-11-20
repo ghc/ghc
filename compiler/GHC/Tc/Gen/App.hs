@@ -1603,20 +1603,25 @@ finishAppWithCache :: RetainedArgCache -> QLFlag
                    -> TcM (HsExpr GhcTc)
 finishAppWithCache cache do_ql rn_expr fun_loc rn_fun tc_fun inst_args
                    app_res_rho exp_res_ty
-  = do { -- Step 4.1: monomorphise un-unified QuickLook instantiation variables
+  = do { case do_ql of
+           NoQL -> return ()
+           DoQL -> do { rejectNativeQuickLook app_res_rho
+                      ; setSrcSpan fun_loc $ rejectNativeQLInstArgs inst_args }
+
+         -- See Note [Introducing an implicit existential].
+       ; (result_expected, pack) <- implicitResult do_ql rn_expr app_res_rho exp_res_ty
+
+         -- Step 4.1: monomorphise un-unified QuickLook instantiation variables
          -- Step 4.2: zonk app_res_rho to expose the polymorphism hidden under
          --           instantiation variables in `app_res_rho`
-         app_res_rho <- case do_ql of
+       ; app_res_rho <- case do_ql of
            NoQL -> return app_res_rho
-           DoQL -> do { rejectNativeQuickLook app_res_rho
-                      ; setSrcSpan fun_loc $ rejectNativeQLInstArgs inst_args
-                      ; liftZonkM $
-                        do { qlMonoInstArgs inst_args
-                           ; zonkTcType app_res_rho } }
+           DoQL -> liftZonkM $
+                   do { qlMonoInstArgs inst_args
+                      ; zonkTcType app_res_rho }
 
          -- Step 5: subsumption check against the expected type
          -- See Note [Unify with expected type before typechecking arguments]
-       ; (result_expected, pack) <- implicitResult rn_expr app_res_rho exp_res_ty
        ; res_wrap <- checkResultTy rn_expr (tc_fun, fun_loc) inst_args
                                    app_res_rho result_expected
 
@@ -1633,16 +1638,19 @@ finishAppWithCache cache do_ql rn_expr fun_loc rn_fun tc_fun inst_args
 
 -- | Introduce a dot package when the application has a fixed payload shape.
 -- See Note [Introducing an implicit existential].
-implicitResult :: HsExpr GhcRn -> TcRhoType -> ExpRhoType
+implicitResult :: QLFlag -> HsExpr GhcRn -> TcRhoType -> ExpRhoType
                -> TcM (ExpRhoType, HsExpr GhcTc -> HsExpr GhcTc)
-implicitResult rn_expr actual expected@(Check wanted)
+implicitResult do_ql rn_expr actual expected@(Check wanted)
   | ExistsTy ImplicitExists _ _ <- coreFullView wanted
   = do { payload <- liftZonkM (zonkTcType actual)
        ; schema <- liftZonkM (zonkTcType wanted)
        ; impred <- xoptM LangExt.ImpredicativeTypes
        ; ds_flag <- getDeepSubsumptionFlag
        ; let quick = impred && supportsQuickLookType schema && supportsQuickLookType payload
-                            && noQuickLookVars schema && noQuickLookVars payload
+                            && noQuickLookVars schema
+                            && case do_ql of
+                                 DoQL -> True
+                                 NoQL -> noQuickLookVars payload
        ; case coreFullView payload of
            TyConApp{} -> pack quick payload schema
            AppTy{} -> pack quick payload schema
@@ -1666,7 +1674,7 @@ implicitResult rn_expr actual expected@(Check wanted)
       | otherwise
       = do { when quick (qlUnify schema payload)
            ; return (mkCheckExpType schema, id) }
-implicitResult _ _ expected = return (expected, id)
+implicitResult _ _ _ expected = return (expected, id)
 
 -- | Match a stored index without assigning its local Id to a metavariable.
 -- See Note [Introducing an implicit existential].
@@ -1703,8 +1711,15 @@ the way out, including witnesses absent from the payload. Check the
 zonked witness before traversing it. finishAppWithCache still checks
 the actual result type against the instantiated payload.
 
-Use this path for types and coercions supported by Quick Look when the
-inputs have no free Quick Look variables. Other packages use ordinary
+Use the checked package type before Step 4 monomorphises the application
+variables. For example, check Duo id calls against exists t. Duo t (Calls t),
+where calls :: Calls (forall a. a -> a). Quick Look at the arguments finds
+the type of calls. Matching the result then fixes both the witness and
+the type of id. finishAppWithCache also handles nested applications after
+tcValArg has restored the enclosing constraints, multiplicity and usage.
+
+The package schema must have no free Quick Look variables. Both types and
+their coercions must support Quick Look. Other packages use ordinary
 witness inference. See Note [Retained types and Quick Look].
 
 Quick Look assumes an invariant function arrow (section 5.8 of its paper).
