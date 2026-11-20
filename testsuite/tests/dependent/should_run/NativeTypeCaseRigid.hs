@@ -58,6 +58,20 @@ rigidIndexedField :: Proxy flag ->
   N.IndexedFieldOrder ('Just ('N.RefinedFieldBox ('Proxy :: Proxy 'False) ('N.FieldOn flag))) :~: Int
 rigidIndexedField _ = Refl
 
+rigidOpenHead :: forall b (d :: N.OpenCaseGate (N.OpenCaseIndex b)).
+  Proxy b -> Proxy d -> N.OpenIndexPick (N.OpenCaseIndex b) ('Just d) :~: Int
+rigidOpenHead _ _ = Refl
+
+rigidOpenField :: Proxy b -> Proxy flag ->
+  N.OpenIndexPick (N.OpenCaseIndex b) ('Just ('N.OpenPlain flag)) :~: Int
+rigidOpenField _ _ = Refl
+
+type family DeferredOpenGate (k :: Type) :: N.OpenCaseGate k
+
+rigidOpenFamily :: Proxy b ->
+  N.OpenIndexPick (N.OpenCaseIndex b) ('Just (DeferredOpenGate (N.OpenCaseIndex b))) :~: Int
+rigidOpenFamily _ = Refl
+
 blockedTransport :: Proxy (d :: N.DependentFieldGate Bool 'True 'Proxy)
                  -> N.DependentFieldPick ('Just d) :~: Char
 blockedTransport _ = Refl

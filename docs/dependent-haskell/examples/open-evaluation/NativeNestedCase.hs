@@ -8,6 +8,7 @@ module NativeNestedCase
   , FamilyGate(..), FamilyGatePick, WrittenGatePick, HiddenGatePick, ApartGatePick
   , DependentFieldGate(..), DependentFieldPick
   , IndexedFieldBox(..), IndexedFieldPayload(..), IndexedFieldPick, IndexedFieldOrder
+  , OpenCaseGate(..), OpenCaseIndex, OpenIndexPick, OpenIndexAtOrdering
   ) where
 
 import Data.Kind (Type)
@@ -140,6 +141,22 @@ newtype GateIndexOther = GateIndexOther Bool
 
 type ApartGatePick (d :: Maybe (FamilyGate GateIndexOther)) = case d of
   Just (PlainGate True) -> Int
+  Just _ -> Bool
+  Nothing -> Char
+
+type family OpenCaseIndex (b :: Bool) :: Type
+
+data OpenCaseGate k where
+  OpenPlain :: Bool -> OpenCaseGate k
+  OpenIndexed :: Proxy b -> OpenCaseGate (OpenCaseIndex b)
+
+type OpenIndexPick (k :: Type) (d :: Maybe (OpenCaseGate k)) = case d of
+  Just (OpenPlain True) -> Int
+  Just _ -> Int
+  Nothing -> Char
+
+type OpenIndexAtOrdering (d :: Maybe (OpenCaseGate Ordering)) = case d of
+  Just (OpenPlain True) -> Int
   Just _ -> Bool
   Nothing -> Char
 

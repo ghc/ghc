@@ -126,6 +126,19 @@ apartIndex = Refl
 hiddenIndex :: N.HiddenGatePick ('Just 'N.IndexedGate) :~: Int
 hiddenIndex = Refl
 
+openIndexHit :: Proxy b -> N.OpenIndexPick (N.OpenCaseIndex b) ('Just ('N.OpenPlain 'True)) :~: Int
+openIndexHit _ = Refl
+
+openIndexMiss :: forall b. Proxy b ->
+  N.OpenIndexPick (N.OpenCaseIndex b) ('Just ('N.OpenIndexed ('Proxy :: Proxy b))) :~: Int
+openIndexMiss _ = Refl
+
+type instance N.OpenCaseIndex 'True = Ordering
+
+openIndexFallback ::
+  N.OpenIndexAtOrdering ('Just ('N.OpenIndexed ('Proxy :: Proxy 'True))) :~: Bool
+openIndexFallback = Refl
+
 refinedField :: Proxy (seed :: Bool) ->
   N.IndexedFieldPick ('Just ('N.RefinedFieldBox ('Proxy :: Proxy seed) ('N.FieldOn flag))) :~: Proxy flag
 refinedField _ = Refl

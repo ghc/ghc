@@ -11,7 +11,7 @@ data Gate k where
   Family :: Proxy a -> Gate (Ix a)
 
 type Bad (d :: Maybe (Gate Ordering)) = case d of
-  Just (Plain _) -> Int
+  Just (Family _) -> Int
   Just _ -> Bool
   Nothing -> Char
 
@@ -24,7 +24,7 @@ data ClosedGate k where
   ClosedFamily :: Proxy a -> ClosedGate (ClosedIx a)
 
 type Blocked (d :: Maybe (ClosedGate Ordering)) = case d of
-  Just (ClosedPlain _) -> Int
+  Just (ClosedFamily _) -> Int
   Just _ -> Bool
   Nothing -> Char
 
@@ -36,6 +36,6 @@ data ConditionalGate k (b :: Bool) where
   ConditionalFamily :: Bool -> ConditionalGate (ConditionalIx b) b
 
 type NeedsRefinement (d :: Maybe (ConditionalGate Bool 'True)) = case d of
-  Just (ConditionalPlain True) -> Int
+  Just (ConditionalFamily True) -> Int
   Just _ -> Bool
   Nothing -> Char
