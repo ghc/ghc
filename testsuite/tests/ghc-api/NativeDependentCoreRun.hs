@@ -2220,17 +2220,18 @@ runProgramChecks libdir = do
                 target <- GHC.guessTarget sourcePath Nothing Nothing
                 GHC.setTargets [target]
                 action
-    withProgram [] retainedProgramSource $ do
-        loaded <- GHC.load GHC.LoadAllTargets
-        unless (GHC.succeeded loaded) (fail "FAIL: native source program did not compile or link")
-    objectExists <- doesFileExist (replaceExtension sourcePath "o")
-    unless objectExists (fail "FAIL: native source program produced no object file")
-    (status, actual, errors) <- readProcessWithExitCode executablePath [] ""
-    unless (status == ExitSuccess) $
-        fail ("FAIL: native source program exited with " ++ show status ++ ":\n" ++ errors)
-    let expected = ["42", "False", "forced", "42", "forced", "raised native-bottom-bool", "[]:0", "[42,42]:2", "[42,42,42]:3"]
-    unless (lines actual == expected) $
-        fail ("FAIL: native source program observations: " ++ show actual ++ "; stderr: " ++ errors)
+    forM_ [[], ["-O2"]] $ \optimization -> do
+        withProgram optimization retainedProgramSource $ do
+            loaded <- GHC.load GHC.LoadAllTargets
+            unless (GHC.succeeded loaded) (fail "FAIL: native source program did not compile or link")
+        objectExists <- doesFileExist (replaceExtension sourcePath "o")
+        unless objectExists (fail "FAIL: native source program produced no object file")
+        (status, actual, errors) <- readProcessWithExitCode executablePath [] ""
+        unless (status == ExitSuccess) $
+            fail ("FAIL: native source program exited with " ++ show status ++ ":\n" ++ errors)
+        let expected = ["42", "False", "forced", "42", "forced", "raised native-bottom-bool", "[]:0", "[42,42]:2", "[42,42,42]:3"]
+        unless (lines actual == expected) $
+            fail ("FAIL: native source program observations: " ++ show actual ++ "; stderr: " ++ errors)
     putStrLn "program keep/choose True: 42"
     putStrLn "program keep/choose False: False"
     putStrLn "program keepSelect bottom (partial WHNF): forced"
@@ -2247,7 +2248,7 @@ runProgramChecks libdir = do
                 ]
                     ++ map ("  " ++) classBody
         rejections =
-            [ ("optimized module", ["-O2"], retainedProgramSource, "optimized module compilation")
+            [ ("custom optimization", ["-O2", "-fno-spec-constr"], retainedProgramSource, "optimized module compilation")
             , ("interface pragmas", ["-fno-omit-interface-pragmas"], retainedProgramSource, "interface unfolding generation")
             , ("serialized Core", ["-fwrite-if-simplified-core"], retainedProgramSource, "Core interface serialization")
             , ("late cost centres", ["-fprof-late"], retainedProgramSource, "profiling or late cost-centre insertion")
