@@ -3557,6 +3557,7 @@ reifyDataCon isGadtDataCon tys dc
              (srcUnpks, srcStricts)
                  = mapAndUnzip reifySourceBang (dataConSrcBangs dc)
              dcdBangs  = zipWith TH.Bang srcUnpks srcStricts
+             retained  = dataConRepArgBinders dc
              fields    = dataConFieldLabels dc
              name      = reifyName dc
              -- Universal tvs present in eq_spec need to be filtered out, as
@@ -3572,10 +3573,16 @@ reifyDataCon isGadtDataCon tys dc
              g_arg_tys = substTys tvb_subst (map scaledThing g_arg_tys')
              g_res_ty  = substTy  tvb_subst g_res_ty'
 
-       ; r_arg_tys <- reifyTypes (if isGadtDataCon then g_arg_tys else arg_tys)
+       ; r_arg_tys <- if null retained
+         then reifyTypes (if isGadtDataCon then g_arg_tys else arg_tys)
+         else pure []
 
        ; main_con <-
-           if | not (null fields) && not isGadtDataCon ->
+           if | not (null retained) -> do
+                  { (args, result) <- reifyRetainedGadtArgs retained dcdBangs
+                                      (map (substScaledTy tvb_subst) g_arg_tys') g_res_ty
+                  ; pure (TH.RetainedGadtC [name] args result) }
+              | not (null fields) && not isGadtDataCon ->
                   return $ TH.RecC name (zip3 (map reifyFieldLabel fields)
                                          dcdBangs r_arg_tys)
               | not (null fields) -> do
@@ -3612,7 +3619,7 @@ reifyDataCon isGadtDataCon tys dc
                          ; let con = TH.ForallC ex_tvs'' cxt main_con
                          ; return $ if null ex_tvs'' then con
                                     else TH.ForallMatchC ma con }
-       ; assert (r_arg_tys `equalLength` dcdBangs)
+       ; assert (not (null retained) || r_arg_tys `equalLength` dcdBangs)
          ret_con }
   where
     mk_specified tv = Bndr tv Specified
@@ -3629,6 +3636,27 @@ reifyDataCon isGadtDataCon tys dc
           (subst', tvs') = substTyVarBndrs subst tvs
           tv_bndrs'      = map (\(tv,fl) -> Bndr tv fl) (zip tvs' flags)
       in (subst', tv_bndrs')
+
+-- | Reify the actual field binders. The wrapper type can omit a vacuous
+-- retained binder even when the constructor's field metadata retains it.
+reifyRetainedGadtArgs :: [Maybe Id] -> [TH.Bang] -> [Scaled Type] -> Type
+                     -> TcM ([TH.RetainedGadtArg], TH.Type)
+reifyRetainedGadtArgs binders bangs fields result =
+  assert (binders `equalLength` bangs && binders `equalLength` fields) $
+    go emptyNameSet (zip3 binders bangs fields)
+  where
+    go scope [] = ([],) <$> reifyTypeInScope scope result
+    go scope ((binder, bang, Scaled mult ty) : rest) = do
+      field_ty <- reifyTypeInScope scope ty
+      (arg, rest_scope) <- case binder of
+        Nothing -> do
+          mult' <- reifyTypeInScope scope mult
+          pure (TH.GadtValueArg bang mult' field_ty, scope)
+        Just index ->
+          pure (TH.GadtIndexArg (reifyName index) field_ty,
+                extendNameSet scope (getName index))
+      (args, result') <- go rest_scope rest
+      pure (arg : args, result')
 
 mkDataConI :: DataCon -> TcM TH.Info
 mkDataConI dc

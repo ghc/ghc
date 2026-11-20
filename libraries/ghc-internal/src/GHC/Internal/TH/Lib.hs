@@ -773,6 +773,19 @@ gadtC cons strtys ty = liftA2 (GadtC cons) (sequenceA strtys) ty
 recGadtC :: Quote m => [Name] -> [m VarStrictType] -> m Type -> m Con
 recGadtC cons varstrtys ty = liftA2 (RecGadtC cons) (sequenceA varstrtys) ty
 
+-- | Build a prefix GADT constructor with retained arguments.
+retainedGadtC :: Quote m => [Name] -> [m RetainedGadtArg] -> m Type -> m Con
+retainedGadtC names args result =
+  RetainedGadtC names <$> sequenceA args <*> result
+
+-- | Build an ordinary field with its source bang and multiplicity.
+gadtValueArg :: Quote m => m Bang -> m Type -> m Type -> m RetainedGadtArg
+gadtValueArg bang mult ty = GadtValueArg <$> bang <*> mult <*> ty
+
+-- | Build a retained field that binds a name in the remaining signature.
+gadtIndexArg :: Quote m => Name -> m Type -> m RetainedGadtArg
+gadtIndexArg name domain = GadtIndexArg name <$> domain
+
 -------------------------------------------------------------------------------
 -- *   Type
 

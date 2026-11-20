@@ -387,6 +387,7 @@ deriving instance Lift DecidedStrictness
 deriving instance Lift Bang
 -- | @since template-haskell-2.22.1.0
 deriving instance Lift Con
+deriving instance Lift RetainedGadtArg
 -- | @since template-haskell-2.22.1.0
 deriving instance Lift TySynEqn
 -- | @since template-haskell-2.22.1.0

@@ -1,11 +1,9 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TemplateHaskell #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, RequiredTypeArguments, TemplateHaskell #-}
 module NativeTypeCaseRetainedReify where
 
 import Language.Haskell.TH (reify)
 
-type Select (b :: Bool) = case b of { True -> Int; False -> Char }
-
-data Stored where
-  Stored :: foreach (b :: Bool) -> Select b -> Stored
+data Stored a where
+  Stored :: forall a -> foreach (b :: Bool) -> Int -> Stored a
 
 $([] <$ reify ''Stored)

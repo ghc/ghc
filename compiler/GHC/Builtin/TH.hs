@@ -249,6 +249,11 @@ infixCOcc   = mkVarOcc "infixC"
 forallCOcc  = mkVarOcc "forallC"
 forallMatchCOcc = mkVarOcc "forallMatchC"
 gadtCOcc    = mkVarOcc "gadtC"
+retainedGadtCOcc, gadtValueArgOcc, gadtIndexArgOcc, retainedGadtArgTyConOcc :: KnownOcc
+retainedGadtCOcc = mkVarOcc "retainedGadtC"
+gadtValueArgOcc = mkVarOcc "gadtValueArg"
+gadtIndexArgOcc = mkVarOcc "gadtIndexArg"
+retainedGadtArgTyConOcc = mkTcOcc "RetainedGadtArg"
 recGadtCOcc = mkVarOcc "recGadtC"
 
 -- data Bang = ...

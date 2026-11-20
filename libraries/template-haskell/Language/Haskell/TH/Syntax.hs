@@ -19,6 +19,7 @@ module Language.Haskell.TH.Syntax (
     Pat (..),
     Stmt (..),
     Con (..),
+    RetainedGadtArg (..),
     Type (..),
     Dec (..),
     BangType,

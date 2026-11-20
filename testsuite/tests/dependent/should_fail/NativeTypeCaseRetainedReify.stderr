@@ -1,5 +1,6 @@
-NativeTypeCaseRetainedReify.hs:11:2: error: [GHC-75721]
-    Template Haskell cannot represent a runtime index in a type.
-   |
-11 | $([] <$ reify ''Stored)
-   |  ^^^^^^^^^^^^^^^^^^^^^^
+NativeTypeCaseRetainedReify.hs:9:2: error: [GHC-75721]
+    Can't represent visible forall in the type of a data constructor in Template Haskell:
+      forall {k}. forall (a :: k) -> Bool -> Int -> Stored a
+  |
+9 | $([] <$ reify ''Stored)
+  |  ^^^^^^^^^^^^^^^^^^^^^^

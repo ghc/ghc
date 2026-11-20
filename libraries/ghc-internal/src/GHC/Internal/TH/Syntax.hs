@@ -1328,7 +1328,19 @@ data Con =
              [VarBangType] -- ^ The constructor arguments
              Type -- ^ See Note [GADT return type]
   | ForallMatchC Type Con
+  | RetainedGadtC [Name] [RetainedGadtArg] Type
+    -- ^ A prefix GADT constructor with one or more retained arguments.
+    -- The argument list is in source order. The result follows the list.
         deriving (Show, Eq, Ord, Generic)
+
+-- | An argument of a prefix GADT constructor with retained arguments.
+data RetainedGadtArg
+  = GadtValueArg Bang Type Type
+    -- ^ Source bang, multiplicity, and type of an ordinary field.
+  | GadtIndexArg Name Type
+    -- ^ A visible runtime binder and its domain. The name scopes over the
+    -- later arguments and the constructor result.
+  deriving (Show, Eq, Ord, Generic)
 
 -- Note [GADT return type]
 -- ~~~~~~~~~~~~~~~~~~~~~~~

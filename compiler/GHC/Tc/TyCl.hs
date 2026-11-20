@@ -5283,13 +5283,15 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _ tag_map
            DDataType -> return ()
            _ -> failWithTc $ TcRnRetainedQuantificationError RetainedPackageDeclaration
        ; skol_info <- mkSkolemInfo (DataConSkol name)
-       ; (tclvl, wanted, (tvbs, _ctxt, (retained, full_ty))) <-
+       ; (tclvl, wanted, (tvbs, _ctxt, (retained, bangs, full_ty))) <-
            pushLevelAndSolveEqualitiesX "tcConDecl:retained" $
            tcGadtConTyVarBndrs skol_info outer_bndrs inner_bndrs $
            do { prefix <- tcConGADTArgs (TheKind liftedTypeKind) args
               ; (retained, suffix_ty) <-
                   tcCheckRetainedConType True (tcDataConMult IsPrefixConGADT) hs_res_ty
+              ; let suffix_bang = HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict
               ; return (replicate (length prefix) Nothing ++ retained,
+                        map snd prefix ++ map (const suffix_bang) retained,
                         tcMkScaledFunTysU (map fst prefix) suffix_ty) }
        ; inf_tkvs <- kindGeneralizeAll skol_info (mkForAllTys (map (unmatchableDataConTy,) tvbs) full_ty)
        ; reportUnsolvedEqualities skol_info inf_tkvs tclvl wanted
@@ -5313,7 +5315,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _ tag_map
                do { rep_nm <- newTyConRepName con_name
                   ; buildDataConWithRetainedArgs retained fam_envs
                       (SrcBangOpts (initBangOpts dflags)) con_name False rep_nm
-                      (map (const (HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict)) arg_tys)
+                      bangs
                       [] univ_tvs ex_tvs user_bndrs eq_preds [] arg_tys' res_ty' rep_tycon tag_map }
        ; mapM build_one names }
 
@@ -6453,6 +6455,8 @@ checkValidDataCon dflags existential_ok tc con
               check_bang orig_arg_ty bang rep_bang n
                | HsSrcBang _  _ SrcLazy <- bang
                , not (xopt LangExt.LazyFieldAnnotations dflags)
+               -- Retained constructors already accept an explicit lazy prefix.
+               , null (dataConRepArgBinders con)
                = addErrTc (bad_bang n LazyFieldsDisabled)
 
                -- Warn about UNPACK without "!"

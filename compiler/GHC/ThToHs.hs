@@ -554,7 +554,9 @@ cvtDataDefnCons ::
 cvtDataDefnCons type_data ksig constrs
   = do  { let isGadtCon (GadtC    _ _ _) = True
               isGadtCon (RecGadtC _ _ _) = True
+              isGadtCon RetainedGadtC{}  = True
               isGadtCon (ForallC  _ _ c) = isGadtCon c
+              isGadtCon (ForallMatchC _ c) = isGadtCon c
               isGadtCon _                = False
               isGadtDecl  = all isGadtCon constrs
               isH98Decl   = all (not . isGadtCon) constrs
@@ -744,6 +746,49 @@ cvtConstr parent_con do_con_name (RecGadtC c varstrtys ty) = case nonEmpty c of
         ; rec_flds <- mapM (cvt_id_arg parent_con) varstrtys
         ; lrec_flds <- returnLA rec_flds
         ; mk_gadt_decl c' (RecConGADT noAnn lrec_flds) ty' }
+
+cvtConstr _ do_con_name (RetainedGadtC names args result) = case nonEmpty names of
+  Nothing -> failWith GadtNoCons
+  Just names -> do
+    names' <- mapM do_con_name names
+    (prefix, suffix) <- cvtRetainedGadtArgs args result
+    mk_gadt_decl names' (PrefixConGADT noExtField prefix) suffix
+
+-- | The source AST stores the prefix fields before the first retained binder
+-- separately. Use the retained function type syntax for the suffix.
+cvtRetainedGadtArgs :: [TH.RetainedGadtArg] -> TH.Type
+                    -> CvtM ([HsConDeclField GhcPs], LHsType GhcPs)
+cvtRetainedGadtArgs args result = prefix args
+  where
+    prefix (GadtValueArg bang mult ty : rest) = do
+      field <- cvt_arg (bang, ty)
+      mult' <- cvtGadtArgMult mult
+      (fields, body) <- prefix rest
+      pure (field { cdf_multiplicity = mult' } : fields, body)
+    prefix binders@(GadtIndexArg{} : _) = ([],) <$> suffix binders
+    prefix [] = failWith (MalformedType TypeLevel result)
+
+    suffix [] = cvtType result
+    suffix (GadtIndexArg name domain : rest) =
+      cvtRetainedBinder TH.BndrReq name domain (suffix rest)
+    suffix (GadtValueArg (Bang unpack strict) mult ty : rest) = do
+      arg <- cvtType ty
+      let bang = HsSrcBang NoSourceText (cvtSrcUnpackedness unpack) (cvtSrcStrictness strict)
+      arg' <- case (unpack, strict) of
+        (NoSourceUnpackedness, NoSourceStrictness) -> pure arg
+        _ -> returnLA $ XHsType (HsBangTy (noAnn, noAnn, noAnn) bang arg)
+      mult' <- cvtGadtArgMult mult
+      body <- suffix rest
+      returnLA (HsFunTy noExtField mult' arg' body)
+
+-- | Constructor arrows can default to One. Keep a Many annotation explicit.
+cvtGadtArgMult :: TH.Type -> CvtM (HsModifiedFunArr GhcPs)
+cvtGadtArgMult mult = do
+  ty <- cvtType mult
+  pure $ case hsTypeToArrow ty of
+    HsModifiedFunArr x [] arr@HsStandardArr{} ->
+      HsModifiedFunArr x [noLocA (HsModifier noAnn ty)] arr
+    arrow -> arrow
 
 mk_gadt_decl :: NonEmpty (LocatedN RdrName) -> HsConDeclGADTDetails GhcPs -> LHsType GhcPs
              -> CvtM (LConDecl GhcPs)
@@ -1821,15 +1866,7 @@ cvtTypeKind typeOrKind ty
 
            ForEachT vis nm domain ty
              | null tys'
-             -> do { nm' <- vNameN nm
-                   ; domain' <- cvtType domain
-                   ; ty' <- withRetainedIndex nm (cvtType ty)
-                   ; binder <- returnLA $
-                       HsTvb noAnn () (HsBndrVar noExtField nm') (HsBndrKind noExtField domain')
-                   ; let delimiter = case vis of
-                           TH.BndrReq   -> Left noEpUniTok
-                           TH.BndrInvis -> Right noEpTok
-                   ; returnLA (HsForEachTy (noEpTok, delimiter) [binder] ty') }
+             -> cvtRetainedBinder vis nm domain (cvtType ty)
 
            SigT ty ki
              -> do { ty' <- cvtType ty
@@ -1938,6 +1975,20 @@ cvtTypeKind typeOrKind ty
 
            _ -> failWith (MalformedType typeOrKind ty)
     }
+
+-- | The runtime name scopes over the continuation after its domain.
+cvtRetainedBinder :: TH.BndrVis -> TH.Name -> TH.Type -> CvtM (LHsType GhcPs)
+                  -> CvtM (LHsType GhcPs)
+cvtRetainedBinder vis nm domain body = do
+  nm' <- vNameN nm
+  domain' <- cvtType domain
+  body' <- withRetainedIndex nm body
+  binder <- returnLA $
+    HsTvb noAnn () (HsBndrVar noExtField nm') (HsBndrKind noExtField domain')
+  let delimiter = case vis of
+        TH.BndrReq   -> Left noEpUniTok
+        TH.BndrInvis -> Right noEpTok
+  returnLA (HsForEachTy (noEpTok, delimiter) [binder] body')
 
 hsTypeToArrow :: LHsType GhcPs -> HsModifiedFunArr GhcPs
 hsTypeToArrow (L l w) = HsModifiedFunArr noExtField mods arr

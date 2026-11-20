@@ -60,6 +60,7 @@ instance Binary TH.DecidedStrictness
 instance Binary TH.FixityDirection
 instance Binary TH.OccName
 instance Binary TH.Con
+instance Binary TH.RetainedGadtArg
 instance Binary TH.AnnLookup
 instance Binary TH.ModuleInfo
 instance Binary TH.Clause

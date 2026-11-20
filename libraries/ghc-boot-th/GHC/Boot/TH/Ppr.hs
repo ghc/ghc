@@ -580,6 +580,7 @@ ppr_typedef data_or_newtype isTop maybeInst ctxt t argsDoc ksig cs decs
     isGadtDecl = not (null cs) && all isGadtCon cs
         where isGadtCon (GadtC _ _ _   ) = True
               isGadtCon (RecGadtC _ _ _) = True
+              isGadtCon RetainedGadtC{} = True
               isGadtCon (ForallC _ _ x ) = isGadtCon x
               isGadtCon (ForallMatchC _ x) = isGadtCon x
               isGadtCon  _               = False
@@ -758,6 +759,15 @@ instance Ppr Con where
         = commaSepApplied cs <+> dcolon <+> ppr_foralls (pprGadtRHS sts ty)
       ppr_con ppr_foralls (RecGadtC cs vsts ty)
         = commaSepApplied cs <+> dcolon <+> ppr_foralls (pprRecFields vsts ty)
+      ppr_con ppr_foralls (RetainedGadtC cs args ty)
+        = commaSepApplied cs <+> dcolon <+> ppr_foralls
+            (sep (map ppr_retained_arg args ++ [ppr ty]))
+
+      ppr_retained_arg (GadtValueArg bang mult ty) =
+        pprBangType (bang, ty) <+> (char '%' <> pprType appPrec mult) <+> text "->"
+      ppr_retained_arg (GadtIndexArg name domain) =
+        text "foreach" <+>
+        parens (pprName' Applied name <+> dcolon <+> ppr domain) <+> text "->"
 
 instance Ppr PatSynDir where
   ppr Unidir        = text "<-"

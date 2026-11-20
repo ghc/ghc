@@ -76,6 +76,7 @@ module Language.Haskell.TH.Lib (
     cxt, classP, equalP,
     -- **** Constructors
     normalC, recC, infixC, forallC, forallMatchC, gadtC, recGadtC,
+    retainedGadtC, gadtValueArg, gadtIndexArg,
 
     -- *** Kinds
     varK, conK, tupleK, arrowK, listK, appK, starK, constraintK,
