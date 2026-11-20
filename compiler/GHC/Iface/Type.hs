@@ -2839,7 +2839,8 @@ putIfaceType _ (IfaceFreeTermAppTy fun _)
 putIfaceType bh (IfaceTermAppTy fun arg)
   = do { putByte bh 12; put_ bh fun; put_ bh arg }
 putIfaceType bh (IfaceExistsTy bndr body)
-  = do { putByte bh 13; put_ bh bndr; put_ bh body }
+  = do { requireIfaceEvidenceVersion bh ErasedExistentialEvidence
+       ; putByte bh 13; put_ bh bndr; put_ bh body }
 putIfaceType bh (IfaceDepFunTy vis bndr body)
   = do { putByte bh 10; put_ bh vis; put_ bh bndr; put_ bh body }
 putIfaceType bh (IfaceTermVar var)
@@ -2943,7 +2944,7 @@ instance Binary IfaceMCoercion where
 -- in GHC.Iface.Binary.
 data IfaceEvidenceVersion
   = NoRetainedEvidence | DepFunCoEvidence | ConstructorCaseEvidence | RetainedSpecRuleEvidence
-  | IndexAliasEvidence
+  | IndexAliasEvidence | ErasedExistentialEvidence
   deriving (Eq, Ord)
 
 -- | Record a feature only while writing the full interface.

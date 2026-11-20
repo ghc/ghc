@@ -3061,11 +3061,13 @@ instance Binary IfaceExpr where
         put_ bh r
         put_ bh torc
     put_ bh (IfacePack schema witness value) = do
+        requireIfaceEvidenceVersion bh ErasedExistentialEvidence
         putByte bh 15
         put_ bh schema
         put_ bh witness
         put_ bh value
     put_ bh (IfaceUnpack witness value package body) = do
+        requireIfaceEvidenceVersion bh ErasedExistentialEvidence
         putByte bh 16
         put_ bh witness
         put_ bh value
