@@ -16,6 +16,4 @@ observeNamedSplitIO obtain later = do
   where
     consume :: CheckedSplit a ('S 'Z) total -> Vec a total -> (Int, [a], [a])
     consume (Pair suffix !(left, right :: Vec a n, Refl)) (second :: Vec a ('S n)) =
-        let rebuilt :: Vec a total
-            rebuilt = appendVec left right
-        in (natToInt suffix, toList rebuilt, toList second)
+        (natToInt suffix, toList (appendVec left right), toList second)

@@ -1163,7 +1163,7 @@ tcRetainedGroundApp True DoQL exp_ty rn_head fun sigma args
        ; residual <- liftZonkM (zonkTcType residual)
        ; let keep_ql = return (prefix, DoQL, residual, remaining, Nothing)
              declared_plan =
-               do { plan <- tcRetainedKnownArgPlan expected fun residual remaining
+               do { plan <- tcRetainedKnownArgPlan tcRetainedQuickLookArgType expected fun residual remaining
                   ; case plan of
                       Just _ -> return (prefix, NoQL, residual, remaining, plan)
                       Nothing -> keep_ql }
@@ -1241,23 +1241,31 @@ retainedPrefixTypes args
 
 -- | Select erased arguments from declared monomorphic values without usage.
 -- See Note [Declared native argument choices].
-tcRetainedKnownArgPlan :: Maybe TcRhoType -> HsExpr GhcTc -> TcSigmaType
+tcRetainedKnownArgPlan :: (LHsExpr GhcRn -> TcM (Maybe Type))
+                      -> Maybe TcRhoType -> HsExpr GhcTc -> TcSigmaType
                       -> [HsExprArg 'TcpRn] -> TcM RetainedInstPlan
-tcRetainedKnownArgPlan expected fun sigma args
+tcRetainedKnownArgPlan declared expected fun sigma args
   | hasNoConcreteTyVars fun
   , not (any is_type_arg args)
-  , (tvs, _, tau) <- tcRetainedInstTelescope sigma
+  = tcRetainedKnownValuePlan declared expected sigma [arg | EValArg { ea_arg = arg } <- args]
+  | otherwise = return Nothing
+  where
+    is_type_arg ETypeArg{} = True
+    is_type_arg _ = False
+
+-- | Match a known declaration and a supplied sequence of value arguments.
+tcRetainedKnownValuePlan :: (LHsExpr GhcRn -> TcM (Maybe Type))
+                        -> Maybe TcRhoType -> TcSigmaType
+                        -> [LHsExpr GhcRn] -> TcM RetainedInstPlan
+tcRetainedKnownValuePlan declared expected sigma values
+  | (tvs, _, tau) <- tcRetainedInstTelescope sigma
   , not (null tvs), isRetainedValueType tau
-  , let values = [arg | EValArg { ea_arg = arg } <- args]
   , not (null values)
   = case coreFullView tau of
       DepFunTy DepFunInvisible binder body ->
         fmap (fmap snd) (tcInferInvisibleRetained tvs binder body values)
       _ -> choose_erased tvs values (retainedDeclaredDomains (length values) tau)
   where
-    is_type_arg ETypeArg{} = True
-    is_type_arg _ = False
-
     choose_erased tvs values (domains, result)
       = do { pairs <- fmap catMaybes $ mapM (declared_arg tvs) (zip domains values)
          ; let actuals = map snd pairs
@@ -1307,7 +1315,7 @@ tcRetainedKnownArgPlan expected fun sigma args
     declared_arg tvs (Just (retained, formal), arg)
       | any (`elemVarSet` tyCoVarsOfType formal) tvs
       = do { actual <- if retained then tcRetainedConstructorArgType arg
-                         else tcRetainedDeclaredArgType tcRetainedDeclaredTypeView arg
+                         else declared arg
            ; return ((formal,) . declared_domain_view retained formal <$> actual) }
       | otherwise = return Nothing
     declared_arg _ _ = return Nothing
@@ -1320,7 +1328,65 @@ tcRetainedKnownArgPlan expected fun sigma args
       = mkTyConApp tc params
     declared_domain_view _ _ actual = actual
 
-tcRetainedKnownArgPlan _ _ _ _ = return Nothing
+tcRetainedKnownValuePlan _ _ _ _ = return Nothing
+
+-- | Read a declared operand type before Quick Look instantiates a native call.
+-- See Note [Nested immutable retained applications].
+tcRetainedQuickLookArgType :: LHsExpr GhcRn -> TcM (Maybe Type)
+tcRetainedQuickLookArgType arg
+  | (L _ (HsVar _ lname), values@(_:_)) <- split_named [] arg
+  , let name = unLocWithUserRdr lname
+  , not (isDataOcc (nameOccName name))
+  , all bare_operand values
+  = runMaybeT $ do
+      fun <- MaybeT (tcLookupIdMaybe name)
+      guard (isEmptyNameEnv (idConcreteTvs fun))
+      sigma <- liftMaybeT (liftZonkM (zonkTcType (varType fun)))
+      let (tvs, theta, tau) = tcRetainedInstTelescope sigma
+      guard (null theta && not (null tvs))
+      result <- MaybeT (pure (tcRetainedOrdinaryResult (length values) tau))
+      guard (isAlgTyConApp result)
+      choices <- MaybeT (tcRetainedKnownValuePlan declared Nothing sigma values)
+      let ty = substTyWith tvs choices result
+      guard (hasNativeDependentExpr (Core.Type ty) && noQuickLookVars ty)
+      valid <- liftMaybeT (tcRetainedInstScope [ty])
+      guard valid
+      return ty
+  | otherwise = declared arg
+  where
+    declared = tcRetainedDeclaredArgType tcRetainedDeclaredTypeView
+
+    split_named values (L _ (HsPar _ inner)) = split_named values inner
+    split_named values (L _ (HsApp _ fun value)) = split_named (value : values) fun
+    split_named values fun = (fun, values)
+
+    bare_operand (L _ (HsPar _ inner)) = bare_operand inner
+    bare_operand (L _ HsVar{}) = True
+    bare_operand _ = False
+
+    isAlgTyConApp ty = case tcSplitTyConApp_maybe ty of
+      Just (tc, _) -> isAlgTyCon tc && not (isClassTyCon tc)
+      _ -> False
+
+{- Note [Nested immutable retained applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In `toList (appendVec left right)`, the declared vector types can
+fix all erased arguments of appendVec. Its result still contains a
+scoped runtime index. Quick Look's nested application rule would
+enter the inner application through tcInstFun, without the complete
+immutable plan available when checking it directly. Instantiation
+variables cannot contain that retained index.
+
+Read the declared result of a simple, fully applied, unconstrained
+inner call using the same immutable selector as a direct call. Limit
+the inner operands to names and use an algebraic result type. Use the
+result only to complete the outer caller's entire plan. If it cannot
+complete this plan, leave normal Quick Look in place. The normal
+checker still checks the inner and outer applications, including their
+argument types, lexical scopes, and usage. No term is evaluated or
+checked during the read, and no Quick Look variable acquires a native
+type.
+-}
 
 -- | Read a monomorphic declaration for immutable retained argument matching.
 -- See Note [Declared retained-domain choices].
@@ -4653,7 +4719,8 @@ tcRetainedArgInstEnabled after_vta do_ql expected rn_head args fun sigma
            NoQL ->
              do { sigma' <- liftZonkM (zonkTcType sigma)
                 ; expected' <- mapM (liftZonkM . zonkTcType) expected
-                ; tcRetainedKnownArgPlan expected' fun sigma' args }
+                ; tcRetainedKnownArgPlan (tcRetainedDeclaredArgType tcRetainedDeclaredTypeView)
+                                       expected' fun sigma' args }
            _ -> return Nothing
        ; case declared of
            Just choices -> return (fun, sigma, [], Just choices)

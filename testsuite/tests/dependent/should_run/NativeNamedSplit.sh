@@ -22,8 +22,8 @@ HS
     "${g[@]}" "$opt" -fomit-interface-pragmas -fno-write-if-simplified-core -c Opaque.hs
     cp {PackedVecLibrary,Opaque}.hi "$src/NamedSplitClient.hs" ../client/
     cd ../client
-    "${g[@]}" "$opt" -XImpredicativeTypes -c NamedSplitClient.hs
-    "${g[@]}" "$opt" -XNoImpredicativeTypes -fforce-recomp -c NamedSplitClient.hs
+    "${g[@]}" "$opt" -XNoImpredicativeTypes -c NamedSplitClient.hs
+    "${g[@]}" "$opt" -XImpredicativeTypes -fforce-recomp -c NamedSplitClient.hs
     cat >Main.hs <<'HS'
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, ScopedTypeVariables, TypeApplications #-}
 module Main where
@@ -51,11 +51,15 @@ main = do
         bottomTuple = Pair (S Z) (error "unused tuple") :: CheckedSplit Bool ('S 'Z) ('S ('S 'Z))
         badProof = Pair (S Z) (VCons True VNil, VCons False VNil, error "split proof forced")
                    :: CheckedSplit Bool ('S 'Z) ('S ('S 'Z))
+        bottomSuffix = Pair (S Z) (VCons True VNil, error "unused suffix", Refl)
+                     :: CheckedSplit Bool ('S 'Z) ('S ('S 'Z))
     result <- observeNamedSplitIO obtain later
+    prefix <- fmap (fmap (\(_, cells, _) -> take 1 cells))
+                   (observeNamedSplitIO (pure (Just bottomSuffix)) later)
     deferred <- fmap (fmap (`defer` later)) obtain
     failed <- try @ErrorCall (evaluate (defer badProof later))
-    case (result, deferred, keepLazy bottomTuple later, failed) of
-        (Just (1, [True, False], [False, True]), Just [False, True], True, Left err)
+    case (result, prefix, deferred, keepLazy bottomTuple later, failed) of
+        (Just (1, [True, False], [False, True]), Just [True], Just [False, True], True, Left err)
             | takeWhile (/= '\n') (displayException err) == "split proof forced" -> pure ()
         _ -> fail "checked split lost its suffix or changed when the lazy patterns demand it"
 HS
@@ -92,25 +96,25 @@ HS
         exit 1
     fi
     cat >AppendIndices.hs <<'HS'
-{-# LANGUAGE DataKinds, ExplicitNamespaces, GADTs, NoExperimentalDependentTypes #-}
-{-# LANGUAGE ScopedTypeVariables, TypeOperators #-}
+{-# LANGUAGE CPP, DataKinds, GADTs, NoExperimentalDependentTypes, ScopedTypeVariables #-}
 module AppendIndices where
 
 import GHC.Sigma (Sigma(Pair))
 import Opaque (HiddenVec)
-import PackedVecLibrary (CheckedSplit, Nat(..), Vec, appendVec, toList, type (+))
+import PackedVecLibrary (CheckedSplit, Nat(..), Vec, appendVec, toList)
 
 appendIndependent :: CheckedSplit Bool ('S 'Z) ('S 'Z)
                   -> CheckedSplit Bool ('S 'Z) ('S ('S 'Z)) -> [Bool]
 appendIndependent (Pair _ (_, a :: Vec Bool n, _)) (Pair _ (_, b :: Vec Bool m, _)) =
-    let combined :: Vec Bool (n + m)
-        combined = appendVec a b
-    in toList combined
+    toList (appendVec a b)
 
+#ifndef CHECK_QUICK_LOOK
 appendOpaque :: Vec Bool 'Z -> HiddenVec -> [Bool]
 appendOpaque left (Pair _ right) = toList (appendVec left right)
+#endif
 HS
-    "${g[@]}" "$opt" -c AppendIndices.hs
+    "${g[@]}" "$opt" -XNoImpredicativeTypes -c AppendIndices.hs
+    "${g[@]}" "$opt" -XImpredicativeTypes -DCHECK_QUICK_LOOK -fforce-recomp -c AppendIndices.hs
 
     cat >RejectIndices.hs <<'HS'
 {-# LANGUAGE DataKinds, GADTs, KindSignatures, NoExperimentalDependentTypes, ScopedTypeVariables #-}
@@ -136,6 +140,30 @@ HS
        ! grep -Eq '^RejectIndices.hs:17:[0-9]+: error: \[GHC-83865\]' reject.log ||
        ! grep -Fq 'Fold other' reject.log; then
         cat reject.log >&2
+        exit 1
+    fi
+    cat >IncompletePlan.hs <<'HS'
+{-# LANGUAGE AllowAmbiguousTypes, DataKinds, GADTs, ImpredicativeTypes #-}
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module IncompletePlan where
+import Data.Type.Equality ((:~:)(Refl))
+import GHC.Sigma (Sigma(Pair))
+import Opaque (Fold)
+import PackedVecLibrary (CheckedSplit, Nat(..), Vec, appendVec, toList)
+
+unknown :: Vec Bool n -> Vec Bool m -> Vec Bool (Fold hidden)
+unknown _ _ = error "hidden index"
+
+bad :: CheckedSplit Bool ('S 'Z) ('S ('S 'Z)) -> [Bool]
+bad (Pair _ (left, right, _)) = toList (unknown left right)
+
+wrongLength :: CheckedSplit Bool ('S 'Z) ('S ('S 'Z)) -> Vec Bool 'Z
+wrongLength (Pair _ (left, right, Refl)) = appendVec left right
+HS
+    if "${g[@]}" "$opt" -c IncompletePlan.hs >incomplete.log 2>&1 ||
+       ! grep -Eq '^IncompletePlan.hs:13:[0-9]+: error: \[GHC-83605\]' incomplete.log ||
+       ! grep -Eq '^IncompletePlan.hs:16:[0-9]+: error: \[GHC-83865\]' incomplete.log; then
+        cat incomplete.log >&2
         exit 1
     fi
     popd >/dev/null

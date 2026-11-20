@@ -268,8 +268,10 @@ the stored field. After matching `Refl`, a later pattern can use
 `Vec a ('S n)`. A lazy tuple can bind the alias and defer the proof
 match. Separate packages still have separate witnesses. At the
 declared original length, `appendVec left right` takes both erased
-indices from the operands. With Quick Look enabled, keep the appended
-vector in a typed local binding before passing it to `toList`.
+indices from the operands. Quick Look also accepts
+`toList (appendVec left right)` when the declared operands fix every
+type argument of the inner call. Separate family variables can still
+need an explicit argument.
 [Ordinary client](../examples/packed-vector/NamedSplitClient.hs) and
 [pattern signature rules in proposal #128](https://ghc-proposals.readthedocs.io/en/latest/proposals/0128-scoped-type-variables-types.html).
 
