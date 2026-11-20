@@ -340,18 +340,25 @@ For a constructor field, use the constructor's name and count sums
 from left to right. Use a separate prefix for constructor fields.
 The constructor name is unique in the module even when record labels
 repeat. A Haskell98 field can use the type header's erased variables.
-A GADT constructor field uses the constructor signature's outer binders.
+A GADT constructor field uses the constructor signature's outer binders
+and any earlier retained arguments on the constructor's argument spine.
 Use the same free-variable order as rnConDecl for implicit binders.
 Leave the constructor result and any context to ordinary constructor
 checking. Leave inner forall groups to the ordinary renamer.
 
-Copy only the erased parameters used by the sum and the parameters
+The parser stores the argument spine from the first retained binder in
+con_res_ty. Walk that spine in source order. Reuse the normal checking of
+the retained application to each lifted synonym. A later binder does not
+scope over earlier fields. Stop at shadowing because the copied kind of
+an earlier parameter may need a name that the shadowing binder hides.
+
+Copy only the parameters used by the sum and the parameters
 used in their written kinds. Keep their original order. Require each
 free variable to be in scope in the source signature or field. Otherwise
 kind inference for the synonym could bind a variable that is out of scope
 at the source occurrence.
-Skip types that contain splices or holes. Do not lift across nested
-binders. They can shadow the original names or bind a retained index.
+Skip types that contain splices or holes. Leave nested binders within a
+field type to the ordinary renamer.
 -}
 -- | Prepare retained sums in top-level signatures and constructor fields.
 liftDeclarationSums :: Bool -> HsGroup GhcPs -> (HsGroup GhcPs, LiftedDecls)
@@ -398,15 +405,35 @@ liftDeclarationSums named_wildcards group
       = let occurrences = extractHsGadtTelescopes telescope $
                           extractConDeclGADTDetailsTyVars args $
                           extractHsTysRdrTyVars [result] []
-            visit = liftField (head names) (outerCaptures outer occurrences)
+            owner = head names
+            scope = outerCaptures outer occurrences
+            visit = liftField owner scope
             (args', sums) = case args of
               PrefixConGADT ann fields -> first (PrefixConGADT ann) (liftFieldList visit fields)
               RecConGADT ann fields -> first (RecConGADT ann) (liftRecordFields visit fields)
-        in (L loc con{con_g_args = args'}, sums)
+            (result', retained_sums, _) = liftRetainedFields owner scope result (length sums)
+        in (L loc con{con_g_args = args', con_res_ty = result'}, sums ++ retained_sums)
       where
         without_inner_forall (L _ HsGadtForAll{}) = False
         without_inner_forall _ = True
     liftConstructor _ con = (con, [])
+
+    liftRetainedFields owner scope ty@(L loc node) salt = case node of
+      HsForEachTy{hst_bndrs = binders, hst_body = body}
+        | let locals = explicitCaptures binders
+              scope' = scope ++ locals
+        , length locals == length binders
+        , null (findDupsEq (==) (map (unLoc . snd) scope')) ->
+            let (body', sums, next) = liftRetainedFields owner scope' body salt
+            in (L loc node{hst_body = body'}, sums, next)
+      HsFunTy ann arrow arg result ->
+        let (arg', sums, next) = liftBody "$field-sum:" owner scope arg salt
+            (result', later, end) = liftRetainedFields owner scope result next
+        in (L loc (HsFunTy ann arrow arg' result'), sums ++ later, end)
+      HsParTy ann body ->
+        let (body', sums, next) = liftRetainedFields owner scope body salt
+        in (L loc (HsParTy ann body'), sums, next)
+      _ -> (ty, [], salt)
 
     liftFields visit (PrefixCon ann fields) =
       first (PrefixCon ann) (liftFieldList visit fields)

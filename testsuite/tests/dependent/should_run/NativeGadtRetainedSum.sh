@@ -46,4 +46,18 @@ HS
         fi
         grep -Fq '[GHC-83865]' reject.log || { cat reject.log >&2; exit 1; }
     done
+
+    cat >BadBranch.hs <<'HS'
+{-# LANGUAGE GADTs #-}
+module BadBranch where
+import GHC.Sigma (Sigma(Pair))
+import NativeGadtRetainedSumProvider
+bad :: Later a b -> Vec a requested
+bad (Later actual (Pair _ (xs, _))) = xs
+HS
+    if "${ghc[@]}" "${flags[@]}" -ferror-spans -c BadBranch.hs >reject.log 2>&1; then
+        echo "Accepted an escaping constructor witness" >&2
+        exit 1
+    fi
+    grep -Eq 'BadBranch.hs:6:[0-9]+-[0-9]+: error: \[GHC-25897\]' reject.log || { cat reject.log >&2; exit 1; }
 done

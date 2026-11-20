@@ -58,3 +58,22 @@ innerWitnessBottom = build (error "inner witness")
 
 innerPairBottom :: Nested Bool
 innerPairBottom = Nested (Pair (S Z) (VCons True VNil, error "inner pair"))
+
+-- | Share the first constructor argument with a later retained sum.
+data Later a b where
+    Later :: foreach (n :: Nat) -> (some (m :: Nat) | (Vec a n, Vec b m)) -> Later a b
+
+-- | Construct the sum at the two supplied lengths.
+makeLater :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a n -> Vec b m -> Later a b
+makeLater n m xs ys = Later n (Pair m (xs, ys))
+
+-- | Give the consumer both lengths and their vectors.
+withLater :: Later a b -> (foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a n -> Vec b m -> r) -> r
+withLater (Later n (Pair m (xs, ys))) consume = consume n m xs ys
+
+-- | Supply an inner vector with an unused outer witness and vector.
+laterWitnessBottom :: Later Bool Char
+laterWitnessBottom = build (error "earlier witness")
+  where
+    build :: Nat -> Later Bool Char
+    build n = makeLater n (S Z) (error "earlier vector") (VCons 'x' VNil)
