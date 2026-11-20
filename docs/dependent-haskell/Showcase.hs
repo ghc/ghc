@@ -1027,6 +1027,8 @@ main = do
     observe "project twice from the same package producer call" (map RankedPackageClient.projectAt [True,False])
     observe "infer a polymorphic lambda witness and call its builder at Int" (RankedPackage.runBuilder 11)
     observe "infer a guarded callback and skip an unused input" RankedPackageClient.runGuarded
+    observe "infer callback witnesses from a type argument and separate equations"
+        RankedPackageClient.runDeclaredWitnesses
     observe "read an integer through an erased package" (PackageRules.roundTrip 7)
     observe "apply an imported integer package rule and keep the witness lazy"
         (PackageRules.open (41 :: Int, (+ 1)),

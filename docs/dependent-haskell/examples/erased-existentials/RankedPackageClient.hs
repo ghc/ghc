@@ -1,7 +1,12 @@
-{-# LANGUAGE ImpredicativeTypes, LambdaCase, NoExperimentalDependentTypes #-}
-module RankedPackageClient (runGuarded, runProjections, projectAt) where
+{-# LANGUAGE ImpredicativeTypes, LambdaCase, NoExperimentalDependentTypes, RequiredTypeArguments #-}
+module RankedPackageClient (runGuarded, runProjections, projectAt, runDeclaredWitnesses) where
 
-import RankedPackage (Callback(..), CallbackPair, GuardedBuilder, atTwoTypes, consumeIdentity, observeGuarded, pairFor)
+import Data.Proxy (Proxy(..))
+import RankedPackage
+    ( Callback(..), CallbackPair, GuardedBuilder, PolyId, TwoWitnessBuilder
+    , atTwoTypes, consumeIdentity, fromLeft, fromRight, observeGuarded
+    , observeTwo, pairFor, withWitness
+    )
 
 -- | Both projections use the package chosen for the same input.
 projectAt :: Bool -> (Int, Bool)
@@ -25,3 +30,20 @@ builder = \cases
 runGuarded :: ((Int, Bool), (Int, Bool))
 runGuarded = (observeGuarded builder False (error "unused guard input"),
               observeGuarded builder True True)
+
+-- | Select the witness with a required type argument.
+required :: GuardedBuilder
+required = \_ input -> (withWitness @Int (type PolyId) Proxy) id (\f -> (f 7, f input))
+
+-- | Select the left and right witnesses in separate equations.
+joint :: TwoWitnessBuilder
+joint = \cases
+    False input -> fromLeft input
+    True input -> fromRight input
+
+-- | Run both builders and leave the first branch's input unused.
+runDeclaredWitnesses :: ((Int, Bool), ((Int, Bool), (Int, Bool)))
+runDeclaredWitnesses =
+    ( observeGuarded required True True
+    , (observeTwo joint False (error "unused callback input"), observeTwo joint True False)
+    )

@@ -1,11 +1,13 @@
-{-# LANGUAGE ExperimentalDependentTypes, ImpredicativeTypes, RankNTypes, ScopedTypeVariables, TypeApplications #-}
+{-# LANGUAGE ExperimentalDependentTypes, ImpredicativeTypes, RankNTypes, RequiredTypeArguments, ScopedTypeVariables, TypeApplications #-}
 
 module RankedPackage
     ( runCallback, runPair, runBuilder, CallbackPair, pairFor
     , Callback(..), GuardedBuilder, atTwoTypes, consumeIdentity, observeGuarded
+    , PolyId, withWitness, TwoWitnessBuilder, fromLeft, fromRight, observeTwo
     ) where
 
 import Data.Kind (Type)
+import Data.Proxy (Proxy)
 
 data Callback t = Callback t (t -> (Int, Bool))
 type Hidden = exists (t :: Type). Callback t
@@ -64,3 +66,29 @@ consumeIdentity value = Callback @PolyId value (\f -> (f 11, f False))
 observeGuarded :: GuardedBuilder -> Bool -> Bool -> (Int, Bool)
 observeGuarded build ready input =
     case build ready input of Callback value call -> call value
+
+-- | Store a value and its consumer at the required type argument.
+withWitness :: forall tag. forall t -> Proxy tag -> t -> (t -> (Int, Bool)) -> Callback t
+withWitness (type t) _ value call = Callback @t value call
+
+type PolyMaybe = forall a. a -> Maybe a
+data TwoCallbacks l r = FromLeft (Callback l) | FromRight (Callback r)
+type TwoWitnessBuilder = exists (l :: Type). exists (r :: Type).
+    Bool -> Bool -> TwoCallbacks l r
+
+-- | Fix the left witness and leave the right witness polymorphic.
+fromLeft :: forall r. Bool -> TwoCallbacks PolyId r
+fromLeft _ = FromLeft (consumeIdentity id)
+
+-- | Fix the right witness and leave the left witness polymorphic.
+fromRight :: forall l. Bool -> TwoCallbacks l PolyMaybe
+fromRight input = FromRight (Callback @PolyMaybe Just useMaybe)
+  where
+    useMaybe :: PolyMaybe -> (Int, Bool)
+    useMaybe f = (maybe 0 id (f 13), maybe False id (f input))
+
+-- | Use the value and consumer from the selected callback.
+observeTwo :: TwoWitnessBuilder -> Bool -> Bool -> (Int, Bool)
+observeTwo build branch input = case build branch input of
+    FromLeft (Callback value call) -> call value
+    FromRight (Callback value call) -> call value
