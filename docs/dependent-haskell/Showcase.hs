@@ -86,6 +86,7 @@ import GHC.TypeLits (charVal)
 import qualified IndexBetaClient as IndexBeta
 import qualified IndexedMark
 import qualified IndexedVec
+import qualified CertifiedSplitClient
 import qualified OrdinaryOpenVectorAppend
 import qualified VectorSplitObservation
 import qualified KnownArgumentClient as Known
@@ -1523,6 +1524,8 @@ sourceAddition = do
         (OrdinaryOpenVectorAppend.observeAppendPair zeroCut, OrdinaryOpenVectorAppend.observeAppendPair n)
     observe "split the appended vector at its first length"
         (toList (fst split), toList (snd split))
+    rebuilt <- CertifiedSplitClient.splitObservation
+    observe "split a vector with a proof of its original contents" rebuilt
     observe "take and drop at the first runtime length" (toList prefix, toList suffix)
     checkedInput <- newIORef [True, False] >>= readIORef
     let matchesEmpty input = case ListVectorClient.fromList input of

@@ -157,6 +157,7 @@ prove empty append preserves a runtime vector: [True,False,False]
 prove the first cell of append at runtime: [False,True,False,False]
 prove empty append for two vectors at a shared runtime cut: (True,True)
 split the appended vector at its first length: ([True],[False,False])
+split a vector with a proof of its original contents: (([True,False],[True],[True,False,True]),([True,True],[True]))
 take and drop at the first runtime length: ([True],[False,False])
 prove the runtime vector is VNil in the empty branch: (True,False)
 check a runtime cut against a vector length: (Just (1,[True],[False]),Nothing)
