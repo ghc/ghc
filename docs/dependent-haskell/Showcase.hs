@@ -828,6 +828,9 @@ genericSafeIndexing = do
             Nothing -> Nothing
             Just checked -> Just (Parameterized.indexGeneric @Int values checked)
     observe "generic checked Int position" selected
+    observe "check a signed position in a packaged vector" $
+        case ListVectorClient.fromList values of
+            Sigma.Pair _ cells -> FinitePositionClient.lookupVecViaView cells position
     observe "generic negative position ignores list"
         (Parameterized.lookupGeneric (error "unused generic negative-position list" :: [Int]) (-1))
     let functions = [id, (* 2)] :: [Int -> Int]

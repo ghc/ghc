@@ -44,6 +44,25 @@ data Fin :: Nat -> Type where
     FZ :: forall (n :: Nat). Fin ('S n)
     FS :: forall (n :: Nat). Fin n -> Fin ('S n)
 
+-- | Check a signed vector position. Inspect only the spine through that position.
+mkFinVec :: Vec a n -> Int -> Maybe (Fin n)
+mkFinVec xs position
+    | position < 0 = Nothing
+    | otherwise = case xs of
+        VNil -> Nothing
+        VCons _ rest
+            | position == 0 -> Just FZ
+            | otherwise -> FS <$> mkFinVec rest (position - 1)
+
+-- | Select a cell at a position checked against this vector's length.
+indexVec :: Fin n -> Vec a n -> a
+indexVec FZ (VCons x _) = x
+indexVec (FS smaller) (VCons _ rest) = indexVec smaller rest
+
+-- | Check and select a vector cell without evaluating it.
+lookupVecChecked :: Vec a n -> Int -> Maybe a
+lookupVecChecked xs position = (`indexVec` xs) <$> mkFinVec xs position
+
 -- | Select an element with a position below the retained list's length.
 -- See Note [Closed-list positions].
 indexClosed :: foreach (xs :: [Bool]) -> Fin (Count xs) -> Bool

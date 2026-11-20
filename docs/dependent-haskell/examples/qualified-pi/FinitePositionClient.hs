@@ -1,12 +1,22 @@
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, ScopedTypeVariables, TypeApplications #-}
-module FinitePositionClient (observeFinitePosition) where
+module FinitePositionClient (lookupVecViaView, observeFinitePosition) where
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Data.IORef (newIORef, readIORef)
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Sigma (Sigma(Pair))
 import FinitePosition
-import PackedVecLibrary (Nat(..))
-import ParameterizedIndexLibrary (Fin(..))
+import PackedVecLibrary (Nat(..), Vec(..))
+import ParameterizedIndexLibrary (Fin(..), indexVec, mkFinVec)
+
+-- | Check a signed position and select the element through its finite view.
+lookupVecViaView :: Vec a n -> Int -> Maybe a
+lookupVecViaView xs offset = do
+    i <- mkFinVec xs offset
+    case viewFin i of
+        AtZero -> case xs of
+            VCons x _ -> Just x
+        AtSucc (Pair p Refl) -> case xs of
+            VCons _ rest -> Just (indexVec p rest)
 
 -- | Count the successor constructors of a finite position.
 rank :: Fin n -> Int

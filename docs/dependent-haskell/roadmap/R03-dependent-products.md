@@ -311,3 +311,10 @@ predecessor at the same bound fails at `Refl`.
 [Haskell source](../examples/qualified-pi/FinitePosition.hs),
 [ordinary client](../examples/qualified-pi/FinitePositionClient.hs)
 and [Agda provenance](../REFERENCES.md#recover-the-predecessor-of-a-bounded-position).
+
+`mkFinVec` checks a signed position against the vector spine. A negative
+position leaves the vector unevaluated. A valid position needs only
+the spine through that cell. In the successor view, the ordinary client
+opens the proof and uses the predecessor to index the vector tail.
+The bound also lets `indexVec` use the checked position with another
+vector of the same length.
