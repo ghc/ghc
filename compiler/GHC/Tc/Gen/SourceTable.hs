@@ -65,7 +65,7 @@ import GHC.Tc.Zonk.TcType (zonkTcType, zonkTcTypes)
 import GHC.Types.Avail (availNames)
 import GHC.Types.Basic (Origin(..), LeftOrRight(..), SourceTableOrigin(..), pickLR)
 import GHC.Types.Error (errorsFound)
-import GHC.Types.Id.Info (IdDetails(SourceTableId))
+import GHC.Types.Id.Info (IdDetails(SourceTableId, VanillaId))
 import GHC.Types.Id (globaliseId, idName, isClassOpId_maybe, isDataConWorkId_maybe, idUnfolding, mkVanillaGlobal, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe,
                      sourceMethodTarget_maybe)
 import GHC.Types.InlinePragma (isNeverActive)
@@ -583,16 +583,13 @@ optionalSourceUsePlan heads methods = do
 
 -- | Find a currently visible rewrite that can change one selected operation.
 changedSourceUse :: [(Id, Maybe Name)] -> TcM (Maybe (Id, Maybe Name))
-changedSourceUse = changedSourceUseWith finalCoreMapperOwner
-
-changedSourceUseWith :: (Id -> Bool) -> [(Id, Maybe Name)] -> TcM (Maybe (Id, Maybe Name))
-changedSourceUseWith uses_final_core ops = do
+changedSourceUse ops = do
     env <- getGblEnv
     visible <- visibleSourceMethodRules env
     rewriting <- goptM Opt_EnableRewriteRules
     let check [] = pure Nothing
         check (op@(v, arg) : rest)
-          | uses_final_core v = do
+          | finalCoreMapperOwner v = do
               let local = sourceRuleOwners (tcg_rules env)
               if rewriting && (idName v `elemNameSet` local || not (checkedMapperRules visible v))
                 then pure (Just op) else check rest
@@ -639,23 +636,23 @@ whose proof is unused records no source dependency or rule restriction.
 
 -- | Record rule heads and their ABI dependencies after checking the visible rules.
 recordSourceUses :: [(Id, Maybe Name)] -> TcM ()
-recordSourceUses = recordSourceUsesWith finalCoreMapperOwner
+recordSourceUses ops = do
+    changed <- changedSourceUse ops
+    case changed of
+      Just (v, _) -> failWithTc (TcRnRetainedQuantificationError
+        (if finalCoreMapperOwner v
+           then RetainedFinalCoreRulesEnabled (idName v)
+           else RetainedSourceRule (idName v)))
+      Nothing -> publishSourceUses ops
 
 -- | Use the exact dependencies visited by the open evaluator.
 -- See Note [Identity certificates and open unfoldings].
 recordUnfoldedSourceUses :: [(Id, Maybe Name)] -> TcM ()
-recordUnfoldedSourceUses = recordSourceUsesWith
-    (\v -> finalCoreMapperOwner v && not (isFinalCoreIdentity v))
-
-recordSourceUsesWith :: (Id -> Bool) -> [(Id, Maybe Name)] -> TcM ()
-recordSourceUsesWith uses_final_core ops = do
-    changed <- changedSourceUseWith uses_final_core ops
-    case changed of
-      Just (v, _) -> failWithTc (TcRnRetainedQuantificationError
-        (if uses_final_core v
-           then RetainedFinalCoreRulesEnabled (idName v)
-           else RetainedSourceRule (idName v)))
-      Nothing -> publishSourceUses ops
+recordUnfoldedSourceUses = recordSourceUses . map ordinary_use
+  where
+    ordinary_use (v, arg)
+      | isFinalCoreIdentity v = (setIdDetails v VanillaId, arg)
+      | otherwise = (v, arg)
 
 -- | Record checked operations without changing the location of late-rule errors.
 publishSourceUses :: [(Id, Maybe Name)] -> TcM ()
@@ -1309,7 +1306,8 @@ of the certificate must disable rewriting.
 Keep the ordinary unfolding path for a written symbolic application.
 See GHC.Rename.Env. The open evaluator reads each
 definition it visits, including aliases, and records its instantiated
-rule head. Apply the ordinary rule check to those uses. The late rule
+rule head. Present those identities as ordinary Ids to the rule check.
+Their Names, types, and attached rules are the same. The late rule
 check can identify them in tcg_evaluated_term_uses. Keep the stricter
 rule policy for nominal uses and for non-identity final Core owners.
 -}
