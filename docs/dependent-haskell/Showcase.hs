@@ -1582,9 +1582,9 @@ listBoundaries = do
     observe "use one dependent pair type at two witness types"
         (Pair.withPair chars (\k v -> (natToInt k, toList v)),
          Pair.withPair tag (\_ c -> getConst c))
-    observe "expand a named consumer over an indexed vector"
-        (Refl :: Pair.Consumer (Vec Char 'Z) (Const String) String
-              :~: (foreach (v :: Vec Char 'Z) -> Const String v -> String))
+    case (Refl :: Pair.Consumer (Vec Char 'Z) (Const String) String
+               :~: (foreach (v :: Vec Char 'Z) -> Const String v -> String)) of
+        Refl -> observe "expand a named consumer over an indexed vector" True
     let row = replicateNative n 'x'
     observe "name a dependent consumer at a runtime vector length"
         (describeVector row (Const "row"))
