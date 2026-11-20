@@ -827,6 +827,12 @@ checked template when its branch evidence has an interface encoding. Native
 index alias alternatives lack that encoding. Interface loading also rejects
 retained dictionary operations. Do not expose their optional templates.
 
+A specialization such as numericCall @Int can leave an exported worker and
+an automatic rule that redirects calls to it. If the rule contains retained
+Core, the interface rule reader cannot reconstruct it. Keep the worker and
+the local specialization. Omit this optional rule from the exported rules.
+See Note [Trimming auto-rules].
+
 A compulsory template cannot be removed. Check it after the simplifier,
 which can change the body that the desugarer checked. Exported RULES must
 also be safe to apply in ordinary importers. The retained driver rejects
@@ -1104,6 +1110,9 @@ findExternalRules opts binds imp_id_rules unfold_env
         --      been discarded; see Note [Trimming auto-rules]
 
     expose_rule rule = all is_external_id (ruleLhsFreeIdsList rule)
+                    && not (opt_has_retained_core opts && isAutoRule rule
+                            && hasNativeDependentProgram [] [rule])
+                -- See Note [Retained Core across module boundaries].
                 -- Don't expose a rule whose LHS mentions a locally-defined
                 -- Id that is completely internal (i.e. not visible to an
                 -- importing module).  NB: ruleLhsFreeIds only returns LocalIds.
