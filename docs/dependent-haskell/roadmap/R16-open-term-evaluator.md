@@ -1005,6 +1005,15 @@ rules visible at the point where it uses the equation. A closed call
 with object code records the object dependency.
 [Binary enumeration regression](../../../testsuite/tests/dependent/should_run/NativeBinaryEnum.sh).
 
+The ordinary function `mayProceed Red _ = False` skips its second
+argument. The other branch returns it. A client can save
+`mayProceed 'Green` as a partial type-level function and prove that it
+returns an as-yet unknown permission. The runtime example calls the red
+branch with an undefined permission and gets `False`.
+[Ordinary producer](../examples/open-evaluation/OpenMapWorker.hs),
+[partial function](../examples/open-evaluation/OpenMapSource.hs)
+and [client proof](../examples/open-evaluation/OpenMapProof.hs).
+
 The remaining part of the roadmap example is the mapper. The installed
 `Prelude.map` has fusion rules. Its interface can omit the recursive
 unfolding. Evidence for the mapper must survive compilation of its

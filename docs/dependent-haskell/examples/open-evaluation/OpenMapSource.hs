@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, Modifiers, PolyKinds, StandaloneKindSignatures #-}
-module OpenMapSource (Each, NegateAll, Signals, OrdinarySignals, OrdinaryPrefix, Heads) where
+module OpenMapSource (Each, NegateAll, Signals, OrdinarySignals, OrdinaryPrefix, AtGreen, Heads) where
 
 import qualified ClosedTableLibrary as C
 import GHC.Exts (U)
@@ -25,6 +25,10 @@ type OrdinarySignals lights = W.each W.signal lights
 -- | Retain the ordinary mapper after supplying its callback.
 type OrdinaryPrefix :: [W.Lamp] %U -> [W.Signal]
 type OrdinaryPrefix = W.each W.signal
+
+-- | Supply the light now and the permission at the use site.
+type AtGreen :: Bool %U -> Bool
+type AtGreen = W.mayProceed 'W.Green
 
 -- | Collect the optional heads of rows using an ordinary polymorphic callback.
 type Heads :: [S.Spine a] -> [Maybe a]

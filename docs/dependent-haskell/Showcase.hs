@@ -102,6 +102,7 @@ import qualified LazyParcel
 import qualified LegacyKindArgument
 import qualified OpenBuildSource
 import qualified OpenMapProof
+import qualified OpenMapWorker
 import qualified InstalledNotProof
 import qualified PreludeMapProof
 import qualified ConsRuleMapProof
@@ -1146,6 +1147,9 @@ main = do
         (OpenMapProof.negateHead (Proxy @'[]), OpenMapProof.redStops (Proxy @'[]))
     observe "map an ordinary enumeration callback over an unknown tail"
         (OpenMapProof.ordinaryRedStops (Proxy @'[]))
+    observe "leave the permission argument open in an ordinary traffic-light function"
+        ( OpenMapProof.greenPermission (Proxy @'True)
+        , OpenMapWorker.mayProceed OpenMapWorker.Red (error "unused permission") )
     observe "use Prelude.not on a known head with an unknown tail"
         (InstalledNotProof.negateHead (Proxy @'[]))
     putStrLn ("use Prelude.map and Prelude.not on an empty list and an unknown tail: "

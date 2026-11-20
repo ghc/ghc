@@ -175,8 +175,12 @@ unchanged. Two distinct scrutinees, reordered rows, and separate
 signatures each have their own helper. The ordinary client can use the
 function at `Int` and `Bool` from its interface. Template Haskell can
 reify the signature in its owner or a client. A stuck mismatch names the
-source signature. Nested explicit quantifiers still require a named
-synonym in this implementation.
+source signature. An explicit nested erased `forall` can name its
+own scrutinee. Each nested telescope starts a fresh scope, even when
+two binders have the same spelling. A `foreach` binder can also supply
+a retained constructor index with a written algebraic domain. A bare
+function arrow copied from a runtime domain can change matchability
+in an erased kind, so that case still requires a named helper.
 [Source](../examples/open-evaluation/NativeCase.hs),
 [client](../../../testsuite/tests/dependent/should_run/NativeTypeCaseClient.hs)
 and [reification](../../../testsuite/tests/dependent/should_run/NativeTypeCaseReify.hs).

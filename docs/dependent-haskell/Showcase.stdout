@@ -301,6 +301,7 @@ pass a constructor to uncurry with two unknown fields: Refl
 prove one map step for an arbitrary callback and tail: Refl
 map Boolean negation and traffic signals over an unknown tail: (Refl,Refl)
 map an ordinary enumeration callback over an unknown tail: Refl
+leave the permission argument open in an ordinary traffic-light function: (Refl,False)
 use Prelude.not on a known head with an unknown tail: Refl
 use Prelude.map and Prelude.not on an empty list and an unknown tail: (Refl,Refl)
 use a checked cons rule without forcing the callback, head or tail: (Refl,True)

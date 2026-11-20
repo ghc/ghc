@@ -1,5 +1,5 @@
 {-# LANGUAGE NoExperimentalDependentTypes #-}
-module OpenMapWorker (each, Lamp(..), Signal(..), signal) where
+module OpenMapWorker (each, Lamp(..), Signal(..), signal, mayProceed) where
 
 -- | Apply a function to each element and keep the result fields lazy.
 each :: (a -> b) -> [a] -> [b]
@@ -16,3 +16,8 @@ data Signal = Stop | Go
 signal :: Lamp -> Signal
 signal Red = Stop
 signal Green = Go
+
+-- | A red light stops traffic without consulting the permission.
+mayProceed :: Lamp -> Bool -> Bool
+mayProceed Red _ = False
+mayProceed Green allowed = allowed
