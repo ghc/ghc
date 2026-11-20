@@ -216,10 +216,27 @@ waits for a matching row. The same check applies to a case in the
 domain of an ordinary arrow in the field.
 [Field source](../examples/open-evaluation/NativeNestedCase.hs).
 
-Template Haskell reports GHC-75721 at a splice that reifies a retained
-`foreach` binder or an index bound by that binder. Its `ForallVisT` binds a visible
-erased type argument. The type AST has no binder for a runtime argument.
-Ordinary module interfaces retain the runtime binder.
+### Quote and reify retained function types
+
+`ForEachT` preserves the runtime binder, argument visibility and domain of
+a retained function type. `IndexVarT` refers to that binder in the result.
+The erased `ForallVisT` and `VarT` retain their meanings. The Showcase splices
+a retained signature and calls the resulting function with a runtime Boolean.
+The external-interpreter test also reifies a same-spelled erased and retained
+binder from an interface, splices the type and calls the result. It checks the
+type codec and rejects a runtime name used as an erased variable.
+[Provider](../examples/open-evaluation/NativeRetainedTH.hs) and
+[test](../../../testsuite/tests/dependent/should_run/NativeTypeCaseRetainedTh.sh).
+
+The retained and erased binders follow the distinction in proposal #378.
+Proposal #281 establishes visible erased quantification. The GADT syntax review
+for #402 asks which namespace owns a constructor binder. Reifying a flat
+constructor declaration whose later fields refer to its retained binder still
+reports GHC-75721. That declaration needs a constructor telescope in the TH
+AST. Raw type-case quotation still has its own representation boundary.
+[Design #378](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#quantifiers),
+[proposal #281](https://ghc-proposals.readthedocs.io/en/latest/proposals/0281-visible-forall.html)
+and [review #402](https://github.com/ghc-proposals/ghc-proposals/pull/402#issuecomment-801420999).
 
 ## A case in a value signature
 

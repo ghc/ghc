@@ -392,6 +392,11 @@ test('NativeTypeCaseReify',
       extra_files([open_eval_dir + 'NativeCase.hs', open_eval_dir + 'NativeNestedCase.hs',
                    open_eval_dir + 'OpenMapWorker.hs'])],
      multimod_compile, ['NativeTypeCaseReify', '-v0 -dcore-lint ' + config.ghc_th_way_flags])
+test('NativeTypeCaseRetainedTh',
+     [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal']),
+      extra_files([open_eval_dir + 'NativeRetainedTH.hs',
+                   'NativeTypeCaseRetainedThWire.hs'])],
+     run_command, ['bash NativeTypeCaseRetainedTh.sh "{compiler}" "{libdir}"'])
 
 test('NativeRetainedFunctionRules',
      [req_host_target_ghc, only_ways(['normal']),
