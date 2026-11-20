@@ -39,6 +39,7 @@ for opt in -O0 -O1 -O2; do
     if [[ $opt == -O1 ]]; then
         grep -Fq 'Inlining done: NativeIndexedConsProof.see' client.log
         grep -Fq 'Inlining done: NativeIndexedConsProof.inlineCons' client.log
+        grep -Fq 'Inlining done: NativeIndexedConsProof.inlineNestedCons' client.log
         grep -Fq 'Inlining done: NativeIndexedOperandWire.tagCons' client.log
     fi
     # Supply the preceding compiler as the third argument for a compatibility run.

@@ -1,5 +1,7 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures, PolyKinds, ScopedTypeVariables, StandaloneKindSignatures, TypeApplications #-}
-module NativeIndexedConsProof (Seen(..), see, inlineNil, inlineCons, writtenNil, writtenCons) where
+module NativeIndexedConsProof (
+    Seen(..), see, inlineNil, inlineCons, inlineNestedCons, writtenNil, writtenCons
+  ) where
 
 import Data.Kind (Type)
 import qualified PackedVecLibrary as P
@@ -34,6 +36,10 @@ inlineNil = inspectNil P.VNil
 inlineCons :: forall n. foreach (x :: Bool) -> foreach (xs :: P.Vec Bool n) ->
               Seen ('P.VCons x xs)
 inlineCons x xs = see @('P.S n) (P.VCons x xs)
+
+inlineNestedCons :: forall n. foreach (first :: Bool) -> foreach (second :: Bool) ->
+                    foreach (xs :: P.Vec Bool n) -> Seen ('P.VCons first ('P.VCons second xs))
+inlineNestedCons first second xs = see @('P.S ('P.S n)) (P.VCons first (P.VCons second xs))
 
 writtenNil :: Seen 'P.VNil
 writtenNil = seeOperand @'P.Z P.VNil

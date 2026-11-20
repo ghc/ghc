@@ -3,7 +3,7 @@ module Main where
 
 import Control.Exception (SomeException, evaluate, try)
 import Control.Monad (unless)
-import NativeIndexedConsProof (Seen(..), see, inlineCons, inlineNil, writtenCons, writtenNil)
+import NativeIndexedConsProof (Seen(..), see, inlineCons, inlineNestedCons, inlineNil, writtenCons, writtenNil)
 import NativeIndexedOperandWire (tagCons)
 import qualified PackedVecLibrary as P
 
@@ -13,11 +13,13 @@ observesCons input = case see input of SeenCons -> True
 main :: IO ()
 main = do
     let headField = error "forced head" :: Bool
+        secondHead = error "forced second head" :: Bool
         tailField = error "forced tail" :: P.Vec Bool 'P.Z
         lazyFields = P.VCons headField tailField
     unless (observesCons lazyFields) (fail "cons proof changed field demand")
     case inlineNil of SeenNil -> pure ()
     case inlineCons headField tailField of SeenCons -> pure ()
+    case inlineNestedCons headField secondHead tailField of SeenCons -> pure ()
     case writtenNil of SeenNil -> pure ()
     case writtenCons headField tailField of SeenCons -> pure ()
     case fst (tagCons headField tailField) of P.VCons _ _ -> pure ()
