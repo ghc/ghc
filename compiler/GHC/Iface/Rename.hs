@@ -709,6 +709,9 @@ rnIfaceFamTyConFlav (IfaceClosedTypeFamilyTyCon ctf)
         IfaceAbstractClosedTyFamTyCon -> pure IfaceAbstractClosedTyFamTyCon
         IfaceBuiltInClosedTyFamTyCon -> pure IfaceBuiltInClosedTyFamTyCon
         IfaceClosedTyFamTyCon mb_ax -> IfaceClosedTyFamTyCon <$> traverse rn_coax mb_ax
+        IfaceScopedClosedTyFamTyCon owner is_sum ax ->
+          IfaceScopedClosedTyFamTyCon <$> rnIfaceNeverExported owner
+                                     <*> pure is_sum <*> rn_coax ax
   where
     rn_coax (n, axs) = ((,) <$> rnIfaceNeverExported n
                             <*> mapM rnIfaceAxBranch axs)

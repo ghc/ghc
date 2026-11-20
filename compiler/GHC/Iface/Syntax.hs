@@ -9,6 +9,7 @@ module GHC.Iface.Syntax (
         module GHC.Iface.Type,
 
         IfaceDecl(..), IfaceFamTyConFlav(..), IfaceClosedTyFamTyCon(..),
+        ifaceClosedFamilyAxiom_maybe,
         IfaceClassOp(..), IfaceAT(..),
         IfaceConDecl(..), IfaceConDecls(..), IfaceEqSpec,
         IfaceExpr(..), IfaceAlt(..), IfaceLetBndr(..), IfaceBinding,
@@ -317,6 +318,16 @@ data IfaceClosedTyFamTyCon
     -- See Note [Pretty printing via Iface syntax] in "GHC.Types.TyThing.Ppr"
   | IfaceAbstractClosedTyFamTyCon
   | IfaceBuiltInClosedTyFamTyCon
+  | IfaceScopedClosedTyFamTyCon !IfExtName !Bool (IfExtName, [IfaceAxBranch])
+
+-- | The checked axiom and its rows, including private retained-sum families.
+ifaceClosedFamilyAxiom_maybe :: IfaceFamTyConFlav -> Maybe (IfExtName, [IfaceAxBranch])
+ifaceClosedFamilyAxiom_maybe (IfaceClosedTypeFamilyTyCon ctf) =
+  case ctf of
+    IfaceClosedTyFamTyCon mb_ax -> mb_ax
+    IfaceScopedClosedTyFamTyCon _ _ ax -> Just ax
+    _ -> Nothing
+ifaceClosedFamilyAxiom_maybe _ = Nothing
 
 data IfaceClassOp
   = IfaceClassOp IfaceTopBndr
@@ -1453,6 +1464,8 @@ pprIfaceDecl ss decl@(IfaceFamily { ifName = tycon
 
     pp_where (IfaceClosedTypeFamilyTyCon (IfaceClosedTyFamTyCon {}))
       = text "where"
+    pp_where (IfaceClosedTypeFamilyTyCon (IfaceScopedClosedTyFamTyCon {}))
+      = text "where"
     pp_where _
       = empty
 
@@ -1476,17 +1489,22 @@ pprIfaceDecl ss decl@(IfaceFamily { ifName = tycon
             ppShowIface ss (text "closed, abstract")
           IfaceClosedTyFamTyCon {} ->
             empty -- see pp_branches
+          IfaceScopedClosedTyFamTyCon owner is_sum _ ->
+            ppShowIface ss (text (if is_sum then "sum codomain of" else "decision in") <+> ppr owner)
           IfaceBuiltInClosedTyFamTyCon ->
             ppShowIface ss (text "built-in")
 
-    pp_branches (IfaceClosedTypeFamilyTyCon (IfaceClosedTyFamTyCon (Just (ax, brs))))
+    pp_branches (IfaceClosedTypeFamilyTyCon (IfaceClosedTyFamTyCon (Just ax))) = pp_equations ax
+    pp_branches (IfaceClosedTypeFamilyTyCon (IfaceScopedClosedTyFamTyCon _ _ ax)) = pp_equations ax
+    pp_branches _ = Outputable.empty
+
+    pp_equations (ax, brs)
       = vcat (unzipWith (pprAxBranch
                      (pprPrefixIfDeclBndr
                        (ss_how_much ss)
                        (occName tycon))
                   ) $ zip [0..] brs)
         $$ ppShowIface ss (text "axiom" <+> ppr ax)
-    pp_branches _ = Outputable.empty
 
     -- See Note [Suppressing binder signatures] in GHC.Iface.Type
     suppress_bndr_sig = SuppressBndrSig True
@@ -2127,6 +2145,8 @@ freeNamesIfFamFlav (IfaceClosedTypeFamilyTyCon ctf) =
     IfaceClosedTyFamTyCon (Just (ax, br)) ->
       unitNameSet ax &&& fnList freeNamesIfAxBranch br
     IfaceClosedTyFamTyCon Nothing -> emptyNameSet
+    IfaceScopedClosedTyFamTyCon owner _ (ax, br) ->
+      mkNameSet [owner, ax] &&& fnList freeNamesIfAxBranch br
     IfaceBuiltInClosedTyFamTyCon -> emptyNameSet
     IfaceAbstractClosedTyFamTyCon -> emptyNameSet
 
@@ -2645,6 +2665,8 @@ instance Binary IfaceFamTyConFlav where
       case ctf of
         IfaceClosedTyFamTyCon mb      -> putByte bh 2 >> put_ bh mb
         IfaceAbstractClosedTyFamTyCon -> putByte bh 3
+        IfaceScopedClosedTyFamTyCon owner is_sum ax ->
+          putByte bh 4 >> put_ bh owner >> put_ bh is_sum >> put_ bh ax
         IfaceBuiltInClosedTyFamTyCon  ->
           pprPanic "Cannot serialize IfaceBuiltInClosedTyFamTyCon (pretty-printing only)" Outputable.empty
 
@@ -2655,6 +2677,8 @@ instance Binary IfaceFamTyConFlav where
                     2 -> do { mb <- get bh
                             ; return (IfaceClosedTypeFamilyTyCon $ IfaceClosedTyFamTyCon mb) }
                     3 -> return $ IfaceClosedTypeFamilyTyCon IfaceAbstractClosedTyFamTyCon
+                    4 -> IfaceClosedTypeFamilyTyCon <$>
+                           (IfaceScopedClosedTyFamTyCon <$> get bh <*> get bh <*> get bh)
                     _ -> pprPanic "Binary.get(IfaceFamTyConFlav): Invalid tag"
                                   (ppr (fromIntegral h :: Int)) }
 
@@ -3441,6 +3465,7 @@ instance NFData IfaceClosedTyFamTyCon where
     IfaceClosedTyFamTyCon ax -> rnf ax
     IfaceAbstractClosedTyFamTyCon -> ()
     IfaceBuiltInClosedTyFamTyCon -> ()
+    IfaceScopedClosedTyFamTyCon owner is_sum ax -> rnf owner `seq` rnf is_sum `seq` rnf ax
 
 instance NFData IfaceTickish where
   rnf = \case

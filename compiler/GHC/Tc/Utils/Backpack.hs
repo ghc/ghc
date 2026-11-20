@@ -412,8 +412,9 @@ thinModIface avails iface =
 ifaceDeclNeverExportedRefs :: IfaceDecl -> [Name]
 ifaceDeclNeverExportedRefs d@IfaceFamily{} =
     case ifFamFlav d of
-        IfaceClosedTypeFamilyTyCon (IfaceClosedTyFamTyCon (Just (n, _)))
-            -> [n]
+        IfaceClosedTypeFamilyTyCon (IfaceScopedClosedTyFamTyCon owner _ (n, _))
+            -> [owner, n]
+        family | Just (n, _) <- ifaceClosedFamilyAxiom_maybe family -> [n]
         _   -> []
 ifaceDeclNeverExportedRefs _ = []
 

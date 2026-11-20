@@ -1256,8 +1256,8 @@ reduceTyFamApp_maybe envs role tc tys
   -- Closed type families
   | Just ctf <- closedTypeFamily_maybe tc
   = case ctf of
-      CTF (Just ax)
-        | Just (ind, inst_tys, inst_cos) <- chooseBranch ax tys
+      _ | Just ax <- closedTyFamCoAxiom_maybe ctf
+        , Just (ind, inst_tys, inst_cos) <- chooseBranch ax tys
         -> let co = mkAxInstCo role (BranchedAxiom ax ind) inst_tys inst_cos
            in Just $ coercionRedn co
       CTF_BuiltIn builtin_fam

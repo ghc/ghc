@@ -27,7 +27,7 @@ module GHC.Core.Coercion.Axiom (
        CoAxiomRule(.., BuiltInEqRule), BuiltInFamRewrite(..), BuiltInFamInjectivity(..), TypeEqn,
        coAxiomRuleArgRoles, coAxiomRuleRole,
        coAxiomRuleBranch_maybe, isNewtypeAxiomRule_maybe,
-       ClosedTyFam(..), BuiltinClosedTyFam(..),
+       ClosedTyFam(..), closedTyFamCoAxiom_maybe, BuiltinClosedTyFam(..),
        trivialBuiltInClosedTyFam
        ) where
 
@@ -712,6 +712,15 @@ data ClosedTyFam
   -- | A closed type family declared in an hs-boot file, with a declaration
   -- of the form @type family F a where ..@ (the @..@ is source syntax, not an elision).
   | CTF_Abstract
+  -- | A private family in a retained-sum codomain. The Name is the root
+  -- of the lexical scope. The flag identifies the codomain of a written sum.
+  | CTF_Scoped !Name !Bool (CoAxiom Branched)
+
+-- | Get the checked equations of an ordinary or scoped closed family.
+closedTyFamCoAxiom_maybe :: ClosedTyFam -> Maybe (CoAxiom Branched)
+closedTyFamCoAxiom_maybe (CTF mb_ax) = mb_ax
+closedTyFamCoAxiom_maybe (CTF_Scoped _ _ ax) = Just ax
+closedTyFamCoAxiom_maybe _ = Nothing
 
 -- | The equations and interaction rules of a built-in closed type family.
 data BuiltinClosedTyFam = BuiltinClosedTyFam

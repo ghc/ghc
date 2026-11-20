@@ -827,11 +827,17 @@ tc_iface_decl parent _ (IfaceFamily {ifName = tc_name,
        = do { tc_rep_name <- newTyConRepName tc_name
             ; return (DataFamilyTyCon tc_rep_name) }
      tc_fam_flav _ IfaceOpenTypeFamilyTyCon = return OpenTypeFamilyTyCon
-     tc_fam_flav _ (IfaceClosedTypeFamilyTyCon ctf) = ClosedTypeFamilyTyCon <$>
+     tc_fam_flav local (IfaceClosedTypeFamilyTyCon ctf) = ClosedTypeFamilyTyCon <$>
        case ctf of
         IfaceClosedTyFamTyCon mb_ax_name_branches ->
          do { ax <- traverse (tcIfaceBranchedAxiom . fst) mb_ax_name_branches
             ; return (CTF ax) }
+        IfaceScopedClosedTyFamTyCon owner is_sum (ax_name, _) -> do
+            when (isNothing (nameModule_maybe owner)
+                  || nameModule_maybe owner /= nameModule_maybe local
+                  || (owner == local && not is_sum))
+              (failIfM (text "Invalid lexical scope for a retained-sum family:" <+> ppr local))
+            CTF_Scoped owner is_sum <$> tcIfaceBranchedAxiom ax_name
         IfaceAbstractClosedTyFamTyCon -> return CTF_Abstract
         IfaceBuiltInClosedTyFamTyCon ->
           pprPanic "tc_iface_decl" $

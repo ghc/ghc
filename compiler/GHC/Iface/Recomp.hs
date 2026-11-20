@@ -780,7 +780,7 @@ couldExportOrderedTypeCase :: ModIface -> Bool
 couldExportOrderedTypeCase = any candidate . mi_decls
   where
     candidate (_, IfaceFamily {ifName = name, ifFamFlav = family})
-      | IfaceClosedTypeFamilyTyCon (IfaceClosedTyFamTyCon (Just (_, _:_:_))) <- family
+      | Just (_, _:_:_) <- ifaceClosedFamilyAxiom_maybe family
       = let occ = occNameString (nameOccName name)
         in any (`isPrefixOf` occ) ["$case:", "$lambda:"]
     candidate _ = False
@@ -994,9 +994,9 @@ couldInferClosedMatchability = any candidate . mi_decls
   where
     candidate (_, IfaceFamily
       { ifBinders = _ : _, ifFamInj = NotInjective
-      , ifFamFlav = IfaceClosedTypeFamilyTyCon
-          (IfaceClosedTyFamTyCon (Just (_, equations))) }) =
-        any has_arrow equations
+      , ifFamFlav = flavor })
+      | Just (_, equations) <- ifaceClosedFamilyAxiom_maybe flavor
+      = any has_arrow equations
     candidate _ = False
 
     has_arrow IfaceAxBranch{ifaxbRHS = IfaceFunTy FTF_T_T _ _ _ _} = True

@@ -12,7 +12,7 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.Tc.Solver.Solve( solveSimpleWanteds )
 
 import GHC.Builtin.CoercionRules
-  ( proveBoxedPairProjection )
+  ( proveBoxedPairProjection, proveScopedSigmaClosure )
 import GHC.Tc.Gen.SourceTable ( sourceTableFamilyAppUse, sourceTableOwner )
 import GHC.Tc.Errors.Types ( RetainedQuantificationError(..), TcRnMessage(..) )
 
@@ -731,6 +731,13 @@ can_eq_nc ces rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
 -- Look for a canonical LHS.
 -- Only rewritten types end up below here.
 ----------------------------
+
+-- See Note [Scoped retained sum codomains] in GHC.Core.TyCo.Compare.
+can_eq_nc ces _ _ ev eq_rel lhs _ rhs _
+  | bothRewritten ces, isWanted ev
+  , Just co <- proveScopedSigmaClosure lhs rhs
+  = do { setEqIfWanted ev (CPH (downgradeRole (eqRelRole eq_rel) Nominal co) emptyCoHoleSet)
+       ; stopWith ev "Checked scoped sum codomain" }
 
 -- Try a certified strict pair composition before choosing a canonical LHS.
 -- See Note [Strict boxed pair composition] in GHC.Builtin.CoercionRules.

@@ -65,7 +65,7 @@ module GHC.Core.TyCon(
         isOpenTypeFamilyTyCon,
         closedTypeFamily_maybe,
         builtInClosedTyFamTyCon_maybe,
-        closedFamilyTyConCoAxiom_maybe,
+        closedFamilyTyConCoAxiom_maybe, closedFamilyScope_maybe,
         tyConInjectivityInfo,
         isGadtSyntaxTyCon, isInjectiveTyCon, isGenerativeTyCon,
         isTyConAssoc, tyConAssoc_maybe, tyConFlavourAssoc_maybe,
@@ -1398,6 +1398,7 @@ instance Outputable FamTyConFlav where
         CTF mb_coax    -> text "closed type family" <+> maybe empty ppr mb_coax
         CTF_Abstract   -> text "abstract closed type family"
         CTF_BuiltIn {} -> text "built-in closed type family"
+        CTF_Scoped _ _ ax -> text "scoped closed type family" <+> ppr ax
 
 {- Note [Closed type families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2622,11 +2623,15 @@ closedTypeFamily_maybe (TyCon { tyConDetails = details })
 -- Only use this function if you are /sure/ you do not need to handle built-in
 -- closed type families.
 closedFamilyTyConCoAxiom_maybe :: TyCon -> Maybe (CoAxiom Branched)
-closedFamilyTyConCoAxiom_maybe tc
-  | Just (CTF mb_coax) <- closedTypeFamily_maybe tc
-  = mb_coax
-  | otherwise
-  = Nothing
+closedFamilyTyConCoAxiom_maybe tc =
+  closedTypeFamily_maybe tc >>= closedTyFamCoAxiom_maybe
+
+-- | The lexical owner and source-codomain flag of a checked private family.
+closedFamilyScope_maybe :: TyCon -> Maybe (Name, Bool)
+closedFamilyScope_maybe tc
+  | Just (CTF_Scoped owner is_sum _) <- closedTypeFamily_maybe tc
+  = Just (owner, is_sum)
+  | otherwise = Nothing
 
 builtInClosedTyFamTyCon_maybe :: TyCon -> Maybe BuiltinClosedTyFam
 builtInClosedTyFamTyCon_maybe tc
@@ -2656,6 +2661,7 @@ famTyConHasInjectivity (TyCon { tyConDetails = details })
         ClosedTypeFamilyTyCon ctf ->
           case ctf of
             CTF (Just {}) -> True
+            CTF_Scoped {}  -> True
             CTF_BuiltIn {} -> True
             _ -> False
         _ -> False

@@ -1582,6 +1582,8 @@ compatFamFlav flav1@(ClosedTypeFamilyTyCon ctf1) flav2@(ClosedTypeFamilyTyCon ct
     (CTF {}, CTF_Abstract) -> checkSuccess
     (CTF_Abstract, CTF {}) -> checkSuccess
     (CTF ax1, CTF ax2) -> eqClosedFamilyAx ax1 ax2
+    (CTF_Scoped owner1 sum1 ax1, CTF_Scoped owner2 sum2 ax2)
+      | owner1 == owner2, sum1 == sum2 -> eqClosedFamilyAx (Just ax1) (Just ax2)
     (CTF_BuiltIn {}, CTF_BuiltIn {}) -> checkSuccess
     _ -> bootErr $ TyConFlavourMismatch flav1 flav2
 compatFamFlav flav1 flav2 = bootErr $ TyConFlavourMismatch flav1 flav2

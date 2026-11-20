@@ -3,7 +3,7 @@ module GHC.Builtin.CoercionRules
   ( builtInCoAxiomRules
   , boxedPairCompositionRule, matchBoxedPairComposition
   , boxedPairReconstructionRule
-  , proveBoxedPairProjection
+  , proveBoxedPairProjection, proveScopedSigmaClosure
   ) where
 
 import GHC.Prelude
@@ -13,7 +13,7 @@ import GHC.Builtin.WiredIn.Types (promotedTupleDataCon, tupleTyCon)
 import GHC.Core.Coercion (existsCoRule, mkNomReflCo, mkSymCo)
 import GHC.Core.Coercion.Axiom
 import GHC.Core.TyCo.Rep (Coercion(AxiomCo))
-import GHC.Core.TyCo.Compare (eqType, eqTypes)
+import GHC.Core.TyCo.Compare (eqType, eqTypes, eqScopedSigmaClosures)
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Data.FastString
@@ -31,7 +31,27 @@ builtInCoAxiomRules =
     foldl' (\rules (name, rule) -> addToUFM rules name rule) typeNatCoAxiomRules
       [ (boxedPairCompositionName, boxedPairCompositionRule)
       , (boxedPairReconstructionName, boxedPairReconstructionRule)
-      , existsCoRule Nominal, existsCoRule Representational ]
+      , existsCoRule Nominal, existsCoRule Representational
+      , (scopedSigmaClosureName, scopedSigmaClosureRule) ]
+
+scopedSigmaClosureName :: FastString
+scopedSigmaClosureName = fsLit "ScopedSigmaClosure"
+
+scopedSigmaClosureRule :: CoAxiomRule
+scopedSigmaClosureRule = BuiltInEqRule scopedSigmaClosureName proves
+  where
+    -- Compare the two left endpoints. Lifting may change each right endpoint.
+    -- The second nominal premise connects the result to the rewritten RHS.
+    proves [Pair lhs _, Pair rhs result]
+      | eqScopedSigmaClosures lhs rhs = Just (Pair lhs result)
+    proves _ = Nothing
+
+-- | Produce nominal evidence for equal scoped retained-sum codomains.
+proveScopedSigmaClosure :: Type -> Type -> Maybe Coercion
+proveScopedSigmaClosure lhs rhs
+  | eqScopedSigmaClosures lhs rhs
+  = Just (AxiomCo scopedSigmaClosureRule [mkNomReflCo lhs, mkNomReflCo rhs])
+  | otherwise = Nothing
 
 {- Note [Strict boxed pair composition]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

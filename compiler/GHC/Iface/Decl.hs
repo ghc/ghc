@@ -211,8 +211,10 @@ tyConToIfaceDecl env tycon
     to_if_ctf CTF_Abstract     = IfaceAbstractClosedTyFamTyCon
     to_if_ctf (CTF_BuiltIn {}) = IfaceBuiltInClosedTyFamTyCon
     to_if_ctf (CTF Nothing)    = IfaceClosedTyFamTyCon Nothing
-    to_if_ctf (CTF (Just ax))
-      = IfaceClosedTyFamTyCon (Just (axn, ibr))
+    to_if_ctf (CTF (Just ax))  = IfaceClosedTyFamTyCon (Just (iface_ax ax))
+    to_if_ctf (CTF_Scoped owner is_sum ax) = IfaceScopedClosedTyFamTyCon owner is_sum (iface_ax ax)
+
+    iface_ax ax = (axn, ibr)
       where defs = fromBranches $ coAxiomBranches ax
             lhss = map coAxBranchLHS defs
             ibr  = map (coAxBranchToIfaceBranch tycon lhss) defs

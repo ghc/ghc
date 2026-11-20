@@ -739,7 +739,9 @@ type instance XXInjectivityAnn  (GhcPass _) = DataConCantHappen
 
 type instance XDataFamily       (GhcPass _) = NoExtField
 type instance XOpenTypeFamily   (GhcPass _) = NoExtField
-type instance XClosedTypeFamily (GhcPass _) = AnnList
+type instance XClosedTypeFamily GhcPs = AnnList
+type instance XClosedTypeFamily GhcRn = Maybe (Name, Bool)
+type instance XClosedTypeFamily GhcTc = Maybe (Name, Bool)
 type instance XXFamilyInfo      (GhcPass _) = DataConCantHappen
 
 instance OutputableBndrId p

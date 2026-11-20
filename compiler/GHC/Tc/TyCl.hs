@@ -3764,7 +3764,7 @@ tcFamDecl1 case_axioms parent (FamilyDecl { fdInfo = fam_info
                                parent inj'
   ; return (tycon, []) }
 
-  | ClosedTypeFamily _ mb_eqns <- fam_info
+  | ClosedTypeFamily scope mb_eqns <- fam_info
   = -- Closed type families are a little tricky, because they contain the definition
     -- of both the type family and the equations for a CoAxiom.
     do { traceTc "tcFamDecl1 Closed type family:" (ppr tc_name)
@@ -3815,7 +3815,12 @@ tcFamDecl1 case_axioms parent (FamilyDecl { fdInfo = fam_info
               | otherwise = Just (mkBranchedCoAxiom Nominal co_ax_name fam_tc branches)
 
              fam_tc = mkFamilyTyCon tc_name kind tc_bndrs 0 res_kind (resultVariableName sig)
-                      (ClosedTypeFamilyTyCon $ CTF mb_co_ax) parent inj'
+                      (ClosedTypeFamilyTyCon closed) parent inj'
+
+             closed
+               | Just (owner, is_sum) <- scope, Just ax <- mb_co_ax
+               = CTF_Scoped owner is_sum ax
+               | otherwise = CTF mb_co_ax
 
          -- We check for instance validity later, when doing validity
          -- checking for the tycon. Exception: checking equations
@@ -4265,7 +4270,10 @@ buildOrderedTypeCase root infos = do
         let kind = mkTyConKindWithMatchability unmatchableDataConTy bs result
         ax_name <- newImplicitBinder name mkInstTyCoOcc
         let fam = mkFamilyTyCon name kind bs 0 result Nothing
-                    (ClosedTypeFamilyTyCon (CTF (Just ax))) Nothing NotInjective
+                    (ClosedTypeFamilyTyCon closed) Nothing NotInjective
+            closed
+              | Just (owner, _) <- closedFamilyScope_maybe root = CTF_Scoped owner False ax
+              | otherwise = CTF (Just ax)
             ax = mkBranchedCoAxiom Nominal ax_name fam branches
         pure fam
 
@@ -5951,13 +5959,12 @@ checkValidTyCon tc
               -> case fam_flav of
                { ClosedTypeFamilyTyCon ctf ->
                  case ctf of
-                   { CTF (Just ax) ->
+                   { _ | Just ax <- closedTyFamCoAxiom_maybe ctf ->
                        addErrCtxt (ClosedFamEqnCtxt tc) $ checkValidCoAxiom ax
-                   ; CTF Nothing -> return ()
                    ; CTF_Abstract ->
                      do { hsBoot <- tcIsHsBootOrSig
                         ; checkTc hsBoot $ TcRnAbstractClosedTyFamDecl }
-                   ; CTF_BuiltIn {} -> return () }
+                   ; _ -> return () }
                ; DataFamilyTyCon {}  -> return ()
                ; OpenTypeFamilyTyCon -> return () }
 

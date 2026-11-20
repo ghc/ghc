@@ -8,7 +8,7 @@ module GHC.Core.TyCo.Compare (
 
     -- * Type equality
     eqType, eqTypeIgnoringMultiplicity, eqTypeX, eqTypes,
-    eqVarBndrs,
+    eqVarBndrs, eqScopedSigmaClosures,
 
     pickyEqType, tcEqType, tcEqKind, tcEqTypeNoKindCheck,
     tcEqTyConApps, tcEqTyConAppArgs,
@@ -28,13 +28,16 @@ module GHC.Core.TyCo.Compare (
 import GHC.Prelude
 
 import GHC.Core.Type( typeKind, coreView, tcSplitAppTyNoView_maybe, splitAppTyNoView_maybe
-                    , isLevityTy, isRuntimeRepTy, isMultiplicityTy )
+                    , isLevityTy, isRuntimeRepTy, isMultiplicityTy
+                    , isUnsaturatedUserFamily, splitTyConApp_maybe )
+import GHC.Core.Coercion.Axiom
 
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCon
 import GHC.Core.Multiplicity( MultiplicityFlag(..) )
 
+import GHC.Types.Name (Name)
 import GHC.Types.Var
 import GHC.Types.Unique
 import GHC.Types.Var.Env
@@ -286,6 +289,74 @@ eqType ta tb = fullEq eq_type_expand_respect ta tb
 eqTypeX :: HasCallStack => RnEnv2 -> Type -> Type -> Bool
 eqTypeX env ta tb = fullEq (eq_type_expand_respect_x env) ta tb
 
+{- Note [Scoped retained sum codomains]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An elaborated retained sum has type Sigma A p. Its codomain is a
+partially applied private family. The missing argument is the witness.
+A checked nominal rule compares two such codomains. It uses each checked
+branch telescope to rename locally bound variables. The ordered patterns,
+roles, incompatible and overlapping rows, and right-hand sides must
+agree. In particular, this rule never equates different source family
+names solely because they give equal results at selected indices.
+
+The renamer attaches one lexical owner Name to the families it generates
+inside each sum. The checked family and its interface keep that Name.
+The comparison follows private decisions only within the two owners
+it started with. An imported closure from another scope keeps its
+nominal identity. A cycle stops comparison. Ordinary eqType uses the
+nominal names of all families.
+See GHC.Builtin.CoercionRules for construction and rechecking of its
+nominal evidence.
+-}
+-- | Check alpha-equivalence of two generated retained-sum codomains.
+eqScopedSigmaClosures :: Type -> Type -> Bool
+eqScopedSigmaClosures lhs rhs
+  | Just (tc1, as1) <- splitTyConApp_maybe lhs
+  , Just (tc2, as2) <- splitTyConApp_maybe rhs
+  , tc1 /= tc2
+  , Just (owner1, True) <- closedFamilyScope_maybe tc1
+  , Just (owner2, True) <- closedFamilyScope_maybe tc2
+  , length as1 + 1 == tyConArity tc1
+  , length as2 + 1 == tyConArity tc2
+  , isUnsaturatedUserFamily tc1 as1
+  , isUnsaturatedUserFamily tc2 as2
+  = fullEq (generic_eq_type_x (ScopedClosures (owner1, owner2) [])
+                              RespectMultiplicities Nothing) lhs rhs
+  | otherwise = False
+
+sameScopedTyCons :: (Name, Name) -> [(TyCon, TyCon)] -> TyCon -> TyCon -> Bool
+sameScopedTyCons owners@(owner1, owner2) seen tc1 tc2
+  | Just (scope1, _) <- closedFamilyScope_maybe tc1, scope1 == owner1
+  , Just (scope2, _) <- closedFamilyScope_maybe tc2, scope2 == owner2
+  , (tc1, tc2) `notElem` seen
+  , NotInjective <- tyConInjectivityInfo tc1
+  , NotInjective <- tyConInjectivityInfo tc2
+  , Just ax1 <- closedFamilyTyConCoAxiom_maybe tc1
+  , Just ax2 <- closedFamilyTyConCoAxiom_maybe tc2
+  , coAxiomRole ax1 == Nominal, coAxiomRole ax2 == Nominal
+  , coAxiomTyCon ax1 == tc1, coAxiomTyCon ax2 == tc2
+  , tyConKind tc1 `eqType` tyConKind tc2
+  = same_rows same_branch (fromBranches (coAxiomBranches ax1))
+                          (fromBranches (coAxiomBranches ax2))
+  | otherwise = False
+  where
+    same_rows same as bs = equalLength as bs && and (zipWith same as bs)
+    same_branch a b = same_equation a b
+      && same_rows same_equation (cab_incomps a) (cab_incomps b)
+      && same_rows same_equation (cab_overlaps a) (cab_overlaps b)
+
+    same_equation a b
+      | cab_roles a == cab_roles b
+      , null (cab_eta_tvs a), null (cab_eta_tvs b)
+      , Just env <- eqVarBndrs (mkRnEnv2 emptyInScopeSet)
+                    (cab_tvs a ++ cab_cvs a) (cab_tvs b ++ cab_cvs b)
+      = same_rows (eq_scoped env) (cab_lhs a) (cab_lhs b)
+        && eq_scoped env (cab_rhs a) (cab_rhs b)
+      | otherwise = False
+
+    eq_scoped env = fullEq (generic_eq_type_x (ScopedClosures owners ((tc1, tc2) : seen))
+                                                 RespectMultiplicities (Just env))
+
 eqTypeIgnoringMultiplicity :: Type -> Type -> Bool
 -- See Note [Respecting multiplicity when comparing types]
 eqTypeIgnoringMultiplicity ta tb = fullEq eq_type_expand_ignore ta tb
@@ -330,7 +401,11 @@ See #19226.
 -}
 
 -- | This flag controls whether we expand synonyms during comparison
-data SynFlag = ExpandSynonyms | KeepSynonyms
+data SynFlag = ExpandSynonyms | KeepSynonyms | ScopedClosures (Name, Name) [(TyCon, TyCon)]
+
+expandsSynonyms :: SynFlag -> Bool
+expandsSynonyms KeepSynonyms = False
+expandsSynonyms _ = True
 
 eq_type_expand_respect, eq_type_expand_ignore, eq_type_keep_respect
   :: Type -> Type -> Bool
@@ -392,12 +467,14 @@ inline_generic_eq_type_x syn_flag mult_flag mb_env
         | tc1 == tc2, not (isForgetfulSynTyCon tc1)   -- See Note [Comparing type synonyms]
         -> gos tys1 tys2
 
-      _ | ExpandSynonyms <- syn_flag, Just t1' <- coreView t1 -> go t1' t2
-        | ExpandSynonyms <- syn_flag, Just t2' <- coreView t2 -> go t1 t2'
+      _ | expandsSynonyms syn_flag, Just t1' <- coreView t1 -> go t1' t2
+        | expandsSynonyms syn_flag, Just t2' <- coreView t2 -> go t1 t2'
 
       (TyConApp tc1 ts1, TyConApp tc2 ts2)
         | tc1 == tc2 -> gos ts1 ts2
-        | otherwise  -> False
+        | ScopedClosures owners seen <- syn_flag
+        -> gos ts1 ts2 && sameScopedTyCons owners seen tc1 tc2
+        | otherwise -> False
 
       (TyVarTy tv1, TyVarTy tv2)
         -> case mb_env of
