@@ -82,6 +82,22 @@ a type declaration separately. Mixed dependencies on same-group type
 declarations, local instances, nonempty deriving, defaults and deferred
 errors remain open.
 
+## Local synonyms in a retained field worker
+
+A retained GADT field can call a local worker whose signature uses
+`type WorkerArgument = Bool`. GHC follows the renamed type dependency
+of the signature and checks the nullary synonym before checking the
+worker. It then uses the worker's checked equations to check the field
+and the remaining declarations in the same splice group.
+
+The same source works when an empty declaration splice checks the
+synonym in an earlier group. A worker after the splice remains out of
+scope. A worker whose helper needs the unfinished field constructor
+still fails with GHC-68947. The ordinary client uses stripped interfaces
+and observes a character at False and an integer at True.
+[Source example](../examples/open-evaluation/LocalAliasField.hs) and
+[source controls](../../../testsuite/tests/dependent/should_run/NativeLocalOpen.sh).
+
 ## M131. Mutually recursive value bindings
 
 GHC can typecheck a recursive group of ordinary functions before

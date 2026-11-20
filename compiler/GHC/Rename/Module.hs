@@ -1510,6 +1510,11 @@ original group because they can use instances from later groups. A SPECIALISE
 pragma can also mention arbitrary local types and values. Keep such bindings
 in the original group.
 
+A worker signature can also name a nullary type synonym with a bare type
+constructor as its right-hand side. GHC.Tc.Module follows the renamed type
+group's dependencies. Check the synonym before the worker in the early
+group. Each prerequisite must be a ready type or another eligible synonym.
+
 A table such as listCount :: [Bool] -> Nat can refer to itself. Move its
 singleton SCC with its original recursion flag. For a list domain the
 element type supplies the declaration dependency. In
@@ -1600,7 +1605,8 @@ localSourceTableBinders binds sigs =
       _ -> False
 
 -- | A type use requires equations before type declarations; a value use can wait.
-data SourceTableUse = TableInType | TableInTerm
+data SourceTableUse = TableInType ((Name -> Bool) -> [Name] -> Maybe NameSet)
+                    | TableInTerm
 
 -- | Schedule independent local source functions. See Note [Ordering local source tables].
 splitLocalSourceTables :: SourceTableUse -> DefUses -> HsGroup GhcRn
@@ -1608,7 +1614,7 @@ splitLocalSourceTables :: SourceTableUse -> DefUses -> HsGroup GhcRn
 splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG binds sigs)),
                                          hs_tyclds = tycls}
   | n : _ <- bound_names
-  , let tables = case use of { TableInType -> allUses dus; TableInTerm -> duDefs dus }
+  , let tables = case use of { TableInType{} -> allUses dus; TableInTerm -> duDefs dus }
         used = mkOccEnv [ (nameOccName f, f) | f <- nameSetElemsStable tables
                          , nameModule_maybe f == nameModule_maybe n ]
         wanted = [ (b, f) | b <- bound_names
@@ -1624,11 +1630,11 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
             , Just domain <- [domain_dependencies outer arg], Just rest <- [result_dependencies outer res] ]
         declared = mkOccSet [ nameOccName f | f <- nameSetElemsStable (duDefs dus)
                                             , nameModule_maybe f == nameModule_maybe n ]
-        candidates = [ (b, kinds, values) | (_, [L _ FunBind{fun_id = L _ b, fun_ext = fvs}]) <- binds
+        candidates = [ (b, deps, values) | (_, [L _ FunBind{fun_id = L _ b, fun_ext = fvs}]) <- binds
                      , mkSourceTableOcc (nameOccName b) `elemOccSet` declared
                      , not (b `elemNameSet` specialised), Just kinds <- [lookupNameEnv signatures b]
                      , let values = (fvs `intersectNameSet` local_values) `delFromNameSet` b
-                     , independent_types kinds (fvs `minusNameSet` local_values) ]
+                     , Just deps <- [independent_types kinds (fvs `minusNameSet` local_values)] ]
         ready = foldl' schedule emptyNameSet candidates
         schedule done (b, _, deps) | isEmptyNameSet (deps `minusNameSet` done) = extendNameSet done b
                                    | otherwise = done
@@ -1638,7 +1644,7 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
         early = [ (b, kinds) | (b, kinds, _) <- candidates
                              , b `elemNameSet` ready, b `elemNameSet` needed ]
         early_names = mkNameSet (map fst early)
-        early_types = mkNameSet (concatMap snd early)
+        early_types = unionNameSets (map snd early)
         (first_binds, rest_binds) = partition early_bind binds
         early_bind :: (RecFlag, LHsBinds GhcRn) -> Bool
         early_bind (_, [L _ FunBind{fun_id = L _ b}]) = b `elemNameSet` early_names
@@ -1654,7 +1660,7 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
     bound_names = [ b | (_, bs) <- binds, L _ FunBind{fun_id = L _ b} <- bs, isExternalName b ]
     used_names = allUses dus
     requested b f = case use of
-      TableInType -> True
+      TableInType{} -> True
       TableInTerm -> b `elemNameSet` term_uses && not (f `elemNameSet` used_names)
 
     -- Exclude the generated table-to-term edge and a function's own recursion.
@@ -1664,11 +1670,13 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
     local_values = mkNameSet (collectHsValBinders CollNoDictBinders vals)
     local_binders = mkNameSet (hsGroupBinders group)
     independent_types kinds fvs = case use of
-      TableInTerm -> True
-      TableInType ->
-        let cons = mkNameSet (concatMap (fromMaybe [] . lookupNameEnv early_datatypes) kinds)
-        in all (\k -> not (k `elemNameSet` local_types) || k `elemNameEnv` early_datatypes) kinds
-           && nameSetAll (`elemNameSet` cons) (fvs `intersectNameSet` local_binders)
+      TableInTerm -> Just (mkNameSet kinds)
+      TableInType typeDeps -> do
+        needed <- typeDeps (`elemNameEnv` early_datatypes) kinds
+        let cons = mkNameSet (concatMap (fromMaybe [] . lookupNameEnv early_datatypes)
+                                        (nameSetElemsStable needed))
+        guard (nameSetAll (`elemNameSet` cons) (fvs `intersectNameSet` local_binders))
+        pure needed
     type_name :: LHsType GhcRn -> Maybe Name
     type_name ty = case unLoc (ignoreParens ty) of
       HsTyVar _ _ (L _ (WithUserRdr _ name))
@@ -1713,7 +1721,6 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
       | Just n <- type_name k = nameUnique n == liftedTypeKindTyConKey
     plain_kind _ = False
 
-    local_types = mkNameSet (map (tcdName . unLoc) (tyClGroupTyClDecls tycls))
     early_datatypes = mkNameEnv
       [ (t, cons) | TyClGroup{group_ext = deps, group_kisigs = [], group_tyclds =
                      [L _ DataDecl{tcdLName = L _ t, tcdModifiers = [],

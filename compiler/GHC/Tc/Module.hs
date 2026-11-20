@@ -2304,7 +2304,8 @@ tcTopSrcTables :: HsGroup GhcRn -> TcM (TcGblEnv, TcLclEnv)
 tcTopSrcTables group = do
     enabled <- xoptM LangExt.ExperimentalDependentTypes
     env <- getGblEnv
-    case if enabled then splitLocalSourceTables TableInType (tcg_dus env) group else Nothing of
+    let use = TableInType (sourceTableTypeDependencies group)
+    case if enabled then splitLocalSourceTables use (tcg_dus env) group else Nothing of
       Nothing -> tcTopSrcDeclGroup group
       Just (needed, early, rest) -> do
         (envs@(early_env, _), wanteds) <- captureTopConstraints (tcTopSrcDeclGroup early)
@@ -2320,6 +2321,26 @@ tcTopSrcTables group = do
           addTopEvBinds evs $ do
             tables_env <- installSourceTables tables
             setGblEnv tables_env (tcTopSrcDeclGroup rest)
+
+-- | Follow the same-group types needed by a source-table signature.
+-- See Note [Ordering local source tables] in GHC.Rename.Module.
+sourceTableTypeDependencies :: HsGroup GhcRn -> (Name -> Bool) -> [Name] -> Maybe NameSet
+sourceTableTypeDependencies HsGroup{hs_tyclds = groups} ready =
+    closeLocalNames dependencies emptyNameSet
+  where
+    local_types = mkNameSet (map (tcdName . unLoc) (tyClGroupTyClDecls groups))
+    aliases = mkNameEnv
+      [ (alias, deps)
+      | TyClGroup{group_ext = deps, group_kisigs = [], group_instds = [],
+                   group_tyclds = [L _ SynDecl{tcdLName = L _ alias,
+                                              tcdTyVars = HsQTvs{hsq_explicit = []},
+                                              tcdRhs = rhs}]} <- groups
+      , L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ target))) <- [ignoreParens rhs]
+      , isTyConName target, alias /= target
+      , isNothing (sourceTableTermOcc (nameOccName target)) ]
+    dependencies name
+      | ready name || not (name `elemNameSet` local_types) = Just emptyNameSet
+      | otherwise = lookupNameEnv aliases name
 
 {- Note [Scheduling local open definitions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2729,11 +2750,11 @@ localOpenDefinitions demands evidence binds = do
       _ -> or (gmapQ hasPendingTypedSplice node)
 
 -- | Close the requested names over the eligible bindings in the graph.
-closeLocalNames :: (Name -> Either String NameSet) -> NameSet -> [Name] -> Either String NameSet
+closeLocalNames :: Monad m => (Name -> m NameSet) -> NameSet -> [Name] -> m NameSet
 closeLocalNames dependencies = foldM visit
   where
     visit checked name
-      | name `elemNameSet` checked = Right checked
+      | name `elemNameSet` checked = pure checked
       | otherwise = do
           uses <- dependencies name
           foldM visit (extendNameSet checked name) (nameSetElemsStable uses)

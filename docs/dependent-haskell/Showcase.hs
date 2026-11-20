@@ -91,6 +91,7 @@ import qualified VectorSplitObservation
 import qualified KnownArgumentClient as Known
 import qualified Language.Haskell.TH as TH
 import qualified LocalOpen
+import qualified LocalAliasField
 import qualified LocalInstance
 import qualified LocalAssociated
 import qualified IndependentFamily
@@ -1237,6 +1238,13 @@ main = do
     secondNegated <- negatedResult <$> readIORef fieldFlag
     observe "pass a refined runtime Boolean to a retained field" (firstField, secondField)
     observe "choose a field result by negating its runtime index" (firstNegated, secondNegated)
+    let aliasResult :: Bool -> String
+        aliasResult b = case LocalAliasField.aliasField of
+            LocalAliasField.AliasField choose -> case b of
+                True -> show (choose b :: Int)
+                False -> [choose b]
+    observe "choose a retained field result through a local type alias"
+        (aliasResult False, aliasResult True)
     observe "select through an ordinary type constructor"
         ( 7 :: NativeNestedCase.TypeHead ('Just Bool)
         , 'x' :: NativeNestedCase.TypeHead ('Just Ordering)

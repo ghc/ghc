@@ -42,6 +42,62 @@ expect_rejection() {
     fi
 }
 
+# The signature's nullary synonym must check before the source table.
+mkdir "$out"/{alias-provider,alias-client}
+cat > "$out/alias-client/ReadAliasField.hs" <<'SOURCE'
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
+module Main where
+import LocalAliasField
+
+renderAlias :: Bool -> String
+renderAlias b = case aliasField of
+    AliasField choose -> case b of
+        True -> show (choose b :: Int)
+        False -> [choose b]
+
+main :: IO ()
+main = print (renderAlias False, renderAlias True)
+SOURCE
+(
+    cd "$out/alias-provider"
+    for group in same prior; do
+        if [[ $group == prior ]]; then
+            sed '/^type WorkerArgument = Bool$/a $(pure [])' "$src/LocalAliasField.hs" > LocalAliasField.hs
+        else
+            cp "$src/LocalAliasField.hs" .
+        fi
+        "${ghc[@]}" -XTemplateHaskell -fforce-recomp -fomit-interface-pragmas \
+            -fno-write-if-simplified-core -c LocalAliasField.hs
+        cp LocalAliasField.hi "$out/alias-client/"
+        ( cd "$out/alias-client"
+          "${ghc[@]}" -fforce-recomp -c ReadAliasField.hs
+          "${ghc[@]}" ReadAliasField.o ../alias-provider/LocalAliasField.o -o read-alias
+          ./read-alias > actual
+          grep -Fxq '("f","41")' actual )
+    done
+
+    # The worker's helper needs the constructor whose field calls the worker.
+    sed -e '/case worker b.*-> AliasField$/a\  Marker :: AliasField' \
+        -e 's/^worker False = False$/worker False = inspect Marker/' \
+        "$src/LocalAliasField.hs" > LocalAliasField.hs
+    cat >> LocalAliasField.hs <<'SOURCE'
+
+inspect :: AliasField -> Bool
+inspect (AliasField _) = True
+inspect Marker = False
+SOURCE
+    line=$(grep -n '^worker False' LocalAliasField.hs | cut -d: -f1)
+    expect_rejection LocalAliasField "$line" '\[GHC-68947\]' 'No checked equations'
+
+    # Keep the earlier successful .hi and .o visible while moving the worker.
+    sed -e '/^worker ::/i $(pure [])' \
+        -e 's/case worker b/case LocalAliasField.worker b/' \
+        "$src/LocalAliasField.hs" > LocalAliasField.hs
+    line=$(grep -n 'case LocalAliasField.worker' LocalAliasField.hs | cut -d: -f1)
+    ghc+=(-XTemplateHaskell)
+    expect_rejection LocalAliasField "$line" '\[GHC-76037\]' 'Not in scope'
+)
+
 cat > NativeLocalOpenNames.hs <<'SOURCE'
 {-# LANGUAGE ExperimentalDependentTypes, ExplicitForAll, TypeApplications #-}
 module NativeLocalOpenNames where
