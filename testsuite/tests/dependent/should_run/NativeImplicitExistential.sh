@@ -91,6 +91,15 @@ for bad in "${bad_sources[@]}"; do
         IntroEscape) code=46956;;
         HiddenName) code=76037;;
     esac
+    if [[ $bad == LetEscape ]]; then
+        for binding in bad different; do
+            line=$(grep -n "^$binding .*=" LetEscape.hs | cut -d: -f1)
+            grep -Eq "^LetEscape.hs:$line:[0-9]+: error: \[GHC-25897\]" LetEscape.log || {
+                cat LetEscape.log >&2
+                exit 1
+            }
+        done
+    fi
     if ! grep -Eq "^$bad.hs:[0-9]+:[0-9]+: error: \[GHC-$code\]" "$bad.log"; then
         cat "$bad.log" >&2
         exit 1

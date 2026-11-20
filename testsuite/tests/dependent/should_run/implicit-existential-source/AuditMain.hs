@@ -3,7 +3,7 @@ module AuditMain where
 
 import Filter
 import Identity
-import LetFilter (letFilter)
+import LetFilter (letFilter, unbundle)
 import Opening
 import Vector
 
@@ -21,3 +21,4 @@ main = do
     print (audit p q, take 1 (toList (forward lazy)),
            observeUnused (error "identity forced the package"))
     print (take 1 (toList (letFilter odd (Cons (7 :: Int) (error "let forced the tail")))))
+    print (unbundle (p, q), take 1 (fst (unbundle (lazy, error "unused second package"))))

@@ -562,12 +562,13 @@ tcPolyNoGen top_lvl rec_tc prag_fn tc_sig_fn bind_list
        ; return (binds', mono_ids') }
   where
     -- See Note [Scoped inferred native values].
-    local_value
-      | NotTopLevel <- top_lvl
-      , NonRecursive <- rec_tc
-      , [L _ (FunBind { fun_matches = MG { mg_alts = L _
-            [L _ (Match { m_pats = L _ [] })] } })] <- bind_list
-      = True
+    local_value ty
+      | NotTopLevel <- top_lvl, NonRecursive <- rec_tc, [L _ bind] <- bind_list
+      = case bind of
+          FunBind { fun_matches = MG { mg_alts = L _
+            [L _ (Match { m_pats = L _ [] })] } } -> True
+          PatBind{} | ExistsTy ImplicitExists _ _ <- coreFullView ty -> True
+          _ -> False
       | otherwise = False
 
     tc_mono_info (MBI { mbi_poly_name = name, mbi_mono_id = mono_id, mbi_mono_mult = mult })
@@ -749,7 +750,7 @@ tcPolyInfer top_lvl rec_tc prag_fn tc_sig_fn bind_list
              <- pushLevelAndCaptureConstraints  $
                 tcMonoBinds rec_tc tc_sig_fn LetLclBndr bind_list
 
-       ; checkInferredRetainedTypes False mono_infos
+       ; checkInferredRetainedTypes (const False) mono_infos
        ; apply_mr <- checkMonomorphismRestriction mono_infos bind_list
 
        -- AbsBinds which are PatBinds can't be linear.
@@ -1323,7 +1324,7 @@ data MonoBindInfo = MBI { mbi_poly_name :: Name
 
 -- | Check inferred retained types before ordinary binding inference.
 -- See Note [Inference of retained types].
-checkInferredRetainedTypes :: Bool -> [MonoBindInfo] -> TcM ()
+checkInferredRetainedTypes :: (TcType -> Bool) -> [MonoBindInfo] -> TcM ()
 checkInferredRetainedTypes local_value infos
   = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
        ; when enabled $ mapM_ check_info infos }
@@ -1334,7 +1335,7 @@ checkInferredRetainedTypes local_value infos
       = setSrcSpan (nameSrcSpan name) $
         do { ty <- liftZonkM $ zonkTcType (idType mono_id)
            ; when (hasNativeDependentExpr (Type ty) && not (closed_package ty)) $
-               if local_value && isNothing (mbi_sig info) && scoped_type ty
+               if local_value ty && isNothing (mbi_sig info) && scoped_type ty
                then checkValidType (InfSigCtxt name) ty
                else failWithTc $ TcRnRetainedQuantificationError (RetainedInference ty) }
 
@@ -1384,8 +1385,14 @@ after checkValidType validates every runtime index against its actual lexical
 binding. This also checks the index domain and multiplicity. The binder's
 ordinary FRR and usage checks still apply. No runtime index is evaluated.
 
-Do not generalise the result. Keep the rejection for recursive groups, pattern
-bindings, partial signatures and retained function telescopes. isTauTy rejects
+A local nonrecursive pattern binding can bind a field whose exact type is
+a dot package. For example, let (yes, no) = partitionVec p xs binds two
+packages. Each field keeps its own existential type. The pattern checker
+still checks the entire pattern against the RHS before these field types
+are validated. Other inferred retained types in patterns require signatures.
+
+Do not generalise the result. Keep the rejection for recursive groups,
+partial signatures and retained function telescopes. isTauTy rejects
 DepFunTy as well as forall and predicate arrows. Existing infer-cell promotion
 and branch joining remain responsible for type-variable and GADT escape.
 
