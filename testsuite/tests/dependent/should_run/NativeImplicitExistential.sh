@@ -115,7 +115,7 @@ for binding in function index; do
     }
 done
 
-cp "$src/"{WitnessClient,WitnessDeep,WitnessMismatch,WitnessPairEscape}.hs .
+cp "$src/"{WitnessClient,WitnessDeep,WitnessMismatch,WitnessPairClient,WitnessPairEscape}.hs .
 "$ghc" "${flags[@]}" -ddump-ds -c WitnessDeep.hs >deep-witness.core
 grep -Eq 'pack (GHC(\.Internal)?\.Types\.)?Int' deep-witness.core
 "$ghc" "${flags[@]}" -XImpredicativeTypes -ddump-ds -c WitnessClient.hs -main-is WitnessClient >witnesses.core
@@ -139,6 +139,16 @@ if "$ghc" "${flags[@]}" -c WitnessMismatch.hs >family-mismatch.log 2>&1; then
     exit 1
 fi
 grep -Fq '[GHC-83865]' family-mismatch.log
+"$ghc" "${flags[@]}" -XImpredicativeTypes -ddump-ds -c WitnessPairClient.hs -main-is WitnessPairClient >witness-pair.core
+grep -Fq 'pack WitnessSchema.PolyId' witness-pair.core
+"$ghc" "${flags[@]}" WitnessPairClient.o ../provider/WitnessSchema.o -main-is WitnessPairClient -o witness-pair
+./witness-pair
+if "$ghc" "${flags[@]}" -fforce-recomp -XNoImpredicativeTypes -c WitnessPairClient.hs >pair-mono.log 2>&1; then
+    echo "The paired callback lost its higher-rank requirement." >&2
+    exit 1
+fi
+line=$(grep -n '^inferredPair =' WitnessPairClient.hs | cut -d: -f1)
+grep -Fq "WitnessPairClient.hs:$line:21: error: [GHC-83865]" pair-mono.log
 if "$ghc" "${flags[@]}" -c WitnessPairEscape.hs >tuple-escape.log 2>&1; then
     echo "A hidden tuple field escaped its match." >&2
     exit 1
