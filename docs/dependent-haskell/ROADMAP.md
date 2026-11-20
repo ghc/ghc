@@ -193,29 +193,36 @@ source examples. General promotion remains open.
 
 ## Current work queue
 
-1. **R05.** Local rules can match an unknown runtime index and its
-   dependent payload in an optimized client. Check imported rule heads,
-   including an orphan rule whose only retained argument is a constant.
-   A visible type application in the rule head also needs a checked
-   source of types for unannotated payload binders.
+1. **R05.** A rule can match a retained head from another module.
+   Extend binder inference to a head with visible type arguments.
+   In `keepMaybe @a m x`, the checker should get the domain of `x`
+   from the same instantiation it uses for the call.
    [Rule and interface support](roadmap/R05-dependent-core.md).
-2. **R23.** An ordinary higher-order class method can get its arrow from
-   the receiver. Check the next example from proposal #242. An unsigned
-   higher-order family should accept both a constructor and a partial
-   family through the same inferred arrow. Check recursive equations and
-   forwarding through another module.
+2. **R23 and R24.** An unsigned recursive family can forward a
+   constructor or a partial family. Improve the diagnostic when a
+   caller needs to enable partial family application. For constrained
+   families, check the domain at formation in a separate client.
+   [Domain example](roadmap/R24-constrained-type-families.md),
    [Later argument](roadmap/R23-unsaturated-type-families.md#choosing-a-prefixs-matchability-from-a-later-argument)
    and [singletons migration](roadmap/R23-unsaturated-type-families.md#arrow-patterns-in-family-equations).
 3. **R22 and R04.** A conditional can package a different callback type
    in each branch. Check introduction and elimination when an implicit
-   existential encloses an explicit one. For retained sums, compare the
-   native list-to-vector producer with the handwritten vector package.
+   existential encloses an explicit one. The native list-to-vector
+   producer now works with an ordinary client and a computed witness.
+   [Retained list pairs](roadmap/R04-dependent-sums.md),
    [Guarded witness](roadmap/R22-existential-quantification.md#inferring-a-higher-rank-witness)
    and [nested patterns](roadmap/R22-existential-quantification.md#constructor-cases-on-the-payload).
 4. **R19.** A GADT field can use an ordered type case under a retained
-   Boolean binder. Extend Template Haskell reification to this field
-   type. H98 fields under a retained binder still use a named helper.
+   Boolean binder. Check whether a branch on an ordinary Boolean can
+   pass that same variable to the field at its refined type. Template
+   Haskell needs a representation for the retained binder before it
+   can reify the field.
    [Retained scrutinees and scope](roadmap/R19-type-level-cases.md#compute-a-retained-scrutinee).
+5. **R16.** Checked Prelude equations support length proofs for
+   `map`, `filter`, and `(++)`, and a proof that map distributes over
+   append. The next example is length preservation for `reverse`.
+   Its private worker changes the accumulator on each recursive call.
+   [Append and map proofs](roadmap/R16-open-term-evaluator.md#prove-that-map-distributes-over-append).
 
 Use this queue for current priorities, the linked card for its acceptance
 criteria, and the [implementation log](PLAN.md) for results from individual
