@@ -304,6 +304,7 @@ map cells with a class method over a family prefix and Maybe: ([Just True,Nothin
 infer the matchability of a family prefix from a later argument: (Just True,True)
 forward an inferred partial-family callback and an ordinary constructor: (Refl,Refl)
 infer both bare kind arrows in a list family proof: Refl
+infer the inner arrow of a higher-order family callback: [True]
 interpret a kind code as an ordinary type constructor: Just True
 interpret two applications of the optional type constructor: Just (Just True)
 choose an interpreted arrow from its expected kind: (Just 3,Right 3)

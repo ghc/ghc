@@ -403,9 +403,15 @@ of a kinded binder in its outer `forall`. In
 the body selects U. An earlier matchability binder can supply the
 arrow. An inferred dependency on a later binder gives GHC-97739.
 If the body leaves the arrow undetermined, GHC defaults it to M.
-An explicit conflicting modifier gives GHC-83865. The inference here
-covers the outer arrow of a kind in the outer telescope of a complete
-signature.
+An explicit conflicting modifier gives GHC-83865.
+
+The same inference applies to nested arrows in the written kind of an
+outer binder. For `g :: (Type -> Type) -> Type`, applying `g` to a
+callback whose kind is `Type %U -> Type` fixes the inner arrow to U.
+The outer arrow still defaults to M if no use determines it. The
+Showcase writes U on the outer arrow to pass an imported higher-order
+family and evaluates the callback at `Bool`.
+[Source example](../examples/open-evaluation/LaterMatchabilityClient.hs).
 
 [Interface and defaulting controls](../../../testsuite/tests/dependent/diagnostics/DependentArrowMatchability.sh)
 and [proposal #242 on kind arrows in type signatures](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#kind-arrows-in-type-signatures).

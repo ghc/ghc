@@ -31,3 +31,10 @@ type ListCallback enabled = ListOf enabled
 -- | Name the partially applied list family for ordinary clients.
 type KnownListCallback :: Type %U -> Type
 type KnownListCallback = ListCallback 'True
+
+-- | Apply an unmatchable callback at Bool.
+type family ApplyBool (f :: Type %U -> Type) where
+  ApplyBool f = f Bool
+
+type AtBool :: (Type %U -> Type) %U -> Type
+type AtBool = ApplyBool

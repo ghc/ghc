@@ -1,13 +1,13 @@
 {-# LANGUAGE DataKinds, KindSignatures, TypeOperators #-}
 {-# LANGUAGE ExplicitForAll, Modifiers, TypeApplications #-}
 {-# LANGUAGE NoExperimentalDependentTypes #-}
-module LaterMatchabilityClient (laterMatchability, forwardedMap, annotatedMap) where
+module LaterMatchabilityClient (laterMatchability, forwardedMap, annotatedMap, nestedCallback) where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy(Proxy))
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Matchability (U)
-import LaterMatchability (ForwardMap, KnownListCallback, ListCallback, MatchResult, UnmatchResult)
+import LaterMatchability (AtBool, ForwardMap, KnownListCallback, ListCallback, MatchResult, UnmatchResult)
 
 laterMatchability :: (MatchResult, UnmatchResult)
 laterMatchability = (Just True, True)
@@ -25,3 +25,11 @@ annotatedMap = mapPair (Proxy @(KnownListCallback :: Type -> Type))
     mapPair :: forall (f :: Type -> Type). Proxy (f :: Type %U -> Type)
             -> ForwardMap f '[Bool, Int] :~: '[f Bool, f Int]
     mapPair _ = Refl
+
+-- | Use the imported list callback to infer the inner arrow.
+nestedCallback :: [Bool]
+nestedCallback = apply (Proxy @AtBool) [True]
+  where
+    apply :: forall (g :: (Type -> Type) %U -> Type).
+             Proxy g -> g KnownListCallback -> g KnownListCallback
+    apply _ = id
