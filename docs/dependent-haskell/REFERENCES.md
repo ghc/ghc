@@ -1048,6 +1048,25 @@ does not apply to Haskell's bottom and `seq`. GHC must preserve each lambda form
 source arity and its existing usage rules. General native lambda inference is
 not established by this expected-type rule.
 
+### Alternating retained and erased binders
+
+[Design for Dependent Types, #378](https://github.com/ghc-proposals/ghc-proposals/pull/378)
+treats dependency, relevance and visibility as separate choices. Eisenberg's
+[thesis, Figure 4.1](https://richarde.dev/papers/2016/thesis/eisenberg-thesis.pdf)
+gives the quantifiers. Agda's [run-time erasure manual](https://agda.readthedocs.io/en/v2.8.0/language/runtime-irrelevance.html)
+shows a telescope with retained and erased arguments and mixed higher-order
+arguments. Check each binder in the scope established by earlier binders.
+
+The accepted [visible-forall proposal #281](https://ghc-proposals.readthedocs.io/en/latest/proposals/0281-visible-forall.html)
+requires an erased argument in its declared visible position. The
+accepted [type-variable scoping proposal #448](https://ghc-proposals.readthedocs.io/en/latest/proposals/0448-type-variable-scoping.html)
+includes an equation with a runtime pattern followed by an invisible
+`@a` pattern. Use its ordinary erased scope and application syntax inside
+the retained telescope. Keep the extra type lambda beneath the runtime
+prefix. GHC can split a single flat equation there when its prefix has
+no strict patterns. Users can write a curried equation to specify the
+point where a strict pattern runs.
+
 ### Explicit higher-order arguments
 
 Agda v2.8.0's

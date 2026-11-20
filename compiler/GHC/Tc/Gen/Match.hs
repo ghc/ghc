@@ -73,7 +73,8 @@ import GHC.Core.Subst ( extendIdSubstWithClone )
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Type ( coreFullView, isManyTy, splitTyConApp_maybe
                      , anyFreeVarsOfType, typeKind, isNativeIndexFunctionId, isNativeOpaqueValueId
-                     , isNativeIndexId, nativeIndexDataConTyArgs, splitFunTy_maybe, substTyWith )
+                     , isInvisibleForAllTyFlag, isNativeIndexId, nativeIndexDataConTyArgs
+                     , splitFunTy_maybe, substTyWith )
 import GHC.Core.Coercion ( MCoercion(MRefl), mkCoVarCo, mkCoCast, coercionType, isReflCo
                          , mkSymCo, mkSubCo, coercionKind, coercionLKind
                          , mkTransCo, mkNomReflCo, mkRepReflCo, mkDepFunCoWithVis )
@@ -105,7 +106,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.Name.Set
 import GHC.Types.Unique.Set (sizeUniqSet)
 import GHC.Types.Id
-import GHC.Types.Var ( EvVar, DepFunTyFlag(..), ExistsTyFlag(ImplicitExists), VarBndr(Bndr), varType, tyVarKind, isId, isCoVar, isTyVar, isVisibleFunArg )
+import GHC.Types.Var ( binderFlag, EvVar, DepFunTyFlag(..), ExistsTyFlag(ImplicitExists), VarBndr(Bndr), varType, tyVarKind, isId, isCoVar, isTyVar, isVisibleFunArg )
 import GHC.Types.Var.Env ( mkInScopeSetList, unitVarEnv )
 import GHC.Types.SrcLoc
 import GHC.Types.Basic( VisArity, RecFlag(NonRecursive), Origin(Generated), GenReason(OtherExpansion), DoPmc(SkipPmc) )
@@ -325,11 +326,11 @@ tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
   = case unLoc (mg_alts matches) of
       [L loc match@(Match { m_pats = L pat_loc pats })]
         | not (first_retained_constructor pats) ->
-          tcRetainedVarMatches herald ctxt ty (filter isVisArgLPat pats) $ \pat_tys rhs_ty boundary names ->
+          tcRetainedVarMatches herald ctxt ty pats $ \pat_tys rhs_ty boundary names ->
             let match' = match { m_pats = L pat_loc (bindRetainedWildcards names pats) }
                 prepared = matches { mg_alts = L (getLoc (mg_alts matches)) [L loc match'] }
             in tcExprMatchesWithWhereFrom (const match) mctxt (invis_pat_tys ++ pat_tys) rhs_ty
-                 (maybe prepared (`splitRetainedContext` prepared) boundary)
+                 (maybe prepared (`splitRetainedSuffix` prepared) boundary)
       _ | DepFunTy DepFunVisible binder _ <- coreFullView ty ->
           do { index <- newSysLocalId (fsLit "retained") ManyTy (varType binder)
              ; let body_ty = applyTypeToArgs ty [Var index]
@@ -346,7 +347,7 @@ tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
     has_function_binder :: Type -> Bool
     has_function_binder ty = case coreFullView ty of
       DepFunTy _ binder body -> isNativeIndexFunctionId binder || has_function_binder body
-      ForAllTy _ (Bndr _ Required) body -> has_function_binder body
+      ForAllTy _ _ body -> has_function_binder body
       FunTy _ _ _ _ body -> has_function_binder body
       _ -> False
 
@@ -364,6 +365,9 @@ tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
       FunTy af _ _ _ body
         | isVisibleFunArg af -> variable_retained_patterns body pats
         | otherwise -> variable_retained_patterns body (pat : pats)
+      ForAllTy _ binder body
+        | isInvisibleForAllTyFlag (binderFlag binder) ->
+            variable_retained_patterns body (pat : pats)
       _ -> False
 
     first_retained_constructor pats
@@ -417,11 +421,11 @@ Name. Do not move a wrapper across a value pattern. The rules for runtime
 demand and retained constructor rows stay the same.
 -}
 
--- | Find a retained binder after required foralls and ordinary arrows.
+-- | Find a retained binder after ordinary arrows and erased foralls.
 hasRetainedFunTy :: Type -> Bool
 hasRetainedFunTy ty = case coreFullView ty of
   DepFunTy DepFunVisible _ _ -> True
-  ForAllTy _ (Bndr _ Required) body -> hasRetainedFunTy body
+  ForAllTy _ _ result -> hasRetainedFunTy result
   FunTy _ _ _ _ result -> hasRetainedFunTy result
   _ -> False
 
@@ -1128,12 +1132,16 @@ to the motive parameter. No equality comes from a definition or unfolding.
 -}
 
 -- | Introduce runtime index identities before checking the remaining patterns.
+-- See Note [Erased suffixes in retained matches].
 tcRetainedVarMatches :: ExpectedFunTyCtxt -> UserTypeCtxt -> Type
                      -> [LPat GhcRn]
                      -> ([ExpPatType] -> ExpRhoType -> Maybe Int -> [Maybe Name] -> TcM a)
                      -> TcM (HsWrapper, a)
-tcRetainedVarMatches herald ctxt initial_ty initial_pats = go [] initial_ty initial_pats
+tcRetainedVarMatches herald ctxt initial_ty source_pats = go [] initial_ty initial_pats
   where
+    initial_pats = filter isVisArgLPat source_pats
+    trailing_erased = not (null initial_pats) && not (isVisArgLPat (last source_pats))
+
     finish acc rhs_ty boundary thing_inside =
       do { let args = reverse acc
          ; result <- thing_inside (map fst args) rhs_ty boundary
@@ -1142,11 +1150,11 @@ tcRetainedVarMatches herald ctxt initial_ty initial_pats = go [] initial_ty init
 
     go acc ty pats thing_inside
       | (theta, _) <- tcSplitPhiTy ty, not (null theta)
-      = do { let prefix = length (filter (isVisibleExpPatType . fst) acc)
-           ; strict <- xoptM LangExt.Strict
-           ; unless (null pats || (not strict && all nonforcing_pattern (take prefix initial_pats))) $
-               failWithTc (TcRnRetainedQuantificationError RetainedContextPattern)
-           ; finish acc (mkCheckExpType ty) (Just prefix) thing_inside }
+      = split_suffix acc ty pats RetainedContextPattern thing_inside
+      | ForAllTy _ binder _ <- coreFullView ty
+      , isInvisibleForAllTyFlag (binderFlag binder)
+      , not (null pats) || trailing_erased
+      = split_suffix acc ty pats RetainedResultWrapper thing_inside
     go acc ty [] thing_inside = finish acc (mkCheckExpType ty) Nothing thing_inside
     go acc ty (pat : pats) thing_inside
       | DepFunTy DepFunVisible binder _ <- coreFullView ty
@@ -1176,6 +1184,13 @@ tcRetainedVarMatches herald ctxt initial_ty initial_pats = go [] initial_ty init
       | ForAllTy _ (Bndr _ Required) _ <- coreFullView ty
       = not (any (isExpFunPatType . fst) acc)
       | otherwise = False
+
+    split_suffix acc ty pats err thing_inside
+      = do { let prefix = length (filter (isVisibleExpPatType . fst) acc)
+           ; strict <- xoptM LangExt.Strict
+           ; unless (null pats || (not strict && all nonforcing_pattern (take prefix initial_pats))) $
+               failWithTc (TcRnRetainedQuantificationError err)
+           ; finish acc (mkCheckExpType ty) (Just prefix) thing_inside }
 
     nonforcing_pattern (L _ pat) = case pat of
       VarPat{} -> True
@@ -1215,11 +1230,11 @@ RHS and its quotations. Ordinary variable-pattern desugaring preserves
 the argument's demand, including the module's Strict setting.
 -}
 
--- | Check a constrained suffix as an expression inside its retained prefix.
--- Keep its guards and local bindings inside the evidence lambdas.
-splitRetainedContext :: Int -> MatchGroup GhcRn (LHsExpr GhcRn)
+-- | Check an erased suffix as an expression inside its runtime prefix.
+-- See Note [Erased suffixes in retained matches].
+splitRetainedSuffix :: Int -> MatchGroup GhcRn (LHsExpr GhcRn)
                      -> MatchGroup GhcRn (LHsExpr GhcRn)
-splitRetainedContext prefix group@(MG { mg_alts = L loc [L match_loc match]
+splitRetainedSuffix prefix group@(MG { mg_alts = L loc [L match_loc match]
                                      , mg_ext = ext })
   = group { mg_alts = L loc [L match_loc outer] }
   where
@@ -1235,8 +1250,25 @@ splitRetainedContext prefix group@(MG { mg_alts = L loc [L match_loc match]
     split_prefix n (pat : ps)
       = let (before, after) = split_prefix (if isVisArgLPat pat then n-1 else n) ps
         in (pat : before, after)
-    split_prefix n [] = pprPanic "splitRetainedContext: missing prefix" (ppr n)
-splitRetainedContext _ _ = panic "splitRetainedContext: multiple equations"
+    split_prefix n [] = pprPanic "splitRetainedSuffix: missing prefix" (ppr n)
+splitRetainedSuffix _ _ = panic "splitRetainedSuffix: multiple equations"
+
+{- Note [Erased suffixes in retained matches]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In a single equation, a forall or context can occur between runtime
+parameters. Check the suffix as a lambda with the declared polytype. This
+puts type and evidence lambdas after the preceding runtime arguments.
+The remaining patterns, guards and local bindings stay inside the lambda.
+A written @a pattern binds the erased type variable at that position.
+The signature's inner forall alone does not scope a name over the equation.
+
+A MatchGroupTc stores a list of runtime argument types and one result type.
+It cannot store a type or evidence lambda between runtime arguments.
+Partition the match only when there are no later runtime patterns, or
+when the prefix cannot force an argument. A split at a strict pattern
+would make a partial application force that pattern too early.
+See docs/dependent-haskell/REFERENCES.md#alternating-retained-and-erased-binders.
+-}
 
 -- | Distinguish transported payloads from shared evidence and runtime indices.
 data RetainedConArg
@@ -1257,6 +1289,9 @@ tcRetainedConArgs herald ctxt = go [] []
                 (reverse (map RetainedConDict givens) ++ argument_plan) n tau }
       | n == 0
       = return (reverse acc, reverse argument_plan, mkCheckExpType ty)
+      | ForAllTy _ binder _ <- coreFullView ty
+      , isInvisibleForAllTyFlag (binderFlag binder)
+      = failWithTc (TcRnRetainedQuantificationError RetainedResultWrapper)
       | DepFunTy DepFunVisible binder _ <- coreFullView ty
       = do { name <- newSysName (nameOccName (idName binder))
            ; let index = mkLocalId name ManyTy (varType binder)

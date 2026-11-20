@@ -79,6 +79,13 @@ cutoff. The proof index keeps that function's identity. [Captured cutoff](R16-op
   source regression.
 - Closed parameterized domains such as `[Bool]`, `Maybe Nat` and `Tree Bool`.
 - Retained workers and function fields through separate interfaces.
+- Complete value signatures can interleave a visible retained binder and an
+  invisible erased forall. A single equation can bind the later erased argument
+  with `@a` and continue with more retained arguments. A binder kind can refer
+  to an earlier retained index. The separate `NativeAlternatingBinders` client
+  checks written type applications, runtime inputs, and lazy ignored indices.
+  A strict prefix in a flat equation and inference of an erased type from a
+  later retained argument remain separate cases.
 - Nominal scalar-domain conversion with scoped source body solving at M58.
 - Fixed function-domain body comparison and payload selection at M59.
   Both stages pass the selected source, runtime and rejection controls.

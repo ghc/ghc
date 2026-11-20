@@ -603,6 +603,12 @@ tcCheckRetainedType allow_function = go
   where
     go :: TcTyMode -> LHsType GhcRn -> TcKind -> TcM TcType
     go mode (L _ (HsParTy _ body)) kind = go mode body kind
+    go mode (L loc (HsForAllTy { hst_tele = tele@HsForAllInvis{}, hst_body = body })) kind
+      | not (isEmptyNameEnv (mode_indices mode)) || hsHasForEachTy (unLoc body)
+      = setSrcSpanA loc $
+        tcExtendIdEnv (nonDetNameEnvElts (mode_indices mode)) $
+        do { (binders, body_ty) <- tcTKTelescope mode tele (go mode body kind)
+           ; return (mkForAllTys binders body_ty) }
     go mode (L loc ty@(HsQualTy _ ctxt body)) kind
       | hsHasForEachTy (unLoc body)
       = setSrcSpanA loc $
@@ -755,10 +761,12 @@ An eligible function Id can also occur as a value index in a closed algebraic
 constructor. Its complete fixed type retains U matchability. Retained
 constructor fields use the same function-domain policy.
 See Note [Function-valued retained binders] in GHC.Core.Type.
-The ordinary outer-forall checker scopes erased type variables around the
-whole telescope. The result has kind Type. Retained binders in other type
-positions use Note [Higher-order retained signatures]. Inner foralls and
-Template Haskell remain gated.
+The ordinary forall checker scopes each erased binder over the rest of its
+telescope. Pass the current runtime indices to the checker for its binder
+kinds and body. An erased forall can follow a retained binder in a function
+signature. Keep the specified and inferred flags in their original positions.
+The result has kind Type. Retained binders in other type positions use
+Note [Higher-order retained signatures]. Template Haskell remains gated.
 
 The delimiter determines visibility. Keep a dot binder even when the body
 does not use the index. Both delimiters bind a runtime value. See
@@ -6296,6 +6304,7 @@ tcTKTelescope mode tele thing_inside =
       HsForAllInvis { hsf_invis_bndrs = bndrs }
         -> do { skol_info <- mkSkolemInfo (ForAllSkol (HsTyVarBndrsRn (unLoc <$> bndrs)))
               ; let skol_mode = smVanilla { sm_clone = False, sm_holes = mode_holes mode
+                                          , sm_indices = mode_indices mode
                                           , sm_tvtv = SMDSkolemTv skol_info }
               ; (inv_tv_bndrs, thing) <- tcExplicitTKBndrsX skol_mode bndrs thing_inside
                 -- inv_tv_bndrs :: [VarBndr TyVar Specificity],
@@ -6565,6 +6574,7 @@ bindExplicitTKBndrsX
     -> TcM ([VarBndr TyVar flag], a)  -- Returned [TcTyVar] are in 1-1 correspondence
                                       -- with the passed-in [LHsTyVarBndr]
 bindExplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_kind
+                                   , sm_indices = indices
                                    , sm_holes = hole_info, sm_family_metadata = family_metadata
                                    , sm_sig_kind_arrows = sig_kind_arrows })
                      hs_tvs thing_inside
@@ -6574,7 +6584,7 @@ bindExplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_ki
     tc_ki_mode = TcTyMode { mode_tyki = KindLevel, mode_holes = hole_info
                          , mode_declaration = False
                          , mode_callback_arrow = OrdinaryArrowChecking
-                         , mode_indices = emptyNameEnv
+                         , mode_indices = indices
                          , mode_pending_calls = Nothing
                          , mode_synonym_metadata = if family_metadata then familyKindMetadata else Nothing
                          , mode_complete_type_arg = Nothing }
@@ -6752,6 +6762,7 @@ data SkolemMode
 
        , sm_family_metadata :: Bool
        , sm_sig_kind_arrows :: Bool -- Defer bare binder arrows until the signature is checked.
+       , sm_indices :: NameEnv Id  -- Runtime indices in binder kinds
        , sm_holes  :: HoleInfo     -- What to do for wildcards in the kind
        }
 
@@ -6767,6 +6778,7 @@ smVanilla = SM { sm_clone  = panic "sm_clone"  -- We always override this
                , sm_kind   = AnyKind
                , sm_family_metadata = False
                , sm_sig_kind_arrows = False
+               , sm_indices = emptyNameEnv
                , sm_holes  = Nothing }
 
 {- Note [Cloning for type variable binders]
