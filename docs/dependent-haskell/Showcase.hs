@@ -1526,6 +1526,8 @@ sourceAddition = do
         (toList (fst split), toList (snd split))
     rebuilt <- CertifiedSplitClient.splitObservation
     observe "split a vector with a proof of its original contents" rebuilt
+    checkedContents <- CertifiedSplitClient.checkedObservation
+    observe "check a runtime cut and prove the original contents" checkedContents
     observe "take and drop at the first runtime length" (toList prefix, toList suffix)
     checkedInput <- newIORef [True, False] >>= readIORef
     let matchesEmpty input = case ListVectorClient.fromList input of
