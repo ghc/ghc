@@ -1427,9 +1427,11 @@ tcCheckInferredFamilyRhs :: LHsType GhcRn -> TcKind -> TcM TcType
 tcCheckInferredFamilyRhs rhs kind = do
   experimental <- xoptM LangExt.ExperimentalDependentTypes
   poly_kinds <- xoptM LangExt.PolyKinds
-  let generalise = experimental && poly_kinds
+  let arrows
+        | experimental && poly_kinds = InferUnsignedFamilyArrows
+        | otherwise = DefaultUnsignedFamilyArrows
   addTypeCtxt rhs $
-    tc_check_lhs_type (typeLevelMode {mode_family_arrow = Just generalise}) rhs kind
+    tc_check_lhs_type (typeLevelMode {mode_family_arrow = arrows}) rhs kind
 
 {- Note [Inferred closed family callback arrows]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1568,7 +1570,7 @@ tcModifiersMult = tc_modifiers_mult typeLevelMode
 data TcTyMode
   = TcTyMode { mode_tyki :: TypeOrKind
              , mode_declaration :: Bool
-             , mode_family_arrow :: Maybe Bool
+             , mode_family_arrow :: FamilyArrowMode
              , mode_holes :: HoleInfo
              , mode_indices :: NameEnv Id
              , mode_pending_calls :: Maybe (NameEnv TcTyVar, PendingSigCalls, TcRef [TcPendingTypeCall])
@@ -1578,6 +1580,12 @@ data TcTyMode
                -- Nothing outside a visible type argument. Just records
                -- completeness of the whole argument, not the current child.
                -- See Note [Retained Pi type arguments].
+
+data FamilyArrowMode
+  = OrdinaryArrowChecking
+  | DefaultUnsignedFamilyArrows
+  | InferUnsignedFamilyArrows
+  deriving Eq
 
 -- See Note [Levels for wildcards]
 -- Nothing <=> no wildcards expected
@@ -1597,7 +1605,7 @@ data HoleMode = HM_Sig      -- Partial type signatures: f :: _ -> Int
 mkMode :: TypeOrKind -> TcTyMode
 mkMode tyki = TcTyMode { mode_tyki = tyki, mode_holes = Nothing
                       , mode_declaration = False
-                      , mode_family_arrow = Nothing
+                      , mode_family_arrow = OrdinaryArrowChecking
                       , mode_indices = emptyNameEnv
                       , mode_pending_calls = Nothing
                       , mode_synonym_metadata = Nothing
@@ -1613,7 +1621,7 @@ mkHoleMode tyki hm
   = do { lvl <- getTcLevel
        ; return (TcTyMode { mode_tyki  = tyki
                           , mode_declaration = False
-                         , mode_family_arrow = Nothing
+                         , mode_family_arrow = OrdinaryArrowChecking
                           , mode_holes = Just (lvl,hm)
                           , mode_indices = emptyNameEnv
                           , mode_pending_calls = Nothing
@@ -4104,20 +4112,20 @@ tcInferTyApps_nosat index_level expected_kind mode orig_hs_ty fun orig_hs_args
            (Nothing, TyConApp tc [])
              | TypeLevel <- mode_tyki mode
              , isTypeFamilyTyCon tc ||
-               (mode_family_arrow mode == Just True && isTcTyCon tc && is_closed_family tc)
+               (mode_family_arrow mode == InferUnsignedFamilyArrows && isTcTyCon tc && is_closed_family tc)
              , hasInferredMatchability tc
              , let indices = takeWhile inferredMatchabilityIndex (tyConBinders tc)
              , any (familyKindUsesMatchability tc) indices -> do
                  defaults <- tcl_kind_arrow_defaults <$> getLclEnv
                  let policy = mode_family_arrow mode
-                     default_level = if policy == Just False then KindLevel else index_level
+                     default_level = if policy == DefaultUnsignedFamilyArrows then KindLevel else index_level
                      choose b
                        | not (familyKindUsesMatchability tc b) = pure unmatchableDataConTy
-                       | policy == Just True = newFlexiTyVarTy matchabilityTy
+                       | policy == InferUnsignedFamilyArrows = newFlexiTyVarTy matchabilityTy
                        | Just (owner, _) <- defaults = fresh_kind_arrow default_level owner
                        | otherwise = pure (defaultForAllMatchability default_level)
                  case (policy, defaults, index_level) of
-                   (Nothing, Nothing, TypeLevel) -> pure fun
+                   (OrdinaryArrowChecking, Nothing, TypeLevel) -> pure fun
                    _ -> mkTyConApp tc <$> traverse choose indices
            _ -> pure fun
        ; (f_args, res_k) <- go_init 1 fun orig_hs_args Nothing
@@ -4253,7 +4261,7 @@ tcInferTyApps_nosat index_level expected_kind mode orig_hs_ty fun orig_hs_args
         -> try_again_after_substing_or $
            do { let arrows_needed = n_initial_val_args all_args
               ; co <- matchExpectedFunKind (HsTypeRnThing $ unLoc hs_ty)
-                          (mode_family_arrow mode == Just True) arrows_needed substed_fun_ki
+                          (mode_family_arrow mode == InferUnsignedFamilyArrows) arrows_needed substed_fun_ki
 
               ; fun' <- liftZonkM $ zonkTcType (fun `mkCastTy` co)
                      -- This zonk is essential, to expose the fruits
@@ -6399,7 +6407,7 @@ bindExplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_ki
   where
     tc_ki_mode = TcTyMode { mode_tyki = KindLevel, mode_holes = hole_info
                          , mode_declaration = False
-                         , mode_family_arrow = Nothing
+                         , mode_family_arrow = OrdinaryArrowChecking
                          , mode_indices = emptyNameEnv
                          , mode_pending_calls = Nothing
                          , mode_synonym_metadata = if family_metadata then familyKindMetadata else Nothing
