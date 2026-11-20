@@ -324,6 +324,15 @@ polymorphic constructor as a migration for promotion.
 [inference rules](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#inference)
 and [promotion](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#promotion).
 
+Stock GHC 9.14.1 accepts the unchanged `LopezJuan` test. The fork
+still rejects it at `data Const :: a -> (b ~> a)` with GHC-83865. The
+reproduction script compiles a copy with `Modifiers` and the single
+synonym change `TyFun arg res %M -> Type`. Both original twin-type
+unification proofs pass. The stock test stays verbatim and its failure
+remains visible in the unchanged directory replay.
+[Stock test](../../../testsuite/tests/dependent/should_compile/LopezJuan.hs)
+and [reproduction script](../examples/open-evaluation/check-singletons-arrows.sh).
+
 ### Arrow patterns in family equations
 
 GHC 9.14.1 accepts the legacy spelling of the two-module reduction.

@@ -11,7 +11,8 @@ lib=$(realpath "$2")
 stock=
 if (( $# == 3 )); then stock=$(realpath "$3"); fi
 src=$(cd "$(dirname "$0")" && pwd)
-full="$src/../../../../testsuite/tests/dependent/should_compile/GADTSingletons.hs"
+legacy="$src/../../../../testsuite/tests/dependent/should_compile"
+full="$legacy/GADTSingletons.hs"
 flags=(-v0 -O0 -package-env - -fdiagnostics-color=never -fomit-interface-pragmas
        -fno-write-if-simplified-core -dcore-lint -dstg-lint)
 ghc=("$compiler" "-B$lib" -XNoExperimentalDependentTypes -fprint-explicit-matchabilities "${flags[@]}")
@@ -30,6 +31,27 @@ reject() {
         exit 1
     fi
 }
+
+# Keep the stock twin-type unification test intact. Check both proofs in a
+# copy whose defunctionalization synonym explicitly gives Const an M kind.
+(
+    mkdir -p "$out/lopez"
+    cd "$out/lopez"
+    cp "$legacy/LopezJuan.hs" .
+    if [[ -n $stock ]]; then
+        "$stock" "${flags[@]}" -fno-code LopezJuan.hs
+    fi
+    reject '[GHC-83865]' 'data Const' "${ghc[@]}" -c LopezJuan.hs
+    sed -i.bak \
+        -e '1i\
+{-# LANGUAGE Modifiers #-}
+' \
+        -e '/^import Data.Proxy/a\
+import GHC.Matchability (M)
+' \
+        -e 's/TyFun arg res -> Type/TyFun arg res %M -> Type/' LopezJuan.hs
+    "${ghc[@]}" -c LopezJuan.hs
+)
 
 # Change the equations in a fresh directory for each compiler invocation.
 for variant in bare synonym-M split polymorphic; do
