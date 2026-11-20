@@ -1,9 +1,9 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, ImpredicativeTypes, LinearTypes, PolyKinds, RankNTypes, TypeApplications #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, ImpredicativeTypes, LinearTypes, PolyKinds, RankNTypes, RequiredTypeArguments, TypeApplications #-}
 module WitnessSchema
     ( Hidden, callback, unpack, Multi, pair, kindBox, KindBox, Deep, producer
     , CallbackPair, atTwoTypes, observePair, ignorePair
     , ProjectionPair, projectionPair, projectionLazy
-    , Payload(..), RankedBuilder, buildAt, configured, observeBuilder, ranked
+    , Payload(..), RankedBuilder, buildAt, configured, withWitness, observeBuilder, ranked
     , Flag(..), FlaggedBuilder, observeFlagged
     , PolyId, GuardedBuilder, consumeAt, observeGuarded, never, different
     , CapturedMono(..), CapturedMonoBuilder
@@ -62,6 +62,9 @@ buildAt b = Payload @PolyId id (\f -> (f (if b then 7 else 9), f b))
 
 configured :: forall {k} (flag :: k) tag. Proxy flag -> (tag -> Bool) -> tag -> Payload PolyId
 configured _ test tag = buildAt (test tag)
+
+withWitness :: forall tag. forall t -> Proxy tag -> t -> (t -> (Int, Bool)) -> Payload t
+withWitness (type t) _ value run = Payload @t value run
 
 observeBuilder :: RankedBuilder -> Bool -> (Int, Bool)
 observeBuilder builder b = case builder b of

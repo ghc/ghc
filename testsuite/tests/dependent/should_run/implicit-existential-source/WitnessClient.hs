@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NoExperimentalDependentTypes #-}
-{-# LANGUAGE DataKinds, LinearTypes, TypeApplications #-}
+{-# LANGUAGE DataKinds, LinearTypes, RequiredTypeArguments, TypeApplications #-}
 module WitnessClient where
 import Control.Monad (unless)
 import Data.Proxy
@@ -20,6 +20,13 @@ viaValue = \_ -> callback
 
 viaTypeArg :: RankedBuilder
 viaTypeArg = \b -> configured @True @Bool Proxy id b
+
+viaRequired :: RankedBuilder
+viaRequired = \b -> (withWitness @Int (type PolyId) Proxy) id (\f -> (f 7, f b))
+
+viaRequiredAnnotated :: RankedBuilder
+viaRequiredAnnotated = (\b -> (withWitness @Int (type PolyId) Proxy) id (\f -> (f 7, f b)))
+    :: Bool -> Payload PolyId
 
 viaPackageTypeArg :: Bool -> (Int, Bool)
 viaPackageTypeArg flag = case ranked @Bool flag of
@@ -46,3 +53,4 @@ main = do
            observeBuilder viaValue (error "unused builder operand"),
            observeBuilder viaTypeArg False, viaPackageTypeArg False,
            viaObserverTypeArg True)
+    print (observeBuilder viaRequired False, observeBuilder viaRequiredAnnotated False)

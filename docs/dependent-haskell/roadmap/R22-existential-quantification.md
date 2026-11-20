@@ -452,6 +452,11 @@ its guard is unreachable.
 Leading visible type applications can choose input types when the
 declared result type is independent of the supplied type arguments.
 The ordinary checker checks those applications at their source spans.
+An explicitly marked required argument can also select the witness.
+For example `\b -> (withWitness @Int (type PolyId) Proxy) id (use b)`
+reads the closed `PolyId` synonym from the producer interface.
+An ordinary rank-n consumer uses the selected callback at two types.
+A type introduced by a lambda pattern cannot supply the outer witness.
 The witness erases before code generation. Agda's `@0` record fields
 use the same runtime distinction between a payload and erased evidence.
 [Source-free client](../../../testsuite/tests/dependent/should_run/implicit-existential-source/WitnessClient.hs)

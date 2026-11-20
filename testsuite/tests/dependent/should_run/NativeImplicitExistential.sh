@@ -145,12 +145,15 @@ for binding in hidden both atKind viaCall viaValue viaTypeArg viaLinear viaGadt;
         exit 1
     }
 done
+line=$(grep -n '^viaRequired =' WitnessClient.hs | cut -d: -f1)
+grep -Eq "^WitnessClient.hs:$line:[0-9]+: error: \[GHC-91510\]" monomorphic.log
 if "$ghc" "${flags[@]}" -c WitnessLambdaReject.hs >lambda-witness.log 2>&1; then
     echo "The lambda witness check accepted an invalid body." >&2
     exit 1
 fi
 for rejection in escape:91028 duplicate:18872 wrongOperand:83865 wrongVisibleKind:83865 \
-                 missingEquality:25897 wrongPackageArgument:83865 escapePackageCall:25897; do
+                 wrongRequiredOperand:83865 missingEquality:25897 \
+                 wrongPackageArgument:83865 escapePackageCall:25897; do
     binding=${rejection%:*}
     code=${rejection#*:}
     line=$(grep -n "^$binding .*=" WitnessLambdaReject.hs | cut -d: -f1)
@@ -159,6 +162,8 @@ for rejection in escape:91028 duplicate:18872 wrongOperand:83865 wrongVisibleKin
         exit 1
     }
 done
+line=$(grep -n '^    (withWitness @Int (type t) Proxy)' WitnessLambdaReject.hs | cut -d: -f1)
+grep -Eq "^WitnessLambdaReject.hs:$line:[0-9]+: error: \[GHC-46956\]" lambda-witness.log
 cp "$src/"{WitnessGuardedClient,WitnessGuardedReject}.hs .
 "$ghc" "${flags[@]}" -c WitnessGuardedClient.hs -main-is WitnessGuardedClient
 "$ghc" "${flags[@]}" WitnessGuardedClient.o ../provider/WitnessSchema.o \
