@@ -31,6 +31,7 @@ cp NativeCase.hi NativeNestedCase.hi NativeTypeCase{Client,Rigid,LetWrong}.hs in
    grep -Fq 'NativeTypeCaseRigid.hs:30:19: error: [GHC-83865]' bad.log &&
    grep -Fq 'NativeTypeCaseRigid.hs:33:18: error: [GHC-83865]' bad.log &&
    grep -Fq 'NativeTypeCaseRigid.hs:36:19: error: [GHC-83865]' bad.log &&
+   grep -Fq 'NativeTypeCaseRigid.hs:39:16: error: [GHC-83865]' bad.log &&
    ! grep -Eq '\$(case(-node)?|lambda):' bad.log &&
    reject NativeTypeCaseLetWrong 8:9 'GHC-83865')
 "${g[@]}" -fomit-interface-pragmas -c NativeTypeCaseHeadProvider.hs
@@ -65,6 +66,6 @@ reject NativeTypeCaseErasedAlias 8:3 'GHC-30337'
 grep -Fq 'appear in an injective position' bad.log
 reject NativeTypeCaseErasedWildcard 8:3 'GHC-30337'
 grep -Fq 'appear in an injective position' bad.log
-reject NativeTypeCaseHiddenAlias 7:3 'GHC-78416'
-grep -Fq 'Cannot use this constructor pattern in a nested type case' bad.log
+reject NativeTypeCaseHiddenAlias 11:11 "GHC-83865"
+grep -Fq "In the expression: Refl" bad.log
 reject NativeTypeCaseHiddenErased 6:3 'GHC-30337'

@@ -34,3 +34,6 @@ writtenFirst _ = Refl
 
 wrongAliasField :: N.PickFlipped ('Just (Maybe (Either Char Bool))) :~: Proxy Bool
 wrongAliasField = Refl
+
+aliasFirst :: Proxy first -> N.AliasFirst ('N.Pair first 'Nothing) :~: Int
+aliasFirst _ = Refl

@@ -3,6 +3,7 @@ module NativeNestedCase
   ( Pick, Pair(..), LeftFirst, IgnoreLeft, Uniform, SameFallback
   , Indexed(..), IndexedPick, TypeHead, UniformTypeHead, Wrapped, WrappedBool
   , PickFlipped, DiscardConstant, CaptureFlipped, WrittenFirst
+  , AliasFirst
   ) where
 
 import Data.Kind (Type)
@@ -90,3 +91,9 @@ type WrittenFirst (m :: Maybe Type) = case m of
   Just (Flip Bool Ordering) -> Int
   Just _ -> Int
   Nothing -> Int
+
+type BothPresent = 'Pair ('Just 'True) ('Just 'False)
+
+type AliasFirst d = case d of
+  BothPresent -> Int
+  Pair _ _ -> Int

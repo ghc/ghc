@@ -89,3 +89,9 @@ transparentAliases ::
   , N.CaptureFlipped 'LT ('Just (Either Char Bool)) :~: '(Proxy 'LT, Proxy Bool, Proxy Char)
   , N.WrittenFirst ('Just (Either unknown Char)) :~: Int )
 transparentAliases = (Refl, Refl, Refl, Refl, Refl)
+
+aliasMatch :: N.AliasFirst ('N.Pair ('Just 'True) ('Just 'False)) :~: Int
+aliasMatch = Refl
+
+aliasMiss :: N.AliasFirst ('N.Pair 'Nothing later) :~: Int
+aliasMiss = Refl
