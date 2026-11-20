@@ -89,11 +89,10 @@ temporary target package database with the base marker compiled in the
 configured base unit. The source test `NativeExistentialSource` runs
 those controls against the `GHC.Exists` provided by the built base.
 
-This slice supports one erased witness with a checked kind, saturated
-applications and a sole prefix Pack case alternative. Compile modules
-that use erased existential types or expressions at `-O0`. The Showcase
-module exports its observation as an ordinary tuple for the optimized
-Showcase entry point.
+The first source compiler supported one erased witness with a checked kind,
+saturated applications and a sole prefix Pack case alternative. It compiled
+the package provider at `-O0`. The example exported its observations as
+an ordinary tuple.
 
 The self-hosted compiler at `3aab77ca78` writes
 `-erased-existentials-v1` when an interface contains an erased
@@ -198,9 +197,10 @@ keeps the same header. Reserializing the cached payload preserves its bytes.
 The same example passes `singletonBuilder` to `runBuilder`. The producer
 checks a lambda against `exists (n :: Nat). a -> Vec a n`. The consumer
 opens that function and binds the filtered result in a local `let`.
-The optimized Showcase imports the packaged lambda from the `-O0`
-producer. Writing the lambda at the call site introduces a raw package
-there and reaches the [optimizer restriction](R05-dependent-core.md#optimizing-erased-packages).
+Both the producer and the ordinary caller can compile at `-O1`. A client can
+also construct a package at the call site. For example,
+`runBuilder (\x -> VCons x VNil) odd (7 :: Int)` returns `[7]`.
+[Optimizer scope](R05-dependent-core.md#optimizing-erased-packages).
 
 Opening is limited to an application with a known operand head and an
 ordinary payload domain. An opening introduces a fresh scoped

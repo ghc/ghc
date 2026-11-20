@@ -100,9 +100,12 @@ is nonempty before it can use a function that requires a successor length.
 
 The dot form infers package introduction and elimination. The bar form
 (``exists (n :: Nat) | Vec a n``) uses explicit ``Pack`` expressions and
-patterns from ``GHC.Exists``. Compile definitions with surviving erased
-package operations at ``-O0``. A separately compiled ``-O1`` module can
-call them.
+patterns from ``GHC.Exists``. Both the producer and an ordinary client can
+compile at ``-O1``, including through a separately compiled interface.
+Two uses of the same unrestricted local package can share a witness in
+one application. Two independently filtered vectors have independent lengths.
+A program that transports equality under an existential binder can still
+require ``-O0``.
 
 Natural numerals in vector indices
 ----------------------------------

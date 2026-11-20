@@ -160,15 +160,24 @@ also checks the scope of both operations after worker/wrapper. A recursive
 join exits through a strict case on the hidden payload. Exitification lifts
 the exit and abstracts the type witness before its payload.
 
-The normal `-O1` pipeline still rejects surviving operations.
-Specialisation and common subexpression elimination still need checks on
-raw packages in the full schedule.
-An ordinary `-O1` module can call a separately compiled `-O0` provider.
-If a source binding still constructs or opens a package, GHC-36962
-identifies that binding. For example, `packValue x = Just x` can introduce
-a package implicitly when `packValue` returns `exists (a :: Type). Maybe a`.
-The diagnostic points at `packValue` even though its definition contains
-no `Pack` expression.
+The normal retained `-O1` schedule also runs on definitions that construct
+or open an erased package. The vector filter and partition use the default
+interface settings. A separately compiled ordinary client reads their
+results without forcing the unused tail. The previous compiler can also
+compile that client against the new interfaces.
+[Filter and partition](../examples/erased-existentials/ImplicitVector.hs).
+
+The specialiser keeps dictionaries that mention the hidden witness inside
+its scope. Expression keys in CSE include the package schema, supplied
+witness and payload. The divergence check follows the body of an opening.
+The source regression opens a package with a local `Show` dictionary and
+renders both a `Bool` and an `Int` through it.
+[Source regression](../../../testsuite/tests/dependent/should_run/NativeExistentialSource.sh).
+
+A module-level rewrite rule outside this schedule produces GHC-51063.
+The diagnostic names the rule. A binding that transports equality under
+an existential binder can still require `-O0`. GHC-59107 identifies the
+binding when it has a source span.
 
 ## Next increments
 
