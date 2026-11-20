@@ -220,6 +220,13 @@ test('NativeScopedSumMatch',
                    'NativeScopedSumMatchClient.hs', 'NativeScopedSumMatchReject.hs'])],
      run_command, ['bash NativeScopedSumMatch.sh "{compiler}" "{libdir}"'])
 
+test('NativeScopedSumSignatureReify',
+     [req_interp, req_rts_linker, only_ways(['normal']),
+      extra_files(['NativeScopedSumSignatureReifyProvider.hs',
+                   'NativeScopedSumSignatureReifyClient.hs'])],
+     run_command, ['bash NativeScopedSumSignatureReify.sh "{compiler}" "{libdir}" '
+                   + config.ghc_th_way_flags])
+
 test('NativeTypeLet',
      [only_ways(['normal']), extra_files([open_eval_dir + 'TypeLet.hs'])],
      run_command, ['bash NativeTypeLet.sh "{compiler}" "{libdir}"'])

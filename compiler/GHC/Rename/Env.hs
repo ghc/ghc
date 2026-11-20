@@ -523,7 +523,7 @@ lookupExactOrOrig_base rdr_name
 
        ; this_mod <- getModule
        ; mb_gre <- if nameIsLocalOrFrom this_mod nm
-                   then lookupLocalExactGRE nm
+                   then lookupLocalOrigGRE nm
                    else lookupImportedExactName nm
        ; return $ case mb_gre of
           Left  err -> ExactOrOrigError err
@@ -533,6 +533,21 @@ lookupExactOrOrig_base rdr_name
   where
     cvtEither (Left e)    = ExactOrOrigError e
     cvtEither (Right gre) = FoundExactOrOrig gre
+
+-- | Look up a local original name, including a private checked synonym.
+-- A reified value signature can refer to a synonym from an earlier declaration
+-- group. The renamer removes its GRE to keep it out of source lookup and exports.
+lookupLocalOrigGRE :: Name -> RnM (Either NotInScopeError GlobalRdrElt)
+lookupLocalOrigGRE name = do
+  exact <- lookupLocalExactGRE name
+  case exact of
+    Left NoExactName{} -> do
+      env <- getGblEnv
+      return $ case lookupNameEnv (tcg_type_env env) name of
+        Just thing@(ATyCon tc) | isTypeSynonymTyCon tc ->
+          Right (mkExactGRE name (tyThingGREInfo thing))
+        _ -> exact
+    _ -> return exact
 
 {- Note [Errors in lookup functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

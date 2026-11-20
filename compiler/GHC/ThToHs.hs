@@ -2231,7 +2231,7 @@ cvtName = cvtNameWith False
 
 cvtNameWith :: Bool -> OccName.NameSpace -> TH.Name -> CvtM RdrName
 cvtNameWith allow_lifted ctxt_ns (TH.Name occ flavour)
-  | not (okOcc ctxt_ns occ_str || (allow_lifted && liftedFamilyName)) =
+  | not (okOcc ctxt_ns occ_str || (allow_lifted && liftedTypeName)) =
       failWith (IllegalOccName ctxt_ns occ_str)
   | otherwise
   = do { loc <- getL
@@ -2242,11 +2242,12 @@ cvtNameWith allow_lifted ctxt_ns (TH.Name occ flavour)
   where
     occ_str = TH.occString occ
 
-    -- Reifying a synonym can return a reference to a private lifted family.
+    -- Reified types can refer to a private lifted family or synonym.
     -- Only an exact original type occurrence can round-trip the internal spelling.
-    liftedFamilyName
+    liftedTypeName
       | TH.NameG TH.TcClsName _ _ <- flavour
-      , ctxt_ns == OccName.tcClsName = any (`isPrefixOf` occ_str) ["$lambda:", "$case:"]
+      , ctxt_ns == OccName.tcClsName
+      = any (`isPrefixOf` occ_str) ["$lambda:", "$case:", "$signature-sum:"]
       | otherwise = False
 
 okOcc :: OccName.NameSpace -> String -> Bool
