@@ -57,3 +57,7 @@ rigidForall select tag flag = select tag flag
 rigidIndexedField :: Proxy flag ->
   N.IndexedFieldOrder ('Just ('N.RefinedFieldBox ('Proxy :: Proxy 'False) ('N.FieldOn flag))) :~: Int
 rigidIndexedField _ = Refl
+
+blockedTransport :: Proxy (d :: N.DependentFieldGate Bool 'True 'Proxy)
+                 -> N.DependentFieldPick ('Just d) :~: Char
+blockedTransport _ = Refl

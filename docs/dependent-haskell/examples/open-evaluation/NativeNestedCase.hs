@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, MagicHash, Modifiers, PolyKinds, RankNTypes, StandaloneKindSignatures, TypeFamilies #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, MagicHash, Modifiers, PolyKinds, RankNTypes, RequiredTypeArguments, StandaloneKindSignatures, TypeFamilies #-}
 module NativeNestedCase
   ( Pick, Pair(..), LeftFirst, IgnoreLeft, Uniform, SameFallback
   , Indexed(..), IndexedPick, TypeHead, UniformTypeHead, Wrapped, WrappedBool
@@ -6,11 +6,12 @@ module NativeNestedCase
   , AliasFirst, MixedAlias, ArrowResult
   , CaseFlag(..), ForallResult, ForallRepResult, forallResult
   , FamilyGate(..), FamilyGatePick, WrittenGatePick, HiddenGatePick, ApartGatePick
+  , DependentFieldGate(..), DependentFieldPick
   , IndexedFieldBox(..), IndexedFieldPayload(..), IndexedFieldPick, IndexedFieldOrder
   ) where
 
 import Data.Kind (Type)
-import Data.Proxy (Proxy)
+import Data.Proxy (Proxy(..))
 import GHC.Exts (Int#, LiftedRep, RuntimeRep(IntRep), TYPE, U)
 
 type Pick d = case d of
@@ -144,6 +145,19 @@ type ApartGatePick (d :: Maybe (FamilyGate GateIndexOther)) = case d of
 
 type family FieldIndex (seed :: Bool) (active :: Bool) :: Type where
   FieldIndex seed active = Bool
+
+-- | Refine an index and transport two later arguments to their new kinds.
+type DependentFieldGate :: forall k -> forall (x :: k) -> Proxy x -> Type
+data DependentFieldGate k value marker where
+  DefaultField :: Bool -> DependentFieldGate k value marker
+  IndexedField :: forall (v :: FieldIndex 'False 'True) (mark :: Proxy v).
+                  Proxy mark -> DependentFieldGate (FieldIndex 'False 'True) v mark
+
+-- | Select a branch after checking transport for both dependent arguments.
+type DependentFieldPick (d :: Maybe (DependentFieldGate Bool 'True 'Proxy)) = case d of
+  Just (IndexedField _) -> Char
+  Just _ -> Int
+  Nothing -> ()
 
 data IndexedFieldPayload (active :: Bool) where
   FieldOn :: Bool -> IndexedFieldPayload 'True

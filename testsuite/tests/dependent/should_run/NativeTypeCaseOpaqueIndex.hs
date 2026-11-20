@@ -39,17 +39,3 @@ type NeedsRefinement (d :: Maybe (ConditionalGate Bool 'True)) = case d of
   Just (ConditionalPlain True) -> Int
   Just _ -> Bool
   Nothing -> Char
-
-type family DependentKind where
-  DependentKind = Bool
-
-type DependentGate :: forall (k :: Type) -> k -> Type
-data DependentGate k value where
-  DependentPlain :: Bool -> DependentGate k value
-  DependentFamily :: forall (value :: DependentKind).
-                     Proxy value -> DependentGate DependentKind value
-
-type NeedsTransport (d :: Maybe (DependentGate Bool 'True)) = case d of
-  Just (DependentPlain True) -> Int
-  Just _ -> Bool
-  Nothing -> Char

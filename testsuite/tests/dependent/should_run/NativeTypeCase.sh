@@ -43,6 +43,7 @@ cp NativeCase.hi NativeNestedCase.hi NativeTypeCaseFallback.hi NativeTypeCase{Cl
    grep -Fq 'NativeTypeCaseRigid.hs:59:23: error: [GHC-83865]' bad.log &&
    grep -Eq 'the type case in .*ForallResult' bad.log &&
    grep -Eq 'the type case in .*IndexedFieldOrder' bad.log &&
+   grep -Fq 'blockedTransport _ = Refl' bad.log &&
    ! grep -Eq '\$(case(-node)?|lambda):' bad.log &&
    reject NativeTypeCaseLetWrong 8:9 'GHC-83865')
 "${g[@]}" -fomit-interface-pragmas -c NativeTypeCaseHeadProvider.hs
@@ -79,7 +80,7 @@ reject NativeTypeCaseNestedAliasHead 5:8 'GHC-55789'
 reject NativeTypeCaseOpaqueIndex 14:3 'GHC-79642'
 grep -Fq 'NativeTypeCaseOpaqueIndex.hs:27:3: error: [GHC-79642]' bad.log
 grep -Fq 'NativeTypeCaseOpaqueIndex.hs:39:3: error: [GHC-79642]' bad.log
-grep -Fq 'NativeTypeCaseOpaqueIndex.hs:53:3: error: [GHC-79642]' bad.log
+test "$(grep -c 'error: \[GHC-79642\]' bad.log)" = 3
 grep -Fq 'Cannot determine which constructors are possible' bad.log
 reject NativeTypeCaseErasedAlias 8:3 'GHC-30337'
 grep -Fq 'appear in an injective position' bad.log
@@ -89,7 +90,8 @@ reject NativeTypeCaseHiddenAlias 11:11 "GHC-83865"
 grep -Fq "In the expression: Refl" bad.log
 reject NativeTypeCaseHiddenErased 6:3 'GHC-30337'
 
-# Check that malformed index transport is rejected without Core Lint.
+# A stuck family still blocks refinement without Core Lint.
 g=("${plain[@]}")
-reject NativeTypeCaseOpaqueIndex 53:3 'GHC-79642'
+reject NativeTypeCaseOpaqueIndex 39:3 'GHC-79642'
+test "$(grep -c 'error: \[GHC-79642\]' bad.log)" = 3
 ! grep -Fq 'Core Lint errors' bad.log

@@ -186,3 +186,14 @@ constructor cases inside expressions.
 [Eisenberg and Stolarek, §§4.5 and 4.7](https://richarde.dev/papers/2014/promotion/promotion.pdf),
 [Agda local definitions](https://agda.readthedocs.io/en/stable/language/let-and-where.html#let-expressions)
 and [Agda pattern lambdas](https://agda.readthedocs.io/en/stable/language/with-abstraction.html#pattern-lambdas).
+
+
+### Transport of dependent constructor indices
+
+A nominal reduction of an earlier constructor argument can change a later
+argument's kind. Lift the binder kind over the preceding argument coercions.
+Cast the later index with that evidence before matching the constructor.
+The source fixture refines a kind to `Bool`, then checks a value of that kind
+and a `Proxy` indexed by the value. Its ordinary client proves both branches.
+A stuck family still blocks the refinement.
+[Constructor and type case](../examples/open-evaluation/NativeNestedCase.hs).

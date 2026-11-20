@@ -149,3 +149,9 @@ liftedResult select = select @Ordering @'LT @LiftedRep Proxy N.CaseOff
 
 unliftedResult :: N.ForallRepResult -> Int
 unliftedResult select = I# (select @Bool @'False @'IntRep Proxy N.CaseOn)
+
+transportedField :: N.DependentFieldPick ('Just ('N.IndexedField 'Proxy)) :~: Char
+transportedField = Refl
+
+ordinaryField :: N.DependentFieldPick ('Just ('N.DefaultField 'True)) :~: Int
+ordinaryField = Refl

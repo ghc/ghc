@@ -4222,7 +4222,10 @@ reduced kind with the scrutinee kind. This can refine another index of
 the same constructor, including an index that occurs in a field kind.
 Check the kinds of the reduced arguments against the constructor kind
 before unification. A reduction can change the kind expected by a later
-argument. That case needs kind transport between arguments.
+argument. Lift each binder kind with the nominal proofs for the arguments
+before it. Cast the argument with that proof and extend the lifting
+context with the argument's reduction and cast. This is the same
+transport as in Note [extendLiftingContextEx] in GHC.Core.Coercion.
 Apply that refinement and the field renaming to the nominal kind
 coercion before casting the constructor. A reduced index can also
 establish apartness when its kind agrees with the scrutinee index kind.
@@ -4455,7 +4458,18 @@ checkedCaseKindRefinement actual expected
              , Just redn <- reduceTyFamApp_maybe fams Nominal family args
              = redn
              | otherwise = Reduction (mkNomReflCo a) a
-           redns = zipWith index_step as bs
+           binders = binderVars (tyConBinders tc)
+           index_steps = zipWith index_step as bs
+           redns
+             | binders `equalLength` index_steps, all isTyVar binders
+             = snd (List.mapAccumL transport (emptyLiftingContext emptyInScopeSet)
+                                 (zip binders index_steps))
+             | otherwise = index_steps
+           transport lc (binder, Reduction co arg) =
+             let kind_co = liftCoSubst Nominal lc (varType binder)
+                 arg_co = co `mkTransCo` mkGReflRightMCo Nominal arg (MCo kind_co)
+                 lc' = extendLiftingContextAndInScope lc binder arg_co
+             in (lc', Reduction arg_co (mkCastTy arg kind_co))
            reduced = map reductionReducedType redns
            index_apart a b = typeKind a `eqType` typeKind b && typesAreApart a b
            kinded_args _ [] = True
