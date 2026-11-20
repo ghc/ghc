@@ -18,7 +18,7 @@ for mode in O0 O2; do
     cp ../instances/*.hi "$src/NativeExistentialInstances.hs" .
     "${ghc[@]}" "-$mode" -c NativeExistentialInstances.hs
     "${ghc[@]}" "-$mode" NativeExistentialInstances.o ../instances/StreamPreview.o ../provider/ErasedStream.o -o client
-    test "$(./client)" = '("GH","[True]","x",(Refl,Refl))'
+    test "$(./client)" = '("GH","[True]","x",(Refl,Refl),[7],"a",2,1)'
 done
 
 reject() {
@@ -36,3 +36,5 @@ reject OPEN GHC-83865 'wrong _ = Refl'
 reject INVERSE GHC-25897 'wrong Refl = Refl'
 reject REPEATED GHC-22979 'instance Sample (a,a) => Sample (Maybe (Stream a))'
 reject DUPLICATE GHC-59692 'instance Sample First'
+reject UNDETERMINED GHC-39999 'undetermined = streamOnly @(Stream Bool) (fromList [True])'
+reject CONFLICT GHC-39999 'conflict = firstElement @Bool @(Stream Char) Proxy (fromList "x")'

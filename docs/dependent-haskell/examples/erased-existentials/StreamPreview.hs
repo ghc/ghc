@@ -1,7 +1,7 @@
-{-# LANGUAGE FlexibleInstances, NoExperimentalDependentTypes #-}
+{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, NoExperimentalDependentTypes #-}
 
 -- | Preview a stream through its exported interface.
-module StreamPreview (Preview(preview)) where
+module StreamPreview (Preview(preview), Prefix(prefix)) where
 
 import ErasedStream (Stream, toList)
 
@@ -22,3 +22,10 @@ instance Preview (Stream Bool) where
 instance Preview err => Preview (Either err (Stream Char)) where
     preview (Left err) = preview err
     preview (Right xs) = preview xs
+
+-- | Read a bounded prefix at the element type requested by the caller.
+class Prefix stream element where
+    prefix :: Int -> stream -> [element]
+
+instance Prefix (Stream a) a where
+    prefix n xs = take n (toList xs)

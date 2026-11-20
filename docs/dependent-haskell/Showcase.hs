@@ -1416,6 +1416,8 @@ main = do
         (StreamPreview.preview (ErasedStream.fromList ('G' : 'H' : error "unused character tail")),
          StreamPreview.preview (ErasedStream.fromList (True : error "unused Boolean tail")),
          StreamPreview.preview @(Either Char (ErasedStream.Stream Char)) (Left 'x'))
+    observe "resolve the stream instance from its requested element type"
+        (StreamPreview.prefix 2 (ErasedStream.fromList [4, 5 :: Int]) :: [Int])
     observe "read streams with different hidden state types"
         (ErasedStream.toList (ErasedStream.oddThrough 6),
          take 1 (ErasedStream.toList (ErasedStream.fromList (True : error "unused stream tail"))))

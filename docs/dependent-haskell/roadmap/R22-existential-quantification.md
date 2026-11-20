@@ -721,6 +721,11 @@ The different element types make the closed package types apart.
 For an open element type or a stuck type family, GHC keeps the possible
 overlap. An equality between packages does not determine a free element type.
 
+An instance `Prefix (Stream a) a` can use the element type requested by
+the caller. GHC checks the whole package after ordinary arguments have
+fixed `a`. The argument order does not affect the match. A class with
+only a `Stream a` argument still cannot infer `a` from the hidden body.
+
 GHC also checks the Paterson conditions on an instance with a package
 in its head. A repeated free variable gives GHC-22979. Two instances
 that differ only in the name of the hidden witness give GHC-59692.

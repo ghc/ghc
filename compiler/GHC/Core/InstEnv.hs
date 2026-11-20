@@ -551,8 +551,8 @@ identicalClsInstHead (ClsInst { is_tcs = rough1, is_tys = tys1 })
                      (ClsInst { is_tcs = rough2, is_tys = tys2 })
   =  not (instanceCantMatch rough1 rough2)  -- Fast check for no match, uses the "rough match" fields;
                                             -- also accounts for class name.
-  && isJust (tcMatchTys tys1 tys2)
-  && isJust (tcMatchTys tys2 tys1)
+  && isJust (tcMatchInstanceTys tys1 tys2)
+  && isJust (tcMatchInstanceTys tys2 tys1)
 
 {-
 ************************************************************************
@@ -1216,7 +1216,7 @@ instEnvMatchesAndUnifiers (InstEnv rm) vis_mods cls tys
       | not (instIsVisible vis_mods item)
       = acc  -- See Note [Instance lookup and orphan instances]
 
-      | Just subst <- tcMatchTys tpl_tys tys
+      | Just subst <- tcMatchInstanceTys tpl_tys tys
       = ((item, map (lookupTyVar subst) tpl_tvs) : acc)
 
       | otherwise
@@ -1230,7 +1230,7 @@ instEnvMatchesAndUnifiers (InstEnv rm) vis_mods cls tys
       = check_unifiers items  -- See Note [Instance lookup and orphan instances]
 
       -- If it matches, check_match has gotten it, so skip over it here
-      | Just {} <- tcMatchTys tpl_tys tys
+      | Just {} <- tcMatchInstanceTys tpl_tys tys
       = check_unifiers items
 
       -- Does not match, so next check whether the things unify
@@ -1528,7 +1528,7 @@ new_inst `overrides` old_inst
     -- `instB` can be instantiated to match `instA`
     -- or the two are equal
     instA `more_specific_than` instB
-      = isJust (tcMatchTys (is_tys instB) (is_tys instA))
+      = isJust (tcMatchInstanceTys (is_tys instB) (is_tys instA))
 
 insert_overlapping :: InstMatch -> InstMatches -> InstMatches
 -- ^ Add a new solution, knocking out strictly less specific ones

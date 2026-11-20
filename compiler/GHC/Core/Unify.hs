@@ -4,7 +4,7 @@
 
 module GHC.Core.Unify (
         tcMatchTy, tcMatchTyKi,
-        tcMatchTys, tcMatchTyKis, tcMatchTysWithRepeated,
+        tcMatchTys, tcMatchInstanceTys, tcMatchTyKis, tcMatchTysWithRepeated,
         tcMatchTyX, tcMatchTysX, tcMatchTyKisX,
         tcMatchTyX_BM, tcMatchRetainedTyX_BM, ruleMatchTyKiX,
 
@@ -32,7 +32,7 @@ import GHC.Core.TyCon
 import GHC.Core.Predicate( CanEqLHS(..), canEqLHS_maybe )
 import GHC.Core.TyCon.Env
 import GHC.Core.TyCo.Rep
-import GHC.Core.TyCo.Compare ( eqType, eqTypeX, tcEqType, tcEqTyConAppArgs )
+import GHC.Core.TyCo.Compare ( eqType, eqTypes, eqTypeX, tcEqType, tcEqTyConAppArgs )
 import GHC.Core.TyCo.FVs ( tyCoVarsOfTypeList )
 import GHC.Core.TyCo.Subst   ( mkTvSubst, deepSubstTy, extendSubstInScopeSet )
 import GHC.Core.Map.Type
@@ -647,6 +647,15 @@ tcMatchTys :: HasDebugCallStack
 tcMatchTys tys1 tys2
   = tc_match_tys alwaysBindTv IgnoreOuterKinds tys1 tys2
 
+-- | Match instance arguments, including packages fixed by other arguments.
+-- See Note [Opaque existential matching].
+tcMatchInstanceTys :: HasDebugCallStack => [Type] -> [Type] -> Maybe Subst
+tcMatchInstanceTys templates targets
+  = fst <$> tc_match_tys_x_with MatchInstance alwaysBindTv IgnoreOuterKinds
+               (mkEmptySubst in_scope) templates targets
+  where
+    in_scope = mkInScopeSet (tyCoVarsOfTypes templates `unionVarSet` tyCoVarsOfTypes targets)
+
 -- | Match a closed-family pattern with an additional check for repeated
 -- template variables. The result records whether that check was used.
 -- In that case, the caller must prove the equality between the instantiated
@@ -725,9 +734,17 @@ tc_match_tys_x_with mode bind_tv match_kis (Subst in_scope id_env tv_env cv_env)
                       match_kis
                       RespectMultiplicities
                       (mkRnEnv2 in_scope) tv_env cv_env tys1 tys2 of
-      Unifiable result -> Just (Subst in_scope id_env (um_tv_env result) (um_cv_env result),
-                                 um_extra_match result)
+      Unifiable result -> Just (final_subst result, um_extra_match result)
+      MaybeApart MARExistential result
+        | MatchInstance <- mode
+        , let subst = final_subst result
+        , all (all (determined result) . tyCoVarsOfTypeList) tys1
+        , eqTypes (substTys subst tys1) tys2
+        -> Just (subst, False)
       _ -> Nothing
+  where
+    final_subst result = Subst in_scope id_env (um_tv_env result) (um_cv_env result)
+    determined result v = isTyVar v && v `elemVarEnv` um_tv_env result
 
 -- | This one is called from the expression matcher,
 -- which already has a MatchEnv in hand
@@ -1627,6 +1644,7 @@ data AmIUnifying = Matching | Unifying
 
 data MatchMode
   = MatchOrdinary
+  | MatchInstance -- See Note [Opaque existential matching].
   | MatchRule     -- See Note [Opaque existential matching].
   | MatchRetained -- See Note [Matching retained function types]
   | MatchRepeatedWith (Type -> Type -> Bool)
@@ -1996,6 +2014,14 @@ equality under one shared binder. Discard its substitution. A stuck
 family application can still make the result uncertain.
 An ordinary data type such as Char or Either keeps a different outer
 head at nominal role. Its arguments do not affect this comparison.
+
+Instance lookup can learn a template variable from another argument.
+For instance, the first argument of C Bool (Hidden Bool) fixes a in the
+instance C a (Hidden a). A MaybeApart result preserves the substitution
+collected across all arguments. Use it only if every free template
+variable is determined and the substituted head equals the entire
+wanted head. This also works when the package is the first argument.
+The comparison does not bind any variable inside the package.
 
 For a Core RULE on `toList @a (s :: Stream a)`, the first argument
 supplies a substitution for a. When the matcher reaches s, compare the

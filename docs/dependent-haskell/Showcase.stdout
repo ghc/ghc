@@ -359,6 +359,7 @@ read an integer through an erased package: 7
 apply an imported integer package rule and keep the witness lazy: (42,7,1)
 match and open existential packages in optimizer rules: (4,3,6)
 select ordinary instances for streams with hidden state: ("GH","[True]","x")
+resolve the stream instance from its requested element type: [4,5]
 read streams with different hidden state types: ([1,3,5],[True])
 fold a stream and stop before an undefined tail: (531,Just True,Nothing)
 fold a mapped stream without forcing its head or tail: (Just True,Just 'x')
