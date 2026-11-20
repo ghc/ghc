@@ -6491,7 +6491,10 @@ and length in a later domain. The fork uses this rule when a Haskell type
 synonym names a dependent consumer. GHC expands the synonym when checking
 the signature for ambiguity. A type parameter can be the domain of an
 opaque witness. Applying that witness as a function requires separate
-evidence about its type.
+evidence about its type. To compare two consumers at the same nominal
+domain, the solver opens both bodies with one fresh runtime binder. An
+ordinary result variable can be determined if it does not depend on
+that binder. See [nominal retained domain conversion](#nominal-retained-domain-conversion).
 [Agda 2.8.0, Function Types](https://agda.readthedocs.io/en/v2.8.0/language/function-types.html)
 and [dependent-pair consumer](examples/packed-vector/DependentPair.hs).
 

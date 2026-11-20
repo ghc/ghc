@@ -8,6 +8,24 @@ increments.
 
 ## Family and package checkpoints
 
+At `7278fc1e52`, an ordinary client can pass a named callback to
+`withPair` and infer its `Char` result. The solver compares the callback
+bodies under one shared runtime binder of type `IO Int`. Inferring a
+result that mentions that binder fails at the callback. The combined
+compiler relink matched all 347 Showcase lines at `-O0`, default `-O1`,
+and default `-O2`. Both source regressions and the ten focused kind and
+matchability diagnostics passed.
+[Source test](../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh)
+and [quantifier display](roadmap/R23-unsaturated-type-families.md).
+
+The full build of `4d5d6e467f` matched all 341 Showcase lines at both
+compiler stages and all three optimization levels. Self-hosted GHCi
+also matched. The focused tests recorded 72 passes and one missing-library
+skip. The dependent directory recorded 306 passes and 20 unexpected
+failures. Polykinds recorded 224 passes, one expected failure, and
+18 unexpected failures. Both directories had the same failure names and
+categories as the 337-line compiler.
+
 At `7d04760583`, all 347 Showcase lines matched with the combined compiler
 relink at `-O0`, default `-O1`, and default `-O2`. The registered vector
 program also ran with Core and STG Lint. The proof at the expression
