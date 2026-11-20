@@ -94,6 +94,7 @@ import GHC.Utils.Logger
 import GHC.Utils.Exception ( NonTermination(..), evaluate )
 
 import GHC.Data.Bag
+import GHC.Data.List.SetOps (hasNoDups)
 import GHC.Data.Maybe
 import GHC.Data.FastString
 
@@ -2450,8 +2451,8 @@ tcIfaceAlt _ _ _ _ (con@(LitAlt _), names, rhs) = do
 tcIfaceAlt scrut scrut_index mult (tycon, inst_tys) (DataAlt con, names, rhs)
   | isNativeIndexDataAlt con names
   = do { (field_names, proof_name) <- case splitAt (dataConRepArity con) names of
-           (fs, [p]) | p `notElem` fs -> return (fs, p)
-           _ -> failIfM (text "Native index interface alternative requires constructor fields followed by one distinct proof name:"
+           (fs, [p]) | hasNoDups names -> return (fs, p)
+           _ -> failIfM (text "Native index interface alternative requires constructor fields followed by one proof, with distinct field and proof names:"
                          <+> ppr con <+> ppr names)
        ; index <- case scrut_index of
            Just i  -> return i
@@ -2505,6 +2506,8 @@ for Bool. Write IfaceDataAltWithProof for the other supported constructors.
 When reading a legacy unfolding, recognize its proof slot by the same
 constructor shape. See Note [Versioning retained evidence] in GHC.Iface.Binary.
 
+Check that all field and proof names differ before extending the interface
+environment. A repeated name would hide the preceding field in the branch.
 Instantiate the ordinary representation fields from left to right. This
 gives the payload its type at the fresh x. Derive the promoted result from
 those same field Ids and the structural index of the actual scrutinee.

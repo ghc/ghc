@@ -2784,8 +2784,10 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                 _ -> fail "FAIL: interface list constructor evidence shape changed"
         rejectsIfaceExpr "a tagged constructor alternative must bind its proof"
             "Missing or unsupported constructor proof" [xs] (listCase [nilAlt, consAlt [hd, tl] (IfaceLcl hd)])
+        rejectsIfaceExpr "two constructor fields must have distinct names"
+            "distinct field and proof names" [xs] (listCase [nilAlt, consAlt [hd, hd, co] (IfaceLcl hd)])
         rejectsIfaceExpr "proof name collides with a constructor field"
-            "one distinct proof name" [xs] (listCase [nilAlt, consAlt [hd, tl, hd] (IfaceLcl hd)])
+            "distinct field and proof names" [xs] (listCase [nilAlt, consAlt [hd, tl, hd] (IfaceLcl hd)])
         rejectsIfaceExpr "one constructor cannot read another constructor's field"
             "Iface id out of scope" [xs] (listCase [IfaceAlt (IfaceDataAlt (dataConName nilDataCon)) [] (IfaceLcl hd), goodCons])
         rejectsIfaceExpr "a proof must use a constructor of the actual scrutinee"
@@ -2800,7 +2802,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                         rejectsIfaceExpr label fragment [] decoded
                 reject
                     "extra interface proof names"
-                    "Native index interface alternative requires constructor fields followed by one distinct proof name"
+                    "Native index interface alternative requires constructor fields followed by one proof"
                     (wrap scrut [falseAlt, IfaceAlt trueCon [proofName, proofName] rhs])
                 forM_ [NormalCompression, SafeExtraCompression, MaximumCompression] $ \compression -> do
                     decoded <- roundtrip compression (wrap (IfaceApp (IfaceLam retained scrut) scrut) [falseAlt, IfaceAlt trueCon [proofName] rhs])
