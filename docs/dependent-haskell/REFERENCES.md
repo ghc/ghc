@@ -164,6 +164,13 @@ The type-level `Map` example uses `(a %U -> b) -> [a] -> [b]`.
 and [acceptance](https://github.com/ghc-proposals/ghc-proposals/pull/370).
 [Map example](examples/open-evaluation/TypeLambda.hs).
 
+Proposal #242 generalises a higher-order kind arrow in an unsigned family
+when its equations leave the matchability unconstrained. A written kind
+signature defaults a bare callback arrow to M. The fork checks the
+unsigned closed-family case with `ExperimentalDependentTypes` and `PolyKinds`.
+[Higher-order arguments](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#higher-order-arguments)
+and [source checks](roadmap/R23-unsaturated-type-families.md#inferring-a-callback-arrow-in-a-closed-family).
+
 The inference rules in #242 default a bare arrow on a type synonym's
 right-hand side to U. The proposal identifies the `singletons` arrow
 `type a ~> b = TyFun a b -> Type` as an exception to the common use of
@@ -174,11 +181,12 @@ can write `type a ~> b = TyFun a b %M -> Type` once.
 and [normative inference rules](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#inference).
 
 Proposal #242 also specifies `-fprint-explicit-matchabilities`.
-The flag matters when copying a callback kind from GHCi. Omitting an
-unmatchable index can make a standalone kind signature require a
-matchable callback. The same display rule applies to fixed matchabilities
-on forall binders. For example, a telescope scope error shows the inferred
-binder order. Explicit printing still shows which binders are matchable.
+The flag shows fixed matchabilities in GHCi. GHCi shows a variable modifier
+such as `%m` even without the flag. Enable `Modifiers` to write this arrow
+syntax in a signature. Omitting an unmatchable index can make a standalone
+kind signature require a matchable callback. A kind mismatch diagnostic
+can show both matchabilities without the flag. Explicit printing also
+shows the matchability of forall binders.
 [Showing matchabilities](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#showing-matchabilities).
 
 These pages record the selected implementation sources, open questions and

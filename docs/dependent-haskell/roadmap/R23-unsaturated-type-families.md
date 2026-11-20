@@ -5,8 +5,8 @@ Serokell marks the proposal as accepted. The fork records matchability
 on ordinary arrows and forall binders. M166 lets a user pass an unapplied
 family at a known unmatchable arrow. A receiver can also require the
 whole trailing invisible telescope or a nonempty suffix of it.
-Kind inference without an expected kind and ordinary-program
-compatibility remain open.
+General kind inference and compatibility with existing unannotated programs
+remain open.
 Use the [work queue](../ROADMAP.md#current-work-queue) for priorities.
 
 ## Matchability on a source arrow
@@ -629,10 +629,20 @@ arrow still selects M.
 An ordinary client proves results for both `Maybe` and a user family
 prefix exported as `Callback a`. The client reads only the stripped
 provider interface. The provider uses the experimental extension for
-the bare partial application.
+the bare partial application. A separate three-module check places `Map`
+and its forwarder in different modules. The ordinary client proves both
+cases from their stripped interfaces.
 [Provider](../../../testsuite/tests/dependent/should_run/NativeUnsaturatedProvider.hs),
 [ordinary client](../../../testsuite/tests/dependent/should_run/NativeUnsaturatedClient.hs)
 and [proposal #242, higher-order arguments](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#higher-order-arguments).
+
+The Showcase's `MapFlags` uses a signed callback kind `Bool %U -> Bool`.
+It applies a partial family at that kind. GHCi displays the unsigned
+`Map` callback with a variable modifier, such as `k %t -> a`. With
+`-fprint-explicit-matchabilities`, it also shows the inferred binder
+and fixed modifiers on the outer arrows.
+[Showcase](../Showcase.hs) and
+[GHCi regression](../../../testsuite/tests/dependent/should_run/NativeInferredFamilyGhci.script).
 
 ## Goal and dependencies
 
