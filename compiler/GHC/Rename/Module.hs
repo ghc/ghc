@@ -355,7 +355,8 @@ source so the normal context check rejects it.
 
 A foreach telescope starts a new table too. Lift a case on an
 application tree with retained variables among its operands. Each
-application head must name a qualified occurrence or a type constructor.
+application head can name a type constructor or a checked source function
+in scope. See Note [Resolving retained case heads].
 The synonym binds an erased index for each retained variable. It uses
 the written domain as the kind. The application receives the original
 runtime indices. Ordinary source calls in the copied tree use the
@@ -408,8 +409,8 @@ to the ordinary renamer.
 For a type case in an ordinary constructor field, use the same
 lexical capture check as for a value signature. Give each written
 case its own helper, including cases in different fields of one
-constructor. A case under a retained binder can inspect that binder
-or a closed name. Keep the original foreach in the field. Apply the
+constructor. A case under a retained binder can inspect that binder,
+a closed name, or a checked application to the binder. Keep the original foreach in the field. Apply the
 same restriction on copying written retained domains as in value
 signatures. For example, a copied arrow can change matchability.
 
@@ -429,13 +430,14 @@ data LiftedTypeSite
   | RetainedTypeSite [RdrName]
   deriving Eq
 
--- | Prepare type cases and retained sums in signatures and constructor fields.
+-- | Rewrite the declarations and return their new private synonyms separately.
+-- See Note [Lifting types from signatures and fields].
 liftDeclarationTypes :: [(RdrName, (GlobalRdrElt, Name))] -> Bool -> HsGroup GhcPs
-                     -> (HsGroup GhcPs, LiftedDecls, [(LocatedN RdrName, GlobalRdrElt)])
+                     -> (HsGroup GhcPs, [TyClGroup GhcPs], LiftedDecls, [(LocatedN RdrName, GlobalRdrElt)])
 liftDeclarationTypes source_heads named_wildcards group
   | not (null synonyms)
-  = (group{hs_valds = values, hs_tyclds = anchors : type_groups}, names, concat uses)
-  | otherwise = (group, [], [])
+  = (group{hs_valds = values, hs_tyclds = type_groups}, [anchors], names, concat uses)
+  | otherwise = (group, [], [], [])
   where
     (values, signature_types) = case hs_valds group of
       ValBinds ann binds ->
@@ -486,7 +488,16 @@ liftDeclarationTypes source_heads named_wildcards group
                           extractConDeclGADTDetailsTyVars args $
                           extractHsTysRdrTyVars [result] []
             owner = head names
-            scope = outerCaptures outer occurrences
+            call_sites
+              | null source_heads = Set.empty
+              | otherwise = Set.fromList
+                  [(loc, unLoc v) | v <- retainedFieldCallHeads args result
+                                  , RealSrcSpan loc _ <- [getLocA v]
+                                  , isJust (lookup (unLoc v) source_heads)]
+            is_call_head v = case getLocA v of
+              RealSrcSpan loc _ -> Set.member (loc, unLoc v) call_sites
+              _ -> False
+            scope = outerCaptures outer (filter (not . is_call_head) occurrences)
             visit = liftField (liftFieldType FieldTypeSite owner scope)
             (args', sums) = case args of
               PrefixConGADT ann fields -> first (PrefixConGADT ann) (liftFieldList visit fields)
@@ -657,21 +668,25 @@ liftDeclarationTypes source_heads named_wildcards group
     fieldSite RetainedFieldTypeSite{} = True
     fieldSite _ = False
 
-    caseScrutinee (RetainedFieldTypeSite names) _ scrutinee
+    caseScrutinee (RetainedFieldTypeSite names) scope scrutinee
       | L _ (HsTyVar _ _ name) <- ignoreParens scrutinee
       , let rdr = unLoc name
       = not (isTvOcc (rdrNameOcc rdr)) || rdr `elem` names
-      | otherwise = False
+      | otherwise = checkedRetainedScrutinee names scope scrutinee
     caseScrutinee (RetainedTypeSite names) scope scrutinee =
-      isJust (signatureCasePart scrutinee >>= retainedCaseScrutinee names (resolveHead scope))
+      checkedRetainedScrutinee names scope scrutinee
     caseScrutinee _ _ _ = True
+
+    checkedRetainedScrutinee names scope scrutinee =
+      isJust (signatureCasePart scrutinee >>= retainedCaseScrutinee names (resolveHead scope))
 
     resolveHead scope name
       | all ((/= name) . unLoc . snd) scope = lookup name source_heads
       | otherwise = Nothing
 
-    retainedHeadUses RetainedTypeSite{} scope (L _ (XHsType (HsTypeCase _ _ scrutinee _))) =
-      [(v, gre) | v <- sourceCallHeads scrutinee, Just (gre, _) <- [resolveHead scope (unLoc v)]]
+    retainedHeadUses site scope (L _ (XHsType (HsTypeCase _ _ scrutinee _)))
+      | not (null (retainedNames site)) =
+          [(v, gre) | v <- sourceCallHeads scrutinee, Just (gre, _) <- [resolveHead scope (unLoc v)]]
     retainedHeadUses _ _ _ = []
 
     retainedNames (RetainedTypeSite names) = names
@@ -850,10 +865,14 @@ sourceCallHeads = spine []
       _ -> []
 
 -- | Find the checked source family in the declaration group's scope.
-retainedSourceHeads :: [LSig GhcPs] -> RnM [(RdrName, (GlobalRdrElt, Name))]
-retainedSourceHeads sigs = do
+retainedSourceHeads :: [LSig GhcPs] -> [TyClGroup GhcPs] -> RnM [(RdrName, (GlobalRdrElt, Name))]
+retainedSourceHeads sigs type_groups = do
   envs@(global, local) <- getRdrEnvs
-  let candidates = [rdr | L _ (TypeSig _ _ _ sig) <- sigs, rdr <- heads sig]
+  let candidates = [unLoc v | L _ (TypeSig _ _ _ sig) <- sigs, v <- caseCallHeads sig] ++
+                   [unLoc v | grp <- type_groups
+                            , L _ DataDecl{tcdDataDefn = HsDataDefn{dd_cons = cs}} <- group_tyclds grp
+                            , L _ ConDeclGADT{con_g_args = args, con_res_ty = res} <- toList cs
+                            , v <- retainedFieldCallHeads args res]
   fmap catMaybes $ forM (Set.toList (Set.fromList candidates)) $ \rdr ->
     case demoteRdrNameTv rdr of
       Just term
@@ -867,13 +886,24 @@ retainedSourceHeads sigs = do
             [(gre, Just table)] -> Just (rdr, (gre, table))
             _ -> Nothing
       _ -> pure Nothing
+
+-- | Inspect case expressions only in constructor types with a retained binder.
+retainedFieldCallHeads :: HsConDeclGADTDetails GhcPs -> LHsType GhcPs -> [LocatedN RdrName]
+retainedFieldCallHeads args result = concatMap heads (result : fields)
   where
-    heads :: Data a => a -> [RdrName]
-    heads node = here ++ concat (gmapQ heads node)
-      where
-        here = case cast node :: Maybe (LHsType GhcPs) of
-          Just (L _ (XHsType (HsTypeCase _ _ scrutinee _))) -> map unLoc (sourceCallHeads scrutinee)
-          _ -> []
+    heads ty | hsHasForEachTy (unLoc ty) = caseCallHeads ty
+             | otherwise = []
+    fields = case args of
+      PrefixConGADT _ xs -> map cdf_type xs
+      RecConGADT _ xs -> [cdf_type (cdrf_spec field) | L _ field <- unLoc xs]
+
+-- | Collect the written application heads in type case scrutinees.
+caseCallHeads :: Data a => a -> [LocatedN RdrName]
+caseCallHeads node = here ++ concat (gmapQ caseCallHeads node)
+  where
+    here = case cast node :: Maybe (LHsType GhcPs) of
+      Just (L _ (XHsType (HsTypeCase _ _ scrutinee _))) -> sourceCallHeads scrutinee
+      _ -> []
 
 -- | The scrutinee followed by the pattern and result in each source row.
 type SignatureCaseKey = (SignatureCasePart, [(SignatureCasePart, SignatureCasePart)])
@@ -1216,21 +1246,14 @@ rnSrcDecls :: HsGroup GhcPs -> RnM (TcGblEnv, HsGroup GhcRn)
 rnSrcDecls group = do
   enabled <- xoptM LangExt.ExperimentalDependentTypes
   named_wildcards <- xoptM LangExt.NamedWildCards
-  is_boot <- tcIsHsBootOrSig
   dflags <- getDynFlags
   let sigma_mod = mkModule (RealUnit (Definite (baseUnitId dflags))) (mkModuleName "GHC.Sigma")
       sigma = mkOrig sigma_mod (mkTcOcc "Sigma")
-      (with_fields, field_names)
-        | enabled && not is_boot
-        , let (fields, names, _) = liftDeclarationTypes [] named_wildcards
-                                    group{hs_valds = hs_valds emptyRdrGroup}
-        = (fields{hs_valds = hs_valds group}, names)
-        | otherwise = (group, [])
-      (with_cases, case_names) = if enabled then liftTypeCases with_fields else (group, [])
+      (with_cases, case_names) = if enabled then liftTypeCases group else (group, [])
       (expanded, lambda_names, scopes) =
         if enabled then liftTypeLambdas sigma with_cases else (group, [], emptyOccEnv)
   rnSrcDeclsWithLambdas sigma named_wildcards
-                        (field_names ++ case_names ++ [(fam, Just owner) | (fam, owner) <- lambda_names])
+                        (case_names ++ [(fam, Just owner) | (fam, owner) <- lambda_names])
                         scopes expanded
 
 -- | Rename the declarations and record the kind-inference edges of private families.
@@ -1304,20 +1327,20 @@ rnSrcDeclsWithLambdas sigma named_wildcards early_hidden early_scopes group@(HsG
 
    --  Now everything is in scope, as the remaining renaming assumes.
    --  See Note [Resolving retained case heads].
-   (sig_types, sigs, hidden, scopes) <-
+   (sig_types, updated_types, sigs, hidden, scopes) <-
      if dependent && not is_boot
-     then do { heads <- retainedSourceHeads sigs'
-             ; let input = emptyRdrGroup{hs_valds = val_decls}
-                   (sig_group, aliases, uses) = liftDeclarationTypes heads named_wildcards input
-                   (cases, case_names) = liftTypeCases sig_group
+     then do { heads <- retainedSourceHeads sigs' tycl_decls
+             ; let input = emptyRdrGroup{hs_valds = val_decls, hs_tyclds = tycl_decls}
+                   (updated, anchors, aliases, uses) = liftDeclarationTypes heads named_wildcards input
+                   (cases, case_names) = liftTypeCases emptyRdrGroup{hs_tyclds = anchors}
                    (late, lambdas, late_scopes) = liftTypeLambdas sigma cases
                    late_hidden = aliases ++ case_names ++ [(fam, Just owner) | (fam, owner) <- lambdas]
              ; forM_ uses $ \(loc, gre) -> setSrcSpanA (getLoc loc) (addUsedGRE AllDeprecationWarnings gre)
-             ; return (hs_tyclds late, case hs_valds late of
+             ; return (hs_tyclds late, hs_tyclds updated, case hs_valds updated of
                                          ValBinds _ entries -> val_sigs entries
                                          _ -> sigs',
                        early_hidden ++ late_hidden, plusOccEnv early_scopes late_scopes) }
-     else pure ([], sigs', early_hidden, early_scopes) ;
+     else pure ([], tycl_decls, sigs', early_hidden, early_scopes) ;
    (sig_envs, sig_bndrs) <- if null sig_types
      then (, emptyNameSet) <$> getEnvs
      else getLocalNonValBinders local_fix_env emptyRdrGroup{hs_tyclds = sig_types} ;
@@ -1334,7 +1357,7 @@ rnSrcDeclsWithLambdas sigma named_wildcards early_hidden early_scopes group@(HsG
    -- means we'll only report a declaration as unused if it isn't
    -- mentioned at all.  Ah well.
    traceRn "Start rnTyClDecls" (ppr tycl_decls) ;
-   (rn_tycl_decls, src_fvs1) <- rnTyClDecls hidden scopes (sig_types ++ tycl_decls) ;
+   (rn_tycl_decls, src_fvs1) <- rnTyClDecls hidden scopes (sig_types ++ updated_types) ;
 
    -- (F) Rename Value declarations right-hand sides
    traceRn "Start rnmono" empty ;
@@ -1425,9 +1448,19 @@ rnSrcDeclsWithLambdas sigma named_wildcards early_hidden early_scopes group@(HsG
 
 {- Note [Resolving retained case heads]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Prepare value signature aliases after the declaration group's type and
-term binders enter scope. The R16 lookup sees a local source definition
-or an actual visible import. Each signature's written telescope can
+Prepare value signature and constructor field aliases after the declaration
+group's type and term binders enter scope. Register the new synonyms and
+families before renaming the rewritten constructor fields. The original
+constructors already have names.
+
+In an implicitly quantified GADT constructor, a written application
+head such as `not` in `case not b of ...` can name a checked function.
+Exclude that occurrence from the implicit binder list when lookup finds
+the function. Keep other occurrences of the same spelling and all explicit
+binders. A field always keeps its own helper and original call.
+
+The R16 lookup sees a local source definition or a visible import.
+Each signature's written telescope can
 shadow that lookup. A shared case compares resolved source family Names
 and the formal index positions. Keep the original expression in the
 checked helper. The regular renamer and type checker still check its

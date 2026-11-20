@@ -11,7 +11,7 @@ module NativeNestedCase
   , RefinedGate(..), RefinedLeaf(..), RefinedBranchPick
   , PlainCaseField(..), CaseField(..), ShadowedCaseField(..)
   , RankedCaseField(..), OrderedRankedCaseField(..), CapturedKindCaseField(..)
-  , RetainedCaseField(..), retainedCaseField
+  , RetainedCaseField(..), retainedCaseField, NegatedCaseField(..), negatedCaseField
   , OpenCaseGate(..), OpenCaseIndex, OpenIndexPick, OpenIndexAtOrdering
   , ScopedOpenIndex
   ) where
@@ -304,6 +304,15 @@ data CapturedKindCaseField (k :: Type) (a :: k) (c :: k) =
 data RetainedCaseField where
   RetainedCaseField :: (foreach (b :: Bool) ->
     (case b of { True -> Int; False -> Char })) -> RetainedCaseField
+
+-- | Choose the field result by applying the installed negation to its index.
+data NegatedCaseField where
+  NegatedCaseField :: (foreach (b :: Bool) ->
+    (case not b of { True -> Int; False -> Char })) -> NegatedCaseField
+
+-- | Return a character at True and an integer at False.
+negatedCaseField :: NegatedCaseField
+negatedCaseField = NegatedCaseField (\case True -> 't'; False -> 41)
 
 -- | Supply both results of the retained field.
 retainedCaseField :: RetainedCaseField

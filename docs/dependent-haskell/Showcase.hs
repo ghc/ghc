@@ -1224,11 +1224,19 @@ main = do
             NativeNestedCase.RetainedCaseField choose -> case b of
                 True -> show (choose b :: Int)
                 False -> [choose b]
+        negatedResult :: Bool -> String
+        negatedResult b = case NativeNestedCase.negatedCaseField of
+            NativeNestedCase.NegatedCaseField choose -> case b of
+                True -> [choose b]
+                False -> show (choose b :: Int)
     fieldFlag <- newIORef True
     firstField <- fieldResult <$> readIORef fieldFlag
+    firstNegated <- negatedResult <$> readIORef fieldFlag
     writeIORef fieldFlag False
     secondField <- fieldResult <$> readIORef fieldFlag
+    secondNegated <- negatedResult <$> readIORef fieldFlag
     observe "pass a refined runtime Boolean to a retained field" (firstField, secondField)
+    observe "choose a field result by negating its runtime index" (firstNegated, secondNegated)
     observe "select through an ordinary type constructor"
         ( 7 :: NativeNestedCase.TypeHead ('Just Bool)
         , 'x' :: NativeNestedCase.TypeHead ('Just Ordering)

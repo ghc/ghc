@@ -216,6 +216,32 @@ grep -Fq 'non-injective type family' bad.log
 grep -Fq 'Use a named type synonym with a standalone kind signature for the case.' bad.log
 if grep -Eq '\$field-(kind|case):' bad.log; then cat bad.log >&2; exit 1; fi
 
+cat >LocalComputedField.hs <<'HS'
+{-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, LambdaCase #-}
+module LocalComputedField where
+import Prelude hiding (not)
+
+data Field where
+  Field :: (foreach (b :: Bool) -> (case not b of { True -> Int; False -> Char })) -> Field
+
+value :: Field
+value = Field (\case True -> 41; False -> 'f')
+
+{-# NOINLINE not #-}
+not :: Bool -> Bool
+not True = True
+not False = False
+#ifdef CHANGE_HEAD
+{-# RULES "change local head" forall x. not x = False #-}
+#endif
+HS
+"${g[@]}" -O2 -c LocalComputedField.hs
+if "${g[@]}" -O2 -fforce-recomp -DCHANGE_HEAD -c LocalComputedField.hs >bad.log 2>&1 ||
+   ! grep -Fq '[GHC-83605]' bad.log || ! grep -Fq 'rewrite rule' bad.log; then
+    cat bad.log >&2
+    exit 1
+fi
+
 # Keep the written Bool domain and the runtime arguments in the interface.
 cat >NativeTypeCaseRetainedField.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, LambdaCase, RankNTypes #-}
@@ -252,6 +278,13 @@ import Control.Exception (ErrorCall(..), evaluate, try)
 import Control.Monad (forM_)
 import Data.IORef
 import NativeTypeCaseRetainedField
+import qualified NativeNestedCase as Field
+
+negated :: Bool -> String
+negated b = case Field.negatedCaseField of
+  Field.NegatedCaseField f -> case b of
+    True -> [f b]
+    False -> show (f b :: Int)
 
 pick :: Bool -> RetainedField -> String
 pick b (RetainedField f) = case b of
@@ -287,16 +320,16 @@ main = do
   forM_ [False, True] $ \b -> do
     writeIORef input b
     value <- readIORef input
-    print (pick value selected, closed value constant)
+    print (pick value selected, closed value constant, negated value)
   print (readStored stored)
   print (guarded True False selected, cachedResult True selected)
   result <- try (evaluate (pick (error "strict scrutinee") selected)) :: IO (Either ErrorCall String)
   print (either (\(ErrorCall message) -> message == "strict scrutinee") (const False) result)
 HS
     "${g[@]}" -c NativeTypeCaseRetainedFieldClient.hs
-    "${g[@]}" NativeTypeCaseRetainedFieldClient.o ../NativeTypeCaseRetainedField.o -o run-retained-field
+    "${g[@]}" NativeTypeCaseRetainedFieldClient.o ../NativeTypeCaseRetainedField.o ../NativeNestedCase.o -o run-retained-field
     ./run-retained-field >retained-field.out
-    printf '("x",23)\n("11",11)\n23\n("fallthrough","same")\nTrue\n' | diff -u - retained-field.out
+    printf '("x",23,"41")\n("11",11,"t")\n23\n("fallthrough","same")\nTrue\n' | diff -u - retained-field.out
 
     cat >BadRetainedField.hs <<'HS'
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}

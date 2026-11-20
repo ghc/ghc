@@ -206,10 +206,14 @@ In a GADT, a field-local `foreach` can supply the scrutinee. For example,
 `One :: (foreach (b :: Bool) -> (case b of { True -> Int; False -> Char })) -> One`
 keeps `b` as a runtime argument. A later field can also inspect a retained
 argument in the constructor telescope. The helper copies the written
-domain and keeps the original field scope. An interface-only client can
-call either branch after refining the Boolean. At an unknown index, the
-case still waits for the first row. Function-arrow domains and computed
-scrutinees in retained fields remain outside this rule.
+domain and keeps the original field scope. A field can also compute its
+scrutinee with a checked function. In `NegatedCaseField`, the field type
+tests `not b`. Its ordinary client reads `b` at runtime and gets a
+character at `True` and an integer at `False`. An unqualified call uses
+the function in scope in the declaration group. A rule that can change
+that function blocks the proof. At an unknown index, the case still
+waits for a matching row. Function-arrow domains remain outside this rule.
+[Field source](../examples/open-evaluation/NativeNestedCase.hs).
 
 Template Haskell reports GHC-75721 at a splice that reifies a retained
 `foreach` binder or an index bound by that binder. Its `ForallVisT` binds a visible
