@@ -1312,9 +1312,11 @@ An identity certificate can supply a bare callback without an unfolding.
 It does not record the aliases exposed by optimizer inlining. A consumer
 of the certificate must disable rewriting.
 
-Keep the ordinary unfolding path for a written symbolic application.
-See GHC.Rename.Env. The open evaluator reads each
-definition it visits, including aliases, and records its instantiated
+Keep the ordinary evaluator for a written application. The expected kind
+of a closed call can determine the result of its operand, as in
+(id (fromIntegral x) :: Nat). A closed executable call also uses the
+ordinary staging rules. See GHC.Rename.Env. The open evaluator reads
+each definition it visits, including aliases, and records its instantiated
 rule head. Present those identities as ordinary Ids to the rule check.
 Their Names, types, and attached rules are the same. The late rule
 check can identify them in tcg_evaluated_term_uses. Keep the stricter
