@@ -53,6 +53,7 @@ import GHC.Tc.TyCl.Build (newImplicitBinder)
 import GHC.Tc.Types.ErrCtxt (HsCtxt(ExprCtxt))
 import GHC.Tc.Types.Evidence (HsWrapper(..), TcEvBinds(..), EvBindsState(..), isEmptyEvBindsMap)
 import GHC.Tc.Types (TcGblEnv(..), tcVisibleOrphanMods)
+import GHC.Tc.Utils.Instantiate (freshenTyVarBndrs)
 import GHC.Tc.Utils.Env (tcLookupGlobal, tcLookupId, tcLookupIdMaybe, tcGetInstEnvs)
 import GHC.Tc.Utils.Monad (TcM, addErr, failWithTc, getEps, getGblEnv, getGlobalRdrEnv, getTcEvBindsMap, getTcEvBindsState,
                            checkNoErrs, getTopEnv, goptM, keepAlive, liftZonkM, newSysName, readTcRef, setSrcSpanA, updTcRef, xoptM)
@@ -1272,7 +1273,7 @@ constructorCaseType tau = do
     (tc, args) <- caseDatatype domain
     let binder_kinds = map (varType . binderVar) binders
     guard (all isLiftedTypeKind binder_kinds ||
-           (isRetainedCaseRoot domain tc && all noFreeVarsOfType binder_kinds))
+           (isRetainedCaseRoot domain tc && noFreeVarsOfType (mkForAllTys telescope liftedTypeKind)))
     parameters <- catMaybes <$> traverse domainParameter args
     guard ((isMonomorphicEnumCaseType tau || not (null parameters)) &&
            sizeUniqSet (mkUniqSet parameters) == length parameters &&
@@ -1299,8 +1300,9 @@ Check both fields and the result before publishing an equation.
 
 The axiom has type variables instead of runtime Ids. Publish the witness
 before the payload. Use the earlier variables to abstract the payload's
-kind. A payload family parameter keeps its declared arrow kind and
-matchability. Match the result Id to the exact pattern leaf. The resulting RHS
+kind. For `DPair a (p :: a -> Type)`, freshen `a` before using it in
+the kind of the new `p` binder. Keep the declared arrow matchability.
+Match the result Id to the exact pattern leaf. The resulting RHS
 does not introduce a free runtime Id or a new axiom about evaluation.
 The ordinary visibility, constructor coverage, and RULE checks still
 apply. Interface recognition checks the instantiated promoted argument
@@ -1638,12 +1640,9 @@ publishConstructorCase owner (ConstructorCaseType telescope _ _ domains _ result
 -- | Publish checked rows with the original kind telescope and visible domains.
 publishConstructorRows :: Id -> [ForAllTyBinder] -> [Type] -> Type -> [ConstructorCaseRow] -> TcM TyCon
 publishConstructorRows owner telescope domains result rows = do
-    kind_binders <- forM telescope $ \(Bndr variable visibility) -> do
-      name <- newSysName (nameOccName (varName variable))
-      pure (mkNamedTyConBinder visibility (mkTyVar name (varType variable)))
-    let quantifiers = [v | Bndr v _ <- kind_binders]
-        instantiate = substTyWith [v | Bndr v _ <- telescope] (mkTyVarTys quantifiers)
-                      . expandTypeSynonyms
+    (renaming, quantifiers) <- freshenTyVarBndrs (binderVars telescope)
+    let kind_binders = zipWith mkNamedTyConBinder (map binderFlag telescope) quantifiers
+        instantiate = substTyUnchecked renaming . expandTypeSynonyms
     operands <- mapM (fresh "arg" . instantiate) domains
     branches <- forM rows $ \(ConstructorCaseRow patterns result_value) -> do
       (lhs, scoped) <- publishPatterns instantiate [] patterns

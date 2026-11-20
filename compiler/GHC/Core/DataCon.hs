@@ -1325,6 +1325,7 @@ promotedRetainedFields con
   , map binderVar (dataConUserTyVarBinders con) == univs
   , isManyTy witness_mult, isOneTy payload_mult || isManyTy payload_mult
   , isNativeClosedIndexType witness_ty
+    || maybe False (`elem` univs) (getTyVar_maybe witness_ty)
   , witness_ty `eqType` varType witness
   , not (anyFreeVarsOfType isId result)
   , Just payload <- abstract_payload univs witness body

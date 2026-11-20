@@ -13,9 +13,10 @@ cp "$src"/{PackedVecLibrary,RetainedNat,PackedLength,RetainedWitness,DependentPa
 "${g[@]}" -fomit-interface-pragmas -c PackedVecLibrary.hs RetainedNat.hs PackedLength.hs RetainedWitness.hs
 "${g[@]}" -O1 -fomit-interface-pragmas -fno-write-if-simplified-core -c DependentPair.hs
 cp DependentPair.hi "$out/client/"
-cp {PackedVecLibrary,PackedLength,RetainedNat,RetainedWitness}.hi "$src"/{PackedProjection,RetainedProjection}.hs "$out/projection/"
+cp {PackedVecLibrary,PackedLength,RetainedNat,RetainedWitness,DependentPair}.hi "$src"/{PackedProjection,RetainedProjection,DependentProjection}.hs "$out/projection/"
 cd "$out/projection"
-"${g[@]}" -fomit-interface-pragmas -c PackedProjection.hs RetainedProjection.hs
+"${g[@]}" -fomit-interface-pragmas -c PackedProjection.hs RetainedProjection.hs DependentProjection.hs
+cp DependentProjection.hi "$out/client/"
 cat >Mixed.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeFamilies #-}
 module Mixed (witness) where
@@ -55,6 +56,7 @@ cat >General.hs <<'HS'
 module General where
 import Data.Functor.Const
 import DependentPair
+import DependentProjection
 
 data Flag b where
   Yes :: Flag 'True
@@ -67,18 +69,22 @@ readInt :: DPair Int (Const Int) -> Int
 readInt (Pair _ (Const value)) = value
 
 readFlag :: DPair Bool Flag -> Bool
-readFlag (Pair _ Yes) = True
-readFlag (Pair _ No)  = False
+readFlag q = case second q of
+  Yes -> True
+  No  -> False
+
+value :: DPair a (Const r) -> r
+value q = getConst (second q)
 
 main :: IO ()
 main = print (readInt (pack (error "unused integer witness") 7),
               withPair (pack (error "unused IO" :: IO Int) 'i') (\_ c -> getConst c),
-              withPair (pack (error "unused function" :: Int -> Int) 'f') (\_ c -> getConst c),
+              value (pack (error "unused function" :: Int -> Int) 'f'),
               withPair (pack (12 :: Int) (error "unused payload" :: Char)) (\x _ -> x),
-              readFlag (Pair True Yes))
+              readFlag (Pair True Yes), readFlag (Pair False No))
 HS
 "${g[@]}" -main-is General -c General.hs
-"${g[@]}" -main-is General General.o ../provider/DependentPair.o -o general
+"${g[@]}" -main-is General General.o ../provider/DependentPair.o ../projection/DependentProjection.o -o general
 ./general
 cat >WrongPair.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes #-}
@@ -103,6 +109,19 @@ if "${g[@]}" -c EscapePair.hs >bad.log 2>&1 || ! grep -Fq 'EscapePair.hs:5:25: e
     cat bad.log >&2
     exit 1
 fi
+# A stricter first projection cannot supply the equation used by second.
+(
+    mkdir strict-first
+    cd strict-first
+    sed 's/first (Pair x _) = x/first (Pair x !_) = x/' "$src/DependentPair.hs" >DependentPair.hs
+    "${g[@]}" -XBangPatterns -fomit-interface-pragmas -c DependentPair.hs
+    cp "$src/DependentProjection.hs" .
+    if "${g[@]}" -c DependentProjection.hs >strict.log 2>&1 ||
+       ! grep -Fq '[GHC-05617]' strict.log || ! grep -Fq 'first (Pair' strict.log; then
+        cat strict.log >&2
+        exit 1
+    fi
+)
 cat >Escape.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes #-}
 module Escape where

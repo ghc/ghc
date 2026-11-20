@@ -2398,7 +2398,7 @@ nativeIndexType structural_fields = go []
             package_root = structural_fields && null path && isSingleton cons
       , (all (tcIsLiftedTypeKind . tyVarKind) (tyConTyVars tc) && all argument args)
          || (package_root && any dataConHasPromotedRetained cons
-             && and (zipWith package_argument (tyConTyVars tc) args))
+             && and (zipWith (package_argument (tyConTyVars tc) args) (tyConTyVars tc) args))
       , Just fields <- concat <$> traverse (con_fields package_root ty args) cons
       = all (field ((tc, args) : path)) fields
       | otherwise = False
@@ -2419,27 +2419,28 @@ nativeIndexType structural_fields = go []
                     && isNativeOpaqueValueType arg
 
     -- A checked root package alone can use an ordinary higher-kinded
-    -- parameter. Its kind must accept a closed lifted witness and return Type.
-    package_argument tv arg
+    -- parameter. Its domain may name an earlier type parameter.
+    package_argument parameters actuals tv arg
       | tcIsLiftedTypeKind (tyVarKind tv) = argument arg
       | Just (_, _, _, domain, range) <- splitFunTy_maybe (tyVarKind tv)
       , range `eqType` liftedTypeKind
-      , isNativeClosedIndexType domain
-      = typeKind arg `eqType` tyVarKind tv
+      , isNativeClosedIndexType domain || maybe False (`elem` parameters) (getTyVar_maybe domain)
+      = typeKind arg `eqType` substTyWith parameters actuals (tyVarKind tv)
       | otherwise = False
 
     con_fields package_root domain args con
       | package_root
-      -- The promoted telescope checks the dependent payload kind. Only its
-      -- witness needs to be a structural domain in its own right.
+      -- A witness declared at a type parameter is opaque after instantiation.
+      -- See Note [Abstract witness domains].
       , dataConHasPromotedRetained con
       , (univs, [], [], [], _, res) <- dataConFullSig con
       , univs `equalLength` args
       , substTyWith univs args res `eqType` domain
       , null (dataConStupidTheta con)
       , Nothing <- dataConWrapId_maybe con
-      , [witness, payload] <- instantiate rep_args
-      = Just [(False, scaledThing witness), (True, scaledThing payload)]
+      , [witness, payload] <- rep_args
+      = let field_type = substTyWith univs args . scaledThing
+        in Just [(is_parameter (scaledThing witness), field_type witness), (True, field_type payload)]
       | null (dataConRepArgBinders con)
       , (univs, [], [], [], orig_args, res) <- dataConFullSig con
       , univs `equalLength` args

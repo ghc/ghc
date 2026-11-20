@@ -105,6 +105,7 @@ import qualified PackedProjection
 import PackedVecLibrary
 import RetainedNat (Retained(..), constantPackage, withRetained)
 import qualified DependentPair as Pair
+import qualified DependentProjection as Pair
 import qualified RetainedProjection
 import qualified QualifiedPiLibrary as Qualified
 import qualified ReadNatural
@@ -1305,6 +1306,8 @@ listBoundaries = do
     observe "use one dependent pair type at two witness types"
         (Pair.withPair chars (\k v -> (natToInt k, toList v)),
          Pair.withPair tag (\_ c -> getConst c))
+    observe "project the payload at the first field of a dependent pair"
+        (natToInt (Pair.first chars), toList (Pair.second chars), getConst (Pair.second tag))
     observe "read either package field without demanding its sibling"
         ( withRetained (constantPackage (error "unused witness") (7 :: Int))
               (\_ box -> getConst box)
