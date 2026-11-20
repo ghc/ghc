@@ -33,21 +33,27 @@ determines that the first has type `forall a. a -> a`. A consumer can write
 the error identifies both the use and the pattern that opened the package.
 [Callback example](examples/erased-existentials/RankedPackage.hs).
 
-Both native compiler stages reproduce the 294-line Showcase at `-O0` and
+A library can export the optimization rule `open (hide x) = x` for an
+erased package. At default `-O1`, the rule fires in the provider and in a
+client compiled from its interface. The client returns the stored value
+and preserves the behavior of a demanded or ignored exception.
+[Rule and provider](examples/erased-existentials/PackageRules.hs).
+
+Both native compiler stages reproduce the 295-line Showcase at `-O0` and
 default `-O1`. The self-hosted compiler also matches the golden output with
-stripped interfaces and in GHCi. An ordinary client built with either
-this compiler or the previous `ffcc494626` compiler reads the same
-compiled providers. It gets `(7,True)` from each of three packaged callbacks
-and reads length `1` through a GADT-style newtype selector. Both compilers
-still choose `Int` for the existing deep-subsumption example.
+stripped interfaces and in GHCi. At each of three interface compression
+levels, the rule client prints `(7,5,9,True)`. The previous compiler
+at `9b11f47553` rejects the new rule format at the interface header.
+When the provider omits the rule, both compiler versions can build and run
+the client against the other version’s interface.
 [Newtype source](examples/packed-vector/StoredVector.hs),
 [Showcase](Showcase.hs) and [commands](README.md#run-the-showcase).
 
-At `58a014ba91`, all 59 focused tests that ran passed. In the dependent
-directory 293 of 314 executed normal-way tests passed. Nine original
-diagnostic goldens now match, including `BadTelescope` and `BadTelescope4`.
-The remaining 21 failures have the same test names and failure categories
-as at `ffcc494626`.
+At `56461950da`, all 59 focused tests that ran passed. In the dependent
+directory 293 of 314 executed normal-way tests passed. The remaining
+21 failures have the same names and categories as at `9b11f47553`.
+The testsuite reports ten compile failures, ten stderr mismatches and
+a command failure in `T13938`.
 
 The upgrade tests cover a change to a family, a packed projection from
 a home or installed module, and combinations of dependent projections
@@ -61,7 +67,7 @@ the header. The new reader checks the coercion's role and scope.
 | Card | What works | Remaining gap |
 | --- | --- | --- |
 | [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | Haskell98 and GADT-style newtypes can wrap a retained length and a vector at that length. The GADT constructor can bind the element type in its own signature. | Broaden dependent product domains and inference. Extend retained field checking to more constructor signatures. |
-| [R05 dependent Core](roadmap/R05-dependent-core.md) | A provider can construct and open erased packages at default `-O1`. A given equality can change the payload type under a hidden witness. | Cover more coercions, rewrite rules and optimization settings. |
+| [R05 dependent Core](roadmap/R05-dependent-core.md) | A provider and an interface-only client can apply a local source rule over erased package types at default `-O1`. A given equality can change a payload type under its witness. | Check lexical package operations inside rules, more coercions and standard `-O2`. |
 | [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The integrated Showcase checks a mapper’s cons rule on an unknown tail and composes two checked traversals. Observing the result constructor leaves the inner callback lazy. | General open evaluation across arbitrary ordinary definitions. |
 | [R19 type-level cases](roadmap/R19-type-level-cases.md) | A constructor match can refine the kinds of later indices using checked nominal equalities. An unknown input that can still match an earlier row blocks a catch-all. | General mixed patterns and open GADT indices. |
 | [R22 erased existentials](roadmap/R22-existential-quantification.md) | Ordinary function equations can open payload constructors. Quick Look can infer a whole package as a type argument. A typed callback can determine the polymorphic witness for an adjacent tuple field, including in a nested application. | Generalize witness projections and inference for checking-only expressions. |
@@ -80,9 +86,10 @@ source examples. General promotion remains open.
 
 ## Current work queue
 
-1. **R05.** Check a source rule such as `open (hide x) = x` at default
-   `-O1`. The provider and an interface-only client must each fire the
-   rule and preserve demand. Broader coercions and `-O2` remain open.
+1. **R05.** Extend liberate-case and constructor specialization under
+   `Pack` and `Unpack`. Check the standard `-O2` pipeline on retained
+   and erased source programs. Extend rule matching to lexical package
+   operations and check the scope of each witness.
 2. **R22.** Extend witness projections and check where lambdas still
    need a type annotation. Keep the hidden type scoped to its opening.
 3. **R19.** Extend the supported constructor patterns. Keep earlier rows
