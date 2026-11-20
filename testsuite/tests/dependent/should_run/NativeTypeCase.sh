@@ -20,7 +20,7 @@ reject() {
 "${g[@]}" -c NativeTypeCaseFallback.hs
 "${g[@]}" -fomit-interface-pragmas -c NativeNestedCase.hs
 "${g[@]}" --show-iface NativeNestedCase.hi >nested.iface
-if sed -n '/^exports:/,/^defaults:/p' nested.iface | grep -E '\$(case(-node)?|lambda):'; then exit 1; fi
+if sed -n '/^exports:/,/^defaults:/p' nested.iface | grep -E '\$(case(-node)?|field-case|lambda):'; then exit 1; fi
 "${g[@]}" --show-iface NativeCase.hi >case.iface
 if sed -n '/^exports:/,/^defaults:/p' case.iface | grep -E '\$case(:|-let-rhs:)'; then exit 1; fi
 mkdir interfaces
@@ -112,6 +112,37 @@ reject NativeTypeCaseOpaqueIndex 40:3 'GHC-79642'
 test "$(grep -c 'error: \[GHC-79642\]' bad.log)" = 1
 ! grep -Fq 'Core Lint errors' bad.log
 
+
+# Read the constructor field from its interface with the extension off.
+(
+    cd interfaces
+    cat >NativeTypeCaseFieldRigid.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, GADTs #-}
+module NativeTypeCaseFieldRigid where
+import Data.Proxy (Proxy)
+import NativeNestedCase
+
+rigid :: CaseField ('Just bit) -> Int
+rigid (CaseField n) = n
+
+shadow :: ShadowedCaseField 'True ('Just 'False) -> Proxy 'True
+shadow (ShadowedCaseField bit) = bit
+HS
+    reject NativeTypeCaseFieldRigid 7:23 '[GHC-83865]'
+    grep -Eq 'the type case in a field of .*CaseField' bad.log
+    grep -Fq 'NativeTypeCaseFieldRigid.hs:10:34: error: [GHC-83865]' bad.log
+    ! grep -Fq '$field-case:' bad.log
+)
+
+cat >NativeTypeCaseFieldEscape.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
+module NativeTypeCaseFieldEscape where
+import Data.Proxy (Proxy)
+data Escape (d :: Maybe Bool) where
+  Escape :: forall (d :: Maybe Bool).
+    (case d of { Just bit -> Proxy bit; Nothing -> Proxy bit }) -> Escape d
+HS
+reject NativeTypeCaseFieldEscape 6:6 '[GHC-97233]'
 
 # A speculative branch gets one family step. Checking a written use
 # of the same constructor still reports the solver's reduction limit.

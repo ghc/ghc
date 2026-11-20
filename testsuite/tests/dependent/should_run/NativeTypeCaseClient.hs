@@ -220,3 +220,24 @@ transportedField = Refl
 
 ordinaryField :: N.DependentFieldPick ('Just ('N.DefaultField 'True)) :~: Int
 ordinaryField = Refl
+
+plainCaseField :: N.PlainCaseField 'True -> Int
+plainCaseField (N.PlainCaseField n) = n
+
+presentCaseField :: N.CaseField ('Just 'True) -> Int
+presentCaseField (N.CaseField n) = n
+
+otherCaseField :: N.CaseField ('Just 'False) -> Int
+otherCaseField (N.CaseField n) = n
+
+missingCaseField :: N.CaseField 'Nothing -> Char
+missingCaseField (N.CaseField c) = c
+
+copyCaseField :: N.CaseField d -> N.CaseField d
+copyCaseField (N.CaseField field) = N.CaseField field
+
+shadowedCaseField :: N.ShadowedCaseField 'True ('Just 'False) -> Proxy 'False
+shadowedCaseField (N.ShadowedCaseField bit) = bit
+
+outerCaseField :: N.ShadowedCaseField 'True 'Nothing -> Proxy 'True
+outerCaseField (N.ShadowedCaseField bit) = bit

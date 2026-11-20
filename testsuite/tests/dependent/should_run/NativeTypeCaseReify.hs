@@ -72,3 +72,11 @@ $(do
 
 checkedIdentity :: Bool
 checkedIdentity = reifiedIdentity (Proxy :: Proxy 'False) True
+
+$(do
+    ty <- reifyType 'N.CaseField
+    let copy = mkName "reifiedCaseField"
+    pure [SigD copy ty, ValD (VarP copy) (NormalB (ConE 'N.CaseField)) []])
+
+checkedCaseField :: N.CaseField ('Just 'True)
+checkedCaseField = reifiedCaseField 42

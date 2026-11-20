@@ -9,6 +9,7 @@ module NativeNestedCase
   , DependentFieldGate(..), DependentFieldPick
   , IndexedFieldBox(..), IndexedFieldPayload(..), IndexedFieldPick, IndexedFieldOrder
   , RefinedGate(..), RefinedLeaf(..), RefinedBranchPick
+  , PlainCaseField(..), CaseField(..), ShadowedCaseField(..)
   , OpenCaseGate(..), OpenCaseIndex, OpenIndexPick, OpenIndexAtOrdering
   , ScopedOpenIndex
   ) where
@@ -267,3 +268,17 @@ type ForallRepResult = forall k (tag :: k) (r :: RuntimeRep) (d :: Maybe Bool).
         Just True -> AtRep r
         Just _ -> AtRep r
         Nothing -> AtRep r) :: TYPE r)
+
+-- | Select a field type from an index of an ordinary data type.
+data PlainCaseField (b :: Bool) =
+  PlainCaseField (case b of { True -> Int; False -> Char })
+
+-- | Keep the order of the tests in a GADT field.
+data CaseField (d :: Maybe Bool) where
+  CaseField :: forall (d :: Maybe Bool).
+    (case d of { Just True -> Int; Just _ -> Int; Nothing -> Char }) -> CaseField d
+
+-- | A pattern shadows the constructor binder in its own branch.
+data ShadowedCaseField (b :: Bool) (d :: Maybe Bool) where
+  ShadowedCaseField :: forall (b :: Bool) (d :: Maybe Bool).
+    Proxy (case d of { Just b -> b; Nothing -> b }) -> ShadowedCaseField b d

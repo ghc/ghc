@@ -2198,6 +2198,12 @@ pprTyTcApp ctxt_prec tc tys =
        -> maybeParen ctxt_prec funPrec $
             text "the type case in the signature for" <+> quotes (text owner)
 
+       | userStyle style, not debug, print_type_abbreviations
+       , Just owner <- stripLiftedTypeOwner "$field-case:"
+                        (occNameString (nameOccName (ifaceTyConName tc)))
+       -> maybeParen ctxt_prec funPrec $
+            text "the type case in a field of" <+> quotes (text owner)
+
        -- See Note [Registered type numerals] in GHC.Tc.Gen.HsType.
        | userStyle style, not debug, not print_kinds, print_type_abbreviations
        , let name = ifaceTyConName tc

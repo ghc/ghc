@@ -404,16 +404,24 @@ at the source occurrence.
 Skip types that contain splices or holes. A wildcard in a case pattern
 is part of the match. Leave nested binders outside these field telescopes
 to the ordinary renamer.
+
+For a type case in an ordinary constructor field, use the same
+lexical capture check as for a value signature. Give each written
+case its own helper, including cases in different fields of one
+constructor. A copied retained domain can change matchability in
+the helper, so leave cases under a retained binder outside this
+field rule.
 -}
 -- | Select the expressions that can be lifted at a declaration type position.
 data LiftedTypeSite
   = FieldTypeSite
+  | RetainedFieldTypeSite
   | SignatureTypeSite
   | ForallTypeSite
   | RetainedTypeSite [RdrName]
   deriving Eq
 
--- | Prepare cases in top-level value signatures and sums in signatures and fields.
+-- | Prepare type cases and retained sums in signatures and constructor fields.
 liftDeclarationTypes :: [(RdrName, (GlobalRdrElt, Name))] -> Bool -> HsGroup GhcPs
                      -> (HsGroup GhcPs, LiftedDecls, [(LocatedN RdrName, GlobalRdrElt)])
 liftDeclarationTypes source_heads named_wildcards group
@@ -460,7 +468,7 @@ liftDeclarationTypes source_heads named_wildcards group
     liftData decl = (decl, [])
 
     liftConstructor scope (L loc con@ConDeclH98{con_telescope = [], con_name = owner, con_args = args}) =
-      let (args', sums) = liftFields (liftField (liftFieldSums owner scope)) args
+      let (args', sums) = liftFields (liftField (liftFieldAt FieldTypeSite owner scope)) args
       in (L loc con{con_args = args'}, sums)
     liftConstructor _ (L loc con@ConDeclGADT
       { con_names = names, con_outer_bndrs = L _ outer, con_telescope = telescope
@@ -471,7 +479,7 @@ liftDeclarationTypes source_heads named_wildcards group
                           extractHsTysRdrTyVars [result] []
             owner = head names
             scope = outerCaptures outer occurrences
-            visit = liftField (liftFieldType owner scope)
+            visit = liftField (liftFieldType FieldTypeSite owner scope)
             (args', sums) = case args of
               PrefixConGADT ann fields -> first (PrefixConGADT ann) (liftFieldList visit fields)
               RecConGADT ann fields -> first (RecConGADT ann) (liftRecordFields visit fields)
@@ -491,7 +499,7 @@ liftDeclarationTypes source_heads named_wildcards group
             let (body', sums, next) = liftRetainedFields owner scope' body salt
             in (L loc node{hst_body = body'}, sums, next)
       HsFunTy ann arrow arg result ->
-        let (arg', sums, next) = liftFieldType owner scope arg salt
+        let (arg', sums, next) = liftFieldType RetainedFieldTypeSite owner scope arg salt
             (result', later, end) = liftRetainedFields owner scope result next
         in (L loc (HsFunTy ann arrow arg' result'), sums ++ later, end)
       HsParTy ann body ->
@@ -499,7 +507,7 @@ liftDeclarationTypes source_heads named_wildcards group
         in (L loc (HsParTy ann body'), sums, next)
       _ -> (ty, [], salt)
 
-    liftFieldType owner scope ty@(L loc node) salt = case node of
+    liftFieldType site owner scope ty@(L loc node) salt = case node of
       HsForEachTy{hst_bndrs = binders, hst_body = body}
         | let locals = explicitCaptures binders
               names = map (unLoc . snd) locals
@@ -509,12 +517,12 @@ liftDeclarationTypes source_heads named_wildcards group
         , null (findDupsEq (==) names)
         , all (Set.disjoint shadowed . kindNames . fst) outer
         , localKindsInScope shadowed locals ->
-            let (body', sums, next) = liftFieldType owner (outer ++ locals) body salt
+            let (body', sums, next) = liftFieldType RetainedFieldTypeSite owner (outer ++ locals) body salt
             in (L loc node{hst_body = body'}, sums, next)
       HsParTy ann body ->
-        let (body', sums, next) = liftFieldType owner scope body salt
+        let (body', sums, next) = liftFieldType site owner scope body salt
         in (L loc (HsParTy ann body'), sums, next)
-      _ -> liftFieldSums owner scope ty salt
+      _ -> liftFieldAt site owner scope ty salt
 
     localKindsInScope _ [] = True
     localKindsInScope hidden ((binder, name):locals) =
@@ -574,21 +582,25 @@ liftDeclarationTypes source_heads named_wildcards group
       [(fmap (updateHsTyVarBndrFlag (const (HsBndrRequired noExtField))) b, v)
       | b <- binders, Just v <- [hsLTyVarLocName b]]
 
-    liftFieldSums owner scope ty salt =
-      let (ty', sums, (next, _)) = liftBody FieldTypeSite owner scope ty (salt, [])
+    liftFieldAt site owner scope ty salt =
+      let (ty', sums, (next, _)) = liftBody site owner scope ty (salt, [])
       in (ty', sums, next)
 
-    liftedAnchor FieldTypeSite _ ty@(L _ (XHsType HsTypeSome{}))
-      | copyable ty = Just ("$field-sum:", Nothing)
+    liftedAnchor site _ ty@(L _ (XHsType HsTypeSome{}))
+      | fieldSite site, copyable ty = Just ("$field-sum:", Nothing)
     liftedAnchor SignatureTypeSite _ ty@(L _ (XHsType HsTypeSome{}))
       | copyable ty = Just ("$signature-sum:", Nothing)
     liftedAnchor site scope (L _ (XHsType (HsTypeCase _ _ scrutinee alts)))
-      | site /= FieldTypeSite
+      | site /= RetainedFieldTypeSite
       , caseScrutinee site scope scrutinee
       , copyable scrutinee
       , all copyableAlt alts
-      = Just ("$signature-case:", signatureCaseKey scrutinee alts)
+      = if site == FieldTypeSite
+          then Just ("$field-case:", Nothing)
+          else Just ("$signature-case:", signatureCaseKey scrutinee alts)
     liftedAnchor _ _ _ = Nothing
+
+    fieldSite site = site == FieldTypeSite || site == RetainedFieldTypeSite
 
     caseScrutinee (RetainedTypeSite names) scope scrutinee =
       isJust (signatureCasePart scrutinee >>= retainedCaseScrutinee names (resolveHead scope))
@@ -625,7 +637,7 @@ liftDeclarationTypes source_heads named_wildcards group
       , Just locals <- forallCaptures tele
       = Just (ForallTypeSite, locals, body)
     innerScope site HsForEachTy{hst_bndrs = binders, hst_body = body}
-      | site /= FieldTypeSite
+      | not (fieldSite site)
       , Just locals <- writtenCaptures binders
       , not (null locals)
       = Just (RetainedTypeSite (map (unLoc . snd) locals ++ retainedNames site), locals, body)

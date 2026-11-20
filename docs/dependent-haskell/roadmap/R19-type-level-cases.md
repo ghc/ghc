@@ -165,6 +165,32 @@ available. A separately distributed provider must be rebuilt to
 publish ordered equations. [Nested provider](../examples/open-evaluation/NativeNestedCase.hs)
 and [interface test](../../../testsuite/tests/dependent/should_run/NativeTypeCase.sh).
 
+## A case in a constructor field
+
+An ordinary data constructor can choose a field type from an index
+in its type. For example, the first two rows select `Int`, while
+the disjoint `Nothing` row selects `Char`.
+
+```haskell
+data Box (d :: Maybe Bool) where
+  Box :: forall (d :: Maybe Bool).
+    (case d of { Just True -> Int; Just _ -> Int; Nothing -> Char }) -> Box d
+```
+
+An ordinary client can use the constructor at a known index or copy
+the field at the same unknown index. Matching `Just b` with rigid
+`b` still waits at the `True` test. A type-case pattern binder
+shadows an enclosing constructor binder in its own row. The
+constructor's field type keeps its helper private in the interface.
+Each written field case has its own helper. To share a case between
+fields, name the type synonym and use it from both fields.
+
+The field rule applies to ordinary H98 and GADT arguments in their
+declaration telescope. Cases under a retained binder or an inner field
+`forall` remain outside this rule.
+[Provider](../examples/open-evaluation/NativeNestedCase.hs) and
+[ordinary client](../../../testsuite/tests/dependent/should_run/NativeTypeCaseClient.hs).
+
 ## A case in a value signature
 
 A top-level function can write a case directly in its argument and result
