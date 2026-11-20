@@ -180,10 +180,10 @@ shareIface _ NormalCompression mi = do
 shareIface nc compressionLevel  mi = do
   bh <- openBinMem initBinMemSize
   start <- tellBinWriter bh
-  has_dep_fun_co <- putIfaceWithExtFields QuietBinIFace compressionLevel bh mi
+  evidence <- putIfaceWithExtFields QuietBinIFace compressionLevel bh mi
   rbh <- shrinkBinBuffer bh
   seekBinReader rbh start
-  res <- getIfaceWithExtFields has_dep_fun_co nc rbh
+  res <- getIfaceWithExtFields evidence nc rbh
   forceModIface res
   return res
 

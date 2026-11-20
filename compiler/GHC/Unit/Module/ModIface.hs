@@ -119,6 +119,7 @@ import GHC.Prelude
 import GHC.Hs
 
 import GHC.Iface.Syntax
+import GHC.Iface.Type (IfaceEvidenceVersion)
 import GHC.Iface.Flags
 import GHC.Iface.Ext.Fields
 import GHC.Iface.Recomp.Types
@@ -237,7 +238,7 @@ data IfaceBinHandle (phase :: ModIfacePhase) where
   --
   -- See Note [Private fields in ModIface] for when this fields needs to be cleared
   -- (e.g., set to 'Nothing').
-  FullIfaceBinHandle :: !(Strict.Maybe (Bool, FullBinData)) -> IfaceBinHandle 'ModIfaceFinal
+  FullIfaceBinHandle :: !(Strict.Maybe (IfaceEvidenceVersion, FullBinData)) -> IfaceBinHandle 'ModIfaceFinal
 
 
 withSelfRecomp :: ModIface_ phase -> r -> (IfaceSelfRecomp -> r) -> r

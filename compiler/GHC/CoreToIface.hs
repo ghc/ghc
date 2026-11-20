@@ -66,7 +66,7 @@ import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.TyCo.Tidy
 
 import GHC.Builtin.WiredIn.Prim ( eqPrimTyCon, eqReprPrimTyCon )
-import GHC.Builtin.WiredIn.Types ( heqTyCon )
+import GHC.Builtin.WiredIn.Types ( boolTyCon, heqTyCon )
 import GHC.Builtin.WiredIn.Ids ( noinlineIdName, noinlineConstraintIdName )
 
 import GHC.Iface.Syntax
@@ -727,12 +727,14 @@ toIfaceAlt alt
   | isNativeIndexAliasAlt alt
   -- See Note [Native index alias evidence in interfaces] in GHC.IfaceToCore.
   = pprPanic "toIfaceAlt: native index alias evidence has no interface codec" (ppr alt)
-toIfaceAlt alt@(Alt (DataAlt con) bs _)
+toIfaceAlt alt@(Alt (DataAlt con) bs rhs)
   | isNativeIndexDataAlt con bs
-  , not (case splitAt (dataConRepArity con) bs of
-           (fields, [cv]) -> all isNativeOpaqueValueId fields && isCoVar cv && isLocalId cv
-           _ -> False)
-  = pprPanic "toIfaceAlt: invalid native constructor proof binder" (ppr alt)
+  = case splitAt (dataConRepArity con) bs of
+      (fields, [cv]) | all isNativeOpaqueValueId fields && isCoVar cv && isLocalId cv ->
+        let iface_con | dataConTyCon con == boolTyCon = IfaceDataAlt (getName con)
+                      | otherwise = IfaceDataAltWithProof (getName con)
+        in IfaceAlt iface_con (map (mkIfLclName . getOccFS) bs) (toIfaceExpr rhs)
+      _ -> pprPanic "toIfaceAlt: invalid native constructor proof binder" (ppr alt)
   -- See Note [Native constructor evidence in interfaces] in GHC.IfaceToCore.
 toIfaceAlt (Alt c bs r) = IfaceAlt (toIfaceCon c) (map (mkIfLclName . getOccFS) bs) (toIfaceExpr r)
 

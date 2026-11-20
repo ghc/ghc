@@ -2335,6 +2335,11 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
         IfaceDefaultAlt   -> return DEFAULT
         IfaceLitAlt lit   -> LitAlt <$> tcIfaceLit lit
         IfaceDataAlt name -> DataAlt <$> tcIfaceDataCon name
+        IfaceDataAltWithProof name -> do
+          dc <- tcIfaceDataCon name
+          unless (isNativeIndexDataAlt dc names) $
+            failIfM (text "Missing or unsupported constructor proof in interface alternative:" <+> ppr dc <+> ppr names)
+          return (DataAlt dc)
       return (alt_con, names, rhs)
     let native_alt (DataAlt con, names, _) = isNativeIndexDataAlt con names
         native_alt _ = False
@@ -2494,6 +2499,11 @@ An interface data alternative stores the names of its binders. A native
 alternative has one extra name after its constructor fields. For example,
 a branch matching Pair x payload binds a proof that the scrutinee index
 equals the promoted Pair applied to x and payload.
+
+The earlier reader supports this slot only on Bool. Preserve that encoding
+for Bool. Write IfaceDataAltWithProof for the other supported constructors.
+When reading a legacy unfolding, recognize its proof slot by the same
+constructor shape. See Note [Versioning retained evidence] in GHC.Iface.Binary.
 
 Instantiate the ordinary representation fields from left to right. This
 gives the payload its type at the fresh x. Derive the promoted result from
