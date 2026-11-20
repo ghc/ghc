@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ExplicitNamespaces #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE NoImplicitPrelude #-}
@@ -7,6 +8,10 @@
 'Pack' is special syntax when ExperimentalDependentTypes is enabled.
 -}
 module GHC.Exists (pattern Pack) where
+
+#if __GLASGOW_HASKELL__ >= 1001
+import qualified GHC.Essentials as Rebindable
+#endif
 
 -- This declaration gives Pack a constructor name for ordinary import and
 -- export processing. Its type is private and its constructor is not used
