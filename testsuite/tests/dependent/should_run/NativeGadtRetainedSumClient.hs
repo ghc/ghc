@@ -47,3 +47,9 @@ main = do
         "earlier retained constructor argument"
     require (withLater laterWitnessBottom (\_ _ _ ys -> cells ys) == "x") "lazy earlier constructor argument"
     throws "earlier witness" (withLater laterWitnessBottom (\n _ _ _ -> lengthValue n))
+    case fieldScope of
+        FieldScope n produce (Pair _ (outer, _)) ->
+            case produce (S Z) True one of
+                Pair m (_, _, inner, _) ->
+                    require ((lengthValue n, lengthValue m, cells outer, cells inner)
+                        == (2, 0, [False, True], [True])) "field-local retained length"

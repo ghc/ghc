@@ -176,8 +176,18 @@ the sum captures `n` where it occurs in the constructor signature. The
 private synonym takes `n` as a parameter. Each earlier binder scopes over
 later fields. Matching the constructor gives the consumer the same witness.
 Returning its vector at a caller-chosen index fails at the returned field.
-A later field can leave the earlier witness unevaluated. The lifting pass
-stops at shadowing within this telescope.
+A later field can leave the earlier witness unevaluated. A GADT field
+can also open its own `foreach` telescope. Its witness can shadow one
+from the constructor. The field body uses the new witness and the next
+constructor field uses the original witness. Use a named sum if a
+written binder kind refers to a name hidden by this shadowing.
+Lifting stops at shadowing on the constructor's own argument spine.
+
+The constructor result has the enclosing telescope scope. A witness
+bound inside a field cannot escape into that result. The usual retained
+constructor restriction requires the erased quantifiers to name the
+datatype parameters. It rejects a constructor result indexed by one
+of its retained arguments.
 [Agda 2.8.0 telescopes](https://agda.readthedocs.io/en/v2.8.0/language/telescopes.html).
 [Interface and demand test](../../../testsuite/tests/dependent/should_run/NativeGadtRetainedSum.sh).
 

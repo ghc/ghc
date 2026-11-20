@@ -83,7 +83,7 @@ import Data.List ( mapAccumL, partition, unzip4 )
 import Data.List.NonEmpty ( NonEmpty(..), head, nonEmpty )
 import Data.Data (Data, cast, gmapQ)
 import Data.Maybe (catMaybes,  isJust, isNothing, fromMaybe, mapMaybe, maybeToList )
-import qualified Data.Set as Set ( delete, difference, empty, fromList, member, null, toList, union )
+import qualified Data.Set as Set ( delete, difference, disjoint, empty, fromList, member, null, toList, union )
 
 {- Note [Lifting type lambdas]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -352,13 +352,19 @@ the retained application to each lifted synonym. A later binder does not
 scope over earlier fields. Stop at shadowing because the copied kind of
 an earlier parameter may need a name that the shadowing binder hides.
 
+A GADT field can itself start with a retained telescope. Its binders
+scope over that field only. Remove shadowed captures before lifting the
+body. Check the remaining written kinds for hidden names. In a group of
+retained binders, a binder's kind is checked before that binder enters
+scope, so check the kinds in order.
+
 Copy only the parameters used by the sum and the parameters
 used in their written kinds. Keep their original order. Require each
 free variable to be in scope in the source signature or field. Otherwise
 kind inference for the synonym could bind a variable that is out of scope
 at the source occurrence.
-Skip types that contain splices or holes. Leave nested binders within a
-field type to the ordinary renamer.
+Skip types that contain splices or holes. Leave other nested binders
+within a field type to the ordinary renamer.
 -}
 -- | Prepare retained sums in top-level signatures and constructor fields.
 liftDeclarationSums :: Bool -> HsGroup GhcPs -> (HsGroup GhcPs, LiftedDecls)
@@ -396,7 +402,7 @@ liftDeclarationSums named_wildcards group
     liftData decl = (decl, [])
 
     liftConstructor scope (L loc con@ConDeclH98{con_telescope = [], con_name = owner, con_args = args}) =
-      let (args', sums) = liftFields (liftField owner scope) args
+      let (args', sums) = liftFields (liftField (liftBody "$field-sum:" owner scope)) args
       in (L loc con{con_args = args'}, sums)
     liftConstructor _ (L loc con@ConDeclGADT
       { con_names = names, con_outer_bndrs = L _ outer, con_telescope = telescope
@@ -407,7 +413,7 @@ liftDeclarationSums named_wildcards group
                           extractHsTysRdrTyVars [result] []
             owner = head names
             scope = outerCaptures outer occurrences
-            visit = liftField owner scope
+            visit = liftField (liftFieldType owner scope)
             (args', sums) = case args of
               PrefixConGADT ann fields -> first (PrefixConGADT ann) (liftFieldList visit fields)
               RecConGADT ann fields -> first (RecConGADT ann) (liftRecordFields visit fields)
@@ -427,13 +433,34 @@ liftDeclarationSums named_wildcards group
             let (body', sums, next) = liftRetainedFields owner scope' body salt
             in (L loc node{hst_body = body'}, sums, next)
       HsFunTy ann arrow arg result ->
-        let (arg', sums, next) = liftBody "$field-sum:" owner scope arg salt
+        let (arg', sums, next) = liftFieldType owner scope arg salt
             (result', later, end) = liftRetainedFields owner scope result next
         in (L loc (HsFunTy ann arrow arg' result'), sums ++ later, end)
       HsParTy ann body ->
         let (body', sums, next) = liftRetainedFields owner scope body salt
         in (L loc (HsParTy ann body'), sums, next)
       _ -> (ty, [], salt)
+
+    liftFieldType owner scope ty@(L loc node) salt = case node of
+      HsForEachTy{hst_bndrs = binders, hst_body = body}
+        | let locals = explicitCaptures binders
+              names = map (unLoc . snd) locals
+              (hidden, outer) = partition ((`elem` names) . unLoc . snd) scope
+              shadowed = Set.fromList (map (unLoc . snd) hidden)
+        , length locals == length binders
+        , null (findDupsEq (==) names)
+        , all (Set.disjoint shadowed . kindNames . fst) outer
+        , localKindsInScope shadowed locals ->
+            let (body', sums, next) = liftFieldType owner (outer ++ locals) body salt
+            in (L loc node{hst_body = body'}, sums, next)
+      HsParTy ann body ->
+        let (body', sums, next) = liftFieldType owner scope body salt
+        in (L loc (HsParTy ann body'), sums, next)
+      _ -> liftBody "$field-sum:" owner scope ty salt
+
+    localKindsInScope _ [] = True
+    localKindsInScope hidden ((binder, name):locals) =
+      Set.disjoint hidden (kindNames binder) && localKindsInScope (Set.delete (unLoc name) hidden) locals
 
     liftFields visit (PrefixCon ann fields) =
       first (PrefixCon ann) (liftFieldList visit fields)
@@ -458,8 +485,8 @@ liftDeclarationSums named_wildcards group
           (fields', sums) = unzip lifted
       in (fields', concat sums)
 
-    liftField owner scope salt field@CDF{cdf_type = ty} =
-      let (ty', sums, next) = liftBody "$field-sum:" owner scope ty salt
+    liftField visit salt field@CDF{cdf_type = ty} =
+      let (ty', sums, next) = visit ty salt
       in (next, (field{cdf_type = ty'}, sums))
 
     liftBind counters (VbSig (L loc (TypeSig sig_ann mods names@(owner:_) wc@HsWC
