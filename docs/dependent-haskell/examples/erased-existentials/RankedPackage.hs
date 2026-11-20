@@ -1,6 +1,9 @@
 {-# LANGUAGE ExperimentalDependentTypes, ImpredicativeTypes, RankNTypes, ScopedTypeVariables, TypeApplications #-}
 
-module RankedPackage (runCallback, runPair, runBuilder) where
+module RankedPackage
+    ( runCallback, runPair, runBuilder
+    , Callback(..), GuardedBuilder, atTwoTypes, consumeIdentity, observeGuarded
+    ) where
 
 import Data.Kind (Type)
 
@@ -44,3 +47,15 @@ builder = \n -> makeCallback @a fromIntegral n
 runBuilder :: Int -> (Int, Bool)
 runBuilder n = case builder @Int n of
     Callback f call -> call f
+
+-- | Store a two-argument builder with one witness for all calls.
+type GuardedBuilder = exists (t :: Type). Bool -> Bool -> Callback t
+
+-- | Take a polymorphic identity and store it with a typed consumer.
+consumeIdentity :: PolyId -> Callback PolyId
+consumeIdentity value = Callback @PolyId value (\f -> (f 11, f False))
+
+-- | Call the builder and give its hidden value to the attached callback.
+observeGuarded :: GuardedBuilder -> Bool -> Bool -> (Int, Bool)
+observeGuarded build ready input =
+    case build ready input of Callback value call -> call value

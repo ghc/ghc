@@ -230,6 +230,7 @@ map an ordinary observer over differently sized partitions: [([7,9],[2]),([2],[7
 use a hidden polymorphic identity at Int and Bool: (7,True)
 infer a hidden function type from its paired callback: (7,True)
 infer a polymorphic lambda witness and call its builder at Int: (11,True)
+infer a guarded callback and skip an unused input: ((7,True),(11,False))
 read an integer through an erased package: 7
 apply an imported integer package rule and keep the witness lazy: (42,7,1)
 match and open existential packages in optimizer rules: (4,3,6)

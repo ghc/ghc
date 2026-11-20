@@ -58,6 +58,7 @@ import qualified PackageRules
 import OrphanPackageRules ()
 import qualified LexicalPackageRules
 import qualified RankedPackage
+import qualified RankedPackageClient
 import qualified StoredVector
 import qualified ExistentialVec as E
 import Data.IORef (modifyIORef', newIORef, readIORef, writeIORef)
@@ -1001,6 +1002,7 @@ main = do
     observe "use a hidden polymorphic identity at Int and Bool" RankedPackage.runCallback
     observe "infer a hidden function type from its paired callback" RankedPackage.runPair
     observe "infer a polymorphic lambda witness and call its builder at Int" (RankedPackage.runBuilder 11)
+    observe "infer a guarded callback and skip an unused input" RankedPackageClient.runGuarded
     observe "read an integer through an erased package" (PackageRules.roundTrip 7)
     observe "apply an imported integer package rule and keep the witness lazy"
         (PackageRules.open (41 :: Int, (+ 1)),
