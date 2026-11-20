@@ -71,6 +71,9 @@ grep -Fq "BadArrow" bad.log
 grep -Fq 'NativeTypeCaseBranchKind.hs:14:12: error: [GHC-83865]' bad.log
 grep -Fq "BadForall" bad.log
 reject NativeTypeCaseForallResult 4:60 '[GHC-97233]'
+reject NativeTypeCaseSignatureDistinct 9:26 '[GHC-83865]'
+grep -Fq 'the type case in the signature for' bad.log
+! grep -Fq '$signature-case:' bad.log
 reject NativeTypeCaseScrutinee 4:15 'Not in scope: type constructor or class'
 reject NativeTypeCaseLetMonomorphic 6:22 'GHC-83865'
 reject NativeTypeCaseLetUnowned 4:26 'A type let used in a case body cannot generalize the kind of its right-hand side.'
