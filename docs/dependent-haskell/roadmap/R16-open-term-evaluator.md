@@ -1701,3 +1701,21 @@ the input spine and skips the combiner on an empty list.
 [Source alias](../examples/open-evaluation/ListFoldrSource.hs),
 [ordinary proof](../examples/open-evaluation/ListFoldrProof.hs), and
 [regression](../../../testsuite/tests/dependent/should_run/NativeOpenListFoldr.sh).
+
+### Select the list instance of `Prelude.foldr`
+
+The receiver kind identifies the list instance of the ordinary selector.
+The compiler looks up its visible, context-free dictionary and checks the
+method selected by the dictionary constructor. The method must have the
+checked list fold equations at the selector's specialized type. The
+ordinary solver must select the same dictionary in the written and lexical
+evidence scopes. A given constraint can therefore block this reduction.
+
+The installed dictionary exposes its compiled method fields as interface
+pragmas. Keep those pragmas available when checking the proof, including
+with `-fno-ignore-interface-pragmas` at `-O0`. An interface that omits its
+method fields needs an existing checked method alias to supply the same
+evidence. The proof also disables rewrite rules for the list worker.
+[Proof using `Prelude.foldr`](../examples/open-evaluation/PreludeFoldrProof.hs),
+[class promotion roadmap](https://ghc.serokell.io/dh#promote-classes), and
+[GHC's lexical scoping principle](https://github.com/ghc-proposals/ghc-proposals/blob/master/principles.rst#221lexical-scoping-principle-lsp).

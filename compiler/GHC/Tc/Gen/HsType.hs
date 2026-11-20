@@ -96,7 +96,8 @@ import GHC.Tc.Validity
 import GHC.Tc.Gen.OpenTypeEval (instantiateOpenTypeFunction, observeOpenType, openTypeFailureReason)
 import GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourceTableFamilyUse, sourceTableTypeUses,
                               sourceCaseKindUse, sourceTableReferenceUse, indexedProjectionSource, isSourceConstructorCase, monomorphicEnumCaseArity, sourceCaseVisibleArity, sourceTableOwner, sourcePairBuilderField,
-                              lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource)
+                              lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource,
+                              lookupSourceListFoldMethod, recordSourceMethodUse)
 import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcPrepareClosedApplication, tcPrepareClosedFunctionValue, tcPrepareClosedResult, tcPrepareClosedObservation, tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand, tcHasClosedCallExecutable)
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Instance.Family (tcGetFamInstEnvs)
@@ -133,7 +134,7 @@ import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.WiredIn.Prim
 
 import GHC.Types.Error
-import GHC.Types.Id ( mkLocalId, mkSysLocalM, sourceTableId_maybe, sourceTableKeepsExecutable )
+import GHC.Types.Id ( isClassOpId_maybe, mkLocalId, mkSysLocalM, sourceTableId_maybe, sourceTableKeepsExecutable )
 import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Set (NameSet, mkNameSet, unionNameSet, emptyNameSet, elemNameSet, extendNameSet)
@@ -155,6 +156,7 @@ import GHC.Utils.Panic
 import GHC.Driver.DynFlags
 import GHC.Driver.Env (hsc_units)
 import GHC.Driver.Ppr (showPpr, showSDocForUser)
+import GHC.Driver.Session (GeneralFlag(Opt_SolveConstantDicts))
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Data.FastString
@@ -613,7 +615,7 @@ tcCheckRetainedType allow_function = go
       | hsHasForEachTy (unLoc body)
       = setSrcSpanA loc $
         do { theta <- tc_hs_context mode ctxt
-           ; body_ty <- go mode body liftedTypeKind
+           ; body_ty <- go (sourceMethodContext mode theta) body liftedTypeKind
            ; checkExpKind mode ty (tcMkPhiTy theta body_ty) liftedTypeKind (Check kind) }
     go mode (L loc (HsFunTy _ mult arg res)) kind
       = setSrcSpanA loc $
@@ -1644,7 +1646,8 @@ tcModifiersMult = tc_modifiers_mult typeLevelMode
 data TcTyMode
   = TcTyMode { mode_tyki :: TypeOrKind
              , mode_declaration :: Bool
-             , mode_callback_arrow :: CallbackArrowMode
+             , mode_callback_arrow :: FamilyArrowMode
+             , mode_source_givens :: [PredType]
              , mode_holes :: HoleInfo
              , mode_indices :: NameEnv Id
              , mode_pending_calls :: Maybe (NameEnv TcTyVar, PendingSigCalls, TcRef [TcPendingTypeCall])
@@ -1681,6 +1684,7 @@ mkMode :: TypeOrKind -> TcTyMode
 mkMode tyki = TcTyMode { mode_tyki = tyki, mode_holes = Nothing
                       , mode_declaration = False
                       , mode_callback_arrow = OrdinaryArrowChecking
+                      , mode_source_givens = []
                       , mode_indices = emptyNameEnv
                       , mode_pending_calls = Nothing
                       , mode_synonym_metadata = Nothing
@@ -1697,6 +1701,7 @@ mkHoleMode tyki hm
        ; return (TcTyMode { mode_tyki  = tyki
                           , mode_declaration = False
                          , mode_callback_arrow = OrdinaryArrowChecking
+                          , mode_source_givens = []
                           , mode_holes = Just (lvl,hm)
                           , mode_indices = emptyNameEnv
                           , mode_pending_calls = Nothing
@@ -1934,7 +1939,7 @@ tcHsType mode t@(HsQualTy { hst_ctxt = ctxt, hst_body = rn_ty }) exp_kind
   , isConstraintLikeKind kind  -- CONSTRAINT rep
   = do { ctxt' <- tc_hs_context mode ctxt
          -- See Note [Body kind of a HsQualTy], point (BK2)
-       ; ty'   <- tc_check_lhs_type mode rn_ty constraintKind
+       ; ty'   <- tc_check_lhs_type (sourceMethodContext mode ctxt') rn_ty constraintKind
        ; let res_ty = tcMkDFunPhiTy ctxt' ty'
        ; checkExpKind mode t res_ty constraintKind exp_kind }
 
@@ -1943,7 +1948,7 @@ tcHsType mode t@(HsQualTy { hst_ctxt = ctxt, hst_body = rn_ty }) exp_kind
 
       ; ek <- newOpenTypeKind  -- The body kind (result of the function) can
                                 -- be TYPE r, for any r, hence newOpenTypeKind
-      ; ty' <- tc_check_lhs_type mode rn_ty ek
+      ; ty' <- tc_check_lhs_type (sourceMethodContext mode ctxt') rn_ty ek
       ; let res_ty = tcMkPhiTy ctxt' ty'
       ; checkExpKind mode t res_ty liftedTypeKind exp_kind }
 
@@ -2835,12 +2840,20 @@ tc_app_ty mode rn_ty exp_kind
                                ; checkExpKind mode rn_ty result result_kind exp_kind }
                          | not (null args)
                          , ordinary_call || (isQual rdr && ready_partial_call && length args == 1)
-                         -> do { hint <- closedCallResultHint ordinary_call exp_kind
-                               ; (result_kind, plan) <- tcPlanOrdinaryCall mode ordinary_call hint fun args
-                               ; checkClosedCallExpectedKind rn_ty exp_kind result_kind
-                               ; run <- prepareClosedCallResult result_kind plan
-                               ; result <- run
-                               ; checkExpKind mode rn_ty result result_kind exp_kind }
+                         -> do { selected <- if ordinary_call then checkedClassFold fun args else pure Nothing
+                               ; case selected of
+                                   Just (dfun, target, table) -> do
+                                     recordSourceMethodUse dfun fun target
+                                     checkSourceMethodSelection mode dfun name
+                                     (ty, kind) <- tcInferTyApps mode hs_fun_ty (mkTyConTy table) hs_args
+                                     checkExpKind mode rn_ty ty kind exp_kind
+                                   Nothing -> do
+                                     hint <- closedCallResultHint ordinary_call exp_kind
+                                     (result_kind, plan) <- tcPlanOrdinaryCall mode ordinary_call hint fun args
+                                     checkClosedCallExpectedKind rn_ty exp_kind result_kind
+                                     run <- prepareClosedCallResult result_kind plan
+                                     result <- run
+                                     checkExpKind mode rn_ty result result_kind exp_kind }
                        _ -> unsupported name }
            _ -> unsupported name
     -- See Note [Nullary indexed source projections] in GHC.Tc.Gen.SourceTable.
@@ -2869,6 +2882,15 @@ tc_app_ty mode rn_ty exp_kind
       | Just (_, RetrySigCalls, _) <- mode_pending_calls mode = True
       | otherwise = False
     unsupported = failWithTc . TcRnNoSourceTable
+    checkedClassFold fun args@[_, _, receiver]
+      | Just _ <- isClassOpId_maybe fun
+      , any isOpenTypeOperand args = do
+          (_, kind) <- tc_infer_lhs_type mode receiver
+          actual <- liftZonkM (zonkTcType kind)
+          case splitTyConApp_maybe actual of
+            Just (tc, [_]) | tc == listTyCon -> lookupSourceListFoldMethod fun (mkTyConTy tc)
+            _ -> pure Nothing
+    checkedClassFold _ _ = pure Nothing
 tc_app_ty mode rn_ty exp_kind
   | L _ (HsTyVar _ NotPromoted (L loc (WithUserRdr rdr name))) <- hs_fun_ty
   , isSourceFamilyName name
@@ -2913,6 +2935,23 @@ tc_app_ty mode rn_ty exp_kind
       result <- observe
       checkExpKind mode rn_ty result kind exp_kind
 tc_app_ty mode rn_ty exp_kind = tc_app_ty_generic mode rn_ty exp_kind
+
+-- | Add the written constraints to the scope of a promoted method call.
+sourceMethodContext :: TcTyMode -> [PredType] -> TcTyMode
+sourceMethodContext mode theta = mode { mode_source_givens = theta ++ mode_source_givens mode }
+
+-- | Require the ordinary solver to select the exact compiled dictionary.
+-- See Note [Select the dictionary for a promoted list fold] in GHC.Tc.Gen.SourceTable.
+checkSourceMethodSelection :: TcTyMode -> Id -> Name -> TcM ()
+checkSourceMethodSelection mode dfun selector = do
+  lexical <- getLexicalGivens
+  written <- newEvVars (mode_source_givens mode)
+  (_, constraints) <- captureConstraints $
+    checkConstraints (SigTypeSkol (ExprSigCtxt NoRRC)) [] (written ++ lexical) $ do
+      wanted <- newWanted (OccurrenceOf selector) Nothing (varType dfun)
+      emitSimple (mkNonCanonical wanted)
+      emitDelayedErrors (unitBag (DE_SourceMethod (ctEvEvId wanted) dfun selector (ctEvLoc wanted)))
+  discardResult (unsetGOptM Opt_SolveConstantDicts (simplifyTopNoDefaulting constraints))
 
 tc_app_ty_generic :: TcTyMode -> HsType GhcRn -> ExpKind -> TcM TcType
 tc_app_ty_generic mode rn_ty exp_kind
@@ -6625,7 +6664,8 @@ bindExplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_ki
     tc_ki_mode = TcTyMode { mode_tyki = KindLevel, mode_holes = hole_info
                          , mode_declaration = False
                          , mode_callback_arrow = OrdinaryArrowChecking
-                         , mode_indices = indices
+                          , mode_source_givens = []
+                          , mode_indices = indices
                          , mode_pending_calls = Nothing
                          , mode_synonym_metadata = if family_metadata then familyKindMetadata else Nothing
                          , mode_complete_type_arg = Nothing }

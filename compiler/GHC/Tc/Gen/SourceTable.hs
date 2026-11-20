@@ -3,20 +3,21 @@ module GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourc
                               sourceTableCallees, sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
                               sourceTableFamilyAppUse, sourceTableReferenceUse, sourceCaseKindUse, sourceCaseVisibleArity, isSourceConstructorCase, sourceTableOwner, monomorphicEnumCaseArity, groundFirstHead,
                               visibleSourceMethodRules, hasSourceMethodRule, hasSourceMethodRuleAt,
-                              sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers, isSourceFilterGuard,
+                              lookupSourceListFoldMethod, sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers, isSourceFilterGuard,
                               OptionalSourceUses, optionalSourceUses, registerOptionalSourceUses,
                               checkOptionalSourceUses, checkSourceMethodUses) where
 
 import GHC.Prelude
 
 import GHC.Builtin.KnownOccs (eqClassOpOcc, minusClassOpOcc)
+import GHC.Core.Class (classAllSelIds, classTyCon)
 import GHC.Builtin.Modules (gHC_CLASSES, gHC_INTERNAL_BASE, gHC_INTERNAL_NUM_INTEGER, gHC_TYPES, mkGhcInternalModule)
 import GHC.Builtin.WiredIn.Types (nilDataCon, consDataCon, boolTy, falseDataCon, trueDataCon, charTy, charTyCon, typeSymbolKind, stringTy, integerTy, integerTyConName, listTyCon, mkListTy, promotedTupleDataCon, tupleDataCon, tupleTyCon, unmatchableDataConTy)
 import GHC.Core (CoreRule(..), isAutoRule, ruleActivation)
 import qualified GHC.Core as Core
 import GHC.Core.CharCase (certOwner, certRows, certify)
 import GHC.Core.OpenWhnf (openDataConFieldTypes)
-import GHC.Core.Predicate (getClassPredTys_maybe)
+import GHC.Core.Predicate (classMethodInstTy, getClassPredTys_maybe, mkClassPred)
 import GHC.Core.Rules (RuleEnv(..), emptyRuleBase, emptyRuleEnv, extendRuleBaseList, getRules)
 import GHC.Core.Coercion (abstractNativeIndices, coercionLKind, coercionRKind, coercionRole, mkNomReflCo, mkSymCo, mkTyConAppCo)
 import GHC.Core.Coercion.Axiom (ClosedTyFam(..), CoAxBranch, coAxiomBranches, coAxiomRole,
@@ -487,6 +488,56 @@ Recheck after processing declarations and splices.
 recordSourceMethodUse :: Id -> Id -> Id -> TcM ()
 recordSourceMethodUse dfun selector target =
     recordSourceUses (sourceMethodOps dfun selector target)
+
+{- Note [Select the dictionary for a promoted list fold]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An occurrence of Prelude.foldr names a class selector. A list operand
+fixes its instance head to Foldable []. A local Given can still supply
+the dictionary, for example after a match on Dict (Foldable []).
+Only the dictionary that selects the checked worker justifies its equations.
+
+First find the method field of the visible instance dictionary. Check
+its specialized type and its list fold equations. Then ask the ordinary
+solver which dictionary the source call uses. GHC.Tc.Gen.HsType supplies
+both lexical Givens and the constraints written in the signature. It
+disables the constant dictionary shortcut for this check because the
+shortcut can bypass a Given. Record the selector, dictionary and worker
+so that a change to the provider invalidates the proof.
+-}
+
+-- | Find a visible ground dictionary whose exact method is a checked list fold.
+-- See Note [Select the dictionary for a promoted list fold].
+lookupSourceListFoldMethod :: Id -> Type -> TcM (Maybe (Id, Id, TyCon))
+lookupSourceListFoldMethod selector domain
+  | Just cls <- isClassOpId_maybe selector
+  , noFreeVarsOfType domain, isTyFamFree domain = do
+      insts <- tcGetInstEnvs
+      env <- getGblEnv
+      case lookupUniqueInstEnv insts cls [domain] of
+        Right (inst, [])
+          | let name = idName (instanceDFunId inst)
+          , nameModule_maybe name /= Just (tcg_semantic_mod env) -> do
+              candidate <- tcLookupIdMaybe name
+              case candidate of
+                Just dfun | varType dfun `eqType` mkClassPred cls [domain] -> do
+                  target <- case sourceMethodTarget_maybe dfun selector of
+                    Just term -> tcLookupIdMaybe term
+                    Nothing -> pure $ do
+                      Core.DFunUnfolding [] con (Core.Type applied : fields) <- pure (idUnfolding dfun)
+                      let selectors = classAllSelIds cls
+                      guard (applied `eqType` domain && con == tyConSingleDataCon (classTyCon cls) &&
+                             lengthIs fields (length selectors))
+                      Core.Var method <- lookup selector (zip selectors fields)
+                      pure method
+                  pure $ do
+                    method <- target
+                    guard (varType method `eqType` classMethodInstTy selector [domain])
+                    table <- sourceTableId_maybe method
+                    guard (isListFoldTable table)
+                    pure (dfun, method, table)
+                _ -> pure Nothing
+        _ -> pure Nothing
+  | otherwise = pure Nothing
 
 -- | The selector's first type argument is fixed by this ground dictionary.
 -- Its monomorphic target and the dictionary itself can have any active rule.

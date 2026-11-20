@@ -136,7 +136,7 @@ test('NativeOpenIndexedAppendGhci',
      run_command, ['bash NativeOpenIndexedAppendGhci.sh "{compiler}" "{libdir}" ' + config.ghc_th_way_flags])
 test('NativeOpenListFoldr',
      [only_ways(['normal']),
-      extra_files([open_eval_dir + f for f in ['ListFoldrSource.hs', 'ListFoldrProof.hs',
+      extra_files([open_eval_dir + f for f in ['ListFoldrSource.hs', 'ListFoldrProof.hs', 'PreludeFoldrProof.hs',
                                                'PreludeAppendLengthSource.hs', 'PreludeMapLengthSize.hs',
                                                'PreludeMapLengthSource.hs', 'PreludeMapLengthProof.hs']]
                   + ['NativeOpenListFoldrProducer.hs'])],

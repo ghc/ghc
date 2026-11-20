@@ -32,7 +32,7 @@ grep -Fq 'Rule fired: foldr/nil' changed.rules
 absent changed direct
 certified changed local
 
-cp "$src/ListFoldrProof.hs" "$out/proof/"
+cp "$src/ListFoldrProof.hs" "$src/PreludeFoldrProof.hs" "$out/proof/"
 cd "$out/proof"
 cat >UserProof.hs <<'HS'
 {-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, Modifiers, PolyKinds #-}
@@ -99,7 +99,7 @@ for optimization in -O0 -O2; do
             absent "valid$optimization" "$term"
         done
     )
-    "${ghc[@]}" "$optimization" -fforce-recomp -c ListFoldrProof.hs UserProof.hs Main.hs
+    "${ghc[@]}" "$optimization" -fforce-recomp -c ListFoldrProof.hs PreludeFoldrProof.hs UserProof.hs Main.hs
     "${ghc[@]}" Main.o "../producer/$producer.o" -o fold-run
     ./fold-run >native.stdout
     for _ in {1..4}; do printf "'s'\n'n'\n'h'\n'i'\n"; done >native.expected
@@ -123,3 +123,26 @@ reject '[GHC-25897]' WrongCons.hs
 sed -e 's/foldAppend k z (Cons xs) ys = case foldAppend k z xs ys of/foldAppend _ _ (Cons _) _ = Refl/' \
     -e '/^    Refl -> Refl$/d' ListFoldrProof.hs >MissingInduction.hs
 reject '[GHC-05617]' MissingInduction.hs
+
+cat >Given.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, FlexibleContexts, GADTs, Modifiers #-}
+{-# LANGUAGE PolyKinds, ScopedTypeVariables, TypeOperators #-}
+{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
+module Given where
+import Data.Kind (Constraint)
+import Data.Proxy (Proxy)
+import Data.Type.Equality ((:~:)(Refl))
+import GHC.Exts (U)
+import qualified Prelude as P
+
+data Dict (p :: Constraint) where
+    Dict :: p => Dict p
+
+masked :: Dict (P.Foldable []) -> ()
+masked Dict = let
+    nil :: forall a b (k :: a %U -> b %U -> b) (z :: b).
+           Proxy k -> Proxy z -> P.foldr k z ('[] :: [a]) :~: z
+    nil _ _ = Refl
+    in ()
+HS
+reject 'This call needs a known' -Wno-simplifiable-class-constraints Given.hs

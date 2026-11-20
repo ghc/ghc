@@ -1,12 +1,13 @@
 {-# LANGUAGE DataKinds, GADTs, Modifiers, NoExperimentalDependentTypes #-}
-{-# LANGUAGE PolyKinds, ScopedTypeVariables, TypeOperators #-}
+{-# LANGUAGE PolyKinds, ScopedTypeVariables, TypeApplications, TypeOperators #-}
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
-module ListFoldrProof (foldNil, foldCons, foldAppend) where
+module ListFoldrProof (foldNil, foldCons, foldAppend, showListFoldAppend) where
 
-import Data.Proxy (Proxy)
+import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Exts (U)
-import ListFoldrSource (Folded)
+import ListFoldrSource (Folded, HeadStep)
+import qualified GHC.Internal.List as List
 import PreludeAppendLengthSource (Appended)
 import PreludeMapLengthProof (Spine(..))
 
@@ -27,3 +28,11 @@ foldAppend :: Proxy k -> Proxy z -> Spine xs -> Proxy ys
 foldAppend _ _ Empty _ = Refl
 foldAppend k z (Cons xs) ys = case foldAppend k z xs ys of
     Refl -> Refl
+
+-- | Apply the theorem to a finite left spine and run the installed fold.
+showListFoldAppend :: String
+showListFoldAppend = show (proof, List.foldr const False ([True] ++ error "forced the right list"))
+  where
+    left :: Spine '[ 'True, 'False]
+    left = Cons (Cons Empty)
+    proof = foldAppend (Proxy @HeadStep) (Proxy @'False) left (Proxy @'[ 'True])
