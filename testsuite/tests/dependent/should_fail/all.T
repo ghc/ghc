@@ -262,3 +262,5 @@ test('NativePercentArrowQuoteUnknown', [req_th, only_ways(['normal'])],
 
 test('NativeTypeCaseQuote', [req_th, only_ways(['normal'])],
      compile_fail, ['-fdiagnostics-show-caret'])
+test('NativeTypeCaseRetainedReify', [req_th, only_ways(['normal'])],
+     compile_fail, ['-fdiagnostics-show-caret ' + config.ghc_th_way_flags])

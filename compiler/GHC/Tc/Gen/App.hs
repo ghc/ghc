@@ -3787,7 +3787,6 @@ tcRetainedWorkerResultMatch :: QLFlag -> Maybe TcRhoType -> [HsExprArg 'TcpRn]
                            -> TcM (Maybe ([Type], TcSigmaType))
 tcRetainedWorkerResultMatch NoQL (Just expected) args fun sigma
   | hasNoConcreteTyVars fun
-  , hasNativeDependentExpr (Core.Type expected)
   , not (any is_type_arg args)
   , (ma_tvs, body) <- tcSplitForAllInvisTyVars sigma
   , let tvs = map snd ma_tvs
@@ -3797,6 +3796,7 @@ tcRetainedWorkerResultMatch NoQL (Just expected) args fun sigma
   , isRetainedValueType expected, isRetainedValueType tau
   , Just result <- worker_result (count isHsValArg args) tau
   , isRetainedValueType result
+  , hasNativeDependentExpr (Core.Type expected) || uniform_constructor_result tvs result
   , Just subst <- tcMatchRetainedTyX_BM (bind_outer tvs) Subst.emptySubst result expected
   , Just inst_tys <- traverse (Subst.lookupTyVar subst) tvs
   , not (any (`elemVarSet` tyCoVarsOfTypes inst_tys) tvs)
@@ -3813,6 +3813,18 @@ tcRetainedWorkerResultMatch NoQL (Just expected) args fun sigma
       | otherwise = DontBindMe
 
     kind_agrees subst tv ty = eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty)
+    -- Sigma a p exposes both erased parameters, even when the expected
+    -- Sigma type contains no runtime Id. The fields still check the index.
+    uniform_constructor_result tvs result
+      | XExpr (ConLikeTc (RealDataCon dc)) <- fun
+      , let fields = dataConRepArgBinders dc
+      , any isJust fields, length fields == count isHsValArg args
+      , Just (tc, params) <- splitTyConApp_maybe result
+      , tc == dataConTyCon dc, isGenerativeTyCon tc Nominal
+      , Just vars <- traverse getTyVar_maybe params
+      = all (`elem` vars) tvs
+      | otherwise = False
+
     worker_result n ty
       | XExpr (ConLikeTc (RealDataCon dc)) <- fun
       , let fields = dataConRepArgBinders dc
@@ -3889,6 +3901,12 @@ mkDepFunTy represents an unused retained binder as an ordinary Many arrow.
 For a retained metadata entry, also accept that arrow with the same closed
 index domain. This consumes the field without choosing its runtime value.
 See docs/dependent-haskell/REFERENCES.md#computed-length-append-next-source-probe.
+
+The expected Sigma Nat p can have no runtime Id in it. Its generative
+constructor exposes both erased parameters of Pair as direct arguments.
+Read them from the expected type before checking the computed witness in
+Pair (sourceLength xs) (sourceVector xs). Keep the exact kind, result and
+scope checks. The second field must still use the first field's index.
 
 tcMatchRetainedTyX_BM compares fixed-domain retained bodies under paired runtime
 binders. Its existing escape check prevents an outer erased parameter from

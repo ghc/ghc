@@ -31,6 +31,46 @@ cp producer/NativeUnsaturatedProvider.hi NativeUnsaturatedClient.hs client/
     done
 )
 
+# A written higher-order arrow keeps its M default.
+cat >client/WrittenArrow.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}
+module WrittenArrow where
+
+import NativeUnsaturatedProvider (Callback, WrittenMap)
+
+type Bad = WrittenMap (Callback 'True) '[ 'True]
+HS
+if (cd client && "${ghc[@]}" -c WrittenArrow.hs) >written.log 2>&1 ||
+   ! grep -Fq '[GHC-83865]' written.log ||
+   ! grep -Fq 'Unmatchable' written.log ||
+   ! grep -Fq 'Matchable' written.log; then
+    cat written.log
+    exit 1
+fi
+
+# NoPolyKinds retains usable M kinds for both application and forwarding.
+cat >client/NoPolyFamily.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, NoPolyKinds #-}
+{-# LANGUAGE TypeFamilies, TypeOperators #-}
+module NoPolyFamily where
+
+import Data.Type.Equality ((:~:)(Refl))
+import NativeUnsaturatedProvider (ForwardMap)
+
+type family ApplyOne f x where
+  ApplyOne f x = f x
+
+type family ForwardOne f xs where
+  ForwardOne f (x ': y ': xs) = ForwardMap f xs
+
+app :: ApplyOne Maybe Bool :~: Maybe Bool
+app = Refl
+
+forward :: ForwardOne Maybe '[Int, Bool, Char] :~: '[Maybe Char]
+forward = Refl
+HS
+(cd client && "${ghc[@]}" -c NoPolyFamily.hs)
+
 # Two different prefixes are not known apart solely because their
 # unsaturated applications cannot be decomposed.
 sed -e 's/module NativeUnsaturatedClient/module Stuck/' \

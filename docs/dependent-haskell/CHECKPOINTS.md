@@ -8,6 +8,24 @@ increments.
 
 ## Family and package checkpoints
 
+At `a6fa7ededf`, bootstrap and self-hosted GHC reproduced all 336
+Showcase lines at stripped `-O0` and default `-O1` and `-O2`.
+Self-hosted GHCi matched. All 19 focused normal-way tests passed. The
+dependent directory ran 323 cases. It recorded 303 expected passes and
+the same 20 unexpected failures, with the same failure categories, as
+the 331-line checkpoint. The typed splice and retained-rule interface
+checks passed. The compiler upgrade rechecked eligible append providers
+at `-O0` and `-O1` and then reused their refreshed interfaces.
+
+This checkpoint adds a computed length paired with a vector, recursive
+family forwarding, and proofs of append's length law and map's
+distributivity over append. A GADT field uses a runtime Boolean to
+select its result type. The Showcase branches before calling the field
+with the corresponding constructor.
+[Append proof](roadmap/R16-open-term-evaluator.md#prove-that-append-adds-the-list-lengths),
+[dependent pairs](roadmap/R04-dependent-sums.md) and
+[GADT fields](roadmap/R19-type-level-cases.md).
+
 At `5171866a01`, bootstrap and self-hosted GHC reproduced the 331-line
 Showcase at stripped `-O0` and default `-O1` and `-O2`. Self-hosted
 GHCi matched the output. All 16 focused normal-way tests passed. The

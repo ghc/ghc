@@ -9,6 +9,22 @@ An erased existential can hide an index without providing its value.
 
 ## What source programs can express
 
+An ordinary module can return a list's computed length with a vector of
+that length. The provider exports `type ListVector a = some (n :: Nat) | Vec a n`.
+The client can use that signature directly.
+
+```haskell
+fromList :: [a] -> ListVector a
+fromList xs = Pair (sourceLength xs) (sourceVector xs)
+```
+
+The expected pair type supplies the witness domain `Nat`. GHC checks
+the vector against the length of the same list. Using a second unknown
+list for the vector fails at the call. Opening the pair can return the
+first element without reading the tail. Reading the length leaves
+the elements lazy. [Ordinary client](../examples/packed-vector/ListVectorClient.hs)
+and [source and demand checks](../../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh).
+
 A package can abstract over the type of the witness as well as the payload
 family. The ordinary client uses the same constructor at `Bool`, `Int`,
 `Int -> Int` and `IO Int`. Reading a constant payload leaves its

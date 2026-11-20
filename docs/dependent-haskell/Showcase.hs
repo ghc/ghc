@@ -97,7 +97,7 @@ import qualified InterpretedKindUseSite
 import qualified NestedFunctionClient
 import qualified InvisibleFamily
 import IndexedMapClient (mappedCells)
-import LaterMatchabilityClient (laterMatchability)
+import LaterMatchabilityClient (forwardedMap, laterMatchability)
 import qualified TypeLambda
 import qualified TypeLet
 import qualified NativeCase
@@ -110,7 +110,9 @@ import qualified OpenMapProof
 import qualified OpenMapWorker
 import qualified InstalledNotProof
 import qualified PreludeFilterProof
+import qualified PreludeAppendLengthProof
 import qualified PreludeFilterLengthProof
+import qualified PreludeMapAppendProof
 import qualified PreludeMapLengthProof
 import qualified PreludeMapProof
 import qualified ConsRuleMapProof
@@ -126,6 +128,7 @@ import qualified PreludePairExport
 import qualified OpaqueCallClient as Opaque
 import qualified PairProjection as ComputedProjection
 import qualified OrdinaryVecClient as Ordinary
+import qualified ListVectorClient
 import qualified ParameterizedIndexLibrary as Parameterized
 import qualified PackedProjection
 import qualified PackageEquality
@@ -788,6 +791,8 @@ ordinaryModuleCalls = do
     valuesRef <- newIORef ([11, 22] :: [Int])
     values <- readIORef valuesRef
     observe "ordinary module generic round-trip" (Ordinary.ordinaryRoundTrip values)
+    observe "pair a list's computed length with its vector"
+        (ListVectorClient.contents (ListVectorClient.fromList values) :: (Int, [Int]))
 
 -- | Check finite positions in lists with opaque elements.
 genericSafeIndexing :: IO ()
@@ -1147,6 +1152,7 @@ main = do
     observe "apply Maybe and a type family through a computed arrow kind" InvisibleFamily.wrappedValues
     observe "map cells with a class method over a family prefix and Maybe" mappedCells
     observe "infer the matchability of a family prefix from a later argument" laterMatchability
+    observe "forward an inferred partial-family callback and an ordinary constructor" forwardedMap
     observe "interpret a kind code as an ordinary type constructor" InterpretedKind.optionalFlag
     observe "interpret two applications of the optional type constructor" InterpretedKind.nestedOptional
     observe "choose an interpreted arrow from its expected kind"
@@ -1192,6 +1198,14 @@ main = do
             ('Just ('NativeNestedCase.RefinedBranch 'Proxy 'NativeNestedCase.InnerDisjoint))
         , 'x' :: NativeNestedCase.RefinedBranchPick 'False ('Just 'NativeNestedCase.OuterDisjoint) )
     observe "choose types in ordinary and rank-n constructor fields" constructorFieldCases
+    let fieldResult b = case NativeNestedCase.retainedCaseField of
+            NativeNestedCase.RetainedCaseField choose ->
+                if b then show (choose True :: Int) else [choose False]
+    fieldFlag <- newIORef True
+    firstField <- fieldResult <$> readIORef fieldFlag
+    writeIORef fieldFlag False
+    secondField <- fieldResult <$> readIORef fieldFlag
+    observe "branch on a runtime Boolean before calling a retained field" (firstField, secondField)
     observe "select through an ordinary type constructor"
         ( 7 :: NativeNestedCase.TypeHead ('Just Bool)
         , 'x' :: NativeNestedCase.TypeHead ('Just Ordering)
@@ -1224,6 +1238,10 @@ main = do
               ++ PreludeMapProof.showPreludeMapProofs)
     putStrLn ("prove map preserves length and leaves the callback lazy: "
               ++ PreludeMapLengthProof.showPreludeMapLength)
+    putStrLn ("prove that append adds the list lengths: "
+              ++ PreludeAppendLengthProof.showPreludeAppendLength)
+    putStrLn ("prove that map distributes over append: "
+              ++ PreludeMapAppendProof.showPreludeMapAppend)
     putStrLn ("filter with Prelude.not and Prelude.id without forcing the kept tail: "
               ++ PreludeFilterProof.showPreludeFilterProofs)
     putStrLn ("prove filter never increases length: "

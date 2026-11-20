@@ -974,10 +974,13 @@ sourceCaseTables binds = do
       imported = ordinaryImport rdr_env
       eligible_case = eligibleCase env exported enum_enabled imported
       generates_code = backendGeneratesCode (backend dflags)
-      final_candidate owner = generates_code
-        && case constructorCaseType (varType owner) of
-             Just (ConstructorCaseType _ tc _ _ 1 _) -> tc == listTyCon
-             _ -> False
+      list_case_position owner
+        | generates_code
+        , Just (ConstructorCaseType _ tc _ _ position _) <- constructorCaseType (varType owner)
+        , tc == listTyCon = Just position
+        | otherwise = Nothing
+      final_candidate = isJust . list_case_position
+      append_candidate owner = list_case_position owner == Just 0
       identity_candidate owner = generates_code && isIdentitySourceType (varType owner)
       is_exported owner = idName owner `elemNameSet` exported
       eligible owner =
@@ -990,7 +993,8 @@ sourceCaseTables binds = do
       owners = [ (bind, owner) | bind <- binds
                , owner <- collectHsBindBinders CollNoDictBinders (unLoc bind) ]
       candidates = [(bind, owner) | (bind, owner) <- owners
-                    , eligible owner || (is_exported owner && identity_candidate owner)]
+                    , eligible owner ||
+                      (is_exported owner && (identity_candidate owner || append_candidate owner))]
   if isHsBootOrSig (tcg_src env) || null candidates
     then pure ([], [])
     else do
@@ -1014,8 +1018,9 @@ sourceCaseTables binds = do
           Just signature -> do
             (table, guard_table) <- publishListFilter owner signature
             pure (Just (finalOwner owner table, table), [guard_table])
-          Nothing | ruled_owner
-                  , Just (signature, rows) <- directListMapper owner body -> do
+          Nothing | Just (signature, rows) <-
+                      (guard ruled_owner *> directListMapper owner body) <|>
+                      (guard (append_candidate owner) *> directListAppend owner body) -> do
             table <- publishConstructorCase owner signature rows
             pure (Just (finalOwner owner table, table), [])
           _ -> pure (Nothing, [])
@@ -1079,6 +1084,7 @@ sourceCaseTables binds = do
       | Just (telescope, domains, result, row) <- checkedConstructorHelper public helper owner rhs
       = publish (publishConstructorRows owner telescope domains result [row])
       | Just (signature, rows) <- checkedConstructorCase public helper owner rhs
+      , not (isListAppendCase signature)
       = publish (publishConstructorCase owner signature rows)
       where
         helper = lookupHelper env imported done
@@ -1101,7 +1107,8 @@ sourceCaseTables binds = do
     eligibleCase env exported enum_enabled imported owner
       | Just kinds <- monomorphicEnumCaseKinds (varType owner)
       = enum_enabled && all enumVisible kinds
-      | Just (ConstructorCaseType _ tc _ domains position _) <- constructorCaseType (varType owner)
+      | Just signature@(ConstructorCaseType _ tc _ domains position _) <- constructorCaseType (varType owner)
+      , not (isListAppendCase signature)
       = (position == 1 && tc == listTyCon) ||
         (nameModule_maybe (tyConName tc) == Just (tcg_semantic_mod env) &&
          publicCaseType env exported (const False) tc) ||
@@ -1442,6 +1449,11 @@ helperInvisibleArity = length . takeWhile isInvisibleTyConBinder . tyConBinders
 -- | The kind telescope, input datatype, value domains, case position and result.
 data ConstructorCaseType = ConstructorCaseType [ForAllTyBinder] TyCon [Type] [Type] Int Type
 
+-- | List append uses final Core evidence. Exclude it from ordinary cases.
+isListAppendCase :: ConstructorCaseType -> Bool
+isListAppendCase (ConstructorCaseType _ root _ _ position _) =
+    root == listTyCon && position == 0
+
 -- | Check the ordinary unary or binary signature for a constructor case.
 constructorCaseType :: Type -> Maybe ConstructorCaseType
 constructorCaseType tau = do
@@ -1466,8 +1478,10 @@ constructorCaseType tau = do
            sizeUniqSet (mkUniqSet parameters) == length parameters &&
            tyCoVarsOfTypes domains == mkUniqSet quantified &&
            caseKind kinds result && all (caseKind kinds) carried)
-    -- Preserve the separate pair and first-order list certificates.
-    guard ((tc /= listTyCon || position == 1) && tc /= tupleTyCon Boxed 2)
+    -- List cases inspect the mapper's list or the first of two equal lists.
+    let append = lengthIs binders 1 && eqTypes domains [domain, domain] &&
+                 result `eqType` domain
+    guard ((tc /= listTyCon || position == 1 || append) && tc /= tupleTyCon Boxed 2)
     pure (ConstructorCaseType binders tc args domains position result)
   where
     domainParameter ty
@@ -1570,8 +1584,7 @@ data ConstructorCaseRow = ConstructorCaseRow [ConstructorCaseTree] ConstructorCa
 
 {- Note [Final Core source equations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Check a ruled mapper's complete lazy list equations at final typechecking
-publication. At this point the module has checked all user declarations.
+Check complete lazy list equations at final typechecking publication. At this point the module has checked all user declarations.
 The new private family is available to neither user declarations nor the
 helper collector. A no-code producer does not create it.
 
@@ -1605,6 +1618,20 @@ directListMapper owner body = do
           (CaseConstructor retCons _ [CaseApply f x, CaseSelf _ [f', xs]]) ]
       | nil == nilDataCon, retNil == nilDataCon, cons == consDataCon, retCons == consDataCon
       , callback == f, callback == f', h == x, t == xs -> pure result
+    _ -> Nothing
+
+-- | Check append's two equations and the demand on both operands.
+directListAppend :: Id -> Core.CoreExpr -> Maybe (ConstructorCaseType, [ConstructorCaseRow])
+directListAppend owner body = do
+  result@(signature, rows) <-
+    checkedConstructorCase (const False) (const Nothing) owner body
+  guard (isListAppendCase signature)
+  case rows of
+    [ ConstructorCaseRow [CaseConstructor nil _ [], CaseField right] (CaseField returned)
+      , ConstructorCaseRow [CaseConstructor cons _ [CaseField h, CaseField t], CaseField right']
+          (CaseConstructor retCons _ [CaseField head', CaseSelf _ [tail', carried]]) ]
+      | nil == nilDataCon, cons == consDataCon, retCons == consDataCon
+      , right == returned, h == head', t == tail', right' == carried -> pure result
     _ -> Nothing
 
 {- Note [Checked list filters]
@@ -1771,7 +1798,8 @@ verifyFinalCoreMapper binds original =
       -> verifyProjection (unitNameSet (idName owner)) owner expression
       | varType owner `eqType` varType original
       -> if lengthIs (finalCoreSourceFamilies original) 1
-           then not (isNothing (directListMapper owner expression))
+           then not (isNothing (directListMapper owner expression <|>
+                                directListAppend owner expression))
            else not (isNothing (directListFilter id owner expression))
     _ -> False
   where
@@ -1812,7 +1840,7 @@ checkedConstructorCase visible helper owner rhs = do
     checked_signature = constructorCaseType (exprType rhs)
 
     public tc = visible tc || case checked_signature of
-      Just (ConstructorCaseType _ root _ _ 1 _) -> root == listTyCon && tc == root
+      Just (ConstructorCaseType _ root _ _ _ _) -> root == listTyCon && tc == root
       _ -> False
 
     checkCase signature parameters result patterns aliases scrutinee

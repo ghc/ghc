@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, MagicHash, Modifiers, PolyKinds, RankNTypes, RequiredTypeArguments, StandaloneKindSignatures, TypeFamilies #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, LambdaCase, MagicHash, Modifiers, PolyKinds, RankNTypes, RequiredTypeArguments, StandaloneKindSignatures, TypeFamilies #-}
 module NativeNestedCase
   ( Pick, Pair(..), LeftFirst, IgnoreLeft, Uniform, SameFallback
   , Indexed(..), IndexedPick, TypeHead, UniformTypeHead, Wrapped, WrappedBool
@@ -11,6 +11,7 @@ module NativeNestedCase
   , RefinedGate(..), RefinedLeaf(..), RefinedBranchPick
   , PlainCaseField(..), CaseField(..), ShadowedCaseField(..)
   , RankedCaseField(..), OrderedRankedCaseField(..), CapturedKindCaseField(..)
+  , RetainedCaseField(..), retainedCaseField
   , OpenCaseGate(..), OpenCaseIndex, OpenIndexPick, OpenIndexAtOrdering
   , ScopedOpenIndex
   ) where
@@ -298,3 +299,12 @@ data CapturedKindCaseField (k :: Type) (a :: k) (c :: k) =
   CapturedKindCaseField
     (forall (k :: Type) (b :: Bool). Proxy b ->
       (case b of { True -> Proxy '(a, c); False -> Proxy k }))
+
+-- | Select the result of this GADT field using a runtime Boolean.
+data RetainedCaseField where
+  RetainedCaseField :: (foreach (b :: Bool) ->
+    (case b of { True -> Int; False -> Char })) -> RetainedCaseField
+
+-- | Supply both results of the retained field.
+retainedCaseField :: RetainedCaseField
+retainedCaseField = RetainedCaseField (\case True -> 11; False -> 'x')
