@@ -272,7 +272,9 @@ test('NativeFunctionIndex',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['NativeFunctionIndexClient.hs',
                    '../../../../docs/dependent-haskell/examples/qualified-pi/FunctionFieldLibrary.hs',
-                   '../../../../docs/dependent-haskell/examples/qualified-pi/FunctionFieldClient.hs'])],
+                   '../../../../docs/dependent-haskell/examples/qualified-pi/FunctionFieldClient.hs',
+                   '../../../../docs/dependent-haskell/examples/qualified-pi/ConstructorCallClient.hs',
+                   '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs'])],
      run_command, ['bash NativeFunctionIndex.sh "{compiler}" "{libdir}"'])
 
 test('NativeRetainedPackage',

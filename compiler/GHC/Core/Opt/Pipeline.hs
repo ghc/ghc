@@ -46,7 +46,7 @@ import GHC.Types.Var (Var, VarBndr(Bndr), isId)
 import GHC.Types.Var.Set (emptyVarSet, elemVarSet, extendVarSet)
 import GHC.Core.Dependent
 import GHC.Core.SimpleOpt (simpleOptNativeProgram, simpleOptPgm)
-import GHC.Core.Opt.CSE  ( cseProgram )
+import GHC.Core.Opt.CSE  ( cseProgramWithMode )
 import GHC.Core.Rules   ( RuleBase, ruleCheckProgram, getRules )
 import GHC.Core.Ppr     ( pprCoreBindings, pprRules )
 import GHC.Core.Utils   ( dumpIdInfoOfProgram, diffBinds, stripTicksE, exprType )
@@ -709,7 +709,7 @@ doCorePassFor core_mode pass guts = do
                                  liftIOWithCount $ simplifyPgm logger (hsc_unit_env hsc_env) name_ppr_ctx opts guts
 
     CoreCSE                   -> {-# SCC "CommonSubExpr" #-}
-                                 updateBinds cseProgram
+                                 updateBinds (cseProgramWithMode core_mode)
 
     CoreLiberateCase          -> {-# SCC "LiberateCase" #-}
                                  updateBinds (liberateCase (initLiberateCaseOpts dflags))

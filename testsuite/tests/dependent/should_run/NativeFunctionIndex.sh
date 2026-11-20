@@ -11,6 +11,11 @@ for level in 0 1; do
     mkdir "O$level"
     (
         cd "O$level"
+        # Exercise CSE on nested calls with branch proofs and on retained operands.
+        cp "$area"/{PackedVecLibrary,ConstructorCallClient}.hs .
+        "${g[@]}" "-O$level" "${flags[@]}" --make ConstructorCallClient.hs \
+            -main-is ConstructorCallClient -o calls >calls.log 2>&1 || { cat calls.log; exit 1; }
+        ./calls >calls.stdout
         mkdir provider consumer client
         cp "$area/FunctionFieldLibrary.hs" provider/
         cd provider
@@ -29,5 +34,6 @@ for level in 0 1; do
         ./run >observed
     )
 done
+diff -u O0/calls.stdout O1/calls.stdout
 diff -u O0/client/observed O1/client/observed
 cat O1/client/observed
