@@ -1183,6 +1183,17 @@ prints `(Refl,Succ (Succ Zero))` with a bottom callback.
 [regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh),
 and [prior art](../REFERENCES.md#induction-on-the-spine-of-a-mapped-list).
 
+The standalone compiler reproduced all 312 Showcase lines after
+bootstrapping and after building itself. The self-hosted runs covered
+GHCi and native `-O0`, `-O1`, and `-O2`. All 68 selected normal-way tests
+passed. The dependent directory had 295 passes and the same 20 failures
+as the public scoped-signature compiler. The polykinds directory had
+224 passes and the same 18 failures as the preceding measured compiler.
+Changing the list step to count each element twice invalidated the
+unchanged singleton proof through an intermediate alias. Withdrawing
+the equation invalidated the alias. Both native and no-code builds
+accepted the restored definition.
+
 ### Filter one known head and keep the recursive tail
 
 `Prelude.filter Prelude.not` keeps a `False` head and skips a `True`
