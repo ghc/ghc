@@ -323,13 +323,12 @@ liftedTypeVarBinder v =
   L (l2l (getLoc v)) (HsTvb noAnn (HsBndrRequired noExtField)
     (HsBndrVar noExtField v) (HsBndrNoKind noExtField))
 
-{- Note [Retained sums in value signatures]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A value signature is checked after type declarations. Give each written
-sum a private synonym so the synonym and its lifted family can share
-kind inference. The synonym checks the witness domain and fixes the
-missing argument of the payload family. The family keeps its checked
-lexical owner. See Note [Lifting type lambdas].
+{- Note [Retained sums in signatures and fields]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Give each written sum a private synonym so the synonym and its lifted
+family can share kind inference. The synonym checks the witness domain
+and fixes the missing argument of the payload family. The family keeps
+its checked lexical owner. See Note [Lifting type lambdas].
 
 Name the synonym from the value name and the position of the sum in its
 signature. Count from left to right in the argument and result types.
@@ -337,66 +336,125 @@ Different values use separate counters. The private type namespace also
 separates a function operator from a same-spelled type operator. A
 signature shared by several values uses its first name.
 
+For an ordinary Haskell98 constructor, use its name and count sums from
+left to right across its fields. Use a separate prefix for constructor
+fields. The constructor name is unique in the module even when record
+labels repeat. A field can use the type header's erased variables.
+Leave constructors with their own telescopes to the ordinary renamer.
+
 Copy only the erased parameters used by the sum and the parameters
-used in their written kinds. Keep their original order. The source
-signature still checks its written forall. Every free variable must
-come from that signature. Otherwise kind inference for the synonym
-could bind a variable that is out of scope at the source occurrence.
+used in their written kinds. Keep their original order. Require each
+free variable to be in scope in the source signature or field. Otherwise
+kind inference for the synonym could bind a variable that is out of scope
+at the source occurrence.
 Skip types that contain splices or holes. Do not lift across nested
 binders. They can shadow the original names or bind a retained index.
 -}
--- | Prepare the retained sums in top-level value signatures for type lifting.
-liftSignatureSums :: Bool -> HsGroup GhcPs -> (HsGroup GhcPs, LiftedDecls)
-liftSignatureSums named_wildcards group@HsGroup{hs_valds = ValBinds ann binds}
+-- | Prepare retained sums in top-level signatures and ordinary data fields.
+liftDeclarationSums :: Bool -> HsGroup GhcPs -> (HsGroup GhcPs, LiftedDecls)
+liftDeclarationSums named_wildcards group
   | not (null synonyms)
-  = (group{hs_valds = ValBinds ann binds', hs_tyclds = anchors : hs_tyclds group}, names)
+  = (group{hs_valds = values, hs_tyclds = anchors : type_groups}, names)
+  | otherwise = (group, [])
   where
-    (_, lifted) = mapAccumL liftBind emptyOccEnv binds
-    (binds', generated) = unzip lifted
-    (synonyms, names) = unzip (concat generated)
+    (values, signature_sums) = case hs_valds group of
+      ValBinds ann binds ->
+        let (_, lifted) = mapAccumL liftBind emptyOccEnv binds
+            (binds', sums) = unzip lifted
+        in (ValBinds ann binds', concat sums)
+      binds -> (binds, [])
+    (type_groups, groups_sums) = unzip (map liftGroup (hs_tyclds group))
+    (synonyms, names) = unzip (signature_sums ++ concat groups_sums)
     anchors = TyClGroup noExtField synonyms [] [] []
+
+    liftGroup decls =
+      let (decls', sums) = unzip (map liftData (group_tyclds decls))
+      in (decls{group_tyclds = decls'}, concat sums)
+
+    liftData (L loc decl@DataDecl{tcdTyVars = hsq,
+                                 tcdDataDefn = defn@HsDataDefn{dd_cons = DataTypeCons False cons}}) =
+      let binders = hsQTvExplicit hsq
+          (kind_occs, _) = hsQTyVarKindOccs binders []
+          scope = implicitCaptures kind_occs ++ explicitCaptures binders
+          (cons', sums) = unzip (map (liftConstructor scope) cons)
+      in (L loc decl{tcdDataDefn = defn{dd_cons = DataTypeCons False cons'}}, concat sums)
+    liftData decl = (decl, [])
+
+    liftConstructor scope (L loc con@ConDeclH98{con_telescope = [], con_name = owner, con_args = args}) =
+      let (args', sums) = liftFields (liftField owner scope) args
+      in (L loc con{con_args = args'}, sums)
+    liftConstructor _ con = (con, [])
+
+    liftFields visit (PrefixCon ann fields) =
+      first (PrefixCon ann) (liftFieldList visit fields)
+    liftFields visit (RecCon ann (L loc fields)) =
+      first (RecCon ann . L loc) (liftFieldList visitRecord fields)
+      where
+        visitRecord salt (L field_loc field@HsConDeclRecField{cdrf_spec = spec}) =
+          let (next, (spec', sums)) = visit salt spec
+          in (next, (L field_loc field{cdrf_spec = spec'}, sums))
+    liftFields visit (InfixCon ann left right) =
+      let (next, (left', left_sums)) = visit 0 left
+          (_, (right', right_sums)) = visit next right
+      in (InfixCon ann left' right', left_sums ++ right_sums)
+    liftFields _ fields = (fields, [])
+
+    liftFieldList visit fields =
+      let (_, lifted) = mapAccumL visit 0 fields
+          (fields', sums) = unzip lifted
+      in (fields', concat sums)
+
+    liftField owner scope salt field@CDF{cdf_type = ty} =
+      let (ty', sums, next) = liftBody "$field-sum:" owner scope ty salt
+      in (next, (field{cdf_type = ty'}, sums))
 
     liftBind counters (VbSig (L loc (TypeSig sig_ann mods names@(owner:_) wc@HsWC
                   {hswc_body = L sig_loc sig@HsSig{sig_bndrs = outer, sig_body = body}}))) =
       let occ = rdrNameOcc (unLoc owner)
           first = fromMaybe 0 (lookupOccEnv counters occ)
-          (body', aliases, next) = liftBody owner (signatureCaptures outer body) body first
+          (body', aliases, next) = liftBody "$signature-sum:" owner (signatureCaptures outer body) body first
           sig' = L sig_loc (sig{sig_body = body'})
       in (extendOccEnv counters occ next, (VbSig (L loc (TypeSig sig_ann mods names
                                                        wc{hswc_body = sig'})), aliases))
     liftBind counters bind = (counters, (bind, []))
 
-    signatureCaptures HsOuterImplicit{} body =
-      [(liftedTypeVarBinder v, v) | v <- nubN (extractHsTyRdrTyVars body)
+    signatureCaptures HsOuterImplicit{} body = implicitCaptures (extractHsTyRdrTyVars body)
+    signatureCaptures HsOuterExplicit{hso_bndrs = binders} _ = explicitCaptures binders
+
+    implicitCaptures occurrences =
+      [(liftedTypeVarBinder v, v) | v <- nubN occurrences
                                 , not (named_wildcards && startsWithUnderscore (rdrNameOcc (unLoc v)))]
-    signatureCaptures (HsOuterExplicit{hso_bndrs = binders}) _ =
+
+    explicitCaptures :: [LHsTyVarBndr flag GhcPs]
+                     -> [(LHsTyVarBndr (HsBndrVis GhcPs) GhcPs, LocatedN RdrName)]
+    explicitCaptures binders =
       [(fmap (updateHsTyVarBndrFlag (const (HsBndrRequired noExtField))) b, v)
       | b <- binders, Just v <- [hsLTyVarLocName b]]
 
-    liftBody owner scope whole@(L loc (XHsType HsTypeSome{})) salt
+    liftBody prefix owner scope whole@(L loc (XHsType HsTypeSome{})) salt
       | copyable whole
       , let free = Set.fromList (map unLoc (extractHsTyRdrTyVars whole))
             (used, missing) = foldr select ([], free) scope
       , Set.null missing
       , all (copyable . fst) used
-      = let occ = mkTcOcc ("$signature-sum:" ++ occNameString (rdrNameOcc (unLoc owner))
+      = let occ = mkTcOcc (prefix ++ occNameString (rdrNameOcc (unLoc owner))
                            ++ ":" ++ show (salt :: Int))
             name = L (l2l loc) (mkRdrUnqual occ)
             alias = L loc (SynDecl noAnn name (mkHsQTvs (map fst used)) Prefix whole)
             applied = foldl' (\f (_, v) -> L loc (HsAppTy noExtField f (typeName v)))
                              (typeName name) used
         in (applied, [(alias, (occ, Nothing))], salt + 1)
-    liftBody owner scope (L loc (HsFunTy ann arrow arg result)) salt =
-      let (arg', arg_aliases, next) = liftBody owner scope arg salt
-          (result', result_aliases, end) = liftBody owner scope result next
+    liftBody prefix owner scope (L loc (HsFunTy ann arrow arg result)) salt =
+      let (arg', arg_aliases, next) = liftBody prefix owner scope arg salt
+          (result', result_aliases, end) = liftBody prefix owner scope result next
       in (L loc (HsFunTy ann arrow arg' result'), arg_aliases ++ result_aliases, end)
-    liftBody owner scope (L loc (HsQualTy ann ctxt body)) salt =
-      let (body', aliases, next) = liftBody owner scope body salt
+    liftBody prefix owner scope (L loc (HsQualTy ann ctxt body)) salt =
+      let (body', aliases, next) = liftBody prefix owner scope body salt
       in (L loc (HsQualTy ann ctxt body'), aliases, next)
-    liftBody owner scope (L loc (HsKindSig ann body kind)) salt =
-      let (body', aliases, next) = liftBody owner scope body salt
+    liftBody prefix owner scope (L loc (HsKindSig ann body kind)) salt =
+      let (body', aliases, next) = liftBody prefix owner scope body salt
       in (L loc (HsKindSig ann body' kind), aliases, next)
-    liftBody owner scope ty salt = liftTypeChildren (liftBody owner scope) ty salt
+    liftBody prefix owner scope ty salt = liftTypeChildren (liftBody prefix owner scope) ty salt
 
     select pair@(binder, name) (captures, used)
       | unLoc name `Set.member` used
@@ -414,7 +472,6 @@ liftSignatureSums named_wildcards group@HsGroup{hs_valds = ValBinds ann binds}
       _ -> and (gmapQ copyable node)
 
     typeName n = L (l2l (getLoc n)) (HsTyVar noAnn NotPromoted n)
-liftSignatureSums _ group = (group, [])
 
 {- Note [Lifting type cases]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -691,13 +748,13 @@ rnSrcDecls group = do
   dflags <- getDynFlags
   let sigma_mod = mkModule (RealUnit (Definite (baseUnitId dflags))) (mkModuleName "GHC.Sigma")
       sigma = mkOrig sigma_mod (mkTcOcc "Sigma")
-      (with_sigs, sig_names)
-        | enabled && not is_boot = liftSignatureSums named_wildcards group
+      (with_sums, sum_names)
+        | enabled && not is_boot = liftDeclarationSums named_wildcards group
         | otherwise = (group, [])
-      (with_cases, case_names) = if enabled then liftTypeCases with_sigs else (group, [])
+      (with_cases, case_names) = if enabled then liftTypeCases with_sums else (group, [])
       (expanded, lambda_names, scopes) =
         if enabled then liftTypeLambdas sigma with_cases else (group, [], emptyOccEnv)
-  rnSrcDeclsWithLambdas (sig_names ++ case_names ++ [(fam, Just owner) | (fam, owner) <- lambda_names])
+  rnSrcDeclsWithLambdas (sum_names ++ case_names ++ [(fam, Just owner) | (fam, owner) <- lambda_names])
                         scopes expanded
 
 -- | Rename the declarations and record the kind-inference edges of private families.

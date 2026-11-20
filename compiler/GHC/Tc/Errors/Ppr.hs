@@ -4898,6 +4898,9 @@ liftedTypeContext name
   | Just synonym <- liftedTypeOwner "$lambda:" name
   , Just owner <- stripLiftedTypeOwner "$signature-sum:" synonym
   = Just (text "retained sum in the signature for" <+> quotes (text owner))
+  | Just synonym <- liftedTypeOwner "$lambda:" name
+  , Just owner <- stripLiftedTypeOwner "$field-sum:" synonym
+  = Just (text "retained sum in a field of" <+> quotes (text owner))
   | Just owner <- liftedTypeOwner "$case:" name = Just (text "type case in" <+> quotes (text owner))
   | Just owner <- liftedTypeOwner "$lambda:" name = Just (text "type lambda in" <+> quotes (text owner))
   | otherwise = Nothing
