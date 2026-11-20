@@ -14,12 +14,13 @@ of an ordered type case in a value signature. The sample renders the
 two results as `"7"` and `"'f'"`. A call that ignores its arguments
 still returns 42 with an undefined index and payload. An ordinary client
 can also open a hidden vector inside a pair without forcing the other
-field. All 330 Showcase lines ran with both compiler stages at `-O0`,
+field. All 336 Showcase lines ran with both compiler stages at `-O0`,
 default `-O1` and default `-O2`, and with the self-hosted GHCi.
 [Showcase](Showcase.hs) and [verification](CHECKPOINTS.md#family-and-package-checkpoints).
 
-An ordinary client can use an optimized rule whose payload type refers
-to a preceding Boolean. The rule fires even when the index comes from
+A rewrite rule can omit the types of its Boolean index and dependent
+payload. GHC infers both from the function's retained signature. An
+ordinary client can use the optimized rule. The rule fires even when the index comes from
 an `IORef`. A call whose result ignores the index can return 19 with an
 undefined Boolean. GHC checks type cases in ordinary and rank-n
 constructor fields. The same higher-order class method can map over
@@ -27,6 +28,14 @@ values indexed by `Maybe` or by a partially applied type family.
 [Rewrite rules](examples/qualified-pi/RetainedRules.hs),
 [field cases](examples/open-evaluation/NativeNestedCase.hs) and
 [class method client](examples/open-evaluation/IndexedMapClient.hs).
+
+An ordinary caller can package a list's computed length with the vector
+indexed by that length. A separate proof module uses the checked
+equations for Prelude `(++)` to prove that append adds lengths and that
+`map` distributes over append for finite lists. Its tests also check
+that the right list and the elements remain lazy where promised.
+[List-to-vector example](roadmap/R04-dependent-sums.md)
+and [append proofs](roadmap/R16-open-term-evaluator.md#prove-that-map-distributes-over-append).
 
 An ordinary module proves that filtering a finite list cannot increase
 its `size`. At each head, a checked `Prelude.filter` equation says
@@ -205,23 +214,20 @@ source examples. General promotion remains open.
    [Domain example](roadmap/R24-constrained-type-families.md),
    [Later argument](roadmap/R23-unsaturated-type-families.md#choosing-a-prefixs-matchability-from-a-later-argument)
    and [singletons migration](roadmap/R23-unsaturated-type-families.md#arrow-patterns-in-family-equations).
-3. **R22 and R04.** A conditional can package a different callback type
-   in each branch. Check introduction and elimination when an implicit
-   existential encloses an explicit one. The native list-to-vector
-   producer now works with an ordinary client and a computed witness.
+3. **R22 and R04.** An ordinary module can put an explicit existential
+   package inside an implicit one and open both in a pattern. Check direct
+   application of a polymorphic consumer whose parameter is inside the
+   explicit package. The list-to-vector producer carries a computed witness.
    [Retained list pairs](roadmap/R04-dependent-sums.md),
    [Guarded witness](roadmap/R22-existential-quantification.md#inferring-a-higher-rank-witness)
    and [nested patterns](roadmap/R22-existential-quantification.md#constructor-cases-on-the-payload).
-4. **R19.** A GADT field can use an ordered type case under a retained
-   Boolean binder. Check whether a branch on an ordinary Boolean can
-   pass that same variable to the field at its refined type. Template
-   Haskell needs a representation for the retained binder before it
-   can reify the field.
+4. **R19.** A branch on an ordinary Boolean can pass that same value to
+   a retained field. The proof is local to the selected constructor branch.
+   Template Haskell still needs a representation for the retained field binder.
    [Retained scrutinees and scope](roadmap/R19-type-level-cases.md#compute-a-retained-scrutinee).
-5. **R16.** Checked Prelude equations support length proofs for
-   `map`, `filter`, and `(++)`, and a proof that map distributes over
-   append. The next example is length preservation for `reverse`.
-   Its private worker changes the accumulator on each recursive call.
+5. **R16.** The checked list worker supports the length theorem for
+   `Prelude.reverse`. The next task is structural recursion with an
+   arbitrary step function and seed, starting with a list right fold.
    [Append and map proofs](roadmap/R16-open-term-evaluator.md#prove-that-map-distributes-over-append).
 
 Use this queue for current priorities, the linked card for its acceptance

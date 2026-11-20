@@ -8,6 +8,41 @@ increments.
 
 ## Family and package checkpoints
 
+At `a6fa7ededf`, bootstrap and self-hosted GHC reproduced all 336
+Showcase lines at stripped `-O0` and default `-O1` and `-O2`.
+Self-hosted GHCi matched. All 19 focused normal-way tests passed. The
+dependent directory ran 323 cases. It recorded 303 expected passes and
+the same 20 unexpected failures, with the same failure categories, as
+the 331-line checkpoint. The typed splice and retained-rule interface
+checks passed. The compiler upgrade rechecked eligible append providers
+at `-O0` and `-O1` and then reused their refreshed interfaces.
+
+This checkpoint adds a computed length paired with a vector, recursive
+family forwarding, and proofs of append's length law and map's
+distributivity over append. A GADT field uses a runtime Boolean to
+select its result type. The Showcase branches before calling the field
+with the corresponding constructor.
+[Append proof](roadmap/R16-open-term-evaluator.md#prove-that-append-adds-the-list-lengths),
+[dependent pairs](roadmap/R04-dependent-sums.md) and
+[GADT fields](roadmap/R19-type-level-cases.md).
+
+At `5171866a01`, bootstrap and self-hosted GHC reproduced the 331-line
+Showcase at stripped `-O0` and default `-O1` and `-O2`. Self-hosted
+GHCi matched the output. All 16 focused normal-way tests passed. The
+dependent directory ran 321 cases. It recorded 301 expected passes
+and the same 20 unexpected failures as the 330-line checkpoint.
+The retained-rule interface checks, typed splice, provider upgrade,
+orphan-rule header and two-way filter upgrade also passed.
+
+The compiler infers both binders of a rule from a retained signature.
+Different branches can choose different callback witnesses by visible
+type application. An unsigned recursive family can forward either a
+constructor or a partial family. GHC also checks compound rank-n field
+kinds and ordered type cases under retained GADT field binders.
+[Rule inference](roadmap/R05-dependent-core.md),
+[existential witnesses](roadmap/R22-existential-quantification.md) and
+[family inference](roadmap/R23-unsaturated-type-families.md).
+
 At `38c0f996f5`, the bootstrap and self-hosted compilers reproduced
 the 330-line Showcase at stripped `-O0` and default `-O1` and `-O2`.
 Self-hosted GHCi reproduced it too. All 15 focused normal-way tests passed.
