@@ -1500,7 +1500,9 @@ hscSimplify' plugins ds_result = do
               name_ppr_ctx = alwaysQualify
               binds = mg_binds ds_result
               rules = mg_rules ds_result
-          endPassHscEnvIO lint_env name_ppr_ctx CoreDesugarOpt binds rules
+          -- Desugaring can bind a GADT's existential with a type let.
+          -- See Note [Substituting type-lets] in GHC.Core.Lint.SubstTypeLets.
+          endPassHscEnvIO lint_env name_ppr_ctx CoreDesugar binds rules
           let simplified = simpleOptNativeProgram binds
           endPassHscEnvIO lint_env name_ppr_ctx CoreDesugarOpt simplified rules
           let result = ds_result { mg_binds = simplified }
