@@ -608,6 +608,13 @@ tcCheckRetainedType allow_function = go
     go mode (L loc (HsFunTy _ mult arg res)) kind
       = setSrcSpanA loc $
         tc_fun_type_x (go mode) (pure unmatchableDataConTy) mode mult arg res (Check kind)
+    go mode (L loc ty@(HsForAllTy { hst_tele = tele@HsForAllVis{}
+                                 , hst_body = body })) kind
+      | allow_function
+      , isEmptyNameEnv (mode_indices mode)
+      , hsHasForEachTy (unLoc body)
+      = setSrcSpanA loc $
+        tc_vis_forall_type mode ty tele (go mode body) (Check kind)
     go mode (L loc ty@(HsForEachTy ann bndrs body)) kind
       = setSrcSpanA loc $
         do { level <- getThLevel
@@ -812,6 +819,13 @@ ordinary open-kind and multiplicity checks. Other type positions use
 tc_check_lhs_type; see Note [Retained Pi type arguments]. The renamer and complete-signature
 guard use hsHasForEachTy. Reject partial signatures even when a wildcard lies
 outside the nested Pi.
+
+A required forall in a complete signature keeps the retained checker for
+its body. For example, forall (p :: a %U -> Bool) -> can precede a retained
+callback on a. Its type variable is erased, and the ordinary telescope
+checker still binds it. This preserves the required argument and the normal
+ambiguity check. The retained signature checker still rejects a forall that
+would enclose already scoped runtime indices.
 
 The application checker supplies the closure's expected type. A source lambda
 uses Note [Checked retained lambdas] in GHC.Tc.Gen.Match. A named function can
@@ -1842,28 +1856,14 @@ tcHsType mode HsForAllTy{} _
 
 tcHsType mode t@(HsForAllTy { hst_tele = tele, hst_body = ty }) exp_kind
   | HsForAllInvis{} <- tele
-  = tc_hs_forall_ty tele ty exp_kind
+  = do { (tv_bndrs, ty') <- tcTKTelescope mode tele (tcLHsType mode ty exp_kind)
+       ; return (mkForAllTys tv_bndrs ty') }
                  -- For an invisible forall, we allow the body to have
                  -- an arbitrary kind (hence exp_kind above).
                  -- See Note [Body kind of a HsForAllTy]
 
   | HsForAllVis{} <- tele
-  = do { ek <- newOpenTypeKind
-       ; r <- tc_hs_forall_ty tele ty (Check ek)
-       ; checkExpKind mode t r ek exp_kind }
-                 -- For a visible forall, we require that the body is of kind TYPE r.
-                 -- See Note [Body kind of a HsForAllTy]
-
-  where
-    tc_hs_forall_ty tele ty ek
-      = do { (tv_bndrs, ty') <- tcTKTelescope mode tele $
-                                tcLHsType mode ty ek
-                 -- Pass on the mode from the type, to any wildcards
-                 -- in kind signatures on the forall'd variables
-                 -- e.g.      f :: _ -> Int -> forall (a :: _). blah
-
-             -- Do not kind-generalise here!  See Note [Kind generalisation]
-           ; return (mkForAllTys tv_bndrs ty') }
+  = tc_vis_forall_type mode t tele (tc_check_lhs_type mode ty) exp_kind
 
 tcHsType mode t@(HsQualTy { hst_ctxt = ctxt, hst_body = rn_ty }) exp_kind
   | null (hsc_ctxt $ unLoc ctxt)
@@ -2458,6 +2458,16 @@ tcCheckMatchabilityArrow ma hs_ty kind
   = setSrcSpanA l $
       tc_fun_type_x (tcCheckMatchabilitySynRhs ma) (pure ma) typeLevelMode arr a b (Check kind)
   | otherwise = tcCheckLHsType hs_ty kind
+
+-- | Check a required forall with the supplied checker for its body.
+-- See Note [Body kind of a HsForAllTy] and Note [Higher-order retained signatures].
+tc_vis_forall_type :: TcTyMode -> HsType GhcRn -> HsForAllTelescope GhcRn
+                   -> (TcKind -> TcM TcType) -> ExpKind -> TcM TcType
+tc_vis_forall_type mode ty tele check_body exp_kind
+  = do { ek <- newOpenTypeKind
+       ; (tv_bndrs, body) <- tcTKTelescope mode tele (check_body ek)
+       -- Keep the caller's mode and let the enclosing signature generalise kinds.
+       ; checkExpKind mode ty (mkForAllTys tv_bndrs body) ek exp_kind }
 
 -- | Check an ordinary arrow with the supplied checker for its child types.
 -- See Note [Higher-order retained signatures].

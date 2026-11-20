@@ -68,7 +68,7 @@ import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Core.TyCon
 import GHC.Core ( Expr(Var, App, Type), exprToNativeIndex )
-import GHC.Core.TyCo.Rep ( Type(DepFunTy, ExistsTy, FunTy, TermVarTy, TermAppTy, TyConApp) )
+import GHC.Core.TyCo.Rep ( Type(DepFunTy, ExistsTy, ForAllTy, FunTy, TermVarTy, TermAppTy, TyConApp) )
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Type ( coreFullView, isManyTy, splitTyConApp_maybe
                      , anyFreeVarsOfType, typeKind, isNativeIndexFunctionId, isNativeOpaqueValueId
@@ -101,7 +101,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Set
 import GHC.Types.Id
-import GHC.Types.Var ( EvVar, DepFunTyFlag(..), ExistsTyFlag(ImplicitExists), varType, tyVarKind, isId, isCoVar, isTyVar, isVisibleFunArg )
+import GHC.Types.Var ( EvVar, DepFunTyFlag(..), ExistsTyFlag(ImplicitExists), VarBndr(Bndr), varType, tyVarKind, isId, isCoVar, isTyVar, isVisibleFunArg )
 import GHC.Types.Var.Env ( mkInScopeSetList, unitVarEnv )
 import GHC.Types.SrcLoc
 import GHC.Types.Basic( VisArity, RecFlag(NonRecursive), Origin(Generated), GenReason(OtherExpansion), DoPmc(SkipPmc) )
@@ -171,9 +171,8 @@ tcFunBindMatches ctxt fun_name mult source_matches invis_pat_tys source_exp_ty
         ; (wrap_fun, r)
              <- case exp_ty of
                   Check ty | hasRetainedFunTy ty
-                    -> do { result <- tcScalingUsage mult $
-                                        tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
-                          ; return (idHsWrapper, result) }
+                    -> tcScalingUsage mult $
+                       tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
                   _ -> matchExpectedFunTys herald ctxt arity exp_ty tc_matches
 
         ; return (visibility_wrap <.> wrap_fun, r) }
@@ -313,7 +312,7 @@ See docs/dependent-haskell/REFERENCES.md#invisible-retained-binders-next-candida
 tcRetainedMatches :: ExpectedFunTyCtxt -> UserTypeCtxt -> HsMatchContextRn
                   -> VisArity -> [ExpPatType] -> Type
                   -> MatchGroup GhcRn (LHsExpr GhcRn)
-                  -> TcM (MatchGroup GhcTc (LHsExpr GhcTc))
+                  -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))
 tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
   | has_function_binder ty
   , not (one_variable_equation matches)
@@ -332,7 +331,8 @@ tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
              ; let body_ty = applyTypeToArgs ty [Var index]
              ; (pat_tys, argument_plan, rhs_ty) <-
                  tcRetainedConArgs herald ctxt (arity - 1) body_ty
-             ; tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty matches }
+             ; result <- tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty matches
+             ; return (idHsWrapper, result) }
         | otherwise -> failWithTc $
             TcRnRetainedQuantificationError RetainedConstructorCoverage
   where
@@ -342,6 +342,7 @@ tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
     has_function_binder :: Type -> Bool
     has_function_binder ty = case coreFullView ty of
       DepFunTy _ binder body -> isNativeIndexFunctionId binder || has_function_binder body
+      ForAllTy _ (Bndr _ Required) body -> has_function_binder body
       FunTy _ _ _ _ body -> has_function_binder body
       _ -> False
 
@@ -355,6 +356,7 @@ tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
     variable_retained_patterns ty (pat : pats) = case coreFullView ty of
       DepFunTy DepFunVisible _ body ->
         isRetainedVarPat pat && variable_retained_patterns body pats
+      ForAllTy _ (Bndr _ Required) body -> variable_retained_patterns body pats
       FunTy af _ _ _ body
         | isVisibleFunArg af -> variable_retained_patterns body pats
         | otherwise -> variable_retained_patterns body (pat : pats)
@@ -402,12 +404,20 @@ checker. When the source patterns end, keep the remaining Pi as the RHS type.
 Do not add a runtime index pattern or eta-expand that result. The ordinary
 pattern checker and desugarer retain newtype pattern laziness. Multiple rows
 with ordinary leading constructor patterns remain separate work.
+
+A leading required forall uses matchExpectedFunTys to scope the source type
+pattern. Keep its wrapper around the checked retained match. The wrapper
+binds the erased skolem and its evidence before any runtime argument. Thus
+in f (type p) decide xs, xs still opens the retained binder with its source
+Name. Do not move a wrapper across a value pattern. The rules for runtime
+demand and retained constructor rows stay the same.
 -}
 
--- | Find a retained binder after any canonical ordinary arrows.
+-- | Find a retained binder after required foralls and ordinary arrows.
 hasRetainedFunTy :: Type -> Bool
 hasRetainedFunTy ty = case coreFullView ty of
   DepFunTy DepFunVisible _ _ -> True
+  ForAllTy _ (Bndr _ Required) body -> hasRetainedFunTy body
   FunTy _ _ _ _ result -> hasRetainedFunTy result
   _ -> False
 
@@ -1030,13 +1040,15 @@ separate work. No equality comes from a local definition or an unfolding.
 -- | Introduce runtime index identities before checking the remaining patterns.
 tcRetainedVarMatches :: ExpectedFunTyCtxt -> UserTypeCtxt -> Type
                      -> [LPat GhcRn]
-                     -> ([ExpPatType] -> ExpRhoType -> Maybe Int -> [Maybe Name] -> TcM a) -> TcM a
+                     -> ([ExpPatType] -> ExpRhoType -> Maybe Int -> [Maybe Name] -> TcM a)
+                     -> TcM (HsWrapper, a)
 tcRetainedVarMatches herald ctxt initial_ty initial_pats = go [] initial_ty initial_pats
   where
     finish acc rhs_ty boundary thing_inside =
-      let args = reverse acc
-      in thing_inside (map fst args) rhs_ty boundary
-           [name | (pat_ty, name) <- args, isVisibleExpPatType pat_ty]
+      do { let args = reverse acc
+         ; result <- thing_inside (map fst args) rhs_ty boundary
+                       [name | (pat_ty, name) <- args, isVisibleExpPatType pat_ty]
+         ; return (idHsWrapper, result) }
 
     go acc ty pats thing_inside
       | (theta, _) <- tcSplitPhiTy ty, not (null theta)
@@ -1062,13 +1074,18 @@ tcRetainedVarMatches herald ctxt initial_ty initial_pats = go [] initial_ty init
                failWithTc (TcRnRetainedQuantificationError RetainedResultWrapper)
            ; go ((mkCheckExpFunPatTy arg_ty, Nothing) : acc) rhs_ty pats thing_inside }
       | otherwise
-      = do { (wrap, result) <- matchExpectedFunTys herald ctxt 1 (mkCheckExpType ty) $
+      = do { (wrap, (rest_wrap, result)) <- matchExpectedFunTys herald ctxt 1 (mkCheckExpType ty) $
                \pat_tys rhs_ty ->
                  do { rhs_ty <- readExpType rhs_ty
                     ; go (map (, Nothing) (reverse pat_tys) ++ acc) rhs_ty pats thing_inside }
-           ; unless (isIdHsWrapper wrap) $
+           ; unless (isIdHsWrapper wrap || leading_required ty acc) $
                failWithTc (TcRnRetainedQuantificationError RetainedResultWrapper)
-           ; return result }
+           ; return (wrap <.> rest_wrap, result) }
+
+    leading_required ty acc
+      | ForAllTy _ (Bndr _ Required) _ <- coreFullView ty
+      = not (any (isExpFunPatType . fst) acc)
+      | otherwise = False
 
     nonforcing_pattern (L _ pat) = case pat of
       VarPat{} -> True
@@ -1804,9 +1821,7 @@ tcLambdaMatches e lam_variant matches invis_pat_tys res_ty
         ; (wrapper, r)
             <- case res_ty of
                  Check ty | hasRetainedFunTy ty
-                   -> do { result <- tcRetainedMatches herald GenSigCtxt ctxt arity
-                                       invis_pat_tys ty matches
-                         ; return (idHsWrapper, result) }
+                   -> tcRetainedMatches herald GenSigCtxt ctxt arity invis_pat_tys ty matches
                  _ -> matchExpectedFunTys herald GenSigCtxt arity res_ty $ \ pat_tys rhs_ty ->
                         tcMatches ctxt tcBody (invis_pat_tys ++ pat_tys) rhs_ty matches
 
