@@ -2,7 +2,7 @@
 module WitnessSchema
     ( Hidden, callback, unpack, Multi, pair, kindBox, KindBox, Deep, producer
     , CallbackPair, atTwoTypes, observePair, ignorePair
-    , RankedBuilder, buildAt, configured, observeBuilder
+    , Payload(..), RankedBuilder, buildAt, configured, observeBuilder
     , Flag(..), FlaggedBuilder, observeFlagged
     , Captured(..), CapturedBuilder, LinearBuilder, buildLinear, buildTwice
     ) where

@@ -75,17 +75,20 @@ for level in 0 1 2; do
     mkdir -p "rule$level/client"
     (
         cd "rule$level"
-        cp "$area"/{PackageRules,LexicalPackageRules,ErasedStream}.hs .
+        cp "$area"/{PackageRules,LexicalPackageRules,ErasedStream,WitnessSchema}.hs .
         extra=()
         if [[ $level == 0 ]]; then extra=("${flags[@]}"); fi
         "${g[@]}" "-O$level" "${extra[@]}" -ddump-rule-firings -c PackageRules.hs >provider.log
         "${g[@]}" "-O$level" "${extra[@]}" -ddump-rule-firings -c LexicalPackageRules.hs >>provider.log
-        "${g[@]}" "-O$level" "${extra[@]}" -c ErasedStream.hs
+        "${g[@]}" "-O$level" "${extra[@]}" -c ErasedStream.hs WitnessSchema.hs
         cp PackageRules.hi LexicalPackageRules.hi ErasedStream.hi "$area"/{NativePackageRuleClient,StreamFold}.hs client/
+        cp WitnessSchema.hi "$area/NativePackageRuleCase.hs" client/
         cd client
         "${g[@]}" "-O$level" "${extra[@]}" -ddump-rule-firings -c NativePackageRuleClient.hs >client.log
+        "${g[@]}" "-O$level" "${extra[@]}" -ddump-rule-firings -c NativePackageRuleCase.hs >callback.log
         "${g[@]}" "-O$level" "${extra[@]}" -ddump-rule-firings -c StreamFold.hs >fold.log
         if [[ $level != 0 ]]; then
+            test "$(grep -Fc 'Rule fired: read/int-pair (LexicalPackageRules)' callback.log)" -eq 1
             test "$(grep -Fc 'Rule fired: toList/build (ErasedStream)' fold.log)" -ge 2
             test "$(grep -Fc 'Rule fired: fold/build (GHC.Internal.Base)' fold.log)" -ge 2
             for log in ../provider.log client.log; do
@@ -97,6 +100,14 @@ for level in 0 1 2; do
         fi
         "${g[@]}" NativePackageRuleClient.o ../PackageRules.o ../LexicalPackageRules.o -o read-back
         ./read-back >observed
+        "${g[@]}" NativePackageRuleCase.o ../PackageRules.o ../LexicalPackageRules.o ../WitnessSchema.o -o callback
+        ./callback >>observed
+        cat >>NativePackageRuleCase.hs <<'SRC'
+
+escape :: RankedBuilder -> Bool -> a
+escape builder b = case builder b of Payload value _ -> value
+SRC
+        reject '[GHC-25897]' "-O$level" "${extra[@]}" -fno-code -c NativePackageRuleCase.hs
     )
 done
 diff -u rule0/client/observed rule1/client/observed
