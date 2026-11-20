@@ -528,10 +528,21 @@ axioms retain their representational behavior. `NativeUnsaturatedFamily`
 covers separate compilation, invalidation, a stuck comparison of
 distinct prefixes, and rejection of inverse decomposition.
 
-Omitted invisible binders and generated source-certificate families
-remain outside this checkpoint. A reducing use of a generated family
-must still establish its source owner and record its rewrite-rule and
-interface dependencies.
+M166 initially excluded generated source-certificate families.
+M169 permits a partial application with a checked certificate.
+`OrdinaryPrefix = W.each W.signal` supplies the callback and leaves
+the list argument open. Both functions come from an ordinary provider.
+An ordinary client takes the prefix from the alias interface and
+passes it to a type family that supplies the last argument.
+
+Storing the prefix records the generated family name. Reducing the
+application checks the source owner and records the dependencies.
+Editing the callback invalidates the client proof with the alias
+interface unchanged. [Ordinary prefix](../examples/open-evaluation/OpenMapSource.hs)
+and [interface and recompilation check](../../../testsuite/tests/dependent/should_run/NativeOpenMap.sh).
+
+M166 also excluded omitted invisible binders. The next two cases
+describe the later support for them.
 
 ### Passing a family with an invisible argument
 
