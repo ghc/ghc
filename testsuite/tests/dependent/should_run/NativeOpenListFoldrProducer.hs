@@ -1,0 +1,43 @@
+{-# LANGUAGE CPP #-}
+module NativeOpenListFoldrProducer
+    ( direct, local, wrongHead, wrongTail, wrongSeed, wrongCallback, wrongOwner, forceResult ) where
+
+{-# NOINLINE [2] direct #-}
+direct :: (a -> b -> b) -> b -> [a] -> b
+direct _ z [] = z
+direct k z (x : xs) = k x (direct k z xs)
+
+{-# INLINE [0] local #-}
+local :: (a -> b -> b) -> b -> [a] -> b
+local k z = go
+  where
+    go [] = z
+    go (x : xs) = k x (go xs)
+
+wrongHead :: (a -> b -> b) -> b -> [a] -> b
+wrongHead _ z [] = z
+wrongHead k z (_ : xs) = k (error "changed head") (wrongHead k z xs)
+
+wrongTail :: (a -> b -> b) -> b -> [a] -> b
+wrongTail _ z [] = z
+wrongTail k z (x : _) = k x (wrongTail k z [])
+
+wrongSeed :: (a -> b -> b) -> b -> [a] -> b
+wrongSeed _ z [] = z
+wrongSeed k z (x : xs) = k x (wrongSeed k (error "changed seed") xs)
+
+wrongCallback :: (a -> b -> b) -> b -> [a] -> b
+wrongCallback _ z [] = z
+wrongCallback k z (x : xs) = k x (wrongCallback (\_ _ -> z) z xs)
+
+wrongOwner :: (a -> b -> b) -> b -> [a] -> b
+wrongOwner _ z [] = z
+wrongOwner k z (x : xs) = k x (direct k z xs)
+
+forceResult :: (a -> b -> b) -> b -> [a] -> b
+forceResult _ z [] = z
+forceResult k z (x : xs) = let rest = forceResult k z xs in rest `seq` k x rest
+
+#ifdef CHANGE_FOLD
+{-# RULES "foldr/nil" [~1] forall k z xs. direct k z xs = z #-}
+#endif

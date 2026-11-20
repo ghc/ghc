@@ -1668,3 +1668,36 @@ result without evaluating its elements. A bottom tail prevents the
 result from exposing a cons.
 [Source aliases](../examples/open-evaluation/PreludeReverseLengthSource.hs)
 and [ordinary proof](../examples/open-evaluation/PreludeReverseLengthProof.hs).
+
+### Check the equations of a right list fold
+
+The installed list `foldr` returns the seed at `[]`. At `x : xs` it
+passes `x` and the fold of `xs` to the combiner. The tail, combiner,
+and seed can stay unknown in the proof. The combiner has unmatchable
+arrows. Its application gives no evidence that its arguments are equal.
+The two checked equations also prove `foldr k z (xs ++ ys) =
+foldr k (foldr k z ys) xs` by induction on the finite spine of `xs`.
+[Agda's `foldr-++`](https://agda.github.io/agda-stdlib/v2.4/Data.List.Properties.html).
+
+The checker accepts a direct recursive call with the same combiner and
+seed, or a call to the local worker that captures both. It checks the
+original head, the proper tail, and the absence of additional demand
+before applying the combiner. The same check works for a separately
+compiled ordinary fold. Changing a checked body during optimization
+withdraws the equation.
+
+The source alias names `GHC.Internal.List.foldr`. Its defining term
+is `GHC.Internal.Base.foldr`. The `Foldable []` dictionary selects that
+term for the method re-exported by `Prelude`. The certificate belongs
+to the list term. Using the class selector in a type requires separate
+evidence for dictionary selection.
+
+The proof disables rewrite rules because the installed fold has
+fusion rules. A builder that uses `seq` can distinguish a partial
+combiner from a constructor, so its polymorphic type cannot justify
+`fold/build`. The native test checks that a non-strict combiner can
+skip the element, seed, and tail. It also checks that the fold demands
+the input spine and skips the combiner on an empty list.
+[Source alias](../examples/open-evaluation/ListFoldrSource.hs),
+[ordinary proof](../examples/open-evaluation/ListFoldrProof.hs), and
+[regression](../../../testsuite/tests/dependent/should_run/NativeOpenListFoldr.sh).
