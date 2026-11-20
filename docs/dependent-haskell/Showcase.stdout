@@ -152,6 +152,7 @@ safeHead at length 1 + n: True
 runtime sum and appended vector: (3,[True,False,False])
 use ordinary vector append in a type: Refl
 split the appended vector at its first length: ([True],[False,False])
+take and drop at the first runtime length: ([True],[False,False])
 reassemble the same two vector elements: [True,False]
 outer successor ignores the second addend: True
 replicate at a computed runtime length: [True,True,True]
