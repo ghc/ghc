@@ -89,6 +89,20 @@ contextKind = Refl
 separateKinds :: SeparateKinds 'False :~: Bool
 separateKinds = Refl
 
+nestedLet :: Proxy a ->
+  ( NestedLetCase a ('Just 'True) :~: Proxy '(Maybe a, Either (Maybe a) (Maybe a))
+  , NestedLetCase a ('Just 'False) :~: Proxy '(Maybe a, Either (Maybe a) (Maybe a))
+  , NestedLetCase a 'Nothing :~: Proxy '(Maybe a, Either (Maybe a) (Maybe a)) )
+nestedLet _ = (Refl, Refl, Refl)
+
+nestedLetShadow :: Proxy b ->
+  ( NestedLetShadow b ('Just 'False) :~: (Proxy 'False, Proxy ('Just b))
+  , NestedLetShadow b 'Nothing :~: (Proxy ('Just b), Proxy ('Just b)) )
+nestedLetShadow _ = (Refl, Refl)
+
+nestedLetKind :: (NestedLetKind 'True :~: Bool, NestedLetKind 'False :~: Bool)
+nestedLetKind = (Refl, Refl)
+
 nested :: ( N.Pick ('Just ('Just 'True)) :~: Proxy 'True
           , N.Pick ('Just 'Nothing) :~: Int
           , N.SameFallback ('Just 'Nothing) :~: Int )

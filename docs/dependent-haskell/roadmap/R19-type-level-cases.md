@@ -299,8 +299,14 @@ the capture scope. Two separate lets can infer different kinds.
 The supported RHSs use names, type applications, promoted lists and tuples,
 kind annotations and type literals. A helper can infer the kind of a visible
 capture. An independent kind parameter remains ambiguous.
-Splices and RHSs that refer to another enclosing type let remain outside
-this slice.
+
+In a chain of lets leading to a case, an inner RHS can refer to an
+enclosing let. For example,
+`let x = a in let x = Maybe x in case d of …` takes the second RHS's
+`x` from the first let and uses the second `x` in the case body.
+The compiler checks the helpers in dependency order and shares their
+inferred kinds across rows. The first constructor test can still block
+the fallback at a rigid index. RHS splices remain outside this slice.
 
 The private synonym follows the promotion paper's lifting of local
 bindings, and the rows follow its closed-family encoding of cases.

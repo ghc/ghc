@@ -79,7 +79,7 @@ import Language.Haskell.Syntax.Specificity (Specificity(SpecifiedSpec))
 import Control.Monad
 import Data.Bifunctor ( first )
 import Data.Foldable ( toList, for_ )
-import Data.List ( elemIndex, mapAccumL, partition, unzip4 )
+import Data.List ( elemIndex, find, mapAccumL, nub, partition, unzip4 )
 import Data.List.NonEmpty ( NonEmpty(..), head, nonEmpty )
 import Data.Data (Data, cast, gmapQ)
 import Data.Maybe (catMaybes,  isJust, isNothing, fromMaybe, mapMaybe, maybeToList )
@@ -824,6 +824,11 @@ even if a pattern binds a variable with the same source name. Give
 cases in the scrutinee the same alias environment. A new let extends
 it only after checking its RHS in the original lexical scope. The
 helper fragment accepts references to the synonym's parameters.
+An inner let can refer to an earlier let through its existing helper.
+Copy the earlier helper's capture arguments into the inner helper's
+telescope. Use the nearest alias for each written name. A restored
+alias can shadow a capture that another alias needs, so save that
+capture under a fresh name before restoring the aliases.
 An inferred kind parameter must be determined by a checked capture.
 See Note [Checked RHSs for cases in type lets] in GHC.Tc.TyCl.
 
@@ -892,31 +897,31 @@ liftTypeCases group =
                                    (scrutinee, scrut_kind) (Just kind) patterns salt
         in (L loc (HsKindSig ann body' kind), cases, next)
     liftRhs owner independent captures aliases
-      (L loc (XHsType (HsTypeLet ann binder rhs
-        (L case_loc (XHsType (HsTypeCase _ _ scrutinee alts)))))) salt
+      (L loc (XHsType (HsTypeLet ann binder rhs body))) salt
       | not independent
-      , Just patterns <- traverse checkAlt alts
-      , Just used <- rhsCaptures captures aliases rhs =
-          let owner_occ = rdrNameOcc (unLoc owner)
-              occ = mkTcOcc ("$case-let-rhs:" ++ occNameString owner_occ ++ ":" ++ show salt)
-              name = L (l2l (getLoc rhs)) (mkRdrUnqual occ)
-              helper = L loc (SynDecl noAnn name
-                         (HsQTvs noExtField [header | (_, (header, _, _)) <- used]) Prefix rhs)
-              rhs_ref = applyType loc name [typeName v | (_, (_, _, v)) <- used]
-              saved = L (getLoc binder) (mkRdrUnqual (mkTyVarOcc ("$case-let-outer:" ++ show salt)))
-              shadowed (_, _, current) = unLoc current == unLoc binder
-              hide capture@(header, v, _)
-                | shadowed capture = (header, v, saved)
-                | otherwise = capture
-              branch_binding = (ann, binder, name, map fst used)
-              (case', generated, next) = liftCase owner False (map hide captures)
-                      (aliases ++ [branch_binding]) case_loc
-                      (scrutinee, HsBndrNoKind noExtField) Nothing patterns (salt + 1)
-              result = letTy loc ann binder rhs_ref case'
-              result'
-                | any shadowed captures = letTy loc ann saved (typeName binder) result
-                | otherwise = result
-          in (result', (helper, (occ, Just owner_occ)) : generated, next)
+      , letCaseBody body
+      , Just (used, references) <- rhsCaptures captures aliases rhs
+      , let owner_occ = rdrNameOcc (unLoc owner)
+            occ = mkTcOcc ("$case-let-rhs:" ++ occNameString owner_occ ++ ":" ++ show salt)
+            name = L (l2l (getLoc rhs)) (mkRdrUnqual occ)
+            helper_rhs = restoreRhs ann used references rhs
+            helper = L loc (SynDecl noAnn name
+                       (HsQTvs noExtField [header | (_, (header, _, _)) <- used]) Prefix helper_rhs)
+            rhs_ref = applyType loc name [typeName v | (_, (_, _, v)) <- used]
+            saved = L (getLoc binder) (mkRdrUnqual (mkTyVarOcc ("$case-let-outer:" ++ show salt)))
+            shadowed (_, _, current) = unLoc current == unLoc binder
+            hide capture@(header, v, _)
+              | shadowed capture = (header, v, saved)
+              | otherwise = capture
+            branch_binding = (ann, binder, name, map fst used)
+            (body', generated, next) = liftRhs owner False (map hide captures)
+                (aliases ++ [branch_binding]) body (salt + 1)
+      , not (null generated)
+      = let result = letTy loc ann binder rhs_ref body'
+            result'
+              | any shadowed captures = letTy loc ann saved (typeName binder) result
+              | otherwise = result
+        in (result', (helper, (occ, Just owner_occ)) : generated, next)
     liftRhs owner False captures aliases (L loc (XHsType (HsTypeLet ann v rhs body))) salt =
       let (rhs', cases, next) = liftRhs owner False captures aliases rhs salt
       in (letTy loc ann v rhs' body, cases, next)
@@ -978,16 +983,44 @@ liftTypeCases group =
     letTy loc ann v rhs body = L loc (XHsType (HsTypeLet ann v rhs body))
     applyType loc name = foldl' (\f x -> L loc (HsAppTy noExtField f x)) (typeName name)
 
-    -- Include earlier variables mentioned in the kind of a captured binder.
+    -- Follow a chain of nonrecursive lets to the ordered case.
+    letCaseBody ty = case unLoc (ignoreParens ty) of
+      XHsType (HsTypeCase _ _ _ alts) -> all (isJust . checkAlt) alts
+      XHsType (HsTypeLet _ _ rhs body) -> isJust (lexicalNames rhs) && letCaseBody body
+      _ -> False
+
+    -- Include the captures of every referenced alias, and their kinds.
     rhsCaptures captures aliases rhs = do
       names <- lexicalNames rhs
-      let alias_names = [unLoc v | (_, v, _, _) <- aliases]
-      guard (all (`notElem` alias_names) names)
-      needed <- foldr captureKind (Just names) captures
+      let named alias (_, v, _, _) = alias == unLoc v
+          resolve n = find (named n) (reverse aliases)
+          references = mapMaybe resolve (nub names)
+          transitive = concat [indices | (_, _, _, indices) <- references]
+          direct = [n | n <- names, not (any (named n) references)]
+          numbered = zip [0 :: Int ..] captures
+          names' = direct ++ [unLoc v | (i, (_, v, _)) <- numbered, i `elem` transitive]
+      needed <- foldr captureKind (Just names') captures
       let available = [unLoc n | (_, n, _) <- captures]
-      if all (`elem` available) needed
-        then Just [pair | pair@(_, (_, v, _)) <- zip [0 :: Int ..] captures, unLoc v `elem` needed]
-        else Nothing
+      guard (all (`elem` available) needed)
+      pure ([pair | pair@(_, (_, v, _)) <- numbered, unLoc v `elem` needed], references)
+
+    -- Keep capture variables visible to later alias applications.
+    restoreRhs ann used references rhs = foldr save restored arguments
+      where
+        loc = getLoc rhs
+        alias_names = [unLoc v | (_, v, _, _) <- references]
+        arguments = [(i, v, argument i v) | (i, (_, v, _)) <- used]
+        argument i v
+          | unLoc v `elem` alias_names =
+              L (getLoc v) (mkRdrUnqual (mkTyVarOcc ("$case-let-argument:" ++ show i)))
+          | otherwise = v
+        save (_, original, saved) body
+          | unLoc original /= unLoc saved = letTy loc ann saved (typeName original) body
+          | otherwise = body
+        restored = foldr restore rhs references
+        restore (alias_ann, binder, helper, indices) =
+          letTy loc alias_ann binder
+            (applyType loc helper [typeName v | (i, _, v) <- arguments, i `elem` indices])
 
     captureKind (L _ HsTvb{tvb_kind = HsBndrKind _ kind}, v, _) inside = do
       names <- inside

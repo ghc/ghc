@@ -51,6 +51,8 @@ cp NativeCase.hi NativeNestedCase.hi OpenMapWorker.hi NativeTypeCaseFallback.hi 
    grep -Fq 'blockedTransport _ = Refl' bad.log &&
    grep -Fq 'NativeTypeCaseRigid.hs:81:21: error: [GHC-83865]' bad.log &&
    grep -Eq 'the type case in .*RefinedBranchPick' bad.log &&
+   grep -Fq 'NativeTypeCaseRigid.hs:85:24: error: [GHC-83865]' bad.log &&
+   grep -Eq 'the type case in .*NestedLetCase' bad.log &&
    ! grep -Eq '\$(case(-node)?|lambda):' bad.log &&
    reject NativeTypeCaseLetWrong 8:9 'GHC-83865')
 "${g[@]}" -fomit-interface-pragmas -c NativeTypeCaseHeadProvider.hs
@@ -83,6 +85,8 @@ grep -Fq 'the type case in the signature for' bad.log
 reject NativeTypeCaseScrutinee 4:15 'Not in scope: type constructor or class'
 reject NativeTypeCaseLetMonomorphic 6:22 'GHC-83865'
 reject NativeTypeCaseLetUnowned 4:26 'A type let used in a case body cannot generalize the kind of its right-hand side.'
+grep -Fq 'NativeTypeCaseLetUnowned.hs:9:15: error:' bad.log
+test "$(grep -Fc 'cannot generalize the kind of its right-hand side' bad.log)" = 2
 
 reject NativeTypeCaseDominatedRhs 6:20 'GHC-76037'
 grep -Fq 'Not in scope: type constructor or class' bad.log

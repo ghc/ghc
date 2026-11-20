@@ -79,3 +79,7 @@ blockedTransport _ = Refl
 blockedBranch :: Proxy seed -> Proxy bit ->
   N.RefinedBranchPick seed ('Just ('N.RefinedBranch 'Proxy ('N.RefinedBit bit))) :~: Int
 blockedBranch _ _ = Refl
+
+blockedNestedLet :: Proxy a -> Proxy bit ->
+  NestedLetCase a ('Just bit) :~: Proxy '(Maybe a, Either (Maybe a) (Maybe a))
+blockedNestedLet _ _ = Refl
