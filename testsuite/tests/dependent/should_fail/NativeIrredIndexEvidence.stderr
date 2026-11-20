@@ -1,0 +1,26 @@
+NativeIrredIndexEvidence.hs:21:26: error: [GHC-83865]
+    • Couldn't match type ‘v0’ with ‘v’
+      Expected: View a b v
+        Actual: View a (Flip a) v0
+      ‘v0’ is untouchable
+        inside the constraints: ()
+        bound by a retained application
+        at NativeIrredIndexEvidence.hs:21:26-47
+    • In the expression: View @a (Proxy @other)
+      In an equation for ‘wrong’:
+          wrong a b v other Refl = View @a (Proxy @other)
+    • Relevant bindings include
+        other :: Token b (bound at NativeIrredIndexEvidence.hs:21:13)
+        v :: Token b (bound at NativeIrredIndexEvidence.hs:21:11)
+
+NativeIrredIndexEvidence.hs:21:35: error: [GHC-18872]
+    • Couldn't match type ‘p0’ with ‘Flip a’
+        arising from a type equality Proxy other ~ Proxy v0
+      ‘p0’ is untouchable
+        inside the constraints: ()
+        bound by a retained application
+        at NativeIrredIndexEvidence.hs:21:35-46
+    • In the second argument of ‘View’, namely ‘(Proxy @other)’
+      In the expression: View @a (Proxy @other)
+      In an equation for ‘wrong’:
+          wrong a b v other Refl = View @a (Proxy @other)
