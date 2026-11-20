@@ -104,7 +104,7 @@ import qualified GHC.ByteCode.Serialize as ByteCode
 
 import GHC.Core
 import GHC.Core.Dependent ( hasExistentialExpr, hasNativeDependentExpr, rejectNativeDependentExpr
-                          , supportsNativeGentle, supportsNativeRuleBinds, supportsErasedUserRule )
+                          , supportsNativeGentle, supportsNativeRuleBinds, supportsLocalUserRule )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.TyCon (tyConName)
 import GHC.Core.Tidy           ( tidyExpr )
@@ -1519,7 +1519,7 @@ hscSimplify' plugins ds_result = do
                           not (supportsNativeRuleBinds [NonRec b rhs])] of
                   b : _ -> do
                     let src = nameSrcSpan (idName b)
-                        message = case filter (not . supportsErasedUserRule b) (idCoreRules b) of
+                        message = case filter (not . supportsLocalUserRule b) (idCoreRules b) of
                           rule : _ -> DriverUnsupportedRetainedRule (ru_name rule) level
                           [] -> DriverUnsupportedRetainedBinding (Just (getOccName b)) level
                     report (if isGoodSrcSpan src then src else module_loc) message
