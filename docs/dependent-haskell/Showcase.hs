@@ -1022,7 +1022,7 @@ main = do
         , () :: NativeNestedCase.TypeHead ('Just [Bool]) )
     observe "select an arrow result inside forall"
         ( NativeNestedCase.forallResult (Proxy @'LT) NativeNestedCase.CaseOn
-        , NativeNestedCase.forallResult (Proxy @'GT) NativeNestedCase.CaseMissing )
+        , NativeNestedCase.forallResult (Proxy @'False) NativeNestedCase.CaseMissing )
     observe "match Bool and Ordering directly in a type"
         (7 :: NativeCase.ByType Bool, 'x' :: NativeCase.ByType Ordering)
     observe "use a local type in a constructor case"

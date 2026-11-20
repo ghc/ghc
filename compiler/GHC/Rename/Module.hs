@@ -324,17 +324,25 @@ arrow. Use the enclosing captures when lifting a case in the result.
 
 Keep an invisible forall in place and copy its binders, in order, to
 the family header. The application uses the original variables inside
-the forall, so their skolems stay in scope. Accept only explicit closed
-binder kinds. A dependent binder would need its family parameter in
-scope during the kind check of its owner. The shared SCC does not
-generalize the family kind until after that check.
+the forall, so their skolems stay in scope.
+
+A dependent binder needs the generalized family kind when checking the
+owner's application. Use the actual declaration dependencies for that
+family. If there is no cycle, normal kind checking generalizes the family
+before the owner uses it. A real cycle keeps the usual restrictions on
+polymorphic recursion. Copy the written kind of the scrutinee from its
+binder. A kind annotation on the case also gives the family its result
+kind. See Note [Result kinds of dependent type cases] in GHC.Tc.TyCl.
 
 Stop if a binder shadows a capture, including a kind variable in its
 header. The name in the copied header must keep its original meaning.
 Stop in an active case-let alias environment. The alias bindings belong
 to the outer case and can shadow names in the copied telescope.
 -}
-liftTypeCases :: HsGroup GhcPs -> (HsGroup GhcPs, [(OccName, OccName)])
+-- | Private names with optional edges back to their kind-checking owners.
+type LiftedDecls = [(OccName, Maybe OccName)]
+
+liftTypeCases :: HsGroup GhcPs -> (HsGroup GhcPs, LiftedDecls)
 liftTypeCases group =
   let (groups, hidden) = unzip (map liftGroup (hs_tyclds group))
   in (group { hs_tyclds = groups }, concat hidden)
@@ -347,17 +355,28 @@ liftTypeCases group =
     liftDecl (L loc syn@SynDecl{tcdLName = owner, tcdRhs = rhs,
                                 tcdTyVars = HsQTvs{hsq_explicit = params}})
       | Just captures <- traverse capture params
-      = let (rhs', cases, _) = liftRhs owner captures [] rhs (0 :: Int)
+      = let (rhs', cases, _) = liftRhs owner False captures [] rhs (0 :: Int)
         in (L loc syn{tcdRhs = rhs'}, cases)
     liftDecl decl = (decl, [])
 
-    liftRhs owner captures aliases (L loc (XHsType (HsTypeCase _ _ scrutinee alts))) salt
-      | Just patterns <- traverse checkAlt alts =
-          liftCase owner captures aliases loc scrutinee patterns salt
-    liftRhs owner captures aliases
+    liftRhs owner independent captures aliases (L loc (XHsType (HsTypeCase _ _ scrutinee alts))) salt
+      | Just patterns <- traverse checkAlt alts
+      , Just scrut_kind <- caseScrutineeKind independent captures scrutinee
+      = liftCase owner independent captures aliases loc (scrutinee, scrut_kind) Nothing patterns salt
+    liftRhs owner True captures aliases (L loc (HsKindSig ann body kind)) salt
+      | L case_loc (XHsType (HsTypeCase _ _ scrutinee alts)) <- ignoreParens body
+      , Just patterns <- traverse checkAlt alts
+      , Just scrut_kind <- caseScrutineeKind True captures scrutinee
+      , Just mentions <- lexicalNames kind
+      , all (`elem` [unLoc name | (_, name, _) <- captures]) mentions
+      = let (body', cases, next) = liftCase owner True captures aliases case_loc
+                                   (scrutinee, scrut_kind) (Just kind) patterns salt
+        in (L loc (HsKindSig ann body' kind), cases, next)
+    liftRhs owner independent captures aliases
       (L loc (XHsType (HsTypeLet ann binder rhs
         (L case_loc (XHsType (HsTypeCase _ _ scrutinee alts)))))) salt
-      | Just patterns <- traverse checkAlt alts
+      | not independent
+      , Just patterns <- traverse checkAlt alts
       , Just used <- rhsCaptures captures aliases rhs =
           let owner_occ = rdrNameOcc (unLoc owner)
               occ = mkTcOcc ("$case-let-rhs:" ++ occNameString owner_occ ++ ":" ++ show salt)
@@ -371,49 +390,63 @@ liftTypeCases group =
                 | shadowed capture = (header, v, saved)
                 | otherwise = capture
               branch_binding = (ann, binder, name, map fst used)
-              (case', generated, next) = liftCase owner (map hide captures)
-                      (aliases ++ [branch_binding]) case_loc scrutinee patterns (salt + 1)
+              (case', generated, next) = liftCase owner False (map hide captures)
+                      (aliases ++ [branch_binding]) case_loc
+                      (scrutinee, HsBndrNoKind noExtField) Nothing patterns (salt + 1)
               result = letTy loc ann binder rhs_ref case'
               result'
                 | any shadowed captures = letTy loc ann saved (typeName binder) result
                 | otherwise = result
-          in (result', (helper, (occ, owner_occ)) : generated, next)
-    liftRhs owner captures aliases (L loc (XHsType (HsTypeLet ann v rhs body))) salt =
-      let (rhs', cases, next) = liftRhs owner captures aliases rhs salt
+          in (result', (helper, (occ, Just owner_occ)) : generated, next)
+    liftRhs owner False captures aliases (L loc (XHsType (HsTypeLet ann v rhs body))) salt =
+      let (rhs', cases, next) = liftRhs owner False captures aliases rhs salt
       in (letTy loc ann v rhs' body, cases, next)
-    liftRhs owner captures aliases
+    liftRhs owner independent captures aliases
       (L loc (HsFunTy ann arrow@(HsModifiedFunArr _ [] HsStandardArr{}) domain result)) salt =
-      let (result', cases, next) = liftRhs owner captures aliases result salt
+      let (result', cases, next) = liftRhs owner independent captures aliases result salt
       in (L loc (HsFunTy ann arrow domain result'), cases, next)
-    liftRhs owner captures aliases
+    liftRhs owner independent captures aliases
       (L loc quantified@HsForAllTy
         { hst_tele = HsForAllInvis { hsf_matchability = Nothing, hsf_invis_bndrs = binders }
         , hst_body = body }) salt
       | null aliases
       , Just locals <- traverse (capture . fmap (updateHsTyVarBndrFlag (const (HsBndrRequired noExtField)))) binders
       , let (implicit, _) = hsQTyVarKindOccs [h | (h, _, _) <- captures] []
-            in_scope = map unLoc implicit ++ [unLoc name | (_, name, _) <- captures]
-      , Just _ <- foldM extendForall in_scope locals
-      = let (body', cases, next) = liftRhs owner (captures ++ locals) aliases body salt
+            kind_scope = [unLoc name | (_, name, _) <- captures]
+            mentions = concatMap (fromMaybe [] . captureKindNames) locals
+      , all (`notElem` map unLoc implicit) [unLoc name | (_, name, _) <- locals]
+      , all (`elem` mentions) [unLoc name | (L _ HsTvb{tvb_kind = HsBndrNoKind{}}, name, _) <- locals]
+      , Just _ <- foldM extendForall kind_scope locals
+      = let separate = independent || not (null mentions)
+            (body', cases, next) = liftRhs owner separate (captures ++ locals) aliases body salt
         in (L loc quantified{hst_body = body'}, cases, next)
-    liftRhs owner captures aliases ty salt =
-      liftTypeChildren (liftRhs owner captures aliases) ty salt
+    liftRhs owner independent captures aliases ty salt =
+      liftTypeChildren (liftRhs owner independent captures aliases) ty salt
 
-    liftCase owner captures aliases loc scrutinee patterns salt =
+    liftCase owner independent captures aliases loc (scrutinee, scrut_kind) result_kind patterns salt =
       let owner_occ = rdrNameOcc (unLoc owner)
-          occ = mkTcOcc ("$case:" ++ occNameString owner_occ ++ ":" ++ show salt)
+          suffix = if independent then "-forall" else ""
+          occ = mkTcOcc ("$case:" ++ occNameString owner_occ ++ ":" ++ show salt ++ suffix)
           name = L (getLoc owner) (mkRdrUnqual occ)
           scrut_var = L (getLoc owner) (mkRdrUnqual (mkTyVarOcc "$scrutinee"))
           scrut_binder = L loc (HsTvb noAnn (HsBndrRequired noExtField)
-                         (HsBndrVar noExtField scrut_var) (HsBndrNoKind noExtField))
+                         (HsBndrVar noExtField scrut_var) scrut_kind)
           eqns = map (branch owner name captures aliases) patterns
           fam = L loc (FamDecl noExtField
                   (FamilyDecl noAnn (ClosedTypeFamily noAnn (Just eqns)) TopLevel
                      name (HsQTvs noExtField ([h | (h, _, _) <- captures] ++ [scrut_binder]))
-                     Prefix (L (l2l loc) (NoSig noExtField)) Nothing))
-          (scrutinee', nested, next) = liftRhs owner captures aliases scrutinee (salt + 1)
+                     Prefix (L (l2l loc) (maybe (NoSig noExtField) (KindSig noExtField) result_kind)) Nothing))
+          (scrutinee', nested, next) = liftRhs owner independent captures aliases scrutinee (salt + 1)
           result = applyType loc name ([typeName v | (_, _, v) <- captures] ++ [scrutinee'])
-      in (result, (fam, (occ, owner_occ)) : nested, next)
+      in (result, (fam, (occ, if independent then Nothing else Just owner_occ)) : nested, next)
+
+    caseScrutineeKind False _ _ = Just (HsBndrNoKind noExtField)
+    caseScrutineeKind True captures scrutinee
+      | L _ (HsTyVar _ NotPromoted name) <- ignoreParens scrutinee
+      , [kind] <- [kind | (L _ HsTvb{tvb_kind = HsBndrKind _ kind}, _, bound) <- captures
+                        , unLoc name == unLoc bound]
+      = Just (HsBndrKind noExtField kind)
+    caseScrutineeKind _ _ _ = Nothing
 
     letTy loc ann v rhs body = L loc (XHsType (HsTypeLet ann v rhs body))
     applyType loc name = foldl' (\f x -> L loc (HsAppTy noExtField f x)) (typeName name)
@@ -448,9 +481,13 @@ liftTypeCases group =
     capture b@(L _ (HsTvb _ (HsBndrRequired _) (HsBndrVar _ n) _)) = Just (b, n, n)
     capture _ = Nothing
 
-    extendForall names (L _ HsTvb{tvb_kind = HsBndrKind _ kind}, name, _)
+    captureKindNames (L _ HsTvb{tvb_kind = HsBndrKind _ kind}, _, _) = lexicalNames kind
+    captureKindNames _ = Just []
+
+    extendForall names binder@(_, name, _)
       | unLoc name `notElem` names
-      , Just [] <- lexicalNames kind
+      , Just mentions <- captureKindNames binder
+      , all (`elem` names) mentions
       = Just (unLoc name : names)
     extendForall _ _ = Nothing
 
@@ -533,10 +570,10 @@ rnSrcDecls group = do
   enabled <- xoptM LangExt.ExperimentalDependentTypes
   let (with_cases, case_names) = if enabled then liftTypeCases group else (group, [])
       (expanded, lambda_names) = if enabled then liftTypeLambdas with_cases else (group, [])
-  rnSrcDeclsWithLambdas (case_names ++ lambda_names) expanded
+  rnSrcDeclsWithLambdas (case_names ++ [(fam, Just owner) | (fam, owner) <- lambda_names]) expanded
 
--- | Rename the declarations and keep each lifted family in its owner's group.
-rnSrcDeclsWithLambdas :: [(OccName, OccName)] -> HsGroup GhcPs -> RnM (TcGblEnv, HsGroup GhcRn)
+-- | Rename the declarations and record the kind-inference edges of private families.
+rnSrcDeclsWithLambdas :: LiftedDecls -> HsGroup GhcPs -> RnM (TcGblEnv, HsGroup GhcRn)
 rnSrcDeclsWithLambdas hidden group@(HsGroup { hs_valds   = val_decls,
                             hs_splcds  = splice_decls,
                             hs_tyclds  = tycl_decls,
@@ -2310,7 +2347,7 @@ another instance, so we better add them to the environment one by one.
 -}
 
 
-rnTyClDecls :: [(OccName, OccName)] -> [TyClGroup GhcPs]
+rnTyClDecls :: LiftedDecls -> [TyClGroup GhcPs]
             -> RnM ([TyClGroup GhcRn], FreeNames)
 -- Rename the declarations and do dependency analysis on them
 rnTyClDecls hidden tycl_ds
@@ -2389,7 +2426,7 @@ getKindSigs :: [Name] -> KindSigEnv -> [LStandaloneKindSig GhcRn]
 getKindSigs bndrs kisig_env = mapMaybe (lookupNameEnv kisig_env) bndrs
 
 rnStandaloneKindSignatures
-  :: [(OccName, OccName)] -> NameSet  -- names of types and classes in the current TyClGroup
+  :: LiftedDecls -> NameSet  -- names of types and classes in the current TyClGroup
   -> [LStandaloneKindSig GhcPs]
   -> RnM [(LStandaloneKindSig GhcRn, FreeNames)]
 rnStandaloneKindSignatures hidden tc_names kisigs
@@ -2400,7 +2437,7 @@ rnStandaloneKindSignatures hidden tc_names kisigs
        }
 
 rnStandaloneKindSignature
-  :: [(OccName, OccName)] -> NameSet  -- names of types and classes in the current TyClGroup
+  :: LiftedDecls -> NameSet  -- names of types and classes in the current TyClGroup
   -> StandaloneKindSig GhcPs
   -> RnM (StandaloneKindSig GhcRn, FreeNames)
 rnStandaloneKindSignature hidden tc_names (StandaloneKindSig _ v ki)
@@ -2413,7 +2450,7 @@ rnStandaloneKindSignature hidden tc_names (StandaloneKindSig _ v ki)
         }
 
 -- See Note [Dependency analysis of type and class decls]
-depAnalTyClDecls :: [(OccName, OccName)] -> GlobalRdrEnv
+depAnalTyClDecls :: LiftedDecls -> GlobalRdrEnv
                  -> NameSet                         -- Names in the current HsGroup
                  -> KindSig_FV_Env                  -- FVs of standalone kind signatures
                  -> [(LTyClDecl GhcRn, FreeNames)]
@@ -2423,10 +2460,10 @@ depAnalTyClDecls hidden rdr_env tc_names kisig_fv_env ds_w_fvs
   where
     lifted_owners = mkOccEnv hidden
     names_by_occ = mkOccEnv [(nameOccName name, name) | name <- nonDetEltsUniqSet tc_names]
-    -- Give the lifted family and its owning synonym one kind-checking SCC.
-    -- The partial application supplies the edge in the other direction.
+    -- The application supplies an edge from the owner to the lifted family.
+    -- Add the reverse edge when they need to share kind inference.
     owner_edge name = mkNameSet
-      [owner | occ <- maybeToList (lookupOccEnv lifted_owners (nameOccName name))
+      [owner | Just occ <- maybeToList (lookupOccEnv lifted_owners (nameOccName name))
              , owner <- maybeToList (lookupOccEnv names_by_occ occ)]
     -- Build a graph where each node is a `TyClDecl` keyed by its name, and
     -- its `FreeNames` give rise to edges.

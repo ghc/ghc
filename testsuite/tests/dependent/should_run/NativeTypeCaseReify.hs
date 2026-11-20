@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TemplateHaskell #-}
-{-# LANGUAGE GADTs, RankNTypes, TypeOperators #-}
+{-# LANGUAGE GADTs, PolyKinds, RankNTypes, TypeOperators #-}
 module NativeTypeCaseReify where
 import Data.Type.Equality ((:~:)(Refl))
 import Data.Proxy (Proxy)
@@ -50,12 +50,14 @@ type SeenForall = $(do
   info <- reify ''N.ForallResult
   case info of
     TyConI (TySynD _ [] scheme)
-      | ForallMatchT (PromotedT tagMa) tagGroup <- scheme
-      , ForallT [KindedTV _ SpecifiedSpec (ConT tagKind)] [] flagForall <- tagGroup
+      | ForallMatchT (PromotedT kindMa) kindGroup <- scheme
+      , ForallT [KindedTV k SpecifiedSpec StarT] [] tagForall <- kindGroup
+      , ForallMatchT (PromotedT tagMa) tagGroup <- tagForall
+      , ForallT [KindedTV _ SpecifiedSpec (VarT tagKind)] [] flagForall <- tagGroup
       , ForallMatchT (PromotedT flagMa) flagGroup <- flagForall
       , ForallT [KindedTV _ SpecifiedSpec (AppT (ConT maybeKind) (ConT flagKind))] [] _ <- flagGroup
-      , tagKind == ''Ordering, maybeKind == ''Maybe, flagKind == ''Bool
-      , nameBase tagMa == "Unmatchable", tagMa == flagMa -> pure scheme
+      , tagKind == k, maybeKind == ''Maybe, flagKind == ''Bool
+      , nameBase kindMa == "Unmatchable", tagMa == kindMa, flagMa == kindMa -> pure scheme
     _ -> fail (pprint info))
 
 checkedForall :: SeenForall

@@ -1,9 +1,10 @@
-{-# LANGUAGE GADTs, DataKinds, NoExperimentalDependentTypes, TypeApplications, TypeFamilies, PolyKinds, TypeOperators #-}
+{-# LANGUAGE GADTs, DataKinds, MagicHash, NoExperimentalDependentTypes, TypeApplications, TypeFamilies, PolyKinds, RankNTypes, TypeOperators #-}
 module NativeTypeCaseClient where
 
 import Data.Kind (Type)
 import Data.Type.Equality ((:~:)(Refl))
-import Data.Proxy (Proxy)
+import GHC.Exts (Int(I#), LiftedRep, RuntimeRep(IntRep))
+import Data.Proxy (Proxy(..))
 import NativeCase
 import qualified NativeNestedCase as N
 
@@ -122,3 +123,9 @@ forallResult :: N.ForallResult
 forallResult tag N.CaseOn = (tag, 1)
 forallResult tag N.CaseOff = (tag, 0)
 forallResult tag N.CaseMissing = (tag, '?')
+
+liftedResult :: N.ForallRepResult -> Int
+liftedResult select = select @Ordering @'LT @LiftedRep Proxy N.CaseOff
+
+unliftedResult :: N.ForallRepResult -> Int
+unliftedResult select = I# (select @Bool @'False @'IntRep Proxy N.CaseOn)

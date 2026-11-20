@@ -632,7 +632,7 @@ tcTyClDecls open_indices tyclds kisig_env role_annots
             -- and that ill-scoped kind made role inference fall over.
 
        ; let inferred = mkNameEnv [(tyConName tc, tc) | tc <- tc_tycons]
-       ; forM_ tyclds $ \(L _ decl) -> case decl of
+       ; forM_ tyclds $ \(L loc decl) -> case decl of
            SynDecl{tcdLName = L _ name, tcdRhs = rhs}
              | "$case-let-rhs:" `List.isPrefixOf` occNameString (nameOccName name)
              , Just tc <- lookupNameEnv inferred name
@@ -640,6 +640,13 @@ tcTyClDecls open_indices tyclds kisig_env role_annots
                  setSrcSpanA (getLoc rhs) $
                    failWithTc (mkTcRnUnknownMessage (mkPlainError []
                      (text "A type let used in a case body cannot generalize the kind of its right-hand side.")))
+           FamDecl{tcdFam = FamilyDecl{fdLName = L _ name}}
+             | isDependentCaseFamily name
+             , Just tc <- lookupNameEnv inferred name
+             , not (tyCoVarsOfType (tyConResKind tc) `subVarSet` mkVarSet (tyConVisibleTyVars tc)) ->
+                 setSrcSpanA loc $
+                   failWithTc (mkTcRnUnknownMessage (mkPlainError []
+                     (text "The result kind of this type case needs an explicit kind annotation.")))
            _ -> pure ()
        ; traceTc "tcTyAndCl generalized kinds" (vcat (map ppr_tc_tycon tc_tycons))
 
@@ -1395,6 +1402,24 @@ isCaseLet :: LTyClDecl GhcRn -> Bool
 isCaseLet (L _ SynDecl{tcdLName = L _ name}) =
   "$case-let-rhs:" `List.isPrefixOf` occNameString (nameOccName name)
 isCaseLet _ = False
+
+{- Note [Result kinds of dependent type cases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When a private family generalizes before its owner, its kind inference
+can add a parameter that the source case does not bind. For example, a
+branch of kind TYPE r can make ordinary family inference add an
+invisible representation parameter. The owner's arrow can default that
+parameter to LiftedRep, independently of the captured r.
+
+Require the result kind to depend only on visible captures. A written
+case annotation supplies that kind, and the normal family checker
+checks each equation against it.
+-}
+-- | The private family for a case with a dependent forall capture.
+isDependentCaseFamily :: Name -> Bool
+isDependentCaseFamily name =
+  "$case:" `List.isPrefixOf` occ && "-forall" `List.isSuffixOf` occ
+  where occ = occNameString (nameOccName name)
 
 -- | An inferred parameter may be the kind of an explicit capture.
 -- The checked argument determines this kind at each helper application.
@@ -6907,6 +6932,7 @@ addVDQNote :: TcTyCon -> TcM a -> TcM a
 addVDQNote tycon thing_inside
   | assertPpr (isMonoTcTyCon tycon) (ppr tycon $$ ppr tc_kind)
     has_vdq
+  , not (isDependentCaseFamily (tyConName tycon))
   = addErrCtxt (VDQWarningCtxt tycon) thing_inside
   | otherwise
   = thing_inside

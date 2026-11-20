@@ -125,10 +125,17 @@ An invisible `forall` can bind variables used by the case. For example,
 `forall (b :: Bool). Flag b -> (case b of { True -> Int; False -> Char })`
 selects the result at each instantiation of the function type. The
 private family takes `b` as a parameter. The application stays under
-the original `forall`. The binders need explicit closed kinds and
-names distinct from the surrounding captures. A dependent telescope
-such as `forall k (a :: k).` requires a family kind that is available
-when checking the owning synonym. [Quantified example](../examples/open-evaluation/NativeNestedCase.hs)
+the original `forall`. Binder names must be distinct from the
+surrounding captures.
+
+In `forall k (tag :: k) (d :: Maybe Bool).`, the helper takes `k` before
+`tag`. A case on `d` uses its written kind. If there is no dependency
+cycle, the helper generalizes before the synonym uses it. An annotation
+such as `(case d of …) :: TYPE r` gives the helper a result kind that
+depends on the captured `r`. GHC asks for an annotation if inference
+introduces a new variable in the result kind. A real cycle uses the
+ordinary rules for recursive kinds.
+[Quantified example](../examples/open-evaluation/NativeNestedCase.hs)
 and [Agda function types](https://agda.readthedocs.io/en/v2.8.0/language/function-types.html).
 
 ## A case in a let body
