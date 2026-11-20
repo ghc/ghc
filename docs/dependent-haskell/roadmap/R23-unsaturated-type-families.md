@@ -102,6 +102,27 @@ kind errors in the `PromoteX` and `DemoteX` equations for `Either`.
 [Full test](../../../testsuite/tests/dependent/should_compile/GADTSingletons.hs)
 and [proposal 242 on synonym right-hand sides](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#rhs-of-type-synonyms).
 
+The nested arrow in `DemoteX (a :: Type) = Demote a` needs two
+independent matchability choices. One controls the returned `Demote a`.
+The other controls its kind, `Demote Type`. With the former compiler,
+an ordinary client could pass `Maybe` to the interpreted unary kind,
+but it could not pass `Either` to the interpreted binary kind.
+The independent parameters let the same interpreter form the two
+matchable arrows of `Either` or the two runtime arrows of `(&&)`.
+Its separately compiled client prints `(Right 7,False)` and leaves the
+second Boolean operand unevaluated.
+[Interpreter](../examples/open-evaluation/NestedFunctionKind.hs)
+and [ordinary client](../examples/open-evaluation/NestedFunctionClient.hs).
+
+In the full upstream test, two written annotations now suffice. The
+`~>` synonym uses `%M`, and the `Promote` equation matches
+`a %(m :: Matchability) -> b` for either `m`. The unchanged source
+still reports GHC-83865 at its original bare synonym. An upgrade from
+the 299-line compiler rebuilds the interpreter once. The next build
+reuses its outputs. Its incremental provider and client interfaces
+have the same ABI hashes as a clean build.
+[Upgrade check, option `--family-forwarding`](../examples/closed-evaluation/check-readback-upgrade.sh).
+
 In `T15874`, the original `type Varianced = forall (var :: Var). Type`
 supplies an invisible U forall. The data-family instance requires M.
 GHC-45219 names the synonym and both matchabilities, including when the
