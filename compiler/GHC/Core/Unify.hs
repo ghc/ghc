@@ -33,6 +33,7 @@ import GHC.Core.Predicate( CanEqLHS(..), canEqLHS_maybe )
 import GHC.Core.TyCon.Env
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Compare ( eqType, eqTypeX, tcEqType, tcEqTyConAppArgs )
+import GHC.Core.TyCo.FVs ( tyCoVarsOfTypeList )
 import GHC.Core.TyCo.Subst   ( mkTvSubst, deepSubstTy, extendSubstInScopeSet )
 import GHC.Core.Map.Type
 import GHC.Core.Multiplicity
@@ -739,7 +740,7 @@ ruleMatchTyKiX
   -> Maybe TvSubstEnv
 ruleMatchTyKiX tmpl_tvs rn_env tenv tmpl target
 -- See Note [Kind coercions in Unify]
-  = case tc_unify_tys MatchOrdinary neverBindFam (matchBindTv tmpl_tvs)
+  = case tc_unify_tys MatchRule neverBindFam (matchBindTv tmpl_tvs)
       -- neverBindFam: a type family probably shouldn't appear
       -- on the LHS of a RULE, although we don't currently prevent it.
       -- But even if it did, (ATF8) in Note [Apartness and type families]
@@ -1626,6 +1627,7 @@ data AmIUnifying = Matching | Unifying
 
 data MatchMode
   = MatchOrdinary
+  | MatchRule     -- See Note [Opaque existential matching].
   | MatchRetained -- See Note [Matching retained function types]
   | MatchRepeatedWith (Type -> Type -> Bool)
 
@@ -1952,6 +1954,15 @@ unify_ty env ty1@ExistsTy{} ty2@ExistsTy{} _
   | not (anyFreeVarsOfTypes isTyCoVar [ty1, ty2])
   , eqTypeX (um_rn_env env) ty1 ty2
   = return ()
+  | MatchRule <- um_match_mode env
+  , let vars = tyCoVarsOfTypeList ty1
+  , all isTyVar vars
+  = do { tenv <- getTvSubstEnv
+       ; case traverse (lookupVarEnv tenv . umRnOccL env) vars of
+           Just args
+             | not (anyInRnEnvR (um_rn_env env) (tyCoVarsOfTypes (ty2 : args)))
+             , eqType (substTyWith vars args ty1) ty2 -> return ()
+           _ -> maybeApart MARExistential }
 unify_ty _ ExistsTy{} _ _ = maybeApart MARExistential
 unify_ty _ _ ExistsTy{} _ = maybeApart MARExistential
 unify_ty _ _ _ _ = surelyApart
@@ -1963,6 +1974,14 @@ alpha-reflexivity. Do not match free template variables through its body or
 derive apartness from failure to do so. Handle whole-type variables and stuck
 type family applications first. The occurs check must still traverse the
 binder and body when a variable can be bound to the whole existential.
+
+For a Core RULE on `toList @a (s :: Stream a)`, the first argument
+supplies a substitution for a. When the matcher reaches s, compare the
+entire existential type at that substitution. Look up each free template
+variable under the current renaming. This comparison cannot bind another
+variable. Both the substitutions and the target must be independent of
+binders introduced on the right of the match. Ordinary family matching
+and apartness keep their existing treatment of an open existential.
 -}
 
 -----------------------------

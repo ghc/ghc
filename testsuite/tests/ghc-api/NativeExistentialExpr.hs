@@ -62,7 +62,7 @@ import GHC.Types.Name.Occurrence (mkVarOcc)
 import GHC.Types.SrcLoc (noSrcSpan)
 import GHC.Types.Unique (Unique, UniqueTag (PluginTag))
 import GHC.Types.Unique.Supply (mkSplitUniqSupply, uniqsFromSupply)
-import GHC.Types.Var (ExistsTyFlag (ExplicitExists), isTyVar, mkCoVar, mkTyVar, varType)
+import GHC.Types.Var (ExistsTyFlag (ExplicitExists, ImplicitExists), isTyVar, mkCoVar, mkTyVar, varType)
 import GHC.Types.Var.Env (mkInScopeSetList)
 import GHC.Unit.Module (IsBootInterface (NotBoot), mkModule)
 import GHC.Unit.Module.ModIface (emptyFullModIface, mi_decls, set_mi_decls)
@@ -191,6 +191,19 @@ checkPackageOptimizers libdir = session libdir $ \env _ -> do
         fail "Rule matching lost the witness or confused alpha-renamed openings"
     unless (matches [hole] template closed && not (matches [hole] template renamed)) $
         fail "A rule substitution captured an opened witness or payload"
+    let openSchema elemTy = ExistsTy ImplicitExists schemaArg
+              (mkBoxedTupleTy [TyVarTy schemaArg, elemTy])
+        element = TyVarTy witness
+        knownElement chosen target = isJust (matchExprs rule_env [witness]
+              [Type element, Type (openSchema element)] [Type chosen, Type (openSchema target)])
+        capturedElement = isJust (matchExprs rule_env [witness]
+              [Type element, Lam schemaArg (Type (openSchema element))]
+              [Type (TyVarTy other), Lam other (Type (openSchema (TyVarTy other)))])
+    unless (knownElement (TyVarTy other) (TyVarTy other)
+            && not capturedElement
+            && not (knownElement boolTy charTy)
+            && not (matches [witness] (Type (openSchema element)) (Type (openSchema boolTy)))) $
+        fail "A rule must fix the element type before comparing whole existential types"
     putStrLn "erased package rules match bound variables and reject escaping substitutions"
 
     -- A lifted exit uses the abstract payload in a strict case. Its type
