@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, PolyKinds #-}
-{-# LANGUAGE StandaloneKindSignatures, TypeFamilies, TypeOperators, UndecidableInstances #-}
+{-# LANGUAGE StandaloneKindSignatures, TypeFamilies, TypeOperators #-}
 
 module NativeNestedSumCapture where
 
@@ -28,7 +28,7 @@ type Shadow a (n :: N) (m :: N) (v :: Vec a (Add n m)) =
   some (n :: Vec a n) |
     (some (x :: Proxy n) | (Proxy n, Proxy x, v :~: v))
 
-type NestedShadow (n :: N) (v :: Vec Bool (Add n n)) =
+type NestedShadow (n :: N) (m :: N) (v :: Vec Bool (Add n m)) =
   some (n :: Vec Bool n) |
     (some (n :: Proxy n) |
       (some (x :: Proxy n) | (Proxy n, Proxy x, v :~: v)))

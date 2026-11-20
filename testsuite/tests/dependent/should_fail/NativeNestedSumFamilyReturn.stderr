@@ -1,0 +1,10 @@
+NativeNestedSumFamilyReturn.hs:7:15: error: [GHC-22979]
+    • The type-family application ‘NativeNestedSumFamilyReturn.$lambda:Loop:1-sigma
+                                     a left’
+        is no smaller than
+        the LHS of the family instance ‘NativeNestedSumFamilyReturn.$lambda:Loop:0-sigma
+                                          a left’
+    • In a branch of the type lambda in ‘Loop’
+      In the type lambda in ‘Loop’
+    Suggested fix:
+      Perhaps you intended to use the ‘UndecidableInstances’ extension

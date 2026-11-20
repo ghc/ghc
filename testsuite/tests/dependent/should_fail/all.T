@@ -269,3 +269,5 @@ test('NativeTypeCaseRetainedReify', [req_th, only_ways(['normal'])],
      compile_fail, ['-fdiagnostics-show-caret ' + config.ghc_th_way_flags])
 test('NativeNestedSumCaptureWrong', normal, compile_fail, [''])
 test('NativeIrredIndexEvidence', normal, compile_fail, [''])
+test('NativeNestedSumRecursiveAlias', normal, compile_fail, [''])
+test('NativeNestedSumFamilyReturn', normal, compile_fail, [''])

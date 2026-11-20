@@ -694,7 +694,16 @@ tcTyClDecls open_indices tyclds kisig_env role_annots
                ; pure (tycons, data_deriv_infos) }
              check_syn_cycles tycons = do
                home_unit <- hsc_home_unit <$> getTopEnv
-               checkSynCycles (homeUnitAsUnit home_unit) (map fst tycons) tyclds
+               let scoped = mkNameSet
+                     [ unLoc name
+                     | L _ (FamDecl _ FamilyDecl{fdLName = name,
+                           fdInfo = ClosedTypeFamily (_, Just _) _}) <- tyclds ]
+                   payloads = mkNameEnv
+                     [ (name, [rhs | VI{vi_rhs = rhs} <- infos])
+                     | (tc, infos) <- tycons
+                     , let name = tyConName tc
+                     , name `elemNameSet` scoped ]
+               checkSynCyclesWithPayloads payloads (homeUnitAsUnit home_unit) (map fst tycons) tyclds
        ; if not edt
          then do { (tycons, derives) <- check_declarations emptyNameEnv
                  ; check_syn_cycles tycons
