@@ -30,12 +30,13 @@ type Blocked (d :: Maybe (ClosedGate Ordering)) = case d of
 
 type family ConditionalIx (b :: Bool) where
   ConditionalIx 'True = Bool
+type family NonInjectiveIx (b :: Bool) where
+  NonInjectiveIx b = Bool
+data ConditionalGate k marker where
+  ConditionalPlain :: Bool -> ConditionalGate Bool Bool
+  ConditionalFamily :: Proxy b -> ConditionalGate (ConditionalIx b) (NonInjectiveIx b)
 
-data ConditionalGate k (b :: Bool) where
-  ConditionalPlain :: Bool -> ConditionalGate k b
-  ConditionalFamily :: Bool -> ConditionalGate (ConditionalIx b) b
-
-type NeedsRefinement (d :: Maybe (ConditionalGate Bool 'True)) = case d of
-  Just (ConditionalFamily True) -> Int
+type NeedsRefinement (d :: Maybe (ConditionalGate Bool (NonInjectiveIx 'True))) = case d of
+  Just (ConditionalPlain True) -> Int
   Just _ -> Bool
   Nothing -> Char

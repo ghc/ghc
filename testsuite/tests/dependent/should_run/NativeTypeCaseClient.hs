@@ -179,6 +179,13 @@ refinedFieldOrder ::
   , N.IndexedFieldOrder ('Just ('N.RefinedFieldBox ('Proxy :: Proxy 'True) ('N.FieldOn 'False))) :~: Int )
 refinedFieldOrder = (Refl, Refl)
 
+refinedBranches :: Proxy seed ->
+  ( N.RefinedBranchPick seed ('Just ('N.RefinedBranch 'Proxy ('N.RefinedBit 'True))) :~: Int
+  , N.RefinedBranchPick seed ('Just ('N.RefinedBranch 'Proxy ('N.RefinedBit 'False))) :~: Int
+  , N.RefinedBranchPick seed ('Just ('N.RefinedBranch 'Proxy 'N.InnerDisjoint)) :~: Bool
+  , N.RefinedBranchPick seed ('Just 'N.OuterDisjoint) :~: Char )
+refinedBranches _ = (Refl, Refl, Refl, Refl)
+
 arrowResult ::
   N.ArrowResult 'LT ('Just ('Just 'True)) :~: (() -> (Proxy 'LT, Proxy 'True))
 arrowResult = Refl

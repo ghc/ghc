@@ -8,6 +8,7 @@ module NativeNestedCase
   , FamilyGate(..), FamilyGatePick, WrittenGatePick, HiddenGatePick, ApartGatePick
   , DependentFieldGate(..), DependentFieldPick
   , IndexedFieldBox(..), IndexedFieldPayload(..), IndexedFieldPick, IndexedFieldOrder
+  , RefinedGate(..), RefinedLeaf(..), RefinedBranchPick
   , OpenCaseGate(..), OpenCaseIndex, OpenIndexPick, OpenIndexAtOrdering
   , ScopedOpenIndex
   ) where
@@ -202,6 +203,33 @@ type IndexedFieldOrder (d :: Maybe (IndexedFieldBox Bool 'True)) = case d of
   Just (RefinedFieldBox _ (FieldOn True)) -> Int
   Just _ -> Int
   Nothing -> Char
+
+type family OuterBranchIndex (tag :: Bool) (seed :: Bool) :: Type where
+  OuterBranchIndex 'True seed = Bool
+  OuterBranchIndex 'False seed = Ordering
+
+type family InnerBranchIndex (tag :: Bool) (seed :: Bool) :: Type where
+  InnerBranchIndex 'False seed = Bool
+  InnerBranchIndex 'True seed = Ordering
+
+-- | A promoted leaf whose result kind depends on its last index.
+data RefinedLeaf k (seed :: Bool) (tag :: Bool) where
+  RefinedBit :: Bool -> RefinedLeaf (InnerBranchIndex tag seed) seed tag
+  InnerDisjoint :: RefinedLeaf Bool seed 'False
+
+-- | A gate that fixes the inner leaf's index independently of its own.
+data RefinedGate k (seed :: Bool) (tag :: Bool) where
+  RefinedBranch :: Proxy seed -> RefinedLeaf Bool seed 'False
+                -> RefinedGate (OuterBranchIndex tag seed) seed tag
+  OuterDisjoint :: RefinedGate Bool seed 'True
+
+-- | Refine the index at each constructor and keep the tests in source order.
+type RefinedBranchPick (seed :: Bool) (d :: Maybe (RefinedGate Bool seed 'True)) = case d of
+  Just (RefinedBranch _ (RefinedBit True)) -> Int
+  Just (RefinedBranch _ (RefinedBit _)) -> Int
+  Just (RefinedBranch _ InnerDisjoint) -> Bool
+  Just OuterDisjoint -> Char
+  Nothing -> ()
 
 type ArrowResult (tag :: k) (d :: Maybe (Maybe Bool)) =
   () -> (case d of

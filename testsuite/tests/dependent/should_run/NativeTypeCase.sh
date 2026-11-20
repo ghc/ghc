@@ -49,6 +49,8 @@ cp NativeCase.hi NativeNestedCase.hi OpenMapWorker.hi NativeTypeCaseFallback.hi 
    grep -Eq 'the type case in .*ForallResult' bad.log &&
    grep -Eq 'the type case in .*IndexedFieldOrder' bad.log &&
    grep -Fq 'blockedTransport _ = Refl' bad.log &&
+   grep -Fq 'NativeTypeCaseRigid.hs:81:21: error: [GHC-83865]' bad.log &&
+   grep -Eq 'the type case in .*RefinedBranchPick' bad.log &&
    ! grep -Eq '\$(case(-node)?|lambda):' bad.log &&
    reject NativeTypeCaseLetWrong 8:9 'GHC-83865')
 "${g[@]}" -fomit-interface-pragmas -c NativeTypeCaseHeadProvider.hs
@@ -89,7 +91,7 @@ grep -Eq 'has kind .*Bool' bad.log
 reject NativeTypeCaseNestedAliasHead 5:8 'GHC-55789'
 reject NativeTypeCaseOpaqueIndex 14:9 'GHC-83865'
 grep -Fq 'NativeTypeCaseOpaqueIndex.hs:27:9: error: [GHC-83865]' bad.log
-grep -Fq 'NativeTypeCaseOpaqueIndex.hs:39:3: error: [GHC-79642]' bad.log
+grep -Fq 'NativeTypeCaseOpaqueIndex.hs:40:3: error: [GHC-79642]' bad.log
 test "$(grep -c 'error: \[GHC-79642\]' bad.log)" = 1
 grep -Fq 'Cannot determine which constructors are possible' bad.log
 reject NativeTypeCaseErasedAlias 8:3 'GHC-30337'
@@ -102,6 +104,35 @@ reject NativeTypeCaseHiddenErased 6:3 'GHC-30337'
 
 # A stuck family still blocks refinement without Core Lint.
 g=("${plain[@]}")
-reject NativeTypeCaseOpaqueIndex 39:3 'GHC-79642'
+reject NativeTypeCaseOpaqueIndex 40:3 'GHC-79642'
 test "$(grep -c 'error: \[GHC-79642\]' bad.log)" = 1
 ! grep -Fq 'Core Lint errors' bad.log
+
+
+# A speculative branch gets one family step. Checking a written use
+# of the same constructor still reports the solver's reduction limit.
+cat >NativeTypeCaseRecursiveIndex.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeFamilies, UndecidableInstances #-}
+module NativeTypeCaseRecursiveIndex where
+
+import Data.Kind (Type)
+
+type family Loop (tag :: Bool) :: Type where
+  Loop 'True = Loop 'True
+  Loop 'False = Ordering
+
+data Gate k (tag :: Bool) where
+  Known :: Bool -> Gate Bool 'True
+  Recursive :: Gate (Loop tag) tag
+
+type Pick (d :: Maybe (Gate Bool 'True)) = case d of
+  Just (Known True) -> Int
+  Just _ -> Bool
+  Nothing -> ()
+HS
+g=("${plain[@]}" -dcore-lint -dstg-lint -freduction-depth=8)
+reject NativeTypeCaseRecursiveIndex 15:3 'GHC-79642'
+sed 's/Just (Known True) -> Int/Just Recursive -> Int/' NativeTypeCaseRecursiveIndex.hs >recursive.hs
+mv recursive.hs NativeTypeCaseRecursiveIndex.hs
+reject NativeTypeCaseRecursiveIndex 15:8 'GHC-40404'
+grep -Fq 'Reduction stack overflow; size = 9' bad.log

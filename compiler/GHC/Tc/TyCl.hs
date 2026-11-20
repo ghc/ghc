@@ -4295,6 +4295,17 @@ pattern can carry a kind cast from ordinary kind checking. Read the constructor
 under that cast, including casts reached by expanding an alias. The
 generated branch constructs its own evidence. The checked source
 pattern, with its casts, still determines the substitution for the RHS.
+
+A family index can need a refinement from another index of the same
+constructor. For example, the result kind Gate (Index tag) seed tag
+can match Gate Bool seed 'True when Index 'True reduces to Bool.
+The indices of the nominally generative Gate head must agree in this
+branch. Use the family-free pairs of indices to find a substitution.
+Apply it to both kinds before retrying the closed-family steps. Only
+a complete unification proves the equality needed for the branch.
+This substitution is local to this constructor and its nested tests.
+The retry starts from the original arguments and still takes only one
+family step per index. It never reduces the result of a previous step.
 -}
 
 data CheckedCasePattern
@@ -4531,18 +4542,31 @@ checkedCaseKindRefinement actual expected
              = redn
              | otherwise = Reduction (mkNomReflCo a) a
            binders = binderVars (tyConBinders tc)
-           index_steps = zipWith index_step as bs
-           redns
-             | binders `equalLength` index_steps, all isTyVar binders
-             = snd (List.mapAccumL transport (emptyLiftingContext emptyInScopeSet)
-                                 (zip binders index_steps))
-             | otherwise = index_steps
+           check_indices prior actual_args expected_args =
+             let index_steps = zipWith index_step actual_args expected_args
+                 redns
+                   | binders `equalLength` index_steps, all isTyVar binders
+                   = snd (List.mapAccumL transport (emptyLiftingContext emptyInScopeSet)
+                                         (zip binders index_steps))
+                   | otherwise = index_steps
+                 reduced = map reductionReducedType redns
+                 refinement = do
+                   guard (kinded_args (tyConKind tc) reduced)
+                   tcUnifyTy (mkTyConApp tc reduced) (mkTyConApp tc expected_args)
+             in case refinement of
+               Just refine ->
+                 let co = mkTyConAppCo Nominal tc (map reductionCoercion redns)
+                     complete = maybe refine (composeTCvSubst refine) prior
+                     -- A reduction can discard an argument that is still in its proof.
+                     scoped = extendSubstInScopeSetFromSource complete (tyCoVarsOfCo co)
+                 in (Just (scoped, co), False)
+               Nothing -> (Nothing, or (zipWith index_apart reduced expected_args))
+
            transport lc (binder, Reduction co arg) =
              let kind_co = liftCoSubst Nominal lc (varType binder)
                  arg_co = co `mkTransCo` mkGReflRightMCo Nominal arg (MCo kind_co)
                  lc' = extendLiftingContextAndInScope lc binder arg_co
              in (lc', Reduction arg_co (mkCastTy arg kind_co))
-           reduced = map reductionReducedType redns
            index_apart a b = typeKind a `eqType` typeKind b && typesAreApart a b
            kinded_args _ [] = True
            kinded_args kind (arg:args)
@@ -4550,16 +4574,16 @@ checkedCaseKindRefinement actual expected
              , typeKind arg `eqType` piTyBinderType bndr
              = kinded_args (piResultTy kind arg) args
              | otherwise = False
-           refinement = do
-             guard (kinded_args (tyConKind tc) reduced)
-             tcUnifyTy (mkTyConApp tc reduced) expected
-       case refinement of
-         Just refine ->
-           let co = mkTyConAppCo Nominal tc (map reductionCoercion redns)
-               -- A reduction can discard an argument that is still in its proof.
-               scoped = extendSubstInScopeSetFromSource refine (tyCoVarsOfCo co)
-           in pure (Just (scoped, co), False)
-         Nothing -> pure (Nothing, or (zipWith index_apart reduced bs))
+           structural_pair (a, b) =
+             isFamFreeTy a && isFamFreeTy b && typeKind a `eqType` typeKind b
+
+       pure $ case check_indices Nothing as bs of
+         (Nothing, False)
+           | let (lhs, rhs) = unzip (filter structural_pair (zip as bs))
+           , Just prior <- tcUnifyTys alwaysBindTv lhs rhs
+           , not (isEmptySubst prior)
+           -> check_indices (Just prior) (substTys prior as) (substTys prior bs)
+         result -> result
   | otherwise = pure (Nothing, False)
 
 -- | Align nominal fields with the checked arguments written at the alias.

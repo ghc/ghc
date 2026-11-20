@@ -144,8 +144,17 @@ An ordinary client checks the extracted field type through the
 interface. A rigid leaf still blocks an earlier constructor test.
 The reduced arguments must still fit the constructor kind. A reduction
 that changes the kind of a later index needs explicit nominal transport.
-An index equation that requires refinement before it can reduce also
-remains outside this check.
+
+A constructor can also fix an index that a closed family needs in
+another index. In `RefinedBranchPick`, the outer constructor fixes
+one tag to `True` and the inner constructor fixes a different tag to
+`False`. Each tests its own tag and carries the same rigid seed.
+The compiler collects the nominal equalities from family-free index
+pairs at the current constructor. Under that substitution it tries
+one reduction per family index and checks the whole result kind.
+Each retry starts from the original indices. A recursive result
+stays stuck. The first test of a rigid Boolean leaf still blocks the
+same-result fallback, and either disjoint constructor can match.
 [Agda indexed matching](https://agda.readthedocs.io/en/v2.8.0/language/coverage-checking.html#matching-on-indexed-datatypes).
 
 The tests compile an ordinary client using only stripped interfaces.
