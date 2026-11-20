@@ -665,7 +665,7 @@ cpeBind top_lvl env (NonRec bndr rhs)
           Var fun -> isNativeIndexFunctionId fun
                   && idType fun `eqType` idType bndr
           _ -> False
-      | isNativeIndexId bndr = isJust (exprToNativeIndex rhs)
+      | isNativeOpaqueValueId bndr = isJust (exprToNativeIndex rhs)
       | otherwise = True
 
 cpeBind top_lvl env (Rec pairs)
@@ -1465,7 +1465,7 @@ cpeApp top_env expr
         -- allocating CaseBound Floats for token and thing as needed
         = do { (floats1, token) <- cpeArg env topDmd token
              ; (floats2, thing) <- cpeBodyF env thing
-             ; case_bndr <- (`setIdUnfolding` evaldUnfolding) <$> newVar env ty
+             ; case_bndr <- (`setIdUnfolding` evaldUnfolding) <$> newVar env (cpSubstTy env ty)
              ; let tup = mkCoreUnboxedTuple [token, Var case_bndr]
              ; let float = mkCaseFloat case_bndr thing
              ; return (floats1 `appFloats` floats2 `snocFloat` float, tup) }

@@ -1206,28 +1206,34 @@ localiseNativeTopIndices name_cache binds = mapM localise_bind binds
                                        indices aliases
            ; return (bndr, mkLets alias_binds (CoreSubst.substExpr subst protected_rhs)) }
       where
-        protected_rhs | isEmptyVarSet top_tables = rhs
-                      | otherwise = protect_calls rhs
+        (operand_vars, protected_rhs) = protect_calls rhs
+        index_vars = operand_vars `unionVarSet` exprAnnotationFreeVars rhs
         indices = filter (\v -> v `elemVarSet` top_binders
-                            && (isNativeIndexId v || isNativeIndexFunctionId v))
+                            && (isNativeIndexId v || isNativeIndexFunctionId v
+                                || (v `elemVarSet` index_vars && isNativeOpaqueValueId v)))
                          (exprFreeVarsList protected_rhs)
         index_set = mkVarSet indices
 
     -- Core.Subst leaves the global reference intact. tidyVarOcc finds the
     -- final top-level binder by Unique. See Note [Local indices across Core Tidy].
+    protect_calls :: CoreExpr -> (VarSet, CoreExpr)
     protect_calls (App fun arg)
-      | App{} <- arg
-      , Just{} <- nativeComputedIndex arg
-      , DepFunTy{} <- coreFullView (exprType fun)
-      = App (protect_calls fun) (protect_operand arg)
-      | otherwise = App (protect_calls fun) (protect_calls arg)
-    protect_calls (Lam b body) = Lam b (protect_calls body)
-    protect_calls (Let bind body) = Let (protect_bind bind) (protect_calls body)
+      | DepFunTy{} <- coreFullView (exprType fun)
+      , Just index <- retainedArgIndex arg
+      = let arg' | not (isEmptyVarSet top_tables), Just{} <- nativeComputedIndex arg
+                 = protect_operand arg
+                 | otherwise = arg
+        in App <$> protect_calls fun <*> (tyCoVarsOfType index, arg')
+      | otherwise = App <$> protect_calls fun <*> protect_calls arg
+    protect_calls (Lam b body) = Lam b <$> protect_calls body
+    protect_calls (Let bind body) = Let <$> protect_bind bind <*> protect_calls body
     protect_calls (Case scrut b ty alts) =
-      Case (protect_calls scrut) b ty [Alt con bs (protect_calls r) | Alt con bs r <- alts]
-    protect_calls (Cast e co) = Cast (protect_calls e) co
-    protect_calls (Tick t e) = Tick t (protect_calls e)
-    protect_calls e = e
+      (\s as -> Case s b ty as) <$> protect_calls scrut <*> traverse protect_alt alts
+    protect_calls (Cast e co) = (\e' -> Cast e' co) <$> protect_calls e
+    protect_calls (Tick t e) = Tick t <$> protect_calls e
+    protect_calls e = pure e
+
+    protect_alt (Alt con bs rhs) = Alt con bs <$> protect_calls rhs
 
     protect_operand expr
       | (Var fun, args@(_ : _)) <- collectArgs expr
@@ -1238,8 +1244,8 @@ localiseNativeTopIndices name_cache binds = mapM localise_bind binds
     protect_operand (App fun arg) = App (protect_operand fun) (protect_operand arg)
     protect_operand expr = expr
 
-    protect_bind (NonRec b r) = NonRec b (protect_calls r)
-    protect_bind (Rec pairs) = Rec [(b, protect_calls r) | (b, r) <- pairs]
+    protect_bind (NonRec b r) = NonRec b <$> protect_calls r
+    protect_bind (Rec pairs) = Rec <$> traverse (traverse protect_calls) pairs
 
     new_alias index
       = do { uniq <- takeUniqFromNameCache name_cache
@@ -1251,6 +1257,8 @@ localiseNativeTopIndices name_cache binds = mapM localise_bind binds
 Core Tidy turns top-level LocalIds into GlobalIds. A native argument such as
 S bottomLength can therefore pass the earlier checks but fail after Tidy:
 exprToNativeIndex requires each variable leaf to be a local unrestricted Id.
+This includes an opaque witness, such as an IO action in a dependent pair.
+Collect its identity from retained operands as well as type annotations.
 TermAppTy also requires a local unrestricted function head. Do not extend
 either grammar to arbitrary GlobalIds.
 
@@ -1273,8 +1281,8 @@ retained arguments] in GHC.Core.
 
 The top binder and its type do not change. A selected index must not escape
 through that type. Source signature and inference checks already exclude
-that escape. The alias has the original closed scalar domain or closed-domain
-function type, and Many multiplicity. The lazy binding does not evaluate the
+that escape. The alias has the original witness type and Many multiplicity.
+The lazy binding does not evaluate the
 index or function head, and does not change the function arity.
 Ordinary RHSs take the existing path. This late step runs after simplification;
 no simplifier can inline an alias before Tidy globalises its RHS. CorePrep's
