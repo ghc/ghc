@@ -150,6 +150,7 @@ data TypeMapX a
        , tm_termvar :: VarMap a -- See Note [Native type-map keys]
        , tm_termapp :: VarMap (TypeMapG a)
        , tm_depfun :: Map.Map DepFunTyFlag (TypeMapG (TypeMapG a))
+       , tm_exists :: TypeMapG (TypeMapG a)
        , tm_app    :: TypeMapG (TypeMapG a)  -- Note [Equality on AppTys] in GHC.Core.Type
        , tm_tycon  :: DNameEnv a
        , tm_forall :: TypeMapG (TypeMapG (BndrMap a)) -- Metadata, body, binder.
@@ -207,13 +208,14 @@ trieMapView _ = Nothing
 -- TODO(22292): derive
 instance Functor TypeMapX where
     fmap f TM
-      { tm_var = tvar, tm_termvar = ttermvar, tm_termapp = ttermapp, tm_depfun = tdepfun
+      { tm_var = tvar, tm_termvar = ttermvar, tm_termapp = ttermapp, tm_depfun = tdepfun, tm_exists = texists
       , tm_app = tapp, tm_tycon = ttycon, tm_forall = tforall
       , tm_tylit = tlit, tm_coerce = tcoerce } = TM
       { tm_var = fmap f tvar
       , tm_termvar = fmap f ttermvar
       , tm_termapp = fmap (fmap f) ttermapp
       , tm_depfun = fmap (fmap (fmap f)) tdepfun
+      , tm_exists = fmap (fmap f) texists
       , tm_app = fmap (fmap f) tapp, tm_tycon = fmap f ttycon
       , tm_forall = fmap (fmap (fmap f)) tforall
       , tm_tylit  = fmap f tlit, tm_coerce = fmap f tcoerce }
@@ -286,6 +288,9 @@ eqDeBruijnType env_t1@(D env1 t1) env_t2@(D env2 t2) =
                  go (D env a) (D env' a')
           (TermVarTy v, TermVarTy v')
               -> liftEquality $ eqDeBruijnVar (D env v) (D env' v')
+          (ExistsTy v ty, ExistsTy v' ty')
+             -> go (D env (varType v)) (D env' (varType v')) `andEq`
+                go (D (extendCME env v) ty) (D (extendCME env' v') ty')
           (DepFunTy vis v ty, DepFunTy vis' v' ty')
               -> liftEquality (vis == vis') `andEq`
                  go (D env (varType v)) (D env' (varType v')) `andEq`
@@ -350,6 +355,7 @@ emptyT = TM { tm_var  = emptyTM
             , tm_termvar = emptyTM
             , tm_termapp = emptyTM
             , tm_depfun = Map.empty
+            , tm_exists = emptyTM
             , tm_app  = emptyTM
             , tm_tycon  = emptyDNameEnv
             , tm_forall = emptyTM
@@ -363,6 +369,8 @@ lkT (D env ty) m = go ty m
     go ty | Just ty' <- trieMapView ty = go ty'
     go (TermVarTy v)              = tm_termvar >.> lkVar env v
     go (TermAppTy f arg)          = tm_termapp >.> lkVar env f >=> lkG (D env arg)
+    go (ExistsTy v ty) = tm_exists >.> lkG (D env (varType v))
+                                   >=> lkG (D (extendCME env v) ty)
     go (DepFunTy vis v ty)        = tm_depfun >.> Map.lookup vis
                                                >=> lkG (D env (varType v))
                                                >=> lkG (D (extendCME env v) ty)
@@ -389,6 +397,9 @@ xtT (D env ty) f m | Just ty' <- trieMapView ty = xtT (D env ty') f m
 xtT (D env (TermVarTy v))     f m = m { tm_termvar = tm_termvar m |> xtVar env v f }
 xtT (D env (TermAppTy fun arg)) f m
   = m { tm_termapp = tm_termapp m |> xtVar env fun |>> xtG (D env arg) f }
+xtT (D env (ExistsTy v ty)) f m
+  = m { tm_exists = tm_exists m |> xtG (D env (varType v))
+                                |>> xtG (D (extendCME env v) ty) f }
 xtT (D env (DepFunTy vis v ty)) f m
   = m { tm_depfun = tm_depfun m |> alterTM vis
                                 |>> xtG (D env (varType v))
@@ -415,6 +426,7 @@ fdT k m = foldTM k (tm_var m)
         . foldTM k (tm_termvar m)
         . foldTM (foldTM k) (tm_termapp m)
         . foldTM (foldTM (foldTM k)) (tm_depfun m)
+        . foldTM (foldTM k) (tm_exists m)
         . foldTM (foldTM k) (tm_app m)
         . foldTM k (tm_tycon m)
         . foldTM (foldTM (foldTM k)) (tm_forall m)
@@ -422,7 +434,7 @@ fdT k m = foldTM k (tm_var m)
         . foldMaybe k (tm_coerce m)
 
 filterT :: (a -> Bool) -> TypeMapX a -> TypeMapX a
-filterT f (TM { tm_var  = tvar, tm_termvar = ttermvar, tm_termapp = ttermapp, tm_depfun = tdepfun
+filterT f (TM { tm_var  = tvar, tm_termvar = ttermvar, tm_termapp = ttermapp, tm_depfun = tdepfun, tm_exists = texists
               , tm_app = tapp, tm_tycon = ttycon
               , tm_forall = tforall, tm_tylit = tlit
               , tm_coerce = tcoerce })
@@ -430,6 +442,7 @@ filterT f (TM { tm_var  = tvar, tm_termvar = ttermvar, tm_termapp = ttermapp, tm
        , tm_termvar = filterTM f ttermvar
        , tm_termapp = fmap (filterTM f) ttermapp
        , tm_depfun = fmap (fmap (filterTM f)) tdepfun
+       , tm_exists = fmap (filterTM f) texists
        , tm_app    = fmap (filterTM f) tapp
        , tm_tycon  = filterTM f ttycon
        , tm_forall = fmap (fmap (filterTM f)) tforall
@@ -716,7 +729,7 @@ xtDNamed :: NamedThing n => n -> XT a -> DNameEnv a -> DNameEnv a
 xtDNamed tc f m = alterDNameEnv f m (getName tc)
 
 mpT :: (a -> Maybe b) -> TypeMapX a -> TypeMapX b
-mpT f (TM { tm_var  = tvar, tm_termvar = ttermvar, tm_termapp = ttermapp, tm_depfun = tdepfun
+mpT f (TM { tm_var  = tvar, tm_termvar = ttermvar, tm_termapp = ttermapp, tm_depfun = tdepfun, tm_exists = texists
           , tm_app = tapp, tm_tycon = ttycon
           , tm_forall = tforall, tm_tylit = tlit
           , tm_coerce = tcoerce })
@@ -724,6 +737,7 @@ mpT f (TM { tm_var  = tvar, tm_termvar = ttermvar, tm_termapp = ttermapp, tm_dep
        , tm_termvar = mapMaybeTM f ttermvar
        , tm_termapp = fmap (mapMaybeTM f) ttermapp
        , tm_depfun = fmap (fmap (mapMaybeTM f)) tdepfun
+       , tm_exists = fmap (mapMaybeTM f) texists
        , tm_app    = fmap (mapMaybeTM f) tapp
        , tm_tycon  = mapMaybeTM f ttycon
        , tm_forall = fmap (fmap (mapMaybeTM f)) tforall

@@ -3,6 +3,7 @@ module GHC.Core.Dependent (
     hasNativeDependentProgram,
     supportsNativeGentle,
     hasNativeDependentExpr,
+    hasExistentialExpr,
     hasNativeDependentExprRhs,
     hasNativeDependentUnfolding,
     rejectNativeDependentProgram,
@@ -15,7 +16,7 @@ import GHC.Core
 import GHC.Core.Type (isNativeIndexType, isNativeIndexFunctionId, isNativeOpaqueValueId
                      , isNativeRetainedBinder, isNativeIndexDomainConversion)
 import GHC.Core.TyCo.Compare (eqType)
-import GHC.Core.Coercion (coercionLKind, coercionRKind, coercionRole)
+import GHC.Core.Coercion (coercionLKind, coercionRKind, coercionRole, isExistsCoRule)
 import GHC.Core.DataCon (dataConRepType)
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon (TyCon, synTyConRhs_maybe)
@@ -71,6 +72,22 @@ hasNativeDependentProgram binds rules =
 supportsNativeGentle :: CoreProgram -> Bool
 supportsNativeGentle binds =
     not (runScanFor CheckGentle AllMetadata (foldMap scanBind binds))
+
+-- | Detect lexical existential expressions before selecting an optimizer.
+-- Occurrences cannot introduce new expression forms through Id metadata.
+hasExistentialExpr :: CoreExpr -> Bool
+hasExistentialExpr Pack{} = True
+hasExistentialExpr Unpack{} = True
+hasExistentialExpr (App f a) = hasExistentialExpr f || hasExistentialExpr a
+hasExistentialExpr (Lam _ body) = hasExistentialExpr body
+hasExistentialExpr (Let binding body) =
+    any hasExistentialExpr (rhssOfBind binding) || hasExistentialExpr body
+hasExistentialExpr (Case scrut _ _ alts) = hasExistentialExpr scrut || any go_alt alts
+  where
+    go_alt (Alt _ _ body) = hasExistentialExpr body
+hasExistentialExpr (Cast e _) = hasExistentialExpr e
+hasExistentialExpr (Tick _ e) = hasExistentialExpr e
+hasExistentialExpr _ = False
 
 -- | Inspect an expression and metadata on its bound identifiers.
 hasNativeDependentExpr :: CoreExpr -> Bool
@@ -137,6 +154,8 @@ scanExpr (Lam b body) = scanBinder b <> scanExpr body
 scanExpr (Let bind body) = scanBind bind <> scanExpr body
 scanExpr (Case scrut b result alts) =
     scanExpr scrut <> scanBinder b <> scanType result <> foldMap scanAlt alts
+scanExpr Pack{} = NativeScan (pure True)
+scanExpr Unpack{} = NativeScan (pure True)
 scanExpr (Cast body co) = scanExpr body <> scanCo co
 scanExpr (Tick tick body) = scanTick tick <> scanExpr body
 scanExpr (Type ty) = scanType ty
@@ -238,6 +257,7 @@ scanType (TyVarTy tv) = scanVarKind tv
 scanType (TermVarTy v) =
     gentleForm (NativeScan (pure (not (isNativeOpaqueValueId v))) <> scanVarKind v)
 scanType (TermAppTy f arg) = gentleForm (scanCallHead f <> scanType arg)
+scanType ExistsTy{} = NativeScan (pure True)
 scanType (DepFunTy _ b body) =
     gentleForm (scanRetainedIndex b <> scanType body)
 scanType (LitTy _) = mempty
@@ -289,7 +309,9 @@ scanCo (GRefl _ ty mco) = scanType ty <> scanMCo mco
 scanCo (TyConAppCo _ _ args) = foldMap scanCo args
 scanCo (AppCo fun arg) = scanCo fun <> scanCo arg
 scanCo (CoVarCo cv) = scanVarKind cv
-scanCo (AxiomCo _ args) = foldMap scanCo args
+scanCo (AxiomCo rule args)
+    | isExistsCoRule rule = NativeScan (pure True)
+    | otherwise = foldMap scanCo args
 scanCo (HoleCo hole) = scanVarKind (coHoleCoVar hole)
 scanCo (SymCo co) = scanCo co
 scanCo (TransCo left right) = scanCo left <> scanCo right

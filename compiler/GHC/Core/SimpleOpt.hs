@@ -542,6 +542,12 @@ simple_opt_expr env expr = go expr
     go (Coercion co)    = Coercion (go_co co)
     go (Lit lit)        = Lit lit
     go (Tick tickish e) = mkTick (substTickish subst tickish) (go e)
+    go (Pack schema witness payload) =
+      Pack (substTyUnchecked subst schema) (substTyUnchecked subst witness) (go payload)
+    go (Unpack witness payload package body) =
+      let (env_witness, witness') = subst_opt_bndr env witness
+          (env_body, payload') = subst_opt_bndr env_witness payload
+      in Unpack witness' payload' (go package) (simple_opt_expr env_body body)
     go (Let (NonRec alias con_app) (Case (Var scrut) b ty alts))
       | soe_native env
       , alias == scrut

@@ -537,6 +537,8 @@ collectCostCentres mod_name binds rules
       Lam _ e -> go cs e
       Let b e -> go (go_bind cs b) e
       Case scrt _ _ alts -> go_alts (go cs scrt) alts
+      Pack _ _ payload -> go cs payload
+      Unpack _ _ package body -> go (go cs package) body
       Cast e _ -> go cs e
       Tick (ProfNote cc _ _) e ->
         go (if ccFromThisModule cc mod_name then S.insert cc cs else cs) e

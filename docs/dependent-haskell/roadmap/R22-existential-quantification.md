@@ -56,11 +56,69 @@ ref `refs/archive/dependent-haskell/r22-formation`. Its GHC API test
 is `NativeExistentialCore`. The expression checkpoint is `949e49d863`
 on the local ref `refs/archive/dependent-haskell/r22-expressions`.
 Its `NativeExistentialExpr` test writes and reads the interface in
-separate GHC sessions. The public compiler still has no source binder
-for `exists`. The private builds reported 29 incomplete matches on the
-new type and 38 warnings that mention missing expression cases. The
-remaining work includes the optimizer, object-code clients and source
-elaboration.
+separate GHC sessions.
+
+## Explicit source packages
+
+With `ExperimentalDependentTypes` and `RequiredTypeArguments`, a
+module can import `GHC.Exists` and export an explicit package.
+
+```haskell
+package :: exists (a :: Type) | Maybe a
+package = Pack (type Bool) (Just True)
+
+present :: Bool
+present = case package of
+  Pack (type a) payload ->
+    case payload of
+      Nothing -> False
+      Just _ -> True
+```
+
+The expected type supplies the package schema. Write `Pack @Schema`
+when the application must synthesize its type. A sole Pack alternative
+binds a fresh type variable over the payload pattern and right-hand side.
+An ordinary variable payload pattern can ignore bottom. A constructor
+payload pattern demands the payload.
+
+The frozen source compiler at `750604f34c` compiled the provider and
+linked an ordinary consumer after removing the provider source. It
+checked Core, STG and HIE, exact constructor identity, both payload
+demand paths, witness escape and Template Haskell. The build used a
+temporary target package database with the base marker compiled in the
+configured base unit. The source test `NativeExistentialSource` runs
+those controls against the `GHC.Exists` provided by the built base.
+
+This slice supports one lifted witness, saturated applications and a
+sole prefix Pack case alternative. Compile modules that use erased
+existential types or expressions at `-O0`. The Showcase module exports
+its observation as an ordinary tuple for the optimized Showcase entry
+point. The implicit dot form and its vector filter remain open.
+
+### A lazy filter with an erased length
+
+The [example](../examples/erased-existentials/ErasedPackage.hs) gives the
+filter an explicit result schema.
+
+```haskell
+type Filtered a = exists (m :: Nat) | Vec a m
+filterVec :: (a -> Bool) -> Vec a n -> Filtered a
+```
+
+On a passing element, the filter opens the recursive result and packs
+the new vector with witness `'S m`. The length is erased. Reading the first
+cell should demand the predicate and its result while leaving the tail
+unevaluated. The source-free client also checks a rejected prefix, an empty
+result, and an empty input.
+
+At `7a2fe4027b` the client observes `([7],[7,9],[],[])` when the element
+type is fixed to `Int` and the length constructors have kind `Type`.
+Using a promoted `Nat` instead reaches GHC-97230 at the existential binder.
+Keeping the element polymorphic reaches a missing `liftCoSubst` case.
+The candidate checks the witness against its declared kind and transports
+payload equality under the binder. The original polymorphic, `Nat`-indexed
+source program is the acceptance test. Implicit packing and opening for
+the dot form require additional inference.
 
 At `e04f9add03`, the filter signature fails at the dot in `exists m.`
 with GHC-68947. An ordinary GADT control uses `Some :: Vec n a -> Some a`.

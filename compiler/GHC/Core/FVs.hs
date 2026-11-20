@@ -262,6 +262,10 @@ exprFVs (Lit _)         = mempty
 exprFVs (Tick t expr)   = tickish_fvs t `mappend` exprFVs expr
 exprFVs (App fun arg)   = exprFVs fun `mappend` exprFVs arg
 exprFVs (Lam bndr body) = addCoreBndrFV bndr (exprFVs body)
+exprFVs (Pack package_ty witness payload) =
+  deepSelTypeFV package_ty `mappend` deepSelTypeFV witness `mappend` exprFVs payload
+exprFVs (Unpack witness payload package body) =
+  exprFVs package `mappend` addCoreBndrFV witness (addCoreBndrFV payload (exprFVs body))
 exprFVs (Cast expr co)  = exprFVs expr `mappend` deepSelCoFV co
 exprFVs (Case scrut bndr ty alts)
   = exprFVs scrut `mappend` deepSelTypeFV ty `mappend`
@@ -323,6 +327,9 @@ coreAnnotationFVs ty co hide = (expr, bind)
     expr (App fun arg) = expr fun <> expr arg
     expr (Lam b body) = under [b] (expr body)
     expr (Cast body c) = expr body <> co c
+    expr (Pack schema witness payload) = ty schema <> ty witness <> expr payload
+    expr (Unpack witness payload package body) =
+        expr package <> under [witness, payload] (expr body)
     expr (Case scrut b t alts) = expr scrut <> ty t <> under [b] (foldMap alt alts)
     expr (Let (NonRec b rhs) body) = expr rhs <> unfolding b <> under [b] (expr body)
     expr (Let (Rec pairs) body) =
@@ -498,6 +505,7 @@ orphNamesOfType (TyVarTy _)          = emptyNameSet
 orphNamesOfType (TermVarTy v)        = orphNamesOfType (varType v)
 orphNamesOfType (TermAppTy f arg)    = orphNamesOfType (varType f)
                                        `unionNameSet` orphNamesOfType arg
+orphNamesOfType (ExistsTy v ty) = orphNamesOfType (varType v) `unionNameSet` orphNamesOfType ty
 orphNamesOfType (DepFunTy _ v res)     = orphNamesOfType (varType v)
                                        `unionNameSet` orphNamesOfType res
 orphNamesOfType (LitTy {})           = emptyNameSet

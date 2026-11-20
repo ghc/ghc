@@ -263,6 +263,10 @@ debug_ppr_ty _ (TermVarTy var)
 debug_ppr_ty prec (TermAppTy fun arg)
   = maybeParen prec appPrec $ ppr fun <+> debug_ppr_ty appPrec arg
 
+debug_ppr_ty prec (ExistsTy var body)
+  = maybeParen prec funPrec $
+      sep [text "exists" <+> parens (ppr var <+> dcolon <+> debug_ppr_ty topPrec (varType var)) <+> vbar,
+           debug_ppr_ty topPrec body]
 debug_ppr_ty prec (DepFunTy vis var res)
   = maybeParen prec funPrec $
     case vis of

@@ -241,6 +241,8 @@ mapTyCo (TyCoMapper { tcm_tyvar = tyvar
     go_ty (TyVarTy tv)    = tyvar tv
     go_ty (TermVarTy v)   = termvar v
     go_ty (TermAppTy f arg) = TermAppTy <$> termfun f <*> go_ty arg
+    go_ty (ExistsTy b body)
+      = tycobinder b Inferred $ \b' -> ExistsTy b' <$> go_ty body
     go_ty (DepFunTy vis b body)
       = termbinder b $ \b' -> mkDepFunTyWithVis vis b' <$> go_ty body
     go_ty (AppTy t1 t2)   = mkAppTy <$> go_ty t1 <*> go_ty t2

@@ -1046,6 +1046,8 @@ data MaybeApartReason
 
   | MARRetainedFunction -- ^ Retained-function congruence is not implemented.
 
+  | MARExistential -- ^ No decomposition of an existential body.
+
 
 combineMAR :: MaybeApartReason -> MaybeApartReason -> MaybeApartReason
 -- See (UR1) in Note [Unification result] for why MARInfinite wins
@@ -1054,6 +1056,7 @@ combineMAR MARTypeFamily       r = r             -- Otherwise it doesn't really 
 combineMAR MARCast             r = r
 combineMAR MARRuntimeIndex     r = r
 combineMAR MARRetainedFunction r = r
+combineMAR MARExistential      r = r
 
 instance Outputable MaybeApartReason where
   ppr MARTypeFamily       = text "MARTypeFamily"
@@ -1061,6 +1064,7 @@ instance Outputable MaybeApartReason where
   ppr MARCast             = text "MARCast"
   ppr MARRuntimeIndex     = text "MARRuntimeIndex"
   ppr MARRetainedFunction = text "MARRetainedFunction"
+  ppr MARExistential      = text "MARExistential"
 
 instance Semigroup MaybeApartReason where
   (<>) = combineMAR
@@ -1628,6 +1632,7 @@ hasUnmatchableApplication = go
     go (ForAllTy ma (Bndr tv _) body) = go ma || go (varType tv) || go body
     go (CastTy ty _) = go ty
     go (DepFunTy _ binder body) = go (varType binder) || go body
+    go (ExistsTy binder body) = go (varType binder) || go body
     go _ = False
 
 -- | Detect retained binders, including those with no free runtime indices.
@@ -1923,7 +1928,23 @@ unify_ty env ty1 ty2 kco
     mb_sat_fam_app1 = isSatTyFamApp ty1
     mb_sat_fam_app2 = isSatTyFamApp ty2
 
+-- See Note [Opaque existential matching].
+unify_ty env ty1@ExistsTy{} ty2@ExistsTy{} _
+  | not (anyFreeVarsOfTypes isTyCoVar [ty1, ty2])
+  , eqTypeX (um_rn_env env) ty1 ty2
+  = return ()
+unify_ty _ ExistsTy{} _ _ = maybeApart MARExistential
+unify_ty _ _ ExistsTy{} _ = maybeApart MARExistential
 unify_ty _ _ _ _ = surelyApart
+
+{- Note [Opaque existential matching]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An existential is a scoped type binder, not a type function. Accept closed
+alpha-reflexivity. Do not match free template variables through its body or
+derive apartness from failure to do so. Handle whole-type variables and stuck
+type family applications first. The occurs check must still traverse the
+binder and body when a variable can be bound to the whole existential.
+-}
 
 -----------------------------
 unify_tc_app :: UMEnv -> TyCon -> [Type] -> [Type] -> UM ()
@@ -2229,6 +2250,11 @@ uOccursCheck (UMState { um_tv_env = tv_env, um_fam_env = fam_env }) bvs lhs ty
       -- A supported index Id has a closed algebraic domain and Many
       -- multiplicity. Its type has no type variables or family applications.
       -- See Note [Apartness of retained runtime indices].
+    go bvs (ExistsTy v body)
+      = go bvs (varType v) ||
+        (case lhs of
+           TyVarLHS tv -> tv /= v && go (bvs `extendVarSet` v) body
+           TyFamLHS {} -> False)
     go bvs (DepFunTy _ v body)
       = go bvs (varType v) ||
         (case lhs of
@@ -2571,6 +2597,7 @@ ty_co_match :: MatchEnv   -- ^ ambient helpful info
 ty_co_match _ _ (TermAppTy {}) _ _ _ = Nothing
 ty_co_match _ _ (TermVarTy {}) _ _ _ = Nothing
 ty_co_match _ _ (DepFunTy {}) _ _ _ = Nothing
+ty_co_match _ _ (ExistsTy {}) _ _ _ = Nothing
 ty_co_match menv subst ty co lkco rkco
   | Just ty' <- coreView ty = ty_co_match menv subst ty' co lkco rkco
 

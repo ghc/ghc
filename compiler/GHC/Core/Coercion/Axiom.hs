@@ -1,4 +1,5 @@
 -- (c) The University of Glasgow 2012
+{-# LANGUAGE PatternSynonyms #-}
 
 -- | Module for coercion axioms, used to represent type family instances
 -- and newtypes
@@ -21,8 +22,9 @@ module GHC.Core.Coercion.Axiom (
        placeHolderIncomps, placeHolderOverlaps,
 
        Role(..),
+       existsCoRuleName,
 
-       CoAxiomRule(..), BuiltInFamRewrite(..), BuiltInFamInjectivity(..), TypeEqn,
+       CoAxiomRule(.., BuiltInEqRule), BuiltInFamRewrite(..), BuiltInFamInjectivity(..), TypeEqn,
        coAxiomRuleArgRoles, coAxiomRuleRole,
        coAxiomRuleBranch_maybe, isNewtypeAxiomRule_maybe,
        ClosedTyFam(..), BuiltinClosedTyFam(..),
@@ -50,6 +52,12 @@ import GHC.Types.SrcLoc
 import qualified Data.Data as Data
 import Data.Array
 import Data.List ( mapAccumL )
+
+-- | The wire name of an existential congruence rule at a checked role.
+existsCoRuleName :: Role -> FastString
+existsCoRuleName Nominal = fsLit "NominalExistsCo"
+existsCoRuleName Representational = fsLit "RepresentationalExistsCo"
+existsCoRuleName Phantom = panic "existsCoRuleName: phantom lifting"
 
 {-
 Note [Coercion axiom branches]
@@ -627,8 +635,8 @@ data CoAxiomRule
                                                        --    e.g.  a+b~0 ==>  a~0
                                                        -- Always unary
 
-  | BuiltInEqRule FastString ([TypeEqn] -> Maybe TypeEqn)
-    -- Free-floating checked nominal equality with two nominal premises.
+  | BuiltInRule FastString Role [Role] ([TypeEqn] -> Maybe TypeEqn)
+    -- Checked equality with the given result role and premise roles.
 
   | BranchedAxiom      (CoAxiom Branched) BranchIndex  -- Closed type family
 
@@ -636,25 +644,29 @@ data CoAxiomRule
                                                        --    data family instances
                                                        --    and newtypes
 
+-- | The nominal rules for pairs take two nominal premises.
+pattern BuiltInEqRule :: FastString -> ([TypeEqn] -> Maybe TypeEqn) -> CoAxiomRule
+pattern BuiltInEqRule name proves = BuiltInRule name Nominal [Nominal, Nominal] proves
+
 instance Eq CoAxiomRule where
   (BuiltInFamRew  bif1)  == (BuiltInFamRew  bif2)  = bifrw_name  bif1 == bifrw_name bif2
   (BuiltInFamInj bif1)   == (BuiltInFamInj bif2)   = bifinj_name bif1 == bifinj_name bif2
   (UnbranchedAxiom ax1)  == (UnbranchedAxiom ax2)  = getUnique ax1 == getUnique ax2
   (BranchedAxiom ax1 i1) == (BranchedAxiom ax2 i2) = getUnique ax1 == getUnique ax2 && i1 == i2
-  (BuiltInEqRule n1 _) == (BuiltInEqRule n2 _) = n1 == n2
+  (BuiltInRule n1 _ _ _) == (BuiltInRule n2 _ _ _) = n1 == n2
   _ == _ = False
 
 coAxiomRuleRole :: CoAxiomRule -> Role
 coAxiomRuleRole (BuiltInFamRew  {})  = Nominal
 coAxiomRuleRole (BuiltInFamInj {})   = Nominal
-coAxiomRuleRole (BuiltInEqRule {})  = Nominal
+coAxiomRuleRole (BuiltInRule _ role _ _) = role
 coAxiomRuleRole (UnbranchedAxiom ax) = coAxiomRole ax
 coAxiomRuleRole (BranchedAxiom ax _) = coAxiomRole ax
 
 coAxiomRuleArgRoles :: CoAxiomRule -> [Role]
 coAxiomRuleArgRoles (BuiltInFamRew  bif) = replicate (bifrw_arity bif) Nominal
 coAxiomRuleArgRoles (BuiltInFamInj {})   = [Nominal]
-coAxiomRuleArgRoles (BuiltInEqRule {})   = [Nominal, Nominal]
+coAxiomRuleArgRoles (BuiltInRule _ _ roles _) = roles
 coAxiomRuleArgRoles (UnbranchedAxiom ax) = coAxBranchRoles (coAxiomSingleBranch ax)
 coAxiomRuleArgRoles (BranchedAxiom ax i) = coAxBranchRoles (coAxiomNthBranch ax i)
 
@@ -677,7 +689,7 @@ instance Data.Data CoAxiomRule where
 instance Outputable CoAxiomRule where
   ppr (BuiltInFamRew  bif) = ppr (bifrw_name bif)
   ppr (BuiltInFamInj bif)  = ppr (bifinj_name bif)
-  ppr (BuiltInEqRule name _) = ppr name
+  ppr (BuiltInRule name _ _ _) = ppr name
   ppr (UnbranchedAxiom ax) = ppr (coAxiomName ax)
   ppr (BranchedAxiom ax i) = ppr (coAxiomName ax) <> brackets (int i)
 

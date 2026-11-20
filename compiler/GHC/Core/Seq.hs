@@ -64,6 +64,10 @@ seqExpr (App f a)       = seqExpr f M.<> seqExpr a
 seqExpr (Lam b e)       = seqBndr b M.<> seqExpr e
 seqExpr (Let b e)       = seqBind b M.<> seqExpr e
 seqExpr (Case e b t as) = seqExpr e M.<> seqBndr b M.<> seqType t M.<> seqAlts as
+seqExpr (Pack schema witness payload)
+  = seqType schema M.<> seqType witness M.<> seqExpr payload
+seqExpr (Unpack witness payload package body)
+  = seqExpr package M.<> seqBndr witness M.<> seqBndr payload M.<> seqExpr body
 seqExpr (Cast e co)     = seqExpr e M.<> seqCo co
 seqExpr (Tick n e)      = seqTickish n M.<> seqExpr e
 seqExpr (Type t)        = seqType t

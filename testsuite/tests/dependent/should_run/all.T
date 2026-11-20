@@ -324,3 +324,8 @@ test('NativeDepFunCoWire',
       extra_files(['NativeDepFunCoClient.hs', 'NativeDepFunCoMutate.hs',
                    'NativeDepFunCoProvider.hs'])],
      run_command, ['bash NativeDepFunCoWire.sh "{compiler}" "{libdir}"'])
+
+test('NativeExistentialSource',
+     [req_host_target_ghc, req_interp, req_rts_linker, only_ways(['normal']),
+      extra_files(['erased-existential-source'])],
+     run_command, ['bash NativeExistentialSource.sh "{compiler}" "{libdir}" ' + config.ghc_th_way_flags])

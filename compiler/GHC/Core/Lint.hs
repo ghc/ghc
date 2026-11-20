@@ -883,6 +883,38 @@ lintCoreExpr (Lit lit)
 
        ; return (literalType lit, zeroUE) }
 
+lintCoreExpr (Pack package_ty witness payload)
+  = do { lintType package_ty
+       ; lintType witness
+       ; (payload_ty, usage) <- markAllJoinsBad (lintCoreExpr payload)
+       ; case coreFullView package_ty of
+           ExistsTy a body ->
+             do { ensureEqTys (varType a) (typeKind witness) (text "Pack witness has the wrong kind")
+                ; lintL (substTyWith [a] [witness] body `eqType` payload_ty) $
+                    text "Pack payload does not match the witness:" <+> ppr payload_ty
+                ; return (package_ty, usage) }
+           _ -> failWithL (text "Pack requires an existential type:" <+> ppr package_ty) }
+
+lintCoreExpr (Unpack witness payload package body)
+  = do { (package_ty, usage) <- markAllJoinsBad (lintCoreExpr package)
+       ; case coreFullView package_ty of
+           ExistsTy a payload_ty ->
+             do { lintL (isTyVar witness && varType witness `eqType` varType a) $
+                    text "Invalid Unpack witness:" <+> ppr witness
+                ; lintTyCoBndr witness $
+             do { lintL (isNonCoVarId payload && isManyTy (idMult payload) && not (isJoinId payload)) $
+                    text "Invalid Unpack payload binder:" <+> ppr payload
+                ; lintBinder LetBind payload $
+             do { lintL (substTyWith [a] [mkTyVarTy witness] payload_ty `eqType` varType payload) $
+                    text "Unpack payload binder does not match the existential:" <+> ppr payload
+                ; addAliasUE payload usage $
+             do { (result, body_usage) <- lintCoreExpr body
+                ; let result_fvs = tyCoVarsOfType result
+                ; lintL (not (witness `elemVarSet` result_fvs || payload `elemVarSet` result_fvs)) $
+                    text "Unpack binder escapes its scope:" <+> ppr result
+                ; return (result, body_usage) } } } }
+           _ -> failWithL (text "Unpack requires an existential package:" <+> ppr package_ty) }
+
 lintCoreExpr (Cast expr co)
   = do { (expr_ty, ue) <- markAllJoinsUnderCast (lintCoreExpr expr)
             -- markAllJoinsUnderCast: see Note [Linting join points with casts or ticks]
@@ -2168,6 +2200,16 @@ lintType (TermAppTy f arg)
            (text "Opaque runtime call argument has the wrong kind:" <+> ppr arg
             $$ text "Expected:" <+> ppr domain) }
 
+lintType (ExistsTy b body)
+  = do { lintL (isTyVar b)
+           (text "Existential binder is not a type variable:" <+> ppr b)
+       ; lintBinder LambdaBind b $
+         do { lintL (typeKind (varType b) `eqType` liftedTypeKind)
+                (text "Existential binder kind must itself have type Type:" <+> ppr b)
+            ; lintType body
+            ; lintL (typeKind body `eqType` liftedTypeKind)
+                (text "Existential payload must have kind Type:" <+> ppr body) } }
+
 lintType (DepFunTy vis b body)
   = do { lintL (isNativeOpaqueValueId b)
            (text "Invalid retained runtime binder:" <+> ppr b <+> dcolon <+> ppr (varType b))
@@ -3002,7 +3044,7 @@ lintCoercion this_co@(AxiomCo ax cos)
                   [pr] -> isJust (bifinj_proves bif pr)
                   _    -> False)
                bad_bif
-    lint_ax (BuiltInEqRule _ proves) prs
+    lint_ax (BuiltInRule _ _ _ proves) prs
       = checkL (isJust (proves prs)) bad_bif
     lint_ax (UnbranchedAxiom ax) prs
       = lintBranch this_co (coAxiomTyCon ax) (coAxiomSingleBranch ax) prs

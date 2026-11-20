@@ -46,6 +46,7 @@ import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Control.Monad (unless)
 import qualified Data.Char
 import qualified Data.Either
+import qualified ErasedPackage
 import qualified ExistentialVec as E
 import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.Functor.Const (Const(..))
@@ -928,6 +929,10 @@ main = do
         (Refl :: IndexedVec.safeHead (IndexedVec.two 3) :~: 3)
     observe "ignore a recursive helper in a type and at runtime"
         (Refl :: LocalOpen.LazyFirst Char Bool :~: Char, LocalOpen.lazyFirst 'x' 'y')
+    observe "open erased packages and leave an unused payload lazy"
+        ErasedPackage.observation
+    observe "filter a vector without forcing the tail to learn the result length"
+        ErasedPackage.filterObservation
     observe "read the cells of a vector packaged with its length"
         (Refl :: E.readSomeVec ('E.SomeVec ('E.SS ('E.SS 'E.SZ))
                     ('IndexedVec.VCons 4 ('IndexedVec.VCons 5 'IndexedVec.VNil))) :~: '[4, 5])

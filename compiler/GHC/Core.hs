@@ -354,7 +354,28 @@ data Expr b
   -- Coercion arguments are morally values and should be treated as such (e.g.,
   -- somewhat close to tokens of type `()`) until they are erased in STG.
 
+  | Pack Type Type (Expr b)
+  -- ^ Existential type, erased witness type, and unchanged runtime payload.
+  -- See Note [Lexical erased existential expressions].
+
+  | Unpack b b (Expr b) (Expr b)
+  -- ^ Type witness and payload binders scope over the body only.
+  -- See Note [Lexical erased existential expressions].
+
   deriving Data
+
+{- Note [Lexical erased existential expressions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Pack annotates the payload with ExistsTy a body and supplies a type witness
+w of kind Type. The payload has type body[w/a]. Pack has precisely the
+payload's representation and demand.
+
+Unpack p opens an existential by binding a fresh type variable and a lazy,
+unrestricted payload Id. The body is checked under both binders. Neither
+binder may occur in its result type. The first binder has no runtime value.
+The second binder aliases the payload and does not demand the package.
+This is draft proposal #473's alternative lexical Core.
+-}
 
 -- | Type synonym for expressions that occur in function argument positions.
 -- Only 'Arg' should contain a 'Type' at top level, general 'Expr' should not

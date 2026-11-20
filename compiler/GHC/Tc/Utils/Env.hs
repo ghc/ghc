@@ -19,6 +19,7 @@ module GHC.Tc.Utils.Env(
         tcLookupLocatedGlobal, tcLookupGlobal, tcLookupGlobalOnly,
         tcLookupTyCon, tcLookupClass,
         tcLookupDataCon, tcLookupPatSyn, tcLookupConLike,
+        isExistsPackName,
         tcLookupRecSelParent,
         tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
         tcLookupLocatedClass, tcLookupAxiom,
@@ -324,11 +325,23 @@ tcLookupPatSyn name = do
 
 tcLookupConLike :: WithUserRdr Name -> TcM ConLike
 tcLookupConLike qname@(WithUserRdr _ name) = do
+    pack <- isExistsPackName name
+    when pack $ failWithTc (TcRnExistsPack ExistsPackInvalidContext)
     thing <- tcLookupGlobal name
     case thing of
         AConLike cl -> return cl
         ATyCon  {}  -> failIllegalTyCon WL_ConLike qname
         _           -> wrongThingErr WrongThingConLike (AGlobal thing) name
+
+-- | Recognize the constructor supplied by the configured base unit.
+isExistsPackName :: Name -> TcM Bool
+isExistsPackName name
+  | nameOccName name == mkDataOcc "Pack"
+  , Just mod <- nameModule_maybe name
+  , moduleName mod == mkModuleName "GHC.Exists"
+  = do { dflags <- getDynFlags
+       ; return (toUnitId (moduleUnit mod) == baseUnitId dflags) }
+  | otherwise = return False
 
 tcLookupRecSelParent :: HsRecUpdParent GhcRn -> TcM RecSelParent
 tcLookupRecSelParent (RnRecUpdParent { rnRecUpdCons = cons })

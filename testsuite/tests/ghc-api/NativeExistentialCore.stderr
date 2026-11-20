@@ -1,0 +1,12 @@
+typecheckIface
+Declaration for value:
+  Existential binder kind must have kind Type: bad
+typecheckIface
+Declaration for value:
+  Existential payload must have kind Type: a
+typecheckIface
+Declaration for value:
+  Iface type variable out of scope:  selfKind
+typecheckIface
+Declaration for value:
+  Iface type variable out of scope:  missingPayloadBinder

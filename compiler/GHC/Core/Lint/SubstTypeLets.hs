@@ -130,6 +130,15 @@ stlExpr subst (Case scrut bndr ty alts)
        where
          (subst'', bndrs') = substBndrs subst' bndrs
 
+stlExpr subst (Pack schema witness payload)
+  = Pack (substTy subst schema) (substTy subst witness) (stlExpr subst payload)
+
+stlExpr subst (Unpack witness payload package body)
+  = Unpack witness' payload' (stlExpr subst package) (stlExpr subst_body body)
+  where
+    (subst_witness, witness') = substBndr subst witness
+    (subst_body, payload') = substBndr subst_witness payload
+
 -- Simple cases
 stlExpr _     (Lit l)       = Lit l
 stlExpr subst (Var v)       = lookupIdSubst subst v

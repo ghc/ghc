@@ -48,7 +48,7 @@ import qualified GHC.Data.BooleanFormula as BF
 import GHC.Data.FastString
 import qualified GHC.Data.Strict as Strict
 import GHC.Hs.Decls.Overlap (OverlapMode(..))
-import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLambda, HsTypeLet, HsTypeCase, HsTypeCaseAlias, HsTypeCaseHead), HsTypeCaseAlt(..)) -- Required for HsConDetails type-family instances
+import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLambda, HsTypeLet, HsTypeCase, HsTypeCaseAlias, HsTypeCaseHead, HsTypeExists), HsTypeCaseAlt(..)) -- Required for HsConDetails type-family instances
 import GHC.TypeLits
 import GHC.Types.ForeignCall
 import GHC.Types.InlinePragma (ActivationGhc, inlinePragmaActivation, inlinePragmaSource)
@@ -4144,6 +4144,13 @@ instance ExactPrint (HsType GhcPs) where
     XHsType . HsTypeCaseHead <$> markAnnotated name
   exact (XHsType (HsTypeCaseAlias generated alias body)) =
     XHsType . HsTypeCaseAlias generated alias <$> markAnnotated body
+  exact (XHsType (HsTypeExists (exists, bar) binder body)) = do
+    exists' <- markEpToken exists
+    binder' <- markAnnotated binder
+    bar' <- markEpToken bar
+    body' <- markAnnotated body
+    return (XHsType (HsTypeExists (exists', bar') binder' body'))
+
   exact (XHsType (HsTypeLet (let_tok, eq, in_tok) var rhs body)) = do
     let' <- markEpToken let_tok
     var' <- markAnnotated var

@@ -31,13 +31,14 @@ trap 'rm -rf -- "$out"' EXIT
 ghc=("$compiler" "-B$libdir" -v0 -package-env - -fexternal-interpreter)
 flags=(-dcore-lint -dstg-lint -fwrite-ide-info -Werror=inaccessible-code
      -i "-i$examples/packed-vector" "-i$examples/qualified-pi"
-     "-i$examples/closed-evaluation" "-i$examples/open-evaluation")
+     "-i$examples/closed-evaluation" "-i$examples/open-evaluation"
+     "-i$examples/erased-existentials")
 
 "${ghc[@]}" "$native_opt" "${native_interfaces[@]}" "${flags[@]}" --make -outputdir "$out/native" -hiedir "$out/hie" \
     "$docs/Showcase.hs" -o "$out/showcase"
 "$out/showcase" | tee "$out/native.stdout"
 diff -u "$docs/Showcase.stdout" "$out/native.stdout"
-for module in Main PackedVecLibrary ClosedTableLibrary; do
+for module in Main PackedVecLibrary ClosedTableLibrary ErasedPackage; do
     test -s "$out/hie/$module.hie"
 done
 

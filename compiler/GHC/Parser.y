@@ -43,7 +43,7 @@ import qualified Data.List.NonEmpty as NE
 import qualified Prelude -- for happy-generated code
 
 import GHC.Hs
-import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLambda, HsTypeLet, HsTypeCase), HsTypeCaseAlt(..))
+import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLambda, HsTypeLet, HsTypeCase, HsTypeExists), HsTypeCaseAlt(..))
 import GHC.Hs.Decls.Overlap ( OverlapMode(..) )
 
 import GHC.Driver.Backpack.Syntax
@@ -620,6 +620,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
 
  'forall'       { L _ (ITforall _) }                -- GHC extension keywords
  'foreach'      { L _ ITforeach }
+ 'exists'       { L _ ITexists }
  'foreign'      { L _ ITforeign }
  'export'       { L _ ITexport }
  'label'        { L _ ITlabel }
@@ -2297,6 +2298,9 @@ ctype   :: { LHsType GhcPs }
                                               HsForAllTy { hst_tele = unLoc $1
                                                          , hst_xforall = noExtField
                                                          , hst_body = $2 } }
+        | 'exists' tv_bndr_no_braces '|' ctype
+                                     {% amsA' (sLL $1 $> $
+                                          XHsType (HsTypeExists (epTok $1, epTok $3) $2 $4)) }
         | 'foreach' foreach_bndrs foreach_separator ctype
                                      {% do { bndrs <- fromSpecTyVarBndrs $2
                                            ; amsA' (sLL $1 $> $

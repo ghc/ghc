@@ -1947,6 +1947,19 @@ tcHsType mode rn_ty@(HsKindSig _ ty sig) exp_kind
 
 -- The case alias needs the checked pattern from its enclosing family equation.
 -- See Note [Type case aliases] in GHC.Tc.TyCl.
+tcHsType mode src@(XHsType (HsTypeExistsRn binder body)) exp_kind
+  = do { skol <- mkSkolemInfo (ForAllSkol (HsTyVarBndrsRn [unLoc binder]))
+       ; (binders, body') <- tcExplicitTKBndrs skol [binder] $
+           tcLHsType mode body (Check liftedTypeKind)
+       ; case binders of
+           [Bndr tv _] -> do
+             setSrcSpanA (getLoc binder) $ do
+               kind <- liftZonkM $ zonkTcType (varType tv)
+               unless (typeKind kind `tcEqType` liftedTypeKind) $
+                 failWithTc (TcRnExistentialBinderKind kind)
+             checkExpKind mode src (ExistsTy tv body') liftedTypeKind exp_kind
+           _ -> panic "tcHsType: existential binder count" }
+
 tcHsType _ (XHsType HsTypeCaseAliasRn{}) _ = failWithTc TcRnTypeCaseContext
 
 -- See Note [Typechecking type lets].
@@ -4693,6 +4706,8 @@ tcTyVar mode name
     else failWithTc $ TcRnRetainedQuantificationError RetainedCallIndex
 tcTyVar _ name         -- Could be a tyvar, a tycon, or a datacon
   = do { traceTc "lk1" (ppr name)
+       ; pack <- isExistsPackName name
+       ; when pack $ failWithTc (TcRnExistsPack ExistsPackInvalidContext)
        ; thing <- tcLookup name
        ; case thing of
            ATyVar _ tv -> return (mkTyVarTy tv, tyVarKind tv)

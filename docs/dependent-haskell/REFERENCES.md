@@ -3060,6 +3060,18 @@ rule. The recursive filter tests demand when the package comes from an
 unknown computation. [Agda's erased vector argument](https://agda.readthedocs.io/en/v2.8.0/language/runtime-irrelevance.html)
 provides the comparison for erasing the witness.
 
+The explicit Core design in the “Alternatives” section of #473 gives
+`ExistsCo` as the congruence rule required by `liftCoSubst`. The vector
+filter needs it even at `-O0` because expanding `Filtered a` substitutes for the
+element type under the length binder. The implementation represents this
+rule with GHC's checked built-in axiom and its existing forall coercion
+binder. The premise and conclusion have the same role. Their scopes and
+kind transport follow the ordinary coercion binder. The witness's kind is
+checked independently of the runtime representation of the payload.
+[Proposal #473](https://github.com/ghc-proposals/ghc-proposals/pull/473),
+[An Existential Crisis Resolved](https://richarde.dev/papers/2021/exists/exists.pdf)
+and [the Core lifting rule](../../compiler/GHC/Core/Coercion.hs).
+
 The [additional paper reading record](papers/README.md#roadmap-review-2026-11-15)
 covers matchability, existential laziness, constrained families, and the
 39-page extended graded paper. That extended version is distinct from the

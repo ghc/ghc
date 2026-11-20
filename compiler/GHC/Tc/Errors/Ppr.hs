@@ -1121,6 +1121,24 @@ instance Diagnostic TcRnMessage where
     TcRnTypeCaseIndexApartness kind
       -> mkSimpleDecorated $ hang
            (text "Cannot determine which constructors are possible at this scrutinee kind:") 2 (ppr kind)
+    TcRnExistentialBinderKind kind
+      -> mkSimpleDecorated $ hang (text "The kind of an explicit existential binder must itself have type Type.")
+                                  2 (text "This binder has kind" <+> quotes (ppr kind) <> dot)
+    TcRnExistsPack problem -> mkSimpleDecorated $ case problem of
+      ExistsPackExtension ->
+        text "GHC.Exists.Pack requires -XExperimentalDependentTypes."
+      ExistsPackArguments ->
+        text "Apply GHC.Exists.Pack to a required type witness and a payload."
+      ExistsPackMissingSchema ->
+        text "GHC.Exists.Pack needs an explicit existential type when its result type is inferred."
+      ExistsPackInvalidSchema ty ->
+        hang (text "GHC.Exists.Pack needs an explicit existential type.")
+          2 (text "The available type is" <+> quotes (ppr ty) <> dot)
+      ExistsPackInvalidKind kind expected ->
+        hang (text "The kind argument to GHC.Exists.Pack must match the witness kind" <+> quotes (ppr expected) <> dot)
+          2 (text "The argument is" <+> quotes (ppr kind) <> dot)
+      ExistsPackInvalidContext ->
+        text "Use GHC.Exists.Pack in an explicit existential application or a sole case alternative with a fresh type variable and a payload pattern."
     TcRnTypeCaseContext
       -> mkSimpleDecorated $ text "A type case is supported only in the right-hand side of a top-level type synonym."
     TcRnTypeLambdaContext
@@ -2488,6 +2506,8 @@ instance Diagnostic TcRnMessage where
     TcRnTypeCasePattern{} -> ErrorWithoutFlag
     TcRnNestedTypeCasePattern{} -> ErrorWithoutFlag
     TcRnTypeCaseIndexApartness{} -> ErrorWithoutFlag
+    TcRnExistentialBinderKind{} -> ErrorWithoutFlag
+    TcRnExistsPack{} -> ErrorWithoutFlag
     TcRnTypeCaseContext{} -> ErrorWithoutFlag
     TcRnTypeLambdaContext{}
       -> ErrorWithoutFlag
@@ -3202,6 +3222,8 @@ instance Diagnostic TcRnMessage where
     TcRnTypeCasePattern{} -> noHints
     TcRnNestedTypeCasePattern{} -> noHints
     TcRnTypeCaseIndexApartness{} -> noHints
+    TcRnExistentialBinderKind{} -> noHints
+    TcRnExistsPack{} -> noHints
     TcRnTypeCaseContext{} -> noHints
     TcRnTypeLambdaContext{}
       -> noHints
@@ -7977,6 +7999,7 @@ pprTHReifyError = \case
            LinearInvisibleArgument -> (True , text "linear invisible argument")
            CoercionsInTypes        -> (False, text "coercions in types")
            DataConVisibleForall    -> (False, text "visible forall in the type of a data constructor")
+           FirstClassExistential   -> (False, text "first-class existential type")
 
 pprTypedTHError :: TypedTHError -> DecoratedSDoc
 pprTypedTHError = \case

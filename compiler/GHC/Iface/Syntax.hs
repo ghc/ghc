@@ -775,6 +775,8 @@ data IfaceExpr
        -- See GHC.Types.Literal Note [Rubbish literals] item (6)
   | IfaceFCall  ForeignCall IfaceType
   | IfaceTick   IfaceTickish IfaceExpr    -- from Tick tickish E
+  | IfacePack   IfaceType IfaceType IfaceExpr
+  | IfaceUnpack IfaceTvBndr IfaceIdBndr IfaceExpr IfaceExpr
 
 
 data IfaceTickish
@@ -1881,6 +1883,14 @@ pprIfaceExpr _ (IfaceLitRubbish tc r)
     <> (case tc of { TypeLike -> empty; ConstraintLike -> text "[c]" })
     <> parens (ppr r)
 
+pprIfaceExpr add_par (IfacePack package_ty witness payload)
+  = add_par $ hang (text "pack" <+> pprParendIfaceType witness) 2
+                     (pprParendIfaceExpr payload <+> dcolon <+> ppr package_ty)
+pprIfaceExpr add_par (IfaceUnpack (witness, _) (_, payload, _) package body)
+  = add_par $ hang (text "unpack" <+> pprParendIfaceExpr package <+> text "as"
+                     <+> ppr witness <+> ppr payload <+> text "in")
+                    2 (ppr body)
+
 pprIfaceExpr add_par app@(IfaceApp _ _) = add_par (pprIfaceApp app [])
 
 pprIfaceExpr add_par i@(IfaceLam _ _)
@@ -2185,6 +2195,8 @@ freeNamesIfType (IfaceAppTy s t)      = freeNamesIfType s &&& freeNamesIfAppArgs
 freeNamesIfType (IfaceTyConApp tc ts) = freeNamesIfTc tc &&& freeNamesIfAppArgs ts
 freeNamesIfType (IfaceTupleTy _ _ ts) = freeNamesIfAppArgs ts
 freeNamesIfType (IfaceLitTy _)        = emptyNameSet
+freeNamesIfType (IfaceExistsTy (_, arg) body)
+  = freeNamesIfType arg &&& freeNamesIfType body
 freeNamesIfType (IfaceForAllTy ma tv t)
   = freeNamesIfType ma &&& freeNamesIfVarBndr tv &&& freeNamesIfType t
 freeNamesIfType (IfaceFunTy _ ma w s t) = freeNamesIfType ma &&& freeNamesIfType w &&& freeNamesIfType s &&& freeNamesIfType t
@@ -2286,6 +2298,11 @@ freeNamesIfExpr (IfaceType ty)        = freeNamesIfType ty
 freeNamesIfExpr (IfaceCo co)          = freeNamesIfCoercion co
 freeNamesIfExpr (IfaceTuple _ as)     = fnList freeNamesIfExpr as
 freeNamesIfExpr (IfaceLam (b,_) body) = freeNamesIfBndr b &&& freeNamesIfExpr body
+freeNamesIfExpr (IfacePack package_ty witness payload)
+  = freeNamesIfType package_ty &&& freeNamesIfType witness &&& freeNamesIfExpr payload
+freeNamesIfExpr (IfaceUnpack witness payload@(mult, _, _) package body)
+  = freeNamesIfTvBndr witness &&& freeNamesIfType mult &&& freeNamesIfIdBndr payload
+      &&& freeNamesIfExpr package &&& freeNamesIfExpr body
 freeNamesIfExpr (IfaceApp f a)        = freeNamesIfExpr f &&& freeNamesIfExpr a
 freeNamesIfExpr (IfaceCast e co)      = freeNamesIfExpr e &&& freeNamesIfCoercion co
 freeNamesIfExpr (IfaceTick t e)       = freeNamesIfTickish t &&& freeNamesIfExpr e
@@ -3043,6 +3060,19 @@ instance Binary IfaceExpr where
         putByte bh 14
         put_ bh r
         put_ bh torc
+    put_ bh (IfacePack schema witness value) = do
+        requireIfaceEvidenceVersion bh ErasedExistentialEvidence
+        putByte bh 15
+        put_ bh schema
+        put_ bh witness
+        put_ bh value
+    put_ bh (IfaceUnpack witness value package body) = do
+        requireIfaceEvidenceVersion bh ErasedExistentialEvidence
+        putByte bh 16
+        put_ bh witness
+        put_ bh value
+        put_ bh package
+        put_ bh body
     get bh = do
         h <- getByte bh
         case h of
@@ -3088,7 +3118,9 @@ instance Binary IfaceExpr where
             14 -> do r <- get bh
                      torc <- get bh
                      return (IfaceLitRubbish torc r)
-            _ -> panic ("get IfaceExpr " ++ show h)
+            15 -> IfacePack <$> get bh <*> get bh <*> get bh
+            16 -> IfaceUnpack <$> get bh <*> get bh <*> get bh <*> get bh
+            _ -> ioError (userError ("get IfaceExpr: invalid expression tag " ++ show h))
 
 instance Binary IfaceTickish where
     put_ bh (IfaceHpcTick m ix) = do
@@ -3366,6 +3398,8 @@ instance NFData IfaceExpr where
     IfaceCo co -> rnf co
     IfaceTuple sort exprs -> rnf sort `seq` rnf exprs
     IfaceLam bndr expr -> rnf bndr `seq` rnf expr
+    IfacePack schema w e -> rnf schema `seq` rnf w `seq` rnf e
+    IfaceUnpack w v p e -> rnf w `seq` rnf v `seq` rnf p `seq` rnf e
     IfaceApp e1 e2 -> rnf e1 `seq` rnf e2
     IfaceCase e nm alts -> rnf e `seq` rnf nm `seq` rnf alts
     IfaceECase e ty -> rnf e `seq` rnf ty

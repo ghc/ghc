@@ -1433,6 +1433,9 @@ collect_cand_qtvs orig_ty is_dep cur_lvl bound dvs ty
     go dv (DepFunTy _ v ty)
       = do { dv1 <- collect_cand_qtvs orig_ty True cur_lvl bound dv (varType v)
            ; collect_cand_qtvs orig_ty is_dep cur_lvl (bound `extendVarSet` v) dv1 ty }
+    go dv (ExistsTy v ty)
+      = do { dv1 <- collect_cand_qtvs orig_ty True cur_lvl bound dv (varType v)
+           ; collect_cand_qtvs orig_ty is_dep cur_lvl (bound `extendVarSet` v) dv1 ty }
     go dv (AppTy t1 t2)       = foldlM go dv [t1, t2]
     go dv (TyConApp tc tys)   = go_tc_args dv (tyConBinders tc) tys
     go dv (FunTy _ ma w arg res) = foldlM go dv [ma, arg, w, res]

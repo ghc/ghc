@@ -14,7 +14,7 @@ module GHC.Tc.Gen.App
        , tcExprPrag
        , tcRetainedInferableArg, tcRetainedArg, tcOptionalLetOperand ) where
 
-import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcPolyExpr, tcInferRho )
+import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcCheckPolyExpr, tcPolyExpr, tcInferRho )
 
 import GHC.Hs
 
@@ -30,7 +30,8 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Solver ( tcRewriteFamilyAxioms )
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Instantiate
-import GHC.Tc.Utils.Env ( tcLookupIdMaybe, tcLookupConLike, tcLookupGlobal, tcLookupLcl_maybe )
+import GHC.Tc.Utils.Env ( isExistsPackName, tcLookupIdMaybe, tcLookupConLike
+                        , tcLookupGlobal, tcLookupLcl_maybe )
 import GHC.Tc.Instance.Family ( tcGetFamInstEnvs, tcLookupDataFamInst_maybe )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.Concrete  ( unifyConcrete, idConcreteTvs )
@@ -438,6 +439,15 @@ tcApp :: HsExpr GhcRn        -- ^ The whole application (For error messages)
 -- See Note [tcApp: typechecking applications]
 -- See Note [splitHsApps] in GHC.Tc.Head
 tcApp rn_expr rn_fun rn_args exp_res_ty
+  = do { pack <- case rn_fun of
+                   HsVar _ (L _ (WithUserRdr _ name)) -> isExistsPackName name
+                   _ -> return False
+       ; if pack then tcExistsPack rn_expr rn_args exp_res_ty
+                 else tcOrdinaryApp rn_expr rn_fun rn_args exp_res_ty }
+
+tcOrdinaryApp :: HsExpr GhcRn -> HsExpr GhcRn -> [HsExprArg 'TcpRn]
+              -> ExpRhoType -> TcM (HsExpr GhcTc)
+tcOrdinaryApp rn_expr rn_fun rn_args exp_res_ty
   = do { wanted_ql <- wantQuickLook rn_fun
        ; fun_lspan <- getFunSrcSpan rn_args
        ; traceTc "tcApp {" $
@@ -512,6 +522,76 @@ tcApp rn_expr rn_fun rn_args exp_res_ty
                 _                    -> return ()
             ; finishAppWithCache (arg_cache ++ extra_cache) do_ql rn_expr fun_lspan
                 rn_fun tc_fun inst_args app_res_rho exp_res_ty } }
+
+-- | Check a saturated explicit existential constructor application.
+-- See Note [Checking explicit existential packages].
+tcExistsPack :: HsExpr GhcRn -> [HsExprArg 'TcpRn] -> ExpRhoType -> TcM (HsExpr GhcTc)
+tcExistsPack rn_expr args expected
+  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+       ; unless enabled $ failWithTc (TcRnExistsPack ExistsPackExtension)
+       ; let (type_args, rest) = span is_type_arg (filter_not_parens args)
+       ; case rest of
+           [EValArg { ea_arg = witness }, EValArg { ea_arg = payload }] ->
+             do { schema <- check_schema [ty | ETypeArg { ea_hs_ty = ty } <- type_args]
+                ; case coreFullView schema of
+                    ExistsTy binder body ->
+                      do { witness_ty <- expr_to_type witness >>= \ty ->
+                                           tcHsTypeApp ty (tyVarKind binder)
+                         ; let payload_ty = substTyWith [binder] [witness_ty] body
+                         ; payload' <- tcScalingUsage ManyTy $ tcCheckPolyExpr payload payload_ty
+                         ; let packed = XExpr (NativeExistsPack schema witness_ty payload')
+                         ; tcWrapResult rn_expr packed schema expected }
+                    _ -> failWithTc (TcRnExistsPack (ExistsPackInvalidSchema schema)) }
+           _ -> failWithTc (TcRnExistsPack ExistsPackArguments) }
+  where
+    is_type_arg ETypeArg{} = True
+    is_type_arg _          = False
+
+    filter_not_parens = filter $ \case
+      EWrap (EPar _) -> False
+      _ -> True
+
+    expected_schema = traverse (liftZonkM . zonkTcType) =<< readExpType_maybe expected
+    read_schema = expected_schema >>= maybe (failWithTc (TcRnExistsPack ExistsPackMissingSchema)) return
+
+    check_schema [] = read_schema
+    check_schema [arg] = do
+      ty <- tcHsTypeApp arg liftedTypeKind
+      case coreFullView ty of
+        ExistsTy{} -> return ty
+        _ -> do
+          mb_schema <- expected_schema
+          case mb_schema of
+            Just schema | ExistsTy{} <- coreFullView schema -> check_kind ty schema
+            _ | eqType ty liftedTypeKind -> read_schema
+              | otherwise -> return ty
+    check_schema [kind, schema] =
+      do { k <- tcHsTypeApp kind liftedTypeKind
+         ; ty <- tcHsTypeApp schema liftedTypeKind
+         ; check_kind k ty }
+    check_schema _ = failWithTc (TcRnExistsPack ExistsPackArguments)
+    check_kind k schema = case coreFullView schema of
+      ExistsTy binder _ | not (eqType k (tyVarKind binder)) ->
+        failWithTc (TcRnExistsPack (ExistsPackInvalidKind k (tyVarKind binder)))
+      _ -> return schema
+
+{- Note [Checking explicit existential packages]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Recognize Pack by its resolved name in base. A constructor named Pack in a
+different unit or module uses ordinary application checking.
+
+The existential schema determines the type of the payload. Read it from an
+explicit type argument or the expected result type. A single visible argument
+can be the schema or its witness kind. Check the kind against the expected
+package. With two visible arguments the second gives the schema. Check
+the witness with the required type argument translation used by tcVDQ. Check
+the payload at the instantiated body type. Keep the schema and witness for
+Core Lint. CoreToStg erases both and keeps the payload's demand.
+
+Skip ordinary inference of the head, including the Quick Look shortcut.
+Pack has no ordinary function type with which the solver could discover the
+existential schema from the payload.
+-}
 
 -- | Select native application checking from the flag or existing type contracts.
 -- See Note [Imported native application contracts].
