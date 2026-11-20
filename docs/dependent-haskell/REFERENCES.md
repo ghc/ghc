@@ -6471,3 +6471,14 @@ returns a proof that appending the two outputs gives the input.
 [Idris 2, Data.Vect.splitAt](https://idris-lang.org/Idris2/base/source/Data.Vect.html#731),
 [Agda standard library v2.3, Data.Vec.Base](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html)
 and [Haskell implementation](examples/packed-vector/PackedVecLibrary.hs).
+
+The closed evaluator checks reassembly of the written vector
+`VCons True (VCons False VNil)` by running the split and append.
+The witness checks the contents for that input. Swapping the two
+elements makes `Refl` fail even though the length stays the same.
+A general proof needs a retained binder for the input vector and
+open append equations at the indexed vector kinds. The zero case
+uses the append identity. The successor case applies constructor
+congruence to the proof for the tail.
+[Ordinary reassembly](examples/closed-evaluation/VectorSplitObservation.hs)
+and [checked witness](../../testsuite/tests/dependent/should_run/NativeClosedIndexedVec.hs).
