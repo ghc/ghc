@@ -581,6 +581,9 @@ orphNamesOfExpr e
     go (Coercion _co)       = emptyNameSet -- See wrinkle (ON1) of Note [Finding orphan names]
     go (App e1 e2)          = go e1 `unionNameSet` go e2
     go (Lam v e)            = go e `delFromNameSet` idName v
+    go (Pack schema w e)    = orphNamesOfTypes [schema, w] `unionNameSet` go e
+    go (Unpack w p e body)  = go e `unionNameSet` (go body `delFromNameSet` varName w
+                                                           `delFromNameSet` varName p)
     go (Tick _ e)           = go e
     go (Cast e _co)         = go e  -- See wrinkle (ON1) of Note [Finding orphan names]
     go (Let (NonRec _ r) e) = go e `unionNameSet` go r

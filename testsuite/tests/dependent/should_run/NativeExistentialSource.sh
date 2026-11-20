@@ -84,9 +84,12 @@ import Data.Kind (Type)
 type Hidden = exists (a :: Type). Maybe a
 packValue :: Bool -> Hidden
 packValue x = Just x
-{-# RULES "package/id" forall (x :: Bool). id x = x #-}
+constant :: Hidden
+constant = Just True
+{-# RULES "package/id" forall (x :: Bool). id (Just x :: Hidden) = constant #-}
 HS
-if "$ghc" "${flags[@]}" -O1 -Wno-inline-rule-shadowing -c RuleOwner.hs >rule.log 2>&1; then
+"$ghc" "${flags[@]}" -Wno-inline-rule-shadowing -fforce-recomp -c RuleOwner.hs
+if "$ghc" "${flags[@]}" -O1 -Wno-inline-rule-shadowing -fforce-recomp -c RuleOwner.hs >rule.log 2>&1; then
     echo "unexpectedly admitted a dependent module's rewrite rule" >&2
     exit 1
 fi
