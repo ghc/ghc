@@ -270,7 +270,10 @@ source examples. General promotion remains open.
 2. **R23 and R24.** A recursive family can forward a constructor
    or a partial family across stripped interfaces. When a signature
    contains one eligible written application, GHC locates its arity
-   error there and suggests the extension. For R24, check a separate
+   error there and suggests the extension. In a complete signature,
+   the body can determine a nested callback arrow's matchability. An
+   unconstrained callback arrow still takes its ordinary default.
+   For R24, check a separate
    client's obligation when it forms an associated family application.
    [Domain example](roadmap/R24-constrained-type-families.md),
    [inferred callback arrows](roadmap/R23-unsaturated-type-families.md#inferring-a-callback-arrow-in-a-closed-family),

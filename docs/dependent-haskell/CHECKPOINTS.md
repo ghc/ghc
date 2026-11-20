@@ -8,6 +8,23 @@ increments.
 
 ## Family and package checkpoints
 
+The bootstrap and self-hosted compiler relinks at `91341c4172` each
+ran all 358 Showcase observations at stripped `-O0` and default
+`-O1` and `-O2`. Self-hosted source-loaded GHCi matched the same
+golden. Both compilers passed the source matchability diagnostics
+and the singletons migration checks against stock GHC 9.14.1.
+
+The preceding 354-line two-stage build at `90f02cc9f5` passed all
+six native runs and 29 focused normal tests. The dependent directory
+recorded 312 passes and the same 17 failures as the 351-line build.
+GHCi rejected the open vector append proof when it inserted a
+breakpoint around the returned field. The corrected verifier checks
+the field below that breakpoint. The registered debugger test stops
+at the original source line and resumes. Strict and coverage-counted
+branches still withhold the equation.
+[Debugger regression](../../testsuite/tests/dependent/should_run/NativeOpenIndexedAppendGhci.sh)
+and [source matchability tests](../../testsuite/tests/dependent/diagnostics/DependentArrowMatchability.sh).
+
 The bootstrap compiler relink at `fa6b3b44ca` reproduced all 356
 Showcase lines at stripped `-O0` and default `-O1` and `-O2`.
 `NativeLocalOpen` and `NativeTypeCase` passed. The source-hidden shadow
