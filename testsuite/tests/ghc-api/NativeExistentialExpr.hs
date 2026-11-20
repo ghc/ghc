@@ -4,7 +4,7 @@ import Control.Exception (SomeException, displayException, evaluate, try)
 import Control.Monad (forM_, unless, void)
 import Control.Monad.IO.Class (liftIO)
 import Data.List (isInfixOf)
-import Data.Maybe (isNothing)
+import Data.Maybe (isJust, isNothing)
 import GHC hiding (exprType)
 import GHC.Builtin.KnownOccs (returnIOIdOcc)
 import GHC.Builtin.Modules (gHC_INTERNAL_BASE)
@@ -15,9 +15,11 @@ import GHC.Core
      Unfolding (CoreUnfolding, uf_tmpl), UnfoldingCache (..), UnfoldingSource (VanillaSrc), mkApps, mkLams)
 import GHC.Core.Coercion (liftCoSubst, mkCoVarCo, mkLiftingContext, mkSubCo)
 import GHC.Core.Coercion.Axiom (Role(..))
+import GHC.Core.Dependent (hasExistentialExpr)
 import GHC.Core.Lint (lintExpr)
 import GHC.Core.Predicate (mkNomEqPred, mkReprEqPred)
 import GHC.Core.Make (mkCharExpr, mkListExpr, mkNothingExpr, mkRuntimeErrorApp, pAT_ERROR_ID)
+import GHC.Core.SimpleOpt (simpleOptNativeExpr)
 import GHC.Core.TyCo.Compare (eqType)
 import GHC.Core.TyCo.Rep (Type (ExistsTy, TyVarTy))
 import GHC.Core.Type (mkTyConApp)
@@ -89,6 +91,27 @@ main = do
     throws False ForcePack "demanding Pack observes payload bottom"
     returns False Computed "Unpack leaves a computed package unevaluated"
     checkLiftingReadback libdir (interfaceFile ++ ".lift")
+    checkAdjacentErasure libdir
+
+-- Preserve an invalid witness escape for Core Lint.
+checkAdjacentErasure :: FilePath -> IO ()
+checkAdjacentErasure libdir = session libdir $ \env _ -> do
+    schemaId : witnessId : payloadId : _ <- uniqsFromSupply <$> mkSplitUniqSupply PluginTag
+    let tv unique name = mkTyVar (mkSysTvName unique (fsLit name)) liftedTypeKind
+        schemaArg = tv schemaId "a"
+        witness = tv witnessId "witness"
+        payload = mkSysLocal (fsLit "payload") payloadId manyDataConTy (TyVarTy witness)
+        true = Var trueDataConId
+        package = Pack (ExistsTy schemaArg (TyVarTy schemaArg)) boolTy true
+        ignored = simpleOptNativeExpr (Unpack witness payload package true)
+        escaped = Unpack witness payload package (Var payload)
+        escaped' = simpleOptNativeExpr escaped
+        lint = lintExpr (initLintConfig (hsc_dflags env) [])
+    unless (not (hasExistentialExpr ignored) && isNothing (lint ignored)) $
+        fail "The well-scoped dead payload survived SimpleOpt"
+    unless (hasExistentialExpr escaped' && isJust (lint escaped') && isJust (lint escaped)) $
+        fail "SimpleOpt hid an escaping existential witness"
+    putStrLn "adjacent package reduction preserves witness scope"
 
 -- | Restore a package cast whose only evidence for its free parameter is a Given.
 checkLiftingReadback :: FilePath -> FilePath -> IO ()

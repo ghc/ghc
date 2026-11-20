@@ -350,3 +350,7 @@ test('NativeExistentialSource',
      [req_host_target_ghc, req_interp, req_rts_linker, only_ways(['normal']),
       extra_files(['erased-existential-source'])],
      run_command, ['bash NativeExistentialSource.sh "{compiler}" "{libdir}" ' + config.ghc_th_way_flags])
+
+test('NativeExistentialBeta',
+     [req_host_target_ghc, unless(have_ncg(), skip), only_ways(['normal'])],
+     compile_and_run, ['-O1 -dcore-lint -dstg-lint'])

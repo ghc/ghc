@@ -5,3 +5,4 @@ imported Unpack demands the payload only when its body does
 imported Unpack returns the body result for a defined package
 demanding Pack observes payload bottom
 Unpack leaves a computed package unevaluated
+adjacent package reduction preserves witness scope
