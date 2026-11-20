@@ -1,12 +1,28 @@
-{-# LANGUAGE GADTs, NoExperimentalDependentTypes, TypeFamilies, TypeOperators #-}
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes, ScopedTypeVariables, TypeFamilies, TypeOperators #-}
 module NativeConstrainedFamilyClient where
 
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
 import NativeConstrainedFamilyProvider (Allowed, Collects(..), Defaulted(..), Pair(..))
 
-assumed :: Collects c => Proxy c -> Proxy (Elem c)
-assumed _ = Proxy
+assumed :: forall c. Collects c => Proxy c -> Proxy (Elem c)
+assumed _ =
+    let local :: Proxy (Elem c)
+        local = Proxy
+    in local
+
+assumedInPattern :: forall c. Witness c -> ()
+assumedInPattern (Witness _) =
+    let local :: Proxy (Elem c)
+        local = Proxy
+    in local `seq` ()
+assumedInPattern (ByEquality _) = ()
+
+localContext :: forall c. Proxy c -> ()
+localContext _ =
+    let local :: Collects c => Proxy (Elem c)
+        local = Proxy
+    in ()
 
 resolved :: Allowed a => Elem [a] :~: a
 resolved = Refl

@@ -161,9 +161,9 @@ omits kinds, classes and partial applications.
 The experiment covers fully applied associated type families with result
 kind `Type` and the same binders as their owner class. It permits a
 different binder order. Each instance supplies an equation or a default.
-The check uses Givens in the same written signature and the imported
-class instance environment. Givens inherited by a local signature from
-its enclosing term need a later check. General kinds, family occurrences
+The check uses Givens in the written signature, Givens from enclosing
+functions or GADT patterns, and the imported class instance environment.
+Formation checks run before inference can add a missing constraint. General kinds, family occurrences
 in aliases or visible type arguments, generated newtype or via equations,
 and partial applications also need separate formation rules.
 

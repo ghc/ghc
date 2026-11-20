@@ -20,7 +20,8 @@ import GHC.Data.FastString
 import GHC.Data.Maybe
 
 -- friends:
-import GHC.Tc.Utils.Unify    ( tcSubTypeAmbiguity, tcSkolemise, DeepSubsumptionFlag(Shallow) )
+import GHC.Tc.Utils.Unify    ( checkConstraints, tcSubTypeAmbiguity, tcSkolemise
+                              , DeepSubsumptionFlag(Shallow) )
 import GHC.Tc.Solver         ( simplifyAmbiguityCheck )
 import GHC.Tc.Instance.Class ( matchGlobalInst, ClsInstResult(..), AssocInstInfo(..) )
 import GHC.Tc.Instance.FunDeps
@@ -461,7 +462,7 @@ check_valid_mono_type partial_family_hint ty
        ; check_type ve ty
        ; checkNoConstrainedFamilyApps ty }
 
--- | Check domain obligations under the written signature's own Givens.
+-- | Check the domain of each family in a written signature.
 -- See Note [Constrained associated family formation].
 checkConstrainedSignature :: UserTypeCtxt -> Type -> TcM ()
 checkConstrainedSignature ctxt ty
@@ -475,13 +476,15 @@ checkConstrainedSignature ctxt ty
        ; traverse_ (checkNoConstrainedFamilyApps . varType . snd) bndrs
        ; traverse_ checkNoConstrainedFamilyApps theta
        ; checkNested rho
+       ; givens <- getLexicalGivens
        ; (_, wanted) <- captureConstraints $
-           tcSkolemise Shallow ctxt ty $ \sk_rho ->
-             forM_ (constrainedFamilyApps sk_rho) $ \case
-               WrittenFamily fam args -> emit_domain fam args
-               FamilyInSynonym fam ->
-                 failWithTc $ TcRnConstrainedFamilyUnsupported fam $
-                   text "This occurrence comes from a type synonym definition."
+           checkConstraints (SigSkol ctxt ty []) [] givens $
+             tcSkolemise Shallow ctxt ty $ \sk_rho ->
+               forM_ (constrainedFamilyApps sk_rho) $ \case
+                 WrittenFamily fam args -> emit_domain fam args
+                 FamilyInSynonym fam ->
+                   failWithTc $ TcRnConstrainedFamilyUnsupported fam $
+                     text "This occurrence comes from a type synonym definition."
        ; simplifyAmbiguityCheck ty wanted }
   | otherwise
   = checkNoConstrainedFamilyApps ty
@@ -569,13 +572,16 @@ identities determine how to instantiate that class predicate. A reader
 checks the same obligation with either setting of the experimental flag.
 
 Check an application in a written signature, before solving a term can
-reduce the family and forget the domain obligation. Solve the class
-predicate from the written Givens and the instance environment. Do not
-add an inferred predicate to the signature or put a dictionary into the
-family's Core kind. For a constructor, check its wrapper type after the
-usual newtype validity check. The wrapper already contains the Givens
-available to its fields, including the constructor's explicit context. This is a source subset of the formulation in
-Morris and Eisenberg, "Constrained Type Families", section 4.2.
+reduce the family and lose the domain obligation. Solve the class
+predicate from the declared and enclosing Givens and the instance
+environment. Check formation separately from inference so that inference
+cannot add a missing predicate to the signature. This source check
+does not put a dictionary into the family's Core kind.
+
+For a constructor, check its wrapper type after the newtype validity
+check. The wrapper contains the Givens for its fields, including the
+constructor's explicit context. See Morris and Eisenberg, "Constrained
+Type Families", section 4.2.
 -}
 
 checkTySynRhs :: UserTypeCtxt -> TcType -> TcM ()

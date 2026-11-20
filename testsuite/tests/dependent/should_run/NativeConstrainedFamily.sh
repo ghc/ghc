@@ -53,6 +53,26 @@ HS
     )
 done
 
+# A local signature cannot cause a missing domain to be inferred for its owner.
+cat >marked/MissingLocal.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes, ScopedTypeVariables, TypeFamilies #-}
+module MissingLocal where
+import Data.Proxy (Proxy(..))
+import NativeConstrainedFamilyProvider (Collects(..))
+outer (_ :: Proxy c) =
+    let local :: Proxy (Elem c)
+        local = Proxy
+    in local `seq` ()
+HS
+cp marked/MissingLocal.hs ordinary/
+if (cd marked && "${ghc[@]}" -c MissingLocal.hs) >missing-local.log 2>&1 ||
+   ! grep -Fq '[GHC-39999]' missing-local.log ||
+   ! grep -Fq 'Collects c' missing-local.log; then
+    cat missing-local.log
+    exit 1
+fi
+(cd ordinary && "${ghc[@]}" -c MissingLocal.hs)
+
 # Coverage follows the imported declaration even when the instance writer
 # has the experimental flag off.
 cat >marked/MissingEquation.hs <<'HS'
