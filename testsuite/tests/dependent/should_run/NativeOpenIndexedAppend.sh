@@ -48,18 +48,30 @@ for opt in -O0 -O1 -O2; do
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
 module Main where
 
-import Control.Exception (SomeException, evaluate, try)
+import Control.Exception (ErrorCall(..), SomeException, evaluate, try)
 import Control.Monad (unless, void)
 import Data.IORef (newIORef, readIORef)
 import Data.Type.Equality ((:~:)(Refl))
-import OpenVectorAppend (appendConsAt, appendEmptyAt)
-import OrdinaryOpenVectorAppend (appendContents, observeAppendCons, observeAppendEmpty)
+import OpenVectorAppend (appendConsAt, appendEmptyAt, appendEmptyAtBoth)
+import OrdinaryOpenVectorAppend (appendContents, observeAppendCons, observeAppendEmpty, observeAppendPair)
 import qualified PackedVecLibrary as P
 
 raises :: a -> IO Bool
 raises value = do
     result <- try (void (evaluate value)) :: IO (Either SomeException ())
     pure (case result of Left _ -> True; Right _ -> False)
+
+pairAtZero :: P.Vec Bool 'P.Z -> P.Vec Bool 'P.Z -> Bool
+pairAtZero xs ys = case appendEmptyAtBoth P.Z xs ys of
+    (Refl, Refl) -> True
+
+pairAtOne :: P.Vec Bool ('P.S 'P.Z) -> P.Vec Bool ('P.S 'P.Z) -> Bool
+pairAtOne xs ys = case appendEmptyAtBoth (P.S P.Z) xs ys of
+    (Refl, Refl) -> True
+
+pairAtTwo :: P.Vec Bool ('P.S ('P.S 'P.Z)) -> P.Vec Bool ('P.S ('P.S 'P.Z)) -> Bool
+pairAtTwo xs ys = case appendEmptyAtBoth (P.S (P.S P.Z)) xs ys of
+    (Refl, Refl) -> True
 
 main :: IO ()
 main = do
@@ -69,6 +81,16 @@ main = do
     print (observeAppendEmpty, appendContents xs, proofOnly (error "forced proof input" :: P.Vec Bool 'P.Z))
     putStrLn observeAppendCons
     let bottom = error "forced vector" :: P.Vec Bool 'P.Z
+        bottomOne = error "forced vector" :: P.Vec Bool ('P.S 'P.Z)
+        bottomTwo = error "forced vector" :: P.Vec Bool ('P.S ('P.S 'P.Z))
+    zero <- newIORef P.Z >>= readIORef
+    one <- newIORef (P.S (error "forced predecessor")) >>= readIORef
+    cut <- try (evaluate (observeAppendPair (error "forced cut")))
+    let demandedCut = case cut of
+            Left (ErrorCall "forced cut") -> True
+            _ -> False
+    print (pairAtZero bottom bottom, pairAtOne bottomOne bottomOne, pairAtTwo bottomTwo bottomTwo,
+           observeAppendPair zero, observeAppendPair one, demandedCut)
     let consProof :: a -> P.Vec a n -> P.Vec a m -> Bool
         consProof hd tl ys = case appendConsAt hd tl ys of Refl -> True
     unless (consProof (error "forced proof head") bottom bottom) (fail "missing recursive proof")
@@ -87,7 +109,7 @@ main = do
 HS
     "${ghc[@]}" "$opt" -fforce-recomp -c OrdinaryOpenVectorAppend.hs Main.hs
     "${ghc[@]}" Main.o OrdinaryOpenVectorAppend.o OpenVectorAppend.o ../provider/PackedVecLibrary.o -o append-run
-    [[ $(./append-run) == $'(("Refl",True),[True,False],True)\nRefl' ]]
+    [[ $(./append-run) == $'(("Refl",True),[True,False],True)\nRefl\n(True,True,True,True,True,True)' ]]
 done
 
 mkdir "$out/interactive"
@@ -140,6 +162,11 @@ wrong :: foreach (xs :: P.Vec Bool 'P.Z) -> foreach (ys :: P.Vec Bool 'P.Z)
 wrong xs ys = Refl
 HS
 reject WrongRuntime.hs 83865 'wrong xs ys = Refl' -O1
+
+sed -e 's/^module OpenVectorAppend .*/module WrongAppendPair where/' \
+    -e "s/appendEmptyAt @a @'P.Z ys)/appendEmptyAt @a @'P.Z xs)/" \
+    "$src/OpenVectorAppend.hs" >WrongAppendPair.hs
+reject WrongAppendPair.hs 05617 "In the expression: appendEmptyAt @a @'P.Z xs" -O1
 
 cat >WrongConsAt.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}

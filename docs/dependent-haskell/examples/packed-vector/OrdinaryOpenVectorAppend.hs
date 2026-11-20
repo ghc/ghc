@@ -1,11 +1,12 @@
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, TypeApplications #-}
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
 
-module OrdinaryOpenVectorAppend (observeAppendEmpty, appendContents, observeAppendCons, consContents) where
+module OrdinaryOpenVectorAppend
+    (observeAppendEmpty, appendContents, observeAppendCons, consContents, observeAppendPair) where
 
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
-import OpenVectorAppend (appendCons, appendConsAt, appendEmpty, appendEmptyAt)
+import OpenVectorAppend (appendCons, appendConsAt, appendEmpty, appendEmptyAt, appendEmptyAtBoth)
 import qualified PackedVecLibrary as P
 
 -- | Use the imported proof and read the head with a suspended tail.
@@ -35,3 +36,14 @@ observeAppendCons =
 consContents :: a -> P.Vec a n -> P.Vec a m -> [a]
 consContents x xs ys = case appendConsAt x xs ys of
     Refl -> P.toList (P.appendVec (P.VCons x xs) ys)
+
+-- | Use both proofs while leaving the two vector arguments unevaluated.
+observeAppendPair :: P.Nat -> Bool
+observeAppendPair n =
+    let xs = missing "forced first vector" (P.replicateNative n True)
+        ys = missing "forced second vector" (P.replicateNative n False)
+    in case appendEmptyAtBoth n xs ys of
+        (Refl, Refl) -> True
+  where
+    missing :: String -> a -> a
+    missing message _ = error message

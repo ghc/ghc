@@ -6628,6 +6628,18 @@ simplifier reads the module's actual flag when it configures rule firing.
 [GHC rewrite rules](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/rewrite_rules.html)
 and [simplifier configuration](../../compiler/GHC/Driver/Config/Core/Opt/Simplify.hs).
 
+### Two append equalities at one runtime length
+
+The Haskell proof uses the empty append equation for two vector
+arguments. It matches their shared length before returning the two
+equalities. Agda's dependent pattern matching also lets a constructor
+pattern refine an index used by more than one argument. The Haskell
+regression checks demand separately with undefined vectors and an
+undefined predecessor.
+[Agda function definitions](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html),
+[Agda vector append](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html),
+and [Haskell proof](examples/packed-vector/OpenVectorAppend.hs).
+
 ## A retained type as a runtime argument
 
 Proposal #378 considers a type representation for a retained `Type`

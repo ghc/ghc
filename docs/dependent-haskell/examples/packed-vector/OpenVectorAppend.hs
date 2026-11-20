@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures, PolyKinds, TypeOperators #-}
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
 
-module OpenVectorAppend (appendEmpty, appendEmptyAt, appendCons, appendConsAt) where
+module OpenVectorAppend (appendEmpty, appendEmptyAt, appendCons, appendConsAt, appendEmptyAtBoth) where
 
 import Data.Proxy (Proxy)
 import Data.Type.Equality ((:~:)(Refl))
@@ -29,3 +29,13 @@ appendConsAt :: forall a n m. foreach (x :: a) -> foreach (xs :: P.Vec a n)
              -> foreach (ys :: P.Vec a m)
              -> P.appendVec ('P.VCons x xs) ys :~: 'P.VCons x (P.appendVec xs ys)
 appendConsAt _ _ _ = Refl
+
+type EmptyLaw a (n :: P.Nat) (xs :: P.Vec a n) = P.appendVec 'P.VNil xs :~: xs
+
+-- | Prove empty append for two vectors after inspecting their shared length.
+appendEmptyAtBoth :: forall a. foreach (n :: P.Nat) -> foreach (xs :: P.Vec a n)
+                  -> foreach (ys :: P.Vec a n)
+                  -> (EmptyLaw a n xs, EmptyLaw a n ys)
+appendEmptyAtBoth n xs ys = case n of
+    P.Z -> (appendEmptyAt @a @'P.Z xs, appendEmptyAt @a @'P.Z ys)
+    P.S k -> (appendEmptyAt @a @('P.S k) xs, appendEmptyAt @a @('P.S k) ys)

@@ -1460,6 +1460,19 @@ Agda uses the same cons equation for the recursive step in
 [regression](../../../testsuite/tests/dependent/should_run/NativeOpenIndexedAppend.sh),
 and [Agda vector append and split](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html).
 
+`appendEmptyAtBoth` matches one retained length and proves the empty
+append equation for each of two vectors at that length. Each equality
+names its own input vector. GHC rejects substituting the first vector
+for the second in the proof.
+
+The ordinary client imports both interfaces with the source files
+absent. It checks the written cuts `Z`, `S Z`, and `S (S Z)`, then
+reads zero and successor from an `IORef`. The proof forces the cut's
+outer constructor and leaves both vectors and the successor's
+predecessor unevaluated. The regression runs with Core and STG Lint
+at `-O0`, `-O1`, and `-O2`.
+[Prior art](../REFERENCES.md#two-append-equalities-at-one-runtime-length).
+
 ### Prove that map distributes over append
 
 `mapAppend` proves `map f (xs ++ ys) = map f xs ++ map f ys`
