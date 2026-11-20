@@ -69,7 +69,7 @@ import GHC.Core.DataCon
 import GHC.Core.Class(classTyCon)
 import GHC.Core.TyCon
 import GHC.Core.Type
-import GHC.Core.TyCo.Rep (Type(ExistsTy, TermAppTy, TermVarTy))
+import GHC.Core.TyCo.Rep (Type(ExistsTy, ForAllTy, TermAppTy, TermVarTy))
 import GHC.Core.Coercion
 import GHC.Core.Predicate( decomposeIPPred, mkNomEqPred )
 
@@ -77,9 +77,9 @@ import GHC.Types.Basic
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Map
 import GHC.Types.Unique.Set
-import GHC.Types.Var ( ExistsTyFlag(ExplicitExists, ImplicitExists), mkTyVar
+import GHC.Types.Var ( ExistsTyFlag(ExplicitExists, ImplicitExists), mkTyVar, isTyVar
                      , binderFlag, binderVar, isInferredForAllTyFlag
-                     , isSpecifiedForAllTyFlag )
+                     , isSpecifiedForAllTyFlag, isVisibleForAllTyFlag )
 import GHC.Types.Var.Set (elemVarSet)
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -406,22 +406,23 @@ tcDeclaredLambdaWitness binder body (MG { mg_alts = L _ matches })
     match_witness _ = return Nothing
 
     rhs_witness formal (L _ (GRHS _ _ rhs))
-      | Just (name, ntypes, nargs) <- application 0 0 rhs
+      | Just (name, ntypes, args) <- application 0 [] rhs
       = do { mb_id <- if isExternalName name
                      then tcLookupIdMaybe name
                      else fmap local_id (tcLookupLcl_maybe name)
            ; declared <- traverse (liftZonkM . zonkTcType . varType) mb_id
            ; formal' <- liftZonkM (zonkTcType formal)
-           ; return $ do { (consumed, residual) <- declared >>= type_prefix ntypes
-                         ; actual <- result_after nargs residual
-                         ; guard (not (any (`elemVarSet` tyCoVarsOfType actual) consumed))
-                         ; matchPolytypeExistsWitness binder formal' actual } }
+           ; case declared >>= type_prefix ntypes of
+               Just (consumed, residual) ->
+                 fmap (>>= matchPolytypeExistsWitness binder formal')
+                      (result_from consumed args residual)
+               Nothing -> return Nothing }
     rhs_witness _ _ = return Nothing
 
-    application ntypes nargs expr = case unLoc (stripParensLHsExpr expr) of
-      HsApp _ fun _ | ntypes == 0 -> application ntypes (nargs + 1) fun
-      HsAppType _ fun _           -> application (ntypes + 1) nargs fun
-      HsVar _ name -> Just (unLocWithUserRdr name, ntypes, nargs)
+    application ntypes args expr = case unLoc (stripParensLHsExpr expr) of
+      HsApp _ fun arg | ntypes == 0 -> application ntypes (arg : args) fun
+      HsAppType _ fun _             -> application (ntypes + 1) args fun
+      HsVar _ name -> Just (unLocWithUserRdr name, ntypes, args)
       _ -> Nothing
 
     type_prefix :: Int -> Type -> Maybe ([TyVar], Type)
@@ -436,6 +437,34 @@ tcDeclaredLambdaWitness binder body (MG { mg_alts = L _ matches })
     result_after :: Int -> Type -> Maybe Type
     result_after 0 ty = Just ty
     result_after n ty = splitVisibleFunTy_maybe ty >>= result_after (n - 1) . snd
+
+    result_from consumed [] ty
+      | any (`elemVarSet` tyCoVarsOfType ty) consumed = return Nothing
+      | otherwise = return (Just ty)
+    result_from consumed (arg : args) ty
+      | HsEmbTy _ written <- unLoc (stripParensLHsExpr arg)
+      , ForAllTy ma bndr rest <- coreFullView ty
+      , isVisibleForAllTyFlag (binderFlag bndr)
+      , let var = binderVar bndr
+      , isTyVar var, eqType ma unmatchableDataConTy
+      = do { known <- required_synonym written
+           ; case known of
+               Just supplied | eqType (typeKind supplied) (tyVarKind var) ->
+                 result_from consumed args (substTyWith [var] [supplied] rest)
+               _ -> result_from (var : consumed) args rest }
+      | Just (_, rest) <- splitVisibleFunTy_maybe ty
+      = result_from consumed args rest
+      | otherwise = return Nothing
+
+    required_synonym :: LHsWcType GhcRn -> TcM (Maybe Type)
+    required_synonym (HsWC [] ty)
+      | HsTyVar _ NotPromoted (L _ (WithUserRdr _ name)) <- unLoc (ignoreParens ty)
+      , isExternalName name, isTcOcc (nameOccName name)
+      = do { thing <- tcLookup name
+           ; return $ case thing of
+               AGlobal (ATyCon tc) | tyConArity tc == 0 -> synTyConRhs_maybe tc
+               _ -> Nothing }
+    required_synonym _ = return Nothing
 
     local_id (Just (ATcId { tct_id = ident })) = Just ident
     local_id _ = Nothing
@@ -474,6 +503,13 @@ result type to be independent of those binders, including in its kinds.
 The ordinary application checker instantiates the binders and checks each
 written operand at its original location.
 See Note [Visible type application and abstraction] in GHC.Tc.Gen.App.
+
+An explicitly marked required argument, such as (type PolyId), can
+also fix the result type. Read only a closed, saturated type synonym
+of the binder's kind. This inspects the declaration before entering
+the lambda's pattern scope. An unread argument can still leave a
+result that is independent of its binder. The ordinary checker
+validates the type argument and checks the application in both cases.
 
 Keep the ordinary match checker, including its deep skolemisation and usage
 checks. The outer forall wrapper remains outside the package when tcPolyExprCheck
