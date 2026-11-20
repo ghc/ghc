@@ -220,8 +220,9 @@ source examples. General promotion remains open.
    or a partial family. GHC preserves named binder order and checks
    extension-off clients through stripped interfaces. A written partial
    application at a fixed U binder reports the missing extension at the
-   application when the signature identifies one site. Extend higher-order
-   inference beyond the tested closed families.
+   application when validity checks the written arguments and the signature
+   identifies one source site. Extend higher-order inference beyond the tested
+   closed families.
    [Inferred callback arrows](roadmap/R23-unsaturated-type-families.md#inferring-a-callback-arrow-in-a-closed-family),
    [later argument](roadmap/R23-unsaturated-type-families.md#choosing-a-prefixs-matchability-from-a-later-argument)
    and [singletons migration](roadmap/R23-unsaturated-type-families.md#arrow-patterns-in-family-equations).

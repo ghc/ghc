@@ -1031,7 +1031,9 @@ check_syn_tc_app (ve@ValidityEnv{ ve_ctxt = ctxt, ve_expand = expand })
   = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
        ; if enabled || ve_imported_synonym ve || is_inferred ctxt
            then check_args_only expand
-           else reportWrittenPartialFamily tc tys }
+           else case expand of
+             Expand -> failWithTc (tyConArityErr tc tys)
+             _ -> reportWrittenPartialFamily tc tys }
 
   | otherwise
   = failWithTc (tyConArityErr tc tys)
@@ -1072,7 +1074,7 @@ reportWrittenPartialFamily :: TyCon -> [Type] -> TcM a
 reportWrittenPartialFamily tc args = do
   contexts <- getErrCtxt
   case writtenSpans contexts of
-    [loc] -> do
+    [Just loc] -> do
       unit_state <- hsc_units <$> getTopEnv
       let hint = useExtensionInOrderTo (text "to write a partial type family application.")
                                       LangExt.ExperimentalDependentTypes
@@ -1089,38 +1091,47 @@ reportWrittenPartialFamily tc args = do
       UserLHsType ty -> walk ty
     writtenSpans (_ : rest) = writtenSpans rest
 
-    walk :: Data a => a -> [SrcSpan]
+    walk :: Data a => a -> [Maybe SrcSpan]
     walk node
       | Just ty <- cast node = walkType ty
       | otherwise = concat (gmapQ walk node)
 
-    walkType :: LHsType GhcRn -> [SrcSpan]
+    walkType :: LHsType GhcRn -> [Maybe SrcSpan]
     walkType (L _ (HsParTy _ ty)) = walkType ty
     walkType (L _ (HsKindSig _ ty kind)) = walkType ty ++ walkType kind
     walkType ty = spine (getLocA ty) 0 ty
 
-    spine :: SrcSpan -> Int -> LHsType GhcRn -> [SrcSpan]
+    spine :: SrcSpan -> Int -> LHsType GhcRn -> [Maybe SrcSpan]
     spine loc n (L _ ty) = case ty of
       HsAppTy _ f a -> spine loc (n + 1) f ++ walkType a
       HsAppKindTy _ f k -> spine loc n f ++ walkType k
       HsParTy _ f -> spine loc n f
       HsKindSig _ f k -> spine loc n f ++ walkType k
       HsOpTy _ l f r -> spine loc (n + 2) f ++ walkType l ++ walkType r
+      HsSpliceTy{} -> [Nothing]  -- The splice may generate a competing site.
       HsTyVar _ _ name
-        | unLocWithUserRdr name == tyConName tc, n == supplied, isGoodSrcSpan loc -> [loc]
+        | unLocWithUserRdr name == tyConName tc, n == supplied ->
+            [if isGoodSrcSpan loc then Just loc else Nothing]
         | otherwise -> []
       _ -> concat (gmapQ walk ty)
 
 {- Note [Locating a partial family application]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The source validity check reports the arity error. LiberalTypeSynonyms
-can erase a partial application before this check. The error context
+The source validity check reports the arity error. The error context
 contains the renamed signature. Core types carry no source span.
+
+In Expand mode, LiberalTypeSynonyms can discard a written application
+while another application of the same family survives. For example, a
+splice can supply the head of the surviving application while a synonym
+discards a written application in a sibling type. Keep the original error
+location in Expand mode. See PartialFamilyArityAfterErasure.
 
 Use the resolved family name and visible arity to locate the error when
 the signature has one matching application. Count the entire application
-spine so a saturated call does not supply a false location. After synonym
-expansion or with several matching sites, use the original error location.
+spine so a saturated call does not supply a false location. A type splice
+can supply a competing application even without LiberalTypeSynonyms.
+After synonym expansion, with a splice, or with several matching sites,
+use the original error location.
 -}
 
 -- | Find a raw partial family without substituting or expanding synonyms.
