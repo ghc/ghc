@@ -323,10 +323,10 @@ source examples. General promotion remains open.
    arbitrary step function and seed, starting with a list right fold.
    [Append and map proofs](roadmap/R16-open-term-evaluator.md#prove-that-map-distributes-over-append).
 
-6. **R21.** A retained field's worker can use a nullary local synonym
-   for its argument type. A worker in a later splice group gives
-   GHC-76037 at the function name. A worker that needs the unfinished
-   constructor still gives GHC-68947.
+6. **R21.** A retained field's worker can use a saturated local synonym
+   such as `WorkerArgument Bool` in its signature. A worker in a later
+   splice group gives GHC-76037 at the function name. A worker that needs
+   the unfinished constructor still gives GHC-68947.
    [Declaration groups and aliases](roadmap/R21-dependency-analysis.md#local-synonyms-in-a-retained-field-worker).
 
 Use this queue for current priorities, the linked card for its acceptance

@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, LambdaCase #-}
 module LocalAliasField (AliasField(..), aliasField) where
 
-type WorkerArgument = Bool
+type WorkerArgument a = a
 
 -- | A local worker selects the retained field's result type.
 data AliasField where
@@ -11,6 +11,6 @@ data AliasField where
 aliasField :: AliasField
 aliasField = AliasField (\case True -> 41; False -> 'f')
 
-worker :: WorkerArgument -> Bool
+worker :: WorkerArgument Bool -> Bool
 worker False = False
 worker True = True

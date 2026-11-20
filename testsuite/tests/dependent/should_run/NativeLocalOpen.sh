@@ -42,7 +42,7 @@ expect_rejection() {
     fi
 }
 
-# The signature's nullary synonym must check before the source table.
+# Check the worker with both parameterized and nullary synonyms.
 mkdir "$out"/{alias-provider,alias-client}
 cat > "$out/alias-client/ReadAliasField.hs" <<'SOURCE'
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
@@ -60,11 +60,14 @@ main = print (renderAlias False, renderAlias True)
 SOURCE
 (
     cd "$out/alias-provider"
-    for group in same prior; do
-        if [[ $group == prior ]]; then
-            sed '/^type WorkerArgument = Bool$/a $(pure [])' "$src/LocalAliasField.hs" > LocalAliasField.hs
-        else
-            cp "$src/LocalAliasField.hs" .
+    for variant in applied nullary prior-applied prior-nullary; do
+        cp "$src/LocalAliasField.hs" .
+        if [[ $variant == *nullary ]]; then
+            sed -i -e 's/type WorkerArgument a = a/type WorkerArgument = Bool/' \
+                -e 's/worker :: WorkerArgument Bool/worker :: WorkerArgument/' LocalAliasField.hs
+        fi
+        if [[ $variant == prior-* ]]; then
+            sed -i '/^type WorkerArgument /a $(pure [])' LocalAliasField.hs
         fi
         "${ghc[@]}" -XTemplateHaskell -fforce-recomp -fomit-interface-pragmas \
             -fno-write-if-simplified-core -c LocalAliasField.hs

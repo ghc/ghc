@@ -2304,7 +2304,7 @@ tcTopSrcTables :: HsGroup GhcRn -> TcM (TcGblEnv, TcLclEnv)
 tcTopSrcTables group = do
     enabled <- xoptM LangExt.ExperimentalDependentTypes
     env <- getGblEnv
-    let use = TableInType (sourceTableTypeDependencies group)
+    let use = TableInType (sourceTableTypeDependencies (tcg_type_env env) group)
     case if enabled then splitLocalSourceTables use (tcg_dus env) group else Nothing of
       Nothing -> tcTopSrcDeclGroup group
       Just (needed, early, rest) -> do
@@ -2324,23 +2324,37 @@ tcTopSrcTables group = do
 
 -- | Follow the same-group types needed by a source-table signature.
 -- See Note [Ordering local source tables] in GHC.Rename.Module.
-sourceTableTypeDependencies :: HsGroup GhcRn -> (Name -> Bool) -> [Name] -> Maybe NameSet
-sourceTableTypeDependencies HsGroup{hs_tyclds = groups} ready =
-    closeLocalNames dependencies emptyNameSet
+sourceTableTypeDependencies :: TypeEnv -> HsGroup GhcRn -> (Name -> Bool)
+                            -> [(Name, Int)] -> Maybe NameSet
+sourceTableTypeDependencies type_env HsGroup{hs_tyclds = groups} ready uses = do
+    guard (all saturated uses)
+    closeLocalNames dependencies emptyNameSet (map fst uses)
   where
     local_types = mkNameSet (map (tcdName . unLoc) (tyClGroupTyClDecls groups))
     aliases = mkNameEnv
-      [ (alias, deps)
+      [ (alias, (length params, deps))
       | TyClGroup{group_ext = deps, group_kisigs = [], group_instds = [],
-                   group_tyclds = [L _ SynDecl{tcdLName = L _ alias,
-                                              tcdTyVars = HsQTvs{hsq_explicit = []},
-                                              tcdRhs = rhs}]} <- groups
+                   group_tyclds = [L _ SynDecl{tcdLName = L _ alias, tcdTyVars = tvs, tcdRhs = rhs}]} <- groups
+      , let params = hsQTvExplicit tvs
+      , all ordinary_parameter params
       , L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ target))) <- [ignoreParens rhs]
-      , isTyConName target, alias /= target
-      , isNothing (sourceTableTermOcc (nameOccName target)) ]
+      , target `elem` hsExplicitLTyVarNames tvs ||
+        (isTyConName target && alias /= target && isNothing (sourceTableTermOcc (nameOccName target))) ]
+
+    ordinary_parameter (L _ HsTvb{tvb_flag = HsBndrRequired{}, tvb_kind = HsBndrNoKind{}}) = True
+    ordinary_parameter _ = False
+
+    saturated (name, supplied)
+      | Just (arity, _) <- lookupNameEnv aliases name = supplied == arity
+      | supplied == 0 = True
+      | Just (ATyCon tc) <- lookupTypeEnv type_env name
+      , isTypeSynonymTyCon tc, isFamFreeTyCon tc
+      = supplied == length (tyConVisibleTyVars tc)
+      | otherwise = False
+
     dependencies name
       | ready name || not (name `elemNameSet` local_types) = Just emptyNameSet
-      | otherwise = lookupNameEnv aliases name
+      | otherwise = snd <$> lookupNameEnv aliases name
 
 {- Note [Scheduling local open definitions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

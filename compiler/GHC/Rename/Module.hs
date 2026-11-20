@@ -1588,10 +1588,12 @@ original group because they can use instances from later groups. A SPECIALISE
 pragma can also mention arbitrary local types and values. Keep such bindings
 in the original group.
 
-A worker signature can also name a nullary type synonym with a bare type
-constructor as its right-hand side. GHC.Tc.Module follows the renamed type
-group's dependencies. Check the synonym before the worker in the early
-group. Each prerequisite must be a ready type or another eligible synonym.
+A worker signature can name a saturated type synonym. GHC.Tc.Module checks
+the written applications against the synonym arity. A same-group synonym
+can refer to a bare type constructor or one of its own parameters. Follow
+the renamed group's dependencies and check the synonym before the worker.
+Each prerequisite must be a ready type or another eligible synonym. A
+previous group can supply an already checked family-free synonym.
 
 A table such as listCount :: [Bool] -> Nat can refer to itself. Move its
 singleton SCC with its original recursion flag. For a list domain the
@@ -1683,7 +1685,7 @@ localSourceTableBinders binds sigs =
       _ -> False
 
 -- | A type use requires equations before type declarations; a value use can wait.
-data SourceTableUse = TableInType ((Name -> Bool) -> [Name] -> Maybe NameSet)
+data SourceTableUse = TableInType ((Name -> Bool) -> [(Name, Int)] -> Maybe NameSet)
                     | TableInTerm
 
 -- | Schedule independent local source functions. See Note [Ordering local source tables].
@@ -1748,7 +1750,9 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
     local_values = mkNameSet (collectHsValBinders CollNoDictBinders vals)
     local_binders = mkNameSet (hsGroupBinders group)
     independent_types kinds fvs = case use of
-      TableInTerm -> Just (mkNameSet kinds)
+      TableInTerm
+        | all ((== 0) . snd) kinds -> Just (mkNameSet (map fst kinds))
+        | otherwise -> Nothing
       TableInType typeDeps -> do
         needed <- typeDeps (`elemNameEnv` early_datatypes) kinds
         let cons = mkNameSet (concatMap (fromMaybe [] . lookupNameEnv early_datatypes)
@@ -1761,22 +1765,34 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
         | isTyConName name, isNothing (sourceTableTermOcc (nameOccName name)) -> Just name
       _ -> Nothing
 
-    domain_dependencies :: HsOuterSigTyVarBndrs GhcRn -> LHsType GhcRn -> Maybe [Name]
+    -- Count only the written visible arguments. The typechecker verifies the
+    -- arity of the synonym and each dependency before moving the declarations.
+    type_dependencies :: LHsType GhcRn -> Maybe [(Name, Int)]
+    type_dependencies = go []
+      where
+        go args ty
+          | L _ (HsAppTy _ fun arg) <- ignoreParens ty = go (arg : args) fun
+          | otherwise = do
+              name <- type_name ty
+              nested <- traverse type_dependencies args
+              pure ((name, length args) : concat nested)
+
+    domain_dependencies :: HsOuterSigTyVarBndrs GhcRn -> LHsType GhcRn -> Maybe [(Name, Int)]
     domain_dependencies outer ty = case (outer_vars outer, list_element ty) of
-      (Just [], element) -> (:[]) <$> type_name (fromMaybe ty element)
+      (Just [], element) -> type_dependencies (fromMaybe ty element)
       (Just [a], Just element)
         | L _ (HsTyVar _ _ (L _ (WithUserRdr _ name))) <- ignoreParens element
         , name == a -> Just []
       _ -> Nothing
 
-    result_dependencies :: HsOuterSigTyVarBndrs GhcRn -> LHsType GhcRn -> Maybe [Name]
+    result_dependencies :: HsOuterSigTyVarBndrs GhcRn -> LHsType GhcRn -> Maybe [(Name, Int)]
     result_dependencies outer ty = case unLoc (ignoreParens ty) of
       HsFunTy _ (HsModifiedFunArr _ [] HsStandardArr{}) carried result
         | Just [] <- outer_vars outer -> do
             deps <- domain_dependencies outer carried
-            res <- type_name result
-            pure (deps ++ [res])
-      _ -> (:[]) <$> type_name ty
+            res <- type_dependencies result
+            pure (deps ++ res)
+      _ -> type_dependencies ty
 
     list_element :: LHsType GhcRn -> Maybe (LHsType GhcRn)
     list_element ty = case unLoc (ignoreParens ty) of

@@ -1246,7 +1246,7 @@ main = do
             LocalAliasField.AliasField choose -> case b of
                 True -> show (choose b :: Int)
                 False -> [choose b]
-    observe "choose a retained field result through a local type alias"
+    observe "choose a retained field result through a saturated type synonym"
         (aliasResult False, aliasResult True)
     observe "select through an ordinary type constructor"
         ( 7 :: NativeNestedCase.TypeHead ('Just Bool)

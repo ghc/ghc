@@ -85,13 +85,16 @@ errors remain open.
 ## Local synonyms in a retained field worker
 
 A retained GADT field can call a local worker whose signature uses
-`type WorkerArgument = Bool`. GHC follows the renamed type dependency
-of the signature and checks the nullary synonym before checking the
-worker. It then uses the worker's checked equations to check the field
-and the remaining declarations in the same splice group.
+`WorkerArgument Bool` for `type WorkerArgument a = a`. The scheduler
+checks the synonym and its renamed dependencies before the worker.
+The source controls also use a nullary synonym. GHC uses the worker's
+checked equations to check the retained field and the remaining
+declarations in the same group.
 
-The same source works when an empty declaration splice checks the
-synonym in an earlier group. Both qualified and unqualified calls to a
+A locally declared synonym can also come from an earlier group. GHC
+uses its checked type constructor to verify saturation without moving
+that declaration. The example gives the same result with an empty splice
+after the synonym. Both qualified and unqualified calls to a
 worker in a later group give GHC-76037 at the call head. A separate type
 occurrence can establish an implicit constructor binder of the same name.
 Such a binder still gives GHC-97233 when the retained case cannot lift
