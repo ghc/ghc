@@ -2006,6 +2006,9 @@ ruleCheck env (Tick _ e)      = ruleCheck env e
 ruleCheck env (Cast e _)      = ruleCheck env e
 ruleCheck env (Let bd e)      = let (env', ds) = ruleCheckBind env bd
                                 in  ds `unionBags` ruleCheck env' e
+ruleCheck env (Pack _ _ e)    = ruleCheck env e
+ruleCheck env (Unpack w p e body)
+  = ruleCheck env e `unionBags` ruleCheck (env `extendInScopeListRC` [w, p]) body
 ruleCheck env (Lam b e)       = ruleCheck (env `extendInScopeRC` b) e
 ruleCheck env (Case e b _ as) = ruleCheck env e `unionBags`
                                 unionManyBags [ruleCheck (env `extendInScopeListRC` (b:bs)) r

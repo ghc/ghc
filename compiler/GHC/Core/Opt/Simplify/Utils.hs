@@ -1159,6 +1159,10 @@ interestingArg env se e
        | isTyVar v             = go env n e
        | n>0                   = NonTrivArg     -- (\x.b) e   is NonTriv
        | otherwise             = ValueArg
+    -- A Pack has the same evaluation cost as its payload. Unpack binds
+    -- the payload lazily, so its scrutinee supplies no value information.
+    go env _ (Pack _ _ payload) = go env 0 payload
+    go _ _ Unpack{}            = NonTrivArg
     go _ _ (Case {})           = NonTrivArg
     go env n (Let b e)         = case go env' n e of
                                    ValueArg -> ValueArg

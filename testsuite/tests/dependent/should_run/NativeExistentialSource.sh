@@ -32,6 +32,7 @@ cp "$src/"{OrdinaryClient,Eliminate,EliminateMain,QuotePack,TypedQuotePack,Reify
 "$ghc" "${flags[@]}" -i../provider -c OrdinaryClient.hs
 "$ghc" "${flags[@]}" OrdinaryClient.o ../provider/Provider.o -o ordinary
 ./ordinary | tee ordinary.stdout
+"$ghc" "${flags[@]}" -c OrdinaryPack.hs
 "$ghc" "${flags[@]}" -i../provider -c Eliminate.hs -fwrite-ide-info \
   -ddump-hie -ddump-ds -ddump-stg-final >eliminate.log
 test -s Eliminate.hie
@@ -43,11 +44,12 @@ if grep -Eiq '\b(Pack|Unpack|PackTag)\b' eliminate.stg; then
   exit 1
 fi
 "$ghc" "${flags[@]}" -i../provider -c EliminateMain.hs
-"$ghc" "${flags[@]}" EliminateMain.o Eliminate.o ../provider/Provider.o -o eliminate
+"$ghc" "${flags[@]}" EliminateMain.o Eliminate.o OrdinaryPack.o ../provider/Provider.o -o eliminate
 ./eliminate >actual
 diff -u - actual <<'EXPECTED'
 ("present","present","absent","present","present")
 ("ignored","ignored application","absent")
+13
 ("[True]","[7]")
 strict payload pattern forced the package
 EXPECTED
@@ -58,16 +60,18 @@ mkdir ../optimized
 (
     cd ../optimized
     opt=(-B"$lib" -v0 -O1 -package-env - -dcore-lint -dstg-lint "$@")
-    cp "$src"/{Provider,OrdinaryClient,Eliminate,EliminateMain}.hs .
-    "$ghc" "${opt[@]}" -c Provider.hs
+    cp "$src"/{Provider,OrdinaryClient,OrdinaryPack,Eliminate,EliminateMain}.hs .
+    "$ghc" "${opt[@]}" -drule-check probe -c Provider.hs >rule-check.log 2>&1
+    grep -Fq "Rule check" rule-check.log
     mv Provider.hs Provider.source
     "$ghc" "${opt[@]}" -c OrdinaryClient.hs
     "$ghc" "${opt[@]}" OrdinaryClient.o Provider.o -o ordinary
     ./ordinary | cmp - ../client/ordinary.stdout
+    "$ghc" "${opt[@]}" -c OrdinaryPack.hs
     "$ghc" "${opt[@]}" -c Eliminate.hs
     mv Eliminate.hs Eliminate.source
     "$ghc" "${opt[@]}" -c EliminateMain.hs
-    "$ghc" "${opt[@]}" EliminateMain.o Eliminate.o Provider.o -o eliminate
+    "$ghc" "${opt[@]}" EliminateMain.o Eliminate.o OrdinaryPack.o Provider.o -o eliminate
     ./eliminate | cmp - ../client/actual
 )
 echo "optimized package providers and clients preserve payload demand"
@@ -91,7 +95,6 @@ grep -Fq '[GHC-51063]' rule.log && grep -Fq 'package/id' rule.log || {
     exit 1
 }
 
-"$ghc" "${flags[@]}" -i../provider -c OrdinaryPack.hs
 mkdir -p fake/GHC
 cp "$src/fake/GHC.Exists.hs" fake/GHC/Exists.hs
 cp "$src/fake/Fake.hs" fake/Fake.hs
