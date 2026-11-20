@@ -8,6 +8,14 @@ increments.
 
 ## Family and package checkpoints
 
+At `90f02cc9f5`, the bootstrap compiler relink reproduced all 354
+Showcase lines at stripped `-O0` and default `-O1` and `-O2`. The
+indexed vector append and installed list reverse tests passed, including
+their rule and source-hidden interface controls. These two paths share
+the check of equations against final Core.
+[Vector append test](../../testsuite/tests/dependent/should_run/NativeOpenIndexedAppend.sh)
+and [reverse test](../../testsuite/tests/dependent/should_run/NativeOpenInstalledReverse.sh).
+
 Both compiler stages at `f1749eccba` reproduced all 348 Showcase lines
 at stripped `-O0` and default `-O1` and `-O2`. Self-hosted GHCi matched
 the same output. The external proof plugin accepted the checked candidate
