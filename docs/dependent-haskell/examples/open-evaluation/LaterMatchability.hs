@@ -27,3 +27,7 @@ type family ListOf (enabled :: Bool) a where
 
 type ListCallback :: Bool -> Type %U -> Type
 type ListCallback enabled = ListOf enabled
+
+-- | Name the partially applied list family for ordinary clients.
+type KnownListCallback :: Type %U -> Type
+type KnownListCallback = ListCallback 'True
