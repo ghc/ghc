@@ -44,21 +44,24 @@ The same consumer reads a list-backed stream and an integer stream that
 skips even values. A one-element prefix leaves the rest of the input list
 unevaluated. [Stream example](examples/erased-existentials/ErasedStream.hs).
 
-Both native compiler stages reproduce the 296-line Showcase at `-O0`,
+A kind family can select a matchable arrow for `Maybe` and an unmatchable
+arrow for a type family. Both results apply to `Int`. Before this change,
+the fork rejected the second application. An ordinary client now prints
+`(Just 7,[7])` from the producer interface. [Computed arrow kinds](examples/open-evaluation/InvisibleFamily.hs).
+
+Both native compiler stages reproduce the 297-line Showcase at `-O0`,
 default `-O1` and default `-O2`. The self-hosted compiler also checks
-stripped optimized interfaces and GHCi. Both the current compiler at
-`-O2` and the previous `6d16505aaa` compiler at `-O1` read the new
-optimized stream and rule providers. Their ordinary clients both print
-`([1,3,5],[True],5)` and apply the imported rule.
+stripped optimized interfaces and GHCi. Both this compiler and
+`2da8cf75ec` compile the ordinary client against the new optimized
+`Wrap` provider. The previous compiler cannot check the provider source.
 [Showcase](Showcase.hs) and [commands](README.md#run-the-showcase).
 
-The compiler built from `dc4aecbd7b` passed all 59 focused tests after
-the GHC API test started checking demand at both `-O0` and `-O2`. Four
-ordinary optimizer tests also passed (`T11731`, `T23491c`, `T24944` and `T14003`).
-In the dependent directory, 293 of 314 executed normal-way tests passed.
-The 21 remaining failures have the same names and categories as at
-`6d16505aaa`. Ten programs fail to compile, ten diagnostics differ,
-and the test command for `T13938` fails.
+At `192e7c3158`, all 60 focused tests that ran passed. In the dependent
+directory, 293 tests passed and 21 failed. In the polykinds directory,
+224 passed, one failed as expected, and 18 failed unexpectedly. Both
+directories have the same unexpected failures as `2da8cf75ec`.
+In the dependent directory, ten programs fail to compile, ten diagnostics
+differ, and the test command for `T13938` fails.
 
 The upgrade tests cover a change to a family, a packed projection from
 a home or installed module, and combinations of dependent projections
@@ -76,7 +79,7 @@ the header. The new reader checks the coercion's role and scope.
 | [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The integrated Showcase checks a mapper’s cons rule on an unknown tail and composes two checked traversals. Observing the result constructor leaves the inner callback lazy. | General open evaluation across arbitrary ordinary definitions. |
 | [R19 type-level cases](roadmap/R19-type-level-cases.md) | A constructor match can refine the kinds of later indices using checked nominal equalities. An unknown input that can still match an earlier row blocks a catch-all. | General mixed patterns and open GADT indices. |
 | [R22 erased existentials](roadmap/R22-existential-quantification.md) | Ordinary function equations can open payload constructors. Quick Look can infer a whole package as a type argument. A typed callback can determine the polymorphic witness for an adjacent tuple field, including in a nested application. | Generalize witness projections and inference for checking-only expressions. |
-| [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | A family can take a visible argument and pass its remaining invisible binder to another family. The receiver can infer its result kind. Ordinary scope errors show the binder order without internal matchability annotations. | General family unsaturation, matchability defaulting and compatibility with ordinary programs. |
+| [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | A family can take a visible argument and pass its remaining invisible binder to another family. The receiver can infer its result kind. An application can use either arrow exposed by a family equation. | General family unsaturation, matchability defaulting and compatibility with ordinary programs. |
 
 The published evaluator work covers closed calls such as `Prelude.sum` and
 open equations such as mapping `Prelude.not` over a list with a known head

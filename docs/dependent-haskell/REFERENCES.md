@@ -5828,6 +5828,18 @@ an error. [Serokell closed evaluator](https://ghc.serokell.io/dh#closed-term-eva
 [fromIntegral](../../libraries/ghc-internal/src/GHC/Internal/Real.hs)
 and [Nat](../../libraries/ghc-internal/src/GHC/Internal/TypeNats.hs).
 
+### Applications at a computed arrow kind
+
+Kiss, Field, Eisenbach and Peyton Jones allow type application at
+either matchability. Their calculus restricts inverse projection to
+matchable applications. In the fork, a family equation can expose the
+arrow for an application. The unifier can also defer the whole equality
+until a saturated family reduces. Both steps use nominal evidence.
+The one-step kind lookup is an implementation choice.
+[ICFP 2019, §4.2](https://simon.peytonjones.org/assets/pdfs/higher-order-type.pdf#page=11),
+[proposal 242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html)
+and [checked source](roadmap/R23-unsaturated-type-families.md#applying-a-type-at-a-family-defined-arrow-kind).
+
 ### Inferring nested applications and exporting pair equations
 
 Agda inserts implicit arguments during elaboration. A type or another

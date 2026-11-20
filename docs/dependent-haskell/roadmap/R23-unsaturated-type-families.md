@@ -176,6 +176,22 @@ failures before reconsidering those goldens.
 [RAE_T32a](../../../testsuite/tests/dependent/should_fail/RAE_T32a.hs)
 and [T13135](../../../testsuite/tests/dependent/should_fail/T13135.hs).
 
+### Applying a type at a family-defined arrow kind
+
+`Wrap False` returns `Maybe`. `Wrap True` returns the unsaturated
+family `AsList`. The kind family `Arrow` selects a matchable arrow for
+the first and an unmatchable arrow for the second. One nominal step
+exposes each arrow. GHC applies both results to `Int`. The ordinary
+client prints `(Just 7,[7])`.
+[Source example](../examples/open-evaluation/InvisibleFamily.hs).
+
+While checking `Wrap True Int ~ [Int]`, the unifier used to demand
+`AsList ~ []` before reducing the application. It now sends the whole
+equality to the solver when either head can be unmatchable. The solver
+can use the equation `AsList a = [a]` at the supplied argument.
+Extracting an argument equality from a given equality still requires a
+matchable head. [Equality controls](../../../testsuite/tests/dependent/diagnostics/DependentArrowMatchability.sh).
+
 ### An open family used after a declaration splice
 
 In `KindEqualities2`, the equation for `IK (Arr k1 k2)` returns
@@ -198,11 +214,11 @@ equations accept either selector and that `TMaybe` requires M. The
 application equation still fails. If the client owns `I`, the provider
 exports `IK` without a parameter and the `TMaybe` equation also fails.
 
-Removing the `TMaybe` equation isolates a second problem. A recursive
-`IK` equation with an explicit `%U` arrow rejects `(I a) (I b)`.
-The same equation with `%M` accepts the application.
-`GHC.Tc.Utils.Unify.matchExpectedFunKind` keeps the selector of a
-visible arrow. When a family hides the arrow, its fallback requests M.
+At `2da8cf75ec`, removing the `TMaybe` equation isolated a second problem. A recursive
+`IK` equation with an explicit `%U` arrow rejected `(I a) (I b)`.
+The same equation with `%M` accepted the application. The family-defined
+arrow check above now accepts both forms of this isolated application.
+The staged program also needs inference for the `TMaybe` equation.
 
 ### M141. Inferring an omitted arrow in a dependent argument
 
