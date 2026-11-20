@@ -1169,7 +1169,7 @@ nameNativeConstructorArgs expr
            ; let prepared_arg
                    | isReflCo domain_co = arg
                    | otherwise = Cast arg (SubCo (mkSymCo domain_co))
-           ; (atom, naming_co, wrap_arg) <- nameNativeIndexArg prepared_arg
+           ; (atom, naming_co, wrap_arg) <- nameNativeIndexArg (exprType expr) prepared_arg
            ; marker <- mkSysLocalM (fsLit "retained_template") ManyTy (varType index)
            ; let marker_co = mkTransCo naming_co
                     (mkGReflRightCo Nominal (coercionRKind naming_co) domain_co)
@@ -1196,13 +1196,13 @@ nameNativeConstructorArgs expr
 
 -- | Name a scalar index and prove its prepared-to-original equality.
 -- The wrapper evaluates constructor WHNFs, but does not evaluate their fields.
-nameNativeIndexArg :: CoreExpr
+nameNativeIndexArg :: Type -> CoreExpr
                    -> UniqSM (CoreExpr, CoercionN, CoreExpr -> CoreExpr)
-nameNativeIndexArg arg
+nameNativeIndexArg result_ty arg
   | Just (normal, index) <- normaliseNativeIndexExpr arg
   = case normal of
       Cast inner (SubCo delta)
-        -> do { (atom, proof, wrap) <- nameNativeIndexArg inner
+        -> do { (atom, proof, wrap) <- nameNativeIndexArg result_ty inner
               ; let left_cast = mkGReflCo Nominal (coercionLKind proof) (MCo delta)
                     right_cast = mkGReflCo Nominal (coercionRKind proof) (MCo delta)
                     converted = mkTransCo (mkSymCo left_cast) (mkTransCo proof right_cast)
@@ -1215,7 +1215,7 @@ nameNativeIndexArg arg
         | Just con <- isDataConWorkId_maybe worker
         , let (type_args, fields) = splitAt (length (dataConUnivTyVars con)) args
         , not (null fields)
-        -> do { named <- mapM nameNativeIndexArg fields
+        -> do { named <- mapM (nameNativeIndexArg result_ty) fields
               ; let atoms = [atom | (atom, _, _) <- named]
                     field_cos = [co | (_, co, _) <- named]
                     wrap_fields = foldr (.) id [wrap | (_, _, wrap) <- named]
@@ -1228,7 +1228,7 @@ nameNativeIndexArg arg
               ; let co = mkTransCo (mkCoVarCo proof)
                            (mkTyConAppCo Nominal (promoteDataCon con) (static_cos ++ field_cos))
                     wrap body = wrap_fields $
-                      Case scrut value (exprType body) [Alt DEFAULT [proof] body]
+                      Case scrut value result_ty [Alt DEFAULT [proof] body]
               ; assertPpr (coercionRKind co `eqType` index) (ppr co $$ ppr arg) $
                   return (Var value, co, wrap) }
       (Var _, args) | all isTypeArg args -> return (normal, mkReflCo Nominal index, id)
@@ -1239,7 +1239,7 @@ nameNativeIndexArg arg
 nameNativeCaseArgument :: Id -> CoreExpr -> Id -> Type -> [CoreAlt]
                        -> UniqSM CoreExpr
 nameNativeCaseArgument fun arg bndr ty alts
-  = do { (atom, arg_co, wrap) <- nameNativeIndexArg arg
+  = do { (atom, arg_co, wrap) <- nameNativeIndexArg ty arg
        ; let call_co = mkTermAppCo fun arg_co
              prepared_index = coercionLKind call_co
        ; alts' <- mapM (transport_alt call_co prepared_index) alts
@@ -1317,6 +1317,12 @@ through mkCastTy. The nominal child stays present in the runtime value cast.
 
 The builder prepends marker relations. Reverse that list before constructing
 template TyVars: each later template kind needs the completed earlier prefix.
+
+Use the result type of the original expression for each enclosing case.
+For example, naming the two constructors in S (S Z) introduces two local
+coercion variables. The result type of the transported body can still
+mention them inside cancelling kind casts. A case result type is outside
+the scope of its alternative's proof binder.
 -}
 
 -- | Lift index equalities through value types and retained binder domains.
