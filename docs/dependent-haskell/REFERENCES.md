@@ -6462,9 +6462,12 @@ Idris 2's `Data.Vect.splitAt` takes a cut `n` and a vector of length
 `n + m`. The zero case returns the empty prefix and the input. The
 successor case splits the tail at the predecessor and adds the head
 back to the prefix. Idris supplies the implicit suffix `{m}` on the
-recursive call. GHC infers the suffix in the recursive Haskell call. With
-two abstract runtime lengths, the Showcase supplies the suffix `@m`.
-The family application `Add n m` alone leaves `m` ambiguous at an abstract cut.
+recursive call. GHC infers the suffix in the recursive Haskell call.
+At a runtime cut, the declared second result vector `Vec a m` determines
+the erased suffix. The Showcase calls `splitAtVec n joined` without a
+type argument. The family application `Add n m` alone leaves `m`
+ambiguous at an abstract cut. Agda likewise permits an expected type
+to determine an implicit argument. [Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html).
 Agda's `Data.Vec.Base.splitAt` follows the same recursion and also
 returns a proof that appending the two outputs gives the input.
 `splitAtVec` exposes the exact lengths of both outputs.

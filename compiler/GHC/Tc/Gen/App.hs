@@ -79,7 +79,7 @@ import GHC.Types.Basic ( TypeOrKind(TypeLevel), IntWithInf, intGtLimit )
 import GHC.Types.TypeEnv ( lookupTypeEnv )
 import GHC.Types.Var
 import GHC.Types.Id ( mkLocalId, isClassOpId_maybe, isDFunId, sourceTableId_maybe, sourceMethodTarget_maybe, sourceLiteralCons_maybe )
-import GHC.Types.Var.Set ( elemVarSet, emptyVarSet, extendVarSet )
+import GHC.Types.Var.Set ( IdSet, elemVarSet, emptyVarSet, extendVarSet, isEmptyVarSet )
 import GHC.Types.Var.FV
 import GHC.Types.Name
 import GHC.Unit.Types ( isInteractiveModule )
@@ -1231,10 +1231,13 @@ tcRetainedKnownArgPlan expected fun sigma args
       = do { pairs <- fmap catMaybes $ mapM (declared_arg tvs) (zip domains values)
          ; let actuals = map snd pairs
                seed | length domains == length values
-                    , Just result_ty <- result
+                    , Just (bound, result_ty) <- result
                     , Just rho <- expected
+                    , not (null pairs) || not (isEmptyVarSet bound)
                     = fromMaybe Subst.emptySubst $
-                        matchRetainedAppType tvs Subst.emptySubst result_ty rho
+                        if null pairs || anyFreeVarsOfType (`elemVarSet` bound) result_ty
+                        then match_result_fields tvs Subst.emptySubst result_ty rho
+                        else matchRetainedAppType tvs Subst.emptySubst result_ty rho
                     | otherwise = Subst.emptySubst
                match subst = foldM (\s (formal, actual) ->
                                       matchRetainedAppType tvs s formal actual)
@@ -1244,8 +1247,7 @@ tcRetainedKnownArgPlan expected fun sigma args
                            other -> other
          ; case matched of
              Just subst
-               | not (null pairs)
-               , any (hasNativeDependentExpr . Core.Type)
+               | any (hasNativeDependentExpr . Core.Type)
                      (sigma : actuals ++ maybeToList expected)
                , Just choices <- traverse (Subst.lookupTyVar subst) tvs
                , not (any (`elemVarSet` tyCoVarsOfTypes choices) tvs)
@@ -1257,6 +1259,19 @@ tcRetainedKnownArgPlan expected fun sigma args
                -> do { valid <- tcRetainedInstScope (sigma : actuals ++ choices ++ maybeToList expected)
                      ; return (if valid then Just choices else Nothing) }
              _ -> return Nothing }
+
+    -- See Note [Erased arguments in a dependent result].
+    match_result_fields tvs subst formal actual
+      | Just tv <- getTyVar_maybe formal, tv `elem` tvs
+      = matchRetainedAppType tvs subst formal actual
+      | Just (tc, templates) <- splitTyConApp_maybe formal
+      , isAlgTyCon tc, isGenerativeTyCon tc Nominal
+      , length templates == tyConArity tc
+      , Just (tc', fields) <- splitTyConApp_maybe actual
+      , tc == tc', templates `equalLength` fields
+      = foldM (\s (template, field) -> match_result_fields tvs s template field)
+              subst (zip templates fields)
+      | otherwise = Just subst
 
     declared_arg tvs (Just (retained, formal), arg)
       | any (`elemVarSet` tyCoVarsOfType formal) tvs
@@ -1587,9 +1602,10 @@ GHC.Core.TyCo.FVs.
 -}
 
 -- | Collect declared domains for the written value-argument prefix.
--- Mark visible retained domains with True. Keep dependent positions with Nothing.
+-- Mark visible retained domains with True. Skip dependent argument domains.
+-- Keep the set of crossed retained binders with the result.
 -- See Note [Declared retained-domain choices].
-retainedDeclaredDomains :: Int -> Type -> ([Maybe (Bool, Type)], Maybe Type)
+retainedDeclaredDomains :: Int -> Type -> ([Maybe (Bool, Type)], Maybe (IdSet, Type))
 retainedDeclaredDomains supplied = go supplied emptyVarSet
   where
     go 0 bound result = result_view bound result
@@ -1608,12 +1624,29 @@ retainedDeclaredDomains supplied = go supplied emptyVarSet
     go _ bound result = result_view bound result
 
     result_view bound result
-      = ([], if mentions bound result then Nothing else Just result)
+      = ([], Just (bound, result))
 
     independent bound retained domain
       | mentions bound domain = Nothing
       | otherwise = Just (retained, domain)
     mentions bound = anyFreeVarsOfType (`elemVarSet` bound)
+
+{- Note [Erased arguments in a dependent result]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider splitAtVec :: forall a m. foreach (n :: Nat)
+                     -> Vec a (Add n m) -> (Vec a n, Vec a m).
+The first vector in the result uses the retained binder. The second
+determines the erased suffix m from the caller's expected pair type.
+Match erased variables in the arguments of matching generative algebraic
+type constructors. A type family result gives no such projection.
+The source arguments can supply the remaining erased choices as usual.
+The same rule applies when only the result supplies information. For
+example, dropVec returns Vec a m and its input contains Add n m.
+
+Only the erased parameters receive type arguments. Keep the declared
+retained telescope. The argument checker still checks the input at
+Add n m, and result subsumption checks the actual first vector length.
+-}
 
 {- Note [Declared retained-domain choices]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1636,10 +1669,10 @@ the selected type and record their usage. This advice only selects complete
 outer erased arguments; it adds no type equality or mutable meta assignment.
 
 Include a retained binder's own domain, which is outside that binder's scope.
-Do not match a later domain or result that mentions a crossed runtime binder.
-Such a match would need the actual runtime argument, which this declaration
-scan does not select. Keep a skipped domain's position for the source argument
-alignment. Original argument checking still resolves every actual index and
+Skip later domains that mention a crossed runtime binder. An exact match
+there would need the actual runtime argument. For a dependent result, see
+Note [Erased arguments in a dependent result]. Keep a skipped domain's
+position for source argument alignment. Original argument checking still resolves every actual index and
 checks the substituted domain. No runtime Id or metadata-only index is invented.
 
 Stop after the written value-argument prefix. A remaining retained telescope

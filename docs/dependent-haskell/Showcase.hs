@@ -1463,7 +1463,7 @@ sourceAddition = do
         joined :: Vec Bool (n + m)
         joined = appendHidden xs ys
         split :: (Vec Bool n, Vec Bool m)
-        split = splitAtVec @Bool @m n joined
+        split = splitAtVec n joined
     observe "runtime sum and appended vector" (natToInt (n + m), toList joined)
     observe "use ordinary vector append in a type"
         (Refl :: PackedVecLibrary.appendVec ('VCons 'True 'VNil) ('VCons 'False 'VNil)

@@ -28,6 +28,12 @@ that would contain the callback's local witness fails at that callback.
 [Consumer](../examples/packed-vector/DependentPair.hs) and
 [formation rule](../REFERENCES.md#naming-a-dependent-function-type).
 
+For `splitAtVec n xs`, the result type `(Vec a n, Vec a m)` supplies
+the erased suffix `m`. Both lengths can come from IO. GHC still checks
+the cut against the expected first length and the input against
+`Vec a (Add n m)`. A suffix hidden under a non-injective family remains
+ambiguous. [Split example and prior art](../REFERENCES.md#split-a-vector-at-a-retained-length).
+
 A retained length can be a checked source call such as `plus n m`.
 Its two inputs can come from IO. The result index remains the same
 through compilation, and the runtime sum stays lazy.
