@@ -215,6 +215,7 @@ ignore a recursive helper in a type and at runtime: (Refl,'x')
 open erased packages and leave an unused payload lazy: (True,False,True)
 filter a vector without forcing the tail to learn the result length: ([7],[7,9])
 infer the hidden lengths of a lazy filter and a retained vector: ([7],[],[9])
+project a stored vector from a strict record field: "h"
 pass a lambda with a hidden vector length and filter its result: [7]
 forget the retained witness and inspect the indexed payload: ([Just True,Just False],Nothing)
 match independent retained sums in a repeated type-family argument: Refl

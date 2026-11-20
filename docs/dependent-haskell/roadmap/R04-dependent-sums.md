@@ -127,6 +127,19 @@ reuse both the worker and the unchanged consumer. An interface-only
 old worker cannot supply the missing equation.
 [Upgrade runner](../examples/closed-evaluation/check-readback-upgrade.sh).
 
+## Sums in constructor fields
+
+[StoredVector](../examples/packed-vector/StoredVector.hs) uses one strict
+record field of type `some (n :: Nat) | Vec a n`. The field captures the
+element type from the data declaration. The same form works in positional
+and infix constructor fields. The ordinary client can read the vector
+after its producer source has been removed.
+
+The strict field evaluates the outer pair to weak head normal form.
+GHC keeps the pair boxed because the payload type depends on its first
+field. Unpacking an ordinary product requires a flat list of independent
+representation arguments. That operation cannot describe this telescope.
+
 ## Payload families for the `some` binder
 
 Serokell writes a retained sum as `some (x :: a) | B`. Its payload can

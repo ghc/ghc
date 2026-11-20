@@ -50,6 +50,7 @@ import DefaultVector (DefaultElement(..))
 import qualified ErasedPackage
 import qualified ForgetWitness
 import qualified ImplicitVector
+import qualified StoredVector
 import qualified ExistentialVec as E
 import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.Functor.Const (Const(..))
@@ -943,6 +944,8 @@ main = do
         ErasedPackage.filterObservation
     observe "infer the hidden lengths of a lazy filter and a retained vector"
         ImplicitVector.observations
+    observe "project a stored vector from a strict record field"
+        (StoredVector.cells (StoredVector.singleton 'h'))
     observe "pass a lambda with a hidden vector length and filter its result"
         (ImplicitVector.runBuilder ImplicitVector.singletonBuilder odd (7 :: Int))
     observe "forget the retained witness and inspect the indexed payload"

@@ -97,6 +97,15 @@ checks clauses under a telescope that permits refinement from the matched
 constructor. [GHC proposal #54](https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0054-kind-signatures.rst)
 and [Agda with-abstraction](https://agda.readthedocs.io/en/v2.8.0/language/with-abstraction.html#generalisation).
 
+### A retained pair in a record
+
+Agda's built-in Sigma record gives its second projection a type indexed by
+its first field. The [stored vector](examples/packed-vector/StoredVector.hs)
+uses that dependency inside one ordinary Haskell record field. The strict
+field applies Haskell's evaluation rule to the pair constructor. Reading its
+payload can leave the witness unevaluated. [Agda's Sigma record](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#the-s-type)
+and [Haskell 2010, strictness flags](https://www.haskell.org/onlinereport/haskell2010/haskellch4.html).
+
 ### Catch-all rows in type cases
 
 A variable pattern binds the scrutinee. A wildcard also succeeds without
