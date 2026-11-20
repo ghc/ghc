@@ -1115,6 +1115,9 @@ instance Diagnostic TcRnMessage where
     TcRnTypeCasePattern (Just pat)
       -> mkSimpleDecorated $ hang (text "After expanding type synonyms, the pattern has no constructor head:")
                                 2 (ppr (coreFullView pat))
+    TcRnExistentialBinderKind kind
+      -> mkSimpleDecorated $ hang (text "An explicit existential binder requires kind Type.")
+                                  2 (text "This binder has kind" <+> quotes (ppr kind) <> dot)
     TcRnTypeCaseContext
       -> mkSimpleDecorated $ text "A type case is supported only in the right-hand side of a top-level type synonym."
     TcRnTypeLambdaContext
@@ -2480,6 +2483,7 @@ instance Diagnostic TcRnMessage where
     TcRnTypeCaseDisabled{}
       -> ErrorWithoutFlag
     TcRnTypeCasePattern{} -> ErrorWithoutFlag
+    TcRnExistentialBinderKind{} -> ErrorWithoutFlag
     TcRnTypeCaseContext{} -> ErrorWithoutFlag
     TcRnTypeLambdaContext{}
       -> ErrorWithoutFlag
@@ -3192,6 +3196,7 @@ instance Diagnostic TcRnMessage where
     TcRnTypeCaseDisabled{}
       -> noHints
     TcRnTypeCasePattern{} -> noHints
+    TcRnExistentialBinderKind{} -> noHints
     TcRnTypeCaseContext{} -> noHints
     TcRnTypeLambdaContext{}
       -> noHints

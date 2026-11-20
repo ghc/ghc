@@ -4589,6 +4589,9 @@ data TcRnMessage where
 
   -- | A type case occurs outside the supported synonym RHS.
   TcRnTypeCaseContext :: TcRnMessage
+
+  -- | An explicit erased existential has a lifted Type binder.
+  TcRnExistentialBinderKind :: !Kind -> TcRnMessage
   deriving Generic
 
 ----

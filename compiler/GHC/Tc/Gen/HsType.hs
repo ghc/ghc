@@ -1950,8 +1950,11 @@ tcHsType mode src@(XHsType (HsTypeExistsRn binder body)) exp_kind
            tcLHsType mode body (Check liftedTypeKind)
        ; case binders of
            [Bndr tv _] -> do
-             setSrcSpanA (getLoc binder) $
-               discardResult (unifyKind Nothing (varType tv) liftedTypeKind)
+             setSrcSpanA (getLoc binder) $ do
+               kind <- liftZonkM $ zonkTcType (varType tv)
+               -- ExistsTy does not store evidence to cast the binder kind.
+               unless (kind `tcEqType` liftedTypeKind) $
+                 failWithTc (TcRnExistentialBinderKind kind)
              checkExpKind mode src (ExistsTy tv body') liftedTypeKind exp_kind
            _ -> panic "tcHsType: existential binder count" }
 

@@ -569,6 +569,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnTypeLetDisabled"                           = 29822
   GhcDiagnosticCode "TcRnTypeCaseDisabled"                          = 98931
   GhcDiagnosticCode "TcRnTypeCasePattern"                           = 55789
+  GhcDiagnosticCode "TcRnExistentialBinderKind"                    = 97230
   GhcDiagnosticCode "TcRnTypeCaseContext"                           = 97233
   GhcDiagnosticCode "TcRnTypeLambdaContext"                         = 27185
   GhcDiagnosticCode "TcRnIllegalRecordSyntax"                       = 89246
