@@ -93,6 +93,7 @@ import GHC.Types.Basic
 import GHC.Utils.Binary
 import GHC.Utils.Outputable
 import GHC.Data.FastString
+import GHC.Data.FastString.Env (delFromFsEnv, nonDetFoldFsEnv)
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import {-# SOURCE #-} GHC.Tc.Utils.TcType ( isMetaTyVar, isTyConableTyVar )
@@ -912,8 +913,12 @@ visibleTypeVarOccurencies = go
 {- Note [Substitution on IfaceType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Substitutions on IfaceType are done only during pretty-printing to
-construct the result type of a GADT, and does not deal with binders
-(eg IfaceForAll), so it doesn't need fancy capture stuff.  -}
+construct the result type of a GADT. An existential can occur in a
+GADT index. Its binder scopes over its payload only. Freshen that binder
+if its name occurs in the substitution range. Reserve all names in the
+payload when generating the replacement, including nested binders.
+A set of all names is sufficient and avoids a second scoped traversal
+to compute free variables. The existing forall restrictions remain. -}
 
 type IfaceTySubst = FastStringEnv IfaceType -- Note [Substitution on IfaceType]
 
@@ -935,7 +940,22 @@ substIfaceType env ty
     go ty@(IfaceFreeTermVar {}) = ty
     go (IfaceTermAppTy fun arg) = IfaceTermAppTy fun (go arg)
     go (IfaceFreeTermAppTy fun arg) = IfaceFreeTermAppTy fun (go arg)
-    go (IfaceExistsTy {})    = pprPanic "substIfaceType: cannot substitute under existential binder" (ppr ty)
+    go (IfaceExistsTy (name, kind) body)
+      = IfaceExistsTy (name', go kind) (substIfaceType body_env body)
+      where
+        without_binder = delFromFsEnv env (ifLclNameFS name)
+        range_names = nonDetFoldFsEnv (Set.union . ifaceLocalNames) Set.empty without_binder
+        used = range_names `Set.union` ifaceLocalNames body
+        name'
+          | Set.member name range_names
+          = head [ candidate
+                 | n <- [(1 :: Int)..]
+                 , let candidate = mkIfLclName (mkFastString (unpackFS (ifLclNameFS name) ++ show n))
+                 , Set.notMember candidate used ]
+          | otherwise = name
+        body_env
+          | name' == name = without_binder
+          | otherwise = extendFsEnv without_binder (ifLclNameFS name) (IfaceTyVar name')
     go (IfaceDepFunTy {})    = pprPanic "substIfaceType: native dependent Core not implemented" (ppr ty)
     go (IfaceTyVar tv)        = substIfaceTyVar env tv
     go (IfaceAppTy  t ts)     = IfaceAppTy  (go t) (substIfaceAppArgs env ts)
@@ -973,6 +993,66 @@ substIfaceType env ty
     go_co (IfaceAxiomCo n cos)       = IfaceAxiomCo n (go_cos cos)
 
     go_cos = map go_co
+
+-- | All local names appearing in a type, including hidden arguments and casts.
+ifaceLocalNames :: IfaceType -> Set.Set IfLclName
+ifaceLocalNames = go
+  where
+    union = Set.union
+    names = Set.unions
+    one = Set.singleton
+    go = \case
+      IfaceTyVar var -> one var
+      IfaceTermVar var -> one var
+      IfaceTermAppTy fun arg -> one fun `union` go arg
+      IfaceFreeTermAppTy _ arg -> go arg
+      IfaceExistsTy (var, arg) body -> names [one var, go arg, go body]
+      IfaceDepFunTy _ (w, var, arg) body -> names [one var, go w, go arg, go body]
+      IfaceAppTy fun args -> go fun `union` go_args args
+      IfaceFunTy _ ma w arg res -> names (map go [ma, w, arg, res])
+      IfaceForAllTy ma (Bndr b _) body -> names [go ma, bndr b, go body]
+      IfaceTyConApp _ args -> go_args args
+      IfaceTupleTy _ _ args -> go_args args
+      IfaceCastTy ty co -> go ty `union` go_co co
+      IfaceCoercionTy co -> go_co co
+      IfaceFreeTyVar{} -> Set.empty
+      IfaceFreeTermVar{} -> Set.empty
+      IfaceLitTy{} -> Set.empty
+
+    go_args IA_Nil = Set.empty
+    go_args (IA_Arg arg _ args) = go arg `union` go_args args
+
+    bndr (IfaceTvBndr (v, k)) = one v `union` go k
+    bndr (IfaceIdBndr (w, v, ty)) = names [one v, go w, go ty]
+
+    go_mco IfaceMRefl = Set.empty
+    go_mco (IfaceMCo co) = go_co co
+
+    go_co = \case
+      IfaceReflCo ty -> go ty
+      IfaceGReflCo _ ty mco -> go ty `union` go_mco mco
+      IfaceFunCo _ ma w arg res -> names (map go_co [ma, w, arg, res])
+      IfaceDepFunCo _ _ b k body -> names [bndr (IfaceIdBndr b), go_mco k, go_co body]
+      IfaceTermAppCo fun co -> one fun `union` go_co co
+      IfaceTyConAppCo _ _ cos -> names (map go_co cos)
+      IfaceAppCo fun arg -> go_co fun `union` go_co arg
+      IfaceForAllCo b _ _ ma k body -> names [bndr b, go_co ma, go_mco k, go_co body]
+      IfaceCoVarCo v -> one v
+      IfaceAxiomCo _ cos -> names (map go_co cos)
+      IfaceUnivCo _ _ ty1 ty2 deps -> names (go ty1 : go ty2 : map dep deps)
+      IfaceSymCo co -> go_co co
+      IfaceTransCo co1 co2 -> go_co co1 `union` go_co co2
+      IfaceSelCo _ co -> go_co co
+      IfaceLRCo _ co -> go_co co
+      IfaceInstCo co1 co2 -> go_co co1 `union` go_co co2
+      IfaceKindCo co -> go_co co
+      IfaceSubCo co -> go_co co
+      IfaceFreeCoVar{} -> Set.empty
+      IfaceHoleCo{} -> Set.empty
+
+    dep (IfaceUnivCoDepCoVar v) = one v
+    dep IfaceUnivCoDepFreeCoVar{} = Set.empty
+    dep IfaceUnivCoDepHole{} = Set.empty
 
 substIfaceAppArgs :: IfaceTySubst -> IfaceAppArgs -> IfaceAppArgs
 substIfaceAppArgs env args
