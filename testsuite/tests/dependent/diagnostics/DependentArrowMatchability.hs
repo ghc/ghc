@@ -28,6 +28,22 @@ importedU = Refl
 ordinary :: Proxy (P.D (Type -> Type) Maybe) -> Proxy ImportedM
 ordinary = id
 
+-- | Infer the callback's kind from its bare use, in either order.
+type AppliedFirst f = (f Bool, P.D (Type %U -> Type) f)
+type BareFirst f = (P.D (Type %U -> Type) f, f Bool)
+
+mixedUses :: AppliedFirst P.Abstract :~: (P.Abstract Bool, P.D (Type %U -> Type) P.Abstract)
+mixedUses = Refl
+
+mixedUsesReversed :: BareFirst P.Abstract :~: (P.D (Type %U -> Type) P.Abstract, P.Abstract Bool)
+mixedUsesReversed = Refl
+
+-- | Keep M if the RHS requires an arrow but leaves matchability open.
+type AppliedDefault f = (Proxy f, f Bool)
+
+appliedDefault :: AppliedDefault Maybe :~: (Proxy Maybe, Maybe Bool)
+appliedDefault = Refl
+
 -- | Use the known kind of a scoped variable in its annotation.
 ascribedLocalU :: forall (f :: Type %U -> Type). Proxy f -> Proxy (f :: Type -> Type)
 ascribedLocalU = id

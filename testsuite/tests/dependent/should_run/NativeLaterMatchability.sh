@@ -18,6 +18,7 @@ cd client
 grep -Eq 'Receiver @.*Matchable .*Select @.*Matchable ' client.iface
 grep -Eq 'Receiver @.*Unmatchable .*Select @.*Unmatchable ' client.iface
 grep -Eq 'type DefaultPrefix = AnchorReceiver.Select @.*Unmatchable ' client.iface
+grep -Eq 'type FamilyBox :: forall \{.*:: .*Matchability\}' client.iface
 
 # An ordinary client checks the result using only interfaces.
 rm LaterMatchability.hs LaterMatchability.o
@@ -99,5 +100,59 @@ if "${ghc[@]}" -c Ambiguous.hs >ambiguous.log 2>&1 ||
    ! grep -Fq '[GHC-16220]' ambiguous.log ||
    ! grep -Fq 'Uninferrable type variable' ambiguous.log; then
     cat ambiguous.log >&2
+    exit 1
+fi
+
+cat >BoxShapes.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, KindSignatures, PolyKinds, TypeFamilies #-}
+module BoxShapes where
+
+import AnchorReceiver (WrapOpen)
+import LaterMatchability (FamilyBox)
+
+data Recursive f = Recursive (f Bool) (Maybe (Recursive f))
+
+sample :: Recursive Maybe
+sample = Recursive (Just True) Nothing
+
+open :: Recursive (WrapOpen 'True)
+open = Recursive [False] Nothing
+
+type OpenCallback = WrapOpen 'True
+data UsesBoxKind (x :: FamilyBox OpenCallback) = UsesBoxKind
+HS
+"${ghc[@]}" -c BoxShapes.hs
+
+cat >BoxMismatch.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, KindSignatures, TypeFamilies #-}
+module BoxMismatch where
+
+import AnchorReceiver (WrapOpen)
+import Data.Kind (Type)
+
+data FixedBox (f :: Type -> Type) = FixedBox (f Bool)
+
+type Bad = FixedBox (WrapOpen 'True)
+HS
+if "${ghc[@]}" -c BoxMismatch.hs >box-mismatch.log 2>&1 ||
+   ! grep -Fq '[GHC-83865]' box-mismatch.log ||
+   ! grep -Fq 'WrapOpen' box-mismatch.log; then
+    cat box-mismatch.log >&2
+    exit 1
+fi
+
+cat >BoxArity.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeFamilies #-}
+module BoxArity where
+
+import AnchorReceiver (WrapOpen)
+import LaterMatchability (ForwardBox)
+
+type Bad = ForwardBox (WrapOpen 'True)
+HS
+if "${ghc[@]}" -c BoxArity.hs >box-arity.log 2>&1 ||
+   ! grep -Fq '[GHC-27346]' box-arity.log ||
+   ! grep -Fq 'should have 2 arguments, but has been given 1' box-arity.log; then
+    cat box-arity.log >&2
     exit 1
 fi

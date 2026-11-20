@@ -2556,6 +2556,21 @@ However, there are two twists:
 
 -}
 
+{- Note [Callback arrows in inferred synonym kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider `type S f = (f Bool, D (Type %U -> Type) f)`, where D's
+second argument has the kind given by its first argument. Checking
+`f Bool` needs an arrow shape before the enclosing kind solver can
+use the second occurrence of `f` to fix its matchability.
+
+Give the missing arrow a matchability variable. Register it with the
+enclosing kind solver, which solves the constraints on the inferred
+binder kinds and defaults an unresolved kind arrow to M. The nested
+synonym solver still handles RHS metadata separately. An arrow whose
+shape is already known needs no variable. Rechecking the RHS uses the
+inferred kind, including the selected matchability.
+-}
+
 ------------------------------------------------------------------------
 kcLTyClDecl :: Bool -> LTyClDecl GhcRn -> TcM (Maybe (Name, SynonymMetadata))
   -- See Note [Kind checking for type and class decls]
@@ -2567,18 +2582,24 @@ kcLTyClDecl collect_metadata (L loc decl)
        ; metadata <- addVDQNote tycon $   -- See Note [Inferring visible dependent quantification]
          addErrCtxt (tcMkDeclCtxt decl) $
          case decl of
-           SynDecl{tcdRhs = rhs} | collect_metadata -> tcExtendNameTyVarEnv (tcTyConScopedTyVars tycon) $
+           SynDecl{tcdRhs = rhs} | collect_metadata -> tcExtendNameTyVarEnv (tcTyConScopedTyVars tycon) $ do
+             outer_owner <- tcl_kind_arrow_defaults <$> getLclEnv
+             -- See Note [Callback arrows in inferred synonym kinds]
+             let callback_arrow = fmap (\(defaults, _) -> do
+                   ma <- newFlexiTyVar matchabilityTy
+                   updTcRef defaults ((ma, KindLevel) :)
+                   pure (mkTyVarTy ma)) outer_owner
              inferSynonymMatchabilities $ do
-             ref <- newTcRef []
-             let choose name n = do
-                   indices <- replicateM n (newFlexiTyVar matchabilityTy)
-                   owner <- tcl_kind_arrow_defaults <$> getLclEnv
-                   forM_ owner $ \(defaults, _) -> updTcRef defaults (map (, TypeLevel) indices ++)
-                   let vars = mkTyVarTys indices
-                   updTcRef ref ((name, vars) :)
-                   pure vars
-             _ <- tcCheckSynonymMetadata choose rhs (tyConResKind tycon)
-             Just . (tc_name,) . reverse <$> readTcRef ref
+               ref <- newTcRef []
+               let choose name n = do
+                     indices <- replicateM n (newFlexiTyVar matchabilityTy)
+                     owner <- tcl_kind_arrow_defaults <$> getLclEnv
+                     forM_ owner $ \(defaults, _) -> updTcRef defaults (map (, TypeLevel) indices ++)
+                     let vars = mkTyVarTys indices
+                     updTcRef ref ((name, vars) :)
+                     pure vars
+               _ <- tcCheckSynonymMetadata choose callback_arrow rhs (tyConResKind tycon)
+               Just . (tc_name,) . reverse <$> readTcRef ref
            _ -> kcTyClDecl decl tycon >> pure Nothing
        ; traceTc "kcTyClDecl done }" (ppr tc_name)
        ; return metadata }
@@ -2607,7 +2628,13 @@ kcTyClDecl (DataDecl { tcdLName    = (L _ _name)
        -- (conceivably) shadowed.
     do { traceTc "kcTyClDecl" (ppr tycon $$ ppr (tyConTyVars tycon) $$ ppr (tyConResKind tycon))
        ; _ <- tcHsContext ctxt
-       ; kcConDecls (tyConResKind tycon) cons
+       ; experimental <- xoptM LangExt.ExperimentalDependentTypes
+       ; poly_kinds <- xoptM LangExt.PolyKinds
+       ; let check_field
+               | experimental && poly_kinds =
+                   tcCheckDatatypeField (mkNameSet (map fst (tcTyConScopedTyVars tycon)))
+               | otherwise = tcCheckLHsTypeInContext
+       ; kcConDeclsWith check_field (tyConResKind tycon) cons
        }
 
 kcTyClDecl (SynDecl { tcdLName = L _ _name, tcdRhs = rhs }) tycon
@@ -2639,24 +2666,26 @@ kcTyClDecl (FamDecl _ (FamilyDecl { fdInfo   = fd_info })) fam_tc
 -- This includes doing kind unification if the type is a newtype.
 -- See Note [Implementation of UnliftedNewtypes] for why we need
 -- the first two arguments.
-kcConArgTys :: ConArgKind                      -- Expected kind of the argument(s)
+kcConArgTys :: (LHsType GhcRn -> ContextKind -> TcM TcType)
+            -> ConArgKind                      -- Expected kind of the argument(s)
             -> IsPrefixConGADT
             -> [HsConDeclField GhcRn]          -- User-written argument types
             -> TcM ()
-kcConArgTys exp_kind con_form arg_tys
+kcConArgTys check_field exp_kind con_form arg_tys
   = forM_ arg_tys $ \(CDF { cdf_multiplicity, cdf_type }) ->
-    do { _ <- tcCheckLHsTypeInContext cdf_type exp_kind
+    do { _ <- check_field cdf_type exp_kind
        ; void $ tcFieldModifiers con_form cdf_multiplicity }
     -- See Note [Implementation of UnliftedNewtypes], STEP 2
 
 -- Kind-check the types of arguments to a Haskell98 data constructor.
-kcConH98Args :: ConArgKind                       -- Expected kind of the argument(s)
+kcConH98Args :: (LHsType GhcRn -> ContextKind -> TcM TcType)
+             -> ConArgKind                       -- Expected kind of the argument(s)
              -> HsConDeclH98Details GhcRn
              -> TcM ()
-kcConH98Args exp_kind con_args = case con_args of
-  PrefixCon _ tys     -> kcConArgTys exp_kind IsNotPrefixConGADT tys
-  InfixCon _ ty1 ty2  -> kcConArgTys exp_kind IsNotPrefixConGADT [ty1, ty2]
-  RecCon _ (L _ flds) -> kcConArgTys exp_kind IsNotPrefixConGADT $
+kcConH98Args check_field exp_kind con_args = case con_args of
+  PrefixCon _ tys     -> kcConArgTys check_field exp_kind IsNotPrefixConGADT tys
+  InfixCon _ ty1 ty2  -> kcConArgTys check_field exp_kind IsNotPrefixConGADT [ty1, ty2]
+  RecCon _ (L _ flds) -> kcConArgTys check_field exp_kind IsNotPrefixConGADT $
                          map (cdrf_spec . unLoc) flds
 
 -- Kind-check the types of arguments to a GADT data constructor.
@@ -2664,16 +2693,20 @@ kcConGADTArgs :: ConArgKind                       -- Expected kind of the argume
               -> HsConDeclGADTDetails GhcRn
               -> TcM ()
 kcConGADTArgs exp_kind con_args = case con_args of
-  PrefixConGADT _ tys     -> kcConArgTys exp_kind IsPrefixConGADT tys
-  RecConGADT _ (L _ flds) -> kcConArgTys exp_kind IsNotPrefixConGADT $
+  PrefixConGADT _ tys     -> kcConArgTys tcCheckLHsTypeInContext exp_kind IsPrefixConGADT tys
+  RecConGADT _ (L _ flds) -> kcConArgTys tcCheckLHsTypeInContext exp_kind IsNotPrefixConGADT $
                              map (cdrf_spec . unLoc) flds
 
 kcConDecls :: TcKind  -- Result kind of tycon
                       -- Used only in H98 case
            -> DataDefnCons (LConDecl GhcRn) -> TcM ()
 -- See Note [kcConDecls: kind-checking data type decls]
-kcConDecls tc_res_kind cons
-  = traverse_ (wrapLocMA_ (kcConDecl new_or_data tc_res_kind)) cons
+kcConDecls = kcConDeclsWith tcCheckLHsTypeInContext
+
+kcConDeclsWith :: (LHsType GhcRn -> ContextKind -> TcM TcType)
+               -> TcKind -> DataDefnCons (LConDecl GhcRn) -> TcM ()
+kcConDeclsWith check_field tc_res_kind cons
+  = traverse_ (wrapLocMA_ (kcConDecl check_field new_or_data tc_res_kind)) cons
   where
     new_or_data = dataDefnConsNewOrData cons
 
@@ -2682,8 +2715,9 @@ kcConDecls tc_res_kind cons
 -- declared with data or newtype, and we need to know the result kind of
 -- this type. See Note [Implementation of UnliftedNewtypes] for why
 -- we need the first two arguments.
-kcConDecl :: NewOrData -> TcKind -> ConDecl GhcRn -> TcM ()
-kcConDecl new_or_data tc_res_kind
+kcConDecl :: (LHsType GhcRn -> ContextKind -> TcM TcType)
+          -> NewOrData -> TcKind -> ConDecl GhcRn -> TcM ()
+kcConDecl check_field new_or_data tc_res_kind
           (ConDeclH98 { con_name = name, con_telescope = teles
                       , con_args = args })
   = addErrCtxt (DataConDefCtxt (NE.singleton name)) $
@@ -2692,12 +2726,12 @@ kcConDecl new_or_data tc_res_kind
              -- getArgExpKind: for newtypes, check that the argument kind
              -- is the same as the tc_res_kind.  See (KCD1)
              -- in Note [kcConDecls: kind-checking data type decls]
-       ; kcConH98Args arg_exp_kind args
+       ; kcConH98Args check_field arg_exp_kind args
          -- We don't need to check the telescope here,
          -- because that's done in tcConDecl
        }
 
-kcConDecl new_or_data _
+kcConDecl _ new_or_data _
           (ConDeclGADT { con_names = names
                        , con_outer_bndrs = L _ outer_bndrs
                        , con_telescope = inner_bndrs
@@ -2714,7 +2748,7 @@ kcConDecl new_or_data _
              ; return () }
            _ -> failWithTc $ TcRnRetainedQuantificationError RetainedPackageDeclaration }
 
-kcConDecl new_or_data _tc_res_kind
+kcConDecl _ new_or_data _tc_res_kind
                       -- NB: _tc_res_kind is unused.   See (KCD3) in
                       -- Note [kcConDecls: kind-checking data type decls]
           (ConDeclGADT { con_names = names
@@ -4016,7 +4050,7 @@ tcTySynRhs metadata roles_info tc_name hs_ty
                                (owner, tys) : next | owner == name, length tys == n ->
                                  writeTcRef ref next >> pure tys
                                _ -> pprPanic "synonym metadata sites changed" (ppr name)
-                       ty <- tcCheckSynonymMetadata choose hs_ty res_kind
+                       ty <- tcCheckSynonymMetadata choose Nothing hs_ty res_kind
                        rest <- readTcRef ref
                        unless (null rest) $ pprPanic "unused synonym metadata sites" (ppr tc_name)
                        pure ty

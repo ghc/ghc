@@ -61,6 +61,17 @@ badDefault = ascribedDefault @P.Abstract
 HS
     reject "$(wc -l < Rejected.hs | tr -d ' ')" '[GHC-83865]' -X"$mode"
 
+    sed 's/^module DependentArrowMatchability/module Rejected/' \
+        DependentArrowMatchability.hs > Rejected.hs
+    printf '\ntype BadAppliedDefault = AppliedDefault P.Abstract\n' >> Rejected.hs
+    reject "$(wc -l < Rejected.hs | tr -d ' ')" '[GHC-83865]' -X"$mode"
+
+    sed 's/^module DependentArrowMatchability/module Rejected/' \
+        DependentArrowMatchability.hs > Rejected.hs
+    printf '\ntype BadMixedArrows f = (f Bool, P.D (Type %%M -> Type) f, P.D (Type %%U -> Type) f)\n' \
+        >> Rejected.hs
+    reject "$(wc -l < Rejected.hs | tr -d ' ')" '[GHC-83865]' -X"$mode"
+
     # A written modifier wins, even when the signature needs a different arrow.
     sed -e 's/^module DependentArrowMatchability/module Rejected/' \
         -e '/^laterBinder ::/s/(f :: Type -> Type)/(f :: Type %M -> Type)/' \

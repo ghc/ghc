@@ -189,6 +189,16 @@ On GHC 9.14.1 the original sources give the following results. Both
 fork compilers give the same outcomes after the source change.
 [Proposal #242 synonym defaults](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#rhs-of-type-synonyms).
 
+The kind of an unsigned synonym's callback parameter can come from a bare
+use of that parameter. In `type AppliedFirst f = (f Bool, D (Type %U -> Type) f)`,
+the second component fixes the arrow of `f` to U. Both component orders
+work with a callback imported through a stripped interface. In
+`type AppliedDefault f = (Proxy f, f Bool)`, neither component fixes
+matchability, so the callback kind keeps its M default. Conflicting
+nominal uses still report GHC-83865.
+[DependentArrowMatchability](../../../testsuite/tests/dependent/diagnostics/DependentArrowMatchability.hs).
+
+
 | Source | Result |
 | --- | --- |
 | [T11523](../../../testsuite/tests/polykinds/T11523.hs), [T12055](../../../testsuite/tests/polykinds/T12055.hs), [T14939](../../../testsuite/tests/polykinds/T14939.hs) | Compile successfully. |
@@ -758,6 +768,19 @@ A binder fixed to M gives GHC-83865 at the same application because the
 remaining family arrow is U. A saturated family can return a
 matchable arrow. [Source-hidden regression](../../../testsuite/tests/dependent/should_run/NativeUnsaturatedFamily.sh)
 and [proposal #242 on family arity](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#arity-of-type-families).
+
+### Inferring a callback arrow from a datatype field
+
+In `data FamilyBox f = FamilyBox (f Bool)`, the field fixes the domain
+of `f`. In an unsigned Haskell 98 declaration, the producer can
+generalise its matchability with `ExperimentalDependentTypes` and
+`PolyKinds`. The unsigned family `ForwardBox` passes the callback
+through. The ordinary Showcase client reads boxes for both `Maybe`
+and an imported, partially applied open family.
+A written kind signature retains its default M callback. GHC still
+checks family arity and the matchability of applications in patterns.
+[Source example](../examples/open-evaluation/LaterMatchability.hs) and
+[proposal #242 on higher-order arguments](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#higher-order-arguments).
 
 ## Goal and dependencies
 
