@@ -76,7 +76,7 @@ import GHC.Types.Basic
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Map
 import GHC.Types.Unique.Set
-import GHC.Types.Var (ExistsTyFlag(ExplicitExists), mkTyVar)
+import GHC.Types.Var (ExistsTyFlag(ExplicitExists, ImplicitExists), mkTyVar)
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Name
@@ -231,12 +231,8 @@ tcPolyExprCheck expr res_ty
                  ; tc_body body }
 
           -- The special case for lambda: go to tcLambdaMatches, passing pat_tys
-          tc_body e@(HsLam x lam_variant matches)
-            = do { (wrap, matches') <-  tcLambdaMatches e lam_variant matches pat_tys
-                                                       (mkCheckExpType rho_ty)
-                   -- NB: tcLambdaMatches concludes with deep skolemisation,
-                   --     if DeepSubsumption is on;  hence no need to do that here
-                 ; return (mkHsWrap wrap $ HsLam x lam_variant matches') }
+          tc_body (HsLam x lam_variant matches)
+            = tcLambdaExpr x lam_variant matches pat_tys (mkCheckExpType rho_ty)
 
           -- The general case: just do deep skolemisation if necessary,
           -- before handing off to tcExpr
@@ -368,6 +364,38 @@ tcCollectApp the_app res_ty
   = do { (fun, args) <- splitHsApps the_app
        ; tcApp the_app fun args res_ty }
 
+-- | Check a lambda and introduce a dot package when its payload is an arrow.
+-- See Note [Implicit existential lambda payloads].
+tcLambdaExpr :: XLam GhcRn -> HsLamVariant -> MatchGroup GhcRn (LHsExpr GhcRn)
+             -> [ExpPatType] -> ExpSigmaType -> TcM (HsExpr GhcTc)
+tcLambdaExpr x lam_variant matches pat_tys expected
+  | Check schema <- expected
+  , ExistsTy ImplicitExists binder body <- coreFullView schema
+  , Just _ <- splitVisibleFunTy_maybe body
+  = do { witness <- newFlexiTyVarTy (tyVarKind binder)
+       ; let payload_ty = substTyWith [binder] [witness] body
+       ; payload <- check_lambda (mkCheckExpType payload_ty)
+       ; return (XExpr (NativeExistsPack schema witness (noLocA payload))) }
+  | otherwise = check_lambda expected
+  where
+    check_lambda expected_ty
+      = do { (wrap, matches') <- tcLambdaMatches (HsLam x lam_variant matches)
+                                                lam_variant matches pat_tys expected_ty
+           ; return (mkHsWrap wrap (HsLam x lam_variant matches')) }
+
+{- Note [Implicit existential lambda payloads]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An expected dot package can hold a function. Choose a fresh witness before
+checking the lambda patterns. Check the lambda once against the instantiated
+payload type. A witness introduced by a pattern cannot escape its implication
+to fill that metavariable. The existential binder does not enter source scope.
+
+Keep the ordinary match checker, including its deep skolemisation and usage
+checks. The outer forall wrapper remains outside the package when tcPolyExprCheck
+skolemises the expected type. Pack erases to the checked lambda in CoreToStg.
+The lambda body still waits for application.
+-}
+
 ---------------
 tcExpr :: HsExpr GhcRn
        -> ExpRhoType   -- DeepSubsumption <=> when checking, this type
@@ -450,9 +478,8 @@ tcExpr e@(HsIPVar _ x) res_ty
                (mkHsWrap wrap (mkHsVar (noLocA ip_op)))
                ip_ty res_ty }
 
-tcExpr e@(HsLam x lam_variant matches) res_ty
-  = do { (wrap, matches') <- tcLambdaMatches e lam_variant matches [] res_ty
-       ; return (mkHsWrap wrap $ HsLam x lam_variant matches') }
+tcExpr (HsLam x lam_variant matches) res_ty
+  = tcLambdaExpr x lam_variant matches [] res_ty
 
 {-
 ************************************************************************
