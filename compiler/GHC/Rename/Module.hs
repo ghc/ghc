@@ -393,6 +393,7 @@ liftDeclarationSums named_wildcards group
         visitRecord salt (L field_loc field@HsConDeclRecField{cdrf_spec = spec}) =
           let (next, (spec', sums)) = visit salt spec
           in (next, (L field_loc field{cdrf_spec = spec'}, sums))
+        visitRecord salt field = (salt, (field, []))
     liftFields visit (InfixCon ann left right) =
       let (next, (left', left_sums)) = visit 0 left
           (_, (right', right_sums)) = visit next right
