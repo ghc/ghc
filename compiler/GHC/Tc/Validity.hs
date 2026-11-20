@@ -922,6 +922,10 @@ check_type (ve@ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
   where
     (arg_rank, res_rank) = funArgResRank rank
 
+check_type ve (ExistsTy tv body)
+  = do { check_type (ve { ve_rank = MustBeMonoType }) (varType tv)
+       ; check_type ve body }
+
 check_type _ ty@(ForAllTy {}) = pprPanic "check_type" (ppr ty)
 check_type _ ty@(CoercionTy {}) = pprPanic "check_type" (ppr ty)
 

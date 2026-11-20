@@ -813,6 +813,7 @@ data Token
 
   | ITforall            IsUnicodeSyntax -- GHC extension keywords
   | ITforeach
+  | ITexists
   | ITexport
   | ITlabel
   | ITdynamic
@@ -1079,6 +1080,7 @@ reservedWordsFM = listToUFM $
 
          ( "forall",         ITforall NormalSyntax, 0),
          ( "foreach",        ITforeach,        xbit ExperimentalDependentTypesBit),
+         ( "exists",         ITexists,         xbit ExperimentalDependentTypesBit),
          ( "mdo",            ITmdo Nothing,   xbit RecursiveDoBit),
              -- See Note [Lexing type pseudo-keywords]
          ( "family",         ITfamily,        0 ),

@@ -856,6 +856,13 @@ rnLHsTyKi env (L loc ty)
 
 rnHsTyKi :: RnTyKiEnv -> HsType GhcPs -> RnM (HsType GhcRn, FreeNames)
 
+rnHsTyKi env (XHsType (HsTypeExists _ binder body))
+  = bindLHsTyVarBndrs (rtke_ctxt env) WarnUnusedForalls Nothing [binder] $ \case
+      [binder'] -> do
+        (body', fvs) <- rnLHsTyKi env body
+        pure (XHsType (HsTypeExistsRn binder' body'), fvs)
+      _ -> panic "rnHsTyKi: existential binder count"
+
 rnHsTyKi env (HsForEachTy x bndrs body)
   = do { ((bndrs', body'), fvs) <-
            rnRetainedTelescope env (rnLHsTyKi env) bndrs body
@@ -2662,6 +2669,8 @@ extract_lty (L _ ty) acc
       HsQualTy { hst_ctxt = ctxt, hst_body = ty }
                                   -> extract_lctxt ctxt $
                                      extract_lty ty acc
+      XHsType (HsTypeExists _ binder body) ->
+        extract_hs_tv_bndrs [binder] acc (extract_lty body [])
       XHsType (HsTypeCaseAlias _ alias body) ->
         filter (\v -> Just (unLoc v) /= (unLoc . snd <$> alias)) (extract_lty body []) ++ acc
       XHsType (HsTypeLet _ binder rhs body)
