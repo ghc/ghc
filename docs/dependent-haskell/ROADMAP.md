@@ -9,38 +9,45 @@ records every edge. The R numbers are local labels for those cards.
 
 ## Where this fork stands
 
-The compiler checkpoint `e4fcef85ce` accepts runtime-indexed functions,
-constructor fields and selected ordinary functions in types. A dependent
-pair can store an abstract lifted witness. An ordinary Haskell client
-can read the payload without forcing that witness, including an IO action.
-Both native stages produce all 266 Showcase lines at `-O0` and at `-O1`
+The fork accepts runtime-indexed functions, constructor fields and selected
+ordinary functions in types. A pair can store an abstract lifted witness.
+An ordinary client can read its payload without forcing the witness, even
+when that witness comes from IO.
+
+Both native compiler stages reproduce the 272 lines of the
+[Showcase](Showcase.hs) at `-O0`, at default `-O1`, and at `-O1`
 with stripped interfaces. Self-hosted GHCi matches at `-O0`.
+The examples include an ordered type case under a dependent binder and
+projection from a separately compiled pair. A client with only the
+provider's interface and object checks witness demand after inlining.
+[Run the Showcase](README.md#run-the-showcase).
 
-All 41 focused tests pass. The dependent directory passes 271 of 303
-cases. Its other 32 tests have the same failures and diagnostics as the
-earlier 265-line checkpoint. Both interface-upgrade checks pass, including
-warm reuse and rejection of stale evidence.
-[R05 optimizer details](roadmap/R05-dependent-core.md#retained-operands-in-the-native-optimizer)
-and [earlier checkpoint](PLAN.md#r04-and-r19-project-through-an-ordinary-function-and-match-a-type-directly).
+At `3b7108a97b`, all 48 focused tests pass. In the dependent directory,
+276 of 306 executed normal-way tests pass. All 30 failures also occurred
+at the previous public checkpoint. `DepFail1` and `T11334b` now pass.
+The preceding 271-line compiler also failed two arrow diagnostic tests.
+Both now pass. A serial comparison against that compiler found three
+changes in the other diagnostics. `KindEqualities2` and `RaeJobTalk`
+now print the conflicting matchability. `T12088sg2` drops a misleading
+argument-count hint for a stuck family.
 
-The integrated bootstrap compiler at `f9427b8d5b` matches all 272 lines of
-[Showcase](Showcase.hs) at `-O0` and at default `-O1`. This includes an
-ordered type case under a dependent binder and projection from a separately
-compiled pair. Source-free clients check repeated inlining and witness
-demand. The compiler passes the native Core API test, the old/new interface
-exchange at three compression levels, and the coercion role and scope
-rejection tests. The preceding 271-line compiler is still in self-host and
-regression testing. Self-hosted and full-suite results for the 272-line
-compiler are pending.
+The upgrade tests cover a change to a family, a packed projection from
+a home or installed module, and combinations of dependent projections
+and ordered type cases. They check a first rebuild, reuse on a second
+build, and rejection of stale evidence. The old and new compilers use
+the same target libraries for each comparison. At three interface
+compression levels the old reader rejects new constructor evidence at
+the header. The new reader checks the coercion's role and scope.
+[R05 interface checks](roadmap/R05-dependent-core.md#default-optimized-interfaces).
 
-| Card | Evidence beyond the published checkpoint | Remaining gap |
+| Card | What works | Remaining gap |
 | --- | --- | --- |
-| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | The integrated compiler checks `second :: foreach (q :: DPair a p) -> p (first q)`. Private revision `998c63cb62` accepts written `some` with an isolated library fixture. A source-free client reads each projection and leaves the other field lazy. | Establish equality for equivalent sum types written independently in two modules. The private payload families currently have different names. General domains and inference for `foreach` also remain open. |
-| [R05 dependent Core](roadmap/R05-dependent-core.md) | The integrated bootstrap compiler runs the default `-O1` Showcase and checks both interface generations. The old reader detects new constructor evidence at the header. | Verify the self-hosted compiler. Check exported specialization rules and optimized functions whose result refers to a callback application. |
-| [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The integrated Showcase checks a mapper's cons rule on an unknown tail and composes two checked traversals. Observing the result constructor leaves the inner callback lazy. | General open evaluation across arbitrary ordinary definitions. |
-| [R19 type-level cases](roadmap/R19-type-level-cases.md) | The integrated compiler handles ordered constructor tests through aliases and selected GADT indices. It checks cases under `forall k (tag :: k)`. The focused interface client instantiates one annotated result at both `LiftedRep` and `IntRep`. | Verify the integrated tests under the self-hosted compiler. General mixed patterns and open GADT indices remain open. |
-| [R22 erased existentials](roadmap/R22-existential-quantification.md) | The private bootstrap compiler at `7a2fe4027b` builds with the real marker in `base`. The source test passes Template Haskell, lexical unpacking, a source-free ordinary client and ten rejection checks. | Verify the self-hosted compiler and GHCi. General pattern matching and optimization of existential expressions remain open. |
-| [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | The integrated changes report the conflicting arrow metadata for a matchability error and suppress an argument-count hint for a stuck family. Eight focused diagnostics passed on the contributing revision. | Compare the integrated diagnostics with the ordinary-program baseline. General family unsaturation remains open. |
+| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | The integrated compiler checks `second :: foreach (q :: DPair a p) -> p (first q)`. A private bootstrap compiler proves equality between two independently written `some` types after a binder rename, using the registered `GHC.Sigma` in `base`. | Check whole-sum equality after self-hosting. A closed family can still get stuck comparing whole sums. General domains and inference for `foreach` remain open. |
+| [R05 dependent Core](roadmap/R05-dependent-core.md) | Both stages run the default `-O1` Showcase. A private compiler also inlines a retained case on a callback and fires a generated specialization rule in a source-free client. | Integrate the private optimizer changes. Retained class defaults still encounter compulsory unfoldings that the writer cannot export. |
+| [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The integrated Showcase checks a mapper’s cons rule on an unknown tail and composes two checked traversals. Observing the result constructor leaves the inner callback lazy. | General open evaluation across arbitrary ordinary definitions. |
+| [R19 type-level cases](roadmap/R19-type-level-cases.md) | The compiler handles ordered constructor tests through aliases and selected GADT indices. It checks cases under `forall k (tag :: k)`. An interface client instantiates one annotated result at both `LiftedRep` and `IntRep`. | General mixed patterns and open GADT indices. |
+| [R22 erased existentials](roadmap/R22-existential-quantification.md) | A private compiler checks a polymorphic filter that hides the output vector’s length. An ordinary source-free client infers the element type and reads the first cell without forcing the tail. | Complete the self-hosted witness and interface checks. Implicit packing and opening with `exists n. …`, general patterns and optimization of existential expressions remain open. |
+| [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | The integrated compiler reports conflicting arrow matchabilities and suppresses the argument-count hint for a stuck family. | General family unsaturation and compatibility with ordinary programs. |
 
 The published evaluator work covers closed calls such as `Prelude.sum` and
 open equations such as mapping `Prelude.not` over a list with a known head
@@ -55,17 +62,19 @@ source examples. General promotion remains open.
 
 ## Current work queue
 
-1. Finish the self-hosted and upgrade checks for the 271-line integration.
-2. Run the 272-line integration under the self-hosted compiler. Verify the
-   R19 dependent binder checks, R23 diagnostics and reuse of existing
-   provider interfaces.
-3. Run R22 source pack and unpack on the self-hosted compiler with its
-   registered `base`. Check the native and interactive Showcase.
-4. Test R04 whole-sum equality across independently compiled modules.
-   Compare equivalent bodies with renamed binders and reject unequal bodies.
-5. Run R05 default optimized unfoldings in both compiler stages. Test the
-   generated specialization rule and a case on a callback from an ordinary
-   client that has only the provider interface and object.
+1. **R22.** Run the vector filter in both compiler directions through a
+   separately compiled provider. The bootstrap checks already cover old
+   readers presented with erased package expressions or the equality proof
+   alone. Carry these checks through self-hosting. Then implement implicit
+   packing and opening.
+2. **R04.** Check whole-sum equality in the self-hosted compiler. Read
+   the scoped evidence from a cached interface. Retain the bootstrap tests
+   for nested sums and interface changes when a payload changes.
+3. **R05.** Integrate checked specialization rules and explicit inlining
+   pragmas. For class defaults, test a separately compiled instance that
+   inherits a retained method.
+4. **R19 and R23.** Extend ordered type cases to mixed patterns. Use the
+   ordinary-program regression baseline when extending family unsaturation.
 
 Use this queue for current priorities, the linked card for its acceptance
 criteria, and the [implementation log](PLAN.md) for results from individual

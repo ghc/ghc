@@ -115,9 +115,21 @@ with either provider. An interface that carries both proof forms selects the
 constructor header in either declaration order. In six runs the client
 returned `(9,'i')` without forcing either witness.
 
-The 271-line optimizer check keeps unsupported generated specialization
-rules local. Exporting those rules and inlining a case that binds a
-callback's result each need separate checks. R05 remains open.
+At `3b7108a97b`, both the bootstrap compiler and the self-hosted compiler
+produce all 272 Showcase lines with default optimized interfaces. The
+[ordinary simplifier client](../../../testsuite/tests/dependent/should_run/NativeSimplifier.sh)
+imports its provider with only an interface and object and compares its
+output to the stripped-interface run. The same test still checks rejection
+of unsupported optimizer options.
+
+The private compiler at `e070cb70cc` also exports a generated specialization
+rule and a written inline pragma on a retained function. A source-free
+client inlines a case on the result of a callback. It distinguishes the
+strict `id` callback from lazy `const True`. The same client fires the
+numeric specialization rule. The 272-line Showcase passes with default
+`-O1` on that private bootstrap compiler. A retained class method needs
+additional checks because a client that inherits the default can require
+its unfolding even when optional interface pragmas are disabled.
 
 ## Next increments
 
