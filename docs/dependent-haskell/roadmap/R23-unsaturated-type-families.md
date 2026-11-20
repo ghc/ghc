@@ -554,6 +554,28 @@ kind the compiler keeps the existing saturation rule.
 [Provider](../examples/open-evaluation/InvisibleFamily.hs) and
 [ordinary interface client](../../../testsuite/tests/dependent/should_run/NativeUnsaturatedInvisibleConsumer.hs).
 
+### Choosing a prefix's matchability from a later argument
+
+In `Receiver (Select 'True) 'Match`, both declarations have an invisible
+matchability parameter. The earlier family prefix supplies a higher-order
+argument. The later argument `'Match :: Anchor M` fixes both parameters.
+The previous checker fixed them to U before it checked `'Match` and
+reported GHC-83865.
+
+The checker now defers an omitted index in experimental type applications
+when a function-valued argument kind and another supplied argument kind
+share it. The earlier prefix also checks its index against the expected
+function kind. Showcase runs an ordinary client at `(Maybe Bool, Bool)`
+and prints `(Just True,True)`. The regression checks the same client
+with stripped provider interfaces. An isolated `Select 'True`, an
+unrelated `Bool` argument, and an anchor whose family maps both indices to
+the same result all retain U. Explicit conflicts and an undetermined
+selector still fail.
+[Provider](../examples/open-evaluation/AnchorReceiver.hs),
+[aliases](../examples/open-evaluation/LaterMatchability.hs),
+[ordinary client](../examples/open-evaluation/LaterMatchabilityClient.hs)
+and [interface and rejection controls](../../../testsuite/tests/dependent/should_run/NativeLaterMatchability.sh).
+
 ## Goal and dependencies
 
 Allow direct higher-order use of type families under explicit matchability,

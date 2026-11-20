@@ -94,6 +94,7 @@ import qualified InterpretedKind
 import qualified InterpretedKindUseSite
 import qualified NestedFunctionClient
 import qualified InvisibleFamily
+import LaterMatchabilityClient (laterMatchability)
 import qualified TypeLambda
 import qualified TypeLet
 import qualified NativeCase
@@ -1114,6 +1115,7 @@ main = do
     observe "infer the first invisible family argument and leave the second open"
         (Refl :: InvisibleFamily.ReadFlag :~: 'True, Refl :: InvisibleFamily.ReadType :~: Int)
     observe "apply Maybe and a type family through a computed arrow kind" InvisibleFamily.wrappedValues
+    observe "infer the matchability of a family prefix from a later argument" laterMatchability
     observe "interpret a kind code as an ordinary type constructor" InterpretedKind.optionalFlag
     observe "interpret two applications of the optional type constructor" InterpretedKind.nestedOptional
     observe "choose an interpreted arrow from its expected kind"
