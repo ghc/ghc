@@ -23,13 +23,24 @@ warm reuse and rejection of stale evidence.
 [R05 optimizer details](roadmap/R05-dependent-core.md#retained-operands-in-the-native-optimizer)
 and [earlier checkpoint](PLAN.md#r04-and-r19-project-through-an-ordinary-function-and-match-a-type-directly).
 
+The integrated bootstrap compiler at `f9427b8d5b` matches all 272 lines of
+[Showcase](Showcase.hs) at `-O0` and at default `-O1`. This includes an
+ordered type case under a dependent binder and projection from a separately
+compiled pair. Source-free clients check repeated inlining and witness
+demand. The compiler passes the native Core API test, the old/new interface
+exchange at three compression levels, and the coercion role and scope
+rejection tests. The preceding 271-line compiler is still in self-host and
+regression testing. Self-hosted and full-suite results for the 272-line
+compiler are pending.
+
 | Card | Evidence beyond the published checkpoint | Remaining gap |
 | --- | --- | --- |
-| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | A private compiler checks `second :: foreach (q :: DPair a p) -> p (first q)` through interfaces. The combined R04/R23 compiler runs 267 Showcase lines. | General domains and inference for `foreach`, and first-class retained `some`. |
-| [R05 dependent Core](roadmap/R05-dependent-core.md) | A separate default-interface prototype exposes an ordinary worker to an optimized, source-free client. | An imported dependent projection still loses a branch coercion when reading its unfolding. Integrate the reader and version checks. |
-| [R19 type-level cases](roadmap/R19-type-level-cases.md) | A private compiler handles nested constructors introduced by an alias. A rigid earlier test blocks a later fallback. Stripped-interface clients, TH reification and exact printing pass. A GADT index can use one reduction of a completed closed family. | Mixed patterns need an unambiguous test order. Open GADT indices and integration with the shared compiler remain open. |
-| [R22 erased existentials](roadmap/R22-existential-quantification.md) | An isolated compiler checks source `Pack (type Bool) (Just True)` and a lexical unpack pattern. A source-free ordinary client links and prints `True`. Core and STG dumps, demand and scope controls pass at `-O0`. | Build the marker library and compiler together from a clean checkout. General pattern matching and ordinary optimization remain open. |
-| [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | The private formatting patch restores both ordinary kind-error goldens, preserves explicit M/U differences and leaves all 124 polykinds exit statuses unchanged. It passes the modifier, reify and exact-print checks. | Review the diagnostics on alias-headed kinds and integrate the printer with the shared compiler. General family unsaturation remains open. |
+| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | The integrated compiler checks `second :: foreach (q :: DPair a p) -> p (first q)`. Private revision `998c63cb62` accepts written `some` with an isolated library fixture. A source-free client reads each projection and leaves the other field lazy. | Establish equality for equivalent sum types written independently in two modules. The private payload families currently have different names. General domains and inference for `foreach` also remain open. |
+| [R05 dependent Core](roadmap/R05-dependent-core.md) | The integrated bootstrap compiler runs the default `-O1` Showcase and checks both interface generations. The old reader detects new constructor evidence at the header. | Verify the self-hosted compiler. Check exported specialization rules and optimized functions whose result refers to a callback application. |
+| [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The integrated Showcase checks a mapper's cons rule on an unknown tail and composes two checked traversals. Observing the result constructor leaves the inner callback lazy. | General open evaluation across arbitrary ordinary definitions. |
+| [R19 type-level cases](roadmap/R19-type-level-cases.md) | The integrated compiler handles ordered constructor tests through aliases and selected GADT indices. It checks cases under `forall k (tag :: k)`. The focused interface client instantiates one annotated result at both `LiftedRep` and `IntRep`. | Verify the integrated tests under the self-hosted compiler. General mixed patterns and open GADT indices remain open. |
+| [R22 erased existentials](roadmap/R22-existential-quantification.md) | The private bootstrap compiler at `7a2fe4027b` builds with the real marker in `base`. The source test passes Template Haskell, lexical unpacking, a source-free ordinary client and ten rejection checks. | Verify the self-hosted compiler and GHCi. General pattern matching and optimization of existential expressions remain open. |
+| [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | The integrated changes report the conflicting arrow metadata for a matchability error and suppress an argument-count hint for a stuck family. Eight focused diagnostics passed on the contributing revision. | Compare the integrated diagnostics with the ordinary-program baseline. General family unsaturation remains open. |
 
 The published evaluator work covers closed calls such as `Prelude.sum` and
 open equations such as mapping `Prelude.not` over a list with a known head
@@ -44,12 +55,17 @@ source examples. General promotion remains open.
 
 ## Current work queue
 
-1. Integrate the R04 pair projections and R23 diagnostics. The combined
-   bootstrap overlay passes 267 Showcase lines at both optimization levels.
-2. Check the R19 ordered cases and R16 mapper rules against that compiler.
-   Compare old and new interfaces across separate producer/client builds.
-3. Build R22 source pack and unpack with the marker library exposed by the
-   ordinary build. Fix the R05 default-interface projection reader.
+1. Finish the self-hosted and upgrade checks for the 271-line integration.
+2. Run the 272-line integration under the self-hosted compiler. Verify the
+   R19 dependent binder checks, R23 diagnostics and reuse of existing
+   provider interfaces.
+3. Run R22 source pack and unpack on the self-hosted compiler with its
+   registered `base`. Check the native and interactive Showcase.
+4. Test R04 whole-sum equality across independently compiled modules.
+   Compare equivalent bodies with renamed binders and reject unequal bodies.
+5. Run R05 default optimized unfoldings in both compiler stages. Test the
+   generated specialization rule and a case on a callback from an ordinary
+   client that has only the provider interface and object.
 
 Use this queue for current priorities, the linked card for its acceptance
 criteria, and the [implementation log](PLAN.md) for results from individual

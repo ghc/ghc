@@ -28,8 +28,9 @@ bash docs/dependent-haskell/check-showcase.sh _build/stage1/bin/ghc _build/stage
 ```
 
 The runner prints the observed values, compares them with the expected
-output, and checks the generated HIE files. Add `-O1` to run the native
-optimizer with stripped interfaces. Add `--ghci` to compare the same
+output, and checks the generated HIE files. Add `--default-o1` to run
+the native optimizer with GHC's default interface settings. Use `-O1`
+to run the same check with stripped interfaces. Add `--ghci` to compare the same
 program in an interpreter-enabled build at `-O0`. The runner uses a
 temporary directory for the examples’ objects and interfaces.
 [Showcase source](Showcase.hs) and [expected output](Showcase.stdout).

@@ -97,6 +97,28 @@ binder's type. These steps preserve the result type and the observed
 demand in the same example. [Showcase](../Showcase.hs) and
 [decision provenance](../REFERENCES.md#retained-operands-under-optimization).
 
+### Default optimized interfaces
+
+The bootstrap compiler at `879625a6d8` reproduces all 271 Showcase lines at
+default `-O1`. Run the [Showcase check](../check-showcase.sh) with
+`--default-o1` to include optimized unfoldings. Core Tidy keeps the original
+scrutinee when a branch's payload type mentions it. When the simplifier
+inlines the case twice, each copy gets its own field and proof binders.
+The [interface client](../../../testsuite/tests/dependent/should_run/NativeDefaultO1Interface.hs)
+uses a vector witness and an IO witness in the same expression.
+
+The compiler at `63ebc62180` adds a header for retained constructor proofs.
+At all three compression levels, the ordinary and dependent-coercion sample
+interfaces have the same bytes as before. An older reader rejects a new
+projection at its header. The new reader runs the same source-free client
+with either provider. An interface that carries both proof forms selects the
+constructor header in either declaration order. In six runs the client
+returned `(9,'i')` without forcing either witness.
+
+The 271-line optimizer check keeps unsupported generated specialization
+rules local. Exporting those rules and inlining a case that binds a
+callback's result each need separate checks. R05 remains open.
+
 ## Next increments
 
 - [x] Specify and run an opaque whole-function cast probe. Use genuinely

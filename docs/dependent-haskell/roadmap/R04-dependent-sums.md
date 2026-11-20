@@ -126,3 +126,33 @@ The upgrade checks rebuild an eligible old witness worker once, then
 reuse both the worker and the unchanged consumer. An interface-only
 old worker cannot supply the missing equation.
 [Upgrade runner](../examples/closed-evaluation/check-readback-upgrade.sh).
+
+## Payload families for the `some` binder
+
+Serokell writes a retained sum as `some (x :: a) | B`. Its payload can
+forget the witness. The bootstrap compiler at `60014cbc8e` accepts the
+following representation when the constructor specifies both erased kinds.
+
+```haskell
+data UPair (a :: Type) (p :: a %U -> Type) where
+  MkPair :: forall (a :: Type) (p :: a %U -> Type).
+            foreach (x :: a) -> p x -> UPair a p
+```
+
+A source-free ordinary client used one payload family that maps `True`
+to `Int` and `False` to `Char`. GHC rejected an `Int` payload at
+`False` at the payload expression. Another family maps every witness to
+`Int`. The client projected `7` at a bottom-valued witness under `-O1`
+with Core and STG lint. A type lambda can also apply a captured matchable
+constructor, such as `Proxy`, to the witness.
+
+The source experiment elaborates the body of `some` to a type lambda.
+The current lambda implementation generates a fresh nominal family.
+Two modules that spell the same sum with different binder names can agree
+at both Boolean inputs and still fail to exchange their packages. The
+acceptance test for first-class sums must pass one module's package to
+the other module's consumer. It must also reject a body that gives a
+different result at an index. The representation above supplies the
+runtime fields and their projection. Type equality across declarations
+remains open. [Serokell's R04 card](https://ghc.serokell.io/dh#dependent-sums)
+and [type-lambda elaboration](R17-type-level-lambdas.md#source-and-evidence).
