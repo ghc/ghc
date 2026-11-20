@@ -32,6 +32,7 @@ import GHC.Driver.Backend
 
 import GHC.Hs
 
+import {-# SOURCE #-} GHC.Tc.Gen.App (tcRuleAppPrefix)
 import {-# SOURCE #-} GHC.Tc.Gen.Expr  ( tcInferRho, tcCheckMonoExpr )
 
 import GHC.Tc.Errors.Types
@@ -75,6 +76,7 @@ import GHC.Types.InlinePragma
 import GHC.Types.Basic
 import GHC.Types.Name
 import GHC.Types.Name.Env
+import GHC.Types.Name.Set
 import GHC.Types.SrcLoc
 
 import GHC.Builtin.WiredIn.Types (unmatchableDataConTy)
@@ -91,7 +93,8 @@ import GHC.Data.Maybe( orElse, whenIsJust )
 import Control.Monad( unless )
 import Data.Foldable ( toList )
 import qualified Data.List.NonEmpty as NE
-import Data.Maybe( mapMaybe )
+import Data.Maybe( fromMaybe, mapMaybe )
+import Data.Data (Data, cast, gmapQ)
 
 {- -------------------------------------------------------------
           Note [Overview of type signatures]
@@ -995,7 +998,7 @@ tcSpecPrag poly_id (SpecSigE nm rule_bndrs spec_e inl)
        ; traceTc "tcSpecPrag SpecSigE {" (ppr nm $$ ppr spec_e)
        ; skol_info <- mkSkolemInfo skol_info_anon
        ; (rhs_tclvl, spec_e_wanted, (rule_bndrs', (tc_spec_e, _rho)))
-            <- tcRuleBndrs skol_info Nothing rule_bndrs $
+            <- tcRuleBndrs skol_info Nothing rule_bndrs $ \_ ->
                tcInferRho spec_e
 
          -- (2) Solve the resulting wanteds
@@ -1217,8 +1220,8 @@ tcRule (HsRule { rd_ext  = ext
        ; skol_info <- mkSkolemInfo (RuleSkol name_fs)
         -- Note [Typechecking rules]
        ; (tc_lvl, lhs_wanted, stuff)
-              <- tcRuleBndrs skol_info (Just lhs) bndrs $
-                 do { (lhs', rule_ty)    <- tcInferRho lhs
+              <- tcRuleBndrs skol_info (Just lhs) bndrs $ \checked_lhs ->
+                 do { (lhs', rule_ty)    <- fromMaybe (tcInferRho lhs) checked_lhs
                     ; (rhs', rhs_wanted) <- captureConstraints $
                                             tcCheckMonoExpr rhs rule_ty
                     ; return (lhs', rule_ty, rhs', rhs_wanted) }
@@ -1302,7 +1305,7 @@ tcRule (HsRule { rd_ext  = ext
 ******************************************************************************** -}
 
 tcRuleBndrs :: SkolemInfo -> Maybe (LHsExpr GhcRn) -> RuleBndrs GhcRn
-            -> TcM a      -- Typecheck this with the rule binders in scope
+            -> (Maybe (TcM (LHsExpr GhcTc, TcRhoType)) -> TcM a)
             -> TcM (TcLevel, WantedConstraints, ([Var], a))
                         -- The [Var] are the explicitly-quantified variables,
                         -- both type variables and term variables
@@ -1318,12 +1321,48 @@ tcRuleBndrs skol_info mb_lhs (RuleBndrs { rb_tyvs = mb_tv_bndrs, rb_tmvs = tm_bn
     --------------
     go_tvs tvs thing_inside = bindExplicitTKBndrs_Skol skol_info tvs thing_inside
 
-    check_terms = do { domain <- ruleBinderDomain mb_lhs
-                     ; go_tms domain emptyNameEnv tm_bndrs thing_inside }
+    check_terms
+      | Just lhs <- mb_lhs
+      , Just (head_name, type_args, args) <- ruleAppSpine lhs
+      = do { mb_fun <- tcLookupIdMaybe head_name
+           ; case mb_fun of
+               Just fun | hasRetainedRuleHead fun ->
+                 if null type_args
+                 then do { domain <- ruleBinderDomain fun args
+                         ; check_with domain }
+                 else check_prefix lhs fun type_args args
+               _ -> check_with no_domain }
+      | otherwise = check_with no_domain
+
+    no_domain _ _ = Nothing
+    check_with domain = go_tms domain emptyNameEnv tm_bndrs (const (thing_inside Nothing))
+
+    check_prefix lhs fun type_args args
+      | any unsigned later
+      = do { (first, (last_bndrs, result)) <-
+               go_tms no_domain emptyNameEnv earlier $ \scope ->
+               do { (sigma, finish) <- tcRuleAppPrefix lhs
+                  ; domain <- ruleBinderDomain (setVarType fun sigma) args
+                  ; go_tms domain scope later (const (thing_inside (Just finish))) }
+           ; return (first ++ last_bndrs, result) }
+      | otherwise = check_with no_domain
+      where
+        names = unionNameSets (map ruleTypeArgNames type_args)
+        (suffix, rest) = span (all (\n -> not (n `elemNameSet` names)) . binder_names . unLoc)
+                              (reverse tm_bndrs)
+        later = reverse suffix
+        earlier = reverse rest
+        unsigned (L _ RuleBndr{}) = True
+        unsigned _ = False
+        binder_names (RuleBndr _ (L _ n)) = [n]
+        binder_names (RuleBndrSig _ (L _ n) (HsPS { hsps_ext = ext })) =
+          n : hsps_nwcs ext ++ hsps_imp_tvs ext
 
     --------------
-    go_tms _ _ [] thing_inside
-      = do { res <- thing_inside; return ([], res) }
+    go_tms :: (NameEnv Id -> Name -> Maybe Type) -> NameEnv Id -> [LRuleBndr GhcRn]
+           -> (NameEnv Id -> TcM b) -> TcM ([Var], b)
+    go_tms _ scope [] thing_inside
+      = do { res <- thing_inside scope; return ([], res) }
     go_tms domain scope (L _ (RuleBndr _ (L _ name)) : rule_bndrs) thing_inside
       = do  { ty <- maybe newOpenFlexiTyVarTy return (domain scope name)
             ; let bndr_id = mkLocalId name ManyTy ty
@@ -1347,27 +1386,37 @@ tcRuleBndrs skol_info mb_lhs (RuleBndrs { rb_tyvs = mb_tv_bndrs, rb_tmvs = tm_bn
                               go_tms domain (extendNameEnv scope name bndr_id) rule_bndrs thing_inside
             ; return (map snd tv_prs ++ bndr_id : bndrs, res) }
 
+-- | Find the value operands and the type arguments on the head. A visible
+-- type argument after a value operand belongs to a different telescope.
+ruleAppSpine :: LHsExpr GhcRn -> Maybe (Name, [LHsWcType GhcRn], [LHsExpr GhcRn])
+ruleAppSpine = values []
+  where
+    values args e = case unLoc (stripParensLHsExpr e) of
+      HsApp _ f x   -> values (x : args) f
+      OpApp _ x f y -> values (x : y : args) f
+      _             -> prefix args [] e
+    prefix args types e = case unLoc (stripParensLHsExpr e) of
+      HsAppType _ f ty -> prefix args (ty : types) f
+      HsVar _ (L _ f)  -> Just (getName f, types, args)
+      _                -> Nothing
+
+-- | Names needed before checking a RULE's written type arguments. The
+-- caller intersects these with the names introduced by this RULE.
+ruleTypeArgNames :: Data a => a -> NameSet
+ruleTypeArgNames thing
+  | Just name <- cast thing = unitNameSet name
+  | Just ty <- cast thing = mkNameSet (map getName (tyCoVarsOfTypeList ty))
+  | otherwise = unionNameSets (gmapQ ruleTypeArgNames thing)
+
 -- | Read a bare rule binder's expected type from a retained application.
 -- See Note [Dependent RULE binder domains].
-ruleBinderDomain :: Maybe (LHsExpr GhcRn) -> TcM (NameEnv Id -> Name -> Maybe Type)
-ruleBinderDomain mb_lhs
-  | Just (head_name, args) <- mb_lhs >>= spine []
-  = do { mb_id <- tcLookupIdMaybe head_name
-       ; case mb_id of
-           Just fun | hasRetainedRuleHead fun ->
-             do { (inst, _, tau) <- tcInstType newMetaTyVars fun
-                ; return (\scope name -> walk (mkVarSet (map snd inst)) scope name tau args) }
-           _ -> return no_domain }
-  | otherwise = return no_domain
+ruleBinderDomain :: Id -> [LHsExpr GhcRn] -> TcM (NameEnv Id -> Name -> Maybe Type)
+ruleBinderDomain fun args
+  = do { (inst, _, tau) <- tcInstType newMetaTyVars fun
+       ; let prefix_metas = filter (\v -> isTcTyVar v && isMetaTyVar v) (tyCoVarsOfTypeList (idType fun))
+             candidates = mkVarSet (map snd inst ++ prefix_metas)
+       ; return (\scope name -> walk candidates scope name tau args) }
   where
-    no_domain _ _ = Nothing
-
-    spine args expr = case unLoc (stripParensLHsExpr expr) of
-      HsApp _ f x     -> spine (x : args) f
-      OpApp _ x f y   -> spine (x : y : args) f
-      HsVar _ (L _ f) -> Just (getName f, args)
-      _               -> Nothing
-
     bare expr = case unLoc (stripParensLHsExpr expr) of
       HsVar _ (L _ v) -> Just (getName v)
       _               -> Nothing
@@ -1390,7 +1439,8 @@ ruleBinderDomain mb_lhs
     walk _ _ _ _ _ = Nothing
 
     -- A signed earlier operand can specialize the head's erased parameters.
-    -- Only the fresh parameters of this signature are match variables.
+    -- Match fresh signature parameters and metavariables in the checked
+    -- prefix. The match supplies a domain without assigning those variables.
     specialize tvs ty binder actual
       | idType binder `eqType` idType actual = Just ty
       | otherwise = do
@@ -1409,9 +1459,13 @@ a free runtime Id. Give the binder its declared argument domain before
 checking the rule. Substitute only actual Ids bound earlier in the rule
 telescope. Explicit binder signatures take precedence.
 
-Inspect the renamed application without expanding or checking its operands.
-The normal application checker still checks the whole left side, including
-all erased arguments and constraints. A different occurrence of the same
+For a leading type application such as keepMaybe @a m x, first bind the
+rule variables that the written type arguments mention. Check that prefix
+with the normal application checker. Use the residual function type for
+subsequent binder domains. Finish the left side with the same checked
+head, arguments and evidence. This keeps the source locations and checks
+wildcards, constraints and splices once. The checker never inspects a
+value operand to discover its type. A different occurrence of the same
 binder must also check at its inferred type. A type family in the domain
 can stay stuck throughout. No inverse family equation is needed.
 -}

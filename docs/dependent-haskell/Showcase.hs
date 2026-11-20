@@ -73,6 +73,7 @@ import qualified FiniteTree
 import qualified FunctionFieldClient
 import qualified FunctionFieldLibrary as FunctionFields
 import qualified RetainedRulesClient
+import qualified VisibleRuleClient
 import qualified RetainedRules as Rule
 import qualified ImportedRetainedRules
 import qualified FunctionPackageLibrary as FunctionPackages
@@ -240,6 +241,10 @@ booleans = do
     observe "apply retained function rules without forcing an unused index"
         (RetainedRulesClient.fromInput b, RetainedRulesClient.atFalse 11, RetainedRulesClient.ignoredIndex)
     observe "infer both rule binders from readKept" (RetainedRulesClient.boundPayload b)
+    readingIndex <- newIORef (Just b) >>= readIORef
+    lazyIndex <- newIORef (error "forced reading index" :: Maybe Bool) >>= readIORef
+    observe "use a type-applied rule with a runtime Maybe index"
+        (VisibleRuleClient.readAt readingIndex 37, VisibleRuleClient.readAt lazyIndex 19)
     observe "apply a rule declared outside the retained function's module"
         (Rule.readChoice (Rule.keep True (ImportedRetainedRules.tagged 23)))
     observe "choose True has result Int" (choose True)

@@ -10,7 +10,7 @@
 -}
 
 module GHC.Tc.Gen.App
-       ( tcApp
+       ( tcApp, tcRuleAppPrefix
        , tcExprPrag
        , matchPolytypeExistsWitness
        , tcImplicitOperand
@@ -489,7 +489,37 @@ tcOrdinaryApp rn_expr rn_fun rn_args exp_res_ty
 
 tcOrdinaryApp' :: HsExpr GhcRn -> (HsExpr GhcRn, SrcSpan) -> HsExpr GhcTc
                -> TcSigmaType -> [HsExprArg 'TcpRn] -> ExpRhoType -> TcM (HsExpr GhcTc)
-tcOrdinaryApp' rn_expr rn_head@(rn_fun, fun_lspan) tc_fun0 fun_sigma0 rn_args exp_res_ty
+tcOrdinaryApp' = tcOrdinaryAppWithPrefix []
+
+-- | Check a retained RULE's leading type arguments once. Keep the original
+-- syntax and the checked arguments for the rest of the application.
+-- See Note [Dependent RULE binder domains] in GHC.Tc.Gen.Sig.
+tcRuleAppPrefix :: LHsExpr GhcRn -> TcM (TcSigmaType, TcM (LHsExpr GhcTc, TcRhoType))
+tcRuleAppPrefix (L loc expr) = context $
+  do { (fun, args) <- splitHsApps expr
+     ; let (leading, rest) = span prefix_arg args
+     ; fun_span <- getFunSrcSpan args
+     ; let head_ctxt = (fun, fun_span)
+     ; (checked_fun, sigma) <- tcInferAppHead head_ctxt
+     ; (prefix, residual) <- tcInstFunWithPrefix True [] Nothing Nothing Nothing
+                               NoQL False head_ctxt checked_fun sigma leading
+     ; let finish = context $
+             do { (lhs, rho) <- runInferRho $ \expected ->
+                    tcOpenImplicitArgs expr residual rest expected $
+                      tcOrdinaryAppWithPrefix prefix expr head_ctxt checked_fun residual
+                ; return (L loc lhs, rho) }
+     ; return (residual, finish) }
+  where
+    context :: TcM a -> TcM a
+    context action = setSrcSpanA loc $ addExprCtxt expr action
+    prefix_arg ETypeArg{} = True
+    prefix_arg EWrap{} = True
+    prefix_arg _ = False
+
+tcOrdinaryAppWithPrefix :: [HsExprArg 'TcpInst] -> HsExpr GhcRn -> (HsExpr GhcRn, SrcSpan)
+                        -> HsExpr GhcTc -> TcSigmaType -> [HsExprArg 'TcpRn]
+                        -> ExpRhoType -> TcM (HsExpr GhcTc)
+tcOrdinaryAppWithPrefix checked_prefix rn_expr rn_head@(rn_fun, fun_lspan) tc_fun0 fun_sigma0 rn_args exp_res_ty
   = do { wanted_ql <- wantQuickLook rn_fun
        ; traceTc "tcApp {" $
            vcat [ text "rn_fun:" <+> ppr rn_fun
@@ -548,7 +578,7 @@ tcOrdinaryApp' rn_expr rn_head@(rn_fun, fun_lspan) tc_fun0 fun_sigma0 rn_args ex
                   -> Just <$> newTcRef Nothing
                 _ -> return Nothing
             ; (inst_args, app_res_rho) <-
-                tcInstFunWithPrefix False prefix vta_cache expected_rho inst_plan
+                tcInstFunWithPrefix False (checked_prefix ++ prefix) vta_cache expected_rho inst_plan
                   do_ql inst_final rn_head tc_fun fun_sigma remaining_args
             ; extra_cache <- case vta_cache of
                 Nothing -> return []
@@ -2645,8 +2675,8 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
                    (binder,) <$> tcRetainedOperand binder arg
                  _ -> failWithTc
                         (TcRnRetainedQuantificationError (RetainedExplicitArgument fun_ty))
-           ; let res_ty = applyTypeToArgs fun_ty [operand]
-                 checked = ERetainedArg DepFunInvisible loc (Scaled ManyTy (varType binder)) runtime_arg res_ty
+           ; res_ty <- retainedAppResult fun_ty binder operand
+           ; let checked = ERetainedArg DepFunInvisible loc (Scaled ManyTy (varType binder)) runtime_arg res_ty
            ; go plan fun_orig pos (checked : acc) res_ty rest_args }
 
     -- See Note [Inferring an invisible retained argument].
@@ -2690,8 +2720,8 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
         (EValArg { ea_arg = arg, ea_loc_span = ctxt } : rest_args)
       | DepFunTy DepFunVisible binder _ <- coreFullView fun_ty
       = do { (core_arg, runtime_arg) <- tcRetainedOperand binder arg
-           ; let body_ty = applyTypeToArgs fun_ty [core_arg]
-                 arg' = ERetainedArg DepFunVisible ctxt (Scaled ManyTy (varType binder)) runtime_arg body_ty
+           ; body_ty <- retainedAppResult fun_ty binder core_arg
+           ; let arg' = ERetainedArg DepFunVisible ctxt (Scaled ManyTy (varType binder)) runtime_arg body_ty
            ; go plan fun_orig (pos + 1) (arg' : acc) body_ty rest_args }
 
     -- Rule ITVDQ from the GHC Proposal #281
@@ -2976,6 +3006,15 @@ tcRetainedOperand binder arg
   where
     domain = varType binder
 
+-- | Use the same domain for index checking and codomain substitution.
+-- See Note [Wildcards in retained operand domains].
+retainedAppResult :: Type -> Id -> Core.CoreExpr -> TcM Type
+retainedAppResult fun_ty binder arg
+  | anyFreeVarsOfType (\v -> isTcTyVar v && isMetaTyVar v) (varType binder)
+  = do { fun_ty' <- liftZonkM (zonkTcType fun_ty)
+       ; return (applyTypeToArgs fun_ty' [arg]) }
+  | otherwise = return (applyTypeToArgs fun_ty [arg])
+
 -- | Check a value operand and specialise a class selector to its checked method.
 -- See Note [Dictionary selection in retained arguments].
 tcRetainedValueOperand :: (LHsExpr GhcRn -> TcM (Core.CoreExpr, LHsExpr GhcRn))
@@ -3142,7 +3181,11 @@ tcRetainedArg domain arg
   = setSrcSpanA (getLoc arg) $
     do { result@(core_arg, _) <- resolve emptyNameEnv domain arg
        ; case Core.retainedArgIndex core_arg of
-           Just index | typeKind index `tcEqType` domain -> return result
+           Just index
+             | typeKind index `tcEqType` domain -> return result
+             | otherwise -> do { domain' <- liftZonkM (zonkTcType domain)
+                               ; if typeKind index `tcEqType` domain'
+                                 then return result else unsupported }
            _ -> unsupported }
   where
     resolve :: NameEnv Id -> Type -> LHsExpr GhcRn -> TcM (Core.CoreExpr, LHsExpr GhcRn)
@@ -3389,7 +3432,20 @@ tcRetainedArgVar expected arg_id
   | varType arg_id `tcEqType` expected = return (Core.Var arg_id)
   | otherwise
   = do { co <- unifyType Nothing (varType arg_id) expected
-       ; return (Core.Cast (Core.Var arg_id) (SubCo co)) }
+       ; co' <- liftZonkM (zonkCo co)
+       ; if isReflCo co'
+         then return (Core.Var (setVarType arg_id (coercionLKind co')))
+         else return (Core.Cast (Core.Var arg_id) (SubCo co')) }
+
+{- Note [Wildcards in retained operand domains]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In keepMaybe @_ m x, the type of m can determine the wildcard. The
+ordinary unifier checks the declared operand against the retained domain.
+If zonking then gives the same type on both sides, use the original
+runtime Id with its resolved type. This supplies an index for the
+codomain. A cast for a non-reflexive equality cannot supply that index.
+Use the resolved domain when applying the dependent function type too.
+-}
 
 {- Note [Retained argument cast diagnostics]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -194,9 +194,9 @@ source examples. General promotion remains open.
 ## Current work queue
 
 1. **R05.** A rule can match a retained head from another module.
-   Extend binder inference to a head with visible type arguments.
-   In `keepMaybe @a m x`, the checker should get the domain of `x`
-   from the same instantiation it uses for the call.
+   The same checked type application supplies the domains of `m`
+   and `x` in `keepReading @Bool m x`. Extend the inference to
+   type arguments after a value operand in a dependent telescope.
    [Rule and interface support](roadmap/R05-dependent-core.md).
 2. **R23 and R24.** An unsigned recursive family can forward a
    constructor or a partial family. The arity error now suggests the

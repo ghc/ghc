@@ -209,9 +209,22 @@ The Boolean and its payload can both omit their annotations. In
 checks every occurrence of each variable at this type. The index must
 already be in scope when the compiler assigns the payload's type.
 The same rule works for two indices and for a polymorphic `Maybe a`
-domain. A leading visible type application on the rule head still
-requires the dependent payload annotation.
-[Source and rejection checks](../examples/qualified-pi/check-retained-rules.sh).
+domain. In `forall m x. keepReading @Bool m x = x`, the checked
+`@Bool` gives `m :: Maybe Bool` and `x :: Reading m`. GHC reuses
+the checked prefix when it checks the call. The prefix can mention
+a type variable from a signed rule binder or an earlier runtime index.
+An ordinary caller can write `keepReading @_ m x` when the type of
+`m` determines the wildcard. The call remains lazy in `m`.
+[Source rule](../examples/qualified-pi/VisibleRuleArguments.hs),
+[client](../examples/qualified-pi/VisibleRuleClient.hs)
+and [checks](../examples/qualified-pi/check-visible-rule-arguments.sh).
+
+The two `forall` groups and the lexical scope of explicit type
+applications follow the existing GHC RULES syntax. The discussion on
+proposal #480 considered how disabling implicit quantification should
+affect rule signatures. This experiment uses the current binder rules.
+[GHC User's Guide](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/rewrite_rules.html)
+and [proposal #480 review](https://github.com/ghc-proposals/ghc-proposals/pull/480#issuecomment-1010366717).
 
 A module can declare a rule for a retained function from another module.
 In `keep True (tagged n) = tagged n`, the rule module defines `tagged`.

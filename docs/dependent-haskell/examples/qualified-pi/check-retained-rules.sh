@@ -100,4 +100,5 @@ if [[ -n $old ]]; then
     cp ../provider/RetainedRules.hi .
     "$old" "${flags[@]}" -O2 -c RetainedRulesClient.hs
 fi
+bash "$src/check-visible-rule-arguments.sh" "$ghc" "$lib"
 bash "$src/check-imported-retained-rules.sh" "$ghc" "$lib" "$old"

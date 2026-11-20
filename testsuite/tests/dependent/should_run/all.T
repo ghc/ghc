@@ -327,6 +327,7 @@ test('NativeRetainedFunctionRules',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['../../../../docs/dependent-haskell/examples/qualified-pi/' + f for f in
                    ['RetainedRules.hs', 'RetainedRulesClient.hs', 'check-retained-rules.sh',
+                    'VisibleRuleArguments.hs', 'VisibleRuleClient.hs', 'check-visible-rule-arguments.sh',
                     'check-imported-retained-rules.sh']])],
      run_command, ['bash check-retained-rules.sh "{compiler}" "{libdir}"'])
 test('NativeSimplifier',
