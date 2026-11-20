@@ -3,9 +3,9 @@
 Upstream: [Unsaturated type families](https://ghc.serokell.io/dh#unsaturated-type-families).
 Serokell marks the proposal as accepted. The fork records matchability
 on ordinary arrows and forall binders. M166 lets a user pass an unapplied
-family at a known unmatchable arrow. Full inference, partial applications
-with remaining invisible binders, and ordinary-program compatibility
-remain open.
+family at a known unmatchable arrow. A receiver can also require the
+whole trailing invisible telescope. Shorter invisible prefixes, full
+inference and ordinary-program compatibility remain open.
 Use the [work queue](../ROADMAP.md#current-work-queue) for priorities.
 
 ## Matchability on a source arrow
@@ -246,6 +246,21 @@ The compiler still rejects inverse equality between two family heads
 and a family declaration whose argument is marked matchable. The
 compatibility failures above also need a policy for arrows in the
 *result* of a family equation.
+
+### Inferring a kind after supplying a visible argument
+
+`RunVisible (PickVisible 'True)` retains the invisible argument of
+`PickVisible`. The receiver already requires the full invisible
+telescope, so the kind checker can infer its result kind as `Type`.
+`RunVisible` supplies `@Bool`. Reduction starts at the family arity.
+[Proposal #242 on quantifiers](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#other-quantifiers).
+
+The test reads the retained application from the provider interface.
+An ordinary client proves the result is `Int`. Changing the equation
+invalidates that proof. An inverse equality and a receiver that requires
+`@M` both fail. The new check requires the same positive number of
+leading invisible binders. Ordinary inference and shorter telescopes
+still use the existing saturation path.
 
 ## Goal and dependencies
 
