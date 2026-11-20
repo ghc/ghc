@@ -22,6 +22,17 @@ viaGuardedAnnotated =
                 | otherwise -> buildAt b
     ) :: Bool -> Bool -> Payload PolyId
 
+viaJoint :: TwoWitnessBuilder
+viaJoint = \cases
+    False b | never -> error "unreachable joint guard"
+            | otherwise -> fromLeft b
+    True b -> fromRight b
+
+viaJointAnnotated :: TwoWitnessBuilder
+viaJointAnnotated = (\cases
+    True b -> fromRight b
+    False b -> fromLeft b) :: Bool -> Bool -> TwoCallbacks PolyId PolyMaybe
+
 main :: IO ()
 main = do
     let inputs = [(False, error "unused callback argument"), (True, True), (True, False)]
@@ -33,6 +44,12 @@ main = do
     checkGuard viaGuarded
     checkGuard viaGuardedAnnotated
     putStrLn "only the selected guard forced its argument"
+    let observeBoth :: TwoWitnessBuilder -> ((Int, Bool), (Int, Bool))
+        observeBoth builder = (observeTwo builder False True, observeTwo builder True False)
+        joint = observeBoth viaJoint
+    unless (joint == observeBoth viaJointAnnotated) $
+        fail "the annotated telescope changed the result"
+    print (joint, fst (observeTwo viaJoint True (error "forced the unused field")))
   where
     checkGuard builder = do
         result <- try @ErrorCall $ evaluate $

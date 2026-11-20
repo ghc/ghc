@@ -457,6 +457,12 @@ For example `\b -> (withWitness @Int (type PolyId) Proxy) id (use b)`
 reads the closed `PolyId` synonym from the producer interface.
 An ordinary rank-n consumer uses the selected callback at two types.
 A type introduced by a lambda pattern cannot supply the outer witness.
+Consecutive dot binders can take their witnesses from separate
+equations. The interface can declare one branch with
+`TwoCallbacks PolyId r` and another with `TwoCallbacks l PolyMaybe`.
+The corresponding direct fields fix both witnesses before the client
+checks the lambda. Each field needs an agreed closed polytype, and
+the ordinary checker still checks every equation.
 The witness erases before code generation. Agda's `@0` record fields
 use the same runtime distinction between a payload and erased evidence.
 [Source-free client](../../../testsuite/tests/dependent/should_run/implicit-existential-source/WitnessClient.hs)

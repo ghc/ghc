@@ -164,8 +164,13 @@ for rejection in escape:91028 duplicate:18872 wrongOperand:83865 wrongVisibleKin
 done
 line=$(grep -n '^    (withWitness @Int (type t) Proxy)' WitnessLambdaReject.hs | cut -d: -f1)
 grep -Eq "^WitnessLambdaReject.hs:$line:[0-9]+: error: \[GHC-46956\]" lambda-witness.log
-cp "$src/"{WitnessGuardedClient,WitnessGuardedReject}.hs .
-"$ghc" "${flags[@]}" -c WitnessGuardedClient.hs -main-is WitnessGuardedClient
+cp "$src/"{WitnessGuardedClient,WitnessGuardedReject,WitnessJointReject}.hs .
+"$ghc" "${flags[@]}" -ddump-ds -c WitnessGuardedClient.hs -main-is WitnessGuardedClient >guarded.core
+awk '/^WitnessGuardedClient.viaJoint$/ { body = 1 }
+     body && /^-- RHS size:/ { exit }
+     body { print }' guarded.core >joint.core
+grep -Fq 'pack WitnessSchema.PolyId' joint.core
+grep -Fq 'pack WitnessSchema.PolyMaybe' joint.core
 "$ghc" "${flags[@]}" WitnessGuardedClient.o ../provider/WitnessSchema.o \
     -main-is WitnessGuardedClient -o guarded-witness
 ./guarded-witness
@@ -178,6 +183,14 @@ for diagnostic in '[GHC-83865]' '[GHC-46956]' 'would escape its scope'; do
         cat guarded-witness.log >&2
         exit 1
     }
+done
+if "$ghc" "${flags[@]}" -c WitnessJointReject.hs >joint-reject.log 2>&1; then
+    echo "The joint witness check accepted a conflicting or local witness." >&2
+    exit 1
+fi
+for binding in 'never -> conflictingLeft b' '(Captured value) True -> fromCaptured value'; do
+    line=$(grep -Fn "$binding" WitnessJointReject.hs | cut -d: -f1)
+    grep -Eq "^WitnessJointReject.hs:$line:[0-9]+: error: \[GHC-91028\]" joint-reject.log
 done
 if "$ghc" "${flags[@]}" -c WitnessMismatch.hs >family-mismatch.log 2>&1; then
     echo "A higher-rank witness hid a conflicting family result." >&2

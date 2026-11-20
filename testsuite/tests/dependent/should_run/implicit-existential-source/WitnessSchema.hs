@@ -5,7 +5,9 @@ module WitnessSchema
     , ProjectionPair, projectionPair, projectionLazy
     , Payload(..), RankedBuilder, buildAt, configured, withWitness, observeBuilder, ranked
     , Flag(..), FlaggedBuilder, observeFlagged
-    , PolyId, GuardedBuilder, consumeAt, observeGuarded, never, different
+    , PolyId, PolyMaybe, GuardedBuilder, consumeAt, observeGuarded, never, different
+    , TwoCallbacks, TwoWitnessBuilder, fromLeft, fromRight, observeTwo
+    , ConfinedTwoWitnessBuilder, conflictingLeft, fromCaptured
     , CapturedMono(..), CapturedMonoBuilder
     , Captured(..), CapturedBuilder, LinearBuilder, buildLinear, buildTwice
     ) where
@@ -84,6 +86,28 @@ never = False
 
 different :: Bool -> Payload PolyMaybe
 different b = Payload @PolyMaybe Just (\f -> (maybe 0 id (f 13), maybe False id (f b)))
+
+data TwoCallbacks l r = FromLeft (Payload l) | FromRight (Payload r)
+
+type TwoWitnessBuilder = exists l. exists r. Bool -> Bool -> TwoCallbacks l r
+type ConfinedTwoWitnessBuilder = exists l. exists r. Captured -> Bool -> TwoCallbacks l r
+
+fromLeft :: forall r. Bool -> TwoCallbacks PolyId r
+fromLeft _ = FromLeft callback
+
+fromRight :: forall l. Bool -> TwoCallbacks l PolyMaybe
+fromRight b = FromRight (different b)
+
+conflictingLeft :: forall r. Bool -> TwoCallbacks PolyMaybe r
+conflictingLeft b = FromLeft (different b)
+
+fromCaptured :: forall a r. Payload (forall x. x -> a) -> TwoCallbacks (forall x. x -> a) r
+fromCaptured = FromLeft
+
+observeTwo :: TwoWitnessBuilder -> Bool -> Bool -> (Int, Bool)
+observeTwo builder choose b = case builder choose b of
+    FromLeft payload -> observePayload payload
+    FromRight payload -> observePayload payload
 
 data CapturedMono where
     CapturedMono :: Payload t -> CapturedMono
