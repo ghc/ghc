@@ -366,3 +366,11 @@ constructs the package. Consecutive witnesses are chosen in scope.
 Checking the final payload can still reject an incompatible family result.
 [Rank-n callback](../examples/erased-existentials/RankedPackage.hs)
 and [GenImpredicative in Figure 10](https://richarde.dev/papers/2021/exists/exists.pdf#page=22).
+
+The expected package type can also connect two fields of a tuple.
+For `exists t. (t, t -> (Int, Bool))`, a callback with argument type
+`forall a. a -> a` fixes the type of a bare `id` in the first field.
+A consumer can use the ordinary equation `observePair (f, k) = k f`.
+A witness that escapes the match produces a type error at its use.
+The diagnostic identifies the source location where GHC opened the package.
+[Tuple example](../examples/erased-existentials/RankedPackage.hs).

@@ -3163,6 +3163,11 @@ polytype. Given a payload of type `Callback (forall a. a -> a)`, the fork
 can infer the hidden type from that application. It allocates the witness
 variables in binder order and checks the final payload type. A closure in
 the package uses the hidden identity at both `Int` and `Bool`.
+The checked type also connects fields of an application. In
+`(id, atTwoTypes) :: exists t. (t, t -> (Int, Bool))`, the second field
+fixes the hidden type of the first. Figure 10 applies the substitution
+from Quick Look before it fills any remaining variables with monotypes.
+The fork uses that order for direct applications and nested arguments.
 Quick Look assumes an invariant arrow. With `DeepSubsumption`, GHC
 uses its usual subsumption check for a function payload.
 [Quick Look, §5.8](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf#page=15),

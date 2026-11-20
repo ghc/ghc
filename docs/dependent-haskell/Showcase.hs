@@ -974,6 +974,7 @@ main = do
     observe "map an ordinary observer over differently sized partitions" $
         PartitionChoices.partitionViews (VCons 7 (VCons 2 (VCons 9 VNil)))
     observe "use a hidden polymorphic identity at Int and Bool" RankedPackage.runCallback
+    observe "infer a hidden function type from its paired callback" RankedPackage.runPair
     observe "transport element equality under a hidden vector length"
         (ImplicitVector.cells (ImplicitVector.transportFiltered Refl passing))
     observe "zip a filtered vector with itself at its hidden length" $
