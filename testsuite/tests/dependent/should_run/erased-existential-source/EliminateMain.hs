@@ -1,0 +1,18 @@
+{-# LANGUAGE TypeApplications #-}
+module Main where
+
+import Control.Exception (SomeException, displayException, evaluate, try)
+import Data.List (isInfixOf)
+import Eliminate
+import Provider
+
+main :: IO ()
+main = do
+  print (inspect supplied, inspect synthesized, inspectBare kindOnly,
+         inspect kindAndSchema, inspect wildcardWitness)
+  print (ignoreBottom, ignoreCall, unpackLocal)
+  result <- try @SomeException (evaluate forceBottom)
+  case result of
+    Left ex | "packed payload forced" `isInfixOf` displayException ex ->
+      putStrLn "strict payload pattern forced the package"
+    _ -> fail "strict payload pattern did not demand the underlying payload"

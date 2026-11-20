@@ -304,3 +304,8 @@ test('NativePackageLength',
       extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs',
                    '../../../../docs/dependent-haskell/examples/packed-vector/PackedLength.hs'])],
      run_command, ['bash NativePackageLength.sh "{compiler}" "{libdir}"'])
+
+test('NativeExistentialSource',
+     [req_host_target_ghc, req_interp, req_rts_linker, only_ways(['normal']),
+      extra_files(['erased-existential-source'])],
+     run_command, ['bash NativeExistentialSource.sh "{compiler}" "{libdir}" ' + config.ghc_th_way_flags])
