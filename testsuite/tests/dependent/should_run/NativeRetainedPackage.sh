@@ -325,10 +325,35 @@ reject_family SHIFTED_WITNESS "    ShiftWitness ('Shift" '[GHC-83605]'
 cd "$out/provider"
 cp "$src/"{StoredVector,ConservedPartition}.hs .
 "${g[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core -c StoredVector.hs ConservedPartition.hs
+cat >VectorIdentity.hs <<'HS'
+{-# LANGUAGE CPP, ExperimentalDependentTypes, GADTs, PolyKinds #-}
+module VectorIdentity (vectorRefl, forwardVector) where
+
+import Data.Type.Equality ((:~:)(Refl))
+import PackedVecLibrary (Vec)
+
+vectorRefl :: foreach (xs :: Vec a n) -> xs :~: xs
+vectorRefl _ = Refl
+
+forwardVector :: foreach (xs :: Vec a n) -> xs :~: xs
+forwardVector xs = vectorRefl xs
+
+#ifdef WRONG_VECTOR
+wrongVector :: foreach (xs :: Vec a n) -> foreach (ys :: Vec a n) -> xs :~: ys
+wrongVector _ _ = Refl
+#endif
+HS
+"${g[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core -c VectorIdentity.hs
+if "${g[@]}" -ferror-spans -fforce-recomp -DWRONG_VECTOR -c VectorIdentity.hs >wrong-vector.log 2>&1 ||
+   ! grep -Fq 'VectorIdentity.hs:15:19-22: error: [GHC-83865]' wrong-vector.log; then
+    cat wrong-vector.log >&2
+    exit 1
+fi
 cp {StoredVector,ConservedPartition}.hi "$src/ListVectorClient.hs" "$out/projection/"
 cd "$out/projection"
 "${g[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core -c ListVectorClient.hs
 cp {StoredVector,ConservedPartition,ListVectorClient}.hi "$out/client/"
+cp "$out/provider/VectorIdentity.hi" "$out/client/"
 cd "$out/client"
 cat >ListVectorMain.hs <<'HS'
 {-# LANGUAGE DataKinds, ExplicitNamespaces, GADTs, NoExperimentalDependentTypes, RequiredTypeArguments #-}
@@ -339,6 +364,7 @@ import GHC.Sigma (Sigma(Pair))
 import ListVectorClient
 import PackedVecLibrary (Nat(..), Vec(..), splitAtVec, toList)
 import StoredVector (ListVector)
+import VectorIdentity (forwardVector, vectorRefl)
 observe :: ListVector Char -> (Int, String)
 observe = contents
 empty :: Split Int 'Z
@@ -346,6 +372,9 @@ empty = partitionVec (error "unused empty predicate") (VNil :: Vec Int 'Z)
 onlyKept, onlyDropped :: Split Int ('S 'Z)
 onlyKept = Pair (S Z) (Pair Z (VCons 7 VNil, error "unused dropped partition", error "unused sum proof"))
 onlyDropped = Pair Z (Pair (S Z) (error "unused kept partition", VCons 9 VNil, Refl))
+vectorProofs :: Vec Int n -> (Bool, Bool)
+vectorProofs xs =
+    (case vectorRefl xs of Refl -> True, case forwardVector xs of Refl -> True)
 main :: IO ()
 main = do
     print (observe (fromList ""), observe (fromList "ab"),
@@ -369,14 +398,16 @@ main = do
                                      (error "unused suffix" :: Vec Int ('S 'Z)))
         demand = (length (toList (fst zeroVector)), length (toList (snd zeroElement)),
                   length (toList (fst one)))
-    case (mixed, lazy, selected, split, demand) of
+    let proofs = (vectorProofs (VCons 7 VNil),
+                  vectorProofs (error "unused indexed vector" :: Vec Int 'Z))
+    case (mixed, lazy, selected, split, demand, proofs) of
         ((4, [3, 4, 1, 2]), 1, [(0, []), (0, []), (1, [7]), (1, [9])],
-         ([7], [9]), (0, 1, 1)) -> pure ()
+         ([7], [9]), (0, 1, 1), ((True, True), (True, True))) -> pure ()
         other -> fail (show other)
 HS
 "${g[@]}" -c ListVectorMain.hs
 "${g[@]}" ListVectorMain.o ../projection/ListVectorClient.o \
-    ../provider/{StoredVector,ConservedPartition,PackedVecLibrary}.o -o list-vector
+    ../provider/{StoredVector,ConservedPartition,PackedVecLibrary,VectorIdentity}.o -o list-vector
 ./list-vector
 cat >WrongPartition.hs <<'HS'
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}

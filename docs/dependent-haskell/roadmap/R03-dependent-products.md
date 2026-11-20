@@ -39,6 +39,12 @@ cutoff. The proof index keeps that function's identity. [Captured cutoff](R16-op
   The `withPair` callback can name that argument as the index of its
   payload. A function-valued witness can pass through this callback
   without being evaluated. [Example](../examples/packed-vector/DependentPair.hs).
+- Opaque binders at saturated lifted data types, including indexed GADTs.
+  `foreach (xs :: Vec a n) -> xs :~: xs` can return `Refl` without inspecting
+  `xs`. An ordinary client can use that proof through an interface.
+  Structural retained matching still requires a supported constructor schema.
+  See [Agda's dependent function types](https://agda.readthedocs.io/en/v2.8.0/language/function-types.html)
+  and the `NativeRetainedPackage` source regression.
 - Closed parameterized domains such as `[Bool]`, `Maybe Nat` and `Tree Bool`.
 - Retained workers and function fields through separate interfaces.
 - Nominal scalar-domain conversion with scoped source body solving at M58.
