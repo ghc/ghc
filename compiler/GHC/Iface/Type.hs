@@ -2951,7 +2951,7 @@ instance Binary IfaceMCoercion where
 data IfaceEvidence
   = DepFunCoEvidence | ConstructorCaseEvidence | RetainedSpecRuleEvidence
   | IndexAliasEvidence | ErasedExistentialEvidence | ScopedSigmaEvidence
-  | RetainedDefaultEvidence | ImplicitExistentialEvidence
+  | RetainedDefaultEvidence | ImplicitExistentialEvidence | ErasedUserRuleEvidence
   deriving (Bounded, Enum, Eq, Ord)
 
 -- | Requirements of an interface payload. See Note [Versioning retained evidence]

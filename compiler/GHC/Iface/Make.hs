@@ -489,9 +489,10 @@ coreRuleToIfaceRule rule@(Rule { ru_name = name, ru_fn = fn,
                 ifRuleKind   = kind,
                 ifRuleOrph   = orph }
   where
-    kind | not auto = IfaceUserRule
-         | hasNativeDependentProgram [] [rule] = IfaceRetainedAutoRule
-         | otherwise = IfaceAutoRule
+    kind | hasNativeDependentProgram [] [rule] =
+             if auto then IfaceRetainedAutoRule else IfaceErasedUserRule
+         | auto = IfaceAutoRule
+         | otherwise = IfaceUserRule
 
         -- For type args we must remove synonyms from the outermost
         -- level.  Reason: so that when we read it back in we'll

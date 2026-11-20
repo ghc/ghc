@@ -50,7 +50,7 @@ import GHC.Core.Unfold
 import GHC.Core.FVs
 import GHC.Core.Rules (canShareRetainedSpecRule)
 import GHC.Core.Dependent
-    ( hasExistentialExpr, hasNativeDependentExprRhs, hasNativeDependentProgram
+    ( hasExistentialExpr, hasNativeDependentExprRhs, hasNativeDependentProgram, supportsErasedUserRule
     , hasNativeDependentUnfolding, isRetainedVanillaDefaultMethod )
 import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.Tidy
@@ -460,8 +460,10 @@ tidyProgram opts (ModGuts { mg_module           = mod
                "Cannot export a compulsory unfolding that contains retained Core."
                (ppr bndr)
         _ -> pure ()
+    let heads = mkNameEnv [(idName b, b) | b <- bindersOfBinds trimmed_binds]
     forM_ trimmed_rules $ \ rule ->
-      when (not (isAutoRule rule) && hasNativeDependentProgram [] [rule]) $
+      when (not (isAutoRule rule) && hasNativeDependentProgram [] [rule]
+            && not (maybe False (`supportsErasedUserRule` rule) (lookupNameEnv heads (ru_fn rule)))) $
         throwGhcExceptionIO $ PprProgramError
           "Cannot export a rewrite rule that contains retained Core."
           (ppr rule)

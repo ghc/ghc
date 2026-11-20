@@ -75,7 +75,7 @@ import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.Dependent
   ( hasNativeDependentExprRhs, hasNativeDependentUnfolding
-  , isRetainedVanillaDefaultMethod )
+  , isRetainedVanillaDefaultMethod, supportsErasedUserRule )
 import GHC.Core.Predicate ( mkNomEqPred )
 import GHC.Core.Opt.OccurAnal ( occurAnalyseBndrsAndExpr )
 import GHC.Core.Ppr
@@ -1634,8 +1634,12 @@ tcIfaceRule iface_rule@IfaceRule{ifRuleName = name, ifActivation = act, ifRuleBn
                 do { args'  <- mapM tcIfaceExpr args
                    ; rhs'   <- tcIfaceExpr rhs
                    ; let native = any hasNativeDependentUnfolding (rhs' : args' ++ map varToCoreExpr bndrs')
-                   ; if kind == IfaceRetainedAutoRule
-                       then do
+                   ; let checked = case kind of
+                           IfaceErasedUserRule -> Just supportsErasedUserRule
+                           IfaceRetainedAutoRule -> Just canShareRetainedSpecRule
+                           _ -> Nothing
+                   ; case checked of
+                       Just accepts -> do
                          unless (nameModule_maybe fn == Just this_mod) $
                            failIfM (retained_doc $$ text "Expected a rule head defined in this module.")
                          thing <- tcIfaceGlobal fn
@@ -1643,15 +1647,15 @@ tcIfaceRule iface_rule@IfaceRule{ifRuleName = name, ifActivation = act, ifRuleBn
                            AnId id -> pure id
                            _ -> failIfM (retained_doc $$ text "Expected an identifier at the rule head.")
                          let rule = mk_rule this_mod bndrs' args' rhs'
-                         unless (native && canShareRetainedSpecRule fun rule) $
-                           failIfM (retained_doc $$ text "Unsupported retained specialization shape.")
+                         unless (native && accepts fun rule) $
+                           failIfM (retained_doc $$ text "Unsupported rule shape.")
                          dflags <- getDynFlags
                          case lintRule (initLintConfig dflags []) fun rule of
                            Nothing -> pure ()
                            Just errs -> failIfM (retained_doc $$ vcat (bagToList errs))
-                       else when native $
+                       Nothing -> when native $
                          failIfM (text "Native dependent interface rules are not supported:" <+> pprRuleName name)
-                   ; when (kind /= IfaceRetainedAutoRule) $ whenGOptM Opt_DoCoreLinting $ do
+                   ; when (isNothing checked) $ whenGOptM Opt_DoCoreLinting $ do
                       { dflags <- getDynFlags
                       ; (_, lcl_env) <- getEnvs
                       ; let in_scope :: [Var]
@@ -1671,7 +1675,9 @@ tcIfaceRule iface_rule@IfaceRule{ifRuleName = name, ifActivation = act, ifRuleBn
                    -- See (OUR1) in Note [OccInfo in unfoldings and rules]
         ; return (mk_rule this_mod bndrs_occ args' rhs_occ) }
   where
-    retained_doc = text "Invalid retained specialization rule:" <+> pprRuleName name
+    retained_doc = case kind of
+      IfaceErasedUserRule -> text "Invalid erased package rule:" <+> pprRuleName name
+      _ -> text "Invalid retained specialization rule:" <+> pprRuleName name
 
     mk_rule this_mod bndrs' args' rhs' =
       Rule { ru_name   = name

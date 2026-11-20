@@ -2,6 +2,8 @@
 module GHC.Core.Dependent (
     hasNativeDependentProgram,
     supportsNativeGentle,
+    supportsNativeRuleBinds,
+    supportsErasedUserRule,
     supportsQuickLookType,
     hasNativeDependentExpr,
     hasExistentialExpr,
@@ -27,9 +29,9 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon (TyCon, synTyConRhs_maybe)
 import GHC.Core.TyCon.Set
 import GHC.Types.Basic (DefMethSpec(VanillaDM))
-import GHC.Types.Id (idCoreRules, idType, realIdUnfolding)
+import GHC.Types.Id (idCoreRules, idType, isJoinId, isImplicitId, realIdUnfolding)
 import GHC.Types.Literal (literalType)
-import GHC.Types.Name (Name, isDefaultMethodOcc, isExternalName, nameOccName)
+import GHC.Types.Name (Name, isDefaultMethodOcc, isExternalName, nameModule_maybe, nameOccName)
 import GHC.Types.Tickish (CoreTickish, GenTickish (..))
 import GHC.Types.Var
 import GHC.Types.Unique.DSet (uniqDSetToList)
@@ -50,7 +52,7 @@ data ScanState = ScanState
     }
 
 -- | Select which retained forms the scan looks for.
-data ScanPurpose = DetectNative | CheckGentle | CheckQuickLook
+data ScanPurpose = DetectNative | CheckGentle | CheckUserRules | CheckErasedTypes
 
 -- | Select which bound-Id metadata a boundary can demand.
 data MetadataScan = AllMetadata | StableMetadata | NoMetadata
@@ -80,10 +82,40 @@ supportsNativeGentle :: CoreProgram -> Bool
 supportsNativeGentle binds =
     not (runScanFor CheckGentle AllMetadata (foldMap scanBind binds))
 
+-- | Check the bindings and local user rules for the retained optimizer.
+supportsNativeRuleBinds :: CoreProgram -> Bool
+supportsNativeRuleBinds binds =
+    not (runScanFor CheckUserRules AllMetadata (foldMap scanBind binds))
+
+-- | Can the producer and reader process this local source rule?
+-- See Note [User rules over erased package types].
+supportsErasedUserRule :: Id -> CoreRule -> Bool
+supportsErasedUserRule fun rule@Rule{ru_auto = False, ru_fn = name,
+                                     ru_origin = origin, ru_orphan = NotOrphan{}}
+  | varName fun == name
+  , maybe (isLocalId fun) (== origin) (nameModule_maybe name)
+  , not (isJoinId fun || isImplicitId fun)
+  = not (runScanFor CheckErasedTypes StableMetadata (scanAnnotations fun <> scanRule rule))
+supportsErasedUserRule _ _ = False
+
+{- Note [User rules over erased package types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A source rule can call functions whose argument or result is an erased
+package. For example, open (hide x) = x has ordinary applications on both
+sides. Check the head type, binder types, arguments, RHS and stable metadata.
+The match uses the existing application and variable rules. A lexical Pack
+or Unpack and a runtime-dependent index need separate matching support.
+
+A rule from the defining module can travel with its head across an interface.
+Give this rule its own wire tag. The reader resolves the head in the defining
+module, checks the same conditions and lints both sides before using it.
+The user supplies the semantic equality, as for an ordinary Haskell RULE.
+-}
+
 -- | Check whether Quick Look can traverse a type and its coercions.
 -- See Note [Retained types and Quick Look] in GHC.Tc.Gen.App.
 supportsQuickLookType :: Type -> Bool
-supportsQuickLookType = not . runScanFor CheckQuickLook NoMetadata . scanType
+supportsQuickLookType = not . runScanFor CheckErasedTypes NoMetadata . scanType
 
 -- | Detect lexical existential expressions before selecting an optimizer.
 -- Occurrences cannot introduce new expression forms through Id metadata.
@@ -156,7 +188,8 @@ gentleForm :: NativeScan -> NativeScan
 gentleForm scan = NativeScan $ do
     purpose <- gets scanPurpose
     case purpose of
-        CheckGentle -> runNativeScan scan
+        CheckGentle    -> runNativeScan scan
+        CheckUserRules -> runNativeScan scan
         _           -> pure True
 
 -- | Report an unsupported compiler operation when a scan finds a native type.
@@ -233,6 +266,7 @@ scanBinder v =
                         let rules = idCoreRules v
                         case purpose of
                             CheckGentle | not (null rules) -> pure True
+                            CheckUserRules | not (all (supportsErasedUserRule v) rules) -> pure True
                             _ -> runNativeScan (foldMap scanRule rules <> scanUnfolding (realIdUnfolding v))
             )
 
