@@ -39,6 +39,7 @@ import GHC.Builtin.Uniques( knownUniqueTupleName )
 
 import GHC.Utils.Panic
 import GHC.Utils.Binary as Binary
+import GHC.Utils.Misc (split)
 import GHC.Utils.Outputable
 
 import GHC.Types.Name
@@ -57,7 +58,8 @@ import GHC.Iface.Ext.Fields (readFieldWith, writeFieldWith, deleteField)
 import GHC.Iface.Syntax (IfaceDecl(..), IfaceFamTyConFlav(..), IfaceClassBody(..), IfaceAT(..), IfaceIdDetails(..))
 import GHC.Types.Basic (SourceTableOrigin(ExecutableSourceTable, FinalCoreSourceTable))
 import GHC.Iface.Type (IfaceType(..), IfaceBndr(..), IfaceAppArgs(..), IfaceTyCon(..), IfaceTyConBinder,
-                       getIfaceType, putIfaceType, ifaceTypeSharedByte, IfaceEvidenceVersion(..))
+                       getIfaceType, putIfaceType, ifaceTypeSharedByte,
+                       IfaceEvidence(..), IfaceEvidenceVersion)
 import GHC.Core.TyCon (isInferredTyConBinder)
 import GHC.Types.Var (VarBndr(..))
 
@@ -70,8 +72,9 @@ import Data.Array.IO
 import Data.Array.Unsafe
 import Data.Char
 import Data.IORef
-import Data.List (find, isSuffixOf)
+import Data.List (find, intercalate, stripPrefix)
 import Data.Map.Strict (Map)
+import qualified Data.Set as Set
 import Data.Word
 import qualified Data.ByteString as BS
 import System.IO (IOMode(WriteMode), withBinaryFile)
@@ -169,15 +172,13 @@ readBinIfaceHeaderVersion profile checkHiWay traceBinIFace hi_path = do
     check_ver  <- get bh
     let our_ver = show hiVersion
     wantedGot "Version" our_ver check_ver text
-    let evidence = fromMaybe NoRetainedEvidence $
-                   find (\v -> evidenceSuffix v `isSuffixOf` check_ver)
-                        [ CombinedScopedSigmaEvidence, ScopedSigmaEvidence
-                        , ErasedExistentialEvidence, IndexAliasEvidence
-                        , RetainedSpecRuleEvidence, ConstructorCaseEvidence, DepFunCoEvidence ]
-        version = take (length check_ver - length (evidenceSuffix evidence)) check_ver
-    unless (version `elem` [our_ver, enumCallbackIfaceVersion, finalCoreIfaceVersion,
-                            matchabilitySchemeIfaceVersion, openMatchabilityIfaceVersion]) $
-      errorOnMismatch "mismatched interface file versions" our_ver check_ver
+    let versions = [our_ver, enumCallbackIfaceVersion, finalCoreIfaceVersion,
+                    matchabilitySchemeIfaceVersion, openMatchabilityIfaceVersion]
+    evidence <- case listToMaybe (mapMaybe (parse_version check_ver) versions) of
+        Just requirements -> pure requirements
+        Nothing -> do
+            errorOnMismatch "mismatched interface file versions" our_ver check_ver
+            pure Set.empty
 
     check_tag <- get bh
     let tag = profileBuildTag profile
@@ -186,6 +187,8 @@ readBinIfaceHeaderVersion profile checkHiWay traceBinIFace hi_path = do
         errorOnMismatch "mismatched interface file profile tag" tag check_tag
 
     pure (evidence, bh)
+  where
+    parse_version actual base = stripPrefix base actual >>= parseEvidenceSuffix
 
 -- | Read an interface file.
 --
@@ -303,7 +306,7 @@ writeBinIface profile traceBinIface compressionLevel hi_path mod_iface = do
     writeHeader bh version
     payload <- tellBinWriter bh
     evidence <- putIfaceWithExtFields traceBinIface compressionLevel bh mod_iface
-    if evidence == NoRetainedEvidence
+    if Set.null evidence
       then writeBinMem bh hi_path
       else do
         header <- openBinMem 128
@@ -317,26 +320,52 @@ writeBinIface profile traceBinIface compressionLevel hi_path mod_iface = do
 
 -- | Header suffix required by the retained evidence in the payload.
 evidenceSuffix :: IfaceEvidenceVersion -> String
-evidenceSuffix NoRetainedEvidence       = ""
-evidenceSuffix DepFunCoEvidence         = "-retained-depfunco-v1"
-evidenceSuffix ConstructorCaseEvidence  = "-retained-constructor-case-v1"
-evidenceSuffix RetainedSpecRuleEvidence = "-retained-specialisation-rule-v1"
-evidenceSuffix IndexAliasEvidence       = "-retained-index-alias-v1"
-evidenceSuffix ErasedExistentialEvidence = "-erased-existentials-v1"
-evidenceSuffix ScopedSigmaEvidence      = "-r04-scoped-sigma-experiment-v1"
-evidenceSuffix CombinedScopedSigmaEvidence = "-scoped-sigma-combined-v1"
-
--- | Select a version that can read both parts of the interface.
--- See Note [Versioning retained evidence].
-combineEvidenceVersions :: IfaceEvidenceVersion -> IfaceEvidenceVersion -> IfaceEvidenceVersion
-combineEvidenceVersions a b
-  | newer == ScopedSigmaEvidence
-  , older `elem` [IndexAliasEvidence, ErasedExistentialEvidence]
-  = CombinedScopedSigmaEvidence
-  | otherwise = newer
+evidenceSuffix requirements
+  | needs RetainedDefaultEvidence
+  , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence
+  = featureSetPrefix ++ intercalate "+" [name | (name, feature) <- independentFeatures, needs feature]
+  | needs ScopedSigmaEvidence
+  , needs IndexAliasEvidence || needs ErasedExistentialEvidence
+  = combinedScopedSigmaSuffix
+  | otherwise = maybe "" legacyEvidenceSuffix (Set.lookupMax requirements)
   where
-    older = min a b
-    newer = max a b
+    needs feature = Set.member feature requirements
+
+legacyEvidenceSuffix :: IfaceEvidence -> String
+legacyEvidenceSuffix DepFunCoEvidence           = "-retained-depfunco-v1"
+legacyEvidenceSuffix ConstructorCaseEvidence   = "-retained-constructor-case-v1"
+legacyEvidenceSuffix RetainedSpecRuleEvidence  = "-retained-specialisation-rule-v1"
+legacyEvidenceSuffix IndexAliasEvidence        = "-retained-index-alias-v1"
+legacyEvidenceSuffix ErasedExistentialEvidence = "-erased-existentials-v1"
+legacyEvidenceSuffix ScopedSigmaEvidence       = "-r04-scoped-sigma-experiment-v1"
+legacyEvidenceSuffix RetainedDefaultEvidence   = "-retained-compulsory-default-v1"
+
+combinedScopedSigmaSuffix :: String
+combinedScopedSigmaSuffix = "-scoped-sigma-combined-v1"
+
+featureSetPrefix :: String
+featureSetPrefix = "-retained-features-v1-"
+
+-- | Keep the wire order independent of declaration and compression order.
+independentFeatures :: [(String, IfaceEvidence)]
+independentFeatures = [ ("default", RetainedDefaultEvidence)
+                      , ("erased", ErasedExistentialEvidence)
+                      , ("scoped", ScopedSigmaEvidence) ]
+
+-- | Accept the old suffixes and the canonical spelling of a new feature set.
+parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion
+parseEvidenceSuffix "" = Just Set.empty
+parseEvidenceSuffix suffix
+  | suffix == combinedScopedSigmaSuffix
+  = Just (Set.fromList [ScopedSigmaEvidence, ErasedExistentialEvidence])
+  | Just feature <- find ((== suffix) . legacyEvidenceSuffix) [minBound..maxBound]
+  = Just (Set.singleton feature)
+  | Just names <- stripPrefix featureSetPrefix suffix
+  , Just features <- traverse (`lookup` independentFeatures) (split '+' names)
+  , let requirements = Set.fromList features
+  , evidenceSuffix requirements == suffix
+  = Just requirements
+  | otherwise = Nothing
 
 {- Note [Versioning retained evidence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -378,6 +407,14 @@ specialization rules, constructor case evidence and dependent function
 coercions. It predates index aliases and erased existentials. An interface
 that also uses either feature needs a distinct header in both declaration
 orders. Each historical reader must reject the mixed payload early.
+
+A compulsory retained default includes the older index alias, rule and
+coercion forms. Erased existentials and scoped sums have independent
+requirements. Keep each requirement while writing. Use the existing
+suffixes when their readers support the complete payload. Otherwise encode
+the independent requirements in a canonical feature list. Check the list
+before reading the payload. Reject unknown, duplicate or out-of-order names.
+The cached payload keeps its requirements and writes the same suffix.
 -}
 
 
@@ -440,8 +477,8 @@ putIfaceWithExtFields traceBinIface compressionLevel bh mod_iface =
         []   -> pure (deleteField sourceTableField fields)
         locs -> writeFieldWith sourceTableField
                     (\h -> putWithUserData QuietBinIFace NormalCompression h locs) fields
-      found <- newIORef NoRetainedEvidence
-      let notify _ required = modifyIORef' found (combineEvidenceVersions required)
+      found <- newIORef Set.empty
+      let notify _ required = modifyIORef' found (Set.insert required)
           feature_bh = addWriterToUserData (mkWriter notify) bh
       forwardPutRel_ feature_bh (\_ -> put_ feature_bh fields') $
         putWithUserData traceBinIface compressionLevel feature_bh mod_iface

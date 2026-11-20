@@ -1075,6 +1075,7 @@ data UnfoldingSource
                     -- Only a few primop-like things have this property
                     -- (see "GHC.Types.Id.Make", calls to mkCompulsoryUnfolding).
                     -- Inline absolutely always, however boring the context.
+  | RetainedDefaultSrc -- A compulsory template for a checked retained default.
 
 isStableUserSource :: UnfoldingSource -> Bool
 isStableUserSource StableUserSrc = True
@@ -1086,10 +1087,12 @@ isStableSystemSource _               = False
 
 isCompulsorySource :: UnfoldingSource -> Bool
 isCompulsorySource CompulsorySrc = True
+isCompulsorySource RetainedDefaultSrc = True
 isCompulsorySource _             = False
 
 isStableSource :: UnfoldingSource -> Bool
 isStableSource CompulsorySrc   = True
+isStableSource RetainedDefaultSrc = True
 isStableSource StableSystemSrc = True
 isStableSource StableUserSrc   = True
 isStableSource VanillaSrc      = False
@@ -1097,12 +1100,14 @@ isStableSource VanillaSrc      = False
 instance NFData UnfoldingSource where
   rnf = \case
     CompulsorySrc -> ()
+    RetainedDefaultSrc -> ()
     StableUserSrc -> ()
     StableSystemSrc -> ()
     VanillaSrc -> ()
 
 instance Outputable UnfoldingSource where
   ppr CompulsorySrc     = text "Compulsory"
+  ppr RetainedDefaultSrc = text "CompulsoryRetainedDefault"
   ppr StableUserSrc     = text "StableUser"
   ppr StableSystemSrc   = text "StableSystem"
   ppr VanillaSrc        = text "<vanilla>"

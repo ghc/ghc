@@ -35,7 +35,7 @@ module GHC.Iface.Type (
 
         -- Binary utilities
         putIfaceType, getIfaceType, ifaceTypeSharedByte,
-        IfaceEvidenceVersion(..), requireIfaceEvidenceVersion,
+        IfaceEvidence(..), IfaceEvidenceVersion, requireIfaceEvidenceVersion,
         -- Equality testing
         isIfaceLiftedTypeKind,
 
@@ -2939,19 +2939,21 @@ instance Binary IfaceMCoercion where
                  return $ IfaceMCo a
          _ -> panic ("get IfaceMCoercion " ++ show tag)
 
--- | Minimum reader support for retained evidence in a serialized payload.
--- See Note [Versioning retained evidence]
+-- | A wire requirement recorded when the writer emits a retained form.
+data IfaceEvidence
+  = DepFunCoEvidence | ConstructorCaseEvidence | RetainedSpecRuleEvidence
+  | IndexAliasEvidence | ErasedExistentialEvidence | ScopedSigmaEvidence
+  | RetainedDefaultEvidence
+  deriving (Bounded, Enum, Eq, Ord)
+
+-- | Requirements of an interface payload. See Note [Versioning retained evidence]
 -- in GHC.Iface.Binary.
-data IfaceEvidenceVersion
-  = NoRetainedEvidence | DepFunCoEvidence | ConstructorCaseEvidence | RetainedSpecRuleEvidence
-  | IndexAliasEvidence | ErasedExistentialEvidence
-  | ScopedSigmaEvidence | CombinedScopedSigmaEvidence
-  deriving (Eq, Ord)
+type IfaceEvidenceVersion = Set.Set IfaceEvidence
 
 -- | Record a feature only while writing the full interface.
-requireIfaceEvidenceVersion :: WriteBinHandle -> IfaceEvidenceVersion -> IO ()
+requireIfaceEvidenceVersion :: WriteBinHandle -> IfaceEvidence -> IO ()
 requireIfaceEvidenceVersion bh required =
-  case findOptionalUserDataWriter (Proxy :: Proxy IfaceEvidenceVersion) bh of
+  case findOptionalUserDataWriter (Proxy :: Proxy IfaceEvidence) bh of
     Just notify -> putEntry notify bh required
     Nothing -> pure () -- Fingerprinting does not write a version header.
 

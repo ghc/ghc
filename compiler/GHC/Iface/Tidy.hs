@@ -51,7 +51,7 @@ import GHC.Core.FVs
 import GHC.Core.Rules (canShareRetainedSpecRule)
 import GHC.Core.Dependent
     ( hasNativeDependentExprRhs, hasNativeDependentProgram
-    , hasNativeDependentUnfolding )
+    , hasNativeDependentUnfolding, isRetainedVanillaDefaultMethod )
 import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.Tidy
 import GHC.Core.Seq         ( seqBinds )
@@ -377,6 +377,25 @@ three places this is actioned:
   load a compulsory unfolding
 -}
 
+{- Note [Compulsory retained defaults]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An instance can inherit a vanilla method whose selector has a retained type.
+The type of the generated default Id must equal the selector type. Check
+the default Name in the declaring class's method table. The default Id type
+selects the retained pipeline before its template can be expanded.
+
+GHC must expand the default's template even when it ignores interface
+pragmas or uses restricted SimpleOpt. See Note [INLINE and default methods]
+in GHC.Tc.TyCl.Instance. Mark this template RetainedDefaultSrc. Tidy
+checks the local declaration. IfaceToCore checks the same class association,
+type and Core scope before a client uses the template.
+
+The marker requires a reader that can expand the default in restricted
+SimpleOpt. The interface writer selects that version only for interfaces
+that store the marker. Keep the existing checks for other compulsory
+unfoldings.
+-}
+
 data UnfoldingExposure
   = ExposeNone -- ^ Don't expose unfoldings
   | ExposeSome -- ^ Expose mandatory unfoldings and those meeting inlining thresholds.
@@ -429,6 +448,12 @@ tidyProgram opts (ModGuts { mg_module           = mod
     forM_ (bindersOfBinds trimmed_binds) $ \ bndr ->
       case realIdUnfolding bndr of
         CoreUnfolding { uf_src = src, uf_tmpl = rhs }
+          | RetainedDefaultSrc <- src
+          -> unless (nameModule_maybe (idName bndr) == Just mod &&
+                     isRetainedVanillaDefaultMethod (idName bndr) (idType bndr)) $
+               throwGhcExceptionIO $ PprProgramError
+                 "Invalid compulsory retained default method."
+                 (ppr bndr)
           | isCompulsorySource src
           , hasNativeDependentExprRhs (Type (idType bndr)) || hasNativeDependentUnfolding rhs
           -> throwGhcExceptionIO $ PprProgramError

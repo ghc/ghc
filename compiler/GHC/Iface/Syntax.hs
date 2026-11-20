@@ -2954,6 +2954,9 @@ instance Binary IfaceInfoItem where
 
 instance Binary IfaceUnfolding where
     put_ bh (IfCoreUnfold s c g e) = do
+        case s of
+          RetainedDefaultSrc -> requireIfaceEvidenceVersion bh RetainedDefaultEvidence
+          _ -> pure ()
         putByte bh 0
         put_ bh s
         putUnfoldingCache bh c
