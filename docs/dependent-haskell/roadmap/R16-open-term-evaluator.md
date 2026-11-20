@@ -1442,8 +1442,18 @@ of the same length. [Runtime proof and optimization](../REFERENCES.md#empty-appe
 
 An ordinary client imports the proof and reads the head of an appended
 vector with a suspended tail. The proof and its caller disable rewrite
-rules locally. This equation covers the empty branch. Agda's vector
-append also uses the cons equation for the recursive step in
+rules locally.
+
+`appendCons` exposes a second checked equation. It preserves the head
+and suspends the recursive call on the exact left tail and right operand.
+Its two `Proxy` parameters identify the independent input indices. The
+result length does not determine them. Compiled Core must rebuild a
+lazy constructor and make the same call before and after optimization.
+The regression rejects an altered head or right operand and checks
+that observing the result's outer constructor leaves the input head,
+tail, and right operand suspended.
+
+Agda uses the same cons equation for the recursive step in
 `splitAt`'s reconstruction proof.
 [Proof](../examples/packed-vector/OpenVectorAppend.hs),
 [ordinary caller](../examples/packed-vector/OrdinaryOpenVectorAppend.hs),

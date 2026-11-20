@@ -1,10 +1,11 @@
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, TypeApplications #-}
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
 
-module OrdinaryOpenVectorAppend (observeAppendEmpty, appendContents) where
+module OrdinaryOpenVectorAppend (observeAppendEmpty, appendContents, observeAppendCons) where
 
+import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
-import OpenVectorAppend (appendEmpty, appendEmptyAt)
+import OpenVectorAppend (appendCons, appendEmpty, appendEmptyAt)
 import qualified PackedVecLibrary as P
 
 -- | Use the imported proof and read the head with a suspended tail.
@@ -23,3 +24,9 @@ observeAppendEmpty =
 appendContents :: P.Vec a n -> [a]
 appendContents xs = case appendEmptyAt xs of
     Refl -> P.toList (P.appendVec P.VNil xs)
+
+-- | Use the imported cons equation at two different input lengths.
+observeAppendCons :: String
+observeAppendCons =
+    show (appendCons @Bool @'P.Z @('P.S 'P.Z) @'True
+                     (Proxy @'P.VNil) (Proxy @('P.VCons 'False 'P.VNil)))
