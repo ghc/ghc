@@ -186,6 +186,58 @@ Formation checks run before inference can add a missing constraint. General kind
 in aliases or visible type arguments, generated newtype or via equations,
 and partial applications also need separate formation rules.
 
+### Associated newtype representation
+
+The review of #177 asks where an associated newtype could store the
+dictionary for its parent class. The private compiler applies the domain
+check to associated type synonyms. The following class contains both a
+type synonym family and a data family.
+
+```haskell
+class Collect c where
+    type Elem c
+    data Wrapped c
+
+instance Show a => Collect [a] where
+    type Elem [a] = a
+    newtype Wrapped [a] = Wrap a
+```
+
+An ordinary client imported the stripped interface with the constructor
+in scope. Stock GHC 9.14.1 and the private compiler both accepted
+`Coercion :: Coercion (Wrapped [a]) a`. The client wrapped and called
+a function at `-O0` and `-O2`. On both compilers, matching `Wrap x`
+and calling `show x` still requires `Show a` in the client signature.
+Stock GHC accepts `Refl :: Elem [a] :~: a` without that constraint.
+The private compiler reports GHC-39999 at `Elem` when the provider
+opts in. Extending domain evidence to pattern matches on associated
+data instances would need a separate representation decision.
+[Review question](https://github.com/ghc-proposals/ghc-proposals/pull/177#issuecomment-549766671).
+
+### Associated applications in type declaration bodies
+
+An ordinary provider allows both `type S = Elem [Int]` and an equation
+`F () = Elem [Int]`. A separately compiled term can use either wrapper
+to prove equality with `Int`, even though there is no `Allowed Int`
+instance. With a marked provider, GHC rejects both right-hand sides
+before the wrappers can be exported. Switching an existing provider to marked mode
+also rechecks the wrappers. The check still rejects a right-hand side
+when the evidence is available, for example for `Elem [Bool]`. The
+current experiment checks evidence in term and constructor signatures.
+
+Draft #177 §3.3 gives a forwarding equation `S a = T a` with a
+standalone kind signature `forall a -> C a => Type`. Both stock GHC
+9.14.1 and the fork reject that kind signature and a qualified family
+result kind with GHC-01259. Accepted proposal #547 §1.2 disallows
+constraints in both positions. The 2019 review also asks how the draft
+accounts for #259's restriction on associated kind signatures. A qualifier
+in an ordinary term type
+synonym is legal in stock GHC, and this experiment still rejects a
+marked family in that synonym's right-hand side.
+[Draft #177](https://github.com/typedrat/ghc-proposals/blob/faf45d2290f06696627b1f5d60ce92741ae9e38b/proposals/0000-simple-constrained-type-families.rst)
+[Eisenberg's 2019 review](https://github.com/ghc-proposals/ghc-proposals/pull/177#issuecomment-549766671),
+and [proposal #547](https://ghc-proposals.readthedocs.io/en/latest/proposals/0547-no-kind-equalities.html#proposed-change-specification).
+
 ### Domain evidence and termination
 
 An opted-in provider with `UndecidableInstances` can define
