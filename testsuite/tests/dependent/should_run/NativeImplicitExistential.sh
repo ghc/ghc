@@ -69,7 +69,8 @@ grep -Eq 'unpack f' call-head.log
 
 bad_sources=(UnsafeHead SameWitness Escape LetEscape BarClient ModesAreDistinct
              BarPack DotForall DotConstraint LinearDotDuplicate LambdaEscape
-             IntroEscape Shadowed HiddenName BarLambda HeadEscape HeadSame HeadDuplicate)
+             IntroEscape Shadowed HiddenName BarLambda HeadEscape HeadSame HeadDuplicate
+             EscapePackage)
 for bad in "${bad_sources[@]}"; do
     cp "$src/$bad.hs" .
     if "$ghc" "${flags[@]}" -c "$bad.hs" >"$bad.log" 2>&1; then
@@ -78,7 +79,7 @@ for bad in "${bad_sources[@]}"; do
     fi
     case "$bad" in
         UnsafeHead|SameWitness|Escape|LetEscape|LambdaEscape|Shadowed|HeadEscape|HeadSame) code=25897;;
-        BarClient|ModesAreDistinct|BarLambda) code=83865;;
+        BarClient|ModesAreDistinct|BarLambda|EscapePackage) code=83865;;
         BarPack) code=27432;;
         DotForall|DotConstraint) code=91510;;
         LinearDotDuplicate|HeadDuplicate) code=18872;;

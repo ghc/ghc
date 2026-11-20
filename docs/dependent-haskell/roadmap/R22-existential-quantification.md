@@ -253,3 +253,10 @@ Each call opens a fresh witness. The source test rejects a call that
 returns its witness at a caller-chosen length. It also rejects an
 observer that equates two independent calls. A direct or nested call
 can consume a linear package once.
+
+An unsigned local binding can keep the directly declared dot result of
+an observer. For example, `let selected = filterVec p (builder x)`
+retains the filter's package type. Its result metadata is established
+outside the opening. The observer's argument-only length can still
+match the witness inside. The checker rejects an observer whose
+result would keep that opened length as a free index.

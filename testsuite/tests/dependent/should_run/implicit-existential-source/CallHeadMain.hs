@@ -2,7 +2,7 @@
 
 module CallHeadMain where
 
-import Filter (Hidden, toList)
+import Filter (Hidden, filterVec, toList)
 import Functions
 import Vector
 
@@ -40,6 +40,11 @@ linearNested f a = move (f a)
     move :: Vec n a %1 -> Vec n a
     move xs = xs
 
+runBuilder :: Function a -> (a -> Bool) -> a -> [a]
+runBuilder builder p x =
+    let selected = filterVec p (builder x)
+    in toList selected
+
 main :: IO ()
 main = do
     print (toList (repack one True), immediate empty (error "used the empty argument" :: Bool))
@@ -47,3 +52,5 @@ main = do
     print (undemanded (error "forced the package" :: Function Bool) True, undemanded bodyTrap True)
     print (toList (linear one True), toList (linearNested empty False))
     print (toList (repackOne False))
+    print (runBuilder one odd (7 :: Int), runBuilder one odd 2,
+           runBuilder empty odd (error "empty forced its argument" :: Int))

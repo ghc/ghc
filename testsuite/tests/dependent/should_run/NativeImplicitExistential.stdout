@@ -11,3 +11,4 @@ forcing the result entered the builder body
 (True,True)
 ([True],[])
 [False]
+([7],[],[])
