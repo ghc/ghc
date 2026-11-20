@@ -7,10 +7,11 @@ export LC_ALL=C
 # supplies the old boot interfaces for the original GHC.Internal.Err source.
 upgrade=
 case ${1:-} in
-    --family-kinds|--family-results|--packed-projections|--abstract-witness) upgrade=$1; shift ;;
+    --family-kinds|--family-results|--family-stages|--packed-projections|--abstract-witness) upgrade=$1; shift ;;
 esac
 if (( $# < 4 || $# > 5 )) || { [[ $upgrade == --family-* || $upgrade == --abstract-witness ]] && (( $# != 4 )); }; then
     echo "Usage: $0 OLD_GHC OLD_LIB NEW_GHC NEW_LIB [OLD_GHC_INTERNAL_BUILD]" >&2
+    echo "       $0 --family-stages OLD_GHC OLD_LIB NEW_GHC NEW_LIB" >&2
     echo "       $0 --family-kinds M177_GHC M177_LIB NEW_GHC NEW_LIB" >&2
     echo "       $0 --family-results INTERMEDIATE_GHC INTERMEDIATE_LIB NEW_GHC NEW_LIB" >&2
     echo "       $0 --packed-projections OLD_GHC OLD_LIB NEW_GHC NEW_LIB [NEW_GHC_PKG]" >&2
@@ -258,6 +259,90 @@ HS
     if grep -F 'Compiling Unrelated' upgrade.log; then exit 1; fi
     "${new[@]}" "${args[@]}" >warm.log 2>&1
     if grep -F 'Compiling ' warm.log; then exit 1; fi
+    exit 0
+fi
+
+if [[ $upgrade == --family-stages ]]; then
+    flags=(-O0 -v1 -fomit-interface-pragmas -fno-write-if-simplified-core -i -i. "${sanity[@]}")
+    cd "$work/home"
+    cat >KindOwner.hs <<'HS'
+{-# LANGUAGE DataKinds, TypeFamilies #-}
+module KindOwner (KindOf) where
+import Data.Kind (Type)
+type family KindOf (b :: Bool) :: Type
+type instance KindOf True = Type -> Type
+HS
+    printf '%s\n' 'module Unrelated where' 'answer :: Int' 'answer = 42' >Unrelated.hs
+    "${old[@]}" "${flags[@]}" --make -no-link KindOwner.hs Unrelated.hs
+    stat -c '%y %n' Unrelated.{hi,o} >before.time
+    cat >Client.hs <<'HS'
+{-# LANGUAGE DataKinds, PolyKinds, TypeFamilies #-}
+module Client where
+import KindOwner
+type family Interpret (b :: Bool) :: KindOf b
+type instance Interpret True = Maybe
+value :: Interpret True Bool
+value = Just True
+HS
+    "${new[@]}" "${flags[@]}" --make -no-link Client.hs Unrelated.hs >first.log 2>&1 || { cat first.log; exit 1; }
+    grep -E 'Compiling KindOwner .*\[Compiler now infers matchability across family declaration groups\]' first.log
+    stat -c '%y %n' Unrelated.{hi,o} >after.time
+    cmp before.time after.time
+    "${new[@]}" "${flags[@]}" --make -no-link Client.hs Unrelated.hs >second.log 2>&1
+    if grep -F 'Compiling ' second.log; then exit 1; fi
+
+    # Keep the installed owner fixed while the default in a client changes.
+    mkdir "$work/provider"
+    cd "$work/provider"
+    pkg=("$(dirname "$old_ghc")/ghc-pkg" --global-package-db "$old_lib/package.conf.d")
+    unit=family-upgrade-0.1
+    base=$("${pkg[@]}" field base id --simple-output)
+    "${pkg[@]}" init "$work/package-db"
+    cat >Owner.hs <<'HS'
+{-# LANGUAGE DataKinds, GADTs, PolyKinds, TypeFamilies #-}
+module Owner (Code(AtBase), F) where
+import Data.Kind (Type)
+type family K (b :: Bool) :: Type
+type instance K False = Type
+type instance K True = Type -> Type
+data Code :: Bool -> Type where
+  AtBase :: Code False
+type family F (a :: Code b) :: K b
+HS
+    printf '%s\n' 'module Facade (module Owner) where' 'import Owner' >Facade.hs
+    "${old[@]}" "${flags[@]}" -this-unit-id "$unit" --make -no-link Facade.hs
+    cat >provider.conf <<CONF
+name: family-upgrade
+version: 0.1
+id: $unit
+key: $unit
+exposed: True
+exposed-modules: Facade
+hidden-modules: Owner
+import-dirs: $PWD
+depends: $base
+CONF
+    "${pkg[@]}" --package-db "$work/package-db" register provider.conf
+    sha256sum Owner.hi Facade.hi >original.sha
+    cd "$work/binary"
+    cat >Use.hs <<'HS'
+{-# LANGUAGE DataKinds #-}
+module Use where
+import Facade
+get :: F AtBase
+get = undefined
+HS
+    flags+=(-package-db "$work/package-db" -package-id "$unit")
+    abi() { "${new[@]}" --show-iface Use.hi | grep -F '  ABI hash:'; }
+    "${old[@]}" "${flags[@]}" -c Use.hs
+    abi >old.abi
+    "${new[@]}" "${flags[@]}" -c Use.hs
+    abi >incremental.abi
+    "${new[@]}" "${flags[@]}" -fforce-recomp -c Use.hs
+    abi >clean.abi
+    cmp incremental.abi clean.abi
+    if cmp -s old.abi clean.abi; then exit 1; fi
+    (cd "$work/provider" && sha256sum -c --quiet original.sha)
     exit 0
 fi
 
