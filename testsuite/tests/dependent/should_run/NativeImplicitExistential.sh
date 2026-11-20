@@ -49,7 +49,7 @@ mv -- Vector.hs Filter.hs LetFilter.hs BarProvider.hs RetainedDot.hs Builder.hs 
 
 cd ../client
 cp ../provider/{Vector,Filter,LetFilter,BarProvider,RetainedDot,Builder,Functions}.hi .
-cp "$src/"{Main,AuditMain,Opening,Identity,RetainedClient,LinearDot,LambdaMain,CallHeadMain,WitnessMain}.hs .
+cp "$src/"{Main,AuditMain,Opening,Identity,RetainedClient,LinearDot,LambdaMain,CallHeadMain,WitnessMain,CaseMain}.hs .
 "$ghc" "${flags[@]}" -c Main.hs Identity.hs Opening.hs LinearDot.hs
 "$ghc" "${flags[@]}" -c AuditMain.hs -main-is AuditMain
 "$ghc" "${flags[@]}" Main.o ../provider/{Vector,Filter}.o -o run
@@ -65,17 +65,22 @@ grep -Eq 'unpack f' call-head.log
     -c WitnessMain.hs -main-is WitnessMain >witness.log
 grep -Eq 'firstPair @m unpacked unpacked' witness.log
 "$ghc" "${flags[@]}" WitnessMain.o ../provider/{Vector,Filter}.o -o witness -main-is WitnessMain
+"$ghc" "${flags[@]}" -ddump-ds -fwrite-ide-info -c CaseMain.hs -main-is CaseMain >case.log
+test -s CaseMain.hie
+grep -Eq 'unpack .*selection' case.log
+"$ghc" "${flags[@]}" CaseMain.o ../provider/{Vector,Filter}.o -o payload-case -main-is CaseMain
 ./run
 ./audit
 ./retained
 ./lambda
 ./call-head
 ./witness
+./payload-case
 
 bad_sources=(UnsafeHead SameWitness Escape LetEscape BarClient ModesAreDistinct
              BarPack DotForall DotConstraint LinearDotDuplicate LambdaEscape
              IntroEscape Shadowed HiddenName BarLambda HeadEscape HeadSame HeadDuplicate
-             EscapePackage)
+             EscapePackage CaseEscape CaseLinearDuplicate BarCase)
 for bad in "${bad_sources[@]}"; do
     cp "$src/$bad.hs" .
     if "$ghc" "${flags[@]}" -c "$bad.hs" >"$bad.log" 2>&1; then
@@ -83,11 +88,11 @@ for bad in "${bad_sources[@]}"; do
         exit 1
     fi
     case "$bad" in
-        UnsafeHead|SameWitness|Escape|LetEscape|LambdaEscape|Shadowed|HeadEscape|HeadSame) code=25897;;
-        BarClient|ModesAreDistinct|BarLambda|EscapePackage) code=83865;;
+        UnsafeHead|SameWitness|Escape|LetEscape|LambdaEscape|Shadowed|HeadEscape|HeadSame|CaseEscape) code=25897;;
+        BarClient|ModesAreDistinct|BarLambda|EscapePackage|BarCase) code=83865;;
         BarPack) code=27432;;
         DotForall|DotConstraint) code=91510;;
-        LinearDotDuplicate|HeadDuplicate) code=18872;;
+        LinearDotDuplicate|HeadDuplicate|CaseLinearDuplicate) code=18872;;
         IntroEscape) code=46956;;
         HiddenName) code=76037;;
     esac

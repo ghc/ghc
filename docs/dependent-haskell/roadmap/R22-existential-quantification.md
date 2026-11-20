@@ -277,3 +277,21 @@ witness at each use. Witness sharing does not allow the witness to
 escape its opening or permit duplicate linear use. This is the
 lexical-variable fragment of the paper's IExistCore projection rule.
 [An Existential Crisis Resolved, section 6.1](https://richarde.dev/papers/2021/exists/exists.pdf).
+
+
+### Constructor cases on the payload
+
+An ordinary client can match a dot package with a constructor of its
+declared data payload. For example, match the result of `filterVec`
+with `Nil` and `Cons x _`. The case checker opens the scrutinee once
+and checks all alternatives under one fresh witness. A GADT
+constructor can refine that witness in its alternative. The result
+type stays in the enclosing scope.
+
+The ordinary match determines demand. A constructor match evaluates
+a bottom package, and matching its first cell can leave a bottom
+tail unevaluated. A variable, wildcard or package-typed pattern
+synonym alone continues to match the package. A case that consumes
+a linear package still checks the usage of its fields. Direct
+constructor matching applies to the dot mode. The bar mode keeps
+its explicit Pack alternative.

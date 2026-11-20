@@ -15,3 +15,7 @@ forcing the result entered the builder body
 ([7],[],[])
 (Just (7,7),Nothing,Just (7,7))
 (True,[7])
+(Just 7,Nothing,Just 9)
+([7],[7],[7])
+(True,True)
+constructor pattern demanded the package
