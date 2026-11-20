@@ -2,6 +2,7 @@
 module NestedEscape where
 
 import Data.Proxy (Proxy)
+import Nested (HiddenProduct, Product(..))
 import NestedSignature
 import Vector
 
@@ -54,3 +55,12 @@ inferredFunction p =
   where
     left :: (Vec l a, Vec r a) -> () -> Vec l a
     left (ls, _) () = ls
+
+firstEquation :: HiddenProduct a -> Vec n a
+firstEquation (Product yes _) = yes
+
+distinctEquations :: HiddenProduct a -> HiddenProduct a -> Bool
+distinctEquations (Product yes _) (Product other _) = sameLength yes other
+  where
+    sameLength :: Vec n a -> Vec n a -> Bool
+    sameLength _ _ = True

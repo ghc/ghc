@@ -25,6 +25,11 @@ constructor pattern demanded the package
 (True,True)
 ([7],[2])
 observing the payload demanded the pair
+(([7,9],[2]),([9],[]))
+([7,9],[True])
+[7]
+(False,False,())
+a constructor equation demanded the rows
 (True,([7],[2,4]),([],[9]),([7],[2,4]))
 True
 (7,11)

@@ -1,10 +1,11 @@
-{-# LANGUAGE DataKinds, GADTs, PolyKinds #-}
+{-# LANGUAGE DataKinds, GADTs, LinearTypes, PolyKinds #-}
 module NestedMain where
 
 import Control.Exception
 import Data.Proxy (Proxy(..))
 import Nested
 import NestedSignature
+import StrictMatch (strictOrder)
 import Vector
 
 list :: Vec n a -> [a]
@@ -31,6 +32,21 @@ built a = lists (buildPair a)
 observeProduct :: HiddenProduct a -> ([a], [a])
 observeProduct p = case p of
     Product ls rs -> (list ls, list rs)
+
+observeEquation :: HiddenProduct a -> ([a], [a])
+observeEquation (Product ls rs)
+    | null (list ls) = (list rs, [])
+observeEquation (Product ls rs) = (list ls, list rs)
+
+observeIndependent :: HiddenProduct Int -> HiddenProduct Bool -> ([Int], [Bool])
+observeIndependent (Product ls _) (Product _ rs) = (list ls, list rs)
+
+ordered :: Bool -> HiddenProduct Int -> Bool
+ordered True (Product _ _) = True
+ordered False _ = False
+
+consume :: HiddenUnit %1 -> ()
+consume (Unit u) = u
 
 ignore :: PackedPair Int -> Bool
 ignore p = unused p
@@ -66,3 +82,15 @@ main = do
         Left e | "forced the pair" == takeWhile (/= '\n') (displayException e) ->
             putStrLn "observing the payload demanded the pair"
         _ -> error "the observer missed pair demand"
+
+    let rows = productPair (Cons (7 :: Int) (Cons 9 Nil)) (Cons 2 Nil)
+        missing = error "forced the rows" :: HiddenProduct Int
+    print (observeEquation rows, observeEquation (productPair Nil (Cons (9 :: Int) Nil)))
+    print (observeIndependent rows (productPair Nil (Cons True Nil)))
+    print (take 1 (fst (observeEquation (productPair (Cons (7 :: Int) (error "forced the unseen row tail")) Nil))))
+    print (ordered False missing, strictOrder False missing, consume (hiddenUnit ()))
+    demanded <- try (evaluate (ordered True missing)) :: IO (Either ErrorCall Bool)
+    case demanded of
+        Left e | "forced the rows" == takeWhile (/= '\n') (displayException e) ->
+            putStrLn "a constructor equation demanded the rows"
+        _ -> error "the equation missed row demand"

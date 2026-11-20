@@ -2,6 +2,7 @@
 module Nested
   ( packPair, partitionPair, localPartition, buildPair, roundTrip, hiddenKind
   , HiddenProduct, productPair, Product(..)
+  , HiddenUnit, hiddenUnit, Unit(..)
   ) where
 
 import Data.Proxy (Proxy(..))
@@ -46,3 +47,11 @@ type HiddenProduct a = exists (n :: Nat). exists (m :: Nat). Product a n m
 
 productPair :: Vec n a -> Vec m a -> HiddenProduct a
 productPair ls rs = Product ls rs
+
+data Unit n where
+    Unit :: () %1 -> Unit 'Z
+
+type HiddenUnit = exists (n :: Nat). Unit n
+
+hiddenUnit :: () %1 -> HiddenUnit
+hiddenUnit u = Unit u

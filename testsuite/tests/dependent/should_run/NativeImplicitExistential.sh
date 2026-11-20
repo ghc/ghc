@@ -56,7 +56,7 @@ mv -- Vector.hs Filter.hs LetFilter.hs BarProvider.hs RetainedDot.hs Builder.hs 
 
 cd ../client
 cp ../provider/{Vector,Filter,LetFilter,BarProvider,RetainedDot,Builder,Functions,NestedSignature,Nested,ForwardProducer,ForwardSchemas}.hi .
-cp "$src/"{Main,AuditMain,Opening,Identity,RetainedClient,LinearDot,LambdaMain,CallHeadMain,WitnessMain,CaseMain,NestedMain,ForwardMain}.hs .
+cp "$src/"{Main,AuditMain,Opening,Identity,RetainedClient,LinearDot,LambdaMain,CallHeadMain,WitnessMain,CaseMain,NestedMain,StrictMatch,ForwardMain}.hs .
 "$ghc" "${flags[@]}" -c Main.hs Identity.hs Opening.hs LinearDot.hs
 "$ghc" "${flags[@]}" -c AuditMain.hs -main-is AuditMain
 "$ghc" "${flags[@]}" Main.o ../provider/{Vector,Filter}.o -o run
@@ -76,9 +76,12 @@ grep -Eq 'firstPair @m unpacked unpacked' witness.log
 test -s CaseMain.hie
 grep -Eq 'unpack .*selection' case.log
 "$ghc" "${flags[@]}" CaseMain.o ../provider/{Vector,Filter}.o -o payload-case -main-is CaseMain
-"$ghc" "${flags[@]}" -ddump-ds -c NestedMain.hs -main-is NestedMain >nested-client.log
+"$ghc" "${flags[@]}" -Wincomplete-patterns -Werror=incomplete-patterns -c StrictMatch.hs
+"$ghc" "${flags[@]}" -Wincomplete-patterns -Werror=incomplete-patterns -fwrite-ide-info \
+    -ddump-ds -c NestedMain.hs -main-is NestedMain >nested-client.log
+test -s NestedMain.hie
 grep -Eq 'unpack unpacked.*:: k_' nested-client.log
-"$ghc" "${flags[@]}" NestedMain.o ../provider/{Vector,NestedSignature,Nested}.o -o nested -main-is NestedMain
+"$ghc" "${flags[@]}" {NestedMain,StrictMatch}.o ../provider/{Vector,NestedSignature,Nested}.o -o nested -main-is NestedMain
 "$ghc" "${flags[@]}" -ddump-ds -c ForwardMain.hs -main-is ForwardMain >forward.log
 grep -A1 'ForwardProducer.choose$' forward.log | grep -Eq '@\(exists .*\. exists '
 grep -A1 'ForwardProducer.choose$' forward.log | grep -Eq '@\(exists .* \| '
@@ -161,7 +164,7 @@ if grep -Eq '\[GHC-39999\]' witness-rejections.log; then
     exit 1
 fi
 
-for binding in first second equalLengths knownKind firstFunction secondFunction witnessFunction; do
+for binding in first second equalLengths knownKind firstFunction secondFunction witnessFunction firstEquation distinctEquations; do
     line=$(grep -n "^$binding .*=" NestedEscape.hs | cut -d: -f1)
     if ! grep -Eq "^NestedEscape.hs:$line:[0-9]+: error: \[GHC-25897\]" NestedEscape.log; then
         cat NestedEscape.log >&2
@@ -172,5 +175,11 @@ done
 line=$(grep -n 'let selected = left p' NestedEscape.hs | cut -d: -f1)
 if ! grep -Eq "^NestedEscape.hs:$line:[0-9]+: error: \[GHC-25897\]" NestedEscape.log; then
     cat NestedEscape.log >&2
+    exit 1
+fi
+
+line=$(grep -n '^badEquation .*=' NestedDuplicate.hs | cut -d: -f1)
+if ! grep -Eq "^NestedDuplicate.hs:$line:[0-9]+: error: \[GHC-18872\]" NestedDuplicate.log; then
+    cat NestedDuplicate.log >&2
     exit 1
 fi
