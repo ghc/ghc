@@ -1140,7 +1140,8 @@ instance Diagnostic TcRnMessage where
       ExistsPackInvalidContext ->
         text "Use GHC.Exists.Pack in an explicit existential application or a sole case alternative with a fresh type variable or _ for the witness, followed by a payload pattern."
     TcRnTypeCaseContext
-      -> mkSimpleDecorated $ text "A type case is supported only in the right-hand side of a top-level type synonym."
+      -> mkSimpleDecorated $
+           text "A type case needs a supported position in a top-level type synonym or value signature."
     TcRnTypeLambdaContext
       -> mkSimpleDecorated $
            text "This type lambda needs the right-hand side of a top-level synonym with ordinary parameters."
@@ -4901,9 +4902,16 @@ liftedTypeContext name
   | Just synonym <- liftedTypeOwner "$lambda:" name
   , Just owner <- stripLiftedTypeOwner "$field-sum:" synonym
   = Just (text "retained sum in a field of" <+> quotes (text owner))
-  | Just owner <- liftedTypeOwner "$case:" name = Just (text "type case in" <+> quotes (text owner))
+  | Just owner <- liftedTypeOwner "$case:" name = Just (pprTypeCaseOwner owner)
   | Just owner <- liftedTypeOwner "$lambda:" name = Just (text "type lambda in" <+> quotes (text owner))
   | otherwise = Nothing
+
+-- | Describe a case by its source synonym or value signature.
+pprTypeCaseOwner :: String -> SDoc
+pprTypeCaseOwner owner
+  | Just signature <- stripLiftedTypeOwner "$signature-case:" owner
+  = text "type case in the signature for" <+> quotes (text signature)
+  | otherwise = text "type case in" <+> quotes (text owner)
 
 -- | Find the generated head in an application context.
 liftedTypeHeadContext :: LHsType GhcRn -> Maybe SDoc
@@ -4949,7 +4957,10 @@ pprTypeCaseMismatch :: Type -> SDoc
 pprTypeCaseMismatch ty
   | Just (tc, _) <- splitTyConAppNoView_maybe ty
   , Just owner <- liftedTypeOwner "$case-node:" (tyConName tc)
-  = text "the type case in" <+> quotes (text owner)
+  = text "the" <+> pprTypeCaseOwner owner
+  | Just (tc, _) <- splitTyConAppNoView_maybe ty
+  , Just signature <- liftedTypeOwner "$signature-case:" (tyConName tc)
+  = text "the type case in the signature for" <+> quotes (text signature)
   | Just (tc, args) <- splitTyConAppNoView_maybe ty
   , Just source <- liftedTypeContext (tyConName tc)
   = let fallback | isJust (liftedTypeOwner "$case:" (tyConName tc)) = text "the" <+> source
