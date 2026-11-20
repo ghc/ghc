@@ -9,13 +9,22 @@ records every edge. The R numbers are local labels for those cards.
 
 ## Where this fork stands
 
+An ordinary client can partition a vector with a runtime predicate and
+return the two parts appended at the original input length. The producer
+returns two nested `some` packages and proves that their lengths add up to
+the input length. Returning just the kept vector at that length fails at
+the returned expression. The 337-line Showcase includes the ordinary
+caller. [Partition proof](examples/packed-vector/ConservedPartition.hs),
+[ordinary caller](examples/packed-vector/ListVectorClient.hs) and
+[verification](CHECKPOINTS.md#family-and-package-checkpoints).
+
 A function can read a Boolean from an `IORef` and use it as the index
 of an ordered type case in a value signature. The sample renders the
 two results as `"7"` and `"'f'"`. A call that ignores its arguments
 still returns 42 with an undefined index and payload. An ordinary client
 can also open a hidden vector inside a pair without forcing the other
-field. All 336 Showcase lines ran with both compiler stages at `-O0`,
-default `-O1` and default `-O2`, and with the self-hosted GHCi.
+field. At the 336-line checkpoint, both compiler stages ran the Showcase
+at `-O0`, default `-O1` and default `-O2`. Self-hosted GHCi also matched.
 [Showcase](Showcase.hs) and [verification](CHECKPOINTS.md#family-and-package-checkpoints).
 
 A rewrite rule can omit the types of its Boolean index and dependent

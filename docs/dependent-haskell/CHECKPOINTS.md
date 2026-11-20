@@ -8,6 +8,16 @@ increments.
 
 ## Family and package checkpoints
 
+At `410405da2b`, the released 336-line compiler with the four changed
+modules relinked reproduced all 337 Showcase lines at `-O0`, default
+`-O1`, and default `-O2` with Core and STG Lint. The registered
+`NativeRetainedPackage` test used stripped producer interfaces. It checked
+the ordinary regroup operation, the demand on the elements, and both
+incorrect length claims. The kind-error golden also matched the user-facing
+matchability syntax. This run used the existing 336 target libraries.
+[Source and regressions](../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh)
+and [nested sum typing](roadmap/R04-dependent-sums.md#partition-at-the-original-length).
+
 At `a6fa7ededf`, bootstrap and self-hosted GHC reproduced all 336
 Showcase lines at stripped `-O0` and default `-O1` and `-O2`.
 Self-hosted GHCi matched. All 19 focused normal-way tests passed. The
