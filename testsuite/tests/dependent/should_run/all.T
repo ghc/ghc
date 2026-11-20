@@ -263,6 +263,11 @@ test('NativeSimplifier',
                    'NativeSimplifierLocalRec.hs'])],
      run_command, ['bash NativeSimplifier.sh "{compiler}" "{libdir}"'])
 
+test('NativeOptimizedReadback',
+     [req_host_target_ghc, req_interp, req_rts_linker, only_ways(['normal']),
+      extra_files(['NativeClosedFamilyProjection.hs'])],
+     run_command, ['bash NativeOptimizedReadback.sh "{compiler}" "{libdir}" ' + config.ghc_th_way_flags])
+
 test('NativeFunctionIndex',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['NativeFunctionIndexClient.hs',
