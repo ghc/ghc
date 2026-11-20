@@ -1369,6 +1369,7 @@ localiseNativeTopIndices name_cache binds = mapM localise_bind binds
       , args `lengthIs` tyConArity family
       = mkApps (Var (globaliseId owner)) (map protect_operand args)
     protect_operand (App fun arg) = App (protect_operand fun) (protect_operand arg)
+    protect_operand (Tick tick body) = Tick tick (protect_operand body)
     protect_operand expr = expr
 
     protect_bind (NonRec b r) = NonRec b <$> protect_calls r

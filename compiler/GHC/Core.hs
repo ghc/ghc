@@ -2643,22 +2643,27 @@ nativeSourceCallIndex expr
   = snd <$> computedIndexExpr expr
   | otherwise = Nothing
 
--- | Compute the index of a constructor tree containing certified source calls.
+-- | Compute the index of a constructor tree with source calls or coverage ticks.
 -- See Note [Source calls in retained arguments].
 nativeComputedIndex :: CoreExpr -> Maybe Type
 nativeComputedIndex expr
-  | has_call expr = snd <$> computedIndexExpr expr
+  | has_computation expr = snd <$> computedIndexExpr expr
   | otherwise = Nothing
   where
-    has_call expr = case collectArgs expr of
-      (Var fun, args@(_ : _)) -> isJust (sourceTableId_maybe fun) || any has_call args
+    has_computation (Tick HpcTick{} _) = True
+    has_computation expr = case collectArgs expr of
+      (Var fun, args@(_ : _)) ->
+        isJust (sourceTableId_maybe fun) || any has_computation args
       _ -> False
 
 -- | Reuse structural constructor checks without enabling beta or cast conversion.
 computedIndexExpr :: CoreExpr -> Maybe (CoreExpr, Type)
-computedIndexExpr = nativeIndexExprWith False source_call
+computedIndexExpr = nativeIndexExprWith False extra
   where
-    source_call expr
+    extra (Tick tick@HpcTick{} body) = do
+      (body', index) <- computedIndexExpr body
+      return (Tick tick body', index)
+    extra expr
       | (Var fun, args@(_:_)) <- collectArgs expr
       , Just family <- sourceTableId_maybe fun
       , let (erased, body) = splitForAllInvisTyBinders (varType fun)
@@ -2716,9 +2721,11 @@ An operand is a local variable, a saturated certified source call, or a
 saturated ordinary constructor whose fields are themselves operands. Check
 every call's actual Id, arity and domains. Keep beta and cast conversions
 disabled in this recursive grammar. The root can be a constructor over a
-call. Require at least one call so the structural normalizer keeps its own
-policy and precedence. CorePrep substitutes variables in the checked tree
-without evaluating or duplicating a field.
+call. Coverage ticks can also wrap a checked operand. They do not change its
+index. Keep their runtime placement. Require a source call or coverage tick
+so the structural normalizer keeps its own policy and precedence. CorePrep
+substitutes variables in the checked tree without evaluating or duplicating
+a field.
 The original Core application supplies the runtime head. A family
 application on its own is insufficient to reconstruct that Id. Keep
 the expression when composing substitutions. Keep the structural
