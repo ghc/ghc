@@ -1520,7 +1520,7 @@ sourceAddition = do
     observe "take and drop at the first runtime length" (toList prefix, toList suffix)
     checkedInput <- newIORef [True, False] >>= readIORef
     let matchesEmpty input = case ListVectorClient.fromList input of
-            Sigma.Pair size xs -> case emptyVectorProof @_ @size xs of
+            Sigma.Pair _ xs -> case emptyVectorProof xs of
                 Just HRefl -> True
                 Nothing -> False
     observe "prove the runtime vector is VNil in the empty branch"
