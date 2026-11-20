@@ -115,7 +115,7 @@ for binding in function index; do
     }
 done
 
-cp "$src/"{WitnessClient,WitnessDeep,WitnessMismatch}.hs .
+cp "$src/"{WitnessClient,WitnessDeep,WitnessMismatch,WitnessPairEscape}.hs .
 "$ghc" "${flags[@]}" -ddump-ds -c WitnessDeep.hs >deep-witness.core
 grep -Eq 'pack (GHC(\.Internal)?\.Types\.)?Int' deep-witness.core
 "$ghc" "${flags[@]}" -XImpredicativeTypes -ddump-ds -c WitnessClient.hs -main-is WitnessClient >witnesses.core
@@ -139,6 +139,13 @@ if "$ghc" "${flags[@]}" -c WitnessMismatch.hs >family-mismatch.log 2>&1; then
     exit 1
 fi
 grep -Fq '[GHC-83865]' family-mismatch.log
+if "$ghc" "${flags[@]}" -c WitnessPairEscape.hs >tuple-escape.log 2>&1; then
+    echo "A hidden tuple field escaped its match." >&2
+    exit 1
+fi
+line=$(grep -n '^escape (f, _) =' WitnessPairEscape.hs | cut -d: -f1)
+grep -Fq "WitnessPairEscape.hs:$line:17: error: [GHC-25897]" tuple-escape.log
+grep -Fq "at WitnessPairEscape.hs:$line:8-13" tuple-escape.log
 
 bad_sources=(UnsafeHead SameWitness Escape LetEscape BarClient ModesAreDistinct
              BarPack DotForall DotConstraint LinearDotDuplicate LambdaEscape

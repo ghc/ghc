@@ -8,5 +8,11 @@ both = pair
 atKind :: KindBox
 atKind = kindBox
 
+inferredPair :: CallbackPair
+inferredPair = (id, atTwoTypes)
+
 main :: IO ()
-main = print (unpack hidden)
+main = do
+    print (unpack hidden)
+    print (observePair inferredPair, observePair (id, atTwoTypes),
+           ignorePair (error "unused function", atTwoTypes))

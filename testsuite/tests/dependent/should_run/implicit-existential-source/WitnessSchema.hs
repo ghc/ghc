@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, ImpredicativeTypes, PolyKinds, RankNTypes, TypeApplications #-}
-module WitnessSchema (Hidden, callback, unpack, Multi, pair, kindBox, KindBox, Deep, producer) where
+module WitnessSchema (Hidden, callback, unpack, Multi, pair, kindBox, KindBox, Deep, producer, CallbackPair, atTwoTypes, observePair, ignorePair) where
 import Data.Kind (Type)
 import Data.Proxy
 
@@ -25,3 +25,13 @@ type Deep = exists (t :: Type). (t -> Bool) -> t
 
 producer :: ((forall x. x) -> Bool) -> Int
 producer _ = 7
+
+type CallbackPair = exists (t :: Type). (t, t -> (Int, Bool))
+atTwoTypes :: PolyId -> (Int, Bool)
+atTwoTypes f = (f 7, f True)
+
+observePair :: CallbackPair -> (Int, Bool)
+observePair (f, k) = k f
+
+ignorePair :: CallbackPair -> Int
+ignorePair (_, _) = 9

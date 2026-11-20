@@ -46,3 +46,4 @@ visible arguments preserve binder order
 (7,11,9)
 selected package raised the original exception
 (7,True)
+((7,True),(7,True),9)
