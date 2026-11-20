@@ -61,6 +61,7 @@ module PackedVecLibrary (
     zipPacked,
     sumNat,
     appendVec,
+    splitAtVec,
     appendNative,
     appendHidden,
     appendPacked,
@@ -266,6 +267,12 @@ sumNat n m = case n of
 appendVec :: Vec a n -> Vec a m -> Vec a (n + m)
 appendVec VNil ys = ys
 appendVec (VCons x xs) ys = VCons x (appendVec xs ys)
+
+-- | Split at the retained length. A zero cut leaves the input unevaluated.
+splitAtVec :: forall a m. foreach (n :: Nat) -> Vec a (Add n m) -> (Vec a n, Vec a m)
+splitAtVec Z xs = (VNil, xs)
+splitAtVec (S k) (VCons x xs) = case splitAtVec k xs of
+    (ys, zs) -> (VCons x ys, zs)
 
 -- | Append vectors indexed by two retained runtime lengths.
 appendNative :: forall a. foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a n -> Vec a m -> Vec a (plus n m)

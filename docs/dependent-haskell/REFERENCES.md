@@ -6455,3 +6455,19 @@ client return the appended vector at the input index.
 [Agda standard library v1.2, interleaving properties](https://agda.github.io/agda-stdlib/v1.2/Data.List.Relation.Ternary.Interleaving.Properties.html),
 [Idris 2, Data.Vect.partition](https://idris-lang.org/Idris2/base/source/Data.Vect.html#743)
 and [Haskell implementation](examples/packed-vector/ConservedPartition.hs).
+
+## Split a vector at a retained length
+
+Idris 2's `Data.Vect.splitAt` takes a cut `n` and a vector of length
+`n + m`. The zero case returns the empty prefix and the input. The
+successor case splits the tail at the predecessor and adds the head
+back to the prefix. Idris supplies the implicit suffix `{m}` on the
+recursive call. GHC infers the suffix in the recursive Haskell call. With
+two abstract runtime lengths, the Showcase supplies the suffix `@m`.
+The family application `Add n m` alone leaves `m` ambiguous at an abstract cut.
+Agda's `Data.Vec.Base.splitAt` follows the same recursion and also
+returns a proof that appending the two outputs gives the input.
+`splitAtVec` exposes the exact lengths of both outputs.
+[Idris 2, Data.Vect.splitAt](https://idris-lang.org/Idris2/base/source/Data.Vect.html#731),
+[Agda standard library v2.3, Data.Vec.Base](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html)
+and [Haskell implementation](examples/packed-vector/PackedVecLibrary.hs).

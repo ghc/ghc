@@ -1461,7 +1461,11 @@ sourceAddition = do
         ys = replicateNative m False
         joined :: Vec Bool (n + m)
         joined = appendHidden xs ys
+        split :: (Vec Bool n, Vec Bool m)
+        split = splitAtVec @Bool @m n joined
     observe "runtime sum and appended vector" (natToInt (n + m), toList joined)
+    observe "split the appended vector at its first length"
+        (toList (fst split), toList (snd split))
     observe "outer successor ignores the second addend" (isSuccessor (1 + undefined))
 
     let filled :: Vec Bool (n + m)
