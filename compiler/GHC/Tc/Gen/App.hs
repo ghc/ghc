@@ -13,6 +13,7 @@ module GHC.Tc.Gen.App
        ( tcApp
        , tcExprPrag
        , matchPolytypeExistsWitness
+       , tcImplicitOperand
        , tcRetainedInferableArg, tcRetainedArg, tcOptionalLetOperand ) where
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcCheckPolyExpr, tcPolyExpr, tcInferRho )
@@ -603,7 +604,7 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
       , isVisibleFunArg af
       = do { implicit <- if (isManyTy mult || isOneTy mult)
                             && demandsPayload (coreFullView domain)
-                         then implicitOperand arg
+                         then tcImplicitOperand arg
                          else return Nothing
            ; let operand = case implicit of
                    Just (package, replace) -> Right (loc, mult, package, replace)
@@ -615,31 +616,6 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
     demandsPayload AppTy{} = True
     demandsPayload FunTy{} = True
     demandsPayload _ = False
-
-    implicitOperand arg = find_head 0 id arg
-      where
-        find_head n rebuild (L loc (HsApp x fun operand)) =
-          find_head (n + 1) (\f -> rebuild (L loc (HsApp x f operand))) fun
-        find_head n rebuild (L loc (HsPar x fun)) =
-          find_head n (\f -> rebuild (L loc (HsPar x f))) fun
-        find_head n rebuild head_expr@(L _ (HsVar _ name))
-          | let id_name = unLocWithUserRdr name
-          , not (isDataOcc (nameOccName id_name))
-          = do { ident <- tcLookupIdMaybe id_name
-               ; return $ case implicitSpineHead . varType <$> ident of
-                   Just (ExistsTy ImplicitExists _ body)
-                     | opensImplicitHead n body -> Just (head_expr, Just rebuild)
-                   Just ty | hasDotResult n ty -> Just (arg, Nothing)
-                   _ -> Nothing }
-        find_head _ _ _ = return Nothing
-
-    hasDotResult 0 ty = case implicitSpineHead ty of
-      ExistsTy ImplicitExists _ _ -> True
-      _ -> False
-    hasDotResult n ty = case implicitSpineHead ty of
-      FunTy { ft_af = af, ft_res = result } | isVisibleFunArg af ->
-        hasDotResult (n - 1) result
-      _ -> False
 
     open result_ty _ rev_args [] =
       check_app (reverse rev_args) (mkCheckExpType result_ty)
@@ -677,6 +653,35 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
       , ExistsTy ImplicitExists _ _ <- coreFullView (varType ident)
       = Just name
     lexicalPackage _ = Nothing
+
+-- | Read the declaration for an implicit package or a call with a package head.
+-- The replacement function rebuilds a call on a checked payload.
+tcImplicitOperand :: LHsExpr GhcRn
+                  -> TcM (Maybe (LHsExpr GhcRn, Maybe (LHsExpr GhcRn -> LHsExpr GhcRn)))
+tcImplicitOperand arg = find_head 0 id arg
+  where
+    find_head n rebuild (L loc (HsApp x fun operand)) =
+      find_head (n + 1) (\f -> rebuild (L loc (HsApp x f operand))) fun
+    find_head n rebuild (L loc (HsPar x fun)) =
+      find_head n (\f -> rebuild (L loc (HsPar x f))) fun
+    find_head n rebuild head_expr@(L _ (HsVar _ name))
+      | let id_name = unLocWithUserRdr name
+      , not (isDataOcc (nameOccName id_name))
+      = do { ident <- tcLookupIdMaybe id_name
+           ; return $ case implicitSpineHead . varType <$> ident of
+               Just (ExistsTy ImplicitExists _ body)
+                 | opensImplicitHead n body -> Just (head_expr, Just rebuild)
+               Just ty | hasDotResult n ty -> Just (arg, Nothing)
+               _ -> Nothing }
+    find_head _ _ _ = return Nothing
+
+    hasDotResult 0 ty = case implicitSpineHead ty of
+      ExistsTy ImplicitExists _ _ -> True
+      _ -> False
+    hasDotResult n ty = case implicitSpineHead ty of
+      FunTy { ft_af = af, ft_res = result } | isVisibleFunArg af ->
+        hasDotResult (n - 1) result
+      _ -> False
 
 -- | Find the declared shape after ordinary invisible instantiation.
 implicitSpineHead :: TcType -> TcType

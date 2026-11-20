@@ -800,9 +800,28 @@ tcExpr expr@(HsCase ctxt scrut matches) res_ty
   = do { opened <- tcExistsCase expr res_ty
        ; case opened of
            Just unpack -> return unpack
-           Nothing -> ordinary_case }
+           Nothing -> do
+             { mult <- newFlexiTyVarTy multiplicityTy
+             ; head_app <- case unLoc (stripParensLHsExpr scrut) of
+                 HsApp{} -> tcImplicitOperand scrut
+                 _ -> return Nothing
+             ; case head_app of
+                 Just (package, Just rebuild) -> open_call mult package rebuild
+                 _ -> ordinary_case mult scrut res_ty } }
   where
-    ordinary_case = do  {  -- We used to typecheck the case alternatives first.
+    -- See Note [Case on a call with an implicit package head].
+    open_call mult package rebuild
+      = do { (checked, schema) <- tcScalingUsage mult $ tcInferRho package
+           ; result_ty <- expTypeToType res_ty
+           ; opened <- tcOpenImplicitPackage (getLocA package) schema checked result_ty $ \payload ->
+               let ref = nlHsVar (getName payload)
+                   source = rebuild (fmap (\head_expr -> mkExpandedLExpr head_expr ref) package)
+               in tcExtendIdEnv [payload] $
+                    ordinary_case mult source (mkCheckExpType result_ty)
+           ; return (preserve_origin opened) }
+
+    ordinary_case mult source expected = do
+               {  -- We used to typecheck the case alternatives first.
                -- The case patterns tend to give good type info to use
                -- when typechecking the scrutinee.  For example
                --   case (map f) of
@@ -811,41 +830,39 @@ tcExpr expr@(HsCase ctxt scrut matches) res_ty
                --
                -- But now, in the GADT world, we need to typecheck the scrutinee
                -- first, to get type info that may be refined in the case alternatives
-              mult <- newFlexiTyVarTy multiplicityTy
-
               -- Typecheck the scrutinee.  We use tcInferRho but tcInferSigma
               -- would also be possible (tcCaseMatches accepts sigma-types)
               -- Interesting litmus test: do these two behave the same?
               --     case id        of {..}
               --     case (\v -> v) of {..}
               -- This design choice is discussed in #17790
-            ; (scrut', scrut_ty) <- tcScalingUsage mult $ tcInferRhoFRR FRRCase scrut
+              (scrut', scrut_ty) <- tcScalingUsage mult $ tcInferRhoFRR FRRCase source
             ; dependent <- xoptM LangExt.ExperimentalDependentTypes
             ; special <- case unLoc (stripParensLHsExpr scrut') of
                 _ | ExistsTy ImplicitExists _ _ <- coreFullView scrut_ty
-                  -> dot_case scrut' scrut_ty mult
+                  -> dot_case scrut' scrut_ty mult expected
                 HsVar _ (L _ index) | dependent, isNativeIndexId index ->
-                  tcRetainedCase index matches res_ty
+                  tcRetainedCase index matches expected
                 _ | dependent ->
                   do { call_index <- checkedNativeCallIndex scrut' scrut_ty
                      ; case call_index of
                          Nothing -> return Nothing
                          Just index ->
                            fmap (fmap preserve_origin) $
-                             tcRetainedCallCase index scrut' matches res_ty }
+                             tcRetainedCallCase index scrut' matches expected }
                 _ -> return Nothing
             ; case special of
                 Just expr -> return expr
                 Nothing -> do
-                  { matches' <- tcCaseMatches ctxt tcBody (Scaled mult scrut_ty) matches res_ty
+                  { matches' <- tcCaseMatches ctxt tcBody (Scaled mult scrut_ty) matches expected
                   ; return (HsCase ctxt scrut' matches') } }
 
     preserve_origin expr' =
       XExpr (ExpandedThingTc (HSE { hse_ctxt = ExprCtxt expr, hse_exp = noLocA expr' }))
 
-    dot_case scrut' schema mult
+    dot_case scrut' schema mult expected
       | any (payload_alt schema) (unLoc (mg_alts matches))
-      = do { result_ty <- expTypeToType res_ty
+      = do { result_ty <- expTypeToType expected
            ; opened <- tcOpenImplicitPackage (getLocA scrut) schema scrut' result_ty $ \payload ->
                do { payload_matches <- tcCaseMatches ctxt tcBody
                         (Scaled mult (varType payload)) matches (mkCheckExpType result_ty)
@@ -856,6 +873,20 @@ tcExpr expr@(HsCase ctxt scrut matches) res_ty
     -- See Note [Matching an implicit existential payload].
     payload_alt schema (L _ Match{m_pats = L _ [pat]}) = matchesImplicitPayloadPat schema pat
     payload_alt _ _ = False
+
+{- Note [Case on a call with an implicit package head]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In `case builder b of Callback value use -> use value`, builder has type
+`exists t. Bool -> Callback t`. The call produces Callback t inside the
+opening of builder. The result of the complete case can have a closed type.
+
+Use the same declared call shape as implicit application operands. Check the
+package head once. Open it around both the call on its payload and the case
+alternatives. Allocate the case result type outside the opening so a field
+that mentions the hidden witness cannot escape. Scale the checked head and
+the rebuilt application at the original scrutinee multiplicity. The ordinary
+case checker keeps the source patterns and their evaluation order.
+-}
 
 tcExpr (HsIf x pred b1 b2) res_ty
   = do { pred'    <- tcCheckMonoExpr pred boolTy

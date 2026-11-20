@@ -259,6 +259,15 @@ argument to an ordinary observer, that observer can run in the same
 opening. Thus `list (f x)` consumes the payload without an intermediate
 package.
 
+A case on the call can use the same opening. In
+`case builder b of Callback value use -> use value`, the pattern and
+its branch share the witness of the call result. The complete case
+must return a type independent of that witness. The constructor
+pattern still forces the result constructor and leaves unused fields lazy.
+This extends the application opening of
+[Elab-IExist](https://richarde.dev/papers/2021/exists/exists.pdf#page=18)
+to a GHC case scrutinee by checking the alternatives in the same scope.
+
 Each call opens a fresh witness. The source test rejects a call that
 returns its witness at a caller-chosen length. It also rejects an
 observer that equates two independent calls. A direct or nested call

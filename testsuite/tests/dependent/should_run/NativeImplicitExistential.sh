@@ -201,6 +201,13 @@ for bad in "${bad_sources[@]}"; do
             }
         done
     fi
+    if [[ $bad == CaseEscape ]]; then
+        line=$(grep -n '^    vec -> vec$' CaseEscape.hs | cut -d: -f1)
+        grep -Eq "^CaseEscape.hs:$line:[0-9]+: error: \[GHC-25897\]" CaseEscape.log || {
+            cat CaseEscape.log >&2
+            exit 1
+        }
+    fi
     if ! grep -Eq "^$bad.hs:[0-9]+:[0-9]+: error: \[GHC-$code\]" "$bad.log"; then
         cat "$bad.log" >&2
         exit 1

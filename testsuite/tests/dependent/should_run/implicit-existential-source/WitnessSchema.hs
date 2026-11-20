@@ -51,7 +51,8 @@ configured :: forall {k} (flag :: k) tag. Proxy flag -> (tag -> Bool) -> tag -> 
 configured _ test tag = buildAt (test tag)
 
 observeBuilder :: RankedBuilder -> Bool -> (Int, Bool)
-observeBuilder builder b = observePayload (builder b)
+observeBuilder builder b = case builder b of
+    Payload value run -> run value
 
 data Flag a where
     Flag :: Flag Bool
