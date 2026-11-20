@@ -3087,6 +3087,15 @@ rule. The recursive filter tests demand when the package comes from an
 unknown computation. [Agda's erased vector argument](https://agda.readthedocs.io/en/v2.8.0/language/runtime-irrelevance.html)
 provides the comparison for erasing the witness.
 
+Idris 2's `Data.Vect.partition` returns two vectors with independently
+quantified lengths. The Haskell example uses the same result shape and a
+lazy pair binding for the recursive call. Its type leaves the relation
+between the sum of the two result lengths and the input length unstated.
+Agda's standard `Data.Vec.filter` illustrates a stronger alternative for
+one output. Its result carries a proof that the length is bounded by the input.
+[Idris 2 partition](https://idris-lang.org/Idris2/base/source/Data.Vect.html)
+and [Agda vector filter](https://agda.github.io/agda-stdlib/master/Data.Vec.html).
+
 Figure 1(b) of *An Existential Crisis Resolved* gives the source rule for
 the [implicit vector filter](examples/erased-existentials/ImplicitVector.hs).
 The passing branch constructs a cell from a recursive call with a fresh

@@ -946,6 +946,12 @@ main = do
         ImplicitVector.observations
     observe "project a stored vector from a strict record field"
         (StoredVector.cells (StoredVector.singleton 'h'))
+    let (passing, failing) = ImplicitVector.partitionVec odd
+            (VCons (7 :: Int) (VCons 2 (VCons 9 VNil)))
+        (firstPart, _) = ImplicitVector.partitionVec odd (VCons (7 :: Int) (error "unused partition tail"))
+    observe "partition a vector at two independent result lengths"
+        (ImplicitVector.cells passing, ImplicitVector.cells failing,
+         take 1 (ImplicitVector.cells firstPart))
     observe "zip a filtered vector with itself at its hidden length" $
         take 1 (ImplicitVector.pairWithSelf
             (ImplicitVector.filterVec odd (VCons (7 :: Int) (error "unused vector tail"))))

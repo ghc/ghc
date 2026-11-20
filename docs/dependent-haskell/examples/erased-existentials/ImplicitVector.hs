@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -O0 #-}
 
 -- | Filter a vector without writing a package constructor or a witness.
-module ImplicitVector (Filtered, filterVec, cells, pairWithSelf, forgetLength, observations, singletonBuilder, runBuilder) where
+module ImplicitVector (Filtered, filterVec, partitionVec, cells, pairWithSelf, forgetLength, observations, singletonBuilder, runBuilder) where
 
 import GHC.Sigma (Sigma(Pair))
 import PackedVecLibrary (Nat(..), Vec(..), toList, zipVec)
@@ -16,6 +16,13 @@ filterVec _ VNil = VNil
 filterVec p (VCons x xs)
   | p x = VCons x (filterVec p xs)
   | otherwise = filterVec p xs
+
+-- | Split the vector. Each result has its own hidden length.
+partitionVec :: (a -> Bool) -> Vec a n -> (Filtered a, Filtered a)
+partitionVec _ VNil = (VNil, VNil)
+partitionVec p (VCons x xs) =
+  let (yes, no) = partitionVec p xs
+  in if p x then (VCons x yes, no) else (yes, VCons x no)
 
 -- | Open the hidden length for the call to 'toList'.
 cells :: Filtered a -> [a]
