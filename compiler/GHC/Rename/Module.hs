@@ -338,13 +338,20 @@ Different values use separate counters. The private type namespace also
 separates a function operator from a same-spelled type operator. A
 signature shared by several values uses its first name.
 
-Within one signature, identical cases can share a synonym. This keeps
-two uses equal even when their common scrutinee is unknown. Compare
-the parsed names, applications and ordered rows. All occurrences
-visited by this pass use the same signature telescope. A row binder
-has the same scope at both occurrences. Skip comparison for other
-syntax, which can contain a nested binder. Keep the first location
-for checking the shared case.
+Within one signature telescope, identical cases can share a synonym.
+This keeps two uses equal when their common scrutinee is unknown.
+Compare the parsed names, applications and ordered rows. A row binder
+has the same scope at both occurrences. Skip comparison for syntax
+that can contain a nested binder. Keep the first location for checking
+the shared case.
+
+In a value signature, a nested erased forall can also provide captures.
+Require written kinds for its local variables and keep the forall at
+the original occurrence. Start a new comparison table there. Remove a
+shadowed outer name from the capture scope. The capture check still
+requires the kind of each selected variable to refer to earlier
+captures. If that requires a shadowed variable, leave the case in the
+source so the normal context check rejects it.
 
 For a constructor field, use the constructor's name and count sums
 from left to right. Use a separate prefix for constructor fields.
@@ -361,9 +368,12 @@ free variable to be in scope in the source signature or field. Otherwise
 kind inference for the synonym could bind a variable that is out of scope
 at the source occurrence.
 Skip types that contain splices or holes. A wildcard in a case pattern
-is part of the match. Do not lift across nested binders. They can
-shadow the original names or bind a retained index.
+is part of the match. The traversal stops at retained binders.
 -}
+-- | Select the expressions that can be lifted at a declaration type position.
+data LiftedTypeSite = FieldTypeSite | SignatureTypeSite | ForallTypeSite
+  deriving Eq
+
 -- | Prepare cases in top-level value signatures and sums in signatures and fields.
 liftDeclarationTypes :: Bool -> HsGroup GhcPs -> (HsGroup GhcPs, LiftedDecls)
 liftDeclarationTypes named_wildcards group
@@ -445,14 +455,14 @@ liftDeclarationTypes named_wildcards group
       in (fields', concat sums)
 
     liftField owner scope salt field@CDF{cdf_type = ty} =
-      let (ty', sums, (next, _)) = liftBody fieldAnchor owner scope ty (salt, [])
+      let (ty', sums, (next, _)) = liftBody FieldTypeSite owner scope ty (salt, [])
       in (next, (field{cdf_type = ty'}, sums))
 
     liftBind counters (VbSig (L loc (TypeSig sig_ann mods names@(owner:_) wc@HsWC
                   {hswc_body = L sig_loc sig@HsSig{sig_bndrs = outer, sig_body = body}}))) =
       let occ = rdrNameOcc (unLoc owner)
           first = fromMaybe 0 (lookupOccEnv counters occ)
-          (body', aliases, (next, _)) = liftBody signatureAnchor owner
+          (body', aliases, (next, _)) = liftBody SignatureTypeSite owner
                                     (signatureCaptures outer body) body (first, [])
           sig' = L sig_loc (sig{sig_body = body'})
       in (extendOccEnv counters occ next, (VbSig (L loc (TypeSig sig_ann mods names
@@ -474,24 +484,34 @@ liftDeclarationTypes named_wildcards group
       [(fmap (updateHsTyVarBndrFlag (const (HsBndrRequired noExtField))) b, v)
       | b <- binders, Just v <- [hsLTyVarLocName b]]
 
-    fieldAnchor :: LHsType GhcPs -> Maybe (String, Maybe SignatureCaseKey)
-    fieldAnchor ty@(L _ (XHsType HsTypeSome{}))
+    liftedAnchor FieldTypeSite ty@(L _ (XHsType HsTypeSome{}))
       | copyable ty = Just ("$field-sum:", Nothing)
-    fieldAnchor _ = Nothing
-
-    signatureAnchor ty@(L _ (XHsType HsTypeSome{}))
+    liftedAnchor SignatureTypeSite ty@(L _ (XHsType HsTypeSome{}))
       | copyable ty = Just ("$signature-sum:", Nothing)
-    signatureAnchor (L _ (XHsType (HsTypeCase _ _ scrutinee alts)))
-      | copyable scrutinee
+    liftedAnchor site (L _ (XHsType (HsTypeCase _ _ scrutinee alts)))
+      | site /= FieldTypeSite
+      , copyable scrutinee
       , all copyableAlt alts
       = Just ("$signature-case:", signatureCaseKey scrutinee alts)
-    signatureAnchor _ = Nothing
+    liftedAnchor _ _ = Nothing
 
     copyableAlt (L _ (HsTypeCaseAlt pat _ rhs)) =
       isJust (classifyTypeCasePattern pat) && copyable rhs
 
-    liftBody anchor owner scope whole@(L loc _) (salt, seen)
-      | Just (prefix, key) <- anchor whole
+    forallCaptures HsForAllInvis{hsf_invis_bndrs = binders} = writtenCaptures binders
+    forallCaptures HsForAllVis{hsf_vis_bndrs = binders} = writtenCaptures binders
+
+    writtenCaptures :: [LHsTyVarBndr flag GhcPs]
+                    -> Maybe [(LHsTyVarBndr (HsBndrVis GhcPs) GhcPs, LocatedN RdrName)]
+    writtenCaptures binders
+      | all hasWrittenKind binders = Just (explicitCaptures binders)
+      | otherwise = Nothing
+
+    hasWrittenKind (L _ (HsTvb _ _ HsBndrVar{} (HsBndrKind _ kind))) = copyable kind
+    hasWrittenKind _ = False
+
+    liftBody site owner scope whole@(L loc _) (salt, seen)
+      | Just (prefix, key) <- liftedAnchor site whole
       , let free = Set.fromList (map unLoc (extractHsTyRdrTyVars whole))
             (used, missing) = foldr select ([], free) scope
       , Set.null missing
@@ -505,17 +525,27 @@ liftDeclarationTypes named_wildcards group
                 alias = L loc (SynDecl noAnn name (mkHsQTvs (map fst used)) Prefix whole)
                 seen' = maybe seen (\k -> (k, occ) : seen) key
             in (applyAnchor loc occ used, [(alias, (occ, Nothing))], (salt + 1, seen'))
-    liftBody anchor owner scope (L loc (HsFunTy ann arrow arg result)) state =
-      let (arg', arg_aliases, next) = liftBody anchor owner scope arg state
-          (result', result_aliases, end) = liftBody anchor owner scope result next
+    liftBody site owner scope (L loc quantified@HsForAllTy{hst_tele = tele, hst_body = body})
+             (salt, seen)
+      | site /= FieldTypeSite
+      , Just locals <- forallCaptures tele
+      , let names = map (unLoc . snd) locals
+      , null (findDupsEq (==) names)
+      = let outer = filter (\(_, name) -> unLoc name `notElem` names) scope
+            (body', aliases, (next, _)) = liftBody ForallTypeSite owner
+                                          (outer ++ locals) body (salt, [])
+        in (L loc quantified{hst_body = body'}, aliases, (next, seen))
+    liftBody site owner scope (L loc (HsFunTy ann arrow arg result)) state =
+      let (arg', arg_aliases, next) = liftBody site owner scope arg state
+          (result', result_aliases, end) = liftBody site owner scope result next
       in (L loc (HsFunTy ann arrow arg' result'), arg_aliases ++ result_aliases, end)
-    liftBody anchor owner scope (L loc (HsQualTy ann ctxt body)) state =
-      let (body', aliases, next) = liftBody anchor owner scope body state
+    liftBody site owner scope (L loc (HsQualTy ann ctxt body)) state =
+      let (body', aliases, next) = liftBody site owner scope body state
       in (L loc (HsQualTy ann ctxt body'), aliases, next)
-    liftBody anchor owner scope (L loc (HsKindSig ann body kind)) state =
-      let (body', aliases, next) = liftBody anchor owner scope body state
+    liftBody site owner scope (L loc (HsKindSig ann body kind)) state =
+      let (body', aliases, next) = liftBody site owner scope body state
       in (L loc (HsKindSig ann body' kind), aliases, next)
-    liftBody anchor owner scope ty state = liftTypeChildren (liftBody anchor owner scope) ty state
+    liftBody site owner scope ty state = liftTypeChildren (liftBody site owner scope) ty state
 
     applyAnchor loc occ = foldl' (\f (_, v) -> L loc (HsAppTy noExtField f (typeName v)))
                                  (typeName (L (l2l loc) (mkRdrUnqual occ)))

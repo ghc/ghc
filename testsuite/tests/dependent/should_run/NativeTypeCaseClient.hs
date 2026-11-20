@@ -31,6 +31,9 @@ signatureTrue = caseIdentity (Proxy @'True) 3
 signatureFalse :: Bool
 signatureFalse = caseIdentity (Proxy @'False) True
 
+nestedSignatureShadow :: Int
+nestedSignatureShadow = nestedCaseIdentity (Proxy @'False) False (Proxy @'True) 7
+
 field :: Field ('Just 'True) :~: '( 'True, 'True)
 field = Refl
 

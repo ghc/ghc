@@ -1,10 +1,10 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, ExplicitForAll, PolyKinds, TypeFamilies #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, ExplicitForAll, PolyKinds, RankNTypes, TypeFamilies #-}
 -- | Select a type from the constructor of a type-level scrutinee.
 module NativeCase
   ( F, ByType, ElementOrSelf, Field, Same, Capture, Braces, roadmap
   , PayloadKind, Fixed, Captured, Retain, PatternShadow, ScrutineeShadow, NestedScope
   , Paired, InferredCapture, ContextKind, SeparateKinds
-  , caseIdentity
+  , caseIdentity, nestedCaseIdentity
   ) where
 
 import Data.Kind (Type)
@@ -52,6 +52,14 @@ caseIdentity :: forall (b :: Bool). Proxy b ->
   (case b of { True -> Int; False -> Bool }) ->
   (case b of { True -> Int; False -> Bool })
 caseIdentity _ input = input
+
+-- | Return the input selected by the inner flag.
+nestedCaseIdentity :: forall (b :: Bool). Proxy b ->
+  (case b of { True -> Int; False -> Bool }) ->
+  (forall (b :: Bool). Proxy b ->
+    (case b of { True -> Int; False -> Bool }) ->
+    (case b of { True -> Int; False -> Bool }))
+nestedCaseIdentity _ _ _ input = input
 
 -- | Reuse a local kind while retaining the kind of an outer parameter.
 type Fixed (k :: Type) (a :: k) = let k = Bool in case 'False of
