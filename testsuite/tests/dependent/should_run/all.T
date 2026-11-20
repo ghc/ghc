@@ -419,6 +419,7 @@ test('NativeNamedSplit',
 test('NativeIndexedConsProof',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['NativeIndexedConsProof.hs', 'NativeIndexedConsProofClient.hs',
+                   'NativeIndexedOperandWire.hs',
                    '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs'])],
      run_command, ['bash NativeIndexedConsProof.sh "{compiler}" "{libdir}"'])
 

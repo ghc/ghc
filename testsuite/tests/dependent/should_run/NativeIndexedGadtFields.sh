@@ -11,10 +11,25 @@ for opt in O0 O2; do
     mkdir -p "$out/$opt"/{provider,client}
     cd "$out/$opt/provider"
     cp "$src/"{PackedVecLibrary,NativeIndexedGadtFieldsProvider}.hs .
-    "${ghc[@]}" "-$opt" -c PackedVecLibrary.hs NativeIndexedGadtFieldsProvider.hs
+    "${ghc[@]}" "-$opt" -c PackedVecLibrary.hs
     if [[ $opt = O2 ]]; then
+        "${ghc[@]}" "-$opt" -ddump-stg-from-core -dsuppress-uniques -dsuppress-idinfo \
+            -dppr-cols=160 -c NativeIndexedGadtFieldsProvider.hs > provider.stg
+        # Keep the original equality token and the two fields only.
+        awk '/PackedVecLibrary[.]VCons[[:space:]].*->/ {
+                 sub(/^.*PackedVecLibrary[.]VCons[[:space:]]+/, "")
+                 sub(/[[:space:]]+->.*$/, "")
+                 seen = 1
+                 if (split($0, binders, /[[:space:]]+/) != 3) {
+                     print
+                     bad = 1
+                 }
+             }
+             END { exit (bad || !seen) }' provider.stg
         "${ghc[@]}" --show-iface NativeIndexedGadtFieldsProvider.hi > provider.iface
         grep -Fq 'indexed-constructor-case+indexed-constructor-fields' provider.iface
+    else
+        "${ghc[@]}" "-$opt" -c NativeIndexedGadtFieldsProvider.hs
     fi
     cp ./*.hi "$src/NativeIndexedGadtFields.hs" ../client/
     cd ../client
