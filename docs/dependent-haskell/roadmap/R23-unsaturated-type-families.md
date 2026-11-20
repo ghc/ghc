@@ -277,81 +277,40 @@ and [promotion](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-un
 
 ### Arrow patterns in family equations
 
-After setting the `(~>)` synonym to M in `GADTSingletons`, the first
-remaining error is at the right-hand side of `PromoteX (Either a)`.
-The earlier equation `Promote (a -> b) = PromoteX a ~> PromoteX b`
-matches U. It leaves `Promote (Type %M -> Type)` stuck. The
-nested-family result patch lets `DemoteX (TyCon2 Either)` use a
-second selector and leaves this `Promote` pattern unchanged.
-[Original `GADTSingletons` test](../../../testsuite/tests/dependent/should_compile/GADTSingletons.hs).
+GHC 9.14.1 accepts the legacy spelling of the two-module reduction.
+The reproduction script removes the `%M` synonym annotation and the
+separate M equation for that check. On `4bb020f702` and the solver
+overlay at `f3833dbd90`, the bare `(~>)` gives GHC-83865 at
+`data TyCon1`. With `%M` on the synonym, the provider compiles
+and its `Refl` proof checks the U case. The separately compiled
+ordinary client has only the provider interface. Its equation
+`PromoteX Maybe = TyCon1 Maybe` gives GHC-83865 because
+`Promote (Type %M -> Type)` stays stuck.
+[Provider](../examples/open-evaluation/SingletonsArrowProvider.hs) and
+[ordinary client](../examples/open-evaluation/SingletonsArrowClient.hs).
 
-GHC 9.14.1 accepts the two modules below. The joint compiler at
-`73bffa1a15` and the nested-family overlay reject `'True` with
-GHC-83865. The provider compiles and the client reads only `Probe.hi`.
-
-```haskell
-{-# LANGUAGE DataKinds, GADTs, KindSignatures, PolyKinds, TypeFamilies, TypeOperators #-}
-module Probe where
-
-import Data.Kind (Type)
-import Data.Type.Equality ((:~:)(Refl))
-
-type family Promote (k :: Type) :: Type
-type instance Promote (a -> b) = Bool
-
-type family PromoteX (a :: k) :: Promote k
-runtime :: Promote (Bool -> Bool) :~: Bool
-runtime = Refl
-```
-
+Keep the bare `Promote (a -> b)` equation for U. If the family has
+no M case, the provider can add an explicit row with the same RHS.
 
 ```haskell
-{-# LANGUAGE DataKinds, PolyKinds, TypeFamilies #-}
-module Client where
-
-import Probe
-
-type instance PromoteX Maybe = 'True
+type instance Promote (a %M -> b) = PromoteX a ~> PromoteX b
 ```
 
-An explicit `%U` leaves the error in the client. An explicit `%M`
-makes the client compile and breaks the provider's `Refl` proof.
-The writer of the `Promote` equation can opt in to both arrows with
-`Modifiers` and the pattern `(a %(m :: Matchability) -> b)`.
-Both modules then compile. The client requires no change or extension.
-This changes one checked equation, so other bare patterns keep their
-current U-only meaning. The separate `(~>)` synonym still needs its
-own choice.
+The same compilers accept this split and a single
+`(a %(m :: Matchability) -> b)` pattern. Both also accept the full
+`GADTSingletons` with either migration. In the unchanged full program,
+both reject four data declarations. With just `%M` on the synonym,
+both reject the two `PromoteX` equations for `Either`. The nested
+result selectors handle the corresponding `DemoteX` equations.
+[Full source](../../../testsuite/tests/dependent/should_compile/GADTSingletons.hs) and
+[reproduction script](../examples/open-evaluation/check-singletons-arrows.sh).
 
-These open family equations compile together on both fork compilers.
-`Select` is also used as the result kind of another family.
-
-```haskell
-{-# LANGUAGE DataKinds, GADTs, Modifiers, PolyKinds, TypeFamilies, TypeOperators #-}
-module Separate where
-
-import Data.Type.Equality ((:~:)(Refl))
-import GHC.Exts (M)
-
-type family Select t
-type instance Select (a -> b) = Bool
-type instance Select (a %M -> b) = Ordering
-
-type family SelectX (a :: k) :: Select k
-type instance SelectX Maybe = 'LT
-
-runtime :: Select (Bool -> Bool) :~: Bool
-runtime = Refl
-
-constructor :: Select (Bool %M -> Bool) :~: Ordering
-constructor = Refl
-```
-
-Making the first pattern polymorphic makes both equations match an
-M arrow. Both compilers report GHC-34447 because the results differ.
-A default that generalizes bare patterns would affect existing
-equations even if it applied only to families used as result kinds.
-The compatibility policy for unchanged source remains open.
+The reproduction script also compiles a separate module that adds
+`Promote (a %M -> b) = Ordering`. This equation coexists with the
+bare U equation. With the polymorphic provider pattern, the separate
+module gives GHC-34447 because both equations now match M and return
+different results. Generalizing bare patterns would break this valid
+program even if inference applied only to families used as result kinds.
 
 Proposal #242's M rule for application patterns concerns the kind of
 the unknown head `f` in `f x`. The U examples for arrow types in
