@@ -2487,6 +2487,9 @@ deTagExpr (Let bind body)           = Let (deTagBind bind) (deTagExpr body)
 deTagExpr (Case e (TB b _) ty alts) = Case (deTagExpr e) b ty (map deTagAlt alts)
 deTagExpr (Tick t e)                = Tick t (deTagExpr e)
 deTagExpr (Cast e co)               = Cast (deTagExpr e) co
+deTagExpr (Pack schema witness e)   = Pack schema witness (deTagExpr e)
+deTagExpr (Unpack (TB w _) (TB p _) e body)
+                                    = Unpack w p (deTagExpr e) (deTagExpr body)
 
 deTagBind :: TaggedBind t -> CoreBind
 deTagBind (NonRec (TB b _) rhs) = NonRec b (deTagExpr rhs)
@@ -3260,6 +3263,8 @@ data AnnExpr' bndr annot
   | AnnTick     CoreTickish (AnnExpr bndr annot)
   | AnnType     Type
   | AnnCoercion Coercion
+  | AnnPack     Type Type (AnnExpr bndr annot)
+  | AnnUnpack   bndr bndr (AnnExpr bndr annot) (AnnExpr bndr annot)
 
 -- | A clone of the 'Alt' type but allowing annotation at every tree node
 data AnnAlt bndr annot = AnnAlt AltCon [bndr] (AnnExpr bndr annot)
@@ -3301,6 +3306,10 @@ deAnnotate' (AnnApp  fun arg)     = App (deAnnotate fun) (deAnnotate arg)
 deAnnotate' (AnnCast e (_,co))    = Cast (deAnnotate e) co
 deAnnotate' (AnnTick tick body)   = Tick tick (deAnnotate body)
 
+deAnnotate' (AnnPack schema witness payload)
+  = Pack schema witness (deAnnotate payload)
+deAnnotate' (AnnUnpack witness payload package body)
+  = Unpack witness payload (deAnnotate package) (deAnnotate body)
 deAnnotate' (AnnLet bind body)
   = Let (deAnnBind bind) (deAnnotate body)
 deAnnotate' (AnnCase scrut v t alts)

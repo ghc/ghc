@@ -77,6 +77,12 @@ exitifyProgram binds = map goTopLvl binds
     go in_scope (Tick t e') = Tick t (go in_scope e')
     go in_scope (App e1 e2) = App (go in_scope e1) (go in_scope e2)
 
+    go in_scope (Pack schema witness payload)
+      = Pack schema witness (go in_scope payload)
+    go in_scope (Unpack witness payload package body)
+      = Unpack witness payload (go in_scope package) (go body_scope body)
+      where body_scope = in_scope `extendInScopeSetList` [witness, payload]
+
     go in_scope (Lam v e')
       = Lam v (go in_scope' e')
       where in_scope' = in_scope `extendInScopeSet` v
@@ -153,6 +159,11 @@ exitifyRec in_scope pairs
     -- We could not turn it into a exit join point. So now recurse
     -- into all expression where eligible exit join points might sit,
     -- i.e. into all tail-call positions:
+
+    -- Only the body inherits tail position. Abstract the witness before its payload.
+    go captured (_, AnnUnpack witness payload package body) = do
+        body' <- go (captured ++ [witness, payload]) body
+        return $ Unpack witness payload (deAnnotate package) body'
 
     -- Case right hand sides are in tail-call position
     go captured (_, AnnCase scrut bndr ty alts) = do

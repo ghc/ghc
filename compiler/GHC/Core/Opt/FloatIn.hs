@@ -156,6 +156,12 @@ fiExpr _ to_drop (_, AnnLit lit)     = wrapFloats to_drop (Lit lit)
 fiExpr _ to_drop (_, AnnType ty)     = assert (null to_drop) $ Type ty
 fiExpr _ to_drop (_, AnnVar v)       = wrapFloats to_drop (Var v)
 fiExpr _ to_drop (_, AnnCoercion co) = wrapFloats to_drop (Coercion co)
+-- Keep incoming bindings outside the lazy package and its witness scope.
+fiExpr platform to_drop (_, AnnPack schema witness payload)
+  = wrapFloats to_drop (Pack schema witness (fiExpr platform [] payload))
+fiExpr platform to_drop (_, AnnUnpack witness payload package body)
+  = wrapFloats to_drop (Unpack witness payload (fiExpr platform [] package)
+                                               (fiExpr platform [] body))
 fiExpr platform to_drop (_, AnnCast expr (co_ann, co))
   = wrapFloats drop_here $
     Cast (fiExpr platform e_drop expr) co

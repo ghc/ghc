@@ -115,6 +115,8 @@ occurAnalyseNativeExpr expr
     go (_, AnnTick tick expr) = Tick tick (go expr)
     go (_, AnnType ty) = Type ty
     go (_, AnnCoercion co) = Coercion co
+    go e@(_, AnnPack{}) = deAnnotate e
+    go e@(_, AnnUnpack{}) = deAnnotate e
 
     -- | Keep binding group order and visit each retained RHS.
     go_bind :: CoreBindWithFVs -> CoreBind
@@ -147,9 +149,8 @@ bindings can be strict. Protect joins and stable or rule-bearing metadata.
 The same rule applies to an unused scalar index or function head: their
 eligible domains do not make an unused lazy binding necessary.
 
-The annotated free-variable tree does not have Pack and Unpack nodes.
-Keep an RHS that contains either node intact. Its checked scoped
-substitution runs in restricted SimpleOpt.
+Keep an RHS that contains Pack or Unpack intact. Restricted SimpleOpt
+checks witness scope before it removes an adjacent pair of operations.
 
 Reconstruct every other node with its original binders and annotations.
 Do not infer occurrence counts, swap case binders, create joins or split

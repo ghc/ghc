@@ -348,6 +348,11 @@ floatExpr (Type ty) = (zeroStats, emptyFloats, Type ty)
 floatExpr (Coercion co) = (zeroStats, emptyFloats, Coercion co)
 floatExpr (Lit lit) = (zeroStats, emptyFloats, Lit lit)
 
+-- SetLevels pins bindings inside these expressions.
+-- See Note [Floating bindings across erased packages] in GHC.Core.Opt.SetLevels.
+floatExpr e@Pack{}   = (zeroStats, emptyFloats, deTagExpr e)
+floatExpr e@Unpack{} = (zeroStats, emptyFloats, deTagExpr e)
+
 floatExpr (App e a)
   = case (floatExpr  e) of { (fse, floats_e, e') ->
     case (floatExpr  a) of { (fsa, floats_a, a') ->

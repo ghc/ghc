@@ -9,14 +9,15 @@ import GHC hiding (exprType)
 import GHC.Builtin.KnownOccs (returnIOIdOcc)
 import GHC.Builtin.Modules (gHC_INTERNAL_BASE)
 import GHC.Builtin.WiredIn.Types
-    (boolTy, charTy, liftedTypeKind, manyDataConTy, maybeTyCon, mkBoxedTupleTy, mkListTy, trueDataConId)
+    (boolTy, charTy, falseDataCon, trueDataCon, liftedTypeKind, manyDataConTy, maybeTyCon, mkBoxedTupleTy, mkListTy, trueDataConId)
 import GHC.Core
-    (Alt (..), AltCon (DEFAULT), Bind (NonRec), CoreExpr, Expr (..),
+    (Alt (..), AltCon (DEFAULT, DataAlt), Bind (NonRec, Rec), CoreExpr, Expr (..),
      Unfolding (CoreUnfolding, uf_tmpl), UnfoldingCache (..), UnfoldingSource (VanillaSrc), mkApps, mkLams)
 import GHC.Core.Coercion (liftCoSubst, mkCoVarCo, mkLiftingContext, mkSubCo)
 import GHC.Core.Coercion.Axiom (Role(..))
 import GHC.Core.Dependent (hasExistentialExpr)
 import GHC.Core.FamInstEnv (emptyFamInstEnv)
+import GHC.Core.Opt.Exitify (exitifyProgram)
 import GHC.Core.Opt.CallArity (callArityRHS)
 import GHC.Core.Opt.OccurAnal (SimplCoreMode(RetainedCore))
 import GHC.Core.Opt.WorkWrap (wwTopBinds)
@@ -26,7 +27,7 @@ import GHC.Core.Make (mkCharExpr, mkListExpr, mkNothingExpr, mkRuntimeErrorApp, 
 import GHC.Core.SimpleOpt (simpleOptNativeExpr)
 import GHC.Core.TyCo.Compare (eqType)
 import GHC.Core.TyCo.Rep (Type (ExistsTy, TyVarTy))
-import GHC.Core.Type (mkTyConApp)
+import GHC.Core.Type (mkTyConApp, mkVisFunTyManyU)
 import GHC.Core.Utils (exprType)
 import GHC.CoreToStg (coreToStg)
 import GHC.CoreToStg.Prep (corePrepExpr)
@@ -50,13 +51,13 @@ import GHC.Runtime.Interpreter (evalString)
 import GHC.Stg.Syntax (GenStgBinding (StgNonRec), GenStgExpr (StgApp, StgCase),
                        StgArg (StgVarArg), GenStgRhs (StgRhsClosure), GenStgTopBinding (StgTopLifted), StgTopBinding)
 import GHC.Tc.Utils.Monad (initIfaceLcl, initIfaceLoad)
-import GHC.Types.Id (mkExportedVanillaId, mkSysLocal, realIdUnfolding)
+import GHC.Types.Id (asJoinId, isJoinId, mkExportedVanillaId, mkSysLocal, realIdUnfolding)
 import GHC.Types.Name (mkExternalName, mkSysTvName, mkSystemName)
 import GHC.Types.Name.Occurrence (mkVarOcc)
 import GHC.Types.SrcLoc (noSrcSpan)
 import GHC.Types.Unique (Unique, UniqueTag (PluginTag))
 import GHC.Types.Unique.Supply (mkSplitUniqSupply, uniqsFromSupply)
-import GHC.Types.Var (ExistsTyFlag (ExplicitExists), mkCoVar, mkTyVar, varType)
+import GHC.Types.Var (ExistsTyFlag (ExplicitExists), isTyVar, mkCoVar, mkTyVar, varType)
 import GHC.Unit.Module (IsBootInterface (NotBoot), mkModule)
 import GHC.Unit.Module.ModIface (emptyFullModIface, mi_decls, set_mi_decls)
 import GHC.Unit.Types (mainUnit)
@@ -130,6 +131,31 @@ checkPackageOptimizers libdir = session libdir $ \env _ -> do
       [NonRec _ result@(Unpack _ _ Pack{} _)] | isNothing (lint result) ->
         putStrLn "worker/wrapper preserves the scope of an opened package"
       _ -> fail "worker/wrapper changed the package or its scope"
+
+    -- A lifted exit uses the abstract payload in a strict case. Its type
+    -- witness must precede the payload in the new join's telescope.
+    ids <- uniqsFromSupply <$> mkSplitUniqSupply PluginTag
+    let fallbackId : loopId : switchId : choiceId : forcedId : _ = ids
+        local name u ty = mkSysLocal (fsLit name) u manyDataConTy ty
+        fallback = local "fallback" fallbackId boolTy
+        boolFun = mkVisFunTyManyU boolTy boolTy
+        loop = asJoinId (local "loop" loopId boolFun) 1
+        switch = local "switch" switchId boolTy
+        choice = local "choice" choiceId boolTy
+        forced = local "forced" forcedId (varType payload)
+        exit = Case (Var payload) forced boolTy [Alt DEFAULT [] (Var fallback)]
+        jump = App (Var loop) true
+        branch = Case (Var switch) choice boolTy
+                   [Alt (DataAlt falseDataCon) [] jump, Alt (DataAlt trueDataCon) [] exit]
+        loopRhs = Lam switch (Unpack witness payload package branch)
+        program = Lam fallback (Let (Rec [(loop, loopRhs)]) jump)
+    unless (isNothing (lint program)) $ fail "Invalid package loop fixture"
+    case exitifyProgram [NonRec (local "select" topId boolFun) program] of
+      [NonRec _ result@(Lam _ (Let (NonRec join (Lam w (Lam x _))) _))]
+        | isJoinId join, isTyVar w, varType x `eqType` TyVarTy w
+        , isNothing (lint result) ->
+          putStrLn "exitification abstracts the hidden witness before its payload"
+      _ -> fail "exitification lost the hidden witness or failed to lift the exit"
 
 -- | Restore a package cast whose only evidence for its free parameter is a Given.
 checkLiftingReadback :: FilePath -> FilePath -> IO ()

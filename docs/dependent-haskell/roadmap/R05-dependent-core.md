@@ -151,16 +151,24 @@ gets `"xxx"` from `toList (filled @Char 3)`. In that client,
 Restricted SimpleOpt eliminates an adjacent pack and unpack when the
 witness stays in scope. The ordinary optimizer can then process the
 result. For a surviving operation, a GHC API check runs the retained
-simplifier, call arity, demand analysis, CPR, worker/wrapper and late demand analysis.
+simplifier, call arity, exitification, inward and outward floating, demand
+analysis, CPR, worker/wrapper and late demand analysis.
 Worker/wrapper produces an unboxed pair worker in this program. The native
 output matches the `-O0` program when the caller ignores a package or
 demands its payload. The [Core API regression](../../../testsuite/tests/ghc-api/NativeExistentialExpr.hs)
-also checks the scope of both operations after worker/wrapper.
+also checks the scope of both operations after worker/wrapper. A recursive
+join exits through a strict case on the hidden payload. Exitification lifts
+the exit and abstracts the type witness before its payload.
 
 The normal `-O1` pipeline still rejects surviving operations.
-Specialisation, floating in both directions, exitification
-and common subexpression elimination still need checks on raw packages.
+Specialisation and common subexpression elimination still need checks on
+raw packages in the full schedule.
 An ordinary `-O1` module can call a separately compiled `-O0` provider.
+If a source binding still constructs or opens a package, GHC-36962
+identifies that binding. For example, `packValue x = Just x` can introduce
+a package implicitly when `packValue` returns `exists (a :: Type). Maybe a`.
+The diagnostic points at `packValue` even though its definition contains
+no `Pack` expression.
 
 ## Next increments
 

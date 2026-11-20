@@ -834,6 +834,19 @@ freeVars = go
         (bind2, bind_fvs) = freeVarsBind bind (freeVarsOf body2)
         body2             = go body
 
+    go (Pack schema witness payload)
+      = ( unionDVarSets [tyCoVarsOfTypeDSet schema, tyCoVarsOfTypeDSet witness,
+                         freeVarsOf payload']
+        , AnnPack schema witness payload' )
+      where payload' = go payload
+
+    go (Unpack witness payload package body)
+      = ( freeVarsOf package' `unionDVarSet` delBindersFV [witness, payload] (freeVarsOf body')
+        , AnnUnpack witness payload package' body' )
+      where
+        package' = go package
+        body' = go body
+
     go (Cast expr co)
       = ( freeVarsOf expr2 `unionDVarSet` cfvs
         , AnnCast expr2 (cfvs, co) )

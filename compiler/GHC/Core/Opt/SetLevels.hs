@@ -353,6 +353,10 @@ lvlExpr env (_, AnnTick tickish expr) = do
     let tickish' = substTickish (le_subst env) tickish
     return (Tick tickish' expr')
 
+-- See Note [Floating bindings across erased packages].
+lvlExpr env expr@(_, AnnPack{})   = return (keepBindingsInPlace env (deAnnotate expr))
+lvlExpr env expr@(_, AnnUnpack{}) = return (keepBindingsInPlace env (deAnnotate expr))
+
 lvlExpr env expr@(_, AnnApp _ _) = lvlApp env expr (collectAnnArgs expr)
 
 -- We don't split adjacent lambdas.  That is, given
@@ -413,8 +417,7 @@ lvlApp env _ (fun, args)
     retainedArgs ty (arg : rest) = do
       let expr = deAnnotate arg
       arg' <- case coreFullView ty of
-        DepFunTy{} -> return (keepIndexArg (le_ctxt_lvl env)
-                                         (substExpr (le_subst env) expr))
+        DepFunTy{} -> return (keepBindingsInPlace env expr)
         _ -> lvlMFE env False arg
       rest' <- retainedArgs (applyTypeToArgs ty [expr]) rest
       return (arg' : rest')
@@ -459,12 +462,21 @@ lvlApp env _ (fun, args)
         ; fun'  <- lvlNonTailExpr env fun
         ; return (foldl' App fun' args') }
 
--- | Tag a retained operand without introducing an opaque binding for any
--- part of its checked index. Work on the renamed expression.
-keepIndexArg :: Level -> CoreExpr -> LevelledExpr
-keepIndexArg lvl = go
+{- Note [Floating bindings across erased packages]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Unpack introduces a type witness and a lazy payload binder. Floating a
+binding across the witness can take its type out of scope. Floating a
+strict case across the payload can change when the package is evaluated.
+Apply the outer substitution and keep the bindings inside each operation
+in place. FloatOut removes their level tags. Retained index arguments use
+the same traversal to preserve the expression checked as an index.
+-}
+
+-- | Apply the level environment's substitution and pin each binder at this level.
+keepBindingsInPlace :: LevelEnv -> CoreExpr -> LevelledExpr
+keepBindingsInPlace env = go . substExpr (le_subst env)
   where
-    tag b = stayPut lvl b
+    tag b = stayPut (le_ctxt_lvl env) b
     go (Var v) = Var v
     go (Lit l) = Lit l
     go (Type t) = Type t
@@ -473,6 +485,8 @@ keepIndexArg lvl = go
     go (Cast e co) = Cast (go e) co
     go (Tick t e) = Tick t (go e)
     go (Lam b e) = Lam (tag b) (go e)
+    go (Pack schema witness payload) = Pack schema witness (go payload)
+    go (Unpack w p e body) = Unpack (tag w) (tag p) (go e) (go body)
     go (Let bind e) = Let (tagBind bind) (go e)
     go (Case e b t alts) = Case (go e) (tag b) t (map tagAlt alts)
     tagBind (NonRec b rhs) = NonRec (tag b) (go rhs)
