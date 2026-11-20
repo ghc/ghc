@@ -119,7 +119,7 @@ import GHC.Data.Bag
 import Control.Monad
 import Data.Either      ( partitionEithers )
 import Data.Function    ( on )
-import Data.List        ( find, partition, sortBy )
+import Data.List        ( find, isPrefixOf, partition, sortBy )
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Semigroup as Semi
 import System.IO.Unsafe ( unsafePerformIO )
@@ -534,19 +534,20 @@ lookupExactOrOrig_base rdr_name
     cvtEither (Left e)    = ExactOrOrigError e
     cvtEither (Right gre) = FoundExactOrOrig gre
 
--- | Look up a local original name, including a private checked synonym.
+-- | Look up a local original name, including a reified signature's sum synonym.
 -- A reified value signature can refer to a synonym from an earlier declaration
 -- group. The renamer removes its GRE to keep it out of source lookup and exports.
 lookupLocalOrigGRE :: Name -> RnM (Either NotInScopeError GlobalRdrElt)
 lookupLocalOrigGRE name = do
   exact <- lookupLocalExactGRE name
   case exact of
-    Left NoExactName{} -> do
-      env <- getGblEnv
-      return $ case lookupNameEnv (tcg_type_env env) name of
-        Just thing@(ATyCon tc) | isTypeSynonymTyCon tc ->
-          Right (mkExactGRE name (tyThingGREInfo thing))
-        _ -> exact
+    Left NoExactName{}
+      | "$signature-sum:" `isPrefixOf` occNameString (nameOccName name) -> do
+        env <- getGblEnv
+        return $ case lookupNameEnv (tcg_type_env env) name of
+          Just thing@(ATyCon tc) | isTypeSynonymTyCon tc ->
+            Right (mkExactGRE name (tyThingGREInfo thing))
+          _ -> exact
     _ -> return exact
 
 {- Note [Errors in lookup functions]
