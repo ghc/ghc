@@ -317,11 +317,11 @@ and [scope and demand checks](../../../testsuite/tests/dependent/should_run/Nati
 
 `splitAtValue` takes a runtime cut and the original vector.
 It returns a retained prefix, a retained suffix, and
-`appendVec left right :~~: original`. The zero branch stores the
+`appendVec left right :~: original`. The zero branch stores the
 input as the suffix. The successor branch opens the recursive result
 and uses its equality to put the original head on the prefix.
 Removing the match on the induction premise makes GHC reject the final
-`HRefl` with GHC-83865.
+`Refl` with GHC-83865.
 
 A separate ordinary client splits `[True, False, True]` at two and reads
 `[True, False]` and `[True]`. After matching the equality it appends
@@ -339,7 +339,7 @@ and [Agda provenance](../REFERENCES.md#prove-that-the-pieces-reconstruct-the-inp
 An independent runtime cut uses the existing remainder proof.
 `checkedSplitAtValue cut total input` returns `Nothing` when the cut
 exceeds the total. A successful result stores the actual suffix length,
-its addition equality, the two vectors, and their contents equality.
+the GADT that relates the three lengths, the two vectors, and their contents equality.
 The client can inspect the length result without evaluating the vector.
 The source-hidden regression checks zero, interior, exact, and excessive
 cuts. [Checked split](../examples/packed-vector/CertifiedSplit.hs)

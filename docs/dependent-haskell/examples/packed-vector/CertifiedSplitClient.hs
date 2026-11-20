@@ -2,34 +2,34 @@
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
 module CertifiedSplitClient (splitObservation, checkDemand, checkedObservation, checkBounds) where
 
-import CertifiedSplit (checkedSplitAtValue, splitAtValue)
+import CertifiedSplit (SplitAtWidth(..), checkedSplitAtValue, splitAtValue)
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Data.IORef (newIORef, readIORef)
-import Data.Type.Equality ((:~:)(Refl), (:~~:)(HRefl))
+import Data.Type.Equality ((:~:)(Refl))
 import GHC.Sigma (Sigma(Pair))
 import qualified PackedVecLibrary as P
 
 -- | Read both pieces and their append after opening the equality.
 atTwo :: P.Vec Bool ('P.S ('P.S ('P.S 'P.Z))) -> ([Bool], [Bool], [Bool])
 atTwo v = case splitAtValue @Bool @('P.S 'P.Z) (P.S (P.S P.Z)) v of
-    Pair left (Pair right HRefl) -> (P.toList left, P.toList right, P.toList (P.appendVec left right))
+    Pair left (Pair right Refl) -> (P.toList left, P.toList right, P.toList (P.appendVec left right))
 
 -- | Split at a length obtained at runtime.
 atRuntime :: P.Nat -> ([Bool], [Bool])
 atRuntime cut =
     let input = P.replicateNative (P.plus cut (P.S P.Z)) True
     in case splitAtValue @Bool @('P.S 'P.Z) cut input of
-        Pair left (Pair right HRefl) -> (P.toList left, P.toList right)
+        Pair left (Pair right Refl) -> (P.toList left, P.toList right)
 
 -- | Demand the zero-cut proof while leaving the original vector lazy.
 atZero :: P.Vec Bool ('P.S 'P.Z) -> Bool
 atZero v = case splitAtValue @Bool @('P.S 'P.Z) P.Z v of
-    Pair _ (Pair _ HRefl) -> True
+    Pair _ (Pair _ Refl) -> True
 
 -- | Demand the proof for a one-cell prefix.
 atOne :: P.Vec Bool ('P.S ('P.S 'P.Z)) -> Bool
 atOne v = case splitAtValue @Bool @('P.S 'P.Z) (P.S P.Z) v of
-    Pair _ (Pair _ HRefl) -> True
+    Pair _ (Pair _ Refl) -> True
 
 -- | Observe the contents for a written cut and for a cut read from IO.
 splitObservation :: IO (([Bool], [Bool], [Bool]), ([Bool], [Bool]))
@@ -51,7 +51,7 @@ contents cut total list = do
     input <- P.fromListExact total list
     split <- checkedSplitAtValue cut total input
     case split of
-        Pair suffix (Refl, Pair left (Pair right HRefl)) ->
+        Pair suffix (SplitAtWidth (Pair left (Pair right Refl))) ->
             Just (P.natToInt suffix, P.toList left, P.toList right, P.toList (P.appendVec left right))
 
 -- | Ask for the length proof while the original vector is bottom.
@@ -62,7 +62,7 @@ bound cut total =
         input = missing (P.replicateNative total True)
     in case checkedSplitAtValue cut total input of
         Nothing -> Nothing
-        Just (Pair suffix (Refl, _)) -> Just (P.natToInt suffix)
+        Just (Pair suffix (SplitAtWidth _)) -> Just (P.natToInt suffix)
 
 -- | Read the cut, length, and list independently. Also try an excessive cut.
 checkedObservation :: IO [Maybe (Int, [Bool], [Bool], [Bool])]

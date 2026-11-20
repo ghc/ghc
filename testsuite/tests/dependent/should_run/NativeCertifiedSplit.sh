@@ -32,10 +32,10 @@ HS
     ./run
 done
 cd "$out/proof"
-sed 's/stepProof _ _ _ _ HRefl = HRefl/stepProof _ _ _ _ _ = HRefl/' CertifiedSplit.hs >MissingPremise.hs
+sed 's/stepProof _ _ _ _ Refl = Refl/stepProof _ _ _ _ _ = Refl/' CertifiedSplit.hs >MissingPremise.hs
 if "${ghc[@]}" -O0 -ferror-spans -fforce-recomp -c MissingPremise.hs >reject.log 2>&1; then
     echo 'Accepted reassembly without the induction premise'
     exit 1
 fi
-rule=$(grep -n '^stepProof _ _ _ _ _ = HRefl' MissingPremise.hs | cut -d: -f1)
-grep -F "MissingPremise.hs:$rule:23-27: error: [GHC-83865]" reject.log >/dev/null
+rule=$(grep -n '^stepProof _ _ _ _ _ = Refl' MissingPremise.hs | cut -d: -f1)
+grep -F "MissingPremise.hs:$rule:23-26: error: [GHC-83865]" reject.log >/dev/null
