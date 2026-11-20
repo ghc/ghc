@@ -1082,6 +1082,8 @@ main = do
         (Refl :: Prelude.map Prelude.not '[ 'True, 'False] :~: '[ 'False, 'True])
     observe "pass an unapplied type family to another family"
         (Refl :: MapFlags FlipFlag '[ 'True, 'False] :~: '[ 'False, 'True])
+    observe "replace an equal callback before supplying the input list"
+        (sameMapping (Refl :: FlipFlag :~: FlipFlag))
     observe "pass a type family with an unapplied invisible binder"
         (Refl :: InvisibleFamily.Observed :~: 'True)
     observe "infer the result kind after passing a visible family argument"
@@ -1162,6 +1164,10 @@ type MapFlags :: (Bool %U -> Bool) -> [Bool] -> [Bool]
 type family MapFlags f xs where
     MapFlags f '[] = '[]
     MapFlags f (x ': xs) = f x ': MapFlags f xs
+
+-- | Equal callbacks give equal traversals before either traversal receives a list.
+sameMapping :: (f :: Bool %U -> Bool) :~: g -> MapFlags f :~: MapFlags g
+sameMapping Refl = Refl
 
 -- | Prove the first output cell without supplying the input tail.
 erasedCell :: forall (xs :: Spine.Spine Bool). Proxy xs

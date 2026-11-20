@@ -366,6 +366,10 @@ For example, normalize Vec Int (Add Z n) under foreach n to Vec Int n.
 Recheck reflexivity after both sides have been rewritten. The rewriting evidence
 already relates the original constraint to these normalized endpoints.
 
+A partially applied family can also become reflexive. Given a ~ b,
+rewriting F a ~ F b produces F a ~ F a. The arguments already agree.
+No injectivity of F is required.
+
 This check does not decompose a retained function or assign a meta-variable.
 Opaque runtime indices stay rigid. In particular, Add n Z does not reduce
 without constructor information about n. See Note [Rewriting retained dependent
@@ -482,6 +486,10 @@ can_eq_nc _ _ _ ev NomEq lhs@(TyConApp tc args) _ rhs@(TyConApp tc' _) _
   , lhs `tcEqType` rhs = canEqReflexive ev NomEq lhs
 
 -- See Note [Reflexivity after retained normalization].
+can_eq_nc ces _ _ ev eq_rel lhs@(TyConApp tc args) _ rhs@(TyConApp tc' _) _
+  | bothRewritten ces, tc == tc', isUnsaturatedUserFamily tc args
+  , lhs `tcEqType` rhs
+  = canEqReflexive ev eq_rel lhs
 can_eq_nc ces _rdr_env _envs ev eq_rel ty1@(TermVarTy v1) _ (TermVarTy v2) _
   | bothRewritten ces, v1 == v2
   = canEqReflexive ev eq_rel ty1

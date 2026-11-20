@@ -5889,6 +5889,17 @@ index. The matchable and unmatchable arrow choices are specific to GHC.
 [Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html)
 and [the separate-module example](examples/open-evaluation/NestedFunctionClient.hs).
 
+### Equality of a partial family after rewriting its argument
+
+Agda's `cong` transports equality through any function by matching on
+`refl`. Proposal 242 distinguishes that direction from recovering an
+input from a type function's result. In the Showcase, equality of two
+callbacks suffices to replace one with the other in a partially applied
+`MapFlags`. The list argument remains open.
+[Agda standard library v2.3](https://agda.github.io/agda-stdlib/v2.3/Relation.Binary.PropositionalEquality.Core.html#cong),
+[proposal 242 on matchability](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#matchabilities)
+and [ordinary client](../../testsuite/tests/dependent/should_run/NativeUnsaturatedClient.hs).
+
 ### Inferring a prefix of invisible family arguments
 
 Proposal 242 gives partial type family applications a kind with

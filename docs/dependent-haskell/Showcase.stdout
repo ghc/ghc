@@ -271,6 +271,7 @@ rebuild one spine cell while its tail remains unknown: Refl
 carry the same tag through a recursive spine: Refl
 apply Prelude.map to Prelude.not at a known list: Refl
 pass an unapplied type family to another family: Refl
+replace an equal callback before supplying the input list: Refl
 pass a type family with an unapplied invisible binder: Refl
 infer the result kind after passing a visible family argument: Refl
 infer the first invisible family argument and leave the second open: (Refl,Refl)
