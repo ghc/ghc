@@ -336,8 +336,8 @@ Different values use separate counters. The private type namespace also
 separates a function operator from a same-spelled type operator. A
 signature shared by several values uses its first name.
 
-For an ordinary Haskell98 constructor, use its name and count sums from
-left to right across its fields. Use a separate prefix for constructor
+For a Haskell98 data or newtype constructor, use its name and count sums
+from left to right across its fields. Use a separate prefix for constructor
 fields. The constructor name is unique in the module even when record
 labels repeat. A field can use the type header's erased variables.
 Leave constructors with their own telescopes to the ordinary renamer.
@@ -350,7 +350,7 @@ at the source occurrence.
 Skip types that contain splices or holes. Do not lift across nested
 binders. They can shadow the original names or bind a retained index.
 -}
--- | Prepare retained sums in top-level signatures and ordinary data fields.
+-- | Prepare retained sums in top-level signatures and ordinary constructor fields.
 liftDeclarationSums :: Bool -> HsGroup GhcPs -> (HsGroup GhcPs, LiftedDecls)
 liftDeclarationSums named_wildcards group
   | not (null synonyms)
@@ -372,12 +372,17 @@ liftDeclarationSums named_wildcards group
       in (decls{group_tyclds = decls'}, concat sums)
 
     liftData (L loc decl@DataDecl{tcdTyVars = hsq,
-                                 tcdDataDefn = defn@HsDataDefn{dd_cons = DataTypeCons False cons}}) =
+                                 tcdDataDefn = defn@HsDataDefn{dd_cons = cons}}) =
       let binders = hsQTvExplicit hsq
           (kind_occs, _) = hsQTyVarKindOccs binders []
           scope = implicitCaptures kind_occs ++ explicitCaptures binders
-          (cons', sums) = unzip (map (liftConstructor scope) cons)
-      in (L loc decl{tcdDataDefn = defn{dd_cons = DataTypeCons False cons'}}, concat sums)
+          (cons', sums) = case cons of
+            DataTypeCons False fields ->
+              let (fields', lifted) = unzip (map (liftConstructor scope) fields)
+              in (DataTypeCons False fields', concat lifted)
+            NewTypeCon field -> first NewTypeCon (liftConstructor scope field)
+            _ -> (cons, [])
+      in (L loc decl{tcdDataDefn = defn{dd_cons = cons'}}, sums)
     liftData decl = (decl, [])
 
     liftConstructor scope (L loc con@ConDeclH98{con_telescope = [], con_name = owner, con_args = args}) =
