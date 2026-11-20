@@ -131,8 +131,8 @@ source examples. General promotion remains open.
 
 ## Current work queue
 
-1. **R05.** Extend source rule support to orphan rules and rules over
-   retained functions. Both currently report GHC-51063. Preserve the
+1. **R05.** Extend source rule support to imported heads and rules over
+   retained functions. Check an imported head with a local anchor and a true orphan. Both currently report GHC-51063. Preserve the
    witness-scope checks used for erased packages.
    [Current rule support](roadmap/R05-dependent-core.md#lexical-package-operations-in-user-rules).
 2. **R23.** Resolve the compatibility policy for unchanged

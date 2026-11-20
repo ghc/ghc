@@ -243,7 +243,10 @@ first-element fold leaves an undefined tail unevaluated.
 The client needs only the provider's interface to compile. The interface
 must include a declaration for the private step-fold function. Older
 providers could record its name as an unbound local. A rule directly on
-the imported `foldr` still reaches the orphan-rule restriction.
+the imported `foldr` still receives GHC-51063. Its left-hand side contains
+the local `toList`, so GHC classifies this rule as non-orphan. A rule for
+`open (hide x)` declared in a third module with both names imported is an
+orphan. The optimizer currently rejects both imported heads.
 [Producer](../examples/erased-existentials/ErasedStream.hs),
 [ordinary client](../examples/erased-existentials/StreamFold.hs)
 and [rule-firing test](../../../testsuite/tests/dependent/should_run/NativeSimplifier.sh).
