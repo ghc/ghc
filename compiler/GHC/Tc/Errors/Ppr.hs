@@ -58,6 +58,7 @@ import GHC.Core.Coercion.Axiom (CoAxBranch, coAxiomTyCon, coAxiomSingleBranch,
 import GHC.Core.ConLike
 import GHC.Core.FamInstEnv ( FamInst(..), famInstAxiom, pprFamInst )
 import GHC.Core.InstEnv
+import qualified GHC.Core.TyCo.Compare as TypeCompare
 import GHC.Core.TyCo.Rep (Type(..))
 import GHC.Core.TyCo.Ppr (pprWithInvisibleBitsWhen, pprSourceTyCon,
                           pprTyVars, pprWithTYPE, pprTyVar, pprTidiedType, pprForAllWithMatchability)
@@ -5115,8 +5116,7 @@ pprMismatchMsg ctxt
                          -- recommend removing args that aren't
                , Just thing <- mb_thing
                , not (stuck_family_result ty1 || stuck_family_result ty2)
-               , not (typeKind ty1 `tcEqType` matchabilityTy &&
-                      typeKind ty2 `tcEqType` matchabilityTy)
+               , not (isMatchabilityMismatch ty1 ty2)
                  -- See Note [Argument counts in kind errors].
                -> Just $ pprTcSolverReportMsg ctxt (ExpectingMoreArguments n thing)
              _ -> Nothing
@@ -5277,6 +5277,7 @@ shouldPprWithInvisibleBits ty1 ty2
         -- See tests T9171, T9144.
 
       , mayLookIdentical ty1 ty2
+      , Set.fromList [TypeCompare.InvisibleMatchability | isMatchabilityMismatch ty1 ty2]
       ]
 shouldPprWithInvisibleBits ty1 ty2
   eq@(KindEqOrigin act exp orig _)
@@ -5287,6 +5288,11 @@ shouldPprWithInvisibleBits ty1 ty2
       ]
 shouldPprWithInvisibleBits ty1 ty2 _ct
   = mayLookIdentical ty1 ty2
+
+-- | Check whether both sides of the mismatch have kind Matchability.
+isMatchabilityMismatch :: Type -> Type -> Bool
+isMatchabilityMismatch ty1 ty2 =
+  typeKind ty1 `tcEqType` matchabilityTy && typeKind ty2 `tcEqType` matchabilityTy
 
 pprWithLinearTypes :: SDoc -> SDoc
 pprWithLinearTypes =
@@ -5335,8 +5341,11 @@ unnecessary clutter:
 
   - Matchability. Controlled by -fprint-explicit-matchabilities.
     Ordinary user-style arrows omit fixed matchability annotations.
-    Show them when they distinguish otherwise identical types. Keep
-    the modifier syntax in modules that use -XModifiers.
+    Show them when they distinguish otherwise identical types. If the
+    solver reports a mismatch between two matchabilities, show how
+    they occur in the expected and actual kinds. The expected kind can
+    be a family application that conceals the underlying arrow.
+    Keep the modifier syntax in modules that use -XModifiers.
 
 To achieve this, each of these user-facing flags controls a field of
 'SDocContext', respectively:
