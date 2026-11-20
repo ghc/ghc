@@ -7328,6 +7328,7 @@ data UnrepresentableTypeDescr
   = LinearInvisibleArgument
   | CoercionsInTypes
   | DataConVisibleForall
+  | FirstClassExistential
 
 -- FFI error types
 data IllegalForeignTypeReason

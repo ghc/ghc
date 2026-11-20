@@ -7932,6 +7932,7 @@ pprTHReifyError = \case
            LinearInvisibleArgument -> (True , text "linear invisible argument")
            CoercionsInTypes        -> (False, text "coercions in types")
            DataConVisibleForall    -> (False, text "visible forall in the type of a data constructor")
+           FirstClassExistential   -> (False, text "first-class existential type")
 
 pprTypedTHError :: TypedTHError -> DecoratedSDoc
 pprTypedTHError = \case

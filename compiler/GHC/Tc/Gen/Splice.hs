@@ -3928,6 +3928,7 @@ reifyType ty                | tcIsLiftedTypeKind ty = return TH.StarT
 reifyType ty@(TermAppTy {}) = pprPanic "reifyType: unsupported runtime call index" (ppr ty)
 reifyType ty@(TermVarTy {}) = pprPanic "reifyType: unsupported runtime index" (ppr ty)
 reifyType ty@(DepFunTy {}) = pprPanic "reifyType: unsupported retained function" (ppr ty)
+reifyType ty@ExistsTy{}     = noTH FirstClassExistential ty
 reifyType (ForAllTy ma (Bndr tv argf) body)
   -- See Note [Reifying forall matchability].
   = do { ma' <- reifyType ma
