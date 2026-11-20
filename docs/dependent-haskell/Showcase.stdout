@@ -2,6 +2,7 @@ Dependent Haskell: completed source features
 runtime Bool choice: "42"
 apply retained function rules without forcing an unused index: (7,11,19)
 infer both rule binders from readKept: 7
+apply a rule declared outside the retained function's module: 23
 choose True has result Int: 42
 choose False has result Bool: False
 keep ignores bottom index and payload: 42

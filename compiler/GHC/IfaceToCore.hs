@@ -76,7 +76,7 @@ import GHC.Core.DataCon
 import GHC.Core.Dependent
   ( hasNativeDependentExprRhs, hasNativeDependentUnfolding
   , isRetainedVanillaDefaultMethod, hasRetainedRuleHead, supportsLocalUserRule
-  , supportsErasedUserRule, supportsImportedErasedRule )
+  , supportsErasedUserRule, supportsImportedErasedRule, supportsImportedUserRule )
 import GHC.Core.Predicate ( mkNomEqPred )
 import GHC.Core.Opt.OccurAnal ( occurAnalyseBndrsAndExpr )
 import GHC.Core.Ppr
@@ -1616,6 +1616,7 @@ tcIfaceRule iface_rule@IfaceRule{ifRuleName = name, ifActivation = act, ifRuleBn
                              Just (supportsImportedErasedRule, "Unsupported anchored erased rule shape.")
                            IfaceErasedUserRule -> Just (supportsErasedUserRule, "Unsupported erased user rule shape.")
                            IfaceRetainedUserRule -> Just (supportsLocalUserRule, "Unsupported retained function rule shape.")
+                           IfaceImportedRetainedRule -> Just (supportsImportedUserRule, "Unsupported imported retained rule shape.")
                            IfaceRetainedAutoRule -> Just (canShareRetainedSpecRule, "Unsupported retained specialization shape.")
                            _ -> Nothing
                    ; case checked of
@@ -1627,6 +1628,8 @@ tcIfaceRule iface_rule@IfaceRule{ifRuleName = name, ifActivation = act, ifRuleBn
                                IfaceAnchoredErasedRule ->
                                  (not (isOrphan orph) && maybe False (/= this_mod) (nameModule_maybe fn),
                                   "Expected a local anchor and an imported rule head.")
+                               IfaceImportedRetainedRule ->
+                                 (maybe False (/= this_mod) (nameModule_maybe fn), "Expected an imported retained rule head.")
                                _ -> (nameModule_maybe fn == Just this_mod,
                                      "Expected a rule head defined in this module.")
                          unless owner_ok $
@@ -1638,6 +1641,7 @@ tcIfaceRule iface_rule@IfaceRule{ifRuleName = name, ifActivation = act, ifRuleBn
                          let rule = mk_rule this_mod bndrs' args' rhs'
                          let has_evidence = case kind of
                                IfaceRetainedUserRule -> hasRetainedRuleHead fun
+                               IfaceImportedRetainedRule -> hasRetainedRuleHead fun
                                _ -> native
                          unless (has_evidence && accepts fun rule) $
                            failIfM (retained_doc $$ text shape_error)
@@ -1678,6 +1682,7 @@ tcIfaceRule iface_rule@IfaceRule{ifRuleName = name, ifActivation = act, ifRuleBn
       IfaceAnchoredErasedRule -> text "Invalid anchored erased package rule:" <+> pprRuleName name
       IfaceErasedUserRule -> text "Invalid erased package rule:" <+> pprRuleName name
       IfaceRetainedUserRule -> text "Invalid retained function rule:" <+> pprRuleName name
+      IfaceImportedRetainedRule -> text "Invalid imported retained function rule:" <+> pprRuleName name
       _ -> text "Invalid retained specialization rule:" <+> pprRuleName name
 
     mk_rule this_mod bndrs' args' rhs' =

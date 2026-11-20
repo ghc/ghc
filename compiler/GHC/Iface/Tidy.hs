@@ -418,7 +418,7 @@ data TidyOpts = TidyOpts
   , opt_static_ptr_opts :: !(Maybe StaticPtrOpts)
       -- ^ Options for generated static pointers, if enabled (/= Nothing).
   , opt_has_retained_core :: !Bool
-  , opt_check_imported_rule :: CoreRule -> IO Bool
+  , opt_check_imported_rule :: CoreRule -> IO (Maybe (Id, Bool))
   , opt_keep_auto_rules :: !Bool
   }
 
@@ -462,14 +462,12 @@ tidyProgram opts (ModGuts { mg_module           = mod
                (ppr bndr)
         _ -> pure ()
     let heads = mkNameEnv [(idName b, b) | b <- bindersOfBinds trimmed_binds]
-    forM_ trimmed_rules $ \ rule -> do
-      let head_id = lookupNameEnv heads (ru_fn rule)
-      when (not (isAutoRule rule) &&
-            (maybe False hasRetainedRuleHead head_id || hasNativeDependentProgram [] [rule])) $ do
-        allowed <- case head_id of
-          Just fun -> pure (supportsLocalUserRule fun rule)
-          Nothing -> opt_check_imported_rule opts rule
-        unless allowed $ throwGhcExceptionIO $ PprProgramError
+    forM_ trimmed_rules $ \ rule -> unless (isAutoRule rule) $ do
+      checked <- case lookupNameEnv heads (ru_fn rule) of
+        Just fun -> pure (Just (fun, supportsLocalUserRule fun rule))
+        Nothing -> opt_check_imported_rule opts rule
+      when (maybe False (hasRetainedRuleHead . fst) checked || hasNativeDependentProgram [] [rule]) $
+        unless (maybe False snd checked) $ throwGhcExceptionIO $ PprProgramError
           "Cannot export a rewrite rule that contains retained Core."
           (ppr rule)
 

@@ -17,7 +17,7 @@ import GHC.Driver.Env
 import GHC.Driver.Backend
 
 import GHC.Core (CoreProgram, CoreRule(..), bindersOfBinds)
-import GHC.Core.Dependent (supportsImportedErasedRule)
+import GHC.Core.Dependent (supportsImportedUserRule)
 import GHC.Core.Lint (lintRule)
 import GHC.Driver.Config.Core.Lint (initLintConfig)
 import GHC.Core.Make (getMkStringIds)
@@ -28,6 +28,7 @@ import GHC.Iface.Load (KnownEntitySource(..), loadKnownKeyOccMaps)
 import GHC.Tc.Utils.Env (lookupKnownKeyGlobal)
 import GHC.Tc.Utils.Monad (initIfaceLoad)
 import GHC.Types.Error (pprDiagnostic)
+import GHC.Types.Id (Id)
 import GHC.Types.Name (nameModule_maybe)
 import GHC.Types.Name.Env (emptyNameEnv)
 import GHC.Types.TyThing
@@ -57,21 +58,26 @@ initTidyOpts native hsc_env guts = do
     , opt_trim_ids          = gopt Opt_OmitInterfacePragmas dflags
     , opt_static_ptr_opts   = static_ptr_opts
     , opt_has_retained_core = native
-    , opt_check_imported_rule = checkImportedPackageRule hsc_env (mg_module guts) (mg_binds guts)
+    , opt_check_imported_rule = checkImportedUserRule hsc_env (mg_module guts) (mg_binds guts)
     , opt_keep_auto_rules   = gopt Opt_KeepAutoRules dflags
     }
 
 -- | Resolve an imported rule head in the loaded type environment and lint both sides.
 -- See Note [Imported heads of erased package rules] in GHC.Core.Dependent.
 checkImportedPackageRule :: HscEnv -> Module -> CoreProgram -> CoreRule -> IO Bool
-checkImportedPackageRule hsc_env owner binds rule@Rule{ru_fn = name, ru_origin = origin}
+checkImportedPackageRule hsc_env owner binds rule =
+    maybe False snd <$> checkImportedUserRule hsc_env owner binds rule
+
+-- | Keep the head available to the export check even for a rule with an ordinary RHS.
+checkImportedUserRule :: HscEnv -> Module -> CoreProgram -> CoreRule -> IO (Maybe (Id, Bool))
+checkImportedUserRule hsc_env owner binds rule@Rule{ru_fn = name, ru_origin = origin}
   | origin == owner, Just head_mod <- nameModule_maybe name, head_mod /= owner = do
       thing <- lookupType hsc_env name
       pure $ case thing of
-        Just (AnId fun) -> supportsImportedErasedRule fun rule &&
-          isNothing (lintRule (initLintConfig (hsc_dflags hsc_env) (bindersOfBinds binds)) fun rule)
-        _ -> False
-checkImportedPackageRule _ _ _ _ = pure False
+        Just (AnId fun) -> Just (fun, supportsImportedUserRule fun rule &&
+          isNothing (lintRule (initLintConfig (hsc_dflags hsc_env) (bindersOfBinds binds)) fun rule))
+        _ -> Nothing
+checkImportedUserRule _ _ _ _ = pure Nothing
 
 initStaticPtrOpts :: HscEnv -> ModGuts -> IO StaticPtrOpts
 initStaticPtrOpts hsc_env guts = do

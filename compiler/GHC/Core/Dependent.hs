@@ -3,7 +3,8 @@ module GHC.Core.Dependent (
     hasNativeDependentProgram,
     supportsNativeGentle,
     supportsNativeRuleBinds,
-    hasRetainedRuleHead, supportsLocalUserRule, supportsErasedUserRule, supportsImportedErasedRule,
+    hasRetainedRuleHead, supportsLocalUserRule, supportsErasedUserRule,
+    supportsImportedErasedRule, supportsImportedUserRule,
     supportsQuickLookType,
     hasNativeDependentExpr,
     hasExistentialExpr,
@@ -119,6 +120,13 @@ The rule for keep b (choose b) also mentions the runtime index in an
 operand. Check both shapes with the retained optimizer's existing type
 and coercion checks. The producer and the reader lint the whole rule.
 An imported use of keep selects the retained optimizer from its type.
+
+The rule can also live in a third module. For a closed rule such as
+keep False p = p, the imported head's Name can be the only reference to
+retained syntax. Resolve that Name in the loaded type environment before
+choosing the interface tag. Preserve the rule's defining module and its
+ordinary orphan classification. A reader with only local retained-rule
+support requires the old tag's head to belong to the rule module.
 -}
 
 -- | Can the producer and reader process this local source rule?
@@ -132,17 +140,24 @@ supportsErasedUserRule _ _ = False
 -- | Check an imported head and its ordinary rule visibility.
 -- See Note [Imported heads of erased package rules].
 supportsImportedErasedRule :: Id -> CoreRule -> Bool
-supportsImportedErasedRule fun rule@Rule{ru_fn = name, ru_origin = origin,
+supportsImportedErasedRule fun rule =
+    not (hasRetainedRuleHead fun) && supportsImportedUserRule fun rule
+
+-- | Validate both the imported head and a local anchor, when present.
+supportsImportedUserRule :: Id -> CoreRule -> Bool
+supportsImportedUserRule fun rule@Rule{ru_fn = name, ru_origin = origin,
                                          ru_local = False, ru_orphan = orphan, ru_args = args}
   | Just owner <- nameModule_maybe name
   , owner /= origin
   , case orphan of
       IsOrphan -> True
       NotOrphan anchor -> NameSet.nameSetAny (is_anchor anchor) (orphNamesOfExprs args)
-  = userRuleShape CheckErasedTypes fun rule
+  = userRuleShape purpose fun rule
   where
+    purpose | hasRetainedRuleHead fun = CheckGentle
+            | otherwise = CheckErasedTypes
     is_anchor anchor n = nameIsLocalOrFrom origin n && nameOccName n == anchor
-supportsImportedErasedRule _ _ = False
+supportsImportedUserRule _ _ = False
 
 -- | Check the typed operands shared by local and imported rule heads.
 userRuleShape :: ScanPurpose -> Id -> CoreRule -> Bool

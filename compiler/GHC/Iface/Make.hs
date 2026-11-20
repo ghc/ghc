@@ -127,7 +127,7 @@ mkPartialIface hsc_env core_prog mod_details mod_summary import_decls
          }
   = do
       self_recomp <- traverse (mkSelfRecomp hsc_env this_mod (ms_hs_hash mod_summary)) usages
-      return $ mkIface_ hsc_env this_mod core_prog hsc_src deps rdr_env import_decls fix_env warns self_trust
+      mkIface_ hsc_env this_mod core_prog hsc_src deps rdr_env import_decls fix_env warns self_trust
                 safe_mode self_recomp docs mod_details modBreaks
 
 -- | Fully instantiate an interface. Adds fingerprints and potentially code
@@ -254,7 +254,7 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary mb_program mb_modBreaks
           docs  <- extractDocs dflags tc_result
           self_recomp <- traverse (mkSelfRecomp hsc_env this_mod (ms_hs_hash mod_summary)) usage
 
-          let partial_iface = mkIface_ hsc_env
+          partial_iface <- mkIface_ hsc_env
                    this_mod (fromMaybe [] mb_program) hsc_src
                    deps rdr_env import_decls
                    fix_env warns
@@ -311,7 +311,7 @@ mkIface_ :: HscEnv -> Module -> CoreProgram -> HscSource
          -> Maybe Docs
          -> ModDetails
          -> Maybe ModBreaks
-         -> PartialModIface
+         -> IO PartialModIface
 mkIface_ hsc_env
          this_mod core_prog hsc_src deps rdr_env import_decls fix_env src_warns
          pkg_trust_req safe_mode self_recomp
@@ -330,6 +330,7 @@ mkIface_ hsc_env
 --      to expose in the interface
         modBreaks
   = do
+    iface_rules <- traverse (coreRuleToIfaceRule hsc_env type_env) rules
     let home_unit    = hsc_home_unit hsc_env
         semantic_mod = homeModuleNameInstantiation home_unit (moduleName this_mod)
         entities = typeEnvElts type_env
@@ -358,7 +359,6 @@ mkIface_ hsc_env
           -- deterministic, so we sort by OccName to canonicalize it.
           -- See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM for more details.
         warns       = toIfaceWarnings src_warns
-        iface_rules = map (coreRuleToIfaceRule type_env) rules
         iface_insts = map instanceToIfaceInst $ fixSafeInstances safe_mode (instEnvElts insts)
         iface_fam_insts = map famInstToIfaceFamInst fam_insts
         trust_info  = setSafeMode safe_mode
@@ -366,7 +366,7 @@ mkIface_ hsc_env
         icomplete_matches = map mkIfaceCompleteMatch complete_matches
         !rdrs = mkIfaceTopEnv rdr_env
 
-    emptyPartialModIface this_mod
+    pure $ emptyPartialModIface this_mod
           -- Need to record this because it depends on the -instantiated-with flag
           -- which could change
           & set_mi_sig_of           (if semantic_mod == this_mod
@@ -468,29 +468,35 @@ ifaceRoughMatchTcs tcs = map do_rough tcs
     do_rough (RM_KnownTc n) = Just (toIfaceTyCon_name n)
 
 --------------------------
-coreRuleToIfaceRule :: TypeEnv -> CoreRule -> IfaceRule
+coreRuleToIfaceRule :: HscEnv -> TypeEnv -> CoreRule -> IO IfaceRule
 -- A plugin that installs a BuiltinRule in a CoreDoPluginPass should
 -- ensure that there's another CoreDoPluginPass that removes the rule.
 -- Otherwise a module using the plugin and compiled with -fno-omit-interface-pragmas
 -- would cause panic when the rule is attempted to be written to the interface file.
-coreRuleToIfaceRule _ rule@(BuiltinRule {})
+coreRuleToIfaceRule _ _ rule@(BuiltinRule {})
   = pprPanic "toHsRule:" (pprRule rule)
 
-coreRuleToIfaceRule type_env rule@(Rule { ru_name = name, ru_fn = fn,
+coreRuleToIfaceRule hsc_env type_env rule@(Rule { ru_name = name, ru_fn = fn,
                             ru_act = act, ru_bndrs = bndrs,
                             ru_args = args, ru_rhs = rhs,
                             ru_orphan = orph, ru_auto = auto, ru_origin = origin })
-  = IfaceRule { ifRuleName   = name,
+  = do
+    head_thing <- if not auto && imported
+                  then GHC.Driver.Env.lookupType hsc_env fn
+                  else pure (lookupTypeEnv type_env fn)
+    pure IfaceRule { ifRuleName   = name,
                 ifActivation = act,
                 ifRuleBndrs  = map toIfaceBndr bndrs,
                 ifRuleHead   = fn,
                 ifRuleArgs   = map do_arg args,
                 ifRuleRhs    = toIfaceExpr rhs,
-                ifRuleKind   = kind,
+                ifRuleKind   = kind head_thing,
                 ifRuleOrph   = orph }
   where
-    kind | not auto, Just (AnId fun) <- lookupTypeEnv type_env fn
-         , hasRetainedRuleHead fun = IfaceRetainedUserRule
+    imported = maybe False (/= origin) (nameModule_maybe fn)
+    kind head_thing
+         | not auto, Just (AnId fun) <- head_thing, hasRetainedRuleHead fun =
+             if imported then IfaceImportedRetainedRule else IfaceRetainedUserRule
          | hasNativeDependentProgram [] [rule] =
              if auto then IfaceRetainedAutoRule
              else case nameModule_maybe fn of

@@ -213,6 +213,15 @@ domain. A leading visible type application on the rule head still
 requires the dependent payload annotation.
 [Source and rejection checks](../examples/qualified-pi/check-retained-rules.sh).
 
+A module can declare a rule for a retained function from another module.
+In `keep True (tagged n) = tagged n`, the rule module defines `tagged`.
+GHC uses it as the rule's local anchor. A rule for `keep False p = p`
+has no local anchor and follows ordinary orphan import visibility.
+The interface identifies the imported retained head even when every type
+in the rule payload is ordinary. An older reader rejects that requirement
+before loading the rule. [Source](../examples/qualified-pi/ImportedRetainedRules.hs)
+and [separate readers](../examples/qualified-pi/check-imported-retained-rules.sh).
+
 Agda registers an equality proof with `REWRITE` and can use it when
 reducing a neutral type. GHC's `RULES` typechecks both sides and gives
 the programmer responsibility for preserving their meaning. R05 follows
