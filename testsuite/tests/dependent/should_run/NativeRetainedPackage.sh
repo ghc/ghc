@@ -369,11 +369,11 @@ cd "$out/provider"
 cp "$src/"{StoredVector,ConservedPartition}.hs .
 "${g[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core -c StoredVector.hs ConservedPartition.hs
 cat >VectorIdentity.hs <<'HS'
-{-# LANGUAGE CPP, ExperimentalDependentTypes, GADTs, PolyKinds #-}
-module VectorIdentity (vectorRefl, forwardVector) where
+{-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, PolyKinds #-}
+module VectorIdentity (vectorRefl, forwardVector, zeroRefl, matchZero) where
 
-import Data.Type.Equality ((:~:)(Refl))
-import PackedVecLibrary (Vec)
+import Data.Type.Equality ((:~:)(Refl), (:~~:)(HRefl))
+import PackedVecLibrary (Nat(..), Vec(..))
 
 vectorRefl :: foreach (xs :: Vec a n) -> xs :~: xs
 vectorRefl _ = Refl
@@ -381,14 +381,30 @@ vectorRefl _ = Refl
 forwardVector :: foreach (xs :: Vec a n) -> xs :~: xs
 forwardVector xs = vectorRefl xs
 
+zeroRefl :: foreach (xs :: Vec Bool 'Z) -> xs :~: ('VNil :: Vec Bool 'Z)
+zeroRefl xs = case xs of
+    VNil -> Refl
+
+matchZero :: foreach (xs :: Vec Bool n) -> Maybe (xs :~~: ('VNil :: Vec Bool 'Z))
+matchZero xs = case xs of
+    VNil -> Just HRefl
+    VCons _ _ -> Nothing
+
 #ifdef WRONG_VECTOR
 wrongVector :: foreach (xs :: Vec a n) -> foreach (ys :: Vec a n) -> xs :~: ys
 wrongVector _ _ = Refl
+
+wrongZero :: foreach (xs :: Vec Bool 'Z) -> foreach (ys :: Vec Bool 'Z) ->
+             (xs :~: ('VNil :: Vec Bool 'Z), ys :~: ('VNil :: Vec Bool 'Z))
+wrongZero xs _ = case xs of
+    VNil -> (Refl, Refl)
 #endif
 HS
-"${g[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core -c VectorIdentity.hs
+"${g[@]}" -Werror=inaccessible-code -Werror=overlapping-patterns \
+    -fomit-interface-pragmas -fno-write-if-simplified-core -c VectorIdentity.hs
 if "${g[@]}" -ferror-spans -fforce-recomp -DWRONG_VECTOR -c VectorIdentity.hs >wrong-vector.log 2>&1 ||
-   ! grep -Fq 'VectorIdentity.hs:15:19-22: error: [GHC-83865]' wrong-vector.log; then
+   ! grep -Fq 'VectorIdentity.hs:24:19-22: error: [GHC-83865]' wrong-vector.log ||
+   ! grep -Fq 'VectorIdentity.hs:29:20-23: error: [GHC-83865]' wrong-vector.log; then
     cat wrong-vector.log >&2
     exit 1
 fi
@@ -401,16 +417,17 @@ cd "$out/client"
 cat >ListVectorMain.hs <<'HS'
 {-# LANGUAGE DataKinds, ExplicitNamespaces, GADTs, NoExperimentalDependentTypes, RequiredTypeArguments, TypeApplications #-}
 module Main where
+import Control.Exception (ErrorCall, evaluate, try)
 import ConservedPartition (Split, branchContents, partitionVec)
 import Data.IORef (newIORef, readIORef)
 import Data.Maybe (isJust, isNothing)
-import Data.Type.Equality ((:~:)(Refl))
+import Data.Type.Equality ((:~:)(Refl), (:~~:)(HRefl))
 import GHC.Sigma (Sigma(Pair))
 import ListVectorClient
 import PackedVecLibrary (Add, Nat(..), Vec(..), appendNative, appendVec, dropVec, replicateNative,
                          splitAtVec, splitAtVecChecked, takeVec, toList)
 import StoredVector (ListVector)
-import VectorIdentity (forwardVector, vectorRefl)
+import VectorIdentity (forwardVector, matchZero, vectorRefl, zeroRefl)
 observe :: ListVector Char -> (Int, String)
 observe = contents
 empty :: Split Int 'Z
@@ -448,9 +465,21 @@ main = do
                   length (toList (fst one)))
     let proofs = (vectorProofs (VCons 7 VNil),
                   vectorProofs (error "unused indexed vector" :: Vec Int 'Z))
-    case (mixed, lazy, selected, split, demand, proofs) of
+    let zero = VNil :: Vec Bool 'Z
+        nonzero = VCons (error "unused head") (error "unused tail" :: Vec Bool 'Z)
+        knownZero = case zeroRefl zero of Refl -> True
+        openZero = case matchZero zero of
+            Just HRefl -> True
+            Nothing -> False
+        lazyCons = case matchZero nonzero of
+            Nothing -> True
+            Just _ -> False
+        bottom = error "zero case demands the scrutinee" :: Vec Bool 'Z
+    forced <- try (evaluate (case zeroRefl bottom of Refl -> True)) :: IO (Either ErrorCall Bool)
+    let zeroChecks = knownZero && openZero && lazyCons && either (const True) (const False) forced
+    case (mixed, lazy, selected, split, demand, proofs, zeroChecks) of
         ((4, [3, 4, 1, 2]), 1, [(0, []), (0, []), (1, [7]), (1, [9])],
-         ([7], [9]), (0, 1, 1), ((True, True), (True, True))) -> pure ()
+         ([7], [9]), (0, 1, 1), ((True, True), (True, True)), True) -> pure ()
         other -> fail (show other)
     cut <- newIORef (S (S Z)) >>= readIORef
     let joined = appendNative @Int cut (S Z) (replicateNative cut 7) (VCons 9 VNil)

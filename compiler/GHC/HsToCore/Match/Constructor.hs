@@ -31,7 +31,7 @@ import GHC.Core.Multiplicity
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Errors.Types (DsMessage(DsRetainedPackagePatterns))
 import GHC.HsToCore.Utils
-import GHC.Core ( CoreExpr )
+import GHC.Core ( CoreExpr, isNativeIndexedNullaryDataAlt )
 import GHC.Core.Make ( mkCoreLets )
 import GHC.Utils.Misc
 import GHC.Types.Id
@@ -147,10 +147,12 @@ matchConFamily (var :| vars) ty groups@(group1 :| other_groups)
     has_native_proof :: EquationInfoNE -> Bool
     has_native_proof eqn
       | ConPat { pat_con = L _ (RealDataCon con)
-               , pat_con_ext = ConPatTc { cpt_tvs = [], cpt_dicts = [cv]
+               , pat_con_ext = ConPatTc { cpt_tvs = [], cpt_dicts = dicts
                                        , cpt_arg_tys = tys } }
           <- firstPat eqn
-      = isCoVar cv && isNativeIndexType (mkTyConApp (dataConTyCon con) tys)
+      = case dicts of
+          [cv] -> isCoVar cv && isNativeIndexType (mkTyConApp (dataConTyCon con) tys)
+          _ -> isNativeIndexedNullaryDataAlt con dicts
       | otherwise = False
 
     toRealAlt alt = case alt_pat alt of

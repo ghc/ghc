@@ -12,7 +12,7 @@ import GHC.Prelude
 
 import GHC.HsToCore.Pmc.Types
 import GHC.HsToCore.Pmc.Utils
-import GHC.Core (CoreExpr, Expr(Var,App))
+import GHC.Core ( isNativeIndexedNullaryDataAlt, CoreExpr, Expr(Var, App) )
 import GHC.Core.Utils (stripTicksTopE)
 import GHC.Data.FastString (unpackFS, lengthFS, mkFastStringShortText)
 import GHC.Driver.DynFlags
@@ -244,7 +244,10 @@ desugarPat x pat = case pat of
            , cpt_dicts   = dicts
            }
          } ->
-    desugarConPatOut x con arg_tys ex_tvs dicts ps
+    let ordinary_dicts = case con of
+          RealDataCon dc | isNativeIndexedNullaryDataAlt dc dicts -> take 1 dicts
+          _ -> dicts
+    in desugarConPatOut x con arg_tys ex_tvs ordinary_dicts ps
 
   NPat ty (L _ olit) mb_neg _ -> do
     -- See Note [Literal short cut] in "GHC.HsToCore.Match.Literal"

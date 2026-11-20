@@ -14,7 +14,7 @@ module GHC.Tc.Gen.Pat
    , newLetBndr
    , LetBndrSpec(..)
    , tcCheckPat, tcCheckPat_O, tcInferPat
-   , tcMatchPats
+   , tcMatchPats, tcMatchPatsWithIndex
    , implicitPayloadType, matchesImplicitPayloadPat
    , bindRetainedConFields, isRetainedVarPat
    , tcRetainedCon, retainedConPat, retainedConIndex, bindRetainedWildcard
@@ -40,7 +40,7 @@ import GHC.Types.Var
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Core.Multiplicity
-import GHC.Core (Expr(Var))
+import GHC.Core (Expr(Var), nativeIndexedNullaryCon_maybe)
 import qualified GHC.Core.Subst as CoreSubst
 import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_kind )
 import GHC.Tc.Utils.Env
@@ -77,6 +77,7 @@ import qualified Data.List.NonEmpty as NE
 import GHC.Data.List.SetOps ( getNth )
 
 import Data.List( partition )
+import Data.Maybe (maybeToList)
 import Control.Monad.Trans.Writer.CPS
 import Control.Monad.Trans.Class
 
@@ -214,6 +215,27 @@ tcMatchPats match_ctxt pats pat_tys thing_inside
   where
     penv = PE { pe_lazy = False, pe_ctxt = LamPat match_ctxt, pe_orig = PatOrigin }
 
+
+-- | Check a bare nullary case row and pass its extra proof to the body checker.
+tcMatchPatsWithIndex :: Id -> HsMatchContextRn -> [LPat GhcRn] -> [ExpPatType]
+                     -> (Maybe EvVar -> TcM a) -> TcM ([LPat GhcTc], a)
+tcMatchPatsWithIndex index ctxt pats pat_tys inside
+  | [L loc pat@(ConPat { pat_con = L con_loc con, pat_args = args@(PrefixCon _ []) })] <- pats
+  , [ExpFunPatTy pat_ty] <- pat_tys
+  = setSrcSpanA loc $
+      do { con_like <- tcLookupConLike con
+         ; case con_like of
+             RealDataCon dc ->
+               do { err_ctxt <- getErrCtxt
+                  ; (checked, result) <- addErrCtxt (PatCtxt pat) $
+                      tcDataConPatWithIndex (Just index) (L con_loc (getName con)) dc pat_ty penv args
+                        (setErrCtxt err_ctxt . inside)
+                  ; return ([L loc checked], result) }
+             PatSynCon{} -> ordinary }
+  | otherwise = ordinary
+  where
+    penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt, pe_orig = PatOrigin }
+    ordinary = tcMatchPats ctxt pats pat_tys (inside Nothing)
 
 tcInferPat :: FixedRuntimeRepContext
            -> HsMatchContextRn
@@ -1190,11 +1212,18 @@ warnMonoLocalBinds
 tcDataConPat :: LocatedN Name -> DataCon
              -> Scaled ExpSigmaTypeFRR        -- Type of the pattern
              -> Checker (HsConPatDetails GhcRn) (Pat GhcTc)
-tcDataConPat con_name data_con pat_ty_scaled penv arg_pats thing_inside
+tcDataConPat con_name data_con pat_ty_scaled penv arg_pats thing_inside =
+  tcDataConPatWithIndex Nothing con_name data_con pat_ty_scaled penv arg_pats
+    (const thing_inside)
+
+tcDataConPatWithIndex :: Maybe Id -> LocatedN Name -> DataCon
+                      -> Scaled ExpSigmaTypeFRR -> PatEnv -> HsConPatDetails GhcRn
+                      -> (Maybe EvVar -> TcM a) -> TcM (Pat GhcTc, a)
+tcDataConPatWithIndex _ con_name data_con pat_ty_scaled penv arg_pats thing_inside
   | not (null (dataConRepArgBinders data_con))
-  = tcRetainedDataConPat con_name data_con pat_ty_scaled penv arg_pats thing_inside
-tcDataConPat (L con_span con_name) data_con pat_ty_scaled
-             penv arg_pats thing_inside
+  = tcRetainedDataConPat con_name data_con pat_ty_scaled penv arg_pats (thing_inside Nothing)
+tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
+                      penv arg_pats thing_inside
   = do  { let tycon = dataConTyCon data_con
                   -- For data families this is the representation tycon
               (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _)
@@ -1257,7 +1286,7 @@ tcDataConPat (L con_span con_name) data_con pat_ty_scaled
                     (val_arg_pats', res) <-
                                         tcConTyArgs tenv penv univ_ty_args $
                                         tcConValArgs con_like arg_tys_scaled
-                                                     penv val_arg_pats thing_inside
+                                                     penv val_arg_pats (thing_inside Nothing)
                   ; let res_pat = ConPat { pat_con = header
                                          , pat_args = val_arg_pats'
                                          , pat_con_ext = ConPatTc
@@ -1279,19 +1308,26 @@ tcDataConPat (L con_span con_name) data_con pat_ty_scaled
         ; when (not (null eq_spec) || any isEqClassPred theta) warnMonoLocalBinds
 
         ; given <- newEvVars theta'
+        ; extra_proof <- case (index, given) of
+            (Just scrut, [eq])
+              | isIdHsWrapper wrap
+              , Just constructor <- nativeIndexedNullaryCon_maybe (varType scrut) data_con eq
+              -> Just <$> newEvVar (mkNomEqPred (TermVarTy scrut) constructor)
+            _ -> return Nothing
+        -- See Note [Native indexed nullary branch evidence] in GHC.Core.
         ; (ev_binds, (arg_pats', res))
              <- -- See Note [Type applications in patterns] (W4)
                 tcConTyArgs tenv penv univ_ty_args                       $
                 checkConstraints (getSkolemInfo skol_info) ex_tvs' given $
                 tcConTyArgs tenv penv ex_ty_args                         $
-                tcConValArgs con_like arg_tys_scaled penv val_arg_pats thing_inside
+                tcConValArgs con_like arg_tys_scaled penv val_arg_pats (thing_inside extra_proof)
 
         ; let res_pat = ConPat
                 { pat_con   = header
                 , pat_args  = arg_pats'
                 , pat_con_ext = ConPatTc
                   { cpt_tvs   = ex_tvs'
-                  , cpt_dicts = given
+                  , cpt_dicts = given ++ maybeToList extra_proof
                   , cpt_binds = ev_binds
                   , cpt_arg_tys = ctxt_res_tys
                   , cpt_wrap  = idHsWrapper

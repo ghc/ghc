@@ -41,7 +41,7 @@ import GHC.Tc.Gen.SourceTable (sourceTableOccurrence, optionalSourceUses, regist
 import GHC.Tc.Gen.Bind        ( tcLocalBinds, tcNonRecLets )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Arrow
-import GHC.Tc.Gen.Match( tcBody, tcLambdaMatches, tcCaseMatches, tcRetainedCase
+import GHC.Tc.Gen.Match( tcBody, tcLambdaMatches, tcCaseMatches, tcIndexedCaseMatches, tcRetainedCase
                        , tcRetainedCallCase
                        , tcOpenImplicitPackage, implicitPayloadType, matchesImplicitPayloadPat
                        , tcGRHSNE, tcDoStmts )
@@ -975,7 +975,13 @@ tcExpr expr@(HsCase ctxt scrut matches) res_ty
             ; case special of
                 Just expr -> return expr
                 Nothing -> do
-                  { matches' <- tcCaseMatches ctxt tcBody (Scaled mult scrut_ty) matches expected
+                  { let check_matches = case unLoc (stripParensLHsExpr scrut') of
+                          HsVar _ (L _ index) | dependent, isNativeOpaqueValueId index
+                            , not (isNativeIndexId index), Check result <- expected
+                            , anyFreeVarsOfType (== index) result ->
+                                tcIndexedCaseMatches index ctxt
+                          _ -> tcCaseMatches ctxt tcBody
+                  ; matches' <- check_matches (Scaled mult scrut_ty) matches expected
                   ; return (HsCase ctxt scrut' matches') } }
 
     preserve_origin expr' =
