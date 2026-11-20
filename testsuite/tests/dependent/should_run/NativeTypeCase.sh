@@ -216,6 +216,82 @@ grep -Fq 'non-injective type family' bad.log
 grep -Fq 'Use a named type synonym with a standalone kind signature for the case.' bad.log
 if grep -Eq '\$field-(kind|case):' bad.log; then cat bad.log >&2; exit 1; fi
 
+# Keep the written Bool domain and the runtime arguments in the interface.
+cat >NativeTypeCaseRetainedField.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, LambdaCase, RankNTypes #-}
+module NativeTypeCaseRetainedField where
+
+data RetainedField where
+  RetainedField :: (foreach (b :: Bool) -> (case b of { True -> Int; False -> Char })) -> RetainedField
+
+selected :: RetainedField
+selected = RetainedField (\case True -> 11; False -> 'x')
+
+data ClosedField where
+  ClosedField :: (foreach (b :: Bool) -> (case True of { True -> Int; False -> Char })) -> ClosedField
+
+constant :: ClosedField
+constant = ClosedField (\b -> if b then 11 else 23)
+
+data StoredField where
+  StoredField :: foreach (b :: Bool) -> (case b of { True -> Int; False -> Int }) -> StoredField
+
+stored :: StoredField
+stored = StoredField False 23
+HS
+"${g[@]}" -fomit-interface-pragmas -c NativeTypeCaseRetainedField.hs
+"${g[@]}" --show-iface NativeTypeCaseRetainedField.hi >retained-field.iface
+grep -Fq 'foreach (b :: GHC.Internal.Types.Bool)' retained-field.iface
+cp NativeTypeCaseRetainedField.hi interfaces/
+(
+    cd interfaces
+    cat >NativeTypeCaseRetainedFieldClient.hs <<'HS'
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
+module Main where
+import Control.Monad (forM_)
+import Data.IORef
+import NativeTypeCaseRetainedField
+
+pick :: Bool -> RetainedField -> String
+pick b (RetainedField f) = if b then show (f True :: Int) else [f False]
+
+closed :: Bool -> ClosedField -> Int
+closed b (ClosedField f) = f b
+
+readStored :: StoredField -> Int
+readStored (StoredField True n) = n
+readStored (StoredField False n) = n
+
+main :: IO ()
+main = do
+  input <- newIORef False
+  forM_ [False, True] $ \b -> do
+    writeIORef input b
+    value <- readIORef input
+    print (pick value selected, closed value constant)
+  print (readStored stored)
+HS
+    "${g[@]}" -c NativeTypeCaseRetainedFieldClient.hs
+    "${g[@]}" NativeTypeCaseRetainedFieldClient.o ../NativeTypeCaseRetainedField.o -o run-retained-field
+    ./run-retained-field >retained-field.out
+    printf '("x",23)\n("11",11)\n23\n' | diff -u - retained-field.out
+
+    cat >BadRetainedField.hs <<'HS'
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
+module BadRetainedField where
+import NativeTypeCaseRetainedField
+
+wrong :: RetainedField -> Char
+wrong (RetainedField f) = f True
+
+neutral :: Bool -> RetainedField -> Int
+neutral b (RetainedField f) = f b
+HS
+    reject BadRetainedField 6:27 '[GHC-83865]'
+    grep -Fq 'BadRetainedField.hs:9:31: error: [GHC-83865]' bad.log
+    grep -Fq 'the type case in a field of' bad.log
+)
+
 # A speculative branch gets one family step. Checking a written use
 # of the same constructor still reports the solver's reduction limit.
 cat >NativeTypeCaseRecursiveIndex.hs <<'HS'
