@@ -538,7 +538,7 @@ This distinction becomes apparent in #17248:
 
 If we treat Newtypes like we treat regular DataCons, we would mark the third
 clause as redundant, which clearly is unsound. The solution:
-1. 'isPmAltConMatchStrict' returns False for newtypes, indicating that a
+1. 'isPmAltConMatchStrict' returns @Just False@ for newtypes, indicating that a
    newtype match is lazy.
 2. When we find @x ~ T2 y@, transfer all constraints on @x@ (which involve @⊥@)
    to @y@, similar to what 'equate' does, and don't add a @x ≁ ⊥@ constraint.
@@ -547,6 +547,117 @@ clause as redundant, which clearly is unsound. The solution:
 3. Immediately reject when we find @x ≁ T2@.
 Handling of Newtypes is also described in the Appendix of the Lower Your Guards paper,
 where you can find the solution in a perhaps more digestible format.
+
+Note [Strictness of pattern synonym matches]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+TODO(sgraf): formulate. Points:
+
+* A match on a data constructor K forces x, so both x ~ K and x ≁ K imply
+  x ≁ ⊥. A match on a pattern synonym P need not force x (#28014, #17357):
+
+    pattern F :: a
+    pattern F <- (const False -> True)
+
+    withBang :: Bool -> Int
+    withBang F  = 1
+    withBang !_ = 2   -- Bang not redundant: withBang undefined is ⊥,
+                      -- but 2 without the bang
+
+  So neither x ~ P nor x ≁ P implies x ≁ ⊥ ('isPmAltConMatchStrict' is
+  'Nothing').
+
+* A match on P may still diverge on ⊥, so the divergent set gets x ~ ⊥
+  ('isPmAltConMatchStrict' is not @Just False@). Example from #17357:
+
+    strictConst :: a -> b -> a
+    strictConst a b = seq b a
+    pattern SF <- (strictConst False -> True)
+
+    f2 :: Bool -> Bool -> ()
+    f2 _  True = ()
+    f2 SF True = ()   -- Inaccessible RHS, not redundant
+    f2 !_ True = ()
+    f2 _  _    = ()
+
+* Rule. Let C be a COMPLETE set from a pragma that applies at the type τ
+  of x. If x failed to match a member of C, and no member of C can match x,
+  then x ≁ ⊥. A member P cannot match x when x failed to match P, or when the
+  provided constraints of P contradict τ. The pragma asserts that matching
+  any value of τ, ⊥ included, against the members of C succeeds or diverges.
+  x ≁ ⊥ is a fact, so redundancy and coverage both use it.
+
+* Type constraints alone leave ⊥. Here no member of C = {G1, G2} (below)
+  can match at G Char, and x failed to match only F:
+
+    data U = MkU (G Char)
+    hc :: U -> Int
+    hc (MkU F) = 1     -- Not matched: MkU _
+
+* Matcher lemma, for the pragma assertion at a τ with a non-⊥ value.
+  $mP :: forall r. τ -> (args -> r) -> (Void# -> r) -> r.
+  By parametricity, $mP v k e ∈ {⊥, k args, e (##)}. By monotonicity in v,
+  if P fails on ⊥ without diverging, P fails on every value.
+  A non-⊥ value v of τ matches some member P of C. If P failed on ⊥
+  without diverging, P fails on v. Contradiction.
+
+* The vanilla COMPLETE set of a data type needs no rule. A failed match on a
+  data constructor gives x ≁ ⊥ already. If no data constructor failed but
+  the set has no inhabitant, τ has no data constructor, and ⊥ stays:
+
+    data T = MkT Void
+    h :: T -> Int
+    h (MkT F) = 1      -- Not matched: MkT _. Indeed h (MkT undefined) fails.
+
+* Implementation in the inhabitation test ('instantiate'). A residual
+  COMPLETE set from a pragma that lost a member witnesses a failed match on
+  that member ('matchedPragmaSets'). This covers synonyms with a required
+  theta, which are not in 'vi_neg'
+  (Note [Completeness checking with required Thetas]).
+  - Without such a set, offer ⊥ first, as before.
+  - Otherwise, search the residual COMPLETE sets for a non-⊥ inhabitant
+    ('instCompleteSets'). If there is none, offer ⊥ when each of these sets
+    has an inhabitant ('allInhabited').
+  The order is only a matter of performance
+  (Note [Shortcutting the inhabitation test]).
+  'generateInhabitingPatterns' decides on a wildcard the same way.
+  Wrinkle: 'instCompleteSet' also removes a member that cannot match at the
+  type of x at the time of the test. A later type refinement that rules out
+  the remaining members then rules out ⊥ as well.
+
+* Example: every member failed.
+
+    pattern Nil :: [a]
+    pattern Nil <- (null -> True)
+    pattern Cons :: a -> [a] -> [a]
+    pattern Cons x xs <- (uncons -> Just (x, xs))
+    {-# COMPLETE Nil, Cons #-}
+
+    g :: [a] -> Int
+    g Nil        = 0
+    g (Cons _ _) = 1   -- Exhaustive
+    g _          = 2   -- Redundant
+
+* Example: members that cannot match at τ.
+
+    data G a where { G1' :: G Int; G2' :: G Bool }
+    pattern G1 :: () => (a ~ Int) => G a
+    pattern G1 = G1'
+    pattern G2 :: () => (a ~ Bool) => G a
+    pattern G2 = G2'
+    {-# COMPLETE G1, G2 #-}
+
+    fb :: G Int -> Int
+    fb G1 = 1          -- Exhaustive: G2 cannot match at G Int
+
+* Precision loss: redundancy that rests on the strictness of P outside an
+  exhausted COMPLETE set is not reported.
+
+    pattern J :: a -> Maybe a
+    pattern J x = Just x
+
+    k :: Maybe Int -> Int
+    k (J _) = 1
+    k !_    = 2        -- Bang is dead, but not reported
 -}
 
 -------------------------
@@ -729,7 +840,7 @@ addNotConCt nabla x nalt = do
     -- otherwise return updated entry and `Just x'` if `x` should be marked dirty,
     -- where `x'` is the representative of `x`.
     go :: VarInfo -> MaybeT DsM (Maybe Id, VarInfo)
-    go vi@(VI x' pos neg _ rcm) = do
+    go vi@(VI x' pos neg bot rcm) = do
       -- 1. Bail out quickly when nalt contradicts a solution
       let contradicts nalt sol = eqPmAltCon (paca_con sol) nalt == Equal
       guard (not (any (contradicts nalt) pos))
@@ -741,8 +852,10 @@ addNotConCt nabla x nalt = do
             -- See Note [Completeness checking with required Thetas]
             | hasRequiredTheta nalt  = neg
             | otherwise              = extendPmAltConSet neg nalt
-      massert (isPmAltConMatchStrict nalt)
-      let vi' = vi{ vi_neg = neg', vi_bot = IsNotBot }
+      -- See Note [Strictness of pattern synonym matches]
+      let bot' | isPmAltConMatchStrict nalt == Just True = IsNotBot
+               | otherwise                               = bot
+      let vi' = vi{ vi_neg = neg', vi_bot = bot' }
       -- 3. Make sure there's at least one other possible constructor
       mb_rcm' <- lift (markMatched nalt rcm)
       pure $ case mb_rcm' of
@@ -796,8 +909,9 @@ addConCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts=env } } x alt tvs args =
             MaybeBot -> pure (nabla_with MaybeBot)
             IsBot    -> addBotCt (nabla_with MaybeBot) y
             IsNotBot -> addNotBotCt (nabla_with MaybeBot) y
-        _ -> assert (isPmAltConMatchStrict alt )
-             pure (nabla_with IsNotBot) -- strict match ==> not ⊥
+        _ | isPmAltConMatchStrict alt == Just True -> pure (nabla_with IsNotBot) -- strict match ==> not ⊥
+          -- See Note [Strictness of pattern synonym matches]
+          | otherwise                              -> pure (nabla_with bot)
 
 equateTys :: [Type] -> [Type] -> [PhiCt]
 equateTys ts us =
@@ -1372,8 +1486,31 @@ varNeedsTesting old_ty_st MkNabla{nabla_ty_st=new_ty_st} vi = do
 --     remain that do not satisfy it.  This lazy approach just
 --     avoids doing unnecessary work.
 instantiate :: Int -> Nabla -> VarInfo -> MaybeT DsM VarInfo
-instantiate fuel nabla vi = {-# SCC "instantiate" #-}
-  (instBot fuel nabla vi <|> instCompleteSets fuel nabla vi)
+instantiate fuel nabla vi = {-# SCC "instantiate" #-} do
+  -- See Note [Strictness of pattern synonym matches]
+  matched <- lift (matchedPragmaSets vi)
+  if null matched
+    then instBot fuel nabla vi <|> instCompleteSets fuel nabla vi
+    else instCompleteSets fuel nabla vi <|> do
+      guard =<< lift (allInhabited fuel nabla (vi_id vi) matched)
+      instBot fuel nabla vi
+
+-- | The residual COMPLETE sets from pragmas that lost a member, for a variable
+-- that might be ⊥. When one of them has no inhabitant, the variable is not ⊥.
+-- See Note [Strictness of pattern synonym matches].
+matchedPragmaSets :: VarInfo -> DsM DsCompleteMatches
+matchedPragmaSets VI{ vi_bot = IsNotBot } = pure []
+matchedPragmaSets VI{ vi_rcm = rcm } = case rcm_pragmas rcm of
+  Nothing        -> pure []
+  Just residuals -> do
+    originals <- dsGetCompleteMatches
+    let lost_member orig res = sizeUniqDSet (cmConLikes res) < sizeUniqDSet (cmConLikes orig)
+    pure [ res | (orig, res) <- zip originals residuals, lost_member orig res ]
+
+-- | Whether each of the COMPLETE sets has an inhabitant at the variable.
+allInhabited :: Int -> Nabla -> Id -> DsCompleteMatches -> DsM Bool
+allInhabited fuel nabla x cms =
+  isJust <$> runMaybeT (foldM (\nabla cm -> instCompleteSet fuel nabla x cm) nabla cms)
 
 -- | The \(⊢_{Bot}\) rule from the paper
 instBot :: Int -> Nabla -> VarInfo -> MaybeT DsM VarInfo
@@ -1986,7 +2123,11 @@ generateInhabitingPatterns mode (x:xs) n nabla = do
             Just clss -> do
               -- Try each COMPLETE set.
               nablass' <- forM clss (instantiate_cons y rep_ty xs n newty_nabla)
-              if any null nablass' && vi_bot vi /= IsNotBot
+              -- See Note [Strictness of pattern synonym matches]
+              bot_possible <- if any null nablass' && vi_bot vi /= IsNotBot
+                then matchedPragmaSets vi >>= allInhabited initFuel newty_nabla y
+                else pure False
+              if bot_possible
               then generateInhabitingPatterns mode xs n newty_nabla -- bot is still possible. Display a wildcard!
               else do
                 -- Pick the residual COMPLETE set with the smallest cost (see 'completeSetCost').

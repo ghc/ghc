@@ -144,7 +144,7 @@ checkGrd grd = CA $ \inc -> case grd of
                         , cr_approx = Precise }
   -- Con: Fall through on x ≁ K and refine with x ~ K ys and type info
   PmCon x con tvs dicts args -> do
-    !div <- if isPmAltConMatchStrict con
+    !div <- if isPmAltConMatchStrict con /= Just False
       then addPhiCtNablas inc (PhiBotCt x)
       else pure mempty
     !matched <- addPhiCtNablas inc (PhiConCt x con tvs (map evVarPred dicts) args)

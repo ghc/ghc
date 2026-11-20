@@ -586,13 +586,14 @@ pmAltConType (PmAltLit lit)     _arg_tys = assert (null _arg_tys ) $ pmLitType l
 pmAltConType (PmAltConLike con) arg_tys  = conLikeResTy con arg_tys
 
 -- | Is a match on this constructor forcing the match variable?
--- True of data constructors, literals and pattern synonyms (#17357), but not of
--- newtypes.
--- See Note [Coverage checking Newtype matches] in GHC.HsToCore.Pmc.Solver.
-isPmAltConMatchStrict :: PmAltCon -> Bool
-isPmAltConMatchStrict PmAltLit{}                      = True
-isPmAltConMatchStrict (PmAltConLike PatSynCon{})      = True -- #17357
-isPmAltConMatchStrict (PmAltConLike (RealDataCon dc)) = not (isNewDataCon dc)
+-- @Just True@ for data constructors and literals, @Just False@ for newtypes,
+-- and 'Nothing' for pattern synonyms, whose matchers may or may not force it.
+-- See Note [Coverage checking Newtype matches] and
+-- Note [Strictness of pattern synonym matches] in GHC.HsToCore.Pmc.Solver.
+isPmAltConMatchStrict :: PmAltCon -> Maybe Bool
+isPmAltConMatchStrict PmAltLit{}                      = Just True
+isPmAltConMatchStrict (PmAltConLike PatSynCon{})      = Nothing
+isPmAltConMatchStrict (PmAltConLike (RealDataCon dc)) = Just (not (isNewDataCon dc))
 
 pmAltConImplBangs :: PmAltCon -> [HsImplBang]
 pmAltConImplBangs PmAltLit{}         = []

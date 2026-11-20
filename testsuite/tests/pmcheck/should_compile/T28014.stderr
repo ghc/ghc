@@ -1,0 +1,32 @@
+T28014.hs:21:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘h’:
+        Patterns of type ‘T’ not matched: MkT p where p is not one of {F}
+
+T28014.hs:33:1: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘g’: g _ = ...
+
+T28014.hs:39:1: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘gBang’: gBang !_ = ...
+
+T28014.hs:59:1: warning: [GHC-94210] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match has inaccessible right hand side
+    In an equation for ‘hu’: hu (MkU G1) = ...
+
+T28014.hs:59:9: warning: [GHC-40564] [-Winaccessible-code (in -Wdefault)]
+    • Inaccessible code in
+        a pattern with pattern synonym:
+          G1 :: forall a. () => (a ~ Int) => G a,
+        in an equation for ‘hu’
+      Couldn't match type ‘Char’ with ‘Int’
+    • In the pattern: G1
+      In the pattern: MkU G1
+      In an equation for ‘hu’: hu (MkU G1) = 1
+
+T28014.hs:64:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘hc’:
+        Patterns of type ‘U’ not matched: MkU p where p is not one of {F}
+

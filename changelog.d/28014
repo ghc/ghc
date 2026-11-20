@@ -1,0 +1,14 @@
+section: compiler
+synopsis: The pattern-match checker no longer assumes that pattern synonym matches force their argument
+description:
+  A match on a pattern synonym excludes ⊥ as a value of the scrutinee only
+  through a ``COMPLETE`` set: when every member that can match at the type of
+  the scrutinee failed to match, and that type has a value other than ⊥.
+  Hence ``-Wredundant-bang-patterns`` and ``-Woverlapping-patterns`` no longer
+  report bangs or clauses as redundant or inaccessible when deleting them
+  would change the semantics, and ``-Wincomplete-patterns`` reports matches
+  that fail on ⊥ fields that a pattern synonym does not force. Redundancy that
+  rests on the strictness of a pattern synonym outside of an exhausted
+  ``COMPLETE`` set is no longer reported.
+issues: #28014 #17357
+mrs: !17033

@@ -1,0 +1,8 @@
+T28014b.hs:18:1: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘w’: w _ G1' = ...
+
+T28014b.hs:19:1: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘w’: w _ G2' = ...
+
