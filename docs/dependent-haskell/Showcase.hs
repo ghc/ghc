@@ -1040,6 +1040,8 @@ main = do
               ++ PreludeMapProof.showPreludeMapProofs)
     observe "use a checked cons rule without forcing the callback, head or tail"
         (ConsRuleMapProof.negateHead (Proxy @'[]), ConsRuleMapProof.lazySpine)
+    observe "compose two checked traversals without forcing the inner callback"
+        (ConsRuleMapProof.twiceHead (Proxy @'[]), ConsRuleMapProof.composedHead (undefined : undefined))
     observe "collect row heads with an ordinary polymorphic callback"
         (OpenMapProof.firstRowHead (Proxy @'True) (Proxy @'Spine.Empty) (Proxy @'[]))
 

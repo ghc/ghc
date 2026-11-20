@@ -10,3 +10,6 @@ mapper f (x : xs) = f x : mapper f xs
 
 {-# RULES "mapper/cons" [~1] forall f x xs.
     mapper f (x : xs) = f x : mapper f xs #-}
+
+{-# RULES "mapper/compose" [~1] forall f g xs.
+    mapper f (mapper g xs) = mapper (\x -> f (g x)) xs #-}
