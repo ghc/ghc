@@ -5859,6 +5859,18 @@ index. The matchable and unmatchable arrow choices are specific to GHC.
 [Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html)
 and [the separate-module example](examples/open-evaluation/NestedFunctionClient.hs).
 
+### Inferring a prefix of invisible family arguments
+
+Proposal 242 gives partial type family applications a kind with
+matchability on the remaining binders. Agda inserts implicit arguments
+from an expected type. In this fork, GHC's existing `checkExpectedKind`
+instantiates the excess leading binders of an eligible family and
+checks the kinds that remain. A caller can therefore request just the
+last invisible binder. The family still reduces only at its arity.
+[Proposal 242 on quantifiers](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#other-quantifiers),
+[Agda 2.8.0 on implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html)
+and [source example](examples/open-evaluation/InvisibleFamily.hs).
+
 ### Inferring matchability across a declaration splice
 
 Proposal 242 distinguishes inference from checking a written kind

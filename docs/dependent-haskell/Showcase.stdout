@@ -271,6 +271,7 @@ apply Prelude.map to Prelude.not at a known list: Refl
 pass an unapplied type family to another family: Refl
 pass a type family with an unapplied invisible binder: Refl
 infer the result kind after passing a visible family argument: Refl
+infer the first invisible family argument and leave the second open: (Refl,Refl)
 apply Maybe and a type family through a computed arrow kind: (Just 7,[7])
 interpret a kind code as an ordinary type constructor: Just True
 interpret two applications of the optional type constructor: Just (Just True)

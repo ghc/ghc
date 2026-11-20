@@ -4,8 +4,9 @@ Upstream: [Unsaturated type families](https://ghc.serokell.io/dh#unsaturated-typ
 Serokell marks the proposal as accepted. The fork records matchability
 on ordinary arrows and forall binders. M166 lets a user pass an unapplied
 family at a known unmatchable arrow. A receiver can also require the
-whole trailing invisible telescope. Shorter invisible prefixes, full
-inference and ordinary-program compatibility remain open.
+whole trailing invisible telescope or a nonempty suffix of it.
+Kind inference without an expected kind and ordinary-program
+compatibility remain open.
 Use the [work queue](../ROADMAP.md#current-work-queue) for priorities.
 
 ## Matchability on a source arrow
@@ -402,9 +403,16 @@ telescope, so the kind checker can infer its result kind as `Type`.
 The test reads the retained application from the provider interface.
 An ordinary client proves the result is `Int`. Changing the equation
 invalidates that proof. An inverse equality and a receiver that requires
-`@M` both fail. The new check requires the same positive number of
-leading invisible binders. Ordinary inference and shorter telescopes
-still use the existing saturation path.
+`@M` both fail. A receiver can also ask for only the final invisible binder.
+In `RunVisible @Bool (ReadAt 'True)`, the receiver expects
+`forall input. @U Bool`. GHC infers `Bool` for the first omitted
+argument to `ReadAt`. The receiver supplies the second argument.
+The same provider yields `Int` when the receiver asks for a result
+of kind `Type`. An explicit conflicting argument and a receiver that
+demands a matchable binder both give GHC-83865. With no expected
+kind the compiler keeps the existing saturation rule.
+[Provider](../examples/open-evaluation/InvisibleFamily.hs) and
+[ordinary interface client](../../../testsuite/tests/dependent/should_run/NativeUnsaturatedInvisibleConsumer.hs).
 
 ## Goal and dependencies
 

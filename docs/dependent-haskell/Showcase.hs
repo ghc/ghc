@@ -1078,6 +1078,8 @@ main = do
         (Refl :: InvisibleFamily.Observed :~: 'True)
     observe "infer the result kind after passing a visible family argument"
         (Refl :: InvisibleFamily.ObservedVisible :~: Int)
+    observe "infer the first invisible family argument and leave the second open"
+        (Refl :: InvisibleFamily.ReadFlag :~: 'True, Refl :: InvisibleFamily.ReadType :~: Int)
     observe "apply Maybe and a type family through a computed arrow kind" InvisibleFamily.wrappedValues
     observe "interpret a kind code as an ordinary type constructor" InterpretedKind.optionalFlag
     observe "interpret two applications of the optional type constructor" InterpretedKind.nestedOptional
