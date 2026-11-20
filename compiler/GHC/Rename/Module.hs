@@ -773,7 +773,9 @@ retainedSourceHeads sigs = do
         | not (elemLocalRdrEnv rdr local)
         , null (lookupGRE global (LookupRdrName rdr (RelevantGREsFOS WantNormal)))
         -> do
-          candidates <- lookupSourceTables envs term
+          -- Compare names here. The original source call still determines
+          -- whether the type checker uses its unfolding or its checked equation.
+          candidates <- lookupSourceTables False envs term
           pure $ case candidates of
             [(gre, Just table)] -> Just (rdr, (gre, table))
             _ -> Nothing
