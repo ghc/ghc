@@ -1,11 +1,11 @@
 {-# LANGUAGE DataKinds, Modifiers, NoExperimentalDependentTypes, ScopedTypeVariables, TypeOperators #-}
-module OpenMapProof (eachEmpty, eachCons, negateHead, redStops, ordinaryRedStops, firstRowHead) where
+module OpenMapProof (eachEmpty, eachCons, negateHead, redStops, ordinaryRedStops, greenPermission, firstRowHead) where
 
 import qualified ClosedTableLibrary as C
 import Data.Proxy (Proxy)
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Exts (U)
-import OpenMapSource (Each, Heads, NegateAll, OrdinarySignals, Signals)
+import OpenMapSource (AtGreen, Each, Heads, NegateAll, OrdinarySignals, Signals)
 import qualified OpenMapWorker as W
 import qualified SpineWorker as S
 
@@ -34,6 +34,10 @@ redStops _ = Refl
 ordinaryRedStops :: forall (xs :: [W.Lamp]). Proxy xs
                  -> OrdinarySignals ('W.Red ': xs) :~: ('W.Stop ': OrdinarySignals xs)
 ordinaryRedStops _ = Refl
+
+-- | A green light returns the caller's permission even when it is unknown.
+greenPermission :: forall (allowed :: Bool). Proxy allowed -> AtGreen allowed :~: allowed
+greenPermission _ = Refl
 
 -- | The head of the first row determines the first result.
 firstRowHead :: forall (x :: Bool) (tail :: S.Spine Bool) (rows :: [S.Spine Bool]).

@@ -3,6 +3,7 @@ runtime Bool choice: "42"
 choose True has result Int: 42
 choose False has result Bool: False
 keep ignores bottom index and payload: 42
+inline retained type case: ("7","'f'",42)
 three-constructor runtime domain: "'G'"
 empty-domain elimination demands its scrutinee: showcase-empty-domain
 IORef length and dependent vector: (3,[7,7,7])
@@ -307,6 +308,7 @@ pass a constructor to uncurry with two unknown fields: Refl
 prove one map step for an arbitrary callback and tail: Refl
 map Boolean negation and traffic signals over an unknown tail: (Refl,Refl)
 map an ordinary enumeration callback over an unknown tail: Refl
+leave the permission argument open in an ordinary traffic-light function: (Refl,False)
 use Prelude.not on a known head with an unknown tail: Refl
 map Prelude.not and Prelude.id over a known head and an unknown tail: (Refl,Refl,Refl)
 prove map preserves length and leaves the callback lazy: (Refl,2)

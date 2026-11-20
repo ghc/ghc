@@ -79,7 +79,7 @@ import Language.Haskell.Syntax.Specificity (Specificity(SpecifiedSpec))
 import Control.Monad
 import Data.Bifunctor ( first )
 import Data.Foldable ( toList, for_ )
-import Data.List ( mapAccumL, partition, unzip4 )
+import Data.List ( elemIndex, mapAccumL, partition, unzip4 )
 import Data.List.NonEmpty ( NonEmpty(..), head, nonEmpty )
 import Data.Data (Data, cast, gmapQ)
 import Data.Maybe (catMaybes,  isJust, isNothing, fromMaybe, mapMaybe, maybeToList )
@@ -338,13 +338,41 @@ Different values use separate counters. The private type namespace also
 separates a function operator from a same-spelled type operator. A
 signature shared by several values uses its first name.
 
-Within one signature, identical cases can share a synonym. This keeps
-two uses equal even when their common scrutinee is unknown. Compare
-the parsed names, applications and ordered rows. All occurrences
-visited by this pass use the same signature telescope. A row binder
-has the same scope at both occurrences. Skip comparison for other
-syntax, which can contain a nested binder. Keep the first location
-for checking the shared case.
+Within one signature telescope, identical cases can share a synonym.
+This keeps two uses equal when their common scrutinee is unknown.
+Compare the parsed names, applications and ordered rows. A row binder
+has the same scope at both occurrences. Skip comparison for syntax
+that can contain a nested binder. Keep the first location for checking
+the shared case.
+
+In a value signature, a nested erased forall can also provide captures.
+Require written kinds for its local variables and keep the forall at
+the original occurrence. Start a new comparison table there. Remove a
+shadowed outer name from the capture scope. The capture check still
+requires the kind of each selected variable to refer to earlier
+captures. If that requires a shadowed variable, leave the case in the
+source so the normal context check rejects it.
+
+A foreach telescope starts a new table too. Lift a case on an
+application tree with retained variables among its operands. Each
+application head must name a qualified occurrence or a type constructor.
+The synonym binds an erased index for each retained variable. It uses
+the written domain as the kind. The application receives the original
+runtime indices. Ordinary source calls in the copied tree use the
+existing checked source equations.
+See Note [Source retained signatures] in GHC.Tc.Gen.HsType.
+
+Check copied runtime domains for forms whose checking differs between
+types and kinds. A bare arrow defaults to unmatchable in a retained
+domain and can default to matchable in an erased binder kind. Leave
+the corresponding case at the written occurrence.
+
+Two retained cases can use one family when all their captures are
+retained indices and their closed domains, application trees, and
+ordered rows agree. Compare the index leaves by position in the
+telescope. Compare the other names in the same declaration group.
+Each application passes its own nominal indices in telescope order.
+Retain the source synonym for each signature so diagnostics can name it.
 
 For a constructor field, use the constructor's name and count sums
 from left to right. Use a separate prefix for constructor fields.
@@ -377,6 +405,14 @@ Skip types that contain splices or holes. A wildcard in a case pattern
 is part of the match. Leave nested binders outside these field telescopes
 to the ordinary renamer.
 -}
+-- | Select the expressions that can be lifted at a declaration type position.
+data LiftedTypeSite
+  = FieldTypeSite
+  | SignatureTypeSite
+  | ForallTypeSite
+  | RetainedTypeSite [RdrName]
+  deriving Eq
+
 -- | Prepare cases in top-level value signatures and sums in signatures and fields.
 liftDeclarationTypes :: Bool -> HsGroup GhcPs -> (HsGroup GhcPs, LiftedDecls)
 liftDeclarationTypes named_wildcards group
@@ -391,8 +427,17 @@ liftDeclarationTypes named_wildcards group
         in (ValBinds ann binds', concat types)
       binds -> (binds, [])
     (type_groups, groups_sums) = unzip (map liftGroup (hs_tyclds group))
-    (synonyms, names) = unzip (signature_types ++ concat groups_sums)
+    (_, shared_types) = mapAccumL shareRetainedCase [] signature_types
+    (synonyms, names) = unzip (shared_types ++ map fst (concat groups_sums))
     anchors = TyClGroup noExtField synonyms [] [] []
+
+    shareRetainedCase seen (entry@(L loc alias@SynDecl{}, names@(occ, _)), Just (key, captures))
+      | Just first <- lookup key seen
+      = let rhs = applyAnchor loc first captures
+        in (seen, (L loc alias{tcdRhs = rhs}, names))
+      | otherwise
+      = ((key, occ) : seen, entry)
+    shareRetainedCase seen (entry, _) = (seen, entry)
 
     liftGroup decls =
       let (decls', sums) = unzip (map liftData (group_tyclds decls))
@@ -504,7 +549,7 @@ liftDeclarationTypes named_wildcards group
                   {hswc_body = L sig_loc sig@HsSig{sig_bndrs = outer, sig_body = body}}))) =
       let occ = rdrNameOcc (unLoc owner)
           first = fromMaybe 0 (lookupOccEnv counters occ)
-          (body', aliases, (next, _)) = liftBody signatureAnchor owner
+          (body', aliases, (next, _)) = liftBody SignatureTypeSite owner
                                     (signatureCaptures outer body) body (first, [])
           sig' = L sig_loc (sig{sig_body = body'})
       in (extendOccEnv counters occ next, (VbSig (L loc (TypeSig sig_ann mods names
@@ -527,31 +572,60 @@ liftDeclarationTypes named_wildcards group
       | b <- binders, Just v <- [hsLTyVarLocName b]]
 
     liftFieldSums owner scope ty salt =
-      let (ty', sums, (next, _)) = liftBody fieldAnchor owner scope ty (salt, [])
+      let (ty', sums, (next, _)) = liftBody FieldTypeSite owner scope ty (salt, [])
       in (ty', sums, next)
 
-    fieldAnchor :: LHsType GhcPs -> Maybe (String, Maybe SignatureCaseKey)
-    fieldAnchor ty@(L _ (XHsType HsTypeSome{}))
+    liftedAnchor FieldTypeSite ty@(L _ (XHsType HsTypeSome{}))
       | copyable ty = Just ("$field-sum:", Nothing)
-    fieldAnchor _ = Nothing
-
-    signatureAnchor ty@(L _ (XHsType HsTypeSome{}))
+    liftedAnchor SignatureTypeSite ty@(L _ (XHsType HsTypeSome{}))
       | copyable ty = Just ("$signature-sum:", Nothing)
-    signatureAnchor (L _ (XHsType (HsTypeCase _ _ scrutinee alts)))
-      | copyable scrutinee
+    liftedAnchor site (L _ (XHsType (HsTypeCase _ _ scrutinee alts)))
+      | site /= FieldTypeSite
+      , caseScrutinee site scrutinee
+      , copyable scrutinee
       , all copyableAlt alts
       = Just ("$signature-case:", signatureCaseKey scrutinee alts)
-    signatureAnchor _ = Nothing
+    liftedAnchor _ _ = Nothing
+
+    caseScrutinee (RetainedTypeSite names) scrutinee =
+      isJust (signatureCasePart scrutinee >>= retainedCaseScrutinee names)
+    caseScrutinee _ _ = True
+
+    retainedNames (RetainedTypeSite names) = names
+    retainedNames _ = []
 
     copyableAlt (L _ (HsTypeCaseAlt pat _ rhs)) =
       isJust (classifyTypeCasePattern pat) && copyable rhs
 
-    liftBody anchor owner scope whole@(L loc _) (salt, seen)
-      | Just (prefix, key) <- anchor whole
+    forallCaptures HsForAllInvis{hsf_invis_bndrs = binders} = writtenCaptures binders
+    forallCaptures HsForAllVis{hsf_vis_bndrs = binders} = writtenCaptures binders
+
+    writtenCaptures :: [LHsTyVarBndr flag GhcPs]
+                    -> Maybe [(LHsTyVarBndr (HsBndrVis GhcPs) GhcPs, LocatedN RdrName)]
+    writtenCaptures binders
+      | all hasWrittenKind binders = Just (explicitCaptures binders)
+      | otherwise = Nothing
+
+    hasWrittenKind (L _ (HsTvb _ _ HsBndrVar{} (HsBndrKind _ kind))) = copyable kind
+    hasWrittenKind _ = False
+
+    innerScope site HsForAllTy{hst_tele = tele, hst_body = body}
+      | site == SignatureTypeSite || site == ForallTypeSite
+      , Just locals <- forallCaptures tele
+      = Just (ForallTypeSite, locals, body)
+    innerScope site HsForEachTy{hst_bndrs = binders, hst_body = body}
+      | site /= FieldTypeSite
+      , Just locals <- writtenCaptures binders
+      , not (null locals)
+      = Just (RetainedTypeSite (map (unLoc . snd) locals ++ retainedNames site), locals, body)
+    innerScope _ _ = Nothing
+
+    liftBody site owner scope whole@(L loc _) (salt, seen)
+      | Just (prefix, key) <- liftedAnchor site whole
       , let free = Set.fromList (map unLoc (extractHsTyRdrTyVars whole))
             (used, missing) = foldr select ([], free) scope
       , Set.null missing
-      , all (copyable . fst) used
+      , all (copyableCapture site) used
       = case key >>= (`lookup` seen) of
           Just occ -> (applyAnchor loc occ used, [], (salt + 1, seen))
           Nothing ->
@@ -560,18 +634,27 @@ liftDeclarationTypes named_wildcards group
                 name = L (l2l loc) (mkRdrUnqual occ)
                 alias = L loc (SynDecl noAnn name (mkHsQTvs (map fst used)) Prefix whole)
                 seen' = maybe seen (\k -> (k, occ) : seen) key
-            in (applyAnchor loc occ used, [(alias, (occ, Nothing))], (salt + 1, seen'))
-    liftBody anchor owner scope (L loc (HsFunTy ann arrow arg result)) state =
-      let (arg', arg_aliases, next) = liftBody anchor owner scope arg state
-          (result', result_aliases, end) = liftBody anchor owner scope result next
+                shared = sharedRetainedCaseKey site used whole key
+            in (applyAnchor loc occ used, [((alias, (occ, Nothing)), shared)], (salt + 1, seen'))
+    liftBody site owner scope (L loc quantified) (salt, seen)
+      | Just (inner, locals, body) <- innerScope site quantified
+      , let names = map (unLoc . snd) locals
+      , null (findDupsEq (==) names)
+      = let outer = filter (\(_, name) -> unLoc name `notElem` names) scope
+            (body', aliases, (next, _)) = liftBody inner owner
+                                          (outer ++ locals) body (salt, [])
+        in (L loc quantified{hst_body = body'}, aliases, (next, seen))
+    liftBody site owner scope (L loc (HsFunTy ann arrow arg result)) state =
+      let (arg', arg_aliases, next) = liftBody site owner scope arg state
+          (result', result_aliases, end) = liftBody site owner scope result next
       in (L loc (HsFunTy ann arrow arg' result'), arg_aliases ++ result_aliases, end)
-    liftBody anchor owner scope (L loc (HsQualTy ann ctxt body)) state =
-      let (body', aliases, next) = liftBody anchor owner scope body state
+    liftBody site owner scope (L loc (HsQualTy ann ctxt body)) state =
+      let (body', aliases, next) = liftBody site owner scope body state
       in (L loc (HsQualTy ann ctxt body'), aliases, next)
-    liftBody anchor owner scope (L loc (HsKindSig ann body kind)) state =
-      let (body', aliases, next) = liftBody anchor owner scope body state
+    liftBody site owner scope (L loc (HsKindSig ann body kind)) state =
+      let (body', aliases, next) = liftBody site owner scope body state
       in (L loc (HsKindSig ann body' kind), aliases, next)
-    liftBody anchor owner scope ty state = liftTypeChildren (liftBody anchor owner scope) ty state
+    liftBody site owner scope ty state = liftTypeChildren (liftBody site owner scope) ty state
 
     applyAnchor loc occ = foldl' (\f (_, v) -> L loc (HsAppTy noExtField f (typeName v)))
                                  (typeName (L (l2l loc) (mkRdrUnqual occ)))
@@ -591,28 +674,86 @@ liftDeclarationTypes named_wildcards group
       Just (L _ HsWildCardTy{}) -> False
       _ -> and (gmapQ copyable node)
 
+    copyableCapture site (binder, name) =
+      copyable binder && (unLoc name `notElem` retainedNames site || copyableDomain binder)
+
+    copyableDomain :: Data a => a -> Bool
+    copyableDomain node = case cast node :: Maybe (LHsType GhcPs) of
+      Just (L _ HsFunTy{}) -> False
+      Just (L _ HsOpTy{}) -> False
+      Just (L _ HsForAllTy{}) -> False
+      Just (L _ HsForEachTy{}) -> False
+      _ -> and (gmapQ copyableDomain node)
+
+    sharedRetainedCaseKey (RetainedTypeSite names) used
+      (L _ (XHsType (HsTypeCase _ _ _ alts))) (Just (scrutinee, rows))
+      | let indices = map (unLoc . snd) used
+      , all (`elem` names) indices
+      , Just domains <- traverse (closedDomain . fst) used
+      , Just scrutinee_key <- retainedCaseScrutinee indices scrutinee
+      , all closedRow alts
+      = Just ((domains, scrutinee_key, rows), used)
+    sharedRetainedCaseKey _ _ _ _ = Nothing
+
+    closedDomain (L _ HsTvb{tvb_kind = HsBndrKind _ domain})
+      | null (extractHsTyRdrTyVars domain) = signatureCasePart domain
+    closedDomain _ = Nothing
+
+    closedRow (L _ (HsTypeCaseAlt pat _ rhs)) =
+      case classifyTypeCasePattern pat of
+        Just (_, []) -> null (extractHsTyRdrTyVars rhs)
+        _ -> False
+
     typeName n = L (l2l (getLoc n)) (HsTyVar noAnn NotPromoted n)
 
 -- | The case syntax compared within a single signature.
 data SignatureCasePart
   = CasePartName PromotionFlag RdrName
   | CasePartApp SignatureCasePart SignatureCasePart
+  | CasePartCapture Int
   | CasePartWildcard
   deriving Eq
+
+-- | Admit applications of global names and normalize retained operands.
+retainedCaseScrutinee :: [RdrName] -> SignatureCasePart -> Maybe SignatureCasePart
+retainedCaseScrutinee names scrutinee = do
+  checked <- operand scrutinee
+  guard (hasCapture checked)
+  pure checked
+  where
+    operand (CasePartName NotPromoted name)
+      | Just i <- elemIndex name names = Just (CasePartCapture i)
+    operand (CasePartApp fun arg) = CasePartApp <$> application fun <*> operand arg
+    operand name = global name
+
+    application (CasePartApp fun arg) = CasePartApp <$> application fun <*> operand arg
+    application name = global name
+
+    global part@(CasePartName _ name)
+      | isQual name || isRdrTc name || isRdrDataCon name = Just part
+    global _ = Nothing
+
+    hasCapture CasePartCapture{} = True
+    hasCapture (CasePartApp fun arg) = hasCapture fun || hasCapture arg
+    hasCapture _ = False
 
 -- | The scrutinee followed by the pattern and result in each source row.
 type SignatureCaseKey = (SignatureCasePart, [(SignatureCasePart, SignatureCasePart)])
 
 -- | Compare spellings and branch order, ignoring source locations and parentheses.
 signatureCaseKey :: LHsType GhcPs -> [LocatedA HsTypeCaseAlt] -> Maybe SignatureCaseKey
-signatureCaseKey scrutinee alts = (,) <$> part scrutinee <*> traverse alternative alts
+signatureCaseKey scrutinee alts = (,) <$> signatureCasePart scrutinee <*> traverse alternative alts
   where
-    alternative (L _ (HsTypeCaseAlt pat _ rhs)) = (,) <$> part pat <*> part rhs
-    part (L _ (HsTyVar _ promotion name)) = Just (CasePartName promotion (unLoc name))
-    part (L _ (HsAppTy _ f x)) = CasePartApp <$> part f <*> part x
-    part (L _ (HsParTy _ ty)) = part ty
-    part (L _ HsWildCardTy{}) = Just CasePartWildcard
-    part _ = Nothing
+    alternative (L _ (HsTypeCaseAlt pat _ rhs)) =
+      (,) <$> signatureCasePart pat <*> signatureCasePart rhs
+
+-- | Compare parsed names and applications in a signature case or closed domain.
+signatureCasePart :: LHsType GhcPs -> Maybe SignatureCasePart
+signatureCasePart (L _ (HsTyVar _ promotion name)) = Just (CasePartName promotion (unLoc name))
+signatureCasePart (L _ (HsAppTy _ f x)) = CasePartApp <$> signatureCasePart f <*> signatureCasePart x
+signatureCasePart (L _ (HsParTy _ ty)) = signatureCasePart ty
+signatureCasePart (L _ HsWildCardTy{}) = Just CasePartWildcard
+signatureCasePart _ = Nothing
 
 {- Note [Lifting type cases]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

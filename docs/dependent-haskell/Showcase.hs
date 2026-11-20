@@ -60,7 +60,7 @@ import qualified LexicalPackageRules
 import qualified RankedPackage
 import qualified StoredVector
 import qualified ExistentialVec as E
-import Data.IORef (modifyIORef', newIORef, readIORef)
+import Data.IORef (modifyIORef', newIORef, readIORef, writeIORef)
 import Data.Functor.Const (Const(..))
 import Data.Kind (Type)
 import Data.List (isInfixOf)
@@ -103,6 +103,7 @@ import qualified LazyParcel
 import qualified LegacyKindArgument
 import qualified OpenBuildSource
 import qualified OpenMapProof
+import qualified OpenMapWorker
 import qualified InstalledNotProof
 import qualified PreludeFilterProof
 import qualified PreludeMapLengthProof
@@ -233,6 +234,14 @@ booleans = do
     let payload :: Select bottomB
         payload = bottomValue @(Select bottomB) "showcase-payload"
     observe "keep ignores bottom index and payload" (keep bottomB payload)
+    writeIORef cell False
+    other <- readIORef cell
+    ignored <- newIORef bottomB >>= readIORef
+    observe "inline retained type case"
+        ( NativeCase.renderRetainedPick b
+        , NativeCase.renderRetainedPick other
+        , NativeCase.retainedKeep ignored (error "showcase-inline-payload")
+        )
   where
     -- Return a result at the selected Boolean type.
     choose :: foreach (b :: Bool) -> Select b
@@ -1164,6 +1173,9 @@ main = do
         (OpenMapProof.negateHead (Proxy @'[]), OpenMapProof.redStops (Proxy @'[]))
     observe "map an ordinary enumeration callback over an unknown tail"
         (OpenMapProof.ordinaryRedStops (Proxy @'[]))
+    observe "leave the permission argument open in an ordinary traffic-light function"
+        ( OpenMapProof.greenPermission (Proxy @'True)
+        , OpenMapWorker.mayProceed OpenMapWorker.Red (error "unused permission") )
     observe "use Prelude.not on a known head with an unknown tail"
         (InstalledNotProof.negateHead (Proxy @'[]))
     putStrLn ("map Prelude.not and Prelude.id over a known head and an unknown tail: "
