@@ -627,6 +627,12 @@ test('NativeMixedPackageInterface',
       extra_files(['../../../../docs/dependent-haskell/examples/erased-existentials/ForgetWitness.hs'])],
      run_command, ['bash NativeMixedPackageInterface.sh "{compiler}" "{libdir}"'])
 
+test('NativeExistentialInstances',
+     [only_ways(['normal']),
+      extra_files(['../../../../docs/dependent-haskell/examples/erased-existentials/ErasedStream.hs',
+                   '../../../../docs/dependent-haskell/examples/erased-existentials/StreamPreview.hs'])],
+     run_command, ['bash NativeExistentialInstances.sh "{compiler}" "{libdir}"'])
+
 test('NativeExistentialSource',
      [req_host_target_ghc, req_interp, req_rts_linker, only_ways(['normal']),
       extra_files(['erased-existential-source'])],

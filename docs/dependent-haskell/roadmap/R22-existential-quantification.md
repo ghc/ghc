@@ -713,6 +713,20 @@ coercions before using the package. A nested runtime index or retained
 function still reports GHC-83605 on this path.
 [Ordinary client](../../../testsuite/tests/dependent/should_run/implicit-existential-source/QuickLookForward.hs).
 
+### Ordinary instances for a stream with hidden state
+
+An ordinary module can declare and use separate class instances for
+`Stream Char` and `Stream Bool`. The state is hidden in both streams.
+The different element types make the closed package types apart.
+For an open element type or a stuck type family, GHC keeps the possible
+overlap. An equality between packages does not determine a free element type.
+
+GHC also checks the Paterson conditions on an instance with a package
+in its head. A repeated free variable gives GHC-22979. Two instances
+that differ only in the name of the hidden witness give GHC-59692.
+[Ordinary instances](../examples/erased-existentials/StreamPreview.hs)
+and [source-hidden regression](../../../testsuite/tests/dependent/should_run/NativeExistentialInstances.sh).
+
 ### Inferring a higher-rank witness
 
 A package can store `Callback t` with a hidden `t`. If the supplied

@@ -1950,10 +1950,12 @@ unify_ty env ty1 ty2 kco
     mb_sat_fam_app2 = isSatTyFamApp ty2
 
 -- See Note [Opaque existential matching].
-unify_ty env ty1@ExistsTy{} ty2@ExistsTy{} _
-  | not (anyFreeVarsOfTypes isTyCoVar [ty1, ty2])
-  , eqTypeX (um_rn_env env) ty1 ty2
+unify_ty env ty1@(ExistsTy flag1 tv1 body1) ty2@(ExistsTy flag2 tv2 body2) _
+  | closed, eqTypeX (um_rn_env env) ty1 ty2
   = return ()
+  | closed, flag1 == flag2
+  , typesCantMatch [(varType tv1, varType tv2), (body1, body2)]
+  = surelyApart
   | MatchRule <- um_match_mode env
   , let vars = tyCoVarsOfTypeList ty1
   , all isTyVar vars
@@ -1963,9 +1965,19 @@ unify_ty env ty1@ExistsTy{} ty2@ExistsTy{} _
              | not (anyInRnEnvR (um_rn_env env) (tyCoVarsOfTypes (ty2 : args)))
              , eqType (substTyWith vars args ty1) ty2 -> return ()
            _ -> maybeApart MARExistential }
-unify_ty _ ExistsTy{} _ _ = maybeApart MARExistential
-unify_ty _ _ ExistsTy{} _ = maybeApart MARExistential
+  where
+    closed = not (anyFreeVarsOfTypes isTyCoVar [ty1, ty2])
+unify_ty _ ExistsTy{} other _ = apartFromPackage other
+unify_ty _ other ExistsTy{} _ = apartFromPackage other
 unify_ty _ _ _ _ = surelyApart
+
+-- | A generative nominal head cannot reduce to an existential binder.
+-- See Note [Opaque existential matching].
+apartFromPackage :: Type -> UM ()
+apartFromPackage ty
+  | Just (tc, _) <- splitTyConApp_maybe ty
+  , isGenerativeTyCon tc Nominal = surelyApart
+  | otherwise = maybeApart MARExistential
 
 {- Note [Opaque existential matching]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1974,6 +1986,16 @@ alpha-reflexivity. Do not match free template variables through its body or
 derive apartness from failure to do so. Handle whole-type variables and stuck
 type family applications first. The occurs check must still traverse the
 binder and body when a variable can be bound to the whole existential.
+
+Two closed packages can select different dictionaries. For example,
+the result of the stored callback can be Bool in one package and Char
+in the other. Ask the ordinary apartness checker whether the bodies
+or witness kinds can unify at all. It may instantiate the two witness
+variables independently. Failure even under that freedom rules out
+equality under one shared binder. Discard its substitution. A stuck
+family application can still make the result uncertain.
+An ordinary data type such as Char or Either keeps a different outer
+head at nominal role. Its arguments do not affect this comparison.
 
 For a Core RULE on `toList @a (s :: Stream a)`, the first argument
 supplies a substitution for a. When the matcher reaches s, compare the

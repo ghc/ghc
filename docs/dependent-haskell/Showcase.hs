@@ -56,6 +56,7 @@ import qualified ImplicitVector
 import qualified PartitionChoices
 import qualified ErasedStream
 import qualified StreamFold
+import qualified StreamPreview
 import qualified PackageRules
 import OrphanPackageRules ()
 import qualified LexicalPackageRules
@@ -1411,6 +1412,10 @@ main = do
          PackageRules.open (True, fromEnum))
     observe "match and open existential packages in optimizer rules"
         (LexicalPackageRules.local 3 (LexicalPackageRules.hideInt 5))
+    observe "select ordinary instances for streams with hidden state"
+        (StreamPreview.preview (ErasedStream.fromList ('G' : 'H' : error "unused character tail")),
+         StreamPreview.preview (ErasedStream.fromList (True : error "unused Boolean tail")),
+         StreamPreview.preview @(Either Char (ErasedStream.Stream Char)) (Left 'x'))
     observe "read streams with different hidden state types"
         (ErasedStream.toList (ErasedStream.oddThrough 6),
          take 1 (ErasedStream.toList (ErasedStream.fromList (True : error "unused stream tail"))))

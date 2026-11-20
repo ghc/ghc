@@ -7495,3 +7495,16 @@ through GHC's ordinary retained-argument checker. The full application
 still checks the payload at its own source location.
 [Agda indexed constructors](https://agda.readthedocs.io/en/v2.8.0/language/data-types.html#indexed-datatypes)
 and [indexed reading](examples/open-evaluation/DirectIndexedList.hs).
+
+## Class instances for existential packages
+
+GHC checks the number of occurrences of free variables and the size of
+an instance context against its head. The fork applies that check under
+the existential binder. Its apartness test compares the kinds and bodies
+of closed packages. Agda also resolves an instance argument by finding a
+unique instance for its required type. The Haskell implementation keeps
+GHC's rules for overlap and type families.
+[GHC instance termination rules](https://downloads.haskell.org/ghc/latest/docs/users_guide/exts/instances.html#instance-termination-rules),
+[GHC type family compatibility](https://downloads.haskell.org/ghc/latest/docs/users_guide/exts/type_families.html#compatibility-and-apartness-of-type-family-equations),
+[Agda 2.8 instance resolution](https://agda.readthedocs.io/en/v2.8.0/language/instance-arguments.html#instance-resolution)
+and [the stream instances](examples/erased-existentials/StreamPreview.hs).
