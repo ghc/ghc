@@ -1318,6 +1318,25 @@ retained operand. Its ordinary calls can still inline.
 [Runtime example](../examples/open-evaluation/PreludeFilterRuntime.hs)
 and [regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh).
 
+### Supply a runtime filter decider
+
+`runtimeFilterBoundWith` takes `foreach (x :: Bool) -> BooleanResult (p x)`
+for an arbitrary unmatchable Boolean predicate `p`. Matching the result
+supplies `p x ~ 'True` or `'False ~ p x` to the existing proof. An ordinary
+client can choose an existentially packaged decider and open the bound
+through interfaces. The example derives the runtime `Prelude.filter`
+callback from that same decider. A decider indexed by negation fails to
+check for the constant-true predicate. A bare `Bool -> Bool` also fails
+because its result supplies no index.
+
+The empty proof leaves the decider lazy. For a cons, the decider controls
+demand for the head. Both first proof constructors leave the tail lazy.
+The full proof requires a finite spine and a defined decision at every
+head. The example's displayed bound and filtered size can evaluate the
+pure decider separately. [Runtime decider](../examples/open-evaluation/PreludeFilterDecider.hs),
+[regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh),
+and [prior art](../REFERENCES.md#checked-runtime-decisions-for-filter).
+
 ### Prove that append adds the list lengths
 
 `lengthAppend` proves `Count (Appended xs ys) :~: Plus (Count xs) (Count ys)`.

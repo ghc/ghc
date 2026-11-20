@@ -27,6 +27,10 @@ from an IO-supplied list. The witness provides the branch equality
 needed to prove the filter size bound. An ordinary client can open the
 packaged bound. [Runtime filter proof](R16-open-term-evaluator.md#prove-that-filter-never-increases-length).
 
+An imported higher-order contract can take a decider with a retained
+head and a result indexed by the chosen predicate. An ordinary module
+can choose that decider at runtime. [Runtime filter decider](R16-open-term-evaluator.md#supply-a-runtime-filter-decider).
+
 - Runtime Bool and Peano Nat indices, checked equations and bounded lambdas.
 - A retained binder can have a lifted type parameter as its domain.
   The `withPair` callback can name that argument as the index of its

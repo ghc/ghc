@@ -1,8 +1,11 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, Modifiers #-}
+{-# LANGUAGE RankNTypes, TypeApplications #-}
 module PreludeFilterRuntime
-    ( RuntimeFilterBound(..), runtimeFilterBound, packRuntimeBound
+    ( BooleanResult(..), booleanResult, negationResult
+    , RuntimeFilterBound(..), runtimeFilterBound, runtimeFilterBoundWith, packRuntimeBound
     , showRuntimeBound ) where
 
+import GHC.Exts (U)
 import Prelude (Bool(..), String, show)
 import qualified Prelude as P
 import PreludeFilterLengthProof
@@ -21,16 +24,30 @@ booleanResult :: foreach (b :: Bool) -> BooleanResult b
 booleanResult True = IsTrue
 booleanResult False = IsFalse
 
--- | Derive one step from the predicate result at each head.
-runtimeSteps :: foreach (xs :: [Bool]) -> FilterSteps Negation xs
-runtimeSteps [] = End
-runtimeSteps (x : xs) = case booleanResult (P.not x) of
-    IsTrue -> keepIfTrue (runtimeSteps xs)
-    IsFalse -> skipIfFalse (runtimeSteps xs)
+-- | Retain the result of the installed Boolean negation.
+negationResult :: foreach (x :: Bool) -> BooleanResult (Negation x)
+negationResult x = booleanResult (P.not x)
+
+-- | Ask the decider for one checked filter step at each head.
+runtimeSteps :: forall (p :: Bool %U -> Bool).
+                (foreach (x :: Bool) -> BooleanResult (p x))
+             -> foreach (xs :: [Bool]) -> FilterSteps p xs
+runtimeSteps decide input = case input of
+    [] -> End
+    x : xs -> case decide x of
+        IsTrue -> keepIfTrue (runtimeSteps decide xs)
+        IsFalse -> skipIfFalse (runtimeSteps decide xs)
+
+-- | Bound the filtered size of a finite list when its decider supplies each result.
+runtimeFilterBoundWith :: forall (p :: Bool %U -> Bool).
+                          (foreach (x :: Bool) -> BooleanResult (p x))
+                       -> foreach (xs :: [Bool])
+                       -> AtMost (Count (FilterWith p xs)) (Count xs)
+runtimeFilterBoundWith decide xs = filterLengthBound (runtimeSteps decide xs)
 
 -- | Bound the filtered size of a finite list with defined Boolean elements.
 runtimeFilterBound :: foreach (xs :: [Bool]) -> AtMost (Count (FilterWith Negation xs)) (Count xs)
-runtimeFilterBound xs = filterLengthBound (runtimeSteps xs)
+runtimeFilterBound xs = runtimeFilterBoundWith @Negation negationResult xs
 
 -- | Store the input list with the bound that refers to that list.
 data RuntimeFilterBound where

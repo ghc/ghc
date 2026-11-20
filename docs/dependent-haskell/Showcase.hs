@@ -110,6 +110,7 @@ import qualified OpenMapProof
 import qualified OpenMapWorker
 import qualified InstalledNotProof
 import qualified PreludeFilterProof
+import qualified PreludeFilterDecider
 import qualified PreludeAppendLengthProof
 import qualified PreludeFilterLengthProof
 import qualified PreludeFilterRuntime
@@ -1251,6 +1252,10 @@ main = do
     xs <- readIORef runtimeList
     putStrLn ("prove the filter bound from a runtime list: "
               ++ PreludeFilterRuntime.showRuntimeBound (PreludeFilterRuntime.packRuntimeBound xs))
+    ref <- newIORef (PreludeFilterDecider.SomeFilterDecider PreludeFilterDecider.alwaysDecider)
+    decider <- readIORef ref
+    putStrLn ("prove the filter bound with a runtime decider: "
+              ++ PreludeFilterDecider.showDecidedBound decider xs)
     observe "use a checked cons rule without forcing the callback, head or tail"
         (ConsRuleMapProof.negateHead (Proxy @'[]), ConsRuleMapProof.lazySpine)
     observe "compose two checked traversals without forcing the inner callback"

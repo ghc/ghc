@@ -6358,6 +6358,24 @@ Core equations. [GHC pragmas](../users_guide/exts/pragmas.rst),
 [GHC rewrite rule semantics](../users_guide/exts/rewrite_rules.rst),
 and [R16 application](roadmap/R16-open-term-evaluator.md#use-an-ordinary-identity-as-an-open-callback).
 
+### Checked runtime decisions for filter
+
+Agda's `length-filter` takes a `Decidable P` argument. It branches on
+`does (P? x)`, the Boolean result of the decision for the current head.
+The Haskell decider returns an indexed Boolean singleton. It accepts
+the runtime head through `foreach`, which lets the result type mention
+that head directly. The example projects the runtime Boolean from the
+same singleton. [Agda standard library 2.4, length-filter](https://agda.github.io/agda-stdlib/v2.4/Data.List.Properties.html#1588),
+[Agda Dec](https://agda.github.io/agda-stdlib/v2.4/Relation.Nullary.Decidable.Core.html),
+and [singletons 3.0.4, fromSing](https://hackage-content.haskell.org/package/singletons-3.0.4/docs/Data-Singletons.html#v:fromSing).
+
+`Data.Bool.Linear` uses `%1` to specify how a Boolean argument is consumed.
+`FilterDecider` uses its result index to specify which answer the callback
+can return. The caller can reuse its decider for each list element, and
+the decider controls whether to evaluate the head.
+[linear-base 0.5.0, Data.Bool.Linear](https://hackage-content.haskell.org/package/linear-base-0.5.0/docs/Data-Bool-Linear.html)
+and [R16 runtime decider](roadmap/R16-open-term-evaluator.md#supply-a-runtime-filter-decider).
+
 Agda permits a datatype declaration and its constructors to appear at
 different positions in an interleaved mutual block. Haskell's renamer
 already groups mutually dependent type declarations. R21 uses those

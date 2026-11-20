@@ -211,17 +211,25 @@ HS
 cp "$src/NativeRetainedSourceOperand.hs" .
 for level in 1 2; do
     "${filter[@]}" "-O$level" -fforce-recomp -c "$src/PreludeFilterRuntime.hs" -odir . -hidir .
+    "${filter[@]}" "-O$level" -fforce-recomp -c "$src/PreludeFilterDecider.hs" -odir . -hidir .
     "${filter[@]}" "-O$level" -fforce-recomp -ddump-simpl -ddump-to-file \
         -dsuppress-uniques -dsuppress-idinfo -dsuppress-module-prefixes -c NativeRetainedSourceOperand.hs
     # Ordinary calls to not still inline. The retained applications use the named call.
     awk '/^ordinaryNot$/,/^$/' NativeRetainedSourceOperand.dump-simpl | grep -Fq 'case x of'
     grep -Fq '(not x)' NativeRetainedSourceOperand.dump-simpl
 done
-sed -e 's/module PreludeFilterRuntime/module DirectCase/' \
-    -e 's/case booleanResult (P.not x) of/case P.not x of/' \
-    -e 's/IsTrue -> keepIfTrue/True -> keepIfTrue/' \
-    -e 's/IsFalse -> skipIfFalse/False -> skipIfFalse/' \
-    "$src/PreludeFilterRuntime.hs" >DirectCase.hs
+cat >DirectCase.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
+module DirectCase where
+import PreludeFilterLengthProof
+import PreludeFilterSource (Negation)
+
+steps :: foreach (xs :: [Bool]) -> FilterSteps Negation xs
+steps [] = End
+steps (x : xs) = case not x of
+    True -> keepIfTrue (steps xs)
+    False -> skipIfFalse (steps xs)
+HS
 if "${filter[@]}" -c DirectCase.hs >direct-case.log 2>&1 ||
    ! grep -Fq '[GHC-05617]' direct-case.log ||
    ! grep -Fq 'True -> keepIfTrue' direct-case.log ||
@@ -286,6 +294,62 @@ True
 OUT
 ./runtime-filter-run '[]' '[False]' '[True]' '[False,True,False]' >runtime-filter.stdout
 diff -u runtime-filter.expected runtime-filter.stdout
+
+cat >WrongDecider.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes #-}
+module WrongDecider where
+import PreludeFilterDecider
+
+wrong :: FilterDecider Always
+wrong = case negationDecider of FilterDecider decide -> FilterDecider decide
+
+unchecked :: FilterDecider Always
+unchecked = FilterDecider id
+HS
+if "${filter[@]}" -c WrongDecider.hs >wrong-decider.log 2>&1 ||
+   ! grep -Fq 'WrongDecider.hs:6:' wrong-decider.log ||
+   ! grep -Fq 'WrongDecider.hs:9:' wrong-decider.log ||
+   ! grep -Fq '[GHC-83865]' wrong-decider.log ||
+   ! grep -Fq 'Bool -> Bool' wrong-decider.log; then
+    cat wrong-decider.log >&2
+    exit 1
+fi
+
+cat >DeciderRun.hs <<'HS'
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
+module Main where
+import Control.Exception (ErrorCall(..), evaluate, try)
+import Data.IORef (newIORef, readIORef)
+import PreludeFilterDecider
+import PreludeFilterLengthProof (AtMost(..))
+import System.Environment (getArgs)
+
+first :: DecidedFilterBound p -> String
+first (DecidedFilterBound _ bound) = case bound of
+    ZeroBound -> "empty"
+    BothSucc _ -> "keep"
+    RightSucc _ -> "skip"
+
+main :: IO ()
+main = do
+    [choice, input] <- getArgs
+    ref <- newIORef (if choice == "not" then SomeFilterDecider negationDecider
+                                       else SomeFilterDecider alwaysDecider)
+    decider <- readIORef ref
+    xs <- newIORef (read input) >>= readIORef
+    putStrLn (showDecidedBound decider xs)
+    putStrLn (first (packDecidedBound (error "empty forced its decider") []))
+    putStrLn (first (packDecidedBound negationDecider (False : error "keep forced its tail")))
+    putStrLn (first (packDecidedBound negationDecider (True : error "skip forced its tail")))
+    putStrLn (first (packDecidedBound alwaysDecider (error "forced head" : error "forced tail")))
+    bad <- try (evaluate (first (packDecidedBound (error "cons needs its decider") [False])))
+    print (case bad of Left (ErrorCall "cons needs its decider") -> True; _ -> False)
+HS
+"${filter[@]}" -c DeciderRun.hs
+"${filter[@]}" DeciderRun.o ../filter-client/PreludeFilter{Decider,LengthProof,Runtime}.o \
+    ../filter/PreludeFilterSource.o ../length-source/PreludeMapLength{Size,Source}.o -o decider-run
+[[ $(./decider-run not '[False,True,True]') == $'(BothSucc (RightSucc (RightSucc ZeroBound)),Succ Zero,Succ (Succ (Succ Zero)))\nempty\nkeep\nskip\nkeep\nTrue' ]]
+[[ $(./decider-run always '[False,True,True]') == $'(BothSucc (BothSucc (BothSucc ZeroBound)),Succ (Succ (Succ Zero)),Succ (Succ (Succ Zero)))\nempty\nkeep\nskip\nkeep\nTrue' ]]
 cd "$out/filter-client"
 
 sed -e 's/^{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}//' \
