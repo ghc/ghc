@@ -86,12 +86,18 @@ data PmGrd
       _pm_let_expr :: !CoreExpr
     }
 
+    -- | Bind the abstract witness and payload of an erased package.
+    -- The opening itself is lazy. The payload guards determine demand.
+  | PmUnpack !Id !Type !TyVar !Id
+
 -- | Should not be user-facing.
 instance Outputable PmGrd where
   ppr (PmCon x alt _tvs _con_dicts con_args)
     = hsep [ppr alt, hsep (map ppr con_args), text "<-", ppr x]
   ppr (PmBang x _loc) = char '!' <> ppr x
   ppr (PmLet x expr) = hsep [text "let", ppr x, text "=", ppr expr]
+  ppr (PmUnpack x _ witness payload)
+    = hsep [text "unpack", ppr x, text "as", ppr witness, ppr payload]
 
 --
 -- * Guard tree language

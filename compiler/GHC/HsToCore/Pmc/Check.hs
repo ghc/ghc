@@ -123,6 +123,11 @@ checkGrd grd = CA $ \inc -> case grd of
     pure CheckResult { cr_ret = emptyRedSets { rs_cov = matched }
                      , cr_uncov = mempty
                      , cr_approx = Precise }
+  PmUnpack x schema witness payload -> do
+    matched <- addPhiCtNablas inc (PhiUnpackCt x schema witness payload)
+    pure CheckResult { cr_ret = emptyRedSets { rs_cov = matched }
+                     , cr_uncov = mempty
+                     , cr_approx = Precise }
   -- Bang x _: Diverge on x ~ ⊥, refine with x ≁ ⊥
   PmBang x mb_info -> do
     div <- addPhiCtNablas inc (PhiBotCt x)

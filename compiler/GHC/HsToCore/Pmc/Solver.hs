@@ -606,6 +606,8 @@ data PhiCt
   | PhiBotCt     !Id
   -- ^ @PhiBotCt x@ encodes "x ~ ⊥", equating @x@ to ⊥.
   -- by @K@.
+  | PhiUnpackCt !Id !Type !TyVar !Id
+  -- ^ Relates the payload of a package to prior openings of the same package.
   | PhiNotBotCt !Id
   -- ^ @PhiNotBotCt x y@ encodes "x ≁ ⊥", asserting that @x@ can't be ⊥.
 
@@ -621,6 +623,8 @@ instance Outputable PhiCt where
   ppr (PhiNotConCt x con)             = ppr x <+> text "≁" <+> ppr con
   ppr (PhiBotCt x)                    = ppr x <+> text "~ ⊥"
   ppr (PhiNotBotCt x)                 = ppr x <+> text "≁ ⊥"
+  ppr (PhiUnpackCt x _ witness payload)
+    = hsep [text "unpack", ppr x, text "as", ppr witness, ppr payload]
 
 type PhiCts = Bag PhiCt
 
@@ -708,6 +712,8 @@ addPhiTmCt nabla (PhiConCt x con tvs dicts args) = do
 addPhiTmCt nabla (PhiNotConCt x con)       = addNotConCt nabla x con
 addPhiTmCt nabla (PhiBotCt x)              = addBotCt nabla x
 addPhiTmCt nabla (PhiNotBotCt x)           = addNotBotCt nabla x
+addPhiTmCt nabla (PhiUnpackCt x schema witness payload)
+  = addUnpackCt nabla x schema witness payload
 
 filterUnliftedFields :: PmAltCon -> [Id] -> [Id]
 filterUnliftedFields con args =
@@ -763,7 +769,7 @@ addNotConCt nabla x nalt = do
     -- otherwise return updated entry and `Just x'` if `x` should be marked dirty,
     -- where `x'` is the representative of `x`.
     go :: VarInfo -> MaybeT DsM (Maybe Id, VarInfo)
-    go vi@(VI x' pos neg _ rcm) = do
+    go vi@VI{ vi_id = x', vi_pos = pos, vi_neg = neg, vi_rcm = rcm } = do
       -- 1. Bail out quickly when nalt contradicts a solution
       let contradicts nalt sol = eqPmAltCon (paca_con sol) nalt == Equal
       guard (not (any (contradicts nalt) pos))
@@ -803,7 +809,7 @@ hasRequiredTheta _                 = False
 -- See Note [TmState invariants].
 addConCt :: Nabla -> Id -> PmAltCon -> [TyVar] -> [Id] -> MaybeT DsM Nabla
 addConCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts=env } } x alt tvs args = do
-  let vi@(VI _ pos neg bot _) = lookupVarInfo ts x
+  let vi@VI{ vi_pos = pos, vi_neg = neg, vi_bot = bot } = lookupVarInfo ts x
   -- First try to refute with a negative fact
   guard (not (elemPmAltConSet alt neg))
   -- Then see if any of the other solutions (remember: each of them is an
@@ -862,7 +868,27 @@ addVarCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts = env } } x y =
       nabla_pos <- foldlM add_pos nabla_equated (vi_pos vi_x)
       -- Do the same for negative info
       let add_neg nabla nalt = addNotConCt nabla y nalt
-      foldlM add_neg nabla_pos (pmAltConSetElems (vi_neg vi_x))
+      nabla_neg <- foldlM add_neg nabla_pos (pmAltConSetElems (vi_neg vi_x))
+      case vi_opening vi_x of
+        Nothing -> pure nabla_neg
+        Just (schema, witness, payload) -> addUnpackCt nabla_neg y schema witness payload
+
+-- | Relate openings in this refinement when their scrutinees are equal.
+-- Keep constructors on the payload's VarInfo, where their types apply.
+addUnpackCt :: Nabla -> Id -> Type -> TyVar -> Id -> MaybeT DsM Nabla
+addUnpackCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts = env } }
+            x schema witness payload = case vi_opening vi of
+  Nothing ->
+    let vi' = vi{ vi_opening = Just (schema, witness, payload) }
+    in pure nabla{ nabla_tm_st = ts{ ts_facts = addToUSDFM env x vi' } }
+  Just (schema', witness', payload')
+    | schema `eqType` schema' -> do
+        let eqs = [mkNomEqPred (mkTyVarTy witness) (mkTyVarTy witness') | witness /= witness']
+        nabla' <- addTyCts nabla (listToBag eqs)
+        addVarCt nabla' payload payload'
+    | otherwise -> pure nabla
+  where
+    vi = lookupVarInfo ts x
 
 -- | Inspects a 'PmCoreCt' @let x = e@ by recording constraints for @x@ based
 -- on the shape of the 'CoreExpr' @e@. Examples:
@@ -1987,7 +2013,7 @@ generateInhabitingPatterns _    _      0 _     = pure []
 generateInhabitingPatterns _    []     _ nabla = pure [nabla]
 generateInhabitingPatterns mode (x:xs) n nabla = do
   tracePm "generateInhabitingPatterns" (ppr mode <+> ppr n <+> ppr (x:xs) $$ ppr nabla)
-  let VI _ pos neg _ _ = lookupVarInfo (nabla_tm_st nabla) x
+  let VI{ vi_pos = pos, vi_neg = neg } = lookupVarInfo (nabla_tm_st nabla) x
   case pos of
     _:_ -> do
       -- Example for multiple solutions (must involve a PatSyn):

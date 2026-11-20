@@ -207,8 +207,8 @@ desugarPat x pat = case pat of
 
         _ -> desugarPat x expansion
 
-    -- Inspect the type of this row's payload. Its witness is local to the row.
-    NativeExistsPat _ _ payload _ p -> desugarPat payload p
+    NativeExistsPat schema witness payload _ p ->
+      consGrdDag (PmUnpack x schema witness payload) <$> desugarPat payload p
 
     -- See Note [Desugar CoPats]
     -- Generally the translation is
