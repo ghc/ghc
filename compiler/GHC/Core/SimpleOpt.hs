@@ -331,6 +331,12 @@ the checked variable aliases described below.
 Do not create new rules or Core unfoldings. mkUnfolding would run occurrence
 analysis again. Do not create join points from pre-existing occurrence metadata.
 
+When a beta redex uses its binder in an annotation, substitute a checked
+index. An opaque binder at Vec a n can occur in its result type even though
+the constructors of Vec do not form a structural domain. An ordinary beta let
+would leave that let binder free in the result type. Function heads use the
+separate fixed-type check. The index check still governs operand reification.
+
 A local nonrecursive binding whose input RHS is literally a variable can be
 removed when both input Ids are eligible local Many indices or native function
 heads. Look up that
@@ -783,14 +789,6 @@ simple_app env e0@(Lam {}) as0@(_:_)
     do_beta :: SimpleOptEnv -> InExpr -> [SimpleContItem] -> OutExpr
     do_beta env e@(Lam b body) args@(ApplyToArg a:as)
       | soe_native env
-      , isNativeIndexId b'
-      = let arg = simple_opt_clo (soeInScope env') a
-        in case exprToNativeIndex arg of
-             Just _ -> do_beta (env' { soe_subst = extendIdSubst (soe_subst env') b arg })
-                               body as
-             Nothing -> rebuild_app env (simple_opt_expr env e) args
-
-      | soe_native env
       , isNativeIndexFunctionId b'
       = let arg = simple_opt_clo (soeInScope env') a
         in case nativeIndexFunctionVar_maybe arg of
@@ -799,6 +797,16 @@ simple_app env e0@(Lam {}) as0@(_:_)
                -> do_beta (env' { soe_subst = extendIdSubst (soe_subst env') b arg })
                           body as
              _ -> rebuild_app env (simple_opt_expr env e) args
+
+      | soe_native env
+      , isNativeIndexId b'
+        || (isNativeOpaqueValueId b' && hasFreeVarInCoreAnnotations b body)
+      -- See Note [Restricted dependent simplification].
+      = let arg = simple_opt_clo (soeInScope env') a
+        in case exprToNativeIndex arg of
+             Just _ -> do_beta (env' { soe_subst = extendIdSubst (soe_subst env') b arg })
+                               body as
+             Nothing -> rebuild_app env (simple_opt_expr env e) args
 
       | -- simpl binder before looking at its type
         -- See Note [Dark corner with representation polymorphism]
