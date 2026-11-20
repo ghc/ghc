@@ -20,6 +20,17 @@ that fact in this fork.
    continue to export an ordinary API to other clients.
    [Closed evaluator](roadmap/R15-closed-term-evaluator.md).
 
+An ordinary producer can request checked equations with
+`{-# OPTIONS_GHC -fwrite-source-equations #-}`. For example, the
+`size` module exports its recursion on the list spine. Both the
+map-length proof and the filter-length bound use these equations
+from a stripped interface. The producer can compile with `-fno-code`.
+GHC checks the source body before it exports an equation. Making
+`size` strict in each element or recurring on the original list
+prevents it from exporting this equation.
+[Ordinary size producer](examples/open-evaluation/PreludeMapLengthSize.hs)
+and [proof and compiler checks](roadmap/R16-open-term-evaluator.md#prove-that-map-preserves-length).
+
 GHC already runs Haskell during compilation. A Template Haskell splice
 can run a search and emit a witness expression. GHC then typechecks that
 expression at the splice site. A typechecker plugin can also participate

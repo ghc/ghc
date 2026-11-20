@@ -9,6 +9,14 @@ records every edge. The R numbers are local labels for those cards.
 
 ## Where this fork stands
 
+The module that defines the Peano list `size` can keep dependent syntax
+off. Its `-fwrite-source-equations` option publishes the checked
+recursive equations, including when compiling without object code.
+The same source function runs at runtime. Separate ordinary proof
+modules use its interface to reason about installed `map` and `filter`.
+[Size definition](examples/open-evaluation/PreludeMapLengthSize.hs)
+and [ordinary module boundary](BOUNDARY-EVIDENCE.md).
+
 An ordinary module proves that filtering a finite list cannot increase
 its `size`. At each head, a checked `Prelude.filter` equation says
 whether that element stays or goes. For `Prelude.not`, knowing the
