@@ -242,7 +242,7 @@ module GHC.Essentials
     , TH.bang, TH.bangType, TH.varBangType
     , TH.unidir, TH.implBidir, TH.explBidir
     , TH.prefixPatSyn, TH.recordPatSyn, TH.infixPatSyn
-    , forallT, forallVisT, forallMatchT, varT, conT, infixT, tupleT
+    , forallT, forallVisT, forallMatchT, forEachT, varT, indexVarT, conT, infixT, tupleT
     , unboxedTupleT, unboxedSumT, arrowT, mulArrowT, listT
     , appT, appKindT, sigT, equalityT, litT, promotedT
     , promotedTupleT, promotedNilT, promotedConsT
