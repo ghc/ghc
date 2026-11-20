@@ -10,6 +10,7 @@ module NativeNestedCase
   , IndexedFieldBox(..), IndexedFieldPayload(..), IndexedFieldPick, IndexedFieldOrder
   , RefinedGate(..), RefinedLeaf(..), RefinedBranchPick
   , PlainCaseField(..), CaseField(..), ShadowedCaseField(..)
+  , RankedCaseField(..), OrderedRankedCaseField(..)
   , OpenCaseGate(..), OpenCaseIndex, OpenIndexPick, OpenIndexAtOrdering
   , ScopedOpenIndex
   ) where
@@ -282,3 +283,12 @@ data CaseField (d :: Maybe Bool) where
 data ShadowedCaseField (b :: Bool) (d :: Maybe Bool) where
   ShadowedCaseField :: forall (b :: Bool) (d :: Maybe Bool).
     Proxy (case d of { Just b -> b; Nothing -> b }) -> ShadowedCaseField b d
+
+-- | Use the inner erased binder to select the result of this field.
+data RankedCaseField (b :: Bool) = RankedCaseField
+  (forall (b :: Bool). Proxy b -> (case b of { True -> Int; False -> Char }))
+
+-- | Keep the earlier test of a field even under its erased forall.
+data OrderedRankedCaseField (d :: Bool) = OrderedRankedCaseField
+  (forall (d :: Maybe Bool). Proxy d ->
+    (case d of { Just True -> Int; Just _ -> Int; Nothing -> Char }))

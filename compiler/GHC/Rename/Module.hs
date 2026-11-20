@@ -410,7 +410,9 @@ lexical capture check as for a value signature. Give each written
 case its own helper, including cases in different fields of one
 constructor. A copied retained domain can change matchability in
 the helper, so leave cases under a retained binder outside this
-field rule.
+field rule. Keep an inner erased forall and put the helper
+application in its body. A copied capture kind must still refer
+to the same binders after shadowing.
 -}
 -- | Select the expressions that can be lifted at a declaration type position.
 data LiftedTypeSite
@@ -512,17 +514,21 @@ liftDeclarationTypes source_heads named_wildcards group
         | let locals = explicitCaptures binders
               names = map (unLoc . snd) locals
               (hidden, outer) = partition ((`elem` names) . unLoc . snd) scope
-              shadowed = Set.fromList (map (unLoc . snd) hidden)
         , length locals == length binders
         , null (findDupsEq (==) names)
-        , all (Set.disjoint shadowed . kindNames . fst) outer
-        , localKindsInScope shadowed locals ->
+        , fieldKindsInScope hidden outer locals ->
             let (body', sums, next) = liftFieldType RetainedFieldTypeSite owner (outer ++ locals) body salt
             in (L loc node{hst_body = body'}, sums, next)
       HsParTy ann body ->
         let (body', sums, next) = liftFieldType site owner scope body salt
         in (L loc (HsParTy ann body'), sums, next)
       _ -> liftFieldAt site owner scope ty salt
+
+    fieldKindsInScope hidden outer locals =
+      all (Set.disjoint shadowed . kindNames . fst) outer
+        && localKindsInScope shadowed locals
+      where
+        shadowed = Set.fromList (map (unLoc . snd) hidden)
 
     localKindsInScope _ [] = True
     localKindsInScope hidden ((binder, name):locals) =
@@ -636,6 +642,10 @@ liftDeclarationTypes source_heads named_wildcards group
       | site == SignatureTypeSite || site == ForallTypeSite
       , Just locals <- forallCaptures tele
       = Just (ForallTypeSite, locals, body)
+      | site == FieldTypeSite
+      , HsForAllInvis{hsf_matchability = Nothing} <- tele
+      , Just locals <- forallCaptures tele
+      = Just (FieldTypeSite, locals, body)
     innerScope site HsForEachTy{hst_bndrs = binders, hst_body = body}
       | not (fieldSite site)
       , Just locals <- writtenCaptures binders
@@ -664,8 +674,9 @@ liftDeclarationTypes source_heads named_wildcards group
       | Just (inner, locals, body) <- innerScope site quantified
       , let names = map (unLoc . snd) locals
       , null (findDupsEq (==) names)
-      = let outer = filter (\(_, name) -> unLoc name `notElem` names) scope
-            (body', aliases, (next, _)) = liftBody inner owner
+      , let (hidden, outer) = partition ((`elem` names) . unLoc . snd) scope
+      , inner /= FieldTypeSite || fieldKindsInScope hidden outer locals
+      = let (body', aliases, (next, _)) = liftBody inner owner
                                           (outer ++ locals) body (salt, [])
         in (L loc quantified{hst_body = body'}, aliases, (next, seen))
     liftBody site owner scope (L loc (HsFunTy ann arrow arg result)) state =

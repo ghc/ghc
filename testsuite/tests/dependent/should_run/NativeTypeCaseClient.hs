@@ -241,3 +241,12 @@ shadowedCaseField (N.ShadowedCaseField bit) = bit
 
 outerCaseField :: N.ShadowedCaseField 'True 'Nothing -> Proxy 'True
 outerCaseField (N.ShadowedCaseField bit) = bit
+
+rankedCaseField :: N.RankedCaseField 'False -> Int
+rankedCaseField (N.RankedCaseField f) = f @'True Proxy
+
+rankedCaseFieldFalse :: N.RankedCaseField 'True -> Char
+rankedCaseFieldFalse (N.RankedCaseField f) = f @'False Proxy
+
+orderedRankedCaseField :: N.OrderedRankedCaseField 'True -> Int
+orderedRankedCaseField (N.OrderedRankedCaseField f) = f @('Just 'False) Proxy

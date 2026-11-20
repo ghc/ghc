@@ -186,8 +186,13 @@ Each written field case has its own helper. To share a case between
 fields, name the type synonym and use it from both fields.
 
 The field rule applies to ordinary H98 and GADT arguments in their
-declaration telescope. Cases under a retained binder or an inner field
-`forall` remain outside this rule.
+declaration telescope. A field can also bind a written erased
+`forall`. For example, the inner `b` in
+`forall (b :: Bool). Proxy b -> (case b of …)` can shadow the data
+parameter. Calling `f @'True Proxy` selects the branch for the inner
+binder. The compiler keeps the quantifier in the field type and
+checks that capture kinds keep their original scope. Cases under
+retained binders remain outside this rule.
 [Provider](../examples/open-evaluation/NativeNestedCase.hs) and
 [ordinary client](../../../testsuite/tests/dependent/should_run/NativeTypeCaseClient.hs).
 

@@ -117,9 +117,9 @@ test "$(grep -c 'error: \[GHC-79642\]' bad.log)" = 1
 (
     cd interfaces
     cat >NativeTypeCaseFieldRigid.hs <<'HS'
-{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, GADTs #-}
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, GADTs, RankNTypes, ScopedTypeVariables, TypeApplications #-}
 module NativeTypeCaseFieldRigid where
-import Data.Proxy (Proxy)
+import Data.Proxy (Proxy(..))
 import NativeNestedCase
 
 rigid :: CaseField ('Just bit) -> Int
@@ -127,10 +127,18 @@ rigid (CaseField n) = n
 
 shadow :: ShadowedCaseField 'True ('Just 'False) -> Proxy 'True
 shadow (ShadowedCaseField bit) = bit
+
+ranked :: forall (bit :: Bool). Proxy bit -> OrderedRankedCaseField 'True -> Int
+ranked _ (OrderedRankedCaseField f) = f @('Just bit) Proxy
+
+rankedShadow :: RankedCaseField 'False -> Char
+rankedShadow (RankedCaseField f) = f @'True Proxy
 HS
     reject NativeTypeCaseFieldRigid 7:23 '[GHC-83865]'
     grep -Eq 'the type case in a field of .*CaseField' bad.log
     grep -Fq 'NativeTypeCaseFieldRigid.hs:10:34: error: [GHC-83865]' bad.log
+    grep -Fq 'NativeTypeCaseFieldRigid.hs:13:39: error: [GHC-83865]' bad.log
+    grep -Fq 'NativeTypeCaseFieldRigid.hs:16:36: error: [GHC-83865]' bad.log
     ! grep -Fq '$field-case:' bad.log
 )
 

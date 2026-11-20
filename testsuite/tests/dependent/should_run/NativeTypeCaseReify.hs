@@ -80,3 +80,11 @@ $(do
 
 checkedCaseField :: N.CaseField ('Just 'True)
 checkedCaseField = reifiedCaseField 42
+
+$(do
+    ty <- reifyType 'N.RankedCaseField
+    let copy = mkName "reifiedRankedCaseField"
+    pure [SigD copy ty, ValD (VarP copy) (NormalB (ConE 'N.RankedCaseField)) []])
+
+checkedRankedCaseField :: N.RankedCaseField 'False
+checkedRankedCaseField = reifiedRankedCaseField (\_ -> error "unused field")
