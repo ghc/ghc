@@ -137,6 +137,19 @@ its enclosing term need a later check. General kinds, family occurrences
 in aliases or visible type arguments, generated newtype or via equations,
 and partial applications also need separate formation rules.
 
+### Domain evidence and termination
+
+An opted-in provider with `UndecidableInstances` can define
+`type Element Bool = Loop Bool` for its `Collect Bool` instance,
+where a closed family has the equation `Loop a = Loop a`. The provider
+compiles. An ordinary client has the required dictionary. Checking
+`formed = Proxy` against `Proxy (Element Bool)` still reaches GHC-40404
+at reduction size 21 with `-freduction-depth=20`. The dictionary checks
+membership in the declared domain. Termination of the equations needs a
+separate argument. Proposal #177 discusses further changes to GHC's
+assumptions about totality under *Effects and Interactions*.
+[Proposal text](https://github.com/typedrat/ghc-proposals/blob/faf45d2290f06696627b1f5d60ce92741ae9e38b/proposals/0000-simple-constrained-type-families.rst).
+
 ### Deferred errors at a module boundary
 
 An ordinary signature `missing :: Elem [Int] :~: Int` fails with GHC-39999
