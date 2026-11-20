@@ -1969,6 +1969,9 @@ Wrinkles:
 -- This is where we arrange that a non-trivial argument is let-bound
 cpeArg :: CorePrepEnv -> Demand
        -> CoreArg -> UniqSM (Floats, CpeArg)
+cpeArg env dmd (Pack schema witness payload)
+  = do { (floats, atom) <- cpeArg env dmd payload
+       ; return (floats, Pack (cpSubstTy env schema) (cpSubstTy env witness) atom) }
 cpeArg env dmd arg
   = do { (floats1, arg1) <- cpeBodyF env arg     -- arg1 can be a lambda
        ; let arg_ty = exprType arg1

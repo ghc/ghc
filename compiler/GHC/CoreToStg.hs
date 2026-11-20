@@ -656,6 +656,8 @@ coreToStgArgs :: [CoreArg] -> CtsM ([StgArg], [StgTickish], [StgBinding])
 coreToStgArgs []
   = return ([], [], [])
 
+coreToStgArgs (Pack _ _ payload : args) = coreToStgArgs (payload : args)
+
 coreToStgArgs (Type _ : args) = coreToStgArgs args
 
 coreToStgArgs (Coercion _ : args) -- Coercion argument; See Note [Coercion tokens]
