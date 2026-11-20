@@ -444,7 +444,10 @@ renameType t = case t of
     doc' <- renameLDocHsSyn doc
     return (HsDocTy noAnn ty' doc')
   HsTyLit _ x -> return (HsTyLit noAnn (renameTyLit x))
-  XHsType a -> pure (XHsType (HsCoreTy a))
+  XHsType (HsCoreTyRn ty) -> pure (XHsType (HsCoreTy ty))
+  -- See Note [Checked types in Haddock].
+  XHsType HsTypeLetRn{} -> throwE "Cannot document a source type let without its checked type."
+  XHsType HsTypeCaseAliasRn{} -> throwE "Cannot document a source type case alias without its checked type."
   HsExplicitListTy _ a b -> HsExplicitListTy noAnn a <$> mapM renameLType b
   -- Special-case unary boxed tuples so that they are pretty-printed as
   -- `'MkSolo x`, not `'(x)`
@@ -457,6 +460,15 @@ renameType t = case t of
   HsSpliceTy (HsUntypedSpliceTop _ st) _ -> renameType (unLoc st)
   HsSpliceTy (HsUntypedSpliceNested _) _ -> error "renameType: not an top level type splice"
   HsWildCardTy _ -> pure (HsWildCardTy noAnn)
+
+{- Note [Checked types in Haddock]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Haddock.Interface.Create obtains declarations from checked TyThings.
+Haddock.Interface.AttachInstances converts checked class and family instances.
+Both paths rebuild syntax from checked types before this renaming pass.
+A renamed source type let or type case alias still has a local binding.
+Report it if it reaches this pass, since dropping the binding changes the type.
+-}
 
 renameTyLit :: HsLit GhcRn -> HsLit DocNameI
 renameTyLit t = case t of
