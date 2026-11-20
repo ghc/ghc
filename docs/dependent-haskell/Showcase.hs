@@ -112,6 +112,7 @@ import qualified InstalledNotProof
 import qualified PreludeFilterProof
 import qualified PreludeAppendLengthProof
 import qualified PreludeFilterLengthProof
+import qualified PreludeFilterRuntime
 import qualified PreludeMapAppendProof
 import qualified PreludeMapLengthProof
 import qualified PreludeMapProof
@@ -1246,6 +1247,10 @@ main = do
               ++ PreludeFilterProof.showPreludeFilterProofs)
     putStrLn ("prove filter never increases length: "
               ++ PreludeFilterLengthProof.showPreludeFilterLength)
+    runtimeList <- newIORef [False, True, False]
+    xs <- readIORef runtimeList
+    putStrLn ("prove the filter bound from a runtime list: "
+              ++ PreludeFilterRuntime.showRuntimeBound (PreludeFilterRuntime.packRuntimeBound xs))
     observe "use a checked cons rule without forcing the callback, head or tail"
         (ConsRuleMapProof.negateHead (Proxy @'[]), ConsRuleMapProof.lazySpine)
     observe "compose two checked traversals without forcing the inner callback"

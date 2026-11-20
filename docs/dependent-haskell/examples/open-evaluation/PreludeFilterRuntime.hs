@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
-{-# OPTIONS_GHC -O0 -fno-enable-rewrite-rules #-}
 module PreludeFilterRuntime
     ( RuntimeFilterBound(..), runtimeFilterBound, packRuntimeBound
     , showRuntimeBound ) where

@@ -208,7 +208,15 @@ HS
 [[ $(./filter-run) == $'(True,True)\n(BothSucc (RightSucc ZeroBound),Succ Zero,Succ (Succ Zero))' ]]
 
 # The proof uses the certified predicate call as a retained argument.
-"${filter[@]}" -c "$src/PreludeFilterRuntime.hs" -odir . -hidir .
+cp "$src/NativeRetainedSourceOperand.hs" .
+for level in 1 2; do
+    "${filter[@]}" "-O$level" -fforce-recomp -c "$src/PreludeFilterRuntime.hs" -odir . -hidir .
+    "${filter[@]}" "-O$level" -fforce-recomp -ddump-simpl -ddump-to-file \
+        -dsuppress-uniques -dsuppress-idinfo -dsuppress-module-prefixes -c NativeRetainedSourceOperand.hs
+    # Ordinary calls to not still inline. The retained applications use the named call.
+    awk '/^ordinaryNot$/,/^$/' NativeRetainedSourceOperand.dump-simpl | grep -Fq 'case x of'
+    grep -Fq '(not x)' NativeRetainedSourceOperand.dump-simpl
+done
 sed -e 's/module PreludeFilterRuntime/module DirectCase/' \
     -e 's/case booleanResult (P.not x) of/case P.not x of/' \
     -e 's/IsTrue -> keepIfTrue/True -> keepIfTrue/' \
@@ -230,6 +238,7 @@ cat >RuntimeFilterRun.hs <<'HS'
 module Main where
 import Control.Exception (ErrorCall(..), evaluate, try)
 import Data.IORef (newIORef, readIORef, writeIORef)
+import NativeRetainedSourceOperand (ordinaryNot, select)
 import PreludeFilterLengthProof (AtMost(..))
 import PreludeFilterRuntime
 import System.Environment (getArgs)
@@ -253,9 +262,15 @@ main = do
     putStrLn (outer (packRuntimeBound (True : error "skip forced tail")))
     result <- try (evaluate (outer (packRuntimeBound [error "predicate head"])))
     print (case result of Left (ErrorCall "predicate head") -> True; _ -> False)
+    refHead <- newIORef (error "strict worker forced its head")
+    x <- readIORef refHead
+    print (select False x)
+    selected <- try (evaluate (select True x))
+    print (ordinaryNot False, case selected of Left (ErrorCall "strict worker forced its head") -> True; _ -> False)
 HS
 "${filter[@]}" -c RuntimeFilterRun.hs
 "${filter[@]}" RuntimeFilterRun.o ../filter-client/PreludeFilter{LengthProof,Runtime}.o \
+    ../filter-client/NativeRetainedSourceOperand.o \
     ../filter/PreludeFilterSource.o ../length-source/PreludeMapLength{Size,Source}.o -o runtime-filter-run
 cat >runtime-filter.expected <<'OUT'
 (ZeroBound,Zero,Zero)
@@ -266,6 +281,8 @@ True
 keep
 skip
 True
+'l'
+(True,True)
 OUT
 ./runtime-filter-run '[]' '[False]' '[True]' '[False,True,False]' >runtime-filter.stdout
 diff -u runtime-filter.expected runtime-filter.stdout

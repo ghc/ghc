@@ -1313,9 +1313,9 @@ An ordinary module can open the packaged proof using only its interface.
 Forcing the package does not inspect the list. Forcing the first proof
 constructor inspects the first head and leaves the tail lazy for both
 decisions. A complete proof requires a finite spine and defined Boolean
-elements. The example uses module-local `-O0`. At default `-O1`, inlining
-`Prelude.not` turns the retained operand into a case that Core Lint
-rejects. [Runtime example](../examples/open-evaluation/PreludeFilterRuntime.hs)
+elements. The simplifier preserves the checked predicate call in the
+retained operand. Its ordinary calls can still inline.
+[Runtime example](../examples/open-evaluation/PreludeFilterRuntime.hs)
 and [regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh).
 
 ### Prove that append adds the list lengths

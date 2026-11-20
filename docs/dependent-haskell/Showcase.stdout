@@ -331,6 +331,7 @@ prove that append adds the list lengths: (Refl,Succ (Succ (Succ Zero)),Succ (Suc
 prove that map distributes over append: (Refl,[False,True,False],[False,True,False],(True,True))
 filter with Prelude.not and Prelude.id without forcing the kept tail: ((Refl,Refl,True),(Refl,Refl,True))
 prove filter never increases length: (BothSucc (RightSucc ZeroBound),Succ Zero,Succ (Succ Zero))
+prove the filter bound from a runtime list: (BothSucc (RightSucc (BothSucc ZeroBound)),Succ (Succ Zero),Succ (Succ (Succ Zero)))
 use a checked cons rule without forcing the callback, head or tail: (Refl,True)
 compose two checked traversals without forcing the inner callback: (Refl,True)
 collect row heads with an ordinary polymorphic callback: Refl

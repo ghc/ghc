@@ -43,6 +43,7 @@ import GHC.Core.Opt.Arity ( ArityType, exprArity, arityTypeBotSigs_maybe
                           , pushCoTyArg, pushCoValArg, exprIsDeadEnd
                           , typeArity, arityTypeArity, etaExpandAT )
 import GHC.Core.SimpleOpt ( exprIsConAppFor_maybe, joinPointBinding_maybe, joinPointBindings_maybe )
+import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.FVs     ( mkRuleInfo, hasFreeVarInCoreAnnotations, exprAnnotationFreeVars
                         , bindsAnnotationFreeVars )
 import GHC.Core.Rules   ( lookupRule, getRules )
@@ -1921,6 +1922,12 @@ simplArg _ _ _ (Simplified {}) arg mco
        MRefl  -> return arg       -- Vastly common case
        MCo co -> return (mkCast arg co)
 simplArg env mb_arg_info fun_ty (UnSimplified arg_se) arg mco
+  | sm_core_mode (seMode env) == RetainedCore
+  , DepFunTy{} <- coreFullView fun_ty
+  , Just _ <- nativeComputedIndex arg
+  -- See Note [Keep checked source calls in retained arguments].
+  = return (mkCastMCo (CoreSubst.substExpr (getFullSubst (getInScope env) arg_se) arg) mco)
+  | otherwise
   = do { let arg_env' = arg_se `setInScopeFromE` env
              arg_ty
                | sm_core_mode (seMode env) == RetainedCore
@@ -1931,6 +1938,24 @@ simplArg env mb_arg_info fun_ty (UnSimplified arg_se) arg mco
                            Just ai -> mkLazyArgStop arg_ty ai
              cont     = addCastMCo mco stop
        ; simplExprC arg_env' arg cont }
+
+{- Note [Keep checked source calls in retained arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For a retained application such as `booleanResult (not x)`, the result
+type mentions the checked source family for `not x`. Inlining `not`
+replaces the call with a case. The case has no index in the operand
+grammar, so Core Lint can no longer instantiate the result type.
+
+Apply the lexical substitution, but leave the checked call tree in place.
+This includes calls nested in constructor arguments. The ordinary
+argument path and calls outside retained operands still use the inliner
+and rules. CorePrep can bind the operand lazily after index erasure.
+
+Case-of-case can duplicate the application continuation. Keep the
+retained operand in each branch. Naming it `karg` would change the
+result's index to `karg` without evidence of its equality to the
+original expression. Only the selected branch can evaluate the argument.
+-}
 
 {-
 ************************************************************************
@@ -4398,10 +4423,15 @@ mkDupableContWithDmds env dmds
         ; (floats1, cont') <- mkDupableContWithDmds env cont_dmds cont
         ; let env' = env `setInScopeFromF` floats1
         ; arg' <- simplArg env' Nothing hole_ty se arg arg_mco
-        ; (let_floats2, triv_arg) <- makeTrivial env' NotTopLevel dmd (fsLit "karg") arg'
+        ; (let_floats2, arg'') <-
+            if | sm_core_mode (seMode env) == RetainedCore
+               , DepFunTy{} <- coreFullView hole_ty
+                 -- See Note [Keep checked source calls in retained arguments].
+                 -> return (emptyLetFloats, arg')
+               | otherwise -> makeTrivial env' NotTopLevel dmd (fsLit "karg") arg'
         ; let all_floats = floats1 `addLetFloats` let_floats2
         ; return ( all_floats
-                 , ApplyToVal { sc_arg = triv_arg, sc_env = Simplified OkDup
+                 , ApplyToVal { sc_arg = arg'', sc_env = Simplified OkDup
                               , sc_cast = MRefl, sc_cont = cont', sc_hole_ty = hole_ty }) }
 
 mkDupableContWithDmds env _
