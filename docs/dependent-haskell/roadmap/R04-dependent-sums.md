@@ -183,8 +183,10 @@ data Nested a where
                (Vec a n, (some (m :: Nat) | (Vec a n, Vec a m)))) -> Nested a
 ```
 
-This nested field requires `UndecidableInstances`. The generated outer
-family uses the inner family at the same arguments.
+This nested field passes the termination check. The generated outer
+family forwards its captures to the inner family and leaves the inner
+witness argument open. GHC checks that the inner family cannot refer
+back to the outer family.
 
 A later field can also use a retained argument of the same constructor.
 In `Later :: foreach (n :: Nat) -> (some (m :: Nat) | (Vec a n, Vec b m)) -> Later a b`,

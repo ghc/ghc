@@ -14,6 +14,7 @@ module GHC.Tc.TyCl.Utils(
         RolesInfo,
         inferRoles,
         checkSynCycles,
+        checkSynCyclesWithPayloads,
         checkClassCycles,
 
         -- * Implicits
@@ -86,11 +87,11 @@ import Control.Monad
 ************************************************************************
 -}
 
-synonymTyConsOfType :: Type -> [TyCon]
+synonymTyConsOfType :: NameEnv [Type] -> Type -> [TyCon]
 -- Does not look through type synonyms at all.
 -- Returns a list of synonym tycons in nondeterministic order.
 -- Keep this synchronized with 'expandTypeSynonyms'
-synonymTyConsOfType ty
+synonymTyConsOfType payloads ty
   = nonDetNameEnvElts (go ty)
   where
      go :: Type -> NameEnv TyCon  -- The NameEnv does duplicate elim
@@ -154,8 +155,11 @@ synonymTyConsOfType ty
      go_co (KindCo co)          = go_co co
      go_co (SubCo co)           = go_co co
 
-     go_tc tc | isTypeSynonymTyCon tc = unitNameEnv (tyConName tc) tc
-              | otherwise             = emptyNameEnv
+     go_tc tc
+       | let name = tyConName tc
+       , isTypeSynonymTyCon tc || name `elemNameEnv` payloads
+       = unitNameEnv name tc
+       | otherwise = emptyNameEnv
      go_s tys = foldr (plusNameEnv . go) emptyNameEnv tys
      go_co_s cos = foldr (plusNameEnv . go_co) emptyNameEnv cos
 
@@ -202,13 +206,18 @@ checkTyConIsAcyclic tc m = SynCycleM $ \s ->
 -- the corresponding @LTyClDecl Name@ for each 'TyCon', so we
 -- can give better error messages.
 checkSynCycles :: Unit -> [TyCon] -> [LTyClDecl GhcRn] -> TcM ()
-checkSynCycles this_uid tcs tyclds =
+checkSynCycles = checkSynCyclesWithPayloads emptyNameEnv
+
+-- | Treat generated sum payload equations as part of their source synonym.
+-- See Note [Termination of lifted sum payloads] in GHC.Tc.Validity.
+checkSynCyclesWithPayloads :: NameEnv [Type] -> Unit -> [TyCon] -> [LTyClDecl GhcRn] -> TcM ()
+checkSynCyclesWithPayloads payloads this_uid tcs tyclds =
     case runSynCycleM (mapM_ (go emptyTyConSet []) tcs) emptyTyConSet of
         Left (loc, err) -> setSrcSpan loc $ failWithTc (TcRnTypeSynonymCycle err)
         Right _  -> return ()
   where
     -- Try our best to print the LTyClDecl for locally defined things
-    lcl_decls = mkNameEnv (zip (map tyConName tcs) tyclds)
+    lcl_decls = mkNameEnv [(tcdName (unLoc decl), decl) | decl <- tyclds]
 
     -- Short circuit if we've already seen this Name and concluded
     -- it was acyclic.
@@ -221,7 +230,9 @@ checkSynCycles this_uid tcs tyclds =
     go' :: TyConSet -> [TyCon] -> TyCon -> SynCycleM ()
     go' so_far seen_tcs tc
         | tc `elemTyConSet` so_far
-            = failSynCycleM (getSrcSpan (head seen_tcs)) (lookup_decl <$> seen_tcs)
+            = let aliases = filter isTypeSynonymTyCon seen_tcs
+                  cycle_tcs = if null aliases then seen_tcs else aliases
+              in failSynCycleM (getSrcSpan (head cycle_tcs)) (lookup_decl <$> cycle_tcs)
         -- Optimization: we don't allow cycles through external packages,
         -- so once we find a non-local name we are guaranteed to not
         -- have a cycle.
@@ -234,6 +245,8 @@ checkSynCycles this_uid tcs tyclds =
             = return ()
         | Just ty <- synTyConRhs_maybe tc =
             go_ty (extendTyConSet so_far tc) (tc:seen_tcs) ty
+        | Just tys <- lookupNameEnv payloads n =
+            mapM_ (go_ty (extendTyConSet so_far tc) (tc:seen_tcs)) tys
         | otherwise = return ()
       where
         n = tyConName tc
@@ -245,7 +258,7 @@ checkSynCycles this_uid tcs tyclds =
 
     go_ty :: TyConSet -> [TyCon] -> Type -> SynCycleM ()
     go_ty so_far seen_tcs ty =
-        mapM_ (go so_far seen_tcs) (synonymTyConsOfType ty)
+        mapM_ (go so_far seen_tcs) (synonymTyConsOfType payloads ty)
 
 {- Note [Superclass cycle check]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

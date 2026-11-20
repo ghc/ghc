@@ -47,6 +47,7 @@ import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Class
 import GHC.Core.TyCon
+import GHC.Core.TyCon.Set (emptyTyConSet, elemTyConSet, extendTyConSet)
 import GHC.Core.Predicate
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Rep
@@ -75,7 +76,7 @@ import GHC.Types.Var     ( Id, ExistsTyFlag(ImplicitExists), VarBndr(..)
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing ( TyThing(..) )
-import GHC.Types.Unique.Set( isEmptyUniqSet )
+import GHC.Types.Unique.Set( isEmptyUniqSet, nonDetEltsUniqSet )
 
 import GHC.Utils.Error
 import GHC.Utils.Misc
@@ -2622,9 +2623,69 @@ checkFamInstRhs lhs_tc lhs_tys famInsts
    check (tc, tys)
       | not (isStuckTypeFamily tc)                                   -- (TF1)
       , Just pc_failure <- pSizeTypes tys `ltPatersonSize` lhs_size  -- (TF2)
+      , not (forwards_payload pc_failure tc tys)
       = Just $ TcRnPatersonCondFailure pc_failure InTyFamEquation (TyConApp lhs_tc lhs_tys) (TyConApp tc tys)
       | otherwise
       = Nothing
+
+   forwards_payload PCF_Size tc tys
+      | Just (root, True) <- closedFamilyScope_maybe lhs_tc
+      , Just (root', True) <- closedFamilyScope_maybe tc
+      = root == root'
+        && tyConArity tc == length tys + 1
+        && eqTypes lhs_tys tys
+        && cannot_return emptyTyConSet [tc]
+   forwards_payload _ _ _ = False
+
+   cannot_return _ [] = True
+   cannot_return seen (tc:rest)
+      | tc == lhs_tc = False
+      | tc `elemTyConSet` seen || not (isTypeFamilyTyCon tc) || isStuckTypeFamily tc
+      = cannot_return seen rest
+      | Just ctf <- closedTypeFamily_maybe tc
+      , CTF_Abstract <- ctf
+      = False
+      | Just ctf <- closedTypeFamily_maybe tc
+      = let rhs = [coAxBranchRHS branch
+                  | ax <- maybeToList (closedTyFamCoAxiom_maybe ctf)
+                  , branch <- fromBranches (coAxiomBranches ax)]
+            calls = nonDetEltsUniqSet (tyConsOfTypes rhs)
+        in cannot_return (extendTyConSet seen tc) (calls ++ rest)
+      | otherwise = False
+
+{- Note [Termination of lifted sum payloads]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A nested sum lifts to a new payload family. The outer equation passes its
+entire telescope to the inner family and leaves its witness argument open:
+
+  Outer a b = Sigma Bool (Inner a b)
+  Inner a b c = ...
+
+The application has the same size as the outer LHS. Accept this forwarding
+edge when the checked arguments agree, the generated families share a
+lexical root, and exactly one witness argument is missing. Other family
+calls still need to satisfy the Paterson conditions.
+
+An ordinary family can hide a return path to the outer payload:
+
+  Inner a b c = User a b
+  User a b = Source a    -- Source mentions the closure Outer a.
+
+Both calls meet the existing size check. User a b only mentions the
+partial application Outer a. Before allowing the new forwarding edge,
+look through synonym expansions and reachable closed family equations.
+Require that none refer back to the caller. An open or abstract family
+can have equations that this check cannot see, so keep the size check
+when such a family is reachable.
+
+The source synonym can also name itself, directly or through another
+synonym. After lifting, those cycles pass through a private family, so
+ordinary synonym expansion alone does not find them. Include the checked
+source payload bodies in the synonym cycle check. Use the checked original
+equations because the ordered case axioms are still tied to the declaration
+knot at that point. Do not follow user family equations when checking
+synonym cycles.
+-}
 
 -----------------
 
