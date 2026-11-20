@@ -66,6 +66,7 @@ import GHC.Core.Utils
 import GHC.Core.Unfold( calcUnfoldingGuidance )
 import GHC.Core.Unfold.Make
 import GHC.Core.Lint
+import GHC.Core.Rules (canShareRetainedSpecRule)
 import GHC.Core.Make
 import GHC.Core.Class
 import GHC.Core.TyCon
@@ -1550,18 +1551,35 @@ tcIfaceRules ignore_prags if_rules
   | otherwise    = mapM tcIfaceRule if_rules
 
 tcIfaceRule :: IfaceRule -> IfL CoreRule
-tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bndrs,
+tcIfaceRule iface_rule@IfaceRule{ifRuleName = name, ifActivation = act, ifRuleBndrs = bndrs,
                         ifRuleHead = fn, ifRuleArgs = args, ifRuleRhs = rhs,
-                        ifRuleAuto = auto, ifRuleOrph = orph })
-  = do  { ~(bndrs', args', rhs') <-
+                        ifRuleKind = kind, ifRuleOrph = orph}
+  = do  { this_mod <- getIfModule
+        ; ~(bndrs', args', rhs') <-
                 -- Typecheck the payload lazily, in the hope it'll never be looked at
                 forkM (text "Rule" <+> pprRuleName name) $
                 bindIfaceBndrs bndrs                      $ \ bndrs' ->
                 do { args'  <- mapM tcIfaceExpr args
                    ; rhs'   <- tcIfaceExpr rhs
-                   ; when (any hasNativeDependentUnfolding (rhs' : args' ++ map varToCoreExpr bndrs')) $
-                       failIfM (text "Native dependent interface rules are not supported:" <+> pprRuleName name)
-                   ; whenGOptM Opt_DoCoreLinting $ do
+                   ; let native = any hasNativeDependentUnfolding (rhs' : args' ++ map varToCoreExpr bndrs')
+                   ; if kind == IfaceRetainedAutoRule
+                       then do
+                         unless (nameModule_maybe fn == Just this_mod) $
+                           failIfM (retained_doc $$ text "Expected a rule head defined in this module.")
+                         thing <- tcIfaceGlobal fn
+                         fun <- case thing of
+                           AnId id -> pure id
+                           _ -> failIfM (retained_doc $$ text "Expected an identifier at the rule head.")
+                         let rule = mk_rule this_mod bndrs' args' rhs'
+                         unless (native && canShareRetainedSpecRule fun rule) $
+                           failIfM (retained_doc $$ text "Unsupported retained specialization shape.")
+                         dflags <- getDynFlags
+                         case lintRule (initLintConfig dflags []) fun rule of
+                           Nothing -> pure ()
+                           Just errs -> failIfM (retained_doc $$ vcat (bagToList errs))
+                       else when native $
+                         failIfM (text "Native dependent interface rules are not supported:" <+> pprRuleName name)
+                   ; when (kind /= IfaceRetainedAutoRule) $ whenGOptM Opt_DoCoreLinting $ do
                       { dflags <- getDynFlags
                       ; (_, lcl_env) <- getEnvs
                       ; let in_scope :: [Var]
@@ -1577,25 +1595,26 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
                                                (pprCoreExpr rhs')
                                                (emptyBag, errs) }
                    ; return (bndrs', args', rhs') }
-        ; let mb_tcs = map ifTopFreeName args
-              (bndrs_occ, rhs_occ) = occurAnalyseBndrsAndExpr bndrs' rhs'
+        ; let (bndrs_occ, rhs_occ) = occurAnalyseBndrsAndExpr bndrs' rhs'
                    -- See (OUR1) in Note [OccInfo in unfoldings and rules]
+        ; return (mk_rule this_mod bndrs_occ args' rhs_occ) }
+  where
+    retained_doc = text "Invalid retained specialization rule:" <+> pprRuleName name
 
-        ; this_mod <- getIfModule
-        ; return (Rule { ru_name   = name
-                       , ru_fn     = fn
-                       , ru_act    = act
-                       , ru_bndrs  = bndrs_occ
-                       , ru_args   = args'
-                       , ru_rhs    = rhs_occ
-                       , ru_rough  = mb_tcs
-                       , ru_origin = this_mod
-                       , ru_orphan = orph
-                       , ru_auto   = auto
-                       , ru_local  = False }) }
+    mk_rule this_mod bndrs' args' rhs' =
+      Rule { ru_name   = name
+           , ru_fn     = fn
+           , ru_act    = act
+           , ru_bndrs  = bndrs'
+           , ru_args   = args'
+           , ru_rhs    = rhs'
+           , ru_rough  = map ifTopFreeName args
+           , ru_origin = this_mod
+           , ru_orphan = orph
+           , ru_auto   = ifRuleAuto iface_rule
+           , ru_local  = False }
               -- ru_local=False: an imported RULE is never for a local Id or, even if
               -- it is (module loop, perhaps) we'll just leave it in the non-local set
-  where
         -- This function *must* mirror exactly what Rules.roughTopNames does
         -- We could have stored the ru_rough field in the iface file
         -- but that would be redundant, I think.

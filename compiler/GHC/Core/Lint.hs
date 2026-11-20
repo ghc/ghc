@@ -19,7 +19,7 @@ module GHC.Core.Lint (
     WarnsAndErrs,
 
     lintCoreBindings, lintUnfolding,
-    lintPassResult, lintExpr,
+    lintPassResult, lintExpr, lintRule,
     lintAxioms,
     lintTcCoercion, lintCoercion_InScope,
 
@@ -2482,6 +2482,16 @@ lint_app_fail_msg msg kfn arg_tys extra
         Linting rules
 *                                                                      *
 ********************************************************************* -}
+
+-- | Lint a standalone rule using the checked type of its head.
+lintRule :: LintConfig -> Id -> CoreRule -> Maybe (Bag SDoc)
+lintRule cfg fun rule
+  | isEmptyBag errs = Nothing
+  | otherwise = Just errs
+  where
+    (_, errs) = initL cfg $ addLoc (RuleOf fun) $ do
+      lintType (idType fun)
+      lintCoreRule fun (idType fun) rule
 
 lintCoreRule :: OutVar -> Type -> CoreRule -> LintM ()
 lintCoreRule _ _ (BuiltinRule {})

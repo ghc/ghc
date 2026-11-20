@@ -171,7 +171,7 @@ readBinIfaceHeaderVersion profile checkHiWay traceBinIFace hi_path = do
     wantedGot "Version" our_ver check_ver text
     let evidence = fromMaybe NoRetainedEvidence $
                    find (\v -> evidenceSuffix v `isSuffixOf` check_ver)
-                        [ConstructorCaseEvidence, DepFunCoEvidence]
+                        [RetainedSpecRuleEvidence, ConstructorCaseEvidence, DepFunCoEvidence]
         version = take (length check_ver - length (evidenceSuffix evidence)) check_ver
     unless (version `elem` [our_ver, enumCallbackIfaceVersion, finalCoreIfaceVersion,
                             matchabilitySchemeIfaceVersion, openMatchabilityIfaceVersion]) $
@@ -318,6 +318,7 @@ evidenceSuffix :: IfaceEvidenceVersion -> String
 evidenceSuffix NoRetainedEvidence       = ""
 evidenceSuffix DepFunCoEvidence         = "-retained-depfunco-v1"
 evidenceSuffix ConstructorCaseEvidence  = "-retained-constructor-case-v1"
+evidenceSuffix RetainedSpecRuleEvidence = "-retained-specialisation-rule-v1"
 
 {- Note [Versioning retained evidence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -330,6 +331,11 @@ unfolding. A reader for constructor evidence also supports DepFunCo.
 Cache the required version alongside the serialized payload. This
 keeps the header consistent when the writer copies the cached bytes.
 See Note [Native constructor evidence in interfaces] in GHC.IfaceToCore.
+
+An automatically generated retained specialization rule uses its own
+tag in the rule origin byte. Older readers reject a retained rule at
+the header. Ordinary user and automatic rules retain their byte values.
+See Note [Exported retained specialisations] in GHC.Core.Rules.
 -}
 
 

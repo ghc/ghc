@@ -31,7 +31,7 @@ module GHC.Core.Rules (
 
         -- * Making rules
         mkRule, mkSpecRule, roughTopNames,
-        ruleIsOrphan
+        ruleIsOrphan, canShareRetainedSpecRule
 
     ) where
 
@@ -47,6 +47,8 @@ import GHC.Driver.Ppr( showSDoc )
 
 import GHC.Core         -- All of it
 import GHC.Core.Subst
+import GHC.Core.Dependent (hasNativeDependentExprRhs)
+import GHC.Core.Predicate (isDictId)
 import GHC.Core.SimpleOpt ( exprIsLambda_maybe )
 import GHC.Core.FVs       ( exprFreeVars, bindFreeVars
                           , rulesFreeVarsDSet, orphNamesOfExprs )
@@ -76,7 +78,7 @@ import GHC.Types.InlinePragma
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import GHC.Types.Name    ( Name, NamedThing(..), nameIsLocalOrFrom )
+import GHC.Types.Name    ( Name, NamedThing(..), nameIsLocalOrFrom, nameModule_maybe )
 import GHC.Types.Name.Set
 import GHC.Types.Name.Occurrence( occNameFS )
 import GHC.Types.Unique
@@ -238,6 +240,52 @@ mkSpecRule dflags this_mod is_auto inl_act herald fn bndrs args rhs
 
     is_local = isLocalId fn
     rule_name = mkSpecRuleName dflags herald fn args
+
+{- Note [Exported retained specialisations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained automatic specialisation may cross a module boundary if its
+head's type selects the retained pipeline in the client. An ordinary
+head can call a retained worker in its body, but clients choose their
+pipeline before using imported rules. Such rules stay local.
+
+Keep the closed shape produced by Specialise for dictionary calls. The
+left hand side supplies types and bound dictionaries. The right hand
+side applies a worker from the same module to arguments in that scope.
+Use the auto flag and the defining module for provenance. The rule name
+is arbitrary user-visible text. The retained driver lints the rule
+before Tidy. The reader checks this shape again and lints both sides.
+See Note [Linting rules] in GHC.Core.Lint.
+-}
+
+-- | Check the producer and consumer boundary for a retained specialization.
+canShareRetainedSpecRule :: Id -> CoreRule -> Bool
+canShareRetainedSpecRule fun Rule{ru_auto = True, ru_origin = origin,
+                                  ru_orphan = NotOrphan{}, ru_fn = name,
+                                  ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs}
+  | idName fun == name
+  , belongsToOrigin fun
+  , hasNativeDependentExprRhs (Type (idType fun))
+  , all (ordinaryArg . varToCoreExpr) bndrs
+  , let (types, dicts) = span isTypeArg args
+  , not (null dicts)
+  , all ordinaryArg types
+  , all boundDictionary dicts
+  , (Var worker, worker_args) <- collectArgs rhs
+  , worker /= fun, not (worker `elemVarSet` bound), belongsToOrigin worker
+  = all workerArg worker_args
+  where
+    belongsToOrigin id =
+      maybe (isLocalId id) (== origin) (nameModule_maybe (idName id))
+      && not (isImplicitId id || isJoinId id)
+    ordinaryArg = not . hasNativeDependentExprRhs
+    bound = mkVarSet bndrs
+    boundDictionary (Var dict) = dict `elemVarSet` bound && isDictId dict
+    boundDictionary _ = False
+    workerArg (Type ty) = case getTyVar_maybe ty of
+      Just tv -> tv `elemVarSet` bound
+      Nothing -> False
+    workerArg arg = boundDictionary arg
+canShareRetainedSpecRule _ _ = False
 
 mkSpecRuleName :: DynFlags -> SDoc -> Id -> [CoreExpr] -> FastString
 mkSpecRuleName dflags herald fn args
