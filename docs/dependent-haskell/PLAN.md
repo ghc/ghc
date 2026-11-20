@@ -6645,9 +6645,13 @@ GHCi uses the same family-instance import closure as a compiled module
 when it checks the type numeral. It also includes family instances declared
 earlier at the prompt. Loading an unrelated module does not bring its
 literal registration into the current prompt scope. A function with a
-retained `Nat` argument accepts `fill 2`. An expression signature around
-the operand, as in `fill (2 :: Nat)`, is outside the current operand grammar.
-An ordinary annotated binding can still supply the argument.
+retained `Nat` argument accepts `fill 2`. M83 rejected an expression
+signature around the operand. R07 now accepts `fill (2 :: Nat)` when the
+complete, monomorphic signature matches the retained domain without a cast.
+The annotation uses ordinary expression signature checking. The selected
+dictionary must supply the checked conversion. The checker still compares the
+result with its independently written signature.
+[Interface test](../../testsuite/tests/dependent/should_compile/NativeLiteralClient.hs).
 
 ### Inference at M83
 

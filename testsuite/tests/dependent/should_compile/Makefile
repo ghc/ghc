@@ -26,7 +26,11 @@ NativeSourceCallIface:
 	grep -q 'forwardProof' changed-method.stderr
 	$(source_call_hc) -fno-code -fwrite-interface -c PackedVecLibrary.hs
 	$(source_call_hc) -c NativeLiteralClient.hs
+	sed 's/(2 :: Nat)/(2 :: Integer)/' NativeLiteralClient.hs > changed/NativeLiteralClient.hs
+	! $(source_call_hc) -fforce-recomp -c changed/NativeLiteralClient.hs 2>wrong-annotation.stderr
+	grep -q 'cannot use the cast required for this argument as a retained index' wrong-annotation.stderr
 	sed 's/n == 0 = Z/n == 0 = S Z/' PackedVecLibrary.hs > changed/PackedVecLibrary.hs
 	$(source_call_hc) -fno-code -fwrite-interface -fforce-recomp -c changed/PackedVecLibrary.hs
 	! $(source_call_hc) -c NativeLiteralClient.hs 2>changed-literal.stderr
 	grep -q 'has no checked zero and successor equations' changed-literal.stderr
+	grep -q 'twoAnnotated' changed-literal.stderr

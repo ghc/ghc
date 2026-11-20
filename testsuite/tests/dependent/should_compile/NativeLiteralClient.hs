@@ -2,7 +2,10 @@
 
 module NativeLiteralClient where
 
-import PackedVecLibrary (Vec, replicateNative)
+import PackedVecLibrary (Nat, Vec, replicateNative)
 
 three :: Vec Bool 3
 three = replicateNative 3 True
+
+twoAnnotated :: Vec Bool 2
+twoAnnotated = replicateNative (2 :: Nat) True

@@ -1607,6 +1607,9 @@ arithmeticNotation = do
         oneMore :: Vec Bool (n + 1)
         oneMore = replicateNative (n + 1) False
     observe "replicateNative 3" (toList filled)
+    let annotated :: Vec Bool 2
+        annotated = replicateNative (2 :: Nat) True
+    observe "replicateNative (2 :: Nat)" (toList annotated)
     observe "replicateNative (n + 1)" (toList oneMore)
     observe "vector with length n + 3" (toList joined)
     observe "2 + 3 at runtime" ((2 + 3) :: Nat)

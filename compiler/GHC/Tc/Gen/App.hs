@@ -42,7 +42,8 @@ import GHC.Tc.Types.TcRef ( TcRef )
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint (WantedConstraints(wc_simple), ctPred, ctEvLoc, ctEvEvId,
                                 mkNonCanonical, DelayedError(DE_SourceMethod))
-import GHC.Tc.Types.ErrCtxt ( FunAppCtxtFunArg(..) )
+import GHC.Tc.Types.ErrCtxt ( FunAppCtxtFunArg(..), UserTypeCtxt(ExprSigCtxt)
+                           , ReportRedundantConstraints(NoRRC) )
 import GHC.Tc.Types.CtLoc ( CtLoc )
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType as TcType
@@ -3311,6 +3312,12 @@ A result signature such as Vec a 3 resolves its numeral independently through
 FromNatural. Ordinary type equality checks that the two meanings agree.
 Each successor adds one constructor. Check the reduction-depth budget before
 allocating the tree, including for a literal too large to fit in an Int.
+
+A complete monomorphic expression signature on the literal must denote the
+same retained domain. Check it before elaborating the literal. A qualified
+signature could introduce a Given and change the conversion. Keep the
+original annotation in the expansion for diagnostics. The constructor tree
+already has the checked domain. The ordinary operand check uses it directly.
 -}
 
 {- Note [Dictionary selection in retained arguments]
@@ -3400,6 +3407,19 @@ tcRetainedArg domain arg
             | let n = il_value lit, n >= 0
             -> do { (core, generated) <- tcRetainedNumeral expected from n
                   ; return (core, L loc (mkExpandedLExpr expr generated)) }
+          ExprWithTySig _ operand sig
+            | HsOverLit _ (OverLit _ (HsIntegral lit)) <- unLoc (stripParensLHsExpr operand)
+            , il_value lit >= 0
+            , isCompleteHsSig sig
+            -> do { -- See Note [Retained integral literals].
+                    annotated <- tcHsSigWcType False (ExprSigCtxt NoRRC) sig
+                  ; unless (isTauTy annotated) unsupported
+                  ; expected' <- liftZonkM (zonkTcType expected)
+                  ; unless (annotated `tcEqType` expected') $
+                      failWithTc $ TcRnRetainedQuantificationError
+                        (RetainedIndexArgumentCast annotated expected')
+                  ; (core, operand') <- resolve env expected' operand
+                  ; return (core, L loc (mkExpandedLExpr expr operand')) }
           HsApp x fun arg -> do
             (core, fun', arg') <- resolve_app env expected fun arg
             return (core, L loc (HsApp x fun' arg'))
