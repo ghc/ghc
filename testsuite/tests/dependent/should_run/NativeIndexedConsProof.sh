@@ -37,10 +37,10 @@ for opt in -O0 -O1 -O2; do
 done
 
 cd "$out/provider"
-sed -e 's/module NativeIndexedConsProof (Seen(..), see) where/module BadHead where/' \
+sed -e 's/^module NativeIndexedConsProof .* where$/module BadHead where/' \
     -e 's/P.VCons x xs -> seenCons x xs/P.VCons x xs -> seenCons False xs/' \
     "$src/NativeIndexedConsProof.hs" > BadHead.hs
-sed 's/module NativeIndexedConsProof (Seen(..), see) where/module BadIndependent where/' \
+sed 's/^module NativeIndexedConsProof .* where$/module BadIndependent where/' \
     "$src/NativeIndexedConsProof.hs" > BadIndependent.hs
 cat >>BadIndependent.hs <<'HS'
 
@@ -59,3 +59,13 @@ for bad in BadHead BadIndependent; do
 done
 grep -Fq 'In the expression: seenCons False xs' BadHead.log
 grep -Fq 'Actual: Seen (P.VCons x xs)' BadIndependent.log
+
+sed -e 's/^module NativeIndexedConsProof .* where$/module BadWidth where/' \
+    -e 's/P.Z P.VNil/P.Z (P.VCons True P.VNil)/' \
+    "$src/NativeIndexedConsProof.hs" > BadWidth.hs
+if "${ghc[@]}" -O1 -c BadWidth.hs >BadWidth.log 2>&1 ||
+   ! grep -Fq '[GHC-83605]' BadWidth.log; then
+    cat BadWidth.log >&2
+    exit 1
+fi
+grep -Fq '(P.VCons True P.VNil)' BadWidth.log
