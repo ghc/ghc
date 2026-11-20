@@ -1540,13 +1540,13 @@ hscSimplify' plugins ds_result = do
 
 {- Note [Retained Core in the Gentle simplifier]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Run one Gentle iteration only after the native module check and restricted
-SimpleOpt. The eligibility scan admits algebraic retained binders, checked
-opaque function heads, and their proofs. It admits checked nominal domain
-conversions between eligible endpoints. See
-Note [Nominal domains in retained Gentle] in GHC.Core.Dependent. Local rules and inputs outside
-this subset use the restricted native pipeline.
-This check does not admit native modules to -O1.
+At -O0, hscSimplify' runs one Gentle iteration after native SimpleOpt
+when the module has no local rules and supportsNativeGentle accepts its
+bindings. The scan checks retained binders, their proofs, and nominal
+conversions between eligible endpoints.
+See Note [Nominal domains in retained Gentle] in GHC.Core.Dependent.
+The -O1 path uses the same scan before it runs the retained optimizer.
+See Note [Compiling native dependent modules].
 
 A local Id can occur only in a type or coercion. Occurrence analysis must
 keep this Id in scope without adding runtime demand. A type or multiplicity
@@ -1570,21 +1570,22 @@ The ordinary mode does not inspect each alternative RHS for native forms.
 
 {- Note [Compiling native dependent modules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The restricted module path compiles retained Boolean workers, including
-exported native signatures. Reuse native SimpleOpt on each RHS and preserve
-top-level binding identities. Do not enter ordinary occurrence analysis or
-the full Core optimizer. Force Core Lint before and after simplification and
-module tidying. The program CorePrep entry requires the same checked opt-in
-and disabled speculation as the expression entry. Force STG Lint after erasure.
+Start with native SimpleOpt and preserve top-level binding identities.
+At -O0, omit interface pragmas. At standard native-object -O1, accept
+the default interface settings. Check the simplified bindings and local
+rules before running core2coreRetained. An unsupported binding or rule
+gets a source diagnostic. See Note [Native dependent unfolding templates]
+in GHC.Core.Unfold.Make for the handling of exported unfoldings.
 
-Require -O0 and omit interface pragmas and serialized Core. Native interface
-signatures use scoped local Ids. Native unfoldings remain gated. Reject plugins,
-profiling and JavaScript code generation before unsupported transformations.
-Repeat the option check at the object and bytecode entries for direct API callers.
-GHCi declaration groups, loaded source modules, and -fbyte-code -no-link use
-the same checked program CorePrep and STG pipeline. The optional .gbc writer
-serializes the resulting bytecode. Serializing Core to an interface is a
-separate path and remains gated.
+Force Core Lint around simplification and tidying. CorePrep disables
+speculation on the native path. Force STG Lint after erasure. Repeat the
+option check at the object and bytecode entries for direct API callers.
+Reject module plugins, profiling, JavaScript code generation, and
+-fwrite-if-simplified-core before those paths can consume dependent Core.
+GHCi declarations, loaded source modules, and -fbyte-code -no-link share
+the checked CorePrep and STG pipeline. The optional .gbc writer serializes
+the resulting bytecode.
+
 Include retained constructor worker types from the module's type constructors
 in each option check. A declaration-only module can have no native explicit
 binding. addImplicitBinds generates its constructor worker later. Classify
