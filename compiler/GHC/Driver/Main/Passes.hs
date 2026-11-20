@@ -743,7 +743,7 @@ checkByteCodeInMemory hsc_env mod_sum mb_old_linkable =
                      Just _ -> do
                        disk_hash <- ByteCode.readBinByteCodeHash
                                       (ml_bytecode_file (ms_location mod_sum))
-                       pure (disk_hash == linkableHash old_linkable)
+                       pure (disk_hash == Just (linkableHash old_linkable))
               else pure True
       if ok
         then return (UpToDateItem old_linkable)
@@ -760,12 +760,17 @@ checkByteCodeFromObject hsc_env mod_sum = do
   case (,) <$> obj_date <*> if_date of
     Just (obj_date, if_date)
       | obj_date >= if_date -> do
-          -- Don't force this if we reuse the linkable already loaded into memory, but we have to check
-          -- that the one we have on disk would be suitable as well.
-          linkable <- unsafeInterleaveIO $ do
-            bco <- ByteCode.readBinByteCode hsc_env obj_fn
-            return $ mkOnlyModuleByteCodeLinkable bco
-          return $ UpToDateItem linkable
+          -- A file without a valid header is treated as missing
+          mb_disk_hash <- ByteCode.readBinByteCodeHash obj_fn
+          case mb_disk_hash of
+            Nothing -> return $ outOfDateItemBecause MissingBytecode Nothing
+            Just _ -> do
+              -- Don't force this if we reuse the linkable already loaded into memory, but we have to check
+              -- that the one we have on disk would be suitable as well.
+              linkable <- unsafeInterleaveIO $ do
+                bco <- ByteCode.readBinByteCode hsc_env obj_fn
+                return $ mkOnlyModuleByteCodeLinkable bco
+              return $ UpToDateItem linkable
     _ -> return $ outOfDateItemBecause MissingBytecode Nothing
 
 -- | Attempt to load bytecode from whole core bindings in the interface if they exist.

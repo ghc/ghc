@@ -170,3 +170,14 @@ bytecode_object26:
 # The module should not be recompiled.
 bytecode_object27:
 	@echo ":reload" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -v1 -fno-hide-source-paths  -fbyte-code -fwrite-byte-code -fwrite-interface BytecodeTest.hs
+
+# Test corrupting the header of the .gbc file and reloading in GHCi
+# The module should be recompiled.
+bytecode_object28:
+	@cat bytecode_object28.script | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -v1 -fno-hide-source-paths  -fbyte-code -fwrite-byte-code -fwrite-interface BytecodeTest.hs
+
+# Test that a bytecode library with a corrupt header is linked again
+bytecode_object29:
+	"$(TEST_HC)" $(TEST_HC_OPTS) -bytecodelib -o linked.bytecode BytecodeTest.hs -fwrite-byte-code -fbyte-code -fwrite-interface
+	@printf 'bad!' | dd of=linked.bytecode bs=1 count=4 conv=notrunc 2>/dev/null
+	"$(TEST_HC)" $(TEST_HC_OPTS) -bytecodelib -o linked.bytecode BytecodeTest.hs -fwrite-byte-code -fbyte-code -fwrite-interface
