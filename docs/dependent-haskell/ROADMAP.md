@@ -9,9 +9,13 @@ records every edge. The R numbers are local labels for those cards.
 
 ## Where this fork stands
 
-The 360-line checkpoint compiles and runs the vector proofs in native
-code and source-loaded GHCi, including when a debugger breakpoint is
-active in the recursive function. [Verification scope](CHECKPOINTS.md#family-and-package-checkpoints).
+An ordinary caller can open a vector split returned by `IO`, name its
+suffix index in a pattern, and write `toList (appendVec left right)`.
+The compiler infers both indices with Quick Look enabled or disabled.
+The 362-line Showcase runs in native code and source-loaded GHCi.
+The earlier 360-line compiler also passed a clean two-stage build.
+[Ordinary split consumer](examples/packed-vector/NamedSplitClient.hs)
+and [verification scope](CHECKPOINTS.md#family-and-package-checkpoints).
 
 A retained function can name an entire indexed vector as its argument.
 `foreach (xs :: Vec a n) -> xs :~: xs` returns `Refl` even for an

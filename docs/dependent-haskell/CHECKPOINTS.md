@@ -28,6 +28,26 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+The 362-line public checkpoint includes an ordinary caller that uses
+the stored suffix in both a pattern signature and a nested vector append.
+At `f47fadd22e` the bootstrap relink passed stripped `-O0`, stripped
+`-O2`, and default `-O2`. A self-hosted relink ran all 362 lines from
+source in GHCi. At `82fdb32532` the alias scheduling change passed the
+same golden at `-O0`, default `-O2`, and in source-loaded GHCi.
+[Split caller](examples/packed-vector/NamedSplitClient.hs)
+and [R21 alias checks](roadmap/R21-dependency-analysis.md#local-synonyms-in-a-retained-field-worker).
+
+A clean Hadrian build of `c24dcec367` reproduced all 360 lines with
+both compiler stages at stripped `-O0` and default `-O1` and `-O2`.
+The self-hosted compiler also ran the source-loaded GHCi golden. The
+dependent test directory had 313 passes and the same 17 failures as the
+354-line baseline. The focused normal run had 33 passes and one failure.
+Its API test expected GHC to reject an alias with the valid proof
+`Add 'Z m :~: m`. The updated test at `50c06eab01` executes that case
+and requires GHC-83865 for a successor contradiction. The complete
+updated API test passed on the clean compiler.
+[API regression](../../testsuite/tests/ghc-api/NativeDependentCoreRun.hs).
+
 At `c24dcec367`, the fork includes both vector append equations, the
 optimized cast fix and inferred matchability for higher-order callbacks.
 The bootstrap and self-hosted compiler relinks each reproduced all 360
