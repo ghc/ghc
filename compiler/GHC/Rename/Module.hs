@@ -83,7 +83,7 @@ import Data.List ( mapAccumL, partition, unzip4 )
 import Data.List.NonEmpty ( NonEmpty(..), head, nonEmpty )
 import Data.Data (Data, cast, gmapQ)
 import Data.Maybe (catMaybes,  isJust, isNothing, fromMaybe, mapMaybe, maybeToList )
-import qualified Data.Set as Set ( delete, difference, fromList, toList, null, member, union )
+import qualified Data.Set as Set ( delete, difference, empty, fromList, member, null, toList, union )
 
 {- Note [Lifting type lambdas]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -405,7 +405,7 @@ liftSignatureSums named_wildcards group@HsGroup{hs_valds = ValBinds ann binds}
 
     kindNames (L _ HsTvb{tvb_kind = HsBndrKind _ kind}) =
       Set.fromList (map unLoc (extractHsTyRdrTyVars kind))
-    kindNames _ = Set.fromList []
+    kindNames _ = Set.empty
 
     copyable :: Data a => a -> Bool
     copyable node = case cast node :: Maybe (LHsType GhcPs) of

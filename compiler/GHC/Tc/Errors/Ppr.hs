@@ -4882,8 +4882,12 @@ mismatchInvisibleBits (CouldNotDeduce { cnd_ea = mb_ea })
 
 -- | Recover the source declaration that owns a private lifted family.
 liftedTypeOwner :: String -> Name -> Maybe String
-liftedTypeOwner prefix name = do
-  key <- stripPrefix prefix (occNameString (getOccName name))
+liftedTypeOwner prefix = stripLiftedTypeOwner prefix . occNameString . getOccName
+
+-- | Remove the prefix and private index from a lifted occurrence.
+stripLiftedTypeOwner :: String -> String -> Maybe String
+stripLiftedTypeOwner prefix occurrence = do
+  key <- stripPrefix prefix occurrence
   case break (== ':') (reverse key) of
     (_ : _, ':' : owner) | not (null owner) -> Just (reverse owner)
     _ -> Nothing
@@ -4891,6 +4895,9 @@ liftedTypeOwner prefix name = do
 -- | Describe the lifted expression in terms of its source declaration.
 liftedTypeContext :: Name -> Maybe SDoc
 liftedTypeContext name
+  | Just synonym <- liftedTypeOwner "$lambda:" name
+  , Just owner <- stripLiftedTypeOwner "$signature-sum:" synonym
+  = Just (text "retained sum in the signature for" <+> quotes (text owner))
   | Just owner <- liftedTypeOwner "$case:" name = Just (text "type case in" <+> quotes (text owner))
   | Just owner <- liftedTypeOwner "$lambda:" name = Just (text "type lambda in" <+> quotes (text owner))
   | otherwise = Nothing
