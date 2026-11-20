@@ -98,6 +98,23 @@ grep -A6 'ForwardProducer.keepTagged$' forward.log | grep -Eq '@\(exists .*\. ex
 ./nested
 ./forward
 
+cp "$src/"{QuickLookForward,QuickLookRuntime}.hs .
+"$ghc" "${flags[@]}" -c QuickLookForward.hs -main-is QuickLookForward
+"$ghc" "${flags[@]}" QuickLookForward.o ../provider/ForwardSchemas.o ../provider/Vector.o \
+    -o quick-look -main-is QuickLookForward
+./quick-look
+if "$ghc" "${flags[@]}" -c QuickLookRuntime.hs >quick-look-runtime.log 2>&1; then
+    echo "Quick Look accepted a runtime dependency" >&2
+    exit 1
+fi
+for binding in function index; do
+    line=$(grep -n "^$binding .*=" QuickLookRuntime.hs | cut -d: -f1)
+    grep -Eq "^QuickLookRuntime.hs:$line:[0-9]+: error: \[GHC-83605\]" quick-look-runtime.log || {
+        cat quick-look-runtime.log >&2
+        exit 1
+    }
+done
+
 bad_sources=(UnsafeHead SameWitness Escape LetEscape BarClient ModesAreDistinct
              BarPack DotForall DotConstraint LinearDotDuplicate LambdaEscape
              IntroEscape Shadowed HiddenName BarLambda HeadEscape HeadSame HeadDuplicate

@@ -3145,6 +3145,16 @@ arguments. Haskell's `bool` determines which alternative is evaluated.
 [Existential types and Quick Look, §8](https://richarde.dev/papers/2021/exists/exists.pdf#page=21)
 and [Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html).
 
+With `ImpredicativeTypes`, GHC can also infer the complete package as
+the type argument of `id`. In `apply (\h -> inspectRanked h) (id ranked)`,
+Quick Look obtains it from the argument before checking the lambda.
+The existential binder scopes a type variable. The traversal checks
+its kind and body. A runtime index or retained function inside either
+still requires the retained scope check. Quick Look assigns the whole
+package and leaves equality between package types to subsumption.
+[A Quick Look at Impredicativity, Figure 5](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf)
+and [An Existential Crisis Resolved, §8](https://richarde.dev/papers/2021/exists/exists.pdf#page=21).
+
 Figure 1(b) of *An Existential Crisis Resolved* gives the source rule for
 the [implicit vector filter](examples/erased-existentials/ImplicitVector.hs).
 The passing branch constructs a cell from a recursive call with a fresh

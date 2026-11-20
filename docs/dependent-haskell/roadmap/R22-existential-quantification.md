@@ -348,3 +348,11 @@ still use the application checker. Returning a package through this route
 preserves the producer's demand. An ordinary client can ignore a
 bottom package and observes the producer's original exception when
 it demands the payload.
+
+With `ImpredicativeTypes`, an ordinary higher-order caller can infer a
+complete erased package from an argument. For example,
+`apply (\h -> inspectRanked h) (id ranked)` infers the package type at
+`id` and at `apply`. Quick Look checks the binder kinds, payload and
+coercions before using the package. A nested runtime index or retained
+function still reports GHC-83605 on this path.
+[Ordinary client](../../../testsuite/tests/dependent/should_run/implicit-existential-source/QuickLookForward.hs).

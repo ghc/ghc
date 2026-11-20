@@ -82,7 +82,7 @@ main = do
            cells (keepKnown left))
     print (barIsEmpty (chooseBar True barValue bar))
     print (slotLabel (choose False missingSlot (slotBox (7 :: Int))),
-           inspectRanked (choose True ranked missingRanked))
+           inspectRanked $ choose True ranked missingRanked)
     demand "opaque family" (slotLabel missingSlot)
     demand "rank-n payload" (inspectRanked missingRanked)
     demand "single dot" (toList single)
