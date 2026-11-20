@@ -39,7 +39,7 @@ module GHC.Core (
         exprToNativeCaseIndex, isNativeCaseValueIndex, nativeIndexFunctionVar_maybe,
         nativeIndexArgKinds,
         isNativeIndexAlt, isNativeIndexDataAlt, isNativeIndexAliasAlt,
-        isNativeIndexedDataAlt, isNativeIndexedGadtCon,
+        isNativeIndexedDataAlt, splitNativeIndexedDataAlt, isNativeIndexedGadtCon,
         nativeIndexedCon_maybe,
 
         mkBinds,
@@ -2992,9 +2992,16 @@ isNativeIndexDataAlt con args
 
 -- | Detect the extra proof after the ordinary GADT alternative binders.
 isNativeIndexedDataAlt :: DataCon -> [b] -> Bool
-isNativeIndexedDataAlt con args =
-    lengthIs args (length (dataConExTyCoVars con) + dataConRepArity con + 1)
-    && isNativeIndexedGadtCon con
+isNativeIndexedDataAlt con = isJust . splitNativeIndexedDataAlt con
+
+-- | Split the last proof binder from the ordinary GADT alternative binders.
+splitNativeIndexedDataAlt :: DataCon -> [b] -> Maybe ([b], b)
+splitNativeIndexedDataAlt con args
+  | let arity = length (dataConExTyCoVars con) + dataConRepArity con
+  , (ordinary, [proof]) <- splitAt arity args
+  , isNativeIndexedGadtCon con
+  = Just (ordinary, proof)
+  | otherwise = Nothing
 
 -- | Check the ordinary GADT constructor shape supported by indexed evidence.
 isNativeIndexedGadtCon :: DataCon -> Bool

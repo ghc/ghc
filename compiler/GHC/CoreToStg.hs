@@ -509,8 +509,12 @@ coreToStgExpr (Case scrut bndr _ alts)
               -- See Note [Native index alias evidence] in GHC.Core.Lint.
               -- Mandatory native Core Lint checks this exact proof binder.
               = []
-              | isNativeIndexAlt alt
-              , DataAlt dc <- con
+              | DataAlt dc <- con
+              , Just (ordinary, cv) <- splitNativeIndexedDataAlt dc binders
+              , isCoVar cv
+              = filterStgBinders ordinary
+              | DataAlt dc <- con
+              , isNativeIndexDataAlt dc binders
               , (fields, [cv]) <- splitAt (dataConRepArity dc) binders
               , isCoVar cv
               = filterStgBinders fields
