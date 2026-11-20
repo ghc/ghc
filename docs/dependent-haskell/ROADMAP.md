@@ -12,7 +12,10 @@ records every edge. The R numbers are local labels for those cards.
 An ordinary caller can open a vector split returned by `IO`, name its
 suffix index in a pattern, and write `toList (appendVec left right)`.
 The compiler infers both indices with Quick Look enabled or disabled.
-The 362-line Showcase runs in native code and source-loaded GHCi.
+The 363-line Showcase runs in native code and source-loaded GHCi. Its
+split example passes the original vector to a function whose expected
+width depends on which cut constructor matched. Both branches leave
+an undefined vector unevaluated.
 The earlier 360-line compiler also passed a clean two-stage build.
 [Ordinary split consumer](examples/packed-vector/NamedSplitClient.hs)
 and [verification scope](CHECKPOINTS.md#family-and-package-checkpoints).

@@ -28,6 +28,18 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `ecfe7ca89f`, matching the runtime cut supplies the nominal equality
+needed to pass the same vector at the branch's width. The source-hidden
+ordinary client returned `(True,True)` on two undefined vectors. A wrong
+width failed with GHC-05617. The bootstrap relink matched all 363 Showcase
+lines at default `-O2`. The self-hosted relink matched them at stripped
+`-O0`, default `-O2` and in source-loaded GHCi. Both relinks used pinned
+compiler objects. In one GHCi process, making append strict removed the
+cons equation. GHCi reported GHC-70565 at the recursive proof term.
+Restoring the lawful provider made the proof available again.
+[Showcase](Showcase.hs), [argument test](../../testsuite/tests/dependent/should_run/NativeRetainedCast.sh)
+and [reload test](../../testsuite/tests/dependent/should_run/NativeOpenIndexedAppendGhci.sh).
+
 The 362-line public checkpoint includes an ordinary caller that uses
 the stored suffix in both a pattern signature and a nested vector append.
 At `f47fadd22e` the bootstrap relink passed stripped `-O0`, stripped
