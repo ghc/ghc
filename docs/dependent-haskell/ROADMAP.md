@@ -9,23 +9,26 @@ records every edge. The R numbers are local labels for those cards.
 
 ## Where this fork stands
 
-The published compiler at `dd00726ab6` accepts runtime-indexed functions,
-retained constructor fields and selected ordinary Haskell calls in types.
-An ordinary client can project a vector at its package’s stored length.
-A type-level case can select `Int` for `Bool` and `Char` for `Ordering`.
-Both native stages and self-hosted GHCi agree on all 265 Showcase output
-lines. The dependent tests pass 267 of 299 cases, with the same 32
-diagnostics as the preceding checkpoint. The focused run passes 35 of
-37. The other two tests expect different arrow formatting in kind errors.
-Both diagnostics match the archived M177 compiler byte for byte.
-[Checkpoint and upgrade results](PLAN.md#r04-and-r19-project-through-an-ordinary-function-and-match-a-type-directly).
+The compiler checkpoint `e4fcef85ce` accepts runtime-indexed functions,
+constructor fields and selected ordinary functions in types. A dependent
+pair can store an abstract lifted witness. An ordinary Haskell client
+can read the payload without forcing that witness, including an IO action.
+Both native stages produce all 266 Showcase lines at `-O0` and at `-O1`
+with stripped interfaces. Self-hosted GHCi matches at `-O0`.
+
+All 41 focused tests pass. The dependent directory passes 271 of 303
+cases. Its other 32 tests have the same failures and diagnostics as the
+earlier 265-line checkpoint. Both interface-upgrade checks pass, including
+warm reuse and rejection of stale evidence.
+[R05 optimizer details](roadmap/R05-dependent-core.md#retained-operands-in-the-native-optimizer)
+and [earlier checkpoint](PLAN.md#r04-and-r19-project-through-an-ordinary-function-and-match-a-type-directly).
 
 | Card | Evidence beyond the published checkpoint | Remaining gap |
 | --- | --- | --- |
-| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | The shared bootstrap at `898bff9a64` runs one pair declaration at different witness types. An ordinary client reads the payload without forcing an integer, function or IO witness. A private compiler also checks `second :: foreach (q :: DPair a p) -> p (first q)` through interfaces and runs 267 Showcase lines. | General domains and inference for `foreach`, and first-class retained `some`. |
-| [R05 dependent Core](roadmap/R05-dependent-core.md) | Both native stages and GHCi agree on 266 lines at `-O0`. The bootstrap built from `e4fcef85ce` passes all 266 at both `-O0` and `-O1` with stripped interfaces. A separate default-interface prototype exposes an ordinary worker to an optimized, source-free client. | Self-host and run the broader regressions on the combined optimizer. Review default unfolding export and versioned coercion readback before integrating them. |
+| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | A private compiler checks `second :: foreach (q :: DPair a p) -> p (first q)` through interfaces. The combined R04/R23 compiler runs 267 Showcase lines. | General domains and inference for `foreach`, and first-class retained `some`. |
+| [R05 dependent Core](roadmap/R05-dependent-core.md) | A separate default-interface prototype exposes an ordinary worker to an optimized, source-free client. | An imported dependent projection still loses a branch coercion when reading its unfolding. Integrate the reader and version checks. |
 | [R19 type-level cases](roadmap/R19-type-level-cases.md) | A private compiler handles nested constructors introduced by an alias. A rigid earlier test blocks a later fallback. Stripped-interface clients, TH reification and exact printing pass. A GADT index can use one reduction of a completed closed family. | Mixed patterns need an unambiguous test order. Open GADT indices and integration with the shared compiler remain open. |
-| [R22 erased existentials](roadmap/R22-existential-quantification.md) | A source provider compiles an explicit existential result, including through a type synonym. An ordinary client links using its interface and observes an undefined result only on demand. Core API checks exercise actual packing, unpacking and erasure. | Source-level construction and elimination of an inhabited package, witness scope and optimization. |
+| [R22 erased existentials](roadmap/R22-existential-quantification.md) | An isolated compiler checks source `Pack (type Bool) (Just True)` and a lexical unpack pattern. A source-free ordinary client links and prints `True`. Core and STG dumps, demand and scope controls pass at `-O0`. | Build the marker library and compiler together from a clean checkout. General pattern matching and ordinary optimization remain open. |
 | [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | The private formatting patch restores both ordinary kind-error goldens, preserves explicit M/U differences and leaves all 124 polykinds exit statuses unchanged. It passes the modifier, reify and exact-print checks. | Review the diagnostics on alias-headed kinds and integrate the printer with the shared compiler. General family unsaturation remains open. |
 
 The published evaluator work covers closed calls such as `Prelude.sum` and
@@ -41,16 +44,12 @@ source examples. General promotion remains open.
 
 ## Current work queue
 
-1. Verify the integrated R05 optimizer with both compiler stages, the full
-   Showcase, registered regressions and interface upgrades. The prior
-   checkpoint `898bff9a64` passed 38 of 40 focused tests and 270 of 303
-   dependent directory tests. The follow-up checks the reported failures.
-2. Review the default-interface R05 series and the R04 pair projections
-   against that compiler. Check source-free clients, strictness and reuse
-   of existing interface files.
-3. Integrate the R19 ordered cases and R23 diagnostics. Continue the R22
-   source-level pack and unpack implementation against the separate Core
-   erasure checks.
+1. Integrate the R04 pair projections and R23 diagnostics. The combined
+   bootstrap overlay passes 267 Showcase lines at both optimization levels.
+2. Check the R19 ordered cases and R16 mapper rules against that compiler.
+   Compare old and new interfaces across separate producer/client builds.
+3. Build R22 source pack and unpack with the marker library exposed by the
+   ordinary build. Fix the R05 default-interface projection reader.
 
 Use this queue for current priorities, the linked card for its acceptance
 criteria, and the [implementation log](PLAN.md) for results from individual

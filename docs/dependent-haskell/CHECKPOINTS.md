@@ -19,6 +19,10 @@ which behavior is available in the published compiler.
 | `r05-reviewed` | `2d95e2d36c` | Selected retained modules use the normal optimizer with stripped interfaces. The compiler and dependent tests from this stack were replayed onto the shared branch. |
 | `r19-ordered-cases` | `9b967b37df` | Nested patterns, ordered demand, ordinary type constructor heads, reordered aliases, TH reification and exact printing have focused tests. |
 | `r22-expressions` | `949e49d863` | Core Lint checks existential formation, introduction and elimination. A fresh reader loads the interface. Seven bytecode runtime and STG checks cover demand and erasure. |
+| `r04-r23-reviewed` | `e6f21bdb98` | The combined bootstrap overlay runs 267 Showcase lines at both optimization levels. T7368 and T7368a match the ordinary kind-error goldens. An old abstract-pair worker rebuilds, then its outputs are reused. |
+| `r19-checked-gadt` | `643e7e3641` | Ordered type patterns can contain alias-introduced constructors and a GADT index reduced by a completed closed family. The native case, source-free client, reification and exact-print checks pass on the private compiler. |
+| `r22-source-inference` | `97994ac34b` | A provider exports an erased existential result. A separately compiled ordinary client demands the result. A TH splice recovers from the unsupported reification diagnostic. |
+| `r22-source-pack` | `7f0214fe15` | A provider constructs and opens an existential package in source. Its ordinary interface-only client prints `True`. The private compiler passes the Core/STG erasure, demand, name resolution, quotation and scope checks with its marker package overlay. |
 
 ## Numeric indices
 
