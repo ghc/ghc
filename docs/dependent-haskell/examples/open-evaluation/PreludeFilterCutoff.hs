@@ -1,4 +1,4 @@
-{-# LANGUAGE ExperimentalDependentTypes, GADTs, TypeApplications #-}
+{-# LANGUAGE ExperimentalDependentTypes, GADTs, RequiredTypeArguments, TypeApplications #-}
 module PreludeFilterCutoff (CutoffBound(..), decideRow, packCutoff, showCutoffBound) where
 
 import PreludeFilterLengthProof (AtMost)
@@ -35,7 +35,7 @@ packCutoff :: Size -> [[Bool]] -> CutoffBound
 packCutoff cutoff rows =
     let predicate :: [Bool] -> Bool
         predicate row = fits cutoff row
-        bound = runtimeFilterBoundFor @[Bool] @predicate (decideRow predicate) rows
+        bound = runtimeFilterBoundFor @[Bool] (type predicate) (decideRow predicate) rows
     in CutoffBound predicate rows bound
 
 -- | Show the bound, the retained row sizes, and the original row count.

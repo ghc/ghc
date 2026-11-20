@@ -1,11 +1,12 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, Modifiers #-}
-{-# LANGUAGE RankNTypes, ScopedTypeVariables, TypeApplications #-}
+{-# LANGUAGE RankNTypes, RequiredTypeArguments, ScopedTypeVariables, TypeApplications #-}
 module PreludeFilterRuntime
     ( BooleanResult(..), booleanResult, negationResult
     , RuntimeFilterBound(..), runtimeFilterBound, runtimeFilterBoundWith
     , runtimeFilterBoundFor, packRuntimeBound
     , showRuntimeBound ) where
 
+import Data.Kind (Type)
 import GHC.Exts (U)
 import Prelude (Bool(..), String, show)
 import qualified Prelude as P
@@ -40,22 +41,22 @@ runtimeSteps decide input = case input of
         IsFalse -> skipIfFalse (runtimeSteps @a @p decide xs)
 
 -- | Bound the filtered size of a finite list when its decider supplies each result.
-runtimeFilterBoundFor :: forall a (p :: a %U -> Bool).
+runtimeFilterBoundFor :: forall (a :: Type). forall (p :: a %U -> Bool) ->
                          (foreach (x :: a) -> BooleanResult (p x))
                       -> foreach (xs :: [a])
                       -> AtMost (Count (FilterWith p xs)) (Count xs)
-runtimeFilterBoundFor decide xs = filterLengthBound (runtimeSteps @a @p decide xs)
+runtimeFilterBoundFor (type p) decide xs = filterLengthBound (runtimeSteps @a @p decide xs)
 
 -- | Bound the filtered size of a finite Boolean list with a checked decider.
-runtimeFilterBoundWith :: forall (p :: Bool %U -> Bool).
+runtimeFilterBoundWith :: forall (p :: Bool %U -> Bool) ->
                           (foreach (x :: Bool) -> BooleanResult (p x))
                        -> foreach (xs :: [Bool])
                        -> AtMost (Count (FilterWith p xs)) (Count xs)
-runtimeFilterBoundWith decide xs = runtimeFilterBoundFor @Bool @p decide xs
+runtimeFilterBoundWith (type p) decide xs = runtimeFilterBoundFor @Bool (type p) decide xs
 
 -- | Bound the filtered size of a finite list with defined Boolean elements.
 runtimeFilterBound :: foreach (xs :: [Bool]) -> AtMost (Count (FilterWith Negation xs)) (Count xs)
-runtimeFilterBound xs = runtimeFilterBoundWith @Negation negationResult xs
+runtimeFilterBound xs = runtimeFilterBoundWith (type Negation) negationResult xs
 
 -- | Store the input list with the bound that refers to that list.
 data RuntimeFilterBound where

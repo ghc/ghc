@@ -1320,8 +1320,10 @@ and [regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstall
 
 ### Supply a runtime filter decider
 
-`runtimeFilterBoundWith` takes `foreach (x :: Bool) -> BooleanResult (p x)`
-for an arbitrary unmatchable Boolean predicate `p`. Matching the result
+`runtimeFilterBoundWith` takes an erased required type argument `(type p)`
+before the decider `foreach (x :: Bool) -> BooleanResult (p x)`. The caller
+supplies `p` because GHC cannot infer an unmatchable predicate from `p x`.
+Matching the result
 supplies `p x ~ 'True` or `'False ~ p x` to the existing proof. An ordinary
 client can choose an existentially packaged decider and open the bound
 through interfaces. The example derives the runtime `Prelude.filter`

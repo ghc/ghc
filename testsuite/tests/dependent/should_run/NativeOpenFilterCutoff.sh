@@ -47,7 +47,7 @@ main = do
 HS
 
 cat >"$work/client/WrongCapture.hs" <<'HS'
-{-# LANGUAGE ExperimentalDependentTypes, TypeApplications #-}
+{-# LANGUAGE CPP, ExperimentalDependentTypes, RequiredTypeArguments, TypeApplications #-}
 module WrongCapture where
 import PreludeFilterCutoff (decideRow)
 import PreludeFilterLengthProof (AtMost)
@@ -57,7 +57,33 @@ import PreludeMapLengthSource (Count)
 
 wrong :: foreach (f :: [Bool] -> Bool) -> foreach (g :: [Bool] -> Bool)
       -> foreach (rows :: [[Bool]]) -> AtMost (Count (FilterWith f rows)) (Count rows)
-wrong f g rows = runtimeFilterBoundFor @[Bool] @g (decideRow g) rows
+#ifdef WRONG_DECIDER
+wrong f g rows = runtimeFilterBoundFor @[Bool] (type f) (decideRow g) rows
+#else
+wrong f g rows = runtimeFilterBoundFor @[Bool] (type g) (decideRow g) rows
+#endif
+HS
+
+cat >"$work/client/DeciderAmbiguity.hs" <<'HS'
+{-# LANGUAGE CPP, ExperimentalDependentTypes, Modifiers, RankNTypes #-}
+{-# LANGUAGE RequiredTypeArguments, TypeApplications #-}
+module DeciderAmbiguity where
+
+import Data.Kind (Type)
+import GHC.Exts (U)
+import PreludeFilterRuntime (BooleanResult, negationResult)
+import PreludeFilterSource (Negation)
+
+choose :: forall (a :: Type) b. forall (p :: a %U -> Bool) -> Show b
+       => (foreach (x :: a) -> BooleanResult (p x)) -> Int
+choose (type p) _ = 0
+
+result :: Int
+#ifdef AMBIGUOUS
+result = choose @Bool (type Negation) negationResult
+#else
+result = choose @Bool @Int (type Negation) negationResult
+#endif
 HS
 
 expected=(
@@ -78,11 +104,30 @@ for level in 0 1 2; do
     done
 done
 
+line=$(grep -n '^wrong .* (type g) ' WrongCapture.hs | cut -d: -f1)
 if "${ghc[@]}" -O1 -c WrongCapture.hs >wrong.log 2>&1 ||
-   ! grep -Fq 'WrongCapture.hs:11:' wrong.log ||
+   ! grep -Fq "WrongCapture.hs:$line:" wrong.log ||
    ! grep -Fq '[GHC-83865]' wrong.log ||
    ! grep -Fq 'size (filter g rows)' wrong.log ||
    ! grep -Fq 'size (filter f rows)' wrong.log; then
     cat wrong.log >&2
+    exit 1
+fi
+
+line=$(grep -n '^wrong .* (type f) ' WrongCapture.hs | cut -d: -f1)
+if "${ghc[@]}" -O1 -DWRONG_DECIDER -c WrongCapture.hs >wrong-decider.log 2>&1 ||
+   ! grep -Fq "WrongCapture.hs:$line:58: error: [GHC-83865]" wrong-decider.log ||
+   ! grep -Fq 'BooleanResult (f x)' wrong-decider.log ||
+   ! grep -Fq 'BooleanResult (g row)' wrong-decider.log; then
+    cat wrong-decider.log >&2
+    exit 1
+fi
+
+"${ghc[@]}" -O1 -c DeciderAmbiguity.hs
+line=$(grep -n '^result = choose @Bool (type Negation)' DeciderAmbiguity.hs | cut -d: -f1)
+if "${ghc[@]}" -O1 -DAMBIGUOUS -fforce-recomp -c DeciderAmbiguity.hs >ambiguity.log 2>&1 ||
+   ! grep -Fq "DeciderAmbiguity.hs:$line:10: error: [GHC-39999]" ambiguity.log ||
+   ! grep -Fq 'Ambiguous type variable' ambiguity.log; then
+    cat ambiguity.log >&2
     exit 1
 fi

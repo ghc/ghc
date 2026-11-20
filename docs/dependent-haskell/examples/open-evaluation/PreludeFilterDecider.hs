@@ -1,4 +1,5 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, Modifiers, TypeFamilies #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, Modifiers #-}
+{-# LANGUAGE RequiredTypeArguments, ScopedTypeVariables, TypeFamilies #-}
 module PreludeFilterDecider
     ( FilterDecider(..), SomeFilterDecider(..), DecidedFilterBound(..)
     , Always, negationDecider, alwaysDecider, packDecidedBound, showDecidedBound ) where
@@ -27,8 +28,8 @@ data DecidedFilterBound (p :: Bool %U -> Bool) where
                        -> DecidedFilterBound p
 
 -- | Package the bound for an ordinary caller.
-packDecidedBound :: FilterDecider p -> [Bool] -> DecidedFilterBound p
-packDecidedBound (FilterDecider decide) xs = DecidedFilterBound xs (runtimeFilterBoundWith decide xs)
+packDecidedBound :: forall p. FilterDecider p -> [Bool] -> DecidedFilterBound p
+packDecidedBound (FilterDecider decide) xs = DecidedFilterBound xs (runtimeFilterBoundWith (type p) decide xs)
 
 -- | Recover the Boolean callback from the checked decision.
 decisionBool :: FilterDecider p -> Bool -> Bool
