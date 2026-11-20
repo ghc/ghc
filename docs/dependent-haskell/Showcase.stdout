@@ -153,6 +153,7 @@ safeHead of a known list cell: False
 safeHead at length 1 + n: True
 runtime sum and appended vector: (3,[True,False,False])
 use ordinary vector append in a type: Refl
+prove empty append preserves a runtime vector: [True,False,False]
 split the appended vector at its first length: ([True],[False,False])
 take and drop at the first runtime length: ([True],[False,False])
 check a runtime cut against a vector length: (Just (1,[True],[False]),Nothing)

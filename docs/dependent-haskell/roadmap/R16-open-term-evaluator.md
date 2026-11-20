@@ -1424,6 +1424,32 @@ publish equations nor record the final Core check.
 [regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledAppend.sh),
 and [prior art](../REFERENCES.md#induction-on-the-left-spine-of-append).
 
+### Prove that empty vector append preserves its right operand
+
+`appendEmpty` proves `P.appendVec 'P.VNil xs :~: xs` for a rigid
+vector at any length. The producer checks the empty branch in
+desugared and optimized Core. The published equation uses the
+constructor's zero index and the nominal equality `Add 'Z n ~ n`.
+A rigid left vector of length zero still leaves the equation stuck.
+Closed calls with a written cons still use the closed evaluator.
+
+`appendEmptyAt` binds the vector with `foreach`. An ordinary caller
+can use the equality for the value it read at runtime. Evaluating the
+proof at an undefined vector returns `Refl`. Appending with an
+undefined left operand still forces that operand in the case expression.
+GHC rejects a proof that identifies the result with a different vector
+of the same length. [Runtime proof and optimization](../REFERENCES.md#empty-append-at-a-runtime-vector).
+
+An ordinary client imports the proof and reads the head of an appended
+vector with a suspended tail. The proof and its caller disable rewrite
+rules locally. This equation covers the empty branch. Agda's vector
+append also uses the cons equation for the recursive step in
+`splitAt`'s reconstruction proof.
+[Proof](../examples/packed-vector/OpenVectorAppend.hs),
+[ordinary caller](../examples/packed-vector/OrdinaryOpenVectorAppend.hs),
+[regression](../../../testsuite/tests/dependent/should_run/NativeOpenIndexedAppend.sh),
+and [Agda vector append and split](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html).
+
 ### Prove that map distributes over append
 
 `mapAppend` proves `map f (xs ++ ys) = map f xs ++ map f ys`

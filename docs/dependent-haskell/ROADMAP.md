@@ -36,8 +36,10 @@ checks the contents of a concrete split. Appending the two parts of
 `[True, False]` gives that same vector. Swapping the elements makes the
 equality proof fail at `Refl`. The ordinary polymorphic `appendVec` can itself appear in a type.
 GHC infers the input lengths of two written vectors, reduces their sum,
-and checks the exact output elements. The law for every input vector
-remains open.
+and checks the exact output elements. An ordinary client can also use
+`appendEmptyAt xs` to prove that appending an empty vector preserves
+its runtime input. The proof does not inspect `xs`. Reconstructing
+arbitrary inputs after splitting still needs the recursive case.
 [Split and prior art](REFERENCES.md#split-a-vector-at-a-retained-length) and
 [contents proof](../../testsuite/tests/dependent/should_run/NativeClosedIndexedVec.hs).
 

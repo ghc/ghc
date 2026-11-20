@@ -17,6 +17,17 @@ requires GHCi. The dependent directory ran 327 normal cases across 334
 tests. It recorded 307 passes and the same 20 failures, by name and
 failure category, as the 340-line compiler.
 
+At `bcc07e37a9`, all 350 Showcase lines matched at `-O0`, default
+`-O1`, and default `-O2`. The compiler relink used the five changed
+modules and the normal 347 build. All six registered tests passed.
+The ordinary interface-only client used the proof for a runtime vector.
+Obtaining `Refl` left an undefined vector unevaluated. A proof about
+another vector of the same length failed at `Refl` with GHC-83865.
+An independent rule fired at both optimization levels when enabled
+and stayed disabled when the proof module's flag was used.
+[Proof](examples/packed-vector/OpenVectorAppend.hs)
+and [source regression](../../testsuite/tests/dependent/should_run/NativeOpenIndexedAppend.sh).
+
 At `6ac33d43bf`, a checked vector split takes an independent runtime
 cut. The success case supplies the proof needed to rejoin the vectors.
 The compiler relink matched all 349 Showcase lines at `-O0`, default

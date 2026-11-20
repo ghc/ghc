@@ -67,7 +67,7 @@ import GHC.Hs
 import GHC.Types.Name.Reader
 import GHC.Tc.Errors.Types
 import GHC.Tc.Errors.Ppr (pprScopeError)
-import GHC.Tc.Gen.SourceTable (isFinalCoreIdentity, isFinalCoreReverseWrapper)
+import GHC.Tc.Gen.SourceTable (indexedProjectionSource, isFinalCoreIdentity, isFinalCoreReverseWrapper)
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.LclEnv
 import GHC.Tc.Utils.Monad
@@ -1324,13 +1324,12 @@ lookupSourceTables legacy_identity (gbl, lcl) term_rdr
               -- Keep the ordinary function available for executable calls.
               -- See Note [A partial pair in a nominal operand] in GHC.Tc.Gen.SourceTable.
               if present occ && not (present (mkSourceFstOcc term_occ) || present (mkSourceSndOcc term_occ))
-                then if legacy_identity
-                     then do
-                       thing <- tcLookupGlobal term
-                       pure $ case thing of
-                         AnId v | isFinalCoreIdentity v -> Nothing
-                         _ -> Just name
-                     else pure (Just name)
+                then do
+                  thing <- tcLookupGlobal term
+                  pure $ case thing of
+                    AnId v | legacy_identity && isFinalCoreIdentity v -> Nothing
+                           | isJust (indexedProjectionSource v) -> Nothing
+                    _ -> Just name
                 else do
                   updTcRef (tcg_source_table_uses env) (`extendNameSet` name)
                   return Nothing

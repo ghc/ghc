@@ -171,6 +171,55 @@ Erase a = 'True`. GHC-25897 rejected `Refl` at type
 `(Erase a ~ Erase b) => a :~: b`. The source changes above preserve
 that distinction between a type constructor and a family.
 
+
+### Category aliases with matchable kinds
+
+The 341-line compiler at `4d5d6e467f` and the 347-line compiler at
+`7278fc1e52` ran the same normal-way polykinds cohort. Both selected
+246 tests, with 498 skipped cases and zero missing libraries. Expected
+passes rose from 224 to 227. The three restored diagnostics were
+`T15795`, `T15795a`, and `T9017`. The six category-alias cases had the
+same diagnostics in both builds. [Compiler checkpoints](../CHECKPOINTS.md).
+
+The six files declare a bare `type Cat k = k -> k -> Type`. Proposal
+#242 gives arrows on a synonym RHS the unmatchable default. In each
+file, enabling `Modifiers`, importing `M` from `GHC.Exts`, and writing
+`type Cat k = k %M -> k %M -> Type` removes the matchability failure.
+On GHC 9.14.1 the original sources give the following results. Both
+fork compilers give the same outcomes after the source change.
+[Proposal #242 synonym defaults](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#rhs-of-type-synonyms).
+
+| Source | Result |
+| --- | --- |
+| [T11523](../../../testsuite/tests/polykinds/T11523.hs), [T12055](../../../testsuite/tests/polykinds/T12055.hs), [T14939](../../../testsuite/tests/polykinds/T14939.hs) | Compile successfully. |
+| [T12055a](../../../testsuite/tests/polykinds/T12055a.hs) | GHC-80003 at the `Functor` superclasses. |
+| [T14846](../../../testsuite/tests/polykinds/T14846.hs) | GHC-25897 at the original instance signature and its kind mismatch. |
+| [T25661](../../../testsuite/tests/polykinds/T25661.hs) | GHC-91028 at `undefined` in `newmapVis`. |
+
+A separately compiled provider exported `type Arrow a b = a -> b`.
+With only its stripped interface, `data Identity :: Arrow Type Type`
+rejects at the data declaration. A type family with the equation
+`Result (a -> b) = b` proves `Result (Arrow Bool Int) :~: Int` by `Refl`.
+Changing the provider to `type Arrow a b = a %M -> b` admits the data
+kind and makes that family equality fail. GHC 9.14.1 accepts both
+clients of the original provider. Both fork compilers accept both
+unchanged clients of this explicitly indexed provider:
+
+```haskell
+{-# LANGUAGE Modifiers, StandaloneKindSignatures, TypeAbstractions #-}
+module Provider (Arrow) where
+
+import Data.Kind (Type)
+import GHC.Exts (Matchability)
+
+type Arrow :: forall (m :: Matchability). Type -> Type -> Type
+type Arrow @m a b = a %m -> b
+```
+
+An automatic change to the fixed RHS default would change the type
+family result. The explicit provider gives each client a separate
+choice, and the two uses of the bare fixed synonym follow #242.
+
 In `T20875`, the equation `ToKind TRUE = Type -> Type` checks its right
 side as an ordinary type. Its arrow gets U. The type constructor `Maybe`
 has an M arrow in its kind. Writing `FUN @M 'Many Type Type` in the

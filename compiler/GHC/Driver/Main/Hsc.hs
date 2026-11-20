@@ -213,6 +213,7 @@ checkNativeDependentModule hsc_env binds rules tycons = do
   return native
 
 -- | Select a standard -O1 or -O2 object-code schedule.
+-- See Note [Disabling rewrite rules in retained modules].
 -- Native modules still require the interface and plugin checks above.
 nativeOptLevel :: DynFlags -> Maybe Int
 nativeOptLevel dflags
@@ -230,7 +231,17 @@ nativeOptLevel dflags
   where
     matchesLevel level (levels, flag)
       | flag == Opt_OmitInterfacePragmas = True
+      | flag == Opt_EnableRewriteRules, not (gopt flag dflags) = True
       | otherwise = gopt flag dflags == (level `elem` levels)
+
+{- Note [Disabling rewrite rules in retained modules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A module can use an imported source equation with user rewrite rules
+disabled. Its proof may also bind a runtime value. Such a module needs
+the retained simplifier at -O1 or -O2. core2coreRetained uses the module's
+DynFlags to build the pass schedule and set sm_rules. Recognise this flag
+combination here and pass the original DynFlags to the simplifier.
+-}
 
 usesOptimizedFlags :: DynFlags -> Bool
 usesOptimizedFlags dflags =
