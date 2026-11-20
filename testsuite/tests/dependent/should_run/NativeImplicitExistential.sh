@@ -138,10 +138,11 @@ if "$ghc" "${flags[@]}" -c WitnessLambdaReject.hs >lambda-witness.log 2>&1; then
     echo "The lambda witness check accepted an invalid body." >&2
     exit 1
 fi
-for rejection in escape:91028 duplicate:18872 wrongOperand:83865 wrongVisibleKind:83865 missingEquality:25897; do
+for rejection in escape:91028 duplicate:18872 wrongOperand:83865 wrongVisibleKind:83865 \
+                 missingEquality:25897 wrongPackageArgument:83865 escapePackageCall:25897; do
     binding=${rejection%:*}
     code=${rejection#*:}
-    line=$(grep -n "^$binding =" WitnessLambdaReject.hs | cut -d: -f1)
+    line=$(grep -n "^$binding .*=" WitnessLambdaReject.hs | cut -d: -f1)
     grep -Eq "^WitnessLambdaReject.hs:$line:[0-9]+: error: \[GHC-$code\]" lambda-witness.log || {
         cat lambda-witness.log >&2
         exit 1

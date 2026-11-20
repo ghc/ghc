@@ -266,6 +266,14 @@ This extends the application opening of
 [Elab-IExist](https://richarde.dev/papers/2021/exists/exists.pdf#page=18)
 to a GHC case scrutinee by checking the alternatives in the same scope.
 
+A leading visible type argument can also select which package a name
+produces. For a declared `builder :: forall a. C a => Builder a`,
+`case builder @Bool flag of …` checks the type argument and instantiates
+the dictionary parameter outside the opening. It applies the opened
+payload to `flag`.
+An ordinary observer can consume `builder @Bool flag` in the same scope.
+[Proposal #378 on application chains](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#dependent-application-and-the-static-subset).
+
 Each call opens a fresh witness. The source test rejects a call that
 returns its witness at a caller-chosen length. It also rejects an
 observer that equates two independent calls. A direct or nested call

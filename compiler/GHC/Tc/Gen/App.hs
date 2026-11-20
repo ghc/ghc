@@ -453,21 +453,34 @@ tcOrdinaryApp rn_expr rn_fun rn_args exp_res_ty
   = do { fun_lspan <- getFunSrcSpan rn_args
        ; let rn_head = (rn_fun, fun_lspan)
        ; (tc_fun0, fun_sigma0) <- tcInferAppHead rn_head
-       ; let check_call fun sigma expected =
-               tcOpenImplicitArgs rn_expr sigma rn_args expected $
+       ; let check_call fun sigma args expected =
+               tcOpenImplicitArgs rn_expr sigma args expected $
                  tcOrdinaryApp' rn_expr rn_head fun sigma
+             -- See Note [Type arguments before an implicit package head].
+             (type_prefix, payload_args)
+               | let (prefix, rest) = span prefix_arg rn_args
+               , any type_arg prefix = (prefix, rest)
+               | otherwise = ([], rn_args)
        ; case implicitSpineHead fun_sigma0 of
            ExistsTy ImplicitExists _ body
-             | all ordinary_arg rn_args
-             , opensImplicitHead (count isHsValArg rn_args) body
-             -> do { (prefix, schema) <- tcInstFun NoQL True rn_head tc_fun0 fun_sigma0 []
+             | all ordinary_arg payload_args
+             , opensImplicitHead (count isHsValArg payload_args) body
+             -> do { (prefix, schema) <- tcInstFun NoQL True rn_head tc_fun0 fun_sigma0 type_prefix
                    ; prefix' <- tcValArgsWithCache [] NoQL rn_head prefix
-                   ; let package = L (noAnnSrcSpan fun_lspan) (rebuildHsApps tc_fun0 prefix')
+                   ; package_loc <- getFunSrcSpan payload_args
+                   ; let package = L (noAnnSrcSpan package_loc) (rebuildHsApps tc_fun0 prefix')
                    ; result <- expTypeToType exp_res_ty
-                   ; tcOpenImplicitPackage fun_lspan schema package result $ \payload ->
-                       check_call (mkHsVar (noLocA payload)) (varType payload) (mkCheckExpType result) }
-           _ -> check_call tc_fun0 fun_sigma0 exp_res_ty }
+                   ; tcOpenImplicitPackage package_loc schema package result $ \payload ->
+                       check_call (mkHsVar (noLocA payload)) (varType payload)
+                                  payload_args (mkCheckExpType result) }
+           _ -> check_call tc_fun0 fun_sigma0 rn_args exp_res_ty }
   where
+    prefix_arg EWrap{} = True
+    prefix_arg arg = type_arg arg
+
+    type_arg ETypeArg{} = True
+    type_arg _ = False
+
     ordinary_arg EValArg{} = True
     ordinary_arg EWrap{} = True
     ordinary_arg _ = False
@@ -544,7 +557,15 @@ tcOrdinaryApp' rn_expr rn_head@(rn_fun, fun_lspan) tc_fun0 fun_sigma0 rn_args ex
                 (DoQL, Check exp_rho) -> quickLookResultType app_res_rho exp_rho
                 _                    -> return ()
             ; finishAppWithCache (arg_cache ++ extra_cache) do_ql rn_expr fun_lspan
-                rn_fun tc_fun inst_args app_res_rho exp_res_ty } }
+                source_fun tc_fun inst_args app_res_rho exp_res_ty } }
+  where
+    -- See Note [Type arguments before an implicit package head].
+    source_fun
+      | HsVar _ name <- rn_fun
+      , isSystemName (unLocWithUserRdr name)
+      , EWrap (EExpand _ (ExprCtxt original@HsAppType{})) : _ <- rn_args
+      = original
+      | otherwise = rn_fun
 
 -- | Scope implicit existential value arguments over the rest of the application.
 -- See Note [Implicit existential arguments].
@@ -656,6 +677,7 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
 
 -- | Read the declaration for an implicit package or a call with a package head.
 -- The replacement function rebuilds a call on a checked payload.
+-- See Note [Type arguments before an implicit package head].
 tcImplicitOperand :: LHsExpr GhcRn
                   -> TcM (Maybe (LHsExpr GhcRn, Maybe (LHsExpr GhcRn -> LHsExpr GhcRn)))
 tcImplicitOperand arg = find_head 0 id arg
@@ -664,16 +686,22 @@ tcImplicitOperand arg = find_head 0 id arg
       find_head (n + 1) (\f -> rebuild (L loc (HsApp x f operand))) fun
     find_head n rebuild (L loc (HsPar x fun)) =
       find_head n (\f -> rebuild (L loc (HsPar x f))) fun
-    find_head n rebuild head_expr@(L _ (HsVar _ name))
-      | let id_name = unLocWithUserRdr name
+    find_head n rebuild head_expr
+      | HsVar _ name <- unLoc (package_head head_expr)
+      , let id_name = unLocWithUserRdr name
       , not (isDataOcc (nameOccName id_name))
       = do { ident <- tcLookupIdMaybe id_name
            ; return $ case implicitSpineHead . varType <$> ident of
                Just (ExistsTy ImplicitExists _ body)
                  | opensImplicitHead n body -> Just (head_expr, Just rebuild)
-               Just ty | hasDotResult n ty -> Just (arg, Nothing)
+               Just ty | HsVar{} <- unLoc head_expr
+                       , hasDotResult n ty -> Just (arg, Nothing)
                _ -> Nothing }
     find_head _ _ _ = return Nothing
+
+    package_head (L _ (HsAppType _ fun _)) = package_head fun
+    package_head (L _ (HsPar _ fun)) = package_head fun
+    package_head expr = expr
 
     hasDotResult 0 ty = case implicitSpineHead ty of
       ExistsTy ImplicitExists _ _ -> True
@@ -698,6 +726,25 @@ opensImplicitHead arity body = arity > 0 && go arity (implicitPayloadType body)
     go n ty = case splitVisibleFunTy_maybe ty of
       Just (_, result) -> go (n - 1) result
       Nothing -> False
+
+{- Note [Type arguments before an implicit package head]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Given builder :: forall a. C a => exists t. a -> Callback t,
+the prefix builder @Bool produces a package. The value argument then
+applies to the function inside the package.
+
+Use the declared shape to identify the prefix. Check its written type
+arguments and instantiate its ordinary invisible binders through IALL
+and ITYARG. Save the checked type applications and dictionary wrappers
+on the package expression. Check the value arguments only after opening
+the package, with the result type outside the opening.
+
+The case and observer paths keep the prefix in their source view and
+check it with the ordinary application checker. They rebuild only the
+value spine inside the opening. Source spans on the prefix still identify
+type argument and dictionary errors. Use the original prefix from the
+expression expansion in value-argument diagnostics for the rebuilt call.
+-}
 
 {- Note [Implicit existential arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
