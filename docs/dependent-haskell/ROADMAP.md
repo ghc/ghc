@@ -14,12 +14,13 @@ of an ordered type case in a value signature. The sample renders the
 two results as `"7"` and `"'f'"`. A call that ignores its arguments
 still returns 42 with an undefined index and payload. An ordinary client
 can also open a hidden vector inside a pair without forcing the other
-field. All 330 Showcase lines ran with both compiler stages at `-O0`,
+field. All 331 Showcase lines ran with both compiler stages at `-O0`,
 default `-O1` and default `-O2`, and with the self-hosted GHCi.
 [Showcase](Showcase.hs) and [verification](CHECKPOINTS.md#family-and-package-checkpoints).
 
-An ordinary client can use an optimized rule whose payload type refers
-to a preceding Boolean. The rule fires even when the index comes from
+A rewrite rule can omit the types of its Boolean index and dependent
+payload. GHC infers both from the function's retained signature. An
+ordinary client can use the optimized rule. The rule fires even when the index comes from
 an `IORef`. A call whose result ignores the index can return 19 with an
 undefined Boolean. GHC checks type cases in ordinary and rank-n
 constructor fields. The same higher-order class method can map over
@@ -201,24 +202,27 @@ source examples. General promotion remains open.
 
 ## Current work queue
 
-1. **R05.** The optimizer matches payloads at an earlier runtime
-   index. Infer these rule binder types from the function signature
-   when the source omits them. Extend the check to imported rule heads.
-   [Rule and interface support](roadmap/R05-dependent-core.md#lexical-package-operations-in-user-rules).
-2. **R23.** A class receiver can determine the callback arrow during
-   ordinary constraint solving. Check direct projection when Quick Look
-   runs first. Then check the inferred arrow of an unsigned higher-order
-   type family from proposal #242.
+1. **R05.** Local rules can match an unknown runtime index and its
+   dependent payload in an optimized client. Check imported rule heads,
+   including an orphan rule whose only retained argument is a constant.
+   A visible type application in the rule head also needs a checked
+   source of types for unannotated payload binders.
+   [Rule and interface support](roadmap/R05-dependent-core.md).
+2. **R23.** An unsigned recursive family can accept a constructor or
+   a partial family through the same inferred arrow. Check explicit named
+   binder order and defaults across language modes. Continue testing
+   ordinary clients against stripped provider interfaces.
    [Later argument](roadmap/R23-unsaturated-type-families.md#choosing-a-prefixs-matchability-from-a-later-argument)
    and [singletons migration](roadmap/R23-unsaturated-type-families.md#arrow-patterns-in-family-equations).
-3. **R22 and R04.** Extend hidden-witness inference beyond callbacks
-   whose checked result determines the witness. Keep independent packages
-   distinct under pattern matching and retain the demand of guards.
+3. **R22 and R04.** A conditional can package a different callback type
+   in each branch. Check introduction and elimination when an implicit
+   existential encloses an explicit one. For retained sums, compare the
+   native list-to-vector producer with the handwritten vector package.
    [Guarded witness](roadmap/R22-existential-quantification.md#inferring-a-higher-rank-witness)
    and [nested patterns](roadmap/R22-existential-quantification.md#constructor-cases-on-the-payload).
-4. **R19.** Ordinary and rank-n constructor fields can use type cases.
-   Check fields where an inner binder shadows names in a compound outer
-   kind. Extend the direct source form to a field with a retained binder.
+4. **R19.** A GADT field can use an ordered type case under a retained
+   Boolean binder. Extend Template Haskell reification to this field
+   type. H98 fields under a retained binder still use a named helper.
    [Retained scrutinees and scope](roadmap/R19-type-level-cases.md#compute-a-retained-scrutinee).
 
 Use this queue for current priorities, the linked card for its acceptance

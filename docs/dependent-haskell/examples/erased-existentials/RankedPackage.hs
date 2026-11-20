@@ -4,6 +4,7 @@ module RankedPackage
     ( runCallback, runPair, runBuilder, CallbackPair, pairFor
     , Callback(..), GuardedBuilder, atTwoTypes, consumeIdentity, observeGuarded
     , PolyId, withWitness, TwoWitnessBuilder, fromLeft, fromRight, observeTwo
+    , Hidden, PolyMaybe, observeCallback
     ) where
 
 import Data.Kind (Type)
@@ -18,8 +19,12 @@ hidden :: Hidden
 hidden = Callback @PolyId id (\f -> (f 7, f True))
 
 -- | Open the package and give its value to the matching callback.
+observeCallback :: Hidden -> (Int, Bool)
+observeCallback (Callback value call) = call value
+
+-- | Run the hidden identity callback at two types.
 runCallback :: (Int, Bool)
-runCallback = case hidden of Callback value call -> call value
+runCallback = observeCallback hidden
 
 type CallbackPair = exists (t :: Type). (t, t -> (Int, Bool))
 

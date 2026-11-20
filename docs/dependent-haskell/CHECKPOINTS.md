@@ -8,6 +8,23 @@ increments.
 
 ## Family and package checkpoints
 
+At `5171866a01`, bootstrap and self-hosted GHC reproduced the 331-line
+Showcase at stripped `-O0` and default `-O1` and `-O2`. Self-hosted
+GHCi matched the output. All 16 focused normal-way tests passed. The
+dependent directory ran 321 cases. It recorded 301 expected passes
+and the same 20 unexpected failures as the 330-line checkpoint.
+The retained-rule interface checks, typed splice, provider upgrade,
+orphan-rule header and two-way filter upgrade also passed.
+
+The compiler infers both binders of a rule from a retained signature.
+Different branches can choose different callback witnesses by visible
+type application. An unsigned recursive family can forward either a
+constructor or a partial family. GHC also checks compound rank-n field
+kinds and ordered type cases under retained GADT field binders.
+[Rule inference](roadmap/R05-dependent-core.md),
+[existential witnesses](roadmap/R22-existential-quantification.md) and
+[family inference](roadmap/R23-unsaturated-type-families.md).
+
 At `38c0f996f5`, the bootstrap and self-hosted compilers reproduced
 the 330-line Showcase at stripped `-O0` and default `-O1` and `-O2`.
 Self-hosted GHCi reproduced it too. All 15 focused normal-way tests passed.

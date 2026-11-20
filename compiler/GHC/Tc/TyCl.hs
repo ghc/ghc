@@ -1818,7 +1818,12 @@ generaliseTcTyCon (tc, tc_kind, skol_info, scoped_prs, tc_res_kind)
 
        -- Step 2b: quantify, mainly meaning skolemise the free variables
        -- Returned 'inferred' are scope-sorted and skolemised
-       ; inferred <- quantifyTyVars skol_info DefaultNonStandardTyVars dvs2
+       ; quantified <- quantifyTyVars skol_info DefaultNonStandardTyVars dvs2
+       ; let inferred = case tyConFlavour tc of
+               ClosedTypeFamilyFlavour ->
+                 let (metadata, others) = partition ((`eqType` matchabilityTy) . tyVarKind) quantified
+                 in metadata ++ others
+               _ -> quantified
 
        ; traceTc "generaliseTcTyCon: pre zonk"
            (vcat [ text "tycon =" <+> ppr tc
@@ -4145,7 +4150,7 @@ kcTyFamInstEqn tc_fam_tc
          bindOuterFamEqnTKBndrs_Q_Tv outer_bndrs $
          do { (fam_app, res_kind) <- tcFamTyPats tc_fam_tc hs_pats
             ; withCaseAlias tc_fam_tc fam_app hs_rhs_ty $ \rhs ->
-                tcCheckLHsTypeInContext rhs (TheKind res_kind) }
+                tcCheckInferredFamilyRhs rhs res_kind }
              -- Why "_Tv" here?  Consider (#14066)
              --  type family Bar x y where
              --      Bar (x :: a) (y :: b) = Int
@@ -4812,7 +4817,12 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
                      ; addConsistencyConstraints mb_clsinfo lhs_ty
                      ; rhs_ty <- withCaseAlias fam_tc lhs_ty hs_rhs_ty $ \rhs -> case index of
                            Just ma -> tcCheckMatchabilitySynRhs ma rhs rhs_kind
-                           Nothing -> tcCheckLHsTypeInContext rhs (TheKind rhs_kind)
+                           Nothing
+                             | ClosedTypeFamilyFlavour <- tyConFlavour fam_tc
+                             , b : _ <- tyConBinders fam_tc
+                             , inferredMatchabilityIndex b
+                             -> tcCheckInferredFamilyRhs rhs rhs_kind
+                             | otherwise -> tcCheckLHsTypeInContext rhs (TheKind rhs_kind)
                      ; return (lhs_ty, rhs_ty) }
 
        ; outer_bndrs <- scopedSortOuter outer_bndrs

@@ -1,7 +1,7 @@
 Dependent Haskell: completed source features
 runtime Bool choice: "42"
 apply retained function rules without forcing an unused index: (7,11,19)
-match a rule payload at the preceding runtime index: 7
+infer both rule binders from readKept: 7
 choose True has result Int: 42
 choose False has result Bool: False
 keep ignores bottom index and payload: 42
@@ -236,6 +236,7 @@ project twice from the same package producer call: [(8,True),(11,False)]
 infer a polymorphic lambda witness and call its builder at Int: (11,True)
 infer a guarded callback and skip an unused input: ((7,True),(11,False))
 infer callback witnesses from a type argument and separate equations: ((7,True),((11,False),(13,False)))
+choose each branch's callback witness by type application: ((7,True),(17,False),17)
 read an integer through an erased package: 7
 apply an imported integer package rule and keep the witness lazy: (42,7,1)
 match and open existential packages in optimizer rules: (4,3,6)
