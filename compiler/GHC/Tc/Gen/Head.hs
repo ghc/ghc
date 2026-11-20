@@ -73,6 +73,8 @@ import GHC.Utils.Outputable as Outputable
 
 import GHC.Data.Maybe
 
+import Control.Monad (when)
+
 {- *********************************************************************
 *                                                                      *
               HsExprArg: auxiliary data type

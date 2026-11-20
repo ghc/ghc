@@ -5363,7 +5363,6 @@ data ExistsPackProblem
   | ExistsPackInvalidSchema !TcType
   | ExistsPackInvalidKind !Kind
   | ExistsPackInvalidContext
-  | ExistsPackCasePattern
 
 data RetainedQuantificationError
   = RetainedBinderCount

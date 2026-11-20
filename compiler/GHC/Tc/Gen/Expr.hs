@@ -1206,7 +1206,7 @@ tcExistsCase expr@(HsCase ctxt scrut matches)
                      <- strip_pat witness_pat
                  , HsTyVar{} <- unLoc (ignoreParens witness_ty)
                  -> open_pack con_loc con name payload_pat
-               _ -> failWithTc (TcRnExistsPack ExistsPackCasePattern) }
+               _ -> failWithTc (TcRnExistsPack ExistsPackInvalidContext) }
 
     open_pack con_loc con name payload_pat
       = do { (scrut', scrut_ty) <- tcScalingUsage ManyTy $ tcInferRhoFRR FRRCase scrut

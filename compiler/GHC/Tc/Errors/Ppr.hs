@@ -1131,10 +1131,8 @@ instance Diagnostic TcRnMessage where
       ExistsPackInvalidKind kind ->
         hang (text "The kind argument to GHC.Exists.Pack must be Type.")
           2 (text "The argument is" <+> quotes (ppr kind) <> dot)
-      ExistsPackCasePattern ->
-        text "Use Pack with a fresh type variable and a payload pattern."
       ExistsPackInvalidContext ->
-        text "Use GHC.Exists.Pack in an explicit existential application or case pattern."
+        text "Use GHC.Exists.Pack in an explicit existential application or a sole case alternative with a fresh type variable and a payload pattern."
     TcRnTypeCaseContext
       -> mkSimpleDecorated $ text "A type case is supported only in the right-hand side of a top-level type synonym."
     TcRnTypeLambdaContext
