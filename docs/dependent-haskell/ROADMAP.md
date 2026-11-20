@@ -32,7 +32,7 @@ determines that the first has type `forall a. a -> a`. A consumer can write
 `observePair (f, k) = k f`. If it tries to return `f` at an arbitrary type,
 the error identifies both the use and the pattern that opened the package.
 A function can also hide the witness shared by all its calls. The consumer
-can write `case builder n of Callback f call -> call f` and use `f` at
+can write `case builder @Int n of Callback f call -> call f` and use `f` at
 both `Int` and `Bool` inside the case.
 [Callback example](examples/erased-existentials/RankedPackage.hs).
 
@@ -69,53 +69,27 @@ result can differ from the choice in its kind. The client prints
 original `GADTSingletons` program still needs two source annotations.
 [Interpreter and compatibility boundary](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
 
-The 303-line Showcase adds `(Right 7,False)` and uses the direct
-callback case. Both compiler stages reproduce the full output at
-`-O0`. The self-hosted compiler also reproduces it at default `-O1`,
-default `-O2` and in GHCi. The family upgrade rebuilds the provider
-once and reuses it on the next build. The old and new compilers both
-compile the ordinary client from the new interface. The R22 source
-test checks witness escapes, linear use and the original GADT pattern.
-[Showcase](Showcase.hs) and [family source and upgrade checks](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
+A family argument can keep its last invisible binder while GHC infers
+the earlier ones. For `RunVisible @Bool (ReadAt 'True)`, GHC infers
+the result kind `Bool` and leaves the input type for `RunVisible`.
+The same family produces `Int` when the receiver requests kind `Type`.
+[Source and ordinary client](roadmap/R23-unsaturated-type-families.md#inferring-a-kind-after-supplying-a-visible-argument).
 
-At the preceding 302-line checkpoint, all 61 focused tests that ran
-passed. The dependent directory recorded 294 passes and 20 unexpected
-failures. Polykinds recorded 224 passes, one expected failure and 18
-unexpected failures. Each unexpected failure had the same name and
-failure category as at the 301-line checkpoint.
+Both compiler stages reproduce the 304-line Showcase at `-O0`.
+The self-hosted compiler also matches at default `-O1`, default
+`-O2` and in GHCi. The preceding compiler rejects the new family
+source with GHC-91028, but it can compile an ordinary client from
+the new optimized interface. Both readers link and run that client.
+All 21 expected passes in the impredicative suite passed. The linear
+suite had 106 passes and the same seven unexpected failures as at
+`7185bd64f8`.
+[Showcase](Showcase.hs) and [run commands](README.md#run-the-showcase).
 
-The 302-line Showcase adds `(4,3,6)` from the package rules. Both
-compiler stages reproduce every line at `-O0`, default `-O1` and
-default `-O2`. The self-hosted compiler also reproduces it in GHCi.
-The Core matcher rejects substitutions that would capture an opened
-witness or payload. The preceding compiler can still use older-style
-rules from a new interface at each of the three compression levels.
-[Showcase](Showcase.hs) and [interface check](examples/erased-existentials/check-rule-interfaces.sh).
-
-The preceding 301-line Showcase includes a constructor match at an open family
-index and a packaged lambda whose hidden witness is polymorphic.
-Both compiler stages reproduce the expected output at `-O0`. The
-self-hosted compiler also reproduces it in GHCi and at default `-O2`.
-All nine focused tests passed. The dependent directory recorded 294
-passes and 20 unexpected failures. Its failure summary matches the
-preceding 299-line checkpoint. The split-interface and family-upgrade
-checks passed. [Showcase source](Showcase.hs) and [run commands](README.md#run-the-showcase).
-
-At the preceding checkpoint, both compiler stages reproduced the 299-line Showcase at `-O0`,
-default `-O1` and default `-O2`. The self-hosted compiler also checks
-stripped optimized interfaces and GHCi. Both this compiler and the
-previous release, `7c873b5f46`, compile the ordinary client from the
-new optimized interfaces. It prints `(Just (Just True),Just True)`.
-The previous release rejects the interpreter's source.
-[Showcase](Showcase.hs) and [commands](README.md#run-the-showcase).
-
-At `55c20e158c`, all 61 focused tests that ran passed. In the dependent
-directory, 294 passed and 20 failed. The unchanged `KindEqualities2`
-now compiles and prints `Nothing` at `-O0` and `-O2`. In polykinds,
-224 passed, one failed as expected, and 18 failed unexpectedly. In
-indexed-types, 420 passed, four failed as expected, and 15 failed
-unexpectedly. The remaining failures in all three directories have the
-same names and failure categories as at `7c873b5f46`.
+At `7185bd64f8`, all 61 runnable focused tests passed. The dependent
+directory had 294 passes and 20 unexpected failures. Polykinds had 224
+passes, one expected failure and 18 unexpected failures. The failing
+tests and their failure categories match the preceding checkpoint.
+[Earlier checkpoints](CHECKPOINTS.md#family-and-package-checkpoints).
 
 The upgrade tests cover a change to a family, a packed projection from
 a home or installed module, and combinations of dependent projections
@@ -132,7 +106,7 @@ the header. The new reader checks the coercion's role and scope.
 | [R05 dependent Core](roadmap/R05-dependent-core.md) | The standard `-O2` pipeline specializes a recursive consumer and keeps retained case proofs scoped. A provider and an interface-only client can match rules that construct or open an erased package. | Support orphan rules, retained function rules and more dependent coercions. |
 | [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The integrated Showcase checks a mapper’s cons rule on an unknown tail and composes two checked traversals. Observing the result constructor leaves the inner callback lazy. | General open evaluation across arbitrary ordinary definitions. |
 | [R19 type-level cases](roadmap/R19-type-level-cases.md) | A constructor match can refine the kinds of later indices using checked nominal equalities. An ordinary constructor can match at an open GADT index. An unknown head or field can still block a later row. | Check source annotations that capture a parameter under a noninjective index family. |
-| [R22 erased existentials](roadmap/R22-existential-quantification.md) | Ordinary function equations can open payload constructors. Quick Look can infer a whole package as a type argument. A typed callback can determine the polymorphic witness for an adjacent field. A direct case on a packaged function call keeps the hidden witness in scope for all alternatives. | Extend witness inference beyond single unguarded lambdas and handle visible type arguments on the packed call head. |
+| [R22 erased existentials](roadmap/R22-existential-quantification.md) | Ordinary function equations can open payload constructors. Quick Look can infer a whole package as a type argument. A typed callback can determine the polymorphic witness for an adjacent field. A direct case on a packaged function call keeps the hidden witness in scope for all alternatives. The call head can take visible type arguments. | Extend witness inference beyond single unguarded lambdas. |
 | [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | A family can take a visible argument and pass its remaining invisible binder to another family. The receiver can infer its result kind. An application can use either arrow exposed by a family equation. The original `KindEqualities2` program checks across its declaration splice. A curried family result can use the matchability required by its caller. | Restore the unannotated `~>` synonym and `Promote` equation in `GADTSingletons`. General unsaturation remains open. |
 
 The published evaluator work covers closed calls such as `Prelude.sum` and
@@ -157,9 +131,9 @@ source examples. General promotion remains open.
    Keep the explicit matchability and noninjective equality checks.
    The staged interpreter with an unsaturated family still needs an explicit
    `%U`. [Current inference boundary](roadmap/R23-unsaturated-type-families.md#an-open-family-used-after-a-declaration-splice).
-3. **R22 and R04.** Check a visible type argument on the head of a
-   packaged call, such as `builder @Bool flag`. Extend retained sum
-   fields to GADT constructors with local type parameters.
+3. **R22 and R04.** Extend retained sum fields to GADT constructors
+   with local type parameters. Check that a separately compiled client
+   preserves the stored vector lengths at default optimization.
 4. **R19.** Check a captured index `b` in a written `Gate (Index b)`
    scrutinee. Preserve earlier rows, nominal evidence and ambiguity checks.
 
