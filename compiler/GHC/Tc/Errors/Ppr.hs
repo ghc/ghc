@@ -8386,13 +8386,20 @@ pprHsCtxt = \case
   ClosedFamEqnCtxt tc ->
     text "In the equations for closed type family" <+>
            quotes (ppr tc)
-  DeclKindSynonymCtxt name local ->
+  DeclKindSynonymCtxt name forall_vis local ->
     vcat [ text "The kind synonym" <+> quotes (ppr name)
-           <+> text "supplies an unmatchable (U) arrow."
-         , text "This declaration requires a matchable (M) arrow."
+           <+> text "supplies an unmatchable (U)" <+> binder <> dot
+         , text "This declaration requires a matchable (M)" <+> binder <> dot
          , if local
-           then text "Use '%M ->' in the synonym's definition, or use a separate matchable synonym here."
-           else text "Use a kind with a matchable arrow or import a matchable synonym." ]
+           then text "Use" <+> annotation
+                <+> text "in the synonym's definition, or use a separate matchable synonym here."
+           else text "Use a kind with a matchable" <+> binder
+                <+> text "or import a matchable synonym." ]
+    where
+      (binder, annotation) = case forall_vis of
+        Nothing        -> (text "arrow", text "'%M ->'")
+        Just Required  -> (text "visible forall", text "'forall ... -> @M'")
+        Just Invisible{} -> (text "invisible forall", text "'forall ... . @M'")
   TySynErrCtxt tc ->
     text "In the expansion of type synonym" <+> quotes (ppr tc)
   RoleAnnotErrCtxt name ->

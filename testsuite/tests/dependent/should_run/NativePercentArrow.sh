@@ -71,3 +71,26 @@ sed -e 's/module WiredArrow/module ForwardedArrow/' \
     WiredArrow.hs >ForwardedArrow.hs
 reject ForwardedArrow 'ForwardedArrow.hs:6:1: error: [GHC-83865]'
 if grep -Fq 'kind synonym' bad.log; then cat bad.log >&2; exit 1; fi
+
+# The mismatch can come from a forall in the synonym's kind.
+cat >ForallAlias.hs <<'HS'
+{-# LANGUAGE DataKinds, GADTs, Modifiers, PolyKinds, RankNTypes #-}
+{-# LANGUAGE RequiredTypeArguments, StandaloneKindSignatures, TypeApplications #-}
+module ForallAlias where
+import Data.Kind (Type)
+import GHC.Exts (M)
+type InvisibleKind = forall (a :: Type). a %M -> Type
+data InvisibleSymbol :: InvisibleKind
+type VisibleKind = forall (a :: Type) -> Type
+type VisibleSymbol :: VisibleKind
+data VisibleSymbol a
+HS
+reject ForallAlias 'error: [GHC-83865]'
+grep -Fq 'supplies an unmatchable (U) invisible forall.' bad.log
+grep -Fq "Use 'forall ... . @M' in the synonym's definition" bad.log
+grep -Fq 'supplies an unmatchable (U) visible forall.' bad.log
+grep -Fq "Use 'forall ... -> @M' in the synonym's definition" bad.log
+sed -e 's/module ForallAlias/module FixedForallAlias/' \
+    -e '/^type InvisibleKind/s/\. a %M/. @M a %M/' \
+    -e '/^type VisibleKind/s/) -> Type/) -> @M Type/' ForallAlias.hs >FixedForallAlias.hs
+"${g[@]}" -c FixedForallAlias.hs

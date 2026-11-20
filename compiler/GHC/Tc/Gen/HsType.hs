@@ -1068,14 +1068,17 @@ checkDeclKindMatchability decl kind
   where
     expected_ma = tyConFlavourMatchability (tyClDeclFlavour decl)
 
--- | Preserve the source synonym in an error for a consumed declaration arrow.
+-- | Preserve the source synonym in an error for a consumed declaration binder.
 checkDeclArrowMatchability :: Kind -> Int -> Matchability -> Matchability -> TcM ()
 checkDeclArrowMatchability kind index actual expected
   | actual `tcEqType` unmatchableDataConTy
   , expected `tcEqType` matchableDataConTy
-  , Just name <- synonymAt index kind = do
+  , Just (name, bndr) <- synonymAt index kind = do
       mod <- tcg_semantic_mod <$> getGblEnv
-      addErrCtxt (DeclKindSynonymCtxt name (nameIsLocalOrFrom mod name)) check
+      let forall_vis = case bndr of
+            Named (Bndr _ vis) -> Just vis
+            Anon{}             -> Nothing
+      addErrCtxt (DeclKindSynonymCtxt name forall_vis (nameIsLocalOrFrom mod name)) check
   | otherwise = check
   where
     check = discardResult $ unifyType Nothing actual expected
@@ -1087,15 +1090,15 @@ checkDeclArrowMatchability kind index actual expected
       , let name = tyConName tc
       , not (isWiredInName name)
       , Just rhs <- synTyConRhs_maybe tc
-      , Just ma <- arrowAt i rhs
-      , ma `tcEqType` unmatchableDataConTy = Just name
+      , Just (ma, bndr) <- binderAt i rhs
+      , ma `tcEqType` unmatchableDataConTy = Just (name, bndr)
       | i > 0, Just (_, _, rest) <- splitPiTy_maybe ty =
           synonymAt (i - 1) rest
       | otherwise = Nothing
 
-    arrowAt i ty = do
-      (ma, _, rest) <- splitPiTy_maybe ty
-      if i == 0 then Just ma else arrowAt (i - 1) rest
+    binderAt i ty = do
+      (ma, bndr, rest) <- splitPiTy_maybe ty
+      if i == 0 then Just (ma, bndr) else binderAt (i - 1) rest
 
 -- | Select exactly the prefix consumed by header matching and data eta expansion.
 -- See Note [Checked declaration-kind matchability].
