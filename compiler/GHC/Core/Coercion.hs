@@ -37,6 +37,7 @@ module GHC.Core.Coercion (
         mkFunCo, mkFunCo2, mkFunCoNoFTF, mkFunResCo,
         mkNakedFunCo,
         mkNakedForAllCo, mkForAllCo, mkForAllVisCos, existsCoRule, isExistsCoRule,
+        existsCoScope, mkExistsCo,
         mkHomoForAllCo, mkHomoForAllCos, mkDepFunCo, mkDepFunCoWithDomain, mkDepFunCoWithVis, mkTermAppCo,
         nativeIndexCastCo_maybe, mapNativeIndexCastCo, mapNativeIndexCastCoM,
         mkPhantomCo, mkAxiomCo,
@@ -1901,6 +1902,15 @@ isExistsCoRule rule@(BuiltInRule _ role [_] _)
   | role /= Phantom = rule == snd (existsCoRule role)
 isExistsCoRule _ = False
 
+-- | Bind the common witness in the premise of existential congruence.
+existsCoScope :: TyVar -> Type -> Type
+existsCoScope v = mkForAllTy unmatchableDataConTy (Bndr v coreTyLamForAllTyFlag)
+
+-- | Lift a scoped payload equality at the role of its premise.
+-- See Note [Lifting under an erased existential].
+mkExistsCo :: Role -> Coercion -> Coercion
+mkExistsCo role scoped = AxiomCo (snd (existsCoRule role)) [scoped]
+
 -- | Erase the environments in a lifting context
 zapLiftingContext :: LiftingContext -> LiftingContext
 zapLiftingContext (LC subst _ _) = LC (zapSubst subst) emptyVarEnv emptyVarEnv
@@ -1938,9 +1948,9 @@ ty_co_subst !lc role ty
     -- See Note [Lifting under an erased existential].
     go r ty@(ExistsTy v body)
       | isReflCo scoped = mkReflCo r (substTy (lcSubstLeft lc) ty)
-      | otherwise = AxiomCo (snd (existsCoRule r)) [scoped]
+      | otherwise = mkExistsCo r scoped
       where
-        scoped = go r (mkForAllTy unmatchableDataConTy (Bndr v coreTyLamForAllTyFlag) body)
+        scoped = go r (existsCoScope v body)
     go r (DepFunTy vis b body)
       | isNativeOpaqueValueId b
       = let (lc', b', delta) = liftCoSubstNativeBndrUsing id
