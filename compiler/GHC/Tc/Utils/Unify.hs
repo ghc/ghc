@@ -3769,6 +3769,7 @@ causing this wibble in behavior seen here.
 -- | Breaks apart a function kind into its pieces.
 matchExpectedFunKind
   :: TypedThing     -- ^ type, only for errors
+  -> Bool            -- ^ Infer matchabilities of missing arrows
   -> Arity           -- ^ n: number of desired arrows
   -> TcKind          -- ^ fun_kind
   -> TcM Coercion    -- ^ co :: fun_kind ~ (arg1 -> ... -> argn -> res)
@@ -3782,7 +3783,7 @@ Try one nominal family step. Use its coercion only if it exposes a
 visible arrow. The next step then consumes an argument. For a stuck
 family, keep the usual constraint and its source location.
 -}
-matchExpectedFunKind hs_ty n k = go n k
+matchExpectedFunKind hs_ty infer_matchability n k = go n k
   where
     go 0 k = return (mkNomReflCo k)
 
@@ -3816,8 +3817,11 @@ matchExpectedFunKind hs_ty n k = go n k
     defer n k
       = do { arg_kinds <- newMetaKindVars n
            ; res_kind  <- newMetaKindVar
-           ; let new_fun = mkVisFunTysManyM arg_kinds res_kind
-                 origin  = TypeEqOrigin { uo_actual    = k
+           ; new_fun <- if infer_matchability
+                        then do { mas <- replicateM n (newFlexiTyVarTy matchabilityTy)
+                                ; return (mkVisFunTysMany (zip mas arg_kinds) res_kind) }
+                        else return (mkVisFunTysManyM arg_kinds res_kind)
+           ; let origin  = TypeEqOrigin { uo_actual    = k
                                         , uo_expected  = new_fun
                                         , uo_thing     = Just hs_ty
                                         , uo_invisible = Nothing

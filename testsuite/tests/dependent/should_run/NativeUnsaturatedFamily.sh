@@ -3,6 +3,7 @@ set -euo pipefail
 
 ghc=("$1" "-B$2" -v0 -O0 -i -i. -package-env - -dcore-lint -dstg-lint
      -fdiagnostics-color=never)
+stripped=(-fomit-interface-pragmas -fno-write-if-simplified-core)
 src=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 out=$(mktemp -d)
 trap 'rm -rf -- "$out"' EXIT
@@ -20,10 +21,15 @@ fi
 (
     cd producer
     cp "$src/NativeUnsaturatedProvider.hs" .
-    "${ghc[@]}" -c NativeUnsaturatedProvider.hs
+    "${ghc[@]}" "${stripped[@]}" -c NativeUnsaturatedProvider.hs
 )
 cp producer/NativeUnsaturatedProvider.hi NativeUnsaturatedClient.hs client/
-(cd client && "${ghc[@]}" -c NativeUnsaturatedClient.hs)
+(
+    cd client
+    for mode in NoImpredicativeTypes ImpredicativeTypes; do
+        "${ghc[@]}" "-X$mode" -fforce-recomp -c NativeUnsaturatedClient.hs
+    done
+)
 
 # Two different prefixes are not known apart solely because their
 # unsaturated applications cannot be decomposed.
@@ -43,7 +49,7 @@ fi
     cd producer
     sed "s/^type instance Select a 'True = a$/type instance Select a 'True = 'False/" \
         "$src/NativeUnsaturatedProvider.hs" >NativeUnsaturatedProvider.hs
-    "${ghc[@]}" -c NativeUnsaturatedProvider.hs
+    "${ghc[@]}" "${stripped[@]}" -c NativeUnsaturatedProvider.hs
 )
 cp producer/NativeUnsaturatedProvider.hi client/
 if (cd client && "${ghc[@]}" -c NativeUnsaturatedClient.hs) >changed.log 2>&1 ||

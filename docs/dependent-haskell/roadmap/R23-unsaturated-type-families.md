@@ -617,6 +617,23 @@ named family receiver and the named `Maybe` receiver.
 [ordinary client](../examples/open-evaluation/IndexedMapClient.hs)
 and [interface and error checks](../../../testsuite/tests/dependent/should_run/NativeIndexedClassReceiver.sh).
 
+### Inferring a callback arrow in a closed family
+
+An unsigned closed `Map f xs` learns the kind of `f` from `f x`.
+With `ExperimentalDependentTypes` and `PolyKinds`, its callback
+matchability generalises. An unsigned `ForwardMap` can pass the same
+callback to `Map`. Both the family kind and its equations retain the
+inferred selector. An explicit higher-order kind signature with a bare
+arrow still selects M.
+
+An ordinary client proves results for both `Maybe` and a user family
+prefix exported as `Callback a`. The client reads only the stripped
+provider interface. The provider uses the experimental extension for
+the bare partial application.
+[Provider](../../../testsuite/tests/dependent/should_run/NativeUnsaturatedProvider.hs),
+[ordinary client](../../../testsuite/tests/dependent/should_run/NativeUnsaturatedClient.hs)
+and [proposal #242, higher-order arguments](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#higher-order-arguments).
+
 ## Goal and dependencies
 
 Allow direct higher-order use of type families under explicit matchability,

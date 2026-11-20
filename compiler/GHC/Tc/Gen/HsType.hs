@@ -54,7 +54,7 @@ module GHC.Tc.Gen.HsType (
         tcHsLiftedType,   tcHsOpenType,
         tcHsLiftedTypeNC, tcHsOpenTypeNC,
         tcInferLHsType, tcInferLHsTypeKind, tcInferLHsTypeUnsaturated,
-        tcCheckLHsTypeInContext, tcCheckLHsType,
+        tcCheckLHsTypeInContext, tcCheckInferredFamilyRhs, tcCheckLHsType,
         tcHsContext, tcLHsPredType,
 
         kindGeneralizeAll,
@@ -1421,6 +1421,32 @@ tcCheckLHsTypeInContext hs_ty exp_kind
     do { ek <- newExpectedKind exp_kind
        ; tcCheckLHsType hs_ty ek }
 
+-- | Check an equation of an unsigned closed family. See Note
+-- [Inferred closed family callback arrows].
+tcCheckInferredFamilyRhs :: LHsType GhcRn -> TcKind -> TcM TcType
+tcCheckInferredFamilyRhs rhs kind = do
+  experimental <- xoptM LangExt.ExperimentalDependentTypes
+  poly_kinds <- xoptM LangExt.PolyKinds
+  let generalise = experimental && poly_kinds
+  addTypeCtxt rhs $
+    tc_check_lhs_type (typeLevelMode {mode_family_arrow = Just generalise}) rhs kind
+
+{- Note [Inferred closed family callback arrows]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In an unsigned closed family, an application such as f x can determine
+the kind of f. With ExperimentalDependentTypes and PolyKinds, use a fresh
+matchability for the missing arrow. Generalise it with the other kind
+variables. Use fresh matchabilities also when forwarding f to an inferred
+family. Defaulting the receiver's index would specialise the new family.
+
+In the final equation check, a recursive reference is a TcTyCon. It and
+other inferred family RHSs must still use fresh matchabilities. Otherwise
+a forwarding or recursive equation can specialise its axiom to U even
+when the family kind is polymorphic. An explicit signature or a LHS
+pattern keeps its separate checking mode. When generalisation is disabled
+an unsigned family retains the default M kind for its callback.
+-}
+
 tcInferLHsType :: LHsType GhcRn -> TcM TcType
 tcInferLHsType hs_ty
   = do { (ty,_kind) <- tcInferLHsTypeKind hs_ty
@@ -1542,6 +1568,7 @@ tcModifiersMult = tc_modifiers_mult typeLevelMode
 data TcTyMode
   = TcTyMode { mode_tyki :: TypeOrKind
              , mode_declaration :: Bool
+             , mode_family_arrow :: Maybe Bool
              , mode_holes :: HoleInfo
              , mode_indices :: NameEnv Id
              , mode_pending_calls :: Maybe (NameEnv TcTyVar, PendingSigCalls, TcRef [TcPendingTypeCall])
@@ -1570,6 +1597,7 @@ data HoleMode = HM_Sig      -- Partial type signatures: f :: _ -> Int
 mkMode :: TypeOrKind -> TcTyMode
 mkMode tyki = TcTyMode { mode_tyki = tyki, mode_holes = Nothing
                       , mode_declaration = False
+                      , mode_family_arrow = Nothing
                       , mode_indices = emptyNameEnv
                       , mode_pending_calls = Nothing
                       , mode_synonym_metadata = Nothing
@@ -1585,6 +1613,7 @@ mkHoleMode tyki hm
   = do { lvl <- getTcLevel
        ; return (TcTyMode { mode_tyki  = tyki
                           , mode_declaration = False
+                         , mode_family_arrow = Nothing
                           , mode_holes = Just (lvl,hm)
                           , mode_indices = emptyNameEnv
                           , mode_pending_calls = Nothing
@@ -4074,24 +4103,31 @@ tcInferTyApps_nosat index_level expected_kind mode orig_hs_ty fun orig_hs_args
              pure (mkTyConApp tc args)
            (Nothing, TyConApp tc [])
              | TypeLevel <- mode_tyki mode
-             , isTypeFamilyTyCon tc
+             , isTypeFamilyTyCon tc ||
+               (mode_family_arrow mode == Just True && isTcTyCon tc && is_closed_family tc)
              , hasInferredMatchability tc
              , let indices = takeWhile inferredMatchabilityIndex (tyConBinders tc)
              , any (familyKindUsesMatchability tc) indices -> do
                  defaults <- tcl_kind_arrow_defaults <$> getLclEnv
-                 let choose b
-                       | familyKindUsesMatchability tc b = case defaults of
-                           Just (owner, _) -> fresh_kind_arrow index_level owner
-                           Nothing -> pure (defaultForAllMatchability index_level)
-                       | otherwise = pure unmatchableDataConTy
-                 case (defaults, index_level) of
-                   (Nothing, TypeLevel) -> pure fun
+                 let policy = mode_family_arrow mode
+                     default_level = if policy == Just False then KindLevel else index_level
+                     choose b
+                       | not (familyKindUsesMatchability tc b) = pure unmatchableDataConTy
+                       | policy == Just True = newFlexiTyVarTy matchabilityTy
+                       | Just (owner, _) <- defaults = fresh_kind_arrow default_level owner
+                       | otherwise = pure (defaultForAllMatchability default_level)
+                 case (policy, defaults, index_level) of
+                   (Nothing, Nothing, TypeLevel) -> pure fun
                    _ -> mkTyConApp tc <$> traverse choose indices
            _ -> pure fun
        ; (f_args, res_k) <- go_init 1 fun orig_hs_args Nothing
        ; traceTc "tcInferTyApps }" (ppr f_args <+> dcolon <+> ppr res_k)
        ; return (f_args, res_k) }
   where
+
+    is_closed_family tc = case tyConFlavour tc of
+      ClosedTypeFamilyFlavour -> True
+      _ -> False
 
     -- go_init just initialises the auxiliary
     -- arguments of the 'go' loop
@@ -4216,7 +4252,8 @@ tcInferTyApps_nosat index_level expected_kind mode orig_hs_ty fun orig_hs_args
       (HsValArg _ _ : _, Nothing)
         -> try_again_after_substing_or $
            do { let arrows_needed = n_initial_val_args all_args
-              ; co <- matchExpectedFunKind (HsTypeRnThing $ unLoc hs_ty) arrows_needed substed_fun_ki
+              ; co <- matchExpectedFunKind (HsTypeRnThing $ unLoc hs_ty)
+                          (mode_family_arrow mode == Just True) arrows_needed substed_fun_ki
 
               ; fun' <- liftZonkM $ zonkTcType (fun `mkCastTy` co)
                      -- This zonk is essential, to expose the fruits
@@ -6362,6 +6399,7 @@ bindExplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_ki
   where
     tc_ki_mode = TcTyMode { mode_tyki = KindLevel, mode_holes = hole_info
                          , mode_declaration = False
+                         , mode_family_arrow = Nothing
                          , mode_indices = emptyNameEnv
                          , mode_pending_calls = Nothing
                          , mode_synonym_metadata = if family_metadata then familyKindMetadata else Nothing
