@@ -34,18 +34,18 @@ import GHC.Driver.Env
 import GHC.Iface.Binary
 import GHC.Iface.Recomp.Binary (putNameLiterally)
 import GHC.Linker.Types
-import GHC.Settings.Constants (hiVersion)
 import GHC.Unit.Types
 import GHC.Utils.Binary
-import GHC.Utils.Fingerprint (Fingerprint, fingerprintFingerprints)
+import GHC.Utils.Fingerprint (Fingerprint(..), fingerprintFingerprints)
 import GHC.Utils.Logger
 import GHC.Utils.Panic
 import GHC.Utils.TmpFs
+import GHC.Version (cProjectVersionInt, cProjectPatchLevel1, cProjectPatchLevel2)
 
 import Data.ByteString (ByteString)
 import Data.ByteString qualified as BS
 import Data.Char (ord)
-import Data.List (sort)
+import Data.List (intercalate, sort)
 import Data.Traversable
 import Data.Word
 import System.Directory
@@ -96,10 +96,16 @@ are version-specific binary formats. Without a small file-level header, stale
 or corrupt files are only discovered once we start deserialising the payload,
 which can lead to confusing failures.
 
-To make these failures explicit, we write a file-kind-specific magic word and
-the current `hiVersion` ahead of the binary payload. Readers validate this
-header before setting up the normal `Name`/`FastString` deserialisation
-machinery. This follows the same approach as normal interface files.
+To make these failures explicit, we write a header ahead of the binary payload:
+
+  * a file-kind-specific magic word,
+  * the version of the compiler (`PersistentBytecodeVersion`),
+  * a hash: the `gbc_hash` of a bytecode file, or the inputs hash of a
+    bytecode library (see Note [Hash of bytecode libs]).
+
+We ensure everthing has a fixed length encoding (see
+`persistentBytecodeHeaderSize`, so that `readPersistentBytecodeHash` can read
+the hash without reading the rest of the file.
 
 Note [Hash of bytecode libs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -109,9 +115,9 @@ that relinking can be skipped when they haven't changed.
 We can't hash the library file itself: we would have to build the
 library to know which hash to expect. So we compare the inputs.
 
-The hash is written right after the file header. The constituent hashes
-are sorted before they are combined, so the order of the modules
-doesn't matter.
+The hash is part of the file header, see Note [Persistent bytecode file
+headers]. The constituent hashes are sorted before they are combined, so
+the order of the modules doesn't matter.
 -}
 
 -- | The hash a bytecode library records for its inputs, given the hash of
@@ -130,26 +136,21 @@ writeBytecodeLib inputs_hash lib path = do
   createDirectoryIfMissing True (takeDirectory path)
   bh' <- openBinMem initBinMemSize
   bh <- addBinNameWriter bh'
-  writePersistentBytecodeHeader BytecodeLibraryFile bh
-  put_ bh inputs_hash
+  writePersistentBytecodeHeader BytecodeLibraryFile inputs_hash bh
   putWithUserData QuietBinIFace NormalCompression bh odbco
   writeBinMem bh path
 
 readBytecodeLib :: HscEnv -> FilePath -> IO OnDiskBytecodeLib
 readBytecodeLib hsc_env path = do
   bh' <- readBinMem path
-  readPersistentBytecodeHeader BytecodeLibraryFile path bh'
-  _inputs_hash <- get bh' :: IO Fingerprint
+  _inputs_hash <- readPersistentBytecodeHeader BytecodeLibraryFile path bh'
   bh <- addBinNameReader (hsc_NC hsc_env) bh'
   res <- getWithUserData (hsc_NC hsc_env) bh
   pure res
 
 -- See Note [Hash of bytecode libs]
 readBytecodeLibInputsHash :: FilePath -> IO Fingerprint
-readBytecodeLibInputsHash path = do
-  bh <- readBinMem path
-  readPersistentBytecodeHeader BytecodeLibraryFile path bh
-  get bh
+readBytecodeLibInputsHash = readPersistentBytecodeHash BytecodeLibraryFile
 
 -- | Convert an 'OnDiskModuleByteCode' to an 'ModuleByteCode'.
 -- 'OnDiskModuleByteCode' is the representation which we read from a file,
@@ -235,14 +236,14 @@ readBinByteCode hsc_env f = do
   odbco <- readOnDiskModuleByteCode hsc_env f
   decodeOnDiskModuleByteCode hsc_env odbco
 
--- | Read only the hash from the start of a bytecode file
-readBinByteCodeHash :: HscEnv -> FilePath -> IO Fingerprint
-readBinByteCodeHash hsc_env f = odgbc_hash <$> readOnDiskModuleByteCode hsc_env f
+-- | Read the hash of a bytecode file, without reading the rest of the file.
+readBinByteCodeHash :: FilePath -> IO Fingerprint
+readBinByteCodeHash = readPersistentBytecodeHash ModuleByteCodeFile
 
 readOnDiskModuleByteCode :: HscEnv -> FilePath -> IO OnDiskModuleByteCode
 readOnDiskModuleByteCode hsc_env f = do
   bh' <- readBinMem f
-  readPersistentBytecodeHeader ModuleByteCodeFile f bh'
+  _hash <- readPersistentBytecodeHeader ModuleByteCodeFile f bh'
   bh <- addBinNameReader (hsc_NC hsc_env) bh'
   getWithUserData (hsc_NC hsc_env) bh
 
@@ -253,7 +254,7 @@ writeBinByteCode f cbc = do
   bh' <- openBinMem initBinMemSize
   bh <- addBinNameWriter bh'
   odbco <- encodeOnDiskModuleByteCode cbc
-  writePersistentBytecodeHeader ModuleByteCodeFile bh
+  writePersistentBytecodeHeader ModuleByteCodeFile (gbc_hash cbc) bh
   putWithUserData QuietBinIFace NormalCompression bh odbco
   writeBinMem bh f
 
@@ -281,18 +282,48 @@ data PersistentBytecodeFile
   = ModuleByteCodeFile
   | BytecodeLibraryFile
 
--- See Note [Persistent bytecode file headers]
-writePersistentBytecodeHeader :: PersistentBytecodeFile -> WriteBinHandle -> IO ()
-writePersistentBytecodeHeader file_kind bh = do
-  put_ bh (persistentBytecodeMagic file_kind)
-  put_ bh (show hiVersion)
+-- | The version of the compiler: major, minor, patch1, patch2
+data PersistentBytecodeVersion
+  = PersistentBytecodeVersion !Word32 !Word32 !Word32 !Word32
+  deriving Eq
 
-readPersistentBytecodeHeader :: PersistentBytecodeFile -> FilePath -> ReadBinHandle -> IO ()
+instance Binary PersistentBytecodeVersion where
+  put_ bh (PersistentBytecodeVersion a b c d) =
+    mapM_ (put_ bh . FixedLengthEncoding) [a, b, c, d]
+  get bh = PersistentBytecodeVersion <$> field <*> field <*> field <*> field
+    where field = unFixedLength <$> get bh
+
+persistentBytecodeVersion :: PersistentBytecodeVersion
+persistentBytecodeVersion =
+  PersistentBytecodeVersion
+    (version_int `div` 100) (version_int `mod` 100)
+    (read cProjectPatchLevel1) (read cProjectPatchLevel2)
+  where
+    version_int = read cProjectVersionInt
+
+showPersistentBytecodeVersion :: PersistentBytecodeVersion -> String
+showPersistentBytecodeVersion (PersistentBytecodeVersion a b c d) =
+  intercalate "." (map show [a, b, c, d])
+
+-- | The size in bytes of the header: the magic word, the version and the hash.
+-- See Note [Persistent bytecode file headers]
+persistentBytecodeHeaderSize :: Int
+persistentBytecodeHeaderSize = 4 + 4 * 4 + 2 * 8
+
+-- See Note [Persistent bytecode file headers]
+writePersistentBytecodeHeader :: PersistentBytecodeFile -> Fingerprint -> WriteBinHandle -> IO ()
+writePersistentBytecodeHeader file_kind (Fingerprint w1 w2) bh = do
+  put_ bh (persistentBytecodeMagic file_kind)
+  put_ bh persistentBytecodeVersion
+  put_ bh (FixedLengthEncoding w1)
+  put_ bh (FixedLengthEncoding w2)
+
+-- | Validate the header of a persistent bytecode file, and return its hash.
+readPersistentBytecodeHeader :: PersistentBytecodeFile -> FilePath -> ReadBinHandle -> IO Fingerprint
 readPersistentBytecodeHeader file_kind path bh = do
   let mismatch what expected actual =
-        throwGhcExceptionIO $ ProgramError $
-          persistentBytecodeFileDescription file_kind ++ " header mismatch in " ++ path ++
-          ": " ++ what ++ " (expected " ++ expected ++ ", got " ++ actual ++ ")"
+        headerMismatch file_kind path $
+          what ++ " (expected " ++ expected ++ ", got " ++ actual ++ ")"
 
   magic <- get bh
   let expected_magic = persistentBytecodeMagic file_kind
@@ -301,10 +332,30 @@ readPersistentBytecodeHeader file_kind path bh = do
     else mismatch "magic" (show $ unFixedLength expected_magic) (show $ unFixedLength magic)
 
   version <- get bh
-  let expected_version = show hiVersion
-  if version == expected_version
+  if version == persistentBytecodeVersion
     then pure ()
-    else mismatch "version" expected_version version
+    else mismatch "version"
+           (showPersistentBytecodeVersion persistentBytecodeVersion)
+           (showPersistentBytecodeVersion version)
+
+  w1 <- get bh
+  w2 <- get bh
+  pure (Fingerprint (unFixedLength w1) (unFixedLength w2))
+
+headerMismatch :: PersistentBytecodeFile -> FilePath -> String -> IO a
+headerMismatch file_kind path what =
+  throwGhcExceptionIO $ ProgramError $
+    persistentBytecodeFileDescription file_kind ++ " header mismatch in " ++ path ++
+    ": " ++ what
+
+-- | Read the hash from the header of a persistent bytecode file, without
+-- reading the rest of the file.
+readPersistentBytecodeHash :: PersistentBytecodeFile -> FilePath -> IO Fingerprint
+readPersistentBytecodeHash file_kind path = do
+  mb_bh <- readBinMemN persistentBytecodeHeaderSize path
+  case mb_bh of
+    Just bh -> readPersistentBytecodeHeader file_kind path bh
+    Nothing -> headerMismatch file_kind path "file too short"
 
 persistentBytecodeFileDescription :: PersistentBytecodeFile -> String
 persistentBytecodeFileDescription ModuleByteCodeFile = "bytecode file"

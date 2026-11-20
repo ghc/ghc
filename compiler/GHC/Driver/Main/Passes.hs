@@ -741,7 +741,7 @@ checkByteCodeInMemory hsc_env mod_sum mb_old_linkable =
               then case ms_bytecode_date mod_sum of
                      Nothing -> pure False
                      Just _ -> do
-                       disk_hash <- ByteCode.readBinByteCodeHash hsc_env
+                       disk_hash <- ByteCode.readBinByteCodeHash
                                       (ml_bytecode_file (ms_location mod_sum))
                        pure (disk_hash == linkableHash old_linkable)
               else pure True
