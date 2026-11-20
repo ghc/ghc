@@ -14,7 +14,7 @@ flags=(-B"$lib" -v0 -O0 -package-env - -i -i.
 
 mkdir provider hidden client
 cd provider
-cp "$src/"{Vector,Filter,LetFilter,BarProvider,DotHie,BarRank,RetainedDot,Builder,Functions}.hs .
+cp "$src/"{Vector,Filter,LetFilter,BarProvider,DotHie,BarRank,RetainedDot,Builder,Functions,NestedSignature,Nested}.hs .
 "$ghc" "${flags[@]}" -c Vector.hs BarRank.hs RetainedDot.hs Functions.hs
 "$ghc" "${flags[@]}" -fwrite-ide-info -c BarProvider.hs
 "$ghc" "${flags[@]}" -ddump-ds -ddump-stg-final -c Filter.hs >filter.log
@@ -25,6 +25,11 @@ grep -Eq 'unpack rest' let-filter.log
 "$ghc" "${flags[@]}" -fwrite-ide-info -ddump-ds -c Builder.hs >builder.log
 grep -Eq "pack \('Vector.S " builder.log
 test -s Builder.hie
+"$ghc" "${flags[@]}" -c NestedSignature.hs
+"$ghc" "${flags[@]}" -fwrite-ide-info -ddump-ds -ddump-stg-final -c Nested.hs >nested.log
+test -s Nested.hie
+grep -Eq '^[[:space:]]+\(pack ' nested.log
+grep -Eq 'unpack unpacked' nested.log
 sed -n '/Final STG:/,$p' filter.log >filter.stg
 test -s filter.stg
 if grep -Eiq '\b(Pack|Unpack|PackTag)\b' filter.stg; then
@@ -45,11 +50,11 @@ done
 IFS= read -r dot_hie < DotHie.hie
 IFS= read -r bar_hie < BarProvider.hie
 [[ $dot_hie == "HIE$(( ${bar_hie#HIE} + 1 ))" ]]
-mv -- Vector.hs Filter.hs LetFilter.hs BarProvider.hs RetainedDot.hs Builder.hs Functions.hs ../hidden/
+mv -- Vector.hs Filter.hs LetFilter.hs BarProvider.hs RetainedDot.hs Builder.hs Functions.hs NestedSignature.hs Nested.hs ../hidden/
 
 cd ../client
-cp ../provider/{Vector,Filter,LetFilter,BarProvider,RetainedDot,Builder,Functions}.hi .
-cp "$src/"{Main,AuditMain,Opening,Identity,RetainedClient,LinearDot,LambdaMain,CallHeadMain,WitnessMain,CaseMain}.hs .
+cp ../provider/{Vector,Filter,LetFilter,BarProvider,RetainedDot,Builder,Functions,NestedSignature,Nested}.hi .
+cp "$src/"{Main,AuditMain,Opening,Identity,RetainedClient,LinearDot,LambdaMain,CallHeadMain,WitnessMain,CaseMain,NestedMain}.hs .
 "$ghc" "${flags[@]}" -c Main.hs Identity.hs Opening.hs LinearDot.hs
 "$ghc" "${flags[@]}" -c AuditMain.hs -main-is AuditMain
 "$ghc" "${flags[@]}" Main.o ../provider/{Vector,Filter}.o -o run
@@ -69,6 +74,9 @@ grep -Eq 'firstPair @m unpacked unpacked' witness.log
 test -s CaseMain.hie
 grep -Eq 'unpack .*selection' case.log
 "$ghc" "${flags[@]}" CaseMain.o ../provider/{Vector,Filter}.o -o payload-case -main-is CaseMain
+"$ghc" "${flags[@]}" -ddump-ds -c NestedMain.hs -main-is NestedMain >nested-client.log
+grep -Eq 'unpack unpacked.*:: k_' nested-client.log
+"$ghc" "${flags[@]}" NestedMain.o ../provider/{Vector,NestedSignature,Nested}.o -o nested -main-is NestedMain
 ./run
 ./audit
 ./retained
@@ -76,11 +84,13 @@ grep -Eq 'unpack .*selection' case.log
 ./call-head
 ./witness
 ./payload-case
+./nested
 
 bad_sources=(UnsafeHead SameWitness Escape LetEscape BarClient ModesAreDistinct
              BarPack DotForall DotConstraint LinearDotDuplicate LambdaEscape
              IntroEscape Shadowed HiddenName BarLambda HeadEscape HeadSame HeadDuplicate
-             EscapePackage CaseEscape CaseLinearDuplicate BarCase)
+             EscapePackage CaseEscape CaseLinearDuplicate BarCase
+             NestedEscape NestedCapture NestedDuplicate NestedInnerBar)
 for bad in "${bad_sources[@]}"; do
     cp "$src/$bad.hs" .
     if "$ghc" "${flags[@]}" -c "$bad.hs" >"$bad.log" 2>&1; then
@@ -88,13 +98,13 @@ for bad in "${bad_sources[@]}"; do
         exit 1
     fi
     case "$bad" in
-        UnsafeHead|SameWitness|Escape|LetEscape|LambdaEscape|Shadowed|HeadEscape|HeadSame|CaseEscape) code=25897;;
-        BarClient|ModesAreDistinct|BarLambda|EscapePackage|BarCase) code=83865;;
+        UnsafeHead|SameWitness|Escape|LetEscape|LambdaEscape|Shadowed|HeadEscape|HeadSame|CaseEscape|NestedEscape) code=25897;;
+        BarClient|ModesAreDistinct|BarLambda|EscapePackage|BarCase|NestedInnerBar) code=83865;;
         BarPack) code=27432;;
         DotForall|DotConstraint) code=91510;;
-        LinearDotDuplicate|HeadDuplicate|CaseLinearDuplicate) code=18872;;
+        LinearDotDuplicate|HeadDuplicate|CaseLinearDuplicate|NestedDuplicate) code=18872;;
         IntroEscape) code=46956;;
-        HiddenName) code=76037;;
+        HiddenName|NestedCapture) code=76037;;
     esac
     if [[ $bad == LetEscape ]]; then
         for binding in bad different; do
@@ -132,3 +142,11 @@ if grep -Eq '\[GHC-39999\]' witness-rejections.log; then
     cat witness-rejections.log >&2
     exit 1
 fi
+
+for binding in first second equalLengths knownKind; do
+    line=$(grep -n "^$binding .*=" NestedEscape.hs | cut -d: -f1)
+    if ! grep -Eq "^NestedEscape.hs:$line:[0-9]+: error: \[GHC-25897\]" NestedEscape.log; then
+        cat NestedEscape.log >&2
+        exit 1
+    fi
+done

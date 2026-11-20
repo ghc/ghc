@@ -295,3 +295,26 @@ synonym alone continues to match the package. A case that consumes
 a linear package still checks the usage of its fields. Direct
 constructor matching applies to the dot mode. The bar mode keeps
 its explicit Pack alternative.
+
+
+### A package with nested dot binders
+
+A partition can return one package that hides both output lengths.
+
+```haskell
+type PackedPair a = exists (n :: Nat). exists (m :: Nat). (Vec n a, Vec m a)
+```
+
+The first binder is in scope in the second binder's kind and in
+the payload. Checking the payload chooses witnesses in that order.
+Core wraps the checked payload with an inner Pack and an outer
+Pack. An application that requests the payload opens consecutive
+dot binders with separate skolems. The result type stays outside both scopes. An inner bar package requires explicit elimination.
+
+The partition uses a lazy pair pattern in each recursive branch.
+The source-free client reads each output's first cell with a bottom
+tail. A consumer can also ignore a bottom package. Inspecting the
+payload pair forces it. Both length witnesses stay independent,
+including after interface readback. The dependent-kind control
+checks `exists (k :: Type). exists (v :: k). Proxy v`.
+[Elab-Gen and Elab-IExist in An Existential Crisis Resolved](https://richarde.dev/papers/2021/exists/exists.pdf).

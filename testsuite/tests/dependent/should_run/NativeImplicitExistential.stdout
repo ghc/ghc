@@ -19,3 +19,8 @@ forcing the result entered the builder body
 ([7],[7],[7])
 (True,True)
 constructor pattern demanded the package
+([7,9],[2])
+([7],[2,4])
+([7],[2],([True],[]),([],[9]))
+(True,True)
+observing the payload demanded the pair
