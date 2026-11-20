@@ -16,6 +16,9 @@ import GHC.Core
 import GHC.Core.Coercion (liftCoSubst, mkCoVarCo, mkLiftingContext, mkSubCo)
 import GHC.Core.Coercion.Axiom (Role(..))
 import GHC.Core.Dependent (hasExistentialExpr)
+import GHC.Core.FamInstEnv (emptyFamInstEnv)
+import GHC.Core.Opt.OccurAnal (SimplCoreMode(RetainedCore))
+import GHC.Core.Opt.WorkWrap (wwTopBinds)
 import GHC.Core.Lint (lintExpr)
 import GHC.Core.Predicate (mkNomEqPred, mkReprEqPred)
 import GHC.Core.Make (mkCharExpr, mkListExpr, mkNothingExpr, mkRuntimeErrorApp, pAT_ERROR_ID)
@@ -29,6 +32,7 @@ import GHC.CoreToStg.Prep (corePrepExpr)
 import GHC.CoreToIface (toIfaceExpr, toIfaceType)
 import GHC.Data.FastString (fsLit)
 import GHC.Driver.Config.Core.Lint (initLintConfig)
+import GHC.Driver.Config.Core.Opt.WorkWrap (initWorkWrapOpts)
 import GHC.Driver.Config.CoreToStg (initCoreToStgOpts)
 import GHC.Driver.Config.CoreToStg.Prep (initCorePrepConfigFor)
 import GHC.Driver.Env (hscInterp)
@@ -91,12 +95,12 @@ main = do
     throws False ForcePack "demanding Pack observes payload bottom"
     returns False Computed "Unpack leaves a computed package unevaluated"
     checkLiftingReadback libdir (interfaceFile ++ ".lift")
-    checkAdjacentErasure libdir
+    checkPackageOptimizers libdir
 
--- Preserve an invalid witness escape for Core Lint.
-checkAdjacentErasure :: FilePath -> IO ()
-checkAdjacentErasure libdir = session libdir $ \env _ -> do
-    schemaId : witnessId : payloadId : _ <- uniqsFromSupply <$> mkSplitUniqSupply PluginTag
+-- Check package scope in SimpleOpt and worker/wrapper before native lowering.
+checkPackageOptimizers :: FilePath -> IO ()
+checkPackageOptimizers libdir = session libdir $ \env _ -> do
+    schemaId : witnessId : payloadId : topId : _ <- uniqsFromSupply <$> mkSplitUniqSupply PluginTag
     let tv unique name = mkTyVar (mkSysTvName unique (fsLit name)) liftedTypeKind
         schemaArg = tv schemaId "a"
         witness = tv witnessId "witness"
@@ -112,6 +116,15 @@ checkAdjacentErasure libdir = session libdir $ \env _ -> do
     unless (hasExistentialExpr escaped' && isJust (lint escaped') && isJust (lint escaped)) $
         fail "SimpleOpt hid an escaping existential witness"
     putStrLn "adjacent package reduction preserves witness scope"
+    supply <- mkSplitUniqSupply PluginTag
+    let mdl = mkModule mainUnit (mkModuleName "PackageWorker")
+        opts = initWorkWrapOpts mdl (hsc_dflags env) (emptyFamInstEnv, emptyFamInstEnv)
+        top = mkSysLocal (fsLit "top") topId manyDataConTy boolTy
+        rhs = Unpack witness payload package true
+    case wwTopBinds RetainedCore opts supply [NonRec top rhs] of
+      [NonRec _ result@(Unpack _ _ Pack{} _)] | isNothing (lint result) ->
+        putStrLn "worker/wrapper preserves the scope of an opened package"
+      _ -> fail "worker/wrapper changed the package or its scope"
 
 -- | Restore a package cast whose only evidence for its free parameter is a Given.
 checkLiftingReadback :: FilePath -> FilePath -> IO ()

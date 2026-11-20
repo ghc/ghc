@@ -136,6 +136,14 @@ wwExpr ww_opts (Lam binder expr)
 wwExpr ww_opts (App f a)
   = App <$> wwExpr ww_opts f <*> wwExpr ww_opts a
 
+wwExpr ww_opts (Pack schema witness payload)
+  = Pack schema witness <$> wwExpr ww_opts payload
+
+wwExpr ww_opts (Unpack witness binder package body)
+  = Unpack witness (zapIdUsedOnceInfo binder)
+      <$> wwExpr ww_opts package <*> wwExpr ww_opts body
+  -- See Note [Zapping Used Once info in WorkWrap]
+
 wwExpr ww_opts (Tick note expr)
   = Tick note <$> wwExpr ww_opts expr
 
