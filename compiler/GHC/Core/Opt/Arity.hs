@@ -1657,8 +1657,25 @@ idArityType v
   where
     id_ty = idType v
 
-    one_shots :: [(Cost,OneShotInfo)]  -- One-shot-ness derived from the type
-    one_shots = repeat IsCheap `zip` typeOneShots id_ty
+    -- One-shot-ness derived from the type, and from the lambdas of the
+    -- unfolding if there is one
+    one_shots :: [(Cost,OneShotInfo)]
+    one_shots = repeat IsCheap `zip`
+                zipWith bestOneShot (typeOneShots id_ty)
+                                    (unf_one_shots ++ repeat NoOneShotInfo)
+
+    unf_one_shots = maybe [] lamOneShots $
+                    maybeUnfoldingTemplate (realIdUnfolding v)
+
+-- | The one-shot info of the leading value lambdas of an expression
+lamOneShots :: CoreExpr -> [OneShotInfo]
+lamOneShots (Lam b e)
+  | isId b                 = idOneShotInfo b : lamOneShots e
+  | otherwise              = lamOneShots e
+lamOneShots (Cast e _)     = lamOneShots e
+lamOneShots (Tick t e)
+  | not (tickishIsCode t)  = lamOneShots e
+lamOneShots _              = []
 
 --------------------
 cheapArityType :: HasDebugCallStack => CoreExpr -> ArityType
