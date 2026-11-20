@@ -81,3 +81,11 @@ typeHeads :: ( N.TypeHead ('Just Bool) :~: Int, N.TypeHead ('Just Ordering) :~: 
              , N.WrappedBool ('Just (Maybe Bool)) :~: Int
              , N.WrappedBool ('Just (Maybe Char)) :~: () )
 typeHeads = (Refl, Refl, Refl, Refl, Refl, Refl, Refl, Refl, Refl)
+
+transparentAliases ::
+  ( N.PickFlipped ('Just (Maybe (Either Char Bool))) :~: Proxy Char
+  , N.PickFlipped ('Just (Maybe (Either Bool Char))) :~: ()
+  , N.DiscardConstant ('Just (Maybe Ordering)) :~: Proxy Ordering
+  , N.CaptureFlipped 'LT ('Just (Either Char Bool)) :~: '(Proxy 'LT, Proxy Bool, Proxy Char)
+  , N.WrittenFirst ('Just (Either unknown Char)) :~: Int )
+transparentAliases = (Refl, Refl, Refl, Refl, Refl)

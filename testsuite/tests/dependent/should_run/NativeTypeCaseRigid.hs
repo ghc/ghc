@@ -28,3 +28,9 @@ typeHead _ = Refl
 
 stuckTypeHead :: Proxy a -> N.UniformTypeHead ('Just (Unknown a)) :~: Int
 stuckTypeHead _ = Refl
+
+writtenFirst :: Proxy x -> N.WrittenFirst ('Just (Either Char x)) :~: Int
+writtenFirst _ = Refl
+
+wrongAliasField :: N.PickFlipped ('Just (Maybe (Either Char Bool))) :~: Proxy Bool
+wrongAliasField = Refl

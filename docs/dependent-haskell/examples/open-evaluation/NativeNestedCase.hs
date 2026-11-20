@@ -2,6 +2,7 @@
 module NativeNestedCase
   ( Pick, Pair(..), LeftFirst, IgnoreLeft, Uniform, SameFallback
   , Indexed(..), IndexedPick, TypeHead, UniformTypeHead, Wrapped, WrappedBool
+  , PickFlipped, DiscardConstant, CaptureFlipped, WrittenFirst
   ) where
 
 import Data.Kind (Type)
@@ -67,3 +68,25 @@ type WrappedBool (m :: Maybe Type) = case m of
   Just (Optional Bool) -> Int
   Just _ -> ()
   Nothing -> ()
+
+type Flip a b = Either b a
+type Discard a b = Maybe b
+
+type PickFlipped (m :: Maybe Type) = case m of
+  Just (Maybe (Flip Bool left)) -> Proxy left
+  Just _ -> ()
+  Nothing -> ()
+
+type DiscardConstant (m :: Maybe Type) = case m of
+  Just (Discard Bool a) -> Proxy a
+  Just _ -> ()
+  Nothing -> ()
+
+type CaptureFlipped (tag :: k) (m :: Maybe Type) = case m of
+  Just (Flip a b) -> '(Proxy tag, Proxy a, Proxy b)
+  Nothing -> '((), (), ())
+
+type WrittenFirst (m :: Maybe Type) = case m of
+  Just (Flip Bool Ordering) -> Int
+  Just _ -> Int
+  Nothing -> Int
