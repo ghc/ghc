@@ -6,7 +6,7 @@ import Control.Monad (unless)
 import Data.Bool (bool)
 import Data.IORef (newIORef, readIORef)
 import Data.Proxy (Proxy(..))
-import Filter (Hidden, filterVec, fromList, partitionVec, toList)
+import Filter (Hidden, familyHide, filterVec, fromList, partitionVec, toList)
 import ForwardSchemas
 import Nested (packPair)
 import NestedSignature (PackedPair)
@@ -121,6 +121,7 @@ main = do
             putStrLn "selected package raised the original exception"
         _ -> fail "unexpected package demand"
     print (partitionHeads (Cons 7 (Cons 2 (error "unused partition tail"))))
+    print (fmap toList (familyHide (Cons 13 Nil) :: Maybe (Hidden Int)))
     let oddCells = filterVec odd (Cons 7 (error "unused odd tail"))
         evenCells = filterVec even (Cons 2 (error "unused even tail"))
         unused = error "unused conditional branch"

@@ -1,5 +1,5 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
-module Filter (Hidden, FilteredWith, SameLength, Product(..), ProductWith, ProductSame,
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, ScopedTypeVariables, TypeFamilies #-}
+module Filter (Hidden, familyHide, FilteredWith, SameLength, Product(..), ProductWith, ProductSame,
                makeProduct, filterVec, partitionVec, toList, fromList) where
 import Vector
 
@@ -16,6 +16,15 @@ type ProductSame a = exists (m :: Nat). Product (Vec m a) (Vec m a)
 -- | Construct the fields of the product in declaration order.
 makeProduct :: a -> b -> Product a b
 makeProduct a b = Product a b
+
+hide :: Vec n a -> Hidden a
+hide xs = xs
+
+type family FamilyHidden a where
+    FamilyHidden a = Maybe (Hidden a)
+
+familyHide :: forall a n. Vec n a -> FamilyHidden a
+familyHide xs = (Just (hide xs) :: Maybe (Hidden a))
 
 filterVec :: (a -> Bool) -> Vec n a -> Hidden a
 filterVec _ Nil = Nil

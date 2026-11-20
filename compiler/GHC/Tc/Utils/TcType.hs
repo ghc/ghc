@@ -1019,6 +1019,8 @@ tcTyFamInstsAndVisX = go
     go is_invis_arg (ForAllTy ma bndr ty) = go True ma
                                          ++ go is_invis_arg (binderType bndr)
                                          ++ go is_invis_arg ty
+    go is_invis_arg (ExistsTy _ v ty)    = go is_invis_arg (varType v)
+                                         ++ go is_invis_arg ty
     go is_invis_arg (FunTy _ ma w ty1 ty2) = go True ma
                                          ++ go is_invis_arg ty1
                                          ++ go is_invis_arg w
