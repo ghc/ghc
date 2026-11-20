@@ -237,6 +237,12 @@ libCase env e@(App {})          | let (fun, args) = collectArgs e
 libCase env (App fun arg)       = App (libCase env fun) (libCase env arg)
 libCase env (Tick tickish body) = Tick tickish (libCase env body)
 libCase env (Cast e co)         = Cast (libCase env e) co
+libCase env (Pack schema witness payload)
+  = Pack schema witness (libCase env payload)
+-- Unpack is lazy. Its binders enter the scope at the current level.
+libCase env (Unpack witness payload package body)
+  = Unpack witness payload (libCase env package)
+           (libCase (addBinders env [witness, payload]) body)
 
 libCase env (Lam binder body)
   = Lam binder (libCase (addBinders env [binder]) body)

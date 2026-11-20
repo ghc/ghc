@@ -7,6 +7,7 @@ demanding Pack observes payload bottom
 Unpack leaves a computed package unevaluated
 adjacent package reduction preserves witness scope
 call arity preserves the scope of an opened package
+liberate-case distinguishes an outer variable from a hidden payload
 worker/wrapper preserves the scope of an opened package
 the dead-end check distinguishes a lazy opening from a demanded payload
 expression keys distinguish erased witnesses and identify alpha-renamed openings

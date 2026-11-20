@@ -18,6 +18,8 @@ import GHC.Core.Coercion.Axiom (Role(..))
 import GHC.Core.Dependent (hasExistentialExpr, supportsNativeGentle)
 import GHC.Core.FamInstEnv (emptyFamInstEnv)
 import GHC.Core.Opt.Arity (exprIsDeadEnd)
+import GHC.Core.Opt.LiberateCase (LibCaseOpts(lco_threshold), liberateCase)
+import GHC.Driver.Config.Core.Opt.LiberateCase (initLiberateCaseOpts)
 import GHC.Core.Opt.Exitify (exitifyProgram)
 import GHC.Core.Opt.CallArity (callArityRHS)
 import GHC.Core.Opt.OccurAnal (SimplCoreMode(RetainedCore))
@@ -53,7 +55,7 @@ import GHC.Runtime.Interpreter (evalString)
 import GHC.Stg.Syntax (GenStgBinding (StgNonRec), GenStgExpr (StgApp, StgCase),
                        StgArg (StgVarArg), GenStgRhs (StgRhsClosure), GenStgTopBinding (StgTopLifted), StgTopBinding)
 import GHC.Tc.Utils.Monad (initIfaceLcl, initIfaceLoad)
-import GHC.Types.Id (asJoinId, isJoinId, mkExportedVanillaId, mkSysLocal, realIdUnfolding)
+import GHC.Types.Id (asJoinId, isJoinId, setIdArity, mkExportedVanillaId, mkSysLocal, realIdUnfolding)
 import GHC.Types.Name (mkExternalName, mkSysTvName, mkSystemName)
 import GHC.Types.Name.Occurrence (mkVarOcc)
 import GHC.Types.SrcLoc (noSrcSpan)
@@ -129,6 +131,28 @@ checkPackageOptimizers libdir = session libdir $ \env _ -> do
     unless (hasExistentialExpr called && isNothing (lint called)) $
         fail "call arity changed the package or its scope"
     putStrLn "call arity preserves the scope of an opened package"
+    outerId : loopId : argId : qId : rId : _ <- uniqsFromSupply <$> mkSplitUniqSupply PluginTag
+    let local u name ty = mkSysLocal (fsLit name) u manyDataConTy ty
+        outer = local outerId "outer" boolTy
+        loopTy = mkVisFunTyManyU boolTy boolTy
+        loop = setIdArity (local loopId "loop" loopTy) 1
+        arg = local argId "arg" boolTy
+        call = App (Var loop) (Var arg)
+        inspect v u = Case (Var v) (local u "forced" (varType v)) boolTy [Alt DEFAULT [] call]
+        hidden = Pack (ExistsTy ExplicitExists schemaArg (TyVarTy schemaArg)) boolTy (inspect outer qId)
+        recBody = Lam arg (Unpack witness payload hidden (inspect payload rId))
+        recursive = Lam outer (Let (Rec [(loop, recBody)]) (App (Var loop) true))
+    unless (isNothing (lint recursive)) $ fail "Invalid liberate-case fixture"
+    -- Size calculation treats a package as too large to duplicate.
+    -- Remove the threshold here to exercise the recursive-call transformation.
+    let libOpts = (initLiberateCaseOpts (hsc_dflags env)) { lco_threshold = Nothing }
+    case liberateCase libOpts [NonRec (local topId "f" loopTy) recursive] of
+      [NonRec _ out@(Lam _ (Let (Rec [(_, Lam _ (Unpack _ _ (Pack _ _ packed) body))]) _))]
+        | Case _ _ _ [Alt DEFAULT [] (Let Rec{} _)] <- packed
+        , Case _ _ _ [Alt DEFAULT [] App{}] <- body
+        , isNothing (lint out) ->
+          putStrLn "liberate-case distinguishes an outer variable from a hidden payload"
+      _ -> fail "liberate-case lost the scope of an opened package"
     case wwTopBinds RetainedCore opts supply [NonRec top called] of
       [NonRec _ result@(Unpack _ _ Pack{} _)] | isNothing (lint result) ->
         putStrLn "worker/wrapper preserves the scope of an opened package"
