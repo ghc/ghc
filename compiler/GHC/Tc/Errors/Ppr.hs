@@ -5114,6 +5114,7 @@ pprMismatchMsg ctxt
              n | n > 0   -- we don't know how many args there are, so don't
                          -- recommend removing args that aren't
                , Just thing <- mb_thing
+               , not (stuck_family_result ty1 || stuck_family_result ty2)
                , not (typeKind ty1 `tcEqType` matchabilityTy &&
                       typeKind ty2 `tcEqType` matchabilityTy)
                  -- See Note [Argument counts in kind errors].
@@ -5125,6 +5126,13 @@ pprMismatchMsg ctxt
     maybe_num_args_msg = num_args_msg `orElse` empty
 
     count_args ty = let (_, binders, _) = splitPiTys ty in count isVisiblePiTyBinder binders
+
+    stuck_family_result ty
+      | (_, _, result) <- splitPiTys ty
+      , Just (tc, _) <- splitTyConApp_maybe result
+      = isTypeFamilyTyCon tc
+      | otherwise
+      = False
 
     ppr_torc TypeLike       = text "type";
     ppr_torc ConstraintLike = text "constraint"
@@ -5204,6 +5212,9 @@ reduces to Type -> @U Type, then Maybe :: F True has one arrow on each
 side. Decomposition leaves M ~ U. Report that mismatch even though
 counting the visible binders of F True gives zero. Keep the arity hint
 when a family reduces to Type and the caller really omitted an argument.
+If a family remains at the end of either kind in the solver's residual
+equality, its result can still supply visible binders. Suppress the hint
+because the visible binder count is incomplete.
 -}
 
 pprQCOriginExtra :: ErrorItem -> SDoc
