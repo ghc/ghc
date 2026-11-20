@@ -151,6 +151,7 @@ safeHead of a known list cell: False
 safeHead at length 1 + n: True
 runtime sum and appended vector: (3,[True,False,False])
 split the appended vector at its first length: ([True],[False,False])
+reassemble the same two vector elements: [True,False]
 outer successor ignores the second addend: True
 replicate at a computed runtime length: [True,True,True]
 grow at a locally named runtime index: ("xxx",'x')

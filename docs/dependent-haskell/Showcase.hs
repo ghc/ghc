@@ -83,6 +83,7 @@ import GHC.TypeLits (charVal)
 import qualified IndexBetaClient as IndexBeta
 import qualified IndexedMark
 import qualified IndexedVec
+import qualified VectorSplitObservation
 import qualified KnownArgumentClient as Known
 import qualified Language.Haskell.TH as TH
 import qualified LocalOpen
@@ -1466,6 +1467,10 @@ sourceAddition = do
     observe "runtime sum and appended vector" (natToInt (n + m), toList joined)
     observe "split the appended vector at its first length"
         (toList (fst split), toList (snd split))
+    case (Refl :: VectorSplitObservation.reassembleTwo ('VCons 'True ('VCons 'False 'VNil))
+               :~: 'VCons 'True ('VCons 'False 'VNil)) of
+        Refl -> observe "reassemble the same two vector elements"
+            (toList (VectorSplitObservation.reassembleTwo (VCons True (VCons False VNil))))
     observe "outer successor ignores the second addend" (isSuccessor (1 + undefined))
 
     let filled :: Vec Bool (n + m)
