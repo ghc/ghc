@@ -132,6 +132,8 @@ import qualified PreludePairExport
 import qualified OpaqueCallClient as Opaque
 import qualified PairProjection as ComputedProjection
 import qualified OrdinaryVecClient as Ordinary
+import qualified ConservedPartition
+import qualified GHC.Sigma as Sigma
 import qualified ListVectorClient
 import qualified ParameterizedIndexLibrary as Parameterized
 import qualified PackedProjection
@@ -1272,6 +1274,12 @@ main = do
     partitionInput <- newIORef [3, 1, 4, 2] >>= readIORef
     observe "regroup both partitions at the original length"
         (ListVectorClient.regroupObservation (> cutoff) partitionInput)
+    case ListVectorClient.fromList partitionInput of
+        Sigma.Pair total values ->
+            let split = ConservedPartition.partitionVec (> cutoff) values
+                select kept = ListVectorClient.choosePartition @Int (type total) kept split
+                    (\n cells -> (natToInt n, toList cells))
+            in observe "choose either partition at a runtime input length" (select True, select False)
 
 -- | Complement one flag at the type level.
 type family FlipFlag (b :: Bool) :: Bool where

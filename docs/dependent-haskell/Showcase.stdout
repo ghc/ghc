@@ -338,3 +338,4 @@ use a checked cons rule without forcing the callback, head or tail: (Refl,True)
 compose two checked traversals without forcing the inner callback: (Refl,True)
 collect row heads with an ordinary polymorphic callback: Refl
 regroup both partitions at the original length: (4,[3,4,1,2])
+choose either partition at a runtime input length: ((2,[3,4]),(2,[1,2]))
