@@ -35,6 +35,7 @@ import GHC.Core.Coercion hiding( substCo )
 import GHC.Core.Rules
 import GHC.Core.Predicate ( scopedSort, typeDeterminesValue )
 import GHC.Core.Type     hiding ( substTy )
+import GHC.Core.TyCo.Rep (Type(DepFunTy))
 import GHC.Core.TyCon   (TyCon, tyConName )
 import GHC.Core.Multiplicity
 import GHC.Core.Ppr     ( pprParendExpr )
@@ -1113,7 +1114,8 @@ extendCaseBndrs :: ScEnv -> OutExpr -> OutId -> AltCon -> [Var] -> (ScEnv, [Var]
 -- we want to bind b, to (C x y)
 -- NB1: Extends only the sc_vals part of the envt
 -- NB2: Kill the dead-ness info on the pattern binders x,y, since
---      they are potentially made alive by the [b -> C x y] binding
+--      they are potentially made alive by the [b -> C x y] binding.
+--      Use these live binders in the constructor value recorded for b.
 extendCaseBndrs env scrut case_bndr con alt_bndrs
    = (env2, alt_bndrs')
  where
@@ -1135,7 +1137,7 @@ extendCaseBndrs env scrut case_bndr con alt_bndrs
                 DataAlt {} -> Just (ConVal True con vanilla_args)
                       where
                         vanilla_args = map Type (tyConAppArgs (idType case_bndr)) ++
-                                       varsToCoreExprs alt_bndrs
+                                       varsToCoreExprs alt_bndrs'
 
    zap v | isTyVar v = v                -- See NB2 above
          | otherwise = zapIdOccInfo v
@@ -1532,6 +1534,35 @@ scExpr' env (Cast e co)  = do (usg, e', ws) <- scExpr env e
                               return (usg, mkCast e' (scSubstCo env co), ws)
                               -- Important to use mkCast here
                               -- See Note [SpecConstr call patterns]
+scExpr' env (Pack schema witness payload)
+  -- See Note [Specialising dependent Core].
+  = do { let !(MkSolo schema') = scSubstTy env schema
+             !(MkSolo witness') = scSubstTy env witness
+       ; (usg, payload', ws) <- scExpr env payload
+       ; return (usg, Pack schema' witness' payload', ws) }
+scExpr' env (Unpack witness payload package body)
+  = do { (pkg_usg, package', pkg_ws) <- scExpr env package
+       ; let (w_env, witness') = extendBndr env witness
+             (body_env, payload') = extendBndr w_env payload
+       ; (body_usg, body', body_ws) <- scExpr body_env body
+       ; return (combineUsage pkg_usg body_usg, Unpack witness' payload' package' body',
+                 combineSpecWarning pkg_ws body_ws) }
+{- Note [Specialising dependent Core]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A Pack carries its schema and witness as type arguments. Apply the same
+substitution to those types as to an ordinary type argument. Calls in the
+payload still contribute to specialisation. An Unpack binds the witness
+in the payload's type and both binders in the body. Check the package in
+the outer environment and combine the calls from both expressions.
+
+A retained case can bind a nominal proof after the constructor fields.
+Keep such a case intact. A constructor value describes only the fields
+and cannot supply that proof. Keep the constructor occurrence unknown
+when its alternative binds this evidence. For a retained application the argument domain is the
+type of the value binder. applyTypeToArgs substitutes the selected
+argument pattern in the rest of the telescope.
+-}
+
 scExpr' env e@(App _ _)  = scApp env (collectArgs e)
 scExpr' env (Lam b e)    = do let (env', b') = extendBndr env b
                               (usg, e', ws) <- scExpr env' e
@@ -1546,7 +1577,8 @@ scExpr' env (Case scrut b ty alts)
   = do  { (scrut_usg, scrut', ws) <- scExpr env scrut
         ; case isValue (sc_vals env) scrut' of
                 Just (ConVal args_are_work_free con args)
-                   | args_are_work_free -> sc_con_app con args scrut' ws
+                   | args_are_work_free, not (any binds_index_evidence alts)
+                   -> sc_con_app con args scrut' ws
                      -- Don't duplicate work!!  #7865
                      -- See Note [ConVal work-free-ness] (1)
                 _other -> sc_vanilla scrut_usg scrut' ws
@@ -1577,14 +1609,20 @@ scExpr' env (Case scrut b ty alts)
 
     single_alt = isSingleton alts
 
-    sc_alt env scrut' b' (Alt con bs rhs)
+    -- Constructor arguments do not include the nominal branch proof.
+    -- See Note [Specialising dependent Core].
+    binds_index_evidence alt = isNativeIndexAlt alt || isNativeIndexAliasAlt alt
+
+    sc_alt env scrut' b' alt@(Alt con bs rhs)
      = do { let (env1, bs1) = extendBndrsWith RecArg env bs
-                (env2, bs2) = extendCaseBndrs env1 scrut' b' con bs1
+                (env2, bs2) | binds_index_evidence alt = (env1, bs1)
+                            | otherwise = extendCaseBndrs env1 scrut' b' con bs1
           ; (usg, rhs', ws) <- scExpr env2 rhs
           ; let (usg', b_occ:|arg_occs) = lookupOccs usg (b':|bs2)
                 scrut_occ = case con of
                                DataAlt dc -- See Note [Do not specialise evals]
-                                  | not (single_alt && all deadArgOcc arg_occs)
+                                  | not (binds_index_evidence alt)
+                                  , not (single_alt && all deadArgOcc arg_occs)
                                   -> ScrutOcc (unitUFM dc arg_occs)
                                _  -> UnkOcc
           ; return (usg', b_occ `combineOcc` scrut_occ, Alt con bs2 rhs', ws) }
@@ -2688,8 +2726,8 @@ argsToPats env in_scope val_env = go
            ; pats <- go (applyTypeToArgs fun_ty [sndOf3 pat]) args occs strs'
            ; return (pat : pats) }
       where
-        (_, arg_bndr, _) = splitPiTy fun_ty
-        arg_ty = piTyBinderType arg_bndr
+        arg_ty | DepFunTy _ binder _ <- coreFullView fun_ty = varType binder
+               | otherwise = let (_, bndr, _) = splitPiTy fun_ty in piTyBinderType bndr
 
 -- | 'argToPat' takes an actual argument, and returns an abstracted
 -- version, consisting of just the "constructor skeleton" of the
