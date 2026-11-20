@@ -282,7 +282,7 @@ test('NativeTypeCaseReify',
 test('NativeSimplifier',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['NativeSimplifierProvider.hs', 'NativeSimplifierClient.hs',
-                   'NativeSimplifierLocalRec.hs', 'NativePackageRuleClient.hs',
+                   'NativeSimplifierLocalRec.hs', 'NativePackageRuleClient.hs', 'NativePackageSpecialise.hs',
                    '../../../../docs/dependent-haskell/examples/erased-existentials/PackageRules.hs'])],
      run_command, ['bash NativeSimplifier.sh "{compiler}" "{libdir}"'])
 

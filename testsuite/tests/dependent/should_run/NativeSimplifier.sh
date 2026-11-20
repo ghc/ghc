@@ -7,7 +7,7 @@ trap 'rm -rf "$tmp"' EXIT
 cd "$tmp"
 g=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint -fdiagnostics-color=never)
 flags=(-fomit-interface-pragmas -fno-write-if-simplified-core)
-for level in 0 1; do
+for level in 0 1 2; do
     mkdir "O$level"
     (
         cd "O$level"
@@ -16,7 +16,7 @@ for level in 0 1; do
             "${g[@]}" "-O$level" "${flags[@]}" -ddump-simpl-iterations -ddump-worker-wrapper \
                 -c "$module.hs" >"$module.log" 2>&1 || { cat "$module.log"; exit 1; }
             grep -Fq 'Simplifier iteration=1' "$module.log" || { cat "$module.log"; exit 1; }
-            if [[ "$level" == 1 ]]; then
+            if [[ "$level" != 0 ]]; then
                 grep -Fq 'Worker Wrapper binds' "$module.log" || { cat "$module.log"; exit 1; }
             fi
         done
@@ -29,6 +29,7 @@ for level in 0 1; do
     )
 done
 diff -u O0/client/observed O1/client/observed
+diff -u O0/client/observed O2/client/observed
 
 cd O1
 reject() {
@@ -40,7 +41,7 @@ reject() {
         exit 1
     fi
 }
-reject 'optimized module compilation with these options' -O2 "${flags[@]}" -c NativeSimplifierProvider.hs
+reject 'optimized module compilation with these options' -O2 -fno-spec-constr "${flags[@]}" -c NativeSimplifierProvider.hs
 reject 'optimized module compilation with these options' -O1 "${flags[@]}" -fno-worker-wrapper -c NativeSimplifierProvider.hs
 "${g[@]}" -O1 -fno-write-if-simplified-core -fforce-recomp -c NativeSimplifierProvider.hs
 cp NativeSimplifierProvider.hi client/
@@ -65,10 +66,12 @@ cat >>LocalRuleProvider.hs <<'SRC'
 SRC
 reject '[GHC-51063]' -O1 "${flags[@]}" -c LocalRuleProvider.hs
 grep -Fq 'dependent keep' reject.log
+reject '[GHC-51063]' -O2 "${flags[@]}" -c LocalRuleProvider.hs
+grep -Fq 'at -O2.' reject.log
 cat client/observed
 
 cd "$tmp"
-for level in 0 1; do
+for level in 0 1 2; do
     mkdir -p "rule$level/client"
     (
         cd "rule$level"
@@ -79,7 +82,7 @@ for level in 0 1; do
         cp PackageRules.hi "$area/NativePackageRuleClient.hs" client/
         cd client
         "${g[@]}" "-O$level" "${extra[@]}" -ddump-rule-firings -c NativePackageRuleClient.hs >client.log
-        if [[ $level == 1 ]]; then
+        if [[ $level != 0 ]]; then
             grep -Fq 'Rule fired: open/hide (PackageRules)' ../provider.log
             grep -Fq 'Rule fired: open/hide (PackageRules)' client.log
         fi
@@ -88,4 +91,10 @@ for level in 0 1; do
     )
 done
 diff -u rule0/client/observed rule1/client/observed
+diff -u rule0/client/observed rule2/client/observed
 cat rule1/client/observed
+
+cp "$area/NativePackageSpecialise.hs" .
+"${g[@]}" -O2 -ddump-spec-constr NativePackageSpecialise.hs -o specialise >specialise.log
+grep -Eq 'SC:[^"]*loop' specialise.log || { cat specialise.log; exit 1; }
+./specialise
