@@ -1196,6 +1196,14 @@ main = do
             ('Just ('NativeNestedCase.RefinedBranch 'Proxy 'NativeNestedCase.InnerDisjoint))
         , 'x' :: NativeNestedCase.RefinedBranchPick 'False ('Just 'NativeNestedCase.OuterDisjoint) )
     observe "choose types in ordinary and rank-n constructor fields" constructorFieldCases
+    let fieldResult b = case NativeNestedCase.retainedCaseField of
+            NativeNestedCase.RetainedCaseField choose ->
+                if b then show (choose True :: Int) else [choose False]
+    fieldFlag <- newIORef True
+    firstField <- fieldResult <$> readIORef fieldFlag
+    writeIORef fieldFlag False
+    secondField <- fieldResult <$> readIORef fieldFlag
+    observe "branch on a runtime Boolean before calling a retained field" (firstField, secondField)
     observe "select through an ordinary type constructor"
         ( 7 :: NativeNestedCase.TypeHead ('Just Bool)
         , 'x' :: NativeNestedCase.TypeHead ('Just Ordering)
