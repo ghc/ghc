@@ -400,8 +400,10 @@ wrongZero xs _ = case xs of
     VNil -> (Refl, Refl)
 #endif
 HS
-"${g[@]}" -Werror=inaccessible-code -Werror=overlapping-patterns \
-    -fomit-interface-pragmas -fno-write-if-simplified-core -c VectorIdentity.hs
+"${g[@]}" -O2 -Werror=inaccessible-code -Werror=overlapping-patterns \
+    -fno-omit-interface-pragmas -fno-write-if-simplified-core -c VectorIdentity.hs
+"${g[@]}" --show-iface VectorIdentity.hi >vector-identity.iface
+grep -Fq 'indexed-constructor-case' vector-identity.iface
 if "${g[@]}" -ferror-spans -fforce-recomp -DWRONG_VECTOR -c VectorIdentity.hs >wrong-vector.log 2>&1 ||
    ! grep -Fq 'VectorIdentity.hs:24:19-22: error: [GHC-83865]' wrong-vector.log ||
    ! grep -Fq 'VectorIdentity.hs:29:20-23: error: [GHC-83865]' wrong-vector.log; then

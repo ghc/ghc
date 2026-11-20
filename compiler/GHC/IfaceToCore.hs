@@ -2492,7 +2492,17 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
         IfaceDefaultAlt   -> return DEFAULT
         IfaceDefaultAltWithProof -> return DEFAULT
         IfaceLitAlt lit   -> LitAlt <$> tcIfaceLit lit
-        IfaceDataAlt name -> DataAlt <$> tcIfaceDataCon name
+        IfaceDataAlt name -> do
+          dc <- tcIfaceDataCon name
+          when (isNativeIndexedNullaryDataAlt dc names) $
+            failIfM (text "Missing indexed constructor proof tag:" <+> ppr dc)
+          return (DataAlt dc)
+        IfaceIndexedDataAltWithProof name -> do
+          dc <- tcIfaceDataCon name
+          unless (isNativeIndexedNullaryDataAlt dc names && hasNoDups (case_bndr : names)) $
+            failIfM (text "Invalid indexed constructor proof in interface alternative:"
+                     <+> ppr dc <+> ppr names)
+          return (DataAlt dc)
         IfaceDataAltWithProof name -> do
           dc <- tcIfaceDataCon name
           unless (isNativeIndexDataAlt dc names) $
@@ -2504,7 +2514,10 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
         has_alt con = any (\(c, _, _) -> c == con) resolved
         scrut_index = exprToNativeIndex scrut'
         constructor_proof = any native_alt resolved
-        native = constructor_proof || any (\(c, ns, _) -> c == DEFAULT && not (null ns)) resolved
+        indexed_proof = any (\(con, ns, _) -> case con of
+                               DataAlt dc -> isNativeIndexedNullaryDataAlt dc ns
+                               _ -> False) resolved
+        native = constructor_proof || indexed_proof || any (\(c, ns, _) -> c == DEFAULT && not (null ns)) resolved
     when constructor_proof $ do
       when (isNothing scrut_index) $
         failIfM (text "Unsupported scrutinee for native index interface evidence:" <+> ppr scrut')
@@ -2614,6 +2627,20 @@ tcIfaceAlt _ _ _ _ (con@(LitAlt _), names, rhs) = do
   Alt con [] <$> tcIfaceExpr rhs
 
 tcIfaceAlt scrut scrut_index case_bndr (tycon, inst_tys) (DataAlt con, names, rhs)
+  | isNativeIndexedNullaryDataAlt con names
+  , [eq_name, proof_name] <- names
+  = do { uniqs <- getUniquesM
+       ; let pat = dataConRepFSInstPat [ifLclNameFS eq_name] uniqs mult con inst_tys
+       ; case (scrut, scrut_index, pat) of
+           (Var _, Just index@TermVarTy{}, ([], [eq]))
+             | Just constructor <- nativeIndexedNullaryCon_maybe (exprType scrut) con eq ->
+                 do { fresh <- newIfaceName (mkVarOccFS (ifLclNameFS proof_name))
+                    ; let cv = mkCoVar fresh (mkNomEqPred index constructor)
+                          binders = [eq, cv]
+                    ; rhs' <- extendIfaceIdEnv binders (tcIfaceExpr rhs)
+                    ; return (Alt (DataAlt con) binders rhs') }
+           _ -> failIfM (text "Invalid indexed constructor proof endpoint:"
+                         <+> ppr con <+> ppr (exprType scrut)) }
   | isNativeIndexDataAlt con names
   = do { (field_names, proof_name) <- case splitAt (dataConRepArity con) names of
            (fs, [p]) | hasNoDups names -> return (fs, p)
