@@ -21,17 +21,19 @@ A known constructor that has no matching branch also leaves the
 case stuck. For `type Pick b = case b of True -> Int`, a client's
 attempt to prove `Pick 'False :~: Int` fails at its `Refl`.
 
-GHC checks one equation of a private closed family per alternative.
-Each equation receives the lexical captures and scrutinee. An error in
-the client can display the checked alternatives using the interface.
-The lifting follows the promotion of case expressions described by
-Eisenberg and Stolarek. Agda's pattern lambdas provide a related way
-to match on an intermediate expression. [Promotion paper, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf)
+GHC first checks one equation per alternative. Each equation receives
+the lexical captures and scrutinee. A flat case publishes these
+equations in a private closed family. For a nested case, GHC compiles
+the checked equations to private closed families that test one
+constructor at a time. An error in a client can display the case using
+the interface. The use of closed families follows the promotion
+translation of Eisenberg and Stolarek. Agda's pattern lambdas provide
+a related way to match on an intermediate expression. [Promotion paper, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf)
 and [Agda pattern lambdas](https://agda.readthedocs.io/en/stable/language/with-abstraction.html#pattern-lambdas).
 
-The supported patterns have a constructor head and distinct variables or
-wildcards for fields. General nested cases, catch-all alternatives and
-case expressions inside arbitrary types remain open.
+Patterns have a constructor head. Fields can contain constructors,
+distinct variables or wildcards. Catch-all alternatives and case
+expressions inside arbitrary types remain open.
 
 ## Type constructors in case patterns
 
@@ -54,30 +56,53 @@ GADT constructors still refine the scrutinee kind.
 [Closed-family translation, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf)
 and [namespace and interface test](../../../testsuite/tests/dependent/should_run/NativeTypeCase.sh).
 
-### Nested patterns at kind `Type`
+### Ordered nested patterns
 
-The next source case selects `Int` for `Just Bool`, `Char` for
-`Just Ordering`, and `()` for another known type. The compiler
-cannot enumerate all types when it reaches the field of `Just`.
-A closed family can instead classify the written heads:
+The first surviving alternative determines the next test. If an earlier
+test is stuck, the result is also stuck. For example, in the following
+case, `Pick ('Just x)` is stuck when `x` is rigid:
 
 ```haskell
-data Head = B | O | Other
-type family Classify (a :: Type) :: Head where
-  Classify Bool     = 'B
-  Classify Ordering = 'O
-  Classify a        = 'Other
+type Pick d = case d of
+  Just (Just _) -> Int
+  Just _        -> Int
+  Nothing       -> Char
 ```
 
-The three results are distinct. GHC can choose `Other` for `[x]`
-even when `x` is unknown. It must wait when the whole type is unknown
-or a type family can still reduce to `Bool` or `Ordering`. A second
-family with one equation per `Head` then selects the source result.
-An ordinary client checked these properties through a stripped interface.
-The unknown case stayed stuck even when every final branch returned
-`Int`. Translating the nested source pattern to these families is open.
-[Agda case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees)
+Agda's case tree for `max` illustrates this distinction between writing
+a clause and making that clause a definitional equality. In GHC, flat
+closed-family equations with the same result can be compatible. The
+fork uses separate decision families so this compatibility cannot
+skip an earlier test. [Agda case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees)
 and [GHC family equation compatibility](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_families.html#compatibility-and-apartness-of-type-family-equations).
+
+At kind `Type`, GHC cannot enumerate the possible heads. A private
+classifier with distinct Boolean results tests the written head.
+Another family uses that result to select the next decision. A known
+different head such as a list proceeds to a later alternative even
+with an unknown element type. An unknown head or a stuck family
+application blocks the test.
+
+When an alias reorders fields, GHC follows the written order for
+written tests. An alias can also add an inner constructor test.
+Mixed patterns can use canonical field order when it visits the
+surviving written tests once and in order. Other mixed shapes and
+non-injective uses of erased pattern binders remain outside this slice.
+
+At an indexed promoted kind, each constructor refines the index.
+When ordinary unification fails, the compiler can try one nominal
+reduction at each constructor result index using an imported or
+previously checked closed-family axiom. This step can also establish
+that a constructor is impossible at the scrutinee kind. Open or
+unresolved index applications can still prevent compilation.
+
+The tests compile an ordinary client using only stripped interfaces.
+They also check reification, exact printing and rejected rigid
+equalities. On an upgrade, GHC rechecks a home module with an old
+multirow type-case or type-lambda interface when the source is
+available. A separately distributed provider must be rebuilt to
+publish ordered equations. [Nested provider](../examples/open-evaluation/NativeNestedCase.hs)
+and [interface test](../../../testsuite/tests/dependent/should_run/NativeTypeCase.sh).
 
 ## A case in a let body
 
