@@ -2247,7 +2247,8 @@ cvtNameWith allow_lifted ctxt_ns (TH.Name occ flavour)
     liftedTypeName
       | TH.NameG TH.TcClsName _ _ <- flavour
       , ctxt_ns == OccName.tcClsName
-      = any (`isPrefixOf` occ_str) ["$lambda:", "$case:", "$signature-sum:", "$field-sum:"]
+      = any (`isPrefixOf` occ_str)
+            ["$lambda:", "$case:", "$signature-sum:", "$signature-case:", "$field-sum:"]
       | otherwise = False
 
 okOcc :: OccName.NameSpace -> String -> Bool

@@ -25,6 +25,12 @@ left = Refl
 right :: F 'False :~: Bool
 right = Refl
 
+signatureTrue :: Int
+signatureTrue = caseIdentity (Proxy @'True) 3
+
+signatureFalse :: Bool
+signatureFalse = caseIdentity (Proxy @'False) True
+
 field :: Field ('Just 'True) :~: '( 'True, 'True)
 field = Refl
 
@@ -138,6 +144,18 @@ type instance N.OpenCaseIndex 'True = Ordering
 openIndexFallback ::
   N.OpenIndexAtOrdering ('Just ('N.OpenIndexed ('Proxy :: Proxy 'True))) :~: Bool
 openIndexFallback = Refl
+
+scopedOpenHit :: Proxy b -> N.ScopedOpenIndex b ('Just ('N.OpenPlain 'True)) :~: Proxy b
+scopedOpenHit _ = Refl
+
+scopedOpenShadow ::
+  N.ScopedOpenIndex 'True ('Just ('N.OpenPlain 'False)) :~: Proxy 'False
+scopedOpenShadow = Refl
+
+scopedOpenMiss :: forall b. Proxy b ->
+  N.ScopedOpenIndex b ('Just ('N.OpenIndexed ('Proxy :: Proxy b))) :~:
+    Proxy ('Just ('N.OpenIndexed ('Proxy :: Proxy b)))
+scopedOpenMiss _ = Refl
 
 refinedField :: Proxy (seed :: Bool) ->
   N.IndexedFieldPick ('Just ('N.RefinedFieldBox ('Proxy :: Proxy seed) ('N.FieldOn flag))) :~: Proxy flag

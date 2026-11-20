@@ -56,7 +56,7 @@ module GHC.Iface.Type (
         pprIfaceSigmaType, pprIfaceTyLit,
         pprIfaceCoercion, pprParendIfaceCoercion,
         splitIfaceSigmaTy, pprIfaceTypeApp, pprUserIfaceForAll,
-        pprIfaceCoTcApp, pprTyTcApp, pprIfacePrefixApp,
+        pprIfaceCoTcApp, pprTyTcApp, pprIfacePrefixApp, stripLiftedTypeOwner,
         isIfaceRhoType,
 
         suppressIfaceInvisibles,
@@ -106,7 +106,7 @@ import Data.Word (Word8)
 import Control.Arrow (first)
 import Control.DeepSeq
 import Control.Monad ((<$!>), when)
-import Data.List (dropWhileEnd)
+import Data.List (dropWhileEnd, stripPrefix)
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Set as Set
 
@@ -2171,6 +2171,14 @@ when explicit kind printing is off, even if its caller retains the argument.
 See Note [Arrow matchability in Haddock] in Haddock.Convert for source ASTs.
 -}
 
+-- | Remove the prefix and private index from a lifted occurrence.
+stripLiftedTypeOwner :: String -> String -> Maybe String
+stripLiftedTypeOwner prefix occurrence = do
+  key <- stripPrefix prefix occurrence
+  case break (== ':') (reverse key) of
+    (_ : _, ':' : owner) | not (null owner) -> Just (reverse owner)
+    _ -> Nothing
+
 pprTyTcApp :: PprPrec -> IfaceTyCon -> IfaceAppArgs -> SDoc
 pprTyTcApp ctxt_prec tc tys =
     sdocOption sdocPrintExplicitKinds $ \print_kinds ->
@@ -2183,6 +2191,12 @@ pprTyTcApp ctxt_prec tc tys =
                 (IfaceForAllTyFlag Required) (IA_Arg ty (IfaceForAllTyFlag Required) IA_Nil) <- tys
        -> maybeParen ctxt_prec funPrec
          $ char '?' <> ftext (getLexicalFastString n) <> dcolon <> ppr_ty topPrec ty
+
+       | userStyle style, not debug, print_type_abbreviations
+       , Just owner <- stripLiftedTypeOwner "$signature-case:"
+                        (occNameString (nameOccName (ifaceTyConName tc)))
+       -> maybeParen ctxt_prec funPrec $
+            text "the type case in the signature for" <+> quotes (text owner)
 
        -- See Note [Registered type numerals] in GHC.Tc.Gen.HsType.
        | userStyle style, not debug, not print_kinds, print_type_abbreviations

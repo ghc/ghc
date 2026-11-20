@@ -281,6 +281,7 @@ infer the first invisible family argument and leave the second open: (Refl,Refl)
 apply Maybe and a type family through a computed arrow kind: (Just 7,[7])
 interpret a kind code as an ordinary type constructor: Just True
 interpret two applications of the optional type constructor: Just (Just True)
+choose an interpreted arrow from its expected kind: (Just 3,Right 3)
 use a nested arrow for Either and a short-circuiting callback: (Right 7,False)
 apply a type lambda to Maybe, Either String and IO: Refl
 partially apply a two-argument type lambda: Refl
@@ -290,8 +291,10 @@ retain the kind of a matched Nothing: Refl
 name and reuse a type-level intermediate result: Refl
 bind the result of a constructor case: (Right True,Left 'c')
 select the result type by a constructor: (7,False)
+repeat a type case in a function argument and result: (42,False)
 select through nested type case patterns: (Proxy,7)
 select a constructor at an open family index: (7,False)
+distinguish an outer index from a shadowing pattern variable: (Refl,Refl)
 refine a constructor field and transport a later dependent index: (Refl,Refl)
 select through an ordinary type constructor: (7,'x',())
 select an arrow result inside forall: ((Proxy,1),(Proxy,'?'))
@@ -305,6 +308,7 @@ map Boolean negation and traffic signals over an unknown tail: (Refl,Refl)
 map an ordinary enumeration callback over an unknown tail: Refl
 use Prelude.not on a known head with an unknown tail: Refl
 map Prelude.not and Prelude.id over a known head and an unknown tail: (Refl,Refl,Refl)
+prove map preserves length and leaves the callback lazy: (Refl,2)
 filter with Prelude.not and Prelude.id without forcing the kept tail: ((Refl,Refl,True),(Refl,Refl,True))
 use a checked cons rule without forcing the callback, head or tail: (Refl,True)
 compose two checked traversals without forcing the inner callback: (Refl,True)

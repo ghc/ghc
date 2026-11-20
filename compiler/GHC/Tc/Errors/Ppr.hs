@@ -68,6 +68,7 @@ import GHC.Core.Predicate
 import GHC.Core.Type
 import GHC.Core.FVs( orphNamesOfTypes )
 import GHC.CoreToIface
+import GHC.Iface.Type (stripLiftedTypeOwner)
 
 import GHC.Driver.Flags
 import GHC.Driver.Backend
@@ -138,7 +139,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Foldable ( fold )
 import Data.Function (on)
-import Data.List ( find, groupBy, sortBy, sortOn, tails, partition, unfoldr, stripPrefix )
+import Data.List ( find, groupBy, sortBy, sortOn, tails, partition, unfoldr )
 import Data.Ord ( comparing )
 import Data.Bifunctor
 
@@ -1140,7 +1141,8 @@ instance Diagnostic TcRnMessage where
       ExistsPackInvalidContext ->
         text "Use GHC.Exists.Pack in an explicit existential application or a sole case alternative with a fresh type variable or _ for the witness, followed by a payload pattern."
     TcRnTypeCaseContext
-      -> mkSimpleDecorated $ text "A type case is supported only in the right-hand side of a top-level type synonym."
+      -> mkSimpleDecorated $
+           text "A type case needs a supported position in a top-level type synonym or value signature."
     TcRnTypeLambdaContext
       -> mkSimpleDecorated $
            text "This type lambda needs the right-hand side of a top-level synonym with ordinary parameters."
@@ -4884,14 +4886,6 @@ mismatchInvisibleBits (CouldNotDeduce { cnd_ea = mb_ea })
 liftedTypeOwner :: String -> Name -> Maybe String
 liftedTypeOwner prefix = stripLiftedTypeOwner prefix . occNameString . getOccName
 
--- | Remove the prefix and private index from a lifted occurrence.
-stripLiftedTypeOwner :: String -> String -> Maybe String
-stripLiftedTypeOwner prefix occurrence = do
-  key <- stripPrefix prefix occurrence
-  case break (== ':') (reverse key) of
-    (_ : _, ':' : owner) | not (null owner) -> Just (reverse owner)
-    _ -> Nothing
-
 -- | Describe the lifted expression in terms of its source declaration.
 liftedTypeContext :: Name -> Maybe SDoc
 liftedTypeContext name
@@ -4901,9 +4895,16 @@ liftedTypeContext name
   | Just synonym <- liftedTypeOwner "$lambda:" name
   , Just owner <- stripLiftedTypeOwner "$field-sum:" synonym
   = Just (text "retained sum in a field of" <+> quotes (text owner))
-  | Just owner <- liftedTypeOwner "$case:" name = Just (text "type case in" <+> quotes (text owner))
+  | Just owner <- liftedTypeOwner "$case:" name = Just (pprTypeCaseOwner owner)
   | Just owner <- liftedTypeOwner "$lambda:" name = Just (text "type lambda in" <+> quotes (text owner))
   | otherwise = Nothing
+
+-- | Describe a case by its source synonym or value signature.
+pprTypeCaseOwner :: String -> SDoc
+pprTypeCaseOwner owner
+  | Just signature <- stripLiftedTypeOwner "$signature-case:" owner
+  = text "type case in the signature for" <+> quotes (text signature)
+  | otherwise = text "type case in" <+> quotes (text owner)
 
 -- | Find the generated head in an application context.
 liftedTypeHeadContext :: LHsType GhcRn -> Maybe SDoc
@@ -4949,7 +4950,7 @@ pprTypeCaseMismatch :: Type -> SDoc
 pprTypeCaseMismatch ty
   | Just (tc, _) <- splitTyConAppNoView_maybe ty
   , Just owner <- liftedTypeOwner "$case-node:" (tyConName tc)
-  = text "the type case in" <+> quotes (text owner)
+  = text "the" <+> pprTypeCaseOwner owner
   | Just (tc, args) <- splitTyConAppNoView_maybe ty
   , Just source <- liftedTypeContext (tyConName tc)
   = let fallback | isJust (liftedTypeOwner "$case:" (tyConName tc)) = text "the" <+> source

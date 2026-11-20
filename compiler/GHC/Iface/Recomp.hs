@@ -62,7 +62,7 @@ import GHC.Utils.Constants (debugIsOn)
 import GHC.Types.Annotations
 import GHC.Types.Avail
 import GHC.Types.Basic ( ImportLevel(..), TupleSort(BoxedTuple) )
-import GHC.Types.Var (VarBndr(Bndr), ForAllTyFlag(Inferred, Invisible))
+import GHC.Types.Var (VarBndr(Bndr), ForAllTyFlag(Inferred, Invisible, Required))
 import GHC.Types.TyThing (TyThing(ATyCon))
 import GHC.Types.UnresolvedImport
 import GHC.Types.Name
@@ -87,7 +87,7 @@ import Control.Monad
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.State
-import Data.List (isPrefixOf, sortBy, sort, sortOn)
+import Data.List (find, isPrefixOf, isSuffixOf, sortBy, sort, sortOn)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Word (Word64)
@@ -418,7 +418,7 @@ checkVersions hsc_env mod_summary iface self_recomp
             then return $ outOfDateItemBecause SourceFileChanged Nothing else do {
        ; if not (isHomeModule home_unit (mi_module iface))
             then return $ outOfDateItemBecause ThisUnitIdChanged Nothing else do {
-       ; (flags_recomp, check_feature_uses) <- checkFlagHash hsc_env iface self_recomp
+       ; (flags_recomp, check_compiler_upgrade) <- checkFlagHash hsc_env iface self_recomp
        ; recomp <- liftIO $ pure flags_recomp
                              `recompThen` checkOptimHash hsc_env self_recomp
                              `recompThen` checkHpcHash hsc_env self_recomp
@@ -447,8 +447,8 @@ checkVersions hsc_env mod_summary iface self_recomp
        ; recomp <- checkList [checkModUsage (hsc_FC hsc_env) u
                              | u <- mi_sr_usages self_recomp]
        ; case recomp of (NeedsRecompile reason) -> return $ OutOfDateItem reason (Just iface) ; _ -> do {
-       ; feature_recomp <- check_feature_uses
-       ; return $ case feature_recomp of
+       ; upgrade_recomp <- check_compiler_upgrade
+       ; return $ case upgrade_recomp of
            NeedsRecompile reason -> OutOfDateItem reason Nothing
            UpToDate -> UpToDateItem iface
     }}}}}}}
@@ -552,13 +552,13 @@ checkHie dflags mod_summary =
                  -> needsRecompileBecause HieOutdated
              _ -> UpToDate
 
--- | Check the flags and return the feature checks to run after normal usage checks.
+-- | Check the flags and return the compiler upgrade check to run after usage checks.
 -- See Note [Recompiling inferred open family applications].
 checkFlagHash :: HscEnv -> ModIface -> IfaceSelfRecomp
               -> IfG (RecompileRequired, IfG RecompileRequired)
 checkFlagHash hsc_env iface self_recomp = do
     let logger   = hsc_logger hsc_env
-    let FingerprintWithValue old_fp old_flags = mi_sr_flag_hash self_recomp
+    let FingerprintWithValue stored_fp old_flags = mi_sr_flag_hash self_recomp
     let (base_fp, new_flags) = fingerprintDynFlags hsc_env (mi_module iface) putNameLiterally
         sum_fp = computeFingerprint putNameLiterally (base_fp, "sum-projections-v1" :: String)
         projection_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v1" :: String)
@@ -587,25 +587,34 @@ checkFlagHash hsc_env iface self_recomp = do
         staged_fp = stagedMatchabilityFingerprint previous_fp
         class_base_fp = classDefaultMatchabilityFingerprint staged_fp
         family_base_fp = forwardedResultFingerprint class_base_fp
+        scoped_base_fp = scopedTypeCaseFingerprint class_base_fp
+        scoped_family_fp = scopedTypeCaseFingerprint family_base_fp
         filter_base_fp = guardedListFilterFingerprint class_base_fp
-        joint_base_fp = guardedListFilterFingerprint family_base_fp
-        identity_base_fp = checkedIdentityFingerprint joint_base_fp
+        filter_family_fp = guardedListFilterFingerprint family_base_fp
+        scoped_filter_fp = scopedTypeCaseFingerprint filter_family_fp
+        identity_base_fp = checkedIdentityFingerprint filter_family_fp
+        new_fp = checkedIdentityFingerprint scoped_filter_fp
+        earlier_rule_generations = [class_base_fp, family_base_fp, scoped_base_fp,
+                                    scoped_family_fp, filter_base_fp, filter_family_fp,
+                                    scoped_filter_fp, identity_base_fp]
+        class_generations = new_fp : earlier_rule_generations
+        forwarded_fps = [new_fp, family_base_fp, scoped_family_fp, filter_family_fp, scoped_filter_fp, identity_base_fp]
+        guarded_fps = [new_fp, filter_base_fp, filter_family_fp, scoped_filter_fp, identity_base_fp]
+        scoped_fps = [new_fp, scoped_base_fp, scoped_family_fp, scoped_filter_fp]
         -- See Note [Recompiling package rule providers].
         stamp_rules = packageRuleProviderFingerprint (mi_rules iface)
-        base_class_fps = [class_base_fp, family_base_fp, filter_base_fp, joint_base_fp, identity_base_fp]
-        class_default_fps = map stamp_rules base_class_fps
-        forwarded_fps = map stamp_rules [family_base_fp, joint_base_fp, identity_base_fp]
-        guarded_fps = map stamp_rules [filter_base_fp, joint_base_fp, identity_base_fp]
-        new_fp = stamp_rules identity_base_fp
+        old_fp | stored_fp `elem` class_generations = stored_fp
+               | Just fp <- find ((== stored_fp) . stamp_rules) class_generations = fp
+               | otherwise = stored_fp
         dflags = hsc_dflags hsc_env
         final_possible = backendGeneratesCode (backend dflags) && couldExportCallbackCase iface
         candidates = exportedCaseDatatypes iface
         recheck reason = out_of_date_hash logger (CustomReason reason)
                            (text reason) old_fp new_fp
     previous <- liftIO $ if
-       | old_fp `elem` base_class_fps, old_fp /= stamp_rules old_fp
+       | stored_fp `elem` earlier_rule_generations, stored_fp /= stamp_rules stored_fp
          -> recheck "Compiler now retains private helpers in erased package rules"
-       | old_fp `elem` (class_default_fps ++ [staged_fp, previous_fp, abstract_fp,
+       | old_fp `elem` (class_generations ++ [staged_fp, previous_fp, abstract_fp,
                                             ordered_fp, retained_case_fp, result_kind_fp])
          -> up_to_date logger (text "Module flags unchanged")
        | old_fp == intermediate_kind_fp
@@ -691,7 +700,7 @@ checkFlagHash hsc_env iface self_recomp = do
         out_of_date logger FlagsChanged (fmap vcat diffs)
     retained <- case previous of
       UpToDate
-        | old_fp `notElem` (class_default_fps ++ [staged_fp, previous_fp, ordered_fp])
+        | old_fp `notElem` (class_generations ++ [staged_fp, previous_fp, ordered_fp])
         , mi_hsc_src iface == HsSrcFile
         , couldExportOrderedTypeCase iface ->
             liftIO $ recheck "Compiler now checks type case constructor order"
@@ -707,11 +716,11 @@ checkFlagHash hsc_env iface self_recomp = do
             else pure UpToDate
       _ -> pure previous
     flags <- case retained of
-      UpToDate | old_fp `notElem` class_default_fps, couldInferClassDefaultSelector iface ->
+      UpToDate | old_fp `notElem` class_generations, couldInferClassDefaultSelector iface ->
         liftIO $ recheck "Compiler now infers matchability for associated type defaults"
       _ -> pure retained
     let check_identity
-          | old_fp /= new_fp
+          | old_fp `notElem` [new_fp, identity_base_fp]
           , backendGeneratesCode (backend dflags)
           , mi_hsc_src iface == HsSrcFile = do
               candidate <- couldExportSourceSignature (isOneShot (ghcMode dflags)) iface PolymorphicIdentity
@@ -729,7 +738,7 @@ checkFlagHash hsc_env iface self_recomp = do
                 else pure UpToDate
           | otherwise = pure UpToDate
         check_family_uses
-          | old_fp `elem` (staged_fp : class_default_fps) = pure UpToDate
+          | old_fp `elem` (staged_fp : class_generations) = pure UpToDate
           | otherwise = do
               candidate <- checkStagedMatchability iface (mi_sr_usages self_recomp)
               if candidate
@@ -739,13 +748,15 @@ checkFlagHash hsc_env iface self_recomp = do
           | old_fp `notElem` forwarded_fps, couldForwardFamilyResult iface =
               liftIO $ recheck "Compiler now separates a family result from its kind"
           | otherwise = pure UpToDate
-    pure (flags, check_identity `recompThen` check_guarded_filter
-                 `recompThen` check_family_uses `recompThen` check_forwarded_result)
-
--- | Record the independent selector on an open equation returning its kind family.
-forwardedResultFingerprint :: Fingerprint -> Fingerprint
-forwardedResultFingerprint fp =
-    computeFingerprint putNameLiterally (fp, "forwarded-family-result-v1" :: String)
+        check_scoped_case
+          | old_fp `notElem` scoped_fps
+          , mi_hsc_src iface == HsSrcFile
+          , couldExportScopedTypeCase iface =
+              liftIO $ recheck "Compiler now checks dependent type case captures"
+          | otherwise = pure UpToDate
+    pure (flags, check_identity `recompThen` check_guarded_filter `recompThen` check_family_uses
+                                     `recompThen` check_forwarded_result
+                                     `recompThen` check_scoped_case)
 
 -- | Mark providers compiled with the scope traversal in GHC.Iface.Tidy.
 -- See Note [Private helpers in erased package rules] in GHC.Iface.Tidy.
@@ -759,7 +770,7 @@ stampPackageRuleProvider rules info =
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The interface writer stamps the flag hash after it knows which rules
 the module exports. The reader uses the stored rules to recognize the
-stamp on each compatible family and filter hash. A provider without
+stamp on each compatible family, filter and scoped-case hash. A provider without
 the stamp needs the private helper check, even if it already has one
 of the other checks. Its next interface records all current checks.
 -}
@@ -770,6 +781,11 @@ packageRuleProviderFingerprint rules fp
   | any isLexicalPackageRule rules =
       computeFingerprint putNameLiterally (fp, "lexical-rule-private-helpers-v1" :: String)
   | otherwise = fp
+
+-- | Record the independent selector on an open equation returning its kind family.
+forwardedResultFingerprint :: Fingerprint -> Fingerprint
+forwardedResultFingerprint fp =
+    computeFingerprint putNameLiterally (fp, "forwarded-family-result-v1" :: String)
 
 -- | Record the inference rules used to compile open family applications.
 stagedMatchabilityFingerprint :: Fingerprint -> Fingerprint
@@ -865,6 +881,28 @@ abstractWitnessFingerprint fp =
 orderedTypeCaseFingerprint :: Fingerprint -> Fingerprint
 orderedTypeCaseFingerprint fp =
     computeFingerprint putNameLiterally (fp, "ordered-type-cases-v1" :: String)
+
+-- | Record that dependent captures can generalize before their case owner.
+scopedTypeCaseFingerprint :: Fingerprint -> Fingerprint
+scopedTypeCaseFingerprint fp =
+    computeFingerprint putNameLiterally (fp, "scoped-type-cases-v1" :: String)
+
+-- | An old lifted case with a named visible capture may use that capture
+-- in a later binder kind. Recheck the home provider once. Renaming checks
+-- the written scope. A case lifted under a dependent forall already
+-- follows the declaration dependencies.
+couldExportScopedTypeCase :: ModIface -> Bool
+couldExportScopedTypeCase = any candidate . mi_decls
+  where
+    candidate (_, IfaceFamily{ifName = name, ifBinders = binders})
+      | let occ = occNameString (nameOccName name)
+      , "$case:" `isPrefixOf` occ, not ("-forall" `isSuffixOf` occ)
+      , _ : captures <- reverse (filter isVisibleTyConBinder binders)
+      = any dependent captures
+    candidate _ = False
+
+    dependent (Bndr IfaceTvBndr{} (NamedTCB Required)) = True
+    dependent _ = False
 
 {- Note [Recompiling ordered type cases]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2159,6 +2197,7 @@ mkSelfRecomp hsc_env this_mod src_hash usages = do
 
       let (flag_hash, flags) = fingerprintDynFlags hsc_env this_mod putNameLiterally
           current_flag_hash = checkedIdentityFingerprint
+                            $ scopedTypeCaseFingerprint
                             $ guardedListFilterFingerprint
                             $ forwardedResultFingerprint
                             $ classDefaultMatchabilityFingerprint

@@ -534,7 +534,7 @@ lookupExactOrOrig_base rdr_name
     cvtEither (Left e)    = ExactOrOrigError e
     cvtEither (Right gre) = FoundExactOrOrig gre
 
--- | Look up a local original name, including a reified field or signature's sum synonym.
+-- | Look up a local original name, including a synonym lifted from a field or signature.
 -- A reified value signature can refer to a synonym from an earlier declaration
 -- group. The renamer removes its GRE to keep it out of source lookup and exports.
 lookupLocalOrigGRE :: Name -> RnM (Either NotInScopeError GlobalRdrElt)
@@ -542,7 +542,8 @@ lookupLocalOrigGRE name = do
   exact <- lookupLocalExactGRE name
   case exact of
     Left NoExactName{}
-      | any (`isPrefixOf` occNameString (nameOccName name)) ["$signature-sum:", "$field-sum:"] -> do
+      | any (`isPrefixOf` occNameString (nameOccName name))
+            ["$signature-sum:", "$signature-case:", "$field-sum:"] -> do
         env <- getGblEnv
         return $ case lookupNameEnv (tcg_type_env env) name of
           Just thing@(ATyCon tc) | isTypeSynonymTyCon tc ->

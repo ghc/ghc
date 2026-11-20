@@ -126,6 +126,17 @@ interface, including when the two rows return the same type.
 [Haskell 2010, §3.17](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-900003.17)
 and [Agda case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees).
 
+Agda gives each pattern lambda a fresh helper. Two separately written
+helpers can stay distinct even when their clauses look alike. GHC binds
+each explicitly scoped type variable at its own declaration. R19 reuses
+a helper for repeated source cases within one signature when the
+scrutinee and ordered rows agree in the same scope. This allows
+`caseIdentity _ x = x` at an unknown index. Separate signatures each
+allocate their own helper.
+[Agda's internal representation of pattern lambdas](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html#internal-representation-of-pattern-lambdas),
+[GHC's lexical scoping rules](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/scoped_type_variables.html#overview)
+and [source signature and controls](roadmap/R19-type-level-cases.md#a-case-in-a-value-signature).
+
 ### Matchability and multiplicity on arrows
 
 Proposal #242 names `GHC.Matchability` as the public module for the
@@ -6220,6 +6231,21 @@ fusion rule with its source definition. The visible rules for `build`
 and `foldr` introduce additional obligations in this fork.
 [HERMIT paper](https://doi.org/10.1145/2804302.2804303)
 and [reading notes and checked scope](papers/README.md#checking-ghc-rewrite-equations-with-hermit-haskell-2015).
+
+### Induction on the spine of a mapped list
+
+Agda's `length-map` uses reflexivity at the empty list and lifts the
+recursive equality through successor at a cons. The Haskell report
+defines both operations by matching the list spine. Its map stores
+the callback result in the head, and length ignores that field.
+[Agda's length-map proof](https://agda.github.io/agda-stdlib/v1.1/Data.List.Properties.html)
+and [Haskell 2010 PreludeList](https://www.haskell.org/onlinereport/haskell2010/haskellch9.html).
+
+The R16 proof applies the installed map equation and then matches
+the recursive `Refl` to lift the equality through successor.
+GHC checks that match with the ordinary equality GADT.
+[Data.Type.Equality source](../../libraries/ghc-internal/src/GHC/Internal/Data/Type/Equality.hs)
+and [R16 map length proof](roadmap/R16-open-term-evaluator.md#prove-that-map-preserves-length).
 
 ### An ordinary enumeration function as a callback
 

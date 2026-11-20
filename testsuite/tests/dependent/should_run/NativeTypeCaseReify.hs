@@ -2,7 +2,7 @@
 {-# LANGUAGE GADTs, PolyKinds, RankNTypes, TypeOperators #-}
 module NativeTypeCaseReify where
 import Data.Type.Equality ((:~:)(Refl))
-import Data.Proxy (Proxy)
+import Data.Proxy (Proxy(..))
 import Language.Haskell.TH
 import NativeCase
 import qualified NativeNestedCase as N
@@ -64,3 +64,11 @@ checkedForall :: SeenForall
 checkedForall tag N.CaseOn = (tag, 1)
 checkedForall tag N.CaseOff = (tag, 0)
 checkedForall tag N.CaseMissing = (tag, '?')
+
+$(do
+    ty <- reifyType 'caseIdentity
+    let copy = mkName "reifiedIdentity"
+    pure [SigD copy ty, ValD (VarP copy) (NormalB (VarE 'caseIdentity)) []])
+
+checkedIdentity :: Bool
+checkedIdentity = reifiedIdentity (Proxy :: Proxy 'False) True

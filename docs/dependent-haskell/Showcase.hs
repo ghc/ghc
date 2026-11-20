@@ -91,6 +91,7 @@ import qualified FamilySignature
 import qualified ImportedFamily
 import qualified MixedFamily
 import qualified InterpretedKind
+import qualified InterpretedKindUseSite
 import qualified NestedFunctionClient
 import qualified InvisibleFamily
 import qualified TypeLambda
@@ -104,6 +105,7 @@ import qualified OpenBuildSource
 import qualified OpenMapProof
 import qualified InstalledNotProof
 import qualified PreludeFilterProof
+import qualified PreludeMapLengthProof
 import qualified PreludeMapProof
 import qualified ConsRuleMapProof
 import qualified OpenBuildWorker as Build
@@ -1102,6 +1104,8 @@ main = do
     observe "apply Maybe and a type family through a computed arrow kind" InvisibleFamily.wrappedValues
     observe "interpret a kind code as an ordinary type constructor" InterpretedKind.optionalFlag
     observe "interpret two applications of the optional type constructor" InterpretedKind.nestedOptional
+    observe "choose an interpreted arrow from its expected kind"
+        (InterpretedKindUseSite.atM, InterpretedKindUseSite.atU)
     observe "use a nested arrow for Either and a short-circuiting callback"
         (NestedFunctionClient.binaryChoice, NestedFunctionClient.conjunction False (error "unused operand"))
     observe "apply a type lambda to Maybe, Either String and IO" TypeLambda.roadmap
@@ -1114,6 +1118,8 @@ main = do
     observe "bind the result of a constructor case"
         (Right True :: TypeLet.CaseResult 'True, Left 'c' :: TypeLet.CaseResult 'False)
     observe "select the result type by a constructor" NativeCase.roadmap
+    observe "repeat a type case in a function argument and result"
+        (NativeCase.caseIdentity (Proxy @'True) 42, NativeCase.caseIdentity (Proxy @'False) False)
     observe "select through nested type case patterns"
         ( Proxy :: NativeNestedCase.Pick ('Just ('Just 'True))
         , 7 :: NativeNestedCase.Pick ('Just 'Nothing) )
@@ -1121,6 +1127,11 @@ main = do
         ( 7 :: NativeNestedCase.OpenIndexPick (NativeNestedCase.OpenCaseIndex 'False)
                   ('Just ('NativeNestedCase.OpenIndexed ('Proxy :: Proxy 'False)))
         , False :: NativeNestedCase.OpenIndexAtOrdering ('Just ('NativeNestedCase.OpenPlain 'False)) )
+    observe "distinguish an outer index from a shadowing pattern variable"
+        ( Refl :: NativeNestedCase.ScopedOpenIndex 'True ('Just ('NativeNestedCase.OpenPlain 'True))
+                  :~: Proxy 'True
+        , Refl :: NativeNestedCase.ScopedOpenIndex 'True ('Just ('NativeNestedCase.OpenPlain 'False))
+                  :~: Proxy 'False )
     observe "refine a constructor field and transport a later dependent index"
         ( Refl :: NativeNestedCase.IndexedFieldPick
             ('Just ('NativeNestedCase.RefinedFieldBox ('Proxy :: Proxy 'False)
@@ -1154,6 +1165,8 @@ main = do
         (InstalledNotProof.negateHead (Proxy @'[]))
     putStrLn ("map Prelude.not and Prelude.id over a known head and an unknown tail: "
               ++ PreludeMapProof.showPreludeMapProofs)
+    putStrLn ("prove map preserves length and leaves the callback lazy: "
+              ++ PreludeMapLengthProof.showPreludeMapLength)
     putStrLn ("filter with Prelude.not and Prelude.id without forcing the kept tail: "
               ++ PreludeFilterProof.showPreludeFilterProofs)
     observe "use a checked cons rule without forcing the callback, head or tail"

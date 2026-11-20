@@ -10,6 +10,9 @@ cp "$src"/{OpenMapWorker,OpenMapSource,OpenMapProof,ClosedTableLibrary,SpineWork
 cd "$out"
 cp OpenMapWorker.hs Worker.source
 
+# The mapper prefix must also typecheck with the producer's object in scope.
+"${ghc[@]}" -fexternal-interpreter --make -no-link -outputdir with-code OpenMapSource.hs
+
 compile_worker() {
     "${ghc[@]}" -c OpenMapWorker.hs
     "${ghc[@]}" --show-iface OpenMapWorker.hi >worker.iface
@@ -29,6 +32,26 @@ rm OpenMapSource.hs OpenMapSource.o
 "${ghc[@]}" -c OpenMapProof.hs
 "${ghc[@]}" -v1 -c OpenMapProof.hs >warm.log 2>&1
 grep -Fq 'compilation IS NOT required' warm.log
+
+# The ordinary client uses a saved mapper prefix and its own family to
+# supply the list argument. Neither source module is on its import path.
+cat >OrdinaryPrefixProof.hs <<'HS'
+{-# LANGUAGE DataKinds, Modifiers, NoExperimentalDependentTypes, TypeFamilies, TypeOperators #-}
+module OrdinaryPrefixProof where
+
+import Data.Type.Equality ((:~:)(Refl))
+import GHC.Matchability (U)
+import OpenMapSource (OrdinaryPrefix)
+import qualified OpenMapWorker as W
+
+type family AtRed (f :: [W.Lamp] %U -> [W.Signal]) where
+    AtRed f = f '[ 'W.Red]
+
+prefixProof :: AtRed OrdinaryPrefix :~: '[ 'W.Stop]
+prefixProof = Refl
+HS
+"${ghc[@]}" -c OrdinaryPrefixProof.hs
+sha256sum OpenMapSource.hi >alias.sha
 
 # A forwarding definition has no checked clauses of its own.
 cat >Forward.hs <<'HS'
@@ -97,6 +120,14 @@ if "${ghc[@]}" -c OpenMapProof.hs >changed.log 2>&1 ||
     cat changed.log >&2
     exit 1
 fi
+
+if "${ghc[@]}" -c OrdinaryPrefixProof.hs >prefix-changed.log 2>&1 ||
+   ! grep -Fq '[GHC-83865]' prefix-changed.log ||
+   ! grep -Fq 'prefixProof = Refl' prefix-changed.log; then
+    cat prefix-changed.log >&2
+    exit 1
+fi
+sha256sum -c --quiet alias.sha
 
 # A closed call should still evaluate the original ordinary object, even
 # when the same producer has a checked family in its interface.
