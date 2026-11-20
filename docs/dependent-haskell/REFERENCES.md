@@ -6603,3 +6603,13 @@ equality. It checks whether the two kinds are surely apart before
 reporting that the branch is unreachable.
 [Agda 2.8.0, matching on indexed datatypes](https://agda.readthedocs.io/en/v2.8.0/language/coverage-checking.html#matching-on-indexed-datatypes)
 and [GHC apartness](../../compiler/GHC/Core/Unify.hs).
+
+The fork also preserves the nominal evidence when the optimizer rewrites
+a cast on a retained expression. GHC distinguishes nominal equality from
+representational equality. For a package payload, the optimizer can
+rewrite the nominal proof it already has and then reconstruct the outer
+representational cast. A cast that has only representational evidence
+follows GHC's ordinary simplification path.
+[GHC roles](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/roles.html),
+[coercion operations](../../compiler/GHC/Core/Coercion.hs)
+and [optimization checkpoint](CHECKPOINTS.md#family-and-package-checkpoints).

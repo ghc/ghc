@@ -8,6 +8,20 @@ increments.
 
 ## Family and package checkpoints
 
+At `fa8b71fb1c`, all 358 Showcase lines matched at `-O0`, default
+`-O1`, and default `-O2`. This run used the normal bootstrap compiler
+at `c94baacebe` with one rebuilt simplifier module. Before that change
+the full Showcase passed `-O0` and failed Core Lint at both optimized
+levels. The simplifier now keeps the nominal evidence for the cast
+from an opened package's payload type to `Vec a n`.
+`NativeRetainedCast`, `NativeOpenIndexedAppend`, `NativeGadtRetainedSum`,
+and `NativeRetainedPackage` passed on the corrected compiler.
+The bootstrap executable does not support interactive use. Self-hosted
+GHCi and the broader suites require the normal build of this revision.
+[Simplifier](../../compiler/GHC/Core/Opt/Simplify/Iteration.hs),
+[cast controls](../../testsuite/tests/dependent/should_run/NativeRetainedCast.sh)
+and [Showcase](Showcase.hs).
+
 At `2d1fd63cc6`, a relink of the 352-line bootstrap compiler checked
 the equality returned by an indexed empty-vector match inside an opened
 package. A nominal cast identifies the payload as a vector. All 352 lines
