@@ -220,6 +220,7 @@ read a retained length through a newtype record selector: (2,"hs")
 read a GADT newtype length without forcing its vector: 1
 read nested lengths and the first aligned cells: (2,1,[('h','s')])
 partition a vector at two independent result lengths: ([7,9],[2],[7])
+match a hidden vector inside a pair without opening its other field: (Just 7,Nothing)
 match both hidden lengths in one partition result: ([7,9],[2])
 choose a partition without forcing the unused branch: ([7,9],[2])
 match hidden partition lengths in function equations: (Just 7,Nothing)

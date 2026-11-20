@@ -970,6 +970,9 @@ main = do
     observe "partition a vector at two independent result lengths"
         (ImplicitVector.cells passing, ImplicitVector.cells failing,
          take 1 (ImplicitVector.cells firstPart))
+    observe "match a hidden vector inside a pair without opening its other field"
+        (ImplicitVector.firstKept (firstPart, error "unused rejected partition"),
+         ImplicitVector.firstKept (ImplicitVector.partitionVec odd (VCons (2 :: Int) VNil)))
     let rows = ImplicitVector.partitionRows odd
             (VCons (7 :: Int) (VCons 2 (VCons 9 VNil)))
     observe "match both hidden lengths in one partition result" $

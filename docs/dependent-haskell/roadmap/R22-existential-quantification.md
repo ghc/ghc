@@ -329,6 +329,16 @@ empty vector. A wildcard in an earlier argument still leaves a later
 package lazy. Each argument has its own witness scope.
 [Partition equations](../examples/erased-existentials/ImplicitVector.hs).
 
+A pair of partitions stores each vector with its own erased length.
+The equations for `firstKept (VCons x _, _)` and `firstKept (VNil, _)`
+open the first package. They cover both vector constructors. The second
+package can be bottom. GHC records the opening on the matched field so
+that later alternatives can use the same witness. A different field
+retains its own witness. The regression checks a false guard, a guard
+that forces a second package, and an inaccessible GADT alternative.
+[Vector partition](../examples/erased-existentials/ImplicitVector.hs)
+and [nested match regression](../../../testsuite/tests/dependent/should_run/NativeNestedPackagePat.sh).
+
 ### A package with nested dot binders
 
 A partition can return one package that hides both output lengths.

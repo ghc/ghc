@@ -6315,3 +6315,13 @@ under `seq`. The fork checks the concrete mapper and keeps the
 unrestricted fusion rule outside conversion.
 [Fusion and definedness reading](papers/README.md#short-cut-fusion-and-definedness)
 and [ordinary GHC counterexample](examples/open-evaluation/check-map-fusion.sh).
+
+## Coverage of nested existential patterns
+
+Graf, Peyton Jones and Scott separate evaluation from constructor matching
+in the guard tree. Their GADT examples use equalities from earlier matches
+to check the remaining alternatives. R22 uses this distinction when a
+pattern opens an erased package. Opening records a witness for the same
+scrutinee. Matching a vector constructor then demands its payload.
+[*Lower Your Guards*, sections 2.4 and 3.1](https://pp.ipd.kit.edu/uploads/publikationen/graf20lyg.pdf)
+and [local R22 examples](roadmap/R22-existential-quantification.md#constructor-cases-on-the-payload).
