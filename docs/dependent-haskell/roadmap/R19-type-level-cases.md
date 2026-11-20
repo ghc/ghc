@@ -113,15 +113,23 @@ type Result b = () -> (case b of { True -> Int; False -> Char })
 ```
 
 The result shares the arrow's lexical scope. The private family takes
-the same captures as a case at the root of the synonym. A local
-`forall` introduces a scope boundary. The compiler stops there to keep
-its binders and their kinds in scope. An ordinary client can use
-`Result 'True` as `() -> Int` through a stripped interface.
+the same captures as a case at the root of the synonym. An ordinary
+client can use `Result 'True` as `() -> Int` through a stripped interface.
 Template Haskell reification preserves the arrow and the exact name of
 the lowered case family. [Serokell roadmap](https://ghc.serokell.io/dh#type-level-case-expressions),
 [promotion paper, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf),
 [Agda pattern lambdas](https://agda.readthedocs.io/en/v2.8.0/language/with-abstraction.html#pattern-lambdas),
 and [interface test](../../../testsuite/tests/dependent/should_run/NativeTypeCase.sh).
+
+An invisible `forall` can bind variables used by the case. For example,
+`forall (b :: Bool). Flag b -> (case b of { True -> Int; False -> Char })`
+selects the result at each instantiation of the function type. The
+private family takes `b` as a parameter. The application stays under
+the original `forall`. The binders need explicit closed kinds and
+names distinct from the surrounding captures. A dependent telescope
+such as `forall k (a :: k).` requires a family kind that is available
+when checking the owning synonym. [Quantified example](../examples/open-evaluation/NativeNestedCase.hs)
+and [Agda function types](https://agda.readthedocs.io/en/v2.8.0/language/function-types.html).
 
 ## A case in a let body
 

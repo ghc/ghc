@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TemplateHaskell #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE GADTs, RankNTypes, TypeOperators #-}
 module NativeTypeCaseReify where
 import Data.Type.Equality ((:~:)(Refl))
 import Data.Proxy (Proxy)
@@ -45,3 +45,20 @@ type SeenArrow = $(do
 
 checkedArrow :: SeenArrow :~: (() -> (Proxy 'LT, Proxy 'True))
 checkedArrow = Refl
+
+type SeenForall = $(do
+  info <- reify ''N.ForallResult
+  case info of
+    TyConI (TySynD _ [] scheme)
+      | ForallMatchT (PromotedT tagMa) tagGroup <- scheme
+      , ForallT [KindedTV _ SpecifiedSpec (ConT tagKind)] [] flagForall <- tagGroup
+      , ForallMatchT (PromotedT flagMa) flagGroup <- flagForall
+      , ForallT [KindedTV _ SpecifiedSpec (AppT (ConT maybeKind) (ConT flagKind))] [] _ <- flagGroup
+      , tagKind == ''Ordering, maybeKind == ''Maybe, flagKind == ''Bool
+      , nameBase tagMa == "Unmatchable", tagMa == flagMa -> pure scheme
+    _ -> fail (pprint info))
+
+checkedForall :: SeenForall
+checkedForall tag N.CaseOn = (tag, 1)
+checkedForall tag N.CaseOff = (tag, 0)
+checkedForall tag N.CaseMissing = (tag, '?')

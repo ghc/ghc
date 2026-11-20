@@ -36,6 +36,8 @@ cp NativeCase.hi NativeNestedCase.hi NativeTypeCase{Client,Rigid,LetWrong}.hs in
    grep -Fq 'NativeTypeCaseRigid.hs:45:21: error: [GHC-83865]' bad.log &&
    grep -Fq 'NativeTypeCaseRigid.hs:48:17: error: [GHC-83865]' bad.log &&
    grep -Fq 'NativeTypeCaseRigid.hs:52:22: error: [GHC-83865]' bad.log &&
+   grep -Fq 'NativeTypeCaseRigid.hs:55:31: error: [GHC-83865]' bad.log &&
+   grep -Eq 'the type case in .*ForallResult' bad.log &&
    ! grep -Eq '\$(case(-node)?|lambda):' bad.log &&
    reject NativeTypeCaseLetWrong 8:9 'GHC-83865')
 "${g[@]}" -fomit-interface-pragmas -c NativeTypeCaseHeadProvider.hs
@@ -58,7 +60,9 @@ reject NativeTypeCaseBranchKind 6:12 "In the type case in"
 grep -Fq 'NativeTypeCaseBranchKind.hs:10:12: error: [GHC-83865]' bad.log
 grep -Fq "In the type case in" bad.log
 grep -Fq "BadArrow" bad.log
-reject NativeTypeCaseForallResult 4:48 '[GHC-97233]'
+grep -Fq 'NativeTypeCaseBranchKind.hs:14:12: error: [GHC-83865]' bad.log
+grep -Fq "BadForall" bad.log
+reject NativeTypeCaseForallResult 4:60 '[GHC-97233]'
 reject NativeTypeCaseScrutinee 4:15 'Not in scope: type constructor or class'
 reject NativeTypeCaseLetMonomorphic 6:22 'GHC-83865'
 reject NativeTypeCaseLetUnowned 4:26 'A type let used in a case body cannot generalize the kind of its right-hand side.'

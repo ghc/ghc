@@ -4927,6 +4927,8 @@ pprTypeCaseMismatch ty
       ax <- closedFamilyTyConCoAxiom_maybe tc
       let branches = fromBranches (coAxiomBranches ax)
           visible = filterOutInvisibleTypes tc args
+      -- The ordered root contains tests, with private nodes for their results.
+      guard (not (any branchesToDecision branches))
       column <- case liftedTypeOwner "$case:" (tyConName tc) of
         Just _ -> Just (length visible - 1)
         Nothing -> do
@@ -4944,6 +4946,11 @@ pprTypeCaseMismatch ty
               <+> braces (sep (punctuate semi rows)))
   | otherwise = ppr ty
   where
+    branchesToDecision branch =
+      case splitTyConAppNoView_maybe (coAxBranchRHS branch) of
+        Just (tc, _) -> isJust (liftedTypeOwner "$case-node:" (tyConName tc))
+        Nothing -> False
+
     select index xs
       | index >= 0, (front, x : back) <- splitAt index xs = Just (x, front ++ back)
       | otherwise = Nothing
@@ -5587,10 +5594,10 @@ we want to give it a bit of structure.  Here's the plan
 pprExpectedActualInfo :: SolverReportErrCtxt -> ExpectedActualInfo -> SDoc
 pprExpectedActualInfo _ (ExpectedActual { ea_expected = exp, ea_actual = act }) =
   vcat
-    [ text "Expected:" <+> ppr (restore exp)
-    , text "  Actual:" <+> ppr (restore act) ]
+    [ text "Expected:" <+> render exp
+    , text "  Actual:" <+> render act ]
   where
-    restore = restoreTypeLambdas [exp, act]
+    render = pprTypeCaseMismatch . restoreTypeLambdas [exp, act]
 pprExpectedActualInfo _
   (ExpectedActualAfterTySynExpansion
     { ea_expanded_expected = exp

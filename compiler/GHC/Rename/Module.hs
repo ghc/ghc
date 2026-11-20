@@ -321,8 +321,18 @@ See Note [Checked RHSs for cases in type lets] in GHC.Tc.TyCl.
 
 The result of an ordinary arrow has the same lexical scope as the
 arrow. Use the enclosing captures when lifting a case in the result.
-Stop at a forall. Lifting past it would require captures for the
-new skolems and their kinds.
+
+Keep an invisible forall in place and copy its binders, in order, to
+the family header. The application uses the original variables inside
+the forall, so their skolems stay in scope. Accept only explicit closed
+binder kinds. A dependent binder would need its family parameter in
+scope during the kind check of its owner. The shared SCC does not
+generalize the family kind until after that check.
+
+Stop if a binder shadows a capture, including a kind variable in its
+header. The name in the copied header must keep its original meaning.
+Stop in an active case-let alias environment. The alias bindings belong
+to the outer case and can shadow names in the copied telescope.
 -}
 liftTypeCases :: HsGroup GhcPs -> (HsGroup GhcPs, [(OccName, OccName)])
 liftTypeCases group =
@@ -375,6 +385,17 @@ liftTypeCases group =
       (L loc (HsFunTy ann arrow@(HsModifiedFunArr _ [] HsStandardArr{}) domain result)) salt =
       let (result', cases, next) = liftRhs owner captures aliases result salt
       in (L loc (HsFunTy ann arrow domain result'), cases, next)
+    liftRhs owner captures aliases
+      (L loc quantified@HsForAllTy
+        { hst_tele = HsForAllInvis { hsf_matchability = Nothing, hsf_invis_bndrs = binders }
+        , hst_body = body }) salt
+      | null aliases
+      , Just locals <- traverse (capture . fmap (updateHsTyVarBndrFlag (const (HsBndrRequired noExtField)))) binders
+      , let (implicit, _) = hsQTyVarKindOccs [h | (h, _, _) <- captures] []
+            in_scope = map unLoc implicit ++ [unLoc name | (_, name, _) <- captures]
+      , Just _ <- foldM extendForall in_scope locals
+      = let (body', cases, next) = liftRhs owner (captures ++ locals) aliases body salt
+        in (L loc quantified{hst_body = body'}, cases, next)
     liftRhs owner captures aliases ty salt =
       liftTypeChildren (liftRhs owner captures aliases) ty salt
 
@@ -426,6 +447,12 @@ liftTypeCases group =
 
     capture b@(L _ (HsTvb _ (HsBndrRequired _) (HsBndrVar _ n) _)) = Just (b, n, n)
     capture _ = Nothing
+
+    extendForall names (L _ HsTvb{tvb_kind = HsBndrKind _ kind}, name, _)
+      | unLoc name `notElem` names
+      , Just [] <- lexicalNames kind
+      = Just (unLoc name : names)
+    extendForall _ _ = Nothing
 
     typeName n = L (l2l (getLoc n)) (HsTyVar noAnn NotPromoted n)
 

@@ -117,3 +117,8 @@ hiddenIndex = Refl
 arrowResult ::
   N.ArrowResult 'LT ('Just ('Just 'True)) :~: (() -> (Proxy 'LT, Proxy 'True))
 arrowResult = Refl
+
+forallResult :: N.ForallResult
+forallResult tag N.CaseOn = (tag, 1)
+forallResult tag N.CaseOff = (tag, 0)
+forallResult tag N.CaseMissing = (tag, '?')

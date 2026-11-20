@@ -1,9 +1,10 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, Modifiers, PolyKinds, TypeFamilies #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, Modifiers, PolyKinds, RankNTypes, TypeFamilies #-}
 module NativeNestedCase
   ( Pick, Pair(..), LeftFirst, IgnoreLeft, Uniform, SameFallback
   , Indexed(..), IndexedPick, TypeHead, UniformTypeHead, Wrapped, WrappedBool
   , PickFlipped, DiscardConstant, CaptureFlipped, WrittenFirst
   , AliasFirst, MixedAlias, ArrowResult
+  , CaseFlag(..), ForallResult, forallResult
   , FamilyGate(..), FamilyGatePick, WrittenGatePick, HiddenGatePick, ApartGatePick
   ) where
 
@@ -145,3 +146,21 @@ type ArrowResult (tag :: k) (d :: Maybe (Maybe Bool)) =
     Just (Just field) -> (Proxy tag, Proxy field)
     Just _ -> (Proxy tag, Proxy 'False)
     Nothing -> ())
+
+data CaseFlag (d :: Maybe Bool) where
+  CaseOn :: CaseFlag ('Just 'True)
+  CaseOff :: CaseFlag ('Just 'False)
+  CaseMissing :: CaseFlag 'Nothing
+
+-- | Select the result from the flag and keep the quantified tag.
+type ForallResult = forall (tag :: Ordering) (d :: Maybe Bool).
+  Proxy tag -> CaseFlag d -> (case d of
+    Just True -> (Proxy tag, Int)
+    Just _ -> (Proxy tag, Int)
+    Nothing -> (Proxy tag, Char))
+
+-- | Use the result type selected by the index of the flag.
+forallResult :: ForallResult
+forallResult tag CaseOn = (tag, 1)
+forallResult tag CaseOff = (tag, 0)
+forallResult tag CaseMissing = (tag, '?')
