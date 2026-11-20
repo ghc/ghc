@@ -115,9 +115,19 @@ with either provider. An interface that carries both proof forms selects the
 constructor header in either declaration order. In six runs the client
 returned `(9,'i')` without forcing either witness.
 
-The 271-line optimizer check keeps unsupported generated specialization
-rules local. Exporting those rules and inlining a case that binds a
-callback's result each need separate checks. R05 remains open.
+The bootstrap at `c4d39eb302` also checks generated specialization rules
+and case evidence for a callback. An ordinary source-free client inlines
+`classify f b :: Flag (f b)`. It gets the false branch for `not True`,
+leaves the argument of `const True` lazy, and forces it under `id`.
+Both import paths fire `SPEC numericCall @Int` from an interface that
+also contains the callback evidence. The results for lengths two and
+zero are `[42,42]` and `[]`. A compiler that supports the rule alone
+rejects this interface at its header.
+
+The same bootstrap matches all 272 Showcase lines at default `-O1`,
+passes Core and STG lint, and rejects duplicate constructor-field names
+in imported branch evidence. The self-hosted and full-suite results for
+this revision are pending. R05 remains open.
 
 ## Next increments
 

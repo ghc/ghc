@@ -36,7 +36,7 @@ compiler are pending.
 | Card | Evidence beyond the published checkpoint | Remaining gap |
 | --- | --- | --- |
 | [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | The integrated compiler checks `second :: foreach (q :: DPair a p) -> p (first q)`. Private revision `998c63cb62` accepts written `some` with an isolated library fixture. A source-free client reads each projection and leaves the other field lazy. | Establish equality for equivalent sum types written independently in two modules. The private payload families currently have different names. General domains and inference for `foreach` also remain open. |
-| [R05 dependent Core](roadmap/R05-dependent-core.md) | The integrated bootstrap compiler runs the default `-O1` Showcase and checks both interface generations. The old reader detects new constructor evidence at the header. | Verify the self-hosted compiler. Check exported specialization rules and optimized functions whose result refers to a callback application. |
+| [R05 dependent Core](roadmap/R05-dependent-core.md) | The integrated bootstrap runs the default `-O1` Showcase and checks both interface generations. Private revision `c4d39eb302` inlines a callback whose result is its type index. An exported specialization rule fires from the same provider through both import paths. | Verify the self-hosted compiler, the broader regression suite and written inlining pragmas on retained functions. |
 | [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The integrated Showcase checks a mapper's cons rule on an unknown tail and composes two checked traversals. Observing the result constructor leaves the inner callback lazy. | General open evaluation across arbitrary ordinary definitions. |
 | [R19 type-level cases](roadmap/R19-type-level-cases.md) | The integrated compiler handles ordered constructor tests through aliases and selected GADT indices. It checks cases under `forall k (tag :: k)`. The focused interface client instantiates one annotated result at both `LiftedRep` and `IntRep`. | Verify the integrated tests under the self-hosted compiler. General mixed patterns and open GADT indices remain open. |
 | [R22 erased existentials](roadmap/R22-existential-quantification.md) | The private bootstrap compiler at `7a2fe4027b` builds with the real marker in `base`. The source test passes Template Haskell, lexical unpacking, a source-free ordinary client and ten rejection checks. | Verify the self-hosted compiler and GHCi. General pattern matching and optimization of existential expressions remain open. |
@@ -63,9 +63,9 @@ source examples. General promotion remains open.
    registered `base`. Check the native and interactive Showcase.
 4. Test R04 whole-sum equality across independently compiled modules.
    Compare equivalent bodies with renamed binders and reject unequal bodies.
-5. Run R05 default optimized unfoldings in both compiler stages. Test the
-   generated specialization rule and a case on a callback from an ordinary
-   client that has only the provider interface and object.
+5. Run R05 default optimized unfoldings in both compiler stages. Verify
+   that written `INLINE` and `INLINABLE` pragmas preserve saturation
+   and demand at an ordinary Haskell call site.
 
 Use this queue for current priorities, the linked card for its acceptance
 criteria, and the [implementation log](PLAN.md) for results from individual
