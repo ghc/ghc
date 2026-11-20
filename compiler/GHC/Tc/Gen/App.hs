@@ -451,8 +451,24 @@ tcOrdinaryApp rn_expr rn_fun rn_args exp_res_ty
   = do { fun_lspan <- getFunSrcSpan rn_args
        ; let rn_head = (rn_fun, fun_lspan)
        ; (tc_fun0, fun_sigma0) <- tcInferAppHead rn_head
-       ; tcOpenImplicitArgs fun_sigma0 rn_args exp_res_ty $
-           tcOrdinaryApp' rn_expr rn_head tc_fun0 fun_sigma0 }
+       ; let check_call fun sigma expected =
+               tcOpenImplicitArgs sigma rn_args expected $
+                 tcOrdinaryApp' rn_expr rn_head fun sigma
+       ; case implicitSpineHead fun_sigma0 of
+           ExistsTy ImplicitExists _ body
+             | all ordinary_arg rn_args
+             , opensImplicitHead (count isHsValArg rn_args) body
+             -> do { (prefix, schema) <- tcInstFun NoQL True rn_head tc_fun0 fun_sigma0 []
+                   ; prefix' <- tcValArgsWithCache [] NoQL rn_head prefix
+                   ; let package = L (noAnnSrcSpan fun_lspan) (rebuildHsApps tc_fun0 prefix')
+                   ; result <- expTypeToType exp_res_ty
+                   ; tcOpenImplicitPackage fun_lspan schema package result $ \payload ->
+                       check_call (mkHsVar (noLocA payload)) (varType payload) (mkCheckExpType result) }
+           _ -> check_call tc_fun0 fun_sigma0 exp_res_ty }
+  where
+    ordinary_arg EValArg{} = True
+    ordinary_arg EWrap{} = True
+    ordinary_arg _ = False
 
 tcOrdinaryApp' :: HsExpr GhcRn -> (HsExpr GhcRn, SrcSpan) -> HsExpr GhcTc
                -> TcSigmaType -> [HsExprArg 'TcpRn] -> ExpRhoType -> TcM (HsExpr GhcTc)
@@ -544,43 +560,49 @@ tcOpenImplicitArgs fun_ty args expected check_app
     isLeft (Right _) = False
 
     mark :: TcType -> [HsExprArg 'TcpRn]
-         -> TcM [Either (HsExprArg 'TcpRn) (HsExprLoc, Mult, LHsExpr GhcRn)]
+         -> TcM [Either (HsExprArg 'TcpRn)
+                        (HsExprLoc, Mult, LHsExpr GhcRn, LHsExpr GhcRn -> LHsExpr GhcRn)]
     mark ty (wrapper@EWrap{} : rest) = (Left wrapper :) <$> mark ty rest
     mark ty (ordinary@EValArg{ea_loc_span = loc, ea_arg = arg} : rest)
       | FunTy { ft_af = af, ft_mult = mult, ft_arg = domain, ft_res = result }
-          <- visibleHead ty
+          <- implicitSpineHead ty
       , isVisibleFunArg af
       = do { implicit <- if (isManyTy mult || isOneTy mult)
                             && demandsPayload (coreFullView domain)
-                         then declaredDotResult 0 arg
-                         else return False
-           ; let operand = if implicit then Right (loc, mult, arg) else Left ordinary
+                         then implicitOperand arg
+                         else return Nothing
+           ; let operand = case implicit of
+                   Just (package, replace) -> Right (loc, mult, package, replace)
+                   Nothing -> Left ordinary
            ; (operand :) <$> mark result rest }
     mark _ rest = return (map Left rest)
-
-    visibleHead ty = case coreFullView ty of
-      ForAllTy _ (Bndr _ vis) body | isInvisibleForAllTyFlag vis -> visibleHead body
-      FunTy { ft_af = af, ft_res = body } | isInvisibleFunArg af -> visibleHead body
-      other -> other
 
     demandsPayload TyConApp{} = True
     demandsPayload AppTy{} = True
     demandsPayload FunTy{} = True
     demandsPayload _ = False
 
-    declaredDotResult :: Int -> LHsExpr GhcRn -> TcM Bool
-    declaredDotResult n (L _ (HsApp _ fun _)) = declaredDotResult (n + 1) fun
-    declaredDotResult n (L _ (HsPar _ fun)) = declaredDotResult n fun
-    declaredDotResult n (L _ (HsVar _ name))
-      | let id_name = unLocWithUserRdr name
-      , not (isDataOcc (nameOccName id_name))
-      = maybe False (hasDotResult n . varType) <$> tcLookupIdMaybe id_name
-    declaredDotResult _ _ = return False
+    implicitOperand arg = find_head 0 id arg
+      where
+        find_head n rebuild (L loc (HsApp x fun operand)) =
+          find_head (n + 1) (\f -> rebuild (L loc (HsApp x f operand))) fun
+        find_head n rebuild (L loc (HsPar x fun)) =
+          find_head n (\f -> rebuild (L loc (HsPar x f))) fun
+        find_head n rebuild head_expr@(L _ (HsVar _ name))
+          | let id_name = unLocWithUserRdr name
+          , not (isDataOcc (nameOccName id_name))
+          = do { ident <- tcLookupIdMaybe id_name
+               ; return $ case implicitSpineHead . varType <$> ident of
+                   Just (ExistsTy ImplicitExists _ body)
+                     | opensImplicitHead n body -> Just (head_expr, rebuild)
+                   Just ty | hasDotResult n ty -> Just (arg, id)
+                   _ -> Nothing }
+        find_head _ _ _ = return Nothing
 
-    hasDotResult 0 ty = case visibleHead ty of
+    hasDotResult 0 ty = case implicitSpineHead ty of
       ExistsTy ImplicitExists _ _ -> True
       _ -> False
-    hasDotResult n ty = case visibleHead ty of
+    hasDotResult n ty = case implicitSpineHead ty of
       FunTy { ft_af = af, ft_res = result } | isVisibleFunArg af ->
         hasDotResult (n - 1) result
       _ -> False
@@ -589,26 +611,48 @@ tcOpenImplicitArgs fun_ty args expected check_app
       check_app (reverse rev_args) (mkCheckExpType result_ty)
     open result_ty rev_args (Left arg : rest) =
       open result_ty (arg : rev_args) rest
-    open result_ty rev_args (Right (loc, mult, arg) : rest) =
+    open result_ty rev_args (Right (loc, mult, arg, rebuild) : rest) =
       do { (checked, actual) <- tcScalingUsage mult $ tcInferRho arg
          ; schema <- liftZonkM (zonkTcType actual)
-         ; case coreFullView schema of
-             ExistsTy ImplicitExists binder payload_ty ->
-               do { let origin = UnifyForAllSkol schema
-                  ; skol <- mkSkolemInfo origin
-                  ; name <- newSysName (getOccName binder)
-                  ; witness <- pushTcLevelM_ $ newSkolemTyVar skol name (tyVarKind binder)
-                  ; payload <- newSysLocalId (fsLit "unpacked") ManyTy $
-                      substTyWith [binder] [mkTyVarTy witness] payload_ty
-                  ; let payload_ref = nlHsVar (getName payload)
-                        ref = EValArg loc noExtField $
-                          fmap (\e -> mkExpandedLExpr e payload_ref) arg
-                  ; (ev_binds, body) <- setSrcSpanA (getLoc arg) $
-                      checkConstraints origin [witness] [] $
-                        tcExtendIdEnv [payload] $ open result_ty (ref : rev_args) rest
-                  ; return (XExpr (NativeExistsUnpack witness payload result_ty checked
-                                      (mkHsDictLet ev_binds (noLocA body)))) }
-             _ -> failWithTc (TcRnExistsPack (ExistsPackInvalidSchema schema)) }
+         ; tcOpenImplicitPackage (getLocA arg) schema checked result_ty $ \payload ->
+             do { let payload_ref = nlHsVar (getName payload)
+                      ref = EValArg loc noExtField $
+                        rebuild (fmap (\e -> mkExpandedLExpr e payload_ref) arg)
+                ; tcExtendIdEnv [payload] $ open result_ty (ref : rev_args) rest } }
+
+-- | Find the declared shape after ordinary invisible instantiation.
+implicitSpineHead :: TcType -> TcType
+implicitSpineHead ty = case coreFullView ty of
+  ForAllTy _ (Bndr _ vis) body | isInvisibleForAllTyFlag vis -> implicitSpineHead body
+  FunTy { ft_af = af, ft_res = body } | isInvisibleFunArg af -> implicitSpineHead body
+  other -> other
+
+-- | Check a value spine against the declared payload of an implicit head.
+opensImplicitHead :: Int -> TcType -> Bool
+opensImplicitHead arity body = arity > 0 && go arity body
+  where
+    go 0 _ = True
+    go n ty = case splitVisibleFunTy_maybe ty of
+      Just (_, result) -> go (n - 1) result
+      Nothing -> False
+
+-- | Open a checked package while keeping its result type outside the scope.
+tcOpenImplicitPackage :: SrcSpan -> TcType -> LHsExpr GhcTc -> TcRhoType
+                      -> (Id -> TcM (HsExpr GhcTc)) -> TcM (HsExpr GhcTc)
+tcOpenImplicitPackage loc schema checked result_ty check_body
+  = case coreFullView schema of
+      ExistsTy ImplicitExists binder payload_ty ->
+        do { let origin = UnifyForAllSkol schema
+           ; skol <- mkSkolemInfo origin
+           ; name <- newSysName (getOccName binder)
+           ; witness <- pushTcLevelM_ $ newSkolemTyVar skol name (tyVarKind binder)
+           ; payload <- newSysLocalId (fsLit "unpacked") ManyTy $
+               substTyWith [binder] [mkTyVarTy witness] payload_ty
+           ; (ev_binds, body) <- setSrcSpan loc $
+               checkConstraints origin [witness] [] (check_body payload)
+           ; return (XExpr (NativeExistsUnpack witness payload result_ty checked
+                               (mkHsDictLet ev_binds (noLocA body)))) }
+      _ -> failWithTc (TcRnExistsPack (ExistsPackInvalidSchema schema))
 
 {- Note [Implicit existential arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -618,6 +662,14 @@ first rule recognizes named argument heads and ordinary value spines.
 The declaration selects the route. The ordinary checker verifies the
 actual argument, including its use and all of its constraints, once.
 Scale that check by the concrete multiplicity of the formal arrow.
+
+A dot package with an arrow payload can also head a value application.
+Instantiate the head's ordinary invisible prefix before opening the package.
+For a direct call, check its original operands against that payload inside
+the opening. A named argument call can need the scope across an enclosing
+consumer. When its formal domain requests a payload, open only the inner
+head and replace that head in the original expression. The ordinary
+checker then checks the rewritten call once, as part of the outer call.
 
 For each dot operand, introduce a fresh skolem and a lazy payload
 binding. Instantiate the application under all of the skolems. The
