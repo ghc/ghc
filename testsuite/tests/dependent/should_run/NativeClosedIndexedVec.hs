@@ -6,6 +6,8 @@ import qualified ExistentialVec as E
 import qualified IndexedVec as V
 import qualified NativeClosedIndexedRoute as R
 import qualified NativeClosedVectorPair as P
+import qualified PackedVecLibrary as Packed
+import qualified VectorSplitObservation as S
 
 cells :: V.two 3 :~: 'V.VCons 3 ('V.VCons 4 'V.VNil)
 cells = Refl
@@ -39,7 +41,11 @@ computed = Refl
 fare :: R.ticket 4 :~: 'R.Ticket ('R.OnWay 'R.AtHome) ('R.Change ('R.Paid 4) 5)
 fare = Refl
 
+reassembled :: S.reassembleTwo ('Packed.VCons 'True ('Packed.VCons 'False 'Packed.VNil))
+            :~: 'Packed.VCons 'True ('Packed.VCons 'False 'Packed.VNil)
+reassembled = Refl
+
 main :: IO ()
-main = case (cells, first, both, pair, writtenExistential, empty, one, two, computed, fare) of
-  (Refl, Refl, Refl, Refl, Refl, Refl, Refl, Refl, Refl, Refl) ->
+main = case (cells, first, both, pair, writtenExistential, empty, one, two, computed, fare, reassembled) of
+  (Refl, Refl, Refl, Refl, Refl, Refl, Refl, Refl, Refl, Refl, Refl) ->
     print (V.safeHead (V.two 3), V.readTwo (V.two 3))

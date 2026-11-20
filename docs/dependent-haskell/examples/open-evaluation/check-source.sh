@@ -69,6 +69,63 @@ cp "$src"/{OpenSource,RunOpenSource}.hs manager/
 )
 printf 'home modules under --make select the expected type arguments\n'
 
+# Check the retained Ordering witness through an ordinary, source-hidden client.
+mkdir ordering-provider ordering-client
+cp "$src/RuntimeOrdering.hs" ordering-provider/
+cp "$src/OrderingPayload.hs" ordering-client/
+(cd ordering-provider && "${ghc[@]}" -c RuntimeOrdering.hs)
+cp ordering-provider/RuntimeOrdering.hi ordering-client/
+cat >ordering-client/RunOrdering.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module Main where
+import Control.Exception (ErrorCall(..), evaluate, try)
+import Data.IORef (newIORef, readIORef)
+import OrderingPayload (showComparison)
+
+main :: IO ()
+main = do
+    pivot <- newIORef True >>= readIORef
+    let unused = error "comparison forced an unused payload"
+    print [ showComparison (not pivot) pivot (17, unused, unused)
+          , showComparison pivot pivot (unused, True, unused)
+          , showComparison pivot (not pivot) (unused, unused, 'G') ]
+    print (const True (showComparison unused unused unused))
+    left <- try (evaluate (showComparison (error "pivot") True unused))
+    right <- try (evaluate (showComparison False (error "head") unused))
+    print (case (left, right) of
+              (Left (ErrorCall "pivot"), Left (ErrorCall "head")) -> True
+              _ -> False)
+HS
+cat >ordering-client/WrongOrdering.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}
+module WrongOrdering where
+
+import RuntimeOrdering (Witness(..))
+
+wrongHead :: foreach (p :: Bool -> Ordering) -> foreach (x :: Bool)
+          -> foreach (y :: Bool) -> Witness (p x)
+wrongHead p x y = case p y of
+    LT -> Less
+    EQ -> Equal
+    GT -> Greater
+HS
+(
+    cd ordering-client
+    "${ghc[@]}" -i. -c OrderingPayload.hs RunOrdering.hs
+    "${ghc[@]}" RunOrdering.o OrderingPayload.o ../ordering-provider/RuntimeOrdering.o -o run
+    [[ $(./run) == $'["LT:17","EQ:True","GT:\'G\'"]\nTrue\nTrue' ]]
+    if "${ghc[@]}" -i. -c WrongOrdering.hs >wrong.log 2>&1; then
+        echo 'An Ordering witness matched the wrong head.' >&2
+        exit 1
+    fi
+    for line in 9 10 11; do
+        if ! grep -Fq "WrongOrdering.hs:$line:11: error: [GHC-83865]" wrong.log; then
+            cat wrong.log >&2
+            exit 1
+        fi
+    done
+)
+
 # A certified identity still supports ordinary symbolic calls with rules on.
 mkdir optimized
 cat >optimized/UnfoldedIdentity.hs <<'HS'

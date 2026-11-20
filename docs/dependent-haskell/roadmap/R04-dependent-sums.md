@@ -261,3 +261,20 @@ partition preserves input order. The partition traverses the finite vector
 and tests each element. The elements can stay unevaluated when the
 predicate ignores them.
 [Agda proof and Idris vector partition](../REFERENCES.md#conservation-of-partition-length).
+
+`choosePartition` gives an imported `Branch a r` continuation the selected
+length and vector. It leaves the other vector and the equality proof
+unevaluated. Its required type argument supplies `total` when the result
+`r` is independent of length. For an empty input, write
+`choosePartition (type 'Z)`. GHC cannot infer `total` from `Split a total`
+alone. A continuation that consumes the sum equality also works if its
+type fixes `total`, or if the expected result fixes it, as in `Vec a total`.
+
+The Showcase passes a list read through an `IORef` to `fromList` and opens
+the result as `Pair total values`. With dependent syntax enabled it can
+write `choosePartition (type total)` to select either output. An ordinary
+module can instead call a local worker with signature `forall n. Vec a n
+-> r` on `values` and pass `(type n)` inside that worker. Naming the term
+binder `total` in a type in the ordinary module produces GHC-45510.
+In both calls the required type argument is erased.
+[Runtime example](../Showcase.hs) and [ordinary selector](../examples/packed-vector/ListVectorClient.hs).

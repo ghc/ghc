@@ -152,6 +152,8 @@ heads of empty and nonempty runtime lists: (Nothing,Just 11)
 safeHead of a known list cell: False
 safeHead at length 1 + n: True
 runtime sum and appended vector: (3,[True,False,False])
+split the appended vector at its first length: ([True],[False,False])
+reassemble the same two vector elements: [True,False]
 outer successor ignores the second addend: True
 replicate at a computed runtime length: [True,True,True]
 grow at a locally named runtime index: ("xxx",'x')
@@ -335,7 +337,12 @@ prove that reverse preserves list length: (Refl,Succ (Succ Zero))
 prove that map distributes over append: (Refl,[False,True,False],[False,True,False],(True,True))
 filter with Prelude.not and Prelude.id without forcing the kept tail: ((Refl,Refl,True),(Refl,Refl,True))
 prove filter never increases length: (BothSucc (RightSucc ZeroBound),Succ Zero,Succ (Succ Zero))
+prove the filter bound from a runtime list: (BothSucc (RightSucc (BothSucc ZeroBound)),Succ (Succ Zero),Succ (Succ (Succ Zero)))
+prove the filter bound with a runtime decider: (BothSucc (BothSucc (BothSucc ZeroBound)),Succ (Succ (Succ Zero)),Succ (Succ (Succ Zero)))
+prove the filter bound for rows at a runtime cutoff: (BothSucc (BothSucc (RightSucc ZeroBound)),[Zero,Succ Zero],Succ (Succ (Succ Zero)))
+select a payload with a checked runtime comparison: ["LT:17","EQ:True","GT:'G'"]
 use a checked cons rule without forcing the callback, head or tail: (Refl,True)
 compose two checked traversals without forcing the inner callback: (Refl,True)
 collect row heads with an ordinary polymorphic callback: Refl
 regroup both partitions at the original length: (4,[3,4,1,2])
+choose either partition at a runtime input length: ((2,[3,4]),(2,[1,2]))

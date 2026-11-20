@@ -1,0 +1,4 @@
+PartialFamilyArityAfterErasure.hs:17:12: error: [GHC-27346]
+    • The type family ‘Select’ should have 2 arguments, but has been given 1
+    • In the type signature:
+        checked :: (Hide (Accept (Select 'True)), Accept (Select 'False))

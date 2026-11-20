@@ -9,11 +9,26 @@ records every edge. The R numbers are local labels for those cards.
 
 ## Where this fork stands
 
+`splitAtVec` takes a runtime cut `n` and a vector of length `Add n m`.
+It returns two vectors of lengths `n` and `m`. The 344-line Showcase also
+checks the contents of a concrete split. Appending the two parts of
+`[True, False]` gives that same vector. Swapping the elements makes the
+equality proof fail at `Refl`. The law for every input vector remains open.
+[Split and prior art](REFERENCES.md#split-a-vector-at-a-retained-length) and
+[contents proof](../../testsuite/tests/dependent/should_run/NativeClosedIndexedVec.hs).
+
+A case on an ordinary comparator can return a witness for `p x` in all
+three `Ordering` branches. A separately compiled ordinary module uses
+the witness to choose an `Int`, `Bool`, or `Char` payload. It leaves the
+other two payloads unevaluated. [Provider](examples/open-evaluation/RuntimeOrdering.hs)
+and [ordinary client](examples/open-evaluation/OrderingPayload.hs).
+
 An ordinary client can partition a vector with a runtime predicate and
 return the two parts appended at the original input length. The producer
 returns two nested `some` packages and proves that their lengths add up to
 the input length. Returning just the kept vector at that length fails at
-the returned expression. The Showcase includes this ordinary caller. [Partition proof](examples/packed-vector/ConservedPartition.hs),
+the returned expression. A caller can also choose either partition at
+runtime and pass its length and vector to the same consumer. [Partition proof](examples/packed-vector/ConservedPartition.hs),
 [ordinary caller](examples/packed-vector/ListVectorClient.hs) and
 [verification](CHECKPOINTS.md#family-and-package-checkpoints).
 
@@ -54,14 +69,16 @@ that the right list and the elements remain lazy where promised.
 [List-to-vector example](roadmap/R04-dependent-sums.md)
 and [append proofs](roadmap/R16-open-term-evaluator.md#prove-that-map-distributes-over-append).
 
-An ordinary module proves that filtering a finite list cannot increase
-its `size`. At each head, a checked `Prelude.filter` equation says
-whether that element stays or goes. For `Prelude.not`, knowing the
-predicate result supplies the equation even when the head is unknown.
-For an abstract predicate, the current compiler requires the step
-equation itself. The source-hidden regression checks both limits and
-rejects the reversed bound for a singleton that the filter drops.
-[Filter proof](examples/open-evaluation/PreludeFilterLengthProof.hs).
+GHC checks that filtering a finite list cannot increase its `size`.
+The list and the cutoff captured by its predicate can both come from
+`IO`. A case on the predicate result supplies the evidence for the
+checked `Prelude.filter` equation at that element. The proof takes an
+explicit predicate argument that GHC erases. A decider for a different
+predicate fails to typecheck. Observing the complete proof requires a
+defined decision at each element.
+[Filter proof](examples/open-evaluation/PreludeFilterLengthProof.hs),
+[runtime cutoff](examples/open-evaluation/PreludeFilterCutoff.hs) and
+[verification](CHECKPOINTS.md#family-and-package-checkpoints).
 
 A function can repeat the same type-level case in its argument and result.
 For `caseIdentity`, the result type is `Int` at `True` and `Bool` at
@@ -224,10 +241,11 @@ source examples. General promotion remains open.
    and `x` in `keepReading @Bool m x`. Extend the inference to
    type arguments after a value operand in a dependent telescope.
    [Rule and interface support](roadmap/R05-dependent-core.md).
-2. **R23 and R24.** An unsigned recursive family can forward a
-   constructor or a partial family across stripped interfaces. The arity error now suggests the
-   extension for eligible partial family applications. For constrained
-   families, check the domain at formation in a separate client.
+2. **R23 and R24.** A recursive family can forward a constructor
+   or a partial family across stripped interfaces. When a signature
+   contains one eligible written application, GHC locates its arity
+   error there and suggests the extension. For R24, check a separate
+   client's obligation when it forms an associated family application.
    [Domain example](roadmap/R24-constrained-type-families.md),
    [inferred callback arrows](roadmap/R23-unsaturated-type-families.md#inferring-a-callback-arrow-in-a-closed-family),
    [later argument](roadmap/R23-unsaturated-type-families.md#choosing-a-prefixs-matchability-from-a-later-argument)

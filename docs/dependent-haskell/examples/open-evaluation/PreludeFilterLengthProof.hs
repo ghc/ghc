@@ -1,9 +1,12 @@
-{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, PolyKinds, StandaloneDeriving, TypeOperators #-}
+{-# LANGUAGE DataKinds, GADTs, Modifiers, NoExperimentalDependentTypes, PolyKinds #-}
+{-# LANGUAGE ScopedTypeVariables, StandaloneDeriving, TypeOperators #-}
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
 module PreludeFilterLengthProof
-    ( AtMost(..), FilterSteps(..), filterLengthBound, showPreludeFilterLength ) where
+    ( AtMost(..), FilterSteps(..), filterLengthBound, keepIfTrue, skipIfFalse
+    , showPreludeFilterLength ) where
 
 import Data.Type.Equality ((:~:)(Refl))
+import GHC.Exts (U)
 import PreludeFilterSource (FilterWith, Negation)
 import qualified PreludeMapLengthSize as S
 import PreludeMapLengthSource (Count)
@@ -30,13 +33,15 @@ filterLengthBound End = ZeroBound
 filterLengthBound (Keep Refl xs) = BothSucc (filterLengthBound xs)
 filterLengthBound (Skip Refl xs) = RightSucc (filterLengthBound xs)
 
--- | Keep a head when the given negation result is true.
-keepNegated :: (Negation x ~ 'True) => FilterSteps Negation xs -> FilterSteps Negation (x ': xs)
-keepNegated = Keep Refl
+-- | Add a step for a head whose predicate returns true.
+keepIfTrue :: forall a (p :: a %U -> Bool) (x :: a) (xs :: [a]).
+              p x ~ 'True => FilterSteps p xs -> FilterSteps p (x ': xs)
+keepIfTrue = Keep Refl
 
--- | Skip a head when the given negation result is false.
-skipNegated :: (Negation x ~ 'False) => FilterSteps Negation xs -> FilterSteps Negation (x ': xs)
-skipNegated = Skip Refl
+-- | Add a step for a head whose predicate returns false.
+skipIfFalse :: forall a (p :: a %U -> Bool) (x :: a) (xs :: [a]).
+               'False ~ p x => FilterSteps p xs -> FilterSteps p (x ': xs)
+skipIfFalse = Skip Refl
 
 -- | Observe the proof and count the filtered and original lists.
 showPreludeFilterLength :: String
@@ -44,4 +49,4 @@ showPreludeFilterLength = show (filterLengthBound steps, S.size (filter not xs),
   where
     xs = [False, True]
     steps :: FilterSteps Negation '[ 'False, 'True]
-    steps = keepNegated (skipNegated End)
+    steps = keepIfTrue (skipIfFalse End)

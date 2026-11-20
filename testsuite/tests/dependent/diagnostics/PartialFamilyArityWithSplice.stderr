@@ -1,0 +1,4 @@
+PartialFamilyArityWithSplice.hs:16:12: error: [GHC-27346]
+    • The type family ‘Select’ should have 2 arguments, but has been given 1
+    • In the type signature:
+        checked :: (Accept (Select 'False), Accept (Select 'True))

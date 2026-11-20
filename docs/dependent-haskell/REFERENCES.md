@@ -6341,10 +6341,17 @@ and [R16 application](roadmap/R16-open-term-evaluator.md#filter-one-known-head-a
 Agda's `length-filter` splits on the current predicate result.
 It adds a successor to both sizes when the head is kept and to
 the upper bound when the head is dropped. The Haskell proof uses
-the same induction. Its witness supplies the corresponding equation
-for installed `Prelude.filter` at each head.
+the same induction. Its witness supplies the result of the predicate
+or the corresponding filter equation. GHC uses the Given coercion for
+the whole application in the guard. Proposal 242 limits decomposition
+of nominal application equalities to matchable arrows. The rewriter
+uses congruence on the guard and leaves the predicate and head rigid.
+The runtime example mirrors Agda's split on an evaluated predicate.
+Its retained Boolean witness names the computed result and exposes the
+branch equality when the caller matches the witness constructor.
 [Agda standard library 2.4, length-filter](https://agda.github.io/agda-stdlib/v2.4/Data.List.Properties.html#1588),
 [Agda with-abstraction](https://agda.readthedocs.io/en/latest/language/with-abstraction.html),
+[GHC proposal 242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#matchability),
 and [R16 length bound](roadmap/R16-open-term-evaluator.md#prove-that-filter-never-increases-length).
 
 ### Exporting an ordinary identity equation
@@ -6364,6 +6371,32 @@ change a call. The proof uses the existing policy for checked final
 Core equations. [GHC pragmas](../users_guide/exts/pragmas.rst),
 [GHC rewrite rule semantics](../users_guide/exts/rewrite_rules.rst),
 and [R16 application](roadmap/R16-open-term-evaluator.md#use-an-ordinary-identity-as-an-open-callback).
+
+### Checked runtime decisions for filter
+
+Agda's `length-filter` takes a `Decidable P` argument. It branches on
+`does (P? x)`, the Boolean result of the decision for the current head.
+The Haskell decider returns an indexed Boolean singleton. It accepts
+the runtime head through `foreach`, which lets the result type mention
+that head directly. The example projects the runtime Boolean from the
+same singleton. [Agda standard library 2.4, length-filter](https://agda.github.io/agda-stdlib/v2.4/Data.List.Properties.html#1588),
+[Agda Dec](https://agda.github.io/agda-stdlib/v2.4/Relation.Nullary.Decidable.Core.html),
+and [singletons 3.0.4, fromSing](https://hackage-content.haskell.org/package/singletons-3.0.4/docs/Data-Singletons.html#v:fromSing).
+
+`Data.Bool.Linear` uses `%1` to specify how a Boolean argument is consumed.
+`FilterDecider` uses its result index to specify which answer the callback
+can return. The caller can reuse its decider for each list element, and
+the decider controls whether to evaluate the head.
+[linear-base 0.5.0, Data.Bool.Linear](https://hackage-content.haskell.org/package/linear-base-0.5.0/docs/Data-Bool-Linear.html)
+and [R16 runtime decider](roadmap/R16-open-term-evaluator.md#supply-a-runtime-filter-decider).
+
+An Agda filter decision can close over a value. For a fixed cutoff
+`k`, the decision can compare the length of each row with `k` using
+`_≤?_`. The Haskell cutoff uses the same local predicate at the
+decision site and in the filter call. Its length test can stop at
+the first successor past the cutoff. [Agda standard library 2.4, list filter](https://agda.github.io/agda-stdlib/v2.4/Data.List.Base.html),
+[Agda natural-number decisions](https://agda.github.io/agda-stdlib/v2.4/Data.Nat.Properties.html),
+and [R16 captured cutoff](roadmap/R16-open-term-evaluator.md#capture-a-runtime-cutoff-in-the-predicate).
 
 Agda permits a datatype declaration and its constructors to appear at
 different positions in an interleaved mutual block. Haskell's renamer
@@ -6436,3 +6469,30 @@ client return the appended vector at the input index.
 [Agda standard library v1.2, interleaving properties](https://agda.github.io/agda-stdlib/v1.2/Data.List.Relation.Ternary.Interleaving.Properties.html),
 [Idris 2, Data.Vect.partition](https://idris-lang.org/Idris2/base/source/Data.Vect.html#743)
 and [Haskell implementation](examples/packed-vector/ConservedPartition.hs).
+
+## Split a vector at a retained length
+
+Idris 2's `Data.Vect.splitAt` takes a cut `n` and a vector of length
+`n + m`. The zero case returns the empty prefix and the input. The
+successor case splits the tail at the predecessor and adds the head
+back to the prefix. Idris supplies the implicit suffix `{m}` on the
+recursive call. GHC infers the suffix in the recursive Haskell call. With
+two abstract runtime lengths, the Showcase supplies the suffix `@m`.
+The family application `Add n m` alone leaves `m` ambiguous at an abstract cut.
+Agda's `Data.Vec.Base.splitAt` follows the same recursion and also
+returns a proof that appending the two outputs gives the input.
+`splitAtVec` exposes the exact lengths of both outputs.
+[Idris 2, Data.Vect.splitAt](https://idris-lang.org/Idris2/base/source/Data.Vect.html#731),
+[Agda standard library v2.3, Data.Vec.Base](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html)
+and [Haskell implementation](examples/packed-vector/PackedVecLibrary.hs).
+
+The closed evaluator checks reassembly of the written vector
+`VCons True (VCons False VNil)` by running the split and append.
+The witness checks the contents for that input. Swapping the two
+elements makes `Refl` fail even though the length stays the same.
+A general proof needs a retained binder for the input vector and
+open append equations at the indexed vector kinds. The zero case
+uses the append identity. The successor case applies constructor
+congruence to the proof for the tail.
+[Ordinary reassembly](examples/closed-evaluation/VectorSplitObservation.hs)
+and [checked witness](../../testsuite/tests/dependent/should_run/NativeClosedIndexedVec.hs).

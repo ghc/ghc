@@ -22,6 +22,18 @@ Its two inputs can come from IO. The result index remains the same
 through compilation, and the runtime sum stays lazy.
 [Computed retained length](../PLAN.md#m81-a-computed-retained-length).
 
+A retained Boolean witness can also use `Prelude.not x` on a head
+from an IO-supplied list. The witness provides the branch equality
+needed to prove the filter size bound. An ordinary client can open the
+packaged bound. [Runtime filter proof](R16-open-term-evaluator.md#prove-that-filter-never-increases-length).
+
+An imported higher-order contract can take a decider with a retained
+head and a result indexed by the chosen predicate. An ordinary module
+can choose that decider at runtime. [Runtime filter decider](R16-open-term-evaluator.md#supply-a-runtime-filter-decider).
+
+A package can retain a local predicate that captures an IO-supplied
+cutoff. The proof index keeps that function's identity. [Captured cutoff](R16-open-term-evaluator.md#capture-a-runtime-cutoff-in-the-predicate).
+
 - Runtime Bool and Peano Nat indices, checked equations and bounded lambdas.
 - A retained binder can have a lifted type parameter as its domain.
   The `withPair` callback can name that argument as the index of its

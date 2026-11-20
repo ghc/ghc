@@ -86,6 +86,7 @@ import GHC.TypeLits (charVal)
 import qualified IndexBetaClient as IndexBeta
 import qualified IndexedMark
 import qualified IndexedVec
+import qualified VectorSplitObservation
 import qualified KnownArgumentClient as Known
 import qualified Language.Haskell.TH as TH
 import qualified LocalOpen
@@ -112,12 +113,17 @@ import qualified OpenBuildSource
 import qualified OpenMapProof
 import qualified OpenMapWorker
 import qualified InstalledNotProof
-import qualified PreludeFilterProof
+import qualified OrderingPayload
+import qualified PreludeFilterCutoff
+import qualified PreludeFilterDecider
 import qualified PreludeAppendLengthProof
 import qualified PreludeFilterLengthProof
+import qualified PreludeFilterProof
+import qualified PreludeFilterRuntime
 import qualified PreludeMapAppendProof
 import qualified PreludeMapLengthProof
 import qualified PreludeReverseLengthProof
+import qualified PreludeMapLengthSize as Size
 import qualified PreludeMapProof
 import qualified ConsRuleMapProof
 import qualified OpenBuildWorker as Build
@@ -132,6 +138,8 @@ import qualified PreludePairExport
 import qualified OpaqueCallClient as Opaque
 import qualified PairProjection as ComputedProjection
 import qualified OrdinaryVecClient as Ordinary
+import qualified ConservedPartition
+import qualified GHC.Sigma as Sigma
 import qualified ListVectorClient
 import qualified ParameterizedIndexLibrary as Parameterized
 import qualified PackedProjection
@@ -1262,6 +1270,24 @@ main = do
               ++ PreludeFilterProof.showPreludeFilterProofs)
     putStrLn ("prove filter never increases length: "
               ++ PreludeFilterLengthProof.showPreludeFilterLength)
+    runtimeList <- newIORef [False, True, False]
+    xs <- readIORef runtimeList
+    putStrLn ("prove the filter bound from a runtime list: "
+              ++ PreludeFilterRuntime.showRuntimeBound (PreludeFilterRuntime.packRuntimeBound xs))
+    ref <- newIORef (PreludeFilterDecider.SomeFilterDecider PreludeFilterDecider.alwaysDecider)
+    decider <- readIORef ref
+    putStrLn ("prove the filter bound with a runtime decider: "
+              ++ PreludeFilterDecider.showDecidedBound decider xs)
+    cutoff <- newIORef (Size.Succ Size.Zero) >>= readIORef
+    rows <- newIORef [[], [False], [True, False]] >>= readIORef
+    putStrLn ("prove the filter bound for rows at a runtime cutoff: "
+              ++ PreludeFilterCutoff.showCutoffBound (PreludeFilterCutoff.packCutoff cutoff rows))
+    pivot <- newIORef True >>= readIORef
+    let unused = error "comparison forced an unused payload"
+    observe "select a payload with a checked runtime comparison"
+        [ OrderingPayload.showComparison (not pivot) pivot (17, unused, unused)
+        , OrderingPayload.showComparison pivot pivot (unused, True, unused)
+        , OrderingPayload.showComparison pivot (not pivot) (unused, unused, 'G') ]
     observe "use a checked cons rule without forcing the callback, head or tail"
         (ConsRuleMapProof.negateHead (Proxy @'[]), ConsRuleMapProof.lazySpine)
     observe "compose two checked traversals without forcing the inner callback"
@@ -1272,6 +1298,12 @@ main = do
     partitionInput <- newIORef [3, 1, 4, 2] >>= readIORef
     observe "regroup both partitions at the original length"
         (ListVectorClient.regroupObservation (> cutoff) partitionInput)
+    case ListVectorClient.fromList partitionInput of
+        Sigma.Pair total values ->
+            let split = ConservedPartition.partitionVec (> cutoff) values
+                select kept = ListVectorClient.choosePartition @Int (type total) kept split
+                    (\n cells -> (natToInt n, toList cells))
+            in observe "choose either partition at a runtime input length" (select True, select False)
 
 -- | Complement one flag at the type level.
 type family FlipFlag (b :: Bool) :: Bool where
@@ -1446,7 +1478,15 @@ sourceAddition = do
         ys = replicateNative m False
         joined :: Vec Bool (n + m)
         joined = appendHidden xs ys
+        split :: (Vec Bool n, Vec Bool m)
+        split = splitAtVec @Bool @m n joined
     observe "runtime sum and appended vector" (natToInt (n + m), toList joined)
+    observe "split the appended vector at its first length"
+        (toList (fst split), toList (snd split))
+    case (Refl :: VectorSplitObservation.reassembleTwo ('VCons 'True ('VCons 'False 'VNil))
+               :~: 'VCons 'True ('VCons 'False 'VNil)) of
+        Refl -> observe "reassemble the same two vector elements"
+            (toList (VectorSplitObservation.reassembleTwo (VCons True (VCons False VNil))))
     observe "outer successor ignores the second addend" (isSuccessor (1 + undefined))
 
     let filled :: Vec Bool (n + m)

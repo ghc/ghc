@@ -43,6 +43,7 @@ import GHC.Core.Opt.Arity ( ArityType, exprArity, arityTypeBotSigs_maybe
                           , pushCoTyArg, pushCoValArg, exprIsDeadEnd
                           , typeArity, arityTypeArity, etaExpandAT )
 import GHC.Core.SimpleOpt ( exprIsConAppFor_maybe, joinPointBinding_maybe, joinPointBindings_maybe )
+import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.FVs     ( mkRuleInfo, hasFreeVarInCoreAnnotations, exprAnnotationFreeVars
                         , bindsAnnotationFreeVars )
 import GHC.Core.Rules   ( lookupRule, getRules )
@@ -60,7 +61,7 @@ import GHC.Types.Demand
 import GHC.Types.Unique ( hasKey )
 import GHC.Types.Basic
 import GHC.Types.Tickish
-import GHC.Types.Var    ( isTyCoVar )
+import GHC.Types.Var    ( isNonCoVarId, isTyCoVar )
 import GHC.Types.Var.Set (VarSet, emptyVarSet, elemVarSet, unionVarSet)
 
 import GHC.Builtin.WiredIn.Prim( realWorldStatePrimTy )
@@ -794,6 +795,16 @@ Floating S Z into a fresh binding n changes the expected type to Vec a n.
 The new runtime Id is opaque, so the original vector type cannot use that
 Id in place of its constructor index. Keep the retained argument in place.
 Ordinary arguments in the same application can still be made trivial.
+If an argument's type mentions a runtime Id, keep it inside a top-level
+RHS. Naming that argument would give a top-level binder a type that refers
+to the runtime Id. Core Tidy can give the RHS a local alias, but the type
+of the top-level binder would still refer to the original Id.
+See Note [Local indices across Core Tidy] in GHC.Iface.Tidy.
+
+This guard applies only to optional preparation of a top-level RHS.
+The continuation paths call makeTrivial with NotTopLevel, so they still
+bind nontrivial arguments before duplication. A constructor field stays
+lazy in its containing RHS. CorePrep can bind it after index erasure.
 -}
 
 prepareRhs :: HasDebugCallStack
@@ -882,6 +893,9 @@ makeTrivial env top_lvl dmd occ_fs expr
   | exprIsTrivial expr                          -- Already trivial
   || not (bindingOk top_lvl expr expr_ty)       -- Cannot trivialise
                                                 --   See Note [Cannot trivialise]
+  || (isTopLevel top_lvl                       -- See Note [Keep retained arguments in prepareRhs]
+      && sm_core_mode (seMode env) == RetainedCore
+      && anyFreeVarsOfType isNonCoVarId expr_ty)
   = return (emptyLetFloats, expr)
 
   | Cast expr' co <- expr
@@ -1921,6 +1935,12 @@ simplArg _ _ _ (Simplified {}) arg mco
        MRefl  -> return arg       -- Vastly common case
        MCo co -> return (mkCast arg co)
 simplArg env mb_arg_info fun_ty (UnSimplified arg_se) arg mco
+  | sm_core_mode (seMode env) == RetainedCore
+  , DepFunTy{} <- coreFullView fun_ty
+  , Just _ <- nativeComputedIndex arg
+  -- See Note [Keep checked source calls in retained arguments].
+  = return (mkCastMCo (CoreSubst.substExpr (getFullSubst (getInScope env) arg_se) arg) mco)
+  | otherwise
   = do { let arg_env' = arg_se `setInScopeFromE` env
              arg_ty
                | sm_core_mode (seMode env) == RetainedCore
@@ -1931,6 +1951,24 @@ simplArg env mb_arg_info fun_ty (UnSimplified arg_se) arg mco
                            Just ai -> mkLazyArgStop arg_ty ai
              cont     = addCastMCo mco stop
        ; simplExprC arg_env' arg cont }
+
+{- Note [Keep checked source calls in retained arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For a retained application such as `booleanResult (not x)`, the result
+type mentions the checked source family for `not x`. Inlining `not`
+replaces the call with a case. The case has no index in the operand
+grammar, so Core Lint can no longer instantiate the result type.
+
+Apply the lexical substitution, but leave the checked call tree in place.
+This includes calls nested in constructor arguments. The ordinary
+argument path and calls outside retained operands still use the inliner
+and rules. CorePrep can bind the operand lazily after index erasure.
+
+Case-of-case can duplicate the application continuation. Keep the
+retained operand in each branch. Naming it `karg` would change the
+result's index to `karg` without evidence of its equality to the
+original expression. Only the selected branch can evaluate the argument.
+-}
 
 {-
 ************************************************************************
@@ -4398,10 +4436,15 @@ mkDupableContWithDmds env dmds
         ; (floats1, cont') <- mkDupableContWithDmds env cont_dmds cont
         ; let env' = env `setInScopeFromF` floats1
         ; arg' <- simplArg env' Nothing hole_ty se arg arg_mco
-        ; (let_floats2, triv_arg) <- makeTrivial env' NotTopLevel dmd (fsLit "karg") arg'
+        ; (let_floats2, arg'') <-
+            if | sm_core_mode (seMode env) == RetainedCore
+               , DepFunTy{} <- coreFullView hole_ty
+                 -- See Note [Keep checked source calls in retained arguments].
+                 -> return (emptyLetFloats, arg')
+               | otherwise -> makeTrivial env' NotTopLevel dmd (fsLit "karg") arg'
         ; let all_floats = floats1 `addLetFloats` let_floats2
         ; return ( all_floats
-                 , ApplyToVal { sc_arg = triv_arg, sc_env = Simplified OkDup
+                 , ApplyToVal { sc_arg = arg'', sc_env = Simplified OkDup
                               , sc_cast = MRefl, sc_cont = cont', sc_hole_ty = hole_ty }) }
 
 mkDupableContWithDmds env _

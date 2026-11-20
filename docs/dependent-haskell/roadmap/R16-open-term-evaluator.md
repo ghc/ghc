@@ -1276,28 +1276,116 @@ an unqualified type variable keeps its earlier scope.
 
 `filterLengthBound` bounds `Count (FilterWith p xs)` by `Count xs`
 for an arbitrary element type and predicate. The `FilterSteps` witness
-contains the finite spine and one equation for each head. At the empty
+contains the finite spine and the decision for each head. At the empty
 list, both sizes are zero. When the predicate keeps a head, the proof
 adds a successor to both bounds. When it skips the head, the proof
 adds a successor only to the original size.
 
-For the installed `Prelude.not`, a given result `Negation x ~ 'True`
-or `Negation x ~ 'False` lets the compiler prove the respective step
-with a rigid `x`. Without that result, the guard remains stuck and
-GHC reports GHC-83865 at `Refl`. For an abstract `p`, a given
-`p x ~ b` still leaves the guarded call stuck and gives GHC-05617.
-The caller supplies the checked keep or skip equation for each head.
+The caller can supply the given result `p x ~ 'True` or
+`'False ~ p x` at a rigid predicate and head. The solver uses that
+nominal equality for the Boolean operand in the checked filter guard.
+The ordinary family equation then selects the branch. The original
+`Keep` and `Skip` constructors still accept an explicit equation for
+the step. The 311 compiler used that form because its rewriter left
+`p x ~ b` inert.
 
 The ordinary regression checks the proof from stripped provider
-interfaces. Both archived stages at `db626fda90` and the public
-311-line compiler at `01cc726ae7` pass the regression.
-A reversed bound for the dropped singleton `'[ 'True]`
+interfaces. It rejects a guessed decision, evidence about another
+predicate or head, and representational equality. It also checks that
+the Given stays inside its branch and that `p x ~ p y` cannot identify
+`x` with `y`. A reversed bound for the dropped singleton `'[ 'True]`
 gives GHC-83865 at `BothSucc ZeroBound`. The runtime example uses the
 same `size` to observe that filtering `[False, True]` by `not` leaves
 one of the two elements.
 [Proof](../examples/open-evaluation/PreludeFilterLengthProof.hs),
 [regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh),
 and [prior art](../REFERENCES.md#list-filtering-with-a-known-predicate-result).
+
+`runtimeFilterBound` uses the same proof on a list read from an `IORef`.
+It matches the retained list. At a cons, it passes the actual call
+`Prelude.not x` to `booleanResult :: foreach (b :: Bool) -> BooleanResult b`.
+Matching the returned GADT gives the nominal result equality for
+`keepIfTrue` or `skipIfFalse`. A direct `case Prelude.not x` does not
+give those equalities and fails at both step constructors. The generic
+`FilterSteps` API still supports other predicates.
+
+An ordinary module can open the packaged proof using only its interface.
+Forcing the package does not inspect the list. Forcing the first proof
+constructor inspects the first head and leaves the tail lazy for both
+decisions. A complete proof requires a finite spine and defined Boolean
+elements. The simplifier preserves the checked predicate call in the
+retained operand. Its ordinary calls can still inline.
+[Runtime example](../examples/open-evaluation/PreludeFilterRuntime.hs)
+and [regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh).
+
+### Supply a runtime filter decider
+
+`runtimeFilterBoundWith` takes an erased required type argument `(type p)`
+before the decider `foreach (x :: Bool) -> BooleanResult (p x)`. The caller
+supplies `p` because GHC cannot infer an unmatchable predicate from `p x`.
+Matching the result
+supplies `p x ~ 'True` or `'False ~ p x` to the existing proof. An ordinary
+client can choose an existentially packaged decider and open the bound
+through interfaces. The example derives the runtime `Prelude.filter`
+callback from that same decider. A decider indexed by negation fails to
+check for the constant-true predicate. A bare `Bool -> Bool` also fails
+because its result supplies no index.
+
+The empty proof leaves the decider lazy. For a cons, the decider controls
+demand for the head. Both first proof constructors leave the tail lazy.
+The full proof requires a finite spine and a defined decision at every
+head. The example's displayed bound and filtered size can evaluate the
+pure decider separately. [Runtime decider](../examples/open-evaluation/PreludeFilterDecider.hs),
+[regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh),
+and [prior art](../REFERENCES.md#checked-runtime-decisions-for-filter).
+
+### Check a three-way runtime comparison
+
+`decideOrdering` matches the actual result of `p x` and returns a witness
+indexed by that same application. `compareFrom` captures a runtime pivot
+in an ordinary `Prelude.compare` closure. An ordinary client can select
+its own closed payload family from the witness. Its helper takes
+`Witness o` and matches the three constructors. Each branch refines the
+variable `o`, so GHC reduces `Select o` and checks the selected payload.
+The other two payloads stay lazy.
+
+A nominal Given `p x ~ 'LT` supplies `Refl :: p x :~: 'LT`. Bare `Refl`
+for `Select (p x) :~: Int` can still get stuck when the application is
+opaque. Pass the first proof to a congruence function over abstract
+`Ordering` variables. Matching `Refl` there transports the equality through
+the family. This is the same direction as Agda's explicit `rewrite` or
+`cong`. An observation of `p y` supplies only the equality for `p y`.
+[Provider](../examples/open-evaluation/RuntimeOrdering.hs),
+[ordinary consumer](../examples/open-evaluation/OrderingPayload.hs), and
+[Agda with-abstraction](https://agda.readthedocs.io/en/latest/language/with-abstraction.html#rewrite).
+
+### Capture a runtime cutoff in the predicate
+
+`packCutoff` closes over a Peano cutoff read from an `IORef`. It checks
+each row with the ordinary `size` function. The same local function goes
+in the proof index and in the installed `Prelude.filter` call. A strict
+case on that function's result supplies the decision at each row. The
+proof passes the element type and predicate explicitly. Omitting the
+predicate would leave it ambiguous under the non-injective size equation.
+A proof built with a different local closure fails with GHC-83865.
+
+The Boolean control captures the argument of ordinary equality. Both
+cutoffs run through the same function body. The direct type alias for the
+unpromoted binary equality fails with open operands. Its partial
+application fails because the closed evaluator requires both arguments.
+The retained route uses the closure identity and the result observed at
+each call. The proof accepts a decider for any element type. Constructing
+a witness from an opaque function still requires a closed function domain
+such as `[Bool] -> Bool`.
+
+The Peano example keeps one, two, or three rows as the runtime cutoff
+increases from zero to two. The first proof constructor leaves the outer
+tail lazy. Zero rejects a nonempty row without inspecting its elements
+or tail. A finite cutoff can reject an infinite row after a finite prefix.
+The whole bound requires a finite outer spine and a defined decision for
+each row. [Cutoff example](../examples/open-evaluation/PreludeFilterCutoff.hs),
+[regression](../../../testsuite/tests/dependent/should_run/NativeOpenFilterCutoff.sh),
+and [prior art](../REFERENCES.md#checked-runtime-decisions-for-filter).
 
 ### Prove that append adds the list lengths
 

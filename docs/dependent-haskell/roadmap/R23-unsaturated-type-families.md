@@ -662,6 +662,17 @@ and fixed modifiers on the outer arrows.
 [Showcase](../Showcase.hs) and
 [GHCi regression](../../../testsuite/tests/dependent/should_run/NativeInferredFamilyGhci.script).
 
+An ordinary client can pass the imported `Callback 'True` to
+`NamedMap @Bool @U @Bool`. Writing the underlying `Select 'True` directly
+requires `ExperimentalDependentTypes`. When there is one matching written
+application in the signature, GHC-27346 underlines it and suggests the
+extension. GHC keeps the signature span with `LiberalTypeSynonyms` or a type
+splice because expansion can discard or introduce partial applications.
+A binder fixed to M gives GHC-83865 at the same application because the
+remaining family arrow is U. A saturated family can return a
+matchable arrow. [Source-hidden regression](../../../testsuite/tests/dependent/should_run/NativeUnsaturatedFamily.sh)
+and [proposal #242 on family arity](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#arity-of-type-families).
+
 ## Goal and dependencies
 
 Allow direct higher-order use of type families under explicit matchability,

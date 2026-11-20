@@ -132,6 +132,23 @@ cp ../filter/PreludeFilterSource.hi ../length-source/PreludeMapLength{Size,Sourc
    "$src"/PreludeFilter{Proof,LengthProof}.hs .
 "${filter[@]}" -c PreludeFilterProof.hs PreludeFilterLengthProof.hs
 
+# Each rejected proof must reach Refl. The KnownTrue sibling must succeed.
+cp "$src/NativeOpenFilterGivenControls.hs" .
+proofs=(withoutResult wrongResult otherPredicate otherHead representationalResult
+        newtypeHead invertHead invertPredicate 'staleGiven _ _ _ Unknown')
+if "${filter[@]}" -fzap-coercions -fmax-errors=20 -c NativeOpenFilterGivenControls.hs >filter-givens.log 2>&1 ||
+   [[ $(grep -Ec '^NativeOpenFilterGivenControls\.hs:[0-9]+:[0-9]+: error:' filter-givens.log) != "${#proofs[@]}" ]]; then
+    cat filter-givens.log >&2
+    exit 1
+fi
+for proof in "${proofs[@]}"; do
+    line=$(awk -v proof="$proof" '$0 ~ "^" proof " .*Refl$" { print NR }' NativeOpenFilterGivenControls.hs)
+    if ! grep -Eq "^NativeOpenFilterGivenControls\.hs:$line:[0-9]+: error:" filter-givens.log; then
+        cat filter-givens.log >&2
+        exit 1
+    fi
+done
+
 cat >UnknownFilter.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
 module UnknownFilter where
@@ -190,6 +207,162 @@ HS
 "${filter[@]}" FilterRun.o PreludeFilter{Proof,LengthProof}.o ../filter/PreludeFilterSource.o \
     ../length-source/PreludeMapLength{Size,Source}.o -o filter-run
 [[ $(./filter-run) == $'(True,True)\n(BothSucc (RightSucc ZeroBound),Succ Zero,Succ (Succ Zero))' ]]
+
+# The proof uses the certified predicate call as a retained argument.
+cp "$src/NativeRetainedSourceOperand.hs" .
+for level in 1 2; do
+    "${filter[@]}" "-O$level" -fforce-recomp -c "$src/PreludeFilterRuntime.hs" -odir . -hidir .
+    "${filter[@]}" "-O$level" -fforce-recomp -c "$src/PreludeFilterDecider.hs" -odir . -hidir .
+    "${filter[@]}" "-O$level" -fforce-recomp -ddump-simpl -ddump-to-file \
+        -dsuppress-uniques -dsuppress-idinfo -dsuppress-module-prefixes -c NativeRetainedSourceOperand.hs
+    # Ordinary calls to not still inline. The retained applications use the named call.
+    awk '/^ordinaryNot$/,/^$/' NativeRetainedSourceOperand.dump-simpl | grep -Fq 'case x of'
+    grep -Fq '(not x)' NativeRetainedSourceOperand.dump-simpl
+done
+cat >DirectCase.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
+module DirectCase where
+import PreludeFilterLengthProof
+import PreludeFilterSource (Negation)
+
+steps :: foreach (xs :: [Bool]) -> FilterSteps Negation xs
+steps [] = End
+steps (x : xs) = case not x of
+    True -> keepIfTrue (steps xs)
+    False -> skipIfFalse (steps xs)
+HS
+if "${filter[@]}" -c DirectCase.hs >direct-case.log 2>&1 ||
+   ! grep -Fq '[GHC-05617]' direct-case.log ||
+   ! grep -Fq 'True -> keepIfTrue' direct-case.log ||
+   ! grep -Fq 'False -> skipIfFalse' direct-case.log; then
+    cat direct-case.log >&2
+    exit 1
+fi
+
+mkdir "$out/runtime-client"
+cd "$out/runtime-client"
+cp ../filter-client/*.hi .
+cat >ForwardFilter.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes, RequiredTypeArguments #-}
+module ForwardFilter (check) where
+import PreludeFilterRuntime (runtimeFilterBoundFor)
+import PreludeFilterSource (Negation)
+check = runtimeFilterBoundFor (type Negation)
+HS
+cat >RuntimeFilterRun.hs <<'HS'
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
+module Main where
+import Control.Exception (ErrorCall(..), evaluate, try)
+import Data.IORef (newIORef, readIORef, writeIORef)
+import ForwardFilter (check)
+import NativeRetainedSourceOperand (ordinaryNot, select)
+import PreludeFilterLengthProof (AtMost(..))
+import PreludeFilterRuntime
+import System.Environment (getArgs)
+
+outer :: RuntimeFilterBound -> String
+outer (RuntimeFilterBound _ bound) = case bound of
+    ZeroBound -> "empty"
+    BothSucc _ -> "keep"
+    RightSucc _ -> "skip"
+
+main :: IO ()
+main = do
+    ref <- newIORef []
+    args <- getArgs
+    mapM_ (\input -> do
+        writeIORef ref (read input)
+        xs <- readIORef ref
+        putStrLn (showRuntimeBound (packRuntimeBound xs))) args
+    print (case packRuntimeBound (error "package forced list") of RuntimeFilterBound _ _ -> True)
+    putStrLn (outer (packRuntimeBound (False : error "keep forced tail")))
+    putStrLn (outer (packRuntimeBound (True : error "skip forced tail")))
+    let xs = False : error "forwarded checker forced tail"
+    print (outer (RuntimeFilterBound xs (check negationResult xs)))
+    result <- try (evaluate (outer (packRuntimeBound [error "predicate head"])))
+    print (case result of Left (ErrorCall "predicate head") -> True; _ -> False)
+    refHead <- newIORef (error "strict worker forced its head")
+    x <- readIORef refHead
+    print (select False x)
+    selected <- try (evaluate (select True x))
+    print (ordinaryNot False, case selected of Left (ErrorCall "strict worker forced its head") -> True; _ -> False)
+HS
+"${filter[@]}" -c ForwardFilter.hs RuntimeFilterRun.hs
+"${filter[@]}" RuntimeFilterRun.o ForwardFilter.o ../filter-client/PreludeFilter{LengthProof,Runtime}.o \
+    ../filter-client/NativeRetainedSourceOperand.o \
+    ../filter/PreludeFilterSource.o ../length-source/PreludeMapLength{Size,Source}.o -o runtime-filter-run
+cat >runtime-filter.expected <<'OUT'
+(ZeroBound,Zero,Zero)
+(BothSucc ZeroBound,Succ Zero,Succ Zero)
+(RightSucc ZeroBound,Zero,Succ Zero)
+(BothSucc (RightSucc (BothSucc ZeroBound)),Succ (Succ Zero),Succ (Succ (Succ Zero)))
+True
+keep
+skip
+"keep"
+True
+'l'
+(True,True)
+OUT
+./runtime-filter-run '[]' '[False]' '[True]' '[False,True,False]' >runtime-filter.stdout
+diff -u runtime-filter.expected runtime-filter.stdout
+
+cat >WrongDecider.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes #-}
+module WrongDecider where
+import PreludeFilterDecider
+
+wrong :: FilterDecider Always
+wrong = case negationDecider of FilterDecider decide -> FilterDecider decide
+
+unchecked :: FilterDecider Always
+unchecked = FilterDecider id
+HS
+if "${filter[@]}" -c WrongDecider.hs >wrong-decider.log 2>&1 ||
+   ! grep -Fq 'WrongDecider.hs:6:' wrong-decider.log ||
+   ! grep -Fq 'WrongDecider.hs:9:' wrong-decider.log ||
+   ! grep -Fq '[GHC-83865]' wrong-decider.log ||
+   ! grep -Fq 'Bool -> Bool' wrong-decider.log; then
+    cat wrong-decider.log >&2
+    exit 1
+fi
+
+cat >DeciderRun.hs <<'HS'
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
+module Main where
+import Control.Exception (ErrorCall(..), evaluate, try)
+import Data.IORef (newIORef, readIORef)
+import PreludeFilterDecider
+import PreludeFilterLengthProof (AtMost(..))
+import System.Environment (getArgs)
+
+first :: DecidedFilterBound p -> String
+first (DecidedFilterBound _ bound) = case bound of
+    ZeroBound -> "empty"
+    BothSucc _ -> "keep"
+    RightSucc _ -> "skip"
+
+main :: IO ()
+main = do
+    [choice, input] <- getArgs
+    ref <- newIORef (if choice == "not" then SomeFilterDecider negationDecider
+                                       else SomeFilterDecider alwaysDecider)
+    decider <- readIORef ref
+    xs <- newIORef (read input) >>= readIORef
+    putStrLn (showDecidedBound decider xs)
+    putStrLn (first (packDecidedBound (error "empty forced its decider") []))
+    putStrLn (first (packDecidedBound negationDecider (False : error "keep forced its tail")))
+    putStrLn (first (packDecidedBound negationDecider (True : error "skip forced its tail")))
+    putStrLn (first (packDecidedBound alwaysDecider (error "forced head" : error "forced tail")))
+    bad <- try (evaluate (first (packDecidedBound (error "cons needs its decider") [False])))
+    print (case bad of Left (ErrorCall "cons needs its decider") -> True; _ -> False)
+HS
+"${filter[@]}" -c DeciderRun.hs
+"${filter[@]}" DeciderRun.o ../filter-client/PreludeFilter{Decider,LengthProof,Runtime}.o \
+    ../filter/PreludeFilterSource.o ../length-source/PreludeMapLength{Size,Source}.o -o decider-run
+[[ $(./decider-run not '[False,True,True]') == $'(BothSucc (RightSucc (RightSucc ZeroBound)),Succ Zero,Succ (Succ (Succ Zero)))\nempty\nkeep\nskip\nkeep\nTrue' ]]
+[[ $(./decider-run always '[False,True,True]') == $'(BothSucc (BothSucc (BothSucc ZeroBound)),Succ (Succ (Succ Zero)),Succ (Succ (Succ Zero)))\nempty\nkeep\nskip\nkeep\nTrue' ]]
+cd "$out/filter-client"
 
 sed -e 's/^{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}//' \
     -e 's/, showPreludeFilterProofs//' \
