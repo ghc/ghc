@@ -8,6 +8,16 @@ increments.
 
 ## Family and package checkpoints
 
+At compiler source `c70b3be78f`, all 17 focused tests passed. The
+dependent directory recorded 295 passes and 20 unexpected failures.
+The failing names and categories match the 309-line checkpoint.
+Both stages compiled the revised shared `size` proof and reproduced the
+full 311-line Showcase at `-O0`, default `-O1` and default `-O2`.
+The self-hosted compiler also reproduced it in GHCi.
+[Shared size proof](examples/open-evaluation/PreludeMapLengthProof.hs),
+[scoped signature](examples/open-evaluation/NativeCase.hs)
+and [interface upgrade](examples/open-evaluation/check-filter-scope-upgrade.sh).
+
 At `4bb020f702`, both stages reproduce the 305-line Showcase at `-O0`.
 The self-hosted compiler also reproduces it in GHCi and at default
 `-O1` and `-O2`. Two ordinary stream folds eliminate the intermediate
