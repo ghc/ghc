@@ -593,9 +593,23 @@ can supply the receiver directly in `mapIndexed (fmap not) (makeReceiver ())`.
 The checker reads the producer's result type, then checks its arguments
 in source order. A polymorphic call such as `id familyInput` still needs a
 local binding to expose its receiver type.
-Without Quick Look, an explicit result signature on
-`getCells (mapIndexed (fmap not) familyInput) :: [Maybe Bool]` can also
-select `Maybe` before the receiver fixes the partial family.
+The ordinary client checks both calls against the signed result
+`([Maybe Bool], [Maybe Bool])` with and without Quick Look. The solver
+can use the receiver's index before it attempts to prove the result
+application equality. It can also retry an ordinary open matchable
+application after independent work has finished. The distinction follows
+the application coercion rules in Figure 5 of [Higher-Order Type-Level Programming in Haskell](https://simon.peytonjones.org/assets/pdfs/higher-order-type.pdf).
+See [Note [Decomposing AppTy equalities]](../../../compiler/GHC/Tc/Solver/Equality.hs).
+
+A separate test hides the result application behind a type family. A
+functional dependency on the receiver's class fixes the index during
+constraint solving. This version checks in both modes. With the direct
+projection `getCells (fromKey False) :: [Maybe Bool]`, Quick Look can
+choose `Maybe` before the class constraint is solved. The direct call
+checks with Quick Look disabled. Its `Choose Bool Maybe` error with
+Quick Look predates the solver change. Section 3.1 describes
+result-directed instantiation in [A Quick Look at Impredicativity](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf).
+
 The Showcase prints `([Just True,Nothing],[Just True,Nothing])` for the
 named family receiver and the named `Maybe` receiver.
 [Provider](../examples/open-evaluation/IndexedMap.hs),
