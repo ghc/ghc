@@ -831,6 +831,8 @@ mkKindRepRhs stuff@(Stuff {..}) in_scope = new_kind_rep_shortcut
       = pprPanic "mkKindRepRhs: unsupported runtime index" (ppr ki)
     new_kind_rep ki@(DepFunTy {})
       = pprPanic "mkKindRepRhs: unsupported retained function" (ppr ki)
+    new_kind_rep ki@(ExistsTy {})
+      = pprPanic "mkKindRepRhs: unsupported erased existential" (ppr ki)
 
     new_kind_rep (TyVarTy v)
       | Just idx <- lookupCME in_scope v
