@@ -1,7 +1,7 @@
 {-# LANGUAGE ExperimentalDependentTypes, ImpredicativeTypes, RankNTypes, ScopedTypeVariables, TypeApplications #-}
 
 module RankedPackage
-    ( runCallback, runPair, runBuilder, CallbackPair
+    ( runCallback, runPair, runBuilder, CallbackPair, pairFor
     , Callback(..), GuardedBuilder, atTwoTypes, consumeIdentity, observeGuarded
     ) where
 
@@ -20,6 +20,11 @@ runCallback :: (Int, Bool)
 runCallback = case hidden of Callback value call -> call value
 
 type CallbackPair = exists (t :: Type). (t, t -> (Int, Bool))
+
+-- | Choose the hidden type and its consumer together.
+pairFor :: Bool -> CallbackPair
+pairFor True = (7 :: Int, \n -> (n + 1, True))
+pairFor False = ('a', \c -> (11, c == 'z'))
 
 -- | Use the supplied identity at two different types.
 atTwoTypes :: PolyId -> (Int, Bool)

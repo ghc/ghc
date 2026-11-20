@@ -1004,6 +1004,7 @@ main = do
     observe "use a hidden polymorphic identity at Int and Bool" RankedPackage.runCallback
     observe "infer a hidden function type from its paired callback" RankedPackage.runPair
     observe "apply the second projection to the first in an ordinary module" RankedPackageClient.runProjections
+    observe "project twice from the same package producer call" (map RankedPackageClient.projectAt [True,False])
     observe "infer a polymorphic lambda witness and call its builder at Int" (RankedPackage.runBuilder 11)
     observe "infer a guarded callback and skip an unused input" RankedPackageClient.runGuarded
     observe "read an integer through an erased package" (PackageRules.roundTrip 7)
@@ -1135,6 +1136,8 @@ main = do
     observe "retain the kind of a matched Nothing"
         (Refl :: TypeLambda.Rebuild ('Nothing :: Maybe Ordering) :~: Proxy ('Nothing :: Maybe Ordering))
     observe "name and reuse a type-level intermediate result" TypeLet.roadmap
+    observe "refer to an outer type let before shadowing it in a case"
+        (Refl :: NativeCase.NestedLetShadow 'True ('Just 'False) :~: (Proxy 'False, Proxy ('Just 'True)))
     observe "bind the result of a constructor case"
         (Right True :: TypeLet.CaseResult 'True, Left 'c' :: TypeLet.CaseResult 'False)
     observe "select the result type by a constructor" NativeCase.roadmap

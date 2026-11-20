@@ -1,7 +1,11 @@
 {-# LANGUAGE ImpredicativeTypes, LambdaCase, NoExperimentalDependentTypes #-}
-module RankedPackageClient (runGuarded, runProjections) where
+module RankedPackageClient (runGuarded, runProjections, projectAt) where
 
-import RankedPackage (Callback(..), CallbackPair, GuardedBuilder, atTwoTypes, consumeIdentity, observeGuarded)
+import RankedPackage (Callback(..), CallbackPair, GuardedBuilder, atTwoTypes, consumeIdentity, observeGuarded, pairFor)
+
+-- | Both projections use the package chosen for the same input.
+projectAt :: Bool -> (Int, Bool)
+projectAt b = snd (pairFor b) (fst (pairFor b))
 
 -- | Apply both selectors to a pair with one hidden type.
 runProjections :: (Int, Bool)
