@@ -28,6 +28,16 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `508cd799f6`, an ordinary caller can again write `expectMarker label
+marker $ evaluate proof` when the proof mentions the length bound by a
+constructor pattern. Before the fix, the checker rejected the application
+with GHC-83865. The packed-vector client produced the same 562 lines at
+`-O2` as the unoptimized reference. The self-hosted compiler matched the
+364-line Showcase at stripped `-O0`, default `-O2` and in GHCi. The
+ordinary rank-n `($)` and nested vector append controls also passed.
+[Packed-vector client](examples/packed-vector/Main.hs) and
+[Quick Look proposal review](https://github.com/ghc-proposals/ghc-proposals/pull/274#issuecomment-533664634).
+
 At `f8d7a68fb1`, a source-hidden client demands empty-append proofs
 for two vectors at one length. It checks literal cuts of zero, one and
 two, two cuts from IO, and an undefined cut. Using the first vector twice fails at the
