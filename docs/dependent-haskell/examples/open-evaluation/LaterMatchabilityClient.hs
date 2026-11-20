@@ -1,13 +1,15 @@
 {-# LANGUAGE DataKinds, KindSignatures, TypeOperators #-}
 {-# LANGUAGE ExplicitForAll, Modifiers, TypeApplications #-}
 {-# LANGUAGE NoExperimentalDependentTypes #-}
-module LaterMatchabilityClient (laterMatchability, forwardedMap, annotatedMap, nestedCallback) where
+module LaterMatchabilityClient
+  (laterMatchability, forwardedMap, annotatedMap, nestedCallback, appliedCallback) where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy(Proxy))
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Matchability (U)
-import LaterMatchability (AtBool, ForwardMap, KnownListCallback, ListCallback, MatchResult, UnmatchResult)
+import LaterMatchability (AtBool, CallbackResult(CallbackResult), ForwardMap,
+                           KnownListCallback, ListCallback, MatchResult, UnmatchResult)
 
 laterMatchability :: (MatchResult, UnmatchResult)
 laterMatchability = (Just True, True)
@@ -33,3 +35,11 @@ nestedCallback = apply (Proxy @AtBool) [True]
     apply :: forall (g :: (Type -> Type) %U -> Type).
              Proxy g -> g KnownListCallback -> g KnownListCallback
     apply _ = id
+
+-- | The bare use fixes the kind of the applied callback.
+type AppliedCallback f = CallbackResult (f Bool) f
+
+appliedCallback :: [Bool]
+appliedCallback =
+  case (CallbackResult [True] :: AppliedCallback KnownListCallback) of
+    CallbackResult result -> result

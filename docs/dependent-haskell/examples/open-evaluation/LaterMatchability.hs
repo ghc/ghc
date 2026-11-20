@@ -38,3 +38,6 @@ type family ApplyBool (f :: Type %U -> Type) where
 
 type AtBool :: (Type %U -> Type) %U -> Type
 type AtBool = ApplyBool
+
+-- | Store the result of a callback whose kind is unmatchable.
+data CallbackResult (result :: Type) (f :: Type %U -> Type) = CallbackResult result
