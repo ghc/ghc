@@ -535,8 +535,13 @@ tcExistsPack rn_expr args expected
              do { schema <- check_schema [ty | ETypeArg { ea_hs_ty = ty } <- type_args]
                 ; case coreFullView schema of
                     ExistsTy binder body ->
-                      do { witness_ty <- expr_to_type witness >>= \ty ->
-                                           tcHsTypeApp ty (tyVarKind binder)
+                      do { arg <- expr_to_type witness
+                         ; inferred <- case arg of
+                             HsWC [] ty | HsWildCardTy (HoleVar (L _ name)) <- unLoc (ignoreParens ty)
+                                        , name == unnamedHoleRdrName
+                               -> infer_retained_witness binder body payload
+                             _ -> return Nothing
+                         ; witness_ty <- maybe (tcHsTypeApp arg (tyVarKind binder)) return inferred
                          ; let payload_ty = substTyWith [binder] [witness_ty] body
                          ; payload' <- tcScalingUsage ManyTy $ tcCheckPolyExpr payload payload_ty
                          ; let packed = XExpr (NativeExistsPack schema witness_ty payload')
@@ -550,6 +555,21 @@ tcExistsPack rn_expr args expected
     filter_not_parens = filter $ \case
       EWrap (EPar _) -> False
       _ -> True
+
+    infer_retained_witness binder body payload = runMaybeT $ do
+      actual <- MaybeT (tcRetainedDeclaredArgType return payload)
+      guard (hasNativeDependentExpr (Core.Type actual))
+      loc <- liftMaybeT $ getCtLocM (lexprCtOrigin payload) (Just TypeLevel)
+      view <- liftMaybeT $ reductionReducedType <$> tcRewriteFamilyAxioms loc actual
+      witness <- MaybeT $ return $ do
+        subst <- matchRetainedAppType [binder] Subst.emptySubst body view
+        Subst.lookupTyVar subst binder
+      guard (hasNativeDependentExpr (Core.Type witness)
+             && eqType (typeKind witness) (tyVarKind binder)
+             && eqType (substTyWith [binder] [witness] body) view)
+      scoped <- liftMaybeT (tcRetainedInstScope [witness])
+      guard scoped
+      return witness
 
     expected_schema = traverse (liftZonkM . zonkTcType) =<< readExpType_maybe expected
     read_schema = expected_schema >>= maybe (failWithTc (TcRnExistsPack ExistsPackMissingSchema)) return
@@ -587,6 +607,15 @@ package. With two visible arguments the second gives the schema. Check
 the witness with the required type argument translation used by tcVDQ. Check
 the payload at the instantiated body type. Keep the schema and witness for
 Core Lint. CoreToStg erases both and keeps the payload's demand.
+
+For `Pack _ flag`, the declared type of flag may already refer to a
+retained field of an enclosing pattern. A wildcard metavariable cannot be
+filled with that field. See Note [Rigid retained indices] in
+GHC.Tc.Utils.Unify. Instead, match the package body against the declared
+payload type after family reduction. The existential binder is the only
+template variable. Check the chosen witness in the current scope, then
+typecheck the payload against the instantiated body as usual. Reading its
+declaration neither evaluates the payload nor consumes a second use.
 
 Skip ordinary inference of the head, including the Quick Look shortcut.
 Pack has no ordinary function type with which the solver could discover the

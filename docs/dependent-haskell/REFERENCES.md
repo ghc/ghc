@@ -3071,6 +3071,19 @@ position when a dependent pattern already determines the index.
 [GHC pattern translation](../../compiler/GHC/Tc/Gen/Pat.hs) and
 [Agda dot patterns](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#dot-patterns).
 
+The retained `some` and erased `exists` forms meet in an ordinary
+conversion. A `GHC.Sigma.Pair` contains a runtime witness and a payload
+indexed by it. The conversion discards the witness and packs the same
+payload with its index erased. A consumer can still match a constructor
+of the payload. Agda’s vector example uses the same distinction between
+a runtime constructor and an erased index. The two earlier interface
+formats each support one of these Haskell binders. A mixed payload
+requires a header that both earlier readers reject.
+[Serokell’s dependent sums](https://ghc.serokell.io/dh#dependent-sums),
+[Agda runtime irrelevance](https://agda.readthedocs.io/en/v2.8.0/language/runtime-irrelevance.html),
+[the Haskell example](examples/erased-existentials/ForgetWitness.hs)
+and [the interface writer](../../compiler/GHC/Iface/Binary.hs).
+
 The explicit Core design in the “Alternatives” section of #473 gives
 `ExistsCo` as the congruence rule required by `liftCoSubst`. The vector
 filter needs it even at `-O0` because expanding `Filtered a` substitutes for the

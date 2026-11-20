@@ -325,6 +325,11 @@ test('NativeDepFunCoWire',
                    'NativeDepFunCoProvider.hs'])],
      run_command, ['bash NativeDepFunCoWire.sh "{compiler}" "{libdir}"'])
 
+test('NativeMixedPackageInterface',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['../../../../docs/dependent-haskell/examples/erased-existentials/ForgetWitness.hs'])],
+     run_command, ['bash NativeMixedPackageInterface.sh "{compiler}" "{libdir}"'])
+
 test('NativeExistentialSource',
      [req_host_target_ghc, req_interp, req_rts_linker, only_ways(['normal']),
       extra_files(['erased-existential-source'])],
