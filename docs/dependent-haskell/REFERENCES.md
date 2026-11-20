@@ -1475,6 +1475,18 @@ constraint into a different Core application order. The existing IALL and
 This is a GHC frontend requirement. It adds no new Core proof rule or mutable
 type-meta assignment for the runtime index.
 
+## Visible type arguments before an erased function package
+
+Proposal 378 describes checking a dependent application one argument
+at a time. Quick Look describes instantiation at an application head.
+For `builder @Int n`, the fork checks `@Int` and the resulting
+dictionary on the declared builder. It opens the erased package
+around the remaining call and its consumer. A mismatch in `n`
+still points to the written application.
+[Proposal 378 on dependent application](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#dependent-application-and-the-static-subset),
+[Quick Look, §4.4](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf#page=10)
+and [packaged callback](examples/erased-existentials/RankedPackage.hs).
+
 ## Source package patterns
 
 Decision: allow ordinary nested patterns in non-retained package fields.
