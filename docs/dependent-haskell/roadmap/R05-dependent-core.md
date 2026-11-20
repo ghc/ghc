@@ -221,9 +221,12 @@ The provider and a client compiled from its interface each fire all
 four rules at default `-O1` and `-O2`. The `-O0` comparison checks
 the same results, including a callback that ignores an undefined
 value. Readers that only support the earlier `open (hide x) = x`
-rule reject the lexical rule at the interface header.
-[Four rules](../examples/erased-existentials/LexicalPackageRules.hs)
-and [ordinary client](../../../testsuite/tests/dependent/should_run/NativePackageRuleClient.hs).
+rule still use it. When they import the four new rules, GHC-47808
+identifies the incompatible interface. The two-compiler check covers
+all three interface compression levels with the same target libraries.
+[Four rules](../examples/erased-existentials/LexicalPackageRules.hs),
+[ordinary client](../../../testsuite/tests/dependent/should_run/NativePackageRuleClient.hs)
+and [interface check](../examples/erased-existentials/check-rule-interfaces.sh).
 
 ## Next increments
 
