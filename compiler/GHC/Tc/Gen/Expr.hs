@@ -742,7 +742,10 @@ tcExpr expr@(HsCase ctxt scrut matches) res_ty
               -- This design choice is discussed in #17790
             ; (scrut', scrut_ty) <- tcScalingUsage mult $ tcInferRhoFRR FRRCase scrut
             ; dependent <- xoptM LangExt.ExperimentalDependentTypes
-            ; retained <- case unLoc (stripParensLHsExpr scrut') of
+            ; special <- case unLoc (stripParensLHsExpr scrut') of
+                _ | ExistsTy ImplicitExists _ payload_ty <- coreFullView scrut_ty
+                  , Just (tc, _) <- tcSplitTyConApp_maybe payload_ty
+                  -> dot_case scrut' scrut_ty mult tc
                 HsVar _ (L _ index) | dependent, isNativeIndexId index ->
                   tcRetainedCase index matches res_ty
                 _ | dependent ->
@@ -750,17 +753,42 @@ tcExpr expr@(HsCase ctxt scrut matches) res_ty
                      ; case call_index of
                          Nothing -> return Nothing
                          Just index ->
-                           do { refined <- tcRetainedCallCase index scrut' matches res_ty
-                              ; let preserve_origin expr = XExpr (ExpandedThingTc
-                                      (HSE { hse_ctxt = ExprCtxt (HsCase ctxt scrut matches)
-                                           , hse_exp = noLocA expr }))
-                              ; return (fmap preserve_origin refined) } }
+                           fmap (fmap preserve_origin) $
+                             tcRetainedCallCase index scrut' matches res_ty }
                 _ -> return Nothing
-            ; case retained of
+            ; case special of
                 Just expr -> return expr
                 Nothing -> do
                   { matches' <- tcCaseMatches ctxt tcBody (Scaled mult scrut_ty) matches res_ty
                   ; return (HsCase ctxt scrut' matches') } }
+
+    preserve_origin expr' =
+      XExpr (ExpandedThingTc (HSE { hse_ctxt = ExprCtxt expr, hse_exp = noLocA expr' }))
+
+    dot_case scrut' schema mult tc
+      | any (payload_alt constructors) (unLoc (mg_alts matches))
+      = do { result_ty <- expTypeToType res_ty
+           ; opened <- tcOpenImplicitPackage (getLocA scrut) schema scrut' result_ty $ \payload ->
+               do { payload_matches <- tcCaseMatches ctxt tcBody
+                        (Scaled mult (varType payload)) matches (mkCheckExpType result_ty)
+                  ; return (HsCase ctxt (nlHsVar payload) payload_matches) }
+           ; return (Just (preserve_origin opened)) }
+      | otherwise = return Nothing
+      where
+        constructors = map dataConName (tyConDataCons tc)
+
+    -- See Note [Matching an implicit existential payload].
+    payload_alt constructors (L _ Match{m_pats = L _ [pat]}) = payload_pat constructors pat
+    payload_alt _ _ = False
+
+    payload_pat :: [Name] -> LPat GhcRn -> Bool
+    payload_pat constructors (L _ pat) = case pat of
+      ParPat _ nested -> payload_pat constructors nested
+      AsPat _ _ nested -> payload_pat constructors nested
+      BangPat _ nested -> payload_pat constructors nested
+      LazyPat _ nested -> payload_pat constructors nested
+      ConPat { pat_con = L _ (WithUserRdr _ name) } -> name `elem` constructors
+      _ -> False
 
 tcExpr (HsIf x pred b1 b2) res_ty
   = do { pred'    <- tcCheckMonoExpr pred boolTy
@@ -1273,6 +1301,21 @@ tcExistsCase expr@(HsCase ctxt scrut matches)
                                     (noLocA (XExpr opened))))) }
                _ -> failWithTc (TcRnExistsPack (ExistsPackInvalidSchema schema)) }
 tcExistsCase _ _ = return Nothing
+
+{- Note [Matching an implicit existential payload]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A data constructor for the declared payload type can request an opening
+in a case, as an application can request one with its formal domain.
+An ordinary case first checks its scrutinee and multiplicity. Open the
+checked package around the whole match, with the result type outside
+the witness scope. Keep the ordinary case match checker. A constructor
+demand, lazy pattern, and GADT refinement keep their ordinary meaning.
+
+A variable or wildcard alone matches the package. A pattern synonym
+can also match the package at its declared type. Require a real data
+constructor of the payload type before selecting the opening. The
+checked dot type is sufficient in a client that imports the schema.
+-}
 
 {- Note [Checking a lexical existential case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

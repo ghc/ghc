@@ -10,7 +10,7 @@
 -}
 
 module GHC.Tc.Gen.App
-       ( tcApp
+       ( tcApp, tcOpenImplicitPackage
        , tcExprPrag
        , tcRetainedInferableArg, tcRetainedArg, tcOptionalLetOperand ) where
 
