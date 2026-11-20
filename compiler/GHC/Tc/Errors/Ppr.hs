@@ -5310,12 +5310,18 @@ unnecessary clutter:
 
         (a -> b)
 
+  - Matchability. Controlled by -fprint-explicit-matchabilities.
+    Ordinary user-style arrows omit fixed matchability annotations.
+    Show them when they distinguish otherwise identical types. Keep
+    the modifier syntax in modules that use -XModifiers.
+
 To achieve this, each of these user-facing flags controls a field of
 'SDocContext', respectively:
 
     * sdocPrintExplicitKinds
     * sdocPrintExplicitRuntimeReps
     * sdocLinearTypes
+    * sdocPrintExplicitMatchabilities
 
 The pretty-printer in GHC.Iface.Type then consults these when deciding how much
 to show.
