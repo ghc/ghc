@@ -338,6 +338,14 @@ Different values use separate counters. The private type namespace also
 separates a function operator from a same-spelled type operator. A
 signature shared by several values uses its first name.
 
+Within one signature, identical cases can share a synonym. This keeps
+two uses equal even when their common scrutinee is unknown. Compare
+the parsed names, applications and ordered rows. All occurrences
+visited by this pass use the same signature telescope. A row binder
+has the same scope at both occurrences. Skip comparison for other
+syntax, which can contain a nested binder. Keep the first location
+for checking the shared case.
+
 For a constructor field, use the constructor's name and count sums
 from left to right. Use a separate prefix for constructor fields.
 The constructor name is unique in the module even when record labels
@@ -437,15 +445,15 @@ liftDeclarationTypes named_wildcards group
       in (fields', concat sums)
 
     liftField owner scope salt field@CDF{cdf_type = ty} =
-      let (ty', sums, next) = liftBody fieldAnchor owner scope ty salt
+      let (ty', sums, (next, _)) = liftBody fieldAnchor owner scope ty (salt, [])
       in (next, (field{cdf_type = ty'}, sums))
 
     liftBind counters (VbSig (L loc (TypeSig sig_ann mods names@(owner:_) wc@HsWC
                   {hswc_body = L sig_loc sig@HsSig{sig_bndrs = outer, sig_body = body}}))) =
       let occ = rdrNameOcc (unLoc owner)
           first = fromMaybe 0 (lookupOccEnv counters occ)
-          (body', aliases, next) = liftBody signatureAnchor owner
-                                    (signatureCaptures outer body) body first
+          (body', aliases, (next, _)) = liftBody signatureAnchor owner
+                                    (signatureCaptures outer body) body (first, [])
           sig' = L sig_loc (sig{sig_body = body'})
       in (extendOccEnv counters occ next, (VbSig (L loc (TypeSig sig_ann mods names
                                                        wc{hswc_body = sig'})), aliases))
@@ -466,45 +474,51 @@ liftDeclarationTypes named_wildcards group
       [(fmap (updateHsTyVarBndrFlag (const (HsBndrRequired noExtField))) b, v)
       | b <- binders, Just v <- [hsLTyVarLocName b]]
 
+    fieldAnchor :: LHsType GhcPs -> Maybe (String, Maybe SignatureCaseKey)
     fieldAnchor ty@(L _ (XHsType HsTypeSome{}))
-      | copyable ty = Just "$field-sum:"
+      | copyable ty = Just ("$field-sum:", Nothing)
     fieldAnchor _ = Nothing
 
     signatureAnchor ty@(L _ (XHsType HsTypeSome{}))
-      | copyable ty = Just "$signature-sum:"
+      | copyable ty = Just ("$signature-sum:", Nothing)
     signatureAnchor (L _ (XHsType (HsTypeCase _ _ scrutinee alts)))
       | copyable scrutinee
       , all copyableAlt alts
-      = Just "$signature-case:"
+      = Just ("$signature-case:", signatureCaseKey scrutinee alts)
     signatureAnchor _ = Nothing
 
     copyableAlt (L _ (HsTypeCaseAlt pat _ rhs)) =
       isJust (classifyTypeCasePattern pat) && copyable rhs
 
-    liftBody anchor owner scope whole@(L loc _) salt
-      | Just prefix <- anchor whole
+    liftBody anchor owner scope whole@(L loc _) (salt, seen)
+      | Just (prefix, key) <- anchor whole
       , let free = Set.fromList (map unLoc (extractHsTyRdrTyVars whole))
             (used, missing) = foldr select ([], free) scope
       , Set.null missing
       , all (copyable . fst) used
-      = let occ = mkTcOcc (prefix ++ occNameString (rdrNameOcc (unLoc owner))
-                           ++ ":" ++ show (salt :: Int))
-            name = L (l2l loc) (mkRdrUnqual occ)
-            alias = L loc (SynDecl noAnn name (mkHsQTvs (map fst used)) Prefix whole)
-            applied = foldl' (\f (_, v) -> L loc (HsAppTy noExtField f (typeName v)))
-                             (typeName name) used
-        in (applied, [(alias, (occ, Nothing))], salt + 1)
-    liftBody anchor owner scope (L loc (HsFunTy ann arrow arg result)) salt =
-      let (arg', arg_aliases, next) = liftBody anchor owner scope arg salt
+      = case key >>= (`lookup` seen) of
+          Just occ -> (applyAnchor loc occ used, [], (salt + 1, seen))
+          Nothing ->
+            let occ = mkTcOcc (prefix ++ occNameString (rdrNameOcc (unLoc owner))
+                                 ++ ":" ++ show (salt :: Int))
+                name = L (l2l loc) (mkRdrUnqual occ)
+                alias = L loc (SynDecl noAnn name (mkHsQTvs (map fst used)) Prefix whole)
+                seen' = maybe seen (\k -> (k, occ) : seen) key
+            in (applyAnchor loc occ used, [(alias, (occ, Nothing))], (salt + 1, seen'))
+    liftBody anchor owner scope (L loc (HsFunTy ann arrow arg result)) state =
+      let (arg', arg_aliases, next) = liftBody anchor owner scope arg state
           (result', result_aliases, end) = liftBody anchor owner scope result next
       in (L loc (HsFunTy ann arrow arg' result'), arg_aliases ++ result_aliases, end)
-    liftBody anchor owner scope (L loc (HsQualTy ann ctxt body)) salt =
-      let (body', aliases, next) = liftBody anchor owner scope body salt
+    liftBody anchor owner scope (L loc (HsQualTy ann ctxt body)) state =
+      let (body', aliases, next) = liftBody anchor owner scope body state
       in (L loc (HsQualTy ann ctxt body'), aliases, next)
-    liftBody anchor owner scope (L loc (HsKindSig ann body kind)) salt =
-      let (body', aliases, next) = liftBody anchor owner scope body salt
+    liftBody anchor owner scope (L loc (HsKindSig ann body kind)) state =
+      let (body', aliases, next) = liftBody anchor owner scope body state
       in (L loc (HsKindSig ann body' kind), aliases, next)
-    liftBody anchor owner scope ty salt = liftTypeChildren (liftBody anchor owner scope) ty salt
+    liftBody anchor owner scope ty state = liftTypeChildren (liftBody anchor owner scope) ty state
+
+    applyAnchor loc occ = foldl' (\f (_, v) -> L loc (HsAppTy noExtField f (typeName v)))
+                                 (typeName (L (l2l loc) (mkRdrUnqual occ)))
 
     select pair@(binder, name) (captures, used)
       | unLoc name `Set.member` used
@@ -522,6 +536,27 @@ liftDeclarationTypes named_wildcards group
       _ -> and (gmapQ copyable node)
 
     typeName n = L (l2l (getLoc n)) (HsTyVar noAnn NotPromoted n)
+
+-- | The case syntax compared within a single signature.
+data SignatureCasePart
+  = CasePartName PromotionFlag RdrName
+  | CasePartApp SignatureCasePart SignatureCasePart
+  | CasePartWildcard
+  deriving Eq
+
+-- | The scrutinee followed by the pattern and result in each source row.
+type SignatureCaseKey = (SignatureCasePart, [(SignatureCasePart, SignatureCasePart)])
+
+-- | Compare spellings and branch order, ignoring source locations and parentheses.
+signatureCaseKey :: LHsType GhcPs -> [LocatedA HsTypeCaseAlt] -> Maybe SignatureCaseKey
+signatureCaseKey scrutinee alts = (,) <$> part scrutinee <*> traverse alternative alts
+  where
+    alternative (L _ (HsTypeCaseAlt pat _ rhs)) = (,) <$> part pat <*> part rhs
+    part (L _ (HsTyVar _ promotion name)) = Just (CasePartName promotion (unLoc name))
+    part (L _ (HsAppTy _ f x)) = CasePartApp <$> part f <*> part x
+    part (L _ (HsParTy _ ty)) = part ty
+    part (L _ HsWildCardTy{}) = Just CasePartWildcard
+    part _ = Nothing
 
 {- Note [Lifting type cases]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -761,10 +796,10 @@ liftTypeCases group =
                        (map (HsValArg noExtField) pats) Prefix body)
 
 -- | Visit type expression children that share their enclosing lexical scope.
--- The caller handles binders and kind annotations. Thread the next private
--- family index through the children in source order.
-liftTypeChildren :: (LHsType GhcPs -> Int -> (LHsType GhcPs, [a], Int))
-                 -> LHsType GhcPs -> Int -> (LHsType GhcPs, [a], Int)
+-- The caller handles binders and kind annotations. Thread its state
+-- through the children in source order.
+liftTypeChildren :: (LHsType GhcPs -> s -> (LHsType GhcPs, [a], s))
+                 -> LHsType GhcPs -> s -> (LHsType GhcPs, [a], s)
 liftTypeChildren visit ty@(L loc node) salt = case node of
   HsParTy ann body -> one (HsParTy ann) body
   HsAppTy ann f x -> two (HsAppTy ann) f x

@@ -1,9 +1,10 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, PolyKinds, TypeFamilies #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, ExplicitForAll, PolyKinds, TypeFamilies #-}
 -- | Select a type from the constructor of a type-level scrutinee.
 module NativeCase
   ( F, ByType, ElementOrSelf, Field, Same, Capture, Braces, roadmap
   , PayloadKind, Fixed, Captured, Retain, PatternShadow, ScrutineeShadow, NestedScope
   , Paired, InferredCapture, ContextKind, SeparateKinds
+  , caseIdentity
   ) where
 
 import Data.Kind (Type)
@@ -45,6 +46,12 @@ type Braces a = case a of { True -> Int; False -> Bool; }
 -- | Observe the two selected result types.
 roadmap :: (F 'True, Braces 'False)
 roadmap = (7, False)
+
+-- | Return the argument at the same selected type.
+caseIdentity :: forall (b :: Bool). Proxy b ->
+  (case b of { True -> Int; False -> Bool }) ->
+  (case b of { True -> Int; False -> Bool })
+caseIdentity _ input = input
 
 -- | Reuse a local kind while retaining the kind of an outer parameter.
 type Fixed (k :: Type) (a :: k) = let k = Bool in case 'False of

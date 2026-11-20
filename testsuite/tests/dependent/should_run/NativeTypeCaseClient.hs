@@ -25,6 +25,12 @@ left = Refl
 right :: F 'False :~: Bool
 right = Refl
 
+signatureTrue :: Int
+signatureTrue = caseIdentity (Proxy @'True) 3
+
+signatureFalse :: Bool
+signatureFalse = caseIdentity (Proxy @'False) True
+
 field :: Field ('Just 'True) :~: '( 'True, 'True)
 field = Refl
 
