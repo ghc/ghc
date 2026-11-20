@@ -33,6 +33,54 @@ if "${ghc[@]}" -O0 -fenable-rewrite-rules -fforce-recomp -c PreludeMapProof.hs >
     exit 1
 fi
 
+# The installed filter needs a known predicate result before choosing a branch.
+# The ordinary client has only the producer interface and keeps the tail open.
+mkdir "$out"/{filter,filter-client}
+cd "$out/filter"
+cp "$src/PreludeFilterSource.hs" .
+filter=("${ghc[@]}" -O1 -fenable-rewrite-rules)
+"${filter[@]}" -c PreludeFilterSource.hs
+cd "$out/filter-client"
+cp ../filter/PreludeFilterSource.hi "$src/PreludeFilterProof.hs" .
+"${filter[@]}" -c PreludeFilterProof.hs
+
+cat >UnknownFilter.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
+module UnknownFilter where
+import Data.Proxy (Proxy)
+import Data.Type.Equality ((:~:)(Refl))
+import PreludeFilterSource (FilterWith)
+
+unknown :: Proxy p -> Proxy xs
+        -> FilterWith p ('False ': xs) :~: ('False ': FilterWith p xs)
+unknown _ _ = Refl
+HS
+if "${filter[@]}" -fno-enable-rewrite-rules -c UnknownFilter.hs >unknown.log 2>&1 ||
+   ! grep -Fq '[GHC-83865]' unknown.log ||
+   ! grep -Fq 'unknown _ _ = Refl' unknown.log; then
+    cat unknown.log >&2
+    exit 1
+fi
+
+cat >FilterRun.hs <<'HS'
+module Main where
+import PreludeFilterProof (lazyHead)
+main :: IO ()
+main = print (lazyHead (error "filter forced the tail"))
+HS
+"${filter[@]}" -c FilterRun.hs
+"${filter[@]}" FilterRun.o PreludeFilterProof.o ../filter/PreludeFilterSource.o -o filter-run
+[[ $(./filter-run) == True ]]
+
+sed 's/^{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}//' PreludeFilterProof.hs >RuleFilter.hs
+if "${filter[@]}" -fforce-recomp -c RuleFilter.hs >filter-rules.log 2>&1 ||
+   ! grep -Eq '(keepFalse|skipTrue) _ = Refl' filter-rules.log ||
+   ! grep -Fq '[GHC-83605]' filter-rules.log ||
+   ! grep -Fq 'with the current rewrite rules' filter-rules.log; then
+    cat filter-rules.log >&2
+    exit 1
+fi
+
 # A no-code build must not issue final-Core provenance. An ordinary producer
 # can publish the certificate, or withdraw it and compile after a real rule.
 cd "$out/producer"
