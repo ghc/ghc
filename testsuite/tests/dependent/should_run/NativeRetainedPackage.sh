@@ -10,7 +10,8 @@ shift 2
 g+=("$@")
 cd "$out/provider"
 cp "$src"/{PackedVecLibrary,RetainedNat,PackedLength,RetainedWitness,DependentPair}.hs .
-"${g[@]}" -fomit-interface-pragmas -c PackedVecLibrary.hs RetainedNat.hs PackedLength.hs RetainedWitness.hs DependentPair.hs
+"${g[@]}" -fomit-interface-pragmas -c PackedVecLibrary.hs RetainedNat.hs PackedLength.hs RetainedWitness.hs
+"${g[@]}" -O1 -fomit-interface-pragmas -fno-write-if-simplified-core -c DependentPair.hs
 cp DependentPair.hi "$out/client/"
 cp {PackedVecLibrary,PackedLength,RetainedNat,RetainedWitness}.hi "$src"/{PackedProjection,RetainedProjection}.hs "$out/projection/"
 cd "$out/projection"

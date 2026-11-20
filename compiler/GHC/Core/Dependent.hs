@@ -13,7 +13,7 @@ import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.Type (isNativeIndexType, isNativeIndexFunctionId, isNativeOpaqueValueId
-                     , isNativeIndexDomainConversion)
+                     , isNativeRetainedBinder, isNativeIndexDomainConversion)
 import GHC.Core.TyCo.Compare (eqType)
 import GHC.Core.Coercion (coercionLKind, coercionRKind, coercionRole)
 import GHC.Core.DataCon (dataConRepType)
@@ -66,7 +66,7 @@ hasNativeDependentProgram :: CoreProgram -> [CoreRule] -> Bool
 hasNativeDependentProgram binds rules =
     runScan AllMetadata (foldMap scanBind binds <> foldMap scanRule rules)
 
--- | Admit algebraic index domains and checked opaque function heads.
+-- | Admit structural indices, fixed call heads and abstract lifted witnesses.
 -- Local rules still use the restricted pipeline.
 supportsNativeGentle :: CoreProgram -> Bool
 supportsNativeGentle binds =
@@ -251,9 +251,10 @@ scanType (ForAllTy ma (Bndr var _) body) =
 scanType (CastTy ty co) = scanType ty <> scanCo co
 scanType (CoercionTy co) = scanCo co
 
--- | Check the existing algebraic and opaque function index contracts.
+-- | Apply the retained binder checks, including Note [Abstract witness domains]
+-- in GHC.Core.Type.
 scanRetainedIndex :: Var -> NativeScan
-scanRetainedIndex v = NativeScan (pure (not (isNativeIndexType (varType v) || isNativeIndexFunctionId v)))
+scanRetainedIndex v = NativeScan (pure (not (isNativeRetainedBinder v)))
 
 -- | Check the head and its annotation without examining the function body.
 scanCallHead :: Id -> NativeScan
