@@ -963,6 +963,7 @@ main = do
         StoredVector.gadtLength 1 (error "unused vector" :: Vec Char 1)
     observe "read nested lengths and the first aligned cells"
         StoredVector.nestedObservation
+    observe "apply a stored selector at a different vector length" StoredVector.viewSelection
     let (passing, failing) = ImplicitVector.partitionVec odd
             (VCons (7 :: Int) (VCons 2 (VCons 9 VNil)))
         (firstPart, _) = ImplicitVector.partitionVec odd (VCons (7 :: Int) (error "unused partition tail"))
