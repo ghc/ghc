@@ -416,6 +416,12 @@ test('NativeNamedSplit',
                    '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs'])],
      run_command, ['bash NativeNamedSplit.sh "{compiler}" "{libdir}"'])
 
+test('NativeIndexedConsProof',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['NativeIndexedConsProof.hs', 'NativeIndexedConsProofClient.hs',
+                   '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs'])],
+     run_command, ['bash NativeIndexedConsProof.sh "{compiler}" "{libdir}"'])
+
 test('NativeRetainedCast',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['NativeRetainedCastClient.hs', 'NativeRetainedCastLength.hs',
