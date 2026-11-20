@@ -85,7 +85,9 @@ A second interpreter can apply `Either` to two argument types and can
 also describe the type of `(&&)`. The choice of arrow in a family's
 result can differ from the choice in its kind. The client prints
 `(Right 7,False)` and leaves the second Boolean unevaluated. The
-original `GADTSingletons` program still needs two source annotations.
+original `GADTSingletons` program compiles with a matchable arrow on
+`(~>)` and a separate matchable `Promote` equation. Its bare equation
+continues to handle ordinary function types.
 [Interpreter and compatibility boundary](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
 
 The list interface of a stream with hidden state supports two ordinary
@@ -156,9 +158,10 @@ source examples. General promotion remains open.
    retained functions. Check an imported head with a local anchor and a true orphan. Both currently report GHC-51063. Preserve the
    witness-scope checks used for erased packages.
    [Current rule support](roadmap/R05-dependent-core.md#lexical-package-operations-in-user-rules).
-2. **R23.** Resolve the compatibility policy for unchanged
-   `GADTSingletons`. A bare arrow pattern in `Promote` currently matches U.
-   Broadening it can overlap an existing M equation.
+2. **R23.** Check when a later argument fixes the arrow of a partial family.
+   Keep the compatibility example for `GADTSingletons`. Its separate M and U
+   equations compile. Generalizing the bare U equation can make an existing
+   M instance in a client module conflict.
    [Two-module example](roadmap/R23-unsaturated-type-families.md#arrow-patterns-in-family-equations).
    Keep the explicit matchability and noninjective equality checks.
    The staged interpreter selects U when its caller supplies an expected
