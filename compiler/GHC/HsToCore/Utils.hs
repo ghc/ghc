@@ -396,12 +396,15 @@ mkDataConCase var ty alts@(alt1 :| _)
           Nothing -> return (Alt (DataAlt con) args body)
           Just (DCB boxer) -> do
             us <- newUniqueSupply
-            let (rep_ids, binds) = initUs_ us (boxer ty_args args)
-            let rep_ids' = map (scaleVarBy (matchIdMult var)) rep_ids
+            let (real_args, proofs)
+                  | isNativeIndexedNullaryDataAlt con args = splitAt (dataConRepArity con) args
+                  | otherwise = (args, [])
+                (rep_ids, binds) = initUs_ us (boxer ty_args real_args)
+                rep_ids' = map (scaleVarBy (matchIdMult var)) rep_ids
               -- Upholds the invariant that the binders of a case expression
               -- must be scaled by the case multiplicity. See Note [Case
               -- expression invariants] in CoreSyn.
-            return (Alt (DataAlt con) rep_ids' (mkLets binds body))
+            return (Alt (DataAlt con) (rep_ids' ++ proofs) (mkLets binds body))
 
     mk_default :: MatchResult (Maybe CoreAlt)
     mk_default

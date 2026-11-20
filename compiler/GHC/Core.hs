@@ -39,6 +39,7 @@ module GHC.Core (
         exprToNativeCaseIndex, nativeIndexFunctionVar_maybe,
         nativeIndexArgKinds,
         isNativeIndexAlt, isNativeIndexDataAlt, isNativeIndexAliasAlt,
+        isNativeIndexedNullaryDataAlt, nativeIndexedNullaryCon_maybe,
 
         mkBinds,
 
@@ -2750,6 +2751,8 @@ exprToNativeCaseIndex (App (Var f) arg)
   , Just index <- exprToNativeIndex arg
   , sameNativeIndexDomain domain (typeKind index)
   = Just (TermAppTy f index)
+exprToNativeCaseIndex (Var v)
+  | isNativeOpaqueValueId v = Just (TermVarTy v)
 exprToNativeCaseIndex expr
   | Just index <- exprToNativeIndex expr
   , isNativeIndexType (typeKind index)
@@ -2964,7 +2967,8 @@ mapNativeIndex subst expr
 -- | Detect extra proof slots on ordinary algebraic alternatives.
 -- Core Lint checks their instantiated domain, count, scope and nominal type.
 isNativeIndexAlt :: Alt b -> Bool
-isNativeIndexAlt (Alt (DataAlt con) args _) = isNativeIndexDataAlt con args
+isNativeIndexAlt (Alt (DataAlt con) args _) =
+  isNativeIndexDataAlt con args || isNativeIndexedNullaryDataAlt con args
 isNativeIndexAlt _ = False
 
 -- | Recognize the proof slot from a constructor and its serialized binder names.
@@ -2977,6 +2981,76 @@ isNativeIndexDataAlt con args
   , (_, [], [], [], _, _) <- dataConFullSig con
   = True
   | otherwise = False
+
+-- | Detect the extra proof after a nullary GADT's ordinary equality binder.
+isNativeIndexedNullaryDataAlt :: DataCon -> [b] -> Bool
+isNativeIndexedNullaryDataAlt con [_, _] = isJust (nativeNullaryGadtSpec_maybe con)
+isNativeIndexedNullaryDataAlt _ _ = False
+
+-- | Reconstruct the promoted constructor endpoint at the scrutinee kind.
+-- See Note [Native indexed nullary branch evidence].
+nativeIndexedNullaryCon_maybe :: Type -> DataCon -> Id -> Maybe Type
+nativeIndexedNullaryCon_maybe domain con equality
+  | Just spec <- nativeNullaryGadtSpec_maybe con
+  , TyConApp tc args <- coreFullView domain
+  , tc == dataConTyCon con
+  , isNativeOpaqueValueType domain
+  , let univs = dataConUnivTyVars con
+  , univs `equalLength` args
+  , let params = zip univs args
+        refined = eqSpecTyVar spec
+  , all (not . anyFreeVarsOfType (== refined) . varType) univs
+  , Just actual <- lookup refined params
+  , Just con_args <- traverse (`lookup` params) (dataConUserTyVars con)
+  , isCoVar equality
+  , let co = mkCoVarCo equality
+  , coercionRole co == Nominal
+  , coercionLKind co `eqType` actual
+  , coercionRKind co `eqType` eqSpecType spec
+  , let constructor = mkTyConApp (promoteDataCon con) con_args
+        kind_co = mkTyConAppCo Nominal tc
+          [if tv == refined then co else mkNomReflCo ty | (tv, ty) <- params]
+  , coercionLKind kind_co `eqType` domain
+  , coercionRKind kind_co `eqType` typeKind constructor
+  = Just (mkCastTy constructor (mkSymCo kind_co))
+  | otherwise = Nothing
+
+nativeNullaryGadtSpec_maybe :: DataCon -> Maybe EqSpec
+nativeNullaryGadtSpec_maybe con
+  | let tc = dataConTyCon con
+  , isVanillaAlgTyCon tc, isBoxedDataTyCon tc
+  , null (dataConRepArgBinders con)
+  , (_, [], [spec], [], [], _) <- dataConFullSig con
+  , null (dataConStupidTheta con), dataConRepArity con == 1
+  , noFreeVarsOfType (eqSpecType spec)
+  = Just spec
+  | otherwise = Nothing
+
+{- Note [Native indexed nullary branch evidence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A VNil alternative already binds nominal co :: n ~# Z. The promoted VNil
+and its scrutinee have different kinds before that equality is applied.
+Lift the equality through the parent datatype and cast the promoted
+constructor back to the scrutinee kind. One extra trailing CoVar proves
+that the actual scrutinee is this constructor at its original kind.
+
+The ordinary GADT evidence stays before the virtual proof. Obtain both
+endpoints from the strict case, its constructor and its ordinary evidence.
+Check the evidence nominally. This increment has no fields or existentials.
+CoreToStg removes only the extra proof. The case still demands the scrutinee,
+even at a known index. A distinct value at the same index gets no proof.
+
+GHC.Tc.Gen.Pat keeps the ordinary equality in the GADT implication.
+GHC.Tc.Gen.Match transports the expected result through the virtual
+proof and casts the branch result back. Coverage uses the ordinary
+GADT evidence. It does not treat the virtual proof as a constraint
+on which constructors can match.
+
+Agda's indexed constructor split refines the indices and binds the
+constructor fields in the branch context. See
+docs/dependent-haskell/REFERENCES.md#agda-provenance. The GHC case keeps
+Haskell's demand on the scrutinee.
+-}
 
 -- | Detect proof binders on a DEFAULT alternative, including malformed proofs.
 -- Core Lint checks their count, scope, and exact nominal equality type.

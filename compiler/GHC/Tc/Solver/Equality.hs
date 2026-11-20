@@ -39,6 +39,7 @@ import GHC.Core.Class
 import GHC.Core.DataCon ( dataConName )
 import GHC.Core.Dependent ( hasNativeDependentExpr )
 import GHC.Core.TyCon
+import GHC.Core.Unify ( typesAreApart )
 import GHC.Core.TyCo.Rep   -- cleverly decomposes types, good for completeness checking
 import GHC.Core.TyCo.FVs ( tyCoVarsOfMCo, almostDevoidCoVarOfCo, mkUnivCoDeps, univCoDepsHoles )
 import qualified GHC.Core.TyCo.Subst as Subst
@@ -801,7 +802,11 @@ can_eq_nc _ _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
       | Just (head, _) <- tcSplitAppTy_maybe ty
       = not (isMatchableFunTy (typeKind head))
       | otherwise = False
-    same_domain v ty = isNativeRetainedBinder v && typeKind ty `eqType` varType v
+    same_domain v ty = isNativeRetainedBinder v
+                    && (domain `eqType` kind || (isGiven ev && not (typesAreApart domain kind)))
+      where
+        domain = varType v
+        kind = typeKind ty
     call_domain f ty = case nativeIndexFunctionTys_maybe f of
       Just (_, result) -> typeKind ty `eqType` result
       Nothing -> False
@@ -826,6 +831,14 @@ A runtime index can equal a constructor or another index of the same domain.
 Failure to rewrite these well-kinded index forms does not establish
 a contradiction. Retain the equality as a non-insoluble IrredShapeReason.
 This also lets the pattern-match oracle retain a checked constructor proof.
+
+When a branch matches HRefl, it introduces both a kind equality and a
+value equality. For example, the value equality relates xs :: Vec a n to
+VNil :: Vec a Z. The kind equality can refine n to Z. The runtime Id still
+carries its original type. Classify this Given as insoluble only when its
+domains are surely apart. The order in which the solver processes the
+two Givens does not affect reachability. This check supplies no coercion.
+
 
 A family can return a U or unknown function before its head is exposed.
 For example, Stored container argument can still equal True. Split ordinary

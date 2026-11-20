@@ -52,6 +52,7 @@ import GHC.Core.FamInstEnv( topNormaliseType )
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
 import GHC.Core.Utils
+import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.Make
 import GHC.Core.Make.Box ( mkBox, mkUnbox )
 import GHC.Core.Make.BigTuple ( mkBigCoreTupTy )
@@ -64,7 +65,8 @@ import GHC.Types.CostCentre
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Var( isInvisibleAnonPiTyBinder )
-import GHC.Types.Var.Set( isEmptyVarSet, elemVarSet )
+import GHC.Types.Var.Set( isEmptyVarSet, elemVarSet, extendVarSet )
+import GHC.Types.Var.Env( mkInScopeSet )
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
 import GHC.Types.Tickish
@@ -478,7 +480,22 @@ dsExpr (HsPragE _ (HsPragSCC _ cc) expr)
 dsExpr (HsCase ctxt discrim matches)
   = do { core_discrim <- dsLExpr discrim
        ; ([discrim_var], matching_code) <- matchWrapper ctxt (Just [core_discrim]) matches
-       ; return (bindNonRec discrim_var core_discrim matching_code) }
+       ; return $ case core_discrim of
+           Var index | any indexed_row (unLoc (mg_alts matches)) ->
+             -- Keep the actual scrutinee named in the branch proof. The
+             -- checked operand is already a variable, so it stays shared.
+             let scope = mkInScopeSet (extendVarSet (exprFreeVars matching_code) index)
+                 subst = CoreSubst.extendIdSubstWithClone (CoreSubst.mkEmptySubst scope)
+                                                        discrim_var index
+             in CoreSubst.substExpr subst matching_code
+           _ -> bindNonRec discrim_var core_discrim matching_code }
+  where
+    indexed_row match =
+      case hsLMatchPats match of
+        [L _ (ConPat { pat_con = L _ (RealDataCon con)
+                     , pat_con_ext = ConPatTc { cpt_dicts = dicts } })]
+          -> isNativeIndexedNullaryDataAlt con dicts
+        _ -> False
 
 -- Pepe: The binds are in scope in the body but NOT in the binding group
 --       This is to avoid silliness in breakpoints

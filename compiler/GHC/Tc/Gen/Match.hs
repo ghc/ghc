@@ -15,7 +15,7 @@
 -- | Typecheck some @Matches@
 module GHC.Tc.Gen.Match
    ( tcFunBindMatches
-   , tcCaseMatches
+   , tcCaseMatches, tcIndexedCaseMatches
    , tcRetainedCase
    , tcRetainedCallCase
    , tcLambdaMatches
@@ -1920,6 +1920,14 @@ tcCaseMatches :: (AnnoBody body, Outputable (body GhcTc))
 tcCaseMatches ctxt tc_body (Scaled scrut_mult scrut_ty) matches res_ty
   = tcMatches ctxt tc_body [ExpFunPatTy (Scaled scrut_mult (mkCheckExpType scrut_ty))] res_ty matches
 
+-- | Check a dependent case on a named opaque GADT scrutinee.
+tcIndexedCaseMatches :: Id -> HsMatchContextRn -> Scaled TcSigmaTypeFRR
+                     -> MatchGroup GhcRn (LHsExpr GhcRn) -> ExpRhoType
+                     -> TcM (MatchGroup GhcTc (LHsExpr GhcTc))
+tcIndexedCaseMatches index ctxt (Scaled mult ty) matches res_ty =
+  tcMatchesFromWithIndex (Just (index, mkLHsWrapCo . mkSymCo)) id ctxt tcBody
+    [ExpFunPatTy (Scaled mult (mkCheckExpType ty))] res_ty matches
+
 -- @tcGRHSsPat@ typechecks @[GRHSs]@ that occur in a @PatMonoBind@.
 tcGRHSsPat :: Mult -> GRHSs GhcRn (LHsExpr GhcRn) -> ExpRhoType
            -> TcM (GRHSs GhcTc (LHsExpr GhcTc))
@@ -2025,7 +2033,15 @@ tcMatchesFrom :: (AnnoBody body, Outputable (body GhcTc))
               -> HsMatchContextRn -> TcMatchAltChecker body -> [ExpPatType] -> ExpRhoType
               -> MatchGroup GhcRn (LocatedA (body GhcRn))
               -> TcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
-tcMatchesFrom source ctxt tc_body pat_tys exp_ty (MG { mg_alts = L l matches
+tcMatchesFrom = tcMatchesFromWithIndex Nothing
+
+tcMatchesFromWithIndex :: (AnnoBody body, Outputable (body GhcTc))
+                       => Maybe (Id, TcCoercion -> LocatedA (body GhcTc) -> LocatedA (body GhcTc))
+                       -> (Match GhcRn (LocatedA (body GhcRn)) -> Match GhcRn (LocatedA (body GhcRn)))
+                       -> HsMatchContextRn -> TcMatchAltChecker body -> [ExpPatType] -> ExpRhoType
+                       -> MatchGroup GhcRn (LocatedA (body GhcRn))
+                       -> TcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
+tcMatchesFromWithIndex index source ctxt tc_body pat_tys exp_ty (MG { mg_alts = L l matches
                                                      , mg_ext = (origin, _) })
   | null matches  -- Deal with case e of {}
     -- Since there are no branches, no one else will fill in exp_ty
@@ -2047,7 +2063,7 @@ tcMatchesFrom source ctxt tc_body pat_tys exp_ty (MG { mg_alts = L l matches
   | otherwise
   = do { let exp_ty' = adjustExpTypeForCaseBranches exp_ty matches
              tc_match match = tcCollectingUsage $
-                              tcMatchWithSource tc_body pat_tys exp_ty' (source (unLoc match)) match
+                              tcMatchWithIndex index tc_body pat_tys exp_ty' (source (unLoc match)) match
        ; (usages, matches') <- mapAndUnzipM tc_match matches
        ; tcEmitBindingUsage $ supUEs usages
        ; pat_tys  <- mapM readScaledExpType (filter_out_forall_pat_tys pat_tys)
@@ -2110,15 +2126,26 @@ tcMatchWithSource :: (AnnoBody body)
                   -> Match GhcRn (LocatedA (body GhcRn))
                   -> LMatch GhcRn (LocatedA (body GhcRn))
                   -> TcM (LMatch GhcTc (LocatedA (body GhcTc)))
-tcMatchWithSource tc_body pat_tys rhs_ty source_match match
+tcMatchWithSource = tcMatchWithIndex Nothing
+
+tcMatchWithIndex :: AnnoBody body
+                 => Maybe (Id, TcCoercion -> LocatedA (body GhcTc) -> LocatedA (body GhcTc))
+                 -> TcMatchAltChecker body -> [ExpPatType] -> ExpRhoType
+                 -> Match GhcRn (LocatedA (body GhcRn))
+                 -> LMatch GhcRn (LocatedA (body GhcRn))
+                 -> TcM (LMatch GhcTc (LocatedA (body GhcTc)))
+tcMatchWithIndex index tc_body pat_tys rhs_ty source_match match
   = do { (L loc r) <- wrapLocMA (tc_match pat_tys rhs_ty) match
        ; return (L loc r) }
   where
     tc_match pat_tys rhs_ty
              (Match { m_ctxt = ctxt, m_pats = L l pats, m_grhss = grhss })
       = add_match_ctxt $
-        do { (pats', (grhss')) <- tcMatchPats ctxt pats pat_tys $
-                                  tcGRHSs ctxt tc_body grhss rhs_ty
+        do { (pats', grhss') <- case index of
+               Nothing -> tcMatchPats ctxt pats pat_tys (tcGRHSs ctxt tc_body grhss rhs_ty)
+               Just (scrutinee, wrap_rhs) ->
+                 tcMatchPatsWithIndex scrutinee ctxt pats pat_tys (check_grhss scrutinee wrap_rhs)
+
              -- NB: pats' are just the /value/ patterns
              -- See Note [tcMatchPats] in GHC.Tc.Gen.Pat
 
@@ -2131,6 +2158,13 @@ tcMatchWithSource tc_body pat_tys rhs_ty source_match match
         --     so we don't want to add "In the lambda abstraction \x->e"
         -- But for \cases with many alternatives, it is helpful to say
         --     which particular alternative we are looking at
+        check_grhss scrutinee wrap_rhs (Just proof)
+          | Check ty <- rhs_ty
+          = do { co <- tcRetainedIndexCoercion (TermVarTy scrutinee) (mkCoVarCo proof) ty
+               ; let check_rhs body rhs = wrap_rhs co <$> tc_body body rhs
+               ; tcGRHSs ctxt check_rhs grhss (mkCheckExpType (pSnd (coercionKind co))) }
+        check_grhss _ _ _ = tcGRHSs ctxt tc_body grhss rhs_ty
+
         add_match_ctxt thing_inside = case ctxt of
             LamAlt LamSingle -> thing_inside
             StmtCtxt (HsDoStmt{}) -> thing_inside -- this is an expanded do stmt

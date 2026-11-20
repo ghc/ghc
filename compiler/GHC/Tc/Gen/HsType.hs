@@ -632,7 +632,7 @@ tcCheckRetainedType allow_function = go
           = setSrcSpanA lb $
             case bndr of
               HsTvb _ () (HsBndrVar _ (L _ name)) (HsBndrKind _ domain) ->
-                do { domain_ty <- tcRetainedBinderDomain True mode domain
+                do { domain_ty <- tcRetainedBinderDomain isNativeRetainedBinderType mode domain
                    ; when (not allow_function && isFunTy domain_ty) $
                        failWithTc $ TcRnRetainedQuantificationError $
                          if mode_complete_type_arg mode == Just False
@@ -680,6 +680,7 @@ tcCheckRetainedConType :: Bool
                       -> LHsType GhcRn -> TcM ([Maybe Id], TcType)
 tcCheckRetainedConType validate_domain tc_field_mult = go typeLevelMode
   where
+    valid_field_domain ty = not validate_domain || isNativeRetainedFieldType ty
     go mode (L _ (HsParTy _ body)) = go mode body
     go mode (L loc (HsForEachTy ann bndrs body))
       = setSrcSpanA loc $
@@ -707,7 +708,7 @@ tcCheckRetainedConType validate_domain tc_field_mult = go typeLevelMode
       = setSrcSpanA loc $
         case bndr of
           HsTvb _ () (HsBndrVar _ (L _ name)) (HsBndrKind _ domain) ->
-            do { domain_ty <- tcRetainedBinderDomain validate_domain mode domain
+            do { domain_ty <- tcRetainedBinderDomain valid_field_domain mode domain
                ; let index = mkLocalId name ManyTy domain_ty
                      mode' = mode { mode_indices = extendNameEnv (mode_indices mode) name index }
                ; (binders, body_ty) <- bind_indices mode' rest body
@@ -720,14 +721,12 @@ tcCheckRetainedConType validate_domain tc_field_mult = go typeLevelMode
 -- | Check the domain of a retained binder before bringing it into scope.
 -- Constructor kind inference skips the domain predicate until the datatype
 -- constructor knots are available.
-tcRetainedBinderDomain :: Bool -> TcTyMode -> LHsType GhcRn -> TcM TcType
-tcRetainedBinderDomain validate_domain mode domain
+tcRetainedBinderDomain :: (Type -> Bool) -> TcTyMode -> LHsType GhcRn -> TcM TcType
+tcRetainedBinderDomain valid_domain mode domain
   = do { domain_ty <- tc_check_lhs_type mode domain liftedTypeKind
        ; domain_ty <- liftZonkM $ zonkTcType domain_ty
-       ; when validate_domain $
-           unless (isNativeRetainedBinderType domain_ty) $
-             failWithTc $ TcRnRetainedQuantificationError
-                            (RetainedUnsupportedDomain domain_ty)
+       ; unless (valid_domain domain_ty) $
+           failWithTc $ TcRnRetainedQuantificationError (RetainedUnsupportedDomain domain_ty)
        ; return domain_ty }
 
 {- Note [Source retained signatures]
@@ -2719,9 +2718,12 @@ tc_app_ty mode rn_ty exp_kind
                        AnId fun
                          | ordinary_call
                          , [left, _] <- args
-                         , Just (table, constructor) <- indexedProjectionSource fun
-                         , L _ (HsTyVar _ _ (L _ (WithUserRdr _ operand))) <- ignoreParens left
-                         , isTyVarName operand || operand == getName constructor
+                         , Just (table, nullary : recursive) <- indexedProjectionSource fun
+                         , (L _ (HsTyVar _ _ (L _ (WithUserRdr _ operand))), left_args) <-
+                             splitHsAppTys (unLoc (indexed_operand left))
+                         , (null left_args && (indexed_variable operand || operand == getName nullary)) ||
+                           (any ((== operand) . getName) recursive &&
+                            any open_indexed_operand args)
                          -> do { sourceTableReferenceUse table
                                ; tc_app_ty_with_head mode rn_ty exp_kind (mkTyConTy table) }
                          | [arg] <- args, isQual rdr
@@ -2757,6 +2759,21 @@ tc_app_ty mode rn_ty exp_kind
                                ; checkExpKind mode rn_ty result result_kind exp_kind }
                        _ -> unsupported name }
            _ -> unsupported name
+    -- See Note [Nullary indexed source projections] in GHC.Tc.Gen.SourceTable.
+    indexed_variable name = isTyVarName name || isJust (lookupNameEnv (mode_indices mode) name)
+    open_indexed_operand ty = case unLoc (indexed_operand ty) of
+      HsTyVar _ NotPromoted (L _ (WithUserRdr _ name)) -> indexed_variable name
+      HsAppTy _ fun arg -> open_indexed_operand fun || open_indexed_operand arg
+      HsExplicitTupleTy _ _ fields -> any open_indexed_operand fields
+      HsExplicitListTy _ _ fields -> any open_indexed_operand fields
+      _ -> False
+
+    -- Inspect the constructor head for routing. Check the original operand
+    -- and its annotation when applying the selected kind.
+    indexed_operand ty = case ignoreParens ty of
+      L _ (HsKindSig _ operand _) -> indexed_operand operand
+      operand -> operand
+
     (hs_fun_ty, hs_args) = splitHsAppTys rn_ty
     value_args = traverse value_arg (filterOut is_par hs_args)
     is_par HsArgPar{} = True

@@ -25,7 +25,7 @@ module GHC.Tc.Utils.Unify (
 
   -- Various unifications
   uType, unifyType, unifyKind, unifyInvisibleType,
-  isRetainedConstructorProof, tcRetainedCoercion,
+  isRetainedConstructorProof, tcRetainedCoercion, tcRetainedIndexCoercion,
   tcRetainedCallCoercion, retainedCallOccurs,
   unifyExprType, unifyTypeAndEmit, promoteTcType,
   swapOverTyVars, touchabilityTest, checkTopShape, lhsPriority,

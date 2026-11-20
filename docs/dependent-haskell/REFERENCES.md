@@ -6578,3 +6578,28 @@ turn them off. The retained pipeline accepts the same override. The
 simplifier reads the module's actual flag when it configures rule firing.
 [GHC rewrite rules](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/rewrite_rules.html)
 and [simplifier configuration](../../compiler/GHC/Driver/Config/Core/Opt/Simplify.hs).
+
+### Recursive append at runtime vector arguments
+
+Agda's vector append returns the left head and appends the left tail to
+the right operand. The Haskell proof applies that equation with three
+retained arguments. Ordinary DataKinds promotion supplies the kind of
+`VCons`, including its tail length. An importing module checks the head
+and tail against that kind. Reading the proof does not evaluate either
+field or the right operand.
+[Agda standard library v2.3, Data.Vec.Base](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html),
+[proof](examples/packed-vector/OpenVectorAppend.hs)
+and [ordinary client](examples/packed-vector/OrdinaryOpenVectorAppend.hs).
+
+### Eliminating an equality returned by a vector match
+
+Agda's coverage checker unifies the constructor result indices with the
+scrutinee indices. An empty branch can refine an unknown length to zero.
+A constructor clash, such as zero against a successor, rules out a branch.
+In the Haskell example, matching `HRefl` gives the ordinary length
+equality and the identity of the vector. While checking the branch,
+the solver can encounter the value equality before applying the length
+equality. It checks whether the two kinds are surely apart before
+reporting that the branch is unreachable.
+[Agda 2.8.0, matching on indexed datatypes](https://agda.readthedocs.io/en/v2.8.0/language/coverage-checking.html#matching-on-indexed-datatypes)
+and [GHC apartness](../../compiler/GHC/Core/Unify.hs).

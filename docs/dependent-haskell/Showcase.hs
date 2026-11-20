@@ -68,7 +68,7 @@ import Data.List (isInfixOf)
 import qualified Data.List
 import qualified Data.Maybe
 import Data.Proxy (Proxy(..))
-import Data.Type.Equality ((:~:) (Refl))
+import Data.Type.Equality ((:~:) (Refl), (:~~:) (HRefl))
 import qualified FiniteTree
 import qualified FunctionFieldClient
 import qualified FunctionFieldLibrary as FunctionFields
@@ -1484,6 +1484,12 @@ oneCellHead extent =
          Just Refl -> Just (safeHead (replicateNative count 'x'))
          Nothing -> Nothing
 
+-- | Return equality with the empty constructor after inspecting the vector.
+emptyVectorProof :: forall a n. foreach (xs :: Vec a n) -> Maybe (xs :~~: ('VNil :: Vec a 'Z))
+emptyVectorProof xs = case xs of
+    VNil -> Just HRefl
+    VCons _ _ -> Nothing
+
 -- | Use ordinary addition on two unknown lengths in a vector result type.
 sourceAddition :: IO ()
 sourceAddition = do
@@ -1507,10 +1513,18 @@ sourceAddition = do
               :~: 'VCons 'True ('VCons 'False 'VNil))
     observe "prove empty append preserves a runtime vector"
         (OrdinaryOpenVectorAppend.appendContents joined)
+    observe "prove the first cell of append at runtime"
+        (OrdinaryOpenVectorAppend.consContents False prefix suffix)
     observe "split the appended vector at its first length"
         (toList (fst split), toList (snd split))
     observe "take and drop at the first runtime length" (toList prefix, toList suffix)
     checkedInput <- newIORef [True, False] >>= readIORef
+    let matchesEmpty input = case ListVectorClient.fromList input of
+            Sigma.Pair size xs -> case emptyVectorProof @_ @size xs of
+                Just HRefl -> True
+                Nothing -> False
+    observe "prove the runtime vector is VNil in the empty branch"
+        (matchesEmpty (drop 2 checkedInput), matchesEmpty checkedInput)
     observe "check a runtime cut against a vector length"
         (ListVectorClient.checkedSplitObservation n checkedInput,
          ListVectorClient.checkedSplitObservation (S m) checkedInput)

@@ -323,7 +323,8 @@ evidenceSuffix :: IfaceEvidenceVersion -> String
 evidenceSuffix requirements
   | needs ErasedUserRuleEvidence || needs LexicalPackageRuleEvidence
     || needs OrphanErasedUserRuleEvidence || needs AnchoredErasedRuleEvidence
-    || needs RetainedUserRuleEvidence || needs ImportedRetainedRuleEvidence = feature_set
+    || needs RetainedUserRuleEvidence || needs ImportedRetainedRuleEvidence
+    || needs IndexedConstructorCaseEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -344,6 +345,7 @@ legacyEvidenceSuffix OrphanErasedUserRuleEvidence = featureSetPrefix ++ "orphan-
 legacyEvidenceSuffix AnchoredErasedRuleEvidence = featureSetPrefix ++ "anchored-user-rule"
 legacyEvidenceSuffix RetainedUserRuleEvidence = featureSetPrefix ++ "retained-user-rule"
 legacyEvidenceSuffix ImportedRetainedRuleEvidence = featureSetPrefix ++ "imported-retained-rule"
+legacyEvidenceSuffix IndexedConstructorCaseEvidence = featureSetPrefix ++ "indexed-constructor-case"
 legacyEvidenceSuffix DepFunCoEvidence           = "-retained-depfunco-v1"
 legacyEvidenceSuffix ConstructorCaseEvidence   = "-retained-constructor-case-v1"
 legacyEvidenceSuffix RetainedSpecRuleEvidence  = "-retained-specialisation-rule-v1"
@@ -370,7 +372,8 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("orphan-user-rule", OrphanErasedUserRuleEvidence)
                       , ("anchored-user-rule", AnchoredErasedRuleEvidence)
                       , ("retained-user-rule", RetainedUserRuleEvidence)
-                      , ("imported-retained-rule", ImportedRetainedRuleEvidence) ]
+                      , ("imported-retained-rule", ImportedRetainedRuleEvidence)
+                      , ("indexed-constructor-case", IndexedConstructorCaseEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion
@@ -407,6 +410,10 @@ See Note [Exported retained specialisations] in GHC.Core.Rules.
 An erased user rule can construct or open a package on either side.
 Record that requirement when writing the rule expression. A reader that
 only supports calls at erased package types rejects the newer header.
+
+An indexed constructor proof follows the ordinary GADT equality binder.
+Its reader reconstructs the promoted endpoint using that equality.
+The indexed alternative has its own tag and independent feature marker.
 
 An index alias uses a distinct DEFAULT alternative tag. An older reader
 accepts ordinary DEFAULT alternatives from the same compiler. It must reject
