@@ -579,9 +579,10 @@ tcTyClGroup open_indices (TyClGroup { group_tyclds = tyclds
                    addErrCtxt (ClosedFamEqnCtxt tycls) $
                      mapM_ (checkTyFamEqnValidityInfo tycls) ax_validity_infos
              ; if ordered_case
-               then do { forM_ ax_validity_infos $ \vi ->
-                           setSrcSpan (vi_loc vi) $
-                             checkValidTyFamEqn tycls (vi_pats vi) (vi_rhs vi)
+               then do { forM_ ax_validity_infos $ \case
+                           VI{vi_loc = loc, vi_pats = pats, vi_rhs = rhs} ->
+                             setSrcSpan loc $ checkValidTyFamEqn tycls pats rhs
+                           NoVI -> pure ()
                        ; setXOptM LangExt.UndecidableInstances (checkValidTyCl tycls) }
                else checkValidTyCl tycls }
 
@@ -632,7 +633,7 @@ tcTyClDecls open_indices tyclds kisig_env role_annots
             -- and that ill-scoped kind made role inference fall over.
 
        ; let inferred = mkNameEnv [(tyConName tc, tc) | tc <- tc_tycons]
-       ; forM_ tyclds $ \(L _ decl) -> case decl of
+       ; forM_ tyclds $ \(L loc decl) -> case decl of
            SynDecl{tcdLName = L _ name, tcdRhs = rhs}
              | "$case-let-rhs:" `List.isPrefixOf` occNameString (nameOccName name)
              , Just tc <- lookupNameEnv inferred name
@@ -640,6 +641,13 @@ tcTyClDecls open_indices tyclds kisig_env role_annots
                  setSrcSpanA (getLoc rhs) $
                    failWithTc (mkTcRnUnknownMessage (mkPlainError []
                      (text "A type let used in a case body cannot generalize the kind of its right-hand side.")))
+           FamDecl{tcdFam = FamilyDecl{fdLName = L _ name}}
+             | isDependentCaseFamily name
+             , Just tc <- lookupNameEnv inferred name
+             , not (tyCoVarsOfType (tyConResKind tc) `subVarSet` mkVarSet (tyConVisibleTyVars tc)) ->
+                 setSrcSpanA loc $
+                   failWithTc (mkTcRnUnknownMessage (mkPlainError []
+                     (text "The result kind of this type case needs an explicit kind annotation.")))
            _ -> pure ()
        ; traceTc "tcTyAndCl generalized kinds" (vcat (map ppr_tc_tycon tc_tycons))
 
@@ -1395,6 +1403,24 @@ isCaseLet :: LTyClDecl GhcRn -> Bool
 isCaseLet (L _ SynDecl{tcdLName = L _ name}) =
   "$case-let-rhs:" `List.isPrefixOf` occNameString (nameOccName name)
 isCaseLet _ = False
+
+{- Note [Result kinds of dependent type cases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When a private family generalizes before its owner, its kind inference
+can add a parameter that the source case does not bind. For example, a
+branch of kind TYPE r can make ordinary family inference add an
+invisible representation parameter. The owner's arrow can default that
+parameter to LiftedRep, independently of the captured r.
+
+Require the result kind to depend only on visible captures. A written
+case annotation supplies that kind, and the normal family checker
+checks each equation against it.
+-}
+-- | The private family for a case with a dependent forall capture.
+isDependentCaseFamily :: Name -> Bool
+isDependentCaseFamily name =
+  "$case:" `List.isPrefixOf` occ && "-forall" `List.isSuffixOf` occ
+  where occ = occNameString (nameOccName name)
 
 -- | An inferred parameter may be the kind of an explicit capture.
 -- The checked argument determines this kind at each helper application.
@@ -3782,7 +3808,7 @@ tcFamDecl1 case_axioms parent (FamilyDecl { fdInfo = fam_info
        ; co_ax_name <- newFamInstAxiomName tc_lname []
 
        ; let mb_co_ax
-              | any (isJust . vi_case_pattern) axiom_validity_infos
+              | any hasCasePattern axiom_validity_infos
               , Just ax <- lookupNameEnv case_axioms tc_name
               = Just ax
               | null eqns = Nothing   -- mkBranchedCoAxiom fails on empty list
@@ -4107,6 +4133,11 @@ typeCasePattern tc source_args rhs checked_args
               CasePatternConstructor (getLocA original) name (map source_case_pattern args)
         go _ _ = CasePatternField
 
+-- | Does the equation retain a source case pattern?
+hasCasePattern :: TyFamEqnValidityInfo -> Bool
+hasCasePattern VI{vi_case_pattern = Just _} = True
+hasCasePattern _ = False
+
 hasOrderedPattern :: TyFamEqnValidityInfo -> Bool
 hasOrderedPattern VI{vi_case_pattern = Just (_, _, pat, _)} = nestedTypeCasePattern pat
 hasOrderedPattern _ = False
@@ -4119,15 +4150,14 @@ needsOrderedCase root infos
   | _:_:_ <- infos = or <$> mapM has_expanded_test infos
   | otherwise = pure False
   where
-    has_expanded_test vi
-      | Just (_, _, pat, ty) <- vi_case_pattern vi
-      , may_expand ty
+    has_expanded_test vi@VI{vi_case_pattern = Just (_, _, pat, ty)}
+      | may_expand ty
       = do checkNoErrs (checkTyFamEqnValidityInfo root vi)
            checked <- checkedCasePattern [] pat ty
            pure $ case checked of
              CheckedCaseConstructor _ _ _ fields -> any is_test fields
              CheckedCaseField -> False
-      | otherwise = pure False
+    has_expanded_test _ = pure False
 
     may_expand (CastTy ty _) = may_expand ty
     may_expand ty = maybe False (isTypeSynonymTyCon . fst) (splitTyConAppNoView_maybe ty)
@@ -4203,16 +4233,18 @@ buildOrderedTypeCase root infos = do
   let vars = binderVars (tyConBinders root)
       args = mkTyVarTys vars
       res = tyConResKind root
-      loc = vi_loc (head infos)
+      loc = case infos of
+        VI{vi_loc = span} : _ -> span
+        _ -> getSrcSpan root
       unsupported :: TcM a
       unsupported = setSrcSpan loc $
         failWithTc (mkTcRnUnknownMessage (mkPlainError []
           (text "This nested type case needs an unsupported constructor telescope.")))
-  checked_rows <- forM infos $ \vi -> case vi_case_pattern vi of
-    Just (owner, i, pat, ty) -> do
+  checked_rows <- forM infos $ \case
+    vi@VI{vi_case_pattern = Just (owner, i, pat, ty)} -> do
       checked <- checkedCasePattern [] pat ty
       pure ((owner, i), (vi, [checked]))
-    Nothing -> unsupported
+    _ -> unsupported
   ((owner, column), rows) <- case unzip checked_rows of
     (first:rest, rows) | all (== first) rest -> pure (first, rows)
     _ -> unsupported
@@ -4254,23 +4286,26 @@ buildOrderedTypeCase root infos = do
         in mkCoAxBranch ts [] [] lhs rhs (replicate (length ts) Nominal) loc
 
       -- Test the current column before choosing a branch.
-      build sourceArgs variables slots result liveRows@((vi, first):_) =
+      build sourceArgs variables slots result
+        liveRows@((VI{vi_loc = row_loc, vi_pats = row_pats, vi_rhs = row_rhs}, first):_) =
         case [(path, (field, span, con))
              | (field, CheckedCaseConstructor path span con _) <- zip [0..] first] of
           [] -> do
-            case tcMatchTyKis (vi_pats vi) sourceArgs of
+            case tcMatchTyKis row_pats sourceArgs of
               Just subst
-                | let rhs = substTyUnchecked subst (vi_rhs vi)
+                | let rhs = substTyUnchecked subst row_rhs
                 , typeKind rhs `eqType` result ->
                     pure ([branch (mkTyVarTys variables) rhs], [])
               _ -> unsupported
           demands -> do
             let (_, (field, span, con)) =
                   List.minimumBy (\(p, _) (q, _) -> compare p q) demands
-            scrut <- maybe unsupported pure (getTyVar_maybe (slots !! field))
-            if varType scrut `eqType` liftedTypeKind
-              then openColumn sourceArgs variables slots result liveRows vi span field scrut con
-              else closedColumn sourceArgs variables slots result liveRows vi field scrut
+            case drop field slots of
+              slot:_ | Just scrut <- getTyVar_maybe slot ->
+                if varType scrut `eqType` liftedTypeKind
+                  then openColumn sourceArgs variables slots result liveRows row_loc span field scrut con
+                  else closedColumn sourceArgs variables slots result liveRows row_loc field scrut
+              _ -> unsupported
         where
           specialize field con (row, pats) = case splitAt field pats of
             (prefix, CheckedCaseField : suffix) ->
@@ -4281,7 +4316,7 @@ buildOrderedTypeCase root infos = do
             _ -> Nothing
             where arity = count isVisibleTyConBinder (tyConBinders con)
 
-          closedColumn sourceArgs variables slots result liveRows vi field scrut = do
+          closedColumn sourceArgs variables slots result liveRows row_loc field scrut = do
             (parent, _) <- maybe unsupported pure (tcSplitTyConApp_maybe (varType scrut))
             cs <- maybe unsupported pure (tyConDataCons_maybe parent)
             let promotable dc = case dataConFullSig dc of
@@ -4291,7 +4326,7 @@ buildOrderedTypeCase root infos = do
                   selected = mapMaybe (specialize field con) liveRows
               if null selected then pure Nothing else do
                 unless (null (dataConRepArgBinders dc)) unsupported
-                onConstructor sourceArgs variables slots result vi field scrut con selected
+                onConstructor sourceArgs variables slots result row_loc field scrut con selected
             let branches = catMaybes results
             if null branches then unsupported else
               pure ([branch lhs rhs | (_, lhs, rhs, _) <- branches],
@@ -4300,7 +4335,7 @@ buildOrderedTypeCase root infos = do
           -- The classifier returns distinct Bool constructors. In particular
           -- its default cannot become compatible with its test even if both
           -- branches of the original case return an identical value.
-          openColumn sourceArgs variables slots result liveRows vi span field scrut con = do
+          openColumn sourceArgs variables slots result liveRows row_loc span field scrut con = do
             unless (isGenerativeTyCon con Nominal && not (isTypeFamilyTyCon con)) $
               setSrcSpan span $ failWithTc (TcRnNestedTypeCasePattern (mkTyVarTy scrut))
             let matchRows = mapMaybe (specialize field con) liveRows
@@ -4309,7 +4344,7 @@ buildOrderedTypeCase root infos = do
                   _ -> True
                 missRows = filter missRow liveRows
                 args = mkTyVarTys variables
-            matched <- onConstructor sourceArgs variables slots result vi field scrut con matchRows
+            matched <- onConstructor sourceArgs variables slots result row_loc field scrut con matchRows
             (pattern, lhs, matchedRhs, matchedHelpers) <- maybe unsupported pure matched
             testArg <- fresh liftedTypeKind
             classify <- makeFamily (mkAnonTyConBinders [testArg]) boolTy
@@ -4323,9 +4358,9 @@ buildOrderedTypeCase root infos = do
             pure ([branch args (mkTyConApp decision (mkTyConApp classify [mkTyVarTy scrut] : args))],
                   classify : decision : matchedHelpers ++ missHelpers)
 
-      build _ _ _ _ [] = unsupported
+      build _ _ _ _ _ = unsupported
 
-      onConstructor sourceArgs variables slots result vi field scrut con selected = do
+      onConstructor sourceArgs variables slots result row_loc field scrut con selected = do
         let bndrs = tyConBinders con
         binders <- map snd <$> foldM (freshBinder fresh) [] bndrs
         let instantiated = substTyWith (binderVars bndrs) (mkTyVarTys binders)
@@ -4341,11 +4376,14 @@ buildOrderedTypeCase root infos = do
                   Just co -> pure (Just (mkEmptySubst emptyInScopeSet, Just co))
                   Nothing
                     | apart -> pure Nothing
-                    | otherwise -> setSrcSpan (vi_loc vi) $
+                    | otherwise -> setSrcSpan row_loc $
                         failWithTc (TcRnTypeCaseIndexApartness scrut_kind)
         case refinement of
           Nothing -> pure Nothing
           Just (refine, kind_co) -> do
+            (before, after) <- case splitAt field slots of
+              (before, _:after) -> pure (before, after)
+              _ -> unsupported
             let refineTy = substTyUnchecked refine
                 extras = result : sourceArgs ++ slots ++ mkTyVarTys binders
                 liveVars = scopedSort (tyCoVarsOfTypesList (map refineTy extras))
@@ -4367,7 +4405,6 @@ buildOrderedTypeCase root infos = do
                 fields = [replace (mkTyVarTy v) | (b, v) <- zip bndrs binders
                                                , isVisibleTyConBinder b]
                 source = map replace sourceArgs
-                (before, _:after) = splitAt field slots
                 child_slots = map replace before ++ fields ++ map replace after
                 lhs = map (replace . mkTyVarTy) variables
             (rhs, helpers) <- makeChild source child_slots (replace result) selected
@@ -6907,6 +6944,7 @@ addVDQNote :: TcTyCon -> TcM a -> TcM a
 addVDQNote tycon thing_inside
   | assertPpr (isMonoTcTyCon tycon) (ppr tycon $$ ppr tc_kind)
     has_vdq
+  , not (isDependentCaseFamily (tyConName tycon))
   = addErrCtxt (VDQWarningCtxt tycon) thing_inside
   | otherwise
   = thing_inside

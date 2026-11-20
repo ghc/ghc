@@ -1,0 +1,6 @@
+StuckFamilyArrowArity.hs:13:13: error: [GHC-83865]
+    • Expected kind ‘Expected (* %M -> *)’,
+        but ‘Maybe’ has kind ‘* %GHC.Internal.Types.Matchable -> *’
+    • In the type ‘(Maybe :: Expected (Type %M -> Type))’
+      In the type synonym declaration for ‘Bad’
+

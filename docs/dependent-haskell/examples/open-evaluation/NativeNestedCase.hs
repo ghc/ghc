@@ -1,15 +1,16 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, Modifiers, PolyKinds, TypeFamilies #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, MagicHash, Modifiers, PolyKinds, RankNTypes, StandaloneKindSignatures, TypeFamilies #-}
 module NativeNestedCase
   ( Pick, Pair(..), LeftFirst, IgnoreLeft, Uniform, SameFallback
   , Indexed(..), IndexedPick, TypeHead, UniformTypeHead, Wrapped, WrappedBool
   , PickFlipped, DiscardConstant, CaptureFlipped, WrittenFirst
-  , AliasFirst, MixedAlias
+  , AliasFirst, MixedAlias, ArrowResult
+  , CaseFlag(..), ForallResult, ForallRepResult, forallResult
   , FamilyGate(..), FamilyGatePick, WrittenGatePick, HiddenGatePick, ApartGatePick
   ) where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy)
-import GHC.Exts (U)
+import GHC.Exts (Int#, LiftedRep, RuntimeRep(IntRep), TYPE, U)
 
 type Pick d = case d of
   Just (Just field) -> Proxy field
@@ -139,3 +140,40 @@ type ApartGatePick (d :: Maybe (FamilyGate GateIndexOther)) = case d of
   Just (PlainGate True) -> Int
   Just _ -> Bool
   Nothing -> Char
+
+type ArrowResult (tag :: k) (d :: Maybe (Maybe Bool)) =
+  () -> (case d of
+    Just (Just field) -> (Proxy tag, Proxy field)
+    Just _ -> (Proxy tag, Proxy 'False)
+    Nothing -> ())
+
+data CaseFlag (d :: Maybe Bool) where
+  CaseOn :: CaseFlag ('Just 'True)
+  CaseOff :: CaseFlag ('Just 'False)
+  CaseMissing :: CaseFlag 'Nothing
+
+-- | Select the result from the flag and keep the quantified tag.
+type ForallResult = forall k (tag :: k) (d :: Maybe Bool).
+  Proxy tag -> CaseFlag d -> (case d of
+    Just True -> (Proxy tag, Int)
+    Just _ -> (Proxy tag, Int)
+    Nothing -> (Proxy tag, Char))
+
+-- | Use the result type selected by the index of the flag.
+forallResult :: ForallResult
+forallResult tag CaseOn = (tag, 1)
+forallResult tag CaseOff = (tag, 0)
+forallResult tag CaseMissing = (tag, '?')
+
+type AtRep :: forall (r :: RuntimeRep) -> TYPE r
+type family AtRep r where
+  AtRep LiftedRep = Int
+  AtRep 'IntRep = Int#
+
+-- | The result representation depends on the quantified representation.
+type ForallRepResult = forall k (tag :: k) (r :: RuntimeRep) (d :: Maybe Bool).
+  Proxy tag -> CaseFlag d ->
+    ((case d of
+        Just True -> AtRep r
+        Just _ -> AtRep r
+        Nothing -> AtRep r) :: TYPE r)

@@ -257,6 +257,7 @@ bind the result of a constructor case: (Right True,Left 'c')
 select the result type by a constructor: (7,False)
 select through nested type case patterns: (Proxy,7)
 select through an ordinary type constructor: (7,'x',())
+select an arrow result inside forall: ((Proxy,1),(Proxy,'?'))
 match Bool and Ordering directly in a type: (7,'x')
 use a local type in a constructor case: Just True
 infer one kind for a local type from both case branches: True

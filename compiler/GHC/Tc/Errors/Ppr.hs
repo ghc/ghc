@@ -58,6 +58,7 @@ import GHC.Core.Coercion.Axiom (CoAxBranch, coAxiomTyCon, coAxiomSingleBranch,
 import GHC.Core.ConLike
 import GHC.Core.FamInstEnv ( FamInst(..), famInstAxiom, pprFamInst )
 import GHC.Core.InstEnv
+import qualified GHC.Core.TyCo.Compare as TypeCompare
 import GHC.Core.TyCo.Rep (Type(..))
 import GHC.Core.TyCo.Ppr (pprWithInvisibleBitsWhen, pprSourceTyCon,
                           pprTyVars, pprWithTYPE, pprTyVar, pprTidiedType, pprForAllWithMatchability)
@@ -4926,6 +4927,8 @@ pprTypeCaseMismatch ty
       ax <- closedFamilyTyConCoAxiom_maybe tc
       let branches = fromBranches (coAxiomBranches ax)
           visible = filterOutInvisibleTypes tc args
+      -- The ordered root contains tests, with private nodes for their results.
+      guard (not (any branchesToDecision branches))
       column <- case liftedTypeOwner "$case:" (tyConName tc) of
         Just _ -> Just (length visible - 1)
         Nothing -> do
@@ -4943,6 +4946,11 @@ pprTypeCaseMismatch ty
               <+> braces (sep (punctuate semi rows)))
   | otherwise = ppr ty
   where
+    branchesToDecision branch =
+      case splitTyConAppNoView_maybe (coAxBranchRHS branch) of
+        Just (tc, _) -> isJust (liftedTypeOwner "$case-node:" (tyConName tc))
+        Nothing -> False
+
     select index xs
       | index >= 0, (front, x : back) <- splitAt index xs = Just (x, front ++ back)
       | otherwise = Nothing
@@ -5114,8 +5122,8 @@ pprMismatchMsg ctxt
              n | n > 0   -- we don't know how many args there are, so don't
                          -- recommend removing args that aren't
                , Just thing <- mb_thing
-               , not (typeKind ty1 `tcEqType` matchabilityTy &&
-                      typeKind ty2 `tcEqType` matchabilityTy)
+               , not (stuck_family_result ty1 || stuck_family_result ty2)
+               , not (isMatchabilityMismatch ty1 ty2)
                  -- See Note [Argument counts in kind errors].
                -> Just $ pprTcSolverReportMsg ctxt (ExpectingMoreArguments n thing)
              _ -> Nothing
@@ -5125,6 +5133,13 @@ pprMismatchMsg ctxt
     maybe_num_args_msg = num_args_msg `orElse` empty
 
     count_args ty = let (_, binders, _) = splitPiTys ty in count isVisiblePiTyBinder binders
+
+    stuck_family_result ty
+      | (_, _, result) <- splitPiTys ty
+      , Just (tc, _) <- splitTyConApp_maybe result
+      = isTypeFamilyTyCon tc
+      | otherwise
+      = False
 
     ppr_torc TypeLike       = text "type";
     ppr_torc ConstraintLike = text "constraint"
@@ -5204,6 +5219,9 @@ reduces to Type -> @U Type, then Maybe :: F True has one arrow on each
 side. Decomposition leaves M ~ U. Report that mismatch even though
 counting the visible binders of F True gives zero. Keep the arity hint
 when a family reduces to Type and the caller really omitted an argument.
+If a family remains at the end of either kind in the solver's residual
+equality, its result can still supply visible binders. Suppress the hint
+because the visible binder count is incomplete.
 -}
 
 pprQCOriginExtra :: ErrorItem -> SDoc
@@ -5266,6 +5284,7 @@ shouldPprWithInvisibleBits ty1 ty2
         -- See tests T9171, T9144.
 
       , mayLookIdentical ty1 ty2
+      , Set.fromList [TypeCompare.InvisibleMatchability | isMatchabilityMismatch ty1 ty2]
       ]
 shouldPprWithInvisibleBits ty1 ty2
   eq@(KindEqOrigin act exp orig _)
@@ -5276,6 +5295,11 @@ shouldPprWithInvisibleBits ty1 ty2
       ]
 shouldPprWithInvisibleBits ty1 ty2 _ct
   = mayLookIdentical ty1 ty2
+
+-- | Check whether both sides of the mismatch have kind Matchability.
+isMatchabilityMismatch :: Type -> Type -> Bool
+isMatchabilityMismatch ty1 ty2 =
+  typeKind ty1 `tcEqType` matchabilityTy && typeKind ty2 `tcEqType` matchabilityTy
 
 pprWithLinearTypes :: SDoc -> SDoc
 pprWithLinearTypes =
@@ -5324,8 +5348,11 @@ unnecessary clutter:
 
   - Matchability. Controlled by -fprint-explicit-matchabilities.
     Ordinary user-style arrows omit fixed matchability annotations.
-    Show them when they distinguish otherwise identical types. Keep
-    the modifier syntax in modules that use -XModifiers.
+    Show them when they distinguish otherwise identical types. If the
+    solver reports a mismatch between two matchabilities, show how
+    they occur in the expected and actual kinds. The expected kind can
+    be a family application that conceals the underlying arrow.
+    Keep the modifier syntax in modules that use -XModifiers.
 
 To achieve this, each of these user-facing flags controls a field of
 'SDocContext', respectively:
@@ -5567,10 +5594,10 @@ we want to give it a bit of structure.  Here's the plan
 pprExpectedActualInfo :: SolverReportErrCtxt -> ExpectedActualInfo -> SDoc
 pprExpectedActualInfo _ (ExpectedActual { ea_expected = exp, ea_actual = act }) =
   vcat
-    [ text "Expected:" <+> ppr (restore exp)
-    , text "  Actual:" <+> ppr (restore act) ]
+    [ text "Expected:" <+> render exp
+    , text "  Actual:" <+> render act ]
   where
-    restore = restoreTypeLambdas [exp, act]
+    render = pprTypeCaseMismatch . restoreTypeLambdas [exp, act]
 pprExpectedActualInfo _
   (ExpectedActualAfterTySynExpansion
     { ea_expanded_expected = exp

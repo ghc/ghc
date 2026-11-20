@@ -48,6 +48,18 @@ kind of a nullary constructor such as `'Nothing`.
 [Agda as-patterns](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#as-patterns)
 and [type-lambda example](roadmap/R17-type-level-lambdas.md#matching-a-lambda-argument).
 
+For a case under a dependent `forall`, copy the capture telescope and
+the scrutinee kind into the private family. Apply that family inside
+the original binder scope. Check the helper before its owner when
+their declaration dependencies allow it. A written result kind such as
+`TYPE r` keeps the result representation tied to the captured `r`.
+Eisenberg and Stolarek provide the family lifting precedent. Agda
+documents codomain substitution and an explicit result family for
+dependent matches.
+[Promotion paper, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf),
+[Agda function types](https://agda.readthedocs.io/en/v2.8.0/language/function-types.html),
+[Agda pattern lambdas](https://agda.readthedocs.io/en/v2.8.0/language/with-abstraction.html#pattern-lambdas).
+
 Matching `BooleanTag field` refines the kind of the field in that branch.
 Agda checks the corresponding index equation when matching an indexed
 constructor. Matching `Bool` itself selects a type with no value field.

@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, ExplicitForAll, KindSignatures, TypeApplications, TypeFamilies, TypeOperators #-}
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, ExplicitForAll, KindSignatures, RankNTypes, TypeApplications, TypeFamilies, TypeOperators #-}
 module NativeTypeCaseRigid where
 import Data.Kind (Type)
 import Data.Proxy (Proxy)
@@ -46,3 +46,10 @@ knownIndexRigid _ = Refl
 
 hiddenIndex :: Proxy x -> N.HiddenGatePick ('Just x) :~: Int
 hiddenIndex _ = Refl
+
+rigidArrowResult ::
+  Proxy x -> N.ArrowResult 'LT ('Just x) :~: (() -> (Proxy 'LT, Proxy 'False))
+rigidArrowResult _ = Refl
+
+rigidForall :: N.ForallResult -> Proxy 'LT -> N.CaseFlag ('Just x) -> (Proxy 'LT, Int)
+rigidForall select tag flag = select tag flag
