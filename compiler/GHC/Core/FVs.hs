@@ -327,6 +327,9 @@ coreAnnotationFVs ty co hide = (expr, bind)
     expr (App fun arg) = expr fun <> expr arg
     expr (Lam b body) = under [b] (expr body)
     expr (Cast body c) = expr body <> co c
+    expr (Pack schema witness payload) = ty schema <> ty witness <> expr payload
+    expr (Unpack witness payload package body) =
+        expr package <> under [witness, payload] (expr body)
     expr (Case scrut b t alts) = expr scrut <> ty t <> under [b] (foldMap alt alts)
     expr (Let (NonRec b rhs) body) = expr rhs <> unfolding b <> under [b] (expr body)
     expr (Let (Rec pairs) body) =
