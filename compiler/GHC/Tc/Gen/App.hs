@@ -54,7 +54,7 @@ import GHC.Core.DataCon ( dataConConcreteTyVars, dataConFullSig, dataConName, is
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr, supportsQuickLookType )
 import GHC.Core.FamInstEnv (FamInstEnvs, reduceTyFamApp_maybe)
-import GHC.Core.Reduction ( reductionReducedType )
+import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.Utils ( applyTypeToArgs, exprType )
 import GHC.Core.FVs ( exprFreeVarsList )
 import GHC.Core.InstEnv ( lookupUniqueInstEnv, instanceDFunId )
@@ -2050,7 +2050,7 @@ tcRetainedResultCoercion args ty
        ; if null indices then return (mkNomReflCo ty)
          else tcRetainedTypeCoercion (`elem` indices) ty }
   where
-    index_arg (ERetainedArg DepFunVisible _ _ arg _)
+    index_arg (ERetainedArg DepFunVisible _ _ arg _ _)
       | HsVar _ name <- unLoc (stripParensLHsExpr arg)
       = tcLookupIdMaybe (unLocWithUserRdr name)
     index_arg _ = return Nothing
@@ -2433,14 +2433,18 @@ tcValArg _ _ _ (ETypeArg l hty ty) = return (ETypeArg l hty ty)
 tcValArg _ _ _ (EWrap (EHsWrap w)) = return (EWrap (EHsWrap w))
 tcValArg _ _ _ (EWrap ew)          = return (EWrap ew)
 
-tcValArg do_ql pos rn_head (ERetainedArg DepFunVisible loc ty arg res_ty)
-  = do { checked <- tcValArgExpr do_ql pos rn_head loc ty arg
-       ; return (ERetainedArg DepFunVisible loc noExtField checked res_ty) }
-tcValArg _ pos rn_head (ERetainedArg DepFunInvisible loc (Scaled mult ty) arg res_ty)
+tcValArg do_ql pos rn_head (ERetainedArg DepFunVisible loc (Scaled mult ty) arg res_ty co)
+  = do { let checked_ty = maybe ty coercionLKind co
+       ; checked <- tcValArgExpr do_ql pos rn_head loc (Scaled mult checked_ty) arg
+       ; return (ERetainedArg DepFunVisible loc noExtField
+                   (maybe checked (`mkLHsWrapCo` checked) co) res_ty noExtField) }
+tcValArg _ pos rn_head (ERetainedArg DepFunInvisible loc (Scaled mult ty) arg res_ty co)
   = addArgCtxt pos rn_head arg $
-    do { checked <- tcScalingUsage mult $
-                     traverse (\e -> tcPolyExpr e (mkCheckExpType ty)) arg
-       ; return (ERetainedArg DepFunInvisible loc noExtField checked res_ty) }
+    do { let checked_ty = maybe ty coercionLKind co
+       ; checked <- tcScalingUsage mult $
+                     traverse (\e -> tcPolyExpr e (mkCheckExpType checked_ty)) arg
+       ; return (ERetainedArg DepFunInvisible loc noExtField
+                   (maybe checked (`mkLHsWrapCo` checked) co) res_ty noExtField) }
 
 tcValArg do_ql pos rn_head (EValArg loc ty arg)
   = EValArg loc noExtField <$> tcValArgExpr do_ql pos rn_head loc ty arg
@@ -2828,7 +2832,7 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
                 -- nested  forall a. Eq a => forall b. Show b => blah
 
     -- See Note [Explicit invisible retained arguments].
-    go1 plan fun_orig pos acc fun_ty (ERetainedArg _ loc _ arg _ : rest_args)
+    go1 plan fun_orig pos acc fun_ty (ERetainedArg _ loc _ arg _ _ : rest_args)
       = do { (binder, (operand, runtime_arg)) <-
                addArgCtxt (pos + count written_prefix_arg acc) rn_head arg $
                case coreFullView fun_ty of
@@ -2837,7 +2841,9 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
                  _ -> failWithTc
                         (TcRnRetainedQuantificationError (RetainedExplicitArgument fun_ty))
            ; res_ty <- retainedAppResult fun_ty binder operand
+           ; arg_co <- retainedVariableCast operand runtime_arg
            ; let checked = ERetainedArg DepFunInvisible loc (Scaled ManyTy (varType binder)) runtime_arg res_ty
+                                            arg_co
            ; go plan fun_orig pos (checked : acc) res_ty rest_args }
 
     -- See Note [Inferring an invisible retained argument].
@@ -2882,7 +2888,9 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
       | DepFunTy DepFunVisible binder _ <- coreFullView fun_ty
       = do { (core_arg, runtime_arg) <- tcRetainedOperand binder arg
            ; body_ty <- retainedAppResult fun_ty binder core_arg
+           ; arg_co <- retainedVariableCast core_arg runtime_arg
            ; let arg' = ERetainedArg DepFunVisible ctxt (Scaled ManyTy (varType binder)) runtime_arg body_ty
+                                         arg_co
            ; go plan fun_orig (pos + 1) (arg' : acc) body_ty rest_args }
 
     -- Rule ITVDQ from the GHC Proposal #281
@@ -3167,6 +3175,16 @@ tcRetainedOperand binder arg
   where
     domain = varType binder
 
+-- | Reuse the nominal conversion of the exact written variable at value checking.
+-- See Note [Retained argument application].
+retainedVariableCast :: Core.CoreExpr -> LHsExpr GhcRn -> TcM (Maybe CoercionN)
+retainedVariableCast (Core.Cast (Core.Var index) (SubCo co)) arg
+  | HsVar _ name <- unLoc (stripParensLHsExpr arg)
+  , unLocWithUserRdr name == getName index
+  = do { givens <- tcl_native_givens . tcl_lcl_ctxt <$> getLclEnv
+       ; return (if anyFreeVarsOfCo (`elem` givens) co then Just co else Nothing) }
+retainedVariableCast _ _ = return Nothing
+
 -- | Use the same domain for index checking and codomain substitution.
 -- See Note [Wildcards in retained operand domains].
 retainedAppResult :: Type -> Id -> Core.CoreExpr -> TcM Type
@@ -3382,7 +3400,7 @@ tcRetainedArg domain arg
                             L loc (ExplicitList x elements')) }
           HsVar _ lname
             | Just arg_id <- lookupNameEnv env (unLocWithUserRdr lname)
-            -> (,original) <$> tcRetainedArgVar expected arg_id
+            -> (,original) <$> tcRetainedArgVar (lexprCtOrigin original) expected arg_id
             | isDataOcc (nameOccName (unLocWithUserRdr lname))
             -> do { con <- tcLookupConLike (unLoc lname)
                   ; case con of
@@ -3404,7 +3422,7 @@ tcRetainedArg domain arg
                                   ; tcSubMult (OccurrenceOf (getName arg_id)) ManyTy mult
                                   ; arg_id <- liftZonkM (zonkId arg_id)
                                   ; if isNativeOpaqueValueId arg_id
-                                    then (,original) <$> tcRetainedArgVar expected arg_id
+                                    then (,original) <$> tcRetainedArgVar (lexprCtOrigin original) expected arg_id
                                     else failWithTc $ TcRnRetainedQuantificationError
                                            (RetainedIndexMultiplicity (idMult arg_id)) }
                                 else case nameModule_maybe (getName arg_id) of
@@ -3583,8 +3601,8 @@ The final retainedArgIndex check still validates saturation and all domains.
 -- | Resolve an index variable at its expected domain. Function values keep
 -- their complete fixed type and lexical identity.
 -- See Note [Retained argument application].
-tcRetainedArgVar :: TcType -> Id -> TcM Core.CoreExpr
-tcRetainedArgVar expected arg_id
+tcRetainedArgVar :: CtOrigin -> TcType -> Id -> TcM Core.CoreExpr
+tcRetainedArgVar origin expected arg_id
   | isNativeIndexFunctionId arg_id
   = if not (isExternalName (getName arg_id))
        && varType arg_id `tcEqType` expected
@@ -3592,11 +3610,31 @@ tcRetainedArgVar expected arg_id
     else failWithTc $ TcRnRetainedQuantificationError RetainedFunctionArgument
   | varType arg_id `tcEqType` expected = return (Core.Var arg_id)
   | otherwise
-  = do { co <- unifyType Nothing (varType arg_id) expected
+  = do { branch_co <- tcRetainedDomainConversion origin (varType arg_id) expected
+       ; co <- maybe (unifyType Nothing (varType arg_id) expected) return branch_co
        ; co' <- liftZonkM (zonkCo co)
        ; if isReflCo co'
          then return (Core.Var (setVarType arg_id (coercionLKind co')))
          else return (Core.Cast (Core.Var arg_id) (SubCo co')) }
+
+-- | Prove a domain conversion from lexical constructor evidence and family axioms.
+-- See Note [Retained argument application].
+tcRetainedDomainConversion :: CtOrigin -> TcType -> TcType -> TcM (Maybe CoercionN)
+tcRetainedDomainConversion origin actual expected
+  | anyFreeVarsOfType isNonCoVarId actual
+  = tryTcDiscardingErrs (return Nothing) $ runMaybeT $ do
+      branch_co <- liftMaybeT (tcRetainedTypeCoercion (const True) actual)
+      guard (not (isReflCo branch_co))
+      let actual' = coercionRKind branch_co
+      if actual' `tcEqType` expected
+        then return branch_co
+        else do
+          loc <- liftMaybeT (getCtLocM origin (Just TypeLevel))
+          Reduction actual_co actual_nf <- liftMaybeT (tcRewriteFamilyAxioms loc actual')
+          Reduction expected_co expected_nf <- liftMaybeT (tcRewriteFamilyAxioms loc expected)
+          guard (actual_nf `tcEqType` expected_nf)
+          return (branch_co `mkTransCo` actual_co `mkTransCo` mkSymCo expected_co)
+  | otherwise = return Nothing
 
 {- Note [Wildcards in retained operand domains]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3675,17 +3713,23 @@ constraint. Report the retained argument's Many requirement and its actual
 multiplicity. This is an unsupported retained argument, not a request to use
 GADT evidence to equate multiplicities.
 
-A scalar variable can have a nominally equal domain with a different family
-application. Keep its nominal domain cast in the resolved Core argument.
-The index substitution then receives an argument of the expected kind.
-The ordinary value checker still checks the argument and its usage. A failed
-domain equality remains a located type error instead of an invalid substitution.
+A variable can have a nominally equal domain with a different family
+application. For example, a constructor equation supplies cut ~# Z while a
+later retained variable still has domain Vec Bool (Add cut m). Lift the
+lexical constructor proof through the original domain. Family axioms can
+then reduce Add. Use this conversion only if it proves the complete domain
+equality. Otherwise, give the original types to the ordinary unifier so it
+can use other Given equalities or infer metavariables as usual.
+
+Keep the nominal domain cast in the resolved Core argument. If that cast
+uses the lexical branch evidence, reuse it on the same written variable
+in tcValArg. Check the occurrence at the cast's input type and account
+for its runtime usage once. Other arguments use the existing argument
+check. A failed domain equality remains a located type error.
 See Note [Nominal native index casts] in GHC.Core.
 
-Keep a normal EValArg with the binder's domain as its expected type. tcValArg
-checks the value once and records its runtime usage. Resolution does not inspect
-unfoldings or evaluate values. Later argument types use the same runtime Id,
-including a lazy binding whose RHS is bottom. No singleton is added.
+Resolution does not inspect unfoldings or evaluate values. Later argument
+types use the same runtime Id, including a lazy binding whose RHS is bottom.
 The provisional Core expression does not replace this original source check.
 See docs/dependent-haskell/REFERENCES.md#agda-provenance and
 docs/dependent-haskell/CORE.md#laziness-and-eta.
