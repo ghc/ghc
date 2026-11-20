@@ -411,6 +411,33 @@ schedule (Capability *initialCapability, Task *task)
     }
 #endif
 
+    // Inform idle GC we're about to run a thread.
+    switch (getRecentActivity())
+    {
+    case ACTIVITY_DONE_GC: {
+        // ACTIVITY_DONE_GC means we turned off the timer signal to
+        // conserve power (see #1623).  Re-enable it here.
+        uint32_t prev;
+        prev = setRecentActivity(ACTIVITY_YES);
+        if (prev == ACTIVITY_DONE_GC) {
+#if !defined(PROFILING)
+            unpauseTimer();
+#endif
+        }
+        break;
+    }
+    case ACTIVITY_INACTIVE:
+        // If we reached ACTIVITY_INACTIVE, then don't reset it until
+        // we've done the GC.  The thread running here might just be
+        // the IO manager thread that handle_tick() woke up via
+        // wakeUpRts().
+        break;
+    default:
+        setRecentActivity(ACTIVITY_YES);
+    }
+
+    traceEventRunThread(cap, t);
+
     /* context switches are initiated by the timer signal, unless
      * the user specified "context switch as often as possible", with
      * +RTS -C0
@@ -462,32 +489,6 @@ schedule (Capability *initialCapability, Task *task)
     dirty_TSO(cap,t);
     dirty_STACK(cap,t->stackobj);
 
-    switch (getRecentActivity())
-    {
-    case ACTIVITY_DONE_GC: {
-        // ACTIVITY_DONE_GC means we turned off the timer signal to
-        // conserve power (see #1623).  Re-enable it here.
-        uint32_t prev;
-        prev = setRecentActivity(ACTIVITY_YES);
-        if (prev == ACTIVITY_DONE_GC) {
-#if !defined(PROFILING)
-            unpauseTimer();
-#endif
-        }
-        break;
-    }
-    case ACTIVITY_INACTIVE:
-        // If we reached ACTIVITY_INACTIVE, then don't reset it until
-        // we've done the GC.  The thread running here might just be
-        // the IO manager thread that handle_tick() woke up via
-        // wakeUpRts().
-        break;
-    default:
-        setRecentActivity(ACTIVITY_YES);
-    }
-
-    traceEventRunThread(cap, t);
-
     switch (prev_what_next) {
 
     case ThreadKilled:
@@ -538,36 +539,10 @@ schedule (Capability *initialCapability, Task *task)
     t->saved_winerror = GetLastError();
 #endif
 
-    if (ret == ThreadBlocked) {
-        StgThreadWhyBlocked why_blocked = ACQUIRE_LOAD(&t->why_blocked);
-        EventThreadStatus status = eventlogThreadStatusBlocked(why_blocked);
-        StgWord32 status_detail = 0;
-        if (why_blocked == BlockedOnBlackHole) {
-            StgTSO *owner = blackHoleOwner(t->block_info.bh->bh);
-            status_detail = owner != NULL ? owner->id : 0;
-        }
-        traceEventStopThread(cap, t, status, status_detail);
-    } else {
-        EventThreadStatus status = eventlogThreadStatus(ret);
-        StgWord32 status_detail = 0;
-        if (ret == StackOverflow) {
-            status_detail = t->tot_stack_size;
-        }
-        traceEventStopThread(cap, t, status, status_detail);
-    }
-
     ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
     ASSERT(t->cap == cap);
 
     // ----------------------------------------------------------------------
-
-    // Costs for the scheduler are assigned to CCS_SYSTEM
-    pauseHeapProfTimer();
-#if defined(PROFILING)
-    cap->r.rCCCS = CCS_SYSTEM;
-#endif
-
-    schedulePostRunThread(cap,t);
 
     ready_to_gc = false;
 
@@ -633,6 +608,33 @@ schedule (Capability *initialCapability, Task *task)
     }
 
     } /* end of run thread loop while() */
+
+    // Trace that the thread stopped and why
+    if (ret == ThreadBlocked) {
+        StgThreadWhyBlocked why_blocked = ACQUIRE_LOAD(&t->why_blocked);
+        EventThreadStatus status = eventlogThreadStatusBlocked(why_blocked);
+        StgWord32 status_detail = 0;
+        if (why_blocked == BlockedOnBlackHole) {
+            StgTSO *owner = blackHoleOwner(t->block_info.bh->bh);
+            status_detail = owner != NULL ? owner->id : 0;
+        }
+        traceEventStopThread(cap, t, status, status_detail);
+    } else {
+        EventThreadStatus status = eventlogThreadStatus(ret);
+        StgWord32 status_detail = 0;
+        if (ret == StackOverflow) {
+            status_detail = t->tot_stack_size;
+        }
+        traceEventStopThread(cap, t, status, status_detail);
+    }
+
+    // Costs for the scheduler are assigned to CCS_SYSTEM
+    pauseHeapProfTimer();
+#if defined(PROFILING)
+    cap->r.rCCCS = CCS_SYSTEM;
+#endif
+
+    schedulePostRunThread(cap,t);
 
     if (ready_to_gc || scheduleNeedHeapProfile(ready_to_gc)) {
       scheduleDoGC(&cap,task,false,ready_to_gc,false,false);
