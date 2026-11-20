@@ -90,6 +90,31 @@ HS
     [[ $(./append-run) == $'(("Refl",True),[True,False],True)\nRefl' ]]
 done
 
+mkdir "$out/interactive"
+cd "$out/interactive"
+cp "$src/"{PackedVecLibrary,OpenVectorAppend,OrdinaryOpenVectorAppend}.hs .
+cons_row=$(awk '/^appendVec \(VCons x xs\) ys =/ {print NR}' PackedVecLibrary.hs)
+test -n "$cons_row"
+if ! {
+    printf 'print (observeAppendEmpty, observeAppendCons)\n'
+    printf ':break PackedVecLibrary %s\n' "$cons_row"
+    printf 'print (consContents False P.VNil (P.VCons True P.VNil))\n:continue\n:quit\n'
+} | "${ghc[@]}" --interactive -ignore-dot-ghci -O0 -fbyte-code -fbreak-points \
+          -fwrite-interface -fomit-interface-pragmas -fno-write-if-simplified-core \
+          '*OrdinaryOpenVectorAppend.hs' >interactive.log 2>&1; then
+    cat interactive.log >&2
+    exit 1
+fi
+if ! grep -Fxq '(("Refl",True),"Refl")' interactive.log ||
+   ! grep -Fq 'Stopped in PackedVecLibrary.appendVec' interactive.log ||
+   ! grep -Fxq '[False,True]' interactive.log; then
+    cat interactive.log >&2
+    exit 1
+fi
+"${ghc[@]}" --show-iface PackedVecLibrary.hi >provider.iface
+grep -Fq "T:appendVec ('VCons" provider.iface
+
+cd "$out/client"
 cat >WrongTail.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures, TypeOperators #-}
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}

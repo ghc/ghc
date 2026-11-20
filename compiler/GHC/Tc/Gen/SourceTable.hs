@@ -36,7 +36,7 @@ import GHC.Core.TyCo.FVs (tyConsOfTypes)
 import GHC.Core.TyCo.Rep (Coercion, Type(TyConApp, TermVarTy, CastTy))
 import GHC.Core.TyCon
 import GHC.Core.Type
-import GHC.Core.Utils (exprType)
+import GHC.Core.Utils (exprType, stripTicksTopE)
 import GHC.Data.Graph.Directed (Node(..), SCC(..), stronglyConnCompFromEdgedVerticesUniq)
 import GHC.Data.FastString (fsLit)
 import GHC.Data.Bag (isEmptyBag)
@@ -80,6 +80,7 @@ import GHC.Types.Name.Set (NameSet, emptyNameSet, elemNameSet, extendNameSet, ex
                            intersectNameSet, isEmptyNameSet, minusNameSet, mkNameSet, nameSetElemsStable,
                            unionNameSet, unionNameSets, unitNameSet)
 import GHC.Types.SrcLoc
+import GHC.Types.Tickish (GenTickish(Breakpoint))
 import GHC.Types.SourceFile (hscSourceToIsBoot, isHsBootOrSig)
 import GHC.Unit.External (eps_rule_base)
 import GHC.Unit.Home (homeUnitId)
@@ -1734,7 +1735,7 @@ checkedIndexedProjection prepare owner original = do
   guard (left == scrutinee && isId right)
   [rhs] <- pure [branch | Core.Alt (Core.DataAlt dc) [evidence] branch <- alts,
                          dc == con, isCoVar evidence]
-  case rhs of
+  case stripIndexedBreakpoints rhs of
     Core.Var v | v == right -> pure ()
     Core.Cast (Core.Var v) _ | v == right -> pure ()
     _ -> Nothing
@@ -1835,18 +1836,28 @@ checkIndexedRecursion owner parameters slot core_types carried alts (IndexedRecu
     [(predecessor, evidence, hd, tl, rhs)] <-
       pure [(p, co, x, xs, e) | Core.Alt (Core.DataAlt dc) [p, co, x, xs] e <- alts, dc == con]
     guard (isTyVar predecessor && isCoVar evidence && isId hd && isId tl)
-    let value = case rhs of Core.Cast body _ -> body; _ -> rhs
+    let value = case stripIndexedBreakpoints rhs of
+          Core.Cast body _ -> stripIndexedBreakpoints body
+          body -> body
     (Core.Var rebuild, args) <- pure (Core.collectArgs value)
     guard (isDataConId_maybe rebuild == Just con)
     [Core.Var first, recurse] <- pure (dropWhile Core.isTyCoArg args)
     guard (first == hd)
-    (Core.Var self, arguments) <- pure (Core.collectArgs recurse)
+    (Core.Var self, arguments) <- pure (Core.collectArgs (stripIndexedBreakpoints recurse))
     let (types, terms) = splitAt (length parameters) arguments
         expected = [mkTyVarTy (if v == slot then predecessor else core_v)
                    | (v, core_v) <- zip parameters core_types]
     actual <- traverse (\case Core.Type ty -> Just ty; _ -> Nothing) types
     [Core.Var tail_arg, Core.Var carried_arg] <- pure terms
     guard (self == owner && eqTypes actual expected && tail_arg == tl && carried_arg == carried)
+
+-- | Ignore debugger breakpoints when checking the indexed equations.
+-- A breakpoint does not evaluate its captured variables. The verifier
+-- reads through these ticks and leaves the original executable Core intact.
+stripIndexedBreakpoints :: Core.CoreExpr -> Core.CoreExpr
+stripIndexedBreakpoints = stripTicksTopE $ \case
+    Breakpoint{} -> True
+    _ -> False
 
 -- | Check the index of the recursive result and compute the promoted
 -- constructor arguments, using the same untouched parameters as the input.
