@@ -36,7 +36,7 @@ if grep -Eiq '\b(Pack|Unpack|PackTag)\b' provider/stg.log; then
 fi
 echo "built provider with Core Pack, erased STG and HIE"
 cd client
-cp "$src/"{OrdinaryClient,Eliminate,EliminateMain,QuotePack,TypedQuotePack,ReifyPack,Escape,Scope,WrongWitnessKind,WrongPayload,MissingSchema,WrongSchema,WithoutExtension,RecordMarker,OverSat,OrdinaryPack}.hs .
+cp "$src/"{OrdinaryClient,Eliminate,EliminateMain,QuotePack,TypedQuotePack,ReifyPack,Escape,Scope,WrongWitnessKind,WitnessTerm,WrongPayload,MissingSchema,WrongSchema,WithoutExtension,RecordMarker,OverSat,OrdinaryPack}.hs .
 # The compiler can load the provider only through its interface and object.
 "$ghc" "${flags[@]}" -i../provider -c OrdinaryClient.hs
 "$ghc" "${flags[@]}" OrdinaryClient.o ../provider/Provider.o -o ordinary
@@ -74,7 +74,7 @@ echo "ordinary namesakes in a different module and a different unit compile"
 "$ghc" "${flags[@]}" -i../provider -c ReifyPack.hs
 echo "typed and untyped quotations and guarded Pack reification pass"
 
-for bad in Escape Scope WrongWitnessKind WrongPayload MissingSchema WrongSchema WithoutExtension RecordMarker OverSat; do
+for bad in Escape Scope WrongWitnessKind WitnessTerm WrongPayload MissingSchema WrongSchema WithoutExtension RecordMarker OverSat; do
   if "$ghc" "${flags[@]}" -i../provider -c "$bad.hs" >"$bad.log" 2>&1; then
     echo "$bad unexpectedly compiled" >&2
     exit 1
@@ -83,6 +83,7 @@ for bad in Escape Scope WrongWitnessKind WrongPayload MissingSchema WrongSchema 
     Escape) expected='escape its scope|rigid.*type variable' ;;
     Scope) expected='[Nn]ot in scope' ;;
     WrongWitnessKind|WrongPayload) expected='\[GHC-83865\]' ;;
+    WitnessTerm) expected='Illegal term-level use of the type variable' ;;
     MissingSchema) expected='needs an explicit existential type when' ;;
     WrongSchema) expected='The available type is' ;;
     WithoutExtension) expected='requires -XExperimentalDependentTypes' ;;
