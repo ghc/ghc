@@ -1594,6 +1594,7 @@ unpackable_type_datacons ty
       -- check for that case
   , Just cons <- tyConDataCons_maybe tc
   , unpackable_cons cons
+  , all (null . dataConRepArgBinders) cons
   = Just cons
   | otherwise
   = Nothing
@@ -1617,6 +1618,11 @@ Note [Unpacking GADTs and existentials]
 Can we unpack a value of an algebraic data type T? For example
    data D a = MkD {-# UNPACK #-} (T a)
 Can we unpack that (T a) field?
+
+The unpacked representation has independent fields. A retained field
+can bind a variable used in the type of a later field. Keep this
+telescope boxed so the later types retain that scope. This applies to
+both products and sums.
 
 Three cases to consider in `unpackable_cons`
 
