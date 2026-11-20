@@ -4,7 +4,7 @@ module NativeCase
   ( F, ByType, ElementOrSelf, Field, Same, Capture, Braces, roadmap
   , PayloadKind, Fixed, Captured, Retain, PatternShadow, ScrutineeShadow, NestedScope
   , Paired, InferredCapture, ContextKind, SeparateKinds
-  , caseIdentity, nestedCaseIdentity, retainedPick
+  , caseIdentity, nestedCaseIdentity, retainedPick, renderRetainedPick
   ) where
 
 import Data.Kind (Type)
@@ -65,6 +65,15 @@ nestedCaseIdentity _ _ _ input = input
 retainedPick :: foreach (b :: Bool) -> (case b of { True -> Int; False -> Char })
 retainedPick True = 7
 retainedPick False = 'f'
+
+-- | Render a result selected by the same runtime Boolean.
+renderRetainedPick :: foreach (flag :: Bool) -> String
+renderRetainedPick flag = render flag (retainedPick flag)
+
+-- | Render each selected type with its own Show instance.
+render :: foreach (selected :: Bool) -> (case selected of { True -> Int; False -> Char }) -> String
+render True value = show value
+render False value = show value
 
 -- | Reuse a local kind while retaining the kind of an outer parameter.
 type Fixed (k :: Type) (a :: k) = let k = Bool in case 'False of

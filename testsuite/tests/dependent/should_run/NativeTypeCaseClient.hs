@@ -34,8 +34,9 @@ signatureFalse = caseIdentity (Proxy @'False) True
 nestedSignatureShadow :: Int
 nestedSignatureShadow = nestedCaseIdentity (Proxy @'False) False (Proxy @'True) 7
 
-retainedSignature :: (Int, Char)
-retainedSignature = (retainedPick True, retainedPick False)
+retainedSignature :: (Int, Char, String, String)
+retainedSignature =
+  (retainedPick True, retainedPick False, renderRetainedPick True, renderRetainedPick False)
 
 field :: Field ('Just 'True) :~: '( 'True, 'True)
 field = Refl

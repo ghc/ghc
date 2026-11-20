@@ -365,6 +365,13 @@ types and kinds. A bare arrow defaults to unmatchable in a retained
 domain and can default to matchable in an erased binder kind. Leave
 the corresponding case at the written occurrence.
 
+Two retained cases can use one family when the scrutinee is the only
+capture and both copies have the same closed written domain and ordered
+rows. Compare only types whose other names resolve in the same declaration
+group. Ignore the scrutinee binder's spelling. Each application still
+passes its own nominal index. Retain the source synonym for each signature
+so diagnostics can name that signature.
+
 For a constructor field, use the constructor's name and count sums
 from left to right. Use a separate prefix for constructor fields.
 The constructor name is unique in the module even when record labels
@@ -404,8 +411,18 @@ liftDeclarationTypes named_wildcards group
         in (ValBinds ann binds', concat types)
       binds -> (binds, [])
     (type_groups, groups_sums) = unzip (map liftGroup (hs_tyclds group))
-    (synonyms, names) = unzip (signature_types ++ concat groups_sums)
+    (_, shared_types) = mapAccumL shareRetainedCase [] signature_types
+    (synonyms, names) = unzip (shared_types ++ map fst (concat groups_sums))
     anchors = TyClGroup noExtField synonyms [] [] []
+
+    shareRetainedCase seen (entry@(L loc alias@SynDecl{}, names@(occ, _)), Just (key, index))
+      | Just first <- lookup key seen
+      = let rhs = L loc (HsAppTy noExtField
+                    (typeName (L (l2l loc) (mkRdrUnqual first))) (typeName index))
+        in (seen, (L loc alias{tcdRhs = rhs}, names))
+      | otherwise
+      = ((key, occ) : seen, entry)
+    shareRetainedCase seen (entry, _) = (seen, entry)
 
     liftGroup decls =
       let (decls', sums) = unzip (map liftData (group_tyclds decls))
@@ -561,7 +578,8 @@ liftDeclarationTypes named_wildcards group
                 name = L (l2l loc) (mkRdrUnqual occ)
                 alias = L loc (SynDecl noAnn name (mkHsQTvs (map fst used)) Prefix whole)
                 seen' = maybe seen (\k -> (k, occ) : seen) key
-            in (applyAnchor loc occ used, [(alias, (occ, Nothing))], (salt + 1, seen'))
+                shared = sharedRetainedCaseKey site used whole key
+            in (applyAnchor loc occ used, [((alias, (occ, Nothing)), shared)], (salt + 1, seen'))
     liftBody site owner scope (L loc quantified) (salt, seen)
       | Just (inner, locals, body) <- innerScope site quantified
       , let names = map (unLoc . snd) locals
@@ -611,6 +629,20 @@ liftDeclarationTypes named_wildcards group
       Just (L _ HsForEachTy{}) -> False
       _ -> and (gmapQ copyableDomain node)
 
+    sharedRetainedCaseKey RetainedTypeSite{}
+      [(L _ HsTvb{tvb_kind = HsBndrKind _ domain}, index)]
+      (L _ (XHsType (HsTypeCase _ _ _ alts))) (Just (_, rows))
+      | null (extractHsTyRdrTyVars domain)
+      , Just domain_key <- signatureCasePart domain
+      , all closedRow alts
+      = Just ((domain_key, rows), index)
+    sharedRetainedCaseKey _ _ _ _ = Nothing
+
+    closedRow (L _ (HsTypeCaseAlt pat _ rhs)) =
+      case classifyTypeCasePattern pat of
+        Just (_, []) -> null (extractHsTyRdrTyVars rhs)
+        _ -> False
+
     typeName n = L (l2l (getLoc n)) (HsTyVar noAnn NotPromoted n)
 
 -- | The case syntax compared within a single signature.
@@ -625,14 +657,18 @@ type SignatureCaseKey = (SignatureCasePart, [(SignatureCasePart, SignatureCasePa
 
 -- | Compare spellings and branch order, ignoring source locations and parentheses.
 signatureCaseKey :: LHsType GhcPs -> [LocatedA HsTypeCaseAlt] -> Maybe SignatureCaseKey
-signatureCaseKey scrutinee alts = (,) <$> part scrutinee <*> traverse alternative alts
+signatureCaseKey scrutinee alts = (,) <$> signatureCasePart scrutinee <*> traverse alternative alts
   where
-    alternative (L _ (HsTypeCaseAlt pat _ rhs)) = (,) <$> part pat <*> part rhs
-    part (L _ (HsTyVar _ promotion name)) = Just (CasePartName promotion (unLoc name))
-    part (L _ (HsAppTy _ f x)) = CasePartApp <$> part f <*> part x
-    part (L _ (HsParTy _ ty)) = part ty
-    part (L _ HsWildCardTy{}) = Just CasePartWildcard
-    part _ = Nothing
+    alternative (L _ (HsTypeCaseAlt pat _ rhs)) =
+      (,) <$> signatureCasePart pat <*> signatureCasePart rhs
+
+-- | Compare parsed names and applications in a signature case or closed domain.
+signatureCasePart :: LHsType GhcPs -> Maybe SignatureCasePart
+signatureCasePart (L _ (HsTyVar _ promotion name)) = Just (CasePartName promotion (unLoc name))
+signatureCasePart (L _ (HsAppTy _ f x)) = CasePartApp <$> signatureCasePart f <*> signatureCasePart x
+signatureCasePart (L _ (HsParTy _ ty)) = signatureCasePart ty
+signatureCasePart (L _ HsWildCardTy{}) = Just CasePartWildcard
+signatureCasePart _ = Nothing
 
 {- Note [Lifting type cases]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
