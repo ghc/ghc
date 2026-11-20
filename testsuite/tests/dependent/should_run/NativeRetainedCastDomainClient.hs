@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, NoExperimentalDependentTypes #-}
+{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, TypeApplications #-}
 module Main where
 import Control.Exception (ErrorCall, evaluate, try)
 import Data.List (isInfixOf)
@@ -13,6 +13,11 @@ main = do
     let empty = error "unused empty vector" :: Vec Bool 'Z
         singleton = error "unused singleton vector" :: Vec Bool ('S 'Z)
     print (observeBranch Z empty, observeBranch (S Z) singleton)
+    print (literalCut undefined)
+
+literalCut :: Vec Bool ('S ('S ('S 'Z))) -> Bool
+literalCut xs = case branchVector @('S 'Z) (S (S Z)) xs of
+    BranchVector -> True
 
 fails :: String -> IO () -> IO ()
 fails label action = do

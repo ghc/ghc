@@ -1,5 +1,6 @@
 {-# LANGUAGE AllowAmbiguousTypes, CPP, DataKinds, ExperimentalDependentTypes, GADTs, PolyKinds, RankNTypes, ScopedTypeVariables, StandaloneKindSignatures, TypeApplications #-}
-module NativeRetainedCastDomainWorker (observe, forceWorker, forceIndex, observeBranch) where
+module NativeRetainedCastDomainWorker
+    (observe, forceWorker, forceIndex, observeBranch, branchVector, BranchVector(..)) where
 
 import Data.IORef (newIORef, readIORef)
 import Data.Kind (Type)
