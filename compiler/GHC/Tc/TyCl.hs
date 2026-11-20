@@ -75,6 +75,7 @@ import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.Coercion
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep   -- for checkValidRoles
+import GHC.Core.TyCo.Subst (extendSubstInScopeSetFromSource)
 import GHC.Core.TyCo.FVs (tyCoVarsOfTypesList)
 import GHC.Core.TyCo.Ppr( pprTyVars )
 import GHC.Core.Class
@@ -4216,12 +4217,17 @@ completed family's axiom. Build the nodes after leaving
 families from completed groups. A family from the current group may
 depend on the new decision families. Its axiom is still unavailable.
 
-Use the ordinary closed-family branch matcher for this step. Cast the
-constructor with the nominal kind coercion if all the reduced indices
-match. A reduced index can also establish apartness. Check apartness
-only between indices whose kinds agree. The case still tests the
-constructor when the indices agree. The source pattern can already
-carry a kind cast from ordinary kind checking. Read the constructor
+Use the ordinary closed-family branch matcher for this step. Unify the
+reduced kind with the scrutinee kind. This can refine another index of
+the same constructor, including an index that occurs in a field kind.
+Check the kinds of the reduced arguments against the constructor kind
+before unification. A reduction can change the kind expected by a later
+argument. That case needs kind transport between arguments.
+Apply that refinement and the field renaming to the nominal kind
+coercion before casting the constructor. A reduced index can also
+establish apartness when its kind agrees with the scrutinee index kind.
+The case still tests the constructor when the indices agree. The source
+pattern can carry a kind cast from ordinary kind checking. Read the constructor
 under that cast, including casts reached by expanding an alias. The
 generated branch constructs its own evidence. The checked source
 pattern, with its casts, still determines the substitution for the RHS.
@@ -4380,9 +4386,9 @@ buildOrderedTypeCase root infos = do
           Nothing
             | typeListsAreApart [con_kind] [scrut_kind] -> pure Nothing
             | otherwise -> do
-                (proof, apart) <- checkedCaseKindCo con_kind scrut_kind
-                case proof of
-                  Just co -> pure (Just (mkEmptySubst emptyInScopeSet, Just co))
+                (reduced_refinement, apart) <- checkedCaseKindRefinement con_kind scrut_kind
+                case reduced_refinement of
+                  Just (refine, co) -> pure (Just (refine, Just co))
                   Nothing
                     | apart -> pure Nothing
                     | otherwise -> setSrcSpan row_loc $
@@ -4409,7 +4415,7 @@ buildOrderedTypeCase root infos = do
                 con_pat = mkTyConApp con (map (retag . mkTyVarTy) binders)
                 pat = case kind_co of
                   Nothing -> con_pat
-                  Just co -> mkCastTy con_pat co
+                  Just co -> mkCastTy con_pat (substCo renaming (substCo refine co))
                 replace = substTyWith [scrut] [pat] . retag
                 fields = [replace (mkTyVarTy v) | (b, v) <- zip bndrs binders
                                                , isVisibleTyConBinder b]
@@ -4427,11 +4433,11 @@ buildOrderedTypeCase root infos = do
       field <- fresh (subst (varType var))
       pure (previous ++ [(var, field)])
 
--- | Try one checked closed-family step per index. Return nominal
--- equality evidence when all indices agree, or report definite apartness.
+-- | Try one checked closed-family step per index. The refinement
+-- makes the nominal coercion prove equality with the scrutinee kind.
 -- See Note [Publishing ordered type cases].
-checkedCaseKindCo :: Kind -> Kind -> TcM (Maybe CoercionN, Bool)
-checkedCaseKindCo actual expected
+checkedCaseKindRefinement :: Kind -> Kind -> TcM (Maybe (Subst, CoercionN), Bool)
+checkedCaseKindRefinement actual expected
   | Just (tc, as) <- tcSplitTyConApp_maybe actual
   , Just (tc', bs) <- tcSplitTyConApp_maybe expected
   , tc == tc'
@@ -4452,9 +4458,22 @@ checkedCaseKindCo actual expected
            redns = zipWith index_step as bs
            reduced = map reductionReducedType redns
            index_apart a b = typeKind a `eqType` typeKind b && typesAreApart a b
-       if reduced `eqTypes` bs
-         then pure (Just (mkTyConAppCo Nominal tc (map reductionCoercion redns)), False)
-         else pure (Nothing, or (zipWith index_apart reduced bs))
+           kinded_args _ [] = True
+           kinded_args kind (arg:args)
+             | Just (_, bndr, _) <- splitPiTy_maybe kind
+             , typeKind arg `eqType` piTyBinderType bndr
+             = kinded_args (piResultTy kind arg) args
+             | otherwise = False
+           refinement = do
+             guard (kinded_args (tyConKind tc) reduced)
+             tcUnifyTy (mkTyConApp tc reduced) expected
+       case refinement of
+         Just refine ->
+           let co = mkTyConAppCo Nominal tc (map reductionCoercion redns)
+               -- A reduction can discard an argument that is still in its proof.
+               scoped = extendSubstInScopeSetFromSource refine (tyCoVarsOfCo co)
+           in pure (Just (scoped, co), False)
+         Nothing -> pure (Nothing, or (zipWith index_apart reduced bs))
   | otherwise = pure (Nothing, False)
 
 -- | Align nominal fields with the checked arguments written at the alias.
