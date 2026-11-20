@@ -187,13 +187,13 @@ and [reification](../../../testsuite/tests/dependent/should_run/NativeTypeCaseRe
 
 ### Compute a retained scrutinee
 
-A retained signature can match the result of a qualified application
-tree. This signature uses the checked R16 equations for both instances
-of `Prelude.not`.
+A retained signature can match the result of an application tree.
+This signature uses ordinary Prelude imports and the checked R16
+equations for both calls to `not`.
 
 ```haskell
 pick :: foreach (b :: Bool)
-     -> (case P.not (P.not b) of { True -> Int; False -> Bool })
+     -> (case not (not b) of { True -> Int; False -> Bool })
 pick True = 42
 pick False = False
 ```
@@ -211,18 +211,16 @@ Identical retained cases in a declaration group can share one generated
 family when their captured domains are closed and their rows have no
 local captures or pattern binders. The comparison uses each retained
 operand's position in the captured telescope. It preserves the
-application tree, qualified head names and row order. A shadowed
-variable keeps the identity of its own runtime binder. Across modules,
-export a named case result to give both signatures the same family.
+application tree and row order. The lookup runs after the declaration
+group's binders enter scope. Two import aliases can share a case when
+they resolve to the same checked source family. Each alias still counts
+as a use of its import. A shadowed variable keeps the identity of its
+own runtime binder. A different checked definition with the same
+spelling has a different identity.
 
-Different spellings of an imported name still give distinct helpers.
-To keep an ordinary function head unqualified, use a named case
-result. Infix calls, explicit kind applications and local callable
-heads remain outside this lifting rule. To extend the comparison,
-resolve heads with ordinary source-table lookup under the signature's
-lexical environment. Compare the resulting names and the captures'
-formal positions. Keep the existing checked-family application and
-evidence checks.
+Across modules, export a named case result to give both signatures the
+same family. Infix calls, explicit kind applications and local callable
+heads remain outside this lifting rule.
 
 ## A case as an arrow result
 
