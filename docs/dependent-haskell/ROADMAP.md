@@ -14,19 +14,20 @@ ordinary functions in types. A pair can store an abstract lifted witness.
 An ordinary client can read its payload without forcing the witness, even
 when that witness comes from IO.
 
-Both native compiler stages reproduce the 277 lines of the [Showcase](Showcase.hs)
+Both native compiler stages reproduce the 280 lines of the [Showcase](Showcase.hs)
 at `-O0` and default `-O1`. The self-hosted compiler also matches the golden
-output with stripped interfaces and in GHCi. An inherited class method fills
-a length-indexed vector. A conversion discards a stored witness and keeps its
-indexed payload. A closed family matches two independently written sums.
-[Run the Showcase](README.md#run-the-showcase).
+output with stripped interfaces and in GHCi. The recursive vector filter
+chooses its result length from the elements that pass. Its source uses
+ordinary constructors and recursion. Taking the first result leaves the input
+after the first passing element unevaluated.
+[Filter source](examples/erased-existentials/ImplicitVector.hs) and
+[Showcase commands](README.md#run-the-showcase).
 
-At `939079e263`, all 56 focused tests that ran passed. In the dependent
-directory, 282 of 312 executed normal-way tests passed. The same 30 tests
-failed at `250b4e328a`, where 279 of 309 passed. An ordinary client can
-bind an imported pair locally and project its payload at `-O1`. The
-exceptional witness stays lazy. Both compiler stages also compile an ordinary
-client that imports the matchability types from `GHC.Matchability` in base.
+At `15bd50018f`, all 58 focused tests that ran passed. In the dependent
+directory, 284 of 314 executed normal-way tests passed. The same 30 cases
+failed with the same failure categories at `7711c264fc`, where 282 of 312
+passed. A source module that constructs or opens a surviving erased package
+still requires `-O0`. An ordinary client can call its functions at `-O1`.
 
 The upgrade tests cover a change to a family, a packed projection from
 a home or installed module, and combinations of dependent projections
