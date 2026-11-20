@@ -41,6 +41,9 @@ cp NativeCase.hi NativeNestedCase.hi NativeTypeCaseFallback.hi NativeTypeCase{Cl
    grep -Fq 'NativeTypeCaseRigid.hs:52:22: error: [GHC-83865]' bad.log &&
    grep -Fq 'NativeTypeCaseRigid.hs:55:31: error: [GHC-83865]' bad.log &&
    grep -Fq 'NativeTypeCaseRigid.hs:59:23: error: [GHC-83865]' bad.log &&
+   grep -Fq 'NativeTypeCaseRigid.hs:63:21: error: [GHC-83865]' bad.log &&
+   grep -Fq 'NativeTypeCaseRigid.hs:67:22: error: [GHC-83865]' bad.log &&
+   grep -Fq 'NativeTypeCaseRigid.hs:73:21: error: [GHC-83865]' bad.log &&
    grep -Eq 'the type case in .*ForallResult' bad.log &&
    grep -Eq 'the type case in .*IndexedFieldOrder' bad.log &&
    grep -Fq 'blockedTransport _ = Refl' bad.log &&
@@ -77,10 +80,10 @@ grep -Fq 'Not in scope: type constructor or class' bad.log
 reject NativeTypeCaseDominatedWrongKind 8:20 'GHC-83865'
 grep -Eq 'has kind .*Bool' bad.log
 reject NativeTypeCaseNestedAliasHead 5:8 'GHC-55789'
-reject NativeTypeCaseOpaqueIndex 14:3 'GHC-79642'
-grep -Fq 'NativeTypeCaseOpaqueIndex.hs:27:3: error: [GHC-79642]' bad.log
+reject NativeTypeCaseOpaqueIndex 14:9 'GHC-83865'
+grep -Fq 'NativeTypeCaseOpaqueIndex.hs:27:9: error: [GHC-83865]' bad.log
 grep -Fq 'NativeTypeCaseOpaqueIndex.hs:39:3: error: [GHC-79642]' bad.log
-test "$(grep -c 'error: \[GHC-79642\]' bad.log)" = 3
+test "$(grep -c 'error: \[GHC-79642\]' bad.log)" = 1
 grep -Fq 'Cannot determine which constructors are possible' bad.log
 reject NativeTypeCaseErasedAlias 8:3 'GHC-30337'
 grep -Fq 'appear in an injective position' bad.log
@@ -93,5 +96,5 @@ reject NativeTypeCaseHiddenErased 6:3 'GHC-30337'
 # A stuck family still blocks refinement without Core Lint.
 g=("${plain[@]}")
 reject NativeTypeCaseOpaqueIndex 39:3 'GHC-79642'
-test "$(grep -c 'error: \[GHC-79642\]' bad.log)" = 3
+test "$(grep -c 'error: \[GHC-79642\]' bad.log)" = 1
 ! grep -Fq 'Core Lint errors' bad.log
