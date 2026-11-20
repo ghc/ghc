@@ -209,6 +209,18 @@ consumers with integer state and list state. An ignored list tail stays lazy.
 [Core scope regression](../../../testsuite/tests/ghc-api/NativeExistentialExpr.hs)
 and [stream example](../examples/erased-existentials/ErasedStream.hs).
 
+### Lexical package operations in user rules
+
+Three small source examples specify the next optimizer checks. In the
+first, `open (x, k) = k x` in a rule introduces a package on the left.
+In the second, `hide x = ((x, id) :: Hidden)` introduces a package on
+the right. In the third, `project p = case p of (x, k) -> k x` opens a
+package on the right. At `7c873b5f46`, all three rules report GHC-51063
+at default `-O2`. The diagnostic names the rule and points to its
+head function's source binding. The existing `open (hide x) = x` rule
+contains ordinary calls and already fires across an interface.
+[Provider](../examples/erased-existentials/PackageRules.hs).
+
 ## Next increments
 
 - [x] Specify and run an opaque whole-function cast probe. Use genuinely
