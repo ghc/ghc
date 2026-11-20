@@ -79,7 +79,7 @@ import Language.Haskell.Syntax.Specificity (Specificity(SpecifiedSpec))
 import Control.Monad
 import Data.Bifunctor ( first )
 import Data.Foldable ( toList, for_ )
-import Data.List ( mapAccumL, partition, unzip4 )
+import Data.List ( elemIndex, mapAccumL, partition, unzip4 )
 import Data.List.NonEmpty ( NonEmpty(..), head, nonEmpty )
 import Data.Data (Data, cast, gmapQ)
 import Data.Maybe (catMaybes,  isJust, isNothing, fromMaybe, mapMaybe, maybeToList )
@@ -353,12 +353,13 @@ requires the kind of each selected variable to refer to earlier
 captures. If that requires a shadowed variable, leave the case in the
 source so the normal context check rejects it.
 
-A foreach telescope starts a new table too. Lift a case on a retained
-binder or on one application of an external name to that binder. The
-synonym binds an erased index with the written domain as its kind.
-It receives the original runtime index at its application. Ordinary
-source calls in the synonym use the existing checked source equations.
-The retained signature checker assigns the argument a runtime identity.
+A foreach telescope starts a new table too. Lift a case on an
+application tree with retained variables among its operands. Each
+application head must name a qualified occurrence or a type constructor.
+The synonym binds an erased index for each retained variable. It uses
+the written domain as the kind. The application receives the original
+runtime indices. Ordinary source calls in the copied tree use the
+existing checked source equations.
 See Note [Source retained signatures] in GHC.Tc.Gen.HsType.
 
 Check copied runtime domains for forms whose checking differs between
@@ -366,12 +367,12 @@ types and kinds. A bare arrow defaults to unmatchable in a retained
 domain and can default to matchable in an erased binder kind. Leave
 the corresponding case at the written occurrence.
 
-Two retained cases can use one family when the retained index is the only
-capture and both copies have the same closed written domain, application
-head, and ordered rows. Compare only types whose other names resolve in
-the same declaration group. Ignore the index binder's spelling. Each
-application still passes its own nominal index. Retain the source synonym
-for each signature so diagnostics can name that signature.
+Two retained cases can use one family when all their captures are
+retained indices and their closed domains, application trees, and
+ordered rows agree. Compare the index leaves by position in the
+telescope. Compare the other names in the same declaration group.
+Each application passes its own nominal indices in telescope order.
+Retain the source synonym for each signature so diagnostics can name it.
 
 For a constructor field, use the constructor's name and count sums
 from left to right. Use a separate prefix for constructor fields.
@@ -416,10 +417,9 @@ liftDeclarationTypes named_wildcards group
     (synonyms, names) = unzip (shared_types ++ map fst (concat groups_sums))
     anchors = TyClGroup noExtField synonyms [] [] []
 
-    shareRetainedCase seen (entry@(L loc alias@SynDecl{}, names@(occ, _)), Just (key, index))
+    shareRetainedCase seen (entry@(L loc alias@SynDecl{}, names@(occ, _)), Just (key, captures))
       | Just first <- lookup key seen
-      = let rhs = L loc (HsAppTy noExtField
-                    (typeName (L (l2l loc) (mkRdrUnqual first))) (typeName index))
+      = let rhs = applyAnchor loc first captures
         in (seen, (L loc alias{tcdRhs = rhs}, names))
       | otherwise
       = ((key, occ) : seen, entry)
@@ -531,23 +531,8 @@ liftDeclarationTypes named_wildcards group
     liftedAnchor _ _ = Nothing
 
     caseScrutinee (RetainedTypeSite names) scrutinee =
-      isJust (retainedCaseHead names scrutinee)
+      isJust (signatureCasePart scrutinee >>= retainedCaseScrutinee names)
     caseScrutinee _ _ = True
-
-    retainedCaseHead names scrutinee
-      | retainedIndex scrutinee = Just Nothing
-      | L _ (HsAppTy _ fun argument) <- ignoreParens scrutinee
-      , L _ (HsTyVar _ NotPromoted head_name) <- ignoreParens fun
-      , let name = unLoc head_name
-      , isQual name || isRdrTc name
-      , retainedIndex argument
-      = Just (Just name)
-      | otherwise = Nothing
-      where
-        retainedIndex ty
-          | L _ (HsTyVar _ NotPromoted name) <- ignoreParens ty
-          = unLoc name `elem` names
-          | otherwise = False
 
     retainedNames (RetainedTypeSite names) = names
     retainedNames _ = []
@@ -643,15 +628,19 @@ liftDeclarationTypes named_wildcards group
       Just (L _ HsForEachTy{}) -> False
       _ -> and (gmapQ copyableDomain node)
 
-    sharedRetainedCaseKey (RetainedTypeSite names)
-      [(L _ HsTvb{tvb_kind = HsBndrKind _ domain}, index)]
-      (L _ (XHsType (HsTypeCase _ _ scrutinee alts))) (Just (_, rows))
-      | null (extractHsTyRdrTyVars domain)
-      , Just domain_key <- signatureCasePart domain
-      , Just head_name <- retainedCaseHead names scrutinee
+    sharedRetainedCaseKey (RetainedTypeSite names) used
+      (L _ (XHsType (HsTypeCase _ _ _ alts))) (Just (scrutinee, rows))
+      | let indices = map (unLoc . snd) used
+      , all (`elem` names) indices
+      , Just domains <- traverse (closedDomain . fst) used
+      , Just scrutinee_key <- retainedCaseScrutinee indices scrutinee
       , all closedRow alts
-      = Just ((domain_key, head_name, rows), index)
+      = Just ((domains, scrutinee_key, rows), used)
     sharedRetainedCaseKey _ _ _ _ = Nothing
+
+    closedDomain (L _ HsTvb{tvb_kind = HsBndrKind _ domain})
+      | null (extractHsTyRdrTyVars domain) = signatureCasePart domain
+    closedDomain _ = Nothing
 
     closedRow (L _ (HsTypeCaseAlt pat _ rhs)) =
       case classifyTypeCasePattern pat of
@@ -664,8 +653,32 @@ liftDeclarationTypes named_wildcards group
 data SignatureCasePart
   = CasePartName PromotionFlag RdrName
   | CasePartApp SignatureCasePart SignatureCasePart
+  | CasePartCapture Int
   | CasePartWildcard
   deriving Eq
+
+-- | Admit applications of global names and normalize retained operands.
+retainedCaseScrutinee :: [RdrName] -> SignatureCasePart -> Maybe SignatureCasePart
+retainedCaseScrutinee names scrutinee = do
+  checked <- operand scrutinee
+  guard (hasCapture checked)
+  pure checked
+  where
+    operand (CasePartName NotPromoted name)
+      | Just i <- elemIndex name names = Just (CasePartCapture i)
+    operand (CasePartApp fun arg) = CasePartApp <$> application fun <*> operand arg
+    operand name = global name
+
+    application (CasePartApp fun arg) = CasePartApp <$> application fun <*> operand arg
+    application name = global name
+
+    global part@(CasePartName _ name)
+      | isQual name || isRdrTc name || isRdrDataCon name = Just part
+    global _ = Nothing
+
+    hasCapture CasePartCapture{} = True
+    hasCapture (CasePartApp fun arg) = hasCapture fun || hasCapture arg
+    hasCapture _ = False
 
 -- | The scrutinee followed by the pattern and result in each source row.
 type SignatureCaseKey = (SignatureCasePart, [(SignatureCasePart, SignatureCasePart)])
