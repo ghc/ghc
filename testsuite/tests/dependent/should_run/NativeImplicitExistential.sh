@@ -49,7 +49,7 @@ mv -- Vector.hs Filter.hs LetFilter.hs BarProvider.hs RetainedDot.hs Builder.hs 
 
 cd ../client
 cp ../provider/{Vector,Filter,LetFilter,BarProvider,RetainedDot,Builder,Functions}.hi .
-cp "$src/"{Main,AuditMain,Opening,Identity,RetainedClient,LinearDot,LambdaMain,CallHeadMain}.hs .
+cp "$src/"{Main,AuditMain,Opening,Identity,RetainedClient,LinearDot,LambdaMain,CallHeadMain,WitnessMain}.hs .
 "$ghc" "${flags[@]}" -c Main.hs Identity.hs Opening.hs LinearDot.hs
 "$ghc" "${flags[@]}" -c AuditMain.hs -main-is AuditMain
 "$ghc" "${flags[@]}" Main.o ../provider/{Vector,Filter}.o -o run
@@ -61,11 +61,16 @@ cp "$src/"{Main,AuditMain,Opening,Identity,RetainedClient,LinearDot,LambdaMain,C
 "$ghc" "${flags[@]}" -ddump-ds -c CallHeadMain.hs -main-is CallHeadMain >call-head.log
 grep -Eq 'unpack f' call-head.log
 "$ghc" "${flags[@]}" CallHeadMain.o ../provider/{Vector,Filter,Functions}.o -o call-head -main-is CallHeadMain
+"$ghc" "${flags[@]}" -ddump-ds -ddump-stg-final -dsuppress-uniques \
+    -c WitnessMain.hs -main-is WitnessMain >witness.log
+grep -Eq 'firstPair @m unpacked unpacked' witness.log
+"$ghc" "${flags[@]}" WitnessMain.o ../provider/{Vector,Filter}.o -o witness -main-is WitnessMain
 ./run
 ./audit
 ./retained
 ./lambda
 ./call-head
+./witness
 
 bad_sources=(UnsafeHead SameWitness Escape LetEscape BarClient ModesAreDistinct
              BarPack DotForall DotConstraint LinearDotDuplicate LambdaEscape
@@ -88,6 +93,23 @@ for bad in "${bad_sources[@]}"; do
     esac
     if ! grep -Eq "^$bad.hs:[0-9]+:[0-9]+: error: \[GHC-$code\]" "$bad.log"; then
         cat "$bad.log" >&2
+        exit 1
+    fi
+done
+
+cp "$src/WitnessRejections.hs" .
+if "$ghc" "${flags[@]}" -c WitnessRejections.hs >witness-rejections.log 2>&1; then
+    echo "WitnessRejections unexpectedly compiled." >&2
+    exit 1
+fi
+for binding in alias repeatedCall polymorphic escape duplicate; do
+    case "$binding" in
+        duplicate) code=18872;;
+        *) code=25897;;
+    esac
+    line=$(grep -n "^$binding .*=" WitnessRejections.hs | cut -d: -f1)
+    if ! grep -Eq "^WitnessRejections.hs:$line:[0-9]+: error: \[GHC-$code\]" witness-rejections.log; then
+        cat witness-rejections.log >&2
         exit 1
     fi
 done

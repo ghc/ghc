@@ -170,8 +170,8 @@ passes the recursive call to the constructor as a lazy thunk.
 The ordinary client imports only interfaces and links against the
 provider objects. It reads the first passing cell with a bottom tail.
 A function with independent length parameters accepts two packages.
-Requiring the same length, assuming a successor, or returning a
-caller-chosen length produces GHC-25897. A polymorphic `id` forwards an
+Different packages cannot supply a shared length. Assuming a successor
+or returning a caller-chosen length produces GHC-25897. A polymorphic `id` forwards an
 existing package. A payload whose type refers to a retained field can
 also supply the witness for an implicit package in that field's scope.
 The same application rule checks a linear operand once. Using that
@@ -203,7 +203,7 @@ producer. Writing the lambda at the call site introduces a raw package
 there and reaches the [optimizer restriction](R05-dependent-core.md#optimizing-erased-packages).
 
 Opening is limited to an application with a known operand head and an
-ordinary payload domain. Each opening introduces a fresh scoped
+ordinary payload domain. An opening introduces a fresh scoped
 witness. The recursive filter result can also be named with
 `let rest = filterVec p xs in Cons x rest`. The nonrecursive local
 binding retains the exact dot package type, including its enclosing
@@ -260,3 +260,20 @@ retains the filter's package type. Its result metadata is established
 outside the opening. The observer's argument-only length can still
 match the witness inside. The checker rejects an observer whose
 result would keep that opened length as a free index.
+
+### Repeated uses of a local package
+
+`firstPair p p` can pass the same local package to two arguments that
+require a shared length. The typechecker uses one witness and one lazy
+payload binding in the application. This covers a monomorphic
+let-bound package or a function parameter. The ordinary client reads
+a pair of heads while the tail is bottom. A function that ignores both
+arguments can also ignore a bottom package.
+
+The binding must resolve to the same checked local variable with the
+same schema. Distinct bindings and repeated computed calls have
+independent witnesses. A polymorphic binding can choose a different
+witness at each use. Witness sharing does not allow the witness to
+escape its opening or permit duplicate linear use. This is the
+lexical-variable fragment of the paper's IExistCore projection rule.
+[An Existential Crisis Resolved, section 6.1](https://richarde.dev/papers/2021/exists/exists.pdf).

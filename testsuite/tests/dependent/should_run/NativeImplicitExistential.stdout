@@ -12,3 +12,5 @@ forcing the result entered the builder body
 ([True],[])
 [False]
 ([7],[],[])
+(Just (7,7),Nothing,Just (7,7))
+(True,[7])
