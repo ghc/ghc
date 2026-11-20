@@ -2796,7 +2796,7 @@ occAnal env expr@(Lam {})
 
 occAnal env (Case scrut bndr ty alts)
   = let
-      WUD scrut_usage scrut' = occAnal (setScrutCtxt env alts) scrut
+      WUD scrut_usage scrut' = occAnal (setScrutCtxt scrut_env alts) scrut
 
       WUD alts_usage (tagged_bndr, alts')
          = addInScopeOne env bndr $ \env ->
@@ -2815,6 +2815,14 @@ occAnal env (Case scrut bndr ty alts)
 
     in WUD total_usage (Case scrut' tagged_bndr ty alts')
   where
+    scrut_env
+      | RetainedCore <- oa_core_mode (occ_opts env)
+      , not (noBinderSwaps env)
+      , any (\alt -> isNativeIndexAlt alt || isNativeIndexAliasAlt alt) alts
+      = env { occ_bs_env = emptyVarEnv, occ_bs_rng = emptyVarSet }
+          -- See Note [Binder swaps and native index evidence].
+      | otherwise = env
+
     do_alts :: OccEnv -> [CoreAlt] -> WithUsageDetails [CoreAlt]
     do_alts _   []         = WUD emptyDetails []
     do_alts env (alt:alts) = WUD (uds1 `orUDs` uds2) (alt':alts')
@@ -3817,6 +3825,20 @@ addBndrSwap scrut case_bndr alts
         || hasFreeVarInCoreAnnotations v rhs
     case_bndr' = zapIdOccInfo case_bndr
                  -- See Note [Zap case binders in proxy bindings]
+
+{- Note [Binder swaps and native index evidence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A virtual coercion in a case alternative names the index of the scrutinee.
+Binder swaps rewrite expressions without substituting in types. For example,
+an outer `case Z of wild` can introduce a swap from the constructor worker Z
+to wild. An inner `case Z of ...` has a proof involving the promoted constructor
+'Z, which does not contain the worker Id. The annotation-use test in
+addBndrSwap therefore cannot detect this dependency.
+
+Process a proof-carrying case's scrutinee without the incoming binder swaps.
+The alternatives keep the usual swaps, subject to their annotation-use check.
+See Note [Native algebraic branch evidence] in GHC.Core.Lint.
+-}
 
 lookupBndrSwap :: OccEnv -> Id -> (CoreExpr, Id)
 -- See Note [The binder-swap substitution]
