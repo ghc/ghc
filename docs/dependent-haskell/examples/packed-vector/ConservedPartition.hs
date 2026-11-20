@@ -1,11 +1,11 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators, UndecidableInstances #-}
 
 -- | Partition a vector and preserve its total length.
-module ConservedPartition (Split, partitionVec) where
+module ConservedPartition (Split, partitionVec, Branch, branchContents) where
 
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Sigma (Sigma(Pair))
-import PackedVecLibrary (Nat(..), Vec(..), Add, addSucc)
+import PackedVecLibrary (Nat(..), Vec(..), Add, addSucc, natToInt, toList)
 
 -- | Store both output lengths, their vectors, and their sum.
 type Split a (total :: Nat) =
@@ -21,3 +21,10 @@ partitionVec p (VCons x xs) =
             | p x -> Pair (S kept) (Pair dropped (VCons x ys, zs, Refl))
             | otherwise -> case addSucc kept dropped of
                 Refl -> Pair kept (Pair (S dropped) (ys, VCons x zs, Refl))
+
+-- | Use one partition at its retained length.
+type Branch a r = foreach (n :: Nat) -> Vec a n -> r
+
+-- | Read the length and contents of one partition.
+branchContents :: Branch a (Int, [a])
+branchContents n xs = (natToInt n, toList xs)

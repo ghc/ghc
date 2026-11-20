@@ -331,12 +331,21 @@ cd "$out/projection"
 cp {StoredVector,ConservedPartition,ListVectorClient}.hi "$out/client/"
 cd "$out/client"
 cat >ListVectorMain.hs <<'HS'
-{-# LANGUAGE NoExperimentalDependentTypes #-}
+{-# LANGUAGE DataKinds, ExplicitNamespaces, GADTs, NoExperimentalDependentTypes, RequiredTypeArguments #-}
 module Main where
+import ConservedPartition (Split, branchContents, partitionVec)
+import Data.Type.Equality ((:~:)(Refl))
+import GHC.Sigma (Sigma(Pair))
 import ListVectorClient
+import PackedVecLibrary (Nat(..), Vec(..))
 import StoredVector (ListVector)
 observe :: ListVector Char -> (Int, String)
 observe = contents
+empty :: Split Int 'Z
+empty = partitionVec (error "unused empty predicate") (VNil :: Vec Int 'Z)
+onlyKept, onlyDropped :: Split Int ('S 'Z)
+onlyKept = Pair (S Z) (Pair Z (VCons 7 VNil, error "unused dropped partition", error "unused sum proof"))
+onlyDropped = Pair Z (Pair (S Z) (error "unused kept partition", VCons 9 VNil, Refl))
 main :: IO ()
 main = do
     print (observe (fromList ""), observe (fromList "ab"),
@@ -345,8 +354,15 @@ main = do
            fromList (error "unused list" :: String) `seq` True)
     let mixed = regroupObservation (> (2 :: Int)) [3, 1, 4, 2]
         lazy = length (snd (regroupObservation (const True) [error "unused partition element" :: Int]))
-    case (mixed, lazy) of
-        ((4, [3, 4, 1, 2]), 1) -> pure ()
+        selected :: [(Int, [Int])]
+        selected =
+            [ choosePartition (type 'Z) True empty branchContents
+            , choosePartition (type 'Z) False empty branchContents
+            , choosePartition (type ('S 'Z)) True onlyKept branchContents
+            , choosePartition (type ('S 'Z)) False onlyDropped branchContents
+            ]
+    case (mixed, lazy, selected) of
+        ((4, [3, 4, 1, 2]), 1, [(0, []), (0, []), (1, [7]), (1, [9])]) -> pure ()
         other -> fail (show other)
 HS
 "${g[@]}" -c ListVectorMain.hs
@@ -372,6 +388,20 @@ if "${g[@]}" -ferror-spans -c WrongPartition.hs >split-errors.log 2>&1 ||
    ! grep -Fq 'WrongPartition.hs:10:40-43: error: [GHC-25897]' split-errors.log ||
    ! grep -Fq 'WrongPartition.hs:13:29-46: error: [GHC-83865]' split-errors.log; then
     cat split-errors.log >&2
+    exit 1
+fi
+
+cat >AmbiguousChoice.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes, RankNTypes #-}
+module AmbiguousChoice where
+import ConservedPartition (Branch, Split)
+
+chooseAmbiguous :: Split a total -> Branch a r -> r
+chooseAmbiguous = undefined
+HS
+if "${g[@]}" -ferror-spans -c AmbiguousChoice.hs >ambiguous-choice.log 2>&1 ||
+   ! grep -Fq 'AmbiguousChoice.hs:5:20-51: error: [GHC-83865]' ambiguous-choice.log; then
+    cat ambiguous-choice.log >&2
     exit 1
 fi
 

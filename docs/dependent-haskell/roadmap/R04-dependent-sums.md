@@ -261,3 +261,11 @@ partition preserves input order. The partition traverses the finite vector
 and tests each element. The elements can stay unevaluated when the
 predicate ignores them.
 [Agda proof and Idris vector partition](../REFERENCES.md#conservation-of-partition-length).
+
+`choosePartition` gives an imported `Branch a r` continuation the selected
+length and vector. It leaves the other vector and the equality proof
+unevaluated. Its required type argument supplies `total` when the result
+`r` is independent of length. For an empty input, write
+`choosePartition (type 'Z)`. GHC cannot infer `total` from `Split a total`
+alone. A continuation that consumes the sum equality also works if its
+type fixes `total`, or if the expected result fixes it, as in `Vec a total`.

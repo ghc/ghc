@@ -1,12 +1,12 @@
-{-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
+{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, RankNTypes, RequiredTypeArguments #-}
 
 -- | Construct and open imported dependent pairs in ordinary Haskell.
-module ListVectorClient (fromList, contents, regroup, regroupObservation) where
+module ListVectorClient (fromList, contents, regroup, regroupObservation, choosePartition) where
 
-import ConservedPartition (partitionVec)
+import ConservedPartition (Branch, Split, partitionVec)
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Sigma (Sigma(Pair))
-import PackedVecLibrary (Vec, appendVec, natToInt, sourceLength, sourceVector, toList)
+import PackedVecLibrary (Nat, Vec, appendVec, natToInt, sourceLength, sourceVector, toList)
 import StoredVector (ListVector)
 
 -- | The same list supplies the length and the vector.
@@ -26,3 +26,9 @@ regroup p xs = case partitionVec p xs of
 regroupObservation :: (a -> Bool) -> [a] -> (Int, [a])
 regroupObservation p xs = case fromList xs of
     Pair n v -> (natToInt n, toList (regroup p v))
+
+-- | Give the callback the length and elements of the selected partition.
+choosePartition :: forall a r. forall (total :: Nat) -> Bool -> Split a total -> Branch a r -> r
+choosePartition _ selectKept (Pair kept (Pair dropped (xs, ys, _))) consume
+    | selectKept = consume kept xs
+    | otherwise  = consume dropped ys
