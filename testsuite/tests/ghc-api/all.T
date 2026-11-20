@@ -20,6 +20,7 @@ test('OpenTermWhnf', [extra_run_opts(f'"{config.libdir}"')],
 test('OpenCharBranchWitness', [req_process, req_host_target_ghc, only_ways(['normal']),
                                extra_run_opts(f'"{config.libdir}"')],
      compile_and_run, ['-package ghc -package transformers'])
+test('NativeIndexAbstraction', normal, compile_and_run, ['-package ghc'])
 test('NativeDependentCoreRun', [req_bco, req_process, req_host_target_ghc,
                               unless(have_ncg(), skip),
                               extra_files(['../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs',
