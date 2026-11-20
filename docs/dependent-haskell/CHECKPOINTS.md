@@ -28,6 +28,17 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `c9e62d3e34`, an unsigned Haskell 98 datatype accepts an imported
+open type family as its parameter. A client compiled from stripped
+interfaces constructs both a `Maybe` box and an open-family box. The
+self-hosted compiler matched all 366 Showcase lines at stripped `-O0`,
+default `-O2` and in source-loaded GHCi. Nine focused tests passed.
+The closed-call append test used the external interpreter to load its
+dynamic objects. The arity and explicit matchability controls still
+reject invalid applications.
+[Example](examples/open-evaluation/LaterMatchabilityClient.hs) and
+[R23 inference conditions](roadmap/R23-unsaturated-type-families.md).
+
 At `508cd799f6`, an ordinary caller can again write `expectMarker label
 marker $ evaluate proof` when the proof mentions the length bound by a
 constructor pattern. Before the fix, the checker rejected the application
