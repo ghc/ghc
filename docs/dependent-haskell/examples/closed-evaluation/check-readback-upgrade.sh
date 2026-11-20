@@ -293,10 +293,10 @@ HS
 
     # The owner can export a class default before it has any instances.
     cat >DefaultOwner.hs <<'HS'
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE KindSignatures, TypeFamilies #-}
 module DefaultOwner (Owner(..)) where
 import Data.Kind (Type)
-class Owner a where
+class Owner (a :: Type) where
     type Result a :: Type
     type Result a = a -> Maybe a
 HS
