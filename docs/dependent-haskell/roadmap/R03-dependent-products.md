@@ -38,7 +38,10 @@ A constructor equation for the cut can pass the original input vector
 at its refined width. The zero branch can use width `m` and the successor
 branch can use `'S (Add k m)`. Both branches preserve the vector's
 identity in the result and can leave the entire vector unevaluated.
-[Showcase](../Showcase.hs) and [derivation](../REFERENCES.md#passing-the-split-input-at-a-refined-width).
+An ordinary caller can also pass `S (S Z)` directly and inspect that
+identity witness while the input vector is undefined.
+[Showcase](../Showcase.hs), [ordinary caller](../../../testsuite/tests/dependent/should_run/NativeRetainedCastDomainClient.hs)
+and [derivation](../REFERENCES.md#passing-the-split-input-at-a-refined-width).
 
 A retained length can be a checked source call such as `plus n m`.
 Its two inputs can come from IO. The result index remains the same
