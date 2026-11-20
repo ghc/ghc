@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
 
 -- | Filter a vector without writing a package constructor or a witness.
-module ImplicitVector (Filtered, filterVec, partitionVec, partitionRows, rowLists, cells, transportFiltered, pairWithSelf, forgetLength, observations, singletonBuilder, runBuilder) where
+module ImplicitVector (Filtered, filterVec, partitionVec, partitionRows, rowLists, firstPassing, cells, transportFiltered, pairWithSelf, forgetLength, observations, singletonBuilder, runBuilder) where
 
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Sigma (Sigma(Pair))
@@ -44,6 +44,11 @@ partitionRows p xs =
 rowLists :: HiddenRows a -> ([a], [a])
 rowLists rows = case rows of
   Rows left right -> (toList left, toList right)
+
+-- | Read only the first cell from the passing side of a partition.
+firstPassing :: HiddenRows a -> Maybe a
+firstPassing (Rows VNil _) = Nothing
+firstPassing (Rows (VCons x _) _) = Just x
 
 -- | Open the hidden length for the call to 'toList'.
 cells :: Filtered a -> [a]

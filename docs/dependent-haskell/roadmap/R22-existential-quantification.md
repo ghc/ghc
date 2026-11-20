@@ -297,6 +297,13 @@ constructor matching applies to the dot mode. The bar mode keeps
 its explicit Pack alternative.
 
 
+A function equation can also use a constructor of the payload. In
+`firstPassing (Rows (VCons x _) _) = Just x`, the match opens the
+package for the source patterns. A preceding equation can match an
+empty vector. A wildcard in an earlier argument still leaves a later
+package lazy. Each argument has its own witness scope.
+[Partition equations](../examples/erased-existentials/ImplicitVector.hs).
+
 ### A package with nested dot binders
 
 A partition can return one package that hides both output lengths.

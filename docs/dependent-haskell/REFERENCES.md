@@ -3121,6 +3121,15 @@ comparison. [Paper, figure 8](https://richarde.dev/papers/2021/exists/exists.pdf
 [Agda dependent pairs](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#the-s-type)
 and [Idris existential pairs](https://www.idris-lang.org/Idris2/base/docs/Data.DPair.html).
 
+Agda checks the clauses of an indexed function against its telescope.
+GHC keeps its ordinary match group for equations on a packaged argument.
+It opens the hidden indices before checking the payload patterns in that
+argument column. This also lets the Haskell match compiler preserve the
+order of guards, wildcard demand, and source locations for coverage
+diagnostics. The existential elaboration supplies the scoped elimination.
+[Agda function clauses](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#general-form)
+and [Eisenberg et al., Figure 8](https://richarde.dev/papers/2021/exists/exists.pdf#page=18).
+
 The fork also checks an ordinary call at a known existential result.
 For `bool fallback rows flag`, the type parameter of `bool` can be the
 entire expected package. Both alternatives use that type. Each keeps

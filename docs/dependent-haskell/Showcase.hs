@@ -959,6 +959,11 @@ main = do
         ImplicitVector.rowLists rows
     observe "choose a partition without forcing the unused branch" $
         ImplicitVector.rowLists (Data.Bool.bool (error "unused partition") rows True)
+    observe "match hidden partition lengths in function equations"
+        (ImplicitVector.firstPassing (ImplicitVector.partitionRows odd
+            (VCons (7 :: Int) (error "unused equation tail"))),
+         ImplicitVector.firstPassing (ImplicitVector.partitionRows odd
+            (VCons (2 :: Int) VNil)))
     observe "transport element equality under a hidden vector length"
         (ImplicitVector.cells (ImplicitVector.transportFiltered Refl passing))
     observe "zip a filtered vector with itself at its hidden length" $
