@@ -416,8 +416,25 @@ cd "$out/projection"
 cp {StoredVector,ConservedPartition,ListVectorClient}.hi "$out/client/"
 cp "$out/provider/VectorIdentity.hi" "$out/client/"
 cd "$out/client"
+# A successor-length vector cannot be VNil.
+cat >Impossible.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
+module Impossible where
+import Data.Type.Equality ((:~~:)(HRefl))
+import PackedVecLibrary (Nat(..), Vec(..))
+impossible :: foreach (xs :: Vec Bool ('S n)) -> Maybe (xs :~~: ('VNil :: Vec Bool 'Z)) -> Bool
+impossible _ proof = case proof of
+    Just HRefl -> True
+    Nothing -> False
+HS
+if "${g[@]}" -Werror=inaccessible-code -c Impossible.hs >impossible.log 2>&1 ||
+   ! grep -Fq '[GHC-40564]' impossible.log; then
+    cat impossible.log >&2
+    exit 1
+fi
+
 cat >ListVectorMain.hs <<'HS'
-{-# LANGUAGE DataKinds, ExplicitNamespaces, GADTs, NoExperimentalDependentTypes, RequiredTypeArguments, TypeApplications #-}
+{-# LANGUAGE DataKinds, ExplicitNamespaces, GADTs, NoExperimentalDependentTypes, RequiredTypeArguments, ScopedTypeVariables, TypeApplications #-}
 module Main where
 import Control.Exception (ErrorCall, evaluate, try)
 import ConservedPartition (Split, branchContents, partitionVec)
@@ -437,6 +454,12 @@ empty = partitionVec (error "unused empty predicate") (VNil :: Vec Int 'Z)
 onlyKept, onlyDropped :: Split Int ('S 'Z)
 onlyKept = Pair (S Z) (Pair Z (VCons 7 VNil, error "unused dropped partition", error "unused sum proof"))
 onlyDropped = Pair Z (Pair (S Z) (error "unused kept partition", VCons 9 VNil, Refl))
+-- | Matching the proof refines the original vector's unknown length.
+onlyEmpty :: forall n. Vec Bool n -> Maybe (Vec Bool 'Z)
+onlyEmpty xs = case matchZero @n xs of
+    Just HRefl -> Just xs
+    Nothing -> Nothing
+
 vectorProofs :: Vec Int n -> (Bool, Bool)
 vectorProofs xs =
     (case vectorRefl xs of Refl -> True, case forwardVector xs of Refl -> True)
@@ -478,7 +501,9 @@ main = do
             Just _ -> False
         bottom = error "zero case demands the scrutinee" :: Vec Bool 'Z
     forced <- try (evaluate (case zeroRefl bottom of Refl -> True)) :: IO (Either ErrorCall Bool)
-    let zeroChecks = knownZero && openZero && lazyCons && either (const True) (const False) forced
+    let emptyResults = isJust (onlyEmpty zero) && isNothing (onlyEmpty nonzero)
+        zeroChecks = knownZero && openZero && lazyCons && emptyResults
+                  && either (const True) (const False) forced
     case (mixed, lazy, selected, split, demand, proofs, zeroChecks) of
         ((4, [3, 4, 1, 2]), 1, [(0, []), (0, []), (1, [7]), (1, [9])],
          ([7], [9]), (0, 1, 1), ((True, True), (True, True)), True) -> pure ()
