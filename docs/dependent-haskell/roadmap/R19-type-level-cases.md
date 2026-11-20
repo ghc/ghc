@@ -54,6 +54,31 @@ GADT constructors still refine the scrutinee kind.
 [Closed-family translation, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf)
 and [namespace and interface test](../../../testsuite/tests/dependent/should_run/NativeTypeCase.sh).
 
+### Nested patterns at kind `Type`
+
+The next source case selects `Int` for `Just Bool`, `Char` for
+`Just Ordering`, and `()` for another known type. The compiler
+cannot enumerate all types when it reaches the field of `Just`.
+A closed family can instead classify the written heads:
+
+```haskell
+data Head = B | O | Other
+type family Classify (a :: Type) :: Head where
+  Classify Bool     = 'B
+  Classify Ordering = 'O
+  Classify a        = 'Other
+```
+
+The three results are distinct. GHC can choose `Other` for `[x]`
+even when `x` is unknown. It must wait when the whole type is unknown
+or a type family can still reduce to `Bool` or `Ordering`. A second
+family with one equation per `Head` then selects the source result.
+An ordinary client checked these properties through a stripped interface.
+The unknown case stayed stuck even when every final branch returned
+`Int`. Translating the nested source pattern to these families is open.
+[Agda case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees)
+and [GHC family equation compatibility](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_families.html#compatibility-and-apartness-of-type-family-equations).
+
 ## A case in a let body
 
 A case branch can use a let-bound type or kind. For example,

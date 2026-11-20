@@ -8,8 +8,8 @@ The current source subset includes runtime Peano naturals, length-indexed vector
 and structural parameterized indices. Generic `[a]` indices can contain Int,
 functions, IO actions, other lifted values, and `Vec Int n` at a runtime `n`.
 
-At compiler checkpoint `004f679c42`, both native stages and self-hosted
-GHCi agree on all 264 lines of the [Showcase](Showcase.hs). A function
+At compiler checkpoint `dd00726ab6`, both native stages and self-hosted
+GHCi agree on all 265 lines of the [Showcase](Showcase.hs). A function
 can return a vector at the length stored in its input package:
 
 ```haskell
@@ -19,16 +19,22 @@ payload (PackVec _ xs) = xs
 
 `packageLength` is an ordinary imported Haskell function. Its compiled
 interface supplies the equation that relates the result to the first
-field. The generic `project` example uses a closed `Witness` family
-and runs with both `Vec Char` and `Const Int`. Reading the constant
+field. The generic `project` example now uses an ordinary imported
+witness function and runs with both `Vec Char` and `Const Int`. Reading the constant
 payload leaves its witness unevaluated.
 [Vector projection](examples/packed-vector/PackedProjection.hs),
 [ordinary length function](examples/packed-vector/PackedLength.hs)
-and [generic projection](examples/packed-vector/RetainedNat.hs).
+and [generic projection](examples/packed-vector/RetainedProjection.hs).
 
-All 34 focused tests passed across the initial run and the corrected
-GHC API rerun. The normal-way dependent directory passed 267 of 299 exercised cases.
-The same 32 cases failed with the same diagnostics as at `e04f9add03`.
+A source type case can match `Bool` and `Ordering` directly. The ordinary
+client checks that their result types are `Int` and `Char`.
+[Type case](examples/open-evaluation/NativeCase.hs).
+
+The focused suite passed 35 of 37 tests. The other two reject the
+expected ill-kinded programs and print arrow matchability in the error.
+Both diagnostics match M177 byte for byte. The normal-way dependent
+directory passed 267 of 299 cases. The same 32 cases failed with the
+same diagnostics as at `004f679c42`.
 The separate polykinds comparison at `88cef2bf98` accepted 116 of
 124 unmodified programs.
 The eight remaining programs compile with explicit matchability on

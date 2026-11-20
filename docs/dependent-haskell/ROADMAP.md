@@ -198,6 +198,16 @@ rechecks the ordinary length function once, including when the datatype
 comes from an installed package. A second build reuses the outputs.
 [R04 source and interface checks](roadmap/R04-dependent-sums.md#project-a-payload-at-the-length-of-its-input-package).
 
+At `dd00726ab6`, an ordinary imported witness function also checks the
+projection when the payload family is a parameter. A source type case
+can distinguish `Bool` from `Ordering` without a wrapper datatype.
+Both native stages and self-hosted GHCi agree on the 265 Showcase lines.
+The dependent directory retains its 267 passes and 32 failures. Two
+additional ordinary kind-error tests give the same diagnostics as M177
+and differ from the upstream golden files.
+[Projection](examples/packed-vector/RetainedProjection.hs)
+and [type case](examples/open-evaluation/NativeCase.hs).
+
 The source checkpoint uses the restricted native optimizer. In a
 separate R05 build, one Gentle iteration preserves term identities in
 recursive groups and casts with nominal domain evidence. The normal
@@ -215,7 +225,7 @@ when some of its operands are unknown.
 
 | Card | Next evidence | Dependency or boundary |
 | --- | --- | --- |
-| [R04, dependent sums](roadmap/R04-dependent-sums.md) | Use an ordinary imported first projection even when the payload family is an unknown parameter. | The concrete vector projection uses the ordinary `packageLength`. The generic projection currently uses the closed `Witness` family. |
+| [R04, dependent sums](roadmap/R04-dependent-sums.md) | Generalize the witness type as well as the payload family. | Ordinary imported functions supply the first projection for both `PackedVec a` and `Retained p`. Both still store a `Nat` witness. |
 | [R22, existential quantification](roadmap/R22-existential-quantification.md) | Check the native erased binder and open an unknown package across an interface. | Its witness erases. Opening an unused payload must preserve laziness. |
 | [R05, dependent Core](roadmap/R05-dependent-core.md#occurrence-analysis) | Run the ordinary optimization schedule while keeping every runtime index in scope. | The worker and its unfolding must use the same bound index. Absence at runtime does not imply absence from the result type. |
 | [R15, closed evaluator](roadmap/R15-closed-term-evaluator.md) | Extend scalar readback to more result shapes while preserving demand. | Both projections and the native object-upgrade check pass with the self-hosted compiler. The unselected exceptional sibling stays lazy. [Readback design](roadmap/R15-closed-term-evaluator.md#native-prototype-for-a-computed-pair-field). |

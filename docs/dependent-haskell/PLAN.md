@@ -9374,3 +9374,21 @@ of 299 exercised cases with the same 32 diagnostics as at `e04f9add03`.
 [Concrete projection](examples/packed-vector/PackedProjection.hs),
 [generic projection](examples/packed-vector/RetainedNat.hs)
 and [package upgrade check](examples/closed-evaluation/check-readback-upgrade.sh).
+
+## R04 and R19. Project through an ordinary function and match a type directly
+
+At `dd00726ab6`, an ordinary function supplies the witness in the type
+of `RetainedProjection.project`. Its client can match `Const x` after
+the payload family has been inferred. A source type case selects
+`Int` for `Bool` and `Char` for `Ordering`. A constructor pattern
+whose synonym expands to a variable is rejected at the source span.
+[Projection](examples/packed-vector/RetainedProjection.hs)
+and [type-case checks](../../testsuite/tests/dependent/should_run/NativeTypeCase.sh).
+
+Both native stages and self-hosted GHCi produce the same 265 Showcase
+lines. The focused tests pass 35 of 37. The two upstream kind-error
+goldens, `T7368` and `T7368a`, omit the explicit arrow matchability
+that the fork prints. The actual errors match M177 byte for byte.
+The dependent directory passes 267 of 299 and preserves all 32 previous
+diagnostics. The upgrade checks cover the generic and concrete workers
+with home and registered package providers.
