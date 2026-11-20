@@ -190,6 +190,20 @@ the `Maybe` equation. In the application equation GHC still expects
 Inferring the result selector for this equation remains open.
 [Original program](../../../testsuite/tests/dependent/should_compile/KindEqualities2.hs).
 
+Separate compilation reproduces both failures. A provider that declares
+`IK` and `I` together exports an inferred matchability parameter for each
+family. A client with only the provider interface can give equations for
+`TInt`, `TBool` and `TMaybe`. Its interface records that the first two
+equations accept either selector and that `TMaybe` requires M. The
+application equation still fails. If the client owns `I`, the provider
+exports `IK` without a parameter and the `TMaybe` equation also fails.
+
+Removing the `TMaybe` equation isolates a second problem. A recursive
+`IK` equation with an explicit `%U` arrow rejects `(I a) (I b)`.
+The same equation with `%M` accepts the application.
+`GHC.Tc.Utils.Unify.matchExpectedFunKind` keeps the selector of a
+visible arrow. When a family hides the arrow, its fallback requests M.
+
 ### M141. Inferring an omitted arrow in a dependent argument
 
 In `D (Type -> Type) Maybe`, the declared kind of `D` says that its
