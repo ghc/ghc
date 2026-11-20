@@ -34,7 +34,8 @@ module GHC.Iface.Type (
         ifTyConBinderVar, ifTyConBinderName,
 
         -- Binary utilities
-        putIfaceType, getIfaceType, ifaceTypeSharedByte, IfaceHasDepFunCo(..),
+        putIfaceType, getIfaceType, ifaceTypeSharedByte,
+        IfaceEvidenceVersion(..), requireIfaceEvidenceVersion,
         -- Equality testing
         isIfaceLiftedTypeKind,
 
@@ -2843,16 +2844,24 @@ instance Binary IfaceMCoercion where
                  return $ IfaceMCo a
          _ -> panic ("get IfaceMCoercion " ++ show tag)
 
--- | A writer-only notification for selecting the interface version.
-data IfaceHasDepFunCo = IfaceHasDepFunCo
+-- | Minimum reader support for retained evidence in a serialized payload.
+-- Later versions include the earlier forms. See Note [Versioning retained evidence]
+-- in GHC.Iface.Binary.
+data IfaceEvidenceVersion = NoRetainedEvidence | DepFunCoEvidence | ConstructorCaseEvidence
+  deriving (Eq, Ord)
+
+-- | Record a feature only while writing the full interface.
+requireIfaceEvidenceVersion :: WriteBinHandle -> IfaceEvidenceVersion -> IO ()
+requireIfaceEvidenceVersion bh required =
+  case findOptionalUserDataWriter (Proxy :: Proxy IfaceEvidenceVersion) bh of
+    Just notify -> putEntry notify bh required
+    Nothing -> pure () -- Fingerprinting does not write a version header.
 
 instance Binary IfaceCoercion where
   put_ _ (IfaceTermAppCo {})
        = ioError (userError "Opaque runtime call congruence interfaces are not implemented.")
   put_ bh (IfaceDepFunCo visL visR bndr domain body) = do
-       case findOptionalUserDataWriter (Proxy :: Proxy IfaceHasDepFunCo) bh of
-         Just notify -> putEntry notify bh IfaceHasDepFunCo
-         Nothing -> pure () -- Fingerprinting does not write the version header.
+       requireIfaceEvidenceVersion bh DepFunCoEvidence
        putByte bh 18
        put_ bh visL
        put_ bh visR

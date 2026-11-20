@@ -2761,13 +2761,17 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             hd = listName "hd"
             tl = listName "tl"
             co = listName "list_proof"
-            consAlt names rhs = IfaceAlt (IfaceDataAlt (dataConName consDataCon)) names rhs
+            consAlt = IfaceAlt (IfaceDataAltWithProof (dataConName consDataCon))
             nilAlt = IfaceAlt (IfaceDataAlt (dataConName nilDataCon)) [] (toIfaceExpr trueExpr)
             listCase alts = IfaceCase (toIfaceExpr (Var xs)) (listName "case_list") alts
             goodCons = consAlt [hd, tl, co] (IfaceLcl hd)
         forM_ [NormalCompression, SafeExtraCompression, MaximumCompression] $ \compression -> do
             encoded <- roundtrip compression (listCase [nilAlt, goodCons])
             decoded <- restoreExpr [xs] encoded
+            legacy <- roundtrip compression (listCase [nilAlt, IfaceAlt (IfaceDataAlt (dataConName consDataCon))
+                                                       [hd, tl, co] (IfaceLcl hd)])
+            restoredLegacy <- restoreExpr [xs] legacy
+            lintAccepts dflags "legacy list constructor evidence uses the same fields" [xs] restoredLegacy
             lintAccepts dflags "interface list case with nominal constructor evidence" [xs] decoded
             case decoded of
                 Case _ _ _ [_, Alt (DataAlt con) [h, t, cv] (Var occurrence)] -> do
@@ -2778,6 +2782,8 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                     checkType dflags "interface list branch uses its fresh fields"
                         (mkTyConApp (promoteDataCon con) [boolTy, TermVarTy h, TermVarTy t]) (coercionRKind evidence)
                 _ -> fail "FAIL: interface list constructor evidence shape changed"
+        rejectsIfaceExpr "a tagged constructor alternative must bind its proof"
+            "Missing or unsupported constructor proof" [xs] (listCase [nilAlt, consAlt [hd, tl] (IfaceLcl hd)])
         rejectsIfaceExpr "proof name collides with a constructor field"
             "one distinct proof name" [xs] (listCase [nilAlt, consAlt [hd, tl, hd] (IfaceLcl hd)])
         rejectsIfaceExpr "one constructor cannot read another constructor's field"

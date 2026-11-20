@@ -783,6 +783,7 @@ data IfaceAlt = IfaceAlt IfaceConAlt [IfLclName] IfaceExpr
 data IfaceConAlt = IfaceDefaultAlt
                  | IfaceDataAlt IfExtName
                  | IfaceLitAlt Literal
+                 | IfaceDataAltWithProof IfExtName
 
 type IfaceBinding b = IfaceBindingX IfaceExpr b
 
@@ -1952,6 +1953,7 @@ instance Outputable IfaceConAlt where
     ppr IfaceDefaultAlt   = text "DEFAULT"
     ppr (IfaceLitAlt l)   = ppr l
     ppr (IfaceDataAlt d)  = ppr d
+    ppr (IfaceDataAltWithProof d) = ppr d
 
 ------------------
 instance Outputable IfaceIdDetails where
@@ -2288,6 +2290,7 @@ freeNamesIfExpr (IfaceCase s _ alts)
     fn_cons []                                     = emptyNameSet
     fn_cons (IfaceAlt IfaceDefaultAlt    _ _ : xs) = fn_cons xs
     fn_cons (IfaceAlt (IfaceDataAlt con) _ _ : _ ) = unitNameSet con
+    fn_cons (IfaceAlt (IfaceDataAltWithProof con) _ _ : _) = unitNameSet con
     fn_cons (_                               : _ ) = emptyNameSet
 
 freeNamesIfExpr (IfaceLet (IfaceNonRec bndr rhs) body)
@@ -3120,12 +3123,18 @@ instance Binary IfaceConAlt where
     put_ bh IfaceDefaultAlt   = putByte bh 0
     put_ bh (IfaceDataAlt aa) = putByte bh 1 >> put_ bh aa
     put_ bh (IfaceLitAlt ac)  = putByte bh 2 >> put_ bh ac
+    put_ bh (IfaceDataAltWithProof con) = do
+        requireIfaceEvidenceVersion bh ConstructorCaseEvidence
+        putByte bh 3
+        put_ bh con
     get bh = do
         h <- getByte bh
         case h of
             0 -> return IfaceDefaultAlt
             1 -> liftM IfaceDataAlt $ get bh
-            _ -> liftM IfaceLitAlt  $ get bh
+            2 -> liftM IfaceLitAlt  $ get bh
+            3 -> liftM IfaceDataAltWithProof $ get bh
+            _ -> fail ("Unknown interface case alternative tag " ++ show h)
 
 instance (Binary r, Binary b) => Binary (IfaceBindingX b r) where
     put_ bh (IfaceNonRec aa ab) = putByte bh 0 >> put_ bh aa >> put_ bh ab
@@ -3386,6 +3395,7 @@ instance NFData IfaceConAlt where
   rnf = \case
     IfaceDefaultAlt -> ()
     IfaceDataAlt nm -> rnf nm
+    IfaceDataAltWithProof nm -> rnf nm
     IfaceLitAlt lit -> rnf lit `seq` ()
 
 instance NFData IfaceCompleteMatch where

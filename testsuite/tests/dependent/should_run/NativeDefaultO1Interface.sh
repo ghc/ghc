@@ -11,6 +11,8 @@ cd "$out"
 cp "$src"/{NativeDefaultO1InterfaceProducer,DependentPair,DependentProjection,PackedVecLibrary}.hs .
 "${ghc[@]}" -c NativeDefaultO1InterfaceProducer.hs DependentPair.hs DependentProjection.hs PackedVecLibrary.hs
 "${ghc[@]}" --show-iface NativeDefaultO1InterfaceProducer.hi >producer.iface
+"${ghc[@]}" --show-iface DependentProjection.hi >projection.iface
+grep -Fq 'retained-constructor-case-v1' projection.iface
 grep -Fq '$windexedWorker' producer.iface
 grep -Fq '$wordinaryWorker' producer.iface
 

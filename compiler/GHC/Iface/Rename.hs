@@ -884,6 +884,7 @@ rnIfaceAlt (IfaceAlt conalt names rhs)
 
 rnIfaceConAlt :: Rename IfaceConAlt
 rnIfaceConAlt (IfaceDataAlt data_occ) = IfaceDataAlt <$> rnIfaceGlobal data_occ
+rnIfaceConAlt (IfaceDataAltWithProof data_occ) = IfaceDataAltWithProof <$> rnIfaceGlobal data_occ
 rnIfaceConAlt alt = pure alt
 
 rnIfaceLetBndr :: Rename IfaceLetBndr
