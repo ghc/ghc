@@ -1016,6 +1016,8 @@ main = do
         (Refl :: Prelude.max (Prelude.fromIntegral (Prelude.length '[1, 2, 3])) 2 :~: 3)
     observe "an ordinary datatype infers the arrow required by Maybe"
         (LegacyKindArgument.maybeField (Just True))
+    observe "use one class default for a constructor kind and a callback type"
+        LegacyKindArgument.defaultCallback
     observe "supply the pair to an exported swap after typechecking its definition"
         (Refl :: OpenBuildSource.Swap '( 'True, 'x') :~: '( 'x', 'True))
     observe "a computed sibling fixes a nested numeric conversion"

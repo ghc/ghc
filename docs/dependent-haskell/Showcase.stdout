@@ -242,6 +242,7 @@ construct a result from two symbolic fields: Refl
 use a derived instance beside a dependent type: "Second"
 a literal sibling fixes a nested numeric conversion: Refl
 an ordinary datatype infers the arrow required by Maybe: Just True
+use one class default for a constructor kind and a callback type: Just True
 supply the pair to an exported swap after typechecking its definition: Refl
 a computed sibling fixes a nested numeric conversion: Refl
 supply either constructor to a projection checked at an unknown input: (Refl,Refl)
