@@ -10,6 +10,9 @@ cp "$src"/{OpenMapWorker,OpenMapSource,OpenMapProof,ClosedTableLibrary,SpineWork
 cd "$out"
 cp OpenMapWorker.hs Worker.source
 
+# The mapper prefix must also typecheck with the producer's object in scope.
+"${ghc[@]}" -fexternal-interpreter --make -no-link -outputdir with-code OpenMapSource.hs
+
 compile_worker() {
     "${ghc[@]}" -c OpenMapWorker.hs
     "${ghc[@]}" --show-iface OpenMapWorker.hi >worker.iface

@@ -3549,9 +3549,11 @@ tcClosedCaseExecutableOwner rdr name args staging
   = do
       table <- tcLookupTyCon name
       let expect_eager = lengthIs args 1 && isMonomorphicEnumCaseType (tyConKind table)
+          visible = filterOut isInvisibleTyConBinder (tyConBinders table)
+          nominal_prefix = length args < length visible && all nominalCallback args
           staged = needs_execution &&
                    (sourceCaseVisibleArity table == Just (length args) ||
-                    any (isJust . bareClosedCallback) args)
+                    (not nominal_prefix && any (isJust . bareClosedCallback) args))
       owner <- if expect_eager || staged then sourceTableOwner table else pure Nothing
       case owner of
         Just fun | staged || sourceTableKeepsExecutable fun -> do
@@ -3672,6 +3674,12 @@ registering any nominal family use. This preserves existing staged calls
 even if later declarations add a rule for the projection. An imported
 constraint, a rigid operand, or an unavailable executable still uses the
 checked family. Never recover from a failed execution by trying an axiom.
+
+A partial application that supplies only checked callbacks uses the
+nominal route even when object code is available. The staged evaluator
+requires a saturated call. The caller checks the callbacks' owners
+before using the source family.
+
 The availability query uses the linker dependency plan and does not load
 code. It does not replace the usual stage, type or linker checks.
 -}
