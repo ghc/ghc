@@ -6255,6 +6255,24 @@ body and requires rewrite rules to be disabled at the proof site.
 [GHC rewrite rule semantics](../users_guide/exts/rewrite_rules.rst),
 and [R16 application](roadmap/R16-open-term-evaluator.md#filter-one-known-head-and-keep-the-recursive-tail).
 
+### Exporting an ordinary identity equation
+
+Agda defines identity by returning the argument directly. This equation
+reduces even when the argument is a variable. The Haskell report's
+definition of `seq` distinguishes bottom at function type from a
+lambda. GHC checks the identity body as well as its type before it
+publishes the projection.
+[Agda Function.Base](https://agda.github.io/agda-stdlib/v2.1/Function.Base.html)
+and [Haskell 2010, strict evaluation](https://www.haskell.org/onlinereport/haskell2010/haskellch6.html#x13-1260006.2).
+
+GHC's `OPAQUE` pragma controls term optimization. An ordinary call to
+an opaque identity can stay in Core while its interface carries the
+separately checked projection. Rewrite rules at the proof site can
+change a call. The proof uses the existing policy for checked final
+Core equations. [GHC pragmas](../users_guide/exts/pragmas.rst),
+[GHC rewrite rule semantics](../users_guide/exts/rewrite_rules.rst),
+and [R16 application](roadmap/R16-open-term-evaluator.md#use-an-ordinary-identity-as-an-open-callback).
+
 Agda permits a datatype declaration and its constructors to appear at
 different positions in an interleaved mutual block. Haskell's renamer
 already groups mutually dependent type declarations. R21 uses those
