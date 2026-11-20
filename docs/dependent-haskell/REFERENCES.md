@@ -6210,6 +6210,21 @@ and `foldr` introduce additional obligations in this fork.
 [HERMIT paper](https://doi.org/10.1145/2804302.2804303)
 and [reading notes and checked scope](papers/README.md#checking-ghc-rewrite-equations-with-hermit-haskell-2015).
 
+### Induction on the spine of a mapped list
+
+Agda's `length-map` uses reflexivity at the empty list and lifts the
+recursive equality through successor at a cons. The Haskell report
+defines both operations by matching the list spine. Its map stores
+the callback result in the head, and length ignores that field.
+[Agda's length-map proof](https://agda.github.io/agda-stdlib/v1.1/Data.List.Properties.html)
+and [Haskell 2010 PreludeList](https://www.haskell.org/onlinereport/haskell2010/haskellch9.html).
+
+The R16 proof applies the installed map equation and then matches
+the recursive `Refl` to lift the equality through successor.
+GHC checks that match with the ordinary equality GADT.
+[Data.Type.Equality source](../../libraries/ghc-internal/src/GHC/Internal/Data/Type/Equality.hs)
+and [R16 map length proof](roadmap/R16-open-term-evaluator.md#prove-that-map-preserves-length).
+
 ### An ordinary enumeration function as a callback
 
 Agda's standard library defines Boolean negation by two constructor
