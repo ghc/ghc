@@ -16,20 +16,24 @@ cp "$src"/PreludeMapLength{Size,Source,Proof}.hs "$src/PreludeAppendLengthSource
 "${ghc[@]}" -O1 -fomit-interface-pragmas -fno-write-if-simplified-core -c \
     PreludeMapLengthSize.hs PreludeMapLengthSource.hs PreludeMapLengthProof.hs PreludeAppendLengthSource.hs
 cd "$out/client"
-cp ../provider/*.hi "$src/PreludeAppendLengthProof.hs" .
+cp ../provider/*.hi "$src"/PreludeAppendLengthProof.hs "$src"/PreludeMapAppendProof.hs .
 
 cat >Main.hs <<'HS'
 module Main where
 
 import PreludeAppendLengthProof (showPreludeAppendLength)
+import PreludeMapAppendProof (showPreludeMapAppend)
 
 main :: IO ()
-main = putStrLn showPreludeAppendLength
+main = do
+    putStrLn showPreludeAppendLength
+    putStrLn showPreludeMapAppend
 HS
 for optimization in -O0 -O2; do
-    "${ghc[@]}" "$optimization" -fenable-rewrite-rules -fforce-recomp -c PreludeAppendLengthProof.hs Main.hs
-    "${ghc[@]}" Main.o PreludeAppendLengthProof.o ../provider/*.o -o append-run
-    [[ $(./append-run) == '(Refl,Succ (Succ (Succ Zero)),Succ (Succ (Succ Zero)),True)' ]]
+    "${ghc[@]}" "$optimization" -fenable-rewrite-rules -fforce-recomp -c \
+        PreludeAppendLengthProof.hs PreludeMapAppendProof.hs Main.hs
+    "${ghc[@]}" Main.o PreludeAppendLengthProof.o PreludeMapAppendProof.o ../provider/*.o -o append-run
+    [[ $(./append-run) == $'(Refl,Succ (Succ (Succ Zero)),Succ (Succ (Succ Zero)),True)\n(Refl,[False,True,False],[False,True,False],(True,True))' ]]
 done
 
 cat >FalseLength.hs <<'HS'
@@ -61,6 +65,15 @@ if "${ghc[@]}" -O1 -c MissingHypothesis.hs >missing-hypothesis.log 2>&1 ||
    ! grep -Fq '[GHC-05617]' missing-hypothesis.log ||
    ! grep -Fq 'lengthAppend (Cons _) _ = Refl' missing-hypothesis.log; then
     cat missing-hypothesis.log >&2
+    exit 1
+fi
+
+sed -e 's/^mapAppend f (Cons xs) ys = .*$/mapAppend _ (Cons _) _ = Refl/' \
+    -e '/^    Refl -> Refl$/d' PreludeMapAppendProof.hs >MissingMapHypothesis.hs
+if "${ghc[@]}" -O1 -c MissingMapHypothesis.hs >missing-map-hypothesis.log 2>&1 ||
+   ! grep -Fq '[GHC-05617]' missing-map-hypothesis.log ||
+   ! grep -Fq 'mapAppend _ (Cons _) _ = Refl' missing-map-hypothesis.log; then
+    cat missing-map-hypothesis.log >&2
     exit 1
 fi
 

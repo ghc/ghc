@@ -1321,3 +1321,20 @@ publish equations nor record the final Core check.
 [proof](../examples/open-evaluation/PreludeAppendLengthProof.hs),
 [regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledAppend.sh),
 and [prior art](../REFERENCES.md#induction-on-the-left-spine-of-append).
+
+### Prove that map distributes over append
+
+`mapAppend` proves `map f (xs ++ ys) = map f xs ++ map f ys`
+by induction on the finite spine of `xs`. It uses both installed
+functions through their aliases. The proof keeps `f` and `ys` abstract.
+The empty case reduces both sides to `map f ys`. The cons case has
+the same head `f x` on both sides. Matching the induction hypothesis
+proves equality of the tails without evaluating `f x`.
+
+The ordinary proof uses stripped provider interfaces and disables
+rewrite rules. At runtime both list expressions return the same
+Boolean values. Both expressions also give a cons with a bottom
+callback, head, left tail, and right list.
+[Proof](../examples/open-evaluation/PreludeMapAppendProof.hs),
+[regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledAppend.sh),
+and [prior art](../REFERENCES.md#distributing-map-over-append).

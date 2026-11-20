@@ -6265,6 +6265,15 @@ constructor of the appended spine with a bottom left tail and right
 list. [GHC append definition and fusion rules](../../libraries/ghc-internal/src/GHC/Internal/Base.hs)
 and [R16 append length proof](roadmap/R16-open-term-evaluator.md#prove-that-append-adds-the-list-lengths).
 
+### Distributing map over append
+
+Agda's `map-++` uses reflexivity at the empty list and lifts the
+induction hypothesis through a cons with head `f x`. The R16 proof uses
+the same induction with the installed Prelude equations. It keeps
+`f x` abstract.
+[Agda standard library 2.4, map-++](https://agda.github.io/agda-stdlib/v2.4/Data.List.Properties.html)
+and [R16 map distribution proof](roadmap/R16-open-term-evaluator.md#prove-that-map-distributes-over-append).
+
 ### An ordinary enumeration function as a callback
 
 Agda's standard library defines Boolean negation by two constructor

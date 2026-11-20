@@ -112,6 +112,7 @@ import qualified InstalledNotProof
 import qualified PreludeFilterProof
 import qualified PreludeAppendLengthProof
 import qualified PreludeFilterLengthProof
+import qualified PreludeMapAppendProof
 import qualified PreludeMapLengthProof
 import qualified PreludeMapProof
 import qualified ConsRuleMapProof
@@ -1239,6 +1240,8 @@ main = do
               ++ PreludeMapLengthProof.showPreludeMapLength)
     putStrLn ("prove that append adds the list lengths: "
               ++ PreludeAppendLengthProof.showPreludeAppendLength)
+    putStrLn ("prove that map distributes over append: "
+              ++ PreludeMapAppendProof.showPreludeMapAppend)
     putStrLn ("filter with Prelude.not and Prelude.id without forcing the kept tail: "
               ++ PreludeFilterProof.showPreludeFilterProofs)
     putStrLn ("prove filter never increases length: "

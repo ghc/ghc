@@ -73,6 +73,7 @@ test('NativeOpenInstalledMap',
 test('NativeOpenInstalledAppend',
      [only_ways(['normal']),
       extra_files([open_eval_dir + f for f in ['PreludeAppendLengthSource.hs', 'PreludeAppendLengthProof.hs',
+                                               'PreludeMapAppendProof.hs',
                                                'PreludeMapLengthSize.hs', 'PreludeMapLengthSource.hs',
                                                'PreludeMapLengthProof.hs']])],
      run_command, ['bash NativeOpenInstalledAppend.sh "{compiler}" "{libdir}"'])
