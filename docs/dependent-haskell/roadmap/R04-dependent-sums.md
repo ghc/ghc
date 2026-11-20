@@ -156,6 +156,23 @@ and the normal restriction on existential variables and contexts.
 The record selector keeps the checked constructor result type and
 Template Haskell reifies the constructor as a GADT record.
 
+A GADT data constructor field can use the same outer erased binders.
+The constructor can hide one of those binders from its result type.
+A nested sum can use its outer witness for two vectors and a separate
+inner witness for a third vector.
+
+```haskell
+data Nested a where
+    Nested :: (some (n :: Nat) |
+               (Vec a n, (some (m :: Nat) | (Vec a n, Vec a m)))) -> Nested a
+```
+
+This nested field requires `UndecidableInstances`. The generated outer
+family uses the inner family at the same arguments. The constructor field
+pass copies the outer erased binders. A sum that refers to an earlier
+retained constructor argument remains outside this scope.
+[Interface and demand test](../../../testsuite/tests/dependent/should_run/NativeGadtRetainedSum.sh).
+
 Agda's dependent pair uses the stored first component to type the
 second field. The GHC newtype wraps that pair as a whole.
 [Agda's dependent pair](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#the-s-type).

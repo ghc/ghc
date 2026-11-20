@@ -340,9 +340,9 @@ For a constructor field, use the constructor's name and count sums
 from left to right. Use a separate prefix for constructor fields.
 The constructor name is unique in the module even when record labels
 repeat. A Haskell98 field can use the type header's erased variables.
-A GADT newtype field uses the constructor signature's outer binders.
+A GADT constructor field uses the constructor signature's outer binders.
 Use the same free-variable order as rnConDecl for implicit binders.
-Leave the constructor result and any context to ordinary newtype
+Leave the constructor result and any context to ordinary constructor
 checking. Leave inner forall groups to the ordinary renamer.
 
 Copy only the erased parameters used by the sum and the parameters
@@ -353,7 +353,7 @@ at the source occurrence.
 Skip types that contain splices or holes. Do not lift across nested
 binders. They can shadow the original names or bind a retained index.
 -}
--- | Prepare retained sums in top-level signatures and ordinary constructor fields.
+-- | Prepare retained sums in top-level signatures and constructor fields.
 liftDeclarationSums :: Bool -> HsGroup GhcPs -> (HsGroup GhcPs, LiftedDecls)
 liftDeclarationSums named_wildcards group
   | not (null synonyms)
@@ -383,7 +383,7 @@ liftDeclarationSums named_wildcards group
             DataTypeCons False fields ->
               let (fields', lifted) = unzip (map (liftConstructor scope) fields)
               in (DataTypeCons False fields', concat lifted)
-            NewTypeCon con -> first NewTypeCon (liftNewtype scope con)
+            NewTypeCon con -> first NewTypeCon (liftConstructor scope con)
             _ -> (cons, [])
       in (L loc decl{tcdDataDefn = defn{dd_cons = cons'}}, sums)
     liftData decl = (decl, [])
@@ -391,9 +391,7 @@ liftDeclarationSums named_wildcards group
     liftConstructor scope (L loc con@ConDeclH98{con_telescope = [], con_name = owner, con_args = args}) =
       let (args', sums) = liftFields (liftField owner scope) args
       in (L loc con{con_args = args'}, sums)
-    liftConstructor _ con = (con, [])
-
-    liftNewtype _ (L loc con@ConDeclGADT
+    liftConstructor _ (L loc con@ConDeclGADT
       { con_names = names, con_outer_bndrs = L _ outer, con_telescope = telescope
       , con_g_args = args, con_res_ty = result })
       | all without_inner_forall telescope
@@ -408,7 +406,7 @@ liftDeclarationSums named_wildcards group
       where
         without_inner_forall (L _ HsGadtForAll{}) = False
         without_inner_forall _ = True
-    liftNewtype scope con = liftConstructor scope con
+    liftConstructor _ con = (con, [])
 
     liftFields visit (PrefixCon ann fields) =
       first (PrefixCon ann) (liftFieldList visit fields)

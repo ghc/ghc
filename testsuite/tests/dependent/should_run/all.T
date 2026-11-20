@@ -228,6 +228,11 @@ test('NativeScopedSumSignatureReify',
      run_command, ['bash NativeScopedSumSignatureReify.sh "{compiler}" "{libdir}" '
                    + config.ghc_th_way_flags])
 
+test('NativeGadtRetainedSum',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['NativeGadtRetainedSumProvider.hs', 'NativeGadtRetainedSumClient.hs'])],
+     run_command, ['bash NativeGadtRetainedSum.sh "{compiler}" "{libdir}"'])
+
 test('NativeTypeLet',
      [only_ways(['normal']), extra_files([open_eval_dir + 'TypeLet.hs'])],
      run_command, ['bash NativeTypeLet.sh "{compiler}" "{libdir}"'])
