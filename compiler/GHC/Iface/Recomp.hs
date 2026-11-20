@@ -418,7 +418,7 @@ checkVersions hsc_env mod_summary iface self_recomp
             then return $ outOfDateItemBecause SourceFileChanged Nothing else do {
        ; if not (isHomeModule home_unit (mi_module iface))
             then return $ outOfDateItemBecause ThisUnitIdChanged Nothing else do {
-       ; (flags_recomp, check_family_uses) <- checkFlagHash hsc_env iface self_recomp
+       ; (flags_recomp, check_feature_uses) <- checkFlagHash hsc_env iface self_recomp
        ; recomp <- liftIO $ pure flags_recomp
                              `recompThen` checkOptimHash hsc_env self_recomp
                              `recompThen` checkHpcHash hsc_env self_recomp
@@ -447,8 +447,8 @@ checkVersions hsc_env mod_summary iface self_recomp
        ; recomp <- checkList [checkModUsage (hsc_FC hsc_env) u
                              | u <- mi_sr_usages self_recomp]
        ; case recomp of (NeedsRecompile reason) -> return $ OutOfDateItem reason (Just iface) ; _ -> do {
-       ; family_recomp <- check_family_uses
-       ; return $ case family_recomp of
+       ; feature_recomp <- check_feature_uses
+       ; return $ case feature_recomp of
            NeedsRecompile reason -> OutOfDateItem reason Nothing
            UpToDate -> UpToDateItem iface
     }}}}}}}
@@ -552,7 +552,7 @@ checkHie dflags mod_summary =
                  -> needsRecompileBecause HieOutdated
              _ -> UpToDate
 
--- | Check the flags and return the family check to run after normal usage checks.
+-- | Check the flags and return the feature checks to run after normal usage checks.
 -- See Note [Recompiling inferred open family applications].
 checkFlagHash :: HscEnv -> ModIface -> IfaceSelfRecomp
               -> IfG (RecompileRequired, IfG RecompileRequired)
@@ -709,17 +709,16 @@ checkFlagHash hsc_env iface self_recomp = do
       UpToDate | old_fp `notElem` class_default_fps, couldInferClassDefaultSelector iface ->
         liftIO $ recheck "Compiler now infers matchability for associated type defaults"
       _ -> pure retained
-    guarded <- case flags of
-      UpToDate
-        | old_fp `notElem` guarded_fps
-        , backendGeneratesCode (backend dflags)
-        , mi_hsc_src iface == HsSrcFile -> do
-          candidate <- couldExportGuardedListFilter iface
-          if candidate
-            then liftIO $ recheck "Compiler now checks guarded list filters"
-            else pure UpToDate
-      _ -> pure flags
-    let check_family_uses
+    let check_guarded_filter
+          | old_fp `notElem` guarded_fps
+          , backendGeneratesCode (backend dflags)
+          , mi_hsc_src iface == HsSrcFile = do
+              candidate <- couldExportGuardedListFilter (isOneShot (ghcMode dflags)) iface
+              if candidate
+                then liftIO $ recheck "Compiler now checks guarded list filters"
+                else pure UpToDate
+          | otherwise = pure UpToDate
+        check_family_uses
           | old_fp `elem` (staged_fp : class_default_fps) = pure UpToDate
           | otherwise = do
               candidate <- checkStagedMatchability iface (mi_sr_usages self_recomp)
@@ -730,7 +729,7 @@ checkFlagHash hsc_env iface self_recomp = do
           | old_fp `notElem` forwarded_fps, couldForwardFamilyResult iface =
               liftIO $ recheck "Compiler now separates a family result from its kind"
           | otherwise = pure UpToDate
-    pure (guarded, check_family_uses `recompThen` check_forwarded_result)
+    pure (flags, check_guarded_filter `recompThen` check_family_uses `recompThen` check_forwarded_result)
 
 -- | Record the independent selector on an open equation returning its kind family.
 forwardedResultFingerprint :: Fingerprint -> Fingerprint
@@ -981,7 +980,11 @@ the current key do not repeat this check.
 
 -- | Read declarations from the home table or the installed interface file.
 readRecompProvider :: SDoc -> Module -> IfG (Maybe ModIface)
-readRecompProvider reason owner = do
+readRecompProvider reason = readRecompProviderWithBoot reason NotBoot
+
+-- | Read the requested boot or full interface when the home table has no entry.
+readRecompProviderWithBoot :: SDoc -> IsBootInterface -> Module -> IfG (Maybe ModIface)
+readRecompProviderWithBoot reason boot owner = do
   env <- getTopEnv
   liftIO $ lookupHugByModule owner (hsc_HUG env) >>= \case
     Just hmi -> pure (Just (hm_iface hmi))
@@ -989,7 +992,7 @@ readRecompProvider reason owner = do
       RealUnit (Definite uid) -> do
         let installed = mkModule uid (moduleName owner)
         found <- findAndReadIface env reason
-                     installed owner NotBoot
+                     installed owner boot
         pure $ case found of
           Succeeded (provider, _) -> Just provider
           Failed _ -> Nothing
@@ -1282,11 +1285,13 @@ data FilterIfaceType = FilterIfaceType IfaceType [(IfLclName, Either Int FilterI
 
 -- | Check whether an exported signature could have the filter shape.
 -- See Note [Looking through type synonyms for guarded list filters].
-couldExportGuardedListFilter :: ModIface -> IfG Bool
-couldExportGuardedListFilter iface = anyM candidate (mi_decls iface)
+couldExportGuardedListFilter :: Bool -> ModIface -> IfG Bool
+couldExportGuardedListFilter one_shot iface =
+    evalStateT (anyM candidate (mi_decls iface))
+      (mkModuleEnv [(mi_semantic_module iface, decl_index iface)])
   where
     exports = mkNameSet (concatMap availNames (mi_exports iface))
-    local_decls = mkNameEnv (type_declarations iface)
+    boot_deps = mkModDeps (dep_boot_mods (mi_deps iface))
     candidate (_, IfaceId{ifName = n, ifType = ty})
       | n `elemNameSet` exports = isJust <$> runMaybeT (filter_type 0 (FilterIfaceType ty []))
     candidate _ = pure False
@@ -1347,14 +1352,26 @@ couldExportGuardedListFilter iface = anyM candidate (mi_decls iface)
       _ -> pure (Just component)
 
     declaration name = case nameModule_maybe name of
-      Just owner
-        | owner == mi_semantic_module iface -> pure (lookupNameEnv local_decls name)
-        | otherwise -> do
-          provider <- readRecompProvider (text "Checking guarded list filter type") owner
-          pure (provider >>= lookup name . type_declarations)
       Nothing -> pure Nothing
+      Just owner -> do
+        cached <- gets (`lookupModuleEnv` owner)
+        decls <- case cached of
+          Just decls -> pure decls
+          Nothing -> do
+            provider <- lift $ readRecompProviderWithBoot (text "Checking guarded list filter type")
+                                (provider_boot owner) owner
+            let decls = maybe emptyNameEnv decl_index provider
+            modify' (\env -> extendModuleEnv env owner decls)
+            pure decls
+        pure (lookupNameEnv decls name)
 
-    type_declarations provider = concatMap (named_declaration . snd) (mi_decls provider)
+    provider_boot owner
+      | one_shot
+      , Just dep <- lookupInstalledModuleEnv boot_deps (toUnitId <$> owner)
+      = gwib_isBoot dep
+      | otherwise = NotBoot
+
+    decl_index provider = mkNameEnv (concatMap (named_declaration . snd) (mi_decls provider))
     named_declaration decl@IfaceClass{ifBody = IfConcreteClass{ifATs = ats}} =
       (ifName decl, decl) : [(ifName family, family) | IfaceAT family _ <- ats]
     named_declaration decl = [(ifName decl, decl)]
@@ -1365,6 +1382,10 @@ An old interface can store Select a in the type of an exported filter.
 The new compiler must recheck the producer to publish the checked equations.
 Use the local declarations and the ordinary recompilation provider lookup
 to inspect saturated synonyms at the arrow, callback and list positions.
+Check dependencies and usages first. The home table supplies the current
+interface in --make. In one-shot mode, use the recorded boot dependencies
+to choose which file to read. Cache each provider for this check. Re-exports
+keep the original defining Name, so use that Name to choose the provider.
 Keep each argument in its original scope when entering a synonym body.
 Give each quantified variable a distinct binder depth for the element check.
 The presentation-only IfaceType substitution cannot handle every binder.
