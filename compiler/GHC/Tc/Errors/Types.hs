@@ -5361,7 +5361,7 @@ data ExistsPackProblem
   | ExistsPackArguments
   | ExistsPackMissingSchema
   | ExistsPackInvalidSchema !TcType
-  | ExistsPackInvalidKind !Kind
+  | ExistsPackInvalidKind !Kind !Kind
   | ExistsPackInvalidContext
 
 data RetainedQuantificationError

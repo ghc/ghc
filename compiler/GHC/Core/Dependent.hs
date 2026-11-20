@@ -16,7 +16,7 @@ import GHC.Core
 import GHC.Core.Type (isNativeIndexType, isNativeIndexFunctionId, isNativeOpaqueValueId
                      , isNativeRetainedBinder, isNativeIndexDomainConversion)
 import GHC.Core.TyCo.Compare (eqType)
-import GHC.Core.Coercion (coercionLKind, coercionRKind, coercionRole)
+import GHC.Core.Coercion (coercionLKind, coercionRKind, coercionRole, isExistsCoRule)
 import GHC.Core.DataCon (dataConRepType)
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon (TyCon, synTyConRhs_maybe)
@@ -310,7 +310,9 @@ scanCo (GRefl _ ty mco) = scanType ty <> scanMCo mco
 scanCo (TyConAppCo _ _ args) = foldMap scanCo args
 scanCo (AppCo fun arg) = scanCo fun <> scanCo arg
 scanCo (CoVarCo cv) = scanVarKind cv
-scanCo (AxiomCo _ args) = foldMap scanCo args
+scanCo (AxiomCo rule args)
+    | isExistsCoRule rule = NativeScan (pure True)
+    | otherwise = foldMap scanCo args
 scanCo (HoleCo hole) = scanVarKind (coHoleCoVar hole)
 scanCo (SymCo co) = scanCo co
 scanCo (TransCo left right) = scanCo left <> scanCo right

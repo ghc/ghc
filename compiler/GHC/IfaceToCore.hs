@@ -1910,7 +1910,7 @@ tcIfaceType = go
            ; return (TermVarTy v) }
     go (IfaceExistsTy bndr@(name, _) body)
       = bindIfaceTyVar bndr $ \tv -> do
-          check_exists_kind name (text "binder") (varType tv)
+          check_exists_kind name (text "binder kind") (typeKind (varType tv))
           body' <- go body
           check_exists_kind name (text "payload") (typeKind body')
           return (ExistsTy tv body')
@@ -2331,7 +2331,7 @@ tcIfaceExpr (IfacePack schema witness payload)
            failIfM (text "An existential Pack payload must be a term in interface.")
        ; case coreFullView schema' of
            ExistsTy a body
-             | typeKind witness' `eqType` liftedTypeKind
+             | typeKind witness' `eqType` varType a
              , substTyWith [a] [witness'] body `eqType` exprType payload'
              -> return (Pack schema' witness' payload')
            _ -> failIfM (text "Invalid existential Pack in interface.") }
@@ -2344,7 +2344,9 @@ tcIfaceExpr (IfaceUnpack witness@(name, _) value package body)
            ExistsTy a payload_ty ->
              bindIfaceTyVar witness $ \witness' ->
              bindIfaceId value $ \value' ->
-             do { check_exists_kind name (text "Unpack witness") (varType witness')
+             do { valid <- evaluateIfaceValidation (ppr name) (varType witness' `eqType` varType a)
+                ; unless valid $
+                    failIfM (text "Existential Unpack witness kind differs from its package:" <+> ppr name)
                 ; unless (isManyTy (idMult value')
                           && substTyWith [a] [mkTyVarTy witness'] payload_ty `eqType` varType value') $
                     failIfM (text "Invalid existential payload binder in interface.")

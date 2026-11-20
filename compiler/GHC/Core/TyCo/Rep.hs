@@ -258,13 +258,14 @@ data Type
 
 {- Note [Lifted erased existentials]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-ExistsTy a body binds a in body. The binder and body both have kind Type.
+ExistsTy a body binds a in body. The binder kind can be Type or an index
+kind such as Nat. The body must have kind Type.
 The witness has no runtime representation. The package has the same lifted
 representation as its payload. ExistsTy is not a Pi type, so Core type
 application and forall coercion projections cannot eliminate it.
 
-This slice provides type formation only. It adds no term operations or
-coercion forms. See draft GHC proposal #473, alternative Core.
+See Note [Lifting under an erased existential] in GHC.Core.Coercion
+and draft GHC proposal #473, alternative Core.
 -}
 
 {- Note [Restricted retained dependent types]

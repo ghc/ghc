@@ -1116,7 +1116,7 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $ hang (text "After expanding type synonyms, the pattern has no constructor head:")
                                 2 (ppr (coreFullView pat))
     TcRnExistentialBinderKind kind
-      -> mkSimpleDecorated $ hang (text "An explicit existential binder requires kind Type.")
+      -> mkSimpleDecorated $ hang (text "The kind of an explicit existential binder must itself have type Type.")
                                   2 (text "This binder has kind" <+> quotes (ppr kind) <> dot)
     TcRnExistsPack problem -> mkSimpleDecorated $ case problem of
       ExistsPackExtension ->
@@ -1128,8 +1128,8 @@ instance Diagnostic TcRnMessage where
       ExistsPackInvalidSchema ty ->
         hang (text "GHC.Exists.Pack needs an explicit existential type.")
           2 (text "The available type is" <+> quotes (ppr ty) <> dot)
-      ExistsPackInvalidKind kind ->
-        hang (text "The kind argument to GHC.Exists.Pack must be Type.")
+      ExistsPackInvalidKind kind expected ->
+        hang (text "The kind argument to GHC.Exists.Pack must match the witness kind" <+> quotes (ppr expected) <> dot)
           2 (text "The argument is" <+> quotes (ppr kind) <> dot)
       ExistsPackInvalidContext ->
         text "Use GHC.Exists.Pack in an explicit existential application or a sole case alternative with a fresh type variable and a payload pattern."

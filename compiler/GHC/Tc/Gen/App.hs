@@ -551,20 +551,29 @@ tcExistsPack rn_expr args expected
       EWrap (EPar _) -> False
       _ -> True
 
-    read_schema = do { mb_ty <- readExpType_maybe expected
-                     ; case mb_ty of
-                         Just ty -> liftZonkM (zonkTcType ty)
-                         Nothing -> failWithTc (TcRnExistsPack ExistsPackMissingSchema) }
+    expected_schema = traverse (liftZonkM . zonkTcType) =<< readExpType_maybe expected
+    read_schema = expected_schema >>= maybe (failWithTc (TcRnExistsPack ExistsPackMissingSchema)) return
 
     check_schema [] = read_schema
-    check_schema [arg] = do { ty <- tcHsTypeApp arg liftedTypeKind
-                            ; if eqType ty liftedTypeKind then read_schema else return ty }
+    check_schema [arg] = do
+      ty <- tcHsTypeApp arg liftedTypeKind
+      case coreFullView ty of
+        ExistsTy{} -> return ty
+        _ -> do
+          mb_schema <- expected_schema
+          case mb_schema of
+            Just schema | ExistsTy{} <- coreFullView schema -> check_kind ty schema
+            _ | eqType ty liftedTypeKind -> read_schema
+              | otherwise -> return ty
     check_schema [kind, schema] =
       do { k <- tcHsTypeApp kind liftedTypeKind
-         ; unless (eqType k liftedTypeKind) $
-             failWithTc (TcRnExistsPack (ExistsPackInvalidKind k))
-         ; tcHsTypeApp schema liftedTypeKind }
+         ; ty <- tcHsTypeApp schema liftedTypeKind
+         ; check_kind k ty }
     check_schema _ = failWithTc (TcRnExistsPack ExistsPackArguments)
+    check_kind k schema = case coreFullView schema of
+      ExistsTy binder _ | not (eqType k (tyVarKind binder)) ->
+        failWithTc (TcRnExistsPack (ExistsPackInvalidKind k (tyVarKind binder)))
+      _ -> return schema
 
 {- Note [Checking explicit existential packages]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -572,8 +581,9 @@ Recognize Pack by its resolved name in base. A constructor named Pack in a
 different unit or module uses ordinary application checking.
 
 The existential schema determines the type of the payload. Read it from an
-explicit type argument or the expected result type. For the supported Type
-binder a single type argument of Type supplies just the optional kind. Check
+explicit type argument or the expected result type. A single visible argument
+can be the schema or its witness kind. Check the kind against the expected
+package. With two visible arguments the second gives the schema. Check
 the witness with the required type argument translation used by tcVDQ. Check
 the payload at the instantiated body type. Keep the schema and witness for
 Core Lint. CoreToStg erases both and keeps the payload's demand.

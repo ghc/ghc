@@ -1,9 +1,9 @@
-{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ExplicitNamespaces #-}
 
 module Main (main) where
 
 import Control.Exception (IOException, SomeException, displayException, evaluate, try)
-import Control.Monad (unless, void)
+import Control.Monad (forM_, unless, void)
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.Array as A
 import qualified Data.IntMap.Strict as IM
@@ -11,12 +11,15 @@ import Data.List (isInfixOf)
 import Data.Maybe (isJust, isNothing)
 import GHC hiding (typeKind)
 import GHC.Builtin.WiredIn.Types
-    (boolTy, constraintKind, eqTyCon, liftedTypeKind, manyDataConTy, maybeTyCon, promotedFalseDataCon,
+    (boolTy, constraintKind, eqTyCon, liftedTypeKind, manyDataConTy, maybeTyCon, mkBoxedTupleTy, promotedFalseDataCon,
      unmatchableDataConTy)
-import GHC.Core (Expr (Lam, Var))
+import GHC.Core (Expr (Coercion, Lam, Var))
+import GHC.Core.Coercion (coercionLKind, coercionRKind, coercionRole, existsCoRule, liftCoSubst, mkCoVarCo, mkLiftingContext, mkNomReflCo)
+import GHC.Core.Coercion.Axiom (Role(..))
 import GHC.Core.Lint (lintExpr)
+import GHC.Core.Predicate (mkNomEqPred, mkReprEqPred)
 import GHC.Core.TyCo.Compare (eqType, nonDetCmpType)
-import GHC.Core.TyCo.Rep (Type (..))
+import GHC.Core.TyCo.Rep (Coercion(AxiomCo), Type (..))
 import GHC.Core.Type (isForAllTy, mkTyConApp, substTyWith, typeKind, tyCoVarsOfType)
 import GHC.Core.Unify (tcMatchTy, tcUnifyTy, typesCantMatch)
 import GHC.CoreToIface (toIfaceType)
@@ -34,12 +37,12 @@ import GHC.Iface.Syntax (IfaceDecl (IfaceId), IfaceIdDetails (IfVanillaId), ifNa
 import GHC.IfaceToCore (typecheckIface)
 import GHC.Tc.Utils.Monad (initIfaceLoad)
 import GHC.Types.Id (mkSysLocal)
-import GHC.Types.Name (mkExternalName, mkSysTvName)
+import GHC.Types.Name (mkExternalName, mkSysTvName, mkSystemName)
 import GHC.Types.Name.Occurrence (mkVarOcc)
 import GHC.Types.SrcLoc (noSrcSpan)
 import GHC.Types.TypeEnv (lookupTypeEnv)
 import GHC.Types.Unique.Supply (mkSplitUniqSupplyGrimily, uniqsFromSupply)
-import GHC.Types.Var (TyVar, mkTyVar, varType, VarBndr (Bndr), pattern Specified)
+import GHC.Types.Var (TyVar, mkCoVar, mkTyVar, varType, VarBndr (Bndr), data Specified)
 import GHC.Types.Var.Set (elemVarSet, isEmptyVarSet)
 import GHC.Unit.Module (mkModule)
 import GHC.Unit.Module.ModDetails (md_types)
@@ -67,11 +70,11 @@ verify :: FilePath -> HscEnv -> IO ()
 verify interfacePath env = do
     us <- uniqsFromSupply <$> mkSplitUniqSupplyGrimily 'p'
     let fresh u n = mkTyVar (mkSysTvName u (fsLit n))
-        ua : ub : uc : bad : dict : v : top : _ = us
+        ua : ub : uc : bad : dict : v : top : uWitness : uProof : _ = us
         a = fresh ua "a" liftedTypeKind
         b = fresh ub "b" liftedTypeKind
         c = fresh uc "c" liftedTypeKind
-        badBinder = fresh bad "bad" boolTy
+        badBinder = fresh bad "bad" (mkTyConApp promotedFalseDataCon [])
         dictBinder = fresh dict "dictionary" constraintKind
         dictPayload = mkTyConApp eqTyCon [liftedTypeKind, boolTy, boolTy]
         free = mkTyConApp maybeTyCon [TyVarTy c]
@@ -105,14 +108,32 @@ verify interfacePath env = do
     let known = fixture a (mkTyConApp maybeTyCon [boolTy])
     assert "opaque existential matching solved through the body" $
         isNothing (tcMatchTy open known) && not (typesCantMatch [(open, known)])
-    assert "Core Lint accepted a Constraint binder" $
-        not (lints (fixture dictBinder (mkTyConApp maybeTyCon [boolTy])))
+    assert "Core Lint rejected an erased witness of kind Constraint" $
+        lints (fixture dictBinder (mkTyConApp maybeTyCon [boolTy]))
     assert "Core Lint accepted a Constraint payload" $
         not (lints (fixture a dictPayload))
     assert "Core Lint accepted the wrong existential binder kind" $
         not (lints (fixture badBinder abstract))
     assert "Core Lint accepted the wrong payload kind" $
         not (lints (fixture a (mkTyConApp promotedFalseDataCon [])))
+
+    let hidden = fresh uWitness "hidden" liftedTypeKind
+        packed x = fixture hidden (mkBoxedTupleTy [TyVarTy x, TyVarTy hidden])
+        wellScoped scope co = isNothing (lintExpr (initLintConfig (hsc_dflags env) scope) (Coercion co))
+    forM_ [(Nominal, mkNomEqPred), (Representational, mkReprEqPred)] $ \(role, predicate) -> do
+        let cv = mkCoVar (mkSystemName uProof (mkVarOcc "given")) (predicate (TyVarTy a) (TyVarTy b))
+            co = liftCoSubst role (mkLiftingContext [(c, mkCoVarCo cv)]) (packed c)
+            scope = [a, b, cv]
+        assert "existential lifting changed the role or endpoints"
+            (coercionRole co == role && coercionLKind co `eqType` packed a && coercionRKind co `eqType` packed b)
+        assert "Core Lint rejected the lifted existential evidence" (wellScoped scope co)
+        case co of
+            AxiomCo _ [premise] | role == Representational ->
+                assert "representational evidence yielded nominal existential equality"
+                    (not (wellScoped scope (AxiomCo (snd (existsCoRule Nominal)) [premise])))
+            _ -> pure ()
+    assert "a non-universal premise yielded existential equality"
+        (not (wellScoped [] (AxiomCo (snd (existsCoRule Nominal)) [mkNomReflCo boolTy])))
 
     let mdl = mkModule mainUnit (mkModuleName "ExistentialSignature")
         nm = mkExternalName top mdl (mkVarOcc "value") noSrcSpan
@@ -163,7 +184,7 @@ verify interfacePath env = do
             case (outcome :: Either SomeException Type) of
               Left _ -> putStrLn ("rejected malformed interface " ++ suffix)
               Right _ -> fail ("accepted malformed interface " ++ suffix)
-    reject ".binder" (toIfaceType (fixture dictBinder (mkTyConApp maybeTyCon [boolTy])))
+    reject ".binder" (toIfaceType (fixture badBinder (mkTyConApp maybeTyCon [boolTy])))
     reject ".payload" (toIfaceType (fixture a dictPayload))
     let scopeName = mkIfLclName (fsLit "selfKind")
         external = mkIfLclName (fsLit "missingPayloadBinder")
