@@ -33,11 +33,12 @@ determines that the first has type `forall a. a -> a`. A consumer can write
 the error identifies both the use and the pattern that opened the package.
 [Callback example](examples/erased-existentials/RankedPackage.hs).
 
-A library can export the optimization rule `open (hide x) = x` for an
-erased package. At default `-O1`, the rule fires in the provider and in a
-client compiled from its interface. The client returns the stored value
-and preserves the behavior of a demanded or ignored exception.
-[Rule and provider](examples/erased-existentials/PackageRules.hs).
+A library can export optimizer rules that construct or open an erased
+package. For example, a rule for `readHidden (x, k) = k x` with
+`x :: Int` fires for an integer package. A package that holds a `Bool`
+keeps its own callback. Both the provider and a client compiled from
+its interface fire all four example rules at default `-O1` and `-O2`.
+[Rules and provider](examples/erased-existentials/LexicalPackageRules.hs).
 
 A stream can hide its state in an ordinary tuple with its step function.
 The same consumer reads a list-backed stream and an integer stream that
@@ -58,7 +59,15 @@ constructor `'Just` and the type of a runtime callback.
 [Interpreter](examples/open-evaluation/InterpretedKind.hs) and
 [callback client](examples/open-evaluation/LegacyKindArgument.hs).
 
-The 301-line Showcase includes a constructor match at an open family
+The 302-line Showcase adds `(4,3,6)` from the package rules. Both
+compiler stages reproduce every line at `-O0`, default `-O1` and
+default `-O2`. The self-hosted compiler also reproduces it in GHCi.
+The Core matcher rejects substitutions that would capture an opened
+witness or payload. The preceding compiler can still use older-style
+rules from a new interface at each of the three compression levels.
+[Showcase](Showcase.hs) and [interface check](examples/erased-existentials/check-rule-interfaces.sh).
+
+The preceding 301-line Showcase includes a constructor match at an open family
 index and a packaged lambda whose hidden witness is polymorphic.
 Both compiler stages reproduce the expected output at `-O0`. The
 self-hosted compiler also reproduces it in GHCi and at default `-O2`.
@@ -95,7 +104,7 @@ the header. The new reader checks the coercion's role and scope.
 | Card | What works | Remaining gap |
 | --- | --- | --- |
 | [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | Haskell98 and GADT-style newtypes can wrap a retained length and a vector at that length. The GADT constructor can bind the element type in its own signature. | Broaden dependent product domains and inference. Extend retained field checking to more constructor signatures. |
-| [R05 dependent Core](roadmap/R05-dependent-core.md) | The standard `-O2` pipeline specializes a recursive consumer and keeps retained case proofs scoped. A provider and an interface-only client can both apply a source rule over erased package types. | Check lexical package operations inside rules and broaden coercion support. |
+| [R05 dependent Core](roadmap/R05-dependent-core.md) | The standard `-O2` pipeline specializes a recursive consumer and keeps retained case proofs scoped. A provider and an interface-only client can match rules that construct or open an erased package. | Support orphan rules, retained function rules and more dependent coercions. |
 | [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The integrated Showcase checks a mapper’s cons rule on an unknown tail and composes two checked traversals. Observing the result constructor leaves the inner callback lazy. | General open evaluation across arbitrary ordinary definitions. |
 | [R19 type-level cases](roadmap/R19-type-level-cases.md) | A constructor match can refine the kinds of later indices using checked nominal equalities. An ordinary constructor can match at an open GADT index. An unknown head or field can still block a later row. | Check source annotations that capture a parameter under a noninjective index family. |
 | [R22 erased existentials](roadmap/R22-existential-quantification.md) | Ordinary function equations can open payload constructors. Quick Look can infer a whole package as a type argument. A typed callback can determine the polymorphic witness for an adjacent field. The declared result of a lambda body can supply the witness before its patterns are checked. | Extend witness inference to other expressions. Direct cases on a packaged function's result can still need a typed consumer. |
@@ -114,9 +123,10 @@ source examples. General promotion remains open.
 
 ## Current work queue
 
-1. **R05.** Extend rule matching to source rules that construct or open
-   an erased package. Check substitution and witness scope on both sides.
-   [Three source cases](roadmap/R05-dependent-core.md#lexical-package-operations-in-user-rules).
+1. **R05.** Extend source rule support to orphan rules and rules over
+   retained functions. Both currently report GHC-51063. Preserve the
+   witness-scope checks used for erased packages.
+   [Current rule support](roadmap/R05-dependent-core.md#lexical-package-operations-in-user-rules).
 2. **R23.** Restore the unchanged `GADTSingletons` program. Check the
    arrow synonym and the `PromoteX` and `DemoteX` equations separately.
    Keep the explicit matchability and noninjective equality checks.
