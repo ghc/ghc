@@ -1638,21 +1638,34 @@ implicitResult :: HsExpr GhcRn -> TcRhoType -> ExpRhoType
 implicitResult rn_expr actual expected@(Check wanted)
   | ExistsTy ImplicitExists _ _ <- coreFullView wanted
   = do { payload <- liftZonkM (zonkTcType actual)
+       ; schema <- liftZonkM (zonkTcType wanted)
+       ; impred <- xoptM LangExt.ImpredicativeTypes
+       ; ds_flag <- getDeepSubsumptionFlag
+       ; let quick = impred && supportsQuickLookType schema && supportsQuickLookType payload
+                            && noQuickLookVars schema && noQuickLookVars payload
        ; case coreFullView payload of
-           TyConApp{} -> pack payload wanted
-           AppTy{} -> pack payload wanted
-           FunTy{} -> pack payload wanted
+           TyConApp{} -> pack quick payload schema
+           AppTy{} -> pack quick payload schema
+           FunTy{} | Deep{} <- ds_flag -> pack False payload schema
+                   | otherwise         -> pack quick payload schema
            _ -> return (expected, id) }
   where
-    pack payload schema
+    pack quick payload schema
       | ExistsTy ImplicitExists binder body <- coreFullView schema
-      = do { retained <- runMaybeT $
-               matchRetainedExistsWitness (exprCtOrigin rn_expr) binder body payload
-           ; witness <- maybe (newFlexiTyVarTy (tyVarKind binder)) return retained
+      = do { witness <- if quick
+               then newMetaTyVarTyAtLevel QLInstVar (tyVarKind binder)
+               else do { retained <- runMaybeT $
+                           matchRetainedExistsWitness (exprCtOrigin rn_expr) binder body payload
+                       ; maybe (newFlexiTyVarTy (tyVarKind binder)) return retained }
            ; let payload_ty = substTyWith [binder] [witness] body
-           ; (expected', inner) <- pack payload payload_ty
+           ; (expected', inner) <- pack quick payload payload_ty
+           ; when quick $
+               do { rejectNativeQuickLook witness
+                  ; liftZonkM (qlMonoTcType witness) }
            ; return (expected', \expr -> XExpr (NativeExistsPack schema witness (noLocA (inner expr)))) }
-      | otherwise = return (mkCheckExpType schema, id)
+      | otherwise
+      = do { when quick (qlUnify schema payload)
+           ; return (mkCheckExpType schema, id) }
 implicitResult _ _ expected = return (expected, id)
 
 -- | Match a stored index without assigning its local Id to a metavariable.
@@ -1679,6 +1692,28 @@ Choose a witness for each consecutive dot binder in order. Substitute
 each witness through the remaining schema before checking the next binder
 kind. Check the final payload once and pack it from the inside out.
 See Elab-Gen in An Existential Crisis Resolved.
+
+With ImpredicativeTypes the witness itself can be a polytype. For
+`exists t. Box t`, a payload of type `Box (forall a. a -> a)` determines
+that full type as the witness. Follow GenImpredicative in Figure 10 of the
+paper. Allocate the instantiation variables in telescope order, then
+Quick Look unifies the final payload type with the application's type.
+The fresh variables are local to this check. Monomorphise each one on
+the way out, including witnesses absent from the payload. Check the
+zonked witness before traversing it. finishAppWithCache still checks
+the actual result type against the instantiated payload.
+
+Use this path for types and coercions supported by Quick Look when the
+inputs have no free Quick Look variables. Other packages use ordinary
+witness inference. See Note [Retained types and Quick Look].
+
+Quick Look assumes an invariant function arrow (section 5.8 of its paper).
+With DeepSubsumption the domain and result of an outer arrow can need
+different subsumption checks. For example, a payload of type
+`((forall a. a) -> Bool) -> Int` fits `exists t. (t -> Bool) -> t`
+at t = Int. Equating the domains first would fix t to the polytype.
+Use ordinary witness inference for outer arrows in this mode. Type
+constructor applications still compare their arguments for equality.
 
 Usually the solver can fill a fresh witness metavariable. A payload that
 already mentions a retained index needs an immutable choice instead.
