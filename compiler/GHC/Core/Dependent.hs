@@ -258,7 +258,7 @@ scanType (TyVarTy tv) = scanVarKind tv
 scanType (TermVarTy v) =
     gentleForm (NativeScan (pure (not (isNativeOpaqueValueId v))) <> scanVarKind v)
 scanType (TermAppTy f arg) = gentleForm (scanCallHead f <> scanType arg)
-scanType (ExistsTy v body) = scanVarKind v <> scanType body
+scanType ExistsTy{} = NativeScan (pure True)
 scanType (DepFunTy _ b body) =
     gentleForm (scanRetainedIndex b <> scanType body)
 scanType (LitTy _) = mempty
