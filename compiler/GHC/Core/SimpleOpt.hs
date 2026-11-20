@@ -545,6 +545,23 @@ simple_opt_expr env expr = go expr
     go (Tick tickish e) = mkTick (substTickish subst tickish) (go e)
     go (Pack schema witness payload) =
       Pack (substTyUnchecked subst schema) (substTyUnchecked subst witness) (go payload)
+    go (Unpack witness payload (Pack _ witness_ty actual) body)
+      | soe_native env
+      , isTyVar witness
+      , canDropNativeLocalBinding payload
+      , let witness_ty' = substTyUnchecked subst witness_ty
+      , typeKind witness_ty' `eqType` substTyUnchecked subst (varType witness)
+      , let env_witness = env { soe_subst = extendTvSubst subst witness witness_ty' }
+      , let payload_ty = substTyUnchecked (soe_subst env_witness) (idType payload)
+      , payload_ty `eqType` substTyUnchecked subst (exprType actual)
+      , let result_fvs = tyCoVarsOfType (exprType body)
+      , not (witness `elemVarSet` result_fvs || payload `elemVarSet` result_fvs)
+      -- See Note [Simplifying an adjacent existential package].
+      = if payload `elemVarSet` exprFreeVars body
+        then let (env_body, binding) =
+                   simple_out_bind NotTopLevel env_witness (zapIdUnfolding payload, go actual)
+             in wrapLet binding (simple_opt_expr env_body body)
+        else simple_opt_expr env_witness body
     go (Unpack witness payload package body) =
       let (env_witness, witness') = subst_opt_bndr env witness
           (env_body, payload') = subst_opt_bndr env_witness payload
@@ -617,6 +634,24 @@ simple_opt_expr env expr = go expr
       = Alt con bndrs' (simple_opt_expr env' rhs)
       where
         (env', bndrs') = subst_opt_bndrs env bndrs
+
+{- Note [Simplifying an adjacent existential package]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Unpack binds the payload lazily. Substitute the witness of a syntactic
+Pack and bind its value in a lifted, unrestricted let. The let preserves
+sharing and lets the body ignore a bottom payload.
+
+Substitute the packed witness and simplify the actual value in the
+outer environment. Only the body sees the opened binders. Check the
+witness kind and the substituted payload type. Require a result type
+independent of both opened binders. Use the ordinary local binder
+substitution to avoid capture. Clear any case binder unfolding.
+Omit the let when the payload has no free occurrence in the body or
+its annotations. The body can still use the type witness.
+
+See Note [Erasing a lexical existential] in GHC.CoreToStg for the
+general erasure rule.
+-}
 
 ----------------------
 {- Note [Native adjacent constructor cases]
