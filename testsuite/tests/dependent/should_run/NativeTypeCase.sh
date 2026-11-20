@@ -248,12 +248,31 @@ cp NativeTypeCaseRetainedField.hi interfaces/
     cat >NativeTypeCaseRetainedFieldClient.hs <<'HS'
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
 module Main where
+import Control.Exception (ErrorCall(..), evaluate, try)
 import Control.Monad (forM_)
 import Data.IORef
 import NativeTypeCaseRetainedField
 
 pick :: Bool -> RetainedField -> String
-pick b (RetainedField f) = if b then show (f True :: Int) else [f False]
+pick b (RetainedField f) = case b of
+  True -> show (f b :: Int)
+  False -> [f b]
+
+guarded :: Bool -> Bool -> RetainedField -> String
+guarded b enabled (RetainedField f) = case b of
+  True | enabled -> show (f True :: Int)
+  True -> "fallthrough"
+  False -> [f False]
+
+sameType :: a -> a -> String
+sameType _ _ = "same"
+
+cachedResult :: Bool -> RetainedField -> String
+cachedResult b (RetainedField f) =
+  let cached = f b
+  in case b of
+    True -> sameType cached (f b)
+    False -> "unused"
 
 closed :: Bool -> ClosedField -> Int
 closed b (ClosedField f) = f b
@@ -270,11 +289,14 @@ main = do
     value <- readIORef input
     print (pick value selected, closed value constant)
   print (readStored stored)
+  print (guarded True False selected, cachedResult True selected)
+  result <- try (evaluate (pick (error "strict scrutinee") selected)) :: IO (Either ErrorCall String)
+  print (either (\(ErrorCall message) -> message == "strict scrutinee") (const False) result)
 HS
     "${g[@]}" -c NativeTypeCaseRetainedFieldClient.hs
     "${g[@]}" NativeTypeCaseRetainedFieldClient.o ../NativeTypeCaseRetainedField.o -o run-retained-field
     ./run-retained-field >retained-field.out
-    printf '("x",23)\n("11",11)\n23\n' | diff -u - retained-field.out
+    printf '("x",23)\n("11",11)\n23\n("fallthrough","same")\nTrue\n' | diff -u - retained-field.out
 
     cat >BadRetainedField.hs <<'HS'
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
@@ -286,9 +308,22 @@ wrong (RetainedField f) = f True
 
 neutral :: Bool -> RetainedField -> Int
 neutral b (RetainedField f) = f b
+
+unrelated :: Bool -> Bool -> RetainedField -> String
+unrelated b other (RetainedField f) = case b of
+  True -> show (f other :: Int)
+  False -> [f b]
+
+guarded :: Bool -> Bool -> RetainedField -> String
+guarded b enabled (RetainedField f) = case b of
+  True | enabled -> show (f b :: Int)
+  True -> "fallthrough"
+  False -> [f False]
 HS
     reject BadRetainedField 6:27 '[GHC-83865]'
     grep -Fq 'BadRetainedField.hs:9:31: error: [GHC-83865]' bad.log
+    grep -Fq 'BadRetainedField.hs:13:17: error: [GHC-05617]' bad.log
+    grep -Fq 'BadRetainedField.hs:18:27: error: [GHC-83865]' bad.log
     grep -Fq 'the type case in a field of' bad.log
 )
 

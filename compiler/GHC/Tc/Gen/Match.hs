@@ -72,7 +72,7 @@ import GHC.Core.TyCo.Rep ( Type(DepFunTy, ExistsTy, FunTy, TermVarTy, TermAppTy,
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Type ( coreFullView, isManyTy, splitTyConApp_maybe
                      , anyFreeVarsOfType, typeKind, isNativeIndexFunctionId, isNativeOpaqueValueId
-                     , nativeIndexDataConTyArgs, splitFunTy_maybe, substTyWith )
+                     , isNativeIndexId, nativeIndexDataConTyArgs, splitFunTy_maybe, substTyWith )
 import GHC.Core.Coercion ( MCoercion(MRefl), mkCoVarCo, mkCoCast
                          , mkSymCo, mkSubCo, coercionKind, coercionLKind
                          , mkTransCo, mkNomReflCo, mkRepReflCo, mkDepFunCoWithVis )
@@ -96,8 +96,10 @@ import GHC.Builtin.WiredIn.Prim
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
+import GHC.Utils.Monad (anyM)
 
 import GHC.Types.Name
+import GHC.Types.Name.Env (anyNameEnv)
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Set
 import GHC.Types.Id
@@ -413,13 +415,24 @@ hasRetainedFunTy ty = case coreFullView ty of
 
 -- | Elaborate a checked dependent case through a retained pattern function.
 -- See Note [Source retained case refinement].
-tcRetainedCase :: Id -> MatchGroup GhcRn (LHsExpr GhcRn) -> ExpRhoType
+tcRetainedCase :: Bool -> Id -> MatchGroup GhcRn (LHsExpr GhcRn) -> ExpRhoType
                -> TcM (Maybe (HsExpr GhcTc))
-tcRetainedCase _ (MG { mg_alts = L _ [] }) _ = return Nothing
-tcRetainedCase index matches@(MG { mg_alts = L loc alternatives }) (Check result_ty)
-  = do { captures <- fmap catMaybes $ mapM capture (nameSetElemsStable (retainedCaseNames matches))
-       ; givens <- filter (depends . varType) . tcl_native_givens . tcl_lcl_ctxt <$> getLclEnv
-       ; if null captures && null givens && not (depends result_ty)
+tcRetainedCase _ _ (MG { mg_alts = L _ [] }) _ = return Nothing
+tcRetainedCase dependent index matches@(MG { mg_alts = L loc alternatives }) (Check result_ty)
+  = do { captures <- if dependent
+                     then do { vars <- dependent_captures
+                             ; mapM_ check_capture vars
+                             ; return vars }
+                     else return []
+       ; givens <- if dependent then dependent_givens else return []
+       ; let explicit = dependent &&
+               (not (null captures) || not (null givens) || depends result_ty)
+       ; application <- if explicit || not (isTauTy result_ty)
+                           || not (isLiftedTypeKind (typeKind result_ty))
+                           || anyFreeVarsOfType (const True) result_ty
+                         then return False
+                         else use_application
+       ; if not (explicit || application)
          then return Nothing
          else setSrcSpanA loc $
            do { when (retainedCaseHasQuote matches) $
@@ -444,8 +457,11 @@ tcRetainedCase index matches@(MG { mg_alts = L loc alternatives }) (Check result
                     add_arguments (L match_loc match@(Match { m_pats = L pats_loc pats }), (con, fields))
                       = let extra = map (noLocA . VarPat noExtField . noLocA) names
                             subject_pats = map (bindRetainedConFields fields) pats
-                            rewritten = rewriteRetainedCase (idName index) con fields capture_names match
-                        in L match_loc (rewritten { m_ctxt = LamAlt LamSingle
+                            rewritten | application = match
+                                      | otherwise = rewriteRetainedCase (idName index) con fields capture_names match
+                            ctxt | application = m_ctxt match
+                                 | otherwise = LamAlt LamSingle
+                        in L match_loc (rewritten { m_ctxt = ctxt
                                                   , m_pats = L pats_loc (subject_pats ++ extra) })
                     matches' = matches { mg_alts = L loc (map add_arguments (zip alternatives constructors)) }
                     dictionary_tys = map (mkCheckExpFunPatTy . Scaled ManyTy . varType) dictionaries
@@ -453,8 +469,13 @@ tcRetainedCase index matches@(MG { mg_alts = L loc alternatives }) (Check result
                     arg_tys = dictionary_tys ++ capture_tys
                     argument_plan = map RetainedConDict dictionaries
                                     ++ map (const RetainedConValue) captures
-              ; checked <- tcRetainedConMatches fresh_index [] arg_tys argument_plan
+              ; let check = tcRetainedConMatches fresh_index [] arg_tys argument_plan
                              (mkCheckExpType (generalize result_ty)) matches'
+              ; checked <- if application
+                           then tcCheckUsage (idName fresh_index) ManyTy $
+                               tcExtendIdEnv2 [(idName index, fresh_index)
+                                              , (idName fresh_index, fresh_index)] check
+                           else check
               ; mapM_ (tcEmitBindingUsage . singleUsageUE) captures
               ; let fun = HsLam noAnn LamSingle checked
                     index_arg = noLocA (HsVar noExtField (noLocA index))
@@ -464,15 +485,50 @@ tcRetainedCase index matches@(MG { mg_alts = L loc alternatives }) (Check result
               ; return (Just (foldl' (\f a -> HsApp noExtField (noLocA f) a) with_evidence arguments)) } }
   where
     depends = anyFreeVarsOfType (== index)
+
+    use_application
+      = do { worker_in_scope <- anyNameEnv retained_worker <$> getLclTypeEnv
+           ; if not worker_in_scope || not (dependent || isNativeIndexId index)
+             then return False
+             else do { complete <- completeRetainedCaseRows (varType index) alternatives
+                     ; known <- if complete
+                                then hasRetainedApplication known_local_app matches
+                                else return False
+                     ; if not known || retainedCaseHasQuote matches
+                       then return False
+                       else if dependent
+                            then return True
+                            else (&&) <$> (null <$> dependent_captures)
+                                      <*> (null <$> dependent_givens) } }
+
+    retained_worker (ATcId { tct_id = worker })
+      | DepFunTy DepFunVisible binder body <- coreFullView (varType worker)
+      , varType binder `eqType` varType index
+      = anyFreeVarsOfType (== binder) body
+    retained_worker _ = False
+
+    known_local_app (HsApp _ fun arg)
+      | HsVar _ (L _ (WithUserRdr _ worker_name)) <- unLoc (stripParensLHsExpr fun)
+      , HsVar _ (L _ (WithUserRdr _ argument_name)) <- unLoc (stripParensLHsExpr arg)
+      , argument_name == idName index
+      = maybe False retained_worker <$> tcLookupLcl_maybe worker_name
+    known_local_app _ = return False
+
+    dependent_captures = fmap catMaybes $
+      mapM capture (nameSetElemsStable (retainedCaseNames matches))
+    dependent_givens =
+      filter (depends . varType) . tcl_native_givens . tcl_lcl_ctxt <$> getLclEnv
+
     capture name
       = do { thing <- tcLookupLcl_maybe name
            ; case thing of
                Just (ATcId { tct_id = var })
-                 | isLocalId var, not (isCoVar var), depends (varType var) ->
-                   do { unless (isManyTy (idMult var)) $
-                          failWithTc (TcRnRetainedQuantificationError (RetainedPatternType (varType var)))
-                      ; return (Just var) }
+                 | isLocalId var, not (isCoVar var), depends (varType var)
+                 -> return (Just var)
                _ -> return Nothing }
+    check_capture var = unless (isManyTy (idMult var)) $
+      failWithTc (TcRnRetainedQuantificationError (RetainedPatternType (varType var)))
+
     constructor (L match_loc (Match { m_pats = L _ [pat]
                                    , m_grhss = GRHSs { grhssGRHSs = L _ (GRHS _ [] _) :| [] } }))
       = setSrcSpanA match_loc $
@@ -487,7 +543,7 @@ tcRetainedCase index matches@(MG { mg_alts = L loc alternatives }) (Check result
       _ -> False
     case_error :: TcM a
     case_error = failWithTc (TcRnRetainedQuantificationError RetainedCasePatterns)
-tcRetainedCase _ _ _ = return Nothing
+tcRetainedCase _ _ _ _ = return Nothing
 
 -- | Refine a checked opaque call through a strict alias and a retained motive.
 -- See Note [Source opaque call refinement].
@@ -506,7 +562,7 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
        ; metadata_trigger <- if existing_trigger || retainedCaseHasQuote matches
                              then return False
                              else do { complete <- complete_constructor_rows
-                                     ; if complete then known_application matches
+                                     ; if complete then hasRetainedApplication named_application matches
                                        else return False }
        ; if not (existing_trigger || metadata_trigger)
          then return Nothing
@@ -667,53 +723,7 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
     call_names :: [Name]
     call_names = map getName (tyCoVarsOfTypeList call_ty)
 
-    -- | Decline unsupported ordinary cases without adding a new diagnostic.
-    complete_constructor_rows :: TcM Bool
-    complete_constructor_rows
-      = do { rows <- mapM row_constructor alternatives
-           ; let expected = case splitTyConApp_maybe (coreFullView domain) of
-                   Just (tc, _) -> tyConDataCons tc
-                   _ -> []
-           ; return $ case sequence rows of
-               Just cons -> not (null cons) && cons `equalLength` expected
-                            && all (`elem` cons) expected
-               Nothing -> False }
-      where
-        row_constructor (L _ (Match { m_pats = L _ [pat]
-                                    , m_grhss = GRHSs { grhssGRHSs = L _ (GRHS _ [] _) :| [] } }))
-          = pattern_constructor pat
-        row_constructor _ = return Nothing
-        pattern_constructor pat = case unLoc (retainedConPat pat) of
-          ParPat _ inner -> pattern_constructor inner
-          ConPat { pat_con = L _ name, pat_args = PrefixCon _ fields }
-            | all isRetainedVarPat fields
-            -> do { con_like <- tcLookupConLike name
-                  ; return $ case con_like of
-                      RealDataCon con
-                        | Just _ <- nativeIndexDataConTyArgs domain con
-                        , fields `lengthIs` dataConSourceArity con -> Just con
-                      _ -> Nothing }
-          _ -> return Nothing
-
-    -- | Inspect existing checked worker types without elaborating source values.
-    known_application :: Data a => a -> TcM Bool
-    known_application thing
-      | Just expr <- (cast thing :: Maybe (HsExpr GhcRn))
-      = case expr of
-          HsTypedBracket{} -> return False
-          HsUntypedBracket{} -> return False
-          HsTypedSplice{} -> return False
-          HsUntypedSplice{} -> return False
-          XExpr{} -> return False
-          HsApp{} -> do { found <- named_application expr
-                        ; if found then return True else children }
-          _ -> children
-      | Just _ <- (cast thing :: Maybe Name) = return False
-      | Just _ <- (cast thing :: Maybe NameSet) = return False
-      | Just _ <- (cast thing :: Maybe Type) = return False
-      | otherwise = children
-      where
-        children = or <$> sequence (gmapQ known_application thing)
+    complete_constructor_rows = completeRetainedCaseRows domain alternatives
 
     -- | Open only the existing retained telescope of a known local worker.
     named_application :: HsExpr GhcRn -> TcM Bool
@@ -913,6 +923,54 @@ See docs/dependent-haskell/REFERENCES.md#strict-opaque-call-refinement-prior-art
 and Note [Checked opaque case alias] in GHC.Hs.Expr.
 -}
 
+-- | Decline unsupported ordinary cases without adding a new diagnostic.
+completeRetainedCaseRows :: Type -> [LMatch GhcRn (LHsExpr GhcRn)] -> TcM Bool
+completeRetainedCaseRows domain alternatives
+  = do { rows <- mapM row_constructor alternatives
+       ; let expected = case splitTyConApp_maybe (coreFullView domain) of
+               Just (tc, _) -> tyConDataCons tc
+               _ -> []
+       ; return $ case sequence rows of
+           Just cons -> not (null cons) && cons `equalLength` expected
+                        && all (`elem` cons) expected
+           Nothing -> False }
+  where
+    row_constructor (L _ (Match { m_pats = L _ [pat]
+                                , m_grhss = GRHSs { grhssGRHSs = L _ (GRHS _ [] _) :| [] } }))
+      = pattern_constructor pat
+    row_constructor _ = return Nothing
+    pattern_constructor pat = case unLoc (retainedConPat pat) of
+      ParPat _ inner -> pattern_constructor inner
+      ConPat { pat_con = L _ name, pat_args = PrefixCon _ fields }
+        | all isRetainedVarPat fields
+        -> do { con_like <- tcLookupConLike name
+              ; return $ case con_like of
+                  RealDataCon con
+                    | Just _ <- nativeIndexDataConTyArgs domain con
+                    , fields `lengthIs` dataConSourceArity con -> Just con
+                  _ -> Nothing }
+      _ -> return Nothing
+
+-- | Inspect existing checked worker types without elaborating source values.
+hasRetainedApplication :: Data a => (HsExpr GhcRn -> TcM Bool) -> a -> TcM Bool
+hasRetainedApplication check thing
+  | Just expr <- (cast thing :: Maybe (HsExpr GhcRn))
+  = case expr of
+      HsTypedBracket{} -> return False
+      HsUntypedBracket{} -> return False
+      HsTypedSplice{} -> return False
+      HsUntypedSplice{} -> return False
+      XExpr{} -> return False
+      HsApp{} -> do { found <- check expr
+                    ; if found then return True else children }
+      _ -> children
+  | Just _ <- (cast thing :: Maybe Name) = return False
+  | Just _ <- (cast thing :: Maybe NameSet) = return False
+  | Just _ <- (cast thing :: Maybe Type) = return False
+  | otherwise = children
+  where
+    children = anyM id (gmapQ (hasRetainedApplication check) thing)
+
 -- | Collect resolved names outside quotations and stored free-name sets.
 retainedCaseNames :: Data a => a -> NameSet
 retainedCaseNames thing
@@ -1017,14 +1075,27 @@ checked constructor for direct references to that original scrutinee in each
 branch. Preserve source locations and update stored free-name sets.
 Use a lambda match context for generated clauses. The enclosing source case
 supplies the error context; generated argument patterns must not appear there.
+Keep the case context when the generated clause has only the source pattern.
 Reject Template Haskell quotations before substitution. Quoted source Names
 must not become the fresh generalized Names.
 
 Complete unguarded constructor clauses preserve inspection of the scrutinee.
 The generated application supplies every generalized argument. Wildcards and
 defaults need a separate forcing rule; do not turn a strict case into an unused
-function argument. General motive inference and dependent congruence remain
-separate work. No equality comes from a local definition or an unfolding.
+function argument. A checked local retained worker can also make a case
+relevant when it takes the scrutinee itself. Require a closed result and
+complete unguarded constructor rows. Check the local environment before
+looking for an application in the clauses. Most ordinary cases have no
+retained worker in scope. With the extension off, keep ordinary
+checking when a referenced local or Given already depends on the scrutinee.
+For example, a local cached result still has the original scrutinee in its
+type. The ordinary path keeps the same index in both applications.
+
+Bind the source name to the fresh motive parameter in the clauses. The
+constructor proof then refines the actual index of the application. The
+application checker transports its result type using that proof. See
+tcRetainedResultCoercion in GHC.Tc.Gen.App. Pass the original runtime value
+to the motive parameter. No equality comes from a definition or unfolding.
 -}
 
 -- | Introduce runtime index identities before checking the remaining patterns.

@@ -962,8 +962,8 @@ tcExpr expr@(HsCase ctxt scrut matches) res_ty
             ; special <- case unLoc (stripParensLHsExpr scrut') of
                 _ | ExistsTy ImplicitExists _ _ <- coreFullView scrut_ty
                   -> dot_case scrut' scrut_ty mult expected
-                HsVar _ (L _ index) | dependent, isNativeIndexId index ->
-                  tcRetainedCase index matches expected
+                HsVar _ (L _ index) | not dependent || isNativeIndexId index ->
+                  tcRetainedCase dependent index matches expected
                 _ | dependent ->
                   do { call_index <- checkedNativeCallIndex scrut' scrut_ty
                      ; case call_index of

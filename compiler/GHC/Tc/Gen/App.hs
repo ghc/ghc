@@ -1513,22 +1513,28 @@ tcRetainedListElementType declared (_ : fields)
 -- Keep the argument Id and its stored type unchanged.
 -- See Note [Declared retained argument refinement].
 tcRetainedDeclaredTypeView :: Type -> TcM Type
-tcRetainedDeclaredTypeView ty
+tcRetainedDeclaredTypeView ty = coercionRKind <$> tcRetainedTypeCoercion (const True) ty
+
+-- | Transport a type using constructor proofs about the selected indices.
+tcRetainedTypeCoercion :: (Id -> Bool) -> Type -> TcM CoercionN
+tcRetainedTypeCoercion select ty
   = do { givens <- tcl_native_givens . tcl_lcl_ctxt <$> getLclEnv
        ; givens <- mapM (liftZonkM . zonkId) givens
-       ; foldM refine ty (reverse givens) }
+       ; foldM refine (mkNomReflCo ty) (reverse givens) }
   where
-    refine ty given
+    refine result_co given
       | isCoVar given
       , Just (index, co) <- orient (mkCoVarCo given)
+      , select index
       , isRetainedConstructorProof index co
-      , anyFreeVarsOfType (== index) ty
+      , let result = coercionRKind result_co
+      , anyFreeVarsOfType (== index) result
       = do { name <- newSysName (mkTyVarOcc "retained_view")
            ; let template = mkTyVar name (varType index)
-           ; case abstractNativeIndices [(TermVarTy index, template)] ty of
-               Nothing -> return ty
-               Just _ -> coercionRKind <$> tcRetainedCoercion index co ty }
-      | otherwise = return ty
+           ; case abstractNativeIndices [(TermVarTy index, template)] result of
+               Nothing -> return result_co
+               Just _ -> mkTransCo result_co <$> tcRetainedCoercion index co result }
+      | otherwise = return result_co
 
     orient co
       | TermVarTy index <- coercionLKind co = Just (index, co)
@@ -1859,8 +1865,13 @@ finishAppWithCache cache do_ql rn_expr fun_loc rn_fun tc_fun inst_args
 
          -- Step 5: subsumption check against the expected type
          -- See Note [Unify with expected type before typechecking arguments]
+       ; branch_co <- case (do_ql, result_expected) of
+           (NoQL, Check expected)
+             | isTauTy expected, not (anyFreeVarsOfType (const True) expected)
+             -> tcRetainedResultCoercion inst_args app_res_rho
+           _ -> return (mkNomReflCo app_res_rho)
        ; res_wrap <- checkResultTy rn_expr (tc_fun, fun_loc) inst_args
-                                   app_res_rho result_expected
+                                   (coercionRKind branch_co) result_expected
 
          -- Step 6: Typecheck the arguments
        ; case do_ql of
@@ -1876,7 +1887,20 @@ finishAppWithCache cache do_ql rn_expr fun_loc rn_fun tc_fun inst_args
                      else return (rebuildHsApps tc_fun tc_args)
 
        ; traceTc "End tcApp }" (ppr tc_fun)
-       ; return (pack (mkHsWrap res_wrap res_expr)) }
+       ; return (pack (mkHsWrap (res_wrap <.> mkWpCastN branch_co) res_expr)) }
+
+-- | Refine the result of applying a retained function to the branch index.
+-- See Note [Source retained case refinement] in GHC.Tc.Gen.Match.
+tcRetainedResultCoercion :: [HsExprArg 'TcpInst] -> Type -> TcM CoercionN
+tcRetainedResultCoercion args ty
+  = do { indices <- catMaybes <$> mapM index_arg args
+       ; if null indices then return (mkNomReflCo ty)
+         else tcRetainedTypeCoercion (`elem` indices) ty }
+  where
+    index_arg (ERetainedArg DepFunVisible _ _ arg _)
+      | HsVar _ name <- unLoc (stripParensLHsExpr arg)
+      = tcLookupIdMaybe (unLocWithUserRdr name)
+    index_arg _ = return Nothing
 
 -- | Identify class selectors with an unmatchable-capable class parameter.
 classHasUnmatchableReceiver :: HsExpr GhcTc -> Bool
