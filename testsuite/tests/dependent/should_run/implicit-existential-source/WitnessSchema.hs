@@ -1,5 +1,10 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, ImpredicativeTypes, PolyKinds, RankNTypes, TypeApplications #-}
-module WitnessSchema (Hidden, callback, unpack, Multi, pair, kindBox, KindBox, Deep, producer, CallbackPair, atTwoTypes, observePair, ignorePair) where
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, ImpredicativeTypes, LinearTypes, PolyKinds, RankNTypes, TypeApplications #-}
+module WitnessSchema
+    ( Hidden, callback, unpack, Multi, pair, kindBox, KindBox, Deep, producer
+    , CallbackPair, atTwoTypes, observePair, ignorePair
+    , RankedBuilder, buildAt, observeBuilder
+    , Captured(..), CapturedBuilder, LinearBuilder, buildLinear, buildTwice
+    ) where
 import Data.Kind (Type)
 import Data.Proxy
 
@@ -35,3 +40,30 @@ observePair (f, k) = k f
 
 ignorePair :: CallbackPair -> Int
 ignorePair (_, _) = 9
+
+type RankedBuilder = exists (t :: Type). Bool -> Payload t
+
+buildAt :: Bool -> Payload PolyId
+buildAt b = Payload @PolyId id (\f -> (f (if b then 7 else 9), f b))
+
+observeBuilder :: RankedBuilder -> Bool -> (Int, Bool)
+observeBuilder builder b = inspect (builder b)
+  where
+    inspect :: Payload t -> (Int, Bool)
+    inspect (Payload value run) = run value
+
+data Captured where
+    Captured :: Payload (forall r. r -> x) -> Captured
+
+type CapturedBuilder = exists (t :: Type). Captured -> Payload t
+type LinearBuilder = exists (t :: Type). Bool %1 -> Payload t
+
+buildLinear :: Bool %1 -> Payload PolyId
+buildLinear b = case b of
+    True  -> buildAt True
+    False -> buildAt False
+
+buildTwice :: Bool %1 -> Bool %1 -> Payload PolyId
+buildTwice left right = case left of
+    True  -> buildLinear right
+    False -> buildLinear right

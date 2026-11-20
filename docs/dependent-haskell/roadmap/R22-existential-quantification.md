@@ -367,6 +367,19 @@ Checking the final payload can still reject an incompatible family result.
 [Rank-n callback](../examples/erased-existentials/RankedPackage.hs)
 and [GenImpredicative in Figure 10](https://richarde.dev/papers/2021/exists/exists.pdf#page=22).
 
+An expected dot package can also hide the callback type in a lambda.
+For an expected `exists t. Bool -> Callback t`, the lambda
+`\b -> prepare b` takes its witness from a declared result of
+`prepare :: Bool -> Callback PolyId`. GHC matches the invariant result
+types before it checks the lambda patterns. The usual lambda check then
+checks the operands and their usage. A pattern-local type cannot supply
+the outer witness. This case uses a single unguarded lambda and a result
+type available before checking its body.
+The witness erases before code generation. Agda's `@0` record fields
+use the same runtime distinction between a payload and erased evidence.
+[Source-free client](../../../testsuite/tests/dependent/should_run/implicit-existential-source/WitnessClient.hs)
+and [Agda erasure](https://agda.readthedocs.io/en/v2.8.0/language/runtime-irrelevance.html).
+
 The expected package type can also connect two fields of a tuple.
 For `exists t. (t, t -> (Int, Bool))`, a callback with argument type
 `forall a. a -> a` fixes the type of a bare `id` in the first field.
