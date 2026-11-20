@@ -6578,3 +6578,12 @@ turn them off. The retained pipeline accepts the same override. The
 simplifier reads the module's actual flag when it configures rule firing.
 [GHC rewrite rules](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/rewrite_rules.html)
 and [simplifier configuration](../../compiler/GHC/Driver/Config/Core/Opt/Simplify.hs).
+
+## A retained type as a runtime argument
+
+Proposal #378 considers a type representation for a retained `Type`
+operand. The reflection paper supplies a typed representation and the
+evidence from equality testing. The source examples and acceptance
+checks for this bridge are on the [R03 card](roadmap/R03-dependent-products.md#runtime-type-operands).
+[Proposal and review](https://github.com/ghc-proposals/ghc-proposals/pull/378)
+and [Peyton Jones, Weirich, Eisenberg and Vytiniotis (2016)](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/08/dynamic.pdf).

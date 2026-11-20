@@ -210,3 +210,56 @@ The dated research records are in
 `syntax-singletons-functions-v1/`. Their provenance files state what was read.
 The cache is ignored. The task boundaries above and the reference ledger must
 remain usable without it.
+
+## Runtime Type operands
+
+Proposal #378 gives `foreach (a :: Type) -> a -> a` as an example.
+Its `ex5` can pass the retained type to an erased argument and ignore
+the runtime representation. The proposal leaves pattern matching on
+`Type` open. Its review asks what a program gains from carrying a
+runtime representation back across the phase boundary.
+[Design sketch, §1.4.9](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#phase-distinction)
+and [review discussion](https://github.com/ghc-proposals/ghc-proposals/pull/378#issuecomment-765416198).
+
+The 354-line compiler rejects `preserve :: foreach (a :: Type) -> a -> a`
+with GHC-83605 at `(a :: Type)`. The existing algebraic binder
+implementation cannot supply a type representation for this argument.
+There is a working reference implementation with the following types.
+
+```haskell
+data Request where
+    Request :: TypeRep (a :: Type) -> a -> Request
+
+keep :: TypeRep a -> a -> a
+keep _ x = x
+
+same :: TypeRep a -> TypeRep b -> a -> Maybe b
+same a b x = case eqTypeRep a b of
+    Just HRefl -> Just x
+    Nothing    -> Nothing
+```
+
+An IORef supplied a Boolean request and then an integer request. The
+test selected the Boolean branch and negated its payload. It returned
+the integer unchanged. A mismatched comparison returned `Nothing`.
+`keep` returned `True` with an undefined representation. Stock GHC
+9.14.1 and the self-hosted fork both gave these results at `-O0` and
+`-O2`. Agda's standard universe example defines a datatype of codes
+and an interpretation function. Haskell's indexed `TypeRep` also
+supports types declared in other modules.
+[Agda universe example](https://agda.readthedocs.io/en/stable/language/mutual-recursion.html#interleaved-mutual-blocks)
+and [reflection paper, §§5.2–5.6](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/08/dynamic.pdf#page=6).
+
+- [ ] Give the source binder an erased type variable and a value whose
+  representation is `TypeRep a`. Preserve the source telescope in
+  interfaces. Check a provider and a source-hidden ordinary caller.
+- [ ] Use the type variable in erased positions. Pass the value in
+  retained positions. Check that `preserve` ignores a bottom
+  representation in compiled code and GHCi.
+- [ ] For a concrete type operand, construct the representation from
+  GHC's existing `Typeable` evidence. For an abstract operand, track
+  where the caller obtains the evidence. An existential input must
+  also establish that its witness has kind `Type`.
+- [ ] Check a runtime type test only inside the branch that receives
+  nominal equality evidence. Specifying source patterns for this test
+  remains a separate design decision.

@@ -1,7 +1,7 @@
 # Dependent Haskell paper reading
 
 Read on 2026-11-14 through 2026-11-20. The [manifest](manifest.json) records
-thirty-one works and thirty-seven downloaded PDF versions. It contains source URLs,
+thirty-two works and thirty-eight downloaded PDF versions. It contains source URLs,
 checksums, page counts, roadmap cards and
 the exact reading scope. PDF copies and extraction files are local in
 `_build/verification/dependent-haskell-papers-2026-11-14/`. The four new
@@ -805,3 +805,13 @@ original input tail. Replaying the two saved cases on the unfused
 side and one on the fused side checked this specialization with an
 unknown seed and combiner. A rule on a caller's own builder can
 still change definedness. [Executable counterexample](../examples/open-evaluation/check-map-fusion.sh).
+
+## Runtime representations of types
+
+In *A reflection on types*, Peyton Jones, Weirich, Eisenberg and Vytiniotis
+pair a value with its indexed type representation. Comparing two
+representations can produce the equality evidence needed to use the
+value at the other type. Sections 5.2–5.6 give the baseline for R03's
+runtime `Type` operand. The local reading also covers the start of §5.7.
+[Paper](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/08/dynamic.pdf)
+and [R03 acceptance checks](../roadmap/R03-dependent-products.md#runtime-type-operands).
