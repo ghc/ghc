@@ -726,6 +726,14 @@ cseExpr env (App f a)
   = App (cseExpr env f) (substExpr (csEnvSubst env) a)
     -- See Note [CSE for retained operands and case evidence]
   | otherwise = App (cseExpr env f) (tryForCSE env a)
+cseExpr env (Pack schema witness payload)
+  = Pack (substTyUnchecked subst schema) (substTyUnchecked subst witness) (tryForCSE env payload)
+  where subst = csEnvSubst env
+cseExpr env (Unpack witness payload package body)
+  = Unpack witness' payload' (tryForCSE env package) (cseExpr body_env body)
+  where
+    (witness_env, witness') = addBinder env witness
+    (body_env, payload') = addBinder witness_env payload
 cseExpr env (Tick t e)            = Tick t (cseExpr env e)
 cseExpr env (Cast e co)           = Cast (tryForCSE env e) (substCo (csEnvSubst env) co)
 cseExpr env (Lam b e)             = let (env', b') = addBinder env b

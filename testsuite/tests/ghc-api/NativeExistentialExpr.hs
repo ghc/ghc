@@ -17,11 +17,13 @@ import GHC.Core.Coercion (liftCoSubst, mkCoVarCo, mkLiftingContext, mkSubCo)
 import GHC.Core.Coercion.Axiom (Role(..))
 import GHC.Core.Dependent (hasExistentialExpr)
 import GHC.Core.FamInstEnv (emptyFamInstEnv)
+import GHC.Core.Opt.Arity (exprIsDeadEnd)
 import GHC.Core.Opt.Exitify (exitifyProgram)
 import GHC.Core.Opt.CallArity (callArityRHS)
 import GHC.Core.Opt.OccurAnal (SimplCoreMode(RetainedCore))
 import GHC.Core.Opt.WorkWrap (wwTopBinds)
 import GHC.Core.Lint (lintExpr)
+import GHC.Core.Map.Expr (emptyCoreMap, eqCoreExpr, extendCoreMap, lookupCoreMap)
 import GHC.Core.Predicate (mkNomEqPred, mkReprEqPred)
 import GHC.Core.Make (mkCharExpr, mkListExpr, mkNothingExpr, mkRuntimeErrorApp, pAT_ERROR_ID)
 import GHC.Core.SimpleOpt (simpleOptNativeExpr)
@@ -102,7 +104,7 @@ main = do
 -- Check package scope in SimpleOpt and worker/wrapper before native lowering.
 checkPackageOptimizers :: FilePath -> IO ()
 checkPackageOptimizers libdir = session libdir $ \env _ -> do
-    schemaId : witnessId : payloadId : topId : _ <- uniqsFromSupply <$> mkSplitUniqSupply PluginTag
+    schemaId : witnessId : payloadId : topId : otherWitnessId : otherPayloadId : _ <- uniqsFromSupply <$> mkSplitUniqSupply PluginTag
     let tv unique name = mkTyVar (mkSysTvName unique (fsLit name)) liftedTypeKind
         schemaArg = tv schemaId "a"
         witness = tv witnessId "witness"
@@ -131,6 +133,29 @@ checkPackageOptimizers libdir = session libdir $ \env _ -> do
       [NonRec _ result@(Unpack _ _ Pack{} _)] | isNothing (lint result) ->
         putStrLn "worker/wrapper preserves the scope of an opened package"
       _ -> fail "worker/wrapper changed the package or its scope"
+
+    let failure = mkRuntimeErrorApp pAT_ERROR_ID boolTy "demanded hidden Bool"
+        deadPack = Pack (ExistsTy ExplicitExists schemaArg (TyVarTy schemaArg)) boolTy failure
+    unless (exprIsDeadEnd deadPack && not (exprIsDeadEnd (Unpack witness payload deadPack true))
+            && exprIsDeadEnd (Unpack witness payload package failure)) $
+        fail "the dead-end check changed the demand of a package"
+    putStrLn "the dead-end check distinguishes a lazy opening from a demanded payload"
+    -- Make the map branch on both forms. Two singleton lookups alone
+    -- exercise only the equality shortcut in GenMap.
+    let schema = ExistsTy ExplicitExists schemaArg (TyVarTy schemaArg)
+        constantSchema = ExistsTy ExplicitExists schemaArg boolTy
+        constant w = Pack constantSchema w true
+        repack w x = Unpack w x package (Pack schema (TyVarTy w) (Var x))
+        other = tv otherWitnessId "other"
+        renamedPayload = mkSysLocal (fsLit "otherPayload") otherPayloadId manyDataConTy (TyVarTy other)
+        orig = repack witness payload
+        renamed = repack other renamedPayload
+        examples = [(package, 1 :: Int), (constant boolTy, 2), (constant charTy, 3), (orig, 4)]
+        table = foldl (\m (e, value) -> extendCoreMap m e value) emptyCoreMap examples
+    unless (eqCoreExpr orig renamed && lookupCoreMap table renamed == Just 4
+            && all (\(e, value) -> lookupCoreMap table e == Just value) examples) $
+        fail "expression map confused a package schema, witness or scoped payload"
+    putStrLn "expression keys distinguish erased witnesses and identify alpha-renamed openings"
 
     -- A lifted exit uses the abstract payload in a strict case. Its type
     -- witness must precede the payload in the new join's telescope.

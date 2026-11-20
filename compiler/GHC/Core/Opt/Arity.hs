@@ -1774,6 +1774,9 @@ exprIsDeadEnd e
     go n (Tick _ e)              = go n e
     go n (Cast e _)              = go n e
     go n (Let _ e)               = go n e
+    -- Pack has the demand of its payload. Unpack binds its payload lazily.
+    go _ (Pack _ _ payload)      = go 0 payload
+    go n (Unpack _ _ _ body)     = go n body
     go n (Lam v e) | isTyVar v   = go n e
                    | otherwise   = False
 

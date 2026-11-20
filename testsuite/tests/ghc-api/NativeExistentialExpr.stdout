@@ -8,4 +8,6 @@ Unpack leaves a computed package unevaluated
 adjacent package reduction preserves witness scope
 call arity preserves the scope of an opened package
 worker/wrapper preserves the scope of an opened package
+the dead-end check distinguishes a lazy opening from a demanded payload
+expression keys distinguish erased witnesses and identify alpha-renamed openings
 exitification abstracts the hidden witness before its payload

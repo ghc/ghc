@@ -1205,6 +1205,18 @@ specExpr env (Var v)       = specVar env v
 specExpr env (Type ty)     = return (Type     (substTy env ty), emptyUDs)
 specExpr env (Coercion co) = return (Coercion (substCo env co), emptyUDs)
 specExpr _   (Lit lit)     = return (Lit lit,                   emptyUDs)
+specExpr env (Pack schema witness payload)
+  = do { (payload', uds) <- specExpr env payload
+       ; return (Pack (substTy env schema) (substTy env witness) payload', uds) }
+specExpr env (Unpack witness payload package body)
+  = do { (package', package_uds) <- specExpr env package
+       ; (body', body_uds) <- specExpr body_env body
+       ; let (free_uds, local_dicts) = dumpUDs [witness', payload'] body_uds
+       ; return (Unpack witness' payload' package' (wrapDictBindsE local_dicts body'),
+                 package_uds `thenUDs` free_uds) }
+  where
+    (witness_env, witness') = substBndr env witness
+    (body_env, payload') = substBndr witness_env payload
 specExpr env (Cast e co)
   = do { (e', uds) <- specExpr env e
        ; return ((mkCast e' (substCo env co)), uds) }
