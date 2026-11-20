@@ -1101,6 +1101,8 @@ main = do
     observe "bind the result of a constructor case"
         (Right True :: TypeLet.CaseResult 'True, Left 'c' :: TypeLet.CaseResult 'False)
     observe "select the result type by a constructor" NativeCase.roadmap
+    observe "repeat a type case in a function argument and result"
+        (NativeCase.caseIdentity (Proxy @'True) 42, NativeCase.caseIdentity (Proxy @'False) False)
     observe "select through nested type case patterns"
         ( Proxy :: NativeNestedCase.Pick ('Just ('Just 'True))
         , 7 :: NativeNestedCase.Pick ('Just 'Nothing) )

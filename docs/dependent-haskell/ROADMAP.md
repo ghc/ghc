@@ -140,7 +140,7 @@ the header. The new reader checks the coercion's role and scope.
 | [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | Haskell98 and GADT-style newtypes can wrap a retained length and a vector at that length. The GADT constructor can bind the element type in its own signature. | Broaden dependent product domains and inference. Extend retained field checking to more constructor signatures. |
 | [R05 dependent Core](roadmap/R05-dependent-core.md) | The standard `-O2` pipeline specializes a recursive consumer and keeps retained case proofs scoped. A provider and an interface-only client can match rules that construct or open an erased package. | Support orphan rules, retained function rules and more dependent coercions. |
 | [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The integrated Showcase checks a mapper’s cons rule on an unknown tail and composes two checked traversals. Observing the result constructor leaves the inner callback lazy. | General open evaluation across arbitrary ordinary definitions. |
-| [R19 type-level cases](roadmap/R19-type-level-cases.md) | A constructor match can refine the kinds of later indices using checked nominal equalities. An ordinary constructor can match at an open GADT index. A written scrutinee kind can capture an earlier parameter under a noninjective family. An unknown head or field can still block a later row. | Direct cases in value signatures still need scope and equality checks. |
+| [R19 type-level cases](roadmap/R19-type-level-cases.md) | A constructor match can refine the kinds of later indices using checked nominal equalities. An ordinary constructor can match at an open GADT index. A written scrutinee kind can capture an earlier parameter under a noninjective family. A top-level value signature can repeat the same ordered case in an argument and the result. | Extend direct cases to nested quantifiers and preserve distinct scopes when binder names repeat. |
 | [R22 erased existentials](roadmap/R22-existential-quantification.md) | Ordinary function equations can open payload constructors. Quick Look can infer a whole package as a type argument. A typed callback can determine the polymorphic witness for an adjacent field. A direct case on a packaged function call keeps the hidden witness in scope for all alternatives. | Extend witness inference beyond single unguarded lambdas and handle visible type arguments on the packed call head. |
 | [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | A family can take a visible argument and pass its remaining invisible binder to another family. The receiver can infer its result kind. An application can use either arrow exposed by a family equation. The original `KindEqualities2` program checks across its declaration splice. A curried family result can use the matchability required by its caller. | Restore the unannotated `~>` synonym and `Promote` equation in `GADTSingletons`. General unsaturation remains open. |
 
@@ -171,10 +171,10 @@ source examples. General promotion remains open.
 3. **R22 and R04.** Check a visible type argument on the head of a
    packaged call, such as `builder @Bool flag`. Extend retained sum
    fields to GADT constructors with local type parameters.
-4. **R19.** Extend type cases from named synonyms to value signatures.
-   Repeated occurrences in a single signature must agree when they bind
-   the same variables and use the same ordered rows. Preserve blocked
-   matches on rigid scrutinees and report errors at the written case.
+4. **R19.** Check direct type cases under nested explicit `forall` binders
+   in a value signature. Preserve the distinction between two sibling
+   binders with the same name and keep rigid matches stuck.
+   [Current signature scope](roadmap/R19-type-level-cases.md#a-case-in-a-value-signature).
 
 Use this queue for current priorities, the linked card for its acceptance
 criteria, and the [implementation log](PLAN.md) for results from individual

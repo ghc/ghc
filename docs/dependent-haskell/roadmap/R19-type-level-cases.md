@@ -156,6 +156,31 @@ available. A separately distributed provider must be rebuilt to
 publish ordered equations. [Nested provider](../examples/open-evaluation/NativeNestedCase.hs)
 and [interface test](../../../testsuite/tests/dependent/should_run/NativeTypeCase.sh).
 
+## A case in a value signature
+
+A top-level function can write a case directly in its argument and result
+types. Both cases below wait when `b` is unknown. The function body still
+typechecks because the two occurrences share a generated family.
+
+```haskell
+caseIdentity :: forall (b :: Bool). Proxy b ->
+  (case b of { True -> Int; False -> Bool }) ->
+  (case b of { True -> Int; False -> Bool })
+caseIdentity _ input = input
+```
+
+The renamer compares names, promotion marks, applications, wildcards
+and row order in one signature. Extra parentheses leave the case
+unchanged. Two distinct scrutinees, reordered rows, and separate
+signatures each have their own helper. The ordinary client can use the
+function at `Int` and `Bool` from its interface. Template Haskell can
+reify the signature in its owner or a client. A stuck mismatch names the
+source signature. Nested explicit quantifiers still require a named
+synonym in this implementation.
+[Source](../examples/open-evaluation/NativeCase.hs),
+[client](../../../testsuite/tests/dependent/should_run/NativeTypeCaseClient.hs)
+and [reification](../../../testsuite/tests/dependent/should_run/NativeTypeCaseReify.hs).
+
 ## A case as an arrow result
 
 A top-level synonym can select the result of an ordinary arrow.
