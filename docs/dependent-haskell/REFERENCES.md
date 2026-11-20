@@ -115,6 +115,24 @@ The dated ignored research cache retains the
 larger link inventory and exact retrieval records. Keep the tracked summaries
 and primary links usable without that cache.
 
+### Retained operands under optimization
+
+Agda substitutes an argument into the result of a dependent function.
+Its with-abstraction equality keeps a proof relating a named result to
+the expression that produced it. The fork's CSE uses these two facts.
+A shared term can replace a retained argument or a case scrutinee only
+when subsequent types and equality evidence still refer to the same index.
+This decision adds no source spelling. [Agda function types](https://agda.readthedocs.io/en/v2.8.0/language/function-types.html),
+[with-abstraction equality](https://agda.readthedocs.io/en/v2.8.0/language/with-abstraction.html#with-abstraction-equality)
+and [the CSE implementation](../../compiler/GHC/Core/Opt/CSE.hs).
+
+The GHC-specific precedents are its constructor form for a list on a RULE
+left-hand side and its lazy aliases for local runtime indices across
+Core Tidy. Apply the former when desugaring an indexed list argument.
+Extend the latter to opaque witnesses. CorePrep checks strictness with
+`seq#` after renaming the case binder's type. Runtime and interface
+evidence are recorded on [the R05 card](roadmap/R05-dependent-core.md#retained-operands-in-the-native-optimizer).
+
 ## Reading order
 
 For M59, use the same-domain congruence and scoped comparison references in

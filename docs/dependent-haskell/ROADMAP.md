@@ -23,10 +23,10 @@ Both diagnostics match the archived M177 compiler byte for byte.
 | Card | Evidence beyond the published checkpoint | Remaining gap |
 | --- | --- | --- |
 | [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | The shared bootstrap at `898bff9a64` runs one pair declaration at different witness types. An ordinary client reads the payload without forcing an integer, function or IO witness. A private compiler also checks `second :: foreach (q :: DPair a p) -> p (first q)` through interfaces and runs 267 Showcase lines. | General domains and inference for `foreach`, and first-class retained `some`. |
-| [R05 dependent Core](roadmap/R05-dependent-core.md) | Both shared native stages and self-hosted GHCi agree on 266 Showcase lines at `-O0`. Selected native modules pass the standard `-O1` optimization passes when they omit interface pragmas and serialized Core. | The full `-O1` Showcase exposes invalid replacements by common-subexpression elimination. Default interface unfoldings, coercion encoding and ordinary optimized clients still need integration. |
-| [R19 type-level cases](roadmap/R19-type-level-cases.md) | A private compiler handles nested `Just Bool` and `Just Ordering`, GADT indices and reordered aliases. A source-free client checks the known cases. An unknown first field keeps the case stuck. | An alias that introduces another constructor test before a fallback is rejected. Unresolved GADT index comparisons also remain open. |
-| [R22 erased existentials](roadmap/R22-existential-quantification.md) | Two GHC API regressions exercise formation and elimination. Seven runtime and STG checks cover a package received through an interface. The source experiment accepts the explicit binder and reaches the provider’s term body. | GHC-91028 rejects an inferred existential result at `error`. A complete source client, ordinary optimization and source-level pack/unpack still need verification. |
-| [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | The published fork accepts 116 of 124 unmodified programs in the polykinds comparison. A private formatting change restores the two ordinary kind-error goldens. | Preserve useful M/U differences, explicit printing and compatibility across the full suite. |
+| [R05 dependent Core](roadmap/R05-dependent-core.md) | Both native stages and GHCi agree on 266 lines at `-O0`. The bootstrap built from `e4fcef85ce` passes all 266 at both `-O0` and `-O1` with stripped interfaces. A separate default-interface prototype exposes an ordinary worker to an optimized, source-free client. | Self-host and run the broader regressions on the combined optimizer. Review default unfolding export and versioned coercion readback before integrating them. |
+| [R19 type-level cases](roadmap/R19-type-level-cases.md) | A private compiler handles nested constructors introduced by an alias. A rigid earlier test blocks a later fallback. Stripped-interface clients, TH reification and exact printing pass. A GADT index can use one reduction of a completed closed family. | Mixed patterns need an unambiguous test order. Open GADT indices and integration with the shared compiler remain open. |
+| [R22 erased existentials](roadmap/R22-existential-quantification.md) | A source provider compiles an explicit existential result, including through a type synonym. An ordinary client links using its interface and observes an undefined result only on demand. Core API checks exercise actual packing, unpacking and erasure. | Source-level construction and elimination of an inhabited package, witness scope and optimization. |
+| [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | The private formatting patch restores both ordinary kind-error goldens, preserves explicit M/U differences and leaves all 124 polykinds exit statuses unchanged. It passes the modifier, reify and exact-print checks. | Review the diagnostics on alias-headed kinds and integrate the printer with the shared compiler. General family unsaturation remains open. |
 
 The published evaluator work covers closed calls such as `Prelude.sum` and
 open equations such as mapping `Prelude.not` over a list with a known head
@@ -41,21 +41,16 @@ source examples. General promotion remains open.
 
 ## Current work queue
 
-Both compiler stages build at the local integration checkpoint `898bff9a64`.
-The focused suite passes 38 of 40 tests. One test requests unsupported
-interface unfoldings. One checks for the previous wording of a retained
-domain error. The dependent directory passes 270 of 303 tests. Its one new
-failure is the unfolding test. The 32 previous diagnostics match the
-published baseline. The full optimized Showcase also fails in
-common-subexpression elimination. These results keep the optimizer work local.
-
-1. Check the whole Showcase from the tracked source, compiler and expected
-   output. Keep an ordinary interface client and a failure case for each
-   feature whose correctness depends on the module boundary.
-2. Review duplicate compiler checks against their existing callers. Preserve
-   the error location, the type equality being proved and runtime demand.
-3. Resolve the R05 optimizer failures before advertising broader optimization.
-   Keep the R19 and R22 prototypes available for the next source increment.
+1. Verify the integrated R05 optimizer with both compiler stages, the full
+   Showcase, registered regressions and interface upgrades. The prior
+   checkpoint `898bff9a64` passed 38 of 40 focused tests and 270 of 303
+   dependent directory tests. The follow-up checks the reported failures.
+2. Review the default-interface R05 series and the R04 pair projections
+   against that compiler. Check source-free clients, strictness and reuse
+   of existing interface files.
+3. Integrate the R19 ordered cases and R23 diagnostics. Continue the R22
+   source-level pack and unpack implementation against the separate Core
+   erasure checks.
 
 Use this queue for current priorities, the linked card for its acceptance
 criteria, and the [implementation log](PLAN.md) for results from individual

@@ -79,6 +79,23 @@ pipeline. General `-O1` remains open.
 [Source controls](../../../testsuite/tests/dependent/should_run/NativeSimplifierProvider.hs)
 and [interface client](../../../testsuite/tests/dependent/should_run/NativeSimplifierClient.hs).
 
+## Retained operands in the native optimizer
+
+The complete 266-line Showcase passes an optimized bootstrap build with
+Core and STG Lint. The runner applies `-fomit-interface-pragmas` and
+`-fno-write-if-simplified-core` after `-O1`. The retained argument of a
+call keeps the constructor tree that the next argument's type mentions.
+A case on `f n` keeps that expression in scope for its branch equality.
+The regression compares nested calls, cyclic inputs and exceptions at both
+optimization levels. [Function index test](../../../testsuite/tests/dependent/should_run/NativeFunctionIndex.sh).
+
+A list used as a retained argument desugars to its constructors. A
+floated opaque witness receives a lazy local alias during Core Tidy.
+When CorePrep lowers `seq#` to a case, it renames the index in the case
+binder's type. These steps preserve the result type and the observed
+demand in the same example. [Showcase](../Showcase.hs) and
+[decision provenance](../REFERENCES.md#retained-operands-under-optimization).
+
 ## Next increments
 
 - [x] Specify and run an opaque whole-function cast probe. Use genuinely
