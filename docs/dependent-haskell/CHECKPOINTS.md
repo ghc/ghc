@@ -6,6 +6,26 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Clean up after each experiment
+
+Use Git to recover finished experiments. Before cleanup, commit the source
+changes and any fixture needed to repeat the result. Record the revision,
+build and test commands, observed result, and relevant failure diagnostic.
+
+Run one-off builds and test links in temporary directories. Keep an
+experiment directory only while a running or queued job uses it. When the
+last job finishes, remove the directory, including its compiler, objects,
+generated interfaces, executables, link archives and raw logs. Check for
+shared inputs first. A thin archive refers to the original objects, so keep
+those objects until its last consumer has finished linking.
+
+An interface-upgrade test can need an older compiler. Record which test
+uses it, its revision, and the matching libraries or objects that the test
+reads. Release those build products when the last consumer finishes.
+Rebuild the pinned revision when that comparison is needed again.
+[Append upgrade test](examples/open-evaluation/check-append-upgrade.sh)
+and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
+
 ## Family and package checkpoints
 
 At `c24dcec367`, the fork includes both vector append equations, the
