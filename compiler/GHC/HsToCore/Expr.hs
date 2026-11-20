@@ -395,8 +395,13 @@ dsExpr (NegApp _ expr neg_expr)
   = do { expr' <- dsLExpr expr
        ; dsSyntaxExpr neg_expr [expr'] }
 
-dsExpr (HsLam _ variant a_Match)
-  = uncurry mkCoreLams <$> matchWrapper (LamAlt variant) Nothing a_Match
+dsExpr (HsLam _ variant group)
+  = uncurry mkCoreLams <$> matchWrapper ctxt Nothing group
+  where
+    -- See Note [Implicit existential function patterns] in GHC.Tc.Gen.Match.
+    ctxt | LamCases <- variant
+         , L _ (L _ Match{m_ctxt = fun_ctxt@FunRhs{}} : _) <- mg_alts group = fun_ctxt
+         | otherwise = LamAlt variant
 
 
 {-

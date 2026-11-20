@@ -20,6 +20,9 @@ module GHC.Tc.Gen.Match
    , tcRetainedCallCase
    , tcLambdaMatches
    , tcMatches
+   , tcOpenImplicitPackage
+   , implicitPayloadType
+   , matchesImplicitPayloadPat
    , tcGRHSNE
    , tcGRHSsPat
    , TcStmtChecker
@@ -65,11 +68,11 @@ import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Core.TyCon
 import GHC.Core ( Expr(Var, App, Type), exprToNativeIndex )
-import GHC.Core.TyCo.Rep ( Type(DepFunTy, FunTy, TermVarTy, TermAppTy, TyConApp) )
+import GHC.Core.TyCo.Rep ( Type(DepFunTy, ExistsTy, FunTy, TermVarTy, TermAppTy, TyConApp) )
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Type ( coreFullView, isManyTy, splitTyConApp_maybe
                      , anyFreeVarsOfType, typeKind, isNativeIndexFunctionId, isNativeOpaqueValueId
-                     , nativeIndexDataConTyArgs, splitFunTy_maybe )
+                     , nativeIndexDataConTyArgs, splitFunTy_maybe, substTyWith )
 import GHC.Core.Coercion ( MCoercion(MRefl), mkCoVarCo, mkCoCast
                          , mkSymCo, mkSubCo, coercionKind, coercionLKind
                          , mkTransCo, mkNomReflCo, mkRepReflCo, mkDepFunCoWithVis )
@@ -98,14 +101,14 @@ import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Set
 import GHC.Types.Id
-import GHC.Types.Var ( EvVar, DepFunTyFlag(..), varType, isId, isCoVar, isTyVar, isVisibleFunArg )
+import GHC.Types.Var ( EvVar, DepFunTyFlag(..), ExistsTyFlag(ImplicitExists), varType, tyVarKind, isId, isCoVar, isTyVar, isVisibleFunArg )
 import GHC.Types.Var.Env ( mkInScopeSetList, unitVarEnv )
 import GHC.Types.SrcLoc
 import GHC.Types.Basic( VisArity, RecFlag(NonRecursive), Origin(Generated), GenReason(OtherExpansion), DoPmc(SkipPmc) )
 import GHC.Data.Bag ( listToBag, unionBags )
 import GHC.Data.FastString ( fsLit )
 import GHC.Data.Pair ( pSnd )
-import GHC.Data.Maybe ( catMaybes, fromMaybe, isNothing )
+import GHC.Data.Maybe ( catMaybes, fromMaybe, isJust, isNothing )
 
 import qualified GHC.Data.List.NonEmpty as NE
 import Data.Data ( Data, cast, gmapQ, gmapT )
@@ -113,7 +116,7 @@ import Data.Data ( Data, cast, gmapQ, gmapT )
 import Control.Monad
 import Control.Arrow ( second )
 import Data.Foldable (toList)
-import Data.List (zipWith4)
+import Data.List (find, transpose, zipWith4)
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe (mapMaybe)
 
@@ -162,7 +165,7 @@ tcFunBindMatches ctxt fun_name mult source_matches invis_pat_tys source_exp_ty
                           , text "invis_pat_tys:" <+> ppr invis_pat_tys
                           , text "pat_tys:" <+> ppr pat_tys
                           , text "rhs_ty:" <+> ppr rhs_ty ]
-                   ; tcExprMatchesWithWhereFrom id mctxt (invis_pat_tys ++ pat_tys) rhs_ty matches }
+                   ; tcFunMatchesWithImplicitPackages mctxt (invis_pat_tys ++ pat_tys) rhs_ty matches }
         ; traceTc "tcFunBindMatches 1" (ppr fun_name $$ ppr mult $$ ppr exp_ty $$ ppr arity)
 
         ; (wrap_fun, r)
@@ -190,6 +193,127 @@ tcFunBindMatches ctxt fun_name mult source_matches invis_pat_tys source_exp_ty
       where
         (erased, values) = span (not . isVisArgLPat) pats
         generated = map (noLocA . VarPat noExtField . noLocA . idName) indices
+
+-- | Check the original equations beneath lazy openings of known package columns.
+-- See Note [Implicit existential function patterns].
+tcFunMatchesWithImplicitPackages
+  :: HsMatchContextRn -> [ExpPatType] -> ExpRhoType
+  -> MatchGroup GhcRn (LHsExpr GhcRn)
+  -> TcM (MatchGroup GhcTc (LHsExpr GhcTc))
+tcFunMatchesWithImplicitPackages ctxt pat_tys exp_ty group
+  | Check result <- exp_ty
+  , any is_dot_arg pat_tys
+  , let columns = transpose (map (filter isVisArgLPat . hsLMatchPats) (unLoc (mg_alts group)))
+        plan = select pat_tys columns
+  , any (isJust . snd) plan
+  = do { args <- mapM new_arg [scaled | ExpFunPatTy scaled <- pat_tys]
+       ; body <- go result plan args [] []
+       ; strict <- xoptM LangExt.Strict
+       ; let arg_types = map (\arg -> Scaled (idMult arg) (idType arg)) args
+             arg_pat arg = let var = noLocA (VarPat noExtField (noLocA arg))
+                           in if strict then noLocA (LazyPat noExtField var) else var
+             equation = mkSimpleMatch ctxt (noLocA (map arg_pat args)) (noLocA body)
+       ; return (MG { mg_alts = noLocA [equation]
+                    , mg_ext = MatchGroupTc arg_types result (Generated OtherExpansion SkipPmc) }) }
+  | otherwise
+  = tcExprMatchesWithWhereFrom id ctxt pat_tys exp_ty group
+  where
+    is_dot_arg (ExpFunPatTy (Scaled _ (Check ty)))
+      | ExistsTy ImplicitExists _ _ <- coreFullView ty = True
+    is_dot_arg _ = False
+
+    select [] _ = []
+    select (pat_ty:rest) columns
+      | isVisibleExpPatType pat_ty, pats:later <- columns
+      = (pat_ty, source_span pat_ty pats) : select rest later
+      | otherwise
+      = (pat_ty, Nothing) : select rest columns
+
+    source_span (ExpFunPatTy (Scaled _ (Check ty))) pats =
+      getLocA <$> find (matchesImplicitPayloadPat ty) pats
+    source_span _ _ = Nothing
+
+    new_arg (Scaled mult ty) = do { ty' <- readExpType ty
+                                 ; newSysLocalId (fsLit "package_arg") mult ty' }
+
+    go result ((ExpFunPatTy _, open):rest) (arg:args) checked_tys operands =
+      case open of
+        Just loc -> tcOpenImplicitPackage loc (idType arg) (nlHsVar arg) result $ \payload ->
+          go result rest args (payload_pat payload : checked_tys) (nlHsVar payload : operands)
+        Nothing -> go result rest args (payload_pat arg : checked_tys) (nlHsVar arg : operands)
+      where
+        payload_pat p = mkCheckExpFunPatTy (Scaled (idMult arg) (idType p))
+    go result ((pat_ty@ExpForAllPatTy{}, _):rest) args checked_tys operands =
+      go result rest args (pat_ty : checked_tys) operands
+    go _ [] [] checked_tys operands =
+      do { inner <- tcExprMatchesWithWhereFrom id ctxt (reverse checked_tys) exp_ty group
+         ; return $ case operands of
+             [operand] -> HsCase ctxt operand inner
+             _ -> unLoc (mkHsApps (L (getLoc (mg_alts inner)) (HsLam noAnn LamCases inner))
+                                  (reverse operands)) }
+    go _ _ _ _ _ = panic "tcFunMatchesWithImplicitPackages"
+
+{- Note [Implicit existential function patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A data constructor of a dot package's payload selects elimination in that
+argument column. Check the original equations and guards together beneath
+one opening for each selected argument. The normal matcher uses the original
+arrow multiplicities. Its result type is outside every witness scope.
+
+The outer equations bind only generated arguments. Apply the checked inner
+match group to their payloads and to the other ordinary arguments. Unpack is
+lazy, so the source match group still determines clause order and demand.
+With Strict, an outer lazy pattern prevents a generated argument from
+becoming strict before any source pattern runs. The inner matches retain
+their FunRhs context for coverage checks and match failures.
+-}
+
+-- | Find the shape below consecutive dot binders.
+-- The result can mention those binders. Use it only to inspect its shape.
+implicitPayloadType :: TcType -> TcType
+implicitPayloadType ty = case coreFullView ty of
+  ExistsTy ImplicitExists _ body -> implicitPayloadType body
+  other -> other
+
+-- | Open checked dot binders with the result type outside every scope.
+tcOpenImplicitPackage :: SrcSpan -> TcType -> LHsExpr GhcTc -> TcRhoType
+                      -> (Id -> TcM (HsExpr GhcTc)) -> TcM (HsExpr GhcTc)
+tcOpenImplicitPackage loc schema checked result_ty check_body = open schema checked
+  where
+    open schema checked =
+      case coreFullView schema of
+        ExistsTy ImplicitExists binder payload_ty ->
+          do { let origin = UnifyForAllSkol schema
+             ; skol <- mkSkolemInfo origin
+             ; name <- newSysName (getOccName binder)
+             ; witness <- pushTcLevelM_ $ newSkolemTyVar skol name (tyVarKind binder)
+             ; let body_ty = substTyWith [binder] [mkTyVarTy witness] payload_ty
+             ; payload <- newSysLocalId (fsLit "unpacked") ManyTy body_ty
+             ; (ev_binds, body) <- setSrcSpan loc $
+                 checkConstraints origin [witness] [] $
+                   case coreFullView body_ty of
+                     ExistsTy ImplicitExists _ _ -> open body_ty (noLocA (mkHsVar (noLocA payload)))
+                     _ -> check_body payload
+             ; return (XExpr (NativeExistsUnpack witness payload result_ty checked
+                                 (mkHsDictLet ev_binds (noLocA body)))) }
+        _ -> failWithTc (TcRnExistsPack (ExistsPackInvalidSchema schema))
+
+-- | Does this source pattern select the payload of the given package?
+-- Use data constructor identities. Other patterns alone keep their usual type.
+matchesImplicitPayloadPat :: TcType -> LPat GhcRn -> Bool
+matchesImplicitPayloadPat schema
+  | ExistsTy ImplicitExists _ body <- coreFullView schema
+  , Just (tc, _) <- tcSplitTyConApp_maybe (implicitPayloadType body)
+  = go (map dataConName (tyConDataCons tc))
+  | otherwise = const False
+  where
+    go constructors (L _ pat) = case pat of
+      ParPat _ nested -> go constructors nested
+      AsPat _ _ nested -> go constructors nested
+      BangPat _ nested -> go constructors nested
+      LazyPat _ nested -> go constructors nested
+      ConPat { pat_con = L _ (WithUserRdr _ name) } -> name `elem` constructors
+      _ -> False
 
 {- Note [Invisible retained definition patterns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

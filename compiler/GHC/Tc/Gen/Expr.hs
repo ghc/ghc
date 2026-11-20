@@ -43,6 +43,7 @@ import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Arrow
 import GHC.Tc.Gen.Match( tcBody, tcLambdaMatches, tcCaseMatches, tcRetainedCase
                        , tcRetainedCallCase
+                       , tcOpenImplicitPackage, implicitPayloadType, matchesImplicitPayloadPat
                        , tcGRHSNE, tcDoStmts )
 import GHC.Tc.Instance.Family ( tcGetFamInstEnvs )
 import GHC.Tc.Zonk.TcType
@@ -746,9 +747,8 @@ tcExpr expr@(HsCase ctxt scrut matches) res_ty
             ; (scrut', scrut_ty) <- tcScalingUsage mult $ tcInferRhoFRR FRRCase scrut
             ; dependent <- xoptM LangExt.ExperimentalDependentTypes
             ; special <- case unLoc (stripParensLHsExpr scrut') of
-                _ | ExistsTy ImplicitExists _ payload_ty <- coreFullView scrut_ty
-                  , Just (tc, _) <- tcSplitTyConApp_maybe (implicitPayloadType payload_ty)
-                  -> dot_case scrut' scrut_ty mult tc
+                _ | ExistsTy ImplicitExists _ _ <- coreFullView scrut_ty
+                  -> dot_case scrut' scrut_ty mult
                 HsVar _ (L _ index) | dependent, isNativeIndexId index ->
                   tcRetainedCase index matches res_ty
                 _ | dependent ->
@@ -768,8 +768,8 @@ tcExpr expr@(HsCase ctxt scrut matches) res_ty
     preserve_origin expr' =
       XExpr (ExpandedThingTc (HSE { hse_ctxt = ExprCtxt expr, hse_exp = noLocA expr' }))
 
-    dot_case scrut' schema mult tc
-      | any (payload_alt constructors) (unLoc (mg_alts matches))
+    dot_case scrut' schema mult
+      | any (payload_alt schema) (unLoc (mg_alts matches))
       = do { result_ty <- expTypeToType res_ty
            ; opened <- tcOpenImplicitPackage (getLocA scrut) schema scrut' result_ty $ \payload ->
                do { payload_matches <- tcCaseMatches ctxt tcBody
@@ -777,21 +777,10 @@ tcExpr expr@(HsCase ctxt scrut matches) res_ty
                   ; return (HsCase ctxt (nlHsVar payload) payload_matches) }
            ; return (Just (preserve_origin opened)) }
       | otherwise = return Nothing
-      where
-        constructors = map dataConName (tyConDataCons tc)
 
     -- See Note [Matching an implicit existential payload].
-    payload_alt constructors (L _ Match{m_pats = L _ [pat]}) = payload_pat constructors pat
+    payload_alt schema (L _ Match{m_pats = L _ [pat]}) = matchesImplicitPayloadPat schema pat
     payload_alt _ _ = False
-
-    payload_pat :: [Name] -> LPat GhcRn -> Bool
-    payload_pat constructors (L _ pat) = case pat of
-      ParPat _ nested -> payload_pat constructors nested
-      AsPat _ _ nested -> payload_pat constructors nested
-      BangPat _ nested -> payload_pat constructors nested
-      LazyPat _ nested -> payload_pat constructors nested
-      ConPat { pat_con = L _ (WithUserRdr _ name) } -> name `elem` constructors
-      _ -> False
 
 tcExpr (HsIf x pred b1 b2) res_ty
   = do { pred'    <- tcCheckMonoExpr pred boolTy

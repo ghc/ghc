@@ -10,7 +10,7 @@
 -}
 
 module GHC.Tc.Gen.App
-       ( tcApp, tcOpenImplicitPackage, implicitPayloadType
+       ( tcApp
        , tcExprPrag
        , tcRetainedInferableArg, tcRetainedArg, tcOptionalLetOperand ) where
 
@@ -21,7 +21,7 @@ import GHC.Hs
 import GHC.Rename.Env ( addUsedGRE, DeprecationWarnings(NoDeprecationWarnings) )
 import GHC.Rename.Utils ( mkExpandedLExpr )
 import GHC.Tc.Gen.Head
-import GHC.Tc.Gen.Match ( tcMatches, tcBody )
+import GHC.Tc.Gen.Match ( tcMatches, tcBody, tcOpenImplicitPackage, implicitPayloadType )
 import GHC.Tc.Gen.SourceTable ( tcLookupSourceTableId, sourceTableOccurrence, recordSourceMethodUse, recordSourceLiteralUse )
 import GHC.Tc.Gen.Sig ( isCompleteHsSig )
 import GHC.Tc.Errors.Types
@@ -692,36 +692,6 @@ opensImplicitHead arity body = arity > 0 && go arity (implicitPayloadType body)
     go n ty = case splitVisibleFunTy_maybe ty of
       Just (_, result) -> go (n - 1) result
       Nothing -> False
-
--- | Find the shape below consecutive dot binders.
--- The result can mention those binders. Use it only to inspect its shape.
-implicitPayloadType :: TcType -> TcType
-implicitPayloadType ty = case coreFullView ty of
-  ExistsTy ImplicitExists _ body -> implicitPayloadType body
-  other -> other
-
--- | Open checked dot binders with the result type outside every scope.
-tcOpenImplicitPackage :: SrcSpan -> TcType -> LHsExpr GhcTc -> TcRhoType
-                      -> (Id -> TcM (HsExpr GhcTc)) -> TcM (HsExpr GhcTc)
-tcOpenImplicitPackage loc schema checked result_ty check_body = open schema checked
-  where
-    open schema checked =
-      case coreFullView schema of
-        ExistsTy ImplicitExists binder payload_ty ->
-          do { let origin = UnifyForAllSkol schema
-             ; skol <- mkSkolemInfo origin
-             ; name <- newSysName (getOccName binder)
-             ; witness <- pushTcLevelM_ $ newSkolemTyVar skol name (tyVarKind binder)
-             ; let body_ty = substTyWith [binder] [mkTyVarTy witness] payload_ty
-             ; payload <- newSysLocalId (fsLit "unpacked") ManyTy body_ty
-             ; (ev_binds, body) <- setSrcSpan loc $
-                 checkConstraints origin [witness] [] $
-                   case coreFullView body_ty of
-                     ExistsTy ImplicitExists _ _ -> open body_ty (noLocA (mkHsVar (noLocA payload)))
-                     _ -> check_body payload
-             ; return (XExpr (NativeExistsUnpack witness payload result_ty checked
-                                 (mkHsDictLet ev_binds (noLocA body)))) }
-        _ -> failWithTc (TcRnExistsPack (ExistsPackInvalidSchema schema))
 
 {- Note [Implicit existential arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
