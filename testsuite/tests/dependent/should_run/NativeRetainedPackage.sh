@@ -86,6 +86,16 @@ HS
 "${g[@]}" -main-is General -c General.hs
 "${g[@]}" -main-is General General.o ../provider/DependentPair.o ../projection/DependentProjection.o -o general
 ./general
+cat >StrictRetainedField.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module StrictRetainedField where
+
+import Data.Functor.Const (Const)
+import DependentPair (DPair)
+
+data Holder = Holder !(DPair Bool (Const Int))
+HS
+"${g[@]}" -O1 -c StrictRetainedField.hs
 cat >WrongPair.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes #-}
 module WrongPair where
