@@ -321,7 +321,7 @@ evidenceSuffix DepFunCoEvidence         = "-retained-depfunco-v1"
 evidenceSuffix ConstructorCaseEvidence  = "-retained-constructor-case-v1"
 evidenceSuffix RetainedSpecRuleEvidence = "-retained-specialisation-rule-v1"
 evidenceSuffix IndexAliasEvidence       = "-retained-index-alias-v1"
-evidenceSuffix ErasedExistentialEvidence = "-experimental-r22-erased-existentials-v1"
+evidenceSuffix ErasedExistentialEvidence = "-erased-existentials-v1"
 
 {- Note [Versioning retained evidence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -350,7 +350,9 @@ omitted. Select the existential version when writing the existential type
 tag. This also covers type entries in compression tables. An Unpack in an
 unfolding can have an ordinary result type and refer to a package from
 another interface. Select the version when writing each existential
-expression tag as well.
+expression tag as well. An existential coercion can serialize an ordinary
+forall premise without an existential type tag. Select the version when
+writing either of its built-in rule names.
 -}
 
 

@@ -1881,10 +1881,7 @@ same account of its scope.
 existsCoRule :: Role -> (FastString, CoAxiomRule)
 existsCoRule role = (name, BuiltInRule name role [role] proves)
   where
-    name = case role of
-      Nominal          -> fsLit "NominalExistsCo"
-      Representational -> fsLit "RepresentationalExistsCo"
-      Phantom          -> panic "existsCoRule: phantom lifting"
+    name = existsCoRuleName role
     proves [Pair lhs rhs] = Pair <$> package lhs <*> package rhs
     proves _ = Nothing
     package (ForAllTy ma (Bndr tv vis) body)

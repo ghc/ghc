@@ -105,7 +105,7 @@ import qualified Data.Semigroup as Semi
 import Data.Word (Word8)
 import Control.Arrow (first)
 import Control.DeepSeq
-import Control.Monad ((<$!>))
+import Control.Monad ((<$!>), when)
 import Data.List (dropWhileEnd)
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Set as Set
@@ -3118,7 +3118,11 @@ instance Binary IfaceUnivCoDep where
   get bh = IfaceUnivCoDepCoVar <$> get bh
 
 instance Binary IfaceAxiomRule where
-  put_ bh (IfaceAR_X n)   = putByte bh 0 >> put_ bh n
+  put_ bh (IfaceAR_X n) = do
+    when (ifLclNameFS n `elem` [existsCoRuleName Nominal, existsCoRuleName Representational]) $
+      requireIfaceEvidenceVersion bh ErasedExistentialEvidence
+    putByte bh 0
+    put_ bh n
   put_ bh (IfaceAR_U n)   = putByte bh 1 >> put_ bh n
   put_ bh (IfaceAR_B n i) = putByte bh 2 >> put_ bh n >> put_ bh i
 
