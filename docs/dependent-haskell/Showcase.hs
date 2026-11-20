@@ -52,6 +52,7 @@ import qualified ErasedPackage
 import qualified ForgetWitness
 import qualified ImplicitVector
 import qualified PartitionChoices
+import qualified PackageRules
 import qualified RankedPackage
 import qualified StoredVector
 import qualified ExistentialVec as E
@@ -975,6 +976,7 @@ main = do
         PartitionChoices.partitionViews (VCons 7 (VCons 2 (VCons 9 VNil)))
     observe "use a hidden polymorphic identity at Int and Bool" RankedPackage.runCallback
     observe "infer a hidden function type from its paired callback" RankedPackage.runPair
+    observe "read an integer through an erased package" (PackageRules.roundTrip 7)
     observe "transport element equality under a hidden vector length"
         (ImplicitVector.cells (ImplicitVector.transportFiltered Refl passing))
     observe "zip a filtered vector with itself at its hidden length" $

@@ -58,6 +58,34 @@ cat >>LocalRuleProvider.hs <<'SRC'
 
 {-# RULES "ordinary control" observeProof Refl = 8 #-}
 SRC
+"${g[@]}" -O1 "${flags[@]}" -c LocalRuleProvider.hs
+cat >>LocalRuleProvider.hs <<'SRC'
+
+{-# RULES "dependent keep" forall xs. keep False xs = xs #-}
+SRC
 reject '[GHC-51063]' -O1 "${flags[@]}" -c LocalRuleProvider.hs
-grep -Fq 'ordinary control' reject.log
+grep -Fq 'dependent keep' reject.log
 cat client/observed
+
+cd "$tmp"
+for level in 0 1; do
+    mkdir -p "rule$level/client"
+    (
+        cd "rule$level"
+        cp "$area/PackageRules.hs" .
+        extra=()
+        if [[ $level == 0 ]]; then extra=("${flags[@]}"); fi
+        "${g[@]}" "-O$level" "${extra[@]}" -ddump-rule-firings -c PackageRules.hs >provider.log
+        cp PackageRules.hi "$area/NativePackageRuleClient.hs" client/
+        cd client
+        "${g[@]}" "-O$level" "${extra[@]}" -ddump-rule-firings -c NativePackageRuleClient.hs >client.log
+        if [[ $level == 1 ]]; then
+            grep -Fq 'Rule fired: open/hide (PackageRules)' ../provider.log
+            grep -Fq 'Rule fired: open/hide (PackageRules)' client.log
+        fi
+        "${g[@]}" NativePackageRuleClient.o ../PackageRules.o -o read-back
+        ./read-back >observed
+    )
+done
+diff -u rule0/client/observed rule1/client/observed
+cat rule1/client/observed

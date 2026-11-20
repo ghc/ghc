@@ -197,6 +197,16 @@ Extend the latter to opaque witnesses. CorePrep checks strictness with
 `seq#` after renaming the case binder's type. Runtime and interface
 evidence are recorded on [the R05 card](roadmap/R05-dependent-core.md#retained-operands-in-the-native-optimizer).
 
+GHC lets a library author state an optimization law in a `RULES` pragma.
+Its matcher checks the left-hand side against typed Core. The author is
+responsible for preserving semantics. Agda's `REWRITE` pragma registers
+a proof for reduction during type checking. The fork uses GHC's
+optimizer rules for `open (hide x) = x`. The interface reader checks
+the rule's scope and types. The rule supplies no equality to the type checker.
+[GHC's rewrite rules](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/rewrite_rules.html#semantics),
+[Playing by the Rules](https://inst.eecs.berkeley.edu/~cs294-260/sp24/papers/haskell-rules.pdf)
+and [Agda rewriting](https://agda.readthedocs.io/en/latest/language/rewriting.html).
+
 ## Reading order
 
 For M59, use the same-domain congruence and scoped comparison references in

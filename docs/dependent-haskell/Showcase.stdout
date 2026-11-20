@@ -225,6 +225,7 @@ match hidden partition lengths in function equations: (Just 7,Nothing)
 map an ordinary observer over differently sized partitions: [([7,9],[2]),([2],[7,9])]
 use a hidden polymorphic identity at Int and Bool: (7,True)
 infer a hidden function type from its paired callback: (7,True)
+read an integer through an erased package: 7
 transport element equality under a hidden vector length: [7,9]
 zip a filtered vector with itself at its hidden length: [(7,7)]
 pass a lambda with a hidden vector length and filter its result: [7]

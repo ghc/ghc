@@ -174,8 +174,18 @@ The source regression opens a package with a local `Show` dictionary and
 renders both a `Bool` and an `Int` through it.
 [Source regression](../../../testsuite/tests/dependent/should_run/NativeExistentialSource.sh).
 
-A module-level rewrite rule outside this schedule produces GHC-51063.
-The diagnostic names the rule. Forward congruence under an existential
+A local source rule can refer to functions with erased package types.
+The example provider and a separately compiled client both fire
+`"open/hide" forall x. open (hide x) = x` at default `-O1`. The reader
+checks the rule head, the erased types in the rule and Core Lint.
+The interface records a capability for this rule. The previous compiler
+rejects that capability at the header. Orphan rules and rules over a
+retained function still report GHC-51063. Lexical Pack and Unpack in the
+rule template require further matching support.
+[Package rule](../examples/erased-existentials/PackageRules.hs)
+and [source regression](../../../testsuite/tests/dependent/should_run/NativeSimplifier.sh).
+
+Forward congruence under an existential
 binder can run through the normal pipeline when its scoped payload
 coercion is supported. Core Lint checks the role and the two endpoints.
 `transportFiltered Refl xs = xs` preserves the hidden length while changing
