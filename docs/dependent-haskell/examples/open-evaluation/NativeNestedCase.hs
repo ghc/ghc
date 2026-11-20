@@ -4,6 +4,7 @@ module NativeNestedCase
   , Indexed(..), IndexedPick, TypeHead, UniformTypeHead, Wrapped, WrappedBool
   , PickFlipped, DiscardConstant, CaptureFlipped, WrittenFirst
   , AliasFirst, MixedAlias
+  , FamilyGate(..), FamilyGatePick
   ) where
 
 import Data.Kind (Type)
@@ -103,3 +104,15 @@ type WrapLeft left right = 'Pair ('Just left) right
 type MixedAlias d = case d of
   WrapLeft True (Just False) -> Int
   Pair _ _ -> Int
+
+type family GateIndex where
+  GateIndex = Bool
+
+data FamilyGate k where
+  PlainGate :: Bool -> FamilyGate k
+  IndexedGate :: FamilyGate GateIndex
+
+type FamilyGatePick (d :: Maybe (FamilyGate Bool)) = case d of
+  Just (PlainGate _) -> Int
+  Just _ -> Bool
+  Nothing -> Char

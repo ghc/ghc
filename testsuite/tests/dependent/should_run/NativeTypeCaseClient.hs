@@ -98,3 +98,9 @@ aliasMiss = Refl
 
 mixedAliasMiss :: N.MixedAlias ('N.Pair ('Just 'False) later) :~: Int
 mixedAliasMiss = Refl
+
+knownIndex :: N.FamilyGatePick ('Just 'N.IndexedGate) :~: Bool
+knownIndex = Refl
+
+ordinaryIndex :: N.FamilyGatePick ('Just ('N.PlainGate 'True)) :~: Int
+ordinaryIndex = Refl

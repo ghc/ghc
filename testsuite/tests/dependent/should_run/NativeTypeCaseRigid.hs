@@ -40,3 +40,6 @@ aliasFirst _ = Refl
 
 mixedAliasFirst :: Proxy first -> N.MixedAlias ('N.Pair ('Just first) 'Nothing) :~: Int
 mixedAliasFirst _ = Refl
+
+knownIndexRigid :: Proxy field -> N.FamilyGatePick ('Just field) :~: Bool
+knownIndexRigid _ = Refl
