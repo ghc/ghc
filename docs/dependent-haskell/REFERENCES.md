@@ -1548,6 +1548,18 @@ still points to the written application.
 [Quick Look, §4.4](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf#page=10)
 and [packaged callback](examples/erased-existentials/RankedPackage.hs).
 
+GHC proposal #274 keeps Quick Look for the wired-in `($)` even when the
+caller omits `ImpredicativeTypes`. The review asks whether the operator
+or its instantiation needs special treatment. Serrano uses `runST $ do
+...` to show why existing callers depend on this rule. In the fork,
+`expectMarker label marker $ evaluate proof` also needs the left
+operand's polymorphic argument to accept a proof whose type mentions a
+local vector length. The retained-argument checker has a separate path
+for this use of `($)`.
+[Accepted proposal #274](https://ghc-proposals.readthedocs.io/en/latest/proposals/0274-quick-look-impredicativity.html#the-dollar-rule),
+[review question](https://github.com/ghc-proposals/ghc-proposals/pull/274#issuecomment-533569608),
+and [author's reply](https://github.com/ghc-proposals/ghc-proposals/pull/274#issuecomment-533664634).
+
 ## Source package patterns
 
 Decision: allow ordinary nested patterns in non-retained package fields.
