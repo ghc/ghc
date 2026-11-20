@@ -17,9 +17,12 @@ data Witness c where
     Witness :: Collects c => Proxy (Elem c) -> Witness c
 
 fromWitness :: forall c. Witness c -> Bool
-fromWitness (Witness _) = case assumed (Proxy :: Proxy c) of Refl -> True
+fromWitness (Witness _) =
+    let local :: Elem c :~: Elem c
+        local = Refl
+    in case local of Refl -> True
 
--- | Check the family under a signature, an instance and a constructor context.
+-- | Check the family with evidence from a signature, an instance and a pattern.
 constrainedElements :: (Bool :~: Bool, Bool :~: Bool, Bool)
 constrainedElements =
     (assumed (Proxy :: Proxy [Bool]), ground, fromWitness (Witness Proxy :: Witness [Bool]))
