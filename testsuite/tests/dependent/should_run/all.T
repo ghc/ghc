@@ -177,6 +177,7 @@ test('NativeSourceTable',
 test('NativeNumeralGhci',
      extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']),
      ghci_script, ['NativeNumeralGhci.script'])
+test('NativeInferredFamilyGhci', normal, ghci_script, ['NativeInferredFamilyGhci.script'])
 test('NativeLetIndependentRule',
      extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']),
      multimod_compile_and_run,

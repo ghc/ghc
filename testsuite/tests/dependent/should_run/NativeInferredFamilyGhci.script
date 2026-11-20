@@ -1,0 +1,12 @@
+:set -XDataKinds -XExperimentalDependentTypes -XPolyKinds -XTypeFamilies -XTypeOperators -XNoModifiers
+import GHC.Matchability (Matchability(..))
+:{
+type family Map f xs where
+    Map _ '[] = '[]
+    Map f (x ': xs) = f x ': Map f xs
+:}
+:kind Maybe
+:kind Map
+:set -fprint-explicit-matchabilities
+:kind Maybe
+:kind Map
