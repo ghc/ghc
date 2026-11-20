@@ -9,9 +9,14 @@ ghc=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint)
 provider=NativeGadtRetainedSumProvider
 client=NativeGadtRetainedSumClient
 
-for level in 0 1; do
-    flags=("-O$level" -fomit-interface-pragmas -fno-write-if-simplified-core)
-    work=$out/O$level
+for mode in O0 O1-stripped O1; do
+    case $mode in
+        O0) flags=(-O0 -fomit-interface-pragmas) ;;
+        O1-stripped) flags=(-O1 -fomit-interface-pragmas) ;;
+        O1) flags=(-O1) ;;
+    esac
+    flags+=(-fno-write-if-simplified-core)
+    work=$out/$mode
     mkdir -p "$work"/{provider,client}
     cd "$work/provider"
     cp "$src/$provider.hs" .

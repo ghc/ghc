@@ -42,7 +42,7 @@ import GHC.Core.Utils
 import GHC.Core.Opt.Arity ( ArityType, exprArity, arityTypeBotSigs_maybe
                           , pushCoTyArg, pushCoValArg, exprIsDeadEnd
                           , typeArity, arityTypeArity, etaExpandAT )
-import GHC.Core.SimpleOpt ( exprIsConApp_maybe, joinPointBinding_maybe, joinPointBindings_maybe )
+import GHC.Core.SimpleOpt ( exprIsConAppFor_maybe, joinPointBinding_maybe, joinPointBindings_maybe )
 import GHC.Core.FVs     ( mkRuleInfo, hasFreeVarInCoreAnnotations, exprAnnotationFreeVars
                         , bindsAnnotationFreeVars )
 import GHC.Core.Rules   ( lookupRule, getRules )
@@ -3359,7 +3359,7 @@ rebuildCase (saf,env) scrut case_bndr alts cont
             Just (Alt _ bs rhs) -> simpl_rhs env scrut bs rhs }
 
   | Just (in_scope', wfloats, con, ty_args, other_args)
-      <- exprIsConApp_maybe (getUnfoldingInRuleMatch env) scrut
+      <- exprIsConAppFor_maybe (sm_core_mode (seMode env)) (getUnfoldingInRuleMatch env) scrut
         -- Works when the scrutinee is a variable with a known unfolding
         -- as well as when it's an explicit constructor application
   , let selected = findAlt (DataAlt con) alts
