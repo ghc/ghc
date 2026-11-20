@@ -10,11 +10,14 @@ records every edge. The R numbers are local labels for those cards.
 ## Where this fork stands
 
 A vector partition can store its two result lengths in one erased package.
-The producer writes `Rows yes no`. The consumer writes
-`case rows of Rows yes no -> …` and can read either vector. Each vector
-retains its own hidden length. Reading the first matching cell leaves the
-remaining input unevaluated. The provider and an ordinary client both
-compile at default `-O1`. [Partition source](examples/erased-existentials/ImplicitVector.hs).
+The producer writes `Rows yes no`. An ordinary function equation can
+inspect the passing vector with `firstPassing (Rows (VCons x _) _) = Just x`.
+The match leaves both unused tails lazy. With `ImpredicativeTypes`, a
+client can use `map rowLists` over partitions with different hidden lengths.
+Quick Look can infer a complete erased package as a type argument. It
+still checks runtime dependencies under the package binder.
+[Partition equations](examples/erased-existentials/ImplicitVector.hs)
+and [ordinary list client](examples/erased-existentials/PartitionChoices.hs).
 
 A function with a proof of `a :~: b` can change a filtered vector's
 element type from `a` to `b` under the same hidden length. A type-level
@@ -23,19 +26,19 @@ checking a later argument whose kind refers to that index. When a family
 cannot reduce, the case still waits for more information.
 [Type-level case](examples/open-evaluation/NativeNestedCase.hs).
 
-Both native compiler stages reproduce the 288-line Showcase at `-O0` and
-default `-O1`. The self-hosted compiler also matches the golden output
-with stripped interfaces and in GHCi. An unsigned binding can store
-the entire nested package. Its interface records `rows :: HiddenRows Int`.
-An ordinary client compiled with either the current or the previous
-compiler (`21d82b9123`) reads both vectors. The provider uses
-`bool fallback rows flag`. Selecting `rows` leaves `fallback` lazy.
-Selecting the failing branch raises its original exception.
+Both native compiler stages reproduce the 291-line Showcase at `-O0` and
+default `-O1`. The self-hosted compiler also matches the golden output with
+stripped interfaces and in GHCi. An ordinary client compiled with either
+this compiler or the previous `abf27ce1a2` compiler reads the partition
+and the retained newtype field from compiled providers. It gets
+`(Just 7,Nothing)` from the two function equations and `(2,"hs")` from
+the newtype selector. An unused newtype pattern leaves the argument lazy.
+[Newtype source](examples/packed-vector/StoredVector.hs),
 [Showcase](Showcase.hs) and [commands](README.md#run-the-showcase).
 
-At `14441015cd`, all 59 focused tests that ran passed. In the dependent
+At `accb08e84a`, all 59 focused tests that ran passed. In the dependent
 directory 284 of 314 executed normal-way tests passed. Each of the 30
-failures has the same test name and failure category as at `21d82b9123`.
+failures has the same test name and failure category as at `abf27ce1a2`.
 
 The upgrade tests cover a change to a family, a packed projection from
 a home or installed module, and combinations of dependent projections
@@ -48,11 +51,11 @@ the header. The new reader checks the coercion's role and scope.
 
 | Card | What works | Remaining gap |
 | --- | --- | --- |
-| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | Function signatures and ordinary constructor fields accept `some`. A strict record can store a vector alongside its length. | Broaden dependent product domains and inference. Check sum formation in other declaration contexts. |
+| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | An ordinary newtype field can store a retained length and a vector at that length. Its record selector, role and Template Haskell reification work across an interface. | Broaden dependent product domains and inference. Check the binder scope of GADT-style fields. |
 | [R05 dependent Core](roadmap/R05-dependent-core.md) | A provider can construct and open erased packages at default `-O1`. A given equality can change the payload type under a hidden witness. | Cover more coercions, rewrite rules and optimization settings. |
 | [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The integrated Showcase checks a mapper’s cons rule on an unknown tail and composes two checked traversals. Observing the result constructor leaves the inner callback lazy. | General open evaluation across arbitrary ordinary definitions. |
 | [R19 type-level cases](roadmap/R19-type-level-cases.md) | A constructor match can refine the kinds of later indices using checked nominal equalities. An unknown input that can still match an earlier row blocks a catch-all. | General mixed patterns and open GADT indices. |
-| [R22 erased existentials](roadmap/R22-existential-quantification.md) | An ordinary polymorphic function can return an entire known package, including a rank-n payload or a stuck type family. An unannotated local can store both hidden lengths of a partition. | Check ordinary function equations on payload constructors, Quick Look and general witness projections. |
+| [R22 erased existentials](roadmap/R22-existential-quantification.md) | Ordinary function equations can open payload constructors. Quick Look can infer a package containing a rank-n function or an opaque family, and an ordinary list can hold such packages. | Infer higher-rank witnesses at package construction and generalize witness projections. |
 | [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | A family can take a visible argument and pass its remaining invisible binder to another family. The receiver can infer its result kind. | General family unsaturation, matchability defaulting and compatibility with ordinary programs. |
 
 The published evaluator work covers closed calls such as `Prelude.sum` and
@@ -68,17 +71,18 @@ source examples. General promotion remains open.
 
 ## Current work queue
 
-1. **R22.** Support constructor patterns in ordinary function equations
-   such as `firstPassing (Rows (VCons x _) _) = Just x`. Check clause
-   order, demand, coverage diagnostics and linear fields. Extend application
-   checking to `($)` and `ImpredicativeTypes` with package arguments.
+1. **R22.** Infer a higher-rank witness during package construction.
+   For `exists t. Callback t`, a supplied callback can determine
+   `t = forall a. a -> a`. Check witness scope, conflicting family
+   results, and compatibility with `DeepSubsumption`.
 2. **R05.** Extend optimizer coverage beyond the supported coercions and
    settings. Check package expressions in rewrite rules and at `-O2`.
 3. **R19.** Extend the supported constructor patterns. Keep earlier rows
    and nominal evidence in scope when matching open GADT indices.
-4. **R04 and R23.** Check retained sum fields in newtypes, including record
-   selectors, roles and witness demand. Use the ordinary-program regression baseline when
-   extending higher-rank family application and defaulting.
+4. **R04 and R23.** Check retained sum fields under GADT constructor
+   binders. Preserve ordinary result-kind, role and newtype diagnostics.
+   Use the ordinary-program regression baseline when extending higher-rank
+   family application and defaulting.
 
 Use this queue for current priorities, the linked card for its acceptance
 criteria, and the [implementation log](PLAN.md) for results from individual
