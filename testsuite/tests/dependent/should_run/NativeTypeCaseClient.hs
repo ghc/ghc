@@ -95,3 +95,6 @@ aliasMatch = Refl
 
 aliasMiss :: N.AliasFirst ('N.Pair 'Nothing later) :~: Int
 aliasMiss = Refl
+
+mixedAliasMiss :: N.MixedAlias ('N.Pair ('Just 'False) later) :~: Int
+mixedAliasMiss = Refl

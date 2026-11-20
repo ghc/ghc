@@ -4157,9 +4157,10 @@ discarded field cannot supply a test or an RHS binding. Also inspect
 aliases after synonym cycle checking. An alias can introduce a test
 even when the written pattern is flat. Such a case must use ordered
 nodes whenever it has a fallback. Assign an added layer its canonical
-field path when all written fields are variables or wildcards. Mixing
-added layers with written subpatterns still needs an unambiguous
-mapping to preserve the order of written tests. A lone flat row can
+field path. Expand a copy of the alias with a distinct marker for each
+visible argument to distinguish written subpatterns from equal types
+introduced by the alias. With extra layers, use canonical order only
+when it visits surviving written tests at most once and in source order. A lone flat row can
 keep its ordinary axiom because no alternative can bypass its tests.
 
 A Type column has no finite set of constructors. Test one checked
@@ -4360,55 +4361,79 @@ checkedCasePattern path (CasePatternConstructor span _ fields) ty =
       , isGenerativeTyCon resolved Nominal
       , not (isTypeFamilyTyCon resolved)
       -> do
-          let source = zip3 [0..] fields old
-          aligned <- if written == resolved
-            then pure [(i, Just field, arg) | (i, field, arg) <- source]
-            else case alignFields source new of
-              Just aligned -> pure aligned
-              Nothing
-                | all is_field fields || unary_path new ->
-                    pure [(i, Nothing, arg) | (i, arg) <- zip [0..] new]
-                | otherwise -> failWithTc (TcRnNestedTypeCasePattern ty)
-          CheckedCaseConstructor path span resolved <$>
-            sequence [check_field (path ++ [i]) field argument
-                     | (i, field, argument) <- aligned]
+          children <- if written == resolved
+            then sequence [checkedCasePattern (path ++ [i]) field arg
+                          | (i, field, arg) <- zip3 [0..] fields old]
+            else synonym_fields written original resolved new
+          pure (CheckedCaseConstructor path span resolved children)
     (_, Nothing) -> failWithTc (TcRnTypeCasePattern (Just ty))
     _ -> failWithTc (TcRnNestedTypeCasePattern ty)
 
   where
-    -- Extra arguments erased by the synonym have no nominal field.
-    -- The source equation's validity check rules out erased binders.
-    alignFields _ [] = Just []
-    alignFields source (arg:args) =
-      case break (\(_, _, old) -> pickyEqType old arg) source of
-        (before, (i, field, _):after) ->
-          ((i, Just field, arg) :) <$> alignFields (before ++ after) args
-        _ -> Nothing
+    -- Expand a copy with markers for the visible arguments. A marker
+    -- identifies a source occurrence even when its checked argument is
+    -- equal to a constant elsewhere in the expansion.
+    synonym_fields written original resolved new = do
+      markers <- forM (visible written original) $ \arg ->
+        flip mkTyVar (typeKind arg) <$> newSysName (mkTyVarOcc "case_argument")
+      let marker_args [] args = map snd args
+          marker_args _ [] = []
+          marker_args pending ((binder, arg):args)
+            | isVisibleTyConBinder binder, marker:more <- pending =
+                mkTyVarTy marker : marker_args more args
+            | otherwise = arg : marker_args pending args
+          expanded = mkTyConApp written
+            (marker_args markers (zip (tyConBinders written) original))
+          marked = zip markers (zip [0..] fields)
+      case tcSplitTyConApp_maybe expanded of
+        Just (head_tc, args)
+          | head_tc == resolved
+          , let shape = visible head_tc args
+          , length shape == length new ->
+            case traverse (find_marker marked) shape of
+              Just aligned
+                | let used = [i | (i, field) <- aligned, is_test field]
+                , length used == length (nub used) ->
+                    sequence [checkedCasePattern (path ++ [i]) field actual
+                             | ((i, field), actual) <- zip aligned new]
+              _ -> do
+                aligned <- sequence [expand_field marked (path ++ [i]) shape actual
+                                    | (i, shape, actual) <- zip3 [0..] shape new]
+                let used = concatMap snd aligned
+                unless (used == List.sort (nub used)) unsupported
+                pure (map fst aligned)
+        _ -> unsupported
 
-    is_field CasePatternField = True
-    is_field CasePatternConstructor{} = False
+    is_test CasePatternField = False
+    is_test CasePatternConstructor{} = True
 
-    unary_path [] = True
-    unary_path [argument]
-      | Just (con, args) <- tcSplitTyConApp_maybe argument =
-          unary_path (visible con args)
-      | otherwise = True
-    unary_path _ = False
+    find_marker marked shape = do
+      var <- getTyVar_maybe shape
+      lookup var marked
 
-    check_field position (Just field) argument =
-      checkedCasePattern position field argument
-    check_field position Nothing argument
-      | Just _ <- getTyVar_maybe argument = pure CheckedCaseField
-      | Just (con, args) <- tcSplitTyConApp_maybe argument
+    expand_field marked position shape actual
+      | Just (i, field) <- find_marker marked shape = do
+          checked <- checkedCasePattern position field actual
+          pure (checked, [i | is_test field])
+      | Just (con, shape_args) <- tcSplitTyConApp_maybe shape
+      , Just (actual_con, actual_args) <- tcSplitTyConApp_maybe actual
+      , actual_con == con
       , isGenerativeTyCon con Nominal
       , not (isTypeFamilyTyCon con)
-      = CheckedCaseConstructor position span con <$>
-          sequence [check_field (position ++ [i]) Nothing arg
-                   | (i, arg) <- zip [0..] (visible con args)]
-      | otherwise = failWithTc (TcRnNestedTypeCasePattern argument)
+      , let shape_fields = visible con shape_args
+            actual_fields = visible con actual_args
+      , length shape_fields == length actual_fields = do
+          children <- sequence
+            [expand_field marked (position ++ [i]) field arg
+            | (i, field, arg) <- zip3 [0..] shape_fields actual_fields]
+          pure (CheckedCaseConstructor position span con (map fst children),
+                concatMap snd children)
+      | otherwise = unsupported
 
     visible tc args = [a | (b, a) <- zip (tyConBinders tc) args
                          , isVisibleTyConBinder b]
+    unsupported :: TcM a
+    unsupported = failWithTc (TcRnNestedTypeCasePattern ty)
 
 checkTyFamInstEqn :: TcTyCon -> Name -> [HsArg p tm ty] -> TcM ()
 checkTyFamInstEqn tc_fam_tc eqn_tc_name hs_pats =

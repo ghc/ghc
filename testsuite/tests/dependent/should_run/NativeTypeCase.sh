@@ -32,6 +32,7 @@ cp NativeCase.hi NativeNestedCase.hi NativeTypeCase{Client,Rigid,LetWrong}.hs in
    grep -Fq 'NativeTypeCaseRigid.hs:33:18: error: [GHC-83865]' bad.log &&
    grep -Fq 'NativeTypeCaseRigid.hs:36:19: error: [GHC-83865]' bad.log &&
    grep -Fq 'NativeTypeCaseRigid.hs:39:16: error: [GHC-83865]' bad.log &&
+   grep -Fq 'NativeTypeCaseRigid.hs:42:21: error: [GHC-83865]' bad.log &&
    ! grep -Eq '\$(case(-node)?|lambda):' bad.log &&
    reject NativeTypeCaseLetWrong 8:9 'GHC-83865')
 "${g[@]}" -fomit-interface-pragmas -c NativeTypeCaseHeadProvider.hs

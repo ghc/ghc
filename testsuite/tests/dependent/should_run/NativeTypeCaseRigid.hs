@@ -37,3 +37,6 @@ wrongAliasField = Refl
 
 aliasFirst :: Proxy first -> N.AliasFirst ('N.Pair first 'Nothing) :~: Int
 aliasFirst _ = Refl
+
+mixedAliasFirst :: Proxy first -> N.MixedAlias ('N.Pair ('Just first) 'Nothing) :~: Int
+mixedAliasFirst _ = Refl
