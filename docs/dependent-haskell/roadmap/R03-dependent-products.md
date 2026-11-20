@@ -22,8 +22,9 @@ The ordinary caller can use `Consumer a p r` in a signature and supply a
 witness and its indexed payload. The Showcase instantiates the witness
 type with a vector whose length comes from IO. An abstract family such as
 `Hidden a` still leaves `a` ambiguous when the rest of the signature
-cannot determine it. A named callback passed to `withPair` can require
-an expected result type.
+cannot determine it. The result of a named callback passed to `withPair` can determine the
+result of the call when the two witness domains agree nominally. A result
+that would contain the callback's local witness fails at that callback.
 [Consumer](../examples/packed-vector/DependentPair.hs) and
 [formation rule](../REFERENCES.md#naming-a-dependent-function-type).
 

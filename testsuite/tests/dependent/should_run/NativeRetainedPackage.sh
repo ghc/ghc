@@ -87,7 +87,7 @@ value q = getConst (second q)
 
 main :: IO ()
 main = print (readInt (pack (error "unused integer witness") 7),
-              withPair (pack (error "unused IO" :: IO Int) 'i') readAction :: Char,
+              withPair (pack (error "unused IO" :: IO Int) 'i') readAction,
               value (pack (error "unused function" :: Int -> Int) 'f'),
               first (pack (12 :: Int) (error "unused payload" :: Char)),
               readFlag (Pair True Yes), readFlag (Pair False No))
@@ -108,6 +108,25 @@ HS
 if "${g[@]}" -c AmbiguousConsumer.hs >bad.log 2>&1 ||
    ! grep -Fq "In the ambiguity check for" bad.log; then
     cat bad.log >&2
+    exit 1
+fi
+# An inferred result must be independent of the runtime argument.
+cat >EscapeCallback.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes, PolyKinds #-}
+module EscapeCallback where
+import Data.Kind (Type)
+import Data.Proxy (Proxy(..))
+type Body (a :: Type) r = foreach (x :: a) -> Proxy x -> r
+type Indexed (a :: Type) = foreach (x :: a) -> Proxy x -> Proxy x
+indexed :: Indexed (IO Int)
+indexed _ value = value
+takeBody :: Body (IO Int) r -> Proxy r
+takeBody _ = Proxy
+leak = takeBody indexed
+HS
+if "${g[@]}" -c EscapeCallback.hs >escape-callback.log 2>&1 ||
+   ! grep -Fq 'EscapeCallback.hs:11:17: error: [GHC-83865]' escape-callback.log; then
+    cat escape-callback.log >&2
     exit 1
 fi
 cat >StrictRetainedField.hs <<'HS'
