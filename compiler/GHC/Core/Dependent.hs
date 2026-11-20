@@ -279,7 +279,7 @@ scanType (TermVarTy v) =
 scanType (TermAppTy f arg) = gentleForm (scanCallHead f <> scanType arg)
 -- An ordinary client can pass a package through a polymorphic function.
 -- Pack and Unpack expressions still require their own optimizer support.
-scanType (ExistsTy binder body) =
+scanType (ExistsTy _ binder body) =
     gentleForm (scanType (varType binder) <> scanType body)
 scanType (DepFunTy _ b body) =
     gentleForm (scanRetainedIndex b <> scanType body)

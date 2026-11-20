@@ -3,7 +3,7 @@
 module NativePercentArrowOnlyModifiers where
 import Data.Kind (Type)
 import Data.Type.Equality ((:~:)(Refl))
-import GHC.Exts (U, M)
+import GHC.Matchability (U, M)
 
 identity :: a %U -> a
 identity x = x

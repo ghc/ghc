@@ -14,22 +14,19 @@ ordinary functions in types. A pair can store an abstract lifted witness.
 An ordinary client can read its payload without forcing the witness, even
 when that witness comes from IO.
 
-Both native compiler stages reproduce the 272 lines of the
-[Showcase](Showcase.hs) at `-O0`, at default `-O1`, and at `-O1`
-with stripped interfaces. Self-hosted GHCi matches at `-O0`.
-The examples include an ordered type case under a dependent binder and
-projection from a separately compiled pair. A client with only the
-provider's interface and object checks witness demand after inlining.
+Both native compiler stages reproduce the 277 lines of the [Showcase](Showcase.hs)
+at `-O0` and default `-O1`. The self-hosted compiler also matches the golden
+output with stripped interfaces and in GHCi. An inherited class method fills
+a length-indexed vector. A conversion discards a stored witness and keeps its
+indexed payload. A closed family matches two independently written sums.
 [Run the Showcase](README.md#run-the-showcase).
 
-At `3b7108a97b`, all 48 focused tests pass. In the dependent directory,
-276 of 306 executed normal-way tests pass. All 30 failures also occurred
-at the previous public checkpoint. `DepFail1` and `T11334b` now pass.
-The preceding 271-line compiler also failed two arrow diagnostic tests.
-Both now pass. A serial comparison against that compiler found three
-changes in the other diagnostics. `KindEqualities2` and `RaeJobTalk`
-now print the conflicting matchability. `T12088sg2` drops a misleading
-argument-count hint for a stuck family.
+At `d1f1757365`, all 53 focused tests that ran passed. In the dependent
+directory, 279 of 309 executed normal-way tests passed. The 30 failing tests
+match checkpoint `d8f2802ddb`, where 276 of 306 passed. A known optimizer
+failure remains in this checkpoint. Common subexpression elimination can
+replace a local runtime index with an imported alias when projecting from a
+pair at `-O1`. The R05 work below fixes this case in a separate compiler.
 
 The upgrade tests cover a change to a family, a packed projection from
 a home or installed module, and combinations of dependent projections
@@ -39,15 +36,6 @@ the same target libraries for each comparison. At three interface
 compression levels the old reader rejects new constructor evidence at
 the header. The new reader checks the coercion's role and scope.
 [R05 interface checks](roadmap/R05-dependent-core.md#default-optimized-interfaces).
-
-The combined compiler builds itself. Both stages reproduce all 277 Showcase
-lines at `-O0` and default `-O1`. The self-hosted compiler also matches the
-golden output with stripped interfaces and in GHCi. An inherited class method
-fills a length-indexed vector. A conversion discards a stored witness and
-keeps its indexed payload. A closed family matches two independently written
-sums. With the Haddock repair at `d1f1757365`, 279 of 309 executed tests in
-the dependent directory pass. The 30 failing tests match the previous public
-checkpoint `d8f2802ddb`.
 
 | Card | What works | Remaining gap |
 | --- | --- | --- |

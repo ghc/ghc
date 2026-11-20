@@ -362,3 +362,7 @@ test('NativeImplicitExistential',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['implicit-existential-source'])],
      run_command, ['bash NativeImplicitExistential.sh "{compiler}" "{libdir}"'])
+
+test('NativeExistentialBeta',
+     [req_host_target_ghc, unless(have_ncg(), skip), only_ways(['normal'])],
+     compile_and_run, ['-O1 -dcore-lint -dstg-lint'])

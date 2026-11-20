@@ -28,7 +28,7 @@ arrow. With :extension:`LinearTypes`, GHC also recognises multiplicity
 modifiers. GHC ignores unrecognised modifiers and warns about them with
 ``-Wunrecognised-modifiers``.
 
-Import ``U`` and ``M`` from ``GHC.Exts`` to write an unmatchable or
+Import ``U`` and ``M`` from ``GHC.Matchability`` to write an unmatchable or
 matchable arrow. For example, ``(a %U -> b) -> [a] -> [b]`` accepts
 an unmatchable callback, such as a type family. An arrow can have one
 modifier of each kind. With :extension:`LinearTypes`, ``a %1 %U -> b``
