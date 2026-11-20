@@ -583,16 +583,17 @@ checkFlagHash hsc_env iface self_recomp = do
         ordered_fp = orderedTypeCaseFingerprint retained_case_fp
         previous_fp = orderedTypeCaseFingerprint abstract_fp
         staged_fp = stagedMatchabilityFingerprint previous_fp
-        class_default_fp = classDefaultMatchabilityFingerprint staged_fp
-        forwarded_fp = forwardedResultFingerprint class_default_fp
-        scoped_fp = scopedTypeCaseFingerprint class_default_fp
-        new_fp = scopedTypeCaseFingerprint forwarded_fp
-        class_generations = [new_fp, forwarded_fp, scoped_fp, class_default_fp]
-        stamp = packageRuleProviderFingerprint (mi_rules iface)
-        -- A fixed lexical rule provider also records how its helpers were tidied.
-        -- Recover the underlying compiler generation for the family and case checks.
+        class_base_fp = classDefaultMatchabilityFingerprint staged_fp
+        family_base_fp = forwardedResultFingerprint class_base_fp
+        scoped_base_fp = scopedTypeCaseFingerprint class_base_fp
+        new_fp = scopedTypeCaseFingerprint family_base_fp
+        earlier_rule_generations = [class_base_fp, family_base_fp, scoped_base_fp]
+        class_generations = new_fp : earlier_rule_generations
+        stamp_rules = packageRuleProviderFingerprint (mi_rules iface)
+        -- The family and scope changes were available independently. Match either
+        -- old producer stamp before checking which change its interface needs.
         old_fp | stored_fp `elem` class_generations = stored_fp
-               | Just fp <- find ((== stored_fp) . stamp) class_generations = fp
+               | Just fp <- find ((== stored_fp) . stamp_rules) class_generations = fp
                | otherwise = stored_fp
         dflags = hsc_dflags hsc_env
         final_possible = backendGeneratesCode (backend dflags) && couldExportCallbackCase iface
@@ -600,7 +601,7 @@ checkFlagHash hsc_env iface self_recomp = do
         recheck reason = out_of_date_hash logger (CustomReason reason)
                            (text reason) old_fp new_fp
     previous <- liftIO $ if
-       | old_fp `elem` class_generations, stored_fp /= stamp old_fp
+       | stored_fp `elem` earlier_rule_generations, stored_fp /= stamp_rules stored_fp
          -> recheck "Compiler now retains private helpers in erased package rules"
        | old_fp `elem` (class_generations ++ [staged_fp, previous_fp, abstract_fp,
                                             ordered_fp, retained_case_fp, result_kind_fp])
@@ -717,11 +718,11 @@ checkFlagHash hsc_env iface self_recomp = do
                 then liftIO $ recheck "Compiler now infers matchability across family declaration groups"
                 else pure UpToDate
         check_forwarded_result
-          | old_fp `notElem` [new_fp, forwarded_fp], couldForwardFamilyResult iface =
+          | old_fp `notElem` [new_fp, family_base_fp], couldForwardFamilyResult iface =
               liftIO $ recheck "Compiler now separates a family result from its kind"
           | otherwise = pure UpToDate
         check_scoped_case
-          | old_fp `notElem` [new_fp, scoped_fp]
+          | old_fp `notElem` [new_fp, scoped_base_fp]
           , mi_hsc_src iface == HsSrcFile
           , couldExportScopedTypeCase iface =
               liftIO $ recheck "Compiler now checks dependent type case captures"

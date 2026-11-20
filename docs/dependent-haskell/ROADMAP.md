@@ -62,6 +62,13 @@ constructor `'Just` and the type of a runtime callback.
 [Interpreter](examples/open-evaluation/InterpretedKind.hs) and
 [callback client](examples/open-evaluation/LegacyKindArgument.hs).
 
+A second interpreter can apply `Either` to two argument types and can
+also describe the type of `(&&)`. The choice of arrow in a family's
+result can differ from the choice in its kind. The client prints
+`(Right 7,False)` and leaves the second Boolean unevaluated. The
+original `GADTSingletons` program still needs two source annotations.
+[Interpreter and compatibility boundary](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
+
 The list interface of a stream with hidden state supports two ordinary
 `foldr` consumers. With a separately compiled provider, both consume the
 producer's builder at `-O1` and `-O2`. The first-element fold returns
@@ -70,13 +77,6 @@ the odd digits in order and gives 531. The focused checks also run the
 same source at `-O0`.
 [Source folds](examples/erased-existentials/StreamFold.hs) and
 [Core and recompilation checks](roadmap/R05-dependent-core.md#a-list-fold-over-a-hidden-stream-state).
-
-A second interpreter can apply `Either` to two argument types and can
-also describe the type of `(&&)`. The choice of arrow in a family's
-result can differ from the choice in its kind. The client prints
-`(Right 7,False)` and leaves the second Boolean unevaluated. The
-original `GADTSingletons` program still needs two source annotations.
-[Interpreter and compatibility boundary](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
 
 A family argument can keep its last invisible binder while GHC infers
 the earlier ones. For `RunVisible @Bool (ReadAt 'True)`, GHC infers
