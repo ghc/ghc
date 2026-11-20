@@ -85,6 +85,18 @@ haddockForeignTest:
 T26114:
 	'$(HADDOCK)' T26114.hs
 
+.PHONY: HaddockErasedExistential
+HaddockErasedExistential:
+	'$(TEST_HC)' -v0 -c -haddock -fwrite-interface -fwrite-ide-info -no-keep-o-files ErasedVectorFilter.hs
+	'$(HADDOCK)' -B "$$('$(TEST_HC)' --print-libdir)" --no-compilation \
+	     --html --hoogle --latex --pretty-html --no-warnings --odir pages \
+	     --package-name=erased-vector --package-version=1 ErasedVectorFilter.hs
+	grep -Fq '>exists</span' pages/ErasedVectorFilter.html
+	grep -Fxq 'type Filtered a = exists (hidden :: Nat) | Vec a hidden' pages/erased-vector.txt
+	grep -Fxq 'type OptionalFiltered a = Maybe (exists (stored :: Nat) | Vec a stored)' pages/erased-vector.txt
+	grep -Fxq 'filterVec :: (a -> Bool) -> Vec a n -> exists (kept :: Nat) | Vec a kept' pages/erased-vector.txt
+	grep -Fxq 'inspectResult :: (exists (observed :: Nat) | Vec a observed) -> Bool' pages/ErasedVectorFilter.tex
+
 # Check that `haddock --incremental` looks for the module in the
 # unit given by `-this-unit-id`.
 .PHONY: haddockIncrementalUnitId

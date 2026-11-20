@@ -31,6 +31,11 @@ test('T26114',
    makefile_test,
    ['T26114'])
 
+test('HaddockErasedExistential',
+     [ignore_stdout, ignore_stderr, req_haddock, extra_files(['ErasedVectorFilter.hs'])],
+     makefile_test,
+     ['HaddockErasedExistential'])
+
 test('haddockIncrementalUnitId',
    [ignore_stderr, req_haddock, extra_files(['IncrementalUnitId.hs'])],
    makefile_test,
