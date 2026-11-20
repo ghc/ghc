@@ -97,7 +97,7 @@ import qualified InterpretedKindUseSite
 import qualified NestedFunctionClient
 import qualified InvisibleFamily
 import IndexedMapClient (mappedCells)
-import LaterMatchabilityClient (laterMatchability)
+import LaterMatchabilityClient (forwardedMap, laterMatchability)
 import qualified TypeLambda
 import qualified TypeLet
 import qualified NativeCase
@@ -1147,6 +1147,7 @@ main = do
     observe "apply Maybe and a type family through a computed arrow kind" InvisibleFamily.wrappedValues
     observe "map cells with a class method over a family prefix and Maybe" mappedCells
     observe "infer the matchability of a family prefix from a later argument" laterMatchability
+    observe "forward an inferred partial-family callback and an ordinary constructor" forwardedMap
     observe "interpret a kind code as an ordinary type constructor" InterpretedKind.optionalFlag
     observe "interpret two applications of the optional type constructor" InterpretedKind.nestedOptional
     observe "choose an interpreted arrow from its expected kind"
