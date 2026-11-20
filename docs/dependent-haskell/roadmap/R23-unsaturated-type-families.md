@@ -380,11 +380,23 @@ programs. Both now compile unchanged.
 [Default signatures](../../../testsuite/tests/dependent/should_compile/T14720.hs)
 and [visible type arguments](../../../testsuite/tests/dependent/should_compile/T15346.hs).
 
-In a variant where `I TMaybe` returns an unsaturated family, writing
-the interpreter's arrow explicitly as `%U` makes it run. The bare
-arrow still leaves the final expression ill-typed. An explicit `%U`
-with the ordinary `Maybe` fails at the family equation. The current
-rules do not infer an implicit argument from an arbitrary value body.
+The optional code can also return an unsaturated family. Keep the
+interpreter's arrow bare and give the same code a second equation.
+The expected kind of `Maybe` selects M at its equation, and the
+unsaturated callback selects U at its equation. A caller can omit the
+annotation on the interpreter's arrow when it supplies the expected
+arrow kind. `UseM (Interpret 'OptionalTag)` and
+`UseU (Interpret 'OptionalTag)` produce `(Just 3,Right 3)` in the Showcase.
+[Callback equation](../examples/open-evaluation/InterpretedKindCallback.hs)
+and [ordinary client](../examples/open-evaluation/InterpretedKindUseSite.hs).
+
+The fully applied `Interpret ('ApplyTag 'OptionalTag 'IntTag)` has kind
+`Type` under both selectors. A value signature defaults to M here and
+rejects `Right 3` at the body. When the interpreter has only the
+unsaturated equation, an explicit `%U` on its arrow makes this fully
+applied use select U. Giving the intermediate function an expected U
+arrow kind also selects U and keeps both equations available.
+[Stripped-interface and negative checks](../examples/open-evaluation/check-interpreted-kind.sh).
 
 An upgrade can also change the meaning of a use whose provider is
 binary-only. An ordinary module can export `get :: F AtBase`, where the

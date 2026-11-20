@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, PolyKinds #-}
 {-# LANGUAGE TemplateHaskell, TypeFamilies, TypeOperators, UndecidableInstances #-}
 
-module InterpretedKind (optionalFlag, nestedOptional) where
+module InterpretedKind (Tag(..), Interpret, optionalFlag, nestedOptional) where
 
 import Data.Kind (Type)
 
@@ -14,6 +14,7 @@ type instance InterpretKind (a ':-> b) = InterpretKind a -> InterpretKind b
 
 data Tag :: Code -> Type where
     FlagTag :: Tag 'Value
+    IntTag :: Tag 'Value
     OptionalTag :: Tag ('Value ':-> 'Value)
     ApplyTag :: Tag (a ':-> b) -> Tag a -> Tag b
 
@@ -23,6 +24,7 @@ $(pure [])
 -- | Apply the interpreted function at the interpreted argument.
 type family Interpret (t :: Tag k) :: InterpretKind k
 type instance Interpret 'FlagTag = Bool
+type instance Interpret 'IntTag = Int
 type instance Interpret 'OptionalTag = Maybe
 type instance Interpret ('ApplyTag f x) = Interpret f (Interpret x)
 

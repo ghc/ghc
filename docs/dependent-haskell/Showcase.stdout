@@ -275,6 +275,7 @@ infer the result kind after passing a visible family argument: Refl
 apply Maybe and a type family through a computed arrow kind: (Just 7,[7])
 interpret a kind code as an ordinary type constructor: Just True
 interpret two applications of the optional type constructor: Just (Just True)
+choose an interpreted arrow from its expected kind: (Just 3,Right 3)
 apply a type lambda to Maybe, Either String and IO: Refl
 partially apply a two-argument type lambda: Refl
 map a type lambda with a constructor case: Refl

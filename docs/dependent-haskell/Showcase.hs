@@ -90,6 +90,7 @@ import qualified FamilySignature
 import qualified ImportedFamily
 import qualified MixedFamily
 import qualified InterpretedKind
+import qualified InterpretedKindUseSite
 import qualified InvisibleFamily
 import qualified TypeLambda
 import qualified TypeLet
@@ -1085,6 +1086,8 @@ main = do
     observe "apply Maybe and a type family through a computed arrow kind" InvisibleFamily.wrappedValues
     observe "interpret a kind code as an ordinary type constructor" InterpretedKind.optionalFlag
     observe "interpret two applications of the optional type constructor" InterpretedKind.nestedOptional
+    observe "choose an interpreted arrow from its expected kind"
+        (InterpretedKindUseSite.atM, InterpretedKindUseSite.atU)
     observe "apply a type lambda to Maybe, Either String and IO" TypeLambda.roadmap
     observe "partially apply a two-argument type lambda" TypeLambda.partial
     observe "map a type lambda with a constructor case" TypeLambda.mixed
