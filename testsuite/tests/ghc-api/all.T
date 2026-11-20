@@ -9,6 +9,11 @@ test('NativeExistentialCore', [req_host_target_ghc, only_ways(['normal']),
                                extra_run_opts(f'"{config.libdir}"')],
      compile_and_run, ['-package ghc -package array -package containers'])
 
+test('NativeExistentialExpr', [req_bco, req_rts_linker, req_process,
+                               req_host_target_ghc, only_ways(['normal']),
+                               extra_run_opts(f'"{config.libdir}" existential-fixture.hi')],
+     compile_and_run, ['-package ghc -package transformers'])
+
 test('OpenTermWhnf', [extra_run_opts(f'"{config.libdir}"')],
      compile_and_run, ['-package ghc'])
 
