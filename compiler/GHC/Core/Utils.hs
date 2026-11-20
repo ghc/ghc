@@ -2392,7 +2392,7 @@ canCollectArgsThroughTick id t
   = tickishFloatable t || cantEtaReduceFun id
 
 -- | Can we eta-reduce the given function?
--- See Note [Eta reduction soundness], criteria (B), (J), and (W).
+-- See Note [Eta reduction soundness], criteria (EtaB), (EtaJ), and (EtaW).
 cantEtaReduceFun :: Id -> Bool
 cantEtaReduceFun fun
   =    hasNoBinding fun -- (B)
