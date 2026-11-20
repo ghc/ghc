@@ -2,8 +2,14 @@
 set -euo pipefail
 export LC_ALL=C
 
+upgrade=false
+if [[ ${1-} == --upgrade ]]; then
+    upgrade=true
+    shift
+fi
 if [[ $# != 3 ]]; then
     echo "Usage: $0 PRE_LEXICAL_RULE_GHC NEW_GHC COMMON_LIBDIR" >&2
+    echo "       $0 --upgrade LEXICAL_RULE_GHC NEW_GHC COMMON_LIBDIR" >&2
     exit 2
 fi
 old=$(realpath "$1")
@@ -13,6 +19,29 @@ src=$(cd "$(dirname "$0")" && pwd)
 tests="$src/../../../../testsuite/tests/dependent/should_run"
 work=$(mktemp -d)
 trap 'rm -rf -- "$work"' EXIT
+if "$upgrade"; then
+    cd "$work"
+    opts=("-B$lib" -v1 -O2 -i -i. -package-env - -dcore-lint -dstg-lint)
+    cp "$src"/{PackageRules,LexicalPackageRules}.hs "$tests/NativePackageRuleClient.hs" .
+    "$old" "${opts[@]}" --make LexicalPackageRules.hs >before.log 2>&1
+    cp -p PackageRules.o control.o
+    if "$old" "${opts[@]}" -c NativePackageRuleClient.hs >client.log 2>&1; then
+        echo "The old interface unexpectedly supplied the private callback." >&2
+        exit 1
+    fi
+    grep -Fq 'Iface id out of scope:  privateIdentity' client.log || { cat client.log >&2; exit 1; }
+    "$new" "${opts[@]}" --make NativePackageRuleClient.hs -o observe >upgrade.log 2>&1 || { cat upgrade.log >&2; exit 1; }
+    grep -Fq 'Compiler now retains private helpers in erased package rules' upgrade.log
+    test ! PackageRules.o -nt control.o
+    ./observe >actual
+    grep -Fxq '((4,3,6),5,1,7,5,6,True)' actual
+    cp -p LexicalPackageRules.o fixed.o
+    "$new" "${opts[@]}" --make NativePackageRuleClient.hs -o observe >warm.log 2>&1
+    test ! LexicalPackageRules.o -nt fixed.o
+    if grep -Fq 'Compiling ' warm.log; then cat warm.log >&2; exit 1; fi
+    echo "Rebuilt the lexical rule provider once and reused the other provider."
+    exit 0
+fi
 opts=("-B$lib" -v0 -O2 -fforce-recomp -i -i. -package-env - -dcore-lint -dstg-lint)
 for level in 1 2 3; do
     dir="$work/$level"

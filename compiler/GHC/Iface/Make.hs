@@ -373,7 +373,7 @@ mkIface_ hsc_env
                                       then Nothing
                                       else Just semantic_mod)
           & set_mi_hsc_src          hsc_src
-          & set_mi_self_recomp      self_recomp
+          & set_mi_self_recomp      (stampPackageRuleProvider iface_rules <$> self_recomp)
           & set_mi_deps             deps
           & set_mi_exports          (mkIfaceExports exports)
 

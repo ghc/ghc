@@ -986,6 +986,10 @@ dffvExpr :: CoreExpr -> DFFV ()
 dffvExpr (Var v)              = insert v
 dffvExpr (App e1 e2)          = dffvExpr e1 >> dffvExpr e2
 dffvExpr (Lam v e)            = extendScope v (dffvExpr e)
+-- See Note [Private helpers in erased package rules].
+dffvExpr (Pack _ _ payload) = dffvExpr payload
+dffvExpr (Unpack witness payload scrut body) =
+  dffvExpr scrut >> extendScope witness (extendScope payload (dffvExpr body))
 dffvExpr (Tick (Breakpoint _ _ ids) e) = mapM_ insert ids >> dffvExpr e
 dffvExpr (Tick _other e)    = dffvExpr e
 dffvExpr (Cast e _)           = dffvExpr e
@@ -994,6 +998,20 @@ dffvExpr (Let (Rec prs) e)    = extendScopeList (map fst prs) $
                                 (mapM_ dffvBind prs >> dffvExpr e)
 dffvExpr (Case e b _ as)      = dffvExpr e >> extendScope b (mapM_ dffvAlt as)
 dffvExpr _other               = return ()
+
+{- Note [Private helpers in erased package rules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An exported rule can open a package and call a private top-level function
+on its fields. A client that loads the rule also needs the function's
+external Name and declaration. Visit the payload of Pack and both
+expressions of Unpack, even if the rule owner's unfolding stays private.
+The two binders of Unpack scope only over its body.
+
+An older interface can contain a local occurrence of a private helper
+without its declaration. GHC.Iface.Recomp marks the producer's flag hash
+when its interface includes a lexical package rule. This rebuilds the
+provider once and lets an unchanged producer be reused on the next build.
+-}
 
 dffvAlt :: CoreAlt -> DFFV ()
 dffvAlt (Alt _ xs r) = extendScopeList xs (dffvExpr r)

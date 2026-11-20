@@ -15,7 +15,7 @@ module GHC.Iface.Syntax (
         IfaceExpr(..), IfaceAlt(..), IfaceLetBndr(..), IfaceBinding,
         IfaceBindingX(..), IfaceMaybeRhs(..), IfaceConAlt(..),
         IfaceIdInfo, IfaceIdDetails(..), IfaceUnfolding(..), IfGuidance(..),
-        IfaceInfoItem(..), IfaceRule(..), IfaceRuleKind(..), ifRuleAuto, hasIfacePackageExpr, IfaceAnnotation(..), IfaceAnnTarget,
+        IfaceInfoItem(..), IfaceRule(..), IfaceRuleKind(..), ifRuleAuto, hasIfacePackageExpr, isLexicalPackageRule, IfaceAnnotation(..), IfaceAnnTarget,
         IfaceWarnings(..), IfaceWarningTxt(..), IfaceStringLiteral(..),
         IfaceDefault(..), IfaceClsInst(..), IfaceFamInst(..), IfaceTickish(..),
         IfaceClassBody(..), IfaceBooleanFormula(..),
@@ -494,6 +494,12 @@ data IfaceRule
         ifRuleKind   :: IfaceRuleKind,
         ifRuleOrph   :: IsOrphan   -- Just like IfaceClsInst
     }
+
+-- | Identify an exported user rule that constructs or opens an erased package.
+isLexicalPackageRule :: IfaceRule -> Bool
+isLexicalPackageRule rule = case ifRuleKind rule of
+    IfaceErasedUserRule -> any hasIfacePackageExpr (ifRuleRhs rule : ifRuleArgs rule)
+    _ -> False
 
 -- | Check interface syntax without forcing a typed unfolding.
 hasIfacePackageExpr :: IfaceExpr -> Bool
@@ -2864,7 +2870,7 @@ instance Binary IfaceFamInst where
         return (IfaceFamInst fam tys name orph)
 
 instance Binary IfaceRule where
-    put_ bh (IfaceRule a1 a2 a3 a4 a5 a6 a7 a8) = do
+    put_ bh rule@(IfaceRule a1 a2 a3 a4 a5 a6 a7 a8) = do
         put_ bh a1
         put_ bh a2
         put_ bh a3
@@ -2879,7 +2885,7 @@ instance Binary IfaceRule where
             putByte bh 2
           IfaceErasedUserRule -> do
             requireIfaceEvidenceVersion bh ErasedUserRuleEvidence
-            when (any hasIfacePackageExpr (a6 : a5)) $
+            when (isLexicalPackageRule rule) $
               requireIfaceEvidenceVersion bh LexicalPackageRuleEvidence
             putByte bh 3
         put_ bh a8
