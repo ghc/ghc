@@ -21,7 +21,8 @@ cd ../client
 if grep -Fq 'Simplifier iteration=' fallback.log; then cat fallback.log; exit 1; fi
 reject() {
     local file=$1 code=$2 diagnostic=$3 status=0
-    "${g[@]}" -O0 "${flags[@]}" -c "$file.hs" >reject.log 2>&1 || status=$?
+    shift 3
+    "${g[@]}" -O0 "${flags[@]}" "$@" -c "$file.hs" >reject.log 2>&1 || status=$?
     if [[ $status != 1 ]] || ! grep -Fq "[$code]" reject.log ||
         ! grep -Fq "$diagnostic" reject.log; then
         cat reject.log
@@ -38,9 +39,10 @@ reject NativeRetainedCastDomainReject GHC-83865 'DomainToken Char'
 sed '/^bad ::/,$d; s/^module NativeRetainedCastDomainReject where/module OrdinaryRoleWitness where/' \
     NativeRetainedCastDomainReject.hs >OrdinaryRoleWitness.hs
 "${g[@]}" -O0 "${flags[@]}" -c OrdinaryRoleWitness.hs
+reject NativeRetainedCastDomainWorker GHC-05617 'In the second argument of' -DWRONG_BRANCH_LENGTH
 "${g[@]}" -O0 "${flags[@]}" -c NativeRetainedCastDomainWorker.hs
 mkdir ordinary
-cp NativeRetainedCastDomainWorker.hi NativeRetainedCastDomainClient.hs ordinary/
+cp NativeRetainedCastDomainWorker.hi NativeRetainedCastDomainClient.hs PackedVecLibrary.hi ordinary/
 cd ordinary
 "${g[@]}" -O0 "${flags[@]}" -c NativeRetainedCastDomainClient.hs
 "${g[@]}" NativeRetainedCastDomainClient.o ../NativeRetainedCastDomainWorker.o \

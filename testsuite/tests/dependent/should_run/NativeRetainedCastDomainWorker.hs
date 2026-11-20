@@ -1,8 +1,9 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, RankNTypes #-}
-module NativeRetainedCastDomainWorker (observe, forceWorker, forceIndex) where
+{-# LANGUAGE AllowAmbiguousTypes, CPP, DataKinds, ExperimentalDependentTypes, GADTs, PolyKinds, RankNTypes, ScopedTypeVariables, StandaloneKindSignatures, TypeApplications #-}
+module NativeRetainedCastDomainWorker (observe, forceWorker, forceIndex, observeBranch) where
 
 import Data.IORef (newIORef, readIORef)
-import PackedVecLibrary (Nat(..), Vec, toList)
+import Data.Kind (Type)
+import PackedVecLibrary (Add, Nat(..), Vec, toList)
 import ParameterizedIndexLibrary
 
 observe :: IO ([Int], [Int], [Int])
@@ -34,3 +35,23 @@ forceIndex =
         token :: TargetToken
         token = error "demanded token"
     in length (toList (applyTokenVector demanding token))
+
+type BranchVector :: forall n. Vec Bool n -> Type
+data BranchVector xs where
+    BranchVector :: BranchVector xs
+
+observeVector :: forall n. foreach (xs :: Vec Bool n) -> BranchVector xs
+observeVector _ = BranchVector
+
+branchVector :: forall m. foreach (cut :: Nat)
+             -> foreach (xs :: Vec Bool (Add cut m)) -> BranchVector xs
+#ifdef WRONG_BRANCH_LENGTH
+branchVector Z xs = observeVector @('S m) xs
+#else
+branchVector Z xs = observeVector @m xs
+#endif
+branchVector (S k) xs = observeVector @('S (Add k m)) xs
+
+observeBranch :: foreach (cut :: Nat) -> foreach (xs :: Vec Bool (Add cut 'Z)) -> Bool
+observeBranch cut xs = case branchVector @'Z cut xs of
+    BranchVector -> True
