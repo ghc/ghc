@@ -84,6 +84,8 @@ import GHC.Unit.Module.Warnings
 import GHC.Unit.Module.Deps
 
 import Control.Monad
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.State
 import Data.List (isPrefixOf, sortBy, sort, sortOn)
 import qualified Data.Map as Map
@@ -711,9 +713,11 @@ checkFlagHash hsc_env iface self_recomp = do
       UpToDate
         | old_fp `notElem` guarded_fps
         , backendGeneratesCode (backend dflags)
-        , mi_hsc_src iface == HsSrcFile
-        , couldExportGuardedListFilter iface ->
-            liftIO $ recheck "Compiler now checks guarded list filters"
+        , mi_hsc_src iface == HsSrcFile -> do
+          candidate <- couldExportGuardedListFilter iface
+          if candidate
+            then liftIO $ recheck "Compiler now checks guarded list filters"
+            else pure UpToDate
       _ -> pure flags
     let check_family_uses
           | old_fp `elem` (staged_fp : class_default_fps) = pure UpToDate
@@ -1272,24 +1276,107 @@ couldExportCallbackCase iface = any candidate (mi_decls iface)
     opaque IfaceAppTy{} = True
     opaque _ = False
 
--- | Check exported signatures of the form @(a -> Bool) -> [a] -> [a]@.
--- The signature selects recompilation. The Core check decides publication.
-couldExportGuardedListFilter :: ModIface -> Bool
-couldExportGuardedListFilter iface = any candidate (mi_decls iface)
+-- | A signature component with its quantified variables and synonym arguments.
+-- See Note [Looking through type synonyms for guarded list filters].
+data FilterIfaceType = FilterIfaceType IfaceType [(IfLclName, Either Int FilterIfaceType)]
+
+-- | Check whether an exported signature could have the filter shape.
+-- See Note [Looking through type synonyms for guarded list filters].
+couldExportGuardedListFilter :: ModIface -> IfG Bool
+couldExportGuardedListFilter iface = anyM candidate (mi_decls iface)
   where
     exports = mkNameSet (concatMap availNames (mi_exports iface))
-    candidate (_, IfaceId{ifName = n, ifType = ty}) = n `elemNameSet` exports && filter_type ty
-    candidate _ = False
+    local_decls = mkNameEnv (type_declarations iface)
+    candidate (_, IfaceId{ifName = n, ifType = ty})
+      | n `elemNameSet` exports = isJust <$> runMaybeT (filter_type 0 (FilterIfaceType ty []))
+    candidate _ = pure False
 
-    filter_type (IfaceForAllTy _ _ body) = filter_type body
-    filter_type (IfaceFunTy FTF_T_T _ _ (IfaceFunTy FTF_T_T _ _ (IfaceTyVar a) (IfaceTyConApp bool IA_Nil))
-                 (IfaceFunTy FTF_T_T _ _ input output))
-      | ifaceTyConName bool == boolTyConName = list_element a input && list_element a output
-    filter_type _ = False
+    filter_type depth ty = lift (view ty) >>= \case
+      Nothing -> pure ()
+      Just (FilterIfaceType (IfaceForAllTy _ (Bndr binder _) body) args) ->
+        filter_type (depth + 1) (FilterIfaceType body ((ifaceBndrName binder, Left depth) : args))
+      Just (FilterIfaceType (IfaceFunTy FTF_T_T _ _ callback rest) args) -> do
+        variable <- callback_element (FilterIfaceType callback args)
+        lift (view (FilterIfaceType rest args)) >>= \case
+          Nothing -> pure ()
+          Just (FilterIfaceType (IfaceFunTy FTF_T_T _ _ input output) rest_args) -> do
+            from <- list_element (FilterIfaceType input rest_args)
+            to <- list_element (FilterIfaceType output rest_args)
+            case catMaybes [variable, from, to] of
+              first : others -> guard (all (== first) others)
+              [] -> pure ()
+          _ -> mzero
+      _ -> mzero
 
-    list_element a (IfaceTyConApp tc (IA_Arg (IfaceTyVar ty) _ IA_Nil)) =
-      ifaceTyConName tc == listTyConName && a == ty
-    list_element _ _ = False
+    callback_element ty = lift (view ty) >>= \case
+      Nothing -> pure Nothing
+      Just (FilterIfaceType (IfaceFunTy FTF_T_T _ _ domain result) args) -> do
+        lift (view (FilterIfaceType result args)) >>= \case
+          Nothing -> element (FilterIfaceType domain args)
+          Just (FilterIfaceType (IfaceTyConApp tc IA_Nil) _)
+            | ifaceTyConName tc == boolTyConName -> element (FilterIfaceType domain args)
+          _ -> mzero
+      _ -> mzero
+
+    list_element ty = lift (view ty) >>= \case
+      Nothing -> pure Nothing
+      Just (FilterIfaceType (IfaceTyConApp tc (IA_Arg arg _ IA_Nil)) args)
+        | ifaceTyConName tc == listTyConName -> element (FilterIfaceType arg args)
+      _ -> mzero
+
+    element ty = lift (view ty) >>= \case
+      Nothing -> pure Nothing
+      Just (FilterIfaceType (IfaceTyVar var) args) -> pure (either Just (const Nothing) =<< lookup var args)
+      _ -> mzero
+
+    view component@(FilterIfaceType ty args) = case ty of
+      IfaceTyVar var | Just (Right arg) <- lookup var args -> view arg
+      IfaceTyConApp tc actuals | let name = ifaceTyConName tc, not (isWiredInName name) ->
+        declaration name >>= \case
+          Just IfaceSynonym{ifBinders = binders, ifSynRhs = rhs} ->
+            let actual_types = appArgsIfaceTypes actuals in
+            if binders `equalLength` actual_types
+              then view (FilterIfaceType rhs
+                          (zip (map ifTyConBinderName binders)
+                               [Right (FilterIfaceType arg args) | arg <- actual_types]))
+              else pure Nothing
+          Just _ -> pure (Just component)
+          Nothing -> pure Nothing
+      IfaceAppTy{} -> pure Nothing
+      IfaceCastTy{} -> pure Nothing
+      _ -> pure (Just component)
+
+    declaration name = case nameModule_maybe name of
+      Just owner
+        | owner == mi_semantic_module iface -> pure (lookupNameEnv local_decls name)
+        | otherwise -> do
+          provider <- readRecompProvider (text "Checking guarded list filter type") owner
+          pure (provider >>= lookup name . type_declarations)
+      Nothing -> pure Nothing
+
+    type_declarations provider = concatMap (named_declaration . snd) (mi_decls provider)
+    named_declaration decl@IfaceClass{ifBody = IfConcreteClass{ifATs = ats}} =
+      (ifName decl, decl) : [(ifName family, family) | IfaceAT family _ <- ats]
+    named_declaration decl = [(ifName decl, decl)]
+
+{- Note [Looking through type synonyms for guarded list filters]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An old interface can store Select a in the type of an exported filter.
+The new compiler must recheck the producer to publish the checked equations.
+Use the local declarations and the ordinary recompilation provider lookup
+to inspect saturated synonyms at the arrow, callback and list positions.
+Keep each argument in its original scope when entering a synonym body.
+Give each quantified variable a distinct binder depth for the element check.
+The presentation-only IfaceType substitution cannot handle every binder.
+
+The Core shape check expands synonyms and treats known family heads as
+rigid. A cast, unresolved declaration or other opaque application can hide
+the necessary shape. Treat that component as unknown and continue checking
+the visible components. A known structural mismatch excludes the signature.
+The final Core check still decides publication. The existing guard fingerprint
+records that check on the next write, so an opaque candidate can cause one
+extra rebuild.
+-}
 
 -- | An exported function can hide its result pair behind a type synonym.
 couldExportPairBuilder :: ModIface -> Bool
