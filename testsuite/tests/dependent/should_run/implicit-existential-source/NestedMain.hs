@@ -17,6 +17,14 @@ lists (ls, rs) = (list ls, list rs)
 cells :: PackedPair a -> ([a], [a])
 cells p = lists p
 
+partial :: PackedPair a -> Int -> ([a], [a])
+partial p =
+    let selected = prefixes p
+    in selected
+  where
+    prefixes :: (Vec l a, Vec r a) -> Int -> ([a], [a])
+    prefixes (ls, rs) n = (take n (list ls), take n (list rs))
+
 built :: a -> ([a], [a])
 built a = lists (buildPair a)
 
@@ -51,6 +59,8 @@ main = do
     print (take 1 (fst (cells yes)), take 1 (snd (cells no)),
            built True, observeProduct (productPair Nil (Cons 9 Nil)))
     print (ignore bottom, kindOK hiddenKind)
+    _ <- evaluate (partial bottom)
+    print (partial (partitionPair odd (Cons 7 (Cons 2 Nil))) 1)
     result <- try (evaluate (fst (cells bottom))) :: IO (Either ErrorCall [Int])
     case result of
         Left e | "forced the pair" == takeWhile (/= '\n') (displayException e) ->

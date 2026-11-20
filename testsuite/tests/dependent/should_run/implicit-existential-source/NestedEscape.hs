@@ -28,3 +28,29 @@ knownKind p = atNat p
   where
     atNat :: Proxy (v :: Nat) -> Bool
     atNat _ = True
+
+firstFunction :: PackedPair a -> () -> Vec n a
+firstFunction p = left p
+  where
+    left :: (Vec l a, Vec r a) -> () -> Vec l a
+    left (ls, _) () = ls
+
+secondFunction :: PackedPair a -> () -> Vec n a
+secondFunction p = right p
+  where
+    right :: (Vec l a, Vec r a) -> () -> Vec r a
+    right (_, rs) () = rs
+
+witnessFunction :: PackedKind -> () -> Proxy (v :: k)
+witnessFunction p = reveal p
+  where
+    reveal :: Proxy a -> () -> Proxy a
+    reveal value () = value
+
+inferredFunction :: PackedPair a -> () -> Vec n a
+inferredFunction p =
+    let selected = left p
+    in selected
+  where
+    left :: (Vec l a, Vec r a) -> () -> Vec l a
+    left (ls, _) () = ls
