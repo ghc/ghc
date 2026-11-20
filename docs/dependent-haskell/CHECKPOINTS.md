@@ -87,6 +87,19 @@ inspect one on the development machine, use `git show` with the full
 ref or commit. The [roadmap](ROADMAP.md#where-this-fork-stands) identifies
 which behavior is available in the published compiler.
 
+At `1928e531f9`, a top-level signature can repeat the same type-level case
+in its argument and result. A checked mapper can appear partially applied
+with a named callback when its object is present or when only its interface
+is available. A staged family can take its arrow kind from the caller.
+Both compiler stages reproduced all 308 Showcase lines at `-O0`, default
+`-O1`, and default `-O2`. The self-hosted compiler also reproduced them in
+GHCi. All 15 focused tests passed. The dependent directory recorded 294
+passes and the same 20 unexpected failures by name and category as
+`4bb020f702`.
+[Source case](examples/open-evaluation/NativeCase.hs),
+[mapper](examples/open-evaluation/OpenMapSource.hs)
+and [staged result](examples/open-evaluation/InterpretedKindUseSite.hs).
+
 | Local ref under `refs/archive/dependent-haskell/` | Commit | What was checked |
 | --- | --- | --- |
 | `r04-abstract-projections` | `2fb04af78d` | A source-free client uses both general pair projections. The native Showcase runs 267 lines. Old witness workers rebuild once and then reuse their artifacts. |
