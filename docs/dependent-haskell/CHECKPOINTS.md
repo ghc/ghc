@@ -8,6 +8,15 @@ increments.
 
 ## Family and package checkpoints
 
+Both compiler stages at `f1749eccba` reproduced all 348 Showcase lines
+at stripped `-O0` and default `-O1` and `-O2`. Self-hosted GHCi matched
+the same output. The external proof plugin accepted the checked candidate
+and rejected the bad candidate. The typed splice and its single finalizer
+passed. Of 28 focused tests, 27 ran and passed in the normal way. One
+requires GHCi. The dependent directory ran 327 normal cases across 334
+tests. It recorded 307 passes and the same 20 failures, by name and
+failure category, as the 340-line compiler.
+
 At `6ac33d43bf`, a checked vector split takes an independent runtime
 cut. The success case supplies the proof needed to rejoin the vectors.
 The compiler relink matched all 349 Showcase lines at `-O0`, default
