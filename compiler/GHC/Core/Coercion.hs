@@ -746,7 +746,7 @@ mkAppCo co arg
 
   | Just (ty1, r) <- isReflCo_maybe co
   , Just (tc, tys) <- splitTyConApp_maybe ty1
-    -- Expand type synonyms; a TyConAppCo can't have a type synonym (#9102)
+    -- Expand the synonym once the arguments reach its arity (#9102).
   = mkTyConAppCo r tc (zip_roles (tyConRolesX r tc) tys)
   where
     zip_roles (Inf r1 _)  []            = [downgradeRole r1 Nominal arg]

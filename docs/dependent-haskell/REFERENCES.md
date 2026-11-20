@@ -5880,6 +5880,21 @@ index. The matchable and unmatchable arrow choices are specific to GHC.
 [Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html)
 and [the separate-module example](examples/open-evaluation/NestedFunctionClient.hs).
 
+### Passing a type synonym as a function
+
+Proposal 242 explicitly includes type synonyms. Its `Const` example
+has an unmatchable arrow for each parameter. A source module can pass
+`Column String` to `Map` and expand the synonym when `Map` supplies
+the column type. The compiler can transport equal arguments through
+that partial application. The prefix does not justify an injectivity
+annotation on a family result. Agda functions also support currying.
+Agda additionally gives functions eta equality. The current Haskell
+experiment does not establish that equality for two distinct partial
+synonym names.
+[Proposal 242, matchabilities](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#matchabilities),
+[Agda 2.8, lambda abstraction](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html#lambda-expressions)
+and [column example](examples/open-evaluation/TypeLambda.hs).
+
 ### Inferring a prefix of invisible family arguments
 
 Proposal 242 gives partial type family applications a kind with

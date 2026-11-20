@@ -1024,7 +1024,7 @@ check_syn_tc_app (ve@ValidityEnv{ ve_ctxt = ctxt, ve_expand = expand })
                            -- See Note [Unsaturated type synonyms in GHCi]
   = check_args_only expand
 
-  | isUnsaturatedUserFamily tc tys
+  | isPartialTypeFunction tc tys
   = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
        ; if enabled || ve_imported_synonym ve || is_inferred ctxt
            then check_args_only expand
@@ -1063,12 +1063,12 @@ check_syn_tc_app (ve@ValidityEnv{ ve_ctxt = ctxt, ve_expand = expand })
            check_type (ve { ve_expand = expand
                           , ve_imported_synonym = imported }) ty'
 
--- | Find a raw partial family without substituting or expanding synonyms.
+-- | Find a written partial family or synonym before substituting its arguments.
 -- See Note [Imported partial family aliases].
 hasWrittenPartialFamily :: Type -> Bool
 hasWrittenPartialFamily = go
   where
-    go (TyConApp tc tys) = isUnsaturatedUserFamily tc tys || any go tys
+    go (TyConApp tc tys) = isPartialTypeFunction tc tys || any go tys
     go (AppTy f a) = go f || go a
     go (FunTy _ ma mult a b) = any go [ma, mult, a, b]
     go (ForAllTy ma (Bndr v _) ty) = go ma || go (varType v) || go ty

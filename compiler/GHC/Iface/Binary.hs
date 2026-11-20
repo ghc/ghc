@@ -321,7 +321,7 @@ writeBinIface profile traceBinIface compressionLevel hi_path mod_iface = do
 -- | Header suffix required by the retained evidence in the payload.
 evidenceSuffix :: IfaceEvidenceVersion -> String
 evidenceSuffix requirements
-  | needs ErasedUserRuleEvidence || needs LexicalPackageRuleEvidence = feature_set
+  | needs ErasedUserRuleEvidence || needs LexicalPackageRuleEvidence || needs PartialSynonymEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -336,6 +336,7 @@ evidenceSuffix requirements
     feature_set = featureSetPrefix ++ intercalate "+" [name | (name, feature) <- independentFeatures, needs feature]
 
 legacyEvidenceSuffix :: IfaceEvidence -> String
+legacyEvidenceSuffix PartialSynonymEvidence = featureSetPrefix ++ "partial-synonym"
 legacyEvidenceSuffix ErasedUserRuleEvidence = featureSetPrefix ++ "user-rule"
 legacyEvidenceSuffix LexicalPackageRuleEvidence = featureSetPrefix ++ "lexical-rule"
 legacyEvidenceSuffix DepFunCoEvidence           = "-retained-depfunco-v1"
@@ -360,7 +361,8 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("implicit", ImplicitExistentialEvidence)
                       , ("scoped", ScopedSigmaEvidence)
                       , ("user-rule", ErasedUserRuleEvidence)
-                      , ("lexical-rule", LexicalPackageRuleEvidence) ]
+                      , ("lexical-rule", LexicalPackageRuleEvidence)
+                      , ("partial-synonym", PartialSynonymEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion

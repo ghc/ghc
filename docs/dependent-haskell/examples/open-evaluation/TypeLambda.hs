@@ -4,7 +4,7 @@
 module TypeLambda
   ( L, Captured, Shadowed, WithError, Mixed, Held, CaseShadow, Rebuild
   , IndexedTag(..), IndexedCase, IndexedCaseInferred
-  , roadmap, partial, mixed, indexedFields
+  , roadmap, partial, optionalColumns, mixed, indexedFields
   ) where
 
 import Data.Kind (Type)
@@ -17,6 +17,14 @@ type Map :: (a %U -> b) -> [a] -> [b]
 type family Map f xs where
   Map f '[] = '[]
   Map f (x ': xs) = f x ': Map f xs
+
+-- | A column read can fail or return a missing cell.
+type Column err a = Either err (Maybe a)
+
+-- | Apply one error type to both column readers.
+optionalColumns :: Map (Column String) '[Int, Char]
+                :~: '[Either String (Maybe Int), Either String (Maybe Char)]
+optionalColumns = Refl
 
 -- | Apply each type constructor to Int.
 type L = Map (\f -> f Int) [Maybe, Either String, IO]

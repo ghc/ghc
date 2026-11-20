@@ -651,6 +651,27 @@ fixed matchability annotations. The explicit print flag shows the annotations.
 A matchability mismatch still shows the expected and actual annotations.
 [Display rule in proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#showing-matchabilities).
 
+## Passing a partially applied type synonym
+
+`type Column err a = Either err (Maybe a)` can supply `Column String`
+as the callback to `Map`. At saturation the ordinary synonym expander
+produces the result type. A constant synonym also works when its
+remaining parameter does not occur in the result. The compiler checks
+the unmatchable kind of each missing binder.
+
+An ordinary module can import a fully applied alias that contains a
+checked prefix. Writing a partial synonym in that module still requires
+the extension. Older readers report GHC-47808 at the import when the
+provider interface contains the new form. An interface containing only
+fully applied synonyms keeps its original encoding.
+
+One equality remains open. Given `type Again e a = Column e a`, the
+two partial synonyms `Again Bool` and `Column Bool` do not yet compare
+equal. Their fully applied forms expand to the same type.
+[Source example](../examples/open-evaluation/TypeLambda.hs),
+[regression](../../../testsuite/tests/dependent/should_run/NativePartialSynonym.hs)
+and [references](../REFERENCES.md#passing-a-type-synonym-as-a-function).
+
 ## Completion boundary
 
 The first increments establish a shared kernel foundation for R05 and R03.

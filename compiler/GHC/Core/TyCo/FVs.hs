@@ -1050,7 +1050,9 @@ keeps its existing implicit M classification in this stage.
 For an oversaturated TyConApp, inspect the residual kind of each application.
 The declared family prefix and its result kind have separate rules. Rebuild
 only the excess arguments as AppTy nodes, then use the same check as AppTy.
-Do not treat every excess family argument as injective.
+Do not treat every excess family argument as injective. A partial synonym
+also keeps its head until saturation. For example, knowing Drop a in
+`type Drop a b = b` gives no information about a.
 
 A FunTy is a structural application of the FUN constructor. Its metadata is
 injective even when that metadata is U. This does not invert a U function's
@@ -1090,6 +1092,7 @@ isInjectiveInType tv ty
     go_tc tc tys
       | (args, extra@(_:_)) <- splitAt (tyConArity tc) tys
       = go (foldl AppTy (TyConApp tc args) extra)
+      | tyConMustBeSaturated tc, tys `lengthLessThan` tyConArity tc = False
       | isTypeFamilyTyCon tc = False
       | otherwise           = any go tys
 
@@ -1166,6 +1169,8 @@ inj_vars_of_type look_under_tfs = go
     go_tc tc tys
       | (args, extra@(_:_)) <- splitAt (tyConArity tc) tys
       = go (foldl AppTy (TyConApp tc args) extra)
+      | tyConMustBeSaturated tc, tys `lengthLessThan` tyConArity tc
+      = mempty
       | isTypeFamilyTyCon tc
       = if | look_under_tfs
            , Injective flags <- tyConInjectivityInfo tc

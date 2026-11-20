@@ -482,6 +482,10 @@ can_eq_nc _ _ _ ev NomEq lhs@(TyConApp tc args) _ rhs@(TyConApp tc' _) _
   , lhs `tcEqType` rhs = canEqReflexive ev NomEq lhs
 
 -- See Note [Reflexivity after retained normalization].
+can_eq_nc ces _ _ ev eq_rel lhs@(TyConApp tc args) _ rhs@(TyConApp tc' _) _
+  | bothRewritten ces, tc == tc', isPartialTypeFunction tc args
+  , lhs `tcEqType` rhs
+  = canEqReflexive ev eq_rel lhs
 can_eq_nc ces _rdr_env _envs ev eq_rel ty1@(TermVarTy v1) _ (TermVarTy v2) _
   | bothRewritten ces, v1 == v2
   = canEqReflexive ev eq_rel ty1
@@ -635,9 +639,9 @@ can_eq_nc ces _rdr_env _envs ev eq_rel ty1 _ ty2 _
    -- here for better error messages rather than decomposing into AppTys;
    -- hence not using a direct match on TyConApp
 
-  , not (isTypeFamilyTyCon tc1 || isTypeFamilyTyCon tc2)
-    -- A type family at the top of LHS or RHS: we want to fall through
-    -- to the canonical-LHS cases (look for canEqLHS_maybe)
+  , not (tyConMustBeSaturated tc1 || tyConMustBeSaturated tc2)
+    -- A saturated family can become a canonical LHS. A partial type
+    -- function stays opaque. Neither permits ordinary TyCon decomposition.
 
   -- See (TC1) in Note [Canonicalising TyCon/TyCon equalities]
   , let role         = eqRelRole eq_rel

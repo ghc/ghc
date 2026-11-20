@@ -192,7 +192,7 @@ test('NativeClosedCallback',
 
 test('NativeUnsaturatedFamily',
      [only_ways(['normal']),
-      extra_files(['NativeUnsaturatedProvider.hs', 'NativeUnsaturatedClient.hs',
+      extra_files(['NativeUnsaturatedProvider.hs', 'NativeUnsaturatedClient.hs', 'NativePartialSynonym.hs',
                    'NativeUnsaturatedInverse.hs', 'NativeUnsaturatedEta.hs'])],
      run_command, ['bash NativeUnsaturatedFamily.sh "{compiler}" "{libdir}"'])
 test('NativeUnsaturatedInvisible',

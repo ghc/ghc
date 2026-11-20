@@ -118,7 +118,7 @@ module GHC.Core.Type (
         isCoercionTy_maybe, isForAllTy,
         isForAllTy_ty, isForAllTy_co,
         isForAllTy_invis_ty,
-        isPiTy, isTauTy, isFamFreeTy, isUnsaturatedUserFamily,
+        isPiTy, isTauTy, isFamFreeTy, isUnsaturatedUserFamily, isPartialTypeFunction,
         isAtomicTy,
 
         isValidJoinPointType,
@@ -1925,7 +1925,13 @@ coAxNthLHS ax ind =
 -- See Note [Partial type family applications].
 isUnsaturatedUserFamily :: TyCon -> [Type] -> Bool
 isUnsaturatedUserFamily tc args
-  | user_family (tyConFlavour tc)
+  | TypeSynonymFlavour <- tyConFlavour tc = False
+  | otherwise = isPartialTypeFunction tc args
+
+-- | A family or type synonym before all of its unmatchable arguments are supplied.
+isPartialTypeFunction :: TyCon -> [Type] -> Bool
+isPartialTypeFunction tc args
+  | type_function (tyConFlavour tc)
   , Nothing <- builtInClosedTyFamTyCon_maybe tc
   , let missing = tyConArity tc - length args
   , missing > 0 =
@@ -1934,9 +1940,10 @@ isUnsaturatedUserFamily tc args
   where
     -- Include checked TcTyCon headers in the initial kind-checking pass.
     -- Their real family TyCons only exist after this mutually recursive group.
-    user_family ClosedTypeFamilyFlavour = True
-    user_family (OpenFamilyFlavour IAmType _) = True
-    user_family _ = False
+    type_function TypeSynonymFlavour = True
+    type_function ClosedTypeFamilyFlavour = True
+    type_function (OpenFamilyFlavour IAmType _) = True
+    type_function _ = False
 
     unmatchable 0 _ = True
     unmatchable n kind
@@ -1964,6 +1971,11 @@ arguments. In particular, failure to split two partial applications
 does not establish their apartness. The source validity check controls
 which modules can write a partial family. Core Lint must also accept
 a legal partial application obtained from an imported interface.
+The same rule applies to a type synonym before it has enough arguments
+to expand. Its TyConAppCo may carry forward equality of its supplied
+arguments. At saturation mkTyConAppCo expands the synonym as usual.
+The interface marks each partial synonym in a type or coercion. An
+older reader can otherwise treat its supplied arguments as injective.
 See proposal #242 and the R23 card in docs/dependent-haskell/roadmap.
 -}
 
@@ -1975,7 +1987,10 @@ isFamFreeTy (TermVarTy _)     = True
 isFamFreeTy (ExistsTy _ b ty) = isFamFreeTy (varType b) && isFamFreeTy ty
 isFamFreeTy (DepFunTy _ b ty) = isFamFreeTy (varType b) && isFamFreeTy ty
 isFamFreeTy (LitTy {})        = True
-isFamFreeTy (TyConApp tc tys) = all isFamFreeTy tys && isFamFreeTyCon tc
+-- coreView has already expanded every saturated synonym. A partial
+-- synonym can expose a redex when the caller supplies another argument.
+isFamFreeTy (TyConApp tc tys) = not (isTypeSynonymTyCon tc)
+                             && isFamFreeTyCon tc && all isFamFreeTy tys
 isFamFreeTy (AppTy a b)       = isMatchableFunTy (typeKind a) && isFamFreeTy a && isFamFreeTy b
 isFamFreeTy (FunTy _ ma w a b) = isFamFreeTy ma && isFamFreeTy w && isFamFreeTy a && isFamFreeTy b
 isFamFreeTy (ForAllTy ma _ ty)  = isFamFreeTy ma && isFamFreeTy ty

@@ -1091,6 +1091,7 @@ main = do
     observe "use a nested arrow for Either and a short-circuiting callback"
         (NestedFunctionClient.binaryChoice, NestedFunctionClient.conjunction False (error "unused operand"))
     observe "apply a type lambda to Maybe, Either String and IO" TypeLambda.roadmap
+    observe "map a partially applied column type synonym" TypeLambda.optionalColumns
     observe "partially apply a two-argument type lambda" TypeLambda.partial
     observe "map a type lambda with a constructor case" TypeLambda.mixed
     observe "read fields from two indexed type case branches" TypeLambda.indexedFields
