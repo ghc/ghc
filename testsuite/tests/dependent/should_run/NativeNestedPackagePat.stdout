@@ -1,0 +1,8 @@
+([Just True,Nothing],[Just True,Nothing])
+([Nothing,Nothing,Just True],[Nothing,Nothing,Just True])
+selected vector, inner pair and guard package forced
+typed quotation preserved the payload constructors
+([Just True,Nothing],[Just True,Nothing])
+([Nothing,Nothing,Just True],[Nothing,Nothing,Just True])
+selected vector, inner pair and guard package forced
+typed quotation preserved the payload constructors

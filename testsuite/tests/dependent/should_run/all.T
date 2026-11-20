@@ -234,6 +234,12 @@ test('NativeGadtRetainedSum',
       extra_files(['NativeGadtRetainedSumProvider.hs', 'NativeGadtRetainedSumClient.hs'])],
      run_command, ['bash NativeGadtRetainedSum.sh "{compiler}" "{libdir}"'])
 
+test('NativeNestedPackagePat',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['NativeGadtRetainedSumProvider.hs', 'NativeNestedPackagePatProvider.hs',
+                   'NativeNestedPackagePatClient.hs', 'NativeNestedPackagePatBad.hs'])],
+     run_command, ['bash NativeNestedPackagePat.sh "{compiler}" "{libdir}"'])
+
 test('NativeTypeLet',
      [only_ways(['normal']), extra_files([open_eval_dir + 'TypeLet.hs'])],
      run_command, ['bash NativeTypeLet.sh "{compiler}" "{libdir}"'])
