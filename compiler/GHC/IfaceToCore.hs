@@ -2323,6 +2323,40 @@ tcIfaceExpr (IfaceLam (bndr, os) body)
     tcIfaceOneShot IfaceOneShot b = setOneShotLambda b
     tcIfaceOneShot _            b = b
 
+tcIfaceExpr (IfacePack schema witness payload)
+  = do { schema' <- tcIfaceType schema
+       ; witness' <- tcIfaceType witness
+       ; payload' <- tcIfaceExpr payload
+       ; when (isTyCoArg payload') $
+           failIfM (text "An existential Pack payload must be a term in interface.")
+       ; case coreFullView schema' of
+           ExistsTy a body
+             | typeKind witness' `eqType` liftedTypeKind
+             , substTyWith [a] [witness'] body `eqType` exprType payload'
+             -> return (Pack schema' witness' payload')
+           _ -> failIfM (text "Invalid existential Pack in interface.") }
+
+tcIfaceExpr (IfaceUnpack witness@(name, _) value package body)
+  = do { package' <- tcIfaceExpr package
+       ; when (isTyCoArg package') $
+           failIfM (text "An existential package must be a term in interface.")
+       ; case coreFullView (exprType package') of
+           ExistsTy a payload_ty ->
+             bindIfaceTyVar witness $ \witness' ->
+             bindIfaceId value $ \value' ->
+             do { check_exists_kind name (text "Unpack witness") (varType witness')
+                ; unless (isManyTy (idMult value')
+                          && substTyWith [a] [mkTyVarTy witness'] payload_ty `eqType` varType value') $
+                    failIfM (text "Invalid existential payload binder in interface.")
+                ; body' <- tcIfaceExpr body
+                ; when (isTyCoArg body') $
+                    failIfM (text "An existential Unpack body must be a term in interface.")
+                ; let result_fvs = tyCoVarsOfType (exprType body')
+                ; when (witness' `elemVarSet` result_fvs || value' `elemVarSet` result_fvs) $
+                    failIfM (text "Existential Unpack binder escapes its scope in interface.")
+                ; return (Unpack witness' value' package' body') }
+           _ -> failIfM (text "Unpack requires an existential package in interface.") }
+
 tcIfaceExpr (IfaceApp fun arg)
   = App <$> tcIfaceExpr fun <*> tcIfaceExpr arg
 
