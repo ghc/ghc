@@ -285,7 +285,8 @@ tcOpenImplicitPackage loc schema checked result_ty check_body = open schema chec
         ExistsTy ImplicitExists binder payload_ty ->
           do { let origin = UnifyForAllSkol schema
              ; skol <- mkSkolemInfo origin
-             ; name <- newSysName (getOccName binder)
+             ; uniq <- newUnique
+             ; let name = mkSystemNameAt uniq (getOccName binder) loc
              ; witness <- pushTcLevelM_ $ newSkolemTyVar skol name (tyVarKind binder)
              ; let body_ty = substTyWith [binder] [mkTyVarTy witness] payload_ty
              ; payload <- newSysLocalId (fsLit "unpacked") ManyTy body_ty
@@ -313,6 +314,7 @@ matchesImplicitPayloadPat schema
       BangPat _ nested -> go constructors nested
       LazyPat _ nested -> go constructors nested
       ConPat { pat_con = L _ (WithUserRdr _ name) } -> name `elem` constructors
+      TuplePat _ fields boxity -> tupleDataConName boxity (length fields) `elem` constructors
       _ -> False
 
 {- Note [Invisible retained definition patterns]
