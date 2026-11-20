@@ -194,6 +194,153 @@ failures before reconsidering those goldens.
 [RAE_T32a](../../../testsuite/tests/dependent/should_fail/RAE_T32a.hs)
 and [T13135](../../../testsuite/tests/dependent/should_fail/T13135.hs).
 
+### Constructor fields used at runtime and after promotion
+
+Stock GHC 9.14.1 accepts this module. The fork at `73bffa1a15`
+reports GHC-83865 at `'Tag`. The field of `Box` has a U arrow, and
+the promoted constructor `'Tag` has an M arrow.
+
+```haskell
+{-# LANGUAGE DataKinds, GADTs, PolyKinds, TypeFamilies #-}
+module Legacy where
+
+data Tag = Tag Bool
+type Callback a b = a -> b
+data Box where
+  Box :: Callback Bool Tag -> Box
+type FamilyArgument = 'Box 'Tag
+makeBox :: Box
+makeBox = Box Tag
+runCallback :: Box -> Tag
+runCallback (Box f) = f True
+```
+
+Fixing the synonym arrow to `%M` lets the promoted constructor take
+`'Tag`. It rejects `Box Tag` because the term constructor `Tag` has a U
+arrow. A compiler prototype inferred a hidden matchability binder for
+the synonym and still assigned U to the field at the constructor
+declaration. The same field boundary occurs in
+[`T12442` at the promoted `MkEff`](../../../testsuite/tests/dependent/should_compile/T12442.hs).
+
+The fork accepts an explicit index on the constructor. The promoted use
+chooses M. The term constructor builds a box with a U field.
+
+```haskell
+{-# LANGUAGE DataKinds, GADTs, Modifiers, PolyKinds #-}
+{-# LANGUAGE StandaloneKindSignatures, TypeAbstractions #-}
+module Explicit where
+
+import Data.Kind (Type)
+import GHC.Exts (M, U, Matchability)
+
+data Tag = Tag Bool
+type Callback :: forall (m :: Matchability). Type -> Type -> Type
+type Callback @m a b = a %m -> b
+data Box (m :: Matchability) where
+  Box :: forall (m :: Matchability). Callback @m Bool Tag -> Box m
+type FamilyArgument = ('Box @M 'Tag :: Box M)
+makeBox :: Box U
+makeBox = Box Tag
+runCallback :: Box U -> Tag
+runCallback (Box f) = f True
+```
+
+Restoring the unchanged source would require a policy for preserving a
+matchability choice through constructor fields and promotion. Proposal
+#242 defaults bare synonym RHS arrows to U and gives an explicit
+polymorphic constructor as a migration for promotion.
+[Synonym RHS rule](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#rhs-of-type-synonyms),
+[inference rules](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#inference)
+and [promotion](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#promotion).
+
+### Arrow patterns in family equations
+
+After setting the `(~>)` synonym to M in `GADTSingletons`, the first
+remaining error is at the right-hand side of `PromoteX (Either a)`.
+The earlier equation `Promote (a -> b) = PromoteX a ~> PromoteX b`
+matches U. It leaves `Promote (Type %M -> Type)` stuck. The
+nested-family result patch lets `DemoteX (TyCon2 Either)` use a
+second selector and leaves this `Promote` pattern unchanged.
+[Original `GADTSingletons` test](../../../testsuite/tests/dependent/should_compile/GADTSingletons.hs).
+
+GHC 9.14.1 accepts the two modules below. The joint compiler at
+`73bffa1a15` and the nested-family overlay reject `'True` with
+GHC-83865. The provider compiles and the client reads only `Probe.hi`.
+
+```haskell
+{-# LANGUAGE DataKinds, GADTs, KindSignatures, PolyKinds, TypeFamilies, TypeOperators #-}
+module Probe where
+
+import Data.Kind (Type)
+import Data.Type.Equality ((:~:)(Refl))
+
+type family Promote (k :: Type) :: Type
+type instance Promote (a -> b) = Bool
+
+type family PromoteX (a :: k) :: Promote k
+runtime :: Promote (Bool -> Bool) :~: Bool
+runtime = Refl
+```
+
+
+```haskell
+{-# LANGUAGE DataKinds, PolyKinds, TypeFamilies #-}
+module Client where
+
+import Probe
+
+type instance PromoteX Maybe = 'True
+```
+
+An explicit `%U` leaves the error in the client. An explicit `%M`
+makes the client compile and breaks the provider's `Refl` proof.
+The writer of the `Promote` equation can opt in to both arrows with
+`Modifiers` and the pattern `(a %(m :: Matchability) -> b)`.
+Both modules then compile. The client requires no change or extension.
+This changes one checked equation, so other bare patterns keep their
+current U-only meaning. The separate `(~>)` synonym still needs its
+own choice.
+
+These open family equations compile together on both fork compilers.
+`Select` is also used as the result kind of another family.
+
+```haskell
+{-# LANGUAGE DataKinds, GADTs, Modifiers, PolyKinds, TypeFamilies, TypeOperators #-}
+module Separate where
+
+import Data.Type.Equality ((:~:)(Refl))
+import GHC.Exts (M)
+
+type family Select t
+type instance Select (a -> b) = Bool
+type instance Select (a %M -> b) = Ordering
+
+type family SelectX (a :: k) :: Select k
+type instance SelectX Maybe = 'LT
+
+runtime :: Select (Bool -> Bool) :~: Bool
+runtime = Refl
+
+constructor :: Select (Bool %M -> Bool) :~: Ordering
+constructor = Refl
+```
+
+Making the first pattern polymorphic makes both equations match an
+M arrow. Both compilers report GHC-34447 because the results differ.
+A default that generalizes bare patterns would affect existing
+equations even if it applied only to families used as result kinds.
+The compatibility policy for unchanged source remains open.
+
+Proposal #242's M rule for application patterns concerns the kind of
+the unknown head `f` in `f x`. The U examples for arrow types in
+instance heads are class instances. The inference section restricts
+automatic generalization to kinds. A rule that generalizes the
+matchability in the written family pattern `(a -> b)` would need
+its own specification.
+[Application patterns](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#application-in-pattern-position),
+[class instances](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#arrow-type-in-type-class-instances)
+and [inference](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#inference).
+
 ### Applying a type at a family-defined arrow kind
 
 `Wrap False` returns `Maybe`. `Wrap True` returns the unsaturated
