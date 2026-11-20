@@ -241,11 +241,19 @@ fi
 mkdir "$out/runtime-client"
 cd "$out/runtime-client"
 cp ../filter-client/*.hi .
+cat >ForwardFilter.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes, RequiredTypeArguments #-}
+module ForwardFilter (check) where
+import PreludeFilterRuntime (runtimeFilterBoundFor)
+import PreludeFilterSource (Negation)
+check = runtimeFilterBoundFor (type Negation)
+HS
 cat >RuntimeFilterRun.hs <<'HS'
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
 module Main where
 import Control.Exception (ErrorCall(..), evaluate, try)
 import Data.IORef (newIORef, readIORef, writeIORef)
+import ForwardFilter (check)
 import NativeRetainedSourceOperand (ordinaryNot, select)
 import PreludeFilterLengthProof (AtMost(..))
 import PreludeFilterRuntime
@@ -268,6 +276,8 @@ main = do
     print (case packRuntimeBound (error "package forced list") of RuntimeFilterBound _ _ -> True)
     putStrLn (outer (packRuntimeBound (False : error "keep forced tail")))
     putStrLn (outer (packRuntimeBound (True : error "skip forced tail")))
+    let xs = False : error "forwarded checker forced tail"
+    print (outer (RuntimeFilterBound xs (check negationResult xs)))
     result <- try (evaluate (outer (packRuntimeBound [error "predicate head"])))
     print (case result of Left (ErrorCall "predicate head") -> True; _ -> False)
     refHead <- newIORef (error "strict worker forced its head")
@@ -276,8 +286,8 @@ main = do
     selected <- try (evaluate (select True x))
     print (ordinaryNot False, case selected of Left (ErrorCall "strict worker forced its head") -> True; _ -> False)
 HS
-"${filter[@]}" -c RuntimeFilterRun.hs
-"${filter[@]}" RuntimeFilterRun.o ../filter-client/PreludeFilter{LengthProof,Runtime}.o \
+"${filter[@]}" -c ForwardFilter.hs RuntimeFilterRun.hs
+"${filter[@]}" RuntimeFilterRun.o ForwardFilter.o ../filter-client/PreludeFilter{LengthProof,Runtime}.o \
     ../filter-client/NativeRetainedSourceOperand.o \
     ../filter/PreludeFilterSource.o ../length-source/PreludeMapLength{Size,Source}.o -o runtime-filter-run
 cat >runtime-filter.expected <<'OUT'
@@ -288,6 +298,7 @@ cat >runtime-filter.expected <<'OUT'
 True
 keep
 skip
+"keep"
 True
 'l'
 (True,True)

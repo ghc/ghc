@@ -61,7 +61,7 @@ import GHC.Types.Demand
 import GHC.Types.Unique ( hasKey )
 import GHC.Types.Basic
 import GHC.Types.Tickish
-import GHC.Types.Var    ( isTyCoVar )
+import GHC.Types.Var    ( isNonCoVarId, isTyCoVar )
 import GHC.Types.Var.Set (VarSet, emptyVarSet, elemVarSet, unionVarSet)
 
 import GHC.Builtin.WiredIn.Prim( realWorldStatePrimTy )
@@ -795,6 +795,16 @@ Floating S Z into a fresh binding n changes the expected type to Vec a n.
 The new runtime Id is opaque, so the original vector type cannot use that
 Id in place of its constructor index. Keep the retained argument in place.
 Ordinary arguments in the same application can still be made trivial.
+If an argument's type mentions a runtime Id, keep it inside a top-level
+RHS. Naming that argument would give a top-level binder a type that refers
+to the runtime Id. Core Tidy can give the RHS a local alias, but the type
+of the top-level binder would still refer to the original Id.
+See Note [Local indices across Core Tidy] in GHC.Iface.Tidy.
+
+This guard applies only to optional preparation of a top-level RHS.
+The continuation paths call makeTrivial with NotTopLevel, so they still
+bind nontrivial arguments before duplication. A constructor field stays
+lazy in its containing RHS. CorePrep can bind it after index erasure.
 -}
 
 prepareRhs :: HasDebugCallStack
@@ -883,6 +893,9 @@ makeTrivial env top_lvl dmd occ_fs expr
   | exprIsTrivial expr                          -- Already trivial
   || not (bindingOk top_lvl expr expr_ty)       -- Cannot trivialise
                                                 --   See Note [Cannot trivialise]
+  || (isTopLevel top_lvl                       -- See Note [Keep retained arguments in prepareRhs]
+      && sm_core_mode (seMode env) == RetainedCore
+      && anyFreeVarsOfType isNonCoVarId expr_ty)
   = return (emptyLetFloats, expr)
 
   | Cast expr' co <- expr
