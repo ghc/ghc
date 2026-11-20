@@ -9,6 +9,17 @@ mapper f (x:xs) = f x : mapper f xs
 
 #ifdef CHANGE_MAPPER
 {-# RULES "drop mapper traversal" [~1] forall f xs. mapper f xs = [] #-}
+#elif defined(CONS_RULE)
+{-# RULES "mapper/cons" [~1] forall f x xs.
+    mapper f (x : xs) =
+#if defined(FORCE_HEAD)
+      x `seq` (f x : mapper f xs)
+#elif defined(DROP_TAIL)
+      f x : []
+#else
+      f x : mapper f xs
+#endif
+  #-}
 #else
 {-# RULES "mapper/id" [~1] forall xs. mapper (\x -> x) xs = xs #-}
 #endif

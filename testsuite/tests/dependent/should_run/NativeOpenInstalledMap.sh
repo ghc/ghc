@@ -135,3 +135,82 @@ if "${identity[@]}" -v1 --make Main.hs -o run >changed.log 2>&1 ||
     cat changed.log >&2
     exit 1
 fi
+
+# A rule can expose the checked cons equation with an opaque callback.
+# The ordinary proof client checks the head with an unknown tail.
+mkdir "$out"/{cons,cons-client}
+cd "$out/cons"
+cp "$out/identity/PreludeMapSource.hs" "$src/NativeOpenInstalledMapProducer.hs" .
+cat >Cons.hs <<'HS'
+module Main where
+import Control.Exception (SomeException, evaluate, try)
+import qualified NativeOpenInstalledMapProducer as W
+
+{-# NOINLINE observe #-}
+observe :: (Bool -> Bool) -> Bool -> [Bool] -> Bool
+observe f x xs = case W.mapper f (x : xs) of
+    _ : _ : _ -> True
+    _ -> False
+
+main :: IO ()
+main = do
+    result <- try (evaluate (observe undefined undefined [True]))
+    print (either (const "forced") show (result :: Either SomeException Bool))
+HS
+cons=("${ghc[@]}" -O1 -fenable-rewrite-rules -DCONS_RULE)
+"${cons[@]}" -c NativeOpenInstalledMapProducer.hs
+"${cons[@]}" -c PreludeMapSource.hs
+"${cons[@]}" --make Cons.hs -ddump-rule-firings -o run >cons.log
+grep -Fq 'Rule fired: mapper/cons' cons.log
+[[ $(./run) == '"True"' ]]
+"${ghc[@]}" --show-iface NativeOpenInstalledMapProducer.hi >cons.iface
+grep -Fq 'FinalCoreSourceTable T:mapper' cons.iface
+grep -Fq '"mapper/cons"' cons.iface
+
+cd "$out/cons-client"
+cp ../cons/{NativeOpenInstalledMapProducer,PreludeMapSource}.hi .
+cat >ConsProof.hs <<'HS'
+{-# LANGUAGE CPP, DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
+module ConsProof where
+import Data.Proxy (Proxy)
+import Data.Type.Equality ((:~:)(Refl))
+import PreludeMapSource (PreludeNegateAll)
+#ifdef SECOND_RULE
+import Orphan ()
+#endif
+
+proof :: Proxy xs -> PreludeNegateAll ('True ': xs) :~: ('False ': PreludeNegateAll xs)
+proof _ = Refl
+HS
+proof=("${ghc[@]}" -O1 -fenable-rewrite-rules -c ConsProof.hs)
+"${proof[@]}" >proof.log 2>&1 || { cat proof.log >&2; exit 1; }
+line=$(awk '/^proof _ = Refl/ { print NR }' ConsProof.hs)
+
+# A checked early rule does not justify a second rule in a later phase.
+sed 's/\[~1\]/[1]/' "$out/rewrite/Orphan.hs" >Orphan.hs
+"${ghc[@]}" -O1 -fenable-rewrite-rules -c Orphan.hs
+if "${proof[@]}" -DSECOND_RULE >orphan.log 2>&1 ||
+   ! grep -Fq "ConsProof.hs:$line:" orphan.log ||
+   ! grep -Fq '[GHC-83605]' orphan.log; then
+    cat orphan.log >&2
+    exit 1
+fi
+
+for control in FORCE_HEAD DROP_TAIL; do
+    cd "$out/cons"
+    "${cons[@]}" -D"$control" -fforce-recomp -c NativeOpenInstalledMapProducer.hs
+    "${cons[@]}" -D"$control" --make Cons.hs -ddump-rule-firings -o run >cons.log
+    grep -Fq 'Rule fired: mapper/cons' cons.log
+    case "$control" in
+        FORCE_HEAD) [[ $(./run) == '"forced"' ]] ;;
+        DROP_TAIL) [[ $(./run) == '"False"' ]] ;;
+    esac
+    cd "$out/cons-client"
+    cp ../cons/NativeOpenInstalledMapProducer.hi .
+    if "${proof[@]}" >changed.log 2>&1 ||
+       ! grep -Fq "ConsProof.hs:$line:" changed.log ||
+       ! grep -Fq '[GHC-83605]' changed.log; then
+        cat changed.log >&2
+        exit 1
+    fi
+done

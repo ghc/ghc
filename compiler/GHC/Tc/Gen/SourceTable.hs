@@ -364,12 +364,12 @@ hasSourceMethodRuleAt rules first fun = any user_rule (getRules rules (globalise
     user_rule rule = not (isAutoRule rule || isNeverActive (ruleActivation rule))
 
 -- | Check that every visible rule of a certified mapper preserves its two list equations.
--- See Note [Identity traversal rules].
+-- See Note [Checked list traversal rules].
 checkedMapperRules :: RuleEnv -> Id -> Bool
 checkedMapperRules env owner = case filter (not . isNeverActive . ruleActivation)
                                          (getRules env (globaliseId owner)) of
     [] -> False
-    rules -> all identityTraversal rules
+    rules -> all (\rule -> identityTraversal rule || consTraversal rule) rules
   where
     identityTraversal Rule{ru_fn = fn, ru_bndrs = [a, xs],
                            ru_args = [Core.Type input, Core.Type output,
@@ -380,16 +380,45 @@ checkedMapperRules env owner = case filter (not . isNeverActive . ruleActivation
         && isId xs && xs == arg && arg == result && eqType (varType xs) (mkListTy input)
     identityTraversal _ = False
 
-{- Note [Identity traversal rules]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    consTraversal Rule{ru_fn = fn, ru_bndrs = binders,
+                       ru_args = [Core.Type input, Core.Type output, Core.Var f, spine],
+                       ru_rhs = rhs}
+      | fn == idName owner
+      , Just a <- getTyVar_maybe input, Just b <- getTyVar_maybe output
+      , (Core.Var in_cons, [Core.Type in_ty, Core.Var x, Core.Var xs]) <- Core.collectArgs spine
+      , in_cons == dataConWorkId consDataCon, eqType in_ty input
+      , lengthIs binders 5, mkUniqSet binders == mkUniqSet [a, b, f, x, xs]
+      , isId f, isId x, isId xs
+      , Just (domain, range) <- caseArrow (varType f)
+      , eqType input domain, eqType output range
+      , eqType (varType x) input, eqType (varType xs) (mkListTy input)
+      , (Core.Var out_cons, [Core.Type out_ty, hd, tl]) <- Core.collectArgs rhs
+      , out_cons == dataConWorkId consDataCon, eqType out_ty output
+      , (Core.Var callback, [Core.Var h']) <- Core.collectArgs hd
+      , callback == f, h' == x
+      , (Core.Var mapper, [Core.Type a', Core.Type b', Core.Var f', Core.Var t']) <- Core.collectArgs tl
+      = mapper == owner && eqType a' input && eqType b' output && f' == f && t' == xs
+    consTraversal _ = False
+
+{- Note [Checked list traversal rules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For the checked list mapper, mapping the identity lambda over an empty
 list gives the empty list. On a cons it returns the original head and
 maps the same lambda over the tail. Neither side forces the head or
 the tail. These equations also preserve a divergent spine.
 
+On a cons, a rule can also expose the checked mapper's own equation.
+The left side supplies the list constructor, so neither side needs to
+force its fields. The right side builds a lazy cons with the same
+callback application and the same recursive call on the input tail.
+The callback stays a rule parameter. This reasoning covers a divergent
+callback and does not require properties of any particular function.
+The rule introduces no fixed rule head except the same mapper.
+See getRules in GHC.Core.Rules for the list constructor.
+
 Check the binders and both sides of every visible rule. An unverified
-rule can change the result even when another rule is the identity
-traversal. Recheck after processing declarations and splices.
+rule can change the result or its demand even if the other rules pass.
+Recheck after processing declarations and splices.
 -}
 
 -- | Check the selected method at the occurrence, and record its semantic dependencies.
@@ -1389,9 +1418,9 @@ continues. See keepValidatedSourceMappers in GHC.Driver.Main.Passes.
 The final worker check says what the produced binding does. It does not
 prove the rules that another module can use to rewrite a call. The distinct
 interface origin requires the consumer to disable rewriting or check
-every visible rule. The identity traversal rule can pass this check
-because its RHS exposes no new call. A fusion rule can expose other
-rule heads and requires a separate proof.
+every visible rule. The identity traversal and the cons equation can
+pass this check. See Note [Checked list traversal rules]. A fusion
+rule can expose other rule heads and requires a separate proof.
 
 Forming a type records the interface dependency without using the
 equation. The solver checks the rules when it uses an equation,

@@ -318,3 +318,9 @@ ordinary runtime `map` call. The executable prints
 head carried by the imported witness. The final result comes from the
 caller's rewritten runtime call.
 [Run the example](examples/boundary-evidence/check-map-witness.sh).
+
+An ordinary mapper with a rule that exposes its checked cons equation
+can also supply a fresh equality with rules enabled. Its rule keeps the
+same callback application and recursive call under a lazy cons. Rules
+that force the head or drop the tail block the equality.
+[Checked cons rule](roadmap/R16-open-term-evaluator.md#using-the-mappers-cons-equation-as-a-rewrite-rule).
