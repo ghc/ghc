@@ -1591,6 +1591,16 @@ normalise_type ty
       | otherwise
       = pprPanic "normalise_type: invalid retained function"
           (ppr v $$ ppr (varType v) $$ ppr body)
+    -- See Note [Keeping existential types opaque during normalisation].
+    go ty@ExistsTy{} =
+      do { lc <- getLC
+         ; role <- getRole
+         ; let left = substTy (lcSubstLeft lc) ty
+               right = substTy (lcSubstRight lc) ty
+         ; if eqType left right
+           then return (mkReflRedn role right)
+           else pprPanic "normalise_type: existential changed by lifting context"
+                  (ppr left $$ ppr right) }
     go (TyConApp tc tys) = normalise_tc_app tc tys
     go ty@(LitTy {})
       = do { r <- getRole
@@ -1650,6 +1660,15 @@ normalise_type ty
                         mkCoherenceRightMRedn role
                           (mkAppRedns fun_redn redns)
                           (mkSymMCo res_co) } }
+
+{- Note [Keeping existential types opaque during normalisation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Inferred bindings normalise their types in mkInferredPolyId. An explicit
+Pack application can supply an existential type directly. Apply the ambient
+substitution to the existential as a unit. The Core coercion language has
+no congruence rule for existentials. Return reflexive evidence only when
+the two sides of the ambient substitution leave the same existential.
+-}
 
 normalise_args :: Kind    -- of the function
                -> Infinite Role  -- roles at which to normalise args

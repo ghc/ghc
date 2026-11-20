@@ -532,7 +532,7 @@ tcExistsPack rn_expr args expected
        ; let (type_args, rest) = span is_type_arg (filter_not_parens args)
        ; case rest of
            [EValArg { ea_arg = witness }, EValArg { ea_arg = payload }] ->
-             do { schema <- check_schema (map ea_hs_ty type_args)
+             do { schema <- check_schema [ty | ETypeArg { ea_hs_ty = ty } <- type_args]
                 ; case coreFullView schema of
                     ExistsTy binder body ->
                       do { witness_ty <- expr_to_type witness >>= \ty ->

@@ -1,10 +1,11 @@
 {-# LANGUAGE ExplicitNamespaces #-}
-{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
--- | Explicit construction and matching of erased existential packages.
---
--- 'Pack' is special syntax when ExperimentalDependentTypes is enabled.
+{- | Explicit construction and matching of erased existential packages.
+
+'Pack' is special syntax when ExperimentalDependentTypes is enabled.
+-}
 module GHC.Exists (pattern Pack) where
 
 -- This declaration gives Pack a constructor name for ordinary import and
