@@ -1071,32 +1071,6 @@ ifaceDeclsForTc iface
       = isCompulsorySource src || not (hasIfacePackageExpr rhs)
     keep _ = True
 
--- | Check interface syntax without forcing a typed unfolding.
-hasIfacePackageExpr :: IfaceExpr -> Bool
-hasIfacePackageExpr = go
-  where
-    go IfacePack{} = True
-    go IfaceUnpack{} = True
-    go (IfaceTuple _ args) = any go args
-    go (IfaceLam _ rhs) = go rhs
-    go (IfaceApp fun arg) = go fun || go arg
-    go (IfaceCase scrut _ alts) = go scrut || any (\(IfaceAlt _ _ rhs) -> go rhs) alts
-    go (IfaceECase scrut _) = go scrut
-    go (IfaceLet binding rhs) = goBind binding || go rhs
-    go (IfaceCast rhs _) = go rhs
-    go (IfaceTick (IfaceBreakpoint _ args) rhs) = any go args || go rhs
-    go (IfaceTick _ rhs) = go rhs
-    go _ = False
-
-    goBind (IfaceNonRec binder rhs) = goPair (binder, rhs)
-    goBind (IfaceRec pairs) = any goPair pairs
-
-    goPair (IfLetBndr _ _ info _, rhs) = go rhs || any goInfo info
-
-    goInfo (HsUnfold _ (IfCoreUnfold _ _ _ rhs)) = go rhs
-    goInfo (HsUnfold _ (IfDFunUnfold _ args)) = any go args
-    goInfo _ = False
-
 {- Note [Erased package unfoldings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 An existential type can pass through an optimized module as an abstract

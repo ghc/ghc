@@ -321,7 +321,7 @@ writeBinIface profile traceBinIface compressionLevel hi_path mod_iface = do
 -- | Header suffix required by the retained evidence in the payload.
 evidenceSuffix :: IfaceEvidenceVersion -> String
 evidenceSuffix requirements
-  | needs ErasedUserRuleEvidence = feature_set
+  | needs ErasedUserRuleEvidence || needs LexicalPackageRuleEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -337,6 +337,7 @@ evidenceSuffix requirements
 
 legacyEvidenceSuffix :: IfaceEvidence -> String
 legacyEvidenceSuffix ErasedUserRuleEvidence = featureSetPrefix ++ "user-rule"
+legacyEvidenceSuffix LexicalPackageRuleEvidence = featureSetPrefix ++ "lexical-rule"
 legacyEvidenceSuffix DepFunCoEvidence           = "-retained-depfunco-v1"
 legacyEvidenceSuffix ConstructorCaseEvidence   = "-retained-constructor-case-v1"
 legacyEvidenceSuffix RetainedSpecRuleEvidence  = "-retained-specialisation-rule-v1"
@@ -358,7 +359,8 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("erased", ErasedExistentialEvidence)
                       , ("implicit", ImplicitExistentialEvidence)
                       , ("scoped", ScopedSigmaEvidence)
-                      , ("user-rule", ErasedUserRuleEvidence) ]
+                      , ("user-rule", ErasedUserRuleEvidence)
+                      , ("lexical-rule", LexicalPackageRuleEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion
@@ -391,6 +393,10 @@ An automatically generated retained specialization rule uses its own
 tag in the rule origin byte. Older readers reject a retained rule at
 the header. Ordinary user and automatic rules retain their byte values.
 See Note [Exported retained specialisations] in GHC.Core.Rules.
+
+An erased user rule can construct or open a package on either side.
+Record that requirement when writing the rule expression. A reader that
+only supports calls at erased package types rejects the newer header.
 
 An index alias uses a distinct DEFAULT alternative tag. An older reader
 accepts ordinary DEFAULT alternatives from the same compiler. It must reject

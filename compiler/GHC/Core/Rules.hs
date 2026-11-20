@@ -1430,6 +1430,20 @@ It's not especially easy to deal with eta reducing the template,
 and never happens, because no one write eta-expanded left-hand-sides.
 -}
 
+-- See Note [Matching erased packages].
+match renv subst (Pack schema1 w1 p1) (Pack schema2 w2 p2) MRefl
+  = do { subst1 <- match_ty renv subst schema1 schema2
+       ; subst2 <- match_ty renv subst1 w1 w2
+       ; match renv subst2 p1 p2 MRefl }
+
+match renv subst (Unpack w1 p1 pkg1 body1) (Unpack w2 p2 pkg2 body2) MRefl
+  = do { subst1 <- match renv subst pkg1 pkg2 MRefl
+       ; subst2 <- match_ty renv subst1 (varType w1) (varType w2)
+       ; let under_witness = rnMatchBndr2 renv w1 w2
+       ; subst3 <- match_ty under_witness subst2 (idMult p1) (idMult p2)
+       ; subst4 <- match_ty under_witness subst3 (varType p1) (varType p2)
+       ; match (rnMatchBndr2 under_witness p1 p2) subst4 body1 body2 MRefl }
+
 ------------------------ Case expression ---------------------
 {- Disabled: see Note [Matching cases] below
 match renv (tv_subst, id_subst, binds) e1
@@ -1456,6 +1470,19 @@ match renv subst (Case e1 x1 ty1 alts1) (Case e2 x2 ty2 alts2) mco
 -- Everything else fails
 match _ _ _e1 _e2 _mco = -- pprTrace "Failing at" ((text "e1:" <+> ppr _e1) $$ (text "e2:" <+> ppr _e2)) $
                          Nothing
+
+{- Note [Matching erased packages]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A Pack carries both the existential type and a witness chosen by the
+producer. Match both types before the payload. Different witnesses can
+give the same payload type when the existential binder is unused.
+
+Unpack opens the package for the body. Match the scrutinees in the
+outer scope. Rename the witnesses together before matching the payload
+binder types. Rename the payload binders together before matching the
+bodies. The usual escape check in match_tmpl_var then prevents a rule
+variable from capturing a locally opened witness or payload.
+-}
 
 -------------
 eta_reduce :: RuleMatchEnv -> CoreExpr -> Maybe (RuleMatchEnv, CoreExpr)

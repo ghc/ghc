@@ -15,7 +15,7 @@ module GHC.Iface.Syntax (
         IfaceExpr(..), IfaceAlt(..), IfaceLetBndr(..), IfaceBinding,
         IfaceBindingX(..), IfaceMaybeRhs(..), IfaceConAlt(..),
         IfaceIdInfo, IfaceIdDetails(..), IfaceUnfolding(..), IfGuidance(..),
-        IfaceInfoItem(..), IfaceRule(..), IfaceRuleKind(..), ifRuleAuto, IfaceAnnotation(..), IfaceAnnTarget,
+        IfaceInfoItem(..), IfaceRule(..), IfaceRuleKind(..), ifRuleAuto, hasIfacePackageExpr, IfaceAnnotation(..), IfaceAnnTarget,
         IfaceWarnings(..), IfaceWarningTxt(..), IfaceStringLiteral(..),
         IfaceDefault(..), IfaceClsInst(..), IfaceFamInst(..), IfaceTickish(..),
         IfaceClassBody(..), IfaceBooleanFormula(..),
@@ -494,6 +494,32 @@ data IfaceRule
         ifRuleKind   :: IfaceRuleKind,
         ifRuleOrph   :: IsOrphan   -- Just like IfaceClsInst
     }
+
+-- | Check interface syntax without forcing a typed unfolding.
+hasIfacePackageExpr :: IfaceExpr -> Bool
+hasIfacePackageExpr = go
+  where
+    go IfacePack{} = True
+    go IfaceUnpack{} = True
+    go (IfaceTuple _ args) = any go args
+    go (IfaceLam _ rhs) = go rhs
+    go (IfaceApp fun arg) = go fun || go arg
+    go (IfaceCase scrut _ alts) = go scrut || any (\(IfaceAlt _ _ rhs) -> go rhs) alts
+    go (IfaceECase scrut _) = go scrut
+    go (IfaceLet binding rhs) = goBind binding || go rhs
+    go (IfaceCast rhs _) = go rhs
+    go (IfaceTick (IfaceBreakpoint _ args) rhs) = any go args || go rhs
+    go (IfaceTick _ rhs) = go rhs
+    go _ = False
+
+    goBind (IfaceNonRec binder rhs) = goPair (binder, rhs)
+    goBind (IfaceRec pairs) = any goPair pairs
+
+    goPair (IfLetBndr _ _ info _, rhs) = go rhs || any goInfo info
+
+    goInfo (HsUnfold _ (IfCoreUnfold _ _ _ rhs)) = go rhs
+    goInfo (HsUnfold _ (IfDFunUnfold _ args)) = any go args
+    goInfo _ = False
 
 -- | Origin and reader requirements of an interface rule.
 data IfaceRuleKind = IfaceUserRule | IfaceAutoRule | IfaceRetainedAutoRule | IfaceErasedUserRule
@@ -2853,6 +2879,8 @@ instance Binary IfaceRule where
             putByte bh 2
           IfaceErasedUserRule -> do
             requireIfaceEvidenceVersion bh ErasedUserRuleEvidence
+            when (any hasIfacePackageExpr (a6 : a5)) $
+              requireIfaceEvidenceVersion bh LexicalPackageRuleEvidence
             putByte bh 3
         put_ bh a8
     get bh = do

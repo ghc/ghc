@@ -103,8 +103,9 @@ supportsErasedUserRule _ _ = False
 A source rule can call functions whose argument or result is an erased
 package. For example, open (hide x) = x has ordinary applications on both
 sides. Check the head type, binder types, arguments, RHS and stable metadata.
-The match uses the existing application and variable rules. A lexical Pack
-or Unpack and a runtime-dependent index need separate matching support.
+Pack matches its schema, witness and payload. Unpack compares the package
+outside the two binders and matches the body under both binders.
+See Note [Matching erased packages] in GHC.Core.Rules.
 
 A rule from the defining module can travel with its head across an interface.
 Give this rule its own wire tag. The reader resolves the head in the defining
@@ -192,6 +193,14 @@ gentleForm scan = NativeScan $ do
         CheckUserRules -> runNativeScan scan
         _           -> pure True
 
+-- | Detect an erased form and check its children at each supported use.
+erasedForm :: NativeScan -> NativeScan
+erasedForm children = NativeScan $ do
+    purpose <- gets scanPurpose
+    case purpose of
+        DetectNative -> pure True
+        _ -> runNativeScan children
+
 -- | Report an unsupported compiler operation when a scan finds a native type.
 rejectNative :: String -> Bool -> IO ()
 rejectNative context found =
@@ -214,9 +223,9 @@ scanExpr (Let bind body) = scanBind bind <> scanExpr body
 scanExpr (Case scrut b result alts) =
     scanExpr scrut <> scanBinder b <> scanType result <> foldMap scanAlt alts
 scanExpr (Pack schema witness payload) =
-    gentleForm (scanType schema <> scanType witness <> scanExpr payload)
+    erasedForm (scanType schema <> scanType witness <> scanExpr payload)
 scanExpr (Unpack witness payload package body) =
-    gentleForm (scanExpr package <> scanBinder witness <> scanBinder payload <> scanExpr body)
+    erasedForm (scanExpr package <> scanBinder witness <> scanBinder payload <> scanExpr body)
 scanExpr (Cast body co) = scanExpr body <> scanCo co
 scanExpr (Tick tick body) = scanTick tick <> scanExpr body
 scanExpr (Type ty) = scanType ty
@@ -320,11 +329,7 @@ scanType (TermVarTy v) =
     gentleForm (NativeScan (pure (not (isNativeOpaqueValueId v))) <> scanVarKind v)
 scanType (TermAppTy f arg) = gentleForm (scanCallHead f <> scanType arg)
 -- The type binder itself is safe for Quick Look. Check its kind and payload.
-scanType (ExistsTy _ binder body) = NativeScan $ do
-    purpose <- gets scanPurpose
-    case purpose of
-        DetectNative -> pure True
-        _ -> runNativeScan (scanType (varType binder) <> scanType body)
+scanType (ExistsTy _ binder body) = erasedForm (scanType (varType binder) <> scanType body)
 scanType (DepFunTy _ b body) =
     gentleForm (scanRetainedIndex b <> scanType body)
 scanType (LitTy _) = mempty
