@@ -576,6 +576,29 @@ selector still fail.
 [ordinary client](../examples/open-evaluation/LaterMatchabilityClient.hs)
 and [interface and rejection controls](../../../testsuite/tests/dependent/should_run/NativeLaterMatchability.sh).
 
+### Class methods with a later receiver
+
+The ordinary client calls `mapIndexed (fmap not) familyInput` using a
+stripped provider interface. The receiver exposes the partial family
+`Pick 'True` through one nominal forwarding equation. That receiver fixes
+the shared callback index and its unmatchable arrow before `fmap` can
+commit to a matchable head. The `Maybe` receiver still selects M.
+
+The same program runs with and without `ImpredicativeTypes`. In both
+modes, the checker reads the receiver's declared type and then checks terms
+in source order. An empty receiver can leave the function index unknown.
+An explicit M argument still rejects the family receiver.
+Passing a producer call directly, as in `mapIndexed (fmap not) (makeReceiver ())`,
+still fails in both modes. Binding the call to a local name succeeds.
+Without Quick Look, an explicit result signature on
+`getCells (mapIndexed (fmap not) familyInput) :: [Maybe Bool]` can also
+select `Maybe` before the receiver fixes the partial family.
+The Showcase prints `([Just True,Nothing],[Just True,Nothing])` for the
+named family receiver and the named `Maybe` receiver.
+[Provider](../examples/open-evaluation/IndexedMap.hs),
+[ordinary client](../examples/open-evaluation/IndexedMapClient.hs)
+and [interface and error checks](../../../testsuite/tests/dependent/should_run/NativeIndexedClassReceiver.sh).
+
 ## Goal and dependencies
 
 Allow direct higher-order use of type families under explicit matchability,

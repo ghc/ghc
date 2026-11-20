@@ -48,7 +48,7 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType as TcType
 import GHC.Tc.Zonk.TcType
 
-import GHC.Core.Class ( Class )
+import GHC.Core.Class ( Class, classTyVars )
 import GHC.Core.ConLike ( ConLike(..) )
 import GHC.Core.DataCon ( dataConConcreteTyVars, dataConFullSig, dataConName, isNewDataCon, dataConOrigArgTys, dataConRepArgBinders, dataConTyCon, dataConWorkId, dataConWrapId )
 import qualified GHC.Core as Core
@@ -69,7 +69,7 @@ import GHC.Core.Type
 import GHC.Core.UsageEnv ( UsageEnv, singleUsageUE, zeroUE )
 import GHC.Core.Coercion
 
-import GHC.Builtin.WiredIn.Types ( multiplicityTy, runtimeRepTy, nilDataCon, consDataCon, mkListTy )
+import GHC.Builtin.WiredIn.Types ( multiplicityTy, runtimeRepTy, nilDataCon, consDataCon, mkListTy, unmatchableDataConTy )
 import GHC.Builtin.PrimOps( tagToEnumKey )
 import GHC.Builtin.KnownKeys
 
@@ -1679,6 +1679,11 @@ finishAppWithCache cache do_ql rn_expr fun_loc rn_fun tc_fun inst_args
                                    app_res_rho result_expected
 
          -- Step 6: Typecheck the arguments
+       ; case do_ql of
+           NoQL | null cache, classHasUnmatchableReceiver tc_fun
+                , all valueOrWrapper inst_args ->
+             void (seedClassReceiver NoQL (rn_fun, fun_loc) (valueDomains inst_args))
+           _ -> return ()
        ; tc_args <- tcValArgsWithCache cache do_ql (rn_fun, fun_loc) inst_args
 
          -- Step 7: Horrible special case for tagToEnum#.
@@ -1688,6 +1693,131 @@ finishAppWithCache cache do_ql rn_expr fun_loc rn_fun tc_fun inst_args
 
        ; traceTc "End tcApp }" (ppr tc_fun)
        ; return (pack (mkHsWrap res_wrap res_expr)) }
+
+-- | Identify class selectors with an unmatchable-capable class parameter.
+classHasUnmatchableReceiver :: HsExpr GhcTc -> Bool
+classHasUnmatchableReceiver (HsVar _ (L _ selector))
+  | Just cls <- isClassOpId_maybe selector
+  = any unmatchable_parameter (classTyVars cls)
+  where
+    unmatchable_parameter tv
+      | Just (ma, _, _) <- tcSplitFunTy_maybe (tyVarKind tv)
+      = isTyVarTy ma || ma `eqType` unmatchableDataConTy
+      | otherwise = False
+classHasUnmatchableReceiver _ = False
+
+-- | Recognize ordinary arguments for a declaration-only receiver hint.
+valueOrWrapper :: HsExprArg 'TcpInst -> Bool
+valueOrWrapper EValArg{} = True
+valueOrWrapper EWrap{} = True
+valueOrWrapper ETypeArg{} = True
+valueOrWrapper _ = False
+
+-- | Preserve positions of checked arguments after type applications.
+valueDomains :: [HsExprArg 'TcpInst] -> [(Int, LHsExpr GhcRn, Type)]
+valueDomains = go 1
+  where
+    go _ [] = []
+    go pos (EValArg{ea_arg = arg, ea_arg_ty = Scaled _ expected} : rest) =
+      (pos, arg, expected) : go (pos + 1) rest
+    go pos (ETypeArg{ea_loc_span = l} : rest)
+      | not (isGeneratedSrcSpan (locA l)) = go (pos + 1) rest
+    go pos (_ : rest) = go pos rest
+
+-- | Learn a closed unmatchable class receiver before checking its callback.
+-- See Note [Unmatchable class receivers].
+seedClassReceiver :: QLFlag -> (HsExpr GhcRn, SrcSpan)
+                  -> [(Int, LHsExpr GhcRn, Type)] -> TcM Bool
+seedClassReceiver do_ql rn_head = go []
+  where
+    go _ [] = return False
+    go callbacks ((pos, arg, expected) : rest) =
+      do { selected <- if null callbacks
+                       then return False
+                       else addArgCtxt pos rn_head arg $
+                              seed_receiver callbacks arg expected
+         ; callbacks' <- if isJust (tcSplitFunTy_maybe expected)
+                         then do { ty <- liftZonkM (zonkTcType expected)
+                                 ; return (ty : callbacks) }
+                         else return callbacks
+         ; selected_rest <- go callbacks' rest
+         ; return (selected || selected_rest) }
+
+    seed_receiver callbacks arg expected = fmap isJust $ runMaybeT $ do
+      (_, L _ (HsVar _ lname)) <- liftMaybe (retainedNamedCallback arg)
+      (tc, indices) <- MaybeT (tcSplitTyConApp_maybe <$> liftZonkM (zonkTcType expected))
+      guard (isAlgTyCon tc)
+      let shared f = any (elemVarSet f . tyCoVarsOfType) callbacks
+      [(f, kind)] <- return
+        [ (f, kind) | TyVarTy f <- indices, eligible f
+                    , Just kind@(ma, _, _) <- [tcSplitFunTy_maybe (tyVarKind f)]
+                    , isTyVarTy ma || ma `eqType` unmatchableDataConTy
+                    , shared f ]
+      open <- liftMaybeT (isUnfilledMetaTyVar f)
+      guard open
+      ident <- MaybeT (tcLookupIdMaybe (unLocWithUserRdr lname))
+      let actual = varType ident
+      guard (isTauTy actual && noFreeVarsOfType actual)
+      (outer, outer_args) <- liftMaybe (tcSplitTyConApp_maybe actual)
+      guard (any family_prefix outer_args)
+      (actual_tc, actual_indices) <- if outer == tc
+        then return (outer, outer_args)
+        else do
+          guard (isTypeFamilyTyCon outer)
+          envs <- liftMaybeT tcGetFamInstEnvs
+          reduction <- liftMaybe (reduceTyFamApp_maybe envs Nominal outer outer_args)
+          liftMaybe (tcSplitTyConApp_maybe (reductionReducedType reduction))
+      guard (tc == actual_tc)
+      [target] <- return
+        [ t | (TyVarTy v, t) <- zip indices actual_indices, v == f, family_prefix t ]
+      guard (not (hasNativeDependentExpr (Core.Type target)))
+      (target_ma, Scaled target_mult target_domain, target_result) <-
+        liftMaybe (tcSplitFunTy_maybe (typeKind target))
+      let (ma, Scaled mult domain, result) = kind
+      guard (target_ma `eqType` unmatchableDataConTy && mult `eqType` target_mult
+             && domain `eqType` target_domain && result `eqType` target_result)
+      compatible <- case getTyVar_maybe ma of
+        Just tv | eligible tv -> liftMaybeT (isUnfilledMetaTyVar tv)
+        _ -> return (ma `eqType` target_ma)
+      guard compatible
+      liftMaybeT $ case do_ql of
+        NoQL -> void (unifyType Nothing target (mkTyVarTy f))
+        DoQL -> qlUnify target (mkTyVarTy f)
+
+    eligible tv = isTcTyVar tv && isMetaTyVar tv &&
+      case do_ql of
+        NoQL -> not (isQLInstTyVar tv)
+        DoQL -> isQLInstTyVar tv
+
+    liftMaybe :: Maybe a -> MaybeT TcM a
+    liftMaybe = MaybeT . pure
+
+    family_prefix t
+      | Just (tc, args) <- tcSplitTyConApp_maybe t = isUnsaturatedUserFamily tc args
+      | otherwise = False
+
+{- Note [Unmatchable class receivers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider mapIndexed (fmap not) familyInput. The class method checks its
+callback against f Bool -> f Bool. If f is unknown, the ordinary check
+can select a matchable f before it checks familyInput :: Batch (Pick True).
+
+Check only classes with a parameter that can have an unmatchable arrow
+kind. Use the receiver's closed declared type when it contains a family
+prefix. Look through at most one nominal family equation to expose the same
+algebraic constructor. Avoid recursive reduction in this optional step.
+An earlier callback must use the same receiver index. Unify that index
+with the partial unmatchable family. The ordinary receiver check supplies
+the family coercion and checks the other indices. Its context can contain
+witnesses from opening earlier implicit operands. Keep checking terms and
+recording usage in source order. For Quick Look, use the same hint on
+the already instantiated visible telescope before looking at the callback.
+Fill only its instantiation variables. Zonk the callback type after the
+hint so an application of that index takes the family path in qlUnify.
+The callback already had a visible arrow, so its outer shape and the
+guardedness test stay the same. Continue with the original Quick Look
+order and cache.
+-}
 
 -- | Introduce a dot package when the application has a fixed payload shape.
 -- See Note [Introducing an implicit existential].
@@ -2420,10 +2550,26 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
                 matchActualFunTy herald
                   (Just $ HsExprTcThing tc_fun)
                   (n_val_args, fun_sigma) fun_ty
-           ; arg' <- quickLookArg do_ql (pos + count written_prefix_arg acc)
-                                  ctxt rn_head arg arg_ty
+           ; let arg_pos = pos + count written_prefix_arg acc
+           ; selected <- case do_ql of
+               DoQL | classHasUnmatchableReceiver tc_fun
+                    , Just{} <- tcSplitFunTy_maybe (scaledThing arg_ty)
+                    , Just domains <- receiverDomains (arg_pos + 1) res_ty rest_args
+                    , not (null domains) ->
+                 seedClassReceiver DoQL rn_head ((arg_pos, arg, scaledThing arg_ty) : domains)
+               _ -> return False
+           ; arg_ty <- if selected then liftZonkM (zonkScaledTcType arg_ty) else return arg_ty
+           ; arg' <- quickLookArg do_ql arg_pos ctxt rn_head arg arg_ty
            ; let acc' = arg' : addArgWrap (mkWpCastN fun_co) acc
            ; go plan fun_orig (pos+1) acc' res_ty rest_args }
+
+    -- Read only the visible domains that already follow this callback.
+    receiverDomains _ _ [] = Just []
+    receiverDomains pos ty (EValArg{ea_arg = arg} : rest)
+      | Just (_, Scaled _ domain, result) <- tcSplitFunTy_maybe ty
+      = ((pos, arg, domain) :) <$> receiverDomains (pos + 1) result rest
+    receiverDomains pos ty (EWrap{} : rest) = receiverDomains pos ty rest
+    receiverDomains _ _ _ = Nothing
 
     new_arg_ty :: CtOrigin -> LHsExpr GhcRn -> Int -> TcM (Scaled TcType)
     -- Make a fresh nus for each argument in rule IVAR

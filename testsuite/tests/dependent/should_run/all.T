@@ -206,6 +206,11 @@ test('NativeLaterMatchability',
       extra_files([open_eval_dir + f for f in ['AnchorReceiver.hs', 'LaterMatchability.hs',
                                               'LaterMatchabilityClient.hs']])],
      run_command, ['bash NativeLaterMatchability.sh "{compiler}" "{libdir}"'])
+test('NativeIndexedClassReceiver',
+     [only_ways(['normal']),
+      extra_files([open_eval_dir + 'IndexedMap.hs', open_eval_dir + 'IndexedMapClient.hs',
+                   'NativeIndexedClassReceiver.hs'])],
+     run_command, ['bash NativeIndexedClassReceiver.sh "{compiler}" "{libdir}"'])
 test('NativeUnsaturatedInvisible',
      [only_ways(['normal']),
       extra_files([open_eval_dir + 'InvisibleFamily.hs', 'NativeUnsaturatedInvisibleConsumer.hs',
