@@ -3305,33 +3305,26 @@ tcRetainedResultMatch do_ql expected args fun sigma
 -- See Note [Exact expected existential packages].
 exactPackageResult :: [TyVar] -> Type -> Type -> Bool
 exactPackageResult tvs (TyVarTy result_var) expected
-  | result_var `elem` tvs
-  , ExistsTy _ binder body <- coreFullView expected
-  = isTauTy (tyVarKind binder) && isFamFreeTy body && tau_payload body
-  where
-    tau_payload ty = case coreFullView ty of
-      ExistsTy _ binder body -> isTauTy (tyVarKind binder) && tau_payload body
-      payload -> isTauTy payload
+  | ExistsTy{} <- coreFullView expected
+  = result_var `elem` tvs
 exactPackageResult _ _ _ = False
 
 {- Note [Exact expected existential packages]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 An ordinary polymorphic producer can already return a whole package.
 When its result is one of its invisible type parameters, match that
-parameter against the expected package. Preserve each checked binder
-and its mode. A nested binder can refer to the outer binder in its
-kind or payload, so the ordinary closed-package isTauTy test does not
-describe this telescope. Check the binder kinds and final payload for
-tau syntax. The package body keeps the family-free guard.
+parameter against the expected package. That type already specifies each
+binder, its mode, and the payload. A type family in the payload can stay
+stuck. A polymorphic payload can stay polymorphic. Matching the bare
+result parameter copies that entire type into an ordinary type application.
+It does not choose a witness or infer an argument of a type family.
 
-This immutable type application uses the existing exact result match.
-It supplies no witness, performs no opening, and creates no mutable
-existential instantiation. All needed outer parameters must have
+All needed outer parameters must have
 well-kinded choices. When the result leaves unrelated ordinary
 parameters, seed the existing argument matcher with the same kind
 and type choice. The original context, argument and result checks
-remain authoritative. See Note [Ordinary parameters in native
-applications].
+remain authoritative. See
+Note [Ordinary parameters in native applications].
 -}
 
 {- Note [Retained choices for partial constructors]
