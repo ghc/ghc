@@ -573,6 +573,8 @@ schedule (Capability *initialCapability, Task *task)
 
     switch (ret) {
     case HeapOverflow:
+        ready_to_gc = scheduleHandleHeapOverflow(cap,t);
+
         if (RELAXED_LOAD_ALWAYS(&cap->r.rHpLim) == NULL ||
                 RELAXED_LOAD_ALWAYS(&cap->context_switch)) {
             // Sometimes we miss a context switch, e.g. when calling
@@ -582,18 +584,20 @@ schedule (Capability *initialCapability, Task *task)
             RELAXED_STORE_ALWAYS(&cap->context_switch, 0);
             appendToRunQueue(cap,t);
         } else {
-            pushOnRunQueue(cap,t);
+            // TODO: it would be nicer to distinguish the context switch and
+            // heap overflow cases in the codes returned to the scheduler.
+            if (ready_to_gc) {
+                pushOnRunQueue(cap,t);
+            } else {
+                continue;
+            }
         }
-
-        ready_to_gc = scheduleHandleHeapOverflow(cap,t);
         break;
 
     case StackOverflow:
-        // just adjust the stack for this thread, then pop it back
-        // on the run queue.
+        // just adjust the stack for this thread, then continue running it
         threadStackOverflow(cap, t);
-        pushOnRunQueue(cap,t);
-        break;
+        continue;
 
     case ThreadYielding:
         if (scheduleHandleYield(t, prev_what_next)) {
@@ -610,7 +614,7 @@ schedule (Capability *initialCapability, Task *task)
                 RELAXED_STORE_ALWAYS(&cap->context_switch, 0);
                 appendToRunQueue(cap,t);
             } else {
-                pushOnRunQueue(cap,t);
+                continue;
             }
         }
         break;
