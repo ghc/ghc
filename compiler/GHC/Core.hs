@@ -39,7 +39,8 @@ module GHC.Core (
         exprToNativeCaseIndex, isNativeCaseValueIndex, nativeIndexFunctionVar_maybe,
         nativeIndexArgKinds,
         isNativeIndexAlt, isNativeIndexDataAlt, isNativeIndexAliasAlt,
-        isNativeIndexedNullaryDataAlt, nativeIndexedNullaryCon_maybe,
+        isNativeIndexedDataAlt, isNativeIndexedGadtCon,
+        nativeIndexedCon_maybe,
 
         mkBinds,
 
@@ -2760,7 +2761,7 @@ exprToNativeCaseIndex expr
   | otherwise = Nothing
 
 -- | Recognize a local value in an index obtained from the checked scrutinee.
--- See Note [Native indexed nullary branch evidence].
+-- See Note [Native indexed branch evidence].
 isNativeCaseValueIndex :: Type -> Bool
 isNativeCaseValueIndex (TermVarTy v) = isNativeOpaqueValueId v
 isNativeCaseValueIndex (CastTy ty _) = isNativeCaseValueIndex ty
@@ -2975,7 +2976,7 @@ mapNativeIndex subst expr
 -- Core Lint checks their instantiated domain, count, scope and nominal type.
 isNativeIndexAlt :: Alt b -> Bool
 isNativeIndexAlt (Alt (DataAlt con) args _) =
-  isNativeIndexDataAlt con args || isNativeIndexedNullaryDataAlt con args
+  isNativeIndexDataAlt con args || isNativeIndexedDataAlt con args
 isNativeIndexAlt _ = False
 
 -- | Recognize the proof slot from a constructor and its serialized binder names.
@@ -2989,32 +2990,48 @@ isNativeIndexDataAlt con args
   = True
   | otherwise = False
 
--- | Detect the extra proof after a nullary GADT's ordinary equality binder.
-isNativeIndexedNullaryDataAlt :: DataCon -> [b] -> Bool
-isNativeIndexedNullaryDataAlt con [_, _] = isJust (nativeNullaryGadtSpec_maybe con)
-isNativeIndexedNullaryDataAlt _ _ = False
+-- | Detect the extra proof after the ordinary GADT alternative binders.
+isNativeIndexedDataAlt :: DataCon -> [b] -> Bool
+isNativeIndexedDataAlt con args =
+    lengthIs args (length (dataConExTyCoVars con) + dataConRepArity con + 1)
+    && isNativeIndexedGadtCon con
 
--- | Reconstruct the promoted constructor endpoint at the scrutinee kind.
--- See Note [Native indexed nullary branch evidence].
-nativeIndexedNullaryCon_maybe :: Type -> DataCon -> Id -> Maybe Type
-nativeIndexedNullaryCon_maybe domain con equality
-  | Just spec <- nativeNullaryGadtSpec_maybe con
+-- | Check the ordinary GADT constructor shape supported by indexed evidence.
+isNativeIndexedGadtCon :: DataCon -> Bool
+isNativeIndexedGadtCon = isJust . nativeIndexedGadtSpec_maybe
+
+-- | Reconstruct the promoted constructor from the ordinary alternative binders.
+-- See Note [Native indexed branch evidence].
+nativeIndexedCon_maybe :: Type -> DataCon -> [Var] -> Maybe Type
+nativeIndexedCon_maybe domain con binders
+  | Just spec <- nativeIndexedGadtSpec_maybe con
   , TyConApp tc args <- coreFullView domain
   , tc == dataConTyCon con
   , isNativeOpaqueValueType domain
   , let univs = dataConUnivTyVars con
-  , univs `equalLength` args
+        exs = dataConExTyCoVars con
+        (existentials, remaining) = splitAt (length exs) binders
+  , equality : fields <- remaining
+  , univs `equalLength` args, exs `equalLength` existentials
+  , all isTyVar existentials
   , let params = zip univs args
         refined = eqSpecTyVar spec
-  , all (not . anyFreeVarsOfType (== refined) . varType) univs
+        substitution = params ++ zip exs (mkTyVarTys existentials)
+        instantiate = substTyWith (map fst substitution) (map snd substitution)
+  , all (not . anyFreeVarsOfType (== refined) . varType) (univs ++ exs)
+  , and (zipWith (\tv actual -> instantiate (varType tv) `eqType` varType actual) exs existentials)
   , Just actual <- lookup refined params
-  , Just con_args <- traverse (`lookup` params) (dataConUserTyVars con)
+  , Just con_args <- traverse (`lookup` substitution) (dataConUserTyVars con)
   , isCoVar equality
   , let co = mkCoVarCo equality
   , coercionRole co == Nominal
   , coercionLKind co `eqType` actual
-  , coercionRKind co `eqType` eqSpecType spec
-  , let constructor = mkTyConApp (promoteDataCon con) con_args
+  , coercionRKind co `eqType` instantiate (eqSpecType spec)
+  , fields `equalLength` dataConOrigArgTys con
+  , all isNativeOpaqueValueId fields
+  , and (zipWith (\field (Scaled _ ty) -> varType field `eqType` instantiate ty)
+                 fields (dataConOrigArgTys con))
+  , let constructor = mkTyConApp (promoteDataCon con) (con_args ++ map TermVarTy fields)
         kind_co = mkTyConAppCo Nominal tc
           [if tv == refined then co else mkNomReflCo ty | (tv, ty) <- params]
   , coercionLKind kind_co `eqType` domain
@@ -3022,30 +3039,34 @@ nativeIndexedNullaryCon_maybe domain con equality
   = Just (mkCastTy constructor (mkSymCo kind_co))
   | otherwise = Nothing
 
-nativeNullaryGadtSpec_maybe :: DataCon -> Maybe EqSpec
-nativeNullaryGadtSpec_maybe con
+nativeIndexedGadtSpec_maybe :: DataCon -> Maybe EqSpec
+nativeIndexedGadtSpec_maybe con
   | let tc = dataConTyCon con
   , isVanillaAlgTyCon tc, isBoxedDataTyCon tc
   , null (dataConRepArgBinders con)
-  , (_, [], [spec], [], [], _) <- dataConFullSig con
-  , null (dataConStupidTheta con), dataConRepArity con == 1
-  , noFreeVarsOfType (eqSpecType spec)
+  , (_, exs, [spec], [], fields, _) <- dataConFullSig con
+  , all isTyVar exs, null (dataConStupidTheta con)
+  , dataConRepArity con == 1 + length fields
+  , all (\(Scaled mult ty) -> (isOneTy mult || isManyTy mult) && isNativeOpaqueValueType ty) fields
+  , all (not . isBanged) (dataConImplBangs con)
+  , not (null fields) || (null exs && noFreeVarsOfType (eqSpecType spec))
   = Just spec
   | otherwise = Nothing
 
-{- Note [Native indexed nullary branch evidence]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A VNil alternative already binds nominal co :: n ~# Z. The promoted VNil
-and its scrutinee have different kinds before that equality is applied.
-Lift the equality through the parent datatype and cast the promoted
-constructor back to the scrutinee kind. One extra trailing CoVar proves
-that the actual scrutinee is this constructor at its original kind.
+{- Note [Native indexed branch evidence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A VCons alternative binds the existential m, the nominal co :: n ~# S m,
+and the actual head and tail fields. Use the constructor's user argument
+order to form the promoted constructor at Vec a (S m). Lift co through
+Vec and cast the constructor back to the scrutinee kind Vec a n. A final
+CoVar proves that the actual scrutinee is that constructor.
 
-The ordinary GADT evidence stays before the virtual proof. Obtain both
-endpoints from the strict case, its constructor and its ordinary evidence.
-Check the evidence nominally. This increment has no fields or existentials.
-CoreToStg removes only the extra proof. The case still demands the scrutinee,
-even at a known index. A distinct value at the same index gets no proof.
+Scope the ordinary binders before the virtual proof. Core Lint derives
+both endpoints from the strict case and the exact ordinary binders.
+Only lifted fields with their original boxed representation enter the
+proof. The scrutinee is unrestricted. A field with multiplicity One in
+the constructor becomes Many at that case multiplicity. CoreToStg removes the last proof binder. The case still
+forces the scrutinee. It does not force the fields.
 
 GHC.Tc.Gen.Pat keeps the ordinary equality in the GADT implication.
 GHC.Tc.Gen.Match transports the expected result through the virtual

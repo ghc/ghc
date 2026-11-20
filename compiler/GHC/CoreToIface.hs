@@ -738,11 +738,13 @@ toIfaceAlt (Alt DEFAULT [cv] rhs)
 toIfaceAlt alt@(Alt DEFAULT (_:_) _)
   = pprPanic "toIfaceAlt: invalid index alias proof binder" (ppr alt)
 toIfaceAlt alt@(Alt (DataAlt con) bs rhs)
-  | isNativeIndexedNullaryDataAlt con bs
-  = case bs of
-      [eq, cv] | all (\v -> isCoVar v && isLocalId v) [eq, cv] ->
-        IfaceAlt (IfaceIndexedDataAltWithProof (getName con))
-          (map (mkIfLclName . getOccFS) bs) (toIfaceExpr rhs)
+  | isNativeIndexedDataAlt con bs
+  = case splitAt (length bs - 1) bs of
+      (_, [cv]) | isCoVar cv, isLocalId cv ->
+        let iface_con | dataConSourceArity con == 0 = IfaceIndexedDataAltWithProof
+                      | otherwise = IfaceIndexedFieldsAltWithProof
+        in IfaceAlt (iface_con (getName con))
+             (map (mkIfLclName . getOccFS) bs) (toIfaceExpr rhs)
       _ -> pprPanic "toIfaceAlt: invalid indexed constructor proof binder" (ppr alt)
   | isNativeIndexDataAlt con bs
   = case splitAt (dataConRepArity con) bs of

@@ -397,7 +397,7 @@ mkDataConCase var ty alts@(alt1 :| _)
           Just (DCB boxer) -> do
             us <- newUniqueSupply
             let (real_args, proofs)
-                  | isNativeIndexedNullaryDataAlt con args = splitAt (dataConRepArity con) args
+                  | isNativeIndexedDataAlt con args = splitAt (length args - 1) args
                   | otherwise = (args, [])
                 (rep_ids, binds) = initUs_ us (boxer ty_args real_args)
                 rep_ids' = map (scaleVarBy (matchIdMult var)) rep_ids

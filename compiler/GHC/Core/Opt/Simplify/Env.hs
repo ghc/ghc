@@ -1126,10 +1126,15 @@ simplBinders  !env bndrs = mapAccumLM simplBinder  env bndrs
 cloneRetainedAltBinders :: SimplEnv -> [InBndr] -> SimplM (SimplEnv, [OutBndr])
 cloneRetainedAltBinders env fields = do
     (Subst scope indices tvs cvs, fresh) <-
-        cloneBndrsM (getTCvSubst env) (map zapFragileIdInfo fields)
+        cloneBndrsM (getTCvSubst env) (map zap_id_info fields)
     let ids = [(old, DoneId new) | (old, new) <- zip fields fresh, isNonCoVarId old]
     return (env { seInScope = scope, seIndexSubst = indices, seTvSubst = tvs,
                   seCvSubst = cvs, seIdSubst = extendVarEnvList (seIdSubst env) ids }, fresh)
+  where
+    -- An indexed GADT alternative starts with erased existential binders.
+    -- Clone them before the equality and fields that mention them.
+    zap_id_info v | isTyVar v = v
+                  | otherwise = zapFragileIdInfo v
 
 -------------
 simplBinder :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)

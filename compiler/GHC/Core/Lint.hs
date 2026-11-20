@@ -1906,8 +1906,9 @@ lintCoreAlt scrut_index case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt 
 
         -- And now bring the new binders into scope
     ; let (ordinary_args, native_proof)
-            | isNativeIndexedNullaryDataAlt con args
-            , [eq, proof] <- args = ([eq], Just proof)
+            | isNativeIndexedDataAlt con args
+            , (bs, [proof]) <- splitAt (length args - 1) args
+            = (bs, Just proof)
             | otherwise = (args, Nothing)
     ; lintL (multiplicities `equalLength` ordinary_args)
         (text "Wrong number of constructor alternative binders:" <+> ppr alt)
@@ -1915,12 +1916,11 @@ lintCoreAlt scrut_index case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt 
     ; lintBinders CasePatBind ordinary_args $ do
       { rhs_ue <- case native_proof of
           Nothing -> lintAltExpr rhs alt_ty
-          Just cv | [eq] <- ordinary_args
-                  , Just index <- scrut_index, isNativeCaseValueIndex index
-                  , Just constructor <- nativeIndexedNullaryCon_maybe scrut_ty con eq ->
-            do { lintL (isLocalId cv && isCoVar cv && cv /= eq
-                        && not (eq `elemInScopeSet` in_scope)
-                        && not (cv `elemInScopeSet` in_scope))
+          Just cv | Just index <- scrut_index, isNativeCaseValueIndex index
+                  , Just constructor <- nativeIndexedCon_maybe scrut_ty con ordinary_args ->
+            do { lintL (isLocalId cv && isCoVar cv
+                        && all (not . (`elemInScopeSet` in_scope)) args
+                        && sizeVarSet (mkVarSet args) == length args)
                    (text "Invalid indexed constructor proof binder:" <+> ppr cv)
                ; ensureEqTys (varType cv) (mkNomEqPred index constructor)
                    (text "Invalid nominal indexed constructor proof:" <+> ppr cv)

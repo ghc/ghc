@@ -40,7 +40,7 @@ import GHC.Types.Var
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Core.Multiplicity
-import GHC.Core (Expr(Var), nativeIndexedNullaryCon_maybe)
+import GHC.Core (Expr(Var), isNativeIndexedGadtCon, nativeIndexedCon_maybe)
 import qualified GHC.Core.Subst as CoreSubst
 import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_kind )
 import GHC.Tc.Utils.Env
@@ -50,6 +50,7 @@ import GHC.Core.TyCo.Ppr ( pprTyVars )
 import GHC.Core.TyCo.Rep ( Type(ExistsTy, TermVarTy) )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Unify
+import GHC.Tc.Zonk.TcType (zonkTcType)
 import GHC.Tc.Gen.HsType
 import GHC.Builtin.WiredIn.Types
 import GHC.Tc.Types.Evidence
@@ -217,11 +218,11 @@ tcMatchPats match_ctxt pats pat_tys thing_inside
     penv = PE { pe_lazy = False, pe_ctxt = LamPat match_ctxt, pe_orig = PatOrigin }
 
 
--- | Check a bare nullary case row and pass its extra proof to the body checker.
+-- | Check an indexed constructor row and pass its proof to the body checker.
 tcMatchPatsWithIndex :: Id -> HsMatchContextRn -> [LPat GhcRn] -> [ExpPatType]
                      -> (Maybe EvVar -> TcM a) -> TcM ([LPat GhcTc], a)
 tcMatchPatsWithIndex index ctxt pats pat_tys inside
-  | [L loc pat@(ConPat { pat_con = L con_loc con, pat_args = args@(PrefixCon _ []) })] <- pats
+  | [L loc pat@(ConPat { pat_con = L con_loc con, pat_args = args@PrefixCon{} })] <- pats
   , [ExpFunPatTy pat_ty] <- pat_tys
   = setSrcSpanA loc $
       do { con_like <- tcLookupConLike con
@@ -1363,19 +1364,36 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
         ; when (not (null eq_spec) || any isEqClassPred theta) warnMonoLocalBinds
 
         ; given <- newEvVars theta'
-        ; extra_proof <- case (index, given) of
-            (Just scrut, [eq])
-              | isIdHsWrapper wrap
-              , Just constructor <- nativeIndexedNullaryCon_maybe (varType scrut) data_con eq
-              -> Just <$> newEvVar (mkNomEqPred (TermVarTy scrut) constructor)
-            _ -> return Nothing
-        -- See Note [Native indexed nullary branch evidence] in GHC.Core.
-        ; (ev_binds, (arg_pats', res))
+        ; let indexed_fields
+                | Just scrut <- index, [eq] <- given
+                , isIdHsWrapper wrap, isNativeIndexedGadtCon data_con
+                , PrefixCon _ fields <- val_arg_pats
+                , Just names <- traverse index_field_name fields
+                = Just (scrut, eq, names)
+                | otherwise = Nothing
+              field_tys
+                | Just (_, _, _ : _) <- indexed_fields
+                = map (scaleScaled ManyTy) (substScaledTys tenv arg_tys)
+                | otherwise = arg_tys_scaled
+        ; when (case indexed_fields of Just (_, _, _ : _) -> True; _ -> False) $
+            tcSubMult (pe_orig penv) ManyTy pat_mult
+        -- See Note [Native indexed branch evidence] in GHC.Core.
+        ; (ev_binds, (arg_pats', (extra_proof, res)))
              <- -- See Note [Type applications in patterns] (W4)
                 tcConTyArgs tenv penv univ_ty_args                       $
                 checkConstraints (getSkolemInfo skol_info) ex_tvs' given $
                 tcConTyArgs tenv penv ex_ty_args                         $
-                tcConValArgs con_like arg_tys_scaled penv val_arg_pats (thing_inside extra_proof)
+                tcConValArgs con_like field_tys penv val_arg_pats $ do
+                  proof <- case indexed_fields of
+                    Just (scrut, eq, names) -> do
+                      fields <- traverse tcLookupId names
+                      actual <- traverse zonk_field fields
+                      case nativeIndexedCon_maybe (varType scrut) data_con (ex_tvs' ++ eq : actual) of
+                        Just con -> Just <$> newEvVar (mkNomEqPred (TermVarTy scrut) con)
+                        Nothing -> return Nothing
+                    Nothing -> return Nothing
+                  result <- thing_inside proof
+                  return (proof, result)
 
         ; let res_pat = ConPat
                 { pat_con   = header
@@ -1390,6 +1408,16 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
                 }
         ; return (mkHsWrapPat wrap res_pat pat_ty, res)
         } }
+  where
+    index_field_name :: LPat GhcRn -> Maybe Name
+    index_field_name (L _ (VarPat _ (L _ name))) = Just name
+    index_field_name (L _ (ParPat _ pat)) = index_field_name pat
+    index_field_name (L _ (SigPat _ pat _)) = index_field_name pat
+    index_field_name _ = Nothing
+
+    -- A signature pattern can name the constructor skolem with a meta-variable.
+    -- Read its solved type and keep the original field's Name and Unique.
+    zonk_field field = setIdType field <$> liftZonkM (zonkTcType (idType field))
 
 -- | Expose the ordinary constructor syntax of a selected retained pattern.
 -- See Note [Parameterized retained constructor patterns].

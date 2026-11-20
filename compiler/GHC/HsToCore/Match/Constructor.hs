@@ -31,7 +31,7 @@ import GHC.Core.Multiplicity
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Errors.Types (DsMessage(DsRetainedPackagePatterns))
 import GHC.HsToCore.Utils
-import GHC.Core ( CoreExpr, isNativeIndexedNullaryDataAlt )
+import GHC.Core ( CoreExpr, isNativeIndexedGadtCon )
 import GHC.Core.Make ( mkCoreLets )
 import GHC.Utils.Misc
 import GHC.Types.Id
@@ -147,12 +147,13 @@ matchConFamily (var :| vars) ty groups@(group1 :| other_groups)
     has_native_proof :: EquationInfoNE -> Bool
     has_native_proof eqn
       | ConPat { pat_con = L _ (RealDataCon con)
-               , pat_con_ext = ConPatTc { cpt_tvs = [], cpt_dicts = dicts
+               , pat_con_ext = ConPatTc { cpt_tvs = tvs, cpt_dicts = dicts
                                        , cpt_arg_tys = tys } }
           <- firstPat eqn
       = case dicts of
-          [cv] -> isCoVar cv && isNativeIndexType (mkTyConApp (dataConTyCon con) tys)
-          _ -> isNativeIndexedNullaryDataAlt con dicts
+          [cv] -> null tvs && isCoVar cv && isNativeIndexType (mkTyConApp (dataConTyCon con) tys)
+          [eq, cv] -> isCoVar eq && isCoVar cv && isNativeIndexedGadtCon con
+          _ -> False
       | otherwise = False
 
     toRealAlt alt = case alt_pat alt of
@@ -236,7 +237,9 @@ exact proof type. CoreToStg erases only the trailing virtual proof.
 
 Bare field patterns retain their renamed Unique values through tcPatBndr and
 selectConMatchVars. The proof therefore names the actual alternative fields.
-Keep the usual existential/evidence/field order for ordinary GADT constructors.
+For an indexed GADT proof, keep the ordinary existentials and equality first.
+Select the exact named fields, including a variable named by a signature pattern.
+Append the virtual proof after those fields.
 See Note [Retained constructor matches] in GHC.Tc.Gen.Match and the Agda
 constructor-context provenance in docs/dependent-haskell/REFERENCES.md.
 -}
@@ -353,6 +356,9 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
             -- case. See Note [Case expression invariants].
         ; arg_vars <- case retained_vars of
             Just fields -> return fields
+            Nothing | Just _ <- indexed_proof
+                    , PrefixCon _ fields <- args1 ->
+                mapM select_indexed_field fields
             Nothing -> selectConMatchVars scaled_arg_tys args1
                 -- Use the first equation as a source of
                 -- suggestions for the new variables
@@ -371,10 +377,22 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
                                   , isNativeIndexType (mkTyConApp (dataConTyCon con) arg_tys)
                                   -- See Note [Retained constructor field scope].
                                   -> arg_vars ++ dicts1
+                                _ | Just (eq, proof) <- indexed_proof
+                                  -> tvs1 ++ [eq] ++ arg_vars ++ [proof]
                                 _ -> tvs1 ++ dicts1 ++ arg_vars,
                               alt_wrapper = wrapper1,
                               alt_result = foldr1 combineMatchResults match_results } }
   where
+    indexed_proof
+      | RealDataCon con <- con1, [eq, cv] <- dicts1
+      , isCoVar eq, isCoVar cv, isNativeIndexedGadtCon con
+      = Just (eq, cv)
+      | otherwise = Nothing
+
+    select_indexed_field (L _ (ParPat _ pat)) = select_indexed_field pat
+    select_indexed_field (L _ (SigPat _ pat _)) = select_indexed_field pat
+    select_indexed_field (L _ pat) = selectMatchVar ManyTy pat
+
     package_error :: DsM a
     package_error = failWithDs DsRetainedPackagePatterns
 

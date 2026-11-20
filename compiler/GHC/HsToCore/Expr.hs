@@ -493,8 +493,8 @@ dsExpr (HsCase ctxt discrim matches)
     indexed_row match =
       case hsLMatchPats match of
         [L _ (ConPat { pat_con = L _ (RealDataCon con)
-                     , pat_con_ext = ConPatTc { cpt_dicts = dicts } })]
-          -> isNativeIndexedNullaryDataAlt con dicts
+                     , pat_con_ext = ConPatTc { cpt_dicts = [_, _] } })]
+          -> isNativeIndexedGadtCon con
         _ -> False
 
 -- Pepe: The binds are in scope in the body but NOT in the binding group
