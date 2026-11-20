@@ -765,7 +765,9 @@ ds_app (HsApp _ fun arg) hs_args core_args
 ds_app (HsAppType arg_ty fun _) hs_args core_args
   = ds_lapp fun hs_args (Type arg_ty : core_args)
 ds_app (HsAppRetained _ fun arg) hs_args core_args
-  = ds_app (HsApp noExtField fun arg) hs_args core_args
+  = do { core_arg <- unsetGOptM Opt_EnableRewriteRules (dsLExpr arg)
+         -- See Note [Desugaring retained operands]
+       ; ds_lapp fun (arg : hs_args) (core_arg : core_args) }
 
 ds_app (XExpr (WrapExpr hs_wrap fun)) hs_args core_args
   = do { (fun_wrap, all_args) <- splitHsWrapperArgs hs_wrap core_args
@@ -1149,6 +1151,18 @@ liberally on "moderately" sized lists should rarely hurt and will often it can
 only expose further optimization opportunities; if no fusion is possible it will
 eventually get rule-rewritten back to a list). We do, however, pay in compile
 time.
+-}
+{- Note [Desugaring retained operands]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The typechecker can use the constructors of a list literal in a result
+index. For example, sourceVector [True, False] returns a vector of length
+two. With rewrite rules enabled, dsExplicitList normally generates a
+call to build. That call has no constructor index in Core.
+
+Desugar the retained operand with rewrite rules disabled. This also
+preserves list constructors inside a larger operand. Ordinary arguments
+in the same application still use the module's rewrite settings.
+See Note [Desugaring RULE left hand sides] in GHC.HsToCore.
 -}
 maxBuildLength :: Int
 maxBuildLength = 32
