@@ -16,7 +16,7 @@ module GHC.Core.FVs (
         exprFreeIds,      exprsFreeIds,
         exprFreeIdsDSet,  exprsFreeIdsDSet,
         exprFreeIdsList,  exprsFreeIdsList,
-        bindFreeVars, hasFreeVarInCoreAnnotations, exprAnnotationFreeVars, bindsAnnotationFreeVars,
+        bindFreeVars, hasFreeVarInCoreAnnotations, exprAnnotationFreeVars, bindsAnnotationFreeVars, bindsAnnotationVars,
 
         -- * Selective free variables of expressions
         InterestingVarFun,
@@ -292,6 +292,13 @@ exprAnnotationFreeVars = fst coreAnnotationVarSets
 -- Include references between the supplied bindings.
 bindsAnnotationFreeVars :: CoreProgram -> VarSet
 bindsAnnotationFreeVars = foldMap (snd coreAnnotationVarSets)
+
+-- | Collect every variable named in annotations, even under its binder.
+-- This protects binder identities in a single traversal of a Core program.
+bindsAnnotationVars :: CoreProgram -> VarSet
+bindsAnnotationVars = foldMap bind
+  where
+    (_, bind) = coreAnnotationFVs tyCoVarsOfType tyCoVarsOfCo (const id)
 
 coreAnnotationVarSets :: (CoreExpr -> VarSet, CoreBind -> VarSet)
 coreAnnotationVarSets =

@@ -653,7 +653,10 @@ runCorePasses passes guts
     mod = mg_module guts
 
 doCorePass :: CoreToDo -> ModGuts -> CoreM ModGuts
-doCorePass pass guts = do
+doCorePass = doCorePassFor OrdinaryCore
+
+doCorePassFor :: SimplCoreMode -> CoreToDo -> ModGuts -> CoreM ModGuts
+doCorePassFor core_mode pass guts = do
   logger    <- getLogger
   hsc_env   <- getHscEnv
   dflags    <- getDynFlags
@@ -710,7 +713,7 @@ doCorePass pass guts = do
                                  updateBindsM (liftIO . cprAnalProgram logger fam_envs)
 
     CoreDoWorkerWrapper       -> {-# SCC "WorkWrap" #-}
-                                 updateBinds (wwTopBinds
+                                 updateBinds (wwTopBinds core_mode
                                                (initWorkWrapOpts (mg_module guts) dflags fam_envs)
                                                us)
 

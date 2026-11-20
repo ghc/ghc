@@ -9,3 +9,5 @@ data SimpleOpts
 so_uf_opts :: SimpleOpts -> UnfoldingOpts
 
 simpleOptExpr :: HasDebugCallStack => SimpleOpts -> CoreExpr -> CoreExpr
+
+simpleOptNativeExpr :: HasDebugCallStack => CoreExpr -> CoreExpr

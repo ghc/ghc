@@ -37,12 +37,14 @@ import GHC.Core.TyCon
 import GHC.Core.TyCon.Set
 import GHC.Core.TyCon.RecWalk
 import GHC.Core.SimpleOpt( SimpleOpts )
+import GHC.Core.Opt.OccurAnal (SimplCoreMode)
 
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Types.Var.Env
+import GHC.Types.Var.Set
 import GHC.Types.Basic
 import GHC.Types.Unique.Supply
 import GHC.Types.Name ( getOccFS )
@@ -148,7 +150,9 @@ data WwOpts
     wo_module            :: !Module
   , -- | Generate workers even if the only effect is some args get passed
     -- unlifted. See Note [WW for calling convention]
-    wo_unlift_strict     :: !Bool }
+    wo_unlift_strict     :: !Bool
+  , wo_core_mode         :: !SimplCoreMode
+  , wo_index_uses        :: VarSet }
 
 type WwResult
   = ([Demand],              -- Demands for worker (value) args
@@ -164,6 +168,7 @@ mkWwBodies :: WwOpts
            -> Id             -- ^ The original function
            -> Arity          -- ^ Worker/wrapper arity
            -> [Var]          -- ^ Manifest args of original function
+           -> VarSet         -- ^ Arguments whose identity must stay in scope
            -> Type           -- ^ Result type of the original function,
                              --   after being stripped of args
            -> [Demand]       -- ^ Strictness of original function
@@ -209,7 +214,7 @@ mkWwBodies :: WwOpts
 -- and beta-redexes]), which allows us to apply the same split to function body
 -- and its unfolding(s) alike.
 --
-mkWwBodies opts fun_id ww_arity arg_vars res_ty demands res_cpr
+mkWwBodies opts fun_id ww_arity arg_vars kept_args res_ty demands res_cpr
   = do  { massertPpr arity_ok
                      (text "wrong wrapper arity" $$ ppr fun_id $$ ppr arg_vars $$ ppr res_ty $$ ppr demands)
 
@@ -222,10 +227,12 @@ mkWwBodies opts fun_id ww_arity arg_vars res_ty demands res_cpr
         ; (subst, cloned_arg_vars) <- cloneBndrsM empty_subst zapped_arg_vars
         ; let res_ty' = substTyUnchecked subst res_ty
               init_str_marks = map (const NotMarkedStrict) cloned_arg_vars
+              keep_indices = mkVarSet [new | (old, new) <- zip arg_vars cloned_arg_vars
+                                          , old `elemVarSet` kept_args]
 
         ; (useful1, work_args_str, wrap_fn_str, fn_args)
              <- -- pprTrace "mkWWbodies" (ppr fun_id $$ ppr (arg_vars `zip` cloned_arg_vars) $$ ppr demands) $
-                mkWWstr opts cloned_arg_vars init_str_marks
+                mkWWstrKeeping keep_indices opts cloned_arg_vars init_str_marks
 
         ; let (work_args, work_marks) = unzip work_args_str
 
@@ -966,13 +973,20 @@ mkWWstr :: WwOpts
                    [CoreExpr])           -- Reboxed args for the call to the
                                          -- original RHS. Corresponds one-to-one
                                          -- with the wrapper arg vars
-mkWWstr opts args str_marks
+mkWWstr = mkWWstrKeeping emptyVarSet
+
+mkWWstrKeeping :: VarSet -> WwOpts -> [Var] -> [StrictnessMark]
+               -> UniqSM (WwUse, [(Var, StrictnessMark)], CoreExpr -> CoreExpr, [CoreExpr])
+mkWWstrKeeping keep_indices opts args str_marks
   = -- pprTrace "mkWWstr" (ppr args) $
     go args str_marks
   where
     go [] _ = return (boringSplit, [], nop_fn, [])
     go (arg : args) (str:strs)
-      = do { (useful1, args1, wrap_fn1, wrap_arg)  <- mkWWstr_one opts arg str
+      = do { (useful1, args1, wrap_fn1, wrap_arg) <-
+             if arg `elemVarSet` keep_indices
+             then return (boringSplit, [(arg,str)], nop_fn, varToCoreExpr arg)
+             else mkWWstr_one opts arg str
            ; (useful2, args2, wrap_fn2, wrap_args) <- go args strs
            ; return ( useful1 || useful2
                     , args1 ++ args2

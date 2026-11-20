@@ -9,6 +9,8 @@ import GHC.Driver.DynFlags
 
 import GHC.Core.FamInstEnv
 import GHC.Core.Opt.WorkWrap
+import GHC.Core.Opt.OccurAnal (SimplCoreMode(..))
+import GHC.Types.Var.Set (emptyVarSet)
 import GHC.Unit.Types
 
 initWorkWrapOpts :: Module -> DynFlags -> FamInstEnvs -> WwOpts
@@ -18,4 +20,6 @@ initWorkWrapOpts this_mod dflags fam_envs = MkWwOpts
   , wo_cpr_anal          = gopt Opt_CprAnal dflags
   , wo_module            = this_mod
   , wo_unlift_strict     = gopt Opt_WorkerWrapperUnlift dflags
+  , wo_core_mode         = OrdinaryCore
+  , wo_index_uses        = emptyVarSet
   }

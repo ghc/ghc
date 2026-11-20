@@ -17,6 +17,9 @@ import GHC.Core
 import GHC.Core.Unfold.Make
 import GHC.Core.Utils  ( exprType, exprIsHNF )
 import GHC.Core.Type
+import GHC.Core.Opt.OccurAnal (SimplCoreMode(..))
+import GHC.Core.FVs (bindsAnnotationVars)
+import GHC.Core.TyCo.FVs (tyCoVarsOfType)
 import GHC.Core.Opt.WorkWrap.Utils
 import GHC.Core.SimpleOpt
 
@@ -25,6 +28,7 @@ import GHC.Data.FastString
 import GHC.Hs.Extension (GhcPass, GhcTc)
 
 import GHC.Types.Var
+import GHC.Types.Var.Set
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.InlinePragma
@@ -69,10 +73,15 @@ info for exported values).
 \end{enumerate}
 -}
 
-wwTopBinds :: WwOpts -> UniqSupply -> CoreProgram -> CoreProgram
+wwTopBinds :: SimplCoreMode -> WwOpts -> UniqSupply -> CoreProgram -> CoreProgram
 
-wwTopBinds ww_opts us top_binds
-  = initUs_ us $ concatMapM (wwBind ww_opts) top_binds
+wwTopBinds mode ww_opts us top_binds
+  = initUs_ us $ concatMapM (wwBind opts) top_binds
+  where
+    opts | RetainedCore <- mode
+         = ww_opts { wo_core_mode = mode
+                   , wo_index_uses = bindsAnnotationVars top_binds }
+         | otherwise = ww_opts
 
 {-
 ************************************************************************
@@ -551,6 +560,10 @@ tryWW   :: WwOpts
                                         -- if two, then a worker and a
                                         -- wrapper.
 tryWW ww_opts is_rec fn_id rhs
+  | fn_id `elemVarSet` wo_index_uses ww_opts
+  = return [(new_fn_id, rhs)]
+    -- See Note [Runtime index references in worker/wrapper].
+
   -- See Note [Drop absent bindings]
   | isAbsDmd (demandInfo fn_info)
   , not (isJoinId fn_id)
@@ -760,6 +773,23 @@ by LitRubbish (see Note [Drop absent bindings]) so there is no great harm.
 -}
 
 
+{- Note [Runtime index references in worker/wrapper]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Demand analysis may report an Id as absent even when a type or coercion
+names it. Keep such a let binder's RHS. Both dropping the binding and
+splitting the thunk can otherwise introduce an absent filler.
+
+Keep a manifest argument when an annotation or the result type names it.
+Also check the corresponding argument of the stable template, which can
+use different Ids. Keep these arguments unchanged in the worker. This
+restriction does not add runtime demand. Ordinary absent arguments can
+still be dropped and strict arguments can still be unboxed.
+
+Retained worker and wrapper unfoldings need the same scope discipline
+as their RHSs. Ordinary SimpleOpt and ordinary occurrence analysis can
+drop a local binder that is only used in an annotation.
+-}
+
 ---------------------
 splitFun :: WwOpts -> Id -> CoreExpr -> UniqSM [(Id, CoreExpr)]
 splitFun ww_opts fn_id rhs
@@ -767,14 +797,16 @@ splitFun ww_opts fn_id rhs
   = warnPprTrace (not (wrap_dmds `lengthIs` (arityInfo fn_info)))
                  "splitFun"
                  (ppr fn_id <+> (ppr wrap_dmds $$ ppr cpr)) $
-    do { mb_stuff <- mkWwBodies ww_opts fn_id ww_arity arg_vars (exprType body) wrap_dmds cpr
+    do { let res_ty = exprType body
+             kept_args = retainedArgs arg_vars res_ty
+         ; mb_stuff <- mkWwBodies ww_opts fn_id ww_arity arg_vars kept_args res_ty wrap_dmds cpr
        ; case mb_stuff of
             Nothing -> -- No useful wrapper; leave the binding alone
                        return [(fn_id, rhs)]
 
             Just stuff
               | let opt_wwd_rhs = mkLams arg_vars $
-                                  simpleOptExpr (wo_simple_opts ww_opts) body
+                                  optWwBody body
                   -- Run the simple optimiser on the WW'd body, to get rid of
                   -- junk. Keep all the original `arg_vars` binders though: this
                   -- might be a join point, and we don't want to lose the
@@ -782,7 +814,7 @@ splitFun ww_opts fn_id rhs
                   -- (honestly, I have forgottne), but doing it this way
                   -- certainly does no harm and is slightly more efficient.
 
-              , Just stable_unf <- certainlyWillInline uf_opts fn_info opt_wwd_rhs
+              , Just stable_unf <- certainlyWillInline (wo_core_mode ww_opts) uf_opts fn_info opt_wwd_rhs
                 -- We could make a w/w split, but in fact the RHS is small
                 -- See Note [Don't w/w inline small non-loop-breaker things]
 
@@ -799,6 +831,30 @@ splitFun ww_opts fn_id rhs
   = return [(fn_id, rhs)]
 
   where
+    optWwBody
+      | wo_core_mode ww_opts == RetainedCore = simpleOptNativeExpr
+      | otherwise = simpleOptExpr (wo_simple_opts ww_opts)
+
+    retainedArgs args res_ty
+      | wo_core_mode ww_opts == RetainedCore
+      = let annotations = wo_index_uses ww_opts
+            result_vars = tyCoVarsOfType res_ty
+            used v = isId v && (v `elemVarSet` annotations || v `elemVarSet` result_vars)
+            retained v = isId v
+        in case realIdUnfolding fn_id of
+             CoreUnfolding { uf_src = src, uf_tmpl = tmpl }
+               | isStableSource src
+               -> case collectNValBinders_maybe ww_arity tmpl of
+                    Just (unf_args, body)
+                      | equalLength args unf_args
+                      -> let unf_result = tyCoVarsOfType (exprType body)
+                             keep v u = used v || (isId u &&
+                                (u `elemVarSet` annotations || u `elemVarSet` unf_result))
+                         in mkVarSet [v | (v,u) <- zip args unf_args, keep v u]
+                    _ -> mkVarSet (filter retained args)
+             _ -> mkVarSet (filter used args)
+      | otherwise = emptyVarSet
+
     uf_opts  = so_uf_opts (wo_simple_opts ww_opts)
     fn_info  = idInfo fn_id
     ww_arity = workWrapArity fn_id rhs
@@ -859,7 +915,7 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
 
                 `setInlinePragma` work_prag
 
-                `setIdUnfolding` mkWorkerUnfolding simpl_opts work_fn fn_unfolding
+                `setIdUnfolding` mkWorkerUnfolding (wo_core_mode ww_opts) simpl_opts work_fn fn_unfolding
                         -- See Note [Worker/wrapper for INLINABLE functions]
 
                 `setIdDmdSig` mkClosedDmdSig work_demands div
@@ -886,7 +942,7 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
 
     wrap_rhs  = wrap_fn work_id
     wrap_prag = mkStrWrapperInlinePrag fn_inl_prag fn_rules
-    wrap_unf  = mkWrapperUnfolding simpl_opts wrap_rhs arity
+    wrap_unf  = mkWrapperUnfolding (wo_core_mode ww_opts) simpl_opts wrap_rhs arity
 
     wrap_id   = fn_id `setIdUnfolding`  wrap_unf
                       `setInlinePragma` wrap_prag

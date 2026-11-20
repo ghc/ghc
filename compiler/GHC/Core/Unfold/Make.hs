@@ -23,7 +23,7 @@ where
 import GHC.Prelude
 import GHC.Core
 import GHC.Core.Unfold
-import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
+import GHC.Core.Opt.OccurAnal ( SimplCoreMode(..), occurAnalyseExpr )
 import GHC.Core.Opt.Arity   ( manifestArity )
 import GHC.Core.DataCon
 import GHC.Core.Dependent ( hasNativeDependentUnfolding )
@@ -114,28 +114,32 @@ mkDataConUnfolding expr
             --    \@a p q. K @a <coercion> p q
             -- and then we definitely want to inline it #25713
 
-mkWrapperUnfolding :: SimpleOpts -> CoreExpr -> Arity -> Unfolding
+mkWrapperUnfolding :: SimplCoreMode -> SimpleOpts -> CoreExpr -> Arity -> Unfolding
 -- Make the unfolding for the wrapper in a worker/wrapper split
 -- after demand/CPR analysis
-mkWrapperUnfolding opts expr arity
+mkWrapperUnfolding mode opts expr arity
   = mkCoreUnfolding StableSystemSrc True
-                    (simpleOptExpr opts expr) Nothing
+                    (simpleOptWwTemplate mode opts expr) Nothing
                     (UnfWhen { ug_arity     = arity
                              , ug_unsat_ok  = unSaturatedOk
                              , ug_boring_ok = boringCxtNotOk })
 
-mkWorkerUnfolding :: SimpleOpts -> (CoreExpr -> CoreExpr) -> Unfolding -> Unfolding
+mkWorkerUnfolding :: SimplCoreMode -> SimpleOpts -> (CoreExpr -> CoreExpr) -> Unfolding -> Unfolding
 -- See Note [Worker/wrapper for INLINABLE functions] in GHC.Core.Opt.WorkWrap
-mkWorkerUnfolding opts work_fn
+mkWorkerUnfolding mode opts work_fn
                   (CoreUnfolding { uf_src = src, uf_tmpl = tmpl
                                  , uf_is_top = top_lvl })
   | isStableSource src
   = mkCoreUnfolding src top_lvl new_tmpl Nothing guidance
   where
-    new_tmpl = simpleOptExpr opts (work_fn tmpl)
+    new_tmpl = simpleOptWwTemplate mode opts (work_fn tmpl)
     guidance = calcUnfoldingGuidance (so_uf_opts opts) False False new_tmpl
 
-mkWorkerUnfolding _ _ _ = noUnfolding
+mkWorkerUnfolding _ _ _ _ = noUnfolding
+
+simpleOptWwTemplate :: SimplCoreMode -> SimpleOpts -> CoreExpr -> CoreExpr
+simpleOptWwTemplate RetainedCore _ = simpleOptNativeExpr
+simpleOptWwTemplate OrdinaryCore opts = simpleOptExpr opts
 
 -- | Make an INLINE unfolding that may be used unsaturated
 -- (ug_unsat_ok = unSaturatedOk) and that is reported as having its
@@ -403,12 +407,12 @@ in GHC.IfaceToCore. Module unfolding generation remains separately gated.
 -}
 
 ----------------
-certainlyWillInline :: UnfoldingOpts -> IdInfo -> CoreExpr -> Maybe Unfolding
+certainlyWillInline :: SimplCoreMode -> UnfoldingOpts -> IdInfo -> CoreExpr -> Maybe Unfolding
 -- ^ Sees if the unfolding is pretty certain to inline.
 -- If so, return a *stable* unfolding for it, that will always inline.
 -- The CoreExpr is the WW'd and simplified RHS. In contrast, the unfolding
 -- template might not have been WW'd yet.
-certainlyWillInline opts fn_info rhs'
+certainlyWillInline mode opts fn_info rhs'
   = case fn_unf of
       CoreUnfolding { uf_guidance = guidance, uf_src = src }
         | noinline -> Nothing       -- See Note [Worker/wrapper for NOINLINE functions]
@@ -424,6 +428,7 @@ certainlyWillInline opts fn_info rhs'
                | otherwise              = StableSystemSrc
 
           tmpl' | isStableSource src = uf_tmpl fn_unf
+                | RetainedCore <- mode = rhs'
                 | otherwise          = occurAnalyseExpr rhs'
                 -- Do not overwrite stable unfoldings!
 
