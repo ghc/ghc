@@ -222,6 +222,17 @@ Across modules, export a named case result to give both signatures the
 same family. Infix calls, explicit kind applications and local callable
 heads remain outside this lifting rule.
 
+An old home module can still have separate private families for two
+equivalent retained signatures. GHC rechecks the provider when an
+exported retained signature refers to a local lifted case. The next
+build reuses the refreshed interface. If sharing changes an exported
+type, ordinary dependency tracking recompiles its clients. A client
+that has only the old interface can still fail at an unknown index,
+even when calls at known constructors work. Rebuild and reinstall an
+older installed provider to publish its shared family. A client build
+cannot rebuild the installed package.
+[Two-compiler upgrade check](../examples/open-evaluation/check-retained-case-upgrade.sh).
+
 ## A case as an arrow result
 
 A top-level synonym can select the result of an ordinary arrow.
