@@ -1835,12 +1835,14 @@ checkSummaryHash
            obj_timestamp <- modificationTimeIfExists (ml_obj_file_ospath location)
            hi_timestamp <- modificationTimeIfExists (ml_hi_file_ospath location)
            hie_timestamp <- modificationTimeIfExists (ml_hie_file_ospath location)
+           bytecode_timestamp <- modificationTimeIfExists (ml_bytecode_file_ospath location)
 
            return $ Right
              ( old_summary
                      { ms_obj_date = obj_timestamp
                      , ms_iface_date = hi_timestamp
                      , ms_hie_date = hie_timestamp
+                     , ms_bytecode_date = bytecode_timestamp
                      }
              )
 

@@ -165,3 +165,8 @@ bytecode_object26:
 	@printf 'bad!' | dd of=BytecodeTest.gbc bs=1 count=4 conv=notrunc 2>/dev/null
 	! "$(TEST_HC)" $(TEST_HC_OPTS) -c -bytecodelib -o linked.bytecode BytecodeTest.gbc 2> bytecode_object26.stderr
 	@grep -F "bytecode file header mismatch" bytecode_object26.stderr >/dev/null
+
+# Test reloading in GHCi with the .gbc file written by the first load
+# The module should not be recompiled.
+bytecode_object27:
+	@echo ":reload" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -v1 -fno-hide-source-paths  -fbyte-code -fwrite-byte-code -fwrite-interface BytecodeTest.hs
