@@ -124,7 +124,11 @@ build, and rejection of stale evidence. The old and new compilers use
 the same target libraries for each comparison. At three interface
 compression levels the old reader rejects new constructor evidence at
 the header. The new reader checks the coercion's role and scope.
-[R05 interface checks](roadmap/R05-dependent-core.md#default-optimized-interfaces).
+For a provider that exports both an ordered case and a list filter, either
+older compiler rebuilds that provider exactly once. A provider that needs only
+the check its compiler already performed stays up to date.
+[R05 interface checks](roadmap/R05-dependent-core.md#default-optimized-interfaces)
+and [two-way filter and case upgrade](examples/open-evaluation/check-filter-scope-upgrade.sh).
 
 | Card | What works | Remaining gap |
 | --- | --- | --- |
