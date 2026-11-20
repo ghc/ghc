@@ -69,6 +69,7 @@ import GHC.Core.UsageEnv
 import GHC.Core.TyCon
 import GHC.Core ( Expr(Var, App, Type), exprToNativeIndex )
 import GHC.Core.TyCo.Rep ( Type(DepFunTy, ExistsTy, ForAllTy, FunTy, TermVarTy, TermAppTy, TyConApp) )
+import GHC.Core.Subst ( extendIdSubstWithClone )
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Type ( coreFullView, isManyTy, splitTyConApp_maybe
                      , anyFreeVarsOfType, typeKind, isNativeIndexFunctionId, isNativeOpaqueValueId
@@ -78,7 +79,7 @@ import GHC.Core.Coercion ( MCoercion(MRefl), mkCoVarCo, mkCoCast
                          , mkTransCo, mkNomReflCo, mkRepReflCo, mkDepFunCoWithVis )
 import GHC.Core.DataCon ( DataCon, dataConName, dataConSourceArity, dataConUnivTyVars, dataConWorkId )
 import GHC.Core.ConLike ( ConLike(RealDataCon) )
-import GHC.Core.Predicate ( mkNomEqPred )
+import GHC.Core.Predicate ( mkNomEqPred, scopedSort )
 import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.Utils ( applyTypeToArgs, exprType )
 -- Create chunkified tuple types for monad comprehensions
@@ -96,7 +97,7 @@ import GHC.Builtin.WiredIn.Prim
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
-import GHC.Utils.Monad (anyM)
+import GHC.Utils.Monad (anyM, mapAccumLM)
 
 import GHC.Types.Name
 import GHC.Types.Name.Env (anyNameEnv)
@@ -429,12 +430,12 @@ tcRetainedCase :: Bool -> Id -> MatchGroup GhcRn (LHsExpr GhcRn) -> ExpRhoType
                -> TcM (Maybe (HsExpr GhcTc))
 tcRetainedCase _ _ (MG { mg_alts = L _ [] }) _ = return Nothing
 tcRetainedCase dependent index matches@(MG { mg_alts = L loc alternatives }) (Check result_ty)
-  = do { captures <- if dependent
-                     then do { vars <- dependent_captures
+  = do { givens <- if dependent then dependent_givens else return []
+       ; captures <- if dependent
+                     then do { vars <- dependent_captures givens
                              ; mapM_ check_capture vars
                              ; return vars }
                      else return []
-       ; givens <- if dependent then dependent_givens else return []
        ; let explicit = dependent &&
                (not (null captures) || not (null givens) || depends result_ty)
        ; application <- if explicit || not (isTauTy result_ty)
@@ -460,10 +461,17 @@ tcRetainedCase dependent index matches@(MG { mg_alts = L loc alternatives }) (Ch
                     in_scope = mkInScopeSetList
                       (fresh_index : tyCoVarsOfTypesList (result_ty : map varType (index : givens ++ captures)))
                     subst = Subst.mkIdSubst in_scope (unitVarEnv index (Var fresh_index))
-                    generalize = Subst.substTy subst
+                    mentions var ty = anyFreeVarsOfType (== var) ty
+                    used_as_index var = any (mentions var) (result_ty : map varType (captures ++ givens))
+                    bind_capture scope var = do
+                      name <- newSysName (nameOccName (idName var))
+                      let shared = mkLocalId name ManyTy (Subst.substTy scope (varType var))
+                      return (extendIdSubstWithClone scope var shared, shared)
+              ; (capture_subst, shared) <- mapAccumLM bind_capture subst captures
+              ; let generalize = Subst.substTy capture_subst
               ; dictionaries <- newEvVars (map (generalize . varType) givens)
-              ; names <- mapM (newSysName . nameOccName . idName) captures
-              ; let capture_names = zip (map idName captures) names
+              ; let names = map idName shared
+                    capture_names = zip (map idName captures) names
                     add_arguments (L match_loc match@(Match { m_pats = L pats_loc pats }), (con, fields))
                       = let extra = map (noLocA . VarPat noExtField . noLocA) names
                             subject_pats = map (bindRetainedConFields fields) pats
@@ -475,10 +483,12 @@ tcRetainedCase dependent index matches@(MG { mg_alts = L loc alternatives }) (Ch
                                                   , m_pats = L pats_loc (subject_pats ++ extra) })
                     matches' = matches { mg_alts = L loc (map add_arguments (zip alternatives constructors)) }
                     dictionary_tys = map (mkCheckExpFunPatTy . Scaled ManyTy . varType) dictionaries
-                    capture_tys = map (mkCheckExpFunPatTy . Scaled ManyTy . generalize . varType) captures
-                    arg_tys = dictionary_tys ++ capture_tys
-                    argument_plan = map RetainedConDict dictionaries
-                                    ++ map (const RetainedConValue) captures
+                    capture_tys = map (mkCheckExpFunPatTy . Scaled ManyTy . varType) shared
+                    arg_tys = capture_tys ++ dictionary_tys
+                    capture_plan var binder
+                      | used_as_index var = RetainedConIndex binder
+                      | otherwise = RetainedConValue
+                    argument_plan = zipWith capture_plan captures shared ++ map RetainedConDict dictionaries
               ; let check = tcRetainedConMatches fresh_index [] arg_tys argument_plan
                              (mkCheckExpType (generalize result_ty)) matches'
               ; checked <- if application
@@ -489,10 +499,10 @@ tcRetainedCase dependent index matches@(MG { mg_alts = L loc alternatives }) (Ch
               ; mapM_ (tcEmitBindingUsage . singleUsageUE) captures
               ; let fun = HsLam noAnn LamSingle checked
                     index_arg = noLocA (HsVar noExtField (noLocA index))
-                    with_evidence = mkHsWrap (mkWpEvVarApps givens)
-                                      (HsApp noExtField (noLocA fun) index_arg)
                     arguments = map (noLocA . HsVar noExtField . noLocA) captures
-              ; return (Just (foldl' (\f a -> HsApp noExtField (noLocA f) a) with_evidence arguments)) } }
+                    applied = foldl' (\f a -> HsApp noExtField (noLocA f) a)
+                                     (HsApp noExtField (noLocA fun) index_arg) arguments
+              ; return (Just (mkHsWrap (mkWpEvVarApps givens) applied)) } }
   where
     depends = anyFreeVarsOfType (== index)
 
@@ -508,7 +518,7 @@ tcRetainedCase dependent index matches@(MG { mg_alts = L loc alternatives }) (Ch
                        then return False
                        else if dependent
                             then return True
-                            else (&&) <$> (null <$> dependent_captures)
+                            else (&&) <$> (null <$> dependent_captures [])
                                       <*> (null <$> dependent_givens) } }
 
     retained_worker (ATcId { tct_id = worker })
@@ -524,8 +534,12 @@ tcRetainedCase dependent index matches@(MG { mg_alts = L loc alternatives }) (Ch
       = maybe False retained_worker <$> tcLookupLcl_maybe worker_name
     known_local_app _ = return False
 
-    dependent_captures = fmap catMaybes $
-      mapM capture (nameSetElemsStable (retainedCaseNames matches))
+    dependent_captures givens = do
+      named <- fmap catMaybes $ mapM capture (nameSetElemsStable (retainedCaseNames matches))
+      let types = result_ty : map varType (givens ++ named)
+          indices = [v | v <- tyCoVarsOfTypesList types, isId v, not (isCoVar v)
+                       , isLocalId v, depends (varType v), v `notElem` named]
+      return (scopedSort (named ++ indices))
     dependent_givens =
       filter (depends . varType) . tcl_native_givens . tcl_lcl_ctxt <$> getLclEnv
 
@@ -1068,9 +1082,13 @@ locals. The constructor rule transports both later arguments and the result.
 
 Generalize incoming evidence whose predicate depends on the index, even when no
 source Name refers to that evidence. The lexical native Given scope records the
-actual parameters. Put fresh evidence parameters before the captured values and
-pass the original evidence with an evidence wrapper. This includes primitive
-equality CoVars; these must not become source HsVar applications. Substitute into
+actual parameters. A captured value can itself occur in the result, in a
+later argument type, or in an evidence predicate. Sort the captures in
+dependency order and substitute each fresh binder into the rest of the
+telescope. Give a capture a retained argument when its identity occurs in
+one of these types. Bind the fresh evidence after the captures so that its
+predicates refer to the new binders. Pass the original evidence with an
+evidence wrapper. This includes primitive equality CoVars. Substitute into
 predicates directly. Their kind is Constraint, not a retained result kind.
 Transport the original dictionaries and let the ordinary solver derive their
 superclasses in each branch. Static forms exclude enclosing evidence.
