@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, PolyKinds, RankNTypes #-}
 {-# LANGUAGE StandaloneKindSignatures, TypeAbstractions, TypeApplications, TypeFamilies #-}
-module InvisibleFamily (Test, Observed, Inferred) where
+module InvisibleFamily (Test, Observed, Inferred, PickVisible, ObservedVisible, IndexedVisible) where
 
 import Data.Kind (Type)
 import GHC.Exts (U)
@@ -30,3 +30,17 @@ type Pick = Select
 
 -- | Expose how GHC saturates Select when it infers the result kind.
 type Inferred = Select
+
+-- | Supply a visible argument and leave the kind argument open.
+type PickVisible :: Bool -> forall (k :: Type). @U Type
+type family PickVisible flag @k
+type instance PickVisible 'True @Bool = Int
+type instance PickVisible 'False @Bool = Int
+
+-- | Infer the result kind from the polymorphic argument.
+type RunVisible :: forall r. (forall (k :: Type). @U r) -> r
+type family RunVisible @r f where
+  forall r (f :: forall (k :: Type). @U r). RunVisible @r f = f @Bool
+
+type ObservedVisible = RunVisible (PickVisible 'True)
+type IndexedVisible flag = RunVisible (PickVisible flag)
