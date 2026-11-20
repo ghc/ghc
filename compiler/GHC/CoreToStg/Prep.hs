@@ -877,6 +877,17 @@ cpeBodyF env (Tick tickish expr)
              | otherwise
              = tickish
 
+cpeBodyF env (Pack schema witness payload)
+  = do { payload' <- cpeBody env payload
+       ; return (emptyFloats, Pack (cpSubstTy env schema) (cpSubstTy env witness) payload') }
+
+cpeBodyF env (Unpack witness value package body)
+  = do { package' <- cpeBody env package
+       ; (witness_env, witness') <- cpCloneBndr env witness
+       ; (body_env, value') <- cpCloneBndr witness_env value
+       ; body' <- cpeBody body_env body
+       ; return (emptyFloats, Unpack witness' value' package' body') }
+
 cpeBodyF env (Cast expr co)
    = do { (floats, expr') <- cpeBodyF env expr
         ; return (floats, Cast expr' (cpSubstCo env co)) }

@@ -3,6 +3,7 @@ module GHC.Core.Dependent (
     hasNativeDependentProgram,
     supportsNativeGentle,
     hasNativeDependentExpr,
+    hasExistentialExpr,
     hasNativeDependentExprRhs,
     hasNativeDependentUnfolding,
     rejectNativeDependentProgram,
@@ -72,6 +73,22 @@ supportsNativeGentle :: CoreProgram -> Bool
 supportsNativeGentle binds =
     not (runScanFor CheckGentle AllMetadata (foldMap scanBind binds))
 
+-- | Detect lexical existential expressions before selecting an optimizer.
+-- Occurrences cannot introduce new expression forms through Id metadata.
+hasExistentialExpr :: CoreExpr -> Bool
+hasExistentialExpr Pack{} = True
+hasExistentialExpr Unpack{} = True
+hasExistentialExpr (App f a) = hasExistentialExpr f || hasExistentialExpr a
+hasExistentialExpr (Lam _ body) = hasExistentialExpr body
+hasExistentialExpr (Let binding body) =
+    any hasExistentialExpr (rhssOfBind binding) || hasExistentialExpr body
+hasExistentialExpr (Case scrut _ _ alts) = hasExistentialExpr scrut || any go_alt alts
+  where
+    go_alt (Alt _ _ body) = hasExistentialExpr body
+hasExistentialExpr (Cast e _) = hasExistentialExpr e
+hasExistentialExpr (Tick _ e) = hasExistentialExpr e
+hasExistentialExpr _ = False
+
 -- | Inspect an expression and metadata on its bound identifiers.
 hasNativeDependentExpr :: CoreExpr -> Bool
 hasNativeDependentExpr = runScan AllMetadata . scanExpr
@@ -137,10 +154,8 @@ scanExpr (Lam b body) = scanBinder b <> scanExpr body
 scanExpr (Let bind body) = scanBind bind <> scanExpr body
 scanExpr (Case scrut b result alts) =
     scanExpr scrut <> scanBinder b <> scanType result <> foldMap scanAlt alts
-scanExpr (Pack package_ty witness payload) =
-    scanType package_ty <> scanType witness <> scanExpr payload
-scanExpr (Unpack witness payload package body) =
-    scanBinder witness <> scanBinder payload <> scanExpr package <> scanExpr body
+scanExpr Pack{} = NativeScan (pure True)
+scanExpr Unpack{} = NativeScan (pure True)
 scanExpr (Cast body co) = scanExpr body <> scanCo co
 scanExpr (Tick tick body) = scanTick tick <> scanExpr body
 scanExpr (Type ty) = scanType ty

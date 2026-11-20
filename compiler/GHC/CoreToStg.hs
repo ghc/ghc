@@ -461,6 +461,18 @@ coreToStgExpr (Tick tick expr)
        !expr2 <- coreToStgExpr expr
        return (StgTick stg_tick expr2)
 
+coreToStgExpr (Pack _ _ payload) = coreToStgExpr payload
+
+-- See Note [Erasing a lexical existential].
+coreToStgExpr (Unpack _ payload package body)
+  | Var p <- package
+  = do { p' <- resolvePayloadAlias p
+       ; extendVarEnvCts [(payload, PayloadAlias p')] (coreToStgExpr body) }
+  | otherwise
+  = do { rhs <- coreToStgRhs (payload, package)
+       ; body' <- extendVarEnvCts [(payload, LetBound NestedLet 0)] (coreToStgExpr body)
+       ; return (StgLet noExtFieldSilent (StgNonRec payload rhs) body') }
+
 coreToStgExpr (Cast expr _)
   = coreToStgExpr expr
 
@@ -563,8 +575,9 @@ coreToStgApp :: Id            -- Function
              -> [StgTickish]  -- From the application nodes
              -> Type          -- Type of the whole application
              -> CtsM StgExpr
-coreToStgApp f core_args app_ticks res_ty
-  = do { how_bound             <- lookupVarCts f
+coreToStgApp fun core_args app_ticks res_ty
+  = do { f <- resolvePayloadAlias fun
+       ; how_bound <- lookupVarCts f
        ; (stg_args, arg_ticks, arg_binds) <- coreToStgArgs core_args
        ; let app = mkStgApp f how_bound core_args stg_args res_ty
              all_ticks =  app_ticks ++ arg_ticks
@@ -672,9 +685,11 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
     -- Since the argument is trivial, the only place the Tick can occur is
     -- somehow wrapping a variable (give or take type args, as above).
     platform <- getPlatform
+    arg' <- case getStgArgFromTrivialArg arg of
+              StgVarArg var -> StgVarArg <$> resolvePayloadAlias var
+              literal -> pure literal
     let arg_ty = exprType arg
         ticks' = map (coreToStgTick arg_ty) (stripTicksT (not . tickishIsCode) arg)
-        arg' = getStgArgFromTrivialArg arg
         arg_rep = typePrimRep arg_ty
         stg_arg_rep = stgArgRep arg'
         bad_args = not (primRepsCompatible platform arg_rep stg_arg_rep)
@@ -810,6 +825,8 @@ data HowBound
         LetInfo         -- Whether top level or nested
         Arity           -- Its arity (local Ids don't have arity info at this point)
 
+  | PayloadAlias Id     -- The lifted package Id that owns an unpacked value.
+
   | LambdaBound         -- Used for both lambda and case
   deriving (Eq)
 
@@ -876,6 +893,26 @@ extendVarEnvCts :: [(Id, HowBound)] -> CtsM a -> CtsM a
 extendVarEnvCts ids_w_howbound expr
    =    CtsM $   \platform env
    -> unCtsM expr platform (extendVarEnvList env ids_w_howbound)
+
+{- Note [Erasing a lexical existential]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Pack has the payload's lifted representation. Unpack of an already named
+package aliases that same runtime variable. Use the payload type for the
+STG occurrence's calling/representation information. The package Id keeps
+its identity and binder. Typed Core never substitutes a package for a
+payload variable at an incompatible type.
+
+An arbitrary package expression is a normal lazy RHS. Use a single STG
+binding and do not introduce a data constructor or a strict case. An
+ordinary case inside the body can still demand the payload.
+-}
+
+resolvePayloadAlias :: Id -> CtsM Id
+resolvePayloadAlias var = do
+    env <- getCtsEnv
+    case lookupVarEnv env var of
+      Just (PayloadAlias owner) -> return (setIdType owner (idType var))
+      _ -> return var
 
 lookupVarCts :: Id -> CtsM HowBound
 lookupVarCts v = CtsM $ \_ env -> return (lookupBinding env v)
@@ -976,6 +1013,7 @@ stgArity :: Id -> HowBound -> Arity
 stgArity _ (LetBound _ arity) = arity
 stgArity f ImportBound        = idArity f
 stgArity _ LambdaBound        = 0
+stgArity _ (PayloadAlias _)   = 0
 
 data CoreToStgOpts = CoreToStgOpts
   { coreToStg_platform :: Platform

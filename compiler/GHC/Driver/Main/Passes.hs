@@ -103,7 +103,7 @@ import GHC.Iface.Ext.Debug  ( diffFile, validateScopes )
 import qualified GHC.ByteCode.Serialize as ByteCode
 
 import GHC.Core
-import GHC.Core.Dependent ( hasNativeDependentExpr, rejectNativeDependentExpr, supportsNativeGentle )
+import GHC.Core.Dependent ( hasExistentialExpr, hasNativeDependentExpr, rejectNativeDependentExpr, supportsNativeGentle )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.TyCon (tyConName)
 import GHC.Core.Tidy           ( tidyExpr )
@@ -1722,7 +1722,10 @@ compileCoreExpr hsc_env srcspan optional ds_expr = do
           rejectNativeDependentExpr "JavaScript code generation" ds_expr
         _ -> return ()
       lintInteractiveExpr (text "native Core before simplification") lint_env ds_expr
-      let simplified = simpleOptNativeExpr ds_expr
+      -- The lexical existential path enters through the Core API. Keep its
+      -- binders intact until CorePrep and do not run an unchecked optimizer.
+      let simplified | hasExistentialExpr ds_expr = ds_expr
+                     | otherwise = simpleOptNativeExpr ds_expr
       lintInteractiveExpr (text "native Core after simplification") lint_env simplified
       return simplified
     else simplifyExpr logger (ue_eps unit_env) simplify_expr_opts ds_expr

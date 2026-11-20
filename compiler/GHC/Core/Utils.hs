@@ -1951,6 +1951,8 @@ exprIsCheapX ok_app expandable e
     ok e = go 0 e
 
     -- n is the number of value arguments
+    go n (Pack _ _ payload)           = go n payload
+    go _ Unpack{}                     = False
     go n (Var v)                      = ok_app v n
     go _ (Lit {})                     = True
     go _ (Type {})                    = True
