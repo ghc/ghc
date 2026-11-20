@@ -213,6 +213,11 @@ domain. In `forall m x. keepReading @Bool m x = x`, the checked
 `@Bool` gives `m :: Maybe Bool` and `x :: Reading m`. GHC reuses
 the checked prefix when it checks the call. The prefix can mention
 a type variable from a signed rule binder or an earlier runtime index.
+Value arguments can also precede the written type argument.
+In `keepAfter ignored @Bool m x`, the rule checks `ignored` at `Bool`
+and infers `x :: Reading m`. The caller can pass an undefined value
+for `ignored`. A test puts a value between two visible type arguments
+and uses a noninjective family for the payload type.
 An ordinary caller can write `keepReading @_ m x` when the type of
 `m` determines the wildcard. The call remains lazy in `m`.
 [Source rule](../examples/qualified-pi/VisibleRuleArguments.hs),

@@ -3,6 +3,7 @@ runtime Bool choice: "42"
 apply retained function rules without forcing an unused index: (7,11,19)
 infer both rule binders from readKept: 7
 use a type-applied rule with a runtime Maybe index: (37,19)
+match a type argument after a lazy value argument: 43
 apply a rule declared outside the retained function's module: 23
 choose True has result Int: 42
 choose False has result Bool: False

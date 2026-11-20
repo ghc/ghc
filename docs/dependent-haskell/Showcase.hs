@@ -260,6 +260,9 @@ booleans = do
     lazyIndex <- newIORef (error "forced reading index" :: Maybe Bool) >>= readIORef
     observe "use a type-applied rule with a runtime Maybe index"
         (VisibleRuleClient.readAt readingIndex 37, VisibleRuleClient.readAt lazyIndex 19)
+    ignoredFirst <- newIORef (error "forced first rule argument") >>= readIORef
+    observe "match a type argument after a lazy value argument"
+        (VisibleRuleClient.readAfter ignoredFirst readingIndex 43)
     observe "apply a rule declared outside the retained function's module"
         (Rule.readChoice (Rule.keep True (ImportedRetainedRules.tagged 23)))
     observe "choose True has result Int" (choose True)

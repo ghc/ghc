@@ -571,13 +571,15 @@ tcOrdinaryApp' :: HsExpr GhcRn -> (HsExpr GhcRn, SrcSpan) -> HsExpr GhcTc
                -> TcSigmaType -> [HsExprArg 'TcpRn] -> ExpRhoType -> TcM (HsExpr GhcTc)
 tcOrdinaryApp' = tcOrdinaryAppWithPrefix []
 
--- | Check a retained RULE's leading type arguments once. Keep the original
--- syntax and the checked arguments for the rest of the application.
+-- | Instantiate the retained RULE through its last written type argument.
+-- Keep preceding value operands for the normal argument check.
 -- See Note [Dependent RULE binder domains] in GHC.Tc.Gen.Sig.
 tcRuleAppPrefix :: LHsExpr GhcRn -> TcM (TcSigmaType, TcM (LHsExpr GhcTc, TcRhoType))
 tcRuleAppPrefix (L loc expr) = context $
   do { (fun, args) <- splitHsApps expr
-     ; let (leading, rest) = span prefix_arg args
+     ; let (trailing, rev_prefix) = break is_type_arg (reverse args)
+           leading = reverse rev_prefix
+           rest = reverse trailing
      ; fun_span <- getFunSrcSpan args
      ; let head_ctxt = (fun, fun_span)
      ; (checked_fun, sigma) <- tcInferAppHead head_ctxt
@@ -592,9 +594,8 @@ tcRuleAppPrefix (L loc expr) = context $
   where
     context :: TcM a -> TcM a
     context action = setSrcSpanA loc $ addExprCtxt expr action
-    prefix_arg ETypeArg{} = True
-    prefix_arg EWrap{} = True
-    prefix_arg _ = False
+    is_type_arg ETypeArg{} = True
+    is_type_arg _ = False
 
 tcOrdinaryAppWithPrefix :: [HsExprArg 'TcpInst] -> HsExpr GhcRn -> (HsExpr GhcRn, SrcSpan)
                         -> HsExpr GhcTc -> TcSigmaType -> [HsExprArg 'TcpRn]
@@ -2737,7 +2738,8 @@ tcInstFunWithExpectedCache :: Maybe (TcRef (Maybe RetainedArgCache))
 tcInstFunWithExpectedCache = tcInstFunWithPrefix False []
 
 -- | Resume instantiation after a checked prefix, or check that prefix only.
--- Prefix-only calls cannot enter value inference or IRESULT.
+-- A prefix-only call stops before instantiating the result. Retained RULEs
+-- may include value operands before a written type argument.
 -- See Note [Ground retained applications].
 tcInstFunWithPrefix :: Bool -> [HsExprArg 'TcpInst]
                     -> Maybe (TcRef (Maybe RetainedArgCache))
@@ -2759,7 +2761,7 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
            DoQL | not prefix_only -> setSrcSpan fun_lspan $ rejectNativeQuickLook fun_sigma
                 | otherwise -> return ()
        ; fun_origin <- mk_origin rn_head
-       ; res@(_, fun_ty) <- go inst_plan fun_origin 1 (reverse prefix) fun_sigma rn_args
+       ; res@(_, fun_ty) <- go inst_plan fun_origin (1 + prefix_values) (reverse prefix) fun_sigma rn_args
        ; traceTc "tcInstFun:ret" (ppr fun_ty)
        ; return res
        }
@@ -2802,7 +2804,11 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
     -- Count value args only when complaining about a function
     -- applied to too many value args
     -- See Note [Herald for matchExpectedFunTys] in GHC.Tc.Utils.Unify.
-    n_val_args = count isHsValArg rn_args
+    n_val_args = prefix_values + count isHsValArg rn_args
+    prefix_values = count consumed_value prefix
+    consumed_value EValArg{} = True
+    consumed_value ERetainedArg{ ea_retained_vis = DepFunVisible } = True
+    consumed_value _ = False
 
     fun_is_out_of_scope  -- See Note [VTA for out-of-scope functions]
       = case tc_fun of

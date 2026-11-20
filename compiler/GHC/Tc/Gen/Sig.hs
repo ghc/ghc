@@ -1323,31 +1323,34 @@ tcRuleBndrs skol_info mb_lhs (RuleBndrs { rb_tyvs = mb_tv_bndrs, rb_tmvs = tm_bn
 
     check_terms
       | Just lhs <- mb_lhs
-      , Just (head_name, type_args, args) <- ruleAppSpine lhs
+      , Just (head_name, prefix, args) <- ruleAppSpine lhs
       = do { mb_fun <- tcLookupIdMaybe head_name
            ; case mb_fun of
                Just fun | hasRetainedRuleHead fun ->
-                 if null type_args
+                 if null prefix
                  then do { domain <- ruleBinderDomain fun args
                          ; check_with domain }
-                 else check_prefix lhs fun type_args args
+                 else check_prefix lhs fun prefix args
                _ -> check_with no_domain }
       | otherwise = check_with no_domain
 
     no_domain _ _ = Nothing
     check_with domain = go_tms domain emptyNameEnv tm_bndrs (const (thing_inside Nothing))
 
-    check_prefix lhs fun type_args args
+    check_prefix lhs fun prefix args
       | any unsigned later
-      = do { (first, (last_bndrs, result)) <-
-               go_tms no_domain emptyNameEnv earlier $ \scope ->
+      = do { early_domain <- case [arg | Right arg <- prefix] of
+                          [] -> return no_domain
+                          vals -> ruleBinderDomain fun vals
+           ; (first, (last_bndrs, result)) <-
+               go_tms early_domain emptyNameEnv earlier $ \scope ->
                do { (sigma, finish) <- tcRuleAppPrefix lhs
                   ; domain <- ruleBinderDomain (setVarType fun sigma) args
                   ; go_tms domain scope later (const (thing_inside (Just finish))) }
            ; return (first ++ last_bndrs, result) }
       | otherwise = check_with no_domain
       where
-        names = unionNameSets (map ruleTypeArgNames type_args)
+        names = unionNameSets (map rulePrefixNames prefix)
         (suffix, rest) = span (all (\n -> not (n `elemNameSet` names)) . binder_names . unLoc)
                               (reverse tm_bndrs)
         later = reverse suffix
@@ -1386,27 +1389,32 @@ tcRuleBndrs skol_info mb_lhs (RuleBndrs { rb_tyvs = mb_tv_bndrs, rb_tmvs = tm_bn
                               go_tms domain (extendNameEnv scope name bndr_id) rule_bndrs thing_inside
             ; return (map snd tv_prs ++ bndr_id : bndrs, res) }
 
--- | Find the value operands and the type arguments on the head. A visible
--- type argument after a value operand belongs to a different telescope.
-ruleAppSpine :: LHsExpr GhcRn -> Maybe (Name, [LHsWcType GhcRn], [LHsExpr GhcRn])
+-- | Split the RULE at its last visible type argument. The prefix keeps
+-- source order so earlier value operands can bind indices for later ones.
+ruleAppSpine :: LHsExpr GhcRn
+             -> Maybe (Name, [Either (LHsWcType GhcRn) (LHsExpr GhcRn)], [LHsExpr GhcRn])
 ruleAppSpine = values []
   where
     values args e = case unLoc (stripParensLHsExpr e) of
-      HsApp _ f x   -> values (x : args) f
-      OpApp _ x f y -> values (x : y : args) f
-      _             -> prefix args [] e
-    prefix args types e = case unLoc (stripParensLHsExpr e) of
-      HsAppType _ f ty -> prefix args (ty : types) f
-      HsVar _ (L _ f)  -> Just (getName f, types, args)
+      HsApp _ f x      -> values (x : args) f
+      OpApp _ x f y    -> values (x : y : args) f
+      HsAppType _ f ty -> prefix args [Left ty] f
+      HsVar _ (L _ f)  -> Just (getName f, [], args)
+      _                -> Nothing
+    prefix args leading e = case unLoc (stripParensLHsExpr e) of
+      HsAppType _ f ty -> prefix args (Left ty : leading) f
+      HsApp _ f x      -> prefix args (Right x : leading) f
+      OpApp _ x f y    -> prefix args (Right x : Right y : leading) f
+      HsVar _ (L _ f)  -> Just (getName f, leading, args)
       _                -> Nothing
 
--- | Names needed before checking a RULE's written type arguments. The
--- caller intersects these with the names introduced by this RULE.
-ruleTypeArgNames :: Data a => a -> NameSet
-ruleTypeArgNames thing
+-- | Names needed before checking a RULE application prefix. The caller
+-- intersects these with the names introduced by this RULE.
+rulePrefixNames :: Data a => a -> NameSet
+rulePrefixNames thing
   | Just name <- cast thing = unitNameSet name
   | Just ty <- cast thing = mkNameSet (map getName (tyCoVarsOfTypeList ty))
-  | otherwise = unionNameSets (gmapQ ruleTypeArgNames thing)
+  | otherwise = unionNameSets (gmapQ rulePrefixNames thing)
 
 -- | Read a bare rule binder's expected type from a retained application.
 -- See Note [Dependent RULE binder domains].
@@ -1465,7 +1473,12 @@ with the normal application checker. Use the residual function type for
 subsequent binder domains. Finish the left side with the same checked
 head, arguments and evidence. This keeps the source locations and checks
 wildcards, constraints and splices once. The checker never inspects a
-value operand to discover its type. A different occurrence of the same
+value operand to discover its type.
+
+For a head such as keepBetween @Char p @Bool m x, bring p into scope
+before instantiating through @Bool. Keep the already checked head and
+all preceding arguments when checking m and x. Their error positions
+include the earlier value arguments. A different occurrence of the same
 binder must also check at its inferred type. A type family in the domain
 can stay stuck throughout. No inverse family equation is needed.
 -}
