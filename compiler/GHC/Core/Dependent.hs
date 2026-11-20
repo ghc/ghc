@@ -2,6 +2,7 @@
 module GHC.Core.Dependent (
     hasNativeDependentProgram,
     supportsNativeGentle,
+    supportsQuickLookType,
     hasNativeDependentExpr,
     hasExistentialExpr,
     hasNativeDependentExprRhs,
@@ -49,7 +50,7 @@ data ScanState = ScanState
     }
 
 -- | Select which retained forms the scan looks for.
-data ScanPurpose = DetectNative | CheckGentle
+data ScanPurpose = DetectNative | CheckGentle | CheckQuickLook
 
 -- | Select which bound-Id metadata a boundary can demand.
 data MetadataScan = AllMetadata | StableMetadata | NoMetadata
@@ -78,6 +79,11 @@ hasNativeDependentProgram binds rules =
 supportsNativeGentle :: CoreProgram -> Bool
 supportsNativeGentle binds =
     not (runScanFor CheckGentle AllMetadata (foldMap scanBind binds))
+
+-- | Check whether Quick Look can traverse a type and its coercions.
+-- See Note [Retained types and Quick Look] in GHC.Tc.Gen.App.
+supportsQuickLookType :: Type -> Bool
+supportsQuickLookType = not . runScanFor CheckQuickLook NoMetadata . scanType
 
 -- | Detect lexical existential expressions before selecting an optimizer.
 -- Occurrences cannot introduce new expression forms through Id metadata.
@@ -151,7 +157,7 @@ gentleForm scan = NativeScan $ do
     purpose <- gets scanPurpose
     case purpose of
         CheckGentle -> runNativeScan scan
-        DetectNative -> pure True
+        _           -> pure True
 
 -- | Report an unsupported compiler operation when a scan finds a native type.
 rejectNative :: String -> Bool -> IO ()
@@ -279,9 +285,12 @@ scanType (TyVarTy tv) = scanVarKind tv
 scanType (TermVarTy v) =
     gentleForm (NativeScan (pure (not (isNativeOpaqueValueId v))) <> scanVarKind v)
 scanType (TermAppTy f arg) = gentleForm (scanCallHead f <> scanType arg)
--- An ordinary client can pass a package through a polymorphic function.
-scanType (ExistsTy _ binder body) =
-    gentleForm (scanType (varType binder) <> scanType body)
+-- The type binder itself is safe for Quick Look. Check its kind and payload.
+scanType (ExistsTy _ binder body) = NativeScan $ do
+    purpose <- gets scanPurpose
+    case purpose of
+        DetectNative -> pure True
+        _ -> runNativeScan (scanType (varType binder) <> scanType body)
 scanType (DepFunTy _ b body) =
     gentleForm (scanRetainedIndex b <> scanType body)
 scanType (LitTy _) = mempty

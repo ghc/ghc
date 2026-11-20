@@ -50,7 +50,7 @@ import GHC.Core.Class ( Class )
 import GHC.Core.ConLike ( ConLike(..) )
 import GHC.Core.DataCon ( dataConConcreteTyVars, dataConFullSig, dataConName, isNewDataCon, dataConOrigArgTys, dataConRepArgBinders, dataConTyCon, dataConWorkId, dataConWrapId )
 import qualified GHC.Core as Core
-import GHC.Core.Dependent ( hasNativeDependentExpr )
+import GHC.Core.Dependent ( hasNativeDependentExpr, supportsQuickLookType )
 import GHC.Core.FamInstEnv (FamInstEnvs, reduceTyFamApp_maybe)
 import GHC.Core.Reduction ( reductionReducedType )
 import GHC.Core.Utils ( applyTypeToArgs, exprType )
@@ -3376,7 +3376,7 @@ tcRetainedWorkerResultMatch NoQL (Just expected) args fun sigma
     constructor_result _ _ = Nothing
 tcRetainedWorkerResultMatch _ _ _ _ _ = return Nothing
 
--- | Admit known scalar or function-valued retained binders without erased polymorphism.
+-- | Admit known retained values and complete erased package types.
 -- Constraint arrows are supported only below a retained binder.
 -- See Note [Known retained function instantiation].
 isRetainedValueType :: Type -> Bool
@@ -3384,6 +3384,7 @@ isRetainedValueType = go False
   where
     go _ ty | isTauTy ty = True
     go under_pi ty = case coreFullView ty of
+      ExistsTy{} -> supportsQuickLookType ty
       DepFunTy _ index body -> isNativeOpaqueValueId index
                          && typeKind body `eqType` liftedTypeKind
                          && go True body
@@ -6180,7 +6181,7 @@ foldQLInstVars check_tv ty
 rejectNativeQuickLook :: TcType -> TcM ()
 rejectNativeQuickLook ty
   = do { ty <- liftZonkM $ zonkTcType ty
-       ; when (hasNativeDependentExpr (Core.Type ty)) $
+       ; unless (supportsQuickLookType ty) $
            failWithTc (TcRnRetainedQuantificationError (RetainedQuickLook ty)) }
 
 -- | Check the type arguments that Quick Look will monomorphise.
@@ -6196,9 +6197,17 @@ rejectNativeQLInstArgs = mapM_ check_arg
 
 {- Note [Retained types and Quick Look]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An erased existential binds a type variable. foldQLInstVars visits its kind
+and body with the same type-binder operation it uses for forall. qlUnify
+can assign the entire package to an instantiation variable. Its ordinary
+occurs and concreteness checks apply. It does not match two packages by
+opening them or by equating their witnesses. Final subsumption checks the
+actual package type, including the binder mode.
+
 Quick Look assigns instantiation variables without the ordinary unifier's
 runtime-index escape check. Its instantiation-variable folders do not support
-retained types either. Reject those types before both operations. Zonk first
+retained types either. Reject runtime indices and retained binders before both operations, including
+those inside an erased package. Zonk first
 so that the check also sees a type behind a filled metavariable. Check the
 WpTyApp inputs before qlMonoInstArgs enters its ZonkM folder.
 
@@ -6207,7 +6216,9 @@ Imported contracts can contain native types in a client without that flag.
 An incomplete immutable application plan can retain DoQL in such a client.
 The native-type rejection must still run before a Quick Look assignment or
 unsupported traversal. See Note [Imported native application contracts].
-This restriction does not add Quick Look support for retained types.
+Eisenberg et al., An Existential Crisis Resolved, section 8, integrates
+erased existential types with the Quick Look rules. See also
+Note [QuickLook unification].
 See Note [Rigid retained indices] in GHC.Tc.Utils.Unify.
 -}
 
