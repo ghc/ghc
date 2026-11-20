@@ -514,7 +514,11 @@ tc_lhs_sig_type retained_sig skol_info full_hs_ty@(L loc (HsSig { sig_bndrs = hs
                  do { exp_kind <- newExpectedKind ctxt_kind
                           -- See Note [Escaping kind in type signatures]
                     ; outer_ma <- tcForAllMatchability (hsOuterMatchability hs_outer_bndrs)
-                    ; stuff <- tcOuterTKBndrs skol_info hs_outer_bndrs $
+                    ; let binder_mode = smVanilla
+                            { sm_clone = False
+                            , sm_tvtv = SMDSkolemTv skol_info
+                            , sm_sig_kind_arrows = True }
+                    ; stuff <- tcOuterTKBndrsX binder_mode skol_info hs_outer_bndrs $
                                (case retained_sig of
                                   Just allow_function -> tcCheckRetainedSigType allow_function
                                   Nothing -> tcCheckLHsType) hs_ty exp_kind
@@ -6461,7 +6465,8 @@ bindExplicitTKBndrsX
     -> TcM ([VarBndr TyVar flag], a)  -- Returned [TcTyVar] are in 1-1 correspondence
                                       -- with the passed-in [LHsTyVarBndr]
 bindExplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_kind
-                                   , sm_holes = hole_info, sm_family_metadata = family_metadata })
+                                   , sm_holes = hole_info, sm_family_metadata = family_metadata
+                                   , sm_sig_kind_arrows = sig_kind_arrows })
                      hs_tvs thing_inside
   = do { traceTc "bindExplicitTKBndrs" (ppr hs_tvs)
        ; go hs_tvs }
@@ -6501,9 +6506,25 @@ bindExplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_ki
            ; kind' <- tc_hs_bndr_kind name kind
            ; newTyVarBndr skol_mode name kind' }
 
+    -- Let a complete signature constrain the omitted arrow in a binder kind.
+    -- Check the binder kind's shape first, then register its arrow with the
+    -- signature's defaulting pass. scopedSortOuter still checks that each
+    -- binder kind refers only to binders earlier in the telescope.
     tc_hs_bndr_kind :: Name -> HsBndrKind GhcRn -> TcM Kind
     tc_hs_bndr_kind _    (HsBndrNoKind _)    = newExpectedKind ctxt_kind
-    tc_hs_bndr_kind name (HsBndrKind _ kind) = tc_lhs_kind_sig tc_ki_mode (TyVarBndrKindCtxt name) kind
+    tc_hs_bndr_kind name (HsBndrKind _ kind)
+      = do { checked <- tc_lhs_kind_sig tc_ki_mode (TyVarBndrKindCtxt name) kind
+           ; case checked of
+               FunTy flag _ mult domain result
+                 | sig_kind_arrows, matchabilityArrow kind
+                 -> do { owner <- tcl_kind_arrow_defaults <$> getLclEnv
+                       ; case owner of
+                           Just (defaults, _) ->
+                             do { ma <- newFlexiTyVar matchabilityTy
+                                ; updTcRef defaults ((ma, KindLevel) :)
+                                ; return (FunTy flag (mkTyVarTy ma) mult domain result) }
+                           Nothing -> return checked }
+               _ -> return checked }
 
     -- Check the HsBndrKind against the kind of the parent type variable,
     -- e.g. the following is rejected:
@@ -6620,6 +6641,7 @@ data SkolemMode
        , sm_kind   :: ContextKind  -- Use this for the kind of any new binders
 
        , sm_family_metadata :: Bool
+       , sm_sig_kind_arrows :: Bool -- Defer bare binder arrows until the signature is checked.
        , sm_holes  :: HoleInfo     -- What to do for wildcards in the kind
        }
 
@@ -6634,6 +6656,7 @@ smVanilla = SM { sm_clone  = panic "sm_clone"  -- We always override this
                , sm_tvtv   = pprPanic "sm_tvtv" callStackDoc -- We always override this
                , sm_kind   = AnyKind
                , sm_family_metadata = False
+               , sm_sig_kind_arrows = False
                , sm_holes  = Nothing }
 
 {- Note [Cloning for type variable binders]

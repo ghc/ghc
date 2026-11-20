@@ -60,4 +60,27 @@ badDefault :: Proxy P.Abstract -> Proxy P.Abstract
 badDefault = ascribedDefault @P.Abstract
 HS
     reject "$(wc -l < Rejected.hs | tr -d ' ')" '[GHC-83865]' -X"$mode"
+
+    # A written modifier wins, even when the signature needs a different arrow.
+    sed -e 's/^module DependentArrowMatchability/module Rejected/' \
+        -e '/^laterBinder ::/s/(f :: Type -> Type)/(f :: Type %M -> Type)/' \
+        DependentArrowMatchability.hs > Rejected.hs
+    line=$(grep -n '^laterBinder ::' Rejected.hs | cut -d: -f1)
+    reject "$line" '[GHC-83865]' -X"$mode"
+
+    # The binder's kind cannot depend on a variable later in the telescope.
+    sed -e 's/^module DependentArrowMatchability/module Rejected/' \
+        -e '/^scopedBinder ::/s/(m :: Matchability) (f :: Type -> Type)/(f :: Type -> Type) (m :: Matchability)/' \
+        DependentArrowMatchability.hs > Rejected.hs
+    line=$(grep -n '^scopedBinder ::' Rejected.hs | cut -d: -f1)
+    reject "$line" '[GHC-97739]' -X"$mode"
+
+    sed 's/^module DependentArrowMatchability/module Rejected/' \
+        DependentArrowMatchability.hs > Rejected.hs
+    cat >> Rejected.hs <<'HS'
+
+badBinderDefault :: Proxy P.Abstract -> Proxy P.Abstract
+badBinderDefault = binderDefault @P.Abstract
+HS
+    reject "$(wc -l < Rejected.hs | tr -d ' ')" '[GHC-83865]' -X"$mode"
 done

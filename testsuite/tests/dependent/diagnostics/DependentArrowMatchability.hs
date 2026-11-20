@@ -47,6 +47,22 @@ ascribedDefault = id
 ascribedDefaultM :: Proxy Maybe -> Proxy Maybe
 ascribedDefaultM = ascribedDefault @Maybe
 
+-- | Let the body of the complete signature select the binder's arrow.
+laterBinder :: forall (f :: Type -> Type). Proxy (P.D (Type %U -> Type) f) -> Proxy f -> Proxy f
+laterBinder _ = id
+
+-- | Keep the M default when the signature leaves the binder's arrow open.
+binderDefault :: forall (f :: Type -> Type). Proxy f -> Proxy f
+binderDefault = id
+
+binderDefaultM :: Proxy Maybe -> Proxy Maybe
+binderDefaultM = binderDefault @Maybe
+
+-- | An earlier binder can also fix the arrow in the same telescope.
+scopedBinder :: forall (m :: Matchability) (f :: Type -> Type).
+                Proxy (P.D (FUN @m 'Many Type Type) f) -> Proxy f -> Proxy f
+scopedBinder _ = id
+
 -- | Check both matchabilities in H98 constructor fields.
 data Fields = Fields (P.D (Type -> Type) Maybe) (P.D (Type -> Type) P.Abstract)
 
