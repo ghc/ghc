@@ -76,7 +76,7 @@ import GHC.Types.Basic
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Map
 import GHC.Types.Unique.Set
-import GHC.Types.Var (mkTyVar)
+import GHC.Types.Var (ExistsTyFlag(ExplicitExists), mkTyVar)
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Name
@@ -1223,7 +1223,7 @@ tcExistsCase expr@(HsCase ctxt scrut matches)
       = do { (scrut', scrut_ty) <- tcScalingUsage ManyTy $ tcInferRhoFRR FRRCase scrut
            ; schema <- liftZonkM (zonkTcType scrut_ty)
            ; case coreFullView schema of
-               ExistsTy _ binder inner -> do
+               ExistsTy ExplicitExists binder inner -> do
                  { result_ty <- expTypeToType expected
                  ; con_like <- RealDataCon <$> tcLookupDataCon con
                  ; let origin = PatSkol con_like ctxt

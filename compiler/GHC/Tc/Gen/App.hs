@@ -31,7 +31,7 @@ import GHC.Tc.Solver ( tcRewriteFamilyAxioms )
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Utils.Env ( isExistsPackName, tcLookupIdMaybe, tcLookupConLike
-                        , tcLookupGlobal, tcLookupLcl_maybe )
+                        , tcLookupGlobal, tcLookupLcl_maybe, tcExtendIdEnv )
 import GHC.Tc.Instance.Family ( tcGetFamInstEnvs, tcLookupDataFamInst_maybe )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.Concrete  ( unifyConcrete, idConcreteTvs )
@@ -448,17 +448,22 @@ tcApp rn_expr rn_fun rn_args exp_res_ty
 tcOrdinaryApp :: HsExpr GhcRn -> HsExpr GhcRn -> [HsExprArg 'TcpRn]
               -> ExpRhoType -> TcM (HsExpr GhcTc)
 tcOrdinaryApp rn_expr rn_fun rn_args exp_res_ty
+  = do { fun_lspan <- getFunSrcSpan rn_args
+       ; let rn_head = (rn_fun, fun_lspan)
+       ; (tc_fun0, fun_sigma0) <- tcInferAppHead rn_head
+       ; tcOpenImplicitArgs fun_sigma0 rn_args exp_res_ty $
+           tcOrdinaryApp' rn_expr rn_head tc_fun0 fun_sigma0 }
+
+tcOrdinaryApp' :: HsExpr GhcRn -> (HsExpr GhcRn, SrcSpan) -> HsExpr GhcTc
+               -> TcSigmaType -> [HsExprArg 'TcpRn] -> ExpRhoType -> TcM (HsExpr GhcTc)
+tcOrdinaryApp' rn_expr rn_head@(rn_fun, fun_lspan) tc_fun0 fun_sigma0 rn_args exp_res_ty
   = do { wanted_ql <- wantQuickLook rn_fun
-       ; fun_lspan <- getFunSrcSpan rn_args
        ; traceTc "tcApp {" $
            vcat [ text "rn_fun:" <+> ppr rn_fun
                 , text "fun_lspan:" <+> ppr fun_lspan
                 , text "rn_args:" <+> ppr rn_args ]
 
 
-       -- Step 1: Infer the type of `fun`, the head of the application
-       ; let rn_head = (rn_fun, fun_lspan)
-       ; (tc_fun0, fun_sigma0) <- tcInferAppHead rn_head
        -- See Note [Imported native application contracts].
        ; native_app <- tcRetainedAppCapability fun_sigma0 exp_res_ty rn_args
        -- See Note [Known native variables with ImpredicativeTypes].
@@ -523,6 +528,106 @@ tcOrdinaryApp rn_expr rn_fun rn_args exp_res_ty
             ; finishAppWithCache (arg_cache ++ extra_cache) do_ql rn_expr fun_lspan
                 rn_fun tc_fun inst_args app_res_rho exp_res_ty } }
 
+-- | Scope implicit existential value arguments over the rest of the application.
+-- See Note [Implicit existential arguments].
+tcOpenImplicitArgs :: TcSigmaType -> [HsExprArg 'TcpRn] -> ExpRhoType
+                   -> ([HsExprArg 'TcpRn] -> ExpRhoType -> TcM (HsExpr GhcTc))
+                   -> TcM (HsExpr GhcTc)
+tcOpenImplicitArgs fun_ty args expected check_app
+  = do { marked <- mark fun_ty args
+       ; if all isLeft marked
+         then check_app args expected
+         else do { result_ty <- expTypeToType expected
+                 ; open result_ty [] marked } }
+  where
+    isLeft (Left _) = True
+    isLeft (Right _) = False
+
+    mark :: TcType -> [HsExprArg 'TcpRn]
+         -> TcM [Either (HsExprArg 'TcpRn) (HsExprLoc, Mult, LHsExpr GhcRn)]
+    mark ty (wrapper@EWrap{} : rest) = (Left wrapper :) <$> mark ty rest
+    mark ty (ordinary@EValArg{ea_loc_span = loc, ea_arg = arg} : rest)
+      | FunTy { ft_af = af, ft_mult = mult, ft_arg = domain, ft_res = result }
+          <- visibleHead ty
+      , isVisibleFunArg af
+      = do { implicit <- if (isManyTy mult || isOneTy mult)
+                            && demandsPayload (coreFullView domain)
+                         then declaredDotResult 0 arg
+                         else return False
+           ; let operand = if implicit then Right (loc, mult, arg) else Left ordinary
+           ; (operand :) <$> mark result rest }
+    mark _ rest = return (map Left rest)
+
+    visibleHead ty = case coreFullView ty of
+      ForAllTy _ (Bndr _ vis) body | isInvisibleForAllTyFlag vis -> visibleHead body
+      FunTy { ft_af = af, ft_res = body } | isInvisibleFunArg af -> visibleHead body
+      other -> other
+
+    demandsPayload TyConApp{} = True
+    demandsPayload AppTy{} = True
+    demandsPayload FunTy{} = True
+    demandsPayload _ = False
+
+    declaredDotResult :: Int -> LHsExpr GhcRn -> TcM Bool
+    declaredDotResult n (L _ (HsApp _ fun _)) = declaredDotResult (n + 1) fun
+    declaredDotResult n (L _ (HsPar _ fun)) = declaredDotResult n fun
+    declaredDotResult n (L _ (HsVar _ name))
+      | let id_name = unLocWithUserRdr name
+      , not (isDataOcc (nameOccName id_name))
+      = maybe False (hasDotResult n . varType) <$> tcLookupIdMaybe id_name
+    declaredDotResult _ _ = return False
+
+    hasDotResult 0 ty = case visibleHead ty of
+      ExistsTy ImplicitExists _ _ -> True
+      _ -> False
+    hasDotResult n ty = case visibleHead ty of
+      FunTy { ft_af = af, ft_res = result } | isVisibleFunArg af ->
+        hasDotResult (n - 1) result
+      _ -> False
+
+    open result_ty rev_args [] =
+      check_app (reverse rev_args) (mkCheckExpType result_ty)
+    open result_ty rev_args (Left arg : rest) =
+      open result_ty (arg : rev_args) rest
+    open result_ty rev_args (Right (loc, mult, arg) : rest) =
+      do { (checked, actual) <- tcScalingUsage mult $ tcInferRho arg
+         ; schema <- liftZonkM (zonkTcType actual)
+         ; case coreFullView schema of
+             ExistsTy ImplicitExists binder payload_ty ->
+               do { let origin = UnifyForAllSkol schema
+                  ; skol <- mkSkolemInfo origin
+                  ; name <- newSysName (getOccName binder)
+                  ; witness <- pushTcLevelM_ $ newSkolemTyVar skol name (tyVarKind binder)
+                  ; payload <- newSysLocalId (fsLit "unpacked") ManyTy $
+                      substTyWith [binder] [mkTyVarTy witness] payload_ty
+                  ; let payload_ref = nlHsVar (getName payload)
+                        ref = EValArg loc noExtField $
+                          fmap (\e -> mkExpandedLExpr e payload_ref) arg
+                  ; (ev_binds, body) <- setSrcSpanA (getLoc arg) $
+                      checkConstraints origin [witness] [] $
+                        tcExtendIdEnv [payload] $ open result_ty (ref : rev_args) rest
+                  ; return (XExpr (NativeExistsUnpack witness payload result_ty checked
+                                      (mkHsDictLet ev_binds (noLocA body)))) }
+             _ -> failWithTc (TcRnExistsPack (ExistsPackInvalidSchema schema)) }
+
+{- Note [Implicit existential arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The declared domain must ask for a payload. A package domain or an
+unconstrained variable keeps forwarding an existing package. This
+first rule recognizes named argument heads and ordinary value spines.
+The declaration selects the route. The ordinary checker verifies the
+actual argument, including its use and all of its constraints, once.
+Scale that check by the concrete multiplicity of the formal arrow.
+
+For each dot operand, introduce a fresh skolem and a lazy payload
+binding. Instantiate the application under all of the skolems. The
+outer result type is present before any of these scopes, so the
+ordinary implication solver rejects a witness that would escape.
+If the result expects another dot package, check and pack the result
+inside the scopes. The erasure of Unpack preserves the payload's
+demand. Bar packages go through the ordinary checker.
+-}
+
 -- | Check a saturated explicit existential constructor application.
 -- See Note [Checking explicit existential packages].
 tcExistsPack :: HsExpr GhcRn -> [HsExprArg 'TcpRn] -> ExpRhoType -> TcM (HsExpr GhcTc)
@@ -534,7 +639,7 @@ tcExistsPack rn_expr args expected
            [EValArg { ea_arg = witness }, EValArg { ea_arg = payload }] ->
              do { schema <- check_schema [ty | ETypeArg { ea_hs_ty = ty } <- type_args]
                 ; case coreFullView schema of
-                    ExistsTy _ binder body ->
+                    ExistsTy ExplicitExists binder body ->
                       do { arg <- expr_to_type witness
                          ; inferred <- case arg of
                              HsWC [] ty | HsWildCardTy (HoleVar (L _ name)) <- unLoc (ignoreParens ty)
@@ -591,7 +696,7 @@ tcExistsPack rn_expr args expected
          ; check_kind k ty }
     check_schema _ = failWithTc (TcRnExistsPack ExistsPackArguments)
     check_kind k schema = case coreFullView schema of
-      ExistsTy _ binder _ | not (eqType k (tyVarKind binder)) ->
+      ExistsTy ExplicitExists binder _ | not (eqType k (tyVarKind binder)) ->
         failWithTc (TcRnExistsPack (ExistsPackInvalidKind k (tyVarKind binder)))
       _ -> return schema
 
@@ -1412,8 +1517,9 @@ finishAppWithCache cache do_ql rn_expr fun_loc rn_fun tc_fun inst_args
 
          -- Step 5: subsumption check against the expected type
          -- See Note [Unify with expected type before typechecking arguments]
+       ; (result_expected, pack) <- implicitResult rn_expr app_res_rho exp_res_ty
        ; res_wrap <- checkResultTy rn_expr (tc_fun, fun_loc) inst_args
-                                   app_res_rho exp_res_ty
+                                   app_res_rho result_expected
 
          -- Step 6: Typecheck the arguments
        ; tc_args <- tcValArgsWithCache cache do_ql (rn_fun, fun_loc) inst_args
@@ -1424,7 +1530,56 @@ finishAppWithCache cache do_ql rn_expr fun_loc rn_fun tc_fun inst_args
                      else return (rebuildHsApps tc_fun tc_args)
 
        ; traceTc "End tcApp }" (ppr tc_fun)
-       ; return (mkHsWrap res_wrap res_expr) }
+       ; let checked = mkHsWrap res_wrap res_expr
+       ; return (case pack of
+           Nothing -> checked
+           Just (schema, witness) ->
+             XExpr (NativeExistsPack schema witness (noLocA checked))) }
+
+-- | Introduce a dot package when the application has a fixed payload shape.
+-- See Note [Introducing an implicit existential].
+implicitResult :: HsExpr GhcRn -> TcRhoType -> ExpRhoType
+               -> TcM (ExpRhoType, Maybe (Type, Type))
+implicitResult rn_expr actual expected@(Check wanted)
+  | ExistsTy ImplicitExists binder body <- coreFullView wanted
+  = do { payload <- liftZonkM (zonkTcType actual)
+       ; case coreFullView payload of
+           TyConApp{} -> pack binder body payload
+           AppTy{} -> pack binder body payload
+           FunTy{} -> pack binder body payload
+           _ -> return (expected, Nothing) }
+  where
+    pack binder body payload = do
+      retained <- runMaybeT $ do
+        guard (hasNativeDependentExpr (Core.Type payload))
+        loc <- liftMaybeT $ getCtLocM (exprCtOrigin rn_expr) (Just TypeLevel)
+        view <- liftMaybeT $ reductionReducedType <$> tcRewriteFamilyAxioms loc payload
+        witness <- MaybeT $ return $ do
+          subst <- matchRetainedAppType [binder] Subst.emptySubst body view
+          Subst.lookupTyVar subst binder
+        guard (hasNativeDependentExpr (Core.Type witness)
+               && eqType (typeKind witness) (tyVarKind binder)
+               && eqType (substTyWith [binder] [witness] body) view)
+        scoped <- liftMaybeT (tcRetainedInstScope [witness])
+        guard scoped
+        return witness
+      witness <- maybe (newFlexiTyVarTy (tyVarKind binder)) return retained
+      let payload_ty = substTyWith [binder] [witness] body
+      return (mkCheckExpType payload_ty, Just (wanted, witness))
+implicitResult _ _ expected = return (expected, Nothing)
+
+{- Note [Introducing an implicit existential]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Check the application result at the dot payload type before packing it.
+Usually the solver can fill a fresh witness metavariable. A payload that
+already mentions a retained index needs an immutable choice instead.
+See Note [Rigid retained indices] in GHC.Tc.Utils.Unify.
+
+Match the body against the result type with only the existential binder
+as a template. Reduce type families before matching. Check the selected
+witness in the current scope. The match does not supply evidence. The
+ordinary application checker still checks subsumption and every argument.
+-}
 
 quickLookResultType :: TcRhoType -> TcRhoType -> TcM ()
 -- This function implements the shaded bit of rule APP-Downarrow in
@@ -2982,7 +3137,8 @@ tcRetainedResultMatch NoQL (Just expected) args fun sigma
   , let (theta, tau) = tcSplitPhiTy body
   , null theta || hasNoConcreteTyVars fun
   , Just result <- tcRetainedOrdinaryResult (count isHsValArg args) tau
-  , isTauTy expected || (hasNoConcreteTyVars fun && isRetainedValueType expected)
+  , isTauTy expected || (hasNoConcreteTyVars fun
+                         && (isRetainedValueType expected || forwardsDot result))
   , isTauTy result
   , not (hasNativeDependentExpr (Core.Type body))
   , Just kind_subst <- tcMatchTyX_BM (bind_outer tvs) Subst.emptySubst
@@ -3002,6 +3158,14 @@ tcRetainedResultMatch NoQL (Just expected) args fun sigma
       | otherwise = DontBindMe
 
     kind_agrees subst tv ty = eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty)
+
+    -- An application may forward the expected package at an erased type
+    -- variable without filling a unification variable with its open schema.
+    forwardsDot (TyVarTy _) = case coreFullView expected of
+      ExistsTy ImplicitExists binder body ->
+        isTauTy (tyVarKind binder) && isTauTy body && isFamFreeTy body
+      _ -> False
+    forwardsDot _ = False
 
 tcRetainedResultMatch do_ql expected args fun sigma
   = tcRetainedWorkerResultMatch do_ql expected args fun sigma

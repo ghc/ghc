@@ -69,7 +69,8 @@ import GHC.Types.FieldLabel (flSelector)
 import GHC.Types.Name
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import GHC.Types.Var     ( Id, VarBndr(..), isInvisibleFunArg, mkTyVar, tyVarName
+import GHC.Types.Var     ( Id, ExistsTyFlag(ImplicitExists), VarBndr(..)
+                        , isInvisibleFunArg, mkTyVar, tyVarName
                         , isId, isCoVar, varType )
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
@@ -922,9 +923,11 @@ check_type (ve@ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
   where
     (arg_rank, res_rank) = funArgResRank rank
 
-check_type ve (ExistsTy _ tv body)
+check_type ve (ExistsTy flag tv body)
   = do { check_type (ve { ve_rank = MustBeMonoType }) (varType tv)
-       ; check_type ve body }
+       ; check_type (case flag of
+           ImplicitExists | isSigmaTy body -> ve { ve_rank = MustBeMonoType }
+           _ -> ve) body }
 
 check_type _ ty@(ForAllTy {}) = pprPanic "check_type" (ppr ty)
 check_type _ ty@(CoercionTy {}) = pprPanic "check_type" (ppr ty)
