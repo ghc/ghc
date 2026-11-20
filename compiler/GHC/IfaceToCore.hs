@@ -1635,11 +1635,11 @@ tcIfaceRule iface_rule@IfaceRule{ifRuleName = name, ifActivation = act, ifRuleBn
                    ; rhs'   <- tcIfaceExpr rhs
                    ; let native = any hasNativeDependentUnfolding (rhs' : args' ++ map varToCoreExpr bndrs')
                    ; let checked = case kind of
-                           IfaceErasedUserRule -> Just supportsErasedUserRule
-                           IfaceRetainedAutoRule -> Just canShareRetainedSpecRule
+                           IfaceErasedUserRule -> Just (supportsErasedUserRule, "Unsupported erased user rule shape.")
+                           IfaceRetainedAutoRule -> Just (canShareRetainedSpecRule, "Unsupported retained specialization shape.")
                            _ -> Nothing
                    ; case checked of
-                       Just accepts -> do
+                       Just (accepts, shape_error) -> do
                          unless (nameModule_maybe fn == Just this_mod) $
                            failIfM (retained_doc $$ text "Expected a rule head defined in this module.")
                          thing <- tcIfaceGlobal fn
@@ -1648,7 +1648,7 @@ tcIfaceRule iface_rule@IfaceRule{ifRuleName = name, ifActivation = act, ifRuleBn
                            _ -> failIfM (retained_doc $$ text "Expected an identifier at the rule head.")
                          let rule = mk_rule this_mod bndrs' args' rhs'
                          unless (native && accepts fun rule) $
-                           failIfM (retained_doc $$ text "Unsupported rule shape.")
+                           failIfM (retained_doc $$ text shape_error)
                          dflags <- getDynFlags
                          case lintRule (initLintConfig dflags []) fun rule of
                            Nothing -> pure ()
