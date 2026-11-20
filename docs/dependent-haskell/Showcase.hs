@@ -875,6 +875,22 @@ duplicateProjection _ = Refl
 instance DefaultElement Char where
     defaultElement = 'x'
 
+data RankedField (d :: Maybe Bool) = RankedField
+  (forall (d :: Maybe Bool). NativeNestedCase.CaseFlag d ->
+    (case d of { Just True -> Int; Just _ -> Int; Nothing -> Char }))
+
+constructorFieldCases :: (Int, Char)
+constructorFieldCases =
+  case (RankedField (\case
+          NativeNestedCase.CaseOn -> 7
+          NativeNestedCase.CaseOff -> 0
+          NativeNestedCase.CaseMissing -> 'x') :: RankedField ('Just 'True)) of
+    RankedField select ->
+      ( case (NativeNestedCase.CaseField (select NativeNestedCase.CaseOn)
+                  :: NativeNestedCase.CaseField ('Just 'True)) of
+          NativeNestedCase.CaseField n -> n
+      , select NativeNestedCase.CaseMissing )
+
 main :: IO ()
 main = do
     putStrLn "Dependent Haskell: completed source features"
@@ -1171,6 +1187,7 @@ main = do
         , True :: NativeNestedCase.RefinedBranchPick 'False
             ('Just ('NativeNestedCase.RefinedBranch 'Proxy 'NativeNestedCase.InnerDisjoint))
         , 'x' :: NativeNestedCase.RefinedBranchPick 'False ('Just 'NativeNestedCase.OuterDisjoint) )
+    observe "choose types in ordinary and rank-n constructor fields" constructorFieldCases
     observe "select through an ordinary type constructor"
         ( 7 :: NativeNestedCase.TypeHead ('Just Bool)
         , 'x' :: NativeNestedCase.TypeHead ('Just Ordering)
