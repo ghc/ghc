@@ -12,6 +12,7 @@
 module GHC.Tc.Gen.App
        ( tcApp
        , tcExprPrag
+       , matchPolytypeExistsWitness
        , tcRetainedInferableArg, tcRetainedArg, tcOptionalLetOperand ) where
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcCheckPolyExpr, tcPolyExpr, tcInferRho )
@@ -1675,6 +1676,28 @@ implicitResult do_ql rn_expr actual expected@(Check wanted)
       = do { when quick (qlUnify schema payload)
            ; return (mkCheckExpType schema, id) }
 implicitResult _ _ _ expected = return (expected, id)
+
+-- | Select a higher-rank witness from equal invariant result types.
+-- See Note [Implicit existential lambda payloads] in GHC.Tc.Gen.Expr.
+matchPolytypeExistsWitness :: TyVar -> Type -> Type -> Maybe Type
+matchPolytypeExistsWitness binder formal actual
+  | TyConApp formal_tc _ <- coreFullView formal
+  , TyConApp actual_tc _ <- coreFullView actual
+  , formal_tc == actual_tc
+  , isGenerativeTyCon formal_tc Nominal
+  , all supportsQuickLookType [tyVarKind binder, formal, actual]
+  , all noQuickLookVars [tyVarKind binder, formal, actual]
+  = do { subst <- tcMatchTyX_BM bind_witness empty_subst formal actual
+       ; witness <- Subst.lookupTyVar subst binder
+       ; guard (not (isTauTy witness)
+                && eqType (typeKind witness) (tyVarKind binder)
+                && eqType (substTyWith [binder] [witness] formal) actual)
+       ; return witness }
+  | otherwise = Nothing
+  where
+    empty_subst = Subst.mkEmptySubst (mkInScopeSet (tyCoVarsOfTypes [formal, actual]))
+    bind_witness tv _ | tv == binder = BindMe
+                      | otherwise = DontBindMe
 
 -- | Match a stored index without assigning its local Id to a metavariable.
 -- See Note [Introducing an implicit existential].

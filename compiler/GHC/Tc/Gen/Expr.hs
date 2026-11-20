@@ -373,7 +373,11 @@ tcLambdaExpr x lam_variant matches pat_tys expected
   | Check schema <- expected
   , ExistsTy ImplicitExists binder body <- coreFullView schema
   , Just _ <- splitVisibleFunTy_maybe (implicitPayloadType body)
-  = do { witness <- newFlexiTyVarTy (tyVarKind binder)
+  = do { impred <- xoptM LangExt.ImpredicativeTypes
+       ; declared <- if impred && lam_variant == LamSingle
+                     then tcDeclaredLambdaWitness binder body matches
+                     else return Nothing
+       ; witness <- maybe (newFlexiTyVarTy (tyVarKind binder)) return declared
        ; let payload_ty = substTyWith [binder] [witness] body
        ; payload <- tcLambdaExpr x lam_variant matches pat_tys (mkCheckExpType payload_ty)
        ; return (XExpr (NativeExistsPack schema witness (noLocA payload))) }
@@ -384,12 +388,58 @@ tcLambdaExpr x lam_variant matches pat_tys expected
                                                 lam_variant matches pat_tys expected_ty
            ; return (mkHsWrap wrap (HsLam x lam_variant matches')) }
 
+-- | Read the result of an ordinary application before entering the lambda.
+-- See Note [Implicit existential lambda payloads].
+tcDeclaredLambdaWitness :: TyVar -> Type -> MatchGroup GhcRn (LHsExpr GhcRn)
+                        -> TcM (Maybe Type)
+tcDeclaredLambdaWitness binder body (MG { mg_alts = L _ [L _ match] })
+  | Match { m_pats = L _ pats, m_grhss = rhss } <- match
+  , GRHSs _ (L _ (GRHS _ [] rhs) NE.:| []) (L _ EmptyLocalBinds{}) <- rhss
+  , all isVisArgLPat pats
+  , Just formal <- result_after (length pats) body
+  , Just (name, nargs) <- application 0 rhs
+  = do { mb_id <- if isExternalName name
+                 then tcLookupIdMaybe name
+                 else fmap local_id (tcLookupLcl_maybe name)
+       ; declared <- traverse (liftZonkM . zonkTcType . varType) mb_id
+       ; formal <- liftZonkM (zonkTcType formal)
+       ; return $ do { actual <- declared >>= result_after nargs
+                     ; matchPolytypeExistsWitness binder formal actual } }
+  where
+    application n expr = case unLoc (stripParensLHsExpr expr) of
+      HsApp _ fun _ -> application (n + 1) fun
+      HsVar _ name -> Just (unLocWithUserRdr name, n)
+      _ -> Nothing
+
+    result_after :: Int -> Type -> Maybe Type
+    result_after 0 ty = Just ty
+    result_after n ty = splitVisibleFunTy_maybe ty >>= result_after (n - 1) . snd
+
+    local_id (Just (ATcId { tct_id = ident })) = Just ident
+    local_id _ = Nothing
+tcDeclaredLambdaWitness _ _ _ = return Nothing
+
 {- Note [Implicit existential lambda payloads]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 An expected dot package can hold a function. Choose a fresh witness before
 checking the lambda patterns. Check the lambda once against the instantiated
 payload type. A witness introduced by a pattern cannot escape its implication
 to fill that metavariable. The existential binder does not enter source scope.
+
+With ImpredicativeTypes, a lambda can take a higher-rank witness from a
+declared result type. For example, check (\b -> prepare b) against
+  exists t. Bool -> Callback t
+when prepare :: Bool -> Callback PolyId. Match the invariant result types
+and check the lambda at Bool -> Callback PolyId.
+
+Figure 10 of Eisenberg et al., "An Existential Crisis Resolved", uses the
+expected payload to guide witness selection. Here the result declaration
+fixes the choice before the lambda patterns enter scope. Read the head's
+declared type and follow its written ordinary application arrows. The
+ordinary check instantiates types, checks operands and records usage.
+A head bound by a lambda pattern is unavailable. Exact invariant matching
+chooses a type without filling any Quick Look variables. Runtime indices
+use their existing checks.
 
 Keep the ordinary match checker, including its deep skolemisation and usage
 checks. The outer forall wrapper remains outside the package when tcPolyExprCheck

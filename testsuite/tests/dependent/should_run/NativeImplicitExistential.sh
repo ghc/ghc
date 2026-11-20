@@ -115,7 +115,7 @@ for binding in function index; do
     }
 done
 
-cp "$src/"{WitnessClient,WitnessDeep,WitnessMismatch,WitnessPairClient,WitnessPairEscape}.hs .
+cp "$src/"{WitnessClient,WitnessDeep,WitnessMismatch,WitnessPairClient,WitnessPairEscape,WitnessLambdaReject}.hs .
 "$ghc" "${flags[@]}" -ddump-ds -c WitnessDeep.hs >deep-witness.core
 grep -Eq 'pack (GHC(\.Internal)?\.Types\.)?Int' deep-witness.core
 "$ghc" "${flags[@]}" -XImpredicativeTypes -ddump-ds -c WitnessClient.hs -main-is WitnessClient >witnesses.core
@@ -127,10 +127,23 @@ if "$ghc" "${flags[@]}" -fforce-recomp -XNoImpredicativeTypes -c WitnessClient.h
     echo "A higher-rank witness was inferred without ImpredicativeTypes." >&2
     exit 1
 fi
-for binding in hidden both atKind; do
+for binding in hidden both atKind viaCall viaValue viaLinear; do
     line=$(grep -n "^$binding =" WitnessClient.hs | cut -d: -f1)
     grep -Eq "^WitnessClient.hs:$line:[0-9]+: error: \[GHC-91028\]" monomorphic.log || {
         cat monomorphic.log >&2
+        exit 1
+    }
+done
+if "$ghc" "${flags[@]}" -c WitnessLambdaReject.hs >lambda-witness.log 2>&1; then
+    echo "The lambda witness check accepted an invalid body." >&2
+    exit 1
+fi
+for rejection in escape:91028 duplicate:18872 wrongOperand:83865; do
+    binding=${rejection%:*}
+    code=${rejection#*:}
+    line=$(grep -n "^$binding =" WitnessLambdaReject.hs | cut -d: -f1)
+    grep -Eq "^WitnessLambdaReject.hs:$line:[0-9]+: error: \[GHC-$code\]" lambda-witness.log || {
+        cat lambda-witness.log >&2
         exit 1
     }
 done
