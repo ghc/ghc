@@ -81,6 +81,11 @@ exprStats (Lam b e)       = bndrStats b `plusCS` exprStats e
 exprStats (Let b e)       = bindStats NotTopLevel b `plusCS` exprStats e
 exprStats (Case e b _ as) = exprStats e `plusCS` bndrStats b
                                         `plusCS` sumCS altStats as
+exprStats (Pack schema witness payload)
+  = oneTM `plusCS` tyStats schema `plusCS` tyStats witness `plusCS` exprStats payload
+exprStats (Unpack witness payload package body)
+  = exprStats package `plusCS` bndrStats witness
+                      `plusCS` bndrStats payload `plusCS` exprStats body
 exprStats (Cast e co)     = coStats co `plusCS` exprStats e
 exprStats (Tick _ e)      = exprStats e
 
@@ -112,6 +117,9 @@ exprSize (App f a)       = exprSize f + exprSize a
 exprSize (Lam b e)       = bndrSize b + exprSize e
 exprSize (Let b e)       = bindSize b + exprSize e
 exprSize (Case e b _ as) = exprSize e + bndrSize b + 1 + sum (map altSize as)
+exprSize (Pack _ _ payload) = exprSize payload
+exprSize (Unpack witness payload package body)
+  = exprSize package + bndrSize witness + bndrSize payload + exprSize body
 exprSize (Cast e _)      = 1 + exprSize e
 exprSize (Tick n e)      = tickSize n + exprSize e
 exprSize (Type _)        = 1
