@@ -1115,6 +1115,11 @@ instance Diagnostic TcRnMessage where
     TcRnTypeCasePattern (Just pat)
       -> mkSimpleDecorated $ hang (text "After expanding type synonyms, the pattern has no constructor head:")
                                 2 (ppr (coreFullView pat))
+    TcRnNestedTypeCasePattern pat
+      -> mkSimpleDecorated $ hang (text "Cannot use this constructor pattern in a nested type case:") 2 (ppr pat)
+    TcRnTypeCaseIndexApartness kind
+      -> mkSimpleDecorated $ hang
+           (text "Cannot determine which constructors are possible at this scrutinee kind:") 2 (ppr kind)
     TcRnTypeCaseContext
       -> mkSimpleDecorated $ text "A type case is supported only in the right-hand side of a top-level type synonym."
     TcRnTypeLambdaContext
@@ -2480,6 +2485,8 @@ instance Diagnostic TcRnMessage where
     TcRnTypeCaseDisabled{}
       -> ErrorWithoutFlag
     TcRnTypeCasePattern{} -> ErrorWithoutFlag
+    TcRnNestedTypeCasePattern{} -> ErrorWithoutFlag
+    TcRnTypeCaseIndexApartness{} -> ErrorWithoutFlag
     TcRnTypeCaseContext{} -> ErrorWithoutFlag
     TcRnTypeLambdaContext{}
       -> ErrorWithoutFlag
@@ -3192,6 +3199,8 @@ instance Diagnostic TcRnMessage where
     TcRnTypeCaseDisabled{}
       -> noHints
     TcRnTypeCasePattern{} -> noHints
+    TcRnNestedTypeCasePattern{} -> noHints
+    TcRnTypeCaseIndexApartness{} -> noHints
     TcRnTypeCaseContext{} -> noHints
     TcRnTypeLambdaContext{}
       -> noHints
@@ -4905,6 +4914,9 @@ view. The expanded-types diagnostic can still show the family.
 -- | Show the constructor case checked by a private family, without reducing it.
 pprTypeCaseMismatch :: Type -> SDoc
 pprTypeCaseMismatch ty
+  | Just (tc, _) <- splitTyConAppNoView_maybe ty
+  , Just owner <- liftedTypeOwner "$case-node:" (tyConName tc)
+  = text "the type case in" <+> quotes (text owner)
   | Just (tc, args) <- splitTyConAppNoView_maybe ty
   , Just source <- liftedTypeContext (tyConName tc)
   = let fallback | isJust (liftedTypeOwner "$case:" (tyConName tc)) = text "the" <+> source

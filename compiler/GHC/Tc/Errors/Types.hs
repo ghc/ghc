@@ -4589,6 +4589,12 @@ data TcRnMessage where
 
   -- | A type case occurs outside the supported synonym RHS.
   TcRnTypeCaseContext :: TcRnMessage
+
+  -- | A nested case pattern has a constructor that cannot be lowered.
+  TcRnNestedTypeCasePattern :: Type -> TcRnMessage
+
+  -- | A constructor may become possible when its index family reduces.
+  TcRnTypeCaseIndexApartness :: Kind -> TcRnMessage
   deriving Generic
 
 ----

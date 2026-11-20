@@ -2607,9 +2607,11 @@ checkTyFamEqnValidityInfo fam_tc = \ case
      , vi_pats         = pats
      , vi_case_pattern = case_pattern
      , vi_rhs          = rhs } -> do
-    forM_ case_pattern $ \(span, pat) ->
-      setSrcSpan span $
-        checkTc (isJust (tcSplitTyConApp_maybe pat)) (TcRnTypeCasePattern (Just pat))
+    forM_ case_pattern $ \(_, _, pattern, pat) ->
+      case pattern of
+        CasePatternConstructor span _ _ -> setSrcSpan span $
+          checkTc (isJust (tcSplitTyConApp_maybe pat)) (TcRnTypeCasePattern (Just pat))
+        CasePatternField -> setSrcSpan loc $ failWithTc (TcRnTypeCasePattern (Just pat))
     setSrcSpan loc $
       checkFamPatBinders fam_tc qtvs non_user_tvs pats rhs
 

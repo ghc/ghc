@@ -8,7 +8,7 @@
 module GHC.Core.Class (
         Class,
         ClassOpItem,
-        ClassATItem(..), TyFamEqnValidityInfo(..),
+        ClassATItem(..), TyFamEqnValidityInfo(..), TypeCasePattern(..), nestedTypeCasePattern,
         ClassMinimalDef,
         DefMethInfo, pprDefMethInfo,
 
@@ -130,7 +130,7 @@ data TyFamEqnValidityInfo
       -- introduces the kind variable @k@ for the kind of @a@. See #23734.
     , vi_pats :: [Type]
       -- ^ LHS patterns
-    , vi_case_pattern :: Maybe (SrcSpan, Type)
+    , vi_case_pattern :: Maybe (Name, Int, TypeCasePattern, Type)
       -- ^ Written constructor pattern and its checked type for a lifted case
     , vi_rhs :: Type
       -- ^ RHS of the equation
@@ -139,6 +139,19 @@ data TyFamEqnValidityInfo
       -- *before* applying the substitution from
       -- Note [Type-checking default assoc decls] in GHC.Tc.TyCl.
     }
+
+-- | Written demands within a lifted type-case scrutinee pattern.
+data TypeCasePattern
+  = CasePatternField
+  | CasePatternConstructor SrcSpan Name [TypeCasePattern]
+
+-- | Does this row demand any field below the outer constructor?
+nestedTypeCasePattern :: TypeCasePattern -> Bool
+nestedTypeCasePattern (CasePatternConstructor _ _ fields) = any isConstructor fields
+  where
+    isConstructor CasePatternConstructor{} = True
+    isConstructor _ = False
+nestedTypeCasePattern CasePatternField = False
 
 type ClassMinimalDef = BooleanFormula GhcRn -- Required methods
 

@@ -539,7 +539,7 @@ type HsCoreTy = Type
 data HsTypeGhcRnExt
   = HsCoreTyRn HsCoreTy
   | HsTypeLetRn (LocatedN Name) (LHsType GhcRn) (LHsType GhcRn)
-  | HsTypeCaseAliasRn (Maybe (Int, LocatedN Name)) (LHsType GhcRn)
+  | HsTypeCaseAliasRn (Name, Int, Maybe (LocatedN Name)) (LHsType GhcRn)
 
 -- Extension of HsType during parsing.
 -- see Note [Trees That Grow] in Language.Haskell.Syntax.Extension
@@ -571,7 +571,7 @@ data HsTypeGhcPsExt
                 (Located [LHsConDeclRecField GhcPs])
     -- See Note [Parsing data type declarations]
 
-  | HsTypeCaseAlias [RdrName] (Maybe (Int, LocatedN RdrName)) (LHsType GhcPs)
+  | HsTypeCaseAlias [RdrName] (LocatedN RdrName, Int, Maybe (LocatedN RdrName)) (LHsType GhcPs)
 
   -- An unquoted constructor head in a lifted type-case equation.
   | HsTypeCaseHead (LocatedN RdrName)
