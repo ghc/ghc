@@ -802,8 +802,8 @@ can_eq_nc _ _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
       | Just (head, _) <- tcSplitAppTy_maybe ty
       = not (isMatchableFunTy (typeKind head))
       | otherwise = False
-    same_domain v ty = isNativeRetainedBinder v
-                    && (domain `eqType` kind || (isGiven ev && not (typesAreApart domain kind)))
+    same_domain v ty = (isNativeRetainedBinder v && domain `eqType` kind)
+                    || (isGiven ev && isNativeOpaqueValueId v && not (typesAreApart domain kind))
       where
         domain = varType v
         kind = typeKind ty
@@ -837,7 +837,10 @@ value equality. For example, the value equality relates xs :: Vec a n to
 VNil :: Vec a Z. The kind equality can refine n to Z. The runtime Id still
 carries its original type. Classify this Given as insoluble only when its
 domains are surely apart. The order in which the solver processes the
-two Givens does not affect reachability. This check supplies no coercion.
+two Givens does not affect reachability. A package payload can have a
+generated family application as its declared type. Check the eligibility of
+this term occurrence even when its declaration is not a foreach binder.
+This check supplies no coercion.
 
 
 A family can return a U or unknown function before its head is exposed.
