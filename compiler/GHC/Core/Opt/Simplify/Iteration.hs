@@ -2546,6 +2546,7 @@ rebuildCall env fun_info
                         , sc_hole_ty = fun_ty, sc_cont = cont })
   | UnSimplified arg_env <- arg_se
   , isStrictArgInfo fun_info  -- Strict arguments
+  , not (sm_core_mode (seMode env) == RetainedCore && is_retained_arrow fun_ty)
   , seCaseCase env            -- But only when case-of-case is on.
                               -- See Note [Case-of-case and full laziness]
   = simplExprF (arg_env `setInScopeFromE` env) arg $
@@ -2562,6 +2563,12 @@ rebuildCall env fun_info
   -- floating a demanded let.
   = do  { arg' <- simplArg env (Just fun_info) fun_ty arg_se arg arg_mco
         ; rebuildCall env (addValArgTo fun_info  arg' fun_ty) cont }
+  where
+    -- StrictArg moves evaluation contexts across a call argument. Keep a
+    -- retained argument's expression in place for result-type instantiation.
+    is_retained_arrow ty = case coreFullView ty of
+      DepFunTy{} -> True
+      _ -> False
 
 ---------- No further useful info, revert to generic rebuild ------------
 rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_arg_specs, ai_rules = rules }) cont

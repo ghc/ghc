@@ -237,7 +237,7 @@ data IfaceBinHandle (phase :: ModIfacePhase) where
   --
   -- See Note [Private fields in ModIface] for when this fields needs to be cleared
   -- (e.g., set to 'Nothing').
-  FullIfaceBinHandle :: !(Strict.Maybe FullBinData) -> IfaceBinHandle 'ModIfaceFinal
+  FullIfaceBinHandle :: !(Strict.Maybe (Bool, FullBinData)) -> IfaceBinHandle 'ModIfaceFinal
 
 
 withSelfRecomp :: ModIface_ phase -> r -> (IfaceSelfRecomp -> r) -> r

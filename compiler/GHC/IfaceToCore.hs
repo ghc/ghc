@@ -2183,8 +2183,19 @@ tcIfaceCo = go
     go (IfaceReflCo t)           = Refl <$> tcIfaceType t
     go (IfaceGReflCo r t mco)    = GRefl r <$> tcIfaceType t <*> go_mco mco
     go (IfaceFunCo r ma w c1 c2) = mkFunCoNoFTF r <$> go ma <*> go w <*> go c1 <*> go c2
-    go (IfaceDepFunCo {})
-      = failIfM (text "Native dependent coercion interfaces are not implemented.")
+    go (IfaceDepFunCo visL visR bndr@(_, name, _) domain body)
+      = do { domain' <- go_mco domain
+           ; case domain' of
+               MRefl -> pure ()
+               MCo delta -> unless (coercionRole delta == Nominal) $
+                 failIfM (text "Invalid retained domain coercion in interface for:" <+> ppr name
+                          $$ text "Expected nominal evidence." $$ ppr delta)
+           ; bindIfaceId bndr $ \ bndr' ->
+        do { body' <- go body
+           ; unless (coercionRole body' /= Nominal || visL == visR) $
+               failIfM (text "Invalid retained function coercion in interface for:" <+> ppr name
+                        $$ text "Nominal evidence requires identical visibilities.")
+           ; return (DepFunCo visL visR bndr' domain' body') } }
     go (IfaceTermAppCo {})
       = failIfM (text "Opaque runtime call congruence interfaces are not implemented.")
     go (IfaceTyConAppCo r tc cs)

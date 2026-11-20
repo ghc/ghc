@@ -45,9 +45,12 @@ import GHC.Tc.Utils.Env
 
 import GHC.Core
 import GHC.Core.Utils ( exprType )
+import GHC.Core.DataCon ( dataConWorkId )
 import GHC.Core.Unfold
 import GHC.Core.FVs
-import GHC.Core.Dependent ( hasNativeDependentExprRhs )
+import GHC.Core.Dependent
+    ( hasNativeDependentExprRhs, hasNativeDependentProgram
+    , hasNativeDependentUnfolding, hasNativeIndexAliasUnfolding )
 import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.Tidy
 import GHC.Core.Seq         ( seqBinds )
@@ -393,6 +396,7 @@ data TidyOpts = TidyOpts
       -- ^ Are rules exposed or not?
   , opt_static_ptr_opts :: !(Maybe StaticPtrOpts)
       -- ^ Options for generated static pointers, if enabled (/= Nothing).
+  , opt_has_retained_core :: !Bool
   , opt_keep_auto_rules :: !Bool
   }
 
@@ -418,6 +422,22 @@ tidyProgram opts (ModGuts { mg_module           = mod
 
   (unfold_env, tidy_occ_env) <- chooseExternalIds opts mod tcs binds imp_rules
   let (trimmed_binds, trimmed_rules) = findExternalRules opts binds imp_rules unfold_env
+
+  when (opt_has_retained_core opts) $ do
+    forM_ (bindersOfBinds trimmed_binds) $ \ bndr ->
+      case realIdUnfolding bndr of
+        CoreUnfolding { uf_src = src, uf_tmpl = rhs }
+          | isCompulsorySource src
+          , hasNativeDependentExprRhs (Type (idType bndr)) || hasNativeDependentUnfolding rhs
+          -> throwGhcExceptionIO $ PprProgramError
+               "Cannot export a compulsory unfolding that contains retained Core."
+               (ppr bndr)
+        _ -> pure ()
+    forM_ trimmed_rules $ \ rule ->
+      when (hasNativeDependentProgram [] [rule]) $
+        throwGhcExceptionIO $ PprProgramError
+          "Cannot export a rewrite rule that contains retained Core."
+          (ppr rule)
 
   local_index_binds <- localiseNativeTopIndices (opt_name_cache opts) trimmed_binds
   (tidy_env, tidy_binds) <- tidyTopBinds unfold_env boot_exports tidy_occ_env local_index_binds
@@ -657,6 +677,7 @@ chooseExternalIds opts mod tcs binds imp_id_rules
 
   binders          = map fst $ flattenBinds binds
   binder_set       = mkVarSet binders
+  rhs_env          = mkVarEnv (flattenBinds binds)
 
   avoids   = [ getOccName name | bndr <- binders,
                                  let name = idName bndr,
@@ -697,7 +718,7 @@ chooseExternalIds opts mod tcs binds imp_id_rules
     | otherwise = do
       (occ_env', name') <- tidyTopName mod name_cache (Just referrer) occ_env idocc
       let
-          (new_ids, show_unfold) = addExternal opts refined_id
+          (new_ids, show_unfold) = addExternal opts (lookupVarEnv rhs_env idocc) refined_id
 
                 -- 'idocc' is an *occurrence*, but we need to see the
                 -- unfolding in the *definition*; so look up in binder_set
@@ -719,8 +740,8 @@ chooseExternalIds opts mod tcs binds imp_id_rules
       let unfold_env' = extendVarEnv unfold_env id (name',False)
       tidy_internal ids unfold_env' occ_env'
 
-addExternal :: TidyOpts -> Id -> ([Id], Bool)
-addExternal opts id
+addExternal :: TidyOpts -> Maybe CoreExpr -> Id -> ([Id], Bool)
+addExternal opts mb_rhs id
   | ExposeNone <- opt_expose_unfoldings opts
   , not (isCompulsoryUnfolding unfolding)
   = ([], False)  -- See Note [Always expose compulsory unfoldings]
@@ -746,9 +767,15 @@ addExternal opts id
         -- We leave the unfolding there even if there is a worker
         -- In GHCi the unfolding is used by importers
 
-    show_unfolding (CoreUnfolding { uf_src = src, uf_guidance = guidance })
-       = stable || profitable || explicitly_requested
+    show_unfolding (CoreUnfolding { uf_src = src, uf_tmpl = rhs
+                                   , uf_guidance = guidance })
+       = (stable || profitable || explicitly_requested)
+         && can_expose_body exposed_rhs
+         -- See Note [Retained Core across module boundaries]
        where
+        -- Core Tidy regenerates non-stable templates from the binding RHS.
+        exposed_rhs | isStableSource src = rhs
+                    | otherwise = fromMaybe rhs mb_rhs
         -- Always expose things whose
         -- source is an inline rule
         stable = isStableSource src
@@ -774,8 +801,39 @@ addExternal opts id
             ExposeSome -> False
             ExposeNone -> False
 
-    show_unfolding (DFunUnfolding {}) = True
+    show_unfolding (DFunUnfolding { df_bndrs = bs, df_con = con, df_args = args })
+       = not (opt_has_retained_core opts)
+         || not (hasNativeDependentUnfolding
+                   (mkLams bs (mkApps (Var (dataConWorkId con)) args)))
     show_unfolding _                  = False
+
+    can_expose_body rhs
+      = not (opt_has_retained_core opts)
+        || (not (hasNativeIndexAliasUnfolding rhs)
+            && (hasNativeDependentExprRhs (Type (idType id))
+                || not (hasNativeDependentUnfolding rhs)))
+
+{- Note [Retained Core across module boundaries]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An ordinary signature can have an unfolding that calls a retained function.
+An importing module can select the ordinary optimizer from its initial Core,
+then encounter retained Core when it inlines that unfolding. This also
+happens in --make, which imports the in-memory result of Core Tidy.
+
+Keep those unfolding bodies private. Keep ordinary unfoldings from the same
+module available. In a client, a reference to an Id with retained Core in
+its type already selects the retained optimizer. That Id can expose its
+checked template when its branch evidence has an interface encoding. Native
+index alias alternatives lack that encoding. Interface loading also rejects
+retained dictionary operations. Do not expose their optional templates.
+
+A compulsory template cannot be removed. Check it after the simplifier,
+which can change the body that the desugarer checked. Exported RULES must
+also be safe to apply in ordinary importers. The retained driver rejects
+local user RULES before optimization. Check the RULES selected by Tidy in
+case optimization generated another RULE. Local optimization continues to
+use the original templates before Core Tidy.
+-}
 
 isOverloaded :: Id -> Bool
 isOverloaded fn =

@@ -34,8 +34,8 @@ import GHC.Platform.Ways
 
 import qualified GHC.LanguageExtensions as LangExt
 
-initTidyOpts :: HscEnv -> ModGuts -> IO TidyOpts
-initTidyOpts hsc_env guts = do
+initTidyOpts :: Bool -> HscEnv -> ModGuts -> IO TidyOpts
+initTidyOpts native hsc_env guts = do
   let dflags = hsc_dflags hsc_env
   static_ptr_opts <- if not (xopt LangExt.StaticPointers dflags)
     then pure Nothing
@@ -51,6 +51,7 @@ initTidyOpts hsc_env guts = do
     , opt_expose_rules      = not (gopt Opt_OmitInterfacePragmas dflags)
     , opt_trim_ids          = gopt Opt_OmitInterfacePragmas dflags
     , opt_static_ptr_opts   = static_ptr_opts
+    , opt_has_retained_core = native
     , opt_keep_auto_rules   = gopt Opt_KeepAutoRules dflags
     }
 

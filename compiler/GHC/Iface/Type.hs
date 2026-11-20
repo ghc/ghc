@@ -34,7 +34,7 @@ module GHC.Iface.Type (
         ifTyConBinderVar, ifTyConBinderName,
 
         -- Binary utilities
-        putIfaceType, getIfaceType, ifaceTypeSharedByte,
+        putIfaceType, getIfaceType, ifaceTypeSharedByte, IfaceHasDepFunCo(..),
         -- Equality testing
         isIfaceLiftedTypeKind,
 
@@ -612,8 +612,7 @@ data IfaceCoercion
   | IfaceGReflCo      Role IfaceType (IfaceMCoercion)
   | IfaceFunCo        Role IfaceCoercion IfaceCoercion IfaceCoercion IfaceCoercion
   | IfaceDepFunCo     !DepFunTyFlag !DepFunTyFlag IfaceIdBndr IfaceMCoercion IfaceCoercion
-      -- Diagnostic form only. The runtime binder scopes over the body.
-      -- The interface writer and importer reject this form.
+      -- The runtime binder scopes over the body only.
   | IfaceTermAppCo    IfLclName IfaceCoercion -- Diagnostic form; no wire encoding
   | IfaceTyConAppCo   Role IfaceTyCon [IfaceCoercion]
   | IfaceAppCo        IfaceCoercion IfaceCoercion
@@ -2844,11 +2843,22 @@ instance Binary IfaceMCoercion where
                  return $ IfaceMCo a
          _ -> panic ("get IfaceMCoercion " ++ show tag)
 
+-- | A writer-only notification for selecting the interface version.
+data IfaceHasDepFunCo = IfaceHasDepFunCo
+
 instance Binary IfaceCoercion where
   put_ _ (IfaceTermAppCo {})
        = ioError (userError "Opaque runtime call congruence interfaces are not implemented.")
-  put_ _ (IfaceDepFunCo {})
-       = ioError (userError "Native dependent coercion interfaces are not implemented.")
+  put_ bh (IfaceDepFunCo visL visR bndr domain body) = do
+       case findOptionalUserDataWriter (Proxy :: Proxy IfaceHasDepFunCo) bh of
+         Just notify -> putEntry notify bh IfaceHasDepFunCo
+         Nothing -> pure () -- Fingerprinting does not write the version header.
+       putByte bh 18
+       put_ bh visL
+       put_ bh visR
+       put_ bh bndr
+       put_ bh domain
+       put_ bh body
   put_ bh (IfaceReflCo a) = do
           putByte bh 1
           put_ bh a
@@ -2986,6 +2996,7 @@ instance Binary IfaceCoercion where
            17-> do a <- get bh
                    b <- get bh
                    return $ IfaceAxiomCo a b
+           18 -> IfaceDepFunCo <$> get bh <*> get bh <*> get bh <*> get bh <*> get bh
            _ -> panic ("get IfaceCoercion " ++ show tag)
 
 -- | Only 'IfaceUnivCoDepCoVar' can be serialised, so no tag is written.

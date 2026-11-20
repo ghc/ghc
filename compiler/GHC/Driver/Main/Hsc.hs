@@ -192,7 +192,7 @@ checkNativeDependentModule hsc_env binds rules tycons = do
       reject "profiling or late cost-centre insertion"
     when (usesOptimizedFlags dflags && not (supportsNativeO1Flags dflags)) $
       reject "optimized module compilation with these options (use -O0 or the standard -O1 native object pipeline)"
-    unless (gopt Opt_OmitInterfacePragmas dflags) $
+    unless (gopt Opt_OmitInterfacePragmas dflags || supportsNativeO1Flags dflags) $
       reject "interface unfolding generation (use -fomit-interface-pragmas)"
     when (gopt Opt_WriteIfSimplifiedCore dflags) $
       reject "Core interface serialization (use -fno-write-if-simplified-core)"

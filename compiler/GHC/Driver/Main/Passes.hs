@@ -1619,7 +1619,7 @@ hscTidy hsc_env guts = do
   when native $
     endPassHscEnvIO lint_env alwaysQualify CoreDesugarOpt (mg_binds guts) (mg_rules guts)
 
-  opts <- initTidyOpts hsc_env guts
+  opts <- initTidyOpts native hsc_env guts
   (cgguts, details) <- withTiming logger
     (text "CoreTidy"<+>brackets (ppr this_mod))
     (const ())

@@ -57,7 +57,7 @@ import GHC.Iface.Ext.Fields (readFieldWith, writeFieldWith, deleteField)
 import GHC.Iface.Syntax (IfaceDecl(..), IfaceFamTyConFlav(..), IfaceClassBody(..), IfaceAT(..), IfaceIdDetails(..))
 import GHC.Types.Basic (SourceTableOrigin(ExecutableSourceTable, FinalCoreSourceTable))
 import GHC.Iface.Type (IfaceType(..), IfaceBndr(..), IfaceAppArgs(..), IfaceTyCon(..), IfaceTyConBinder,
-                       getIfaceType, putIfaceType, ifaceTypeSharedByte)
+                       getIfaceType, putIfaceType, ifaceTypeSharedByte, IfaceHasDepFunCo(..))
 import GHC.Core.TyCon (isInferredTyConBinder)
 import GHC.Types.Var (VarBndr(..))
 
@@ -70,8 +70,11 @@ import Data.Array.IO
 import Data.Array.Unsafe
 import Data.Char
 import Data.IORef
+import Data.List (isSuffixOf)
 import Data.Map.Strict (Map)
 import Data.Word
+import qualified Data.ByteString as BS
+import System.IO (IOMode(WriteMode), withBinaryFile)
 import System.IO.Unsafe
 import Data.Typeable (Typeable)
 import qualified GHC.Data.Strict as Strict
@@ -128,7 +131,12 @@ readBinIfaceHeader
   -> TraceBinIFace
   -> FilePath
   -> IO ReadBinHandle
-readBinIfaceHeader profile _name_cache checkHiWay traceBinIFace hi_path = do
+readBinIfaceHeader profile _name_cache checkHiWay traceBinIFace hi_path =
+    snd <$> readBinIfaceHeaderVersion profile checkHiWay traceBinIFace hi_path
+
+readBinIfaceHeaderVersion
+  :: Profile -> CheckHiWay -> TraceBinIFace -> FilePath -> IO (Bool, ReadBinHandle)
+readBinIfaceHeaderVersion profile checkHiWay traceBinIFace hi_path = do
     let platform = profilePlatform profile
 
         wantedGot :: String -> a -> a -> (a -> SDoc) -> IO ()
@@ -161,8 +169,12 @@ readBinIfaceHeader profile _name_cache checkHiWay traceBinIFace hi_path = do
     check_ver  <- get bh
     let our_ver = show hiVersion
     wantedGot "Version" our_ver check_ver text
-    unless (check_ver `elem` [enumCallbackIfaceVersion, finalCoreIfaceVersion,
-                              matchabilitySchemeIfaceVersion, openMatchabilityIfaceVersion]) $
+    let tagged = depFunCoIfaceSuffix `isSuffixOf` check_ver
+        version = if tagged
+                  then take (length check_ver - length depFunCoIfaceSuffix) check_ver
+                  else check_ver
+    unless (version `elem` [our_ver, enumCallbackIfaceVersion, finalCoreIfaceVersion,
+                            matchabilitySchemeIfaceVersion, openMatchabilityIfaceVersion]) $
       errorOnMismatch "mismatched interface file versions" our_ver check_ver
 
     check_tag <- get bh
@@ -171,7 +183,7 @@ readBinIfaceHeader profile _name_cache checkHiWay traceBinIFace hi_path = do
     when (checkHiWay == CheckHiWay) $
         errorOnMismatch "mismatched interface file profile tag" tag check_tag
 
-    pure bh
+    pure (tagged, bh)
 
 -- | Read an interface file.
 --
@@ -184,15 +196,15 @@ readBinIface
   -> FilePath
   -> IO ModIface
 readBinIface profile name_cache checkHiWay traceBinIface hi_path = do
-    bh <- readBinIfaceHeader profile name_cache checkHiWay traceBinIface hi_path
+    (tagged, bh) <- readBinIfaceHeaderVersion profile checkHiWay traceBinIface hi_path
 
-    mod_iface <- getIfaceWithExtFields name_cache bh
+    mod_iface <- getIfaceWithExtFields tagged name_cache bh
 
     return $ mod_iface
 
 
-getIfaceWithExtFields :: NameCache -> ReadBinHandle -> IO ModIface
-getIfaceWithExtFields name_cache bh = do
+getIfaceWithExtFields :: Bool -> NameCache -> ReadBinHandle -> IO ModIface
+getIfaceWithExtFields has_dep_fun_co name_cache bh = do
   -- Start offset for the byte array that contains the serialised 'ModIface'.
   start <- tellBinReader bh
   extFields_p_rel <- getRelBin bh
@@ -217,7 +229,7 @@ getIfaceWithExtFields name_cache bh = do
   modIfaceBinData <- freezeBinHandle bh start
   pure $ located_iface
     & set_mi_ext_fields extFields
-    & set_mi_hi_bytes (FullIfaceBinHandle $ Strict.Just modIfaceBinData)
+    & set_mi_hi_bytes (FullIfaceBinHandle $ Strict.Just (has_dep_fun_co, modIfaceBinData))
 
 -- | This performs a get action after reading the dictionary and symbol
 -- table. It is necessary to run this before trying to deserialise any
@@ -275,23 +287,36 @@ writeBinIface profile traceBinIface compressionLevel hi_path mod_iface = do
         printer (text "writeBinIface compression level:" <+> ppr compressionLevel)
 
     bh <- openBinMem initBinMemSize
-    let platform = profilePlatform profile
-    put_ bh (binaryInterfaceMagic platform)
+    let writeHeader h version = do
+          put_ h (binaryInterfaceMagic (profilePlatform profile))
+          put_ h version
+          put_ h (profileBuildTag profile)
 
-    -- The version, profile tag, and source hash go next
+    -- Select the existing version first. The writer records extra features.
     let version | any (hasOpenMatchabilityScheme . snd) (mi_decls mod_iface) = openMatchabilityIfaceVersion
                 | any hasMatchabilityScheme (mi_decls mod_iface) = matchabilitySchemeIfaceVersion
                 | any hasFinalCore (mi_decls mod_iface) = finalCoreIfaceVersion
                 | any hasEnumCallback (mi_decls mod_iface) = enumCallbackIfaceVersion
                 | otherwise = show hiVersion
-    put_ bh version
-    let tag = profileBuildTag profile
-    put_  bh tag
+    writeHeader bh version
+    payload <- tellBinWriter bh
+    has_dep_fun_co <- putIfaceWithExtFields traceBinIface compressionLevel bh mod_iface
+    if not has_dep_fun_co
+      then writeBinMem bh hi_path
+      else do
+        header <- openBinMem 128
+        writeHeader header (version ++ depFunCoIfaceSuffix)
+        -- The payload uses relative offsets, so it can follow the longer header.
+        withBinaryFile hi_path WriteMode $ \ h ->
+          withBinBuffer header $ \ prefix ->
+            withBinBufferFrom bh payload $ \ body -> do
+              BS.hPut h prefix
+              BS.hPut h body
 
-    putIfaceWithExtFields traceBinIface compressionLevel bh mod_iface
+-- | An older reader must reject this interface before decoding a coercion.
+depFunCoIfaceSuffix :: String
+depFunCoIfaceSuffix = "-retained-depfunco-v1"
 
-    -- And send the result to the file
-    writeBinMem bh hi_path
 
 -- Executable-origin declarations use a new IdDetails tag. Keep ordinary
 -- interfaces readable by the older compiler. Its version check rejects
@@ -343,7 +368,7 @@ hasEnumCallback _ = False
 -- This avoids serialisation of the 'ModIface' if the fields 'mi_hi_bytes' contains a
 -- 'Just' value. This field is populated by reading the 'ModIface' using
 -- 'getIfaceWithExtFields' and not modifying it in any way afterwards.
-putIfaceWithExtFields :: TraceBinIFace -> CompressionIFace -> WriteBinHandle -> ModIface -> IO ()
+putIfaceWithExtFields :: TraceBinIFace -> CompressionIFace -> WriteBinHandle -> ModIface -> IO Bool
 putIfaceWithExtFields traceBinIface compressionLevel bh mod_iface =
   case mi_hi_bytes mod_iface of
     FullIfaceBinHandle Strict.Nothing -> do
@@ -352,9 +377,15 @@ putIfaceWithExtFields traceBinIface compressionLevel bh mod_iface =
         []   -> pure (deleteField sourceTableField fields)
         locs -> writeFieldWith sourceTableField
                     (\h -> putWithUserData QuietBinIFace NormalCompression h locs) fields
-      forwardPutRel_ bh (\_ -> put_ bh fields') $ do
-        putWithUserData traceBinIface compressionLevel bh mod_iface
-    FullIfaceBinHandle (Strict.Just binData) -> putFullBinData bh binData
+      found <- newIORef False
+      let notify _ IfaceHasDepFunCo = writeIORef found True
+          feature_bh = addWriterToUserData (mkWriter notify) bh
+      forwardPutRel_ feature_bh (\_ -> put_ feature_bh fields') $
+        putWithUserData traceBinIface compressionLevel feature_bh mod_iface
+      readIORef found
+    FullIfaceBinHandle (Strict.Just (found, binData)) -> do
+      putFullBinData bh binData
+      pure found
 
 {- Note [Source table locations in interfaces]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
