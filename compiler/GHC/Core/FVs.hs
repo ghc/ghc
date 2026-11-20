@@ -262,6 +262,10 @@ exprFVs (Lit _)         = mempty
 exprFVs (Tick t expr)   = tickish_fvs t `mappend` exprFVs expr
 exprFVs (App fun arg)   = exprFVs fun `mappend` exprFVs arg
 exprFVs (Lam bndr body) = addCoreBndrFV bndr (exprFVs body)
+exprFVs (Pack package_ty witness payload) =
+  deepSelTypeFV package_ty `mappend` deepSelTypeFV witness `mappend` exprFVs payload
+exprFVs (Unpack witness payload package body) =
+  exprFVs package `mappend` addCoreBndrFV witness (addCoreBndrFV payload (exprFVs body))
 exprFVs (Cast expr co)  = exprFVs expr `mappend` deepSelCoFV co
 exprFVs (Case scrut bndr ty alts)
   = exprFVs scrut `mappend` deepSelTypeFV ty `mappend`
@@ -498,6 +502,7 @@ orphNamesOfType (TyVarTy _)          = emptyNameSet
 orphNamesOfType (TermVarTy v)        = orphNamesOfType (varType v)
 orphNamesOfType (TermAppTy f arg)    = orphNamesOfType (varType f)
                                        `unionNameSet` orphNamesOfType arg
+orphNamesOfType (ExistsTy v ty) = orphNamesOfType (varType v) `unionNameSet` orphNamesOfType ty
 orphNamesOfType (DepFunTy _ v res)     = orphNamesOfType (varType v)
                                        `unionNameSet` orphNamesOfType res
 orphNamesOfType (LitTy {})           = emptyNameSet

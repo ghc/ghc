@@ -320,6 +320,14 @@ ppr_expr add_par (Type ty)     = add_par (text "TYPE:" <+> ppr ty)       -- Weir
 ppr_expr add_par (Coercion co) = add_par (text "CO:" <+> ppr co)
 ppr_expr add_par (Lit lit)     = pprLiteral add_par lit
 
+ppr_expr add_par (Pack package_ty witness payload)
+  = add_par $ hang (text "pack" <+> pprParendType witness) 2
+                     (pprParendExpr payload <+> dcolon <+> ppr package_ty)
+ppr_expr add_par (Unpack witness payload package body)
+  = add_par $ hang (text "unpack" <+> pprParendExpr package <+> text "as"
+                     <+> pprBndr LambdaBind witness <+> pprBndr LambdaBind payload <+> text "in")
+                    2 (pprCoreExpr body)
+
 ppr_expr add_par (Cast expr co)
   = add_par $ sep [pprParendExpr expr, text "`cast`" <+> pprOptCo co]
 

@@ -213,6 +213,12 @@ tidyExpr env (Coercion co) = Coercion (tidyCo env co)
 tidyExpr _   (Lit lit)     = Lit lit
 tidyExpr env (App f a)     = App (tidyExpr env f) (tidyExpr env a)
 tidyExpr env (Tick t e)    = Tick (tidyTickish env t) (tidyExpr env e)
+tidyExpr env (Pack package_ty witness payload)
+  = Pack (tidyType env package_ty) (tidyType env witness) (tidyExpr env payload)
+tidyExpr env (Unpack witness payload package body)
+  = tidyBndr env witness =: \ (witness_env, witness') ->
+    tidyBndr witness_env payload =: \ (body_env, payload') ->
+    Unpack witness' payload' (tidyExpr env package) (tidyExpr body_env body)
 tidyExpr env (Cast e co)   = Cast (tidyExpr env e) (tidyCo env co)
 
 tidyExpr env (Let b e)

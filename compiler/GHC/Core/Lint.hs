@@ -883,6 +883,39 @@ lintCoreExpr (Lit lit)
 
        ; return (literalType lit, zeroUE) }
 
+lintCoreExpr (Pack package_ty witness payload)
+  = do { lintType package_ty
+       ; lintType witness
+       ; lintL (typeKind witness `eqType` liftedTypeKind) $
+           text "Pack witness must have kind Type:" <+> ppr witness
+       ; (payload_ty, usage) <- markAllJoinsBad (lintCoreExpr payload)
+       ; case coreFullView package_ty of
+           ExistsTy a body ->
+             do { lintL (substTyWith [a] [witness] body `eqType` payload_ty) $
+                    text "Pack payload does not match the witness:" <+> ppr payload_ty
+                ; return (package_ty, usage) }
+           _ -> failWithL (text "Pack requires an existential type:" <+> ppr package_ty) }
+
+lintCoreExpr (Unpack witness payload package body)
+  = do { (package_ty, usage) <- markAllJoinsBad (lintCoreExpr package)
+       ; case coreFullView package_ty of
+           ExistsTy a payload_ty ->
+             do { lintL (isTyVar witness && varType witness `eqType` liftedTypeKind) $
+                    text "Invalid Unpack witness:" <+> ppr witness
+                ; lintTyCoBndr witness $
+             do { lintL (isNonCoVarId payload && isManyTy (idMult payload) && not (isJoinId payload)) $
+                    text "Invalid Unpack payload binder:" <+> ppr payload
+                ; lintBinder LetBind payload $
+             do { lintL (substTyWith [a] [mkTyVarTy witness] payload_ty `eqType` varType payload) $
+                    text "Unpack payload binder does not match the existential:" <+> ppr payload
+                ; addAliasUE payload usage $
+             do { (result, body_usage) <- lintCoreExpr body
+                ; let result_fvs = tyCoVarsOfType result
+                ; lintL (not (witness `elemVarSet` result_fvs || payload `elemVarSet` result_fvs)) $
+                    text "Unpack binder escapes its scope:" <+> ppr result
+                ; return (result, body_usage) } } } }
+           _ -> failWithL (text "Unpack requires an existential package:" <+> ppr package_ty) }
+
 lintCoreExpr (Cast expr co)
   = do { (expr_ty, ue) <- markAllJoinsUnderCast (lintCoreExpr expr)
             -- markAllJoinsUnderCast: see Note [Linting join points with casts or ticks]

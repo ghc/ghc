@@ -150,6 +150,8 @@ exprType (Let bind body)
        then pprPanic "exprType: let-bound runtime index escapes its scope" (ppr body_ty)
        else body_ty
 exprType (Case _ _ ty _)     = ty
+exprType (Pack package_ty _ _) = package_ty
+exprType (Unpack _ _ _ body)   = exprType body
 exprType (Cast _ co)         = coercionRKind co
 exprType (Tick _ e)          = exprType e
 exprType (Lam binder expr)   = mkLamType binder (exprType expr)
