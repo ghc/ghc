@@ -101,6 +101,11 @@ test('NativeOpenIndexedAppend',
       extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/' + f
                    for f in ['PackedVecLibrary.hs', 'OpenVectorAppend.hs', 'OrdinaryOpenVectorAppend.hs']])],
      run_command, ['bash NativeOpenIndexedAppend.sh "{compiler}" "{libdir}" ' + config.ghc_th_way_flags])
+test('NativeOpenIndexedAppendGhci',
+     [req_interp, req_rts_linker, only_ways(['normal']),
+      extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/' + f
+                   for f in ['PackedVecLibrary.hs', 'OpenVectorAppend.hs', 'OrdinaryOpenVectorAppend.hs']])],
+     run_command, ['bash NativeOpenIndexedAppendGhci.sh "{compiler}" "{libdir}" ' + config.ghc_th_way_flags])
 test('NativeOpenInstalledPair',
      [req_interp, req_rts_linker, only_ways(['normal']),
       extra_files([open_eval_dir + 'PreludePairExport.hs',
