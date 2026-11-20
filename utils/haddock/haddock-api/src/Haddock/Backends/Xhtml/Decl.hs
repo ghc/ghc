@@ -1862,6 +1862,9 @@ ppr_mono_ty (HsSpliceTy v _) _ _ _ = dataConCantHappen v
 ppr_mono_ty (XHsType (HsBangTy b ty)) u q _ =
   ppBang b +++ ppLParendType u q HideEmptyContexts ty
 ppr_mono_ty (XHsType (HsRecTy{})) _ _ _ = toHtml ("{..}" :: LText)
+ppr_mono_ty (XHsType (HsErasedExists binder body)) u q e =
+  keyword "exists" <+> ppHsTyVarBndr u q (unLoc binder) <+> char '|'
+    <+> ppr_mono_lty body u q e
 ppr_mono_ty (XHsType (HsCheckedTypeCase scrutinee rows)) u q e =
   keyword "case" <+> pp scrutinee <+> keyword "of"
     <+> braces (hsep (intersperse (stringToHtml ";") (map row rows)))

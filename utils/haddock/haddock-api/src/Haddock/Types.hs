@@ -848,7 +848,26 @@ type XRecCond a =
   , MapXRec a
   , UnXRec a
   , WrapXRec a (HsType a)
+  , MapHsExists a
   )
+
+-- | Traverse an erased existential while inserting parentheses.
+class MapHsExists a where
+  mapHsExists
+    :: (LHsTyVarBndr Specificity a -> LHsTyVarBndr Specificity a)
+    -> (LHsType a -> LHsType a)
+    -> HsType a
+    -> Maybe (HsType a)
+
+instance MapHsExists GhcRn where
+  mapHsExists mapBinder mapBody (XHsType (HsTypeExistsRn binder body)) =
+    Just (XHsType (HsTypeExistsRn (mapBinder binder) (mapBody body)))
+  mapHsExists _ _ _ = Nothing
+
+instance MapHsExists DocNameI where
+  mapHsExists mapBinder mapBody (XHsType (HsErasedExists binder body)) =
+    Just (XHsType (HsErasedExists (mapBinder binder) (mapBody body)))
+  mapHsExists _ _ _ = Nothing
 
 type instance XValArg DocNameI = NoExtField
 type instance XTypeArg DocNameI = NoExtField
@@ -896,6 +915,8 @@ data HsTypeDocNameIExt
   | HsRecTy     [LHsConDeclRecField DocNameI]
 
   | HsCheckedTypeCase (LHsType DocNameI) [(LHsType DocNameI, LHsType DocNameI)]
+
+  | HsErasedExists (LHsTyVarBndr Specificity DocNameI) (LHsType DocNameI)
 
   | HsRedacted  (HsType DocNameI) -- ^ contains the kind of the redacted type
 

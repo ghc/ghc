@@ -446,6 +446,8 @@ renameType t = case t of
     return (HsDocTy noAnn ty' doc')
   HsTyLit _ x -> return (HsTyLit noAnn (renameTyLit x))
   XHsType (HsCoreTyRn ty) -> pure (XHsType (HsCoreTy ty))
+  XHsType (HsTypeExistsRn binder body) ->
+    XHsType <$> (HsErasedExists <$> renameLTyVarBndr pure binder <*> renameLType body)
   -- See Note [Checked types in Haddock].
   XHsType HsTypeLetRn{} -> throwE "Cannot document a source type let without its checked type."
   XHsType HsTypeCaseAliasRn{} -> throwE "Cannot document a source type case alias without its checked type."

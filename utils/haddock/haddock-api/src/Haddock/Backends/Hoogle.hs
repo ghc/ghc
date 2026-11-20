@@ -108,6 +108,8 @@ dropHsDocTy = drop_sig_ty
     drop_ty (HsOpTy x a b c) = HsOpTy x (drop_lty a) (drop_lty b) (drop_lty c)
     drop_ty (HsParTy x a) = HsParTy x (drop_lty a)
     drop_ty (HsKindSig x a b) = HsKindSig x (drop_lty a) b
+    drop_ty (XHsType (HsTypeExistsRn binder body)) =
+      XHsType (HsTypeExistsRn binder (drop_lty body))
     drop_ty (HsDocTy _ a _) = drop_ty $ unL a
     drop_ty x = x
 
@@ -291,6 +293,8 @@ ppSynonym sDocContext SynDecl{tcdLName = name, tcdTyVars = tyvars, tcdRhs = L _ 
             <+> braces (hsep (punctuate semi (map row rows)))
       | otherwise = dcolon <+> ppr (reparenLType (synifyKindSig (typeKind ty)))
     row (pat, body) = ppr pat <+> arrow <+> ppr body
+ppSynonym sDocContext x@SynDecl{tcdRhs = rhs} =
+  [out sDocContext x{tcdRhs = reparenLType rhs}]
 ppSynonym sDocContext x = [out sDocContext x]
 
 ppData :: SDocContext -> TyClDecl GhcRn -> [(Name, DocForDecl Name)] -> [String]

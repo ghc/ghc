@@ -65,7 +65,7 @@ import GHC.Utils.EndoOS
 import qualified GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic (panic)
 
-import Haddock.Types (DocName, DocNameI, ExportInfo, XRecCond, HsTypeDocNameIExt(..))
+import Haddock.Types (DocName, DocNameI, ExportInfo, MapHsExists(..), XRecCond, HsTypeDocNameIExt(..))
 
 moduleString :: Module -> String
 moduleString = moduleNameString . moduleName
@@ -485,7 +485,10 @@ reparenTypePrec = go
     go _ t@HsSpliceTy{} = t
     go _ t@HsTyLit{} = t
     go _ t@HsWildCardTy{} = t
-    go _ t@XHsType{} = t
+    go p t@XHsType{}
+      | Just exists <- mapHsExists (mapXRec @a reparenTyVar) reparenLType t =
+          paren p PREC_CTX exists
+      | otherwise = t
 
     -- Located variant of 'go'
     goL :: Precedence -> LHsType a -> LHsType a
@@ -801,6 +804,7 @@ typeNames ty = go ty Set.empty
         FunTy _ ma w t1 t2 -> go t2 $ go t1 $ go w $ go ma acc
         TyConApp tcon args -> List.foldl' (\s t' -> go t' s) (Set.insert (getName tcon) acc) args
         ForAllTy ma bndr t' -> go t' $ go (tyVarKind (binderVar bndr)) $ go ma acc
+        ExistsTy tv t' -> go t' $ go (tyVarKind tv) acc
         LitTy _ -> acc
         CastTy t' _ -> go t' acc
         CoercionTy{} -> acc
@@ -877,6 +881,8 @@ defaultRuntimeRepVars = go emptyVarEnv
     go subs (DepFunTy vis binder body) =
       -- See Note [Retained types in Haddock] in Haddock.Convert.
       DepFunTy vis (go_id subs binder) (go subs body)
+    go subs (ExistsTy binder body) =
+      ExistsTy (updateTyVarKind (go subs) binder) (go subs body)
     go subs (TyConApp tc tc_args) =
       TyConApp tc (map (go subs) tc_args)
     go subs (FunTy af ma w arg res) =
