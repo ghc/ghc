@@ -42,8 +42,6 @@ import GHC.Builtin.Modules( gHC_CLASSES )
 import GHC.Builtin.Uniques  ( mkAlphaTyVarUnique )
 
 import GHC.Core.Type
-import GHC.Core ( Expr(Var) )
-import GHC.Core.Utils ( applyTypeToArgs )
 import GHC.Core.Unify ( typesAreApart, tcMatchTyX_BM, BindFlag(..) )
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom
@@ -247,86 +245,17 @@ checkAmbiguity ctxt ty
          -- tyvars are skolemised, we can safely use tcSimplifyTop
        ; allow_ambiguous <- xoptM LangExt.AllowAmbiguousTypes
        ; unless allow_ambiguous $
-         withRetainedAmbiguityType ty $ \check_ty ->
-         do { (_wrap, wanted) <- addErrCtxt (AmbiguityCheckCtxt ctxt allow_ambiguous) $
+         do { (indices, wanted) <- addErrCtxt (AmbiguityCheckCtxt ctxt allow_ambiguous) $
                                  captureConstraints $
-                                 tcSubTypeAmbiguity ctxt check_ty check_ty
+                                 tcSubTypeAmbiguity ctxt ty
                                  -- See Note [Ambiguity check and deep subsumption]
                                  -- in GHC.Tc.Utils.Unify
-            ; simplifyAmbiguityCheck ty wanted }
+            ; tcExtendIdEnv indices (simplifyAmbiguityCheck ty wanted) }
 
        ; traceTc "} Done ambiguity check for" (ppr ty) }
 
   | otherwise
   = return ()
-
--- | Open a retained telescope for the ambiguity check only.
--- See Note [Ambiguity checking retained signatures].
-withRetainedAmbiguityType :: Type -> (Type -> TcM a) -> TcM a
-withRetainedAmbiguityType ty thing_inside
-  = do { (indices, check_ty) <- go ty
-       ; tcExtendIdEnv indices (thing_inside check_ty) }
-  where
-    go ty@(DepFunTy DepFunVisible index _)
-      = do { fresh <- newSysLocalId (getOccFS index) ManyTy (varType index)
-           ; (indices, body) <- go (applyTypeToArgs ty [Var fresh])
-           ; return (fresh : indices, mkVisFunTyManyU (varType index) body) }
-    go (ForAllTy ma binder body)
-      = do { (ma_indices, ma) <- go ma
-           ; (indices, body) <- go body
-           ; return (ma_indices ++ indices,
-                     mkTyCoForAllTy ma (binderVar binder) (binderFlag binder) body) }
-    go (FunTy flag ma mult arg res)
-      = do { (ma_indices, ma) <- go ma
-           ; (arg_indices, arg) <- go arg
-           ; (res_indices, res) <- go res
-           ; return (ma_indices ++ arg_indices ++ res_indices, FunTy flag ma mult arg res) }
-    go ty@(TyConApp tc args)
-      | isTypeSynonymTyCon tc
-      , not (isTauTyCon tc && all isTauTy args)
-      , Just rhs <- coreView ty
-      = do { projected@(indices, _) <- go rhs
-           ; return (if null indices then ([], ty) else projected) }
-    go ty = return ([], ty)
-
-{- Note [Ambiguity checking retained signatures]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The ambiguity check compares a signature with a fresh instantiation of itself.
-For forall a. foreach n -> a -> Vec a n, the payload metavariable must unify
-with the payload skolem. Structural unification under a retained binder remains
-gated, so ordinary equality cannot perform this payload unification.
-
-Open each visible retained binder with one fresh runtime Id. Use that same
-opaque Id on both sides of the check. Replace the opened binder with an
-ordinary arrow. Keep invisible retained binders intact for ordinary checking.
-This projection does not supply an implicit source argument.
-See Note [Retained function visibility] in GHC.Core.TyCo.Rep.
-Keep outer erased quantifiers, so ordinary ambiguity checks still apply to
-their type variables and constraints. Do not replace runtime indices with
-fresh type metavariables: Select b need not determine b.
-
-A synonym can name the same telescope. For example, a synonym with RHS
-foreach (x :: a) -> x :~: x determines a from its argument. Open the
-telescope for the ambiguity check as for the written type. A tau synonym
-applied to tau arguments cannot contain a retained binder. Keep the
-original synonym if expansion opens no binder, including in diagnostics.
-
-Project both the argument and result of an ordinary arrow. For example,
-forall a. (foreach m -> Vec a m -> Vec a m) -> Int compares a payload skolem
-with its fresh metavariable inside the argument Pi. Leaving that Pi unchanged
-would prevent the ordinary payload unification. Opening an outer retained
-binder first substitutes its fresh Id through the whole body, including any
-nested argument Pi. Thus an argument closure can still refer to the outer
-runtime index. Keep all fresh runtime Ids in scope for the projected check.
-
-Agda's equalFun and compareDom also compare codomains in one shared extended
-context. See docs/dependent-haskell/REFERENCES.md#agda-provenance.
-
-Scope the fresh Ids over constraint capture and simplification. The check
-discards its wrapper and evidence, as it does for an ordinary signature.
-This projection does not change the signature or produce a Core coercion
-between retained functions. Native metavariable escape checks still apply.
--}
 
 wantAmbiguityCheck :: UserTypeCtxt -> Bool
 wantAmbiguityCheck ctxt

@@ -796,11 +796,12 @@ lifting builds `DepFunCo` with nominal domain evidence. Cast the closure without
 eta expansion. Preserve forall metadata outside its own binder. Input cast or
 coercion evidence that depends on the abstracted index remains unsupported.
 
-For signature ambiguity checking only, open visible retained binders in ordinary arrow
-arguments as well as results. Use one fresh opaque runtime Id on both sides of
-the self-check. Scope all fresh Ids over constraint capture and simplification.
-Keep the actual signature retained. This projection supplies no coercion between
-different retained functions. Preserve the structural-unification gate.
+For signature ambiguity checking, skolemise and instantiate the two signatures
+before opening their visible retained binders. Compare each paired domain
+nominally. Use a common opaque runtime Id at the expected domain. If necessary,
+transport it to the actual domain with the nominal equality Wanted. Compare
+both ordinary arrow arguments and results. Keep the constraints for a nested
+erased forall in that binder's implication. Discard all the evidence.
 See [Agda's expected-argument and shared-context rules](REFERENCES.md#explicit-higher-order-arguments).
 
 For Core application of `DepFunTy vis b result`, check the runtime argument against
@@ -1370,12 +1371,11 @@ native Quick Look and mutable native type assignments remain gated. See
 Notes [Native index bindings during typechecking] and
 [Immutable native dollar applications] in `GHC.Tc.Gen.App`.
 
-Ambiguity checking opens each retained binder with one shared opaque runtime Id.
-It compares ordinary arrows under those Ids and retains the outer erased
-quantifiers. The check discards its wrapper and evidence. It does not require
-a retained-function coercion. Noninjective erased payload families still fail
-the ordinary ambiguity check. See Note [Ambiguity checking retained signatures]
-in `GHC.Tc.Validity` and the Agda provenance references.
+Ambiguity checking instantiates the outer erased parameters before opening
+paired retained binders. A suffix that occurs only under a noninjective type
+family can remain ambiguous. A result such as `Proxy m` can determine that
+suffix. See Note [Ambiguity checking retained signatures] in
+`GHC.Tc.Utils.Unify` and the Agda provenance references.
 
 Keep `foreach` an ordinary identifier when the experimental flag is disabled.
 Its proposed syntax can also parse as an ordinary type-variable application.

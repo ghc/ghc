@@ -92,6 +92,7 @@ import GHC.Core.ConLike (ConLike(..))
 import GHC.Core.FamInstEnv ( emptyFamInstEnvs, reduceTyFamApp_maybe )
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr )
+import GHC.Core.Utils ( applyTypeToArgs )
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep hiding (Refl)
 import GHC.Core.TyCo.FVs
@@ -124,7 +125,7 @@ import GHC.Driver.DynFlags
 import Data.List (foldl')
 import GHC.Data.Bag
 import GHC.Data.FastString
-import GHC.Data.Maybe (firstJusts)
+import GHC.Data.Maybe (firstJusts, isJust)
 
 import Control.Monad
 import Data.Functor.Identity (Identity(..))
@@ -1763,20 +1764,106 @@ tcSubTypeHoleFit ds_flag orig cand_ty hole_ty =
 
 ---------------
 tcSubTypeAmbiguity :: UserTypeCtxt   -- Where did this type arise
-                   -> TcSigmaType -> TcSigmaType -> TcM HsWrapper
+                   -> TcSigmaType -> TcM [Id]
 -- See Note [Ambiguity check and deep subsumption]
-tcSubTypeAmbiguity ctxt ty_actual ty_expected
+-- and Note [Ambiguity checking retained signatures].
+tcSubTypeAmbiguity ctxt ty
   -- See Note [Ambiguity skolemisation is not runtime abstraction]
   -- in GHC.Tc.Utils.Instantiate. No result wrapper is applied to a value.
   = do { rec { (_, tv_prs, given, rho_ty, _) <-
-                 topSkolemiseWith AmbiguitySkolemisation skol_info ty_expected
-             ; let sig_skol = SigSkol ctxt ty_expected (map (fmap (binderVar . snd)) tv_prs)
+                 topSkolemiseWith AmbiguitySkolemisation skol_info ty
+             ; let sig_skol = SigSkol ctxt ty (map (fmap (binderVar . snd)) tv_prs)
              ; skol_info <- mkSkolemInfo sig_skol }
        ; let skol_tvs = map (binderVar . snd . snd) tv_prs
-       ; _ <- checkConstraints sig_skol skol_tvs given $
-                tc_sub_type_shallow (unifyType Nothing)
-                  (AmbiguityCheckOrigin ctxt) ty_actual rho_ty
-       ; pure idHsWrapper }
+             orig = AmbiguityCheckOrigin ctxt
+       ; snd <$> checkConstraints sig_skol skol_tvs given
+           (if has_retained rho_ty
+            then do { (_, rho_actual) <- topInstantiate orig ty
+                    ; compare_rho rho_actual rho_ty }
+            else do { _ <- tc_sub_type_shallow (unifyType Nothing) orig ty rho_ty
+                    ; pure [] }) }
+  where
+    -- Look only at the telescope and at ordinary function arguments.
+    has_retained (DepFunTy DepFunVisible _ _) = True
+    has_retained (ForAllTy _ _ body)          = has_retained body
+    has_retained (FunTy _ _ _ arg res)       = has_retained arg || has_retained res
+    has_retained ty@(TyConApp tc args)
+      | isTypeSynonymTyCon tc
+      , not (isTauTyCon tc && all isTauTy args)
+      , Just rhs <- coreView ty               = has_retained rhs
+    has_retained _                           = False
+
+    compare_rho actual expected
+      | not (has_retained expected)
+      = check_equality actual expected
+      | DepFunTy DepFunVisible a _ <- coreFullView actual
+      , DepFunTy DepFunVisible e _ <- coreFullView expected
+      = do { domain_co <- unifyType Nothing (varType a) (varType e)
+           ; ad <- liftZonkM $ zonkTcType (varType a)
+           ; ed <- liftZonkM $ zonkTcType (varType e)
+           ; fresh <- newSysLocalId (getOccFS e) ManyTy ed
+           ; co <- liftZonkM $ zonkCo domain_co
+           ; let arg = Core.Var fresh
+                 actual_arg
+                   | ad `tcEqType` ed = arg
+                   | otherwise = Core.Cast arg (SubCo (mkSymCo co))
+           ; if isJust (Core.retainedArgIndex actual_arg)
+             then do { actual <- liftZonkM $ zonkTcType actual
+                     ; expected <- liftZonkM $ zonkTcType expected
+                     ; rest <- tcExtendIdEnv [fresh] $
+                           compare_rho (applyTypeToArgs actual [actual_arg])
+                                       (applyTypeToArgs expected [arg])
+                     ; pure (fresh : rest) }
+             else check_equality actual expected }
+      | ForAllTy ma_a (Bndr a vis_a) body_a <- coreFullView actual
+      , ForAllTy ma_e (Bndr e vis_e) body_e <- coreFullView expected
+      , isTyVar a, isTyVar e, vis_a `eqForAllVis` vis_e
+      = do { _ <- unifyType Nothing ma_a ma_e
+           ; kind_co <- unifyType Nothing (varType e) (varType a)
+           ; let skol_anon = UnifyForAllSkol expected
+           ; skol_info <- mkSkolemInfo skol_anon
+           ; (subst, [skol]) <- tcInstSkolTyVars skol_info [e]
+           ; let actual_arg = mkCastTy (mkTyVarTy skol) kind_co
+           ; snd <$> checkConstraints skol_anon [skol] []
+                 (compare_rho (substTyWith [a] [actual_arg] body_a) (substTy subst body_e)) }
+      | FunTy af1 ma1 mult1 arg1 res1 <- coreFullView actual
+      , FunTy af2 ma2 mult2 arg2 res2 <- coreFullView expected
+      , af1 == af2
+      = do { _ <- unifyType Nothing ma1 ma2
+           ; _ <- unifyType Nothing mult1 mult2
+           ; (++) <$> compare_rho arg1 arg2 <*> compare_rho res1 res2 }
+      | otherwise
+      = check_equality actual expected
+
+    check_equality actual expected = [] <$ unifyType Nothing actual expected
+
+{- Note [Ambiguity checking retained signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The ambiguity check compares a skolemised signature with a fresh
+instantiation of itself. Keep each retained telescope intact during both
+operations. For example, a retained xs :: Vec a (Add cut m) must have
+the same kind as the index argument to appendVec in its body. Opening xs
+first would leave a free Id whose type still mentions the original a and m
+after the surrounding type has substituted them.
+
+Compare the paired domains nominally. Then use one fresh opaque Id at the
+expected domain. Use that Id directly on both sides when the domains agree.
+Otherwise use the nominal domain Wanted to transport it to the actual
+domain. The result comparison can still determine an erased variable, for
+example when it returns Proxy m and Add cut m alone cannot determine m.
+Keep the original function equality if the native index grammar cannot
+represent the transport. A function-valued index requires a bare Id.
+
+Traverse both sides of ordinary arrows. Under an erased forall in a
+higher-rank argument, make a common skolem and keep the body check in
+its implication. Check equality under the binder. Keep the ordinary
+shallow subsumption path for types without a visible retained telescope.
+
+The fresh runtime Ids scope over their body constraints and remain
+available during ambiguity solving. The check discards all evidence and
+does not change the signature. See docs/dependent-haskell/REFERENCES.md
+for Agda's shared-context comparison.
+-}
 
 ---------------
 addSubTypeCtxt :: TcType -> ExpType -> TcM a -> TcM a

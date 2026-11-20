@@ -366,11 +366,14 @@ Agda compares Pi codomains under one shared extended context.
 calls [`compareDom`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L827-L849),
 which checks the domains and extends that context before comparing the bodies.
 The pinned `Conversion.hs` blob is `69423e2c11b6f35bc5eee2d502cf2830efbc005a`.
-The GHC ambiguity check opens each retained binder with one shared opaque runtime
-Id. It compares temporary ordinary arrows under those Ids and retains outer
-erased quantifiers. It discards the wrapper and evidence. This checking-only
-projection is a GHC adaptation. It does not extend FC coercions or disable
-ordinary ambiguity checks. A noninjective payload family remains ambiguous.
+GHC first skolemises one copy of the signature and instantiates the other.
+It checks each pair of retained domains nominally before opening the body.
+The shared runtime Id has the expected domain. The actual body can use it
+at a different domain through the nominal equality Wanted. The ambiguity
+check discards its evidence. A suffix that appears only under a
+noninjective family remains ambiguous in the vector regression.
+[GHC ambiguity check](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/ambiguous_types.html)
+and [retained vector regression](../../testsuite/tests/dependent/should_run/NativeOpenIndexedAppend.sh).
 
 Expected-result instantiation uses a separate GHC adaptation. It matches an
 ordinary constructor or helper result against a checked expected type. It binds
