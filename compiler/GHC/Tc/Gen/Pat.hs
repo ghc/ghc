@@ -45,6 +45,7 @@ import qualified GHC.Core.Subst as CoreSubst
 import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_kind )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
+import GHC.Tc.Zonk.TcType (zonkTcType)
 import GHC.Core.TyCo.Ppr ( pprTyVars )
 import GHC.Core.TyCo.Rep ( Type(ExistsTy, TermVarTy) )
 import GHC.Tc.Utils.TcType
@@ -1100,6 +1101,9 @@ tcPatSig in_pat_bind sig res_ty
               when in_pat_bind
                 (addErr (TcRnCannotBindScopedTyVarInPatSig sig_tvs_ne))
 
+              unless in_pat_bind $
+                bindRetainedPatSigVars (mkVarSet (map snd sig_tvs)) sig_ty res_ty
+
               -- Now do a subsumption check of the pattern signature against res_ty
               wrap <- addErrCtxt (PatSigErrCtxt sig_ty res_ty) $
                       tcSubTypePat PatSigOrigin PatSigCtxt res_ty sig_ty
@@ -1107,6 +1111,52 @@ tcPatSig in_pat_bind sig res_ty
               -- Phew!
               return (sig_ty, sig_tvs, sig_wcs, wrap)
        }
+
+-- | Name a retained index already present in a checked pattern type.
+-- See Note [Retained indices in pattern signatures].
+bindRetainedPatSigVars :: VarSet -> TcType -> ExpSigmaType -> TcM ()
+bindRetainedPatSigVars binders sig_ty (Check expected)
+  | Just (tc, sig_args) <- tcSplitTyConApp_maybe sig_ty
+  , Just (expected_tc, expected_args) <- tcSplitTyConApp_maybe expected
+  , tc == expected_tc
+  , isInjectiveTyCon tc Nominal
+  , not (isTypeFamilyTyCon tc)
+  , sig_args `equalLength` expected_args
+  = zipWithM_ bind sig_args expected_args
+  where
+    bind sig (TermVarTy index)
+      | Just tv <- getTyVar_maybe sig
+      , tv `elemVarSet` binders
+      , isNativeIndexId index
+      = do { active <- tcLookupLcl_maybe (idName index)
+           ; case active of
+               Just (ATcId { tct_id = actual }) | actual == index -> do
+                 unfilled <- isUnfilledMetaTyVar tv
+                 kind <- liftZonkM $ zonkTcType (tyVarKind tv)
+                 when (unfilled && kind `eqType` idType actual) $
+                   liftZonkM $ writeMetaTyVar tv (TermVarTy actual)
+               _ -> return () }
+    bind _ _ = return ()
+bindRetainedPatSigVars _ _ _ = return ()
+
+{- Note [Retained indices in pattern signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In a checked pattern such as
+
+    Pair _ (right :: Vec a suffix)
+
+the signature can name the runtime index of the vector. A fresh type
+variable from this signature can alias an in-scope retained Id in a
+corresponding argument of the same nominally injective type constructor.
+Use the actual Id from the pattern environment. This neither introduces a
+second witness nor adds an equality between distinct runtime values.
+
+The alias only changes the signature's own fresh metavariable. The normal
+subsumption check still verifies the whole pattern signature, including
+any repeated occurrences. Do not infer through a type family or write
+inferred types that capture a retained Id outside its scope. In
+particular, leave the ordinary solver's escape check in place.
+-}
 
 {- *********************************************************************
 *                                                                      *

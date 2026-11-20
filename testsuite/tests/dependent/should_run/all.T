@@ -404,6 +404,12 @@ test('NativeRetainedPackage',
                    '../../../../docs/dependent-haskell/examples/packed-vector/RetainedProjection.hs'])],
      run_command, ['bash NativeRetainedPackage.sh "{compiler}" "{libdir}"'])
 
+test('NativeNamedSplit',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/NamedSplitClient.hs',
+                   '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs'])],
+     run_command, ['bash NativeNamedSplit.sh "{compiler}" "{libdir}"'])
+
 test('NativeRetainedCast',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['NativeRetainedCastClient.hs', 'NativeRetainedCastLength.hs',

@@ -161,6 +161,7 @@ prove the runtime vector is VNil in the empty branch: (True,False)
 check a runtime cut against a vector length: (Just (1,[True],[False]),Nothing)
 use a split proof from IO in the next argument: Just ([True],[False])
 reassemble the same two vector elements: [True,False]
+name an arbitrary retained suffix in a split pattern: Just (1,[True,False],[False,True])
 outer successor ignores the second addend: True
 replicate at a computed runtime length: [True,True,True]
 grow at a locally named runtime index: ("xxx",'x')

@@ -143,6 +143,7 @@ import qualified OrdinaryVecClient as Ordinary
 import qualified ConservedPartition
 import qualified GHC.Sigma as Sigma
 import qualified ListVectorClient
+import qualified NamedSplitClient
 import qualified ParameterizedIndexLibrary as Parameterized
 import qualified PackedProjection
 import qualified PackageEquality
@@ -1538,6 +1539,11 @@ sourceAddition = do
                :~: 'VCons 'True ('VCons 'False 'VNil)) of
         Refl -> observe "reassemble the same two vector elements"
             (toList (VectorSplitObservation.reassembleTwo (VCons True (VCons False VNil))))
+    twoCells <- newIORef (VCons True (VCons False VNil))
+    namedSplit <- NamedSplitClient.observeNamedSplitIO
+        (splitAtVecChecked (S Z) (S (S Z)) <$> readIORef twoCells)
+        (VCons False (VCons True VNil))
+    observe "name an arbitrary retained suffix in a split pattern" namedSplit
     observe "outer successor ignores the second addend" (isSuccessor (1 + undefined))
 
     let filled :: Vec Bool (n + m)

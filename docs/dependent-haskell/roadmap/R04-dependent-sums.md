@@ -262,6 +262,15 @@ and tests each element. The elements can stay unevaluated when the
 predicate ignores them.
 [Agda proof and Idris vector partition](../REFERENCES.md#conservation-of-partition-length).
 
+An ordinary checked-split pattern can name the stored suffix in
+`(right :: Vec a n)`. The type name `n` refers to the same witness as
+the stored field. After matching `Refl`, a later pattern can use
+`Vec a ('S n)`. A lazy tuple can bind the alias and defer the proof
+match. Separate packages still have separate witnesses.
+[Ordinary client](../examples/packed-vector/NamedSplitClient.hs) and
+[pattern signature rules in proposal #128](https://ghc-proposals.readthedocs.io/en/latest/proposals/0128-scoped-type-variables-types.html).
+
+
 `choosePartition` gives an imported `Branch a r` continuation the selected
 length and vector. It leaves the other vector and the equality proof
 unevaluated. Its required type argument supplies `total` when the result
