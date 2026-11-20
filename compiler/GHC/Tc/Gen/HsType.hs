@@ -3030,6 +3030,10 @@ For the ordinary tree, instantiate each application once and solve its
 argument and result kinds together. A computed operand can then constrain
 a sibling in either order. Resolve checked boundaries and choose legacy
 empty-list defaults before requiring fully ground ordinary applications.
+After the operands determine the erased parameters, a ground result can
+still contain family applications. Reduce its kind using nominal family
+axioms before preparing readback. Ordinary term checking still validates
+the complete application at the resulting type.
 -}
 
 -- | An ordinary application can remain Core until its result is observed.
@@ -3338,10 +3342,16 @@ tcPlanClosedTree mode ordinary hint root arguments = do
           ("The operands do not determine the following type parameters: " ++ unwords unresolved ++ "."))
       constraints <- liftZonkM (zonkTcTypes constraints)
       inputs <- liftZonkM (zonkTcTypes inputs)
-      result <- liftZonkM (zonkTcType result)
-      unless (all ground (result : inputs) &&
+      unless (all ground inputs &&
               all (\p -> ground p && isJust (getClassPredTys_maybe p)) constraints) $
         unsupported name
+      zonked_result <- liftZonkM (zonkTcType result)
+      -- See Note [Expected result kinds for closed calls].
+      result <- if noFreeVarsOfType zonked_result && not (isTyFamFree zonked_result)
+        then do norm_loc <- getCtLocM AnnOrigin Nothing
+                reductionReducedType <$> tcRewriteFamilyAxioms norm_loc zonked_result
+        else return zonked_result
+      unless (ground result) $ unsupported name
       ClosedApplication loc fun (zip (map fst vars) values) [] inputs result <$> traverse verify children
 
     verify (ClosedFamilyApplication loc owner table kinds inputs result children) = setSrcSpan loc $ do

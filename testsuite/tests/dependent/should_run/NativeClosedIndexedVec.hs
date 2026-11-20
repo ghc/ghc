@@ -9,6 +9,9 @@ import qualified NativeClosedVectorPair as P
 import qualified PackedVecLibrary as Packed
 import qualified VectorSplitObservation as S
 
+next :: R.nextPlace ('R.OnWay 'R.AtHome) :~: 'R.AtHome
+next = Refl
+
 cells :: V.two 3 :~: 'V.VCons 3 ('V.VCons 4 'V.VNil)
 cells = Refl
 
