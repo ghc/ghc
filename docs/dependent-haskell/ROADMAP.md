@@ -31,11 +31,11 @@ for this revision are in progress.
 
 | Card | Evidence beyond the published checkpoint | Remaining gap |
 | --- | --- | --- |
-| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | The integrated compiler checks `second :: foreach (q :: DPair a p) -> p (first q)`. An ordinary client reads the payload from a separately compiled provider. | General domains and inference for `foreach`, and first-class retained `some`. |
-| [R05 dependent Core](roadmap/R05-dependent-core.md) | The private reader at `b0d4dd3850` reconstructs a branch's constructor fields and nominal equality. An ordinary client at default `-O1` reads the projected payload and leaves its bottom-valued IO witness lazy. | Verify the full optimizer and selective interface version in a consistent compiler build. The initial compiler linked from mixed artifacts crashed before it wrote the test interface. |
+| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | The integrated compiler checks `second :: foreach (q :: DPair a p) -> p (first q)`. Private revision `998c63cb62` accepts written `some` with an isolated library fixture. A source-free client reads each projection and leaves the other field lazy. | Establish equality for equivalent sum types written independently in two modules. The private payload families currently have different names. General domains and inference for `foreach` also remain open. |
+| [R05 dependent Core](roadmap/R05-dependent-core.md) | The private bootstrap compiler at `879625a6d8` matches all 271 Showcase lines at default `-O1`. At `63ebc62180`, an old reader detects new constructor evidence at the header. A new reader runs source-free clients against both generations at all three compression levels. | Verify the combined compiler in both stages. Check exported specialization rules and optimized functions whose result refers to a callback application. |
 | [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The integrated Showcase checks a mapper's cons rule on an unknown tail and composes two checked traversals. Observing the result constructor leaves the inner callback lazy. | General open evaluation across arbitrary ordinary definitions. |
 | [R19 type-level cases](roadmap/R19-type-level-cases.md) | The integrated compiler handles ordered constructor tests through aliases and selected GADT indices. Private revision `0af90fa373` also checks cases under `forall k (tag :: k)`. An ordinary interface client instantiates one annotated result at both `LiftedRep` and `IntRep`. | Integrate the dependent binder checks. General mixed patterns and open GADT indices remain open. |
-| [R22 erased existentials](roadmap/R22-existential-quantification.md) | An isolated compiler checks source `Pack (type Bool) (Just True)` and a lexical unpack pattern. A source-free ordinary client links and prints `True`. Core and STG dumps, demand and scope controls pass at `-O0`. | Build the marker library and compiler together from a clean checkout. General pattern matching and ordinary optimization remain open. |
+| [R22 erased existentials](roadmap/R22-existential-quantification.md) | The private bootstrap compiler at `7a2fe4027b` builds with the real marker in `base`. The source test passes Template Haskell, lexical unpacking, a source-free ordinary client and ten rejection checks. | Verify the self-hosted compiler and GHCi. General pattern matching and optimization of existential expressions remain open. |
 | [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | Eight focused diagnostic tests pass on the private follow-up. An actual matchability conflict displays the conflicting arrow metadata. A stuck family no longer produces a speculative argument-count hint. | Integrate the diagnostics. General family unsaturation remains open. |
 
 The published evaluator work covers closed calls such as `Prelude.sum` and
@@ -55,10 +55,13 @@ source examples. General promotion remains open.
 2. Integrate the R19 dependent binder checks and the R23 diagnostic fixes.
    Verify reuse of existing provider interfaces. Check how Haddock renders
    a public type case when its implementation uses a private family.
-3. Build R22 source pack and unpack together with the `GHC.Exists` marker
-   in `base`. Run an ordinary client from the producer interface and object.
-4. Check R05 default optimized unfoldings in both compiler stages. Test old
-   and new readers on the versioned projection and on an ordinary interface.
+3. Run R22 source pack and unpack on the self-hosted compiler with its
+   registered `base`. Check the native and interactive Showcase.
+4. Test R04 whole-sum equality across independently compiled modules.
+   Compare equivalent bodies with renamed binders and reject unequal bodies.
+5. Run R05 default optimized unfoldings in both compiler stages. Test the
+   generated specialization rule and a case on a callback from an ordinary
+   client that has only the provider interface and object.
 
 Use this queue for current priorities, the linked card for its acceptance
 criteria, and the [implementation log](PLAN.md) for results from individual
