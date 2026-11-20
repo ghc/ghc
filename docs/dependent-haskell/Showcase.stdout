@@ -229,6 +229,7 @@ match hidden partition lengths in function equations: (Just 7,Nothing)
 map an ordinary observer over differently sized partitions: [([7,9],[2]),([2],[7,9])]
 use a hidden polymorphic identity at Int and Bool: (7,True)
 infer a hidden function type from its paired callback: (7,True)
+apply the second projection to the first in an ordinary module: (7,True)
 infer a polymorphic lambda witness and call its builder at Int: (11,True)
 infer a guarded callback and skip an unused input: ((7,True),(11,False))
 read an integer through an erased package: 7

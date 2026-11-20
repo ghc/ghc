@@ -1,7 +1,14 @@
 {-# LANGUAGE ImpredicativeTypes, LambdaCase, NoExperimentalDependentTypes #-}
-module RankedPackageClient (runGuarded) where
+module RankedPackageClient (runGuarded, runProjections) where
 
-import RankedPackage (Callback(..), GuardedBuilder, atTwoTypes, consumeIdentity, observeGuarded)
+import RankedPackage (Callback(..), CallbackPair, GuardedBuilder, atTwoTypes, consumeIdentity, observeGuarded)
+
+-- | Apply both selectors to a pair with one hidden type.
+runProjections :: (Int, Bool)
+runProjections = project (id, atTwoTypes)
+  where
+    project :: CallbackPair -> (Int, Bool)
+    project p = snd p (fst p)
 
 -- | Use the declared consumer to infer the witness for both guards.
 builder :: GuardedBuilder

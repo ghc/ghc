@@ -1,7 +1,7 @@
 {-# LANGUAGE ExperimentalDependentTypes, ImpredicativeTypes, RankNTypes, ScopedTypeVariables, TypeApplications #-}
 
 module RankedPackage
-    ( runCallback, runPair, runBuilder
+    ( runCallback, runPair, runBuilder, CallbackPair
     , Callback(..), GuardedBuilder, atTwoTypes, consumeIdentity, observeGuarded
     ) where
 
