@@ -46,6 +46,7 @@ import GHC.Core.Reduction
 import GHC.Core.RoughMap
 import GHC.Core.FVs( orphNamesOfAxiomLHS )
 
+import GHC.Builtin.CoercionRules( proveScopedSigmaClosure )
 import GHC.Builtin.WiredIn.TypeLits( tryMatchFam )
 
 import GHC.Types.Var.Set
@@ -1257,9 +1258,14 @@ reduceTyFamApp_maybe envs role tc tys
   | Just ctf <- closedTypeFamily_maybe tc
   = case ctf of
       _ | Just ax <- closedTyFamCoAxiom_maybe ctf
-        , Just (ind, inst_tys, inst_cos) <- chooseBranch ax tys
+        , Just (ind, inst_tys, inst_cos, arg_cos) <- chooseBranch ax tys
         -> let co = mkAxInstCo role (BranchedAxiom ax ind) inst_tys inst_cos
-           in Just $ coercionRedn co
+               redn = coercionRedn co
+           in Just $ case arg_cos of
+                Nothing -> redn
+                Just cos ->
+                  downgradeRole role Nominal (mkTyConAppCo Nominal tc cos)
+                    `mkTransRedn` redn
       CTF_BuiltIn builtin_fam
         | Just (rewrite,ts,ty) <- tryMatchFam builtin_fam tys
         -> let co = mkAxiomCo rewrite (map mkNomReflCo ts)
@@ -1271,41 +1277,89 @@ reduceTyFamApp_maybe envs role tc tys
 
 -- The axiom can be oversaturated. (Closed families only.)
 chooseBranch :: CoAxiom Branched -> [Type]
-             -> Maybe (BranchIndex, [Type], [Coercion])  -- found match, with args
+             -> Maybe (BranchIndex, [Type], [Coercion], Maybe [CoercionN])
 chooseBranch axiom tys
   = do { let num_pats = coAxiomNumPats axiom
              (target_tys, extra_tys) = splitAt num_pats tys
              branches = coAxiomBranches axiom
-       ; (ind, inst_tys, inst_cos)
-           <- findBranch (unMkBranches branches) target_tys
-       ; return ( ind, inst_tys `chkAppend` extra_tys, inst_cos ) }
+       ; (ind, inst_tys, inst_cos, arg_cos)
+           <- findBranch (coAxiomTyCon axiom) (unMkBranches branches) target_tys
+       ; guard (isNothing arg_cos || null extra_tys)
+       ; return (ind, inst_tys `chkAppend` extra_tys, inst_cos, arg_cos) }
 
 -- The axiom must *not* be oversaturated
-findBranch :: Array BranchIndex CoAxBranch
+findBranch :: TyCon -> Array BranchIndex CoAxBranch
            -> [Type]
-           -> Maybe (BranchIndex, [Type], [Coercion])
-    -- coercions relate requested types to returned axiom LHS at role N
-findBranch branches target_tys
+           -> Maybe (BranchIndex, [Type], [Coercion], Maybe [CoercionN])
+    -- The optional proofs relate the requested arguments to the axiom LHS.
+findBranch fam_tc branches target_tys
   = -- Implements the Closed Family Matching Rule
     -- in Note [Compatibility]
     foldr go Nothing (assocs branches)
   where
-    go :: (BranchIndex, CoAxBranch)
-       -> Maybe (BranchIndex, [Type], [Coercion])
-       -> Maybe (BranchIndex, [Type], [Coercion])
     go (index, branch) other
-      = let (CoAxBranch { cab_tvs = tpl_tvs, cab_cvs = tpl_cvs
-                        , cab_lhs = tpl_lhs }) = branch
-        in case tcMatchTys tpl_lhs target_tys of
-        Just subst -- Matching worked. now, check for apartness.
+      = let CoAxBranch { cab_tvs = tpl_tvs, cab_cvs = tpl_cvs } = branch
+        in case matchClosedBranch fam_tc branch target_tys of
+        Just (subst, arg_cos)
           |  apartnessCheck target_tys branch
+          ,  maybe True (\cos -> apartnessCheck (map coercionRKind cos) branch) arg_cos
           -> -- Matching worked & we're apart from all incompatible branches.
              -- success
              assert (all (isJust . lookupCoVar subst) tpl_cvs) $
-             Just (index, substTyVars subst tpl_tvs, substCoVars subst tpl_cvs)
+             Just (index, substTyVars subst tpl_tvs, substCoVars subst tpl_cvs, arg_cos)
 
         -- Failure. keep looking
         _ -> other
+
+{- Note [Scoped sums in closed family matches]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A repeated variable in a family pattern can encounter two independently
+written sums of the same type. Their codomains have different private
+names. The checked nominal proof identifies them only if their lexical
+closures agree. See Note [Scoped retained sum codomains] in
+GHC.Core.TyCo.Compare.
+
+Try that proof only for a repeated template variable. If matching used
+it, instantiate the entire pattern and prove each argument equality.
+Compose the nominal argument conversion with the ordinary branch axiom.
+The axiom receives its exact instantiated pattern. The conversion requires
+equal result kinds and no extra arguments. Family reduction returns
+homogeneous evidence. Extra arguments can require dependent kind casts.
+
+Check apartness for the original arguments and for the converted arguments
+that Core Lint sees on the axiom. Unknown partial families remain opaque
+to apartness. A failed conversion therefore cannot select a fallback.
+The same match also defines what counts as an earlier match for injectivity.
+-}
+
+-- | Match a branch and produce nominal argument proofs if it used conversion.
+matchClosedBranch :: TyCon -> CoAxBranch -> [Type] -> Maybe (Subst, Maybe [CoercionN])
+matchClosedBranch fam_tc branch target = do
+    (subst, converted) <- tcMatchTysWithRepeated has_proof lhs target
+    if converted
+      then do
+        let instantiated = Type.substTys subst lhs
+        guard (result_kind target `eqType` result_kind instantiated)
+        cos <- zipWithM scopedMatchCo target instantiated
+        return (subst, Just cos)
+      else return (subst, Nothing)
+  where
+    lhs = coAxBranchLHS branch
+    has_proof a b = isJust (scopedMatchCo a b)
+    result_kind = typeKind . mkTyConApp fam_tc
+
+-- See Note [Scoped sums in closed family matches].
+scopedMatchCo :: Type -> Type -> Maybe CoercionN
+scopedMatchCo lhs rhs
+  | eqType lhs rhs = Just (mkNomReflCo lhs)
+  | not (eqType (typeKind lhs) (typeKind rhs)) = Nothing
+  | Just co <- proveScopedSigmaClosure lhs rhs = Just co
+  | Just (tc, as) <- splitTyConApp_maybe lhs
+  , Just (tc', bs) <- splitTyConApp_maybe rhs
+  , tc == tc', isGenerativeTyCon tc Nominal
+  , equalLength as bs
+  = mkTyConAppCo Nominal tc <$> zipWithM scopedMatchCo as bs
+  | otherwise = Nothing
 
 -- | Do an apartness check, as described in the "Closed Type Families" paper
 -- (POPL '14). This should be used when determining if an equation
@@ -1325,17 +1379,17 @@ apartnessCheck target (CoAxBranch { cab_incomps = incomps })
 
 -- | Check whether an earlier branch matches these target types
 noEarlierMatchCheck
-  :: [Type]
+  :: TyCon -> [Type]
   -> CoAxBranch -- ^ The candidate equation we wish to use
   -> Bool       -- ^ True <=> equation can fire
-noEarlierMatchCheck target (CoAxBranch { cab_overlaps = overlaps })
+noEarlierMatchCheck fam_tc target (CoAxBranch { cab_overlaps = overlaps })
     -- NB: this is the /only/ use of the `cab_overlaps` field
     -- See Note [Storing compatibility] and
     -- (RW4) in Note [Relevance]
   = not (any matches overlaps)
   where
     matches earlier_branch
-      = isJust (tcMatchTys (coAxBranchLHS earlier_branch) target)
+      = isJust (matchClosedBranch fam_tc earlier_branch target)
 
 {-
 ************************************************************************

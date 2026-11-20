@@ -719,7 +719,8 @@ getRelevantBranches ax work_args work_rhs
                             -- See (RW1)-(RW3) in Note [Relevance]
             , let lhs_tys' = map (deepSubstTy subst) lhs_tys
                   -- deepSubstTy: see (CF8) in Note [Exploiting closed type families]
-            , noEarlierMatchCheck lhs_tys' branch  -- See (RW4) in Note [Relevance]
+            , noEarlierMatchCheck (coAxiomTyCon ax) lhs_tys' branch
+                -- See (RW4) in Note [Relevance]
             = -- Ignore the substitution, except for `noEarlierMatchCheck`
               Just $
               if all (`elemSubst` subst) qtvs
