@@ -44,6 +44,7 @@ import qualified ComputedPair as Computed
 import qualified ConstructorCallClient as Constructor
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Control.Monad (unless)
+import qualified Data.Bool
 import qualified Data.Char
 import qualified Data.Either
 import DefaultVector (DefaultElement(..))
@@ -952,9 +953,12 @@ main = do
     observe "partition a vector at two independent result lengths"
         (ImplicitVector.cells passing, ImplicitVector.cells failing,
          take 1 (ImplicitVector.cells firstPart))
+    let rows = ImplicitVector.partitionRows odd
+            (VCons (7 :: Int) (VCons 2 (VCons 9 VNil)))
     observe "match both hidden lengths in one partition result" $
-        ImplicitVector.rowLists (ImplicitVector.partitionRows odd
-            (VCons (7 :: Int) (VCons 2 (VCons 9 VNil))))
+        ImplicitVector.rowLists rows
+    observe "choose a partition without forcing the unused branch" $
+        ImplicitVector.rowLists (Data.Bool.bool (error "unused partition") rows True)
     observe "transport element equality under a hidden vector length"
         (ImplicitVector.cells (ImplicitVector.transportFiltered Refl passing))
     observe "zip a filtered vector with itself at its hidden length" $

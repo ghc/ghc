@@ -311,6 +311,11 @@ Core wraps the checked payload with an inner Pack and an outer
 Pack. An application that requests the payload opens consecutive
 dot binders with separate skolems. The result type stays outside both scopes. An inner bar package requires explicit elimination.
 
+A local binding can store the whole nested package. For example,
+`let rows = partitionPair p xs in roundTrip rows` keeps both lengths
+hidden. Check free variables on the whole type. The inner package alone
+can refer to the length bound by the outer package.
+
 The partition uses a lazy pair pattern in each recursive branch.
 The source-free client reads each output's first cell with a bottom
 tail. A consumer can also ignore a bottom package. Inspecting the
@@ -329,10 +334,10 @@ exception producer or `error`. A choice can include consecutive
 binders and a kind that depends on an earlier binder. The chosen
 type argument preserves the bar and dot modes.
 
-The checker matches the kind and complete package type. Each
-binder's kind and the final payload must have tau syntax, and the
-body must be family-free. Any other ordinary parameters still use
-the application checker. Returning a package through this route
+The checker matches the kind and complete package type. It can pass a
+package containing an opaque type family or a rank-n function. The
+caller needs no equation for the family. Any other ordinary parameters
+still use the application checker. Returning a package through this route
 preserves the producer's demand. An ordinary client can ignore a
 bottom package and observes the producer's original exception when
 it demands the payload.

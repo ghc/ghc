@@ -3121,6 +3121,21 @@ comparison. [Paper, figure 8](https://richarde.dev/papers/2021/exists/exists.pdf
 [Agda dependent pairs](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#the-s-type)
 and [Idris existential pairs](https://www.idris-lang.org/Idris2/base/docs/Data.DPair.html).
 
+The fork also checks an ordinary call at a known existential result.
+For `bool fallback rows flag`, the type parameter of `bool` can be the
+entire expected package. Both alternatives use that type. Each keeps
+its own witnesses. This type application also works for a package with
+an opaque family in its payload. It requires no equality between family
+arguments. A local binding that stores an entire nested package checks
+free variables under all its binders, as in the nested package typing
+of Figure 8. Figure 2 classifies existential types as polytypes.
+Section 8 describes how Quick Look can infer impredicative instantiations.
+Here the expected type supplies the full instantiation. Agda's implicit
+argument examples also use surrounding types to determine omitted
+arguments. Haskell's `bool` determines which alternative is evaluated.
+[Existential types and Quick Look, §8](https://richarde.dev/papers/2021/exists/exists.pdf#page=21)
+and [Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html).
+
 Figure 1(b) of *An Existential Crisis Resolved* gives the source rule for
 the [implicit vector filter](examples/erased-existentials/ImplicitVector.hs).
 The passing branch constructs a cell from a recursive call with a fresh
