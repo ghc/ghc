@@ -2,11 +2,12 @@
 {-# LANGUAGE RequiredTypeArguments #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
-module Eliminate (inspect, inspectBare, ignoreBottom, ignoreCall, forceBottom, unpackLocal, shown, render) where
+module Eliminate (inspect, inspectBare, ignoreBottom, ignoreCall, forceBottom, unpackLocal, shown, render, inlineArgument) where
 
 import Data.Kind (Type)
 import qualified GHC.Exists as Exists
 import Provider
+import OrdinaryPack (observeArgument)
 
 {-# NOINLINE inspect #-}
 inspect :: Hidden -> String
@@ -64,3 +65,7 @@ renderList = show
 render :: HiddenShow -> String
 render p = case p of
   Exists.Pack (type a) (Shown x) -> renderList [x :: a]
+
+-- Exercise argument classification at an imported, polymorphic call.
+inlineArgument :: Bool -> Int -> Int
+inlineArgument x choice = observeArgument (Just x :: exists (a :: Type). Maybe a) choice

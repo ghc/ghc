@@ -11,6 +11,7 @@ main = do
   print (inspect supplied, inspect synthesized, inspectBare kindOnly,
          inspect kindAndSchema, inspect wildcardWitness)
   print (ignoreBottom, ignoreCall, unpackLocal)
+  print (inlineArgument True 1)
   print (render (shown True), render (shown (7 :: Int)))
   result <- try @SomeException (evaluate forceBottom)
   case result of
