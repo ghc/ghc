@@ -51,14 +51,26 @@ how a separate family that calls an associated family could state the
 constraint in a standalone kind signature.
 [Proposal text at the reviewed revision](https://github.com/typedrat/ghc-proposals/blob/faf45d2290f06696627b1f5d60ce92741ae9e38b/proposals/0000-simple-constrained-type-families.rst).
 
-The draft considers an extension that changes the meaning of the same
-library for different consumers. Its migration plan infers missing
-constraints in existing signatures and warns. It suggests
-`InferKindConstraints` as a temporary extension name. On 2026-11-20 the
+The draft considers a switch for domain checking. It rejects that
+approach because a library would need two builds. Its migration plan
+applies the domain rule to all producers. A temporary extension would
+infer missing constraints in existing signatures and warn. The draft
+suggests the name `InferKindConstraints`. On 2026-11-20 the
 PR was open with the label *Needs revision*. The latest discussion on
 the PR was on 2019-11-05.
 [PR #177](https://github.com/ghc-proposals/ghc-proposals/pull/177)
 and [Eisenberg's review](https://github.com/ghc-proposals/ghc-proposals/pull/177#issuecomment-549766671).
+
+Eisenberg asks how a caller would select the missing argument in a
+multi-parameter class. For example, if `class C a b` declares `type F a`,
+the application `F Int` supplies no `b` for the constraint `C Int b`.
+He also asks how an associated `newtype` could store a dictionary
+alongside its only field. These are separate tests for extending the
+single-parameter `Collects` experiment. Simon Peyton Jones questions the
+cost of changing constructor elaboration before the dependent-type
+design is settled.
+[Eisenberg's questions](https://github.com/ghc-proposals/ghc-proposals/pull/177#issuecomment-549766671)
+and [Peyton Jones's reply](https://github.com/ghc-proposals/ghc-proposals/pull/177#issuecomment-549934585).
 
 The accepted proposal #547 disallows `=>` in family result kind
 annotations and standalone kind signatures. Class constraints were
