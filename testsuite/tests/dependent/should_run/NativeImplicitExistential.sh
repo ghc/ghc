@@ -71,7 +71,13 @@ grep -Eq 'unpack f' call-head.log
 "$ghc" "${flags[@]}" -ddump-ds -ddump-stg-final -dsuppress-uniques \
     -c WitnessMain.hs -main-is WitnessMain >witness.log
 grep -Eq 'firstPair @m unpacked unpacked' witness.log
-"$ghc" "${flags[@]}" WitnessMain.o ../provider/{Vector,Filter}.o -o witness -main-is WitnessMain
+awk '/^WitnessMain.projected$/ { body = 1 }
+     body && /^-- RHS size:/ { exit }
+     body { $1 = $1; printf "%s ", $0 }' witness.log >projected.log
+[[ $(grep -o 'unpack p as' projected.log | wc -l) == 1 ]]
+grep -Eq 'snd @t @\(t -> [[:alnum:].]*Int\) unpacked' projected.log
+grep -Eq 'fst @t @\(t -> [[:alnum:].]*Int\) unpacked' projected.log
+"$ghc" "${flags[@]}" WitnessMain.o ../provider/{Vector,Filter,WitnessSchema}.o -o witness -main-is WitnessMain
 "$ghc" "${flags[@]}" -ddump-ds -fwrite-ide-info -c CaseMain.hs -main-is CaseMain >case.log
 test -s CaseMain.hie
 grep -Eq 'unpack .*selection' case.log
@@ -185,6 +191,12 @@ fi
 line=$(grep -n '^escape (f, _) =' WitnessPairEscape.hs | cut -d: -f1)
 grep -Fq "WitnessPairEscape.hs:$line:17: error: [GHC-25897]" tuple-escape.log
 grep -Fq "at WitnessPairEscape.hs:$line:8-13" tuple-escape.log
+for rejection in crossed:25897 projectedEscape:25897 duplicated:18872; do
+    binding=${rejection%:*}
+    code=${rejection#*:}
+    line=$(grep -n "^$binding .*=" WitnessPairEscape.hs | cut -d: -f1)
+    grep -Eq "^WitnessPairEscape.hs:$line:[0-9]+: error: \[GHC-$code\]" tuple-escape.log
+done
 
 bad_sources=(UnsafeHead SameWitness Escape LetEscape BarClient ModesAreDistinct
              BarPack DotForall DotConstraint LinearDotDuplicate LambdaEscape

@@ -307,6 +307,17 @@ escape its opening or permit duplicate linear use. This is the
 lexical-variable fragment of the paper's IExistCore projection rule.
 [An Existential Crisis Resolved, section 6.1](https://richarde.dev/papers/2021/exists/exists.pdf).
 
+An ordinary client can also write `snd p (fst p)` for
+`p :: exists t. (t, t -> Int)`. The nested unary call reuses the
+unrestricted opening of the same local package in the enclosing
+application. Both calls keep the ordinary demand of their selectors.
+The source-free test agrees with `case p of (x, k) -> k x` when it
+demands the result or ignores the whole application. Returning
+`fst p` at a caller-chosen type, combining independent packages, and
+duplicating a linear package still fail. The paper also accepts
+alpha-equivalent computed package expressions.
+[An Existential Crisis Resolved, Aside 2](https://richarde.dev/papers/2021/exists/exists.pdf#page=21).
+
 
 ### Constructor cases on the payload
 

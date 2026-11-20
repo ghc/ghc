@@ -15,6 +15,9 @@ forcing the result entered the builder body
 ([7],[],[])
 (Just (7,7),Nothing,Just (7,7))
 (True,[7])
+([8,11,13],[8,11,13])
+(19,19)
+the projection demanded the package
 (Just 7,Nothing,Just 9)
 ([7],[7],[7])
 (True,True)

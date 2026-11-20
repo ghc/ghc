@@ -2,6 +2,7 @@
 module WitnessSchema
     ( Hidden, callback, unpack, Multi, pair, kindBox, KindBox, Deep, producer
     , CallbackPair, atTwoTypes, observePair, ignorePair
+    , ProjectionPair, projectionPair, projectionLazy
     , Payload(..), RankedBuilder, buildAt, configured, observeBuilder, ranked
     , Flag(..), FlaggedBuilder, observeFlagged
     , PolyId, GuardedBuilder, consumeAt, observeGuarded, never, different
@@ -43,6 +44,15 @@ observePair (f, k) = k f
 
 ignorePair :: CallbackPair -> Int
 ignorePair (_, _) = 9
+
+type ProjectionPair = exists (t :: Type). (t, t -> Int)
+
+projectionPair :: Bool -> ProjectionPair
+projectionPair True = (7 :: Int, (+ 1) :: Int -> Int)
+projectionPair False = (True, \b -> if b then 11 else 12)
+
+projectionLazy :: ProjectionPair
+projectionLazy = (error "forced the element" :: Bool, const 13 :: Bool -> Int)
 
 type RankedBuilderAt a = exists (t :: Type). a -> Payload t
 type RankedBuilder = RankedBuilderAt Bool
