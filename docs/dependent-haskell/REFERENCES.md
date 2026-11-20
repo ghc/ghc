@@ -6500,6 +6500,27 @@ congruence to the proof for the tail.
 [Ordinary reassembly](examples/closed-evaluation/VectorSplitObservation.hs)
 and [checked witness](../../testsuite/tests/dependent/should_run/NativeClosedIndexedVec.hs).
 
+## Check a split at an independent runtime cut
+
+`splitAtVecChecked` compares the runtime cut and total before splitting
+any of the vector. If the cut fits, the result supplies a vector at the
+cut, an existential suffix length with its vector, and evidence that
+`Add cut suffix` equals the total. An excessive cut returns `Nothing`.
+The two vector fields share a lazy call to `splitAtVec`. A zero cut
+leaves the total unevaluated. A positive cut inspects only the length
+constructors needed to reach the cut or detect exhaustion.
+[Haskell implementation](examples/packed-vector/PackedVecLibrary.hs) and
+[ordinary caller](examples/packed-vector/ListVectorClient.hs).
+
+Agda's bounded vector padding turns a length bound into a remainder and
+an addition equality. Idris 2's `isLTE` compares two runtime lengths and
+`plusMinusLte` relates the difference to the original length. Its
+`Data.Vect.splitAt` then uses an input whose length is already a sum.
+[Agda standard library v2.3, Data.Vec.Bounded.Base](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Bounded.Base.html),
+[Idris 2, Data.Nat.isLTE](https://idris-lang.org/Idris2/base/source/Data.Nat.html#200),
+[Idris 2, Data.Nat.plusMinusLte](https://idris-lang.org/Idris2/base/source/Data.Nat.html#713)
+and [Idris 2, Data.Vect.splitAt](https://idris-lang.org/Idris2/base/source/Data.Vect.html#731).
+
 ## Naming a dependent function type
 
 Agda checks the domain of a dependent function before checking its codomain

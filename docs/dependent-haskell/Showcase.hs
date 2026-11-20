@@ -1475,6 +1475,10 @@ sourceAddition = do
     observe "split the appended vector at its first length"
         (toList (fst split), toList (snd split))
     observe "take and drop at the first runtime length" (toList prefix, toList suffix)
+    checkedInput <- newIORef [True, False] >>= readIORef
+    observe "check a runtime cut against a vector length"
+        (ListVectorClient.checkedSplitObservation n checkedInput,
+         ListVectorClient.checkedSplitObservation (S m) checkedInput)
     case (Refl :: VectorSplitObservation.reassembleTwo ('VCons 'True ('VCons 'False 'VNil))
                :~: 'VCons 'True ('VCons 'False 'VNil)) of
         Refl -> observe "reassemble the same two vector elements"
