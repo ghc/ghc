@@ -1510,9 +1510,10 @@ hscSimplify' plugins ds_result = do
                     throwOneError (initSourceErrorContext (hsc_dflags lint_env)) $
                       mkPlainErrorMsgEnvelope loc (GhcDriverMessage message)
                   module_loc = mg_loc ds_result
-              case rules of
-                rule : _ -> report module_loc (DriverUnsupportedRetainedRule (ru_name rule) level)
-                [] -> return ()
+              forM_ rules $ \rule -> do
+                allowed <- checkImportedPackageRule lint_env (mg_module ds_result) simplified rule
+                unless allowed $
+                  report module_loc (DriverUnsupportedRetainedRule (ru_name rule) level)
               unless (supportsNativeRuleBinds simplified) $
                 case [b | (b, rhs) <- flattenBinds simplified,
                           not (supportsNativeRuleBinds [NonRec b rhs])] of
@@ -1573,7 +1574,9 @@ The ordinary mode does not inspect each alternative RHS for native forms.
 Start with native SimpleOpt and preserve top-level binding identities.
 At -O0, omit interface pragmas. At standard native-object -O1, accept
 the default interface settings. Check the simplified bindings and local
-rules before running core2coreRetained. An unsupported binding or rule
+rules before running core2coreRetained. For a package rule with an imported head, resolve
+the head and lint the arguments and RHS against its type.
+An unsupported binding or rule
 gets a source diagnostic. See Note [Native dependent unfolding templates]
 in GHC.Core.Unfold.Make for the handling of exported unfoldings.
 

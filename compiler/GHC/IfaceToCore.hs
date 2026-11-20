@@ -75,7 +75,7 @@ import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.Dependent
   ( hasNativeDependentExprRhs, hasNativeDependentUnfolding
-  , isRetainedVanillaDefaultMethod, supportsErasedUserRule )
+  , isRetainedVanillaDefaultMethod, supportsErasedUserRule, supportsImportedErasedRule )
 import GHC.Core.Predicate ( mkNomEqPred )
 import GHC.Core.Opt.OccurAnal ( occurAnalyseBndrsAndExpr )
 import GHC.Core.Ppr
@@ -1609,13 +1609,26 @@ tcIfaceRule iface_rule@IfaceRule{ifRuleName = name, ifActivation = act, ifRuleBn
                    ; rhs'   <- tcIfaceExpr rhs
                    ; let native = any hasNativeDependentUnfolding (rhs' : args' ++ map varToCoreExpr bndrs')
                    ; let checked = case kind of
+                           IfaceErasedUserRule | isOrphan orph ->
+                             Just (supportsImportedErasedRule, "Unsupported erased orphan rule shape.")
+                           IfaceAnchoredErasedRule ->
+                             Just (supportsImportedErasedRule, "Unsupported anchored erased rule shape.")
                            IfaceErasedUserRule -> Just (supportsErasedUserRule, "Unsupported erased user rule shape.")
                            IfaceRetainedAutoRule -> Just (canShareRetainedSpecRule, "Unsupported retained specialization shape.")
                            _ -> Nothing
                    ; case checked of
                        Just (accepts, shape_error) -> do
-                         unless (nameModule_maybe fn == Just this_mod) $
-                           failIfM (retained_doc $$ text "Expected a rule head defined in this module.")
+                         let (owner_ok, owner_error) = case kind of
+                               IfaceErasedUserRule | isOrphan orph ->
+                                 (maybe False (/= this_mod) (nameModule_maybe fn),
+                                  "Expected an imported head for the orphan rule.")
+                               IfaceAnchoredErasedRule ->
+                                 (not (isOrphan orph) && maybe False (/= this_mod) (nameModule_maybe fn),
+                                  "Expected a local anchor and an imported rule head.")
+                               _ -> (nameModule_maybe fn == Just this_mod,
+                                     "Expected a rule head defined in this module.")
+                         unless owner_ok $
+                           failIfM (retained_doc $$ text owner_error)
                          thing <- tcIfaceGlobal fn
                          fun <- case thing of
                            AnId id -> pure id
@@ -1650,6 +1663,7 @@ tcIfaceRule iface_rule@IfaceRule{ifRuleName = name, ifActivation = act, ifRuleBn
         ; return (mk_rule this_mod bndrs_occ args' rhs_occ) }
   where
     retained_doc = case kind of
+      IfaceAnchoredErasedRule -> text "Invalid anchored erased package rule:" <+> pprRuleName name
       IfaceErasedUserRule -> text "Invalid erased package rule:" <+> pprRuleName name
       _ -> text "Invalid retained specialization rule:" <+> pprRuleName name
 

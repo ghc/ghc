@@ -1,7 +1,8 @@
 {-# LANGUAGE ExperimentalDependentTypes, ScopedTypeVariables #-}
-module ErasedStream (Stream, fromList, oddThrough, toList) where
+module ErasedStream (Stream, fromList, oddThrough, toList, mapToList) where
 
 import Data.Kind (Type)
+import qualified GHC.Base as Base
 import GHC.Exts (build)
 
 -- | One transition of a stream with state s.
@@ -43,3 +44,12 @@ foldSteps cons done step = go
 {-# RULES "toList/build" [~1] forall (stream :: Stream a).
     toList stream = build (\cons nil -> case stream of
       (step, start) -> foldSteps cons nil step start) #-}
+
+-- | Map the yielded elements to an ordinary list.
+mapToList :: (a -> b) -> Stream a -> [b]
+{-# INLINE [1] mapToList #-}
+mapToList f stream = map f (toList stream)
+
+{-# RULES "foldr/mapToList" [~1] forall cons nil f (stream :: Stream a).
+    Base.foldr cons nil (mapToList f stream) =
+      case stream of (step, start) -> foldSteps (\x rest -> cons (f x) rest) nil step start #-}

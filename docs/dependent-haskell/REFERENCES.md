@@ -5900,6 +5900,17 @@ index. The matchable and unmatchable arrow choices are specific to GHC.
 [Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html)
 and [the separate-module example](examples/open-evaluation/NestedFunctionClient.hs).
 
+### Equality of a partial family after rewriting its argument
+
+Agda's `cong` transports equality through any function by matching on
+`refl`. Proposal 242 distinguishes that direction from recovering an
+input from a type function's result. In the Showcase, equality of two
+callbacks suffices to replace one with the other in a partially applied
+`MapFlags`. The list argument remains open.
+[Agda standard library v2.3](https://agda.github.io/agda-stdlib/v2.3/Relation.Binary.PropositionalEquality.Core.html#cong),
+[proposal 242 on matchability](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#matchabilities)
+and [ordinary client](../../testsuite/tests/dependent/should_run/NativeUnsaturatedClient.hs).
+
 ### Inferring a prefix of invisible family arguments
 
 Proposal 242 gives partial type family applications a kind with
@@ -6269,6 +6280,24 @@ body and requires rewrite rules to be disabled at the proof site.
 [GHC filter definition and fusion rules](../../libraries/ghc-internal/src/GHC/Internal/List.hs),
 [GHC rewrite rule semantics](../users_guide/exts/rewrite_rules.rst),
 and [R16 application](roadmap/R16-open-term-evaluator.md#filter-one-known-head-and-keep-the-recursive-tail).
+
+### Exporting an ordinary identity equation
+
+Agda defines identity by returning the argument directly. This equation
+reduces even when the argument is a variable. The Haskell report's
+definition of `seq` distinguishes bottom at function type from a
+lambda. GHC checks the identity body as well as its type before it
+publishes the projection.
+[Agda Function.Base](https://agda.github.io/agda-stdlib/v2.1/Function.Base.html)
+and [Haskell 2010, strict evaluation](https://www.haskell.org/onlinereport/haskell2010/haskellch6.html#x13-1260006.2).
+
+GHC's `OPAQUE` pragma controls term optimization. An ordinary call to
+an opaque identity can stay in Core while its interface carries the
+separately checked projection. Rewrite rules at the proof site can
+change a call. The proof uses the existing policy for checked final
+Core equations. [GHC pragmas](../users_guide/exts/pragmas.rst),
+[GHC rewrite rule semantics](../users_guide/exts/rewrite_rules.rst),
+and [R16 application](roadmap/R16-open-term-evaluator.md#use-an-ordinary-identity-as-an-open-callback).
 
 Agda permits a datatype declaration and its constructors to appear at
 different positions in an interleaved mutual block. Haskell's renamer

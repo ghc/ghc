@@ -93,19 +93,21 @@ fi
 
 cat >FilterRun.hs <<'HS'
 module Main where
-import PreludeFilterProof (lazyHead)
+import PreludeFilterProof (lazyHead, lazyIdentityHead)
 main :: IO ()
-main = print (lazyHead (error "filter forced the tail"))
+main = print (lazyHead bottom, lazyIdentityHead bottom)
+  where
+    bottom = error "filter forced the tail"
 HS
 "${filter[@]}" -c FilterRun.hs
 "${filter[@]}" FilterRun.o PreludeFilterProof.o ../filter/PreludeFilterSource.o -o filter-run
-[[ $(./filter-run) == True ]]
+[[ $(./filter-run) == '(True,True)' ]]
 
 sed -e 's/^{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}//' \
     -e 's/, showPreludeFilterProofs//' \
     -e '/^showPreludeFilterProofs ::/,$d' PreludeFilterProof.hs >RuleFilter.hs
 if "${filter[@]}" -fforce-recomp -c RuleFilter.hs >filter-rules.log 2>&1 ||
-   ! grep -Eq '(keepFalse|skipTrue) _ = Refl' filter-rules.log ||
+   ! grep -Eq '(keepFalse|skipTrue|keepTrue|skipFalse) _ = Refl' filter-rules.log ||
    ! grep -Fq '[GHC-83605]' filter-rules.log ||
    ! grep -Fq 'with the current rewrite rules' filter-rules.log; then
     cat filter-rules.log >&2

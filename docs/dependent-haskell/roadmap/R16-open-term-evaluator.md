@@ -1190,3 +1190,26 @@ need a check. The regression also verifies that a kept runtime head can
 be observed with a bottom tail.
 [Interface and runtime regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh)
 and [prior art](../REFERENCES.md#list-filtering-with-a-known-predicate-result).
+
+### Use an ordinary identity as an open callback
+
+`Prelude.filter Prelude.id` keeps a `True` head and skips a `False`
+head without knowing the tail. `Prelude.map Prelude.id` preserves a
+rigid head at any lifted element type. The ordinary proof modules
+need only the [filter alias interface](../examples/open-evaluation/PreludeFilterSource.hs)
+or the [map alias interface](../examples/open-evaluation/PreludeMapSource.hs).
+
+GHC checks the ordinary definition before and after optimization. It
+requires an unrestricted function with one lifted type parameter and
+a body that returns its bound argument. When the optimizer shares the
+body, GHC follows aliases to a checked projection in the same module.
+This is how the installed `id` retains its equation after GHC shares
+its implementation with `breakpoint`. The interface can omit the
+term unfolding. A no-code producer cannot publish this equation.
+
+The proof site disables rewrite rules. An old source provider is
+rechecked if an exported signature can be the polymorphic identity and
+its interface has no checked equation. Clients with only an old
+interface need the producer to publish the equation before they can
+prove it. See the [installed list regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh)
+and [prior art](../REFERENCES.md#exporting-an-ordinary-identity-equation).

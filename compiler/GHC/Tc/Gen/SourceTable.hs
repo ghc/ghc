@@ -961,12 +961,15 @@ sourceCaseTables binds = do
       enum_enabled = not char_tables
       imported = ordinaryImport rdr_env
       eligible_case = eligibleCase env exported enum_enabled imported
-      final_candidate owner = backendGeneratesCode (backend dflags)
+      generates_code = backendGeneratesCode (backend dflags)
+      final_candidate owner = generates_code
         && case constructorCaseType (varType owner) of
              Just (ConstructorCaseType _ tc _ _ 1 _) -> tc == listTyCon
              _ -> False
+      identity_candidate owner = generates_code && isIdentitySourceType (varType owner)
+      is_exported owner = idName owner `elemNameSet` exported
       eligible owner =
-        idName owner `elemNameSet` exported &&
+        is_exported owner &&
         (final_candidate owner || not (idName owner `elemNameSet` ruled)) &&
         ((char_tables && varType owner `eqType` charArrow) ||
          not (isNothing (pairCaseType (varType owner))) ||
@@ -974,7 +977,8 @@ sourceCaseTables binds = do
          eligible_case owner)
       owners = [ (bind, owner) | bind <- binds
                , owner <- collectHsBindBinders CollNoDictBinders (unLoc bind) ]
-      candidates = filter (eligible . snd) owners
+      candidates = [(bind, owner) | (bind, owner) <- owners
+                    , eligible owner || (is_exported owner && identity_candidate owner)]
   if isHsBootOrSig (tcg_src env) || null candidates
     then pure ([], [])
     else do
@@ -983,7 +987,7 @@ sourceCaseTables binds = do
       prepared <- fmap catMaybes $ forM candidates $ \(bind, owner) -> do
         let ruled_owner = changed owner
             check_final = final_candidate owner
-        if ruled_owner && not check_final then pure Nothing else do
+        if ruled_owner && not (check_final || identity_candidate owner) then pure Nothing else do
           rhs <- bindingCore bind owner
           pure $ do
             body <- rhs
@@ -991,7 +995,8 @@ sourceCaseTables binds = do
                           then directListFilter (simpleOptExpr (initSimpleOpts dflags)) owner body
                           else Nothing
             pure (owner, body, ruled_owner, guarded)
-      let root_cores = [(owner, body) | (owner, body, False, Nothing) <- prepared]
+      let root_cores = [(owner, body) | (owner, body, False, Nothing) <- prepared
+                                     , eligible owner]
       final <- forM prepared $ \(owner, body, ruled_owner, guarded) ->
         case guarded of
           Just signature -> do
@@ -1027,8 +1032,18 @@ sourceCaseTables binds = do
           helper_tables = mkNameEnv [(tyConName table, table) | (_, table) <- helpers]
           used = helperClosure helper_tables emptyNameSet (calleeNames roots)
           referenced (_, table) = tyConName table `elemNameSet` used
+          used_helpers = filter referenced helpers
+          helper_owners = mkNameSet (map (idName . fst) used_helpers)
+      identities <- forM [(owner, projection)
+                         | (owner, body, _, _) <- prepared
+                         , identity_candidate owner
+                         , not (idName owner `elemNameSet` helper_owners)
+                         , Just projection <- [checkedIdentitySource owner body]] $
+        \(owner, (telescope, domains, result, row)) -> do
+          table <- publishConstructorRows owner telescope domains result [row]
+          pure (finalOwner owner table, table)
       let (final_tables, guard_tables) = unzip final
-      pure (catMaybes final_tables ++ roots ++ filter referenced helpers,
+      pure (catMaybes final_tables ++ identities ++ roots ++ used_helpers,
             concat guard_tables ++ concat fields)
   where
     charArrow = mkVisFunTyManyU charTy charTy
@@ -1235,6 +1250,36 @@ checkedConstructorHelper public helper owner rhs = do
     value <- checkCaseResult public publicKind helper
                              (\v -> v <$ guard (v `elem` terms)) (const Nothing) result body
     pure (declared, domains, result, ConstructorCaseRow (map CaseField terms) value)
+
+{- Note [Published polymorphic identity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The constructor helper check derives the equation that returns its
+argument. An exported identity can supply this equation even when its
+interface omits its Core unfolding. Require a single lifted type
+parameter and a single ordinary argument of that type. Check the same
+projection before and after optimization.
+
+The optimizer can share a body with another binding. Follow aliases
+only within this module's final Core, and check the terminal body.
+
+Keep an identity's private helper table when another source table
+depends on it. A provisional final Core table cannot be a dependency
+of another table. See Note [Final Core source equations].
+-}
+
+-- | Recognize an ordinary lifted polymorphic identity signature.
+isIdentitySourceType :: Type -> Bool
+isIdentitySourceType ty =
+    case constructorHelperType ty of
+      Just ([Bndr a _], [domain], result) ->
+        getTyVar_maybe domain == Just a && domain `eqType` result
+      _ -> False
+
+-- | Check the exact projection using the existing constructor helper.
+checkedIdentitySource :: Id -> Core.CoreExpr -> Maybe ([ForAllTyBinder], [Type], Type, ConstructorCaseRow)
+checkedIdentitySource owner rhs = do
+    guard (isIdentitySourceType (varType owner))
+    checkedConstructorHelper (const False) (const Nothing) owner rhs
 
 -- | Recognize a private constructor-case family and its nominal equations.
 isSourceConstructorCase :: TyCon -> Bool
@@ -1669,13 +1714,25 @@ finalCoreMappers = filter finalCoreMapperOwner . map fst . Core.flattenBinds
 -- | Confirm the same owner and the same checked equations after optimization.
 verifyFinalCoreMapper :: [Core.CoreBind] -> Id -> Bool
 verifyFinalCoreMapper binds original =
-  case [(v, rhs) | (v, rhs) <- Core.flattenBinds binds, idName v == idName original] of
+  case [(v, rhs) | (v, rhs) <- bindings, idName v == idName original] of
     [(owner, expression)]
-      | varType owner `eqType` varType original ->
-          if lengthIs (finalCoreSourceFamilies original) 1
-            then not (isNothing (directListMapper owner expression))
-            else not (isNothing (directListFilter id owner expression))
+      | varType owner `eqType` varType original
+      , isIdentitySourceType (varType owner)
+      -> verifyProjection (unitNameSet (idName owner)) owner expression
+      | varType owner `eqType` varType original
+      -> if lengthIs (finalCoreSourceFamilies original) 1
+           then not (isNothing (directListMapper owner expression))
+           else not (isNothing (directListFilter id owner expression))
     _ -> False
+  where
+    bindings = Core.flattenBinds binds
+    verifyProjection seen owner (Core.Var target)
+      | not (idName target `elemNameSet` seen)
+      , varType target `eqType` varType owner
+      , Just rhs <- lookup target bindings
+      = verifyProjection (extendNameSet seen (idName target)) target rhs
+    verifyProjection _ owner expression =
+      not (isNothing (checkedIdentitySource owner expression))
 
 -- | Read exhaustive cases on exact bound operands and check each result.
 checkedConstructorCase :: (TyCon -> Bool) -> (Id -> Maybe TyCon) -> Id -> Core.CoreExpr

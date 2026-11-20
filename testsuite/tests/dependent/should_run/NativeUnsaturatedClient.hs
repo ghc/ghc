@@ -19,3 +19,7 @@ saturated = Refl
 
 given :: f :~: Alias 'True -> Apply f :~: 'True
 given Refl = Refl
+
+-- Both prefixes agree after rewriting with the index equality.
+congruence :: a :~: b -> Callback a :~: Callback b
+congruence Refl = Refl

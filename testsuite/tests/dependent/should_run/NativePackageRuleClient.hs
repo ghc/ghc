@@ -2,6 +2,7 @@
 module Main where
 
 import Control.Exception (ErrorCall, evaluate, try)
+import OrphanPackageRules ()
 import PackageRules (hide, open, roundTrip)
 import qualified LexicalPackageRules as L
 
@@ -18,3 +19,4 @@ main = do
     print (L.local 3 packed, L.readHidden (3 :: Int, (+ 2)), L.readHidden (True, fromEnum),
            L.readHidden (undefined :: Int, const 7), L.project packed,
            L.increment (case packed of (v, f) -> f v), either (const True) (const False) forcedPackage)
+    print (open (41 :: Int, (+ 1)), open (undefined :: Int, const 7), open (True, fromEnum))

@@ -83,7 +83,7 @@ import Data.List ( mapAccumL, partition, unzip4 )
 import Data.List.NonEmpty ( NonEmpty(..), head, nonEmpty )
 import Data.Data (Data, cast, gmapQ)
 import Data.Maybe (catMaybes,  isJust, isNothing, fromMaybe, mapMaybe, maybeToList )
-import qualified Data.Set as Set ( delete, difference, empty, fromList, member, null, toList, union )
+import qualified Data.Set as Set ( delete, difference, disjoint, empty, fromList, member, null, toList, union )
 
 {- Note [Lifting type lambdas]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -350,19 +350,32 @@ For a constructor field, use the constructor's name and count sums
 from left to right. Use a separate prefix for constructor fields.
 The constructor name is unique in the module even when record labels
 repeat. A Haskell98 field can use the type header's erased variables.
-A GADT constructor field uses the constructor signature's outer binders.
+A GADT constructor field uses the constructor signature's outer binders
+and any earlier retained arguments on the constructor's argument spine.
 Use the same free-variable order as rnConDecl for implicit binders.
 Leave the constructor result and any context to ordinary constructor
 checking. Leave inner forall groups to the ordinary renamer.
 
-Copy only the erased parameters used by the expression and the parameters
+The parser stores the argument spine from the first retained binder in
+con_res_ty. Walk that spine in source order. Reuse the normal checking of
+the retained application to each lifted synonym. A later binder does not
+scope over earlier fields. Stop at shadowing because the copied kind of
+an earlier parameter may need a name that the shadowing binder hides.
+
+A GADT field can itself start with a retained telescope. Its binders
+scope over that field only. Remove shadowed captures before lifting the
+body. Check the remaining written kinds for hidden names. In a group of
+retained binders, a binder's kind is checked before that binder enters
+scope, so check the kinds in order.
+
+Copy only the parameters used by the lifted expression and the parameters
 used in their written kinds. Keep their original order. Require each
 free variable to be in scope in the source signature or field. Otherwise
 kind inference for the synonym could bind a variable that is out of scope
 at the source occurrence.
 Skip types that contain splices or holes. A wildcard in a case pattern
-is part of the match. Do not lift across nested binders. They can
-shadow the original names or bind a retained index.
+is part of the match. Leave nested binders outside these field telescopes
+to the ordinary renamer.
 -}
 -- | Prepare cases in top-level value signatures and sums in signatures and fields.
 liftDeclarationTypes :: Bool -> HsGroup GhcPs -> (HsGroup GhcPs, LiftedDecls)
@@ -400,7 +413,7 @@ liftDeclarationTypes named_wildcards group
     liftData decl = (decl, [])
 
     liftConstructor scope (L loc con@ConDeclH98{con_telescope = [], con_name = owner, con_args = args}) =
-      let (args', sums) = liftFields (liftField owner scope) args
+      let (args', sums) = liftFields (liftField (liftFieldSums owner scope)) args
       in (L loc con{con_args = args'}, sums)
     liftConstructor _ (L loc con@ConDeclGADT
       { con_names = names, con_outer_bndrs = L _ outer, con_telescope = telescope
@@ -409,15 +422,56 @@ liftDeclarationTypes named_wildcards group
       = let occurrences = extractHsGadtTelescopes telescope $
                           extractConDeclGADTDetailsTyVars args $
                           extractHsTysRdrTyVars [result] []
-            visit = liftField (head names) (outerCaptures outer occurrences)
+            owner = head names
+            scope = outerCaptures outer occurrences
+            visit = liftField (liftFieldType owner scope)
             (args', sums) = case args of
               PrefixConGADT ann fields -> first (PrefixConGADT ann) (liftFieldList visit fields)
               RecConGADT ann fields -> first (RecConGADT ann) (liftRecordFields visit fields)
-        in (L loc con{con_g_args = args'}, sums)
+            (result', retained_sums, _) = liftRetainedFields owner scope result (length sums)
+        in (L loc con{con_g_args = args', con_res_ty = result'}, sums ++ retained_sums)
       where
         without_inner_forall (L _ HsGadtForAll{}) = False
         without_inner_forall _ = True
     liftConstructor _ con = (con, [])
+
+    liftRetainedFields owner scope ty@(L loc node) salt = case node of
+      HsForEachTy{hst_bndrs = binders, hst_body = body}
+        | let locals = explicitCaptures binders
+              scope' = scope ++ locals
+        , length locals == length binders
+        , null (findDupsEq (==) (map (unLoc . snd) scope')) ->
+            let (body', sums, next) = liftRetainedFields owner scope' body salt
+            in (L loc node{hst_body = body'}, sums, next)
+      HsFunTy ann arrow arg result ->
+        let (arg', sums, next) = liftFieldType owner scope arg salt
+            (result', later, end) = liftRetainedFields owner scope result next
+        in (L loc (HsFunTy ann arrow arg' result'), sums ++ later, end)
+      HsParTy ann body ->
+        let (body', sums, next) = liftRetainedFields owner scope body salt
+        in (L loc (HsParTy ann body'), sums, next)
+      _ -> (ty, [], salt)
+
+    liftFieldType owner scope ty@(L loc node) salt = case node of
+      HsForEachTy{hst_bndrs = binders, hst_body = body}
+        | let locals = explicitCaptures binders
+              names = map (unLoc . snd) locals
+              (hidden, outer) = partition ((`elem` names) . unLoc . snd) scope
+              shadowed = Set.fromList (map (unLoc . snd) hidden)
+        , length locals == length binders
+        , null (findDupsEq (==) names)
+        , all (Set.disjoint shadowed . kindNames . fst) outer
+        , localKindsInScope shadowed locals ->
+            let (body', sums, next) = liftFieldType owner (outer ++ locals) body salt
+            in (L loc node{hst_body = body'}, sums, next)
+      HsParTy ann body ->
+        let (body', sums, next) = liftFieldType owner scope body salt
+        in (L loc (HsParTy ann body'), sums, next)
+      _ -> liftFieldSums owner scope ty salt
+
+    localKindsInScope _ [] = True
+    localKindsInScope hidden ((binder, name):locals) =
+      Set.disjoint hidden (kindNames binder) && localKindsInScope (Set.delete (unLoc name) hidden) locals
 
     liftFields visit (PrefixCon ann fields) =
       first (PrefixCon ann) (liftFieldList visit fields)
@@ -442,8 +496,8 @@ liftDeclarationTypes named_wildcards group
           (fields', sums) = unzip lifted
       in (fields', concat sums)
 
-    liftField owner scope salt field@CDF{cdf_type = ty} =
-      let (ty', sums, (next, _)) = liftBody fieldAnchor owner scope ty (salt, [])
+    liftField visit salt field@CDF{cdf_type = ty} =
+      let (ty', sums, next) = visit ty salt
       in (next, (field{cdf_type = ty'}, sums))
 
     liftBind counters (VbSig (L loc (TypeSig sig_ann mods names@(owner:_) wc@HsWC
@@ -471,6 +525,10 @@ liftDeclarationTypes named_wildcards group
     explicitCaptures binders =
       [(fmap (updateHsTyVarBndrFlag (const (HsBndrRequired noExtField))) b, v)
       | b <- binders, Just v <- [hsLTyVarLocName b]]
+
+    liftFieldSums owner scope ty salt =
+      let (ty', sums, (next, _)) = liftBody fieldAnchor owner scope ty (salt, [])
+      in (ty', sums, next)
 
     fieldAnchor :: LHsType GhcPs -> Maybe (String, Maybe SignatureCaseKey)
     fieldAnchor ty@(L _ (XHsType HsTypeSome{}))

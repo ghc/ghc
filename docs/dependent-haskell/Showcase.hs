@@ -55,6 +55,7 @@ import qualified PartitionChoices
 import qualified ErasedStream
 import qualified StreamFold
 import qualified PackageRules
+import OrphanPackageRules ()
 import qualified LexicalPackageRules
 import qualified RankedPackage
 import qualified StoredVector
@@ -964,6 +965,7 @@ main = do
         StoredVector.gadtLength 1 (error "unused vector" :: Vec Char 1)
     observe "read nested lengths and the first aligned cells"
         StoredVector.nestedObservation
+    observe "apply a stored selector at a different vector length" StoredVector.viewSelection
     let (passing, failing) = ImplicitVector.partitionVec odd
             (VCons (7 :: Int) (VCons 2 (VCons 9 VNil)))
         (firstPart, _) = ImplicitVector.partitionVec odd (VCons (7 :: Int) (error "unused partition tail"))
@@ -990,6 +992,10 @@ main = do
     observe "infer a hidden function type from its paired callback" RankedPackage.runPair
     observe "infer a polymorphic lambda witness and call its builder at Int" (RankedPackage.runBuilder 11)
     observe "read an integer through an erased package" (PackageRules.roundTrip 7)
+    observe "apply an imported integer package rule and keep the witness lazy"
+        (PackageRules.open (41 :: Int, (+ 1)),
+         PackageRules.open (undefined :: Int, const 7),
+         PackageRules.open (True, fromEnum))
     observe "match and open existential packages in optimizer rules"
         (LexicalPackageRules.local 3 (LexicalPackageRules.hideInt 5))
     observe "read streams with different hidden state types"
@@ -999,6 +1005,9 @@ main = do
         (StreamFold.digits (ErasedStream.oddThrough 6),
          StreamFold.first (ErasedStream.fromList (True : error "unused fold tail")),
          StreamFold.first (ErasedStream.fromList ([] :: [Bool])))
+    observe "fold a mapped stream without forcing its head or tail"
+        (StreamFold.firstMapped not (ErasedStream.fromList [False]),
+         StreamFold.firstMapped (const 'x') (ErasedStream.fromList (undefined : undefined)))
     observe "transport element equality under a hidden vector length"
         (ImplicitVector.cells (ImplicitVector.transportFiltered Refl passing))
     observe "zip a filtered vector with itself at its hidden length" $
@@ -1087,6 +1096,8 @@ main = do
         (Refl :: Prelude.map Prelude.not '[ 'True, 'False] :~: '[ 'False, 'True])
     observe "pass an unapplied type family to another family"
         (Refl :: MapFlags FlipFlag '[ 'True, 'False] :~: '[ 'False, 'True])
+    observe "replace an equal callback before supplying the input list"
+        (sameMapping (Refl :: FlipFlag :~: FlipFlag))
     observe "pass a type family with an unapplied invisible binder"
         (Refl :: InvisibleFamily.Observed :~: 'True)
     observe "infer the result kind after passing a visible family argument"
@@ -1155,11 +1166,11 @@ main = do
         (OpenMapProof.ordinaryRedStops (Proxy @'[]))
     observe "use Prelude.not on a known head with an unknown tail"
         (InstalledNotProof.negateHead (Proxy @'[]))
-    putStrLn ("use Prelude.map and Prelude.not on an empty list and an unknown tail: "
+    putStrLn ("map Prelude.not and Prelude.id over a known head and an unknown tail: "
               ++ PreludeMapProof.showPreludeMapProofs)
     putStrLn ("prove map preserves length and leaves the callback lazy: "
               ++ PreludeMapLengthProof.showPreludeMapLength)
-    putStrLn ("filter a known head and leave the tail lazy: "
+    putStrLn ("filter with Prelude.not and Prelude.id without forcing the kept tail: "
               ++ PreludeFilterProof.showPreludeFilterProofs)
     observe "use a checked cons rule without forcing the callback, head or tail"
         (ConsRuleMapProof.negateHead (Proxy @'[]), ConsRuleMapProof.lazySpine)
@@ -1178,6 +1189,10 @@ type MapFlags :: (Bool %U -> Bool) -> [Bool] -> [Bool]
 type family MapFlags f xs where
     MapFlags f '[] = '[]
     MapFlags f (x ': xs) = f x ': MapFlags f xs
+
+-- | Equal callbacks give equal traversals before either traversal receives a list.
+sameMapping :: (f :: Bool %U -> Bool) :~: g -> MapFlags f :~: MapFlags g
+sameMapping Refl = Refl
 
 -- | Prove the first output cell without supplying the input tail.
 erasedCell :: forall (xs :: Spine.Spine Bool). Proxy xs

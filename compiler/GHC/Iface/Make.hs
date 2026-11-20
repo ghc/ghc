@@ -479,7 +479,7 @@ coreRuleToIfaceRule rule@(BuiltinRule {})
 coreRuleToIfaceRule rule@(Rule { ru_name = name, ru_fn = fn,
                             ru_act = act, ru_bndrs = bndrs,
                             ru_args = args, ru_rhs = rhs,
-                            ru_orphan = orph, ru_auto = auto })
+                            ru_orphan = orph, ru_auto = auto, ru_origin = origin })
   = IfaceRule { ifRuleName   = name,
                 ifActivation = act,
                 ifRuleBndrs  = map toIfaceBndr bndrs,
@@ -490,7 +490,10 @@ coreRuleToIfaceRule rule@(Rule { ru_name = name, ru_fn = fn,
                 ifRuleOrph   = orph }
   where
     kind | hasNativeDependentProgram [] [rule] =
-             if auto then IfaceRetainedAutoRule else IfaceErasedUserRule
+             if auto then IfaceRetainedAutoRule
+             else case nameModule_maybe fn of
+               Just owner | owner /= origin, NotOrphan{} <- orph -> IfaceAnchoredErasedRule
+               _ -> IfaceErasedUserRule
          | auto = IfaceAutoRule
          | otherwise = IfaceUserRule
 
