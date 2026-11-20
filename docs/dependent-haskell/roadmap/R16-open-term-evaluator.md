@@ -1145,6 +1145,28 @@ the fresh proof. An ordinary call in that configuration still returns
 `True` when the orphan rule fires.
 [Provider, proof and runtime check](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh).
 
+### Prove that map preserves length
+
+An ordinary client proves that the list produced by `Prelude.map`
+has the original length for an arbitrary callback. Its `Spine`
+witness carries the constructors of a finite list and omits its
+elements. The empty case uses the installed map equation. The cons
+case uses that equation once, so it adds a successor on each side.
+Matching the recursive `Refl` supplies the equality for the tails.
+Neither step needs an equation for the callback.
+
+The same induction checks a direct retained list at `-O0`. A retained
+`Bool -> Bool` callback works when the proof defines one equation
+and matches the list in its body. A value of the generic retained
+function domain `a -> b` still requires separate support. The
+ordinary client can quantify over that arrow in a type or kind.
+
+The ordinary regression imports only the alias interface. It rejects
+an added successor at the empty clause and counts two mapped elements
+with a bottom callback. [Alias](../examples/open-evaluation/PreludeMapLengthSource.hs),
+[proof](../examples/open-evaluation/PreludeMapLengthProof.hs), and
+[prior art](../REFERENCES.md#induction-on-the-spine-of-a-mapped-list).
+
 ### Filter one known head and keep the recursive tail
 
 `Prelude.filter Prelude.not` keeps a `False` head and skips a `True`
