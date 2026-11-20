@@ -94,7 +94,7 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity
 import GHC.Tc.Gen.OpenTypeEval (instantiateOpenTypeFunction, observeOpenType, openTypeFailureReason)
-import GHC.Tc.Gen.SourceTable (recordSourceUses, sourceTableFamilyUse, sourceTableTypeUses,
+import GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourceTableFamilyUse, sourceTableTypeUses,
                               sourceCaseKindUse, sourceTableReferenceUse, isSourceConstructorCase, isMonomorphicEnumCaseType, sourceCaseVisibleArity, sourceTableOwner, sourcePairBuilderField,
                               lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource)
 import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcPrepareClosedApplication, tcPrepareClosedFunctionValue, tcPrepareClosedResult, tcPrepareClosedObservation, tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand, tcHasClosedCallExecutable)
@@ -2803,7 +2803,7 @@ tcOpenTypeCall mode name instantiated result_kind args = do
             Just (owner, _) -> pure owner
             Nothing -> tcLookupId n
       dependencies <- forM used $ \(n, first) -> (, first) <$> lookup_owner n
-      recordSourceUses dependencies
+      recordUnfoldedSourceUses dependencies
       updTcRef (tcg_evaluated_term_uses env) (\seen -> seen `unionNameSet` constructors `unionNameSet` mkNameSet (map fst used))
       pure result
   where
