@@ -9,7 +9,7 @@ out=$(mktemp -d)
 trap 'rm -rf -- "$out"' EXIT
 cd "$out"
 cp "$src"/NativeUnsaturated{Eta,Inverse,Client}.hs .
-mkdir producer client
+mkdir producer gateway client
 
 "${ghc[@]}" -c NativeUnsaturatedEta.hs
 if "${ghc[@]}" -c NativeUnsaturatedInverse.hs >inverse.log 2>&1 ||
@@ -28,6 +28,84 @@ cp producer/NativeUnsaturatedProvider.hi NativeUnsaturatedClient.hs client/
     cd client
     for mode in NoImpredicativeTypes ImpredicativeTypes; do
         "${ghc[@]}" "-X$mode" -fforce-recomp -c NativeUnsaturatedClient.hs
+    done
+)
+
+# Compile the ordinary re-export against the provider interface.
+cp producer/NativeUnsaturatedProvider.hi gateway/
+cat >gateway/NativeUnsaturatedReexport.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module NativeUnsaturatedReexport (module P) where
+import NativeUnsaturatedProvider as P
+HS
+(cd gateway && "${ghc[@]}" -c NativeUnsaturatedReexport.hs)
+cp gateway/NativeUnsaturatedReexport.hi client/
+sed -e 's/^module NativeUnsaturatedClient/module GatewayClient/' \
+    -e 's/^import NativeUnsaturatedProvider /import NativeUnsaturatedReexport /' \
+    NativeUnsaturatedClient.hs >client/GatewayClient.hs
+(cd client && "${ghc[@]}" -c GatewayClient.hs)
+
+(
+    cd client
+    for provider in NativeUnsaturatedProvider NativeUnsaturatedReexport; do
+        # Use the original family at the same unmatchable input as the alias.
+        cat >RawPrefix.hs <<EOF
+{-# LANGUAGE DataKinds, TypeApplications, TypeOperators #-}
+module RawPrefix where
+import Data.Type.Equality ((:~:)(Refl))
+import GHC.Exts (FUN, M, U, Multiplicity(Many))
+import $provider (Select)
+type Apply :: FUN @U 'Many Bool Bool -> Bool
+type Apply f = f 'True
+proof :: Apply (Select 'True) :~: 'True
+proof = Refl
+EOF
+        if "${ghc[@]}" -XNoExperimentalDependentTypes -c RawPrefix.hs >raw.log 2>&1 ||
+           ! grep -Fq '[GHC-27346]' raw.log ||
+           ! grep -Eq 'Perhaps you intended to use the .*ExperimentalDependentTypes.* extension' raw.log; then
+            cat raw.log
+            exit 1
+        fi
+        "${ghc[@]}" -XExperimentalDependentTypes -c RawPrefix.hs
+    done
+
+    # Opting in does not let a partial family fill a matchable arrow.
+    sed -e 's/^module RawPrefix/module WrongMatchability/' \
+        -e 's/FUN @U/FUN @M/' RawPrefix.hs >WrongMatchability.hs
+    for mode in NoExperimentalDependentTypes ExperimentalDependentTypes; do
+        if "${ghc[@]}" -X"$mode" -c WrongMatchability.hs >bad.log 2>&1 ||
+           ! grep -Fq '[GHC-83865]' bad.log ||
+           grep -Fq ExperimentalDependentTypes bad.log; then
+            cat bad.log
+            exit 1
+        fi
+    done
+
+    # The extension cannot enable a partial built-in family or make a family
+    # application legal in an instance head.
+    cat >BadArity.hs <<'EOF'
+{-# LANGUAGE DataKinds #-}
+module BadArity where
+import Data.Proxy
+import GHC.TypeNats (CmpNat)
+bad :: Proxy (CmpNat 1)
+bad = Proxy
+EOF
+    cat >BadPattern.hs <<'EOF'
+{-# LANGUAGE DataKinds, FlexibleInstances, TypeApplications #-}
+module BadPattern where
+import GHC.Exts (FUN, U, Multiplicity(Many))
+import NativeUnsaturatedReexport (Select)
+class C (f :: FUN @U 'Many Bool Bool)
+instance C (Select 'True)
+EOF
+    for file in BadArity BadPattern; do
+        if "${ghc[@]}" -XNoExperimentalDependentTypes -c "$file.hs" >bad.log 2>&1 ||
+           ! grep -Fq '[GHC-27346]' bad.log ||
+           grep -Fq ExperimentalDependentTypes bad.log; then
+            cat bad.log
+            exit 1
+        fi
     done
 )
 

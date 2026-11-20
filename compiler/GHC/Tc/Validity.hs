@@ -58,6 +58,7 @@ import GHC.Core.FamInstEnv ( isDominatedBy, injectiveBranches
                            , InjectivityCheckResult(..) )
 
 import GHC.Hs
+import GHC.Driver.Env (hsc_units)
 import GHC.Driver.Session
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -66,6 +67,7 @@ import GHC.Types.Basic   ( TypeOrKind(..), UnboxedTupleOrSum(..)
                          , unboxedTupleOrSumExtension )
 import GHC.Types.Id (isNaughtyRecordSelector)
 import GHC.Types.FieldLabel (flSelector)
+import GHC.Types.Hint (suggestExtension)
 import GHC.Types.Name
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
@@ -476,7 +478,8 @@ checkValidType ctxt ty
        ; expand <- initialExpandMode
        ; let ve = ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
                              , ve_rank = rank, ve_expand = expand
-                             , ve_indices = emptyVarSet, ve_imported_synonym = False }
+                             , ve_indices = emptyVarSet, ve_imported_synonym = False
+                             , ve_partial_family_hint = True }
 
        -- Check the internal validity of the type itself
        -- Fail if bad things happen, else we misleading
@@ -498,12 +501,16 @@ checkValidType ctxt ty
 
 checkValidMonoType :: Type -> TcM ()
 -- Assumes argument is fully zonked
-checkValidMonoType ty
+checkValidMonoType = check_valid_mono_type True
+
+check_valid_mono_type :: Bool -> Type -> TcM ()
+check_valid_mono_type partial_family_hint ty
   = do { env <- liftZonkM $ tcInitOpenTidyEnv (tyCoVarsOfTypeList ty)
        ; expand <- initialExpandMode
        ; let ve = ValidityEnv{ ve_tidy_env = env, ve_ctxt = SigmaCtxt
                              , ve_rank = MustBeMonoType, ve_expand = expand
-                             , ve_indices = emptyVarSet, ve_imported_synonym = False }
+                             , ve_indices = emptyVarSet, ve_imported_synonym = False
+                             , ve_partial_family_hint = partial_family_hint }
        ; check_type ve ty }
 
 checkTySynRhs :: UserTypeCtxt -> TcType -> TcM ()
@@ -797,7 +804,8 @@ data ValidityEnv = ValidityEnv
   , ve_rank     :: Rank
   , ve_expand   :: ExpandMode
   , ve_indices  :: VarSet
-  , ve_imported_synonym :: Bool }
+  , ve_imported_synonym :: Bool
+  , ve_partial_family_hint :: Bool }
 
 instance Outputable ValidityEnv where
   ppr (ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
@@ -1028,14 +1036,22 @@ check_syn_tc_app (ve@ValidityEnv{ ve_ctxt = ctxt, ve_expand = expand })
   = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
        ; if enabled || ve_imported_synonym ve || is_inferred ctxt
            then check_args_only expand
-           else failWithTc (tyConArityErr tc tys) }
+           else fail_partial_family }
 
   | otherwise
-  = failWithTc (tyConArityErr tc tys)
+  = failWithTc arity_err
   where
     tc_arity  = tyConArity tc
     is_inferred InfSigCtxt{} = True
     is_inferred _ = False
+
+    fail_partial_family
+      | ve_partial_family_hint ve
+      = do { unit_state <- hsc_units <$> getTopEnv
+           ; let info = ErrInfo [] Nothing [suggestExtension LangExt.ExperimentalDependentTypes]
+           ; failWithTc $ TcRnMessageWithInfo unit_state (mkDetailedMessage info arity_err) }
+      | otherwise = failWithTc arity_err
+    arity_err = tyConArityErr tc tys
 
     check_arg :: ExpandMode -> KindOrType -> TcM ()
     check_arg expand =
@@ -1453,7 +1469,12 @@ check_pred_ty indices env dflags ctxt expand pred
                     , ve_rank     = rank
                     , ve_expand   = expand
                     , ve_indices  = indices
-                    , ve_imported_synonym = False }
+                    , ve_imported_synonym = False
+                    , ve_partial_family_hint = case classifyPredType pred of
+                        -- The head of a quantified constraint follows the
+                        -- same rules as the head of an instance declaration.
+                        ForAllPred _ _ head_pred -> isTyFamFree head_pred
+                        _ -> True }
 
 check_pred_help :: Bool    -- True <=> under a type synonym
                 -> TidyEnv
@@ -2752,7 +2773,10 @@ checkValidTypePats tc pat_ty_args
          -- One could imagine generalising to allow
          --      instance C (forall a. a->a)
          -- but we don't know what all the consequences might be.
-         traverse_ checkValidMonoType pat_ty_args
+         --
+         -- Suppress the opt-in hint when the expanded pattern still
+         -- contains a family application. The extension cannot make it legal.
+         traverse_ (\ty -> check_valid_mono_type (isTyFamFree ty) ty) pat_ty_args
 
        -- Ensure that no type family applications occur a type pattern
        ; case tcTyConAppTyFamInstsAndVis tc pat_ty_args of

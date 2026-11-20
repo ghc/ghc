@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, PolyKinds, StandaloneKindSignatures #-}
 {-# LANGUAGE TypeAbstractions, TypeApplications, TypeFamilies, TypeOperators #-}
-module NativeUnsaturatedProvider (Callback, Same, ForwardMap, WrittenMap, NamedMap) where
+module NativeUnsaturatedProvider (Callback, Same, Select, ForwardMap, WrittenMap, NamedMap) where
 
 import GHC.Exts (FUN, U, Multiplicity(Many))
 import GHC.Matchability (Matchability)

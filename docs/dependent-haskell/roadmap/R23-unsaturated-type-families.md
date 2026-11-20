@@ -643,7 +643,11 @@ arrow still selects M.
 An ordinary client proves results for both `Maybe` and a user family
 prefix exported as `Callback a`. The client reads only the stripped
 provider interface. The provider uses the experimental extension for
-the bare partial application.
+the bare partial application. An ordinary module can re-export the alias.
+If a client writes the partial family application directly, GHC-27346
+suggests enabling `ExperimentalDependentTypes`. The same rule applies
+through a re-export. Built-in family arity errors and illegal instance
+heads keep their existing diagnostics.
 [Provider](../../../testsuite/tests/dependent/should_run/NativeUnsaturatedProvider.hs),
 [ordinary client](../../../testsuite/tests/dependent/should_run/NativeUnsaturatedClient.hs)
 and [proposal #242, higher-order arguments](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#higher-order-arguments).

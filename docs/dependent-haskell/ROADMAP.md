@@ -199,8 +199,8 @@ source examples. General promotion remains open.
    from the same instantiation it uses for the call.
    [Rule and interface support](roadmap/R05-dependent-core.md).
 2. **R23 and R24.** An unsigned recursive family can forward a
-   constructor or a partial family. Improve the diagnostic when a
-   caller needs to enable partial family application. For constrained
+   constructor or a partial family. The arity error now suggests the
+   extension for eligible partial family applications. For constrained
    families, check the domain at formation in a separate client.
    [Domain example](roadmap/R24-constrained-type-families.md),
    [Later argument](roadmap/R23-unsaturated-type-families.md#choosing-a-prefixs-matchability-from-a-later-argument)
