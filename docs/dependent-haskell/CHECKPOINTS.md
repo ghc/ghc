@@ -28,6 +28,19 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `75e123a31c`, the Stage 2 relink produced all 368 Showcase lines at
+stripped `-O0`, default `-O1`, default `-O2`, and in source-loaded GHCi.
+The separately compiled finite-position client tested signed offsets from
+IO, a second vector of the same length, and undefined vector fields.
+Replacing the actual predecessor with an independent one failed at
+`Refl`. An older compiler read an ordinary GADT interface from the
+new writer and rejected a provider that requires the new zero-case
+evidence. The preceding `a51c497d96` passed an incremental two-stage
+Hadrian build, the 366-line Showcase in the same modes, and the
+source-hidden certified split.
+[Finite-position test](../../testsuite/tests/dependent/should_run/NativeIndexedFin.sh)
+and [ordinary client](examples/qualified-pi/FinitePositionClient.hs).
+
 At `508cd799f6`, an ordinary caller can again write `expectMarker label
 marker $ evaluate proof` when the proof mentions the length bound by a
 constructor pattern. Before the fix, the checker rejected the application

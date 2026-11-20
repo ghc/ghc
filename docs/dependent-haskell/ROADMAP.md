@@ -9,6 +9,14 @@ records every edge. The R numbers are local labels for those cards.
 
 ## Where this fork stands
 
+An ordinary module can check a signed offset once against a vector.
+On success, `mkFinVec` returns a position of type `Fin n`. The caller
+can use that position on any vector of length `n`. A negative offset
+returns `Nothing` without inspecting the vector. A match on `FS p` in
+a retained function identifies the actual predecessor `p`. Its proof
+leaves that predecessor unevaluated.
+[Signed lookup and predecessor proof](roadmap/R03-dependent-products.md#retain-a-bounded-position-and-its-actual-predecessor).
+
 An ordinary caller can split a vector at a runtime cut and obtain a
 proof that appending the two pieces gives back its original input.
 `splitAtValue` returns two retained vectors and a homogeneous equality.
@@ -19,10 +27,11 @@ the recursive path down the input spine.
 [Split theorem](examples/packed-vector/CertifiedSplit.hs) and
 [ordinary caller](examples/packed-vector/CertifiedSplitClient.hs).
 
-The 366-line Showcase runs in native code and source-loaded GHCi.
+The 368-line Showcase runs in native code and source-loaded GHCi.
 The source-hidden proof regression passes at `-O0`, `-O1`, and `-O2`.
-Removing the induction premise fails at the final `Refl`. The earlier
-360-line checkpoint also passed a clean two-stage Hadrian build.
+Removing the induction premise fails at the final `Refl`. The certified split
+checks without `UndecidableInstances`. The preceding 366-line checkpoint
+also passed both stages of a normal Hadrian build.
 [Verification scope](CHECKPOINTS.md#family-and-package-checkpoints).
 
 A retained function can name an entire indexed vector as its argument.
@@ -291,16 +300,13 @@ reconstruction proof for an arbitrary cut within the vector.
 [Split evidence](roadmap/R04-dependent-sums.md#prove-a-split-preserves-the-original-vector)
 and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vector-append-preserves-its-right-operand).
 
-1. **R03 and R05.** Extend indexed pattern refinement to the existing
-   finite positions. In `Fin ('S n)`, the zero position has a hidden
-   predecessor bound and no runtime fields. A view of the successor
-   must refer to its actual predecessor. Keep the ordinary case's demand
-   and its error location. [Finite positions](examples/qualified-pi/ParameterizedIndexLibrary.hs).
-2. **R04 and R21.** Check generated nested sum families without requiring
-   a source termination extension when the helper dependencies are
-   finite. Check recursive source aliases and calls to open families
-   separately. [Captured vector indices](roadmap/R04-dependent-sums.md#prove-a-split-preserves-the-original-vector).
-3. **R03 and R05.** Infer the input index of a GADT result after matching
+1. **R03 and R05.** Use written indexed constructors as retained
+   arguments whenever the expected result determines their erased
+   parameters. The finite-position view already matches `FZ` and
+   `FS p`. Passing either directly to a retained function still gives
+   GHC-83605. Keep nested operands lazy and test separate compilation.
+   [Finite positions](examples/qualified-pi/FinitePosition.hs).
+2. **R03 and R05.** Infer the input index of a GADT result after matching
    a length equality. The checked split currently writes that argument
    explicitly. A failed inference must give a located type error.
    [Checked constructor](examples/packed-vector/CertifiedSplit.hs).
