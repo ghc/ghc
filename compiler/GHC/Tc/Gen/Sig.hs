@@ -599,14 +599,7 @@ lhsBindVisArity _ env = env        -- PatBind/VarBind
 addInlinePrags :: TcId -> [LSig GhcRn] -> TcM TcId
 addInlinePrags poly_id prags_for_me
   | inl@(L _ prag) : inls <- inl_prags
-  = do { -- See Note [Retained optimisation pragmas].
-         case [ loc | L loc p <- inl_prags
-                    , isInlinePragma p || isInlinablePragma p ] of
-           loc : _ | hasNativeDependentExpr (Type (idType poly_id))
-             -> setSrcSpanA loc $
-                failWithTc (TcRnRetainedQuantificationError RetainedPragma)
-           _ -> return ()
-       ; traceTc "addInlinePrag" (ppr poly_id $$ ppr prag)
+  = do { traceTc "addInlinePrag" (ppr poly_id $$ ppr prag)
        ; unless (null inls) (warn_multiple_inlines inl inls)
        ; return (poly_id `setInlinePragma` prag) }
   | otherwise
@@ -628,13 +621,14 @@ addInlinePrags poly_id prags_for_me
          in addDiagnosticTc dia
 
 
-{- Note [Retained optimisation pragmas]
+{- Note [Retained SPECIALISE pragmas]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-INLINE and INLINABLE create ordinary unfoldings during desugaring. SPECIALISE
-uses ordinary specialisation and rule code. These paths do not support retained
-types. Reject these supplied pragmas at their own source locations before
-entering those paths. Keep NOINLINE, OPAQUE, and unrelated pragmas unchanged.
-The native scanner also finds retained indices inside an ordinary arrow type.
+Source SPECIALISE uses the ordinary pragma checking and desugaring path.
+Reject a retained signature at the pragma's location before entering
+that path. The native scanner also finds retained indices inside an
+ordinary arrow type. The optimizer's generated dictionary specializations
+have a separate boundary. See Note [Exported retained specialisations]
+in GHC.Core.Rules.
 -}
 
 {- Note [Pattern synonym inline arity]
@@ -948,7 +942,7 @@ tcSpecPrags :: Id -> [LSig GhcRn]
 -- Reason: required by tcSubExp
 tcSpecPrags poly_id prag_sigs
   = do { traceTc "tcSpecPrags" (ppr poly_id <+> ppr spec_sigs)
-       ; -- See Note [Retained optimisation pragmas].
+       ; -- See Note [Retained SPECIALISE pragmas].
          case spec_sigs of
            L loc _ : _ | hasNativeDependentExpr (Type (idType poly_id))
              -> setSrcSpanA loc $

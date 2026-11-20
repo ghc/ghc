@@ -43,7 +43,8 @@ import GHC.HsToCore.Pmc ( addTyCs, pmcGRHSs )
 
 import GHC.Hs             -- lots of things
 import GHC.Core           -- lots of things
-import GHC.Core.Dependent ( hasNativeDependentExpr )
+import GHC.Core.Dependent
+  ( hasNativeDependentExpr, hasNativeDependentExprRhs, hasNativeDependentUnfolding )
 import GHC.Core.SimpleOpt
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Core.InstEnv ( CanonicalEvidence(..) )
@@ -60,6 +61,7 @@ import GHC.Core.Coercion
 import GHC.Core.Rules
 import GHC.Core.Ppr( pprCoreBinders )
 import GHC.Core.TyCo.Compare( eqType )
+import GHC.Core.TyCo.Rep ( Type(DepFunTy) )
 
 import GHC.Builtin.KnownKeys( typeableClassKey )
 import GHC.Builtin.KnownOccs
@@ -445,13 +447,21 @@ dsAbsBinds dflags tyvars dicts exports
 makeCorePair :: DynFlags -> Id -> Bool -> CoreExpr
              -> (Id, CoreExpr)
 makeCorePair dflags gbl_id is_default_method rhs
-  | is_default_method || isInlinePragma inline_prag || isInlinablePragma inline_prag
+  | is_default_method
   , hasNativeDependentExpr rhs
-  -- See Note [Native unfolding construction].
+  -- See Note [Written retained unfolding pragmas].
   = throwGhcException (Sorry
-      ("Native dependent Core cannot enter INLINE, INLINABLE, or default-method unfolding construction while desugaring binding "
+      ("Native dependent Core cannot enter default-method unfolding construction while desugaring binding "
        ++ showSDoc dflags (ppr gbl_id)
        ++ ". This operation does not support retained Boolean types or branch proofs."))
+
+  | isInlinePragma inline_prag || isInlinablePragma inline_prag
+  , native_rhs
+  , not (hasNativeDependentExprRhs (Type (idType gbl_id)))
+  = throwGhcException (Sorry
+      ("Native dependent Core cannot enter INLINE or INLINABLE unfolding construction while desugaring binding "
+       ++ showSDoc dflags (ppr gbl_id)
+       ++ ". This operation does not support an ordinary signature with a retained RHS."))
 
   | is_default_method    -- Default methods are *always* inlined
                          -- See Note [INLINE and default methods] in GHC.Tc.TyCl.Instance
@@ -467,60 +477,61 @@ makeCorePair dflags gbl_id is_default_method rhs
   where
     simpl_opts    = initSimpleOpts dflags
     inline_prag   = idInlinePragma gbl_id
+    native_rhs    = hasNativeDependentUnfolding rhs
     inlinable_unf = mkInlinableUnfolding simpl_opts StableUserSrc rhs
     inline_pair
        | AppliedToAtLeast vis_arity <- inlinePragmaSaturation inline_prag
         -- Add an Unfolding for an INLINE (but not for NOINLINE)
-        -- And eta-expand the RHS; see Note [Eta-expanding INLINE things]
+        -- Eta-expand ordinary RHSs. See Note [Eta-expanding INLINE things]
+        -- and Note [Written retained unfolding pragmas].
        , let runtime_arity = findSatArity vis_arity (idType gbl_id)
         -- NB: runtime_arity: the arity passed to mkInlineUnfoldingWithArity
         --     must take account of dictionaries and required type args
        = ( gbl_id `setIdUnfolding` mkInlineUnfoldingWithArity simpl_opts StableUserSrc
                                                               runtime_arity rhs
-         , etaExpand runtime_arity rhs)
+         , if native_rhs then rhs else etaExpand runtime_arity rhs)
 
        | otherwise
        = pprTrace "makeCorePair: arity missing" (ppr gbl_id) $
          (gbl_id `setIdUnfolding` mkInlineUnfoldingNoArity simpl_opts StableUserSrc rhs, rhs)
 
-{- Note [Native unfolding construction]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-INLINE, INLINABLE, and default-method unfoldings are constructed before the
-module driver checks for native dependent Core. Omitted interface pragmas do
-not prevent this construction. Reject a native RHS before these builders run.
-Check the pragma or default-method condition first. Ordinary bindings without
-an unfolding request need no native scan here.
+{- Note [Written retained unfolding pragmas]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+INLINE counts the arguments supplied at the source binding head. A visible
+retained binder consumes one such position and one Core argument. An
+invisible retained binder consumes only a Core argument. The ordinary
+dictionary and erased-binder rules still apply.
 
-The unfolding builders run ordinary simpleOptExpr. mkCoreUnfolding also runs
-ordinary occurrence analysis. Selecting native SimpleOpt alone would still
-allow that analysis to delete bindings used only by runtime type indices.
-Native unfolding construction needs a separate implementation. Do not silently
-discard a requested unfolding or change compulsory default-method semantics.
+Use this arity for INLINE guidance. Keep the retained RHS unchanged.
+Moving a returned lambda outside a case can change what a partial call
+evaluates. The unfolding builder uses native SimpleOpt and preserves
+dependencies in the template.
+
+Only a retained signature selects the retained pipeline in a client.
+Keep the existing restriction on written pragmas for ordinary signatures
+with retained RHSs. Compulsory default-method unfoldings still use the
+ordinary path. Reject a retained RHS before constructing one. An ordinary
+binding without an unfolding request needs no native scan here.
 -}
 
+-- | Convert the arity of the written patterns to Core call saturation.
 findSatArity :: VisArity -> Type -> Arity
--- Given the VisArity, find the value Arity of the function.
--- This is the number of runtime-value arguments the function must be applied
--- to before the INLINE pragma fires and inlines the function
--- We must:
---    add one for each invisible dictionary arg; and
---    subtract one for each required type argment
-findSatArity vis_arity ty
-  = go vis_arity pi_bndrs
+findSatArity vis_arity ty = go vis_arity ty
   where
-    (_, pi_bndrs, _) = splitPiTys ty
+    go ar next
+      | DepFunTy vis _ res <- coreFullView next
+      = step ar (vis == DepFunInvisible) True res
+      | Just (_, bndr, res) <- splitPiTy_maybe next
+      = step ar (isInvisiblePiTyBinder bndr) (isRuntimePiTyBinder bndr) res
+      | ar == 0 = 0
+      | otherwise = pprPanic "findSatArity" (ppr vis_arity $$ ppr ty)
 
-    go vis_arity (bndr : bndrs)
-      | isInvisiblePiTyBinder bndr = add_bndr bndr (go vis_arity     bndrs)
-      | vis_arity == 0             = 0
-      | otherwise                  = add_bndr bndr (go (vis_arity-1) bndrs)
-    go vis_arity []
-      | vis_arity == 0 = 0
-      | otherwise      = pprPanic "findSatArity" (ppr vis_arity $$ ppr ty)
-
-    add_bndr :: PiTyBinder -> Arity -> Arity
-    add_bndr bndr ar | isRuntimePiTyBinder bndr = ar+1
-                     | otherwise                = ar
+    step ar invisible runtime res
+      | invisible = count_arg + go ar res
+      | ar == 0   = 0
+      | otherwise = count_arg + go (ar-1) res
+      where
+        count_arg = if runtime then 1 else 0
 
 {-
 Note [Desugaring AbsBinds]
