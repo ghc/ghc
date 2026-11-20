@@ -1,4 +1,5 @@
-{-# LANGUAGE DataKinds, GADTs, PolyKinds, ScopedTypeVariables, TypeApplications, TypeOperators #-}
+{-# LANGUAGE DataKinds, GADTs, Modifiers, PolyKinds, ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications, TypeFamilies, TypeOperators, UndecidableInstances #-}
 module DependentArrowMatchability where
 
 import Data.Kind (Type)
@@ -59,3 +60,30 @@ quantified = Quantified @a
 inverseM :: forall (f :: FUN @M 'Many Type Type) a b.
             Proxy f -> f a :~: f b -> a :~: b
 inverseM _ Refl = Refl
+
+-- | Distinguish an encoded arrow from a runtime arrow.
+data ArrowCode (a :: Type) (b :: Type)
+
+-- | Use a matchable arrow for an encoded callback.
+type a ~> b = ArrowCode a b %M -> Type
+
+-- | Store the encoded callback.
+data Encoded a = Encode (a ~> Type)
+
+-- | Store the ordinary callback.
+data Decoded a = Decode (a -> Type)
+
+-- | Demote the kind of a type.
+type family Demote (k :: Type) :: Type
+
+-- | Demote a type at its demoted kind.
+type family DemoteType (x :: k) :: Demote k
+
+type instance Demote Type = Type
+type instance DemoteType (a :: Type) = Demote a
+type instance Demote (a ~> b) = DemoteType a -> DemoteType b
+type instance Demote (Encoded a) = Decoded (DemoteType a)
+
+-- The decoded field fixes the callback arrow to U. Its domain must
+-- agree with the parameter in the demoted wrapper kind.
+type instance DemoteType ('Encode x :: Encoded a) = 'Decode (DemoteType x)
