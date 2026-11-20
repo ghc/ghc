@@ -126,6 +126,7 @@ import qualified PreludePairExport
 import qualified OpaqueCallClient as Opaque
 import qualified PairProjection as ComputedProjection
 import qualified OrdinaryVecClient as Ordinary
+import qualified ListVectorClient
 import qualified ParameterizedIndexLibrary as Parameterized
 import qualified PackedProjection
 import qualified PackageEquality
@@ -788,6 +789,8 @@ ordinaryModuleCalls = do
     valuesRef <- newIORef ([11, 22] :: [Int])
     values <- readIORef valuesRef
     observe "ordinary module generic round-trip" (Ordinary.ordinaryRoundTrip values)
+    observe "pair a list's computed length with its vector"
+        (ListVectorClient.contents (ListVectorClient.fromList values) :: (Int, [Int]))
 
 -- | Check finite positions in lists with opaque elements.
 genericSafeIndexing :: IO ()

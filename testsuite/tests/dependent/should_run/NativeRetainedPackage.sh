@@ -321,3 +321,42 @@ reject_family SHIFTED_WITNESS "    ShiftWitness ('Shift" '[GHC-83605]'
         exit 1
     fi
 )
+
+cd "$out/provider"
+cp "$src/StoredVector.hs" .
+"${g[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core -c StoredVector.hs
+cp StoredVector.hi "$src/ListVectorClient.hs" "$out/projection/"
+cd "$out/projection"
+"${g[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core -c ListVectorClient.hs
+cp StoredVector.hi ListVectorClient.hi "$out/client/"
+cd "$out/client"
+cat >ListVectorMain.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module Main where
+import ListVectorClient
+import StoredVector (ListVector)
+observe :: ListVector Char -> (Int, String)
+observe = contents
+main :: IO ()
+main = print (observe (fromList ""), observe (fromList "ab"),
+              take 1 (snd (observe (fromList ('x' : error "unused tail")))),
+              fst (observe (fromList [error "unused element" :: Char])),
+              fromList (error "unused list" :: String) `seq` True)
+HS
+"${g[@]}" -c ListVectorMain.hs
+"${g[@]}" ListVectorMain.o ../projection/ListVectorClient.o ../provider/{StoredVector,PackedVecLibrary}.o -o list-vector
+./list-vector
+cat >WrongList.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module WrongList where
+import GHC.Sigma (Sigma(Pair))
+import PackedVecLibrary (sourceLength, sourceVector)
+import StoredVector (ListVector)
+wrong :: [a] -> [a] -> ListVector a
+wrong xs ys = Pair (sourceLength xs) (sourceVector ys)
+HS
+if "${g[@]}" -c WrongList.hs >bad.log 2>&1 ||
+   ! grep -Fq '[GHC-83865]' bad.log || ! grep -Fq 'sourceVector ys' bad.log; then
+    cat bad.log >&2
+    exit 1
+fi
