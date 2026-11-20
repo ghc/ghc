@@ -1320,7 +1320,47 @@ can_eq_app :: CtEvidence       -- :: s1 t1 ~N s2 t2
 -- See Note [Decomposing AppTy equalities]
 can_eq_app ev s1 t1 s2 t2
   | CtWanted (WantedCt { ctev_dest = dest }) <- ev
-  = do { traceTcS "can_eq_app" (vcat [ text "s1:" <+> ppr s1, text "t1:" <+> ppr t1
+  = if (m1 && m2) || s1 `tcEqType` s2 then wanted_congruence dest
+    else do { open1 <- still_open s1
+            ; open2 <- still_open s2
+            ; if (m1 || open1) && (m2 || open2)
+              then do { deferred <- deferOpenAppEq ev
+                      ; if deferred then stopWith ev "Deferred open application equality"
+                                    else wanted_congruence dest }
+              else finishCanWithIrred IrredShapeReason ev }
+
+  | m1, m2
+  , s1k `mismatches` s2k
+  = canEqHardFailure ev (s1 `mkAppTy` t1) (s2 `mkAppTy` t2)
+
+  | CtGiven (GivenCt { ctev_evar = evar }) <- ev
+  , m1, m2
+  = do { let co   = mkCoVarCo evar
+             co_s = mkLRCo CLeft  co
+             co_t = mkLRCo CRight co
+       ; ev_s <- newGivenEv loc ( mkTcEqPredLikeEv ev s1 s2
+                                , evCoercion co_s )
+       ; ev_t <- newGivenEv loc ( mkTcEqPredLikeEv ev t1 t2
+                                , evCoercion co_t )
+       ; emitWorkNC [CtGiven ev_t]
+       ; startAgainWith (mkNonCanonical $ CtGiven ev_s) }
+
+  | otherwise
+  = finishCanWithIrred IrredShapeReason ev
+
+  where
+    still_open fun
+      | (head_ty, _) <- tcSplitAppTys fun
+      , Just f <- getTyVar_maybe head_ty
+      , isTcTyVar f, isMetaTyVar f
+      , Just (ma, _, _) <- tcSplitFunTy_maybe (typeKind fun)
+      , Just m <- getTyVar_maybe ma
+      , isTcTyVar m, isMetaTyVar m
+      = do { open <- isUnfilledMetaTyVar f
+           ; if open then isUnfilledMetaTyVar m else return False }
+      | otherwise = return False
+
+    wanted_congruence dest = do { traceTcS "can_eq_app" (vcat [ text "s1:" <+> ppr s1, text "t1:" <+> ppr t1
                                      , text "s2:" <+> ppr s2, text "t2:" <+> ppr t2
                                      , text "vis:" <+> ppr (isNextArgVisible s1) ])
        ; co_plus_holes <- wrapUnifierAndEmit ev Nominal $ \uenv ->
@@ -1338,35 +1378,12 @@ can_eq_app ev s1 t1 s2 t2
        ; setWantedEq dest co_plus_holes
        ; stopWith ev "Decomposed [W] AppTy" }
 
-    -- If there is a ForAll/(->) mismatch, the use of the Left coercion
-    -- below is ill-typed, potentially leading to a panic in splitTyConApp
-    -- Test case: typecheck/should_run/Typeable1
-    -- We could also include this mismatch check above (for W and D), but it's slow
-    -- and we'll get a better error message not doing it
-  | isMatchableFunTy (typeKind s1), isMatchableFunTy (typeKind s2)
-  , s1k `mismatches` s2k
-  = canEqHardFailure ev (s1 `mkAppTy` t1) (s2 `mkAppTy` t2)
-
-  | CtGiven (GivenCt { ctev_evar = evar }) <- ev
-  , isMatchableFunTy (typeKind s1), isMatchableFunTy (typeKind s2)
-  = do { let co   = mkCoVarCo evar
-             co_s = mkLRCo CLeft  co
-             co_t = mkLRCo CRight co
-       ; ev_s <- newGivenEv loc ( mkTcEqPredLikeEv ev s1 s2
-                                , evCoercion co_s )
-       ; ev_t <- newGivenEv loc ( mkTcEqPredLikeEv ev t1 t2
-                                , evCoercion co_t )
-       ; emitWorkNC [CtGiven ev_t]
-       ; startAgainWith (mkNonCanonical $ CtGiven ev_s) }
-
-  | otherwise
-  = finishCanWithIrred IrredShapeReason ev
-
-  where
     loc = ctEvLoc ev
 
     s1k = typeKind s1
     s2k = typeKind s2
+    m1 = isMatchableFunTy s1k
+    m2 = isMatchableFunTy s2k
 
     k1 `mismatches` k2
       =  isForAllTy k1 && not (isForAllTy k2)
@@ -1964,10 +1981,24 @@ Note [Decomposing TyConApp equalities]. We have
                               only at matchable consumed kind arrows
 
 The split helpers inspect application syntax. They do not establish matchability.
-A Given requires the inverse rule and therefore requires M. A Wanted can use
-forward AppCo congruence at U, but this strategy can be incomplete. An opaque
-U application does not establish that its arguments or head are equal.
-Structural comparison of arrow types through SelFun remains valid at U.
+The arrow restriction on CO_LEFT and CO_RIGHT is the same as in Figure 5
+of Higher-Order Type-Level Programming in Haskell. A Given requires the
+inverse rule and therefore requires M. A Wanted can
+use forward AppCo congruence when the heads already agree. Different
+heads with two matchable arrows can decompose immediately. For example,
+f Bool ~ Maybe Bool with f :: Type %U -> Type can later reduce to reflexivity
+when another equality fixes f to a partial family. Decomposition would
+already have committed to the unsatisfiable equality f ~ Maybe.
+
+With an open head and open matchability, process independent receiver
+equalities and dictionaries first. Use deferOpenAppEq after rewriting
+so that the same rule applies when an equation exposes the application.
+If the head and matchability are still open, the Wanted may choose that
+head by ordinary forward congruence. For a partial application, check the
+arrow consumed by this application and the head of its spine. This is
+a choice for a metavariable. Known U heads still require rewriting or an
+independent equality. Structural comparison of arrow types through
+SelFun is valid at U.
 
 In the first of these, why do we need Nominal equality in (t1 ~N t2)?
 See (APT3) below.
@@ -2009,6 +2040,8 @@ and all will be well. See also Note [Unwrap newtypes first].
 
 Bottom line:
 * Nominal Given AppTy decomposes only at matchable kind arrows: can_eq_app
+* Nominal Wanted AppTy with different heads can decompose immediately at two
+  matchable kind arrows. A flexible head can wait for other work.
 * Never decompose AppTy at representational role (neither Given nor Wanted):
   the lack of an equation in can_eq_nc
 

@@ -75,6 +75,7 @@ import GHC.Data.Bag
 import Control.Monad      ( forM_ )
 import qualified Data.List.NonEmpty as NE
 import Data.Function      ( on )
+import qualified Data.Sequence as Seq
 
 {-
 ************************************************************************
@@ -95,7 +96,14 @@ consider using this depth for prioritization as well in the future.
 As a simple form of priority queue, our worklist separates out
 
 * equalities (wl_eqs); see Note [Prioritise equalities]
-* all the rest (wl_rest)
+* other ordinary work (wl_rest)
+* application equalities that can still choose a flexible head (wl_open_apps)
+  See Note [Decomposing AppTy equalities] in GHC.Tc.Solver.Equality.
+
+The last group runs after the other work. Retry its equalities in the order
+in which they were deferred. Picking the oldest first avoids reversing
+the order of independent inference choices merely because they had to wait.
+The sequence supports adding work at the back and taking it from the front.
 
 Note [Prioritise equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -173,6 +181,9 @@ data WorkList
          -- in GHC.Tc.Types.Constraint for more details.
 
        , wl_rest :: [Ct]
+       , wl_open_apps :: Seq.Seq Ct
+           -- Wanteds that could choose a still-open function head.
+           -- See Note [Decomposing AppTy equalities] in GHC.Tc.Solver.Equality.
     }
 
 isNominalEqualityCt :: Ct -> Bool
@@ -187,16 +198,20 @@ isNominalEqualityCt ct
 
 appendWorkList :: WorkList -> WorkList -> WorkList
 appendWorkList
-    (WL { wl_eqs_N = eqs1_N, wl_eqs_X = eqs1_X, wl_rw_eqs = rw_eqs1, wl_rest = rest1 })
-    (WL { wl_eqs_N = eqs2_N, wl_eqs_X = eqs2_X, wl_rw_eqs = rw_eqs2, wl_rest = rest2 })
+    (WL { wl_eqs_N = eqs1_N, wl_eqs_X = eqs1_X, wl_rw_eqs = rw_eqs1, wl_rest = rest1
+        , wl_open_apps = apps1 })
+    (WL { wl_eqs_N = eqs2_N, wl_eqs_X = eqs2_X, wl_rw_eqs = rw_eqs2, wl_rest = rest2
+        , wl_open_apps = apps2 })
    = WL { wl_eqs_N   = eqs1_N   ++ eqs2_N
         , wl_eqs_X   = eqs1_X   ++ eqs2_X
         , wl_rw_eqs  = rw_eqs1  ++ rw_eqs2
-        , wl_rest    = rest1    ++ rest2 }
+        , wl_rest    = rest1    ++ rest2
+        , wl_open_apps = apps1 Seq.>< apps2 }
 
 workListSize :: WorkList -> Int
-workListSize (WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X, wl_rw_eqs = rw_eqs, wl_rest = rest })
-  = length eqs_N + length eqs_X + length rw_eqs + length rest
+workListSize (WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X, wl_rw_eqs = rw_eqs
+                 , wl_rest = rest, wl_open_apps = apps })
+  = length eqs_N + length eqs_X + length rw_eqs + length rest + Seq.length apps
 
 extendWorkListEq :: CoHoleSet -> Ct -> WorkList -> WorkList
 extendWorkListEq rewriters ct
@@ -274,17 +289,17 @@ extendWorkListCts cts wl = foldr extendWorkListCt wl cts
 
 isEmptyWorkList :: WorkList -> Bool
 isEmptyWorkList (WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X
-                    , wl_rw_eqs = rw_eqs, wl_rest = rest })
-  = null eqs_N && null eqs_X && null rw_eqs && null rest
+                    , wl_rw_eqs = rw_eqs, wl_rest = rest, wl_open_apps = apps })
+  = null eqs_N && null eqs_X && null rw_eqs && null rest && Seq.null apps
 
 emptyWorkList :: WorkList
 emptyWorkList = WL { wl_eqs_N = [], wl_eqs_X = []
-                   , wl_rw_eqs = [], wl_rest = [] }
+                   , wl_rw_eqs = [], wl_rest = [], wl_open_apps = Seq.empty }
 
 -- Pretty printing
 instance Outputable WorkList where
   ppr (WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X
-          , wl_rw_eqs = rw_eqs, wl_rest = rest })
+          , wl_rw_eqs = rw_eqs, wl_rest = rest, wl_open_apps = apps })
    = text "WL" <+> (braces $
      vcat [ ppUnless (null eqs_N) $
             text "Eqs_N =" <+> vcat (map ppr eqs_N)
@@ -294,6 +309,8 @@ instance Outputable WorkList where
             text "RwEqs =" <+> vcat (map ppr rw_eqs)
           , ppUnless (null rest) $
             text "Non-eqs =" <+> vcat (map ppr rest)
+          , ppUnless (Seq.null apps) $
+            text "Open application eqs =" <+> ppr (Seq.length apps)
           ])
 
 {- *********************************************************************

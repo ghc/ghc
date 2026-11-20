@@ -18,7 +18,7 @@ module GHC.Tc.Solver.Monad (
     setEvBindsTcS, setTcLevelTcS,
     getNativeBinderScope, withNativeBinderScope, getSourceLetScope, withSourceLetProof,
 
-    selectNextWorkItem,
+    selectNextWorkItem, deferOpenAppEq,
     getWorkList,
     updWorkListTcS,
     pushLevelNoWorkList, pushTcLevelM_,
@@ -200,6 +200,8 @@ import GHC.Data.Pair
 import GHC.Utils.Monad
 
 import GHC.Exts (oneShot)
+
+import qualified Data.Sequence as Seq
 
 import Control.Monad
 import Data.Foldable hiding ( foldr1 )
@@ -1937,7 +1939,7 @@ selectNextWorkItem
        ; wl     <- readTcRef wl_var
 
        ; case wl of { WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X
-                         , wl_rw_eqs = rw_eqs, wl_rest = rest }
+                         , wl_rw_eqs = rw_eqs, wl_rest = rest, wl_open_apps = apps }
            | ct:cts <- eqs_N  -> pick_me ct (wl { wl_eqs_N  = cts })
            | ct:cts <- eqs_X  -> pick_me ct (wl { wl_eqs_X  = cts })
            | otherwise        -> try_rws [] rw_eqs
@@ -1959,9 +1961,23 @@ selectNextWorkItem
              try_rest zonked_rws
                | ct:cts <- rest       = pick_me ct (wl { wl_rw_eqs = zonked_rws, wl_rest = cts })
                | ct:cts <- zonked_rws = pick_me ct (wl { wl_rw_eqs = cts })
+               | ct Seq.:< more <- Seq.viewl apps
+               = do { ct' <- liftZonkTcS (TcM.zonkCtCoHoleSet ct)
+                    ; pick_me ct' (wl { wl_rw_eqs = [], wl_open_apps = more }) }
                | otherwise            = return Nothing
      } }
 
+
+-- | Postpone a choice of open head while ordinary work is pending.
+-- See Note [Decomposing AppTy equalities] in GHC.Tc.Solver.Equality.
+deferOpenAppEq :: CtEvidence -> TcS Bool
+deferOpenAppEq ev =
+  do { ref <- getTcSWorkListRef
+     ; wl <- readTcRef ref
+     ; if isEmptyWorkList (wl { wl_open_apps = Seq.empty })
+       then return False
+       else do { writeTcRef ref (wl { wl_open_apps = wl_open_apps wl Seq.|> mkNonCanonical ev })
+               ; return True } }
 
 pushTcLevelM_ :: TcS a -> TcS a
 pushTcLevelM_ (TcS thing_inside)
