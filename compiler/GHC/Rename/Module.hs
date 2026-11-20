@@ -49,6 +49,7 @@ import GHC.Unit.Module.Warnings
 import GHC.Builtin( mkUnboundName )
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.KnownOccs (consDataCon_RDR)
+import GHC.Builtin.WiredIn.Types (liftedTypeKindTyConName)
 
 import GHC.Types.FieldLabel
 import GHC.Types.Name.Reader
@@ -133,6 +134,18 @@ some (x :: A) | B to Sigma A with the lifted lambda for B. The
 name Sigma comes from GHC.Sigma in the configured base unit.
 The witness domain stays outside the lambda scope. Sigma's
 payload parameter checks the kind of the lifted family.
+
+With explicitly kinded captures, a later capture or the witness domain
+can depend on an earlier capture. For example, in
+  type Keep (n :: N) (m :: N) (x :: Proxy (Add n m)) =
+    some (tag :: Bool) | (x :~: x)
+the helper needs a kind of the form
+  forall (n :: N) (m :: N) -> Proxy (Add n m) -> Bool -> Type
+The anonymous binders of the provisional family kind do not substitute
+the actual arguments for n and m in the kind of x. Give the hidden
+family a standalone kind signature when all the written kinds determine
+the telescope. Keep the inference path for incomplete kinds and do not
+copy source splices into the signature.
 -}
 -- | Lift type lambdas from synonym right-hand sides. See Note [Lifting type lambdas].
 liftTypeLambdas :: RdrName -> HsGroup GhcPs
@@ -175,7 +188,8 @@ liftTypeLambdas sigma group =
     liftRhs scoped owner captures (L loc (XHsType (HsTypeLambda _ vars body))) salt =
       liftLambdaRhs scoped False owner captures loc vars body salt Nothing
     liftRhs scoped owner captures (L loc (XHsType (HsTypeSome _ binder domain body))) salt =
-      let (schema, families, next) = liftLambdaRhs scoped True owner captures loc [binder] body salt Nothing
+      let signature = sumPayloadKind captures domain
+          (schema, families, next) = liftLambdaRhs scoped True owner captures loc [binder] body salt signature
           sigma_ty = typeName (L (l2l loc) sigma)
           app f arg = L loc (HsAppTy noExtField f arg)
       in (app (app sigma_ty domain) schema, families, next)
@@ -199,6 +213,38 @@ liftTypeLambdas sigma group =
     spliceFree node
       | Just (L _ HsSpliceTy{}) <- (cast node :: Maybe (LHsType GhcPs)) = False
       | otherwise = and (gmapQ spliceFree node)
+
+    -- See Note [Lifting type lambdas]. Bind only captures that occur in a
+    -- later kind. Check closure after binding the captures in source order.
+    sumPayloadKind captures domain
+      | Just binders <- traverse explicitCapture captures
+      , completeKind domain
+      , (kind, free, True) <- foldr addCapture (result, kindVars domain, False) binders
+      , Set.null free
+      = Just kind
+      | otherwise = Nothing
+      where
+        result = nlHsFunTy domain (nlHsTyVar NotPromoted (Exact (ExactName liftedTypeKindTyConName)))
+        kindVars = Set.fromList . map unLoc . extractHsTyRdrTyVars
+
+        explicitCapture (binder@(L _ (HsTvb _ _ (HsBndrVar _ name) (HsBndrKind _ kind))), _)
+          | completeKind kind = Just (binder, unLoc name, kind)
+        explicitCapture _ = Nothing
+
+        addCapture (binder, name, kind) (body, free, dependent) =
+          let used = Set.member name free
+              kind' | used = L (getLoc kind) (HsForAllTy noExtField
+                                 (mkHsForAllVisTele noAnn [fmap (setHsTyVarBndrFlag ()) binder]) body)
+                    | otherwise = nlHsFunTy kind body
+          in (kind', kindVars kind `Set.union` Set.delete name free, used || dependent)
+
+        completeKind :: Data a => a -> Bool
+        completeKind node =
+          case cast node :: Maybe (LHsType GhcPs) of
+            Just (L _ HsSpliceTy{})    -> False
+            Just (L _ HsWildCardTy{})  -> False
+            Just (L _ XHsType{})      -> False
+            _ -> and (gmapQ completeKind node)
 
     liftLambdaRhs outer_scope is_sum owner captures loc vars body salt signature =
       let owner_occ = rdrNameOcc (unLoc owner)

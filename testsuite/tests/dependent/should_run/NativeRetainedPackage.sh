@@ -13,6 +13,22 @@ cp "$src"/{PackedVecLibrary,RetainedNat,PackedLength,RetainedWitness,DependentPa
 "${g[@]}" -fomit-interface-pragmas -c PackedVecLibrary.hs RetainedNat.hs PackedLength.hs RetainedWitness.hs
 "${g[@]}" -O1 -fomit-interface-pragmas -fno-write-if-simplified-core -c DependentPair.hs
 cp DependentPair.hi "$out/client/"
+cat >IndexedCapture.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, NoStandaloneKindSignatures, PolyKinds, TypeFamilies, TypeOperators, UndecidableInstances #-}
+module IndexedCapture (captured) where
+import Data.Proxy (Proxy(..))
+import Data.Type.Equality ((:~:)(Refl))
+import GHC.Sigma (Sigma(Pair))
+import PackedVecLibrary (Add, Nat(..))
+
+type Keep (n :: Nat) (m :: Nat) (x :: Proxy (Add n m)) =
+    some (tag :: Bool) | (x :~: x)
+
+captured :: Keep 'Z ('S 'Z) 'Proxy
+captured = Pair True Refl
+HS
+"${g[@]}" -fomit-interface-pragmas -Werror=unused-foralls -c IndexedCapture.hs
+cp IndexedCapture.hi "$out/client/"
 cp {PackedVecLibrary,PackedLength,RetainedNat,RetainedWitness,DependentPair}.hi "$src"/{PackedProjection,RetainedProjection,DependentProjection}.hs "$out/projection/"
 cd "$out/projection"
 "${g[@]}" -fomit-interface-pragmas -c PackedProjection.hs RetainedProjection.hs DependentProjection.hs
@@ -31,9 +47,12 @@ HS
 cp {PackedVecLibrary,RetainedNat,PackedLength,RetainedWitness,PackedProjection,RetainedProjection,Mixed}.hi "$out/client/"
 cd "$out/client"
 cat >Main.hs <<'HS'
-{-# LANGUAGE DataKinds, NoExperimentalDependentTypes #-}
+{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}
 module Main where
 import Data.Functor.Const (Const(..))
+import Data.Type.Equality ((:~:)(Refl))
+import GHC.Sigma (Sigma(Pair))
+import IndexedCapture (captured)
 import PackedVecLibrary
 import RetainedNat
 import RetainedProjection (project)
@@ -47,9 +66,12 @@ main = do
   let q = constantPackage (error "unused projected witness") (7 :: Int)
   print (getConst (project q))
   print (withRetained q (\_ box -> case box of Const x -> x))
+  case captured of
+    Pair True Refl -> pure ()
+    Pair False _ -> fail "unexpected captured witness"
 HS
 "${g[@]}" -c Main.hs
-"${g[@]}" Main.o ../projection/RetainedProjection.o ../provider/{PackedVecLibrary,RetainedNat,RetainedWitness}.o -o run
+"${g[@]}" Main.o ../projection/RetainedProjection.o ../provider/{IndexedCapture,PackedVecLibrary,RetainedNat,RetainedWitness}.o -o run
 ./run
 cat >General.hs <<'HS'
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, PolyKinds #-}
