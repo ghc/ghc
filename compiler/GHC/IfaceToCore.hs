@@ -2652,9 +2652,10 @@ tcIfaceAlt scrut scrut_index case_bndr (tycon, inst_tys) (DataAlt con, names, rh
   , [eq_name, proof_name] <- names
   = do { uniqs <- getUniquesM
        ; let pat = dataConRepFSInstPat [ifLclNameFS eq_name] uniqs mult con inst_tys
-       ; case (scrut, scrut_index, pat) of
-           (Var _, Just index@TermVarTy{}, ([], [eq]))
-             | Just constructor <- nativeIndexedNullaryCon_maybe (exprType scrut) con eq ->
+       ; case (scrut_index, pat) of
+           (Just index, ([], [eq]))
+             | isNativeCaseValueIndex index
+             , Just constructor <- nativeIndexedNullaryCon_maybe (exprType scrut) con eq ->
                  do { fresh <- newIfaceName (mkVarOccFS (ifLclNameFS proof_name))
                     ; let cv = mkCoVar fresh (mkNomEqPred index constructor)
                           binders = [eq, cv]

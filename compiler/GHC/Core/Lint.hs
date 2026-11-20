@@ -1916,7 +1916,7 @@ lintCoreAlt scrut_index case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt 
       { rhs_ue <- case native_proof of
           Nothing -> lintAltExpr rhs alt_ty
           Just cv | [eq] <- ordinary_args
-                  , Just index@TermVarTy{} <- scrut_index
+                  , Just index <- scrut_index, isNativeCaseValueIndex index
                   , Just constructor <- nativeIndexedNullaryCon_maybe scrut_ty con eq ->
             do { lintL (isLocalId cv && isCoVar cv && cv /= eq
                         && not (eq `elemInScopeSet` in_scope)

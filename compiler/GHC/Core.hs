@@ -36,7 +36,7 @@ module GHC.Core (
         varToCoreExpr, varsToCoreExprs, exprToBoolIndex,
         exprToNativeIndex, normaliseNativeIndexExpr, mapNativeIndex,
         nativeSourceCallIndex, nativeComputedIndex, retainedArgIndex,
-        exprToNativeCaseIndex, nativeIndexFunctionVar_maybe,
+        exprToNativeCaseIndex, isNativeCaseValueIndex, nativeIndexFunctionVar_maybe,
         nativeIndexArgKinds,
         isNativeIndexAlt, isNativeIndexDataAlt, isNativeIndexAliasAlt,
         isNativeIndexedNullaryDataAlt, nativeIndexedNullaryCon_maybe,
@@ -2755,9 +2755,16 @@ exprToNativeCaseIndex (Var v)
   | isNativeOpaqueValueId v = Just (TermVarTy v)
 exprToNativeCaseIndex expr
   | Just index <- exprToNativeIndex expr
-  , isNativeIndexType (typeKind index)
+  , isNativeIndexType (typeKind index) || isNativeCaseValueIndex index
   = Just index
   | otherwise = Nothing
+
+-- | Recognize a local value in an index obtained from the checked scrutinee.
+-- See Note [Native indexed nullary branch evidence].
+isNativeCaseValueIndex :: Type -> Bool
+isNativeCaseValueIndex (TermVarTy v) = isNativeOpaqueValueId v
+isNativeCaseValueIndex (CastTy ty _) = isNativeCaseValueIndex ty
+isNativeCaseValueIndex _ = False
 
 -- | Return a supported runtime normal form together with its native index.
 -- The caller must check the original expression's typing and scope with Lint.
@@ -3050,6 +3057,12 @@ Agda's indexed constructor split refines the indices and binds the
 constructor fields in the branch context. See
 docs/dependent-haskell/REFERENCES.md#agda-provenance. The GHC case keeps
 Haskell's demand on the scrutinee.
+
+Inlining can replace the scrutinee with a package payload cast from its
+generated family type to Vec a n. exprToNativeIndex checks the nominal
+coercion and returns the casted index. Use that whole index on the left
+of the branch equality. The cast's endpoints alone do not identify the
+value. See Note [Nominal native index casts].
 -}
 
 -- | Detect proof binders on a DEFAULT alternative, including malformed proofs.
