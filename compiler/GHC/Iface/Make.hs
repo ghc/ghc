@@ -41,6 +41,7 @@ import GHC.CoreToIface
 import GHC.Core
 import GHC.Core.Class
 import GHC.Core.Coercion.Axiom
+import GHC.Core.Dependent (hasNativeDependentProgram)
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import GHC.Core.Ppr
@@ -475,7 +476,7 @@ coreRuleToIfaceRule :: CoreRule -> IfaceRule
 coreRuleToIfaceRule rule@(BuiltinRule {})
   = pprPanic "toHsRule:" (pprRule rule)
 
-coreRuleToIfaceRule (Rule { ru_name = name, ru_fn = fn,
+coreRuleToIfaceRule rule@(Rule { ru_name = name, ru_fn = fn,
                             ru_act = act, ru_bndrs = bndrs,
                             ru_args = args, ru_rhs = rhs,
                             ru_orphan = orph, ru_auto = auto })
@@ -485,9 +486,13 @@ coreRuleToIfaceRule (Rule { ru_name = name, ru_fn = fn,
                 ifRuleHead   = fn,
                 ifRuleArgs   = map do_arg args,
                 ifRuleRhs    = toIfaceExpr rhs,
-                ifRuleAuto   = auto,
+                ifRuleKind   = kind,
                 ifRuleOrph   = orph }
   where
+    kind | not auto = IfaceUserRule
+         | hasNativeDependentProgram [] [rule] = IfaceRetainedAutoRule
+         | otherwise = IfaceAutoRule
+
         -- For type args we must remove synonyms from the outermost
         -- level.  Reason: so that when we read it back in we'll
         -- construct the same ru_rough field as we have right now;

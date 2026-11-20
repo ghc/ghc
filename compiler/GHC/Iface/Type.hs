@@ -2847,7 +2847,8 @@ instance Binary IfaceMCoercion where
 -- | Minimum reader support for retained evidence in a serialized payload.
 -- Later versions include the earlier forms. See Note [Versioning retained evidence]
 -- in GHC.Iface.Binary.
-data IfaceEvidenceVersion = NoRetainedEvidence | DepFunCoEvidence | ConstructorCaseEvidence
+data IfaceEvidenceVersion
+  = NoRetainedEvidence | DepFunCoEvidence | ConstructorCaseEvidence | RetainedSpecRuleEvidence
   deriving (Eq, Ord)
 
 -- | Record a feature only while writing the full interface.

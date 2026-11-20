@@ -56,7 +56,7 @@ import GHC.Hs (HsType (..), hsForEachVisibility)
 import GHC.Iface.Binary (CheckHiWay (CheckHiWay), CompressionIFace (..), TraceBinIFace (..), getWithUserData, putWithUserData, readBinIface, writeBinIface)
 import GHC.Iface.Decl (tyThingToIfaceDecl)
 import GHC.Iface.Env (extendIfaceIdEnv)
-import GHC.Iface.Syntax (IfGuidance (IfWhen), IfaceAlt (..), IfaceBang (IfNoBang, IfStrict), IfaceConAlt (..), IfaceConDecl (..), IfaceConDecls (IfDataTyCon), IfaceDecl (IfaceData, IfaceId, IfaceSynonym, ifCons, ifKind, ifName, ifParent, ifResKind), IfaceExpr (..), IfaceIdDetails (IfDFunId, IfVanillaId), IfaceInfoItem (HsUnfold), IfaceRule (IfaceRule), IfaceSrcBang (IfSrcBang), IfaceTyConParent (IfDataInstance), IfaceUnfolding (IfCoreUnfold, IfDFunUnfold))
+import GHC.Iface.Syntax (IfGuidance (IfWhen), IfaceAlt (..), IfaceBang (IfNoBang, IfStrict), IfaceConAlt (..), IfaceConDecl (..), IfaceConDecls (IfDataTyCon), IfaceDecl (IfaceData, IfaceId, IfaceSynonym, ifCons, ifKind, ifName, ifParent, ifResKind), IfaceExpr (..), IfaceIdDetails (IfDFunId, IfVanillaId), IfaceInfoItem (HsUnfold), IfaceRule (IfaceRule), IfaceRuleKind (IfaceUserRule), IfaceSrcBang (IfSrcBang), IfaceTyConParent (IfDataInstance), IfaceUnfolding (IfCoreUnfold, IfDFunUnfold))
 import GHC.Iface.Type (IfaceAppArgs (IA_Nil, IA_Arg), IfaceBndr (IfaceIdBndr, IfaceTvBndr), IfaceCoercion (IfaceCoVarCo, IfaceForAllCo, IfaceTermAppCo), IfaceForAllTyFlag (IfaceForAllTyFlag), IfaceTyCon (IfaceTyCon), IfaceTyConSort (IfaceNormalTyCon), IfaceType (..), getIfaceType, putIfaceType, ifaceBndrName, ifLclNameFS, mkIfLclName, mkIfaceForAllTvBndr, mkIfaceTyConInfo)
 import GHC.IfaceToCore (tcIfaceDecl, tcIfaceExpr, tcIfaceRules)
 import qualified GHC.Parser as Parser
@@ -1670,7 +1670,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             rejectsIfaceRule :: String -> [IfaceBndr] -> IfaceExpr -> IO ()
             rejectsIfaceRule label binders body =
                 rejectsDeferredIface label "Native dependent interface rules are not supported" $ \importEnv -> do
-                    let rule = IfaceRule (fsLit "native_rule") AlwaysActive binders (idName (dataConWorkId trueDataCon)) [] body False IsOrphan
+                    let rule = IfaceRule (fsLit "native_rule") AlwaysActive binders (idName (dataConWorkId trueDataCon)) [] body IfaceUserRule IsOrphan
                     rules <-
                         initIfaceLoad importEnv
                             $ initIfaceLcl ifaceModule (text "native rule test") NotBoot
