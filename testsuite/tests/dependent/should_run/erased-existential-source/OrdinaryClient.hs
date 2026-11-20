@@ -10,7 +10,7 @@ main = do
   let ready = supplied `seq` synthesized `seq` kindOnly `seq`
               kindAndSchema `seq` wildcardWitness `seq` written `seq` "constructed"
   putStrLn ready
-  result <- try @SomeException (evaluate lazyPack)
+  result <- try @SomeException (evaluate (lazyPack `seq` ()))
   case result of
     Left ex | "packed payload forced" `isInfixOf` displayException ex ->
       putStrLn "Pack has the demand of its payload"
