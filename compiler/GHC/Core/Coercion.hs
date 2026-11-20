@@ -1888,7 +1888,7 @@ existsCoRule role = (name, BuiltInRule name role [role] proves)
     proves _ = Nothing
     package (ForAllTy ma (Bndr tv vis) body)
       | isTyVar tv
-      , vis == coreTyLamForAllTyFlag
+      , isCoreTyLamForAllTyFlag vis
       , ma `eqType` unmatchableDataConTy
       , typeKind (varType tv) `eqType` liftedTypeKind
       , typeKind body `eqType` liftedTypeKind
