@@ -32,6 +32,7 @@ import GHC.Types.Basic      ( RecFlag(..), isRec )
 import GHC.Types.Id         ( idType, isJoinId, idJoinPointHood )
 import GHC.Types.Tickish
 import GHC.Types.Var
+import GHC.Types.Var.FV (runFVSelective)
 import GHC.Types.Var.Set
 
 import GHC.Utils.Misc
@@ -317,6 +318,11 @@ of the types of all the drop points involved. If any of the floaters
 bind a coercion variable mentioned in any of the types, that binder must
 be dropped right away.
 
+A retained runtime index can occur in the type of a case scrutinee.
+Moving its let into the scrutinee makes the scrutinee type refer to a
+binder that is out of scope. The case binder carries that type. Keep
+the free variables of its type and the case result type at the case.
+
 Note [Shadowing and name capture]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have
@@ -521,7 +527,7 @@ bindings are:
 
 -}
 
-fiExpr platform to_drop (_, AnnCase scrut case_bndr _ [AnnAlt con alt_bndrs rhs])
+fiExpr platform to_drop (_, AnnCase scrut case_bndr ty [AnnAlt con alt_bndrs rhs])
   | isUnliftedType (idType case_bndr)
      -- binders have a fixed RuntimeRep so it's OK to call isUnliftedType
   , exprOkToDiscard (deAnnotate scrut)
@@ -538,7 +544,8 @@ fiExpr platform to_drop (_, AnnCase scrut case_bndr _ [AnnAlt con alt_bndrs rhs]
 
     (shared_binds, [scrut_binds, rhs_binds])
        = sepBindsByDropPoint platform False to_drop
-                     all_bndrs [scrut_fvs, rhs_fvs]
+                     (all_bndrs `unionDVarSet` caseTypeFVs case_bndr ty)
+                     [scrut_fvs, rhs_fvs]
 
 fiExpr platform to_drop (_, AnnCase scrut case_bndr ty alts)
   = wrapFloats drop_here1 $
@@ -550,7 +557,8 @@ fiExpr platform to_drop (_, AnnCase scrut case_bndr ty alts)
         -- Float into the scrut and alts-considered-together just like App
     (drop_here1, [scrut_drops, alts_drops])
        = sepBindsByDropPoint platform False to_drop
-             all_alt_bndrs [scrut_fvs, all_alt_fvs]
+             (all_alt_bndrs `unionDVarSet` caseTypeFVs case_bndr ty)
+             [scrut_fvs, all_alt_fvs]
              -- all_alt_bndrs: see Note [Shadowing and name capture]
 
         -- Float into the alts with the is_case flag set
@@ -571,6 +579,12 @@ fiExpr platform to_drop (_, AnnCase scrut case_bndr ty alts)
     all_alt_fvs = foldr unionDVarSet (unitDVarSet case_bndr) alts_fvs
 
     fi_alt to_drop (AnnAlt con args rhs) = Alt con args (fiExpr platform to_drop rhs)
+
+-- | Free variables in types used at the case. See Note [Floating coercions].
+caseTypeFVs :: Id -> Type -> FreeVarSet
+caseTypeFVs bndr result =
+  runFVSelective isLocalVar (bndrTypeTyCoFVs bndr)
+    `unionDVarSet` tyCoVarsOfTypeDSet result
 
 ------------------
 fiBind :: Platform

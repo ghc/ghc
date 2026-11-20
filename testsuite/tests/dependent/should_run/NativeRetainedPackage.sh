@@ -96,6 +96,41 @@ import DependentPair (DPair)
 data Holder = Holder !(DPair Bool (Const Int))
 HS
 "${g[@]}" -O1 -c StrictRetainedField.hs
+(
+  cd "$out/provider"
+  cat >SelectorProvider.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
+module SelectorProvider where
+
+data Flag (b :: Bool) where
+  Yes :: Int -> Flag 'True
+  No :: Flag 'False
+
+type Package = some (b :: Bool) | Flag b
+data Aliased = Aliased { getAlias :: Package }
+data Direct = Direct { getDirect :: some (b :: Bool) | Flag b }
+HS
+  "${g[@]}" -O1 -c SelectorProvider.hs
+  cp SelectorProvider.hi "$out/client/"
+)
+cat >SelectorClient.hs <<'HS'
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
+module SelectorClient where
+
+import GHC.Sigma.Projection (second)
+import SelectorProvider
+
+readFlag :: Flag b -> Int
+readFlag (Yes n) = n
+readFlag No = 0
+
+viaAlias :: Aliased -> Int
+viaAlias box = let pair = getAlias box in readFlag (second pair)
+
+viaDirect :: Direct -> Int
+viaDirect box = let pair = getDirect box in readFlag (second pair)
+HS
+"${g[@]}" -O1 -c SelectorClient.hs
 cat >WrongPair.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes #-}
 module WrongPair where
