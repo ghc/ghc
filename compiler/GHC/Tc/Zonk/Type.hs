@@ -1107,6 +1107,15 @@ zonkExpr (XExpr (NativeExistsPack schema witness payload))
        ; payload' <- zonkLExpr payload
        ; return (XExpr (NativeExistsPack schema' witness' payload')) }
 
+zonkExpr (XExpr (NativeExistsUnpack witness payload result_ty package body))
+  = do { result_ty' <- zonkTcTypeToTypeX result_ty
+       ; package' <- zonkLExpr package
+       ; runZonkBndrT (do { witness' <- zonkTyBndrX witness
+                          ; payload' <- zonkIdBndrX payload
+                          ; return (witness', payload') }) $ \(witness', payload') ->
+         do { body' <- zonkLExpr body
+            ; return (XExpr (NativeExistsUnpack witness' payload' result_ty' package' body')) } }
+
 zonkExpr (XExpr (NativeCaseAlias scrut value proof result_ty body))
   = do { scrut' <- zonkLExpr scrut
        ; result_ty' <- zonkTcTypeToTypeX result_ty

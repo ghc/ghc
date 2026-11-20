@@ -4704,6 +4704,8 @@ tcTyVar mode name
     else failWithTc $ TcRnRetainedQuantificationError RetainedCallIndex
 tcTyVar _ name         -- Could be a tyvar, a tycon, or a datacon
   = do { traceTc "lk1" (ppr name)
+       ; pack <- isExistsPackName name
+       ; when pack $ failWithTc (TcRnExistsPack ExistsPackInvalidContext)
        ; thing <- tcLookup name
        ; case thing of
            ATyVar _ tv -> return (mkTyVarTy tv, tyVarKind tv)

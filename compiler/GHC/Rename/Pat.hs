@@ -43,6 +43,7 @@ import {-# SOURCE #-} GHC.Rename.Splice ( rnSplicePat, rnSpliceTyPat )
 import GHC.Hs
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
+import GHC.Tc.Utils.Env (isExistsPackName)
 import GHC.Tc.Utils.TcMType ( hsOverLitKnownOcc )
 
 import GHC.Rename.Doc (rnLHsDoc)
@@ -707,13 +708,23 @@ rnConPatAndThen :: NameMaker
 
 rnConPatAndThen mk con (PrefixCon x pats)
   = do  { con' <- lookupConCps con
-        ; pats' <- rnLArgPatsAndThen mk pats
+        ; pack <- liftCps $ isExistsPackName (getName con')
+        ; let args = if pack then pack_type_binder pats else pats
+        ; pats' <- rnLArgPatsAndThen mk args
         ; return $ ConPat
             { pat_con_ext = noExtField
             , pat_con = con'
             , pat_args = PrefixCon x pats'
             }
         }
+  where
+    pack_type_binder :: [LPat GhcPs] -> [LPat GhcPs]
+    pack_type_binder [L l (VarPat _ (L nloc rdr)), payload]
+      | isUnqual rdr
+      = let tv = mkRdrUnqual (mkTyVarOccFS (occNameFS (rdrNameOcc rdr)))
+            ty = L l (HsTyVar noAnn NotPromoted (L (l2l nloc) tv))
+        in [L l (EmbTyPat noAnn (mkHsTyPat ty)), payload]
+    pack_type_binder pats = pats
 
 rnConPatAndThen mk con (InfixCon _ pat1 pat2)
   = do  { con' <- lookupConCps con

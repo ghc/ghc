@@ -320,6 +320,9 @@ dsExpr e@(XExpr ext_expr_tc)
       NativeExistsPack schema witness payload
         -> Pack schema witness <$> dsLExpr payload
 
+      NativeExistsUnpack witness payload _ package body
+        -> Unpack witness payload <$> dsLExpr package <*> dsLExpr body
+
       -- See Note [Checked opaque case alias] in GHC.Hs.Expr.
       NativeCaseAlias scrut value proof result_ty body
         -> do { scrut' <- dsLExpr scrut

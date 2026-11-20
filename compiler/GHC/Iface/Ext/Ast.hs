@@ -1375,6 +1375,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
           ExpandedThingTc (HSE _ e)
             -> [ toHie e ]
           NativeExistsPack _ _ payload -> [toHie payload]
+          NativeExistsUnpack _ _ _ package body -> [toHie package, toHie body]
           NativeCaseAlias scrut _ _ _ body
             -> [ toHie scrut, toHie body ]
           NativeLetAlias rhs _ value _ _ body ->

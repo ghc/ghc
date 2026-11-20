@@ -68,7 +68,7 @@ import GHC.Core.DataCon
 import GHC.Core.Class(classTyCon)
 import GHC.Core.TyCon
 import GHC.Core.Type
-import GHC.Core.TyCo.Rep (Type(TermAppTy, TermVarTy))
+import GHC.Core.TyCo.Rep (Type(ExistsTy, TermAppTy, TermVarTy))
 import GHC.Core.Coercion
 import GHC.Core.Predicate( decomposeIPPred, mkNomEqPred )
 
@@ -102,7 +102,7 @@ import GHC.Utils.Panic
 
 import GHC.Data.List.SetOps
 import GHC.Data.Maybe
-import GHC.Data.FastString (fastStringToShortText)
+import GHC.Data.FastString (fastStringToShortText, fsLit)
 
 import Control.Monad
 import qualified Data.List.NonEmpty as NE
@@ -690,45 +690,50 @@ tcExpr original@(HsLet x (L loc binds) body) res_ty
            Nothing -> do { (binds', body') <- tcLocalBinds binds (tcMonoLExpr body res_ty)
                          ; return (HsLet x (L loc binds') body') } }
 
-tcExpr (HsCase ctxt scrut matches) res_ty
-  = do  {  -- We used to typecheck the case alternatives first.
-           -- The case patterns tend to give good type info to use
-           -- when typechecking the scrutinee.  For example
-           --   case (map f) of
-           --     (x:xs) -> ...
-           -- will report that map is applied to too few arguments
-           --
-           -- But now, in the GADT world, we need to typecheck the scrutinee
-           -- first, to get type info that may be refined in the case alternatives
-          mult <- newFlexiTyVarTy multiplicityTy
+tcExpr expr@(HsCase ctxt scrut matches) res_ty
+  = do { opened <- tcExistsCase expr res_ty
+       ; case opened of
+           Just unpack -> return unpack
+           Nothing -> ordinary_case }
+  where
+    ordinary_case = do  {  -- We used to typecheck the case alternatives first.
+               -- The case patterns tend to give good type info to use
+               -- when typechecking the scrutinee.  For example
+               --   case (map f) of
+               --     (x:xs) -> ...
+               -- will report that map is applied to too few arguments
+               --
+               -- But now, in the GADT world, we need to typecheck the scrutinee
+               -- first, to get type info that may be refined in the case alternatives
+              mult <- newFlexiTyVarTy multiplicityTy
 
-          -- Typecheck the scrutinee.  We use tcInferRho but tcInferSigma
-          -- would also be possible (tcCaseMatches accepts sigma-types)
-          -- Interesting litmus test: do these two behave the same?
-          --     case id        of {..}
-          --     case (\v -> v) of {..}
-          -- This design choice is discussed in #17790
-        ; (scrut', scrut_ty) <- tcScalingUsage mult $ tcInferRhoFRR FRRCase scrut
-        ; dependent <- xoptM LangExt.ExperimentalDependentTypes
-        ; retained <- case unLoc (stripParensLHsExpr scrut') of
-            HsVar _ (L _ index) | dependent, isNativeIndexId index ->
-              tcRetainedCase index matches res_ty
-            _ | dependent ->
-              do { call_index <- checkedNativeCallIndex scrut' scrut_ty
-                 ; case call_index of
-                     Nothing -> return Nothing
-                     Just index ->
-                       do { refined <- tcRetainedCallCase index scrut' matches res_ty
-                          ; let preserve_origin expr = XExpr (ExpandedThingTc
-                                  (HSE { hse_ctxt = ExprCtxt (HsCase ctxt scrut matches)
-                                       , hse_exp = noLocA expr }))
-                          ; return (fmap preserve_origin refined) } }
-            _ -> return Nothing
-        ; case retained of
-            Just expr -> return expr
-            Nothing -> do
-              { matches' <- tcCaseMatches ctxt tcBody (Scaled mult scrut_ty) matches res_ty
-              ; return (HsCase ctxt scrut' matches') } }
+              -- Typecheck the scrutinee.  We use tcInferRho but tcInferSigma
+              -- would also be possible (tcCaseMatches accepts sigma-types)
+              -- Interesting litmus test: do these two behave the same?
+              --     case id        of {..}
+              --     case (\v -> v) of {..}
+              -- This design choice is discussed in #17790
+            ; (scrut', scrut_ty) <- tcScalingUsage mult $ tcInferRhoFRR FRRCase scrut
+            ; dependent <- xoptM LangExt.ExperimentalDependentTypes
+            ; retained <- case unLoc (stripParensLHsExpr scrut') of
+                HsVar _ (L _ index) | dependent, isNativeIndexId index ->
+                  tcRetainedCase index matches res_ty
+                _ | dependent ->
+                  do { call_index <- checkedNativeCallIndex scrut' scrut_ty
+                     ; case call_index of
+                         Nothing -> return Nothing
+                         Just index ->
+                           do { refined <- tcRetainedCallCase index scrut' matches res_ty
+                              ; let preserve_origin expr = XExpr (ExpandedThingTc
+                                      (HSE { hse_ctxt = ExprCtxt (HsCase ctxt scrut matches)
+                                           , hse_exp = noLocA expr }))
+                              ; return (fmap preserve_origin refined) } }
+                _ -> return Nothing
+            ; case retained of
+                Just expr -> return expr
+                Nothing -> do
+                  { matches' <- tcCaseMatches ctxt tcBody (Scaled mult scrut_ty) matches res_ty
+                  ; return (HsCase ctxt scrut' matches') } }
 
 tcExpr (HsIf x pred b1 b2) res_ty
   = do { pred'    <- tcCheckMonoExpr pred boolTy
@@ -1175,6 +1180,72 @@ When the body uses the proof, record the method and equation dependencies
 and validate the eventual RULES. Desugaring must discharge that same proof
 by retained application at the canonical product. Otherwise desugar the
 written RHS once as an ordinary lazy let.
+-}
+
+-- | Open an explicit existential in a single case alternative.
+-- See Note [Checking a lexical existential case].
+tcExistsCase :: HsExpr GhcRn -> ExpRhoType -> TcM (Maybe (HsExpr GhcTc))
+tcExistsCase expr@(HsCase ctxt scrut matches)
+             expected
+  | MG { mg_alts = L _ [L _ match] } <- matches
+  , Match { m_pats = L _ [pat] } <- match
+  , ConPat { pat_con = L con_loc (WithUserRdr _ con), pat_args = args } <- strip_pat pat
+  = do { pack <- isExistsPackName con
+       ; if pack then Just <$> check_pack con_loc con args
+                 else return Nothing }
+  where
+    strip_pat (L _ (ParPat _ pat)) = strip_pat pat
+    strip_pat (L _ pat) = pat
+
+    check_pack con_loc con args
+      = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+           ; unless enabled $ failWithTc (TcRnExistsPack ExistsPackExtension)
+           ; case args of
+               PrefixCon _ [witness_pat, payload_pat]
+                 | EmbTyPat _ HsTP{ hstp_ext = HsTPRn [] [] [name], hstp_body = witness_ty }
+                     <- strip_pat witness_pat
+                 , HsTyVar{} <- unLoc (ignoreParens witness_ty)
+                 -> open_pack con_loc con name payload_pat
+               _ -> failWithTc (TcRnExistsPack ExistsPackCasePattern) }
+
+    open_pack con_loc con name payload_pat
+      = do { (scrut', scrut_ty) <- tcScalingUsage ManyTy $ tcInferRhoFRR FRRCase scrut
+           ; schema <- liftZonkM (zonkTcType scrut_ty)
+           ; case coreFullView schema of
+               ExistsTy binder inner -> do
+                 { result_ty <- expTypeToType expected
+                 ; con_like <- RealDataCon <$> tcLookupDataCon con
+                 ; let origin = PatSkol con_like ctxt
+                 ; skol_info <- mkSkolemInfo origin
+                 ; witness <- pushTcLevelM_ $ newSkolemTyVar skol_info name (tyVarKind binder)
+                 ; let payload_ty = substTyWith [binder] [mkTyVarTy witness] inner
+                       replace_pat = fmap (\row -> row { m_pats = [payload_pat] <$ m_pats row })
+                       payload_matches = matches { mg_alts = fmap (map replace_pat) (mg_alts matches) }
+                 ; payload <- newSysLocalId (fsLit "unpacked") ManyTy payload_ty
+                 ; (ev_binds, body_matches) <- setSrcSpanA con_loc $
+                     checkConstraints origin [witness] [] $
+                       tcExtendNameTyVarEnv [(name, witness)] $
+                         tcCaseMatches ctxt tcBody (Scaled ManyTy payload_ty) payload_matches
+                           (mkCheckExpType result_ty)
+                 ; let body = noLocA (HsCase ctxt (nlHsVar payload) body_matches)
+                       opened = NativeExistsUnpack witness payload result_ty scrut'
+                                  (mkHsDictLet ev_binds body)
+                 ; return (XExpr (ExpandedThingTc (HSE (ExprCtxt expr)
+                                    (noLocA (XExpr opened))))) }
+               _ -> failWithTc (TcRnExistsPack (ExistsPackInvalidSchema schema)) }
+tcExistsCase _ _ = return Nothing
+
+{- Note [Checking a lexical existential case]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A sole Pack alternative opens the package with a fresh type skolem and a
+payload. Prepare the result type at the outer level so it cannot mention the
+skolem. Use the same implication machinery as constructor patterns for
+constraints in the payload match and its right-hand side.
+
+Translate the payload pattern to an ordinary case inside Unpack. A variable
+or wildcard does not demand the payload in a lazy module. An ordinary strict
+payload pattern, such as Just x, demands it in the usual way. The scope of the
+skolem covers the payload pattern and the whole alternative.
 -}
 
 -- | Classify an opaque call after ordinary expression and usage checking.

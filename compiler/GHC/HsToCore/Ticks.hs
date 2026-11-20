@@ -565,6 +565,7 @@ isCallSite HsAppType{} = True
 isCallSite HsAppRetained{} = True
 isCallSite HsCase{}    = True
 isCallSite (XExpr NativeExistsPack{}) = True
+isCallSite (XExpr NativeExistsUnpack{}) = True
 isCallSite (XExpr NativeCaseAlias{}) = True
 isCallSite (XExpr NativeLetAlias{}) = True
 isCallSite (XExpr (ExpandedThingTc (HSE _ e)))
@@ -719,6 +720,10 @@ addTickHsExpr (XExpr (WrapExpr w e)) =
 addTickHsExpr (XExpr (ExpandedThingTc hse)) = addTickHsExpanded hse
 addTickHsExpr (XExpr (NativeExistsPack schema witness payload)) =
   XExpr . NativeExistsPack schema witness <$> addTickLHsExpr payload
+addTickHsExpr (XExpr (NativeExistsUnpack witness payload result_ty package body))
+  = do { package' <- addTickLHsExpr package
+       ; body' <- bindNativeCaseIds [payload] (addTickLHsExpr body)
+       ; return (XExpr (NativeExistsUnpack witness payload result_ty package' body')) }
 addTickHsExpr (XExpr (NativeCaseAlias scrut value proof result_ty body))
   = do { scrut' <- addTickIndex scrut
        ; body' <- bindNativeCaseIds [value, proof] (addTickLHsExpr body)
