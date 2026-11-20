@@ -132,6 +132,22 @@ cp ../filter/PreludeFilterSource.hi ../length-source/PreludeMapLength{Size,Sourc
    "$src"/PreludeFilter{Proof,LengthProof}.hs .
 "${filter[@]}" -c PreludeFilterProof.hs PreludeFilterLengthProof.hs
 
+# Each rejected proof must reach Refl. The KnownTrue sibling must succeed.
+cp "$src/NativeOpenFilterGivenControls.hs" .
+if "${filter[@]}" -fzap-coercions -fmax-errors=20 -c NativeOpenFilterGivenControls.hs >filter-givens.log 2>&1 ||
+   grep -Fq 'staleGiven _ _ _ KnownTrue = Refl' filter-givens.log; then
+    cat filter-givens.log >&2
+    exit 1
+fi
+for proof in withoutResult wrongResult otherPredicate otherHead representationalResult \
+             invertHead invertPredicate 'staleGiven _ _ _ Unknown'; do
+    line=$(awk -v proof="$proof" '$0 ~ "^" proof " .*Refl$" { print NR }' NativeOpenFilterGivenControls.hs)
+    if ! grep -Fq "NativeOpenFilterGivenControls.hs:$line:" filter-givens.log; then
+        cat filter-givens.log >&2
+        exit 1
+    fi
+done
+
 cat >UnknownFilter.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
 module UnknownFilter where

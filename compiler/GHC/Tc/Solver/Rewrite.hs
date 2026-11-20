@@ -22,6 +22,7 @@ import GHC.Tc.Types.CtLoc( CtLoc, resetCtLocDepth )
 import GHC.Core.Predicate
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type
+import GHC.Core.DataCon (promoteDataCon)
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Errors.Types
 import GHC.Core.TyCon
@@ -43,17 +44,18 @@ import GHC.Driver.Config.Core.Lint( initLintConfig )
 import GHC.Driver.DynFlags
 import GHC.Tc.Utils.Monad (rewriterTcMPlugins)
 import qualified GHC.Tc.Utils.Monad as TcM
-import GHC.Tc.Gen.SourceTable (sourceTableFamilyAppUse)
+import GHC.Tc.Gen.SourceTable (isSourceFilterGuard, sourceTableFamilyAppUse)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Tc.Solver.Monad as TcS
+import GHC.Tc.Solver.InertSet (inert_irreds)
 
 import GHC.Utils.Misc
 import GHC.Data.Maybe
 import GHC.Exts (oneShot)
 import Control.Monad
 import Control.Applicative (liftA3)
-import GHC.Builtin.WiredIn.Types (tYPETyCon)
+import GHC.Builtin.WiredIn.Types (tYPETyCon, falseDataCon, trueDataCon)
 import Data.List ( find )
 import GHC.Data.List.Infinite (Infinite)
 import GHC.Data.Bag( listToBag, bagToList, isEmptyBag )
@@ -1305,8 +1307,65 @@ rewrite_exact_fam_app_step tc tys
        ; case result3 of
            -- (WorthCaching1) in Note [When is a reduction worth caching?]
            Just redn -> return $! FamAppReduced (redn_args_and_then redn) True
-           -- We have made no progress at all: STEP 5 (GIVEUP).
-           _         -> return $! FamAppNotReduced give_up }}}}}
+           Nothing -> do
+             guarded <- rewriteFilterGuard tc xis tc_rewriters
+             return $! case guarded of
+               Just redn -> FamAppReduced (redn_args_and_then redn) True
+               -- We have made no progress at all: STEP 5 (GIVEUP).
+               Nothing -> FamAppNotReduced give_up }}}}}
+
+{- Note [Given results of checked filter predicates]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The cons equation for checked filter calls a private family with arguments
+`(p x), p, x, xs`. A nominal Given for the Boolean result of `p x` can
+select its branch. Canonicalization keeps that Given as an irreducible
+equality. Its left side is neither a variable nor a family application.
+
+Use that coercion only on the first visible argument of the guard. Lift
+it through the guard family, then apply its ordinary family axiom.
+Keep the predicate, head, and tail unchanged. In particular, a proof
+about a different application supplies no equation here. See
+Note [Decomposing AppTy equalities] in GHC.Tc.Solver.Equality.
+
+Record the Given with the rewriter. This keeps the coercion dependency
+for zapping and caching. Skip the lookup during axiom-only reduction.
+-}
+
+-- | Use an exact nominal Given to select a checked filter branch.
+-- See Note [Given results of checked filter predicates].
+rewriteFilterGuard :: TyCon -> [TcType] -> [TcPluginRewriter] -> RewriteM (Maybe Reduction)
+rewriteFilterGuard tc tys tc_rewriters
+  | isSourceFilterGuard tc
+  , let (params, operands) = splitAt (tyConArity tc - 4) tys
+  , test@(AppTy fun arg) : rest@[predicate, head_ty, _] <- operands
+  , not (isMatchableFunTy (typeKind fun))
+  , fun `tcEqType` predicate, arg `tcEqType` head_ty
+  = withoutExternalEvidence Nothing $ do
+      inerts <- liftTcS getInertCans
+      case firstJusts (map (givenResult test . irredCtEvidence) (bagToList (inert_irreds inerts))) of
+        Nothing -> return Nothing
+        Just (ev, result, co) -> do
+          reduced <- try_to_reduce tc (params ++ (result : rest)) tc_rewriters
+          traverse (compose ev co params rest) reduced
+  | otherwise = return Nothing
+  where
+    givenResult test ev
+      | isGiven ev
+      , EqPred NomEq lhs rhs <- classifyPredType (ctEvPred ev)
+      , lhs `tcEqType` test, isResult rhs = Just (ev, rhs, ctEvCoercion ev)
+      | isGiven ev
+      , EqPred NomEq lhs rhs <- classifyPredType (ctEvPred ev)
+      , rhs `tcEqType` test, isResult lhs = Just (ev, lhs, mkSymCo (ctEvCoercion ev))
+      | otherwise = Nothing
+
+    isResult ty = ty `tcEqType` mkTyConTy (promoteDataCon falseDataCon)
+               || ty `tcEqType` mkTyConTy (promoteDataCon trueDataCon)
+
+    compose ev co params rest redn = do
+      recordRewriter ev
+      role <- getRole
+      let args_co = mkTyConAppCo role tc (map mkNomReflCo params ++ (co : map mkNomReflCo rest))
+      return $! args_co `mkTransRedn` redn
 
 -- | The result of rewriting an exactly-saturated type family application.
 --

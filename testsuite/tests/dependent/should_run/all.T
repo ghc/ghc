@@ -68,7 +68,7 @@ test('NativeOpenInstalledMap',
                    open_eval_dir + 'PreludeFilterLengthProof.hs',
                    open_eval_dir + 'PreludeMapLengthSize.hs', open_eval_dir + 'PreludeMapLengthSource.hs',
                    open_eval_dir + 'PreludeMapLengthProof.hs',
-                   'NativeOpenInstalledMapProducer.hs'])],
+                   'NativeOpenInstalledMapProducer.hs', 'NativeOpenFilterGivenControls.hs'])],
      run_command, ['bash NativeOpenInstalledMap.sh "{compiler}" "{libdir}"'])
 test('NativeOpenInstalledAppend',
      [only_ways(['normal']),

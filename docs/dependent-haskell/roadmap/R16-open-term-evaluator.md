@@ -1276,22 +1276,24 @@ an unqualified type variable keeps its earlier scope.
 
 `filterLengthBound` bounds `Count (FilterWith p xs)` by `Count xs`
 for an arbitrary element type and predicate. The `FilterSteps` witness
-contains the finite spine and one equation for each head. At the empty
+contains the finite spine and the decision for each head. At the empty
 list, both sizes are zero. When the predicate keeps a head, the proof
 adds a successor to both bounds. When it skips the head, the proof
 adds a successor only to the original size.
 
-For the installed `Prelude.not`, a given result `Negation x ~ 'True`
-or `Negation x ~ 'False` lets the compiler prove the respective step
-with a rigid `x`. Without that result, the guard remains stuck and
-GHC reports GHC-83865 at `Refl`. For an abstract `p`, a given
-`p x ~ b` still leaves the guarded call stuck and gives GHC-05617.
-The caller supplies the checked keep or skip equation for each head.
+The caller can supply the given result `p x ~ 'True` or
+`'False ~ p x` at a rigid predicate and head. The solver uses that
+nominal equality for the Boolean operand in the checked filter guard.
+The ordinary family equation then selects the branch. The original
+`Keep` and `Skip` constructors still accept an explicit equation for
+the step. The 311 compiler used that form because its rewriter left
+`p x ~ b` inert.
 
 The ordinary regression checks the proof from stripped provider
-interfaces. Both archived stages at `db626fda90` and the public
-311-line compiler at `01cc726ae7` pass the regression.
-A reversed bound for the dropped singleton `'[ 'True]`
+interfaces. It rejects a guessed decision, evidence about another
+predicate or head, and representational equality. It also checks that
+the Given stays inside its branch and that `p x ~ p y` cannot identify
+`x` with `y`. A reversed bound for the dropped singleton `'[ 'True]`
 gives GHC-83865 at `BothSucc ZeroBound`. The runtime example uses the
 same `size` to observe that filtering `[False, True]` by `not` leaves
 one of the two elements.

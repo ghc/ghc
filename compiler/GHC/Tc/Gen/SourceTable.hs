@@ -3,7 +3,7 @@ module GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourc
                               sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
                               sourceTableFamilyAppUse, sourceTableReferenceUse, sourceCaseKindUse, sourceCaseVisibleArity, isSourceConstructorCase, sourceTableOwner, monomorphicEnumCaseArity, groundFirstHead,
                               visibleSourceMethodRules, hasSourceMethodRule, hasSourceMethodRuleAt,
-                              sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers,
+                              sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers, isSourceFilterGuard,
                               OptionalSourceUses, optionalSourceUses, registerOptionalSourceUses,
                               checkOptionalSourceUses, checkSourceMethodUses) where
 
@@ -1714,6 +1714,11 @@ directListFilter prepare owner original = do
 -- | The auxiliary family shares the filter's source-equation owner.
 filterGuardOcc :: OccName -> OccName
 filterGuardOcc = mkSourceTableOcc . mkVarOcc . ("#guard:" ++) . occNameString
+
+-- | Recognise a generated Boolean guard for a checked filter.
+isSourceFilterGuard :: TyCon -> Bool
+isSourceFilterGuard tc = isJust $
+    sourceTableTermOcc (nameOccName (tyConName tc)) >>= stripPrefix "#guard:" . occNameString
 
 -- | Compare the exact derived occurrence and module of a filter guard.
 isFilterGuardFor :: TyCon -> TyCon -> Bool

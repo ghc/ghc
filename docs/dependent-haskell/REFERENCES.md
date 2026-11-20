@@ -6327,10 +6327,14 @@ and [R16 application](roadmap/R16-open-term-evaluator.md#filter-one-known-head-a
 Agda's `length-filter` splits on the current predicate result.
 It adds a successor to both sizes when the head is kept and to
 the upper bound when the head is dropped. The Haskell proof uses
-the same induction. Its witness supplies the corresponding equation
-for installed `Prelude.filter` at each head.
+the same induction. Its witness supplies the result of the predicate
+or the corresponding filter equation. GHC uses the Given coercion for
+the whole application in the guard. Proposal 242 limits decomposition
+of nominal application equalities to matchable arrows. The rewriter
+uses congruence on the guard and leaves the predicate and head rigid.
 [Agda standard library 2.4, length-filter](https://agda.github.io/agda-stdlib/v2.4/Data.List.Properties.html#1588),
 [Agda with-abstraction](https://agda.readthedocs.io/en/latest/language/with-abstraction.html),
+[GHC proposal 242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#matchability),
 and [R16 length bound](roadmap/R16-open-term-evaluator.md#prove-that-filter-never-increases-length).
 
 ### Exporting an ordinary identity equation
