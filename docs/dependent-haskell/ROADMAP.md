@@ -21,12 +21,12 @@ a length-indexed vector. A conversion discards a stored witness and keeps its
 indexed payload. A closed family matches two independently written sums.
 [Run the Showcase](README.md#run-the-showcase).
 
-At `d1f1757365`, all 53 focused tests that ran passed. In the dependent
-directory, 279 of 309 executed normal-way tests passed. The 30 failing tests
-match checkpoint `d8f2802ddb`, where 276 of 306 passed. A known optimizer
-failure remains in this checkpoint. Common subexpression elimination can
-replace a local runtime index with an imported alias when projecting from a
-pair at `-O1`. The R05 work below fixes this case in a separate compiler.
+At `939079e263`, all 56 focused tests that ran passed. In the dependent
+directory, 282 of 312 executed normal-way tests passed. The same 30 tests
+failed at `250b4e328a`, where 279 of 309 passed. An ordinary client can
+bind an imported pair locally and project its payload at `-O1`. The
+exceptional witness stays lazy. Both compiler stages also compile an ordinary
+client that imports the matchability types from `GHC.Matchability` in base.
 
 The upgrade tests cover a change to a family, a packed projection from
 a home or installed module, and combinations of dependent projections
@@ -63,10 +63,13 @@ source examples. General promotion remains open.
    for the recursive dot-form vector filter. Two independent packages keep
    distinct lengths. Unsafe head and escaping-length examples fail. At
    `0d31e72282`, the same inference handles a retained constructor field.
-   Integrate these source tests and their interface and HIE checks.
+   The combined bootstrap at `62a5eb24cd` passes the source and mixed
+   interface checks. Verify let-bound results and function payloads on the
+   same self-hosted compiler.
 2. **R04.** At `6d0a28fc77`, direct `some` binders work in argument and
-   result signatures in private tests. Finish the compiler build and the
-   Template Haskell round trip for an imported direct signature.
+   result signatures in private tests. The self-host at `c5094c96c9`
+   round-trips an imported signature through Template Haskell. Extend the
+   same scoping rules to data constructor fields.
 3. **R05.** At `dc5fca502c`, common subexpression elimination preserves a
    local index when an ordinary client projects from an imported pair. The
    retained simplifier handles surviving erased package operations in an API
@@ -74,8 +77,11 @@ source examples. General promotion remains open.
    unused package and a lazy field. Check worker/wrapper and the remaining
    scheduled passes before enabling these operations in the normal `-O1`
    pipeline.
-4. **R19 and R23.** Extend ordered type cases to mixed patterns. Use the
-   ordinary-program regression baseline when extending family unsaturation.
+4. **R19 and R23.** The private R19 compiler at `6766ceb299` accepts
+   a variable or wildcard after a constructor row. An unknown input still
+   blocks reduction at the earlier constructor. Check this with the combined
+   compiler. Use the ordinary-program regression baseline when extending
+   family unsaturation.
 
 Use this queue for current priorities, the linked card for its acceptance
 criteria, and the [implementation log](PLAN.md) for results from individual
