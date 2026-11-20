@@ -38,7 +38,7 @@ module GHC.Tc.Utils.Unify (
   --------------------------------
   -- Holes
   matchExpectedListTy,
-  matchExpectedTyConApp,
+  matchExpectedTyConApp, matchSumPayload,
   matchExpectedAppTy,
   matchExpectedFunTys,
   matchExpectedFunKind,
@@ -89,7 +89,7 @@ import GHC.Tc.Utils.TcMType qualified as TcM
 import GHC.Tc.Solver.InertSet
 
 import GHC.Core.ConLike (ConLike(..))
-import GHC.Core.FamInstEnv ( reduceTyFamApp_maybe )
+import GHC.Core.FamInstEnv ( emptyFamInstEnvs, reduceTyFamApp_maybe )
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr )
 import GHC.Core.Type
@@ -1117,6 +1117,33 @@ matchExpectedListTy exp_ty
       ; return (co, elt_ty) }
 
 ---------------------
+-- | Match a generated sum payload with its checked constructor type.
+-- See Note [Constructors in a nested dependent sum].
+matchSumPayload :: TyCon -> TcType -> Maybe (TcCoercionN, [TcType])
+matchSumPayload expected_tc ty
+  | Just (family, args) <- tcSplitTyConApp_maybe ty
+  , Just (_, True) <- closedFamilyScope_maybe family
+  , Just (Reduction co result) <- reduceTyFamApp_maybe emptyFamInstEnvs Nominal family args
+  , Just (tc, params) <- tcSplitTyConApp_maybe result
+  , tc == expected_tc
+  = Just (co, params)
+  | otherwise = Nothing
+
+{- Note [Constructors in a nested dependent sum]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In some (n :: Nat) | some (m :: Nat) | body, the outer payload has
+the type of a private family applied to n. Its checked equation gives
+the inner Sigma type. Use this nominal reduction to obtain the inner
+constructor parameters before checking its retained witness. Keep the
+original expected type for the final application check. A pattern uses
+the reduction to cast the scrutinee before it binds the inner fields.
+
+Reduce the generated closed family once. Its axiom needs no open family
+instances. Only use the result when it has the requested algebraic head.
+This leaves user families in the payload fields unevaluated and preserves
+the scope of each witness.
+-}
+
 matchExpectedTyConApp :: TyCon                -- T :: forall kv1 ... kvm. k1 -> ... -> kn -> *
                       -> TcRhoType            -- orig_ty
                       -> TcM (TcCoercionN,    -- T k1 k2 k3 a b c ~N orig_ty

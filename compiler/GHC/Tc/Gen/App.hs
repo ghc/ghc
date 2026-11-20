@@ -489,8 +489,16 @@ tcOrdinaryApp rn_expr rn_fun rn_args exp_res_ty
 
 tcOrdinaryApp' :: HsExpr GhcRn -> (HsExpr GhcRn, SrcSpan) -> HsExpr GhcTc
                -> TcSigmaType -> [HsExprArg 'TcpRn] -> ExpRhoType -> TcM (HsExpr GhcTc)
-tcOrdinaryApp' rn_expr rn_head@(rn_fun, fun_lspan) tc_fun0 fun_sigma0 rn_args exp_res_ty
-  = do { wanted_ql <- wantQuickLook rn_fun
+tcOrdinaryApp' rn_expr rn_head@(rn_fun, fun_lspan) tc_fun0 fun_sigma0 rn_args written_res_ty
+  -- See Note [Constructors in a nested dependent sum] in GHC.Tc.Utils.Unify.
+  = do { let exp_res_ty = case (tc_fun0, written_res_ty) of
+               (XExpr (ConLikeTc (RealDataCon dc)), Check ty)
+                 | not (null (dataConRepArgBinders dc))
+                 , let tc = dataConTyCon dc
+                 , Just (_, params) <- matchSumPayload tc ty
+                 -> mkCheckExpType (mkTyConApp tc params)
+               _ -> written_res_ty
+       ; wanted_ql <- wantQuickLook rn_fun
        ; traceTc "tcApp {" $
            vcat [ text "rn_fun:" <+> ppr rn_fun
                 , text "fun_lspan:" <+> ppr fun_lspan
@@ -559,7 +567,7 @@ tcOrdinaryApp' rn_expr rn_head@(rn_fun, fun_lspan) tc_fun0 fun_sigma0 rn_args ex
                 (DoQL, Check exp_rho) -> quickLookResultType app_res_rho exp_rho
                 _                    -> return ()
             ; finishAppWithCache (arg_cache ++ extra_cache) do_ql rn_expr fun_lspan
-                source_fun tc_fun inst_args app_res_rho exp_res_ty } }
+                source_fun tc_fun inst_args app_res_rho written_res_ty } }
   where
     -- See Note [Type arguments before an implicit package head].
     source_fun

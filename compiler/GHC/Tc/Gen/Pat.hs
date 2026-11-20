@@ -1437,8 +1437,14 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
            _ -> bad_pattern
        ; check_con_pat_arity con_like (length pats)
        ; tcSubMult (pe_orig penv) ManyTy pat_mult
-       ; (wrap, ctxt_res_tys) <- matchExpectedConTy penv (dataConTyCon con) pat_ty_scaled
-       ; unless (isIdHsWrapper wrap) bad_pattern
+       ; let tc = dataConTyCon con
+       ; expected <- readExpType_maybe (scaledThing pat_ty_scaled)
+       -- See Note [Constructors in a nested dependent sum] in GHC.Tc.Utils.Unify.
+       ; (wrap, ctxt_res_tys) <- case expected >>= matchSumPayload tc of
+           Just (co, tys) -> return (mkWpCastN co, tys)
+           Nothing -> do { matched@(wrap, _) <- matchExpectedConTy penv tc pat_ty_scaled
+                         ; unless (isIdHsWrapper wrap) bad_pattern
+                         ; return matched }
        ; pat_ty <- readExpType (scaledThing pat_ty_scaled)
        ; subst <- instTyVarsWith PatOrigin univ_tvs ctxt_res_tys
        ; (pats', res) <- check_fields subst [] 1 (zipEqual binders arg_tys) pats
