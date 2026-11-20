@@ -251,11 +251,16 @@ first-element fold leaves an undefined tail unevaluated.
 
 The client needs only the provider's interface to compile. The interface
 must include a declaration for the private step-fold function. Older
-providers could record its name as an unbound local. A rule directly on
-the imported `foldr` still reaches the orphan-rule restriction.
+providers could record its name as an unbound local. The list-fusion rule uses the locally defined `toList` as its head.
 [Producer](../examples/erased-existentials/ErasedStream.hs),
 [ordinary client](../examples/erased-existentials/StreamFold.hs)
 and [rule-firing test](../../../testsuite/tests/dependent/should_run/NativeSimplifier.sh).
+
+The [integer package rule](../examples/erased-existentials/OrphanPackageRules.hs)
+is a separate example. Importing its module brings the specialization of
+`PackageRules.open` into scope. A Boolean package still uses the original
+function. The test compiles the same integer calls with and without the
+import and checks which rules fire.
 
 ## Next increments
 

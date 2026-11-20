@@ -55,6 +55,7 @@ import qualified PartitionChoices
 import qualified ErasedStream
 import qualified StreamFold
 import qualified PackageRules
+import OrphanPackageRules ()
 import qualified LexicalPackageRules
 import qualified RankedPackage
 import qualified StoredVector
@@ -985,6 +986,10 @@ main = do
     observe "infer a hidden function type from its paired callback" RankedPackage.runPair
     observe "infer a polymorphic lambda witness and call its builder at Int" (RankedPackage.runBuilder 11)
     observe "read an integer through an erased package" (PackageRules.roundTrip 7)
+    observe "apply an imported integer package rule and keep the witness lazy"
+        (PackageRules.open (41 :: Int, (+ 1)),
+         PackageRules.open (undefined :: Int, const 7),
+         PackageRules.open (True, fromEnum))
     observe "match and open existential packages in optimizer rules"
         (LexicalPackageRules.local 3 (LexicalPackageRules.hideInt 5))
     observe "read streams with different hidden state types"
