@@ -16,12 +16,24 @@ cd "$out/correct"
 cp "$src/"{PackedVecLibrary,OpenVectorAppend,OrdinaryOpenVectorAppend}.hs .
 nil_row=$(awk '/^appendVec VNil ys = ys$/ {print NR}' PackedVecLibrary.hs)
 test -n "$nil_row"
+
+# Change the observation, then make the recursive equation invalid.
+sed 's/^toList (VCons x xs) = x : toList xs$/toList (VCons x xs) = toList xs ++ [x]/' \
+    PackedVecLibrary.hs >reversed.hs
+sed 's/^appendVec (VCons x xs) ys = VCons x (appendVec xs ys)$/appendVec (VCons x xs) ys = x `seq` VCons x (appendVec xs ys)/' \
+    reversed.hs >strict-cons.hs
+observe_cons='print (observeAppendCons, consContents False P.VNil (P.VCons True P.VNil))'
 if ! {
     printf 'print observeAppendEmpty\n:module + PackedVecLibrary\n'
     printf ':break PackedVecLibrary %s\n' "$nil_row"
-    printf 'print (appendContents (VCons True VNil))\n:continue\n:quit\n'
+    printf 'print (appendContents (VCons True VNil))\n:continue\n:delete *\n'
+    printf '%s\n' "$observe_cons"
+    printf '%s\n' ':! cp reversed.hs PackedVecLibrary.hs' ':reload' "$observe_cons"
+    printf '%s\n' ':! cp strict-cons.hs PackedVecLibrary.hs' ':reload' ':show modules'
+    printf '%s\n' ':! cp PackedVecLibrary.hi strict-cons.hi'
+    printf '%s\n' ':! cp reversed.hs PackedVecLibrary.hs' ':reload' "$observe_cons" ':quit'
 } | "${ghc[@]}" "${interactive[@]}" "${strip[@]}" -i -i. -outputdir . \
-          '*OrdinaryOpenVectorAppend.hs' >interactive.log 2>&1; then
+          -ferror-spans '*OrdinaryOpenVectorAppend.hs' >interactive.log 2>&1; then
     cat interactive.log >&2
     exit 1
 fi
@@ -30,8 +42,27 @@ if ! grep -Fxq '("Refl",True)' interactive.log ||
     cat interactive.log >&2
     exit 1
 fi
+if ! grep -E '^\("Refl",\[|: error: \[|^(PackedVecLibrary|OpenVectorAppend|OrdinaryOpenVectorAppend)$' \
+        interactive.log >reload.log ||
+   ! diff -u - reload.log <<'EOF'; then
+("Refl",[False,True])
+("Refl",[True,False])
+OpenVectorAppend.hs:30:29-43: error: [GHC-70565]
+PackedVecLibrary
+("Refl",[True,False])
+EOF
+    cat interactive.log >&2
+    exit 1
+fi
 "${ghc[@]}" --show-iface PackedVecLibrary.hi >provider.iface
+"${ghc[@]}" --show-iface strict-cons.hi >strict-cons.iface
 grep -Fq 'FinalCoreSourceTable T:appendVec' provider.iface
+grep -Fq "T:appendVec ('VCons" provider.iface
+grep -Fq "T:appendVec 'VNil carried" strict-cons.iface
+if grep -Fq "T:appendVec ('VCons" strict-cons.iface; then
+    echo 'Reload kept an equation for a strict cons branch' >&2
+    exit 1
+fi
 
 cd "$out/strict"
 cp "$src/OpenVectorAppend.hs" .
