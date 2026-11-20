@@ -17,7 +17,8 @@ import GHC.Core.Utils   ( exprType, mkAltExpr
                         , exprIsTickedString
                         , stripTicksE, stripTicksT, mkTicks )
 import GHC.Core.FVs     ( exprFreeVars )
-import GHC.Core.Type    ( coreFullView, tyConAppArgs )
+import GHC.Core.Type    ( coreFullView, tyConAppArgs, isNativeOpaqueValueId
+                        , isNativeIndexFunctionId )
 import GHC.Core
 import GHC.Utils.Outputable
 import GHC.Types.Basic
@@ -28,6 +29,7 @@ import GHC.Utils.Misc   ( filterOut, equalLength )
 import GHC.Utils.Panic
 import Data.Functor.Identity ( Identity (..) )
 import Data.List        ( mapAccumL )
+import Data.Maybe       ( isJust )
 
 {-
                         Simple common sub-expression
@@ -782,6 +784,12 @@ makes the second argument require Vec Int x. A binding for x does not
 supply the nominal equality x ~# S Z. Apply the current substitution
 to the retained operand and keep its index expression.
 
+The forward substitution must also preserve an index. For example, given
+let pair = importedPair in second pair, the local pair can occur in the
+result type of second. An imported value has no local index identity.
+Keep the local binding when its replacement cannot occur in that type.
+A variable used as an index function needs another eligible function head.
+
 The same constraint applies to a nested case on the same call:
 
     case f n of x { DEFAULT (co1 :: x ~# f n) ->
@@ -949,7 +957,16 @@ lookupSubst :: CSEnv -> Id -> OutExpr
 lookupSubst (CS { cs_subst = sub}) x = lookupIdSubst sub x
 
 extendCSSubst :: CSEnv -> Id  -> CoreExpr -> CSEnv
-extendCSSubst cse x rhs = cse { cs_subst = extendSubst (cs_subst cse) x rhs }
+extendCSSubst cse x rhs
+  | RetainedCore <- cs_mode cse
+  , isId x, isNativeOpaqueValueId x
+  , not preserves_index
+  = cse  -- See Note [CSE for retained operands and case evidence]
+  | otherwise = cse { cs_subst = extendSubst (cs_subst cse) x rhs }
+  where
+    preserves_index
+      | isNativeIndexFunctionId x = isJust (nativeIndexFunctionVar_maybe rhs)
+      | otherwise                 = isJust (retainedArgIndex rhs)
 
 -- | Add clones to the substitution to deal with shadowing.  See
 -- Note [Shadowing in CSE] for more details.  You should call this whenever

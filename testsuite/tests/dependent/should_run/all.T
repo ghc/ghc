@@ -210,6 +210,10 @@ test('NativeTypeLambdaReify',
       extra_files([open_eval_dir + 'TypeLambda.hs', 'NativeTypeLambdaReifyClient.hs'])],
      multimod_compile, ['NativeTypeLambdaReifyClient', '-v0 -dcore-lint ' + config.ghc_th_way_flags])
 
+test('NativeCSEProjection',
+     [only_ways(['normal']), extra_files(['NativeCSEProjectionLib.hs'])],
+     multimod_compile_and_run, ['NativeCSEProjection', '-O1 -dcore-lint -dstg-lint'])
+
 test('NativeScopedSumMatch',
      [only_ways(['normal']),
       extra_files(['NativeScopedSumMatchLeft.hs', 'NativeScopedSumMatchRight.hs',
