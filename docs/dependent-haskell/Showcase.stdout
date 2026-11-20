@@ -217,6 +217,8 @@ filter a vector without forcing the tail to learn the result length: ([7],[7,9])
 infer the hidden lengths of a lazy filter and a retained vector: ([7],[],[9])
 project a stored vector from a strict record field: "h"
 partition a vector at two independent result lengths: ([7,9],[2],[7])
+match both hidden lengths in one partition result: ([7,9],[2])
+transport element equality under a hidden vector length: [7,9]
 zip a filtered vector with itself at its hidden length: [(7,7)]
 pass a lambda with a hidden vector length and filter its result: [7]
 forget the retained witness and inspect the indexed payload: ([Just True,Just False],Nothing)
@@ -267,6 +269,7 @@ name and reuse a type-level intermediate result: Refl
 bind the result of a constructor case: (Right True,Left 'c')
 select the result type by a constructor: (7,False)
 select through nested type case patterns: (Proxy,7)
+refine a constructor field and transport a later dependent index: (Refl,Refl)
 select through an ordinary type constructor: (7,'x',())
 select an arrow result inside forall: ((Proxy,1),(Proxy,'?'))
 match Bool and Ordering directly in a type: (7,'x')

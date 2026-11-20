@@ -1942,6 +1942,19 @@ states this invariant. Otherwise the binder becomes an ordinary unrestricted
 value arrow. This inherited simplification keeps the runtime argument.
 
 
+## Refining a dependent constructor telescope
+
+Agda matches an indexed constructor by unifying its result indices with
+the indices of the scrutinee. A preceding match can determine the value
+of a later pattern. GHC must also represent equality from a closed type
+family as a nominal coercion. R19 lifts each later binder's kind through
+the preceding coercions before comparing the next argument. This reuses
+the lifting context from the Core coercion library. The case remains
+stuck when a required family equation cannot reduce.
+[Agda indexed pattern matching](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#dot-patterns),
+[GHC coercion lifting](../../compiler/GHC/Core/Coercion.hs) and
+[R19 indexed examples](roadmap/R19-type-level-cases.md#transport-of-dependent-constructor-indices).
+
 ## Ordered variable fallback equations
 
 Status: M21 implemented. Both compiler stages, the located-error checks and
@@ -3095,6 +3108,18 @@ Agda's standard `Data.Vec.filter` illustrates a stronger alternative for
 one output. Its result carries a proof that the length is bounded by the input.
 [Idris 2 partition](https://idris-lang.org/Idris2/base/source/Data.Vect.html)
 and [Agda vector filter](https://agda.github.io/agda-stdlib/master/Data.Vec.html).
+
+Figure 8 of *An Existential Crisis Resolved* supplies the elaboration
+rules for nested packages. Elab-Gen packs a checked payload under a list
+of witnesses. Elab-IExist opens a package while checking an application.
+The fork substitutes each witness into the next binder's kind. A case
+whose pattern names the payload's data constructor uses the same lexical
+scope. This case context extends the application rule in the paper.
+Agda's dependent pair supplies the binder-order comparison. Its second
+field can mention the first. Idris's `Exists` supplies the erased-witness
+comparison. [Paper, figure 8](https://richarde.dev/papers/2021/exists/exists.pdf#page=18),
+[Agda dependent pairs](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#the-s-type)
+and [Idris existential pairs](https://www.idris-lang.org/Idris2/base/docs/Data.DPair.html).
 
 Figure 1(b) of *An Existential Crisis Resolved* gives the source rule for
 the [implicit vector filter](examples/erased-existentials/ImplicitVector.hs).

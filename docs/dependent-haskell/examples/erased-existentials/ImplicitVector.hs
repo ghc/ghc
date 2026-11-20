@@ -1,8 +1,9 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
 
 -- | Filter a vector without writing a package constructor or a witness.
-module ImplicitVector (Filtered, filterVec, partitionVec, cells, pairWithSelf, forgetLength, observations, singletonBuilder, runBuilder) where
+module ImplicitVector (Filtered, filterVec, partitionVec, partitionRows, rowLists, cells, transportFiltered, pairWithSelf, forgetLength, observations, singletonBuilder, runBuilder) where
 
+import Data.Type.Equality ((:~:)(Refl))
 import GHC.Sigma (Sigma(Pair))
 import PackedVecLibrary (Nat(..), Vec(..), toList, zipVec)
 
@@ -16,12 +17,33 @@ filterVec p (VCons x xs)
   | p x = VCons x (filterVec p xs)
   | otherwise = filterVec p xs
 
+-- | Change the element type using a proof under the same hidden length.
+transportFiltered :: a :~: b -> Filtered a -> Filtered b
+transportFiltered Refl xs = xs
+
 -- | Split the vector. Each result has its own hidden length.
 partitionVec :: (a -> Bool) -> Vec a n -> (Filtered a, Filtered a)
 partitionVec _ VNil = (VNil, VNil)
 partitionVec p (VCons x xs) =
   let (yes, no) = partitionVec p xs
   in if p x then (VCons x yes, no) else (yes, VCons x no)
+
+-- | Store both vectors in one payload.
+data Rows a n m = Rows (Vec a n) (Vec a m)
+
+-- | Erase the two independent lengths in binder order.
+type HiddenRows a = exists (n :: Nat). exists (m :: Nat). Rows a n m
+
+-- | Collect both outputs in one package.
+partitionRows :: (a -> Bool) -> Vec a n -> HiddenRows a
+partitionRows p xs =
+  let (yes, no) = partitionVec p xs
+  in Rows yes no
+
+-- | Match the payload constructor through both existential binders.
+rowLists :: HiddenRows a -> ([a], [a])
+rowLists rows = case rows of
+  Rows left right -> (toList left, toList right)
 
 -- | Open the hidden length for the call to 'toList'.
 cells :: Filtered a -> [a]

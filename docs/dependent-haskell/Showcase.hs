@@ -952,6 +952,11 @@ main = do
     observe "partition a vector at two independent result lengths"
         (ImplicitVector.cells passing, ImplicitVector.cells failing,
          take 1 (ImplicitVector.cells firstPart))
+    observe "match both hidden lengths in one partition result" $
+        ImplicitVector.rowLists (ImplicitVector.partitionRows odd
+            (VCons (7 :: Int) (VCons 2 (VCons 9 VNil))))
+    observe "transport element equality under a hidden vector length"
+        (ImplicitVector.cells (ImplicitVector.transportFiltered Refl passing))
     observe "zip a filtered vector with itself at its hidden length" $
         take 1 (ImplicitVector.pairWithSelf
             (ImplicitVector.filterVec odd (VCons (7 :: Int) (error "unused vector tail"))))
@@ -1054,6 +1059,12 @@ main = do
     observe "select through nested type case patterns"
         ( Proxy :: NativeNestedCase.Pick ('Just ('Just 'True))
         , 7 :: NativeNestedCase.Pick ('Just 'Nothing) )
+    observe "refine a constructor field and transport a later dependent index"
+        ( Refl :: NativeNestedCase.IndexedFieldPick
+            ('Just ('NativeNestedCase.RefinedFieldBox ('Proxy :: Proxy 'False)
+                     ('NativeNestedCase.FieldOn 'True))) :~: Proxy 'True
+        , Refl :: NativeNestedCase.DependentFieldPick
+            ('Just ('NativeNestedCase.IndexedField 'Proxy)) :~: Char )
     observe "select through an ordinary type constructor"
         ( 7 :: NativeNestedCase.TypeHead ('Just Bool)
         , 'x' :: NativeNestedCase.TypeHead ('Just Ordering)
