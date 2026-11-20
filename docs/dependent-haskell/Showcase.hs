@@ -83,6 +83,7 @@ import GHC.TypeLits (charVal)
 import qualified IndexBetaClient as IndexBeta
 import qualified IndexedMark
 import qualified IndexedVec
+import qualified OrdinaryOpenVectorAppend
 import qualified VectorSplitObservation
 import qualified KnownArgumentClient as Known
 import qualified Language.Haskell.TH as TH
@@ -1472,6 +1473,8 @@ sourceAddition = do
     observe "use ordinary vector append in a type"
         (Refl :: PackedVecLibrary.appendVec ('VCons 'True 'VNil) ('VCons 'False 'VNil)
               :~: 'VCons 'True ('VCons 'False 'VNil))
+    observe "prove empty append preserves a runtime vector"
+        (OrdinaryOpenVectorAppend.appendContents joined)
     observe "split the appended vector at its first length"
         (toList (fst split), toList (snd split))
     observe "take and drop at the first runtime length" (toList prefix, toList suffix)

@@ -22,7 +22,7 @@ reject() {
 }
 
 mkdir "$out"/{provider,client}
-for opt in -O0 -O1; do
+for opt in -O0 -O1 -O2; do
     cd "$out/provider"
     cp "$src/PackedVecLibrary.hs" .
     interfaces=()
@@ -43,16 +43,23 @@ for opt in -O0 -O1; do
     # The ordinary consumer reads both interfaces with its local rule policy.
     cp "$src/OrdinaryOpenVectorAppend.hs" .
     cat >Main.hs <<'HS'
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}
+{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
 module Main where
 
 import Control.Exception (SomeException, evaluate, try)
-import OrdinaryOpenVectorAppend (observeAppendEmpty)
+import Data.IORef (newIORef, readIORef)
+import Data.Type.Equality ((:~:)(Refl))
+import OpenVectorAppend (appendEmptyAt)
+import OrdinaryOpenVectorAppend (appendContents, observeAppendEmpty)
 import qualified PackedVecLibrary as P
 
 main :: IO ()
 main = do
-    print observeAppendEmpty
+    xs <- newIORef (P.VCons True (P.VCons False P.VNil)) >>= readIORef
+    let proofOnly :: P.Vec Bool n -> Bool
+        proofOnly v = case appendEmptyAt v of Refl -> True
+    print (observeAppendEmpty, appendContents xs, proofOnly (error "forced proof input" :: P.Vec Bool 'P.Z))
     left <- try (evaluate (P.appendVec (error "forced left" :: P.Vec Bool 'P.Z) P.VNil))
       :: IO (Either SomeException (P.Vec Bool 'P.Z))
     case left of
@@ -61,7 +68,7 @@ main = do
 HS
     "${ghc[@]}" "$opt" -fforce-recomp -c OrdinaryOpenVectorAppend.hs Main.hs
     "${ghc[@]}" Main.o OrdinaryOpenVectorAppend.o OpenVectorAppend.o ../provider/PackedVecLibrary.o -o append-run
-    [[ $(./append-run) == '("Refl",True)' ]]
+    [[ $(./append-run) == '(("Refl",True),[True,False],True)' ]]
 done
 
 cat >WrongTail.hs <<'HS'
@@ -77,6 +84,18 @@ wrongTail :: forall (xs :: P.Vec Bool ('P.S 'P.Z)) (ys :: P.Vec Bool ('P.S 'P.Z)
 wrongTail = Refl
 HS
 reject WrongTail.hs 25897 'wrongTail = Refl' -O1
+
+cat >WrongRuntime.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
+{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
+module WrongRuntime where
+import Data.Type.Equality ((:~:)(Refl))
+import qualified PackedVecLibrary as P
+wrong :: foreach (xs :: P.Vec Bool 'P.Z) -> foreach (ys :: P.Vec Bool 'P.Z)
+      -> P.appendVec 'P.VNil xs :~: ys
+wrong xs ys = Refl
+HS
+reject WrongRuntime.hs 83865 'wrong xs ys = Refl' -O1
 
 cat >OpaqueLeft.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures, TypeOperators #-}

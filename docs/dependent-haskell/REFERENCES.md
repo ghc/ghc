@@ -6546,3 +6546,21 @@ before checking the returned vector. A symbolic tail leaves an open proof
 obligation. [Agda vector append](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html),
 [Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html)
 and [closed evaluator](roadmap/R15-closed-term-evaluator.md).
+
+### Empty append at a runtime vector
+
+Agda reduces `[] ++ ys` to `ys` without inspecting `ys`. Its vector
+`splitAt` uses this equation in the zero branch of its reconstruction
+proof. The Haskell proof uses the same equation for a runtime-bound
+`xs`. This matters for a lazy vector. Its length can be known even if
+the vector is undefined. The empty-append proof returns `Refl` without
+inspecting that vector.
+[Agda standard library v2.3, Data.Vec.Base](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html)
+and [Haskell proof](examples/packed-vector/OpenVectorAppend.hs).
+
+The proof module disables rewrite rules so the imported equation applies.
+GHC normally enables rewrite rules at `-O1` and `-O2` and lets a module
+turn them off. The retained pipeline accepts the same override. The
+simplifier reads the module's actual flag when it configures rule firing.
+[GHC rewrite rules](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/rewrite_rules.html)
+and [simplifier configuration](../../compiler/GHC/Driver/Config/Core/Opt/Simplify.hs).
