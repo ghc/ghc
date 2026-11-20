@@ -3277,7 +3277,7 @@ tcRetainedResultMatch NoQL (Just expected) args fun sigma
   , null theta || hasNoConcreteTyVars fun
   , Just result <- tcRetainedOrdinaryResult (count isHsValArg args) tau
   , isTauTy expected || (hasNoConcreteTyVars fun
-                         && (isRetainedValueType expected || forwardsDot result))
+                         && (isRetainedValueType expected || forwards_package tvs result))
   , isTauTy result
   , not (hasNativeDependentExpr (Core.Type body))
   , Just kind_subst <- tcMatchTyX_BM (bind_outer tvs) Subst.emptySubst
@@ -3298,16 +3298,36 @@ tcRetainedResultMatch NoQL (Just expected) args fun sigma
 
     kind_agrees subst tv ty = eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty)
 
-    -- An application may forward the expected package at an erased type
-    -- variable without filling a unification variable with its open schema.
-    forwardsDot (TyVarTy _) = case coreFullView expected of
-      ExistsTy ImplicitExists binder body ->
-        isTauTy (tyVarKind binder) && isTauTy body && isFamFreeTy body
-      _ -> False
-    forwardsDot _ = False
+    -- See Note [Exact expected existential packages].
+    forwards_package tvs (TyVarTy result_var)
+      | result_var `elem` tvs
+      , ExistsTy _ binder body <- coreFullView expected
+      = isTauTy (tyVarKind binder) && isFamFreeTy body && tau_payload body
+    forwards_package _ _ = False
+
+    tau_payload ty = case coreFullView ty of
+      ExistsTy _ binder body -> isTauTy (tyVarKind binder) && tau_payload body
+      payload -> isTauTy payload
 
 tcRetainedResultMatch do_ql expected args fun sigma
   = tcRetainedWorkerResultMatch do_ql expected args fun sigma
+
+{- Note [Exact expected existential packages]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An ordinary polymorphic producer can already return a whole package.
+When its result is one of its invisible type parameters, match that
+parameter against the expected package. Preserve each checked binder
+and its mode. A nested binder can refer to the outer binder in its
+kind or payload, so the ordinary closed-package isTauTy test does not
+describe this telescope. Check the binder kinds and final payload for
+tau syntax. The package body keeps the family-free guard.
+
+This immutable type application uses the existing exact result match.
+It supplies no witness, performs no opening, and creates no mutable
+existential instantiation. All needed outer parameters must have
+well-kinded choices. Keep the original context and check every
+argument and the result normally.
+-}
 
 {- Note [Retained choices for partial constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
