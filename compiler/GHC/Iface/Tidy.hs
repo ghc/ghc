@@ -51,7 +51,6 @@ import GHC.Core.FVs
 import GHC.Core.Rules (canShareRetainedSpecRule)
 import GHC.Core.Dependent
     ( hasExistentialExpr, hasNativeDependentExprRhs, hasNativeDependentProgram, supportsErasedUserRule
-    , supportsErasedOrphanRule
     , hasNativeDependentUnfolding, isRetainedVanillaDefaultMethod )
 import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.Tidy
@@ -419,6 +418,7 @@ data TidyOpts = TidyOpts
   , opt_static_ptr_opts :: !(Maybe StaticPtrOpts)
       -- ^ Options for generated static pointers, if enabled (/= Nothing).
   , opt_has_retained_core :: !Bool
+  , opt_check_imported_rule :: CoreRule -> IO Bool
   , opt_keep_auto_rules :: !Bool
   }
 
@@ -463,10 +463,11 @@ tidyProgram opts (ModGuts { mg_module           = mod
         _ -> pure ()
     let heads = mkNameEnv [(idName b, b) | b <- bindersOfBinds trimmed_binds]
     forM_ trimmed_rules $ \ rule ->
-      when (not (isAutoRule rule) && hasNativeDependentProgram [] [rule]
-            && not (supportsErasedOrphanRule Nothing rule && ru_origin rule == mod)
-            && not (maybe False (`supportsErasedUserRule` rule) (lookupNameEnv heads (ru_fn rule)))) $
-        throwGhcExceptionIO $ PprProgramError
+      when (not (isAutoRule rule) && hasNativeDependentProgram [] [rule]) $ do
+        allowed <- case lookupNameEnv heads (ru_fn rule) of
+          Just fun -> pure (supportsErasedUserRule fun rule)
+          Nothing -> opt_check_imported_rule opts rule
+        unless allowed $ throwGhcExceptionIO $ PprProgramError
           "Cannot export a rewrite rule that contains retained Core."
           (ppr rule)
 

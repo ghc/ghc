@@ -57,7 +57,7 @@ import GHC.Driver.Errors
 import GHC.Driver.Messager
 import GHC.Driver.Errors.Types
 import GHC.Driver.Config.Core.Opt.Simplify ( initSimplifyExprOpts )
-import GHC.Driver.Config.Core.Lint ( endPassHscEnvIO, initLintConfig )
+import GHC.Driver.Config.Core.Lint ( endPassHscEnvIO )
 import GHC.Driver.Config.Core.Lint.Interactive ( lintInteractiveExpr )
 import GHC.Driver.Config.CoreToStg
 import GHC.Driver.Config.CoreToStg.Prep
@@ -104,9 +104,7 @@ import qualified GHC.ByteCode.Serialize as ByteCode
 
 import GHC.Core
 import GHC.Core.Dependent ( hasExistentialExpr, hasNativeDependentExpr, rejectNativeDependentExpr
-                          , supportsNativeGentle, supportsNativeRuleBinds, supportsErasedUserRule
-                          , supportsErasedOrphanRule )
-import GHC.Core.Lint ( lintRule )
+                          , supportsNativeGentle, supportsNativeRuleBinds, supportsErasedUserRule )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.TyCon (tyConName)
 import GHC.Core.Tidy           ( tidyExpr )
@@ -157,7 +155,6 @@ import GHC.Types.ForeignStubs
 import GHC.Types.Id
 import GHC.Types.Id.Info (IdDetails(VanillaId))
 import GHC.Types.Var (setIdDetails)
-import GHC.Types.TyThing (TyThing(AnId))
 import GHC.Types.Name.Set (mkNameSet, elemNameSet)
 import GHC.Types.IPE
 import GHC.Types.Name
@@ -1514,15 +1511,8 @@ hscSimplify' plugins ds_result = do
                       mkPlainErrorMsgEnvelope loc (GhcDriverMessage message)
                   module_loc = mg_loc ds_result
               forM_ rules $ \rule -> do
-                supported <- if supportsErasedOrphanRule Nothing rule && ru_origin rule == mg_module ds_result
-                  then lookupType lint_env (ru_fn rule) >>= \case
-                    Just (AnId fun) ->
-                      pure (supportsErasedOrphanRule (Just fun) rule &&
-                            isNothing (lintRule (initLintConfig (hsc_dflags lint_env)
-                                                 (bindersOfBinds simplified)) fun rule))
-                    _ -> pure False
-                  else pure False
-                unless supported $
+                allowed <- checkImportedPackageRule lint_env (mg_module ds_result) simplified rule
+                unless allowed $
                   report module_loc (DriverUnsupportedRetainedRule (ru_name rule) level)
               unless (supportsNativeRuleBinds simplified) $
                 case [b | (b, rhs) <- flattenBinds simplified,
@@ -1584,8 +1574,8 @@ The ordinary mode does not inspect each alternative RHS for native forms.
 Start with native SimpleOpt and preserve top-level binding identities.
 At -O0, omit interface pragmas. At standard native-object -O1, accept
 the default interface settings. Check the simplified bindings and local
-rules before running core2coreRetained. For an orphan package rule, resolve
-its imported head and lint the arguments and RHS against its type.
+rules before running core2coreRetained. For a package rule with an imported head, resolve
+the head and lint the arguments and RHS against its type.
 An unsupported binding or rule
 gets a source diagnostic. See Note [Native dependent unfolding templates]
 in GHC.Core.Unfold.Make for the handling of exported unfoldings.

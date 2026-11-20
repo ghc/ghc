@@ -3,8 +3,7 @@ module GHC.Core.Dependent (
     hasNativeDependentProgram,
     supportsNativeGentle,
     supportsNativeRuleBinds,
-    supportsErasedUserRule,
-    supportsErasedOrphanRule,
+    supportsErasedUserRule, supportsImportedErasedRule,
     supportsQuickLookType,
     hasNativeDependentExpr,
     hasExistentialExpr,
@@ -18,6 +17,7 @@ module GHC.Core.Dependent (
 import GHC.Prelude
 
 import GHC.Core
+import GHC.Core.FVs (orphNamesOfExprs)
 import GHC.Core.Class (classOpItems)
 import GHC.Core.Predicate (getClassPredTys_maybe)
 import GHC.Core.Type (isNativeIndexType, isNativeIndexFunctionId, isNativeOpaqueValueId
@@ -32,7 +32,8 @@ import GHC.Core.TyCon.Set
 import GHC.Types.Basic (DefMethSpec(VanillaDM))
 import GHC.Types.Id (idCoreRules, idType, isJoinId, isImplicitId, realIdUnfolding)
 import GHC.Types.Literal (literalType)
-import GHC.Types.Name (Name, isDefaultMethodOcc, isExternalName, nameModule_maybe, nameOccName)
+import GHC.Types.Name (Name, isDefaultMethodOcc, isExternalName, nameIsLocalOrFrom, nameModule_maybe, nameOccName)
+import qualified GHC.Types.Name.Set as NameSet
 import GHC.Types.Tickish (CoreTickish, GenTickish (..))
 import GHC.Types.Var
 import GHC.Types.Unique.DSet (uniqDSetToList)
@@ -91,26 +92,49 @@ supportsNativeRuleBinds binds =
 -- | Can the producer and reader process this local source rule?
 -- See Note [User rules over erased package types].
 supportsErasedUserRule :: Id -> CoreRule -> Bool
-supportsErasedUserRule fun rule@Rule{ru_auto = False, ru_fn = name,
-                                     ru_origin = origin, ru_orphan = NotOrphan{}}
-  | varName fun == name
-  , maybe (isLocalId fun) (== origin) (nameModule_maybe name)
-  , not (isJoinId fun || isImplicitId fun)
-  = not (runScanFor CheckErasedTypes StableMetadata (scanAnnotations fun <> scanRule rule))
+supportsErasedUserRule fun rule@Rule{ru_fn = name, ru_origin = origin, ru_orphan = NotOrphan{}}
+  | maybe (isLocalId fun) (== origin) (nameModule_maybe name)
+  = erasedRuleShape fun rule
 supportsErasedUserRule _ _ = False
 
--- | Check a true orphan package rule. Tidy has only the rule and its binders.
--- The source driver and interface reader also check the resolved head.
-supportsErasedOrphanRule :: Maybe Id -> CoreRule -> Bool
-supportsErasedOrphanRule head_id rule@Rule{ru_auto = False, ru_local = False,
-                                         ru_fn = name, ru_origin = origin,
-                                         ru_orphan = IsOrphan}
+-- | Check an imported head and its ordinary rule visibility.
+-- See Note [Imported heads of erased package rules].
+supportsImportedErasedRule :: Id -> CoreRule -> Bool
+supportsImportedErasedRule fun rule@Rule{ru_fn = name, ru_origin = origin,
+                                         ru_local = False, ru_orphan = orphan, ru_args = args}
   | Just owner <- nameModule_maybe name
   , owner /= origin
-  , all (\fun -> varName fun == name && not (isJoinId fun || isImplicitId fun)) head_id
-  = not (runScanFor CheckErasedTypes StableMetadata
-           (foldMap scanAnnotations head_id <> scanRule rule))
-supportsErasedOrphanRule _ _ = False
+  , case orphan of
+      IsOrphan -> True
+      NotOrphan anchor -> NameSet.nameSetAny (is_anchor anchor) (orphNamesOfExprs args)
+  = erasedRuleShape fun rule
+  where
+    is_anchor anchor n = nameIsLocalOrFrom origin n && nameOccName n == anchor
+supportsImportedErasedRule _ _ = False
+
+-- | Check the typed operands shared by local and imported rule heads.
+erasedRuleShape :: Id -> CoreRule -> Bool
+erasedRuleShape fun rule@Rule{ru_fn = name, ru_auto = False}
+  | varName fun == name
+  , not (isJoinId fun || isImplicitId fun)
+  = not (runScanFor CheckErasedTypes StableMetadata (scanAnnotations fun <> scanRule rule))
+erasedRuleShape _ _ = False
+
+{- Note [Imported heads of erased package rules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A rule for foldr k z (toList s) has an imported head and a local
+anchor, toList. A module with only a rule for open (hide x) has no
+anchor when both functions are imported. Preserve the ordinary orphan
+classification in both cases. The compiler resolves the head in its
+defining module and lints the rule against that Id's type. Check the
+stored anchor against the free external names on the left. Simplification
+can introduce other local names after the anchor was chosen. The rule's origin
+remains the module that declared it, which controls orphan visibility.
+True orphan rules keep their existing interface tag. A rule with a local
+anchor and an imported head needs a separate tag so an older reader can
+reject the interface before checking the rule against a local head.
+See Note [Orphans] in GHC.Core.InstEnv.
+-}
 
 {- Note [User rules over erased package types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -125,11 +149,6 @@ A rule from the defining module can travel with its head across an interface.
 Give this rule its own wire tag. The reader resolves the head in the defining
 module, checks the same conditions and lints both sides before using it.
 The user supplies the semantic equality, as for an ordinary Haskell RULE.
-
-A true orphan can use an imported head. Check its type in the source driver
-and again on import. The rule still originates in its own module. The
-ordinary rule environment tests that module against the visible orphans.
-The orphan marker does not change how Pack and Unpack match.
 -}
 
 -- | Check whether Quick Look can traverse a type and its coercions.
