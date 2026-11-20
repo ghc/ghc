@@ -1156,6 +1156,12 @@ main = do
                      ('NativeNestedCase.FieldOn 'True))) :~: Proxy 'True
         , Refl :: NativeNestedCase.DependentFieldPick
             ('Just ('NativeNestedCase.IndexedField 'Proxy)) :~: Char )
+    observe "refine the outer and inner GADT indices in one type case"
+        ( 7 :: NativeNestedCase.RefinedBranchPick 'False
+            ('Just ('NativeNestedCase.RefinedBranch 'Proxy ('NativeNestedCase.RefinedBit 'True)))
+        , True :: NativeNestedCase.RefinedBranchPick 'False
+            ('Just ('NativeNestedCase.RefinedBranch 'Proxy 'NativeNestedCase.InnerDisjoint))
+        , 'x' :: NativeNestedCase.RefinedBranchPick 'False ('Just 'NativeNestedCase.OuterDisjoint) )
     observe "select through an ordinary type constructor"
         ( 7 :: NativeNestedCase.TypeHead ('Just Bool)
         , 'x' :: NativeNestedCase.TypeHead ('Just Ordering)
