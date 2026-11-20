@@ -1238,7 +1238,7 @@ lookupTypeOcc position rdr_name
     lookup_table term_rdr = do
       envs <- getRdrEnvs
       let legacy_identity = case position of
-            TypeApplicationHead open -> open
+            TypeApplicationHead{} -> True
             _ -> False
       candidates <- lookupSourceTables legacy_identity envs term_rdr
       case candidates of
