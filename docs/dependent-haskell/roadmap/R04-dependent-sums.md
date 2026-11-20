@@ -140,6 +140,20 @@ GHC keeps the pair boxed because the payload type depends on its first
 field. Unpacking an ordinary product requires a flat list of independent
 representation arguments. That operation cannot describe this telescope.
 
+A Haskell98 newtype can wrap a retained sum directly in a positional
+or record field. The record selector returns the whole pair, including
+the runtime witness. A newtype pattern that ignores its field leaves
+the pair unevaluated. GHC derives the representation axiom and roles
+through its ordinary newtype checks. A type parameter captured by the
+generated payload family has a nominal role. An ordinary source-free
+client reifies the selector type with Template Haskell and uses it
+to coerce the wrapper to its field.
+[Registered source test](../../../testsuite/tests/dependent/should_run/NativeScopedSumSignatureReify.sh).
+
+Agda's dependent pair uses the stored first component to type the
+second field. The GHC newtype wraps that pair as a whole.
+[Agda's dependent pair](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#the-s-type).
+
 ## Payload families for the `some` binder
 
 Serokell writes a retained sum as `some (x :: a) | B`. Its payload can
