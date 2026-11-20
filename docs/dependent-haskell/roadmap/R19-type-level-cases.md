@@ -171,9 +171,9 @@ caseIdentity _ input = input
 
 The renamer compares names, promotion marks, applications, wildcards
 and row order in one signature. Extra parentheses leave the case
-unchanged. Two distinct scrutinees, reordered rows, and separate
-signatures each have their own helper. The ordinary client can use the
-function at `Int` and `Bool` from its interface. Template Haskell can
+unchanged. Distinct scrutinees and reordered rows have separate helpers.
+The ordinary client can use the function at `Int` and `Bool` from
+its interface. Template Haskell can
 reify the signature in its owner or a client. A stuck mismatch names the
 source signature. An explicit nested erased `forall` can name its
 own scrutinee. Each nested telescope starts a fresh scope, even when
@@ -184,6 +184,45 @@ in an erased kind, so that case still requires a named helper.
 [Source](../examples/open-evaluation/NativeCase.hs),
 [client](../../../testsuite/tests/dependent/should_run/NativeTypeCaseClient.hs)
 and [reification](../../../testsuite/tests/dependent/should_run/NativeTypeCaseReify.hs).
+
+### Compute a retained scrutinee
+
+A retained signature can match the result of a qualified application
+tree. This signature uses the checked R16 equations for both instances
+of `Prelude.not`.
+
+```haskell
+pick :: foreach (b :: Bool)
+     -> (case P.not (P.not b) of { True -> Int; False -> Bool })
+pick True = 42
+pick False = False
+```
+
+A call can use two retained indices. The supplied order determines
+which operands the source equations inspect. The private synonym
+receives the original indices and preserves that order. A checked
+equation may use the first constructor without inspecting the second
+operand. Unknown inputs still block an earlier test. A visible rule
+that can change a used source equation causes an error.
+[R16 checked functions](R16-open-term-evaluator.md) and
+[source and interface client](../../../testsuite/tests/dependent/should_run/NativeTypeCaseClient.hs).
+
+Identical retained cases in a declaration group can share one generated
+family when their captured domains are closed and their rows have no
+local captures or pattern binders. The comparison uses each retained
+operand's position in the captured telescope. It preserves the
+application tree, qualified head names and row order. A shadowed
+variable keeps the identity of its own runtime binder. Across modules,
+export a named case result to give both signatures the same family.
+
+Different spellings of an imported name still give distinct helpers.
+To keep an ordinary function head unqualified, use a named case
+result. Infix calls, explicit kind applications and local callable
+heads remain outside this lifting rule. To extend the comparison,
+resolve heads with ordinary source-table lookup under the signature's
+lexical environment. Compare the resulting names and the captures'
+formal positions. Keep the existing checked-family application and
+evidence checks.
 
 ## A case as an arrow result
 

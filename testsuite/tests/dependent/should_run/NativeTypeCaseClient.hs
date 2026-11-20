@@ -8,6 +8,7 @@ import Data.Proxy (Proxy(..))
 import NativeCase
 import qualified NativeNestedCase as N
 import qualified NativeTypeCaseFallback as Catch
+import qualified OpenMapWorker as Open
 
 always :: Proxy b -> Catch.Always b :~: Int
 always _ = Refl
@@ -37,6 +38,11 @@ nestedSignatureShadow = nestedCaseIdentity (Proxy @'False) False (Proxy @'True) 
 retainedSignature :: (Int, Char, String, String)
 retainedSignature =
   (retainedPick True, retainedPick False, renderRetainedPick True, renderRetainedPick False)
+
+computedRetained :: (Int, Bool, Proxy Int, Proxy Char)
+computedRetained =
+  (retainedDoubleNot True, retainedDoubleNot False,
+   retainedPermission Open.Green True, retainedPermission Open.Red True)
 
 field :: Field ('Just 'True) :~: '( 'True, 'True)
 field = Refl

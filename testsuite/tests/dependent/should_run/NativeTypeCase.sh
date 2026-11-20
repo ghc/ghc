@@ -6,6 +6,7 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 cd "$tmp"
 cp "$area"/Native*.hs .
+cp "$area/OpenMapWorker.hs" .
 plain=("$1" "-B$2" -v0 -package-env - -i -i. -fdiagnostics-color=never)
 g=("${plain[@]}" -dcore-lint -dstg-lint)
 reject() {
@@ -14,6 +15,7 @@ reject() {
   if [[ $status != 1 ]] || ! grep -Fq "$file.hs:$span:" bad.log ||
       ! grep -Fq "$message" bad.log; then cat bad.log >&2; exit 1; fi
 }
+"${g[@]}" -fomit-interface-pragmas -c OpenMapWorker.hs
 "${g[@]}" -c NativeCase.hs
 "${g[@]}" -c NativeTypeCaseFallback.hs
 "${g[@]}" -fomit-interface-pragmas -c NativeNestedCase.hs
@@ -22,7 +24,7 @@ if sed -n '/^exports:/,/^defaults:/p' nested.iface | grep -E '\$(case(-node)?|la
 "${g[@]}" --show-iface NativeCase.hi >case.iface
 if sed -n '/^exports:/,/^defaults:/p' case.iface | grep -E '\$case(:|-let-rhs:)'; then exit 1; fi
 mkdir interfaces
-cp NativeCase.hi NativeNestedCase.hi NativeTypeCaseFallback.hi NativeTypeCase{Client,Rigid,LetWrong,FallbackRigid}.hs interfaces/
+cp NativeCase.hi NativeNestedCase.hi OpenMapWorker.hi NativeTypeCaseFallback.hi NativeTypeCase{Client,Rigid,LetWrong,FallbackRigid}.hs interfaces/
 (cd interfaces && reject NativeTypeCaseFallbackRigid 9:13 'GHC-83865' && grep -Fq 'Force b' bad.log)
 (cd interfaces && "${g[@]}" -c NativeTypeCaseClient.hs &&
    reject NativeTypeCaseRigid 10:13 'case a of {True -> Int; False -> Int}' &&

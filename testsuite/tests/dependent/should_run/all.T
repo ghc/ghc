@@ -266,6 +266,7 @@ test('NativePercentArrowPpr',
 test('NativeTypeCase',
      [only_ways(['normal']),
       extra_files([open_eval_dir + 'NativeCase.hs', open_eval_dir + 'NativeNestedCase.hs',
+                   open_eval_dir + 'OpenMapWorker.hs',
                    'NativeTypeCaseClient.hs', 'NativeTypeCaseRigid.hs',
                    'NativeTypeCaseInvalid.hs', 'NativeTypeCaseEscape.hs', 'NativeTypeCaseBadPattern.hs',
                    'NativeTypeCaseFallback.hs', 'NativeTypeCaseFallbackRigid.hs', 'NativeTypeCaseDisabled.hs', 'NativeTypeCaseBranchKind.hs',
@@ -281,7 +282,8 @@ test('NativeTypeCase',
      run_command, ['bash NativeTypeCase.sh "{compiler}" "{libdir}"'])
 test('NativeTypeCaseReify',
      [req_interp, req_rts_linker, only_ways(['normal']),
-      extra_files([open_eval_dir + 'NativeCase.hs', open_eval_dir + 'NativeNestedCase.hs'])],
+      extra_files([open_eval_dir + 'NativeCase.hs', open_eval_dir + 'NativeNestedCase.hs',
+                   open_eval_dir + 'OpenMapWorker.hs'])],
      multimod_compile, ['NativeTypeCaseReify', '-v0 -dcore-lint ' + config.ghc_th_way_flags])
 
 test('NativeSimplifier',

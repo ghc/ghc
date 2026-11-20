@@ -5,10 +5,14 @@ module NativeCase
   , PayloadKind, Fixed, Captured, Retain, PatternShadow, ScrutineeShadow, NestedScope
   , Paired, InferredCapture, ContextKind, SeparateKinds
   , caseIdentity, nestedCaseIdentity, retainedPick, renderRetainedPick, retainedKeep
+  , retainedDoubleNot, retainedPermission
   ) where
 
 import Data.Kind (Type)
-import Data.Proxy (Proxy)
+import Data.Proxy (Proxy(..))
+import qualified OpenMapWorker as Open
+import Prelude
+import qualified Prelude as P
 
 -- | Choose an ordinary result type from a Boolean.
 type F a = case a of
@@ -78,6 +82,17 @@ render False value = show value
 -- | Return a constant without forcing either argument.
 retainedKeep :: foreach (flag :: Bool) -> (case flag of { True -> Int; False -> Char }) -> Int
 retainedKeep _ _ = 42
+
+-- | Select the result after two checked Boolean negations.
+retainedDoubleNot :: foreach (b :: Bool)
+                  -> (case P.not (P.not b) of { True -> Int; False -> Bool })
+retainedDoubleNot True = 42
+retainedDoubleNot False = False
+
+-- | Select a type from two runtime operands.
+retainedPermission :: foreach (light :: Open.Lamp) -> foreach (allowed :: Bool)
+                   -> Proxy (case Open.mayProceed light allowed of { True -> Int; False -> Char })
+retainedPermission _ _ = Proxy
 
 -- | Reuse a local kind while retaining the kind of an outer parameter.
 type Fixed (k :: Type) (a :: k) = let k = Bool in case 'False of
