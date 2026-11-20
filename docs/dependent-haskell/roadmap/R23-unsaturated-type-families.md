@@ -84,6 +84,24 @@ predicts this break and gives U as the default for a synonym RHS.
 [Source test](../../../testsuite/tests/dependent/should_run/NativePercentArrowOnlyModifiers.hs)
 and [proposal rationale](../REFERENCES.md#matchability-and-multiplicity-on-arrows).
 
+`GADTSingletons` has a second dependency on arrow matchability. Stock
+GHC 9.14.1 accepts the original module. The fork at `7c873b5f46` already
+rejects these three declarations with `DataKinds`, `GADTs`, `PolyKinds`
+and `TypeOperators` enabled.
+
+```haskell
+data TyFun :: Type -> Type -> Type
+type a ~> b = TyFun a b -> Type
+data TyCon1 :: (k1 -> k2) -> (k1 ~> k2)
+```
+
+With the R23 compiler at `55c20e158c`, fixing the synonym to M makes
+this reduction compile. Fixing it to U gives GHC-83865 at `TyCon1`.
+In the full module, fixing the synonym to M exposes three further
+kind errors in the `PromoteX` and `DemoteX` equations for `Either`.
+[Full test](../../../testsuite/tests/dependent/should_compile/GADTSingletons.hs)
+and [proposal 242 on synonym right-hand sides](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#rhs-of-type-synonyms).
+
 In `T15874`, the original `type Varianced = forall (var :: Var). Type`
 supplies an invisible U forall. The data-family instance requires M.
 GHC-45219 names the synonym and both matchabilities, including when the
@@ -247,6 +265,10 @@ compiler upgrade must inspect that declaration even when the module
 has no local instances. Both ordinary and boot interfaces can record
 a signature whose inferred index changes. The upgrade check compares
 both client ABIs with clean builds.
+If recompiling a provider changes its ABI, the normal dependency check
+reports the provider by name. If its ABI stays the same, the compiler
+checks whether the client used a family whose inferred arguments can
+change. This also covers a library imported through a re-export.
 [Upgrade test](../examples/closed-evaluation/check-readback-upgrade.sh).
 
 #### Earlier failures
