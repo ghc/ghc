@@ -821,21 +821,22 @@ can_eq_nc _ _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
 {- Note [Congruence for generated type lambdas]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A wanted can compare Map f xs and Map g xs with xs still unknown.
-Map is not injective. Decomposing the wanted would assume an equality
-of its arguments. Instead, check the generated f and g independently
-using their checked lexical closures. Build nominal congruence only
-when every argument already has a proof. This does not select a family
-equation or add new wanteds. Written family heads retain their names.
+Map is non-injective. Decomposing the wanted would assume an equality
+of its arguments. Check the lexical closures of f and g independently.
+Build nominal congruence only when every argument already has a proof.
+Use the same family head on both sides, whether the family is open or
+closed. Ordinary matching and apartness still select its equations.
 See Note [Scoped retained sum codomains] in GHC.Core.TyCo.Compare.
 -}
 
--- | Prove a generated closure equality, including under a closed family.
+-- | Prove a generated closure equality, including under a type family.
 proveLambdaCongruence :: Type -> Type -> Maybe CoercionN
 proveLambdaCongruence lhs rhs
   | Just co <- proveScopedLambdaClosure lhs rhs = Just co
   | Just (tc, as) <- splitTyConApp_maybe lhs
   , Just (tc', bs) <- splitTyConApp_maybe rhs
-  , tc == tc', isJust (closedFamilyTyConCoAxiom_maybe tc)
+  , tc == tc'
+  , isOpenTypeFamilyTyCon tc || isJust (closedFamilyTyConCoAxiom_maybe tc)
   , lengthIs as (tyConArity tc), equalLength as bs
   , typeKind lhs `eqType` typeKind rhs
   , not (lhs `eqType` rhs)
