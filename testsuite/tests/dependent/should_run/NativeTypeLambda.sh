@@ -15,6 +15,17 @@ cp "$src"/{TypeLambda,NativeTypeLambdaScope}.hs .
 "${g[@]}" --show-iface TypeLambda.hi >provider.iface
 if sed -n '/^exports:/,/^defaults:/p' provider.iface | grep -E '[$](lambda|signature-lambda):'; then exit 1; fi
 "${g[@]}" -fomit-interface-pragmas -c NativeTypeLambdaScope.hs
+cat >RepeatedProvider.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes, Modifiers, StandaloneKindSignatures #-}
+module RepeatedProvider where
+import Data.Kind (Type)
+import GHC.Matchability (U)
+type LeftCallback :: Type -> Type %U -> Type
+type LeftCallback e = \a -> Either e a
+type RightCallback :: Type -> Type %U -> Type
+type RightCallback e = \field -> Either e field
+HS
+"${g[@]}" -fomit-interface-pragmas -c RepeatedProvider.hs
 sed 's/, UndecidableInstances//; s/module TypeLambda/module Termination/' TypeLambda.hs >Termination.hs
 if "${g[@]}" -c Termination.hs >termination.log 2>&1 ||
    ! grep -Fq 'error: [GHC-22979]' termination.log ||
@@ -23,11 +34,35 @@ if "${g[@]}" -c Termination.hs >termination.log 2>&1 ||
     cat termination.log >&2
     exit 1
 fi
-cp TypeLambda.hi NativeTypeLambdaScope.hi "$out/client/"
+cp TypeLambda.hi NativeTypeLambdaScope.hi RepeatedProvider.hi "$out/client/"
 cd "$out/client"
 test ! -e TypeLambda.hs
 cp "$src/TypeLambdaClient.hs" .
 "${g[@]}" -fomit-interface-pragmas -c TypeLambdaClient.hs
+
+cat >RepeatedClient.hs <<'HS'
+{-# LANGUAGE DataKinds, GADTs, Modifiers, NoExperimentalDependentTypes #-}
+{-# LANGUAGE StandaloneKindSignatures, TypeFamilies, TypeOperators #-}
+module RepeatedClient where
+import Data.Kind (Type)
+import Data.Type.Equality ((:~:)(Refl))
+import GHC.Matchability (U)
+import RepeatedProvider
+type Same :: (Type %U -> Type) -> (Type %U -> Type) -> Bool
+type family Same x y where
+    Same x x = 'True
+    Same _ _ = 'False
+test :: Same (LeftCallback Char) (RightCallback Char) :~: 'True
+test = Refl
+HS
+"${g[@]}" -c RepeatedClient.hs
+sed -e 's/module RepeatedClient/module WrongRepeat/' -e "s/:~: 'True/:~: 'False/" \
+    RepeatedClient.hs >WrongRepeat.hs
+if "${g[@]}" -c WrongRepeat.hs >repeat.log 2>&1 ||
+   ! grep -Fq 'error: [GHC-83865]' repeat.log; then
+    cat repeat.log >&2
+    exit 1
+fi
 
 sed -e 's/module TypeLambdaClient/module ChangedLambda/' \
     -e 's/Either e field/Either field e/' TypeLambdaClient.hs >ChangedLambda.hs

@@ -79,6 +79,12 @@ reduce applications from an earlier unmarked provider at known
 indices. Forwarding its opaque callback at an unknown index needs the
 provider's closure metadata.
 
+A closed family can also match two equivalent closures against one
+repeated variable. For `Same x x = 'True`, GHC proves the argument
+conversion before applying the branch axiom. It checks apartness with
+the arguments on both sides of that conversion. Unrelated opaque
+callbacks keep the family stuck when GHC cannot check apartness.
+
 In `Shadowed (q :: Type) (a :: q)`, the lambda binds a new `q`.
 The family header keeps the outer `q` in scope for the kind of `a`.
 The family equation uses the inner `q` for its input. At
