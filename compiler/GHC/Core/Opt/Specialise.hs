@@ -16,7 +16,7 @@ import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 
 import GHC.Core.Type  hiding( substTy, substCo, extendTvSubst, zapSubst )
 import GHC.Core.SimpleOpt( defaultSimpleOpts, simpleOptExprWith, simpleOptNativeExpr, exprIsConApp_maybe )
-import GHC.Core.Dependent (hasNativeDependentUnfolding)
+import GHC.Core.Dependent (hasNativeDependentUnfolding, hasScopedDictionaryProgram)
 import GHC.Core.Opt.OccurAnal (SimplCoreMode(..))
 import GHC.Core.Predicate
 import GHC.Core.Class( classMethods )
@@ -1626,6 +1626,12 @@ type SpecInfo = ( [CoreRule]       -- Specialisation rules
                 , UsageDetails )   -- Usage details from specialised RHSs
 
 specCalls spec_imp env existing_rules calls_for_me fn rhs
+  | RetainedCore <- se_core_mode env
+  , notNull calls_for_me
+  , hasScopedDictionaryProgram [NonRec fn rhs]
+  = return ([], [], emptyUDs)
+    -- See Note [Specialising functions with scoped class methods].
+
         -- The first case is the interesting one
   |  notNull calls_for_me               -- And there are some calls to specialise
   && not (isNeverActive (idInlineActivation fn))
@@ -2054,6 +2060,19 @@ unfolding template rather than to its optimised RHS, and the two may differ:
 the argument can be dead in the RHS and not in the template. The specialised
 function's unfolding then contains the filler, and any call site that inlines
 it evaluates the error thunk. See #27703 for an instance of how this goes wrong.
+
+Note [Specialising functions with scoped class methods]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A scoped class method can occur in a type, for example Tagged (choose x).
+The type names the dictionary supplied by the caller. An ordinary
+specialisation rule matches any dictionary at the specialised class type,
+then uses the dictionary chosen when the rule was built. Even a trivial
+dictionary expression can be a cast rather than the variable named in a
+type. Binding that expression to a fresh variable would still give the
+rule a different dictionary from its caller.
+
+Keep the original binding when its type, RHS or unfolding uses a scoped
+method. Other bindings in the module can specialise as usual.
 
 Note [Specialisation modulo dictionary selectors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
