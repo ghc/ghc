@@ -296,7 +296,8 @@ test('NativeUnsaturatedFamily',
 test('NativeMatchableProjection',
      [only_ways(['normal']),
       extra_files([open_eval_dir + f for f in ['MatchableEquality.hs', 'MatchableView.hs']]
-                  + ['../../../../docs/dependent-haskell/examples/qualified-pi/RetainedCharacters.hs'])],
+                  + ['../../../../docs/dependent-haskell/examples/qualified-pi/RetainedCharacters.hs',
+                     'NativeMatchableKindProjection.hs'])],
      run_command, ['bash NativeMatchableProjection.sh "{compiler}" "{libdir}"'])
 test('NativeLaterMatchability',
      [only_ways(['normal']),

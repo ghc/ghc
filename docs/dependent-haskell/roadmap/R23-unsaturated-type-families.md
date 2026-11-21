@@ -923,6 +923,10 @@ endpoints before projecting. The cast in the recorded head keeps the
 GADT's proof in scope. If the equality alone still supplies the
 matchable heads, the interface uses the existing projection encoding.
 A reader that needs the new rule can identify it in the header.
+The same projection can also recover the hidden kind of the argument.
+A client obtains an index at `'True :: Bool` from one package and at
+`Int :: Type` from another.
+[Two argument kinds](../../../testsuite/tests/dependent/should_run/NativeMatchableKindProjection.hs).
 [Source example](../examples/open-evaluation/MatchableView.hs)
 and [checked-rule controls](../../../testsuite/tests/ghc-api/MatchableProjectionRule.hs).
 

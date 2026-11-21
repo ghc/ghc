@@ -20,7 +20,10 @@ for opt in -O0 -O2; do
 done
 "${ghc[@]}" --show-iface MatchableView.hi >provider.iface
 grep -Eq '^ *got .*matchable-projection' provider.iface
-cp "$src/RetainedCharacters.hs" .
+cp "$src/"{RetainedCharacters,NativeMatchableKindProjection}.hs .
+for opt in -O0 -O2; do
+    "${ghc[@]}" "$opt" -Werror=incomplete-patterns -fforce-recomp -c NativeMatchableKindProjection.hs
+done
 cat >Mixed.hs <<'HSMIXED'
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, ScopedTypeVariables, TypeApplications #-}
 module Mixed (present) where
@@ -54,16 +57,17 @@ import Data.Proxy (Proxy(..))
 import GHC.Matchability (M)
 import MatchableView
 import Mixed (present)
+import qualified NativeMatchableKindProjection as Kind
 main :: IO ()
 main = do
     let input = Applied @M @Maybe Proxy KnownM 'q' (fmap odd)
         (c, run) = viewResult input
-    if present input (Just 4) == ('λ', Just False)
+    if present input (Just 4) == ('λ', Just False) && Kind.observe == (True, 'k')
         then print (c, run (Just 3), betaResult input (Just 4))
         else fail "incorrect result from the mixed interface"
 HSCLIENT
 "${ghc[@]}" -O2 -c Main.hs
-"${ghc[@]}" Main.o ../provider/{Mixed,RetainedCharacters,MatchableView}.o ../lib/MatchableEquality.o -o check
+"${ghc[@]}" Main.o ../provider/{Mixed,RetainedCharacters,MatchableView,NativeMatchableKindProjection}.o ../lib/MatchableEquality.o -o check
 ./check
 cat >Unproved.hs <<'HSCONTROL'
 {-# LANGUAGE DataKinds, GADTs, Modifiers, NoExperimentalDependentTypes, PolyKinds, TypeOperators #-}
