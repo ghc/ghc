@@ -821,8 +821,7 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
                     ++ map (varType . snd) (head_binders ++ cb_binders)
       guard (not (result_var `elemVarSet` tyCoVarsOfTypes other))
       (ident, operands) <- MaybeT (tcDeclaredOperandSpine False callback)
-      let (provided, _, declared) = tcRetainedInstTelescope (varType ident)
-      residual <- MaybeT . pure $ foldM (\ty _ -> snd <$> splitVisibleFunTy_maybe ty) declared operands
+      (provided, residual) <- MaybeT . pure $ declared_residual (varType ident) operands
       let (_, actuals, callback_result) = tcSplitFunTys residual
           inputs = map scaledThing (formals ++ actuals)
           pairs = zip (map scaledThing actuals) (map scaledThing formals)
@@ -846,6 +845,16 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
         is_value _ = False
         directly_opened (Right (_, _, _, Nothing)) = True
         directly_opened _ = False
+
+        -- IALL can instantiate another group after each supplied value.
+        declared_residual sigma args = case args of
+          [] -> Just (tvs, body)
+          _ : rest -> do
+            (_, result) <- splitVisibleFunTy_maybe body
+            (later_tvs, residual) <- declared_residual result rest
+            return (tvs ++ later_tvs, residual)
+          where
+            (tvs, _, body) = tcRetainedInstTelescope sigma
 
     open result_ty opened rev_args [] = do
       let args = reverse rev_args
@@ -1320,6 +1329,13 @@ For a result with consecutive dot binders, check each binder kind and
 the final payload. An inner body can refer to a witness bound by an
 earlier dot. Keep the whole result type over these witnesses. The
 producer thunk stays lazy.
+
+A declaration can place its inferred lengths after an ordinary argument,
+as in select :: Predicate a -> forall i j. Vec a i -> Vec a j -> HiddenRows a.
+Read the invisible binders exposed after each supplied value, including
+the last one. Match only variables bound by these groups. Check the final
+package for escapes from all of them. The ordinary application checker
+instantiates each group and checks the arguments and constraints in order.
 -}
 
 {- Note [Projected implicit existential operands]
