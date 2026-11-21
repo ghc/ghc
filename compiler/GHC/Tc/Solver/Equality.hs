@@ -46,7 +46,8 @@ import GHC.Core.TyCo.Rep   -- cleverly decomposes types, good for completeness c
 import GHC.Core.TyCo.FVs ( tyCoVarsOfMCo, almostDevoidCoVarOfCo, mkUnivCoDeps, univCoDepsHoles )
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Coercion
-import GHC.Core.Coercion.Axiom ( CoAxiomRule(BranchedAxiom), coAxiomName, co_ax_source_proof_rules, sourceProofAxiomRules )
+import GHC.Core.Coercion.Axiom ( CoAxiomRule(BranchedAxiom), coAxiomName, coAxiomTyCon,
+                               co_ax_source_proof_rules, sourceProofAxiomRules )
 import GHC.Core.Reduction
 import GHC.Core.FamInstEnv ( FamInstEnvs )
 import GHC.Core
@@ -762,23 +763,30 @@ can_eq_nc ces rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
            ; let solve = can_eq_nc ces' rdr_env envs new_ev eq_rel xi1 xi1 xi2 xi2
            ; case (eq_rel, new_ev) of
                (NomEq, CtWanted (WantedCt { ctev_dest = HoleDest hole }))
-                 -> record_axiom_use hole redn1 (record_axiom_use hole redn2 solve)
+                 -> record_reduction_uses hole (reduction_uses ps_ty1 redn1 ++ reduction_uses ps_ty2 redn2) solve
                _ -> solve }
 
-    -- Keep the genuine family axiom in the reduction. The reduced type
-    -- alone cannot distinguish a checked source method from a literal.
-    record_axiom_use hole (Reduction (AxiomCo ax@(BranchedAxiom axiom 0) []) _) solve
-      | deps@(_ : _) <- sourceProofAxiomRules ax
+    -- See Note [Committing a checked method synonym].
+    reduction_uses ty (Reduction (AxiomCo rule@(BranchedAxiom axiom branch) arguments) _) =
+      [ (coAxiomName axiom, deps)
+      | branch == 0, null arguments, let deps = sourceProofAxiomRules rule, not (null deps) ] ++
+      [ (tyConName synonym, deps)
+      | TyConApp synonym _ <- [ty], let deps = synTyConSourceProofRules synonym, not (null deps)
+      , TyConApp family args <- [coreFullView ty], saturatedSourceHead family args
+      , coAxiomTyCon axiom == family ]
+    reduction_uses _ _ = []
+
+    record_reduction_uses hole uses@(_ : _) solve
       = do { result <- solve
            ; filled <- wrapTcS (TcM.liftZonkM (unpackCoercionHole_maybe hole))
            ; case filled of
                Just (CPH { cph_co = co }) | isReflCo co ->
                  wrapTcS $ TcM.setCtLocM (ctEvLoc ev) $ do
                    loc <- TcM.getSrcSpanM
-                   TcM.recordSourceProofUse loc (coAxiomName axiom) deps
+                   mapM_ (uncurry (TcM.recordSourceProofUse loc)) uses
                _ -> pure ()
            ; pure result }
-    record_axiom_use _ _ solve = solve
+    record_reduction_uses _ _ solve = solve
 
     rewrite_if_unrewritten :: Bool -> TcType -> TcS (Reduction, CoHoleSet)
     rewrite_if_unrewritten already_rewritten ps_ty
@@ -786,6 +794,17 @@ can_eq_nc ces rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
       = return (mkReflRedn (eqRelRole eq_rel) ps_ty, emptyCoHoleSet)
       | otherwise
       = rewrite ev ps_ty
+
+{- Note [Committing a checked method synonym]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An imported synonym Mapped f x can expand to the selected method's private
+source family. Solving Mapped f (Right x) ~ Right (f x) uses its family
+axiom, so the resulting proof depends on the selector's rules. Keep the
+genuine source-family axiom through rewriting. Record the synonym's rule
+dependencies when this axiom reduces its expanded head and the rewritten
+nominal Wanted is solved by reflexivity. Merely naming the synonym or
+proving equality with itself needs no family equation.
+-}
 
 ----------------------------
 -- Look for a canonical LHS.

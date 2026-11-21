@@ -34,9 +34,10 @@ import GHC.Core.TyCo.FVs( tyCoVarsOfTypes, tyCoVarsOfCo
                         , unionUnivCoDeps
                         )
 import GHC.Core.Coercion
-import GHC.Core.Coercion.Axiom ( sourceProofAxiomRules )
+import GHC.Core.Coercion.Axiom ( CoAxiomRule(BranchedAxiom), coAxiomTyCon, sourceProofAxiomRules )
 import GHC.Core.Lint( lintTcCoercion )
 import GHC.Core.Reduction
+import GHC.Types.Name ( nameOccName, sourceTableTermOcc )
 import GHC.Types.Unique.FM
 import GHC.Types.Var
 import GHC.Types.Var.Set
@@ -1211,8 +1212,15 @@ rewriteExactFamApp tc tys =
            return redn
          FamAppReduced redn worth_caching _ ->
            do { -- Zap the reduction (when -fzap-coercions is on).
-              ; zapped_redn <- case (tys, reductionCoercion redn) of
-                   ([], AxiomCo ax []) | _ : _ <- sourceProofAxiomRules ax -> return redn
+              ; zapped_redn <- case () of
+                   _ | null tys, AxiomCo ax [] <- reductionCoercion redn
+                     , _ : _ <- sourceProofAxiomRules ax -> return redn
+                   -- An imported synonym can carry the rule dependencies of
+                   -- a checked method. Let the equality solver see the axiom
+                   -- that reduced the synonym's private source family.
+                   _ | Just _ <- sourceTableTermOcc (nameOccName (tyConName tc))
+                     , AxiomCo (BranchedAxiom ax _) _ <- reductionCoercion redn
+                     , coAxiomTyCon ax == tc -> return redn
                    _ -> zapRedn deps fam_ty redn
 
                 -- See Note [The family application cache]
