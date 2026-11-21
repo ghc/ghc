@@ -3,11 +3,13 @@ module Main where
 
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Control.Monad (unless)
+import Data.IORef (newIORef, readIORef)
 import Data.List (isInfixOf)
 import GHC.Sigma (Sigma(Pair))
 import qualified Language.Haskell.TH as TH
 import NativeGadtRetainedSumProvider
 import NativeNestedPackagePatProvider
+import qualified PackedVecLibrary as Packed
 
 headCell :: Vec a ('S m) -> a
 headCell (VCons x _) = x
@@ -48,8 +50,15 @@ checkDemand message value = do
                 fail (displayException err)
         Right _ -> fail ("expected " ++ message)
 
+-- | Read the padding length and the vector from the nested package.
+observePadding :: PaddedVector ('Packed.S 'Packed.Z) -> (Int, String)
+observePadding (Pair padding (Pair _ vector)) = (Packed.natToInt padding, Packed.toList vector)
+
 main :: IO ()
 main = do
+    padding <- newIORef (Packed.S (Packed.S Packed.Z)) >>= readIORef
+    let padded = observePadding (padVector padding)
+    unless (padded == (2, "x..")) (fail (show padded))
     let values = map seal [outerWitnessBottom, emptyInput]
     print (map first values, map control values)
     checkDemand "second vector" (first (seal innerWitnessBottom))
