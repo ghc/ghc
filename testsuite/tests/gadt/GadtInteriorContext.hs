@@ -9,6 +9,9 @@ right (Two _ (Tag (type Int))) flag | flag = 7
 right (Two _ _) _ = 13
 right (Strict _ (Tag (type Int))) _ = 19
 
+hidden :: Hidden -> Bool
+hidden (Hidden _ x) = x == x
+
 throws :: a -> IO Bool
 throws x = either (const True) (const False) <$> try @SomeException (evaluate x)
 
@@ -21,3 +24,4 @@ main = do
   afterContext <- throws (Strict @Int bottom :: Tag Int -> Two Int)
   full <- throws (Strict @Int bottom (Tag (type Int)))
   print (partial, afterContext, full)
+  print (hidden (Hidden True False), hidden (Hidden @Double 0 (0/0)))

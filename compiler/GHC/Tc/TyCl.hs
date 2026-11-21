@@ -6520,8 +6520,7 @@ checkValidDataCon dflags existential_ok tc con
                        = orderedConArgsHaveScope groups (early ++ late) theta arg_tys
                        | otherwise = disjointVarSet (mkVarSet (binderVars late)) (tyCoVarsOfTypes prefix_types)
                ; checkTc ((null ex_tvs ||
-                            ((dataConTerminalOrder con == gadtTrailingContextOnly ||
-                              (is_ordered && isNothing (dataConInteriorContext con))) &&
+                            ((dataConTerminalOrder con == gadtTrailingContextOnly || is_ordered) &&
                              all isTyVar ex_tvs))
                           && null eq_spec
                           && null (dataConStupidTheta con)

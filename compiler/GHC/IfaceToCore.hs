@@ -1286,10 +1286,7 @@ tcIfaceDataCons tycon_name tycon if_cons
                     positive (ConValueArgs n) = n > 0
                     non_field ConValueArgs{} = False
                     non_field _ = True
-                    admissible_binders
-                      | Just _ <- conInteriorContext source_order = null ex_bndrs
-                      | otherwise = all type_binder ex_bndrs
-                in unless (valid_group && admissible_binders && ordinary_data &&
+                in unless (valid_group && all type_binder ex_bndrs && ordinary_data &&
                            has_wrapper && null arg_binders && null spec && null lbl_names) $
                      failIfM (text "Invalid interior constructor group in interface:" <+> ppr dc_name)
           ; when (terminal_order /= 0) $
