@@ -9,7 +9,7 @@ records every edge. The R numbers are local labels for those cards.
 
 ## Where this fork stands
 
-At `711b6e0e56`, **23 of 50 cards (46%) are complete** on the upstream
+At `5ecac2c539`, **23 of 50 cards (46%) are complete** on the upstream
 checklist. The fork adds a tested part of **19 of the 27 open cards**.
 This count includes a card when the fork demonstrates a behavior in
 source Haskell or in compiled Core. Each card counts once, regardless
@@ -22,6 +22,13 @@ depend on others, so this count cannot estimate the remaining work time.
 | Promotion and evaluation | R07, R12, R13, R14, R15, R16, R17, R18, R19 |
 | Declaration dependencies, families and GADTs | R21, R23, R24, R41 |
 | Namespace warnings | R36 |
+
+A library can declare an open row schema. Another module can supply an
+instance whose type lambda captures its error type. A client can use
+both the optional schema and the error schema from compiled interfaces.
+The two instances appear in the 501-output Showcase.
+[Schema library](examples/open-evaluation/TypeLambda.hs) and
+[separate instance](examples/open-evaluation/SchemaColumns.hs).
 
 Proposal #765 adds pun warnings. The fork now implements the top-level
 part of `-Wpun-bindings`. With this flag, `data T = T` reports both

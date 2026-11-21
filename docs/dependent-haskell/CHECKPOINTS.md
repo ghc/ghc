@@ -55,6 +55,23 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At compiler revision `5ecac2c539`, an ordinary client reads
+`Just 42` and `Left "missing"` from rows whose schemas were defined
+in different modules. Each open family equation can pass a capturing
+lambda to `Map`. A conflicting instance reports GHC-34447, the public
+family name and the location of the local declaration.
+[Instance and client checks](../../testsuite/tests/dependent/should_run/NativeTypeLambda.sh).
+
+All 501 Showcase outputs matched at native `-O0`, native `-O2` and
+in source GHCi. The 17 selected registered tests and the linked GHC
+API checks passed. Local and imported lambda signatures round-tripped
+in both interpreter modes. A module with ordinary equations and prior
+retained-sum equations produced byte-identical interfaces and objects
+at both optimization levels when compiled at the same output path.
+A separate `-fno-code` sample of 400 ordinary open family equations
+allocated 684,612,648 bytes, up from 684,114,056 at the R36 checkpoint.
+All three runs with each compiler gave the same allocation.
+
 At compiler revision `711b6e0e56`, `-Wpun-bindings` and
 `-Werror=pun-bindings` identify type and term definitions with the
 same spelling in one top-level declaration group. The diagnostic is
