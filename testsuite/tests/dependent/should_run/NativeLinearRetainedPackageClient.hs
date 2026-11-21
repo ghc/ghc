@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, TypeApplications #-}
 module Main where
 
-import Control.Exception (ErrorCall, evaluate, try)
+import Control.Exception (ErrorCall, displayException, evaluate, try)
 import NativeLinearRetainedPackageProvider
 
 main :: IO ()
@@ -24,6 +24,15 @@ main = do
           , inspect (packetFalse unused False 36 (37 :: Int))
           , inspect (packetZero unused (38 :: Int))
           , snd (inspect (packetFalse unused unused unused (39 :: Int))) )
+    print ( chooseThree (makeTriple unused 1 True True True (1 :: Int))
+          , chooseThree (makeTriple unused 2 True True False (2 :: Int))
+          , chooseThree (makeTriple unused 3 True False unused (3 :: Int))
+          , chooseThree (makeTriple unused 4 False unused unused (4 :: Int))
+          , snd (chooseThree (makeTriple unused unused False unused unused (5 :: Int))) )
+    let bothBottom = makeTriple unused unused (error "ordinary first")
+                                 (error "retained later") unused (0 :: Int)
+    order <- try @ErrorCall (evaluate (snd (chooseThree bothBottom)))
+    print (either ((== "ordinary first") . takeWhile (/= '\n') . displayException) (const False) order)
     print =<< mapM throws
         [ takeRefined (error "outer package")
         , takeRefined (makeIndex (error "retained index") 20)

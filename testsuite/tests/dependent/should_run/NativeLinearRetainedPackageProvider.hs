@@ -86,3 +86,19 @@ packetZero b a = FlagFirst Z b (error "unused flag payload") () a
 
 packetUnknown :: Bool -> a -> Packet a
 packetUnknown b a = IndexFirst (S Z) b (at Z 0) (error "unused flag payload") a
+
+data Triple a where
+    Three :: foreach (n :: Nat) -> Payload n -> Bool
+          -> foreach (b :: Bool) -> Flag b -> foreach (c :: Bool) -> Flag c
+          -> a %1 -> Triple a
+
+chooseThree :: Triple a %1 -> (Int, a)
+chooseThree (Three Z () _ _ _ _ _ a) = (0, a)
+chooseThree (Three (S k) payload True True _ True _ a) = (10 + readAt k payload, a)
+chooseThree (Three (S k) payload True True _ False _ a) = (20 + readAt k payload, a)
+chooseThree (Three (S k) payload True False _ _ _ a) = (30 + readAt k payload, a)
+chooseThree (Three (S k) payload False _ _ _ _ a) = (40 + readAt k payload, a)
+
+makeTriple :: Nat -> Int -> Bool -> Bool -> Bool -> a -> Triple a
+makeTriple n i ordinary b c a =
+    Three (S n) (at n i) ordinary b (error "first flag payload") c (error "second flag payload") a

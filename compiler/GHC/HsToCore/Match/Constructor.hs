@@ -52,8 +52,7 @@ import GHC.Utils.Panic
 import Control.Monad(liftM, join)
 import Data.Data ( Data, cast, gmapT )
 import Data.Foldable ( find )
-import Data.Function ( on )
-import Data.List ( sort )
+import Data.List ( nub, sort )
 import Data.Maybe ( fromMaybe, isJust, isNothing )
 import Data.Typeable ( Typeable )
 import Data.List.NonEmpty (NonEmpty(..))
@@ -128,20 +127,14 @@ matchConFamily (var :| vars) ty groups@(group1 :| other_groups)
   -- See Note [Retained package equation scope].
   -- See Note [Retained constructor equation scope].
   | Just rows <- find needs_separate_rows groups
-  = if isManyTy (matchIdMult var)
+  = if isManyTy (matchIdMult var) && not (matchInLinearPackage var)
     then do { results <- mapM match_retained_row (join groups)
             ; return (foldr1 combineMatchResults results) }
     else putSrcSpanDsA (getLoc (eqn_pat (NE.head rows))) $
            failWithDs DsLinearRetainedPackageRows
 
   | otherwise
-  = do let mult = matchIdMult var
-           -- Each variable in the argument list correspond to one column in the
-           -- pattern matching equations. Its multiplicity is the context
-           -- multiplicity of the pattern. We extract that multiplicity, so that
-           -- 'matchOneconLike' knows the context multiplicity, in case it needs
-           -- to come up with new variables.
-       alts <- mapM (fmap toRealAlt . matchOneConLike vars ty mult . share_native_rows) groups
+  = do alts <- mapM (fmap toRealAlt . matchOneConLike var vars ty . share_native_rows) groups
        return (mkDataConCase var ty alts)
   where
     ConPat { pat_con = L _ con1 } = firstPat (NE.head group1)
@@ -154,52 +147,23 @@ matchConFamily (var :| vars) ty groups@(group1 :| other_groups)
     -- See Note [Sharing linear package fields].
     linear_retained_group rows
       | not (isManyTy (matchIdMult var))
-      , Just patterns <- traverse (index_pattern 0) rows
-      , Just by_tag <- complete_index_groups patterns
-      = all shareable_indices by_tag
+      , Just cons@(dc :| _) <- traverse first_index_constructor rows
+      = let family = dataConTyCon dc
+            tags = sort . map dataConTag
+        in all ((== family) . dataConTyCon) cons
+             && tags (nub (NE.toList cons)) == tags (tyConDataCons family)
       | otherwise = False
 
-    complete_index_groups patterns@((dc, _, _, _) :| _)
-      | let family = dataConTyCon dc
-            tag (con, _, _, _) = dataConTag con
-            by_tag = NE.groupBy1 ((==) `on` tag) (NE.sortWith tag patterns)
-      , all (\(con, _, _, _) -> dataConTyCon con == family) patterns
-      , map (tag . NE.head) (NE.toList by_tag) == sort (map dataConTag (tyConDataCons family))
-      = Just by_tag
-      | otherwise = Nothing
-
-    shareable_indices (_ :| []) = True
-    shareable_indices rows =
-      isJust (indexPatternSubsts (fmap (\(_, whole, pat, _) -> ([whole], pat)) rows))
-        && (all (all bare_index . drop 1 . retained_pats) source_rows
-              || complete_second_split source_rows)
-      where
-        source_rows = fmap (\(_, _, _, row) -> row) rows
-
-    complete_second_split rows
-      | Just patterns <- traverse (index_pattern 1) rows
-      , Just by_tag <- complete_index_groups patterns
-      = all (null . NE.tail) by_tag
-      | otherwise = False
-
-    index_pattern pos row
-      | ConPat {pat_con = L _ (RealDataCon con), pat_args = PrefixCon _ pats} <- firstPat row
-      , (Just _, L _ pat) : _ <- drop pos (zip (dataConRepArgBinders con) pats)
-      , AsPat _ (L _ whole) inner <- pat
-      , matcher@ConPat{pat_con = L _ (RealDataCon index_con)} <- strip_index_parens (unLoc inner)
-      = Just (index_con, whole, matcher, row)
+    first_index_constructor row
+      | ConPat {pat_con = L _ (RealDataCon con), pat_args = PrefixCon _ (L _ pat : _)} <- firstPat row
+      , Just _ : _ <- dataConRepArgBinders con
+      , AsPat _ _ inner <- pat
+      , ConPat{pat_con = L _ (RealDataCon index_con)} <- strip_index_parens (unLoc inner)
+      = Just index_con
       | otherwise = Nothing
 
     strip_index_parens (ParPat _ pat) = strip_index_parens (unLoc pat)
     strip_index_parens pat = pat
-
-    retained_pats row
-      | ConPat {pat_con = L _ (RealDataCon con), pat_args = PrefixCon _ pats} <- firstPat row
-      = [pat | (Just _, L _ pat) <- zip (dataConRepArgBinders con) pats]
-      | otherwise = []
-
-    bare_index VarPat{} = True
-    bare_index _ = False
 
     share_native_rows rows@(first :| rest)
       | not (null rest), Just substs <- native_row_substs rows
@@ -210,12 +174,12 @@ matchConFamily (var :| vars) ty groups@(group1 :| other_groups)
       | Subst.isEmptySubst subst = row
       | otherwise = renameEquation subst row
 
-    native_row_substs = indexPatternSubsts . fmap (\row -> ([], firstPat row))
+    native_row_substs = indexPatternSubsts . fmap firstPat
 
     -- Compile one equation with its own runtime index binders.
     match_retained_row :: EquationInfoNE -> DsM (MatchResult CoreExpr)
     match_retained_row eqn
-      = do { alt <- matchOneConLike vars ty (matchIdMult var) (eqn :| [])
+      = do { alt <- matchOneConLike var vars ty (eqn :| [])
            ; return (mkDataConCase var ty (toRealAlt alt :| [])) }
 
     -- | Detect a retained telescope in any constructor group.
@@ -298,8 +262,7 @@ matchPatSyn :: NonEmpty MatchId
             -> NonEmpty EquationInfoNE
             -> DsM (MatchResult CoreExpr)
 matchPatSyn (var :| vars) ty eqns
-  = do let mult = matchIdMult var
-       alt <- fmap toSynAlt $ matchOneConLike vars ty mult eqns
+  = do alt <- fmap toSynAlt $ matchOneConLike var vars ty eqns
        return (mkCoSynCaseMatchResult var ty alt)
   where
     toSynAlt alt = case alt_pat alt of
@@ -382,12 +345,12 @@ Ordinary GADT constructors keep the existing shared-field path: the native
 index-domain predicate excludes their existentials and equality constraints.
 -}
 
-matchOneConLike :: [MatchId]
+matchOneConLike :: MatchId
+                -> [MatchId]
                 -> Type
-                -> Mult
                 -> NonEmpty EquationInfoNE
                 -> DsM (CaseAlt ConLike)
-matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single constructor
+matchOneConLike scrut vars ty (eqn1 :| eqns)   -- All eqns for a single constructor
   = do  { retained_vars <- case con1 of
             RealDataCon con | not (null (dataConRepArgBinders con)) ->
               putSrcSpanDsA (getLoc (eqn_pat eqn1)) $
@@ -415,7 +378,10 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
               match_group arg_vars arg_eqn_prs
                 = do { (wraps, eqns') <- liftM NE.unzip (mapM shift arg_eqn_prs)
                      ; let group_arg_vars = select_arg_vars arg_vars arg_eqn_prs
-                     ; match_result <- match (map mkMatchId group_arg_vars ++ vars) ty (NE.toList eqns')
+                     ; let field v = (mkMatchId v) { matchInLinearPackage = linear_package }
+                           linear_package = matchInLinearPackage scrut
+                                         || (isJust retained_vars && not (isManyTy mult))
+                     ; match_result <- match (map field group_arg_vars ++ vars) ty (NE.toList eqns')
                      ; return $ foldr1 (.) wraps <$> match_result
                      }
 
@@ -475,6 +441,8 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
                               alt_wrapper = wrapper1,
                               alt_result = foldr1 combineMatchResults match_results } }
   where
+    mult = matchIdMult scrut
+
     indexed_proof
       | RealDataCon con <- con1, [eq, cv] <- dicts1
       , isCoVar eq, isCoVar cv, isNativeIndexedGadtCon con
@@ -539,13 +507,10 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
 Testing the same linear package in separate cases can use its scrutinee twice
 or capture a linear field in a failure continuation. Use one outer case if
 the first retained field covers all constructors in its family. The ordinary
-matcher can split this first column before it tests the other fields. A repeated
-constructor in this split must satisfy Note [Sharing retained index constructor fields].
-Its later retained patterns can be variables. The next constructor argument
-can instead be a retained field with one row for each constructor in its
-family. The matcher then splits that column before it tests the remaining
-fields. Each alternative binds its own proof for that column.
-Report a source error when a linear package would require separate cases.
+matcher processes the remaining columns in order. Mark the match variables
+for the fields of a linear retained package. Keep this mark when the matcher
+introduces new columns. Report a source error if a marked column would
+need separate cases to keep its proofs in scope.
 
 Use the first row's runtime field Ids in the outer case. Replace the retained
 field Ids of each later row before matching the inner columns. The substitution
@@ -574,28 +539,28 @@ The usual evidence aliases can then use the first proof for both rows. Keep
 both rows' evidence bindings in the constructor alternative. Source field
 patterns are bare variables, so sharing a binder does not force that field.
 
-The outer package split checks this condition before it can share any fields.
-Include its whole-index Id in the substitution for this check. The inner split
-uses the same condition after it has bound the shared whole-index Id.
+Check this condition when the ordinary matcher reaches the index column. The
+whole-index Id has already been shared by the outer package case. Earlier
+constructor alternatives have also shared their fields and scoped their proofs.
 Only admit a prefix constructor with one virtual proof and no other evidence,
 existentials, wrappers or retained field telescope of its own.
 -}
 
 -- | Check the predicate and field types after renaming each later row's fields.
-indexPatternSubsts :: NonEmpty ([Id], Pat GhcTc) -> Maybe [Subst.Subst]
+indexPatternSubsts :: NonEmpty (Pat GhcTc) -> Maybe [Subst.Subst]
 indexPatternSubsts patterns = do
   first :| later <- traverse fields_and_proof patterns
   traverse (align first) later
   where
-    fields_and_proof (outer, ConPat
+    fields_and_proof ConPat
         { pat_con = L _ (RealDataCon con), pat_args = PrefixCon _ pats
         , pat_con_ext = ConPatTc { cpt_tvs = [], cpt_dicts = [cv]
-                                , cpt_arg_tys = tys, cpt_wrap = wrapper } })
+                                , cpt_arg_tys = tys, cpt_wrap = wrapper } }
       | isCoVar cv, isIdHsWrapper wrapper, null (dataConRepArgBinders con)
       , length pats == dataConRepArity con
       , isNativeIndexType (mkTyConApp (dataConTyCon con) tys)
       = do fields <- traverse bare_field pats
-           return (con, outer ++ fields, varType cv)
+           return (con, fields, varType cv)
     fields_and_proof _ = Nothing
 
     bare_field (L _ (VarPat _ (L _ v))) = Just v
