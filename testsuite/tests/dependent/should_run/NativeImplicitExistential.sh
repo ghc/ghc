@@ -478,6 +478,35 @@ for opt in 0 2; do
         { cat open-let-reject.log >&2; exit 1; }
 done
 
+# Use the result of an opened package through a deep dictionary adapter.
+for opt in 0 2; do
+    mkdir -p "$out/lexical-retained-$opt/"{provider,client}
+    cd "$out/lexical-retained-$opt/provider"
+    retained_flags=("${flags[@]}" "-O$opt")
+    "$ghc" "${retained_flags[@]}" -c "$src/LexicalRetainedReader.hs" -outputdir .
+    cp LexicalRetainedReader.hi "$out/lexical-let-$opt/provider/LexicalLetProvider.hi" \
+        "$src/"{LexicalRetainedClient,LexicalOrdinaryShallow}.hs ../client/
+    cd ../client
+    "$ghc" "${retained_flags[@]}" -c LexicalOrdinaryShallow.hs
+    "$ghc" "${retained_flags[@]}" -DDEEP -ddump-ds -fwrite-ide-info \
+        -c LexicalRetainedClient.hs >retained.log
+    test -s LexicalRetainedClient.hie
+    grep -Eq 'unpack \(LexicalLetProvider.relayLinear' retained.log
+    grep -Fq 'LexicalRetainedReader.$p1Display' retained.log
+    "$ghc" "${retained_flags[@]}" LexicalRetainedClient.o LexicalOrdinaryShallow.o \
+        ../provider/LexicalRetainedReader.o "$out/lexical-let-$opt/provider/LexicalLetProvider.o" -o run
+    ./run >retained.out
+    diff -u <(printf '%s\n' "(\"True\",\"'q'\",\"True\",(\"True\",\"'q'\"))") retained.out
+    if "$ghc" "${retained_flags[@]}" -fforce-recomp -c LexicalRetainedClient.hs >shallow.log 2>&1; then
+        echo "The retained dictionary adapter unexpectedly passed shallow subsumption." >&2
+        exit 1
+    fi
+    for line in $(grep -n 'in apply worker$' LexicalRetainedClient.hs | cut -d: -f1); do
+        grep -Eq "^LexicalRetainedClient.hs:$line:17: error: \[GHC-83865\]" shallow.log ||
+            { cat shallow.log >&2; exit 1; }
+    done
+done
+
 # Only an opening serialized in the interface needs the linear reader.
 cd "$out/lexical-let-2/client"
 "$ghc" -B"$lib" --show-iface LexicalLinearLet.hi >linear-body-iface.log
