@@ -3,6 +3,7 @@
 module Main (main) where
 
 import Data.Kind (Type)
+import qualified Data.Binary as Package
 import GHC.Matchability (M, U)
 import qualified GHC.Utils.Binary as Binary
 import Type.Reflection
@@ -26,12 +27,15 @@ roundTrip label expected rep = do
     out <- Binary.openBinMem 1024
     Binary.put_ out rep
     decoded <- Binary.shrinkBinBuffer out >>= Binary.get
-    case decoded of
-      SomeTypeRep (App' f _)
-        | Fun' match _ _ <- typeRepKind f
-        , SomeTypeRep match == expected
-        , decoded == rep -> putStrLn label
-      _ -> fail ("unexpected application after decoding: " ++ label)
+    check "GHC.Utils.Binary" decoded
+    check "Data.Binary" (Package.decode (Package.encode rep))
+  where
+    check codec decoded = case decoded of
+        SomeTypeRep (App' f _)
+          | Fun' match _ _ <- typeRepKind f
+          , SomeTypeRep match == expected
+          , decoded == rep -> putStrLn (codec ++ " " ++ label)
+        _ -> fail (codec ++ " decoded a different " ++ label)
 
 main :: IO ()
 main = do

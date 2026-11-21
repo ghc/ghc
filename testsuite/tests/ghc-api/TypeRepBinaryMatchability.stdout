@@ -1,2 +1,4 @@
-matchable application
-unmatchable application
+GHC.Utils.Binary matchable application
+Data.Binary matchable application
+GHC.Utils.Binary unmatchable application
+Data.Binary unmatchable application
