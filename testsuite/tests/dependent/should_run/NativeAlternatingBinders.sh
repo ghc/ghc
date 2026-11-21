@@ -291,3 +291,142 @@ for opt in O0 O1 O2; do
         fi
     )
 done
+
+cat >RankDomainProvider.hs <<'HS'
+{-# LANGUAGE AllowAmbiguousTypes, DataKinds, ExperimentalDependentTypes, GADTs, PolyKinds #-}
+{-# LANGUAGE RankNTypes, TypeApplications, TypeFamilies, TypeOperators #-}
+module RankDomainProvider
+    ( Reflect, reflect, bottomReflect, wrongResult, fixedDomain
+    , AmbiguousReflect, ambiguous
+    ) where
+
+import Data.Proxy (Proxy(..))
+import Data.Type.Equality ((:~:)(Refl))
+
+type Reflect a = foreach (x :: Maybe a) -> x :~: x
+
+reflect :: forall a. Show a => Reflect a
+reflect _ = Refl
+
+bottomReflect :: forall a. Show a => Reflect a
+bottomReflect = error "callback bottom"
+
+wrongResult :: forall a. Show a => foreach (x :: Maybe a) -> Proxy x
+wrongResult _ = Proxy
+
+fixedDomain :: Reflect Bool
+fixedDomain _ = Refl
+
+type family Opaque a
+type BuiltinReflect a = foreach (x :: Maybe (Opaque a)) -> x :~: x
+
+class Extra a
+type AmbiguousReflect a = Extra a => BuiltinReflect a
+
+ambiguous :: forall a. AmbiguousReflect a
+ambiguous _ = Refl
+HS
+
+cat >RankDomainClient.hs <<'HS'
+{-# LANGUAGE BangPatterns, DataKinds, GADTs, NoDeepSubsumption #-}
+{-# LANGUAGE NoExperimentalDependentTypes, RankNTypes, ScopedTypeVariables #-}
+{-# LANGUAGE TypeAbstractions, TypeApplications, TypeOperators #-}
+module Main where
+
+import Control.Exception (ErrorCall, displayException, evaluate, try)
+import Data.IORef (newIORef, readIORef)
+import Data.List (isInfixOf)
+import Data.Type.Equality ((:~:)(Refl))
+import RankDomainProvider (AmbiguousReflect, Reflect, ambiguous, bottomReflect, reflect)
+
+class Show a => Display a
+instance Display Bool
+instance Display Char
+
+run :: (forall a. Display a => Reflect a) -> Maybe Bool -> Maybe Char -> (Bool, Bool)
+run worker b c = (see (worker @Bool b), see (worker @Char c))
+  where
+    see :: x :~: x -> Bool
+    see Refl = True
+
+ignore :: (forall a. Display a => Reflect a) -> Bool
+ignore _ = True
+
+demand :: (forall a. Display a => Reflect a) -> ()
+demand worker = case worker @Bool of !_ -> ()
+
+runOpaque :: (forall a. AmbiguousReflect a) -> Bool
+runOpaque _ = True
+
+main :: IO ()
+main = do
+    b <- newIORef (error "Bool index forced") >>= readIORef
+    c <- newIORef (error "Char index forced") >>= readIORef
+    print (run reflect b c, run (\ @a -> reflect @a) b c, ignore bottomReflect, runOpaque (\ @a -> ambiguous @a))
+    forced <- try (evaluate (demand bottomReflect))
+    case forced of
+      Left e | "callback bottom" `isInfixOf` displayException (e :: ErrorCall) ->
+          putStrLn "callback bottom: forced"
+      _ -> fail "callback WHNF was not forced"
+HS
+
+cat >RankDomainReject.hs <<'HS'
+{-# LANGUAGE CPP, DataKinds, NoDeepSubsumption, NoExperimentalDependentTypes #-}
+{-# LANGUAGE RankNTypes, ScopedTypeVariables, TypeApplications #-}
+module RankDomainReject where
+
+import Data.Proxy (Proxy)
+import RankDomainProvider
+
+class Show a => Display a
+
+run :: (forall a. Display a => Reflect a) -> Bool
+run _ = True
+
+#if FORM == 1
+bad :: Bool
+bad = run fixedDomain
+#elif FORM == 2
+bad :: Bool
+bad = run wrongResult
+#elif FORM == 3
+bad :: forall outer. Show outer => Proxy outer -> Bool
+bad _ = run (reflect @outer)
+#elif FORM == 4
+runOpaque :: (forall a. AmbiguousReflect a) -> Bool
+runOpaque _ = True
+bad :: Bool
+bad = runOpaque ambiguous
+#endif
+HS
+
+# Exercise shallow subsumption against an interface in an ordinary client.
+for opt in O0 O2; do
+    mkdir -p "$out/domain-$opt"/{provider,client}
+    cp RankDomainProvider.hs "$out/domain-$opt/provider/"
+    cp {RankDomainClient,RankDomainReject}.hs "$out/domain-$opt/client/"
+    (
+        cd "$out/domain-$opt/provider"
+        flags=("-$opt")
+        if [[ $opt == O0 ]]; then
+            flags+=(-fomit-interface-pragmas -fno-write-if-simplified-core)
+        fi
+        "${ghc[@]}" "${flags[@]}" -c RankDomainProvider.hs
+        cp RankDomainProvider.hi ../client/
+        cd ../client
+        "${ghc[@]}" "-$opt" -c RankDomainClient.hs
+        "${ghc[@]}" "-$opt" RankDomainClient.o ../provider/RankDomainProvider.o -o run
+        ./run >runtime
+        printf '%s\n' '((True,True),(True,True),True,True)' 'callback bottom: forced' | cmp - runtime
+
+        form=0
+        for diagnostic in 'with ‘Bool’' 'Proxy x' 'with ‘outer’' 'non-injective type family'; do
+            form=$((form + 1))
+            if "${ghc[@]}" "-$opt" "-DFORM=$form" -c RankDomainReject.hs >reject.log 2>&1 ||
+               ! grep -Fq "$diagnostic" reject.log; then
+                cat reject.log >&2
+                exit 1
+            fi
+        done
+    )
+done

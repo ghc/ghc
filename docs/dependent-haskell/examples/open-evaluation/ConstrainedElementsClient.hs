@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
-{-# LANGUAGE DataKinds, ExplicitNamespaces, RequiredTypeArguments, TypeAbstractions, TypeApplications #-}
+{-# LANGUAGE DataKinds, ExplicitNamespaces, RequiredTypeArguments, TypeApplications #-}
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes, PartialTypeSignatures, QuantifiedConstraints, RankNTypes, ScopedTypeVariables, TypeFamilies, TypeOperators #-}
 module ConstrainedElementsClient (constrainedElements, annotatedElement, explicitElements, renderField, formatField, renderKnownFields, retainedMaybeDomain, aliasedReflection, partialElement) where
 
@@ -82,7 +82,7 @@ retainedMaybeDomain = do
 
 -- | Use the partial family and the qualified proof through their imported aliases.
 aliasedReflection :: (Maybe Bool, AtNothing MaybeBoolEcho :~: 'Nothing)
-aliasedReflection = (run (\ @a -> reflectMaybe @a) (Just True), Refl)
+aliasedReflection = (run reflectMaybe (Just True), Refl)
   where
     run :: (forall a. Reflection a) -> Maybe Bool -> Maybe Bool
     run proof x = case proof @Bool x of Refl -> x

@@ -257,10 +257,11 @@ exports a proof type that uses this rule.
 type Reflection a = Allowed a => foreach (x :: Maybe a) -> Echo x :~: x
 ```
 
-An ordinary module can use `forall a. Reflection a` as a callback type.
-The ordinary caller uses `\ @a -> reflectMaybe @a` to instantiate the
-proof at the callback's element type. Passing `reflectMaybe` directly
-currently reports GHC-83865 when comparing the retained binder domains.
+An ordinary module can use `forall a. Reflection a` as a callback type
+and pass `reflectMaybe` directly. Shallow subsumption matches the nominal
+`Maybe` domain at the callback's element type and checks the complete
+retained function. The explicit spelling `\ @a -> reflectMaybe @a` also
+works.
 The client also imports `MaybeBoolEcho`, a synonym for the partial family at the
 kind `Maybe Bool %U -> Maybe Bool`, and proves the result at `'Nothing`.
 
