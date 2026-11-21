@@ -67,8 +67,10 @@ The most recent binding of a name is visible in subsequent right-hand
 sides and the body. Thus `Maybe b` uses the first `b`, and the body uses
 the second. In `let { b = a; a = Bool } in b`,
 the first right-hand side uses an enclosing `a` if one is in scope.
-Without that binding, the reference is out of scope. Each right-hand side
-must kind-check, including unused bindings and bindings later shadowed.
+A signature with implicit quantification can bind that free `a` as a type
+parameter. In a type synonym with no enclosing `a`, the reference is out of
+scope. Each right-hand side must kind-check, including unused bindings and
+bindings later shadowed.
 
 Agda's manual specifies scope from earlier definitions to later ones. Its
 compiler handles each simple binding without a signature separately and

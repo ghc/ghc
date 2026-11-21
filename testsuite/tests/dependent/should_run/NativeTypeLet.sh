@@ -13,12 +13,20 @@ cd "$out/provider"
 cp "$src/"{PackedVecLibrary,TypeLet}.hs .
 "${g[@]}" -c PackedVecLibrary.hs
 "${g[@]}" -c TypeLet.hs
-cp TypeLet.hi PackedVecLibrary.hi "$out/client/"
+cat >SignatureLet.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes #-}
+module SignatureLet (capture) where
+capture :: let { saved = a; a = Bool } in saved -> a -> saved
+capture saved _ = saved
+HS
+"${g[@]}" -fomit-interface-pragmas -c SignatureLet.hs
+cp TypeLet.hi PackedVecLibrary.hi SignatureLet.hi "$out/client/"
 cd "$out/client"
 cat >OrdinaryLet.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
 module OrdinaryLet where
 import Data.Type.Equality ((:~:)(Refl))
+import qualified SignatureLet
 import TypeLet
 
 roadmap :: F Bool :~: Ordering
@@ -38,6 +46,9 @@ nested = Refl
 
 capture :: CaptureBeforeShadow 'False :~: '( 'False, 'True)
 capture = Refl
+
+forward :: a -> Bool -> a
+forward = SignatureLet.capture
 
 yes :: CaseResult 'True :~: Either Bool Bool
 yes = Refl
