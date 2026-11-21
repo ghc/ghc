@@ -454,6 +454,13 @@ The source controls distinguish a representational coercion, a sibling
 parameter, and an argument hidden by a type synonym.
 [Equation controls](../../../testsuite/tests/dependent/should_run/NativeFamilyEquationScope.hs).
 
+A retained package pattern can infer its scrutinee type from an
+ordinary expression. Before reducing a constrained family at that
+type's head, GHC checks its domain in the pattern's lexical scope.
+The family equation supplies nominal equality evidence. The instance
+environment and the available Givens supply the domain dictionary.
+[Source-hidden package match and missing-domain control](R04-dependent-sums.md#match-a-constrained-associated-family-result).
+
 An instance selected by the writer can acquire a more specific alternative
 in a later module. The equation proof therefore uses local evidence. A
 top-level family with a ground equation such as `F () = Elem [Bool]` still

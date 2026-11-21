@@ -280,6 +280,10 @@ test('NativeListBoundary',
                   '../../../../docs/dependent-haskell/examples/packed-vector/OrdinaryVecClient.hs']),
      multimod_compile_and_run,
      ['NativeListBoundary', '-fomit-interface-pragmas -fno-write-if-simplified-core'])
+test('NativeKnownPair',
+     [extra_files(['NativeKnownPairProvider.hs', 'NativeKnownPairClient.hs'])],
+     run_command, ['bash NativeKnownPair.sh "{compiler}" "{libdir}"'])
+
 test('NativeRetainedTypeWitness',
      [only_ways(['normal']),
       extra_files(['NativeRetainedTypeWitnessLib.hs', 'NativeRetainedTypeWitness.hs',
@@ -361,6 +365,24 @@ test('NativeGadtRetainedSum',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['NativeGadtRetainedSumProvider.hs', 'NativeGadtRetainedSumClient.hs'])],
      run_command, ['bash NativeGadtRetainedSum.sh "{compiler}" "{libdir}"'])
+
+test('NativeClosedFamilySum',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['NativeClosedFamilySumProvider.hs', 'NativeClosedFamilySumChain.hs',
+                   'NativeClosedFamilySumClient.hs'])],
+     run_command, ['bash NativeClosedFamilySum.sh "{compiler}" "{libdir}"'])
+
+test('NativeAssociatedSum',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['NativeAssociatedSumClass.hs', 'NativeAssociatedSumProvider.hs',
+                   'NativeAssociatedSumClient.hs'])],
+     run_command, ['bash NativeAssociatedSum.sh "{compiler}" "{libdir}"'])
+
+test('NativeConstrainedSum',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['NativeAssociatedSumClass.hs', 'NativeAssociatedSumProvider.hs',
+                   'NativeConstrainedSumProvider.hs', 'NativeConstrainedSumClient.hs'])],
+     run_command, ['bash NativeConstrainedSum.sh "{compiler}" "{libdir}"'])
 
 test('NativeAlternatingBinders',
      [req_host_target_ghc, only_ways(['normal']),

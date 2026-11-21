@@ -2,7 +2,7 @@
 
 -- | Construct and open imported dependent pairs in ordinary Haskell.
 module ListVectorClient
-    ( fromList, contents, regroup, regroupObservation, choosePartition,
+    ( fromList, contents, familyResultLength, regroup, regroupObservation, choosePartition,
       checkedSplitObservation, checkedSplitIO
     ) where
 
@@ -11,7 +11,7 @@ import Data.Type.Equality ((:~:)(Refl))
 import GHC.Sigma (Sigma(Pair))
 import PackedVecLibrary (CheckedSplit, Nat(..), Vec, appendVec, natToInt, sourceLength, sourceVector,
                          splitAtVecChecked, toList)
-import StoredVector (ListVector)
+import StoredVector (ListVector, VectorResult)
 
 -- | The same list supplies the length and the vector.
 fromList :: [a] -> ListVector a
@@ -20,6 +20,13 @@ fromList xs = Pair (sourceLength xs) (sourceVector xs)
 -- | Read either field independently.
 contents :: ListVector a -> (Int, [a])
 contents (Pair n xs) = (natToInt n, toList xs)
+
+-- | Read the length of a family result without demanding its vector.
+familyResultLength :: Nat -> Int
+familyResultLength n = resultLength (Pair n (error "unused vector"))
+  where
+    resultLength :: VectorResult True Char -> Int
+    resultLength (Pair index _) = natToInt index
 
 -- | Put the elements that pass the predicate first, at the same length.
 regroup :: (a -> Bool) -> Vec a n -> Vec a n
