@@ -580,11 +580,11 @@ instantiation. Open only the checked result. The alternatives can
 hide different witnesses. The selector determines which value is
 returned and how much of each operand it evaluates.
 
-A lexical tuple binding can use a closed schema from one forwarding
-slot as its expected RHS type. Allow leading type arguments for
-specified multiplicity binders. These arguments leave the forwarded
-type parameter for ordinary inference. The original RHS still checks
-the written type arguments and the producer's usage.
+A lexical tuple binding can use the schema from one forwarding slot as
+its expected RHS type. See Note [Scope of a forwarded package schema].
+Allow leading type arguments for specified multiplicity binders. These
+arguments leave the forwarded type parameter for ordinary inference.
+The original RHS still checks the written type arguments and usage.
 
 An independent higher-rank callback does not obscure the result
 parameter. For relay :: (forall x. x -> x) -> a -> a, the second
@@ -963,7 +963,7 @@ tcDeclaredOperandResult operand =
        (tcDeclaredOperandSpine False operand)
 
 -- | Read a lexical package operand's declared type. A forwarded result
--- supplies a closed expected type for checking the original operand.
+-- supplies an expected type for checking the original operand.
 tcLexicalPackageOperand :: LHsExpr GhcRn -> TcM (Maybe (TcType, Bool))
 tcLexicalPackageOperand = tcPackageOperandResult True
 
@@ -971,33 +971,43 @@ tcLexicalPackageOperand = tcPackageOperandResult True
 -- The result flag asks the caller to check the whole operand at the schema.
 -- See Note [Implicit opening for an explicit package argument].
 tcPackageOperandResult :: Bool -> LHsExpr GhcRn -> TcM (Maybe (TcType, Bool))
-tcPackageOperandResult lexical operand = runMaybeT $ do
-  (ident, args) <- MaybeT (tcDeclaredOperandSpine lexical operand)
-  let sigma = varType ident
-      arity = length args
-  result <- MaybeT (pure (implicitSpineResult arity sigma))
-  case result of
-    TyVarTy v
-      | isEmptyNameEnv (idConcreteTvs ident)
-      , (tvs, _, body) <- tcRetainedInstTelescope sigma
-      , v `elem` tvs
-      , (matches, domains, final) <- splitFunTys body
-      , domains `equalLength` args
-      , getTyVar_maybe (coreFullView final) == Just v
-      , all isTauTy matches, all (ordinary_domain v) domains
-      , first : rest <- [arg | (Scaled _ domain, arg) <- zip domains args
-                             , getTyVar_maybe (coreFullView domain) == Just v]
-      -> do { selected@(schema, _) <- MaybeT (tcPackageOperandResult lexical first)
-            ; case rest of
-                [] | lexical -> do { guard (closed_dot_schema schema)
-                                   ; pure (schema, True) }
-                [] -> pure selected
-                _ -> do { guard (not lexical && closed_dot_schema schema)
-                        ; alternatives <- traverse (MaybeT . tcPackageOperandResult lexical) rest
-                        ; guard (all (agrees_with schema . fst) alternatives)
-                        ; pure (schema, True) } }
-    _ -> pure (result, False)
+tcPackageOperandResult lexical = go False
   where
+    go forwarded operand = runMaybeT $ do
+      (ident, args) <- MaybeT (tcDeclaredOperandSpine lexical operand)
+      let sigma = varType ident
+          arity = length args
+      result <- MaybeT (pure (implicitSpineResult arity sigma))
+      case result of
+        TyVarTy v
+          | isEmptyNameEnv (idConcreteTvs ident)
+          , (tvs, _, body) <- tcRetainedInstTelescope sigma
+          , v `elem` tvs
+          , (matches, domains, final) <- splitFunTys body
+          , domains `equalLength` args
+          , getTyVar_maybe (coreFullView final) == Just v
+          , all isTauTy matches, all (ordinary_domain v) domains
+          , first : rest <- [arg | (Scaled _ domain, arg) <- zip domains args
+                                 , getTyVar_maybe (coreFullView domain) == Just v]
+          -> do { selected@(schema, _) <- MaybeT (go lexical first)
+                ; case rest of
+                    [] | lexical -> pure (schema, True)
+                    [] -> pure selected
+                    _ -> do { guard (not lexical && closed_dot_schema schema)
+                            ; alternatives <- traverse (MaybeT . go False) rest
+                            ; guard (all (agrees_with schema . fst) alternatives)
+                            ; pure (schema, True) } }
+        _ -> do { when forwarded $ guard (scoped_dot_schema sigma result)
+                ; pure (result, False) }
+
+    scoped_dot_schema sigma ty
+      | schema@(ExistsTy ImplicitExists _ _) <- coreFullView ty
+      = all rigid (tyCoVarsOfTypeList schema)
+      | otherwise = False
+      where
+        scope = tyCoVarsOfType sigma
+        rigid v = isTcTyVar v && isSkolemTyVar v && v `elemVarSet` scope
+
     closed_dot_schema ty
       | schema@(ExistsTy ImplicitExists _ _) <- coreFullView ty
       = noFreeVarsOfType schema
@@ -1014,6 +1024,24 @@ tcPackageOperandResult lexical operand = runMaybeT $ do
         && not (v `elemVarSet` tyCoVarsOfType domain)
         && not (hasNativeDependentExpr (Core.Type domain))
       | otherwise = False
+
+{- Note [Scope of a forwarded package schema]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A lexical tuple binding checks a forwarding call at the selected package
+schema before opening it. The schema can mention a rigid type variable from
+the caller, or a witness opened by an enclosing binding. Use the complete
+declaration of the selected operand as the scope check. A variable already
+free in that declaration stays in scope when the probe removes its arrows.
+An operand's quantified variables belong to its own telescope. Compare
+variables by identity and include the free variables of their kinds.
+See Note [Computing deep free variables] in GHC.Core.TyCo.FVs.
+
+Apply this check at the leaf of a single forwarding chain. A direct RHS
+keeps ordinary instantiation, and multiple forwarding operands keep their
+existing rule. Ordinary checking of the full call still checks its sibling
+arguments, evidence, and usage at the selected schema. The opening keeps
+the complete let result outside the new witness scope.
+-}
 
 -- | Read a named head and its ordinary arguments without elaboration.
 -- In a lexical package binding, allow leading specified multiplicity arguments.
