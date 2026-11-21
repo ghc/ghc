@@ -56,9 +56,10 @@ Splicing the quotation checks the type at the splice site.
 An ordinary client can import a value with that type and observe
 `Right (Just True)`. Reification of a checked type can expand the
 abbreviation. The TH constructor and `letT` smart constructor are
-specific to this fork. Proposal #378 describes the source-level
-design. The review discusses using the same written identifier for a
-term and a type. [Design proposal](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html)
+specific to this fork. Serokell gives the type-level let example.
+Proposal #378 describes how a term-level let-bound name can appear in a
+type. Eisenberg's review explains the aim of sharing term and type
+syntax. [Term variables in types](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#term-variables-in-types)
 and [review discussion](https://github.com/ghc-proposals/ghc-proposals/pull/378#discussion_r524560765).
 [Quotation and splice test](../../../testsuite/tests/dependent/should_run/NativeTypeLetQuote.hs).
 
