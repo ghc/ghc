@@ -28,6 +28,24 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `2df3d0020e`, a local `INLINE` function can replicate a captured
+element at two runtime lengths. An ordinary module opens an erased
+package with a strict tuple pattern and passes its hidden state to its
+linear reader. The previous compiler reads ordinary, object-only and
+unrestricted-rule interfaces. It rejects an exported linear opening
+at the interface header. The current reader fires the rule twice.
+
+The predecessor with both R23 callback changes passed all 36 selected
+tests. After integrating R19 arrow domains, seven tests covering the
+changed features passed again. The final Stage 2 compiler matched 397
+Showcase lines at stripped `-O0`, default `-O1`, default `-O2`, and
+in GHCi. The Core API matched its 37-line output and the evidence API
+checks passed. The 390-line revision at `300e845ea2` also passed a
+normal two-stage Hadrian build.
+[Ordinary linear reader](examples/erased-existentials/RankedPackageClient.hs),
+[local unfolding](examples/qualified-pi/IndexBetaClient.hs),
+and [interface rule regression](../../testsuite/tests/dependent/should_run/NativeImplicitExistential.sh).
+
 At `f90de7ce0c`, a family equation can apply its callback when the
 declared kind computes its matchability with `Flip m`. The ordinary
 client reads a stripped interface and returns `(Just False,[True])`.
