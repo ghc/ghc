@@ -463,11 +463,10 @@ and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vecto
    at that constructor's field.
    [Checked input inference](roadmap/R03-dependent-products.md)
    and [independent inputs](../../testsuite/tests/dependent/should_fail/NativeIrredIndexEvidence.hs).
-2. **R05.** Check package templates for the internal workers of recursive
-   binding groups. An exported `INLINE` or `INLINABLE` binding with an
-   ordinary signature can now carry a checked package template in its
-   interface. An older reader can use the object call. Tidy discards
-   a package-bearing template attached to a nested local binding.
+2. **R05.** Check package templates for recursive groups that abstract
+   over types or dictionaries. An inferred monomorphic group can use a
+   direct alias to export a checked worker unfolding. The interface keeps
+   the loop breaker, and older readers can call the object code.
    [Retained unfolding checks](roadmap/R05-dependent-core.md#export-retained-unfoldings-at-ordinary-signatures).
 
 ### Other open work

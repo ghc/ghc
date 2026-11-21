@@ -352,6 +352,105 @@ for opt in -O1 -O2; do
     )
 done
 
+cat >Recursive.hs <<'HS'
+{-# LANGUAGE CPP, ExperimentalDependentTypes #-}
+module Recursive (top, opened) where
+
+import Data.Kind (Type)
+
+type Hidden = exists (a :: Type). (a, a -> Int)
+
+{-# NOINLINE consume #-}
+consume :: Hidden -> Int
+consume (value, render) = render value
+
+#ifdef BREAK_TOP
+{-# INLINABLE top #-}
+#else
+{-# INLINE top #-}
+#endif
+top steps keep n =
+    if (steps :: Int) <= 0
+      then consume (((n :: Int), \v -> if keep then v + 1 else 0) :: Hidden)
+      else peer (steps - 1) keep n
+
+#ifdef BREAK_TOP
+{-# INLINE peer #-}
+#else
+{-# NOINLINE peer #-}
+#endif
+peer steps keep n =
+    if steps > 2 then top (steps - 1) keep n else top steps keep n
+
+{-# NOINLINE hide #-}
+hide :: Int -> Hidden
+hide n = (n, (+ 1))
+
+{-# INLINE opened #-}
+opened steps n =
+    if (steps :: Int) <= 0
+      then case hide n of (v, render) -> render v
+      else next (steps - 1) n
+
+{-# NOINLINE next #-}
+next steps n =
+    if steps > 2 then opened (steps - 1) n else opened steps n
+HS
+
+cat >RecursiveClient.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module Main (main) where
+
+import Control.Exception (ErrorCall, evaluate, try)
+import Recursive (opened, top)
+
+main :: IO ()
+main = do
+    result <- try (evaluate (top 0 True (error "demanded retained field")))
+              :: IO (Either ErrorCall Int)
+    let demanded = either (const True) (const False) result
+    print (top 0 True 7 + 1, top 5 True 5,
+           top 5 False (error "unused retained field"), opened 5 22 + 1, demanded)
+HS
+
+for opt in -O1 -O2; do
+    for variant in regular loop-breaker; do
+        if [[ $opt == -O1 && $variant == loop-breaker ]]; then
+            continue
+        fi
+        out="$tmp/recursive-package/$opt/$variant"
+        mkdir -p "$out"/{provider,client}
+        cp Recursive.hs "$out/provider/"
+        cp RecursiveClient.hs "$out/client/Main.hs"
+        (
+            cd "$out/provider"
+            defines=()
+            if [[ $variant == loop-breaker ]]; then defines=(-DBREAK_TOP); fi
+            "${ghc[@]}" "$opt" "${defines[@]}" -c Recursive.hs
+            "${ghc[@]}" --show-iface Recursive.hi > provider.iface
+            grep -Fq 'retained-features-v1-erased+implicit+retained-user-unfolding' provider.iface
+            if [[ $variant == loop-breaker ]]; then
+                grep -A9 -F '  $wtop ::' provider.iface |
+                    grep -F 'Unfolding(loop-breaker): Core: StableRetainedUser' >/dev/null
+            fi
+            cp Recursive.hi ../client/
+        )
+        (
+            cd "$out/client"
+            "${ghc[@]}" "$opt" -ddump-inlinings -c Main.hs > client.core
+            grep -Fx 'Inlining done: Recursive.opened' client.core >/dev/null
+            if [[ $variant == regular ]]; then
+                grep -Fx 'Inlining done: Recursive.top' client.core >/dev/null
+            elif grep -Fxq 'Inlining done: Recursive.$wtop' client.core; then
+                echo 'Inlined the retained recursive loop breaker'
+                exit 1
+            fi
+            "${ghc[@]}" Main.o ../provider/Recursive.o -o run
+            printf '%s\n' '(9,6,0,24,True)' | cmp - <(./run)
+        )
+    done
+done
+
 cat >TopRecursive.hs <<'HS'
 {-# LANGUAGE ExperimentalDependentTypes #-}
 module TopRecursive (entry) where

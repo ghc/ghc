@@ -509,9 +509,16 @@ pragma can export a checked `Pack` or `Unpack` template. The reader checks
 types and scope before it uses the template. An older reader that knows
 both interface tags discards the template and uses the object code.
 The inliner counts the payload of `Pack`. It counts the lazy binding of
-`Unpack` when the package expression needs one. A top-level pragma that
-desugaring transfers to an internal recursive worker still reports
-GHC-92256 at the source binding.
+`Unpack` when the package expression needs one.
+
+An inferred monomorphic recursive group can also export a checked worker
+template when the source binding is a direct alias. The simplifier uses
+the existing indirection pass to move the worker RHS, pragma and unfolding
+to the exported binding. An interface can carry a template for a strong
+loop breaker. The reader restores its loop-breaker flag and leaves its call
+intact. In the inferred polymorphic case, the exported binding selects the
+worker from a tuple under type or dictionary abstractions. That path still
+reports GHC-92256 for a package-bearing worker template at the source binding.
 [Simplified wrapper](../examples/qualified-pi/IndexBetaClient.hs),
 [finite view producer](../examples/qualified-pi/FinitePosition.hs),
 [ordinary client](../examples/qualified-pi/FinitePositionClient.hs),
