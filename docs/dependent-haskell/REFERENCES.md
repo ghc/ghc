@@ -6656,6 +6656,14 @@ unrestricted fusion rule outside conversion.
 [Fusion and definedness reading](papers/README.md#short-cut-fusion-and-definedness)
 and [ordinary GHC counterexample](examples/open-evaluation/check-map-fusion.sh).
 
+## Right fold after map
+
+The Agda standard library proves `foldr-map` by induction on the input
+list. The Haskell proof uses the same induction on a finite spine. It
+combines the step and mapper with Prelude's `(.)`.
+[Agda's `Data.List.Properties`](https://agda.github.io/agda-stdlib/v2.4/Data.List.Properties.html)
+and [Haskell proof](examples/open-evaluation/PreludeFoldrProof.hs).
+
 ## Coverage of nested existential patterns
 
 Graf, Peyton Jones and Scott separate evaluation from constructor matching
@@ -7194,3 +7202,37 @@ list constructors supply the ordinary element types. GHC checks the
 original fields and the equality of the two lengths at the call.
 [Agda 2.8.0, implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html)
 and [Agda standard library 2.3, vector operations](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html).
+
+### Written character indices
+
+GHC proposal #387 supplies `Char` literals in types and `KnownChar`.
+Agda also has a built-in character type whose literals can occur in
+dependent types. The fork uses the existing `CharTyLit` for a written
+retained operand. Its runtime expression is the ordinary boxed worker
+`C#` applied to `LitChar`. This exact form can also occur as an element
+of a written list. CorePrep names the boxed literal with the checked
+alias used for constructor operands. The literal is already in weak
+head normal form. An ordinary client can read it while a different
+list element stays lazy. When an interface stores such an operand in
+an unfolding, its header requires `retained-char-operand`. Ordinary
+character literals and interfaces without retained operands keep
+their existing format.
+[GHC proposal #387](https://ghc-proposals.readthedocs.io/en/latest/proposals/0387-char-kind.html),
+[Agda built-in characters](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#characters),
+and [ordinary character client](examples/qualified-pi/RetainedCharacterClient.hs).
+
+### Quoted strings in retained operands
+
+GHC usually lowers an ordinary string to `unpackCString#` or
+`unpackCStringUtf8#`. The second function handles Unicode and embedded
+NUL through Modified UTF-8. A plain retained `"λ🙂"` uses the same lazy
+list and DataKinds index as `['λ','🙂']`. The expansion reads the
+parsed code points before desugaring. It leaves overloaded `fromString`
+calls outside this rule.
+
+Agda provides `primStringToList` to convert its built-in `String` to
+`List Char`. Haskell's `String` is already `[Char]`, so the fork can
+use ordinary list constructors and the existing character index.
+[GHC User's Guide, unboxed types and primitive operations](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/primitives.html#unboxed-types),
+[Agda built-in strings](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#strings),
+and [ordinary character client](examples/qualified-pi/RetainedCharacterClient.hs).

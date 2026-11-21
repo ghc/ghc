@@ -133,6 +133,8 @@ import qualified PreludeFilterAppendProof
 import qualified PreludeFilterCutoff
 import qualified PreludeFilterDecider
 import qualified PreludeAppendLengthProof
+import qualified ListFoldrProof
+import qualified PreludeFoldrProof
 import qualified PreludeFilterLengthProof
 import qualified PreludeFilterProof
 import qualified PreludeFilterRuntime
@@ -172,6 +174,7 @@ import qualified QualifiedPiLibrary as Qualified
 import qualified ReadNatural
 import qualified Type.Reflection as Reflection
 import qualified UnicodeExport
+import qualified RetainedCharacterClient
 
 {- Note [Maintaining the Dependent Haskell showcase]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1045,6 +1048,10 @@ main = do
         [CharacterExport.p3 (Proxy @'x'), CharacterExport.p3 (Proxy @'!')]
     observe "Unicode code points from an exported Data.Char.toUpper equality"
         (map fromEnum [UnicodeExport.p3 (Proxy @'é'), UnicodeExport.p3 (Proxy @'\x1e943')])
+    observe "written character indices and a lazy later element"
+        (RetainedCharacterClient.observeCharacters (error "forced the later character"))
+    observe "quoted retained string with an embedded NUL"
+        (RetainedCharacterClient.observeQuoted (error "forced the later string"))
     observe "greatest common divisor checked in a type"
         (TypeNats.natVal (Proxy @(Prelude.gcd 18 24)))
     observe "first and second fields proved through an imported pair equality"
@@ -1416,6 +1423,10 @@ main = do
               ++ PreludeMapLengthProof.showPreludeMapLength)
     putStrLn ("prove that append adds the list lengths: "
               ++ PreludeAppendLengthProof.showPreludeAppendLength)
+    putStrLn ("prove the list fold law for append: " ++ ListFoldrProof.showListFoldAppend)
+    observe "prove the append law through the Prelude.foldr list instance"
+        PreludeFoldrProof.example
+    putStrLn ("prove that folding a mapped list composes the step: " ++ PreludeFoldrProof.showFoldMap)
     putStrLn ("prove that reverse preserves list length: "
               ++ PreludeReverseLengthProof.showPreludeReverseLength)
     putStrLn ("prove that map distributes over append: "

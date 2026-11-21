@@ -134,6 +134,20 @@ test('NativeOpenIndexedAppendGhci',
       extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/' + f
                    for f in ['PackedVecLibrary.hs', 'OpenVectorAppend.hs', 'OrdinaryOpenVectorAppend.hs']])],
      run_command, ['bash NativeOpenIndexedAppendGhci.sh "{compiler}" "{libdir}" ' + config.ghc_th_way_flags])
+test('NativeOpenListFoldr',
+     [only_ways(['normal']),
+      extra_files([open_eval_dir + f for f in ['ListFoldrSource.hs', 'ListFoldrProof.hs', 'PreludeFoldrProof.hs',
+                                               'PreludeAppendLengthSource.hs', 'PreludeMapLengthSize.hs',
+                                               'PreludeMapLengthSource.hs', 'PreludeMapLengthProof.hs']]
+                  + ['NativeOpenListFoldrProducer.hs', 'NativeOpenListFoldrConcrete.hs'])],
+     run_command, ['bash NativeOpenListFoldr.sh "{compiler}" "{libdir}"'])
+test('NativeOpenListFoldrGhci',
+     [req_interp, req_rts_linker, only_ways(['normal']),
+      extra_files([open_eval_dir + f for f in ['ListFoldrSource.hs', 'ListFoldrProof.hs', 'PreludeFoldrProof.hs',
+                                               'PreludeAppendLengthSource.hs', 'PreludeMapLengthSize.hs',
+                                               'PreludeMapLengthSource.hs', 'PreludeMapLengthProof.hs']]
+                  + ['NativeOpenListFoldrProducer.hs', 'NativeOpenListFoldrConcrete.hs'])],
+     run_command, ['bash NativeOpenListFoldrGhci.sh "{compiler}" "{libdir}"'])
 test('NativeOpenInstalledPair',
      [req_interp, req_rts_linker, only_ways(['normal']),
       extra_files([open_eval_dir + 'PreludePairExport.hs',
@@ -154,6 +168,11 @@ test('NativeOpenPairLinkable',
 test('NativeOpenCharGhci',
      extra_files([open_eval_dir + f for f in ['OpenAlias.hs', 'OpenProducer.hs', 'OpenSource.hs']]),
      ghci_script, ['NativeOpenCharGhci.script'])
+test('NativeRetainedChar',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['../../../../docs/dependent-haskell/examples/qualified-pi/' + f
+                   for f in ['RetainedCharacters.hs', 'RetainedCharacterClient.hs']])],
+     run_command, ['bash NativeRetainedChar.sh "{compiler}" "{libdir}"'])
 test('NativeOpenRetry',
      [req_interp, req_rts_linker, only_ways(['normal']), extra_files(['NativeOpenRetryLib.hs'])],
      multimod_compile_and_run,

@@ -493,9 +493,13 @@ and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vecto
    the field selects the result type using the function in scope.
    Template Haskell still needs a representation for the retained field binder.
    [Retained scrutinees and scope](roadmap/R19-type-level-cases.md#compute-a-retained-scrutinee).
-5. **R16.** The checked list worker supports the length theorem for
-   `Prelude.reverse`. The next task is structural recursion with an
-   arbitrary step function and seed, starting with a list right fold.
+5. **R12 and R16.** An ordinary client can prove that `Prelude.reverse`
+   preserves length. A proof using `Prelude.foldr` establishes the append
+   law for an arbitrary step and seed. It uses the method selected by the
+   installed list dictionary. A code-generating producer can record that
+   choice even when its interface omits optimizer pragmas. The next
+   example to check is `fmap` on `Maybe`.
+   [Public fold proof](examples/open-evaluation/PreludeFoldrProof.hs).
    [Append and map proofs](roadmap/R16-open-term-evaluator.md#prove-that-map-distributes-over-append).
 
 6. **R21.** A retained field's worker can use a saturated local synonym
@@ -615,8 +619,8 @@ still require substantial research.
 - [ ] **R04 [Dependent sums](https://ghc.serokell.io/dh#dependent-sums)** — Unmarked. Needs/includes: R05, R22.
 - [ ] **R05 [Dependent Core language](https://ghc.serokell.io/dh#dependent-core-language)** — Unmarked. Needs/includes: no outgoing graph edge.
 - [ ] **R06 [Universal promotion](https://ghc.serokell.io/dh#universal-promotion)** — Unmarked. Needs/includes: R07, R10, R12, R13, R14.
-- [ ] **R07 [Promote literals](https://ghc.serokell.io/dh#promote-literals)** — Unmarked. Needs/includes: R08, R09, R24. M80 supplies nonnegative type numerals at registered index kinds. [M83](PLAN.md#m83-ordinary-numerals-in-retained-arguments) accepts term numerals in retained arguments when the actual conversion has checked equations. A complete monomorphic annotation can name the retained domain. General overloaded term promotion and constrained family evaluation remain open.
-- [x] **R08 [Promote Char](https://ghc.serokell.io/dh#promote-char)** — Completed. Needs/includes: no outgoing graph edge.
+- [ ] **R07 [Promote literals](https://ghc.serokell.io/dh#promote-literals)** — Unmarked. Needs/includes: R08, R09, R24. M80 supplies nonnegative type numerals at registered index kinds. [M83](PLAN.md#m83-ordinary-numerals-in-retained-arguments) accepts term numerals in retained arguments when the actual conversion has checked equations. A complete monomorphic annotation can name the retained domain. [Written character literals](REFERENCES.md#written-character-indices) can supply retained indices directly or as elements of a written list. [Plain quoted strings](REFERENCES.md#quoted-strings-in-retained-operands) use the same lazy character lists. General overloaded term promotion and constrained family evaluation remain open.
+- [x] **R08 [Promote Char](https://ghc.serokell.io/dh#promote-char)** — Completed. Needs/includes: no outgoing graph edge. [Written character indices](REFERENCES.md#written-character-indices) use the existing DataKinds character literals.
 - [x] **R09 [Promote Natural](https://ghc.serokell.io/dh#promote-natural)** — Completed. Needs/includes: no outgoing graph edge.
 - [ ] **R10 [Promote unboxed types](https://ghc.serokell.io/dh#promote-unboxed-types)** — Unmarked. Needs/includes: R11. [Source probes and R11 acceptance check](roadmap/R10-unboxed-promotion.md).
 - [ ] **R11 [Homogeneous equality](https://ghc.serokell.io/dh#homogeneous-equality)** — Unmarked. Needs/includes: no outgoing graph edge.

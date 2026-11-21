@@ -28,6 +28,39 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `16b14c445e`, Hadrian built a regular Stage 2 compiler and the stock
+libraries. This compiler rebuilt `GHC.Internal.Base` and stripped
+`GHC.Internal.Data.Foldable` with Core and STG Lint. The installed list
+instance supplied the method for the `Prelude.foldr` append and map
+proofs. An ordinary client also used character and string literals as
+retained arguments. All 428 Showcase rows matched in native code at
+`-O0`, `-O1` and `-O2`, and in source-loaded GHCi. Nine registered
+tests passed.
+
+The merge at `74731c9f19` added the current family scope and matchability
+changes. Three compiler modules differed from the self-host. We rebuilt
+them and linked them with its other objects and stock packages. All 429
+rows matched in the same four modes. Ten registered tests passed. At
+`-O0` and `-O2`, the older nullary-family providers rebuilt once and
+remained current on the next run. An unrelated module stayed current.
+The previous character reader rejected a retained character unfolding
+at its interface header and linked the provider's stripped interface.
+[Fold proofs](examples/open-evaluation/PreludeFoldrProof.hs) and
+[ordinary character client](examples/qualified-pi/RetainedCharacterClient.hs).
+
+At `057f0d628c`, a written character or a list of characters supplied a
+retained argument at its DataKinds index. All 422 Showcase outputs
+matched in stripped native code at `-O0`, source-loaded GHCi, and native
+code at `-O1` and `-O2`. Nineteen registered tests, the 37-row native
+Core test and the evidence API checks passed.
+
+The preceding 421-output compiler rejected a provider that exported a
+retained character in an unfolding. It reported GHC-47808 at the
+interface header. The same reader used a stripped retained object and
+inlined ordinary character code. The new reader also inlined the
+retained literal. [Character client](examples/qualified-pi/RetainedCharacterClient.hs)
+and [two-reader test](../../testsuite/tests/dependent/should_run/NativeRetainedChar.sh).
+
 At `d1db028e3c`, the ordinary two-vector client inferred its result
 package. Its output was `([7],[2,4])`. Reading the first cell on
 either side left the other input and the selected tail unevaluated.

@@ -2984,7 +2984,7 @@ data IfaceEvidence
   | IndexedConstructorCaseEvidence | IndexedConstructorFieldsEvidence
   | IndexedConstructorOperandEvidence
   | IndexedConstructorExistentialCaseEvidence | GeneralIndexedConstructorOperandEvidence
-  | RetainedUserUnfoldingEvidence | LinearUnpackEvidence
+  | RetainedUserUnfoldingEvidence | LinearUnpackEvidence | RetainedCharOperandEvidence
   deriving (Bounded, Enum, Eq, Ord)
 
 -- | Requirements of an interface payload. See Note [Versioning retained evidence]

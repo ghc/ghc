@@ -191,13 +191,13 @@ gcast2 :: forall c t t' a b. (Typeable t, Typeable t')
        => c (t a b) -> Maybe (c (t' a b))
 gcast2 x = fmap (\Refl -> x) (eqT :: Maybe (t :~: t'))
 
--- | Applies a type to a function type. Returns: @Just u@ if the first argument
--- represents a function of type @t -> u@ and the second argument represents a
--- function of type @t@. Otherwise, returns @Nothing@.
+-- | Returns @Just u@ if the first argument represents an unrestricted arrow
+-- from @t@ to @u@ and the second argument represents @t@. The arrow can have
+-- either matchability. Otherwise, returns @Nothing@.
 funResultTy :: TypeRep -> TypeRep -> Maybe TypeRep
 funResultTy (I.SomeTypeRep f) (I.SomeTypeRep x)
   | Just HRefl <- (I.typeRep :: I.TypeRep Type) `I.eqTypeRep` I.typeRepKind f
-  , I.Fun arg res <- f
+  , I.Fun' _ arg res <- f
   , Just HRefl <- arg `I.eqTypeRep` x
   = Just (I.SomeTypeRep res)
   | otherwise = Nothing

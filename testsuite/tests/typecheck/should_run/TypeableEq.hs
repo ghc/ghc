@@ -1,4 +1,4 @@
-{-# LANGUAGE PolyKinds, TypeFamilies #-}
+{-# LANGUAGE LinearTypes, PolyKinds, TypeApplications, TypeFamilies #-}
 
 -- | Test equality predicates of Type.Reflection.
 module Main where
@@ -9,6 +9,8 @@ import Data.Maybe
 import Data.Proxy
 import Data.Functor.Const
 import Data.Functor.Product
+import qualified Data.Typeable as Legacy
+import GHC.Exts (RuntimeRep, TYPE)
 
 --data Product (f :: k -> Type) (g :: k -> Type) (a :: k)
 --    = Product (f x) (g x)
@@ -61,9 +63,20 @@ test4 = do
     App ddy _ <- pure dy
     checkEq True ddx ddy
 
+testFunctionResult :: IO ()
+testFunctionResult = do
+    let kind = typeRepKind (typeRep @TYPE)
+        expected = Just (SomeTypeRep (typeRep @Type))
+        result f x = Legacy.funResultTy (SomeTypeRep f) (SomeTypeRep x)
+    check (result kind (typeRep @RuntimeRep) == expected) "matchable kind result"
+    check (result kind (typeRep @Int) == Nothing) "mismatched domain"
+    check (result (typeRep @(Int -> Bool)) (typeRep @Int) ==
+           Just (SomeTypeRep (typeRep @Bool))) "ordinary function result"
+    check (result (typeRep @(Int %1 -> Bool)) (typeRep @Int) == Nothing)
+          "linear function"
 
 main :: IO ()
-main = sequence_ [test1, test2, test3, test4]
+main = sequence_ [test1, test2, test3, test4, testFunctionResult]
 
 type IsEqual = Bool
 

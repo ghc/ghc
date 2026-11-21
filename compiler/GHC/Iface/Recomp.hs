@@ -599,6 +599,9 @@ checkFlagHash hsc_env iface self_recomp = do
         new_fp = binaryEnumFingerprint scoped_identity_fp
         append_fp = checkedListAppendFingerprint new_fp
         reverse_fp = checkedListReverseFingerprint append_fp
+        fold_fp = checkedListFoldFingerprint reverse_fp
+        fold_method_fp = checkedListFoldMethodsFingerprint fold_fp
+        monomorphic_fold_fp = checkedMonomorphicListFoldFingerprint fold_method_fp
         retained_signature_fp = retainedSignatureCaseFingerprint new_fp
         earlier_rule_generations = [class_base_fp, family_base_fp, scoped_base_fp,
                                     scoped_family_fp, filter_base_fp, filter_family_fp,
@@ -616,8 +619,9 @@ checkFlagHash hsc_env iface self_recomp = do
         -- See Note [Recompiling nullary closed arrow families].
         nullary_candidate = mi_hsc_src iface == HsSrcFile &&
                            couldInferNullaryClosedMatchability (map snd (mi_decls iface))
-        nullary_base_fps = [new_fp, reverse_fp]
-                        ++ [stamp reverse_fp | Just (stamp, _) <- [source_provider]]
+        list_fps = [reverse_fp, fold_fp, fold_method_fp, monomorphic_fold_fp]
+        nullary_base_fps = new_fp : list_fps
+                        ++ [stamp fp | Just (stamp, _) <- [source_provider], fp <- list_fps]
                         ++ [guardedPrefixFingerprint reverse_fp
                             | mi_module iface == guardedListModule]
         with_retained fps = fps ++ map retainedSignatureCaseFingerprint fps
@@ -627,25 +631,39 @@ checkFlagHash hsc_env iface self_recomp = do
               (with_retained nullary_base_fps ++ with_retained (map stamp_rules nullary_base_fps))
           = (True, fp)
           | otherwise = (False, raw_file_fp)
-        read_provider_stamp fingerprint =
-          find (\stamp -> stamp (fingerprint reverse_fp) == file_fp)
+        read_provider_stamp fingerprint fp =
+          (,fp) <$> find (\stamp -> stamp (fingerprint fp) == file_fp)
             [id, stamp_rules, retainedSignatureCaseFingerprint,
              retainedSignatureCaseFingerprint . stamp_rules]
-        provider_stamp = source_provider >>= read_provider_stamp . fst
+        provider_stamp = source_provider >>= \(fingerprint, _) ->
+          read_provider_stamp fingerprint monomorphic_fold_fp `mplus`
+          read_provider_stamp fingerprint fold_method_fp `mplus`
+          read_provider_stamp fingerprint fold_fp `mplus`
+          read_provider_stamp fingerprint reverse_fp
         prefix_stamp
-          | mi_module iface == guardedListModule = read_provider_stamp guardedPrefixFingerprint
+          | mi_module iface == guardedListModule = read_provider_stamp guardedPrefixFingerprint reverse_fp
           | otherwise = Nothing
-        stored_fp = maybe file_fp (\stamp -> stamp reverse_fp) (provider_stamp `mplus` prefix_stamp)
-        (old_fp, checked_append, checked_reverse, shared_retained_cases)
-          | stored_fp `elem` reverse_fps = (new_fp, True, True, False)
-          | stored_fp `elem` map retainedSignatureCaseFingerprint reverse_fps = (new_fp, True, True, True)
-          | stored_fp `elem` append_fps = (new_fp, True, False, False)
-          | stored_fp `elem` map retainedSignatureCaseFingerprint append_fps = (new_fp, True, False, True)
-          | stored_fp == retained_signature_fp = (new_fp, False, False, True)
-          | stored_fp `elem` class_generations = (stored_fp, False, False, False)
-          | Just fp <- find ((== stored_fp) . stamp_rules) class_generations = (fp, False, False, False)
-          | stored_fp == retainedSignatureCaseFingerprint (stamp_rules new_fp) = (new_fp, False, False, True)
-          | otherwise = (stored_fp, False, False, False)
+        stored_fp = maybe file_fp (uncurry ($)) (provider_stamp `mplus` prefix_stamp)
+        fold_fps = [fold_fp, stamp_rules fold_fp]
+        fold_method_fps = [fold_method_fp, stamp_rules fold_method_fp]
+        monomorphic_fold_fps = [monomorphic_fold_fp, stamp_rules monomorphic_fold_fp]
+        retained_monomorphic_fold_fps = map retainedSignatureCaseFingerprint monomorphic_fold_fps
+        (old_fp, checked_append, checked_reverse, checked_fold, checked_fold_method, shared_retained_cases)
+          | stored_fp `elem` monomorphic_fold_fps = (new_fp, True, True, True, True, False)
+          | stored_fp `elem` retained_monomorphic_fold_fps = (new_fp, True, True, True, True, True)
+          | stored_fp `elem` fold_method_fps = (new_fp, True, True, True, True, False)
+          | stored_fp `elem` map retainedSignatureCaseFingerprint fold_method_fps = (new_fp, True, True, True, True, True)
+          | stored_fp `elem` fold_fps = (new_fp, True, True, True, False, False)
+          | stored_fp `elem` map retainedSignatureCaseFingerprint fold_fps = (new_fp, True, True, True, False, True)
+          | stored_fp `elem` reverse_fps = (new_fp, True, True, False, False, False)
+          | stored_fp `elem` map retainedSignatureCaseFingerprint reverse_fps = (new_fp, True, True, False, False, True)
+          | stored_fp `elem` append_fps = (new_fp, True, False, False, False, False)
+          | stored_fp `elem` map retainedSignatureCaseFingerprint append_fps = (new_fp, True, False, False, False, True)
+          | stored_fp == retained_signature_fp = (new_fp, False, False, False, False, True)
+          | stored_fp `elem` class_generations = (stored_fp, False, False, False, False, False)
+          | Just fp <- find ((== stored_fp) . stamp_rules) class_generations = (fp, False, False, False, False, False)
+          | stored_fp == retainedSignatureCaseFingerprint (stamp_rules new_fp) = (new_fp, False, False, False, False, True)
+          | otherwise = (stored_fp, False, False, False, False, False)
         dflags = hsc_dflags hsc_env
         final_possible = backendGeneratesCode (backend dflags) && couldExportCallbackCase iface
         candidates = exportedCaseDatatypes iface
@@ -802,6 +820,34 @@ checkFlagHash hsc_env iface self_recomp = do
           , mi_hsc_src iface == HsSrcFile
           , backendGeneratesCode (backend dflags) = liftIO $ recheck reason
           | otherwise = pure UpToDate
+        check_fold
+          | not checked_fold
+          , backendGeneratesCode (backend dflags)
+          , mi_hsc_src iface == HsSrcFile = do
+              candidate <- couldExportSourceSignature (isOneShot (ghcMode dflags)) iface ListFold
+              if candidate
+                then liftIO $ recheck "Compiler now checks right list fold equations"
+                else pure UpToDate
+          | otherwise = pure UpToDate
+        check_fold_method
+          | not checked_fold_method
+          , backendGeneratesCode (backend dflags)
+          , mi_hsc_src iface == HsSrcFile = do
+              candidate <- couldExportSourceSignature (isOneShot (ghcMode dflags)) iface ListFoldMethod
+              if candidate
+                then liftIO $ recheck "Compiler now checks right list fold method fields"
+                else pure UpToDate
+          | otherwise = pure UpToDate
+        check_monomorphic_fold
+          | stored_fp `notElem` monomorphic_fold_fps
+          , stored_fp `notElem` retained_monomorphic_fold_fps
+          , backendGeneratesCode (backend dflags)
+          , mi_hsc_src iface == HsSrcFile = do
+              candidate <- couldExportSourceSignature (isOneShot (ghcMode dflags)) iface MonomorphicListFold
+              if candidate
+                then liftIO $ recheck "Compiler now checks monomorphic right list fold equations"
+                else pure UpToDate
+          | otherwise = pure UpToDate
         check_family_uses
           | old_fp `elem` (staged_fp : class_generations) = pure UpToDate
           | otherwise = do
@@ -840,6 +886,9 @@ checkFlagHash hsc_env iface self_recomp = do
     pure (flags, check_identity `recompThen` check_guarded_filter
                                      `recompThen` check_append
                                      `recompThen` check_reverse
+                                     `recompThen` check_fold
+                                     `recompThen` check_fold_method
+                                     `recompThen` check_monomorphic_fold
                                      `recompThen` check_source_provider
                                      `recompThen` check_family_uses
                                      `recompThen` check_forwarded_result
@@ -979,6 +1028,21 @@ checkedListAppendFingerprint fp =
 checkedListReverseFingerprint :: Fingerprint -> Fingerprint
 checkedListReverseFingerprint fp =
     computeFingerprint putNameLiterally (fp, "checked-list-reverse-v1" :: String)
+
+-- | Record that a code-generating build checked for right list fold equations.
+checkedListFoldFingerprint :: Fingerprint -> Fingerprint
+checkedListFoldFingerprint fp =
+    computeFingerprint putNameLiterally (fp, "checked-list-fold-v1" :: String)
+
+-- | Record that a code-generating build checked dictionary fields for list folds.
+checkedListFoldMethodsFingerprint :: Fingerprint -> Fingerprint
+checkedListFoldMethodsFingerprint fp =
+    computeFingerprint putNameLiterally (fp, "checked-list-fold-method-v1" :: String)
+
+-- | Record that a code-generating build checked monomorphic right list folds.
+checkedMonomorphicListFoldFingerprint :: Fingerprint -> Fingerprint
+checkedMonomorphicListFoldFingerprint fp =
+    computeFingerprint putNameLiterally (fp, "checked-monomorphic-list-fold-v1" :: String)
 
 -- | Recheck installed providers once when a source equation is added.
 checkedSourceProvider :: Module -> Maybe (Fingerprint -> Fingerprint, String)
@@ -1566,9 +1630,10 @@ couldExportCallbackCase iface = any candidate (mi_decls iface)
 data SourceIfaceType = SourceIfaceType IfaceType [(IfLclName, Either Int SourceIfaceType)]
 
 -- | The signature shapes used to find producers with missing source equations.
-data SourceSignature = GuardedListFilter | PolymorphicIdentity | ListAppend
+data SourceSignature
+  = GuardedListFilter | PolymorphicIdentity | ListAppend | ListFold | ListFoldMethod | MonomorphicListFold
 
--- | Check whether an exported signature could supply the requested equation.
+-- | Check whether an interface signature could supply the requested equation.
 -- See Note [Looking through type synonyms for checked source signatures].
 couldExportSourceSignature :: Bool -> ModIface -> SourceSignature -> IfG Bool
 couldExportSourceSignature one_shot iface signature =
@@ -1578,19 +1643,44 @@ couldExportSourceSignature one_shot iface signature =
     exports = mkNameSet (concatMap availNames (mi_exports iface))
     boot_deps = mkModDeps (dep_boot_mods (mi_deps iface))
     candidate (_, IfaceId{ifName = n, ifType = ty, ifIdDetails = details})
+      | ListFoldMethod <- signature = check (fold_dictionary details)
       | n `elemNameSet` exports = case signature of
           GuardedListFilter -> check (filter_type 0)
           PolymorphicIdentity
             | IfSourceTableId{} <- details -> pure False
-            | otherwise -> check (one_lifted_parameter identity_arrow)
+            | otherwise -> check (lifted_parameter 0 identity_arrow)
           ListAppend
             | IfSourceTableId{} <- details -> pure False
-            | otherwise -> check (one_lifted_parameter (append_arrows (2 :: Int)))
+            | otherwise -> check (lifted_parameter 0 (append_arrows (2 :: Int)))
+          ListFold
+            | IfSourceTableId{} <- details -> pure False
+            | otherwise -> check (lifted_parameter 0 (lifted_parameter 1 fold_arrows))
+          MonomorphicListFold
+            | IfSourceTableId{} <- details -> pure False
+            | otherwise -> check monomorphic_fold_arrows
       where
         check shape = isJust <$> runMaybeT (shape (SourceIfaceType ty []))
     candidate _ = pure False
 
-    one_lifted_parameter check_body ty = lift (view ty) >>= \case
+    fold_dictionary details ty = do
+      known <- case details of
+        IfDFunId -> pure []
+        IfSourceDFunId methods _ -> pure (map fst methods)
+        _ -> mzero
+      Just (SourceIfaceType (IfaceTyConApp cls (IA_Arg domain _ IA_Nil)) args) <- lift (view ty)
+      Just list@(SourceIfaceType (IfaceTyConApp tc IA_Nil) _) <- lift (view (SourceIfaceType domain args))
+      guard (ifaceTyConName tc == listTyConName)
+      Just IfaceClass{ifBinders = [parameter], ifBody = IfConcreteClass{ifSigs = methods, ifUnary = False}} <-
+        lift (declaration (ifaceTyConName cls))
+      let context = [(ifTyConBinderName parameter, Right list)]
+          shaped (IfaceClassOp name method _) =
+            if name `elem` known then pure False else
+              isJust <$> runMaybeT (lifted_parameter 0 (lifted_parameter 1 fold_arrows)
+                                           (SourceIfaceType method context))
+      found <- lift (anyM shaped methods)
+      guard found
+
+    lifted_parameter index check_body ty = lift (view ty) >>= \case
       Nothing -> pure ()
       Just (SourceIfaceType (IfaceForAllTy ma (Bndr (IfaceTvBndr (name, kind))
                                               (IfaceForAllTyFlag (Invisible _))) body) args)
@@ -1598,7 +1688,7 @@ couldExportSourceSignature one_shot iface signature =
             lift (view (SourceIfaceType kind args)) >>= \case
               Just (SourceIfaceType kind' _) -> guard (isIfaceLiftedTypeKind kind')
               Nothing -> pure ()
-            check_body (SourceIfaceType body ((name, Left 0) : args))
+            check_body (SourceIfaceType body ((name, Left index) : args))
       _ -> mzero
 
     identity_arrow ty = lift (view ty) >>= \case
@@ -1620,6 +1710,34 @@ couldExportSourceSignature one_shot iface signature =
             operand <- list_element (SourceIfaceType input args)
             guard (maybe True (== 0) operand)
             append_arrows (n - 1) (SourceIfaceType output args)
+      _ -> mzero
+
+    fold_arguments ty = do
+      (callback, rest) <- ordinary_arrow ty
+      (seed, rest') <- ordinary_arrow rest
+      (list, result) <- ordinary_arrow rest'
+      (item, callback_rest) <- ordinary_arrow callback
+      (state, output) <- ordinary_arrow callback_rest
+      pure (item, seed, list, [state, output, result])
+
+    fold_arrows ty = do
+      (item, seed, list, results) <- fold_arguments ty
+      a <- element item
+      b <- element seed
+      parameter <- list_element list
+      states <- traverse element results
+      guard (all (== b) states && a == parameter &&
+             (a, b) `elem` [(Just 0, Just 1), (Just 1, Just 0)])
+
+    -- The interface identifies candidates. The Core checker verifies nominal equality.
+    monomorphic_fold_arrows ty = do
+      (_, _, list, _) <- fold_arguments ty
+      void (list_argument list)
+
+    ordinary_arrow ty = lift (view ty) >>= \case
+      Just (SourceIfaceType (IfaceFunTy FTF_T_T ma mult input output) args)
+        | nullary_name unmatchableDataConName ma, nullary_name manyDataConName mult ->
+            pure (SourceIfaceType input args, SourceIfaceType output args)
       _ -> mzero
 
     nullary_name expected (IfaceTyConApp tc IA_Nil) = ifaceTyConName tc == expected
@@ -1652,10 +1770,16 @@ couldExportSourceSignature one_shot iface signature =
           _ -> mzero
       _ -> mzero
 
-    list_element ty = lift (view ty) >>= \case
+    list_element ty = maybe (pure Nothing) element =<< list_argument ty
+
+    list_argument (SourceIfaceType (IfaceAppTy fun (IA_Arg arg _ IA_Nil)) args) = do
+      Just (SourceIfaceType (IfaceTyConApp tc IA_Nil) _) <- lift (view (SourceIfaceType fun args))
+      guard (ifaceTyConName tc == listTyConName)
+      pure (Just (SourceIfaceType arg args))
+    list_argument ty = lift (view ty) >>= \case
       Nothing -> pure Nothing
       Just (SourceIfaceType (IfaceTyConApp tc (IA_Arg arg _ IA_Nil)) args)
-        | ifaceTyConName tc == listTyConName -> element (SourceIfaceType arg args)
+        | ifaceTyConName tc == listTyConName -> pure (Just (SourceIfaceType arg args))
       _ -> mzero
 
     element ty = lift (view ty) >>= \case
@@ -2443,7 +2567,9 @@ mkSelfRecomp hsc_env this_mod src_hash usages = do
           stamp_provider = maybe id fst (checkedSourceProvider this_mod)
           list_stamp
             | backendGeneratesCode (backend dflags) =
-                stamp_provider . checkedListReverseFingerprint . checkedListAppendFingerprint
+                stamp_provider . checkedMonomorphicListFoldFingerprint .
+                checkedListFoldMethodsFingerprint . checkedListFoldFingerprint .
+                checkedListReverseFingerprint . checkedListAppendFingerprint
             | otherwise = id
           current_flag_hash = list_stamp
                             $ binaryEnumFingerprint

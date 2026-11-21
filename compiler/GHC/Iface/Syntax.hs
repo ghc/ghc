@@ -514,6 +514,7 @@ hasIfacePackageExpr = go
     go (IfaceLam _ rhs) = go rhs
     go (IfaceApp fun arg) = go fun || go arg
     go (IfaceIndexedConArg _ arg) = go arg
+    go (IfaceRetainedCharArg arg) = go arg
     go (IfaceCase scrut _ alts) = go scrut || any (\(IfaceAlt _ _ rhs) -> go rhs) alts
     go (IfaceECase scrut _) = go scrut
     go (IfaceLet binding rhs) = goBind binding || go rhs
@@ -829,6 +830,7 @@ data IfaceExpr
   | IfacePack   IfaceType IfaceType IfaceExpr
   | IfaceUnpack IfaceTvBndr IfaceIdBndr IfaceExpr IfaceExpr
   | IfaceIndexedConArg !IfaceIndexedConShape IfaceExpr
+  | IfaceRetainedCharArg IfaceExpr
 
 -- | The constructor shapes that a reader can use as retained operands.
 data IfaceIndexedConShape = IfaceSimpleIndexedCon | IfaceGeneralIndexedCon
@@ -1959,6 +1961,7 @@ pprIfaceExpr add_par (IfaceUnpack (witness, _) (_, payload, _) package body)
 
 pprIfaceExpr add_par app@(IfaceApp _ _) = add_par (pprIfaceApp app [])
 pprIfaceExpr add_par (IfaceIndexedConArg _ arg) = pprIfaceExpr add_par arg
+pprIfaceExpr add_par (IfaceRetainedCharArg arg) = pprIfaceExpr add_par arg
 
 pprIfaceExpr add_par i@(IfaceLam _ _)
   = add_par (sep [char '\\' <+> sep (map pprIfaceLamBndr bndrs) <+> arrow,
@@ -2378,6 +2381,7 @@ freeNamesIfExpr (IfaceUnpack witness payload@(mult, _, _) package body)
       &&& freeNamesIfExpr package &&& freeNamesIfExpr body
 freeNamesIfExpr (IfaceApp f a)        = freeNamesIfExpr f &&& freeNamesIfExpr a
 freeNamesIfExpr (IfaceIndexedConArg _ a) = freeNamesIfExpr a
+freeNamesIfExpr (IfaceRetainedCharArg a) = freeNamesIfExpr a
 freeNamesIfExpr (IfaceCast e co)      = freeNamesIfExpr e &&& freeNamesIfCoercion co
 freeNamesIfExpr (IfaceTick t e)       = freeNamesIfTickish t &&& freeNamesIfExpr e
 freeNamesIfExpr (IfaceECase e ty)     = freeNamesIfExpr e &&& freeNamesIfType ty
@@ -3141,6 +3145,10 @@ instance Binary IfaceExpr where
             requireIfaceEvidenceVersion bh GeneralIndexedConstructorOperandEvidence
             putByte bh 18
         put_ bh arg
+    put_ bh (IfaceRetainedCharArg arg) = do
+        requireIfaceEvidenceVersion bh RetainedCharOperandEvidence
+        putByte bh 19
+        put_ bh arg
     put_ bh (IfaceApp ag ah) = do
         putByte bh 5
         put_ bh ag
@@ -3245,6 +3253,7 @@ instance Binary IfaceExpr where
             16 -> IfaceUnpack <$> get bh <*> get bh <*> get bh <*> get bh
             17 -> IfaceIndexedConArg IfaceSimpleIndexedCon <$> get bh
             18 -> IfaceIndexedConArg IfaceGeneralIndexedCon <$> get bh
+            19 -> IfaceRetainedCharArg <$> get bh
             _ -> ioError (userError ("get IfaceExpr: invalid expression tag " ++ show h))
 
 instance Binary IfaceTickish where
@@ -3542,6 +3551,7 @@ instance NFData IfaceExpr where
     IfaceUnpack w v p e -> rnf w `seq` rnf v `seq` rnf p `seq` rnf e
     IfaceApp e1 e2 -> rnf e1 `seq` rnf e2
     IfaceIndexedConArg _ e -> rnf e
+    IfaceRetainedCharArg e  -> rnf e
     IfaceCase e nm alts -> rnf e `seq` rnf nm `seq` rnf alts
     IfaceECase e ty -> rnf e `seq` rnf ty
     IfaceLet bind e -> rnf bind `seq` rnf e
