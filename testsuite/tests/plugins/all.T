@@ -67,8 +67,9 @@ test('HomogeneousSelectorGivens',
      multimod_compile_and_run,
      ['HomogeneousSelectorGivens', '-v0 -package ghc -dcore-lint -dstg-lint ' + config.plugin_way_flags])
 test('CoercionForall',
-     [only_ways(['normal']), extra_files(['CoercionForallPlugin.hs'])],
-     multimod_compile, ['CoercionForall', '-v0 -package ghc -dcore-lint ' + config.plugin_way_flags])
+     [req_host_target_ghc, only_ways(['normal']), extra_files(['CoercionForallWitness.hs']),
+      extra_run_opts(f'"{config.libdir}"')],
+     compile_and_run, ['-package ghc'])
 test('HomogeneousSelectorRole', normal, compile_fail, [''])
 
 test('plugins06',
