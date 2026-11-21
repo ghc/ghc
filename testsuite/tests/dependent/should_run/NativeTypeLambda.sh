@@ -125,6 +125,23 @@ printf '%s\n' "(Left GT,Right True,Just 'a',Just True)" "(Just 'x',Right True)" 
 ./rows >rows.actual
 cmp rows.expected rows.actual
 
+cat >WrongCallback.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}
+module WrongCallback where
+import Data.Proxy (Proxy)
+import TypeLambda (Fields, Map, withErrors)
+reversed :: Proxy e -> Fields xs -> Fields (Map (\a -> Either a e) xs)
+reversed p xs = withErrors p xs
+HS
+if "${g[@]}" -c WrongCallback.hs >callback.log 2>&1 ||
+   ! grep -Fq 'WrongCallback.hs:6:17: error: [GHC-83865]' callback.log ||
+   ! grep -Eq "type lambda in the signature for .withErrors." callback.log ||
+   ! grep -Eq "type lambda in the signature for .reversed." callback.log ||
+   grep -Fq '$signature-lambda:' callback.log; then
+    cat callback.log >&2
+    exit 1
+fi
+
 cat >LaterLet.hs <<'HS'
 {-# LANGUAGE ExperimentalDependentTypes #-}
 module LaterLet where

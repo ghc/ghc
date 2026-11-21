@@ -3,7 +3,7 @@
 -- | Apply a type lambda to a list of type constructors.
 module TypeLambda
   ( L, Captured, Shadowed, WithError, Prefixes, ScopedRow, Mixed, Held, CaseShadow, Rebuild
-  , Fields(..), withErrors, IndexedTag(..), IndexedCase, IndexedCaseInferred
+  , Fields(..), Map, withErrors, IndexedTag(..), IndexedCase, IndexedCaseInferred
   , roadmap, partial, prefixes, mixed, indexedFields
   ) where
 
