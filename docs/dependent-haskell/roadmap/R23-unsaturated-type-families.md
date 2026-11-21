@@ -21,6 +21,22 @@ compiler. [Map source](../examples/open-evaluation/TypeLambda.hs) and
 
 ## Compatibility with existing Haskell
 
+An ordinary module with `LiberalTypeSynonyms` can pass a partially applied
+type synonym and a data constructor to the same higher-order synonym. For
+example, `type Callback f g = forall a. f a -> g a` accepts
+`Callback Identity []` when `type Identity a = a`. The compiler infers
+matchability separately for each callback parameter. A written arrow
+annotation still fixes the matchability at that position.
+[Ordinary client](../examples/open-evaluation/LiberalCallback.hs)
+and [proposal #242 on higher-order arguments](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#higher-order-arguments).
+
+An installed library compiled with fixed matchable parameters needs a
+rebuild to admit the partial synonym. A home build checks the provider
+and recompiles clients if its exported kind changes. A warm build
+reuses those interfaces. An older compiler reports GHC-47808 when it
+imports a provider with the new inferred kind.
+[Compiler-upgrade check](../examples/open-evaluation/check-liberal-callback-upgrade.sh).
+
 In `type family PFrom (x :: a) :: Rep a`, the result kind can depend
 on an inferred matchability argument to `Rep`. Fixing that argument
 prematurely gives `SDecide (Rep k)` two different meanings in the
