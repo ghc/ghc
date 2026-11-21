@@ -1001,6 +1001,14 @@ type family SecondFlag (t :: Tuple Bool Bool) :: Bool where
 secondFlag :: SecondFlag ('Tup2 'True 'False) :~: 'False
 secondFlag = Refl
 
+-- | Store a column value before the required type argument.
+data ColumnSample a b where
+    ColumnSample :: forall a. (a :~: Int) -> a -> forall b -> ColumnSample a b
+
+-- | Matching Refl establishes that the last type pattern is Int.
+columnCount :: ColumnSample a a -> Int
+columnCount (ColumnSample Refl n (type Int)) = n
+
 -- | Hide the field type and retain both dictionaries for its consumer.
 data PrintablePair where
     PrintablePair :: forall a. Eq a => (Show a => a -> a -> PrintablePair)
@@ -1012,6 +1020,8 @@ describePair (PrintablePair a b) = (a == b, show b)
 main :: IO ()
 main = do
     observe "select the second field of a promoted data family pair" secondFlag
+    observe "use earlier field evidence in a later constructor type pattern"
+        (columnCount (ColumnSample @Int Refl 37 (type Int)))
     observe "recover consecutive GADT constraints" (describePair (PrintablePair False True))
     observe "form an associated family type from its class evidence" constrainedElements
     observe "form an expression annotation with the matched dictionary" annotatedElement
