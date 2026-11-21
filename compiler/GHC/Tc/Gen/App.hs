@@ -3788,7 +3788,8 @@ tcRetainedFunctionArg domain arg
 tcRetainedArg :: Type -> LHsExpr GhcRn -> TcM (Core.CoreExpr, LHsExpr GhcRn)
 tcRetainedArg domain arg
   = setSrcSpanA (getLoc arg) $
-    do { result@(core_arg, _) <- resolve emptyNameEnv domain arg
+    do { domain <- constructor_domain domain arg
+       ; result@(core_arg, _) <- resolve emptyNameEnv domain arg
        ; case Core.retainedArgIndex core_arg of
            Just index
              | typeKind index `tcEqType` domain -> return result
@@ -3797,6 +3798,26 @@ tcRetainedArg domain arg
                                  then return result else unsupported }
            _ -> unsupported }
   where
+    -- See Note [Inferred domains of written retained constructors].
+    constructor_domain domain arg
+      | anyFreeVarsOfType flexible domain
+      , case unLoc (stripParensLHsExpr arg) of
+          HsVar _ name -> isDataOcc (nameOccName (unLocWithUserRdr name))
+          _ -> True
+      = do { actual <- tcRetainedConstructorArgType arg
+           ; case actual of
+               Just ty
+                 | not (hasNativeDependentExpr (Core.Type ty))
+                 , isJust (tcMatchTyX_BM bind Subst.emptySubst domain ty)
+                 -> do { _ <- unifyType Nothing domain ty
+                       ; liftZonkM (zonkTcType domain) }
+               _ -> return domain }
+      | otherwise = return domain
+      where
+        flexible tv = isTcTyVar tv && isMetaTyVar tv
+        bind tv _ | flexible tv = BindMe
+                  | otherwise   = DontBindMe
+
     resolve :: NameEnv Id -> Type -> LHsExpr GhcRn -> TcM (Core.CoreExpr, LHsExpr GhcRn)
     resolve env expected original = do
       result@(core, checked) <- tcRetainedValueOperand (resolve_expr env expected) expected original
@@ -4041,6 +4062,22 @@ tcRetainedArg domain arg
 
     unsupported :: TcM a
     unsupported = failWithTc (TcRnRetainedQuantificationError RetainedIndexExpression)
+
+{- Note [Inferred domains of written retained constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In zipWithExact [x,y] [u,v] (,), the two input lists determine their
+element types. The result type of the callback is still unknown. Ordinary
+forall instantiation can therefore supply a fresh element type for each
+list. If we build the (:) worker at that type before checking x, its Core
+type argument still contains the old metavariable when we recover the index.
+
+Read the declared type of the constructor tree before building its workers.
+Match only metavariables of the expected domain. Let the ordinary unifier
+check that match and read its result. An ordinary metavariable cannot stand
+for a type containing a runtime index. The existing immutable instantiation
+path handles those types. The operand check still validates each field and
+its usage. A bare local variable retains its lexical conversion evidence.
+-}
 
 {- Note [Erased arguments of certified source operands]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
