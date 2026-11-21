@@ -91,13 +91,26 @@ if "$ghc" "${flags[@]}" -c TupleLengthReject.hs >tuple-length.log 2>&1; then
     echo "A boxed tuple used two independently filtered vectors at one length." >&2
     exit 1
 fi
-line=$(grep -n '^wrong xs = ' TupleLengthReject.hs | cut -d: -f1)
+line=$(grep -n '^wrong xs = (' TupleLengthReject.hs | cut -d: -f1)
 grep -Fq "TupleLengthReject.hs:$line:31: error: [GHC-25897]" tuple-length.log
 grep -Fq "at TupleLengthReject.hs:$line:13-28" tuple-length.log
 grep -Fq "at TupleLengthReject.hs:$line:31-47" tuple-length.log
 grep -Fq 'In the expression: filterVec even xs' tuple-length.log
 if grep -Fq 'unpacked_' tuple-length.log; then
     cat tuple-length.log >&2
+    exit 1
+fi
+if "$ghc" "${flags[@]}" -DPRODUCT_FIELDS -c TupleLengthReject.hs >product-length.log 2>&1; then
+    echo "A user product used two independently filtered vectors at one length." >&2
+    exit 1
+fi
+line=$(grep -n '^wrong xs = makeProduct ' TupleLengthReject.hs | cut -d: -f1)
+grep -Fq "TupleLengthReject.hs:$line:43: error: [GHC-25897]" product-length.log
+grep -Fq "at TupleLengthReject.hs:$line:24-41" product-length.log
+grep -Fq "at TupleLengthReject.hs:$line:43-61" product-length.log
+grep -Fq '(filterVec even xs)' product-length.log
+if grep -Fq 'unpacked_' product-length.log; then
+    cat product-length.log >&2
     exit 1
 fi
 "$ghc" "${flags[@]}" CaseMain.o ../provider/{Vector,Filter}.o -o payload-case -main-is CaseMain

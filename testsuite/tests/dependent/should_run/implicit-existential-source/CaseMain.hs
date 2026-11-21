@@ -42,10 +42,20 @@ synonym p = case p of Keep -> True
 -- | Store a filter result with a reader for its hidden length.
 withFirst :: (a -> Bool) -> Vec n a -> FilteredWith a (Maybe a)
 withFirst predicate xs = (filterVec predicate xs, firstCell)
-  where
-    firstCell :: Vec m a -> Maybe a
-    firstCell Nil = Nothing
-    firstCell (Cons x _) = Just x
+
+firstCell :: Vec m a -> Maybe a
+firstCell Nil = Nothing
+firstCell (Cons x _) = Just x
+
+withProduct, withProductFunction :: Vec n Int -> ProductWith Int (Maybe Int)
+withProduct xs = Product (filterVec odd xs) firstCell
+withProductFunction xs = makeProduct (filterVec odd xs) firstCell
+
+withProductSection :: Vec n Int -> ProductWith Int Bool
+withProductSection xs = (filterVec odd xs `makeProduct`) (const True)
+
+readProduct :: ProductWith a r -> r
+readProduct p = case p of Product xs reader -> reader xs
 
 -- | Store a reader that can ignore the vector entirely.
 withIgnored :: (a -> Bool) -> Vec n a -> FilteredWith a Bool
@@ -71,6 +81,11 @@ main = do
          && readFiltered (withIgnored odd (error "unused filter input" :: Vec 'Z Int))
          && readFiltered (linearWith (error "unused linear package" :: Hidden Int))) $
         fail "the tuple forced the discarded filter or used the wrong length"
+    let kept = Cons 7 (error "unused product tail")
+    unless (readProduct (withProduct kept) == Just 7
+         && readProduct (withProductFunction kept) == Just 7
+         && readProduct (withProductSection (error "unused product input" :: Vec 'Z Int))) $
+        fail "the product forced the discarded filter or used the wrong length"
     answer <- try (evaluate (first bottom)) :: IO (Either ErrorCall (Maybe Int))
     case answer of
         Left e | "forced the selected spine" == takeWhile (/= '\n') (displayException e) ->
