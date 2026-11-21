@@ -21,7 +21,7 @@ module GHC.Rename.HsType (
         lookupField, mkHsOpTyRn,
         rnLTyVar, classifyTypeCasePattern,
 
-        rnHsConDeclField, rnRetainedSigType,
+        rnHsConDeclField, rnRetainedSigType, rnHsSigWcTypeWithSplice,
 
         -- Precence related stuff
         NegationHandling(..),
@@ -288,7 +288,14 @@ The index remains the actual opaque Id. No RHS is unfolded or evaluated.
 rnHsSigWcType :: HsDocContext
               -> LHsSigWcType GhcPs
               -> RnM (LHsSigWcType GhcRn, FreeNames)
-rnHsSigWcType doc (HsWC { hswc_body =
+rnHsSigWcType = rnHsSigWcTypeWithSplice (const rnSpliceType)
+
+-- | Allow a top-level signature checker to rename its complete type splice.
+-- Nested splices keep the ordinary type renamer and its lexical environment.
+rnHsSigWcTypeWithSplice
+  :: (HsDocContext -> HsUntypedSplice GhcPs -> RnM (HsType GhcRn, FreeNames))
+  -> HsDocContext -> LHsSigWcType GhcPs -> RnM (LHsSigWcType GhcRn, FreeNames)
+rnHsSigWcTypeWithSplice rename_splice doc (HsWC { hswc_body =
     sig_ty@(L loc (HsSig{sig_bndrs = outer_bndrs, sig_body = body_ty })) })
   = do { experimental <- xoptM LangExt.ExperimentalDependentTypes
        ; free_vars <- filterInScopeM (extract_lhs_sig_ty sig_ty)
@@ -310,6 +317,11 @@ rnHsSigWcType doc (HsWC { hswc_body =
                        failWithTc $ TcRnRetainedQuantificationError RetainedPartialSignature
                    ; (body', fvs) <- rnRetainedSigType doc body_ty
                    ; pure ([], body', fvs) }
+              | HsOuterImplicit{} <- outer_bndrs
+              , L splice_loc (HsSpliceTy _ splice) <- body_ty
+              -> setSrcSpanA splice_loc $ do
+                   (body', fvs) <- rename_splice doc splice
+                   pure ([], L splice_loc body', fvs)
               | otherwise -> rnWcBodyType doc nwc_rdrs body_ty
        ; pure ( HsWC  { hswc_ext = wcs, hswc_body = L loc $
                 HsSig { sig_ext = noExtField

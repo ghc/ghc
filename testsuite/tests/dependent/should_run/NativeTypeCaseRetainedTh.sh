@@ -26,7 +26,7 @@ import Data.Proxy (Proxy(..))
 import Data.IORef (newIORef, readIORef, writeIORef)
 import NativeRetainedTH (quoted, render)
 import NativeTypeCaseRetainedTh (fromQuote, fromReify)
-import NativeTypeCaseRetainedThRaw (chooseInline)
+import NativeTypeCaseRetainedThRaw (chooseInline, chooseDirect, caseData)
 
 main :: IO ()
 main = do
@@ -39,6 +39,8 @@ main = do
     second <- observe <$> readIORef flag
     print (first, second)
     print (chooseInline True :: Int, chooseInline False :: Char)
+    print (chooseDirect True () :: Int, chooseDirect False () :: Char)
+    print caseData
 
 observe :: Bool -> String
 observe b = render b (quoted b)
@@ -82,13 +84,15 @@ for opt in -O0 -O2; do
     "${ghc[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core -c NativeTypeCaseRetainedThProvider.hs
     mv NativeTypeCaseRetainedThProvider.hs provider.source
     "${ghc[@]}" -c NativeTypeCaseRetainedTh.hs
+    : > case-effects
     "${ghc[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core -c NativeTypeCaseRetainedThRaw.hs
+    printf 'after\ncase\nbefore\nfinalizer\n' | diff -u - case-effects
     mv NativeTypeCaseRetainedThRaw.hs raw.source
     "${ghc[@]}" -c NativeTypeCaseRetainedThClient.hs
     "${ghc[@]}" NativeTypeCaseRetainedThClient.o NativeTypeCaseRetainedTh.o \
         NativeTypeCaseRetainedThProvider.o NativeTypeCaseRetainedThRaw.o NativeRetainedTH.o -o run
     ./run > actual
-    printf "(11,'x',11,'x',11,'x')\n(\"11\",\"x\")\n(13,'q')\n" | diff -u - actual
+    printf "(11,'x',11,'x',11,'x')\n(\"11\",\"x\")\n(13,'q')\n(19,'c')\nTrue\n" | diff -u - actual
     status=0
     "${ghc[@]}" -c NativeTypeCaseRetainedThWrongBranch.hs > wrong-branch.log 2>&1 || status=$?
     if [[ $status != 1 ]] || ! grep -Fq "Couldn't match type" wrong-branch.log ||

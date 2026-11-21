@@ -1,8 +1,9 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, TemplateHaskell #-}
-module NativeTypeCaseRetainedThRaw (chooseInline) where
+module NativeTypeCaseRetainedThRaw (chooseInline, chooseDirect, caseData) where
 
 import Data.Proxy (Proxy)
 import Language.Haskell.TH
+import Language.Haskell.TH.Syntax (addModFinalizer, dataToExpQ, dataToPatQ)
 
 $(do
   ty <- [t| foreach (b :: Bool) -> case b of { True -> Int; False -> Char } |]
@@ -26,3 +27,22 @@ $(do
 
 chooseInline True = 13
 chooseInline False = 'q'
+
+before :: $(runIO (appendFile "case-effects" "before\n") >> [t| Int |])
+before = 19
+
+chooseDirect :: $(do
+  runIO (appendFile "case-effects" "case\n")
+  addModFinalizer (runIO (appendFile "case-effects" "finalizer\n"))
+  [t| foreach (b :: Bool) -> () -> case b of { True -> Int; False -> Char } |])
+chooseDirect True () = before
+chooseDirect False () = after
+
+after :: $(runIO (appendFile "case-effects" "after\n") >> [t| Char |])
+after = 'c'
+
+caseData :: Bool
+caseData =
+  case $(dataToExpQ (const Nothing) (CaseT StarT [TypeCaseAlt WildCardT ConstraintT])) of
+    $(dataToPatQ (const Nothing) (CaseT StarT [TypeCaseAlt WildCardT ConstraintT])) -> True
+    _ -> False

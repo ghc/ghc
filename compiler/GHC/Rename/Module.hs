@@ -19,7 +19,7 @@ module GHC.Rename.Module (
 import GHC.Prelude hiding ( head )
 
 import {-# SOURCE #-} GHC.Rename.Expr( rnLExpr )
-import {-# SOURCE #-} GHC.Rename.Splice ( rnSpliceDecl, rnTopSpliceDecls )
+import {-# SOURCE #-} GHC.Rename.Splice ( rnSpliceDecl, rnTopSpliceDecls, rnSpliceTypeWith )
 
 import GHC.Hs
 import GHC.Hs.Type (mkHsImplicitSigType, HsTypeGhcPsExt(HsTypeCase, HsTypeCaseAlias, HsTypeLet, HsTypeSome), HsTypeCaseAlt(..))
@@ -1501,18 +1501,26 @@ rnSrcDeclsWithLambdas sigma named_wildcards early_hidden early_scopes group@(HsG
    -- means we'll only report a declaration as unused if it isn't
    -- mentioned at all.  Ah well.
    traceRn "Start rnTyClDecls" (ppr tycl_decls) ;
-   (rn_tycl_decls, src_fvs1) <- rnTyClDecls hidden scopes (sig_types ++ updated_types) ;
+   (rn_source_types, source_type_fvs) <- rnTyClDecls hidden scopes (sig_types ++ updated_types) ;
 
    -- (F) Rename Value declarations right-hand sides
    traceRn "Start rnmono" empty ;
    let { val_bndr_set = mkNameSet id_bndrs `unionNameSet` mkNameSet pat_syn_bndrs } ;
    let { new_lhs = makeRnValBinds noExtField binds' sigs } ;
-   (rn_val_decls@(XValBindsLR (HsVBG rn_binds sigs')), bind_dus) <- if is_boot
-    -- For an hs-boot, use tc_bndrs (which collects how we're renamed
-    -- signatures), since val_bndr_set is empty (there are no x = ...
-    -- bindings in an hs-boot.)
-    then rnTopBindsBoot tc_bndrs new_lhs
-    else rnValBindsRHS (TopSigCtxt val_bndr_set) new_lhs ;
+   ((rn_val_decls@(XValBindsLR (HsVBG rn_binds sigs')), bind_dus), rn_splice_types) <-
+     if dependent && not is_boot
+     then do { splice_types <- newTcRef []
+             ; let rename_splice = rnSplicedSignatureCases sigma named_wildcards local_fix_env splice_types
+             ; binds <- rnValBindsRHSWith (rnHsSigWcTypeWithSplice rename_splice)
+                          (TopSigCtxt val_bndr_set) new_lhs
+             ; types <- reverse <$> readTcRef splice_types
+             ; pure (binds, types) }
+     else (, []) <$> if is_boot
+       -- The signatures bind the boot names. There are no value bindings.
+       then rnTopBindsBoot tc_bndrs new_lhs
+       else rnValBindsRHS (TopSigCtxt val_bndr_set) new_lhs ;
+   let { rn_tycl_decls = rn_source_types ++ concatMap fst rn_splice_types
+       ; src_fvs1 = plusFNs (source_type_fvs : map snd rn_splice_types) } ;
    traceRn "finish rnmono" (ppr rn_val_decls) ;
 
    -- (G) Rename Fixity and deprecations
@@ -1589,6 +1597,58 @@ rnSrcDeclsWithLambdas sigma named_wildcards early_hidden early_scopes group@(HsG
    traceRn "finish Dus" (ppr src_dus ) ;
    return (final_tcg_env, rn_group)
                     }}}}}
+
+-- | Lift cases from the parsed result of a complete top-level signature splice.
+-- See Note [Lifting cases from signature splices].
+rnSplicedSignatureCases
+  :: RdrName -> Bool -> MiniFixityEnv -> TcRef [([TyClGroup GhcRn], FreeNames)]
+  -> HsDocContext -> HsUntypedSplice GhcPs -> RnM (HsType GhcRn, FreeNames)
+rnSplicedSignatureCases sigma named_wildcards fix_env generated doc =
+  rnSpliceTypeWith $ \raw ->
+    case doc of
+      TypeSigCtx names@(_:_) | contains_case raw -> do
+        let rename ty = rnLHsType (SpliceTypeCtx raw) ty
+            sig = HsSig noExtField (HsOuterImplicit noExtField) raw
+            wc = HsWC noExtField (L (getLoc raw) sig)
+            input_sig = noLocA (TypeSig noAnn [] names wc)
+            input = emptyRdrGroup{hs_valds = ValBinds noExtField [VbSig input_sig]}
+        heads <- retainedSourceHeads [input_sig] []
+        let (updated, anchors, aliases, uses, _) = liftDeclarationTypes heads named_wildcards input
+        case (anchors, hs_valds updated) of
+          (_:_, ValBinds _ [VbSig (L _ (TypeSig _ _ _ HsWC{hswc_body = L _ HsSig{sig_body = ty}}))]) -> do
+            let (cases, case_names) = liftTypeCases emptyRdrGroup{hs_tyclds = anchors}
+                (late, lambdas, scopes) = liftTypeLambdas sigma cases
+                hidden = aliases ++ case_names ++ [(fam, Just owner) | (fam, owner) <- lambdas]
+                declarations = hs_tyclds late
+            forM_ uses $ \(loc, gre) -> setSrcSpanA (getLoc loc) (addUsedGRE AllDeprecationWarnings gre)
+            (envs, _) <- getLocalNonValBinders fix_env emptyRdrGroup{hs_tyclds = declarations}
+            restoreEnvs envs $ do
+              types <- rnTyClDecls hidden scopes declarations
+              updTcRef generated (types :)
+              rename ty
+          _ -> rename raw
+      _ -> rnLHsType (SpliceTypeCtx raw) raw
+  where
+    contains_case :: Data a => a -> Bool
+    contains_case node
+      | Just (L _ (XHsType HsTypeCase{})) <- cast node :: Maybe (LHsType GhcPs)
+      = True
+      | otherwise = or (gmapQ contains_case node)
+
+{- Note [Lifting cases from signature splices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A splice at the root of a value signature can return a type case. The
+initial declaration lifting pass has only the source splice. Run the splice
+in the ordinary signature renamer. Use its parsed result to construct the
+same private declarations as for a written signature. Register the names
+only while renaming these declarations and the result. Add the renamed
+declarations to the owning group for kind checking and interface writing.
+
+The splice runs once, in signature order. The regular splice path carries
+its free names and module finalizers. Nested splices keep that path without
+this lifting step. The new private declarations use the same capture and
+ordered case checks as in Note [Lifting types from signatures and fields].
+-}
 
 {- Note [Resolving retained case heads]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
