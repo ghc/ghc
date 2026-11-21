@@ -3015,7 +3015,8 @@ dataConInstPat fss uniqs mult con inst_tys
       | otherwise
       = snd $ mapAccumL mk_retained_field full_subst $
           zip retained_binders (zip4 id_uniqs id_fss arg_tys arg_strs)
-    retained_binders = dataConRepArgBinders con
+    retained_binders = dataConRepArgBinders con ++ [Nothing | dataConHasRetainedResult con]
+      -- See Note [Retained constructor result equality] in GHC.Core.DataCon.
 
     mk_id_var subst uniq fs (Scaled m ty) str
       = setCaseBndrEvald str $  -- See Note [Mark evaluated arguments]

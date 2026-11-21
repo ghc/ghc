@@ -1338,8 +1338,7 @@ tcIfaceDataCons tycon_name tycon if_cons
         -- (b) to avoid faulting in the component types unless
         --     they are really needed
         ; ~(eq_spec, theta, retained_binders, arg_tys, stricts) <- forkM (mk_doc dc_name) $
-             do { eq_spec <- tcIfaceEqSpec spec
-                ; theta   <- tcIfaceCtxt ctxt
+             do { theta <- tcIfaceCtxt ctxt
                 -- A predicate or field can refer to this TyCon. Check its
                 -- scope in the same lazy computation that reads the type.
                 ; let prefix_theta = if trailing_context then [] else theta
@@ -1363,6 +1362,16 @@ tcIfaceDataCons tycon_name tycon if_cons
                                      ; return tys }
                             ; return ([], arg_tys) }
                     else tc_retained_args dc_name emptyVarSet arg_binders args
+                ; eq_spec <- extendIfaceIdEnv [field | Just field <- retained_binders] $
+                               tcIfaceEqSpec spec
+                ; when (not (null arg_binders) && not (null spec)) $
+                    case retained_binders of
+                      [Just field] -> do
+                        { valid <- evaluateIfaceNativeDomain (ppr dc_name)
+                            (isNativeClosedIndexType (varType field))
+                        ; unless valid $
+                            failIfM (text "Invalid retained result field in interface:" <+> ppr dc_name) }
+                      _ -> failIfM (text "Invalid retained result field in interface:" <+> ppr dc_name)
                 ; stricts <- mapM tc_strict if_stricts
                         -- The IfBang field can mention
                         -- the type itself; hence inside forkM
@@ -1416,10 +1425,8 @@ tcIfaceDataCons tycon_name tycon if_cons
                 && all type_binder univs && all (\(Bndr b _) -> type_binder b) users
                 && length univ_names == length (nub univ_names)
                 && length user_names == length (nub user_names)
-                && univ_names `equalLength` user_names
-                && all (`elem` univ_names) user_names
-                && null exs && null spec && null ctxt && null fields
-                && not wrapper && ordinary_data
+                && valid_result && null exs && null ctxt && null fields
+                && ordinary_data
                 && (null bangs || bangs `equalLength` args)
                 && all lazy_bang bangs
                 && (null src_bangs || src_bangs `equalLength` args)
@@ -1432,6 +1439,16 @@ tcIfaceDataCons tycon_name tycon if_cons
         names = [n | Just n <- binders]
         univ_names = map ifaceBndrName univs
         user_names = [ifaceBndrName b | Bndr b _ <- users]
+        valid_result
+          | wrapper
+          , [Just field] <- binders
+          , [univ] <- univ_names
+          , [] <- user_names
+          , [(lhs, IfaceTermVar rhs)] <- spec
+          = lhs == univ && rhs == field
+          | otherwise
+          = not wrapper && null spec && univ_names `equalLength` user_names
+            && all (`elem` univ_names) user_names
         lazy_bang IfNoBang = True
         lazy_bang _        = False
         lazy_src_bang (IfSrcBang unpack strict)

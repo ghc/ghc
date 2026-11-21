@@ -3859,6 +3859,13 @@ pprRetainedQuantificationError reason = case reason of
     vcat [ text "A retained constructor requires a lazy ordinary data declaration with a lifted result kind."
          , text "Records, contexts, existential binders, equality specifications, and StrictData are not supported."
          , text "Its erased quantifiers must name exactly the datatype parameters." ]
+  RetainedConstructorResult ty ->
+    vcat [ text "A constructor may use its only field as the sole result index."
+         , text "The field must appear directly and have a closed structural index type."
+         , text "The result type is" <+> quotes (ppr ty) <> dot
+         , text "For other results, use an ordinary datatype parameter in the result type."
+         , fsep [ text "Relate it to the retained field with a propositional equality field using"
+                , quotes (text ":~:") <+> text "from" <+> quotes (text "Data.Type.Equality") <> dot ] ]
   RetainedPackagePromotion ->
     vcat [ text "This retained constructor has no supported promoted field telescope."
          , text "Promotion requires one witness followed by a field whose final type argument is that witness." ]

@@ -4750,7 +4750,9 @@ rnConDecl (ConDeclGADT { con_names   = names
             then do { enabled <- xoptM LangExt.ExperimentalDependentTypes
                     ; if enabled then rnRetainedSigType ctxt res_ty
                                  else rnLHsType ctxt res_ty }
-            else rnLHsType ctxt res_ty
+            else case HsDecls.splitGadtInterior args res_ty of
+                   Just{} -> rnLHsGadtSuffix ctxt res_ty
+                   Nothing -> rnLHsType ctxt res_ty
         ; (mods', mods_fvs) <- rnModifiersContextAndWarn ctxt mods
 
          -- Keep terminal groups on the source side of the declaration.

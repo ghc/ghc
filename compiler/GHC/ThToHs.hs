@@ -784,11 +784,17 @@ cvtRetainedGadtArgs args result = do
   body <- suffix binders
   let prefix_fields = PrefixConGADT noExtField fields
       supported_interior = isJust (HsDecls.splitGadtInterior prefix_fields body)
-  when (null binders &&
-        isNothing (HsDecls.splitGadtTerminal prefix_fields body) && not supported_interior) $
+  when (not supported_interior &&
+        (any explicit_group binders ||
+         (null binders && isNothing (HsDecls.splitGadtTerminal prefix_fields body)))) $
     failWith (MalformedType TypeLevel result)
   pure (fields, body)
   where
+    explicit_group GadtInvisibleArgs{} = True
+    explicit_group GadtRequiredArgs{} = True
+    explicit_group GadtContextArgs{} = True
+    explicit_group _ = False
+
     prefix (GadtValueArg bang mult ty : rest) = do
       field <- cvt_arg (bang, ty)
       mult' <- cvtGadtArgMult mult
@@ -799,6 +805,17 @@ cvtRetainedGadtArgs args result = do
     suffix [] = cvtType result
     suffix (GadtIndexArg name domain : rest) =
       cvtRetainedBinder TH.BndrReq name domain (suffix rest)
+    suffix (GadtInvisibleArgs ma tvs@(_ : _) : rest) = do
+      tele <- mkHsForAllInvisTele noAnn <$> cvtTvs tvs
+      forall_group ma tele rest
+    suffix (GadtRequiredArgs ma tvs@(_ : _) : rest) = do
+      tele <- mkHsForAllVisTele noAnn <$> cvtTvs tvs
+      forall_group ma tele rest
+    suffix (GadtContextArgs ctxt@(_ : _) : rest) = do
+      ctxt' <- cvtContext funPrec ctxt
+      body <- suffix rest
+      loc <- noAnnSrcSpan <$> getL
+      pure (mkHsQualTy ctxt loc ctxt' body)
     suffix (GadtValueArg (Bang unpack strict) mult ty : rest) = do
       arg <- cvtType ty
       let bang = HsSrcBang NoSourceText (cvtSrcUnpackedness unpack) (cvtSrcStrictness strict)
@@ -808,24 +825,29 @@ cvtRetainedGadtArgs args result = do
       mult' <- cvtGadtArgMult mult
       body <- suffix rest
       returnLA (HsFunTy noExtField mult' arg' body)
+    suffix (_ : _) = failWith (MalformedType TypeLevel result)
+
+    forall_group ma tele rest = do
+      ma' <- cvtKind ma
+      body <- suffix rest
+      loc <- noAnnSrcSpan <$> getL
+      pure (mkHsForAllTy loc (tele { hsf_matchability = Just ma' }) body)
 
 {- Note [Terminal constructor foralls in TH]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For a prefix constructor with a late forall or context, use RetainedGadtC.
-An interior specified forall scopes over one plain final field. Its Type
-suffix preserves that field's type and multiplicity.
-Each GadtValueArg represents a retained value field and carries its source
-bang and multiplicity. GadtC carries only the bang and field type. The
-result Type contains a ForallVisT for a required group or a ForallT with
-its trailing context. A context alone uses ForallT without binders.
-Keep the matchability annotation when present.
-A ForallC still wraps the leading invisible binders and context.
+An ordered suffix with a field annotation represents its forall and context
+groups explicitly. A suffix of plain fields can use the Type representation
+to preserve the field types and multiplicities.
+Each GadtValueArg carries the source bang and multiplicity of a value field.
+In the Type representation, a required group uses ForallVisT and an invisible
+group uses ForallT. A context alone uses ForallT without binders.
+Keep the matchability annotation when present. A ForallC wraps the leading
+invisible binders and context.
 
-If the argument list has no GadtIndexArg, accept this representation only
-for a nonempty field prefix followed by a supported terminal group. Use the
-same shape check as for the source declaration. This preserves the scope of
-the required variables and rejects suffixes outside the supported syntax.
-The existing binary representation carries all these fields.
+Use the same shape check as for source declarations. A grouped argument list
+needs a nonempty prefix of value fields and an interior telescope. A suffix
+stored as a Type can contain an interior or terminal telescope.
 -}
 
 -- | Constructor arrows can default to One. Keep a Many annotation explicit.
