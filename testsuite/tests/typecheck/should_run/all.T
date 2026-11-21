@@ -110,6 +110,9 @@ test('T7861',
       exit_code(1)], compile_and_run, [''])
 test('TcTypeNatSimpleRun', normal, compile_and_run, [''])
 test('TcTypeSymbolSimpleRun', normal, compile_and_run, [''])
+test('AppendSymbolDeductionReadback',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['AppendSymbolDeductionProvider.hs'])], makefile_test, [])
 test('T8119', normal, ghci_script, ['T8119.script'])
 test('T8492', normal, compile_and_run, [''])
 test('T8739', normal, compile_and_run, [''])
