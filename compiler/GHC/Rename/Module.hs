@@ -180,6 +180,12 @@ only enclosing variables written in the family pattern. The splice's
 source does not show which variables its result uses. A class default has
 only the scope of its own equation.
 
+A type let binds a name only in its body. Lift callbacks in the RHS
+with the outer captures. A callback in the body can capture the checked
+let result as another argument. Give this argument a fresh family
+parameter. When the let shadows an outer capture, save the outer value
+before the let. Another capture can still depend on it in its kind.
+
 An unused capture gets a wildcard in the generated equation. The
 family still receives the capture because other arguments can depend
 on it. Keep named patterns for written lambda binders so the renamer
@@ -303,6 +309,20 @@ liftTypeLambdas sigma group = do
     liftRhs lift_sum scoped owner captures (L loc (HsKindSig ann body kind)) salt =
       let (body', families, next) = liftRhs lift_sum scoped owner captures body salt
       in (L loc (HsKindSig ann body' kind), families, next)
+    liftRhs _ scoped owner captures (L loc (XHsType (HsTypeLet ann binder rhs body))) salt =
+      let (rhs', rhs_families, next) = liftRhs False scoped owner captures rhs salt
+          saved = privateName "let-outer" next 0 binder
+          header = liftedTypeVarBinder (privateName "let-header" next 0 binder)
+          shadowed (_, name) = sameBinder binder name
+          save c@(param, _) | shadowed c = (param, saved)
+                            | otherwise  = c
+          scope = map save captures ++ [(header, binder)]
+          (body', body_families, end) = liftRhs False scoped owner scope body (next + 1)
+          local = L loc (XHsType (HsTypeLet ann binder rhs' body'))
+          result | not (null body_families), any shadowed captures
+                 = L loc (XHsType (HsTypeLet (noAnn, noAnn, noAnn) saved (typeName binder) local))
+                 | otherwise = local
+      in (result, rhs_families ++ body_families, if null body_families then next else end)
     liftRhs _ scoped owner captures (L loc (XHsType (HsTypeLambda _ vars body))) salt =
       liftLambdaRhs scoped Nothing owner captures loc vars body salt Nothing
     liftRhs True scoped owner captures (L loc (XHsType (HsTypeSome _ binder domain body))) salt =

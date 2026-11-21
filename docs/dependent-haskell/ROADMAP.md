@@ -9,7 +9,7 @@ records every edge. The R numbers are local labels for those cards.
 
 ## Where this fork stands
 
-At `64eb309d18`, **23 of 50 cards (46%) are complete** on the upstream
+At `8c4942f617`, **23 of 50 cards (46%) are complete** on the upstream
 checklist. The fork adds a tested part of **18 of the 27 open cards**.
 This count includes a card when the fork demonstrates a behavior in
 source Haskell or in compiled Core. Each card counts once, regardless
@@ -21,6 +21,14 @@ depend on others, so this count cannot estimate the remaining work time.
 | Dependent binders, Core and equality | R03, R04, R05, R11, R22 |
 | Promotion and evaluation | R07, R12, R13, R14, R15, R16, R17, R18, R19 |
 | Declaration dependencies, families and GADTs | R21, R23, R24, R41 |
+
+A type-level `let` can name a callback and pass it to `Map` after
+an inner `let` shadows a captured type name. An ordinary client with
+`ImpredicativeTypes` can return an existentially packaged callback
+without naming its polymorphic witness. All 497 Showcase outputs
+matched at native `-O0`, native `-O2` and in source GHCi.
+[Scoped row](examples/open-evaluation/TypeLambda.hs) and
+[verification](CHECKPOINTS.md#family-and-package-checkpoints).
 
 Type-level lets can now appear in Template Haskell type quotations.
 A GADT constructor can also place a `Typeable` constraint after a

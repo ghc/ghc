@@ -2,7 +2,7 @@
              TypeApplications, TypeFamilies, TypeOperators, UndecidableInstances #-}
 -- | Apply a type lambda to a list of type constructors.
 module TypeLambda
-  ( L, Captured, Shadowed, WithError, Prefixes, Mixed, Held, CaseShadow, Rebuild
+  ( L, Captured, Shadowed, WithError, Prefixes, ScopedRow, Mixed, Held, CaseShadow, Rebuild
   , IndexedTag(..), IndexedCase, IndexedCaseInferred
   , roadmap, partial, prefixes, mixed, indexedFields
   ) where
@@ -36,6 +36,12 @@ type Prefixes :: Maybe Type -> [Type] -> [Type]
 type family Prefixes prefix xs where
   Prefixes ('Just e) xs = Map (\a -> Either e a) xs
   Prefixes 'Nothing xs = Map (\e -> Maybe e) xs
+
+-- | Capture the outer error type in the callback and its local abbreviation in the row.
+type ScopedRow e xs =
+  let wrap = (\a -> Either e a)
+  in let e = Maybe e
+     in Map (\a -> (e, wrap a)) xs
 
 -- | Check both callbacks with the same list.
 prefixes :: ( Prefixes ('Just String) '[Int] :~: '[Either String Int]

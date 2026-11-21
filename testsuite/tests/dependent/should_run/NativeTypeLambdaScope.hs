@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, Modifiers, PolyKinds, StandaloneKindSignatures #-}
 {-# LANGUAGE TypeFamilies, TypeOperators, UndecidableInstances #-}
 module NativeTypeLambdaScope
-  ( Levels, Adjacent, InferredLevels, UsesKind
+  ( Levels, Adjacent, InferredLevels, UsesKind, LetKind
   , Selected, Siblings, OrdinaryCases, Consed, SelectedFirst
   ) where
 import Data.Kind (Type)
@@ -16,6 +16,9 @@ type Pair x y = (x,y)
 type Levels (q :: Type) (a :: q) =
   (\q -> Pair (Proxy a, q)
          (ApplyTwo (\q b -> (Proxy a, q, b)) Int Ordering)) Bool
+
+type LetKind (k :: Type) (x :: k) =
+  let k = Maybe k in (\a -> (k, Proxy x, a)) Char
 
 type Adjacent (q :: Type) (a :: q) =
   ApplyTwo (\q -> (\q -> (Proxy a, q))) Int Ordering

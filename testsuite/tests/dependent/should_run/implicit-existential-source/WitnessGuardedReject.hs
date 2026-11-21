@@ -24,7 +24,7 @@ conflictingIf = \flag b ->
     if never
         then if flag then (buildAt b :: Payload PolyId)
                      else (different b :: Payload PolyMaybe)
-        else buildAt b
+        else id (buildAt b)
 
 #elif defined(CONDITIONAL_ESCAPE)
 escapeIf :: CapturedMonoBuilder

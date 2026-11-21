@@ -40,6 +40,11 @@ implicit synonym kind variable can also appear explicitly in the lifted
 body. An ordinary interface-only client checks these cases. Nested
 family applications remain subject to the usual termination checks.
 
+A callback defined inside a type let can capture the checked local
+value. If the let shadows an outer type parameter, a capture whose
+kind mentions that parameter keeps the outer kind.
+[Let example](R18-type-level-lets.md).
+
 The compiler lifts each lambda to a private closed family. The
 declaration group checks the synonym and generated family together.
 Captured variables become parameters. Saturation exposes the family

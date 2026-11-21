@@ -30,6 +30,9 @@ reports and checks for live, queued and linked users before removal.
 The timer can also remove the compiled `ghc-config` helper in a completed
 test run. It checks the reports, the helper's source and the Makefile rule.
 The next run rebuilds the helper from that source.
+For a normal two-stage build, the timer can reclaim the RTS C objects and
+dependency files after both compilers pass the same Showcase at the recorded
+Git revision. The normal build script can regenerate those files.
 For other products, keep the completion log outside `_build`. After the last
 consumer finishes, record the source revision and build command.
 
@@ -51,6 +54,19 @@ Rebuild the pinned revision when that comparison is needed again.
 and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
+
+At compiler revision `8c4942f617`, a type-level `let` can bind a
+callback that captures an outer type. An inner `let` can shadow that
+type name. Applying the callback still uses the outer type. In an
+ordinary module with `ImpredicativeTypes`, Quick Look can infer the
+erased witness `forall a. a -> a` in `\flag -> id (prepare flag)`.
+[Local type callback](examples/open-evaluation/TypeLambda.hs) and
+[erased witness](roadmap/R22-existential-quantification.md).
+
+All 497 Showcase outputs matched at native `-O0`, native `-O2` and
+in source GHCi. All 15 selected registered tests passed. The linked
+GHC API tests matched 37 dependent-program and 18 open-evaluation
+outputs. The constructor and coercion checks also passed.
 
 At compiler revision `f1fb064fa5`, Template Haskell can quote and
 splice a type-level let. Its right-hand side sees the outer binder.
