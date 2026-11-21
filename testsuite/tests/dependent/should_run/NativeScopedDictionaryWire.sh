@@ -186,10 +186,14 @@ module Length where
 import Data.Proxy
 import ScopedFamilyMethodProvider
 wrong :: Collects c => c -> Proxy 6
-wrong x = snd (measuredEntry x 5)
+wrong x = case measuredEntry x 5 of (_, lengthProxy) -> lengthProxy
 HS
+    sed 's/module Length/module Five/; s/Proxy 6/Proxy 5/' Length.hs > Five.hs
+    "${ghc[@]}" "$opt" -c Five.hs
     if "${ghc[@]}" "$opt" -c Length.hs > length.log 2>&1; then exit 1; fi
     grep -Fq '[GHC-83865]' length.log
+    grep -Fq 'Expected: Proxy 6' length.log
+    grep -Fq 'Actual: Proxy 5' length.log
     cat > Receiver.hs <<'HS'
 module Receiver where
 import ScopedFamilyMethodProvider
