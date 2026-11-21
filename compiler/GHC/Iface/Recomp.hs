@@ -613,12 +613,15 @@ checkFlagHash hsc_env iface self_recomp = do
         append_fps = [append_fp, stamp_rules append_fp]
         reverse_fps = [reverse_fp, stamp_rules reverse_fp]
         source_provider = checkedSourceProvider (mi_module iface)
-        provider_stamp = do
-          (fingerprint, _) <- source_provider
+        read_provider_stamp fingerprint =
           find (\stamp -> stamp (fingerprint reverse_fp) == file_fp)
             [id, stamp_rules, retainedSignatureCaseFingerprint,
              retainedSignatureCaseFingerprint . stamp_rules]
-        stored_fp = maybe file_fp (\stamp -> stamp reverse_fp) provider_stamp
+        provider_stamp = source_provider >>= read_provider_stamp . fst
+        prefix_stamp
+          | mi_module iface == guardedListModule = read_provider_stamp guardedPrefixFingerprint
+          | otherwise = Nothing
+        stored_fp = maybe file_fp (\stamp -> stamp reverse_fp) (provider_stamp `mplus` prefix_stamp)
         (old_fp, checked_append, checked_reverse, shared_retained_cases)
           | stored_fp `elem` reverse_fps = (new_fp, True, True, False)
           | stored_fp `elem` map retainedSignatureCaseFingerprint reverse_fps = (new_fp, True, True, True)
@@ -945,8 +948,8 @@ checkedSourceProvider :: Module -> Maybe (Fingerprint -> Fingerprint, String)
 checkedSourceProvider mod
   | mod == gHC_INTERNAL_BASE =
       Just (checkedCompositionFingerprint, "Compiler now checks function composition equations in GHC.Internal.Base")
-  | mod == mkGhcInternalModule (fsLit "GHC.Internal.List") =
-      Just (guardedPrefixFingerprint, "Compiler now checks takeWhile equations in GHC.Internal.List")
+  | mod == guardedListModule =
+      Just (guardedListFingerprint, "Compiler now checks dropWhile equations in GHC.Internal.List")
   | otherwise = Nothing
 
 -- | Record the composition check for installed GHC.Internal.Base.
@@ -955,11 +958,20 @@ checkedCompositionFingerprint :: Fingerprint -> Fingerprint
 checkedCompositionFingerprint fp =
     computeFingerprint putNameLiterally (fp, "checked-function-composition-v1" :: String)
 
--- | Mark the installed provider checked for a guarded prefix.
+-- | The installed provider of the guarded list definitions.
+guardedListModule :: Module
+guardedListModule = mkGhcInternalModule (fsLit "GHC.Internal.List")
+
+-- | Recognize the installed provider checked for a guarded prefix.
 -- See Note [Checked guarded list equations] in GHC.Tc.Gen.SourceTable.
 guardedPrefixFingerprint :: Fingerprint -> Fingerprint
 guardedPrefixFingerprint fp =
     computeFingerprint putNameLiterally (fp, "checked-guarded-list-prefix-v1" :: String)
+
+-- | Record that each guarded-list branch was checked independently.
+guardedListFingerprint :: Fingerprint -> Fingerprint
+guardedListFingerprint fp =
+    computeFingerprint putNameLiterally (fp, "checked-guarded-list-v2" :: String)
 
 -- | Record that the compiler checked for equations derived from constructor cases.
 caseTreeFingerprint :: Fingerprint -> Fingerprint

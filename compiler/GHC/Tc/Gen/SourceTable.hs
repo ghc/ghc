@@ -1035,8 +1035,8 @@ sourceCaseTables binds = do
                                      , eligible owner]
       final <- forM prepared $ \(owner, body, ruled_owner, guarded) ->
         case guarded of
-          Just (signature, stops) -> do
-            (table, guard_table) <- publishGuardedList owner signature stops
+          Just (signature, branches) -> do
+            (table, guard_table) <- publishGuardedList owner signature branches
             pure (Just (finalOwner owner table, table), [guard_table])
           Nothing | Just (signature, rows) <-
                       (guard ruled_owner *> directListMapper owner body) <|>
@@ -2183,12 +2183,16 @@ reverseWrapperWorker table = do
 {- Note [Checked guarded list equations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The cons branch must test the original callback on the original head.
-False recurses on the original tail for filter, or returns [] for takeWhile.
-True returns the original head and leaves the recursive call lazy. The empty
-branch skips the callback. The final check must see the same false result.
-Check the exact body before and after optimization. Before optimization,
-the simple optimizer removes the desugarer's local failure continuation
-and binder aliases. It does not apply user rewrite rules.
+Each result returns [], the original cons, a call on the original tail,
+or the original head with that same call as its lazy tail. The empty
+branch skips the callback. The cons alternative establishes that the
+input variable and case binder refer to the same cons. The equation for
+returning either variable uses the original head and tail of that cons.
+
+Check the exact body before and after optimization. The result of each
+Boolean branch must agree. The simple optimizer removes the desugarer's
+local failure continuation and binder aliases before the first check.
+It does not apply user rewrite rules.
 The optimizer can replace the empty constructor with the binder of the
 list case. The empty alternative already establishes its constructor.
 
@@ -2205,9 +2209,12 @@ calls the list family, so it cannot use the allowance for a legacy
 private leaf. See Note [Legacy private source leaves].
 -}
 
--- | Check the predicate case and report whether False ends the traversal.
+-- | The checked result of a guarded list branch.
+data GuardedListResult = GuardNil | GuardInput | GuardRecur | GuardConsRecur
+
+-- | Check the predicate case and the result of each alternative.
 directGuardedList :: (Core.CoreExpr -> Core.CoreExpr) -> Id -> Core.CoreExpr
-                  -> Maybe (ConstructorCaseType, Bool)
+                  -> Maybe (ConstructorCaseType, (GuardedListResult, GuardedListResult))
 directGuardedList prepare owner original = do
     ConstructorCaseType declared tc [declared_el] [declared_pred, declared_input] 1 declared_result <-
       constructorCaseType (varType owner)
@@ -2241,24 +2248,29 @@ directGuardedList prepare owner original = do
       _ -> void (returned nilDataCon 0 empty)
     Core.Case test _ inner
       [ Core.Alt (Core.DataAlt no) [] rejected
-        , Core.Alt (Core.DataAlt yes) [] kept ] <- pure nonempty
+        , Core.Alt (Core.DataAlt yes) [] accepted ] <- pure nonempty
     (Core.Var predicate, [Core.Var head_arg]) <- pure (Core.collectArgs test)
     guard (predicate == p && head_arg == x && inner `eqType` result &&
            no == falseDataCon && yes == trueDataCon)
-    [Core.Var head_value, tail_value] <- returned consDataCon 2 kept
-    guard (head_value == x)
     let recurse value = do
           (Core.Var f, args) <- pure (Core.collectArgs value)
           let (kind_args', value_args) = splitAt (length types) args
           kinds <- traverse (\case Core.Type ty -> Just ty; _ -> Nothing) kind_args'
           [Core.Var callback, Core.Var tail_arg] <- pure value_args
           guard (f == owner && eqTypes kinds kind_args && callback == p && tail_arg == xs)
-    stops <- case returned nilDataCon 0 rejected of
-      Just _ -> pure True
-      Nothing -> False <$ recurse rejected
-    recurse tail_value
+        same_input (Core.Var v) = v == list_binder || v == ls
+        same_input _ = False
+        branch value =
+          (GuardNil <$ returned nilDataCon 0 value) <|>
+          (GuardInput <$ guard (same_input value)) <|>
+          (GuardRecur <$ recurse value) <|>
+          (do [Core.Var head_value, tail_value] <- returned consDataCon 2 value
+              guard (head_value == x)
+              GuardConsRecur <$ recurse tail_value)
+    on_false <- branch rejected
+    on_true <- branch accepted
     let kept_binders = zipWith (\(Bndr v _) (Bndr _ vis) -> Bndr v vis) telescope declared
-    pure (ConstructorCaseType kept_binders tc elements domains 1 result, stops)
+    pure (ConstructorCaseType kept_binders tc elements domains 1 result, (on_false, on_true))
 
 -- | The auxiliary family shares the filter's source-equation owner.
 filterGuardOcc :: OccName -> OccName
@@ -2281,8 +2293,10 @@ isFilterGuardFor primary candidate =
     guard_name = tyConName candidate
 
 -- | Publish two families for the two tests in the guarded cons equation.
-publishGuardedList :: Id -> ConstructorCaseType -> Bool -> TcM (TyCon, TyCon)
-publishGuardedList owner (ConstructorCaseType telescope _ [element] [predicate_domain, list_domain] _ result) stops = do
+publishGuardedList :: Id -> ConstructorCaseType -> (GuardedListResult, GuardedListResult)
+                   -> TcM (TyCon, TyCon)
+publishGuardedList owner (ConstructorCaseType telescope _ [element] [predicate_domain, list_domain] _ result)
+                   (on_false, on_true) = do
     (renaming, parameters) <- freshenTyVarBndrs (binderVars telescope)
     let instantiate = substTyUnchecked renaming . expandTypeSynonyms
         args = mkTyVarTys parameters
@@ -2316,15 +2330,27 @@ publishGuardedList owner (ConstructorCaseType telescope _ [element] [predicate_d
         select = buildSourceFamily guard_name guard_axiom
           (kind_binders ++ mkAnonTyConBinders guard_operands) list
           [ branch [p, x, xs] [mkTyConTy (promoteDataCon falseDataCon), predicate, hd, tl]
-                (if stops then nil else recur)
+                (branch_result on_false)
             , branch [p, x, xs] [mkTyConTy (promoteDataCon trueDataCon), predicate, hd, tl]
-                (cons hd recur) ]
-        recur = mkTyConApp spine (args ++ [predicate, tl])
+                (branch_result on_true) ]
+        branch_result = guardedListBranchResult spine args predicate hd tl
     pure (spine, select)
   where
     term = idName owner
     fresh occ kind = flip mkTyVar kind <$> newSysName (mkTyVarOcc occ)
 publishGuardedList _ _ _ = panic "publishGuardedList: invalid checked signature"
+
+-- | Interpret a checked result using the head and tail of the matched cons.
+guardedListBranchResult :: TyCon -> [Type] -> Type -> Type -> Type -> GuardedListResult -> Type
+guardedListBranchResult spine params predicate hd tl branch = case branch of
+    GuardNil -> mkTyConApp (promoteDataCon nilDataCon) [element]
+    GuardInput -> cons tl
+    GuardRecur -> recur
+    GuardConsRecur -> cons recur
+  where
+    element = typeKind hd
+    cons rest = mkTyConApp (promoteDataCon consDataCon) [element, hd, rest]
+    recur = mkTyConApp spine (params ++ [predicate, tl])
 
 -- | Collect the provisional families that must leave the interface together.
 finalCoreSourceFamilies :: Id -> [TyCon]
@@ -2366,14 +2392,17 @@ verifyFinalCoreMapper binds original =
       | varType owner `eqType` varType original
       -> case finalCoreSourceFamilies original of
            [_] -> isJust (directListMapper owner expression <|> directListAppend owner expression)
-           [_, select] -> isJust $ do
-             (_, stops) <- directGuardedList id owner expression
+           [spine, select] -> isJust $ do
+             (_, (on_false, on_true)) <- directGuardedList id owner expression
              axiom <- closedFamilyTyConCoAxiom_maybe select
-             [rejected, _] <- pure (fromBranches (coAxiomBranches axiom))
-             let nil = case splitTyConApp_maybe (coAxBranchRHS rejected) of
-                   Just (tc, _) -> isPromotedDataCon_maybe tc == Just nilDataCon
-                   Nothing -> False
-             guard (stops == nil)
+             [rejected, accepted] <- pure (fromBranches (coAxiomBranches axiom))
+             let check expected branch = do
+                   let (params, operands) = splitAt (helperInvisibleArity select) (coAxBranchLHS branch)
+                   [_, predicate, hd, tl] <- pure operands
+                   guard (coAxBranchRHS branch `eqType`
+                          guardedListBranchResult spine params predicate hd tl expected)
+             check on_false rejected
+             check on_true accepted
            _ -> False
     _ -> False
   where
