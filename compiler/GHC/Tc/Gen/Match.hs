@@ -1532,7 +1532,10 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
     check_missing (one, two)
       | any (anyFreeVarsOfType (\v -> v == first_index || v == second_index)) predicates
       = do { level <- getTcLevel
-           ; let satisfiable tys = newEvVars tys >>= tcCheckGivens (emptyInertSet level) . listToBag
+           ; ambient <- filter (isCoverageEquality . varType) <$> getLexicalGivens
+           ; let satisfiable tys = do
+                   givens <- newEvVars tys
+                   tcCheckGivens (emptyInertSet level) (listToBag (ambient ++ givens))
            ; before <- satisfiable predicates
            ; when (isNothing before) missing_pair
            ; co1 <- hypothetical first_index one
@@ -1738,9 +1741,10 @@ are in scope. A variable fallback uses the original dictionaries and
 keeps its evidence outside its local definitions and RHS.
 
 For an omitted pair, instantiate each constructor with fresh fields.
-Specialise the declared nominal equalities to that pair. Accept the
-omission only if the ordinary Given solver refutes the specialised
-equalities. A stuck family can leave the pair possible. See also
+Specialise the declared nominal equalities to that pair. Check them with
+the enclosing nominal Givens. Accept the omission only if the ordinary
+Given solver refutes the specialised equalities. A stuck family can leave
+the pair possible. See also
 Note [Retained equalities in uncovered patterns] in GHC.HsToCore.Pmc.Solver.
 
 Check unique feasible constructor pairs, or use a final fallback equation as

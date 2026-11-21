@@ -199,9 +199,24 @@ useFallback xs ys = contents
 oneSided :: foreach (n :: Nat) -> (n ~ 'Z) => foreach (m :: Nat) -> Vec Bool m
 oneSided Z Z = VNil
 oneSided Z (S k) = VCons False (oneSided Z k)
+
+ambient :: forall n. (n ~ 'Z) => foreach (x :: Nat) -> foreach (y :: Nat)
+        -> (x ~ n, y ~ n) => Vec Bool x
+ambient Z Z = VNil
+
+#ifdef UNRELATED_AMBIENT
+unrelated :: forall n p. (n ~ 'Z) => foreach (x :: Nat) -> foreach (y :: Nat)
+          -> (x ~ p, y ~ p) => Vec Bool x
+unrelated Z Z = VNil
+#endif
 #endif
 HS
 "${ghc[@]}" -O0 -Werror=incomplete-patterns -c MatrixLength.hs
+if "${ghc[@]}" -O0 -DUNRELATED_AMBIENT -fforce-recomp -fdiagnostics-color=never -c MatrixLength.hs >ambient.log 2>&1; then
+    echo 'Used an unrelated outer equality to omit a retained pair'
+    exit 1
+fi
+grep -Fq 'Missing equation for the retained constructor pair (S, S).' ambient.log
 if "${ghc[@]}" -O0 -DOMIT -fforce-recomp -fdefer-type-errors -fdiagnostics-color=never -c MatrixLength.hs >pair.log 2>&1; then
     echo 'Accepted an omitted cons/cons equation'
     exit 1
