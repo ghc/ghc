@@ -19,14 +19,17 @@ shadowed :: forall (b :: Type). Proxy b -> foreach (b :: Bool) -> Select b
 shadowed _ = quoted
 HS
 cat >NativeTypeCaseRetainedThClient.hs <<'HS'
-{-# LANGUAGE NoExperimentalDependentTypes, TypeApplications #-}
+{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, TypeApplications, TypeOperators #-}
 module Main where
 
 import Data.Proxy (Proxy(..))
 import Data.IORef (newIORef, readIORef, writeIORef)
+import Data.Type.Equality ((:~:)(Refl))
 import NativeRetainedTH (quoted, render)
 import NativeTypeCaseRetainedTh (fromQuote, fromReify)
-import NativeTypeCaseRetainedThRaw (chooseInline, chooseDirect, renderDirect, observeInline, caseData)
+import NativeTypeCaseRetainedThRaw
+  (chooseInline, chooseDirect, renderDirect, observeInline, caseData,
+   chooseQuoted, renderQuoted, QuotedPick)
 
 main :: IO ()
 main = do
@@ -37,13 +40,16 @@ main = do
     first <- observe <$> readIORef flag
     firstInline <- observeInline <$> readIORef flag
     firstDirect <- observeDirect <$> readIORef flag
+    firstQuoted <- observeQuoted <$> readIORef flag
     writeIORef flag False
     second <- observe <$> readIORef flag
     secondInline <- observeInline <$> readIORef flag
     secondDirect <- observeDirect <$> readIORef flag
+    secondQuoted <- observeQuoted <$> readIORef flag
     print (first, second)
     print (firstInline, secondInline)
     print (firstDirect, secondDirect)
+    print (firstQuoted, secondQuoted, quotedPick)
     print (chooseInline True :: Int, chooseInline False :: Char)
     print (chooseDirect True () :: Int, chooseDirect False () :: Char)
     print caseData
@@ -53,6 +59,12 @@ observe b = render b (quoted b)
 
 observeDirect :: Bool -> String
 observeDirect b = renderDirect b (chooseDirect b ())
+
+observeQuoted :: Bool -> String
+observeQuoted b = renderQuoted b (chooseQuoted b)
+
+quotedPick :: QuotedPick ('Just 'True) :~: Proxy 'True
+quotedPick = Refl
 HS
 cat >NativeTypeCaseRetainedThWrong.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, TemplateHaskell #-}
@@ -131,7 +143,7 @@ for opt in -O0 -O2; do
     "${ghc[@]}" NativeTypeCaseRetainedThClient.o NativeTypeCaseRetainedTh.o \
         NativeTypeCaseRetainedThProvider.o NativeTypeCaseRetainedThRaw.o NativeRetainedTH.o -o run
     ./run > actual
-    printf "(11,'x',11,'x',11,'x')\n(\"11\",\"x\")\n(\"13\",\"q\")\n(\"19\",\"c\")\n(13,'q')\n(19,'c')\nTrue\n" | diff -u - actual
+    printf "(11,'x',11,'x',11,'x')\n(\"11\",\"x\")\n(\"13\",\"q\")\n(\"19\",\"c\")\n(\"23\",\"d\",Refl)\n(13,'q')\n(19,'c')\nTrue\n" | diff -u - actual
     status=0
     "${ghc[@]}" -c NativeTypeCaseRetainedThWrongBranch.hs > wrong-branch.log 2>&1 || status=$?
     if [[ $status != 1 ]] || ! grep -Fq "Couldn't match type" wrong-branch.log ||

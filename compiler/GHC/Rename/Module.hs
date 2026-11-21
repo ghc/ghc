@@ -522,11 +522,11 @@ data LiftedTypeSite
 -- | Rewrite the declarations and return their new private synonyms separately.
 -- See Note [Lifting types from signatures and fields].
 liftDeclarationTypes :: [(RdrName, Maybe (GlobalRdrElt, Name))]
-                     -> [(RetainedCaseKey, RdrName)] -> Bool -> HsGroup GhcPs
+                     -> [(RetainedCaseKey, RdrName)] -> Bool -> Bool -> HsGroup GhcPs
                      -> (HsGroup GhcPs, [TyClGroup GhcPs], LiftedDecls,
                          [(LocatedN RdrName, GlobalRdrElt)], [LocatedN RdrName],
                          [(RetainedCaseKey, OccName)])
-liftDeclarationTypes source_heads earlier named_wildcards group
+liftDeclarationTypes source_heads earlier lift_cases named_wildcards group
   | not (null synonyms)
   = (group{hs_valds = values, hs_tyclds = type_groups}, [anchors], names, concat uses, missing, helpers)
   | otherwise = (group, [], [], [], [], [])
@@ -754,7 +754,8 @@ liftDeclarationTypes source_heads earlier named_wildcards group
     liftedAnchor SignatureTypeSite _ ty@(L _ (XHsType HsTypeSome{}))
       | copyable ty = Just ("$signature-sum:", Nothing)
     liftedAnchor site scope (L _ (XHsType (HsTypeCase _ _ scrutinee alts)))
-      | caseScrutinee site scope scrutinee
+      | lift_cases
+      , caseScrutinee site scope scrutinee
       , copyable scrutinee
       , all copyableAlt alts
       = if fieldSite site
@@ -1096,6 +1097,10 @@ additional arguments. Hide a captured argument's name in any branch
 where a pattern binds that spelling. Put the family and its owning
 synonym in the same kind-checking SCC.
 
+An untyped declaration quote keeps the case in its source signature,
+synonym or field. The quote emits CaseT with its local names. Lift the
+case when the declarations enter the splice's checking group.
+
 For a case in a let body, put the RHS in one private type synonym.
 The original let and the branch rows use that checked synonym at the
 corresponding lexical captures. Keep earlier captures needed by the
@@ -1410,20 +1415,24 @@ rnSrcDecls :: HsGroup GhcPs -> RnM (TcGblEnv, HsGroup GhcRn)
 rnSrcDecls group = do
   enabled <- xoptM LangExt.ExperimentalDependentTypes
   named_wildcards <- xoptM LangExt.NamedWildCards
+  level <- getThLevel
   dflags <- getDynFlags
-  let sigma_mod = mkModule (RealUnit (Definite (baseUnitId dflags))) (mkModuleName "GHC.Sigma")
+  let lift_cases = case level of
+        UntypedBrack{} -> False
+        _ -> enabled
+      sigma_mod = mkModule (RealUnit (Definite (baseUnitId dflags))) (mkModuleName "GHC.Sigma")
       sigma = mkOrig sigma_mod (mkTcOcc "Sigma")
-      (with_cases, case_names) = if enabled then liftTypeCases group else (group, [])
+      (with_cases, case_names) = if lift_cases then liftTypeCases group else (group, [])
       (expanded, lambda_names, scopes) =
         if enabled then liftTypeLambdas sigma with_cases else (group, [], emptyOccEnv)
-  rnSrcDeclsWithLambdas sigma named_wildcards
+  rnSrcDeclsWithLambdas sigma named_wildcards lift_cases
                         (case_names ++ [(fam, Just owner) | (fam, owner) <- lambda_names])
                         scopes expanded
 
 -- | Rename the declarations and record the kind-inference edges of private families.
-rnSrcDeclsWithLambdas :: RdrName -> Bool -> LiftedDecls -> OccEnv (OccName, Bool) -> HsGroup GhcPs
+rnSrcDeclsWithLambdas :: RdrName -> Bool -> Bool -> LiftedDecls -> OccEnv (OccName, Bool) -> HsGroup GhcPs
                       -> RnM (TcGblEnv, HsGroup GhcRn)
-rnSrcDeclsWithLambdas sigma named_wildcards early_hidden early_scopes group@(HsGroup { hs_valds   = val_decls,
+rnSrcDeclsWithLambdas sigma named_wildcards lift_cases early_hidden early_scopes group@(HsGroup { hs_valds   = val_decls,
                             hs_splcds  = splice_decls,
                             hs_tyclds  = tycl_decls,
                             hs_derivds = deriv_decls,
@@ -1493,9 +1502,9 @@ rnSrcDeclsWithLambdas sigma named_wildcards early_hidden early_scopes group@(HsG
    --  See Note [Resolving retained case heads].
    (sig_types, updated_types, sigs, hidden, scopes) <-
      if dependent && not is_boot
-     then do { heads <- retainedSourceHeads sigs' tycl_decls
+     then do { heads <- if lift_cases then retainedSourceHeads sigs' tycl_decls else pure []
              ; let input = emptyRdrGroup{hs_valds = val_decls, hs_tyclds = tycl_decls}
-                   (updated, anchors, aliases, uses, unbound, _) = liftDeclarationTypes heads [] named_wildcards input
+                   (updated, anchors, aliases, uses, unbound, _) = liftDeclarationTypes heads [] lift_cases named_wildcards input
                    (cases, case_names) = liftTypeCases emptyRdrGroup{hs_tyclds = anchors}
                    (late, lambdas, late_scopes) = liftTypeLambdas sigma cases
                    late_hidden = aliases ++ case_names ++ [(fam, Just owner) | (fam, owner) <- lambdas]
@@ -1532,7 +1541,7 @@ rnSrcDeclsWithLambdas sigma named_wildcards early_hidden early_scopes group@(HsG
    let { val_bndr_set = mkNameSet id_bndrs `unionNameSet` mkNameSet pat_syn_bndrs } ;
    let { new_lhs = makeRnValBinds noExtField binds' sigs } ;
    ((rn_val_decls@(XValBindsLR (HsVBG rn_binds sigs')), bind_dus), rn_splice_types) <-
-     if dependent && not is_boot
+     if lift_cases && not is_boot
      then do { splice_types <- newTcRef []
              ; splice_cases <- newTcRef []
              ; let rename_splice = rnSplicedSignatureCases sigma named_wildcards local_fix_env splice_types splice_cases
@@ -1641,7 +1650,7 @@ rnSplicedSignatureCases sigma named_wildcards fix_env generated splice_cases doc
         heads <- retainedSourceHeads [input_sig] []
         earlier <- readTcRef splice_cases
         let (updated, anchors, aliases, uses, _, helpers) =
-              liftDeclarationTypes heads (map (fmap nameRdrName) earlier) named_wildcards input
+              liftDeclarationTypes heads (map (fmap nameRdrName) earlier) True named_wildcards input
         case (anchors, hs_valds updated) of
           (_:_, ValBinds _ [VbSig (L _ (TypeSig _ _ _ HsWC{hswc_body = L _ HsSig{sig_body = ty}}))]) -> do
             let (cases, case_names) = liftTypeCases emptyRdrGroup{hs_tyclds = anchors}

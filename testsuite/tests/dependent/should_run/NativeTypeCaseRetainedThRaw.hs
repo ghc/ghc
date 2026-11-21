@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, TemplateHaskell #-}
 module NativeTypeCaseRetainedThRaw
-  (chooseInline, chooseDirect, renderDirect, observeInline, caseData) where
+  (chooseInline, chooseDirect, renderDirect, observeInline, caseData
+  , chooseQuoted, renderQuoted, QuotedPick) where
 
 import Data.Proxy (Proxy)
 import Language.Haskell.TH
@@ -63,3 +64,28 @@ caseData =
   where
     lifted = $(lift (CaseT StarT [TypeCaseAlt WildCardT ConstraintT, TypeCaseAlt StarT WildCardT]))
     expected = $$(liftTyped (TypeCaseAlt WildCardT ConstraintT))
+
+$(do
+  ds <- [d|
+    type QuotedPick (d :: Maybe Bool) =
+      case d of { Just d -> Proxy d; Nothing -> Proxy False }
+
+    chooseQuoted :: foreach (b :: Bool) -> case b of { True -> Int; False -> Char }
+    chooseQuoted True = 23
+    chooseQuoted False = 'd'
+
+    renderQuoted :: foreach (b :: Bool) -> (case b of { True -> Int; False -> Char }) -> String
+    renderQuoted True i = show i
+    renderQuoted False c = [c] |]
+  case ( [t | SigD name t <- ds, nameBase name == "chooseQuoted"]
+       , [(bs, rhs) | TySynD name bs rhs <- ds, nameBase name == "QuotedPick"]
+       ) of
+    ( [ForEachT BndrReq b _ (CaseT (IndexVarT bUse) _)]
+      , [ ([KindedTV outer _ _], CaseT (VarT outerUse)
+            (TypeCaseAlt (AppT (PromotedT just) (VarT inner))
+                         (AppT (ConT proxy) (VarT innerUse)) : _))
+        ]
+      )
+      | b == bUse, outer == outerUse, outer /= inner, inner == innerUse
+      , just == 'Just, proxy == ''Proxy -> pure ds
+    _ -> fail (pprint ds))

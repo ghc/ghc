@@ -249,16 +249,18 @@ calls. The stripped provider interface suffices at both `-O0` and `-O2`.
 [Provider](../examples/open-evaluation/NativeRetainedTH.hs).
 
 A declaration splice can use the quoted type in `SigD`. The declarations
-it returns can share a case helper within one group. A type splice can
+it returns can share a case helper within one group. A declaration quote
+`[d| … |]` also preserves `CaseT` in a signature or type synonym.
+The splice checks the case in the receiving group. A type splice can
 supply the complete top-level value signature. Separate signature splices
 in the same group can share a case on a retained binder when the capture
 domains and ordered rows agree and their names have fixed identities.
 The checker lifts the rows and preserves ordered reduction in both forms.
 Each splice and its module finalizer run once in the ordinary order.
 Use a named family to share a case across declaration groups or modules.
-Nested type splices and raw cases lifted inside declaration quotes produce
-a source diagnostic. Reification describes the checked signature and its
-family applications.
+Nested type splices and cases inside quoted type lambdas produce a source
+diagnostic. Reification describes the checked signature and its family
+applications.
 [External-interpreter fixture](../../../testsuite/tests/dependent/should_run/NativeTypeCaseRetainedThRaw.hs),
 [Template Haskell declaration groups](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/template_haskell.html#declaration-groups),
 [proposal #378 scoping review](https://github.com/ghc-proposals/ghc-proposals/pull/378#discussion_r524560765),

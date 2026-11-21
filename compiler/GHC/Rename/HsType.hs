@@ -1068,10 +1068,11 @@ rnHsTyKi env (XHsType (HsTypeCase (case_kw, _) _ scrutinee alts)) = do
       Just (pattern', _) -> pure (pattern', rhs)
       Nothing -> setSrcSpanA (getLoc pat) $
         failWithTc (TcRnTypeCasePattern Nothing)
-  case rtke_ctxt env of
-    TypBrCtx{} -> do
-      -- A type quote records source syntax. Its eventual declaration splice
-      -- supplies the context that checks and lifts the case.
+  level <- getThLevel
+  case level of
+    UntypedBrack{} -> do
+      -- Record the source case in the quote. The splice site supplies the
+      -- declaration group that checks and lifts the case.
       (scrutinee', scrutinee_fvs) <- rnLHsTyKi env scrutinee
       (rows', rows_fvs) <- mapFvRn rn_row rows
       pure (XHsType (HsTypeCaseRn scrutinee' rows'), scrutinee_fvs `plusFN` rows_fvs)
