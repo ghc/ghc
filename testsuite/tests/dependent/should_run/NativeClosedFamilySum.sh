@@ -32,8 +32,11 @@ for opt in O0 O2; do
     cp "$provider.hi" "$src/$client.hs" ../client/
 
     cd ../client
-    reject "$client.hs:14:24-34: error: [GHC-83865]" \
+    reject "$client.hs:15:24-34: error: [GHC-83865]" \
         "${ghc[@]}" "-$opt" -DBAD_TAG -c "$client.hs"
+    reject "$client.hs:37:15-18: error: [GHC-83605]" \
+        "${ghc[@]}" "-$opt" -DBAD_PATTERN -c "$client.hs"
+    test "$(grep -Fc 'error: [GHC-83605]' reject.log)" = 3
     "${ghc[@]}" "-$opt" -c "$client.hs"
     "${ghc[@]}" "$client.o" "../provider/$provider.o" -o run
     ./run

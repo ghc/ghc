@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP, DataKinds, ExplicitForAll, ExperimentalDependentTypes, GADTs, PolyKinds, TypeFamilies #-}
 
-module NativeClosedFamilySumProvider (KindCapture, Pack, Tagged (..)) where
+module NativeClosedFamilySumProvider (KindCapture, Pack, PackViaAlias, Tagged (..)) where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy)
@@ -16,6 +16,11 @@ type family Pack (select :: Bool) (a :: Type) :: Type where
 #else
     Pack True a = some (tag :: Bool) | Tagged tag a
 #endif
+
+type NamedSum a = some (tag :: Bool) | Tagged tag a
+
+type family PackViaAlias (select :: Bool) a where
+    PackViaAlias True a = NamedSum a
 
 type family KindCapture (select :: Bool) (k :: Type) (item :: k) :: Type where
     forall (k :: Type) (item :: k). KindCapture True k item =

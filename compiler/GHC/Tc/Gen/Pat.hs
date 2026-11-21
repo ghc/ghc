@@ -58,6 +58,8 @@ import GHC.Tc.Types.Origin
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Coercion
+import GHC.Core.FamInstEnv (emptyFamInstEnvs, reduceTyFamApp_maybe)
+import GHC.Core.Reduction (Reduction(..))
 import GHC.Core.Predicate ( isEvId, mkNomEqPred )
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
@@ -1559,8 +1561,8 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
        ; check_con_pat_arity con_like (length pats)
        ; let tc = dataConTyCon con
        ; expected <- readExpType_maybe (scaledThing pat_ty_scaled)
-       -- See Note [Constructors in a nested dependent sum] in GHC.Tc.Utils.Unify.
-       ; (wrap, ctxt_res_tys) <- case expected >>= matchSumPayload tc of
+       ; family_result <- maybe (pure Nothing) (match_family_result tc) expected
+       ; (wrap, ctxt_res_tys) <- case family_result of
            Just (co, tys) -> return (mkWpCastN co, tys)
            Nothing -> do { matched@(wrap, _) <- matchExpectedConTy penv tc pat_ty_scaled
                          ; unless (isIdHsWrapper wrap) bad_pattern
@@ -1579,6 +1581,19 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
   where
     bad_pattern :: TcM a
     bad_pattern = failWithTc (TcRnRetainedQuantificationError RetainedPackagePattern)
+
+    -- See Note [Checking retained package patterns].
+    match_family_result :: TyCon -> TcType -> TcM (Maybe (TcCoercionN, [TcType]))
+    match_family_result parent ty
+      | Just (family, args) <- tcSplitTyConApp_maybe ty
+      , Just _ <- closedTypeFamily_maybe family
+      = do { args <- liftZonkM (mapM zonkTcType args)
+           ; return $ do
+               Reduction co result <- reduceTyFamApp_maybe emptyFamInstEnvs Nominal family args
+               (tc, params) <- tcSplitTyConApp_maybe result
+               guard (tc == parent)
+               return (co, params) }
+      | otherwise = return Nothing
 
     check_fields _ _ _ [] []
       = do { res <- thing_inside; return ([], res) }
@@ -1688,6 +1703,13 @@ context, and require an identity result wrapper for the ordinary constructor mat
 Match compilation keeps each equation's actual source field Ids in a separate
 case, including when its family has other constructors.
 See Note [Retained package equation scope] in GHC.HsToCore.Match.Constructor.
+
+A closed type family can return the package. Try one nominal reduction of
+the expected type. Use the constructor arguments only if the result has
+the selected constructor's parent as its head. Put the reduction on the
+scrutinee so the fields bind at their checked types. This also handles
+the private family of a nested sum. Leave reductions inside the fields
+to ordinary type checking.
 
 Scale each field by the multiplicity of the case. A retained field is declared
 at Many, so its pattern Id still has multiplicity Many in a linear case.
