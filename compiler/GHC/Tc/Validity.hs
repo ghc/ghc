@@ -531,25 +531,47 @@ checkConstrainedSignature ctxt ty
     checkNested ty@ExistsTy{} = checkNoConstrainedFamilyApps ty
     checkNested _ = pure ()
 
-    emit_domain fam args
-      | Just parent <- tyConAssoc_maybe fam
-      , Just cls <- tyConClass_maybe parent
-      , args `lengthIs` tyConArity fam
-      , let env = zipVarEnv (tyConTyVars fam) args
-      , Just class_args <- traverse (lookupVarEnv env) (classTyVars cls)
-      = do { ev <- newWanted (OccurrenceOf (tyConName fam)) (Just TypeLevel)
-                             (mkClassPred cls class_args)
-           ; emitSimple (mkNonCanonical ev) }
-      | otherwise =
-        failWithTc $ TcRnConstrainedFamilyUnsupported fam $
-          text "The family must be fully applied at this occurrence."
+    emit_domain fam args = case associatedFamilyDomain fam args of
+      Left reason -> failWithTc (TcRnConstrainedFamilyUnsupported fam reason)
+      Right pred_ty -> do
+        ev <- newWanted (OccurrenceOf (tyConName fam)) (Just TypeLevel) pred_ty
+        emitSimple (mkNonCanonical ev)
+
+-- | Recover the owner predicate from the supplied family arguments.
+-- See Note [Associated family domain arguments].
+associatedFamilyDomain :: TyCon -> [Type] -> Either SDoc PredType
+associatedFamilyDomain fam args
+  | Just cls <- tyConAssoc_maybe fam >>= tyConClass_maybe
+  = let supplied = mkVarEnv (zip (tyConTyVars fam) args)
+        actual v = lookupVarEnv supplied v
+        formals = classTyVars cls
+    in case traverse actual formals of
+      Just class_args -> Right (mkClassPred cls class_args)
+      Nothing -> Left $ sep
+        [ text "Supply" <+> pprWithCommas (quotes . ppr) (filter (isNothing . actual) formals)
+        , text "to determine the instance of" <+> quotes (ppr (className cls)) <> dot ]
+  | otherwise = Left (text "The family declaration has no associated class.")
+
+{- Note [Associated family domain arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The family binders include the kind variables that appear in argument types.
+Pair the supplied arguments with those binders. Look up each class binder
+in this environment, in the order of the class declaration. Ignore extra
+family arguments when forming the class predicate.
+
+For example, in class KnownIndex k, the family Echo (x :: k) :: k has
+the invisible argument k. The partial application Echo :: Bool %U -> Bool
+already determines the domain KnownIndex Bool. Bare Elem from class
+Collects c does not determine c. The ordinary arity and matchability
+checks still apply to a prefix that determines its domain.
+-}
 
 -- | Refuse contexts that have no formation rule in this experiment.
 checkNoConstrainedFamilyApps :: Type -> TcM ()
 checkNoConstrainedFamilyApps ty
   | use : _ <- constrainedFamilyApps ty
   = failWithTc $ TcRnConstrainedFamilyUnsupported (familyTyCon use) $
-      text "Use a saturated application in a value signature, expression annotation, constructor field, or explicit type argument."
+      text "Use the family in a value signature, expression annotation, constructor field, or explicit type argument."
   | otherwise = pure ()
   where
     familyTyCon (WrittenFamily fam _) = fam
@@ -1170,8 +1192,8 @@ check_syn_tc_app (ve@ValidityEnv{ ve_ctxt = ctxt, ve_expand = expand })
   = check_args_only expand
 
   | isConstrainedFamilyTyCon tc
-  = failWithTc $ TcRnConstrainedFamilyUnsupported tc $
-      text "The family must be fully applied at this occurrence."
+  , Left reason <- associatedFamilyDomain tc tys
+  = failWithTc (TcRnConstrainedFamilyUnsupported tc reason)
 
   | isUnsaturatedUserFamily tc tys
   = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
