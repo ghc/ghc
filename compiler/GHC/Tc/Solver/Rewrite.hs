@@ -1246,9 +1246,9 @@ rewrite_exact_fam_app_step tc tys
        ; case result1 of
              -- We reduced without rewriting any arguments: not worth caching.
              -- See Note [When is a reduction worth caching?]
-         { Just (FreshReduction redn) -> return $! FamAppReduced redn False Nothing
-         ; Just (CachedReduction redn) -> return $! FamAppReduced redn False (Just tys)
-         ; Nothing ->
+         { FreshReduction redn -> return $! FamAppReduced redn False Nothing
+         ; CachedReduction redn -> return $! FamAppReduced redn False (Just tys)
+         ; NoFamilyReduction ->
 
         -- That didn't work. So reduce the arguments, in STEP 2.
     do { eq_rel <- getEqRel
@@ -1315,9 +1315,9 @@ rewrite_exact_fam_app_step tc tys
     do { result3 <- try_to_reduce tc xis tc_rewriters
        ; case result3 of
            -- (WorthCaching1) in Note [When is a reduction worth caching?]
-           Just (FreshReduction redn) -> return $! FamAppReduced (redn_args_and_then redn) True Nothing
-           Just (CachedReduction redn) -> return $! FamAppReduced (redn_args_and_then redn) True (Just xis)
-           Nothing -> do
+           FreshReduction redn -> return $! FamAppReduced (redn_args_and_then redn) True Nothing
+           CachedReduction redn -> return $! FamAppReduced (redn_args_and_then redn) True (Just xis)
+           NoFamilyReduction -> do
              guarded <- rewriteFilterGuard tc xis tc_rewriters
              return $! case guarded of
                Just redn -> FamAppReduced (redn_args_and_then redn) True Nothing
@@ -1399,7 +1399,10 @@ rewriteFilterGuard tc tys tc_rewriters
         Nothing -> return Nothing
         Just (ev, result, co) -> do
           reduced <- try_to_reduce tc (params ++ (result : rest)) tc_rewriters
-          traverse (compose ev co params rest . familyReduction) reduced
+          case reduced of
+            NoFamilyReduction -> return Nothing
+            FreshReduction redn -> Just <$> compose ev co params rest redn
+            CachedReduction redn -> Just <$> compose ev co params rest redn
   | otherwise = return Nothing
   where
     givenResult test ev
@@ -2027,69 +2030,44 @@ checkZappedRedn dflags deps r lhs_ty (Reduction co xi)
                          ]
        }
 
--- | The reducer distinguishes cached evidence from fresh reductions.
-data FamilyReduction = FreshReduction !Reduction | CachedReduction !Reduction
-
--- | Get the reduction without its source.
-familyReduction :: FamilyReduction -> Reduction
-familyReduction (FreshReduction redn) = redn
-familyReduction (CachedReduction redn) = redn
+-- | Record whether a family reduction uses a cached equality.
+data FamilyReduction = NoFamilyReduction
+                     | FreshReduction !Reduction
+                     | CachedReduction !Reduction
 
 -- | Try to reduce a type family application at the current role.
---
--- See Note [How to normalise a family application]
-try_to_reduce :: TyCon -> [TcType] -> [TcPluginRewriter]
-              -> RewriteM (Maybe FamilyReduction)
-try_to_reduce tc tys tc_rewriters
-  = mkRewriteM $ \rewrite_env path ->
-    do { let -- Record the dependencies of this reduction, to handle any
-             -- reduction introduced by plugins or looked up in the famapp cache.
-             record_deps :: Maybe Reduction -> TcS (Maybe Reduction)
-             record_deps mb_redn
-               | Just redn <- mb_redn
-               = do { wrapTcS $ TcM.setCtLocM (re_loc rewrite_env) $
-                        sourceTableFamilyAppUse tc tys
-                    ; updTcRef (re_used_cos rewrite_env)
-                        ( `addUnivCoDep` reductionCoercion redn )
-                    ; return mb_redn }
-               | otherwise
-               = return mb_redn
+-- See Note [How to normalise a family application].
+try_to_reduce :: TyCon -> [TcType] -> [TcPluginRewriter] -> RewriteM FamilyReduction
+try_to_reduce tc tys tc_rewriters = mkRewriteM $ \env path ->
+  do { let eq_rel = re_eq_rel env
 
-             match_fam = wrapTcS $ TcM.setCtLocM (re_loc rewrite_env) $
-                           matchFamTcM tc tys
+           finish origin redn = do
+             { traceTcS "Eager T.F. reduction success" (vcat [ppr tc, ppr tys, ppr redn])
+             ; return $! origin $! case eq_rel of
+                 NomEq  -> redn
+                 ReprEq -> mkSubRedn redn }
 
-       ; let eq_rel = re_eq_rel rewrite_env
-       ; result <- if re_fam_axioms_only rewrite_env
-              || not (isEmptyVarSet (re_native_binders rewrite_env))
-           -- Global family axioms do not emit constraints or update caches.
-           -- See Note [Rewriting retained dependent functions].
-           then fmap FreshReduction <$> match_fam
-           else firstJustsM
-              [ -- STEP 1a & STEP 4a
-                fmap FreshReduction <$> (record_deps
-                  =<< runTcPluginRewriters rewrite_env tc_rewriters tys)
-              , -- STEP 1b & STEP 4b
-                fmap CachedReduction <$> (record_deps =<<
-                  lookupFamilyEvidence eq_rel path tc tys (lookupFamAppCache tc tys))
-              , -- STEP 1c & STEP 4c
-                fmap FreshReduction <$> match_fam
-              ]
-       ; traverse (downgrade eq_rel) result }
-  where
-    -- The result above is always Nominal. We might want a Representational
-    -- coercion; this downgrades (and prints, out of convenience).
-    downgrade :: EqRel -> FamilyReduction -> TcS FamilyReduction
-    downgrade eq_rel result
-      = do { traceTcS "Eager T.F. reduction success" $
-             vcat [ ppr tc
-                  , ppr tys
-                  , ppr (familyReduction result)
-                  ]
-             -- Return the original result in the common nominal case.
-           ; return $! case (eq_rel, result) of
-               (NomEq, _) -> result
-               (ReprEq, FreshReduction redn) -> FreshReduction (mkSubRedn redn)
-               (ReprEq, CachedReduction redn) -> CachedReduction (mkSubRedn redn) }
+           use_external origin redn = do
+             { wrapTcS $ TcM.setCtLocM (re_loc env) $ sourceTableFamilyAppUse tc tys
+             ; updTcRef (re_used_cos env) (`addUnivCoDep` reductionCoercion redn)
+             ; finish origin redn }
+
+           match_fam = do
+             { match <- wrapTcS $ TcM.setCtLocM (re_loc env) $ matchFamTcM tc tys
+             ; maybe (return NoFamilyReduction) (finish FreshReduction) match }
+
+           -- STEP 1b & STEP 4b, followed by the top-level instances.
+           try_cache = do
+             { cached <- lookupFamilyEvidence eq_rel path tc tys (lookupFamAppCache tc tys)
+             ; maybe match_fam (use_external CachedReduction) cached }
+
+       ; if re_fam_axioms_only env || not (isEmptyVarSet (re_native_binders env))
+         -- See Note [Rewriting retained dependent functions].
+         then match_fam
+         else case tc_rewriters of
+                [] -> try_cache
+                _  -> do { plugin <- runTcPluginRewriters env tc_rewriters tys
+                         ; maybe try_cache (use_external FreshReduction) plugin } }
 
 -- Retrieve all type-checking plugins that can rewrite a (saturated) type-family application
 -- headed by the given 'TyCon`.
