@@ -11,6 +11,7 @@ choose the types of two successive fields: (61,False,'z')
 compare a payload using a dictionary supplied between fields: ((67,True),(71,False))
 use a leading context in a field pattern and a later equality in the branch: (1,73)
 supply a required type between constructor fields: ((79,True),(83,'r'))
+read the dictionary supplied after a constructor field and its required type: ((89,"Bool"),(97,"Char"))
 duplicate the unrestricted field of a quoted constructor: (17,17)
 recover consecutive GADT constraints: (False,"True")
 form an associated family type from its class evidence: (Refl,Refl,True)
@@ -427,6 +428,7 @@ map a type lambda with a constructor case: Refl
 read fields from two indexed type case branches: (Refl,Refl)
 retain the kind of a matched Nothing: Refl
 name and reuse a type-level intermediate result: Refl
+splice a type let that shadows its outer binder: Right (Just True)
 select a vector header with a runtime flag and a computed width: (":xy","xy")
 refer to an outer type let before shadowing it in a case: Refl
 bind the result of a constructor case: (Right True,Left 'c')
