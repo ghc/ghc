@@ -21,6 +21,22 @@ for opt in -O0 -O2; do
     test "$(./probe yes)" = True
     test "$(./probe no)" = False
 
+    cp "$src/../MappingWorker.hs" "$src/MappingTags.hs" ../provider/
+    (cd ../provider && "${ghc[@]}" "$opt" -fomit-interface-pragmas -fno-write-if-simplified-core \
+        -c MappingWorker.hs MappingTags.hs)
+    cp ../provider/{MappingWorker,MappingTags}.hi "$src/MappingScope.hs" .
+    "${ghc[@]}" "$opt" -fignore-interface-pragmas -c MappingScope.hs
+    for setting in WRONG_TAG GIVEN; do
+        if "${ghc[@]}" "$opt" -fignore-interface-pragmas -fforce-recomp -D"$setting" -c MappingScope.hs > failure 2>&1; then
+            echo "Accepted $setting at $opt"
+            exit 1
+        fi
+        case "$setting" in
+            WRONG_TAG) grep -Fq 'GHC-83865' failure && grep -Fq 'New (f x)' failure || exit 1 ;;
+            GIVEN) grep -Fq 'GHC-83605' failure && grep -Fq 'MapLike Maybe' failure || exit 1 ;;
+        esac
+    done
+
     cd ../evidence
     cp "$src/ChooseEvidence.hs" "$src/EvidenceMain.hs" .
     if "${ghc[@]}" "$opt" -DMISSING_GIVEN -c ChooseEvidence.hs > missing 2>&1; then
