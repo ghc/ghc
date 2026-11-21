@@ -1324,8 +1324,9 @@ An ordinary client proves removal of `False` and preservation of an
 `Entry` with a rigid tail. The Showcase exposes one output element for
 each function and leaves the later tail unforced. A callback on a
 newtype of `Bool` fails the kind check. A Boolean branch that forces the
-removed head loses both equations. The producer withholds the list
-equations in a no-code build.
+removed head loses both equations. The Showcase uses object code for
+the producer in GHCi. A no-code build of the same definitions without
+the fixture's object-code option withholds the list equations.
 [Producer](../examples/open-evaluation/ConcreteGuardedList.hs),
 [ordinary proofs](../examples/open-evaluation/ConcreteGuardedListProof.hs),
 [regression](../../../testsuite/tests/dependent/should_run/NativeOpenConcreteGuardedList.sh),

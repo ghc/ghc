@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fwrite-source-equations #-}
+{-# OPTIONS_GHC -fwrite-source-equations -fobject-code #-}
 module ConcreteGuardedList (Signal(..), isMarker, dropBool, dropMarkers) where
 
 -- | Mark input that a consumer can skip before reaching its first entry.

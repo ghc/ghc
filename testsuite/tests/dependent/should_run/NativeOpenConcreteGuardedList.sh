@@ -70,7 +70,7 @@ if "${ghc[@]}" -O0 -c WrongCallback.hs >wrong-callback.log 2>&1 ||
 fi
 
 cd "$out/no-code"
-cp ../provider/ConcreteGuardedList.hs .
+sed '/^{-# OPTIONS_GHC / s/ -fobject-code//' ../provider/ConcreteGuardedList.hs >ConcreteGuardedList.hs
 "${ghc[@]}" -fno-code -fwrite-interface -c ConcreteGuardedList.hs
 "${ghc[@]}" --show-iface ConcreteGuardedList.hi >no-code.iface
 if grep -Eq 'T:(#guard:)?(dropBool|dropMarkers)' no-code.iface; then
