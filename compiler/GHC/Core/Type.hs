@@ -2654,8 +2654,9 @@ isNativeRetainedFieldType ty
 isNativeAlgebraicOrAbstractDomain :: Type -> Bool
 isNativeAlgebraicOrAbstractDomain ty = case coreFullView ty of
   TyVarTy {} -> True
-  TyConApp tc args ->
-    isVanillaAlgTyCon tc && isBoxedDataTyCon tc && tyConArity tc == length args
+  TyConApp tc args
+    | isDataFamilyTyCon tc -> tyConArity tc <= length args
+    | otherwise -> isVanillaAlgTyCon tc && isBoxedDataTyCon tc && tyConArity tc == length args
   _ -> False
 
 {- Note [Opaque algebraic retained binders]
@@ -2669,7 +2670,11 @@ that domain directly:
 The result mentions the local Id. Binding that Id uses the domain's type
 and requires no traversal of its constructors or their equalities. Use
 the saturated, lifted boxed data head. A synonym can expand to such a head.
-The binder does not reify Vec's constructors as indices. Constructor
+The same rule applies to a saturated data family application of kind Type.
+The binder uses the public type without selecting its representation.
+A data family can have additional arguments after its declared arity.
+
+The binder does not reify constructors as indices. Constructor
 reification and structural matching still require isNativeIndexType.
 Function calls still use the fixed head check in
 Note [Function-valued retained binders].
