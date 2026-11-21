@@ -122,6 +122,58 @@ HS
             cat alias.log
             exit 1
         fi
+        cat >InstanceDomain.hs <<'HS'
+{-# LANGUAGE CPP, FlexibleContexts, FlexibleInstances, GADTs, NoExperimentalDependentTypes, TypeFamilies, UndecidableInstances #-}
+module Main where
+import Data.Proxy (Proxy(..))
+import NativeConstrainedFamilyProvider (Collects(Elem))
+
+data Cell c where
+    Cell :: Collects c => Proxy c -> Elem c -> Cell c
+class Render a where
+    render :: a -> String
+
+instance (Collects c, Show (Elem c)) => Render (Cell c) where
+    render (Cell _ x) = show x
+
+class Collects c => Readable c
+instance Readable [Bool]
+newtype ReadableCell c = ReadableCell (Cell c)
+instance (Readable c, Show (Elem c)) => Render (ReadableCell c) where
+    render (ReadableCell cell) = render cell
+
+newtype FixedCell a = FixedCell (Cell [a])
+instance (a ~ Bool, Show (Elem [a])) => Render (FixedCell a) where
+    render (FixedCell cell) = render cell
+
+#ifdef MISSING_DOMAIN
+newtype Ground = Ground Int
+instance Show (Elem [Int]) => Render Ground where
+    render (Ground n) = show n
+#endif
+
+main :: IO ()
+main = do
+    let cell = Cell (Proxy :: Proxy [Bool]) True
+    print (render cell, render (ReadableCell cell), render (FixedCell cell))
+#ifdef MISSING_DOMAIN
+    putStrLn (render (Ground 42))
+#endif
+HS
+        "${ghc[@]}" -c InstanceDomain.hs
+        "${ghc[@]}" InstanceDomain.o NativeConstrainedFamilyProvider.o -o instance-domain
+        test "$(./instance-domain)" = '("True","True","True")'
+        for defer in -fno-defer-type-errors -fdefer-type-errors; do
+            flags=(-fforce-recomp -DMISSING_DOMAIN "$defer" -ferror-spans -c InstanceDomain.hs)
+            if [[ $reader == ordinary ]]; then
+                "${ghc[@]}" "${flags[@]}"
+            elif "${ghc[@]}" "${flags[@]}" >instance-domain.log 2>&1 ||
+                 ! grep -Eq '^InstanceDomain.hs:26:[0-9]+(-[0-9]+)?: error: \[GHC-39999\]' instance-domain.log ||
+                 ! grep -Fq 'Allowed Int' instance-domain.log; then
+                cat instance-domain.log
+                exit 1
+            fi
+        done
         cat >MissingField.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes, TypeFamilies #-}
 module MissingField where
