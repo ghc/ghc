@@ -14,8 +14,11 @@ On success, `mkFinVec` returns a position of type `Fin n`. The caller
 can use that position on any vector of length `n`. A negative offset
 returns `Nothing` without inspecting the vector. A match on `FS p` in
 a retained function identifies the actual predecessor `p`. Its proof
-leaves that predecessor unevaluated.
-[Signed lookup and predecessor proof](roadmap/R03-dependent-products.md#retain-a-bounded-position-and-its-actual-predecessor).
+leaves that predecessor unevaluated. The same function accepts written
+`FZ` and `FS p` as retained arguments. A constructor result can also
+determine multiple erased parameters.
+[Written constructors](roadmap/R03-dependent-products.md#write-indexed-constructors-in-retained-applications)
+and [signed lookup and predecessor proof](roadmap/R03-dependent-products.md#retain-a-bounded-position-and-its-actual-predecessor).
 
 An ordinary caller can split a vector at a runtime cut and obtain a
 proof that appending the two pieces gives back its original input.
@@ -23,14 +26,15 @@ proof that appending the two pieces gives back its original input.
 For an independently read cut and total, `checkedSplitAtValue` returns
 `Nothing` if the cut exceeds the total. On success, checking the suffix
 length leaves the vector unevaluated. Opening the contents proof takes
-the recursive path down the input spine.
+the recursive path down the input spine. The expected result and the
+length equality now select the original vector at the constructor call.
 [Split theorem](examples/packed-vector/CertifiedSplit.hs) and
 [ordinary caller](examples/packed-vector/CertifiedSplitClient.hs).
 
-The 368-line Showcase runs in native code and source-loaded GHCi.
+The 371-line Showcase runs in native code and source-loaded GHCi.
 The source-hidden proof regression passes at `-O0`, `-O1`, and `-O2`.
 Removing the induction premise fails at the final `Refl`. The certified split
-checks without `UndecidableInstances`. The preceding 366-line checkpoint
+checks without `UndecidableInstances`. The 368-line signed-lookup checkpoint
 also passed both stages of a normal Hadrian build.
 [Verification scope](CHECKPOINTS.md#family-and-package-checkpoints).
 
@@ -300,12 +304,17 @@ reconstruction proof for an arbitrary cut within the vector.
 [Split evidence](roadmap/R04-dependent-sums.md#prove-a-split-preserves-the-original-vector)
 and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vector-append-preserves-its-right-operand).
 
-1. **R03 and R05.** Use written indexed constructors as retained
-   arguments whenever the expected result determines their erased
-   parameters. The finite-position view already matches `FZ` and
-   `FS p`. Passing either directly to a retained function still gives
-   GHC-83605. Keep nested operands lazy and test separate compilation.
-   [Finite positions](examples/qualified-pi/FinitePosition.hs).
+1. **R03 and R05.** Extend the checked match beyond the one exact
+   expected result slot used by the split. Keep ordinary type errors
+   for independent values at one index. A Given equality between
+   open family applications can expose a solver rewrite cycle.
+   [Checked input inference](roadmap/R03-dependent-products.md)
+   and [independent inputs](../../testsuite/tests/dependent/should_fail/NativeIrredIndexEvidence.hs).
+2. **R05.** Preserve explicit `INLINE` unfoldings when an ordinary
+   signature has a retained body. Select the required optimizer path
+   when another module imports the unfolding. Check the demand of a
+   partial application and report unsupported cases at the source.
+   [Written unfolding checks](../../compiler/GHC/HsToCore/Binds.hs).
 
 ### Other open work
 

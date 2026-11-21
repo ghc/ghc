@@ -6632,6 +6632,29 @@ binders. An older reader rejects this feature in the interface header.
 [ordinary client](examples/qualified-pi/FinitePositionClient.hs) and
 [regression](../../testsuite/tests/dependent/should_run/NativeIndexedFin.sh).
 
+Agda's implicit arguments allow the expected result type to supply the
+bound for `Fin.zero` and `Fin.suc`. The Haskell implementation reuses
+the GADT operand worker from `016edc72bb` and the interface format
+from `b0b432fb93`. GHC matches the constructor result against the
+expected domain with `tcMatchTyX_BM`. It checks the instantiated
+result, actual fields, and nominal worker evidence. Two erased
+parameters can occur in different positions in the result. A type
+family can also occur in a syntactically matching application.
+The field check still distinguishes two runtime values at the same
+index.
+[Agda 2.8 implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html),
+[GHC application matching](../../compiler/GHC/Tc/Gen/App.hs) and
+[GHC worker operands](../../compiler/GHC/Core.hs).
+
+In the certified split, the expected constructor result contains the
+original vector. GHC uses that scoped value for the last erased
+argument and checks its kind with the nominal length evidence. Agda
+keeps the context of a metavariable when it checks an assignment.
+The Haskell rule makes this choice during committed application
+instantiation. It uses a single exact result slot.
+[Agda 2.8 metavariables](https://hackage-content.haskell.org/package/Agda-2.8.0/docs/src/Agda.TypeChecking.MetaVars.html)
+and [checked split](examples/packed-vector/CertifiedSplit.hs).
+
 ## Check a split at an independent runtime cut
 
 `splitAtVecChecked` compares the runtime cut and total before splitting

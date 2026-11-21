@@ -317,3 +317,27 @@ the spine through that cell. In the successor view, the ordinary client
 opens the proof and uses the predecessor to index the vector tail.
 The bound also lets `indexVec` use the checked position with another
 vector of the same length.
+
+## Write indexed constructors in retained applications
+
+`constructedViews p` passes `FZ` and `FS p` directly to `viewFin`.
+The expected bound fixes their hidden parameter. An ordinary client
+opens the successor view to retrieve its input. The test also constructs
+`Mk2 :: b -> a -> Both (Maybe a) [b]`. The expected result fixes
+both erased arguments even though the constructor quantifies them in
+the opposite order. A stored unfolding preserves the field order and
+leaves both fields lazy.
+[Finite-position view](../examples/qualified-pi/FinitePosition.hs),
+[multiple result indices](../../../testsuite/tests/dependent/should_run/NativeGeneralGadtOperandProvider.hs)
+and [Agda and GHC provenance](../REFERENCES.md#recover-the-predecessor-of-a-bounded-position).
+
+The application checks the fields after matching the result. For
+`Hide :: Proxy p -> Hidden (Width p)`, the expected `Hidden (Width p)`
+can supply the constructor argument syntactically. Two independent
+values `x` and `y` at `Proxy p` still give distinct indices. Returning
+the application built from `y` when the result requires `x` fails at
+the source expression. The old vector operand keeps its original
+interface header. Pass the previous compiler as the third argument of
+the regression to check both headers.
+[Source diagnostic](../../../testsuite/tests/dependent/should_fail/NativeIndexOperandFamily.stderr)
+and [cross-module checks](../../../testsuite/tests/dependent/should_run/NativeIndexedFin.sh).
