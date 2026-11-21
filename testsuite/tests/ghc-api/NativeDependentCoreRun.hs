@@ -4221,8 +4221,8 @@ runPackageSourceRejectChecks = do
         , ("SumEscape", 5617, "replicateNative p 42", ["TypeFamilies"], equalityImports, sums ++ ["bad :: foreach (q :: Nat) -> Sum n m -> Vec Int q", "bad q (Sum p Refl) = replicateNative p 42"])
         , ("SumAliasWrongEvidence", 83865, "alias m Refl", ["TypeFamilies"], equalityImports, sums ++ ["alias :: forall (n :: Nat) (m :: Nat). foreach (p :: Nat) -> (p :~: Add n m) -> Sum n m", "alias p proof = Sum p proof", "bad :: foreach (m :: Nat) -> Sum (S Z) m", "bad m = alias m Refl"])
         , ("SumPartial", 83865, "Sum m", ["TypeFamilies"], equalityImports, sums ++ ["bad :: foreach (m :: Nat) -> (m :~: m) -> Sum Z m", "bad m = Sum m"])
-        , ("LinearClause", 18872, "arising from a pattern", ["LinearTypes"], [], package ++ ["bad :: PackedVec a %1 -> PackedVec a", "bad (PackVec n xs) = PackVec n xs"])
-        , ("LinearCase", 18872, "arising from multiplicity", ["LinearTypes"], [], package ++ ["bad :: PackedVec a %1 -> PackedVec a", "bad p = case p of PackVec n xs -> PackVec n xs"])
+        , ("LinearClause", 18872, "multiplicity", ["LinearTypes"], [], linearPackage ++ ["bad :: PackedVec a %1 -> (PackedVec a, PackedVec a)", "bad (PackVec n xs) = (PackVec n xs, PackVec n xs)"])
+        , ("LinearCase", 18872, "multiplicity", ["LinearTypes"], [], linearPackage ++ ["bad :: PackedVec a %1 -> ()", "bad p = case p of PackVec _ xs -> ()"])
         , ("RigidMultiplicity", 25897, "is a rigid type variable", ["LinearTypes"], ["import GHC.Types (Multiplicity)"], package ++ ["bad :: forall (p :: Multiplicity) a. PackedVec a %p -> PackedVec a", "bad (PackVec n xs) = PackVec n xs"])
         , ("FilterWrongLength", 5617, "PackVec m (VCons x ys)", [], [], package ++ ["filterVec :: forall a n. (a -> Bool) -> Vec a n -> PackedVec a", "filterVec predicate VNil = PackVec Z VNil", "filterVec predicate (VCons x xs) =", "  if predicate x", "    then case filterVec predicate xs of", "      PackVec m ys -> PackVec m (VCons x ys)", "    else filterVec predicate xs"])
         , ("BoundedVectorLength", 5617, "VCons x ys", [], [], bounded "PackBounded len (VCons x ys) (weakenRight proof)" dropBound)
@@ -4533,6 +4533,7 @@ runPackageSourceRejectChecks = do
     qualifiedPiExtensions = ["TypeFamilies", "FlexibleContexts", "ConstraintKinds", "AllowAmbiguousTypes", "ImpredicativeTypes"]
     declaration signature = ["data PackedVec a where", "  PackVec :: " ++ signature]
     package = declaration "foreach (n :: Nat) -> Vec a n -> PackedVec a"
+    linearPackage = declaration "foreach (n :: Nat) -> Vec a n %1 -> PackedVec a"
     localSignatures =
         package
             ++ [ "localVector :: foreach (n :: Nat) -> Vec Int n"
