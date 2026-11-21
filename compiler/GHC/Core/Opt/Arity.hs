@@ -3361,6 +3361,11 @@ etaBodyForJoinPoint need_args body
       = go (n-1) res_ty subst' (tv' : rev_bs) (e `App` varToCoreExpr tv')
         -- The varToCoreExpr is important: `tv` might be a coercion variable
 
+      -- See Note [Retained arguments of join points] in GHC.Core.Type.
+      | DepFunTy _ index res_ty <- coreFullView ty
+      , let (subst', index') = substBndr subst index
+      = go (n-1) res_ty subst' (index' : rev_bs) (e `App` Var index')
+
       | Just (_, ma, mult, arg_ty, res_ty) <- splitFunTy_maybe ty
       , Type.substTyUnchecked subst ma `eqType` unmatchableDataConTy
       , let (subst', b) = freshEtaId n subst (Scaled mult arg_ty)

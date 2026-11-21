@@ -64,6 +64,7 @@ import GHC.Core
 import GHC.Core.Utils
 import GHC.Core.Subst( cloneBndrsM, substExprSC )
 import GHC.Core.Unfold
+import GHC.Core.TyCo.Rep (Type(DepFunTy))
 import GHC.Core.TyCo.Subst (emptyIdSubstEnv, mkSubst)
 import GHC.Core.Multiplicity( Scaled(..), mkMultMul )
 import GHC.Core.Make            ( mkWildValBinder, mkCoreLet )
@@ -1342,6 +1343,10 @@ adjustJoinPointType mult new_res_ty join_id
     go n ty
       | n == 0
       = new_res_ty
+
+      -- See Note [Retained arguments of join points] in GHC.Core.Type.
+      | DepFunTy vis index body_ty <- coreFullView ty
+      = mkDepFunTyWithVis vis (scaleIdBy mult index) (go (n-1) body_ty)
 
       | Just (ma, arg_bndr, body_ty) <- splitPiTy_maybe ty
       , let body_ty' = go (n-1) body_ty

@@ -2216,6 +2216,7 @@ isPrimitiveType ty = case splitTyConApp_maybe ty of
 -- then j could be a binary join point returning an Int, but it could *not* be a
 -- unary join point returning a -> Int.
 --
+-- See Note [Retained arguments of join points].
 -- TODO: See Note [Excess polymorphism and join points]
 isValidJoinPointType :: JoinArity -> Type -> Bool
 isValidJoinPointType arity ty
@@ -2226,12 +2227,27 @@ isValidJoinPointType arity ty
       = tvs `disjointVarSet` tyCoVarsOfType ty
       | Just (_, t, ty') <- splitForAllTyCoVar_maybe ty
       = valid_under (tvs `extendVarSet` t) (arity-1) ty'
+      | DepFunTy _ index body <- coreFullView ty
+      = valid_under (tvs `extendVarSet` index) (arity-1) body
       | Just (_, ma, _, _, res_ty) <- splitFunTy_maybe ty
       , eqType ma unmatchableDataConTy
         -- See Note [Ordinary arrow metadata and eta] in GHC.Core.Opt.Arity.
       = valid_under tvs (arity-1) res_ty
       | otherwise
       = False
+
+{- Note [Retained arguments of join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A join point can take a runtime index. Later arguments may depend on it.
+For example, an alternative of Stored can produce a join of type
+
+  foreach (b :: Bool) -> Value b -> Stored -> String
+
+Count b as one value argument. Check the return type after consuming all
+join arguments. It must mention none of the locally bound type variables
+or runtime indices, since the jump returns to the caller's context.
+For example, a join that returns Value b after consuming b is invalid.
+-}
 
 {- Note [Excess polymorphism and join points]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
