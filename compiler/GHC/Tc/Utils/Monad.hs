@@ -628,9 +628,10 @@ getNativeGivens =
 ~~~~~~~~~~~~~~~~~~~~~~~
 A retained source case must transport lexical evidence whose predicate depends
 on its runtime index. A constrained family in a local signature can use the
-evidence of an enclosing implication to prove its domain. Record the actual
-evidence parameters while checking the implication body. We build the
-implication after checking that body.
+evidence of an enclosing implication to prove its domain. A source use of a
+class method in a type checks which dictionary the implication selects.
+Record the actual evidence parameters while checking the implication body.
+We build the implication after checking that body.
 
 The source name environment and the pending Wanteds do not contain all these
 parameters. Use TcS to derive superclass evidence and solve constraints.

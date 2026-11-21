@@ -1668,3 +1668,88 @@ result without evaluating its elements. A bottom tail prevents the
 result from exposing a cons.
 [Source aliases](../examples/open-evaluation/PreludeReverseLengthSource.hs)
 and [ordinary proof](../examples/open-evaluation/PreludeReverseLengthProof.hs).
+
+### Check the equations of a right list fold
+
+The installed list `foldr` returns the seed at `[]`. At `x : xs` it
+passes `x` and the fold of `xs` to the combiner. The tail, combiner,
+and seed can stay unknown in the proof. The combiner has unmatchable
+arrows. Its application gives no evidence that its arguments are equal.
+The two checked equations also prove `foldr k z (xs ++ ys) =
+foldr k (foldr k z ys) xs` by induction on the finite spine of `xs`.
+[Agda's `foldr-++`](https://agda.github.io/agda-stdlib/v2.4/Data.List.Properties.html).
+
+The checker accepts a direct recursive call with the same combiner and
+seed, or a call to the local worker that captures both. It checks the
+original head, the proper tail, and the absence of additional demand
+before applying the combiner. The same check works for a separately
+compiled ordinary fold. Changing a checked body during optimization
+withdraws the equation. A fold that forces the step or seed before
+matching the list fails at its open type alias. A no-code build withholds
+both equations.
+
+The source alias names `GHC.Internal.List.foldr`. Its defining term
+is `GHC.Internal.Base.foldr`. The `Foldable []` dictionary selects that
+term for the method re-exported by `Prelude`. The certificate belongs
+to the list term. Using the class selector in a type requires separate
+evidence for dictionary selection.
+
+The proof disables rewrite rules because the installed fold has
+fusion rules. A builder that uses `seq` can distinguish a partial
+combiner from a constructor, so its polymorphic type cannot justify
+`fold/build`. The native test checks that a non-strict combiner can
+skip the element, seed, and tail. It also checks that the fold demands
+the input spine and skips the combiner on an empty list.
+[Source alias](../examples/open-evaluation/ListFoldrSource.hs),
+[ordinary proof](../examples/open-evaluation/ListFoldrProof.hs), and
+[regression](../../../testsuite/tests/dependent/should_run/NativeOpenListFoldr.sh).
+
+GHCi loads direct and local-worker folds from source with the bytecode
+backend. It checks both equations with the same Core matcher. The
+matcher reads through breakpoints on the seed result, callback
+application, and recursive call. The interpreter retains the
+breakpoints. The regression proves the source equations, checks that
+the strict step and seed variants still fail, and emits no object file.
+[GHCi regression](../../../testsuite/tests/dependent/should_run/NativeOpenListFoldrGhci.sh).
+
+### Fold with fixed element and seed types
+
+An ordinary `foldBits` takes a Boolean step and seed over `[Bool]`.
+The same equations hold for a local worker that folds `[Char]` with a
+`Maybe Bool` seed. The element and seed types are closed. The first
+callback argument must match the list element nominally. The second
+callback argument and both results must match the seed type nominally.
+A callback on a newtype of `Bool` fails at its use. The strict-step
+and strict-seed variants still fail at their aliases. A compiler
+upgrade rechecks an older interface with an eligible signature once.
+[Concrete consumer](../../../testsuite/tests/dependent/should_run/NativeOpenListFoldrConcrete.hs)
+and [native controls](../../../testsuite/tests/dependent/should_run/NativeOpenListFoldr.sh).
+
+### Select the list instance of `Prelude.foldr`
+
+The receiver kind identifies the list instance of the ordinary selector.
+The compiler looks up its visible, context-free dictionary and checks the
+method selected by the dictionary constructor. The method must have the
+checked list fold equations at the selector's specialized type. The
+ordinary solver must select the same dictionary in the written and lexical
+evidence scopes. A given constraint can therefore block this reduction.
+
+A code-generating build checks the dictionary's final Core constructor.
+If its field names the checked list fold, the compiler records the selector
+and worker Names in the dictionary's mandatory interface details. The
+proof works at `-O0` with interface pragmas ignored. An older interface
+can also supply the field through its dictionary unfolding when interface
+pragmas are available. The proof disables rewrite rules for the list worker.
+[Proof using `Prelude.foldr`](../examples/open-evaluation/PreludeFoldrProof.hs),
+[class promotion roadmap](https://ghc.serokell.io/dh#promote-classes), and
+[GHC's lexical scoping principle](https://github.com/ghc-proposals/ghc-proposals/blob/master/principles.rst#221lexical-scoping-principle-lsp).
+
+### Fold a mapped list
+
+Induction on a finite list spine proves that `foldr k z (map f xs)` equals
+`foldr (k . f) z xs`. The step, mapper, and seed can stay abstract. The
+proof uses the installed `foldr`, `map`, and `(.)` with rewrite rules
+disabled. In the runtime example, both folds skip an undefined seed and
+tail. A step that ignores its head also skips the mapper and input head.
+[Source proof](../examples/open-evaluation/PreludeFoldrProof.hs) and
+[Agda's list law](../REFERENCES.md#right-fold-after-map).

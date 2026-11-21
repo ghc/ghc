@@ -129,6 +129,8 @@ import qualified PreludeFilterAppendProof
 import qualified PreludeFilterCutoff
 import qualified PreludeFilterDecider
 import qualified PreludeAppendLengthProof
+import qualified ListFoldrProof
+import qualified PreludeFoldrProof
 import qualified PreludeFilterLengthProof
 import qualified PreludeFilterProof
 import qualified PreludeFilterRuntime
@@ -1374,6 +1376,10 @@ main = do
               ++ PreludeMapLengthProof.showPreludeMapLength)
     putStrLn ("prove that append adds the list lengths: "
               ++ PreludeAppendLengthProof.showPreludeAppendLength)
+    putStrLn ("prove the list fold law for append: " ++ ListFoldrProof.showListFoldAppend)
+    observe "prove the append law through the Prelude.foldr list instance"
+        PreludeFoldrProof.example
+    putStrLn ("prove that folding a mapped list composes the step: " ++ PreludeFoldrProof.showFoldMap)
     putStrLn ("prove that reverse preserves list length: "
               ++ PreludeReverseLengthProof.showPreludeReverseLength)
     putStrLn ("prove that map distributes over append: "
