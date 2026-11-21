@@ -1116,8 +1116,8 @@ which is unproblematic.
 -- | Substitute local function heads and name scalar retained arguments.
 -- See Note [Retained constructor arguments in CorePrep].
 -- See Note [Function-valued retained binders] in GHC.Core.Type.
-nameNativeConstructorArgs :: CoreExpr -> UniqSM (Maybe CoreExpr)
-nameNativeConstructorArgs expr
+nameNativeConstructorArgs :: Platform -> CoreExpr -> UniqSM (Maybe CoreExpr)
+nameNativeConstructorArgs platform expr
   | Cast inner co <- fun
   , hasNativeDependentExpr (Coercion co)
   , arg : rest <- args
@@ -1125,8 +1125,8 @@ nameNativeConstructorArgs expr
   = return (Just (mkApps (mkCastMCo (App inner arg') result_co) rest))
   | otherwise
   = do { head' <- case fun of
-           Cast inner co -> fmap (`mkCast` co) <$> nameNativeConstructorArgs inner
-           Tick tick inner -> fmap (Tick tick) <$> nameNativeConstructorArgs inner
+           Cast inner co -> fmap (`mkCast` co) <$> nameNativeConstructorArgs platform inner
+           Tick tick inner -> fmap (Tick tick) <$> nameNativeConstructorArgs platform inner
            _ -> return Nothing
        ; case head' of
            Just fun' -> return (Just (mkApps fun' args))
@@ -1145,7 +1145,7 @@ nameNativeConstructorArgs expr
       | otherwise = needs_names (applyTypeToArgs ty [arg]) rest
 
     build ty app transport wrap []
-      = do { co <- liftNativeIndexTransport "the application result" transport ty
+      = do { co <- liftNativeIndexTransport platform "the application result" transport ty
            ; return (wrap (mkCast app (mkSubCo co))) }
     build ty app transport wrap (arg : rest)
       | DepFunTy _ index _ <- coreFullView ty
@@ -1165,7 +1165,7 @@ nameNativeConstructorArgs expr
                  "Native dependent Core requires a retained function argument to be an eligible local variable of its fixed function type in CorePrep.")
       | DepFunTy _ index _ <- coreFullView ty
       -- See Note [Naming later retained domains].
-      = do { domain_co <- liftNativeIndexTransport "a later retained domain" transport (varType index)
+      = do { domain_co <- liftNativeIndexTransport platform "a later retained domain" transport (varType index)
            ; let prepared_arg
                    | isReflCo domain_co = arg
                    | otherwise = Cast arg (SubCo (mkSymCo domain_co))
@@ -1180,7 +1180,7 @@ nameNativeConstructorArgs expr
       = do { check_erased_binder ty transport
            ; build (applyTypeToArgs ty [arg]) (App app arg) transport wrap rest }
       | Just (_, _, _, arg_ty, res_ty) <- splitFunTy_maybe ty
-      = do { co <- liftNativeIndexTransport "a later argument" transport arg_ty
+      = do { co <- liftNativeIndexTransport platform "a later argument" transport arg_ty
            ; let arg' = mkCast arg (mkSymCo (mkSubCo co))
            ; build res_ty (App app arg') transport wrap rest }
       | Coercion {} <- arg
@@ -1211,8 +1211,9 @@ nameNativeIndexArg result_ty arg
   | otherwise = nativeIndexTransportError "an unsupported retained argument"
   where
     name_constructor normal index
-      | Just _ <- isCharLitTy index
-      -- See Note [Boxed character literal indices] in GHC.Core.
+      | isJust (isCharLitTy index) || isJust (isNumLitTy index)
+      -- See Notes [Boxed character literal indices] and
+      -- [Boxed natural literal indices] in GHC.Core.
       = name_value normal normal (mkNomReflCo index) id
       | Just (con, tys, build, fields) <- nativeConFields_maybe normal
       , not (null fields) || isNativeConstructedGadtIndex index
@@ -1385,8 +1386,8 @@ the scope of its alternative's proof binder.
 
 -- | Lift index equalities through value types and retained binder domains.
 -- Fresh symbolic Ids occur only in this temporary template, never in output Core.
-liftNativeIndexTransport :: String -> [(Id, CoercionN)] -> Type -> UniqSM CoercionN
-liftNativeIndexTransport context transport ty
+liftNativeIndexTransport :: Platform -> String -> [(Id, CoercionN)] -> Type -> UniqSM CoercionN
+liftNativeIndexTransport platform context transport ty
   | all (isReflCo . snd) relevant
   = return (mkReflCo Nominal left_ty)
   | otherwise
@@ -1415,7 +1416,8 @@ liftNativeIndexTransport context transport ty
       where
         in_scope = mkInScopeSet (tyCoVarsOfType ty `unionVarSet`
                                 unionVarSets (map (tyCoVarsOfCo . snd) relevant))
-        bindings = mkVarEnv [(index, mapNativeIndex (const (endpoint co)) (Var index))
+        bindings = mkVarEnv [(index, mapNativeIndexWithNatural (Just . mkNaturalExpr platform)
+                                     (const (endpoint co)) (Var index))
                            | (index, co) <- relevant]
 
     -- Each later template kind uses the completed earlier prefix.
@@ -1438,7 +1440,7 @@ cpeApp :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeBody)
 -- May return a CpeBody (instead of CpeApp) because of saturating primops
 cpeApp top_env expr
   = do { named <- if cp_allowNativeDependent (cpe_config top_env)
-                  then nameNativeConstructorArgs expr
+                  then nameNativeConstructorArgs (cp_platform (cpe_config top_env)) expr
                   else return Nothing
        ; case named of
            Just expr' -> cpeBodyF top_env expr'

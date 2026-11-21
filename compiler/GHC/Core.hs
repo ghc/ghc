@@ -34,7 +34,7 @@ module GHC.Core (
 
         mkConApp, mkConApp2, mkTyBind, mkCoBind,
         varToCoreExpr, varsToCoreExprs, exprToBoolIndex,
-        exprToNativeIndex, normaliseNativeIndexExpr, mapNativeIndex,
+        exprToNativeIndex, normaliseNativeIndexExpr, mapNativeIndex, mapNativeIndexWithNatural,
         nativeSourceCallIndex, nativeComputedIndex, retainedArgIndex, nativeDeferredArgIndex,
         exprToNativeCaseIndex, isNativeCaseValueIndex, isNativeIndexedCaseScrutinee,
         nativeIndexFunctionVar_maybe, nativeIndexArgKinds, nativeIndexedConArgs,
@@ -2782,7 +2782,7 @@ exprToNativeCaseIndex (Var v)
 exprToNativeCaseIndex expr
   | Just index <- exprToNativeIndex expr
   , isNativeIndexType (typeKind index) || isNativeCaseValueIndex index
-    || isJust (isCharLitTy index)
+    || isJust (isCharLitTy index) || isJust (isNumLitTy index)
   = Just index
   | otherwise = Nothing
 
@@ -3027,7 +3027,13 @@ isNativeConstructedGadtIndex _ = False
 -- | Substitute in a supported runtime index without evaluating its value.
 -- Leave expressions outside the supported index language unchanged.
 mapNativeIndex :: (Type -> Type) -> CoreExpr -> CoreExpr
-mapNativeIndex subst expr
+mapNativeIndex = mapNativeIndexWithNatural (const Nothing)
+
+-- | Substitute in a retained operand using the target's Natural representation.
+-- CorePrep supplies the target-specific builder. The platform-independent
+-- coercion paths use 'mapNativeIndex' only for variable and cast ranges.
+mapNativeIndexWithNatural :: (Integer -> Maybe CoreExpr) -> (Type -> Type) -> CoreExpr -> CoreExpr
+mapNativeIndexWithNatural mk_natural subst expr
   | Just (_, index) <- normaliseNativeIndexExpr expr
   = let index' = subst index
     in case from_index index' of
@@ -3040,6 +3046,7 @@ mapNativeIndex subst expr
       , TyConApp tc [] <- typeKind ty
       , Just con <- tyConSingleDataCon_maybe tc
       = Just (mkConApp con [mkCharLit c])
+    from_index ty | Just n <- isNumLitTy ty, n >= 0 = mk_natural n
     from_index (TermVarTy v)
       | isNativeOpaqueValueId v = Just (Var v)
     from_index (CastTy index delta)
