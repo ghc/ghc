@@ -3851,8 +3851,9 @@ pprRetainedQuantificationError reason = case reason of
          , text "Records, contexts, existential binders, equality specifications, and StrictData are not supported."
          , text "Its erased quantifiers must name exactly the datatype parameters." ]
   RetainedConstructorResult ty ->
-    vcat [ text "A constructor may use its only retained field as the sole result index."
-         , text "The field must appear directly and have a closed structural index type."
+    vcat [ text "A constructor may use its only retained field directly in the result type."
+         , text "The field must have a closed structural index type."
+         , text "Other result arguments must be unchanged erased parameters."
          , text "The result type is" <+> quotes (ppr ty) <> dot
          , text "For other results, use an ordinary datatype parameter in the result type."
          , fsep [ text "Relate it to the retained field with a propositional equality field using"

@@ -227,7 +227,8 @@ for shape in COMPOUND_RESULT TWO_FIELDS_RESULT; do
             grep -Fq 'CheckedList.hs:11:61-74: error: [GHC-83605]' result.log
             grep -Eq 'The result type is .CheckedList ys.\.' result.log ;;
     esac
-    grep -Fq 'A constructor may use its only retained field as the sole result index.' result.log
+    grep -Fq 'A constructor may use its only retained field directly in the result type.' result.log
+    grep -Fq 'Other result arguments must be unchanged erased parameters.' result.log
     grep -Fq 'propositional equality field' result.log
 done
 if "${ghc[@]}" -O0 -fforce-recomp -XStrictData -fdiagnostics-color=never \
