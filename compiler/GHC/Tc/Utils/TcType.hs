@@ -2055,6 +2055,7 @@ isSigmaTy :: TcType -> Bool
 -- But NOT
 --     forall a -> blah
 isSigmaTy (ForAllTy _ (Bndr _ af) _)     = isInvisibleForAllTyFlag af
+isSigmaTy DepDictTy{}                    = True
 isSigmaTy (FunTy { ft_af = af })       = isInvisibleFunArg af
 isSigmaTy ty | Just ty' <- coreView ty = isSigmaTy ty'
 isSigmaTy _                            = False

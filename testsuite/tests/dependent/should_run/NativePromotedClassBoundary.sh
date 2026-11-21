@@ -9,12 +9,7 @@ for opt in -O0 -O2; do
     mkdir -p "$out/$opt/"{target,provider,client,evidence}
     cd "$out/$opt/target"
     cp "$src/ChooseTarget.hs" .
-    if "${ghc[@]}" "$opt" -c ChooseTarget.hs > failure 2>&1; then
-        echo "Accepted the abstract promoted method at $opt"
-        exit 1
-    fi
-    grep -Eq '^ChooseTarget.hs:[0-9]+:[0-9]+: error: \[GHC-70566\]' failure
-    grep -Fq 'The local dependency choose is not an ordinary function binding.' failure
+    "${ghc[@]}" "$opt" -c ChooseTarget.hs
 
     cd ../provider
     cp "$src/ChooseControl.hs" .
@@ -35,11 +30,7 @@ for opt in -O0 -O2; do
     grep -Eq '^ChooseEvidence.hs:[0-9]+:[0-9]+: error: \[GHC-39999\]' missing
     grep -Fq 'add (Choose b) to the context' missing
 
-    if "${ghc[@]}" "$opt" -DPROMOTED -c ChooseEvidence.hs > promoted 2>&1; then
-        echo "Accepted the two abstract promoted methods at $opt"
-        exit 1
-    fi
-    test "$(grep -cF 'error: [GHC-70566]' promoted)" = 2
+    "${ghc[@]}" "$opt" -DPROMOTED -c ChooseEvidence.hs
 
     "${ghc[@]}" "$opt" -c ChooseEvidence.hs
     "${ghc[@]}" "$opt" -c EvidenceMain.hs

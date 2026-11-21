@@ -206,6 +206,12 @@ toIfaceTypeX fr (TyVarTy tv)   -- See Note [Free TyVars and CoVars in IfaceType]
 toIfaceTypeX fr (TermVarTy var)
   | var `elemVarSet` fr = IfaceFreeTermVar var
   | otherwise = IfaceTermVar (mkIfLclName (occNameFS (getOccName var)))
+toIfaceTypeX fr (DepDictTy var body)
+  = IfaceDepDictTy (toIfaceIdBndrX fr var)
+                   (toIfaceTypeX (fr `delVarSet` var) body)
+toIfaceTypeX fr (ClassAppTy method inst dict arg _)
+  = IfaceClassAppTy (idName method) (toIfaceTypeX fr inst)
+                   (toIfaceTypeX fr dict) (toIfaceTypeX fr arg)
 toIfaceTypeX fr (TermAppTy fun arg)
   -- See Note [Opaque call indices in interfaces] in GHC.Iface.Type.
   | fun `elemVarSet` fr = IfaceFreeTermAppTy fun arg'
@@ -795,6 +801,9 @@ toIfaceApp e as = mkIfaceApps (exprType e) (toIfaceExpr e) as
 
 mkIfaceApps :: Type -> IfaceExpr -> [CoreExpr] -> IfaceExpr
 mkIfaceApps _ iface [] = iface
+mkIfaceApps ty _ (_ : _)
+  | DepDictTy{} <- coreFullView ty
+  = panic "mkIfaceApps: experimental dependent dictionary application"
 mkIfaceApps ty iface (arg : rest)
   = mkIfaceApps result (IfaceApp iface encoded) rest
   where

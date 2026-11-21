@@ -18,7 +18,7 @@ chooseTagged x = tagBool (choose x)
 ```
 
 `tagBool :: foreach (b :: Bool) -> Tagged b` returns the corresponding
-singleton constructor. GHC reports GHC-70566 for the result type.
+singleton constructor. The public baseline reports GHC-70566 for the result type.
 “Cannot reduce the open call to ‘choose’ in a type.” The explanation is
 “The local dependency choose is not an ordinary function binding.”
 [Target source](../../../testsuite/tests/dependent/should_run/promoted-class/ChooseTarget.hs).
@@ -91,7 +91,7 @@ order, `db :: Choose b` and then `da :: Choose a`. It emits
 `choose @a da x` and `choose @b db y`. A control that removes `Choose b`
 fails at the second call. The test compiles the term-only program and
 checks that both dictionary fields produce their expected results. The
-indexed signature currently reports GHC-70566 at both occurrences.
+public baseline reports GHC-70566 at both occurrences in the indexed signature.
 [Source controls](../../../testsuite/tests/dependent/should_run/promoted-class/ChooseEvidence.hs).
 
 For this first slice, require a unique direct Given of the instantiated
@@ -126,3 +126,33 @@ syntax. The `@@` notation in #383 illustrates the dictionary argument
 and is not proposed source syntax here.
 [Agda 2.8 instance arguments](https://agda.readthedocs.io/en/v2.8.0/language/instance-arguments.html#usage)
 and [#383 sketch](https://github.com/ghc-proposals/ghc-proposals/issues/383#issuecomment-739058810).
+
+## Private interface experiment on public baseline `526aa52f79`
+
+The private compiler exports `chooseTagged` and `chooseTaggedBoth` as
+signatures. Each selector refers to the dictionary and operand bound in
+its signature. The reader checks both references using the method's
+instantiated type. It derives the index kind from the selector.
+These interfaces use the compositional `experimental-scoped-dictionary`
+feature. Interfaces with only ordinary exports keep their existing
+format. The experiment omits unfolding pragmas for modules with these
+types. GHCi runs their bytecode and skips breakpoint stops whose types
+include scoped dictionaries. HIE renders the source form of the
+constraint and selector. Its type table still uses the exact Core
+dictionary identity when sharing entries.
+
+The wire test compiles a client with only the provider interface
+available. It calls both exported functions, checks the reversed
+dictionary order and both demand cases, and rejects missing or swapped
+evidence. The same interface can carry R24's constrained family version
+and both R22 package markers. The reader still rejects a family use
+without the owner dictionary.
+[Wire test](../../../testsuite/tests/dependent/should_run/NativeScopedDictionaryWire.sh).
+
+
+The private Showcase calls the imported selector under two direct Givens,
+one for a Boolean and one for its wrapper with the opposite behavior.
+The signatures use existing class constraints and keep the two
+`Choose` dictionaries distinct.
+[Showcase provider](../examples/open-evaluation/ScopedClassMethod.hs).
+[Showcase client](../examples/open-evaluation/ScopedClassMethodClient.hs).

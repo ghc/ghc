@@ -157,6 +157,8 @@ data TypeMapX a
              -- See Note [Binders] in GHC.Core.Map.Expr
        , tm_tylit  :: TyLitMap a
        , tm_coerce :: Maybe a
+       , tm_depdict :: TypeMapG (TypeMapG a)
+       , tm_classapp :: DNameEnv (TypeMapG (TypeMapG (TypeMapG (TypeMapG a))))
        }
     -- Note that there is no tyconapp case; see Note [Equality on AppTys] in GHC.Core.Type
 
@@ -181,6 +183,10 @@ each context with the runtime binder. The trie stores visibility, domain, then
 the scoped body. This agrees with DepFunTy equality in GHC.Core.TyCo.Compare.
 It handles nested binders without capturing a free runtime Id. Existing synonym, cast,
 and kind handling remains in place. No index evaluation or unification occurs.
+
+A dependent dictionary uses its predicate and the body in the extended
+scope. A class selector uses the method's global name and the four type
+fields in order. This keeps two different lexical dictionaries distinct.
 
 Agda v2.8.0 represents Var with a de Bruijn index and Pi with an explicit
 binder body. Its Abs equality compares the scoped bodies. These are the
@@ -210,7 +216,8 @@ instance Functor TypeMapX where
     fmap f TM
       { tm_var = tvar, tm_termvar = ttermvar, tm_termapp = ttermapp, tm_depfun = tdepfun, tm_exists = texists
       , tm_app = tapp, tm_tycon = ttycon, tm_forall = tforall
-      , tm_tylit = tlit, tm_coerce = tcoerce } = TM
+      , tm_tylit = tlit, tm_coerce = tcoerce
+      , tm_depdict = tdepdict, tm_classapp = tclassapp } = TM
       { tm_var = fmap f tvar
       , tm_termvar = fmap f ttermvar
       , tm_termapp = fmap (fmap f) ttermapp
@@ -218,7 +225,9 @@ instance Functor TypeMapX where
       , tm_exists = fmap (fmap (fmap f)) texists
       , tm_app = fmap (fmap f) tapp, tm_tycon = fmap f ttycon
       , tm_forall = fmap (fmap (fmap f)) tforall
-      , tm_tylit  = fmap f tlit, tm_coerce = fmap f tcoerce }
+      , tm_tylit  = fmap f tlit, tm_coerce = fmap f tcoerce
+      , tm_depdict = fmap (fmap f) tdepdict
+      , tm_classapp = fmap (fmap (fmap (fmap (fmap f)))) tclassapp }
 
 instance TrieMap TypeMapX where
    type Key TypeMapX = DeBruijn Type
@@ -297,6 +306,13 @@ eqDeBruijnType env_t1@(D env1 t1) env_t2@(D env2 t2) =
                  go (D env (varType v)) (D env' (varType v')) `andEq`
                  go (D (extendCME env v) ty) (D (extendCME env' v') ty')
 
+          (ClassAppTy f inst dict arg kind, ClassAppTy f' inst' dict' arg' kind')
+              -> liftEquality (f == f') `andEq`
+                 gos env env' [inst, dict, arg, kind] [inst', dict', arg', kind']
+          (DepDictTy dict ty, DepDictTy dict' ty')
+              -> go (D env (varType dict)) (D env' (varType dict')) `andEq`
+                 go (D (extendCME env dict) ty) (D (extendCME env' dict') ty')
+
           (TyVarTy v, TyVarTy v')
               -> liftEquality $ eqDeBruijnVar (D env v) (D env' v')
           -- See Note [Equality on AppTys] in GHC.Core.Type
@@ -361,7 +377,9 @@ emptyT = TM { tm_var  = emptyTM
             , tm_tycon  = emptyDNameEnv
             , tm_forall = emptyTM
             , tm_tylit  = emptyTyLitMap
-            , tm_coerce = Nothing }
+            , tm_coerce = Nothing
+            , tm_depdict = emptyTM
+            , tm_classapp = emptyDNameEnv }
 
 -----------------
 lkT :: DeBruijn Type -> TypeMapX a -> Maybe a
@@ -370,6 +388,11 @@ lkT (D env ty) m = go ty m
     go ty | Just ty' <- trieMapView ty = go ty'
     go (TermVarTy v)              = tm_termvar >.> lkVar env v
     go (TermAppTy f arg)          = tm_termapp >.> lkVar env f >=> lkG (D env arg)
+    go (DepDictTy dict ty)       = tm_depdict >.> lkG (D env (varType dict))
+                                               >=> lkG (D (extendCME env dict) ty)
+    go (ClassAppTy f inst dict arg kind)
+      = tm_classapp >.> lkDNamed f >=> lkG (D env inst) >=> lkG (D env dict)
+                                   >=> lkG (D env arg) >=> lkG (D env kind)
     go (ExistsTy flag v ty) = tm_exists >.> Map.lookup flag
                                        >=> lkG (D env (varType v))
                                    >=> lkG (D (extendCME env v) ty)
@@ -399,6 +422,13 @@ xtT (D env ty) f m | Just ty' <- trieMapView ty = xtT (D env ty') f m
 xtT (D env (TermVarTy v))     f m = m { tm_termvar = tm_termvar m |> xtVar env v f }
 xtT (D env (TermAppTy fun arg)) f m
   = m { tm_termapp = tm_termapp m |> xtVar env fun |>> xtG (D env arg) f }
+xtT (D env (DepDictTy dict ty)) f m
+  = m { tm_depdict = tm_depdict m |> xtG (D env (varType dict))
+                                  |>> xtG (D (extendCME env dict) ty) f }
+xtT (D env (ClassAppTy method inst dict arg kind)) f m
+  = m { tm_classapp = tm_classapp m |> xtDNamed method
+                                    |>> xtG (D env inst) |>> xtG (D env dict)
+                                    |>> xtG (D env arg) |>> xtG (D env kind) f }
 xtT (D env (ExistsTy flag v ty)) f m
   = m { tm_exists = tm_exists m |> alterTM flag
                                 |>> xtG (D env (varType v))
@@ -435,12 +465,14 @@ fdT k m = foldTM k (tm_var m)
         . foldTM (foldTM (foldTM k)) (tm_forall m)
         . foldTyLit k (tm_tylit m)
         . foldMaybe k (tm_coerce m)
+        . foldTM (foldTM k) (tm_depdict m)
+        . foldTM (foldTM (foldTM (foldTM (foldTM k)))) (tm_classapp m)
 
 filterT :: (a -> Bool) -> TypeMapX a -> TypeMapX a
 filterT f (TM { tm_var  = tvar, tm_termvar = ttermvar, tm_termapp = ttermapp, tm_depfun = tdepfun, tm_exists = texists
               , tm_app = tapp, tm_tycon = ttycon
               , tm_forall = tforall, tm_tylit = tlit
-              , tm_coerce = tcoerce })
+              , tm_coerce = tcoerce, tm_depdict = tdepdict, tm_classapp = tclassapp })
   = TM { tm_var    = filterTM f tvar
        , tm_termvar = filterTM f ttermvar
        , tm_termapp = fmap (filterTM f) ttermapp
@@ -450,7 +482,9 @@ filterT f (TM { tm_var  = tvar, tm_termvar = ttermvar, tm_termapp = ttermapp, tm
        , tm_tycon  = filterTM f ttycon
        , tm_forall = fmap (fmap (filterTM f)) tforall
        , tm_tylit  = filterTM f tlit
-       , tm_coerce = filterMaybe f tcoerce }
+       , tm_coerce = filterMaybe f tcoerce
+       , tm_depdict = fmap (filterTM f) tdepdict
+       , tm_classapp = fmap (fmap (fmap (fmap (filterTM f)))) tclassapp }
 
 ------------------------
 data TyLitMap a = TLM { tlm_number :: Map.Map Integer a
@@ -735,7 +769,7 @@ mpT :: (a -> Maybe b) -> TypeMapX a -> TypeMapX b
 mpT f (TM { tm_var  = tvar, tm_termvar = ttermvar, tm_termapp = ttermapp, tm_depfun = tdepfun, tm_exists = texists
           , tm_app = tapp, tm_tycon = ttycon
           , tm_forall = tforall, tm_tylit = tlit
-          , tm_coerce = tcoerce })
+          , tm_coerce = tcoerce, tm_depdict = tdepdict, tm_classapp = tclassapp })
   = TM { tm_var    = mapMaybeTM f tvar
        , tm_termvar = mapMaybeTM f ttermvar
        , tm_termapp = fmap (mapMaybeTM f) ttermapp
@@ -745,4 +779,6 @@ mpT f (TM { tm_var  = tvar, tm_termvar = ttermvar, tm_termapp = ttermapp, tm_dep
        , tm_tycon  = mapMaybeTM f ttycon
        , tm_forall = fmap (fmap (mapMaybeTM f)) tforall
        , tm_tylit  = mapMaybeTM f tlit
-       , tm_coerce = tcoerce >>= f }
+       , tm_coerce = tcoerce >>= f
+       , tm_depdict = fmap (mapMaybeTM f) tdepdict
+       , tm_classapp = fmap (fmap (fmap (fmap (mapMaybeTM f)))) tclassapp }
