@@ -2257,25 +2257,20 @@ runProgramChecks libdir = do
             , ("interface pragmas", ["-fno-omit-interface-pragmas"], retainedProgramSource, "interface unfolding generation")
             , ("serialized Core", ["-fwrite-if-simplified-core"], retainedProgramSource, "Core interface serialization")
             , ("late cost centres", ["-fprof-late"], retainedProgramSource, "profiling or late cost-centre insertion")
-            , ("INLINE entry", [], sourceWith ["{-# INLINE entry #-}"], "unfolding construction while desugaring binding")
-            , ("INLINABLE entry", [], sourceWith ["{-# INLINABLE entry #-}"], "unfolding construction while desugaring binding")
             , ("no-code backend", ["-fno-code", "-no-link"], retainedProgramSource, "module compilation without an object or bytecode backend")
             , ("native class default method", [], classSource, "default-method unfolding construction while desugaring binding")
             ]
-    forM_ rejections $ \(label, extraFlags, source, phase) -> do
         -- The make driver catches panics as Failed. Call this phase directly.
-        result <-
-            try
-                ( withProgram extraFlags source $ do
-                    void (GHC.depanal [] False)
-                    summary <- GHC.getModSummary (mkModule mainUnit (mkModuleName "Main"))
-                    parsed <- GHC.parseModule summary
-                    checked <- GHC.typecheckModule GHC.StartAndKeepRunningTcMPlugins parsed
-                    desugared <- GHC.desugarModule checked
-                    environment <- GHC.getSession
-                    liftIO $ void $ hscSimplify environment [] (GHC.coreModule desugared)
-                ) ::
-                IO (Either GhcException ())
+        checkProgram = do
+            void (GHC.depanal [] False)
+            summary <- GHC.getModSummary (mkModule mainUnit (mkModuleName "Main"))
+            parsed <- GHC.parseModule summary
+            checked <- GHC.typecheckModule GHC.StartAndKeepRunningTcMPlugins parsed
+            desugared <- GHC.desugarModule checked
+            environment <- GHC.getSession
+            liftIO $ void $ hscSimplify environment [] (GHC.coreModule desugared)
+    forM_ rejections $ \(label, extraFlags, source, phase) -> do
+        result <- try (withProgram extraFlags source checkProgram) :: IO (Either GhcException ())
         case result of
             Left (Sorry message)
                 | phase `isInfixOf` message
@@ -2284,6 +2279,10 @@ runProgramChecks libdir = do
                 | otherwise -> fail ("FAIL: program rejection " ++ label ++ "; wrong phase: " ++ message)
             Left exception -> fail ("FAIL: program rejection " ++ label ++ "; wrong exception: " ++ displayException exception)
             Right () -> fail ("FAIL: native program accepted " ++ label)
+    forM_ ["INLINE", "INLINABLE"] $ \pragma ->
+        withProgram [] (sourceWith ["{-# " ++ pragma ++ " entry #-}"]) $ do
+            result <- GHC.handleSourceError (pure . Left) (Right <$> checkProgram)
+            checkSourceRejection (pragma ++ " entry") 92256 ("The " ++ pragma ++ " unfolding of") result
     writeFile sourcePath retainedProgramSource
     putStrLn "program rejection checks: ok"
 
