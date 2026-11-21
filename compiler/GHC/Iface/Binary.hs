@@ -523,6 +523,11 @@ coercions. It predates index aliases and erased existentials. An interface
 that also uses either feature needs a distinct header in both declaration
 orders. Each historical reader must reject the mixed payload early.
 
+An independent type lambda root uses its own closed family tag. Mark
+both that tag and the scoped-lambda proof rule in the header. A proof
+can refer entirely to closures from a different interface. Existing
+scoped sum families keep their own tag and feature.
+
 An ordered GADT constructor can put an inferred binder after a field.
 The existing binder flag carries its specificity. Older readers only
 accept specified binders in a late invisible group. Record the new

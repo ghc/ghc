@@ -311,8 +311,9 @@ nominal evidence.
 A type lambda outside a retained sum uses the same scope record. Its
 generated root has its own Name as the owner and the sum flag is False.
 Its generated decisions can carry that owner, but each has a different
-Name. A retained-sum root still has the sum flag. This distinguishes the
-two proof rules without changing the interface encoding for a family.
+Name. A retained-sum root still has the sum flag. The interface has a
+separate tag for a type lambda root, which restores its own Name as the
+owner when GHC reads the declaration.
 -}
 -- | Check alpha-equivalence of two generated retained-sum codomains.
 eqScopedSigmaClosures :: Type -> Type -> Bool
