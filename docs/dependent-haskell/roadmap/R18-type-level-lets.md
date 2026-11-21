@@ -32,11 +32,26 @@ A let RHS can also match a constructor. In
 the case inspects the outer Boolean. Both arguments to `Either` use the
 locally bound result. The provider checks an unused case RHS, and an
 ordinary interface client must know the constructor to prove which result
-type was selected. General case expressions in the body of a let remain
-open. [Agda let scope](https://agda.readthedocs.io/en/v2.8.0/language/let-and-where.html#let-expressions)
+type was selected. The [R19 card](R19-type-level-cases.md#a-case-in-a-let-body)
+describes the cases that can use a let-bound value in their branches. [Agda let scope](https://agda.readthedocs.io/en/v2.8.0/language/let-and-where.html#let-expressions)
 and [Eisenberg and Stolarek on case lifting, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf).
 
 The source form supports one variable per binding and nested lets.
 Binding groups, local patterns, and combining lets with general
 type-level lambdas and cases remain open. Raw Template Haskell type
 quotation reports an error at the let.
+
+## A vector with an optional header
+
+`Frame n b a` binds `width = 1 + n` before matching the flag `b`.
+The header branch returns a `Vec a width`. The other branch returns a
+`Vec a n`. The producer and consumer use the same runtime flag. An
+ordinary client obtains `":xy"` or `"xy"` from the same two cells.
+The second branch leaves the unused header unevaluated.
+[Source](../examples/open-evaluation/TypeLet.hs) and
+[ordinary client and width checks](../../../testsuite/tests/dependent/should_run/NativeTypeLet.sh).
+
+The let RHS keeps its infix syntax for normal fixity resolution. A
+backticked type variable can supply the operator, so the helper
+captures the operator as well as variables from its two operands.
+[GHC's infix type syntax](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/infix_tycons.html).

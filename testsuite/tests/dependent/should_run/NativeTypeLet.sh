@@ -133,7 +133,7 @@ HS
 for opt in -O0 -O2; do
     "${g[@]}" "$opt" -fforce-recomp -c Main.hs
     "${g[@]}" Main.o ../provider/{Operator,TypeLet,PackedVecLibrary}.o -o frame
-    ./frame | grep -Fx '(":xy","xy")'
+    ./frame | grep -Fxq '(":xy","xy")'
 done
 sed -e 's/module Main/module WrongWidth/' -e "s/Frame 2 'True Char :~: Vec Char 3/Frame 2 'True Char :~: Vec Char 2/" Main.hs >WrongWidth.hs
 if "${g[@]}" -c WrongWidth.hs >error.log 2>&1; then exit 1; fi

@@ -456,8 +456,10 @@ unresolved kind variables. For example, both branches of
 The compiler rejects incompatible uses and unresolved variables outside
 the capture scope. Two separate lets can infer different kinds.
 
-The supported RHSs use names, type applications, promoted lists and tuples,
-kind annotations and type literals. A helper can infer the kind of a visible
+The supported RHSs use names, prefix and infix type applications, promoted
+lists and tuples, kind annotations and type literals. An infix operator can
+be a backticked parameter. The [header example](R18-type-level-lets.md#a-vector-with-an-optional-header)
+uses an infix sum. A helper can infer the kind of a visible
 capture. An independent kind parameter remains ambiguous.
 
 In a chain of lets leading to a case, an inner RHS can refer to an
