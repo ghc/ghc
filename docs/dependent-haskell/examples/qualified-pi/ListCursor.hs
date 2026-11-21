@@ -1,4 +1,4 @@
-{-# LANGUAGE ExperimentalDependentTypes, GADTs, LinearTypes, ScopedTypeVariables #-}
+{-# LANGUAGE EmptyCase, ExperimentalDependentTypes, GADTs, LinearTypes, ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications, UndecidableInstances #-}
 
 -- | Store an ordinary list with a position checked against that list.
@@ -22,7 +22,9 @@ cursor xs n = case mkFinGeneric xs n of
 
 -- | Consume a checked position to select the list element.
 readCursor :: Cursor a %1 -> a
-readCursor (Pair xs i) = indexGeneric xs i
+readCursor (Pair [] i) = case i of {}
+readCursor (Pair (x : _) FZ) = x
+readCursor (Pair (_ : xs) (FS i)) = indexGeneric xs i
 
 -- | Package the cursor for a consumer with no knowledge of its representation.
 prepare :: forall a. Cursor a -> Selection a

@@ -3757,7 +3757,8 @@ improveSeq :: (FamInstEnv, FamInstEnv)
 improveSeq fam_envs (saf,env) scrut case_bndr case_bndr1 [Alt DEFAULT _ _]
   | SAF_In <- saf  -- improveSeq extends the substitution; not allowed for SAF_Out
   , Just (Reduction co ty2) <- topNormaliseType_maybe fam_envs (idType case_bndr1)
-  = do { case_bndr2 <- newId (fsLit "nt") ManyTy ty2
+  -- The cast changes the scrutinee type. Preserve the case multiplicity.
+  = do { case_bndr2 <- newId (fsLit "nt") (idMult case_bndr1) ty2
         ; let rhs  = DoneEx (Var case_bndr2 `Cast` mkSymCo co) NotJoinPoint
               env2 = extendIdSubst env case_bndr rhs
         ; return (env2, scrut `Cast` co, case_bndr2) }
