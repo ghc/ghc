@@ -1,6 +1,16 @@
-GadtTrailingFieldScope.hs:8:10: error: [GHC-39999]
+GadtTrailingFieldScope.hs:12:10: error: [GHC-39999]
     • No instance for ‘Eq a’ arising from the literal ‘0’
       Possible fix: add (Eq a) to the context of the data constructor ‘N’
     • In the pattern: 0
       In the pattern: N 0
       In an equation for ‘wrong’: wrong (N 0) = True
+
+GadtTrailingFieldScope.hs:22:15: error: [GHC-39999]
+    • No instance for ‘Typeable a’ arising from a use of ‘inspect’
+      Possible fix:
+        add (Typeable a) to the context of
+          the type signature for:
+            early :: forall {k} (a :: k). Later a a -> String
+    • In the expression: inspect
+      In the pattern: inspect -> name
+      In the pattern: Later (inspect -> name) (type _)

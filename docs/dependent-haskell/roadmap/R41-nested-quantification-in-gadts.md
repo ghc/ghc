@@ -12,6 +12,7 @@
 - [x] Interleave specified forall groups, contexts, and fields in a lifted prefix constructor.
 - [x] Preserve both a leading and a terminal constructor context.
 - [x] Place a required forall between two prefix fields in a lifted constructor.
+- [x] Follow a terminal required forall with a constructor context.
 - [ ] Support the remaining orders of fields, contexts, and quantifiers in prefix constructors.
 
 The [Showcase](../Showcase.hs) defines a constructor with fields of
@@ -129,3 +130,11 @@ from an earlier field is in scope when the required type pattern
 is checked. The [interface client](../../../testsuite/tests/gadt/GadtInteriorForAll.hs)
 checks both forms. The [TH test](../../../testsuite/tests/gadt/GadtInteriorForAllTh.hs)
 round-trips the required group as `ForallVisT`.
+
+In `TypeTag :: Int -> forall a -> Typeable a => TypeTag`, the
+required type and its dictionary follow the field. A pattern of
+the form `TypeTag n (type a)` can use the dictionary in the branch.
+An earlier field pattern cannot use it. The
+[interface client](../../../testsuite/tests/gadt/TerminalGadtContext.hs)
+constructs and matches both an existential and a result-determined
+type with `RequiredTypeArguments` disabled in the client.

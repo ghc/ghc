@@ -1,8 +1,9 @@
-{-# LANGUAGE ExplicitNamespaces, GADTs, Haskell2010, NoExperimentalDependentTypes, RequiredTypeArguments #-}
+{-# LANGUAGE ExplicitNamespaces, GADTs, Haskell2010, NoExperimentalDependentTypes, NoRequiredTypeArguments #-}
 {-# LANGUAGE ScopedTypeVariables, TypeAbstractions, TypeApplications, ViewPatterns #-}
-module LabelledValueClient (labelledValues, labelledPair, storedChecks, rankedPairs, typedNotes) where
+module LabelledValueClient (labelledValues, labelledPair, storedChecks, rankedPairs, typedNotes, typeTags) where
 
-import LabelledValue (LabelledValue(..), LabelledPair(..), StoredCheck(..), RankedPair(..), TypedNote(..))
+import LabelledValue (LabelledValue(..), LabelledPair(..), StoredCheck(..), RankedPair(..), TypedNote(..), TypeTag(..))
+import Type.Reflection (typeRep)
 
 readLabelledValue :: LabelledValue a -> (Int, a)
 readLabelledValue (LabelledValue n @field (value :: field)) = (n, value)
@@ -49,3 +50,11 @@ typedNotes :: ((Int, Bool), (Int, Char))
 typedNotes =
     (readTypedNote (TypedNote 79 (type Bool) True),
      readTypedNote (TypedNote 83 (type Char) 'r'))
+
+readTypeTag :: TypeTag -> (Int, String)
+readTypeTag (TypeTag n (type a)) = (n, show (typeRep @a))
+
+-- | Read the actual type stored by each constructor call.
+typeTags :: ((Int, String), (Int, String))
+typeTags = (readTypeTag (TypeTag 89 (type Bool)),
+            readTypeTag (TypeTag 97 (type Char)))
