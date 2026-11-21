@@ -58,7 +58,7 @@ import GHC.Core.Seq         ( seqBinds )
 import GHC.Core.Opt.Arity   ( exprArity, typeArity, exprBotStrictness_maybe )
 import GHC.Core.InstEnv
 import GHC.Core.Type
-import GHC.Core.TyCo.Rep ( Type(DepFunTy) )
+import GHC.Core.TyCo.Rep ( Type(DepDictTy, DepFunTy) )
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Tidy
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
@@ -1400,7 +1400,8 @@ localiseNativeTopIndices name_cache binds = mapM localise_bind binds
         index_vars = operand_vars `unionVarSet` exprAnnotationFreeVars rhs
         indices = filter (\v -> v `elemVarSet` top_binders
                             && (isNativeIndexId v || isNativeIndexFunctionId v
-                                || (v `elemVarSet` index_vars && isNativeOpaqueValueId v)))
+                                || (v `elemVarSet` index_vars
+                                    && (isNativeOpaqueValueId v || isNativeClassDictionaryId v))))
                          (exprFreeVarsList protected_rhs)
         index_set = mkVarSet indices
 
@@ -1408,6 +1409,10 @@ localiseNativeTopIndices name_cache binds = mapM localise_bind binds
     -- final top-level binder by Unique. See Note [Local indices across Core Tidy].
     protect_calls :: CoreExpr -> (VarSet, CoreExpr)
     protect_calls (App fun arg)
+      | DepDictTy{} <- coreFullView (exprType fun)
+      , Var dict <- arg
+      , isNativeClassDictionaryId dict
+      = App <$> protect_calls fun <*> (unitVarSet dict, arg)
       | DepFunTy{} <- coreFullView (exprType fun)
       , Just index <- retainedArgIndex arg
       = let arg' | not (isEmptyVarSet top_tables), Just{} <- nativeComputedIndex arg
@@ -1450,6 +1455,8 @@ S bottomLength can therefore pass the earlier checks but fail after Tidy:
 exprToNativeIndex requires each variable leaf to be a local unrestricted Id.
 This includes an opaque witness, such as an IO action in a dependent pair.
 Collect its identity from retained operands as well as type annotations.
+The private dictionary application also needs a local evidence ID. Preserve
+the solver's closed evidence under a lazy local alias.
 TermAppTy also requires a local unrestricted function head. Do not extend
 either grammar to arbitrary GlobalIds.
 

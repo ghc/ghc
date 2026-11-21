@@ -260,6 +260,14 @@ debug_ppr_ty _ (TyVarTy tv)
 debug_ppr_ty _ (TermVarTy var)
   = ppr var
 
+debug_ppr_ty prec (ClassAppTy selector inst dict operand _)
+  = maybeParen prec appPrec $
+      ppr selector <+> (char '@' <> debug_ppr_ty appPrec inst)
+        <+> debug_ppr_ty appPrec dict <+> debug_ppr_ty appPrec operand
+debug_ppr_ty prec (DepDictTy var body)
+  = maybeParen prec funPrec $
+      parens (ppr var <+> dcolon <+> debug_ppr_ty topPrec (varType var))
+        <+> darrow <+> debug_ppr_ty topPrec body
 debug_ppr_ty prec (TermAppTy fun arg)
   = maybeParen prec appPrec $ ppr fun <+> debug_ppr_ty appPrec arg
 

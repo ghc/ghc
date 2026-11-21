@@ -481,6 +481,15 @@ inline_generic_eq_type_x syn_flag mult_flag mb_env
               Nothing  -> tv1 == tv2
               Just env -> rnOccL env tv1 == rnOccR env tv2
 
+      (ClassAppTy f1 a1 d1 x1 k1, ClassAppTy f2 a2 d2 x2 k2)
+        -> f1 == f2 && gos [a1, d1, x1, k1] [a2, d2, x2, k2]
+
+      (DepDictTy v1 body1, DepDictTy v2 body2)
+        -> case mb_env of
+             Nothing -> generic_eq_type_x syn_flag mult_flag (Just (initRnEnv t1 t2)) t1 t2
+             Just env -> go (varType v1) (varType v2)
+                      && generic_eq_type_x syn_flag mult_flag (Just (rnBndr2 env v1 v2)) body1 body2
+
       (TermAppTy f1 a1, TermAppTy f2 a2)
         -> (case mb_env of
               Nothing -> f1 == f2
@@ -567,6 +576,8 @@ hasCasts :: Type -> Bool
 hasCasts (CastTy {})     = True
 hasCasts (CoercionTy {}) = True
 hasCasts (AppTy t1 t2)   = hasCasts t1 || hasCasts t2
+hasCasts (ClassAppTy _ inst dict operand kind) = any hasCasts [inst, dict, operand, kind]
+hasCasts (DepDictTy b body) = hasCasts (varType b) || hasCasts body
 hasCasts (TermAppTy _ arg) = hasCasts arg
 hasCasts (ForAllTy ma _ ty) = hasCasts ma || hasCasts ty
 hasCasts (ExistsTy _ v ty) = hasCasts (varType v) || hasCasts ty
@@ -812,6 +823,10 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
 
     go env (TyVarTy tv1)       (TyVarTy tv2)
       = liftOrdering $ rnOccL env tv1 `nonDetCmpVar` rnOccR env tv2
+    go env (ClassAppTy f1 a1 d1 x1 k1) (ClassAppTy f2 a2 d2 x2 k2)
+      = liftOrdering (f1 `nonDetCmpVar` f2) `thenCmpTy` gos env [a1, d1, x1, k1] [a2, d2, x2, k2]
+    go env (DepDictTy v1 t1) (DepDictTy v2 t2)
+      = go env (varType v1) (varType v2) `thenCmpTy` go (rnBndr2 env v1 v2) t1 t2
     go env (TermAppTy f1 a1) (TermAppTy f2 a2)
       = liftOrdering (rnOccL env f1 `nonDetCmpVar` rnOccR env f2)
         `thenCmpTy` go env a1 a2
@@ -873,6 +888,8 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
             get_rank (ForAllTy {})   = 7
             get_rank (DepFunTy {})   = 8
             get_rank (ExistsTy {})   = 11
+            get_rank (DepDictTy {})  = 12
+            get_rank (ClassAppTy {}) = 13
 
     gos :: RnEnv2 -> [Type] -> [Type] -> TypeOrdering
     gos _   []         []         = TEQ
@@ -1022,6 +1039,9 @@ mayLookIdentical orig_ty1 orig_ty2
           do { kind_ok <- tell_on_mismatch InvisibleKind $ go env False (typeKind ty) (tyVarKind tv)
              ; return $ not kind_ok }
     go _ _ (TyVarTy {}) (TyVarTy {}) = return False
+
+    go env _top t1@ClassAppTy{} t2@ClassAppTy{} = return (eqTypeX env t1 t2)
+    go env _top t1@DepDictTy{} t2@DepDictTy{} = return (eqTypeX env t1 t2)
 
     go env _top (TermAppTy f1 a1) (TermAppTy f2 a2)
       | rnOccL env f1 == rnOccR env f2 = go env False a1 a2

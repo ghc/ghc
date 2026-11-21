@@ -1,6 +1,9 @@
 form an associated family type from its class evidence: (Refl,Refl,True)
 form an expression annotation with the matched dictionary: True
 pass an associated type as a specified and a required argument: (True,False)
+use two caller dictionaries in imported dependent results: ((True,False),(False,True))
+read a scoped method through a Haskell 2010 client: ((True,False),(False,True))
+compare zero under two caller dictionaries: [(LT,LT),(EQ,LT),(GT,LT)]
 render a field with evidence for its runtime flag: (Just "x",Nothing)
 format a field with a polymorphic consumer: (Just "[x]",Nothing)
 choose a field domain with a required type argument: ("True","x")
