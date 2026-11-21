@@ -3250,9 +3250,13 @@ tcIfaceAxiomRule :: IfaceAxiomRule -> [Coercion] -> IfL CoAxiomRule
 -- built-in rules have stable names in builtInCoAxiomRules.
 tcIfaceAxiomRule (IfaceAR_X n) args
   | key == fsLit "AppendSymbolT3"
-  = read_append_symbol_rule append_symbol_rules
+  = read_deduction "AppendSymbol" append_symbol_rules
   | key `elem` append_symbol_rules
-  = read_append_symbol_rule [key]
+  = read_deduction "AppendSymbol" [key]
+  | key == fsLit "CharToNatT1"
+  = read_deduction "character conversion" character_rules
+  | key `elem` character_rules
+  = read_deduction "character conversion" [key]
   | Just axr <- lookupUFM builtInCoAxiomRules key
   = return axr
   | otherwise
@@ -3260,34 +3264,43 @@ tcIfaceAxiomRule (IfaceAR_X n) args
   where
     key = ifLclNameFS n
     append_symbol_rules = [fsLit "AppendSymbolKnownPrefix", fsLit "AppendSymbolKnownSuffix"]
+    character_rules = [fsLit "CharToNatDeduction", fsLit "NatToCharDeduction"]
 
-    -- See Note [AppendSymbol deductions in interfaces].
-    read_append_symbol_rule candidates = case args of
-      [arg] | coercionRole arg == Nominal ->
+    -- See Note [Built-in deduction keys in interfaces].
+    read_deduction family candidates = case args of
+      [arg] | coercionRole arg == Nominal
+            , let premise = coercionKind arg ->
         case [ rule
              | candidate <- candidates
              , Just rule@(BuiltInFamInj inj) <- [lookupUFM builtInCoAxiomRules candidate]
-             , isJust (bifinj_proves inj (coercionKind arg)) ] of
+             , isJust (bifinj_proves inj premise) ] of
           [rule] -> return rule
           []     -> invalid
-          _      -> failIfM (text "Ambiguous legacy AppendSymbol deduction in interface. Recompile the producer.")
+          _      -> failIfM (text "Ambiguous legacy" <+> text family
+                              <+> text "deduction in interface. Recompile the producer.")
       _ -> invalid
-
-    invalid = failIfM (text "Invalid AppendSymbol deduction in interface:" <+> ppr n)
+      where
+        invalid = failIfM (text "Invalid" <+> text family <+> text "deduction in interface:" <+> ppr n)
 tcIfaceAxiomRule (IfaceAR_U name)   _ = do { ax <- tcIfaceUnbranchedAxiom name; return (UnbranchedAxiom ax) }
 tcIfaceAxiomRule (IfaceAR_B name i) _ = do { ax <- tcIfaceBranchedAxiom name;   return (BranchedAxiom ax i) }
 
-{- Note [AppendSymbol deductions in interfaces]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Built-in deduction keys in interfaces]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Older modules wrote the same name, AppendSymbolT3, for the two rules that
 remove a known prefix or suffix. The rule table kept only one entry. An
 optimized client could read the other rule and panic in coercionKind.
+CharToNat and NatToChar deductions likewise shared CharToNatT1.
 
-Read the nominal premise before selecting the rule. Both rules compare
-literals, so a substitution can make a second rule applicable. It cannot
-invalidate the first rule. Recover the legacy rule only when exactly one
-rule applies. With two applicable rules the old interface does not specify
+Read the nominal premise before selecting the rule. For AppendSymbol,
+substitution can make both rules applicable. It cannot invalidate the
+first rule. With two applicable rules the old interface does not specify
 which operand the proof equates. Reject it before constructing AxiomCo.
+
+The character conversion rules have disjoint premises. The left endpoint
+must have the specified type family head and the right endpoint must
+be a literal of the corresponding result kind. The family check in
+mkTopUnaryFamDeduction must return Nothing for the other family because
+this lookup tries both rules.
 
 Fresh modules write distinct rule names. Older readers reject an unknown
 name when they load an affected unfolding. The ordinary interface format

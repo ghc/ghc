@@ -290,7 +290,9 @@ mkTopUnaryFamDeduction str fam_tc f
       , bifinj_axr    = BuiltInFamInj bif
       , bifinj_proves = \(Pair lhs rhs)
                         -> do { (tc, [a]) <- splitTyConApp_maybe lhs
-                              ; massertPpr (tc == fam_tc) (ppr tc $$ ppr fam_tc)
+                              -- See Note [Built-in deduction keys in interfaces]
+                              -- in GHC.IfaceToCore.
+                              ; guard (tc == fam_tc)
                               ; f a rhs } }
 
 mkTopBinFamDeduction :: String -> TyCon
@@ -912,7 +914,7 @@ axCharToNatRewrites
 axCharToNatInjectivity :: [BuiltInFamInjectivity]
 axCharToNatInjectivity
   = [ -- (CharToNat c ~ 122) => (c ~ 'z')
-      mkTopUnaryFamDeduction "CharToNatT1" typeCharToNatTyCon $ \c r ->
+      mkTopUnaryFamDeduction "CharToNatDeduction" typeCharToNatTyCon $ \c r ->
       do { nr <- isNumLitTy r; chr <- integerToChar nr; return (Pair c (mkCharLitTy chr)) } ]
 
 -------------------------------------------------------------------------------
@@ -945,7 +947,7 @@ axNatToCharRewrites
 axNatToCharInjectivity :: [BuiltInFamInjectivity]
 axNatToCharInjectivity
   = [ -- (NatToChar n ~ 'z') => (n ~ 122)
-      mkTopUnaryFamDeduction "CharToNatT1" typeNatToCharTyCon $ \n r ->
+      mkTopUnaryFamDeduction "NatToCharDeduction" typeNatToCharTyCon $ \n r ->
       do { c <- isCharLitTy r; return (Pair n (mkNumLitTy (charToInteger c))) } ]
 
 
