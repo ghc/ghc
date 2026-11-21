@@ -20,9 +20,10 @@ shared inputs first. A thin archive refers to the original objects, so keep
 those objects until its last consumer has finished linking.
 
 The local retention timer checks allocated bytes under the main `_build`
-every 15 minutes. At 200 GB (200,000,000,000 bytes), it collects eligible
-products under `_build/verification`. It recognizes completed native API test
-drivers and uses the existing expiry rule for old native test programs.
+every 15 minutes. At 200 GB (200,000,000,000 bytes), it collects all eligible
+products it found under `_build/verification`. It finishes that list even if
+usage falls below 200 GB during the pass. It recognizes completed native API
+test drivers and uses the existing expiry rule for old native test programs.
 It also removes a testsuite's `tmp/ghctest-*` directory when the test names
 and timestamps match a successful summary and JUnit report. It keeps both
 reports and checks for live, queued and linked users before removal.
