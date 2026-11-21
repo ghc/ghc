@@ -1350,6 +1350,8 @@ main = do
     observe "project twice from the same package producer call" (map RankedPackageClient.projectAt [True,False])
     observe "infer a polymorphic lambda witness and call its builder at Int" (RankedPackage.runBuilder 11)
     observe "infer a guarded callback and skip an unused input" RankedPackageClient.runGuarded
+    observe "infer a hidden callback type from an application argument"
+        (map RankedPackageClient.runArgumentWitness [False, True])
     observe "infer one callback type for both arms of a conditional producer"
         ( RankedPackageClient.runConditional chooseLeft (error "unused conditional input")
         , RankedPackageClient.runConditional chooseRight True )

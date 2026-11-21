@@ -746,6 +746,11 @@ result arm. A pattern guard can refine its own arm after witness selection.
 Leading visible type applications can choose input types when the
 declared result type is independent of the supplied type arguments.
 The ordinary checker checks those applications at their source spans.
+For `\b -> id (prepare b)`, Quick Look finds the result
+`Callback PolyId` from the argument of `id`. The enclosing package
+uses `PolyId` as its witness. The normal lambda check then checks
+the application and its operands at their original locations.
+[Argument-driven witness](../examples/erased-existentials/RankedPackageClient.hs).
 An explicitly marked required argument can also select the witness.
 For example `\b -> (withWitness @Int (type PolyId) Proxy) id (use b)`
 reads the closed `PolyId` synonym from the producer interface.

@@ -1,6 +1,6 @@
 {-# LANGUAGE BangPatterns, LinearTypes, MonoLocalBinds, ImpredicativeTypes, LambdaCase, NoExperimentalDependentTypes, RequiredTypeArguments, ScopedTypeVariables #-}
 module RankedPackageClient
-    ( runGuarded, runConditional, runProjections, projectAt, runDeclaredWitnesses, runExplicitBranches
+    ( runGuarded, runConditional, runArgumentWitness, runProjections, projectAt, runDeclaredWitnesses, runExplicitBranches
     , runMixedPackage, runProducedPackage, runForwardedPackage, runLabelledPackage
     , runSelectedPackage, firstSelected, firstSelectedFilter, firstByOrdering, firstForwarded, runLocalPattern, readCount, refilter, refilterRows, refilterNumericZip
     ) where
@@ -48,6 +48,14 @@ runConditional flag input =
             then Callback id atTwoTypes
             else if ready then consumeIdentity id else error "selected conditional arm")
         flag input
+
+-- | Infer the hidden callback type from the argument of id.
+runArgumentWitness :: Bool -> (Int, Bool)
+runArgumentWitness flag =
+    observeGuarded (\_ input -> id (prepare input)) True flag
+  where
+    prepare :: Bool -> Callback PolyId
+    prepare input = Callback @PolyId id (\f -> (f 7, f input))
 
 -- | Read one witness from a type argument and two from separate equations.
 runDeclaredWitnesses :: ((Int, Bool), ((Int, Bool), (Int, Bool)))
