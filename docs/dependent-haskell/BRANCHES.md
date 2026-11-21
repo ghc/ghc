@@ -76,3 +76,30 @@ the following command.
 git worktree add --detach /tmp/ghc-mixed-packages \
   refs/archive/dependent-haskell/streams-20261121/retired/main/codex/r22-mixed-spine
 ```
+
+Keep a full checkout only while an experiment uses it. After the last
+test, save local edits, verify the recovery revision in the primary
+repository, and remove the working copy. Rebuild the compiler on demand.
+
+To replay a retired checkout, find its original path and revision in
+`checkout-recovery.tsv` under
+`~/.local/state/ghc-build-retention/evidence/source-checkouts-20261121/`.
+Use the snapshot ref in that row if you need its uncommitted changes.
+Run these commands from the primary repository with the chosen revision.
+
+```sh
+git worktree add --detach /tmp/ghc-replay "$revision"
+git -C /tmp/ghc-replay submodule update --init --recursive
+```
+
+The published commits are on the fork. The additional experimental
+revisions have local archive refs and recovery bundles. The source
+checkout bundle uses published commit `1c243406e9` as its prerequisite.
+
+Some experiments copied individual files without a Git checkout. Their
+manifest records each file's old path, mode, and blob. Read the restore
+instructions from the local archive with this command.
+
+```sh
+git show refs/archive/dependent-haskell/source-copy-recovery/markerless-20261121-with-fixtures:README.md
+```
