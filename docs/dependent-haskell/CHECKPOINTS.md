@@ -35,6 +35,10 @@ witness and diagnostic tests. Its 437 Showcase rows matched at native
 `-O0`, `-O1`, `-O2` and in GHCi. A source-hidden Safe client passed
 `(type Bool)` at an expected `TypeRep`. The negative test reports a
 missing `Typeable a` at the written type operand.
+The follow-up diagnostic names `Type.Reflection.TypeRep` when the caller
+expects a local type with the same name. A bare operand with no expected
+type requests a signature. All four registered tests and the 437-row
+Showcase passed in the same modes.
 
 At `4910df774c`, a regular Hadrian Stage 2 rebuilt the stock Base, List
 and Foldable modules with Core and STG Lint. The installed list interface
