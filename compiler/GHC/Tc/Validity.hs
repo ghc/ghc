@@ -1,3 +1,5 @@
+{-# LANGUAGE RecursiveDo #-}
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -20,8 +22,8 @@ import GHC.Data.FastString
 import GHC.Data.Maybe
 
 -- friends:
-import GHC.Tc.Utils.Unify    ( checkConstraints, tcSubTypeAmbiguity, tcSkolemiseGeneral
-                              , DeepSubsumptionFlag(Shallow), unifyTypeAndEmit )
+import GHC.Tc.Utils.Unify    ( checkConstraints, tcSubTypeAmbiguity, unifyTypeAndEmit )
+import GHC.Tc.Utils.Instantiate ( tcInstSkolTyVarsX )
 import GHC.Tc.Solver         ( simplifyAmbiguityCheck, pushLevelAndSolveEqualities )
 import GHC.Tc.Solver.Monad   ( runTcS )
 import GHC.Tc.Solver.Solve   ( solveWanteds )
@@ -34,7 +36,7 @@ import GHC.Tc.Types.Rank
 import GHC.Tc.Errors ( reportAllUnsolved )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Constraint ( userTypeError_maybe, mkNonCanonical )
-import GHC.Tc.Utils.TcMType (newWanted)
+import GHC.Tc.Utils.TcMType (newEvVars, newWanted)
 import GHC.Tc.Types.TH ( ThLevel(Comp) )
 import GHC.Tc.Utils.Env (tcLookupId, tcLookupLcl_maybe, tcExtendIdEnv)
 import GHC.Tc.Utils.TcType
@@ -496,12 +498,18 @@ checkConstrainedSignature ctxt ty
     check_telescope origin whole = go whole
       where
         go sig
-          | not (isSigmaTy sig) = check_body sig
-          | otherwise
-          = do { let (bndrs, theta, _) = tcSplitSigmaTy sig
-               ; traverse_ (checkNoConstrainedFamilyApps . varType . snd) bndrs
-               ; traverse_ checkNoConstrainedFamilyApps theta
-               ; void $ tcSkolemiseGeneral Shallow origin whole sig $ \_ rho -> check_body rho }
+          | (bndrs, phi) <- tcSplitForAllTyVarBinders sig
+          , let (theta, rho) = tcSplitPhiTy phi
+          , not (null bndrs && null theta)
+          = do { let tvs = map (binderVar . snd) bndrs
+                     in_scope = mkInScopeSet (tyCoVarsOfType sig)
+               ; traverse_ checkNoConstrainedFamilyApps (map fst bndrs ++ map varType tvs ++ theta)
+               ; rec { skol_info <- mkSkolemInfo origin_info
+                     ; (subst, skols) <- tcInstSkolTyVarsX skol_info (mkEmptySubst in_scope) tvs
+                     ; let origin_info = SigSkol origin whole (map tyVarName tvs `zip` skols) }
+               ; given <- newEvVars (substTheta subst theta)
+               ; void $ checkConstraints origin_info skols given (go (substTy subst rho)) }
+          | otherwise = check_body sig
 
         check_body (DepFunTy _ index body)
           = do { check_part (varType index)
@@ -607,6 +615,11 @@ of Elem c inside the callback. The result cannot use this Given. Report
 an unsolved constraint on c against the callback. Suggesting it on the
 enclosing function would put c outside its scope.
 See Note [Setting the argument context] in GHC.Tc.Utils.Unify.
+
+A required type argument has the same scope as a specified type argument.
+Skolemise both when checking formation. Do not build a runtime type-lambda
+wrapper for a family occurrence in a type. See Note [Ambiguity skolemisation is not runtime abstraction]
+in GHC.Tc.Utils.Instantiate.
 
 The nested checks share the signature's formation check, including its
 treatment of unsolved premises under deferred type errors. See
