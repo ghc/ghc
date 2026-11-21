@@ -7547,3 +7547,16 @@ GHC's rules for overlap and type families.
 [GHC type family compatibility](https://downloads.haskell.org/ghc/latest/docs/users_guide/exts/type_families.html#compatibility-and-apartness-of-type-family-equations),
 [Agda 2.8 instance resolution](https://agda.readthedocs.io/en/v2.8.0/language/instance-arguments.html#instance-resolution)
 and [the stream instances](examples/erased-existentials/StreamPreview.hs).
+
+## Evidence for a retained predicate on a lifted input
+
+Agda's standard library defines `T? x` with result type `Dec (T x)`.
+The result records the Boolean and evidence for the corresponding
+proposition. In the fork, `decideBy f x` returns `BooleanResult (f x)`.
+Matching its constructors tells the caller which Boolean the Haskell
+callback returned on this input. The callback keeps ordinary Haskell
+evaluation and can diverge. GHC proposal #378 sketches retention and
+substitution at dependent application in sections 1.4.4 and 1.4.7.
+[Agda's Boolean decision](https://agda.github.io/agda-stdlib/master/Relation.Nullary.Decidable.Core.html),
+[GHC proposal #378](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#dependent-application-and-the-static-subset)
+and [Haskell predicate](examples/open-evaluation/PreludeFilterRuntime.hs).

@@ -2,7 +2,7 @@
 module PreludeFilterCutoff (CutoffBound(..), decideRow, packCutoff, showCutoffBound) where
 
 import PreludeFilterLengthProof (AtMost)
-import PreludeFilterRuntime (BooleanResult(..), runtimeFilterBoundFor)
+import PreludeFilterRuntime (BooleanResult, decideBy, runtimeFilterBoundFor)
 import PreludeFilterSource (FilterWith)
 import PreludeMapLengthSize (Size(..), size)
 import PreludeMapLengthSource (Count)
@@ -20,9 +20,7 @@ fits cutoff row = atMostSize (size row) cutoff
 -- | Use the actual local predicate as the index of its decision.
 decideRow :: foreach (f :: [Bool] -> Bool)
           -> foreach (row :: [Bool]) -> BooleanResult (f row)
-decideRow f row = case f row of
-    True -> IsTrue
-    False -> IsFalse
+decideRow f row = decideBy @[Bool] f row
 
 -- | Store the captured predicate, the input rows, and their filter size bound.
 data CutoffBound where
