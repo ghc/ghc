@@ -148,6 +148,10 @@ test('TerminalGadtTh',
      [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal']),
       extra_files(['TerminalGadtThProvider.hs'])],
      run_command, ['bash TerminalGadtTh.sh "{compiler}" "{libdir}"'])
+test('TerminalGadtContextTh',
+     [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal']),
+      extra_files(['TerminalGadtTh.sh', 'TerminalGadtContextProvider.hs'])],
+     run_command, ['bash TerminalGadtTh.sh "{compiler}" "{libdir}" TerminalGadtContextTh TerminalGadtContextProvider'])
 test('TerminalGadtThBadMultiplicity', req_th, compile_fail, [''])
 test('GadtTrailingContext', extra_files(['GadtTrailingContextProvider.hs']),
      makefile_test, [])
