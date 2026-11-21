@@ -510,7 +510,9 @@ and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vecto
    independent higher-rank callback can be another argument to that
    call. A selector can use several operands with the same closed
    package type. A binder kind can determine an earlier reader parameter. The
-   list-to-vector producer carries a computed witness.
+   list-to-vector producer carries a computed witness. A reader can open
+   the result of a `case` on three packages. With `ImpredicativeTypes`,
+   `toList (id xs)` also opens the forwarded package around the reader.
    [Mixed package readers](roadmap/R22-existential-quantification.md#a-package-with-nested-dot-binders),
    [Retained list pairs](roadmap/R04-dependent-sums.md),
    [Guarded witness](roadmap/R22-existential-quantification.md#inferring-a-higher-rank-witness),

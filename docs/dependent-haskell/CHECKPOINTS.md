@@ -48,6 +48,22 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At revision `e5f162cbec`, an ordinary client passes a three-way `case`
+directly to a vector reader. Only the selected vector is evaluated.
+With `ImpredicativeTypes`, the client can also write `toList (id xs)`
+when `xs` carries a hidden length. GHC opens the package around the
+reader call. A constructor can require `Ord a` before a field and expose
+`a ~ Int` after it. A view pattern on the field can use the first
+constraint. The branch body can use both.
+
+The 484 Showcase outputs matched at native O0, O1, O2 and in source-loaded
+GHCi. The compiler passed 38 constructor, existential and impredicativity
+tests, the retained-family domain test and all 37 GHC API observations.
+The previous compiler rejects a new leading-and-terminal context layout
+when it imports the interface.
+[Ordinary vector client](examples/erased-existentials/RankedPackageClient.hs)
+and [constructor example](examples/open-evaluation/LabelledValue.hs).
+
 At compiler revision `95182f6deb`, a client can pass a conditional
 directly to an ordinary vector reader. The operands can be two named
 packages or two polymorphic producers such as `filterVec`. GHC checks
