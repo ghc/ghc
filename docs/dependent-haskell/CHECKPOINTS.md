@@ -45,6 +45,23 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At compiler revision `00c3df07d4`, a local producer's signature can
+mention a closed family with a standalone kind signature before GHC
+checks the imported family equation that uses the producer. The
+stripped-interface client returned `True` at O0 and O2. A genuine cycle
+through the kind signature still reports GHC-70566.
+[Signed family example](examples/open-evaluation/FamilySignature.hs).
+
+The same compiler reconstructs both prefix and suffix deductions for
+`AppendSymbol` from old optimized interfaces when the premise identifies
+one rule. A fresh producer records the direction explicitly. An older
+reader can link the fresh object with interface pragmas ignored. Both
+readers retain the ordinary type mismatch for a wrong result index on
+the supported paths. Six registered cases and all 474 optimized Showcase
+rows passed. [Source test](../../testsuite/tests/typecheck/should_run/AppendSymbolDeductionReadback.hs)
+and [proof selection check](../../testsuite/tests/ghc-api/AppendSymbolDeductionIface.hs).
+
+
 At compiler revision `e59256cf58`, a prefix GADT accepts one specified
 `forall` between two value fields. An ordinary client of a stripped
 interface chooses `@Bool` or `@Char` after the first field and observes
