@@ -50,7 +50,7 @@ import GHC.Tc.Zonk.TcType
 
 import GHC.Core.Class ( Class, classTyVars )
 import GHC.Core.ConLike ( ConLike(..) )
-import GHC.Core.DataCon ( dataConConcreteTyVars, dataConFullSig, dataConName, isNewDataCon, dataConOrigArgTys, dataConRepArgBinders, dataConTyCon, dataConWorkId, dataConWrapId )
+import GHC.Core.DataCon ( dataConConcreteTyVars, dataConFullSig, dataConName, isNewDataCon, dataConOrigArgTys, dataConOrigResTy, dataConRepArgBinders, dataConTyCon, dataConUserTyVars, dataConWorkId, dataConWrapId )
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr, supportsQuickLookType )
 import GHC.Core.FamInstEnv (FamInstEnvs, reduceTyFamApp_maybe)
@@ -3449,10 +3449,20 @@ tcRetainedArg domain arg
     -- Instantiate the erased parameters from the complete expected domain.
     constructor expected dc = case nativeIndexDataConTyArgs expected dc of
       Just tys -> return (Core.mkTyApps (Core.Var (dataConWorkId dc)) tys)
-      Nothing -> case Core.nativeIndexedConApp_maybe expected dc of
+      Nothing -> case indexed expected of
         Just app -> return app
         Nothing -> do { refined <- tcRetainedDeclaredTypeView expected
-                      ; maybe unsupported return (Core.nativeIndexedConApp_maybe refined dc) }
+                      ; maybe unsupported return (indexed refined) }
+      where
+        indexed domain = do
+          let tvs = dataConUserTyVars dc
+              bind tv _ | tv `elem` tvs = BindMe
+                        | otherwise     = DontBindMe
+          subst <- tcMatchTyX_BM bind Subst.emptySubst (dataConOrigResTy dc) domain
+          tys <- traverse (Subst.lookupTyVar subst) tvs
+          guard (substTyWith tvs tys (dataConOrigResTy dc) `eqType` domain)
+          (prefix, _) <- Core.nativeIndexedConArgs dc tys
+          return (Core.mkApps (Core.Var (dataConWorkId dc)) prefix)
 
     resolve_app :: NameEnv Id -> Type -> LHsExpr GhcRn -> LHsExpr GhcRn
                 -> TcM (Core.CoreExpr, LHsExpr GhcRn, LHsExpr GhcRn)

@@ -58,7 +58,7 @@ import GHC.Core.TyCon hiding ( pprPromotionQuote )
 import GHC.Core.Coercion.Axiom
 import GHC.Core.DataCon
 import GHC.Core.Type
-import GHC.Core.Utils (exprType)
+import GHC.Core.Utils (applyTypeToArgs, exprType)
 import GHC.Core.Multiplicity
 import GHC.Core.PatSyn
 import GHC.Core.TyCo.Rep
@@ -677,13 +677,13 @@ toIfaceExpr (Unpack witness value package body)
 toIfaceExpr (App f a)       = toIfaceApp f [a]
 toIfaceExpr (Case s x ty as)
   | null as                 = IfaceECase (toIfaceExpr s) (toIfaceType ty)
-  | otherwise               = IfaceCase scrut (mkIfLclName (getOccFS x)) (map toIfaceAlt as)
+  | otherwise               = IfaceCase scrut (mkIfLclName (getOccFS x))
+                                  (map toIfaceAlt as)
   where
     -- Inlining a retained application can leave a constructed scrutinee.
     -- The branch proof then requires the same reader support as the application.
     scrut | any (\alt -> isNativeIndexAlt alt || isNativeIndexAliasAlt alt) as
-          , containsIndexedConOperand s
-          = IfaceIndexedConArg (toIfaceExpr s)
+          = toIfaceRetainedOperand s
           | otherwise = toIfaceExpr s
 toIfaceExpr (Let b e)       = IfaceLet (toIfaceBind b) (toIfaceExpr e)
 toIfaceExpr (Cast e co)     = IfaceCast (toIfaceExpr e) (toIfaceCoercion co)
@@ -789,19 +789,29 @@ toIfaceApp (Var v) as
             tup_args  = map toIfaceExpr val_args
             tc        = dataConTyCon dc
 
-        _ -> mkIfaceApps (Var v) (toIfaceVar v) as
+        _ -> mkIfaceApps (idType v) (toIfaceVar v) as
 
-toIfaceApp e as = mkIfaceApps e (toIfaceExpr e) as
+toIfaceApp e as = mkIfaceApps (exprType e) (toIfaceExpr e) as
 
-mkIfaceApps :: CoreExpr -> IfaceExpr -> [CoreExpr] -> IfaceExpr
+mkIfaceApps :: Type -> IfaceExpr -> [CoreExpr] -> IfaceExpr
 mkIfaceApps _ iface [] = iface
-mkIfaceApps fun iface (arg : rest)
-  = mkIfaceApps (App fun arg) (IfaceApp iface encoded) rest
+mkIfaceApps ty iface (arg : rest)
+  = mkIfaceApps result (IfaceApp iface encoded) rest
   where
-    encoded | containsIndexedConOperand arg
-            , DepFunTy{} <- coreFullView (exprType fun)
-            = IfaceIndexedConArg (toIfaceExpr arg)
+    result = case coreFullView ty of
+      FunTy { ft_res = body } -> body
+      _ -> applyTypeToArgs ty [arg]
+    encoded | not (isTyCoArg arg), DepFunTy{} <- coreFullView ty
+            = toIfaceRetainedOperand arg
             | otherwise = toIfaceExpr arg
+
+-- | Mark the constructor capabilities that the reader needs for this index.
+toIfaceRetainedOperand :: CoreExpr -> IfaceExpr
+toIfaceRetainedOperand arg
+  | containsGeneralIndexedConOperand arg = IfaceIndexedConArg IfaceGeneralIndexedCon encoded
+  | containsIndexedConOperand arg        = IfaceIndexedConArg IfaceSimpleIndexedCon encoded
+  | otherwise                            = encoded
+  where encoded = toIfaceExpr arg
 
 ---------------------
 toIfaceVar :: Id -> IfaceExpr

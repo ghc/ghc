@@ -1140,7 +1140,8 @@ nameNativeConstructorArgs expr
     needs_names ty (arg : rest)
       | DepFunTy {} <- coreFullView ty
       , not (exprIsTrivial arg)
-      , Just {} <- normaliseNativeIndexExpr arg = True
+      , Just {} <- normaliseNativeIndexExpr arg
+      , Nothing <- nativeDeferredArgIndex arg = True
       | otherwise = needs_names (applyTypeToArgs ty [arg]) rest
 
     build ty app transport wrap []
@@ -1148,7 +1149,7 @@ nameNativeConstructorArgs expr
            ; return (wrap (mkCast app (mkSubCo co))) }
     build ty app transport wrap (arg : rest)
       | DepFunTy _ index _ <- coreFullView ty
-      , Just call_index <- nativeComputedIndex arg
+      , Just call_index <- nativeDeferredArgIndex arg
       -- See Note [Naming computed retained arguments at erasure].
       = if typeKind call_index `eqType` varType index
         then build (applyTypeToArgs ty [arg]) (App app arg) transport wrap rest
@@ -1211,7 +1212,7 @@ nameNativeIndexArg result_ty arg
   where
     name_constructor normal index
       | Just (con, tys, build, fields) <- nativeConFields_maybe normal
-      , not (null fields)
+      , not (null fields) || isNativeConstructedGadtIndex index
       = do { (scrut, field_co, wrap_fields) <-
                  nameNativeConFields result_ty con tys build fields
            ; let scrut_index = coercionLKind field_co
@@ -1270,6 +1271,7 @@ prepareNativeCaseScrutinee ty (App (Var fun) arg)
 prepareNativeCaseScrutinee ty scrut
   | Just (con, tys, build, fields) <- nativeConFields_maybe scrut
   , any (not . exprIsTrivial) fields
+  , Just _ <- exprToNativeCaseIndex scrut
   = Just (nameNativeConFields ty con tys build fields)
   | otherwise = Nothing
 
@@ -1654,10 +1656,10 @@ cpeApp top_env expr
       AIApp arg
         | cp_allowNativeDependent (cpe_config env)
         , DepFunTy {} <- coreFullView (exprType fun')
-        , Just index <- nativeComputedIndex arg
+        , Just index <- nativeDeferredArgIndex arg
         -- See Note [Naming computed retained arguments at erasure].
         -> let call = prepare_computation arg in
-           case nativeComputedIndex call of
+           case nativeDeferredArgIndex call of
              Just index' | index' `eqType` cpSubstTy env index
                -> rebuild_app' env as (App fun' call) floats (drop 1 ss) rt_ticks (req_depth-1)
              _ -> throwGhcException (Sorry
@@ -1666,6 +1668,7 @@ cpeApp top_env expr
           prepare_computation (App f a) = App (prepare_computation f) (prepare_computation a)
           prepare_computation (Tick tick@HpcTick{} body) = Tick tick (prepare_computation body)
           prepare_computation (Type ty) = Type (cpSubstTy env ty)
+          prepare_computation (Coercion co) = Coercion (cpSubstCo env co)
           prepare_computation (Var v) = lookupCorePrepEnv env v
           prepare_computation e = pprPanic "CorePrep: malformed retained computation" (ppr e)
 
@@ -1718,6 +1721,11 @@ thunk. This includes nested certified calls and constructors over calls.
 Each binding retains the actual source head and fields. No binding floats
 out of its enclosing computation. A nested call runs only when its caller
 demands that operand.
+
+A retained GADT constructor can determine a later witness or equality
+field. Preserve the checked constructor tree until erasure as well.
+Replacing it with a fresh Core variable would require transporting the
+later proof through its constructor's result index.
 
 An HPC tick leaves the nominal index unchanged. Preserve the tick in the
 same thunk that contains the instrumented operand. The strict alias case

@@ -35,10 +35,11 @@ module GHC.Core (
         mkConApp, mkConApp2, mkTyBind, mkCoBind,
         varToCoreExpr, varsToCoreExprs, exprToBoolIndex,
         exprToNativeIndex, normaliseNativeIndexExpr, mapNativeIndex,
-        nativeSourceCallIndex, nativeComputedIndex, retainedArgIndex,
-        exprToNativeCaseIndex, isNativeCaseValueIndex, nativeIndexFunctionVar_maybe,
-        nativeIndexArgKinds, nativeIndexedConApp_maybe, splitNativeIndexedConApp,
-        containsIndexedConOperand,
+        nativeSourceCallIndex, nativeComputedIndex, retainedArgIndex, nativeDeferredArgIndex,
+        exprToNativeCaseIndex, isNativeCaseValueIndex, isNativeIndexedCaseScrutinee,
+        nativeIndexFunctionVar_maybe, nativeIndexArgKinds, nativeIndexedConArgs,
+        nativeIndexedConApp_maybe, splitNativeIndexedConApp, isNativeConstructedGadtIndex,
+        containsIndexedConOperand, containsGeneralIndexedConOperand,
         isNativeIndexAlt, isNativeIndexDataAlt, isNativeIndexAliasAlt, isNativeIndexAliasBinder,
         isNativeIndexedDataAlt, splitNativeIndexedDataAlt, isNativeIndexedGadtCon,
         nativeIndexedCon_maybe,
@@ -2660,6 +2661,14 @@ nativeComputedIndex expr
         isJust (sourceTableId_maybe fun) || any has_computation args
       _ -> False
 
+-- | Recover the index of an operand whose tree can stay intact until STG erasure.
+-- See Note [Naming computed retained arguments at erasure] in GHC.CoreToStg.Prep.
+nativeDeferredArgIndex :: CoreExpr -> Maybe Type
+nativeDeferredArgIndex e
+  | containsIndexedOperand (isJust . nativeIndexedOperandSignature_maybe) e
+  = snd <$> computedIndexExpr e
+  | otherwise = nativeComputedIndex e
+
 -- | Reuse structural constructor checks without enabling beta or cast conversion.
 computedIndexExpr :: CoreExpr -> Maybe (CoreExpr, Type)
 computedIndexExpr = nativeIndexExprWith False extra
@@ -2762,14 +2771,16 @@ exprToNativeCaseIndex expr
   = Just index
   | otherwise = Nothing
 
--- | Recognize a local value or constructor index from the checked scrutinee.
+-- | Recognize a local value or a checked indexed constructor in a strict case.
 -- See Note [Native indexed branch evidence].
 isNativeCaseValueIndex :: Type -> Bool
 isNativeCaseValueIndex (TermVarTy v) = isNativeOpaqueValueId v
 isNativeCaseValueIndex (CastTy ty _) = isNativeCaseValueIndex ty
-isNativeCaseValueIndex (TyConApp tc _)
-  = isJust (isPromotedDataCon_maybe tc >>= nativeIndexedOperandSpec_maybe)
-isNativeCaseValueIndex _ = False
+isNativeCaseValueIndex index = isNativeConstructedGadtIndex index
+
+-- | Check the index of the actual scrutinee of a GADT alternative.
+isNativeIndexedCaseScrutinee :: Type -> Bool
+isNativeIndexedCaseScrutinee = isNativeCaseValueIndex
 
 -- | Return a supported runtime normal form together with its native index.
 -- The caller must check the original expression's typing and scope with Lint.
@@ -2816,9 +2827,10 @@ nativeIndexExprWith allow_conversions extra = go emptyVarEnv
                          else Nothing }
              else Nothing }
       | Just (con, tys, fields) <- splitNativeIndexedConApp expr
+      , (builder, args) <- collectArgs expr
       = do { (fields', indices) <- unzip <$> traverse (go env) fields
            ; index <- nativeIndexedPromotedCon_maybe con tys indices
-           ; return (mkApps (mkTyApps (Var (dataConWrapId con)) tys) fields', index) }
+           ; return (mkApps builder (takeWhile isTyCoArg args ++ fields'), index) }
       | (Var worker, args) <- collectArgs expr
       , Just con <- isDataConWorkId_maybe worker
       , let (type_args, fields) = splitAt (length (dataConUnivTyVars con)) args
@@ -2952,6 +2964,45 @@ nativeIndexArgKinds con tys indices
     same_domain index (Scaled _ ty)
       = sameNativeIndexDomain (typeKind index) ty
 
+-- | Instantiate the worker of a lazy GADT constructor from its source arguments.
+-- See Note [Indexed GADT constructor operands].
+nativeIndexedConArgs :: DataCon -> [Type] -> Maybe ([CoreExpr], [Type])
+nativeIndexedConArgs con params
+  | Just (exs, eqs, fields) <- nativeIndexedOperandSignature_maybe con
+  , params `equalLength` user_tvs
+  , and [typeKind ty `eqType` inst (tyVarKind tv) | (tv, ty) <- zip user_tvs params]
+  , Just ex_args <- traverse (`lookup` zip user_tvs params) exs
+  , let domains = [inst ty | Scaled _ ty <- fields]
+  , all isNativeOpaqueValueType domains
+  = Just (map Type (map inst (dataConResRepTyArgs con) ++ ex_args) ++
+          [Coercion (mkNomReflCo (inst (eqSpecType spec))) | spec <- eqs], domains)
+  | otherwise = Nothing
+  where
+    user_tvs = dataConUserTyVars con
+    inst = substTyWith user_tvs params
+
+-- | Check the representation shared by both indexed operand capabilities.
+nativeIndexedOperandSignature_maybe :: DataCon
+                                    -> Maybe ([TyCoVar], [EqSpec], [Scaled Type])
+nativeIndexedOperandSignature_maybe con
+  | (_, exs, eqs@(_ : _), [], fields, _) <- dataConFullSig con
+  , null (dataConStupidTheta con)
+  , isVanillaAlgTyCon (dataConTyCon con), isBoxedDataTyCon (dataConTyCon con)
+  , not (isTypeDataCon con), null (dataConRepArgBinders con)
+  , not (any isBanged (dataConImplBangs con))
+  , dataConRepArity con == length eqs + length fields
+  , all isTyVar exs
+  = Just (exs, eqs, fields)
+  | otherwise = Nothing
+
+-- | Recognize the validated promoted endpoint of an indexed constructor application.
+isNativeConstructedGadtIndex :: Type -> Bool
+isNativeConstructedGadtIndex (TyConApp tc args)
+  | Just con <- isPromotedDataCon_maybe tc
+  , let (params, fields) = splitAt (length (dataConUserTyVars con)) args
+  = isJust (nativeIndexedPromotedCon_maybe con params fields)
+isNativeConstructedGadtIndex _ = False
+
 -- | Substitute in a supported runtime index without evaluating its value.
 -- Leave expressions outside the supported index language unchanged.
 mapNativeIndex :: (Type -> Type) -> CoreExpr -> CoreExpr
@@ -2972,17 +3023,11 @@ mapNativeIndex subst expr
            ; return (Cast expr (SubCo delta)) }
     from_index (TyConApp tc args)
       | Just con <- isPromotedDataCon_maybe tc
-      , Just _ <- nativeIndexedOperandSpec_maybe con
-      , let (tys, fields) = splitAt (length (dataConUserTyVars con)) args
-      , Just _ <- nativeIndexedPromotedCon_maybe con tys fields
-      = mkApps (mkTyApps (Var (dataConWrapId con)) tys) <$> traverse from_index fields
-      | Just con <- isPromotedDataCon_maybe tc
-      , let (tys, fields) = splitAt (length (dataConUnivTyVars con)) args
-      , Just _ <- nativeIndexDataConTyArgs (mkTyConApp (dataConTyCon con) tys) con
-      , fields `lengthIs` dataConSourceArity con
-      , nativeIndexArgKinds con tys fields
-      = do { fields' <- traverse from_index fields
-           ; return (mkConApp con (map Type tys ++ fields')) }
+      , let (params, fields) = splitAt (length (dataConUserTyVars con)) args
+      , Just (prefix, _) <- nativeIndexedConArgs con params
+      , Just _ <- nativeIndexedPromotedCon_maybe con params fields
+      = do { values <- traverse from_index fields
+           ; return (mkConApp con (prefix ++ values)) }
     from_index _ = Nothing
 
 -- | Instantiate the constructor wrapper from its known result domain.
@@ -3016,38 +3061,44 @@ splitNativeIndexedConApp :: CoreExpr -> Maybe (DataCon, [Type], [CoreExpr])
 splitNativeIndexedConApp expr = case collectArgs expr of
   (Var builder, args)
     | Just con <- isDataConWrapId_maybe builder
-    , Just _ <- nativeIndexedOperandSpec_maybe con
     , let (type_args, fields) = splitAt (length (dataConUserTyVars con)) args
-    -> checked con type_args fields
-    | Just con <- isDataConWorkId_maybe builder
-    , Just spec <- nativeIndexedOperandSpec_maybe con
-    , let params = dataConUnivTyVars con ++ dataConExTyCoVars con
-    , (type_args, evidence : fields) <- splitAt (length params) args
-    , Coercion co <- evidence
-    , coercionRole co == Nominal, isReflCo co
     -> do { tys <- traverse type_arg type_args
-          ; guard (params `equalLength` tys)
-          ; let choices = zip params tys
-          ; actual <- lookup (eqSpecTyVar spec) choices
-          ; let required = substTyWith params tys (eqSpecType spec)
-          ; guard (eqType (coercionLKind co) actual && eqType (coercionRKind co) required)
+          ; (_, domains) <- nativeIndexedConArgs con tys
+          ; guard (fields `equalLength` domains)
+          ; return (con, tys, fields) }
+    | Just con <- isDataConWorkId_maybe builder
+    , Just (exs, _, _) <- nativeIndexedOperandSignature_maybe con
+    -> do { let binders = dataConUnivTyVars con ++ exs
+                (type_args, _) = splitAt (length binders) args
+          ; tys <- traverse type_arg type_args
+          ; guard (binders `equalLength` tys)
+          ; let choices = zip binders tys
           ; user_tys <- traverse (`lookup` choices) (dataConUserTyVars con)
-          ; checked con (map Type user_tys) fields }
+          ; (prefix, domains) <- nativeIndexedConArgs con user_tys
+          ; let (actual, fields) = splitAt (length prefix) args
+          ; guard (actual `equalLength` prefix && and (zipWith same_prefix actual prefix))
+          ; guard (fields `equalLength` domains)
+          ; return (con, user_tys, fields) }
   _ -> Nothing
   where
-    checked con eras fields = do
-      guard (isJust (dataConWrapId_maybe con) && fields `lengthIs` dataConSourceArity con)
-      tys <- traverse type_arg eras
-      return (con, tys, fields)
     type_arg (Type ty) = Just ty
     type_arg _ = Nothing
+
+    same_prefix (Type a) (Type b) = a `eqType` b
+    same_prefix (Coercion co) (Coercion expected)
+      = coercionRole co == Nominal && isReflCo co &&
+        coercionLKind co `eqType` coercionLKind expected &&
+        coercionRKind co `eqType` coercionRKind expected
+    same_prefix _ _ = False
 
 -- | Check the erased arguments and value indices in the promoted telescope.
 nativeIndexedPromotedCon_maybe :: DataCon -> [Type] -> [Type] -> Maybe Type
 nativeIndexedPromotedCon_maybe con tys fields = do
+  (_, domains) <- nativeIndexedConArgs con tys
+  guard (fields `equalLength` domains)
+  guard (and (zipWith sameNativeIndexDomain (map typeKind fields) domains))
   let promoted = promoteDataCon con
       user_vars = dataConUserTyVars con
-  guard (tys `equalLength` user_vars && fields `lengthIs` dataConSourceArity con)
   result <- foldM apply (tyConKind promoted) (tys ++ fields)
   guard (sameNativeIndexDomain result (substTyWith user_vars tys (dataConOrigResTy con)))
   return (mkTyConApp promoted (tys ++ fields))
@@ -3070,16 +3121,29 @@ nativeIndexedOperandSpec_maybe con = do
       -> Just spec
     _ -> Nothing
 
--- | Detect indexed constructor operands that require a new interface reader.
+-- | Detect indexed operands that use the published interface capability.
 containsIndexedConOperand :: CoreExpr -> Bool
-containsIndexedConOperand (Var v)
-  | Just con <- isDataConWorkId_maybe v = isJust (nativeIndexedOperandSpec_maybe con)
-  | Just con <- isDataConWrapId_maybe v = isJust (nativeIndexedOperandSpec_maybe con)
-containsIndexedConOperand (App fun arg) = containsIndexedConOperand fun || containsIndexedConOperand arg
-containsIndexedConOperand (Lam _ body)  = containsIndexedConOperand body
-containsIndexedConOperand (Tick _ body) = containsIndexedConOperand body
-containsIndexedConOperand (Cast body _) = containsIndexedConOperand body
-containsIndexedConOperand _             = False
+containsIndexedConOperand = containsIndexedOperand (isJust . nativeIndexedOperandSpec_maybe)
+
+-- | Detect additional indexed operands that require the general interface capability.
+containsGeneralIndexedConOperand :: CoreExpr -> Bool
+containsGeneralIndexedConOperand = containsIndexedOperand general
+  where
+    general con = isJust (nativeIndexedOperandSignature_maybe con) &&
+                  not (isJust (nativeIndexedOperandSpec_maybe con))
+
+-- | Find a constructor head in the runtime part of an operand tree.
+containsIndexedOperand :: (DataCon -> Bool) -> CoreExpr -> Bool
+containsIndexedOperand accepts = go
+  where
+    go (Var v)
+      | Just con <- isDataConWorkId_maybe v = accepts con
+      | Just con <- isDataConWrapId_maybe v = accepts con
+    go (App fun arg) = go fun || go arg
+    go (Lam _ body)  = go body
+    go (Tick _ body) = go body
+    go (Cast body _) = go body
+    go _             = False
 
 {- Note [Indexed GADT constructor operands]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3090,18 +3154,27 @@ arguments. For example, Vec a (S n) determines a and n for VCons. Only the
 promoted successor in that exact result permits this step.
 
 The simplifier can expose the wrapper's worker. Read its erased universals,
-existentials and nominal EqSpec operand in their Core order. Require the
-reflexive proof generated by the ordinary wrapper. Recover the promoted
-arguments in the user order. Keep the real fields and validate each index's
+existentials and nominal EqSpec operands in their Core order. Require the
+reflexive proofs generated by the ordinary wrapper. Recover the promoted
+arguments in the user order. The checked decoder preserves the original
+builder and evidence when substituting into fields. The inverse promotion
+path can rebuild the ordinary worker from those source arguments. Keep the real fields and validate each index's
 kind in the promoted telescope. Casts around the constructor use the
 separate nominal index conversion rule. This adds neither an inverse for
 families nor equality between independent operands of the same width.
 
-In CorePrep, a saturated constructor with fields needs an alias before
-the retained call. Use the same checked DEFAULT case as for a structural
-constructor. Core Lint and the interface reader admit the opaque binder
-only for the checked GADT application. That application has a known WHNF.
-The alias case does not force its head or tail fields.
+An indexed operand can stay in the application until STG erases its index.
+Inside a strict case, CorePrep may still need to name a constructor field
+with the same checked DEFAULT alias as for a structural constructor.
+Core Lint and the interface reader admit the opaque binder for a checked
+GADT application. That application has a known WHNF. The alias case
+does not force its fields.
+
+The published operand shape has a single EqSpec. Only that shape has
+domain-driven argument inference. The general worker representation
+supports multiple EqSpecs and a different order of source binders.
+Use the separate interface capability when an operand needs this
+representation.
 
 Inlining a retained argument can also replace the scrutinee of an indexed
 case. Recompute the left endpoint from the checked expression. The actual
@@ -3232,6 +3305,12 @@ generated family type to Vec a n. exprToNativeIndex checks the nominal
 coercion and returns the casted index. Use that whole index on the left
 of the branch equality. The cast's endpoints alone do not identify the
 value. See Note [Nominal native index casts].
+
+Inlining can also expose a checked indexed constructor as the scrutinee.
+For example, the proof in a VNil alternative has the promoted VNil on the
+left when the case scrutinizes the VNil worker. Check the original index
+and reconstruct the right endpoint from the alternative binders in Lint
+and when reading an interface.
 -}
 
 -- | Detect proof binders on a DEFAULT alternative, including malformed proofs.
@@ -3244,7 +3323,8 @@ isNativeIndexAliasAlt _ = False
 -- See Note [Indexed GADT constructor operands].
 isNativeIndexAliasBinder :: CoreExpr -> Id -> Bool
 isNativeIndexAliasBinder expr binder = isNativeIndexId binder
-  || (isNativeOpaqueValueId binder && isJust (splitNativeIndexedConApp expr))
+  || (isNativeOpaqueValueId binder &&
+      maybe False isNativeConstructedGadtIndex (exprToNativeCaseIndex expr))
 
 -- | Convert a Boolean argument through the restricted frontend index language.
 exprToBoolIndex :: CoreExpr -> Maybe Type

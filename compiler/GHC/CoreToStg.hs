@@ -670,7 +670,7 @@ coreToStgArgs (Coercion _ : args) -- Coercion argument; See Note [Coercion token
 
 -- See Note [Naming computed retained arguments at erasure] in GHC.CoreToStg.Prep.
 coreToStgArgs (call : args)
-  | Just {} <- nativeComputedIndex call
+  | Just {} <- if exprIsTrivial call then nativeComputedIndex call else nativeDeferredArgIndex call
   = do { uniq <- getCtsUnique
        ; let thunk = mkSysLocal (fsLit "retained_arg") uniq ManyTy (exprType call)
        ; call' <- nameComputedOperands call
