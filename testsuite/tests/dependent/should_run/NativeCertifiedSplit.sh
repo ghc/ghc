@@ -81,3 +81,16 @@ if grep -Fq '$lambda:' swapped.log; then
     cat swapped.log >&2
     exit 1
 fi
+
+# The inferred vectors still require evidence for the width conversion.
+sed '/^checkedSplitBoth cut/,$s/Just (Pair suffix Refl)/Just (Pair suffix _)/' CertifiedSplit.hs >NoLengthProof.hs
+if "${ghc[@]}" -O0 -fforce-recomp -c NoLengthProof.hs >width.log 2>&1; then
+    echo 'Accepted the paired split without its bounds equality'
+    exit 1
+fi
+grep -Eq '^NoLengthProof.hs:.*error: \[GHC-83865\]' width.log
+grep -Fq 'SplitBothAtWidth a cut suffix total xs ys' width.log
+if grep -Fq '$lambda:' width.log; then
+    cat width.log >&2
+    exit 1
+fi

@@ -6533,7 +6533,10 @@ mk_ea_msg ctxt at_top level
   (TypeEqOrigin { uo_actual = act, uo_expected = exp, uo_thing = mb_thing })
   | Just thing <- mb_thing
   , KindLevel <- level
-  = Right $ pprKindMismatchMsg thing exp act
+  = Right $ case thing of
+      HsExprRnThing{} | sum_payload -> pprExpectedActualInfo ctxt ea
+      HsExprTcThing{} | sum_payload -> pprExpectedActualInfo ctxt ea
+      _ -> pprKindMismatchMsg thing exp act
   | Just item <- at_top
   , let  ea = EA $ if expanded_syns then Just ea_expanded else Nothing
          mismatch = mkBasicMismatchMsg ea item exp act
@@ -6547,6 +6550,9 @@ mk_ea_msg ctxt at_top level
     else [ea]
 
   where
+    -- A kind equality from transporting an index can carry the enclosing
+    -- term application as its origin. Its expected payload is a value type.
+    sum_payload = isJust (diagnosticSumPayload exp) || isJust (diagnosticSumPayload act)
     ea = ExpectedActual { ea_expected = exp, ea_actual = act }
     ea_expanded =
       ExpectedActualAfterTySynExpansion
