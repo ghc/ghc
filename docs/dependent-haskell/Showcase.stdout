@@ -3,6 +3,7 @@ form an expression annotation with the matched dictionary: True
 pass an associated type as a specified and a required argument: (True,False)
 render a field with evidence for its runtime flag: (Just "x",Nothing)
 format a field with a polymorphic consumer: (Just "[x]",Nothing)
+choose a field domain with a required type argument: ("True","x")
 Dependent Haskell: completed source features
 runtime Bool choice: "42"
 apply retained function rules without forcing an unused index: (7,11,19)
