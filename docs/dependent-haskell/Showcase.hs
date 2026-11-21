@@ -155,6 +155,7 @@ import qualified OpenConstructorWorker as W
 import qualified NativeMultiPackage as Packages
 import Numeric.Natural (Natural)
 import qualified OpenSource
+import qualified OrdinaryScopedComparison
 import qualified ScopedClassMethodClient
 import qualified Signal
 import qualified PreludePairExport
@@ -990,6 +991,8 @@ main = do
         (ScopedClassMethodClient.twoDictionaries enabled, ScopedClassMethodClient.twoDictionaries disabled)
     observe "read a scoped method through a Haskell 2010 client"
         (ScopedClassMethodClient.ordinaryChoices enabled, ScopedClassMethodClient.ordinaryChoices disabled)
+    observe "compare zero under two caller dictionaries"
+        (map OrdinaryScopedComparison.observations [-2, 0, 2])
     observe "render a field with evidence for its runtime flag" (renderField enabled, renderField disabled)
     observe "format a field with a polymorphic consumer" (formatField enabled, formatField disabled)
     observe "choose a field domain with a required type argument" renderKnownFields

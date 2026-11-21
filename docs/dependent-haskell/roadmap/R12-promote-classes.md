@@ -2,8 +2,10 @@
 
 R12 is open. It depends on R13 (function promotion) and R24 (constrained
 type families). M82 and M83 can use checked equations after identifying a
-concrete instance method. A type that refers to a method through a caller's
-abstract class dictionary remains open.
+concrete instance method. The private prototype retains a unary method
+application through one unique direct Given. It keeps the caller's exact
+dictionary in the result type. Superclass selection, recursive evidence
+and general class promotion remain open.
 [Serokell card](https://ghc.serokell.io/dh#promote-classes) and
 [local dependencies](../ROADMAP.md#upstream-checklist-and-complete-dependency-index).
 
@@ -18,7 +20,7 @@ chooseTagged x = tagBool (choose x)
 ```
 
 `tagBool :: foreach (b :: Bool) -> Tagged b` returns the corresponding
-singleton constructor. The public baseline reports GHC-70566 for the result type.
+tagged Boolean value. The public baseline reports GHC-70566 for the result type.
 “Cannot reduce the open call to ‘choose’ in a type.” The explanation is
 “The local dependency choose is not an ordinary function binding.”
 [Target source](../../../testsuite/tests/dependent/should_run/promoted-class/ChooseTarget.hs).
@@ -35,13 +37,13 @@ and [test runner](../../../testsuite/tests/dependent/should_run/NativePromotedCl
 
 ## Evidence needed
 
-The first acceptance criterion is to typecheck `chooseTagged` while
-`a` and its `Choose a` evidence are abstract. The index and the term call
+The private prototype typechecks `chooseTagged` while `a` and its
+`Choose a` evidence are abstract. The index and the term call
 must use the same selector, instantiation, operand and evidence. The
 application can stay opaque during type checking. With the constraint
 removed, the call must require `Choose a`.
 
-The retained signature checker currently checks the predicates in
+The retained signature checker on the public baseline checks the predicates in
 `HsQualTy` and builds ordinary constraint arrows with `tcMkPhiTy`.
 Those arrows have no evidence binder in the body type. The local
 dependency scheduler rejects the selector before it reaches that
@@ -200,3 +202,30 @@ loads its serialized Core from the provider interface. The client prints
 `(True,[955,0,128578])`. This checks that the reader distinguishes the
 retained character tag from the dictionary application tag.
 [Reload test](../../../testsuite/tests/dependent/should_run/NativeScopedDictionaryCoreReload.sh).
+
+
+## An Ordering result through a direct Given
+
+`compareTagged` retains `compareZero x` at kind `Ordering`. A Haskell
+2010 client matches the imported result directly. One instance compares
+an integer to zero. The second returns `LT` without forcing its operand.
+The client observes all three orderings and passes a bottom to the second
+instance. The wire check also rejects forwarding an independent operand
+at the same class domain.
+[Comparison provider](../examples/open-evaluation/ScopedComparison.hs),
+[ordinary client](../examples/open-evaluation/OrdinaryScopedComparison.hs)
+and [runner](../examples/open-evaluation/check-scoped-comparison.sh).
+
+The same unary selector path checks a user-defined enumeration and a
+fixed `Maybe Ordering` result. The result kind comes from the selector
+signature. The current source path requires one retained receiver of the
+class parameter's type and one matching direct Given. A binary selector
+and a method whose evidence must be selected through a superclass are
+outside that path.
+
+The direct case works without solving an equality for an unknown result
+index. Passing the call to a polymorphic accessor requires that equality
+and reports GHC-83605. Access through a pattern synonym and refining GADT
+patterns in the Haskell 2010 reader also remain unsupported.
+[Scoped application checking](../../../compiler/GHC/Tc/Gen/App.hs)
+and [selector shape and result kind](../../../compiler/GHC/Core.hs).
