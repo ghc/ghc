@@ -150,3 +150,4 @@ test('TerminalGadtThBadMultiplicity', req_th, compile_fail, [''])
 test('GadtTrailingContext', extra_files(['GadtTrailingContextProvider.hs']),
      makefile_test, [])
 test('GadtTrailingContextScope', normal, compile_fail, [''])
+test('GadtTrailingFieldScope', normal, compile_fail, [''])

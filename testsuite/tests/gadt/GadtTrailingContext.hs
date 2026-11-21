@@ -30,6 +30,19 @@ compareInPattern :: Combined a b -> a -> a -> Bool
 compareInPattern (Combined Evidence) x (compare x -> LT) = True
 compareInPattern (Combined _) _ _ = False
 
+data Never = Never
+instance Eq Never where
+  _ == _ = False
+
+existsEq :: F -> Bool
+existsEq (K x) = x == x
+
+indexedEq :: Box a -> a -> Bool
+indexedEq (Box x) y = x == y
+
+standaloneAlias :: forall a. a %1 -> Eq a => F
+standaloneAlias = K
+
 throws :: a -> IO Bool
 throws x = either (const True) (const False) <$> try @SomeException (evaluate x)
 
@@ -49,3 +62,5 @@ main = do
   print (compareInPattern combined (Rank 2) (Rank 1),
          compareInPattern combined (Rank 1) (Rank 2))
   print =<< throws (compareInPattern missing (Rank 2) (Rank 1))
+  print (existsEq (standaloneAlias Never), existsEq (K True),
+         indexedEq (Box (Badge 1)) (Badge 3))

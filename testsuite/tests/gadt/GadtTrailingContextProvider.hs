@@ -1,5 +1,5 @@
 {-# LANGUAGE GADTs, RequiredTypeArguments #-}
-module GadtTrailingContextProvider (T(..), Witness(..), Checked(..), Evidence(..), Combined(..)) where
+module GadtTrailingContextProvider (T(..), Witness(..), Checked(..), Evidence(..), Combined(..), F(..), Box(..)) where
 
 data T a where
   MkT :: Int -> forall a. Eq a => T a
@@ -16,3 +16,9 @@ data Evidence a where
 
 data Combined a b where
   Combined :: forall a. Evidence a -> forall b. Eq b => Combined a b
+
+data F where
+  K :: a -> Eq a => F
+
+data Box a where
+  Box :: forall a. a -> Eq a => Box a

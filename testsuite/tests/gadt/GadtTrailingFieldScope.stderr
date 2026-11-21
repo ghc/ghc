@@ -1,0 +1,6 @@
+GadtTrailingFieldScope.hs:8:10: error: [GHC-39999]
+    • No instance for ‘Eq a’ arising from the literal ‘0’
+      Possible fix: add (Eq a) to the context of the data constructor ‘N’
+    • In the pattern: 0
+      In the pattern: N 0
+      In an equation for ‘wrong’: wrong (N 0) = True

@@ -5,3 +5,4 @@ True
 (GT,True)
 (True,False)
 True
+(False,True,True)
