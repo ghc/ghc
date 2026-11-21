@@ -216,6 +216,9 @@ vector with length 3: [True,False,True]
 replicateAt 3: [True,True,True]
 replicateNative 3: [True,True,True]
 replicateNative (2 :: Nat): [True,True]
+explicit numeric conversion in an ordinary client: [True,True,True]
+use the selected (+) in a retained result: [True,True,True]
+append two and one using the selected (+): ("aab",'a',"")
 replicateNative (n + 1): [False,False,False]
 vector with length n + 3: [False,False,True,False,True]
 2 + 3 at runtime: 5
@@ -368,6 +371,7 @@ forward an inferred partial-family callback and an ordinary constructor: (Refl,R
 infer both bare kind arrows in a list family proof: Refl
 infer the inner arrow of a higher-order family callback: [True]
 infer an unsigned synonym kind from a bare callback use: [True]
+pass a partial synonym and a list constructor to one callback type: ([True],"q")
 store the result of Maybe and an imported open family: (Just True,[False])
 use one polymorphic map with Maybe and a type family: (Just True,[False])
 apply a callback with matchability computed in its declared kind: (Just False,[True])

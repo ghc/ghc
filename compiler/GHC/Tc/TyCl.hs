@@ -1855,13 +1855,25 @@ generaliseTcTyCon (tc, tc_kind, skol_info, scoped_prs, tc_res_kind)
                  --     Maintain the L-R order of scoped_tvs
 
        -- Step 2a: find all the Inferred variables we want to quantify over
-       ; dvs1 <- candidateQTyVarsOfKinds $
-                 (tc_res_kind : map tyVarKind spec_req_tvs)
+       ; let arg_kinds = map tyVarKind spec_req_tvs
+       ; dvs1 <- candidateQTyVarsOfKinds (tc_res_kind : arg_kinds)
+       ; liberal <- xoptM LangExt.LiberalTypeSynonyms
        ; let dvs2 = dvs1 `delCandidates` spec_req_tvs
+             callback_indices
+               | liberal, TypeSynonymFlavour <- tyConFlavour tc
+               = [tv | tv <- tyCoVarsOfTypesList arg_kinds
+                     , tv `elemVarSet` candidateKindVars dvs2
+                     , tyVarKind tv `eqType` matchabilityTy
+                     , any (synonymCallbackIndex tv) arg_kinds]
+               | otherwise = []
 
        -- Step 2b: quantify, mainly meaning skolemise the free variables
        -- Returned 'inferred' are scope-sorted and skolemised
-       ; quantified <- quantifyTyVars skol_info DefaultNonStandardTyVars dvs2
+       -- See Note [Callback arrows in inferred synonym kinds].
+       ; inferred_indices <- liftZonkM $
+           mapM (skolemiseQuantifiedTyVar skol_info) callback_indices
+       ; quantified <- quantifyTyVars skol_info DefaultNonStandardTyVars
+                         (dvs2 `delCandidates` callback_indices)
        -- Matchability has a closed kind, so its inferred binders have no
        -- predecessors. Keep them together for tcInferredMatchabilityFamPats.
        -- The relative order of other inferred binders and of all written
@@ -1870,7 +1882,7 @@ generaliseTcTyCon (tc, tc_kind, skol_info, scoped_prs, tc_res_kind)
                ClosedTypeFamilyFlavour ->
                  let (metadata, others) = partition ((`eqType` matchabilityTy) . tyVarKind) quantified
                  in metadata ++ others
-               _ -> quantified
+               _ -> inferred_indices ++ quantified
 
        ; traceTc "generaliseTcTyCon: pre zonk"
            (vcat [ text "tycon =" <+> ppr tc
@@ -2574,6 +2586,17 @@ binder kinds and defaults an unresolved kind arrow to M. The nested
 synonym solver still handles RHS metadata separately. An arrow whose
 shape is already known needs no variable. Rechecking the RHS uses the
 inferred kind, including the selected matchability.
+
+With LiberalTypeSynonyms, `type Apply f = f ()` can accept either a
+constructor or a partial synonym that becomes saturated after expansion.
+Keep unresolved matchability indices in its inferred argument kinds.
+These indices have the closed kind Matchability, independent of
+PolyKinds. Quantify them before the other inferred kind variables.
+At a use site, kind-check the argument against the instantiated kind.
+When a synonym without LiberalTypeSynonyms applies this scheme to a
+callback, use the existing default for an unresolved argument index.
+The ordinary validity check still rejects a partial synonym that
+survives expansion.
 -}
 
 ------------------------------------------------------------------------
@@ -2589,17 +2612,22 @@ kcLTyClDecl collect_metadata (L loc decl)
          case decl of
            SynDecl{tcdRhs = rhs} | collect_metadata -> tcExtendNameTyVarEnv (tcTyConScopedTyVars tycon) $ do
              outer_owner <- tcl_kind_arrow_defaults <$> getLclEnv
+             liberal <- xoptM LangExt.LiberalTypeSynonyms
              -- See Note [Callback arrows in inferred synonym kinds]
              let callback_arrow = fmap (\(defaults, _) -> do
                    ma <- newFlexiTyVar matchabilityTy
-                   updTcRef defaults ((ma, KindLevel) :)
+                   unless liberal $ updTcRef defaults ((ma, KindLevel) :)
                    pure (mkTyVarTy ma)) outer_owner
              inferSynonymMatchabilities $ do
                ref <- newTcRef []
-               let choose name n = do
-                     indices <- replicateM n (newFlexiTyVar matchabilityTy)
+               let choose name callbacks = do
+                     indices <- mapM (const (newFlexiTyVar matchabilityTy)) callbacks
                      owner <- tcl_kind_arrow_defaults <$> getLclEnv
-                     forM_ owner $ \(defaults, _) -> updTcRef defaults (map (, TypeLevel) indices ++)
+                     forM_ (zip callbacks indices) $ \(callback, ma) -> do
+                       let (default_owner, level)
+                             | callback && not liberal = (outer_owner, KindLevel)
+                             | otherwise = (owner, TypeLevel)
+                       forM_ default_owner $ \(defaults, _) -> updTcRef defaults ((ma, level) :)
                      let vars = mkTyVarTys indices
                      updTcRef ref ((name, vars) :)
                      pure vars
@@ -4056,10 +4084,10 @@ tcTySynRhs metadata roles_info tc_name hs_ty
                    case metadata of
                      Just plan -> do
                        ref <- newTcRef plan
-                       let choose name n = do
+                       let choose name callbacks = do
                              rest <- readTcRef ref
                              case rest of
-                               (owner, tys) : next | owner == name, length tys == n ->
+                               (owner, tys) : next | owner == name, equalLength tys callbacks ->
                                  writeTcRef ref next >> pure tys
                                _ -> pprPanic "synonym metadata sites changed" (ppr name)
                        ty <- tcCheckSynonymMetadata choose Nothing hs_ty res_kind

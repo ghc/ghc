@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeApplications #-}
 
 module NativeLiteralClient where
 
@@ -9,3 +9,9 @@ three = replicateNative 3 True
 
 twoAnnotated :: Vec Bool 2
 twoAnnotated = replicateNative (2 :: Nat) True
+
+threeConverted :: Vec Bool 3
+threeConverted = replicateNative (fromInteger 3) True
+
+twoSpecifiedConversion :: Vec Bool 2
+twoSpecifiedConversion = replicateNative (fromInteger @Nat 2) True

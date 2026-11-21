@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, KindSignatures, TypeOperators #-}
 module NativeMethodAliasClient where
 
 import Data.Proxy (Proxy(..))
@@ -12,3 +12,6 @@ forwardProof = tagBit (forward Off)
 
 backwardProof :: Proxy 'Off
 backwardProof = tagBit (backward Off)
+
+combined :: foreach (x :: Bit) -> foreach (y :: Bit) -> Proxy ((x :: Bit) <> (y :: Bit))
+combined x y = tagBit (x <> y)

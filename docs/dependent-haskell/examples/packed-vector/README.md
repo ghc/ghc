@@ -372,6 +372,13 @@ from this directory to compile against the provider interface. The
 test changes the expected sum to `2 + 2` and then tries to take the head
 of the empty append. Both changes give a type error.
 
+[RetainedSumOperator.hs](RetainedSumOperator.hs) writes the result length
+using the certified `Prelude.+` method in `appendByMethod`.
+[AppendByMethodClient.hs](AppendByMethodClient.hs) checks the same lengths
+using that export. Run `bash check-append-by-method.sh GHC LIBDIR` to
+check the source-hidden call, the wrong length and empty head, type
+operator precedence, and recompilation after a method change.
+
 `Add` computes an erased sum index. `sumNat` computes an ordinary runtime
 length `p` and stores an equality proof in `Sum n m`. `appendNative` returns
 a vector at `Add n m`. `appendPacked` matches `Refl` to transport that vector

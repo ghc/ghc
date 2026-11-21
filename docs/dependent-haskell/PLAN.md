@@ -6348,6 +6348,13 @@ in a type. An in-scope type operator takes precedence. GHC uses the fixity
 of the term when it resolves an ordinary function in infix type syntax.
 That use records a dependency on the term as well as its equations.
 
+A saturated binary class operator can use the published table of its
+selected method. A retained binder must fix the shared operand and
+result domain. Both operands are checked against the table. A local
+Given cannot stand in for the certified dictionary. An ordinary client
+can consume the result through the existing source family interface.
+[Vector example](examples/packed-vector/RetainedSumOperator.hs).
+
 For a static length, `replicateAt 3 True` takes a visible type argument.
 Two ordinary `ReplicateLength` instances build the cells. A runtime length
 can come from `readIORef` and be passed to `replicateNative`. A bare
@@ -6651,6 +6658,11 @@ complete, monomorphic signature matches the retained domain without a cast.
 The annotation uses ordinary expression signature checking. The selected
 dictionary must supply the checked conversion. The checker still compares the
 result with its independently written signature.
+
+An explicit `fromInteger 3` or `fromInteger @Nat 3` can use the same
+certificate. The argument must pass the ordinary Integer literal
+shortcut. This preserves a rebound literal's separate interpretation
+and leaves computed or negative arguments outside the certificate.
 [Interface test](../../testsuite/tests/dependent/should_compile/NativeLiteralClient.hs).
 
 ### Inference at M83

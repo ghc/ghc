@@ -753,6 +753,7 @@ isOpenTypeOperandWith :: (IdOccP (GhcPass p) -> Bool) -> (IdOccP (GhcPass p) -> 
 isOpenTypeOperandWith variable constructor = (== Just True) . symbolic
   where
     symbolic ty = case unLoc (ignoreParens ty) of
+      HsKindSig _ operand _ -> symbolic operand
       HsTyVar _ NotPromoted (L _ name) | variable name -> Just True
       HsExplicitTupleTy _ _ [x, y] -> or <$> traverse symbolic [x, y]
       _ -> case spine ty [] of

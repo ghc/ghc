@@ -101,5 +101,6 @@ test('NativeDependentResultBinders', normal, compile, [''])
 test('NativeSourceCallIface',
      extra_files(['../../../../docs/dependent-haskell/examples/qualified-pi/ClosedTableLibrary.hs',
                   '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs',
-                  'NativeMethodAliases.hs', 'NativeMethodAliasClient.hs', 'NativeLiteralClient.hs']),
+                  'NativeMethodAliases.hs', 'NativeMethodAliasClient.hs', 'NativeLiteralClient.hs',
+                  '../../../../docs/dependent-haskell/examples/packed-vector/RetainedSumOperator.hs']),
      makefile_test, ['NativeSourceCallIface'])

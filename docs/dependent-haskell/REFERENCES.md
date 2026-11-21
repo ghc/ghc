@@ -5219,6 +5219,34 @@ ordinary type reduction on the library's independent `FromNatural` instance.
 [literal desugaring](../../compiler/GHC/HsToCore/Match/Literal.hs),
 and [the two vector-library conversions](examples/packed-vector/PackedVecLibrary.hs).
 
+### Certified addition in an indexed append
+
+Agda's vector append returns a vector indexed by the sum of its input
+lengths. Its `head` requires a successor length. Agda separately supports
+literal conversions whose instance arguments can express a constraint,
+as in its `Fin` example.
+[Agda vector operations](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html)
+and [literal overloading](https://agda.readthedocs.io/en/v2.8.0/language/literal-overloading.html#natural-numbers).
+
+The review of accepted GHC proposal #378 discusses writing vector append
+with a term-derived sum. Its separate `replicate` discussion explains why
+a function can need the length at runtime. The review of open proposal
+#154 raises the constraints required by general literal overloading.
+[#378 append discussion](https://github.com/ghc-proposals/ghc-proposals/pull/378#issuecomment-771658295),
+[#378 retained length discussion](https://github.com/ghc-proposals/ghc-proposals/pull/378#issuecomment-729355504)
+and [#154 overloading review](https://github.com/ghc-proposals/ghc-proposals/pull/154#issuecomment-408117903).
+
+The fork's `appendByMethod` uses the checked `Num Nat` method for
+`Prelude.+`. A retained operand fixes the shared domain. A type operator
+in scope takes priority over the term selector. The ordinary client uses
+an independent type-level sum to check the result length. It rejects a
+wrong length and a head lookup on an empty vector. Changing the method
+from addition to multiplication invalidates an unchanged client's
+old length check.
+[Append example](examples/packed-vector/RetainedSumOperator.hs),
+[ordinary client](examples/packed-vector/AppendByMethodClient.hs)
+and [runner](examples/packed-vector/check-append-by-method.sh).
+
 ### Comparing a computed length with a function argument
 
 Agda 2.8.0's `compareAtom` reduces both inputs before inspecting their

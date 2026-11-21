@@ -51,7 +51,7 @@ import GHC.Tc.Zonk.TcType
 
 import GHC.Core.Class ( Class, classTyVars )
 import GHC.Core.ConLike ( ConLike(..) )
-import GHC.Core.DataCon ( dataConConcreteTyVars, dataConFullSig, dataConName, isNewDataCon, dataConOrigArgTys, dataConOrigResTy, dataConRepArgBinders, dataConTyCon, dataConUserTyVars, dataConWorkId, dataConWrapId )
+import GHC.Core.DataCon ( DataCon, dataConConcreteTyVars, dataConFullSig, dataConName, isNewDataCon, dataConOrigArgTys, dataConOrigResTy, dataConRepArgBinders, dataConTyCon, dataConUserTyVars, dataConWorkId, dataConWrapId )
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr, supportsQuickLookType )
 import GHC.Core.FamInstEnv (FamInstEnvs, reduceTyFamApp_maybe)
@@ -72,7 +72,7 @@ import GHC.Core.UsageEnv ( UsageEnv, popUE, singleUsageUE, zeroUE )
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom (coAxiomBranches, coAxBranchLHS, coAxBranchRHS, coAxBranchCoVars, fromBranches)
 
-import GHC.Builtin.WiredIn.Types ( charTy, multiplicityTy, runtimeRepTy, nilDataCon, consDataCon, mkListTy, unmatchableDataConTy )
+import GHC.Builtin.WiredIn.Types ( charTy, integerTy, multiplicityTy, runtimeRepTy, nilDataCon, consDataCon, mkListTy, unmatchableDataConTy )
 import GHC.Builtin.PrimOps( tagToEnumKey )
 import GHC.Builtin.KnownKeys
 
@@ -3919,16 +3919,28 @@ tcRetainedValueOperand resolve domain arg@(L loc original)
             (supplied, _) <- tcVTA (idConcreteTvs sel) (varType sel) ty
             unless (supplied `tcEqType` domain) unchecked
           dfun <- tcRetainedDFun name cls domain >>= maybe unchecked return
-          target_name <- maybe unchecked return (sourceMethodTarget_maybe dfun sel)
-          target <- tcLookupIdMaybe target_name >>= maybe unchecked return
-          unless (varType target `tcEqType` classMethodInstTy sel [domain]) unchecked
+          platform <- getPlatform
+          case args of
+            [operand]
+              | Just (zero, successor) <- sourceLiteralCons_maybe dfun sel
+              , HsOverLit _ (OverLit OverLitRn{ol_rebindable = False} literal)
+                  <- unLoc (stripParensLHsExpr operand)
+              , Just (HsLit _ (XLit (HsInteger _ n _)))
+                  <- shortCutLit platform literal integerTy
+              , n >= 0
+              -> do { (core, generated) <- buildRetainedNumeral dfun sel zero successor n
+                    ; return (core, L loc (mkExpandedLExpr original generated)) }
+            _ -> do
+              target_name <- maybe unchecked return (sourceMethodTarget_maybe dfun sel)
+              target <- tcLookupIdMaybe target_name >>= maybe unchecked return
+              unless (varType target `tcEqType` classMethodInstTy sel [domain]) unchecked
 
-          let target_head = L head_loc (HsVar noExtField (fmap (const (noUserRdr target_name)) lname))
-              runtime_arg = L loc (mkExpandedLExpr original (mkHsApps target_head args))
-          checked <- resolve runtime_arg
-          recordSourceMethodUse dfun sel target
-          wantRetainedMethod sel dfun
-          return checked
+              let target_head = L head_loc (HsVar noExtField (fmap (const (noUserRdr target_name)) lname))
+                  runtime_arg = L loc (mkExpandedLExpr original (mkHsApps target_head args))
+              checked <- resolve runtime_arg
+              recordSourceMethodUse dfun sel target
+              wantRetainedMethod sel dfun
+              return checked
         _ -> ordinary
   | otherwise = ordinary
   where
@@ -3972,6 +3984,12 @@ tcRetainedNumeral domain from n = do
     _ -> unverified
   dfun <- tcRetainedDFun from cls domain >>= maybe unverified return
   (zero, succ_con) <- maybe unverified return (sourceLiteralCons_maybe dfun sel)
+  buildRetainedNumeral dfun sel zero succ_con n
+
+-- | Build the index and runtime operand from a checked nonnegative conversion.
+buildRetainedNumeral :: Id -> Id -> DataCon -> DataCon -> Integer
+                     -> TcM (Core.CoreExpr, LHsExpr GhcRn)
+buildRetainedNumeral dfun sel zero succ_con n = do
   dflags <- getDynFlags
   when (n > toInteger (maxBound :: Int) || intGtLimit (fromInteger n) (reductionDepth dflags)) $
     failWithTc (TcRnRetainedQuantificationError (RetainedLiteralDepth n))
@@ -3991,6 +4009,12 @@ The completed Num dictionary must certify its zero and successor equations.
 Require the ordinary solver to select this dictionary, just as for (+).
 Build both the runtime argument and its index from those exact constructors.
 The constructors may be private to the module that defines the instance.
+
+An explicit call to the same certified method can use the ordinary Integer
+literal shortcut for its argument. Require a non-rebound literal that the
+shortcut accepts at Integer. The outer method still needs the certificate
+and the exact dictionary. A rebound literal or a computed Integer argument
+can have a different meaning.
 
 A result signature such as Vec a 3 resolves its numeral independently through
 FromNatural. Ordinary type equality checks that the two meanings agree.

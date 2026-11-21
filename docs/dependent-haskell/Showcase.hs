@@ -108,6 +108,7 @@ import qualified InterpretedKind
 import qualified InterpretedKindUseSite
 import qualified NestedFunctionClient
 import qualified InvisibleFamily
+import qualified LiberalCallback
 import ConstrainedElementsClient (advanceCursor, showAdvance, showRemainder, splitCollection, partialElement, aliasedReflection, annotatedElement, constrainedElements, explicitElements, formatField, renderField, renderKnownFields, retainedMaybeDomain)
 import ConstrainedElementsQuickLook (showReflection)
 import OpenArrowKindClient (openKindRows)
@@ -169,6 +170,8 @@ import qualified PackedProjection
 import qualified PackageEquality
 import AppendLengthClient (appendTwoAndOne)
 import PackedVecLibrary
+import qualified AppendByMethodClient
+import qualified RetainedSumOperator
 import RetainedNat (Retained(..), constantPackage, withRetained)
 import qualified DependentPair as Pair
 import qualified DependentProjection as Pair
@@ -1313,6 +1316,7 @@ main = do
     observe "infer both bare kind arrows in a list family proof" annotatedMap
     observe "infer the inner arrow of a higher-order family callback" nestedCallback
     observe "infer an unsigned synonym kind from a bare callback use" appliedCallback
+    observe "pass a partial synonym and a list constructor to one callback type" LiberalCallback.collectValues
     observe "store the result of Maybe and an imported open family" boxedCallbacks
     observe "use one polymorphic map with Maybe and a type family" rankedMap
     observe "apply a callback with matchability computed in its declared kind" flippedCallbacks
@@ -1786,6 +1790,9 @@ arithmeticNotation = do
     let annotated :: Vec Bool 2
         annotated = replicateNative (2 :: Nat) True
     observe "replicateNative (2 :: Nat)" (toList annotated)
+    observe "explicit numeric conversion in an ordinary client" Ordinary.ordinaryConvert
+    observe "use the selected (+) in a retained result" (toList (RetainedSumOperator.sumIndex n (S Z)))
+    observe "append two and one using the selected (+)" AppendByMethodClient.appendTwoAndOneByMethod
     observe "replicateNative (n + 1)" (toList oneMore)
     observe "vector with length n + 3" (toList joined)
     observe "2 + 3 at runtime" ((2 + 3) :: Nat)
