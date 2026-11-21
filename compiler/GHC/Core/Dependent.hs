@@ -3,6 +3,7 @@ module GHC.Core.Dependent (
     hasNativeDependentProgram,
     supportsNativeGentle,
     supportsNativeRuleBinds,
+    supportsScopedDictionaryCore,
     hasRetainedRuleHead, supportsLocalUserRule, supportsErasedUserRule,
     supportsImportedErasedRule, supportsImportedUserRule,
     supportsQuickLookType,
@@ -13,6 +14,7 @@ module GHC.Core.Dependent (
     isRetainedVanillaDefaultMethod,
     rejectNativeDependentProgram,
     rejectNativeDependentExpr,
+    hasScopedDictionaryProgram, hasScopedDictionaryExpr, hasScopedDictionaryType, rejectScopedDictionaryProgram, rejectScopedDictionaryExpr,
 ) where
 
 import GHC.Prelude
@@ -21,7 +23,8 @@ import GHC.Core
 import GHC.Core.FVs (orphNamesOfExprs)
 import GHC.Core.Class (classOpItems)
 import GHC.Core.Predicate (getClassPredTys_maybe)
-import GHC.Core.Type (coreFullView, isNativeIndexType, isNativeIndexFunctionId, isNativeOpaqueValueId
+import GHC.Core.Type (coreFullView, isNativeIndexType, isNativeIndexFunctionId
+                     , isNativeClassDictionaryId, isNativeOpaqueValueId
                      , isNativeRetainedBinder, isNativeIndexDomainConversion
                      , splitForAllTyCoVars, splitFunTy_maybe)
 import GHC.Core.TyCo.Compare (eqType)
@@ -55,7 +58,9 @@ data ScanState = ScanState
     }
 
 -- | Select which retained forms the scan looks for.
-data ScanPurpose = DetectNative | CheckGentle | CheckUserRules | CheckErasedTypes
+data ScanPurpose
+    = DetectNative | CheckGentle | CheckUserRules | CheckErasedTypes | DetectScopedDictionaries
+    | CheckScopedDictionaryCore
 
 -- | Select which bound-Id metadata a boundary can demand.
 data MetadataScan = AllMetadata | StableMetadata | NoMetadata
@@ -89,6 +94,13 @@ supportsNativeGentle binds =
 supportsNativeRuleBinds :: CoreProgram -> Bool
 supportsNativeRuleBinds binds =
     not (runScanFor CheckUserRules AllMetadata (foldMap scanBind binds))
+
+-- | Admit the scoped dictionary codec and the retained binders it needs.
+-- Other retained proofs and computations still require separate validation.
+supportsScopedDictionaryCore :: CoreProgram -> Bool
+supportsScopedDictionaryCore binds =
+    hasScopedDictionaryProgram binds
+    && not (runScanFor CheckScopedDictionaryCore AllMetadata (foldMap scanBind binds))
 
 -- | Does the rule head take a retained argument in its function telescope?
 hasRetainedRuleHead :: Id -> Bool
@@ -260,6 +272,34 @@ rejectNativeDependentExpr :: String -> CoreExpr -> IO ()
 rejectNativeDependentExpr context expr =
     rejectNative context (hasNativeDependentExpr expr)
 
+-- | Detect private dictionary types before preparation or interface construction.
+hasScopedDictionaryProgram :: CoreProgram -> Bool
+hasScopedDictionaryProgram binds =
+    runScanFor DetectScopedDictionaries AllMetadata (foldMap scanBind binds)
+
+-- | Detect a private dictionary form in an expression and its annotations.
+hasScopedDictionaryExpr :: CoreExpr -> Bool
+hasScopedDictionaryExpr = runScanFor DetectScopedDictionaries AllMetadata . scanExpr
+
+-- | Detect a private dictionary form in an interface-visible type.
+hasScopedDictionaryType :: Type -> Bool
+hasScopedDictionaryType =
+    runScanFor DetectScopedDictionaries NoMetadata . scanType
+
+-- | Keep experimental dictionary types out of ordinary CorePrep.
+rejectScopedDictionaryProgram :: CoreProgram -> IO ()
+rejectScopedDictionaryProgram binds =
+    rejectScopedDictionaries (foldMap scanBind binds)
+
+-- | Keep experimental dictionary applications out of interactive CorePrep.
+rejectScopedDictionaryExpr :: CoreExpr -> IO ()
+rejectScopedDictionaryExpr = rejectScopedDictionaries . scanExpr
+
+rejectScopedDictionaries :: NativeScan -> IO ()
+rejectScopedDictionaries scan =
+    when (runScanFor DetectScopedDictionaries AllMetadata scan) $
+      throwGhcExceptionIO (Sorry "CorePrep does not support experimental dependent dictionaries")
+
 -- | Run a scan with empty metadata, kind, and synonym caches.
 runScan :: MetadataScan -> NativeScan -> Bool
 runScan = runScanFor DetectNative
@@ -276,7 +316,32 @@ gentleForm scan = NativeScan $ do
     case purpose of
         CheckGentle    -> runNativeScan scan
         CheckUserRules -> runNativeScan scan
+        DetectScopedDictionaries -> runNativeScan scan
         _           -> pure True
+
+-- | Check retained binders and operands in the scoped dictionary codec.
+dictionaryOperandForm :: NativeScan -> NativeScan
+dictionaryOperandForm children = NativeScan $ do
+    purpose <- gets scanPurpose
+    runNativeScan $ case purpose of
+      CheckScopedDictionaryCore -> children
+      _ -> gentleForm children
+
+-- | Check the children of a dictionary form only at its Core interface boundary.
+scopedDictionaryForm :: NativeScan -> NativeScan
+scopedDictionaryForm children = NativeScan $ do
+    purpose <- gets scanPurpose
+    case purpose of
+      CheckScopedDictionaryCore -> runNativeScan children
+      _ -> pure True
+
+-- | Exclude shape diagnostics from the scan for actual dictionary forms.
+unsupportedShape :: Bool -> NativeScan
+unsupportedShape invalid = NativeScan $ do
+    purpose <- gets scanPurpose
+    pure $ case purpose of
+      DetectScopedDictionaries -> False
+      _ -> invalid
 
 -- | Detect an erased form and check its children at each supported use.
 erasedForm :: NativeScan -> NativeScan
@@ -284,6 +349,7 @@ erasedForm children = NativeScan $ do
     purpose <- gets scanPurpose
     case purpose of
         DetectNative -> pure True
+        CheckScopedDictionaryCore -> pure True
         _ -> runNativeScan children
 
 -- | Report an unsupported compiler operation when a scan finds a native type.
@@ -416,14 +482,21 @@ scanSynonym tc
 
 -- | Inspect syntax and synonym bodies, including unused synonym arguments.
 scanType :: Type -> NativeScan
+scanType (DepDictTy dict body) =
+    scopedDictionaryForm (unsupportedShape (not (isNativeClassDictionaryId dict))
+                          <> scanAnnotations dict <> scanType body)
+scanType (ClassAppTy _ inst (TermVarTy dict) arg@(TermVarTy _) kind) =
+    scopedDictionaryForm (unsupportedShape (not (isNativeClassDictionaryId dict))
+                          <> scanAnnotations dict <> scanType inst <> scanType arg <> scanType kind)
+scanType ClassAppTy{} = NativeScan (pure True)
 scanType (TyVarTy tv) = scanVarKind tv
 scanType (TermVarTy v) =
-    gentleForm (NativeScan (pure (not (isNativeOpaqueValueId v))) <> scanVarKind v)
+    dictionaryOperandForm (unsupportedShape (not (isNativeOpaqueValueId v)) <> scanVarKind v)
 scanType (TermAppTy f arg) = gentleForm (scanCallHead f <> scanType arg)
 -- The type binder itself is safe for Quick Look. Check its kind and payload.
 scanType (ExistsTy _ binder body) = erasedForm (scanType (varType binder) <> scanType body)
 scanType (DepFunTy _ b body) =
-    gentleForm (scanRetainedIndex b <> scanType body)
+    dictionaryOperandForm (scanRetainedIndex b <> scanType body)
 scanType (LitTy _) = mempty
 scanType (TyConApp tc args) = foldMap scanType args <> scanSynonym tc
 scanType (AppTy fun arg) = scanType fun <> scanType arg
@@ -437,11 +510,11 @@ scanType (CoercionTy co) = scanCo co
 -- | Apply the retained binder checks, including Note [Abstract witness domains]
 -- in GHC.Core.Type.
 scanRetainedIndex :: Var -> NativeScan
-scanRetainedIndex v = NativeScan (pure (not (isNativeRetainedBinder v)))
+scanRetainedIndex v = unsupportedShape (not (isNativeRetainedBinder v))
 
 -- | Check the head and its annotation without examining the function body.
 scanCallHead :: Id -> NativeScan
-scanCallHead f = NativeScan (pure (not (isNativeIndexFunctionId f))) <> scanVarKind f
+scanCallHead f = unsupportedShape (not (isNativeIndexFunctionId f)) <> scanVarKind f
 
 {- Note [Nominal domains in retained Gentle]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -460,10 +533,10 @@ scanCo (DepFunCo _ _ b domain body) =
   where
     scanDomain MRefl = mempty
     scanDomain (MCo delta) =
-        NativeScan (pure (not (coercionRole delta == Nominal
+        unsupportedShape (not (coercionRole delta == Nominal
                             && coercionLKind delta `eqType` varType b
                             && isNativeIndexDomainConversion (varType b) target
-                            && (isNativeIndexType target || isNativeIndexFunctionId b))))
+                            && (isNativeIndexType target || isNativeIndexFunctionId b)))
           <> scanCo delta
       where
         target = coercionRKind delta

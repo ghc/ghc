@@ -21,7 +21,7 @@ import GHC.Core.DataCon (dataConWrapperType)
 import GHC.Core.PatSyn
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
-import GHC.Core.Utils (applyTypeToArgs)
+import GHC.Core.Utils (applyTypeToArgs, mkLamType)
 import GHC.Hs
 import GHC.Tc.Types.Evidence
 import GHC.Types.Id
@@ -231,10 +231,14 @@ hsWrapperType wrap ty = prTypeType $ go wrap (ty,[])
     go (WpRetainedFun b w) = liftPRType $ \t ->
       mkDepFunTy b (hsWrapperType w (applyTypeToArgs t [Var b]))
     go (WpCast co)        = liftPRType $ \_ -> coercionRKind co
-    go (WpEvLam v)        = liftPRType $ mkInvisFunTy (idType v)
+    go (WpEvLam v)        = liftPRType $ \body ->
+      if isNativeClassDictionaryId v && anyFreeVarsOfType (== v) body
+      then mkLamType v body
+      else mkInvisFunTy (idType v) body
     -- See Note [Invisible retained operands in wrappers].
     go (WpEvApp (EvExpr arg)) = liftPRType $ \t -> case coreFullView t of
       DepFunTy DepFunInvisible _ _ -> applyTypeToArgs t [arg]
+      DepDictTy{}                  -> applyTypeToArgs t [arg]
       _ -> funResultTy t
     go (WpEvApp _)        = liftPRType $ funResultTy
     go (WpTyLam tv)       = liftPRType $ mkTyCoForAllTy unmatchableDataConTy tv Inferred
@@ -247,7 +251,8 @@ An inferred invisible retained argument uses WpEvApp with its checked
 Core operand. See Note [Inferring an invisible retained argument] in
 GHC.Tc.Gen.App. This wrapper applies a runtime operand, so substitute its
 index into the result with applyTypeToArgs. funResultTy handles ordinary
-evidence arrows but cannot compute a retained application result.
+evidence arrows. A dependent dictionary arrow uses the same substitution
+with its checked evidence Id.
 -}
 
 matchGroupTcType :: MatchGroupTc -> Type

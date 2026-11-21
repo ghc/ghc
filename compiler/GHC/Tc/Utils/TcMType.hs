@@ -1427,6 +1427,12 @@ collect_cand_qtvs orig_ty is_dep cur_lvl bound dvs ty
     go dv (TermAppTy f arg)
       = do { dv1 <- collect_cand_qtvs orig_ty True cur_lvl bound dv (varType f)
            ; go dv1 arg }
+    go dv (ClassAppTy _ inst dict operand kind)
+      = foldlM (collect_cand_qtvs orig_ty True cur_lvl bound) dv
+          [inst, dict, operand, kind]
+    go dv (DepDictTy v ty)
+      = do { dv1 <- collect_cand_qtvs orig_ty True cur_lvl bound dv (varType v)
+           ; collect_cand_qtvs orig_ty is_dep cur_lvl (bound `extendVarSet` v) dv1 ty }
     go dv (TermVarTy v)
       = collect_cand_qtvs orig_ty True cur_lvl bound dv (varType v)
         -- The Id is rigid. Only its type can contain quantification candidates.

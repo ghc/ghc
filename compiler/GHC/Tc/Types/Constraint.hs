@@ -1475,6 +1475,10 @@ userTypeError_maybe look_everywhere = go
     go (TermAppTy _ arg)
       | not look_everywhere = Nothing
       | otherwise = go arg
+    go (DepDictTy v ty) = go (varType v) `firstJust` go ty
+    go (ClassAppTy _ inst dict operand kind)
+      | not look_everywhere = Nothing
+      | otherwise = firstJusts (map go [inst, dict, operand, kind])
     go (DepFunTy _ v ty) = go (varType v) `firstJust` go ty
     go (ExistsTy _ v ty) = go (varType v) `firstJust` go ty
     go (FunTy { ft_ma = ma, ft_mult = mult, ft_arg = arg, ft_res = res })

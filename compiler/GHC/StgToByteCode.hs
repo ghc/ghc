@@ -41,6 +41,7 @@ import GHC.Builtin.PrimOps.Ids (primOpId)
 import GHC.Core.Type
 import GHC.Core.Predicate( tyCoVarsOfTypesWellScoped )
 import GHC.Core.Coercion ( abstractNativeIndices )
+import GHC.Core.Dependent ( hasScopedDictionaryType )
 import GHC.Core.TyCo.Rep ( Type(..) )
 import GHC.Core.TyCo.Tidy ( tidyType, tidyFreeTyCoVarsX )
 import GHC.Types.Var ( binderVar, isNonCoVarId, mkTyVar )
@@ -2819,6 +2820,9 @@ data BreakTick = BreakTick BreakpointId [TyVar] [Maybe Id] Type
 -- | Abstract free runtime indices before writing the debugger's type telescope.
 prepareBreakTick :: BreakpointId -> Type -> [Id] -> BcM (Maybe BreakTick)
 prepareBreakTick tick_id result fvs
+  | any hasScopedDictionaryType types
+  -- See Note [Runtime indices at bytecode breakpoints].
+  = return Nothing
   | not (any isNonCoVarId ordinary_tyvars)
   , not (any (anyFreeVarsOfType isNonCoVarId . idMult) fvs)
   = return (Just (BreakTick tick_id ordinary_tyvars (map Just fvs) result))
@@ -2899,6 +2903,10 @@ If a local's type cannot be abstracted, its slot is absent. Keep the slot
 position for syncOccs in GHC.Runtime.Eval. A breakpoint with an unrepresentable
 result cannot describe _result. Omit its instruction and clear the enclosing
 step-out location for its body. Nested representable ticks can still stop.
+A scoped class selector can refer to a dictionary that exists only as
+lexical evidence in Core. Omit a stop that would need to expose such a
+type through the debugger's type-variable telescope.
+
 The step-out of a representable tick uses that tick's types and the offsets
 for the case continuation's stack layout.
 -}

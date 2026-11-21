@@ -2019,6 +2019,24 @@ tcIfaceType = go
           body' <- go body
           check_exists_kind name (text "payload") (typeKind body')
           return (ExistsTy flag tv body')
+    go (IfaceDepDictTy bndr@(_, name, _) body)
+      = bindIfaceId bndr $ \dict -> do
+          unless (isNativeClassDictionaryId dict) $
+            failIfM (text "Invalid scoped dictionary binder in interface:" <+> ppr name)
+          body' <- go body
+          unless (typeKind body' `eqType` liftedTypeKind) $
+            failIfM (text "Expected a lifted scoped dictionary result in interface:" <+> ppr name)
+          return (DepDictTy dict body')
+    go (IfaceClassAppTy method inst (IfaceTermVar dict) (IfaceTermVar arg))
+      = do selector <- tcIfaceExtId method
+           inst' <- go inst
+           dict' <- tcIfaceLclId dict
+           arg' <- tcIfaceLclId arg
+           case nativeClassSelectorIndex (mkApps (Var selector) [Type inst', Var dict', Var arg']) of
+             Just index -> return index
+             Nothing -> failIfM (text "Invalid scoped class selector in interface:" <+> ppr method)
+    go IfaceClassAppTy{}
+      = failIfM (text "Scoped class selector in interface requires two lexical references")
     go (IfaceDepFunTy vis bndr@(mult, name, domain) body)
       -- See Note [Retained binders in interfaces].
       -- See Note [Exported function-valued retained signatures] in GHC.Tc.Gen.HsType.
@@ -2496,6 +2514,15 @@ tcIfaceExpr (IfaceUnpack witness@(name, _) value package body)
 
 tcIfaceExpr (IfaceApp fun arg@IfaceIndexedConArg{}) = tcIfaceRetainedApp fun arg
 tcIfaceExpr (IfaceApp fun arg@IfaceRetainedCharArg{}) = tcIfaceRetainedApp fun arg
+tcIfaceExpr (IfaceDictApp fun name)
+  = do { f <- tcIfaceExpr fun
+       ; dict <- tcIfaceLclId name
+       ; case coreFullView (exprType f) of
+           DepDictTy binder _
+             | isNativeClassDictionaryId dict
+             , idType dict `eqType` idType binder -> return (App f (Var dict))
+           _ -> failIfM (text "Invalid scoped dictionary application in interface:" <+> ppr name) }
+
 tcIfaceExpr (IfaceIndexedConArg _ _)
   = failIfM (text "Indexed constructor operand outside a retained application or proof case.")
 tcIfaceExpr (IfaceRetainedCharArg _)

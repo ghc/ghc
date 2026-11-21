@@ -34,7 +34,8 @@ import GHC.Core.Opt.OccurAnal( OccurAnalOpts(..), SimplCoreMode(..), occurAnalys
                              canDropNativeLocalBinding,
                              occurAnalysePgm, zapLambdaBndrs )
 import GHC.Core.DataCon
-import GHC.Core.Dependent ( hasNativeDependentExpr )
+import GHC.Core.Dependent ( hasNativeDependentExpr, hasScopedDictionaryExpr
+                          , hasScopedDictionaryType )
 import GHC.Core.Coercion.Opt ( optCoercion, optTransCo, OptCoercionOpts (..) )
 import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
                             , isInScope, substTyVarBndr, cloneTyVarBndr )
@@ -317,6 +318,13 @@ simpleOptNativeProgram = map simplify_bind
   where
     simplify_bind (NonRec b rhs) = NonRec b (simpleOptNativeExpr rhs)
     simplify_bind (Rec pairs) = Rec [(b, simpleOptNativeExpr rhs) | (b, rhs) <- pairs]
+
+-- | A private class selector requires a local variable as its operand.
+-- Keep a retained binding if a nonvariable could reach a selector annotation.
+selectorSafeIndexSubstitution :: CoreExpr -> Type -> Bool
+selectorSafeIndexSubstitution _ TermVarTy{} = True
+selectorSafeIndexSubstitution body _ =
+    not (hasScopedDictionaryExpr body || hasScopedDictionaryType (exprType body))
 
 {- Note [Restricted dependent simplification]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -795,6 +803,18 @@ simple_app env e0@(Lam {}) as0@(_:_)
     do_beta :: SimpleOptEnv -> InExpr -> [SimpleContItem] -> OutExpr
     do_beta env e@(Lam b body) args@(ApplyToArg a:as)
       | soe_native env
+      , isNativeClassDictionaryId b'
+      , hasFreeVarInCoreAnnotations b body
+        || anyFreeVarsOfType (== b) (exprType body)
+      = let arg = simple_opt_clo (soeInScope env') a
+        in case arg of
+             Var actual | isNativeClassDictionaryId actual
+                        , idType b' `eqType` idType actual
+               -> do_beta (env' { soe_subst = extendIdSubst (soe_subst env') b arg })
+                          body as
+             _ -> rebuild_app env (simple_opt_expr env e) args
+
+      | soe_native env
       , isNativeIndexFunctionId b'
       = let arg = simple_opt_clo (soeInScope env') a
         in case nativeIndexFunctionVar_maybe arg of
@@ -812,9 +832,10 @@ simple_app env e0@(Lam {}) as0@(_:_)
       -- See Note [Restricted dependent simplification].
       = let arg = simple_opt_clo (soeInScope env') a
         in case exprToNativeIndex arg of
-             Just _ -> do_beta (env' { soe_subst = extendIdSubst (soe_subst env') b arg })
-                               body as
-             Nothing -> rebuild_app env (simple_opt_expr env e) args
+             Just index | selectorSafeIndexSubstitution body index
+               -> do_beta (env' { soe_subst = extendIdSubst (soe_subst env') b arg })
+                          body as
+             _ -> rebuild_app env (simple_opt_expr env e) args
 
       | -- simpl binder before looking at its type
         -- See Note [Dark corner with representation polymorphism]
@@ -1981,6 +2002,13 @@ exprIsConAppFor_maybe mode ise@(ISE in_scope id_unf) expr
 
     go subst floats (Lam bndr body) (CC (arg:args) mco)
        | RetainedCore <- mode
+       , isNativeClassDictionaryId bndr
+       , hasFreeVarInCoreAnnotations bndr body
+       = do let (_, bndr') = subst_bndr subst bndr
+            actual <- termVar_maybe arg
+            guard (isNativeClassDictionaryId actual && idType actual `eqType` idType bndr')
+            go (extend subst bndr arg) floats body (CC args mco)
+       | RetainedCore <- mode
        , isNativeOpaqueValueId bndr
        , hasFreeVarInCoreAnnotations bndr body
        = do let (_, bndr') = subst_bndr subst bndr
@@ -1988,6 +2016,7 @@ exprIsConAppFor_maybe mode ise@(ISE in_scope id_unf) expr
                      then TermVarTy <$> nativeIndexFunctionVar_maybe arg
                      else exprToNativeIndex arg
             guard (typeKind index `eqType` idType bndr')
+            guard (selectorSafeIndexSubstitution body index)
             go (extend subst bndr arg) floats body (CC args mco)
        | do_beta_by_substitution bndr arg
        = go (extend subst bndr arg) floats body (CC args mco)

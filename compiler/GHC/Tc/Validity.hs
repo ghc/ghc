@@ -452,9 +452,31 @@ checkValidType ctxt ty
        -- Check for ambiguous types.  See Note [When to call checkAmbiguity]
        -- NB: this will happen even for monotypes, but that should be cheap;
        --     and there may be nested foralls for the subtype test to examine
-       ; checkAmbiguity ctxt ty
+       ; if hasScopedDictionary ty
+         then unless (scopedDictionaryArgumentsDetermined ty) $
+                failWithTc $ TcRnRetainedQuantificationError RetainedCallIndex
+         else checkAmbiguity ctxt ty
 
        ; traceTc "checkValidType done" (ppr ty <+> text "::" <+> ppr (typeKind ty)) }
+
+-- The prototype accepts a complete leading qualified telescope only when
+-- each erased parameter is determined by a visible retained argument.
+hasScopedDictionary :: Type -> Bool
+hasScopedDictionary (ForAllTy _ _ ty) = hasScopedDictionary ty
+hasScopedDictionary (FunTy af _ _ _ ty) | isInvisibleFunArg af = hasScopedDictionary ty
+hasScopedDictionary DepDictTy{} = True
+hasScopedDictionary _ = False
+
+scopedDictionaryArgumentsDetermined :: Type -> Bool
+scopedDictionaryArgumentsDetermined ty =
+    all (\(_, tv) -> isTyVar tv && any ((== Just tv) . getTyVar_maybe) domains) parameters
+  where
+    (parameters, rho) = splitForAllTyCoVars ty
+    domains = arguments rho
+    arguments (DepDictTy _ body) = arguments body
+    arguments (FunTy af _ _ _ body) | isInvisibleFunArg af = arguments body
+    arguments (DepFunTy DepFunVisible v body) = varType v : arguments body
+    arguments _ = []
 
 checkValidMonoType :: Type -> TcM ()
 -- Assumes argument is fully zonked
@@ -517,6 +539,8 @@ checkConstrainedSignature ctxt ty
           | isInvisibleFunArg af = FunTy af ma mult pred_ty (qualifierPrefix rest)
         qualifierPrefix _ = unitTy
 
+        check_body (DepDictTy dict body)
+          = mapM_ checkNoConstrainedFamilyApps [varType dict, body]
         check_body (DepFunTy _ index body)
           = do { check_part (varType index)
                ; tcExtendIdEnv [index] (go body) }
@@ -696,6 +720,8 @@ constrainedFamilyApps ty = State.evalState (go ty) emptyUniqSet
     go (AppTy f x) = descend [f, x]
     go (FunTy _ ma mult a b) = descend [ma, mult, a, b]
     go (ForAllTy ma b ty) = descend [ma, binderType b, ty]
+    go (DepDictTy v ty) = descend [varType v, ty]
+    go (ClassAppTy _ inst _ arg kind) = descend [inst, arg, kind]
     go (DepFunTy _ v ty) = descend [varType v, ty]
     go (ExistsTy _ v ty) = descend [varType v, ty]
     go (TermAppTy _ arg) = go arg
@@ -1281,6 +1307,16 @@ check_type :: ValidityEnv -> Type -> TcM ()
 -- Rank 0 means no for-alls anywhere
 
 -- See Note [Validity of retained binders]
+check_type ve (DepDictTy dict body)
+  = do { unless (isNativeClassDictionaryId dict && not (dict `elemVarSet` ve_indices ve)) $
+           failWithTc $ TcRnRetainedQuantificationError (RetainedInvalidBinder dict)
+       ; check_type ve (varType dict)
+       ; check_type (ve { ve_indices = ve_indices ve `extendVarSet` dict }) body }
+check_type ve (ClassAppTy _ inst (TermVarTy dict) arg kind)
+  = do { unless (isNativeClassDictionaryId dict && dict `elemVarSet` ve_indices ve) $
+           failWithTc $ TcRnRetainedQuantificationError RetainedCallIndex
+       ; mapM_ (check_type ve) [inst, arg, kind] }
+check_type _ ClassAppTy{} = failWithTc $ TcRnRetainedQuantificationError RetainedCallIndex
 check_type ve (TermAppTy head_id arg)
   = do { unless (isNativeIndexFunctionId head_id) $
            failWithTc $ TcRnRetainedQuantificationError RetainedCallIndex
