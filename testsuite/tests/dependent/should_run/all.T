@@ -565,5 +565,6 @@ test('NativeRetainedFamilyDomain',
 test('NativeConstrainedFamily',
      [only_ways(['normal']),
       extra_files(['NativeConstrainedFamilyProvider.hs', 'NativeConstrainedFamilyClient.hs',
-                   'NativePartialFamilyScope.hs', 'NativeImprovedFamilyScope.hs'])],
+                   'NativePartialFamilyScope.hs', 'NativeImprovedFamilyScope.hs',
+                   'NativeFamilyEquationScope.hs'])],
      run_command, ['bash NativeConstrainedFamily.sh "{compiler}" "{libdir}"'])

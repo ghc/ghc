@@ -1,5 +1,5 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, FlexibleContexts, FlexibleInstances, FunctionalDependencies, GADTs, Modifiers, PolyKinds, RankNTypes, ScopedTypeVariables, TypeApplications, TypeFamilies, TypeOperators #-}
-module ConstrainedElements (Collection(..), Allowed, Collects(..), FieldKey, Field(..), field, applyField, withField, KnownIndex(..), Reflection, reflectMaybe, MaybeBoolEcho, AtNothing) where
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, FlexibleContexts, FlexibleInstances, FunctionalDependencies, GADTs, Modifiers, PolyKinds, RankNTypes, ScopedTypeVariables, TypeApplications, TypeFamilies, TypeOperators, UndecidableInstances #-}
+module ConstrainedElements (Cursor(..), Collection(..), Allowed, Collects(..), FieldKey, Field(..), field, applyField, withField, KnownIndex(..), Reflection, reflectMaybe, MaybeBoolEcho, AtNothing) where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
@@ -74,3 +74,18 @@ instance Collection [a] a where
 instance Collection (Maybe a) a where
     type Rest (Maybe a) = ()
     uncons = fmap (\x -> (x, ()))
+
+-- | Advance past the first element when it satisfies the predicate.
+class Collection c e => Cursor c e | c -> e where
+    type Remaining c
+    type Remaining c = Rest c
+    advanceIf :: (e -> Bool) -> c -> Maybe (Remaining c)
+
+instance Cursor [a] a where
+    advanceIf p (x:xs) | p x = Just xs
+    advanceIf _ _ = Nothing
+
+instance Cursor (Maybe a) a where
+    type Remaining (Maybe a) = Rest (Maybe a)
+    advanceIf p (Just x) | p x = Just ()
+    advanceIf _ _ = Nothing

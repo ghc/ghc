@@ -107,7 +107,7 @@ import qualified InterpretedKind
 import qualified InterpretedKindUseSite
 import qualified NestedFunctionClient
 import qualified InvisibleFamily
-import ConstrainedElementsClient (splitCollection, partialElement, aliasedReflection, annotatedElement, constrainedElements, explicitElements, formatField, renderField, renderKnownFields, retainedMaybeDomain)
+import ConstrainedElementsClient (advanceCursor, splitCollection, partialElement, aliasedReflection, annotatedElement, constrainedElements, explicitElements, formatField, renderField, renderKnownFields, retainedMaybeDomain)
 import ConstrainedElementsQuickLook (showReflection)
 import IndexedMapClient (mappedCells)
 import LaterMatchabilityClient (annotatedMap, appliedCallback, boxedCallbacks, computedDictionary, flippedCallbacks, forwardedMap,
@@ -975,6 +975,9 @@ main = do
     observe "forward a runtime element with a quantified partial signature" (partialElement enabled, partialElement disabled)
     observe "split collections whose types determine their elements"
         (splitCollection [enabled, disabled], splitCollection (Just 'x'), splitCollection (Nothing :: Maybe Char))
+    observe "advance a cursor using its superclass family equation"
+        (advanceCursor id [enabled, disabled], advanceCursor id [disabled, enabled],
+         advanceCursor (== 'x') (Just 'x'))
     putStrLn "Dependent Haskell: completed source features"
     booleans
     finiteDomains

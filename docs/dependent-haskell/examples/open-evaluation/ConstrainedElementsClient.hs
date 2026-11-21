@@ -1,9 +1,9 @@
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 {-# LANGUAGE DataKinds, ExplicitNamespaces, RequiredTypeArguments, TypeApplications #-}
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes, PartialTypeSignatures, QuantifiedConstraints, RankNTypes, ScopedTypeVariables, TypeFamilies, TypeOperators #-}
-module ConstrainedElementsClient (splitCollection, constrainedElements, annotatedElement, explicitElements, renderField, formatField, renderKnownFields, retainedMaybeDomain, aliasedReflection, runReflection, partialElement) where
+module ConstrainedElementsClient (advanceCursor, splitCollection, constrainedElements, annotatedElement, explicitElements, renderField, formatField, renderKnownFields, retainedMaybeDomain, aliasedReflection, runReflection, partialElement) where
 
-import ConstrainedElements (Collection(..), Allowed, Collects(..), FieldKey, Field(..), applyField, field, withField, Reflection, reflectMaybe, MaybeBoolEcho, AtNothing)
+import ConstrainedElements (Cursor(..), Collection(..), Allowed, Collects(..), FieldKey, Field(..), applyField, field, withField, Reflection, reflectMaybe, MaybeBoolEcho, AtNothing)
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
@@ -99,3 +99,7 @@ partialElement = forward (Proxy @[]) (Proxy @Bool)
 -- | The collection determines the element type required by Rest.
 splitCollection :: Collection c e => c -> Maybe (e, Rest c)
 splitCollection = uncons
+
+-- | Check the remaining input under the imported cursor constraint.
+advanceCursor :: Cursor c e => (e -> Bool) -> c -> Maybe (Remaining c)
+advanceCursor = advanceIf

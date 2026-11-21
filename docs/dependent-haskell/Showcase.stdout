@@ -9,6 +9,7 @@ use a qualified proof and a partial family through imported type synonyms: (Just
 render a retained callback with ImpredicativeTypes enabled: ["Just True","Nothing"]
 forward a runtime element with a quantified partial signature: (True,False)
 split collections whose types determine their elements: (Just (True,[False]),Just ('x',()),Nothing)
+advance a cursor using its superclass family equation: (Just [False],Nothing,Just ())
 Dependent Haskell: completed source features
 runtime Bool choice: "42"
 apply retained function rules without forcing an unused index: (7,11,19)

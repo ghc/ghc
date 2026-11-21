@@ -15,7 +15,7 @@ for reader in marked ordinary; do
         mode=-XNoExperimentalDependentTypes
     fi
     (cd provider && "${ghc[@]}" -fforce-recomp "$mode" -c NativeConstrainedFamilyProvider.hs)
-    cp provider/NativeConstrainedFamilyProvider.hi "$src/"{NativeConstrainedFamilyClient,NativePartialFamilyScope,NativeImprovedFamilyScope}.hs "$reader/"
+    cp provider/NativeConstrainedFamilyProvider.hi "$src/"{NativeConstrainedFamilyClient,NativePartialFamilyScope,NativeImprovedFamilyScope,NativeFamilyEquationScope}.hs "$reader/"
     (
         cd "$reader"
         "${ghc[@]}" -c NativeConstrainedFamilyClient.hs
@@ -29,6 +29,25 @@ for reader in marked ordinary; do
             cat premise.log
             exit 1
         fi
+        equation=(-fforce-recomp -XExperimentalDependentTypes -c NativeFamilyEquationScope.hs)
+        "${ghc[@]}" "${equation[@]}"
+        for site in WRONG_OWNER WRITER_ONLY WRONG_ARGUMENT REPRESENTATIONAL MISSING_PREMISE; do
+            case "$site" in
+                WRONG_OWNER) predicate='Output c Bool' ;;
+                WRITER_ONLY) predicate='Collects (Key' ;;
+                WRONG_ARGUMENT) predicate='Collects b' ;;
+                REPRESENTATIONAL) predicate='Collects a' ;;
+                MISSING_PREMISE) predicate='Allowed a' ;;
+            esac
+            if [[ $reader == ordinary ]]; then
+                "${ghc[@]}" "${equation[@]}" "-D$site"
+            elif "${ghc[@]}" "${equation[@]}" "-D$site" -fdefer-type-errors >equation.log 2>&1 ||
+                 ! grep -Eq '^NativeFamilyEquationScope.hs:[0-9]+:[0-9]+: error: \[GHC-90647\]' equation.log ||
+                 ! grep -Fq "$predicate" equation.log; then
+                cat equation.log
+                exit 1
+            fi
+        done
         improved=(-fforce-recomp -c NativeImprovedFamilyScope.hs)
         "${ghc[@]}" "${improved[@]}"
         for site in ALIAS_GUARD MISSING_OWNER WRONG_EXPLICIT EXPLICIT_PREFIX; do
