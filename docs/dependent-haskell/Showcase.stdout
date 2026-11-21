@@ -423,6 +423,7 @@ map a type lambda with a constructor case: Refl
 read fields from two indexed type case branches: (Refl,Refl)
 retain the kind of a matched Nothing: Refl
 name and reuse a type-level intermediate result: Refl
+splice a type let that shadows its outer binder: Right (Just True)
 select a vector header with a runtime flag and a computed width: (":xy","xy")
 refer to an outer type let before shadowing it in a case: Refl
 bind the result of a constructor case: (Right True,Left 'c')

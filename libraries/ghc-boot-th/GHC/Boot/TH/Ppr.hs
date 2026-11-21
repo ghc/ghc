@@ -920,6 +920,10 @@ pprType p (ForEachT vis name domain body) =
       BndrReq   -> binder <+> text "->"
       BndrInvis -> binder <> char '.'
 pprType _ (IndexVarT name) = pprName' Applied name
+pprType p (LetT name rhs body) =
+  parensIf (p >= funPrec) $
+    text "let" <+> pprName' Applied name <+> equals <+> pprType noPrec rhs
+      <+> text "in" <+> pprType noPrec body
 pprType p (CaseT scrutinee rows) =
   parensIf (p >= funPrec) $
     text "case" <+> pprType noPrec scrutinee <+> text "of"
