@@ -349,6 +349,10 @@ dsAbsBinds dflags tyvars dicts exports
        ; let aux_binds = Rec aux_prs
                 -- Monomorphic recursion possible, hence Rec
 
+             package_workers = mkVarSet
+               [ worker | (worker, _) <- aux_prs
+                        , CoreUnfolding { uf_src = RetainedUserSrc, uf_tmpl = tmpl } <- [realIdUnfolding worker]
+                        , hasExistentialExpr tmpl ]
              new_force_vars = get_new_force_vars force_vars
              locals       = map abe_mono exports
              all_locals   = locals ++ new_force_vars
@@ -378,12 +382,13 @@ dsAbsBinds dflags tyvars dicts exports
                      ; let rhs = core_wrap $ mkLams tyvars $ mkLams dicts sel_body
                            rhs_for_spec = Let (NonRec poly_tup_id poly_tup_rhs) rhs
                      ; (spec_binds, rules) <- dsSpecs rhs_for_spec spec_prags
-                     ; let global' = (global `setInlinePragma` defaultInlinePragma)
-                                             `addIdSpecialisations` rules
-                           -- Kill the INLINE pragma because it applies to
-                           -- the user written (local) function.  The global
-                           -- Id is just the selector.  Hmm.
-                     ; return (fromOL spec_binds ++ [(global', rhs)]) } }
+                     ; selector <- if local `elemVarSet` package_workers
+                           then do
+                             let template = core_wrap $ mkLams tyvars $ mkLams dicts $
+                                            mkCoreLets ds_ev_binds $ mkLet aux_binds (Var local)
+                             fst <$> makeCorePair dflags False (idName global) global False template
+                           else pure (global `setInlinePragma` defaultInlinePragma)
+                     ; return (fromOL spec_binds ++ [(addIdSpecialisations selector rules, rhs)]) } }
 
        ; export_binds_s <- mapM mk_bind (exports ++ extra_exports)
 
@@ -541,8 +546,11 @@ still chooses loop breakers for the recursive group.
 In the general AbsBinds case the workers are local to the tuple function.
 Its type and dictionary lambdas bind the variables in the worker template.
 Use the local unfolding policy for those workers. Leave the pragma on the
-worker that owns the definition. The exported selector calls the shared
-tuple function. See Note [Desugaring AbsBinds].
+worker that owns the definition. For its export, close the selected worker
+over those same binders and evidence bindings. This gives the client a
+stable unfolding with all of the group's free variables in scope.
+The runtime selector still calls the shared tuple function.
+See Note [Desugaring AbsBinds].
 See Note [Erased package unfoldings] in GHC.IfaceToCore.
 Compulsory default-method unfoldings still use their separate check.
 An ordinary binding without an unfolding request needs no native scan here.
