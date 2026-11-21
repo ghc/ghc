@@ -7194,3 +7194,21 @@ list constructors supply the ordinary element types. GHC checks the
 original fields and the equality of the two lengths at the call.
 [Agda 2.8.0, implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html)
 and [Agda standard library 2.3, vector operations](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html).
+
+### Written character indices
+
+GHC proposal #387 supplies `Char` literals in types and `KnownChar`.
+Agda also has a built-in character type whose literals can occur in
+dependent types. The fork uses the existing `CharTyLit` for a written
+retained operand. Its runtime expression is the ordinary boxed worker
+`C#` applied to `LitChar`. This exact form can also occur as an element
+of a written list. CorePrep names the boxed literal with the checked
+alias used for constructor operands. The literal is already in weak
+head normal form. An ordinary client can read it while a different
+list element stays lazy. When an interface stores such an operand in
+an unfolding, its header requires `retained-char-operand`. Ordinary
+character literals and interfaces without retained operands keep
+their existing format.
+[GHC proposal #387](https://ghc-proposals.readthedocs.io/en/latest/proposals/0387-char-kind.html),
+[Agda built-in characters](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#characters),
+and [ordinary character client](examples/qualified-pi/RetainedCharacterClient.hs).

@@ -154,6 +154,11 @@ test('NativeOpenPairLinkable',
 test('NativeOpenCharGhci',
      extra_files([open_eval_dir + f for f in ['OpenAlias.hs', 'OpenProducer.hs', 'OpenSource.hs']]),
      ghci_script, ['NativeOpenCharGhci.script'])
+test('NativeRetainedChar',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['../../../../docs/dependent-haskell/examples/qualified-pi/' + f
+                   for f in ['RetainedCharacters.hs', 'RetainedCharacterClient.hs']])],
+     run_command, ['bash NativeRetainedChar.sh "{compiler}" "{libdir}"'])
 test('NativeOpenRetry',
      [req_interp, req_rts_linker, only_ways(['normal']), extra_files(['NativeOpenRetryLib.hs'])],
      multimod_compile_and_run,

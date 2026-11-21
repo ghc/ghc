@@ -2494,16 +2494,12 @@ tcIfaceExpr (IfaceUnpack witness@(name, _) value package body)
                 ; return (Unpack witness' value' package' body') }
            _ -> failIfM (text "Unpack requires an existential package in interface.") }
 
-tcIfaceExpr (IfaceApp fun (IfaceIndexedConArg shape arg))
-  = do { f <- tcIfaceExpr fun
-       ; a <- tcIfaceExpr arg
-       ; case coreFullView (exprType f) of
-           DepFunTy _ binder _ | matchesIndexedConShape shape a
-             , Just index <- retainedArgIndex a
-             , typeKind index `eqType` varType binder -> return (App f a)
-           _ -> failIfM (text "Invalid indexed constructor argument in retained interface application.") }
+tcIfaceExpr (IfaceApp fun arg@IfaceIndexedConArg{}) = tcIfaceRetainedApp fun arg
+tcIfaceExpr (IfaceApp fun arg@IfaceRetainedCharArg{}) = tcIfaceRetainedApp fun arg
 tcIfaceExpr (IfaceIndexedConArg _ _)
   = failIfM (text "Indexed constructor operand outside a retained application or proof case.")
+tcIfaceExpr (IfaceRetainedCharArg _)
+  = failIfM (text "Character operand outside a retained application or proof case.")
 tcIfaceExpr (IfaceApp fun arg)
   = App <$> tcIfaceExpr fun <*> tcIfaceExpr arg
 
@@ -2521,9 +2517,7 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
         [proof] | proof /= case_bndr -> return ()
         _ -> failIfM (text "An index alias alternative requires one proof distinct from its case binder:" <+> ppr names)
       _ -> return ()
-    (tagged_operand, scrut') <- case scrut of
-      IfaceIndexedConArg shape operand -> (Just shape,) <$> tcIfaceExpr operand
-      _ -> (Nothing,) <$> tcIfaceExpr scrut
+    (tagged_char, tagged_operand, scrut') <- tcIfaceRetainedOperand scrut
     -- Resolve each constructor once, before inspecting its representation arity.
     let scrut_index = exprToNativeCaseIndex scrut'
         constructed = maybe False isNativeConstructedGadtIndex scrut_index
@@ -2564,6 +2558,8 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
                                DataAlt dc -> isNativeIndexedDataAlt dc ns
                                _ -> False) resolved
         native = constructor_proof || indexed_proof || any (\(c, ns, _) -> c == DEFAULT && not (null ns)) resolved
+    when (tagged_char && not (native && isJust scrut_index)) $
+      failIfM (text "Invalid character scrutinee in native index interface proof:" <+> ppr scrut')
     forM_ tagged_operand $ \shape ->
       unless (native && isJust scrut_index && matchesIndexedConShape shape scrut') $
         failIfM (text "Invalid indexed constructor scrutinee in native index interface proof:"
@@ -2642,6 +2638,31 @@ tcIfaceExpr (IfaceTick tickish expr) = do
       _otherwise    -> do
         tickish' <- tcIfaceTickish tickish
         return (Tick tickish' expr')
+
+-- | Check the indexed type of an application with a tagged operand.
+tcIfaceRetainedApp :: IfaceExpr -> IfaceExpr -> IfL CoreExpr
+tcIfaceRetainedApp fun arg
+  = do { f <- tcIfaceExpr fun
+       ; (_, shape, a) <- tcIfaceRetainedOperand arg
+       ; case coreFullView (exprType f) of
+           DepFunTy _ binder _ | maybe True (`matchesIndexedConShape` a) shape
+             , Just index <- retainedArgIndex a
+             , typeKind index `eqType` varType binder -> return (App f a)
+           _ -> failIfM (text "Invalid tagged operand in retained interface application.") }
+
+-- | Read optional capability tags in their writer order.
+tcIfaceRetainedOperand :: IfaceExpr -> IfL (Bool, Maybe IfaceIndexedConShape, CoreExpr)
+tcIfaceRetainedOperand expr
+  = do { let (tagged_char, rest) = case expr of
+               IfaceRetainedCharArg operand -> (True, operand)
+               _ -> (False, expr)
+       ; let (shape, operand) = case rest of
+               IfaceIndexedConArg con subexpr -> (Just con, subexpr)
+               _ -> (Nothing, rest)
+       ; result <- tcIfaceExpr operand
+       ; when (tagged_char && not (containsRetainedCharLiteral result)) $
+           failIfM (text "Missing boxed character literal in tagged interface operand:" <+> ppr result)
+       ; return (tagged_char, shape, result) }
 
 -------------------------
 tcIfaceTickish :: IfaceTickish -> IfL CoreTickish
