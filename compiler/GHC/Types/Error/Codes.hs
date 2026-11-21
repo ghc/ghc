@@ -206,6 +206,7 @@ type family GhcDiagnosticCode c = n | n -> c where
 
   -- Desugarer diagnostic codes
   GhcDiagnosticCode "DsRetainedPackagePatterns"                     = 94726
+  GhcDiagnosticCode "DsLinearRetainedPackageRows"                  = 47619
   GhcDiagnosticCode "DsRetainedInlinePragma"                        = 92256
   GhcDiagnosticCode "DsEmptyEnumeration"                            = 10190
   GhcDiagnosticCode "DsIdentitiesFound"                             = 04214

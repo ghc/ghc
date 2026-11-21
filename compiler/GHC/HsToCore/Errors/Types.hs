@@ -175,6 +175,9 @@ data DsMessage
   -- | The unfolding of an ordinary signature still contains retained Core.
   | DsRetainedInlinePragma !Name !InlineSpec
 
+  -- | Separate equations would match a linear retained package more than once.
+  | DsLinearRetainedPackageRows
+
   deriving Generic
 
 -- The positional number of the argument for an expression (first, second, third, etc)
