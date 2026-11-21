@@ -32,7 +32,7 @@ module GHC.Core.Opt.Simplify.Env (
 
         -- * Simplifying 'Id' binders
         simplNonRecBndr, simplNonRecJoinBndr, simplRecBndrs, simplRecJoinBndrs,
-        simplBinder, simplBinders, cloneRetainedAltBinders,
+        simplBinder, simplBinders, cloneRetainedAltBinders, cloneRetainedCaseBinder,
         substTy, substTyVar, getFullSubst, getTCvSubst,
         substCo, substCoVar,
 
@@ -62,7 +62,7 @@ import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Rules.Config ( RuleOpts(..) )
 import GHC.Core
 import GHC.Core.Utils
-import GHC.Core.Subst( cloneBndrsM, substExprSC )
+import GHC.Core.Subst( cloneBndr, substExprSC )
 import GHC.Core.Unfold
 import GHC.Core.TyCo.Rep (Type(DepFunTy))
 import GHC.Core.TyCo.Subst (emptyIdSubstEnv, mkSubst)
@@ -81,6 +81,7 @@ import GHC.Types.Id as Id
 import GHC.Types.InlinePragma ( ActivationGhc, CompilerPhase, isActiveInPhase )
 import GHC.Types.Basic
 import GHC.Types.Unique.FM      ( mapMaybeUFM, pprUniqFM )
+import GHC.Types.Unique.Supply  ( getUniqueM )
 
 import GHC.Data.OrdList
 import GHC.Data.Graph.UnVar
@@ -1125,17 +1126,24 @@ simplBinders  !env bndrs = mapAccumLM simplBinder  env bndrs
 -- | Freshen a whole retained field telescope when copying an unfolding.
 -- See Note [Inlining retained constructor alternatives] in GHC.Core.Opt.Simplify.Iteration.
 cloneRetainedAltBinders :: SimplEnv -> [InBndr] -> SimplM (SimplEnv, [OutBndr])
-cloneRetainedAltBinders env fields = do
-    (Subst scope indices tvs cvs, fresh) <-
-        cloneBndrsM (getTCvSubst env) (map zap_id_info fields)
-    let ids = [(old, DoneId new) | (old, new) <- zip fields fresh, isNonCoVarId old]
+cloneRetainedAltBinders = mapAccumLM cloneRetainedCaseBinder
+
+-- | Freshen a case or field binder from a copied retained alternative.
+-- See Note [Inlining retained constructor alternatives] in GHC.Core.Opt.Simplify.Iteration.
+cloneRetainedCaseBinder :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
+cloneRetainedCaseBinder env old = do
+    unique <- getUniqueM
+    let (Subst scope indices tvs cvs, fresh) =
+            cloneBndr (getTCvSubst env) unique binder
+        ids | isNonCoVarId old = extendVarEnv (seIdSubst env) old (DoneId fresh)
+            | otherwise = seIdSubst env
     return (env { seInScope = scope, seIndexSubst = indices, seTvSubst = tvs,
-                  seCvSubst = cvs, seIdSubst = extendVarEnvList (seIdSubst env) ids }, fresh)
+                  seCvSubst = cvs, seIdSubst = ids }, fresh)
   where
     -- An indexed GADT alternative starts with erased existential binders.
     -- Clone them before the equality and fields that mention them.
-    zap_id_info v | isTyVar v = v
-                  | otherwise = zapFragileIdInfo v
+    binder | isTyVar old = old
+           | otherwise = zapFragileIdInfo old
 
 -------------
 simplBinder :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)

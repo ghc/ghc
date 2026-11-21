@@ -15,6 +15,13 @@ for opt in -O0 -O2; do
     "${ghc[@]}" --show-iface "$provider/Provider.hi" >"$provider/interface"
     grep -Fq 'retained-constructor-context' "$provider/interface"
 
+    known="$work/$opt/known"
+    mkdir -p "$known"
+    "${ghc[@]}" "$opt" -c -i "-i$provider" -o "$known/Main.o" \
+        -ohi "$known/Main.hi" "$src/KnownCase.hs"
+    "${ghc[@]}" "$known/Main.o" "$provider/Provider.o" -o "$known/run"
+    test "$("$known/run")" = $'1\n2'
+
     for client in Main ReifiedMain QuotedMain; do
         out="$work/$opt/$client"
         mkdir -p "$out"
@@ -24,3 +31,12 @@ for opt in -O0 -O2; do
         test "$("$out/run")" = '("71","r")'
     done
 done
+
+if "${ghc[@]}" -O0 -c -fno-code -i "-i$work/-O0/provider" \
+    -DWRONG_WITNESS -fdiagnostics-color=never \
+    "$src/KnownCase.hs" >"$work/wrong.log" 2>&1; then
+    echo "A retained constructor supplied an equality at the wrong endpoint." >&2
+    exit 1
+fi
+line=$(grep -n '^wrong (Mk ' "$src/KnownCase.hs" | cut -d: -f1)
+grep -Eq "KnownCase\\.hs:$line:[0-9]+: error: \\[GHC-83865\\]" "$work/wrong.log"
