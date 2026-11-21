@@ -28,6 +28,22 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `1c7f70b3ef`, the list index accepts `Fin (sourceLength xs)`.
+An unsigned local caller can pass its list to both `mkFinGeneric` and
+`indexGeneric`. The corresponding inputs on the preceding compiler needed
+a signature, even when the caller supplied `@Char`. The earlier
+`GenericCount` family keeps its arity and forwards to the ordinary
+function. Both public workers now name that function directly.
+
+All 390 Showcase lines matched stripped `-O0`, default `-O1` and
+`-O2`, and GHCi. All 33 focused tests passed, and the Core API run
+matched its 37-line golden. The updated source-hidden finite-index test
+also passed at all three native optimization levels. Its negative cases
+check GHC-83865 at `FZ` for an empty list, GHC-83605 at a linear
+operand, and GHC-25897 at an operand with a rigid incompatible type.
+[Ordinary caller](examples/qualified-pi/FinitePositionClient.hs)
+and [registered checks](../../testsuite/tests/dependent/should_run/NativeIndexedFin.sh).
+
 At `f17c3f41b8`, an ordinary client can use
 `let (value, use) = package in use value` when the package hides the
 type of `value`. The original let binding shares the producer.

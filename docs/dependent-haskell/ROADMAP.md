@@ -9,6 +9,17 @@ records every edge. The R numbers are local labels for those cards.
 
 ## Where this fork stands
 
+The roadmap's bounded list index works from source. Its type is
+`foreach (xs :: [a]) -> Fin (sourceLength xs) -> a`, where
+`sourceLength` is the ordinary list function. In a separately compiled
+ordinary module, GHC infers the local list argument in
+`checked xs n = fmap (indexGeneric xs) (mkFinGeneric xs n)`.
+`checked "abc" 1` returns `Just 'b'`. A negative position returns
+`Nothing` before inspecting the list. A written `FZ` at the empty list
+fails at compile time. A finite position can select from a cyclic list.
+[Implementation](examples/qualified-pi/ParameterizedIndexLibrary.hs)
+and [ordinary caller](examples/qualified-pi/FinitePositionClient.hs).
+
 An ordinary module can check a signed offset once against a vector.
 On success, `mkFinVec` returns a position of type `Fin n`. The caller
 can use that position on any vector of length `n`. A negative offset
