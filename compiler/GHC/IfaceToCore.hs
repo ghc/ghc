@@ -2384,8 +2384,17 @@ tcIfaceCo = go
     go (IfaceLRCo lr c)          = mkLRCo lr <$> go c
     go (IfaceKindCo c)           = KindCo   <$> go c
     go (IfaceSubCo c)            = SubCo    <$> go c
-    go (IfaceAxiomCo ax cos)     = AxiomCo <$> tcIfaceAxiomRule ax
-                                           <*> mapM go cos
+    go (IfaceAxiomCo ax cos)
+      = do { rule <- tcIfaceAxiomRule ax
+           ; args <- mapM go cos
+           ; case rule of
+               BuiltInRule name _ roles proves
+                 | Just _ <- matchableProjectionDirection name
+                 -> unless (map coercionRole args == roles &&
+                            isJust (proves (map coercionKind args))) $
+                      failIfM (text "Invalid matchable application projection in interface:" <+> ppr name)
+               _ -> return ()
+           ; return (AxiomCo rule args) }
     go (IfaceFreeCoVar c)        = pprPanic "tcIfaceCo:IfaceFreeCoVar" (ppr c)
     go (IfaceHoleCo c)           = pprPanic "tcIfaceCo:IfaceHoleCo"    (ppr c)
 

@@ -25,7 +25,7 @@ module GHC.Core.Coercion.Axiom (
        existsCoRuleName,
 
        CoAxiomRule(.., BuiltInEqRule), BuiltInFamRewrite(..), BuiltInFamInjectivity(..), TypeEqn,
-       scopedSigmaClosureName, matchableProjectionName,
+       scopedSigmaClosureName, matchableProjectionName, matchableProjectionDirection,
        coAxiomRuleArgRoles, coAxiomRuleRole,
        coAxiomRuleBranch_maybe, isNewtypeAxiomRule_maybe,
        ClosedTyFam(..), closedTyFamCoAxiom_maybe, BuiltinClosedTyFam(..),
@@ -659,6 +659,13 @@ scopedSigmaClosureName = fsLit "ScopedSigmaClosure"
 matchableProjectionName :: LeftOrRight -> FastString
 matchableProjectionName CLeft  = fsLit "MatchableAppLeft"
 matchableProjectionName CRight = fsLit "MatchableAppRight"
+
+-- | Decode the component selected by this built-in rule.
+matchableProjectionDirection :: FastString -> Maybe LeftOrRight
+matchableProjectionDirection name
+  | name == matchableProjectionName CLeft  = Just CLeft
+  | name == matchableProjectionName CRight = Just CRight
+  | otherwise                              = Nothing
 
 instance Eq CoAxiomRule where
   (BuiltInFamRew  bif1)  == (BuiltInFamRew  bif2)  = bifrw_name  bif1 == bifrw_name bif2

@@ -3170,7 +3170,7 @@ instance Binary IfaceAxiomRule where
       requireIfaceEvidenceVersion bh ErasedExistentialEvidence
     when (uses ImplicitExists) $
       requireIfaceEvidenceVersion bh ImplicitExistentialEvidence
-    when (ifLclNameFS n `elem` map matchableProjectionName [CLeft, CRight]) $
+    when (isJust (matchableProjectionDirection (ifLclNameFS n))) $
       requireIfaceEvidenceVersion bh MatchableProjectionEvidence
     when (ifLclNameFS n == scopedSigmaClosureName) $
       requireIfaceEvidenceVersion bh ScopedSigmaEvidence

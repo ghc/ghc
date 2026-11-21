@@ -1040,13 +1040,6 @@ projectMatchableApp lr app fun arg
   where
     fun_kind = typeKind fun
 
--- | Decode the component selected by this built-in rule.
-matchableProjectionDirection :: FastString -> Maybe LeftOrRight
-matchableProjectionDirection name
-  | name == matchableProjectionName CLeft  = Just CLeft
-  | name == matchableProjectionName CRight = Just CRight
-  | otherwise                              = Nothing
-
 -- | Recover an ordinary projection when the equality alone proves its head kinds.
 -- See Note [Matchability in application projection evidence].
 ordinaryAppProjection_maybe :: CoAxiomRule -> [Coercion] -> Maybe (LeftOrRight, Coercion)
@@ -1083,9 +1076,11 @@ through mkLRCo so later substitution can retain its original heads.
 A projection that needs the scoped proof must keep the checked rule in
 the interface. Its header records that requirement.
 
-Computing one endpoint checks the application on that side only.
-Computing both for each nested projection would double the work at
-each level. Core Lint calls the rule on both complete endpoints.
+The four component premises record the type at each endpoint. Read the
+requested component directly in coercion_lr_kind. Rechecking the parent
+projection there repeatedly traverses the same proof. Core Lint checks
+every premise and both applications. The interface reader also checks
+the full rule before it admits stored evidence.
 See Note [coercionKind performance].
 -}
 
@@ -2618,12 +2613,9 @@ coercion_lr_kind which orig_co
     go_ax axr@(BuiltInFamRew  bif) cos  = check_bif_res axr (bifrw_proves  bif (map coercionKind cos))
     go_ax axr@(BuiltInFamInj bif) [co]  = check_bif_res axr (bifinj_proves bif (coercionKind co))
     go_ax axr@(BuiltInFamInj {})  _     = crash axr
-    go_ax axr@(BuiltInRule name Nominal _ _) [co, cf, cx, cg, cy]
+    go_ax (BuiltInRule name Nominal _ _) [_, cf, cx, cg, cy]
       | Just lr <- matchableProjectionDirection name
-      = let (fun, arg) = pickLR which ((cf, cx), (cg, cy))
-        in case projectMatchableApp lr (go co) (go fun) (go arg) of
-             Just ty -> ty
-             Nothing -> crash axr
+      = go (pickLR lr (pickLR which ((cf, cx), (cg, cy))))
     go_ax axr@(BuiltInRule _ _ _ proves) cos =
       check_bif_res axr (proves (map coercionKind cos))
     go_ax     (UnbranchedAxiom ax) cos  = go_branch ax (coAxiomSingleBranch ax) cos
