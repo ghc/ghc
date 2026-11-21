@@ -12,10 +12,25 @@ g=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint
 cd "$out/provider"
 cp "$src"/{TypeLambda,SchemaColumns,NativeTypeLambdaScope}.hs .
 "${g[@]}" -Werror=unused-type-patterns -fomit-interface-pragmas -c TypeLambda.hs
+sed -e 's/^module TypeLambda$/module OpenTypeLambda/' \
+    -e 's/^type family Map f xs where$/type family Map f xs/' \
+    -e 's/^  Map \(.* = .*\)$/type instance Map \1/' TypeLambda.hs >OpenTypeLambda.hs
+"${g[@]}" -Werror=unused-type-patterns -fomit-interface-pragmas -c OpenTypeLambda.hs
 "${g[@]}" --show-iface TypeLambda.hi >provider.iface
 if sed -n '/^exports:/,/^defaults:/p' provider.iface | grep -E '[$](lambda|signature-lambda):'; then exit 1; fi
 "${g[@]}" -fomit-interface-pragmas -c NativeTypeLambdaScope.hs
 "${g[@]}" -fomit-interface-pragmas -c SchemaColumns.hs
+cat >RepeatedProvider.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes, Modifiers, StandaloneKindSignatures #-}
+module RepeatedProvider where
+import Data.Kind (Type)
+import GHC.Matchability (U)
+type LeftCallback :: Type -> Type %U -> Type
+type LeftCallback e = \a -> Either e a
+type RightCallback :: Type -> Type %U -> Type
+type RightCallback e = \field -> Either e field
+HS
+"${g[@]}" -fomit-interface-pragmas -c RepeatedProvider.hs
 sed 's/, UndecidableInstances//; s/module TypeLambda/module Termination/' TypeLambda.hs >Termination.hs
 if "${g[@]}" -c Termination.hs >termination.log 2>&1 ||
    ! grep -Fq 'error: [GHC-22979]' termination.log ||
@@ -24,8 +39,48 @@ if "${g[@]}" -c Termination.hs >termination.log 2>&1 ||
     cat termination.log >&2
     exit 1
 fi
-cp TypeLambda.hi SchemaColumns.hi NativeTypeLambdaScope.hi "$out/client/"
+cp TypeLambda.hi SchemaColumns.hi OpenTypeLambda.hi NativeTypeLambdaScope.hi RepeatedProvider.hi "$out/client/"
 cd "$out/client"
+test ! -e TypeLambda.hs
+cp "$src/TypeLambdaClient.hs" .
+"${g[@]}" -fomit-interface-pragmas -c TypeLambdaClient.hs
+sed -e 's/module TypeLambdaClient/module OpenTypeLambdaClient/' \
+    -e 's/import TypeLambda /import OpenTypeLambda /' TypeLambdaClient.hs >OpenTypeLambdaClient.hs
+"${g[@]}" -fomit-interface-pragmas -c OpenTypeLambdaClient.hs
+
+cat >RepeatedClient.hs <<'HS'
+{-# LANGUAGE DataKinds, GADTs, Modifiers, NoExperimentalDependentTypes #-}
+{-# LANGUAGE StandaloneKindSignatures, TypeFamilies, TypeOperators #-}
+module RepeatedClient where
+import Data.Kind (Type)
+import Data.Type.Equality ((:~:)(Refl))
+import GHC.Matchability (U)
+import RepeatedProvider
+type Same :: (Type %U -> Type) -> (Type %U -> Type) -> Bool
+type family Same x y where
+    Same x x = 'True
+    Same _ _ = 'False
+test :: Same (LeftCallback Char) (RightCallback Char) :~: 'True
+test = Refl
+HS
+"${g[@]}" -c RepeatedClient.hs
+sed -e 's/module RepeatedClient/module WrongRepeat/' -e "s/:~: 'True/:~: 'False/" \
+    RepeatedClient.hs >WrongRepeat.hs
+if "${g[@]}" -c WrongRepeat.hs >repeat.log 2>&1 ||
+   ! grep -Fq 'error: [GHC-83865]' repeat.log; then
+    cat repeat.log >&2
+    exit 1
+fi
+
+sed -e 's/module TypeLambdaClient/module ChangedLambda/' \
+    -e 's/Either e field/Either field e/' TypeLambdaClient.hs >ChangedLambda.hs
+if "${g[@]}" -c ChangedLambda.hs >changed.log 2>&1 ||
+   ! grep -Fq 'error: [GHC-83865]' changed.log ||
+   ! grep -Fq 'withErrors p fields' changed.log; then
+    cat changed.log >&2
+    exit 1
+fi
+
 cat >Ordinary.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeApplications, TypeOperators #-}
 module Ordinary where
@@ -101,8 +156,9 @@ module Main where
 import Data.Type.Equality ((:~:)(Refl))
 import Ordinary (capturedRow, independentRow, scopedRow)
 import Data.Proxy (Proxy(..))
-import TypeLambda (Columns, Fields(..), Optional, Prefixes, ScopedRow, withErrors)
+import TypeLambda (Columns, Fields(..), Optional, Prefixes, ScopedRow)
 import SchemaColumns (Checked)
+import TypeLambdaClient (forwardErrors)
 
 withError :: Fields (Prefixes ('Just Ordering) '[Char, Bool])
 withError = case capturedRow of Refl -> Field (Left GT) (Field (Right True) End)
@@ -118,7 +174,7 @@ main = case (capturedRow, independentRow, withError, withoutError) of
         row = case scopedRow of Refl -> Field (Just 'x', Right True) End
     case row of Field value End -> print value
     let input = Field 'x' (Field (error "unused field" :: Bool) End)
-    case withErrors (Proxy :: Proxy String) input of
+    case forwardErrors (Proxy :: Proxy String) input of
       Field x (Field _ End) -> print x
     let optional :: Fields (Columns Optional '[Int])
         optional = Field (Just 42) End
@@ -128,7 +184,7 @@ main = case (capturedRow, independentRow, withError, withoutError) of
       (Field x End, Field y End) -> print (x, y)
 HS
 "${g[@]}" -c RowsMain.hs
-"${g[@]}" RowsMain.o Ordinary.o ../provider/TypeLambda.o ../provider/SchemaColumns.o -o rows
+"${g[@]}" RowsMain.o Ordinary.o TypeLambdaClient.o ../provider/TypeLambda.o ../provider/SchemaColumns.o -o rows
 printf '%s\n' "(Left GT,Right True,Just 'a',Just True)" "(Just 'x',Right True)" "Right 'x'" '(Just 42,Left "missing")' >rows.expected
 ./rows >rows.actual
 cmp rows.expected rows.actual

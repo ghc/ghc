@@ -122,6 +122,7 @@ import LaterMatchabilityClient (annotatedMap, appliedCallback, boxedCallbacks, c
                                 laterMatchability, nestedCallback, rankedMap)
 import qualified SchemaColumns
 import qualified TypeLambda
+import qualified TypeLambdaClient
 import qualified TypeLet
 import qualified NativeCase
 import qualified NativeNestedCase
@@ -1559,6 +1560,10 @@ main = do
     case TypeLambda.withErrors (Proxy @String) fields of
         TypeLambda.Field x (TypeLambda.Field y TypeLambda.End) ->
             observe "give every field in a row the same error type" (x, y)
+    let lazyFields = TypeLambda.Field 'x' (TypeLambda.Field (error "unused field" :: Bool) TypeLambda.End)
+    case TypeLambdaClient.forwardErrors (Proxy @String) lazyFields of
+        TypeLambda.Field first _ ->
+            observe "forward a row with the same callback across modules" first
     let optional :: TypeLambda.Fields (TypeLambda.Columns TypeLambda.Optional '[Int])
         optional = TypeLambda.Field (Just 42) TypeLambda.End
         checked :: TypeLambda.Fields (TypeLambda.Columns (SchemaColumns.Checked String) '[Bool])
