@@ -473,9 +473,22 @@ for opt in 0 2; do
         grep -Eq "^LexicalOpenReject.hs:$((line + offset)):$column: error: \[GHC-25897\]" open-let-reject.log ||
             { cat open-let-reject.log >&2; exit 1; }
     done
-    line=$(grep -nF '(freshOpenPayload True)' LexicalOpenReject.hs | cut -d: -f1)
-    grep -Eq "^LexicalOpenReject.hs:$line:[0-9]+: error: \[GHC-83865\]" open-let-reject.log ||
+    field=$(grep -nF '(freshOpenPayload True)' LexicalOpenReject.hs)
+    line=${field%%:*}
+    prefix=${field#*:}
+    prefix=${prefix%%freshOpenPayload True*}
+    column=$((${#prefix} + 1))
+    grep -Eq "^LexicalOpenReject.hs:$line:$column: error: \[GHC-83865\]" open-let-reject.log ||
         { cat open-let-reject.log >&2; exit 1; }
+    grep -Eq "Couldn't match expected type .b. with actual type .a." open-let-reject.log
+    grep -Fq 'In the expression: value' open-let-reject.log
+    grep -Fq 'the type OuterPayload' open-let-reject.log
+    grep -Fq 'with actual type: OpenPayload' open-let-reject.log
+    grep -Fq 'In the expression: reader value' open-let-reject.log
+    if grep -Fq 'unpacked_' open-let-reject.log; then
+        cat open-let-reject.log >&2
+        exit 1
+    fi
 done
 
 # Use the result of an opened package through a deep dictionary adapter.
@@ -505,6 +518,8 @@ for opt in 0 2; do
         grep -Eq "^LexicalRetainedClient.hs:$line:17: error: \[GHC-83865\]" shallow.log ||
             { cat shallow.log >&2; exit 1; }
     done
+    grep -Fq 'Expected: RetainedReader' shallow.log
+    grep -Fq 'In the expression: apply worker' shallow.log
 done
 
 # Only an opening serialized in the interface needs the linear reader.
