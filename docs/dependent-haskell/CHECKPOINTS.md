@@ -19,6 +19,23 @@ generated interfaces, executables, link archives and raw logs. Check for
 shared inputs first. A thin archive refers to the original objects, so keep
 those objects until its last consumer has finished linking.
 
+The local retention timer checks allocated bytes under the main `_build`
+every 15 minutes. At 200 GB (200,000,000,000 bytes), it collects eligible
+products under `_build/verification`. It recognizes completed native API test
+drivers and uses the existing expiry rule for old native test programs.
+For other products, keep the completion log outside `_build`. After the last
+consumer finishes, record the source revision and build command.
+
+```sh
+ghc-build-retention --build-root "$PWD/_build" retire "$product" \
+  --source "$revision" --completed-evidence "$completion_log" --rebuild "$rebuild_command"
+```
+
+Run `ghc-build-retention --build-root "$PWD/_build" withdraw "$product"`
+before using that product again. The collector checks active and queued work,
+reader references, and file identities before removal. Local receipts are in
+`~/.local/state/ghc-build-retention/`.
+
 An interface-upgrade test can need an older compiler. Record which test
 uses it, its revision, and the matching libraries or objects that the test
 reads. Release those build products when the last consumer finishes.
