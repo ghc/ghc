@@ -3696,14 +3696,13 @@ tcClassATs class_name class_tvs cls ats at_defs
                         emptyNameEnv at_defs
 
     tc_at at = do { (fam_tc, val_infos) <- addLocM (tcFamDecl1 emptyNameEnv (Just cls)) at
-                  ; let fam_tvs = tyConTyVars fam_tc
-                  ; when (isConstrainedFamilyTyCon fam_tc) $
+                  ; let fam_vars = mkVarSet (tyConTyVars fam_tc)
+                        missing = filter (\v -> not (v `elemVarSet` fam_vars)) class_tvs
+                  ; when (isConstrainedFamilyTyCon fam_tc && not (null missing)) $
                       setSrcSpanA (getLoc at) $
-                      checkTc (length fam_tvs == length class_tvs &&
-                               all (`elemVarSet` mkVarSet fam_tvs) class_tvs &&
-                               isLiftedTypeKind (tyConResKind fam_tc)) $
-                        TcRnConstrainedFamilyUnsupported fam_tc $
-                          text "The family must have the same binders as its class and result kind Type."
+                        failWithTc $ TcRnConstrainedFamilyUnsupported fam_tc $
+                          hang (text "Missing class parameters in the family declaration")
+                               2 (pprWithCommas ppr missing)
                   ; mapM_ (checkTyFamEqnValidityInfo fam_tc) val_infos
                   ; let at_defs = lookupNameEnv at_defs_map (at_fam_name at)
                                   `orElse` []

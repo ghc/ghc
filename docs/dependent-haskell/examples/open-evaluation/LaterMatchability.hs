@@ -1,10 +1,12 @@
 {-# LANGUAGE KindSignatures, Modifiers, PolyKinds, StandaloneKindSignatures, TypeFamilies, TypeOperators #-}
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}
 {-# LANGUAGE GADTs, RankNTypes, TypeAbstractions, TypeApplications #-}
+{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
 module LaterMatchability where
 
 import AnchorReceiver
 import Data.Kind (Type)
+import Data.Proxy (Proxy)
 import GHC.Matchability (M, Matchability, U)
 
 type MatchResult = Receiver (Select 'True) 'Match
@@ -46,6 +48,16 @@ type family ApplyFlipped @m f a where
 
 type FlippedMatch = ApplyFlipped @U Maybe Bool
 type FlippedUnmatch = ApplyFlipped @M KnownListCallback Bool
+
+type family InitialSelector (flag :: Bool) :: Matchability where
+  InitialSelector flag = U
+
+class ComputedTag (flag :: Bool) a where
+  computedTag :: Proxy flag -> Proxy a -> Bool
+
+instance forall flag (f :: Type %(Flip (InitialSelector flag)) -> Type) x.
+         ComputedTag flag (f x) where
+  computedTag _ _ = True
 
 type family ForwardMap f xs where
   ForwardMap _ '[] = '[]

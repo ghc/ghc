@@ -55,6 +55,15 @@ argument type. It does not supply evidence to the surrounding result.
 [Agda instance candidates](https://agda.readthedocs.io/en/v2.8.0/language/instance-arguments.html)
 and [retained field example](roadmap/R24-constrained-type-families.md#family-domains-under-a-retained-binder).
 
+Proposal #281 supplies the Haskell syntax `forall c ->` and `(type c)`.
+Agda's dependent function space allows the type of a later argument to
+mention an earlier explicit parameter. R24 uses the same scope for a
+family domain after a required parameter. The check freshens the bound
+type variables and solves the class constraint in its declared scope.
+[GHC proposal #281](https://ghc-proposals.readthedocs.io/en/latest/proposals/0281-visible-forall.html),
+[Agda dependent function types](https://agda.readthedocs.io/en/v2.8.0/language/function-types.html)
+and [R24 example](roadmap/R24-constrained-type-families.md#required-type-arguments).
+
 The [program roadmap](ROADMAP.md) owns the work queue and the upstream task
 index. The 2026-11-16 review adds feature pages that connect research to the
 next implementation obligations:

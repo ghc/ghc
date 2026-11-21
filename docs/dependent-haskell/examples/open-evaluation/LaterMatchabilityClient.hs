@@ -2,14 +2,16 @@
 {-# LANGUAGE ExplicitForAll, Modifiers, TypeApplications #-}
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
 module LaterMatchabilityClient
-  (laterMatchability, forwardedMap, annotatedMap, nestedCallback, appliedCallback, boxedCallbacks, rankedMap, flippedCallbacks) where
+  ( laterMatchability, forwardedMap, annotatedMap, nestedCallback, appliedCallback
+  , boxedCallbacks, rankedMap, flippedCallbacks, computedDictionary
+  ) where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy(Proxy))
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Matchability (U)
 import LaterMatchability (AtBool, CallbackResult(CallbackResult), ForwardMap,
-                           FamilyBox(FamilyBox), FlippedMatch, FlippedUnmatch, ForwardBox, KnownListCallback, ListBox,
+                           computedTag, FamilyBox(FamilyBox), FlippedMatch, FlippedUnmatch, ForwardBox, KnownListCallback, ListBox,
                            ListCallback, ListRecipe, MatchResult, Recipe(Recipe), UnmatchResult)
 
 laterMatchability :: (MatchResult, UnmatchResult)
@@ -60,3 +62,7 @@ rankedMap =
 -- | Use both results of the declared callback kind.
 flippedCallbacks :: (FlippedMatch, FlippedUnmatch)
 flippedCallbacks = (Just False, [True])
+
+-- | Select a dictionary with a computed matchable application pattern.
+computedDictionary :: Bool
+computedDictionary = computedTag (Proxy @'True) (Proxy @(Maybe Bool))

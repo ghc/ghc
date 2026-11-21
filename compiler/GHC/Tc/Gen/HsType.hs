@@ -1286,8 +1286,7 @@ tcHsClsInstType user_ctxt hs_inst_ty
                                   (substTy subst body)
        ; mapBagM_ checkImplicationInvariants prefix_implics
        ; emitImplications prefix_implics
-       ; checkValidInstance user_ctxt hs_inst_ty inst_ty
-       ; return inst_ty }
+       ; checkValidInstance user_ctxt hs_inst_ty inst_ty }
 
 ----------------------------------------------
 -- | Type-check a visible type application
