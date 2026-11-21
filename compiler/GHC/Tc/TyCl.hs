@@ -5487,6 +5487,8 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
       ConContextArgs (length (hsConDeclTheta (Just ctxt)))
     source_group (Left (L _ (HsGadtForAll _ HsForAllInvis { hsf_invis_bndrs = bs }))) =
       ConTypeArgs (length bs)
+    source_group (Left (L _ (HsGadtForAll _ HsForAllVis { hsf_vis_bndrs = bs }))) =
+      ConTypeArgs (length bs)
     source_group _ = panic "tcConDecl: invalid interior telescope group"
 
 -- | Check the syntax admitted for a retained constructor field telescope.

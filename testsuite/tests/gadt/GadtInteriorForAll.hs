@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, Haskell2010, ImpredicativeTypes, NoExperimentalDependentTypes, ScopedTypeVariables, TypeAbstractions, TypeApplications #-}
+{-# LANGUAGE ExplicitNamespaces, GADTs, Haskell2010, ImpredicativeTypes, LinearTypes, NoExperimentalDependentTypes, RequiredTypeArguments, ScopedTypeVariables, TypeAbstractions, TypeApplications #-}
 module Main where
 
 import Control.Exception
@@ -20,6 +20,16 @@ contrasting (Later Any _) = 0
 readShadow :: Shadow -> ()
 readShadow (Shadow @outer (_ :: outer) @inner (_ :: inner)) = ()
 
+readRequired :: Required a -> (Int, a)
+readRequired (Required n (type b) (x :: b)) = (n, x)
+
+readRequiredPack :: RequiredPack -> Int
+readRequiredPack (RequiredPack n (type a) (_ :: a)) = n
+
+refined :: RequiredLater a a -> Int
+refined (RequiredLater IsInt (type Int) x) = x
+refined (RequiredLater Any (type a) (_ :: a)) = 0
+
 main :: IO ()
 main = do
   print (readBox (Box 23 @Bool False), readPack (Pack 29 @Char 'q'),
@@ -31,3 +41,12 @@ main = do
   saturated <- throws (Box bottom @Bool True)
   lazySuffix <- throws (Box 5 @Bool (error "lazy suffix"))
   print (partial, applied, saturated, lazySuffix)
+  print (readRequired (Required 41 (type Bool) True),
+         readRequiredPack (RequiredPack 43 Char 'x'),
+         refined (RequiredLater IsInt (type Int) 47),
+         refined (RequiredLater Any (type Bool) False))
+  requiredPartial <- throws (seq @(forall a -> a %1 -> Required a) (Required bottom) True)
+  requiredApplied <- throws (Required bottom (type Bool))
+  requiredSaturated <- throws (Required bottom (type Bool) True)
+  requiredLazy <- throws (Required 5 (type Bool) (error "lazy suffix"))
+  print (requiredPartial, requiredApplied, requiredSaturated, requiredLazy)

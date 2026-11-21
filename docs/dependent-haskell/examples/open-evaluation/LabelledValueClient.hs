@@ -1,8 +1,8 @@
-{-# LANGUAGE GADTs, Haskell2010, NoExperimentalDependentTypes #-}
+{-# LANGUAGE ExplicitNamespaces, GADTs, Haskell2010, NoExperimentalDependentTypes, RequiredTypeArguments #-}
 {-# LANGUAGE ScopedTypeVariables, TypeAbstractions, TypeApplications, ViewPatterns #-}
-module LabelledValueClient (labelledValues, labelledPair, storedChecks, rankedPairs) where
+module LabelledValueClient (labelledValues, labelledPair, storedChecks, rankedPairs, typedNotes) where
 
-import LabelledValue (LabelledValue(..), LabelledPair(..), StoredCheck(..), RankedPair(..))
+import LabelledValue (LabelledValue(..), LabelledPair(..), StoredCheck(..), RankedPair(..), TypedNote(..))
 
 readLabelledValue :: LabelledValue a -> (Int, a)
 readLabelledValue (LabelledValue n @field (value :: field)) = (n, value)
@@ -40,3 +40,12 @@ readRankedPair (RankedPair (x, _)) = x
 rankedPairs :: (Int, Int)
 rankedPairs = (readRankedPair (RankedPair (2, 3)),
                readRankedPair (RankedPair (73, 5)))
+
+readTypedNote :: TypedNote a -> (Int, a)
+readTypedNote (TypedNote n (type a) (value :: a)) = (n, value)
+
+-- | Apply and match the required type between the two fields.
+typedNotes :: ((Int, Bool), (Int, Char))
+typedNotes =
+    (readTypedNote (TypedNote 79 (type Bool) True),
+     readTypedNote (TypedNote 83 (type Char) 'r'))

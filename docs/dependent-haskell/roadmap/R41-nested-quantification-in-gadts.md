@@ -11,6 +11,7 @@
 - [x] Repeat the specified forall and field groups.
 - [x] Interleave specified forall groups, contexts, and fields in a lifted prefix constructor.
 - [x] Preserve both a leading and a terminal constructor context.
+- [x] Place a required forall between two prefix fields in a lifted constructor.
 - [ ] Support the remaining orders of fields, contexts, and quantifiers in prefix constructors.
 
 The [Showcase](../Showcase.hs) defines a constructor with fields of
@@ -116,3 +117,15 @@ telescope lets a view pattern use an early `Ord a` dictionary.
 A terminal equality is available in the branch after the field
 has matched. The source-hidden client and Template Haskell tests
 exercise both context positions.
+
+A required forall can also appear between fields. In
+`Required :: Int -> forall a -> a -> Required a`, the result
+determines `a`. The call `Required 41 (type Bool) True` supplies it
+after the first field. In `RequiredPack :: Int -> forall a -> a ->
+RequiredPack`, the type is existential. The pattern
+`RequiredPack n (type a) (x :: a)` binds `a` after the first field
+and scopes it over the second field and the branch. An equality
+from an earlier field is in scope when the required type pattern
+is checked. The [interface client](../../../testsuite/tests/gadt/GadtInteriorForAll.hs)
+checks both forms. The [TH test](../../../testsuite/tests/gadt/GadtInteriorForAllTh.hs)
+round-trips the required group as `ForallVisT`.
