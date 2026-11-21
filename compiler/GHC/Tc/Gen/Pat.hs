@@ -32,7 +32,9 @@ import GHC.Hs.Syn.Type
 import GHC.Rename.Utils
 import GHC.Tc.Errors.Types
 import GHC.Tc.Gen.Sig( TcPragEnv, lookupPragEnv, addInlinePrags )
-import GHC.Tc.Solver.Monad (bumpReductionDepthTcM, matchFamTcM)
+import GHC.Tc.Solver.Monad (bumpReductionDepthTcM, matchFamTcM, runTcS)
+import GHC.Tc.Solver.Rewrite (rewriteTyConAppArgsNom)
+import GHC.Tc.Solver.Solve (solveSimpleGivens)
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Validity (checkConstrainedSignature)
@@ -53,16 +55,17 @@ import GHC.Core.TyCo.Ppr ( pprTyVars )
 import GHC.Core.TyCo.Rep ( Type(ExistsTy, TermVarTy) )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Unify
-import GHC.Tc.Zonk.TcType (zonkTcType)
 import GHC.Tc.Gen.HsType
 import GHC.Builtin.WiredIn.Types
 import GHC.Tc.Types.Evidence
+import GHC.Tc.Types.Constraint (mkGivens)
+import GHC.Tc.Types.CtLoc (ctLocLevel, ctLocEnv, mkGivenLoc)
 import GHC.Tc.Types.Origin
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.Reduction (Reduction(..))
-import GHC.Core.Predicate ( isEvId, mkNomEqPred )
+import GHC.Core.Predicate ( getClassPredTys_maybe, getEqPredTys_maybe, isEvId, mkNomEqPred )
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Core.ConLike
@@ -76,6 +79,7 @@ import GHC.Utils.Panic
 import qualified GHC.LanguageExtensions as LangExt
 import Control.Arrow  ( first, second )
 import Control.Monad
+import GHC.Data.Bag (Bag, emptyBag, unionBags)
 import GHC.Data.FastString
 import GHC.Data.Pair ( pSnd )
 import qualified Data.List.NonEmpty as NE
@@ -1568,7 +1572,7 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
        ; expected <- readExpType_maybe (scaledThing pat_ty_scaled)
        ; family_result <- maybe (pure Nothing) (match_family_result tc) expected
        ; (wrap, ctxt_res_tys) <- case family_result of
-           Just (co, tys) -> return (mkWpCastN co, tys)
+           Just (co, tys, binds) -> return (mkWpLet (EvBinds binds) <.> mkWpCastN co, tys)
            Nothing -> do { matched@(wrap, _) <- matchExpectedConTy penv tc pat_ty_scaled
                          ; unless (isIdHsWrapper wrap) bad_pattern
                          ; return matched }
@@ -1588,18 +1592,18 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
     bad_pattern = failWithTc (TcRnRetainedQuantificationError RetainedPackagePattern)
 
     -- See Note [Checking retained package patterns].
-    match_family_result :: TyCon -> TcType -> TcM (Maybe (TcCoercionN, [TcType]))
+    match_family_result :: TyCon -> TcType -> TcM (Maybe (TcCoercionN, [TcType], Bag EvBind))
     match_family_result parent ty
       | Just (family, _) <- tcSplitTyConApp_maybe ty
       , isTypeFamilyTyCon family
       = do { loc <- getCtLocM (OccurrenceOf (tyConName family)) (Just TypeLevel)
            ; ty <- liftZonkM (zonkTcType ty)
-           ; go loc ty }
+           ; go loc True ty }
       | otherwise = return Nothing
       where
-        go loc ty = case tcSplitTyConApp_maybe ty of
+        go loc retry ty = case tcSplitTyConApp_maybe ty of
           Just (tc, args)
-            | tc == parent -> return (Just (mkNomReflCo ty, args))
+            | tc == parent -> return (Just (mkNomReflCo ty, args, emptyBag))
             | isTypeFamilyTyCon tc ->
                 do { args <- if isConstrainedFamilyTyCon tc && args `lengthAtLeast` tyConArity tc
                              then do { checkNoErrs $ checkConstrainedSignature TypeAppCtxt ty
@@ -1607,11 +1611,38 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
                              else return args
                    ; reduction <- matchFamTcM tc args
                    ; case reduction of
-                       Nothing -> return Nothing
+                       Nothing
+                         | retry
+                         , isFamFreeTy (tyConKind tc)
+                         , all (\arg -> isFamFreeTy arg && isFamFreeTy (typeKind arg)) args
+                         -> refine_args loc ty tc args
+                         | otherwise -> return Nothing
                        Just (Reduction co rhs) ->
                          do { loc <- bumpReductionDepthTcM loc ty
-                            ; fmap (first (mkTransCo co)) <$> go loc rhs } }
+                            ; fmap (prepend co emptyBag) <$> go loc True rhs } }
           _ -> return Nothing
+
+        refine_args loc ty tc args = do
+          givens <- filter (nominal_equality . varType) <$> getLexicalGivens
+          if null givens
+            then return Nothing
+            else do
+              let given_loc = mkGivenLoc (ctLocLevel loc) (getSkolemInfo unkSkol) (ctLocEnv loc)
+              (Reduction co ty', ev_binds) <- runTcS $ do
+                solveSimpleGivens (mkGivens given_loc givens)
+                rewriteTyConAppArgsNom loc tc args
+              if ty `tcEqType` ty'
+                then return Nothing
+                else fmap (prepend co (evBindMapBinds ev_binds)) <$> go loc False ty'
+
+        nominal_equality pred_ty
+          | not (isFamFreeTy pred_ty) = False
+          | Just (Nominal, _, _) <- getEqPredTys_maybe pred_ty = True
+          | Just (cls, _) <- getClassPredTys_maybe pred_ty = cls == eqClass || cls == heqClass
+          | otherwise = False
+
+        prepend co binds (rest_co, tys, rest_binds) =
+          (mkTransCo co rest_co, tys, binds `unionBags` rest_binds)
 
     check_fields _ _ _ [] []
       = do { res <- thing_inside; return ([], res) }
@@ -1735,6 +1766,13 @@ environment. A missing domain is an error, including when the caller
 defers term errors. No domain dictionary enters the pattern wrapper.
 matchFamTcM then uses the ordinary nominal solver rule and its instance
 environment, including imported open family instances.
+
+If lookup gets stuck, rewrite the head's arguments with the ordinary
+solver and the in-scope nominal equalities. Use only family-free arguments,
+kinds and Givens. The rewrite leaves the family head in place, so the
+retry checks the domain before using the equation. Keep the evidence
+bindings for the argument coercion around the final scrutinee cast.
+Representational Givens do not select an equation.
 
 Compose the nominal coercions and use the result when its head is the
 selected constructor's parent. Put that cast on the scrutinee so the fields

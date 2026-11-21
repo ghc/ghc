@@ -406,6 +406,20 @@ newtype around a package still fails at the pattern.
 The match forces the outer pair and keeps an unused payload lazy.
 The regression compares a named sum and direct `some` at `-O0`
 and `-O2` with the provider source hidden from the client.
+
+An ordinary reader can also use a nominal equality to expose the
+family equation. The same match works after a GADT pattern supplies
+that equality.
+
+```haskell
+readRefined :: (a ~ Bool) => Shape a Char -> Bool
+readRefined pkg = case pkg of Pair tag _ -> tag
+```
+
+If lookup gets stuck, GHC rewrites family-free arguments with the
+available family-free nominal equalities. It tries that head again
+with the same domain check. A representational `Coercible a Bool`
+constraint still leaves `Shape a Char` stuck.
 [Provider](../../../testsuite/tests/dependent/should_run/NativeConstrainedSumProvider.hs)
 and [ordinary client](../../../testsuite/tests/dependent/should_run/NativeConstrainedSumClient.hs).
 
