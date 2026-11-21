@@ -358,3 +358,19 @@ The client can inspect the length result without evaluating the vector.
 The source-hidden regression checks zero, interior, exact, and excessive
 cuts. [Checked split](../examples/packed-vector/CertifiedSplit.hs)
 and [ordinary client](../examples/packed-vector/CertifiedSplitClient.hs).
+
+## Repeated retained constructors in linear packages
+
+A package can store a retained natural number, a payload selected by that
+number, and a linear field. Two equations can both match `S predecessor`
+and select different ordinary fields. GHC shares the constructor case
+after checking that the renamed predecessor fields, multiplicities and
+equality proofs agree. Each branch can use its own written predecessor
+name. Returning evidence for `Z` where the predecessor is unknown gives
+GHC-05617.
+
+A source-hidden ordinary client checks that an unused predecessor and
+payload remain lazy. A pattern combination that still requires separate
+matches on the linear package reports GHC-47619.
+[Provider](../../../testsuite/tests/dependent/should_run/NativeLinearRetainedPackageProvider.hs)
+and [rejection controls](../../../testsuite/tests/dependent/should_run/NativeLinearRetainedPackageEvidenceReject.hs).

@@ -28,6 +28,24 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `1610131f91`, `withIndex` consumes both a bounded position and a
+callback linearly. A discarded or duplicated callback reports GHC-18872
+at its binder in the written equation. A repeated retained constructor
+with a predecessor shares its package case. An ordinary client also
+opens a package with a higher-rank reader and formats its contents with
+a `Show` superclass. An unused runtime tag stays unevaluated.
+
+The Stage 2 compiler matched all 410 Showcase rows at stripped `-O0`,
+default `-O1`, default `-O2` and in source-loaded GHCi. It passed 15
+registered integration tests, the complete 37-row Core API regression
+and the evidence API checks. The separate formatter and its located
+errors passed at `-O0` and `-O2`. The previous reader ran the ordinary
+rule and rejected the linear rule at the interface header. The linear
+continuation predecessor passed 44 focused registered tests before the
+higher-rank package integration.
+[Linear callback](examples/qualified-pi/ListCursor.hs)
+and [interface regression](../../testsuite/tests/dependent/should_run/NativeImplicitExistential.sh).
+
 At `f3cc8c7849` the same two list-index equations accept a linear
 position or an unrestricted one. An ordinary client checks a runtime
 offset, packages the list and position, then opens the package and calls
