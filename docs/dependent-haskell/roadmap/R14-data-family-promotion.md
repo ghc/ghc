@@ -113,19 +113,43 @@ The promoted constructor has result kind `C (Int, b)`. GHC uses the
 source telescope of the GADT constructor, so the refined parameter
 appears directly in the result kind. A separately compiled closed type
 family can match `'Refines` and prove its result with `Refl`. Using
-`'Refines` at kind `C (Char, Bool)` fails.
+`'Refines` at kind `C (Char, Bool)` gives GHC-83865.
 
 An ordinary client can also pass `Refines` to an imported
 `foreach (t :: C (Int, Bool))` function. The worker receives the
 refined type argument and an exact nominal reflexive proof. The
 wrapper still applies the separate representational instance axiom.
 The interface reader checks the same operand shape for an optimized
-unfolding.
+unfolding. The [ordinary Showcase client](../examples/open-evaluation/FamilyRefinementClient.hs)
+expects the proof for `('Refines :: C (Int, Bool))` and prints
+`(Refl,True)`. Passing the same constructor to a retained argument of
+type `C (Char, Bool)` gives GHC-83605.
 [Promotion and retained-operand tests](../../../testsuite/tests/dependent/should_run/data-family-promotion).
 
 ## Next acceptance check
 
-Specify how a promoted family constructor with a stored context can
-bind and expose its evidence in a type. Discussion #456 identifies the
-coercion binder question for constrained constructors.
-[Discussion #456](https://github.com/ghc-proposals/ghc-proposals/discussions/456).
+```haskell
+class Pick a where
+    pick :: a -> Bool
+
+data family Cell a
+data instance Cell [a] where
+    Stored :: Pick a => a -> Cell [a]
+```
+
+`type Index = 'Stored 'True` gives GHC-64578 even with a
+`Pick Bool` instance. A matching ordinary GADT constructor gives
+GHC-28374 for its context. Proposal #547 preserves the distinction
+between a constructor's explicit context and an ordinary result
+refinement.
+[Proposal #547, examples](https://ghc-proposals.readthedocs.io/en/latest/proposals/0547-no-kind-equalities.html#examples).
+
+The private R12 prototype can refer to a dictionary already in scope
+for a retained function. Promoting `Stored` also needs a kind
+application that records the evidence stored by this constructor.
+A promoted match needs to bring that evidence into scope for
+`pick x`, as the runtime pattern `Stored x` already does. Two
+modules can select different instances when constructing `Stored True`,
+so the field alone cannot determine this evidence.
+[Discussion #456](https://github.com/ghc-proposals/ghc-proposals/discussions/456)
+and [#383 dictionary sketch](https://github.com/ghc-proposals/ghc-proposals/issues/383#issuecomment-739058810).

@@ -44,6 +44,7 @@ import qualified Data.Either
 import DefaultVector (DefaultElement(..))
 import qualified ErasedPackage
 import FamilyTuple (Tuple(Tup2))
+import qualified FamilyRefinementClient
 import qualified RetainedFamilyTuple
 import qualified ForgetWitness
 import qualified ImplicitVector
@@ -1035,6 +1036,8 @@ main :: IO ()
 main = do
     observe "select the second field of a promoted data family pair" secondFlag
     observe "retain a data family pair and read its fields" retainedPair
+    observe "pass a refined data family constructor from an ordinary client"
+        FamilyRefinementClient.refinedResult
     observe "use earlier field evidence in a later constructor type pattern"
         (columnCount (ColumnSample @Int Refl 37 (type Int)))
     observe "use a stored equality in a later constructor type pattern"

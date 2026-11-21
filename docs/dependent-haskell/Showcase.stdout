@@ -1,5 +1,6 @@
 select the second field of a promoted data family pair: Refl
 retain a data family pair and read its fields: (Refl,(True,False))
+pass a refined data family constructor from an ordinary client: (Refl,True)
 use earlier field evidence in a later constructor type pattern: 37
 use a stored equality in a later constructor type pattern: 41
 recover consecutive GADT constraints: (False,"True")
