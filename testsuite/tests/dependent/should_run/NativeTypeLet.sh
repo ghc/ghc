@@ -118,13 +118,14 @@ module Main where
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Exts (Multiplicity(..))
 import Operator (Handler, Prefix, Result)
-import PackedVecLibrary (Vec(..))
+import Data.Proxy (Proxy)
+import PackedVecLibrary (Nat(..), Vec(..))
 import TypeLet (Frame, frameValues)
 
-longer :: Frame 2 'True Char :~: Vec Char 3
-longer = Refl
-shorter :: Frame 2 'False Char :~: Vec Char 2
-shorter = Refl
+longer :: Proxy n -> Frame n 'True Char :~: Vec Char ('S n)
+longer _ = Refl
+shorter :: Proxy n -> Frame n 'False Char :~: Vec Char n
+shorter _ = Refl
 captured :: Result Either Char Bool 'True :~: Maybe (Either Char Bool)
 captured = Refl
 second :: Result (,) Char Bool 'False :~: [(Char, Bool)]
@@ -147,7 +148,15 @@ for opt in -O0 -O2; do
     "${g[@]}" Main.o ../provider/{Operator,TypeLet,PackedVecLibrary}.o -o frame
     ./frame | grep -Fxq '(":xy","xy")'
 done
-sed -e 's/module Main/module WrongWidth/' -e "s/Frame 2 'True Char :~: Vec Char 3/Frame 2 'True Char :~: Vec Char 2/" Main.hs >WrongWidth.hs
+cat >WrongWidth.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
+module WrongWidth where
+import Data.Type.Equality ((:~:)(Refl))
+import PackedVecLibrary (Nat(..), Vec)
+import TypeLet (Frame)
+wrong :: Frame 'Z 'True Char :~: Vec Char 'Z
+wrong = Refl
+HS
 if "${g[@]}" -c WrongWidth.hs >error.log 2>&1; then exit 1; fi
 grep -Fq '[GHC-83865]' error.log
 grep -Fq 'Refl' error.log
