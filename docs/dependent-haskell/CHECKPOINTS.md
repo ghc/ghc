@@ -45,6 +45,22 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `892ba587fb`, an ordinary module passed a runtime Boolean to both
+`frameRow` and `frameToList`. With two cells it obtained `":xy"` or
+`"xy"`. The header-free branch ignored an undefined header. Separate
+type equalities establish the result length for every `n`. Stripped
+providers and clients ran at `-O0` and `-O2` with Core and STG lint.
+Both compiler versions read the interfaces for the old prefix spelling
+and the new infix spelling.
+[Type-let test](../../testsuite/tests/dependent/should_run/NativeTypeLet.sh)
+and [width example](roadmap/R18-type-level-lets.md#a-vector-with-an-optional-header).
+
+The previous compiler also panicked on a prefix RHS `f a b` when the
+kind of `f` was inferred. Resolving the kind of each checked capture
+before substitution preserves the function kind at its application.
+See Note [The Purely Kinded Type Invariant (PKTI)] in
+[GHC.Tc.Gen.HsType](../../compiler/GHC/Tc/Gen/HsType.hs).
+
 At `020023a416`, an ordinary keyed row used the key vector to determine
 the length of the value vector. A dependent client checked the whole row
 through stripped interfaces. At `9aeba5a435`, an ordinary caller also used
