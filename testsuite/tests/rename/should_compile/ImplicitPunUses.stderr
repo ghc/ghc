@@ -1,0 +1,17 @@
+ImplicitPunUses.hs:8:13: warning: [GHC-41293] [-Wpun-uses]
+    ‘a’ depends on separate type and term namespaces.
+    This use resolves to ‘a’ defined at ImplicitPunUses.hs:8:1
+    Same-spelled names in the other namespace:
+      ‘a’ defined at ImplicitPunUses.hs:6:1
+
+ImplicitPunUses.hs:8:18: warning: [GHC-41293] [-Wpun-uses]
+    ‘a’ depends on separate type and term namespaces.
+    This use resolves to ‘a’ defined at ImplicitPunUses.hs:8:1
+    Same-spelled names in the other namespace:
+      ‘a’ defined at ImplicitPunUses.hs:6:1
+
+ImplicitPunUses.hs:18:22: warning: [GHC-41293] [-Wpun-uses]
+    ‘q’ depends on separate type and term namespaces.
+    This use resolves to ‘q’ defined at ImplicitPunUses.hs:18:17
+    Same-spelled names in the other namespace:
+      ‘q’ defined at ImplicitPunUses.hs:18:14

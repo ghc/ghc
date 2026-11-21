@@ -1959,6 +1959,17 @@ instance Diagnostic TcRnMessage where
          vcat [ quotes (ppr (nameOccName name))
                   <+> text "is declared in both the type and term namespaces."
               , text "Other declaration at" <+> ppr (nameSrcLoc other) ]
+    TcRnPunUse rdr selected alternatives
+      -> mkSimpleDecorated $
+         vcat [ quotes (ppr rdr) <+> text "depends on separate type and term namespaces."
+              , text "This use resolves to" <+> ppr_candidate selected
+              , text "Same-spelled names in the other namespace:"
+              , nest 2 (vcat (map ppr_candidate (NE.toList alternatives))) ]
+      where
+        ppr_candidate gre = quotes (ppr (greName gre)) <+> pprNameProvenance gre
+    TcRnPunnedTypeSyntax syntax
+      -> mkSimpleDecorated $
+         text "The type syntax" <+> quotes syntax <+> text "depends on ListTuplePuns."
     TcRnPackageImportsDisabled
       -> mkSimpleDecorated $
          text "Package-qualified imports are not enabled"
@@ -2796,6 +2807,10 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnPunBinding{}
       -> WarningWithFlag Opt_WarnPunBindings
+    TcRnPunUse{}
+      -> WarningWithFlag Opt_WarnPunUses
+    TcRnPunnedTypeSyntax{}
+      -> WarningWithFlag Opt_WarnPunUses
     TcRnPackageImportsDisabled
       -> ErrorWithoutFlag
     TcRnIllegalDataCon{}
@@ -3583,6 +3598,10 @@ instance Diagnostic TcRnMessage where
     TcRnDuplicateDecls _ fs
       -> [suggestExtension LangExt.DuplicateRecordFields | all isFieldName fs]
     TcRnPunBinding{}
+      -> noHints
+    TcRnPunUse{}
+      -> noHints
+    TcRnPunnedTypeSyntax{}
       -> noHints
     TcRnPackageImportsDisabled
       -> [suggestExtension LangExt.PackageImports]

@@ -1153,6 +1153,7 @@ data WarningFlag =
    | Opt_WarnRedundantCanonicalMethods               -- ^ @since 10.2
    --search codebase for Opt_WarnRedundantCanonicalMethods for cleanup
    | Opt_WarnPunBindings
+   | Opt_WarnPunUses
    deriving (Eq, Ord, Show, Enum, Bounded)
 
 -- | Return the names of a WarningFlag
@@ -1280,6 +1281,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnSemaphoreOpenFailure                   -> "semaphore-open-failure" :| []
   Opt_WarnDefaultedCallStack                      -> "defaulted-callstack" :| []
   Opt_WarnPunBindings                             -> "pun-bindings" :| []
+  Opt_WarnPunUses                                 -> "pun-uses" :| []
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options

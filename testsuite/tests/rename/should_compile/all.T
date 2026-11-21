@@ -259,3 +259,8 @@ test('T25901_sub_g', [extra_files(['T25901_sub_g_helper.hs'])], multimod_compile
 
 test('ToplevelPunBindings', normal, compile, ['-Wpun-bindings'])
 test('LocalPunBindings', normal, compile, ['-Wpun-bindings -Wname-shadowing'])
+test('PunUses', [extra_files(['PunUseData.hs', 'PunUseType.hs'])],
+     multimod_compile, ['PunUses', '-v0 -Wpun-uses'])
+test('DisambiguatedPunUses', [extra_files(['PunUseData.hs', 'PunUseType.hs'])],
+     multimod_compile, ['DisambiguatedPunUses', '-v0 -Werror=pun-uses'])
+test('ImplicitPunUses', normal, compile, ['-Wpun-uses -Wterm-variable-capture'])

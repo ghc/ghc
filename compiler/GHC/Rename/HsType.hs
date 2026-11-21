@@ -85,7 +85,7 @@ import GHC.Types.Basic  ( TypeOrKind(..) )
 import GHC.Builtin( mkUnboundName, isUnboundName )
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.KnownOccs
-import GHC.Builtin.WiredIn.Types( oneDataConName )
+import GHC.Builtin.WiredIn.Types( listTyConName, oneDataConName )
 
 import GHC.Unit.Module ( getModule )
 
@@ -97,7 +97,9 @@ import GHC.Data.FastString
 import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 
+import Data.Foldable (for_)
 import Data.List (nubBy, partition)
+import qualified Data.List.NonEmpty as NE
 import Data.Data (Data, cast, gmapQ)
 import Control.Monad
 
@@ -698,7 +700,8 @@ rnImplicitTvOccs mb_assoc implicit_vs_with_dups thing_inside
          -- See Note [Source locations for implicitly bound type variables].
        ; loc <- getSrcSpanM
        ; let loc' = noAnnSrcSpan loc
-       ; vars <- mapM (newTyVarNameRnImplicit mb_assoc . L loc' . unLoc) implicit_vs
+       ; vars <- mapM (newTyVarNameRnImplicit mb_assoc implicit_vs_with_dups . L loc' . unLoc)
+                      implicit_vs
 
        ; bindLocalNamesFV vars $
          thing_inside vars }
@@ -1015,7 +1018,11 @@ rnHsTyKi env (HsKindSig x ty k)
 -- Unboxed tuples are allowed to have poly-typed arguments.  These
 -- sometimes crop up as a result of CPR worker-wrappering dictionaries.
 rnHsTyKi env tupleTy@(HsTupleTy x tup_con tys)
-  = do { when (isRnKindLevel env) $
+  = do { case x of
+           AnnParens (EpTok (EpaSpan (RealSrcSpan _ _))) _ ->
+             addDiagnostic (TcRnPunnedTypeSyntax (ppr tupleTy))
+           _ -> pure ()
+       ; when (isRnKindLevel env) $
            checkDataKinds env tupleTy
        ; (tys', fvs) <- mapFvRn (rnLHsTyKi env) tys
        ; return (HsTupleTy x tup_con tys', fvs) }
@@ -1323,6 +1330,17 @@ rnHsTyVar lookup_occ env tv ip (L loc rdr_name)
            -- Any type variable at the kind level is illegal without the use
            -- of PolyKinds (see #14710)
        ; gre <- lookup_occ rdr_name
+       ; unless (isPromoted ip) $ do
+           warnGlobalPunUse (L loc rdr_name) gre
+           -- The parser records the punctuation only for written syntax.
+           -- A type constructed by Template Haskell has no such tokens.
+           let name = greName gre
+           case anns loc of
+             NameAnnOnly (NameSquare _ _) _ | name == listTyConName ->
+               addDiagnosticAt (locA loc) (TcRnPunnedTypeSyntax (text "[]"))
+             NameAnnCommas (NameParens _ _) _ _ | isTupleTyConName name ->
+               addDiagnosticAt (locA loc) (TcRnPunnedTypeSyntax (ppr rdr_name))
+             _ -> pure ()
        ; checkNamedWildCard env (greName gre)
        ; this_mod <- getModule
        ; explicit_level_imports <- xoptM LangExt.ExplicitLevelImports
@@ -1356,6 +1374,8 @@ rnHsTyOp env overall_ty tyop
                  = any (isOpenTypeOperandWith isRdrTyVar (isDataOcc . rdrNameOcc)) [left, right]
                  | otherwise = False
        ; opgre <- lookupTypeAppHeadRn open_operands op
+       ; unless (isPromoted prom) $
+           warnGlobalPunUse (L loc op) opgre
        ; checkNamedWildCard env (greName opgre)
        ; let opName = greName opgre
        ; unlessXOptM LangExt.TypeOperators $
@@ -1730,8 +1750,8 @@ bindHsOuterTyVarBndrs doc mb_cls implicit_vars outer_bndrs thing_inside =
          ; return (result, ma_fvs `plusFN` fvs) }
 
 -- See Note [Term variable capture and implicit quantification]
-warn_term_var_capture :: LocatedN RdrName -> RnM ()
-warn_term_var_capture lVar = do
+warn_term_var_capture :: FreeKiTyVars -> LocatedN RdrName -> Name -> RnM ()
+warn_term_var_capture occurrences lVar chosen = do
     gbl_env <- getGlobalRdrEnv
     local_env <- getLocalRdrEnv
     case demoteRdrNameTv $ unLoc lVar of
@@ -1740,9 +1760,17 @@ warn_term_var_capture lVar = do
         let global_vars = lookupGRE gbl_env (LookupRdrName demoted_name SameNameSpace)
         let mlocal_var  = lookupLocalRdrEnv local_env demoted_name
         case mlocal_var of
-          Just name -> warnCapturedTerm lVar (Right name)
-          Nothing   -> unless (null global_vars) $
-                         warnCapturedTerm lVar (Left global_vars)
+          Just name -> warn (Right name) (mkLocalVanillaGRE NoParent name NE.:| [])
+          Nothing   -> for_ (NE.nonEmpty global_vars) $ warn (Left global_vars)
+  where
+    warn captured alternatives = do
+      pun_uses <- woptM Opt_WarnPunUses
+      if pun_uses
+        then for_ occurrences $ \(L loc rdr) ->
+          when (rdr == unLoc lVar) $
+            addDiagnosticAt (locA loc)
+              (TcRnPunUse rdr (mkLocalVanillaGRE NoParent chosen) alternatives)
+        else warnCapturedTerm lVar captured
 
 bindHsForAllTelescope :: HsDocContext
                       -> HsForAllTelescope GhcPs
@@ -1898,13 +1926,16 @@ rnHsBndrVis :: HsBndrVis GhcPs -> HsBndrVis GhcRn
 rnHsBndrVis (HsBndrRequired _)    = HsBndrRequired  noExtField
 rnHsBndrVis (HsBndrInvisible _at) = HsBndrInvisible noExtField
 
-newTyVarNameRn, newTyVarNameRnImplicit
-  :: Maybe a -- associated class
-  -> LocatedN RdrName -> RnM Name
-newTyVarNameRn         mb_assoc = new_tv_name_rn mb_assoc newLocalBndrRn
-newTyVarNameRnImplicit mb_assoc = new_tv_name_rn mb_assoc $ \lrdr ->
-  do { warn_term_var_capture lrdr
-     ; newLocalBndrRn lrdr }
+newTyVarNameRn :: Maybe a -- associated class
+               -> LocatedN RdrName -> RnM Name
+newTyVarNameRn mb_assoc = new_tv_name_rn mb_assoc newLocalBndrRn
+
+newTyVarNameRnImplicit :: Maybe a -- associated class
+                       -> FreeKiTyVars -> LocatedN RdrName -> RnM Name
+newTyVarNameRnImplicit mb_assoc occurrences = new_tv_name_rn mb_assoc $ \lrdr ->
+  do { name <- newLocalBndrRn lrdr
+     ; warn_term_var_capture occurrences lrdr name
+     ; return name }
 
 new_tv_name_rn :: Maybe a -- associated class
                -> (LocatedN RdrName -> RnM Name) -- how to create a new name
@@ -1958,6 +1989,11 @@ parent class.
 
 The solution is to check if it's a class variable (this is done in `new_tv_name_rn`)
 before we check for term variable capture.
+
+With -Wpun-uses, report every written occurrence of this newly bound
+variable. In a unified namespace, implicit quantification could not
+shadow the term name. Use the source locations before removing duplicate
+free variables. Emit the old binder-level message when -Wpun-uses is off.
 -}
 
 {-

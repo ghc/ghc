@@ -1,0 +1,48 @@
+PunUses.hs:3:17: warning: [GHC-41293] [-Wpun-uses]
+    ‘T’ depends on separate type and term namespaces.
+    This use resolves to ‘T’ imported from ‘PunUseType’ at PunUses.hs:6:1-17
+                             (and originally defined at PunUseType.hs:3:1-10)
+    Same-spelled names in the other namespace:
+      ‘T’ imported from ‘PunUseData’ at PunUses.hs:5:1-17
+          (and originally defined at PunUseData.hs:3:10)
+
+PunUses.hs:12:8: warning: [GHC-41293] [-Wpun-uses]
+    ‘T’ depends on separate type and term namespaces.
+    This use resolves to ‘T’ imported from ‘PunUseType’ at PunUses.hs:6:1-17
+                             (and originally defined at PunUseType.hs:3:1-10)
+    Same-spelled names in the other namespace:
+      ‘T’ imported from ‘PunUseData’ at PunUses.hs:5:1-17
+          (and originally defined at PunUseData.hs:3:10)
+
+PunUses.hs:16:8: warning: [GHC-41293] [-Wpun-uses]
+    ‘T’ depends on separate type and term namespaces.
+    This use resolves to ‘T’ imported from ‘PunUseData’ at PunUses.hs:5:1-17
+                             (and originally defined at PunUseData.hs:3:10)
+    Same-spelled names in the other namespace:
+      ‘T’ imported from ‘PunUseType’ at PunUses.hs:6:1-17
+          (and originally defined at PunUseType.hs:3:1-10)
+
+PunUses.hs:19:17: warning: [GHC-41293] [-Wpun-uses]
+    ‘Both.T’ depends on separate type and term namespaces.
+    This use resolves to ‘T’ imported qualified from ‘PunUseData’ at PunUses.hs:7:1-35
+                             (and originally defined at PunUseData.hs:3:10)
+    Same-spelled names in the other namespace:
+      ‘T’ imported qualified from ‘PunUseType’ at PunUses.hs:8:1-35
+          (and originally defined at PunUseType.hs:3:1-10)
+
+PunUses.hs:22:12: warning: [GHC-41293] [-Wpun-uses]
+    ‘T’ depends on separate type and term namespaces.
+    This use resolves to ‘T’ imported from ‘PunUseData’ at PunUses.hs:5:1-17
+                             (and originally defined at PunUseData.hs:3:10)
+    Same-spelled names in the other namespace:
+      ‘T’ imported from ‘PunUseType’ at PunUses.hs:6:1-17
+          (and originally defined at PunUseType.hs:3:1-10)
+
+PunUses.hs:27:16: warning: [GHC-79036] [-Wpun-uses]
+    The type syntax ‘(a, b)’ depends on ListTuplePuns.
+
+PunUses.hs:27:26: warning: [GHC-79036] [-Wpun-uses]
+    The type syntax ‘()’ depends on ListTuplePuns.
+
+PunUses.hs:30:15: warning: [GHC-79036] [-Wpun-uses]
+    The type syntax ‘[]’ depends on ListTuplePuns.
