@@ -51,7 +51,7 @@ module GHC.Core.TyCo.Subst
         substVarBndrUsing,
         checkValidSubst, isValidTCvSubst,
 
-        deepSubstTy
+        deepSubstTy, deepSubstCo
   ) where
 
 import GHC.Prelude
@@ -1234,8 +1234,10 @@ deepSubstTyCoMapper
        in runStrictReaderT (k tcv') subst'
 
 deepSubstTy :: Subst -> Type -> Type
-deepSubstTy = case mapTyCo deepSubstTyCoMapper of
-                (subst_ty, _, _, _) -> runSubstM subst_ty
+-- | Substitute in a coercion and in the types of its free variables.
+deepSubstCo :: Subst -> Coercion -> Coercion
+(deepSubstTy, deepSubstCo) = case mapTyCo deepSubstTyCoMapper of
+  (subst_ty, _, subst_co, _) -> (runSubstM subst_ty, runSubstM subst_co)
 
 deepSubstTyVar :: Subst -> TyVar -> Type
 deepSubstTyVar subst@(Subst _ _ tenv _) tv

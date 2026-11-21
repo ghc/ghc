@@ -22,9 +22,12 @@ import GHC.Hs
 import GHC.HsToCore.Binds
 import GHC.Core.ConLike
 import GHC.Core.Coercion ( MCoercion(..), coercionLKind, mkUnbranchedAxInstCo )
-import GHC.Core.DataCon ( dataConRepType, dataConTyCon, dataConRepArgBinders )
-import GHC.Core.Type ( coreFullView, isNativeIndexType, mkTyConApp, piResultTys )
-import GHC.Core.TyCon ( isNewTyCon, newTyConCo )
+import GHC.Core.DataCon ( DataCon, dataConRepType, dataConTyCon, dataConTag, dataConRepArgBinders )
+import GHC.Core.Type ( coreFullView, isManyTy, isNativeIndexType, mkTyConApp, piResultTys )
+import GHC.Core.TyCon ( isNewTyCon, newTyConCo, tyConDataCons )
+import GHC.Core.FVs ( exprFreeVars )
+import qualified GHC.Core.Subst as Subst
+import GHC.Core.TyCo.Subst ( deepSubstCo, deepSubstTy )
 import GHC.Tc.Types.Evidence ( isEmptyTcEvBinds, isIdHsWrapper )
 import GHC.Tc.Utils.TcType
 import GHC.Core.Multiplicity
@@ -37,13 +40,19 @@ import GHC.Core.Utils ( applyTypeToArgs )
 import GHC.Core.Make ( mkCoreLets )
 import GHC.Utils.Misc
 import GHC.Types.Id
-import GHC.Types.Var ( isCoVar )
+import GHC.Types.Var ( Var, isCoVar, isTyVar, updateVarType )
+import GHC.Types.Var.Env ( mkInScopeSetList )
+import GHC.Types.Var.Set ( mapVarSet, nonDetStrictFoldVarSet )
 import GHC.Types.Name.Env
 import GHC.Types.FieldLabel ( flSelector )
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import Control.Monad(liftM, unless, join)
+import Control.Monad(liftM, join)
+import Data.Data ( Data, cast, gmapT )
+import Data.List ( sort )
+import Data.Maybe ( fromMaybe )
+import Data.Typeable ( Typeable )
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 
@@ -115,8 +124,7 @@ matchConFamily (var :| vars) ty groups@(group1 :| other_groups)
 
   -- See Note [Retained package equation scope].
   -- See Note [Retained constructor equation scope].
-  | any (any has_retained_fields) groups
-    || any (any has_native_proof) groups
+  | any needs_separate_rows groups
   = do { results <- mapM match_retained_row (join groups)
        ; return (foldr1 combineMatchResults results) }
 
@@ -131,6 +139,31 @@ matchConFamily (var :| vars) ty groups@(group1 :| other_groups)
        return (mkDataConCase var ty alts)
   where
     ConPat { pat_con = L _ con1 } = firstPat (NE.head group1)
+
+    needs_separate_rows group@(first :| rest) =
+      not (null rest)
+        && (any has_native_proof group
+          || (has_retained_fields first && not (linear_retained_group group)))
+
+    -- See Note [Sharing linear package fields].
+    linear_retained_group rows
+      | not (isManyTy (matchIdMult var))
+      , Just (dc :| dcs) <- traverse first_index_constructor rows
+      = let family = dataConTyCon dc
+        in all ((== family) . dataConTyCon) dcs
+             && sort (map dataConTag (dc : dcs)) == sort (map dataConTag (tyConDataCons family))
+      | otherwise = False
+
+    first_index_constructor row
+      | ConPat {pat_con = L _ (RealDataCon con), pat_args = PrefixCon _ (L _ pat : _)} <- firstPat row
+      , Just _ : _ <- dataConRepArgBinders con
+      , AsPat _ _ inner <- pat
+      = index_constructor (unLoc inner)
+      | otherwise = Nothing
+
+    index_constructor (ParPat _ pat) = index_constructor (unLoc pat)
+    index_constructor ConPat{pat_con = L _ (RealDataCon con)} = Just con
+    index_constructor _ = Nothing
 
     -- Compile one equation with its own runtime index binders.
     match_retained_row :: EquationInfoNE -> DsM (MatchResult CoreExpr)
@@ -252,19 +285,20 @@ Each package equation binds its own runtime index Id. Later field types and
 the typed RHS refer to that Id. Sharing the first equation's fields with a
 later equation through ordinary let aliases does not substitute those types.
 
-A constructor family can contain both ordinary and retained constructors.
-Select this path if any group has retained fields, regardless of the first
-group. Do not share retained fields through the ordinary grouping path.
+A singleton group keeps all its original fields and evidence. Use one outer
+case when each retained constructor has a singleton group. This also works
+when the constructor family contains ordinary constructors.
 
-Compile each equation with its own constructor case on the original shared
-scrutinee. Combine the groups in their existing order and preserve source
-order within each constructor group. Different constructors do not overlap.
+With several rows, a linear package can share its fields in the case described
+in Note [Sharing linear package fields]. Otherwise compile each equation with
+its own constructor case on the original shared scrutinee. Keep the group order
+and the source order within each group. Different constructors do not overlap.
 A singleton case in a multi-constructor family keeps its DEFAULT failure
 continuation. A failed field pattern or guard then tries the next row outside
 the current row's field scope. An earlier infallible match discards later rows.
 Each case keeps its actual retained source field Ids. selectMatchVar chooses
 ordinary fields from their checked outer pattern types. Their nested patterns
-use the usual match compiler. No typed-AST or runtime-index alias is required.
+use the usual match compiler.
 
 Re-casing the shared scrutinee does not repeat its evaluation. The fields stay
 lazy until their patterns or RHS demand them. This can generate more cases
@@ -287,7 +321,7 @@ grouping shares the first row's fields and introduces evidence aliases. Those
 aliases do not substitute the runtime Ids in later proof types or RHS types.
 
 Use the separate-row strategy from Note [Retained package equation scope] when
-a checked native constructor pattern carries a virtual proof. Compile each row
+a group with several rows carries a virtual proof. Compile each row
 with its own fields and proof. Keep source order within each constructor group.
 Different constructors do not overlap. Each case uses the existing DEFAULT
 failure path for other constructors. A failed later column or guard tries the
@@ -308,11 +342,10 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
   = do  { retained_vars <- case con1 of
             RealDataCon con | not (null (dataConRepArgBinders con)) ->
               putSrcSpanDsA (getLoc (eqn_pat eqn1)) $
-                do { unless (null eqns) package_error
-                   ; case args1 of
-                       PrefixCon _ pats ->
-                         Just <$> retained_fields (piResultTys (dataConRepType con) arg_tys) pats
-                       _ -> package_error }
+                  case args1 of
+                    PrefixCon _ pats ->
+                      Just <$> retained_fields (piResultTys (dataConRepType con) arg_tys) pats
+                    _ -> package_error
             _ -> return Nothing
         ; let inst_tys = assert (all tcIsTcTyVar ex_tvs) $
                            -- ex_tvs can only be tyvars as data types in source
@@ -369,10 +402,14 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
                 -- Use the first equation as a source of
                 -- suggestions for the new variables
 
+        ; shared_eqns <- case (con1, retained_vars) of
+            (RealDataCon con, Just fields) -> mapM (shareRowFields con fields) eqns
+            _ -> return eqns
+
         -- Divide into sub-groups; see Note [Record patterns]
         ; let groups :: NonEmpty (NonEmpty (ConArgPats, EquationInfoNE))
               groups = NE.groupBy1 compatible_pats
-                     $ fmap (\eqn -> (con_pat_args (firstPat eqn), eqn)) (eqn1 :| eqns)
+                     $ fmap (\eqn -> (con_pat_args (firstPat eqn), eqn)) (eqn1 :| shared_eqns)
 
         ; match_results <- mapM (match_group arg_vars) groups
 
@@ -447,6 +484,67 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
         fld_var_env = mkNameEnv $ zipEqual fields1 arg_vars
         lookup_fld (L _ rpat) = lookupNameEnv_NF fld_var_env
                                             (idName (hsRecFieldId rpat))
+
+{- Note [Sharing linear package fields]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Testing the same linear package in separate cases can use its scrutinee twice
+or capture a linear field in a failure continuation. Use one outer case if
+the first retained field has one row for each constructor in its family. The
+ordinary matcher can split this first column before it tests the other fields.
+Each constructor alternative can reach only its own source row.
+
+Use the first row's runtime field Ids in the outer case. Replace the retained
+field Ids of each later row before matching the inner columns. The substitution
+also updates the field types, the virtual proofs and the desugared RHS. Keep the
+proof binders in their inner constructor patterns. The matcher still selects
+ordinary field aliases and scales their multiplicities in the usual way.
+-}
+
+-- | Rename a later row's retained fields to the fields bound by the shared case.
+shareRowFields :: DataCon -> [Id] -> EquationInfoNE -> DsM EquationInfoNE
+shareRowFields con shared row
+  | ConPat{pat_args = PrefixCon _ pats} <- firstPat row
+  = do { let columns = [(new, pat) | (Just _, new, L _ pat) <-
+                          zip3 (dataConRepArgBinders con) shared pats]
+       ; pairs <- mapM (\(new, pat) -> (, Var new) <$> selectMatchVar ManyTy pat) columns
+       ; let subst = Subst.mkOpenSubst (mkInScopeSetList shared) pairs
+       ; return (renameEquation subst row) }
+  | otherwise = pprPanic "shareRowFields: expected a prefix constructor" (ppr row)
+
+-- | Substitute types and evidence before compiling later pattern columns.
+renameEquation :: Subst.Subst -> EquationInfo -> EquationInfo
+renameEquation subst (EqnMatch pat rest) = EqnMatch (renamePattern subst pat) (renameEquation subst rest)
+renameEquation subst (EqnDone result) = EqnDone (renameCore subst <$> result)
+
+-- | Substitute in typed pattern annotations, including evidence wrappers.
+renamePattern :: forall a. Data a => Subst.Subst -> a -> a
+renamePattern subst thing
+  | Just v <- cast thing = put (renameRowVar subst v)
+  | Just ty <- cast thing = put (deepSubstTy subst ty)
+  | Just co <- cast thing = put (deepSubstCo subst co)
+  | Just e <- cast thing = put (renameCore subst e)
+  | otherwise = gmapT (renamePattern subst) thing
+  where
+    put :: Typeable b => b -> a
+    put updated = fromMaybe thing (cast updated)
+
+-- | Keep each variable's identity, except for a retained field being shared.
+renameRowVar :: Subst.Subst -> Var -> Var
+renameRowVar subst v
+  | isTyVar v || isCoVar v = updateVarType (deepSubstTy subst) v
+  | Just (Var new) <- Subst.lookupIdSubst_maybe subst v = new
+  | otherwise = updateIdTypeAndMult (deepSubstTy subst) v
+
+-- | Use the renamed free variables when substituting in a row's Core.
+renameCore :: Subst.Subst -> CoreExpr -> CoreExpr
+renameCore subst expr = Subst.substExpr combined expr
+  where
+    free = exprFreeVars expr
+    scope = mapVarSet (renameRowVar subst) free
+    combined = nonDetStrictFoldVarSet refresh (Subst.extendSubstInScopeSet subst scope) free
+    refresh v env
+      | isCoVar v = Subst.extendSubstWithVar env v (renameRowVar subst v)
+      | otherwise = env
 
 -----------------
 compatible_pats :: (ConArgPats,a) -> (ConArgPats,a) -> Bool
