@@ -430,3 +430,17 @@ sed 's/Just (Known True) -> Int/Just Recursive -> Int/' NativeTypeCaseRecursiveI
 mv recursive.hs NativeTypeCaseRecursiveIndex.hs
 reject NativeTypeCaseRecursiveIndex 15:8 'GHC-40404'
 grep -Fq 'Reduction stack overflow; size = 9' bad.log
+
+# An optimized constructor unfolding produces a join with a retained index.
+mkdir -p retained-join/client
+(
+    cd retained-join
+    flags=("-B$2" -O2 -v0 -i -i. -package-env - -dcore-lint -dstg-lint)
+    cp "$area/NativeRetainedJoinProvider.hs" .
+    "$1" "${flags[@]}" -c NativeRetainedJoinProvider.hs
+    cd client
+    cp ../NativeRetainedJoinProvider.hi "$area/NativeRetainedJoin.hs" .
+    "$1" "${flags[@]}" -c NativeRetainedJoin.hs
+    "$1" "-B$2" -v0 NativeRetainedJoin.o ../NativeRetainedJoinProvider.o -o run
+    test "$(./run)" = '("37","d")'
+)

@@ -520,3 +520,14 @@ runtime indices. Independent indices still require equality evidence.
 [Alternating binder regression](../../../testsuite/tests/dependent/should_run/NativeAlternatingBinders.sh),
 [proposal #511](https://ghc-proposals.readthedocs.io/en/latest/proposals/0511-deep-subsumption.html),
 and [discussion of dictionary arguments and evaluation](https://github.com/ghc-proposals/ghc-proposals/pull/287#issuecomment-543733379).
+
+### Retained arguments in join points
+
+An optimized client can inline a producer of a GADT and share a case
+alternative using a join point. The join takes the runtime index before
+the field whose type depends on it. For example, its type can be
+`foreach (b :: Bool) -> Value b -> Stored -> String`. The result
+`String` has the same type at both jumps. A result that still mentions
+`b` after the join consumes its arguments cannot leave this scope.
+The simplifier preserves the index when changing the join's result type.
+[Source-hidden regression](../../../testsuite/tests/dependent/should_run/NativeRetainedJoin.hs).

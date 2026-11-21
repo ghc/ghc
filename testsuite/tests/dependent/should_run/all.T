@@ -384,6 +384,7 @@ test('NativeTypeCase',
                    'NativeTypeCaseDominatedRhs.hs', 'NativeTypeCaseDominatedWrongKind.hs',
                    'NativeTypeCaseNestedAliasHead.hs', 'NativeTypeCaseOpaqueIndex.hs',
                    'NativeTypeCaseErasedAlias.hs', 'NativeTypeCaseErasedWildcard.hs',
+                   'NativeRetainedJoin.hs', 'NativeRetainedJoinProvider.hs',
                    'NativeTypeCaseHiddenAlias.hs', 'NativeTypeCaseHiddenErased.hs'])],
      run_command, ['bash NativeTypeCase.sh "{compiler}" "{libdir}"'])
 test('NativeTypeCaseReify',
