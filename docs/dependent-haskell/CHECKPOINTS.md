@@ -45,6 +45,33 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At compiler revision `95182f6deb`, a client can pass a conditional
+directly to an ordinary vector reader. The operands can be two named
+packages or two polymorphic producers such as `filterVec`. GHC checks
+the conditional once. It then opens the selected package for the call.
+The runtime example returns `([6],[7])` and leaves the unused branch
+and the rest of the selected vector unevaluated. A custom `ifThenElse`
+retains its declared argument and result types. A type family that
+reduces to a package domain still forwards the package intact.
+[Ordinary client](examples/erased-existentials/RankedPackageClient.hs)
+and [source regression](../../testsuite/tests/dependent/should_run/implicit-existential-source/QuickLookForward.hs).
+
+The same compiler accepts `StoredCheck :: !Int -> forall a. Eq a => a
+-> StoredCheck a`. The wrapper takes arguments in source order.
+Matching makes the dictionary available after its position in the
+pattern. The ordinary client returns `((67,True),(71,False))`.
+The constructor build checked 16 registrations and five historical
+interface layouts. The application typechecker change preserved its
+compiler package ABI. [Constructor](examples/open-evaluation/LabelledValue.hs),
+[client](examples/open-evaluation/LabelledValueClient.hs), and
+[proposal #402 review](https://github.com/ghc-proposals/ghc-proposals/pull/402#discussion_r575067219).
+
+All 480 Showcase rows matched at native O0, O1 and O2 and in source-loaded
+GHCi. The source-hidden conditional matrix passed at O0 and O2 with
+`ImpredicativeTypes` both enabled and disabled. The registered existential
+test passed. The GHC API run matched all 37 expected lines.
+
+
 At compiler revision `3b5e52d9ad`, an ordinary module can choose the
 types of two successive GADT fields and call an inferred polymorphic
 function that uses erased packages. An interface-only client reads
