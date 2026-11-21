@@ -676,3 +676,9 @@ diagnostic at the flag.
 [Ordinary client](../examples/open-evaluation/DirectIndexedListClient.hs),
 [constructor](../examples/open-evaluation/DirectIndexedList.hs),
 and [inference references](../REFERENCES.md#nested-constructors-with-a-runtime-result-index).
+
+Quick Look inspects a nested call when its declared domain admits a
+constructor with a retained result index. An ordinary chain of calls
+to `choose :: Maybe a -> Maybe a` takes the existing inference path.
+The compiler allocation test `QuickLookOrdinaryChain` checks 480 calls
+around `Just id` with an impredicative result.

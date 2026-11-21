@@ -854,6 +854,12 @@ test ('MultilineStringsPerf',
       compile,
       ['-O'])
 
+test('QuickLookOrdinaryChain',
+     [ collect_compiler_stats('bytes allocated', 5),
+       pre_cmd('$PYTHON genQuickLookOrdinaryChain.py > QuickLookOrdinaryChain.hs'),
+       extra_files(['genQuickLookOrdinaryChain.py']) ],
+     compile, ['-fno-code'])
+
 test ('T24984',
       [ collect_compiler_stats('bytes allocated',5) ],
       compile,

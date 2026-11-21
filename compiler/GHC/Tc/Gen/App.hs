@@ -1981,10 +1981,13 @@ tcRetainedQuickLookArgType arg
       guard (isEmptyNameEnv (idConcreteTvs fun))
       sigma <- liftMaybeT (liftZonkM (zonkTcType (varType fun)))
       let (tvs, theta, tau) = tcRetainedInstTelescope sigma
+          bare = all bare_operand values
       guard (null theta && not (null tvs))
+      guard (bare || takesDirectIndexArgument tau)
       result <- MaybeT (pure (tcRetainedOrdinaryResult (length values) tau))
       guard (isAlgTyConApp result)
-      choices <- MaybeT (tcRetainedKnownValuePlan tcRetainedQuickLookArgType Nothing sigma values)
+      let read_operand = if bare then declared else tcRetainedQuickLookArgType
+      choices <- MaybeT (tcRetainedKnownValuePlan read_operand Nothing sigma values)
       let ty = substTyWith tvs choices result
       guard (hasNativeDependentExpr (Core.Type ty) && noQuickLookVars ty)
       valid <- liftMaybeT (tcRetainedInstScope [ty])
@@ -2002,13 +2005,15 @@ tcRetainedQuickLookArgType arg
         ATcId { tct_id = local } <- MaybeT (tcLookupLcl_maybe (unLocWithUserRdr name))
         actual <- liftMaybeT (liftZonkM (zonkId local))
         let domain = varType binder
+        guard (all noQuickLookVars [varType actual, typeKind (varType actual), idMult actual])
         value <- if isNativeOpaqueValueId actual && varType actual `eqType` domain
                  then pure actual
                  else do
                    level <- liftMaybeT getTcLevel
                    let flexible ty = case coreFullView ty of
-                         TyVarTy tv -> isTcTyVar tv && isMetaTyVar tv
-                                    && not (isQLInstTyVar tv) && isTouchableMetaTyVar level tv
+                         TyVarTy tv | isTcTyVar tv, isMetaTyVar tv
+                                    , TauTv <- metaTyVarInfo tv
+                                    -> not (isQLInstTyVar tv) && isTouchableMetaTyVar level tv
                          _ -> False
                    guard (flexible (varType actual) || varType actual `eqType` domain)
                    guard (isManyTy (idMult actual) || isOneTy (idMult actual)
@@ -2025,9 +2030,23 @@ tcRetainedQuickLookArgType arg
     split_named values (L _ (HsApp _ fun value)) = split_named (value : values) fun
     split_named values fun = (fun, values)
 
+    bare_operand operand = case unLoc (stripParensLHsExpr operand) of
+      HsVar{} -> True
+      _ -> False
+
     isAlgTyConApp ty = case tcSplitTyConApp_maybe ty of
       Just (tc, _) -> isAlgTyCon tc && not (isClassTyCon tc)
       _ -> False
+
+-- | Does a value argument accept a constructor indexed by its own retained field?
+-- See Note [Nested immutable retained applications].
+takesDirectIndexArgument :: Type -> Bool
+takesDirectIndexArgument ty
+  | Just (domain, result) <- splitVisibleFunTy_maybe ty
+  = case tcSplitTyConApp_maybe domain of
+      Just (tc, _) | any dataConHasRetainedResult (tyConDataCons tc) -> True
+      _ -> takesDirectIndexArgument result
+  | otherwise = False
 
 {- Note [Nested immutable retained applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2041,7 +2060,10 @@ variables cannot contain that retained index.
 Read the declared result of a simple, fully applied, unconstrained
 inner call using the same immutable selector as a direct call. Inspect
 only operands that determine an erased argument. Each recursive call
-examines a proper subexpression. This also handles an ordinary projection
+examines a proper subexpression. Recurse through a named call only if a
+declared domain has a constructor with a retained result index. Repeated
+ordinary calls such as choose (choose (Just id)) must not inspect every
+suffix of the argument tree. This also handles an ordinary projection
 of a rebuilt value, such as `readLayout (roundCell (Cell xs value))`.
 Use the algebraic argument type only to complete the outer caller's plan.
 Otherwise leave normal Quick Look in place. The normal checker still
@@ -2060,9 +2082,10 @@ arrow without checking its operand. For example, in
 `adjust f (Reading calibrated value)`, only calibrated fixes the result
 type. For an unsigned local variable, use the ordinary retained-variable
 check to fix its type or multiplicity from the constructor domain. Only
-touchable ordinary metavariables qualify. The head and saturation already
-determine that domain. The normal argument check records field usage. A known linear operand
-gets the retained-variable diagnostic at its source occurrence.
+touchable ordinary metavariables qualify. Check the operand's kind too.
+The saturated constructor requires these assignments even if the outer
+plan fails and ordinary checking resumes. The normal argument check
+records usage. Report a linear operand at its source occurrence.
 See Note [Retained constructor result equality] in GHC.Core.DataCon.
 -}
 
@@ -8421,7 +8444,9 @@ quickLookArg1 pos app_lspan rn_head larg@(L _ arg) sc_arg_ty@(Scaled _ orig_arg_
              result <- tcKnownRetainedConstructorResult rn_args fun sigma orig_arg_rho
              if isJust result then return True else
                case fun of
-                 HsVar{} | all isPlainQuickLookArg rn_args -> do
+                 HsVar{} | all isPlainQuickLookArg rn_args
+                         , let (_, _, tau) = tcRetainedInstTelescope sigma
+                         , takesDirectIndexArgument tau -> do
                    plan <- tcRetainedKnownArgPlan tcRetainedQuickLookArgType Nothing fun sigma rn_args
                    return (maybe False (any (hasNativeDependentExpr . Core.Type)) plan)
                  _ -> return False
