@@ -1332,6 +1332,8 @@ main = do
     observe "pass a refined runtime Boolean to a retained field" (firstField, secondField)
     observe "choose a field result by negating its runtime index" (firstNegated, secondNegated)
     observe "choose a result with a quoted retained signature" (firstQuoted, secondQuoted)
+    observe "splice a result type selected by a retained Boolean"
+        (NativeRetainedTH.quotedCase True (), NativeRetainedTH.quotedCase False ())
     observe "store a runtime index in a quoted constructor" (firstStored, secondStored)
     let aliasResult :: Bool -> String
         aliasResult b = case LocalAliasField.aliasField of

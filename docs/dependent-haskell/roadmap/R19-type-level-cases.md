@@ -237,6 +237,10 @@ An inline case in `[t| foreach (b :: Bool) -> case b of … |]` uses `CaseT`.
 Its rows use the type-pattern syntax of closed family equations. A pattern
 variable binds in the result of its own row. The scrutinee uses `IndexVarT`
 for the actual retained binder. The case and its order survive the quotation.
+The Showcase calls a function whose quoted signature has `()` between
+the retained binder and its result case. It checks an `Int` result at
+`True` and a `Char` result at `False`.
+[Quoted signature](../examples/open-evaluation/NativeRetainedTH.hs).
 
 A declaration splice or a splice that supplies a complete top-level value
 signature can return the quoted type. The existing case checker then lifts
