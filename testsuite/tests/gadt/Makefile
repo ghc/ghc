@@ -37,3 +37,10 @@ GadtTrailingContext:
 	@'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -O2 -dcore-lint -dstg-lint -i -i. -outputdir . -c GadtTrailingContext.hs
 	@'$(TEST_HC)' $(TEST_HC_OPTS) -v0 Main.o GadtTrailingContextProvider.o -o GadtTrailingContext$(exeext)
 	@./GadtTrailingContext$(exeext)
+
+.PHONY: GadtInteriorContext
+GadtInteriorContext:
+	@'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -O2 -dcore-lint -dstg-lint -fomit-interface-pragmas -fno-write-if-simplified-core -outputdir . -c GadtInteriorContextProvider.hs
+	@'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -O2 -dcore-lint -dstg-lint -i -i. -outputdir . -c GadtInteriorContext.hs
+	@'$(TEST_HC)' $(TEST_HC_OPTS) -v0 Main.o GadtInteriorContextProvider.o -o GadtInteriorContext$(exeext)
+	@./GadtInteriorContext$(exeext)
