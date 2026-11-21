@@ -1329,8 +1329,9 @@ data Con =
              Type -- ^ See Note [GADT return type]
   | ForallMatchC Type Con
   | RetainedGadtC [Name] [RetainedGadtArg] Type
-    -- ^ A prefix GADT constructor with one or more retained arguments.
-    -- The argument list is in source order. The result follows the list.
+    -- ^ A prefix GADT constructor with a retained index argument or a
+    -- terminal required forall. The argument list is in source order.
+    -- A terminal required forall wraps the result type.
         deriving (Show, Eq, Ord, Generic)
 
 -- | An argument of a prefix GADT constructor with retained arguments.
