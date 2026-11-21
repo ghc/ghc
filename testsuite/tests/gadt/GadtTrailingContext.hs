@@ -1,4 +1,4 @@
-{-# LANGUAGE ExplicitNamespaces, GADTs, ImpredicativeTypes, LinearTypes, RequiredTypeArguments, TypeAbstractions, TypeApplications, TypeOperators #-}
+{-# LANGUAGE ExplicitNamespaces, GADTs, ImpredicativeTypes, LinearTypes, RequiredTypeArguments, TypeAbstractions, TypeApplications, TypeOperators, ViewPatterns #-}
 module Main where
 
 import Control.Exception (SomeException, evaluate, try)
@@ -19,6 +19,17 @@ newtype Badge = Badge Int
 instance Eq Badge where
   Badge a == Badge b = odd a == odd b
 
+data Rank = Rank Int deriving Eq
+instance Ord Rank where
+  compare (Rank a) (Rank b) = compare b a
+
+compareFields :: Combined a b -> a -> a -> b -> b -> (Ordering, Bool)
+compareFields (Combined Evidence) x y u v = (compare x y, u == v)
+
+compareInPattern :: Combined a b -> a -> a -> Bool
+compareInPattern (Combined Evidence) x (compare x -> LT) = True
+compareInPattern (Combined _) _ _ = False
+
 throws :: a -> IO Bool
 throws x = either (const True) (const False) <$> try @SomeException (evaluate x)
 
@@ -32,3 +43,9 @@ main = do
   lazy <- throws (MkT bottom @Badge)
   print (partial, strict, lazy)
   print (case refined (Checked @Int (Witness (type Int)) @Bool) of (Refl, Refl) -> True)
+  let combined = Combined @Rank Evidence @Badge
+      missing = Combined @Rank (error "nested matcher") @Badge
+  print (compareFields combined (Rank 1) (Rank 2) (Badge 1) (Badge 3))
+  print (compareInPattern combined (Rank 2) (Rank 1),
+         compareInPattern combined (Rank 1) (Rank 2))
+  print =<< throws (compareInPattern missing (Rank 2) (Rank 1))

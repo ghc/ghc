@@ -335,7 +335,7 @@ matchView (var :| vars) ty eqns@(eqn1 :| _)
 -- decompose the first pattern and leave the rest alone
 decomposeFirstPat :: (Pat GhcTc -> Pat GhcTc) -> EquationInfoNE -> EquationInfoNE
 decomposeFirstPat extract eqn@(EqnMatch { eqn_pat = pat }) = eqn{eqn_pat = fmap extract pat}
-decomposeFirstPat _ (EqnDone {}) = panic "decomposeFirstPat"
+decomposeFirstPat _ _ = panic "decomposeFirstPat"
 
 getCoPat, getBangPat, getViewPat :: Pat GhcTc -> Pat GhcTc
 getCoPat (XPat (CoPat _ pat _)) = pat
@@ -429,6 +429,9 @@ tidyEqnInfo :: MatchId -> EquationInfo
         --      one of these for which patGroup is defined.
 
 tidyEqnInfo _ eqn@(EqnDone {}) = return (idDsWrapper, eqn)
+tidyEqnInfo v (EqnScope binds rest) = do
+  (wrap, eqn) <- tidyEqnInfo v rest
+  return (mkCoreLets binds . wrap, eqn)
 
 tidyEqnInfo v eqn@(EqnMatch { eqn_pat = p@(L loc _) }) = do
   (wrap, pat') <- tidyLPat v p

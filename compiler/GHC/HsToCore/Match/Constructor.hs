@@ -23,7 +23,7 @@ import GHC.HsToCore.Binds
 import GHC.Core.ConLike
 import GHC.Core.Coercion ( MCoercion(..), coercionLKind, mkUnbranchedAxInstCo )
 import GHC.Core.DataCon ( DataCon, dataConRepType, dataConTyCon, dataConTag
-                       , dataConRepArgBinders, dataConRepArity )
+                       , dataConRepArgBinders, dataConRepArity, dataConHasTrailingContext )
 import GHC.Core.Type ( coreFullView, isManyTy, isNativeIndexType, mkTyConApp, piResultTys )
 import GHC.Core.TyCon ( isNewTyCon, newTyConCo, tyConDataCons )
 import GHC.Core.FVs ( exprFreeVars )
@@ -395,12 +395,13 @@ matchOneConLike scrut vars ty (eqn1 :| eqns)   -- All eqns for a single construc
                                       , cpt_dicts = ds
                                       , cpt_binds = bind }})
                     , eqn_rest = rest })
-                = do dsTcEvBinds bind $ \ds_bind ->
-                       return ( wrapBinds (tvs `zip` tvs1)
-                              . wrapBinds (ds  `zip` dicts1)
-                              . mkCoreLets ds_bind
-                              , prependPats (conArgPats val_arg_tys args) rest
-                              )
+                = dsTcEvBinds bind $ \ds_bind -> do
+                    let wrap = wrapBinds (tvs `zip` tvs1) . wrapBinds (ds `zip` dicts1)
+                        fields = conArgPats val_arg_tys args
+                    return $ case con1 of
+                      RealDataCon con | dataConHasTrailingContext con, not (null ds_bind) ->
+                        (wrap, prependPats fields (EqnScope ds_bind rest))
+                      _ -> (wrap . mkCoreLets ds_bind, prependPats fields rest)
               shift (_, eqn) = pprPanic "matchOneCon/shift" (ppr eqn)
         ; let scaled_arg_tys = map (scaleScaled mult) val_arg_tys
             -- The 'val_arg_tys' are taken from the data type definition, they
@@ -521,6 +522,21 @@ proof binders in their inner constructor patterns. The matcher still selects
 ordinary field aliases and scales their multiplicities in the usual way.
 -}
 
+{- Note [Trailing constructor evidence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The fields can supply dictionaries to the solver before the constructor's
+trailing context enters scope. A solved binding from that context can refer
+to a field dictionary. For example:
+
+  Combined :: Evidence a -> forall b. Eq b => Combined a b
+  compareFields (Combined Evidence) x y = compare x y
+
+The outer constructor case binds the stored Eq dictionary. The Evidence case
+binds Ord. Bind the solved evidence after all field patterns, before any
+following argument patterns or guards. EqnScope records this point in the
+row. Its bindings are available only after the preceding patterns match.
+-}
+
 -- | Rename a later row's retained fields to the fields bound by the shared case.
 shareRowFields :: DataCon -> [Id] -> EquationInfoNE -> DsM EquationInfoNE
 shareRowFields con shared row
@@ -588,6 +604,8 @@ indexPatternSubsts patterns = do
 -- | Substitute types and evidence before compiling later pattern columns.
 renameEquation :: Subst.Subst -> EquationInfo -> EquationInfo
 renameEquation subst (EqnMatch pat rest) = EqnMatch (renamePattern subst pat) (renameEquation subst rest)
+renameEquation subst (EqnScope binds rest)
+  = EqnScope (renamePattern subst binds) (renameEquation subst rest)
 renameEquation subst (EqnDone result) = EqnDone (renameCore subst <$> result)
 
 -- | Substitute in typed pattern annotations, including evidence wrappers.

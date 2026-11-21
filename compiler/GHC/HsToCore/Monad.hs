@@ -75,7 +75,7 @@ import GHC.HsToCore.Pmc.Solver.Types (initNablas)
 import GHC.Core.FamInstEnv
 import GHC.Core
 import GHC.Core.Coercion ( MCoercionR, MCoercion(..), coercionRKind, mkTransMCo )
-import GHC.Core.Make  ( unitExpr )
+import GHC.Core.Make  ( mkCoreLets, unitExpr )
 import GHC.Core.Utils ( exprType )
 import GHC.Core.DataCon
 import GHC.Core.ConLike
@@ -166,9 +166,13 @@ data EquationInfo
             (MatchResult CoreExpr)
             -- ^ What to do after match
 
+  | EqnScope [CoreBind] EquationInfo
+    -- ^ Evidence in scope after the preceding patterns.
+    -- See Note [Trailing constructor evidence] in GHC.HsToCore.Match.Constructor.
+
 type EquationInfoNE = EquationInfo
 -- An EquationInfo which has at least one pattern
---   i.e. it's an EqnMatch, not EqnDone
+--   The head is an EqnMatch after removing any EqnScope nodes.
 
 prependPats :: [LPat GhcTc] -> EquationInfo -> EquationInfo
 prependPats [] eqn = eqn
@@ -179,11 +183,13 @@ mkEqnInfo pats = prependPats pats . EqnDone
 
 eqnMatchResult :: EquationInfo -> MatchResult CoreExpr
 eqnMatchResult (EqnDone rhs) = rhs
+eqnMatchResult (EqnScope binds rest) = mkCoreLets binds <$> eqnMatchResult rest
 eqnMatchResult (EqnMatch { eqn_rest = eq }) = eqnMatchResult eq
 
 instance Outputable EquationInfo where
     ppr = ppr . allEqnPats where
       allEqnPats (EqnDone {}) = []
+      allEqnPats (EqnScope _ rest) = allEqnPats rest
       allEqnPats (EqnMatch { eqn_pat = pat, eqn_rest = eq }) = unLoc pat : allEqnPats eq
 
 type DsWrapper = CoreExpr -> CoreExpr
