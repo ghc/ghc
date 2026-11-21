@@ -411,12 +411,21 @@ tcLambdaExpr x lam_variant matches pat_tys expected
 -- See Note [Implicit existential lambda payloads].
 tcDeclaredLambdaWitness :: TyVar -> Type -> MatchGroup GhcRn (LHsExpr GhcRn)
                         -> TcM (Maybe Type)
-tcDeclaredLambdaWitness binder body matches =
-  firstJustsM (declaredLambdaResults False body matches match_witness)
+tcDeclaredLambdaWitness binder body matches
+  = do { let results = lambdaResultArms body matches
+       ; declared <- firstJustsM (declaredLambdaResults False results match_witness)
+       ; case declared of
+           Just _ -> return declared
+           Nothing -> firstJustsM (map quick_look results) }
   where
     match_witness formal consumed actual =
       do { guard (not (any (`elemVarSet` tyCoVarsOfType actual) consumed))
          ; matchPolytypeExistsWitness binder formal actual }
+
+    quick_look (formal, rhs) =
+      do { formal <- liftZonkM (zonkTcType formal)
+         ; actual <- tcPreviewQuickLookResult rhs
+         ; return (actual >>= match_witness formal []) }
 
 -- | Select closed witnesses for consecutive dot binders from independent result fields.
 -- See Note [Implicit existential lambda payloads].
@@ -425,7 +434,8 @@ tcDeclaredLambdaTelescope :: Type -> MatchGroup GhcRn (LHsExpr GhcRn)
 tcDeclaredLambdaTelescope schema matches
   | (binders@(_ : _ : _), body) <- telescope schema
   , all (\v -> eqType (tyVarKind v) liftedTypeKind) binders
-  = do { rows <- mapMaybeM id (declaredLambdaResults True body matches (match_row binders))
+  = do { rows <- mapMaybeM id
+                   (declaredLambdaResults True (lambdaResultArms body matches) (match_row binders))
        ; return $ case rows of
            [] -> Nothing
            _ -> traverse agree (transpose rows) }
@@ -458,10 +468,9 @@ tcDeclaredLambdaTelescope schema matches
       = Just witness
       | otherwise = Nothing
 
--- | Inspect named RHS applications using the ordinary result declaration.
-declaredLambdaResults :: Bool -> Type -> MatchGroup GhcRn (LHsExpr GhcRn)
-                      -> (Type -> [TyVar] -> Type -> Maybe a) -> [TcM (Maybe a)]
-declaredLambdaResults skip_invisible body (MG { mg_alts = L _ matches }) select =
+-- | Pair each eligible result arm with its formal type.
+lambdaResultArms :: Type -> MatchGroup GhcRn (LHsExpr GhcRn) -> [(Type, LHsExpr GhcRn)]
+lambdaResultArms body (MG { mg_alts = L _ matches }) =
     concatMap match_results matches
   where
     match_results (L _ (Match { m_pats = L _ pats
@@ -479,12 +488,21 @@ declaredLambdaResults skip_invisible body (MG { mg_alts = L _ matches }) select 
               HsMultiIf _ rhss -> foldr (rhs_results formal) rest rhss
               HsCase _ _ (MG { mg_alts = L _ alts }) ->
                 foldr (case_results formal) rest alts
-              _ -> rhs_result formal expr : rest
+              _ -> (formal, expr) : rest
 
     case_results formal (L _ (Match { m_grhss = GRHSs _ rhss (L _ EmptyLocalBinds{}) })) rest
       = foldr (rhs_results formal) rest rhss
     case_results _ _ rest = rest
 
+    result_after :: Int -> Type -> Maybe Type
+    result_after 0 ty = Just ty
+    result_after n ty = splitVisibleFunTy_maybe ty >>= result_after (n - 1) . snd
+
+-- | Inspect named RHS applications using the ordinary result declaration.
+declaredLambdaResults :: Bool -> [(Type, LHsExpr GhcRn)]
+                      -> (Type -> [TyVar] -> Type -> Maybe a) -> [TcM (Maybe a)]
+declaredLambdaResults skip_invisible results select = map (uncurry rhs_result) results
+  where
     rhs_result formal rhs
       | Just (name, ntypes, args) <- application 0 [] rhs
       = do { mb_id <- if isExternalName name
@@ -492,18 +510,14 @@ declaredLambdaResults skip_invisible body (MG { mg_alts = L _ matches }) select 
                      else fmap local_id (tcLookupLcl_maybe name)
            ; declared <- traverse (liftZonkM . zonkTcType . varType) mb_id
            ; formal' <- liftZonkM (zonkTcType formal)
-           ; selected <- case declared >>= type_prefix ntypes of
+           ; case declared >>= type_prefix ntypes of
                Just (consumed, residual) ->
                  let (skipped, result) = if skip_invisible
                                          then tcSplitForAllInvisTyVars residual
                                          else ([], residual)
                  in fmap (>>= uncurry (select formal'))
                          (result_from (map snd skipped ++ consumed) args result)
-               Nothing -> return Nothing
-           ; case selected of
-               Just _ -> return selected
-               Nothing -> do { actual <- tcPreviewQuickLookResult rhs
-                             ; return (actual >>= select formal' []) } }
+               Nothing -> return Nothing }
     rhs_result _ _ = return Nothing
 
     application ntypes args expr = case unLoc (stripParensLHsExpr expr) of
@@ -520,10 +534,6 @@ declaredLambdaResults skip_invisible body (MG { mg_alts = L _ matches }) select 
            ; guard (isSpecifiedForAllTyFlag (binderFlag specified))
            ; (consumed, residual) <- type_prefix (n - 1) rest
            ; return (map snd inferred ++ binderVar specified : consumed, residual) }
-
-    result_after :: Int -> Type -> Maybe Type
-    result_after 0 ty = Just ty
-    result_after n ty = splitVisibleFunTy_maybe ty >>= result_after (n - 1) . snd
 
     result_from consumed [] ty = return (Just (consumed, ty))
     result_from consumed (arg : args) ty
@@ -598,9 +608,11 @@ The ordinary application checker instantiates the binders and checks each
 written operand at its original location.
 See Note [Visible type application and abstraction] in GHC.Tc.Gen.App.
 
-If the declaration does not fix the witness, Quick Look can use the
-call's arguments to find a result type. This covers
-`\b -> id (prepare b)` with the same declaration for prepare.
+If no result declaration fixes the single witness, Quick Look can use a
+call's arguments to find its result type. This covers
+`\b -> id (prepare b)` with the same declaration for prepare. Try the
+declarations first. A result may need a pattern equality to check at
+the witness another arm declares.
 See Note [Quick Look before lambda patterns] in GHC.Tc.Gen.App.
 
 An explicitly marked required argument, such as (type PolyId), can
