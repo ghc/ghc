@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP, FlexibleContexts, QuantifiedConstraints #-}
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes, ScopedTypeVariables, TypeFamilies, TypeOperators #-}
 module NativeConstrainedFamilyClient where
 
@@ -17,6 +18,19 @@ assumedInPattern (Witness _) =
         local = Proxy
     in local `seq` ()
 assumedInPattern (ByEquality _) = ()
+
+-- The outer signature supplies both the domain rule and its premise.
+fromRule :: forall f a.
+#ifdef OMIT_DOMAIN_PREMISE
+    (forall x. Allowed x => Collects (f x)) =>
+#else
+    (Allowed a, forall x. Allowed x => Collects (f x)) =>
+#endif
+    Proxy (f a) -> ()
+fromRule _ =
+    let local :: Proxy (Elem (f a))
+        local = Proxy
+    in local `seq` ()
 
 localContext :: forall c. Proxy c -> ()
 localContext _ =

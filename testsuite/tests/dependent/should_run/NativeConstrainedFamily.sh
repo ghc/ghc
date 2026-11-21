@@ -20,6 +20,15 @@ for reader in marked ordinary; do
         cd "$reader"
         "${ghc[@]}" -c NativeConstrainedFamilyClient.hs
         "${ghc[@]}" -fforce-recomp -fdefer-type-errors -c NativeConstrainedFamilyClient.hs
+        missing_premise=(-fforce-recomp -fno-code -DOMIT_DOMAIN_PREMISE -c NativeConstrainedFamilyClient.hs)
+        if [[ $reader == ordinary ]]; then
+            "${ghc[@]}" "${missing_premise[@]}"
+        elif "${ghc[@]}" "${missing_premise[@]}" >premise.log 2>&1 ||
+             ! grep -Fq '[GHC-39999]' premise.log ||
+             ! grep -Fq 'Allowed a' premise.log; then
+            cat premise.log
+            exit 1
+        fi
         cat >MissingField.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes, TypeFamilies #-}
 module MissingField where

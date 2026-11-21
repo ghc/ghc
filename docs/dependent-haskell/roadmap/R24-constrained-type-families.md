@@ -70,6 +70,22 @@ the PR was on 2019-11-05.
 [PR #177](https://github.com/ghc-proposals/ghc-proposals/pull/177)
 and [Eisenberg's review](https://github.com/ghc-proposals/ghc-proposals/pull/177#issuecomment-549766671).
 
+The discussion that led to #177 asks how a client can establish a
+domain from a GADT constructor or a quantified constraint. Looking up
+a top-level instance alone misses both cases. The ordinary test client
+uses both sources. Its local binding can form `Elem (f a)` under
+`forall x. Allowed x => Collects (f x)` and `Allowed a`. Removing
+the premise reports GHC-39999 at `Elem` for the marked provider.
+Writing the same type on the expression itself still gives GHC-90647.
+[Client](../../../testsuite/tests/dependent/should_run/NativeConstrainedFamilyClient.hs).
+
+The same discussion asks whether coverage
+and termination should be separate requirements. The authors disagreed
+about the consequences for closed family reduction.
+[GADT evidence](https://github.com/ghc-proposals/ghc-proposals/pull/154#issuecomment-408569969),
+[termination](https://github.com/ghc-proposals/ghc-proposals/pull/154#issuecomment-409628107)
+and [the reply](https://github.com/ghc-proposals/ghc-proposals/pull/154#issuecomment-409688377).
+
 Eisenberg asks how a caller would select the missing argument in a
 multi-parameter class. For example, if `class C a b` declares `type F a`,
 the application `F Int` supplies no `b` for the constraint `C Int b`.
