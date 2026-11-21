@@ -611,7 +611,7 @@ trimId :: Bool -> Id -> Id
 -- downstream compilations
 trimId do_trim id
   | do_trim, not (isImplicitId id)
-  = id `setIdInfo`      vanillaIdInfo
+  = id `setIdInfo`      (vanillaIdInfo `setSourceProofRuleInfo` sourceProofRuleInfo (idInfo id))
        `setIdUnfolding` idUnfolding id
        -- We respect the final unfolding chosen by tidyTopIdInfo.
        -- We have already trimmed it if we don't want it for -O0;
@@ -1595,7 +1595,7 @@ tidyTopIdInfo rhs_tidy_env name rhs_ty orig_rhs tidy_rhs idinfo show_unfold
                                                  -- in GHC.Core.Tidy
 
   | otherwise           -- Externally-visible Ids get the whole lot
-  = vanillaIdInfo
+  = vanillaIdInfo `setSourceProofRuleInfo` sourceProofRuleInfo idinfo
         `setArityInfo`       arity
         `setDmdSigInfo`      final_sig
         `setCprSigInfo`      final_cpr

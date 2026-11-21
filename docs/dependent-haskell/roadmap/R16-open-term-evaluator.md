@@ -1945,3 +1945,125 @@ types of imported definitions during reduction. Agda can also check
 confluence. [GHC rule phases and semantics](../../users_guide/exts/rewrite_rules.rst),
 [GHC rule matching](../../../compiler/GHC/Core/Rules.hs#L739-L806)
 and [Agda 2.8.0 rewriting](https://agda.readthedocs.io/en/v2.8.0/language/rewriting.html#importing-rewrite-rules).
+#### A proof whose method is reduced in a type synonym
+
+The private importer prototype records the checked method, dictionary
+and worker when they are used in a complete function signature. It
+reports GHC-83605 at an ordinary use of the imported proof when a
+conflicting rule is active. It preserves the dependencies through
+ordinary value bindings that forward the proof.
+
+A nullary synonym can compute the same result before signature checking.
+
+```haskell
+type Image = Prelude.fmap Prelude.not ('Just 'True)
+
+image :: Image :~: 'Just 'False
+image = Refl
+```
+
+At private revision `e6d4218a72`, the interface writes `Image` as
+`'Just 'False` and omits the method dependencies. A source-hidden
+ordinary client with the rule above still prints `Refl` and `Nothing`
+at `-O2`. The compiler needs to preserve the checked dependencies of
+`Image` when it checks and exports `image`.
+
+The private follow-up records the selector, the selected ground
+dictionary and its direct worker when it checks the closed call.
+A stripped interface carries those dependencies on `Image`.
+An ordinary module can export `type Indirect = Image`, and another
+ordinary module can export `image :: Indirect :~: 'Just 'False`.
+A source-hidden client of that proof gets GHC-83605 at its use
+with the conflicting rule enabled. Disabling rewrite rules preserves
+the proof use. A different export retains its ordinary runtime behavior.
+
+Changing the source from a literal synonym RHS to the checked call
+changes its interface fingerprint even though both RHSs reduce to
+`'Just 'False`. The compiler then checks each dependent module again.
+The experiment covers direct ground dictionary workers and named
+synonym references. The compiler relies on metadata written when it
+checks the producer. See the interface upgrade case below.
+
+Three method sources passed the private replay. A signature with a
+rigid callback records the selected `Functor Maybe` method. The
+installed list proof from `01c41a57a1` still requires rules off because
+the active fusion rules fail the existing mapper check. A separate
+list worker with a validated identity rule accepts at `-O2` and rejects
+a new selector or strict cons rule. The closed Maybe call above takes
+the interpreter path and records the actual ground dictionary and
+worker from specialization.
+
+Two further forms still compiled at `85db325d58` and printed `Refl`
+and `Nothing` in the presence of the conflicting rule above.
+
+1. Replace the private type synonym in the proof provider with a
+   nullary closed family. The interface axiom contains the reduced
+   RHS, and the ordinary client uses the proof with source hidden.
+
+   ```haskell
+   type family Image where
+       Image = Prelude.fmap Prelude.not ('Just 'True)
+
+   image :: Image :~: 'Just 'False
+   image = Refl
+   ```
+
+2. Import only the marked type synonym. Define and use the proof in
+   the same ordinary module as the rule. The local use does not pass
+   through the imported value check.
+
+   ```haskell
+   import Origin (Image)
+
+   image :: Image :~: 'Just 'False
+   image = Refl
+
+   main = do
+       print image
+       print (run True)
+   ```
+
+The eager nominal equality check now records the dependency when
+expansion of the imported synonym immediately proves the equality.
+This catches the named proof above, a let-bound proof, and a direct
+`(Refl :: Image :~: 'Just 'False)` at the `Refl` site. These forms
+still compile with rewrite rules disabled. An unrelated term import,
+`Proxy Image`, and `Refl :: Image :~: Image` require no such check.
+
+A Given can also expose the imported synonym during canonicalization:
+
+```haskell
+fromGiven :: forall (a :: Maybe Bool). a ~ Image => Proxy a -> a :~: 'Just 'False
+fromGiven _ = Refl
+```
+
+The eager check leaves a Wanted. The solver rewrites it with
+`a ~ Image` and expands `Image` to prove the result. When expansion of
+a marked nullary synonym fills the Wanted's coercion hole with a
+reflexive proof, GHC now checks the original `Refl` site. This uses the
+normal rule flags. Two Givens that rewrite both sides to the same
+`Image` can prove reflexivity without expanding it.
+
+The single-equation nullary closed family now stores the dependency
+on its nominal axiom. Its interface adds the
+`source-proof-rule-axioms` requirement and retains the same result
+type. The solver checks the rule when use of that axiom proves the
+ordinary client's nominal equality. `Refl :: Image :~: Image` and
+`Proxy Image` can still compile with the rule enabled. If a complete
+signature's binding proves the equation in the producer, an ordinary
+client that only imports the resulting proof gets GHC-83605 at the
+term use. A different export remains usable.
+
+An interface from the previous compiler can contain the same
+normalized axiom and provider ABI for the promoted and literal
+RHSs. A new compiler reads those existing interfaces in warm home
+builds and in installed packages. Rebuild the checked provider to
+write the dependency and protect future proof uses. The new axiom
+fingerprint invalidates a dependent module with the same normalized
+family result. The same writer uses the established interface
+encoding for an ordinary literal equation.
+
+The axiom check currently covers an immediate nominal proof from a
+single nullary equation. The next acceptance check is a closed
+family with arguments, where one selected branch uses a checked
+method and a different branch can be used with the rule enabled.

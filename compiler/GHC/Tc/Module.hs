@@ -83,7 +83,7 @@ import GHC.Core.Utils (exprType)
 import GHC.Data.OrdList (fromOL)
 import GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceCaseTables, sourceRuleOwners, sourceRuleOwnersAt, visibleSourceMethodRules,
                                hasSourceMethodRule, hasSourceMethodRuleAt, sourceLiteralWorkers, checkSourceMethodUses,
-                               checkOptionalSourceUses,
+                               checkOptionalSourceUses, checkAndInstallSourceProofs,
                                sourceMapSelector, sourceTableDependencies)
 import GHC.Tc.Gen.Foreign
 import GHC.Tc.TyCl.Instance
@@ -696,7 +696,9 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
 
         -- The interface also carries the equations of eligible source functions.
         -- See Note [Closed source tables] in GHC.Tc.Gen.SourceTable.
-      ; setGblEnv tcg_env' (checkSourceMethodUses tcg_env')
+      ; tcg_env' <- setGblEnv tcg_env' $ do
+          checkSourceMethodUses tcg_env'
+          checkAndInstallSourceProofs tcg_env'
       ; failIfErrsM
       ; tables_enabled <- xoptM LangExt.ExperimentalDependentTypes
       ; write_equations <- goptM Opt_WriteSourceEquations

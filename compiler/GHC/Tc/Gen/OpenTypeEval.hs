@@ -5,6 +5,7 @@ module GHC.Tc.Gen.OpenTypeEval
   , instantiateOpenTypeFunction
   , instantiateOpenMethod
   , readOpenMethodWorker
+  , readOpenDefinition
   ) where
 
 import GHC.Prelude

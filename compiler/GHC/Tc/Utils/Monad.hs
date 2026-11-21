@@ -48,6 +48,7 @@ module GHC.Tc.Utils.Monad(
 
   -- * Accessing input/output
   newTcRef, readTcRef, writeTcRef, updTcRef, updTcRefM,
+  recordSourceProofUse,
 
   -- * Debugging
   traceTc, traceRn, traceOptTcRn, dumpOptTcRn,
@@ -358,7 +359,7 @@ initTcGblEnv hsc_env hsc_src keep_rn_syntax mod loc =
      ; used_gre_var         <- newIORef []
      ; source_table_uses    <- newIORef emptyNameSet
      ; evaluated_term_uses  <- newIORef emptyNameSet
-     ; source_rule_types    <- newIORef emptyNameEnv
+     ; source_rule_types    <- newIORef emptySourceRuleUses
      ; home_rule_dependencies <- newIORef Map.empty
      ; optional_source_uses <- newIORef []
      ; th_var               <- newIORef False
@@ -1356,6 +1357,13 @@ recordHomeRuleDependencies ifaces = do
 *                                                                      *
 ************************************************************************
 -}
+
+-- | Record source proof use until the module's rewrite rules are known.
+recordSourceProofUse :: SrcSpan -> Name -> [SourceProofRule] -> TcM ()
+recordSourceProofUse loc name deps = do
+    env <- getGblEnv
+    updTcRef (tcg_source_rule_types env) $ \state ->
+      state { sourceProofOccurrences = (name, loc, deps) : sourceProofOccurrences state }
 
 getSrcSpanM :: TcRn SrcSpan
         -- Avoid clash with Name.getSrcLoc

@@ -25,6 +25,7 @@ module GHC.Types.Id.Info (
         -- * The IdInfo type
         IdInfo,         -- Abstract
         vanillaIdInfo, noCafIdInfo,
+        sourceProofRuleInfo, setSourceProofRuleInfo,
 
         -- ** The OneShotInfo type
         OneShotInfo(..),
@@ -538,7 +539,10 @@ data IdInfo
         -- See also Note [LFInfo of DataCon workers and wrappers]
 
         -- See documentation of the getters for what these packed fields mean.
-        tagSig          :: !(Maybe TagSig)
+        tagSig          :: !(Maybe TagSig),
+        -- Checked methods used in source proofs. Keep these dependencies
+        -- when discarding optimization information.
+        sourceProofRuleInfo :: [SourceProofRule]
     }
 
 -- | Encodes arities, OneShotInfo, CafInfo.
@@ -690,6 +694,10 @@ setDmdSigInfo info dd = dd `seq` info { dmdSigInfo = dd }
 setCprSigInfo :: IdInfo -> CprSig -> IdInfo
 setCprSigInfo info cpr = cpr `seq` info { cprSigInfo = cpr }
 
+-- | Retain the dependencies of checked source evidence on this export.
+setSourceProofRuleInfo :: IdInfo -> [SourceProofRule] -> IdInfo
+setSourceProofRuleInfo info deps = info { sourceProofRuleInfo = deps }
+
 -- | Basic 'IdInfo' that carries no useful information whatsoever
 vanillaIdInfo :: IdInfo
 vanillaIdInfo
@@ -707,7 +715,8 @@ vanillaIdInfo
                              bitfieldSetOneShotInfo NoOneShotInfo $
                              emptyBitField,
             lfInfo         = Nothing,
-            tagSig         = Nothing
+            tagSig         = Nothing,
+            sourceProofRuleInfo = []
            }
 
 -- | More informative 'IdInfo' we can use when we know the 'Id' has no CAF references

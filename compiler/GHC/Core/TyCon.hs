@@ -96,6 +96,7 @@ module GHC.Core.TyCon(
         tyConDataFamInst_maybe, tyConDataFamInstSig_maybe, tyConDataFamCoercion_maybe,
         tyConFamilyResVar_maybe,
         synTyConDefn_maybe, synTyConRhs_maybe, partialSynTyConDefn_maybe,
+        synTyConSourceProofRules, setSynTyConSourceProofRules,
         famTyConFlav_maybe,
         algTyConRhs,
         newTyConRhs, newTyConEtadArity, newTyConEtadRhs,
@@ -950,9 +951,11 @@ data TyConDetails =
                                  -- forgetfulness. False conveys definite information
                                  -- (definitely not forgetful); True is always safe.
 
-        synIsConcrete :: Bool    -- True <= If 'tys' are concrete then the expansion
+        synIsConcrete :: Bool,   -- True <= If 'tys' are concrete then the expansion
                                  --         of (S tys) is definitely concrete
                                  -- But False is always safe
+
+        synSourceProofRules :: [SourceProofRule]
     }
 
   -- | Represents families (both type and data)
@@ -2300,7 +2303,24 @@ mkSynonymTyCon name kind binders res_kind roles rhs eta_rhs is_tau
                  , synIsTau       = is_tau
                  , synIsFamFree   = is_fam_free
                  , synIsForgetful = is_forgetful
-                 , synIsConcrete  = is_concrete }
+                 , synIsConcrete  = is_concrete
+                 , synSourceProofRules = [] }
+
+-- | Source method rule dependencies retained when a synonym RHS reduces.
+synTyConSourceProofRules :: TyCon -> [SourceProofRule]
+synTyConSourceProofRules TyCon{tyConDetails = SynonymTyCon{synSourceProofRules = deps}} = deps
+synTyConSourceProofRules _ = []
+
+-- | Attach checked rule dependencies without rebuilding an ordinary synonym.
+setSynTyConSourceProofRules :: TyCon -> [SourceProofRule] -> TyCon
+setSynTyConSourceProofRules tc [] = tc
+setSynTyConSourceProofRules tc@TyCon{tyConDetails = details@SynonymTyCon{}} deps =
+  tc'
+  where
+    -- A nullary application must refer to this same TyCon and its dependencies.
+    tc' = tc { tyConDetails = details { synSourceProofRules = deps }
+             , tyConNullaryTy = mkNakedTyConTy tc' }
+setSynTyConSourceProofRules tc _ = pprPanic "setSynTyConSourceProofRules" (ppr tc)
 
 -- | Create a type family or data family 'TyCon'
 mkFamilyTyCon :: Name

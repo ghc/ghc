@@ -57,7 +57,8 @@ import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.BasicTypes (TcTyThing(ATcTypeLet, ATcCaseLet))
 import GHC.Tc.Types.Origin
-import GHC.Tc.Gen.SourceTable (checkOptionalSourceUses)
+import GHC.Tc.Gen.SourceTable (checkOptionalSourceUses, captureSourceMethodProof, closedSourceProofArgs)
+import GHC.Tc.Gen.OpenTypeEval (readOpenDefinition, readOpenMethodWorker)
 import GHC.Tc.Types.LclEnv
 import GHC.Tc.Types.Constraint (WantedConstraints)
 import GHC.Tc.Types.Evidence
@@ -73,6 +74,7 @@ import qualified GHC.Core as Core
 import GHC.Core.FVs (exprSomeFreeVarsList)
 import GHC.Core.Make (mkCoreApp, mkCoreApps, mkCoreConWrapApps, mkCharExpr, mkListExpr
                      , mkConsExpr, mkNaturalExpr)
+import GHC.Core.Predicate (getClassPredTys_maybe)
 import GHC.Core.Multiplicity
 import GHC.Core.Coercion
   ( coercionLKind, coercionRKind, coercionRole, etaExpandCoAxBranch
@@ -1946,39 +1948,92 @@ closedImportedGRE rdr_env con = do
 -- See Note [Closed literal type evaluation].
 tcRunClosedCall :: Id -> Core.CoreExpr -> Type -> TcM Type
 tcRunClosedCall fun argument result_kind = do
-  apply <- tcPrepareClosedApplication fun [exprType argument] result_kind
+  apply <- tcPrepareClosedApplication fun [exprType argument] result_kind []
   reify <- tcPrepareClosedResult (idName fun) result_kind
   apply [argument] >>= reify
 
 -- | Typecheck the ordinary runtime application without observing its value.
-tcPrepareClosedApplication :: Id -> [Type] -> Kind -> TcM ([Core.CoreExpr] -> TcM Core.CoreExpr)
-tcPrepareClosedApplication fun domains result_kind = do
+tcPrepareClosedApplication :: Id -> [Type] -> Kind -> [Bool] -> TcM ([Core.CoreExpr] -> TcM Core.CoreExpr)
+tcPrepareClosedApplication fun domains result_kind rigid_args = do
   let name = idName fun
       bad = failWithTc . TcRnClosedTypeEval name
+      rigidOperand True arg = Just arg
+      rigidOperand False _ = Nothing
       expected = foldr mkVisFunTyManyU result_kind domains
-  function <- tcPrepareClosedFunctionValue fun expected
+  (function, method) <- prepareClosedFunction fun expected
   loc <- getSrcSpanM
   return $ \arguments -> setSrcSpan loc $ do
     unless (length arguments == length domains &&
             and (zipWith tcEqType (map exprType arguments) domains)) $
       bad "The runtime operands do not have the expected types."
+    forM_ method $ \(dfun, worker) -> do
+      let (dictionary, body) = case function of
+            Core.Let (Core.NonRec binder (Core.Var selected)) body
+              | selected == dfun -> (binder, body)
+            _ -> (dfun, function)
+          checked = case Core.collectArgs body of
+            (Core.Var selector, args)
+              | fun == selector
+              , [Core.Var actual_dict] <- filter (not . Core.isTypeArg) args
+              , actual_dict == dictionary ->
+                  closedSourceProofArgs (zipWith rigidOperand rigid_args arguments)
+            _ -> []
+      refined <- if null checked then pure ([], []) else do
+        let leaves = concatMap (exprSomeFreeVarsList nonConstructorTerm) arguments
+        stable <- and <$> traverse closedRuleLeaf (worker : leaves)
+        if stable then do
+          env <- getGblEnv
+          updTcRef (tcg_evaluated_term_uses env) (`extendNameSetList` map idName (worker : leaves))
+          pure (checked, leaves)
+        else pure ([], [])
+      captureSourceMethodProof dfun fun worker refined
     return (mkCoreApps function arguments)
+
+{- Note [Closed rule argument shapes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A constructor argument supplies a rule mismatch only when the provider
+wrote that constructor. For example, evaluation can turn an opaque call
+into a constructor, but a rule can change the result of the opaque call.
+
+Inlining the selected worker or a callback can expose another call to the
+selector. Check the imported worker and each non-constructor free term
+of the arguments. Accept only available unfoldings with no free term
+references other than data constructor workers. Retain the coarse rule
+dependency of each such argument term so a new rule cannot replace it.
+-}
+
+-- | Check the imported definition used by an argument or method worker.
+closedRuleLeaf :: Id -> TcM Bool
+closedRuleLeaf var = do
+  body <- readOpenDefinition var
+  pure (either (const False) (null . exprSomeFreeVarsList nonConstructorTerm) body)
+
+-- | Find term references that a constructor cannot account for.
+nonConstructorTerm :: Var -> Bool
+nonConstructorTerm var = isId var && not (isDataConWorkId var)
 
 -- | Prepare an imported function at its checked ordinary runtime type.
 tcPrepareClosedFunctionValue :: Id -> Type -> TcM Core.CoreExpr
 tcPrepareClosedFunctionValue fun expected = do
+  (function, method) <- prepareClosedFunction fun expected
+  forM_ method $ \(dfun, worker) -> captureSourceMethodProof dfun fun worker ([], [])
+  pure function
+
+-- | Check a specialization and identify its selected method, if known.
+prepareClosedFunction :: Id -> Type -> TcM (Core.CoreExpr, Maybe (Id, Id))
+prepareClosedFunction fun expected = do
   let name = idName fun
   tcPreflightClosedCall name
-  function <- if idType fun `tcEqType` expected
-                then pure (Core.Var fun)
-                else specializeClosedFunction name expected
+  (function, method) <- if idType fun `tcEqType` expected
+                          then pure (Core.Var fun, Nothing)
+                          else specializeClosedFunction fun expected
   unless (exprType function `tcEqType` expected) $
     failWithTc (TcRnClosedTypeEval name
       "The closed call does not have the expected ordinary function type.")
   -- Even a fused call can be simplified using an imported unfolding.
   env <- getGblEnv
   updTcRef (tcg_evaluated_term_uses env) (`extendNameSet` name)
-  return function
+  return (function, method)
 
 -- | Render and interpret a complete runtime expression at a type boundary.
 tcPrepareClosedResult :: Name -> Kind -> TcM (Core.CoreExpr -> TcM Type)
@@ -2220,10 +2275,11 @@ closedCallRenderer name (ClosedCodec shape nodes) = do
       return $ \value -> with_bindings (render value empty_string)
 
 -- | Use ordinary term checking to supply type and dictionary arguments.
-specializeClosedFunction :: Name -> Type -> TcM Core.CoreExpr
-specializeClosedFunction name expected = do
+specializeClosedFunction :: Id -> Type -> TcM (Core.CoreExpr, Maybe (Id, Id))
+specializeClosedFunction fun expected = do
   loc <- getSrcSpanM
-  let occurrence = L (noAnnSrcSpan loc) (mkHsVar (L (noAnnSrcSpan loc) name))
+  let name = idName fun
+      occurrence = L (noAnnSrcSpan loc) (mkHsVar (L (noAnnSrcSpan loc) name))
   typed <- unsetGOptM Opt_DeferTypeErrors $
            unsetGOptM Opt_DeferTypedHoles $
            unsetGOptM Opt_DeferOutOfScopeVariables $
@@ -2239,7 +2295,28 @@ specializeClosedFunction name expected = do
       "The specialization uses an unfinished local binding or dictionary.")
   updTcRef (tcg_evaluated_term_uses env)
            (`extendNameSetList` [getName v | v <- free, isGlobalId v])
-  pure core
+  method <- closedMethodProof env fun free
+  pure (core, method)
+
+-- | Find the concrete method selection made by ordinary specialization.
+-- Free variables describe the evidence actually present in this expression.
+-- An abstract or non-ground dictionary does not identify a checked field.
+closedMethodProof :: TcGblEnv -> Id -> [Var] -> TcM (Maybe (Id, Id))
+closedMethodProof env selector free
+  | Just cls <- isClassOpId_maybe selector
+  , [dfun] <- [v | v <- free, isDFunId v
+                 , Just (actual, [_]) <- [getClassPredTys_maybe (idType v)]
+                 , cls == actual]
+  = do
+      state <- readTcRef (tcg_source_rule_types env)
+      case sourceProofSignature state of
+        Nothing -> pure Nothing
+        Just _ -> do
+          worker <- case sourceMethodTarget_maybe dfun selector of
+            Just name -> tcLookupIdMaybe name
+            Nothing -> either (const Nothing) Just <$> readOpenMethodWorker dfun selector
+          return ((dfun,) <$> worker)
+  | otherwise = pure Nothing
 
 -- | Desugar code that will run during compilation. Emit any diagnostics
 -- before evaluation. See Note [Errors in desugaring a splice].

@@ -725,11 +725,17 @@ tc_iface_decl :: Maybe Class  -- ^ For associated type/data family declarations
               -> IfaceDecl
               -> IfL TyThing
 tc_iface_decl _ ignore_prags (IfaceId {ifName = name, ifType = iface_type,
-                                       ifIdDetails = details, ifIdInfo = info})
+                                       ifIdDetails = raw_details, ifIdInfo = info,
+                                       ifIdSourceProofRules = deps })
   = do  { ty <- tcIfaceType iface_type
+        ; let (details, proof_rules) = case raw_details of
+                IfSourceProofId legacy -> (IfVanillaId, map (, []) legacy)
+                _ -> (raw_details, deps)
         ; details <- tcIdDetails name ty details
         ; info <- tcIdInfo ignore_prags TopLevel name ty info
-        ; return (AnId (mkGlobalId details name ty info)) }
+        ; rules <- tcIfaceSourceProofRules proof_rules
+        ; let checked_info = if null rules then info else setSourceProofRuleInfo info rules
+        ; return (AnId (mkGlobalId details name ty checked_info)) }
 
 tc_iface_decl _ _
   (IfaceData {ifName = tc_name,
@@ -787,6 +793,7 @@ tc_iface_decl _ _
                  ifKind = kind,
                  ifRoles = roles,
                  ifSynRhs = rhs_ty,
+                 ifSynSourceProofRules = proof_rules,
                  ifBinders = binders,
                  ifResKind = res_kind })
    = do { kind' <- tcIfaceType kind
@@ -806,7 +813,8 @@ tc_iface_decl _ _
                    else return NativeUnknownDomain
         ; let tycon = setTyConNativeDomainShape
                         (buildSynTyCon tc_name kind' binders' res_kind' roles rhs) shape
-        ; return (ATyCon tycon) } }
+        ; deps <- tcIfaceSourceProofRules proof_rules
+        ; return (ATyCon (setSynTyConSourceProofRules tycon deps)) } }
    where
      mk_doc n = text "Type synonym" <+> ppr n
 
@@ -945,7 +953,8 @@ tc_iface_decl _parent ignore_prags
    mk_op_doc op_name op_ty = text "Class op" <+> sep [ppr op_name, ppr op_ty]
 
 tc_iface_decl _ _ (IfaceAxiom { ifName = tc_name, ifTyCon = tc
-                              , ifAxBranches = branches, ifAxSourceSpans = spans, ifRole = role })
+                              , ifAxBranches = branches, ifAxSourceSpans = spans
+                              , ifAxSourceProofRules = deps, ifRole = role })
   = do { tc_tycon    <- tcIfaceTyCon tc
        -- Must be done lazily, because axioms are forced when checking
        -- for family instance consistency, and the RHS may mention
@@ -955,7 +964,9 @@ tc_iface_decl _ _ (IfaceAxiom { ifName = tc_name, ifTyCon = tc
        -- See #13803
        ; tc_branches <- forkM (text "Axiom branches" <+> ppr tc_name)
                       $ tc_ax_branches spans branches
-       ; let axiom = mkBranchedCoAxiom role tc_name tc_tycon tc_branches
+       ; rules <- tcIfaceSourceProofRules deps
+       ; let axiom = (mkBranchedCoAxiom role tc_name tc_tycon tc_branches)
+                      { co_ax_source_proof_rules = rules }
        ; return (ACoAxiom axiom) }
 
 tc_iface_decl _ _ (IfacePatSyn{ ifName = name
@@ -2979,6 +2990,13 @@ and Note [Native index alias evidence] in GHC.Core.Lint.
 ************************************************************************
 -}
 
+-- | Read identities used by the source proof rule checker.
+tcIfaceSourceProofRules :: [IfaceSourceProofRule] -> IfL [SourceProofRule]
+tcIfaceSourceProofRules = traverse $ \((owner, first, mapper), args) ->
+  (,,,) <$> symbol owner <*> traverse symbol first <*> pure mapper <*> traverse (traverse symbol) args
+  where
+    symbol = uncurry lookupOrig
+
 tcIdDetails :: Name -> Type -> IfaceIdDetails -> IfL IdDetails
 tcIdDetails _ _  IfVanillaId           = return VanillaId
 tcIdDetails owner ty (IfSourceTableId table_name origin) = do
@@ -2989,6 +3007,7 @@ tcIdDetails owner ty (IfSourceTableId table_name origin) = do
                   , Just _ <- sourceTableId_maybe fun -> return tc
         _ -> failIfM (text "Invalid source table for" <+> ppr owner <+> ppr table_name)
     return (SourceTableId owner table origin)
+tcIdDetails _ _ (IfSourceProofId _) = pure VanillaId
 tcIdDetails _ _  (IfWorkerLikeId dmds) = return $ WorkerLikeId dmds
 tcIdDetails _ ty IfDFunId              = return (mkDFunIdDetails cls)
   where

@@ -33,7 +33,7 @@ import GHC.Core.TyCon
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Var
-import GHC.Types.Id.Info (IdDetails(..), SourceDFun(sdf_owner))
+import GHC.Types.Id.Info (IdDetails(..), SourceDFun(sdf_owner), sourceProofRuleInfo, setSourceProofRuleInfo)
 import GHC.Types.TyThing
 
 -- | A map from 'Name's to 'TyThing's, constructed by typechecking
@@ -89,12 +89,13 @@ restoreSourceTableId :: TypeEnv -> Id -> Id
 restoreSourceTableId types fun
   | isLocalId fun, isExternalName (getName fun)
   , Just (AnId owner) <- lookupTypeEnv types (getName fun)
-  , let details = idDetails owner
-  , case details of
-      SourceTableId name _ _     -> name == getName fun
-      DFunId _ (Just source)     -> sdf_owner source == getName fun
-      _                          -> False
-  = setIdDetails fun details
+  = let with_details = case idDetails owner of
+          details@(SourceTableId name _ _) | name == getName fun -> setIdDetails fun details
+          details@(DFunId _ (Just source)) | sdf_owner source == getName fun -> setIdDetails fun details
+          _ -> fun
+        deps = sourceProofRuleInfo (idInfo owner)
+    in if null deps then with_details
+       else lazySetIdInfo with_details (setSourceProofRuleInfo (idInfo with_details) deps)
   | otherwise = fun
 
 -- Extend the type environment

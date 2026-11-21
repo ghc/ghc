@@ -795,6 +795,7 @@ mkBranchedCoAxiom role ax_name fam_tc branches
             , co_ax_name     = ax_name
             , co_ax_tc       = fam_tc
             , co_ax_role     = role
+            , co_ax_source_proof_rules = []
             , co_ax_implicit = False
             , co_ax_branches = manyBranches (computeAxiomIncomps branches) }
                                -- computeAxiomIncomps: see (SC1) in
@@ -806,6 +807,7 @@ mkUnbranchedCoAxiom ax_name fam_tc branch
             , co_ax_name     = ax_name
             , co_ax_tc       = fam_tc
             , co_ax_role     = Nominal
+            , co_ax_source_proof_rules = []
             , co_ax_implicit = False
             , co_ax_branches = unbranched (noAxiomIncomps branch) }
                                -- noAxiomIncomps: see (SC1) in
@@ -823,6 +825,7 @@ mkSingleCoAxiom role ax_name tvs eta_tvs cvs fam_tc lhs_tys rhs_ty
             , co_ax_name     = ax_name
             , co_ax_tc       = fam_tc
             , co_ax_role     = role
+            , co_ax_source_proof_rules = []
             , co_ax_implicit = False
             , co_ax_branches = unbranched (noAxiomIncomps branch) }
                                -- noAxiomIncomps: see (SC1) in
@@ -841,6 +844,7 @@ mkNewTypeCoAxiom :: Name -> TyCon -> [TyVar] -> [Role] -> Type -> CoAxiom Unbran
 mkNewTypeCoAxiom name tycon tvs roles rhs_ty
   = CoAxiom { co_ax_unique   = nameUnique name
             , co_ax_name     = name
+            , co_ax_source_proof_rules = []
             , co_ax_implicit = True  -- See Note [Implicit axioms] in GHC.Core.TyCon
             , co_ax_role     = Representational
             , co_ax_tc       = tycon

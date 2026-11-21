@@ -27,7 +27,7 @@ module GHC.Core.Coercion.Axiom (
        CoAxiomRule(.., BuiltInEqRule), BuiltInFamRewrite(..), BuiltInFamInjectivity(..), TypeEqn,
        scopedSigmaClosureName, scopedLambdaClosureName, matchableProjectionName, matchableProjectionDirection,
        coAxiomRuleArgRoles, coAxiomRuleRole,
-       coAxiomRuleBranch_maybe, isNewtypeAxiomRule_maybe,
+       coAxiomRuleBranch_maybe, sourceProofAxiomRules, isNewtypeAxiomRule_maybe,
        ClosedTyFam(..), closedTyFamCoAxiom_maybe, BuiltinClosedTyFam(..),
        trivialBuiltInClosedTyFam
        ) where
@@ -271,6 +271,7 @@ data CoAxiom br
     , co_ax_tc       :: TyCon         -- The head of the LHS patterns
                                       -- e.g.  the newtype or family tycon
     , co_ax_branches :: Branches br   -- The branches that form this axiom
+    , co_ax_source_proof_rules :: [SourceProofRule]
     , co_ax_implicit :: Bool          -- True <=> the axiom is "implicit"
                                       -- See Note [Implicit axioms]
          -- INVARIANT: co_ax_implicit == True implies length co_ax_branches == 1.
@@ -342,6 +343,11 @@ coAxiomName = co_ax_name
 
 coAxiomRole :: CoAxiom br -> Role
 coAxiomRole = co_ax_role
+
+-- | Rule dependencies of the supported nullary closed family equation.
+sourceProofAxiomRules :: CoAxiomRule -> [SourceProofRule]
+sourceProofAxiomRules (BranchedAxiom ax 0) = co_ax_source_proof_rules ax
+sourceProofAxiomRules _ = []
 
 coAxiomBranches :: CoAxiom br -> Branches br
 coAxiomBranches = co_ax_branches

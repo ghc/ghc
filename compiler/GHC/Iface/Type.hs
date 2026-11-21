@@ -3077,6 +3077,11 @@ data IfaceEvidence
   | RetainedConstructorContextEvidence
   | HomeRuleInterfaceEvidence
   | PartialSynonymEvidence
+  | SourceProofRuleEvidence
+  | SourceProofRuleAliasEvidence
+  | SourceProofRuleAxiomEvidence
+  | SourceProofRuleInfoEvidence
+  | SourceProofRuleArgumentsEvidence
   deriving (Bounded, Enum, Eq, Ord)
 
 -- | Requirements of an interface payload. See Note [Versioning retained evidence]

@@ -501,6 +501,7 @@ rnIfaceDecl = \case
     , ifType      = ty0
     , ifIdDetails = details0
     , ifIdInfo    = info0
+    , ifIdSourceProofRules = deps0
     } -> do
     name <-
       case details0 of
@@ -515,12 +516,14 @@ rnIfaceDecl = \case
     ty      <- rnIfaceType ty0
     details <- rnIfaceIdDetails details0
     info    <- rnIfaceIdInfo info0
+    deps    <- traverse rnSourceProofRule deps0
     return $
       IfaceId  -- See Note [Prefer explicit record construction]
         { ifName      = name
         , ifType      = ty
         , ifIdDetails = details
         , ifIdInfo    = info
+        , ifIdSourceProofRules = deps
         }
   IfaceData
     { ifName       = name0
@@ -562,6 +565,7 @@ rnIfaceDecl = \case
     , ifKind    = syn_kind0
     , ifResKind = syn_reskind0
     , ifSynRhs  = syn_rhs0
+    , ifSynSourceProofRules = deps0
     , ifRoles   = roles
     } -> do
       name        <- rnIfaceGlobal name0
@@ -569,6 +573,7 @@ rnIfaceDecl = \case
       syn_kind    <- rnIfaceType syn_kind0
       syn_reskind <- rnIfaceType syn_reskind0
       syn_rhs     <- rnIfaceType syn_rhs0
+      deps        <- traverse rnSourceProofRule deps0
       return $
         IfaceSynonym  -- See Note [Prefer explicit record construction]
           { ifName    = name
@@ -576,6 +581,7 @@ rnIfaceDecl = \case
           , ifKind    = syn_kind
           , ifResKind = syn_reskind
           , ifSynRhs  = syn_rhs
+          , ifSynSourceProofRules = deps
           , ifRoles   = roles
           }
   IfaceFamily
@@ -630,17 +636,20 @@ rnIfaceDecl = \case
     , ifTyCon      = tycon0
     , ifAxBranches = ax_branches0
     , ifAxSourceSpans = spans
+    , ifAxSourceProofRules = deps0
     , ifRole       = role
     } -> do
     name        <- rnIfaceNeverExported name0
     tycon       <- rnIfaceTyCon tycon0
     ax_branches <- mapM rnIfaceAxBranch ax_branches0
+    deps        <- traverse rnSourceProofRule deps0
     return $
       IfaceAxiom  -- See Note [Prefer explicit record construction]
         { ifName       = name
         , ifTyCon      = tycon
         , ifAxBranches = ax_branches
         , ifAxSourceSpans = spans
+        , ifAxSourceProofRules = deps
         , ifRole       = role
         }
   IfacePatSyn
@@ -961,8 +970,16 @@ rnIfaceIdDetails (IfSourceTableId table origin) = flip IfSourceTableId origin <$
 rnIfaceIdDetails (IfSourceDFunId methods literal) =
   IfSourceDFunId <$> mapM (\(sel, target) -> (,) <$> rnIfaceGlobal sel <*> rnIfaceGlobal target) methods
                  <*> traverse (\(sel, z, s) -> (,,) <$> rnIfaceGlobal sel <*> rnIfaceGlobal z <*> rnIfaceGlobal s) literal
+rnIfaceIdDetails (IfSourceProofId deps) = IfSourceProofId <$> traverse (fmap fst . rnSourceProofRule . (, [])) deps
 rnIfaceIdDetails details
   = pure details
+
+rnSourceProofRule :: Rename IfaceSourceProofRule
+rnSourceProofRule ((owner, first, mapper), args) = do
+  head_info <- (,,) <$> rename_name owner <*> traverse rename_name first <*> pure mapper
+  (head_info,) <$> traverse (traverse rename_name) args
+  where
+    rename_name (mod, occ) = (, occ) <$> rnModule mod
 
 rnIfaceType :: Rename IfaceType
 rnIfaceType (IfaceFreeTyVar n) = pure (IfaceFreeTyVar n)

@@ -81,7 +81,7 @@ module GHC.Types.Name (
         getSrcLoc, getSrcSpan, getOccString, getOccFS,
 
         pprInfixName, pprPrefixName, isSymOccForPpr, pprModulePrefix, pprNameUnqualified,
-        nameStableString,
+        nameStableString, SourceProofRule, SourceProofArgs, SourceProofArg(..),
 
         -- Re-export the OccName stuff
         module GHC.Types.Name.Occurrence
@@ -719,6 +719,35 @@ stableNameCmp (Name { n_sort = s1, n_occ = occ1 })
 -}
 
 -- | The same comments as for `Name`'s `Ord` instance apply.
+-- | Rule head, first type constructor, mapper check and checked arguments.
+type SourceProofRule = (Name, Maybe Name, Bool, SourceProofArgs)
+
+-- | The checked shapes at corresponding value arguments.
+-- An empty list carries no refinement.
+type SourceProofArgs = [SourceProofArg Name]
+
+-- | A saturated ordinary constructor, or an operand without known shape.
+data SourceProofArg name
+  = SourceProofUnknown
+  | SourceProofCon name [SourceProofArg name]
+  deriving (Eq, Ord, Functor, Foldable, Traversable)
+
+instance NFData name => NFData (SourceProofArg name) where
+  rnf SourceProofUnknown = ()
+  rnf (SourceProofCon name fields) = rnf name `seq` rnf fields
+
+instance Outputable name => Outputable (SourceProofArg name) where
+  ppr SourceProofUnknown = text "_"
+  ppr (SourceProofCon name fields) = ppr (name, fields)
+
+instance Binary name => Binary (SourceProofArg name) where
+  put_ bh SourceProofUnknown = putByte bh 0
+  put_ bh (SourceProofCon name fields) = putByte bh 1 >> put_ bh name >> put_ bh fields
+  get bh = getByte bh >>= \case
+    0 -> pure SourceProofUnknown
+    1 -> SourceProofCon <$> get bh <*> get bh
+    _ -> panic "Binary.get(SourceProofArg)"
+
 instance Eq Name where
     a == b = case (a `compare` b) of { EQ -> True;  _ -> False }
     a /= b = case (a `compare` b) of { EQ -> False; _ -> True }
