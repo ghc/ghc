@@ -258,7 +258,12 @@ domains and ordered rows agree and their names have fixed identities.
 The checker lifts the rows and preserves ordered reduction in both forms.
 Each splice and its module finalizer run once in the ordinary order.
 Use a named family to share a case across declaration groups or modules.
-Nested type splices and cases inside quoted type lambdas produce a source
+A type splice inside a value signature can supply a case when the fragment
+declares its own local binders. An erased binder inside the splice can index
+the case. A variable bound by one row can shadow that binder. Separate
+fragments and written cases in the same signature keep distinct helpers.
+Use a named family when the fragment needs a binder from the enclosing
+signature. Cases inside quoted type lambdas still produce a source
 diagnostic. Reification describes the checked signature and its family
 applications.
 [External-interpreter fixture](../../../testsuite/tests/dependent/should_run/NativeTypeCaseRetainedThRaw.hs),
@@ -276,7 +281,8 @@ Ordinary `GadtC`, `RecGadtC` and `ForallC` keep their representation.
 The external-interpreter test reifies a declaration from a stripped interface
 and splices a copy. It checks lazy fields, erased binders and the constructor
 codec. The Showcase passes its runtime input and dependent payload to a
-constructor declared in a quote.
+constructor declared in a quote. It also reads a case-selected field from
+a constructor declared with a direct inline case inside `[d| … |]`.
 [Provider](../examples/open-evaluation/NativeRetainedConTH.hs) and
 [test](../../../testsuite/tests/dependent/should_run/NativeTypeCaseRetainedConTh.sh).
 

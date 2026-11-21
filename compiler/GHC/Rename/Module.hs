@@ -79,7 +79,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import Language.Haskell.Syntax.Specificity (Specificity(SpecifiedSpec))
 
 import Control.Monad
-import Data.Bifunctor ( first )
+import Data.Bifunctor ( first, second )
 import Data.Foldable ( toList, for_ )
 import Data.List ( elemIndex, find, mapAccumL, nub, partition, unzip4 )
 import Data.List.NonEmpty ( NonEmpty(..), head, nonEmpty )
@@ -522,11 +522,12 @@ data LiftedTypeSite
 -- | Rewrite the declarations and return their new private synonyms separately.
 -- See Note [Lifting types from signatures and fields].
 liftDeclarationTypes :: [(RdrName, Maybe (GlobalRdrElt, Name))]
-                     -> [(RetainedCaseKey, RdrName)] -> Bool -> Bool -> HsGroup GhcPs
+                     -> [(RetainedCaseKey, RdrName)] -> (Int -> String)
+                     -> Bool -> Bool -> HsGroup GhcPs
                      -> (HsGroup GhcPs, [TyClGroup GhcPs], LiftedDecls,
                          [(LocatedN RdrName, GlobalRdrElt)], [LocatedN RdrName],
                          [(RetainedCaseKey, OccName)])
-liftDeclarationTypes source_heads earlier lift_cases named_wildcards group
+liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcards group
   | not (null synonyms)
   = (group{hs_valds = values, hs_tyclds = type_groups}, [anchors], names, concat uses, missing, helpers)
   | otherwise = (group, [], [], [], [], [])
@@ -844,7 +845,7 @@ liftDeclarationTypes source_heads earlier lift_cases named_wildcards group
           Just occ -> (applyAnchor loc occ used, [], (salt + 1, seen))
           Nothing ->
             let occ = mkTcOcc (prefix ++ occNameString (rdrNameOcc (unLoc owner))
-                                 ++ ":" ++ show (salt :: Int))
+                                 ++ ":" ++ helper_suffix salt)
                 name = L (l2l loc) (mkRdrUnqual occ)
                 -- The signature applies the helper to the original binders.
                 -- Bind fresh type variables in the copy of a quoted case.
@@ -1504,7 +1505,7 @@ rnSrcDeclsWithLambdas sigma named_wildcards lift_cases early_hidden early_scopes
      if dependent && not is_boot
      then do { heads <- if lift_cases then retainedSourceHeads sigs' tycl_decls else pure []
              ; let input = emptyRdrGroup{hs_valds = val_decls, hs_tyclds = tycl_decls}
-                   (updated, anchors, aliases, uses, unbound, _) = liftDeclarationTypes heads [] lift_cases named_wildcards input
+                   (updated, anchors, aliases, uses, unbound, _) = liftDeclarationTypes heads [] show lift_cases named_wildcards input
                    (cases, case_names) = liftTypeCases emptyRdrGroup{hs_tyclds = anchors}
                    (late, lambdas, late_scopes) = liftTypeLambdas sigma cases
                    late_hidden = aliases ++ case_names ++ [(fam, Just owner) | (fam, owner) <- lambdas]
@@ -1543,7 +1544,7 @@ rnSrcDeclsWithLambdas sigma named_wildcards lift_cases early_hidden early_scopes
    ((rn_val_decls@(XValBindsLR (HsVBG rn_binds sigs')), bind_dus), rn_splice_types) <-
      if lift_cases && not is_boot
      then do { splice_types <- newTcRef []
-             ; splice_cases <- newTcRef []
+             ; splice_cases <- newTcRef (0, [])
              ; let rename_splice = rnSplicedSignatureCases sigma named_wildcards local_fix_env splice_types splice_cases
              ; binds <- rnValBindsRHSWith (rnHsSigWcTypeWithSplice rename_splice)
                           (TopSigCtxt val_bndr_set) new_lhs
@@ -1632,25 +1633,30 @@ rnSrcDeclsWithLambdas sigma named_wildcards lift_cases early_hidden early_scopes
    return (final_tcg_env, rn_group)
                     }}}}}
 
--- | Lift cases from the parsed result of a complete top-level signature splice.
+-- | Lift cases from the parsed result of a top-level signature splice.
 -- See Note [Lifting cases from signature splices].
 rnSplicedSignatureCases
   :: RdrName -> Bool -> MiniFixityEnv -> TcRef [([TyClGroup GhcRn], FreeNames)]
-  -> TcRef [(RetainedCaseKey, Name)]
-  -> HsDocContext -> HsUntypedSplice GhcPs -> RnM (HsType GhcRn, FreeNames)
-rnSplicedSignatureCases sigma named_wildcards fix_env generated splice_cases doc =
-  rnSpliceTypeWith $ \raw ->
+  -> TcRef (Int, [(RetainedCaseKey, Name)])
+  -> SignatureSpliceSite -> HsDocContext -> HsUntypedSplice GhcPs
+  -> RnM (HsType GhcRn, FreeNames)
+rnSplicedSignatureCases sigma named_wildcards fix_env generated splice_cases site doc =
+  rnSpliceTypeWith $ \raw -> do
+    local <- getLocalRdrEnv
     case doc of
-      TypeSigCtx names@(_:_) | contains_case raw -> do
+      TypeSigCtx names@(_:_) | contains_case raw, independent local raw -> do
         let rename ty = rnLHsType (SpliceTypeCtx raw) ty
             sig = HsSig noExtField (HsOuterImplicit noExtField) raw
             wc = HsWC noExtField (L (getLoc raw) sig)
             input_sig = noLocA (TypeSig noAnn [] names wc)
             input = emptyRdrGroup{hs_valds = ValBinds noExtField [VbSig input_sig]}
         heads <- retainedSourceHeads [input_sig] []
-        earlier <- readTcRef splice_cases
+        (ordinal, complete_helpers) <- readTcRef splice_cases
+        let (earlier, suffix) = case site of
+              CompleteSignatureSplice -> (complete_helpers, show)
+              NestedSignatureSplice -> ([], \salt -> "splice" ++ show ordinal ++ "-" ++ show salt)
         let (updated, anchors, aliases, uses, _, helpers) =
-              liftDeclarationTypes heads (map (fmap nameRdrName) earlier) True named_wildcards input
+              liftDeclarationTypes heads (map (fmap nameRdrName) earlier) suffix True named_wildcards input
         case (anchors, hs_valds updated) of
           (_:_, ValBinds _ [VbSig (L _ (TypeSig _ _ _ HsWC{hswc_body = L _ HsSig{sig_body = ty}}))]) -> do
             let (cases, case_names) = liftTypeCases emptyRdrGroup{hs_tyclds = anchors}
@@ -1664,10 +1670,14 @@ rnSplicedSignatureCases sigma named_wildcards fix_env generated splice_cases doc
             types <- restoreEnvs (global{tcg_rdr_env = rdr_env}, local) $
               rnTyClDecls hidden scopes declarations
             restoreEnvs envs $ do
-              new_helpers <- forM (filter (stableSplicedCase . fst) helpers) $ \(key, occ) -> do
-                name <- getName <$> lookupTopBndrRn WL_Anything (mkRdrUnqual occ)
-                pure (key, name)
-              updTcRef splice_cases (new_helpers ++)
+              case site of
+                CompleteSignatureSplice -> do
+                  new_helpers <- forM (filter (stableSplicedCase . fst) helpers) $ \(key, occ) -> do
+                    name <- getName <$> lookupTopBndrRn WL_Anything (mkRdrUnqual occ)
+                    pure (key, name)
+                  updTcRef splice_cases (second (new_helpers ++))
+                NestedSignatureSplice ->
+                  updTcRef splice_cases (first (+ 1))
               updTcRef generated (types :)
               rename ty
           _ -> rename raw
@@ -1679,6 +1689,18 @@ rnSplicedSignatureCases sigma named_wildcards fix_env generated splice_cases doc
       = True
       | otherwise = or (gmapQ contains_case node)
 
+    independent local raw = case site of
+      CompleteSignatureSplice -> True
+      NestedSignatureSplice ->
+        null (extractHsTyRdrTyVars raw) && not (uses_local local raw)
+
+    uses_local :: Data a => LocalRdrEnv -> a -> Bool
+    uses_local local node
+      | Just rdr <- cast node :: Maybe RdrName
+      = elemLocalRdrEnv rdr local ||
+        maybe False (`elemLocalRdrEnv` local) (demoteRdrNameTv rdr)
+      | otherwise = or (gmapQ (uses_local local) node)
+
 {- Note [Lifting cases from signature splices]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A splice at the root of a value signature can return a type case. The
@@ -1689,9 +1711,13 @@ only while renaming these declarations and the result. Add the renamed
 declarations to the owning group for kind checking and interface writing.
 
 The splice runs once, in signature order. The regular splice path carries
-its free names and module finalizers. Nested splices keep that path without
-this lifting step. The new private declarations use the same capture and
-ordered case checks as in Note [Lifting types from signatures and fields].
+its free names and module finalizers. In a nested type splice, lift only a
+fragment whose binders are all declared within the fragment. The lifting
+pass cannot copy enclosing signature binders because their parsed domains
+are unavailable. Give each nested splice a distinct helper suffix so it
+does not collide with a written case or another splice in the signature.
+The new private declarations use the same capture and ordered case checks
+as in Note [Lifting types from signatures and fields].
 
 Two signature splices in the same declaration group can reuse one private
 helper for the same case on a retained capture. Compare the formal capture's

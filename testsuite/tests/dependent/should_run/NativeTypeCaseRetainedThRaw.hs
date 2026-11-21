@@ -1,9 +1,10 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, TemplateHaskell #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, LambdaCase, TemplateHaskell #-}
 module NativeTypeCaseRetainedThRaw
   (chooseInline, chooseDirect, renderDirect, observeInline, caseData
-  , chooseQuoted, renderQuoted, QuotedPick) where
+  , chooseQuoted, renderQuoted, QuotedPick, chooseNested, SpliceFlag(..)
+  , nestedCases, chooseNestedRetained) where
 
-import Data.Proxy (Proxy)
+import Data.Proxy (Proxy(..))
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax (addModFinalizer, dataToExpQ, dataToPatQ, lift, liftTyped)
 
@@ -89,3 +90,27 @@ $(do
       | b == bUse, outer == outerUse, outer /= inner, inner == innerUse
       , just == 'Just, proxy == ''Proxy -> pure ds
     _ -> fail (pprint ds))
+
+data SpliceFlag (d :: Maybe Bool) where
+  SpliceOn :: SpliceFlag ('Just 'True)
+  SpliceOff :: SpliceFlag 'Nothing
+
+chooseNested :: () -> $([t| forall (d :: Maybe Bool). SpliceFlag d ->
+                            case d of { Just d -> Proxy d; Nothing -> Int } |])
+chooseNested () SpliceOn = Proxy
+chooseNested () SpliceOff = 29
+
+nestedCases :: () ->
+  ($(do runIO (appendFile "nested-effects" "first\n")
+        addModFinalizer (runIO (appendFile "nested-effects" "finalizer\n"))
+        [t| case True of { True -> Int; False -> Char } |]),
+   $(runIO (appendFile "nested-effects" "second\n") >>
+     [t| case False of { True -> Int; False -> Char } |]),
+   case True of { True -> Bool; False -> String })
+nestedCases () = (31, 'n', True)
+
+chooseNestedRetained :: foreach (b :: Bool) -> $([t| foreach (b :: Bool) ->
+  case b of { True -> Int; False -> Char } |])
+chooseNestedRetained _ = \case
+  True -> 43
+  False -> 's'
