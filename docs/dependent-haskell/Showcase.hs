@@ -856,6 +856,7 @@ genericSafeIndexing = do
     observe "read checked list positions through ordinary and linear callers" =<< CursorClient.observeCursors
     observe "read a checked position with a linear callback" =<< CursorClient.observeIndexedCallback
     observe "use one bounded position on equal-length lists" =<< CursorClient.observeAligned
+    observe "consume two independently bounded list positions" =<< CursorClient.observeBoth
     observe "check a signed position in a packaged vector" $
         case ListVectorClient.fromList values of
             Sigma.Pair _ cells -> FinitePositionClient.lookupVecViaView cells position
@@ -1090,6 +1091,11 @@ main = do
         ErasedPackage.filterObservation
     observe "infer the hidden lengths of a lazy filter and a retained vector"
         ImplicitVector.observations
+    observe "refilter a vector through a rank-2 callback at its hidden length"
+        ( take 1 (ImplicitVector.cells (RankedPackageClient.refilter odd (> 3)
+            (VCons (3 :: Int) (VCons 7 (error "unused refilter tail")))))
+        , ImplicitVector.cells (RankedPackageClient.refilter odd (> 3)
+            (VCons (2 :: Int) (VCons 7 (VCons 9 VNil)))) )
     observe "project a stored vector from a strict record field"
         (StoredVector.cells (StoredVector.singleton 'h'))
     observe "read a retained length through a newtype record selector" $

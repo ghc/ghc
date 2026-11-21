@@ -1,5 +1,8 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, LinearTypes, TypeFamilies #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, LinearTypes #-}
+{-# LANGUAGE RoleAnnotations, TypeFamilies, UndecidableInstances #-}
 module NativeLinearRetainedPackageProvider where
+
+import GHC.Sigma (Sigma(Pair))
 
 type family Flag (b :: Bool) where
     Flag 'True = ()
@@ -62,3 +65,70 @@ at _ = At
 
 next :: Nat -> Bool -> Int -> a -> OwnedStep a
 next n b i a = Step (S n) b (at n i) a
+
+data Packet a where
+    IndexFirst :: foreach (n :: Nat) -> foreach (b :: Bool) -> Payload n -> Flag b -> a %1 -> Packet a
+    FlagFirst :: foreach (n :: Nat) -> foreach (b :: Bool) -> Flag b -> Payload n -> a %1 -> Packet a
+
+inspect :: Packet a %1 -> ((Int, Bool), a)
+inspect (IndexFirst Z _ () _ a) = ((0, False), a)
+inspect (IndexFirst (S left) True payload () a) = ((readAt left payload, True), a)
+inspect (IndexFirst (S right) False payload flag a) = ((1 + readAt right payload, flag), a)
+inspect (FlagFirst (S right) False flag payload a) = ((1 + readAt right payload, flag), a)
+inspect (FlagFirst Z _ _ () a) = ((0, False), a)
+inspect (FlagFirst (S left) True () payload a) = ((readAt left payload, True), a)
+
+packetTrue :: Nat -> Int -> () -> a -> Packet a
+packetTrue n i flag a = IndexFirst (S n) True (at n i) flag a
+
+packetFalse :: Nat -> Bool -> Int -> a -> Packet a
+packetFalse n flag i a = FlagFirst (S n) False flag (at n i) a
+
+packetZero :: Bool -> a -> Packet a
+packetZero b a = FlagFirst Z b (error "unused flag payload") () a
+
+packetUnknown :: Bool -> a -> Packet a
+packetUnknown b a = IndexFirst (S Z) b (at Z 0) (error "unused flag payload") a
+
+data Triple a where
+    Three :: foreach (n :: Nat) -> Payload n -> Bool
+          -> foreach (b :: Bool) -> Flag b -> foreach (c :: Bool) -> Flag c
+          -> a %1 -> Triple a
+
+chooseThree :: Triple a %1 -> (Int, a)
+chooseThree (Three Z () _ _ _ _ _ a) = (0, a)
+chooseThree (Three (S k) payload True True _ True _ a) = (10 + readAt k payload, a)
+chooseThree (Three (S k) payload True True _ False _ a) = (20 + readAt k payload, a)
+chooseThree (Three (S k) payload True False _ _ _ a) = (30 + readAt k payload, a)
+chooseThree (Three (S k) payload False _ _ _ _ a) = (40 + readAt k payload, a)
+
+makeTriple :: Nat -> Int -> Bool -> Bool -> Bool -> a -> Triple a
+makeTriple n i ordinary b c a =
+    Three (S n) (at n i) ordinary b (error "first flag payload") c (error "second flag payload") a
+
+type Mark = some (b :: Bool) | Flag b
+
+type role PairProof nominal
+data PairProof (m :: Mark) = PairProof Bool
+
+readPairProof :: foreach (m :: Mark) -> PairProof m -> Bool
+readPairProof _ (PairProof valid) = valid
+
+data NestedMark a where
+    Stage :: foreach (n :: Nat) -> foreach (m :: Mark) -> Bool -> PairProof m -> a %1 -> NestedMark a
+
+chooseMark :: NestedMark a %1 -> (Bool, a)
+chooseMark (Stage Z _ _ _ a) = (False, a)
+chooseMark (Stage (S _) (Pair first payload) True proof a) =
+    (readPairProof (Pair first payload) proof && readFlag first payload, a)
+chooseMark (Stage (S _) (Pair second payload) False proof a) =
+    (readPairProof (Pair second payload) proof && not (readFlag second payload), a)
+
+makeMark :: Nat -> Mark -> Bool -> a -> NestedMark a
+makeMark n mark branch a = Stage (S n) mark branch (proveMark mark) a
+  where
+    proveMark :: foreach (m :: Mark) -> PairProof m
+    proveMark _ = PairProof True
+
+unknownMark :: Bool -> Mark
+unknownMark b = Pair b (error "payload")

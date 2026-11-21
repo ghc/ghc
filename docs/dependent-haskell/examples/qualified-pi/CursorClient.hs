@@ -1,10 +1,10 @@
 {-# LANGUAGE BangPatterns, LinearTypes, MonoLocalBinds, NoExperimentalDependentTypes #-}
 
 -- | Open a checked list selection in an ordinary module.
-module CursorClient (observeCursors, observeIndexedCallback, observeAligned) where
+module CursorClient (observeCursors, observeIndexedCallback, observeAligned, observeBoth) where
 
 import Data.IORef (newIORef, readIORef)
-import ListCursor (Selection, cursor, lookupAligned, prepare, withIndex)
+import ListCursor (Selection, cursor, lookupAligned, positions, prepare, readBoth, withIndex)
 import ParameterizedIndexLibrary (indexGeneric, mkFinGeneric)
 
 -- | Pass the stored position once to its reader.
@@ -42,3 +42,15 @@ observeAligned = do
     k <- newIORef 1 >>= readIORef
     pure [lookupAligned xs ys k, lookupAligned xs (drop 1 ys) k,
           lookupAligned (error "forced first list") (error "forced second list") (-1)]
+
+-- | Use independent offsets on finite and cyclic lists from ordinary code.
+observeBoth :: IO [Maybe (Char, Int)]
+observeBoth = do
+    word <- newIORef "abc" >>= readIORef
+    k <- newIORef 1 >>= readIORef
+    let readAt xs i ys j = case positions xs i ys j of
+            Nothing -> Nothing
+            Just pair -> Just (readBoth pair)
+    pure [readAt word k [10, 20, 30, 40] 0,
+          readAt (cycle "ab") 3 (cycle [10, 20]) 3,
+          readAt word (-1) (error "forced right list") 0]

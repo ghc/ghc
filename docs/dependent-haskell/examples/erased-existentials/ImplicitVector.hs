@@ -1,7 +1,7 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, RankNTypes, TypeOperators #-}
 
 -- | Filter a vector without writing a package constructor or a witness.
-module ImplicitVector (Filtered, filterVec, partitionVec, firstKept, partitionRows, rowLists, firstPassing, cells, transportFiltered, pairWithSelf, forgetLength, observations, singletonBuilder, runBuilder) where
+module ImplicitVector (Filtered, filterVec, withVector, partitionVec, firstKept, partitionRows, rowLists, firstPassing, cells, transportFiltered, pairWithSelf, forgetLength, observations, singletonBuilder, runBuilder) where
 
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Sigma (Sigma(Pair))
@@ -16,6 +16,10 @@ filterVec _ VNil = VNil
 filterVec p (VCons x xs)
   | p x = VCons x (filterVec p xs)
   | otherwise = filterVec p xs
+
+-- | Apply a consumer that works for every vector length.
+withVector :: (forall k. Vec a k -> r) -> Vec a n -> r
+withVector use xs = use xs
 
 -- | Change the element type using a proof under the same hidden length.
 transportFiltered :: a :~: b -> Filtered a -> Filtered b

@@ -2,12 +2,14 @@
 module RankedPackageClient
     ( runGuarded, runConditional, runProjections, projectAt, runDeclaredWitnesses, runExplicitBranches
     , runMixedPackage, runProducedPackage, runForwardedPackage, runLabelledPackage
-    , runSelectedPackage, runLocalPattern, readCount
+    , runSelectedPackage, runLocalPattern, readCount, refilter
     ) where
 
 import Data.Bool (bool)
 import Data.Proxy (Proxy(..))
 import qualified ErasedPackage
+import ImplicitVector (Filtered, filterVec, withVector)
+import PackedVecLibrary (Vec)
 import RankedPackage
     ( Callback(..), CallbackPair, GuardedBuilder, Hidden, PolyId, PolyMaybe
     , TwoWitnessBuilder, atTwoTypes, consumeIdentity, fromLeft, fromRight
@@ -111,6 +113,12 @@ runLocalPattern flag = let (value, reader) = pairFor flag in reader value
 -- | Hide the first witness after packing the second.
 hide :: Int -> ErasedPackage.MixedNumber
 hide value = ErasedPackage.packNumber value
+
+-- | Filter at the length hidden by the first filter and return a new package.
+refilter :: (a -> Bool) -> (a -> Bool) -> Vec a n -> Filtered a
+refilter first second xs =
+    let kept = withVector (filterVec second) (filterVec first xs)
+    in kept
 
 -- | Open the hidden state and pass it once to the stored reader.
 readCount :: ErasedPackage.EncodedCount %1 -> Int
