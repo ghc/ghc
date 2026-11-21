@@ -1,0 +1,10 @@
+NativeRetainedTypeDomain.hs:8:21: error: [GHC-83605]
+    • Retained arguments with domain ‘Type’ are not supported yet.
+      For a runtime type witness, pass an explicit ‘TypeRep a’ argument from ‘Type.Reflection’.
+    • In the type signature: preserve :: foreach (a :: Type) -> a -> a
+
+NativeRetainedTypeDomain.hs:11:26: error: [GHC-83605]
+    • Retained arguments with domain ‘Type’ are not supported yet.
+      For a runtime type witness, pass an explicit ‘TypeRep a’ argument from ‘Type.Reflection’.
+    • In the type signature:
+        preserveAlias :: foreach (a :: Lifted) -> a -> a

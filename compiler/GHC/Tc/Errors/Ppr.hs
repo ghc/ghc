@@ -3699,11 +3699,16 @@ pprRetainedQuantificationError reason = case reason of
   RetainedExplicitArgument ty ->
     vcat [ text "An explicit retained argument requires an invisible retained binder."
          , text "The function has type:" <+> ppr ty ]
-  RetainedUnsupportedDomain ty ->
-    vcat [ if isPiTy ty
-           then text "This retained argument has an unsupported function domain."
-           else text "A retained value argument requires a lifted type parameter or a supported algebraic type."
-         , text "Its declared domain is:" <+> ppr ty ]
+  RetainedUnsupportedDomain ty
+    | isLiftedTypeKind ty ->
+      vcat [ text "Retained arguments with domain" <+> quotes (text "Type") <+> text "are not supported yet."
+           , text "For a runtime type witness, pass an explicit" <+> quotes (text "TypeRep a")
+               <+> text "argument from" <+> quotes (text "Type.Reflection") <> dot ]
+    | otherwise ->
+      vcat [ if isPiTy ty
+             then text "This retained argument has an unsupported function domain."
+             else text "A retained value argument requires a lifted type parameter or a supported algebraic type."
+           , text "Its declared domain is:" <+> ppr ty ]
   RetainedResultKind ty ->
     vcat [ text "The result of retained quantification must have kind" <+> quotes (text "Type")
          , text "The result type is:" <+> ppr ty ]
