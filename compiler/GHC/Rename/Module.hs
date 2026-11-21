@@ -155,8 +155,17 @@ Restore those names with type lets if the header has private names.
 For example, a domain of Proxy x after some (x :: A) must refer to
 the witness header, even when it shadows a synonym parameter x.
 See Note [Provisional kinds of sum payloads] in GHC.Tc.TyCl.
+
+A closed type family equation can return a sum. Give each row its own
+payload family. Take its captures from the equation binders. An implicit
+equation binds the variables in its left-hand side, as in rnFamEqn.
+Keep the binders that a capture's written kind needs. Keep the entire
+scope when the result contains a splice. The free-variable traversal
+cannot see the variables in the result of a splice. The original equation
+still goes through the ordinary scope, kind, and termination checks.
 -}
--- | Lift type lambdas from synonym right-hand sides. See Note [Lifting type lambdas].
+-- | Lift type lambdas from synonyms and sums from closed family equations.
+-- See Note [Lifting type lambdas].
 liftTypeLambdas :: RdrName -> HsGroup GhcPs
                 -> (HsGroup GhcPs, [(OccName, OccName)], OccEnv (OccName, Bool))
 liftTypeLambdas sigma group =
@@ -178,7 +187,42 @@ liftTypeLambdas sigma group =
             implicit = [(liftedTypeVarBinder k, k) | k <- kinds]
             (rhs', families, _) = liftRhs Nothing owner (implicit ++ scoped) rhs (0 :: Int)
         in (L loc syn{tcdRhs = rhs'}, families)
+    liftDecl (L loc decl@FamDecl{tcdFam = family@FamilyDecl
+                  { fdLName = owner, fdInfo = ClosedTypeFamily ann (Just rows) }}) =
+      let (_, results) = mapAccumL (liftEquation owner) (0 :: Int) rows
+          (rows', lifted) = unzip results
+          family' = family{fdInfo = ClosedTypeFamily ann (Just rows')}
+      in (L loc decl{tcdFam = family'}, concat lifted)
     liftDecl decl = (decl, [])
+
+    liftEquation owner salt (L loc eqn@FamEqn{feqn_rhs = rhs})
+      | sumResult rhs =
+          let captures = equationCaptures eqn
+              free = Set.fromList (map unLoc (extractHsTyRdrTyVars rhs))
+              used | spliceFree rhs = fst (foldr selectCapture ([], free) captures)
+                   | otherwise = captures
+              (rhs', families, next) = liftRhs Nothing owner used rhs salt
+          in (next, (L loc eqn{feqn_rhs = rhs'}, families))
+    liftEquation _ salt row = (salt, (row, []))
+
+    sumResult (L _ (HsParTy _ body)) = sumResult body
+    sumResult (L _ (HsKindSig _ body _)) = sumResult body
+    sumResult (L _ (XHsType HsTypeSome{})) = True
+    sumResult _ = False
+
+    equationCaptures FamEqn{feqn_bndrs = HsOuterImplicit{}, feqn_pats = pats} =
+      [(liftedTypeVarBinder v, v) | v <- nubN (extractHsTyArgRdrKiTyVars pats)]
+    equationCaptures FamEqn{feqn_bndrs = HsOuterExplicit{hso_bndrs = binders}} =
+      mapMaybe (capture . fmap (setHsTyVarBndrFlag (HsBndrRequired noExtField))) binders
+
+    selectCapture c@(binder, v) (used, free)
+      | Set.member (unLoc v) free =
+          let kinds = case unLoc binder of
+                HsTvb{tvb_kind = HsBndrKind _ kind} ->
+                  Set.fromList (map unLoc (extractHsTyRdrTyVars kind))
+                _ -> Set.empty
+          in (c : used, Set.union kinds (Set.delete (unLoc v) free))
+      | otherwise = (used, free)
 
     liftRhs scoped owner captures (L loc (HsKindSig ann body kind)) salt
       | L _ HsForAllTy{} <- stripParens kind
