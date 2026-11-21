@@ -1752,14 +1752,16 @@ tcRetainedKnownValuePlan :: (LHsExpr GhcRn -> TcM (Maybe Type))
                         -> [LHsExpr GhcRn] -> TcM RetainedInstPlan
 tcRetainedKnownValuePlan declared expected sigma values
   | (tvs, theta, tau) <- tcRetainedInstTelescope sigma
-  , not (null tvs), isRetainedValueType (withoutScopedDictionaries tau)
+  , not (null tvs)
+  , let (scoped_preds, body) = scopedDictionaryContext tau
+  , isRetainedValueType body
   , not (null values)
   = case coreFullView tau of
       DepFunTy DepFunInvisible binder body ->
         fmap (fmap snd) (tcInferInvisibleRetained tvs binder body values)
-      _ -> choose_erased tvs theta tau values (retainedDeclaredDomains (length values) tau)
+      _ -> choose_erased scoped_preds tvs theta tau values (retainedDeclaredDomains (length values) tau)
   where
-    choose_erased tvs theta tau values (domains, result, masked)
+    choose_erased scoped_preds tvs theta tau values (domains, result, masked)
       = do { pairs <- fmap catMaybes $ mapM (declared_arg tvs) (zip domains values)
          ; let actuals = map snd pairs
                seed | length domains == length values
@@ -1782,6 +1784,14 @@ tcRetainedKnownValuePlan declared expected sigma values
                | any (hasNativeDependentExpr . Core.Type)
                      (sigma : actuals ++ maybeToList expected)
                -> runMaybeT $ do
+                    -- See Note [Applying a scoped dictionary].
+                    choices_subst <- case scoped_preds of
+                      [] -> pure subst
+                      _  -> do
+                        let missing = filter (isNothing . Subst.lookupTyVar subst) tvs
+                            required = tyCoVarsOfTypes scoped_preds
+                        guard (not (any (`elemVarSet` required) missing))
+                        fst <$> liftMaybeT (newMetaTyVarsX subst missing)
                     let fixed = mapMaybe (Subst.lookupTyVar subst) tvs
                         -- See Note [Multiplicity of a supplied native argument].
                         fresh_mult tv = eqType (tyVarKind tv) multiplicityTy
@@ -1789,14 +1799,14 @@ tcRetainedKnownValuePlan declared expected sigma values
                           && not (any (anyFreeVarsOfType (== tv))
                                       (masked : theta ++ map tyVarKind tvs))
                           && any (hasNativeDependentExpr . Core.Type) fixed
-                        choice tv = case Subst.lookupTyVar subst tv of
+                        choice tv = case Subst.lookupTyVar choices_subst tv of
                           Just ty -> pure ty
                           Nothing -> guard (fresh_mult tv) >> liftMaybeT newMultiplicityVar
                     choices <- traverse choice tvs
                     guard (not (any (`elemVarSet` tyCoVarsOfTypes choices) tvs))
                     guard (and (zipWith (\tv ty ->
-                              eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty)) tvs choices))
-                    guard (all (\(formal, actual) -> eqType (Subst.substTy subst formal) actual) pairs)
+                              eqType (Subst.substTy choices_subst (tyVarKind tv)) (typeKind ty)) tvs choices))
+                    guard (all (\(formal, actual) -> eqType (Subst.substTy choices_subst formal) actual) pairs)
                     let tys = sigma : actuals ++ choices ++ maybeToList expected
                     guard (all noQuickLookVars tys)
                     valid <- liftMaybeT (tcRetainedInstScope tys)
@@ -2245,11 +2255,14 @@ hasScopedDictionaryPrefix sigma
   , DepDictTy{} <- coreFullView rho = True
   | otherwise = False
 
--- | Read past the private evidence prefix for declaration matching only.
-withoutScopedDictionaries :: Type -> Type
-withoutScopedDictionaries ty
-  | DepDictTy _ body <- coreFullView ty = withoutScopedDictionaries body
-  | otherwise = ty
+-- | Collect the predicates whose evidence occurs in the body of this prefix.
+scopedDictionaryContext :: Type -> ([PredType], Type)
+scopedDictionaryContext ty = case coreFullView ty of
+  DepDictTy dict body ->
+    let (preds, rho) = scopedDictionaryContext body
+    in (varType dict : preds, rho)
+  FunTy af _ _ _ body | isInvisibleFunArg af -> scopedDictionaryContext body
+  _ -> ([], ty)
 
 -- | Collect declared domains for the written value-argument prefix.
 -- Mark visible retained domains with True. Skip dependent argument domains.
@@ -3934,6 +3947,13 @@ The declaration pass reads through the evidence prefix. It keeps the
 dictionaries bound and cannot infer an argument from a selector
 application in the result. A dictionary in an expected result must
 match the identity and predicate of an actual lexical Given.
+
+A signature can also have ordinary constraints and payload parameters.
+Select the parameters of every dependent dictionary before opening it.
+Instantiate remaining parameters in dependency order. For example, in
+(Inspect r, Label a b) => foreach (x :: r) -> a -> Payload (ordering x),
+the receiver fixes r. The ordinary solver can use the functional
+dependency a -> b to determine b.
 
 At the call, prefer the unique lexical Given with the exact predicate.
 A Wanted for the same predicate can produce a fresh let-bound alias.

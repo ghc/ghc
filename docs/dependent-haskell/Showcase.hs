@@ -161,6 +161,7 @@ import qualified NativeMultiPackage as Packages
 import Numeric.Natural (Natural)
 import qualified OpenSource
 import qualified OrdinaryScopedComparison
+import qualified OrdinaryScopedChoice
 import qualified ScopedClassMethodClient
 import qualified Signal
 import qualified PreludePairExport
@@ -1010,6 +1011,8 @@ main = do
         (ScopedClassMethodClient.twoDictionaries enabled, ScopedClassMethodClient.twoDictionaries disabled)
     observe "read a scoped method through a Haskell 2010 client"
         (ScopedClassMethodClient.ordinaryChoices enabled, ScopedClassMethodClient.ordinaryChoices disabled)
+    observe "infer a payload constraint beside a scoped method"
+        (OrdinaryScopedChoice.readDescription enabled 'q')
     observe "compare zero under two caller dictionaries"
         (map OrdinaryScopedComparison.observations [-2, 0, 2])
     observe "render a field with evidence for its runtime flag" (renderField enabled, renderField disabled)

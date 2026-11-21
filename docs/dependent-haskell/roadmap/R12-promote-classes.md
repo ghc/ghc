@@ -256,6 +256,10 @@ receiver domains before it opens the instantiated dictionary with the
 matching Given. It then runs the usual ambiguity check on the body.
 A redundant constraint on a fresh type parameter can still produce an
 ambiguity error, and `AllowAmbiguousTypes` defers it to the use site.
+At a call site, the receiver fixes the predicate of the scoped dictionary.
+GHC instantiates other erased parameters in dependency order. Ordinary
+constraints can use a functional dependency to fix a payload's encoding.
+[Example](../examples/open-evaluation/OrdinaryScopedChoice.hs).
 The ordinary test client passes a local receiver. Applying the imported
 function directly to a constructor at the method-indexed position still
 requires a local binding for that receiver.

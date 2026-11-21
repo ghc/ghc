@@ -178,7 +178,7 @@ for opt in -O0 -O2; do
     "${ghc[@]}" "$opt" -c ScopedFamilyMethodClient.hs
     "${ghc[@]}" ScopedFamilyMethodClient.o ../provider/ScopedFamilyMethodProvider.o -o run
     ./run > actual
-    printf '%s\n' "((GT,True),(LT,'x'))" "((GT,'q'),LT)" | cmp - actual
+    printf '%s\n' "((GT,True),(LT,'x'))" "((GT,'q'),LT)" '("True","False")' | cmp - actual
 
     cat > Ambiguous.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, ScopedTypeVariables #-}

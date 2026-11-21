@@ -1,4 +1,4 @@
-{-# LANGUAGE Haskell2010, NoExperimentalDependentTypes, TypeFamilies #-}
+{-# LANGUAGE Haskell2010, NoExperimentalDependentTypes, MultiParamTypeClasses, TypeFamilies #-}
 module Main where
 
 import ScopedFamilyMethodProvider
@@ -16,6 +16,13 @@ readEntry :: Collects c => c -> Element c -> (Ordering, Element c)
 readEntry x payload = case inspectEntry x payload of
     TaggedEntry order item -> (order, item)
 
+instance Encode Char Bool where
+    encode x = x == 'q'
+
+readEncoding :: Collects c => c -> Char -> String
+readEncoding x payload = case encodeEntry x payload of
+    TaggedEntry _ text -> text
+
 readPayload :: Collects c => c -> a -> (Ordering, a)
 readPayload x payload = case inspectPayload x payload of
     TaggedEntry order item -> (order, item)
@@ -24,3 +31,4 @@ main :: IO ()
 main = do
     print (readEntry (2 :: Int) True, readEntry (error "unforced" :: AlwaysBelow) 'x')
     print (readPayload (2 :: Int) 'q', fst (readPayload AlwaysBelow (error "unforced payload" :: Char)))
+    print (readEncoding (2 :: Int) 'q', readEncoding AlwaysBelow 'x')
