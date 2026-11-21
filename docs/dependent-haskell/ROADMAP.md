@@ -655,6 +655,13 @@ still require substantial research.
 - [ ] **R05 [Dependent Core language](https://ghc.serokell.io/dh#dependent-core-language)** — Unmarked. Needs/includes: no outgoing graph edge.
 - [ ] **R06 [Universal promotion](https://ghc.serokell.io/dh#universal-promotion)** — Unmarked. Needs/includes: R07, R10, R12, R13, R14.
 - [ ] **R07 [Promote literals](https://ghc.serokell.io/dh#promote-literals)** — Unmarked. Needs/includes: R08, R09, R24. M80 supplies nonnegative type numerals at registered index kinds. [M83](PLAN.md#m83-ordinary-numerals-in-retained-arguments) accepts term numerals in retained arguments when the actual conversion has checked equations. A complete monomorphic annotation can name the retained domain. [Written character literals](REFERENCES.md#written-character-indices) can supply retained indices directly or as elements of a written list. [Plain quoted strings](REFERENCES.md#quoted-strings-in-retained-operands) use the same lazy character lists. A saturated, certified binary method can compute the [result length of an indexed append](REFERENCES.md#certified-addition-in-an-indexed-append). [Written Natural literals](REFERENCES.md#written-retained-natural-literals) use DataKinds numerals and the ordinary boxed runtime representation with the standard `Num Natural` dictionary. General overloaded term promotion and constrained family evaluation remain open.
+  [The one-cell vector package](examples/packed-vector/PackedProjection.hs)
+  uses `1` at a registered Peano kind under `ExperimentalDependentTypes`.
+  An ordinary caller can import its interface and prove that its length equals `'S 'Z`.
+  Agda accepts decimal numerals directly at its builtin `Nat` in vector indices such as `1 + n`.
+  Accepted GHC proposal #364 assigns ordinary type numerals the builtin `Natural` kind.
+  [Agda vector operations](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html)
+  and [GHC proposal #364](https://ghc-proposals.readthedocs.io/en/latest/proposals/0364-unify-natural.html).
 - [x] **R08 [Promote Char](https://ghc.serokell.io/dh#promote-char)** — Completed. Needs/includes: no outgoing graph edge. [Written character indices](REFERENCES.md#written-character-indices) use the existing DataKinds character literals.
 - [x] **R09 [Promote Natural](https://ghc.serokell.io/dh#promote-natural)** — Completed. Needs/includes: no outgoing graph edge.
 - [ ] **R10 [Promote unboxed types](https://ghc.serokell.io/dh#promote-unboxed-types)** — Unmarked. Needs/includes: R11. [Source probes and R11 acceptance check](roadmap/R10-unboxed-promotion.md).

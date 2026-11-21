@@ -10,7 +10,7 @@ type family Length (p :: PackedVec a) :: Nat where
     Length ('PackVec n xs) = n
 
 -- | A package containing one Boolean.
-type One = 'PackVec ('S 'Z) ('VCons 'True 'VNil)
+type One = 'PackVec 1 ('VCons 'True 'VNil)
 
 -- | Return the vector indexed by the length of this package.
 payload :: foreach (p :: PackedVec a) -> Vec a (PackedLength.packageLength p)
