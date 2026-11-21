@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns, LinearTypes, MonoLocalBinds, NoExperimentalDependentTypes #-}
 
 -- | Open a checked list selection in an ordinary module.
-module CursorClient (observeCursors, observeIndexedCallback, observeAligned, observeBoth, observeZip, zipTwoPairs) where
+module CursorClient (observeCursors, observeIndexedCallback, observeAligned, observeBoth, observeZip, zipTwoPairs, zipIntLiterals) where
 
 import AlignedList (checkedZipWith, zipWithExact)
 import PackedVecLibrary (toList)
@@ -73,3 +73,8 @@ observeZip = do
 -- | Both written lists have length two.
 zipTwoPairs :: a -> a -> b -> b -> [(a, b)]
 zipTwoPairs x y u v = toList (zipWithExact [x, y] [u, v] (,))
+
+
+-- | Zip ordinary machine integers using the written lists' common length.
+zipIntLiterals :: [Int]
+zipIntLiterals = toList (zipWithExact [1, 2] [10, 20] (+))
