@@ -2,7 +2,7 @@
 module RankedPackageClient
     ( runGuarded, runConditional, runProjections, projectAt, runDeclaredWitnesses, runExplicitBranches
     , runMixedPackage, runProducedPackage, runForwardedPackage, runLabelledPackage
-    , runSelectedPackage, firstSelected, runLocalPattern, readCount, refilter, refilterRows, refilterNumericZip
+    , runSelectedPackage, firstSelected, firstSelectedFilter, runLocalPattern, readCount, refilter, refilterRows, refilterNumericZip
     ) where
 
 import AlignedList (zipWithExact)
@@ -157,3 +157,8 @@ refilterNumericZip keep x y u v =
 -- | Open the selected vector and leave the other operand unevaluated.
 firstSelected :: Bool -> Filtered a -> Filtered a -> [a]
 firstSelected flag left right = take 1 (toList (if flag then id left else right))
+
+-- | Read one cell from the selected filter result.
+firstSelectedFilter :: Bool -> (a -> Bool) -> Vec a n -> Vec a m -> [a]
+firstSelectedFilter flag keep left right =
+    take 1 (toList (if flag then filterVec keep left else filterVec keep right))

@@ -616,6 +616,9 @@ learns its element type from the input lists. GHC then opens that result
 at the call. A formal domain that can reduce to a package, such as a type
 family application, keeps ordinary forwarding. A custom `ifThenElse`
 introduced by `RebindableSyntax` keeps its ordinary application rules.
+The Showcase calls `filterVec` on the selected input vector. It reads
+the first retained element and leaves both the other input and the
+selected tail lazy.
 [Source-hidden consumer](../../../testsuite/tests/dependent/should_run/implicit-existential-source/QuickLookForward.hs).
 
 An ignored conditional can need its expected type. For example,
