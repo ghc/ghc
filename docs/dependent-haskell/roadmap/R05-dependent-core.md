@@ -241,12 +241,13 @@ A fresh value pattern in a retained telescope checks its ordinary arrow
 against `%U`, even when an erased `forall` precedes that pattern. The
 same check applies to constructor equations. The solver can infer `%U`
 from the pattern. An existing `%M` function can pass through the result
-at its full type. A Given such as `ma ~ U` can justify an arrow cast in
-a variable equation. GHC lifts that cast through preceding value binders
-without moving their pattern matches. A constructor equation that needs
-a cast still reports the retained wrapper restriction. Proposal #242
-specifies unmatchable term-level function arrows. Its review discusses how term-level functions
-used in types should keep their arrow meaning.
+at its full type. An enclosing Given such as `ma ~ U` can justify an arrow
+cast in a variable or constructor equation. GHC lifts that cast through
+preceding runtime binders without moving their pattern matches. Evidence
+from a pattern is in scope inside its row, after the type of that pattern's
+arrow has been checked. Proposal #242 specifies unmatchable term-level
+function arrows. Its review discusses how term-level functions used in
+types should keep their arrow meaning.
 [Proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#term-level-functions),
 [review discussion](https://github.com/ghc-proposals/ghc-proposals/pull/242#issuecomment-502487934),
 and [Given and demand checks](../../../testsuite/tests/dependent/should_run/NativeRetainedMatchability.sh).
