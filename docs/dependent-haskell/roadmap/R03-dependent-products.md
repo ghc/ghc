@@ -464,6 +464,13 @@ the regression to check both headers.
 [Source diagnostic](../../../testsuite/tests/dependent/should_fail/NativeIndexOperandFamily.stderr)
 and [cross-module checks](../../../testsuite/tests/dependent/should_run/NativeIndexedFin.sh).
 
+The application `IndexedList xs` can use the runtime list `xs` directly
+as the sole result index. An ordinary GADT pattern recovers the index
+equality, so `rebuild (IndexedList ys) = IndexedList ys` preserves the
+original index. The Showcase reads the first cell after rebuilding
+the list and leaves its tail unevaluated.
+[Constructor and client](R04-dependent-sums.md#sums-in-constructor-fields).
+
 ### Infer two retained indices from a constructor result
 
 An ordinary caller can split two vectors at one runtime cut. A successful
