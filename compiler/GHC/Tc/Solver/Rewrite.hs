@@ -131,6 +131,7 @@ runRewrite loc flav eq_rel thing_inside
                         , re_rewriters = rewriters_ref
                         , re_used_cos  = used_cos_ref
                         , re_source_proof_family = source_proof_ref
+                        , re_source_proof_synonyms = Nothing
                         , re_native_lifting = emptyLiftingContext emptyInScopeSet
                         , re_source_lets = source_lets
                         , re_native_binders = native_binders
@@ -314,10 +315,13 @@ rewriteWithSourceProofs :: CtEvidence -> TcType
                         -> TcS ((Reduction, [(Name, [SourceProofRule])]), CoHoleSet)
 rewriteWithSourceProofs ev ty
   = do { traceTcS "rewrite {" (ppr ty)
-       ; result@((redn, _), _) <- runRewriteCtEv ev $ do
-           redn <- rewrite_one ty
-           axioms <- reductionSourceAxioms redn
-           return (redn, sourceProofUses ty axioms)
+       ; synonyms_ref <- newTcRef []
+       ; result@((redn, _), _) <- runRewriteCtEv ev $
+           withRewriteEnv (\env -> env { re_source_proof_synonyms = Just synonyms_ref }) $ do
+             redn <- rewrite_one ty
+             axioms <- reductionSourceAxioms redn
+             synonyms <- liftTcS $ readTcRef synonyms_ref
+             return (redn, sourceProofUses axioms synonyms)
        ; traceTcS "rewrite }" (ppr $ reductionReducedType redn)
        ; return result }
 
@@ -820,7 +824,19 @@ rewrite_one :: TcType -> RewriteM Reduction
 
 rewrite_one ty
   | Just ty' <- rewriterView ty  -- See Note [Rewriting synonyms]
-  = rewrite_one ty'
+  = case checkedSynonymOrigin ty of
+      Just origin -> rewrite_checked_synonym [origin] ty'
+      Nothing -> rewrite_one ty'
+
+  where
+    -- Keep the origin only along this expansion, never in its arguments.
+    rewrite_checked_synonym origins expanded
+      | Just expanded' <- rewriterView expanded
+      = rewrite_checked_synonym (maybe origins (: origins) (checkedSynonymOrigin expanded)) expanded'
+      | TyConApp family args <- expanded
+      , isMethodSourceFamily family, lengthIs args (tyConArity family)
+      = rewriteExactFamAppWithOrigins origins family args
+      | otherwise = rewrite_one expanded
 
 -- A dictionary index has no checked rewrite or congruence rule. Only
 -- reflexivity in the equality checker can discharge an obligation on it.
@@ -1218,10 +1234,14 @@ rewriteExactFamApp
   :: TyCon      -- ^ @F@
   -> [TcType]   -- ^ @tys@, exactly saturating @F@
   -> RewriteM Reduction
-rewriteExactFamApp tc tys =
+rewriteExactFamApp = rewriteExactFamAppWithOrigins []
+
+-- | Rewrite a family application reached through checked synonym expansion.
+rewriteExactFamAppWithOrigins :: [(Name, [SourceProofRule])] -> TyCon -> [TcType] -> RewriteM Reduction
+rewriteExactFamAppWithOrigins origins tc tys =
   do { let !fam_ty = mkTyConApp tc tys
      ; (deps, res) <- trackingDependencies $
-                      rewrite_exact_fam_app fam_ty tc tys
+                      rewrite_exact_fam_app origins fam_ty tc tys
      ; case res of
          FamAppNotReduced redn ->
             -- We only rewrote the arguments: nothing to zap nor cache.
@@ -1249,52 +1269,69 @@ rewriteExactFamApp tc tys =
 
 -- | Inspect the coercion only after a relevant family reduced.
 -- See Note [Committing checked source family branches].
-reductionSourceAxioms :: Reduction -> RewriteM [CoAxiomRule]
+reductionSourceAxioms :: Reduction -> RewriteM [(CoAxiomRule, Coercion)]
 reductionSourceAxioms redn = mkRewriteM $ \env _ -> do
     marked_family <- readTcRef (re_source_proof_family env)
     return $ if marked_family then sourceProofAxioms (reductionCoercion redn) else []
 
 -- | Collect selected branches and private source-family axioms in a reduction.
-sourceProofAxioms :: Coercion -> [CoAxiomRule]
+sourceProofAxioms :: Coercion -> [(CoAxiomRule, Coercion)]
 sourceProofAxioms co = go co []
   where
-    go (AxiomCo rule args) rest =
+    go proof@(AxiomCo rule args) rest =
       let arg_uses = foldr go rest args
       in case rule of
            BranchedAxiom axiom _
              | isMethodSourceFamily (coAxiomTyCon axiom)
-               || not (null (sourceProofAxiomRules rule)) -> rule : arg_uses
+               || not (null (sourceProofAxiomRules rule)) -> (rule, proof) : arg_uses
            _ -> arg_uses
     go (TyConAppCo _ _ args) rest = foldr go rest args
     go (AppCo fun arg) rest = go fun (go arg rest)
-    go (TransCo first second) rest = go first (go second rest)
+    go (TermAppCo _ arg) rest = go arg rest
+    go (DepFunCo _ _ _ domain body) rest = go_mco domain (go body rest)
+    go (ForAllCo { fco_ma = ma, fco_kind = kind, fco_body = body }) rest =
+      go ma (go_mco kind (go body rest))
+    go (FunCo { fco_ma = ma, fco_mult = mult, fco_arg = arg, fco_res = res }) rest =
+      go ma (go mult (go arg (go res rest)))
+    go (GRefl _ _ kind) rest = go_mco kind rest
     go (SymCo inner) rest = go inner rest
-    go _ rest = rest
+    go (TransCo first second) rest = go first (go second rest)
+    go (SelCo _ inner) rest = go inner rest
+    go (LRCo _ inner) rest = go inner rest
+    go (InstCo inner arg) rest = go inner (go arg rest)
+    go (KindCo inner) rest = go inner rest
+    go (SubCo inner) rest = go inner rest
+    go Refl{} rest = rest
+    go CoVarCo{} rest = rest
+    go HoleCo{} rest = rest
+    go UnivCo{} rest = rest
+
+    go_mco MRefl rest = rest
+    go_mco (MCo inner) rest = go inner rest
 
 -- | The private family that implements a checked source method.
 isMethodSourceFamily :: TyCon -> Bool
 isMethodSourceFamily = isJust . sourceTableTermOcc . nameOccName . tyConName
 
--- | Attribute uses to the selected axiom and to any checked synonym
--- whose expanded family actually reduced.
-sourceProofUses :: TcType -> [CoAxiomRule] -> [(Name, [SourceProofRule])]
-sourceProofUses _ [] = []
-sourceProofUses ty axioms =
-    [ (coAxiomName axiom, deps)
-    | rule@(BranchedAxiom axiom _) <- axioms
-    , deps@(_ : _) <- [sourceProofAxiomRules rule] ] ++ synonym_uses
-  where
-    synonym_uses
-      | TyConApp synonym _ <- ty
-      , deps@(_ : _) <- synTyConSourceProofRules synonym
-      , TyConApp family args <- coreFullView ty
-      , lengthIs args (tyConArity family), isMethodSourceFamily family
-      , any (matches family) axioms
-      = [(tyConName synonym, deps)]
-      | otherwise = []
+-- | Report the provenance carried by a synonym, if any.
+checkedSynonymOrigin :: TcType -> Maybe (Name, [SourceProofRule])
+checkedSynonymOrigin (TyConApp synonym _)
+  | deps@(_ : _) <- synTyConSourceProofRules synonym = Just (tyConName synonym, deps)
+checkedSynonymOrigin _ = Nothing
 
-    matches family (BranchedAxiom axiom _) = coAxiomTyCon axiom == family
-    matches _ _ = False
+-- | Attribute uses to the selected axioms and to the synonyms whose
+-- selected applications occur in the reduction proof.
+sourceProofUses :: [(CoAxiomRule, Coercion)]
+                -> [(CoAxiomRule, Coercion, Name, [SourceProofRule])]
+                -> [(Name, [SourceProofRule])]
+sourceProofUses axioms synonyms =
+    [ (coAxiomName axiom, deps)
+    | (rule@(BranchedAxiom axiom _), _) <- axioms
+    , deps@(_ : _) <- [sourceProofAxiomRules rule] ] ++
+    [ (owner, deps) | (rule, proof, owner, deps) <- synonyms
+                    , any (matches rule proof) axioms ]
+  where
+    matches rule proof (other_rule, other_proof) = rule == other_rule && eqCoercion proof other_proof
 
 {- Note [Committing checked source family branches]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1303,11 +1340,24 @@ Keep the selected family axiom in the coercion. Its branch index tells
 us which equation supplied the result. If a reduction first rewrites a
 family argument, that argument's proof is part of the reduction too.
 
+Follow the explicit coercion operands of congruence, casts,
+composition, substitution and projection. A forall or dependent
+function can carry proofs in its domain or body. Collect branch names
+and dependencies, which do not refer to local binders. Do not inspect
+endpoint types, coercion variables, holes or universal coercion
+dependency sets. They do not identify the family equation selected by
+this rewrite. A proof-irrelevant coercion type uses reflexivity and
+does not itself select an equation.
+
 A checked synonym such as Mapped f x can expand to a private source
-family. Its dependencies apply only if a selected axiom belongs to
-that family. This also covers a reduction that rewrites x before
-selecting an equation. Naming the synonym or proving reflexivity
-can succeed without using the equation.
+family. Pass its origin to the reduction of that application only.
+Record the origin when that reduction selects a family equation.
+The final proof must contain that axiom application. This also covers
+a reduction that rewrites x before selecting an equation, or an
+enclosing family that must inspect the synonym's result. An enclosing
+family with an eager constant equation never rewrites the argument.
+Naming the synonym or proving reflexivity can succeed without using
+the equation.
 
 A successful reduction of a relevant family sets a flag for the
 current rewrite. This lets ordinary rewrites leave coercions lazy.
@@ -1322,11 +1372,11 @@ is solved by reflexivity.
 -- | Reduce an exactly-saturated type family application.
 --
 -- See Note [How to normalise a family application].
-rewrite_exact_fam_app :: TcType -> TyCon -> [TcType] -> RewriteM FamAppRewrite
-rewrite_exact_fam_app fam_ty tc tys
+rewrite_exact_fam_app :: [(Name, [SourceProofRule])] -> TcType -> TyCon -> [TcType] -> RewriteM FamAppRewrite
+rewrite_exact_fam_app origins fam_ty tc tys
   = assertPpr (fam_ty `eqType` mkTyConApp tc tys)
               (ppr fam_ty $$ ppr tc $$ ppr tys) $
-    do { step <- rewrite_exact_fam_app_step tc tys
+    do { step <- rewrite_exact_fam_app_step origins tc tys
        ; case step of
            -- STEP 5 (GIVEUP): the type family application did not reduce.
            FamAppNotReduced {} -> return step
@@ -1344,7 +1394,7 @@ rewrite_exact_fam_app fam_ty tc tys
     rewrite_rhs rhs
       | Just (fam_ty', tc', tys', tys_rest) <- splitTyFamApp_maybe rhs
       -- Another family application: go round the loop again.
-      = do { res <- rewrite_exact_fam_app fam_ty' tc' tys'
+      = do { res <- rewrite_exact_fam_app [] fam_ty' tc' tys'
            ; let (redn, worth_caching) = famAppRewriteRedn res
            ; redn' <- rewrite_app_ty_args redn tys_rest
            ; return (redn', worth_caching) }
@@ -1354,14 +1404,14 @@ rewrite_exact_fam_app fam_ty tc tys
 
 -- | Try to reduce the an exactly-saturated type family application once:
 -- STEPs 1-5 of Note [How to normalise a family application].
-rewrite_exact_fam_app_step :: TyCon -> [TcType] -> RewriteM FamAppRewrite
-rewrite_exact_fam_app_step tc tys
+rewrite_exact_fam_app_step :: [(Name, [SourceProofRule])] -> TyCon -> [TcType] -> RewriteM FamAppRewrite
+rewrite_exact_fam_app_step origins tc tys
   = do { -- Query the typechecking plugins for all their rewriting functions
          -- which apply to a type family application headed by the TyCon 'tc'.
        ; tc_rewriters <- getTcPluginRewritersForTyCon tc
 
        -- STEP 1. Try to reduce without reducing arguments first.
-       ; result1 <- try_to_reduce tc tys tc_rewriters
+       ; result1 <- try_reduce tys tc_rewriters
        ; case result1 of
              -- We reduced without rewriting any arguments: not worth caching.
              -- See Note [When is a reduction worth caching?]
@@ -1431,7 +1481,7 @@ rewrite_exact_fam_app_step tc tys
          ; _ ->
 
          -- Inerts didn't work. Try to reduce again, in STEP 4.
-    do { result3 <- try_to_reduce tc xis tc_rewriters
+    do { result3 <- try_reduce xis tc_rewriters
        ; case result3 of
            -- (WorthCaching1) in Note [When is a reduction worth caching?]
            FreshReduction redn -> return $! FamAppReduced (redn_args_and_then redn) True Nothing
@@ -1442,6 +1492,18 @@ rewrite_exact_fam_app_step tc tys
                Just redn -> FamAppReduced (redn_args_and_then redn) True Nothing
                -- We have made no progress at all: STEP 5 (GIVEUP).
                Nothing -> FamAppNotReduced give_up }}}}}
+  where
+    try_reduce args rewriters = do
+      result <- try_to_reduce tc args rewriters
+      case (origins, result) of
+        (_ : _, FreshReduction (Reduction co _)) -> do
+          ref <- getRewriteEnvField re_source_proof_synonyms
+          case (ref, co) of
+            (Just uses, proof@(AxiomCo rule@(BranchedAxiom axiom _) _)) | coAxiomTyCon axiom == tc ->
+              liftTcS $ updTcRef uses ([(rule, proof, owner, deps) | (owner, deps) <- origins] ++)
+            _ -> return ()
+        _ -> return ()
+      return result
 
 -- | Follow inert or cached family evidence while rewriting its right-hand side.
 -- See Note [Mixed-flavour family rewrite cycles].
@@ -1570,6 +1632,7 @@ famAppRewriteRedn (FamAppNotReduced redn)            = (redn, False)
 splitTyFamApp_maybe :: TcType -> Maybe (TcType, TyCon, [TcType], [TcType])
 splitTyFamApp_maybe ty
   | Just ty' <- rewriterView ty  -- See Note [Rewriting synonyms]
+  , Nothing <- checkedSynonymOrigin ty
   = splitTyFamApp_maybe ty'
   | TyConApp tc tys <- ty
   , isTypeFamilyTyCon tc
