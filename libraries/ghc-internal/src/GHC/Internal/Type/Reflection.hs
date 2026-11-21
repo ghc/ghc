@@ -40,7 +40,7 @@ module GHC.Internal.Type.Reflection
     , I.TypeRep
     , data I.TypeRep
     , I.typeOf
-    , data I.App, data I.Con, data I.Con', data I.Fun, data I.Fun'
+    , data I.App, data I.App', data I.Con, data I.Con', data I.Fun, data I.Fun'
     , I.typeRepTyCon
     , I.rnfTypeRep
     , I.eqTypeRep

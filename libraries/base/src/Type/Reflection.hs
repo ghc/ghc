@@ -39,6 +39,7 @@ module Type.Reflection
      pattern TypeRep,
      typeOf,
      pattern App,
+     pattern App',
      pattern Con,
      pattern Con',
      pattern Fun,

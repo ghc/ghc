@@ -62,7 +62,7 @@ module GHC.Internal.Data.Typeable.Internal (
     -- * TypeRep
     TypeRep,
     data TypeRep,
-    data App, data Con, data Con', data Fun, data Fun',
+    data App, data App', data Con, data Con', data Fun, data Fun',
     typeRep,
     typeOf,
     typeRepTyCon,
@@ -262,7 +262,7 @@ The Fun pattern keeps its runtime U/Many contract. Fun' exposes the
 matchability of any Many arrow. Kind checks must use Fun' because constructor
 kind arrows have M. The application decoder retains metadata in the FUN kind
 arguments; it does not encode an M arrow with the runtime Fun constructor.
-splitApps omits kind arguments, including matchability. Fun' and the App/Con'
+splitApps omits kind arguments, including matchability. Fun' and the App'/Con'
 decomposition retain that metadata.
 
 A TrApp stores an application whose head can have U matchability. An equality
@@ -568,7 +568,7 @@ mkTrAppChecked (TrApp {trAppFun = p, trAppArg = x}) y
   = mkTrFun match mul x y
 mkTrAppChecked a b = mkTrApp a b
 
--- | A type application.
+-- | A type application with a matchable head.
 --
 -- For instance,
 --
@@ -586,12 +586,56 @@ mkTrAppChecked a b = mkTrApp a b
 --
 -- where @arrow :: TypeRep ((->) :: TYPE IntRep -> Type -> Type)@.
 --
+-- Use @App'@ to match both matchabilities.
+-- See Note [Application patterns and matchability].
 pattern App :: forall k2 (t :: k2). ()
+            => forall k1 (a :: k1 -> k2) (b :: k1). (t ~ a b)
+            => TypeRep a -> TypeRep b -> TypeRep t
+pattern App f x <- (splitMatchableApp -> Just (MatchableApp f x))
+  where App f x = mkTrAppChecked f x
+
+-- | An application with an unrestricted head of either matchability.
+-- Match @App'@ with 'Con' or @Con'@ to cover all representations.
+pattern App' :: forall k2 (t :: k2). ()
             => forall (ma :: Matchability) k1
                       (a :: FUN @ma 'Many k1 k2) (b :: k1). (t ~ a b)
             => TypeRep a -> TypeRep b -> TypeRep t
-pattern App f x <- (splitApp -> IsApp f x)
-  where App f x = mkTrAppChecked f x
+pattern App' f x <- (splitApp -> IsApp f x)
+  where App' f x = mkTrAppChecked f x
+
+{- Note [Application patterns and matchability]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An equality t ~ f x permits decomposition only if f has a matchable
+kind arrow. App supplies this condition so a caller can recover the
+argument of a known type constructor. The runtime representation can
+also store an application with an unmatchable head. Compare the actual
+head's matchability before supplying the equality through App.
+
+App' keeps the head's matchability existential. Use App' in the
+complete match sets because App skips applications with a U head.
+
+TYPE and FUN have matchable kinds. Their representations can construct
+the matchable result directly. A TrApp needs the runtime check.
+-}
+
+data MatchableApp (a :: k) where
+    MatchableApp :: forall k' k (f :: k' -> k) (x :: k').
+                    TypeRep f %1 -> TypeRep x %1 -> MatchableApp (f x)
+
+splitMatchableApp :: TypeRep a -> Maybe (MatchableApp a)
+splitMatchableApp TrType = Just (MatchableApp trTYPE trLiftedRep)
+splitMatchableApp rep@(TrFun {trFunArg = a, trFunRes = b})
+  = Just (MatchableApp (mkTrApp (bareArrow rep) a) b)
+splitMatchableApp (TrApp {trAppFun = f, trAppArg = x}) = matchableApp f x
+splitMatchableApp _ = Nothing
+
+matchableApp :: forall {ma :: Matchability} k' k (f :: FUN @ma 'Many k' k) (x :: k').
+                TypeRep f -> TypeRep x -> Maybe (MatchableApp (f x))
+matchableApp f x
+  | Fun' match _ _ <- typeRepKind f
+  , Just HRefl <- eqTypeRep match trMatchable
+  = Just (MatchableApp f x)
+  | otherwise = Nothing
 
 data AppOrCon (a :: k) where
     IsApp :: forall {ma :: Matchability} k k'
@@ -664,8 +708,8 @@ pattern Con' :: forall k (a :: k). ()
              => TyCon -> [SomeTypeRep] -> TypeRep a
 pattern Con' con ks <- (splitApp -> IsCon con ks)
 
-{-# COMPLETE App, Con  #-}
-{-# COMPLETE App, Con' #-}
+{-# COMPLETE App', Con  #-}
+{-# COMPLETE App', Con' #-}
 
 {- Note [Con evidence]
 ~~~~~~~~~~~~~~~~~~~~~~
