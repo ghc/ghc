@@ -535,3 +535,22 @@ test('NativeImplicitExistential',
 test('NativeExistentialBeta',
      [req_host_target_ghc, unless(have_ncg(), skip), only_ways(['normal'])],
      compile_and_run, ['-O1 -dcore-lint -dstg-lint'])
+
+test('NativeConstrainedFamilyRules',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['NativeConstrainedFamilyRulesProvider.hs', 'NativeConstrainedFamilyRulesClient.hs',
+                   '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']
+                  + ['../../../../docs/dependent-haskell/examples/qualified-pi/' + f
+                     for f in ['ParameterizedIndexLibrary.hs', 'FinitePosition.hs']])],
+     run_command, ['bash NativeConstrainedFamilyRules.sh "{compiler}" "{libdir}"'])
+
+test('NativeRetainedFamilyDomain',
+     [only_ways(['normal']),
+      extra_files(['../../../../docs/dependent-haskell/examples/open-evaluation/' + f
+                   for f in ['ConstrainedElements.hs', 'ConstrainedElementsClient.hs']])],
+     run_command, ['bash NativeRetainedFamilyDomain.sh "{compiler}" "{libdir}"'])
+
+test('NativeConstrainedFamily',
+     [only_ways(['normal']),
+      extra_files(['NativeConstrainedFamilyProvider.hs', 'NativeConstrainedFamilyClient.hs'])],
+     run_command, ['bash NativeConstrainedFamily.sh "{compiler}" "{libdir}"'])

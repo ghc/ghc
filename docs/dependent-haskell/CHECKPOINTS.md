@@ -28,6 +28,54 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `455a53f43e`, a polymorphic callback can use its class constraint
+to form an associated family. The ordinary client formats a field read
+at a runtime flag. All 403 Showcase rows matched at stripped `-O0`,
+default `-O1`, default `-O2` and in GHCi. Five focused registered tests
+passed. At `e577ab4962`, two registered formation tests also checked
+that a missing premise names the callback type that can bind it.
+[Provider](examples/open-evaluation/ConstrainedElements.hs)
+and [diagnostic checks](../../testsuite/tests/dependent/should_run/NativeRetainedFamilyDomain.sh).
+
+At `00b4822dd4`, a family domain can use the preceding retained
+argument. A dictionary from a GADT pattern justifies the element type
+for that same flag. The combined Stage 2 compiler passed the 402-row
+Showcase at stripped `-O0`, default `-O1`, default `-O2` and in GHCi.
+Five focused registered tests passed, including wrong-flag and
+out-of-scope evidence checks.
+[Runtime example](examples/open-evaluation/ConstrainedElementsClient.hs)
+and [scope checks](../../testsuite/tests/dependent/should_run/NativeRetainedFamilyDomain.sh).
+
+At `5af708d0cc`, the ordinary client checks the class domain of a
+fully applied associated family from an imported interface. The same
+interface supplies a retained unfolding and a rewrite rule for linear
+existential packages. The compiler inlines the unfolding and fires
+the rule twice. Changing `Elem [Bool]` to `Elem [Int]` reports the
+missing `Allowed Int` even with deferred term errors. The previous
+reader accepts an ordinary interface and rejects the new family header.
+
+The combined Stage 2 compiler matched all 401 Showcase observations at
+stripped `-O0`, default `-O1`, default `-O2` and in GHCi. Nine selected
+registered tests passed. The 399-observation predecessor also completed
+a normal two-stage Hadrian build.
+[Domain checks](../../testsuite/tests/dependent/should_run/NativeConstrainedFamily.sh)
+and [mixed interface regression](../../testsuite/tests/dependent/should_run/NativeConstrainedFamilyRules.sh).
+
+At `3c90ebc198`, an ordinary client uses a case to select the input
+of a multiplicity-polymorphic arrow. A linear call consumes its argument
+once. An unrestricted call returns the first field of a pair and leaves
+the second field unevaluated. The Showcase prints `(7,(19,'q'),29)`.
+[Provider and linearity checks](../../testsuite/tests/dependent/should_run/NativeTypeCase.sh).
+
+This revision also enforces matchability on variable-headed applications
+in instance heads and family patterns. A written unmatchable arrow gives
+GHC-83865 under either setting of the dependent extension, including
+with deferred term errors. The combined Stage 2 compiler matched all
+398 Showcase observations in native `-O0`, native `-O2`, and source-loaded
+GHCi. Nine registered tests passed in the normal way.
+[Instance pattern regression](../../testsuite/tests/dependent/should_run/NativeUnsaturatedFamily.sh)
+and [proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#application-in-pattern-position).
+
 At `2df3d0020e`, a local `INLINE` function can replicate a captured
 element at two runtime lengths. An ordinary module opens an erased
 package with a strict tuple pattern and passes its hidden state to its

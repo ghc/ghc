@@ -21,7 +21,7 @@ module GHC.Tc.Utils.Unify (
   DeepSubsumptionFlag(..), DeepSubsumptionDepth(..),
   getDeepSubsumptionFlag, getDeepSubsumptionFlag_DataConHead,
   isRhoTyDS,
-  tcSkolemise, tcSkolemiseCompleteSig, tcSkolemiseExpectedType,
+  tcSkolemise, tcSkolemiseGeneral, tcSkolemiseCompleteSig, tcSkolemiseExpectedType,
 
   -- Various unifications
   uType, unifyType, unifyKind, unifyInvisibleType,
@@ -535,7 +535,7 @@ checkConstraints skol_info skol_tvs given thing_inside
 
        ; if implication_needed
          then do { (tclvl, wanted, result) <- pushLevelAndCaptureConstraints $
-                                               tcExtendNativeGivens given thing_inside
+                                               tcExtendLexicalGivens given thing_inside
                  ; (implics, ev_binds) <- buildImplicationFor tclvl skol_info skol_tvs given wanted
                  ; traceTc "checkConstraints A" (ppr tclvl $$ ppr skol_tvs $$ traceCallStackDoc)
                  ; emitImplications implics

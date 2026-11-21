@@ -1,9 +1,10 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, LambdaCase, MagicHash, Modifiers, PolyKinds, RankNTypes, RequiredTypeArguments, StandaloneKindSignatures, TypeFamilies #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, LambdaCase, LinearTypes, MagicHash, Modifiers, PolyKinds, RankNTypes, RequiredTypeArguments, StandaloneKindSignatures, TypeFamilies #-}
 module NativeNestedCase
   ( Pick, Pair(..), LeftFirst, IgnoreLeft, Uniform, SameFallback
   , Indexed(..), IndexedPick, TypeHead, UniformTypeHead, Wrapped, WrappedBool
   , PickFlipped, DiscardConstant, CaptureFlipped, WrittenFirst
   , AliasFirst, MixedAlias, ArrowDomain, ArrowResult
+  , LinearArrowDomain, MultiplicityArrowDomain
   , CaseFlag(..), ForallResult, ForallRepResult, forallResult
   , FamilyGate(..), FamilyGatePick, WrittenGatePick, HiddenGatePick, ApartGatePick
   , DependentFieldGate(..), DependentFieldPick
@@ -18,7 +19,7 @@ module NativeNestedCase
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
-import GHC.Exts (Int#, LiftedRep, RuntimeRep(IntRep), TYPE, U)
+import GHC.Exts (Int#, LiftedRep, Multiplicity, RuntimeRep(IntRep), TYPE, U)
 
 type Pick d = case d of
   Just (Just field) -> Proxy field
@@ -247,6 +248,14 @@ type ArrowDomain (tag :: k) (d :: Maybe (Maybe Bool)) =
     Just (Just bit) -> (Proxy tag, Proxy bit)
     Just Nothing -> Proxy tag
     Nothing -> Char) -> Int
+
+-- | Select the input of a linear arrow.
+type LinearArrowDomain (b :: Bool) =
+  (case b of { True -> Int; False -> Char }) %1 -> Int
+
+-- | Keep the same multiplicity in the arrow and the captured proxy type.
+type MultiplicityArrowDomain (b :: Bool) = forall (p :: Multiplicity).
+  (case b of { True -> Proxy p; False -> Char }) %p -> Proxy p
 
 data CaseFlag (d :: Maybe Bool) where
   CaseOn :: CaseFlag ('Just 'True)

@@ -81,7 +81,7 @@ import qualified ImportedRetainedRules
 import qualified FunctionPackageLibrary as FunctionPackages
 import qualified FunctionSignatureLibrary as FunctionSignatures
 import qualified GroundApplicationClient as Ground
-import GHC.Exts (FUN, Multiplicity (Many))
+import GHC.Exts (FUN, Multiplicity (Many, One))
 import GHC.Matchability (M, U, Matchability(..))
 import qualified GHC.TypeNats as TypeNats
 import GHC.TypeLits (charVal)
@@ -106,6 +106,7 @@ import qualified InterpretedKind
 import qualified InterpretedKindUseSite
 import qualified NestedFunctionClient
 import qualified InvisibleFamily
+import ConstrainedElementsClient (annotatedElement, constrainedElements, explicitElements, formatField, renderField)
 import IndexedMapClient (mappedCells)
 import LaterMatchabilityClient (annotatedMap, appliedCallback, boxedCallbacks, flippedCallbacks, forwardedMap,
                                 laterMatchability, nestedCallback, rankedMap)
@@ -945,8 +946,21 @@ constructorFieldCases =
           NativeNestedCase.CaseField n -> n
       , select NativeNestedCase.CaseMissing )
 
+-- | Select the input type of an arrow with a quantified multiplicity.
+type PairCaseArrow (b :: Bool) = forall (p :: Multiplicity).
+    (case b of { True -> (Int, Char); False -> Bool }) %p -> (Int, Char)
+
 main :: IO ()
 main = do
+    observe "form an associated family type from its class evidence" constrainedElements
+    observe "form an expression annotation with the matched dictionary" annotatedElement
+    observe "pass an associated type as a specified and a required argument" explicitElements
+    fieldFlag <- newIORef True
+    enabled <- readIORef fieldFlag
+    writeIORef fieldFlag False
+    disabled <- readIORef fieldFlag
+    observe "render a field with evidence for its runtime flag" (renderField enabled, renderField disabled)
+    observe "format a field with a polymorphic consumer" (formatField enabled, formatField disabled)
     putStrLn "Dependent Haskell: completed source features"
     booleans
     finiteDomains
@@ -1318,6 +1332,14 @@ main = do
         arrowMissing c = fromEnum c
     observe "select the input type of an ordinary arrow"
         (arrowInput (Proxy, 7), arrowMissing 'x')
+    let linearInput :: NativeNestedCase.LinearArrowDomain 'True
+        linearInput x = x
+        pairIdentity :: PairCaseArrow 'True
+        pairIdentity x = x
+        pairAtOne :: (Int, Char) %1 -> (Int, Char)
+        pairAtOne x = pairIdentity @'One x
+    observe "select linear and multiplicity-polymorphic arrow inputs"
+        (linearInput 7, pairAtOne (19, 'q'), fst (pairIdentity @'Many (29, error "unused pair field")))
     observe "match Bool and Ordering directly in a type"
         (7 :: NativeCase.ByType Bool, 'x' :: NativeCase.ByType Ordering)
     observe "remove a Maybe layer and keep any other type"

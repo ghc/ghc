@@ -1754,7 +1754,7 @@ tcInferInvisibleRetained tvs binder body args
                      anchors | null tvs  = filter determines pairs
                              | otherwise = pairs  -- Erased argument prepass
                ; select template (map snd indices ++ tvs) anchors }
-       ; givens <- tcl_native_givens . tcl_lcl_ctxt <$> getLclEnv
+       ; givens <- getNativeGivens
        ; selected <- choose return
        ; case selected of
            Nothing | not (null givens) -> choose tcRetainedDeclaredTypeView
@@ -1909,7 +1909,7 @@ tcRetainedDeclaredTypeView ty = coercionRKind <$> tcRetainedTypeCoercion (const 
 -- | Transport a type using constructor proofs about the selected indices.
 tcRetainedTypeCoercion :: (Id -> Bool) -> Type -> TcM CoercionN
 tcRetainedTypeCoercion select ty
-  = do { givens <- tcl_native_givens . tcl_lcl_ctxt <$> getLclEnv
+  = do { givens <- getNativeGivens
        ; givens <- mapM (liftZonkM . zonkId) givens
        ; foldM refine (mkNomReflCo ty) (reverse givens) }
   where
@@ -1940,7 +1940,7 @@ genericVector from the proof-backed view [Vec Int (S k)]. Otherwise Count at
 the original and refined element types can block result checking before the
 ordinary solver checks the argument.
 
-Use only the actual lexical evidence parameters in tcl_native_givens. This
+Use only the actual lexical evidence parameters returned by getNativeGivens. This
 list is newest first. Apply checked nominal constructor proofs from outer to
 inner scope. Orient an actual nominal proof toward the runtime index before
 checking its constructor endpoint. For example, matching Refl can supply
@@ -3496,7 +3496,7 @@ retainedVariableCast :: Core.CoreExpr -> LHsExpr GhcRn -> TcM (Maybe CoercionN)
 retainedVariableCast (Core.Cast (Core.Var index) (SubCo co)) arg
   | HsVar _ name <- unLoc (stripParensLHsExpr arg)
   , unLocWithUserRdr name == getName index
-  = do { givens <- tcl_native_givens . tcl_lcl_ctxt <$> getLclEnv
+  = do { givens <- getNativeGivens
        ; return (if anyFreeVarsOfCo (`elem` givens) co then Just co else Nothing) }
 retainedVariableCast _ _ = return Nothing
 
@@ -6044,7 +6044,7 @@ tcRetainedInstScope :: [Type] -> TcM Bool
 tcRetainedInstScope tys
   = do { local_env <- getLclTypeEnv
        ; global_env <- tcg_type_env <$> getGblEnv
-       ; givens <- tcl_native_givens . tcl_lcl_ctxt <$> getLclEnv
+       ; givens <- getNativeGivens
        ; givens <- mapM (liftZonkM . zonkId) givens
        ; let -- The outer Maybe distinguishes an absent binding from a
              -- present binding of the wrong sort. Only absence permits

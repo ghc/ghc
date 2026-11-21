@@ -173,7 +173,8 @@ readBinIfaceHeaderVersion profile checkHiWay traceBinIFace hi_path = do
     let our_ver = show hiVersion
     wantedGot "Version" our_ver check_ver text
     let versions = [our_ver, enumCallbackIfaceVersion, finalCoreIfaceVersion,
-                    matchabilitySchemeIfaceVersion, openMatchabilityIfaceVersion]
+                    matchabilitySchemeIfaceVersion, openMatchabilityIfaceVersion,
+                    constrainedFamilyIfaceVersion]
     evidence <- case listToMaybe (mapMaybe (parse_version check_ver) versions) of
         Just requirements -> pure requirements
         Nothing -> do
@@ -298,7 +299,8 @@ writeBinIface profile traceBinIface compressionLevel hi_path mod_iface = do
           put_ h (profileBuildTag profile)
 
     -- Select the existing version first. The writer records extra features.
-    let version | any (hasOpenMatchabilityScheme . snd) (mi_decls mod_iface) = openMatchabilityIfaceVersion
+    let version | any (hasConstrainedFamily . snd) (mi_decls mod_iface) = constrainedFamilyIfaceVersion
+                | any (hasOpenMatchabilityScheme . snd) (mi_decls mod_iface) = openMatchabilityIfaceVersion
                 | any hasMatchabilityScheme (mi_decls mod_iface) = matchabilitySchemeIfaceVersion
                 | any hasFinalCore (mi_decls mod_iface) = finalCoreIfaceVersion
                 | any hasEnumCallback (mi_decls mod_iface) = enumCallbackIfaceVersion
@@ -490,6 +492,16 @@ matchabilitySchemeIfaceVersion = show hiVersion ++ "-matchability-schemes-v1"
 -- | Older readers must not load an associated family with a new binder list.
 openMatchabilityIfaceVersion :: String
 openMatchabilityIfaceVersion = show hiVersion ++ "-matchability-schemes-v2"
+
+-- | Announce the checked domain before an older reader reaches its tag.
+constrainedFamilyIfaceVersion :: String
+constrainedFamilyIfaceVersion = show hiVersion ++ "-constrained-families-v1"
+
+hasConstrainedFamily :: IfaceDecl -> Bool
+hasConstrainedFamily IfaceFamily{ifFamFlav = IfaceConstrainedTypeFamilyTyCon} = True
+hasConstrainedFamily IfaceClass{ifBody = IfConcreteClass{ifATs = ats}} =
+  any (\(IfaceAT decl _) -> hasConstrainedFamily decl) ats
+hasConstrainedFamily _ = False
 
 hasOpenMatchabilityScheme :: IfaceDecl -> Bool
 hasOpenMatchabilityScheme IfaceFamily

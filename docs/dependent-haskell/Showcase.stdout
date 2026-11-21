@@ -1,3 +1,8 @@
+form an associated family type from its class evidence: (Refl,Refl,True)
+form an expression annotation with the matched dictionary: True
+pass an associated type as a specified and a required argument: (True,False)
+render a field with evidence for its runtime flag: (Just "x",Nothing)
+format a field with a polymorphic consumer: (Just "[x]",Nothing)
 Dependent Haskell: completed source features
 runtime Bool choice: "42"
 apply retained function rules without forcing an unused index: (7,11,19)
@@ -365,6 +370,7 @@ choose a retained field result through a saturated type synonym: ("f","41")
 select through an ordinary type constructor: (7,'x',())
 select an arrow result inside forall: ((Proxy,1),(Proxy,'?'))
 select the input type of an ordinary arrow: (7,120)
+select linear and multiplicity-polymorphic arrow inputs: (7,(19,'q'),29)
 match Bool and Ordering directly in a type: (7,'x')
 remove a Maybe layer and keep any other type: (7,'x')
 use a local type in a constructor case: Just True

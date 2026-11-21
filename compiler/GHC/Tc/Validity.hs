@@ -5,7 +5,7 @@
 
 module GHC.Tc.Validity (
   Rank(..), UserTypeCtxt(..), checkValidType, checkValidMonoType,
-  checkValidTheta,
+  checkValidTheta, checkConstrainedSignature,
   checkValidInstance, checkValidInstHead, validDerivPred,
   checkTySynRhs, checkEscapingKind,
   checkValidCoAxiom, checkValidCoAxBranch,
@@ -20,16 +20,21 @@ import GHC.Data.FastString
 import GHC.Data.Maybe
 
 -- friends:
-import GHC.Tc.Utils.Unify    ( tcSubTypeAmbiguity )
-import GHC.Tc.Solver         ( simplifyAmbiguityCheck )
+import GHC.Tc.Utils.Unify    ( checkConstraints, tcSubTypeAmbiguity, tcSkolemiseGeneral
+                              , DeepSubsumptionFlag(Shallow), unifyTypeAndEmit )
+import GHC.Tc.Solver         ( simplifyAmbiguityCheck, pushLevelAndSolveEqualities )
+import GHC.Tc.Solver.Monad   ( runTcS )
+import GHC.Tc.Solver.Solve   ( solveWanteds )
 import GHC.Tc.Instance.Class ( matchGlobalInst, ClsInstResult(..), AssocInstInfo(..) )
 import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Instance.Family
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.ErrCtxt
 import GHC.Tc.Types.Rank
+import GHC.Tc.Errors ( reportAllUnsolved )
 import GHC.Tc.Errors.Types
-import GHC.Tc.Types.Constraint ( userTypeError_maybe )
+import GHC.Tc.Types.Constraint ( userTypeError_maybe, mkNonCanonical )
+import GHC.Tc.Utils.TcMType (newWanted)
 import GHC.Tc.Types.TH ( ThLevel(Comp) )
 import GHC.Tc.Utils.Env (tcLookupId, tcLookupLcl_maybe, tcExtendIdEnv)
 import GHC.Tc.Utils.TcType
@@ -71,12 +76,13 @@ import GHC.Types.Name.Reader (unLocWithUserRdr)
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Var     ( Id, ExistsTyFlag(ImplicitExists), VarBndr(..)
-                        , isInvisibleFunArg, mkTyVar, tyVarName
+                        , isInvisibleFunArg, isVisibleFunArg, mkTyVar, tyVarName
                         , isId, isCoVar, varType )
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing ( TyThing(..) )
-import GHC.Types.Unique.Set( isEmptyUniqSet, nonDetEltsUniqSet )
+import GHC.Types.Unique.Set ( addOneToUniqSet, elementOfUniqSet, emptyUniqSet
+                            , isEmptyUniqSet, nonDetEltsUniqSet )
 
 import GHC.Utils.Error
 import GHC.Utils.Misc
@@ -86,6 +92,7 @@ import GHC.Utils.Panic
 import GHC.Data.List.SetOps
 
 import Control.Monad
+import qualified Control.Monad.Trans.State.Strict as State
 import Data.Data (Data, cast, gmapQ)
 import Data.Foldable
 import Data.Function
@@ -422,7 +429,8 @@ checkValidType ctxt ty
        ; let ve = ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
                              , ve_rank = rank, ve_expand = expand
                              , ve_indices = emptyVarSet, ve_imported_synonym = False
-                             , ve_partial_family_hint = True }
+                             , ve_partial_family_hint = True
+                             , ve_instance_pat = Nothing }
 
        -- Check the internal validity of the type itself
        -- Fail if bad things happen, else we misleading
@@ -432,6 +440,7 @@ checkValidType ctxt ty
               mapM_ (check_retained_index ve)
                 [v | v <- fvs, isId v, not (isCoVar v)]
             ; check_type ve ty
+            ; checkConstrainedSignature ctxt ty
             ; checkUserTypeError ctxt ty
             ; traceTc "done ct" (ppr ty) }
 
@@ -444,17 +453,197 @@ checkValidType ctxt ty
 
 checkValidMonoType :: Type -> TcM ()
 -- Assumes argument is fully zonked
-checkValidMonoType = check_valid_mono_type True
+checkValidMonoType = check_valid_mono_type Nothing
 
-check_valid_mono_type :: Bool -> Type -> TcM ()
-check_valid_mono_type partial_family_hint ty
+check_valid_mono_type :: Maybe SkolemInfoAnon -> Type -> TcM ()
+check_valid_mono_type instance_pat ty
   = do { env <- liftZonkM $ tcInitOpenTidyEnv (tyCoVarsOfTypeList ty)
        ; expand <- initialExpandMode
        ; let ve = ValidityEnv{ ve_tidy_env = env, ve_ctxt = SigmaCtxt
                              , ve_rank = MustBeMonoType, ve_expand = expand
                              , ve_indices = emptyVarSet, ve_imported_synonym = False
-                             , ve_partial_family_hint = partial_family_hint }
-       ; check_type ve ty }
+                             , ve_partial_family_hint = isNothing instance_pat || isTyFamFree ty
+                             , ve_instance_pat = instance_pat }
+       ; check_type ve ty
+       ; checkNoConstrainedFamilyApps ty }
+
+-- | Check the domain of each family in a written signature.
+-- See Note [Constrained associated family formation].
+checkConstrainedSignature :: UserTypeCtxt -> Type -> TcM ()
+checkConstrainedSignature ctxt ty
+  | null uses
+  = pure ()
+  | fam : _ <- [f | FamilyInSynonym f <- uses]
+  = failWithTc $ TcRnConstrainedFamilyUnsupported fam $
+      text "This occurrence comes from a type synonym definition."
+  | checks_domain ctxt
+  = do { givens <- getLexicalGivens
+       ; (_, wanted) <- captureConstraints $
+           checkConstraints (SigSkol ctxt ty []) [] givens (check_telescope ctxt ty)
+       ; (unsolved, _) <- runTcS (solveWanteds wanted)
+       ; reportAllUnsolved unsolved }
+  | otherwise
+  = checkNoConstrainedFamilyApps ty
+  where
+    uses = constrainedFamilyApps ty
+    checks_domain FunSigCtxt{} = True
+    checks_domain ExprSigCtxt{} = True
+    checks_domain TypeAppCtxt = True
+    checks_domain ConArgCtxt{} = True
+    checks_domain _ = False
+
+    -- See Note [Family domains beneath retained binders].
+    check_telescope origin whole = go whole
+      where
+        go sig
+          | not (isSigmaTy sig) = check_body sig
+          | otherwise
+          = do { let (bndrs, theta, _) = tcSplitSigmaTy sig
+               ; traverse_ (checkNoConstrainedFamilyApps . varType . snd) bndrs
+               ; traverse_ checkNoConstrainedFamilyApps theta
+               ; void $ tcSkolemiseGeneral Shallow origin whole sig $ \_ rho -> check_body rho }
+
+        check_body (DepFunTy _ index body)
+          = do { check_part (varType index)
+               ; tcExtendIdEnv [index] (go body) }
+        check_body (FunTy af ma mult arg result)
+          | isVisibleFunArg af
+          = do { mapM_ check_part [ma, mult]
+               ; check_telescope GenSigCtxt arg
+               ; go result }
+        check_body body = check_part body
+
+    check_part part
+      = do { checkNested part
+           ; forM_ (constrainedFamilyApps part) $ \case
+               WrittenFamily fam args -> emit_domain fam args
+               FamilyInSynonym fam ->
+                 failWithTc $ TcRnConstrainedFamilyUnsupported fam $
+                   text "This occurrence comes from a type synonym definition." }
+
+    checkNested rho
+      | isSigmaTy rho = checkNoConstrainedFamilyApps rho
+    checkNested (FunTy _ _ _ a b) = checkNested a >> checkNested b
+    checkNested (TyConApp _ args) = traverse_ checkNested args
+    checkNested (AppTy f a) = checkNested f >> checkNested a
+    checkNested (CastTy ty _) = checkNested ty
+    checkNested ty@DepFunTy{} = checkNoConstrainedFamilyApps ty
+    checkNested ty@ExistsTy{} = checkNoConstrainedFamilyApps ty
+    checkNested _ = pure ()
+
+    emit_domain fam args
+      | Just parent <- tyConAssoc_maybe fam
+      , Just cls <- tyConClass_maybe parent
+      , args `lengthIs` tyConArity fam
+      , let env = zipVarEnv (tyConTyVars fam) args
+      , Just class_args <- traverse (lookupVarEnv env) (classTyVars cls)
+      = do { ev <- newWanted (OccurrenceOf (tyConName fam)) (Just TypeLevel)
+                             (mkClassPred cls class_args)
+           ; emitSimple (mkNonCanonical ev) }
+      | otherwise =
+        failWithTc $ TcRnConstrainedFamilyUnsupported fam $
+          text "The family must be fully applied at this occurrence."
+
+-- | Refuse contexts that have no formation rule in this experiment.
+checkNoConstrainedFamilyApps :: Type -> TcM ()
+checkNoConstrainedFamilyApps ty
+  | use : _ <- constrainedFamilyApps ty
+  = failWithTc $ TcRnConstrainedFamilyUnsupported (familyTyCon use) $
+      text "Use a saturated application in a value signature, expression annotation, constructor field, or explicit type argument."
+  | otherwise = pure ()
+  where
+    familyTyCon (WrittenFamily fam _) = fam
+    familyTyCon (FamilyInSynonym fam) = fam
+
+data ConstrainedFamilyUse
+  = WrittenFamily TyCon [Type]
+  | FamilyInSynonym TyCon
+
+-- Walk the written arguments even for a forgetful synonym. A marked
+-- occurrence in an imported RHS is unsupported in this experiment. Inspect
+-- that RHS before substitution and at most once per synonym TyCon.
+constrainedFamilyApps :: Type -> [ConstrainedFamilyUse]
+constrainedFamilyApps ty = State.evalState (go False ty) emptyUniqSet
+  where
+    go in_rhs (TyConApp tc args) = do
+      nested <- descend in_rhs args
+      if isConstrainedFamilyTyCon tc
+        then pure ((if in_rhs then FamilyInSynonym tc else WrittenFamily tc args) : nested)
+        else if isFamFreeTyCon tc
+          then pure nested
+          else case synTyConRhs_maybe tc of
+            Nothing -> pure nested
+            Just rhs -> do
+              seen <- State.get
+              if tc `elementOfUniqSet` seen
+                then pure nested
+                else do
+                  State.put $! addOneToUniqSet seen tc
+                  (++ nested) <$> go True rhs
+    go in_rhs (AppTy f x) = descend in_rhs [f, x]
+    go in_rhs (FunTy _ ma mult a b) = descend in_rhs [ma, mult, a, b]
+    go in_rhs (ForAllTy ma b ty) = descend in_rhs [ma, binderType b, ty]
+    go in_rhs (DepFunTy _ v ty) = descend in_rhs [varType v, ty]
+    go in_rhs (ExistsTy _ v ty) = descend in_rhs [varType v, ty]
+    go in_rhs (TermAppTy _ arg) = go in_rhs arg
+    go in_rhs (CastTy ty _) = go in_rhs ty
+    go _ _ = pure []
+
+    descend in_rhs = fmap concat . traverse (go in_rhs)
+
+{- Note [Family domains beneath retained binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In foreach (flag :: Bool) -> Values (At flag) => Proxy (Item (At flag)),
+the last application of Item needs Values (At flag). Bring the actual
+runtime index into scope before skolemising the rest of the telescope.
+The context on that suffix supplies the domain for its result. Check the
+index's own type before entering its scope. A constraint beneath a binder
+cannot justify an application in an earlier argument.
+
+An ordinary argument can be a callback with its own class context.
+For (forall c. Collects c => Proxy c -> Elem c -> Elem c) -> result,
+skolemise the callback independently. Its Given justifies both occurrences
+of Elem c inside the callback. The result cannot use this Given. Report
+an unsolved constraint on c against the callback. Suggesting it on the
+enclosing function would put c outside its scope.
+See Note [Setting the argument context] in GHC.Tc.Utils.Unify.
+
+The nested checks share the signature's formation check, including its
+treatment of unsolved premises under deferred type errors. See
+Note [Constrained associated family formation].
+-}
+
+{- Note [Constrained associated family formation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The experiment opts families in at the producer. A marked family records
+the parent-class domain in its declaration interface. Its raw binder
+identities determine how to instantiate that class predicate. A reader
+checks the same obligation with either setting of the experimental flag.
+
+Check an application in a written signature, before solving a term can
+reduce the family and lose the domain obligation. Solve the class
+predicate from the declared and enclosing Givens and the instance
+environment. Check formation separately from inference so that inference
+cannot add a missing predicate to the signature. Expression annotations
+use the same domain check as named signatures. For a partial signature,
+check the written type before the expression or binding fixes a wildcard.
+For example, checking Refl can reduce Elem [Int] to Int and fill the hole
+in Elem [Int] :~: _. Checking the inferred type then loses that use of Elem.
+For a written type argument, tcHsTypeApp checks formation before the
+function can discard the argument or reduce the family. Both @t and a
+required (type t) argument use that path. This source check
+does not put a dictionary into the family's Core kind.
+
+Report a missing domain even under -fdefer-type-errors. The check
+discards the dictionary, so a deferred error has no runtime use site.
+For example, a family axiom can let an out-of-domain equality reduce
+to Refl. A client of that module could then use Refl without an error.
+
+For a constructor, check its wrapper type after the newtype validity
+check. The wrapper contains the Givens for its fields, including the
+constructor's explicit context. See Morris and Eisenberg, "Constrained
+Type Families", section 4.2.
+-}
 
 checkTySynRhs :: UserTypeCtxt -> TcType -> TcM ()
 checkTySynRhs ctxt ty
@@ -748,7 +937,8 @@ data ValidityEnv = ValidityEnv
   , ve_expand   :: ExpandMode
   , ve_indices  :: VarSet
   , ve_imported_synonym :: Bool
-  , ve_partial_family_hint :: Bool }
+  , ve_partial_family_hint :: Bool
+  , ve_instance_pat :: Maybe SkolemInfoAnon }  -- When checking a matching pattern
 
 instance Outputable ValidityEnv where
   ppr (ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
@@ -795,7 +985,11 @@ check_type _ (TyVarTy _)
 
 check_type ve (AppTy ty1 ty2)
   = do  { check_type ve ty1
-        ; check_arg_type False ve ty2 }
+        ; check_arg_type False ve ty2
+        ; case (ve_instance_pat ve, ve_expand ve) of
+            (_, NoExpand) -> pure ()
+            (Just skol_info, _) -> checkPatternMatchability skol_info ty1
+            _ -> pure () }
 
 check_type ve ty@(TyConApp tc tys)
   | isTypeSynonymTyCon tc || isTypeFamilyTyCon tc
@@ -974,6 +1168,10 @@ check_syn_tc_app (ve@ValidityEnv{ ve_ctxt = ctxt, ve_expand = expand })
                            -- type family constructors in GHCi :kind commands.
                            -- See Note [Unsaturated type synonyms in GHCi]
   = check_args_only expand
+
+  | isConstrainedFamilyTyCon tc
+  = failWithTc $ TcRnConstrainedFamilyUnsupported tc $
+      text "The family must be fully applied at this occurrence."
 
   | isUnsaturatedUserFamily tc tys
   = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
@@ -1476,6 +1674,7 @@ check_pred_ty indices env dflags ctxt expand pred
                     , ve_expand   = expand
                     , ve_indices  = indices
                     , ve_imported_synonym = False
+                    , ve_instance_pat = Nothing
                     , ve_partial_family_hint = case classifyPredType pred of
                         -- The head of a quantified constraint follows the
                         -- same rules as the head of an instance declaration.
@@ -2833,6 +3032,7 @@ checkFamPatBinders fam_tc qtvs non_user_tvs pats rhs
 -- Specifically:
 --    * All monotypes
 --    * No type-family applications
+--    * Matchable application heads
 checkValidTypePats :: TyCon -> [Type] -> TcM ()
 checkValidTypePats tc pat_ty_args
   = do { -- Check that each of pat_ty_args is a monotype.
@@ -2842,7 +3042,7 @@ checkValidTypePats tc pat_ty_args
          --
          -- Suppress the opt-in hint when the expanded pattern still
          -- contains a family application. The extension cannot make it legal.
-         traverse_ (\ty -> check_valid_mono_type (isTyFamFree ty) ty) pat_ty_args
+         traverse_ (check_valid_mono_type (Just skol_info)) pat_ty_args
 
        -- Ensure that no type family applications occur a type pattern
        ; case tcTyConAppTyFamInstsAndVis tc pat_ty_args of
@@ -2853,6 +3053,35 @@ checkValidTypePats tc pat_ty_args
                   tf_is_invis_arg tf_tc tf_args }
   where
     inst_ty = mkTyConApp tc pat_ty_args
+    skol_info
+      | isClassTyCon tc = InstSkol IsClsInst pSizeZero
+      | otherwise       = FamInstSkol
+
+-- | Check the consumed kind binder of an application in an instance pattern.
+-- See Note [Matchability of instance patterns].
+checkPatternMatchability :: SkolemInfoAnon -> Type -> TcM ()
+checkPatternMatchability skol_info head_ty
+  | Just (ma, _, _) <- splitPiTy_maybe (typeKind head_ty)
+  , not (ma `eqType` matchableDataConTy)
+  = pushLevelAndSolveEqualities skol_info [] $
+      void $ unifyTypeAndEmit KindLevel (origin ma) ma matchableDataConTy
+  | otherwise = pure ()
+  where
+    origin ma = TypeEqOrigin { uo_actual = ma, uo_expected = matchableDataConTy
+                             , uo_thing = Nothing, uo_invisible = Nothing }
+
+{- Note [Matchability of instance patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An application such as f x is a matchable pattern only when the
+consumed binder is matchable. A family's binder check can succeed
+if f and x are also bound in other, injective positions. That does
+not make f x a valid pattern. Check the application after synonym
+expansion so a synonym can discard an unused argument. Check the
+matchability of just the consumed binder by nominal equality. Neither the
+instance context nor later instance selection can supply it.
+
+See proposal #242, Application in pattern position.
+-}
 
 -------------------------
 checkConsistentFamInst :: AssocInstInfo

@@ -580,7 +580,7 @@ only evidence maps in lexical scope with sourceMethodEvidenceMatches. Missing,
 Given, cyclic or different evidence supplies no alias Given and no extra error.
 The ordinary body constraints remain responsible for diagnostics.
 
-Do not put the optional proof in tcl_native_givens while checking the body.
+Do not put the optional proof in tcl_lexical_givens while checking the body.
 Once selected, add it to ic_given without discarding the immutable candidate.
 Do not add it twice on subsequent solver iterations. This keeps equality levels
 and needed CoVars under the ordinary implication rules. An unresolved candidate can be

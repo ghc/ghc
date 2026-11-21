@@ -401,6 +401,13 @@ its own specification.
 [class instances](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#arrow-type-in-type-class-instances)
 and [inference](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#inference).
 
+A variable-headed pattern such as `f x` requires M at the
+consumed argument. GHC checks the kind of the function in
+class and family instance heads after synonym expansion.
+Binding `f` and `x` elsewhere on the same LHS does not make
+a U application valid. A computed selector can reduce to M.
+[Pattern tests](../../../testsuite/tests/dependent/should_run/NativeUnsaturatedFamily.sh).
+
 In `T12088sg3`, the two saturated `TyCon2 (->)` patterns select
 different arrows. After the synonym and `Promote` migration above,
 the type pattern in the `Promote` equation selects U. The kind
