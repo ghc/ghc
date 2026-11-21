@@ -1,6 +1,6 @@
 {-# LANGUAGE BangPatterns, LinearTypes, MonoLocalBinds, ImpredicativeTypes, LambdaCase, NoExperimentalDependentTypes, RequiredTypeArguments #-}
 module RankedPackageClient
-    ( runGuarded, runProjections, projectAt, runDeclaredWitnesses, runExplicitBranches
+    ( runGuarded, runConditional, runProjections, projectAt, runDeclaredWitnesses, runExplicitBranches
     , runMixedPackage, runProducedPackage, runForwardedPackage, runLabelledPackage
     , runSelectedPackage, runLocalPattern, readCount
     ) where
@@ -36,6 +36,15 @@ builder = \cases
 runGuarded :: ((Int, Bool), (Int, Bool))
 runGuarded = (observeGuarded builder False (error "unused guard input"),
               observeGuarded builder True True)
+
+-- | Use one hidden callback type for both arms of the conditional producer.
+runConditional :: Bool -> Bool -> (Int, Bool)
+runConditional flag input =
+    observeGuarded
+        (\choose ready -> if choose
+            then Callback id atTwoTypes
+            else if ready then consumeIdentity id else error "selected conditional arm")
+        flag input
 
 -- | Read one witness from a type argument and two from separate equations.
 runDeclaredWitnesses :: ((Int, Bool), ((Int, Bool), (Int, Bool)))

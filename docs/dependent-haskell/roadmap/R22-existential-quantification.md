@@ -632,6 +632,10 @@ takes a polymorphic callback and returns `Payload PolyId` can fix the
 witness for a different branch that constructs `Payload id atTwoTypes`.
 A branch with an incompatible result still reports a type error when
 its guard is unreachable.
+The ordinary Showcase client supplies its conditional producer directly
+to the caller that expects the package. The first route leaves its
+second input unevaluated.
+[Conditional producer](../examples/erased-existentials/RankedPackageClient.hs).
 Leading visible type applications can choose input types when the
 declared result type is independent of the supplied type arguments.
 The ordinary checker checks those applications at their source spans.
