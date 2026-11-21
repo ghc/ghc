@@ -589,12 +589,13 @@ tcOrdinaryApp' :: HsExpr GhcRn -> (HsExpr GhcRn, SrcSpan) -> HsExpr GhcTc
 tcOrdinaryApp' = tcOrdinaryAppWithPrefix []
 
 -- | Instantiate the retained RULE through its last written type argument.
+-- The ordinary application checker checks a heralded operand at its binder.
 -- Keep preceding value operands for the normal argument check.
 -- See Note [Dependent RULE binder domains] in GHC.Tc.Gen.Sig.
 tcRuleAppPrefix :: LHsExpr GhcRn -> TcM (TcSigmaType, TcM (LHsExpr GhcTc, TcRhoType))
 tcRuleAppPrefix (L loc expr) = context $
   do { (fun, args) <- splitHsApps expr
-     ; let (trailing, rev_prefix) = break is_type_arg (reverse args)
+     ; let (trailing, rev_prefix) = break looks_like_type_arg (reverse args)
            leading = reverse rev_prefix
            rest = reverse trailing
      ; fun_span <- getFunSrcSpan args
@@ -611,8 +612,6 @@ tcRuleAppPrefix (L loc expr) = context $
   where
     context :: TcM a -> TcM a
     context action = setSrcSpanA loc $ addExprCtxt expr action
-    is_type_arg ETypeArg{} = True
-    is_type_arg _ = False
 
 tcOrdinaryAppWithPrefix :: [HsExprArg 'TcpInst] -> HsExpr GhcRn -> (HsExpr GhcRn, SrcSpan)
                         -> HsExpr GhcTc -> TcSigmaType -> [HsExprArg 'TcpRn]
@@ -5979,8 +5978,9 @@ docs/dependent-haskell/REFERENCES.md#runtime-equality-and-aligned-zip-next-sourc
 -- or `fn :: forall x -> t`?
 --
 -- This is a conservative heuristic that returns `False` for "don't know".
--- Used to improve error messages only.
--- See Note [VTA for out-of-scope functions].
+-- Use it to mark written type operands before checking the application.
+-- See Note [VTA for out-of-scope functions] and Note [Dependent RULE binder domains]
+-- in GHC.Tc.Gen.Sig.
 looks_like_type_arg :: HsExprArg 'TcpRn -> Bool
 looks_like_type_arg ETypeArg{} =
   -- The argument is clearly supposed to instantiate an invisible forall,

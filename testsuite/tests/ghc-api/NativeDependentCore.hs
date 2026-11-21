@@ -2836,13 +2836,30 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                         setIdUnfolding
                             (local 3108 "opaque_interface_producer" (mkFunctionType unmatchableDataConTy ManyTy boolTy boolTy))
                             (unfolding (error "forced an interface producer unfolding"))
+                    linearProducer =
+                        setIdType ifaceOpaqueProducer (mkFunctionType unmatchableDataConTy OneTy boolTy boolTy)
                 opaqueProofCase <-
                     roundtrip NormalCompression $
                         wrap (IfaceApp (toIfaceExpr (Var ifaceOpaqueProducer)) scrut) [falseAlt, IfaceAlt trueCon [proofName] rhs]
+                opaqueCase <- restoreExpr [ifaceOpaqueProducer] opaqueProofCase
+                lintAccepts dflags "interface proof accepts a scoped opaque call" [ifaceOpaqueProducer] opaqueCase
+                case opaqueCase of
+                    Lam arg (Lam _ (Case (App (Var producer) (Var operand)) _ result alts@[_, _])) -> do
+                        check "opaque scrutinee uses the exact scoped identifiers" (producer == ifaceOpaqueProducer && operand == arg)
+                        let callIndex = TermAppTy ifaceOpaqueProducer (TermVarTy arg)
+                        checkType dflags "opaque interface case result" (indexed callIndex) result
+                        forM_ alts $ \alt -> case alt of
+                            Alt (DataAlt con) [cv] _ -> do
+                                let co = mkCoVarCo cv
+                                check "opaque interface proof is nominal" (coercionRole co == Nominal)
+                                checkType dflags "opaque interface proof call" callIndex (coercionLKind co)
+                                checkType dflags "opaque interface proof constructor" (constructorIndex con) (coercionRKind co)
+                            _ -> fail "FAIL: opaque interface proof alternative changed shape"
+                    _ -> fail "FAIL: opaque interface proof case changed shape"
                 rejectsIfaceExpr
-                    "unsupported opaque interface proof scrutinee"
+                    "linear call cannot be an interface proof scrutinee"
                     "Unsupported scrutinee for native index interface evidence"
-                    [ifaceOpaqueProducer]
+                    [linearProducer]
                     opaqueProofCase
                 reject
                     "incomplete interface proof case"

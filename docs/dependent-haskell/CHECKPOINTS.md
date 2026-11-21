@@ -28,6 +28,45 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `6b2c1a6029`, a source-hidden caller can split two different vectors
+at one runtime cut. Each proof reconstructs its own vector. Exchanging
+the fields produces GHC-83865 at each wrong argument and prints the two
+written `SplitAtValue` types. Ignoring the bounds equality produces
+GHC-83865 at the constructor and shows both widths. Reading the first
+proof leaves the second vector unevaluated. A separate kind-order test
+checks a constructor whose second inferred operand depends on the first.
+
+The compiler checks the installed definition of `(.)` for the finite map
+composition proof. The installed `filter` and `(++)` support a distribution
+proof with one Boolean decision per head of the finite left list. A
+runtime caller constructs those decisions for `Prelude.not`.
+[Paired client](examples/packed-vector/CertifiedSplitClient.hs),
+[map composition](examples/open-evaluation/PreludeMapCompositionProof.hs),
+and [filter distribution](examples/open-evaluation/PreludeFilterAppendProof.hs).
+
+The Stage 2 compiler built against the normal `89aa40ec56` baseline
+matched all 380 Showcase lines at native `-O0`, `-O1`, `-O2`, and in
+source-loaded GHCi. All 23 focused tests passed. The complete
+`NativeDependentCoreRun` executable matched its 37-line golden, and
+`NativeIndexAbstraction` passed both evidence assertions. The existing
+inner-forall negative now reports GHC-25897 at the body of the function.
+Its type signature is legal. A separate two-stage Hadrian build passed
+on the preceding 378-line paired-split revision, including all four
+Showcase modes and the source-hidden split and finite-position tests.
+
+At `b5faf22c3e`, the rule for `keepRequired tag (type Bool) m x`
+infers the types of `m` and `x`. A client compiled from the producer's
+interface fires the rule at `-O2` and leaves both indices lazy. A type
+splice in the prefix runs once. The signed rule and an ordinary control
+produce identical interface and object files before and after the change.
+Six focused regressions passed, and 378 Showcase lines matched at stripped
+`-O0`, default `-O2` and in source-loaded GHCi. The full Core API test
+checks both endpoints of the branch equality for the scoped call `f b`.
+The same interface bytes are rejected when the reader gives `f` a linear
+arrow.
+[Source rule](examples/qualified-pi/VisibleRuleArguments.hs) and
+[interface proof](../../testsuite/tests/ghc-api/NativeDependentCore.hs).
+
 At `cd14d1268d`, an ordinary reader gets 17, 23 and 29 from a named
 erased package, a producer call, and the same call forwarded through
 `id`. A required erased type can also follow a retained argument.

@@ -42,8 +42,8 @@ The Showcase includes ordinary clients of the `INLINE` and `INLINABLE`
 finite zero views. It also includes finite-list proofs for the installed
 Prelude definitions of `map`, `(.)`, `filter`, and `(++)`. The source-hidden
 split regression passes at `-O0`, `-O1`, and `-O2`. Removing the induction
-premise fails at the final `Refl`. Both stages of a normal Hadrian build
-passed at the preceding 376-line checkpoint.
+premise fails at the final `Refl`. A normal two-stage Hadrian build also
+passed on the 378-line paired-split revision.
 [Verification scope](CHECKPOINTS.md#family-and-package-checkpoints).
 
 A retained function can name an entire indexed vector as its argument.
@@ -334,8 +334,8 @@ and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vecto
    the type argument. A retained prefix can also precede a specified
    erased binder and a second retained argument, as in
    `keepTagged tag @Bool m x`. The corresponding required binder
-   takes `(type Bool)`. Its rewrite rule can give explicit signatures
-   for the later runtime arguments.
+   takes `(type Bool)`. A rewrite rule can infer the types of the later
+   runtime arguments from that prefix.
    [Rule and interface support](roadmap/R05-dependent-core.md).
 2. **R23 and R24.** A recursive family can forward a constructor
    or a partial family across stripped interfaces. When a signature

@@ -111,6 +111,28 @@ fi
 sed 's/x :: Reading other/x :: Reading m/' Independent.hs >SameIndex.hs
 "$ghc" "${flags[@]}" -O2 -c SameIndex.hs
 
+sed 's/"keepRequired\/Bool" forall tag m x\./"keepRequired\/Bool" forall tag (m :: Maybe Bool) (x :: TaggedReading tag m)./' \
+    "$src/VisibleRuleArguments.hs" >VisibleRuleArguments.hs
+"$ghc" "${flags[@]}" -O2 -c VisibleRuleArguments.hs
+
+cp "$src/VisibleRuleArguments.hs" WrongRequiredIndex.hs
+cat >>WrongRequiredIndex.hs <<'HS'
+{-# NOINLINE independent #-}
+independent :: foreach (left :: Bool) -> Bool -> forall (a :: Type) ->
+               foreach (m :: Maybe a) -> TaggedReading left m -> TaggedReading left m
+independent left _ (type a) m x = keepRequired left (type a) m x
+
+{-# RULES "independent" forall left (right :: Bool) m x.
+    independent left right (type Bool) m x = keepRequired right (type Bool) m x #-}
+HS
+if "$ghc" "${flags[@]}" -O2 -c WrongRequiredIndex.hs >bad.log 2>&1 ||
+   ! grep -Fq 'Expected: TaggedReading left m' bad.log ||
+   ! grep -Fq 'Actual: TaggedReading right m' bad.log ||
+   ! grep -Fq 'When checking the rewrite rule "independent"' bad.log; then
+    cat bad.log >&2
+    exit 1
+fi
+
 cd "$out/client"
 cat >WrongRequired.hs <<'HS'
 {-# LANGUAGE CPP, ExplicitNamespaces, NoExperimentalDependentTypes, RequiredTypeArguments, TypeApplications #-}

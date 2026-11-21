@@ -222,7 +222,8 @@ position. Its kind can refer to a preceding runtime index. A partial
 application before the required argument keeps the required binder.
 Flat equations split at that binder when the prefix has no strict
 value patterns. An explicit curried equation can express a strict prefix.
-The R05 rule for `keepRequired` signs its later dependent binders.
+The R05 rule for `keepRequired` infers its later dependent binders
+from the prefix ending at `(type Bool)`.
 
 ## Completion boundary
 
