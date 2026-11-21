@@ -368,6 +368,7 @@ forward an inferred partial-family callback and an ordinary constructor: (Refl,R
 infer both bare kind arrows in a list family proof: Refl
 infer the inner arrow of a higher-order family callback: [True]
 infer an unsigned synonym kind from a bare callback use: [True]
+pass a partial synonym and a list constructor to one callback type: ([True],"q")
 store the result of Maybe and an imported open family: (Just True,[False])
 use one polymorphic map with Maybe and a type family: (Just True,[False])
 apply a callback with matchability computed in its declared kind: (Just False,[True])

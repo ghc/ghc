@@ -108,6 +108,7 @@ import qualified InterpretedKind
 import qualified InterpretedKindUseSite
 import qualified NestedFunctionClient
 import qualified InvisibleFamily
+import qualified LiberalCallback
 import ConstrainedElementsClient (advanceCursor, showAdvance, showRemainder, splitCollection, partialElement, aliasedReflection, annotatedElement, constrainedElements, explicitElements, formatField, renderField, renderKnownFields, retainedMaybeDomain)
 import ConstrainedElementsQuickLook (showReflection)
 import OpenArrowKindClient (openKindRows)
@@ -1305,6 +1306,7 @@ main = do
     observe "infer both bare kind arrows in a list family proof" annotatedMap
     observe "infer the inner arrow of a higher-order family callback" nestedCallback
     observe "infer an unsigned synonym kind from a bare callback use" appliedCallback
+    observe "pass a partial synonym and a list constructor to one callback type" LiberalCallback.collectValues
     observe "store the result of Maybe and an imported open family" boxedCallbacks
     observe "use one polymorphic map with Maybe and a type family" rankedMap
     observe "apply a callback with matchability computed in its declared kind" flippedCallbacks
