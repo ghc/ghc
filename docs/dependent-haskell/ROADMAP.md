@@ -41,6 +41,12 @@ whose first argument is a required type. The ordinary client invokes it
 at two kinds and obtains `(3,LT)`.
 [R23 examples and limits](roadmap/R23-unsaturated-type-families.md#passing-a-polymorphic-mapper-at-its-full-kind).
 
+An ordinary module can open an erased state and its linear reader in a
+strict tuple binding. A local `INLINE` function can use a retained
+call with a captured element. The Showcase reads both an encoded Boolean
+and an encoded integer, and replicates a captured element at two runtime
+lengths. [Release and interface checks](CHECKPOINTS.md#family-and-package-checkpoints).
+
 An ordinary module can check a signed offset once against a vector.
 On success, `mkFinVec` returns a position of type `Fin n`. The caller
 can use that position on any vector of length `n`. A negative offset
