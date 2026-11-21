@@ -62,6 +62,37 @@ HS
                 exit 1
             fi
         done
+        cat >PartialDomain.hs <<'HS'
+{-# LANGUAGE CPP, NoExperimentalDependentTypes, PartialTypeSignatures, TypeFamilies, TypeOperators #-}
+module PartialDomain where
+import Data.Type.Equality ((:~:)(Refl))
+import NativeConstrainedFamilyProvider (Collects(..))
+#ifdef VALID
+type Item = Bool
+#else
+type Item = Int
+#endif
+#ifdef BINDING
+proof :: Elem [Item] :~: _
+proof = Refl
+#else
+proof = (Refl :: Elem [Item] :~: _)
+#endif
+HS
+        for form in BINDING ANNOTATION; do
+            partial=(-fforce-recomp -Wno-partial-type-signatures "-D$form" -c PartialDomain.hs)
+            "${ghc[@]}" "${partial[@]}" -DVALID
+            for defer in -fno-defer-type-errors -fdefer-type-errors; do
+                if [[ $reader == ordinary ]]; then
+                    "${ghc[@]}" "${partial[@]}" "$defer"
+                elif "${ghc[@]}" "${partial[@]}" "$defer" >partial.log 2>&1 ||
+                     ! grep -Fq '[GHC-39999]' partial.log ||
+                     ! grep -Fq 'Allowed Int' partial.log; then
+                    cat partial.log
+                    exit 1
+                fi
+            done
+        done
         if [[ $reader == marked ]]; then
             cat >DeferredTerm.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes, TypeFamilies #-}

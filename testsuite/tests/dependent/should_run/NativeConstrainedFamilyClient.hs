@@ -16,7 +16,7 @@ assumedInPattern :: forall c. Witness c -> ()
 assumedInPattern (Witness _) =
     let local :: Proxy (Elem c)
         local = Proxy
-    in local `seq` ()
+    in (local :: Proxy (Elem c)) `seq` ()
 assumedInPattern (ByEquality _) = ()
 
 -- The outer signature supplies both the domain rule and its premise.
@@ -30,7 +30,7 @@ fromRule :: forall f a.
 fromRule _ =
     let local :: Proxy (Elem (f a))
         local = Proxy
-    in local `seq` ()
+    in (local :: Proxy (Elem (f a))) `seq` ()
 
 localContext :: forall c. Proxy c -> ()
 localContext _ =

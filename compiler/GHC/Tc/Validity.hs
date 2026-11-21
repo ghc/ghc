@@ -5,7 +5,7 @@
 
 module GHC.Tc.Validity (
   Rank(..), UserTypeCtxt(..), checkValidType, checkValidMonoType,
-  checkValidTheta,
+  checkValidTheta, checkConstrainedSignature,
   checkValidInstance, checkValidInstHead, validDerivPred,
   checkTySynRhs, checkEscapingKind,
   checkValidCoAxiom, checkValidCoAxBranch,
@@ -495,6 +495,7 @@ checkConstrainedSignature ctxt ty
   where
     uses = constrainedFamilyApps ty
     checks_domain FunSigCtxt{} = True
+    checks_domain ExprSigCtxt{} = True
     checks_domain ConArgCtxt{} = True
     checks_domain _ = False
 
@@ -579,7 +580,11 @@ Check an application in a written signature, before solving a term can
 reduce the family and lose the domain obligation. Solve the class
 predicate from the declared and enclosing Givens and the instance
 environment. Check formation separately from inference so that inference
-cannot add a missing predicate to the signature. This source check
+cannot add a missing predicate to the signature. Expression annotations
+use the same domain check as named signatures. For a partial signature,
+check the written type before the expression or binding fixes a wildcard.
+For example, checking Refl can reduce Elem [Int] to Int and fill the hole
+in Elem [Int] :~: _. Checking the inferred type then loses that use of Elem. This source check
 does not put a dictionary into the family's Core kind.
 
 Report a missing domain even under -fdefer-type-errors. The check

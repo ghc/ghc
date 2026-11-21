@@ -104,7 +104,7 @@ import qualified InterpretedKind
 import qualified InterpretedKindUseSite
 import qualified NestedFunctionClient
 import qualified InvisibleFamily
-import ConstrainedElementsClient (constrainedElements)
+import ConstrainedElementsClient (annotatedElement, constrainedElements)
 import IndexedMapClient (mappedCells)
 import LaterMatchabilityClient (annotatedMap, appliedCallback, boxedCallbacks, forwardedMap,
                                 laterMatchability, nestedCallback)
@@ -942,6 +942,7 @@ constructorFieldCases =
 main :: IO ()
 main = do
     observe "form an associated family type from its class evidence" constrainedElements
+    observe "form an expression annotation with the matched dictionary" annotatedElement
     putStrLn "Dependent Haskell: completed source features"
     booleans
     finiteDomains

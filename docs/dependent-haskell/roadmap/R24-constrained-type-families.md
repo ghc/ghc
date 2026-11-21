@@ -76,7 +76,12 @@ a top-level instance alone misses both cases. The ordinary test client
 uses both sources. Its local binding can form `Elem (f a)` under
 `forall x. Allowed x => Collects (f x)` and `Allowed a`. Removing
 the premise reports GHC-39999 at `Elem` for the marked provider.
-Writing the same type on the expression itself still gives GHC-90647.
+A complete expression annotation can use the same evidence. GHC also
+checks the written family before it infers a wildcard in an expression
+or binding signature. Thus `Refl :: Elem [Int] :~: _` reports the
+missing `Allowed Int` at `Elem`, including under `-fdefer-type-errors`.
+A nested annotation in the body of a partially signed function can still
+lack the function's quantified premise during inference.
 [Client](../../../testsuite/tests/dependent/should_run/NativeConstrainedFamilyClient.hs).
 
 The same discussion asks whether coverage
