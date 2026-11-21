@@ -83,9 +83,23 @@ awk '/^WitnessMain.fromProducer$/ { body = 1 }
 [[ $(grep -o 'unpack ' computed-projection.log | wc -l) == 1 ]]
 [[ $(grep -o 'WitnessSchema.projectionPair' computed-projection.log | wc -l) == 1 ]]
 "$ghc" "${flags[@]}" WitnessMain.o ../provider/{Vector,Filter,WitnessSchema}.o -o witness -main-is WitnessMain
-"$ghc" "${flags[@]}" -ddump-ds -fwrite-ide-info -c CaseMain.hs -main-is CaseMain >case.log
+"$ghc" "${flags[@]}" -dlinear-core-lint -ddump-ds -fwrite-ide-info -c CaseMain.hs -main-is CaseMain >case.log
 test -s CaseMain.hie
 grep -Eq 'unpack .*selection' case.log
+cp "$src/TupleLengthReject.hs" .
+if "$ghc" "${flags[@]}" -c TupleLengthReject.hs >tuple-length.log 2>&1; then
+    echo "A boxed tuple used two independently filtered vectors at one length." >&2
+    exit 1
+fi
+line=$(grep -n '^wrong xs = ' TupleLengthReject.hs | cut -d: -f1)
+grep -Fq "TupleLengthReject.hs:$line:31: error: [GHC-25897]" tuple-length.log
+grep -Fq "at TupleLengthReject.hs:$line:13-28" tuple-length.log
+grep -Fq "at TupleLengthReject.hs:$line:31-47" tuple-length.log
+grep -Fq 'In the expression: filterVec even xs' tuple-length.log
+if grep -Fq 'unpacked_' tuple-length.log; then
+    cat tuple-length.log >&2
+    exit 1
+fi
 "$ghc" "${flags[@]}" CaseMain.o ../provider/{Vector,Filter}.o -o payload-case -main-is CaseMain
 "$ghc" "${flags[@]}" -Wincomplete-patterns -Werror=incomplete-patterns -c StrictMatch.hs
 "$ghc" "${flags[@]}" -Wincomplete-patterns -Werror=incomplete-patterns -fwrite-ide-info \

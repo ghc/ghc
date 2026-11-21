@@ -685,3 +685,12 @@ A consumer can use the ordinary equation `observePair (f, k) = k f`.
 A witness that escapes the match produces a type error at its use.
 The diagnostic identifies the source location where GHC opened the package.
 [Tuple example](../examples/erased-existentials/RankedPackage.hs).
+
+The expected package can also tell a boxed tuple to open a field.
+For `exists n. (Vec n a, Vec n a -> r)`, an ordinary client writes
+`(filterVec predicate xs, firstCell)`. The tuple stores the filtered
+vector and checks its reader at that vector's hidden length.
+The expected type supplies the tuple shape and the reader can ignore
+the vector. Two separate filters cannot supply two fields that require
+the same length. Each filter has its own rigid witness.
+[Source-hidden tuple client](../../../testsuite/tests/dependent/should_run/implicit-existential-source/CaseMain.hs).

@@ -1,8 +1,11 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
-module Filter (Hidden, filterVec, partitionVec, toList) where
+module Filter (Hidden, FilteredWith, SameLength, filterVec, partitionVec, toList) where
 import Vector
 
 type Hidden a = exists (m :: Nat). Vec m a
+
+type FilteredWith a r = exists (m :: Nat). (Vec m a, Vec m a -> r)
+type SameLength a = exists (m :: Nat). (Vec m a, Vec m a)
 
 filterVec :: (a -> Bool) -> Vec n a -> Hidden a
 filterVec _ Nil = Nil

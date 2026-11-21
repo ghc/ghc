@@ -21,7 +21,7 @@ import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcCheckMonoExpr, tcCheckPolyExpr, tcPolyE
 import GHC.Hs
 
 import GHC.Rename.Env ( addUsedGRE, DeprecationWarnings(NoDeprecationWarnings) )
-import GHC.Rename.Utils ( mkExpandedLExpr )
+import GHC.Rename.Utils ( mkExpandedLExpr, wrapGenSpan )
 import GHC.Tc.Gen.Head
 import GHC.Tc.Gen.Match ( tcMatches, tcBody, tcOpenImplicitPackage, implicitPayloadType )
 import GHC.Tc.Gen.SourceTable ( tcLookupSourceTableId, sourceTableOccurrence, recordSourceMethodUse, recordSourceLiteralUse )
@@ -33,7 +33,8 @@ import GHC.Tc.Solver ( tcRewriteFamilyAxioms )
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Utils.Env ( isExistsPackName, tcLookupIdMaybe, tcLookupConLike
-                        , tcLookup, tcLookupGlobal, tcLookupLcl_maybe, tcExtendIdEnv )
+                        , tcLookup, tcLookupGlobal, tcLookupLcl_maybe
+                        , tcExtendIdEnv, tcExtendGeneratedIdEnv )
 import GHC.Tc.Instance.Family ( tcGetFamInstEnvs, tcLookupDataFamInst_maybe )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.Concrete  ( unifyConcrete, idConcreteTvs )
@@ -462,7 +463,8 @@ tcOrdinaryApp rn_expr rn_fun rn_args exp_res_ty
                   ; mixed <- tcOpenMixedBarArgument fun sigma args expected check
                   ; case mixed of
                       Just opened -> return opened
-                      Nothing -> tcOpenImplicitArgs rn_expr sigma args expected (check fun sigma) }
+                      Nothing -> tcOpenImplicitArgs rn_expr (implicitTupleSpine fun sigma expected)
+                                                   args expected (check fun sigma) }
              -- See Note [Type arguments before an implicit package head].
              (type_prefix, payload_args)
                | let (prefix, rest) = span prefix_arg rn_args
@@ -741,6 +743,45 @@ tcOrdinaryAppWithPrefix checked_prefix rn_expr rn_head@(rn_fun, fun_lspan) tc_fu
       = original
       | otherwise = rn_fun
 
+-- | Use expected boxed tuple fields to decide which operands request opening.
+-- See Note [Implicit opening for a tuple payload].
+implicitTupleSpine :: HsExpr GhcTc -> TcSigmaType -> ExpRhoType -> TcSigmaType
+implicitTupleSpine fun sigma expected
+  | XExpr (ConLikeTc (RealDataCon dc)) <- fun
+  , let tuple_tc = dataConTyCon dc
+  , isBoxedTupleTyCon tuple_tc
+  , Check schema <- expected
+  , ExistsTy ImplicitExists _ payload <- coreFullView schema
+  , Just (tc, fields) <- tcSplitTyConApp_maybe (implicitPayloadType payload)
+  , tc == tuple_tc
+  , (binders, body) <- tcSplitForAllInvisTyVars sigma
+  , let (_, _, result) = splitFunTys body
+  , Just (result_tc, ts) <- tcSplitTyConApp_maybe result
+  , result_tc == tuple_tc
+  , Just vars <- traverse getTyVar_maybe ts
+  , all (`elem` map snd binders) vars
+  , vars `equalLength` fields
+  = substTyWith vars fields body
+  | otherwise = sigma
+
+{- Note [Implicit opening for a tuple payload]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For (filterVec p xs, first) checked at
+  exists n. (Vec a n, Vec a n -> Maybe a)
+the constructor's declared arguments are just type variables. The first
+field of the expected tuple requests a vector payload. Read those fields
+before checking the application and use their shapes to select openings.
+
+Match the result of the actual boxed tuple constructor. Substitute the
+expected fields in its arrow spine for the read-only argument classifier.
+The checker still uses the constructor's original type and argument
+multiplicities. It instantiates the output witness inside the openings.
+Independent openings introduce distinct skolems, so two filtered vectors
+cannot stand for two fields at the same length. A field whose declared
+type is itself a package still forwards that package. Each opening keeps
+the original argument lazy.
+-}
+
 -- | Scope implicit existential value arguments over the rest of the application.
 -- See Note [Implicit existential arguments].
 tcOpenImplicitArgs :: HsExpr GhcRn -> TcSigmaType -> [HsExprArg 'TcpRn] -> ExpRhoType
@@ -852,7 +893,7 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
                  guard (eqType previous schema)
                  return payload
                continue env payload =
-                 let payload_ref = nlHsVar (getName payload)
+                 let payload_ref = wrapGenSpan (mkHsVar (wrapGenSpan (getName payload)))
                      ref = EValArg loc noExtField $
                        fromMaybe id rebuild (fmap (\e -> mkExpandedLExpr e payload_ref) arg)
                  in open result_ty env (ref : rev_args) rest
@@ -862,7 +903,7 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
                let env = case key of
                      Just identity -> Map.insert identity (schema, payload) opened
                      Nothing -> opened
-               in tcExtendIdEnv [payload] $ continue env payload }
+               in tcExtendGeneratedIdEnv payload $ continue env payload }
 
     openingKey :: LHsExpr GhcRn -> LHsExpr GhcTc -> TcM (Maybe (Name, Maybe Name))
     openingKey original checked

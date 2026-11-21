@@ -1,8 +1,9 @@
-{-# LANGUAGE GADTs, LinearTypes, PatternSynonyms #-}
+{-# LANGUAGE DataKinds, GADTs, LinearTypes, NoExperimentalDependentTypes, NoImpredicativeTypes, PatternSynonyms #-}
 
 module CaseMain where
 
 import Control.Exception
+import Control.Monad (unless)
 import Filter
 import Vector
 
@@ -38,6 +39,25 @@ ignored p = case p of _ -> True
 synonym :: Hidden a -> Bool
 synonym p = case p of Keep -> True
 
+-- | Store a filter result with a reader for its hidden length.
+withFirst :: (a -> Bool) -> Vec n a -> FilteredWith a (Maybe a)
+withFirst predicate xs = (filterVec predicate xs, firstCell)
+  where
+    firstCell :: Vec m a -> Maybe a
+    firstCell Nil = Nothing
+    firstCell (Cons x _) = Just x
+
+-- | Store a reader that can ignore the vector entirely.
+withIgnored :: (a -> Bool) -> Vec n a -> FilteredWith a Bool
+withIgnored predicate xs = (filterVec predicate xs, const True)
+
+linearWith :: Hidden a %1 -> FilteredWith a Bool
+linearWith p = (p, const True)
+
+-- | Supply both fields from one opening of the package.
+readFiltered :: FilteredWith a r -> r
+readFiltered p = let (xs, readCells) = p in readCells xs
+
 main :: IO ()
 main = do
     let yes = filterVec odd (Cons (7 :: Int) (error "forced the unseen tail"))
@@ -46,6 +66,11 @@ main = do
     print (first yes, first empty, filteredFirst odd (Cons (9 :: Int) (error "forced the computed tail")))
     print (take 1 (toList (linearForward yes)), take 1 (forward yes), take 1 (toList (repack yes)))
     print (ignored bottom, synonym bottom)
+    unless (readFiltered (withFirst odd (Cons (2 :: Int) (Cons 7 (error "unused tuple tail")))) == Just 7
+         && readFiltered (withFirst odd (Nil :: Vec 'Z Int)) == Nothing
+         && readFiltered (withIgnored odd (error "unused filter input" :: Vec 'Z Int))
+         && readFiltered (linearWith (error "unused linear package" :: Hidden Int))) $
+        fail "the tuple forced the discarded filter or used the wrong length"
     answer <- try (evaluate (first bottom)) :: IO (Either ErrorCall (Maybe Int))
     case answer of
         Left e | "forced the selected spine" == takeWhile (/= '\n') (displayException e) ->
