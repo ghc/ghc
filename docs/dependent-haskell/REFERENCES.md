@@ -3282,6 +3282,16 @@ supplies the input to the lexical opening in Elab-IExist. [Agda implicit argumen
 [Idris 2 elaboration](https://idris2.readthedocs.io/en/latest/implementation/overview.html#implicit-arguments),
 and [Paper, figure 8](https://richarde.dev/papers/2021/exists/exists.pdf#page=18).
 
+For a selector such as `bool right left flag`, each direct forwarding
+operand must expose the same closed erased schema. The checker uses
+that schema as the expected type of the complete selector call. The
+scope of the opening follows Elab-IExist and starts at the selected
+result. The schema agreement rule belongs to this fork. The unused
+operand retains the demand of the selector.
+[Paper, figure 8](https://richarde.dev/papers/2021/exists/exists.pdf#page=18),
+[Data.Bool](https://hackage.haskell.org/package/base/docs/Data-Bool.html#v:bool),
+and [Showcase selector](examples/erased-existentials/RankedPackageClient.hs).
+
 Agda checks the clauses of an indexed function against its telescope.
 GHC keeps its ordinary match group for equations on a packaged argument.
 It opens the hidden indices before checking the payload patterns in that

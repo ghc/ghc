@@ -2,8 +2,10 @@
 module RankedPackageClient
     ( runGuarded, runProjections, projectAt, runDeclaredWitnesses, runExplicitBranches
     , runMixedPackage, runProducedPackage, runForwardedPackage, runLabelledPackage
+    , runSelectedPackage
     ) where
 
+import Data.Bool (bool)
 import Data.Proxy (Proxy(..))
 import qualified ErasedPackage
 import RankedPackage
@@ -80,6 +82,18 @@ runForwardedPackage n = ErasedPackage.readNumber (id (hide n))
 -- | Read the label and number while keeping both witnesses hidden.
 runLabelledPackage :: Int -> (String, Int)
 runLabelledPackage n = ErasedPackage.readLabelledNumber (id (hide n))
+
+-- | Read the selected package and leave the other package unevaluated.
+runSelectedPackage :: Bool -> (String, Int)
+runSelectedPackage chooseLeft
+    | chooseLeft = readSelected (hide 37) unused
+    | otherwise = readSelected unused (hide 41)
+  where
+    unused :: ErasedPackage.MixedNumber
+    unused = error "unselected package"
+
+    readSelected :: ErasedPackage.MixedNumber -> ErasedPackage.MixedNumber -> (String, Int)
+    readSelected left right = ErasedPackage.readLabelledNumber (bool right left chooseLeft)
 
 -- | Hide the first witness after packing the second.
 hide :: Int -> ErasedPackage.MixedNumber

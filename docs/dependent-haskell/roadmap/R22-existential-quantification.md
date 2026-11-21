@@ -439,14 +439,18 @@ package. It checks the callback type, the producer's constraints, and
 argument use. The result still cannot expose the hidden witness.
 
 A selector such as `Bool -> a -> a -> a` can forward either operand
-when both declare the same closed erased package schema. GHC checks
-the complete selector at the common schema, then opens the result.
-The two alternatives can hide different witnesses. The selector chooses
-the value at runtime. A lazy selector can leave the unused package
-unevaluated. An incompatible branch still fails at that argument.
-To extend this match to types with free variables, the checker needs
+when both declare the same closed erased package schema after expanding
+type aliases and comparing binders up to renaming. GHC checks the complete
+selector at the common schema, then opens the result. The alternatives
+can hide different witnesses. The Showcase uses `bool right left flag`
+with a flag read from an `IORef`. It reads either labelled number and
+leaves the other package unevaluated. An incompatible branch fails at
+that argument. The probe needs a closed schema for every forwarding
+operand. Extending the match to types with free variables requires
 evidence that those variables are rigid in the caller's scope. A fresh
 variable from an omitted producer argument cannot supply that evidence.
+[Ordinary selector client](../examples/erased-existentials/RankedPackageClient.hs)
+and [implicit opening in Elab-IExist](https://richarde.dev/papers/2021/exists/exists.pdf#page=18).
 
 A result parameter with no corresponding argument type can remain
 ambiguous. An opaque family result stays opaque.

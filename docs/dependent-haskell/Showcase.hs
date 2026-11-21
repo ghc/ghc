@@ -1035,6 +1035,13 @@ main = do
         )
     observe "read a forwarded erased package and keep its label"
         (RankedPackageClient.runLabelledPackage 31)
+    packageChoice <- newIORef True
+    chooseLeft <- readIORef packageChoice
+    writeIORef packageChoice False
+    chooseRight <- readIORef packageChoice
+    observe "read the selected erased package and leave the other lazy"
+        (RankedPackageClient.runSelectedPackage chooseLeft,
+         RankedPackageClient.runSelectedPackage chooseRight)
     observe "filter a vector without forcing the tail to learn the result length"
         ErasedPackage.filterObservation
     observe "infer the hidden lengths of a lazy filter and a retained vector"
