@@ -1255,6 +1255,11 @@ main = do
     observe "open the vector chosen by a runtime conditional"
         (RankedPackageClient.firstSelected chooseLeft evens (error "unused right vector"),
          RankedPackageClient.firstSelected chooseRight (error "unused left vector") odds)
+    observe "open the result of the selected polymorphic filter"
+        ( RankedPackageClient.firstSelectedFilter chooseLeft even
+            (VCons (6 :: Int) (error "unused left tail")) (error "unused right input")
+        , RankedPackageClient.firstSelectedFilter chooseRight odd
+            (error "unused left input") (VCons (7 :: Int) (error "unused right tail")) )
     observe "consume a hidden Boolean or integer once"
         (RankedPackageClient.readCount (ErasedPackage.encodeCount (Left True)),
          RankedPackageClient.readCount (ErasedPackage.encodeCount (Right 17)))

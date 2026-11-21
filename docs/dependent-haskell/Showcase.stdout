@@ -312,6 +312,7 @@ pass named, computed and forwarded erased packages to a polymorphic reader: (17,
 read a forwarded erased package and keep its label: ("count",31)
 read the selected erased package and leave the other lazy: (("count",37),("count",41))
 open the vector chosen by a runtime conditional: ([4],[5])
+open the result of the selected polymorphic filter: ([6],[7])
 consume a hidden Boolean or integer once: (1,17)
 read dependent fields from a local package pattern: ((8,True),(11,False))
 use a Show superclass to format a reopened package: ("True","'q'")
