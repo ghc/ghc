@@ -405,12 +405,16 @@ for opt in 0 2; do
     "$ghc" "${let_flags[@]}" -c "$src/LexicalLetProvider.hs" -outputdir .
     cd ../client
     cp ../provider/LexicalLetProvider.hi "$src/"{LexicalLetMain,LexicalLetReject,LexicalBangLet,LexicalStrictLet}.hs \
-        "$src/"{LexicalStrictLetReject,LexicalLinearLetReject}.hs .
-    "$ghc" "${let_flags[@]}" -c LexicalBangLet.hs LexicalStrictLet.hs LexicalLetMain.hs
-    "$ghc" "${let_flags[@]}" LexicalLetMain.o LexicalBangLet.o LexicalStrictLet.o ../provider/LexicalLetProvider.o -o run
+        "$src/"{LexicalStrictLetReject,LexicalLinearLet,LexicalLinearLetReject}.hs .
+    linear_lint=()
+    if [[ $opt == 0 ]]; then linear_lint=(-dlinear-core-lint); fi
+    "$ghc" "${let_flags[@]}" "${linear_lint[@]}" -c LexicalLinearLet.hs LexicalStrictLet.hs
+    "$ghc" "${let_flags[@]}" -c LexicalBangLet.hs LexicalLetMain.hs
+    "$ghc" "${let_flags[@]}" LexicalLetMain.o LexicalBangLet.o LexicalStrictLet.o LexicalLinearLet.o \
+        ../provider/LexicalLetProvider.o -o run
     ./run >lexical-let.out
     printf '%s\n' '((1,1),(98,98),77)' "(True,(True,98),(True,'x'))" \
-        '(["True","bottom package","bottom package","True"],77,77,98)' |
+        '(["True","bottom package","bottom package","True"],77,77,98)' '(5,9)' |
         diff -u - lexical-let.out
     if "$ghc" "${let_flags[@]}" -c LexicalLetReject.hs >lexical-let-reject.log 2>&1; then
         echo "LexicalLetReject unexpectedly compiled." >&2
@@ -439,7 +443,36 @@ for opt in 0 2; do
         echo "LexicalLinearLetReject unexpectedly compiled." >&2
         exit 1
     fi
-    line=$(grep -n '^readLinear package =' LexicalLinearLetReject.hs | cut -d: -f1)
-    grep -Eq "^LexicalLinearLetReject.hs:$line:12: error: \[GHC-18872\]" linear-let-reject.log ||
-        { cat linear-let-reject.log >&2; exit 1; }
+    for reader in readLazy readTwice; do
+        rhs=$(grep -n "^$reader package =" LexicalLinearLetReject.hs)
+        line=${rhs%%:*}
+        prefix=${rhs#*:}
+        prefix=${prefix%%package in*}
+        column=$((${#prefix} + 1))
+        grep -Eq "^LexicalLinearLetReject.hs:$line:$column: error: \[GHC-18872\]" linear-let-reject.log ||
+            { cat linear-let-reject.log >&2; exit 1; }
+    done
 done
+
+# Only an opening serialized in the interface needs the linear reader.
+cd "$out/lexical-let-2/client"
+"$ghc" -B"$lib" --show-iface LexicalLinearLet.hi >linear-body-iface.log
+if grep -Fq 'linear-unpack' linear-body-iface.log; then
+    cat linear-body-iface.log >&2
+    exit 1
+fi
+mkdir -p "$out/linear-rule/"{provider,client}
+cd "$out/linear-rule/provider"
+cp "$out/lexical-let-2/provider/LexicalLetProvider.hi" .
+rule_flags=("${flags[@]}" -O2 -fno-omit-interface-pragmas)
+"$ghc" "${rule_flags[@]}" -c "$src/LexicalLinearRule.hs" -outputdir .
+"$ghc" -B"$lib" --show-iface LexicalLinearRule.hi >linear-rule-iface.log
+grep -Eq '^ *got +[0-9]+-retained-features-v1-erased\+user-rule\+lexical-rule\+linear-unpack$' linear-rule-iface.log
+cd ../client
+cp ../provider/{LexicalLetProvider,LexicalLinearRule}.hi "$src/LexicalLinearRuleMain.hs" .
+"$ghc" "${rule_flags[@]}" -ddump-rule-firings -c LexicalLinearRuleMain.hs >linear-rule-firings.log
+test "$(grep -Fc 'Rule fired: read/linear-let (LexicalLinearRule)' linear-rule-firings.log)" = 2
+"$ghc" "${rule_flags[@]}" LexicalLinearRuleMain.o ../provider/LexicalLinearRule.o \
+    "$out/lexical-let-2/provider/LexicalLetProvider.o" -o run
+./run >linear-rule.out
+diff -u <(printf '(5,9)\n') linear-rule.out

@@ -706,8 +706,6 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
        -- See wrinkle (DME1) in Note [Coercion errors in tcSubMult] in GHC.Tc.Utils.Unify.
        ; when (null simples) $
          reportMultiplicityCoercionErrs ctxt mult_co_errs
-       ; when (null simples || deferringAnyBindings ctxt) $
-         mapM_ reportRetainedMatchabilityError [loc | DE_RetainedMatchability _ loc <- tidy_errs]
 
        -- Now the constraints that give serious errors
        -- Like Int ~ Bool (incl nullary TyCons)
@@ -774,7 +772,6 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
             -> (es1, es2, es3, (mult_co, loc):es4, es5)
           DE_SourceMethod ev _ method loc
             -> (es1, es2, es3, es4, (ev, method, loc):es5)
-          DE_RetainedMatchability {} -> (es1, es2, es3, es4, es5)
 
     -- This obligation must remain an error with -fdefer-type-errors.
     -- See Note [Checked source method evidence] in GHC.Tc.Solver.Solve.
@@ -782,10 +779,6 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
     reportSourceMethodError (ev, method, loc)
       = setCtLocM loc $ addErrTc $ TcRnRetainedQuantificationError $
           RetainedSourceMethodEvidence method (varType ev)
-
-    -- See Note [Ordinary arrows in retained matches] in GHC.Tc.Gen.Match.
-    reportRetainedMatchabilityError loc = setCtLocM loc $ addErrTc $
-      TcRnRetainedQuantificationError RetainedResultWrapper
 
     --serious_reporters: ones that should *not* be suppressed by cec_error_reported,
     --     (i.e. by an insoluble somewhere else in the tree)

@@ -394,10 +394,6 @@ data DelayedError
     -- ^ The actual method dictionary must select the checked source instance.
     -- See Note [Checked source method evidence] in GHC.Tc.Solver.Solve.
 
-  | DE_RetainedMatchability TcCoercion CtLoc
-    -- ^ A consumed ordinary arrow must have reflexive matchability evidence.
-    -- See Note [Ordinary arrows in retained matches] in GHC.Tc.Gen.Match.
-
 
 instance Outputable DelayedError where
   ppr (DE_Hole hole) = ppr hole
@@ -406,7 +402,6 @@ instance Outputable DelayedError where
   ppr (DE_SourceMethod ev dfun method _)
     = text "Source method evidence:" <+> ppr method <+> ppr ev
       <+> dcolon <+> ppr (varType ev) <+> text "from" <+> ppr dfun
-  ppr (DE_RetainedMatchability co _) = ppr co
 
 -- | A hole stores the information needed to report diagnostics
 -- about holes in terms (unbound identifiers or underscores) or
@@ -902,7 +897,6 @@ tcvs_of_errs (DE_NotConcrete {})    = mempty
 tcvs_of_errs (DE_Multiplicity co _) = deepDetCoFV co
 tcvs_of_errs (DE_SourceMethod ev dfun _ _)
   = deepDetTypeFV (varType ev) `mappend` deepDetTypeFV (varType dfun)
-tcvs_of_errs (DE_RetainedMatchability co _) = deepDetCoFV co
 
 tcvs_of_hole :: Hole -> DTyCoFV
 tcvs_of_hole (Hole { hole_ty = ty }) = deepDetTypeFV ty
@@ -1186,7 +1180,6 @@ dropMisleading wanted@(WC { wc_simple = simples, wc_impl = implics, wc_errors = 
     keep_delayed_error (DE_NotConcrete {}) = True
     keep_delayed_error (DE_Multiplicity {}) = True
     keep_delayed_error (DE_SourceMethod {}) = True
-    keep_delayed_error (DE_RetainedMatchability {}) = True
 
 isSolvedStatus :: ImplicStatus -> Bool
 isSolvedStatus (IC_Solved {}) = True
@@ -1248,7 +1241,6 @@ nonDefaultableTyVarsOfWC (WC { wc_simple = simples, wc_impl = implics, wc_errors
       non_defaultable_tvs_of_err (DE_Hole {}) = emptyVarSet
       non_defaultable_tvs_of_err (DE_Multiplicity {}) = emptyVarSet
       non_defaultable_tvs_of_err (DE_SourceMethod ev _ _ _) = tyCoVarsOfType (varType ev)
-      non_defaultable_tvs_of_err (DE_RetainedMatchability {}) = emptyVarSet
 
 insolubleWC :: WantedConstraints -> Bool
 insolubleWC (WC { wc_impl = implics, wc_simple = simples, wc_errors = errors })
@@ -1261,7 +1253,6 @@ insolubleWC (WC { wc_impl = implics, wc_simple = simples, wc_errors = errors })
       is_insoluble (DE_NotConcrete {}) = True
       is_insoluble (DE_Multiplicity {}) = False
       is_insoluble (DE_SourceMethod {}) = False
-      is_insoluble (DE_RetainedMatchability {}) = False
 
 insolubleWantedCt :: Ct -> Bool
 -- | Is this a definitely insoluble Wanted constraint?

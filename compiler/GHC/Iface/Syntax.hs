@@ -55,7 +55,7 @@ import GHC.Iface.Recomp.Binary
 
 import GHC.Builtin( mkUnboundName )
 import GHC.Builtin.KnownKeys ( unrestrictedFunTyConKey, liftedTypeKindTyConKey
-                             , constraintKindTyConKey )
+                             , constraintKindTyConKey, manyDataConKey )
 
 import GHC.Core( IsOrphan, isOrphan, UnfoldingCache(..) )
 import GHC.Core.Class
@@ -3179,8 +3179,11 @@ instance Binary IfaceExpr where
         put_ bh schema
         put_ bh witness
         put_ bh value
-    put_ bh (IfaceUnpack witness value package body) = do
+    put_ bh (IfaceUnpack witness value@(mult, _, _) package body) = do
         requireIfaceEvidenceVersion bh ErasedExistentialEvidence
+        case mult of
+          IfaceTyConApp tc IA_Nil | ifaceTyConName tc `hasKey` manyDataConKey -> pure ()
+          _ -> requireIfaceEvidenceVersion bh LinearUnpackEvidence
         putByte bh 16
         put_ bh witness
         put_ bh value

@@ -1,7 +1,7 @@
 {-# LANGUAGE ExperimentalDependentTypes, LinearTypes #-}
 module LexicalLetProvider
   ( HiddenPayload, producePayload, lazyPayload, bottomPayload
-  , LinearPayload
+  , LinearPayload, linearPayload
   ) where
 
 type HiddenPayload = exists a. (a, a -> Int)
@@ -18,3 +18,10 @@ bottomPayload :: Bool -> HiddenPayload
 bottomPayload _ = error "bottom package"
 
 type LinearPayload = exists a. (a, a %1 -> Int)
+
+linearPayload :: Bool -> LinearPayload
+linearPayload flag = (flag, readFlag)
+  where
+    readFlag :: Bool %1 -> Int
+    readFlag True = 5
+    readFlag False = 9

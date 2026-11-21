@@ -143,9 +143,4 @@ for opt in O0 O2; do
             exit 1
         fi
     done
-    if "${ghc[@]}" "-$opt" -DFORM=3 -DMA=M -fdefer-type-errors -fforce-recomp -c LambdaArrow.hs >reject.log 2>&1 ||
-       ! grep -Fq 'error: [GHC-83605]' reject.log || grep -Fq 'Core Lint errors' reject.log; then
-        cat reject.log >&2
-        exit 1
-    fi
 done

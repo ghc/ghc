@@ -76,32 +76,145 @@ print (advance 41)
 GHCi
 printf '%s\n42\n' "$expected" | cmp - ghci.log
 
-cat >Residual.hs <<'HS'
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeFamilies #-}
-module Residual where
+cat >LocalProducer.hs <<'HS'
+{-# LANGUAGE BangPatterns, DataKinds, ExperimentalDependentTypes, ScopedTypeVariables, TypeApplications #-}
+module LocalProducer (inlineCapture, inlinableCapture, forwardLocal, nested, erasedCapture) where
 
-type family Payload (flag :: Bool) where
-    Payload True = Int
-    Payload False = Bool
+import Data.Proxy (Proxy(..))
+
+data Key (tag :: Bool) = Key
 
 {-# NOINLINE choose #-}
-choose :: foreach (flag :: Bool) -> Payload flag
-choose True = 42
-choose False = False
+choose :: foreach (tag :: Bool) -> Key tag -> Int -> Int -> Int
+choose False _ _ n = n
+choose True _ !capture n = capture + n
 
-ordinary :: Int
-ordinary =
-    let {-# INLINABLE local #-}
-        local :: Int
-        local = choose True
-    in local
+{-# NOINLINE inlineCapture #-}
+inlineCapture :: Int -> Int -> Int
+inlineCapture free =
+    let {-# INLINE [0] useInline #-}
+        useInline :: Int -> Int
+        useInline n = choose True Key free n
+    in useInline
+
+{-# NOINLINE inlinableCapture #-}
+inlinableCapture :: Int -> Int -> Int
+inlinableCapture free =
+    let {-# INLINABLE useInlinable #-}
+        useInlinable :: Int -> Int
+        useInlinable n = choose True Key free n
+    in useInlinable
+
+{-# NOINLINE withIndex #-}
+withIndex :: foreach (tag :: Bool) -> Key tag -> Int -> Int -> Int
+withIndex tag key free =
+    let {-# INLINE useIndex #-}
+        useIndex :: Int -> Int
+        useIndex n = choose tag key free n
+    in useIndex
+
+{-# NOINLINE forwardLocal #-}
+forwardLocal :: Int -> Int -> Int
+forwardLocal = withIndex False Key
+
+{-# INLINE [1] nested #-}
+nested :: Int -> Int -> Int
+nested free n =
+    let {-# INLINE [0] inNested #-}
+        inNested :: Int -> Int
+        inNested x = choose True Key free x
+    in inNested n + inNested n
+
+{-# NOINLINE fromType #-}
+fromType :: forall a. Proxy a -> Int -> Int
+fromType _ n = n
+
+{-# NOINLINE erasedCapture #-}
+erasedCapture :: forall a. Proxy a -> (Int, Int)
+erasedCapture =
+    let {-# INLINABLE useErased #-}
+        useErased :: Int
+        useErased = choose True Key (fromType (Proxy @a) 17) 1
+    in \_ -> (useErased, useErased)
 HS
-if "${ghc[@]}" -O1 -fdiagnostics-color=never -fforce-recomp -c Residual.hs > residual.log 2>&1; then
-    echo 'Accepted a local INLINABLE template containing retained Core'
+cat >LocalClient.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes, TypeApplications #-}
+module Main where
+import Control.Exception (evaluate, SomeException, try)
+import Data.IORef (newIORef, readIORef)
+import Data.Proxy (Proxy(..))
+import LocalProducer
+
+throws :: IO a -> IO Bool
+throws act = either (const True) (const False) <$> try @SomeException act
+
+main :: IO ()
+main = do
+    bad <- readIORef =<< newIORef (error "captured")
+    inlinePartial <- throws (evaluate (inlineCapture bad `seq` ()))
+    inlineFull <- throws (evaluate (inlineCapture bad 41))
+    inlinablePartial <- throws (evaluate (inlinableCapture bad `seq` ()))
+    inlinableFull <- throws (evaluate (inlinableCapture bad 41))
+    print (inlineCapture 1 41, inlinableCapture 1 41, forwardLocal bad 41, nested 1 41)
+    print (erasedCapture (Proxy @Bool))
+    print (inlinePartial, inlineFull, inlinablePartial, inlinableFull)
+HS
+
+for opt in -O0 -O1 -O2; do
+    out="$tmp/local/$opt"
+    mkdir -p "$out"/{provider,client}
+    cp LocalProducer.hs "$out/provider/"
+    cp LocalClient.hs "$out/client/Main.hs"
+    (
+        cd "$out/provider"
+        "${ghc[@]}" "$opt" -ddump-ds -ddump-simpl -dsuppress-uniques -c LocalProducer.hs > producer.core
+        for binder in useInline useInlinable useIndex useErased; do
+            grep -m1 -A7 "$binder \[InlPrag=" producer.core | grep -F 'Src=StableRetainedUser' >/dev/null
+        done
+        if [[ "$opt" != -O0 ]]; then
+            sed -n '/==== Tidy Core/,$p' producer.core > tidy.core
+            grep -m1 -A7 'useErased \[InlPrag=INLINABLE\] :: Int' tidy.core | grep -F 'Src=StableRetainedUser' >/dev/null
+            "${ghc[@]}" --show-iface LocalProducer.hi > producer.iface
+            grep -m1 -A6 'inNested ::' producer.iface | grep -F 'Unfolding: Core: StableRetainedUser' >/dev/null
+        fi
+        cp LocalProducer.hi ../client/
+    )
+    (
+        cd "$out/client"
+        "${ghc[@]}" "$opt" -ddump-inlinings -c Main.hs > client.core
+        if [[ "$opt" != -O0 ]]; then
+            grep -F 'Inlining done: LocalProducer.nested' client.core >/dev/null
+        fi
+        "${ghc[@]}" Main.o ../provider/LocalProducer.o -o run
+        printf '%s\n' '(42,42,41,84)' '(18,18)' '(False,True,False,True)' | cmp - <(./run)
+    )
+done
+
+cat >LocalReject.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes #-}
+module LocalReject where
+
+import Data.Kind (Type)
+
+type Hidden = exists (a :: Type). Maybe a
+
+{-# NOINLINE consume #-}
+consume :: Hidden -> Int
+consume _ = 42
+
+reject :: Int -> Int
+reject n =
+    let {-# INLINABLE local #-}
+        local :: Int -> Int
+        local x = consume (Just x :: Hidden)
+    in local n
+HS
+if "${ghc[@]}" -O1 -fdiagnostics-color=never -fforce-recomp -c LocalReject.hs > residual.log 2>&1; then
+    echo 'Accepted a local stable unfolding containing a retained package operation'
     exit 1
 fi
-grep -qFx 'Residual.hs:17:9: error: [GHC-92256]' residual.log
-grep -q 'The INLINABLE unfolding of .*local.* still contains retained Core.' residual.log
+grep -qFx 'LocalReject.hs:16:9: error: [GHC-92256]' residual.log
+grep -q 'The INLINABLE unfolding of .*local.* contains unsupported retained Core.' residual.log
 
 cp "$src"/{FinitePosition,ParameterizedIndexLibrary,PackedVecLibrary}.hs .
 cat >FinConstruction.hs <<'HS'
