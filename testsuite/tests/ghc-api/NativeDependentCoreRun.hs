@@ -4016,7 +4016,8 @@ runPackageSourceRejectChecks = do
         , ("StrictData", 83605, "StrictData", ["StrictData"], [], package)
         , ("TypeData", 83605, "retained constructor", ["TypeData"], [], ["type data PackedVec a where", "  PackVec :: foreach (n :: Nat) -> Vec a n -> PackedVec a"])
         , ("Existential", 83605, "existential binders", [], [], declaration "forall a hidden. foreach (n :: Nat) -> Vec a n -> hidden -> PackedVec a")
-        , ("Equality", 83605, "contexts", [], [], declaration "forall a. (a ~ Int) => foreach (n :: Nat) -> Vec a n -> PackedVec a")
+        , ("WrongConstructorEquality", 18872, "PackVec", [], [], equalityPackage ++
+            ["bad :: PackedVec Bool", "bad = PackVec @Bool (S Z) (VCons True VNil)"])
         , ("RefinedUniversal", 83605, "equality specifications", [], [], declaration "foreach (n :: Nat) -> Vec Int n -> PackedVec Int")
         , ("Promotion", 83605, "no supported promoted field telescope", [], [],
             declaration "foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a m -> PackedVec a" ++ ["type Bad = 'PackVec"])
@@ -4250,7 +4251,13 @@ runPackageSourceRejectChecks = do
             sourceModuleRejects name code fragment moduleName source
     -- Check accepted source forms and immutable proof transport without adding output.
     forM_
-        [ ("OrdinaryArrowGiven", ["TypeFamilies", "FlexibleContexts"], [], ["ordinaryArrow :: forall value. value ~ (Int -> Int) => value -> Int -> Int", "ordinaryArrow f = f"])
+        [ ("ConstructorEqualityContext", [], equalityImports, equalityPackage ++
+            [ "constructorEquality :: PackedVec a -> a :~: Int"
+            , "constructorEquality (PackVec _ _) = Refl"
+            , "constructed :: PackedVec Int"
+            , "constructed = PackVec (S Z) (VCons 73 VNil)"
+            ])
+        , ("OrdinaryArrowGiven", ["TypeFamilies", "FlexibleContexts"], [], ["ordinaryArrow :: forall value. value ~ (Int -> Int) => value -> Int -> Int", "ordinaryArrow f = f"])
         , ("LaterOrdinaryPattern", [], [], package ++ ["good :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int m", "good Z right VNil ys = ys", "good (S k) later xs ys = ys"])
         , ("LocalSignatureAliasIndex", [], [], localSignatures ++ ["good :: Nat -> PackedVec Int", "good n = let m = n in let { xs :: Vec Int n; xs = localVector m } in PackVec n xs"])
         , ("IdenticalRetainedPi", ["TypeFamilies", "FlexibleContexts"], [], ["identicalPi :: (foreach (n :: Nat) -> Vec Int n) -> (foreach (n :: Nat) -> Vec Int n)", "identicalPi f = f"])
@@ -4534,6 +4541,7 @@ runPackageSourceRejectChecks = do
     qualifiedPiExtensions = ["TypeFamilies", "FlexibleContexts", "ConstraintKinds", "AllowAmbiguousTypes", "ImpredicativeTypes"]
     declaration signature = ["data PackedVec a where", "  PackVec :: " ++ signature]
     package = declaration "foreach (n :: Nat) -> Vec a n -> PackedVec a"
+    equalityPackage = declaration "forall a. (a ~ Int) => foreach (n :: Nat) -> Vec a n -> PackedVec a"
     linearPackage = declaration "foreach (n :: Nat) -> Vec a n %1 -> PackedVec a"
     localSignatures =
         package
