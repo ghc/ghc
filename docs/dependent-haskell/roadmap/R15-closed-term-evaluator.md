@@ -609,6 +609,39 @@ changed its object and preserved its interface ABI hash. GHC rechecked
 the original proof and reported that the returned second cell was
 `6` where the client required `5`.
 
+## Read back a recursive result with witnessed indices
+
+An ordinary producer can return a batch of vectors whose lengths vary
+from one chunk to the next. Each `Chunk` stores a singleton for its own
+vector length. The remaining batch has the same type as the whole
+result. In a separate module the client checks both lengths and the
+three values with `Refl`.
+
+```haskell
+evenBatch :: B.build 4 :~: 'B.Chunk ('E.SS 'E.SZ) ('V.VCons 4 'V.VNil)
+                            ('B.Chunk ('E.SS ('E.SS 'E.SZ))
+                                ('V.VCons 5 ('V.VCons 6 'V.VNil)) 'B.End)
+evenBatch = Refl
+```
+
+The compiler checks the first two fields of each witnessed constructor.
+It uses the existing recursive result codec for the remaining fields.
+The interpreter reads each singleton and the decoder checks its vector
+at that length. A length from an earlier chunk does not constrain a
+later chunk. A hidden reachable constructor or an inconsistent witness
+causes GHC-70565 at the source call.
+
+Full readback demands the remaining batch. An ordinary enclosing call
+can inspect just the first width. The proof of
+`B.firstWidth (B.partial 9) :~: 1` then leaves the vector and remaining
+chunks undefined. The source-hidden regression uses stripped producer
+interfaces. It checks the full even and odd results, the partial-width
+proof, and a full read that forces an undefined tail. The Showcase
+prints the complete proof, the two widths, and the partial observation.
+[Ordinary batch](../examples/closed-evaluation/WitnessedBatch.hs),
+[separate-module check](../../../testsuite/tests/dependent/should_run/NativeClosedWitnessedBatch.sh),
+and [Idris dependent pairs](../REFERENCES.md#recursively-read-back-witnessed-constructors).
+
 ## M136. Composing ordinary calls before observation
 
 `LazyParcel` exports an abstract datatype and ordinary functions.

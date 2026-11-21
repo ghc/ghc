@@ -6071,6 +6071,19 @@ syntax. [Serokell's dependency analysis](https://serokell.io/blog/dependency-ana
 [Agda's interleaved declarations](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html#interleaved-mutual-blocks)
 and [GHC's declaration scheduler](../../compiler/GHC/Tc/Module.hs).
 
+### Recursively read back witnessed constructors
+
+The Idris 2 tutorial's vector filter returns a dependent pair. Its
+recursive branch opens the result of the recursive call before building
+a new pair whose length follows the selected branch. The Haskell batch
+also stores a vector with a witness for its computed length. Each batch
+constructor can choose its own length. GHC reads the witness at each
+constructor and checks the vector against it. Haskell's lazy fields let
+an ordinary consumer stop after reading the first witness.
+[Idris dependent pairs and vector filter](https://idris2.readthedocs.io/en/latest/tutorial/typesfuns.html#dependent-pairs),
+[ordinary batch](examples/closed-evaluation/WitnessedBatch.hs),
+and [R15 result check](roadmap/R15-closed-term-evaluator.md#read-back-a-recursive-result-with-witnessed-indices).
+
 ### Observing a composition and returning an open constructor
 
 In Haskell a constructor pattern inspects the outer value. A field
