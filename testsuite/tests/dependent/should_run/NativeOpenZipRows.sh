@@ -71,7 +71,23 @@ concrete :: forall (ys :: [Char]). zipConcrete '[] ys :~: 'Z
 concrete = Refl
 HS
 "${ghc[@]}" -fenable-rewrite-rules -c Laws.hs
-"${ghc[@]}" -c ZipRows.hs
+"${ghc[@]}" -Werror=incomplete-patterns -Werror=overlapping-patterns -c ZipRows.hs
+
+cat >LaterFallback.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, KindSignatures #-}
+module LaterFallback (which, choiceNumber) where
+
+newtype Choice (xs :: [Char]) (ys :: [Bool]) = Choice Int
+
+which :: foreach (xs :: [Char]) -> foreach (ys :: [Bool]) -> Choice xs ys
+which [] _ = Choice 0
+which (_ : _) [] = Choice 1
+which (_ : _) ys = Choice (if null ys then 9 else 2)
+
+choiceNumber :: Choice xs ys -> Int
+choiceNumber (Choice n) = n
+HS
+"${ghc[@]}" -Werror=incomplete-patterns -Werror=overlapping-patterns -c LaterFallback.hs
 
 cat >Main.hs <<'HS'
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes, TypeApplications #-}
@@ -79,6 +95,7 @@ module Main where
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Data.List (isPrefixOf)
 import Data.Type.Equality ((:~:)(Refl))
+import LaterFallback (which, choiceNumber)
 import PackedVecLibrary (toList)
 import ZipRows (zipMinimum, zipRows)
 
@@ -94,25 +111,52 @@ main = do
         badChar = error "first element" :: Char
         badBool = error "second element" :: Bool
         emptyB = [] :: [Bool]
+        leftTail = 'a' : error "first tail"
+        rightTail = True : error "second tail"
     print (toList (zipRows infinite [True, False]))
     print (null (toList (zipRows "" badSecond)))
     print (length (toList (zipRows [badChar] [badBool])))
+    print (take 1 (toList (zipRows leftTail rightTail)), null (toList (zipRows leftTail emptyB)))
     first <- try @ErrorCall (evaluate (null (toList (zipRows badFirst emptyB))))
     print (either (isPrefixOf "first spine" . displayException) (const False) first)
+    print (choiceNumber (which "" badSecond), choiceNumber (which "a" emptyB), choiceNumber (which "a" [True]))
+    second <- try @ErrorCall (evaluate (choiceNumber (which "a" badSecond)))
+    print (either (isPrefixOf "second spine" . displayException) (const False) second)
     print (minimumHolds "" badSecond, minimumHolds [badChar] [badBool],
            minimumHolds infinite [True, False])
 HS
 "${ghc[@]}" -c Main.hs
-"${ghc[@]}" Main.o ZipRows.o ../provider/{PackedVecLibrary,ZipLengthSource}.o -o run
+"${ghc[@]}" Main.o ZipRows.o LaterFallback.o ../provider/{PackedVecLibrary,ZipLengthSource}.o -o run
 ./run >actual
 diff -u - actual <<'OUT'
 ([('a',True)],[('a',True)])
 [('a',True),('a',False)]
 True
 1
+([('a',True)],True)
+True
+(0,1,2)
 True
 (True,True,True)
 OUT
+
+awk '{sub(/^module ZipRows /,"module ShadowedRow "); print}
+     /^zipRows \[\] _ = VNil$/ {print "zipRows [] [] = VNil"}' ZipRows.hs >ShadowedRow.hs
+reject '^ShadowedRow.hs:13:12-13: error: \[GHC-83605\]' ShadowedRow.hs
+
+cat >MissingPair.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, KindSignatures #-}
+module MissingPair where
+data Phase = Empty | First | Last
+data Packet (phase :: Phase) (value :: Bool) = Packet
+bad :: foreach (phase :: Phase) -> foreach (value :: Bool) -> Packet phase value
+bad Empty _ = Packet
+bad First False = Packet
+bad First True = Packet
+bad Last False = Packet
+HS
+reject '^MissingPair.hs:\(6,1\)-\(9,23\): error: \[GHC-83605\]' MissingPair.hs
+grep -Fq 'Missing equation for the retained constructor pair (Last, True).' reject.log
 
 cat >WrongDemand.hs <<'HS'
 {-# LANGUAGE AllowAmbiguousTypes, DataKinds, ExperimentalDependentTypes, GADTs #-}
