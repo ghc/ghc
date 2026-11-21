@@ -117,10 +117,8 @@ See Note [Closed-list positions] for the ordinary Fin representation.
 -- | Select an element with a position below the retained list's length.
 -- See Note [Generic list positions].
 indexGeneric :: forall (a :: Type). foreach (xs :: [a]) -> Fin (sourceLength xs) -> a
-indexGeneric [] impossible = case impossible of {}
-indexGeneric (value : rest) position = case position of
-    FZ -> value
-    FS smaller -> indexGeneric @a rest smaller
+indexGeneric (value : _) FZ = value
+indexGeneric (_ : rest) (FS smaller) = indexGeneric rest smaller
 
 -- | Check a signed position without inspecting the list elements.
 -- See Note [Generic list positions].

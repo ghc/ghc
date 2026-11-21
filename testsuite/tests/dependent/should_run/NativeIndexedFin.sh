@@ -13,17 +13,19 @@ for opt in -O0 -O1 -O2; do
     "${ghc[@]}" "$opt" -fwrite-source-equations -c PackedVecLibrary.hs
     "${ghc[@]}" "$opt" -Werror=incomplete-patterns -c ParameterizedIndexLibrary.hs
     cd ../proof
-    cp "$src/FinitePosition.hs" ../indices/*.hi .
-    "${ghc[@]}" "$opt" -c FinitePosition.hs
+    cp "$src/"{FinitePosition,NativeIndexedFinGate}.hs ../indices/*.hi .
+    "${ghc[@]}" "$opt" -Werror=incomplete-patterns -c FinitePosition.hs NativeIndexedFinGate.hs
     cd ../client
     cp "$src/FinitePositionClient.hs" ../proof/*.hi .
     "${ghc[@]}" "$opt" -Werror=incomplete-patterns -c FinitePositionClient.hs
     cat >Main.hs <<'HS'
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}
 module Main where
+import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Data.IORef (newIORef, readIORef)
 import Data.Maybe (isJust)
-import FinitePositionClient (lookupVecViaView, observeConstructedViews, observeFinitePosition, observeListIndices)
+import FinitePositionClient (lookupVecViaView, observeConstructedViews, observeEmptyIndex, observeFinitePosition, observeListIndices)
+import NativeIndexedFinGate (Gate(..), Ticket(..), grant)
 import PackedVecLibrary (Nat(..), Vec(..))
 import ParameterizedIndexLibrary (indexVec, lookupVecChecked, mkFinVec)
 
@@ -31,6 +33,13 @@ main :: IO ()
 main = do
     observeFinitePosition >>= print
     observeListIndices >>= print
+    empty <- observeEmptyIndex
+    gate <- newIORef (Shut (error "gate field")) >>= readIORef
+    denied <- try (evaluate (grant gate (error "ticket"))) :: IO (Either ErrorCall Bool)
+    case denied of
+        Left err | empty && grant (Open True) Granted
+                 , takeWhile (/= '\n') (displayException err) == "ticket" -> pure ()
+        _ -> fail "wrong demand for an omitted retained equation"
     views <- observeConstructedViews
     if views == (Just 1, True) then pure () else fail (show views)
     positions <- newIORef [minBound, -1, 0, 1, 2, 3, maxBound] >>= readIORef
@@ -51,10 +60,52 @@ main = do
         actual -> fail (show actual)
 HS
     "${ghc[@]}" "$opt" -c Main.hs
-    "${ghc[@]}" Main.o FinitePositionClient.o ../proof/FinitePosition.o ../indices/*.o -o run
+    "${ghc[@]}" Main.o FinitePositionClient.o ../proof/*.o ../indices/*.o -o run
     ./run
 done
 cd "$out/client"
+cat >MissingRows.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeFamilies #-}
+module MissingRows where
+import NativeIndexedFinGate
+
+type family Unknown (g :: Gate) :: Bool where
+    Unknown ('Open b) = 'True
+
+inhabited :: foreach (g :: Gate) -> Ticket 'True -> Bool
+inhabited (Open b) Granted = b
+
+stuck :: foreach (g :: Gate) -> Ticket (Unknown g) -> Bool
+stuck (Open b) Granted = b
+
+noSplit :: foreach (g :: Gate) -> Ticket (Ready g) -> Bool
+noSplit (Open b) _ = b
+
+lazySplit :: foreach (g :: Gate) -> Ticket (Ready g) -> Bool
+lazySplit (Open b) ~Granted = b
+HS
+if "${ghc[@]}" -O0 -fdiagnostics-color=never -c MissingRows.hs >missing.log 2>&1; then
+    echo 'Accepted an uncovered retained equation'
+    exit 1
+fi
+for line in 9 12 15 18; do
+    grep -Eq "^MissingRows.hs:$line:[0-9]+: error: .GHC-83605." missing.log
+done
+test "$(grep -c 'Missing equation for the retained constructor .*Shut' missing.log)" -eq 4
+cat >MissingSuccessor.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, ScopedTypeVariables #-}
+module MissingSuccessor where
+import PackedVecLibrary (sourceLength)
+import ParameterizedIndexLibrary (Fin(..))
+index :: forall a. foreach (xs :: [a]) -> Fin (sourceLength xs) -> a
+index (x : _) FZ = x
+HS
+if "${ghc[@]}" -O0 -Werror=incomplete-patterns -c MissingSuccessor.hs >successor.log 2>&1; then
+    echo 'Accepted an uncovered successor position'
+    exit 1
+fi
+grep -Fq 'MissingSuccessor.hs:6:1: error: [GHC-62161]' successor.log
+grep -Fq 'FS' successor.log
 cat >InvalidListIndex.hs <<'HS'
 {-# LANGUAGE DataKinds, LinearTypes, NoExperimentalDependentTypes, ScopedTypeVariables, TypeApplications #-}
 module InvalidListIndex where

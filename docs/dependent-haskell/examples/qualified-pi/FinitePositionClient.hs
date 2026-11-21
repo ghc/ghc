@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, ScopedTypeVariables, TypeApplications #-}
-module FinitePositionClient (lookupVecViaView, observeFinitePosition, observeConstructedViews, observeZeroViews, observeListIndices) where
+module FinitePositionClient (lookupVecViaView, observeFinitePosition, observeConstructedViews, observeZeroViews, observeListIndices, observeEmptyIndex) where
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Data.IORef (newIORef, readIORef)
 import Data.Type.Equality ((:~:)(Refl))
@@ -78,3 +78,12 @@ observeListIndices = do
     let checked ys n = fmap (indexGeneric ys) (mkFinGeneric ys n)
     pure [checked xs i, checked xs 3, checked (error "forced negative input") (-1),
           checked ('x' : error "forced suffix") 0, checked (cycle "xy") 4]
+
+-- | An empty-list index takes its position before it inspects it.
+observeEmptyIndex :: IO Bool
+observeEmptyIndex = do
+    select <- evaluate (indexGeneric @Char [])
+    result <- try @ErrorCall (evaluate (select (error "empty position")))
+    pure $ case result of
+        Left err -> takeWhile (/= '\n') (displayException err) == "empty position"
+        Right _ -> False

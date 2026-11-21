@@ -460,7 +460,7 @@ test('NativeNamedSplit',
 
 test('NativeIndexedFin',
      [req_host_target_ghc, only_ways(['normal']),
-      extra_files(['NativeGeneralGadtOperandProvider.hs', 'NativeIndexedOperandWire.hs',
+      extra_files(['NativeIndexedFinGate.hs', 'NativeGeneralGadtOperandProvider.hs', 'NativeIndexedOperandWire.hs',
                    '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']
                   + ['../../../../docs/dependent-haskell/examples/qualified-pi/' + f
                      for f in ['ParameterizedIndexLibrary.hs', 'FinitePosition.hs', 'FinitePositionClient.hs']])],
