@@ -141,7 +141,10 @@ import TypeLambda (Columns, Map)
 type instance Columns (Checked String) fields = Map (\a -> Maybe a) fields
 HS
 if "${g[@]}" -c Conflict.hs >conflict.log 2>&1 ||
-   ! grep -Fq 'Conflicting family instance declarations' conflict.log; then
+   ! grep -Fq 'Conflicting family instance declarations' conflict.log ||
+   ! grep -Eq 'type lambda in an instance of .Columns.' conflict.log ||
+   ! grep -Fq 'Defined at Conflict.hs:5:15' conflict.log ||
+   grep -Fq '$callback:' conflict.log; then
     cat conflict.log >&2
     exit 1
 fi
