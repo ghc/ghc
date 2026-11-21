@@ -2,7 +2,7 @@
 module RankedPackageClient
     ( runGuarded, runProjections, projectAt, runDeclaredWitnesses, runExplicitBranches
     , runMixedPackage, runProducedPackage, runForwardedPackage, runLabelledPackage
-    , runSelectedPackage
+    , runSelectedPackage, runLocalPattern
     ) where
 
 import Data.Bool (bool)
@@ -94,6 +94,10 @@ runSelectedPackage chooseLeft
 
     readSelected :: ErasedPackage.MixedNumber -> ErasedPackage.MixedNumber -> (String, Int)
     readSelected left right = ErasedPackage.readLabelledNumber (bool right left chooseLeft)
+
+-- | Bind the two fields under the same hidden witness.
+runLocalPattern :: Bool -> (Int, Bool)
+runLocalPattern flag = let (value, reader) = pairFor flag in reader value
 
 -- | Hide the first witness after packing the second.
 hide :: Int -> ErasedPackage.MixedNumber

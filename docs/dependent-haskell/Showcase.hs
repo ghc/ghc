@@ -1046,6 +1046,9 @@ main = do
     observe "read the selected erased package and leave the other lazy"
         (RankedPackageClient.runSelectedPackage chooseLeft,
          RankedPackageClient.runSelectedPackage chooseRight)
+    observe "read dependent fields from a local package pattern"
+        (RankedPackageClient.runLocalPattern chooseLeft,
+         RankedPackageClient.runLocalPattern chooseRight)
     observe "filter a vector without forcing the tail to learn the result length"
         ErasedPackage.filterObservation
     observe "infer the hidden lengths of a lazy filter and a retained vector"

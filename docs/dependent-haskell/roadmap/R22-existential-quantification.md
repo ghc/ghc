@@ -312,14 +312,17 @@ openings keep separate witnesses.
 The binding stays lazy and shares both fields of its RHS. A consumer
 can ignore a bottom package. The normal local binding checker handles
 pattern typing, usage, and generalization. A local identity function
-in the body still works at two types.
+in the body still works at two types. The Showcase client reads an
+`Int` and a `Char` with their respective callbacks on the two runtime
+branches.
 
 This path accepts one unsigned nonrecursive boxed tuple binding with
 variable or wildcard fields and `Strict` off. The unguarded RHS must
 be a name or ordinary application whose declaration exposes the dot
 package. The usual binding rules still apply to recursive groups,
 signed bindings, and patterns that bring their own evidence.
-[Source-hidden regression](../../../testsuite/tests/dependent/should_run/NativeImplicitExistential.sh)
+[Ordinary client](../examples/erased-existentials/RankedPackageClient.hs),
+[source-hidden regression](../../../testsuite/tests/dependent/should_run/NativeImplicitExistential.sh),
 and [GHC's existential constructor restrictions](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/existential_quantification.html#restrictions).
 
 ### Repeated uses of a local package
