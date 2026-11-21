@@ -6466,15 +6466,17 @@ checkValidDataCon dflags existential_ok tc con
           do { let univ_tvs = dataConUnivTyVars con
                    user_tvs = binderVars (dataConUserTyVarBinders con)
                    (_, _, eq_spec, _, _, _) = dataConFullSig con
+                   retained_fields = [field | Just field <- dataConRepArgBinders con]
+                   valid_eq_spec = case (map eqSpecPair eq_spec, retained_fields) of
+                     ([], _) -> True
+                     ([(lhs, TermVarTy rhs)], [field]) -> lhs `elem` univ_tvs && rhs == field
+                     _ -> False
              ; unless (isBoxedDataTyCon tc && isLiftedAlgTyCon tc
                        && isVanillaAlgTyCon tc && not (isTypeDataTyCon tc)
                        && null (dataConExTyCoVars con)
                        && null (dataConOtherTheta con)
-                       && (if dataConHasRetainedResult con
-                           then null user_tvs && isSingleton univ_tvs && isSingleton eq_spec
-                           else null eq_spec && length user_tvs == length univ_tvs
-                             && sizeVarSet (mkVarSet user_tvs) == length user_tvs
-                             && all (`elemVarSet` mkVarSet univ_tvs) user_tvs)) $
+                       && valid_eq_spec && checkDataConTyVars con
+                       && sizeVarSet (mkVarSet user_tvs) == length user_tvs) $
                  failWithTc $ TcRnRetainedQuantificationError RetainedPackageDeclaration }
 
         ; traceTc "checkValidDataCon" (vcat
@@ -6537,8 +6539,8 @@ checkValidDataCon dflags existential_ok tc con
           -- Reason: it's really the argument of an equality constraint
         ; unless (dataConHasRetainedResult con) $
             checkValidMonoType orig_res_ty
-            -- The retained result is exactly the parent applied to its field.
-            -- Check it in the wrapper type where that field is bound.
+            -- Check the retained result in the wrapper type where the field
+            -- and the unchanged erased arguments are bound.
         ; checkEscapingKind (dataConWrapperType con)
 
         -- For /data/ types check that each argument has a fixed runtime rep

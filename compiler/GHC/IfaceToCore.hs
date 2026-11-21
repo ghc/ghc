@@ -1365,11 +1365,11 @@ tcIfaceDataCons tycon_name tycon if_cons
                 ; let retained_fields = [field | Just field <- retained_binders]
                 ; eq_spec <- extendIfaceIdEnv retained_fields $ tcIfaceEqSpec spec
                 ; when (not (null arg_binders) && not (null spec)) $
-                    case (retained_fields, univ_tvs) of
-                      ([field], [univ]) -> do
+                    case (retained_fields, eq_spec) of
+                      ([field], [eq]) -> do
                         { valid <- evaluateIfaceNativeDomain (ppr dc_name)
                             (isNativeClosedIndexType (varType field)
-                             && varType field `eqType` varType univ
+                             && varType field `eqType` varType (eqSpecTyVar eq)
                              && all (not . anyFreeVarsOfType isId . scaledMult) arg_tys)
                         ; unless valid $
                             failIfM (text "Invalid retained result field in interface:" <+> ppr dc_name) }
@@ -1435,8 +1435,8 @@ tcIfaceDataCons tycon_name tycon if_cons
                 && all lazy_src_bang src_bangs) $
           failIfM (text "Invalid retained constructor fields in interface:" <+> ppr name
                    $$ text "Expected aligned distinct field names and a lazy data constructor"
-                   $$ text "without a wrapper, context, existential, or record field."
-                   $$ text "Universal and user type binders must have the same distinct names.")
+                   $$ text "without a context, existential, or record field."
+                   $$ text "User type binders must match the universal binders outside the result equality.")
       where
         names = [n | Just n <- binders]
         univ_names = map ifaceBndrName univs
@@ -1444,13 +1444,12 @@ tcIfaceDataCons tycon_name tycon if_cons
         valid_result
           | wrapper
           , [field] <- names
-          , [univ] <- univ_names
-          , [] <- user_names
           , [(lhs, IfaceTermVar rhs)] <- spec
-          = lhs == univ && rhs == field
+          = lhs `elem` univ_names && rhs == field
+            && matching_users (filter (/= lhs) univ_names)
           | otherwise
-          = not wrapper && null spec && univ_names `equalLength` user_names
-            && all (`elem` univ_names) user_names
+          = not wrapper && null spec && matching_users univ_names
+        matching_users expected = expected `equalLength` user_names && all (`elem` expected) user_names
         lazy_bang IfNoBang = True
         lazy_bang _        = False
         lazy_src_bang (IfSrcBang unpack strict)

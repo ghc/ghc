@@ -69,12 +69,18 @@ import NativeGadtRetainedSumProvider
 #ifdef ESCAPE
 bad :: Packed Bool -> Vec Bool caller
 bad (Pair _ xs) = forward xs
-#else
+#elif defined(INDEPENDENT)
 bad :: Packed Bool -> Packed Bool -> Bool
 bad (Pair _ xs) (Pair _ ys) = sameLength xs ys
+#elif defined(WRONG_ELEMENT)
+bad :: DirectVec a n -> Vec b n -> DirectVec a n
+bad (DirectVec n _) xs = DirectVec n xs
+#else
+bad :: DirectVec a n -> Vec a m -> DirectVec a n
+bad (DirectVec n _) xs = DirectVec n xs
 #endif
 HS
-    for which in ESCAPE INDEPENDENT; do
+    for which in ESCAPE INDEPENDENT WRONG_ELEMENT WRONG_LENGTH; do
         if "${ghc[@]}" "${flags[@]}" -D"$which" -ferror-spans -c BadPayload.hs >reject.log 2>&1; then
             echo "Accepted $which" >&2
             exit 1
@@ -82,6 +88,8 @@ HS
         case $which in
             ESCAPE) expected='BadPayload.hs:7:19-[0-9]+: error: \[GHC-25897\]' ;;
             INDEPENDENT) expected='BadPayload.hs:10:45-46: error: \[GHC-83865\]' ;;
+            WRONG_ELEMENT) expected='BadPayload.hs:13:[0-9]+(-[0-9]+)?: error: \[GHC-25897\]' ;;
+            WRONG_LENGTH) expected='BadPayload.hs:16:[0-9]+(-[0-9]+)?: error: \[GHC-25897\]' ;;
         esac
         grep -Eq "$expected" reject.log || { cat reject.log >&2; exit 1; }
     done
@@ -95,14 +103,17 @@ data BadScope where
     BadScope :: foreach (n :: Nat)
              -> (foreach (n :: FlagAt n) -> (some (m :: Nat) | (KindTag n, Vec Char m)))
              -> BadScope
-#else
+#elif defined(RESULT_SCOPE)
 data BadScope (a :: Nat) where
     BadScope :: forall (a :: Nat). foreach (n :: Nat)
              -> (foreach (n :: Nat) -> (some (m :: Nat) | Vec Char m))
              -> BadScope m
+#else
+data BadScope a (n :: Nat) where
+    BadScope :: foreach (n :: Nat) -> Vec b n -> BadScope a n
 #endif
 HS
-    for which in HIDDEN_KIND RESULT_SCOPE; do
+    for which in HIDDEN_KIND RESULT_SCOPE UNMATCHED_ERASED; do
         if "${ghc[@]}" "${flags[@]}" -D"$which" -ferror-spans -c BadScope.hs >reject.log 2>&1; then
             echo "Accepted $which" >&2
             exit 1
@@ -113,6 +124,7 @@ HS
                 grep -Fq 'A retained dependent sum is supported' reject.log || { cat reject.log >&2; exit 1; }
                 ;;
             RESULT_SCOPE) expected='BadScope.hs:13:26: error: \[GHC-76037\]' ;;
+            UNMATCHED_ERASED) expected='BadScope.hs:16:[0-9]+(-[0-9]+)?: error: \[GHC-83605\]' ;;
         esac
         grep -Eq "$expected" reject.log || { cat reject.log >&2; exit 1; }
     done

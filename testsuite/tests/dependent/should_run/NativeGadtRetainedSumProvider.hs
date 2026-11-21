@@ -111,8 +111,8 @@ pack :: foreach (n :: Nat) -> Vec Bool n -> Packed Bool
 pack n xs = Pair n xs
 
 -- | Store a vector at the length supplied by the first field.
-data DirectVec (n :: Nat) where
-    DirectVec :: foreach (n :: Nat) -> Vec Bool n -> DirectVec n
+data DirectVec a (n :: Nat) where
+    DirectVec :: foreach (n :: Nat) -> Vec a n -> DirectVec a n
 
 -- | Store a value at any length.
 data AtLength (n :: Nat) = AtLength Int

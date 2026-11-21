@@ -762,7 +762,8 @@ tcCheckRetainedConType validate_domain allow_result tc_field_mult
            ; return ([], res_ty) }
 
     direct_result mode ty
-      | Just (_, [TermVarTy field]) <- tcSplitTyConApp_maybe ty
+      | Just (_, args) <- tcSplitTyConApp_maybe ty
+      , [TermVarTy field] <- filter (isNothing . getTyVar_maybe) args
       , [binder] <- nonDetNameEnvElts (mode_indices mode)
       = field == binder
         && (not validate_domain || isNativeClosedIndexType (varType field))

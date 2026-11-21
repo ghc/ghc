@@ -18,10 +18,10 @@ outerCells (Nested (Pair _ (xs, _))) = cells xs
 isEmptyPack :: Packed Bool -> Bool
 isEmptyPack (Pair _ xs) = isJust (emptyWitness xs)
 
-rebuildDirect :: DirectVec n -> DirectVec n
+rebuildDirect :: DirectVec a n -> DirectVec a n
 rebuildDirect (DirectVec n xs) = DirectVec n xs
 
-openDirect :: Packed Bool -> [Bool]
+openDirect :: Packed a -> [a]
 openDirect (Pair n xs) =
     let wrapped = DirectVec n xs
     in case rebuildDirect wrapped of DirectVec _ ys -> cells ys
@@ -49,12 +49,15 @@ main = do
         value = makeNested (S Z) (S (S Z)) one other (VCons False one)
         hidden = makeHidden (S (S Z)) one other (VCons False one)
         aligned = [(True, False)]
+        packedChar :: Packed Char
+        packedChar = Pair (S Z) (VCons 'q' VNil)
     require (isEmptyPack (pack Z VNil)) "inferred empty payload index"
     require (not (isEmptyPack (pack (S Z) (VCons True (error "unused tail")))))
         "inferred nonempty payload index without demanding its tail"
     require (phantomPayload phantom) "the reduced payload determines the index"
     require (take 1 (openDirect (pack (S Z) (VCons True (error "direct tail")))) == [True])
         "a direct result keeps the index opened by the dependent sum"
+    require (openDirect packedChar == "q") "a direct result preserves the element type"
     n <- newIORef (S Z) >>= readIORef
     unused <- newIORef (error "direct length" :: Nat) >>= readIORef
     let vector = DirectVec n (error "direct vector")
