@@ -140,6 +140,7 @@ import qualified PreludeFilterProof
 import qualified PreludeFilterRuntime
 import qualified PreludeMapAppendProof
 import qualified PreludeMapCompositionProof
+import qualified PreludeSpanRuntime
 import qualified PreludeTakeWhile
 import qualified PreludeMapLengthProof
 import qualified PreludeReverseLengthProof
@@ -1462,6 +1463,8 @@ main = do
     prefixInput <- newIORef (False : True : error "prefix and suffix forced the rejected tail") >>= readIORef
     putStrLn ("recover a list from its checked prefix and suffix: "
               ++ PreludeDropWhileRuntime.showPrefixAndSuffix prefixInput)
+    putStrLn ("prove both projections and rejoin an ordinary span: "
+              ++ PreludeSpanRuntime.showSpan prefixInput)
     putStrLn ("prove guarded list equations at two concrete element types: "
               ++ ConcreteGuardedListProof.showConcreteGuardedLists)
     pivot <- newIORef True >>= readIORef

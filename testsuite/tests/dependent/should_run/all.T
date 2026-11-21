@@ -90,11 +90,17 @@ test('NativeOpenInstalledTakeWhile',
      run_command, ['bash NativeOpenInstalledTakeWhile.sh "{compiler}" "{libdir}"'])
 test('NativeOpenInstalledDropWhile',
      [only_ways(['normal']),
-      extra_files([open_eval_dir + f for f in ['PreludeMapLengthSize.hs', 'PreludeMapLengthSource.hs',
+      extra_files(['NativeOpenSpanShapes.hs'] +
+                  [open_eval_dir + f for f in ['PreludeMapLengthSize.hs', 'PreludeMapLengthSource.hs',
                    'PreludeAppendLengthSource.hs', 'PreludeFilterSource.hs', 'PreludeFilterLengthProof.hs',
                    'PreludeFilterRuntime.hs', 'PreludeFilterAppendProof.hs', 'PreludeTakeWhile.hs',
-                   'PreludeDropWhileSource.hs', 'PreludeDropWhileProof.hs']])],
+                   'PreludeDropWhileSource.hs', 'PreludeDropWhileProof.hs',
+                   'PreludeSpanSource.hs', 'PreludeSpanProof.hs']])],
      run_command, ['bash NativeOpenInstalledDropWhile.sh "{compiler}" "{libdir}"'])
+test('NativeOpenSpanGhci',
+     [req_bco, req_host_target_ghc, only_ways(['normal']),
+      extra_files(['NativeOpenSpanShapes.hs'])],
+     run_command, ['bash NativeOpenSpanGhci.sh "{compiler}" "{libdir}"'])
 test('NativeOpenUserGuardedTail', [only_ways(['normal'])],
      run_command, ['bash NativeOpenUserGuardedTail.sh "{compiler}" "{libdir}"'])
 test('NativeOpenConcreteGuardedList',
