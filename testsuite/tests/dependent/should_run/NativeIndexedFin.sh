@@ -22,13 +22,13 @@ for opt in -O0 -O1 -O2; do
     cp "$src/"{FinitePositionClient,CursorClient}.hs ../proof/*.hi .
     "${ghc[@]}" "$opt" -Werror=incomplete-patterns -c FinitePositionClient.hs CursorClient.hs
     cat >Main.hs <<'HS'
-{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}
+{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, TypeApplications #-}
 module Main where
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import AlignedList (zipWithExact)
 import Data.IORef (newIORef, readIORef)
 import Data.Maybe (isJust)
-import CursorClient (observeBoth, observeZip, observeAligned, observeCursors, observeIndexedCallback, zipTwoPairs)
+import CursorClient (observeBoth, observeZip, observeAligned, observeCursors, observeIndexedCallback, zipTwoPairs, zipInt8Literals)
 import NativeLinearIndexColumns (choose)
 import FinitePositionClient (lookupVecViaView, observeConstructedViews, observeEmptyIndex, observeFinitePosition, observeListIndices)
 import NativeIndexedFinGate (Gate(..), Ticket(..), grant)
@@ -49,10 +49,10 @@ main = do
     observeFinitePosition >>= print
     observeListIndices >>= print
     let lazyOperands =
-            take 1 (toList (zipWithExact [5 + 1, error "forced later left field"]
+            take 1 (toList ((zipWithExact @Int @Int @Int [5 + 1, error "forced later left field"])
                 [10, error "forced later right field"] (+))) :: [Int]
-    if (written, toList scopedVector, scopedLambda, lazyOperands) ==
-        ([11,22], [11,22], [11,22], [16])
+    if (written, toList scopedVector, scopedLambda, lazyOperands, zipInt8Literals) ==
+        ([11,22], [11,22], [11,22], [16], [137,-108])
     then pure ()
     else fail "the retained list spine changed a field or closed result"
     both <- observeBoth
@@ -233,6 +233,33 @@ if "${ghc[@]}" -O0 -DWRONG_ELEMENT -fdiagnostics-color=never -c WrittenLists.hs 
     exit 1
 fi
 grep -Fq 'WrittenLists.hs:7:42: error: [GHC-25897]' element.log
+cat >WrittenListTypes.hs <<'HS'
+{-# LANGUAGE CPP, NoExperimentalDependentTypes, TypeApplications #-}
+module WrittenListTypes where
+import AlignedList (zipWithExact)
+import PackedVecLibrary (toList)
+wrong :: [Int]
+#ifdef WRONG_KIND
+wrong = toList (zipWithExact @Maybe [1,2] [10,20] (+))
+#elif defined(TOO_MANY)
+wrong = toList (zipWithExact @Int @Int @Int @Int [1,2] [10,20] (+))
+#else
+wrong = toList (zipWithExact @Char @Int @Int [5 + 1, 'x'] [10,20] (\_ y -> y))
+#endif
+HS
+for mode in WRONG_KIND TOO_MANY WRONG_ELEMENT_TYPE; do
+    if "${ghc[@]}" -O0 -D"$mode" -fdiagnostics-color=never -c WrittenListTypes.hs >type.log 2>&1; then
+        echo "Accepted an invalid visible type application ($mode)"
+        exit 1
+    fi
+    case "$mode" in
+        WRONG_KIND) grep -Fq 'WrittenListTypes.hs:7:31: error: [GHC-83865]' type.log ;;
+        TOO_MANY) grep -Fq 'WrittenListTypes.hs:9:17: error: [GHC-95781]' type.log ;;
+        WRONG_ELEMENT_TYPE)
+            grep -Fq 'WrittenListTypes.hs:11:47: error: [GHC-39999]' type.log
+            grep -Fq 'Num Char' type.log ;;
+    esac
+done
 cat >ScopedFields.hs <<'HS'
 {-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, TypeFamilies #-}
 module ScopedFields where

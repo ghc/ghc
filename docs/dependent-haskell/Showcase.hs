@@ -867,6 +867,7 @@ genericSafeIndexing = do
     observe "zip two list literals at their statically known length" $
         CursorClient.zipTwoPairs 'a' 'b' (10 :: Int) 20
     observe "zip integer literals at a proven common length" CursorClient.zipIntLiterals
+    observe "zip with the first list at Int8" CursorClient.zipInt8Literals
     let chars = Column.Column (Reflection.typeRep @Char) "abc"
         unused = Column.Column (Reflection.typeRep @Bool) (error "forced column")
     observe "read a column at a runtime type and offset"

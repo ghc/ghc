@@ -152,6 +152,7 @@ consume two independently bounded list positions: [Just ('b',10),Just ('b',20),N
 zip ordinary lists at their proven common length: (Just [('a',10),('b',20)],Nothing,Just 30,[('x','x')])
 zip two list literals at their statically known length: [('a',10),('b',20)]
 zip integer literals at a proven common length: [11,22]
+zip with the first list at Int8: [137,-108]
 read a column at a runtime type and offset: (Just 'b',Nothing,Nothing)
 check a signed position in a packaged vector: Just 22
 generic negative position ignores list: Nothing
