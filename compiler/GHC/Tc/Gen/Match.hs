@@ -1723,12 +1723,12 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
        ; let written = zip constructors matches
        ; rows <- if any (not . isManyTy . scaledMult) arg_tys
                  then group_linear_rows written
-                 else return written
+                 else return [(row, Nothing) | row <- written]
        ; absent <- mapM (absurd_row arg_tys) missing
        ; result_ty <- readExpType rhs_ty
        ; (usages, checked) <- mapAndUnzipM
-           (\(con, match) -> tcCollectingUsage (check_match con arg_tys result_ty match))
-           (rows ++ absent)
+           (\((con, match), args) -> tcCollectingUsage (check_match args con arg_tys result_ty match))
+           (rows ++ [(row, Just ([], [])) | row <- absent])
        ; tcEmitBindingUsage (supUEs usages)
        ; if null matches
          then empty_matches arg_tys result_ty
@@ -1810,28 +1810,35 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
     group_linear_rows (row@((dc, fields), L row_loc first@Match { m_pats = L pats_loc pats }) : rest)
       = do { let (same, others) = partition ((== dc) . fst . fst) rest
            ; combined <- case same of
-               [] -> return row
-               _ | [RetainedConValue] <- argument_plan
-                 , [con_pat, position] <- pats
-                 -> do { name <- newSysName (mkVarOcc "position")
-                       ; alts <- mapM (position_alt fields) (row : same)
+               [] -> return (row, Nothing)
+               _ | all is_value argument_plan
+                 , con_pat : args@(first_arg : _) <- pats
+                 , length args == length argument_plan
+                 -> do { names <- mapM (const (newSysName (mkVarOcc "arg"))) args
+                       ; let ctxt = case args of [_] -> CaseAlt; _ -> LamAlt LamCases
+                       ; alts <- mapM (value_alt fields ctxt) (row : same)
                        ; let cases = group { mg_alts = L loc alts }
-                             body = L (getLoc position) (HsCase CaseAlt (nlHsVar name) cases)
-                             outer = first { m_pats = L pats_loc [bindRetainedConFields fields con_pat, nlVarPat name]
-                                           , m_grhss = unguardedGRHSs (getLocA position) body noAnn }
-                       ; return ((dc, fields), L row_loc outer) }
+                             body = case names of
+                               [n] -> L (getLoc first_arg) (HsCase CaseAlt (nlHsVar n) cases)
+                               _ -> L row_loc (HsLam noAnn LamCases cases)
+                             outer = first { m_pats = L pats_loc (bindRetainedConFields fields con_pat : map nlVarPat names)
+                                           , m_grhss = unguardedGRHSs (locA row_loc) body noAnn }
+                       ; return (((dc, fields), L row_loc outer), Just (names, map (unLoc . snd) (row : same))) }
                _ -> setSrcSpanA row_loc argument_error
            ; (combined :) <$> group_linear_rows others }
+      where
+        is_value RetainedConValue = True
+        is_value _ = False
 
-    position_alt shared ((_, fields), L row_loc source@Match { m_pats = L pats_loc [_, pat] })
+    value_alt shared ctxt ((_, fields), L row_loc source@Match { m_pats = L pats_loc (_ : pats) })
       = do { let names = [(idName own, idName common) | (own, common) <- zipEqual fields shared, own /= common]
            ; case retainedMatchQuotation source of
                Just span | not (null names) -> setSrcSpan span $
                  failWithTc (TcRnRetainedQuantificationError RetainedConstructorQuotation)
                _ -> return ()
            ; return (L row_loc (renameRetainedMatch names
-                       (source { m_ctxt = CaseAlt, m_pats = L pats_loc [pat] }))) }
-    position_alt _ (_, L row_loc _) = setSrcSpanA row_loc argument_error
+                       (source { m_ctxt = ctxt, m_pats = L pats_loc pats }))) }
+    value_alt _ _ (_, L row_loc _) = setSrcSpanA row_loc argument_error
 
     -- See Note [Omitted impossible retained equations].
     absurd_row arg_tys con
@@ -1854,9 +1861,11 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
                Nothing -> missing_equation con
                Just n -> do
                  { name <- newSysName (mkVarOcc "impossible")
-                 ; let pats = [if i == n then nlVarPat name else nlWildPatName
-                              | (i, _, _) <- columns]
-                       empty = MG (Generated OtherExpansion SkipPmc, snd (mg_ext group)) (L loc [])
+                 ; pats <- forM columns $ \(i, (_, Scaled mult _), _) ->
+                     if i == n then return (nlVarPat name)
+                     else if isManyTy mult then return nlWildPatName
+                     else nlVarPat <$> newSysName (mkVarOcc "unused")
+                 ; let empty = MG (Generated OtherExpansion SkipPmc, snd (mg_ext group)) (L loc [])
                        rhs = noLocA (HsCase CaseAlt (nlHsVar name) empty)
                  ; return ((dc, fields), mkSimpleMatch (m_ctxt first) (noLocA (con_pat : pats)) rhs) } }
       | otherwise = missing_equation con
@@ -1918,7 +1927,7 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
       = readScaledExpType ty
     argument_type _ = argument_error
 
-    check_match (con, fields) arg_tys result_ty (L match_loc source_match)
+    check_match operands (con, fields) arg_tys result_ty (L match_loc source_match)
       = setSrcSpanA match_loc $
         do { let constructor_index = retainedConIndex (varType index) con fields
            ; cv <- newEvVar (mkNomEqPred (TermVarTy index) constructor_index)
@@ -1938,23 +1947,39 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
                                   , not (isReflCo co)]
            ; refined_givens <- newEvVars (map (pSnd . coercionKind . snd) dictionary_cos)
            ; domain_givens <- newEvVars (map coercionType domain_cos)
-           ; let refined_args = zipWith3 (\dictionary (Scaled mult ty) co ->
-                                   mkCheckExpFunPatTy (Scaled mult (case dictionary of
+           ; let refined_domains = zipWith3 (\dictionary (Scaled mult ty) co ->
+                                   Scaled mult (case dictionary of
                                      RetainedConValue -> pSnd (coercionKind co)
-                                     _ -> ty)))
+                                     _ -> ty))
                                  argument_plan arg_tys arg_cos
+                 refined_args = map mkCheckExpFunPatTy refined_domains
                  index_arg = mkCheckExpFunPatTy (Scaled ManyTy (varType index))
                  renamed = renameRetainedMatch names match
                  prepare = insert_dictionaries argument_plan . retainedConPats [(0, fields)]
                          . bindRetainedWildcards (retainedColumnNames index argument_plan)
-                 match' = renamed { m_pats = fmap prepare (m_pats renamed) }
+                 match' = renamed { m_pats = fmap prepare (m_pats renamed)
+                                  , m_ctxt = case operands of
+                                      Just (_ : _ : _, _) -> LamAlt LamSingle
+                                      _ -> m_ctxt renamed }
+                 check_body (L body_loc (HsLam _ LamCases cases)) expected
+                   | Just (names@(_ : _ : _), originals) <- operands = do
+                       checked <- tcMatchesFromWithIndex Nothing (const originals)
+                                    (LamAlt LamCases) tcBody refined_args expected cases
+                       args <- zipWithM (\name (Scaled mult ty) ->
+                                  tcScalingUsage mult (tcBody (nlHsVar name) (mkCheckExpType ty)))
+                                  names refined_domains
+                       return (mkHsApps (L body_loc (HsLam noAnn LamCases checked)) args)
+                 check_body body expected = tcBody body expected
+                 original = case operands of
+                   Just (_, first : _) -> first
+                   _ -> source_match
                  check = do
                    clause <- if length matches == 1
                      then prepareUnguardedWhere (mkCheckExpType (pSnd (coercionKind result_co)))
                             (L match_loc match')
                      else return (L match_loc match')
-                   tcMatchWithSource tcBody (invis_pat_tys ++ index_arg : refined_args)
-                     (mkCheckExpType (pSnd (coercionKind result_co))) source_match clause
+                   tcMatchWithSource check_body (invis_pat_tys ++ index_arg : refined_args)
+                     (mkCheckExpType (pSnd (coercionKind result_co))) original clause
            ; (ev_binds, L checked_loc checked) <-
                checkConstraints (PatSkol (RealDataCon con) (m_ctxt match)) []
                  (cv : refined_givens ++ domain_givens) check
@@ -1970,14 +1995,17 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
                TcEvBinds binds -> do { mapM_ (addTcEvBind binds) given_binds
                                      ; return ev_binds }
                EvBinds binds -> return (EvBinds (listToBag given_binds `unionBags` binds))
+           ; strict <- xoptM LangExt.Strict
            ; let Match { m_pats = L pats_loc checked_pats, m_grhss = grhss } = checked
+                 generated pat@(L l _) | strict && isJust operands = L l (LazyPat noExtField pat)
+                                       | otherwise = pat
                  checked_pats' = case checked_pats of
                    L first_loc first : rest ->
                      L first_loc (AsPat noExtField (noLocA index)
                                     (L first_loc (addRetainedConProof cv branch_binds first)))
                      : zipWith4 (\dictionary co (Scaled _ ty) (L pat_loc pat) ->
                                    case dictionary of
-                                     RetainedConValue -> L pat_loc (XPat (CoPat (mkWpCastN co) pat ty))
+                                     RetainedConValue -> generated (L pat_loc (XPat (CoPat (mkWpCastN co) pat ty)))
                                      _ -> L pat_loc pat)
                                 argument_plan arg_cos arg_tys rest
                    [] -> panic "tcRetainedConMatches: no constructor pattern"
@@ -1985,6 +2013,7 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
                    L rhs_loc (GRHS x guards (mkLHsWrapCo (mkSymCo result_co) rhs))
                  grhss' = grhss { grhssGRHSs = fmap cast_rhs (grhssGRHSs grhss) }
            ; return (L checked_loc (checked { m_pats = L pats_loc checked_pats'
+                                          , m_ctxt = m_ctxt source_match
                                           , m_grhss = grhss' })) }
 
     insert_dictionaries ds = before_index
@@ -2052,6 +2081,19 @@ Use the field identities of the first cons pattern throughout that branch.
 Rename each subsequent row's field occurrences before checking its ordinary
 position alternative. Keep the source order and span of each alternative.
 The ordinary pattern checker checks field usage and missing alternatives.
+
+With multiple ordinary columns, check all the alternatives at their
+refined argument types. For example, indexThen takes both a linear Fin
+and a linear continuation after the retained list. Inferring the type of
+a fresh lambda here can lose the length of the pattern-bound tail.
+
+Check each alternative with its original equation as the error context.
+The generated outer match binds the arguments without testing them.
+Under Strict, suppress bangs on those generated binders after checking
+their usage. The written patterns still determine demand in each row.
+On an omitted impossible branch, bind each linear operand even if the
+branch ends in an empty case. A wildcard would require Many before GHC
+checks that the branch is impossible.
 -}
 
 {- Note [Omitted impossible retained equations]
@@ -2271,7 +2313,7 @@ tcIndexedCaseMatches :: Id -> HsMatchContextRn -> Scaled TcSigmaTypeFRR
                      -> MatchGroup GhcRn (LHsExpr GhcRn) -> ExpRhoType
                      -> TcM (MatchGroup GhcTc (LHsExpr GhcTc))
 tcIndexedCaseMatches index ctxt (Scaled mult ty) matches res_ty =
-  tcMatchesFromWithIndex (Just (index, mkLHsWrapCo . mkSymCo)) id ctxt tcBody
+  tcMatchesFromWithIndex (Just (index, mkLHsWrapCo . mkSymCo)) (map unLoc) ctxt tcBody
     [ExpFunPatTy (Scaled mult (mkCheckExpType ty))] res_ty matches
 
 -- @tcGRHSsPat@ typechecks @[GRHSs]@ that occur in a @PatMonoBind@.
@@ -2379,11 +2421,11 @@ tcMatchesFrom :: (AnnoBody body, Outputable (body GhcTc))
               -> HsMatchContextRn -> TcMatchAltChecker body -> [ExpPatType] -> ExpRhoType
               -> MatchGroup GhcRn (LocatedA (body GhcRn))
               -> TcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
-tcMatchesFrom = tcMatchesFromWithIndex Nothing
+tcMatchesFrom source = tcMatchesFromWithIndex Nothing (map (source . unLoc))
 
 tcMatchesFromWithIndex :: (AnnoBody body, Outputable (body GhcTc))
                        => Maybe (Id, TcCoercion -> LocatedA (body GhcTc) -> LocatedA (body GhcTc))
-                       -> (Match GhcRn (LocatedA (body GhcRn)) -> Match GhcRn (LocatedA (body GhcRn)))
+                       -> ([LMatch GhcRn (LocatedA (body GhcRn))] -> [Match GhcRn (LocatedA (body GhcRn))])
                        -> HsMatchContextRn -> TcMatchAltChecker body -> [ExpPatType] -> ExpRhoType
                        -> MatchGroup GhcRn (LocatedA (body GhcRn))
                        -> TcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
@@ -2408,9 +2450,9 @@ tcMatchesFromWithIndex index source ctxt tc_body pat_tys exp_ty (MG { mg_alts = 
 
   | otherwise
   = do { let exp_ty' = adjustExpTypeForCaseBranches exp_ty matches
-             tc_match match = tcCollectingUsage $
-                              tcMatchWithIndex index tc_body pat_tys exp_ty' (source (unLoc match)) match
-       ; (usages, matches') <- mapAndUnzipM tc_match matches
+             tc_match (original, match) = tcCollectingUsage $
+                              tcMatchWithIndex index tc_body pat_tys exp_ty' original match
+       ; (usages, matches') <- mapAndUnzipM tc_match (zipEqual (source matches) matches)
        ; tcEmitBindingUsage $ supUEs usages
        ; pat_tys  <- mapM readScaledExpType (filter_out_forall_pat_tys pat_tys)
        ; rhs_ty   <- readExpType exp_ty

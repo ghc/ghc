@@ -3769,7 +3769,7 @@ pprRetainedQuantificationError reason = case reason of
     text "Constructor equations with later retained arguments do not support Template Haskell quotations yet."
   RetainedConstructorArguments ->
     vcat [text "Retained constructor fields and later retained variables require bare variable patterns or wildcards."
-         ,text "Arguments after a retained constructor require unrestricted multiplicities."]
+         ,text "For this combination of patterns, use unrestricted arguments or match the remaining arguments inside the constructor branch."]
   RetainedPatternType ty ->
     vcat [ text "Retained constructor refinement does not support this type yet:"
          , ppr ty ]

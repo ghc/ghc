@@ -15,11 +15,16 @@ main = do
           , takeOverlap (Slot False False (17 :: Int))
           , takeTwo (Two False True unused () (18 :: Int))
           , takeTwo (Two True False () True (19 :: Int)) )
+    print ( takeStep (next unused True 23 (24 :: Int))
+          , takeStep (next (S Z) False 25 (26 :: Int))
+          , snd (takeStep (next unused False unused (27 :: Int))) )
     print =<< mapM throws
         [ takeRefined (error "outer package")
         , takeRefined (makeIndex (error "retained index") 20)
         , takeRefined (Slot True (error "matched unit") 21)
-        , snd (takeOverlap (Slot False (error "matched flag") 22)) ]
+        , snd (takeOverlap (Slot False (error "matched flag") 22))
+        , fst (takeStep (next Z False (error "matched payload") (28 :: Int)))
+        , snd (takeStep (next Z (error "matched Bool") 29 30)) ]
   where
     throws :: Int -> IO Bool
     throws n = either (const True) (const False) <$> try @ErrorCall (evaluate n)

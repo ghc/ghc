@@ -7074,3 +7074,18 @@ in supplied arrow weights. The result and class premises cannot
 depend on that fresh choice.
 [GHC multiplicity polymorphism](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/linear_types.html)
 and [Idris 2 multiplicities](https://idris2.readthedocs.io/en/latest/tutorial/multiplicities.html).
+
+### Multiple ordinary arguments after a retained match
+
+Agda checks later patterns in a clause after refining the earlier
+constructor. The fork uses the resulting argument types to check the
+ordinary Haskell pattern columns together. GHC proposal #302 supplies
+the existing multiple-argument `\cases` representation. It preserves
+the arity of the source function. GHC's linearity rules check the
+position and continuation in each reachable alternative. With `Strict`,
+a written lazy pattern suppresses the implicit bang on that argument.
+The indexed lookup regression checks this demand in the ordinary client.
+[Agda case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees),
+[GHC lambda-case](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/lambda_case.html),
+[GHC strict patterns](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/strict.html)
+and [strict multi-column example](../../testsuite/tests/dependent/should_run/NativeLinearIndexColumns.hs).
