@@ -191,7 +191,8 @@ import qualified RetainedCharacterClient
 Add a small, labeled example when a source feature is completed. Keep the
 examples finite. Reuse the checked example libraries and show their types here
 when the signature explains the feature. Compiler-only invariants remain in
-CORE.md and the existing tests. A passing example does not prove totality.
+CORE.md and the existing tests. DeferredHeterogeneous checks the kinds of
+coercion binders for deferred type errors. A passing example does not prove totality.
 The API fixture checks native dead-local removal and detected recursive
 interface failures. This program checks evaluation and sharing through the
 same native compiler path.

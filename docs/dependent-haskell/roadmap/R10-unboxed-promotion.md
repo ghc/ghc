@@ -98,3 +98,21 @@ mixed-kind binder for `general`, namely `(a :: TYPE r) ~# (Int# :: TYPE
 `RawInt` refines the representation to `IntRep`. Use `general` to test
 transport under `TYPE`. Use the family patterns above to test kind
 formation and binding.
+
+### Deferred heterogeneous equalities
+
+With `-fdefer-type-errors`, a call can require evidence for
+`(a :: k1) ~~ (b :: k2)`. GHC now binds a nominal proof that `k2` equals
+`k1` and a proof that `a` equals `b` transported to `k1`. The second proof
+has the role of the original hole. GHC composes the proofs to fill the
+hole. Demanding invalid evidence raises the original deferred error.
+The [Core regression](../../../testsuite/tests/plugins/DeferredHeterogeneous.hs)
+checks the kinds of the generated binders.
+
+A pattern match on `HRefl` can still bind a mixed-kind coercion.
+GADT constructor workers, boxed source constraints, and primitive Core
+coercions have separate representations. The review of proposal #547
+discusses the distinction for promotion.
+[Proposal #547 review](https://github.com/ghc-proposals/ghc-proposals/pull/547#discussion_r1069601568),
+[System D, §6.1](https://www.seas.upenn.edu/~sweirich/papers/systemd-submission.pdf#page=19),
+and [Agda equality](https://agda.readthedocs.io/en/latest/language/built-ins.html#equality).
