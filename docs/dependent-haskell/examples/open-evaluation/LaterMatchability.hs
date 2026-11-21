@@ -1,10 +1,11 @@
 {-# LANGUAGE KindSignatures, Modifiers, PolyKinds, StandaloneKindSignatures, TypeFamilies, TypeOperators #-}
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}
+{-# LANGUAGE GADTs, RankNTypes, TypeApplications #-}
 module LaterMatchability where
 
 import AnchorReceiver
 import Data.Kind (Type)
-import GHC.Matchability (U)
+import GHC.Matchability (M, Matchability, U)
 
 type MatchResult = Receiver (Select 'True) 'Match
 type UnmatchResult = Receiver (Select 'True) 'Unmatch
@@ -17,6 +18,22 @@ signed = Just True
 type family Map f xs where
   Map _ '[] = '[]
   Map f (x ': xs) = f x ': Map f xs
+
+type Mapper = forall (m :: Matchability) {b} {a}. @U
+              (a %m -> b) %U -> [a] %U -> [b]
+
+type family Only (xs :: [Type]) :: Type where
+  Only '[x] = x
+
+-- | Store results from the same mapper at the two callback kinds.
+type Recipe :: Mapper -> Type
+data Recipe mapper where
+  Recipe :: forall (mapper :: Mapper).
+            Only (mapper @M Maybe '[Bool]) ->
+            Only (mapper @U KnownListCallback '[Bool]) ->
+            Recipe mapper
+
+type ListRecipe = Recipe Map
 
 type family ForwardMap f xs where
   ForwardMap _ '[] = '[]

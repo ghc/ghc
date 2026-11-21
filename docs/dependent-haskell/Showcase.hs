@@ -106,7 +106,7 @@ import qualified NestedFunctionClient
 import qualified InvisibleFamily
 import IndexedMapClient (mappedCells)
 import LaterMatchabilityClient (annotatedMap, appliedCallback, boxedCallbacks, forwardedMap,
-                                laterMatchability, nestedCallback)
+                                laterMatchability, nestedCallback, rankedMap)
 import qualified TypeLambda
 import qualified TypeLet
 import qualified NativeCase
@@ -1218,6 +1218,7 @@ main = do
     observe "infer the inner arrow of a higher-order family callback" nestedCallback
     observe "infer an unsigned synonym kind from a bare callback use" appliedCallback
     observe "store the result of Maybe and an imported open family" boxedCallbacks
+    observe "use one polymorphic map with Maybe and a type family" rankedMap
     observe "interpret a kind code as an ordinary type constructor" InterpretedKind.optionalFlag
     observe "interpret two applications of the optional type constructor" InterpretedKind.nestedOptional
     observe "choose an interpreted arrow from its expected kind"

@@ -1,8 +1,8 @@
 {-# LANGUAGE DataKinds, KindSignatures, TypeOperators #-}
 {-# LANGUAGE ExplicitForAll, Modifiers, TypeApplications #-}
-{-# LANGUAGE NoExperimentalDependentTypes #-}
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
 module LaterMatchabilityClient
-  (laterMatchability, forwardedMap, annotatedMap, nestedCallback, appliedCallback, boxedCallbacks) where
+  (laterMatchability, forwardedMap, annotatedMap, nestedCallback, appliedCallback, boxedCallbacks, rankedMap) where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy(Proxy))
@@ -10,7 +10,7 @@ import Data.Type.Equality ((:~:)(Refl))
 import GHC.Matchability (U)
 import LaterMatchability (AtBool, CallbackResult(CallbackResult), ForwardMap,
                            FamilyBox(FamilyBox), ForwardBox, KnownListCallback, ListBox,
-                           ListCallback, MatchResult, UnmatchResult)
+                           ListCallback, ListRecipe, MatchResult, Recipe(Recipe), UnmatchResult)
 
 laterMatchability :: (MatchResult, UnmatchResult)
 laterMatchability = (Just True, True)
@@ -50,3 +50,9 @@ boxedCallbacks :: (Maybe Bool, [Bool])
 boxedCallbacks =
   case (FamilyBox (Just True) :: ForwardBox Maybe, FamilyBox [False] :: ListBox) of
     (FamilyBox matchable, FamilyBox unmatchable) -> (matchable, unmatchable)
+
+-- | Read the ordinary values stored by the polymorphic mapper.
+rankedMap :: (Maybe Bool, [Bool])
+rankedMap =
+  case (Recipe (Just True) [False] :: ListRecipe) of
+    Recipe matchable unmatchable -> (matchable, unmatchable)
