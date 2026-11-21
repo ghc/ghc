@@ -2473,6 +2473,18 @@ of ``-W(no-)*``.
     This is no longer allowed, as explained in :ref:`undecidable-instances`.
     This warning was used during the transition period.
 
+.. ghc-flag:: -Wpun-bindings
+    :shortdesc: warn when type and term bindings share a name in one scope
+    :type: dynamic
+    :reverse: -Wno-pun-bindings
+    :default: off
+
+    Warn about type and term definitions with the same name in one top-level
+    declaration group, such as ``data T = T``. This also applies when the type
+    and term definitions are in separate declarations in that group.
+    A local declaration can shadow an imported name without producing this
+    warning. :ghc-flag:`-Weverything` enables this warning.
+
 .. ghc-flag:: -Wterm-variable-capture
     :shortdesc: warn when an implicitly quantified type variable captures a term's name
     :type: dynamic

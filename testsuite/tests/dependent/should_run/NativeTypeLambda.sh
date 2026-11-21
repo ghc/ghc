@@ -10,11 +10,12 @@ g=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint
    -fdiagnostics-color=never)
 
 cd "$out/provider"
-cp "$src"/{TypeLambda,NativeTypeLambdaScope}.hs .
+cp "$src"/{TypeLambda,SchemaColumns,NativeTypeLambdaScope}.hs .
 "${g[@]}" -Werror=unused-type-patterns -fomit-interface-pragmas -c TypeLambda.hs
 "${g[@]}" --show-iface TypeLambda.hi >provider.iface
 if sed -n '/^exports:/,/^defaults:/p' provider.iface | grep -E '[$](lambda|signature-lambda):'; then exit 1; fi
 "${g[@]}" -fomit-interface-pragmas -c NativeTypeLambdaScope.hs
+"${g[@]}" -fomit-interface-pragmas -c SchemaColumns.hs
 sed 's/, UndecidableInstances//; s/module TypeLambda/module Termination/' TypeLambda.hs >Termination.hs
 if "${g[@]}" -c Termination.hs >termination.log 2>&1 ||
    ! grep -Fq 'error: [GHC-22979]' termination.log ||
@@ -23,7 +24,7 @@ if "${g[@]}" -c Termination.hs >termination.log 2>&1 ||
     cat termination.log >&2
     exit 1
 fi
-cp TypeLambda.hi NativeTypeLambdaScope.hi "$out/client/"
+cp TypeLambda.hi SchemaColumns.hi NativeTypeLambdaScope.hi "$out/client/"
 cd "$out/client"
 cat >Ordinary.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeApplications, TypeOperators #-}
@@ -100,7 +101,8 @@ module Main where
 import Data.Type.Equality ((:~:)(Refl))
 import Ordinary (capturedRow, independentRow, scopedRow)
 import Data.Proxy (Proxy(..))
-import TypeLambda (Fields(..), Prefixes, ScopedRow, withErrors)
+import TypeLambda (Columns, Fields(..), Optional, Prefixes, ScopedRow, withErrors)
+import SchemaColumns (Checked)
 
 withError :: Fields (Prefixes ('Just Ordering) '[Char, Bool])
 withError = case capturedRow of Refl -> Field (Left GT) (Field (Right True) End)
@@ -118,12 +120,31 @@ main = case (capturedRow, independentRow, withError, withoutError) of
     let input = Field 'x' (Field (error "unused field" :: Bool) End)
     case withErrors (Proxy :: Proxy String) input of
       Field x (Field _ End) -> print x
+    let optional :: Fields (Columns Optional '[Int])
+        optional = Field (Just 42) End
+        checked :: Fields (Columns (Checked String) '[Bool])
+        checked = Field (Left "missing") End
+    case (optional, checked) of
+      (Field x End, Field y End) -> print (x, y)
 HS
 "${g[@]}" -c RowsMain.hs
-"${g[@]}" RowsMain.o Ordinary.o ../provider/TypeLambda.o -o rows
-printf '%s\n' "(Left GT,Right True,Just 'a',Just True)" "(Just 'x',Right True)" "Right 'x'" >rows.expected
+"${g[@]}" RowsMain.o Ordinary.o ../provider/TypeLambda.o ../provider/SchemaColumns.o -o rows
+printf '%s\n' "(Left GT,Right True,Just 'a',Just True)" "(Just 'x',Right True)" "Right 'x'" '(Just 42,Left "missing")' >rows.expected
 ./rows >rows.actual
 cmp rows.expected rows.actual
+
+cat >Conflict.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes, TypeFamilies, UndecidableInstances #-}
+module Conflict where
+import SchemaColumns (Checked)
+import TypeLambda (Columns, Map)
+type instance Columns (Checked String) fields = Map (\a -> Maybe a) fields
+HS
+if "${g[@]}" -c Conflict.hs >conflict.log 2>&1 ||
+   ! grep -Fq 'Conflicting family instance declarations' conflict.log; then
+    cat conflict.log >&2
+    exit 1
+fi
 
 cat >WrongCallback.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}

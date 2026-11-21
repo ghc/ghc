@@ -4035,6 +4035,11 @@ data TcRnMessage where
                      -> !(NE.NonEmpty Name) -- ^ The individual declarations
                      -> TcRnMessage
 
+  -- | A type binding and a term binding share one spelling and scope.
+  TcRnPunBinding :: !Name -- ^ The binding at the diagnostic site
+                 -> !Name -- ^ The other binding
+                 -> TcRnMessage
+
   {-| TcRnPackageImportsDisabled is an error indicating that an import uses
     a package qualifier while the extension PackageImports was disabled.
 

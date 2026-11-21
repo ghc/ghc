@@ -1152,6 +1152,7 @@ data WarningFlag =
    | Opt_WarnImplicitFieldStrictness                 -- ^ @since 10.2
    | Opt_WarnRedundantCanonicalMethods               -- ^ @since 10.2
    --search codebase for Opt_WarnRedundantCanonicalMethods for cleanup
+   | Opt_WarnPunBindings
    deriving (Eq, Ord, Show, Enum, Bounded)
 
 -- | Return the names of a WarningFlag
@@ -1278,6 +1279,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnUnrecognisedModifiers                   -> "unrecognised-modifiers" :| []
   Opt_WarnSemaphoreOpenFailure                   -> "semaphore-open-failure" :| []
   Opt_WarnDefaultedCallStack                      -> "defaulted-callstack" :| []
+  Opt_WarnPunBindings                             -> "pun-bindings" :| []
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options

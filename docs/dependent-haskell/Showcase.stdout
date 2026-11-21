@@ -430,6 +430,7 @@ partially apply a two-argument type lambda: Refl
 map a callback that captures a closed family pattern: (Refl,Refl)
 capture a type before and after a local let: Refl
 give every field in a row the same error type: (Right 'x',Right True)
+use column schemas defined in separate modules: (Just 42,Left "missing")
 map a type lambda with a constructor case: Refl
 read fields from two indexed type case branches: (Refl,Refl)
 retain the kind of a matched Nothing: Refl

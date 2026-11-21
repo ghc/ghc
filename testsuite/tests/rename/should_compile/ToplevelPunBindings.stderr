@@ -1,0 +1,7 @@
+ToplevelPunBindings.hs:6:13: warning: [GHC-59431] [-Wpun-bindings]
+    ‘Same’ is declared in both the type and term namespaces.
+    Other declaration at ToplevelPunBindings.hs:6:1
+
+ToplevelPunBindings.hs:8:14: warning: [GHC-59431] [-Wpun-bindings]
+    ‘Split’ is declared in both the type and term namespaces.
+    Other declaration at ToplevelPunBindings.hs:7:1

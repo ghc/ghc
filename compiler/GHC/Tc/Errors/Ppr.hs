@@ -1150,7 +1150,7 @@ instance Diagnostic TcRnMessage where
            text "A type case needs a supported position in a top-level type synonym, a top-level value signature, or a constructor field."
     TcRnTypeLambdaContext
       -> mkSimpleDecorated $
-           text "A type lambda needs a supported position in a top-level type synonym, the right-hand side of a closed type family equation, or a top-level value signature."
+           text "A type lambda needs a supported position in a top-level type synonym, the right-hand side of a type family equation, or a top-level value signature."
 
     TcRnInvalidVisibleKindArgument arg ty
       -> mkSimpleDecorated $
@@ -1950,6 +1950,11 @@ instance Diagnostic TcRnMessage where
                 -- be printed qualified.
                text "Declared at:" <+>
                vcat (NE.toList $ ppr . nameSrcLoc <$> sorted_names)]
+    TcRnPunBinding name other
+      -> mkSimpleDecorated $
+         vcat [ quotes (ppr (nameOccName name))
+                  <+> text "is declared in both the type and term namespaces."
+              , text "Other declaration at" <+> ppr (nameSrcLoc other) ]
     TcRnPackageImportsDisabled
       -> mkSimpleDecorated $
          text "Package-qualified imports are not enabled"
@@ -2783,6 +2788,8 @@ instance Diagnostic TcRnMessage where
       -> WarningWithFlag Opt_WarnUnusedImports
     TcRnDuplicateDecls{}
       -> ErrorWithoutFlag
+    TcRnPunBinding{}
+      -> WarningWithFlag Opt_WarnPunBindings
     TcRnPackageImportsDisabled
       -> ErrorWithoutFlag
     TcRnIllegalDataCon{}
@@ -3567,6 +3574,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnDuplicateDecls _ fs
       -> [suggestExtension LangExt.DuplicateRecordFields | all isFieldName fs]
+    TcRnPunBinding{}
+      -> noHints
     TcRnPackageImportsDisabled
       -> [suggestExtension LangExt.PackageImports]
     TcRnIllegalDataCon{}
