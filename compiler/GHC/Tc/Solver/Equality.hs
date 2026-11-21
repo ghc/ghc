@@ -1356,10 +1356,8 @@ can_eq_app ev s1 t1 s2 t2
   = do { let co   = mkCoVarCo evar
              co_s = mkLRCo CLeft  co
              co_t = mkLRCo CRight co
-       ; ev_s <- newGivenEv loc ( mkTcEqPredLikeEv ev s1 s2
-                                , evCoercion co_s )
-       ; ev_t <- newGivenEv loc ( mkTcEqPredLikeEv ev t1 t2
-                                , evCoercion co_t )
+       ; ev_s <- newSelectorGiven loc Nominal co_s s1 s2
+       ; ev_t <- newSelectorGiven loc Nominal co_t t1 t2
        ; emitWorkNC [CtGiven ev_t]
        ; startAgainWith (mkNonCanonical $ CtGiven ev_s) }
 
@@ -2169,24 +2167,27 @@ emitSelectorGivens :: CtLoc -> [(Role, TcCoercion)] -> TcS ()
 emitSelectorGivens loc selectors
   = do { traceTcS "emitSelectorGivens" (ppr selectors)
        ; givens <- sequence
-           [ bind_selector role co lhs rhs
+           [ newSelectorGiven loc role co lhs rhs
            | (role, co) <- selectors
            , let Pair lhs rhs = coercionKind co
            , not (lhs `tcEqType` rhs) ]
        ; emitWorkNC (map CtGiven givens) }
-  where
-    bind_selector role co lhs rhs
-      | let k1 = typeKind lhs
-            k2 = typeKind rhs
-      , not (k1 `tcEqType` k2)
-      = do { kind_ev <- newGivenEv (mkKindEqLoc lhs rhs loc)
-                            (mkNomEqPred k2 k1, evCoercion (mkSymCo (mkKindCo co)))
-           ; emitWorkNC [CtGiven kind_ev]
-           ; let kind_co = givenCtEvCoercion kind_ev
-           ; newGivenEv loc (mkEqPredRole role lhs (mkCastTy rhs kind_co),
-                    evCoercion (co `mkTransCo` mkGReflRightCo role rhs kind_co)) }
-      | otherwise
-      = newGivenEv loc (mkEqPredRole role lhs rhs, evCoercion co)
+
+-- | Bind a projection at its original role after any necessary kind cast.
+-- See Note [Homogeneous selector Givens].
+newSelectorGiven :: CtLoc -> Role -> TcCoercion -> TcType -> TcType -> TcS GivenCtEvidence
+newSelectorGiven loc role co lhs rhs
+  | let k1 = typeKind lhs
+        k2 = typeKind rhs
+  , not (k1 `tcEqType` k2)
+  = do { kind_ev <- newGivenEv (mkKindEqLoc lhs rhs loc)
+                        (mkNomEqPred k2 k1, evCoercion (mkSymCo (mkKindCo co)))
+       ; emitWorkNC [CtGiven kind_ev]
+       ; let kind_co = givenCtEvCoercion kind_ev
+       ; newGivenEv loc (mkEqPredRole role lhs (mkCastTy rhs kind_co),
+                evCoercion (co `mkTransCo` mkGReflRightCo role rhs kind_co)) }
+  | otherwise
+  = newGivenEv loc (mkEqPredRole role lhs rhs, evCoercion co)
 
 {- Note [Homogeneous selector Givens]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2200,8 +2201,9 @@ Bind the index equality a ~# (b |> h) next, using the selector followed by
 the cast on b. Both binders have same-kind endpoints. Use the selector's
 role for the index equality, including a representational projection.
 This performs the transport from canEqCanLHSHetero before binding the
-selected evidence. The constructor or function representation stays the
-same.
+selected evidence. The same operation applies to the two nominal LRCo
+projections of a matchable application. Continue with the head equality
+first, as in can_eq_app.
 -}
 
 canDecomposableFunTy :: CtEvidence -> EqRel -> FunTyFlag
