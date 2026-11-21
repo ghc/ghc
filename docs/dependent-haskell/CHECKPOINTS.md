@@ -48,6 +48,26 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At compiler revision `e3c9d53c0b`, the ordinary `MappingWorker`
+module exports a ground instance whose mapping method selects a named
+worker. The proof module checks the `Nothing` and `Just x` equations
+for an open callback. A second instance exchanges two constructor tags.
+GHC rejects a proof that claims it preserves the first tag. A locally
+supplied dictionary rejects the `Maybe` proof with GHC-83605.
+
+A source upgrade from `61785e1925` rebuilt the worker and its instance.
+When the worker already carried its equations, GHC rebuilt the old
+instance to record the method choice. Native and typecheck-only
+builds reused the warm interfaces. The unrelated test interface stayed
+byte-identical. An ordinary client using the previous compiler read the
+new interface and linked its provider at O0 and O2.
+All 489 Showcase outputs matched in source-loaded GHCi and at native
+O0 and O2. The compiled GHC API program matched all 37 expected lines.
+Nine registered tests passed, including the negative method-selection
+and constructor-tag proofs.
+[Proofs](examples/open-evaluation/MappingProof.hs)
+and [review and Core observations](roadmap/R05-dependent-core.md#open-observation-of-the-installed-maybe-method).
+
 Compiler `61785e1925` accepts a required type argument after a value
 field in a prefix GADT constructor. An ordinary client supplies
 `TypedNote 79 (type Bool) True`. Pattern matching binds the type at
