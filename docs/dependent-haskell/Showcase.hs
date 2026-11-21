@@ -90,6 +90,7 @@ import qualified IndexedMark
 import qualified IndexedVec
 import qualified CertifiedSplitClient
 import qualified CursorClient
+import qualified RuntimeTypeColumn as Column
 import qualified FinitePositionClient
 import qualified OrdinaryOpenVectorAppend
 import qualified VectorSplitObservation
@@ -860,6 +861,12 @@ genericSafeIndexing = do
     observe "zip ordinary lists at their proven common length" =<< CursorClient.observeZip
     observe "zip two list literals at their statically known length" $
         CursorClient.zipTwoPairs 'a' 'b' (10 :: Int) 20
+    let chars = Column.Column (Reflection.typeRep @Char) "abc"
+        unused = Column.Column (Reflection.typeRep @Bool) (error "forced column")
+    observe "read a column at a runtime type and offset"
+        ( Column.lookupColumn (Reflection.typeRep @Char) chars position
+        , Column.lookupColumn (Reflection.typeRep @Char) unused (error "forced offset")
+        , Column.lookupColumn (Reflection.typeRep @Bool) unused (-1) )
     observe "check a signed position in a packaged vector" $
         case ListVectorClient.fromList values of
             Sigma.Pair _ cells -> FinitePositionClient.lookupVecViaView cells position
