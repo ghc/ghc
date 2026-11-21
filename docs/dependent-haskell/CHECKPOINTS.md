@@ -59,6 +59,28 @@ Rebuild the pinned revision when that comparison is needed again.
 [Append upgrade test](examples/open-evaluation/check-append-upgrade.sh)
 and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
+## Ordered type let source checkpoint
+
+At compiler revision `fd41efddef`, a type can use a nonempty group of
+simple let bindings. The first binding can capture an enclosing name
+before a later binding shadows it. In the optional-header example,
+`width = 1 + n` is in scope in `withHeader = Vec a width`.
+An ordinary client can import the result from the provider's interface.
+[Type definitions](examples/open-evaluation/TypeLet.hs) and
+[scope and proposal history](roadmap/R18-type-level-lets.md#ordered-binding-groups).
+
+Both normal compiler stages produced all 511 expected Showcase lines at
+`-O0` and `-O2`. The self-hosted compiler also matched the output in
+GHCi. The first-stage source and quotation checks passed. The
+self-hosted testsuite returned seven expected passes and no unexpected
+results across the seven selected tests. Five exact-print fixtures
+passed. The ordinary pretty-printer round-tripped a grouped let with a
+case inside its right-hand side. A forward reference in a closed synonym
+reported GHC-76037 at the offending variable. In a signature with
+implicit quantification the same free name can bind an outer parameter.
+[Source and interface tests](../../testsuite/tests/dependent/should_run/NativeTypeLet.sh)
+and [printing fixture](../../testsuite/tests/ghc-api/exactprint/TypeLetPrint.hs).
+
 ## Combined matrix and retained constructor checkpoint
 
 At `dc31b96c26`, normal quick Hadrian builds of Stage 1 and Stage 2

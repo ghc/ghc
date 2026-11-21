@@ -49,7 +49,7 @@ and [client](../../../testsuite/tests/dependent/should_run/NativeTypeLambda.sh).
 
 ## Ordered binding groups
 
-The fork's design takes a nonempty group of simple bindings under
+The fork accepts a nonempty group of simple bindings under
 `ExperimentalDependentTypes`. Braces with semicolons and layout have the
 same meaning. These two definitions give the same result.
 
@@ -71,6 +71,11 @@ A signature with implicit quantification can bind that free `a` as a type
 parameter. In a type synonym with no enclosing `a`, the reference is out of
 scope. Each right-hand side must kind-check, including unused bindings and
 bindings later shadowed.
+
+For example, `type Bad = let { a = b; b = Bool } in Maybe a` reports
+GHC-76037, “Not in scope: type variable ‘b’”, at the first use of `b`.
+The normal compiler stages checked both forms of the group.
+[Verification](../CHECKPOINTS.md#ordered-type-let-source-checkpoint).
 
 Agda's manual specifies scope from earlier definitions to later ones. Its
 compiler handles each simple binding without a signature separately and
