@@ -49,10 +49,13 @@ kindFromConstraint
 kindFromConstraint = Refl
 ```
 
-The public compiler elaborates the second example using `heq_sel` to
+The v69 compiler elaborated the second example using `heq_sel` to
 bind one primitive coercion and `Kind co` to recover its kind equality.
-The remaining Core change replaces this with separate evidence for the
-kind equality and for the index equality after the kind cast.
+The v79 worker carries separate evidence for the kind equality and
+for the index equality after transport. Rebuild installed native
+providers when moving to v79. Even an ordinary exported function can
+refer to the old selector in its object code.
+[Shared rebuild and upgrade checks](../CHECKPOINTS.md#shared-r11-and-r16-rebuild).
 
 ## Related source features
 

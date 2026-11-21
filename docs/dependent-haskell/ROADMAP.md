@@ -9,7 +9,7 @@ records every edge. The R numbers are local labels for those cards.
 
 ## Where this fork stands
 
-At `fd41efddef`, **23 of 50 cards (46%) are complete** on the upstream
+**23 of 50 cards (46%) are complete** on the upstream
 checklist. The fork adds a tested part of **20 of the 27 open cards**.
 This count includes a card when the fork demonstrates a behavior in
 source Haskell or in compiled Core. Each card counts once, regardless
@@ -23,11 +23,13 @@ depend on others, so this count cannot estimate the remaining work time.
 | Declaration dependencies, families and GADTs | R21, R23, R24, R41 |
 | Namespace warnings | R36 |
 
-The 511-output Showcase includes a square whose row count is also its
+The 517-output Showcase includes a square whose row count is also its
 column count, a polymorphic vector package with a runtime length, and a
 closed family that matches `Int#`. A group of type-level let bindings can
 name the width and the type of a vector with an optional header.
-[Two-stage verification](CHECKPOINTS.md#ordered-type-let-source-checkpoint).
+An ordinary consumer can open two vector packages independently, or
+regroup two partitions at their original length.
+[Two-stage verification](CHECKPOINTS.md#shared-r11-and-r16-rebuild).
 
 Earlier [Showcase milestones and examples](CHECKPOINTS.md#showcase-history-through-502-outputs)
 record how each behavior was introduced.
@@ -55,8 +57,8 @@ source examples. General promotion remains open.
 
 ## Current work queue
 
-The combined compiler at `fd41efddef` passed the following checks.
-They are the baseline for subsequent changes. Reuse one normal build
+The following changes entered the fork before the shared R11/R16 rebuild.
+They remain regression checks for subsequent changes. Reuse one normal build
 for all cards that change the same checker or interface format.
 
 | Cards | Integrated change | Regression coverage |
@@ -74,17 +76,21 @@ applicable rule now invalidates the warm proof in both object-code and
 with no further edits.
 [Recovered branches and remaining checks](BRANCHES.md).
 
-Two changes need separate decisions before integration.
+R11 and R16 now share a compiler and library rebuild. The R11 worker
+uses scoped same-kind evidence for supported GADT equalities. The v79
+reader rejects v69 interfaces before a client can link their object
+code. Rebuild the provider and its clients together. More general GADT
+equality telescopes remain open.
+[Worker and solver evidence](roadmap/R11-homogeneous-equality.md).
 
-* **R11 homogeneous equality.** The experimental worker ABI changes a
-  selector used by existing object files. Rebuild the provider and the
-  client together before selecting that ABI for the fork.
-  [Worker and solver evidence](roadmap/R10-unboxed-promotion.md#r11-acceptance-check).
-* **R16 open evaluation.** The two prototypes record different
-  dependencies for imported method proofs. A usable design must reject
-  a stale proof from an older interface and accept the ordinary optimized
-  Showcase with the installed rewrite rules enabled.
-  [Open evaluation](roadmap/R16-open-term-evaluator.md).
+R16 records the method and arguments used by a checked proof. A
+client with a conflicting rewrite rule receives GHC-83605 at the
+proof use. An explicitly opaque, closed observation computed in a
+rules-off provider can be used by an optimized ordinary client.
+The next family case is a checked method in one equation of a family
+with arguments, where a disjoint equation remains usable.
+[Open evaluation](roadmap/R16-open-term-evaluator.md) and
+[upgrade checks](CHECKPOINTS.md#shared-r11-and-r16-rebuild).
 
 For the remaining work on each card, use the table below. The
 [previous queue](CHECKPOINTS.md#vector-split-and-package-checkpoints)
@@ -205,7 +211,7 @@ still require substantial research.
 - [x] **R08 [Promote Char](https://ghc.serokell.io/dh#promote-char)** — Completed. Needs/includes: no outgoing graph edge. [Written character indices](REFERENCES.md#written-character-indices) use the existing DataKinds character literals.
 - [x] **R09 [Promote Natural](https://ghc.serokell.io/dh#promote-natural)** — Completed. Needs/includes: no outgoing graph edge.
 - [ ] **R10 [Promote unboxed types](https://ghc.serokell.io/dh#promote-unboxed-types)** — Unmarked. Needs/includes: R11. [Source probes and R11 acceptance check](roadmap/R10-unboxed-promotion.md).
-- [ ] **R11 [Homogeneous equality](https://ghc.serokell.io/dh#homogeneous-equality)** — Unmarked. Needs/includes: no outgoing graph edge. Deferred heterogeneous equality holes and projected constructor, function, or matchable application Givens use same-kind evidence binders. Pattern-bound coercions can still have endpoints at different kinds. [Core check](roadmap/R10-unboxed-promotion.md#deferred-heterogeneous-equalities). The [worker-format trial](roadmap/R11-homogeneous-equality.md) gives pattern-bound coercions a scoped kind proof and requires matched libraries.
+- [ ] **R11 [Homogeneous equality](https://ghc.serokell.io/dh#homogeneous-equality)** — Unmarked. Needs/includes: no outgoing graph edge. Deferred heterogeneous equality holes and projected constructor, function, or matchable application Givens use same-kind evidence binders. Pattern-bound coercions can still have endpoints at different kinds. [Core check](roadmap/R10-unboxed-promotion.md#deferred-heterogeneous-equalities). The [v79 worker](roadmap/R11-homogeneous-equality.md) gives supported pattern-bound coercions a scoped kind proof. Rebuild native libraries for this compiler.
 - [ ] **R12 [Promote classes](https://ghc.serokell.io/dh#promote-classes)** — Unmarked. Needs/includes: R13, R24. M82 connects a concrete instance method to a checked source function in a retained argument. M83 checks the selected ground `Num` instance’s conversion of a nonnegative literal. A direct class constraint can supply an opaque unary method in an exported index. The caller can infer an independent payload and its ordinary class constraints. Superclass selection and general class promotion remain open. [Abstract method example](roadmap/R12-promote-classes.md).
 - [ ] **R13 [Function promotion](https://ghc.serokell.io/dh#function-promotion)** — Unmarked. Needs/includes: R15, R16, R17, R18, R19, R21, R23. The [map length example](roadmap/R16-open-term-evaluator.md#prove-that-map-preserves-length) calls the ordinary `size` function at runtime and uses its checked equations in a separate proof module.
 - [ ] **R14 [Data family promotion](https://ghc.serokell.io/dh#data-family-promotion)** — Unmarked. Needs/includes: no outgoing graph edge. [Simple instance constructors](roadmap/R14-data-family-promotion.md).

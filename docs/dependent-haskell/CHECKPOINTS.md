@@ -59,6 +59,53 @@ Rebuild the pinned revision when that comparison is needed again.
 [Append upgrade test](examples/open-evaluation/check-append-upgrade.sh)
 and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
+## Shared R11 and R16 rebuild
+
+The v69 comparison compiler at `ae563bb342` matched all 517 Showcase
+lines at native `-O0` and `-O2` with both normal Hadrian stages.
+Self-hosted GHCi also matched. All 12 selected tests passed, including
+retained constructor contexts, existential instances, family applications,
+reflection and home-module rule changes.
+
+The first combined v79 build at `83f2aea915` started with an empty
+build directory and stock GHC 9.14.1. Both stages built with the same
+libraries. Importing an old provider failed at the import. Linking its
+object directly failed on its reference to the old equality selector.
+This also happened when the provider exported only `Bool -> Int`.
+With source available, `--make` rebuilt all three modules and the
+executable ran. A second build reused all three objects. An ordinary
+client of the rebuilt GADT provider printed `(41,42)` at both optimization
+levels. The old compiler also rejected the new interface.
+
+The optimized Showcase exposed a separate R16 failure in this build.
+An ordinary client imported two closed results computed by a rules-off
+provider. It received GHC-83605 on both uses because its installed
+Prelude had an applicable rule for the provider's internal `foldr`.
+The provider now marks these results `OPAQUE`. The checker recognizes
+their closed source signatures. A client that tries to import a generic
+fold law still has to meet the rule check.
+[Proof checks](roadmap/R16-open-term-evaluator.md) and
+[worker representation](roadmap/R11-homogeneous-equality.md).
+
+Both normal compiler stages at `5f70c2bdfc` matched the 517-line
+Showcase at `-O0` and `-O2`. The self-hosted compiler also matched in
+GHCi. All 12 consolidation tests passed. The three focused R16 tests
+passed, including the installed fold and transitive home-rule changes.
+The checked-method test builds a dynamic object for its separately
+compiled callback when the in-process interpreter needs one.
+The same fixture passed with the external interpreter.
+
+The v69-to-v79 upgrade rejected an old alias or family interface at
+import. After rebuilding the provider, the client reported GHC-83605
+at the conflicting proof. Rules-off and ordinary home modules rebuilt
+once and reused their new outputs. With the final self-hosted compiler,
+ordinary `-O0` and `-O2` clients both observed `(41,42,43,44)` from
+the retained `Whole` and `Move` examples compiled at `-O0`.
+Compiling those providers at `-O2` passed desugaring lint and reached
+the existing optimizer restriction GHC-59107.
+[Installed provider upgrade](examples/open-evaluation/check-source-proof-provider-upgrade.sh)
+and [home cache upgrade](examples/open-evaluation/check-home-rule-closure-upgrade.sh).
+
 ## Ordered type let source checkpoint
 
 At compiler revision `fd41efddef`, a type can use a nonempty group of
