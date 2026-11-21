@@ -1,12 +1,19 @@
-{-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, FlexibleContexts, Modifiers, RankNTypes, ScopedTypeVariables, TypeFamilies, TypeOperators #-}
+{-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, ExplicitNamespaces, FlexibleContexts, Modifiers, RankNTypes, RequiredTypeArguments, ScopedTypeVariables, TypeFamilies, TypeOperators #-}
 module NativeRetainedFamilyDomain where
 
 import ConstrainedElements (Collects(..), FieldKey, KnownIndex(..))
+import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Matchability (U)
 
-#if defined(FORGOTTEN) || defined(VALID_FORGOTTEN)
+#ifdef REQUIRED_KINDS
+project :: forall k -> forall (c :: k) -> Collects c => Proxy (Elem c)
+project (type _) (type _) = Proxy
+
+ok :: Proxy Bool
+ok = project (type Type) (type [Bool])
+#elif defined(FORGOTTEN) || defined(VALID_FORGOTTEN)
 type Ignore a = forall b. Show b => b -> String
 #ifdef VALID_FORGOTTEN
 forgotten :: Ignore (Elem [Bool])
@@ -39,6 +46,9 @@ escape _ = Proxy
 #elif defined(CALLBACK_MISSING)
 unqualified :: (forall c. Proxy c -> Elem c -> Elem c) -> Bool
 unqualified _ = True
+#elif defined(REQUIRED_MISSING)
+required :: forall (tag :: Bool) -> Proxy (Elem (FieldKey tag))
+required (type _) = Proxy
 #else
 missing :: foreach (tag :: Bool) -> Proxy (Elem (FieldKey tag))
 missing _ = Proxy

@@ -1,9 +1,10 @@
-{-# LANGUAGE ExplicitNamespaces, RequiredTypeArguments, TypeApplications #-}
+{-# LANGUAGE DataKinds, ExplicitNamespaces, RequiredTypeArguments, TypeApplications #-}
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes, ScopedTypeVariables, TypeFamilies, TypeOperators #-}
-module ConstrainedElementsClient (constrainedElements, annotatedElement, explicitElements, renderField, formatField, retainedMaybeDomain) where
+module ConstrainedElementsClient (constrainedElements, annotatedElement, explicitElements, renderField, formatField, renderKnownFields, retainedMaybeDomain) where
 
-import ConstrainedElements (Collects(..), Field(..), applyField, field, withField, reflectMaybe)
+import ConstrainedElements (Collects(..), FieldKey, Field(..), applyField, field, withField, reflectMaybe)
 import Data.IORef (newIORef, readIORef, writeIORef)
+import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
 
@@ -54,6 +55,14 @@ formatField :: Bool -> Maybe String
 formatField tag = case field tag of
     Nothing -> Nothing
     Just present -> Just (withField (\_ render value -> "[" ++ render value ++ "]") tag present)
+
+-- | Render an element of the domain supplied as a required type argument.
+renderKnown :: forall (c :: Type) -> Collects c => (Elem c -> String) -> Elem c -> String
+renderKnown (type _) render value = render value
+
+-- | Use two class instances in a module with ordinary required type arguments.
+renderKnownFields :: (String, String)
+renderKnownFields = (renderKnown (type [Bool]) show True, renderKnown (type (FieldKey 'True)) (: []) 'x')
 
 -- | Use the polymorphic proof with two runtime constructors and an unused bottom.
 retainedMaybeDomain :: IO (Maybe Bool, Maybe Bool, Bool)

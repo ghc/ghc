@@ -1,4 +1,5 @@
 {-# LANGUAGE RecursiveDo #-}
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -22,6 +23,7 @@ import GHC.Data.Maybe
 
 -- friends:
 import GHC.Tc.Utils.Unify    ( checkConstraints, tcSubTypeAmbiguity, unifyTypeAndEmit )
+import GHC.Tc.Utils.Instantiate ( tcInstSkolTyVarsX )
 import GHC.Tc.Solver         ( simplifyAmbiguityCheck, pushLevelAndSolveEqualities )
 import GHC.Tc.Solver.Monad   ( runTcS )
 import GHC.Tc.Solver.Solve   ( solveWanteds )
@@ -34,7 +36,6 @@ import GHC.Tc.Types.Rank
 import GHC.Tc.Errors ( reportAllUnsolved )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Constraint ( userTypeError_maybe, mkNonCanonical )
-import GHC.Tc.Utils.Instantiate (tcInstSkolTyVarsX)
 import GHC.Tc.Utils.TcMType (newEvVars, newWanted)
 import GHC.Tc.Types.TH ( ThLevel(Comp) )
 import GHC.Tc.Utils.Env (tcLookupId, tcLookupLcl_maybe, tcExtendIdEnv)
@@ -499,20 +500,20 @@ checkConstrainedSignature ctxt ty
       where
         go sig = case written_prefix sig of
           ([], [], body) -> check_body body
-          (tvs, theta, body) -> mdo
+          (bndrs, theta, body) -> mdo
             info <- mkSkolemInfo sig_skol
-            let in_scope = mkInScopeSet (tyCoVarsOfType sig)
+            let tvs = map snd bndrs
+                in_scope = mkInScopeSet (tyCoVarsOfType sig)
             (subst, skolems) <- tcInstSkolTyVarsX info (mkEmptySubst in_scope) tvs
             let sig_skol = SigSkol origin whole (zip (map tyVarName tvs) skolems)
-            traverse_ (checkNoConstrainedFamilyApps . varType) tvs
+            traverse_ checkNoConstrainedFamilyApps (map fst bndrs ++ map varType tvs)
             traverse_ checkNoConstrainedFamilyApps theta
             given <- newEvVars (substTheta subst theta)
             void $ checkConstraints sig_skol skolems given (check_body (substTy subst body))
 
         -- Stop at a synonym so that check_part sees its written arguments.
-        written_prefix (ForAllTy _ (Bndr tv vis) rest)
-          | isInvisibleForAllTyFlag vis
-          = let (tvs, theta, body) = written_prefix rest in (tv : tvs, theta, body)
+        written_prefix (ForAllTy ma (Bndr tv _) rest)
+          = let (bndrs, theta, body) = written_prefix rest in ((ma, tv) : bndrs, theta, body)
         written_prefix (FunTy af _ _ pred_ty rest)
           | isInvisibleFunArg af
           = let (tvs, theta, body) = written_prefix rest in (tvs, pred_ty : theta, body)
@@ -646,6 +647,11 @@ of Elem c inside the callback. The result cannot use this Given. Report
 an unsolved constraint on c against the callback. Suggesting it on the
 enclosing function would put c outside its scope.
 See Note [Setting the argument context] in GHC.Tc.Utils.Unify.
+
+A required type argument has the same scope as a specified type argument.
+Skolemise both when checking formation. Do not build a runtime type-lambda
+wrapper for a family occurrence in a type. See Note [Ambiguity skolemisation is not runtime abstraction]
+in GHC.Tc.Utils.Instantiate.
 
 Read the written forall binders and predicates before expanding a synonym.
 For type Ignore a = forall b. Show b => b -> String, Ignore (Elem [Int])

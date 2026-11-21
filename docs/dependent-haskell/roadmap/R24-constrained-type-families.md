@@ -255,6 +255,23 @@ requires independent evidence there.
 [ordinary client](../examples/open-evaluation/ConstrainedElementsClient.hs)
 and [scope regression](../../../testsuite/tests/dependent/should_run/NativeRetainedFamilyDomain.hs).
 
+### Required type arguments
+
+An ordinary module can write this signature with `RequiredTypeArguments`.
+
+```haskell
+renderKnown :: forall (c :: Type) -> Collects c => (Elem c -> String) -> Elem c -> String
+renderKnown (type _) render value = render value
+```
+
+The application `renderKnown (type [Bool]) show True` returns `"True"`.
+The class predicate supplies the family domain in the function signature.
+GHC checks the class instance at the call. The type argument is erased.
+The same scope rule works with multiple required binders, including
+`forall k -> forall (c :: k) -> Collects c => Proxy (Elem c)`.
+[Ordinary implementation](../examples/open-evaluation/ConstrainedElementsClient.hs)
+and [visible forall proposal](https://ghc-proposals.readthedocs.io/en/latest/proposals/0281-visible-forall.html).
+
 ### Associated newtype representation
 
 The review of #177 asks where an associated newtype could store the

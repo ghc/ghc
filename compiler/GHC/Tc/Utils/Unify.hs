@@ -21,7 +21,7 @@ module GHC.Tc.Utils.Unify (
   DeepSubsumptionFlag(..), DeepSubsumptionDepth(..),
   getDeepSubsumptionFlag, getDeepSubsumptionFlag_DataConHead,
   isRhoTyDS,
-  tcSkolemise, tcSkolemiseGeneral, tcSkolemiseCompleteSig, tcSkolemiseExpectedType,
+  tcSkolemise, tcSkolemiseCompleteSig, tcSkolemiseExpectedType,
 
   -- Various unifications
   uType, unifyType, unifyKind, unifyInvisibleType,

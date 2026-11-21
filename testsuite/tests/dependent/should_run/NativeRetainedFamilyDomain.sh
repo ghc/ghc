@@ -11,9 +11,10 @@ cp "$src/ConstrainedElements.hs" .
 cd client
 cp ../ConstrainedElements.hi "$src/ConstrainedElementsClient.hs" "$src/NativeRetainedFamilyDomain.hs" .
 "${ghc[@]}" -c ConstrainedElementsClient.hs
+"${ghc[@]}" -DREQUIRED_KINDS -c NativeRetainedFamilyDomain.hs
 "${ghc[@]}" -fforce-recomp -DKNOWN_PREFIX -c NativeRetainedFamilyDomain.hs
 "${ghc[@]}" -fforce-recomp -DVALID_FORGOTTEN -c NativeRetainedFamilyDomain.hs
-for mode in FORGOTTEN MISSING_PREFIX MISSING_KIND WRONG_TAG LATE_GIVEN CALLBACK_ESCAPE CALLBACK_MISSING MISSING; do
+for mode in FORGOTTEN MISSING_PREFIX MISSING_KIND WRONG_TAG LATE_GIVEN CALLBACK_ESCAPE CALLBACK_MISSING REQUIRED_MISSING MISSING; do
     if "${ghc[@]}" -fforce-recomp "-D$mode" -fdefer-type-errors -c NativeRetainedFamilyDomain.hs > failure 2>&1; then
         echo "Accepted $mode"
         exit 1
@@ -33,6 +34,6 @@ for mode in FORGOTTEN MISSING_PREFIX MISSING_KIND WRONG_TAG LATE_GIVEN CALLBACK_
             grep -Fq 'Collects c' failure
             grep -A1 'a type expected by the context:' failure | grep -Fq 'Proxy c -> Elem c -> Elem c'
             ;;
-        MISSING) grep -Fq 'Collects (FieldKey tag)' failure ;;
+        REQUIRED_MISSING|MISSING) grep -Fq 'Collects (FieldKey tag)' failure ;;
     esac
 done
