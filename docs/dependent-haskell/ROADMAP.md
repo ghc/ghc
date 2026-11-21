@@ -9,7 +9,7 @@ records every edge. The R numbers are local labels for those cards.
 
 ## Where this fork stands
 
-At `5ecac2c539`, **23 of 50 cards (46%) are complete** on the upstream
+At `2a1003b253`, **23 of 50 cards (46%) are complete** on the upstream
 checklist. The fork adds a tested part of **19 of the 27 open cards**.
 This count includes a card when the fork demonstrates a behavior in
 source Haskell or in compiled Core. Each card counts once, regardless
@@ -23,6 +23,11 @@ depend on others, so this count cannot estimate the remaining work time.
 | Declaration dependencies, families and GADTs | R21, R23, R24, R41 |
 | Namespace warnings | R36 |
 
+The 502-output Showcase proves a rectangular table's contents after the
+producer discards its row labels. The evaluator recovers the row count
+from the outer vector. Column labels still establish the width, even
+for an empty table. [Table example and limits](roadmap/R15-closed-term-evaluator.md#read-the-stored-cells-of-a-rectangular-table).
+
 A library can declare an open row schema. Another module can supply an
 instance whose type lambda captures its error type. A client can use
 both the optional schema and the error schema from compiled interfaces.
@@ -30,12 +35,13 @@ The two instances appear in the 501-output Showcase.
 [Schema library](examples/open-evaluation/TypeLambda.hs) and
 [separate instance](examples/open-evaluation/SchemaColumns.hs).
 
-Proposal #765 adds pun warnings. The fork now implements the top-level
-part of `-Wpun-bindings`. With this flag, `data T = T` reports both
-declaration locations. A type and a constructor in different declarations
-of the same group can also trigger the warning. Local binding groups
-and `-Wpun-uses` remain open. [Accepted proposal and review](https://github.com/ghc-proposals/ghc-proposals/pull/765)
-and [GHC regression](../../testsuite/tests/rename/should_compile/ToplevelPunBindings.hs).
+Proposal #765 adds pun warnings. With `-Wpun-bindings`, `data T = T`
+reports both declaration locations. The warning also covers explicit
+type and term binders with the same name in one function or lambda
+match. A binder can still shadow a name from an enclosing scope.
+Implicit local type binders and use-site pun warnings remain open.
+[Accepted proposal and review](https://github.com/ghc-proposals/ghc-proposals/pull/765)
+and [binding examples](roadmap/R36-pun-warnings.md).
 
 A separately compiled producer can return a rectangular table whose
 type hides its dimensions. The client can prove every stored cell at
@@ -500,7 +506,7 @@ and [two-way filter and case upgrade](examples/open-evaluation/check-filter-scop
 | --- | --- | --- |
 | [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | GADT constructors can store nested retained sums that refer to erased parameters. An ordinary client can construct and match a `Pair` when its expected type reduces to a retained sum. | Broaden dependent product domains and inference. Support constructor results indexed directly by a retained field. |
 | [R05 dependent Core](roadmap/R05-dependent-core.md) | The standard `-O2` pipeline specializes a recursive consumer and keeps retained case proofs scoped. A provider and an interface-only client can match rules that construct or open an erased package. Source rules can have an imported head and a local anchor, or come from a visible orphan module. | Rules for retained functions and general dependent coercions remain open. |
-| [R15 closed evaluator](roadmap/R15-closed-term-evaluator.md#read-independent-row-and-column-counts) | A client proves the labels and all cells of a compiled rectangular table with two hidden dimensions. | The nested field needs earlier fields that establish its dimensions. General readback of fields with unknown indices remains open. |
+| [R15 closed evaluator](roadmap/R15-closed-term-evaluator.md#read-independent-row-and-column-counts) | A client proves the labels and all cells of a compiled rectangular table with two hidden dimensions. | The outer vector can establish its row count. Reading a square matrix whose two dimensions share one hidden index remains open. |
 | [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The installed `filter not` handles a known Boolean head and an unknown tail. A separate ordinary client proves length preservation for the installed `map` by induction over a finite spine. | General open evaluation across arbitrary ordinary definitions. |
 | [R19 type-level cases](roadmap/R19-type-level-cases.md) | Retained signatures can match a runtime index or an application of a checked function. Two qualified imports of the same checked function can share a case in one declaration group. The upgrade test rebuilds an affected home provider once. | Separately compiled modules still need a shared result type at an unknown index. Older installed providers need rebuilding to export a shared result. |
 | [R22 erased existentials](roadmap/R22-existential-quantification.md) | A constructor pattern can open a hidden vector length inside a tuple. A typed consumer can fix the higher-rank witness of a guarded callback. | Extend inference to callbacks without a result declaration that determines the witness. |
