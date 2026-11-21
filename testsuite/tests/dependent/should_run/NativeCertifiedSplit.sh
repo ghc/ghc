@@ -39,3 +39,16 @@ if "${ghc[@]}" -O0 -ferror-spans -fforce-recomp -c MissingPremise.hs >reject.log
 fi
 rule=$(grep -n '^stepProof _ _ _ _ _ = Refl' MissingPremise.hs | cut -d: -f1)
 grep -F "MissingPremise.hs:$rule:23-26: error: [GHC-83865]" reject.log >/dev/null
+
+# The width proof is available for both vectors. Only the original
+# vector has the identity named by the expected split type.
+sed -e 's/foreach (v :: P.Vec a total) -> Maybe/foreach (v :: P.Vec a total) -> foreach (other :: P.Vec a total) -> Maybe/' \
+    -e 's/^checkedSplitAtValue cut total v =/checkedSplitAtValue cut total v other =/' \
+    -e 's/splitAtValue @a @suffix cut v)))/splitAtValue @a @suffix cut other)))/' \
+    CertifiedSplit.hs >OtherVector.hs
+if "${ghc[@]}" -O0 -fforce-recomp -c OtherVector.hs >other.log 2>&1 ||
+   ! grep -Eq '^OtherVector.hs:.*error: \[GHC-83865\]' other.log ||
+   ! grep -Fq 'splitAtValue @a @suffix cut other' other.log; then
+    cat other.log >&2
+    exit 1
+fi
