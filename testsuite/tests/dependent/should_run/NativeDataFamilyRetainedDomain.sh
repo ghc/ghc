@@ -30,6 +30,11 @@ for opt in -O0 -O2; do
     "${ghc[@]}" "$opt" -XNoExperimentalDependentTypes -c Main.hs
     "${ghc[@]}" Main.o ../provider/{TupleProvider,RetainedTuple}.o -o run
     test "$(./run)" = "$expected"
+
+    cp "$src/RetainedStrictClient.hs" StrictMain.hs
+    "${ghc[@]}" "$opt" -c StrictMain.hs -o StrictMain.o -ohi StrictMain.hi
+    "${ghc[@]}" StrictMain.o ../provider/{TupleProvider,RetainedTuple}.o -o run-strict
+    test "$(./run-strict)" = '(True,True,True,True)'
 done
 
 mkdir "$out/interactive"
