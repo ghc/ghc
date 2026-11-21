@@ -218,6 +218,11 @@ syntactically allowed. Some further various observations about this grammar:
   Pattern matching makes those constraints available to the field patterns,
   the terminal type patterns, and the right-hand side.
 
+  Template Haskell can quote or reify this prefix declaration. Its
+  ``RetainedGadtC`` represents each field with its bang and multiplicity.
+  A ``ForallVisT`` in the result type represents the terminal type arguments.
+  This use of ``RetainedGadtC`` needs no named retained index field.
+
   A higher-rank field has its own quantifiers or constraints inside
   parentheses. For example, ``MkS :: Int -> (forall a. a -> a) -> S``
   has a polymorphic second field.

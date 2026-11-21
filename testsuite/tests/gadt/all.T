@@ -142,3 +142,8 @@ test('TerminalGadtForAll', extra_files(['TerminalGadtForAllProvider.hs']),
 test('TerminalGadtContext', extra_files(['TerminalGadtContextProvider.hs']),
      makefile_test, [])
 test('TerminalGadtContextScope', normal, compile_fail, [''])
+test('TerminalGadtTh',
+     [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal']),
+      extra_files(['TerminalGadtThProvider.hs'])],
+     run_command, ['bash TerminalGadtTh.sh "{compiler}" "{libdir}"'])
+test('TerminalGadtThBadMultiplicity', req_th, compile_fail, [''])
