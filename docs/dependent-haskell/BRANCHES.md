@@ -12,14 +12,14 @@ also left tested changes on branches outside that history.
 | --- | --- | --- |
 | R04 retained sums | `10d0e5cd18`, forward port `ea55c8c1d0` | An as-pattern on a retained constructor field binds the name used by later fields. The published compiler rejected the written as-pattern. The port passes the six selected tests, including laziness and rejection of crossed bounds. |
 | R05/R16 rewrite rules | `3d0408cfc6` controls, `fd5a526ea1` forward port | The compiler records the home interfaces consulted by a final Core proof. Adding an applicable rule in a transitive home module now invalidates the cached proof. The self-hosted compiler passed seven registered tests and the native and no-code upgrade controls. Both stages matched 511 Showcase outputs at `-O0` and `-O2`. Self-hosted GHCi matched them too. |
-| R11 equality | `f8c9aff6dc`, `db329db55a` | A historical point-free equality fixture still gives a Core Lint error on the combined compiler. Compare the homogeneous retained-index rewrite independently of the proposed worker ABI. |
-| R19 retained constructors | `19efc07551`, interface marker `c903a3043d` | A constructor can require `(a ~ Bool, b ~ Char)` before its retained Boolean field. The published compiler rejects this context. Check quotation, source-hidden clients, and the old reader's rejection of the new interface. |
+| R11 equality | `47955a207f`, `0a8bc47405` | The first change fixes Core Lint for repeated retained-index transport. The second changes the GADT worker and the native equality selector. A v69 object can refer to the old selector even when its exported type is `Bool -> Int`. |
+| R16 imported proofs | `b938c7f7c0`, `9347fe1049` | A client checks applicable rewrite rules when it uses an imported method proof. A provider compiled with rules disabled can export an opaque closed observation. The optimized Showcase uses this for the installed Prelude fold. |
+| R19 retained constructors | `9c38f1827a` | A constructor can require `(a ~ Bool, b ~ Char)` before its retained Boolean field. The registered regression checks quotation and source-hidden clients. |
 | R22 erased existentials | `8d7a0f8845`, `11212858ca`, `178111e9b4` | An ordinary call can open two independent packages. A product can store a filtered vector alongside a reader at its hidden length. A forwarding let or case can repack opened witnesses while they are in scope. These are separate application and binding checks. |
 | R23 reflection | `21f280105b`, binary `4cc3fe29c8` | Printing a reflected matchable linear arrow raised an exception. The stack also restores the matchable-head contract of `Type.Reflection.App` and adds `App'` for both matchabilities. Verify both codecs with the matching binary submodule. |
 
 The R04 Quick Look prototype `35ead97235` already has a published
-implementation at `10bf2b0c4b`. The R11 worker ABI still needs a
-coordinated rebuild. The two-list zip at `3d5c46ec69` supplies a
+implementation at `10bf2b0c4b`. The two-list zip at `3d5c46ec69` supplies a
 test case. Its own commit adds no compiler support. The current
 evaluator reports GHC-68947 at `zipLength xs ys`.
 
@@ -50,17 +50,29 @@ At the successor checkpoint, 112 were ancestors, 38 had identical
 commit diffs after adjusting index hashes and hunk positions, seven
 merged with no tree change, and one matched a published tree. A second
 cleanup retired 382 topic names in 220 scratch Git databases. Each of
-those tips is an ancestor of the published branch. Every retired name
-has a local recovery ref at its original tip. Dirty checkouts, stashes,
-and branches with unexplained changes remain available.
+those tips is an ancestor of the published branch. A source and test
+comparison identified 36 more main-repository names with integrated
+changes.
+
+The final pass archived 128 main-repository names and 774 scratch names.
+It preserved the original tips of distinct experiments as well as
+superseded changes. The primary repository now has one checked-out
+branch, `dependent-haskell`. Its other head, `master`, tracks upstream.
+The archive also contains 42 worktree snapshots and one interrupted
+three-patch queue. Each worktree snapshot has a parent for the original
+index, so staged and unstaged versions can be recovered separately.
 
 The local source bundle and its ref map are in the evidence directory
-`branches-20261121`. Restore verification found all 19,970 required Git
-objects outside `26004c02c0` in the bundle. A separate archive records
-the uncommitted source. The branch ledger records ancestry, patch
-comparisons, and unresolved cases. To recover a retired branch, run the
-following in the repository that owned it, substituting its recorded name.
+`branches-20261121`. The final bundle preserves 1,055 distinct source
+tips. A restore check found all 24,907 required Git objects outside the
+published prerequisite `d620e2ad78`. A separate archive records the
+uncommitted source. The final branch ledger records which changes
+entered the compiler and which remain experiments. Use the recovery ref
+recorded for the branch to open a detached checkout. For example, restore
+the original mixed-package experiment from the primary repository with
+the following command.
 
 ```sh
-git branch "$name" "refs/archive/dependent-haskell/2026-11-21/integrated/$name"
+git worktree add --detach /tmp/ghc-mixed-packages \
+  refs/archive/dependent-haskell/streams-20261121/retired/main/codex/r22-mixed-spine
 ```
