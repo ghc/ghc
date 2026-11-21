@@ -4742,7 +4742,8 @@ tcRetainedResultMatch NoQL (Just expected) args fun sigma
 tcRetainedResultMatch do_ql expected args fun sigma
   = tcRetainedWorkerResultMatch do_ql expected args fun sigma
 
--- | Match the result of an ordinary application without choosing absent parameters.
+-- | Match the result without choosing absent parameters. The flag identifies
+-- a ranked constructor result that requires complete instantiation.
 retainedOrdinaryResultSubst :: TcRhoType -> [HsExprArg 'TcpRn] -> HsExpr GhcTc
                             -> TcSigmaType -> Maybe ([TyVar], Type, Subst.Subst, Bool)
 retainedOrdinaryResultSubst expected args fun sigma
@@ -4769,6 +4770,7 @@ retainedOrdinaryResultSubst expected args fun sigma
   , Just subst <- tcMatchTyX_BM (bind_outer tvs) kind_subst result expected
   , eqType (Subst.substTy subst result) expected
   = Just (tvs, body, subst, ranked_constructor)
+  | otherwise = Nothing
   where
     is_type_arg ETypeArg{} = True
     is_type_arg _ = False
