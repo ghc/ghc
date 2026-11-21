@@ -19,7 +19,7 @@ where
 
 import GHC.Prelude
 import GHC.Data.FastString
-import GHC.Builtin.Modules (gHC_INTERNAL_BASE, gHC_INTERNAL_ERR, mkGhcInternalModule)
+import GHC.Builtin.Modules (gHC_INTERNAL_BASE, gHC_INTERNAL_ERR, gHC_PRIM, isWiredInOnlyModule, mkGhcInternalModule)
 import GHC.Builtin.WiredIn.Types
   (boolTyConName, charTyConName, listTyConName, manyDataConName, naturalTyConName, pairTyCon
   , matchabilityTyConName, matchableDataConName, unmatchableDataConName)
@@ -63,7 +63,7 @@ import GHC.Utils.Constants (debugIsOn)
 
 import GHC.Types.Annotations
 import GHC.Types.Avail
-import GHC.Types.Basic ( ImportLevel(..), TupleSort(BoxedTuple) )
+import GHC.Types.Basic ( ImportLevel(..), SourceTableOrigin(FinalCoreSourceTable), TupleSort(BoxedTuple) )
 import GHC.Types.Var (VarBndr(Bndr), ForAllTyFlag(Inferred, Invisible, Required))
 import GHC.Types.TyThing (TyThing(ATyCon))
 import GHC.Types.UnresolvedImport
@@ -914,6 +914,14 @@ checkFlagHash hsc_env iface self_recomp = do
           , couldInferLiberalSynonymMatchability (mi_exports iface) (map snd (mi_decls iface)) =
               liftIO $ recheck "Compiler now infers matchability for liberal synonym callbacks"
           | otherwise = pure UpToDate
+        check_home_rule_closures
+          | checkRuleClosures dflags iface
+          , not (Map.member homeRuleClosuresField (getExtensibleFields (mi_ext_fields iface)))
+          = do candidate <- usesFinalCoreSourceTable (mi_sr_usages self_recomp)
+               if candidate
+                 then liftIO $ recheck "Compiler now tracks home rule dependencies for final Core equations"
+                 else pure UpToDate
+          | otherwise = pure UpToDate
     pure (flags, check_identity `recompThen` check_guarded_filter
                                      `recompThen` check_append
                                      `recompThen` check_reverse
@@ -929,7 +937,8 @@ checkFlagHash hsc_env iface self_recomp = do
                                      `recompThen` check_retained_signature
                                      `recompThen` check_nullary_family
                                      `recompThen` check_liberal_synonym
-                                     `recompThen` check_mapping)
+                                     `recompThen` check_mapping
+                                     `recompThen` check_home_rule_closures)
 
 {- Note [Recompiling liberal synonym callbacks]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -996,6 +1005,52 @@ mappingField = "checked-container-mapping-v1"
 -- | Record that a potential old synonym provider was checked once.
 liberalSynonymCallbackField :: String
 liberalSynonymCallbackField = "liberal-synonym-callback-v1"
+
+{- Note [Recompiling final Core rule dependencies]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A source proof can depend on the absence of an applicable home rule.
+A private rule can change a home module's full interface hash while its ABI
+stays the same. A new proof records the full hashes of the home interfaces
+that supply its visible rules.
+
+An older interface has no such usages. Inspect the providers of values
+and tables in its usages. A package usage records only the provider module,
+so recheck when that module supplies any final Core table. Also recheck if
+the provider is unavailable. A new interface records this check even when
+the recompiled module no longer uses a final Core proof.
+-}
+
+-- | Extensible field for interfaces reviewed for home rule dependencies.
+homeRuleClosuresField :: String
+homeRuleClosuresField = "home-rule-closures-reviewed-v1"
+
+-- | Check source modules that enable rewrite rules.
+checkRuleClosures :: DynFlags -> ModIface_ phase -> Bool
+checkRuleClosures dflags iface = mi_hsc_src iface == HsSrcFile
+                            && gopt Opt_EnableRewriteRules dflags
+
+-- | Detect old usages that may depend on a final Core equation.
+-- See Note [Recompiling final Core rule dependencies].
+usesFinalCoreSourceTable :: [Usage] -> IfG Bool
+usesFinalCoreSourceTable = anyM imported
+  where
+    imported UsageHomeModule{usg_mod_name = name, usg_unit_id = uid, usg_entities = entities}
+      | not (null entities)
+      = let used = Set.fromList (map fst entities)
+        in check_provider (mkModule (RealUnit (Definite uid)) name) (`Set.member` used)
+    imported UsagePackageModule{usg_mod = owner} = check_provider owner (const True)
+    imported UsageHomeModuleInterface{} = pure True
+    imported _ = pure False
+
+    check_provider owner used
+      | owner == gHC_PRIM || isWiredInOnlyModule owner = pure False
+      | otherwise = do
+          provider <- readRecompProvider (text "Checking final Core rule dependencies") owner
+          pure (maybe True (any (uses_table used . snd) . mi_decls) provider)
+
+    uses_table used IfaceId{ifName = owner, ifIdDetails = IfSourceTableId table FinalCoreSourceTable} =
+      used (nameOccName owner) || used (nameOccName table)
+    uses_table _ _ = False
 
 {- Note [Recompiling nullary closed arrow families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2275,6 +2330,11 @@ checkModUsage _ UsageMergedRequirement{ usg_mod = mod, usg_mod_hash = old_mod_ha
   needInterface mod $ \iface -> do
     let reason = ModuleChangedRaw (moduleName mod)
     checkModuleFingerprint logger reason old_mod_hash (mi_mod_hash iface)
+checkModUsage _ UsageHomeModuleInterface{ usg_mod = mod, usg_iface_hash = old_iface_hash } = do
+  logger <- getLogger
+  needInterface mod $ \iface -> do
+    let reason = ModuleChangedRaw (moduleName mod)
+    checkModuleFingerprint logger reason old_iface_hash (mi_iface_hash iface)
 checkModUsage _  UsageHomeModuleBytecode{ usg_mod_name = mod_name
                                                  , usg_unit_id = uid
                                                  , usg_bytecode_hash = old_bytecode_hash } = do
@@ -2740,6 +2800,10 @@ addFingerprints
         -> IO ModIface
 addFingerprints hsc_env iface0 = do
   (abiHashes, caches, decls_w_hashes) <- addAbiHashes hsc_env (mi_mod_info iface0) (mi_public iface0) (mi_deps iface0)
+  stamp_home_rules <- case mi_self_recomp_info iface0 of
+    Just info | checkRuleClosures (hsc_dflags hsc_env) iface0 ->
+      initIfaceLoad hsc_env (usesFinalCoreSourceTable (mi_sr_usages info))
+    _ -> pure False
 
    -- put the declarations in a canonical order, sorted by OccName
   let sorted_decls :: [(Fingerprint, IfaceDecl)]
@@ -2788,25 +2852,19 @@ addFingerprints hsc_env iface0 = do
                         (mi_abi_mod_hash abiHashes,
                          mi_self_recomp_info iface,
                          mi_deps iface0)
-      liberal_hash | stamp_liberal =
-                       computeFingerprint putNameLiterally (base_hash, liberalSynonymCallbackField)
-                   | otherwise = base_hash
-      checked_hash | stamp_mapping = computeFingerprint putNameLiterally (liberal_hash, mappingField)
-                   | otherwise = liberal_hash
+      checked_fields = [liberalSynonymCallbackField | stamp_liberal]
+                    ++ [mappingField | stamp_mapping]
+                    ++ [homeRuleClosuresField | stamp_home_rules]
+      checked_hash = foldl' (\fp field -> computeFingerprint putNameLiterally (fp, field))
+                            base_hash checked_fields
       !iface_hash = case sourceTableLocations sorted_decls of
         []   -> checked_hash
         locs -> computeFingerprint putNameLiterally (checked_hash, locs)
 
-  liberal_iface <- if stamp_liberal
-                   then do fields <- writeField liberalSynonymCallbackField () (mi_ext_fields iface)
-                           pure (set_mi_ext_fields fields iface)
-                   else pure iface
-  checked_iface <- if stamp_mapping
-                   then do fields <- writeField mappingField () (mi_ext_fields liberal_iface)
-                           pure (set_mi_ext_fields fields liberal_iface)
-                   else pure liberal_iface
-
-  let final_iface = completePartialModIface checked_iface iface_hash
+  fields <- foldM (\fields field -> writeField field () fields) (mi_ext_fields iface) checked_fields
+  let checked_iface | null checked_fields = iface
+                    | otherwise = set_mi_ext_fields fields iface
+      final_iface = completePartialModIface checked_iface iface_hash
                      sorted_decls sorted_extra_decls abiHashes caches
    --
   return final_iface

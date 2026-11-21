@@ -37,6 +37,7 @@ module GHC.Driver.Env
    , mainModIs
 
    , hugRulesBelow
+   , hugRuleInterfacesBelow
    , hugInstancesBelow
    , hugAnnsBelow
    , hugCompleteSigsBelow
@@ -261,6 +262,11 @@ hscUIC hsc_env = ue_uic (hsc_unit_env hsc_env)
 hugRulesBelow :: HscEnv -> UnitId -> ModuleNameWithIsBoot -> IO RuleBase
 hugRulesBelow hsc_env uid mn = foldr (flip extendRuleBaseList) emptyRuleBase <$>
   hugSomeThingsBelowUs (md_rules . hm_details) False hsc_env uid mn
+
+-- | Find the home interfaces consulted by 'hugRulesBelow'.
+hugRuleInterfacesBelow :: HscEnv -> UnitId -> ModuleNameWithIsBoot -> IO [ModIface]
+hugRuleInterfacesBelow hsc_env uid mn = concat <$>
+  hugSomeThingsBelowUs (\info -> [hm_iface info]) False hsc_env uid mn
 
 -- | Get annotations from all modules "below" this one (in the dependency
 -- sense) within the home units. If the module is @Nothing@, returns /all/

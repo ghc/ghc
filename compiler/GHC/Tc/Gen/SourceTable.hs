@@ -45,7 +45,7 @@ import GHC.Data.OrdList (fromOL)
 import GHC.Driver.Backend (backendGeneratesCode)
 import GHC.Driver.Config (initSimpleOpts)
 import GHC.Driver.Session (GeneralFlag(Opt_EnableRewriteRules), backend, HasDynFlags(getDynFlags))
-import GHC.Driver.Env (hsc_HUG, hsc_home_unit, hugRulesBelow)
+import GHC.Driver.Env (hsc_HUG, hsc_home_unit, hugRuleInterfacesBelow, hugRulesBelow)
 import GHC.Hs
 import {-# SOURCE #-} GHC.HsToCore.Binds (dsTopLHsBinds)
 import GHC.HsToCore.Errors.Ppr () -- Diagnostic DsMessage
@@ -62,7 +62,7 @@ import GHC.Tc.Types (TcGblEnv(..), tcVisibleOrphanMods)
 import GHC.Tc.Utils.Instantiate (freshenTyVarBndrs)
 import GHC.Tc.Utils.Env (tcLookupGlobal, tcLookupId, tcLookupIdMaybe, tcGetInstEnvs)
 import GHC.Tc.Utils.Monad (TcM, addErr, failWithTc, getEps, getGblEnv, getGlobalRdrEnv, getTcEvBindsMap, getTcEvBindsState,
-                           checkNoErrs, getTopEnv, goptM, keepAlive, liftZonkM, newSysName, readTcRef, setSrcSpanA, updTcRef, xoptM)
+                           checkNoErrs, getTopEnv, goptM, keepAlive, liftZonkM, newSysName, readTcRef, recordHomeRuleDependencies, setSrcSpanA, updTcRef, xoptM)
 import GHC.Tc.Utils.TcType (isTyFamFree)
 import GHC.Tc.Zonk.TcType (zonkTcType, zonkTcTypes)
 import GHC.Types.Avail (availNames)
@@ -898,11 +898,20 @@ checkSourceMethodUsesWithPending env = do
         setSrcSpanA (getLoc rule) (mapM_ report (nameSetElemsStable names))
       unless (isEmptyNameSet imported) $ do
         visible <- visibleSourceMethodRules env
-        forM_ (nameSetElemsStable imported) $ \name -> do
+        uses_checked_rules <- forM (nameSetElemsStable imported) $ \name -> do
           v <- tcLookupId name
           let changed | uses_final_core v = not (checkedMapperRules visible v)
                       | otherwise = any (\arg -> hasSourceMethodRuleAt visible arg v) (arguments name)
           when changed (report name)
+          pure (uses_final_core v && not changed)
+        -- A private rule can change the full interface hash while its ABI
+        -- stays the same. Record the rule environment of committed proofs.
+        let here = tcg_mod env
+        when (or uses_checked_rules && not (isInteractiveModule here || isHsBootOrSig (tcg_src env))) $ do
+          hsc <- getTopEnv
+          deps <- liftIO $ hugRuleInterfacesBelow hsc (homeUnitId (hsc_home_unit hsc))
+                     (GWIB (moduleName here) NotBoot)
+          recordHomeRuleDependencies deps
 
 -- | Find source functions that a user rule can rewrite.
 sourceRuleOwners :: [LRuleDecl GhcTc] -> NameSet

@@ -146,6 +146,8 @@ pprUsage usage@UsageDirectory{}
           ppr (usg_dir_hash usage)]
 pprUsage usage@UsageMergedRequirement{}
   = hsep [text "merged", ppr (usg_mod usage), ppr (usg_mod_hash usage)]
+pprUsage UsageHomeModuleInterface{ usg_mod = mod, usg_iface_hash = hash }
+  = hsep [text "homeRuleInterface", ppr mod, ppr hash]
 pprUsage usage@UsageHomeModuleBytecode{}
   = hsep [text "Bytecode", ppr (usg_mod_name usage)
                                , ppr (usg_unit_id usage)
