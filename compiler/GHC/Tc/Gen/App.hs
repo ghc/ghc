@@ -4112,6 +4112,7 @@ tcRetainedResultIndexCast NoQL (Just expected) args fun sigma
   , templates `equalLength` actuals
   , let tvs = map snd binders
   , Just indices <- traverse (result_index (zip templates actuals)) tvs
+  , any is_retained_var indices
   , or (zipWith (\index tv -> not (typeKind index `eqType` tyVarKind tv)) indices tvs)
   , all noQuickLookVars [body, expected]
   = do { valid <- tcRetainedInstScope (body : expected : indices)
@@ -4121,9 +4122,12 @@ tcRetainedResultIndexCast NoQL (Just expected) args fun sigma
             ; return (Just (choices, Subst.substTy subst body)) } }
   where
     result_index pairs tv
-      | [index@TermVarTy{}] <- [actual | (formal, actual) <- pairs, getTyVar_maybe formal == Just tv]
+      | [index] <- [actual | (formal, actual) <- pairs, getTyVar_maybe formal == Just tv]
       = Just index
       | otherwise = Nothing
+
+    is_retained_var TermVarTy{} = True
+    is_retained_var _ = False
 
     transport subst (tv, index)
       = do { let kind = Subst.substTy subst (tyVarKind tv)
@@ -4151,7 +4155,10 @@ The expected result supplies the exact value v. An instantiation
 metavariable cannot hold that value, even after kind transport.
 
 For a saturated real constructor, take each remaining invisible binder
-from its unique direct argument in the same data TyCon. Find every index
+from its unique direct argument in the same data TyCon. At least one
+argument must identify a retained value. Other positions can determine
+ordinary parameters such as the element type of both vectors. Copy the
+argument from its position without decomposing it. Find every choice
 before emitting any evidence. Check the indices in binder order. An
 earlier transport can occur in a later kind. Use ordinary nominal kind
 checking, as for a written type application, and cast each scoped index.
