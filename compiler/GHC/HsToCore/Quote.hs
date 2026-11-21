@@ -37,6 +37,7 @@ import GHC.HsToCore.Binds
 import qualified GHC.Boot.TH.Syntax as TH
 
 import GHC.Hs
+import qualified GHC.Hs.Decls as HsDecls
 import GHC.Hs.Type (HsTypeGhcRnExt(HsTypeLetRn, HsTypeCaseAliasRn, HsTypeCaseRn))
 import GHC.Hs.Decls.Overlap ( OverlapMode(..) )
 
@@ -3131,9 +3132,11 @@ repGadtDataCons :: NonEmpty (LocatedN Name)
 repGadtDataCons cons details res_ty
     = do cons' <- mapM lookupLOcc cons -- See Note [Binders and occurrences]
          case details of
-           PrefixConGADT _ ps | hsHasForEachTy (unLoc res_ty) -> do
-             prefix <- mapM rep_field ps
-             repRetainedGadt (nonEmptyCoreList' cons') prefix res_ty
+           PrefixConGADT _ ps
+             | hsHasForEachTy (unLoc res_ty)
+             || isJust (HsDecls.splitGadtTerminalForAll details res_ty) -> do
+               prefix <- mapM rep_field ps
+               repRetainedGadt (nonEmptyCoreList' cons') prefix res_ty
            PrefixConGADT _ ps -> do
              arg_tys <- repPrefixConArgs IsPrefixConGADT ps
              res_ty' <- repLTy TypeLevel res_ty
@@ -3148,6 +3151,7 @@ repGadtDataCons cons details res_ty
       repGadtValueArg cdf_unpack cdf_bang cdf_multiplicity cdf_type
 
 -- | Quote the constructor suffix with retained names in scope.
+-- See Note [Terminal constructor foralls in TH] in GHC.ThToHs.
 repRetainedGadt :: Core [TH.Name] -> [Core (M TH.RetainedGadtArg)]
                 -> LHsType GhcRn -> MetaM (Core (M TH.Con))
 repRetainedGadt names prefix = go (reverse prefix)
