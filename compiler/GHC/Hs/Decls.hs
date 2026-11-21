@@ -1008,21 +1008,27 @@ splitGadtTerminal (PrefixConGADT _ (_ : _)) ty
   , let group = L loc (HsGadtForAll noExtField tele)
   = case tele of
       HsForAllVis { hsf_vis_bndrs = binders }
+        | not (null binders)
+        , Just (ctxt, result) <- terminal_context body ->
+          Just ([group, ctxt], length binders, result)
         | not (null binders), plain_result body ->
           Just ([group], length binders, body)
       HsForAllInvis { hsf_invis_bndrs = binders }
         | not (null binders)
         , all ((== SpecifiedSpec) . hsTyVarBndrFlag . unLoc) binders
-        , L _ HsQualTy { hst_ctxt = ctxt, hst_body = result } <- ignoreParens body
-        , not (null (hsConDeclTheta (Just ctxt)))
-        , plain_result result ->
-          Just ([group, mkHsGadtContext ctxt], length binders, result)
+        , Just (ctxt, result) <- terminal_context body ->
+          Just ([group, ctxt], length binders, result)
       _ -> Nothing
-  | L _ HsQualTy { hst_ctxt = ctxt, hst_body = result } <- ignoreParens ty
-  , not (null (hsConDeclTheta (Just ctxt)))
-  , plain_result result
-  = Just ([mkHsGadtContext ctxt], gadtTrailingContextOnly, result)
+  | Just (ctxt, result) <- terminal_context ty
+  = Just ([ctxt], gadtTrailingContextOnly, result)
   where
+    terminal_context ty
+      | L _ HsQualTy { hst_ctxt = ctxt, hst_body = result } <- ignoreParens ty
+      , not (null (hsConDeclTheta (Just ctxt)))
+      , plain_result result
+      = Just (mkHsGadtContext ctxt, result)
+      | otherwise = Nothing
+
     plain_result result = case unLoc (ignoreParens result) of
       HsForAllTy{} -> False
       HsForEachTy{} -> False
