@@ -1,0 +1,15 @@
+Int -> Bool
+Int %'Matchable -> Bool
+Int %'One %'Matchable -> Bool
+FUN 'Many ('BoxedRep 'Lifted) ('BoxedRep 'Lifted)
+FUN 'Matchable 'Many ('BoxedRep 'Lifted) ('BoxedRep 'Lifted)
+Proxy (* -> *)
+Proxy (* %'Unmatchable -> *)
+Proxy ((* %'Unmatchable -> *) -> *)
+Proxy ((* -> *) -> *)
+* -> *
+* %'Matchable -> *
+True
+True
+True
+True

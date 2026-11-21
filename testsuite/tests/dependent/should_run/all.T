@@ -431,6 +431,7 @@ test('NativeOpenMatchability',
                    'NativeOpenMatchabilityClient.hs', 'NativeOpenMatchabilityConflict.hs'])],
      run_command, ['bash NativeOpenMatchability.sh "{compiler}" "{libdir}"'])
 
+test('NativeReflectionShow', normal, compile_and_run, [''])
 test('NativePercentArrow',
      [only_ways(['normal']),
       extra_files(['NativePercentArrowProvider.hs', 'NativePercentArrowOnlyModifiers.hs',

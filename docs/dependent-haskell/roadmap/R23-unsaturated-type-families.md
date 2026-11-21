@@ -1126,6 +1126,23 @@ fixed matchability annotations. The explicit print flag shows the annotations.
 A matchability mismatch still shows the expected and actual annotations.
 [Display rule in proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#showing-matchabilities).
 
+### Showing reflected arrows
+
+The runtime `TypeRep` printer omits U for ordinary arrows and raw `FUN`.
+It omits M inside reflected kind arguments. For example, the kind argument
+in `Proxy (RuntimeRep -> *) TYPE` has an M arrow. An explicit U arrow in
+that position prints with `%'Unmatchable`. A standalone M arrow prints
+with `%'Matchable`. The printer uses the modifier syntax from proposal #370.
+
+The compiler flag from proposal #242 controls compiler type printing.
+Runtime `Show` uses the representation and its display context.
+`Fun'`, `Con'`, and `eqTypeRep` still observe the raw matchability.
+Printing a linear arrow renders the arrow directly. `splitApps` still
+requires an unrestricted function.
+[Reflection checks](../../../testsuite/tests/dependent/should_run/NativeReflectionShow.hs),
+[proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#showing-matchabilities),
+and [modifier syntax in proposal #370](https://ghc-proposals.readthedocs.io/en/latest/proposals/0370-modifiers.html#proposed-change-specification).
+
 ## Substituting an equal index in a partial family
 
 An ordinary client can prove `Callback a :~: Callback b` from an
