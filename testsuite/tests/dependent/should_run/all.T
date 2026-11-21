@@ -154,6 +154,9 @@ test('NativeOpenListFoldrGhci',
                                                'PreludeMapLengthSource.hs', 'PreludeMapLengthProof.hs']]
                   + ['NativeOpenListFoldrProducer.hs', 'NativeOpenListFoldrConcrete.hs'])],
      run_command, ['bash NativeOpenListFoldrGhci.sh "{compiler}" "{libdir}"'])
+test('NativeHomeRuleRecomp',
+     [only_ways(['normal'])],
+     run_command, ['bash NativeHomeRuleRecomp.sh "{compiler}" "{libdir}"'])
 test('NativeOpenInstalledPair',
      [req_interp, req_rts_linker, only_ways(['normal']),
       extra_files([open_eval_dir + 'PreludePairExport.hs',
