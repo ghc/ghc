@@ -4083,8 +4083,8 @@ tcRetainedResultInst do_ql expected args fun sigma
            Just _ -> return matched
            Nothing -> tcRetainedResultCandidate do_ql expected args fun sigma }
 
--- | Instantiate the last erased constructor binder from an exact result index.
--- See Note [Transporting a retained result index].
+-- | Instantiate erased constructor binders from exact retained result indices.
+-- See Note [Transporting retained result indices].
 tcRetainedResultIndexCast :: QLFlag -> Maybe TcRhoType -> [HsExprArg 'TcpRn]
                          -> HsExpr GhcTc -> TcSigmaType
                          -> TcM (Maybe ([Type], TcSigmaType))
@@ -4092,7 +4092,7 @@ tcRetainedResultIndexCast NoQL (Just expected) args fun sigma
   | XExpr (ConLikeTc (RealDataCon dc)) <- fun
   , hasNoConcreteTyVars fun
   , not (any is_type_arg args)
-  , ([(_, tv)], body) <- tcSplitForAllInvisTyVars sigma
+  , (binders@(_:_), body) <- tcSplitForAllInvisTyVars sigma
   , isTauTy body
   , Just result <- tcRetainedOrdinaryResult (count isHsValArg args) body
   , Just (tc, templates) <- splitTyConApp_maybe result
@@ -4100,42 +4100,55 @@ tcRetainedResultIndexCast NoQL (Just expected) args fun sigma
   , length templates == tyConArity tc
   , Just actuals <- retainedResultArgs tc expected
   , templates `equalLength` actuals
-  , [index@TermVarTy{}] <- [ actual | (formal, actual) <- zip templates actuals
-                                   , getTyVar_maybe formal == Just tv ]
-  , not (typeKind index `eqType` tyVarKind tv)
+  , let tvs = map snd binders
+  , Just indices <- traverse (result_index (zip templates actuals)) tvs
+  , or (zipWith (\index tv -> not (typeKind index `eqType` tyVarKind tv)) indices tvs)
   , all noQuickLookVars [body, expected]
-  = do { valid <- tcRetainedInstScope [index, body, expected]
+  = do { valid <- tcRetainedInstScope (body : expected : indices)
        ; if not valid then return Nothing else
-         do { co <- unifyKind Nothing (typeKind index) (tyVarKind tv)
-            ; let choice = mkCastTy index co
-            ; return (Just ([choice], substTyWith [tv] [choice] body)) } }
+         do { let in_scope = mkInScopeSet (tyCoVarsOfTypes (body : map tyVarKind tvs))
+            ; (subst, choices) <- mapAccumLM transport (Subst.mkEmptySubst in_scope) (zip tvs indices)
+            ; return (Just (choices, Subst.substTy subst body)) } }
   where
+    result_index pairs tv
+      | [index@TermVarTy{}] <- [actual | (formal, actual) <- pairs, getTyVar_maybe formal == Just tv]
+      = Just index
+      | otherwise = Nothing
+
+    transport subst (tv, index)
+      = do { let kind = Subst.substTy subst (tyVarKind tv)
+           ; co <- unifyKind Nothing (typeKind index) kind
+           ; let choice = mkCastTy index co
+           ; return (Subst.extendTvSubstAndInScope subst tv choice, choice) }
+
     is_type_arg ETypeArg{} = True
     is_type_arg _ = False
 tcRetainedResultIndexCast _ _ _ _ _ = return Nothing
 
 -- | Read the expected data arguments, including a checked sum payload.
--- See Note [Transporting a retained result index].
+-- See Note [Transporting retained result indices].
 retainedResultArgs :: TyCon -> Type -> Maybe [Type]
 retainedResultArgs tc ty
   | Just (head_tc, params) <- splitTyConApp_maybe ty, head_tc == tc = Just params
   | otherwise = snd <$> matchSumPayload tc ty
 
-{- Note [Transporting a retained result index]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Transporting retained result indices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In a checked split, a constructor returns Width (Add cut suffix) p
 while the expected result is Width total v. The length proof can
 establish the kind equality Vec a total ~# Vec a (Add cut suffix).
 The expected result supplies the exact value v. An instantiation
 metavariable cannot hold that value, even after kind transport.
 
-For a saturated real constructor with one invisible binder left, take
-the index only from a direct result argument of the same data TyCon.
-Use ordinary nominal kind checking, as for a written type application,
-and cast that same scoped index. This produces an immutable application.
-Emit the kind equality in IALL when the caller commits to this application.
-The enclosing implication must solve it. The application checker still
-checks all field arguments and the entire result.
+For a saturated real constructor, take each remaining invisible binder
+from its unique direct argument in the same data TyCon. Find every index
+before emitting any evidence. Check the indices in binder order. An
+earlier transport can occur in a later kind. Use ordinary nominal kind
+checking, as for a written type application, and cast each scoped index.
+This produces an immutable application. Emit the kind equalities in IALL
+when the caller commits to this application. The enclosing implication
+must solve them. The application checker still checks all field arguments
+and the entire result.
 For a generated sum payload, read the result arguments after the checked
 family reduction in matchSumPayload. That reduction goes from the family
 application to the expected data type. Only the data type has a slot that
