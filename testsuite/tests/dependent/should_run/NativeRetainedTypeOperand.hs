@@ -22,3 +22,5 @@ main = do
   print (preserve (type Bool) True, reflect False)
   print (onlyBool (type Char) (error "unused payload"))
   print (ignoreType (Proxy @Char), (type Maybe) :: TypeRep Maybe)
+  print (selected @{type Char} (error "unused payload"),
+         preserveImplicit @{error "unused witness" :: TypeRep Bool} True)

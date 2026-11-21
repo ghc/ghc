@@ -5,8 +5,6 @@ import Data.Kind (Type)
 
 type Lifted = Type
 
-preserve :: foreach (a :: Type). a -> a
-preserve x = x
+type Unsupported = foreach (a :: Type). a -> a
 
-preserveAlias :: foreach (a :: Lifted). a -> a
-preserveAlias x = x
+type UnsupportedAlias = foreach (a :: Lifted) -> a -> a

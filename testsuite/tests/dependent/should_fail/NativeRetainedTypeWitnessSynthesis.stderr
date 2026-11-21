@@ -1,6 +1,11 @@
-NativeRetainedTypeWitnessSynthesis.hs:10:21: error: [GHC-39999]
+NativeRetainedTypeWitnessSynthesis.hs:11:21: error: [GHC-39999]
     • No instance for ‘Typeable a’
         arising from the type operand ‘type a’
     • In the first argument of ‘preserve’, namely ‘(type a)’
       In the expression: preserve (type a)
       In an equation for ‘missing’: missing = preserve (type a)
+
+NativeRetainedTypeWitnessSynthesis.hs:17:20: error: [GHC-39999]
+    • No instance for ‘Typeable a’ arising from a use of ‘selected’
+    • In the expression: selected
+      In an equation for ‘missingInvisible’: missingInvisible = selected

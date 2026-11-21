@@ -190,8 +190,8 @@ M58 and M59 expose those rules through source checking.
 - [ ] Extend omission beyond the measured domains and application forms.
       Keep retention independent of visibility and inference.
 - [ ] Specify runtime `Type` operands and their universe representation.
-      Visible binders in value signatures accept explicit `TypeRep` operands.
-      Type operands that request evidence remain open.
+      Complete value signatures support visible and invisible Type binders.
+      Runtime type patterns still need a syntax and an evidence scope.
 - [x] Finish [M68 ordinary callers](../PLAN.md#m68-ordinary-callers-of-retained-apis).
       Imported retained contracts must preserve inference and evidence scope
       without requiring dependent source syntax. Keep the application change
@@ -348,14 +348,34 @@ universe's level from the datatypes of codes that programs can inspect.
 [Agda universe levels](https://agda.readthedocs.io/en/v2.8.0/language/universe-levels.html)
 and [Agda type codes](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html#forward-declaration).
 
+An invisible binder in a complete value signature can supply the same witness
+through `Typeable`.
+
+```haskell
+selected :: foreach (a :: Type). a -> String
+selected _ = show a
+
+map selected [(), ()]
+```
+
+An ordinary argument or a known result type can determine the erased type.
+A higher-rank caller can provide the required `Typeable` constraint through
+its callback type. Write `selected @{type Bool} True` to supply the witness
+explicitly. If a provider ignores that witness, a bottom operand stays lazy.
+An exported unfolding can use the existing representational visibility cast
+when its result type does not refer to the runtime argument. The direct call
+`map selected` works with shallow and deep subsumption. Quick Look still
+rejects `map $ selected` and the direct call with `ImpredicativeTypes`.
+
 - [x] Give a visible source binder an erased type variable and a value
   whose representation is `TypeRep a`. Check a provider and a source-hidden
   ordinary caller. Keep the ordinary type and arrow in the interface.
 - [x] Use the type variable in erased positions. Pass the value in
   retained positions. Check that `preserve` ignores a bottom
   representation in compiled code and GHCi.
-- [ ] Preserve source telescope information for implicit construction of
-  the runtime representation across modules.
+- [x] Preserve the invisible witness binder across modules. Check an inferred
+  ordinary callback, a partial application, a result-only witness, and a
+  higher-rank `Typeable` argument through stripped interfaces.
 - [x] Construct concrete and abstract type operands when the caller
   expects `TypeRep`. Reject an abstract type with no `Typeable` evidence.
 - [ ] Check a runtime type test only inside the branch that receives

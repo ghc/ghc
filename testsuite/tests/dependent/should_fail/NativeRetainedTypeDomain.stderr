@@ -1,12 +1,13 @@
-NativeRetainedTypeDomain.hs:8:21: error: [GHC-83605]
+NativeRetainedTypeDomain.hs:8:28: error: [GHC-83605]
     • A retained binder with domain ‘Type’ is not supported in this position.
-      Use a visible ‘foreach (a :: Type) ->’ binder in a complete value signature,
+      Use a retained ‘foreach (a :: Type)’ binder in a complete value signature,
       or use an explicit ‘TypeRep a’ parameter from ‘Type.Reflection’.
-    • In the type signature: preserve :: foreach (a :: Type). a -> a
+    • In the type ‘foreach (a :: Type). a -> a’
+      In the type synonym declaration for ‘Unsupported’
 
-NativeRetainedTypeDomain.hs:11:26: error: [GHC-83605]
+NativeRetainedTypeDomain.hs:10:33: error: [GHC-83605]
     • A retained binder with domain ‘Type’ is not supported in this position.
-      Use a visible ‘foreach (a :: Type) ->’ binder in a complete value signature,
+      Use a retained ‘foreach (a :: Type)’ binder in a complete value signature,
       or use an explicit ‘TypeRep a’ parameter from ‘Type.Reflection’.
-    • In the type signature:
-        preserveAlias :: foreach (a :: Lifted). a -> a
+    • In the type ‘foreach (a :: Lifted) -> a -> a’
+      In the type synonym declaration for ‘UnsupportedAlias’

@@ -1,5 +1,6 @@
 {-# LANGUAGE NoExperimentalDependentTypes #-}
 {-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE TypeApplications #-}
 module Main where
@@ -8,6 +9,12 @@ import NativeRetainedTypeWitnessLib
 import Type.Reflection
 
 data Token = Token Int deriving Show
+
+useOrdinary :: (forall a. Typeable a => a -> String) -> [String]
+useOrdinary f = [f False, f 'x']
+
+selectInts :: [Int] -> [String]
+selectInts = map selected
 
 main :: IO ()
 main = do
@@ -19,3 +26,6 @@ main = do
   print (first == second)
   let (lazy, _) = duplicate (typeRep @Token) (error "unused second witness")
   print (lazy == typeRep @Token)
+  print (map selected [(), ()], selectInts [4], useOrdinary selected)
+  print (id reflected :: TypeRep Bool)
+  print (selected (error "unused payload" :: Int))

@@ -4,7 +4,8 @@
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
-module NativeRetainedTypeWitnessLib (preserve, duplicate, onlyBool) where
+module NativeRetainedTypeWitnessLib
+  (preserve, duplicate, onlyBool, selected, preserveImplicit, reflected) where
 
 import Data.Kind (Type)
 import Type.Reflection
@@ -25,3 +26,12 @@ onlyBool rep value =
   case eqTypeRep rep (typeRep @Bool) of
     Just HRefl -> Just (not value)
     Nothing -> Nothing
+
+selected :: foreach (a :: Type). a -> String
+selected _ = show a
+
+preserveImplicit :: foreach (a :: Type). a -> a
+preserveImplicit x = x
+
+reflected :: foreach (a :: Type). TypeRep a
+reflected = a

@@ -6,3 +6,12 @@ NativeRetainedTypeWitnessMismatch.hs:13:32: error: [GHC-83865]
       In the expression: agree (typeRep @Bool) (typeRep @Int) True
       In an equation for ‘wrong’:
           wrong = agree (typeRep @Bool) (typeRep @Int) True
+
+NativeRetainedTypeWitnessMismatch.hs:19:33: error: [GHC-83865]
+    • Couldn't match type ‘Int’ with ‘Bool’
+      Expected: TypeRep Bool
+        Actual: TypeRep Int
+    • In the first argument of ‘agreeImplicit’, namely ‘typeRep @Int’
+      In the expression: agreeImplicit @{typeRep @Int} True
+      In an equation for ‘wrongImplicit’:
+          wrongImplicit = agreeImplicit @{typeRep @Int} True

@@ -4,6 +4,10 @@ Just False
 Nothing
 True
 True
+(["()","()"],["Int"],["Bool","Char"])
+Bool
+"Int"
 (True,Just True)
 Nothing
 ((),Maybe)
+("Char",True)
