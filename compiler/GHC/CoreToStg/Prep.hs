@@ -1169,7 +1169,8 @@ nameNativeConstructorArgs platform expr
 
     needs_names _ [] = False
     needs_names ty (arg : rest)
-      | DepFunTy {} <- coreFullView ty
+      | DepFunTy _ index body <- coreFullView ty
+      , not (isVacuousRetainedBinder index body)
       , not (exprIsTrivial arg)
       , Just {} <- normaliseNativeIndexExpr arg
       , Nothing <- nativeDeferredArgIndex arg = True
@@ -1179,6 +1180,9 @@ nameNativeConstructorArgs platform expr
       = do { co <- liftNativeIndexTransport platform "the application result" transport ty
            ; return (wrap (mkCast app (mkSubCo co))) }
     build ty app transport wrap (arg : rest)
+      | DepFunTy _ index body <- coreFullView ty
+      , isVacuousRetainedBinder index body
+      = apply_argument (varType index) body
       | DepFunTy _ index _ <- coreFullView ty
       , Just call_index <- nativeDeferredArgIndex arg
       -- See Note [Naming computed retained arguments at erasure].
@@ -1211,13 +1215,16 @@ nameNativeConstructorArgs platform expr
       = do { check_erased_binder ty transport
            ; build (applyTypeToArgs ty [arg]) (App app arg) transport wrap rest }
       | Just (_, _, _, arg_ty, res_ty) <- splitFunTy_maybe ty
-      = do { co <- liftNativeIndexTransport platform "a later argument" transport arg_ty
-           ; let arg' = mkCast arg (mkSymCo (mkSubCo co))
-           ; build res_ty (App app arg') transport wrap rest }
+      = apply_argument arg_ty res_ty
       | Coercion {} <- arg
       = do { check_erased_binder ty transport
            ; build (applyTypeToArgs ty [arg]) (App app arg) transport wrap rest }
       | otherwise = pprPanic "nameNativeConstructorArgs: application type" (ppr ty $$ ppr expr)
+      where
+        apply_argument arg_ty res_ty
+          = do { co <- liftNativeIndexTransport platform "a later argument" transport arg_ty
+               ; let arg' = mkCast arg (mkSymCo (mkSubCo co))
+               ; build res_ty (App app arg') transport wrap rest }
 
     check_erased_binder ty transport
       | ForAllTy _ma binder _ <- coreFullView ty
@@ -1405,6 +1412,12 @@ Naming gives p : atom ~ (original |> sym delta), at kind A_prepared. Compose
 p with GRefl N (coercionRKind p) delta to obtain the marker relation
 atom :: A_prepared ~ original :: A_original. The nested kind casts cancel
 through mkCastTy. The nominal child stays present in the runtime value cast.
+
+A vacuous retained binder has no index to name. Treat its application as
+an ordinary arrow here. Transport its domain if an earlier index occurs
+there, and leave the runtime expression lazy. In particular, a TypeRep
+witness can share an application with a constructed index. See
+Note [Vacuous retained applications] in GHC.Core.Utils.
 
 The builder prepends marker relations. Reverse that list before constructing
 template TyVars: each later template kind needs the completed earlier prefix.
