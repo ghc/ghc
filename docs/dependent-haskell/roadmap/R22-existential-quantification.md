@@ -312,6 +312,7 @@ skips a callback whose expected type starts with `forall`. The package
 check uses its declared input type and leaves its ordinary checking in
 that scope. Agda likewise permits erased vector indices in compile-time
 types.
+[Ordinary refilter client](../examples/erased-existentials/RankedPackageClient.hs),
 [Source-hidden refilter](../../../testsuite/tests/dependent/should_run/implicit-existential-source/QuickLookForward.hs),
 [Quick Look, Figure 5](https://www.microsoft.com/en-us/research/wp-content/uploads/2020/01/quick-look-icfp20.pdf),
 and [Agda's erased vector indices](https://agda.readthedocs.io/en/stable/language/runtime-irrelevance.html).
