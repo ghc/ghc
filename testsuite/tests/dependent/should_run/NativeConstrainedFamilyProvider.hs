@@ -1,11 +1,14 @@
-{-# LANGUAGE FlexibleInstances, FunctionalDependencies, MultiParamTypeClasses, TypeFamilies #-}
-module NativeConstrainedFamilyProvider (Collects(..), Allowed, Defaulted(..), Pair(..), Key, KeyElement, Output(..), Projected, Chain(..), Fixed(..)) where
+{-# LANGUAGE ConstraintKinds, FlexibleContexts, FlexibleInstances, FunctionalDependencies, MultiParamTypeClasses, TypeFamilies #-}
+module NativeConstrainedFamilyProvider (Collects(..), Display, Allowed, Defaulted(..), Pair(..), Key, KeyElement, Output(..), Projected, Chain(..), Fixed(..)) where
 
 class Allowed a
 instance Allowed Bool
 
 class Collects c where
     type Elem c
+
+-- | The two component dictionaries of a displayable collection.
+type Display c = (Show (Elem c), Collects c)
 
 instance Allowed a => Collects [a] where
     type Elem [a] = a

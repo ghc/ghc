@@ -10,6 +10,7 @@ render a retained callback with ImpredicativeTypes enabled: ["Just True","Nothin
 forward a runtime element with a quantified partial signature: (True,False)
 split collections whose types determine their elements: (Just (True,[False]),Just ('x',()),Nothing)
 show the rest of a collection: (Just "[False]",Just "()",Nothing)
+print a cursor through its constraint synonym: (Just "[False]",Nothing,Just "()")
 advance a cursor using its superclass family equation: (Just [False],Nothing,Just ())
 use a stored retained callback at Bool and Char: Just (Just True,Just 'x')
 Dependent Haskell: completed source features

@@ -81,6 +81,7 @@ and [inference and escape checks](roadmap/R22-existential-quantification.md).
 
 An ordinary client can request `Show (Rest c)` alongside `Collection c e`.
 The collection constraint supplies the domain of its associated type.
+A library can export the same pair of constraints as a synonym.
 [Showing the rest of a collection](roadmap/R24-constrained-type-families.md#family-applications-in-a-signature-constraint).
 
 A type synonym can use a `case` to choose the argument type of an

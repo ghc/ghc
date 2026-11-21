@@ -1,11 +1,11 @@
-{-# LANGUAGE CPP, FlexibleContexts, MultiParamTypeClasses, QuantifiedConstraints, TypeApplications #-}
+{-# LANGUAGE CPP, ConstraintKinds, FlexibleContexts, MultiParamTypeClasses, QuantifiedConstraints, TypeApplications #-}
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes, RankNTypes, ScopedTypeVariables, TypeFamilies, TypeOperators #-}
 module NativeConstrainedFamilyClient where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
-import NativeConstrainedFamilyProvider (Allowed, Collects(..), Defaulted(..), Pair(..))
+import NativeConstrainedFamilyProvider (Allowed, Collects(..), Display, Defaulted(..), Pair(..))
 
 -- The superclass of Self cannot justify a family in Self's own arguments.
 class Collects c => Self c x
@@ -25,6 +25,17 @@ acrossForall :: forall (c :: Type). Collects c =>
     forall (x :: Type). Show (Elem c) => Proxy x -> Proxy c -> Bool
 #endif
 acrossForall _ _ = True
+
+-- An ordinary reader can use both components of the imported constraint.
+displayElement :: (Display c, Eq c) => Proxy c -> Elem c -> String
+displayElement _ = show
+
+#ifdef MENTION_TUPLE
+mentioned :: Proxy c -> Proxy (Display c)
+#else
+mentioned :: Collects c => Proxy c -> Proxy (Display c)
+#endif
+mentioned _ = Proxy
 
 assumed :: forall c. Collects c => Proxy c -> Proxy (Elem c)
 assumed _ =

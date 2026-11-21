@@ -1,5 +1,5 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, FlexibleContexts, FlexibleInstances, FunctionalDependencies, GADTs, Modifiers, PolyKinds, RankNTypes, ScopedTypeVariables, TypeApplications, TypeFamilies, TypeOperators, UndecidableInstances #-}
-module ConstrainedElements (Cursor(..), Collection(..), Allowed, Collects(..), FieldKey, Field(..), field, applyField, withField, KnownIndex(..), Reflection, reflectMaybe, MaybeBoolEcho, AtNothing) where
+{-# LANGUAGE ConstraintKinds, DataKinds, ExperimentalDependentTypes, FlexibleContexts, FlexibleInstances, FunctionalDependencies, GADTs, Modifiers, PolyKinds, RankNTypes, ScopedTypeVariables, TypeApplications, TypeFamilies, TypeOperators, UndecidableInstances #-}
+module ConstrainedElements (Cursor(..), PrintableCursor, Collection(..), Allowed, Collects(..), FieldKey, Field(..), field, applyField, withField, KnownIndex(..), Reflection, reflectMaybe, MaybeBoolEcho, AtNothing) where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
@@ -80,6 +80,9 @@ class Collection c e => Cursor c e | c -> e where
     type Remaining c
     type Remaining c = Rest c
     advanceIf :: (e -> Bool) -> c -> Maybe (Remaining c)
+
+-- | A cursor whose remaining collection can be printed.
+type PrintableCursor c e = (Cursor c e, Show (Remaining c))
 
 instance Cursor [a] a where
     advanceIf p (x:xs) | p x = Just xs

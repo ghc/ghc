@@ -29,7 +29,7 @@ for reader in marked ordinary; do
             cat premise.log
             exit 1
         fi
-        for site in CIRCULAR_QUALIFIER LATE_QUALIFIER; do
+        for site in CIRCULAR_QUALIFIER LATE_QUALIFIER MENTION_TUPLE; do
             qualifier=(-fforce-recomp "-D$site" -fdefer-type-errors -c NativeConstrainedFamilyClient.hs)
             if [[ $reader == ordinary ]]; then
                 "${ghc[@]}" "${qualifier[@]}"
