@@ -1600,10 +1600,11 @@ main = do
     observe "read fields from two indexed type case branches" TypeLambda.indexedFields
     observe "retain the kind of a matched Nothing"
         (Refl :: TypeLambda.Rebuild ('Nothing :: Maybe Ordering) :~: Proxy ('Nothing :: Maybe Ordering))
-    observe "reuse an earlier binding in a type let group" TypeLet.roadmap
-    observe "splice a type let group that uses an outer name before shadowing it"
-        (Right (Just True) :: $([t| let a = Bool in
-            let { wrapped = Maybe a; a = wrapped } in Either a a |]))
+    observe "name and reuse a type-level intermediate result" TypeLet.roadmap
+    observe "splice a type let that shadows its outer binder"
+        (Right (Just True) :: $([t| let a = Bool in let a = Maybe a in Either a a |]))
+    observe "capture an outer type in a let group before shadowing its name"
+        (Refl :: TypeLet.CaptureBeforeShadow 'False :~: '( 'False, 'True))
     let row = VCons 'x' (VCons 'y' VNil)
     observe "select a vector header with a runtime flag and a computed width"
         (TypeLet.frameValues enabled 2 ':' row,

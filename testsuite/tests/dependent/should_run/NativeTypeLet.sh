@@ -33,8 +33,11 @@ outer = Refl
 reuse :: Reuse 'True :~: '( 'True, 'True)
 reuse = Refl
 
-nested :: Nested 'False :~: '( 'False, 'True)
+nested :: Nested 'False :~: '( 'False, 'False)
 nested = Refl
+
+capture :: CaptureBeforeShadow 'False :~: '( 'False, 'True)
+capture = Refl
 
 yes :: CaseResult 'True :~: Either Bool Bool
 yes = Refl

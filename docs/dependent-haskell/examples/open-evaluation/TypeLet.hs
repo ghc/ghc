@@ -1,7 +1,8 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, ExplicitNamespaces, GADTs #-}
 {-# LANGUAGE ScopedTypeVariables, TypeApplications, TypeFamilies, TypeOperators, UndecidableInstances #-}
 -- | Bind an intermediate result in a type synonym.
-module TypeLet (F, Shadow, Reuse, Outer, Nested, CaseResult, Frame, frameRow, frameToList, frameValues, roadmap) where
+module TypeLet (F, Shadow, Reuse, Outer, Nested, CaptureBeforeShadow, CaseResult, Frame,
+                frameRow, frameToList, frameValues, roadmap) where
 import Data.Type.Equality ((:~:)(Refl))
 import PackedVecLibrary (Nat, Vec(..), toList, type (+))
 
@@ -16,10 +17,7 @@ type family H (a :: Bool) (b :: Bool) where
   H 'False 'False = Char
 
 -- | Name the result of G and pass it to H twice.
-type F a =
-  let flag = G a
-      result = H flag flag
-  in result
+type F a = let b = G a in H b b
 
 -- | Both uses of b refer to the local definition.
 type Shadow (b :: Bool) = let b = 'True in H b b
@@ -30,8 +28,15 @@ type Reuse (a :: Bool) = let { b = a; b = '(b,b) } in b
 -- | The RHS refers to the outer b.
 type Outer (b :: Bool) = let b = b in H b b
 
+-- | A nested definition can refer to the enclosing local name.
+type Nested (a :: Bool) = let b = a in let c = b in '(b,c)
+
 -- | The first binding in the group uses b from the enclosing let.
-type Nested (a :: Bool) = let b = a in let { c = b; b = 'True } in '(c,b)
+type CaptureBeforeShadow (a :: Bool) =
+  let b = a in
+  let captured = b
+      b = 'True
+  in '(captured,b)
 
 -- | Match the outer flag and use the selected type on both sides of Either.
 type CaseResult (flag :: Bool) =
