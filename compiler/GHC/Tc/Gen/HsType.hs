@@ -28,6 +28,7 @@ module GHC.Tc.Gen.HsType (
             bindExplicitTKBndrs_Q_Tv, bindExplicitTKBndrs_Q_Skol,
 
         bindOuterFamEqnTKBndrs_Q_Tv, bindOuterFamEqnTKBndrs,
+        intPrimFamilyPatKinds,
         tcOuterTKBndrs, scopedSortOuter, outerTyVars, outerTyVarBndrs,
         tcGadtConTyVarBndrs, tcConDeclTelescope, tcCheckRetainedConType,
         bindOuterSigTKBndrs_Tv,
@@ -140,6 +141,7 @@ import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.WiredIn.Prim
 
 import GHC.Types.Error
+import GHC.Types.Literal (litValue, mkLitIntWrap)
 import GHC.Types.Id ( idName, isClassOpId_maybe, mkLocalId, mkSysLocalM, sourceTableId_maybe, sourceTableKeepsExecutable )
 import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
@@ -2232,6 +2234,13 @@ tc_hs_lit_ty mode rn_ty (HsString _ s) exp_kind
 tc_hs_lit_ty mode rn_ty (HsChar _ c) exp_kind
   = do checkWiredInTyCon charTyCon
        checkExpKind mode rn_ty (mkCharLitTy c) charTy exp_kind
+tc_hs_lit_ty mode rn_ty lit@(HsIntPrim _ n) exp_kind
+  = do { native <- xoptM LangExt.ExperimentalDependentTypes
+       ; if native
+           then do { platform <- targetPlatform <$> getDynFlags
+                   ; let ty = LitTy (IntPrimTyLit (litValue (mkLitIntWrap platform n)))
+                   ; checkExpKind mode rn_ty ty intPrimTy exp_kind }
+           else failWithTc (TcRnUnpromotableLit lit) }
 tc_hs_lit_ty _mode _ lit _
   = failWithTc $ TcRnUnpromotableLit lit
 
@@ -6714,21 +6723,43 @@ bindOuterSigTKBndrs_Tv_M mode
   = bindOuterTKBndrsX (smVanilla { sm_clone = True, sm_tvtv = SMDTyVarTv
                                  , sm_holes = mode_holes mode })
 
-bindOuterFamEqnTKBndrs_Q_Tv :: HsOuterFamEqnTyVarBndrs GhcRn
+-- | Give an implicit field binder the kind of the wired-in constructor field.
+-- See Note [Int# family pattern binders] in GHC.Core.Type.
+intPrimFamilyPatKinds :: TyCon -> HsFamEqnPats GhcRn -> TcM (NameEnv Kind)
+intPrimFamilyPatKinds fam pats
+  | ClosedTypeFamilyFlavour <- tyConFlavour fam
+  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+       ; return $ if enabled
+           then mkNameEnv [(name, intPrimTy) | HsValArg _ pat <- pats, Just name <- [int_field pat]]
+           else emptyNameEnv }
+  | otherwise = return emptyNameEnv
+  where
+    int_field pat
+      | (L _ (HsTyVar _ IsPromoted (L _ (WithUserRdr _ con))), [HsValArg _ arg])
+          <- splitHsAppTys (unLoc (ignoreParens pat))
+      , con == intDataConName
+      , L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ name))) <- ignoreParens arg
+      , isTyVarName name
+      = Just name
+      | otherwise = Nothing
+
+bindOuterFamEqnTKBndrs_Q_Tv :: NameEnv Kind -> HsOuterFamEqnTyVarBndrs GhcRn
                             -> TcM a
                             -> TcM (HsOuterFamEqnTyVarBndrs GhcTc, a)
-bindOuterFamEqnTKBndrs_Q_Tv hs_bndrs thing_inside
+bindOuterFamEqnTKBndrs_Q_Tv kinds hs_bndrs thing_inside
   = bindOuterTKBndrsX (smVanilla { sm_clone = False, sm_parent = True
+                                 , sm_implicit_kinds = kinds
                                  , sm_tvtv = SMDTyVarTv })
                       hs_bndrs thing_inside
     -- sm_clone=False: see Note [Cloning for type variable binders]
 
-bindOuterFamEqnTKBndrs :: SkolemInfo
+bindOuterFamEqnTKBndrs :: SkolemInfo -> NameEnv Kind
                        -> HsOuterFamEqnTyVarBndrs GhcRn
                        -> TcM a
                        -> TcM (HsOuterFamEqnTyVarBndrs GhcTc, a)
-bindOuterFamEqnTKBndrs skol_info
+bindOuterFamEqnTKBndrs skol_info kinds
   = bindOuterTKBndrsX (smVanilla { sm_clone = False, sm_parent = True
+                                 , sm_implicit_kinds = kinds
                                  , sm_tvtv = SMDSkolemTv skol_info })
     -- sm_clone=False: see Note [Cloning for type variable binders]
 
@@ -7063,7 +7094,9 @@ bindImplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_ki
       , Just (ATyVar _ tv) <- lookupNameEnv lcl_env name
       = return tv
       | otherwise
-      = do { kind <- newExpectedKind ctxt_kind
+      = do { kind <- case lookupNameEnv (sm_implicit_kinds skol_mode) name of
+                        Just known_kind -> return known_kind
+                        Nothing -> newExpectedKind ctxt_kind
            ; newTyVarBndr skol_mode name kind }
 
 --------------------------------------
@@ -7086,6 +7119,7 @@ data SkolemMode
                               -- Note [Checking partial type signatures]
 
        , sm_kind   :: ContextKind  -- Use this for the kind of any new binders
+       , sm_implicit_kinds :: NameEnv Kind -- Known kinds of implicit family pattern binders
 
        , sm_family_metadata :: Bool
        , sm_sig_kind_arrows :: Bool -- Defer bare binder arrows until the signature is checked.
@@ -7103,6 +7137,7 @@ smVanilla = SM { sm_clone  = panic "sm_clone"  -- We always override this
                , sm_parent = False
                , sm_tvtv   = pprPanic "sm_tvtv" callStackDoc -- We always override this
                , sm_kind   = AnyKind
+               , sm_implicit_kinds = emptyNameEnv
                , sm_family_metadata = False
                , sm_sig_kind_arrows = False
                , sm_indices = emptyNameEnv

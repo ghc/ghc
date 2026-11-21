@@ -487,7 +487,7 @@ filterT f (TM { tm_var  = tvar, tm_termvar = ttermvar, tm_termapp = ttermapp, tm
        , tm_classapp = fmap (fmap (fmap (fmap (filterTM f)))) tclassapp }
 
 ------------------------
-data TyLitMap a = TLM { tlm_number :: Map.Map Integer a
+data TyLitMap a = TLM { tlm_number :: Map.Map (Bool, Integer) a -- True for Int# literals
                       , tlm_string :: UniqDFM  FastString a
                       , tlm_char   :: Map.Map Char a
                       }
@@ -512,14 +512,16 @@ emptyTyLitMap = TLM { tlm_number = Map.empty, tlm_string = emptyUDFM, tlm_char =
 lkTyLit :: TyLit -> TyLitMap a -> Maybe a
 lkTyLit l =
   case l of
-    NumTyLit n -> tlm_number >.> Map.lookup n
+    NumTyLit n -> tlm_number >.> Map.lookup (False, n)
+    IntPrimTyLit n -> tlm_number >.> Map.lookup (True, n)
     StrTyLit n -> tlm_string >.> (`lookupUDFM` n)
     CharTyLit n -> tlm_char >.> Map.lookup n
 
 xtTyLit :: TyLit -> XT a -> TyLitMap a -> TyLitMap a
 xtTyLit l f m =
   case l of
-    NumTyLit n ->  m { tlm_number = Map.alter f n (tlm_number m) }
+    NumTyLit n ->  m { tlm_number = Map.alter f (False, n) (tlm_number m) }
+    IntPrimTyLit n -> m { tlm_number = Map.alter f (True, n) (tlm_number m) }
     StrTyLit n ->  m { tlm_string = alterUDFM  f (tlm_string m) n }
     CharTyLit n -> m { tlm_char = Map.alter f n (tlm_char m) }
 

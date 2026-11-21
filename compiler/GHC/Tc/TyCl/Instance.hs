@@ -60,6 +60,7 @@ import GHC.Core.Make   ( nO_METHOD_BINDING_ERROR_ID )
 import GHC.Core.Unfold.Make ( mkDFunUnfolding )
 import GHC.Core.FamInstEnv
 import GHC.Core.Type
+import GHC.Types.Name.Env (emptyNameEnv)
 import GHC.Core.Multiplicity
 import GHC.Core.InstEnv
 import GHC.Core.Predicate( classMethodInstTy, getClassPredTys_maybe, isCoVarType )
@@ -970,7 +971,7 @@ tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
   = do { traceTc "tcDataFamInstHeader {" (ppr fam_tc <+> ppr hs_pats)
        ; (tclvl, wanted, (outer_bndrs, (stupid_theta, lhs_ty, master_res_kind, instance_res_kind)))
             <- pushLevelAndSolveEqualitiesX "tcDataFamInstHeader" $
-               bindOuterFamEqnTKBndrs skol_info hs_outer_bndrs    $  -- Binds skolem TcTyVars
+               bindOuterFamEqnTKBndrs skol_info emptyNameEnv hs_outer_bndrs $  -- Binds skolem TcTyVars
                do { stupid_theta <- tcHsContext hs_ctxt
                   ; (lhs_ty, lhs_kind) <- tcFamTyPats fam_tc hs_pats
                   ; (lhs_applied_ty, lhs_applied_kind)

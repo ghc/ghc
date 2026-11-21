@@ -729,6 +729,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnRetainedQuantificationNotImplemented"      = 43582
   GhcDiagnosticCode "TcRnRetainedQuantificationError"               = 83605
   GhcDiagnosticCode "TcRnUnpromotableLit"                           = 51819
+  GhcDiagnosticCode "TcRnEscapingIntPrimFamilyBinder"              = 95274
   GhcDiagnosticCode "TcRnUnrecognisedModifier"                      = 49969
   GhcDiagnosticCode "TcRnUnknownModifierKind"                       = 38026
   GhcDiagnosticCode "TcRnTooManyMatchabilities"                     = 64627

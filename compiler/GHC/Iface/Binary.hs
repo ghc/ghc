@@ -350,7 +350,7 @@ evidenceSuffix requirements
     || needs RetainedUserUnfoldingEvidence || needs LinearUnpackEvidence
     || needs RetainedCharOperandEvidence || needs MatchableProjectionEvidence
     || needs RetainedNaturalOperandEvidence
-    || needs ExperimentalScopedDictionaryEvidence
+    || needs ExperimentalIntPrimIndexEvidence || needs ExperimentalScopedDictionaryEvidence
     || needs ExperimentalScopedDictionaryCoreEvidence || needs RetainedDataFamilyConOperandEvidence
     || needs TerminalGadtForAllEvidence || needs TerminalGadtContextEvidence
     || needs TerminalGadtTrailingContextEvidence || needs TerminalGadtContextOnlyEvidence
@@ -372,6 +372,7 @@ evidenceSuffix requirements
     feature_set = featureSetPrefix ++ intercalate "+" [name | (name, feature) <- independentFeatures, needs feature]
 
 legacyEvidenceSuffix :: IfaceEvidence -> String
+legacyEvidenceSuffix ExperimentalIntPrimIndexEvidence = featureSetPrefix ++ "experimental-int-prim-index"
 legacyEvidenceSuffix ErasedUserRuleEvidence = featureSetPrefix ++ "user-rule"
 legacyEvidenceSuffix LexicalPackageRuleEvidence = featureSetPrefix ++ "lexical-rule"
 legacyEvidenceSuffix OrphanErasedUserRuleEvidence = featureSetPrefix ++ "orphan-user-rule"
@@ -438,6 +439,7 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("retained-char-operand", RetainedCharOperandEvidence)
                       , ("matchable-projection", MatchableProjectionEvidence)
                       , ("retained-natural-operand", RetainedNaturalOperandEvidence)
+                      , ("experimental-int-prim-index", ExperimentalIntPrimIndexEvidence)
                       , ("experimental-scoped-dictionary", ExperimentalScopedDictionaryEvidence)
                       , ("experimental-scoped-dictionary-core-v3", ExperimentalScopedDictionaryCoreEvidence)
                       , ("retained-data-family-constructor-operand", RetainedDataFamilyConOperandEvidence)

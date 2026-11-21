@@ -359,6 +359,7 @@ data IfaceTyLit
   = IfaceNumTyLit Integer
   | IfaceStrTyLit LexicalFastString
   | IfaceCharTyLit Char
+  | IfaceIntPrimTyLit Integer
   deriving (Eq, Ord)
 
 type IfaceTyConBinder    = VarBndr IfaceBndr TyConBndrVis
@@ -2574,6 +2575,7 @@ pprIfaceTyLit :: IfaceTyLit -> SDoc
 pprIfaceTyLit (IfaceNumTyLit n) = integer n
 pprIfaceTyLit (IfaceStrTyLit n) = text (show n)
 pprIfaceTyLit (IfaceCharTyLit c) = text (show c)
+pprIfaceTyLit (IfaceIntPrimTyLit n) = integer n <> char '#'
 
 pprIfaceCoercion, pprParendIfaceCoercion :: IfaceCoercion -> SDoc
 pprIfaceCoercion = ppr_co topPrec
@@ -2781,6 +2783,10 @@ instance Binary IfaceTyLit where
   put_ bh (IfaceNumTyLit n)   = putByte bh 1 >> put_ bh n
   put_ bh (IfaceStrTyLit n)   = putByte bh 2 >> put_ bh n
   put_ bh (IfaceCharTyLit n)  = putByte bh 3 >> put_ bh n
+  put_ bh (IfaceIntPrimTyLit n) = do
+    requireIfaceEvidenceVersion bh ExperimentalIntPrimIndexEvidence
+    putByte bh 4
+    put_ bh n
 
   get bh =
     do tag <- getByte bh
@@ -2791,6 +2797,7 @@ instance Binary IfaceTyLit where
                  ; return (IfaceStrTyLit n) }
          3 -> do { n <- get bh
                  ; return (IfaceCharTyLit n) }
+         4 -> IfaceIntPrimTyLit <$> get bh
          _ -> panic ("get IfaceTyLit " ++ show tag)
 
 instance Binary IfaceAppArgs where
@@ -3058,6 +3065,7 @@ data IfaceEvidence
   | OrderedGadtTelescopeEvidence
   | InferredOrderedGadtBindersEvidence
   | ExtendedOrderedGadtTelescopeEvidence
+  | ExperimentalIntPrimIndexEvidence
   deriving (Bounded, Enum, Eq, Ord)
 
 -- | Requirements of an interface payload. See Note [Versioning retained evidence]
@@ -3295,6 +3303,7 @@ instance NFData IfaceType where
 instance NFData IfaceTyLit where
   rnf = \case
     IfaceNumTyLit f1 -> rnf f1
+    IfaceIntPrimTyLit f1 -> rnf f1
     IfaceStrTyLit f1 -> rnf f1
     IfaceCharTyLit f1 -> rnf f1
 

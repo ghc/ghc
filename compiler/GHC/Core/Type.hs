@@ -64,6 +64,7 @@ module GHC.Core.Type (
         mkPiTy, mkPiTys, DepFunTyFlag(..), mkDepFunTy, mkDepFunTyWithVis, isBoolIndexId,
         mkPiTysM, mkPiTysU,
         isNativeIndexId, isNativeIndexType, isNativeClosedIndexType, nativeIndexDataConTyArgs,
+        isIntPrimFamilyPatBinder,
         isNativeIndexFunctionId, nativeIndexFunctionTys_maybe,
         nativeIndexFunctionTypeTys_maybe,
         isNativeOpaqueValueId, isNativeOpaqueValueType, isNativeClassDictionaryId,
@@ -2557,6 +2558,30 @@ nativeIndexFunctionTypeTys_maybe ty
 isNativeIndexFunctionId :: Id -> Bool
 isNativeIndexFunctionId = isJust . nativeIndexFunctionTys_maybe
 
+{- Note [Int# family pattern binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A closed type family equation can match the field of promoted I#. The
+equation binds an erased Int# index only where its pattern has the form
+'I# x. The binder cannot occur in the right-hand side. These rules preserve
+the match at a known constructor application and leave a neutral Int stuck.
+
+The axiom binds the variable without introducing a ForAllTy. The ordinary
+FORALL1 rule and runtime index readback keep their existing scope. See
+GHC.Tc.Gen.HsType for source binding and GHC.Core.Lint for axiom checking.
+-}
+
+-- | Check the scope of a raw field variable in a closed family axiom.
+isIntPrimFamilyPatBinder :: [Type] -> Type -> TyVar -> Bool
+isIntPrimFamilyPatBinder pats rhs var
+  = isTyVar var && varType var `eqType` intPrimTy
+    && any int_pattern pats
+    && all (\pat -> int_pattern pat || not (occurs_in pat)) pats
+    && not (occurs_in rhs)
+  where
+    occurs_in ty = var `elemVarSet` tyCoVarsOfType ty
+    int_pattern (TyConApp tc [TyVarTy field]) = tc `hasKey` intDataConKey && field == var
+    int_pattern _ = False
+
 -- | Test whether a type can classify an opaque runtime value index.
 -- See Note [Opaque runtime index values].
 isNativeOpaqueValueType :: Type -> Bool
@@ -2985,6 +3010,7 @@ returnsConstraintKind kind                    = isConstraintLikeKind kind
 --------------------------
 typeLiteralKind :: TyLit -> Kind
 typeLiteralKind (NumTyLit {}) = naturalTy
+typeLiteralKind (IntPrimTyLit {}) = intPrimTy
 typeLiteralKind (StrTyLit {}) = typeSymbolKind
 typeLiteralKind (CharTyLit {}) = charTy
 

@@ -702,6 +702,7 @@ kindIsTypeable (TyConApp tc args)
   = do { tc_ok <- tyConIsTypeable tc
        ; if tc_ok then allM kindIsTypeable args else return False }
 kindIsTypeable (ForAllTy{})         = return False
+kindIsTypeable (LitTy IntPrimTyLit{}) = return False
 kindIsTypeable (LitTy _)            = return True
 kindIsTypeable (CastTy{})           = return False
   -- See Note [Typeable instances for casted types]

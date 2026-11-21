@@ -4281,8 +4281,9 @@ kcTyFamInstEqn tc_fam_tc
 
        ; checkTyFamInstEqn tc_fam_tc eqn_tc_name hs_pats
 
+       ; raw_kinds <- intPrimFamilyPatKinds tc_fam_tc hs_pats
        ; discardResult $
-         bindOuterFamEqnTKBndrs_Q_Tv outer_bndrs $
+         bindOuterFamEqnTKBndrs_Q_Tv raw_kinds outer_bndrs $
          do { (fam_app, res_kind) <- tcFamTyPats tc_fam_tc hs_pats
             ; withCaseAlias tc_fam_tc fam_app hs_rhs_ty $ \rhs ->
                 tcCheckInferredFamilyRhs rhs res_kind }
@@ -4932,12 +4933,13 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
        -- By now, for type families (but not data families) we should
        -- have checked that the number of patterns matches tyConArity
        ; skol_info <- mkSkolemInfo FamInstSkol
+       ; raw_kinds <- intPrimFamilyPatKinds fam_tc hs_pats
 
        -- This code is closely related to the code
        -- in GHC.Tc.Gen.HsType.kcCheckDeclHeader_cusk
        ; (tclvl, wanted, (outer_bndrs, (lhs_ty, rhs_ty)))
                <- pushLevelAndSolveKindArrowsX "tcTyFamInstEqnGuts" $
-                  bindOuterFamEqnTKBndrs skol_info outer_hs_bndrs   $
+                  bindOuterFamEqnTKBndrs skol_info raw_kinds outer_hs_bndrs $
                   do { (lhs_ty, rhs_kind, index) <- case tyConBinders fam_tc of
                            b : _ | inferredMatchabilityIndex b -> do
                              (lhs, kind, mas) <- tcInferredMatchabilityFamPats fam_tc hs_pats

@@ -4249,6 +4249,7 @@ in pattern synonym signatures to separate required and provided contexts.
 
 reifyTyLit :: TyCoRep.TyLit -> TcM TH.TyLit
 reifyTyLit (NumTyLit n) = return (TH.NumTyLit n)
+reifyTyLit lit@IntPrimTyLit{} = noTH MachineIntTypeLiteral (LitTy lit)
 reifyTyLit (StrTyLit s) = return (TH.StrTyLit (unpackFS s))
 reifyTyLit (CharTyLit c) = return (TH.CharTyLit c)
 

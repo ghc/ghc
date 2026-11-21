@@ -1219,6 +1219,10 @@ instance Diagnostic TcRnMessage where
                      TermVariablePE -> text "term variables cannot be promoted"
                      TypeVariablePE -> text "type variables bound in a kind signature cannot be used in the type"
           same_rec_group_msg = text "it is defined and used in the same recursive group"
+    TcRnEscapingIntPrimFamilyBinder binders
+      -> mkSimpleDecorated $
+           hang (text "An Int# binder may occur only in the promoted I# field of a closed family pattern:")
+                2 (pprWithCommas ppr binders)
     TcRnUnpromotableLit lit
       -> mkSimpleDecorated $
            vcat [ text "The literal" <+> quotes (ppr lit) <+> text "cannot be promoted."
@@ -2540,6 +2544,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnUnpromotableThing{}
       -> ErrorWithoutFlag
+    TcRnEscapingIntPrimFamilyBinder{}
+      -> ErrorWithoutFlag
     TcRnUnpromotableLit{}
       -> ErrorWithoutFlag
     TcRnIllegalTermLevelUse{}
@@ -3262,6 +3268,8 @@ instance Diagnostic TcRnMessage where
     TcRnClassKindNotConstraint{}
       -> noHints
     TcRnUnpromotableThing{}
+      -> noHints
+    TcRnEscapingIntPrimFamilyBinder{}
       -> noHints
     TcRnUnpromotableLit{}
       -> noHints
@@ -8129,6 +8137,7 @@ pprTHReifyError = \case
            CoercionsInTypes        -> (False, text "coercions in types")
            DataConVisibleForall    -> (False, text "visible forall in the type of a data constructor")
            FirstClassExistential   -> (False, text "first-class existential type")
+           MachineIntTypeLiteral   -> (False, text "machine integer type literal")
            InteriorConstructorContext -> (False, text "constructor with an interior context")
 
 pprTypedTHError :: TypedTHError -> DecoratedSDoc

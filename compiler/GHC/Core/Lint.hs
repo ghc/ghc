@@ -2614,6 +2614,10 @@ lintTyLit (NumTyLit n)
     where msg = text "Negative type literal:" <+> integer n
 lintTyLit (StrTyLit _) = return ()
 lintTyLit (CharTyLit _) = return ()
+lintTyLit (IntPrimTyLit n)
+  = do { platform <- getPlatform
+       ; lintL (platformInIntRange platform n)
+           (text "Machine integer type literal out of range:" <+> integer n) }
 
 -----------------
 lint_ty_app :: Type -> Kind -> [Type] -> LintM ()
@@ -3545,16 +3549,23 @@ lint_axiom ax@(CoAxiom { co_ax_tc = tc, co_ax_branches = branches
 lint_branch :: TyCon -> CoAxBranch -> LintM ()
 lint_branch ax_tc (CoAxBranch { cab_tvs = tvs, cab_cvs = cvs
                               , cab_lhs = lhs_args, cab_rhs = rhs })
-  = lintBinders LambdaBind (tvs ++ cvs) $
-    do { let lhs = mkTyConApp ax_tc lhs_args
-       ; lintType lhs
-       ; lintType rhs
-       ; let lhs_kind = typeKind lhs
-             rhs_kind = typeKind rhs
-       ; lintL (not (lhs_kind `typesAreApart` rhs_kind)) $
-         hang (text "Inhomogeneous axiom")
-            2 (text "lhs:" <+> ppr lhs <+> dcolon <+> ppr lhs_kind $$
-               text "rhs:" <+> ppr rhs <+> dcolon <+> ppr rhs_kind) }
+  = foldr lint_pattern_binder (lintBinders LambdaBind cvs lint_body) tvs
+  where
+    lint_pattern_binder tv inside
+      | ClosedTypeFamilyFlavour <- tyConFlavour ax_tc
+      , isIntPrimFamilyPatBinder lhs_args rhs tv
+      = lintType (varType tv) >> addInScopeTyCoVar tv inside
+      | otherwise = lintTyCoBndr tv inside
+
+    lint_body = do { let lhs = mkTyConApp ax_tc lhs_args
+                   ; lintType lhs
+                   ; lintType rhs
+                   ; let lhs_kind = typeKind lhs
+                         rhs_kind = typeKind rhs
+                   ; lintL (not (lhs_kind `typesAreApart` rhs_kind)) $
+                     hang (text "Inhomogeneous axiom")
+                        2 (text "lhs:" <+> ppr lhs <+> dcolon <+> ppr lhs_kind $$
+                           text "rhs:" <+> ppr rhs <+> dcolon <+> ppr rhs_kind) }
 
 lint_family_branch :: TyCon -> CoAxBranch -> LintM ()
 -- These checks do not apply to newtype axioms

@@ -2513,6 +2513,9 @@ data TcRnMessage where
   -}
   TcRnUnpromotableLit :: !(HsLit GhcRn) -> TcRnMessage
 
+  -- | An Int# field binder occurs outside its closed family constructor pattern.
+  TcRnEscapingIntPrimFamilyBinder :: ![TyVar] -> TcRnMessage
+
   {- | TcRnIllegalTermLevelUse is an error that occurs when the user attempts to
        use a type-level entity at the term-level.
 
@@ -7372,6 +7375,7 @@ data UnrepresentableTypeDescr
   | CoercionsInTypes
   | DataConVisibleForall
   | FirstClassExistential
+  | MachineIntTypeLiteral
   | RetainedFunctionType
   | RetainedRuntimeIndex
   | InteriorConstructorContext
