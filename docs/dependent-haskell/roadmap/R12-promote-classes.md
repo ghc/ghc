@@ -216,12 +216,15 @@ at the same class domain.
 [ordinary client](../examples/open-evaluation/OrdinaryScopedComparison.hs)
 and [runner](../examples/open-evaluation/check-scoped-comparison.sh).
 
-The same unary selector path checks a user-defined enumeration and a
-fixed `Maybe Ordering` result. The result kind comes from the selector
-signature. The current source path requires one retained receiver of the
-class parameter's type and one matching direct Given. A binary selector
-and a method whose evidence must be selected through a superclass are
-outside that path.
+The same unary selector path checks a user-defined enumeration,
+`Maybe Ordering`, and a result of kind `Maybe a` at the receiver
+parameter `a`. The result kind comes from the selector signature.
+The current source path requires one retained receiver of the class
+parameter's type and one matching direct Given. A binary selector
+and a method whose evidence comes through a superclass are outside
+that path. A function-valued selector result can occur in a signature.
+Passing the selected function to a retained-function binder gives
+GHC-83605. That application requires a local function variable.
 
 The direct case works without solving an equality for an unknown result
 index. Passing the call to a polymorphic accessor requires that equality
