@@ -1536,8 +1536,8 @@ reportClosedShapeError owner err = case err of
           explanation = case indices of
             _:_:_ -> ". The field type depends on multiple hidden indices " ++
                      render (parens (pprWithCommas ppr indices)) ++
-                     ". Read such a field after determining its indices from earlier fields. " ++
-                     "Its constructors must determine one of those indices."
+                     ". Its constructors must determine one index. " ++
+                     "Earlier fields must determine the other indices."
             _ -> " at the hidden index. The field's constructors must determine that index."
       failWithTc (TcRnClosedTypeEval owner
         ("Cannot reify field " ++ show position ++ " of " ++ constructor ++ explanation))
@@ -1625,21 +1625,12 @@ closedCallValueShape rdr_env kind = do
 
     witness_shape unsupported active indices known ty
       | closedGroundField ty = AtGroundType <$> shape active ty
-      | Just index <- structural_index =
-          AtWitnessIndex <$> open_shape unsupported active indices known index ty
+      | [(index, plan)] <- [(v, plan) | v <- field_indices indices ty,
+                                        Just plan <- [closedOpenAlternatives known v ty]] =
+          AtWitnessIndex <$> open_shape unsupported active indices known index ty plan
       | otherwise = Trans.lift (Left unsupported)
-      where
-        structural_index = case field_indices indices ty of
-          [index] -> Just index
-          used | all (`elemVarSet` known) used
-               , Just (_, args) <- splitTyConApp_maybe ty
-               , [index] <- filter (\v -> any (tcEqType (mkTyVarTy v)) args) used
-               -> Just index
-          _ -> Nothing
 
-    open_shape unsupported active indices known index field = do
-      (tc, args, alternatives) <- Trans.lift $
-        maybe (Left unsupported) Right (closedOpenAlternatives known index field)
+    open_shape unsupported active indices known index field (tc, args, alternatives) = do
       let constructors = [con | (con, _, _) <- alternatives]
       unless (all (isJust . closedImportedGRE rdr_env) constructors) $
         Trans.lift (Left (InaccessibleClosedData tc False))
@@ -2386,9 +2377,12 @@ A recursive constructor refines its index to an injective promoted
 application of its case-bound predecessor. It has one recursive field
 at that predecessor. Other fields can use the ordinary ground codec.
 
-A table can store its cells at Vec rows (Vec cols a) after fields that
-establish rows and cols. The outer vector changes its row index. Its
-element type retains the established column index. A nonrecursive
+For Vec rows (Vec cols a), the outer vector's constructors determine
+rows. The element type retains cols at each recursive step. It needs
+an earlier witness for cols. Check the constructors to find the
+structural index and validate every other index against an earlier
+field. If an earlier field determined rows too, the two counts must
+agree. A nonrecursive
 indexed field must be a proper subterm of the surrounding type. This
 keeps codec planning finite. An empty outer vector has no row from
 which to recover its column index. Read the column labels first.
