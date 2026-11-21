@@ -1414,32 +1414,47 @@ addDeferredBinding ctxt supp hints msg (EI { ei_evdest = Just dest
                                            , ei_loc = loc })
   -- if evdest is Just, then the constraint was from a wanted
   | deferringAnyBindings ctxt
-  = do { err_tm <- mkErrorTerm loc item_ty ctxt msg supp hints
+  = do { err_tm <- mkErrorTerm loc ctxt msg supp hints
        ; let ev_binds_var = cec_binds ctxt
+             bind_error evar ty =
+               addTcEvBind ev_binds_var $ mkWantedEvBind evar EvCanonical (err_tm ty)
 
        ; case dest of
            EvVarDest evar
-             -> addTcEvBind ev_binds_var $ mkWantedEvBind evar EvCanonical err_tm
+             -> bind_error evar item_ty
            HoleDest hole
              -> do { -- See Note [Deferred errors for coercion holes]
-                     let co_var = coHoleCoVar hole
-                   ; addTcEvBind ev_binds_var $ mkWantedEvBind co_var EvCanonical err_tm
-                   ; fillCoercionHole hole (CPH { cph_co = mkCoVarCo co_var
-                                                , cph_holes = emptyCoHoleSet })  } }
+                     let old_var = coHoleCoVar hole
+                   ; co_var <- liftZonkM (zonkCoVar old_var)
+                   ; let (lhs, rhs, role) = coVarTypesRole co_var
+                         lhs_kind = typeKind lhs
+                         rhs_kind = typeKind rhs
+                   ; co <- if lhs_kind `tcEqType` rhs_kind
+                           then do { bind_error old_var item_ty
+                                   ; return (mkCoVarCo old_var) }
+                           else do { let kind_pred = mkNomEqPred rhs_kind lhs_kind
+                                   ; kind_var <- newEvVar kind_pred
+                                   ; let kind_co = mkCoVarCo kind_var
+                                         index_pred = mkEqPredRole role lhs (mkCastTy rhs kind_co)
+                                   ; index_var <- newEvVar index_pred
+                                   ; bind_error kind_var kind_pred
+                                   ; bind_error index_var index_pred
+                                   ; return (mkCoVarCo index_var `mkTransCo` mkGReflLeftCo role rhs kind_co) }
+                   ; fillCoercionHole hole (CPH { cph_co = co
+                                                , cph_holes = emptyCoHoleSet }) } }
 addDeferredBinding _ _ _ _ _ = return ()    -- Do not set any evidence for Given
 
 mkSolverErrorTerm :: CtLoc -> Type  -- of the error term
                   -> SolverReport -> TcM EvTerm
-mkSolverErrorTerm ct_loc ty err
-  = mkErrorTerm ct_loc ty (reportContext . sr_important_msg $ err)
-                          (TcRnSolverReport (sr_important_msg err) ErrorWithoutFlag)
-                          (sr_supplementary err)
-                          (sr_hints err)
+mkSolverErrorTerm ct_loc ty err =
+  ($ ty) <$> mkErrorTerm ct_loc (reportContext . sr_important_msg $ err)
+                               (TcRnSolverReport (sr_important_msg err) ErrorWithoutFlag)
+                               (sr_supplementary err)
+                               (sr_hints err)
 
-mkErrorTerm :: CtLoc -> Type  -- of the error term
-            -> SolverReportErrCtxt -> TcRnMessage
-            -> [SupplementaryInfo] -> [GhcHint] -> TcM EvTerm
-mkErrorTerm ct_loc ty ctxt msg supp hints
+mkErrorTerm :: CtLoc -> SolverReportErrCtxt -> TcRnMessage
+            -> [SupplementaryInfo] -> [GhcHint] -> TcM (Type -> EvTerm)
+mkErrorTerm ct_loc ctxt msg supp hints
   = do { msg <- mkErrorReport
                   (ctLocEnv ct_loc)
                   msg
@@ -1451,7 +1466,7 @@ mkErrorTerm ct_loc ty ctxt msg supp hints
        ; let err_msg = deferredTypeErrorMessage (initTcMessageOpts dflags) msg
              err_str = showSDoc dflags err_msg
 
-       ; return $ evDelayedError ty err_str }
+       ; return $ \ty -> evDelayedError ty err_str }
 
 tryReporters :: SolverReportErrCtxt
              -> [ReporterSpec]
@@ -1556,6 +1571,13 @@ Instead, we invent a new EvVar, bind it to an error and then make a coercion
 from that EvVar, filling the hole with that coercion. Because coercions'
 types are unlifted, the error is guaranteed to be hit before we get to the
 coercion.
+
+For a heterogeneous hole, bind a nominal kind equality and a homogeneous
+index equality instead. For a hole like (a :: k1) ~r (b :: k2), bind
+ck :: k2 ~# k1 and ci :: a ~r (b |> ck) to the same error. Fill the hole with
+ci followed by the inverse kind cast on b. The composition keeps the
+original endpoints and role. Both evidence bindings still force the error,
+even if a function ignores the boxed dictionary made from the hole.
 
 ************************************************************************
 *                                                                      *
