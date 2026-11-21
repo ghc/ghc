@@ -5437,6 +5437,7 @@ data RetainedQuantificationError
   | RetainedMissingEquation Name
   | RetainedTypeOperandContext (Maybe Type)
   | RetainedSelectorReceiver
+  | RetainedConstructorResult Type
 
 -- | An error in the implementation of an abstract datatype using
 -- a type synonym.

@@ -202,11 +202,25 @@ written binder kind refers to a name hidden by this shadowing.
 Lifting stops at shadowing on the constructor's own argument spine.
 
 The constructor result has the enclosing telescope scope. A witness
-bound inside a field cannot escape into that result. The usual retained
-constructor restriction requires the erased quantifiers to name the
-datatype parameters. It rejects a constructor result indexed by one
-of its retained arguments. A public index parameter can still describe
-the exact stored value. For example, the constructor
+bound inside a field cannot escape into that result. A constructor can
+use its only field directly as its only result index. The field is lazy
+and its domain is a supported closed structural type such as `[Bool]`
+or `Ordering`. Match the field with a variable or wildcard. The
+constructor pattern introduces the nominal index equality after the
+field binder. Code generation erases the equality.
+An ordinary client can rebuild the constructor at its original index and
+read the first cell of a runtime list with an unevaluated tail.
+In `rebuild (IndexedList xs)`, the nested constructor supplies the
+outer call's index. This also works with `ImpredicativeTypes`.
+[Inference and prior art](../REFERENCES.md#nested-constructors-with-a-runtime-result-index).
+GHC reports compound results and results that depend on one of several
+fields at the written result type.
+[Direct constructor](../examples/open-evaluation/DirectIndexedList.hs),
+[ordinary client](../examples/open-evaluation/DirectIndexedListClient.hs),
+and [source-hidden check](../../../testsuite/tests/dependent/should_run/NativeIndexedFin.sh).
+
+An explicit equality can also describe the exact stored value.
+For example, the constructor
 `CheckedList :: foreach (ys :: [Bool]) -> (xs :~: ys) -> CheckedList xs`
 stores the runtime list `ys`. Constructing it with `Refl` checks the
 public index `xs` against that list. [Indexed list](../examples/open-evaluation/IndexedPrefix.hs).

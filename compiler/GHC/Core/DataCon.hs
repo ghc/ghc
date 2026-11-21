@@ -35,7 +35,7 @@ module GHC.Core.DataCon (
         dataConTerminalOrder, dataConLateTyVarCount, dataConUserTyVarGroups, dataConHasTrailingContext,
         dataConSourceOrder, dataConInteriorContext, dataConContextFieldCount, dataConInteriorForAll,
         orderedConArgsHaveScope,
-        dataConTheta,
+        dataConTheta, dataConHasRetainedResult,
         dataConStupidTheta,
         dataConOtherTheta,
         dataConInstArgTys, dataConOrigArgTys, dataConOrigResTy,
@@ -1210,16 +1210,28 @@ mkDataConWithTelescope source_order arg_binders name declared_infix prom_info
   where
     valid_retained_args
       = arg_binders `equalLength` orig_arg_tys
-        && null ex_tvs && null eq_spec && null theta && null stupid_theta
+        && null ex_tvs && null theta && null stupid_theta
         && null fields && isVanillaAlgTyCon rep_tycon
         && not (isTypeDataTyCon rep_tycon)
         && isLiftedTypeKind (tyConResKind rep_tycon)
-        && valid_universals
-        && case rep of { NoDataConRep -> True; _ -> False }
         && all lazy_src arg_stricts
         && all lazy_impl impl_bangs && not (any isMarkedStrict str_marks)
         && valid_fields emptyVarSet arg_binders orig_arg_tys
-        && not (anyFreeVarsOfType isId orig_res_ty)
+        && valid_result
+
+    valid_result
+      | [Just field] <- arg_binders
+      , [univ] <- univ_tvs
+      , [] <- user_tvbs
+      , [EqSpec t (TermVarTy rhs)] <- eq_spec
+      , Just (parent, [TermVarTy result]) <- splitTyConApp_maybe orig_res_ty
+      = t == univ && rhs == field && result == field && parent == rep_tycon
+        && varType field `eqType` varType univ
+        && case rep of { DCR {} -> True; _ -> False }
+      | otherwise
+      = null eq_spec && not (anyFreeVarsOfType isId orig_res_ty)
+        && valid_universals
+        && case rep of { NoDataConRep -> True; _ -> False }
 
     valid_universals
       = all isTyVar univ_tvs && all isTyVar user_tvs
@@ -1284,6 +1296,11 @@ mkDataConWithTelescope source_order arg_binders name declared_infix prom_info
     rep_ty
       | not (null arg_binders), not valid_retained_args
       = pprPanic "mkDataConWithTelescope: invalid retained telescope" (ppr name)
+      | dataConHasRetainedResult con
+      = mkInfForAllTys [(unmatchableDataConTy, tv) | tv <- univ_tvs] $
+        mkRetainedArgTys arg_binders orig_arg_tys $
+        mkScaledFunctionTysU (map unrestricted (eqSpecPreds eq_spec)) $
+        mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
       | otherwise = case rep of
         -- If the DataCon has no wrapper, then the worker's type *is* the
         -- user-facing type, so we can simply use dataConWrapperType.
@@ -1788,8 +1805,9 @@ dataConWrapperType :: DataCon -> Type
 -- NB: If the constructor is part of a data instance, the result type
 -- mentions the family tycon, not the internal one.
 dataConWrapperType con
-  | null (dataConRepArgBinders con) = dataConWrapperTypeUnchecked con
-  | otherwise                     = dataConRepType con
+  | null (dataConRepArgBinders con) || dataConHasRetainedResult con
+  = dataConWrapperTypeUnchecked con
+  | otherwise = dataConRepType con
 
 -- | Rebuild the user type after the retained representation check.
 dataConWrapperTypeUnchecked :: DataCon -> Type
@@ -1870,10 +1888,43 @@ stores the full group order for that constructor and checks it against
 its decoded arrays. See GHC.IfaceToCore.tcIfaceDataCons.
 -}
 
--- | Return retained binders for representation fields. An empty list denotes
--- ordinary fields. Retained constructors have no representation wrapper.
+-- | Return retained binders for the source fields. An empty list denotes
+-- ordinary fields. A retained result adds its equality after these fields.
 dataConRepArgBinders :: DataCon -> [Maybe Id]
 dataConRepArgBinders = dcOrigArgBinders
+
+-- | A constructor whose result index refers to its retained field.
+-- See Note [Retained constructor result equality].
+dataConHasRetainedResult :: DataCon -> Bool
+dataConHasRetainedResult con
+  = not (null (dcOrigArgBinders con)) && not (null (dcEqSpec con))
+
+{- Note [Retained constructor result equality]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A constructor with this source type:
+
+  Indexed :: foreach (ys :: [Bool]) -> Indexed ys
+
+has a worker with a uniform result:
+
+  Indexed :: forall xs. foreach (ys :: [Bool]) -> (xs ~# ys) -> Indexed xs
+
+The data constructor's EqSpec records xs ~# ys. The worker places that
+coercion argument after the field because its type depends on the field.
+A wrapper applies the worker at ys and supplies reflexivity. A case
+alternative binds a fresh field Id and then the stored coercion at that Id.
+The coercion has no runtime representation. Neither operation evaluates ys.
+
+Do not put this proof in the ordinary EqSpec prefix. The source field Id
+would be out of scope there. Keep the same order when copying alternative
+binders in GHC.Core.Utils and when checking them in GHC.Core.Lint. An
+interface decodes the proof's type in the scope of the decoded field.
+
+The admitted shape has one field at a closed structural index type, one
+result index and no contexts or existentials. Only a variable or wildcard
+can match the field. The resulting
+equality is an ordinary nominal Given for the rest of the pattern match.
+-}
 
 -- | Rebuild a constructor field telescope without erasing runtime binders.
 mkRetainedArgTys :: [Maybe Id] -> [Scaled Type] -> Type -> Type
@@ -1900,15 +1951,18 @@ must inspect the nonempty metadata and reject it without reentering the same
 field-type thunk. See Note [Retained constructor fields in interfaces] in
 GHC.Iface.Syntax. The ordinary constructor path keeps its existing laziness.
 
-The first subset has no wrapper, existential, constraint, record selector,
-data-family or newtype representation, "type data" parent, strict field, or
-unpacked field. The ordinary parent and all fields are lifted. The user quantifiers name exactly
-the universal type variables, with no duplicates. A named field has a closed
-native scalar or opaque function domain and multiplicity Many. Its Id must be
-fresh. Only earlier retained fields can occur as free runtime Ids in a field type. No
-runtime field Id can escape into the constructor result. Rebuild the worker
-and wrapper types with DepFunTy at each named field. The runtime field remains
-an ordinary lazy constructor payload slot.
+The ordinary retained package has no wrapper. Its user quantifiers name
+exactly the universal type variables, with no duplicates. A retained result
+uses a wrapper and its own EqSpec. See Note [Retained constructor result
+equality].
+
+Neither form permits existential or context binders, record selectors,
+data families, newtypes, type data, strict fields, or unpacked fields.
+The parent and all fields are lifted. A named field has a supported closed
+domain and multiplicity Many. Its Id must be fresh. Only earlier retained
+fields can occur free in a field type. Rebuild the worker and wrapper types
+with DepFunTy at each dependent field. Each runtime field remains an ordinary
+lazy constructor payload slot.
 
 A function field uses the existing retained-binder policy. Its closed ordinary
 Many arrow has independently supported scalar domains. The actual field Id
@@ -1929,7 +1983,8 @@ dataConInstOrigArgTys. Use dataConRepInstPat for scoped Core patterns. Raw
 argument-type accessors must be used with dataConRepArgBinders.
 The product splitter declines retained constructors for the same reason.
 Constructor impossibility checking returns False without calling the flat
-signature API. These constructors have no equality specification or context.
+signature API. The coverage checker must arrange its own field scope
+before it can use a retained result equality.
 
 Agda constructor telescopes scope earlier fields over later field types.
 This guides the binding representation, not the evaluation rules for lazy
@@ -2207,7 +2262,7 @@ dataConCannotMatch :: [Type] -> DataCon -> Bool
 --                  where T is the dcRepTyCon for the data con
 dataConCannotMatch tys con
   | not (null (dataConRepArgBinders con))
-  = False -- Retained constructors have no equalities or context.
+  = False -- Do not use the flat signature to instantiate a retained telescope.
           -- See Note [Retained constructor field telescopes].
   -- See (U6) in Note [Implementing unsafeCoerce]
   -- in base:Unsafe.Coerce

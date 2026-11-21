@@ -23,7 +23,8 @@ import GHC.HsToCore.Binds
 import GHC.Core.ConLike
 import GHC.Core.Coercion ( MCoercion(..), coercionLKind, mkUnbranchedAxInstCo )
 import GHC.Core.DataCon ( DataCon, dataConRepType, dataConTyCon, dataConTag
-                       , dataConRepArgBinders, dataConRepArity, dataConContextFieldCount )
+                       , dataConRepArgBinders, dataConRepArity, dataConContextFieldCount
+                       , dataConHasRetainedResult )
 import GHC.Core.Type ( coreFullView, isManyTy, isNativeIndexType, mkTyConApp, piResultTys )
 import GHC.Core.TyCon ( isNewTyCon, newTyConCo, tyConDataCons )
 import GHC.Core.FVs ( exprFreeVars )
@@ -457,6 +458,8 @@ matchOneConLike scrut vars ty (eqn1 :| eqns)   -- All eqns for a single construc
         ; return $ MkCaseAlt{ alt_pat = con1,
                               alt_bndrs = case con1 of
                                 RealDataCon con
+                                  | dataConHasRetainedResult con
+                                  -> arg_vars ++ dicts1
                                   | null tvs1, [_] <- dicts1
                                   , isNativeIndexType (mkTyConApp (dataConTyCon con) arg_tys)
                                   -- See Note [Retained constructor field scope].

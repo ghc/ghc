@@ -2778,7 +2778,9 @@ kcConDecl _ new_or_data _
        ; case args of
            PrefixConGADT _ _ -> do
              { _ <- kcConGADTArgs (TheKind liftedTypeKind) args
-             ; _ <- tcCheckRetainedConType False (tcDataConMult IsPrefixConGADT) res_ty
+             ; _ <- tcCheckRetainedConType False
+                      (retainedResultAllowed outer_bndrs inner_bndrs args)
+                      (tcDataConMult IsPrefixConGADT) res_ty
              ; return () }
            _ -> failWithTc $ TcRnRetainedQuantificationError RetainedPackageDeclaration }
 
@@ -5326,7 +5328,9 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _ tag_map
            tcGadtConTyVarBndrs skol_info outer_bndrs inner_bndrs $
            do { prefix <- tcConGADTArgs (TheKind liftedTypeKind) args
               ; (retained, suffix_ty) <-
-                  tcCheckRetainedConType True (tcDataConMult IsPrefixConGADT) hs_res_ty
+                  tcCheckRetainedConType True
+                    (retainedResultAllowed outer_bndrs inner_bndrs args)
+                    (tcDataConMult IsPrefixConGADT) hs_res_ty
               ; let suffix_bang = HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict
               ; return (replicate (length prefix) Nothing ++ retained,
                         map snd prefix ++ map (const suffix_bang) retained,
@@ -5510,6 +5514,13 @@ checkRetainedConShape new_or_data telescope args res_ty
     plain_field (CDF _ unpack strict _ _ _)
       = not (isSrcUnpacked unpack) && not (isSrcStrict strict)
 
+-- | The first retained result form takes exactly one runtime field.
+retainedResultAllowed :: HsOuterSigTyVarBndrs GhcRn
+                      -> [LHsGadtTelescope GhcRn] -> HsConDeclGADTDetails GhcRn
+                      -> Bool
+retainedResultAllowed HsOuterImplicit{} [] (PrefixConGADT _ []) = True
+retainedResultAllowed _ _ _ = False
+
 -- | Split fields with their explicit metadata, including vacuous binders.
 splitRetainedConFields :: [Maybe Id] -> Type -> ([Scaled Type], Type)
 splitRetainedConFields [] ty = ([], ty)
@@ -5535,17 +5546,18 @@ and its domain.
 
 Split the zonked telescope before applying the result substitution. Map that
 substitution lazily over the field types. Field counts and list spines must
-not force rejigConRes while the parent TyCon is still knot-tied. The terminal
-result has no free runtime Ids, and rejigConRes substitutes only erased type
-variables. It cannot rename or capture the retained field Ids. Keep its
-existential and equality metadata until checkValidDataCon can reject it after
-the parent knot is complete.
+not force rejigConRes while the parent TyCon is still knot-tied.
+rejigConRes substitutes only erased type variables. It cannot rename or
+capture a retained field Id. Keep its existential and equality metadata until
+checkValidDataCon can check it after the parent knot is complete.
 
 Kind inference checks domain kinds without inspecting unfinished datatype
 constructor graphs. Final checking validates the fixed native index domain.
 Erased outer quantifiers keep their ordinary GADT scope. The retained Ids
-are fields, not existential type variables. This subset has no existential,
-equality specification, context, record field, strict field, or newtype.
+are fields. An ordinary retained package has no EqSpec. A direct retained
+result gets one from rejigConRes. See Note [Retained constructor result
+equality] in GHC.Core.DataCon. Neither form permits existential or context
+binders, records, strict fields, or newtypes.
 Reject StrictData rather than changing its field evaluation rules.
 See Note [Retained constructor field telescopes] in GHC.Core.DataCon and
 Note [Source retained signatures] in GHC.Tc.Gen.HsType.
@@ -6457,11 +6469,12 @@ checkValidDataCon dflags existential_ok tc con
              ; unless (isBoxedDataTyCon tc && isLiftedAlgTyCon tc
                        && isVanillaAlgTyCon tc && not (isTypeDataTyCon tc)
                        && null (dataConExTyCoVars con)
-                       && null eq_spec
                        && null (dataConOtherTheta con)
-                       && length user_tvs == length univ_tvs
-                       && sizeVarSet (mkVarSet user_tvs) == length user_tvs
-                       && all (`elemVarSet` mkVarSet univ_tvs) user_tvs) $
+                       && (if dataConHasRetainedResult con
+                           then null user_tvs && isSingleton univ_tvs && isSingleton eq_spec
+                           else null eq_spec && length user_tvs == length univ_tvs
+                             && sizeVarSet (mkVarSet user_tvs) == length user_tvs
+                             && all (`elemVarSet` mkVarSet univ_tvs) user_tvs)) $
                  failWithTc $ TcRnRetainedQuantificationError RetainedPackageDeclaration }
 
         ; traceTc "checkValidDataCon" (vcat
@@ -6522,7 +6535,10 @@ checkValidDataCon dflags existential_ok tc con
           -- Check that the result type is a *monotype*
           --  e.g. reject this:   MkT :: T (forall a. a->a)
           -- Reason: it's really the argument of an equality constraint
-        ; checkValidMonoType orig_res_ty
+        ; unless (dataConHasRetainedResult con) $
+            checkValidMonoType orig_res_ty
+            -- The retained result is exactly the parent applied to its field.
+            -- Check it in the wrapper type where that field is bound.
         ; checkEscapingKind (dataConWrapperType con)
 
         -- For /data/ types check that each argument has a fixed runtime rep
@@ -7217,8 +7233,8 @@ checkValidRoles tc
   where
     check_dc_roles datacon
       = do { traceTc "check_dc_roles" (ppr datacon <+> ppr (tyConRoles tc))
-           ; mapM_ (check_ty_roles role_env Representational) $
-             eqSpecPreds eq_spec ++ theta
+           ; mapM_ (check_ty_roles result_env Representational) (eqSpecPreds eq_spec)
+           ; mapM_ (check_ty_roles role_env Representational) theta
            ; if null field_binders
              then mapM_ (check_ty_roles role_env Representational) (map scaledThing arg_tys)
              else check_fields role_env field_binders arg_tys }
@@ -7231,6 +7247,8 @@ checkValidRoles tc
         ex_roles   = mkVarEnv (map (, Nominal) ex_tvs)
         role_env   = univ_roles `plusVarEnv` ex_roles
         field_binders = dataConRepArgBinders datacon
+        result_env = foldl' (\env field -> extendVarEnv env field Nominal)
+                            role_env [field | Just field <- field_binders]
 
     -- See Note [Roles of retained constructor fields] in GHC.Tc.TyCl.Utils.
     check_fields _ [] [] = return ()

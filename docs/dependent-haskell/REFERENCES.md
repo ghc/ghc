@@ -7458,3 +7458,17 @@ at the same source revision.
 [GHC rewrite rules](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/rewrite_rules.html),
 [Agda 2.8.0 rewriting](https://agda.readthedocs.io/en/v2.8.0/language/rewriting.html),
 and [R16 mapping proof](roadmap/R16-open-term-evaluator.md#a-rule-in-the-module-importing-a-mapping-proof).
+
+### Nested constructors with a runtime result index
+
+Agda can infer an implicit argument from the type of a supplied value.
+In this fork, the type of `IndexedList xs` supplies the erased index of
+`rebuild :: IndexedList ys -> IndexedList ys`. Proposal #274 describes
+how GHC uses argument information when it checks an application. The
+fork can read the constructor result at a local field before Quick Look
+instantiates the outer function. The normal argument check still tracks
+usage. Passing two independent lists to a function that requires the
+same index fails at the arguments.
+[Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html),
+[GHC proposal #274](https://ghc-proposals.readthedocs.io/en/latest/proposals/0274-quick-look-impredicativity.html),
+and [ordinary client](examples/open-evaluation/DirectIndexedListClient.hs).

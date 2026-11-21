@@ -742,11 +742,18 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
   = return (NoDataConRep, arg_ibangs, rep_strs)
 
   | otherwise
-  = do { wrap_args <- mapM (newLocal (fsLit "conrep")) wrap_arg_tys
-       ; wrap_body <- mk_rep_app (dropList stupid_theta wrap_args `zip` dropList eq_spec unboxers)
-                                 initial_wrap_app
-                        -- Drop the stupid theta arguments, as per
-                        -- Note [Instantiating stupid theta] in GHC.Core.DataCon.
+  = do { (wrap_args, wrap_body) <-
+           case dataConRepArgBinders data_con of
+             [Just field] | retained_result ->
+               -- Reuse the binder referenced by the result and by reflexivity.
+               -- See Note [Retained constructor result equality] in GHC.Core.DataCon.
+               return ([field], mkCoApps (App initial_wrap_app (Var field)) refls)
+             _ -> do { args <- mapM (newLocal (fsLit "conrep")) wrap_arg_tys
+                     ; body <- mk_rep_app (dropList stupid_theta args `zip` dropList eq_spec unboxers)
+                                          (mkCoApps initial_wrap_app refls)
+                     ; return (args, body) }
+           -- Drop the stupid theta arguments, as per
+           -- Note [Instantiating stupid theta] in GHC.Core.DataCon.
 
        ; let wrap_id = mkGlobalId (DataConWrapId data_con) wrap_name wrap_ty wrap_info
              wrap_info = noCafIdInfo
@@ -842,7 +849,10 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
     tycon        = dataConTyCon data_con       -- The representation TyCon (not family)
     wrap_ty      = dataConWrapperType data_con
     ev_tys       = eqSpecPreds eq_spec ++ theta
-    all_arg_tys  = map unrestricted ev_tys ++ orig_arg_tys
+    retained_result = dataConHasRetainedResult data_con
+    all_arg_tys
+      | retained_result = orig_arg_tys ++ map unrestricted ev_tys
+      | otherwise = map unrestricted ev_tys ++ orig_arg_tys
     ev_ibangs    = map (const HsLazy) ev_tys
     orig_bangs   = dataConSrcBangs data_con
 
@@ -882,7 +892,9 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
           FixedBangOpts bangs   -> bangs
 
     (rep_tys_w_strs, wrappers)
-      = unzip (zipWith (dataConArgRep platform) all_arg_tys (ev_ibangs ++ arg_ibangs))
+      = unzip (zipWith (dataConArgRep platform) all_arg_tys all_ibangs)
+    all_ibangs | retained_result = arg_ibangs ++ ev_ibangs
+               | otherwise = ev_ibangs ++ arg_ibangs
 
     (unboxers, boxers) = unzip wrappers
     (rep_tys, rep_strs) = unzip (concat rep_tys_w_strs)
@@ -902,6 +914,7 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
       | isUnaryClassTyCon tycon   -- See (UCM8) in Note [Unary class magic]
       = False                     -- in GHC.Core.TyCon
 
+      | retained_result = True
       | otherwise
       = (not new_tycon
                      -- (Most) newtypes have only a worker, with the exception
@@ -930,7 +943,7 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
     initial_wrap_app = Var (dataConWorkId data_con)
                        `mkTyApps`  res_ty_args
                        `mkVarApps` ex_tvs
-                       `mkCoApps`  map (mkReflCo Nominal . eqSpecType) eq_spec
+    refls = map (mkReflCo Nominal . eqSpecType) eq_spec
 
     mk_boxer :: [Boxer] -> DataConBoxer
     mk_boxer boxers = DCB (\ ty_args src_vars ->

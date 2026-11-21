@@ -263,15 +263,15 @@ tyConToIfaceDecl env tycon
           (con_env1, user_bndrs') = tidyForAllTyBinders emptyTidyEnv user_bndrs
           (con_env2, univ_tvs') = mapAccumL tidyFreeTyCoVarX con_env1 univ_tvs
           (con_env3, ex_tvs') = mapAccumL tidyFreeTyCoVarX con_env2 ex_tvs
-          to_eq_spec (tv,ty) = (tidyTyVar con_env3 tv, tidyToIfaceType con_env3 ty)
+          to_eq_spec (tv,ty) = (tidyTyVar con_env3 tv, tidyToIfaceType con_env4 ty)
 
           arg_binders = dataConRepArgBinders data_con
-          (if_arg_binders, if_arg_tys)
+          (con_env4, (if_arg_binders, if_arg_tys))
             | null arg_binders
-            = ([], map (\(Scaled w t) -> (tidyToIfaceType con_env3 w
-                                         , tidyToIfaceType con_env3 t)) arg_tys)
+            = (con_env3, ([], map (\(Scaled w t) -> (tidyToIfaceType con_env3 w
+                                                    , tidyToIfaceType con_env3 t)) arg_tys))
             | otherwise
-            = unzip $ snd $ mapAccumL tidy_arg con_env3 (zipEqual arg_binders arg_tys)
+            = fmap unzip $ mapAccumL tidy_arg con_env3 (zipEqual arg_binders arg_tys)
 
           -- See Note [Retained constructor fields in interfaces].
           tidy_arg env (mb_binder, Scaled w ty)

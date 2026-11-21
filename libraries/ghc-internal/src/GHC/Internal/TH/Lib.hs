@@ -786,6 +786,18 @@ gadtValueArg bang mult ty = GadtValueArg <$> bang <*> mult <*> ty
 gadtIndexArg :: Quote m => Name -> m Type -> m RetainedGadtArg
 gadtIndexArg name domain = GadtIndexArg name <$> domain
 
+-- | Build an invisible forall group in an ordered GADT signature.
+gadtInvisibleArgs :: Quote m => m Type -> [m (TyVarBndr Specificity)] -> m RetainedGadtArg
+gadtInvisibleArgs ma tvs = GadtInvisibleArgs <$> ma <*> sequenceA tvs
+
+-- | Build a required forall group in an ordered GADT signature.
+gadtRequiredArgs :: Quote m => m Type -> [m (TyVarBndr ())] -> m RetainedGadtArg
+gadtRequiredArgs ma tvs = GadtRequiredArgs <$> ma <*> sequenceA tvs
+
+-- | Build a context group in an ordered GADT signature.
+gadtContextArgs :: Quote m => m Cxt -> m RetainedGadtArg
+gadtContextArgs = fmap GadtContextArgs
+
 -------------------------------------------------------------------------------
 -- *   Type
 
