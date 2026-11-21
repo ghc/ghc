@@ -12,6 +12,8 @@
 - [x] Interleave specified forall groups, contexts, and fields in a lifted prefix constructor.
 - [x] Preserve both a leading and a terminal constructor context.
 - [x] Place a required forall between two prefix fields in a lifted constructor.
+- [x] Place inferred and specified type variables in the same forall between prefix fields.
+- [ ] Preserve a field's bang after a nested quantifier.
 - [ ] Support the remaining orders of fields, contexts, and quantifiers in prefix constructors.
 
 The [Showcase](../Showcase.hs) defines a constructor with fields of
@@ -129,3 +131,21 @@ from an earlier field is in scope when the required type pattern
 is checked. The [interface client](../../../testsuite/tests/gadt/GadtInteriorForAll.hs)
 checks both forms. The [TH test](../../../testsuite/tests/gadt/GadtInteriorForAllTh.hs)
 round-trips the required group as `ForallVisT`.
+
+An invisible group after a field can mark some binders as inferred.
+For `InferredPair :: Int -> forall {a} b. Show b => (a, b) -> InferredPair`,
+`InferredPair 61 @Bool ('x', True)` fixes `b` to `Bool`. The
+`InferredPair n @b (_, x)` pattern also binds the specified
+variable. Quotation and reification preserve both binder flags.
+[Explicit specificity proposal](https://ghc-proposals.readthedocs.io/en/latest/proposals/0099-explicit-specificity.html),
+[interface client](../../../testsuite/tests/gadt/GadtOrderedTelescope.hs),
+and [TH test](../../../testsuite/tests/gadt/GadtOrderedTelescopeTh.hs).
+
+Proposal #402 permits a strictness annotation on a prefix field in any
+position. The compiler currently reports GHC-18932 for
+`Late :: Int -> forall a -> !a -> Late`, including when the first
+field and required binder are valid. The parser keeps bangs on the
+initial fields. The ordered suffix in a TH `RetainedGadtC` is a
+`Type` and carries a field type and multiplicity. Supporting a bang
+after a nested quantifier requires keeping that bang through both
+declaration quotation and reification.

@@ -48,3 +48,6 @@ data Fenced a where
 
 data Late a b where
   Late :: Show a => !a -> forall b. Eq b => Late a b
+
+data InferredPair where
+  InferredPair :: Int -> forall {a} b. Show b => (a, b) -> InferredPair

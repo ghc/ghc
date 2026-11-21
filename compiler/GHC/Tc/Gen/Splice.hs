@@ -3660,9 +3660,10 @@ reifyDataCon isGadtDataCon tys dc
                           | all isVisibleForAllTyBinder bs = do
                               tvs <- reifyTyVarBndrs [Bndr (binderVar tv) () | tv <- bs]
                               TH.ForallMatchT ma . TH.ForallVisT tvs <$> rest
-                          | otherwise = do
-                              tvs <- reifyTyVarBndrs [Bndr (binderVar tv) SpecifiedSpec | tv <- bs]
+                          | Just invis <- to_invis_bndrs bs = do
+                              tvs <- reifyTyVarBndrs invis
                               TH.ForallMatchT ma . TH.ForallT tvs [] <$> rest
+                          | otherwise = panic "reifyDataCon: mixed visibility in constructor group"
                         reify_context ps rest = do
                           ctxt <- reifyCxt ps
                           TH.ForallT [] ctxt <$> rest
