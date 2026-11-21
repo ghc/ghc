@@ -29,6 +29,11 @@ refilter xs =
     let ys = consumeVector (filterVec (> 3)) (filterVec odd xs)
     in ys
 
+-- | Open the vector selected by the conditional.
+firstSelected :: Bool -> Hidden a -> Hidden a -> [a]
+firstSelected flag left right =
+    take 1 (listCells (if flag then id left else right))
+
 -- | Infer the result of a callback whose element type is fixed.
 refilterMapped :: Vec n Int -> Hidden Int
 refilterMapped xs =
@@ -71,6 +76,12 @@ main = do
             putStrLn "selected package raised the original exception"
         _ -> fail "unexpected package demand"
     print (partitionHeads (Cons 7 (Cons 2 (error "unused partition tail"))))
+    let oddCells = filterVec odd (Cons 7 (error "unused odd tail"))
+        evenCells = filterVec even (Cons 2 (error "unused even tail"))
+        unused = error "unused conditional branch"
+    unless (firstSelected True oddCells unused == [7]
+         && firstSelected False unused evenCells == [2]) $
+        fail "opening a conditional changed branch or tail demand"
     let filteredCells input = toList (refilter input)
     unless (take 1 (filteredCells (Cons 3 (Cons 7 (error "unused refilter tail")))) == [7]
          && filteredCells (Cons 3 (Cons 7 (Cons 8 (Cons 9 Nil)))) == [7, 9]

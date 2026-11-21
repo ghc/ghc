@@ -971,7 +971,7 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
         is_value (Left EValArg{}) = True
         is_value Right{} = True
         is_value _ = False
-        directly_opened (Right (_, _, _, Nothing)) = True
+        directly_opened (Right (_, _, _, Nothing, _)) = True
         directly_opened _ = False
 
         -- IALL can instantiate another group after each supplied value.
@@ -990,8 +990,11 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
       check_app args' (mkCheckExpType result_ty)
     open result_ty opened rev_args (Left arg : rest) =
       open result_ty opened (arg : rev_args) rest
-    open result_ty opened rev_args (Right (loc, mult, arg, rebuild) : rest) =
-      do { (checked, actual) <- tcScalingUsage mult $ tcInferRho arg
+    open result_ty opened rev_args (Right (loc, mult, arg, rebuild, known_schema) : rest) =
+      do { (checked, actual) <- tcScalingUsage mult $
+               case known_schema of
+                 Just schema -> (, schema) <$> tcCheckMonoExpr arg schema
+                 Nothing -> tcInferRho arg
          ; schema <- liftZonkM (zonkTcType actual)
          ; key <- if isManyTy mult && isNothing rebuild
                   then openingKey arg checked
@@ -1085,7 +1088,8 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
 -- See Note [Quick Look and ordinary argument checking].
 tcImplicitAppArgs :: TcType -> [HsExprArg 'TcpRn]
                   -> TcM [Either (HsExprArg 'TcpRn)
-                                 (HsExprLoc, Mult, LHsExpr GhcRn, Maybe (LHsExpr GhcRn -> LHsExpr GhcRn))]
+                                 (HsExprLoc, Mult, LHsExpr GhcRn,
+                                  Maybe (LHsExpr GhcRn -> LHsExpr GhcRn), Maybe TcType)]
 tcImplicitAppArgs ty (wrapper@EWrap{} : rest) = (Left wrapper :) <$> tcImplicitAppArgs ty rest
 tcImplicitAppArgs ty (ordinary@EValArg{ea_loc_span = loc, ea_arg = arg} : rest)
   | FunTy { ft_af = af, ft_mult = mult, ft_arg = domain, ft_res = result }
@@ -1093,12 +1097,16 @@ tcImplicitAppArgs ty (ordinary@EValArg{ea_loc_span = loc, ea_arg = arg} : rest)
   , isVisibleFunArg af
   = do { implicit <- if (isManyTy mult || isOneTy mult)
                         && demands_payload (coreFullView domain)
-                     then tcImplicitOperand arg
+                     then classify mult
                      else return Nothing
-       ; let operand = case implicit of
-               Just (package, replace) -> Right (loc, mult, package, replace)
-               Nothing -> Left ordinary
+       ; let operand = maybe (Left ordinary) Right implicit
        ; (operand :) <$> tcImplicitAppArgs result rest }
+  where
+    classify mult = case unLoc (stripParensLHsExpr arg) of
+      HsIf{} -> fmap (fmap (\(schema, _) -> (loc, mult, arg, Nothing, Just schema)))
+                     (tcPackageOperandResult False arg)
+      _ -> fmap (fmap (\(package, replace) -> (loc, mult, package, replace, Nothing)))
+                (tcImplicitOperand arg)
 tcImplicitAppArgs _ rest = return (map Left rest)
 
 -- | Check if a declared argument domain requests the payload of a package.
@@ -1165,12 +1173,18 @@ tcDeclaredOperandResult operand =
 tcLexicalPackageOperand :: LHsExpr GhcRn -> TcM (Maybe (TcType, Bool))
 tcLexicalPackageOperand = tcPackageOperandResult True
 
--- | Read a package result through directly forwarded argument types.
+-- | Read a package result from a declaration, forwarding call or conditional.
 -- The result flag asks the caller to check the whole operand at the schema.
 -- See Note [Implicit opening for an explicit package argument].
 tcPackageOperandResult :: Bool -> LHsExpr GhcRn -> TcM (Maybe (TcType, Bool))
 tcPackageOperandResult lexical = go False
   where
+    go forwarded (L _ (HsPar _ operand)) = go forwarded operand
+    go _ (L _ (HsIf _ _ left right)) = runMaybeT $ do
+      (schema, _) <- MaybeT (go True left)
+      (other, _) <- MaybeT (go True right)
+      guard (eqType schema other)
+      pure (schema, True)
     go forwarded operand = runMaybeT $ do
       (ident, args) <- MaybeT (tcDeclaredOperandSpine lexical operand)
       let sigma = varType ident
@@ -1187,7 +1201,7 @@ tcPackageOperandResult lexical = go False
           , all isTauTy matches, all (ordinary_domain v) domains
           , first : rest <- [arg | (Scaled _ domain, arg) <- zip domains args
                                  , getTyVar_maybe (coreFullView domain) == Just v]
-          -> do { selected@(schema, _) <- MaybeT (go lexical first)
+          -> do { selected@(schema, _) <- MaybeT (go (forwarded || lexical) first)
                 ; case rest of
                     [] | lexical -> pure (schema, True)
                     [] -> pure selected
@@ -1369,6 +1383,15 @@ first rule recognizes named argument heads and ordinary value spines.
 The declaration selects the route. The ordinary checker verifies the
 actual argument, including its use and all of its constraints, once.
 Scale that check by the concrete multiplicity of the formal arrow.
+
+In listCells (if flag then id left else right), the declared branches
+can supply the same dot schema. Read both without checking the terms.
+Each must expose the same complete package type with only rigid free
+variables. Check the conditional at that schema before opening it.
+The ordinary conditional checker keeps its branch usage and demand.
+When either branch needs an expected type to expose its schema, keep
+ordinary checking at the formal domain. This preserves, for example,
+an ignored conditional whose branches both call error.
 
 A dot package with an arrow payload can also head a value application.
 Instantiate the head's ordinary invisible prefix before opening the package.

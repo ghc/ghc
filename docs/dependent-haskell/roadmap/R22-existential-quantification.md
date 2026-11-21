@@ -600,8 +600,17 @@ and [implicit opening in Elab-IExist](https://richarde.dev/papers/2021/exists/ex
 
 A result parameter with no corresponding argument type can remain
 ambiguous. An opaque family result stays opaque.
-An `if` whose branches return `Mixed` can infer that type on its own.
-Bind the conditional at `Mixed` before passing it to the consumer.
+An ordinary consumer can open the result of a conditional directly.
+For `left, right :: Hidden a`, the source-hidden test calls
+`take 1 (listCells (if flag then id left else right))`. Both branches
+identify the same package type, including the caller's rigid `a`.
+GHC checks both branches at that type and brings the selected length
+into scope for the call to `listCells`. Either package can hide a
+different length. The unused branch and the selected vector's tail
+stay lazy.
+A producer's own uninstantiated type variable cannot supply the common
+type.
+[Source-hidden consumer](../../../testsuite/tests/dependent/should_run/implicit-existential-source/QuickLookForward.hs).
 
 An ignored conditional can need its expected type. For example,
 `ignoreInner (if flag then id (error "left") else error "right")`
