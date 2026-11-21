@@ -540,7 +540,8 @@ checkConstrainedSignature ctxt ty
         qualifierPrefix _ = unitTy
 
         check_body (DepDictTy dict body)
-          = mapM_ checkNoConstrainedFamilyApps [varType dict, body]
+          = do { check_part (varType dict)
+               ; void $ checkConstraints (SigSkol origin whole []) [] [dict] (go body) }
         check_body (DepFunTy _ index body)
           = do { check_part (varType index)
                ; tcExtendIdEnv [index] (go body) }
@@ -816,6 +817,8 @@ familyDomainObligations ty = State.evalStateT (go ty) emptyUFM
           range <- go res
           pure (kinds ++ domain ++ range)
     go (AppTy f x) = children [f, x]
+    go (DepDictTy v body) = forbidden [varType v, body]
+    go (ClassAppTy _ inst _ arg kind) = forbidden [inst, arg, kind]
     go (DepFunTy _ v body) = do
       binder_uses <- go (varType v)
       body_uses <- go body >>= close_retained v
@@ -933,6 +936,11 @@ runtime index into scope before skolemising the rest of the telescope.
 The context on that suffix supplies the domain for its result. Check the
 index's own type before entering its scope. A constraint beneath a binder
 cannot justify an application in an earlier argument.
+
+A leading dependent dictionary binder supplies its exact evidence
+parameter when checking its body. Check the predicate first, outside
+that parameter's scope. A nested dictionary or selector inside a
+monotype does not have a family formation rule here.
 
 An ordinary argument can be a callback with its own class context.
 For (forall c. Collects c => Proxy c -> Elem c -> Elem c) -> result,
