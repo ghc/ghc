@@ -629,7 +629,17 @@ the operand against the formal domain. This keeps the expected
 higher-rank field type for a case that builds a callback. A branch
 local head or a case alternative with local declarations can still
 need an annotation. Quick Look can record a named application's
-result, but its current judgment does not infer case results.
+result. Its current judgment does not infer case results.
+
+With `ImpredicativeTypes`, `listCells (id package)` can open a dot
+package found by Quick Look. The checker resumes the cached producer
+once at its inferred package type. The reader's type applications and
+constraints use the fresh witness inside the opening. Its result type
+stays outside that witness's scope. This path handles a single ordinary
+value argument and a generative reader parameter. It requires a package
+type with no unresolved Quick Look variables. With ordinary inference,
+when there is no cache for `id`, name the package or annotate the operand
+at its package type before the call.
 [Source-hidden consumer](../../../testsuite/tests/dependent/should_run/implicit-existential-source/QuickLookForward.hs).
 
 An ignored conditional can need its expected type. For example,

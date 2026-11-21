@@ -31,6 +31,10 @@ refilter xs =
     let ys = consumeVector (filterVec (> 3)) (filterVec odd xs)
     in ys
 
+-- | Open the package type inferred for the argument to the reader.
+firstForwarded :: Hidden a -> [a]
+firstForwarded package = take 1 (listCells (id package))
+
 -- | Open the vector selected by the conditional.
 firstSelected :: Bool -> Hidden a -> Hidden a -> [a]
 firstSelected flag left right =
@@ -120,6 +124,8 @@ main = do
     let oddCells = filterVec odd (Cons 7 (error "unused odd tail"))
         evenCells = filterVec even (Cons 2 (error "unused even tail"))
         unused = error "unused conditional branch"
+    unless (firstForwarded oddCells == [7 :: Int]) $
+        fail "opening a cached argument forced the vector tail"
     unless (firstSelected True oddCells unused == [7]
          && firstSelected False unused evenCells == [2]) $
         fail "opening a conditional changed branch or tail demand"

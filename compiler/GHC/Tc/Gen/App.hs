@@ -23,7 +23,8 @@ import GHC.Hs
 import GHC.Rename.Env ( addUsedGRE, DeprecationWarnings(NoDeprecationWarnings) )
 import GHC.Rename.Utils ( mkExpandedLExpr )
 import GHC.Tc.Gen.Head
-import GHC.Tc.Gen.Match ( tcMatches, tcBody, tcOpenImplicitPackage, implicitPayloadType, tcCloseRuntimeScope )
+import GHC.Tc.Gen.Match ( tcMatches, tcBody, tcOpenImplicitPackage, tcOpenImplicitPackageAt
+                        , implicitPayloadType, tcCloseRuntimeScope )
 import GHC.Tc.Gen.SourceTable ( tcLookupSourceTableId, sourceTableOccurrence, recordSourceMethodUse, recordSourceLiteralUse )
 import GHC.Tc.Gen.Sig ( isCompleteHsSig )
 import GHC.Tc.Errors.Types
@@ -847,18 +848,23 @@ tcOrdinaryAppScoped fields checked_prefix rn_expr rn_head@(rn_fun, fun_lspan) tc
                 NoQL | native_app, not (null [() | ETypeArg{} <- rn_args])
                   -> Just <$> newTcRef Nothing
                 _ -> return Nothing
-            ; (inst_args, app_res_rho) <-
-                tcInstFunWithPrefix False (checked_prefix ++ prefix) vta_cache expected_rho inst_plan
-                  do_ql inst_final rn_head tc_fun fun_sigma remaining_args
+            ; let instantiate =
+                    tcInstFunWithPrefix False (checked_prefix ++ prefix) vta_cache expected_rho inst_plan
+                      do_ql inst_final rn_head tc_fun fun_sigma remaining_args
+            ; ((inst_args, app_res_rho), emit_wanteds) <- case do_ql of
+                NoQL -> (, return ()) <$> instantiate
+                DoQL -> do { (instantiated, wanted) <- captureConstraints instantiate
+                           ; return (instantiated, emitConstraints wanted) }
             ; extra_cache <- case vta_cache of
                 Nothing -> return []
                 Just ref -> fromMaybe [] <$> readTcRef ref
-            ; -- Step 3: Take a quick look at the result type.
-              -- See Note [QuickLook: arguments before result].
-              case (do_ql, exp_res_ty) of
-                (DoQL, Check exp_rho) -> quickLookResultType app_res_rho exp_rho
-                _                    -> return ()
-            ; finishAppWithScopedCache fields (arg_cache ++ extra_cache) do_ql rn_expr fun_lspan
+            ; let prepare = do
+                    emit_wanteds
+                    -- See Note [QuickLook: arguments before result].
+                    case (do_ql, exp_res_ty) of
+                      (DoQL, Check exp_rho) -> quickLookResultType app_res_rho exp_rho
+                      _                    -> return ()
+            ; finishAppWithScopedCache fields (arg_cache ++ extra_cache) prepare do_ql rn_expr fun_lspan
                 source_fun tc_fun inst_args app_res_rho written_res_ty } }
   where
     -- See Note [Type arguments before an implicit package head].
@@ -2751,7 +2757,8 @@ an expression-local implication. See
  docs/dependent-haskell/REFERENCES.md#retained-class-consumers.
 -}
 
-finishApp :: QLFlag
+finishApp :: TcM ()                 -- Saved constraints and result Quick Look
+          -> QLFlag
           -> HsExpr GhcRn           -- The whole application
           -> SrcSpan                -- Span for the /head/ of the application
           -> HsExpr GhcRn           -- The head of the application (renamed)
@@ -2761,23 +2768,83 @@ finishApp :: QLFlag
           -> TcM (HsExpr GhcTc)
 -- Instantiation and Quick Look are done.  Now do typechecking,
 -- of both the result type and the arguments, before rebuilding.
-finishApp = finishAppWithCache []
-
--- | Finish an application with arguments inferred for immutable index matching.
-finishAppWithCache :: RetainedArgCache -> QLFlag
-                   -> HsExpr GhcRn -> SrcSpan -> HsExpr GhcRn -> HsExpr GhcTc
-                   -> [HsExprArg 'TcpInst] -> TcRhoType -> ExpRhoType
-                   -> TcM (HsExpr GhcTc)
-finishAppWithCache = finishAppWithScopedCache []
+finishApp = finishAppWithScopedCache [] []
 
 -- | Finish an application below any generated runtime field bindings.
-finishAppWithScopedCache :: [Name] -> RetainedArgCache -> QLFlag
+-- See Note [Opening a package found by Quick Look].
+finishAppWithScopedCache :: [Name] -> RetainedArgCache -> TcM () -> QLFlag
                          -> HsExpr GhcRn -> SrcSpan -> HsExpr GhcRn -> HsExpr GhcTc
                          -> [HsExprArg 'TcpInst] -> TcRhoType -> ExpRhoType
                          -> TcM (HsExpr GhcTc)
-finishAppWithScopedCache fields cache do_ql rn_expr fun_loc rn_fun tc_fun inst_args
+finishAppWithScopedCache fields cache prepare do_ql rn_expr fun_loc rn_fun tc_fun inst_args
                         app_res_rho exp_res_ty
-  = do { case do_ql of
+  | DoQL <- do_ql
+  , null fields, null cache
+  , [arg@EValArgQL{eaql_loc_span = loc, eaql_arg_ty = scaled@(Scaled mult domain)
+                  , eaql_larg = original, eaql_res_rho = actual}]
+       <- filter (not . wrapper) inst_args
+  , Just (tc, _) <- tcSplitTyConApp_maybe domain
+  , isGenerativeTyCon tc Nominal
+  , isOneTy mult || isManyTy mult
+  = do { actual <- liftZonkM (zonkTcType actual)
+       ; outer_result <- case exp_res_ty of
+           Check result -> noQuickLookVars <$> liftZonkM (zonkTcType result)
+           Infer{} -> return True
+       ; case coreFullView actual of
+           ExistsTy ImplicitExists _ _ | noQuickLookVars actual, outer_result
+             -> do { EValArg{ea_arg = checked} <-
+                       tcValArg do_ql 1 (rn_fun, fun_loc)
+                         arg{eaql_arg_ty = Scaled mult actual, eaql_encl = True}
+                   ; result_ty <- expTypeToType exp_res_ty
+                   ; tcOpenImplicitPackageAt mult (getLocA original) actual checked result_ty $ \payload ->
+                       do { qlUnify (varType payload) domain
+                          ; let replace EValArgQL{} = EValArg loc scaled original
+                                replace arg = arg
+                                payload_cache = [(1, (nlHsVar payload, varType payload, zeroUE))]
+                          ; finishAppBody fields payload_cache prepare do_ql rn_expr fun_loc rn_fun
+                              tc_fun (map replace inst_args) app_res_rho (mkCheckExpType result_ty) } }
+           _ -> ordinary }
+  | otherwise = ordinary
+  where
+    wrapper EWrap{} = True
+    wrapper _ = False
+    ordinary = finishAppBody fields cache prepare do_ql rn_expr fun_loc rn_fun tc_fun
+                             inst_args app_res_rho exp_res_ty
+
+{- Note [Opening a package found by Quick Look]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In firstCell (id x), where x has type exists n. Vec n a, Quick Look
+has already instantiated id at the package type. The boxed vector
+domain asks for its payload. Use the cached result before argument
+subsumption compares the quantified type directly with Vec.
+
+Resume the original argument once at its cached package type. This
+restores its saved usage and constraints, including any checking of
+arguments that Quick Look skipped. Open the result under a fresh witness.
+Quick Look can instantiate the outer reader's remaining variables
+before their level is fixed. Emit the reader's saved obligations under
+the opening. Finish its result and argument checks there. The outward
+result type must have its type variables at ordinary levels. Allocate
+an inference metavariable outside the opening when the result is inferred.
+Otherwise Quick Look could assign the hidden witness to an outward
+instantiation variable, whose level is infinity.
+
+Require one cached value argument, a generative formal head and a
+concrete multiplicity. No second operand or written type argument needs
+to be moved into that scope. The cached package must have no unresolved
+Quick Look variables. Retain the original checking path without such a
+cache. In particular, do not enable Quick Look on any additional calls.
+-}
+
+-- | Check the instantiated result and arguments, then rebuild the call.
+finishAppBody :: [Name] -> RetainedArgCache -> TcM () -> QLFlag
+              -> HsExpr GhcRn -> SrcSpan -> HsExpr GhcRn -> HsExpr GhcTc
+              -> [HsExprArg 'TcpInst] -> TcRhoType -> ExpRhoType
+              -> TcM (HsExpr GhcTc)
+finishAppBody fields cache prepare do_ql rn_expr fun_loc rn_fun tc_fun inst_args
+              app_res_rho exp_res_ty
+  = do { prepare
+       ; case do_ql of
            NoQL -> return ()
            DoQL -> do { rejectNativeQuickLook app_res_rho
                       ; setSrcSpan fun_loc $ rejectNativeQLInstArgs inst_args }
@@ -3108,14 +3175,14 @@ paper. Allocate the instantiation variables in telescope order, then
 Quick Look unifies the final payload type with the application's type.
 The fresh variables are local to this check. Monomorphise each one on
 the way out, including witnesses absent from the payload. Check the
-zonked witness before traversing it. finishAppWithCache still checks
+zonked witness before traversing it. finishAppWithScopedCache still checks
 the actual result type against the instantiated payload.
 
 Use the checked package type before Step 4 monomorphises the application
 variables. For example, check Duo id calls against exists t. Duo t (Calls t),
 where calls :: Calls (forall a. a -> a). Quick Look at the arguments finds
 the type of calls. Matching the result then fixes both the witness and
-the type of id. finishAppWithCache also handles nested applications after
+the type of id. finishAppWithScopedCache also handles nested applications after
 tcValArg has restored the enclosing constraints, multiplicity and usage.
 
 The package schema must have no free Quick Look variables. Both types and
@@ -3277,19 +3344,15 @@ tcValArg _ pos rn_fun_head
        ; (wrap, arg')
             <- tcScalingUsage mult  $
                tcSkolemise ds_flag GenSigCtxt exp_arg_ty $ \ exp_arg_rho ->
-               do { -- Emit saved-up constraints, /under/ the tcSkolemise
-                    -- See (QLA4) in Note [Quick Look at value arguments]
-                    emitConstraints wanted
-                    -- Emit saved-up usages /under/ the tcScalingUsage.
+               do { -- Emit saved-up usages /under/ the tcScalingUsage.
                     -- See (QLA5) in Note [Quick Look at value arguments]
-                  ; tcEmitBindingUsage head_ue
-
-                    -- Unify with context if we have not already done so
-                    -- See (QLA4) in Note [Quick Look at value arguments]
-                  ; unless arg_influences_enclosing_call $   -- Don't repeat
-                    qlUnify app_res_rho exp_arg_rho          -- the qlUnify
-
-                  ; finishApp DoQL rn_expr arg_head_loc rn_fun tc_fun inst_args app_res_rho
+                    tcEmitBindingUsage head_ue
+                  ; let prepare = do
+                          -- See (QLA4) in Note [Quick Look at value arguments].
+                          emitConstraints wanted
+                          unless arg_influences_enclosing_call $
+                            qlUnify app_res_rho exp_arg_rho
+                  ; finishApp prepare DoQL rn_expr arg_head_loc rn_fun tc_fun inst_args app_res_rho
                               (mkCheckExpType exp_arg_rho) }
 
        ; traceTc "tcEValArgQL }" $
@@ -4956,7 +5019,7 @@ final subsumption can fill the ordinary alpha with Int. It must still reject
 an incompatible expected index. Candidate selection is not equality evidence.
 
 Emit WpTyApps and keep the actual substituted function type. Both the early
-application route and tcInstFunWithExpected continue to finishAppWithCache.
+application route and tcInstFunWithExpected continue to finishAppWithScopedCache.
 Its checkResultTy call checks subsumption against the original expected type
 and emits the required equality evidence. For example, a non-reflexive Refl
 still fails without a suitable Given. Never replace the actual result with
@@ -5637,7 +5700,7 @@ arguments. The generic route requires an anchor in that prefix. Start matching f
 the empty substitution: the final expected result is after the extra
 arguments, not the intermediate result used to choose fst's parameter.
 Keep the full original argument spine for tcInstFunWithExpected and
-finishAppWithCache. They check the extra arguments, evidence order, usage and
+finishAppWithScopedCache. They check the extra arguments, evidence order, usage and
 final result. Do not infer or cache an extra argument here.
 
 A top-level lambda, literal, case, let, or do expression keeps its ordinary
@@ -5964,7 +6027,7 @@ isConcreteType; this checks representation choices, not the native payload.
 Apply WpTyApps to the original operator. Do not rewrite ($) to a beta redex or
 infer its first operand. Check that operand against the complete ordinary
 arrow, including the native RHS type. Use NoQL for instantiation, result
-checking and finishAppWithCache. The existing argument cache emits RHS usage
+checking and finishAppWithScopedCache. The existing argument cache emits RHS usage
 once, and ordinary final subsumption still runs. No evaluation order changes.
 
 If immutable matching fails after inference, retain that cache and use NoQL
