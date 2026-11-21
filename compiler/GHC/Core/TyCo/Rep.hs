@@ -311,8 +311,8 @@ the original constructor telescope before instantiation. Fixed concrete fields
 keep their structural or eligible function-field checks. See Notes
 [Algebraic runtime index domains] and [Function-valued retained binders] in
 GHC.Core.Type. Opaque function-value identity does not grant call permission.
-Native calls retain their closed visible U/Many function type and independently
-closed function-free structural endpoints. Their application uses
+Native calls use a visible U/Many function type with a lifted argument and
+a closed function-free structural result. Their application uses
 TermAppTy/TermAppCo. See Note [Native function-value application] in
 GHC.Core.TyCo.Make.
 
@@ -379,9 +379,9 @@ and general optimization remain separate gates.
 {- Note [Opaque native call indices]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 TermAppTy f arg represents an opaque call to one local unrestricted non-join
-function. Its visible unrestricted arrow has independently closed scalar
-domains A and B. Both arrow classifications are Type. The argument is a scoped
-Type of kind A; the call has kind B.
+function. Its visible unrestricted arrow has a lifted domain A and a closed
+structural result B. The argument is a scoped Type of kind A. The call has
+kind B.
 Do not unfold f or infer argument equality from equality of calls.
 
 TermAppCo f co lifts a nominal argument proof through the same checked head.
@@ -391,10 +391,11 @@ occurrence, not a binder. Substitution supports only eligible variable heads;
 the pipeline must retain bindings for other substitution ranges. Runtime
 reification is partial and has a narrower grammar than this Type constructor.
 
-Require the raw head type and multiplicities to have no free variables. An
-unused synonym argument must not hide metadata which needs zonking or scope
-transport. Keep function-head eligibility separate from scalar index and
-retained-binder eligibility.
+An outer erased binder can occur in the head's argument domain. Apply the
+source substitution to the head's type before checking it against the
+target Id. The target Id is already in scope at the new type. See Note
+[Substituting runtime Id metadata] in GHC.Core.TyCo.Subst. Keep the result,
+matchability and multiplicities closed.
 
 TermVarTy can also record an eligible function value stored in a closed
 algebraic index. Applying this index through the smart makers produces the
@@ -406,6 +407,8 @@ in GHC.Core.TyCo.Make.
 Agda's neutral application and scoped substitution are the operational
 precedent. See Agda v2.8.0 Syntax/Internal.hs221-252 and
 TypeChecking/Substitute.hs827-852, pinned in docs/dependent-haskell/REFERENCES.md.
+See also GHC proposal #378, sections 1.4.4 and 1.4.7, on retention and
+substitution at dependent application.
 This rule does not add an evaluator to type equality.
 -}
 
