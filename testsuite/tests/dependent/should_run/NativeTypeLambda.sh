@@ -322,7 +322,7 @@ module Disabled where
 type Bad = (\x -> x)
 HS
 if "${g[@]}" -c Disabled.hs >disabled.log 2>&1 ||
-   ! grep -Eq '^Disabled[.]hs:3:12: error: \[GHC-27184\]' disabled.log ||
+   ! grep -Eq '^Disabled[.]hs:3:13: error: \[GHC-27184\]' disabled.log ||
    ! grep -Fq 'Type lambdas require -XExperimentalDependentTypes' disabled.log; then
     cat disabled.log >&2
     exit 1
@@ -336,7 +336,7 @@ witness :: Proxy (\x -> x)
 witness = undefined
 HS
 if "${g[@]}" -c Signature.hs >context.log 2>&1 ||
-   ! grep -Eq '^Signature[.]hs:4:18: error: \[GHC-27185\]' context.log ||
+   ! grep -Eq '^Signature[.]hs:4:19: error: \[GHC-27185\]' context.log ||
    ! grep -Fq 'top-level synonym' context.log; then
     cat context.log >&2
     exit 1

@@ -21,7 +21,7 @@ type LetKind (k :: Type) (x :: k) =
   let k = Maybe k in (\a -> (k, Proxy x, a)) Char
 
 type Adjacent (q :: Type) (a :: q) =
-  ApplyTwo (\q -> (\q -> (Proxy a, q))) Int Ordering
+  ApplyTwo (\q -> \q -> (Proxy a, q)) Int Ordering
 
 type InferredLevels (a :: q) =
   (\q -> Pair (Proxy a, q)

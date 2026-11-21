@@ -22,3 +22,5 @@ data Ordered where
     Ordered ∷ ∀ a. @U {- Keep this comment after metadata. -}
               ∀ b. @U
               Show a ⇒ a → b → Ordered
+
+type Wrap = \a {- Before the Unicode arrow. -} → Maybe a

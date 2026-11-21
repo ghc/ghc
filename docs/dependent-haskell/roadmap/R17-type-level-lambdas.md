@@ -16,6 +16,15 @@ proof = Refl
 
 ## Source and evidence
 
+A lambda can occupy a whole type right-hand side. For example,
+`type Wrap = \a -> Maybe a` and `let wrap = \a -> Either e a in wrap Bool`
+use the same spelling as a term lambda. Use parentheses when passing a
+lambda as an argument, as in `Map (\a -> Maybe a) xs`. The parsed
+tree uses `HsParTy` for written parentheses and `HsTypeLambda` for
+the lambda. Exact printing preserves comments and the written arrow.
+[Source example](../examples/open-evaluation/TypeLambda.hs) and
+[printer fixture](../../../testsuite/tests/printer/RetainedPrint.hs).
+
 M174 checks this source in a top-level synonym with
 `ExperimentalDependentTypes` and `DataKinds`. The module that defines
 `Map` enables `TypeFamilies`. An ordinary client

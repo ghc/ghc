@@ -39,3 +39,9 @@ data Ordered where
                      (Show a =>
                       forall b. @U
                       (Eq b => a -> b -> Ordered))
+
+type Wrap = \a {- Before the arrow. -} -> Maybe a
+
+type Row e = let wrap = \a -> Either e a in wrap Bool
+
+type PairWith = (\a -> \b -> (a, b))
