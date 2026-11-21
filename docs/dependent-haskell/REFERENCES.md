@@ -861,6 +861,15 @@ Template Haskell expansion.
 
 ### Retained class consumers
 
+Agda's instance arguments can be supplied explicitly. A projection then
+refers to that instance. R12 retains the same distinction in Core when
+a Haskell class selector occurs in a type. GHC's automatic specialisation
+rules can match an arbitrary dictionary at the specialised type. Such a
+rule needs a separate justification for a binding whose types name the
+dictionary. R12 keeps that binding polymorphic.
+[Agda instance arguments](https://agda.readthedocs.io/en/v2.8.0/language/instance-arguments.html#usage)
+and [GHC specialisation](../../compiler/GHC/Core/Opt/Specialise.hs).
+
 Use Agda v2.8.0 as the primary comparison for instance arguments. An instance
 argument is a contextual term. GHC passes an ordinary class dictionary as
 evidence to a method. The mechanisms share a scope obligation. Their search and

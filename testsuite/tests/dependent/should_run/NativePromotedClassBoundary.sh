@@ -38,3 +38,17 @@ for opt in -O0 -O2; do
     test "$(./evidence yes)" = '(True,False)'
     test "$(./evidence no)" = '(False,True)'
 done
+
+mkdir -p "$out/specialise"/{provider,client}
+cd "$out/specialise/provider"
+cp "$src/../"{PackedVecLibrary,ImplicitVector,ScopedClassMethod}.hs .
+"${ghc[@]}" -O2 -fomit-interface-pragmas -fno-write-if-simplified-core \
+    -c PackedVecLibrary.hs ImplicitVector.hs ScopedClassMethod.hs
+cd ../client
+cp ../provider/*.hi "$src/ScopedSpecialise.hs" .
+for opt in -O1 -O2; do
+    "${ghc[@]}" "$opt" -fforce-recomp -ddump-rule-firings -c ScopedSpecialise.hs > firings
+    grep -Fq 'SPEC countKey @Int' firings
+    "${ghc[@]}" "$opt" ScopedSpecialise.o ../provider/*.o -o select
+    test "$(./select)" = '([7],[],[],2)'
+done

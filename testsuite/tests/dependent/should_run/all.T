@@ -621,7 +621,11 @@ test('NativeDataFamilyConstructorOperands',
      run_command, ['bash NativeDataFamilyConstructorOperands.sh "{compiler}" "{libdir}"'])
 
 test('NativePromotedClassBoundary',
-     [req_host_target_ghc, only_ways(['normal']), extra_files(['promoted-class'])],
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['promoted-class',
+                   '../../../../docs/dependent-haskell/examples/erased-existentials/ImplicitVector.hs',
+                   '../../../../docs/dependent-haskell/examples/open-evaluation/ScopedClassMethod.hs',
+                   '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs'])],
      run_command, ['bash NativePromotedClassBoundary.sh "{compiler}" "{libdir}"'])
 
 test('NativeScopedDictionaryWire',

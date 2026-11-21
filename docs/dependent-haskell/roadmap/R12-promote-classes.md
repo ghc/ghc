@@ -159,6 +159,14 @@ The signatures use existing class constraints and keep the two
 [Showcase provider](../examples/open-evaluation/ScopedClassMethod.hs).
 [Showcase client](../examples/open-evaluation/ScopedClassMethodClient.hs).
 
+An ordinary caller can use the selected method inside a vector filter.
+At `-O1` and `-O2`, the automatic specialiser keeps a binding that uses
+a scoped method. A generated dictionary rule would match any evidence
+for that instance type. The result type names the caller's own dictionary.
+An independent equality count in the same module still specialises at
+`Int`. An empty vector leaves the receiver unevaluated.
+[Ordinary client](../../../testsuite/tests/dependent/should_run/promoted-class/ScopedSpecialise.hs)
+and [specialisation rules](../../../compiler/GHC/Core/Opt/Specialise.hs).
 
 ## Reload a scoped dictionary body
 
