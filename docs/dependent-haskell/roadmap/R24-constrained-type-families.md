@@ -220,10 +220,24 @@ whole domain. For example, `Echo :: Maybe Bool %U -> Maybe Bool` already
 supplies the class parameter. Bare `Elem` still needs the parameter of
 `Collects c`. R23 also checks the matchability and the reader's permission
 to write a partial application. Each marked instance needs an equation
-or default. Family occurrences in type synonym definitions and generated
-newtype or via equations still need separate formation rules.
-[Proposal #177 and its review](https://github.com/ghc-proposals/ghc-proposals/pull/177)
+or default. The draft of #177 gives both a kind-indexed class and an
+associated family that omits a class parameter. It also considers
+functional dependencies and superclass equalities for recovering a missing
+parameter. The fork currently requires the parameter to occur among the
+family binders. Eisenberg's review gives an existing signature that an
+unconditional domain check would reject. The fork keeps the producer
+opt-in for these examples.
+[Draft #177, §3](https://github.com/ghc-proposals/ghc-proposals/blob/faf45d2290f06696627b1f5d60ce92741ae9e38b/proposals/0000-simple-constrained-type-families.rst),
+[compatibility review](https://github.com/ghc-proposals/ghc-proposals/pull/177#issuecomment-430274548)
 and [proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html).
+
+A marked family in a written argument must have a domain even if its
+enclosing synonym ignores that argument. For
+`type Ignore a = forall b. Show b => b -> String`, a signature using
+`Ignore (Elem [Int])` reports GHC-39999 for `Allowed Int`.
+Family applications in a synonym's definition and generated newtype or
+via equations still need separate formation rules.
+[Source checks](../../../testsuite/tests/dependent/should_run/NativeRetainedFamilyDomain.hs).
 
 ### Family domains under a retained binder
 
