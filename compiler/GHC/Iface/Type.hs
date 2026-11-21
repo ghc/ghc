@@ -56,7 +56,7 @@ module GHC.Iface.Type (
         pprIfaceSigmaType, pprIfaceTyLit,
         pprIfaceCoercion, pprParendIfaceCoercion,
         splitIfaceSigmaTy, pprIfaceTypeApp, pprUserIfaceForAll,
-        pprIfaceCoTcApp, pprTyTcApp, pprIfacePrefixApp, stripLiftedTypeOwner,
+        pprIfaceCoTcApp, pprTyTcApp, pprIfacePrefixApp, stripLiftedTypeOwner, pprLiftedTypeLambdaSite,
         isIfaceRhoType,
 
         suppressIfaceInvisibles,
@@ -99,7 +99,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Panic
 import {-# SOURCE #-} GHC.Tc.Utils.TcType ( isMetaTyVar, isTyConableTyVar )
 
-import Data.Maybe (isJust)
+import Data.Maybe (fromMaybe, isJust)
 import Data.Proxy
 import qualified Data.Semigroup as Semi
 import Data.Word (Word8)
@@ -2218,6 +2218,17 @@ stripLiftedTypeOwner prefix occurrence = do
     (_ : _, ':' : owner) | not (null owner) -> Just (reverse owner)
     _ -> Nothing
 
+-- | Identify the signature or open family equation that contains a lifted lambda.
+pprLiftedTypeLambdaSite :: String -> Maybe SDoc
+pprLiftedTypeLambdaSite occurrence
+  | Just value <- stripLiftedTypeOwner "$signature-lambda:" owner
+  = Just (text "type lambda in the signature for" <+> quotes (text value))
+  | Just family <- stripLiftedTypeOwner "R:$callback:" owner
+  = Just (text "type lambda in an instance of" <+> quotes (text family))
+  | otherwise = Nothing
+  where
+    owner = fromMaybe occurrence (stripLiftedTypeOwner "$lambda:" occurrence)
+
 pprTyTcApp :: PprPrec -> IfaceTyCon -> IfaceAppArgs -> SDoc
 pprTyTcApp ctxt_prec tc tys =
     sdocOption sdocPrintExplicitKinds $ \print_kinds ->
@@ -2232,10 +2243,8 @@ pprTyTcApp ctxt_prec tc tys =
          $ char '?' <> ftext (getLexicalFastString n) <> dcolon <> ppr_ty topPrec ty
 
        | userStyle style, not debug, print_type_abbreviations
-       , Just owner <- stripLiftedTypeOwner "$signature-lambda:"
-                        (occNameString (nameOccName (ifaceTyConName tc)))
-       -> pprIfacePrefixApp ctxt_prec
-            (parens (text "type lambda in the signature for" <+> quotes (text owner)))
+       , Just site <- pprLiftedTypeLambdaSite (occNameString (nameOccName (ifaceTyConName tc)))
+       -> pprIfacePrefixApp ctxt_prec (parens site)
             (map (ppr_app_arg appPrec) (appArgsIfaceTypesForAllTyFlags $
               stripInvisArgs (PrintExplicitKinds print_kinds) tys))
 

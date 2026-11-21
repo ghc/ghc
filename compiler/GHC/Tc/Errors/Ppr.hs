@@ -68,7 +68,7 @@ import GHC.Core.Predicate
 import GHC.Core.Type
 import GHC.Core.FVs( orphNamesOfTypes )
 import GHC.CoreToIface
-import GHC.Iface.Type (stripLiftedTypeOwner)
+import GHC.Iface.Type (pprLiftedTypeLambdaSite, stripLiftedTypeOwner)
 
 import GHC.Driver.Flags
 import GHC.Driver.Backend
@@ -1150,7 +1150,7 @@ instance Diagnostic TcRnMessage where
            text "A type case needs a supported position in a top-level type synonym, a top-level value signature, or a constructor field."
     TcRnTypeLambdaContext
       -> mkSimpleDecorated $
-           text "A type lambda needs a supported position in a top-level type synonym, the right-hand side of a closed type family equation, or a top-level value signature."
+           text "A type lambda needs a supported position in a top-level type synonym, the right-hand side of a type family equation, or a top-level value signature."
 
     TcRnInvalidVisibleKindArgument arg ty
       -> mkSimpleDecorated $
@@ -4934,9 +4934,7 @@ liftedTypeOwner prefix = stripLiftedTypeOwner prefix . occNameString . getOccNam
 -- | Describe the lifted expression in terms of its source declaration.
 liftedTypeContext :: Name -> Maybe SDoc
 liftedTypeContext name
-  | Just synonym <- liftedTypeOwner "$lambda:" name
-  , Just owner <- stripLiftedTypeOwner "$signature-lambda:" synonym
-  = Just (text "type lambda in the signature for" <+> quotes (text owner))
+  | Just site <- pprLiftedTypeLambdaSite (occNameString (getOccName name)) = Just site
   | Just synonym <- liftedTypeOwner "$lambda:" name
   , Just owner <- stripLiftedTypeOwner "$signature-sum:" synonym
   = Just (text "retained sum in the signature for" <+> quotes (text owner))
