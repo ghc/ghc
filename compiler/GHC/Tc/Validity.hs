@@ -494,6 +494,8 @@ checkConstrainedSignature ctxt ty
 
     -- See Note [Family domains beneath retained binders].
     check_telescope sig
+      | not (isSigmaTy sig) = check_body sig
+      | otherwise
       = do { let (bndrs, theta, _) = tcSplitSigmaTy sig
            ; traverse_ (checkNoConstrainedFamilyApps . varType . snd) bndrs
            ; traverse_ checkNoConstrainedFamilyApps theta
@@ -504,8 +506,9 @@ checkConstrainedSignature ctxt ty
            ; tcExtendIdEnv [index] (check_telescope body) }
     check_body (FunTy af ma mult arg result)
       | not (isInvisibleFunArg af)
-      = do { mapM_ check_part [ma, mult, arg]
-           ; if isSigmaTy result then check_telescope result else check_body result }
+      = do { mapM_ check_part [ma, mult]
+           ; check_telescope arg
+           ; check_telescope result }
     check_body body = check_part body
 
     check_part part
@@ -594,6 +597,11 @@ runtime index into scope before skolemising the rest of the telescope.
 The context on that suffix supplies the domain for its result. Check the
 index's own type before entering its scope. A constraint beneath a binder
 cannot justify an application in an earlier argument.
+
+An ordinary argument can be a callback with its own class context.
+For (forall c. Collects c => Proxy c -> Elem c -> Elem c) -> result,
+skolemise the callback independently. Its Given justifies both occurrences
+of Elem c inside the callback. The result cannot use this Given.
 
 The nested checks share the signature's formation check, including its
 treatment of unsolved premises under deferred type errors. See
