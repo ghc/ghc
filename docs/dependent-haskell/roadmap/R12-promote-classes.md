@@ -254,6 +254,41 @@ remain outside this check.
 [Mixed provider](../../../testsuite/tests/dependent/should_run/promoted-class/ScopedFamilyMethodProvider.hs)
 and [wire runner](../../../testsuite/tests/dependent/should_run/NativeScopedDictionaryWire.sh).
 
+## A Given from a retained data family match
+
+`foldCell :: foreach (c :: Cell [Bool]) -> At c` matches the retained
+value with `Stored x`. The pattern introduces the actual `Pick Bool`
+dictionary. The branch can call the imported selector `observe x`
+under this Given and return `At c`. It can also call `tag (pick x)`
+directly under the same Given. The selector's index stays inside the
+branch.
+
+The source-hidden client passes two cells with payload `True` and
+observes `(True,False)`. One cell stores the provider's general
+dictionary. The other stores the client's more specific dictionary.
+The checker fixes the case multiplicity before entering the constructor
+implication when the scrutinee is an unrestricted local data family
+value. An inner case with an ordinary `Bool` result can pass the field
+directly to the retained selector. A linear field or scrutinee still
+fails. The checker compares the
+instantiated predicates of the lexical Givens before applying a scoped
+selector. A branch with two matching dictionaries fails even under
+`-fdefer-type-errors`.
+[Stored dictionary test](../../../testsuite/tests/dependent/should_run/NativeScopedStoredDictionary.sh).
+The [Showcase client](../examples/open-evaluation/StoredDictionaryClient.hs)
+compares an ordinary match with a dependent match on the same two
+`Stored True` cells. Both matches report `(True,False)`.
+
+In the review of draft #177, Eisenberg asked whether a value of an
+associated data family type would always imply its parent class.
+Zavialov asked when a constructor would need to store a dictionary.
+Here the constructor explicitly requires `Pick a`. The two cells above
+show why its consumer must use the dictionary selected at construction.
+The [R24 newtype example](R24-constrained-type-families.md#associated-newtype-representation)
+covers a constructor with no such constraint.
+[Eisenberg's question](https://github.com/ghc-proposals/ghc-proposals/pull/177#issuecomment-431006662)
+and [Zavialov's example](https://github.com/ghc-proposals/ghc-proposals/pull/177#issuecomment-431507862).
+
 ### Ambiguity in a method-indexed signature
 
 In `inspectPayload :: forall c a. Collects c => foreach (x :: c)
@@ -283,3 +318,14 @@ a retained index. Reifying the elaborated signature reports GHC-75721.
 The current Template Haskell type representation has no binder for the
 selected dictionary.
 [Reification check](../../../testsuite/tests/dependent/should_run/NativeScopedDictionaryCoreReload.sh).
+
+
+### A separate length argument
+
+In `tagAt x 5`, the method `choose x` uses the identity of `x`.
+The length has its own index. An ordinary client can supply it as a
+literal. A client that expects length `6` gets a type mismatch. An
+application that supplies a literal as the method receiver gets a source
+diagnostic at that argument.
+[Provider](../examples/open-evaluation/ScopedClassMethod.hs)
+and [ordinary client](../examples/open-evaluation/OrdinaryScopedChoice.hs).

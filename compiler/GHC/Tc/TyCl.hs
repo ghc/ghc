@@ -2798,8 +2798,8 @@ kcConDecl _ new_or_data _tc_res_kind
        ; con_res_kind <- newOpenTypeKind
        ; case HsDecls.splitGadtTerminalForAll args res_ty of
            Nothing -> discardResult $ tcCheckLHsTypeInContext res_ty (TheKind con_res_kind)
-           Just (tele, _, result) ->
-             kcRuntimeConTelescope [tele] $
+           Just (nodes, _, result) ->
+             kcRuntimeConTelescope nodes $
              discardResult $ tcCheckLHsTypeInContext result (TheKind con_res_kind)
 
        ; let arg_exp_kind = getArgExpKind new_or_data con_res_kind
@@ -5363,8 +5363,12 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
        ; let (terminal, late_count, hs_result)
                = case HsDecls.splitGadtTerminalForAll hs_args hs_res_ty of
                    Nothing -> ([], 0, hs_res_ty)
-                   Just (group, count, result) -> ([group], count, result)
-       ; when (late_count /= 0 && new_or_data == NewType) $
+                   Just groups -> groups
+       ; let is_context (L _ HsGadtContext{}) = True
+             is_context _ = False
+       ; when (late_count /= 0 &&
+               (new_or_data == NewType ||
+                (any is_context terminal && any is_context inner_bndrs))) $
            setSrcSpanA (getLoc hs_res_ty) $
            failWithTc (TcRnNestedForallsContexts NFC_GadtConSig)
        ; skol_info <- mkSkolemInfo (DataConSkol name)
@@ -6446,7 +6450,8 @@ checkValidDataCon dflags existential_ok tc con
         ; when (dataConLateTyVarCount con /= 0) $
             do { let (early, late) = dataConUserTyVarGroups con
                      (_, ex_tvs, eq_spec, theta, _, _) = dataConFullSig con
-                     prefix_types = map (varType . binderVar) early ++ theta ++
+                     prefix_theta = if dataConHasTrailingContext con then [] else theta
+                     prefix_types = map (varType . binderVar) early ++ prefix_theta ++
                        concatMap (\(Scaled mult ty) -> [mult, ty]) arg_tys
                      late_vars = mkVarSet (binderVars late)
                ; checkTc (null ex_tvs && null eq_spec

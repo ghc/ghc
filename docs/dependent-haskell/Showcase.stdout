@@ -3,14 +3,17 @@ retain a data family pair and read its fields: (Refl,(True,False))
 pass a refined data family constructor from an ordinary client: (Refl,True)
 use earlier field evidence in a later constructor type pattern: 37
 use a stored equality in a later constructor type pattern: 41
+use the dictionary supplied after a constructor field: ((29,True),(31,False))
 duplicate the unrestricted field of a quoted constructor: (17,17)
 recover consecutive GADT constraints: (False,"True")
 form an associated family type from its class evidence: (Refl,Refl,True)
 form an expression annotation with the matched dictionary: True
 pass an associated type as a specified and a required argument: (True,False)
 use two caller dictionaries in imported dependent results: ((True,False),(False,True))
+read the stored dictionary with ordinary and dependent matches: ((True,False),(True,False))
 read a scoped method through a Haskell 2010 client: ((True,False),(False,True))
 infer a payload constraint beside a scoped method: (True,"'q'")
+pass a literal length beside a scoped method receiver: (True,5)
 discard the payload of a locally indexed choice: False
 compare zero under two caller dictionaries: [(LT,LT),(EQ,LT),(GT,LT)]
 render a field with evidence for its runtime flag: (Just "x",Nothing)
@@ -65,6 +68,7 @@ immediate index beta reduction: [5,5,5,5]
 inline an ordinary function that calls a retained helper: 42
 replicate a captured element at two runtime lengths: ([7],[7,7])
 inline a local package helper with captured values: (18,1)
+apply an exported package helper to a captured function: (17,3)
 explicit erased choices and qualified Pi: [7,7,7]
 known arguments select erased choices: [7,7,7]
 generic consumer of a native function: 42

@@ -252,8 +252,10 @@ for opt in -O0 -O1 -O2; do
     cp PackageClient.hs "$out/client/Main.hs"
     (
         cd "$out/provider"
+        # Keep the INLINABLE opener so Tidy must discard its template.
         "${ghc[@]}" "$opt" -ddump-ds -ddump-simpl -ddump-inlinings -dverbose-core2core \
-            -dsuppress-uniques -c LocalPackage.hs > provider.core 2> provider.log
+            -funfolding-creation-threshold=0 -dsuppress-uniques \
+            -c LocalPackage.hs > provider.core 2> provider.log
         for binder in packLocal openLocal; do
             grep -m1 -A7 "$binder \[InlPrag=" provider.core | grep -F 'Src=StableRetainedUser' >/dev/null
         done
@@ -281,9 +283,177 @@ for opt in -O0 -O1 -O2; do
     )
 done
 
-cat >TopPackage.hs <<'HS'
+cat >ExportedPackage.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes #-}
+module ExportedPackage (packed, opened) where
+
+import Data.Kind (Type)
+
+type Hidden = exists (a :: Type). (a, a -> Int)
+
+{-# NOINLINE consume #-}
+consume :: Hidden -> Int
+consume (value, render) = render value
+
+{-# INLINE packed #-}
+packed :: Int -> Bool -> Int -> Int
+packed offset keep n =
+    consume ((n, \n -> if keep then offset + n else 0) :: Hidden)
+
+{-# NOINLINE hide #-}
+hide :: Int -> Hidden
+hide n = (n, (+ 1))
+
+{-# INLINABLE opened #-}
+opened :: Int -> Int
+opened n = case hide n of
+    (value, render) -> render value
+HS
+
+cat >ExportedPackageClient.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module Main (main) where
+
+import Control.Exception (ErrorCall, evaluate, try)
+import ExportedPackage (opened, packed)
+
+main :: IO ()
+main = do
+    required <- try (evaluate (packed 10 True (error "demanded field"))) :: IO (Either ErrorCall Int)
+    let demanded = either (const True) (const False) required
+    print (packed 10 True 7 + 1,
+           packed (error "unused offset") False (error "unused field"),
+           opened 22 + 1, demanded)
+HS
+
+for opt in -O1 -O2; do
+    out="$tmp/exported-package/$opt"
+    mkdir -p "$out"/{provider,client}
+    cp ExportedPackage.hs "$out/provider/"
+    cp ExportedPackageClient.hs "$out/client/Main.hs"
+    (
+        cd "$out/provider"
+        "${ghc[@]}" "$opt" -c ExportedPackage.hs
+        "${ghc[@]}" --show-iface ExportedPackage.hi > provider.iface
+        grep -Fq 'retained-features-v1-erased+implicit+retained-user-unfolding' provider.iface
+        for binder in packed opened; do
+            grep -A8 "^  $binder ::" provider.iface | grep -F 'Unfolding: Core: StableRetainedUser' >/dev/null
+        done
+        cp ExportedPackage.hi ../client/
+    )
+    (
+        cd "$out/client"
+        "${ghc[@]}" "$opt" -ddump-inlinings -c Main.hs > client.core
+        for binder in packed opened; do
+            grep -Fx "Inlining done: ExportedPackage.$binder" client.core >/dev/null
+        done
+        "${ghc[@]}" Main.o ../provider/ExportedPackage.o -o run
+        printf '%s\n' '(18,0,24,True)' | cmp - <(./run)
+    )
+done
+
+cat >Recursive.hs <<'HS'
 {-# LANGUAGE CPP, ExperimentalDependentTypes #-}
-module TopPackage (entry) where
+module Recursive (top, opened) where
+
+import Data.Kind (Type)
+
+type Hidden = exists (a :: Type). (a, a -> Int)
+
+{-# NOINLINE consume #-}
+consume :: Hidden -> Int
+consume (value, render) = render value
+
+#ifdef BREAK_TOP
+{-# INLINABLE top #-}
+#else
+{-# INLINE top #-}
+#endif
+top steps keep n =
+    if (steps :: Int) <= 0
+      then consume (((n :: Int), \v -> if keep then v + 1 else 0) :: Hidden)
+      else peer (steps - 1) keep n
+
+#ifdef BREAK_TOP
+{-# INLINE peer #-}
+#else
+{-# NOINLINE peer #-}
+#endif
+peer steps keep n =
+    if steps > 2 then top (steps - 1) keep n else top steps keep n
+
+{-# NOINLINE hide #-}
+hide :: Int -> Hidden
+hide n = (n, (+ 1))
+
+{-# INLINE opened #-}
+opened steps n =
+    if (steps :: Int) <= 0
+      then case hide n of (v, render) -> render v
+      else next (steps - 1) n
+
+{-# NOINLINE next #-}
+next steps n =
+    if steps > 2 then opened (steps - 1) n else opened steps n
+HS
+
+cat >RecursiveClient.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module Main (main) where
+
+import Control.Exception (ErrorCall, evaluate, try)
+import Recursive (opened, top)
+
+main :: IO ()
+main = do
+    result <- try (evaluate (top 0 True (error "demanded retained field")))
+              :: IO (Either ErrorCall Int)
+    let demanded = either (const True) (const False) result
+    print (top 0 True 7 + 1, top 5 True 5,
+           top 5 False (error "unused retained field"), opened 5 22 + 1, demanded)
+HS
+
+for opt in -O1 -O2; do
+    for variant in regular loop-breaker; do
+        if [[ $opt == -O1 && $variant == loop-breaker ]]; then
+            continue
+        fi
+        out="$tmp/recursive-package/$opt/$variant"
+        mkdir -p "$out"/{provider,client}
+        cp Recursive.hs "$out/provider/"
+        cp RecursiveClient.hs "$out/client/Main.hs"
+        (
+            cd "$out/provider"
+            defines=()
+            if [[ $variant == loop-breaker ]]; then defines=(-DBREAK_TOP); fi
+            "${ghc[@]}" "$opt" "${defines[@]}" -c Recursive.hs
+            "${ghc[@]}" --show-iface Recursive.hi > provider.iface
+            grep -Fq 'retained-features-v1-erased+implicit+retained-user-unfolding' provider.iface
+            if [[ $variant == loop-breaker ]]; then
+                grep -A9 -F '  $wtop ::' provider.iface |
+                    grep -F 'Unfolding(loop-breaker): Core: StableRetainedUser' >/dev/null
+            fi
+            cp Recursive.hi ../client/
+        )
+        (
+            cd "$out/client"
+            "${ghc[@]}" "$opt" -ddump-inlinings -c Main.hs > client.core
+            grep -Fx 'Inlining done: Recursive.opened' client.core >/dev/null
+            if [[ $variant == regular ]]; then
+                grep -Fx 'Inlining done: Recursive.top' client.core >/dev/null
+            elif grep -Fxq 'Inlining done: Recursive.$wtop' client.core; then
+                echo 'Inlined the retained recursive loop breaker'
+                exit 1
+            fi
+            "${ghc[@]}" Main.o ../provider/Recursive.o -o run
+            printf '%s\n' '(9,6,0,24,True)' | cmp - <(./run)
+        )
+    done
+done
+
+cat >TopRecursive.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes #-}
+module TopRecursive (entry) where
 
 import Data.Kind (Type)
 
@@ -293,26 +463,19 @@ type Hidden = exists (a :: Type). Maybe a
 consume :: Hidden -> Int
 consume _ = 42
 
-{-# INLINABLE disallowed #-}
-#ifdef RECURSIVE
-disallowed n = if n == 0 then consume (Just n :: Hidden) else peer (n - 1)
-peer n = disallowed n
-#else
-disallowed :: Int -> Int
-disallowed n = consume (Just n :: Hidden)
-#endif
+{-# INLINABLE top #-}
+top n = if n == 0 then consume (Just n :: Hidden) else peer (n - 1)
+peer n = top n
 
 entry :: Int -> Int
-entry n = disallowed n
+entry = top
 HS
-for define in -URECURSIVE -DRECURSIVE; do
-    if "${ghc[@]}" "$define" -O1 -fdiagnostics-color=never -fforce-recomp -c TopPackage.hs > residual.log 2>&1; then
-        echo "Accepted a top-level package template ($define)"
-        exit 1
-    fi
-    grep -qE '^TopPackage.hs:[0-9]+:1: error: \[GHC-92256\]$' residual.log
-    grep -q 'The INLINABLE unfolding of .*disallowed.* contains unsupported retained Core.' residual.log
-done
+if "${ghc[@]}" -O1 -fdiagnostics-color=never -fforce-recomp -c TopRecursive.hs > residual.log 2>&1; then
+    echo 'Accepted a package template for an internal worker of a top-level recursive group'
+    exit 1
+fi
+grep -qFx 'TopRecursive.hs:13:1: error: [GHC-92256]' residual.log
+grep -q 'The INLINABLE unfolding of .*top.* contains unsupported retained Core.' residual.log
 
 cp "$src"/{FinitePosition,ParameterizedIndexLibrary,PackedVecLibrary}.hs .
 cat >FinConstruction.hs <<'HS'

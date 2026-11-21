@@ -3150,7 +3150,7 @@ repGadtDataCons cons details res_ty
     rep_field (CDF { cdf_unpack, cdf_bang, cdf_multiplicity, cdf_type }) =
       repGadtValueArg cdf_unpack cdf_bang cdf_multiplicity cdf_type
 
--- | Quote the constructor suffix with retained names in scope.
+-- | Quote the constructor suffix with its retained names or terminal foralls.
 -- See Note [Terminal constructor foralls in TH] in GHC.ThToHs.
 repRetainedGadt :: Core [TH.Name] -> [Core (M TH.RetainedGadtArg)]
                 -> LHsType GhcRn -> MetaM (Core (M TH.Con))

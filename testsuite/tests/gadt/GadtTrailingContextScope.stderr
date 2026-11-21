@@ -1,0 +1,2 @@
+GadtTrailingContextScope.hs:5:20: error: [GHC-76037]
+    Not in scope: type variable ‘a’

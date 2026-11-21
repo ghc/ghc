@@ -89,6 +89,7 @@ import GHC.Tc.Utils.TcMType qualified as TcM
 import GHC.Tc.Solver.InertSet
 
 import GHC.Core.ConLike (ConLike(..))
+import GHC.Core.DataCon (dataConHasTrailingContext)
 import GHC.Core.FamInstEnv ( reduceScopedSumPayload_maybe, reduceTyFamApp_maybe )
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr )
@@ -2555,6 +2556,16 @@ tc_sub_type_deep fun_pos@(tc_fun, pos) ds_depth unify inst_orig ctxt ty_actual t
          ; case reflected of
              Just (witness, res) -> (<.> witness) <$> go res ty_e'
              Nothing -> go1 ty_a' ty_e' }
+
+    -- TopSub leaves the expected terminal context quantified. Match an
+    -- equal sigma before instantiating it. A preceding linear field can
+    -- still use the normal constructor multiplicity subsumption.
+    go1 ty_a ty_e
+      | TopSub <- ds_depth
+      , Just (XExpr (ConLikeTc (RealDataCon con))) <- tc_fun
+      , dataConHasTrailingContext con
+      , tcEqType ty_a ty_e
+      = just_unify ty_a ty_e
 
     -- If ty_actual is not a rho-type, instantiate it first; otherwise
     -- unification has no chance of succeeding.

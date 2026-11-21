@@ -223,6 +223,20 @@ syntactically allowed. Some further various observations about this grammar:
   A ``ForallVisT`` in the result type represents the terminal type arguments.
   This use of ``RetainedGadtC`` needs no named retained index field.
 
+  A prefix constructor can also use a specified forall followed by a
+  context after its fields. For example, under :extension:`RankNTypes`
+  define the constructor as follows. ::
+
+    data T a where
+      MkT :: Int -> forall a. Eq a => T a
+
+  Use a visible type application after the field, as in ``MkT 7 @Bool``.
+  The ``a`` binder does not scope over the earlier field. The constraint
+  is available after the earlier field and type patterns have been checked.
+  This form has a single context after the specified forall and no earlier
+  context. Template Haskell represents the final group as a ``ForallT``
+  with its context inside the result type.
+
   A higher-rank field has its own quantifiers or constraints inside
   parentheses. For example, ``MkS :: Int -> (forall a. a -> a) -> S``
   has a polymorphic second field.

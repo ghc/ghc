@@ -32,7 +32,7 @@ module GHC.Core.DataCon (
         dataConUnivTyVars, dataConExTyCoVars, dataConUnivAndExTyCoVars,
         dataConConcreteTyVars,
         dataConUserTyVars, dataConUserTyVarBinders,
-        dataConLateTyVarCount, dataConUserTyVarGroups,
+        dataConLateTyVarCount, dataConUserTyVarGroups, dataConHasTrailingContext,
         dataConTheta,
         dataConStupidTheta,
         dataConOtherTheta,
@@ -1480,6 +1480,13 @@ dataConUserTyVarBinders = dcUserTyVarBinders
 dataConLateTyVarCount :: DataCon -> Int
 dataConLateTyVarCount = dcLateTyVarCount
 
+-- | Does the constructor's context follow its fields and specified binders?
+-- See Note [Terminal constructor type arguments].
+dataConHasTrailingContext :: DataCon -> Bool
+dataConHasTrailingContext con
+  | (_, Bndr _ vis : _) <- dataConUserTyVarGroups con = isSpecifiedForAllTyFlag vis
+  | otherwise = False
+
 -- | The type binders before and after the value fields.
 dataConUserTyVarGroups :: DataCon -> ([TyVarBinder], [TyVarBinder])
 dataConUserTyVarGroups (MkData { dcUserTyVarBinders = binders, dcLateTyVarCount = late })
@@ -1734,22 +1741,30 @@ dataConWrapperTypeUnchecked con@(MkData { dcOtherTheta = theta, dcOrigArgTys = a
                                  dcOrigResTy = res_ty,
                                  dcStupidTheta = stupid_theta })
   = mkForAllTys [(unmatchableDataConTy, bndr) | bndr <- early] $
-    mkInvisFunTys (stupid_theta ++ theta) $
+    mkInvisFunTys (stupid_theta ++ early_theta) $
     mkRetainedArgTys arg_binders arg_tys $
-    mkForAllTys [(unmatchableDataConTy, bndr) | bndr <- late] res_ty
+    mkForAllTys [(unmatchableDataConTy, bndr) | bndr <- late] $
+    mkInvisFunTys late_theta res_ty
   where
     (early, late) = dataConUserTyVarGroups con
+    (early_theta, late_theta)
+      | dataConHasTrailingContext con = ([], theta)
+      | otherwise = (theta, [])
 
 {- Note [Terminal constructor type arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A source type such as `forall a. Int -> forall b -> G a b` puts the required
-type argument after the field. Keep its position in the wrapper and in
-pattern checking. The worker still binds all type variables before its
-representation fields. The source context comes before the fields and can
-use only the early binders. When checking a pattern, its Givens are in
-scope for the field patterns, the terminal type patterns, and the RHS.
-Store the size of one terminal required group. The promoted constructor
-follows source argument order.
+The source type can put a required or specified type group after its fields.
+Keep its position in the wrapper and in pattern checking. The worker still
+binds all type variables and evidence before its representation fields.
+
+The supported terminal groups are distinct. A required group can have a
+context before the fields. A specified group has its context after its
+binders and has no context before the fields. The late binder count and
+its visibility identify these forms without another DataCon field. A
+pattern receives the Givens from a trailing context after its earlier
+field and type patterns. The wrapper takes each dictionary in the same
+place as its source constraint. The promoted constructor follows source
+argument order when it has a promotable context.
 Its term wrapper disqualifies it from structural native index domains.
 See Note [Algebraic runtime index domains] in GHC.Core.Type.
 -}

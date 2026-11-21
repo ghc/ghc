@@ -1,6 +1,6 @@
 {-# LANGUAGE ExperimentalDependentTypes #-}
 
-module PackageRules (Hidden, hide, open, roundTrip) where
+module PackageRules (Hidden, hide, open, roundTrip, applyHidden) where
 
 import Data.Kind (Type)
 
@@ -21,3 +21,8 @@ open (x, k) = k x
 -- | Read the integer that was stored.
 roundTrip :: Int -> Int
 roundTrip x = open (hide x)
+
+-- | Pack an argument with its consumer. The consumer chooses whether to force it.
+{-# INLINE applyHidden #-}
+applyHidden :: (Int -> Int) -> Int -> Int
+applyHidden f x = open ((x, f) :: Hidden)

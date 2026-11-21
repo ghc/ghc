@@ -78,7 +78,7 @@ import GHC.Types.InlinePragma
 import GHC.Types.Tickish
 import GHC.Types.SrcLoc
 import GHC.Types.SourceText
-import GHC.Types.Var( VarBndr(..), binderVar, visArgTypeLike )
+import GHC.Types.Var( VarBndr(..), binderVar, binderFlag, isSpecifiedForAllTyFlag, visArgTypeLike )
 
 import GHC.Unit.Module
 import GHC.Unit.Module.Warnings
@@ -1739,9 +1739,12 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
     (early, late)
       | late_count == 0 = (user_tvbs, [])
       | otherwise = splitAt (length user_tvbs - late_count) user_tvbs
-    pp_gadt_res_ty = pprIfaceForAllPart (map (ifaceUnmatchable,) late) []
+    (early_ctxt, late_ctxt)
+      | ifaceHasTrailingContext late = ([], ctxt)
+      | otherwise = (ctxt, [])
+    pp_gadt_res_ty = pprIfaceForAllPart (map (ifaceUnmatchable,) late) late_ctxt
                                        (mk_user_con_res_ty eq_spec)
-    ppr_gadt_ty = pprIfaceForAllPart (map (ifaceUnmatchable,) early) ctxt pp_tau
+    ppr_gadt_ty = pprIfaceForAllPart (map (ifaceUnmatchable,) early) early_ctxt pp_tau
 
         -- A bit gruesome this, but we can't form the full con_tau, and ppr it,
         -- because we don't have a Name for the tycon, only an OccName
@@ -2804,12 +2807,20 @@ instance Binary IfaceAxBranch where
         a7 <- get bh
         return (IfaceAxBranch a1 a2 a3 a4 a5 a6 a7)
 
+-- The terminal binders distinguish the two context positions.
+-- See Note [Terminal constructor type arguments] in GHC.Core.DataCon.
+ifaceHasTrailingContext :: [IfaceForAllBndr] -> Bool
+ifaceHasTrailingContext (binder : _) = isSpecifiedForAllTyFlag (ifaceForAllTyFlag (binderFlag binder))
+ifaceHasTrailingContext [] = False
+
 instance Binary IfaceConDecls where
     put_ bh IfAbstractTyCon  = putByte bh 0
     put_ bh (IfDataTyCon False cs)
       | any (/= 0) late = do
           requireIfaceEvidenceVersion bh TerminalGadtForAllEvidence
-          when (any has_terminal_context cs) $
+          when (any has_trailing_context cs) $
+            requireIfaceEvidenceVersion bh TerminalGadtTrailingContextEvidence
+          when (any has_leading_context cs) $
             requireIfaceEvidenceVersion bh TerminalGadtContextEvidence
           putByte bh 4
           put_ bh cs
@@ -2817,9 +2828,13 @@ instance Binary IfaceConDecls where
       | otherwise = putByte bh 1 >> put_ bh cs
       where
         late = map ifConLateTyVarCount cs
-        -- An earlier terminal reader expects an empty context.
-        has_terminal_context con =
-          ifConLateTyVarCount con /= 0 && not (null (ifConCtxt con))
+        has_trailing_context con =
+          ifConLateTyVarCount con /= 0 &&
+          let binders = ifConUserTvBinders con
+          in ifaceHasTrailingContext (drop (length binders - ifConLateTyVarCount con) binders)
+        has_leading_context con =
+          ifConLateTyVarCount con /= 0 && not (null (ifConCtxt con)) &&
+          not (has_trailing_context con)
     put_ bh (IfDataTyCon True cs) = putByte bh 2 >> put_ bh cs
     put_ bh (IfNewTyCon c)   = putByte bh 3 >> put_ bh c
     get bh = do

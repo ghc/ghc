@@ -4562,8 +4562,8 @@ rnConDecl (ConDeclGADT { con_names   = names
             else rnLHsType ctxt res_ty
         ; (mods', mods_fvs) <- rnModifiersContextAndWarn ctxt mods
 
-         -- Keep a terminal required group on the source side of the
-         -- declaration. Check the result after that group.
+         -- Keep terminal groups on the source side of the declaration.
+         -- The prefix fields have already been renamed in their own scope.
        ; let con_result = case HsDecls.splitGadtTerminalForAll new_args new_res_ty of
                             Just (_, _, result) -> result
                             Nothing             -> new_res_ty

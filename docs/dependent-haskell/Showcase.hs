@@ -161,6 +161,7 @@ import qualified OrdinaryScopedComparison
 import qualified OrdinaryScopedChoice
 import qualified ScopedClassMethod as Choice
 import qualified ScopedClassMethodClient
+import qualified StoredDictionaryClient
 import qualified Signal
 import qualified PreludePairExport
 import qualified OpaqueCallClient as Opaque
@@ -415,6 +416,9 @@ vectors = do
     observe "inline a local package helper with captured values"
         (inlinePacked 10 True 7,
          inlinePacked (error "unused offset") False (error "unused payload"))
+    observe "apply an exported package helper to a captured function"
+        (PackageRules.applyHidden (+ 5) 12,
+         PackageRules.applyHidden (const 3) (error "unused package field"))
     observe "explicit erased choices and qualified Pi" (toList (Ground.groundDirect n Qualified.fixedQ))
     observe "known arguments select erased choices" (toList (Known.knownDirect n Qualified.fixedQ))
     observe "generic consumer of a native function" (Known.knownGenericIgnore Qualified.fixedQ)
@@ -1025,6 +1029,14 @@ columnCount :: ColumnSample a a -> Int
 columnCount (ColumnSample Refl n (type Int)) = n
 columnCount (GivenCount n (type Int)) = n
 
+-- | Keep the dictionary supplied after the field.
+data Labelled a where
+    Labelled :: Int -> forall a. Eq a => Labelled a
+
+-- | Compare two values with the dictionary that the constructor stored.
+compareLabel :: Labelled a -> a -> a -> (Int, Bool)
+compareLabel (Labelled n) x y = (n, x == y)
+
 -- | Hide the field type and retain both dictionaries for its consumer.
 data PrintablePair where
     PrintablePair :: forall a. Eq a => (Show a => a -> a -> PrintablePair)
@@ -1043,6 +1055,9 @@ main = do
         (columnCount (ColumnSample @Int Refl 37 (type Int)))
     observe "use a stored equality in a later constructor type pattern"
         (columnCount (GivenCount @Int 41 (type Int)))
+    observe "use the dictionary supplied after a constructor field"
+        (compareLabel (Labelled 29 @String) "yes" "yes",
+         compareLabel (Labelled 31 @Int) 1 3)
     observe "duplicate the unrestricted field of a quoted constructor" (QuotedColumn.readQuoted 17)
     observe "recover consecutive GADT constraints" (describePair (PrintablePair False True))
     observe "form an associated family type from its class evidence" constrainedElements
@@ -1054,10 +1069,14 @@ main = do
     disabled <- readIORef fieldFlag
     observe "use two caller dictionaries in imported dependent results"
         (ScopedClassMethodClient.twoDictionaries enabled, ScopedClassMethodClient.twoDictionaries disabled)
+    observe "read the stored dictionary with ordinary and dependent matches"
+        StoredDictionaryClient.storedDecisions
     observe "read a scoped method through a Haskell 2010 client"
         (ScopedClassMethodClient.ordinaryChoices enabled, ScopedClassMethodClient.ordinaryChoices disabled)
     observe "infer a payload constraint beside a scoped method"
         (OrdinaryScopedChoice.readDescription enabled 'q')
+    observe "pass a literal length beside a scoped method receiver"
+        (OrdinaryScopedChoice.readAtFive enabled)
     observe "discard the payload of a locally indexed choice" $
         let localFlag = False
         in case Choice.describeChoice localFlag (error "unused payload" :: Char) of

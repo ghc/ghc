@@ -58,6 +58,7 @@ import GHC.Tc.Zonk.TcType
 
 import GHC.Core.Coercion
 import GHC.Core.ConLike
+import GHC.Core.DataCon ( dataConHasTrailingContext )
 import GHC.Core.PatSyn (PatSyn(..))
 import GHC.Core.TyCo.Ppr ( pprTyVar )
 import GHC.Core.Type
@@ -1636,9 +1637,15 @@ zonk_pat p@(ConPat { pat_con = L con_loc con
           -- /kind/ need potential zonking.
           -- cf typecheck/should_compile/tc221.hs
         ; new_evs     <- zonkEvBndrsX evs
-        ; new_binds   <- zonkTcEvBinds binds
-        ; new_wrapper <- zonkCoFn wrapper
-        ; new_args    <- zonkConStuff args
+        ; (new_binds, new_wrapper, new_args) <- case con of
+            RealDataCon dc | dataConHasTrailingContext dc ->
+              do { args' <- zonkConStuff args
+                 ; binds' <- zonkTcEvBinds binds
+                 ; pure (binds', wrapper, args') }
+            _ -> do { binds' <- zonkTcEvBinds binds
+                    ; wrapper' <- zonkCoFn wrapper
+                    ; args' <- zonkConStuff args
+                    ; pure (binds', wrapper', args') }
         ; new_con     <- case con of
             RealDataCon {} -> return con
               -- Data constructors never contain metavariables: they are

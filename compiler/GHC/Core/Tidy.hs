@@ -411,9 +411,8 @@ template during optimization of the defining module.
 An exported unfolding can contain a local binding whose template still
 contains a package operation after simplification removes it from the RHS.
 Discard that local template during Tidy, before creating the interface or
-the in-memory ModDetails for another module. GHC.Iface.Tidy still withholds
-top-level templates that contain package operations in their expression.
-This keeps the existing interface reader contract. See Note [Erased package
+the in-memory ModDetails for another module. GHC.Iface.Tidy checks the
+separate export rule for top-level templates. See Note [Erased package
 unfoldings] in GHC.IfaceToCore.
 -}
 
