@@ -3175,7 +3175,10 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
                                   ; writeTcRef ref (Just cache)
                                   ; return choices } }
                     _ -> return Nothing
-                ; go1 inferred fun_orig pos acc fun_ty args } }
+                ; choices <- case inferred of
+                    Just _ -> return inferred
+                    Nothing -> tcRetainedPartialResultPlan do_ql expected_rho args tc_fun fun_ty
+                ; go1 choices fun_orig pos acc fun_ty args } }
 
     is_type_arg ETypeArg{} = True
     is_type_arg _ = False
@@ -4603,6 +4606,19 @@ tcRetainedResultMatch :: QLFlag -> Maybe TcRhoType -> [HsExprArg 'TcpRn]
                       -> HsExpr GhcTc -> TcSigmaType
                       -> TcM (Maybe ([Type], TcSigmaType))
 tcRetainedResultMatch NoQL (Just expected) args fun sigma
+  | Just (tvs, body, subst) <- retainedOrdinaryResultSubst expected args fun sigma
+  , Just inst_tys <- traverse (Subst.lookupTyVar subst) tvs
+  , and (zipWith (\tv ty -> eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty))
+                tvs inst_tys)
+  = do { valid <- tcRetainedInstScope inst_tys
+       ; return (if valid then Just (inst_tys, Subst.substTy subst body) else Nothing) }
+tcRetainedResultMatch do_ql expected args fun sigma
+  = tcRetainedWorkerResultMatch do_ql expected args fun sigma
+
+-- | Match the result of an ordinary application without choosing absent parameters.
+retainedOrdinaryResultSubst :: TcRhoType -> [HsExprArg 'TcpRn] -> HsExpr GhcTc
+                            -> TcSigmaType -> Maybe ([TyVar], Type, Subst.Subst)
+retainedOrdinaryResultSubst expected args fun sigma
   | hasNativeDependentExpr (Core.Type expected)
   , not (any is_type_arg args)
   , (ma_tvs, body) <- tcSplitForAllInvisTyVars sigma
@@ -4618,11 +4634,9 @@ tcRetainedResultMatch NoQL (Just expected) args fun sigma
   , Just kind_subst <- tcMatchTyX_BM (bind_outer tvs) Subst.emptySubst
                                    (typeKind result) (typeKind expected)
   , Just subst <- tcMatchTyX_BM (bind_outer tvs) kind_subst result expected
-  , Just inst_tys <- traverse (Subst.lookupTyVar subst) tvs
-  , and (zipWith (kind_agrees subst) tvs inst_tys)
   , eqType (Subst.substTy subst result) expected
-  = do { valid <- tcRetainedInstScope inst_tys
-       ; return (if valid then Just (inst_tys, Subst.substTy subst body) else Nothing) }
+  = Just (tvs, body, subst)
+  | otherwise = Nothing
   where
     is_type_arg ETypeArg{} = True
     is_type_arg _ = False
@@ -4631,10 +4645,62 @@ tcRetainedResultMatch NoQL (Just expected) args fun sigma
       | tv `elem` tvs = BindMe
       | otherwise = DontBindMe
 
-    kind_agrees subst tv ty = eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty)
+{- Note [Partial ordinary applications at a native result type]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In fmap (sum . toList) vectors, the input of the callback can be
+Vec Int (sourceLength xs). The declared result of (.) after two arguments is
+a -> c. It determines a and c, but does not mention the intermediate b.
+If IALL allocates a meta-variable for a, it cannot assign the native input.
+This also prevents normal argument checking from passing that input to
+toList.
 
-tcRetainedResultMatch do_ql expected args fun sigma
-  = tcRetainedWorkerResultMatch do_ql expected args fun sigma
+Use the exact expected-result substitution when it fixes a native type.
+Use it just before ordinary instantiation, after complete result and
+argument-based inference. Allow only ordinary lifted type parameters to
+remain unknown. Their kinds and the kinds of the chosen parameters must
+already agree. Allocate ordinary meta-variables for those unknowns and
+pass the complete plan to IALL. Normal argument checks use the selected
+input and infer the intermediate type. The normal meta-variable check
+still rejects a native assignment to an unknown parameter. Keep the
+original head, argument multiplicities, constraints and final subsumption.
+-}
+
+-- | Keep exact native choices and infer the remaining ordinary parameters.
+-- See Note [Partial ordinary applications at a native result type].
+tcRetainedPartialResultPlan :: QLFlag -> Maybe TcRhoType -> [HsExprArg 'TcpRn]
+                            -> HsExpr GhcTc -> TcSigmaType -> TcM RetainedInstPlan
+tcRetainedPartialResultPlan NoQL (Just expected) args fun sigma
+  | HsVar{} <- fun
+  , hasNoConcreteTyVars fun
+  , isFunTy expected
+  , hasNativeDependentExpr (Core.Type expected)
+  , any isHsValArg args
+  = runMaybeT $ do
+      expected <- liftMaybeT (liftZonkM (zonkTcType expected))
+      guard (isTauTy expected)
+      (tvs, _, subst) <- MaybeT (pure (retainedOrdinaryResultSubst expected args fun sigma))
+      selected <- MaybeT (pure (retainedPartialResultChoices tvs subst))
+      guard (noQuickLookVars expected)
+      scoped <- liftMaybeT (tcRetainedInstScope selected)
+      guard scoped
+      snd <$> MaybeT (tcRetainedArgChoices False tvs subst)
+tcRetainedPartialResultPlan _ _ _ _ _ = return Nothing
+
+-- | Validate the native choices before allocating the remaining ordinary arguments.
+retainedPartialResultChoices :: [TyVar] -> Subst.Subst -> Maybe [Type]
+retainedPartialResultChoices tvs subst
+  | not (null pending), all ((`eqType` liftedTypeKind) . kind) pending
+  , any (hasNativeDependentExpr . Core.Type) selected
+  , not (any (`elemVarSet` tyCoVarsOfTypes (selected ++ map kind tvs)) tvs)
+  , and [kind tv `eqType` typeKind ty | (tv, Just ty) <- choices]
+  , all noQuickLookVars selected
+  = Just selected
+  | otherwise = Nothing
+  where
+    choices = [(tv, Subst.lookupTyVar subst tv) | tv <- tvs]
+    selected = [ty | (_, Just ty) <- choices]
+    pending = [tv | (tv, Nothing) <- choices]
+    kind tv = Subst.substTy subst (tyVarKind tv)
 
 -- | Recognize a package expected at one invisible result parameter.
 -- See Note [Exact expected existential packages].
@@ -5070,8 +5136,9 @@ tcRetainedInferableArg (L _ expr)
       _ -> return (False, False)
   where
     -- See Note [Partially applied callbacks].
-    carries_result (tvs, _, _, result) =
+    carries_result (_, tvs, _, FunTy { ft_res = result }) =
       any (`elemVarSet` tyCoVarsOfType result) tvs
+    carries_result _ = False
 
     application fun args =
       do { (inferable, anchor) <- tcRetainedInferableArg fun
@@ -5913,7 +5980,7 @@ tcRetainedCallbackArgs tvs args subst cache = go subst cache args
                _ -> return (Nothing, cache') } }
       | isNothing (lookup pos cache)
       , let formal = scaledThing domain
-      , FunTy { ft_af = af, ft_arg = input, ft_res = output }
+      , callback_type@FunTy { ft_af = af, ft_arg = input, ft_res = output }
            <- coreFullView (Subst.substTy subst formal)
       , isVisibleFunArg af, mentions_templates input || mentions_templates output
       = do { prefix <- tcPartialCallback arg
@@ -5924,15 +5991,19 @@ tcRetainedCallbackArgs tvs args subst cache = go subst cache args
                  ; case valid of
                      Just chosen -> go chosen cache rest
                      Nothing -> do
-                       { (usage, (typed, actual)) <- tcCollectingUsage (tcInferRho arg)
-                       ; matched <- tcRetainedMatchArgs tvs subst [(formal, actual)]
-                       ; let cache' = cache ++ [(pos, (typed, actual, usage))]
-                       ; case matched of
-                           Just chosen -> go chosen cache' rest
-                           Nothing -> return (Nothing, cache') } } }
+                       { deferred <- defer_prefix callback_type prefix
+                       ; if deferred then go subst cache rest else
+                         do { (usage, (typed, actual)) <- tcCollectingUsage (tcInferRho arg)
+                            ; matched <- tcRetainedMatchArgs tvs subst [(formal, actual)]
+                            ; let cache' = cache ++ [(pos, (typed, actual, usage))]
+                            ; case matched of
+                                Just chosen -> go chosen cache' rest
+                                Nothing -> return (Nothing, cache') } } } }
       | otherwise = go subst cache rest
 
-    select_prefix subst input output (parameters, fields, formal_input, formal_output) = runMaybeT $ do
+    select_prefix subst input output
+      (_, parameters, fields, FunTy { ft_arg = formal_input, ft_res = formal_output })
+      = runMaybeT $ do
       let initial | mentions_templates input = Subst.emptySubst
                   | otherwise = fromMaybe Subst.emptySubst
                                 (matchRetainedAppType parameters Subst.emptySubst formal_input input)
@@ -5948,6 +6019,29 @@ tcRetainedCallbackArgs tvs args subst cache = go subst cache args
       guard scoped
       with_input <- MaybeT (pure (match_type subst input actual_input))
       MaybeT (pure (match_type with_input (Subst.substTy with_input output) actual_output))
+    select_prefix _ _ _ _ = return Nothing
+
+    -- See Note [Partially applied callbacks].
+    defer_prefix expected@FunTy { ft_mult = mult, ft_arg = input, ft_res = output }
+                 (True, parameters, fields, residual)
+      | isManyTy mult
+      , hasNativeDependentExpr (Core.Type input)
+      , not (any (isNativeIndexType . tyVarKind) tvs)
+      , not (mentions_templates input)
+      , isTauTy input
+      , Just result_var <- getTyVar_maybe output
+      , result_var `elem` tvs, tyVarKind result_var `eqType` liftedTypeKind
+      , noQuickLookVars expected
+      , Just subst <- matchRetainedAppType parameters Subst.emptySubst residual expected
+      , Subst.substTy subst residual `eqType` expected
+      , Just selected <- retainedPartialResultChoices parameters subst
+      = do { ordinary <- allM ordinary_operand (map snd fields)
+           ; if ordinary then tcRetainedInstScope selected else return False }
+    defer_prefix _ _ = return False
+
+    ordinary_operand arg =
+      do { declared <- tcRetainedNamedCallbackType arg
+         ; return (maybe False (not . hasNativeDependentExpr . Core.Type) declared) }
 
     mentions_templates ty = any (`elemVarSet` tyCoVarsOfType ty) tvs
     no_ql_vars = not . any (\v -> isTcTyVar v && isQLInstTyVar v) . tyCoVarsOfTypeList
@@ -5983,13 +6077,13 @@ tcRetainedCallbackArgs tvs args subst cache = go subst cache args
 -- | Read the residual function type of a known, partially applied value.
 -- See Note [Partially applied callbacks].
 tcPartialCallback :: LHsExpr GhcRn
-                  -> TcM (Maybe ([TyVar], [(Scaled Type, LHsExpr GhcRn)], Type, Type))
-tcPartialCallback = collect []
+                  -> TcM (Maybe (Bool, [TyVar], [(Scaled Type, LHsExpr GhcRn)], Type))
+tcPartialCallback = collect True []
   where
-    collect fields (L _ (HsPar _ fun)) = collect fields fun
-    collect fields (L _ (HsApp _ fun arg)) = collect (arg : fields) fun
-    collect fields (L _ (HsAppType _ fun _)) = collect fields fun
-    collect fields@(_:_) (L loc (HsVar _ lname)) = setSrcSpanA loc $ do
+    collect plain fields (L _ (HsPar _ fun)) = collect plain fields fun
+    collect plain fields (L _ (HsApp _ fun arg)) = collect plain (arg : fields) fun
+    collect _     fields (L _ (HsAppType _ fun _)) = collect False fields fun
+    collect plain fields@(_:_) (L loc (HsVar _ lname)) = setSrcSpanA loc $ do
       let name = unLocWithUserRdr lname
       owner <- if isDataOcc (nameOccName name)
         then do { con <- tcLookupConLike (unLoc lname)
@@ -6003,11 +6097,11 @@ tcPartialCallback = collect []
         let (tvs, _, tau) = tcRetainedInstTelescope (varType var)
             (_, domains, _) = splitFunTys tau
         guard (not (null tvs) && not (hasNativeDependentExpr (Core.Type tau)))
-        FunTy { ft_af = af, ft_arg = input, ft_res = output }
+        residual@FunTy { ft_af = af }
           <- coreFullView <$> tcRetainedOrdinaryResult (length fields) tau
         guard (isVisibleFunArg af)
-        return (tvs, zip domains fields, input, output)
-    collect _ _ = return Nothing
+        return (plain && not (isDataOcc (nameOccName name)), tvs, zip domains fields, residual)
+    collect _ _ _ = return Nothing
 
 {- Note [Partially applied callbacks]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -6029,11 +6123,24 @@ When the output parameter is still unknown, match the partially applied function
 remaining input against that known input. Declared prefix fields can
 supply missing erased parameters. Use the declared residual result
 as a candidate for the outer call. This step neither checks a field
-occurrence nor supplies evidence. If declarations do not determine the callback,
+occurrence nor supplies evidence.
+
+For fmap ((.) sum toList) vectors, the callback result can be an
+undetermined lifted type parameter. The input alone does not determine
+the intermediate type of (.). If the callback's residual arrow exactly
+matches the known native input and this result parameter, defer the
+callback. Limit this check to an ordinary function prefix without written
+type arguments and with named polymorphic operands whose types contain
+no native syntax. These operands supply no independent native anchor.
+Keep the known input and let the generic route allocate the ordinary
+result parameter. Normal callback checking then has the expected arrow.
+See Note [Partial ordinary applications at a native result type].
+
+If declarations do not determine the callback and it cannot be deferred,
 infer the original expression and cache its type and usage once. This
-preserves an application where the prefix is the only source of a native
-index. Otherwise, the ordinary callback check consumes the original syntax, including any written type arguments,
-at its real multiplicity. See Note [Retained choices for partial constructors].
+preserves applications where the prefix supplies a native index. Normal
+callback checking consumes the original syntax at its real multiplicity.
+See Note [Retained choices for partial constructors].
 -}
 
 -- | Recognize a named callback without checking it or collecting usage.

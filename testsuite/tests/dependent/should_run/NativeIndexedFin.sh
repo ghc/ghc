@@ -91,6 +91,22 @@ HS
     ./run
 done
 cd "$out/client"
+cat >EscapingComposedResult.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, ScopedTypeVariables #-}
+module EscapingComposedResult where
+import AlignedList (checkedZipWith)
+import PackedVecLibrary (Vec)
+
+escape :: forall n. [Char] -> [Int] -> Maybe (Vec Int n)
+escape left numbers = fmap ((.) id id) (checkedZipWith left numbers (flip const))
+HS
+if "${ghc[@]}" -O0 -fdiagnostics-color=never -c EscapingComposedResult.hs >compose-escape.log 2>&1; then
+    echo 'Accepted a runtime vector length at an unrelated result index'
+    exit 1
+fi
+grep -Eq '^EscapingComposedResult.hs:7:[0-9]+: error: .GHC-25897.' compose-escape.log
+grep -Fq 'PackedVecLibrary.sourceLength left' compose-escape.log
+grep -Fq 'is a rigid type variable bound by' compose-escape.log
 cat >MissingRows.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeFamilies #-}
 module MissingRows where

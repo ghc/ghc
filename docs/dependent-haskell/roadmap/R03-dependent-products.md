@@ -522,13 +522,17 @@ counterexamples satisfy their specialised equality dictionaries.
 
 For independent inputs, `checkedZipWith` first compares the two finite
 spines with `sameNat`. Unequal lengths return `Nothing` before the
-callback runs. For two occurrences of the same input, an ordinary
+callback runs. An ordinary caller can use `fmap ((.) sum toList)` on
+the checked result in an unsigned binding. The known vector length
+determines the callback's input while its result type is inferred.
+For two occurrences of the same input, an ordinary
 caller can use `zipWithExact xs xs` directly. The first output cell
 then leaves the tail of `xs` unevaluated. A cons equation that returns
 `VNil` reports GHC-83865 at its result. Omitting the possible cons/cons
 equation reports GHC-83605 with the two constructors.
-[Producer](../examples/qualified-pi/AlignedList.hs) and
-[ordinary caller](../examples/qualified-pi/CursorClient.hs).
+[Producer](../examples/qualified-pi/AlignedList.hs),
+[ordinary caller](../examples/qualified-pi/CursorClient.hs), and
+[callback inference](../REFERENCES.md#runtime-equality-and-aligned-zip-next-source-probe).
 
 An ordinary caller can also write both list spines. The declared types
 of the elements determine the two element types. The equations for
