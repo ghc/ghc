@@ -1,16 +1,29 @@
 module Main where
 
-import Control.Monad (unless)
+import Control.Monad (forM_, unless)
+import Control.Monad.IO.Class (liftIO)
+import Data.Either (isRight)
+import GHC (getSession, getSessionDynFlags, runGhc, setSessionDynFlags)
+import GHC.Core.TyCon (tyConName)
+import GHC.CoreToIface (toIfaceType)
+import GHC.Data.IOEnv (tryM)
+import GHC.Iface.Syntax (IfaceExpr(IfaceCo))
+import GHC.Iface.Type (IfaceAxiomRule(IfaceAR_X), IfaceCoercion(..), IfaceMCoercion(..), mkIfLclName)
+import GHC.IfaceToCore (tcIfaceExpr)
+import GHC.Tc.Utils.Monad (initIfaceLcl, initIfaceLoad)
+import GHC.Unit.Module (IsBootInterface(NotBoot))
+import GHC.Utils.Outputable (text)
+import System.Environment (getArgs)
 import Data.Maybe (isNothing)
 import GHC.Builtin.CoercionRules (builtInCoAxiomRules)
 import GHC.Builtin.WiredIn.Types
-import GHC.Core.Coercion.Axiom (CoAxiomRule(..))
+import GHC.Core.Coercion.Axiom (CoAxiomRule(..), Role(Representational))
 import GHC.Core.TyCo.Compare (eqType)
 import GHC.Core.Type
 import GHC.Data.FastString (fsLit)
 import GHC.Data.Pair (Pair(..))
 import GHC.Types.Basic (LeftOrRight(..))
-import GHC.Types.Name (mkSystemName)
+import GHC.Types.Name (mkSystemName, nameModule)
 import GHC.Types.Name.Occurrence (mkTyVarOcc)
 import GHC.Types.Unique (mkUniqueGrimilyWithTag)
 import GHC.Types.Unique.FM (lookupUFM)
@@ -44,6 +57,27 @@ main = do
         wrongKind = args (mkAppTy f matchableDataConTy) rhs f matchableDataConTy g charTy
         noRightHead = args lhs (mkAppTy u charTy) f boolTy u charTy
         wrongRightArg = args lhs rhs f boolTy g boolTy
-        invalid = [noHead, wrongHead, wrongArg, wrongKind, noRightHead, wrongRightArg, tail ok]
+        invalid = [noHead, wrongHead, wrongArg, wrongKind, noRightHead, wrongRightArg, drop 1 ok]
     unless (all (\lr -> all (isNothing . check lr) invalid) [CLeft, CRight]) $
         fail "accepted a projection with an unproved head, argument, or kind"
+    [libdir] <- getArgs
+    runGhc (Just libdir) $ do
+        flags <- getSessionDynFlags
+        setSessionDynFlags flags
+        env <- getSession
+        let home = nameModule (tyConName maybeTyCon)
+            refl = IfaceReflCo . toIfaceType
+            app = refl (mkAppTy g boolTy)
+            right = refl boolTy
+            headCo = refl g
+            weak = IfaceGReflCo Representational (toIfaceType g) IfaceMRefl
+            args' = [app, headCo, right, headCo, right]
+            cases = [("valid", True, args'),
+                     ("wrong argument", False, [app, headCo, right, headCo, refl charTy]),
+                     ("wrong role", False, [app, weak, right, headCo, right]),
+                     ("missing premise", False, drop 1 args')]
+        liftIO $ forM_ [CLeft, CRight] $ \lr -> forM_ cases $ \(label, valid, premises) -> do
+            let rule = IfaceAR_X (mkIfLclName (ruleName lr))
+            decoded <- initIfaceLoad env $ initIfaceLcl home (text label) NotBoot $
+                tryM (tcIfaceExpr (IfaceCo (IfaceAxiomCo rule premises)))
+            unless (isRight decoded == valid) $ fail "unexpected interface projection"
