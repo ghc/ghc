@@ -342,6 +342,10 @@ the tuple pattern's inferred multiplicity. Core Lint tracks usage through
 the alias, and the ordinary case generated for the pattern forces the tuple.
 The source-hidden regression also reads a package at `%1` with `Strict`,
 and checks GHC-18872 for a lazy linear binding and a duplicated use.
+An exported lexical rule can contain the linear opening. Its interface
+advertises `linear-unpack` so earlier readers reject it at the header.
+An opening confined to an object file leaves the header's requirements
+unchanged.
 
 This path accepts one unsigned nonrecursive boxed tuple binding with
 variable or wildcard fields and at most one outer bang or tilde. The

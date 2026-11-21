@@ -453,3 +453,26 @@ for opt in 0 2; do
             { cat linear-let-reject.log >&2; exit 1; }
     done
 done
+
+# Only an opening serialized in the interface needs the linear reader.
+cd "$out/lexical-let-2/client"
+"$ghc" -B"$lib" --show-iface LexicalLinearLet.hi >linear-body-iface.log
+if grep -Fq 'linear-unpack' linear-body-iface.log; then
+    cat linear-body-iface.log >&2
+    exit 1
+fi
+mkdir -p "$out/linear-rule/"{provider,client}
+cd "$out/linear-rule/provider"
+cp "$out/lexical-let-2/provider/LexicalLetProvider.hi" .
+rule_flags=("${flags[@]}" -O2 -fno-omit-interface-pragmas)
+"$ghc" "${rule_flags[@]}" -c "$src/LexicalLinearRule.hs" -outputdir .
+"$ghc" -B"$lib" --show-iface LexicalLinearRule.hi >linear-rule-iface.log
+grep -Eq '^ *got +[0-9]+-retained-features-v1-erased\+user-rule\+lexical-rule\+linear-unpack$' linear-rule-iface.log
+cd ../client
+cp ../provider/{LexicalLetProvider,LexicalLinearRule}.hi "$src/LexicalLinearRuleMain.hs" .
+"$ghc" "${rule_flags[@]}" -ddump-rule-firings -c LexicalLinearRuleMain.hs >linear-rule-firings.log
+test "$(grep -Fc 'Rule fired: read/linear-let (LexicalLinearRule)' linear-rule-firings.log)" = 2
+"$ghc" "${rule_flags[@]}" LexicalLinearRuleMain.o ../provider/LexicalLinearRule.o \
+    "$out/lexical-let-2/provider/LexicalLetProvider.o" -o run
+./run >linear-rule.out
+diff -u <(printf '(5,9)\n') linear-rule.out
