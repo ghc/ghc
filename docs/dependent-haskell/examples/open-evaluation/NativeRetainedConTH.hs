@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TemplateHaskell #-}
 -- | Store a value whose type depends on a preceding runtime argument.
-module NativeRetainedConTH (Stored(..), renderStored) where
+module NativeRetainedConTH (Stored(..), renderStored, InlineStored(..), storeInline) where
 
 import NativeRetainedTH (Select)
 
@@ -13,3 +13,14 @@ $([d|
 renderStored :: Stored -> String
 renderStored (Stored True n) = show n
 renderStored (Stored False c) = [c]
+
+$([d|
+  data InlineStored where
+    InlineStored :: foreach (b :: Bool) ->
+      (case b of { True -> Int; False -> Char }) -> InlineStored
+  |])
+
+-- | Store a value of the inline case's selected type.
+storeInline :: Bool -> InlineStored
+storeInline True = InlineStored True 37
+storeInline False = InlineStored False 'd'
