@@ -2348,7 +2348,11 @@ getSomeTypeRep bh = do
         2 -> do SomeTypeRep f <- getSomeTypeRep bh
                 SomeTypeRep x <- getSomeTypeRep bh
                 case Refl.typeRepKind f of
+#if __GLASGOW_HASKELL__ > 1000
+                  Refl.Fun' _ arg res ->
+#else
                   Refl.Fun arg res ->
+#endif
                       case arg `Refl.eqTypeRep` Refl.typeRepKind x of
                         Just Refl.HRefl ->
                             case Refl.typeRepKind res `Refl.eqTypeRep` (Refl.typeRep :: Refl.TypeRep Type) of
@@ -2489,7 +2493,11 @@ putTypeRep bh (Refl.Con' con ks) = do
     put_ bh (1 :: Word8)
     put_ bh con
     put_ bh ks
+#if __GLASGOW_HASKELL__ > 1000
+putTypeRep bh (Refl.App' f x) = do
+#else
 putTypeRep bh (Refl.App f x) = do
+#endif
     put_ bh (2 :: Word8)
     putTypeRep bh f
     putTypeRep bh x
