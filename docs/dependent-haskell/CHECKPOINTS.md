@@ -28,6 +28,24 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `7128a29dc8`, one runtime cut splits both Boolean flags and characters.
+The proofs track the original contents of each vector. Using the same
+element type for both inputs still rejects exchanged proofs at each
+written argument. The source-hidden client matched its 18-line golden
+across three optimization levels.
+
+The compiler at `45054a2d9a` also checks that the installed `takeWhile`
+and `dropWhile` recover a finite list when their results are appended.
+An erased package selector leaves the unused alternative lazy.
+An imported rewrite rule matches two separate required type arguments.
+All 28 focused regressions passed. The Core API executable matched its
+37-line golden, and the interface evidence checks passed. That compiler
+rebuilt the installed list equations and matched the 387-line Showcase
+at stripped `-O0`, default `-O1` and `-O2`, and in source-loaded GHCi.
+[Mixed vector inputs](examples/packed-vector/CertifiedSplitClient.hs),
+[prefix and suffix](roadmap/R16-open-term-evaluator.md),
+and [package selection](roadmap/R22-existential-quantification.md).
+
 At `afcdaf34da`, the paired split needs no visible type applications.
 After `cutRemainder` returns `Pair suffix Refl`, GHC checks each
 `splitAtValue cut input` against its field type. It recovers the suffix
