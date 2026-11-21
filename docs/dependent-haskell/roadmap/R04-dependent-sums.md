@@ -379,10 +379,35 @@ patterns.
 The ordinary client matches `Pair` on the result of an ordinary
 associated instance. The class declaration lives in a module that uses
 ordinary `TypeFamilies`. This fork marks the family declared under
-`ExperimentalDependentTypes` as constrained. The client uses `first`
-with the existing domain check for that default.
+`ExperimentalDependentTypes` as constrained.
 [Instance and default provider](../../../testsuite/tests/dependent/should_run/NativeAssociatedSumProvider.hs)
 and [interface-only client](../../../testsuite/tests/dependent/should_run/NativeAssociatedSumClient.hs).
+
+## Match a constrained associated family result
+
+An ordinary client can use `first` or match `Pair` on the same
+`Defaulted Char` result. The class instance provides the domain for
+the default. A separate test matches a result that passes through
+two constrained families. The GADT pattern `Permit` gives the client
+the required `Allowed a` dictionary.
+
+```haskell
+readGiven :: Permit a -> Proxy a -> Bool
+readGiven Permit ix = case make ix of Pair tag _ -> tag
+```
+
+GHC checks each domain in scope at the `Pair` pattern before it
+reduces that family head. For `make (Proxy :: Proxy Int)`, the
+scrutinee type is inferred and GHC reports the missing `Allowed Int`
+at `Pair`, including with `-fdefer-type-errors`. Reduction must
+reach the package constructor's parent. A stuck application or a
+newtype around a package still fails at the pattern.
+
+The match forces the outer pair and keeps an unused payload lazy.
+The regression compares a named sum and direct `some` at `-O0`
+and `-O2` with the provider source hidden from the client.
+[Provider](../../../testsuite/tests/dependent/should_run/NativeConstrainedSumProvider.hs)
+and [ordinary client](../../../testsuite/tests/dependent/should_run/NativeConstrainedSumClient.hs).
 
 ## Partition at the original length
 
