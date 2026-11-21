@@ -28,13 +28,14 @@ ghc=("$1" "-B$2" -v0 -package-env - -dcore-lint -dstg-lint)
 for opt in -O0 -O2; do
     for mode in -fno-external-interpreter -fexternal-interpreter; do
         out="$work/$opt$mode"
-        mkdir -p "$out"
-        "${ghc[@]}" "$opt" "$mode" -fomit-interface-pragmas -fforce-recomp -odir "$out" -hidir "$out" -c NativeTypeLetQuote.hs
-        cp Main.hs "$out"
+        mkdir -p "$out/client"
+        "${ghc[@]}" "$opt" "$mode" -fomit-interface-pragmas -fno-write-if-simplified-core \
+            -fforce-recomp -odir "$out" -hidir "$out" -c NativeTypeLetQuote.hs
+        cp Main.hs "$out/NativeTypeLetQuote.hi" "$out/client"
         (
-            cd "$out"
-            "${ghc[@]}" -i -i. -c Main.hs
-            "${ghc[@]}" Main.o NativeTypeLetQuote.o -o observe
+            cd "$out/client"
+            "${ghc[@]}" "$opt" -i -i. -c Main.hs
+            "${ghc[@]}" "$opt" Main.o ../NativeTypeLetQuote.o -o observe
             test "$(./observe)" = "(Right (Just True),Just 'q',(Just 3,Nothing))"
         )
     done
