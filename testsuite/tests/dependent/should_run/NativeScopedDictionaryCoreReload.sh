@@ -120,6 +120,24 @@ HS
 "${ghc[@]}" Main.o -o read-core
 test "$(./read-core)" = '(True,[955,0,128578])'
 
+# Reification has no TH.Type form for the exact scoped dictionary.
+mkdir "$out/reify"
+cd "$out/reify"
+cp ../-O0/provider/Provider.hi .
+cat >Reify.hs <<'HS'
+{-# LANGUAGE TemplateHaskell #-}
+module Reify where
+import Language.Haskell.TH.Syntax (reifyType)
+import Provider (chooseTagged)
+$(reifyType 'chooseTagged >> pure [])
+HS
+if "${ghc[@]}" -fno-code -c Reify.hs > reify.log 2>&1; then
+    echo "Reification accepted a scoped dictionary"
+    exit 1
+fi
+grep -Fq '[GHC-75721]' reify.log
+grep -Fq 'Template Haskell cannot represent a runtime index in a type.' reify.log
+
 # A fresh GHCi session can reuse the provider interface and regenerate code
 # when a changed splice needs it.
 mkdir "$out/incremental"
