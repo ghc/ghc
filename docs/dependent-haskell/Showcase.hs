@@ -1443,6 +1443,10 @@ main = do
     observe "retain the kind of a matched Nothing"
         (Refl :: TypeLambda.Rebuild ('Nothing :: Maybe Ordering) :~: Proxy ('Nothing :: Maybe Ordering))
     observe "name and reuse a type-level intermediate result" TypeLet.roadmap
+    let row = VCons 'x' (VCons 'y' VNil)
+    observe "select a vector header with a runtime flag and a computed width"
+        (TypeLet.frameValues enabled 2 ':' row,
+         TypeLet.frameValues disabled 2 (error "unused header") row)
     observe "refer to an outer type let before shadowing it in a case"
         (Refl :: NativeCase.NestedLetShadow 'True ('Just 'False) :~: (Proxy 'False, Proxy ('Just 'True)))
     observe "bind the result of a constructor case"

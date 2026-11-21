@@ -382,7 +382,8 @@ test('NativeRetainedIndexHpc',
      run_command, ['bash NativeRetainedIndexHpc.sh "{compiler}" "{libdir}" "{hpc}"'])
 
 test('NativeTypeLet',
-     [only_ways(['normal']), extra_files([open_eval_dir + 'TypeLet.hs'])],
+     [only_ways(['normal']), extra_files([open_eval_dir + 'TypeLet.hs',
+                                       '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs'])],
      run_command, ['bash NativeTypeLet.sh "{compiler}" "{libdir}"'])
 
 test('NativeClosedMatchability',

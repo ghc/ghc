@@ -1,7 +1,9 @@
-{-# LANGUAGE TypeOperators, DataKinds, ExperimentalDependentTypes, TypeFamilies #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, ExplicitNamespaces, GADTs #-}
+{-# LANGUAGE ScopedTypeVariables, TypeApplications, TypeFamilies, TypeOperators, UndecidableInstances #-}
 -- | Bind an intermediate result in a type synonym.
-module TypeLet (F, Shadow, Reuse, Outer, Nested, CaseResult, roadmap) where
+module TypeLet (F, Shadow, Reuse, Outer, Nested, CaseResult, Frame, frameValues, roadmap) where
 import Data.Type.Equality ((:~:)(Refl))
+import PackedVecLibrary (Nat, Vec(..), toList, type (+))
 
 -- | Select a flag for each input type in the example.
 type family G a where
@@ -31,6 +33,24 @@ type Nested (a :: Bool) = let b = a in let c = b in '(b,c)
 -- | Match the outer flag and use the selected type on both sides of Either.
 type CaseResult (flag :: Bool) =
   let flag = case flag of { True -> Bool; False -> Char } in Either flag flag
+
+-- | A row with one additional value when the header flag is set.
+type Frame (n :: Nat) (b :: Bool) a =
+  let width = 1 + n in case b of { True -> Vec a width; False -> Vec a n }
+
+-- | Forward the runtime flag to both the producer and the consumer.
+frameValues :: forall a. foreach (b :: Bool) -> foreach (n :: Nat) -> a -> Vec a n -> [a]
+frameValues flag n h row = values @a flag n (header @a flag n h row)
+
+-- | Prepend the header when the flag selects the longer vector.
+header :: forall a. foreach (b :: Bool) -> foreach (n :: Nat) -> a -> Vec a n -> Frame n b a
+header True  _ h row = VCons h row
+header False _ _ row = row
+
+-- | Read the vector at the length selected by the flag.
+values :: forall a. foreach (b :: Bool) -> foreach (n :: Nat) -> Frame n b a -> [a]
+values True  _ row = toList row
+values False _ row = toList row
 
 -- | Check the result of substituting G Bool in both positions.
 roadmap :: F Bool :~: Ordering

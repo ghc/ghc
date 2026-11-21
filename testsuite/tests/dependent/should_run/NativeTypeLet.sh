@@ -10,9 +10,10 @@ g=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint
    -fdiagnostics-color=never)
 
 cd "$out/provider"
-cp "$src/TypeLet.hs" .
+cp "$src/"{PackedVecLibrary,TypeLet}.hs .
+"${g[@]}" -c PackedVecLibrary.hs
 "${g[@]}" -c TypeLet.hs
-cp TypeLet.hi "$out/client/"
+cp TypeLet.hi PackedVecLibrary.hi "$out/client/"
 cd "$out/client"
 cat >OrdinaryLet.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
@@ -93,3 +94,48 @@ module UnusedInvalid where
 type Bad (a :: Bool) = let b = Maybe a in Int
 HS
 reject UnusedInvalid 3:38 83865 'Expected a type'
+
+# The infix operator can be a captured type variable.
+cd "$out/provider"
+cat > Operator.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeFamilies, TypeOperators #-}
+module Operator where
+import Data.Kind (Type)
+type Result (f :: Type -> Type -> Type) a b flag =
+    let field = a `f` b in case flag of { True -> Maybe field; False -> [field] }
+HS
+"${g[@]}" -fomit-interface-pragmas -c Operator.hs
+cp Operator.hi "$out/client/"
+cd "$out/client"
+cat > Main.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
+module Main where
+import Data.Type.Equality ((:~:)(Refl))
+import Operator (Result)
+import PackedVecLibrary (Vec(..))
+import TypeLet (Frame, frameValues)
+
+longer :: Frame 2 'True Char :~: Vec Char 3
+longer = Refl
+shorter :: Frame 2 'False Char :~: Vec Char 2
+shorter = Refl
+captured :: Result Either Char Bool 'True :~: Maybe (Either Char Bool)
+captured = Refl
+second :: Result (,) Char Bool 'False :~: [(Char, Bool)]
+second = Refl
+
+main :: IO ()
+main = do
+    let row = VCons 'x' (VCons 'y' VNil)
+        render flag = frameValues flag 2 (if flag then ':' else error "unused header") row
+    print (render True, render False)
+HS
+for opt in -O0 -O2; do
+    "${g[@]}" "$opt" -fforce-recomp -c Main.hs
+    "${g[@]}" Main.o ../provider/{Operator,TypeLet,PackedVecLibrary}.o -o frame
+    ./frame | grep -Fx '(":xy","xy")'
+done
+sed -e 's/module Main/module WrongWidth/' -e "s/Frame 2 'True Char :~: Vec Char 3/Frame 2 'True Char :~: Vec Char 2/" Main.hs >WrongWidth.hs
+if "${g[@]}" -c WrongWidth.hs >error.log 2>&1; then exit 1; fi
+grep -Fq '[GHC-83865]' error.log
+grep -Fq 'Refl' error.log
