@@ -3240,7 +3240,13 @@ implicitResult do_ql rn_expr actual expected@(Check wanted)
     pack quick payload schema
       | ExistsTy ImplicitExists binder body <- coreFullView schema
       = do { witness <- if quick
-               then newMetaTyVarTyAtLevel QLInstVar (tyVarKind binder)
+               then case (coreFullView body, coreFullView payload) of
+                      (FunTy{}, FunTy{})
+                        -- See Note [Matching a witness below forall].
+                        | Just exact <- matchExactPolytypeWitness binder body payload
+                        , ForAllTy{} <- coreFullView exact
+                        -> return exact
+                      _ -> newMetaTyVarTyAtLevel QLInstVar (tyVarKind binder)
                else do { retained <- runMaybeT $
                            matchRetainedExistsWitness (exprCtOrigin rn_expr) binder body payload
                        ; maybe (newFlexiTyVarTy (tyVarKind binder)) return retained }
@@ -3304,7 +3310,13 @@ matchPolytypeExistsWitness binder formal actual
   , TyConApp actual_tc _ <- coreFullView actual
   , formal_tc == actual_tc
   , isGenerativeTyCon formal_tc Nominal
-  , all supportsQuickLookType [tyVarKind binder, formal, actual]
+  = matchExactPolytypeWitness binder formal actual
+  | otherwise = Nothing
+
+-- | Match one fixed polytype witness without binding any other variables.
+matchExactPolytypeWitness :: TyVar -> Type -> Type -> Maybe Type
+matchExactPolytypeWitness binder formal actual
+  | all supportsQuickLookType [tyVarKind binder, formal, actual]
   , all noQuickLookVars [tyVarKind binder, formal, actual]
   = do { subst <- tcMatchTyX_BM bind_witness empty_subst formal actual
        ; witness <- Subst.lookupTyVar subst binder
@@ -3317,6 +3329,28 @@ matchPolytypeExistsWitness binder formal actual
     empty_subst = Subst.mkEmptySubst (mkInScopeSet (tyCoVarsOfTypes [formal, actual]))
     bind_witness tv _ | tv == binder = BindMe
                       | otherwise = DontBindMe
+
+{- Note [Matching a witness below forall]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Under shallow subsumption, a declared payload can determine a polytype
+inside a callback's forall. For example, to pack
+
+  (forall r. (PolyId -> r) -> Maybe r) -> Int
+
+as exists t. (forall r. (t -> r) -> Maybe r) -> Int, choose
+PolyId = forall a. a -> a.
+
+Quick Look stops at a forall because it cannot track the bound variables.
+See (UQL4) in Note [QuickLook unification].
+For this match, both payload types have no Quick Look variables.
+The Core matcher renames the forall binders and rejects a substitution
+that mentions a variable bound inside the target. A witness
+forall a. a -> r therefore cannot refer to the callback's r.
+See (CU2) in Note [The Core unifier] in GHC.Core.Unify.
+
+Check the witness kind and compare the complete substituted payload
+with the declared type. Then check the original expression as usual.
+-}
 
 -- | Match a stored index without assigning its local Id to a metavariable.
 -- See Note [Introducing an implicit existential].

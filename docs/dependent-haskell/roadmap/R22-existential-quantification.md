@@ -742,6 +742,15 @@ Checking the final payload can still reject an incompatible family result.
 [Rank-n callback](../examples/erased-existentials/RankedPackage.hs)
 and [GenImpredicative in Figure 10](https://richarde.dev/papers/2021/exists/exists.pdf#page=22).
 
+With `ImpredicativeTypes` and shallow subsumption, a declared function
+can fix a witness under a callback's `forall`. A value of type
+`InputAt PolyId -> Int` can supply `exists t. InputAt t -> Int`, where
+`InputAt t = forall r. (t -> r) -> Maybe r` and
+`PolyId = forall a. a -> a`. GHC checks the full payload type after
+it substitutes the witness. A witness such as `forall a. a -> r`
+would capture the callback's local result type, so GHC rejects it.
+[Interface-only client](../../../testsuite/tests/dependent/should_run/implicit-existential-source/Opening.hs).
+
 An ordinary client with `ImpredicativeTypes` can name a witness in each
 branch. In an expected `exists t. Callback t`, `Callback @PolyId` and
 `Callback @PolyMaybe` fix the types of their callback arguments.
