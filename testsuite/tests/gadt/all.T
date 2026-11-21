@@ -147,3 +147,6 @@ test('TerminalGadtTh',
       extra_files(['TerminalGadtThProvider.hs'])],
      run_command, ['bash TerminalGadtTh.sh "{compiler}" "{libdir}"'])
 test('TerminalGadtThBadMultiplicity', req_th, compile_fail, [''])
+test('GadtTrailingContext', extra_files(['GadtTrailingContextProvider.hs']),
+     makefile_test, [])
+test('GadtTrailingContextScope', normal, compile_fail, [''])
