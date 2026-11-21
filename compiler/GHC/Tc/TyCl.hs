@@ -3583,7 +3583,7 @@ tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
                do { ctxt <- tcHsContext hs_ctxt
                   ; fds  <- mapM (addLocM tc_fundep) fundeps
                   ; sig_stuff <- tcClassSigs class_name sigs meths
-                  ; at_stuff  <- tcClassATs class_name (binderVars tc_bndrs) clas ats at_defs
+                  ; at_stuff  <- tcClassATs class_name clas ats at_defs
                   ; return (ctxt, fds, sig_stuff, at_stuff) }
 
        -- See Note [Error on unconstrained meta-variables] in GHC.Tc.Utils.TcMType
@@ -3666,12 +3666,11 @@ families.
 -}
 
 tcClassATs :: Name                    -- The class name (not knot-tied)
-           -> [TyVar]                 -- The class binders (not knot-tied)
            -> Class                   -- The class parent of this associated type
            -> [LFamilyDecl GhcRn]     -- Associated types.
            -> [LTyFamDefltDecl GhcRn] -- Associated type defaults.
            -> TcM [ClassATItem]
-tcClassATs class_name class_tvs cls ats at_defs
+tcClassATs class_name cls ats at_defs
   = do {  -- Complain about associated type defaults for non associated-types
          sequence_ [ failWithTc $ TcRnIllegalInstance
                                 $ IllegalFamilyInstance $ InvalidAssoc
@@ -3696,13 +3695,6 @@ tcClassATs class_name class_tvs cls ats at_defs
                         emptyNameEnv at_defs
 
     tc_at at = do { (fam_tc, val_infos) <- addLocM (tcFamDecl1 emptyNameEnv (Just cls)) at
-                  ; let fam_vars = mkVarSet (tyConTyVars fam_tc)
-                        missing = filter (\v -> not (v `elemVarSet` fam_vars)) class_tvs
-                  ; when (isConstrainedFamilyTyCon fam_tc && not (null missing)) $
-                      setSrcSpanA (getLoc at) $
-                        failWithTc $ TcRnConstrainedFamilyUnsupported fam_tc $
-                          hang (text "Missing class parameters in the family declaration")
-                               2 (pprWithCommas ppr missing)
                   ; mapM_ (checkTyFamEqnValidityInfo fam_tc) val_infos
                   ; let at_defs = lookupNameEnv at_defs_map (at_fam_name at)
                                   `orElse` []
@@ -6610,8 +6602,9 @@ checkValidClass cls
         -- Check the class operations.
         -- But only if there have been no earlier errors
         -- See Note [Abort when superclass cycle is detected]
-        ; whenNoErrs $
-          mapM_ (check_op constrained_class_methods) op_stuff
+        ; whenNoErrs $ do
+            forM_ at_stuff $ \(ATI fam_tc _) -> checkAssociatedFamilyCoverage cls fam_tc
+            mapM_ (check_op constrained_class_methods) op_stuff
 
         -- Check the associated type defaults are well-formed and instantiated
         ; mapM_ check_at at_stuff  }
