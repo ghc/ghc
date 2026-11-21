@@ -100,9 +100,9 @@ data TcLclCtxt
         tcl_in_gen_code :: Bool,            -- Are we type checking a generated expression?
         tcl_err_ctxt    :: ErrCtxtStack,
         tcl_tclvl       :: TcLevel,
-        tcl_native_givens :: [EvVar],       -- Lexical native evidence parameters,
+        tcl_lexical_givens :: [EvVar],       -- Lexical evidence parameters,
                                             -- including equality CoVars.
-                                            -- See Note [Lexical native Givens]
+                                            -- See Note [Lexical Givens]
                                             -- in GHC.Tc.Utils.Monad.
         tcl_source_let_views :: VarEnv TcType, -- Candidates for argument selection.
                                             -- See Note [Inferring through local definitions]

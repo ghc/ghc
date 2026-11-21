@@ -547,7 +547,7 @@ tcRetainedCase dependent index matches@(MG { mg_alts = L loc alternatives }) (Ch
                        , isLocalId v, depends (varType v), v `notElem` named]
       return (scopedSort (named ++ indices))
     dependent_givens =
-      filter (depends . varType) . tcl_native_givens . tcl_lcl_ctxt <$> getLclEnv
+      filter (depends . varType) <$> getNativeGivens
 
     capture name
       = do { thing <- tcLookupLcl_maybe name
@@ -584,7 +584,7 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
                   matches@(MG { mg_alts = L loc alternatives }) (Check result_ty)
   = do { captures <- fmap catMaybes $ mapM capture
                        (nameSetElemsStable (retainedCaseNames matches))
-       ; native_givens <- tcl_native_givens . tcl_lcl_ctxt <$> getLclEnv
+       ; native_givens <- getNativeGivens
        ; givens <- filterM (depends . varType) native_givens
        ; result_depends <- depends result_ty
        ; let existing_trigger = not (null captures) || not (null givens)

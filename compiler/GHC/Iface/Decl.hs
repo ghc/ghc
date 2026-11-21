@@ -204,6 +204,7 @@ tyConToIfaceDecl env tycon
 
     to_if_fam_flav :: FamTyConFlav -> IfaceFamTyConFlav
     to_if_fam_flav OpenTypeFamilyTyCon         = IfaceOpenTypeFamilyTyCon
+    to_if_fam_flav ConstrainedTypeFamilyTyCon  = IfaceConstrainedTypeFamilyTyCon
     to_if_fam_flav (DataFamilyTyCon {})        = IfaceDataFamilyTyCon
     to_if_fam_flav (ClosedTypeFamilyTyCon ctf) = IfaceClosedTypeFamilyTyCon (to_if_ctf ctf)
 

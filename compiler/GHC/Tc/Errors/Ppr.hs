@@ -1745,6 +1745,9 @@ instance Diagnostic TcRnMessage where
          2 (ppr dm_ty)
       $$ (text "does not match its corresponding"
           <+> text "non-default type signature")
+    TcRnConstrainedFamilyUnsupported family reason ->
+      mkSimpleDecorated $ text "Constrained associated type family" <+>
+        quotes (ppr family) $$ reason
     TcRnTyFamsDisabled reason -> mkSimpleDecorated $
       text "Illegal family" <+> text sort <+> text "for" <+> quotes name
       where
@@ -2702,6 +2705,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnDefaultSigMismatch{}
       -> ErrorWithoutFlag
+    TcRnConstrainedFamilyUnsupported{}
+      -> ErrorWithoutFlag
     TcRnTyFamsDisabled{}
       -> ErrorWithoutFlag
     TcRnBadTyConTelescope {}
@@ -3432,6 +3437,8 @@ instance Diagnostic TcRnMessage where
     TcRnSuperclassCycle{}
       -> [suggestExtension LangExt.UndecidableSuperClasses]
     TcRnDefaultSigMismatch{}
+      -> noHints
+    TcRnConstrainedFamilyUnsupported{}
       -> noHints
     TcRnTyFamsDisabled{}
       -> [suggestExtension LangExt.TypeFamilies]

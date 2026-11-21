@@ -832,6 +832,8 @@ tc_iface_decl parent _ (IfaceFamily {ifName = tc_name,
        = do { tc_rep_name <- newTyConRepName tc_name
             ; return (DataFamilyTyCon tc_rep_name) }
      tc_fam_flav _ IfaceOpenTypeFamilyTyCon = return OpenTypeFamilyTyCon
+     tc_fam_flav _ IfaceConstrainedTypeFamilyTyCon =
+       return ConstrainedTypeFamilyTyCon
      tc_fam_flav local (IfaceClosedTypeFamilyTyCon ctf) = ClosedTypeFamilyTyCon <$>
        case ctf of
         IfaceClosedTyFamTyCon mb_ax_name_branches ->
