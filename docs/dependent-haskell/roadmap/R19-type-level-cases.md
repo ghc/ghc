@@ -216,10 +216,96 @@ waits for a matching row. The same check applies to a case in the
 domain of an ordinary arrow in the field.
 [Field source](../examples/open-evaluation/NativeNestedCase.hs).
 
-Template Haskell reports GHC-75721 at a splice that reifies a retained
-`foreach` binder or an index bound by that binder. Its `ForallVisT` binds a visible
-erased type argument. The type AST has no binder for a runtime argument.
-Ordinary module interfaces retain the runtime binder.
+### Quote and reify retained function types
+
+`ForEachT` preserves the runtime binder, argument visibility and domain of
+a retained function type. `IndexVarT` refers to that binder in the result.
+The erased `ForallVisT` and `VarT` retain their meanings. The Showcase splices
+a retained signature and calls the resulting function with a runtime Boolean.
+The external-interpreter test also reifies a same-spelled erased and retained
+binder from an interface, splices the type and calls the result. It checks the
+type codec and rejects a runtime name used as an erased variable.
+[Provider](../examples/open-evaluation/NativeRetainedTH.hs) and
+[test](../../../testsuite/tests/dependent/should_run/NativeTypeCaseRetainedTh.sh).
+
+The retained and erased binders follow the distinction in proposal #378.
+Proposal #281 establishes visible erased quantification.
+[Design #378](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#quantifiers),
+and [proposal #281](https://ghc-proposals.readthedocs.io/en/latest/proposals/0281-visible-forall.html).
+
+An inline case in `[t| foreach (b :: Bool) -> case b of … |]` uses `CaseT`.
+Its rows use the type-pattern syntax of closed family equations. A pattern
+variable binds in the result of its own row. The scrutinee uses `IndexVarT`
+for the actual retained binder. The case and its order survive the quotation.
+The Showcase calls a function whose quoted signature has `()` between
+the retained binder and its result case. It checks an `Int` result at
+`True` and a `Char` result at `False`.
+[Quoted signature](../examples/open-evaluation/NativeRetainedTH.hs).
+
+The Showcase composes `renderCase b (quotedCase b ())` before inspecting
+`b`. The functions have independently spliced signatures. An ordinary
+client reads `b` from an IORef and obtains `("19","q")` across its two
+calls. The stripped provider interface suffices at both `-O0` and `-O2`.
+[Provider](../examples/open-evaluation/NativeRetainedTH.hs).
+
+A declaration splice can use the quoted type in `SigD`. The declarations
+it returns can share a case helper within one group. A declaration quote
+`[d| … |]` also preserves `CaseT` in a signature or type synonym.
+The splice checks the case in the receiving group. A type splice can
+supply the complete top-level value signature. Separate signature splices
+in the same group can share a case on a retained binder when the capture
+domains and ordered rows agree and their names have fixed identities.
+The checker lifts the rows and preserves ordered reduction in both forms.
+Each splice and its module finalizer run once in the ordinary order.
+Use a named family to share a case across declaration groups or modules.
+A type splice inside a value signature can supply a case when the fragment
+declares its own local binders. An erased binder inside the splice can index
+the case. A variable bound by one row can shadow that binder. Separate
+fragments and written cases in the same signature keep distinct helpers.
+A quotation or `lookupTypeName` can also refer to an outer erased `forall`
+binder by its exact name. Its kind must be written as a resolved type name
+or promoted constructor. A name from `mkName` supplies only its spelling.
+Use a named family for other enclosing type binders. Cases inside quoted type
+lambdas still produce a source diagnostic. Reification describes the
+checked signature and its family applications.
+
+A nested type splice can also use an enclosing retained variable by its
+exact `IndexVarT` name. A direct quotation and `lookupValueName` both
+identify the original runtime binder. The case lifter can copy a closed
+domain written with type constructors, such as `Bool` or `Maybe Bool`.
+A free fresh name and an erased variable cannot serve as this index.
+Using the binder's name does not make its runtime value available in the
+compile-time splice.
+[External-interpreter fixture](../../../testsuite/tests/dependent/should_run/NativeTypeCaseRetainedThRaw.hs),
+[Template Haskell declaration groups](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/template_haskell.html#declaration-groups),
+[proposal #378 scoping review](https://github.com/ghc-proposals/ghc-proposals/pull/378#discussion_r524560765),
+and [Eisenberg and Stolarek, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf).
+
+### Quote and reify retained GADT constructors
+
+`RetainedGadtC` carries the ordered fields and result of a prefix constructor.
+A retained field binds its runtime name over later field types. An ordinary
+field carries its source strictness and multiplicity. The bound name remains
+in the declaration even when the constructor type simplifies it to an arrow.
+Ordinary `GadtC`, `RecGadtC` and `ForallC` keep their representation.
+The external-interpreter test reifies a declaration from a stripped interface
+and splices a copy. It checks lazy fields, erased binders and the constructor
+codec. The Showcase passes its runtime input and dependent payload to a
+constructor declared in a quote. It also reads a case-selected field from
+a constructor declared with a direct inline case inside `[d| … |]`.
+[Provider](../examples/open-evaluation/NativeRetainedConTH.hs) and
+[test](../../../testsuite/tests/dependent/should_run/NativeTypeCaseRetainedConTh.sh).
+
+The current source checker rejects a retained name in the final result, a
+retained telescope with record fields, and strictness annotations after the
+first retained binder. Required erased forall in a constructor declaration
+still receives the Template Haskell diagnostic. Proposal #402 separates
+record fields and prefix arguments. Its review considers the namespace of a
+constructor binder. Eisenberg's thesis describes ordered dependencies among
+constructor arguments.
+[Proposal #402](https://ghc-proposals.readthedocs.io/en/latest/proposals/0402-gadt-syntax.html),
+[review #402](https://github.com/ghc-proposals/ghc-proposals/pull/402#issuecomment-801420999),
+and [thesis §5.4.1](https://www.cis.upenn.edu/~sweirich/papers/eisenberg-thesis.pdf).
 
 ## A case in a value signature
 

@@ -13,7 +13,7 @@ they may be affected by renaming (which isn't fully worked out yet).
 
 module GHC.Rename.Bind (
    -- Renaming top-level bindings
-   rnTopBindsLHS, rnTopBindsLHSBoot, rnTopBindsBoot, rnValBindsRHS,
+   rnTopBindsLHS, rnTopBindsLHSBoot, rnTopBindsBoot, rnValBindsRHS, rnValBindsRHSWith,
 
    -- Renaming local bindings
    rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS,
@@ -331,9 +331,16 @@ rnValBindsRHS :: HsSigCtxt
               -> HsValBindsLR GhcRn GhcPs
               -> RnM (HsValBinds GhcRn, DefUses)
 
-rnValBindsRHS ctxt (ValBinds _ vbinds)
+rnValBindsRHS = rnValBindsRHSWith rnHsSigWcType
+
+-- | Supply a value signature renamer without moving it ahead of other splices.
+rnValBindsRHSWith
+  :: (HsDocContext -> LHsSigWcType GhcPs -> RnM (LHsSigWcType GhcRn, FreeNames))
+  -> HsSigCtxt -> HsValBindsLR GhcRn GhcPs
+  -> RnM (HsValBinds GhcRn, DefUses)
+rnValBindsRHSWith rename_type ctxt (ValBinds _ vbinds)
   = do { let (mbinds, sigs) = val_binds_and_sigs vbinds
-       ; (sigs', sig_fvs) <- renameSigs ctxt sigs
+       ; (sigs', sig_fvs) <- renameSigsWith (renameValueSig rename_type ctxt) ctxt sigs
 
        -- Update the TcGblEnv with renamed COMPLETE pragmas from the current
        -- module, for pattern irrefutability checking in do notation.
@@ -360,7 +367,7 @@ rnValBindsRHS ctxt (ValBinds _ vbinds)
 
         ; return (XValBindsLR (HsVBG anal_binds sigs'), valbind'_dus) } }
 
-rnValBindsRHS _ b = pprPanic "rnValBindsRHS" (ppr b)
+rnValBindsRHSWith _ _ b = pprPanic "rnValBindsRHS" (ppr b)
 
 -- Wrapper for local binds
 --
@@ -1081,30 +1088,41 @@ renameSigs :: HsSigCtxt
            -> [LSig GhcPs]
            -> RnM ([LSig GhcRn], FreeNames)
 -- Renames the signatures and performs error checks
-renameSigs ctxt sigs
+renameSigs ctxt = renameSigsWith (renameSig ctxt) ctxt
+
+-- | Use the supplied signature renamer and keep ordinary signature checks.
+renameSigsWith :: (Sig GhcPs -> RnM (Sig GhcRn, FreeNames)) -> HsSigCtxt
+               -> [LSig GhcPs] -> RnM ([LSig GhcRn], FreeNames)
+renameSigsWith rename_sig ctxt sigs
   = do  { mapM_ dupSigDeclErr (findDupSigs sigs)
 
         ; checkDupMinimalSigs sigs
 
-        ; (sigs', sig_fvs) <- mapFvRn (wrapLocFstMA (renameSig ctxt)) sigs
+        ; (sigs', sig_fvs) <- mapFvRn (wrapLocFstMA rename_sig) sigs
 
         ; let (good_sigs, bad_sigs) = partition (okHsSig ctxt) sigs'
         ; mapM_ misplacedSigErr bad_sigs                 -- Misplaced
 
         ; return (good_sigs, sig_fvs) }
 
-----------------------
-renameSig :: HsSigCtxt -> Sig GhcPs -> RnM (Sig GhcRn, FreeNames)
-renameSig ctxt sig@(TypeSig _ mods vs ty)
+-- | Check a value signature with the supplied type renamer.
+renameValueSig
+  :: (HsDocContext -> LHsSigWcType GhcPs -> RnM (LHsSigWcType GhcRn, FreeNames))
+  -> HsSigCtxt -> Sig GhcPs -> RnM (Sig GhcRn, FreeNames)
+renameValueSig rename_type ctxt sig@(TypeSig _ mods vs ty)
   = do  { new_vs <- mapM (lookupSigOccRn ctxt sig) vs
         ; let doc = TypeSigCtx vs
         ; retained <- xoptM LangExt.ExperimentalDependentTypes
         ; (new_ty, fvs) <- case ctxt of
             LocalBindCtxt bound_names | retained -> rnLocalHsSigWcType bound_names doc ty
-            _ -> rnHsSigWcType doc ty
+            _ -> rename_type doc ty
         ; (mods', mods_fvs) <- rnModifiersContext doc mods
         ; return (TypeSig noAnn mods' new_vs new_ty, fvs `plusFN` mods_fvs) }
+renameValueSig _ ctxt sig = renameSig ctxt sig
 
+----------------------
+renameSig :: HsSigCtxt -> Sig GhcPs -> RnM (Sig GhcRn, FreeNames)
+renameSig ctxt sig@TypeSig{} = renameValueSig rnHsSigWcType ctxt sig
 renameSig ctxt sig@(ClassOpSig _ is_deflt vs ty)
   = do  { defaultSigs_on <- xoptM LangExt.DefaultSignatures
         ; when (is_deflt && not defaultSigs_on) $

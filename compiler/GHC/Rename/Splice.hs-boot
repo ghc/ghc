@@ -2,11 +2,15 @@ module GHC.Rename.Splice where
 
 import GHC.Hs
 import GHC.Tc.Utils.Monad
+import GHC.Types.Name (Name)
 import GHC.Types.Name.Reader (WithUserRdr, GlobalRdrElt)
 import GHC.Types.Name.Set
 
 
 rnSpliceType :: HsUntypedSplice GhcPs -> RnM (HsType GhcRn, FreeNames)
+rnSpliceTypeWith :: [Name]
+                 -> (LHsType GhcPs -> RnM (LHsType GhcRn, FreeNames))
+                 -> HsUntypedSplice GhcPs -> RnM (HsType GhcRn, FreeNames)
 rnSplicePat  :: HsUntypedSplice GhcPs -> RnM ( (HsUntypedSplice GhcRn, HsUntypedSpliceResult (LPat GhcPs))
                                              , FreeNames)
 rnSpliceTyPat  :: HsUntypedSplice GhcPs -> RnM ( (HsUntypedSplice GhcRn, HsUntypedSpliceResult (LHsType GhcPs))

@@ -42,6 +42,7 @@ tcTopSpliceExpr :: SpliceType -> TcM (LHsExpr GhcTc) -> TcM (LHsExpr GhcTc)
 runMetaE :: LHsExpr GhcTc -> TcM (LHsExpr GhcPs)
 runMetaP :: LHsExpr GhcTc -> TcM (LPat GhcPs)
 runMetaT :: LHsExpr GhcTc -> TcM (LHsType GhcPs)
+runMetaTWithIndices :: [Name] -> LHsExpr GhcTc -> TcM (LHsType GhcPs)
 runMetaD :: LHsExpr GhcTc -> TcM [LHsDecl GhcPs]
 
 lookupThName_maybe :: TH.Name -> TcM (Maybe Name)
