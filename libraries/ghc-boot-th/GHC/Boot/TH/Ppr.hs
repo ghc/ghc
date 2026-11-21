@@ -580,6 +580,7 @@ ppr_typedef data_or_newtype isTop maybeInst ctxt t argsDoc ksig cs decs
     isGadtDecl = not (null cs) && all isGadtCon cs
         where isGadtCon (GadtC _ _ _   ) = True
               isGadtCon (RecGadtC _ _ _) = True
+              isGadtCon RetainedGadtC{} = True
               isGadtCon (ForallC _ _ x ) = isGadtCon x
               isGadtCon (ForallMatchC _ x) = isGadtCon x
               isGadtCon  _               = False
@@ -758,6 +759,15 @@ instance Ppr Con where
         = commaSepApplied cs <+> dcolon <+> ppr_foralls (pprGadtRHS sts ty)
       ppr_con ppr_foralls (RecGadtC cs vsts ty)
         = commaSepApplied cs <+> dcolon <+> ppr_foralls (pprRecFields vsts ty)
+      ppr_con ppr_foralls (RetainedGadtC cs args ty)
+        = commaSepApplied cs <+> dcolon <+> ppr_foralls
+            (sep (map ppr_retained_arg args ++ [ppr ty]))
+
+      ppr_retained_arg (GadtValueArg bang mult ty) =
+        pprBangType (bang, ty) <+> (char '%' <> pprType appPrec mult) <+> text "->"
+      ppr_retained_arg (GadtIndexArg name domain) =
+        text "foreach" <+>
+        parens (pprName' Applied name <+> dcolon <+> ppr domain) <+> text "->"
 
 instance Ppr PatSynDir where
   ppr Unidir        = text "<-"
@@ -901,6 +911,20 @@ pprType p (ForallT tvars ctxt ty) =
   parensIf (p >= funPrec) $ sep [pprForall tvars ctxt, pprType qualPrec ty]
 pprType p (ForallVisT tvars ty) =
   parensIf (p >= funPrec) $ sep [pprForallVis tvars [], pprType qualPrec ty]
+pprType p (ForEachT vis name domain body) =
+  parensIf (p >= funPrec) $
+    sep [ prefix, pprType qualPrec body ]
+  where
+    binder = parens (pprName' Applied name <+> dcolon <+> pprType noPrec domain)
+    prefix = text "foreach" <+> case vis of
+      BndrReq   -> binder <+> text "->"
+      BndrInvis -> binder <> char '.'
+pprType _ (IndexVarT name) = pprName' Applied name
+pprType p (CaseT scrutinee rows) =
+  parensIf (p >= funPrec) $
+    text "case" <+> pprType noPrec scrutinee <+> text "of"
+      <+> braces (sep (punctuate semi [pprType noPrec pat <+> text "->" <+> pprType noPrec rhs
+                                     | TypeCaseAlt pat rhs <- rows]))
 pprType p (ForallMatchT ma (ForallT tvars ctxt ty)) | not (null tvars) =
   parensIf (p >= funPrec) $
     sep [pprForallMatch ForallInvis (Just ma) tvars ctxt, pprType qualPrec ty]

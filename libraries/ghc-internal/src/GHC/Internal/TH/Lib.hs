@@ -773,6 +773,19 @@ gadtC cons strtys ty = liftA2 (GadtC cons) (sequenceA strtys) ty
 recGadtC :: Quote m => [Name] -> [m VarStrictType] -> m Type -> m Con
 recGadtC cons varstrtys ty = liftA2 (RecGadtC cons) (sequenceA varstrtys) ty
 
+-- | Build a prefix GADT constructor with retained arguments.
+retainedGadtC :: Quote m => [Name] -> [m RetainedGadtArg] -> m Type -> m Con
+retainedGadtC names args result =
+  RetainedGadtC names <$> sequenceA args <*> result
+
+-- | Build an ordinary field with its source bang and multiplicity.
+gadtValueArg :: Quote m => m Bang -> m Type -> m Type -> m RetainedGadtArg
+gadtValueArg bang mult ty = GadtValueArg <$> bang <*> mult <*> ty
+
+-- | Build a retained field that binds a name in the remaining signature.
+gadtIndexArg :: Quote m => Name -> m Type -> m RetainedGadtArg
+gadtIndexArg name domain = GadtIndexArg name <$> domain
+
 -------------------------------------------------------------------------------
 -- *   Type
 
@@ -785,6 +798,22 @@ forallT tvars ctxt ty = do
 
 forallVisT :: Quote m => [m (TyVarBndr ())] -> m Type -> m Type
 forallVisT tvars ty = ForallVisT <$> sequenceA tvars <*> ty
+
+-- | Construct a retained function type.
+forEachT :: Quote m => BndrVis -> Name -> m Type -> m Type -> m Type
+forEachT vis name domain body = ForEachT vis name <$> domain <*> body
+
+-- | Refer to a retained term variable in a type.
+indexVarT :: Quote m => Name -> m Type
+indexVarT = pure . IndexVarT
+
+-- | Construct an ordered type case.
+caseT :: Quote m => m Type -> [m TypeCaseAlt] -> m Type
+caseT scrutinee rows = CaseT <$> scrutinee <*> sequenceA rows
+
+-- | Construct one pattern and result of an ordered type case.
+typeCaseAlt :: Quote m => m Type -> m Type -> m TypeCaseAlt
+typeCaseAlt pat rhs = TypeCaseAlt <$> pat <*> rhs
 
 -- | Set the matchability of an immediate, nonempty type forall group.
 -- See Note [Forall matchability wrappers] in GHC.Internal.TH.Syntax.

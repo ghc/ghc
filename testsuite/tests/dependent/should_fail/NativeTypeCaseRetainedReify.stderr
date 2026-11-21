@@ -1,5 +1,6 @@
-NativeTypeCaseRetainedReify.hs:22:2: error: [GHC-75721]
-    Template Haskell cannot represent a retained ‘foreach’ binder.
-   |
-22 | $(do named <- recover (pure True) (False <$ reifyType 'Named)
-   |  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^...
+NativeTypeCaseRetainedReify.hs:9:2: error: [GHC-75721]
+    Can't represent visible forall in the type of a data constructor in Template Haskell:
+      forall {k}. forall (a :: k) -> Bool -> Int -> Stored a
+  |
+9 | $([] <$ reify ''Stored)
+  |  ^^^^^^^^^^^^^^^^^^^^^^
