@@ -156,3 +156,26 @@ The signatures use existing class constraints and keep the two
 `Choose` dictionaries distinct.
 [Showcase provider](../examples/open-evaluation/ScopedClassMethod.hs).
 [Showcase client](../examples/open-evaluation/ScopedClassMethodClient.hs).
+
+
+## Reload a scoped dictionary body
+
+A source-hidden Template Haskell client can run the provider from its
+`.hi` and persisted `.gbc`. The `.gbc` already contains bytecode.
+With `-fwrite-if-simplified-core`, the provider can instead supply its
+`.hi` alone. GHC reads the extra Core bindings and generates bytecode.
+The regression tests this with interface pragmas ignored, two distinct
+dictionaries, and a bottom in each of the two lazy positions.
+A second GHCi session reuses the provider interface and regenerates its
+bytecode when a changed client splice calls it.
+[Persistent bytecode implementation](https://gitlab.haskell.org/ghc/ghc/-/commit/6bd8155c991cfce7cca594bc63ba8f6ca6751667).
+[Extra Core help](https://ghc.gitlab.haskell.org/ghc/doc/libraries/ghc-9.15-inplace/src/GHC.Unit.Module.WholeCoreBindings.html).
+[Reload test](../../../testsuite/tests/dependent/should_run/NativeScopedDictionaryCoreReload.sh).
+
+A separate `experimental-scoped-dictionary-core` marker identifies
+serialized bodies. The reader resolves a dictionary application against
+its lexical binder and checks the nominal predicate before constructing
+Core. Whole-module replay checks the admitted forms and runs scoped
+Core Lint. It uses an empty interactive context. The codec leaves
+unfolding pragmas suppressed and keeps the serialization gate for
+other retained proofs and erased package expressions.

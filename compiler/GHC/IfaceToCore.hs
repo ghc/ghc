@@ -2512,6 +2512,15 @@ tcIfaceExpr (IfaceUnpack witness@(name, _) value package body)
                 ; return (Unpack witness' value' package' body') }
            _ -> failIfM (text "Unpack requires an existential package in interface.") }
 
+tcIfaceExpr (IfaceDictApp fun name)
+  = do { f <- tcIfaceExpr fun
+       ; dict <- tcIfaceLclId name
+       ; case coreFullView (exprType f) of
+           DepDictTy binder _
+             | isNativeClassDictionaryId dict
+             , idType dict `eqType` idType binder -> return (App f (Var dict))
+           _ -> failIfM (text "Invalid scoped dictionary application in interface:" <+> ppr name) }
+
 tcIfaceExpr (IfaceApp fun (IfaceIndexedConArg shape arg))
   = do { f <- tcIfaceExpr fun
        ; a <- tcIfaceExpr arg

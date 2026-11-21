@@ -72,7 +72,7 @@ import GHC.HsToCore.Breakpoints.Types (ModBreaks)
 
 import GHC.Core
 import GHC.Core.Dependent
-    ( hasNativeDependentProgram, rejectNativeDependentProgram
+    ( supportsScopedDictionaryCore, hasNativeDependentProgram, rejectNativeDependentProgram
     , hasNativeDependentExpr, rejectNativeDependentExpr, hasRetainedRuleHead )
 import GHC.Core.DataCon ( dataConRepArgBinders, dataConWorkId )
 import GHC.Core.TyCon ( TyCon, tyConDataCons_maybe )
@@ -206,7 +206,7 @@ checkNativeDependentModule hsc_env binds rules tycons = do
       reject "optimized module compilation with these options (use -O0 or a standard -O1 or -O2 native object pipeline)"
     unless (gopt Opt_OmitInterfacePragmas dflags || isJust opt_level) $
       reject "interface unfolding generation (use -fomit-interface-pragmas)"
-    when (gopt Opt_WriteIfSimplifiedCore dflags) $
+    when (gopt Opt_WriteIfSimplifiedCore dflags && not (supportsScopedDictionaryCore binds)) $
       reject "Core interface serialization (use -fno-write-if-simplified-core)"
     unless (null (pluginsWithArgs (hsc_plugins hsc_env)) && null (pluginModNames dflags)) $
       reject "module plugins"

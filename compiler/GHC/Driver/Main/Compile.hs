@@ -77,7 +77,8 @@ import GHC.Iface.Load   ( writeIface, flagsToIfCompression )
 import qualified GHC.ByteCode.Serialize as ByteCode
 
 import GHC.Core
-import GHC.Core.Dependent ( hasScopedDictionaryProgram, rejectNativeDependentProgram )
+import GHC.Core.Dependent ( hasScopedDictionaryProgram, supportsScopedDictionaryCore
+                          , rejectNativeDependentProgram )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.TyCon
 import GHC.Core.LateCC
@@ -313,6 +314,8 @@ compileWholeCoreBindings ::
   IO ModuleByteCode
 compileWholeCoreBindings hsc_env type_env wcb = do
   core_binds <- typecheck
+  when (hasScopedDictionaryProgram core_binds && not (supportsScopedDictionaryCore core_binds)) $
+    throwGhcExceptionIO (Sorry "Unsupported retained forms in a scoped dictionary Core interface.")
   (stubs, foreign_files) <- decode_foreign
   gen_bytecode core_binds stubs foreign_files
   where

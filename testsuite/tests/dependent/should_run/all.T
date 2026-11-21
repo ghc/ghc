@@ -561,6 +561,11 @@ test('NativeScopedDictionaryWire',
       extra_files(['promoted-class'])],
      run_command, ['bash NativeScopedDictionaryWire.sh "{compiler}" "{libdir}"'])
 
+test('NativeScopedDictionaryCoreReload',
+     [req_host_target_ghc, req_th, req_interp, req_rts_linker, only_ways(['normal']),
+      extra_files(['promoted-class'])],
+     run_command, ['bash NativeScopedDictionaryCoreReload.sh "{compiler}" "{libdir}"'])
+
 test('NativeRetainedFamilyDomain',
      [only_ways(['normal']),
       extra_files(['../../../../docs/dependent-haskell/examples/open-evaluation/' + f

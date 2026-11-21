@@ -3027,7 +3027,7 @@ data IfaceEvidence
   | IndexedConstructorOperandEvidence
   | IndexedConstructorExistentialCaseEvidence | GeneralIndexedConstructorOperandEvidence
   | RetainedUserUnfoldingEvidence | LinearUnpackEvidence
-  | ExperimentalScopedDictionaryEvidence
+  | ExperimentalScopedDictionaryEvidence | ExperimentalScopedDictionaryCoreEvidence
   deriving (Bounded, Enum, Eq, Ord)
 
 -- | Requirements of an interface payload. See Note [Versioning retained evidence]

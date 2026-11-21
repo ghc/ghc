@@ -3,7 +3,7 @@
 module Main (main) where
 
 import Control.Exception (SomeException, displayException, evaluate, try)
-import Control.Monad (unless, when)
+import Control.Monad (forM_, unless, when)
 import Control.Monad.IO.Class (liftIO)
 import Data.List (isInfixOf)
 import Data.Maybe (isNothing)
@@ -29,19 +29,24 @@ import GHC.CoreToStg.Prep (corePrepExpr, corePrepPgm)
 import GHC.CoreToIface (toIfaceExpr, toIfaceType)
 import GHC.Data.FastString (fsLit)
 import GHC.Driver.Config.Core.Lint (initLintConfig)
-import GHC.Iface.Type (IfaceType(..), appArgsIfaceTypes)
+import GHC.Iface.Env (extendIfaceIdEnv)
+import GHC.Iface.Syntax (IfaceExpr(..))
+import GHC.IfaceToCore (tcIfaceExpr)
+import GHC.Iface.Type (IfaceType(..), appArgsIfaceTypes, ifLclNameFS, mkIfLclName)
 import GHC.Driver.Config.CoreToStg.Prep (initCorePrepConfigFor, initCorePrepPgmConfig)
 import GHC.Types.Id (idName, mkSysLocal, setIdType)
-import GHC.Types.Name (mkSystemName)
+import GHC.Types.Name (mkSystemName, nameModule)
 import GHC.Types.Name.Occurrence (mkTcOcc, mkTyVarOcc)
 import GHC.Types.TyThing (TyThing (ATyCon, AnId))
 import GHC.Types.Unique (mkUniqueGrimilyWithTag)
 import GHC.Types.Var (Id, DepFunTyFlag (DepFunVisible), ForAllTyFlag (Invisible), Specificity (SpecifiedSpec), VarBndr (Bndr), mkTyVar, varType)
 import GHC.Types.Var.Env (emptyInScopeSet, mkInScopeSetList, mkRnEnv2)
 import GHC.Types.Var.Set (elemVarSet, isEmptyVarSet)
-import GHC.Unit.Types (mainUnit, mkModule, mkModuleName)
+import GHC.Tc.Utils.Monad (initIfaceLcl, initIfaceLoad)
+import GHC.Unit.Types (IsBootInterface(NotBoot), mainUnit, mkModule, mkModuleName)
+import GHC.Data.IOEnv (IOEnvFailure)
 import GHC.Utils.Logger (initLogger)
-import GHC.Utils.Outputable (ppr, showSDocUnsafe)
+import GHC.Utils.Outputable (ppr, showSDocUnsafe, text)
 import System.Environment (getArgs)
 import System.IO (BufferMode (LineBuffering), hSetBuffering, stdout)
 
@@ -289,9 +294,30 @@ main = do
             when (isNothing (lintExpr cfg abstract)) $
                 fail "ordinary Core Lint accepted a dependent dictionary lambda"
             let receiver = valueId 23 "receiver" (qualified ea x selectA)
-            rejectsPhase "interface conversion of a dependent dictionary application"
-                "experimental dependent dictionary application"
-                (toIfaceExpr (App (Var receiver) (Var ea2)))
+            case toIfaceExpr (App (Var receiver) (Var ea2)) of
+                IfaceDictApp (IfaceLcl _) dict | ifLclNameFS dict == fsLit "ea2" ->
+                    putStrLn "interface dictionary application retains the actual binder"
+                _ -> fail "interface dictionary application lost its binder"
+            rejectsPhase "interface conversion of mismatched dictionary evidence"
+                "invalid scoped dictionary application"
+                (toIfaceExpr (App (Var receiver) (Var eb)))
+            let input name = IfaceDictApp (IfaceLcl (mkIfLclName (fsLit "receiver"))) (mkIfLclName (fsLit name))
+                restore scope expression =
+                    initIfaceLoad env $
+                    initIfaceLcl (nameModule (idName suc)) (text "scoped dictionary application") NotBoot $
+                    extendIfaceIdEnv scope $
+                    tcIfaceExpr expression
+            restored <- restore [receiver, ea2] (input "ea2")
+            case restored of
+                App (Var f) (Var dict) | f == receiver && dict == ea2 -> pure ()
+                _ -> fail "the interface reader changed the applied dictionary"
+            forM_ ["missing", "eb"] $ \dict -> do
+                rejected <- try (restore [receiver, ea2, eb] (input dict))
+                    :: IO (Either IOEnvFailure (Expr Id))
+                case rejected of
+                    Left _ -> putStrLn ("interface reader rejected dictionary " ++ dict)
+                    Right _ -> fail ("interface reader accepted dictionary " ++ dict)
+
             prep <- initCorePrepConfigFor True env
             logger <- initLogger
             rejectsIOPhase "CorePrep rejects dependent dictionary expressions"
