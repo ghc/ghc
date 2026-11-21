@@ -29,8 +29,8 @@ escapeInner p = case p of
 stale :: Mixed -> (Int, Int)
 stale p = (readInner p, readInner @Bool p)
 
-escapeCall :: forall a. Mixed -> a
-escapeCall p = outerValue p
+escapeCall :: forall a. Bool -> a
+escapeCall flag = outerValue (chooseMixed flag)
 
 captureRank :: BadRank -> (Int, Bool)
 captureRank p = readRankInner p

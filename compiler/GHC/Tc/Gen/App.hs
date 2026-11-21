@@ -520,7 +520,7 @@ tcOpenMixedBarArgument fun sigma args expected check_app
            Nothing -> return Nothing }
   | otherwise = return Nothing
 
--- | Read the declaration of a unary mixed package call without elaborating it.
+-- | Find the declared mixed operand of a unary call without elaborating it.
 -- See Note [Implicit opening for an explicit package argument].
 tcFindMixedBarArgument :: TcSigmaType -> [HsExprArg 'TcpRn]
                        -> TcM (Maybe (TyVar, TcSigmaType, TcType, LHsExpr GhcRn))
@@ -532,9 +532,8 @@ tcFindMixedBarArgument sigma args
   , Just template <- barPackageSignature domain
   , isInjectiveInType binder template
   , [EValArg{ea_arg = operand}] <- filter (not . parens) args
-  , HsVar _ name <- unLoc (stripParensLHsExpr operand)
-  = do { ident <- tcLookupIdMaybe (unLocWithUserRdr name)
-       ; return $ case coreFullView . varType <$> ident of
+  = do { declared <- tcDeclaredOperandResult operand
+       ; return $ case coreFullView <$> declared of
            Just (ExistsTy ImplicitExists _ inner)
              | Just _ <- matchBarPackageWitness binder domain (implicitPayloadType inner)
              -> Just (binder, rho, domain, operand)
@@ -546,17 +545,24 @@ tcFindMixedBarArgument sigma args
 
 {- Note [Implicit opening for an explicit package argument]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For inspectInner p, the formal domain is exists b | (a, b) under
-forall a. If p hides a in a dot package, its opened bar type can determine
-the erased type application. Determine this before creating inference
-variables: ordinary unification treats the bar type as opaque.
+For inspectInner (make flag), the formal domain is exists b | (a, b) under
+forall a. If make returns a declared mixed package, its opened bar type
+can determine the erased type application. Read the operand's declared
+result before creating inference variables. The ordinary unifier treats
+the bar type as opaque.
 
 Require an injective occurrence of the parameter in the bar binder's kind
 or body. The scoped comparison selects a type, then checks the complete bar
-type at that choice. Recompute the choice from the actual opened payload
+type at that choice. Infer the operand once and give that checked expression
+to the existing lazy unpack. Recompute the choice from the opened payload
 so it refers to the fresh skolem. Keep the result type outside its scope.
-Continue checking the source application under this opening. Only the dot
-binder opens here; the callee still controls the explicit unpacking.
+Continue checking the source application under this opening. The callee
+still controls the explicit unpacking.
+
+Proposal #473's IExist rule opens a typed expression. Its alternative Core
+form uses a lazy unpack to keep the witness in scope. The ordinary source
+operand remains in the diagnostic context.
+
 Use the same read-only preflight to defer Quick Look when it would skip
 the opening. See Note [Quick Look and implicit existential arguments].
 -}
@@ -895,6 +901,20 @@ implicitSpineResult n ty
   = implicitSpineResult (n - 1) result
   | otherwise = Nothing
 
+-- | Read the declared result of a named head and its ordinary value arguments.
+-- The caller still checks the whole operand, including its constraints.
+tcDeclaredOperandResult :: LHsExpr GhcRn -> TcM (Maybe TcType)
+tcDeclaredOperandResult = go 0
+  where
+    go n (L _ (HsApp _ fun _)) = go (n + 1) fun
+    go n (L _ (HsPar _ fun)) = go n fun
+    go n (L _ (HsVar _ lname))
+      | let name = unLocWithUserRdr lname
+      , not (isDataOcc (nameOccName name))
+      = do { ident <- tcLookupIdMaybe name
+           ; return (ident >>= implicitSpineResult n . varType) }
+    go _ _ = return Nothing
+
 -- | Recognize a written dot type without checking the expression or signature.
 -- See Note [Projected implicit existential operands].
 tcImplicitOperandSignature :: LHsSigWcType GhcRn -> TcM Bool
@@ -932,7 +952,7 @@ tcImplicitOperandProjection sigma written operand
   , Just (tc, domain_args) <- tcSplitTyConApp_maybe domain
   , isGenerativeTyCon tc Nominal
   , any (eqType (mkTyVarTy result_var)) domain_args
-  = do { declared <- declared_result 0 operand
+  = do { declared <- tcDeclaredOperandResult operand
        ; case declared >>= match_dot tvs tc domain result_var of
            Just () -> case lookup result_var (zip specified written) of
              Just (HsWC { hswc_body = ty }) -> tcImplicitOperandType ty
@@ -940,15 +960,6 @@ tcImplicitOperandProjection sigma written operand
            Nothing -> return False }
   | otherwise = return False
   where
-    declared_result n (L _ (HsApp _ fun _)) = declared_result (n + 1) fun
-    declared_result n (L _ (HsPar _ fun)) = declared_result n fun
-    declared_result n (L _ (HsVar _ lname))
-      | let name = unLocWithUserRdr lname
-      , not (isDataOcc (nameOccName name))
-      = do { ident <- tcLookupIdMaybe name
-           ; return (ident >>= implicitSpineResult n . varType) }
-    declared_result _ _ = return Nothing
-
     match_dot tvs tc domain result_var actual = do
       (actual_tc, _) <- tcSplitTyConApp_maybe actual
       guard (actual_tc == tc && supportsQuickLookType actual && noQuickLookVars actual)

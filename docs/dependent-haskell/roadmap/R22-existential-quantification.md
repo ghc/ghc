@@ -404,9 +404,18 @@ binder kind or body. The result type stays outside the dot witness's
 scope. The consumer can open the inner package with its explicit Pack
 pattern, or ignore its payload and leave the argument lazy.
 
-The argument in this call must be a named value of the declared mixed
-type. For a package-producing expression, bind its result at `Mixed`
-before passing the name to the consumer.
+The caller can also write `inspectInner (make flag)` when `make`
+has a declared mixed result. The producer can have polymorphic
+parameters and constraints. The checker checks the call once and gives
+its result to a lazy unpack. The run test uses a separate client and
+compares the call with a named package. A consumer that ignores the
+package also leaves a bottom producer argument unevaluated.
+[Proposal #473, implicit existential elimination](https://github.com/ghc-proposals/ghc-proposals/pull/473).
+
+The checker reads the producer's declared result at the written value
+arguments. For an expression such as `id (make flag)`, the result type
+depends on inference. Bind that expression at `Mixed` before passing it
+to the consumer.
 
 A local binding can store the whole nested package. For example,
 `let rows = partitionPair p xs in roundTrip rows` keeps both lengths

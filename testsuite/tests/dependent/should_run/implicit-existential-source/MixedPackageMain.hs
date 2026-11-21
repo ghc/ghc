@@ -17,11 +17,17 @@ bottomPayload = lazyInner
 readViaBar :: Mixed -> Int
 readViaBar p = readInner p
 
-readInsideQuickLook :: Mixed -> Int
-readInsideQuickLook p = id ((readInner) p)
+readViaProducer :: Bool -> Int
+readViaProducer flag = readInner (chooseMixed flag)
+
+readInsideQuickLook :: Bool -> Int
+readInsideQuickLook flag = id ((readInner) (chooseMixed flag))
 
 ignoreViaBar :: Mixed -> Bool
 ignoreViaBar p = ignoreInner p
+
+ignoreViaProducer :: Bool -> Bool
+ignoreViaProducer flag = ignoreInner (chooseMixed flag)
 
 readViaRank :: RankedMixed -> (Int, Bool)
 readViaRank p = readRankInner p
@@ -33,8 +39,12 @@ main = do
   result <- try (evaluate (readMixed bottomPayload))
   print (either (\(ErrorCall message) -> message == "mixed payload") (const False) result)
   flag <- newIORef True
-  first <- readViaBar . chooseMixed <$> readIORef flag
+  input <- readIORef flag
+  let first = readViaProducer input
+  if first == readViaBar (chooseMixed input)
+    then pure ()
+    else fail "Different result through a named mixed package"
   writeIORef flag False
-  second <- readInsideQuickLook . chooseMixed <$> readIORef flag
+  second <- readInsideQuickLook <$> readIORef flag
   print (first, second, readViaRank rankedMixed, readKindInner kindMixed)
-  print (ignoreViaBar (error "unused package"))
+  print (ignoreViaBar (error "unused package") && ignoreViaProducer (error "unused producer input"))
