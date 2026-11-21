@@ -286,6 +286,14 @@ The interface stores the elaborated type
 `forall {a}. TypeRep a -> a -> a`. The original `foreach` spelling is
 absent from the interface. GHCi displays the elaborated type.
 
+The [column example](../examples/qualified-pi/RuntimeTypeColumn.hs)
+combines this binder with a bounded lookup. The column stores a
+representation with its values. On a successful `eqTypeRep` comparison,
+`HRefl` identifies the requested element type. `mkFinGeneric` then
+checks the signed offset against those values. A type mismatch leaves
+both the offset and the values unevaluated. A negative offset at the
+correct type leaves the values unevaluated.
+
 The ordinary reflection API implements the same equality and demand
 semantics with the following types.
 
