@@ -19,7 +19,7 @@ module GHC.Core.Lint (
     WarnsAndErrs,
 
     lintCoreBindings, lintUnfolding,
-    lintPassResult, lintExpr, lintRule, lintScopedDictionaryType, lintScopedDictionaryExpr,
+    lintPassResult, lintScopedDictionaryPassResult, lintExpr, lintRule, lintScopedDictionaryType, lintScopedDictionaryExpr,
     ScopedSelectorApp, checkScopedSelectorApp, eqScopedSelectorApp,
     substScopedSelectorApp, scopedSelectorResultKind,
     lintAxioms,
@@ -27,7 +27,7 @@ module GHC.Core.Lint (
 
     -- ** Debug output
     EndPassConfig (..),
-    endPassIO,
+    endPassIO, endScopedDictionaryPassIO,
     lintMessage,
     displayLintResults, dumpPassResult
  ) where
@@ -301,12 +301,20 @@ endPassIO :: Logger
           -> CoreProgram -> [CoreRule]
           -> IO ()
 -- Used by the IO-is CorePrep too
-endPassIO logger cfg binds rules
+endPassIO = endPassIOWith lintPassResult
+
+-- | Dump and lint a program at a checked private dictionary boundary.
+endScopedDictionaryPassIO :: Logger -> EndPassConfig -> CoreProgram -> [CoreRule] -> IO ()
+endScopedDictionaryPassIO = endPassIOWith lintScopedDictionaryPassResult
+
+endPassIOWith :: (Logger -> LintPassResultConfig -> CoreProgram -> IO ())
+              -> Logger -> EndPassConfig -> CoreProgram -> [CoreRule] -> IO ()
+endPassIOWith lint logger cfg binds rules
   = do { dumpPassResult logger (ep_dumpCoreSizes cfg) (ep_namePprCtx cfg) mb_flag
                         (renderWithContext defaultSDocContext (ep_prettyPass cfg))
                         (ep_passDetails cfg) binds rules
        ; for_ (ep_lintPassResult cfg) $ \lp_cfg ->
-           lintPassResult logger lp_cfg binds
+           lint logger lp_cfg binds
        }
   where
     mb_flag = case ep_dumpFlag cfg of
@@ -372,7 +380,14 @@ data LintPassResultConfig = LintPassResultConfig
 
 lintPassResult :: Logger -> LintPassResultConfig
                -> CoreProgram -> IO ()
-lintPassResult logger cfg binds
+lintPassResult = lintPassResultWith False
+
+-- | Validate a complete program with scoped dictionary indices enabled.
+lintScopedDictionaryPassResult :: Logger -> LintPassResultConfig -> CoreProgram -> IO ()
+lintScopedDictionaryPassResult = lintPassResultWith True
+
+lintPassResultWith :: Bool -> Logger -> LintPassResultConfig -> CoreProgram -> IO ()
+lintPassResultWith scoped logger cfg binds
   = do { let lint_config = LintConfig
                 { l_diagOpts = lpr_diagOpts cfg
                 , l_platform = lpr_platform cfg
@@ -387,7 +402,7 @@ lintPassResult logger cfg binds
                     | otherwise        = binds
 
        -- Do the main Lint pass itself
-       ; let warns_and_errs = lintCoreBindings lint_config binds1
+       ; let warns_and_errs = lintCoreBindingsWith scoped lint_config binds1
 
        -- Report the results
        ; Err.showPass logger $
@@ -429,8 +444,12 @@ lintCoreBindings :: LintConfig -> CoreProgram -> WarnsAndErrs
 --   Returns (warnings, errors)
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
-lintCoreBindings cfg binds
+lintCoreBindings = lintCoreBindingsWith False
+
+lintCoreBindingsWith :: Bool -> LintConfig -> CoreProgram -> WarnsAndErrs
+lintCoreBindingsWith scoped cfg binds
   = initL cfg $
+    withScopedDictionaryLint scoped $
     addLoc TopLevelBindings           $
     do { -- Check that all top-level binders are distinct
          -- We do not allow  [NonRec x=1, NonRec y=x, NonRec x=2]
@@ -529,9 +548,12 @@ lintScopedDictionary cfg check
   | otherwise       = Just errs
   where
     (_, errs) = initL cfg $
-      addLoc TopLevelBindings $
-        LintM $ \env lint_errs ->
-          unLintM check (env { le_scoped_dictionaries = True }) lint_errs
+      addLoc TopLevelBindings (withScopedDictionaryLint True check)
+
+withScopedDictionaryLint :: Bool -> LintM a -> LintM a
+withScopedDictionaryLint False check = check
+withScopedDictionaryLint True check = LintM $ \env lint_errs ->
+  unLintM check (env { le_scoped_dictionaries = True }) lint_errs
 
 -- | An experimental neutral selector application held outside the Type AST.
 -- See Note [Scoped selector application prototype].

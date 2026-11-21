@@ -31,7 +31,7 @@ module GHC.Driver.Main.Passes
     , hscSimplify
     , hscSimplify'
     , hscDesugarAndSimplify
-    , hscTidy
+    , hscTidy, hscTidyScopedDictionary
 
     ) where
 
@@ -57,7 +57,7 @@ import GHC.Driver.Errors
 import GHC.Driver.Messager
 import GHC.Driver.Errors.Types
 import GHC.Driver.Config.Core.Opt.Simplify ( initSimplifyExprOpts )
-import GHC.Driver.Config.Core.Lint ( endPassHscEnvIO )
+import GHC.Driver.Config.Core.Lint ( endPassHscEnvIO, initEndPassConfig )
 import GHC.Driver.Config.Core.Lint.Interactive ( lintInteractiveExpr )
 import GHC.Driver.Config.CoreToStg
 import GHC.Driver.Config.CoreToStg.Prep
@@ -104,7 +104,9 @@ import qualified GHC.ByteCode.Serialize as ByteCode
 
 import GHC.Core
 import GHC.Core.Dependent ( hasExistentialExpr, hasNativeDependentExpr, rejectNativeDependentExpr
+                          , hasScopedDictionaryProgram
                           , supportsNativeGentle, supportsNativeRuleBinds, supportsLocalUserRule )
+import GHC.Core.Lint ( endScopedDictionaryPassIO )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.TyCon (tyConName)
 import GHC.Core.Tidy           ( tidyExpr )
@@ -1638,15 +1640,26 @@ myCoreToStg logger dflags ic_inscope for_bytecode this_mod ml prepd_binds = do
 
 
 hscTidy :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
-hscTidy hsc_env guts = do
+hscTidy = hscTidyWith False
+
+-- | Tidy a checked private module for object generation without an interface.
+hscTidyScopedDictionary :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
+hscTidyScopedDictionary = hscTidyWith True
+
+hscTidyWith :: Bool -> HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
+hscTidyWith scoped hsc_env guts = do
   native <- checkNativeDependentModule hsc_env (mg_binds guts) (mg_rules guts) (mg_tcs guts)
   let logger   = hsc_logger hsc_env
   let this_mod = mg_module guts
   let lint_env | native = hscUpdateFlags (`gopt_set` Opt_DoCoreLinting) hsc_env
                | otherwise = hsc_env
+      end_pass ppr_ctx pass
+        | scoped && hasScopedDictionaryProgram (mg_binds guts) = endScopedDictionaryPassIO logger $
+            initEndPassConfig (hsc_dflags lint_env) (interactiveInScope (hsc_IC lint_env)) ppr_ctx pass
+        | otherwise = endPassHscEnvIO lint_env ppr_ctx pass
 
   when native $
-    endPassHscEnvIO lint_env alwaysQualify CoreDesugarOpt (mg_binds guts) (mg_rules guts)
+    end_pass alwaysQualify CoreDesugarOpt (mg_binds guts) (mg_rules guts)
 
   opts <- initTidyOpts native hsc_env guts
   (cgguts, details) <- withTiming logger
@@ -1660,7 +1673,7 @@ hscTidy hsc_env guts = do
   let name_ppr_ctx   = mkNamePprCtx ptc (hsc_unit_env hsc_env) (mg_rdr_env guts)
       ptc            = initPromotionTickContext (hsc_dflags hsc_env)
 
-  endPassHscEnvIO lint_env name_ppr_ctx CoreTidy all_tidy_binds tidy_rules
+  end_pass name_ppr_ctx CoreTidy all_tidy_binds tidy_rules
 
   -- If the endPass didn't print the rules, but ddump-rules is
   -- on, print now

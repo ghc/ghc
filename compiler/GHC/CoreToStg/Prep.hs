@@ -10,7 +10,7 @@ Core pass to saturate constructors and PrimOps
 module GHC.CoreToStg.Prep
    ( CorePrepConfig (..)
    , CorePrepPgmConfig (..)
-   , corePrepPgm
+   , corePrepPgm, corePrepScopedDictionaryPgm
    , corePrepExpr
    )
 where
@@ -33,7 +33,8 @@ import GHC.Builtin.WiredIn.Ids ( realWorldPrimId )
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity
 import GHC.Core.Lint    ( EndPassConfig(..), LintPassResultConfig(..)
-                        , endPassIO, lintPassResult )
+                        , endPassIO, lintPassResult
+                        , endScopedDictionaryPassIO, lintScopedDictionaryPassResult )
 import GHC.Core hiding( FloatBind(..) )
 import GHC.Core.FVs (exprFreeVars)
 import GHC.Core.Dependent
@@ -243,8 +244,16 @@ corePrepPgm :: Logger
             -> CorePrepPgmConfig
             -> Module -> CoreProgram
             -> IO CoreProgram
-corePrepPgm logger cp_cfg pgm_cfg
-            this_mod binds =
+corePrepPgm = corePrepPgmWith False
+
+-- | Prepare a checked in-memory dictionary program for the native backend.
+corePrepScopedDictionaryPgm :: Logger -> CorePrepConfig -> CorePrepPgmConfig
+                            -> Module -> CoreProgram -> IO CoreProgram
+corePrepScopedDictionaryPgm = corePrepPgmWith True
+
+corePrepPgmWith :: Bool -> Logger -> CorePrepConfig -> CorePrepPgmConfig
+                -> Module -> CoreProgram -> IO CoreProgram
+corePrepPgmWith scoped logger cp_cfg pgm_cfg this_mod binds =
     withTiming logger
                (text "CorePrep"<+>brackets (ppr this_mod))
                (\a -> a `seqList` ()) $ do
@@ -253,7 +262,7 @@ corePrepPgm logger cp_cfg pgm_cfg
     -- See Note [CorePrep for retained dependent programs].
     checked_end_pass_cfg <- if native
       then do
-        rejectScopedDictionaryProgram binds
+        unless scoped $ rejectScopedDictionaryProgram binds
         unless (cp_allowNativeDependent cp_cfg) $
           rejectNativeDependentProgram "CorePrep" binds []
         when (cp_specEval cp_cfg || cp_specEvalDFun cp_cfg
@@ -265,7 +274,8 @@ corePrepPgm logger cp_cfg pgm_cfg
             "Native dependent Core requires CorePrep program Lint before and after preparation.")
           Just lint_cfg -> do
             let checked_lint_cfg = lint_cfg { lpr_preSubst = False }
-            lintPassResult logger
+            let lint = if scoped then lintScopedDictionaryPassResult else lintPassResult
+            lint logger
               (checked_lint_cfg { lpr_passPpr = text "before native CorePrep" })
               binds
             return (end_pass_cfg { ep_lintPassResult = Just checked_lint_cfg })
@@ -278,8 +288,8 @@ corePrepPgm logger cp_cfg pgm_cfg
                  corePrepTopBinds initialCorePrepEnv binds
         binds_out = deFloatTop native floats
 
-    endPassIO logger checked_end_pass_cfg
-              binds_out []
+    let end_pass = if scoped then endScopedDictionaryPassIO else endPassIO
+    end_pass logger checked_end_pass_cfg binds_out []
 
     return binds_out
 
@@ -663,6 +673,10 @@ cpeBind top_lvl env (NonRec bndr rhs)
        ; return (env2, floats1, Nothing) }
   where
     native_rhs_ok bndr rhs
+      | isNativeClassDictionaryId bndr
+      = case rhs of
+          Var actual -> isNativeClassDictionaryId actual && idType actual `eqType` idType bndr
+          _ -> False
       | isNativeIndexFunctionId bndr
       = case rhs of
           Var fun -> isNativeIndexFunctionId fun

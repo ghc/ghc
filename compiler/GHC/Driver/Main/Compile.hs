@@ -22,7 +22,7 @@ module GHC.Driver.Main.Compile
     , loadIfaceByteCodeLazy
     , hscMaybeWriteIface
     , hscCompileCmmFile
-    , hscGenHardCode
+    , hscGenHardCode, hscGenScopedDictionaryHardCode
 
     , hscInteractive
     , mkCgInteractiveGuts
@@ -81,7 +81,7 @@ import GHC.Core.TyCon
 import GHC.Core.LateCC
 import GHC.Core.LateCC.Types
 
-import GHC.CoreToStg.Prep( CorePrepPgmConfig, corePrepPgm )
+import GHC.CoreToStg.Prep( CorePrepPgmConfig, corePrepPgm, corePrepScopedDictionaryPgm )
 import GHC.CoreToStg.AddImplicitBinds( addImplicitBinds )
 import GHC.CoreToStg    ( coreToStg )
 
@@ -543,7 +543,18 @@ hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
 hscGenHardCode :: HscEnv -> CgGuts -> ModLocation -> FilePath
                -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)], Maybe StgCgInfos, Maybe CmmCgInfos )
                 -- ^ @Just f@ <=> _stub.c is f
-hscGenHardCode hsc_env cgguts mod_loc output_filename = do
+hscGenHardCode = hscGenHardCodeWith False
+
+-- | Generate code from a checked private dictionary module without an interface.
+hscGenScopedDictionaryHardCode
+    :: HscEnv -> CgGuts -> ModLocation -> FilePath
+    -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)], Maybe StgCgInfos, Maybe CmmCgInfos)
+hscGenScopedDictionaryHardCode = hscGenHardCodeWith True
+
+hscGenHardCodeWith
+    :: Bool -> HscEnv -> CgGuts -> ModLocation -> FilePath
+    -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)], Maybe StgCgInfos, Maybe CmmCgInfos)
+hscGenHardCodeWith scoped hsc_env cgguts mod_loc output_filename = do
         let CgGuts{ cg_module   = this_mod,
                     cg_binds    = core_binds,
                     cg_ccs      = local_ccs
@@ -642,8 +653,9 @@ hscGenHardCode hsc_env cgguts mod_loc output_filename = do
         unless native $
           rejectNativeDependentProgram "unchecked late-plugin or implicit-binding output" binds_to_prep []
         cp_cfg <- initCorePrepConfigFor native hsc_env
-        (prepd_binds) <- {-# SCC "CorePrep" #-}
-                         corePrepPgm
+        let prepare = if scoped then corePrepScopedDictionaryPgm else corePrepPgm
+        prepd_binds <- {-# SCC "CorePrep" #-}
+                         prepare
                            (hsc_logger hsc_env) cp_cfg cp_pgm_cfg
                            this_mod binds_to_prep
 

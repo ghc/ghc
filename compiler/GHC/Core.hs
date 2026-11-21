@@ -2685,7 +2685,8 @@ nativeDeferredArgIndex :: CoreExpr -> Maybe Type
 nativeDeferredArgIndex e
   | containsIndexedOperand (isJust . nativeIndexedOperandSignature_maybe) e
   = snd <$> computedIndexExpr e
-  | otherwise = nativeComputedIndex e
+  | Just index <- nativeComputedIndex e = Just index
+  | otherwise = nativeClassSelectorIndex e
 
 -- | Reuse structural constructor checks without enabling beta or cast conversion.
 computedIndexExpr :: CoreExpr -> Maybe (CoreExpr, Type)

@@ -13,7 +13,7 @@ module GHC.Core.Dependent (
     isRetainedVanillaDefaultMethod,
     rejectNativeDependentProgram,
     rejectNativeDependentExpr,
-    rejectScopedDictionaryProgram, rejectScopedDictionaryExpr,
+    hasScopedDictionaryProgram, rejectScopedDictionaryProgram, rejectScopedDictionaryExpr,
 ) where
 
 import GHC.Prelude
@@ -262,7 +262,12 @@ rejectNativeDependentExpr :: String -> CoreExpr -> IO ()
 rejectNativeDependentExpr context expr =
     rejectNative context (hasNativeDependentExpr expr)
 
--- | Keep experimental dictionary types out of CorePrep.
+-- | Detect private dictionary types before preparation or interface construction.
+hasScopedDictionaryProgram :: CoreProgram -> Bool
+hasScopedDictionaryProgram binds =
+    runScanFor DetectScopedDictionaries AllMetadata (foldMap scanBind binds)
+
+-- | Keep experimental dictionary types out of ordinary CorePrep.
 rejectScopedDictionaryProgram :: CoreProgram -> IO ()
 rejectScopedDictionaryProgram binds =
     rejectScopedDictionaries (foldMap scanBind binds)
