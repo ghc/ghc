@@ -260,7 +260,7 @@ toIfaceTypeX fr (TyConApp tc tys)
 
     -- other applications
   | otherwise
-  = IfaceTyConApp (toIfaceTyCon tc) (toIfaceTcArgsX fr tc tys)
+  = IfaceTyConApp (toIfaceAppliedTyCon tc tys) (toIfaceTcArgsX fr tc tys)
   where
     arity = tyConArity tc
     n_tys = length tys
@@ -270,6 +270,14 @@ toIfaceTyVar = mkIfLclName . occNameFS . getOccName
 
 toIfaceCoVar :: CoVar -> IfLclName
 toIfaceCoVar = mkIfLclName . occNameFS . getOccName
+
+-- | Mark a synonym prefix in both types and coercions.
+-- See Note [Partial type family applications] in GHC.Core.Type.
+toIfaceAppliedTyCon :: TyCon -> [a] -> IfaceTyCon
+toIfaceAppliedTyCon tc args
+  | isTypeSynonymTyCon tc, args `lengthLessThan` tyConArity tc
+  = IfaceTyCon (tyConName tc) (mkIfaceTyConInfo NotPromoted IfacePartialSynonym)
+  | otherwise = toIfaceTyCon tc
 
 ----------------
 toIfaceTyCon :: TyCon -> IfaceTyCon
@@ -367,7 +375,7 @@ toIfaceCoercionX fr co
 
     go co@(TyConAppCo r tc cos)
       =  assertPpr (isNothing (tyConAppFunCo_maybe r tc cos)) (ppr co) $
-         IfaceTyConAppCo r (toIfaceTyCon tc) (map go cos)
+         IfaceTyConAppCo r (toIfaceAppliedTyCon tc cos) (map go cos)
 
     go (FunCo { fco_role = r, fco_ma = ma, fco_mult = w, fco_arg = co1, fco_res = co2 })
       = IfaceFunCo r (go ma) (go w) (go co1) (go co2)

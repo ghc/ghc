@@ -1156,6 +1156,32 @@ can also keep a closed family stuck at a repeated pattern.
 [Source and inverse checks](../../../testsuite/tests/dependent/should_run/NativeUnsaturatedFamily.sh)
 and [Agda and GHC provenance](../REFERENCES.md#equality-of-a-partial-family-after-rewriting-its-argument).
 
+## Passing a partially applied type synonym
+
+`type Column err a = Either err (Maybe a)` can supply `Column String`
+as the callback to `Map`. At saturation the ordinary synonym expander
+produces the result type. A constant synonym also works when its
+remaining parameter does not occur in the result. The compiler checks
+the unmatchable kind of each missing binder.
+
+An ordinary module can import a fully applied alias that contains a
+checked prefix. Writing a partial synonym in that module still requires
+the extension. Older readers report GHC-47808 at the import when the
+provider interface contains the new form. An interface containing only
+fully applied synonyms keeps its original encoding.
+
+Given `type Again e a = Column e a`, the prefixes `Again Bool` and
+`Column Bool` compare equal before the caller supplies the last argument.
+The missing parameter must occur only as the final argument. The two
+remaining functions must have the same kind and matchability. Earlier
+experimental interfaces that serialize a partial synonym need recompilation.
+At `-O0` and `-O2`, a source-hidden client can use the forwarded function,
+match the exported equality, or use the equality directly. Tests at all three
+interface compression levels also compare ordinary interface bytes.
+[Source example](../examples/open-evaluation/TypeLambda.hs),
+[regression](../../../testsuite/tests/dependent/should_run/NativePartialSynonym.hs)
+and [references](../REFERENCES.md#passing-a-type-synonym-as-a-function).
+
 ## Completion boundary
 
 The first increments establish a shared kernel foundation for R05 and R03.

@@ -1922,14 +1922,14 @@ unify_ty env ty1 ty2 kco
   , Just (tc,tys) <- mb_sat_fam_app2
   = uVarOrFam (umSwapRn env) (TyFamLHS tc tys) ty1 (mkSymCo kco)
 
-  -- A partial family is opaque. In particular, the absence of an
-  -- AppTy split does not establish apartness of two partial applications.
+  -- A partial type function is opaque. A failed AppTy split does not
+  -- establish apartness of two partial synonym or family applications.
   | Just (tc, args) <- mb_tc_app1
-  , isTypeFamilyTyCon tc, args `lengthLessThan` tyConArity tc
+  , tyConMustBeSaturated tc, args `lengthLessThan` tyConArity tc
   = unify_opaque_app env ty1 ty2
 
   | Just (tc, args) <- mb_tc_app2
-  , isTypeFamilyTyCon tc, args `lengthLessThan` tyConArity tc
+  , tyConMustBeSaturated tc, args `lengthLessThan` tyConArity tc
   = unify_opaque_app env ty1 ty2
 
   -- Handle oversaturated type families. Suppose we have

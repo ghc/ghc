@@ -6215,6 +6215,30 @@ callbacks suffices to replace one with the other in a partially applied
 [proposal 242 on matchability](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#matchabilities)
 and [ordinary client](../../testsuite/tests/dependent/should_run/NativeUnsaturatedClient.hs).
 
+### Passing a type synonym as a function
+
+Agda's function eta rule checks `f` against a function that forwards
+its bound variable to `f`. The fork applies this rule to a synonym
+prefix when the residual kinds agree. Proposal 242 distinguishes the
+matchabilities of type constructors and type functions. That distinction
+rules out contracting an unmatchable synonym to a matchable constructor.
+[Agda 2.8 function eta](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html#lambda-expressions)
+and [proposal 242, Matchabilities](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#matchabilities).
+
+
+Proposal 242 explicitly includes type synonyms. Its `Const` example
+has an unmatchable arrow for each parameter. A source module can pass
+`Column String` to `Map` and expand the synonym when `Map` supplies
+the column type. The compiler can transport equal arguments through
+that partial application. The prefix does not justify an injectivity
+annotation on a family result. Agda functions also support currying.
+Agda additionally gives functions eta equality. The current Haskell
+experiment does not establish that equality for two distinct partial
+synonym names.
+[Proposal 242, matchabilities](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#matchabilities),
+[Agda 2.8, lambda abstraction](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html#lambda-expressions)
+and [column example](examples/open-evaluation/TypeLambda.hs).
+
 ### Inferring a prefix of invisible family arguments
 
 Proposal 242 gives partial type family applications a kind with

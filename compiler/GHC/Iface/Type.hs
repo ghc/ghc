@@ -471,6 +471,8 @@ data IfaceTyConSort = IfaceNormalTyCon          -- ^ a regular tycon
                     | IfaceSumTyCon !Arity
                       -- ^ an unboxed sum, e.g. @(# a | b | c #)@
 
+                    | IfacePartialSynonym -- ^ A synonym applied below its arity.
+
                     | IfaceEqualityTyCon
                       -- ^ A heterogeneous equality TyCon
                       --   (i.e. eqPrimTyCon, eqReprPrimTyCon, heqTyCon)
@@ -484,6 +486,7 @@ instance Outputable IfaceTyConSort where
   ppr (IfaceTupleTyCon n sort) = ppr sort <> colon <> ppr n
   ppr (IfaceSumTyCon n)        = text "sum:" <> ppr n
   ppr IfaceEqualityTyCon       = text "equality"
+  ppr IfacePartialSynonym      = text "partial synonym"
 
 {- Note [Free TyVars and CoVars in IfaceType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2755,6 +2758,9 @@ instance Binary IfaceTyConSort where
    put_ bh (IfaceTupleTyCon arity sort) = putByte bh 1 >> put_ bh arity >> put_ bh sort
    put_ bh (IfaceSumTyCon arity)        = putByte bh 2 >> put_ bh arity
    put_ bh IfaceEqualityTyCon           = putByte bh 3
+   put_ bh IfacePartialSynonym          = do
+     requireIfaceEvidenceVersion bh PartialSynonymEvidence
+     putByte bh 4
 
    get bh = do
        n <- getByte bh
@@ -2763,6 +2769,7 @@ instance Binary IfaceTyConSort where
          1 -> IfaceTupleTyCon <$> get bh <*> get bh
          2 -> IfaceSumTyCon <$> get bh
          3 -> return IfaceEqualityTyCon
+         4 -> return IfacePartialSynonym
          _ -> panic "get IfaceTyConSort"
 
 instance Binary IfaceTyConInfo where
@@ -3069,6 +3076,7 @@ data IfaceEvidence
   | ScopedLambdaEvidence
   | RetainedConstructorContextEvidence
   | HomeRuleInterfaceEvidence
+  | PartialSynonymEvidence
   deriving (Bounded, Enum, Eq, Ord)
 
 -- | Requirements of an interface payload. See Note [Versioning retained evidence]
@@ -3367,6 +3375,7 @@ instance NFData IfaceTyConSort where
     IfaceTupleTyCon arity sort -> rnf arity `seq` rnf sort `seq` ()
     IfaceSumTyCon arity -> rnf arity
     IfaceEqualityTyCon -> ()
+    IfacePartialSynonym -> ()
 
 instance NFData IfLclName where
   rnf (IfLclName lfs) = rnf lfs

@@ -1184,8 +1184,9 @@ data Coercion
   -- TyConAppCo :: "e" -> _ -> ?? -> e
   -- See Note [TyConAppCo roles]
   | TyConAppCo Role TyCon [Coercion]    -- lift TyConApp
-               -- The TyCon is never a synonym;
-               -- we expand synonyms eagerly
+               -- Expand synonyms at saturation. A partial synonym can
+               -- carry congruence over its supplied arguments.
+               -- See Note [Partial type family applications] in GHC.Core.Type.
                -- But it can be a type function
                -- TyCon is never a saturated (->); use FunCo instead
 

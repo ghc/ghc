@@ -2554,7 +2554,7 @@ lintTySynFamApp :: Bool -> Type -> TyCon -> [Type] -> LintM ()
 lintTySynFamApp report_unsat ty tc tys
   | report_unsat   -- Report unsaturated only if report_unsat is on
   , tys `lengthLessThan` tyConArity tc
-  , not (isUnsaturatedUserFamily tc tys)
+  , not (isPartialTypeFunction tc tys)
   = failWithL (hang (text "Un-saturated type application") 2 (ppr ty))
 
   -- Deal with type synonyms
@@ -2938,6 +2938,7 @@ lintCoercion co@(TyConAppCo r tc cos)
     -- All saturated TyConAppCos should be FunCos
 
   | Just {} <- synTyConDefn_maybe tc
+  , cos `lengthAtLeast` tyConArity tc
   = failWithL (text "Synonym in TyConAppCo:" <+> ppr co)
 
   | otherwise
@@ -2946,9 +2947,9 @@ lintCoercion co@(TyConAppCo r tc cos)
        ; let tc_kind = tyConKind tc
              lhs = map coercionLKind cos
              rhs = map coercionRKind cos
-       ; when (isTypeFamilyTyCon tc && cos `lengthLessThan` tyConArity tc) $
-           lintL (isUnsaturatedUserFamily tc lhs && isUnsaturatedUserFamily tc rhs)
-                 (text "Invalid partial type family in a coercion:" <+> ppr co)
+       ; when (tyConMustBeSaturated tc && cos `lengthLessThan` tyConArity tc) $
+           lintL (isPartialTypeFunction tc lhs && isPartialTypeFunction tc rhs)
+                 (text "Invalid partial type function in a coercion:" <+> ppr co)
        ; lint_co_app co tc_kind lhs
        ; lint_co_app co tc_kind rhs
        ; zipWithM_ (lintRole co) (tyConRoleListX r tc) (map coercionRole cos) }

@@ -4,7 +4,7 @@
 module TypeLambda
   ( L, Captured, Shadowed, WithError, Prefixes, ScopedRow, Mixed, Held, CaseShadow, Rebuild
   , Fields(..), Map, Columns, Optional, withErrors, IndexedTag(..), IndexedCase, IndexedCaseInferred
-  , roadmap, partial, prefixes, mixed, indexedFields
+  , roadmap, partial, optionalColumns, sameColumnReader, prefixes, mixed, indexedFields
   ) where
 
 import Data.Kind (Type)
@@ -35,6 +35,21 @@ data Fields (xs :: [Type]) where
 withErrors :: Proxy e -> Fields xs -> Fields (Map (\a -> Either e a) xs)
 withErrors _ End = End
 withErrors p (Field x xs) = Field (Right x) (withErrors p xs)
+
+-- | A column read can fail or return a missing cell.
+type Column err a = Either err (Maybe a)
+
+-- | Keep the same reader when the last argument is forwarded unchanged.
+type ReadColumn err a = Column err a
+
+-- | Compare the readers before choosing the cell type.
+sameColumnReader :: ReadColumn String :~: Column String
+sameColumnReader = Refl
+
+-- | Apply one error type to both column readers.
+optionalColumns :: Map (Column String) '[Int, Char]
+                :~: '[Either String (Maybe Int), Either String (Maybe Char)]
+optionalColumns = Refl
 
 -- | Apply each type constructor to Int.
 type L = Map (\f -> f Int) [Maybe, Either String, IO]

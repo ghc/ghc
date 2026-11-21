@@ -3161,7 +3161,7 @@ tc_app_ty_with_head mode rn_ty exp_kind fun_ty
        ; allow_partial <- xoptM LangExt.ExperimentalDependentTypes
        ; (ty, inferred_kind) <- case (exp_kind, tcSplitTyConApp_maybe prefix) of
            (Check expected, Just (tc, args))
-             | allow_partial, isUnsaturatedUserFamily tc args
+             | allow_partial, isPartialTypeFunction tc args
              , let n_expected = invisibleBndrCount expected
              , expected `tcEqType` prefix_kind
                || (n_expected > 0 && n_expected <= invisibleBndrCount prefix_kind)

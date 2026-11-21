@@ -360,7 +360,7 @@ evidenceSuffix requirements
     || needs InferredOrderedGadtBindersEvidence
     || needs ExtendedOrderedGadtTelescopeEvidence || needs ScopedLambdaEvidence
     || needs RetainedConstructorContextEvidence
-    || needs HomeRuleInterfaceEvidence = feature_set
+    || needs HomeRuleInterfaceEvidence || needs PartialSynonymEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -376,6 +376,7 @@ evidenceSuffix requirements
 
 legacyEvidenceSuffix :: IfaceEvidence -> String
 legacyEvidenceSuffix ExperimentalIntPrimIndexEvidence = featureSetPrefix ++ "experimental-int-prim-index"
+legacyEvidenceSuffix PartialSynonymEvidence = featureSetPrefix ++ "partial-synonym-v2"
 legacyEvidenceSuffix ErasedUserRuleEvidence = featureSetPrefix ++ "user-rule"
 legacyEvidenceSuffix LexicalPackageRuleEvidence = featureSetPrefix ++ "lexical-rule"
 legacyEvidenceSuffix OrphanErasedUserRuleEvidence = featureSetPrefix ++ "orphan-user-rule"
@@ -461,7 +462,8 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("extended-ordered-gadt-telescope", ExtendedOrderedGadtTelescopeEvidence)
                       , ("scoped-lambda", ScopedLambdaEvidence)
                       , ("retained-constructor-context", RetainedConstructorContextEvidence)
-                      , ("home-rule-interfaces", HomeRuleInterfaceEvidence) ]
+                      , ("home-rule-interfaces", HomeRuleInterfaceEvidence)
+                      , ("partial-synonym-v2", PartialSynonymEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion

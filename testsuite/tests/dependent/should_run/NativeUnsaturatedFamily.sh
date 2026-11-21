@@ -317,3 +317,49 @@ if (cd client && "${ghc[@]}" -c NativeUnsaturatedClient.hs) >changed.log 2>&1 ||
     cat changed.log
     exit 1
 fi
+
+# A validated alias can cross into an ordinary module. A synonym prefix
+# still cannot establish that its supplied argument is injective.
+cd "$out/producer"
+cp "$src/NativePartialSynonym.hs" .
+"${ghc[@]}" -c NativePartialSynonym.hs
+cd "$out/client"
+cp ../producer/NativePartialSynonym.hi .
+cat >OrdinarySynonym.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module OrdinarySynonym where
+import NativePartialSynonym (Saved)
+use :: Saved Bool -> Saved Bool
+use = id
+HS
+"${ghc[@]}" -c OrdinarySynonym.hs
+cat >BadInjectivity.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes, TypeFamilyDependencies #-}
+module BadInjectivity where
+import NativePartialSynonym (Drop, Slot)
+type family Claim a = r | r -> a where
+    Claim a = Slot (Drop a)
+HS
+if "${ghc[@]}" -c BadInjectivity.hs >injectivity.log 2>&1 ||
+   ! grep -Fq '[GHC-05175]' injectivity.log ||
+   ! grep -Fq 'Claim a = Slot (Drop a)' injectivity.log; then
+    cat injectivity.log
+    exit 1
+fi
+
+# The omitted variable must be absent from the function that remains.
+cat >BadForward.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes, TypeOperators #-}
+module BadForward where
+import Data.Type.Equality
+import NativePartialSynonym (Slot)
+type Pair e a = (e, a)
+type Copy a = Pair a a
+wrong :: Slot Copy :~: Slot (Pair Bool)
+wrong = Refl
+HS
+if "${ghc[@]}" -c BadForward.hs >forward.log 2>&1 ||
+   ! grep -Fq '[GHC-83865]' forward.log; then
+    cat forward.log
+    exit 1
+fi
