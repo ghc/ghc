@@ -178,8 +178,6 @@ instance Diagnostic DsMessage where
                -> mkMsg "SCC pragmas" empty
              ThNoUserInline
                -> mkMsg "NOUSERINLINE" empty
-             ThTypeLet
-               -> mkMsg "Type let syntax" empty
              ThTypeCase
                -> mkMsg "Type case syntax" empty
              ThExoticFormOfType ty

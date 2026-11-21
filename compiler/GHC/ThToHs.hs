@@ -1925,6 +1925,12 @@ cvtTypeKind typeOrKind ty
                returnLA (HsTypeCaseAlt pat' noEpUniTok rhs')
              mk_apps (XHsType (HsTypeCase (noEpTok, noEpTok) Nothing scrutinee' rows')) tys'
 
+           LetT name rhs body -> do
+             name' <- tNameN name
+             rhs'  <- cvtTypeKind typeOrKind rhs
+             body' <- cvtTypeKind typeOrKind body
+             mk_apps (XHsType (HsTypeLet (noEpTok, noEpTok, noEpTok) name' rhs' body')) tys'
+
            SigT ty ki
              -> do { ty' <- cvtType ty
                    ; ki' <- cvtKind ki
