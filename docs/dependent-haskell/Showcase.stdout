@@ -165,6 +165,7 @@ split the appended vector at its first length: ([True],[False,False])
 split a vector with a proof of its original contents: (([True,False],[True],[True,False,True]),([True,True],[True]))
 split proof demand (zero ignores input, one ignores fields, one demands the cell): (True,True,True)
 check a runtime cut and prove the original contents: [Just (1,[True],[False],[True,False]),Nothing]
+split two independent vectors at one checked cut: (Just (([True],[False]),([False],[True])),Just [True],Nothing)
 recover the checked predecessor of a finite position: ((Nothing,Just 1),(True,False,True,True))
 pass zero and a written successor to a retained function: (Just 1,True)
 take and drop at the first runtime length: ([True],[False,False])

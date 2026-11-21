@@ -2,11 +2,14 @@
 (True,True,True)
 [Just (1,[True],[False],[True,False]),Nothing]
 [Just 0,Just 1,Just 0,Nothing,Nothing]
+(Just (([True],[False]),([False],[True])),Just [True],Nothing)
 (([True,False],[True],[True,False,True]),([True,True],[True]))
 (True,True,True)
 [Just (1,[True],[False],[True,False]),Nothing]
 [Just 0,Just 1,Just 0,Nothing,Nothing]
+(Just (([True],[False]),([False],[True])),Just [True],Nothing)
 (([True,False],[True],[True,False,True]),([True,True],[True]))
 (True,True,True)
 [Just (1,[True],[False],[True,False]),Nothing]
 [Just 0,Just 1,Just 0,Nothing,Nothing]
+(Just (([True],[False]),([False],[True])),Just [True],Nothing)

@@ -1,8 +1,8 @@
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, TypeApplications #-}
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
-module CertifiedSplitClient (splitObservation, checkDemand, checkedObservation, checkBounds) where
+module CertifiedSplitClient (splitObservation, checkDemand, checkedObservation, checkBounds, pairedObservation) where
 
-import CertifiedSplit (SplitAtWidth(..), checkedSplitAtValue, splitAtValue)
+import CertifiedSplit (SplitAtWidth(..), SplitBothAtWidth(..), checkedSplitBoth, checkedSplitAtValue, splitAtValue)
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Data.IORef (newIORef, readIORef)
 import Data.Type.Equality ((:~:)(Refl))
@@ -78,3 +78,32 @@ checkBounds = [bound P.Z P.Z, bound one two, bound two two, bound (P.S two) two,
   where
     one = P.S P.Z
     two = P.S one
+
+-- | Read two vectors of the same length and inspect each reconstruction proof.
+pairedContents :: P.Nat -> P.Nat -> [Bool] -> [Bool] -> Maybe (([Bool], [Bool]), ([Bool], [Bool]))
+pairedContents cut total first second = do
+    xs <- P.fromListExact total first
+    ys <- P.fromListExact total second
+    split <- checkedSplitBoth cut total xs ys
+    case split of
+        Pair _ (SplitBothAtWidth (Pair xl (Pair xr Refl)) (Pair yl (Pair yr Refl))) ->
+            Just ((P.toList xl, P.toList xr), (P.toList yl, P.toList yr))
+
+-- | Read the first proof without evaluating the second input.
+firstPrefix :: P.Nat -> P.Nat -> Maybe [Bool]
+firstPrefix cut total =
+    let xs = P.replicateNative total True
+        missing :: a -> a
+        missing _ = error "forced second vector"
+        ys = missing xs
+    in case checkedSplitBoth cut total xs ys of
+        Just (Pair _ (SplitBothAtWidth (Pair prefix (Pair _ Refl)) _)) -> Just (P.toList prefix)
+        Nothing -> Nothing
+
+-- | Try one valid cut and one excessive cut from an ordinary module.
+pairedObservation :: IO (Maybe (([Bool], [Bool]), ([Bool], [Bool])), Maybe [Bool], Maybe [Bool])
+pairedObservation = do
+    cut <- newIORef (P.S P.Z) >>= readIORef
+    total <- newIORef (P.S (P.S P.Z)) >>= readIORef
+    pure (pairedContents cut total [True,False] [False,True],
+          firstPrefix cut total, firstPrefix (P.S total) total)
