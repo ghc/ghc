@@ -72,7 +72,7 @@ import NativeIndexedFinGate
 type family Unknown (g :: Gate) :: Bool where
     Unknown ('Open b) = 'True
 
-inhabited :: foreach (g :: Gate) -> Ticket 'True -> Bool
+inhabited :: foreach (g :: Gate) -> Ticket (Always g) -> Bool
 inhabited (Open b) Granted = b
 
 stuck :: foreach (g :: Gate) -> Ticket (Unknown g) -> Bool
@@ -83,6 +83,10 @@ noSplit (Open b) _ = b
 
 lazySplit :: foreach (g :: Gate) -> Ticket (Ready g) -> Bool
 lazySplit (Open b) ~Granted = b
+
+type family Always (g :: Gate) :: Bool where
+    Always ('Open b) = 'True
+    Always ('Shut b) = 'True
 HS
 if "${ghc[@]}" -O0 -fdiagnostics-color=never -c MissingRows.hs >missing.log 2>&1; then
     echo 'Accepted an uncovered retained equation'
