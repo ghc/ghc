@@ -1,4 +1,4 @@
-{-# LANGUAGE ImpredicativeTypes, NoExperimentalDependentTypes #-}
+{-# LANGUAGE ImpredicativeTypes, NoExperimentalDependentTypes, RankNTypes #-}
 module Main where
 
 import Control.Exception (ErrorCall(..), evaluate, try)
@@ -41,6 +41,10 @@ readNamedBoth p = readBoth p
 readProducedBoth :: Bool -> Int
 readProducedBoth flag = id (readBoth (id (makeBoth flag)))
 
+readRankedBoth :: Bool -> Int
+readRankedBoth flag = withRankedId (\transform ->
+  readBoth (relayRanked transform flag (makeBoth flag)))
+
 main :: IO ()
 main = do
   print (readMixed named, readMixed applied, readMixed written, readKind kindMixed)
@@ -60,3 +64,6 @@ main = do
   third <- readProducedBoth <$> readIORef flag
   print (readNamedBoth (makeBoth input), third, readDependent depMixed,
          ignoreBoth (makeBoth (error "unused multi-parameter producer input")))
+  fourth <- readRankedBoth <$> readIORef flag
+  print (readRankedBoth input, fourth, ignoreBoth (relayRanked id (error "unused label" :: Bool)
+         (makeBoth (error "unused ranked producer input"))))

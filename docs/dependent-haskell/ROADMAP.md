@@ -358,9 +358,10 @@ and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vecto
    package inside an implicit one and open both in a pattern. A direct call
    can infer several of a reader's erased parameters from a named mixed
    package, a call with a declared mixed result, or a polymorphic call
-   that forwards a supplied package type directly to its result. A
-   binder kind can determine an earlier parameter. The list-to-vector
-   producer carries a computed witness.
+   that forwards a supplied package type directly to its result. An
+   independent higher-rank callback can be another argument to that
+   call. A binder kind can determine an earlier reader parameter. The
+   list-to-vector producer carries a computed witness.
    [Mixed package readers](roadmap/R22-existential-quantification.md#a-package-with-nested-dot-binders),
    [Retained list pairs](roadmap/R04-dependent-sums.md),
    [Guarded witness](roadmap/R22-existential-quantification.md#inferring-a-higher-rank-witness)

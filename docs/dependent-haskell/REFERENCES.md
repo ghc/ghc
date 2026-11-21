@@ -3271,6 +3271,17 @@ example shows that one call can omit several dependent arguments.
 [Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html),
 and [Showcase client](examples/erased-existentials/RankedPackageClient.hs).
 
+Agda inserts omitted arguments and uses the types of written arguments
+to infer them. Idris 2 describes scoped elaboration and postponed
+unification for implicits. In `relay transform package`, this fork's
+declaration check follows the one bare package parameter from the
+argument to the result. The independent rank-n callback has its own
+expected type. Ordinary application checking handles the callback,
+the producer's constraints, and argument use. Its checked expression
+supplies the input to the lexical opening in Elab-IExist. [Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html),
+[Idris 2 elaboration](https://idris2.readthedocs.io/en/latest/implementation/overview.html#implicit-arguments),
+and [Paper, figure 8](https://richarde.dev/papers/2021/exists/exists.pdf#page=18).
+
 Agda checks the clauses of an indexed function against its telescope.
 GHC keeps its ordinary match group for equations on a packaged argument.
 It opens the hidden indices before checking the payload patterns in that

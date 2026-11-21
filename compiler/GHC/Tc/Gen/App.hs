@@ -562,6 +562,15 @@ ordinary expression checker still instantiates the head and checks
 all constraints. A family application or an unconstrained result
 parameter cannot identify a package through this probe.
 
+An independent higher-rank callback does not obscure the result
+parameter. For relay :: (forall x. x -> x) -> a -> a, the second
+argument supplies a. Accept a higher-rank sibling with a leading
+invisible telescope and an ordinary monomorphic body. Its type cannot
+mention the forwarded parameter, including in a kind or a constraint.
+Check the complete relay call before opening the resulting package.
+The ordinary checker checks the callback against its higher-rank
+domain, emits the relay's constraints, and accounts for argument use.
+
 For readBoth :: forall a b. Inner a b -> Int and an operand with type
 exists a. Inner a Char, the opened bar type determines both a and b.
 Require an injective occurrence of each parameter in the bar binder's
@@ -936,15 +945,26 @@ tcMixedOperandResult operand = runMaybeT $ do
   case result of
     TyVarTy v
       | isEmptyNameEnv (idConcreteTvs ident)
-      , (tvs, _, tau) <- tcRetainedInstTelescope sigma
-      , v `elem` tvs, isTauTy tau
-      , (_, domains, final) <- splitFunTys tau
+      , (tvs, _, body) <- tcRetainedInstTelescope sigma
+      , v `elem` tvs
+      , (matches, domains, final) <- splitFunTys body
       , domains `equalLength` args
       , getTyVar_maybe (coreFullView final) == Just v
+      , all isTauTy matches, all (ordinary_domain v) domains
       , [source] <- [arg | (Scaled _ domain, arg) <- zip domains args
                         , getTyVar_maybe (coreFullView domain) == Just v]
       -> MaybeT (tcMixedOperandResult source)
     _ -> pure result
+  where
+    ordinary_domain v (Scaled mult domain) =
+      isTauTy mult && (isTauTy domain || independent_callback v domain)
+
+    independent_callback v domain
+      | (binders@(_:_), _, body) <- tcRetainedInstTelescope domain
+      = all isTyVar binders && isTauTy body
+        && not (v `elemVarSet` tyCoVarsOfType domain)
+        && not (hasNativeDependentExpr (Core.Type domain))
+      | otherwise = False
 
 -- | Read the head and written ordinary arguments without elaboration.
 tcDeclaredOperandSpine :: LHsExpr GhcRn -> TcM (Maybe (Id, [LHsExpr GhcRn]))

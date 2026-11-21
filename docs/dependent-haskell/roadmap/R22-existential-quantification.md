@@ -431,8 +431,15 @@ polymorphic producer can forward the type of one written ordinary
 argument directly to its result. For example, a function of type
 `Show a => a -> b -> b` forwards the second argument type. The
 compiler opens the checked expression, including its type and evidence
-applications. A result parameter with no corresponding argument type
-can remain ambiguous. An opaque family result stays opaque.
+applications. The same call can pass an independent higher-rank callback.
+For `relay :: (forall x. x -> x) -> a -> a`, the package argument fixes
+`a`. The caller can supply the callback under a rank-n lambda. The
+ordinary check validates the complete producer call before opening the
+package. It checks the callback type, the producer's constraints, and
+argument use. The result still cannot expose the hidden witness.
+
+A result parameter with no corresponding argument type can remain
+ambiguous. An opaque family result stays opaque.
 An `if` whose branches return `Mixed` can infer that type on its own.
 Bind the conditional at `Mixed` before passing it to the consumer.
 
