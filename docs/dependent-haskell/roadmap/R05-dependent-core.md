@@ -598,3 +598,29 @@ value arguments. A separately compiled ordinary client checks this path
 at `-O2` with Core and STG Lint.
 [Source example](R03-dependent-products.md#zip-two-lists-at-a-common-length)
 and [CorePrep](../../../compiler/GHC/CoreToStg/Prep.hs).
+
+## Open observation of the installed Maybe method
+
+At compiler revision `61785e1925`, the desugared call to `Prelude.fmap`
+at `Maybe` passes the installed `Functor Maybe` dictionary. Its class
+selector selects a worker shared with the `Applicative Maybe` instance.
+The worker name can change with optimization. A separate call with a
+local `Functor Maybe` constraint passes the local dictionary.
+
+An experiment evaluated the selected worker in Core. At `Nothing`,
+it produced `Nothing` with a divergent callback. At `Just x`, it
+exposed the constructor while its field remained lazy. Demanding
+the field exposed an application of the original callback to `x`.
+An identity callback returned `x`. A missing worker unfolding or an
+unknown local dictionary stopped the observation. The experiment
+checked 12 Core assertions and the runtime demand at O0 and O2.
+
+Readback is the remaining step for a source equality. Core can index
+a strict case scrutinee by an application `f x`. Supporting the
+`Just` equation requires preserving the laziness of the constructor
+field. Eisenberg's review of #383 distinguishes the Core representation
+from an incremental extension of the surface language.
+[Open evaluator](../../../compiler/GHC/Core/OpenWhnf.hs),
+[review](https://github.com/ghc-proposals/ghc-proposals/issues/383#issuecomment-746676314),
+[follow-up](https://github.com/ghc-proposals/ghc-proposals/issues/383#issuecomment-749166999),
+and [Dependent Haskell specification](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf).

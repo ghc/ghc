@@ -1832,3 +1832,10 @@ the actual method body a question for R05 as well as R16.
 [Agda Maybe](https://github.com/agda/agda-stdlib/blob/v2.4/src/Data/Maybe/Base.agda),
 [installed instance](../../../libraries/ghc-internal/src/GHC/Internal/Base.hs),
 and [Eisenberg's review](https://github.com/ghc-proposals/ghc-proposals/issues/383#issuecomment-746676314).
+
+On upgrading from a compiler that omits this evidence, a source build
+checks the worker and its instance again. A warm build reuses both
+interfaces. The upgrade check also applies to `-fno-code -fwrite-interface`.
+A separate Core experiment observed both outer constructors from the
+installed `Prelude.fmap`.
+[Core observations and readback](R05-dependent-core.md#open-observation-of-the-installed-maybe-method).
