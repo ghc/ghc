@@ -46,7 +46,7 @@ import GHC.Core.Reduction
 import GHC.Core.RoughMap
 import GHC.Core.FVs( orphNamesOfAxiomLHS )
 
-import GHC.Builtin.CoercionRules( proveScopedSigmaClosure )
+import GHC.Builtin.CoercionRules( proveScopedSigmaClosure, proveScopedLambdaClosure )
 import GHC.Builtin.WiredIn.TypeLits( tryMatchFam )
 
 import GHC.Types.Var.Set
@@ -1320,12 +1320,12 @@ findBranch fam_tc branches target_tys
         -- Failure. keep looking
         _ -> other
 
-{- Note [Scoped sums in closed family matches]
+{- Note [Scoped closures in closed family matches]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A repeated variable in a family pattern can encounter two independently
-written sums of the same type. Their codomains have different private
-names. The checked nominal proof identifies them only if their lexical
-closures agree. See Note [Scoped retained sum codomains] in
+generated sum codomains or type lambdas. The checked nominal proof
+identifies them only if their lexical closures agree. See Note
+[Scoped retained sum codomains] in
 GHC.Core.TyCo.Compare.
 
 Try that proof only for a repeated template variable. If matching used
@@ -1357,12 +1357,13 @@ matchClosedBranch fam_tc branch target = do
     has_proof a b = isJust (scopedMatchCo a b)
     result_kind = typeKind . mkTyConApp fam_tc
 
--- See Note [Scoped sums in closed family matches].
+-- See Note [Scoped closures in closed family matches].
 scopedMatchCo :: Type -> Type -> Maybe CoercionN
 scopedMatchCo lhs rhs
   | eqType lhs rhs = Just (mkNomReflCo lhs)
   | not (eqType (typeKind lhs) (typeKind rhs)) = Nothing
   | Just co <- proveScopedSigmaClosure lhs rhs = Just co
+  | Just co <- proveScopedLambdaClosure lhs rhs = Just co
   | Just (tc, as) <- splitTyConApp_maybe lhs
   , Just (tc', bs) <- splitTyConApp_maybe rhs
   , tc == tc', isGenerativeTyCon tc Nominal
