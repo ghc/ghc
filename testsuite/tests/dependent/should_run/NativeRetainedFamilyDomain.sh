@@ -4,13 +4,14 @@ src=$(cd "$(dirname "$0")" && pwd)
 out=$(mktemp -d)
 trap 'rm -rf -- "$out"' EXIT
 ghc=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint -fdiagnostics-color=never)
+stripped=(-fomit-interface-pragmas -fno-write-if-simplified-core)
 cd "$out"
 mkdir client
 cp "$src/ConstrainedElements.hs" .
-"${ghc[@]}" -fomit-interface-pragmas -c ConstrainedElements.hs
+"${ghc[@]}" "${stripped[@]}" -c ConstrainedElements.hs
 cd client
 cp ../ConstrainedElements.hi "$src/ConstrainedElementsClient.hs" "$src/NativeRetainedFamilyDomain.hs" .
-"${ghc[@]}" -c ConstrainedElementsClient.hs
+"${ghc[@]}" "${stripped[@]}" -c ConstrainedElementsClient.hs
 "${ghc[@]}" -DREQUIRED_KINDS -c NativeRetainedFamilyDomain.hs
 "${ghc[@]}" -fforce-recomp -DKNOWN_PREFIX -c NativeRetainedFamilyDomain.hs
 "${ghc[@]}" -fforce-recomp -DVALID_FORGOTTEN -c NativeRetainedFamilyDomain.hs
@@ -40,3 +41,29 @@ for mode in ALIAS_OPEN ALIAS_ESCAPE FORGOTTEN MISSING_PREFIX MISSING_KIND WRONG_
         REQUIRED_MISSING|MISSING) grep -Fq 'Collects (FieldKey tag)' failure ;;
     esac
 done
+
+# The ordinary wrapper and producer are both source-hidden in this reader.
+cd "$out"
+mkdir format
+cp ConstrainedElements.hi client/ConstrainedElementsClient.hi "$src/ConstrainedFormatClient.hs" format/
+cd format
+cat >Main.hs <<'HS'
+module Main where
+import ConstrainedFormatClient (renderedRawView)
+main :: IO ()
+main = putStrLn renderedRawView
+HS
+for level in -O0 -O2; do
+    "${ghc[@]}" "$level" -fforce-recomp -c ConstrainedFormatClient.hs Main.hs
+    "${ghc[@]}" Main.o ConstrainedFormatClient.o ../client/ConstrainedElementsClient.o ../ConstrainedElements.o -o run
+    [[ $(./run) == '[True,False]' ]]
+done
+
+sed -e 's/^    ( Allowed a$/    (/' -e 's/^    , forall x\./      forall x./' ConstrainedFormatClient.hs >MissingViews.hs
+line=$(awk '/^renderRaw ::/ { print NR }' MissingViews.hs)
+if "${ghc[@]}" -O2 -fforce-recomp -fdefer-type-errors -c MissingViews.hs >failure 2>&1 ||
+   ! grep -Eq "^MissingViews.hs:$line:[0-9]+: error: \[GHC-39999\]" failure ||
+   ! grep -Fq 'Could not deduce ‘Allowed a’ arising from a use of ‘FieldView’' failure; then
+    cat failure
+    exit 1
+fi

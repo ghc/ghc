@@ -1,5 +1,5 @@
 {-# LANGUAGE ConstraintKinds, DataKinds, ExperimentalDependentTypes, FlexibleContexts, FlexibleInstances, FunctionalDependencies, GADTs, Modifiers, PolyKinds, RankNTypes, ScopedTypeVariables, TypeApplications, TypeFamilies, TypeOperators, UndecidableInstances #-}
-module ConstrainedElements (Cursor(..), PrintableCursor, Collection(..), Allowed, Collects(..), FieldKey, Field(..), field, applyField, withField, KnownIndex(..), Reflection, reflectMaybe, MaybeBoolEcho, AtNothing) where
+module ConstrainedElements (Cursor(..), PrintableCursor, Collection(..), Allowed, Collects(..), FieldKey, Field(..), field, applyField, withField, KnownIndex(..), Reflection, reflectMaybe, MaybeBoolEcho, AtNothing, FormatKey, RenderFormat(..), Formatted, FieldViews(..), ViewsFor) where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
@@ -60,6 +60,27 @@ type AtNothing (f :: Maybe Bool %U -> Maybe Bool) = f 'Nothing
 -- | Reflect a runtime index using the instance for its kind.
 reflectMaybe :: forall a. Reflection a
 reflectMaybe _ = Refl
+
+-- | Identify the domain of a field format.
+data FormatKey (c :: Type)
+
+-- | Select the field representation for a known domain and a detail flag.
+class RenderFormat c where
+    type FieldView c (detailed :: Bool) :: Type
+
+-- | The detailed view adds a label to the raw value.
+type family Formatted c (detailed :: Bool) where
+    Formatted c 'False = c
+    Formatted c 'True = (String, c)
+
+instance {-# OVERLAPPABLE #-} RenderFormat (FormatKey c) where
+    type FieldView (FormatKey c) detailed = Formatted c detailed
+
+-- | Keep the raw and detailed presentations of a field.
+data FieldViews (view :: Bool %U -> Type) = FieldViews (view 'False) (view 'True)
+
+-- | Choose the format domain and leave the detail flag open.
+type ViewsFor c = FieldViews (FieldView (FormatKey c))
 
 -- | Split a collection into one element and the remainder.
 class Collection c e | c -> e where

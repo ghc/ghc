@@ -300,6 +300,32 @@ right-hand-side arity rule in proposal #242.
 [proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#rhs-of-type-synonyms)
 and [separate compilation test](../../../testsuite/tests/dependent/should_run/NativeConstrainedFamily.sh).
 
+The same check applies after an ordinary wrapper composes an abstract
+constructor with an imported alias.
+
+```haskell
+type ViewsFor c = FieldViews (FieldView (FormatKey c))
+type ViewsAfter f a = ViewsFor (f a)
+```
+
+`FieldView` receives its owner argument and still waits for the Boolean
+detail flag. The producer uses a general format instance. A separate
+ordinary module defines `ViewsAfter`. The ordinary reader introduces a
+more specific list instance and sees both modules through interfaces.
+Both instances choose the same representation. The list instance also
+requires evidence for its element type.
+The reader uses `Allowed a` and
+`forall x. Allowed x => RenderFormat (FormatKey (f x))` to form
+`ViewsAfter f a` with `f` abstract. Removing `Allowed a` reports
+GHC-39999 at the reader's signature, including with deferred errors.
+The Showcase selects the raw list and leaves the detailed view lazy.
+This combines the source entailment check in section 4.2 with a
+partially applied family in an unmatchable callback position.
+[Formation rule](https://richarde.dev/papers/2017/partiality/partiality.pdf),
+[proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#higher-order-arguments),
+[ordinary reader](../examples/open-evaluation/ConstrainedFormatClient.hs)
+and [source-hidden regression](../../../testsuite/tests/dependent/should_run/NativeRetainedFamilyDomain.sh).
+
 ### Family applications in a signature constraint
 
 An ordinary module can write `showRemainder :: (Collection c e, Show (Rest c)) => c -> Maybe String`.

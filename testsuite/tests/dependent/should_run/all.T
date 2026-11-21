@@ -650,7 +650,7 @@ test('NativeScopedDictionaryCoreReload',
 test('NativeRetainedFamilyDomain',
      [only_ways(['normal']),
       extra_files(['../../../../docs/dependent-haskell/examples/open-evaluation/' + f
-                   for f in ['ConstrainedElements.hs', 'ConstrainedElementsClient.hs']])],
+                   for f in ['ConstrainedElements.hs', 'ConstrainedElementsClient.hs', 'ConstrainedFormatClient.hs']])],
      run_command, ['bash NativeRetainedFamilyDomain.sh "{compiler}" "{libdir}"'])
 
 test('NativeConstrainedFamily',

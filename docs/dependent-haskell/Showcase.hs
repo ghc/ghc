@@ -113,6 +113,7 @@ import qualified InvisibleFamily
 import qualified LiberalCallback
 import ConstrainedElementsClient (advanceCursor, showAdvance, showRemainder, splitCollection, partialElement, aliasedReflection, annotatedElement, constrainedElements, explicitElements, formatField, renderField, renderKnownFields, retainedMaybeDomain)
 import ConstrainedElementsQuickLook (showReflection)
+import ConstrainedFormatClient (renderedRawView)
 import OpenArrowKindClient (openKindRows)
 import StoredReflectionClient (readStoredReflection)
 import IndexedMapClient (mappedCells)
@@ -1126,6 +1127,7 @@ main = do
     observe "use a qualified proof and a partial family through imported type synonyms" aliasedReflection
     observe "render a retained callback with ImpredicativeTypes enabled" (map showReflection [Just True, Nothing])
     observe "forward a runtime element with a quantified partial signature" (partialElement enabled, partialElement disabled)
+    observe "render a raw view through an ordinary wrapper around a partial family" renderedRawView
     observe "split collections whose types determine their elements"
         (splitCollection [enabled, disabled], splitCollection (Just 'x'), splitCollection (Nothing :: Maybe Char))
     observe "show the rest of a collection"
