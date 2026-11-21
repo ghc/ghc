@@ -1032,6 +1032,8 @@ main = do
         , RankedPackageClient.runProducedPackage 23
         , RankedPackageClient.runForwardedPackage 29
         )
+    observe "read a forwarded erased package and keep its label"
+        (RankedPackageClient.runLabelledPackage 31)
     observe "filter a vector without forcing the tail to learn the result length"
         ErasedPackage.filterObservation
     observe "infer the hidden lengths of a lazy filter and a retained vector"

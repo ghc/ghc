@@ -39,7 +39,7 @@ readNamedBoth :: BothMixed -> Int
 readNamedBoth p = readBoth p
 
 readProducedBoth :: Bool -> Int
-readProducedBoth flag = id (readBoth (makeBoth flag))
+readProducedBoth flag = id (readBoth (id (makeBoth flag)))
 
 main :: IO ()
 main = do

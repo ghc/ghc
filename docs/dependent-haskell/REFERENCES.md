@@ -3260,6 +3260,17 @@ comparison. [Paper, figure 8](https://richarde.dev/papers/2021/exists/exists.pdf
 [Agda dependent pairs](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#the-s-type)
 and [Idris existential pairs](https://www.idris-lang.org/Idris2/base/docs/Data.DPair.html).
 
+A mixed package also supplies type arguments to a polymorphic reader.
+The fork checks the reader's invisible telescope against the opened
+bar type. The match uses the bar binder's kind and body. It substitutes
+the selected arguments into later kinds and checks the complete bar
+type before checking the call. Elab-IExist supplies the application
+scope. The telescope match is a rule in this fork. Agda's `subst`
+example shows that one call can omit several dependent arguments.
+[Paper, figure 8](https://richarde.dev/papers/2021/exists/exists.pdf#page=18),
+[Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html),
+and [Showcase client](examples/erased-existentials/RankedPackageClient.hs).
+
 Agda checks the clauses of an indexed function against its telescope.
 GHC keeps its ordinary match group for equations on a packaged argument.
 It opens the hidden indices before checking the payload patterns in that

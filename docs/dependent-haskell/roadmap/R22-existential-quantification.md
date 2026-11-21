@@ -412,15 +412,19 @@ compares the call with a named package. A consumer that ignores the
 package also leaves a bottom producer argument unevaluated.
 
 A unary reader can infer several erased parameters from the same opened
-bar package. For `readBoth :: forall a b. BothInner a b -> Int`, a value
-of type `exists a. BothInner a Char` fixes the first argument to the
-hidden witness and the second to `Char`. A binder kind can fix an earlier
-parameter in the same telescope. The reader call must agree with the
-complete bar schema, including repeated occurrences. An occurrence only
-under an opaque type family gives no witness. A reference to the bar
-binder cannot instantiate the reader's parameters, and the opened dot
-witness cannot escape in the result.
-[Proposal #473, implicit existential elimination](https://github.com/ghc-proposals/ghc-proposals/pull/473).
+bar package. The Showcase's ordinary client calls
+`readLabelledNumber (id (hide n))`, where `hide n` has type
+`exists a. LabelledNumber a String`. The opened package fixes `a` to
+the hidden witness and `label` to `String`. The caller gets back
+the label and number. The source-hidden regression also checks that a
+bar binder's kind can fix an earlier parameter in the telescope.
+The complete bar schema must match, including repeated occurrences.
+An occurrence only under an opaque type family gives no witness.
+The reader's type arguments cannot capture the bar binder. The opened
+dot witness cannot escape in the result.
+[Ordinary client](../examples/erased-existentials/RankedPackageClient.hs),
+[source-hidden regression](../../../testsuite/tests/dependent/should_run/NativeImplicitExistential.sh),
+and [Proposal #473, implicit existential elimination](https://github.com/ghc-proposals/ghc-proposals/pull/473).
 
 The caller can also write `inspectInner (id (make flag))`. A
 polymorphic producer can forward the type of one written ordinary

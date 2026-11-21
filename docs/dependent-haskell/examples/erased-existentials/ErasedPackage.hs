@@ -4,7 +4,7 @@
 -- | Observe payloads whose type witness is erased.
 module ErasedPackage
   ( observation, MixedNumber, packNumber, readMixedNumber, readNumber
-  , Filtered, filterVec, cells, filterObservation
+  , readLabelledNumber, Filtered, filterVec, cells, filterObservation
   ) where
 
 import Data.Kind (Type)
@@ -29,14 +29,15 @@ observation =
       Pack (type a) _ -> True
   )
 
-type NumberPackage a = exists (b :: Type) | (a, b, Int)
+type LabelledNumber a label = exists (b :: Type) | (a, b, label, Int)
+type NumberPackage a = LabelledNumber a String
 
 -- | Hide the remaining type of an explicitly packed number.
 type MixedNumber = exists (a :: Type). NumberPackage a
 
 -- | Introduce the explicit witness while keeping the outer type visible.
 packNumber :: Int -> NumberPackage Bool
-packNumber n = Pack (type Char) (True, 'x', n)
+packNumber n = Pack (type Char) (True, 'x', "count", n)
 
 -- | Open both packages and read the number.
 readMixedNumber :: MixedNumber -> Int
@@ -44,8 +45,12 @@ readMixedNumber p = readNumber p
 
 -- | Read the number without exposing either witness in the result.
 readNumber :: forall a. NumberPackage a -> Int
-readNumber q = case q of
-  Pack (type b) (_, _ :: b, n) -> n
+readNumber q = snd (readLabelledNumber @a @String q)
+
+-- | Read the public label and number from the package.
+readLabelledNumber :: forall a label. LabelledNumber a label -> (label, Int)
+readLabelledNumber q = case q of
+  Pack (type b) (_, _ :: b, label, n) -> (label, n)
 
 -- | A vector whose result length is known only to its producer.
 type Filtered a = exists (m :: Nat) | Vec a m

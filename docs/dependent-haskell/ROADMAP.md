@@ -351,10 +351,12 @@ and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vecto
    and [singletons migration](roadmap/R23-unsaturated-type-families.md#arrow-patterns-in-family-equations).
 3. **R22 and R04.** An ordinary module can put an explicit existential
    package inside an implicit one and open both in a pattern. A direct call
-   can infer a polymorphic consumer's parameter from a named mixed
+   can infer several of a reader's erased parameters from a named mixed
    package, a call with a declared mixed result, or a polymorphic call
-   that forwards a supplied package type directly to its result.
-   The list-to-vector producer carries a computed witness.
+   that forwards a supplied package type directly to its result. A
+   binder kind can determine an earlier parameter. The list-to-vector
+   producer carries a computed witness.
+   [Mixed package readers](roadmap/R22-existential-quantification.md#a-package-with-nested-dot-binders),
    [Retained list pairs](roadmap/R04-dependent-sums.md),
    [Guarded witness](roadmap/R22-existential-quantification.md#inferring-a-higher-rank-witness)
    and [nested patterns](roadmap/R22-existential-quantification.md#constructor-cases-on-the-payload).
