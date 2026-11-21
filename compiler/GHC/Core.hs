@@ -40,7 +40,7 @@ module GHC.Core (
         termVar_maybe, nativeIndexFunctionVar_maybe, nativeIndexArgKinds,
         nativeClassSelectorTys, nativeClassSelectorIndex, nativeIndexedConArgs,
         nativeIndexedConApp_maybe, splitNativeIndexedConApp, isNativeConstructedGadtIndex,
-        nativeFamilyConHead_maybe,
+        nativeFamilyConHead_maybe, nativeFamilyPromotedCon_maybe,
         containsIndexedConOperand, containsGeneralIndexedConOperand, containsRetainedCharLiteral,
         containsRetainedDataFamilyConOperand,
         containsRetainedNaturalLiteral, isBoxedBigNaturalLiteral,

@@ -2087,6 +2087,14 @@ tcIfaceType = go
                        indexed = any (anyFreeVarsOfType isId) tks' && not (null eqs) && null theta
                  , not (null (dataConRepArgBinders con)) || indexed ->
                    check_iface_retained_args (ppr tc) (tyConKind tc') tks'
+                 | isJust (tyConDataFamCoercion_maybe (dataConTyCon con))
+                 , let (tys, fields) = splitAt (length (dataConUserTyVars con)) tks'
+                 , any (anyFreeVarsOfType isId) fields ->
+                 do { valid <- evaluateIfaceNativeDomain (ppr tc) $
+                          isJust (nativeFamilyPromotedCon_maybe con tys fields)
+                      ; unless valid $
+                          failIfM (text "Invalid retained data family constructor fields in interface:"
+                                   <+> ppr tc) }
                  | let (tys, fields) = splitAt (length (dataConUnivTyVars con)) tks'
                  , any (anyFreeVarsOfType isId) fields ->
                  do { valid <- evaluateIfaceNativeDomain (ppr tc) $
