@@ -88,6 +88,13 @@ test('NativeOpenInstalledTakeWhile',
                    'PreludeFilterSource.hs', 'PreludeFilterLengthProof.hs', 'PreludeFilterRuntime.hs',
                    'PreludeTakeWhile.hs']])],
      run_command, ['bash NativeOpenInstalledTakeWhile.sh "{compiler}" "{libdir}"'])
+test('NativeOpenInstalledDropWhile',
+     [only_ways(['normal']),
+      extra_files([open_eval_dir + f for f in ['PreludeMapLengthSize.hs', 'PreludeMapLengthSource.hs',
+                   'PreludeAppendLengthSource.hs', 'PreludeFilterSource.hs', 'PreludeFilterLengthProof.hs',
+                   'PreludeFilterRuntime.hs', 'PreludeFilterAppendProof.hs', 'PreludeTakeWhile.hs',
+                   'PreludeDropWhileSource.hs', 'PreludeDropWhileProof.hs']])],
+     run_command, ['bash NativeOpenInstalledDropWhile.sh "{compiler}" "{libdir}"'])
 
 test('NativeOpenInstalledAppend',
      [only_ways(['normal']),

@@ -6467,10 +6467,13 @@ element. A false decision returns the empty list and a true decision
 keeps the element. Agda uses these equations in `takeWhile++dropWhile`.
 The Haskell example checks the installed `Prelude.takeWhile` against the
 same branch shapes. Its runtime tests cover demand on a bottom tail and
-the short circuit of the captured `(&&)`.
+the short circuit of the captured `(&&)`. The `Prelude.dropWhile`
+equations also let the ordinary proof reconstruct the input with
+`Prelude.(++)`. A false decision ends the proof even when later decisions
+are undefined.
 [Agda list definitions](https://agda.github.io/agda-stdlib/v2.4/Data.List.Base.html#330),
 [Agda prefix and suffix law](https://agda.github.io/agda-stdlib/v2.4/Data.List.Properties.html#1575),
-and [R16 prefix](roadmap/R16-open-term-evaluator.md#stop-a-list-prefix-at-the-first-rejected-head).
+and [R16 prefix and suffix](roadmap/R16-open-term-evaluator.md#recover-the-input-from-its-prefix-and-suffix).
 
 ### Checked runtime decisions for filter
 

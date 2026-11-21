@@ -1261,6 +1261,28 @@ equation. The installed module rebuilds once to publish the new equations.
 [regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledTakeWhile.sh),
 and [prior art](../REFERENCES.md#ending-a-list-prefix-at-a-decision).
 
+### Recover the input from its prefix and suffix
+
+The same guarded-list checker certifies `Prelude.dropWhile`. On a cons,
+it returns the original list when the predicate rejects the head. When
+the predicate accepts, it recurses on the original tail. The checker
+validates each result before and after optimization. It accepts the
+empty list, the original cons, a recursive call on the original tail,
+or the original head prepended to that call. A rule can change the
+result to another of these shapes. The compiler then drops both equations
+because the final result differs from the initial equation.
+
+An ordinary client proves `takeWhile p xs ++ dropWhile p xs = xs`
+with a decision for each inspected head. The proof recurses while the
+predicate accepts. The first rejection supplies both equations and the
+proof leaves the remaining decisions lazy. The runtime suffix also
+leaves both fields of the rejected cons lazy. An accepted head requires
+the next spine cell. The regression rejects a different predicate input,
+changed recursion arguments, and a forced tail in the rejecting branch.
+[Source alias](../examples/open-evaluation/PreludeDropWhileSource.hs),
+[proof](../examples/open-evaluation/PreludeDropWhileProof.hs), and
+[regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledDropWhile.sh).
+
 ### Use an ordinary identity as an open callback
 
 `Prelude.filter Prelude.id` keeps a `True` head and skips a `False`
