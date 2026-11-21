@@ -6826,3 +6826,96 @@ This is progress within R05/C1. It completes none of C1, C2 or R22.
 M59 addresses fixed function-domain body comparison. Opaque Pi instantiation
 and domain projection remain separate obligations. Representational Pi equality
 alone cannot supply nominal domain equality.
+
+## Vector split and package checkpoints
+
+The vector split now exercises dependent products, dependent sums, Core,
+and open evaluation together. The empty and cons equations for ordinary
+append pass through separate compilation. The split returns a
+reconstruction proof for an arbitrary cut within the vector.
+[Split evidence](roadmap/R04-dependent-sums.md#prove-a-split-preserves-the-original-vector)
+and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vector-append-preserves-its-right-operand).
+
+1. **R03 and R05.** The expected constructor result can now identify
+   two original vectors and both element types after one bounds check.
+   The expected vector domains of the returned pieces also determine the
+   suffix. The paired implementation needs no visible type application.
+   An index that appears only under a noninjective type family remains
+   ambiguous. If a local Given equates two applications of an open
+   family, GHC can use it without equating the arguments. A retained
+   constructor that requires the arguments to agree reports the mismatch
+   at that constructor's field.
+   [Checked input inference](roadmap/R03-dependent-products.md)
+   and [independent inputs](../../testsuite/tests/dependent/should_fail/NativeIrredIndexEvidence.hs).
+2. **R05.** Package templates can now close over the inferred types and
+   dictionaries of a recursive group. An ordinary client can inline a
+   selected worker while its peers remain in scope. An inferred monomorphic group can use a
+   direct alias to export a checked worker unfolding. The interface keeps
+   the loop breaker, and older readers can call the object code.
+   [Retained unfolding checks](roadmap/R05-dependent-core.md#export-retained-unfoldings-at-ordinary-signatures).
+
+### Related checks
+
+1. **R05.** A rule can match a retained head from another module.
+   The same checked type application supplies the domains of `m`
+   and `x` in `keepReading @Bool m x`. An ordinary value can precede
+   the type argument. A retained prefix can also precede a specified
+   erased binder and a second retained argument, as in
+   `keepTagged tag @Bool m x`. The corresponding required binder
+   takes `(type Bool)`. A rewrite rule can infer the types of the later
+   runtime arguments from that prefix.
+   [Rule and interface support](roadmap/R05-dependent-core.md).
+2. **R23 and R24.** A recursive family can forward a constructor
+   or a partial family across stripped interfaces. When a signature
+   contains one eligible written application, GHC locates its arity
+   error there and suggests the extension. In a complete signature,
+   the body can determine a nested callback arrow's matchability. An
+   unconstrained callback arrow still takes its ordinary default.
+   R24 checks the parent class when a separate client writes a fully applied
+   associated family in a signature, constructor field, or visible type argument.
+   [Domain example](roadmap/R24-constrained-type-families.md),
+   [inferred callback arrows](roadmap/R23-unsaturated-type-families.md#inferring-a-callback-arrow-in-a-closed-family),
+   [later argument](roadmap/R23-unsaturated-type-families.md#choosing-a-prefixs-matchability-from-a-later-argument)
+   and [singletons migration](roadmap/R23-unsaturated-type-families.md#arrow-patterns-in-family-equations).
+3. **R22 and R04.** An ordinary module can put an explicit existential
+   package inside an implicit one and open both in a pattern. A direct call
+   can infer several of a reader's erased parameters from a named mixed
+   package, a call with a declared mixed result, or a polymorphic call
+   that forwards a supplied package type directly to its result. An
+   independent higher-rank callback can be another argument to that
+   call. A selector can use several operands with the same closed
+   package type. A binder kind can determine an earlier reader parameter. The
+   list-to-vector producer carries a computed witness. A reader can open
+   the result of a `case` on three packages. With `ImpredicativeTypes`,
+   `toList (id xs)` also opens the forwarded package around the reader.
+   [Mixed package readers](roadmap/R22-existential-quantification.md#a-package-with-nested-dot-binders),
+   [Retained list pairs](roadmap/R04-dependent-sums.md),
+   [Guarded witness](roadmap/R22-existential-quantification.md#inferring-a-higher-rank-witness),
+   [local package pattern](roadmap/R22-existential-quantification.md#a-nonrecursive-local-package-pattern),
+   and [nested patterns](roadmap/R22-existential-quantification.md#constructor-cases-on-the-payload).
+4. **R19.** A branch on an ordinary Boolean can pass that same value to
+   a retained field. Matching on an expression such as `not b` in
+   the field selects the result type using the function in scope.
+   Template Haskell can quote and reify the retained binder in a signature
+   or a prefix GADT constructor. A type quotation preserves a case on an
+   enclosing retained binder as `CaseT`.
+   [Retained scrutinees](roadmap/R19-type-level-cases.md#compute-a-retained-scrutinee)
+   and [constructor quotations](roadmap/R19-type-level-cases.md#quote-and-reify-retained-gadt-constructors).
+5. **R12 and R16.** An ordinary client can prove that `Prelude.reverse`
+   preserves length. A proof using `Prelude.foldr` establishes the append
+   law for an arbitrary step and seed. It uses the method selected by the
+   installed list dictionary. A code-generating producer can record that
+   choice even when its interface omits optimizer pragmas. The installed
+   `Functor Maybe` dictionary supplies both `Prelude.fmap` equations.
+   A second call can consume the first call's result with both callbacks
+   still abstract. A local dictionary leaves the method choice open.
+   [Installed method proof](examples/open-evaluation/PreludeMappingProof.hs)
+   and [named worker proof](examples/open-evaluation/MappingProof.hs).
+   [Public fold proof](examples/open-evaluation/PreludeFoldrProof.hs).
+   [Append and map proofs](roadmap/R16-open-term-evaluator.md#prove-that-map-distributes-over-append).
+
+6. **R21.** A retained field's worker can use a saturated local synonym
+   such as `WorkerArgument Bool` in its signature. A worker in a later
+   splice group gives GHC-76037 at the function name. A worker that needs
+   the unfinished constructor still gives GHC-68947.
+   [Declaration groups and aliases](roadmap/R21-dependency-analysis.md#local-synonyms-in-a-retained-field-worker).

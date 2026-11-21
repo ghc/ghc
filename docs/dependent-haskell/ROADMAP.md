@@ -9,7 +9,7 @@ records every edge. The R numbers are local labels for those cards.
 
 ## Where this fork stands
 
-At `2a1003b253`, **23 of 50 cards (46%) are complete** on the upstream
+At `5374dbcf79`, **23 of 50 cards (46%) are complete** on the upstream
 checklist. The fork adds a tested part of **19 of the 27 open cards**.
 This count includes a card when the fork demonstrates a behavior in
 source Haskell or in compiled Core. Each card counts once, regardless
@@ -525,101 +525,35 @@ source examples. General promotion remains open.
 
 ## Current work queue
 
-The vector split now exercises dependent products, dependent sums, Core,
-and open evaluation together. The empty and cons equations for ordinary
-append pass through separate compilation. The split returns a
-reconstruction proof for an arbitrary cut within the vector.
-[Split evidence](roadmap/R04-dependent-sums.md#prove-a-split-preserves-the-original-vector)
-and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vector-append-preserves-its-right-operand).
+The published compiler at `5374dbcf79` has a 502-line Showcase. The
+next integration combines the following changes on that revision. Keep
+one source revision and one normal two-stage build for these checks.
+Separate runs establish the behavior of a component. The combined compiler
+must also pass the registered tests and reproduce the Showcase at native
+`-O0`, native `-O2` and in source GHCi.
 
-1. **R03 and R05.** The expected constructor result can now identify
-   two original vectors and both element types after one bounds check.
-   The expected vector domains of the returned pieces also determine the
-   suffix. The paired implementation needs no visible type application.
-   An index that appears only under a noninjective type family remains
-   ambiguous. If a local Given equates two applications of an open
-   family, GHC can use it without equating the arguments. A retained
-   constructor that requires the arguments to agree reports the mismatch
-   at that constructor's field.
-   [Checked input inference](roadmap/R03-dependent-products.md)
-   and [independent inputs](../../testsuite/tests/dependent/should_fail/NativeIrredIndexEvidence.hs).
-2. **R05.** Package templates can now close over the inferred types and
-   dictionaries of a recursive group. An ordinary client can inline a
-   selected worker while its peers remain in scope. An inferred monomorphic group can use a
-   direct alias to export a checked worker unfolding. The interface keeps
-   the loop breaker, and older readers can call the object code.
-   [Retained unfolding checks](roadmap/R05-dependent-core.md#export-retained-unfoldings-at-ordinary-signatures).
+| Cards | Change under test | Required check |
+| --- | --- | --- |
+| [R03](roadmap/R03-dependent-products.md), [R04](roadmap/R04-dependent-sums.md), [R41](roadmap/R41-nested-quantification-in-gadts.md) | A constructor supplies a runtime result index to a nested call. A retained package can carry a polymorphic element. A quoted GADT preserves the order of its binders and fields. | Check source-hidden clients, lazy fields, rejected index and payload mismatches, interface markers, and ordinary Quick Look allocation. |
+| [R10](roadmap/R10-unboxed-promotion.md) | A closed family matches a signed machine integer of type `Int#`. | Check target-width conversion and the imported family axiom with both compiler stages. |
+| [R15](roadmap/R15-closed-term-evaluator.md), [R17](roadmap/R17-type-level-lambdas.md) | Rectangular and square matrices retain their shape during readback. A type family recognizes equal lambda closures across an interface. | Check zero-sized and mismatched dimensions, imported closure equality, and the cost of nested family applications. |
+| [R36](roadmap/R36-pun-warnings.md) | The renamer warns about an ambiguous use when a term and a type share a name. | Check qualified and explicitly disambiguated uses, implicit binders, diagnostic locations, and `-Werror=pun-uses`. |
 
-### Other open work
+Two changes need separate decisions before integration.
 
-1. **R05.** A rule can match a retained head from another module.
-   The same checked type application supplies the domains of `m`
-   and `x` in `keepReading @Bool m x`. An ordinary value can precede
-   the type argument. A retained prefix can also precede a specified
-   erased binder and a second retained argument, as in
-   `keepTagged tag @Bool m x`. The corresponding required binder
-   takes `(type Bool)`. A rewrite rule can infer the types of the later
-   runtime arguments from that prefix.
-   [Rule and interface support](roadmap/R05-dependent-core.md).
-2. **R23 and R24.** A recursive family can forward a constructor
-   or a partial family across stripped interfaces. When a signature
-   contains one eligible written application, GHC locates its arity
-   error there and suggests the extension. In a complete signature,
-   the body can determine a nested callback arrow's matchability. An
-   unconstrained callback arrow still takes its ordinary default.
-   R24 checks the parent class when a separate client writes a fully applied
-   associated family in a signature, constructor field, or visible type argument.
-   [Domain example](roadmap/R24-constrained-type-families.md),
-   [inferred callback arrows](roadmap/R23-unsaturated-type-families.md#inferring-a-callback-arrow-in-a-closed-family),
-   [later argument](roadmap/R23-unsaturated-type-families.md#choosing-a-prefixs-matchability-from-a-later-argument)
-   and [singletons migration](roadmap/R23-unsaturated-type-families.md#arrow-patterns-in-family-equations).
-3. **R22 and R04.** An ordinary module can put an explicit existential
-   package inside an implicit one and open both in a pattern. A direct call
-   can infer several of a reader's erased parameters from a named mixed
-   package, a call with a declared mixed result, or a polymorphic call
-   that forwards a supplied package type directly to its result. An
-   independent higher-rank callback can be another argument to that
-   call. A selector can use several operands with the same closed
-   package type. A binder kind can determine an earlier reader parameter. The
-   list-to-vector producer carries a computed witness. A reader can open
-   the result of a `case` on three packages. With `ImpredicativeTypes`,
-   `toList (id xs)` also opens the forwarded package around the reader.
-   [Mixed package readers](roadmap/R22-existential-quantification.md#a-package-with-nested-dot-binders),
-   [Retained list pairs](roadmap/R04-dependent-sums.md),
-   [Guarded witness](roadmap/R22-existential-quantification.md#inferring-a-higher-rank-witness),
-   [local package pattern](roadmap/R22-existential-quantification.md#a-nonrecursive-local-package-pattern),
-   and [nested patterns](roadmap/R22-existential-quantification.md#constructor-cases-on-the-payload).
-4. **R19.** A branch on an ordinary Boolean can pass that same value to
-   a retained field. Matching on an expression such as `not b` in
-   the field selects the result type using the function in scope.
-   Template Haskell can quote and reify the retained binder in a signature
-   or a prefix GADT constructor. A type quotation preserves a case on an
-   enclosing retained binder as `CaseT`.
-   [Retained scrutinees](roadmap/R19-type-level-cases.md#compute-a-retained-scrutinee)
-   and [constructor quotations](roadmap/R19-type-level-cases.md#quote-and-reify-retained-gadt-constructors).
-5. **R12 and R16.** An ordinary client can prove that `Prelude.reverse`
-   preserves length. A proof using `Prelude.foldr` establishes the append
-   law for an arbitrary step and seed. It uses the method selected by the
-   installed list dictionary. A code-generating producer can record that
-   choice even when its interface omits optimizer pragmas. The installed
-   `Functor Maybe` dictionary supplies both `Prelude.fmap` equations.
-   A second call can consume the first call's result with both callbacks
-   still abstract. A local dictionary leaves the method choice open.
-   [Installed method proof](examples/open-evaluation/PreludeMappingProof.hs)
-   and [named worker proof](examples/open-evaluation/MappingProof.hs).
-   [Public fold proof](examples/open-evaluation/PreludeFoldrProof.hs).
-   [Append and map proofs](roadmap/R16-open-term-evaluator.md#prove-that-map-distributes-over-append).
+* **R11 homogeneous equality.** The experimental worker ABI changes a
+  selector used by existing object files. Rebuild the provider and the
+  client together before selecting that ABI for the fork.
+  [Worker and solver evidence](roadmap/R10-unboxed-promotion.md#r11-acceptance-check).
+* **R16 open evaluation.** The two prototypes record different
+  dependencies for imported method proofs. A usable design must reject
+  a stale proof from an older interface and accept the ordinary optimized
+  Showcase with the installed rewrite rules enabled.
+  [Open evaluation](roadmap/R16-open-term-evaluator.md).
 
-6. **R21.** A retained field's worker can use a saturated local synonym
-   such as `WorkerArgument Bool` in its signature. A worker in a later
-   splice group gives GHC-76037 at the function name. A worker that needs
-   the unfinished constructor still gives GHC-68947.
-   [Declaration groups and aliases](roadmap/R21-dependency-analysis.md#local-synonyms-in-a-retained-field-worker).
-
-Use this queue for current priorities, the linked card for its acceptance
-criteria, and the [implementation log](PLAN.md) for results from individual
-checkpoints. Earlier work orders and measurements are in the
-[historical records](CHECKPOINTS.md#historical-roadmap-checkpoints).
+For the remaining work on each card, use the table below. The
+[previous queue](CHECKPOINTS.md#vector-split-and-package-checkpoints)
+records the earlier source and interface checks.
 
 ## Remaining work by roadmap area
 
