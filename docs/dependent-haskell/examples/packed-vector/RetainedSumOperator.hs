@@ -1,5 +1,5 @@
 {-# LANGUAGE ExperimentalDependentTypes, TypeOperators #-}
-module NativeSourceBinaryMethod (sumIndex, successorIndex) where
+module RetainedSumOperator (sumIndex, successorIndex) where
 
 import PackedVecLibrary (Nat, Vec, replicateNative)
 import Prelude (Bool(True), (+))

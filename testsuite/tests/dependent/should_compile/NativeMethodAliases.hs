@@ -16,3 +16,10 @@ stay On  = On
 instance Turn Bit where
     forward = turn
     backward = stay
+
+combine :: Bit -> Bit -> Bit
+combine Off b = b
+combine On b = turn b
+
+instance Semigroup Bit where
+    (<>) = combine

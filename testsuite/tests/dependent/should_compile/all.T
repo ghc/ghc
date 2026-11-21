@@ -102,5 +102,5 @@ test('NativeSourceCallIface',
      extra_files(['../../../../docs/dependent-haskell/examples/qualified-pi/ClosedTableLibrary.hs',
                   '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs',
                   'NativeMethodAliases.hs', 'NativeMethodAliasClient.hs', 'NativeLiteralClient.hs',
-                  'NativeSourceBinaryMethod.hs']),
+                  '../../../../docs/dependent-haskell/examples/packed-vector/RetainedSumOperator.hs']),
      makefile_test, ['NativeSourceCallIface'])
