@@ -1689,7 +1689,7 @@ See Note [Retained package equation scope] in GHC.HsToCore.Match.Constructor.
 Scale each field by the multiplicity of the case. A retained field is declared
 at Many, so its pattern Id still has multiplicity Many in a linear case.
 For an ordinary field, use the multiplicity in the constructor telescope.
-For example, a linear match on Pair can use both unrestricted fields freely.
+For example, a linear match on Pair can use its retained witness freely.
 A linear match on a constructor with a linear payload must use that payload
 once. See Note [Retained package equation scope] in GHC.HsToCore.Match.Constructor.
 

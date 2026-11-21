@@ -1530,9 +1530,7 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
            ; return (pair : seen) }
 
     argument_type (ExpFunPatTy ty)
-      = do { scaled@(Scaled mult _) <- readScaledExpType ty
-           ; unless (isManyTy mult) argument_error
-           ; return scaled }
+      = readScaledExpType ty
     argument_type _ = argument_error
 
     check_row row arg_tys result_ty (L match_loc match@(Match { m_pats = L _ pats }))
@@ -1883,9 +1881,7 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
     argument_error = failWithTc (TcRnRetainedQuantificationError RetainedConstructorArguments)
 
     argument_type (ExpFunPatTy ty)
-      = do { scaled@(Scaled mult _) <- readScaledExpType ty
-           ; unless (isManyTy mult) argument_error
-           ; return scaled }
+      = readScaledExpType ty
     argument_type _ = argument_error
 
     check_match (con, fields) arg_tys result_ty (L match_loc source_match)
