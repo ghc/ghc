@@ -8,3 +8,7 @@ good Product * (Const * [Char]) == Product * (Const * [Char])?
 good Product * (Const * [Char]) (Const * Int) Int == Product * (Const * [Char]) (Const * Int) Char?
 good Product * (Const * [Char]) (Const * Int) == Product * (Const * [Char]) (Const * Int)?
 good Product * (Const * [Char]) == Product * (Const * [Char])?
+good matchable kind result
+good mismatched domain
+good ordinary function result
+good linear function
