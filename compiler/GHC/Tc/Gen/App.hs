@@ -3175,7 +3175,10 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
                                   ; writeTcRef ref (Just cache)
                                   ; return choices } }
                     _ -> return Nothing
-                ; go1 inferred fun_orig pos acc fun_ty args } }
+                ; choices <- case inferred of
+                    Just _ -> return inferred
+                    Nothing -> tcRetainedPartialResultPlan do_ql expected_rho args tc_fun fun_ty
+                ; go1 choices fun_orig pos acc fun_ty args } }
 
     is_type_arg ETypeArg{} = True
     is_type_arg _ = False
@@ -4566,6 +4569,19 @@ tcRetainedResultMatch :: QLFlag -> Maybe TcRhoType -> [HsExprArg 'TcpRn]
                       -> HsExpr GhcTc -> TcSigmaType
                       -> TcM (Maybe ([Type], TcSigmaType))
 tcRetainedResultMatch NoQL (Just expected) args fun sigma
+  | Just (tvs, body, subst) <- retainedOrdinaryResultSubst expected args fun sigma
+  , Just inst_tys <- traverse (Subst.lookupTyVar subst) tvs
+  , and (zipWith (\tv ty -> eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty))
+                tvs inst_tys)
+  = do { valid <- tcRetainedInstScope inst_tys
+       ; return (if valid then Just (inst_tys, Subst.substTy subst body) else Nothing) }
+tcRetainedResultMatch do_ql expected args fun sigma
+  = tcRetainedWorkerResultMatch do_ql expected args fun sigma
+
+-- | Match the result of an ordinary application without choosing absent parameters.
+retainedOrdinaryResultSubst :: TcRhoType -> [HsExprArg 'TcpRn] -> HsExpr GhcTc
+                            -> TcSigmaType -> Maybe ([TyVar], Type, Subst.Subst)
+retainedOrdinaryResultSubst expected args fun sigma
   | hasNativeDependentExpr (Core.Type expected)
   , not (any is_type_arg args)
   , (ma_tvs, body) <- tcSplitForAllInvisTyVars sigma
@@ -4581,11 +4597,9 @@ tcRetainedResultMatch NoQL (Just expected) args fun sigma
   , Just kind_subst <- tcMatchTyX_BM (bind_outer tvs) Subst.emptySubst
                                    (typeKind result) (typeKind expected)
   , Just subst <- tcMatchTyX_BM (bind_outer tvs) kind_subst result expected
-  , Just inst_tys <- traverse (Subst.lookupTyVar subst) tvs
-  , and (zipWith (kind_agrees subst) tvs inst_tys)
   , eqType (Subst.substTy subst result) expected
-  = do { valid <- tcRetainedInstScope inst_tys
-       ; return (if valid then Just (inst_tys, Subst.substTy subst body) else Nothing) }
+  = Just (tvs, body, subst)
+  | otherwise = Nothing
   where
     is_type_arg ETypeArg{} = True
     is_type_arg _ = False
@@ -4594,10 +4608,53 @@ tcRetainedResultMatch NoQL (Just expected) args fun sigma
       | tv `elem` tvs = BindMe
       | otherwise = DontBindMe
 
-    kind_agrees subst tv ty = eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty)
+{- Note [Partial ordinary applications at a native result type]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In fmap (sum . toList) vectors, the input of the callback can be
+Vec Int (sourceLength xs). The declared result of (.) after two arguments is
+a -> c. It determines a and c, but does not mention the intermediate b.
+If IALL allocates a meta-variable for a, it cannot assign the native input.
+This also prevents normal argument checking from passing that input to
+toList.
 
-tcRetainedResultMatch do_ql expected args fun sigma
-  = tcRetainedWorkerResultMatch do_ql expected args fun sigma
+Use the exact expected-result substitution when it fixes a native type.
+Use it just before ordinary instantiation, after complete result and
+argument-based inference. Allow only ordinary lifted type parameters to
+remain unknown. Their kinds and the kinds of the chosen parameters must
+already agree. Allocate ordinary meta-variables for those unknowns and
+pass the complete plan to IALL. Normal argument checks use the selected
+input and infer the intermediate type. The normal meta-variable check
+still rejects a native assignment to an unknown parameter. Keep the
+original head, argument multiplicities, constraints and final subsumption.
+-}
+
+-- | Keep exact native choices and infer the remaining ordinary parameters.
+-- See Note [Partial ordinary applications at a native result type].
+tcRetainedPartialResultPlan :: QLFlag -> Maybe TcRhoType -> [HsExprArg 'TcpRn]
+                            -> HsExpr GhcTc -> TcSigmaType -> TcM RetainedInstPlan
+tcRetainedPartialResultPlan NoQL (Just expected) args fun sigma
+  | HsVar{} <- fun
+  , hasNoConcreteTyVars fun
+  , isFunTy expected
+  , hasNativeDependentExpr (Core.Type expected)
+  , any isHsValArg args
+  = runMaybeT $ do
+      expected <- liftMaybeT (liftZonkM (zonkTcType expected))
+      guard (isTauTy expected)
+      (tvs, _, subst) <- MaybeT (pure (retainedOrdinaryResultSubst expected args fun sigma))
+      let choices = map (Subst.lookupTyVar subst) tvs
+          selected = catMaybes choices
+          pending = [tv | (tv, Nothing) <- zip tvs choices]
+          kind tv = Subst.substTy subst (tyVarKind tv)
+      guard (not (null pending) && all ((`eqType` liftedTypeKind) . kind) pending)
+      guard (any (hasNativeDependentExpr . Core.Type) selected)
+      guard (not (any (`elemVarSet` tyCoVarsOfTypes (selected ++ map kind tvs)) tvs))
+      guard (and [kind tv `eqType` typeKind ty | (tv, Just ty) <- zip tvs choices])
+      guard (all noQuickLookVars (expected : selected))
+      scoped <- liftMaybeT (tcRetainedInstScope selected)
+      guard scoped
+      snd <$> MaybeT (tcRetainedArgChoices False tvs subst)
+tcRetainedPartialResultPlan _ _ _ _ _ = return Nothing
 
 -- | Recognize a package expected at one invisible result parameter.
 -- See Note [Exact expected existential packages].
