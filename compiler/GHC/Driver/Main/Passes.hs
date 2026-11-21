@@ -166,13 +166,17 @@ import GHC.Types.SourceError
 import GHC.Types.SafeHaskell
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
+import GHC.Types.TypeEnv (lookupTypeEnv, plusTypeEnv, typeEnvFromEntities)
+import GHC.Types.TyThing (TyThing(..))
 import GHC.Types.Unique.Supply ( uniqFromTag, UniqueTag(BcoTag) )
 import GHC.Types.Unique.Set
 import GHC.Types.Var.Env       ( mkEmptyTidyEnv )
 import GHC.Types.Var.Set
 
 import GHC.Utils.Fingerprint ( Fingerprint )
-import GHC.Tc.Gen.SourceTable (finalCoreMappers, verifyFinalCoreMapper, failedFinalListTables, finalCoreSourceFamilies, sourceTableCallees, publishListFoldMethods)
+import GHC.Tc.Gen.SourceTable (finalCoreMappers, verifyFinalCoreMapper, failedFinalListTables,
+                               finalCoreSourceFamilies, sourceTableCallees, publishListFoldMethods,
+                               keepCheckedMapWorkers, publishCheckedMapMethods)
 import GHC.Utils.Panic
 import GHC.Utils.Error
 import GHC.Utils.Outputable
@@ -891,10 +895,26 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
           plugins <- liftIO $ readIORef (tcg_th_coreplugins tc_result)
           optimized <- hscSimplify' plugins desugared_guts
           let checked = keepValidatedSourceMappers desugared_guts optimized
-              simplified_guts = checked { mg_binds = publishListFoldMethods (mg_module checked) (mg_binds checked) }
+              simplified_guts = checked { mg_binds = keepCheckedMapWorkers tc_result $
+                                              publishListFoldMethods (mg_module checked) (mg_binds checked) }
 
-          (cg_guts, details) <-
+          (cg_guts, original_details) <-
               liftIO $ hscTidy hsc_env simplified_guts
+
+          publication <- case publishCheckedMapMethods tc_result (cg_binds cg_guts) of
+            Nothing -> pure Nothing
+            Just publish -> liftIO $ fmap snd $
+              initTc NoTcMPlugins hsc_env hsc_src False (mg_module checked) (tcg_top_loc tc_result) $
+                setGblEnv tc_result publish
+          let details = case publication of
+                Just (ids, families) ->
+                  let types = md_types original_details `plusTypeEnv` typeEnvFromEntities ids families [] []
+                      update dfun = case lookupTypeEnv types (idName dfun) of
+                        Just (AnId new) -> new
+                        _ -> dfun
+                  in original_details { md_types = types
+                                      , md_insts = updateClsInstDFuns update (md_insts original_details) }
+                Nothing -> original_details
 
           !partial_iface <- liftIO $
                 {-# SCC "GHC.Driver.Main.mkPartialIface" #-}

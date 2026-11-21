@@ -49,6 +49,7 @@ module GHC.Types.Id (
         recordSelectorTyCon_maybe,
         sourceTableId_maybe, sourceTableKeepsExecutable, sourceMethodAliases, sourceMethodTarget_maybe,
         setSourceMethodIds, setSourceLiteralCons, sourceLiteralCons_maybe, sourceDFunDetails_maybe,
+        sourceMethodDFunClass,
 
         -- ** Modifying an Id
         setIdName, setIdUnique, GHC.Types.Id.setIdType, setIdMult,
@@ -147,6 +148,8 @@ import GHC.Core ( CoreExpr, CoreRule, Unfolding(..), IdUnfoldingFun
                 , isStableUnfolding, isCompulsoryUnfolding, isEvaldUnfolding
                 , hasSomeUnfolding, noUnfolding, evaldUnfolding )
 import GHC.Core.Type
+import GHC.Core.TyCo.Compare (eqType)
+import GHC.Types.Var (VarBndr(..), ForAllTyFlag(..), isTyVar)
 import GHC.Core.TyCon (TyCon, closedFamilyTyConCoAxiom_maybe, isTerminatingTyCon,
                        isGadtSyntaxTyCon, tyConDataCons, tyConName)
 import GHC.Core.Predicate( getClassPredTys_maybe, isCoVarType )
@@ -236,7 +239,7 @@ setSourceMethodIds dfun methods =
   setSourceDFun dfun aliases (sdf_literal =<< ownedSourceDFun dfun)
   where
     names = [(idName sel, idName target) | (sel, target) <- methods]
-    aliases | Just (cls, _) <- getClassPredTys_maybe (idType dfun)
+    aliases | Just cls <- sourceMethodDFunClass (idType dfun)
             , all (isJust . sourceTableId_maybe . snd) methods
             , validSourceMethods cls names = names
             | otherwise = []
@@ -263,11 +266,24 @@ setSourceDFun dfun methods literal
 sourceDFunDetails_maybe :: Name -> Type -> [(Name, Name)] -> Maybe SourceLiteralNames -> Maybe IdDetails
 sourceDFunDetails_maybe owner ty methods literal
   | isExternalName owner, not (null methods) || isJust literal
-  , Just (cls, _) <- getClassPredTys_maybe ty, noFreeVarsOfType ty
+  , Just cls <- sourceMethodDFunClass ty
   , validSourceMethods cls methods
   , all (isJust . sourceLiteralCons ty) literal
   = Just (DFunId (isTerminatingTyCon (classTyCon cls)) (Just (SourceDFun owner methods literal)))
   | otherwise = Nothing
+
+-- | Read the class of a closed, context-free DFun with erased type parameters.
+sourceMethodDFunClass :: Type -> Maybe Class
+sourceMethodDFunClass ty
+  | noFreeVarsOfType ty
+  , let (binders, body) = splitForAllForAllTyBinders ty
+  , all ordinary binders
+  = fst <$> getClassPredTys_maybe body
+  | otherwise = Nothing
+  where
+    ordinary (ma, Bndr v (Invisible _)) =
+      isTyVar v && ma `eqType` defaultForAllMatchability TypeLevel
+    ordinary _ = False
 
 validSourceMethods :: Class -> [(Name, Name)] -> Bool
 validSourceMethods cls methods =
@@ -311,11 +327,10 @@ sourceLiteralCons ty (sel, zero_name, succ_name)
   = Just (zero, succ_con)
   | otherwise = Nothing
 
--- | Look up the runtime target for a selector applied to a ground dictionary.
+-- | Look up the runtime target for a selector and its exact dictionary.
 sourceMethodTarget_maybe :: Id -> Id -> Maybe Name
 sourceMethodTarget_maybe dfun selector
-  | Just (cls, _) <- getClassPredTys_maybe (idType dfun)
-  , noFreeVarsOfType (idType dfun)
+  | Just cls <- sourceMethodDFunClass (idType dfun)
   , isClassOpId_maybe selector == Just cls
   = lookup (idName selector) (sourceMethodAliases dfun)
   | otherwise = Nothing
@@ -324,8 +339,9 @@ sourceMethodTarget_maybe dfun selector
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A class selector gets its implementation from its dictionary. A retained
 call can use the equations of another function when the checked instance
-method is an alias for that function. Keep the alias on the ground DFun,
-using the actual selector and target Names. A different dictionary for
+method is an alias for that function. Keep the alias on the DFun, using
+the actual selector and target Names. A polymorphic DFun passes its
+erased parameters to the worker in order. A different dictionary for
 the same class can select a different implementation.
 
 GHC ordinarily selects the field with a DFun unfolding. See

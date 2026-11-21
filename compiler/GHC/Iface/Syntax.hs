@@ -2555,6 +2555,11 @@ details.
 
 instance Binary IfaceDecl where
     put_ bh (IfaceId name ty details idinfo deps) = do
+        -- Earlier readers accept source methods only on a ground DFun.
+        case (ty, details) of
+          (IfaceForAllTy{}, IfSourceDFunId{}) ->
+            requireIfaceEvidenceVersion bh PolymorphicSourceMethodEvidence
+          _ -> pure ()
         putSourceProofTag bh deps SourceProofRuleInfoEvidence 0 11 12
         putIfaceTopBndr bh name
         lazyPut bh (ty, details, idinfo)
