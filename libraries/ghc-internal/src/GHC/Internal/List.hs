@@ -45,6 +45,7 @@ module GHC.Internal.List (
 
 import GHC.Internal.Base
 import GHC.Internal.Data.Maybe
+import GHC.Internal.Data.Tuple () -- Checked pair projections for span
 import GHC.Internal.Err (error)
 import GHC.Internal.Num (Num(..))
 import GHC.Internal.Bignum.Integer (Integer)

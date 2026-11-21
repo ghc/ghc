@@ -29,6 +29,19 @@ refilter xs =
     let ys = consumeVector (filterVec (> 3)) (filterVec odd xs)
     in ys
 
+-- | Infer the result of a callback whose element type is fixed.
+refilterMapped :: Vec n Int -> Hidden Int
+refilterMapped xs =
+    let kept = consumeVector mapThenKeep (filterVec odd xs)
+    in kept
+  where
+    mapThenKeep :: Vec j Int -> Hidden Int
+    mapThenKeep = filterVec (> 6) . increment
+
+    increment :: Vec j Int -> Vec j Int
+    increment Nil = Nil
+    increment (Cons x rest) = Cons (x + 1) (increment rest)
+
 -- | Keep both hidden lengths in the result of a locally declared callback.
 refilterBoth :: forall a i j. Integral a => Vec i a -> Vec j a -> ([a], [a])
 refilterBoth xs ys =
@@ -63,6 +76,10 @@ main = do
          && filteredCells (Cons 3 (Cons 7 (Cons 8 (Cons 9 Nil)))) == [7, 9]
          && null (filteredCells Nil)) $
         fail "the ranked callback changed filter order or demand"
+    unless (take 1 (toList (refilterMapped (Cons 7 (error "unused mapped tail")))) == [8]
+         && toList (refilterMapped (Cons 7 (Cons 2 Nil))) == [8]
+         && null (toList (refilterMapped (Cons 5 (Cons 2 Nil))))) $
+        fail "the concrete callback changed the filtered payload or demand"
     unless (refilterBoth (Cons 3 (Cons 7 Nil)) (Cons 2 (Cons 4 (Cons 10 Nil))) == ([7], [2, 4])
          && take 1 (fst (refilterBoth (Cons 7 (error "unused left tail")) (error "unused right vector"))) == [7]
          && take 1 (snd (refilterBoth (error "unused left vector") (Cons 2 (error "unused right tail")))) == [2]) $

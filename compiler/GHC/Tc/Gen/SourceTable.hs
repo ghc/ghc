@@ -12,7 +12,7 @@ import GHC.Prelude
 import GHC.Builtin.KnownOccs (eqClassOpOcc, minusClassOpOcc)
 import GHC.Core.Class (Class, classAllSelIds, classMethods, classTyCon, classTyVars)
 import GHC.Builtin.Modules (gHC_CLASSES, gHC_INTERNAL_BASE, gHC_INTERNAL_NUM_INTEGER, gHC_TYPES, mkGhcInternalModule)
-import GHC.Builtin.WiredIn.Types (nilDataCon, consDataCon, boolTy, falseDataCon, trueDataCon, charTy, charTyCon, typeSymbolKind, stringTy, integerTy, integerTyConName, listTyCon, mkListTy, promotedTupleDataCon, tupleDataCon, tupleTyCon, unmatchableDataConTy)
+import GHC.Builtin.WiredIn.Types (nilDataCon, consDataCon, boolTy, falseDataCon, trueDataCon, charTy, charTyCon, typeSymbolKind, stringTy, integerTy, integerTyConName, listTyCon, mkListTy, mkTupleTy, promotedTupleDataCon, tupleDataCon, tupleTyCon, unmatchableDataConTy)
 import GHC.Core (CoreRule(..), isAutoRule, ruleActivation)
 import qualified GHC.Core as Core
 import GHC.Core.CharCase (certOwner, certRows, certify)
@@ -1151,7 +1151,9 @@ sourceCaseTables binds = do
           pure $ do
             body <- rhs
             let guarded = if check_final
-                          then directGuardedList prepare owner body
+                          then (\(signature, branches) -> (signature, GuardedListBranches branches))
+                                 <$> directGuardedList prepare owner body
+                               <|> (,GuardedPairBranches) <$> directGuardedListPair prepare [] owner body
                           else Nothing
             pure (owner, body, ruled_owner, guarded)
       let root_cores = [(owner, body) | (owner, body, False, Nothing) <- prepared
@@ -1159,8 +1161,10 @@ sourceCaseTables binds = do
       final <- forM prepared $ \(owner, body, ruled_owner, guarded) ->
         case guarded of
           Just (signature, branches) -> do
-            (table, guard_table) <- publishGuardedList owner signature branches
-            pure (Just (finalOwner owner table, table), [guard_table])
+            tables <- publishGuardedList owner signature branches
+            case tables of
+              Just (table, guard_table) -> pure (Just (finalOwner owner table, table), [guard_table])
+              Nothing -> pure (Nothing, [])
           Nothing | Just (signature, rows) <-
                       (guard ruled_owner *> directListMapper owner body) <|>
                       (guard (binary_list_candidate owner) *>
@@ -2474,6 +2478,11 @@ See Note [Legacy private source leaves].
 -- | The checked result of a guarded list branch.
 data GuardedListResult = GuardNil | GuardInput | GuardTail | GuardRecur | GuardConsRecur
 
+-- | The two list branches or the checked lazy pair construction.
+data GuardedListBranches
+  = GuardedListBranches (GuardedListResult, GuardedListResult)
+  | GuardedPairBranches
+
 -- | Check the predicate case and the result of each alternative.
 directGuardedList :: (Core.CoreExpr -> Core.CoreExpr) -> Id -> Core.CoreExpr
                   -> Maybe (ConstructorCaseType, (GuardedListResult, GuardedListResult))
@@ -2491,29 +2500,14 @@ directGuardedList prepare owner original = do
     let (binders, body) = Core.collectBinders rhs
         (types, terms) = splitAt (length telescope) binders
         kind_args = mkTyVarTys types
-        returned con fields value = case Core.collectArgs value of
-          (Core.Var worker, Core.Type ty : args)
-            | worker == dataConWorkId con
-            , ty `eqType` element
-            , lengthIs args fields -> Just args
-          _ -> Nothing
+        returned con fields = listConstructor con element fields
     [p, ls] <- pure terms
     guard (types == binderVars telescope && all isId terms &&
            eqTypes (map varType terms) [pred_ty, input])
-    Core.Case (Core.Var scrut) list_binder outer
-      [ Core.Alt (Core.DataAlt nil) [] empty
-        , Core.Alt (Core.DataAlt cons) [x, xs] nonempty ] <- pure body
-    guard (scrut == ls && outer `eqType` result && nil == nilDataCon &&
-           cons == consDataCon && isId x && isId xs && eqTypes (map varType [x, xs]) [element, input])
+    (list_binder, x, xs, empty, rejected, accepted) <- guardedListBody p ls element result body
     case empty of
       Core.Var value | value == list_binder -> pure ()
       _ -> void (returned nilDataCon 0 empty)
-    Core.Case test _ inner
-      [ Core.Alt (Core.DataAlt no) [] rejected
-        , Core.Alt (Core.DataAlt yes) [] accepted ] <- pure nonempty
-    (Core.Var predicate, [Core.Var head_arg]) <- pure (Core.collectArgs test)
-    guard (predicate == p && head_arg == x && inner `eqType` result &&
-           no == falseDataCon && yes == trueDataCon)
     let recurse value = do
           (Core.Var f, args) <- pure (Core.collectArgs value)
           let (kind_args', value_args) = splitAt (length types) args
@@ -2536,6 +2530,163 @@ directGuardedList prepare owner original = do
   where
     guarded_signature ty = constructorCaseType ty <|> monomorphicGuardedListCaseType ty
 
+-- | Read the input spine and the application of the same predicate to its head.
+guardedListBody :: Id -> Id -> Type -> Type -> Core.CoreExpr
+                -> Maybe (Id, Id, Id, Core.CoreExpr, Core.CoreExpr, Core.CoreExpr)
+guardedListBody p input element result body = do
+    Core.Case (Core.Var scrutinee) list_binder outer
+      [ Core.Alt (Core.DataAlt nil) [] empty
+        , Core.Alt (Core.DataAlt cons) [head_id, tail_id] nonempty ] <- pure body
+    guard (scrutinee == input && outer `eqType` result && nil == nilDataCon &&
+           cons == consDataCon && isId head_id && isId tail_id &&
+           eqTypes (map varType [head_id, tail_id]) [element, varType input])
+    Core.Case test _ inner
+      [ Core.Alt (Core.DataAlt no) [] rejected
+        , Core.Alt (Core.DataAlt yes) [] accepted ] <- pure nonempty
+    (Core.Var predicate, [Core.Var head_arg]) <- pure (Core.collectArgs test)
+    guard (predicate == p && head_arg == head_id && inner `eqType` result &&
+           no == falseDataCon && yes == trueDataCon)
+    pure (list_binder, head_id, tail_id, empty, rejected, accepted)
+
+{- Note [Lazy recursive guarded list pairs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The input spine and predicate guard the returned pair. The accepting
+branch returns a boxed pair with the original head in the first field.
+Both field selectors scrutinize the same suspended recursive call.
+The recursive call must stay under that suspension. A case on the
+recursive pair before the result constructor would force the tail.
+
+CPR can put an unboxed result in a private worker. Check the exported
+wrapper's exact call and exact reboxing. In the worker, check the
+unboxed constructors and the same lazy selectors. The reboxing on the
+recursive edge must remain in the let binding. Check the target and
+arguments of both calls. The rules for an ordinary guarded list still
+require the original predicate, the original head, and the matched tail.
+
+GHCi can keep a selector in a let binding named by a debugger breakpoint.
+Check that exact binding when a result field uses it. The executable
+Core keeps the aliases and breakpoints.
+
+Use the installed checked pair projection equations in the accepting
+branch. The publisher checks both projections at the list field kind.
+Their family applications remain under the returned pair. A neutral
+recursive tail therefore leaves the same family application as an
+ordinary client call to the projection. The standard source dependency
+walk checks the projection owners and their rules.
+-}
+
+-- | Check both forms of the guarded pair. See Note [Lazy recursive guarded list pairs].
+directGuardedListPair :: (Core.CoreExpr -> Core.CoreExpr) -> [(Id, Core.CoreExpr)]
+                      -> Id -> Core.CoreExpr -> Maybe ConstructorCaseType
+directGuardedListPair prepare bindings owner original = do
+    guard (exprType original `eqType` varType owner && not (hasNativeDependentExprRhs original))
+    signature@(ConstructorCaseType telescope tc [element] [predicate, input] 1 result) <-
+        constructorCaseType (varType owner)
+    guard (tc == listTyCon && predicate `eqType` mkVisFunTyManyU element boolTy &&
+           result `eqType` mkTupleTy Boxed [input, input])
+    let rhs = stripTicksE isSourceBreakpoint (prepare original)
+        operands expr = do
+          let (binders, body) = Core.collectBinders expr
+              (types, terms) = splitAt (length telescope) binders
+          [p, ls] <- pure terms
+          (root, [elt]) <- caseDatatype (varType ls)
+          guard (root == listTyCon && all isId terms && lengthIs types (length telescope) &&
+                 all (\v -> isTyVar v && isLiftedTypeKind (varType v)) types &&
+                 varType p `eqType` mkVisFunTyManyU elt boolTy)
+          pure (mkTyVarTys types, p, ls, elt, body)
+
+        verify box loop expr = do
+          guard (exprType expr `eqType` varType loop)
+          (types, p, ls, elt, body) <- operands expr
+          let list = varType ls
+              result_ty = mkTupleTy box [list, list]
+              nil (Core.Var v) list_binder = v == list_binder || v == ls
+              nil value _ = isJust (listConstructor nilDataCon elt 0 value)
+          (list_binder, x, xs, empty, rejected, accepted) <-
+            guardedListBody p ls elt result_ty body
+          (nil_left, nil_right) <- pairFields box list empty
+          guard (nil nil_left list_binder && nil nil_right list_binder)
+          (nil_field, Core.Var returned) <- pairFields box list rejected
+          void (listConstructor nilDataCon elt 0 nil_field)
+          guard (returned == list_binder || returned == ls)
+          Core.Let (Core.NonRec suspended call) value <- pure accepted
+          guard (varType suspended `eqType` mkTupleTy Boxed [list, list])
+          recursive <- case box of
+            Boxed -> pure call
+            Unboxed -> reboxedCall list call
+          guard (guardedPairCall types p xs recursive == Just loop)
+          let (aliases, pair) = selectorLets value
+          (prefix, suffix) <- pairFields box list pair
+          [Core.Var head_id, tail_value] <- listConstructor consDataCon elt 2 prefix
+          guard (head_id == x)
+          first <- pairField aliases CLeft list suspended tail_value
+          second <- pairField aliases CRight list suspended suffix
+          guard (lengthIs aliases (length (catMaybes [first, second])))
+
+        worker_wrapper = do
+          (types, p, ls, _, body) <- operands rhs
+          call <- reboxedCall (varType ls) body
+          worker <- guardedPairCall types p ls call
+          guard (worker /= owner)
+          expression <- lookup worker bindings
+          verify Unboxed worker (stripTicksE isSourceBreakpoint expression)
+    verify Boxed owner rhs <|> worker_wrapper
+    pure signature
+  where
+    selectorLets (Core.Let (Core.NonRec alias selector) value) =
+      let (aliases, result) = selectorLets value
+      in ((alias, selector) : aliases, result)
+    selectorLets value = ([], value)
+
+-- | Match a saturated list constructor at the checked element type.
+listConstructor :: DataCon -> Type -> Int -> Core.CoreExpr -> Maybe [Core.CoreExpr]
+listConstructor con element arity value = case Core.collectArgs value of
+    (Core.Var worker, Core.Type ty : fields)
+      | worker == dataConWorkId con, ty `eqType` element, lengthIs fields arity -> Just fields
+    _ -> Nothing
+
+-- | Match the original predicate, list operand, and visible type arguments.
+guardedPairCall :: [Type] -> Id -> Id -> Core.CoreExpr -> Maybe Id
+guardedPairCall types predicate input value = do
+    (Core.Var function, args) <- pure (Core.collectArgs value)
+    let (kind_args, terms) = span Core.isTypeArg args
+    [Core.Var p, Core.Var ls] <- pure terms
+    guard (p == predicate && ls == input && eqTypes (map Core.exprToType kind_args) types)
+    pure function
+
+-- | Read only the two lazy fields of the specified tuple constructor.
+pairFields :: Boxity -> Type -> Core.CoreExpr -> Maybe (Core.CoreExpr, Core.CoreExpr)
+pairFields box field_kind value = do
+    (Core.Var worker, args) <- pure (Core.collectArgs value)
+    let (_, terms) = span Core.isTypeArg args
+    [first, second] <- pure terms
+    guard (worker == dataConWorkId (tupleDataCon box 2) &&
+           exprType value `eqType` mkTupleTy box [field_kind, field_kind] &&
+           eqTypes (map exprType terms) [field_kind, field_kind])
+    pure (first, second)
+
+-- | Read a worker call whose unboxed result is placed in a new boxed pair.
+reboxedCall :: Type -> Core.CoreExpr -> Maybe Core.CoreExpr
+reboxedCall list expr = do
+    Core.Case call _ result [Core.Alt (Core.DataAlt con) [first, second] rhs] <- pure expr
+    guard (con == tupleDataCon Unboxed 2 && result `eqType` mkTupleTy Boxed [list, list] &&
+           exprType call `eqType` mkTupleTy Unboxed [list, list])
+    (Core.Var left, Core.Var right) <- pairFields Boxed list rhs
+    guard (left == first && right == second)
+    pure call
+
+-- | Match a strict selector inside a lazy result field and report its alias.
+pairField :: [(Id, Core.CoreExpr)] -> LeftOrRight -> Type -> Id -> Core.CoreExpr -> Maybe (Maybe Id)
+pairField aliases side list suspended field = do
+    (alias, value) <- case field of
+      Core.Var v -> (Just v,) <$> lookup v aliases
+      _ -> pure (Nothing, field)
+    Core.Case (Core.Var pair) _ kind
+      [Core.Alt (Core.DataAlt con) [first, second] (Core.Var selected)] <- pure value
+    guard (con == tupleDataCon Boxed 2 && pair == suspended && kind `eqType` list &&
+           selected == pickLR side (first, second))
+    pure alias
+
 -- | The auxiliary family shares the filter's source-equation owner.
 filterGuardOcc :: OccName -> OccName
 filterGuardOcc = mkSourceTableOcc . mkVarOcc . ("#guard:" ++) . occNameString
@@ -2556,18 +2707,54 @@ isFilterGuardFor primary candidate =
     root = tyConName primary
     guard_name = tyConName candidate
 
--- | Publish two families for the two tests in the guarded cons equation.
-publishGuardedList :: Id -> ConstructorCaseType -> (GuardedListResult, GuardedListResult)
-                   -> TcM (TyCon, TyCon)
-publishGuardedList owner (ConstructorCaseType telescope _ [element] [predicate_domain, list_domain] _ result)
-                   (on_false, on_true) = do
+-- | Resolve and check the pair selectors used by the guarded list equations.
+-- See Note [Lazy recursive guarded list pairs].
+guardedListProjections :: Type -> TcM (Maybe (TyCon, TyCon))
+guardedListProjections list = do
+    envs <- tcGetFamInstEnvs
+    left <- fresh_field
+    right <- fresh_field
+    let pair = mkTyConApp (promotedTupleDataCon Boxed 2) [list, list, left, right]
+        inputs = [list, list, pair]
+        projection occ selected = do
+          name <- lookupOrig (mkGhcInternalModule (fsLit "GHC.Internal.Data.Tuple")) (mkVarOcc occ)
+          projected <- tcLookupIdMaybe name
+          pure $ do
+            table <- projected >>= sourceTableId_maybe
+            guard (sourceCaseVisibleArity table == Just 1)
+            reduced <- reduceTyFamApp_maybe envs Nominal table inputs
+            guard (reductionReducedType reduced `eqType` selected)
+            pure table
+    first <- projection "fst" left
+    second <- projection "snd" right
+    pure ((,) <$> first <*> second)
+  where
+    fresh_field = mkTyVarTy . flip mkTyVar list <$> newSysName (mkTyVarOcc "field")
+
+-- | Publish two families for the two tests in a guarded cons equation.
+publishGuardedList :: Id -> ConstructorCaseType -> GuardedListBranches -> TcM (Maybe (TyCon, TyCon))
+publishGuardedList owner signature@(ConstructorCaseType _ _ _ [_, list] _ _) branches =
+    case branches of
+      GuardedListBranches results -> Just <$> publishGuardedListWith owner signature (Left results)
+      GuardedPairBranches -> do
+        selectors <- guardedListProjections list
+        traverse (publishGuardedListWith owner signature . Right) selectors
+publishGuardedList _ _ _ = panic "publishGuardedList: invalid checked signature"
+
+-- | Share the signature and predicate case across both guarded result shapes.
+publishGuardedListWith :: Id -> ConstructorCaseType
+                       -> Either (GuardedListResult, GuardedListResult) (TyCon, TyCon)
+                       -> TcM (TyCon, TyCon)
+publishGuardedListWith owner
+    (ConstructorCaseType telescope _ [element] [predicate_domain, list_domain] _ result) branches = do
     (renaming, parameters) <- freshenTyVarBndrs (binderVars telescope)
     let instantiate = substTyUnchecked renaming . expandTypeSynonyms
         args = mkTyVarTys parameters
         kind_binders = zipWith mkNamedTyConBinder (map binderFlag telescope) parameters
         el = instantiate element
         pred_kind = instantiate predicate_domain
-        list = instantiate result
+        list = instantiate list_domain
+        result_kind = instantiate result
         loc = nameSrcSpan term
     operands <- mapM (fresh "arg") [pred_kind, instantiate list_domain]
     guard_operands <- mapM (fresh "arg") [boolTy, pred_kind, el, list]
@@ -2578,31 +2765,41 @@ publishGuardedList owner (ConstructorCaseType telescope _ [element] [predicate_d
     root_axiom <- newImplicitBinder root_name mkInstTyCoOcc
     guard_name <- newImplicitBinder term filterGuardOcc
     guard_axiom <- newImplicitBinder guard_name mkInstTyCoOcc
+    let promoted_pair first second =
+          mkTyConApp (promotedTupleDataCon Boxed 2) [list, list, first, second]
+        branch vars lhs rhs _ =
+          mkCoAxBranch (parameters ++ vars) [] [] (args ++ lhs) rhs
+                        (map (const Nominal) (parameters ++ vars)) loc
+        yes = mkTyConTy (promoteDataCon trueDataCon)
+        no = mkTyConTy (promoteDataCon falseDataCon)
     let predicate = mkTyVarTy p
         hd = mkTyVarTy x
         tl = mkTyVarTy xs
         nil = mkTyConApp (promoteDataCon nilDataCon) [el]
         cons first rest = mkTyConApp (promoteDataCon consDataCon) [el, first, rest]
-        branch vars lhs rhs _ =
-          mkCoAxBranch (parameters ++ vars) [] [] (args ++ lhs) rhs
-                        (map (const Nominal) (parameters ++ vars)) loc
         spine = buildSourceFamily root_name root_axiom
-          (kind_binders ++ mkAnonTyConBinders operands) list
-          [ branch [p] [predicate, nil] nil
+          (kind_binders ++ mkAnonTyConBinders operands) result_kind
+          [ branch [p] [predicate, nil] empty
             , branch [p, x, xs] [predicate, cons hd tl]
                 (mkTyConApp select (args ++ [mkAppTy predicate hd, predicate, hd, tl])) ]
         select = buildSourceFamily guard_name guard_axiom
-          (kind_binders ++ mkAnonTyConBinders guard_operands) list
-          [ branch [p, x, xs] [mkTyConTy (promoteDataCon falseDataCon), predicate, hd, tl]
-                (branch_result on_false)
-            , branch [p, x, xs] [mkTyConTy (promoteDataCon trueDataCon), predicate, hd, tl]
-                (branch_result on_true) ]
+          (kind_binders ++ mkAnonTyConBinders guard_operands) result_kind
+          [ branch [p, x, xs] [no, predicate, hd, tl] rejected
+            , branch [p, x, xs] [yes, predicate, hd, tl] accepted ]
         branch_result = guardedListBranchResult spine args predicate hd tl
+        (empty, rejected, accepted) = case branches of
+          Left (on_false, on_true) ->
+            (nil, branch_result on_false, branch_result on_true)
+          Right (first, second) ->
+            let recur = mkTyConApp spine (args ++ [predicate, tl])
+                project selector = mkTyConApp selector [list, list, recur]
+            in (promoted_pair nil nil, promoted_pair nil (cons hd tl),
+                promoted_pair (cons hd (project first)) (project second))
     pure (spine, select)
   where
     term = idName owner
     fresh occ kind = flip mkTyVar kind <$> newSysName (mkTyVarOcc occ)
-publishGuardedList _ _ _ = panic "publishGuardedList: invalid checked signature"
+publishGuardedListWith _ _ _ = panic "publishGuardedListWith: invalid checked signature"
 
 -- | Interpret a checked result using the head and tail of the matched cons.
 guardedListBranchResult :: TyCon -> [Type] -> Type -> Type -> Type -> GuardedListResult -> Type
@@ -2657,6 +2854,9 @@ verifyFinalCoreMapper binds original =
       | varType owner `eqType` varType original
       -> case finalCoreSourceFamilies original of
            [_] -> isJust (directListMapper owner expression <|> directListAppend owner expression)
+           [spine, _] | Just (tc, _) <- splitTyConApp_maybe (tyConResKind spine)
+                      , tc == tupleTyCon Boxed 2 ->
+                        isJust (directGuardedListPair id bindings owner expression)
            [spine, select] -> isJust $ do
              (_, (on_false, on_true)) <- directGuardedList id owner expression
              axiom <- closedFamilyTyConCoAxiom_maybe select

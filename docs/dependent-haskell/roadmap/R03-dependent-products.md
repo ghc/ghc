@@ -614,6 +614,10 @@ element is rejected at the source, and two local elements do not acquire
 an equality from their list lengths. This rule applies to leading written
 list operands when checked family axioms remove their element identities
 from the remaining type and constraints.
+Visible type arguments still determine each list's element type. The same
+proof applies with parentheses around the head or a partial application.
+The spine check uses the declared telescope before substituting type
+arguments, so the proof must hold for all those types.
 [Haskell 2010 Report, let expressions](https://haskell.foundation/haskell-2010-revised-report/expressions.html#let-expressions),
 [GHC proposal #378, dependent application](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#dependent-application-and-the-static-subset),
 and [Agda's length-indexed zip](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html).

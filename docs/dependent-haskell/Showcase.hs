@@ -141,6 +141,7 @@ import qualified PreludeFilterProof
 import qualified PreludeFilterRuntime
 import qualified PreludeMapAppendProof
 import qualified PreludeMapCompositionProof
+import qualified PreludeSpanRuntime
 import qualified PreludeTakeWhile
 import qualified PreludeMapLengthProof
 import qualified PreludeReverseLengthProof
@@ -869,6 +870,7 @@ genericSafeIndexing = do
     observe "zip two list literals at their statically known length" $
         CursorClient.zipTwoPairs 'a' 'b' (10 :: Int) 20
     observe "zip integer literals at a proven common length" CursorClient.zipIntLiterals
+    observe "zip with the first list at Int8" CursorClient.zipInt8Literals
     let chars = Column.Column (Reflection.typeRep @Char) "abc"
         unused = Column.Column (Reflection.typeRep @Bool) (error "forced column")
     observe "read a column at a runtime type and offset"
@@ -1137,6 +1139,12 @@ main = do
         RankedPackageClient.refilterRows odd even (< 10)
             (VCons (7 :: Int) (VCons 11 VNil))
             (VCons 2 (VCons 4 (VCons 10 VNil)))
+    cutoff <- newIORef (7 :: Int) >>= readIORef
+    observe "filter a numeric zip through an Int callback at its hidden length"
+        ( take 1 (RankedPackageClient.refilterNumericZip (> cutoff)
+            1 (error "unused left suffix") 6 (error "unused right suffix"))
+        , RankedPackageClient.refilterNumericZip (> cutoff) 1 2 6 2
+        , RankedPackageClient.refilterNumericZip (> cutoff) 0 2 5 2 )
     observe "project a stored vector from a strict record field"
         (StoredVector.cells (StoredVector.singleton 'h'))
     observe "read a retained length through a newtype record selector" $
@@ -1466,6 +1474,8 @@ main = do
     prefixInput <- newIORef (False : True : error "prefix and suffix forced the rejected tail") >>= readIORef
     putStrLn ("recover a list from its checked prefix and suffix: "
               ++ PreludeDropWhileRuntime.showPrefixAndSuffix prefixInput)
+    putStrLn ("prove both projections and rejoin an ordinary span: "
+              ++ PreludeSpanRuntime.showSpan prefixInput)
     putStrLn ("prove guarded list equations at two concrete element types: "
               ++ ConcreteGuardedListProof.showConcreteGuardedLists)
     pivot <- newIORef True >>= readIORef

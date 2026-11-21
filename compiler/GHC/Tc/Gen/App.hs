@@ -66,7 +66,7 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr
 import qualified GHC.Core.TyCo.Subst as Subst
-import GHC.Core.Unify ( tcMatchTyX_BM, tcMatchRetainedTyX_BM, BindFlag(..), BindTvFun )
+import GHC.Core.Unify ( tcMatchTyX_BM, tcMatchRetainedTyX_BM, tcUnifyTys, BindFlag(..), BindTvFun )
 import GHC.Core.Type
 import GHC.Core.UsageEnv ( UsageEnv, popUE, singleUsageUE, zeroUE )
 import GHC.Core.Coercion
@@ -693,15 +693,20 @@ tcRetainedSpineFields expr sigma args
   | not (any needs_fields args) = return (args, [])
   | (_, _, tau) <- tcRetainedInstTelescope sigma
   , DepFunTy DepFunVisible _ _ <- coreFullView tau
-  = do { plan <- tryTcDiscardingErrs (return Nothing) $
-           runMaybeT (scan tau args [])
+  = do { let (prefix, operands) = span spine_prefix args
+       ; plan <- tryTcDiscardingErrs (return Nothing) $
+           runMaybeT (scan tau operands [])
        ; case plan of
            Nothing -> return (args, [])
            Just count -> do
-             { changed <- traverse prepare (take count args)
-             ; return (map fst changed ++ drop count args, concatMap snd changed) } }
+             { changed <- traverse prepare (take count operands)
+             ; return (prefix ++ map fst changed ++ drop count operands, concatMap snd changed) } }
   | otherwise = return (args, [])
   where
+    spine_prefix ETypeArg{} = True
+    spine_prefix (EWrap EPar{}) = True
+    spine_prefix _ = False
+
     needs_fields = maybe False (any opaque . snd) . list_fields
     list_fields EValArg{ea_arg = arg}
       | L loc (ExplicitList _ elements) <- stripParensLHsExpr arg = Just (loc, elements)
@@ -713,6 +718,8 @@ tcRetainedSpineFields expr sigma args
       HsLit _ HsString{} -> False
       _ -> True
 
+    scan ty (EWrap EPar{} : rest) fields
+      = (1 +) <$> scan ty rest fields
     scan ty (arg : rest) fields
       | DepFunTy DepFunVisible binder _ <- coreFullView ty
       , Just (_, elements) <- list_fields arg
@@ -753,6 +760,14 @@ fields before changing an argument. Checked family reduction must remove
 these fields from the entire telescope, including its constraints.
 A result or constraint that compares contents keeps the original checking
 rule. A successful projection does not establish any new field equality.
+
+Ignore leading written type arguments and parentheses in this scan. A
+conversion valid before substituting the quantified type variables is valid
+after substitution. Keep the written arguments and parentheses in the
+application. The usual type application rules still check the type arguments
+and determine the actual field types. A checked RULE prefix can already
+contain retained value operands. This rewrite applies to the source spine
+before checking such operands.
 
 Check each new RHS once as a monomorphic ordinary expression. A lazy binding
 owns the fresh Id used by both the retained index and the runtime list. Bind
@@ -934,18 +949,18 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
       (ident, operands) <- MaybeT (tcDeclaredOperandSpine False callback)
       (provided, residual) <- MaybeT . pure $ declared_residual (varType ident) operands
       let (_, actuals, callback_result) = tcSplitFunTys residual
-          inputs = map scaledThing (formals ++ actuals)
-          pairs = zip (map scaledThing actuals) (map scaledThing formals)
+          actual_types = map scaledThing actuals
+          formal_types = map scaledThing formals
+          inputs = formal_types ++ actual_types
+          input_vars = provided ++ map snd head_binders
+          bind_input tv _ | tv `elem` input_vars = BindMe
+                          | otherwise = DontBindMe
       guard (actuals `equalLength` formals)
       guard (all isFamFreeTy inputs && all supportsQuickLookType inputs)
       guard (all noQuickLookVars (callback_result : inputs))
-      let scope = mkInScopeSet (tyCoVarsOfTypes (callback_result : inputs))
-          bind_provided tv _ | tv `elem` provided = BindMe
-                             | otherwise = DontBindMe
-      subst <- MaybeT . pure $
-        foldM (\subst (actual, formal) -> tcMatchTyX_BM bind_provided subst actual formal)
-              (Subst.mkEmptySubst scope) pairs
-      guard (all (\(actual, formal) -> eqType (Subst.substTy subst actual) formal) pairs)
+      subst <- MaybeT (pure (tcUnifyTys bind_input actual_types formal_types))
+      guard (and (zipWith eqType (Subst.substTys subst actual_types)
+                                 (Subst.substTys subst formal_types)))
       let template = Subst.substTy subst callback_result
           free = tyCoVarsOfType template
       guard (all (not . (`elemVarSet` free)) (provided ++ map snd cb_binders))
@@ -1419,8 +1434,11 @@ Quick Look skips the callback because its expected type starts with forall.
 See Note [Quick Look at value arguments].
 
 When the consumer has a ranked callback followed by directly opened
-operands, match the callback's declared input types against the expected
-callback domains. Use one substitution for the whole spine. A declared
+operands, unify the callback's declared input types with the expected
+callback domains. Bind variables of the two head declarations only. This
+lets a concrete callback, such as Vec Int j -> Filtered Int, fix the
+consumer's element type. Use one substitution for the whole spine.
+Both sides must agree after substitution. A declared
 callback that uses one length for two inputs cannot match distinct rigid
 lengths. Require the result parameter
 to occur only as the callback result and the complete application result.

@@ -1,0 +1,15 @@
+NativeListIndexDiagnostics.hs:10:1: error: [GHC-62161] [-Wincomplete-patterns (in -Wextra), Werror=incomplete-patterns]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘missing’:
+        Patterns of type ‘[a]’, ‘Fin (sourceLength items)’ not matched:
+            (_:_) (FS _)
+
+NativeListIndexDiagnostics.hs:13:1: error: [GHC-94210] [-Woverlapping-patterns (in -Wdefault), Werror=overlapping-patterns]
+    Pattern match has inaccessible right hand side
+    In an equation for ‘impossible’:
+        impossible [] FZ = ...
+
+NativeListIndexDiagnostics.hs:19:1: error: [GHC-53633] [-Woverlapping-patterns (in -Wdefault), Werror=overlapping-patterns]
+    Pattern match is redundant
+    In an equation for ‘ordinary’: ordinary whole@(_ : _) = ...
+

@@ -342,7 +342,7 @@ tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
             in tcExprMatchesWithWhereFrom (const match) mctxt (invis_pat_tys ++ pat_tys) rhs_ty
                  (maybe prepared (`splitRetainedSuffix` prepared) boundary)
       _ | DepFunTy DepFunVisible binder _ <- coreFullView ty ->
-          do { index <- newSysLocalId (fsLit "retained") ManyTy (varType binder)
+          do { index <- newSysLocalId (occNameFS (nameOccName (idName binder))) ManyTy (varType binder)
              ; let body_ty = applyTypeToArgs ty [Var index]
              ; (wrap, (pat_tys, argument_plan, rhs_ty)) <-
                  tcRetainedConArgs herald ctxt (arity - 1) body_ty
@@ -1678,7 +1678,7 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
            ; let Match { m_pats = L pats_loc checked_pats, m_grhss = grhss } = checked
                  wrap_index _ Nothing _ pat = pat
                  wrap_index index (Just cv) binds (L pat_loc pat)
-                   = L pat_loc (AsPat noExtField (noLocA index)
+                   = L pat_loc (AsPat noExtField (L (noAnnSrcSpan generatedSrcSpan) index)
                        (L pat_loc (addRetainedConProof cv binds pat)))
                  wrap_later column argument co (Scaled _ ty) pat@(L pat_loc inner)
                    | column == second_column = wrap_index second_index (snd <$> cvs) ev_binds pat
@@ -2107,8 +2107,8 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
                                        | otherwise = pat
                  checked_pats' = case checked_pats of
                    L first_loc first : rest ->
-                     L first_loc (AsPat noExtField (noLocA index)
-                                    (L first_loc (addRetainedConProof cv branch_binds first)))
+                     L first_loc (AsPat noExtField (L (noAnnSrcSpan generatedSrcSpan) index)
+                                   (L first_loc (addRetainedConProof cv branch_binds first)))
                      : zipWith4 (\dictionary co (Scaled _ ty) (L pat_loc pat) ->
                                    case dictionary of
                                      RetainedConValue -> generated (L pat_loc (XPat (CoPat (mkWpCastN co) pat ty)))

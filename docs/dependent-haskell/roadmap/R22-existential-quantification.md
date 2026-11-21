@@ -345,6 +345,23 @@ ordinary client that keeps `[7]` on the left and `[2,4]` on the right.
 [Agda record telescopes](https://agda.readthedocs.io/en/v2.8.0/language/record-types.html),
 and [Agda erased record fields](https://agda.readthedocs.io/en/v2.8.0/language/runtime-irrelevance.html#syntax).
 
+### Infer a package from a concrete callback input
+
+The ordinary Showcase client zips two written lists of length two. It filters
+the sums, then passes the hidden vector to a rank-2 consumer. Its declared
+callback takes `Vec Int n`, increments the cells and filters again using a
+runtime cutoff. The callback fixes the consumer's element type to `Int`.
+The unsigned result binding keeps the callback's declared `Filtered Int`
+type. Its length belongs to the new package.
+
+Equal input lengths allow the zip. The element values still determine
+which results pass. Reading the first kept cell leaves later fields lazy.
+Agda's `zipWith` preserves the length and its filter provides an upper bound.
+The Haskell example keeps the exact resulting length erased.
+[Showcase client](../examples/erased-existentials/RankedPackageClient.hs),
+[Agda zip](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html#zipWith),
+and [Agda filter](https://agda.github.io/agda-stdlib/master/Data.Vec.html).
+
 ### A nonrecursive local package pattern
 
 An ordinary client can write `let (value, reader) = p in reader value`

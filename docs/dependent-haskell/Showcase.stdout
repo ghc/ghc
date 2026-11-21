@@ -154,6 +154,7 @@ consume two independently bounded list positions: [Just ('b',10),Just ('b',20),N
 zip ordinary lists at their proven common length: (Just [('a',10),('b',20)],Nothing,Just 30,[('x','x')])
 zip two list literals at their statically known length: [('a',10),('b',20)]
 zip integer literals at a proven common length: [11,22]
+zip with the first list at Int8: [137,-108]
 read a column at a runtime type and offset: (Just 'b',Nothing,Nothing)
 check a signed position in a packaged vector: Just 22
 generic negative position ignores list: Nothing
@@ -287,6 +288,7 @@ filter a vector without forcing the tail to learn the result length: ([7],[7,9])
 infer the hidden lengths of a lazy filter and a retained vector: ([7],[],[9])
 refilter a vector through a rank-2 callback at its hidden length: ([7],[7,9])
 refilter two vectors and infer both hidden result lengths: ([7],[2,4])
+filter a numeric zip through an Int callback at its hidden length: ([8],[8],[])
 project a stored vector from a strict record field: "h"
 read a retained length through a newtype record selector: (2,"hs")
 read a GADT newtype length without forcing its vector: 1
@@ -424,6 +426,7 @@ prove the filter bound with a runtime decider: (BothSucc (BothSucc (BothSucc Zer
 prove the filter bound for rows at a runtime cutoff: (BothSucc (BothSucc (RightSucc ZeroBound)),[Zero,Succ Zero],Succ (Succ (Succ Zero)))
 stop or keep a lazy list prefix with a runtime gate: ((False,[]),(True,[True]))
 recover a list from its checked prefix and suffix: (Refl,[False,True],[False,True])
+prove both projections and rejoin an ordinary span: (Refl,Refl,Refl,[False],[True],[False,True])
 prove guarded list equations at two concrete element types: (Refl,Refl,[True],[Entry])
 select a payload with a checked runtime comparison: ["LT:17","EQ:True","GT:'G'"]
 use a checked cons rule without forcing the callback, head or tail: (Refl,True)

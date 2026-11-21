@@ -1289,6 +1289,45 @@ rejected head stays undefined.
 [regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledDropWhile.sh),
 and [Agda's prefix and suffix law](../REFERENCES.md#ending-a-list-prefix-at-a-decision).
 
+### Project and rejoin a guarded split
+
+The ordinary proof can put the checked prefix and suffix in a promoted
+pair. The installed `fst`, `snd`, and `(++)` equations project and
+rejoin it. The same prefix induction proves that the result is the
+original list. The proof can use the provider's stripped interface.
+The closed evaluator also checks `Prelude.span Prelude.not` on the
+literal list `[False, True, False]`. The same projection and append
+equations check that its two lists reconstruct the literal input.
+
+The checked equations for installed `Prelude.span` use the original
+predicate and matched tail. The proof of the accepted prefix exposes the
+original head with an unknown tail. The accepted suffix equals the second
+projection of the recursive split. The rejected suffix is the original
+cons. An ordinary client proves that appending the two projections
+reconstructs the input. The proof inspects each decision up to the first
+rejection and leaves the remaining decisions lazy.
+The Showcase prints both accepted projection equalities and the
+reassembly proof. It observes the first element of each result and the
+first two elements after append, with an undefined tail after the rejected
+head.
+
+The accepting branch returns the pair and the first prefix cons before
+matching the recursive pair. The selectors for the recursive fields remain
+inside the result fields. A strict recursive case forces the undefined
+suffix before it returns the first cons. The initial list case and
+predicate must finish before `span` returns the pair.
+For example, matching the result of `span p undefined` forces the list.
+A pair built directly from the two list calls exposes its constructor
+before either call runs.
+The checker verifies the ordinary body and the optimized wrapper and
+worker with their unboxed pair result. It uses the existing checked
+`fst` and `snd` tables in the accepted branch. A strict recursive
+body publishes no equation. A proof with an unknown Boolean decision
+cannot select the branch.
+[Proof](../examples/open-evaluation/PreludeSpanProof.hs),
+[regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledDropWhile.sh),
+and [Agda's `span-defn`](../REFERENCES.md#ending-a-list-prefix-at-a-decision).
+
 ### Return the matched tail from an ordinary producer
 
 An ordinary module can opt into source equations with
