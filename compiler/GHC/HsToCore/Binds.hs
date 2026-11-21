@@ -203,8 +203,8 @@ dsHsBind dflags (VarBind { var_id = var
   = do  { core_expr <- dsLExpr expr
                 -- Dictionary bindings are always VarBinds,
                 -- so we only need do this here
-        ; let core_bind@(id,_) = makeCorePair dflags var False core_expr
-              force_var = if xopt LangExt.Strict dflags
+        ; core_bind@(id,_) <- makeCorePair dflags var False core_expr
+        ; let force_var = if xopt LangExt.Strict dflags
                           then [id]
                           else []
         ; return (force_var, [core_bind]) }
@@ -218,8 +218,8 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
 
       ; let body' = mkOptTickBox tick body
             rhs   = core_wrap (mkLams args body')
-            core_binds@(id,_) = makeCorePair dflags fun False rhs
-            force_var
+      ; core_binds@(id,_) <- makeCorePair dflags fun False rhs
+      ; let force_var
                 -- Bindings are strict when -XStrict is enabled
               | xopt LangExt.Strict dflags
               , matchGroupVisArity matches == 0 -- no need to force lambdas
@@ -308,9 +308,7 @@ dsAbsBinds dflags tyvars dicts exports
        ; (spec_binds, rules) <- dsSpecs rhs prags
 
        ; let global_id' = addIdSpecialisations global_id rules
-             main_bind  = makeCorePair dflags global_id'
-                                       (isDefaultMethod prags)
-                                       rhs
+       ; main_bind <- makeCorePair dflags global_id' (isDefaultMethod prags) rhs
 
        ; return (force_vars', fromOL spec_binds ++ [main_bind]) } }
 
@@ -334,7 +332,8 @@ dsAbsBinds dflags tyvars dicts exports
                     { return ( gbl_id `setInlinePragma` defaultInlinePragma
                              , core_wrap (Var lcl_id)) } }
        ; main_prs <- mapM mk_main exports
-       ; let bind_prs' = map mk_aux_bind bind_prs
+       ; bind_prs' <- mapM mk_aux_bind bind_prs
+       ; let
              -- When there's a single source binding, we wrap the evidence binding in a
              -- separate let-rec (DSB1) inside the first desugared binding (DSB2).
              -- See Note [The no-tyvar no-dict case].
@@ -345,7 +344,8 @@ dsAbsBinds dflags tyvars dicts exports
     -- The general case
     -- See Note [Desugaring AbsBinds]
   | otherwise
-  = do { let aux_binds = Rec (map mk_aux_bind bind_prs)
+  = do { aux_prs <- mapM mk_aux_bind bind_prs
+       ; let aux_binds = Rec aux_prs
                 -- Monomorphic recursion possible, hence Rec
 
              new_force_vars = get_new_force_vars force_vars
@@ -390,7 +390,7 @@ dsAbsBinds dflags tyvars dicts exports
                 , (poly_tup_id, poly_tup_rhs) :
                    concat export_binds_s) }
   where
-    mk_aux_bind :: (Id,CoreExpr) -> (Id,CoreExpr)
+    mk_aux_bind :: (Id,CoreExpr) -> DsM (Id,CoreExpr)
     mk_aux_bind (lcl_id, rhs) = let lcl_w_inline = lookupVarEnv inline_env lcl_id
                                                    `orElse` lcl_id
                                  in
@@ -446,12 +446,12 @@ dsAbsBinds dflags tyvars dicts exports
 -- using this information.
 ------------------------
 makeCorePair :: DynFlags -> Id -> Bool -> CoreExpr
-             -> (Id, CoreExpr)
+             -> DsM (Id, CoreExpr)
 makeCorePair dflags gbl_id is_default_method rhs
   | is_default_method
   , native_rhs
   , isRetainedVanillaDefaultMethod (idName gbl_id) (idType gbl_id)
-  = (gbl_id `setIdUnfolding` mkRetainedDefaultUnfolding rhs, rhs)
+  = pure (gbl_id `setIdUnfolding` mkRetainedDefaultUnfolding rhs, rhs)
 
   | is_default_method
   , hasNativeDependentExpr rhs
@@ -461,29 +461,31 @@ makeCorePair dflags gbl_id is_default_method rhs
        ++ showSDoc dflags (ppr gbl_id)
        ++ ". This operation does not support retained Boolean types or branch proofs."))
 
+  | is_default_method    -- Default methods are *always* inlined
+                         -- See Note [INLINE and default methods] in GHC.Tc.TyCl.Instance
+  = pure (gbl_id `setIdUnfolding` mkCompulsoryUnfolding' simpl_opts rhs, rhs)
+
   | isInlinePragma inline_prag || isInlinablePragma inline_prag
   , native_rhs
   , not (hasNativeDependentExprRhs (Type (idType gbl_id)))
-  = throwGhcException (Sorry
-      ("Native dependent Core cannot enter INLINE or INLINABLE unfolding construction while desugaring binding "
-       ++ showSDoc dflags (ppr gbl_id)
-       ++ ". This operation does not support an ordinary signature with a retained RHS."))
-
-  | is_default_method    -- Default methods are *always* inlined
-                         -- See Note [INLINE and default methods] in GHC.Tc.TyCl.Instance
-  = (gbl_id `setIdUnfolding` mkCompulsoryUnfolding' simpl_opts rhs, rhs)
+  , CoreUnfolding { uf_tmpl = tmpl } <- realIdUnfolding (fst pair)
+  , hasNativeDependentUnfolding tmpl
+  = putSrcSpanDs (nameSrcSpan (idName gbl_id)) $
+    failWithDs (DsRetainedInlinePragma (idName gbl_id) inline_spec)
 
   | otherwise
-  = case inlinePragmaSpec inline_prag of
+  = pure pair
+  where
+    simpl_opts    = initSimpleOpts dflags
+    inline_prag   = idInlinePragma gbl_id
+    inline_spec   = inlinePragmaSpec inline_prag
+    native_rhs    = hasNativeDependentUnfolding rhs
+    pair = case inline_spec of
           NoUserInlinePrag -> (gbl_id, rhs)
           NoInline  {}     -> (gbl_id, rhs)
           Opaque    {}     -> (gbl_id, rhs)
           Inlinable {}     -> (gbl_id `setIdUnfolding` inlinable_unf, rhs)
           Inline    {}     -> inline_pair
-  where
-    simpl_opts    = initSimpleOpts dflags
-    inline_prag   = idInlinePragma gbl_id
-    native_rhs    = hasNativeDependentUnfolding rhs
     inlinable_unf = mkInlinableUnfolding simpl_opts StableUserSrc rhs
     inline_pair
        | AppliedToAtLeast vis_arity <- inlinePragmaSaturation inline_prag
@@ -514,9 +516,12 @@ evaluates. The unfolding builder uses native SimpleOpt and preserves
 dependencies in the template.
 
 Only a retained signature selects the retained pipeline in a client.
-Keep the existing restriction on written pragmas for ordinary signatures
-with retained RHSs. Compulsory default-method unfoldings still use the
-separate check in Note [Compulsory retained defaults] in GHC.Iface.Tidy.
+Native SimpleOpt can remove all retained Core from the template, for
+example by deleting an unused retained local binding. Permit a written
+pragma at an ordinary signature when the resulting template contains
+only ordinary Core. Keep the check on residual retained Core in
+Note [Retained Core across module boundaries] in GHC.Iface.Tidy.
+Compulsory default-method unfoldings still use their separate check.
 An ordinary binding without an unfolding request needs no native scan here.
 -}
 

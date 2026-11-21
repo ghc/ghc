@@ -13,6 +13,7 @@ import GHC.Types.Basic (pprRuleName)
 import GHC.Types.Error
 import GHC.Types.Error.Codes
 import GHC.Types.Id (idType)
+import GHC.Types.InlinePragma (inlinePragmaName)
 import GHC.Types.SrcLoc
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -28,6 +29,12 @@ instance Diagnostic DsMessage where
     DsRetainedPackagePatterns
       -> mkSimpleDecorated $
            text "Retained package matches require prefix patterns with bare variable retained fields and unrestricted multiplicity."
+    DsRetainedInlinePragma binding pragma
+      -> mkSimpleDecorated $
+           vcat [ text "The" <+> inlinePragmaName pragma <+> text "unfolding of"
+                    <+> quotes (ppr binding) <+> text "still contains retained Core."
+                , text "An importer can select the ordinary optimizer from this binding's type."
+                ]
     DsEmptyEnumeration
       -> mkSimpleDecorated $ text "Enumeration is empty"
     DsIdentitiesFound conv_fn type_of_conv
@@ -263,6 +270,7 @@ instance Diagnostic DsMessage where
   diagnosticReason = \case
     DsUnknownMessage m          -> diagnosticReason m
     DsRetainedPackagePatterns   -> ErrorWithoutFlag
+    DsRetainedInlinePragma{}    -> ErrorWithoutFlag
     DsEmptyEnumeration          -> WarningWithFlag Opt_WarnEmptyEnumerations
     DsIdentitiesFound{}         -> WarningWithFlag Opt_WarnIdentities
     DsOverflowedLiterals{}      -> WarningWithFlag Opt_WarnOverflowedLiterals
@@ -293,6 +301,7 @@ instance Diagnostic DsMessage where
   diagnosticHints = \case
     DsUnknownMessage m          -> diagnosticHints m
     DsRetainedPackagePatterns   -> noHints
+    DsRetainedInlinePragma{}    -> noHints
     DsEmptyEnumeration          -> noHints
     DsIdentitiesFound{}         -> noHints
     DsOverflowedLiterals i _tc bounds usingNegLiterals

@@ -14,7 +14,7 @@ import GHC.Hs
 import GHC.HsToCore.Pmc.Solver.Types
 import GHC.Types.Error
 import GHC.Types.Id
-import GHC.Types.InlinePragma (ActivationGhc)
+import GHC.Types.InlinePragma (ActivationGhc, InlineSpec)
 import GHC.Types.Name (Name)
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -171,6 +171,9 @@ data DsMessage
   | DsIncompleteRecordSelector !Name       -- ^ The selector
                                ![ConLike]  -- ^ The partial constructors
                                !Int        -- ^ The max number of constructors reported
+
+  -- | The unfolding of an ordinary signature still contains retained Core.
+  | DsRetainedInlinePragma !Name !InlineSpec
 
   deriving Generic
 
