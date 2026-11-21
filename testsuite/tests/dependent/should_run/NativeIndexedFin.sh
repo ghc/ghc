@@ -184,6 +184,99 @@ if "${ghc[@]}" -O0 -fforce-recomp -DBAD_INDEX -fdiagnostics-color=never -c Indep
     exit 1
 fi
 grep -Eq '^IndependentLengths.hs:17:[0-9]+: error: .GHC-83865.' wrong-length.log
+cat >CheckedList.hs <<'HS'
+{-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
+module CheckedList where
+import Data.Type.Equality ((:~:)(Refl))
+
+data CheckedList (xs :: [Bool]) where
+#if defined(DIRECT_RESULT)
+    CheckedList :: foreach (ys :: [Bool]) -> CheckedList ys
+#elif defined(COMPOUND_RESULT)
+    CheckedList :: foreach (ys :: [Bool]) -> CheckedList (True ': ys)
+#elif defined(TWO_FIELDS_RESULT)
+    CheckedList :: foreach (ys :: [Bool]) (zs :: [Bool]) -> CheckedList ys
+#else
+    CheckedList :: forall xs. foreach (ys :: [Bool]) -> (xs :~: ys) -> CheckedList xs
+
+checked :: CheckedList '[True]
+checked = CheckedList [True] Refl
+#endif
+
+#ifdef DIRECT_RESULT
+data Tagged (tag :: Ordering) where
+    Dynamic :: foreach (tag :: Ordering) -> Tagged tag
+    Fixed :: Tagged 'EQ
+#endif
+HS
+"${ghc[@]}" -O0 -c CheckedList.hs
+for shape in COMPOUND_RESULT TWO_FIELDS_RESULT; do
+    if "${ghc[@]}" -O0 -fforce-recomp "-D$shape" -ferror-spans \
+            -fdiagnostics-color=never -c CheckedList.hs >result.log 2>&1; then
+        echo "Accepted an unsupported retained constructor result ($shape)"
+        exit 1
+    fi
+    case $shape in
+        COMPOUND_RESULT)
+            grep -Fq 'CheckedList.hs:9:46-69: error: [GHC-83605]' result.log
+            grep -Eq 'The result type is .CheckedList \(True : ys\).\.' result.log ;;
+        TWO_FIELDS_RESULT)
+            grep -Fq 'CheckedList.hs:11:61-74: error: [GHC-83605]' result.log
+            grep -Eq 'The result type is .CheckedList ys.\.' result.log ;;
+    esac
+    grep -Fq 'A constructor may use its only field as the sole result index.' result.log
+    grep -Fq 'propositional equality field' result.log
+done
+if "${ghc[@]}" -O0 -fforce-recomp -XStrictData -fdiagnostics-color=never \
+        -c CheckedList.hs >strict.log 2>&1; then
+    echo 'Accepted a retained constructor with StrictData'
+    exit 1
+fi
+grep -Fq 'A retained constructor requires a lazy ordinary data declaration' strict.log
+mkdir -p "$tmp/result"/{provider,client}
+cp CheckedList.hs "$tmp/result/provider/"
+cat >"$tmp/result/client/ResultClient.hs" <<'HS'
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
+module Main where
+
+import Data.IORef (newIORef, readIORef)
+import CheckedList
+
+roundList :: CheckedList xs -> CheckedList xs
+roundList (CheckedList stored) = CheckedList stored
+
+roundTag :: Tagged tag -> Tagged tag
+roundTag (Dynamic stored) = Dynamic stored
+roundTag Fixed = Fixed
+
+dynamic :: Tagged tag -> Bool
+dynamic (Dynamic _) = True
+dynamic Fixed = False
+
+main :: IO ()
+main = do
+    xs <- newIORef (error "forced retained list" :: [Bool]) >>= readIORef
+    tag <- newIORef (error "forced retained ordering" :: Ordering) >>= readIORef
+    let listLazy = case CheckedList xs of
+            indexed@(CheckedList _) -> case roundList indexed of CheckedList _ -> True
+        tagLazy = case Dynamic tag of
+            indexed -> dynamic (roundTag indexed)
+    if listLazy && tagLazy && not (dynamic (roundTag Fixed))
+        then pure ()
+        else fail "retained constructor result changed its runtime witness"
+HS
+for opt in -O0 -O2; do
+    (
+        cd "$tmp/result/provider"
+        "${ghc[@]}" "$opt" -fforce-recomp -DDIRECT_RESULT -fomit-interface-pragmas \
+            -fno-write-if-simplified-core -c CheckedList.hs
+        cp CheckedList.hi ../client/
+        cd ../client
+        "${ghc[@]}" "$opt" -fforce-recomp -Werror=incomplete-patterns -c ResultClient.hs
+        "${ghc[@]}" "$opt" ResultClient.o ../provider/CheckedList.o -o result-client
+        ./result-client
+    )
+done
 cat >ScopedLength.hs <<'HS'
 {-# LANGUAGE CPP, EmptyCase, ExperimentalDependentTypes, GADTs, LinearTypes, ScopedTypeVariables #-}
 module ScopedLength where

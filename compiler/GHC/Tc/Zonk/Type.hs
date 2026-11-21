@@ -58,7 +58,7 @@ import GHC.Tc.Zonk.TcType
 
 import GHC.Core.Coercion
 import GHC.Core.ConLike
-import GHC.Core.DataCon ( dataConHasTrailingContext )
+import GHC.Core.DataCon ( dataConHasRetainedResult, dataConHasTrailingContext )
 import GHC.Core.PatSyn (PatSyn(..))
 import GHC.Core.TyCo.Ppr ( pprTyVar )
 import GHC.Core.Type
@@ -1637,8 +1637,15 @@ zonk_pat p@(ConPat { pat_con = L con_loc con
           -- Must zonk the existential variables, because their
           -- /kind/ need potential zonking.
           -- cf typecheck/should_compile/tc221.hs
+        -- The result coercion can refer to the selected field Id.
+        ; retained_args <- case con of
+            RealDataCon dc | dataConHasRetainedResult dc -> Just <$> zonkConStuff args
+            _ -> pure Nothing
         ; new_evs     <- zonkEvBndrsX evs
         ; (new_binds, new_wrapper, new_args, new_ordered) <- case con of
+            _ | Just args' <- retained_args ->
+                do { binds' <- zonkTcEvBinds binds
+                   ; pure (binds', wrapper, args', []) }
             _ | not (null ordered_binds), PrefixCon x pats <- args ->
                 do { binds' <- zonkTcEvBinds binds
                    ; (pats', scopes) <- zonkOrderedConPats 0 pats ordered_binds

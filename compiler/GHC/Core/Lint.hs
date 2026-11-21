@@ -2074,8 +2074,11 @@ lintCoreAlt scrut_index case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt 
 
     ; unless (null (dataConRepArgBinders con)) $ do
       { in_scope <- getInScope
-      ; lintL (all (\v -> isLocalId v && not (isCoVar v)
-                         && not (v `elemInScopeSet` in_scope)) args
+      ; let expected_binders
+              | dataConHasRetainedResult con = map isCoVar args == [False, True]
+              | otherwise = all (not . isCoVar) args
+      ; lintL (all (\v -> isLocalId v && not (v `elemInScopeSet` in_scope)) args
+               && expected_binders
                && sizeVarSet (mkVarSet args) == length args)
           (text "Retained constructor fields require fresh local Ids:" <+> ppr args) }
 

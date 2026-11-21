@@ -729,42 +729,53 @@ See docs/dependent-haskell/REFERENCES.md#checked-local-payload-signatures.
 -- domain kinds because the datatype constructor knots are not yet available.
 -- Return explicit metadata too: mkDepFunTy can erase a vacuous binder.
 tcCheckRetainedConType :: Bool
+                      -> Bool -- ^ Permit a single field to determine the result index
                       -> (HsModifiedFunArr GhcRn -> TcM Mult)
                       -> LHsType GhcRn -> TcM ([Maybe Id], TcType)
-tcCheckRetainedConType validate_domain tc_field_mult = go typeLevelMode
+tcCheckRetainedConType validate_domain allow_result tc_field_mult
+  = go allow_result typeLevelMode
   where
     valid_field_domain ty = not validate_domain || isNativeRetainedFieldType ty
-    go mode (L _ (HsParTy _ body)) = go mode body
-    go mode (L loc (HsForEachTy ann bndrs body))
+    go allow mode (L _ (HsParTy _ body)) = go allow mode body
+    go allow mode (L loc (HsForEachTy ann bndrs body))
       = setSrcSpanA loc $
         do { when (null bndrs) $
                failWithTc $ TcRnRetainedQuantificationError RetainedBinderCount
            ; when (hsForEachVisibility ann == DepFunInvisible) $
                failWithTc $ TcRnRetainedQuantificationError RetainedInvisibleField
-           ; bind_indices mode bndrs body }
-    go mode (L loc (HsFunTy _ mult arg res))
+           ; bind_indices allow mode bndrs body }
+    go _ mode (L loc (HsFunTy _ mult arg res))
       = setSrcSpanA loc $
         do { arg_ty <- tc_check_lhs_type mode arg liftedTypeKind
            ; mult_ty <- tc_field_mult mult
-           ; (binders, body_ty) <- go mode res
+           ; (binders, body_ty) <- go False mode res
            ; return (Nothing : binders, tcMkVisFunTy unmatchableDataConTy mult_ty arg_ty body_ty) }
-    go _ (L loc HsForAllTy{}) = unsupported loc
-    go _ (L loc HsQualTy{})   = unsupported loc
-    go mode body@(L loc _)
+    go _ _ (L loc HsForAllTy{}) = unsupported loc
+    go _ _ (L loc HsQualTy{})   = unsupported loc
+    go allow mode body@(L loc _)
       = setSrcSpanA loc $
         do { res_ty <- tc_check_lhs_type mode body liftedTypeKind
-           ; when (anyFreeVarsOfType isId res_ty) $ unsupported loc
+           ; when (anyFreeVarsOfType isId res_ty
+                   && not (allow && direct_result mode res_ty)) $
+               failWithTc $ TcRnRetainedQuantificationError (RetainedConstructorResult res_ty)
            ; return ([], res_ty) }
 
-    bind_indices mode [] body = go mode body
-    bind_indices mode (L loc bndr : rest) body
+    direct_result mode ty
+      | Just (_, [TermVarTy field]) <- tcSplitTyConApp_maybe ty
+      , [binder] <- nonDetNameEnvElts (mode_indices mode)
+      = field == binder
+        && (not validate_domain || isNativeClosedIndexType (varType field))
+      | otherwise = False
+
+    bind_indices allow mode [] body = go allow mode body
+    bind_indices allow mode (L loc bndr : rest) body
       = setSrcSpanA loc $
         case bndr of
           HsTvb _ () (HsBndrVar _ (L _ name)) (HsBndrKind _ domain) ->
             do { domain_ty <- tcRetainedBinderDomain valid_field_domain mode domain
                ; let index = mkLocalId name ManyTy domain_ty
                      mode' = mode { mode_indices = extendNameEnv (mode_indices mode) name index }
-               ; (binders, body_ty) <- bind_indices mode' rest body
+               ; (binders, body_ty) <- bind_indices allow mode' rest body
                ; return (Just index : binders, mkDepFunTy index body_ty) }
           _ -> failWithTc $ TcRnRetainedQuantificationError RetainedBinderCount
 
