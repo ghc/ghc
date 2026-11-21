@@ -6651,6 +6651,11 @@ complete, monomorphic signature matches the retained domain without a cast.
 The annotation uses ordinary expression signature checking. The selected
 dictionary must supply the checked conversion. The checker still compares the
 result with its independently written signature.
+
+An explicit `fromInteger 3` or `fromInteger @Nat 3` can use the same
+certificate. The argument must pass the ordinary Integer literal
+shortcut. This preserves a rebound literal's separate interpretation
+and leaves computed or negative arguments outside the certificate.
 [Interface test](../../testsuite/tests/dependent/should_compile/NativeLiteralClient.hs).
 
 ### Inference at M83
