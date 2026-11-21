@@ -133,6 +133,24 @@ absent and constructs fields whose types depend on the mapped list.
 The scope test rejects a reference to another equation's pattern binder at
 the written occurrence.
 
+## Open family instances
+
+A library can declare an open `Columns` family. A different module can
+define its own schema and map a lambda over the field types.
+
+```haskell
+data Checked e
+type instance Columns (Checked e) fields = Map (\a -> Either e a) fields
+```
+
+The instance pattern binds `e`. The lambda binds `a`. A client that imports
+only the interfaces can construct a row with type `Columns (Checked String) '[Bool]`.
+Another instance maps `Maybe` over the fields of an optional row.
+GHC still rejects an overlapping instance with a different result.
+[Schema library](../examples/open-evaluation/TypeLambda.hs),
+[instance module](../examples/open-evaluation/SchemaColumns.hs) and
+[GHC open type families](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_families.html#open-type-synonym-families).
+
 ## Matching a lambda argument
 
 A constructor case can form the body of a type lambda. For example,

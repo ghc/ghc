@@ -170,6 +170,11 @@ For a top-level type instance, allocate a stable occurrence before lifting
 the payload. The same open family can have multiple instances, including
 instances in separate declaration groups. The payload helper belongs to
 the instance module even if that module imports the family.
+Check whether the equation would generate a helper before allocating
+its owner. An ordinary equation must not consume a unique occurrence.
+Use a separate occurrence for a lambda in an open family instance.
+Its lexical captures come from that equation. The renamed instance
+still goes through the usual type family validity and overlap checks.
 
 In an associated instance, an explicit equation forall can use variables
 from the enclosing instance head. Keep those captures as arguments to the
@@ -231,10 +236,15 @@ liftTypeLambdas sigma group = do
     liftTypeInst inherited (L loc inst@TyFamInstD
                                 { tfid_inst = decl@TyFamInstDecl
                                 { tfid_eqn = eqn@FamEqn{feqn_tycon = owner, feqn_rhs = rhs} } })
-      | sumResult rhs = do
-          occ <- chooseUniqueOccTc (mkInstTyTcOcc ("$sum:" ++ occNameString (rdrNameOcc (unLoc owner))))
+      | let liftFor name = liftEquation inherited name (0 :: Int) (L loc eqn)
+            (_, (_, candidates)) = liftFor owner
+      , not (null candidates) = do
+          let family = occNameString (rdrNameOcc (unLoc owner))
+              stem | sumResult rhs = "$sum:" ++ family
+                   | otherwise = "$callback:" ++ family ++ ":instance"
+          occ <- chooseUniqueOccTc (mkInstTyTcOcc stem)
           let instance_owner = L (getLoc owner) (mkRdrUnqual occ)
-              (_, (L _ eqn', lifted)) = liftEquation False inherited instance_owner (0 :: Int) (L loc eqn)
+              (_, (L _ eqn', lifted)) = liftFor instance_owner
           return (L loc inst{tfid_inst = decl{tfid_eqn = eqn'}}, lifted)
     liftTypeInst _ inst = return (inst, [])
 
@@ -248,7 +258,7 @@ liftTypeLambdas sigma group = do
         in return (L loc syn{tcdRhs = rhs'}, families)
     liftDecl (L loc decl@FamDecl{tcdFam = family@FamilyDecl
                   { fdLName = owner, fdInfo = ClosedTypeFamily ann (Just rows) }}) =
-      let (_, results) = mapAccumL (liftEquation True [] owner) (0 :: Int) rows
+      let (_, results) = mapAccumL (liftEquation [] owner) (0 :: Int) rows
           (rows', lifted) = unzip results
           family' = family{fdInfo = ClosedTypeFamily ann (Just rows')}
       in return (L loc decl{tcdFam = family'}, concat lifted)
@@ -257,17 +267,13 @@ liftTypeLambdas sigma group = do
       return (L loc cls{tcdDecls = nested'}, lifted)
     liftDecl decl = return (decl, [])
 
-    liftEquation closed inherited owner salt row@(L loc eqn@FamEqn{feqn_rhs = rhs})
-      | closed || has_sum =
-          let captures = equationCaptures inherited eqn
-              free = Set.fromList (map unLoc (extractHsTyRdrTyVars rhs))
-              used | spliceFree rhs = fst (foldr selectCapture ([], free) captures)
-                   | otherwise = captures
-              (rhs', families, next) = liftRhs has_sum Nothing owner used rhs salt
-          in (next, (L loc eqn{feqn_rhs = rhs'}, families))
-      | otherwise = (salt, (row, []))
-      where
-        has_sum = sumResult rhs
+    liftEquation inherited owner salt (L loc eqn@FamEqn{feqn_rhs = rhs}) =
+      let captures = equationCaptures inherited eqn
+          free = Set.fromList (map unLoc (extractHsTyRdrTyVars rhs))
+          used | spliceFree rhs = fst (foldr selectCapture ([], free) captures)
+               | otherwise = captures
+          (rhs', families, next) = liftRhs (sumResult rhs) Nothing owner used rhs salt
+      in (next, (L loc eqn{feqn_rhs = rhs'}, families))
 
     sumResult (L _ (HsParTy _ body)) = sumResult body
     sumResult (L _ (HsKindSig _ body _)) = sumResult body
