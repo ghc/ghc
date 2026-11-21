@@ -1400,13 +1400,13 @@ tcIfaceDataCons tycon_name tycon if_cons
     type_binder (IfaceTvBndr _) = True
     type_binder _              = False
 
-    -- Each written forall has one visibility. The existing user binder flags
-    -- store it, so the group encoding stays the same.
+    -- Each written forall is either required or invisible. The existing
+    -- binder flags also store each invisible binder's specificity.
     valid_type_groups bs [] = null bs
     valid_type_groups bs ((_, n) : rest) =
       let (here, later) = splitAt n bs
       in (all isVisibleForAllTyBinder here ||
-          all (isSpecifiedForAllTyFlag . binderFlag) here) &&
+          all isInvisibleForAllTyBinder here) &&
          valid_type_groups later rest
 
     -- Check only interface syntax here. The parent TyCon is still knot-tied.
