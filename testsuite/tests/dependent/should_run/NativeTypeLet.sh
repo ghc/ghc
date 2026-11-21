@@ -104,6 +104,8 @@ module Operator where
 import GHC.Exts (Multiplicity)
 type Result (f :: * -> * -> *) a b flag =
     let field = a `f` b in case flag of { True -> Maybe field; False -> [field] }
+type Prefix f a b flag =
+    let field = f a b in case flag of { True -> Maybe field; False -> [field] }
 type Handler (m :: Multiplicity) a b flag =
     let callback = a %m -> b in case flag of { True -> Maybe callback; False -> [callback] }
 HS
@@ -115,7 +117,7 @@ cat > Main.hs <<'HS'
 module Main where
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Exts (Multiplicity(..))
-import Operator (Handler, Result)
+import Operator (Handler, Prefix, Result)
 import PackedVecLibrary (Vec(..))
 import TypeLet (Frame, frameValues)
 
@@ -127,6 +129,8 @@ captured :: Result Either Char Bool 'True :~: Maybe (Either Char Bool)
 captured = Refl
 second :: Result (,) Char Bool 'False :~: [(Char, Bool)]
 second = Refl
+inferred :: Prefix Either Int Char 'True :~: Maybe (Either Int Char)
+inferred = Refl
 linear :: Handler 'One Char Bool 'True :~: Maybe (Char %1 -> Bool)
 linear = Refl
 many :: Handler 'Many Char Bool 'False :~: [Char -> Bool]
