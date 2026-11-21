@@ -6,7 +6,15 @@ import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Matchability (U)
 
-#if defined(KNOWN_PREFIX)
+#if defined(FORGOTTEN) || defined(VALID_FORGOTTEN)
+type Ignore a = forall b. Show b => b -> String
+#ifdef VALID_FORGOTTEN
+forgotten :: Ignore (Elem [Bool])
+#else
+forgotten :: Ignore (Elem [Int])
+#endif
+forgotten x = show x
+#elif defined(KNOWN_PREFIX)
 data Uses (f :: Maybe Bool %U -> Maybe Bool) = Uses
 prefix :: Uses Echo
 prefix = Uses
