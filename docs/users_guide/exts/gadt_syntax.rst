@@ -213,8 +213,10 @@ syntactically allowed. Some further various observations about this grammar:
   Pass the integer first, then the required type, as in
   ``After @Char 37 (type Bool)``. A pattern uses the same order, as in
   ``After n (type b)``. This form applies to lifted data constructors whose
-  result is the parent applied to distinct type variables and whose
-  signature has an empty context.
+  result is the parent applied to distinct type variables. A constructor
+  context can precede the fields and refer to earlier type variables.
+  Pattern matching makes those constraints available to the field patterns,
+  the terminal type patterns, and the right-hand side.
 
   A higher-rank field has its own quantifiers or constraints inside
   parentheses. For example, ``MkS :: Int -> (forall a. a -> a) -> S``

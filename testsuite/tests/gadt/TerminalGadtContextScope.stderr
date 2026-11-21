@@ -1,0 +1,2 @@
+TerminalGadtContextScope.hs:5:27: error: [GHC-76037]
+    Not in scope: type variable ‘b’
