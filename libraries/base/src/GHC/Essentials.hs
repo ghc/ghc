@@ -204,7 +204,7 @@ module GHC.Essentials
     -- Template Haskell
     , Lift, Quote  -- The Lift and Quote classeso
     , Q, DecsQ, ExpQ, TypeQ, PatQ
-    , Name, Decs, TH.Type, FunDep
+    , Name, Decs, TH.Type, TypeCaseAlt, FunDep
     , Pred, Code, InjectivityAnn, ModName
     , Con, RetainedGadtArg, BangType, VarBangType, RuleBndr, TySynEqn, Role, DerivClause
     , Kind, TyVarBndrUnit, TyVarBndrSpec, TyVarBndrVis, DerivStrategy
@@ -244,6 +244,7 @@ module GHC.Essentials
     , TH.unidir, TH.implBidir, TH.explBidir
     , TH.prefixPatSyn, TH.recordPatSyn, TH.infixPatSyn
     , forallT, forallVisT, forallMatchT, forEachT, varT, indexVarT, conT, infixT, tupleT
+    , caseT, typeCaseAlt
     , unboxedTupleT, unboxedSumT, arrowT, mulArrowT, listT
     , appT, appKindT, sigT, equalityT, litT, promotedT
     , promotedTupleT, promotedNilT, promotedConsT
