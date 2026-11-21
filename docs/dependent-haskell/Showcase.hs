@@ -149,6 +149,7 @@ import qualified PreludeAppendLengthProof
 import qualified ListFoldrProof
 import qualified MappingProof
 import qualified PreludeMappingProof
+import qualified OrdinaryEitherMapping
 import qualified PreludeFoldrProof
 import qualified PreludeFilterLengthProof
 import qualified PreludeFilterProof
@@ -1769,6 +1770,7 @@ main = do
     -- module checks their rule dependencies when it uses the exported proof.
     putStrLn ("prove that Prelude.fmap leaves Nothing unchanged: " ++ PreludeMappingProof.example)
     putStrLn ("map an open Just field once and twice with Prelude.fmap: " ++ PreludeMappingProof.presentExample)
+    putStrLn ("prove the two Either equations of Prelude.fmap: " ++ OrdinaryEitherMapping.example)
     putStrLn ("prove that folding a mapped list composes the step: " ++ PreludeFoldrProof.showFoldMap)
     putStrLn ("prove that reverse preserves list length: "
               ++ PreludeReverseLengthProof.showPreludeReverseLength)

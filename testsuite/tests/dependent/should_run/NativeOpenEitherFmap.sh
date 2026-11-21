@@ -61,6 +61,20 @@ HS
 printf '(Refl,Refl)\n' >expected
 cmp expected actual
 
+# Compile the same ordinary client used by the Showcase against a stripped .hi.
+cp "$src/OrdinaryEitherMapping.hs" .
+test ! -e PreludeFmapEitherProof.hs
+cat >Observe.hs <<'HS'
+module Main where
+import qualified OrdinaryEitherMapping
+
+main :: IO ()
+main = putStrLn OrdinaryEitherMapping.example
+HS
+"${ghc[@]}" -O2 -fenable-rewrite-rules -fignore-interface-pragmas -c OrdinaryEitherMapping.hs Observe.hs
+"${ghc[@]}" OrdinaryEitherMapping.o Observe.o ../producer/PreludeFmapEitherProof.o -o observe
+diff -u <(printf "((Refl,Refl),Left 'x',Right False)\n") <(./observe)
+
 reject() {
     local expected=$1
     shift

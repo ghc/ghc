@@ -164,6 +164,7 @@ test('NativeHomeRuleRecomp',
 test('NativeOpenEitherFmap',
      [only_ways(['normal']),
       extra_files([open_eval_dir + 'PreludeFmapEitherProof.hs',
+                   open_eval_dir + 'OrdinaryEitherMapping.hs',
                    'NativeOpenEitherFmapProducer.hs'])],
      run_command, ['bash NativeOpenEitherFmap.sh "{compiler}" "{libdir}"'])
 test('NativeOpenEitherFmapDownstream',
