@@ -167,6 +167,7 @@ import qualified ParameterizedIndexLibrary as Parameterized
 import qualified PackedProjection
 import qualified PackageEquality
 import PackedVecLibrary
+import qualified AppendByMethodClient
 import qualified RetainedSumOperator
 import RetainedNat (Retained(..), constantPackage, withRetained)
 import qualified DependentPair as Pair
@@ -1777,6 +1778,7 @@ arithmeticNotation = do
     observe "replicateNative (2 :: Nat)" (toList annotated)
     observe "explicit numeric conversion in an ordinary client" Ordinary.ordinaryConvert
     observe "use the selected (+) in a retained result" (toList (RetainedSumOperator.sumIndex n (S Z)))
+    observe "append two and one using the selected (+)" AppendByMethodClient.appendTwoAndOneByMethod
     observe "replicateNative (n + 1)" (toList oneMore)
     observe "vector with length n + 3" (toList joined)
     observe "2 + 3 at runtime" ((2 + 3) :: Nat)
