@@ -217,6 +217,9 @@ Showcase splits a list of Boolean values and an optional character through
 the same imported class method. A functional dependency can also determine
 a second parameter through an intermediate parameter. An unrelated slot
 in a multi-parameter class still makes an associated declaration ambiguous.
+GHC also requires an associated declaration in a non-nullary class to
+mention a class variable. The existing GHC-55912 check still applies to
+`class Only e | -> e` with a nullary associated family.
 [Source provider](../examples/open-evaluation/ConstrainedElements.hs) and
 [ordinary client](../examples/open-evaluation/ConstrainedElementsClient.hs).
 
@@ -233,7 +236,11 @@ For example, `forall a. Allowed a => Owner (f a) Bool` may prove
 in `Owner (f Bool) e` from this quantified constraint. GHC 9.14.1
 reports GHC-39999 for the analogous ordinary class method when its result
 type is unknown. Writing its result as `Bool` lets GHC use the quantified
-constraint. The domain check uses the same instance solver.
+constraint. The domain check uses the same instance solver. A client can
+specialize the quantified constraint by constructing
+`Dict :: Dict (Owner (f Bool) Bool)`. Matching that dictionary supplies
+the evidence for the nested family application. With `Int` in place of
+`Bool`, GHC reports the missing `Allowed Int` at `Dict`.
 [GHC User’s Guide on quantified constraints](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/quantified_constraints.html#instance-lookup).
 
 A partial application in a written value signature can determine the
