@@ -313,10 +313,11 @@ reconstruction proof for an arbitrary cut within the vector.
 and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vector-append-preserves-its-right-operand).
 
 1. **R03 and R05.** The expected constructor result can now identify
-   two original vectors after one bounds check. A later inferred operand
-   can also depend on an earlier one. The remaining work includes mixed
-   erased arguments whose values are only partly determined by the
-   result. A Given equality between open family applications can still
+   two original vectors and their element type after one bounds check.
+   The expected vector domains of the returned pieces also determine the
+   suffix. The paired implementation needs no visible type application.
+   An index that appears only under a noninjective type family remains
+   ambiguous. A Given equality between open family applications can still
    expose a solver rewrite cycle.
    [Checked input inference](roadmap/R03-dependent-products.md)
    and [independent inputs](../../testsuite/tests/dependent/should_fail/NativeIrredIndexEvidence.hs).
