@@ -103,7 +103,8 @@ import GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourc
                               sourceCaseKindUse, sourceTableReferenceUse, indexedProjectionSource, isSourceConstructorCase, monomorphicEnumCaseArity, sourceCaseVisibleArity, sourceTableOwner, sourcePairBuilderField,
                               lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource,
                               lookupSourceBinaryMethod, sourceMapSelector, lookupSourceContainerMethod,
-                              lookupSourceGroundDFun, recordSourceMethodUse, recordSourceProofAliasUse)
+                              lookupSourceGroundDFun, lookupSourceCheckedMapMethod,
+                              recordSourceMethodUse, recordSourceProofAliasUse)
 import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcPrepareClosedApplication, tcPrepareClosedFunctionValue, tcPrepareClosedResult, tcPrepareClosedObservation, tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand, tcHasClosedCallExecutable)
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Instance.Family (tcGetFamInstEnvs)
@@ -3043,13 +3044,18 @@ tc_app_ty_other mode rn_ty exp_kind
           actual <- liftZonkM (zonkTcType kind)
           case splitAppTy_maybe actual of
             Just (domain, _) -> do
-              table <- lookupSourceContainerMethod fun domain
+              table <- lookupSourceCheckedMapMethod cls fun domain
               case table of
-                Just checked -> pure (Just (checkTableMethod fun checked))
-                Nothing | isOpenTypeOperand left
-                        , isOpenTypeOperand right || promotedReceiver receiver ->
-                  fmap (checkOpenMethod fun left receiver) <$> lookupSourceGroundDFun cls domain
-                Nothing -> pure Nothing
+                Just (dfun, predicate, worker, checked) ->
+                  pure (Just (checkInstantiatedMethod fun predicate (dfun, worker, checked)))
+                Nothing -> do
+                  ground <- lookupSourceContainerMethod fun domain
+                  case ground of
+                    Just checked -> pure (Just (checkTableMethod fun checked))
+                    Nothing | isOpenTypeOperand left
+                            , isOpenTypeOperand right || promotedReceiver receiver ->
+                      fmap (checkOpenMethod fun left receiver) <$> lookupSourceGroundDFun cls domain
+                    Nothing -> pure Nothing
             Nothing -> pure Nothing
       | Just _ <- isClassOpId_maybe fun
       , Just domain <- retainedDomain left <|> retainedDomain right
@@ -3057,9 +3063,12 @@ tc_app_ty_other mode rn_ty exp_kind
            fmap (checkTableMethod fun) <$> lookupSourceBinaryMethod fun actual
     checkedClassMethod _ _ = pure Nothing
 
-    checkTableMethod fun (dfun, target, table) = do
+    checkTableMethod fun selected@(dfun, _, _) =
+      checkInstantiatedMethod fun (varType dfun) selected
+
+    checkInstantiatedMethod fun predicate (dfun, target, table) = do
       recordSourceMethodUse dfun fun target
-      checkSourceMethodSelection mode dfun (idName fun)
+      checkSourceMethodSelection mode dfun predicate (idName fun)
       (ty, kind) <- tcInferTyApps mode hs_fun_ty (mkTyConTy table) hs_args
       checkExpKind mode rn_ty ty kind exp_kind
 
@@ -3067,7 +3076,7 @@ tc_app_ty_other mode rn_ty exp_kind
     checkOpenMethod fun left receiver dfun = do
       let name = idName fun
       local <- tcOpenTypeContext mode name
-      checkSourceMethodSelection mode dfun name
+      checkSourceMethodSelection mode dfun (varType dfun) name
       worker <- readOpenMethodWorker dfun fun >>= either (reportOpenTypeFailure name) pure
       recordSourceMethodUse dfun fun worker
       (callback, _) <- tc_infer_lhs_type mode left
@@ -3143,13 +3152,13 @@ sourceMethodContext mode theta = mode { mode_source_givens = theta ++ mode_sourc
 
 -- | Require the ordinary solver to select the exact compiled dictionary.
 -- See Note [Select the dictionary for a promoted method] in GHC.Tc.Gen.SourceTable.
-checkSourceMethodSelection :: TcTyMode -> Id -> Name -> TcM ()
-checkSourceMethodSelection mode dfun selector = do
+checkSourceMethodSelection :: TcTyMode -> Id -> PredType -> Name -> TcM ()
+checkSourceMethodSelection mode dfun predicate selector = do
   lexical <- getLexicalGivens
   written <- newEvVars (mode_source_givens mode)
   (_, constraints) <- captureConstraints $
     checkConstraints (SigTypeSkol (ExprSigCtxt NoRRC)) [] (written ++ lexical) $ do
-      wanted <- newWanted (OccurrenceOf selector) Nothing (varType dfun)
+      wanted <- newWanted (OccurrenceOf selector) Nothing predicate
       emitSimple (mkNonCanonical wanted)
       emitDelayedErrors (unitBag (DE_SourceMethod (ctEvEvId wanted) dfun selector (ctEvLoc wanted)))
   discardResult (unsetGOptM Opt_SolveConstantDicts (simplifyTopNoDefaulting constraints))

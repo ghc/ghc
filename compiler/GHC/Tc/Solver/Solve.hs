@@ -32,14 +32,15 @@ import qualified GHC.Tc.Utils.Monad   as TcM
 import qualified GHC.Tc.Zonk.TcType   as TcM
 
 import GHC.Builtin.WiredIn.Types ( unmatchableDataConTy )
-import GHC.Core ( Expr(Var) )
+import GHC.Core ( Expr(Type, Var), collectArgs )
+import GHC.Core.Type ( splitForAllForAllTyBinders, substTyWith )
 import GHC.Core.Predicate
 import GHC.Core.Reduction
 import GHC.Core.Coercion
 import GHC.Core.Class( classHasSCs )
 
 import GHC.Types.Id( idType, isDFunId )
-import GHC.Types.Var( DFunId, EvVar, tyVarKind )
+import GHC.Types.Var( DFunId, EvVar, ForAllTyFlag(Invisible), VarBndr(..), isTyVar, tyVarKind )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Basic ( IntWithInf, intGtLimit )
@@ -865,10 +866,11 @@ checked source equations. Its dictionary Wanted must still be solved in its
 original implication. Check that same Wanted's actual evidence after solving.
 A separate instance lookup cannot account for lexical Givens or local instances.
 
-Accept only a context-free, ground DFun of the exact dictionary predicate.
-Follow exact variable aliases in Wanted evidence bindings. Do not follow Given
-bindings, casts, evidence applications, or arbitrary unfoldings. A missing alias
-or a cycle does not prove the obligation. Keep an unproved check for a later
+Accept only a context-free DFun instantiated at the exact dictionary predicate.
+Its free variables must be rigid. Follow exact variable aliases in Wanted
+evidence bindings. The DFun application can pass erased type arguments.
+A Given, cast, evidence argument or arbitrary unfolding cannot prove the
+obligation. Keep an unproved check for a later
 solver pass or error reporting. Never replace its evidence with another DFun.
 
 cloneWC preserves these checks and dictionary EvVars, while it clones evidence
@@ -891,21 +893,36 @@ sourceMethodEvidenceMatches bindings dictionary expected
   = do { dictionary <- zonk_id dictionary
        ; expected <- zonk_id expected
        ; if isDFunId expected && isClassPred (idType dictionary)
-            && noFreeVarsOfType (idType dictionary)
-            && idType dictionary `tcEqType` idType expected
+            && all rigid (tyCoVarsOfTypeList (idType dictionary))
          then go emptyVarSet (idType dictionary) expected dictionary
          else return False }
   where
     zonk_id var = wrapTcS (TcM.liftZonkM (TcM.zonkId var))
+    rigid tv = isTyVar tv && isSkolemTyVar tv && not (isRuntimeUnkSkol tv)
     go seen predicate expected current
       | current `elemVarSet` seen = return False
-      | Just EvBind { eb_info = EvBindWanted {}, eb_rhs = EvExpr (Var next) }
+      | Just EvBind { eb_info = EvBindWanted {}, eb_rhs = EvExpr rhs }
           <- asum [lookupEvBind scope current | scope <- bindings]
+      , (Var next, args) <- collectArgs rhs
       = do { next <- zonk_id next
-           ; if not (idType next `tcEqType` predicate) then return False
-             else if isDFunId next then return (next == expected)
-             else go (extendVarSet seen current) predicate expected next }
+           ; if isDFunId next then
+               if next == expected then matches predicate next args else return False
+             else if null args && idType next `tcEqType` predicate
+               then go (extendVarSet seen current) predicate expected next
+               else return False }
       | otherwise = return False
+
+    matches predicate dfun args
+      | (binders, body) <- splitForAllForAllTyBinders (idType dfun)
+      , Just variables <- traverse erasedBinder binders
+      , Just types <- traverse (\case Type ty -> Just ty; _ -> Nothing) args
+      , equalLength variables types, isClassPred body
+      = do { actual <- wrapTcS (TcM.liftZonkM (TcM.zonkTcTypes types))
+           ; return (substTyWith variables actual body `tcEqType` predicate) }
+      | otherwise = return False
+    erasedBinder (ma, Bndr v (Invisible _))
+      | isTyVar v, ma `tcEqType` unmatchableDataConTy = Just v
+    erasedBinder _ = Nothing
 
 {- Note [Delete dead Given evidence bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

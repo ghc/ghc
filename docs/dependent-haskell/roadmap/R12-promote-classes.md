@@ -9,6 +9,37 @@ and general class promotion remain open.
 [Serokell card](https://ghc.serokell.io/dh#promote-classes) and
 [local dependencies](../ROADMAP.md#upstream-checklist-and-complete-dependency-index).
 
+## A checked method with a polymorphic receiver
+
+```haskell
+type MappedEither :: forall e a b. (a %U -> b) -> Either e a -> Either e b
+type MappedEither f x = Prelude.fmap f x
+```
+
+The instance dictionary passes its erased `e` to the worker. The compiler
+checks the dictionary field and the worker's final constructor cases.
+The exported synonym names the worker's checked family. The two equations
+preserve `Left x` and return `Right (f x)` for `Right x`. The baseline
+reported GHC-70565 at the open callback in `Prelude.fmap f x`.
+[Either proof](../examples/open-evaluation/PreludeFmapEitherProof.hs).
+
+The `Result e` test uses an independent `Translate` class. An ordinary
+client reads the existing proof from a stripped interface. A client with
+a specialized `Translate (Result Type)` instance can prove the equation
+for its own worker. Equating that result with the original worker's
+result fails with GHC-83865. A fresh call with an abstract `e` and an
+applicable coherent or incoherent overlap fails with GHC-70565.
+A competing instance for `Maybe` is apart from `Result e`.
+[Result provider](../../../testsuite/tests/dependent/should_run/either-fmap-overlap-source/ResultFunctor.hs)
+and [downstream test](../../../testsuite/tests/dependent/should_run/NativeOpenEitherFmapDownstream.sh).
+
+A local dictionary Given blocks the default worker check. An active rule
+on `fmap` for `Either` reports GHC-83605 for a direct proof, an imported
+synonym, or an imported equality proof. A separate rule for `Maybe` fires
+in a consumer that still uses the `Either` proof. Rebuild older providers
+to add the mandatory method evidence used by these tests.
+[Given and rewrite controls](../../../testsuite/tests/dependent/should_run/NativeOpenEitherFmap.sh).
+
 ## A method in a retained result type
 
 ```haskell
