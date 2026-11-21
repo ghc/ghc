@@ -25,7 +25,9 @@ fold :: (a -> b -> b) -> b -> [a] -> b
 fold _ seed [] = seed
 fold step seed (x : xs) = step x (fold step seed xs)
 HS
+# Keep the rule in the provider interface when the consumer uses -fno-code.
 cat > RuleHelper.hs <<'HS'
+{-# OPTIONS_GHC -fobject-code #-}
 {-# LANGUAGE Trustworthy #-}
 module RuleHelper (value, delayed) where
 
