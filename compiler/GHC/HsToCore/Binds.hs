@@ -203,7 +203,7 @@ dsHsBind dflags (VarBind { var_id = var
   = do  { core_expr <- dsLExpr expr
                 -- Dictionary bindings are always VarBinds,
                 -- so we only need do this here
-        ; core_bind@(id,_) <- makeCorePair dflags (idName var) var False core_expr
+        ; core_bind@(id,_) <- makeCorePair dflags False (idName var) var False core_expr
         ; let force_var = if xopt LangExt.Strict dflags
                           then [id]
                           else []
@@ -218,7 +218,7 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
 
       ; let body' = mkOptTickBox tick body
             rhs   = core_wrap (mkLams args body')
-      ; core_binds@(id,_) <- makeCorePair dflags (idName fun) fun False rhs
+      ; core_binds@(id,_) <- makeCorePair dflags False (idName fun) fun False rhs
       ; let force_var
                 -- Bindings are strict when -XStrict is enabled
               | xopt LangExt.Strict dflags
@@ -308,7 +308,7 @@ dsAbsBinds dflags tyvars dicts exports
        ; (spec_binds, rules) <- dsSpecs rhs prags
 
        ; let global_id' = addIdSpecialisations global_id rules
-       ; main_bind <- makeCorePair dflags (idName global_id) global_id' (isDefaultMethod prags) rhs
+       ; main_bind <- makeCorePair dflags False (idName global_id) global_id' (isDefaultMethod prags) rhs
 
        ; return (force_vars', fromOL spec_binds ++ [main_bind]) } }
 
@@ -332,7 +332,8 @@ dsAbsBinds dflags tyvars dicts exports
                     { return ( gbl_id `setInlinePragma` defaultInlinePragma
                              , core_wrap (Var lcl_id)) } }
        ; main_prs <- mapM mk_main exports
-       ; bind_prs' <- mapM mk_aux_bind bind_prs
+       ; let direct_workers = mkVarSet [worker | (_, Var worker) <- main_prs]
+       ; bind_prs' <- mapM (mk_aux_bind direct_workers) bind_prs
        ; let
              -- When there's a single source binding, we wrap the evidence binding in a
              -- separate let-rec (DSB1) inside the first desugared binding (DSB2).
@@ -344,7 +345,7 @@ dsAbsBinds dflags tyvars dicts exports
     -- The general case
     -- See Note [Desugaring AbsBinds]
   | otherwise
-  = do { aux_prs <- mapM mk_aux_bind bind_prs
+  = do { aux_prs <- mapM (mk_aux_bind emptyVarSet) bind_prs
        ; let aux_binds = Rec aux_prs
                 -- Monomorphic recursion possible, hence Rec
 
@@ -390,11 +391,11 @@ dsAbsBinds dflags tyvars dicts exports
                 , (poly_tup_id, poly_tup_rhs) :
                    concat export_binds_s) }
   where
-    mk_aux_bind :: (Id,CoreExpr) -> DsM (Id,CoreExpr)
-    mk_aux_bind (lcl_id, rhs) =
+    mk_aux_bind :: VarSet -> (Id,CoreExpr) -> DsM (Id,CoreExpr)
+    mk_aux_bind direct_workers (lcl_id, rhs) =
       let lcl_w_inline = lookupVarEnv inline_env lcl_id `orElse` lcl_id
           pragma_name = idName (lookupVarEnv global_env lcl_id `orElse` lcl_id)
-      in makeCorePair dflags pragma_name lcl_w_inline False rhs
+      in makeCorePair dflags (lcl_id `elemVarSet` direct_workers) pragma_name lcl_w_inline False rhs
 
     inline_env :: IdEnv Id -- Maps a monomorphic local Id to one with
                            -- the inline pragma from the source
@@ -445,9 +446,9 @@ dsAbsBinds dflags tyvars dicts exports
 -- the unfolding in the interface file is made in `GHC.Iface.Tidy.addExternal`
 -- using this information.
 ------------------------
-makeCorePair :: DynFlags -> Name -> Id -> Bool -> CoreExpr
+makeCorePair :: DynFlags -> Bool -> Name -> Id -> Bool -> CoreExpr
              -> DsM (Id, CoreExpr)
-makeCorePair dflags pragma_name gbl_id is_default_method rhs
+makeCorePair dflags direct_worker pragma_name gbl_id is_default_method rhs
   | is_default_method
   , native_rhs
   , isRetainedVanillaDefaultMethod (idName gbl_id) (idType gbl_id)
@@ -471,7 +472,7 @@ makeCorePair dflags pragma_name gbl_id is_default_method rhs
   , unf@CoreUnfolding { uf_tmpl = tmpl } <- realIdUnfolding (fst pair)
   , hasNativeDependentUnfolding tmpl
   -- See Note [Written retained unfolding pragmas].
-  = if (isInternalName pragma_name || pragma_name == idName gbl_id
+  = if (direct_worker || isInternalName pragma_name || pragma_name == idName gbl_id
         || not (hasExistentialExpr tmpl))
        && supportsNativeRuleBinds [NonRec (fst pair) tmpl]
     then pure (setIdUnfolding (fst pair) unf{uf_src = RetainedUserSrc}, snd pair)
@@ -531,8 +532,12 @@ A local binding uses the same tag. The retained optimizer sees the
 stable template when it scans the binding. The tag stays attached if
 the binding floats without abstraction or occurs inside an exported template.
 Permit package operations in a local template or the template of the
-top-level binding that owns the pragma. Desugaring can transfer a top-level
-pragma to an internal worker. The worker needs a separate export check.
+top-level binding that owns the pragma. In the monomorphic AbsBinds path
+also accept a worker whose wrapper is a direct alias. The simplifier can
+move the unfolding and pragma to the exported Id with the worker RHS.
+See Note [Transferring IdInfo] in GHC.Core.Opt.Simplify. Occurrence analysis
+still chooses loop breakers for the recursive group. A selector out of a
+polymorphic tuple has no such transfer path.
 See Note [Erased package unfoldings] in GHC.IfaceToCore.
 Compulsory default-method unfoldings still use their separate check.
 An ordinary binding without an unfolding request needs no native scan here.
