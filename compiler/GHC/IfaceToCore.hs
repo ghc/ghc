@@ -2505,10 +2505,13 @@ tcIfaceExpr (IfaceUnpack witness@(name, _) value package body)
 
 tcIfaceExpr (IfaceApp fun arg@IfaceIndexedConArg{}) = tcIfaceRetainedApp fun arg
 tcIfaceExpr (IfaceApp fun arg@IfaceRetainedCharArg{}) = tcIfaceRetainedApp fun arg
+tcIfaceExpr (IfaceApp fun arg@IfaceRetainedNaturalArg{}) = tcIfaceRetainedApp fun arg
 tcIfaceExpr (IfaceIndexedConArg _ _)
   = failIfM (text "Indexed constructor operand outside a retained application or proof case.")
 tcIfaceExpr (IfaceRetainedCharArg _)
   = failIfM (text "Character operand outside a retained application or proof case.")
+tcIfaceExpr (IfaceRetainedNaturalArg _)
+  = failIfM (text "Natural operand outside a retained application or proof case.")
 tcIfaceExpr (IfaceApp fun arg)
   = App <$> tcIfaceExpr fun <*> tcIfaceExpr arg
 
@@ -2526,7 +2529,7 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
         [proof] | proof /= case_bndr -> return ()
         _ -> failIfM (text "An index alias alternative requires one proof distinct from its case binder:" <+> ppr names)
       _ -> return ()
-    (tagged_char, tagged_operand, scrut') <- tcIfaceRetainedOperand scrut
+    (tagged_literal, tagged_operand, scrut') <- tcIfaceRetainedOperand scrut
     -- Resolve each constructor once, before inspecting its representation arity.
     let scrut_index = exprToNativeCaseIndex scrut'
         constructed = maybe False isNativeConstructedGadtIndex scrut_index
@@ -2567,8 +2570,8 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
                                DataAlt dc -> isNativeIndexedDataAlt dc ns
                                _ -> False) resolved
         native = constructor_proof || indexed_proof || any (\(c, ns, _) -> c == DEFAULT && not (null ns)) resolved
-    when (tagged_char && not (native && isJust scrut_index)) $
-      failIfM (text "Invalid character scrutinee in native index interface proof:" <+> ppr scrut')
+    when (tagged_literal && not (native && isJust scrut_index)) $
+      failIfM (text "Invalid literal scrutinee in native index interface proof:" <+> ppr scrut')
     forM_ tagged_operand $ \shape ->
       unless (native && isJust scrut_index && matchesIndexedConShape shape scrut') $
         failIfM (text "Invalid indexed constructor scrutinee in native index interface proof:"
@@ -2662,16 +2665,21 @@ tcIfaceRetainedApp fun arg
 -- | Read optional capability tags in their writer order.
 tcIfaceRetainedOperand :: IfaceExpr -> IfL (Bool, Maybe IfaceIndexedConShape, CoreExpr)
 tcIfaceRetainedOperand expr
-  = do { let (tagged_char, rest) = case expr of
-               IfaceRetainedCharArg operand -> (True, operand)
+  = do { let (tagged_natural, char_operand) = case expr of
+               IfaceRetainedNaturalArg operand -> (True, operand)
                _ -> (False, expr)
+       ; let (tagged_char, rest) = case char_operand of
+               IfaceRetainedCharArg operand -> (True, operand)
+               _ -> (False, char_operand)
        ; let (shape, operand) = case rest of
                IfaceIndexedConArg con subexpr -> (Just con, subexpr)
                _ -> (Nothing, rest)
        ; result <- tcIfaceExpr operand
        ; when (tagged_char && not (containsRetainedCharLiteral result)) $
            failIfM (text "Missing boxed character literal in tagged interface operand:" <+> ppr result)
-       ; return (tagged_char, shape, result) }
+       ; when (tagged_natural && not (containsRetainedNaturalLiteral result)) $
+           failIfM (text "Missing boxed natural literal in tagged interface operand:" <+> ppr result)
+       ; return (tagged_char || tagged_natural, shape, result) }
 
 -------------------------
 tcIfaceTickish :: IfaceTickish -> IfL CoreTickish

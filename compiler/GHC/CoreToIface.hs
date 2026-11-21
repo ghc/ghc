@@ -809,29 +809,32 @@ mkIfaceApps ty iface (arg : rest)
             | otherwise = toIfaceExpr arg
 
 -- | Mark the capabilities that the reader needs for this index.
--- See Note [Retained character operands in interfaces].
+-- See Note [Retained scalar operands in interfaces].
 toIfaceRetainedOperand :: CoreExpr -> IfaceExpr
 toIfaceRetainedOperand arg
-  | containsRetainedCharLiteral arg = IfaceRetainedCharArg encoded_operand
-  | otherwise                       = encoded_operand
+  | containsRetainedNaturalLiteral arg = IfaceRetainedNaturalArg encoded_char
+  | otherwise                          = encoded_char
   where
+    encoded_char
+      | containsRetainedCharLiteral arg = IfaceRetainedCharArg encoded_operand
+      | otherwise                       = encoded_operand
     encoded_operand
       | containsGeneralIndexedConOperand arg = IfaceIndexedConArg IfaceGeneralIndexedCon encoded
       | containsIndexedConOperand arg        = IfaceIndexedConArg IfaceSimpleIndexedCon encoded
       | otherwise                            = encoded
     encoded = toIfaceExpr arg
 
-{- Note [Retained character operands in interfaces]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-An ordinary character literal and its type-level CharTyLit use the existing
-wire formats. A boxed literal in a retained application or proof scrutinee
-also needs the reader to recover its index. A reader without this support
+{- Note [Retained scalar operands in interfaces]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Ordinary Char and Natural literals and their DataKinds indices use the
+existing wire formats. A boxed literal in a retained application or proof
+scrutinee also needs the reader to recover its index. A reader without this support
 can decode the literal but cannot compute the type of the retained
 application.
 
 Mark the operand so the writer records the required capability in the
-header. The capability can coexist with the indexed constructor capability
-on the same operand. When ordinary code uses a literal, or when the writer
+header. Character, natural, and indexed constructor operands can require
+more than one capability. When ordinary code uses a literal, or when the writer
 omits the unfolding, the file needs no new capability.
 -}
 

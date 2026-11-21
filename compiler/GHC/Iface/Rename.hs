@@ -851,6 +851,7 @@ rnIfaceExpr (IfaceApp fun arg)
     = IfaceApp <$> rnIfaceExpr fun <*> rnIfaceExpr arg
 rnIfaceExpr (IfaceIndexedConArg shape arg) = IfaceIndexedConArg shape <$> rnIfaceExpr arg
 rnIfaceExpr (IfaceRetainedCharArg arg) = IfaceRetainedCharArg <$> rnIfaceExpr arg
+rnIfaceExpr (IfaceRetainedNaturalArg arg) = IfaceRetainedNaturalArg <$> rnIfaceExpr arg
 rnIfaceExpr (IfaceCase scrut case_bndr alts)
     = IfaceCase <$> rnIfaceExpr scrut
                 <*> pure case_bndr

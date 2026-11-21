@@ -40,7 +40,7 @@ module GHC.Core (
         nativeIndexFunctionVar_maybe, nativeIndexArgKinds, nativeIndexedConArgs,
         nativeIndexedConApp_maybe, splitNativeIndexedConApp, isNativeConstructedGadtIndex,
         containsIndexedConOperand, containsGeneralIndexedConOperand, containsRetainedCharLiteral,
-        isBoxedBigNaturalLiteral,
+        containsRetainedNaturalLiteral, isBoxedBigNaturalLiteral,
         isNativeIndexAlt, isNativeIndexDataAlt, isNativeIndexAliasAlt, isNativeIndexAliasBinder,
         isNativeIndexedDataAlt, splitNativeIndexedDataAlt, isNativeIndexedGadtCon,
         nativeIndexedCon_maybe,
@@ -3107,13 +3107,21 @@ Neither bare primitive literal forms a retained index.
 
 -- | Detect a boxed character literal in the runtime part of a retained operand.
 containsRetainedCharLiteral :: CoreExpr -> Bool
-containsRetainedCharLiteral expr
-  | Just _ <- boxedCharLiteral_maybe expr = True
-containsRetainedCharLiteral (App fun arg) = containsRetainedCharLiteral fun || containsRetainedCharLiteral arg
-containsRetainedCharLiteral (Lam _ body)  = containsRetainedCharLiteral body
-containsRetainedCharLiteral (Tick _ body) = containsRetainedCharLiteral body
-containsRetainedCharLiteral (Cast body _) = containsRetainedCharLiteral body
-containsRetainedCharLiteral _             = False
+containsRetainedCharLiteral = containsRetainedLiteral boxedCharLiteral_maybe
+
+-- | Detect a boxed natural literal in the runtime part of a retained operand.
+containsRetainedNaturalLiteral :: CoreExpr -> Bool
+containsRetainedNaturalLiteral = containsRetainedLiteral boxedNaturalLiteral_maybe
+
+containsRetainedLiteral :: (CoreExpr -> Maybe a) -> CoreExpr -> Bool
+containsRetainedLiteral literal = go
+  where
+    go expr | Just _ <- literal expr = True
+    go (App fun arg) = go fun || go arg
+    go (Lam _ body)  = go body
+    go (Tick _ body) = go body
+    go (Cast body _) = go body
+    go _             = False
 
 {- Note [Boxed character literal indices]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
