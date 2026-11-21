@@ -27,7 +27,7 @@ module Main where
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Data.IORef (newIORef, readIORef)
 import Data.Maybe (isJust)
-import CursorClient (observeAligned, observeCursors, observeIndexedCallback)
+import CursorClient (observeBoth, observeAligned, observeCursors, observeIndexedCallback)
 import NativeLinearIndexColumns (choose)
 import FinitePositionClient (lookupVecViaView, observeConstructedViews, observeEmptyIndex, observeFinitePosition, observeListIndices)
 import NativeIndexedFinGate (Gate(..), Ticket(..), grant)
@@ -38,6 +38,8 @@ main :: IO ()
 main = do
     observeFinitePosition >>= print
     observeListIndices >>= print
+    both <- observeBoth
+    if both == [Just ('b', 10), Just ('b', 20), Nothing] then pure () else fail (show both)
     aligned <- observeAligned
     if aligned == [Just ('b', 20), Nothing, Nothing] then pure () else fail (show aligned)
     callbacks <- observeIndexedCallback
