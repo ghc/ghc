@@ -120,6 +120,7 @@ import IndexedMapClient (mappedCells)
 import qualified MatchableView as View
 import LaterMatchabilityClient (annotatedMap, appliedCallback, boxedCallbacks, computedDictionary, flippedCallbacks, forwardedMap,
                                 laterMatchability, nestedCallback, rankedMap)
+import qualified SchemaColumns
 import qualified TypeLambda
 import qualified TypeLet
 import qualified NativeCase
@@ -1554,6 +1555,13 @@ main = do
     case TypeLambda.withErrors (Proxy @String) fields of
         TypeLambda.Field x (TypeLambda.Field y TypeLambda.End) ->
             observe "give every field in a row the same error type" (x, y)
+    let optional :: TypeLambda.Fields (TypeLambda.Columns TypeLambda.Optional '[Int])
+        optional = TypeLambda.Field (Just 42) TypeLambda.End
+        checked :: TypeLambda.Fields (TypeLambda.Columns (SchemaColumns.Checked String) '[Bool])
+        checked = TypeLambda.Field (Left "missing") TypeLambda.End
+    case (optional, checked) of
+        (TypeLambda.Field x TypeLambda.End, TypeLambda.Field y TypeLambda.End) ->
+            observe "use column schemas defined in separate modules" (x, y)
     observe "map a type lambda with a constructor case" TypeLambda.mixed
     observe "read fields from two indexed type case branches" TypeLambda.indexedFields
     observe "retain the kind of a matched Nothing"

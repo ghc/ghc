@@ -3,7 +3,7 @@
 -- | Apply a type lambda to a list of type constructors.
 module TypeLambda
   ( L, Captured, Shadowed, WithError, Prefixes, ScopedRow, Mixed, Held, CaseShadow, Rebuild
-  , Fields(..), Map, withErrors, IndexedTag(..), IndexedCase, IndexedCaseInferred
+  , Fields(..), Map, Columns, Optional, withErrors, IndexedTag(..), IndexedCase, IndexedCaseInferred
   , roadmap, partial, prefixes, mixed, indexedFields
   ) where
 
@@ -17,6 +17,14 @@ type Map :: (a %U -> b) -> [a] -> [b]
 type family Map f xs where
   Map _ '[] = '[]
   Map f (x ': xs) = f x ': Map f xs
+
+-- | A schema assigns a result type to each field in a row.
+type Columns :: Type -> [Type] -> [Type]
+type family Columns schema fields
+
+-- | A schema with one optional value in each field.
+data Optional
+type instance Columns Optional fields = Map (\a -> Maybe a) fields
 
 -- | A heterogeneous row indexed by the types of its fields.
 data Fields (xs :: [Type]) where
