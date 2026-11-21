@@ -9,12 +9,12 @@ out=$(mktemp -d)
 trap 'rm -rf -- "$out"' EXIT
 mkdir "$out"/{producer,client}
 cd "$out/producer"
-cp "$src/PreludeFmapEitherProof.hs" .
+cp "$src/"{PreludeFmapEitherProof,CheckedEitherInput}.hs .
 "${ghc[@]}" -O0 -fignore-interface-pragmas -fomit-interface-pragmas \
-    -fno-write-if-simplified-core -c PreludeFmapEitherProof.hs
+    -fno-write-if-simplified-core -c PreludeFmapEitherProof.hs CheckedEitherInput.hs
 
 cd "$out/client"
-cp ../producer/PreludeFmapEitherProof.hi .
+cp ../producer/{PreludeFmapEitherProof,CheckedEitherInput}.hi .
 cat >Main.hs <<'HS'
 {-# LANGUAGE CPP, DataKinds, Modifiers, NoExperimentalDependentTypes #-}
 {-# LANGUAGE ScopedTypeVariables, TypeApplications, TypeOperators #-}
@@ -195,6 +195,82 @@ done
 grep -Fq 'Rule fired: r12/either' replay.log
 "${ghc[@]}" Replay.o ../producer/PreludeFmapEitherProof.o -o replay
 [[ $(./replay) == 'Left False' ]]
+
+# The ordinary client sees only the stripped provider interfaces.
+test ! -e CheckedEitherInput.hs
+test ! -e PreludeFmapEitherProof.hs
+cat >BranchReplay.hs <<'HS'
+{-# LANGUAGE CPP, DataKinds, Modifiers, NoExperimentalDependentTypes #-}
+{-# LANGUAGE ScopedTypeVariables, TypeFamilies, TypeOperators #-}
+{-# OPTIONS_GHC -Wno-inline-rule-shadowing -Wno-orphans #-}
+module BranchReplay where
+
+import CheckedEitherInput (Input)
+import Data.Proxy (Proxy(..))
+import Data.Type.Equality ((:~:)(Refl))
+import GHC.Exts (U)
+import PreludeFmapEitherProof (MappedEither)
+
+#ifdef OUTER_RULE
+{-# RULES "r12/either/branch" [~1] forall f (x :: Either Bool a). fmap f x = Left False #-}
+#elif defined(INNER_RULE)
+{-# RULES "r16/maybe/branch" [~1] forall f. fmap f (Just True) = Nothing #-}
+#endif
+
+#ifdef LITERAL
+type SelectedInput = Input 'False
+#else
+type SelectedInput = Input 'True
+#endif
+
+#if defined(ARROW)
+type family InspectArrow f where
+    InspectArrow (Proxy ('Right ('Just 'False) :: Either Bool (Maybe Bool)) -> ()) = 'True
+
+proof :: InspectArrow (Proxy SelectedInput -> ()) :~: 'True
+proof = Refl
+#elif defined(NESTED_SYNONYM)
+type family IsRight (value :: Either Bool b) :: Bool where
+#ifdef IGNORE
+    IsRight _ = 'True
+#else
+    IsRight ('Right _) = 'True
+    IsRight ('Left _) = 'False
+#endif
+
+proof :: forall b (f :: Maybe Bool %U -> b). Proxy f ->
+    IsRight (MappedEither f ('Right ('Just 'False))) :~: 'True
+proof _ = Refl
+#elif defined(REFLEXIVE)
+nameOnly :: forall b (f :: Maybe Bool %U -> b). Proxy f -> Proxy (MappedEither f SelectedInput)
+nameOnly _ = Proxy
+
+proof :: forall b (f :: Maybe Bool %U -> b). Proxy f ->
+    MappedEither f SelectedInput :~: MappedEither f SelectedInput
+proof _ = Refl
+#else
+proof :: forall b (f :: Maybe Bool %U -> b). Proxy f ->
+    MappedEither f SelectedInput :~: ('Right (f ('Just 'False)) :: Either Bool b)
+proof _ = Refl
+#endif
+HS
+
+branch_flags=(-O2 -fignore-interface-pragmas -fenable-rewrite-rules -fforce-recomp)
+"${ghc[@]}" "${branch_flags[@]}" -c BranchReplay.hs
+for rule in INNER_RULE OUTER_RULE; do
+    reject '[GHC-83605]' "${branch_flags[@]}" "-D$rule" BranchReplay.hs
+    "${ghc[@]}" "${branch_flags[@]}" "-D$rule" -DREFLEXIVE -c BranchReplay.hs
+done
+"${ghc[@]}" "${branch_flags[@]}" -DINNER_RULE -DLITERAL -c BranchReplay.hs
+reject '[GHC-83605]' "${branch_flags[@]}" -DOUTER_RULE -DLITERAL BranchReplay.hs
+"${ghc[@]}" "${branch_flags[@]}" -DNESTED_SYNONYM -c BranchReplay.hs
+reject '[GHC-83605]' "${branch_flags[@]}" -DOUTER_RULE -DNESTED_SYNONYM BranchReplay.hs
+"${ghc[@]}" "${branch_flags[@]}" -DOUTER_RULE -DNESTED_SYNONYM -DIGNORE -c BranchReplay.hs
+for zap in -fzap-coercions -fno-zap-coercions; do
+    reject '[GHC-83605]' "${branch_flags[@]}" "$zap" -DINNER_RULE -DARROW BranchReplay.hs
+    "${ghc[@]}" "${branch_flags[@]}" "$zap" -DINNER_RULE -DARROW -DLITERAL -c BranchReplay.hs
+    "${ghc[@]}" "${branch_flags[@]}" "$zap" -fno-enable-rewrite-rules -DINNER_RULE -DARROW -c BranchReplay.hs
+done
 
 cp "$src/NativeOpenEitherFmapProducer.hs" .
 "${ghc[@]}" -O0 -fomit-interface-pragmas -c NativeOpenEitherFmapProducer.hs

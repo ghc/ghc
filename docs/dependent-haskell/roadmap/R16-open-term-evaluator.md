@@ -2092,6 +2092,13 @@ a proof about `MappedEither f (Image 'True)` can use both the mapping
 axiom and the checked branch of `Image`. A literal receiver branch
 adds no dependency of its own.
 
+The [Showcase provider](../examples/open-evaluation/CheckedEitherInput.hs)
+uses the two branches to produce the same `Right` value. A
+[source-hidden test](../../../testsuite/tests/dependent/should_run/NativeOpenEitherFmap.sh)
+checks both branches through an arrow argument and a method synonym.
+It also checks a family that inspects the synonym result and a
+constant family that can select its equation without inspecting it.
+
 The interface adds the `source-proof-rule-branches` requirement for
 indexed dependencies. It keeps the old encoding for unmarked axioms
 and marked nullary axioms. A reader without this feature rejects the
