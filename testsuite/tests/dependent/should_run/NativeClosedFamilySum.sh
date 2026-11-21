@@ -24,7 +24,7 @@ for opt in O0 O2; do
     mkdir -p "$work"/{provider,client}
     cd "$work/provider"
     cp "$src/$provider.hs" .
-    reject "$provider.hs:14:51-56: error: [GHC-76037]" \
+    reject "$provider.hs:15:51-56: error: [GHC-76037]" \
         "${ghc[@]}" "-$opt" -DBAD_SCOPE -c "$provider.hs"
     "${ghc[@]}" "-$opt" -c "$provider.hs"
     "${ghc[@]}" --show-iface "$provider.hi" > iface.txt
@@ -32,7 +32,7 @@ for opt in O0 O2; do
     cp "$provider.hi" "$src/$client.hs" ../client/
 
     cd ../client
-    reject "$client.hs:13:24-34: error: [GHC-83865]" \
+    reject "$client.hs:14:24-34: error: [GHC-83865]" \
         "${ghc[@]}" "-$opt" -DBAD_TAG -c "$client.hs"
     "${ghc[@]}" "-$opt" -c "$client.hs"
     "${ghc[@]}" "$client.o" "../provider/$provider.o" -o run
