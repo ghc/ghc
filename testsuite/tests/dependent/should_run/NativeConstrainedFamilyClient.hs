@@ -1,10 +1,30 @@
-{-# LANGUAGE CPP, FlexibleContexts, QuantifiedConstraints, TypeApplications #-}
-{-# LANGUAGE GADTs, NoExperimentalDependentTypes, ScopedTypeVariables, TypeFamilies, TypeOperators #-}
+{-# LANGUAGE CPP, FlexibleContexts, MultiParamTypeClasses, QuantifiedConstraints, TypeApplications #-}
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes, RankNTypes, ScopedTypeVariables, TypeFamilies, TypeOperators #-}
 module NativeConstrainedFamilyClient where
 
+import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
 import NativeConstrainedFamilyProvider (Allowed, Collects(..), Defaulted(..), Pair(..))
+
+-- The superclass of Self cannot justify a family in Self's own arguments.
+class Collects c => Self c x
+
+#ifdef CIRCULAR_QUALIFIER
+withSelf :: Self c (Elem c) => Proxy c -> Bool
+#else
+withSelf :: (Self c (Elem c), Collects c) => Proxy c -> Bool
+#endif
+withSelf _ = True
+
+#ifdef LATE_QUALIFIER
+acrossForall :: forall (c :: Type). Show (Elem c) =>
+    forall (x :: Type). Collects c => Proxy x -> Proxy c -> Bool
+#else
+acrossForall :: forall (c :: Type). Collects c =>
+    forall (x :: Type). Show (Elem c) => Proxy x -> Proxy c -> Bool
+#endif
+acrossForall _ _ = True
 
 assumed :: forall c. Collects c => Proxy c -> Proxy (Elem c)
 assumed _ =

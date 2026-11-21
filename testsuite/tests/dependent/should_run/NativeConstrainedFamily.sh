@@ -29,6 +29,17 @@ for reader in marked ordinary; do
             cat premise.log
             exit 1
         fi
+        for site in CIRCULAR_QUALIFIER LATE_QUALIFIER; do
+            qualifier=(-fforce-recomp "-D$site" -fdefer-type-errors -c NativeConstrainedFamilyClient.hs)
+            if [[ $reader == ordinary ]]; then
+                "${ghc[@]}" "${qualifier[@]}"
+            elif "${ghc[@]}" "${qualifier[@]}" >qualifier.log 2>&1 ||
+                 ! grep -Fq '[GHC-39999]' qualifier.log ||
+                 ! grep -Fq 'Collects c' qualifier.log; then
+                cat qualifier.log
+                exit 1
+            fi
+        done
         equation=(-fforce-recomp -XExperimentalDependentTypes -c NativeFamilyEquationScope.hs)
         "${ghc[@]}" "${equation[@]}"
         for site in WRONG_OWNER WRITER_ONLY WRONG_ARGUMENT REPRESENTATIONAL MISSING_PREMISE; do

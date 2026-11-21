@@ -300,6 +300,25 @@ right-hand-side arity rule in proposal #242.
 [proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#rhs-of-type-synonyms)
 and [separate compilation test](../../../testsuite/tests/dependent/should_run/NativeConstrainedFamily.sh).
 
+### Family applications in a signature constraint
+
+An ordinary module can write `showRemainder :: (Collection c e, Show (Rest c)) => c -> Maybe String`.
+The first constraint establishes the domain of `Rest c` in the second.
+Either order works. The caller supplies the renderer for the resulting type.
+For lists the function shows the tail. For `Just x` it shows `()`.
+[Ordinary client](../examples/open-evaluation/ConstrainedElementsClient.hs).
+
+The checker uses the premises without marked families to form the other
+premises in the same context. A predicate such as `Self c (Elem c)` with
+superclass `Collects c` therefore needs independent evidence for its own
+argument. A premise that follows a nested `forall` can serve the body
+of that `forall`. A family in an earlier constraint needs evidence in the
+earlier scope. Section 4.2 of Morris and
+Eisenberg gives the family formation rule. The sibling-premise restriction
+is the fork's conservative rule for checking GHC contexts.
+[Paper, section 4.2](https://jgbm.github.io/pubs/morris-icfp2017-families-extended.pdf#page=9)
+and [source test](../../../testsuite/tests/dependent/should_run/NativeConstrainedFamilyClient.hs).
+
 ### Family domains under a retained binder
 
 ```haskell
