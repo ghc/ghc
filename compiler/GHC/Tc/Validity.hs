@@ -496,6 +496,7 @@ checkConstrainedSignature ctxt ty
     uses = constrainedFamilyApps ty
     checks_domain FunSigCtxt{} = True
     checks_domain ExprSigCtxt{} = True
+    checks_domain TypeAppCtxt = True
     checks_domain ConArgCtxt{} = True
     checks_domain _ = False
 
@@ -527,7 +528,7 @@ checkNoConstrainedFamilyApps :: Type -> TcM ()
 checkNoConstrainedFamilyApps ty
   | use : _ <- constrainedFamilyApps ty
   = failWithTc $ TcRnConstrainedFamilyUnsupported (familyTyCon use) $
-      text "This use requires a saturated application in a term or constructor signature."
+      text "Use a saturated application in a value signature, expression annotation, constructor field, or explicit type argument."
   | otherwise = pure ()
   where
     familyTyCon (WrittenFamily fam _) = fam
@@ -584,7 +585,10 @@ cannot add a missing predicate to the signature. Expression annotations
 use the same domain check as named signatures. For a partial signature,
 check the written type before the expression or binding fixes a wildcard.
 For example, checking Refl can reduce Elem [Int] to Int and fill the hole
-in Elem [Int] :~: _. Checking the inferred type then loses that use of Elem. This source check
+in Elem [Int] :~: _. Checking the inferred type then loses that use of Elem.
+For a written type argument, tcHsTypeApp checks formation before the
+function can discard the argument or reduce the family. Both @t and a
+required (type t) argument use that path. This source check
 does not put a dictionary into the family's Core kind.
 
 Report a missing domain even under -fdefer-type-errors. The check

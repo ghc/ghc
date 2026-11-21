@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, FlexibleContexts, QuantifiedConstraints #-}
+{-# LANGUAGE CPP, FlexibleContexts, QuantifiedConstraints, TypeApplications #-}
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes, ScopedTypeVariables, TypeFamilies, TypeOperators #-}
 module NativeConstrainedFamilyClient where
 
@@ -16,7 +16,7 @@ assumedInPattern :: forall c. Witness c -> ()
 assumedInPattern (Witness _) =
     let local :: Proxy (Elem c)
         local = Proxy
-    in (local :: Proxy (Elem c)) `seq` ()
+    in (local :: Proxy (Elem c)) `seq` Proxy @(Elem c) `seq` ()
 assumedInPattern (ByEquality _) = ()
 
 -- The outer signature supplies both the domain rule and its premise.

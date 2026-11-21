@@ -63,8 +63,10 @@ HS
             fi
         done
         cat >PartialDomain.hs <<'HS'
-{-# LANGUAGE CPP, NoExperimentalDependentTypes, PartialTypeSignatures, TypeFamilies, TypeOperators #-}
+{-# LANGUAGE CPP, ExplicitNamespaces, NoExperimentalDependentTypes, PartialTypeSignatures #-}
+{-# LANGUAGE RequiredTypeArguments, TypeApplications, TypeFamilies, TypeOperators #-}
 module PartialDomain where
+import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
 import NativeConstrainedFamilyProvider (Collects(..))
 #ifdef VALID
@@ -72,14 +74,20 @@ type Item = Bool
 #else
 type Item = Int
 #endif
-#ifdef BINDING
+#if defined(VISIBLE)
+proof = Proxy @(Elem [Item]) `seq` ()
+#elif defined(REQUIRED)
+takeType :: forall a -> Proxy a
+takeType (type a) = Proxy
+proof = takeType (type (Elem [Item])) `seq` ()
+#elif defined(BINDING)
 proof :: Elem [Item] :~: _
 proof = Refl
 #else
 proof = (Refl :: Elem [Item] :~: _)
 #endif
 HS
-        for form in BINDING ANNOTATION; do
+        for form in BINDING ANNOTATION VISIBLE REQUIRED; do
             partial=(-fforce-recomp -Wno-partial-type-signatures "-D$form" -c PartialDomain.hs)
             "${ghc[@]}" "${partial[@]}" -DVALID
             for defer in -fno-defer-type-errors -fdefer-type-errors; do

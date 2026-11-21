@@ -177,6 +177,16 @@ also change a constructor's type and runtime representation.
 [Eisenberg's compatibility example](https://github.com/ghc-proposals/ghc-proposals/pull/177#issuecomment-430274548)
 and [review of constructor dictionaries, inference and newtypes](https://github.com/ghc-proposals/ghc-proposals/pull/177#issuecomment-549766671).
 
+A client can use the marked family in `id @(Elem [Bool]) True` and
+in a required argument such as `required (type (Elem [Bool])) False`.
+Both check the domain before applying the function. An argument
+`Elem [Int]` reports GHC-39999 even when the result discards it. A
+wildcard in `Elem [_]` must supply enough information to select its
+domain. A GADT match or a quantified constraint can supply local
+evidence for a specified argument.
+[Ordinary client](../examples/open-evaluation/ConstrainedElementsClient.hs)
+and [required type arguments, proposal #281](https://ghc-proposals.readthedocs.io/en/latest/proposals/0281-visible-forall.html).
+
 ## Evidence and next check
 
 Section 4.2 of *Constrained Type Families* requires the source context
@@ -204,7 +214,7 @@ different binder order. Each instance supplies an equation or a default.
 The check uses Givens in the written signature, Givens from enclosing
 functions or GADT patterns, and the imported class instance environment.
 Formation checks run before inference can add a missing constraint. General kinds, family occurrences
-in aliases or visible type arguments, generated newtype or via equations,
+in aliases, generated newtype or via equations,
 and partial applications also need separate formation rules.
 
 ### Associated newtype representation
