@@ -27,7 +27,7 @@ Proposal #765 adds pun warnings. The fork now implements the top-level
 part of `-Wpun-bindings`. With this flag, `data T = T` reports both
 declaration locations. A type and a constructor in different declarations
 of the same group can also trigger the warning. Local binding groups
-and `-Wpun-uses` remain open. [Accepted proposal and review](REFERENCES.md#namespace-pun-warnings)
+and `-Wpun-uses` remain open. [Accepted proposal and review](https://github.com/ghc-proposals/ghc-proposals/pull/765)
 and [GHC regression](../../testsuite/tests/rename/should_compile/ToplevelPunBindings.hs).
 
 A separately compiled producer can return a rectangular table whose
