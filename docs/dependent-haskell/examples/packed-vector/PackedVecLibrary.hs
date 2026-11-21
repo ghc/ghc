@@ -634,7 +634,8 @@ natValue (S n) = 1 + natValue n
 
 {- Note [Generic list indices]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-GenericCount follows the list constructors. Each element keeps its identity
+GenericCount forwards to the ordinary sourceLength function. Its equation
+preserves the family name and arity for existing callers. Each element keeps its identity
 as an opaque value. Its type can be Int, a function type, IO Int, or Vec Int n.
 The recursive tail keeps its structural list domain. These workers inspect
 only the list constructors. They do not prove totality for partial or cyclic
@@ -643,8 +644,7 @@ inputs. genericFirst returns an ordinary value. Its caller controls demand.
 
 -- | Count constructors without inspecting the opaque elements.
 type family GenericCount (xs :: [a]) :: Nat where
-    GenericCount '[] = 'Z
-    GenericCount (x ': xs) = 'S (GenericCount xs)
+    GenericCount xs = sourceLength xs
 
 -- | Retain the list shape and construct a vector at its actual length.
 genericVector :: forall (a :: Type). foreach (xs :: [a]) -> Vec a (GenericCount xs)

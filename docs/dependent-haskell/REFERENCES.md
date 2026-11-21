@@ -6974,3 +6974,15 @@ each other. See Note [Mixed-flavour family rewrite cycles] in
 `GHC.Tc.Solver.InertSet`.
 [GHC's injective families](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_families.html#injective-type-families)
 and [Agda 2.8.0 on injectivity](https://agda.readthedocs.io/en/v2.8.0/language/pragmas.html#the-injective-pragma).
+
+### Index an ordinary list at its source length
+
+Serokell's opening example bounds a list position by the length of the
+same list. Agda's standard library uses this type for `lookup`. The fork
+uses its ordinary Peano-valued `sourceLength` at both levels. A signed
+machine integer is checked when the caller constructs a `Fin`. GHC uses
+the ordinary monotype inference rules to learn the domain of an unsigned
+local list operand. Multiplicity and lexical scope are checked afterward.
+[Serokell roadmap](https://ghc.serokell.io/dh#dependent-haskell),
+[Agda standard library 2.3, Data.List.Base](https://agda.github.io/agda-stdlib/v2.3/Data.List.Base.html),
+and [implementation](examples/qualified-pi/ParameterizedIndexLibrary.hs).

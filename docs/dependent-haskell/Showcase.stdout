@@ -128,6 +128,7 @@ ordinary module runtime replicate: [7,7]
 ordinary module generic round-trip: [11,22]
 pair a list's computed length with its vector: (2,[11,22])
 generic checked Int position: Just 22
+index a list by its ordinary source length: [Just 'b',Nothing,Nothing,Just 'x',Just 'x']
 check a signed position in a packaged vector: Just 22
 generic negative position ignores list: Nothing
 generic checked function position: Just 42

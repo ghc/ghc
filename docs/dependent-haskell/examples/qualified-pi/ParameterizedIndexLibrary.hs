@@ -95,15 +95,16 @@ lookupRuntime xs position = case mkFinClosed xs position of
 
 {- Note [Generic list positions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-GenericCount records the list shape. It does not inspect the elements.
+The ordinary sourceLength function records the list shape. Its checked
+equations do not inspect the elements.
 Retained list refinement supplies the bound for the ordinary Fin case.
 The element type can contain an earlier runtime index. Keep that complete type
 when returning the selected head. A function element remains an ordinary value.
 Selection does not grant native call permission or function equality.
 
 Use the same actual list to construct and consume the witness in lookupGeneric.
-Write the constructor bound explicitly as GenericCount rest. Fin proves a bound;
-it does not identify the list. Count and GenericCount remain separate families.
+The constructor bound is sourceLength rest. A Fin value can be used with
+any list whose length is the same.
 
 mkFinGeneric checks a negative position before inspecting the list. Both workers
 traverse only the required prefix. They do not compute the full length. They can
@@ -115,7 +116,7 @@ See Note [Closed-list positions] for the ordinary Fin representation.
 
 -- | Select an element with a position below the retained list's length.
 -- See Note [Generic list positions].
-indexGeneric :: forall (a :: Type). foreach (xs :: [a]) -> Fin (GenericCount xs) -> a
+indexGeneric :: forall (a :: Type). foreach (xs :: [a]) -> Fin (sourceLength xs) -> a
 indexGeneric [] impossible = case impossible of {}
 indexGeneric (value : rest) position = case position of
     FZ -> value
@@ -123,7 +124,7 @@ indexGeneric (value : rest) position = case position of
 
 -- | Check a signed position without inspecting the list elements.
 -- See Note [Generic list positions].
-mkFinGeneric :: forall (a :: Type). foreach (xs :: [a]) -> Int -> Maybe (Fin (GenericCount xs))
+mkFinGeneric :: forall (a :: Type). foreach (xs :: [a]) -> Int -> Maybe (Fin (sourceLength xs))
 mkFinGeneric xs position =
     if position < 0
         then Nothing
@@ -131,10 +132,10 @@ mkFinGeneric xs position =
             [] -> Nothing
             _value : rest ->
                 if position == 0
-                    then Just (FZ @(GenericCount rest))
+                    then Just (FZ @(sourceLength rest))
                     else case mkFinGeneric @a rest (position - 1) of
                         Nothing -> Nothing
-                        Just smaller -> Just (FS @(GenericCount rest) smaller)
+                        Just smaller -> Just (FS @(sourceLength rest) smaller)
 
 -- | Construct and consume a checked position with the same actual list.
 -- See Note [Generic list positions].

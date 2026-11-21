@@ -406,3 +406,21 @@ two vectors of equal length fails at the first exchanged field.
 [Source](../examples/packed-vector/CertifiedSplit.hs),
 [ordinary client](../examples/packed-vector/CertifiedSplitClient.hs),
 and [dependent binder regression](../../../testsuite/tests/dependent/should_compile/NativeDependentResultBinders.hs).
+
+## Index an ordinary list using its source length
+
+`indexGeneric :: forall a. foreach (xs :: [a]) -> Fin (sourceLength xs) -> a`
+uses the same ordinary function that counts a list at runtime. The existing
+`GenericCount` family forwards to this definition. An ordinary module can
+write the following local function without a signature.
+
+```haskell
+checked xs n = fmap (indexGeneric xs) (mkFinGeneric xs n)
+```
+
+The negative offset case returns `Nothing` before inspecting the list.
+A finite offset into a cyclic list can succeed. The API computes only
+the prefix it needs. A type checker can also use a statically constructed
+`Fin` when its bound matches the list.
+[Ordinary caller](../examples/qualified-pi/FinitePositionClient.hs)
+and [Agda and Serokell examples](../REFERENCES.md#index-an-ordinary-list-at-its-source-length).

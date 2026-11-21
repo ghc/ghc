@@ -327,12 +327,12 @@ and general optimization remain gated.
 ## Generic safe list positions
 
 [ParameterizedIndexLibrary.hs](ParameterizedIndexLibrary.hs) adds three generic
-workers. They reuse the existing Fin datatype and the saturated GenericCount
+workers. They reuse the existing Fin datatype and the ordinary sourceLength
 family imported from PackedVecLibrary:
 
 ```haskell
-indexGeneric :: forall (a :: Type). foreach (xs :: [a]) -> Fin (GenericCount xs) -> a
-mkFinGeneric :: forall (a :: Type). foreach (xs :: [a]) -> Int -> Maybe (Fin (GenericCount xs))
+indexGeneric :: forall (a :: Type). foreach (xs :: [a]) -> Fin (sourceLength xs) -> a
+mkFinGeneric :: forall (a :: Type). foreach (xs :: [a]) -> Int -> Maybe (Fin (sourceLength xs))
 lookupGeneric :: forall (a :: Type). [a] -> Int -> Maybe a
 ```
 
@@ -343,8 +343,8 @@ They preserve lazy unselected heads and tails and permit finite access to a
 cyclic list. A selected head is demanded only when the caller demands it.
 EmptyCase still forces an impossible witness. Fin records a bound, not list
 identity. Equal-bound reuse does not establish equality of list values.
-Count and its M60 workers remain unchanged; Count and GenericCount are separate
-families. These functions add no totality or bounds-check-elimination result.
+GenericCount now forwards to sourceLength. Existing clients can still apply
+the family at its original arity. These functions add no totality or bounds-check-elimination result.
 
 Elements can be ordinary values, functions, IO actions or Vec Int n at an earlier
 actual runtime n. Returning a function does not grant native call permission or

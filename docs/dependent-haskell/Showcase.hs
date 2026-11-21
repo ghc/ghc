@@ -845,6 +845,7 @@ genericSafeIndexing = do
             Nothing -> Nothing
             Just checked -> Just (Parameterized.indexGeneric @Int values checked)
     observe "generic checked Int position" selected
+    observe "index a list by its ordinary source length" =<< FinitePositionClient.observeListIndices
     observe "check a signed position in a packaged vector" $
         case ListVectorClient.fromList values of
             Sigma.Pair _ cells -> FinitePositionClient.lookupVecViaView cells position

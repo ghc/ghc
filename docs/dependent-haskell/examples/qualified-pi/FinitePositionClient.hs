@@ -1,12 +1,12 @@
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, ScopedTypeVariables, TypeApplications #-}
-module FinitePositionClient (lookupVecViaView, observeFinitePosition, observeConstructedViews, observeZeroViews) where
+module FinitePositionClient (lookupVecViaView, observeFinitePosition, observeConstructedViews, observeZeroViews, observeListIndices) where
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Data.IORef (newIORef, readIORef)
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Sigma (Sigma(Pair))
 import FinitePosition
 import PackedVecLibrary (Nat(..), Vec(..))
-import ParameterizedIndexLibrary (Fin(..), indexVec, mkFinVec)
+import ParameterizedIndexLibrary (Fin(..), indexGeneric, indexVec, mkFinGeneric, mkFinVec)
 
 -- | Check a signed position and select the element through its finite view.
 lookupVecViaView :: Vec a n -> Int -> Maybe a
@@ -69,3 +69,12 @@ observeZeroViews = (isZeroView (zeroView @'Z), isZeroView (zeroViewInlinable @'Z
     isZeroView :: FinView i -> Bool
     isZeroView AtZero = True
     isZeroView AtSucc{} = False
+
+-- | Check an inferred ordinary caller on finite, partial, and cyclic lists.
+observeListIndices :: IO [Maybe Char]
+observeListIndices = do
+    xs <- newIORef "abc" >>= readIORef
+    i <- newIORef 1 >>= readIORef
+    let checked ys n = fmap (indexGeneric ys) (mkFinGeneric ys n)
+    pure [checked xs i, checked xs 3, checked (error "forced negative input") (-1),
+          checked ('x' : error "forced suffix") 0, checked (cycle "xy") 4]

@@ -23,13 +23,14 @@ for opt in -O0 -O1 -O2; do
 module Main where
 import Data.IORef (newIORef, readIORef)
 import Data.Maybe (isJust)
-import FinitePositionClient (lookupVecViaView, observeConstructedViews, observeFinitePosition)
+import FinitePositionClient (lookupVecViaView, observeConstructedViews, observeFinitePosition, observeListIndices)
 import PackedVecLibrary (Nat(..), Vec(..))
 import ParameterizedIndexLibrary (indexVec, lookupVecChecked, mkFinVec)
 
 main :: IO ()
 main = do
     observeFinitePosition >>= print
+    observeListIndices >>= print
     views <- observeConstructedViews
     if views == (Just 1, True) then pure () else fail (show views)
     positions <- newIORef [minBound, -1, 0, 1, 2, 3, maxBound] >>= readIORef
