@@ -56,12 +56,14 @@ type family UnApp p q r where
   forall (f :: Type %U -> Type) x. UnApp (Proxy f) (Proxy x) (f x) = x
 HS
 for flag in -XExperimentalDependentTypes -XNoExperimentalDependentTypes; do
-    if "${ghc[@]}" "$flag" -c UnmatchablePattern.hs >pattern.log 2>&1 ||
-       [[ $(grep -Fc '[GHC-83865]' pattern.log) != 2 ]] ||
-       ! grep -Fq 'Unmatchable' pattern.log || ! grep -Fq 'Matchable' pattern.log; then
-        cat pattern.log >&2
-        exit 1
-    fi
+    for defer in -fno-defer-type-errors -fdefer-type-errors; do
+        if "${ghc[@]}" "$flag" "$defer" -c UnmatchablePattern.hs >pattern.log 2>&1 ||
+           [[ $(grep -Fc 'error: [GHC-83865]' pattern.log) != 2 ]] ||
+           ! grep -Fq 'Unmatchable' pattern.log || ! grep -Fq 'Matchable' pattern.log; then
+            cat pattern.log >&2
+            exit 1
+        fi
+    done
 done
 
 (
