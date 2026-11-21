@@ -39,7 +39,7 @@ type family Prefixes prefix xs where
 
 -- | Capture the outer error type in the callback and its local abbreviation in the row.
 type ScopedRow e xs =
-  let wrap = \a -> Either e a
+  let wrap = (\a -> Either e a)
   in let e = Maybe e
      in Map (\a -> (e, wrap a)) xs
 
