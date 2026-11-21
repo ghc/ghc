@@ -22,7 +22,7 @@ module GHC.Core.DataCon (
         FieldLabel(..), flLabel, FieldLabelString,
 
         -- ** Type construction
-        mkDataCon, mkDataConWithRetainedArgs, fIRST_TAG,
+        mkDataCon, mkDataConWithRetainedArgs, mkDataConWithTelescope, fIRST_TAG,
 
         -- ** Type deconstruction
         dataConRepType, dataConInstSig, dataConFullSig,
@@ -32,6 +32,7 @@ module GHC.Core.DataCon (
         dataConUnivTyVars, dataConExTyCoVars, dataConUnivAndExTyCoVars,
         dataConConcreteTyVars,
         dataConUserTyVars, dataConUserTyVarBinders,
+        dataConLateTyVarCount, dataConUserTyVarGroups,
         dataConTheta,
         dataConStupidTheta,
         dataConOtherTheta,
@@ -462,6 +463,7 @@ data DataCon
         --    with the set of dcUnivTyVars whose tyvars do not appear in dcEqSpec
         -- So dcUserTyVarBinders is a subset of (dcUnivTyVars ++ dcExTyCoVars)
         -- See Note [DataCon user type variable binders]
+        dcLateTyVarCount :: !Int,
         dcUserTyVarBinders :: [TyVarBinder],
 
         dcEqSpec :: [EqSpec],   -- Equalities derived from the result type,
@@ -1121,9 +1123,7 @@ mkDataCon :: Name
 
 mkDataCon = mkDataConWithRetainedArgs []
 
--- | Build a wrapper-free constructor with a retained field telescope.
--- An empty binder list selects the ordinary constructor representation.
--- See Note [Retained constructor field telescopes].
+-- | Build a constructor with its existing retained-field layout.
 mkDataConWithRetainedArgs :: [Maybe Id] -- ^ Retained binders, aligned with original fields
           -> Name
           -> Bool               -- ^ Is the constructor declared infix?
@@ -1153,7 +1153,41 @@ mkDataConWithRetainedArgs :: [Maybe Id] -- ^ Retained binders, aligned with orig
           -> DataCon
   -- Can get the tag from the TyCon
 
-mkDataConWithRetainedArgs arg_binders name declared_infix prom_info
+mkDataConWithRetainedArgs = mkDataConWithTelescope 0
+
+-- | Build a constructor with an ordered source telescope.
+-- See Notes [Terminal constructor type arguments] and [Retained constructor field telescopes].
+mkDataConWithTelescope :: Int          -- ^ Type binders following the value fields
+          -> [Maybe Id]               -- ^ Retained binders, aligned with original fields
+          -> Name
+          -> Bool               -- ^ Is the constructor declared infix?
+          -> TyConRepName       -- ^  TyConRepName for the promoted TyCon
+          -> [HsSrcBang]        -- ^ Strictness/unpack annotations, from user
+          -> [HsImplBang]       -- ^ Strictness/unpack annotations, as inferred by the compiler
+          -> [StrictnessMark]   -- ^ Strictness marks for the DataCon worker's fields in Core
+          -> [FieldLabel]       -- ^ Field labels for the constructor,
+                                -- if it is a record, otherwise empty
+          -> [TyVar]            -- ^ Universals.
+          -> [TyCoVar]          -- ^ Existentials.
+          -> ConcreteTyVars
+                                -- ^ TyVars which must be instantiated with
+                                -- concrete types
+          -> [TyVarBinder]      -- ^ User-written 'TyVarBinder's
+          -> [EqSpec]           -- ^ GADT equalities
+          -> KnotTied ThetaType -- ^ Theta-type occurring before the arguments proper
+          -> [KnotTied (Scaled Type)]    -- ^ Original argument types
+          -> KnotTied Type      -- ^ Original result type
+          -> PromDataConInfo    -- ^ See comments on 'GHC.Core.TyCon.PromDataConInfo'
+          -> KnotTied TyCon     -- ^ Representation type constructor
+          -> ConTag             -- ^ Constructor tag
+          -> ThetaType          -- ^ The "stupid theta", context of the data
+                                -- declaration e.g. @data Eq a => T a ...@
+          -> Id                 -- ^ Worker Id
+          -> DataConRep         -- ^ Representation
+          -> DataCon
+  -- Can get the tag from the TyCon
+
+mkDataConWithTelescope late_tyvar_count arg_binders name declared_infix prom_info
           arg_stricts  -- Must match orig_arg_tys 1-1
           impl_bangs   -- Must match orig_arg_tys 1-1
           str_marks    -- Must be empty or match dataConRepArgTys 1-1
@@ -1223,6 +1257,7 @@ mkDataConWithRetainedArgs arg_binders name declared_infix prom_info
                   dcExTyCoVars = ex_tvs,
                   dcConcreteTyVars = conc_tvs,
                   dcUserTyVarBinders = user_tvbs,
+                  dcLateTyVarCount = late_tyvar_count,
                   dcEqSpec = eq_spec,
                   dcOtherTheta = theta,
                   dcStupidTheta = stupid_theta,
@@ -1246,7 +1281,7 @@ mkDataConWithRetainedArgs arg_binders name declared_infix prom_info
 
     rep_ty
       | not (null arg_binders), not valid_retained_args
-      = pprPanic "mkDataConWithRetainedArgs: invalid telescope" (ppr name)
+      = pprPanic "mkDataConWithTelescope: invalid retained telescope" (ppr name)
       | otherwise = case rep of
         -- If the DataCon has no wrapper, then the worker's type *is* the
         -- user-facing type, so we can simply use dataConWrapperType.
@@ -1271,7 +1306,10 @@ mkDataConWithRetainedArgs arg_binders name declared_infix prom_info
       -- Tiresome!  And unnecessary because these tyvars are never looked at
     prom_arg_bndrs   = [ mkAnonTyConBinder (mkTyVar n t)
      {- Visible -}     | (n,t) <- dropList theta fresh_names `zip` map scaledThing orig_arg_tys ]
-    prom_bndrs       = prom_tv_bndrs ++ prom_arg_bndrs
+    (early_prom_bndrs, late_prom_bndrs)
+      | late_tyvar_count == 0 = (prom_tv_bndrs, [])
+      | otherwise = splitAt (length prom_tv_bndrs - late_tyvar_count) prom_tv_bndrs
+    prom_bndrs       = early_prom_bndrs ++ prom_arg_bndrs ++ late_prom_bndrs
     prom_res_kind    = orig_res_ty
     promoted
       | null arg_binders
@@ -1288,9 +1326,14 @@ mkDataConWithRetainedArgs arg_binders name declared_infix prom_info
       | otherwise
       = pprPanic "promoteDataCon: retained field telescope" (ppr name)
 
-    roles field_role = map (\tv -> if isTyVar tv then Nominal else Phantom)
-                           (univ_tvs ++ ex_tvs)
-                       ++ map (const field_role) (theta ++ map scaledThing orig_arg_tys)
+    roles field_role
+      | late_tyvar_count /= 0
+      = map (const Nominal) early_prom_bndrs
+        ++ map (const field_role) prom_arg_bndrs
+        ++ map (const Nominal) late_prom_bndrs
+      | otherwise
+      = map (\tv -> if isTyVar tv then Nominal else Phantom) (univ_tvs ++ ex_tvs)
+        ++ map (const field_role) (theta ++ map scaledThing orig_arg_tys)
 
 {- Note [Promoting one retained witness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1432,6 +1475,16 @@ dataConUserTyVars (MkData { dcUserTyVarBinders = tvbs }) = binderVars tvbs
 -- user wrote them
 dataConUserTyVarBinders :: DataCon -> [TyVarBinder]
 dataConUserTyVarBinders = dcUserTyVarBinders
+
+-- | Number of required type arguments after the value fields.
+dataConLateTyVarCount :: DataCon -> Int
+dataConLateTyVarCount = dcLateTyVarCount
+
+-- | The type binders before and after the value fields.
+dataConUserTyVarGroups :: DataCon -> ([TyVarBinder], [TyVarBinder])
+dataConUserTyVarGroups (MkData { dcUserTyVarBinders = binders, dcLateTyVarCount = late })
+  | late == 0 = (binders, [])
+  | otherwise = splitAt (length binders - late) binders
 
 -- | Dependent (kind-level) equalities in a constructor.
 -- There are extracted from the existential variables.
@@ -1676,14 +1729,27 @@ dataConWrapperType con
 
 -- | Rebuild the user type after the retained representation check.
 dataConWrapperTypeUnchecked :: DataCon -> Type
-dataConWrapperTypeUnchecked (MkData { dcUserTyVarBinders = user_tvbs,
-                             dcOtherTheta = theta, dcOrigArgTys = arg_tys,
-                             dcOrigArgBinders = arg_binders,
-                             dcOrigResTy = res_ty,
-                             dcStupidTheta = stupid_theta })
-  = mkForAllTys [(unmatchableDataConTy, bndr) | bndr <- user_tvbs] $
+dataConWrapperTypeUnchecked con@(MkData { dcOtherTheta = theta, dcOrigArgTys = arg_tys,
+                                 dcOrigArgBinders = arg_binders,
+                                 dcOrigResTy = res_ty,
+                                 dcStupidTheta = stupid_theta })
+  = mkForAllTys [(unmatchableDataConTy, bndr) | bndr <- early] $
     mkInvisFunTys (stupid_theta ++ theta) $
-    mkRetainedArgTys arg_binders arg_tys res_ty
+    mkRetainedArgTys arg_binders arg_tys $
+    mkForAllTys [(unmatchableDataConTy, bndr) | bndr <- late] res_ty
+  where
+    (early, late) = dataConUserTyVarGroups con
+
+{- Note [Terminal constructor type arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A source type such as `forall a. Int -> forall b -> G a b` puts the required
+type argument after the field. Keep its position in the wrapper and in
+pattern checking. The worker still binds all type variables before its
+representation fields. The initial case stores the size of one terminal
+required group. The promoted constructor follows source argument order.
+Its term wrapper disqualifies it from structural native index domains.
+See Note [Algebraic runtime index domains] in GHC.Core.Type.
+-}
 
 -- | Return retained binders for representation fields. An empty list denotes
 -- ordinary fields. Retained constructors have no representation wrapper.
@@ -2104,11 +2170,12 @@ dataConUserTyVarBindersNeedWrapper :: DataCon -> Bool
 dataConUserTyVarBindersNeedWrapper (MkData { dcUnivTyVars = univ_tvs
                                            , dcExTyCoVars = ex_tvs
                                            , dcUserTyVarBinders = user_tvbs
+                                           , dcLateTyVarCount = late_tyvars
                                            , dcEqSpec = eq_spec })
   = assert (null eq_spec || answer)  -- all GADTs should say "yes" here
     answer
   where
-    answer = need_reorder || need_flag_cast
+    answer = late_tyvars /= 0 || need_reorder || need_flag_cast
     need_reorder   = (univ_tvs ++ ex_tvs) /= binderVars user_tvbs
     need_flag_cast = any (not . isCoreTyLamForAllTyFlag)
                          (binderFlags user_tvbs)

@@ -20,6 +20,7 @@ import GHC.Prelude
 import GHC.Hs
 
 import GHC.Tc.Gen.Pat
+import GHC.Core.DataCon (dataConUserTyVarGroups)
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Errors.Types
@@ -1081,15 +1082,16 @@ tcPatToExpr ps_name args pat = go pat
                     -> TcM (HsExpr GhcRn)
     mkPrefixConExpr lcon@(L loc con_name) pats
       = do { con_like <- tcLookupConLike con_name
-           ; let tvbs = conLikeUserTyVarBinders con_like
-           ; (_ty_pats, val_pats) <- zipPatsBndrs pats tvbs
-                -- Type arguments _ty_pats are discarded, just like the SigPat's type.
+           ; let (early, late) = case con_like of
+                   RealDataCon dc -> dataConUserTyVarGroups dc
+                   _ -> (conLikeUserTyVarBinders con_like, [])
+           ; (_, val_pats, _) <- zipConPatsBndrs con_like pats
                 -- See Note [Discarding types in the builder expression]
-           ; let ty_exprs = [wildCardTyArg | tvb <- tvbs, isVisibleForAllTyBinder tvb]
-                -- Placeholders `_` for the discarded required type arguments.
+           ; let required_args tvbs = [wildCardTyArg | tvb <- tvbs, isVisibleForAllTyBinder tvb]
            ; val_exprs <- mapM go val_pats
            ; let con = L (l2l loc) (HsVar noExtField lcon)
-           ; return (unLoc $ mkHsApps con (ty_exprs ++ val_exprs)) }
+           ; return (unLoc $ mkHsApps con
+                       (required_args early ++ val_exprs ++ required_args late)) }
 
     mkRecordConExpr :: LocatedN (WithUserRdr Name)
                     -> HsRecFields GhcRn (LPat GhcRn)

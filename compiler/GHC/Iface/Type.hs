@@ -3031,6 +3031,7 @@ data IfaceEvidence
   | RetainedNaturalOperandEvidence
   | ExperimentalScopedDictionaryEvidence | ExperimentalScopedDictionaryCoreEvidence
   | RetainedDataFamilyConOperandEvidence
+  | TerminalGadtForAllEvidence
   deriving (Bounded, Enum, Eq, Ord)
 
 -- | Requirements of an interface payload. See Note [Versioning retained evidence]

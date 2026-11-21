@@ -97,7 +97,7 @@ import GHC.Utils.Fingerprint
 import GHC.Utils.Binary
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Misc( dropList, filterByList, notNull, unzipWith,
+import GHC.Utils.Misc( dropList, equalLength, filterByList, notNull, unzipWith,
                        zipWithEqual )
 
 import GHC.Data.FastString
@@ -402,7 +402,8 @@ data IfaceConDecl
           -- Empty (meaning all lazy),
           -- or 1-1 corresp with arg tys
           -- See Note [Bangs on imported data constructors] in GHC.Types.Id.Make
-        ifConSrcStricts :: [IfaceSrcBang] } -- empty meaning no src stricts
+        ifConSrcStricts :: [IfaceSrcBang], -- empty meaning no src stricts
+        ifConLateTyVarCount :: !Int } -- Required binders after the value fields
 
 type IfaceEqSpec = [(IfLclName,IfaceType)]
 
@@ -1709,8 +1710,9 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
                  ifConUnivTvs = univ_tvs, ifConUserTvBinders = user_tvbs,
                  ifConEqSpec = eq_spec, ifConCtxt = ctxt, ifConArgTys = arg_tys,
                  ifConArgBinders = arg_binders,
-                 ifConStricts = stricts, ifConFields = fields })
-  | gadt_style = pp_prefix_con <+> dcolon <+> ppr_gadt_ty
+                 ifConStricts = stricts, ifConFields = fields,
+                 ifConLateTyVarCount = late_count })
+  | gadt_style || late_count /= 0 = pp_prefix_con <+> dcolon <+> ppr_gadt_ty
   | otherwise  = ppr_ex_quant pp_h98_con
   where
     pp_h98_con
@@ -1734,8 +1736,12 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
     -- the universal tyvar binders from user_tvbs.
     ex_tvbs = dropList tc_binders user_tvbs
     ppr_ex_quant = pprIfaceForAllPartMust (map (ifaceUnmatchable,) ex_tvbs) ctxt
-    pp_gadt_res_ty = mk_user_con_res_ty eq_spec
-    ppr_gadt_ty = pprIfaceForAllPart (map (ifaceUnmatchable,) user_tvbs) ctxt pp_tau
+    (early, late)
+      | late_count == 0 = (user_tvbs, [])
+      | otherwise = splitAt (length user_tvbs - late_count) user_tvbs
+    pp_gadt_res_ty = pprIfaceForAllPart (map (ifaceUnmatchable,) late) []
+                                       (mk_user_con_res_ty eq_spec)
+    ppr_gadt_ty = pprIfaceForAllPart (map (ifaceUnmatchable,) early) ctxt pp_tau
 
         -- A bit gruesome this, but we can't form the full con_tau, and ppr it,
         -- because we don't have a Name for the tycon, only an OccName
@@ -2800,7 +2806,15 @@ instance Binary IfaceAxBranch where
 
 instance Binary IfaceConDecls where
     put_ bh IfAbstractTyCon  = putByte bh 0
-    put_ bh (IfDataTyCon False cs) = putByte bh 1 >> put_ bh cs
+    put_ bh (IfDataTyCon False cs)
+      | any (/= 0) late = do
+          requireIfaceEvidenceVersion bh TerminalGadtForAllEvidence
+          putByte bh 4
+          put_ bh cs
+          put_ bh late
+      | otherwise = putByte bh 1 >> put_ bh cs
+      where
+        late = map ifConLateTyVarCount cs
     put_ bh (IfDataTyCon True cs) = putByte bh 2 >> put_ bh cs
     put_ bh (IfNewTyCon c)   = putByte bh 3 >> put_ bh c
     get bh = do
@@ -2810,10 +2824,18 @@ instance Binary IfaceConDecls where
             1 -> liftM (IfDataTyCon False) (get bh)
             2 -> liftM (IfDataTyCon True) (get bh)
             3 -> liftM IfNewTyCon (get bh)
+            4 -> do
+                cons <- get bh
+                late <- get bh
+                if cons `equalLength` late && all (>= 0) late && any (> 0) late
+                  then return (IfDataTyCon False (zipWith set_count cons late))
+                  else fail "Invalid terminal constructor foralls in interface"
             _ -> error "Binary(IfaceConDecls).get: Invalid IfaceConDecls"
+      where
+        set_count con count = con { ifConLateTyVarCount = count }
 
 instance Binary IfaceConDecl where
-    put_ bh (IfCon a1 a2 a3 a12 a4 a5 a6 a7 a8 a13 a9 a10 a11) = do
+    put_ bh (IfCon a1 a2 a3 a12 a4 a5 a6 a7 a8 a13 a9 a10 a11 _) = do
         putIfaceTopBndr bh a1
         put_ bh a2
         put_ bh a3
@@ -2843,7 +2865,7 @@ instance Binary IfaceConDecl where
         a10 <- get bh
         a11 <- get bh
         a12 <- get bh
-        return (IfCon a1 a2 a3 a12 a4 a5 a6 a7 a8 a13 a9 a10 a11)
+        return (IfCon a1 a2 a3 a12 a4 a5 a6 a7 a8 a13 a9 a10 a11 0)
 
 instance Binary IfaceBang where
     put_ bh IfNoBang        = putByte bh 0
@@ -3525,7 +3547,7 @@ instance NFData IfaceConDecls where
     IfNewTyCon f1 -> rnf f1
 
 instance NFData IfaceConDecl where
-  rnf (IfCon f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13) =
+  rnf (IfCon f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 _) =
     rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq` rnf f6 `seq`
     rnf f7 `seq` rnf f8 `seq` rnf f9 `seq` rnf f10 `seq` rnf f11 `seq` rnf f12 `seq` rnf f13
 

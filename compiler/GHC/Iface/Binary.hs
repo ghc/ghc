@@ -351,7 +351,8 @@ evidenceSuffix requirements
     || needs RetainedCharOperandEvidence || needs MatchableProjectionEvidence
     || needs RetainedNaturalOperandEvidence
     || needs ExperimentalScopedDictionaryEvidence
-    || needs ExperimentalScopedDictionaryCoreEvidence || needs RetainedDataFamilyConOperandEvidence = feature_set
+    || needs ExperimentalScopedDictionaryCoreEvidence || needs RetainedDataFamilyConOperandEvidence
+    || needs TerminalGadtForAllEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -384,6 +385,7 @@ legacyEvidenceSuffix RetainedNaturalOperandEvidence = featureSetPrefix ++ "retai
 legacyEvidenceSuffix ExperimentalScopedDictionaryEvidence = featureSetPrefix ++ "experimental-scoped-dictionary"
 legacyEvidenceSuffix ExperimentalScopedDictionaryCoreEvidence = featureSetPrefix ++ "experimental-scoped-dictionary-core-v3"
 legacyEvidenceSuffix RetainedDataFamilyConOperandEvidence = featureSetPrefix ++ "retained-data-family-constructor-operand"
+legacyEvidenceSuffix TerminalGadtForAllEvidence = featureSetPrefix ++ "terminal-gadt-forall"
 legacyEvidenceSuffix GeneralIndexedConstructorOperandEvidence = featureSetPrefix ++ "general-indexed-constructor-operand"
 legacyEvidenceSuffix DepFunCoEvidence           = "-retained-depfunco-v1"
 legacyEvidenceSuffix ConstructorCaseEvidence   = "-retained-constructor-case-v1"
@@ -424,7 +426,8 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("retained-natural-operand", RetainedNaturalOperandEvidence)
                       , ("experimental-scoped-dictionary", ExperimentalScopedDictionaryEvidence)
                       , ("experimental-scoped-dictionary-core-v3", ExperimentalScopedDictionaryCoreEvidence)
-                      , ("retained-data-family-constructor-operand", RetainedDataFamilyConOperandEvidence) ]
+                      , ("retained-data-family-constructor-operand", RetainedDataFamilyConOperandEvidence)
+                      , ("terminal-gadt-forall", TerminalGadtForAllEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion

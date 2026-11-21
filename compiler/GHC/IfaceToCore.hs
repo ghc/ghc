@@ -1254,8 +1254,15 @@ tcIfaceDataCons tycon_name tycon if_cons
                          ifConCtxt = ctxt, ifConEqSpec = spec,
                          ifConArgTys = args, ifConFields = lbl_names,
                          ifConStricts = if_stricts,
-                         ifConSrcStricts = if_src_stricts})
-     = do { unless (null arg_binders) $
+                         ifConSrcStricts = if_src_stricts,
+                         ifConLateTyVarCount = late_count})
+     = do { when (late_count /= 0) $
+              unless (late_count > 0 && late_count <= length user_bndrs &&
+                      has_wrapper && not (null args) &&
+                      null arg_binders && null ex_bndrs && null spec &&
+                      null ctxt && null lbl_names) $
+                failIfM (text "Invalid terminal constructor foralls in interface:" <+> ppr dc_name)
+          ; unless (null arg_binders) $
               check_retained_shape dc_name has_wrapper arg_binders args univ_bndrs user_bndrs
                 ex_bndrs spec ctxt lbl_names if_stricts if_src_stricts
           ; bindIfaceForAllBndrs user_bndrs $ \ if_user_tvs ->
@@ -1304,12 +1311,21 @@ tcIfaceDataCons tycon_name tycon if_cons
 
         ; prom_rep_name <- newTyConRepName dc_name
 
+        ; when (late_count /= 0) $
+            do { let (early, late) = splitAt (length user_tvs - late_count) user_tvs
+                     late_vars = mkVarSet (binderVars late)
+                     prefix_types = map (varType . binderVar) early ++
+                       concatMap (\(Scaled mult ty) -> [mult, ty]) arg_tys
+               ; unless (all isVisibleForAllTyBinder late &&
+                         late_vars `subVarSet` mkVarSet univ_tvs &&
+                         disjointVarSet late_vars (tyCoVarsOfTypes prefix_types)) $
+                   failIfM (text "Invalid terminal constructor binder scope:" <+> ppr dc_name) }
         ; let bang_opts = FixedBangOpts stricts
             -- Pass the HsImplBangs (i.e. final decisions) to buildDataCon;
             -- it'll use these to guide the construction of a worker.
             -- See Note [Bangs on imported data constructors] in GHC.Types.Id.Make
 
-        ; con <- buildDataConWithRetainedArgs
+        ; con <- buildDataConWithTelescope late_count
                        (if null arg_binders then [] else retained_binders)
                        (pprPanic "tcIfaceDataCons: FamInstEnvs" (ppr dc_name))
                        bang_opts

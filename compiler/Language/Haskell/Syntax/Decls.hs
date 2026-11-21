@@ -1054,12 +1054,11 @@ GHC.Parser.PostProcess.mkHsOpTyPV to preserve this trick.
 -- Wrinkle: No nested foralls or contexts
 -----
 
-GADT constructors provide some freedom to change the order of foralls in their
-types (see Note [DataCon user type variable binders] in GHC.Core.DataCon), but
-this freedom is still limited. GADTs still require that all quantification
-occurs "prenex". That is, any explicitly quantified type variables must occur
-at the front of the GADT type, followed by any contexts, followed by the body of
-the GADT type, in precisely that order. For instance:
+A prefix GADT constructor can start with forall groups and consecutive
+contexts. The fields follow those groups. An ordinary lifted constructor
+can put a required forall after its last field. This group scopes over
+the result type. See Note [Terminal constructor type arguments] in
+GHC.Core.DataCon. For instance:
 
   data T where
     MkT1 :: forall a b. (Eq a, Eq b) => a -> b -> T
@@ -1067,7 +1066,7 @@ the GADT type, in precisely that order. For instance:
     MkT2 :: forall a. Eq a => forall b. a -> b -> T
       -- Rejected, `forall b` is nested
     MkT3 :: forall a b. Eq a => Eq b => a -> b -> T
-      -- Rejected, `Eq b` is nested
+      -- OK, consecutive contexts
     MkT4 :: Int -> forall a. a -> T
       -- Rejected, `forall a` is nested
     MkT5 :: forall a. Int -> Eq a => a -> T
@@ -1077,17 +1076,11 @@ the GADT type, in precisely that order. For instance:
     MkT7 :: (Eq a => a -> T)
       -- OK, ditto
 
-For the full details, see the "Formal syntax for GADTs" section of the GHC
-User's Guide. GHC enforces that GADT constructors do not have nested `forall`s
-or contexts in a single place:
-
-   GHC, in the process of splitting apart a GADT's type,
-   extracts out the leading `forall`s and context (if they are provided). To
-   accomplish this splitting, the parser uses the GHC.Hs.Type.splitLHsGadtTy
-   function, which records the parentheses that surround the leading `forall`s
-   in con_telescope (as these parentheses are syntactically significant).
-   If the body returned by splitLHsGadtTy still contains any `forall`s or
-   contexts, then they must be nested, so they will be rejected.
+GHC.Hs.Type.splitLHsGadtTy extracts the leading foralls and contexts.
+It records their parentheses in con_telescope. The parser splits off
+the prefix fields and leaves a terminal required group in the result.
+The renamer checks the result after this group. It rejects other nested
+foralls or contexts.
 
    Note that this step applies to both prefix and record GADTs alike, as they
    both have syntax which permits `forall`s and contexts. The difference is

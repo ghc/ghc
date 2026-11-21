@@ -22,6 +22,7 @@ import {-# SOURCE #-} GHC.Rename.Expr( rnLExpr )
 import {-# SOURCE #-} GHC.Rename.Splice ( rnSpliceDecl, rnTopSpliceDecls, rnSpliceTypeWith )
 
 import GHC.Hs
+import qualified GHC.Hs.Decls as HsDecls
 import GHC.Hs.Type (mkHsImplicitSigType, HsTypeGhcPsExt(HsTypeCase, HsTypeCaseAlias, HsTypeLet, HsTypeSome), HsTypeCaseAlt(..))
 import GHC.Hs.Decls.Overlap ( OverlapMode(..) )
 import GHC.Iface.Env ( lookupOrig )
@@ -4561,11 +4562,12 @@ rnConDecl (ConDeclGADT { con_names   = names
             else rnLHsType ctxt res_ty
         ; (mods', mods_fvs) <- rnModifiersContextAndWarn ctxt mods
 
-         -- Ensure that there are no nested `forall`s or contexts, per
-         -- Note [GADT abstract syntax] (Wrinkle: No nested foralls or contexts)
-         -- in GHC.Hs.Type.
-       ; addNoNestedForallsContextsErr ctxt
-           NFC_GadtConSig new_res_ty
+         -- Keep a terminal required group on the source side of the
+         -- declaration. Check the result after that group.
+       ; let con_result = case HsDecls.splitGadtTerminalForAll new_args new_res_ty of
+                            Just (_, _, result) -> result
+                            Nothing             -> new_res_ty
+       ; addNoNestedForallsContextsErr ctxt NFC_GadtConSig con_result
 
         ; let all_fvs = fvs2 `plusFN` fvs3 `plusFN` mods_fvs
 

@@ -7,7 +7,7 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module GHC.Tc.TyCl.Build (
-        buildDataCon, buildDataConWithRetainedArgs,
+        buildDataCon, buildDataConWithRetainedArgs, buildDataConWithTelescope,
         buildPatSyn,
         TcMethInfo, MethInfo,
         buildClass, buildAbstractClass,
@@ -171,8 +171,7 @@ buildDataCon :: FamInstEnvs
 --      allocating its unique (hence monadic)
 buildDataCon = buildDataConWithRetainedArgs []
 
--- | Build a constructor with an optional retained field telescope.
--- Retained fields use the direct lazy representation, without a wrapper.
+-- | Build a constructor with its existing retained-field layout.
 buildDataConWithRetainedArgs :: [Maybe Id] -- ^ Retained field binders, or []
                             -> FamInstEnvs
             -> DataConBangOpts
@@ -197,7 +196,36 @@ buildDataConWithRetainedArgs :: [Maybe Id] -- ^ Retained field binders, or []
 --   a) makes the worker Id
 --   b) makes the wrapper Id if necessary, including
 --      allocating its unique (hence monadic)
-buildDataConWithRetainedArgs retained_binders fam_envs dc_bang_opts src_name declared_infix prom_info src_bangs
+buildDataConWithRetainedArgs = buildDataConWithTelescope 0
+
+-- | Build a constructor with an ordered source telescope.
+-- Retained fields use the direct lazy representation, without a wrapper.
+buildDataConWithTelescope :: Int         -- ^ Required type binders after fields
+                            -> [Maybe Id] -- ^ Retained field binders, or []
+                            -> FamInstEnvs
+            -> DataConBangOpts
+            -> Name
+            -> Bool                     -- Declared infix
+            -> TyConRepName
+            -> [HsSrcBang]
+           -> [FieldLabel]             -- Field labels
+           -> [TyVar]                  -- Universals
+           -> [TyCoVar]                -- Existentials
+           -> [TyVarBinder]            -- User-written 'TyVarBinder's
+           -> [EqSpec]                 -- Equality spec
+           -> KnotTied ThetaType       -- Does not include the "stupid theta"
+                                       -- or the GADT equalities
+           -> [KnotTied (Scaled Type)] -- Arguments
+           -> KnotTied Type            -- Result types
+           -> KnotTied TyCon           -- Rep tycon
+           -> NameEnv ConTag           -- Maps the Name of each DataCon to its
+                                       -- ConTag
+           -> TcRnIf m n DataCon
+-- A wrapper for DataCon.mkDataCon that
+--   a) makes the worker Id
+--   b) makes the wrapper Id if necessary, including
+--      allocating its unique (hence monadic)
+buildDataConWithTelescope late_count retained_binders fam_envs dc_bang_opts src_name declared_infix prom_info src_bangs
              field_lbls univ_tvs ex_tvs user_tvbs eq_spec ctxt arg_tys res_ty
              rep_tycon tag_map
   = do  { wrap_name <- newImplicitBinder src_name mkDataConWrapperOcc
@@ -212,7 +240,7 @@ buildDataConWithRetainedArgs retained_binders fam_envs dc_bang_opts src_name dec
         ; let stupid_ctxt = mkDataConStupidTheta rep_tycon (map scaledThing arg_tys) univ_tvs
               tag = lookupNameEnv_NF tag_map src_name
               -- See Note [Constructor tag allocation], fixes #14657
-              data_con = mkDataConWithRetainedArgs retained_binders src_name declared_infix prom_info
+              data_con = mkDataConWithTelescope late_count retained_binders src_name declared_infix prom_info
                                    src_bangs impl_bangs str_marks field_lbls
                                    univ_tvs ex_tvs
                                    noConcreteTyVars
