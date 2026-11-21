@@ -1008,7 +1008,15 @@ tcExpr expr@(HsCase ctxt scrut matches) res_ty
             ; case special of
                 Just expr -> return expr
                 Nothing -> do
-                  { let check_matches = case unLoc (stripParensLHsExpr scrut') of
+                  { -- See Note [Unrestricted data family case fields].
+                    case unLoc (stripParensLHsExpr scrut') of
+                      HsVar _ (L _ index)
+                        | dependent, isNativeOpaqueValueId index
+                        , Just (tc, _) <- splitTyConApp_maybe scrut_ty
+                        , isDataFamilyTyCon tc ->
+                            tcEqMult (OccurrenceOf (idName index)) mult ManyTy
+                      _ -> return ()
+                  ; let check_matches = case unLoc (stripParensLHsExpr scrut') of
                           HsVar _ (L _ index) | dependent, isNativeOpaqueValueId index
                             , not (isNativeIndexId index), Check result <- expected
                             , anyFreeVarsOfType (== index) result ->
@@ -1033,6 +1041,21 @@ tcExpr expr@(HsCase ctxt scrut matches) res_ty
     -- See Note [Matching an implicit existential payload].
     payload_alt schema (L _ Match{m_pats = L _ [pat]}) = matchesImplicitPayloadPat schema pat
     payload_alt _ _ = False
+
+{- Note [Unrestricted data family case fields]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The selector in `case c of Stored x -> tag (pick x)` can use the
+constructor's class Given. Its retained operand needs an unrestricted
+field. If the case multiplicity is still a metavariable, the constructor
+implication can make it untouchable. The retained operand check cannot
+then establish Many with reflexive evidence.
+
+For a checked local data family scrutinee whose binding is already
+unrestricted, choose Many before checking the alternatives. The case
+can use this variable at Many and scale its fields at Many, regardless
+of whether the result names the scrutinee. Keep fresh multiplicity
+inference for linear variables and compound scrutinees.
+-}
 
 {- Note [Case on a call with an implicit package head]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

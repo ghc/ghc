@@ -2495,15 +2495,8 @@ tcIndexedCaseMatches :: Id -> HsMatchContextRn -> Scaled TcSigmaTypeFRR
                      -> MatchGroup GhcRn (LHsExpr GhcRn) -> ExpRhoType
                      -> TcM (MatchGroup GhcTc (LHsExpr GhcTc))
 tcIndexedCaseMatches index ctxt (Scaled mult ty) matches res_ty =
-  do { -- The dependent scrutinee is a known unrestricted local Id.
-       -- Fix the multiplicity before the family constructor binds its Givens.
-       ; when (isNativeOpaqueValueId index &&
-               case splitTyConApp_maybe ty of
-                 Just (tc, _) -> isDataFamilyTyCon tc
-                 Nothing -> False) $
-           tcEqMult (OccurrenceOf (idName index)) mult ManyTy
-       ; tcMatchesFromWithIndex (Just (index, mkLHsWrapCo . mkSymCo)) (map unLoc) ctxt tcBody
-           [ExpFunPatTy (Scaled mult (mkCheckExpType ty))] res_ty matches }
+  tcMatchesFromWithIndex (Just (index, mkLHsWrapCo . mkSymCo)) (map unLoc) ctxt tcBody
+    [ExpFunPatTy (Scaled mult (mkCheckExpType ty))] res_ty matches
 
 -- @tcGRHSsPat@ typechecks @[GRHSs]@ that occur in a @PatMonoBind@.
 tcGRHSsPat :: Mult -> GRHSs GhcRn (LHsExpr GhcRn) -> ExpRhoType
