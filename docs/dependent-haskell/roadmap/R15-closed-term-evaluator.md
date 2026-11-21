@@ -656,7 +656,9 @@ with the wrong mask length fails at the source call. An outer observation
 of just the width can leave the other three fields undefined.
 `selectedValues` consumes the two vectors together. The shared index
 excludes unequal spines. Applying the mask `[False, True]` to the values
-`[4, 5]` returns `[5]`. The
+`[4, 5]` returns `[5]`. In an ordinary module,
+`MaskedRow (SS SZ) (VCons 4 VNil) 'x' VNil` fails at the last `VNil`
+with GHC-83865. The mask has length zero where the constructor requires one. The
 evaluator supports one erased constructor index with a recoverable witness
 in the first field. Each indexed payload must support the checked
 constructor cases described above. [Source and projections](../examples/closed-evaluation/WitnessedBatch.hs).
