@@ -793,10 +793,11 @@ A mapper that accepts only M fails the rank check.
 This combines the proposal's inferred `Map` with its `D F`
 example of passing a family at a polymorphic kind. The earlier
 checker instantiated the hidden matchability before checking
-the receiver's kind. A closed family equation that binds the
-same rank-polymorphic mapper in its left-hand side and then
-uses it at both matchabilities still fails. The `Recipe`
-example checks the family as an argument to a datatype.
+the receiver's kind. A closed family can also accept `Map`.
+To use both matchabilities in one equation, bind the argument
+with `forall (mapper :: Mapper).` on that equation. With an
+implicit equation binder, even a complete family header leaves
+`mapper @M` with an unknown kind during RHS checking (GHC-20967).
 [Source and interface checks](../../../testsuite/tests/dependent/should_run/NativeLaterMatchability.sh),
 [proposal #242, other quantifiers](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#other-quantifiers)
 and [proposal review](https://github.com/ghc-proposals/ghc-proposals/pull/242).

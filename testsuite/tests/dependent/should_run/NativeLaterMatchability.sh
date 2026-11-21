@@ -58,18 +58,26 @@ fi
 
 cat >RankTelescope.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, Modifiers, PolyKinds, RankNTypes #-}
-{-# LANGUAGE StandaloneKindSignatures, TypeFamilies #-}
+{-# LANGUAGE StandaloneKindSignatures, TypeApplications, TypeFamilies, TypeOperators, UndecidableInstances #-}
 module RankTelescope where
 
 import Data.Kind (Type)
+import Data.Type.Equality ((:~:)(Refl))
 import GHC.Matchability (M, U)
-import LaterMatchability (Map)
+import LaterMatchability (KnownListCallback, Map, Mapper)
 
 type ShortMapper = forall {b} {a}. @U (a %M -> b) %U -> [a] %U -> [b]
 type Short :: ShortMapper -> Type
 data Short f = Short
 
 type Specialized = Short Map
+
+type family AtBoth (mapper :: Mapper) :: ([Type], [Type]) where
+  forall (mapper :: Mapper).
+    AtBoth mapper = '(mapper @M Maybe '[Bool], mapper @U KnownListCallback '[Bool])
+
+both :: AtBoth Map :~: '( '[Maybe Bool], '[[Bool]])
+both = Refl
 HS
 "${ghc[@]}" -c RankTelescope.hs
 cat >>RankTelescope.hs <<'HS'
