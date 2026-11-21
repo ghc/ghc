@@ -2,7 +2,7 @@
 
 R12 is open. It depends on R13 (function promotion) and R24 (constrained
 type families). M82 and M83 can use checked equations after identifying a
-concrete instance method. The private prototype retains a unary method
+concrete instance method. The experimental compiler retains a unary method
 application through one unique direct Given. It keeps the caller's exact
 dictionary in the result type. Superclass selection, recursive evidence
 and general class promotion remain open.
@@ -20,7 +20,7 @@ chooseTagged x = tagBool (choose x)
 ```
 
 `tagBool :: foreach (b :: Bool) -> Tagged b` returns the corresponding
-tagged Boolean value. The public baseline reports GHC-70566 for the result type.
+tagged Boolean value. Before scoped dictionary support, the baseline reported GHC-70566 for the result type.
 “Cannot reduce the open call to ‘choose’ in a type.” The explanation is
 “The local dependency choose is not an ordinary function binding.”
 [Target source](../../../testsuite/tests/dependent/should_run/promoted-class/ChooseTarget.hs).
@@ -37,7 +37,7 @@ and [test runner](../../../testsuite/tests/dependent/should_run/NativePromotedCl
 
 ## Evidence needed
 
-The private prototype typechecks `chooseTagged` while `a` and its
+The compiler typechecks `chooseTagged` while `a` and its
 `Choose a` evidence are abstract. The index and the term call
 must use the same selector, instantiation, operand and evidence. The
 application can stay opaque during type checking. With the constraint
@@ -93,7 +93,7 @@ order, `db :: Choose b` and then `da :: Choose a`. It emits
 `choose @a da x` and `choose @b db y`. A control that removes `Choose b`
 fails at the second call. The test compiles the term-only program and
 checks that both dictionary fields produce their expected results. The
-public baseline reports GHC-70566 at both occurrences in the indexed signature.
+baseline reported GHC-70566 at both occurrences before the index could carry a dictionary.
 [Source controls](../../../testsuite/tests/dependent/should_run/promoted-class/ChooseEvidence.hs).
 
 For this first slice, require a unique direct Given of the instantiated
@@ -152,7 +152,7 @@ without the owner dictionary.
 [Wire test](../../../testsuite/tests/dependent/should_run/NativeScopedDictionaryWire.sh).
 
 
-The private Showcase calls the imported selector under two direct Givens,
+The Showcase calls the imported selector under two direct Givens,
 one for a Boolean and one for its wrapper with the opposite behavior.
 The signatures use existing class constraints and keep the two
 `Choose` dictionaries distinct.
@@ -265,3 +265,9 @@ function directly to a constructor at the method-indexed position still
 requires a local binding for that receiver.
 [Ambiguity check](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/ambiguous_types.html)
 and [client](../../../testsuite/tests/dependent/should_run/promoted-class/ScopedFamilyMethodClient.hs).
+
+A written Template Haskell quotation can use an imported method in
+a retained index. Reifying the elaborated signature reports GHC-75721.
+The current Template Haskell type representation has no binder for the
+selected dictionary.
+[Reification check](../../../testsuite/tests/dependent/should_run/NativeScopedDictionaryCoreReload.sh).
