@@ -2032,7 +2032,8 @@ closedCallRenderer name (ClosedCodec shape nodes) = do
             evidence : values | isCoVar evidence, equalLength fields values -> do
               (target, previous) <- case (result_index, locals) of
                 (ClosedFixedIndex base, []) -> return (mkTyConTy (promoteDataCon base), Nothing)
-                (ClosedSuccessor successor, [local]) | isTyVar local ->
+                (ClosedSuccessor successor, [local])
+                  | isTyVar local, tyVarKind local `tcEqType` tyVarKind index ->
                   let previous = mkTyVarTy local
                   in return (mkTyConApp (promoteDataCon successor) [previous], Just previous)
                 _ -> unexpected_rep
@@ -2099,8 +2100,9 @@ closedCallRenderer name (ClosedCodec shape nodes) = do
                                 return checked
                 renderers <- mapM (renderFields refs quote) codecs
                 return (foldr (.) id (zipWith ($) renderers values))
-              ClosedWitnessedFields witness payload ground
+              ClosedWitnessedFields witness@(ClosedOpenShape template _ _ _) payload ground
                 | [index] <- existentials, isTyVar index
+                , tyVarKind index `tcEqType` tyVarKind template
                 , let idx = mkTyVarTy index
                 , witness_value : payload_value : values <- binders
                 , varType witness_value `tcEqType` closedOpenType witness idx
@@ -2314,9 +2316,11 @@ A recursive constructor refines its index to an injective promoted
 application of its case-bound predecessor. It has one recursive field
 at that predecessor. Other fields use the ordinary ground codec.
 
-The interpreter uses two polymorphic Core workers. Each recurses at the
-type of its own constructor-bound field. The case evidence confirms
-the planned index pattern and supplies no data to the wire. The host
+The enclosing Core case binds the existential with
+dataConRepInstPat. Check its kind and both fields using that binder.
+The first two fields have separate polymorphic Core workers. Each
+recursive case checks its actual nominal equality against the planned
+index pattern. The case evidence supplies no data to the wire. The host
 decoder recovers each index from its witness, checks the payload at that
 index, and builds the checked promoted constructor. The preflight plan
 determines the constructor tags and visibility checks.

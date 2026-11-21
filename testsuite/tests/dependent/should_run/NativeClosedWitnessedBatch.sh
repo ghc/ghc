@@ -17,8 +17,10 @@ for opt in -O0 -O2; do
     cd "$out/${opt#-}/producer"
     cp "$src"/{ExistentialVec,IndexedVec,WitnessedBatch}.hs .
     cat >WrongWitness.hs <<'HS'
-{-# LANGUAGE DataKinds #-}
-module WrongWitness (buildWrong) where
+{-# LANGUAGE DataKinds, GADTs, KindSignatures #-}
+module WrongWitness
+    ( buildWrong, EvidenceBatch(..), withEvidence, TaggedBatch(..), withEquality
+    ) where
 import ExistentialVec (SN(..))
 import IndexedVec (Vec(..))
 import Numeric.Natural (Natural)
@@ -28,6 +30,19 @@ import WitnessedBatch (Batch(..))
 buildWrong :: Natural -> Batch Natural
 buildWrong n = Chunk (SS SZ) (VCons n VNil)
                      (Chunk (SS SZ) (unsafeCoerce (VCons n (VCons n VNil))) End)
+
+data EvidenceBatch a where
+    EvidenceEnd :: EvidenceBatch a
+    EvidenceChunk :: Eq a => SN n -> Vec n a -> EvidenceBatch a -> EvidenceBatch a
+
+withEvidence :: Natural -> EvidenceBatch Natural
+withEvidence _ = error "class-constrained constructor was evaluated"
+
+data TaggedBatch (marked :: Bool) a where
+    TaggedChunk :: SN n -> Vec n a -> TaggedBatch 'True a
+
+withEquality :: Natural -> TaggedBatch 'True Natural
+withEquality _ = error "equality-constrained constructor was evaluated"
 HS
     "${ghc[@]}" "$opt" "${producer_flags[@]}" -c IndexedVec.hs ExistentialVec.hs WitnessedBatch.hs WrongWitness.hs
     cd "../client"
@@ -108,6 +123,35 @@ hidden = Proxy
 HS
     reject Hidden 'bring every constructor into scope from a non-SOURCE import.'
     if grep -Fq "‘End’" reject.log; then cat reject.log >&2; exit 1; fi
+
+    sed -e 's/module Hidden/module HiddenWitness/' -e 's/SN(..)/SN(SS)/' \
+        -e 's/(Batch(Chunk), build)/(Batch(..), build)/' Hidden.hs >HiddenWitness.hs
+    reject HiddenWitness 'Cannot inspect the constructors of SN.'
+    if grep -Fq "‘SZ’" reject.log; then cat reject.log >&2; exit 1; fi
+
+    cat >ClassEvidence.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes #-}
+module ClassEvidence where
+import Data.Proxy (Proxy(..))
+import ExistentialVec (SN(..))
+import IndexedVec (N(..), Vec(..))
+import qualified WrongWitness as W
+proof :: Proxy (W.withEvidence 4)
+proof = Proxy
+HS
+    reject ClassEvidence 'EvidenceBatch Natural.'
+    if grep -Fq 'class-constrained constructor was evaluated' reject.log; then
+        cat reject.log >&2
+        exit 1
+    fi
+
+    sed -e 's/module ClassEvidence/module EqualityEvidence/' \
+        -e 's/withEvidence/withEquality/' ClassEvidence.hs >EqualityEvidence.hs
+    reject EqualityEvidence 'Cannot recover a constructor-local type argument from the checked result type.'
+    if grep -Fq 'equality-constrained constructor was evaluated' reject.log; then
+        cat reject.log >&2
+        exit 1
+    fi
 
     sed -e 's/module DemandTail/module BadWitness/' -e 's/B.partialTail 9/Wrong.buildWrong 4/' \
         -e '/^import qualified WitnessedBatch as B$/a import qualified WrongWitness as Wrong' \
