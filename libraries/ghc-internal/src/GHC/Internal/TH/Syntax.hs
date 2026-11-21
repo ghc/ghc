@@ -1328,7 +1328,19 @@ data Con =
              [VarBangType] -- ^ The constructor arguments
              Type -- ^ See Note [GADT return type]
   | ForallMatchC Type Con
+  | RetainedGadtC [Name] [RetainedGadtArg] Type
+    -- ^ A prefix GADT constructor with one or more retained arguments.
+    -- The argument list is in source order. The result follows the list.
         deriving (Show, Eq, Ord, Generic)
+
+-- | An argument of a prefix GADT constructor with retained arguments.
+data RetainedGadtArg
+  = GadtValueArg Bang Type Type
+    -- ^ Source bang, multiplicity, and type of an ordinary field.
+  | GadtIndexArg Name Type
+    -- ^ A visible runtime binder and its domain. The name scopes over the
+    -- later arguments and the constructor result.
+  deriving (Show, Eq, Ord, Generic)
 
 -- Note [GADT return type]
 -- ~~~~~~~~~~~~~~~~~~~~~~~
@@ -1431,7 +1443,20 @@ data Type = ForallT [TyVarBndr Specificity] Cxt Type -- ^ @forall \<vars\>. \<ct
           | WildCardT                      -- ^ @_@
           | ImplicitParamT String Type     -- ^ @?x :: t@
           | ForallMatchT Type Type
+          | ForEachT BndrVis Name Type Type
+            -- ^ A retained function type. The name binds a runtime argument
+            -- in the result type. Its domain is outside that scope.
+            -- 'BndrReq' uses @foreach (x :: t) -> r@. 'BndrInvis' uses
+            -- @foreach (x :: t). r@.
+          | IndexVarT Name                 -- ^ A retained term variable used in a type.
+          | CaseT Type [TypeCaseAlt]       -- ^ @case t of { p -> r; ... }@
       deriving( Show, Eq, Ord, Generic )
+
+-- | A row in an ordered type case. Type variable occurrences in the
+-- pattern bind over the result of this row. A pattern uses the same type
+-- syntax as the arguments of a 'TySynEqn'.
+data TypeCaseAlt = TypeCaseAlt Type Type
+  deriving( Show, Eq, Ord, Generic )
 
 {- Note [Forall matchability wrappers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
