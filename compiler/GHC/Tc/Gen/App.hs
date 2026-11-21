@@ -1492,7 +1492,7 @@ tcRetainedGroundApp True DoQL exp_ty rn_head fun sigma args
                ; let tys = residual : prefix_tys ++ maybeToList expected
                ; valid_scope <- tcRetainedInstScope tys
                ; if not (valid_scope && all no_ql_vars tys
-                         && maybe True isRetainedValueType expected)
+                         && maybe True known_result expected)
                  then keep_ql else
                  if not (any (hasNativeDependentExpr . Core.Type) tys)
                  then declared_plan else
@@ -1531,6 +1531,7 @@ tcRetainedGroundApp True DoQL exp_ty rn_head fun sigma args
     prefix_arg _ = False
     type_arg ETypeArg{} = True
     type_arg _ = False
+    known_result ty = isRetainedValueType ty || isRankedRetainedContainer ty
     no_ql_vars = not . any is_ql . tyCoVarsOfTypeList
     is_ql v = isTcTyVar v && isQLInstTyVar v
 tcRetainedGroundApp _ ql _ _ _ sigma args = return ([], ql, sigma, args, Nothing)
@@ -1544,7 +1545,7 @@ retainedPrefixTypes args
     value_type ty
       = do { ty <- liftZonkM (zonkTcType ty)
            ; return $ if hasNativeDependentExpr (Core.Type ty)
-                         && not (isRetainedValueType ty)
+                         && not (isRetainedValueType ty || isRankedRetainedCallback ty)
                       then Nothing else Just [ty] }
     arg_types (ETypeArg { ea_ty_arg = ty }) = value_type ty
     arg_types (EWrap (EHsWrap wrap)) = wrap_types wrap
@@ -2269,6 +2270,14 @@ in the residual type, expected type or saved prefix metadata. Ground theta
 remains an obligation for IALL and instCall. Outer rigid variables and runtime
 indices are permitted. Ordinary metavariables keep their existing rules.
 
+A written type application can supply a ranked retained callback to an
+algebraic constructor. In Just @Callback reflect, ITYARG has already
+checked Callback. The residual type Callback -> Maybe Callback declares
+the field and the result. Keep this type argument in the checked prefix
+and use ordinary checking for that field. The callback keeps its binders,
+constraints and scope. Quick Look does not assign an instantiation
+variable to Callback.
+
 Alternatively, use the existing immutable expected-result selection, including
 its algebraic candidate fallback. Keep the actual substituted signature. Append
 its type applications after the explicit prefix. This lets a nested Refl use
@@ -2323,7 +2332,20 @@ isGroundRetainedCallType ty
     && (isRetainedValueType arg || isRankedRetainedCallback arg)
     && isGroundRetainedCallType res
   | otherwise
-  = isRetainedValueType ty
+  = isRetainedValueType ty || isRankedRetainedContainer ty
+
+-- | Recognize an algebraic result with a ranked retained type argument.
+-- See Note [Ground retained applications].
+isRankedRetainedContainer :: Type -> Bool
+isRankedRetainedContainer ty
+  | TyConApp tc args <- coreFullView ty
+  , isAlgTyCon tc, not (isClassTyCon tc)
+  , length args == tyConArity tc
+  , typeKind ty `eqType` liftedTypeKind
+  = any isRankedRetainedCallback args
+    && all (\arg -> isRetainedValueType arg || isRankedRetainedCallback arg) args
+  | otherwise
+  = False
 
 isRankedRetainedCallback :: Type -> Bool
 isRankedRetainedCallback ty
