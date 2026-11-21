@@ -33,7 +33,7 @@ module GHC.Tc.Gen.Match
    , tcStmtsAndThen
    , tcDoStmts
    , tcBody
-   , tcScopedRuntimeBody
+   , tcScopedRuntimeBody, tcCloseRuntimeScope
    , tcDoStmt
    , tcGuardStmt
    , checkArgCounts
@@ -2436,18 +2436,27 @@ tcScopedRuntimeBody bound body@(L loc expr) expected
   , Infer ir <- expected
   = do { local <- newInferExpType (ir_inst ir)
        ; checked <- tcBody body local
-       ; actual <- readExpType local >>= liftZonkM . zonkTcType
-       ; let local_indices ty = filter mentions_local (tyCoVarsOfTypeList ty)
-             mentions_local var = isId var && not (isCoVar var) && getName var `elem` bound
-       ; case local_indices actual of
-           [] -> fmap (L loc) (tcWrapResultMono expr (unLoc checked) actual expected)
-           _ -> setSrcSpanA loc $
-             do { origin <- getCtLocM (exprCtOrigin expr) (Just TypeLevel)
-                ; Reduction co reduced <- tcRewriteFamilyAxioms origin actual
-                ; case local_indices reduced of
-                    index : _ -> failWithTc $ TcRnRetainedQuantificationError (RetainedIndexOutOfScope index)
-                    [] -> L loc <$> tcWrapResultMono expr (mkHsWrapCo co (unLoc checked)) reduced expected } }
+       ; actual <- readExpType local
+       ; Reduction co reduced <- setSrcSpanA loc $
+           tcCloseRuntimeScope bound (exprCtOrigin expr) actual
+       ; L loc <$> tcWrapResultMono expr (mkHsWrapCo co (unLoc checked)) reduced expected }
   | otherwise = tcBody body expected
+
+-- | Close the result with nominal family evidence before leaving a runtime scope.
+tcCloseRuntimeScope :: [Name] -> CtOrigin -> Type -> TcM Reduction
+tcCloseRuntimeScope [] _ ty = return (Reduction (mkNomReflCo ty) ty)
+tcCloseRuntimeScope bound origin ty
+  = do { actual <- liftZonkM (zonkTcType ty)
+       ; case local_indices actual of
+           [] -> return (Reduction (mkNomReflCo actual) actual)
+           _ -> do { loc <- getCtLocM origin (Just TypeLevel)
+                   ; reduction@(Reduction _ reduced) <- tcRewriteFamilyAxioms loc actual
+                   ; case local_indices reduced of
+                       index : _ -> failWithTc $ TcRnRetainedQuantificationError (RetainedIndexOutOfScope index)
+                       [] -> return reduction } }
+  where
+    local_indices = filter mentions_local . tyCoVarsOfTypeList
+    mentions_local var = isId var && not (isCoVar var) && getName var `elem` bound
 
 {- Note [Closing an inferred runtime index scope]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

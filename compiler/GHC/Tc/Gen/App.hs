@@ -23,7 +23,7 @@ import GHC.Hs
 import GHC.Rename.Env ( addUsedGRE, DeprecationWarnings(NoDeprecationWarnings) )
 import GHC.Rename.Utils ( mkExpandedLExpr )
 import GHC.Tc.Gen.Head
-import GHC.Tc.Gen.Match ( tcMatches, tcBody, tcOpenImplicitPackage, implicitPayloadType )
+import GHC.Tc.Gen.Match ( tcMatches, tcBody, tcOpenImplicitPackage, implicitPayloadType, tcCloseRuntimeScope )
 import GHC.Tc.Gen.SourceTable ( tcLookupSourceTableId, sourceTableOccurrence, recordSourceMethodUse, recordSourceLiteralUse )
 import GHC.Tc.Gen.Sig ( isCompleteHsSig )
 import GHC.Tc.Errors.Types
@@ -33,7 +33,7 @@ import GHC.Tc.Solver ( tcRewriteFamilyAxioms )
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Utils.Env ( isExistsPackName, tcLookupIdMaybe, tcLookupConLike
-                        , tcLookup, tcLookupGlobal, tcLookupLcl_maybe, tcExtendIdEnv )
+                        , tcLookup, tcLookupGlobal, tcLookupLcl_maybe, tcExtendIdEnv, tcExtendGeneratedIdEnv )
 import GHC.Tc.Instance.Family ( tcGetFamInstEnvs, tcLookupDataFamInst_maybe )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.Concrete  ( unifyConcrete, idConcreteTvs )
@@ -68,7 +68,7 @@ import GHC.Core.TyCo.Ppr
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Unify ( tcMatchTyX_BM, tcMatchRetainedTyX_BM, BindFlag(..), BindTvFun )
 import GHC.Core.Type
-import GHC.Core.UsageEnv ( UsageEnv, singleUsageUE, zeroUE )
+import GHC.Core.UsageEnv ( UsageEnv, popUE, singleUsageUE, zeroUE )
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom (coAxiomBranches, coAxBranchLHS, coAxBranchRHS, coAxBranchCoVars, fromBranches)
 
@@ -78,10 +78,10 @@ import GHC.Builtin.KnownKeys
 
 import GHC.Driver.DynFlags ( DynFlags(reductionDepth), HasDynFlags(getDynFlags) )
 import GHC.Types.TyThing ( TyThing(AnId, AConLike, ATyCon) )
-import GHC.Types.Basic ( TypeOrKind(TypeLevel), IntWithInf, intGtLimit )
+import GHC.Types.Basic ( RecFlag(NonRecursive), TypeOrKind(TypeLevel), IntWithInf, intGtLimit )
 import GHC.Types.TypeEnv ( lookupTypeEnv )
 import GHC.Types.Var
-import GHC.Types.Id ( mkLocalId, isClassOpId_maybe, isDFunId, sourceTableId_maybe, sourceMethodTarget_maybe, sourceLiteralCons_maybe )
+import GHC.Types.Id ( idName, idType, mkLocalId, isClassOpId_maybe, isDFunId, sourceTableId_maybe, sourceMethodTarget_maybe, sourceLiteralCons_maybe )
 import GHC.Types.Var.Set ( IdSet, elemVarSet, emptyVarSet, extendVarSet, isEmptyVarSet, mkVarSet, sizeVarSet )
 import GHC.Types.Var.FV
 import GHC.Types.Name
@@ -656,7 +656,115 @@ tcRuleAppPrefix (L loc expr) = context $
 tcOrdinaryAppWithPrefix :: [HsExprArg 'TcpInst] -> HsExpr GhcRn -> (HsExpr GhcRn, SrcSpan)
                         -> HsExpr GhcTc -> TcSigmaType -> [HsExprArg 'TcpRn]
                         -> ExpRhoType -> TcM (HsExpr GhcTc)
-tcOrdinaryAppWithPrefix checked_prefix rn_expr rn_head@(rn_fun, fun_lspan) tc_fun0 fun_sigma0 rn_args written_res_ty
+tcOrdinaryAppWithPrefix checked_prefix rn_expr rn_head tc_fun fun_sigma rn_args expected
+  = do { (args, fields) <- if null checked_prefix
+                          then tcRetainedSpineFields rn_expr fun_sigma rn_args
+                          else return (rn_args, [])
+       ; let check names = tcOrdinaryAppScoped names checked_prefix rn_expr rn_head
+                                              tc_fun fun_sigma args expected
+       ; if null fields then check [] else tcWithSpineFields fields check }
+
+-- | Check each field once and share it with the retained application below.
+tcWithSpineFields :: [(Id, LHsExpr GhcRn)] -> ([Name] -> TcM (HsExpr GhcTc))
+                  -> TcM (HsExpr GhcTc)
+tcWithSpineFields fields check
+  = do { rhss <- forM fields $ \(field, rhs) ->
+           tcScalingUsage ManyTy (tcCheckPolyExpr rhs (idType field))
+       ; let ids = map fst fields
+       ; (usage, result) <- tcCollectingUsage $
+           foldr tcExtendGeneratedIdEnv (check (map getName ids)) ids
+       ; tcEmitBindingUsage (foldl' (\ue field -> snd (popUE ue field)) usage ids)
+       ; let binds = HsValBinds noAnn (XValBindsLR (HsVBG
+                       [(NonRecursive, [mk_bind field rhs]) | (field, rhs) <- zip ids rhss] []))
+       ; return (HsLet noExtField (noLocA binds) (noLocA result)) }
+  where
+    mk_bind :: Id -> LHsExpr GhcTc -> LHsBind GhcTc
+    mk_bind field rhs = noLocA PatBind
+      { pat_ext = XPatBindTc (idType field) [] [] ManyTy
+      , pat_lhs = noLocA (LazyPat noExtField (noLocA (VarPat noExtField (noLocA field))))
+      , pat_mods = []
+      , pat_rhs = unguardedGRHSs (getLocA rhs) rhs noAnn }
+
+-- | Select plain list fields when the remainder of the contract forgets all fields.
+-- See Note [Opaque operands for a retained list spine].
+tcRetainedSpineFields :: HsExpr GhcRn -> Type -> [HsExprArg 'TcpRn]
+                     -> TcM ([HsExprArg 'TcpRn], [(Id, LHsExpr GhcRn)])
+tcRetainedSpineFields expr sigma args
+  | not (any needs_fields args) = return (args, [])
+  | (_, _, tau) <- tcRetainedInstTelescope sigma
+  , DepFunTy DepFunVisible _ _ <- coreFullView tau
+  = do { plan <- tryTcDiscardingErrs (return Nothing) $
+           runMaybeT (scan tau args [])
+       ; case plan of
+           Nothing -> return (args, [])
+           Just count -> do
+             { changed <- traverse prepare (take count args)
+             ; return (map fst changed ++ drop count args, concatMap snd changed) } }
+  | otherwise = return (args, [])
+  where
+    needs_fields = maybe False (any opaque . snd) . list_fields
+    list_fields EValArg{ea_arg = arg}
+      | L loc (ExplicitList _ elements) <- stripParensLHsExpr arg = Just (loc, elements)
+    list_fields _ = Nothing
+
+    opaque element = case unLoc (stripParensLHsExpr element) of
+      HsVar{} -> False
+      HsLit _ HsChar{} -> False
+      HsLit _ HsString{} -> False
+      _ -> True
+
+    scan ty (arg : rest) fields
+      | DepFunTy DepFunVisible binder _ <- coreFullView ty
+      , Just (_, elements) <- list_fields arg
+      , Just [element_ty] <- nativeIndexDataConTyArgs (idType binder) nilDataCon
+      = do { ids <- liftMaybeT $ mapM (const (newSysLocalId (fsLit "element") ManyTy element_ty)) elements
+           ; let nil = Core.mkTyApps (Core.Var (dataConWorkId nilDataCon)) [element_ty]
+                 cons = Core.mkTyApps (Core.Var (dataConWorkId consDataCon)) [element_ty]
+                 operand = foldr (\field tail -> Core.mkApps cons [Core.Var field, tail]) nil ids
+           ; guard (isJust (Core.retainedArgIndex operand))
+           ; next <- scan (applyTypeToArgs ty [operand]) rest (ids ++ fields)
+           ; return (1 + next) }
+    scan ty _ fields
+      = do { guard (not (null fields))
+           ; _ <- liftMaybeT (tcCloseRuntimeScope (map getName fields) (exprCtOrigin expr) ty)
+           ; return 0 }
+
+    prepare arg
+      | Just (loc, elements) <- list_fields arg
+      , any opaque elements
+      = do { element_ty <- newFlexiTyVarTy liftedTypeKind
+           ; (elements', fields) <- mapAndUnzipM (name_field element_ty) elements
+           ; let arg' = arg { ea_arg = L loc (ExplicitList noExtField elements') }
+           ; return (arg', concat fields) }
+      | otherwise = return (arg, [])
+
+    name_field ty rhs
+      | opaque rhs
+      = do { field <- newSysLocalId (fsLit "element") ManyTy ty
+           ; let reference = mkExpandedLExpr (unLoc rhs) (nlHsVar (idName field))
+           ; return (L (getLoc rhs) reference, [(field, rhs)]) }
+      | otherwise = return (rhs, [])
+
+{- Note [Opaque operands for a retained list spine]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A list's checked length can depend on its constructors without depending on
+its values. Check the whole remaining telescope once with independent opaque
+fields before changing an argument. Checked family reduction must remove
+these fields from the entire telescope, including its constraints.
+A result or constraint that compares contents keeps the original checking
+rule. A successful projection does not establish any new field equality.
+
+Check each new RHS once as a monomorphic ordinary expression. A lazy binding
+owns the fresh Id used by both the retained index and the runtime list. Bind
+the application evidence underneath those Ids. Normalize its actual outward
+type under the same scope and use the nominal coercion there. See
+Note [Closing an inferred runtime index scope] in GHC.Tc.Gen.Match.
+-}
+
+tcOrdinaryAppScoped :: [Name] -> [HsExprArg 'TcpInst] -> HsExpr GhcRn -> (HsExpr GhcRn, SrcSpan)
+                    -> HsExpr GhcTc -> TcSigmaType -> [HsExprArg 'TcpRn]
+                    -> ExpRhoType -> TcM (HsExpr GhcTc)
+tcOrdinaryAppScoped fields checked_prefix rn_expr rn_head@(rn_fun, fun_lspan) tc_fun0 fun_sigma0 rn_args written_res_ty
   -- See Note [Constructors in a nested dependent sum] in GHC.Tc.Utils.Unify.
   = do { let exp_res_ty = case (tc_fun0, written_res_ty) of
                (XExpr (ConLikeTc (RealDataCon dc)), Check ty)
@@ -675,7 +783,7 @@ tcOrdinaryAppWithPrefix checked_prefix rn_expr rn_head@(rn_fun, fun_lspan) tc_fu
        -- See Note [Imported native application contracts].
        ; native_app <- tcRetainedAppCapability fun_sigma0 exp_res_ty rn_args
        -- See Note [Known native variables with ImpredicativeTypes].
-       ; head_ql <- if any isExplicitRetainedArg rn_args
+       ; head_ql <- if not (null fields) || any isExplicitRetainedArg rn_args
                     then return NoQL
                     else tcRetainedKnownHeadQL native_app wanted_ql rn_args exp_res_ty tc_fun0 fun_sigma0
        ; tcRetainedAppEvidence native_app $
@@ -733,7 +841,7 @@ tcOrdinaryAppWithPrefix checked_prefix rn_expr rn_head@(rn_fun, fun_lspan) tc_fu
               case (do_ql, exp_res_ty) of
                 (DoQL, Check exp_rho) -> quickLookResultType app_res_rho exp_rho
                 _                    -> return ()
-            ; finishAppWithCache (arg_cache ++ extra_cache) do_ql rn_expr fun_lspan
+            ; finishAppWithScopedCache fields (arg_cache ++ extra_cache) do_ql rn_expr fun_lspan
                 source_fun tc_fun inst_args app_res_rho written_res_ty } }
   where
     -- See Note [Type arguments before an implicit package head].
@@ -2525,14 +2633,22 @@ finishAppWithCache :: RetainedArgCache -> QLFlag
                    -> HsExpr GhcRn -> SrcSpan -> HsExpr GhcRn -> HsExpr GhcTc
                    -> [HsExprArg 'TcpInst] -> TcRhoType -> ExpRhoType
                    -> TcM (HsExpr GhcTc)
-finishAppWithCache cache do_ql rn_expr fun_loc rn_fun tc_fun inst_args
-                   app_res_rho exp_res_ty
+finishAppWithCache = finishAppWithScopedCache []
+
+-- | Finish an application below any generated runtime field bindings.
+finishAppWithScopedCache :: [Name] -> RetainedArgCache -> QLFlag
+                         -> HsExpr GhcRn -> SrcSpan -> HsExpr GhcRn -> HsExpr GhcTc
+                         -> [HsExprArg 'TcpInst] -> TcRhoType -> ExpRhoType
+                         -> TcM (HsExpr GhcTc)
+finishAppWithScopedCache fields cache do_ql rn_expr fun_loc rn_fun tc_fun inst_args
+                        app_res_rho exp_res_ty
   = do { case do_ql of
            NoQL -> return ()
            DoQL -> do { rejectNativeQuickLook app_res_rho
                       ; setSrcSpan fun_loc $ rejectNativeQLInstArgs inst_args }
 
          -- See Note [Introducing an implicit existential].
+       ; Reduction scope_co app_res_rho <- tcCloseRuntimeScope fields (exprCtOrigin rn_expr) app_res_rho
        ; (result_expected, pack) <- implicitResult do_ql rn_expr app_res_rho exp_res_ty
 
          -- Step 4.1: monomorphise un-unified QuickLook instantiation variables
@@ -2568,7 +2684,7 @@ finishAppWithCache cache do_ql rn_expr fun_loc rn_fun tc_fun inst_args
                      else return (rebuildHsApps tc_fun tc_args)
 
        ; traceTc "End tcApp }" (ppr tc_fun)
-       ; return (pack (mkHsWrap (res_wrap <.> mkWpCastN branch_co) res_expr)) }
+       ; return (pack (mkHsWrap (res_wrap <.> mkWpCastN branch_co <.> mkWpCastN scope_co) res_expr)) }
 
 -- | Refine the result of applying a retained function to the branch index.
 -- See Note [Source retained case refinement] in GHC.Tc.Gen.Match.
