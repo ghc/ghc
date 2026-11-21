@@ -6445,10 +6445,11 @@ checkValidDataCon dflags existential_ok tc con
 
         ; when (dataConLateTyVarCount con /= 0) $
             do { let (early, late) = dataConUserTyVarGroups con
-                     prefix_types = map (varType . binderVar) early ++
+                     (_, ex_tvs, eq_spec, theta, _, _) = dataConFullSig con
+                     prefix_types = map (varType . binderVar) early ++ theta ++
                        concatMap (\(Scaled mult ty) -> [mult, ty]) arg_tys
                      late_vars = mkVarSet (binderVars late)
-               ; checkTc (isVanillaDataCon con
+               ; checkTc (null ex_tvs && null eq_spec
                           && null (dataConStupidTheta con)
                           && not (isDataFamInstTyCon tc)
                           && not (isTypeDataCon con)

@@ -1745,8 +1745,11 @@ dataConWrapperTypeUnchecked con@(MkData { dcOtherTheta = theta, dcOrigArgTys = a
 A source type such as `forall a. Int -> forall b -> G a b` puts the required
 type argument after the field. Keep its position in the wrapper and in
 pattern checking. The worker still binds all type variables before its
-representation fields. The initial case stores the size of one terminal
-required group. The promoted constructor follows source argument order.
+representation fields. The source context comes before the fields and can
+use only the early binders. When checking a pattern, its Givens are in
+scope for the field patterns, the terminal type patterns, and the RHS.
+Store the size of one terminal required group. The promoted constructor
+follows source argument order.
 Its term wrapper disqualifies it from structural native index domains.
 See Note [Algebraic runtime index domains] in GHC.Core.Type.
 -}

@@ -2809,12 +2809,17 @@ instance Binary IfaceConDecls where
     put_ bh (IfDataTyCon False cs)
       | any (/= 0) late = do
           requireIfaceEvidenceVersion bh TerminalGadtForAllEvidence
+          when (any has_terminal_context cs) $
+            requireIfaceEvidenceVersion bh TerminalGadtContextEvidence
           putByte bh 4
           put_ bh cs
           put_ bh late
       | otherwise = putByte bh 1 >> put_ bh cs
       where
         late = map ifConLateTyVarCount cs
+        -- An earlier terminal reader expects an empty context.
+        has_terminal_context con =
+          ifConLateTyVarCount con /= 0 && not (null (ifConCtxt con))
     put_ bh (IfDataTyCon True cs) = putByte bh 2 >> put_ bh cs
     put_ bh (IfNewTyCon c)   = putByte bh 3 >> put_ bh c
     get bh = do

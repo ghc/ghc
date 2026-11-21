@@ -1260,7 +1260,7 @@ tcIfaceDataCons tycon_name tycon if_cons
               unless (late_count > 0 && late_count <= length user_bndrs &&
                       has_wrapper && not (null args) &&
                       null arg_binders && null ex_bndrs && null spec &&
-                      null ctxt && null lbl_names) $
+                      null lbl_names) $
                 failIfM (text "Invalid terminal constructor foralls in interface:" <+> ppr dc_name)
           ; unless (null arg_binders) $
               check_retained_shape dc_name has_wrapper arg_binders args univ_bndrs user_bndrs
@@ -1297,9 +1297,9 @@ tcIfaceDataCons tycon_name tycon if_cons
         ; ~(eq_spec, theta, retained_binders, arg_tys, stricts) <- forkM (mk_doc dc_name) $
              do { eq_spec <- tcIfaceEqSpec spec
                 ; theta   <- tcIfaceCtxt ctxt
-                -- Check scope in the same lazy computation that reads
-                -- types, since an argument can refer to this TyCon.
-                ; check_prefix_scope (map (varType . binderVar) early)
+                -- A predicate or field can refer to this TyCon. Check its
+                -- scope in the same lazy computation that reads the type.
+                ; check_prefix_scope (map (varType . binderVar) early ++ theta)
                 -- This fixes #13710.  The enclosing lazy thunk gets
                 -- forced when typechecking record wildcard pattern
                 -- matching (it's not completely clear why this
