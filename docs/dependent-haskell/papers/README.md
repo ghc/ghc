@@ -53,10 +53,10 @@ versions and several selective readings.
 | [Observational Equality Meets CIC](https://pujet.fr/pdf/toplas25_cicobs.pdf) | Pujet, Leray and Tabareau, TOPLAS 2025 | R05, R23 | Indexed transport and cast computation. The formalized conversion proof covers the natural-number fragment. |
 
 | [Combining Proofs and Programs in a Dependently Typed Language](https://www.seas.upenn.edu/~sweirich/papers/popl14-trellys.pdf) | Casinghino, Sjöberg and Weirich, POPL 2014 | R05 | Logical and programmatic fragments. The core proves closed logical CBV termination. Open-term normalization, Zombie's richer feature set and lazy-Haskell totality are separate boundaries. |
-| [Refinement Types For Haskell](https://simon.peytonjones.org/assets/pdfs/refinement-types-for-haskell.pdf) | Vazou, Seidel, Jhala, Vytiniotis and Peyton-Jones, ICFP 2014 | R05, optional assurance | Potential divergence, weak-head values, finite values and decreasing recursion metrics. No guarantee is transferred to this compiler. |
+| [Refinement Types For Haskell](https://simon.peytonjones.org/assets/pdfs/refinement-types-for-haskell.pdf) | Vazou, Seidel, Jhala, Vytiniotis and Peyton-Jones, ICFP 2014 | R05 | Potential divergence, weak-head values, finite values and decreasing recursion metrics. No guarantee is transferred to this compiler. |
 | [ANF preserves dependent types up to extensional equality](https://doi.org/10.1017/S0956796822000090) | Koronkevich, Rakow, Ahmed and Bowman, JFP 2022 | R05 | Dependency-preserving naming, continuation typing and the limits of a naive coercion translation. |
 | [Free Theorems in the Presence of seq](https://janis-voigtlaender.eu/JV04.html) | Johann and Voigtländer, POPL 2004 | R16 | A polymorphic type does not determine whether a function demands an argument. |
-| [QuickSpec: Guessing Formal Specifications using Testing](https://smallbone.se/papers/quickspec.pdf) | Claessen, Smallbone and Hughes, TAP 2010 | R15, R16 | Candidate equations for an optional boundary checker. |
+| [QuickSpec: Guessing Formal Specifications using Testing](https://smallbone.se/papers/quickspec.pdf) | Claessen, Smallbone and Hughes, TAP 2010 | R15, R16 | Candidate equations from finite test observations. |
 | [Simulation in the Call-by-Need Lambda-Calculus with Letrec, Case, Constructors, and Seq](https://lmcs.episciences.org/930) | Schmidt-Schauß, Sabel and Machkasova, LMCS 2015 | R05, R16 | Contextual equivalence, convergence and the observations available through `seq`. |
 | [Reasoning with the HERMIT](https://ku-fpg.github.io/software/hermit/) | Farmer, Sculthorpe and Gill, Haskell 2015 | R16 | Checking a scripted proof of a GHC rewrite equation against the Core being compiled. |
 | [A Short Cut to Deforestation](https://www.microsoft.com/en-us/research/publication/a-short-cut-to-deforestation/) | Gill, Launchbury and Peyton Jones, FPCA 1993 | R16 | The list builder for `map` and the `foldr/build` transformation. |
@@ -736,11 +736,10 @@ The heap example includes an exceptional `undefined` value at each type
 and compares heaps through their `toList` results. The fixed-point example
 distinguishes an expression that raises an exception at zero from one
 that returns a value. The paper gives no completeness result for Haskell
-contexts using `seq` or for divergence. An optional checker can propose
-a law on this basis. GHC still needs evidence for the exact dependent
-obligation. [Heap example, pages 8–9](https://smallbone.se/papers/quickspec.pdf#page=8),
-[fixed-point example, page 12](https://smallbone.se/papers/quickspec.pdf#page=12)
-and [boundary evidence](../BOUNDARY-EVIDENCE.md).
+contexts using `seq` or for divergence. Agreement in those observations
+can suggest an equation. GHC still needs evidence for the exact dependent
+obligation. [Heap example, pages 8–9](https://smallbone.se/papers/quickspec.pdf#page=8)
+and [fixed-point example, page 12](https://smallbone.se/papers/quickspec.pdf#page=12).
 
 ## Contextual equivalence in a call-by-need calculus, LMCS 2015
 
@@ -753,9 +752,7 @@ whose body diverges, but diverges when `E` itself diverges.
 and [Definition 2.2, page 6](https://lmcs.episciences.org/930/pdf#page=6).
 
 Proposition 7.2 and Theorems 7.5–7.6 relate the authors’ applicative
-tests and simulations to contextual approximation in LR. The [boundary
-example](../BOUNDARY-EVIDENCE.md#what-does-an-observation-establish)
-checks agreement on two specified Boolean inputs. Applying the paper’s
+tests and simulations to contextual approximation in LR. Applying the
 theorem to this fork would require a correspondence with its semantics.
 The reading covers the abstract, selected introduction passages,
 Definition 2.2 and the theorem statements on pages 45–46.

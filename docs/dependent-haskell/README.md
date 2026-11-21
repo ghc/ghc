@@ -55,7 +55,7 @@ toList (fill 2)
 | What runs on the fork? Which features are still private? | [Verified checkpoints and current queue](ROADMAP.md#where-this-fork-stands) |
 | How far along is the whole program? | [All 50 Serokell cards and their dependencies](ROADMAP.md#upstream-checklist-and-complete-dependency-index) |
 | What can I write in Haskell? | [Extension guide](../users_guide/exts/experimental_dependent_types.rst), [indexed vectors](examples/packed-vector/README.md), [higher-order functions](examples/qualified-pi/README.md) |
-| What can an ordinary module prove? | [Interface and compile-time evidence](BOUNDARY-EVIDENCE.md) |
+| What can an ordinary module prove? | [Length of a mapped list](examples/open-evaluation/PreludeMapLengthProof.hs) |
 | How does the compiler represent a retained value? | [Core contract](CORE.md) and [Eisenberg branch port](PORT.md) |
 | Which designs and papers did we use? | [Reference ledger](REFERENCES.md) and [paper notes](papers/README.md) |
 | How was an older result checked? | [Implementation log](PLAN.md) and [historical verification records](CHECKPOINTS.md) |
