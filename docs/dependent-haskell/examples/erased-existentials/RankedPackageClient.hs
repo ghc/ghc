@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns, LinearTypes, MonoLocalBinds, ImpredicativeTypes, LambdaCase, NoExperimentalDependentTypes, RequiredTypeArguments, ScopedTypeVariables #-}
 module RankedPackageClient
     ( runGuarded, runConditional, runArgumentWitness, runProjections, projectAt, runDeclaredWitnesses, runExplicitBranches
+    , runRankedInput
     , runMixedPackage, runProducedPackage, runForwardedPackage, runLabelledPackage
     , runSelectedPackage, firstSelected, firstSelectedFilter, firstByOrdering, firstForwarded, runLocalPattern, readCount, refilter, refilterRows, refilterNumericZip
     , packageFiltered, readFiltered
@@ -9,6 +10,7 @@ module RankedPackageClient
 
 import AlignedList (zipWithExact)
 import Data.Bool (bool)
+import Data.Maybe (fromMaybe)
 import Data.Proxy (Proxy(..))
 import qualified ErasedPackage
 import ImplicitVector (Filtered, FilteredWith, Rows(..), HiddenRows, cells, filterVec, packRows, rowLists, withVector)
@@ -17,6 +19,7 @@ import RankedPackage
     ( Callback(..), CallbackPair, GuardedBuilder, Hidden, PolyId, PolyMaybe
     , TwoWitnessBuilder, atTwoTypes, consumeIdentity, fromLeft, fromRight
     , observeCallback, observeGuarded, observeTwo, pairFor, withWitness
+    , InputAt, RankedInput, observeRankedInput
     )
 
 -- | Both projections use the package chosen for the same input.
@@ -50,6 +53,20 @@ runConditional flag input =
             then Callback id atTwoTypes
             else if ready then consumeIdentity id else error "selected conditional arm")
         flag input
+
+-- | Hide the polymorphic identity beneath the callback's forall.
+runRankedInput :: Bool -> Int
+runRankedInput useCallback = observeRankedInput useCallback packed
+  where
+    packed :: RankedInput
+    packed = produce
+
+    produce :: InputAt PolyId -> Int
+    produce receive = fromMaybe 43 (receive readIdentity id)
+
+    readIdentity :: PolyId -> Int
+    readIdentity f = case atTwoTypes f of
+        (n, accepted) -> if accepted then n else 0
 
 -- | Infer the hidden callback type from the argument of id.
 runArgumentWitness :: Bool -> (Int, Bool)
