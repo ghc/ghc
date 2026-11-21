@@ -2,6 +2,7 @@
 module Main where
 
 import Control.Exception (ErrorCall, displayException, evaluate, try)
+import GHC.Sigma (Sigma(Pair))
 import NativeLinearRetainedPackageProvider
 
 main :: IO ()
@@ -33,6 +34,13 @@ main = do
                                  (error "retained later") unused (0 :: Int)
     order <- try @ErrorCall (evaluate (snd (chooseThree bothBottom)))
     print (either ((== "ordinary first") . takeWhile (/= '\n') . displayException) (const False) order)
+    print ( chooseMark (makeMark unused (Pair True ()) True (1 :: Int))
+          , chooseMark (makeMark unused (Pair False True) False (2 :: Int))
+          , snd (chooseMark (makeMark unused (unknownMark unused) True (3 :: Int))) )
+    print =<< mapM demanded
+        [ snd (chooseMark (makeMark unused (error "marker") (error "branch") False))
+        , fst (chooseMark (makeMark unused (unknownMark (error "witness")) True False))
+        , fst (chooseMark (makeMark unused (Pair False (error "payload")) False False)) ]
     print =<< mapM throws
         [ takeRefined (error "outer package")
         , takeRefined (makeIndex (error "retained index") 20)
@@ -46,3 +54,7 @@ main = do
   where
     throws :: Int -> IO Bool
     throws n = either (const True) (const False) <$> try @ErrorCall (evaluate n)
+
+    demanded :: Bool -> IO String
+    demanded value = either (takeWhile (/= '\n') . displayException) (const "ok")
+                  <$> try @ErrorCall (evaluate value)

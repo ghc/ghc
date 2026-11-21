@@ -1,5 +1,8 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, LinearTypes, TypeFamilies #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, LinearTypes #-}
+{-# LANGUAGE RoleAnnotations, TypeFamilies, UndecidableInstances #-}
 module NativeLinearRetainedPackageProvider where
+
+import GHC.Sigma (Sigma(Pair))
 
 type family Flag (b :: Bool) where
     Flag 'True = ()
@@ -102,3 +105,30 @@ chooseThree (Three (S k) payload False _ _ _ _ a) = (40 + readAt k payload, a)
 makeTriple :: Nat -> Int -> Bool -> Bool -> Bool -> a -> Triple a
 makeTriple n i ordinary b c a =
     Three (S n) (at n i) ordinary b (error "first flag payload") c (error "second flag payload") a
+
+type Mark = some (b :: Bool) | Flag b
+
+type role PairProof nominal
+data PairProof (m :: Mark) = PairProof Bool
+
+readPairProof :: foreach (m :: Mark) -> PairProof m -> Bool
+readPairProof _ (PairProof valid) = valid
+
+data NestedMark a where
+    Stage :: foreach (n :: Nat) -> foreach (m :: Mark) -> Bool -> PairProof m -> a %1 -> NestedMark a
+
+chooseMark :: NestedMark a %1 -> (Bool, a)
+chooseMark (Stage Z _ _ _ a) = (False, a)
+chooseMark (Stage (S _) (Pair first payload) True proof a) =
+    (readPairProof (Pair first payload) proof && readFlag first payload, a)
+chooseMark (Stage (S _) (Pair second payload) False proof a) =
+    (readPairProof (Pair second payload) proof && not (readFlag second payload), a)
+
+makeMark :: Nat -> Mark -> Bool -> a -> NestedMark a
+makeMark n mark branch a = Stage (S n) mark branch (proveMark mark) a
+  where
+    proveMark :: foreach (m :: Mark) -> PairProof m
+    proveMark _ = PairProof True
+
+unknownMark :: Bool -> Mark
+unknownMark b = Pair b (error "payload")

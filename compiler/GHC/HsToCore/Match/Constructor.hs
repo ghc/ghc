@@ -139,10 +139,10 @@ matchConFamily (var :| vars) ty groups@(group1 :| other_groups)
   where
     ConPat { pat_con = L _ con1 } = firstPat (NE.head group1)
 
-    needs_separate_rows group@(first :| rest) =
-      not (null rest)
-        && ((any has_native_proof group && isNothing (native_row_substs group))
-          || (has_retained_fields first && not (linear_retained_group group)))
+    needs_separate_rows group@(first :| rest)
+      | null rest = False
+      | any has_native_proof group = isNothing (native_row_substs group)
+      | otherwise = has_retained_fields first && not (linear_retained_group group)
 
     -- See Note [Sharing linear package fields].
     linear_retained_group rows
@@ -174,7 +174,9 @@ matchConFamily (var :| vars) ty groups@(group1 :| other_groups)
       | Subst.isEmptySubst subst = row
       | otherwise = renameEquation subst row
 
-    native_row_substs = indexPatternSubsts . fmap firstPat
+    native_row_substs rows@(first :| _)
+      | has_retained_fields first, not (matchInLinearPackage var) = Nothing
+      | otherwise = indexPatternSubsts (fmap firstPat rows)
 
     -- Compile one equation with its own runtime index binders.
     match_retained_row :: EquationInfoNE -> DsM (MatchResult CoreExpr)
@@ -542,8 +544,11 @@ patterns are bare variables, so sharing a binder does not force that field.
 Check this condition when the ordinary matcher reaches the index column. The
 whole-index Id has already been shared by the outer package case. Earlier
 constructor alternatives have also shared their fields and scoped their proofs.
-Only admit a prefix constructor with one virtual proof and no other evidence,
-existentials, wrappers or retained field telescope of its own.
+Only admit a prefix constructor with one virtual proof and no existentials or
+result wrapper. In a linear package, the checked index constructor may have
+its own retained witness. Include that witness and its dependent payload in
+the same field substitution. Check both field types before sharing the proof.
+The index schema check admits only the supported promoted telescope.
 -}
 
 -- | Check the predicate and field types after renaming each later row's fields.
@@ -556,7 +561,7 @@ indexPatternSubsts patterns = do
         { pat_con = L _ (RealDataCon con), pat_args = PrefixCon _ pats
         , pat_con_ext = ConPatTc { cpt_tvs = [], cpt_dicts = [cv]
                                 , cpt_arg_tys = tys, cpt_wrap = wrapper } }
-      | isCoVar cv, isIdHsWrapper wrapper, null (dataConRepArgBinders con)
+      | isCoVar cv, isIdHsWrapper wrapper
       , length pats == dataConRepArity con
       , isNativeIndexType (mkTyConApp (dataConTyCon con) tys)
       = do fields <- traverse bare_field pats

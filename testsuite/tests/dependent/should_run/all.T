@@ -456,8 +456,7 @@ test('NativeCertifiedSplit',
 test('NativeLinearRetainedPackage',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['NativeLinearRetainedPackage' + suffix for suffix in
-                   ['Provider.hs', 'Client.hs', 'Reject.hs', 'OverlapReject.hs',
-                    'EvidenceReject.hs', 'FallthroughReject.hs']])],
+                   ['Provider.hs', 'Client.hs', 'Reject.hs', 'EvidenceReject.hs', 'FallthroughReject.hs']])],
      run_command, ['bash NativeLinearRetainedPackage.sh "{compiler}" "{libdir}"'])
 test('NativeNamedSplit',
      [req_host_target_ghc, only_ways(['normal']),
