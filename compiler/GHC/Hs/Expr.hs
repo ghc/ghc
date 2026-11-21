@@ -384,8 +384,9 @@ type instance XStatic        GhcTc = (Type, HsExpr GhcTc)
 type instance XEmbTy         GhcPs = EpToken "type"
 type instance XEmbTy         GhcRn = NoExtField
 type instance XEmbTy         GhcTc = DataConCantHappen
-  -- A free-standing HsEmbTy is an error.
-  -- Valid usages are immediately desugared into Type.
+  -- Required arguments translate to types. A checked TypeRep operand
+  -- expands to a term. See Note [Reflecting a checked type operand]
+  -- in GHC.Tc.Gen.Expr.
 
 type instance XStar          GhcPs = TokStar
 type instance XStar          GhcRn = TokStar
