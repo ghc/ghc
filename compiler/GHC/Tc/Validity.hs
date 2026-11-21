@@ -84,6 +84,7 @@ import GHC.Types.Var     ( Id, ExistsTyFlag(ImplicitExists), VarBndr(..)
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing ( TyThing(..) )
+import GHC.Types.Unique.FM ( addToUFM, emptyUFM, lookupUFM )
 import GHC.Types.Unique.Set ( addOneToUniqSet, elementOfUniqSet, emptyUniqSet
                             , isEmptyUniqSet, nonDetEltsUniqSet )
 
@@ -95,11 +96,12 @@ import GHC.Utils.Panic
 import GHC.Data.List.SetOps
 
 import Control.Monad
+import Control.Monad.Trans.Class (lift)
 import qualified Control.Monad.Trans.State.Strict as State
 import Data.Data (Data, cast, gmapQ)
 import Data.Foldable
 import Data.Function
-import Data.List        ( (\\) )
+import Data.List        ( nubBy, (\\) )
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty ( NonEmpty(..) )
 
@@ -476,9 +478,6 @@ checkConstrainedSignature :: UserTypeCtxt -> Type -> TcM ()
 checkConstrainedSignature ctxt ty
   | null uses
   = pure ()
-  | fam : _ <- [f | FamilyInSynonym f <- uses]
-  = failWithTc $ TcRnConstrainedFamilyUnsupported fam $
-      text "This occurrence comes from a type synonym definition."
   | checks_domain ctxt
   = do { givens <- getLexicalGivens
        ; (_, wanted) <- captureConstraints $
@@ -493,31 +492,13 @@ checkConstrainedSignature ctxt ty
     checks_domain ExprSigCtxt{} = True
     checks_domain TypeAppCtxt = True
     checks_domain ConArgCtxt{} = True
+    checks_domain TySynCtxt{} = True
     checks_domain _ = False
 
     -- See Note [Family domains beneath retained binders].
     check_telescope origin whole = go whole
       where
-        go sig = case written_prefix sig of
-          ([], [], body) -> check_body body
-          (bndrs, theta, body) -> mdo
-            info <- mkSkolemInfo sig_skol
-            let tvs = map snd bndrs
-                in_scope = mkInScopeSet (tyCoVarsOfType sig)
-            (subst, skolems) <- tcInstSkolTyVarsX info (mkEmptySubst in_scope) tvs
-            let sig_skol = SigSkol origin whole (zip (map tyVarName tvs) skolems)
-            traverse_ checkNoConstrainedFamilyApps (map fst bndrs ++ map varType tvs)
-            traverse_ checkNoConstrainedFamilyApps theta
-            given <- newEvVars (substTheta subst theta)
-            void $ checkConstraints sig_skol skolems given (check_body (substTy subst body))
-
-        -- Stop at a synonym so that check_part sees its written arguments.
-        written_prefix (ForAllTy ma (Bndr tv _) rest)
-          = let (bndrs, theta, body) = written_prefix rest in ((ma, tv) : bndrs, theta, body)
-        written_prefix (FunTy af _ _ pred_ty rest)
-          | isInvisibleFunArg af
-          = let (tvs, theta, body) = written_prefix rest in (tvs, pred_ty : theta, body)
-        written_prefix rest = ([], [], rest)
+        go sig = with_scope origin whole sig check_body
 
         check_body (DepFunTy _ index body)
           = do { check_part (varType index)
@@ -529,13 +510,14 @@ checkConstrainedSignature ctxt ty
                ; go result }
         check_body body = check_part body
 
-    check_part part
-      = do { checkNested part
-           ; forM_ (constrainedFamilyApps part) $ \case
-               WrittenFamily fam args -> emit_domain fam args
-               FamilyInSynonym fam ->
-                 failWithTc $ TcRnConstrainedFamilyUnsupported fam $
-                   text "This occurrence comes from a type synonym definition." }
+    check_part part = do
+      checkNested part
+      uses <- familyDomainObligations part
+      forM_ uses $ \case
+        UnsupportedFamily fam reason -> failWithTc (TcRnConstrainedFamilyUnsupported fam reason)
+        ScopedFamily fam sigma -> with_scope ctxt ty sigma $ \pred_ty -> do
+          ev <- newWanted (OccurrenceOf (tyConName fam)) (Just TypeLevel) pred_ty
+          emitSimple (mkNonCanonical ev)
 
     checkNested rho@(ForAllTy _ (Bndr _ vis) _)
       | isInvisibleForAllTyFlag vis = checkNoConstrainedFamilyApps rho
@@ -549,11 +531,27 @@ checkConstrainedSignature ctxt ty
     checkNested ty@ExistsTy{} = checkNoConstrainedFamilyApps ty
     checkNested _ = pure ()
 
-    emit_domain fam args = case associatedFamilyDomain fam args of
-      Left reason -> failWithTc (TcRnConstrainedFamilyUnsupported fam reason)
-      Right pred_ty -> do
-        ev <- newWanted (OccurrenceOf (tyConName fam)) (Just TypeLevel) pred_ty
-        emitSimple (mkNonCanonical ev)
+    with_scope origin whole sig inside = case written_prefix sig of
+      ([], [], body) -> inside body
+      (bndrs, theta, body) -> mdo
+        info <- mkSkolemInfo sig_skol
+        let tvs = map snd bndrs
+            in_scope = mkInScopeSet (tyCoVarsOfType sig)
+        (subst, skolems) <- tcInstSkolTyVarsX info (mkEmptySubst in_scope) tvs
+        let sig_skol = SigSkol origin whole (zip (map tyVarName tvs) skolems)
+        traverse_ checkNoConstrainedFamilyApps (map fst bndrs ++ map varType tvs)
+        traverse_ checkNoConstrainedFamilyApps theta
+        given <- newEvVars (substTheta subst theta)
+        void $ checkConstraints sig_skol skolems given (inside (substTy subst body))
+
+    -- Stop at a synonym so that check_part sees its written arguments.
+    written_prefix (ForAllTy ma (Bndr tv _) rest)
+      = let (bndrs, theta, body) = written_prefix rest in ((ma, tv) : bndrs, theta, body)
+    written_prefix (FunTy af _ _ pred_ty rest)
+      | isInvisibleFunArg af
+      = let (tvs, theta, body) = written_prefix rest in (tvs, pred_ty : theta, body)
+    written_prefix rest = ([], [], rest)
+
 
 -- | Recover the owner predicate from the supplied family arguments.
 -- See Note [Associated family domain arguments].
@@ -587,28 +585,21 @@ checks still apply to a prefix that determines its domain.
 -- | Refuse contexts that have no formation rule in this experiment.
 checkNoConstrainedFamilyApps :: Type -> TcM ()
 checkNoConstrainedFamilyApps ty
-  | use : _ <- constrainedFamilyApps ty
-  = failWithTc $ TcRnConstrainedFamilyUnsupported (familyTyCon use) $
-      text "Use the family in a value signature, expression annotation, constructor field, or explicit type argument."
+  | fam : _ <- constrainedFamilyApps ty
+  = failWithTc (TcRnConstrainedFamilyUnsupported fam unsupportedFamilySite)
   | otherwise = pure ()
-  where
-    familyTyCon (WrittenFamily fam _) = fam
-    familyTyCon (FamilyInSynonym fam) = fam
 
-data ConstrainedFamilyUse
-  = WrittenFamily TyCon [Type]
-  | FamilyInSynonym TyCon
+unsupportedFamilySite :: SDoc
+unsupportedFamilySite = text "Use the family in a value signature, type synonym, expression annotation, constructor field, or explicit type argument."
 
--- Walk the written arguments even for a forgetful synonym. A marked
--- occurrence in an imported RHS is unsupported in this experiment. Inspect
--- that RHS before substitution and at most once per synonym TyCon.
-constrainedFamilyApps :: Type -> [ConstrainedFamilyUse]
-constrainedFamilyApps ty = State.evalState (go False ty) emptyUniqSet
+-- Find marked families without substituting or allocating scoped predicates.
+constrainedFamilyApps :: Type -> [TyCon]
+constrainedFamilyApps ty = State.evalState (go ty) emptyUniqSet
   where
-    go in_rhs (TyConApp tc args) = do
-      nested <- descend in_rhs args
+    go (TyConApp tc args) = do
+      nested <- descend args
       if isConstrainedFamilyTyCon tc
-        then pure ((if in_rhs then FamilyInSynonym tc else WrittenFamily tc args) : nested)
+        then pure (tc : nested)
         else if isFamFreeTyCon tc
           then pure nested
           else case synTyConRhs_maybe tc of
@@ -619,17 +610,148 @@ constrainedFamilyApps ty = State.evalState (go False ty) emptyUniqSet
                 then pure nested
                 else do
                   State.put $! addOneToUniqSet seen tc
-                  (++ nested) <$> go True rhs
-    go in_rhs (AppTy f x) = descend in_rhs [f, x]
-    go in_rhs (FunTy _ ma mult a b) = descend in_rhs [ma, mult, a, b]
-    go in_rhs (ForAllTy ma b ty) = descend in_rhs [ma, binderType b, ty]
-    go in_rhs (DepFunTy _ v ty) = descend in_rhs [varType v, ty]
-    go in_rhs (ExistsTy _ v ty) = descend in_rhs [varType v, ty]
-    go in_rhs (TermAppTy _ arg) = go in_rhs arg
-    go in_rhs (CastTy ty _) = go in_rhs ty
-    go _ _ = pure []
+                  (++ nested) <$> go rhs
+    go (AppTy f x) = descend [f, x]
+    go (FunTy _ ma mult a b) = descend [ma, mult, a, b]
+    go (ForAllTy ma b ty) = descend [ma, binderType b, ty]
+    go (DepFunTy _ v ty) = descend [varType v, ty]
+    go (ExistsTy _ v ty) = descend [varType v, ty]
+    go (TermAppTy _ arg) = go arg
+    go (CastTy ty _) = go ty
+    go _ = pure []
 
-    descend in_rhs = fmap concat . traverse (go in_rhs)
+    descend = fmap concat . traverse go
+
+-- | A class predicate with the binders and premises in scope at the application.
+data ConstrainedFamilyUse
+  = ScopedFamily TyCon PredType
+  | UnsupportedFamily TyCon SDoc
+
+-- | Collect family applications before a synonym can discard a written argument.
+-- See Note [Domains in type synonyms].
+familyDomainObligations :: Type -> TcM [ConstrainedFamilyUse]
+familyDomainObligations ty = State.evalStateT (go ty) emptyUFM
+  where
+    go (TyConApp tc args) = do
+      written <- children args
+      if isConstrainedFamilyTyCon tc
+        then pure (domain tc args : written)
+        else if isFamFreeTyCon tc
+          then pure written
+          else case synTyConDefn_maybe tc of
+            Nothing -> pure written
+            Just (tvs, rhs) -> do
+              uses <- templates tc rhs
+              let (actuals, _) = splitAtList tvs args
+              pure $ written ++ if equalLength actuals tvs
+                then map (mapSigma (substTyWith tvs actuals)) uses
+                else map refuse uses
+    go (ForAllTy ma b body) = do
+      kinds <- forbidden [ma, binderType b]
+      uses <- go body
+      pure (kinds ++ map (mapSigma (ForAllTy ma b)) uses)
+    go (FunTy af ma mult arg res)
+      | isInvisibleFunArg af = do
+          preds <- forbidden [ma, mult, arg]
+          uses <- go res
+          pure $ preds ++ map (mapSigma (tcMkDFunPhiTy [arg])) uses
+      | otherwise = do
+          kinds <- forbidden [ma, mult]
+          domain <- go arg
+          range <- go res
+          pure (kinds ++ domain ++ range)
+    go (AppTy f x) = children [f, x]
+    go (DepFunTy _ v body) = do
+      binder_uses <- go (varType v)
+      body_uses <- go body >>= close_retained v
+      pure (binder_uses ++ body_uses)
+    go (ExistsTy _ v body) = forbidden [varType v, body]
+    go (TermAppTy _ arg) = go arg
+    go (CastTy t _) = go t
+    go _ = pure []
+
+    -- See Note [Retained indices in domain predicates].
+    close_retained v uses
+      | not (any mentions uses) = pure uses
+      | otherwise = do
+          name <- lift $ newSysName (mkTyVarOccFS (occNameFS (getOccName v)))
+          let tv = mkTyVar name (varType v)
+              close use@(ScopedFamily fam sigma)
+                | mentions use = case abstractNativeIndices [(TermVarTy v, tv)] sigma of
+                    Just body | not (v `elemVarSet` tyCoVarsOfType body) ->
+                      ScopedFamily fam (mkSpecForAllTy unmatchableDataConTy tv body)
+                    _ -> UnsupportedFamily fam
+                           (text "The class domain uses a retained index that cannot be abstracted.")
+              close use = use
+          pure (map close uses)
+      where
+        mentions (ScopedFamily _ sigma) = v `elemVarSet` tyCoVarsOfType sigma
+        mentions _ = False
+
+    domain fam args = either (UnsupportedFamily fam) (ScopedFamily fam)
+                             (associatedFamilyDomain fam args)
+
+    children = fmap (map monotype . concat) . traverse go
+    forbidden = fmap (map refuse . concat) . traverse go
+    refuse (ScopedFamily fam _) = UnsupportedFamily fam unsupportedFamilySite
+    refuse use = use
+    monotype use@(ScopedFamily _ ForAllTy{}) = refuse use
+    monotype use@(ScopedFamily _ sigma) | isSigmaTy sigma = refuse use
+    monotype use = use
+    mapSigma f (ScopedFamily fam sigma) = ScopedFamily fam (f sigma)
+    mapSigma _ use = use
+
+    templates tc rhs = do
+      cache <- State.get
+      case lookupUFM cache tc of
+        Just uses -> pure uses
+        Nothing -> do
+          State.put $! addToUFM cache tc []
+          uses <- nubBy sameUse <$> go rhs
+          State.modify' (\m -> addToUFM m tc uses)
+          pure uses
+
+    sameUse (ScopedFamily f t) (ScopedFamily g u) = f == g && eqType t u
+    sameUse (UnsupportedFamily f _) (UnsupportedFamily g _) = f == g
+    sameUse _ _ = False
+
+{- Note [Domains in type synonyms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A family application has a domain even in an unused synonym argument.
+For example, type Bad = Forget (Elem [Int]) requires Collects [Int]
+when type Forget a = (). Check the written arguments independently of
+the right-hand side.
+
+Keep the written forall binders and constraints around each application.
+For example, type Q a = Allowed a => Proxy (Elem [a]) -> () gives the
+obligation Allowed a => Collects [a]. Substitute for a in the whole type
+when a client uses Q. A premise in Q cannot discharge a separate
+obligation in a written argument to Q.
+
+Traverse the argument and result of a function separately. In
+(forall a. Allowed a => Proxy a -> Elem [a]) -> Elem [Int], the Given
+belongs to the callback. It cannot establish Allowed Int for the result.
+
+Cache the obligations of each synonym in its formal parameters. Two uses
+of one synonym can have different arguments. Remove duplicate obligations
+in the cached result so repeated pairs of the same synonym stay small.
+-}
+
+{- Note [Retained indices in domain predicates]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Under foreach (b :: Bool), check the family domain for an arbitrary b.
+The term binder belongs to the source function. Give the solver a fresh
+type variable of the same kind. Abstract occurrences in both the wanted
+predicate and its written premises. For example, checking When b under
+Enabled b gives the quantified predicate
+forall (b :: Bool). Enabled b => Enabled b.
+
+Only abstract a binder that occurs in the predicate or its premises.
+Reflect b can have the domain KnownKind Bool, independent of b. Keep the
+original source and runtime binder. Check the predicate with analysis
+skolemisation. It introduces the Givens without building runtime
+abstractions or presenting the proof obligation as a source signature.
+-}
 
 {- Note [Family domains beneath retained binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
