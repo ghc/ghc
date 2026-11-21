@@ -364,6 +364,14 @@ assignment and general Quick Look over native types remain unsupported.
 
 ## Append with a computed result length
 
+[AppendLengthClient.hs](AppendLengthClient.hs) appends two characters to
+one character. Its ordinary source checks the result against the
+independent type-level sum `2 + 1`. It also uses a nonempty head and
+appends two empty vectors. Run `bash check-append-length.sh GHC LIBDIR`
+from this directory to compile against the provider interface. The
+test changes the expected sum to `2 + 2` and then tries to take the head
+of the empty append. Both changes give a type error.
+
 `Add` computes an erased sum index. `sumNat` computes an ordinary runtime
 length `p` and stores an equality proof in `Sum n m`. `appendNative` returns
 a vector at `Add n m`. `appendPacked` matches `Refl` to transport that vector
