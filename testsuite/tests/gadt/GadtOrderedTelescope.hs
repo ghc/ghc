@@ -55,6 +55,9 @@ readFence (Fenced (x, _)) = x
 readLate :: Late a b -> String
 readLate (Late x @b) = show x
 
+readInferredPair :: InferredPair -> (Int, String)
+readInferredPair (InferredPair n @b (_, x)) = (n, show @b x)
+
 throws :: a -> IO Bool
 throws x = either (const True) (const False) <$> try @SomeException (evaluate x)
 
@@ -86,3 +89,4 @@ main = do
   saturatedLate <- throws (Late @Int bottom @Bool)
   lazyF2 <- throws (keepF2 (MkF2 @Bool (error "unused lazy field")))
   print (partialLate, saturatedLate, lazyF2)
+  print (readInferredPair (InferredPair 61 @Bool ('x', True)))

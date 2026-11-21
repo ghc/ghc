@@ -55,6 +55,27 @@ $([d| data QuotedF2 a where
 alias :: $(TH.reifyType 'MkF2)
 alias = MkF2
 
+$(do
+    let local = TH.mkName "RebuiltInferredPair"
+    info <- TH.reify ''InferredPair
+    case info of
+      TH.TyConI (TH.DataD [] _ [] kind
+        [TH.RetainedGadtC [_] fields
+          (TH.ForallMatchT ma
+            (TH.ForallT tvs@[TH.KindedTV _ TH.InferredSpec _,
+                            TH.KindedTV _ TH.SpecifiedSpec _] []
+              (TH.ForallT [] context (TH.AppT field (TH.ConT result)))))] [])
+        | result == ''InferredPair ->
+            pure [TH.DataD [] local [] kind
+              [TH.RetainedGadtC [local] fields
+                (TH.ForallMatchT ma (TH.ForallT tvs []
+                  (TH.ForallT [] context (TH.AppT field (TH.ConT local)))))] []]
+      _ -> fail (show info))
+
+$([d| data QuotedInferredPair where
+        QuotedInferredPair :: Int -> forall {a} b. Show b => (a, b) -> QuotedInferredPair
+   |])
+
 main :: IO ()
 main = do
   print (equalRebuilt (Rebuilt 1 @Bool True),
@@ -62,3 +83,5 @@ main = do
   print (case alias @Int 7 of MkF2 x -> x == x,
          case RebuiltF2 @Bool False of RebuiltF2 x -> compare x x,
          case QuotedF2 @Char 't' of QuotedF2 x -> x /= x)
+  print (case RebuiltInferredPair 5 @Bool ('x', True) of RebuiltInferredPair _ @b (_, x) -> show @b x,
+         case QuotedInferredPair 7 @Char (False, 'y') of QuotedInferredPair _ @b (_, x) -> show @b x)
