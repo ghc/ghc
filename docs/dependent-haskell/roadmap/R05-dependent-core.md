@@ -226,6 +226,11 @@ two indices lazy. A rule can also use a required type operand written
 with the `type` herald. In `keepRequired tag (type Bool) m x`, the
 ordinary required-argument check supplies the types of `m` and `x`.
 Without the herald, the later rule binders still need signatures.
+In `keepTwoRequired tag (type Bool) m (type Char) n x`, each written
+type operand gives the domain for the retained argument after it.
+The source-hidden client fires the rule at `Bool` and `Char`. A call
+with `Char` and `Char` keeps the original function. Both calls leave
+all three runtime indices lazy.
 An ordinary caller can write `keepReading @_ m x` when the type of
 `m` determines the wildcard. The call remains lazy in `m`.
 [Source rule](../examples/qualified-pi/VisibleRuleArguments.hs),

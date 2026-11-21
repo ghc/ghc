@@ -10,7 +10,7 @@
 -}
 
 module GHC.Tc.Gen.App
-       ( tcApp, tcRuleAppPrefix
+       ( tcApp, tcRuleAppPrefix, RuleAppPrefix(..)
        , tcExprPrag
        , matchPolytypeExistsWitness
        , tcImplicitOperand
@@ -615,27 +615,31 @@ tcOrdinaryApp' :: HsExpr GhcRn -> (HsExpr GhcRn, SrcSpan) -> HsExpr GhcTc
                -> TcSigmaType -> [HsExprArg 'TcpRn] -> ExpRhoType -> TcM (HsExpr GhcTc)
 tcOrdinaryApp' = tcOrdinaryAppWithPrefix []
 
--- | Instantiate the retained RULE through its last written type argument.
--- The ordinary application checker checks a heralded operand at its binder.
--- Keep preceding value operands for the normal argument check.
+-- | Suspend the check at each written type argument until the preceding
+-- rule variables are in scope. Reuse the checked arguments at the next step.
 -- See Note [Dependent RULE binder domains] in GHC.Tc.Gen.Sig.
-tcRuleAppPrefix :: LHsExpr GhcRn -> TcM (TcSigmaType, TcM (LHsExpr GhcTc, TcRhoType))
+data RuleAppPrefix
+  = CheckRulePrefix (TcM (TcSigmaType, RuleAppPrefix))
+  | FinishRuleApp (TcM (LHsExpr GhcTc, TcRhoType))
+
+-- | Infer the head of the retained RULE application.
+tcRuleAppPrefix :: LHsExpr GhcRn -> TcM (TcSigmaType, RuleAppPrefix)
 tcRuleAppPrefix (L loc expr) = context $
   do { (fun, args) <- splitHsApps expr
-     ; let (trailing, rev_prefix) = break looks_like_type_arg (reverse args)
-           leading = reverse rev_prefix
-           rest = reverse trailing
      ; fun_span <- getFunSrcSpan args
      ; let head_ctxt = (fun, fun_span)
      ; (checked_fun, sigma) <- tcInferAppHead head_ctxt
-     ; (prefix, residual) <- tcInstFunWithPrefix True [] Nothing Nothing Nothing
-                               NoQL False head_ctxt checked_fun sigma leading
-     ; let finish = context $
-             do { (lhs, rho) <- runInferRho $ \expected ->
-                    tcOpenImplicitArgs expr residual rest expected $
-                      tcOrdinaryAppWithPrefix prefix expr head_ctxt checked_fun residual
-                ; return (L loc lhs, rho) }
-     ; return (residual, finish) }
+     ; let check prefix residual remaining = case break looks_like_type_arg remaining of
+             (values, ty_arg : rest) -> CheckRulePrefix $ context $
+               do { (checked, sigma') <- tcInstFunWithPrefix True prefix Nothing Nothing Nothing
+                                          NoQL False head_ctxt checked_fun residual (values ++ [ty_arg])
+                  ; return (sigma', check checked sigma' rest) }
+             _ -> FinishRuleApp $ context $
+               do { (lhs, rho) <- runInferRho $ \expected ->
+                      tcOpenImplicitArgs expr residual remaining expected $
+                        tcOrdinaryAppWithPrefix prefix expr head_ctxt checked_fun residual
+                  ; return (L loc lhs, rho) }
+     ; return (sigma, check [] sigma args) }
   where
     context :: TcM a -> TcM a
     context action = setSrcSpanA loc $ addExprCtxt expr action

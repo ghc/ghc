@@ -32,7 +32,7 @@ import GHC.Driver.Backend
 
 import GHC.Hs
 
-import {-# SOURCE #-} GHC.Tc.Gen.App (tcRuleAppPrefix)
+import {-# SOURCE #-} GHC.Tc.Gen.App (RuleAppPrefix(..), tcRuleAppPrefix)
 import {-# SOURCE #-} GHC.Tc.Gen.Expr  ( tcInferRho, tcCheckMonoExpr )
 
 import GHC.Tc.Errors.Types
@@ -1323,43 +1323,52 @@ tcRuleBndrs skol_info mb_lhs (RuleBndrs { rb_tyvs = mb_tv_bndrs, rb_tmvs = tm_bn
 
     check_terms
       | Just lhs <- mb_lhs
-      , Just (head_name, prefix, args) <- ruleAppSpine lhs
+      , Just (head_name, operands) <- ruleAppSpine lhs
       = do { mb_fun <- tcLookupIdMaybe head_name
            ; case mb_fun of
-               Just fun | hasRetainedRuleHead fun ->
-                 if null prefix
-                 then do { domain <- ruleBinderDomain fun args
-                         ; check_with domain }
-                 else check_prefix lhs fun prefix args
+               Just fun | hasRetainedRuleHead fun -> check_app lhs fun operands
                _ -> check_with no_domain }
       | otherwise = check_with no_domain
 
     no_domain _ _ = Nothing
     check_with domain = go_tms domain emptyNameEnv tm_bndrs (const (thing_inside Nothing))
 
-    check_prefix lhs fun prefix args
-      = do { early_domain <- case [arg | Right arg <- prefix, not (has_type_herald arg)] of
-                               [] -> return no_domain
-                               vals -> ruleBinderDomain fun vals
-           ; if any unsigned later
-             then do { (first, (last_bndrs, result)) <-
-                         go_tms early_domain emptyNameEnv earlier $ \scope ->
-                         do { (sigma, finish) <- tcRuleAppPrefix lhs
-                            ; domain <- ruleBinderDomain (setVarType fun sigma) args
-                            ; go_tms domain scope later (const (thing_inside (Just finish))) }
-                     ; return (first ++ last_bndrs, result) }
-             else check_with early_domain }
+    check_app lhs fun operands
+      | (values, ty_arg : _) <- break ruleTypeOperand operands
+      , let (_, later) = split_binders (values ++ [ty_arg]) tm_bndrs
+      , any unsigned later
+      = do { (sigma, prefix) <- tcRuleAppPrefix lhs
+           ; check_prefix (setVarType fun sigma) prefix operands emptyNameEnv tm_bndrs }
+      | otherwise
+      = do { domain <- domain_for fun (takeWhile (not . ruleTypeOperand) operands)
+           ; check_with domain }
+
+    check_prefix fun prefix operands scope bndrs =
+      case (prefix, break ruleTypeOperand operands) of
+        (CheckRulePrefix next, (values, ty_arg : rest)) ->
+          do { domain <- domain_for fun values
+             ; let (earlier, later) = split_binders (values ++ [ty_arg]) bndrs
+             ; (first, (last_bndrs, result)) <- go_tms domain scope earlier $ \scope' ->
+                 do { (sigma, checked) <- next
+                    ; check_prefix (setVarType fun sigma) checked rest scope' later }
+             ; return (first ++ last_bndrs, result) }
+        (FinishRuleApp finish, (values, [])) ->
+          do { domain <- domain_for fun values
+             ; go_tms domain scope bndrs (const (thing_inside (Just finish))) }
+        _ -> panic "tcRuleBndrs: inconsistent rule application prefix"
+
+    domain_for fun operands = ruleBinderDomain fun [arg | Right arg <- operands]
+
+    split_binders prefix bndrs = (reverse rest, reverse suffix)
       where
         names = unionNameSets (map rulePrefixNames prefix)
         (suffix, rest) = span (all (\n -> not (n `elemNameSet` names)) . binder_names . unLoc)
-                              (reverse tm_bndrs)
-        later = reverse suffix
-        earlier = reverse rest
-        unsigned (L _ RuleBndr{}) = True
-        unsigned _ = False
-        binder_names (RuleBndr _ (L _ n)) = [n]
-        binder_names (RuleBndrSig _ (L _ n) (HsPS { hsps_ext = ext })) =
-          n : hsps_nwcs ext ++ hsps_imp_tvs ext
+                              (reverse bndrs)
+    unsigned (L _ RuleBndr{}) = True
+    unsigned _ = False
+    binder_names (RuleBndr _ (L _ n)) = [n]
+    binder_names (RuleBndrSig _ (L _ n) (HsPS { hsps_ext = ext })) =
+      n : hsps_nwcs ext ++ hsps_imp_tvs ext
 
     --------------
     go_tms :: (NameEnv Id -> Name -> Maybe Type) -> NameEnv Id -> [LRuleBndr GhcRn]
@@ -1389,24 +1398,23 @@ tcRuleBndrs skol_info mb_lhs (RuleBndrs { rb_tyvs = mb_tv_bndrs, rb_tmvs = tm_bn
                               go_tms domain (extendNameEnv scope name bndr_id) rule_bndrs thing_inside
             ; return (map snd tv_prs ++ bndr_id : bndrs, res) }
 
--- | Split the RULE at its last written type operand.
+-- | Read the RULE head and all written operands in source order.
 -- See Note [Dependent RULE binder domains].
 ruleAppSpine :: LHsExpr GhcRn
-             -> Maybe (Name, [Either (LHsWcType GhcRn) (LHsExpr GhcRn)], [LHsExpr GhcRn])
+             -> Maybe (Name, [Either (LHsWcType GhcRn) (LHsExpr GhcRn)])
 ruleAppSpine = go []
   where
     go args e = case unLoc (stripParensLHsExpr e) of
       HsApp _ f x      -> go (Right x : args) f
       OpApp _ x f y    -> go (Right x : Right y : args) f
       HsAppType _ f ty -> go (Left ty : args) f
-      HsVar _ (L _ f)  -> let (suffix, prefix) = break is_type_operand (reverse args)
-                         in Just (getName f, reverse prefix, [arg | Right arg <- reverse suffix])
+      HsVar _ (L _ f)  -> Just (getName f, args)
       _                -> Nothing
 
-    is_type_operand = either (const True) has_type_herald
-
-has_type_herald :: LHsExpr GhcRn -> Bool
-has_type_herald arg = case unLoc (stripParensLHsExpr arg) of
+-- | Find the same written type operands as looks_like_type_arg in GHC.Tc.Gen.App.
+ruleTypeOperand :: Either (LHsWcType GhcRn) (LHsExpr GhcRn) -> Bool
+ruleTypeOperand (Left _) = True
+ruleTypeOperand (Right arg) = case unLoc (stripParensLHsExpr arg) of
   HsEmbTy{} -> True
   _ -> False
 
@@ -1478,8 +1486,8 @@ wildcards, constraints and splices once. The checker never inspects a
 value operand to discover its type.
 
 For a head such as keepBetween @Char p @Bool m x, bring p into scope
-before instantiating through @Bool. Keep the already checked head and
-all preceding arguments when checking m and x. Their error positions
+after instantiating through @Char and before checking @Bool. Keep the
+checked head and preceding arguments when checking m and x. Their error positions
 include the earlier value arguments. A different occurrence of the same
 binder must also check at its inferred type. A type family in the domain
 can stay stuck throughout. No inverse family equation is needed.
@@ -1490,6 +1498,11 @@ function type and decides whether the binder is required. The prepass does
 not elaborate the type. It uses the same checked prefix for the rule and
 checks a splice in the argument once. A required operand without a herald
 does not mark a prefix boundary.
+
+Checking each prefix in turn also lets an unsigned retained binder use the
+domain fixed by an earlier type operand. For example, in
+keepTwo tag (type Bool) m (type Char) n x, m gets type Maybe Bool before
+checking (type Char). Keep the order of the binders in the written forall.
 -}
 
 

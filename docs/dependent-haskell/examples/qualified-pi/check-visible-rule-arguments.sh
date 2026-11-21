@@ -12,12 +12,16 @@ cp "$src/VisibleRuleArguments.hs" "$out/provider/"
 cp "$src/VisibleRuleClient.hs" "$out/client/"
 cat >"$out/client/OtherRequired.hs" <<'HS'
 {-# LANGUAGE ExplicitNamespaces, NoExperimentalDependentTypes, RequiredTypeArguments #-}
-module OtherRequired (readRequiredOther) where
-import VisibleRuleArguments (TaggedReading(..), keepRequired)
+module OtherRequired (readRequiredOther, readTwoRequiredOther) where
+import VisibleRuleArguments (TaggedReading(..), keepRequired, keepTwoRequired)
 
 readRequiredOther :: Bool -> Maybe Char -> Int -> Int
 readRequiredOther tag m value =
     case keepRequired tag (type Char) m (TaggedReading value) of TaggedReading n -> n
+
+readTwoRequiredOther :: Bool -> Maybe Char -> Maybe Char -> Int -> Int
+readTwoRequiredOther tag m n value =
+    case keepTwoRequired tag (type Char) m (type Char) n (TaggedReading value) of TaggedReading x -> x
 HS
 cat >"$out/client/Main.hs" <<'HS'
 module Main where
@@ -31,7 +35,8 @@ main = do
     other <- newIORef (error "forced Char reading index" :: Maybe Char) >>= readIORef
     ignored <- newIORef (error "forced first argument") >>= readIORef
     print (readAt m 37, readAt bottom 19, readAfter ignored m 43, readTagged ignored bottom 47,
-           readRequired ignored bottom 53, readRequiredOther ignored other 59)
+           readRequired ignored bottom 53, readRequiredOther ignored other 59,
+           readTwoRequired ignored bottom other 61, readTwoRequiredOther ignored other other 67)
 HS
 
 for opt in 0 2; do
@@ -43,6 +48,7 @@ for opt in 0 2; do
     "$ghc" "${flags[@]}" -O"$opt" -ddump-rule-firings -ddump-simpl -dsuppress-all -c OtherRequired.hs >other
     if [[ $opt == 2 ]]; then
         grep -Fq 'Rule fired: keepRequired/Bool (VisibleRuleArguments)' firings || { cat firings; exit 1; }
+        grep -Fq 'Rule fired: keepTwoRequired/Bool/Char (VisibleRuleArguments)' firings || { cat firings; exit 1; }
         grep -Fq 'Rule fired: keepTagged/Bool (VisibleRuleArguments)' firings || { cat firings; exit 1; }
         grep -Fq 'Rule fired: keepAfter/Bool (VisibleRuleArguments)' firings || { cat firings; exit 1; }
         grep -Fq 'Rule fired: keepReading/Bool (VisibleRuleArguments)' firings || { cat firings; exit 1; }
@@ -50,10 +56,14 @@ for opt in 0 2; do
             cat other >&2
             exit 1
         fi
+        if grep -Fq 'Rule fired: keepTwoRequired/Bool/Char' other || ! grep -Ewq '(\$w)?keepTwoRequired[[:digit:]]*' other; then
+            cat other >&2
+            exit 1
+        fi
     fi
     "$ghc" "${flags[@]}" -O"$opt" -c Main.hs
     "$ghc" "-B$lib" Main.o OtherRequired.o VisibleRuleClient.o ../provider/VisibleRuleArguments.o -o observe
-    [[ $(./observe) == '(37,19,43,47,53,59)' ]]
+    [[ $(./observe) == '(37,19,43,47,53,59,61,67)' ]]
 done
 
 cd "$out/provider"

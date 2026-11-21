@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, PolyKinds, ScopedTypeVariables, TypeAbstractions #-}
 {-# LANGUAGE ExplicitNamespaces, RequiredTypeArguments #-}
-module VisibleRuleArguments (Reading(..), keepReading, keepAfter, TaggedReading(..), keepTagged, keepRequired) where
+module VisibleRuleArguments (Reading(..), keepReading, keepAfter, TaggedReading(..), keepTagged, keepRequired, keepTwoRequired) where
 
 import Data.Kind (Type)
 
@@ -40,3 +40,12 @@ keepRequired tag (type a) m x = keepTagged tag @a m x
 
 {-# RULES "keepRequired/Bool" forall tag m x.
     keepRequired tag (type Bool) m x = x #-}
+
+-- | Keep the payload across both required type arguments.
+{-# NOINLINE keepTwoRequired #-}
+keepTwoRequired :: foreach (tag :: Bool) -> forall (a :: Type) -> foreach (m :: Maybe a) ->
+                   forall (b :: Type) -> foreach (n :: Maybe b) -> TaggedReading tag n -> TaggedReading tag n
+keepTwoRequired _ (type a) _ (type b) _ x = x
+
+{-# RULES "keepTwoRequired/Bool/Char" forall tag m n x.
+    keepTwoRequired tag (type Bool) m (type Char) n x = x #-}
