@@ -128,6 +128,7 @@ import qualified PreludeFilterProof
 import qualified PreludeFilterRuntime
 import qualified PreludeMapAppendProof
 import qualified PreludeMapCompositionProof
+import qualified PreludeTakeWhile
 import qualified PreludeMapLengthProof
 import qualified PreludeReverseLengthProof
 import qualified PreludeMapLengthSize as Size
@@ -1329,6 +1330,12 @@ main = do
     rows <- newIORef [[], [False], [True, False]] >>= readIORef
     putStrLn ("prove the filter bound for rows at a runtime cutoff: "
               ++ PreludeFilterCutoff.showCutoffBound (PreludeFilterCutoff.packCutoff cutoff rows))
+    gateOff <- newIORef False >>= readIORef
+    gateOn <- newIORef True >>= readIORef
+    let rest = error "takeWhile forced the tail"
+        prefix gate x = PreludeTakeWhile.prefixObservation (PreludeTakeWhile.observePrefix gate x rest)
+    observe "stop or keep a lazy list prefix with a runtime gate"
+        (prefix gateOff (error "disabled gate forced the head"), prefix gateOn True)
     pivot <- newIORef True >>= readIORef
     let unused = error "comparison forced an unused payload"
     observe "select a payload with a checked runtime comparison"

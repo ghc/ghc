@@ -1,7 +1,8 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, Modifiers #-}
 {-# LANGUAGE ScopedTypeVariables, TypeApplications, TypeOperators #-}
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
-module PreludeTakeWhile (Prefix, Enabled, PrefixStep(..), RuntimePrefix(..), observePrefix) where
+module PreludeTakeWhile
+    ( Prefix, Enabled, PrefixStep(..), RuntimePrefix(..), observePrefix, prefixObservation ) where
 
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Exts (U)
@@ -34,3 +35,12 @@ step :: foreach (gate :: Bool) -> foreach (x :: Bool) -> foreach (xs :: [Bool])
 step gate x _ = case booleanResult (gate && x) of
     IsFalse -> Stops Refl
     IsTrue -> Keeps Refl
+
+-- | Match the equality and observe up to one element of the actual prefix.
+prefixObservation :: RuntimePrefix -> (Bool, [Bool])
+prefixObservation (RuntimePrefix gate x xs result) =
+    (kept, take 1 (takeWhile (gate &&) (x : xs)))
+  where
+    kept = case result of
+        Stops Refl -> False
+        Keeps Refl -> True

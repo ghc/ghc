@@ -374,6 +374,7 @@ prove that filter distributes over append: (Refl,[1,3],[1,3],(True,True))
 prove the filter bound from a runtime list: (BothSucc (RightSucc (BothSucc ZeroBound)),Succ (Succ Zero),Succ (Succ (Succ Zero)))
 prove the filter bound with a runtime decider: (BothSucc (BothSucc (BothSucc ZeroBound)),Succ (Succ (Succ Zero)),Succ (Succ (Succ Zero)))
 prove the filter bound for rows at a runtime cutoff: (BothSucc (BothSucc (RightSucc ZeroBound)),[Zero,Succ Zero],Succ (Succ (Succ Zero)))
+stop or keep a lazy list prefix with a runtime gate: ((False,[]),(True,[True]))
 select a payload with a checked runtime comparison: ["LT:17","EQ:True","GT:'G'"]
 use a checked cons rule without forcing the callback, head or tail: (Refl,True)
 compose two checked traversals without forcing the inner callback: (Refl,True)
