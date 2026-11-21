@@ -1591,10 +1591,10 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
     do { let (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _) = dataConFullSig con
              binders = dataConRepArgBinders con
              con_like = RealDataCon con
-       ; unless (null ex_tvs && null theta
+       ; unless (null ex_tvs && (null theta || null eq_spec)
                  && binders `equalLength` arg_tys && not (pe_lazy penv)) bad_pattern
-       ; unless (null eq_spec) $
-           checkGADT con_like ex_tvs (eqSpecPreds eq_spec) penv
+       ; unless (null eq_spec && null theta) $
+           checkGADT con_like ex_tvs (eqSpecPreds eq_spec ++ theta) penv
        ; case pe_ctxt penv of
            LamPat{} -> return ()
            LetPat{} -> bad_pattern
@@ -1614,7 +1614,17 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
                          ; return matched }
        ; pat_ty <- readExpType (scaledThing pat_ty_scaled)
        ; subst <- instTyVarsWith PatOrigin univ_tvs ctxt_res_tys
-       ; (pats', (givens, binds, res)) <- check_fields subst [] 1 (zipEqual binders arg_tys) pats
+       ; let check_pats = check_fields subst [] 1 (zipEqual binders arg_tys) pats
+       ; (pats', (givens, binds, res)) <- case theta of
+           [] -> check_pats
+           _  -> do { warnMonoLocalBinds
+                    ; given <- newEvVars (substTheta subst theta)
+                    ; let match_ctxt = case pe_ctxt penv of
+                              LamPat mc -> mc
+                              LetPat{} -> PatBindRhs
+                    ; (ev_binds, (pats', (_, _, res))) <-
+                        checkConstraints (PatSkol con_like match_ctxt) [] given check_pats
+                    ; return (pats', (given, ev_binds, res)) }
        ; let pat = ConPat { pat_con = L con_span con_like
                           , pat_args = PrefixCon ann pats'
                           , pat_con_ext = ConPatTc

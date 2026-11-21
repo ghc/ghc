@@ -1629,7 +1629,7 @@ instCon fuel nabla@MkNabla{nabla_ty_st = ty_st} x con = {-# SCC "instCon" #-} Ma
           uniqs <- getUniquesM
           let inst_tys = map (substTyVar sigma_univ) (dataConUnivTyVars dc)
               (_, fields) = dataConRepInstPat uniqs ManyTy dc inst_tys
-          pure fields
+          pure (drop (length thetas) fields)
         _ -> mapM mkPmId field_tys'
       tracePm (hdr "(cts)") $ vcat
         [ ppr x <+> dcolon <+> ppr match_ty
@@ -1675,8 +1675,8 @@ instCon fuel nabla@MkNabla{nabla_ty_st = ty_st} x con = {-# SCC "instCon" #-} Ma
 A speculative package constructor needs fresh runtime field Ids too. A flat
 type substitution leaves the declaration's retained field templates free in
 later field types. Use dataConRepInstPat to freshen fields from left to right
-and substitute each retained Id into the remaining types. Retained package
-constructors have no erased existentials or constructor constraints.
+and substitute each retained Id into the remaining types. Drop the prefix
+of dictionaries after using their predicates in the type oracle.
 
 The observed source-pattern path instead uses its checked field Ids. See
 Note [Checking retained package patterns] in GHC.Tc.Gen.Pat. Both paths keep

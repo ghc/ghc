@@ -5325,7 +5325,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _ tag_map
            DDataType -> return ()
            _ -> failWithTc $ TcRnRetainedQuantificationError RetainedPackageDeclaration
        ; skol_info <- mkSkolemInfo (DataConSkol name)
-       ; (tclvl, wanted, (tvbs, _ctxt, (retained, bangs, full_ty))) <-
+       ; (tclvl, wanted, (tvbs, ctxt, (retained, bangs, full_ty))) <-
            pushLevelAndSolveEqualitiesX "tcConDecl:retained" $
            tcGadtConTyVarBndrs skol_info outer_bndrs inner_bndrs $
            do { prefix <- tcConGADTArgs (TheKind liftedTypeKind) args
@@ -5337,18 +5337,21 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _ tag_map
               ; return (replicate (length prefix) Nothing ++ retained,
                         map snd prefix ++ map (const suffix_bang) retained,
                         tcMkScaledFunTysU (map fst prefix) suffix_ty) }
-       ; inf_tkvs <- kindGeneralizeAll skol_info (mkForAllTys (map (unmatchableDataConTy,) tvbs) full_ty)
+       ; inf_tkvs <- kindGeneralizeAll skol_info $
+           mkForAllTys (map (unmatchableDataConTy,) tvbs) (tcMkPhiTy ctxt full_ty)
        ; reportUnsolvedEqualities skol_info inf_tkvs tclvl wanted
        ; let inf_bndrs = mkTyVarBinders Inferred inf_tkvs
-       ; (inf_bndrs, tvbs, retained, full_ty) <- initZonkEnv NoFlexi $
+       ; (inf_bndrs, tvbs, ctxt, full_ty) <- initZonkEnv NoFlexi $
            runZonkBndrT (zonkTyVarBindersX inf_bndrs) $ \ inf_bndrs ->
            runZonkBndrT (zonkTyVarBindersX tvbs) $ \ tvbs ->
-             do { full_ty <- zonkTcTypeToTypeX full_ty
-                ; return (inf_bndrs, tvbs, retained, full_ty) }
+             do { ctxt <- zonkTcTypesToTypesX ctxt
+                ; full_ty <- zonkTcTypeToTypeX full_ty
+                ; return (inf_bndrs, tvbs, ctxt, full_ty) }
        ; let (arg_tys, res_ty) = splitRetainedConFields retained full_ty
              res_tmpl = mkDDHeaderTy dd_info rep_tycon tc_bndrs
              (univ_tvs, ex_tvs, user_bndrs, eq_preds, arg_subst)
                = rejigConRes tc_bndrs res_tmpl inf_bndrs tvbs res_ty
+             ctxt' = substTys arg_subst ctxt
              arg_tys' = map (substScaledTy arg_subst) arg_tys
              res_ty' = substTy arg_subst res_ty
              -- Keep the field list spine independent of the knot-tied rejig.
@@ -5360,7 +5363,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _ tag_map
                   ; buildDataConWithTelescope (LegacyConOrder 0) retained fam_envs
                       (SrcBangOpts (initBangOpts dflags)) con_name False rep_nm
                       bangs
-                      [] univ_tvs ex_tvs user_bndrs eq_preds [] arg_tys' res_ty' rep_tycon tag_map }
+                      [] univ_tvs ex_tvs user_bndrs eq_preds ctxt' arg_tys' res_ty' rep_tycon tag_map }
        ; mapM build_one names }
 
 tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
@@ -5507,10 +5510,16 @@ checkRetainedConShape new_or_data telescope args res_ty
   = setSrcSpanA (getLoc res_ty) $
     do { strict_data <- xoptM LangExt.StrictData
        ; unless (not strict_data && new_or_data /= NewType
-                 && all (null . hsc_ctxt . unLoc) (gadtTelescopeContexts telescope)
+                 && not (any is_forall (dropWhile (not . has_context) telescope))
                  && plain_prefix args) $
            failWithTc $ TcRnRetainedQuantificationError RetainedPackageDeclaration }
   where
+    has_context (L _ (HsGadtContext ctxt)) = not (null (hsc_ctxt (unLoc ctxt)))
+    has_context _ = False
+
+    is_forall (L _ HsGadtForAll{}) = True
+    is_forall _ = False
+
     plain_prefix (PrefixConGADT _ fields) = all plain_field fields
     plain_prefix _ = False
     plain_field (CDF _ unpack strict _ _ _)
@@ -6467,7 +6476,7 @@ checkValidDataCon dflags existential_ok tc con
         ; unless (null (dataConRepArgBinders con)) $
           do { let univ_tvs = dataConUnivTyVars con
                    user_tvs = binderVars (dataConUserTyVarBinders con)
-                   (_, _, eq_spec, _, _, _) = dataConFullSig con
+                   (_, _, eq_spec, theta, _, _) = dataConFullSig con
                    retained_fields = [field | Just field <- dataConRepArgBinders con]
                    valid_eq_spec = case (map eqSpecPair eq_spec, retained_fields) of
                      ([], _) -> True
@@ -6476,7 +6485,8 @@ checkValidDataCon dflags existential_ok tc con
              ; unless (isBoxedDataTyCon tc && isLiftedAlgTyCon tc
                        && isVanillaAlgTyCon tc && not (isTypeDataTyCon tc)
                        && null (dataConExTyCoVars con)
-                       && null (dataConOtherTheta con)
+                       && validRetainedConTheta theta
+                       && (null theta || (null eq_spec && user_tvs == univ_tvs))
                        && valid_eq_spec && checkDataConTyVars con
                        && sizeVarSet (mkVarSet user_tvs) == length user_tvs) $
                  failWithTc $ TcRnRetainedQuantificationError RetainedPackageDeclaration }

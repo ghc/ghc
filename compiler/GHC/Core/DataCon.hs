@@ -37,7 +37,7 @@ module GHC.Core.DataCon (
         orderedConArgsHaveScope,
         dataConTheta, dataConHasRetainedResult,
         dataConStupidTheta,
-        dataConOtherTheta,
+        dataConOtherTheta, validRetainedConTheta,
         dataConInstArgTys, dataConOrigArgTys, dataConOrigResTy,
         dataConInstOrigArgTys, dataConRepArgTys, dataConRepArgBinders, dataConResRepTyArgs,
         dataConInstUnivs,
@@ -1210,7 +1210,10 @@ mkDataConWithTelescope source_order arg_binders name declared_infix prom_info
   where
     valid_retained_args
       = arg_binders `equalLength` orig_arg_tys
-        && null ex_tvs && null theta && null stupid_theta
+        && null ex_tvs && validRetainedConTheta theta && null stupid_theta
+        && (null theta || case source_order of
+              LegacyConOrder 0 -> null eq_spec
+              _ -> False)
         && null fields && isVanillaAlgTyCon rep_tycon
         && not (isTypeDataTyCon rep_tycon)
         && isLiftedTypeKind (tyConResKind rep_tycon)
@@ -1235,7 +1238,8 @@ mkDataConWithTelescope source_order arg_binders name declared_infix prom_info
         && case rep of { NoDataConRep -> True; _ -> False }
 
     valid_universals
-      = all isTyVar univ_tvs && all isTyVar user_tvs
+      = (null theta || user_tvs == univ_tvs)
+        && all isTyVar univ_tvs && all isTyVar user_tvs
         && sizeVarSet univ_set == length univ_tvs
         && sizeVarSet (mkVarSet user_tvs) == length user_tvs
         && checkDataConTyVars con
@@ -1889,7 +1893,8 @@ its decoded arrays. See GHC.IfaceToCore.tcIfaceDataCons.
 -}
 
 -- | Return retained binders for the source fields. An empty list denotes
--- ordinary fields. A retained result adds its equality after these fields.
+-- ordinary fields. Dictionaries precede these fields. A retained result
+-- adds its equality after these fields.
 dataConRepArgBinders :: DataCon -> [Maybe Id]
 dataConRepArgBinders = dcOrigArgBinders
 
@@ -1968,6 +1973,7 @@ domain and multiplicity Many. Its Id must be fresh. Only earlier retained
 fields can occur free in a field type. Rebuild the worker and wrapper types
 with DepFunTy at each dependent field. Each runtime field remains an ordinary
 lazy constructor payload slot.
+See Note [Retained constructor equality contexts].
 
 A function field uses the existing retained-binder policy. Its closed ordinary
 Many arrow has independently supported scalar domains. The actual field Id
@@ -1994,6 +2000,24 @@ before it can use a retained result equality.
 Agda constructor telescopes scope earlier fields over later field types.
 This guides the binding representation, not the evaluation rules for lazy
 Haskell. See docs/dependent-haskell/REFERENCES.md for the pinned provenance.
+
+Note [Retained constructor equality contexts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An explicit boxed (~) context is a prefix of lazy dictionary fields in the
+worker. The dictionary is an ordinary Id. Its nominal coercion superclass
+has endpoints of the same kind. Keep the constructor wrapper-free. Core
+case alternatives bind the dictionaries before the source fields. Only the
+source fields have retained binder metadata.
+
+The context precedes every retained binder. Its scope contains only the
+constructor type parameters. Require the user quantifiers to follow the
+datatype parameter order so the constructor worker and its case alternatives
+instantiate the same dictionary types. Pattern checking supplies the prefix
+as local Givens. The coverage checker uses their predicates separately from
+the constructor's source fields.
+
+Neither promotion nor EqSpec refinement uses this representation. Both
+would need a separate rule for the retained field telescope.
 -}
 
 -- | Finds the instantiated types of the arguments required to construct a
@@ -2100,6 +2124,15 @@ dataConOrigArgTys dc = dcOrigArgTys dc
 -- | Returns constraints in the wrapper type, other than those in the dataConEqSpec
 dataConOtherTheta :: DataCon -> ThetaType
 dataConOtherTheta dc = dcOtherTheta dc
+
+-- | The supported explicit context of a retained constructor.
+-- See Note [Retained constructor equality contexts].
+validRetainedConTheta :: ThetaType -> Bool
+validRetainedConTheta = all is_boxed_equality
+  where
+    is_boxed_equality pred_ty
+      | Just (tc, [_, _, _]) <- splitTyConApp_maybe pred_ty = tc `hasKey` eqTyConKey
+      | otherwise = False
 
 -- | Returns the arg types of the worker, including *all* non-dependent
 -- evidence, after any flattening has been done and without substituting for

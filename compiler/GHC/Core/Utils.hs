@@ -3015,7 +3015,10 @@ dataConInstPat fss uniqs mult con inst_tys
       | otherwise
       = snd $ mapAccumL mk_retained_field full_subst $
           zip retained_binders (zip4 id_uniqs id_fss arg_tys arg_strs)
-    retained_binders = dataConRepArgBinders con ++ [Nothing | dataConHasRetainedResult con]
+    retained_binders = case dataConRepArgBinders con of
+      [] -> []
+      binders -> [Nothing | _ <- dataConOtherTheta con] ++ binders
+                 ++ [Nothing | dataConHasRetainedResult con]
       -- See Note [Retained constructor result equality] in GHC.Core.DataCon.
 
     mk_id_var subst uniq fs (Scaled m ty) str
@@ -3043,7 +3046,7 @@ in-scope set too, so substitution avoids capture under nested retained binders.
 Do not put these runtime fields among the erased existential binders.
 
 Keep the ordinary constructor path unchanged. The retained subset has no
-representation wrapper, so its metadata and representation fields align.
+representation wrapper. The dictionary prefix has no retained binders.
 See Note [Retained constructor field telescopes] in GHC.Core.DataCon.
 -}
 
