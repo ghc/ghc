@@ -2483,7 +2483,20 @@ of ``-W(no-)*``.
     declaration group, such as ``data T = T``. This also applies when the type
     and term definitions are in separate declarations in that group.
     A local declaration can shadow an imported name without producing this
-    warning. :ghc-flag:`-Weverything` enables this warning.
+    warning.
+
+    The warning also applies to explicit type and value binders in one
+    match. For example: ::
+
+        id :: forall a -> a -> a
+        id (type a) a = a
+
+    An enclosing scope can contain another binder with the same name.
+    For example, ``f @a = \(a :: a) -> a`` puts the term binder in the
+    lambda and uses the outer type variable in its annotation. This
+    does not produce a binding warning.
+
+    :ghc-flag:`-Weverything` enables this warning.
 
 .. ghc-flag:: -Wterm-variable-capture
     :shortdesc: warn when an implicitly quantified type variable captures a term's name
