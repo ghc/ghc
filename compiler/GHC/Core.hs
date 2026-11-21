@@ -3103,10 +3103,10 @@ mapNativeIndexWithNatural mk_natural subst expr
     from_index (TyConApp tc args)
       | Just con <- isPromotedDataCon_maybe tc
       , let (tys, fields) = splitAt (length (dataConUserTyVars con)) args
-      , Just (worker_tys, _, _, cast) <- nativeFamilyConArgs con tys
+      , Just (prefix, _, _, cast) <- nativeFamilyConArgs con tys
       , Just _ <- nativeFamilyPromotedCon_maybe con tys fields
       = do { values <- traverse from_index fields
-           ; pure (Cast (mkConApp con (map Type worker_tys ++ values)) cast) }
+           ; pure (Cast (mkConApp con (prefix ++ values)) cast) }
       | Just con <- isPromotedDataCon_maybe tc
       , let (params, fields) = splitAt (length (dataConUserTyVars con)) args
       , Just (prefix, _) <- nativeIndexedConArgs con params
@@ -3129,29 +3129,32 @@ nativeFamilyConHead_maybe con tys = do
   wrapper <- dataConWrapId_maybe con
   return (mkTyApps (Var wrapper) tys)
 
--- | Return the worker's instantiation and the instance's runtime cast.
+-- | Return the worker's erased arguments and the instance's runtime cast.
 -- See Note [Retained data family constructor operands].
-nativeFamilyConArgs :: DataCon -> [Type] -> Maybe ([Type], [Type], Type, CoercionR)
+nativeFamilyConArgs :: DataCon -> [Type] -> Maybe ([CoreExpr], [Type], Type, CoercionR)
 nativeFamilyConArgs con tys = do
   axiom <- tyConDataFamCoercion_maybe rep
   guard (isBoxedDataTyCon rep && not (isTypeDataTyCon rep))
-  guard (isVanillaDataCon con && null (dataConStupidTheta con))
+  guard (null exs && null theta && null (dataConStupidTheta con))
   guard (null (dataConRepArgBinders con) && not (any isBanged (dataConImplBangs con)))
   guard (tys `equalLength` user_tvs &&
          and [typeKind ty `eqType` inst (tyVarKind tv) | (tv, ty) <- zip user_tvs tys])
   let worker_tys = map inst (dataConResRepTyArgs con)
-      fields = [inst field | Scaled _ field <- dataConOrigArgTys con]
-      result = inst (dataConOrigResTy con)
-  guard (dataConRepArity con == length fields && length worker_tys >= coAxiomArity axiom 0)
+      proofs = [Coercion (mkNomReflCo (inst (eqSpecType eq))) | eq <- eqs]
+      fields = [inst field | Scaled _ field <- source_fields]
+      result = inst result_ty
+  guard (dataConRepArity con == length eqs + length fields &&
+         length worker_tys >= coAxiomArity axiom 0)
   let cast = mkSymCo (mkUnbranchedAxInstCo Representational axiom worker_tys [])
   guard (all isNativeOpaqueValueType fields &&
          sameNativeIndexDomain (coercionLKind cast) (mkTyConApp rep worker_tys) &&
          sameNativeIndexDomain (coercionRKind cast) result)
-  return (worker_tys, fields, result, cast)
+  return (map Type worker_tys ++ proofs, fields, result, cast)
   where
     rep = dataConTyCon con
     user_tvs = dataConUserTyVars con
     inst = substTyWith user_tvs tys
+    (_, exs, eqs, theta, source_fields, result_ty) = dataConFullSig con
 
 -- | Recover the promoted constructor at its original public family kind.
 nativeFamilyPromotedCon_maybe :: DataCon -> [Type] -> [Type] -> Maybe Type
@@ -3169,19 +3172,20 @@ splitNativeFamilyConApp (Cast expr cast) = do
   (Var worker, args) <- Just (collectArgs expr)
   con <- isDataConWorkId_maybe worker
   let univs = dataConUnivTyVars con
-      (type_args, fields) = splitAt (length univs) args
+      (type_args, _) = splitAt (length univs) args
   worker_tys <- traverse family_type_arg type_args
   guard (worker_tys `equalLength` univs)
   tys <- traverse (`lookup` zip univs worker_tys) (dataConUserTyVars con)
-  (expected_tys, domains, _, expected_cast) <- nativeFamilyConArgs con tys
-  guard (worker_tys `equalLength` expected_tys && and (zipWith eqType worker_tys expected_tys) &&
-         fields `equalLength` domains)
+  (prefix, domains, _, expected_cast) <- nativeFamilyConArgs con tys
+  let (actual, fields) = splitAt (length prefix) args
+  guard (actual `equalLength` prefix && and (zipWith sameNativeConPrefixArg actual prefix))
+  guard (fields `equalLength` domains)
   guard (coercionRole cast == Representational &&
          coercionLKind cast `eqType` coercionLKind expected_cast &&
          coercionRKind cast `eqType` coercionRKind expected_cast)
   axiom <- tyConDataFamCoercion_maybe (dataConTyCon con)
   guard (uses_axiom (UnbranchedAxiom axiom) cast)
-  return (con, tys, \xs -> Cast (mkApps (Var worker) (type_args ++ xs)) cast, fields)
+  return (con, tys, \xs -> Cast (mkApps (Var worker) (actual ++ xs)) cast, fields)
   where
     uses_axiom ax (AxiomCo actual cos) = actual == ax && all isReflCo cos
     uses_axiom ax (AppCo co arg) = uses_axiom ax co && isReflCo arg
@@ -3210,8 +3214,11 @@ the axiom identity and its reflexive arguments. Recover the promoted
 constructor directly at its public kind. Never put the representational
 coercion in a type cast or derive nominal equality from it.
 
-Only a simple lazy constructor can use this path. Compose the operand
-inside the normal retained-argument thunk until STG erases the index.
+An equality refinement changes the worker's universal instantiation.
+The wrapper supplies a separate nominal reflexive proof for each EqSpec.
+Check those arguments and rebuild them independently of the family cast.
+Keep the operand inside the retained-argument thunk until STG erases the
+index.
 -}
 
 -- | Recognise the ordinary boxed representation of a character literal.
@@ -3327,7 +3334,7 @@ splitNativeIndexedConApp expr = case collectArgs expr of
           ; user_tys <- traverse (`lookup` choices) (dataConUserTyVars con)
           ; (prefix, domains) <- nativeIndexedConArgs con user_tys
           ; let (actual, fields) = splitAt (length prefix) args
-          ; guard (actual `equalLength` prefix && and (zipWith same_prefix actual prefix))
+          ; guard (actual `equalLength` prefix && and (zipWith sameNativeConPrefixArg actual prefix))
           ; guard (fields `equalLength` domains)
           ; return (con, user_tys, fields) }
   _ -> Nothing
@@ -3335,12 +3342,14 @@ splitNativeIndexedConApp expr = case collectArgs expr of
     type_arg (Type ty) = Just ty
     type_arg _ = Nothing
 
-    same_prefix (Type a) (Type b) = a `eqType` b
-    same_prefix (Coercion co) (Coercion expected)
-      = coercionRole co == Nominal && isReflCo co &&
-        coercionLKind co `eqType` coercionLKind expected &&
-        coercionRKind co `eqType` coercionRKind expected
-    same_prefix _ _ = False
+-- | Compare a worker argument with the checked wrapper's erased prefix.
+sameNativeConPrefixArg :: CoreExpr -> CoreExpr -> Bool
+sameNativeConPrefixArg (Type a) (Type b) = a `eqType` b
+sameNativeConPrefixArg (Coercion co) (Coercion expected)
+  = coercionRole co == Nominal && isReflCo co &&
+    coercionLKind co `eqType` coercionLKind expected &&
+    coercionRKind co `eqType` coercionRKind expected
+sameNativeConPrefixArg _ _ = False
 
 -- | Check the erased arguments and value indices in the promoted telescope.
 nativeIndexedPromotedCon_maybe :: DataCon -> [Type] -> [Type] -> Maybe Type
