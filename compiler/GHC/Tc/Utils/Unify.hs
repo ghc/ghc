@@ -4252,6 +4252,8 @@ simpleUnifyCheck caller given_eq_lvl lhs_tv rhs
     rhs_is_bad (TermAppTy {}) = True
     rhs_is_bad (TermVarTy {}) = True
     rhs_is_bad (DepFunTy {})  = True
+    rhs_is_bad (ClassAppTy {}) = True
+    rhs_is_bad (DepDictTy {})  = True
     rhs_is_bad ty@ExistsTy{} = lhs_tv_is_concrete || not (isTauTy ty)
     rhs_is_bad (TyVarTy tv) = rhs_tcv_is_bad tv
 
@@ -4942,6 +4944,9 @@ check_ty_eq_rhs flags ty
               ; return (mkDepFunRedn vis index <$> body_res) }
         | otherwise
         -> return $ PuFail impredicativeProblem
+      -- The immutable Given exception above does not validate dictionary scope.
+      ClassAppTy {}   -> return $ PuFail (cteProblem cteSkolemEscape)
+      DepDictTy {}    -> return $ PuFail impredicativeProblem
       LitTy {}        -> return $ okCheckRefl ty
       TyConApp tc tys -> checkTyConApp flags ty tc tys
       TyVarTy tv      -> checkTyVar flags tv

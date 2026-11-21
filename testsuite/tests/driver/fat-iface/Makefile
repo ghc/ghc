@@ -57,3 +57,8 @@ T22807_ghci: clean
 	"$(TEST_HC)" $(TEST_HC_OPTS) T22807_ghci.hs -fno-full-laziness -fhide-source-paths -fwrite-if-simplified-core -O2 -dynamic -v0
 	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -fhide-source-paths -fno-full-laziness < T22807_ghci.script
 
+
+fatCoreLint: clean
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c FatQuote.hs -fno-code -fwrite-if-simplified-core
+	test ! -f FatQuote.o
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c FatTH.hs -fprefer-byte-code -dcore-lint
