@@ -754,17 +754,20 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
   where
     check_opened marked
       | Infer ir <- expected
-      , Just template <- spine_result head_body args
       = do { level <- getTcLevel
-           ; if level `sameDepthAs` ir_lvl ir
-             then do { let free = tyCoVarsOfType template
-                           result_vars = [v | (_, v) <- head_binders, v `elemVarSet` free]
-                     ; (subst, _) <- newMetaTyVarsX (Subst.mkEmptySubst (mkInScopeSet free))
-                                                   result_vars
-                     ; let schema = Subst.substTy subst template
-                     ; body <- open schema Map.empty [] marked
-                     ; tcWrapResult rn_expr body schema expected }
-             else check_mono marked }
+           ; template <- if level `sameDepthAs` ir_lvl ir
+                          then declared_result marked
+                          else return Nothing
+           ; case template of
+               Just result ->
+                 do { let free = tyCoVarsOfType result
+                          result_vars = [v | (_, v) <- head_binders, v `elemVarSet` free]
+                    ; (subst, _) <- newMetaTyVarsX (Subst.mkEmptySubst (mkInScopeSet free))
+                                                  result_vars
+                    ; let schema = Subst.substTy subst result
+                    ; body <- open schema Map.empty [] marked
+                    ; tcWrapResult rn_expr body schema expected }
+               Nothing -> check_mono marked }
       | otherwise = check_mono marked
 
     check_mono marked = do
@@ -772,19 +775,64 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
       open result_ty Map.empty [] marked
 
     (head_binders, head_sigma) = tcSplitForAllInvisTyVars fun_ty
-    (_, head_body) = tcSplitPhiTy head_sigma
+    (head_theta, head_body) = tcSplitPhiTy head_sigma
 
-    spine_result result []
+    declared_result marked
+      | Just result <- spine_result head_body args = return (Just result)
+      | otherwise = ranked_result marked
+
+    spine_result result [] = package_result result
+    spine_result ty (EWrap{} : rest) = spine_result ty rest
+    spine_result ty (EValArg{} : rest)
+      | Just (_, res) <- splitVisibleFunTy_maybe ty = spine_result res rest
+    spine_result _ _ = Nothing
+
+    package_result result
       | ExistsTy ImplicitExists binder body <- coreFullView result
       , isTauTy (varType binder), isTauTy body
       , isFamFreeTy result
       , not (hasNativeDependentExpr (Core.Type (varType binder)))
       , not (hasNativeDependentExpr (Core.Type body))
       = Just result
-    spine_result ty (EWrap{} : rest) = spine_result ty rest
-    spine_result ty (EValArg{} : rest)
-      | Just (_, res) <- splitVisibleFunTy_maybe ty = spine_result res rest
-    spine_result _ _ = Nothing
+      | otherwise = Nothing
+
+    -- See Note [Inferring an erased package from a higher-rank callback].
+    ranked_result marked = runMaybeT $ do
+      guard =<< liftMaybeT (xoptM LangExt.ImpredicativeTypes)
+      [Left EValArg{ea_arg = callback}, Right (_, _, _, Nothing)] <-
+        pure [arg | arg <- marked, is_value arg]
+      let (mas, domains, result) = splitFunTys head_body
+      [Scaled cb_use cb, Scaled payload_use payload] <- pure domains
+      TyVarTy result_var <- pure (coreFullView result)
+      guard (result_var `elem` map snd head_binders)
+      let (cb_binders, cb_body) = tcSplitForAllInvisTyVars cb
+      guard (not (null cb_binders))
+      (cb_match, Scaled cb_mult formal, cb_result) <- MaybeT (pure (tcSplitFunTy_maybe cb_body))
+      guard (eqType cb_result result)
+      let other = [cb_use, payload_use, payload, cb_match, cb_mult, formal]
+                    ++ mas ++ head_theta ++ map fst cb_binders
+                    ++ map (varType . snd) (head_binders ++ cb_binders)
+      guard (not (result_var `elemVarSet` tyCoVarsOfTypes other))
+      (ident, operands) <- MaybeT (tcDeclaredOperandSpine False callback)
+      let (provided, _, declared) = tcRetainedInstTelescope (varType ident)
+      residual <- MaybeT . pure $ foldM (\ty _ -> snd <$> splitVisibleFunTy_maybe ty) declared operands
+      (actual, callback_result) <- MaybeT (pure (splitVisibleFunTy_maybe residual))
+      guard (all isFamFreeTy [formal, actual])
+      guard (all supportsQuickLookType [formal, actual])
+      guard (all noQuickLookVars [formal, actual, callback_result])
+      let scope = mkInScopeSet (tyCoVarsOfTypes [formal, actual, callback_result])
+          bind_provided tv _ | tv `elem` provided = BindMe
+                             | otherwise = DontBindMe
+      subst <- MaybeT . pure $ tcMatchTyX_BM bind_provided (Subst.mkEmptySubst scope) actual formal
+      guard (eqType (Subst.substTy subst actual) formal)
+      let template = Subst.substTy subst callback_result
+          free = tyCoVarsOfType template
+      guard (all (not . (`elemVarSet` free)) (provided ++ map snd cb_binders))
+      MaybeT (pure (package_result template))
+      where
+        is_value (Left EValArg{}) = True
+        is_value Right{} = True
+        is_value _ = False
 
     open result_ty opened rev_args [] = do
       let args = reverse rev_args
@@ -1223,6 +1271,37 @@ its declared package. The ordinary head instantiation still takes
 place inside the opening, so argument-only variables can match the
 witness. Fill the usual inference slot after closing the implication.
 The outer result's metavariables cannot capture the opened witness.
+-}
+
+{- Note [Inferring an erased package from a higher-rank callback]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider a separately compiled consumer of a filtered vector.
+
+  consume :: (forall j. Vec a j -> r) -> Vec a k -> r
+  let ys = consume (filterVec (> 3)) (filterVec odd xs) in cells ys
+
+Opening the second operand needs a result type outside its witness scope.
+An ordinary inference slot cannot contain the dot result of filterVec.
+Quick Look skips the callback because its expected type starts with forall.
+See Note [Quick Look at value arguments].
+
+When the consumer has a ranked callback and one directly opened operand,
+match the declared input type of the callback to the consumer's callback
+domain. Use a type match without unification. Require the result parameter
+to occur only as the callback result and the complete application result.
+This avoids choosing a package for a parameter that another argument or
+constraint can select. Use the substituted result only when it declares a
+dot package and contains no binder from the callback's local forall or
+unmatched binder from the callback's declaration. Read only the leading
+telescope. A forall below an applied value arrow can introduce another
+binder, so the probe cannot strip that forall. For the example, matching
+Vec a j transports the element parameter into the consumer's telescope.
+The callback length j does not occur in the package.
+
+Freshen the consumer's result parameters outside the opening. Check the
+original callback at that result through the ordinary argument checker.
+This still checks its supplied arguments, constraints, and multiplicity.
+The producer thunk stays lazy.
 -}
 
 {- Note [Projected implicit existential operands]

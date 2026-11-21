@@ -114,6 +114,21 @@ cp "$src/"{QuickLookForward,QuickLookRuntime}.hs .
 "$ghc" "${flags[@]}" QuickLookForward.o ../provider/{Filter,ForwardSchemas,Vector}.o \
     -o quick-look -main-is QuickLookForward
 ./quick-look
+cp "$src/RankedFilterReject.hs" .
+for rejection in ESCAPE_LENGTH LATE_BINDER BAD_PREDICATE; do
+    if "$ghc" "${flags[@]}" "-D$rejection" -c RankedFilterReject.hs > ranked-filter.log 2>&1; then
+        echo "Accepted the ranked filter control $rejection." >&2
+        exit 1
+    fi
+    case "$rejection" in
+        ESCAPE_LENGTH) operand='keepInput'; column=32; code=91028; detail='Restricted j Int' ;;
+        LATE_BINDER) operand='lateResult True'; column=33; code=91028; detail='Stamped stamp0 Int' ;;
+        BAD_PREDICATE) operand='filterVec (\_ -> ())'; column=50; code=83865; detail='expected type .Bool.' ;;
+    esac
+    line=$(grep -nF "$operand" RankedFilterReject.hs | tail -1 | cut -d: -f1)
+    grep -Fq "RankedFilterReject.hs:$line:$column: error: [GHC-$code]" ranked-filter.log
+    grep -Eq "$detail" ranked-filter.log
+done
 if "$ghc" "${flags[@]}" -c QuickLookRuntime.hs >quick-look-runtime.log 2>&1; then
     echo "Quick Look accepted a runtime dependency" >&2
     exit 1
