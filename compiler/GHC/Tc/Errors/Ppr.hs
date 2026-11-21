@@ -3701,9 +3701,12 @@ pprRetainedQuantificationError reason = case reason of
          , text "The function has type:" <+> ppr ty ]
   RetainedUnsupportedDomain ty
     | isLiftedTypeKind ty ->
-      vcat [ text "Retained arguments with domain" <+> quotes (text "Type") <+> text "are not supported yet."
-           , text "For a runtime type witness, pass an explicit" <+> quotes (text "TypeRep a")
-               <+> text "argument from" <+> quotes (text "Type.Reflection") <> dot ]
+      vcat [ text "A retained binder with domain" <+> quotes (text "Type")
+               <+> text "is not supported in this position."
+           , text "Use a visible" <+> quotes (text "foreach (a :: Type) ->")
+               <+> text "binder in a complete value signature,"
+           , text "or use an explicit" <+> quotes (text "TypeRep a") <+> text "parameter from"
+               <+> quotes (text "Type.Reflection") <> dot ]
     | otherwise ->
       vcat [ if isPiTy ty
              then text "This retained argument has an unsupported function domain."
