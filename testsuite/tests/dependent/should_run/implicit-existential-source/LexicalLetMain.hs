@@ -6,6 +6,7 @@ import Data.IORef
 import LexicalBangLet
 import LexicalStrictLet
 import LexicalLetProvider
+import LexicalLinearLet
 
 readPayload :: HiddenPayload -> Int
 readPayload package = let (value, reader) = package in reader value
@@ -48,3 +49,4 @@ main = do
                                    ignoreStrict first, ignoreStrictTilde first]
   print (demand, readBangField, readStrictField,
          readPayload (repackStrict (producePayload second)))
+  print (readLinear (linearPayload first), readLinearStrict (linearPayload second))

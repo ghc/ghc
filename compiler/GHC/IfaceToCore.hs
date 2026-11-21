@@ -2477,7 +2477,10 @@ tcIfaceExpr (IfaceUnpack witness@(name, _) value package body)
              do { valid <- evaluateIfaceValidation (ppr name) (varType witness' `eqType` varType a)
                 ; unless valid $
                     failIfM (text "Existential Unpack witness kind differs from its package:" <+> ppr name)
-                ; unless (isManyTy (idMult value')
+                ; let mult = idMult value'
+                ; unless (isNonCoVarId value'
+                          && isMultiplicityTy (typeKind mult)
+                          && not (witness' `elemVarSet` tyCoVarsOfType mult)
                           && substTyWith [a] [mkTyVarTy witness'] payload_ty `eqType` varType value') $
                     failIfM (text "Invalid existential payload binder in interface.")
                 ; body' <- tcIfaceExpr body
@@ -3016,7 +3019,9 @@ tcUnfoldingRhs source toplvl name declared_ty expr
         when native $
           failIfM (text "Unsupported compulsory retained unfolding:" <+> ppr name)
       RetainedUserSrc ->
-        unless (isTopLevel toplvl && not (hasNativeDependentExprRhs (Type declared_ty))
+        -- Local stable templates use the same tag. Lint them in their
+        -- enclosing interface scope below.
+        unless (not (hasNativeDependentExprRhs (Type declared_ty))
                 && not (hasExistentialExpr core_expr')) $
           failIfM (text "Invalid retained user unfolding:" <+> ppr name)
       _ -> pure ()

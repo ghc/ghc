@@ -1,5 +1,5 @@
-{-# LANGUAGE NoExperimentalDependentTypes, Strict #-}
-module LexicalStrictLet (ignoreStrict, ignoreStrictTilde, readStrictField, repackStrict) where
+{-# LANGUAGE LinearTypes, MonoLocalBinds, NoExperimentalDependentTypes, Strict #-}
+module LexicalStrictLet (ignoreStrict, ignoreStrictTilde, readStrictField, repackStrict, readLinearStrict) where
 
 import LexicalLetProvider
 
@@ -14,3 +14,6 @@ readStrictField = let (value, reader) = lazyPayload in reader value
 
 repackStrict :: HiddenPayload -> HiddenPayload
 repackStrict package = let (value, reader) = package in (value, reader)
+
+readLinearStrict :: LinearPayload %1 -> Int
+readLinearStrict package = let (value, reader) = package in reader value

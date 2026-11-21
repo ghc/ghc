@@ -1357,6 +1357,9 @@ lvlBind env (AnnNonRec bndr rhs)
                    --                     (see extendPolyLvlEnv)
   || not (wantToFloat env NonRecursive dest_lvl is_join is_top_bindable)
   || hasRuntimeIndexRefs env ty_fvs
+  || (floatCoreMode (le_switches env) == RetainedCore
+      && isRetainedUserUnfolding (realIdUnfolding bndr) && not (null abs_vars))
+     -- See Note [Floating retained user unfoldings].
   = -- No float
     do { rhs' <- lvlRhs env NonRecursive is_bot_lam mb_join_arity rhs
        ; let  bind_lvl        = incMinorLvl (le_ctxt_lvl env)
@@ -1404,6 +1407,8 @@ lvlBind env (AnnNonRec bndr rhs)
 lvlBind env (AnnRec pairs)
   |  not (wantToFloat env Recursive dest_lvl is_join is_top_bindable)
   || hasRuntimeIndexRefs env ty_fvs
+  || (floatCoreMode (le_switches env) == RetainedCore
+      && any (isRetainedUserUnfolding . realIdUnfolding) bndrs && not (null abs_vars))
   = -- No float
     do { let bind_lvl       = incMinorLvl (le_ctxt_lvl env)
              (env', bndrs') = substAndLvlBndrs Recursive env bind_lvl bndrs
@@ -1961,6 +1966,16 @@ type LvlM result = UniqSM result
 
 initLvl :: UniqSupply -> UniqSM a -> a
 initLvl = initUs_
+
+{- Note [Floating retained user unfoldings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Stable user unfoldings can contain retained Core, including references to
+variables in a local binding's scope. Cloning with substitution preserves
+the template and its source tag. Floating with abstraction would replace
+the template with metadata for a new function. Keep a marked binding in
+scope when floating would require abstraction. The simplifier applies the
+same restriction in simplLazyBind in GHC.Core.Opt.Simplify.Iteration.
+-}
 
 newPolyBndrs :: Level -> LevelEnv -> [OutVar] -> [InId]
              -> LvlM (LevelEnv, [OutId])

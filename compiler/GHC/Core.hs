@@ -376,10 +376,14 @@ Pack annotates the payload with ExistsTy flag a body and supplies a type witness
 w of kind Type. The payload has type body[w/a]. Pack has precisely the
 payload's representation and demand.
 
-Unpack p opens an existential by binding a fresh type variable and a lazy,
-unrestricted payload Id. The body is checked under both binders. Neither
-binder may occur in its result type. The first binder has no runtime value.
-The second binder aliases the payload and does not demand the package.
+Unpack p opens an existential by binding a fresh type variable and a lazy
+payload Id. The body is checked under both binders. Neither binder may occur
+in its result type. The first binder has no runtime value. The second binder
+aliases the payload and does not demand the package. Check usage through the
+alias as for a non-recursive let (see Note [Multiplicity of let binders] in
+GHC.Types.Var). The payload Id carries the source pattern's multiplicity so
+it can also serve as a case binder. Its multiplicity is in scope outside the
+opening.
 This is draft proposal #473's alternative lexical Core.
 -}
 

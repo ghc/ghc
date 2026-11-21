@@ -470,8 +470,7 @@ makeCorePair dflags gbl_id is_default_method rhs
   , not (hasNativeDependentExprRhs (Type (idType gbl_id)))
   , unf@CoreUnfolding { uf_tmpl = tmpl } <- realIdUnfolding (fst pair)
   , hasNativeDependentUnfolding tmpl
-  = if isExternalName (idName gbl_id)
-       && not (hasExistentialExpr tmpl) && supportsNativeRuleBinds [NonRec (fst pair) tmpl]
+  = if not (hasExistentialExpr tmpl) && supportsNativeRuleBinds [NonRec (fst pair) tmpl]
     then pure (setIdUnfolding (fst pair) unf{uf_src = RetainedUserSrc}, snd pair)
     else putSrcSpanDs (nameSrcSpan (idName gbl_id)) $
            failWithDs (DsRetainedInlinePragma (idName gbl_id) inline_spec)
@@ -524,6 +523,10 @@ mark its unfolding source. Clients use the tag to select the retained
 pipeline before reading the template. The module interface checks these
 exports. See Note [Retained Core across module boundaries] in
 GHC.Iface.Tidy.
+
+A local binding uses the same tag. The retained optimizer sees the
+stable template when it scans the binding. The tag stays attached if
+the binding floats without abstraction or occurs inside an exported template.
 Compulsory default-method unfoldings still use their separate check.
 An ordinary binding without an unfolding request needs no native scan here.
 -}

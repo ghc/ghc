@@ -43,7 +43,8 @@ import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Arrow
 import GHC.Tc.Gen.Match( tcBody, tcLambdaMatches, tcCaseMatches, tcIndexedCaseMatches, tcRetainedCase
                        , tcRetainedCallCase
-                       , tcOpenImplicitPackage, implicitPayloadType, matchesImplicitPayloadPat
+                       , tcOpenImplicitPackage, tcOpenImplicitPackageAt
+                       , implicitPayloadType, matchesImplicitPayloadPat
                        , tcGRHSNE, tcDoStmts )
 import GHC.Tc.Instance.Family ( tcGetFamInstEnvs )
 import GHC.Tc.Zonk.TcType
@@ -1297,9 +1298,10 @@ tcLexicalExistsLet original (L bind_loc (HsValBinds ann (XValBindsLR (HsVBG grou
         ExistsTy ImplicitExists _ _ -> guard (matchesImplicitPayloadPat schema pat)
         _ -> mzero
       liftMaybeT $ do
-        (checked, actual) <- tcScalingUsage ManyTy $ tcInferRhoFRR FRRPatBind rhs
+        mult <- newMultiplicityVar
+        (checked, actual) <- tcScalingUsage mult $ tcInferRhoFRR FRRPatBind rhs
         result_ty <- expTypeToType expected
-        opened <- tcOpenImplicitPackage (getLocA rhs) actual checked result_ty $ \payload -> do
+        opened <- tcOpenImplicitPackageAt mult (getLocA rhs) actual checked result_ty $ \payload -> do
           let name = getName payload
               replacement = fmap (\source -> mkExpandedLExpr source (nlHsVar name)) rhs
               binding' = binding
@@ -1310,9 +1312,10 @@ tcLexicalExistsLet original (L bind_loc (HsValBinds ann (XValBindsLR (HsVBG grou
             tcExtendIdEnv [payload] $
               tcLocalBinds scope (tcMonoLExpr body (mkCheckExpType result_ty))
           let (payload_use, body_usage) = popUE usage payload
-          case payload_use of
-            MUsage mult -> void (unifyType Nothing mult ManyTy)
-            _ -> return ()
+              rhs_mult = case payload_use of
+                MUsage p -> p
+                _ -> ManyTy
+          tcEqMult (NonLinearPatternOrigin OtherPatternReason pat) rhs_mult mult
           tcEmitBindingUsage body_usage
           return (HsLet noExtField (L bind_loc decls) body')
         return (mkExpandedExprTc original opened)
@@ -1349,11 +1352,13 @@ tilde keeps it lazy, including under Strict. See Note [decideBangHood]
 in GHC.HsToCore.Utils. The type of the complete let cannot mention the
 hidden witness in any of these cases.
 
-Unpack binds an unrestricted payload. Check the original package and
-the synthetic pattern RHS at Many. An ordinary strict binding can infer
-linear use, but then its Core case needs a linear scrutinee. The
-unrestricted Unpack binder cannot serve as that scrutinee. Delete the
-synthetic Id from the usage environment before leaving the opening.
+Allocate the payload multiplicity outside the opening. Use it to scale the
+producer and annotate the payload Id. Equate it with the use of the synthetic
+RHS from tcLocalBinds without using coercion evidence. This preserves the
+ordinary restriction on lazy bindings. A strict match may reuse the payload
+Id as its Core case binder
+(see matchSinglePat in GHC.HsToCore.Match). Delete the synthetic Id from
+the usage environment before leaving the opening.
 
 Restrict this entry to an unsigned singleton nonrecursive binding with
 an unguarded RHS, and a boxed tuple of variables or wildcards with at most

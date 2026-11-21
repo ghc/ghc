@@ -327,7 +327,7 @@ evidenceSuffix requirements
     || needs IndexedConstructorCaseEvidence || needs IndexedConstructorFieldsEvidence
     || needs IndexedConstructorOperandEvidence
     || needs IndexedConstructorExistentialCaseEvidence || needs GeneralIndexedConstructorOperandEvidence
-    || needs RetainedUserUnfoldingEvidence = feature_set
+    || needs RetainedUserUnfoldingEvidence || needs LinearUnpackEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -353,6 +353,7 @@ legacyEvidenceSuffix IndexedConstructorFieldsEvidence = featureSetPrefix ++ "ind
 legacyEvidenceSuffix IndexedConstructorOperandEvidence = featureSetPrefix ++ "indexed-constructor-operand"
 legacyEvidenceSuffix IndexedConstructorExistentialCaseEvidence = featureSetPrefix ++ "indexed-constructor-existential-case"
 legacyEvidenceSuffix RetainedUserUnfoldingEvidence = featureSetPrefix ++ "retained-user-unfolding"
+legacyEvidenceSuffix LinearUnpackEvidence = featureSetPrefix ++ "linear-unpack"
 legacyEvidenceSuffix GeneralIndexedConstructorOperandEvidence = featureSetPrefix ++ "general-indexed-constructor-operand"
 legacyEvidenceSuffix DepFunCoEvidence           = "-retained-depfunco-v1"
 legacyEvidenceSuffix ConstructorCaseEvidence   = "-retained-constructor-case-v1"
@@ -386,7 +387,8 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("indexed-constructor-operand", IndexedConstructorOperandEvidence)
                       , ("indexed-constructor-existential-case", IndexedConstructorExistentialCaseEvidence)
                       , ("general-indexed-constructor-operand", GeneralIndexedConstructorOperandEvidence)
-                      , ("retained-user-unfolding", RetainedUserUnfoldingEvidence) ]
+                      , ("retained-user-unfolding", RetainedUserUnfoldingEvidence)
+                      , ("linear-unpack", LinearUnpackEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion
@@ -423,6 +425,12 @@ See Note [Exported retained specialisations] in GHC.Core.Rules.
 An erased user rule can construct or open a package on either side.
 Record that requirement when writing the rule expression. A reader that
 only supports calls at erased package types rejects the newer header.
+
+The Unpack operand includes the payload multiplicity. Older readers decode
+that field and require Many when they typecheck a rule or unfolding. Record
+LinearUnpackEvidence when serializing an Unpack with any other multiplicity.
+Those readers then reject the header before trying to load the rule. An
+opening in object code alone does not require this feature.
 
 An indexed constructor proof follows the ordinary GADT equality binder.
 Its reader reconstructs the promoted endpoint using that equality.

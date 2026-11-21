@@ -38,10 +38,41 @@ strictPrefix :: forall (ma :: Matchability). ma ~ U =>
                 foreach (tag :: Bool) -> forall a -> foreach (m :: Maybe a) -> Reading tag m -> Int -> Int %ma -> Int
 strictPrefix _ (type a) _ _ !_ x = x
 
+{-# NOINLINE constructor #-}
+constructor :: forall (ma :: Matchability). ma ~ U =>
+               foreach (tag :: Bool) -> Eq Int => foreach (m :: Maybe Bool) -> Reading tag m -> Int %ma -> Int
+constructor False _ _ x = x
+constructor True _ _ x = x
+
 #ifdef BAD
 bad :: foreach (tag :: Bool) -> forall a -> foreach (m :: Maybe a) -> Reading tag m %M -> Reading tag m
 bad _ (type a) _ x = x
+
+badConstructor :: foreach (tag :: Bool) -> Reading tag ('Nothing :: Maybe Bool) -> Int %M -> Int
+badConstructor False _ x = x
+badConstructor True _ x = x
 #endif
+HS
+
+cat >TooLateGiven.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, Modifiers, ScopedTypeVariables #-}
+module TooLateGiven where
+import GHC.Exts (Matchability, U)
+
+data Witness (ma :: Matchability) where
+    UnmatchableWitness :: Witness U
+
+data Reading (tag :: Bool) = Reading Int
+
+ordinary :: forall (ma :: Matchability). Witness ma %ma -> Int
+ordinary UnmatchableWitness = 7
+
+retained :: forall (ma :: Matchability). foreach (tag :: Bool) -> Witness ma %ma -> Reading tag
+retained _ UnmatchableWitness = Reading 7
+
+constructor :: forall (ma :: Matchability). foreach (tag :: Bool) -> Witness ma %ma -> Reading tag
+constructor False UnmatchableWitness = Reading 7
+constructor True UnmatchableWitness = Reading 7
 HS
 
 cat >Main.hs <<'HS'
@@ -67,13 +98,25 @@ main = do
     prefix <- newIORef (error "strict prefix") >>= readIORef
     let result = case Retained.forward @U tag (type Bool) index (Retained.Reading 41) of Retained.Reading n -> n
         partial = Retained.strictPrefix @U tag (type Bool) index (Retained.Reading 0) prefix
+        constructorPartial = Retained.constructor @U tag index (Retained.Reading 0)
         bad = case Retained.bad tag (type Bool) index (Retained.Reading 41) of Retained.Reading n -> n
     partialForced <- threw (evaluate (partial `seq` ()))
     fullForced <- threw (evaluate (partial 61))
+    constructorPartialForced <- threw (evaluate (constructorPartial `seq` ()))
+    constructorFullForced <- threw (evaluate (constructorPartial 61))
     ordinaryDeferred <- deferred (evaluate (Ordinary.bad 41))
     retainedDeferred <- deferred (evaluate bad)
-    print (Ordinary.forward @U 41, result, partialForced, fullForced, ordinaryDeferred, retainedDeferred)
+    constructorDeferred <- deferred (evaluate (Retained.badConstructor True (Retained.Reading 0) 61))
+    print (Ordinary.forward @U 41, result, Retained.constructor @U True index (Retained.Reading 0) 61)
+    print (partialForced, fullForced, constructorPartialForced, constructorFullForced)
+    print (ordinaryDeferred, retainedDeferred, constructorDeferred)
 HS
+
+if "${ghc[@]}" -fno-code TooLateGiven.hs >reject.log 2>&1 ||
+   [[ $(grep -Fc 'error: [GHC-25897]' reject.log) != 3 ]]; then
+    cat reject.log >&2
+    exit 1
+fi
 
 for opt in 0 2; do
     mkdir -p "$out/$opt"/{provider,client}
@@ -96,6 +139,6 @@ for opt in 0 2; do
         "${ghc[@]}" "-O$opt" -c Main.hs
         "${ghc[@]}" Main.o ../provider/Ordinary.o ../provider/Retained.o -o run
         ./run >actual
-        printf '%s\n' '(41,41,False,True,True,True)' | cmp - actual
+        printf '%s\n' '(41,41,61)' '(False,True,False,True)' '(True,True,True)' | cmp - actual
     )
 done

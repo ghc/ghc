@@ -21,6 +21,7 @@ module GHC.Tc.Gen.Match
    , tcLambdaMatches
    , tcMatches
    , tcOpenImplicitPackage
+   , tcOpenImplicitPackageAt
    , implicitPayloadType
    , matchesImplicitPayloadPat
    , tcGRHSNE
@@ -59,7 +60,6 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Gen.Bind
 import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.Unify
-import GHC.Tc.Types.Constraint ( DelayedError(DE_RetainedMatchability) )
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.ErrCtxt( UserTypeCtxt( GenSigCtxt ), pprUserTypeCtxt )
 import GHC.Tc.Types.Evidence
@@ -77,8 +77,8 @@ import GHC.Core.Type ( coreFullView, isManyTy, splitTyConApp_maybe
                      , isInvisibleForAllTyFlag, isNativeIndexId, nativeIndexDataConTyArgs
                      , splitFunTy_maybe, substTyWith )
 import GHC.Core.Coercion ( MCoercion(MRefl, MCo), Role(Representational), mkCoVarCo, mkCoCast, coercionType, isReflCo
-                         , mkSymCo, mkSubCo, coercionKind, coercionLKind, coercionRKind
-                         , mkFunCo
+                         , mkSymCo, mkSubCo, coercionKind, coercionLKind
+                         , mkFunCo, mkFunResCo
                          , mkTransCo, mkNomReflCo, mkRepReflCo, mkDepFunCoWithVis )
 import GHC.Core.DataCon ( DataCon, dataConCannotMatch, dataConName, dataConSourceArity, dataConTyCon, dataConUnivTyVars, dataConWorkId )
 import GHC.Core.ConLike ( ConLike(RealDataCon) )
@@ -112,7 +112,7 @@ import GHC.Types.Var ( binderFlag, EvVar, DepFunTyFlag(..), ExistsTyFlag(Implici
 import GHC.Types.Var.Env ( mkInScopeSetList, unitVarEnv )
 import GHC.Types.SrcLoc
 import GHC.Types.Basic( VisArity, RecFlag(NonRecursive), Origin(Generated), GenReason(OtherExpansion), DoPmc(SkipPmc) )
-import GHC.Data.Bag ( listToBag, unitBag, unionBags )
+import GHC.Data.Bag ( listToBag, unionBags )
 import GHC.Data.FastString ( fsLit )
 import GHC.Data.Pair ( pSnd )
 import GHC.Data.Maybe ( catMaybes, firstJustsM, fromMaybe, isJust, isNothing )
@@ -277,7 +277,12 @@ their FunRhs context for coverage checks and match failures.
 -- | Open checked dot binders with the result type outside every scope.
 tcOpenImplicitPackage :: SrcSpan -> TcType -> LHsExpr GhcTc -> TcRhoType
                       -> (Id -> TcM (HsExpr GhcTc)) -> TcM (HsExpr GhcTc)
-tcOpenImplicitPackage loc schema checked result_ty check_body = open schema checked
+tcOpenImplicitPackage = tcOpenImplicitPackageAt ManyTy
+
+-- | Open checked dot binders with the multiplicity of the payload pattern.
+tcOpenImplicitPackageAt :: Mult -> SrcSpan -> TcType -> LHsExpr GhcTc -> TcRhoType
+                        -> (Id -> TcM (HsExpr GhcTc)) -> TcM (HsExpr GhcTc)
+tcOpenImplicitPackageAt mult loc schema checked result_ty check_body = open schema checked
   where
     open schema checked =
       case coreFullView schema of
@@ -288,7 +293,7 @@ tcOpenImplicitPackage loc schema checked result_ty check_body = open schema chec
              ; let name = mkSystemNameAt uniq (getOccName binder) loc
              ; witness <- pushTcLevelM_ $ newSkolemTyVar skol name (tyVarKind binder)
              ; let body_ty = substTyWith [binder] [mkTyVarTy witness] payload_ty
-             ; payload <- newSysLocalId (fsLit "unpacked") ManyTy body_ty
+             ; payload <- newSysLocalId (fsLit "unpacked") mult body_ty
              ; (ev_binds, body) <- setSrcSpan loc $
                  checkConstraints origin [witness] [] $
                    case coreFullView body_ty of
@@ -336,10 +341,10 @@ tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
       _ | DepFunTy DepFunVisible binder _ <- coreFullView ty ->
           do { index <- newSysLocalId (fsLit "retained") ManyTy (varType binder)
              ; let body_ty = applyTypeToArgs ty [Var index]
-             ; (pat_tys, argument_plan, rhs_ty) <-
+             ; (wrap, (pat_tys, argument_plan, rhs_ty)) <-
                  tcRetainedConArgs herald ctxt (arity - 1) body_ty
              ; result <- tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty matches
-             ; return (idHsWrapper, result) }
+             ; return (liftRetainedLambdaWrap index wrap, result) }
         | otherwise -> failWithTc $
             TcRnRetainedQuantificationError RetainedConstructorCoverage
   where
@@ -1247,12 +1252,12 @@ retained telescope. This uses the same equality as matchExpectedFunTys.
 Let the solver resolve the equality in its original scope. A matchability
 variable introduced at the call can be untouchable inside an erased forall.
 
-Require reflexive argument representation. In a variable equation, carry
-the matchability proof in a result cast. Lift it through the preceding
-value binders without introducing another lambda or moving any pattern
-match. A preceding erased binder uses its existing wrapper outside this cast.
-The constructor walker still requires reflexive matchability, as it has
-no result wrapper at the match group.
+Require reflexive argument representation. Carry the matchability proof in a
+result cast. Lift it through the preceding binders without introducing another
+lambda or moving any pattern match. A preceding erased binder uses its existing
+wrapper outside this cast. In a constructor group, build the cast while
+collecting shared arguments, before entering the scope of any pattern evidence.
+A Given introduced by a pattern cannot justify the arrow for that pattern.
 An arrow with no corresponding pattern keeps its complete type, so an
 existing matchable function can pass through as the result.
 -}
@@ -1339,17 +1344,21 @@ data RetainedConArg
 
 -- | Collect shared binders in telescope order without counting evidence as values.
 tcRetainedConArgs :: ExpectedFunTyCtxt -> UserTypeCtxt -> Int -> Type
-                  -> TcM ([ExpPatType], [RetainedConArg], ExpRhoType)
+                  -> TcM (HsWrapper, ([ExpPatType], [RetainedConArg], ExpRhoType))
 tcRetainedConArgs herald ctxt = go [] []
   where
     go acc argument_plan n ty
       | (theta, tau) <- tcSplitPhiTy ty, not (null theta)
       = do { givens <- newEvVars theta
            ; let pat_tys = map (mkCheckExpFunPatTy . Scaled ManyTy . varType) givens
-           ; go (reverse pat_tys ++ acc)
-                (reverse (map RetainedConDict givens) ++ argument_plan) n tau }
+           ; (wrap, result) <- go (reverse pat_tys ++ acc)
+                (reverse (map RetainedConDict givens) ++ argument_plan) n tau
+           ; let wrap' = case wrap of
+                   WpCast co -> mkWpCastR (foldr (mkFunResCo Representational unmatchableDataConTy) co givens)
+                   _ -> wrap
+           ; return (wrap', result) }
       | n == 0
-      = return (reverse acc, reverse argument_plan, mkCheckExpType ty)
+      = return (idHsWrapper, (reverse acc, reverse argument_plan, mkCheckExpType ty))
       | ForAllTy _ binder _ <- coreFullView ty
       , isInvisibleForAllTyFlag (binderFlag binder)
       = failWithTc (TcRnRetainedQuantificationError RetainedResultWrapper)
@@ -1357,14 +1366,14 @@ tcRetainedConArgs herald ctxt = go [] []
       = do { name <- newSysName (nameOccName (idName binder))
            ; let index = mkLocalId name ManyTy (varType binder)
                  pat_ty = mkCheckExpFunPatTy (Scaled ManyTy (varType binder))
-           ; go (pat_ty : acc) (RetainedConIndex index : argument_plan) (n-1)
-                (applyTypeToArgs ty [Var index]) }
-      | FunTy{} <- coreFullView ty
+           ; (wrap, result) <- go (pat_ty : acc) (RetainedConIndex index : argument_plan) (n-1)
+                                  (applyTypeToArgs ty [Var index])
+           ; return (liftRetainedLambdaWrap index wrap, result) }
+      | FunTy { ft_af = af } <- coreFullView ty
       = do { (ma_co, arg_ty, rhs_ty) <- matchRetainedLambdaArrow herald (n, ty) ty
-           ; unless (isReflCo ma_co) $
-               do { loc <- getCtLocM (TypeEqOrigin unmatchableDataConTy (coercionRKind ma_co) Nothing Nothing) Nothing
-                  ; emitDelayedErrors (unitBag (DE_RetainedMatchability ma_co loc)) }
-           ; go (mkCheckExpFunPatTy arg_ty : acc) (RetainedConValue : argument_plan) (n-1) rhs_ty }
+           ; (wrap, result) <- go (mkCheckExpFunPatTy arg_ty : acc) (RetainedConValue : argument_plan) (n-1) rhs_ty
+           ; wrap' <- liftOrdinaryLambdaWrap af ma_co arg_ty rhs_ty wrap
+           ; return (wrap', result) }
       | otherwise
       = do { (wrap, result) <- matchExpectedFunTys herald ctxt 1 (mkCheckExpType ty) $
                \pat_tys rhs_ty ->

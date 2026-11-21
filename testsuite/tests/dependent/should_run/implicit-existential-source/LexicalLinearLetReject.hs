@@ -3,5 +3,8 @@ module LexicalLinearLetReject where
 
 import LexicalLetProvider
 
-readLinear :: LinearPayload %1 -> Int
-readLinear package = let !(value, reader) = package in reader value
+readLazy :: LinearPayload %1 -> Int
+readLazy package = let ~(value, reader) = package in reader value
+
+readTwice :: LinearPayload %1 -> (Int, Int)
+readTwice package = let !(value, reader) = package in (reader value, reader value)

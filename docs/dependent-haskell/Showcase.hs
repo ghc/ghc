@@ -384,6 +384,8 @@ vectors = do
     observe "equality evidence beneath a retained Pi" (toList (transported n))
     observe "immediate index beta reduction" (toList (IndexBeta.betaSuccessor n 5))
     observe "inline an ordinary function that calls a retained helper" (IndexBeta.inlineIncrement 41)
+    observe "replicate a captured element at two runtime lengths"
+        (IndexBeta.replicateTwice 7 (S Z) (S (S Z)))
     observe "explicit erased choices and qualified Pi" (toList (Ground.groundDirect n Qualified.fixedQ))
     observe "known arguments select erased choices" (toList (Known.knownDirect n Qualified.fixedQ))
     observe "generic consumer of a native function" (Known.knownGenericIgnore Qualified.fixedQ)
@@ -1049,6 +1051,9 @@ main = do
     observe "read the selected erased package and leave the other lazy"
         (RankedPackageClient.runSelectedPackage chooseLeft,
          RankedPackageClient.runSelectedPackage chooseRight)
+    observe "consume a hidden Boolean or integer once"
+        (RankedPackageClient.readCount (ErasedPackage.encodeCount (Left True)),
+         RankedPackageClient.readCount (ErasedPackage.encodeCount (Right 17)))
     observe "read dependent fields from a local package pattern"
         (RankedPackageClient.runLocalPattern chooseLeft,
          RankedPackageClient.runLocalPattern chooseRight)
