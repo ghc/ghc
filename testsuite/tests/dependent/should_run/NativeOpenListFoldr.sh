@@ -95,7 +95,7 @@ for optimization in -O0 -O2; do
     (
         cd ../producer
         for term in direct local; do certified "valid$optimization" "$term"; done
-        for term in wrongHead wrongTail wrongSeed wrongCallback wrongOwner forceResult; do
+        for term in wrongHead wrongTail wrongSeed wrongCallback wrongOwner forceStep forceSeed forceResult; do
             absent "valid$optimization" "$term"
         done
     )
@@ -119,6 +119,20 @@ reject() {
 sed '/^{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}$/d' ListFoldrProof.hs >RulesOn.hs
 reject '[GHC-83605]' RulesOn.hs
 reject '[GHC-83605]' UserProof.hs -DBAD_RULE
+for term in forceStep forceSeed; do
+    cat >StrictFold.hs <<HS
+{-# LANGUAGE ExperimentalDependentTypes, Modifiers, StandaloneKindSignatures #-}
+module StrictFold where
+import GHC.Exts (U)
+import qualified NativeOpenListFoldrProducer as F
+
+type StrictFold :: forall a b. (a %U -> b %U -> b) -> b -> [a] -> b
+type StrictFold k z xs = F.$term k z xs
+HS
+    reject '[GHC-70565]' StrictFold.hs
+    grep -Fq 'StrictFold.hs:7:' rejected.log
+    grep -Fq "F.$term k z xs" rejected.log
+done
 sed 's/:~: k x (Folded k z xs)/:~: z/' ListFoldrProof.hs >WrongCons.hs
 reject '[GHC-25897]' WrongCons.hs
 sed -e 's/foldAppend k z (Cons xs) ys = case foldAppend k z xs ys of/foldAppend _ _ (Cons _) _ = Refl/' \

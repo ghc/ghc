@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 module NativeOpenListFoldrProducer
-    ( direct, local, wrongHead, wrongTail, wrongSeed, wrongCallback, wrongOwner, forceResult ) where
+    ( direct, local, wrongHead, wrongTail, wrongSeed, wrongCallback, wrongOwner
+    , forceStep, forceSeed, forceResult ) where
 
 {-# NOINLINE [2] direct #-}
 direct :: (a -> b -> b) -> b -> [a] -> b
@@ -33,6 +34,16 @@ wrongCallback k z (x : xs) = k x (wrongCallback (\_ _ -> z) z xs)
 wrongOwner :: (a -> b -> b) -> b -> [a] -> b
 wrongOwner _ z [] = z
 wrongOwner k z (x : xs) = k x (direct k z xs)
+
+forceStep :: (a -> b -> b) -> b -> [a] -> b
+forceStep k z xs = k `seq` case xs of
+    [] -> z
+    x : rest -> k x (forceStep k z rest)
+
+forceSeed :: (a -> b -> b) -> b -> [a] -> b
+forceSeed k z xs = z `seq` case xs of
+    [] -> z
+    x : rest -> k x (forceSeed k z rest)
 
 forceResult :: (a -> b -> b) -> b -> [a] -> b
 forceResult _ z [] = z

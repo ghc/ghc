@@ -1684,7 +1684,9 @@ seed, or a call to the local worker that captures both. It checks the
 original head, the proper tail, and the absence of additional demand
 before applying the combiner. The same check works for a separately
 compiled ordinary fold. Changing a checked body during optimization
-withdraws the equation.
+withdraws the equation. A fold that forces the step or seed before
+matching the list fails at its open type alias. A no-code build withholds
+both equations.
 
 The source alias names `GHC.Internal.List.foldr`. Its defining term
 is `GHC.Internal.Base.foldr`. The `Foldable []` dictionary selects that
@@ -1701,6 +1703,14 @@ the input spine and skips the combiner on an empty list.
 [Source alias](../examples/open-evaluation/ListFoldrSource.hs),
 [ordinary proof](../examples/open-evaluation/ListFoldrProof.hs), and
 [regression](../../../testsuite/tests/dependent/should_run/NativeOpenListFoldr.sh).
+
+GHCi loads direct and local-worker folds from source with the bytecode
+backend. It checks both equations with the same Core matcher. The
+matcher reads through breakpoints on the seed result, callback
+application, and recursive call. The interpreter retains the
+breakpoints. The regression proves the source equations, checks that
+the strict step and seed variants still fail, and emits no object file.
+[GHCi regression](../../../testsuite/tests/dependent/should_run/NativeOpenListFoldrGhci.sh).
 
 ### Select the list instance of `Prelude.foldr`
 
