@@ -270,10 +270,15 @@ This observation also succeeds with an undefined payload. GHC rejects a
 payload for a different tag at the written payload. An equation that
 uses a binder from another equation fails at that variable's occurrence.
 The regression checks both errors at `-O0` and `-O2`. The client sees
-only the provider's interface during typechecking.
+only the provider's interface during typechecking. An explicit `forall`
+also retains a kind variable used only in the kind of a captured binder.
 [Provider](../../../testsuite/tests/dependent/should_run/NativeClosedFamilySumProvider.hs),
 [ordinary client](../../../testsuite/tests/dependent/should_run/NativeClosedFamilySumClient.hs),
 and [regression](../../../testsuite/tests/dependent/should_run/NativeClosedFamilySum.sh).
+
+The Showcase reads a retained vector length without evaluating the vector.
+[Vector result family](../examples/packed-vector/StoredVector.hs) and
+[ordinary length projection](../examples/packed-vector/ListVectorClient.hs).
 
 The interface contains the `Pack` equations in terms of `GHC.Sigma.Sigma`
 and a private payload family for each sum. `--show-iface` displays this
