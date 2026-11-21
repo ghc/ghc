@@ -986,8 +986,17 @@ constructorFieldCases =
 type PairCaseArrow (b :: Bool) = forall (p :: Multiplicity).
     (case b of { True -> (Int, Char); False -> Bool }) %p -> (Int, Char)
 
+-- | Hide the field type and retain both dictionaries for its consumer.
+data PrintablePair where
+    PrintablePair :: forall a. Eq a => (Show a => a -> a -> PrintablePair)
+
+-- | Compare the pair and display its second field at the hidden type.
+describePair :: PrintablePair -> (Bool, String)
+describePair (PrintablePair a b) = (a == b, show b)
+
 main :: IO ()
 main = do
+    observe "recover consecutive GADT constraints" (describePair (PrintablePair False True))
     observe "form an associated family type from its class evidence" constrainedElements
     observe "form an expression annotation with the matched dictionary" annotatedElement
     observe "pass an associated type as a specified and a required argument" explicitElements
