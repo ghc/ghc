@@ -5125,11 +5125,26 @@ pprMismatchMsg ctxt
         = nargs_msg $$ ea_msg
 
         | ea_looks_same ty1 ty2 exp act
+          || (sum_payload exp ty1 && sum_payload act ty2)
+          || (sum_payload exp ty2 && sum_payload act ty1)
         , Right ea_msg <- mk_ea_msg ctxt (Just item) level orig
         = ea_msg
 
         | otherwise
         = bale_out_msg
+
+    -- A named retained sum expands to Sigma applied to a payload family.
+    -- A mismatch between those exact closures is clearer at the written types.
+    -- See Note [Printing lifted type lambdas in a client].
+    sum_payload written closure
+      | Just (syn, _) <- splitTyConAppNoView_maybe written
+      , isTypeSynonymTyCon syn
+      , Just (family, args) <- splitTyConAppNoView_maybe closure
+      , Just (_, True) <- closedFamilyScope_maybe family
+      , length args + 1 == tyConArity family
+      , Just (_, payload) <- splitAppTy_maybe written
+      = payload `pickyEqType` closure
+      | otherwise = False
 
       -- bale_out_msg: the mismatched types are /inside/ exp and act
     bale_out_msg = vcat errs
