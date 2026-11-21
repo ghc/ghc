@@ -7698,10 +7698,9 @@ still require the restricted optimization settings.
 
 ## M98: the length of zip over two ordinary lists
 
-Deferred R13 library and source-equation increment. The [R15 evaluator](roadmap/R15-closed-term-evaluator.md) now has priority.
-
-The proposed change inspects more than one argument. Zip two ordinary lists, possibly with different element types
-or lengths, and return a vector indexed by the number of pairs produced.
+The ordinary function checks two list spines. Its inputs can have different
+element types and lengths. The dependent client returns a vector indexed
+by the number of pairs produced.
 The first empty input ends the computation. If the first list is empty,
 leave the second spine unevaluated.
 
@@ -7715,29 +7714,25 @@ zipRows :: forall a b. foreach (xs :: [a]) -> foreach (ys :: [b])
         -> Vec (a, b) (zipLength xs ys)
 ```
 
-On M97 the standalone ordinary definition compiles. A separate module
-asking for the polymorphic empty-first equation reports GHC-68947 at
-`zipLength`. A monomorphic producer also compiles, but a nested-case
-consumer reports GHC-83865 at `VNil`: the expected index remains
-`zipLength '[] ys`. The existing source checker handles one inspected
-column and one unchanged argument. The two tails here both change.
+The source checker verifies coverage at each inspected constructor.
+It requires the first list to decrease in a recursive call. For the
+second recursive operand it uses the unchanged argument or a smaller
+field from that operand's own pattern. It compares every provisional
+equation with the corresponding final Core equation before writing
+the interface.
 
-- [ ] Check two shallow pattern columns from the zonked function. Check
-      coverage at each inspected constructor. Start with the monomorphic
-      case to isolate pattern coverage and recursive argument selection.
-      Extend the same checked result to independent lifted element types.
-- [ ] Retain the source order of scrutiny in the generated family.
-      Reduce `zipLength '[] ys` for any `ys`. Reduce the empty-second
-      equation only when the first list is known to have a cell. Prove
-      structural decrease on the first tail and use the checked second
-      field as the second recursive operand.
-- [ ] Check separate producer and consumer modules. Exercise both empty
-      shapes, unequal lengths, a finite prefix of an infinite input,
-      lazy elements, and a bottom spine on either side. Reject a
-      nondecreasing call and an equality that would inspect the second
-      list before the first. Recheck an unchanged client after changing
-      a producer equation.
-- [ ] Run the vector producer from source and add it to the Showcase.
+`zipLength '[] ys` reduces with an unknown `ys`. The empty-second
+equation requires a known first cons. An attempted equality for an
+unknown first list fails at `Refl` with GHC-83865. A client that enables
+rewriting checks the exact source owner for active rules.
+
+The [ordinary provider](examples/packed-vector/ZipLengthSource.hs) and
+[dependent client](examples/packed-vector/ZipRows.hs) supply a Showcase
+row. The client uses nested cases to refine the two indices in order.
+`NativeOpenZipRows` checks the stripped interface, separate client,
+two concrete element kinds, runtime demand, and recompilation after a
+changed equation. It also checks that a rule which changes the final
+result removes the provisional table.
       Use the existing nested-case path to separate source equation
       checking from the syntax of two retained clause patterns.
 

@@ -481,7 +481,8 @@ checkedMapperRules env owner = case filter (not . isNeverActive . ruleActivation
                                          (getRules env (globaliseId owner)) of
     rules | Just table <- sourceTableId_maybe owner
           , isListFoldTable table || isReverseWorkerTable table ||
-            isJust (reverseWrapperWorker table) -> null rules
+            isJust (reverseWrapperWorker table) ||
+            isTwoListCaseTable table -> null rules
     [] -> False
     rules -> all (\rule -> identityTraversal rule || consTraversal rule || composeTraversals rule) rules
   where
@@ -1609,6 +1610,7 @@ sourceCaseTables binds = do
       ruled = sourceRuleOwners (tcg_rules env)
       enum_enabled = not char_tables
       imported = ordinaryImport rdr_env
+      public = publicCaseType env exported imported
       eligible_case = eligibleCase env exported enum_enabled imported
       generates_code = backendGeneratesCode (backend dflags)
       list_case_position owner
@@ -1677,7 +1679,8 @@ sourceCaseTables binds = do
           Nothing | Just (signature, rows) <-
                       (guard ruled_owner *> directListMapper owner body) <|>
                       (guard (binary_list_candidate owner) *>
-                        (directListAppend owner body <|> directListReverseWorker owner (prepare body))) <|>
+                        (directListAppend owner body <|> directListReverseWorker owner (prepare body) <|>
+                         checkedTwoListCase public owner (prepare body))) <|>
                       (guard (fold_candidate owner) *> directListFold owner (prepare body)) -> do
             table <- publishConstructorCase owner signature rows
             pure (Just (finalOwner owner table, table), [])
@@ -1720,7 +1723,6 @@ sourceCaseTables binds = do
             , Just _ <- constructorHelperType (varType owner)
             = fmap (owner,) <$> bindingCore bind owner
             | otherwise = pure Nothing
-          public = publicCaseType env exported imported
       helper_cores <- collectHelpers helperCore references emptyNameSet reachable
       helpers <- foldM (buildHelper env imported public) []
                    (stronglyConnCompFromEdgedVerticesUniq helper_cores)
@@ -2190,6 +2192,23 @@ isBinaryListCase :: ConstructorCaseType -> Bool
 isBinaryListCase (ConstructorCaseType _ root _ _ position _) =
     root == listTyCon && position == 0
 
+-- | Identify the two-list case grammar without the specialized append and
+-- reverse worker signature. See Note [Checked cases on two lists].
+isTwoListCase :: ConstructorCaseType -> Bool
+isTwoListCase (ConstructorCaseType binders root _ domains position result) =
+    root == listTyCon && position == 0 && twoListDomains domains &&
+    not (lengthIs binders 1 && eqTypes domains [result, result])
+
+isTwoListCaseTable :: TyCon -> Bool
+isTwoListCaseTable table =
+    isJust (sourceTableTermOcc (nameOccName (tyConName table))) &&
+    isJust (closedFamilyTyConCoAxiom_maybe table) &&
+    maybe False isTwoListCase (constructorCaseType (tyConKind table))
+
+twoListDomains :: [Type] -> Bool
+twoListDomains domains =
+    lengthIs domains 2 && all (\ty -> fmap fst (caseDatatype ty) == Just listTyCon) domains
+
 -- | Check the ordinary unary or binary signature for a constructor case.
 constructorCaseType :: Type -> Maybe ConstructorCaseType
 constructorCaseType tau = do
@@ -2209,15 +2228,17 @@ constructorCaseType tau = do
     let binder_kinds = map (varType . binderVar) binders
     guard (all isLiftedTypeKind binder_kinds ||
            (isRetainedCaseRoot domain tc && noFreeVarsOfType (mkForAllTys telescope liftedTypeKind)))
-    parameters <- catMaybes <$> traverse domainParameter args
-    guard ((isJust (monomorphicEnumCaseArity tau) || not (null parameters)) &&
-           sizeUniqSet (mkUniqSet parameters) == length parameters &&
-           tyCoVarsOfTypes domains == mkUniqSet quantified &&
-           caseKind kinds result && all (caseKind kinds) carried)
-    -- List cases inspect the mapper's list or the first of two equal lists.
-    let append = lengthIs binders 1 && eqTypes domains [domain, domain] &&
-                 result `eqType` domain
-    guard ((tc /= listTyCon || position == 1 || append) && tc /= tupleTyCon Boxed 2)
+    let two_lists = twoListDomains domains
+    if two_lists && null binders
+      then guard (all (caseKind kinds) args)
+      else do
+        parameters <- catMaybes <$> traverse domainParameter args
+        guard ((isJust (monomorphicEnumCaseArity tau) || not (null parameters)) &&
+               sizeUniqSet (mkUniqSet parameters) == length parameters)
+    guard (tyCoVarsOfTypes domains == mkUniqSet quantified &&
+           caseKind kinds result && all (caseKind kinds) carried &&
+           (tc /= listTyCon || position == 1 || two_lists) &&
+           tc /= tupleTyCon Boxed 2)
     pure (ConstructorCaseType binders tc args domains position result)
   where
     domainParameter ty
@@ -2371,6 +2392,28 @@ rule can expose other rule heads and requires a separate proof.
 Forming a type records the interface dependency without using the
 equation. The solver checks the rules when it uses an equation,
 including through an imported alias.
+
+Note [Checked cases on two lists]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The case tree for zipLength inspects the first list before it inspects
+the second. Keep every path in Core alternative order, including the
+path that leaves the second operand untouched. The empty second list
+does not select an equation when the first list is unknown.
+
+In a recursive call, the first list must decrease. A second operand that
+the current path did not inspect must retain its original value. If the
+path inspected the second list, accept only one of its smaller fields
+with the same type. Check each operand against its own pattern.
+
+The final checker matches all equations against the provisional axiom.
+It uses the axiom's variables at the same positions in each path. This
+checks the constructors and operands after alpha-renaming. Drop the
+table if optimization changes a pattern or result, even if the new
+body also passes the structural check. Check the exact owner for
+visible rules at an imported use.
+
+Ignore debugger breakpoints in both checks. Keep coverage ticks because
+they record evaluation.
 -}
 
 {- Note [Nullary indexed source projections]
@@ -3354,6 +3397,7 @@ verifyFinalCoreMapper binds original =
       | varType owner `eqType` varType original
       , Just table <- sourceTableId_maybe original
       , isListFoldTable table || isReverseWorkerTable table || isJust (reverseWrapperWorker table)
+                       || isTwoListCaseTable table
       -> checkedFinalListTable bindings table
       | varType owner `eqType` varType original
       , Just (_, constructors) <- indexedProjectionSource original
@@ -3394,6 +3438,7 @@ failedFinalListTables :: [Core.CoreBind] -> [TyCon] -> [TyCon]
 failedFinalListTables binds tables =
     [table | table <- tables
            , isListFoldTable table || isReverseWorkerTable table || isJust (reverseWrapperWorker table)
+                            || isTwoListCaseTable table
            , not (checkedFinalListTable bindings table)]
   where
     bindings = Core.flattenBinds binds
@@ -3410,6 +3455,10 @@ checkedFinalListTable bindings table = isJust $ do
         worker_rhs <- lookup callee bindings
         directListReverseWorker callee worker_rhs
       Nothing | isListFoldTable table -> directListFold owner rhs
+              | isTwoListCaseTable table -> do
+                  (signature, rows) <- checkedTwoListCase (const True) owner rhs
+                  guard (matchesConstructorCase table signature rows)
+                  pure (signature, rows)
               | otherwise -> directListReverseWorker owner rhs
   where
     owns family value =
@@ -3417,6 +3466,38 @@ checkedFinalListTable bindings table = isJust $ do
           owner_name = idName value
       in nameModule_maybe owner_name == nameModule_maybe family_name &&
          sourceTableTermOcc (nameOccName family_name) == Just (nameOccName owner_name)
+
+-- | Check a left-first case tree on two ordinary lists.
+checkedTwoListCase :: (TyCon -> Bool) -> Id -> Core.CoreExpr
+                   -> Maybe (ConstructorCaseType, [ConstructorCaseRow])
+checkedTwoListCase public owner rhs = do
+    (signature, rows) <- checkedConstructorCase public (const Nothing) owner
+                           (stripTicksE isSourceBreakpoint rhs)
+    guard (isTwoListCase signature)
+    pure (signature, rows)
+
+-- | Compare the final rows with the exact nominal equations for this owner.
+matchesConstructorCase :: TyCon -> ConstructorCaseType -> [ConstructorCaseRow] -> Bool
+matchesConstructorCase table (ConstructorCaseType telescope _ _ _ _ _) rows = isJust $ do
+    axiom <- closedFamilyTyConCoAxiom_maybe table
+    let branches = fromBranches (coAxiomBranches axiom)
+    guard (equalLength rows branches)
+    zipWithM matches rows branches
+  where
+    matches (ConstructorCaseRow patterns result) branch = do
+      let (parameters, fields) = splitAt (length telescope) (coAxBranchTyVars branch)
+          ids = concatMap patternFields patterns
+          instantiate = substTyWith (binderVars telescope) (mkTyVarTys parameters)
+          toType = constructorCaseTreeType table instantiate (zip ids fields)
+      guard (null (coAxBranchCoVars branch) && equalLength parameters telescope &&
+             equalLength ids fields &&
+             eqTypes (map (instantiate . varType) ids) (map varType fields) &&
+             eqTypes (mkTyVarTys parameters ++ map toType patterns) (coAxBranchLHS branch) &&
+             toType result `eqType` coAxBranchRHS branch)
+
+    patternFields (CaseField v) = [v]
+    patternFields (CaseConstructor _ _ fields) = concatMap patternFields fields
+    patternFields _ = panic "matchesConstructorCase: call in pattern"
 
 -- | Read exhaustive cases on exact bound operands and check each result.
 checkedConstructorCase :: (TyCon -> Bool) -> (Id -> Maybe TyCon) -> Id -> Core.CoreExpr
@@ -3431,7 +3512,10 @@ checkedConstructorCase visible helper owner rhs = do
     guard (parameters == [v | Bndr v _ <- telescope])
     guard (all isId terms && eqTypes (map varType terms) domains)
     (_, scrutinee, _) <- splitCaseOperand position terms
-    let kinds = [mkTyVarTy v | Bndr v _ <- telescope]
+    let kinds = [mkTyVarTy v | Bndr v _ <- telescope] ++
+                [element | isTwoListCase signature
+                         , operand <- domains
+                         , Just (_, [element]) <- [caseDatatype operand]]
         public_domain ty = case caseArrow ty of
           Just (input, output) -> all (casePublicKind public kinds) [input, output]
           Nothing -> casePublicKind public kinds ty
@@ -3513,7 +3597,7 @@ checkedConstructorCase visible helper owner rhs = do
       where
         scoped v = any (contains v) patterns
 
-    checkedSelfCall (ConstructorCaseType telescope tc args _ position _) patterns aliases expr = do
+    checkedSelfCall signature@(ConstructorCaseType telescope tc args domains position _) patterns aliases expr = do
       (before, CaseConstructor _ _ children, after) <- splitCaseOperand position patterns
       (Core.Var callee, arguments) <- pure (Core.collectArgs expr)
       guard (callee == owner)
@@ -3524,10 +3608,17 @@ checkedConstructorCase visible helper owner rhs = do
       (left, Core.Var operand, right) <- splitCaseOperand position operands
       let field = resolve aliases operand
       guard (varType field `eqType` mkTyConApp tc args && any (contains field) children)
-      original <- traverse (\case CaseField v -> Just v; _ -> Nothing) (before ++ after)
       actual <- traverse (\case Core.Var v -> Just (resolve aliases v); _ -> Nothing) (left ++ right)
-      guard (actual == original)
-      pure (CaseSelf types (map CaseField (take position original ++ field : drop position original)))
+      let carried = before ++ after
+          checkOperand ty (CaseField v) selected = selected == v && varType selected `eqType` ty
+          checkOperand ty (CaseConstructor _ _ fields) selected =
+            isTwoListCase signature && varType selected `eqType` ty &&
+            any (contains selected) fields
+          checkOperand _ _ _ = False
+          carried_types = take position domains ++ drop (position + 1) domains
+          (left_fields, right_fields) = splitAt position actual
+      guard (equalLength actual carried && and (zipWith3 checkOperand carried_types carried actual))
+      pure (CaseSelf types (map CaseField (left_fields ++ field : right_fields)))
 
     checkedCallback (ConstructorCaseType _ _ _ _ 1 _) patterns aliases expr = do
       [CaseField carried, root@CaseConstructor{}] <- pure patterns
@@ -3634,7 +3725,7 @@ publishConstructorRows owner telescope domains result rows = do
       let fields = reverse scoped
           vars = quantifiers ++ map snd fields
           branch family = mkCoAxBranch vars [] [] (mkTyVarTys quantifiers ++ lhs)
-                      (publishResult family instantiate fields result_value)
+                      (constructorCaseTreeType family instantiate fields result_value)
                       (map (const Nominal) vars) (nameSrcSpan (idName owner))
       pure branch
     makeSourceFamily (idName owner) (kind_binders ++ mkAnonTyConBinders operands)
@@ -3664,20 +3755,18 @@ publishConstructorRows owner telescope domains result rows = do
       pure (mkTyConApp (promoteDataCon dc) (map instantiate parameters ++ fields), scoped')
     publishPattern _ _ _ = panic "publishConstructorCase: call in pattern"
 
-    publishResult _ _ fields (CaseField selected) = fieldType fields selected
-    publishResult family instantiate fields (CaseConstructor dc args children) =
-      mkTyConApp (promoteDataCon dc) (map instantiate args ++ map publish children)
-      where publish = publishResult family instantiate fields
-    publishResult family instantiate fields (CaseCall table args children) =
-      mkTyConApp table (map instantiate args ++ map publish children)
-      where publish = publishResult family instantiate fields
-    publishResult family instantiate fields (CaseSelf args operands) =
-      mkTyConApp family (map instantiate args ++ map (publishResult family instantiate fields) operands)
+-- | Translate a checked case tree under the equation's field binders.
+constructorCaseTreeType :: TyCon -> (Type -> Type) -> [(Id, TyVar)] -> ConstructorCaseTree -> Type
+constructorCaseTreeType family instantiate fields = translate
+  where
+    translate (CaseField selected) = fieldType selected
+    translate (CaseConstructor dc args children) = application (promoteDataCon dc) args children
+    translate (CaseCall table args children) = application table args children
+    translate (CaseSelf args operands) = application family args operands
+    translate (CaseApply fun args) = mkAppTys (fieldType fun) (map translate args)
 
-    publishResult family instantiate fields (CaseApply fun args) =
-      mkAppTys (fieldType fields fun) (map (publishResult family instantiate fields) args)
-
-    fieldType fields selected = case lookup selected fields of
+    application tc args children = mkTyConApp tc (map instantiate args ++ map translate children)
+    fieldType selected = case lookup selected fields of
       Just v -> mkTyVarTy v
       Nothing -> panic "publishConstructorCase: unbound selected field"
 
