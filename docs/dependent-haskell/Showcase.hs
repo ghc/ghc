@@ -152,6 +152,7 @@ import qualified PreludeFilterProof
 import qualified IndexedPrefix
 import qualified IndexedPrefixClient
 import qualified DirectIndexedListClient
+import qualified DirectIndexedVectorClient
 import qualified PreludeFilterRuntime
 import qualified PreludeMapAppendProof
 import qualified PreludeMapCompositionProof
@@ -1750,6 +1751,7 @@ main = do
          not (null (prefix (error "forced indexed list head") unusedTail)))
     IndexedPrefixClient.matchIndex >>= observe "match the stored list equality with an unevaluated head and tail"
     DirectIndexedListClient.firstCell >>= observe "read the first cell of a directly indexed list"
+    DirectIndexedVectorClient.firstCells >>= observe "read the first cells of polymorphic directly indexed vectors"
     runtimeList <- newIORef [False, True, False]
     xs <- readIORef runtimeList
     putStrLn ("prove the filter bound from a runtime list: "

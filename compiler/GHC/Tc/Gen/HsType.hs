@@ -729,7 +729,7 @@ See docs/dependent-haskell/REFERENCES.md#checked-local-payload-signatures.
 -- domain kinds because the datatype constructor knots are not yet available.
 -- Return explicit metadata too: mkDepFunTy can erase a vacuous binder.
 tcCheckRetainedConType :: Bool
-                      -> Bool -- ^ Permit a single field to determine the result index
+                      -> Bool -- ^ Permit a retained field to determine the result index
                       -> (HsModifiedFunArr GhcRn -> TcM Mult)
                       -> LHsType GhcRn -> TcM ([Maybe Id], TcType)
 tcCheckRetainedConType validate_domain allow_result tc_field_mult
@@ -744,11 +744,12 @@ tcCheckRetainedConType validate_domain allow_result tc_field_mult
            ; when (hsForEachVisibility ann == DepFunInvisible) $
                failWithTc $ TcRnRetainedQuantificationError RetainedInvisibleField
            ; bind_indices allow mode bndrs body }
-    go _ mode (L loc (HsFunTy _ mult arg res))
+    go allow mode (L loc (HsFunTy _ mult arg res))
       = setSrcSpanA loc $
         do { arg_ty <- tc_check_lhs_type mode arg liftedTypeKind
            ; mult_ty <- tc_field_mult mult
-           ; (binders, body_ty) <- go False mode res
+           ; let independent = not (anyFreeVarsOfType isId mult_ty)
+           ; (binders, body_ty) <- go (allow && independent) mode res
            ; return (Nothing : binders, tcMkVisFunTy unmatchableDataConTy mult_ty arg_ty body_ty) }
     go _ _ (L loc HsForAllTy{}) = unsupported loc
     go _ _ (L loc HsQualTy{})   = unsupported loc
@@ -761,7 +762,8 @@ tcCheckRetainedConType validate_domain allow_result tc_field_mult
            ; return ([], res_ty) }
 
     direct_result mode ty
-      | Just (_, [TermVarTy field]) <- tcSplitTyConApp_maybe ty
+      | Just (_, args) <- tcSplitTyConApp_maybe ty
+      , [TermVarTy field] <- filter (isNothing . getTyVar_maybe) args
       , [binder] <- nonDetNameEnvElts (mode_indices mode)
       = field == binder
         && (not validate_domain || isNativeClosedIndexType (varType field))

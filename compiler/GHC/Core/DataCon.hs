@@ -79,7 +79,7 @@ import GHC.Core.Unify
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep ( Type(..) )
 import GHC.Core.TyCo.Subst
-import GHC.Core.TyCo.Compare( eqType )
+import GHC.Core.TyCo.Compare( eqType, eqTypes )
 import GHC.Core.Multiplicity
 import {-# SOURCE #-} GHC.Types.TyThing
 import GHC.Types.FieldLabel
@@ -1220,13 +1220,14 @@ mkDataConWithTelescope source_order arg_binders name declared_infix prom_info
         && valid_result
 
     valid_result
-      | [Just field] <- arg_binders
-      , [univ] <- univ_tvs
-      , [] <- user_tvbs
+      | [field] <- [b | Just b <- arg_binders]
       , [EqSpec t (TermVarTy rhs)] <- eq_spec
-      , Just (parent, [TermVarTy result]) <- splitTyConApp_maybe orig_res_ty
-      = t == univ && rhs == field && result == field && parent == rep_tycon
-        && varType field `eqType` varType univ
+      , Just (parent, args) <- splitTyConApp_maybe orig_res_ty
+      = rhs == field && parent == rep_tycon && t `elem` univ_tvs
+        && varType field `eqType` varType t
+        && valid_universals
+        && eqTypes args [if tv == t then TermVarTy field else mkTyVarTy tv | tv <- univ_tvs]
+        && all (not . anyFreeVarsOfType isId . scaledMult) orig_arg_tys
         && case rep of { DCR {} -> True; _ -> False }
       | otherwise
       = null eq_spec && not (anyFreeVarsOfType isId orig_res_ty)
@@ -1237,8 +1238,7 @@ mkDataConWithTelescope source_order arg_binders name declared_infix prom_info
       = all isTyVar univ_tvs && all isTyVar user_tvs
         && sizeVarSet univ_set == length univ_tvs
         && sizeVarSet (mkVarSet user_tvs) == length user_tvs
-        && user_tvs `equalLength` univ_tvs
-        && all (`elemVarSet` univ_set) user_tvs
+        && checkDataConTyVars con
       where
         user_tvs = binderVars user_tvbs
         univ_set = mkVarSet univ_tvs
@@ -1903,27 +1903,32 @@ dataConHasRetainedResult con
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A constructor with this source type:
 
-  Indexed :: foreach (ys :: [Bool]) -> Indexed ys
+  SomeVec :: foreach (n :: Nat) -> Vec a n -> SomeVec a n
 
 has a worker with a uniform result:
 
-  Indexed :: forall xs. foreach (ys :: [Bool]) -> (xs ~# ys) -> Indexed xs
+  SomeVec :: forall a i. foreach (n :: Nat) -> Vec a n %1 -> (i ~# n) -> SomeVec a i
 
-The data constructor's EqSpec records xs ~# ys. The worker places that
-coercion argument after the field because its type depends on the field.
-A wrapper applies the worker at ys and supplies reflexivity. A case
-alternative binds a fresh field Id and then the stored coercion at that Id.
-The coercion has no runtime representation. Neither operation evaluates ys.
+The data constructor's EqSpec records i ~# n. The worker places that
+coercion argument after the source fields, in the scope of the retained
+field. The wrapper applies the worker at a and n. It passes the fields
+in source order and supplies reflexivity. A case alternative binds the
+fields, then the coercion at the fresh retained field Id. The coercion
+has no runtime representation. Building the constructor or binding its
+fields leaves the fields unevaluated.
 
 Do not put this proof in the ordinary EqSpec prefix. The source field Id
 would be out of scope there. Keep the same order when copying alternative
 binders in GHC.Core.Utils and when checking them in GHC.Core.Lint. An
 interface decodes the proof's type in the scope of the decoded field.
 
-The admitted shape has one field at a closed structural index type, one
-result index and no contexts or existentials. Only a variable or wildcard
-can match the field. The resulting
-equality is an ordinary nominal Given for the rest of the pattern match.
+This shape has one retained field at a closed structural index type and
+no contexts or existentials. One result argument is the retained field.
+The others are unchanged universal variables. The wrapper binds exactly
+those variables. An ordinary field type can refer to an earlier retained
+field. Its multiplicity must be independent of the retained field. A
+variable or wildcard can match the retained field. The equality is an
+ordinary nominal Given after the fields are in scope.
 -}
 
 -- | Rebuild a constructor field telescope without erasing runtime binders.
