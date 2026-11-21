@@ -55,6 +55,22 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At compiler revision `2a1003b253`, a client proves the contents of
+`Table.withoutRowLabels (Table.sample 4)` from a compiled producer.
+The outer cell vector supplies its own length. A later vector of row
+labels must have that length. The checks cover empty axes, a wrong
+inner width and inconsistent trailing labels at `-O0` and `-O2` in
+both interpreter modes. A square whose two dimensions share one hidden
+index still reports GHC-70565 at the call.
+[Table example](roadmap/R15-closed-term-evaluator.md#read-the-stored-cells-of-a-rectangular-table).
+
+The same compiler reports GHC-59431 for explicit type and term
+binders with the same name in one match under `-Wpun-bindings`.
+All 502 Showcase outputs matched at native `-O0`, native `-O2`, and
+in source GHCi. All 29 selected registered tests and the three linked
+GHC API drivers passed.
+[Local warning examples](roadmap/R36-pun-warnings.md).
+
 At compiler revision `5ecac2c539`, an ordinary client reads
 `Just 42` and `Left "missing"` from rows whose schemas were defined
 in different modules. Each open family equation can pass a capturing
