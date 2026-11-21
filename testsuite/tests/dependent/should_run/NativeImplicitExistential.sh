@@ -368,7 +368,8 @@ if grep -Eq '\[GHC-39999\]' witness-rejections.log; then
     exit 1
 fi
 
-for binding in first second equalLengths knownKind firstFunction secondFunction witnessFunction firstEquation distinctEquations; do
+for binding in first second equalLengths knownKind firstFunction secondFunction witnessFunction \
+               firstEquation distinctEquations wrongRepack unpackedLet unpackedCase; do
     line=$(grep -n "^$binding .*=" NestedEscape.hs | cut -d: -f1)
     if ! grep -Eq "^NestedEscape.hs:$line:[0-9]+: error: \[GHC-25897\]" NestedEscape.log; then
         cat NestedEscape.log >&2

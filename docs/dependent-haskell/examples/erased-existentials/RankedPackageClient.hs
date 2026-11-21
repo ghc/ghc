@@ -3,13 +3,14 @@ module RankedPackageClient
     ( runGuarded, runConditional, runProjections, projectAt, runDeclaredWitnesses, runExplicitBranches
     , runMixedPackage, runProducedPackage, runForwardedPackage, runLabelledPackage
     , runSelectedPackage, runLocalPattern, readCount, refilter, refilterRows, refilterNumericZip
+    , swapRowsLet, swapRowsCase
     ) where
 
 import AlignedList (zipWithExact)
 import Data.Bool (bool)
 import Data.Proxy (Proxy(..))
 import qualified ErasedPackage
-import ImplicitVector (Filtered, HiddenRows, cells, filterVec, packRows, rowLists, withVector)
+import ImplicitVector (Filtered, HiddenRows, Rows(..), cells, filterVec, packRows, rowLists, withVector)
 import PackedVecLibrary (Nat(..), Vec(..))
 import RankedPackage
     ( Callback(..), CallbackPair, GuardedBuilder, Hidden, PolyId, PolyMaybe
@@ -137,6 +138,18 @@ refilterRows leftTest rightTest keep left right =
 
     withRows :: (forall i j. Vec a i -> Vec a j -> r) -> Vec a l -> Vec a k -> r
     withRows use xs ys = use xs ys
+
+-- | Swap both lengths under the case and share the resulting package.
+swapRowsLet :: HiddenRows a -> HiddenRows a
+swapRowsLet rows =
+    let result = case rows of Rows left right -> Rows right left
+    in result
+
+-- | Forward the fixed package type through a variable case.
+swapRowsCase :: HiddenRows a -> HiddenRows a
+swapRowsCase rows =
+    case (case rows of Rows left right -> Rows right left) of
+        result -> result
 
 -- | Zip equal-length inputs, then map and filter at an erased input length.
 refilterNumericZip :: (Int -> Bool) -> Int -> Int -> Int -> Int -> [Int]

@@ -18,6 +18,10 @@ lists (ls, rs) = (list ls, list rs)
 cells :: PackedPair a -> ([a], [a])
 cells p = lists p
 
+swapLet, swapCase :: PackedPair a -> PackedPair a
+swapLet p = let result = case p of (xs, ys) -> (ys, xs) in result
+swapCase p = case (case p of (xs, ys) -> (ys, xs)) of result -> result
+
 partial :: PackedPair a -> Int -> ([a], [a])
 partial p =
     let selected = prefixes p
@@ -70,6 +74,12 @@ main :: IO ()
 main = do
     print (cells (localPartition odd (Cons 7 (Cons 2 (Cons 9 Nil)))))
     print (cells (roundTrip (packPair (Cons 7 Nil) (Cons 2 (Cons 4 Nil)))))
+    let unequal = packPair (Cons (7 :: Int) Nil) (Cons 2 (Cons 4 Nil))
+        lazy = packPair (error "forced the other vector")
+                        (Cons (7 :: Int) (error "forced the swapped tail"))
+    print (cells (swapLet unequal), cells (swapCase unequal))
+    print (take 1 (fst (cells (swapLet lazy))), take 1 (fst (cells (swapCase lazy))),
+           ignore (swapLet bottom), ignore (swapCase bottom))
     let yes = partitionPair odd (Cons 7 (error "forced the unseen passing tail"))
         no = partitionPair odd (Cons 2 (error "forced the unseen failing tail"))
     print (take 1 (fst (cells yes)), take 1 (snd (cells no)),
@@ -77,11 +87,10 @@ main = do
     print (ignore bottom, kindOK hiddenKind)
     _ <- evaluate (partial bottom)
     print (partial (partitionPair odd (Cons 7 (Cons 2 Nil))) 1)
-    result <- try (evaluate (fst (cells bottom))) :: IO (Either ErrorCall [Int])
-    case result of
-        Left e | "forced the pair" == takeWhile (/= '\n') (displayException e) ->
-            putStrLn "observing the payload demanded the pair"
-        _ -> error "the observer missed pair demand"
+    checkDemand bottom
+    checkDemand (swapLet bottom)
+    checkDemand (swapCase bottom)
+    putStrLn "observing the payload demanded the pair"
 
     let rows = productPair (Cons (7 :: Int) (Cons 9 Nil)) (Cons 2 Nil)
         missing = error "forced the rows" :: HiddenProduct Int
@@ -94,3 +103,10 @@ main = do
         Left e | "forced the rows" == takeWhile (/= '\n') (displayException e) ->
             putStrLn "a constructor equation demanded the rows"
         _ -> error "the equation missed row demand"
+  where
+    checkDemand :: PackedPair Int -> IO ()
+    checkDemand p = do
+        result <- try (evaluate (fst (cells p))) :: IO (Either ErrorCall [Int])
+        case result of
+            Left e | "forced the pair" == takeWhile (/= '\n') (displayException e) -> pure ()
+            _ -> error "the observer missed pair demand"

@@ -26,6 +26,8 @@ the projection demanded the package
 constructor pattern demanded the package
 ([7,9],[2])
 ([7],[2,4])
+(([2,4],[7]),([2,4],[7]))
+([7],[7],True,True)
 ([7],[2],([True],[]),([],[9]))
 (True,True)
 ([7],[2])

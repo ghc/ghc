@@ -38,7 +38,7 @@ import GHC.Tc.Gen.App
 import GHC.Tc.Gen.Head
 import GHC.Tc.Gen.Do
 import GHC.Tc.Gen.SourceTable (sourceTableOccurrence, optionalSourceUses, registerOptionalSourceUses)
-import GHC.Tc.Gen.Bind        ( tcLocalBinds, tcNonRecLets )
+import GHC.Tc.Gen.Bind        ( tcLocalBinds, tcNonRecLets, tcNonRecLetAtType )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Arrow
 import GHC.Tc.Gen.Match( tcBody, tcScopedRuntimeBody, tcLambdaMatches, tcCaseMatches, tcIndexedCaseMatches, tcRetainedCase
@@ -927,6 +927,16 @@ tcExpr (ExplicitSum _ alt arity expr) res_ty
 ************************************************************************
 -}
 
+tcExpr (HsLet x (L loc (HsValBinds ann (XValBindsLR (HsVBG groups [])))) body) res_ty
+  | Check schema <- res_ty
+  , ExistsTy ImplicitExists _ _ <- coreFullView schema
+  , [(NonRecursive, [binding@(L _ (FunBind { fun_id = L _ name, fun_matches = matches }))])] <- groups
+  , Just _ <- lazyLetRhs matches
+  , returnsLocal name body
+  = do { (checked, body') <- tcNonRecLetAtType name schema binding (tcMonoLExpr body res_ty)
+       ; let binds = HsValBinds ann (XValBindsLR (HsVBG [(NonRecursive, checked)] []))
+       ; return (HsLet x (L loc binds) body') }
+
 tcExpr original@(HsLet x local_binds@(L loc binds) body) res_ty
   = do { opened <- tcLexicalExistsLet original local_binds body res_ty
        ; case opened of
@@ -946,6 +956,17 @@ tcExpr original@(HsLet x local_binds@(L loc binds) body) res_ty
                  Nothing -> do { let names = collectLocalBinders CollNoDictBinders binds
                                ; (binds', body') <- tcLocalBinds binds (tcScopedRuntimeBody names body res_ty)
                                ; return (HsLet x (L loc binds') body') } } }
+
+tcExpr (HsCase ctxt scrut matches) res_ty
+  | Check schema <- res_ty
+  , ExistsTy ImplicitExists _ _ <- coreFullView schema
+  , [L _ Match{ m_pats = L _ [L _ (VarPat _ (L _ name))], m_grhss = grhss }] <- unLoc (mg_alts matches)
+  , Just rhs <- unguardedRhs grhss
+  , returnsLocal name rhs
+  = do { mult <- newMultiplicityVar
+       ; scrut' <- tcScalingUsage mult (tcCheckMonoExpr scrut schema)
+       ; matches' <- tcCaseMatches ctxt tcBody (Scaled mult schema) matches res_ty
+       ; return (HsCase ctxt scrut' matches') }
 
 tcExpr expr@(HsCase ctxt scrut matches) res_ty
   = do { opened <- tcExistsCase expr res_ty
@@ -1540,10 +1561,40 @@ tcOptionalLet checked rest expected
 lazyLetRhs :: MatchGroup (GhcPass p) (LHsExpr (GhcPass p)) -> Maybe (LHsExpr (GhcPass p))
 lazyLetRhs MG { mg_alts = L _ [L _ match] }
   | Match { m_ctxt = FunRhs { mc_strictness = NoSrcStrict }, m_pats = L _ []
-          , m_grhss = GRHSs { grhssGRHSs = L _ (GRHS _ [] rhs) NE.:| []
-                            , grhssLocalBinds = L _ EmptyLocalBinds{} } } <- match
-  = Just rhs
+          , m_grhss = grhss } <- match
+  = unguardedRhs grhss
 lazyLetRhs _ = Nothing
+
+unguardedRhs :: GRHSs (GhcPass p) (LHsExpr (GhcPass p)) -> Maybe (LHsExpr (GhcPass p))
+unguardedRhs GRHSs { grhssGRHSs = L _ (GRHS _ [] rhs) NE.:| []
+                   , grhssLocalBinds = L _ EmptyLocalBinds{} } = Just rhs
+unguardedRhs _ = Nothing
+
+-- | Recognise the result of a forwarding let or case.
+-- See Note [Repacking through a local binding].
+returnsLocal :: Name -> LHsExpr GhcRn -> Bool
+returnsLocal name expr = case unLoc (stripParensLHsExpr expr) of
+  HsVar _ ref -> unLocWithUserRdr ref == name
+  _ -> False
+
+{- Note [Repacking through a local binding]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this ordinary function with a checked result of type Packed a:
+
+    swap p = let result = case p of (xs, ys) -> (ys, xs) in result
+
+Inferring the local RHS makes the two hidden lengths escape the inner
+case. The result context already supplies the package type. Use it to
+check the binding, as for a complete local signature. A single variable
+case that returns the variable can use the same input type for its
+scrutinee. Keep the original binding or match and its multiplicity checks.
+
+Only the exact returned binder transmits the expected type. The existing
+implicit result check packs each witness in the scope that introduced it.
+This follows Elab-Gen's scope rule. No witness enters the binding's type.
+An inferred result, a recursive or signed let, and other case patterns
+keep their ordinary checking rules. See R22 in the dependent Haskell roadmap.
+-}
 
 {- Note [Signed and grouped local indices]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

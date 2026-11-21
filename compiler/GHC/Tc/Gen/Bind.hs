@@ -7,7 +7,7 @@
 -}
 
 module GHC.Tc.Gen.Bind
-   ( tcLocalBinds, tcNonRecLets
+   ( tcLocalBinds, tcNonRecLets, tcNonRecLetAtType
    , tcTopBinds
    , tcValBinds
    , tcHsBootSigs
@@ -368,6 +368,18 @@ tcNonRecLets binds sigs inside body = do
     let check binding rest = tcNonRecValBind NotTopLevel sig_fn emptyNameEnv binding
                                  (\checked -> inside checked rest)
     tcExtendSigIds NotTopLevel poly_ids (foldr check body binds)
+
+-- | Check an acyclic local binding at an already checked type.
+tcNonRecLetAtType :: Name -> TcType -> LHsBind GhcRn -> TcM a
+                  -> TcM (LHsBinds GhcTc, a)
+tcNonRecLetAtType name ty binding body =
+  let ident = mkLocalId name ManyTy ty
+      sig = TcIdSig (TcCompleteSig (completeSigFromId (FunSigCtxt name NoRRC) ident))
+      sig_fn n | n == name = Just sig
+               | otherwise = Nothing
+  in tcExtendSigIds NotTopLevel [ident] $
+       tcNonRecValBind NotTopLevel sig_fn emptyNameEnv binding $ \checked ->
+         (checked,) <$> body
 
 tcNonRecValBind :: TopLevelFlag -> TcSigFun -> TcPragEnv -> LHsBind GhcRn
                 -> (LHsBinds GhcTc -> TcM a) -> TcM a

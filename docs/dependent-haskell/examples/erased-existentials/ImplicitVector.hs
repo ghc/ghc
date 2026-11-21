@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, RankNTypes, TypeOperators #-}
 
 -- | Filter a vector without writing a package constructor or a witness.
-module ImplicitVector (Filtered, filterVec, withVector, partitionVec, firstKept, HiddenRows, packRows, partitionRows, rowLists, firstPassing, cells, transportFiltered, pairWithSelf, forgetLength, observations, singletonBuilder, runBuilder) where
+module ImplicitVector (Filtered, filterVec, withVector, partitionVec, firstKept, Rows(..), HiddenRows, packRows, partitionRows, rowLists, firstPassing, cells, transportFiltered, pairWithSelf, forgetLength, observations, singletonBuilder, runBuilder) where
 
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Sigma (Sigma(Pair))

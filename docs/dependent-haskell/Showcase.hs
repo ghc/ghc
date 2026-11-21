@@ -1132,6 +1132,12 @@ main = do
         RankedPackageClient.refilterRows odd even (< 10)
             (VCons (7 :: Int) (VCons 11 VNil))
             (VCons 2 (VCons 4 (VCons 10 VNil)))
+    observe "repack two hidden lengths through a local let and case"
+        ( ImplicitVector.rowLists (RankedPackageClient.swapRowsLet
+            (ImplicitVector.partitionRows odd (VCons (7 :: Int) (VCons 2 (VCons 9 VNil)))))
+        , take 1 (fst (ImplicitVector.rowLists (RankedPackageClient.swapRowsCase
+            (ImplicitVector.packRows (error "unused row")
+                (VCons (4 :: Int) (error "unused row tail")))))) )
     cutoff <- newIORef (7 :: Int) >>= readIORef
     observe "filter a numeric zip through an Int callback at its hidden length"
         ( take 1 (RankedPackageClient.refilterNumericZip (> cutoff)
