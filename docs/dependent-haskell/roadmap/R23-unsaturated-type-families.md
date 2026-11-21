@@ -35,6 +35,8 @@ rebuild to admit the partial synonym. A home build checks the provider
 and recompiles clients if its exported kind changes. A warm build
 reuses those interfaces. An older compiler reports GHC-47808 when it
 imports a provider with the new inferred kind.
+The initial regression check restores four existing source programs,
+`tc149`, `tc155`, `tc188`, and `tc234`.
 [Compiler-upgrade check](../examples/open-evaluation/check-liberal-callback-upgrade.sh).
 
 In `type family PFrom (x :: a) :: Rep a`, the result kind can depend

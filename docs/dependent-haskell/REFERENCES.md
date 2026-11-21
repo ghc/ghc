@@ -5243,6 +5243,11 @@ an independent type-level sum to check the result length. It rejects a
 wrong length and a head lookup on an empty vector. Changing the method
 from addition to multiplication invalidates an unchanged client's
 old length check.
+A written `Num Nat` constraint can supply a different dictionary.
+An ordinary `fromInteger @Nat 2` can use that dictionary. For a retained
+index, the compiler must establish that the selected method has the
+checked equations. It reports GHC-83605 for that example at both
+`-O0` and `-O2`.
 [Append example](examples/packed-vector/RetainedSumOperator.hs),
 [ordinary client](examples/packed-vector/AppendByMethodClient.hs)
 and [runner](examples/packed-vector/check-append-by-method.sh).
