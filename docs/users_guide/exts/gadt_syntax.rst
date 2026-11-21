@@ -124,7 +124,7 @@ grammar is subject to change in the future.
 
 .. code-block:: none
 
-  gadt_con ::= conids '::' foralls opt_ctxt gadt_body
+  gadt_con ::= conids '::' foralls gadt_body
 
   conids ::= conid
           |  conid ',' conids
@@ -146,14 +146,20 @@ grammar is subject to change in the future.
                  |  '{' tyvar '::' ctype '}'
 
   opt_ctxt ::= <empty>
-            |  btype '=>'
-            |  '(' ctxt ')' '=>'
+            |  ctxt_arrow
+
+  ctxt_arrow ::= btype '=>'
+               |  '(' ctxt ')' '=>'
 
   ctxt ::= ctype
         |  ctype ',' ctxt
 
-  gadt_body ::= prefix_gadt_body
-             |  record_gadt_body
+  gadt_body ::= prefix_gadt_contexts
+             |  opt_ctxt record_gadt_body
+
+  prefix_gadt_contexts ::= '(' prefix_gadt_contexts ')'
+                        |  ctxt_arrow prefix_gadt_contexts
+                        |  prefix_gadt_body
 
   prefix_gadt_body ::= '(' prefix_gadt_body ')'
                     |  return_type
@@ -192,14 +198,15 @@ implementation details of GHC's parser (such as the placement of Haddock
 comments), but it is sufficient to attain an understanding of what is
 syntactically allowed. Some further various observations about this grammar:
 
-- GADT constructor types are currently not permitted to have arbitrarily nested
-  ``forall``\ s or ``=>``\ s. (e.g., something like ``MkT :: Int -> forall a. a -> T``
-  would be rejected.) As a result, ``gadt_sig`` puts all of its quantification
-  and constraints up front with ``foralls`` and ``opt_context``. Note that
-  higher-rank ``forall``\ s and ``=>``\ s are only permitted if they do not appear
-  directly to the right of a function arrow in a `prefix_gadt_body`. (e.g.,
-  something like ``MkS :: Int -> (forall a. a) -> S`` is allowed, since
-  parentheses separate the ``forall`` from the ``->``.)
+- In a prefix GADT constructor, write the quantifiers first, followed by
+  any constraints, then the fields. You can write consecutive contexts
+  as ``Eq a => Show a => a -> Packed`` or group the constraints as
+  ``(Eq a, Show a) => a -> Packed``. A record GADT constructor accepts a
+  single context.
+
+  A higher-rank field has its own quantifiers or constraints inside
+  parentheses. For example, ``MkS :: Int -> (forall a. a -> a) -> S``
+  has a polymorphic second field.
 
 - GADT constructors permit outermost parentheses that surround the ``foralls``
   or ``opt_ctxt``, as well as interleaved parentheses between multiple

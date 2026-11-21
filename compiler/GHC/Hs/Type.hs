@@ -1076,10 +1076,10 @@ splitLHsSigmaTyInvis ty
 -- * @inner_bndrs@ are the remaining @forall@ telescopes, interleaved with the
 --   parentheses that enclose them.
 --
--- * A context is a final telescope node. Check the record prefix restriction
---   before appending that node. See Note [Constructor telescope contexts].
+-- * Each consecutive context is a telescope node. Record constructors
+--   allow one context. See Note [Constructor telescope contexts] in "GHC.Hs.Decls".
 --
--- * @body@ is the body of the type after the optional @forall@s and context.
+-- * @body@ is the body of the type after the optional @forall@s and contexts.
 --
 -- This function does look through parentheses, but it does not discard them:
 -- they are syntactically significant, so they are recorded in @inner_bndrs@.
@@ -1096,7 +1096,13 @@ splitLHsGadtTy (L _ sig_ty)
         -- Bad! Record GADTs are not allowed to have inner_bndrs,
         -- undo the split to get a proper error message later
       then (outer_bndrs, [], sigma_ty)
-      else (outer_bndrs, inner_bndrs ++ maybe [] (pure . mkHsGadtContext) mb_ctxt, rho_ty)
+      else let prefix = inner_bndrs ++ maybe [] (pure . mkHsGadtContext) mb_ctxt
+           in case split_contexts rho_ty of
+                (contexts, body)
+                  | not (null contexts)
+                  , not (is_gadt_rec_ty (ignoreParens body))
+                  -> (outer_bndrs, prefix ++ contexts, body)
+                _ -> (outer_bndrs, prefix, rho_ty)
   where
     split_outer_bndrs :: HsSigType GhcPs -> (HsOuterSigTyVarBndrs GhcPs, LHsType GhcPs)
     split_outer_bndrs (HsSig{sig_bndrs = outer_bndrs, sig_body = body_ty}) =
@@ -1112,6 +1118,15 @@ splitLHsGadtTy (L _ sig_ty)
       = let ~(args, t) = split_inner_bndrs ty
         in (L l (HsGadtPar toks) : args, t)
     split_inner_bndrs t = ([], t)
+
+    split_contexts :: LHsType GhcPs -> ([LHsGadtTelescope GhcPs], LHsType GhcPs)
+    split_contexts (L _ HsQualTy { hst_ctxt = ctxt, hst_body = body })
+      = let ~(contexts, t) = split_contexts body
+        in (mkHsGadtContext ctxt : contexts, t)
+    split_contexts (L l (HsParTy toks body))
+      | (context : contexts, t) <- split_contexts body
+      = (L l (HsGadtPar toks) : context : contexts, t)
+    split_contexts t = ([], t)
 
     -- type of form {fld :: ty, ...} -> ResTy
     is_gadt_rec_ty (L _ (HsFunTy _ _ (L _ (XHsType HsRecTy{})) _)) = True

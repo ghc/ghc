@@ -44,3 +44,7 @@ data C a where
   MkC2 :: ( -- comment after the parenthesis
            forall a. C a)
   MkC3 :: (forall a. {- inline comment -} C a)
+
+data Packed where
+  MkPacked :: forall a. Eq a => ( -- second context
+             Show a {- before the arrow -} => a -> Packed)
