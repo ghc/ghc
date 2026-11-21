@@ -28,6 +28,43 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `d1db028e3c`, the ordinary two-vector client inferred its result
+package. Its output was `([7],[2,4])`. Reading the first cell on
+either side left the other input and the selected tail unevaluated.
+Removing a required `Show a` constraint reported GHC-39999 at the
+producer argument. Identifying different hidden lengths still failed.
+
+All 421 Showcase outputs matched in stripped native code at `-O0`,
+source-loaded GHCi, and native code at `-O1` and `-O2`. Eighteen
+registered tests passed. The erased-existential test also passed with
+the added missing-constraint control. The ordinary impredicative suite
+recorded 21 expected passes and one expected failure.
+[Two-vector client](examples/erased-existentials/RankedPackageClient.hs)
+and [R22 inference](roadmap/R22-existential-quantification.md).
+
+The combined compiler at `0869c02fcf` passed all 420 Showcase outputs
+in stripped native code at `-O0`, source-loaded GHCi and native code
+at `-O1` and `-O2`. Eighteen registered tests, the 37-row Core test
+and the evidence API checks passed.
+
+A separate ordinary client used only the provider interfaces at compile
+time. It read `Just (Token 2)` from a column of its own `Token` type.
+A type mismatch and a negative offset both returned `Nothing`. The
+test passed at `-O2` with Core and STG Lint and stripped interfaces.
+[Runtime type and bounded position](examples/qualified-pi/RuntimeTypeColumn.hs).
+
+The written-list and callback changes at `3b90104b36` passed all 417
+Showcase rows in stripped native code at `-O0`, source-loaded GHCi, and
+native code at `-O1` and `-O2`. Fourteen registered tests passed. The
+37-row native Core test and the evidence API checks passed.
+
+An ordinary client compiled at `-O2` with only the interfaces for
+`zipWithExact` and `toList`. Core and STG Lint checked the unboxed
+equality argument after CorePrep named both list spines. Taking the
+first pair left the second element of each list unevaluated. A second
+client used ordinary composition to sum a length-checked result.
+[Written lists and runtime equality](roadmap/R03-dependent-products.md#zip-two-lists-at-a-common-length).
+
 At `cd293f731f`, all 416 Showcase outputs matched in stripped native
 code at `-O0`, source-loaded GHCi, and native code at `-O1` and `-O2`.
 Fourteen registered tests, the 37-row native Core test and the evidence

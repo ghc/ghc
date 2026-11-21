@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, RankNTypes, TypeOperators #-}
 
 -- | Filter a vector without writing a package constructor or a witness.
-module ImplicitVector (Filtered, filterVec, withVector, partitionVec, firstKept, partitionRows, rowLists, firstPassing, cells, transportFiltered, pairWithSelf, forgetLength, observations, singletonBuilder, runBuilder) where
+module ImplicitVector (Filtered, filterVec, withVector, partitionVec, firstKept, HiddenRows, packRows, partitionRows, rowLists, firstPassing, cells, transportFiltered, pairWithSelf, forgetLength, observations, singletonBuilder, runBuilder) where
 
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Sigma (Sigma(Pair))
@@ -42,6 +42,10 @@ data Rows a n m = Rows (Vec a n) (Vec a m)
 
 -- | Erase the two independent lengths in binder order.
 type HiddenRows a = exists (n :: Nat). exists (m :: Nat). Rows a n m
+
+-- | Package two vectors with independently chosen lengths.
+packRows :: Vec a n -> Vec a m -> HiddenRows a
+packRows xs ys = Rows xs ys
 
 -- | Collect both outputs in one package.
 partitionRows :: (a -> Bool) -> Vec a n -> HiddenRows a

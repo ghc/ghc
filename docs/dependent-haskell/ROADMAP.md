@@ -55,12 +55,29 @@ rank-2 callback and infer the hidden length of the second filter.
 [Two positions](examples/qualified-pi/ListCursor.hs) and
 [ordinary filter client](examples/erased-existentials/RankedPackageClient.hs).
 
+An ordinary caller can write `zipWithExact [x, y] [u, v] (,)`. GHC
+checks both lengths at compile time and infers both element types.
+[Written list example](roadmap/R03-dependent-products.md#zip-two-lists-at-a-common-length).
+
+A column can store a `TypeRep a` beside values of hidden element type
+`a`. A caller supplies the type it wants and a signed offset. A type
+comparison refines the element type. A bounded position permits the
+lookup. A type mismatch leaves the offset and values unevaluated.
+[Runtime type and position](examples/qualified-pi/RuntimeTypeColumn.hs).
+
 A producer can zip two ordinary lists into a vector whose length is
 the length of the first input. Its signature requires equal input
 lengths. For two independent inputs, a runtime comparison supplies
 that equality. Passing the same list twice supplies it by reflexivity
 and allows the first result cell to be read without inspecting the tail.
 [Source and coverage](roadmap/R03-dependent-products.md#zip-two-lists-at-a-common-length).
+
+An ordinary client can filter two vectors independently, pass them to
+a higher-rank callback, and infer the package returned by the callback.
+It can read the first result from either vector while the other input is
+undefined. The second filter can change the two lengths independently.
+[Two-vector example](examples/erased-existentials/RankedPackageClient.hs)
+and [inference and escape checks](roadmap/R22-existential-quantification.md).
 
 A type synonym can use a `case` to choose the argument type of an
 ordinary arrow. For example, one branch can take a pair and another
@@ -493,7 +510,7 @@ The table gives the completion criteria for each area.
 
 | Roadmap area | Remaining local work | Main obligations before completion |
 | --- | --- | --- |
-| R03: dependent products | General domains, broader invisible argument inference, runtime `Type` operands | Separate retention from visibility. Define a runtime universe bridge. Required erased `forall` and existing `TypeRep` do not supply that bridge. |
+| R03: dependent products | General domains, broader invisible argument inference, and runtime type operands | A visible `foreach (a :: Type)` in a complete value signature accepts an explicit `TypeRep a`. The interface records the erased type parameter and witness arrow. Source type operands, hidden witnesses and type patterns remain open. |
 | R04 and R22: sums and existentials | First-class erased `exists` and retained `some` | Specify formation, introduction, elimination, scope and representation. Existing retained ADT fields provide a storage baseline. |
 | R05: dependent Core | Typed conversion, proof operations, transformations, unfoldings and normal optimization | Reconcile the native forms with the calculi. Preserve roles, scope, demand, sharing and ordinary GHC behavior. |
 | R15 and R16: closed and open evaluation | Computation in types over closed inputs and rigid variables | Specify staging, divergence, stuck terms and diagnostics. Reuse ordinary term definitions without parallel handwritten families. |

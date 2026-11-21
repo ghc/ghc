@@ -111,11 +111,11 @@ grep -A6 'ForwardProducer.keepTagged$' forward.log | grep -Eq '@\(exists .*\. ex
 
 cp "$src/"{QuickLookForward,QuickLookRuntime}.hs .
 "$ghc" "${flags[@]}" -c QuickLookForward.hs -main-is QuickLookForward
-"$ghc" "${flags[@]}" QuickLookForward.o ../provider/{Filter,ForwardSchemas,Vector}.o \
+"$ghc" "${flags[@]}" QuickLookForward.o ../provider/{Filter,ForwardSchemas,Nested,NestedSignature,Vector}.o \
     -o quick-look -main-is QuickLookForward
 ./quick-look
 cp "$src/RankedFilterReject.hs" .
-for rejection in ESCAPE_LENGTH LATE_BINDER BAD_PREDICATE; do
+for rejection in ESCAPE_LENGTH LATE_BINDER LATE_CONSTRAINT BAD_PREDICATE SHARED_CALLBACK SHARED_INPUTS SHARED_RESULT ESCAPING_SECOND; do
     if "$ghc" "${flags[@]}" "-D$rejection" -c RankedFilterReject.hs > ranked-filter.log 2>&1; then
         echo "Accepted the ranked filter control $rejection." >&2
         exit 1
@@ -123,7 +123,12 @@ for rejection in ESCAPE_LENGTH LATE_BINDER BAD_PREDICATE; do
     case "$rejection" in
         ESCAPE_LENGTH) operand='keepInput'; column=32; code=91028; detail='Restricted j Int' ;;
         LATE_BINDER) operand='lateResult True'; column=33; code=91028; detail='Stamped stamp0 Int' ;;
+        LATE_CONSTRAINT) operand='qualifiedResult True'; column=33; code=39999; detail='No instance for .Show a.' ;;
         BAD_PREDICATE) operand='filterVec (\_ -> ())'; column=50; code=83865; detail='expected type .Bool.' ;;
+        SHARED_CALLBACK) operand='withBoth producer'; column=27; code=25897; detail='first argument.*producer' ;;
+        SHARED_INPUTS) operand='withBoth producer'; column=55; code=25897; detail='third argument.*filterVec even ys' ;;
+        SHARED_RESULT) operand='in commonLength result'; column=21; code=25897; detail='first argument.*commonLength.*result' ;;
+        ESCAPING_SECOND) operand='withBoth producer'; column=27; code=91028; detail='Restricted m Int' ;;
     esac
     line=$(grep -nF "$operand" RankedFilterReject.hs | tail -1 | cut -d: -f1)
     grep -Fq "RankedFilterReject.hs:$line:$column: error: [GHC-$code]" ranked-filter.log

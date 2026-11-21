@@ -1179,13 +1179,13 @@ nameNativeConstructorArgs expr
       | Type {} <- arg
       = do { check_erased_binder ty transport
            ; build (applyTypeToArgs ty [arg]) (App app arg) transport wrap rest }
-      | Coercion {} <- arg
-      = do { check_erased_binder ty transport
-           ; build (applyTypeToArgs ty [arg]) (App app arg) transport wrap rest }
       | Just (_, _, _, arg_ty, res_ty) <- splitFunTy_maybe ty
       = do { co <- liftNativeIndexTransport "a later argument" transport arg_ty
            ; let arg' = mkCast arg (mkSymCo (mkSubCo co))
            ; build res_ty (App app arg') transport wrap rest }
+      | Coercion {} <- arg
+      = do { check_erased_binder ty transport
+           ; build (applyTypeToArgs ty [arg]) (App app arg) transport wrap rest }
       | otherwise = pprPanic "nameNativeConstructorArgs: application type" (ppr ty $$ ppr expr)
 
     check_erased_binder ty transport
@@ -1763,7 +1763,12 @@ See Note [Checked native index beta exposure] in GHC.Core.
 Walk the complete supplied application with fresh symbolic index placeholders.
 For each later ordinary argument, lift the prepared-to-original index equalities
 through its formal type and cast the payload in the inverse direction. Cast the
-final result back to its original index. A result-only cast is insufficient.
+final result back to its original index. Worker/wrapper can replace a
+boxed equality dictionary with a coercion argument to an ordinary arrow.
+Transport that coercion across the same aliases as a value argument.
+mkCast composes the evidence for its two endpoints. A coercion supplied
+to a forall binder still follows the erased binder path.
+A result-only cast is insufficient.
 The placeholders occur only in temporary templates. Output contains checked
 type applications and nominal coercion lifting, with no universal axiom.
 

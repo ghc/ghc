@@ -1775,6 +1775,24 @@ all equalities. Expected checking can also supply an ordinary function arrow
 after the written arguments. This follows expected-type instantiation; the
 candidate itself supplies no equality proof.
 
+In `fmap ((.) sum toList) (checkedZipWith xs ys f)`, `fmap` obtains the
+callback's input `Vec Int (sourceLength xs)` from the zip. The result of
+the partial application of `(.)` determines its input and result type
+parameters. Its intermediate type stays open. If the result is an
+undetermined ordinary type parameter, defer the prefix so that `fmap`
+can pass the known input to normal argument checking. This route uses
+NoQL, an unrestricted callback, and a prefix without written type
+arguments. Its operands must have named polymorphic signatures with no
+native anchor of their own. Argument checking infers `[Int]` as the
+intermediate type and `Int` as the result. The zip client uses this
+prefix in an unsigned local binding.
+
+See [A Quick Look at Impredicativity, Figure 4](https://www.microsoft.com/en-us/research/wp-content/uploads/2020/01/quick-look-icfp20.pdf#page=8)
+for IALL, and Notes [Partially applied callbacks] and
+[Partial ordinary applications at a native result type] in
+`GHC.Tc.Gen.App` for native argument selection. Normal subsumption still
+rejects a result that claims an unrelated length.
+
 GHC already gives wired-in dollar applications special Quick Look handling
 in `GHC.Tc.Gen.App`. Its source signature in
 `libraries/ghc-internal/src/GHC/Internal/Base.hs` quantifies over both runtime
@@ -3393,6 +3411,17 @@ still requires the retained scope check. Quick Look assigns the whole
 package and leaves equality between package types to subsumption.
 [A Quick Look at Impredicativity, Figure 5](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf)
 and [An Existential Crisis Resolved, §8](https://richarde.dev/papers/2021/exists/exists.pdf#page=21).
+
+For a producer of two filtered vectors, the fork matches both input
+domains with one substitution. Each input length has its own scope.
+Agda records can give each vector a separate erased length field.
+Quick Look instantiates invisible binders as each value argument
+exposes them. The fork reads the same binders from the declared
+callback to identify its result package. It then checks the original
+application under that expected type.
+[Agda 2.8.0, erased record fields](https://agda.readthedocs.io/en/v2.8.0/language/runtime-irrelevance.html#syntax),
+[Quick Look, application rules](https://www.microsoft.com/en-us/research/wp-content/uploads/2020/01/quick-look-icfp20.pdf#page=8),
+and [R22 inference](roadmap/R22-existential-quantification.md).
 
 Figure 10 extends package introduction when the witness can itself be a
 polytype. Given a payload of type `Callback (forall a. a -> a)`, the fork
@@ -6931,10 +6960,18 @@ and [Haskell proof](examples/packed-vector/OpenVectorAppend.hs).
 
 Proposal #378 considers a type representation for a retained `Type`
 operand. The reflection paper supplies a typed representation and the
-evidence from equality testing. The source examples and acceptance
-checks for this bridge are on the [R03 card](roadmap/R03-dependent-products.md#runtime-type-operands).
+evidence from equality testing in an open world. Eisenberg and Weirich's
+singleton encoding keeps both the erased index and its runtime witness.
+Agda's coded universe example separates codes and their interpretation,
+within an explicit hierarchy of sorts. The visible binder implementation
+uses an erased parameter and an explicit, lifted `TypeRep` operand.
+The [R03 card](roadmap/R03-dependent-products.md#runtime-type-operands)
+records the interface contract and the remaining source decisions.
 [Proposal and review](https://github.com/ghc-proposals/ghc-proposals/pull/378)
-and [Peyton Jones, Weirich, Eisenberg and Vytiniotis (2016)](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/08/dynamic.pdf).
+and [Peyton Jones, Weirich, Eisenberg and Vytiniotis (2016)](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/08/dynamic.pdf),
+[Eisenberg and Weirich (2012)](https://richarde.dev/papers/2012/singletons/paper.pdf),
+[Agda universe levels](https://agda.readthedocs.io/en/v2.8.0/language/universe-levels.html)
+and [Agda type codes](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html#forward-declaration).
 
 ### Recursive append at runtime vector arguments
 
@@ -7149,3 +7186,11 @@ pattern. A pattern synonym or a newtype does not supply that
 constructor fact.
 [Lower Your Guards](https://pp.ipd.kit.edu/uploads/publikationen/graf20lyg.pdf)
 and [checker implementation](../../compiler/GHC/HsToCore/Pmc/Solver.hs).
+
+Agda infers hidden arguments from explicit arguments in a function
+application. Its vector `zipWith` leaves the input element types and
+length implicit. In the fork, the declarations of fields in written
+list constructors supply the ordinary element types. GHC checks the
+original fields and the equality of the two lengths at the call.
+[Agda 2.8.0, implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html)
+and [Agda standard library 2.3, vector operations](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html).

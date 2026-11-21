@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns, LinearTypes, MonoLocalBinds, NoExperimentalDependentTypes #-}
 
 -- | Open a checked list selection in an ordinary module.
-module CursorClient (observeCursors, observeIndexedCallback, observeAligned, observeBoth, observeZip) where
+module CursorClient (observeCursors, observeIndexedCallback, observeAligned, observeBoth, observeZip, zipTwoPairs) where
 
 import AlignedList (checkedZipWith, zipWithExact)
 import PackedVecLibrary (toList)
@@ -66,8 +66,10 @@ observeZip = do
     prefix <- newIORef ('x' : error "forced suffix") >>= readIORef
     let exact = fmap toList (checkedZipWith word numbers (,))
         mismatch = fmap toList (checkedZipWith word (take 1 numbers) (error "forced callback"))
-        selected = case checkedZipWith lazyWord numbers (flip const) of
-            Just vector -> Just (sum (toList vector))
-            Nothing -> Nothing
+        selected = fmap ((.) sum toList) (checkedZipWith lazyWord numbers (flip const))
         sameInput = take 1 (toList (zipWithExact prefix prefix (,)))
     pure (exact, mismatch, selected, sameInput)
+
+-- | Both written lists have length two.
+zipTwoPairs :: a -> a -> b -> b -> [(a, b)]
+zipTwoPairs x y u v = toList (zipWithExact [x, y] [u, v] (,))

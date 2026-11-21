@@ -27,7 +27,7 @@ module Main where
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Data.IORef (newIORef, readIORef)
 import Data.Maybe (isJust)
-import CursorClient (observeBoth, observeZip, observeAligned, observeCursors, observeIndexedCallback)
+import CursorClient (observeBoth, observeZip, observeAligned, observeCursors, observeIndexedCallback, zipTwoPairs)
 import NativeLinearIndexColumns (choose)
 import FinitePositionClient (lookupVecViaView, observeConstructedViews, observeEmptyIndex, observeFinitePosition, observeListIndices)
 import NativeIndexedFinGate (Gate(..), Ticket(..), grant)
@@ -42,6 +42,9 @@ main = do
     if both == [Just ('b', 10), Just ('b', 20), Nothing] then pure () else fail (show both)
     zipped <- observeZip
     if zipped == (Just [('a', 10), ('b', 20)], Nothing, Just 30, [('x', 'x')]) then pure () else fail (show zipped)
+    case zipTwoPairs 'a' (error "forced second left field") True (error "forced second right field") of
+        ('a', True) : _ -> pure ()
+        _ -> fail "wrong first pair"
     aligned <- observeAligned
     if aligned == [Just ('b', 20), Nothing, Nothing] then pure () else fail (show aligned)
     callbacks <- observeIndexedCallback
@@ -88,6 +91,22 @@ HS
     ./run
 done
 cd "$out/client"
+cat >EscapingComposedResult.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, ScopedTypeVariables #-}
+module EscapingComposedResult where
+import AlignedList (checkedZipWith)
+import PackedVecLibrary (Vec)
+
+escape :: forall n. [Char] -> [Int] -> Maybe (Vec Int n)
+escape left numbers = fmap ((.) id id) (checkedZipWith left numbers (flip const))
+HS
+if "${ghc[@]}" -O0 -fdiagnostics-color=never -c EscapingComposedResult.hs >compose-escape.log 2>&1; then
+    echo 'Accepted a runtime vector length at an unrelated result index'
+    exit 1
+fi
+grep -Eq '^EscapingComposedResult.hs:7:[0-9]+: error: .GHC-25897.' compose-escape.log
+grep -Fq 'PackedVecLibrary.sourceLength left' compose-escape.log
+grep -Fq 'is a rigid type variable bound by' compose-escape.log
 cat >MissingRows.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeFamilies #-}
 module MissingRows where
@@ -174,6 +193,30 @@ if "${ghc[@]}" -O0 -fforce-recomp -DUNRELATED -DOMIT -fdefer-type-errors -fdiagn
     exit 1
 fi
 grep -Fq 'ScopedLength.hs:13:1: error: [GHC-83605]' unrelated.log
+cat >WrittenLists.hs <<'HS'
+{-# LANGUAGE CPP, NoExperimentalDependentTypes #-}
+module WrittenLists where
+import AlignedList (zipWithExact)
+import PackedVecLibrary (toList)
+pairs :: a -> a -> b -> b -> [(a, b)]
+#ifdef WRONG_ELEMENT
+pairs x y u v = toList (zipWithExact [x, u] [u, v] (,))
+#else
+pairs x y u v = toList (zipWithExact [x, y] [u] (,))
+#endif
+HS
+if "${ghc[@]}" -O0 -fdiagnostics-color=never -c WrittenLists.hs >length.log 2>&1; then
+    echo 'Accepted two list literals of different lengths'
+    exit 1
+fi
+grep -Fq 'WrittenLists.hs:9:25: error: [GHC-18872]' length.log
+grep -Fq "Couldn't match type" length.log
+if "${ghc[@]}" -O0 -DWRONG_ELEMENT -fdiagnostics-color=never -c WrittenLists.hs >element.log 2>&1; then
+    echo 'Accepted a list element of the wrong type'
+    exit 1
+fi
+grep -Fq 'WrittenLists.hs:7:42: error: [GHC-25897]' element.log
+
 cat >MatrixLength.hs <<'HS'
 {-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, ScopedTypeVariables, TypeFamilies #-}
 module MatrixLength where
