@@ -30,6 +30,7 @@ checked constructor lambda: [42,42,42]
 linear equality witness beneath a retained binder: 42
 equality evidence beneath a retained Pi: [7,7,7]
 immediate index beta reduction: [5,5,5,5]
+inline an ordinary function that calls a retained helper: 42
 explicit erased choices and qualified Pi: [7,7,7]
 known arguments select erased choices: [7,7,7]
 generic consumer of a native function: 42
@@ -160,6 +161,7 @@ prove the first cell of append at runtime: [False,True,False,False]
 prove empty append for two vectors at a shared runtime cut: (True,True)
 split the appended vector at its first length: ([True],[False,False])
 split a vector with a proof of its original contents: (([True,False],[True],[True,False,True]),([True,True],[True]))
+split proof demand (zero ignores input, one ignores fields, one demands the cell): (True,True,True)
 check a runtime cut and prove the original contents: [Just (1,[True],[False],[True,False]),Nothing]
 recover the checked predecessor of a finite position: ((Nothing,Just 1),(True,False,True,True))
 pass zero and a written successor to a retained function: (Just 1,True)

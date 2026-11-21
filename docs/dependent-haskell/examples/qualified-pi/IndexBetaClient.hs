@@ -35,3 +35,11 @@ betaBottomWorker = error "native-source-beta-function"
 -- | Return the original partial function without an eta expansion.
 betaBottomPartial :: foreach (n :: Nat) -> Vec Int n -> Vec Int n
 betaBottomPartial n = betaBottomWorker ((\k -> k) n)
+
+-- | Export an ordinary unfolding after simplifying a call to a retained helper.
+{-# INLINE inlineIncrement #-}
+inlineIncrement :: Int -> Int
+inlineIncrement n =
+    let increment :: foreach (i :: Int) -> Int
+        increment i = i + 1
+    in increment n

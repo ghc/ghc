@@ -371,6 +371,7 @@ vectors = do
     observe "linear equality witness beneath a retained binder" (linearProof n (rightZero n))
     observe "equality evidence beneath a retained Pi" (toList (transported n))
     observe "immediate index beta reduction" (toList (IndexBeta.betaSuccessor n 5))
+    observe "inline an ordinary function that calls a retained helper" (IndexBeta.inlineIncrement 41)
     observe "explicit erased choices and qualified Pi" (toList (Ground.groundDirect n Qualified.fixedQ))
     observe "known arguments select erased choices" (toList (Known.knownDirect n Qualified.fixedQ))
     observe "generic consumer of a native function" (Known.knownGenericIgnore Qualified.fixedQ)
@@ -1536,6 +1537,8 @@ sourceAddition = do
         (toList (fst split), toList (snd split))
     rebuilt <- CertifiedSplitClient.splitObservation
     observe "split a vector with a proof of its original contents" rebuilt
+    observe "split proof demand (zero ignores input, one ignores fields, one demands the cell)"
+        =<< CertifiedSplitClient.checkDemand
     checkedContents <- CertifiedSplitClient.checkedObservation
     observe "check a runtime cut and prove the original contents" checkedContents
     finitePosition <- FinitePositionClient.observeFinitePosition
