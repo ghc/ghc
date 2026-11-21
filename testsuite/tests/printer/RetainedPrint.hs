@@ -44,4 +44,19 @@ type Wrap = \a {- Before the arrow. -} -> Maybe a
 
 type Row e = let wrap = \a -> Either e a in wrap Bool
 
+type CaseRow (flag :: Bool) =
+  let picked = case flag of
+        'True -> Int
+        'False -> Char
+      boxed = Maybe picked
+  in Either picked boxed
+
+type ArrowRow (flag :: Bool) =
+  let { worker = Bool -> case flag of
+          'True -> Int
+          'False -> Char
+      ; boxed = Maybe worker
+      }
+  in Either worker boxed
+
 type PairWith = (\a -> \b -> (a, b))

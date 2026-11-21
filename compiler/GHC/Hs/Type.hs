@@ -610,6 +610,8 @@ splitHsTypeLet (L _ (HsTypeLetBind name _ rhs) :| binds) body =
 {- Note [Ordered type let bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The parser keeps the binding group, braces and separators for exact printing.
+In a braced group, the pretty-printer puts the separator before the next
+binding. Dedenting first closes any layout case in the preceding RHS.
 Each RHS sees the enclosing scope and the preceding binders. A later binder
 can shadow an earlier one. For example,
 
@@ -1760,10 +1762,11 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
     HsTypeLet _ brackets binds body ->
       let binding (L _ (HsTypeLetBind v _ rhs)) =
             ppr v <+> equals <+> ppr_mono_lty rhs
-          bindings = case (brackets, binds) of
-            (Nothing, b :| []) -> binding b
-            _ -> braces (sep (punctuate semi (map binding (NE.toList binds))))
-      in text "let" <+> bindings <+> text "in" <+> ppr_mono_lty body
+          bindings = map binding (NE.toList binds)
+          group = case brackets of
+            Nothing -> vcat bindings
+            Just _  -> vcat (zipWith (<+>) (lbrace : repeat semi) bindings ++ [rbrace])
+      in sep [hang (text "let") 2 group, hang (text "in") 2 (ppr_mono_lty body)]
   GhcRn -> case t of
     HsCoreTyRn ty -> ppr ty
     HsGadtFieldRn field -> pprHsConDeclFieldNoMult field
