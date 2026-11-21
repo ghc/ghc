@@ -1324,13 +1324,21 @@ An ordinary client proves removal of `False` and preservation of an
 `Entry` with a rigid tail. The Showcase exposes one output element for
 each function and leaves the later tail unforced. A callback on a
 newtype of `Bool` fails the kind check. A Boolean branch that forces the
-removed head loses both equations. The Showcase uses object code for
-the producer in GHCi. A no-code build of the same definitions without
-the fixture's object-code option withholds the list equations.
+removed head loses both equations. A no-code build withholds the list
+equations.
 [Producer](../examples/open-evaluation/ConcreteGuardedList.hs),
 [ordinary proofs](../examples/open-evaluation/ConcreteGuardedListProof.hs),
-[regression](../../../testsuite/tests/dependent/should_run/NativeOpenConcreteGuardedList.sh),
+[native regression](../../../testsuite/tests/dependent/should_run/NativeOpenConcreteGuardedList.sh),
 and [nominal roles](../REFERENCES.md#nominal-domains-for-concrete-list-callbacks).
+
+GHCi loads the producer from source with the bytecode backend. Its final
+Core keeps debugger breakpoints around the predicate call, constructor
+and branch results. The checker reads through those ticks and compares
+both branches with the original equations. The ticks stay in the
+executable Core. The interpreted strict-head variant still fails at the
+alias, and the lazy variant passes with no object file.
+[GHCi regression](../../../testsuite/tests/dependent/should_run/NativeOpenConcreteGuardedListGhci.sh)
+and [Core breakpoint definition](../../../compiler/GHC/Types/Tickish.hs).
 
 ### Use an ordinary identity as an open callback
 

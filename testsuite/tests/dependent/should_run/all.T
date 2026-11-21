@@ -102,6 +102,11 @@ test('NativeOpenConcreteGuardedList',
       extra_files([open_eval_dir + f for f in ['ConcreteGuardedList.hs',
                    'ConcreteGuardedListSource.hs', 'ConcreteGuardedListProof.hs']])],
      run_command, ['bash NativeOpenConcreteGuardedList.sh "{compiler}" "{libdir}"'])
+test('NativeOpenConcreteGuardedListGhci',
+     [req_interp, req_rts_linker, only_ways(['normal']),
+      extra_files([open_eval_dir + f for f in ['ConcreteGuardedList.hs',
+                   'ConcreteGuardedListSource.hs', 'ConcreteGuardedListProof.hs']])],
+     run_command, ['bash NativeOpenConcreteGuardedListGhci.sh "{compiler}" "{libdir}"'])
 
 test('NativeOpenInstalledAppend',
      [only_ways(['normal']),
