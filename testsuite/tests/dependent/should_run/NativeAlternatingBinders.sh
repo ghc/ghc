@@ -99,3 +99,53 @@ if "${ghc[@]}" -c WrongCons.hs >reject.log 2>&1 ||
     cat reject.log >&2
     exit 1
 fi
+
+cat >LambdaArrow.hs <<'HS'
+{-# LANGUAGE AllowAmbiguousTypes, CPP, DataKinds, ExperimentalDependentTypes, ExplicitNamespaces, Modifiers #-}
+{-# LANGUAGE PolyKinds, RankNTypes, RequiredTypeArguments #-}
+module LambdaArrow where
+import GHC.Exts (M, Matchability, U)
+
+data Payload (tag :: Bool) (m :: Maybe a) = Payload Int
+
+#if FORM == 1
+keep :: foreach (tag :: Bool) -> Payload tag (Nothing :: Maybe Bool) %MA -> Payload tag (Nothing :: Maybe Bool)
+keep _ x = x
+#elif FORM == 2
+keep :: foreach (tag :: Bool) -> forall a -> foreach (m :: Maybe a) -> Payload tag m %MA -> Payload tag m
+keep _ (type a) _ x = x
+#elif FORM == 3
+keep :: foreach (tag :: Bool) -> Payload tag (Nothing :: Maybe Bool) %MA -> Payload tag (Nothing :: Maybe Bool)
+keep False x = x
+keep True x = x
+#elif FORM == 4
+keep :: (foreach (tag :: Bool) -> forall a -> foreach (m :: Maybe a) -> Payload tag m %M -> Payload tag m)
+     -> foreach (tag :: Bool) -> forall a -> foreach (m :: Maybe a) -> Payload tag m %M -> Payload tag m
+keep existing = existing
+#else
+ignore :: forall (ma :: Matchability).
+          (foreach (tag :: Bool) -> forall a -> foreach (m :: Maybe a) -> Payload tag m %ma -> Payload tag m) -> Int
+ignore _ = 61
+
+infer :: Int
+infer = ignore (\_ (type a) _ x -> x)
+#endif
+HS
+for opt in O0 O2; do
+    "${ghc[@]}" "-$opt" -DFORM=4 -fforce-recomp -c LambdaArrow.hs
+    "${ghc[@]}" "-$opt" -DFORM=5 -fforce-recomp -c LambdaArrow.hs
+    for form in 1 2 3; do
+        "${ghc[@]}" "-$opt" "-DFORM=$form" -DMA=U -fforce-recomp -c LambdaArrow.hs
+        if "${ghc[@]}" "-$opt" "-DFORM=$form" -DMA=M -fforce-recomp -c LambdaArrow.hs >reject.log 2>&1 ||
+           ! grep -Fq '[GHC-83865]' reject.log || ! grep -Fq 'Unmatchable' reject.log ||
+           ! grep -Fq 'Expected: M' reject.log || grep -Fq 'Core Lint errors' reject.log; then
+            cat reject.log >&2
+            exit 1
+        fi
+    done
+    if "${ghc[@]}" "-$opt" -DFORM=2 -DMA=M -fdefer-type-errors -fforce-recomp -c LambdaArrow.hs >reject.log 2>&1 ||
+       ! grep -Fq 'error: [GHC-83605]' reject.log || grep -Fq 'Core Lint errors' reject.log; then
+        cat reject.log >&2
+        exit 1
+    fi
+done

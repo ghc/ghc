@@ -834,16 +834,16 @@ simplifyDelayedErrors = mapMaybeBagM simpl_err
     simpl_err :: DelayedError -> TcS (Maybe DelayedError)
     simpl_err (DE_Hole hole) = Just . DE_Hole <$> simpl_hole hole
     simpl_err err@(DE_NotConcrete {}) = return $ Just err
-    simpl_err (DE_Multiplicity mult_co loc)
-      = do { mult_co' <- TcS.zonkCo mult_co
-           ; if isReflexiveCo mult_co' then
-               return Nothing
-             else
-               return $ Just (DE_Multiplicity mult_co' loc) }
+    simpl_err (DE_Multiplicity co loc) = simpl_reflexive DE_Multiplicity co loc
+    simpl_err (DE_RetainedMatchability co loc) = simpl_reflexive DE_RetainedMatchability co loc
     simpl_err err@(DE_SourceMethod ev dfun _ _)
       = do { bindings <- getInScopeEvBindsVars >>= traverse TcS.getTcEvBindsMap
            ; checked <- sourceMethodEvidenceMatches bindings ev dfun
            ; return (if checked then Nothing else Just err) }
+
+    simpl_reflexive build co loc = do
+      co' <- TcS.zonkCo co
+      return (if isReflexiveCo co' then Nothing else Just (build co' loc))
 
     simpl_hole :: Hole -> TcS Hole
 

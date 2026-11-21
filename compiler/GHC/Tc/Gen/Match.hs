@@ -59,6 +59,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Gen.Bind
 import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.Unify
+import GHC.Tc.Types.Constraint ( DelayedError(DE_RetainedMatchability) )
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.ErrCtxt( UserTypeCtxt( GenSigCtxt ), pprUserTypeCtxt )
 import GHC.Tc.Types.Evidence
@@ -110,7 +111,7 @@ import GHC.Types.Var ( binderFlag, EvVar, DepFunTyFlag(..), ExistsTyFlag(Implici
 import GHC.Types.Var.Env ( mkInScopeSetList, unitVarEnv )
 import GHC.Types.SrcLoc
 import GHC.Types.Basic( VisArity, RecFlag(NonRecursive), Origin(Generated), GenReason(OtherExpansion), DoPmc(SkipPmc) )
-import GHC.Data.Bag ( listToBag, unionBags )
+import GHC.Data.Bag ( listToBag, unitBag, unionBags )
 import GHC.Data.FastString ( fsLit )
 import GHC.Data.Pair ( pSnd )
 import GHC.Data.Maybe ( catMaybes, fromMaybe, isJust, isNothing )
@@ -1167,9 +1168,8 @@ tcRetainedVarMatches herald ctxt initial_ty source_pats = go [] initial_ty initi
                  pat_ty = mkCheckExpFunPatTy (Scaled ManyTy (varType binder))
            ; go ((pat_ty, Just name) : acc) (applyTypeToArgs ty [Var index]) pats thing_inside }
       | FunTy{} <- coreFullView ty
-      = do { (co, _ma, arg_ty, rhs_ty) <- matchActualFunTy herald Nothing (length initial_pats, initial_ty) ty
-           ; unless (isIdHsWrapper (mkWpCastN co)) $
-               failWithTc (TcRnRetainedQuantificationError RetainedResultWrapper)
+      = do { (arg_ty, rhs_ty) <- setSrcSpanA (getLoc pat) $
+                  matchRetainedLambdaArrow herald (length initial_pats, initial_ty) ty
            ; go ((mkCheckExpFunPatTy arg_ty, Nothing) : acc) rhs_ty pats thing_inside }
       | otherwise
       = do { (wrap, (rest_wrap, result)) <- matchExpectedFunTys herald ctxt 1 (mkCheckExpType ty) $
@@ -1202,6 +1202,38 @@ tcRetainedVarMatches herald ctxt initial_ty source_pats = go [] initial_ty initi
       AsPat _ _ inner -> nonforcing_pattern inner
       SigPat _ inner _ -> nonforcing_pattern inner
       _ -> False
+
+-- | Check an ordinary arrow consumed by a new runtime lambda.
+-- See Note [Ordinary arrows in retained matches].
+matchRetainedLambdaArrow :: ExpectedFunTyCtxt -> (VisArity, Type) -> Type
+                         -> TcM (Scaled TcSigmaTypeFRR, TcSigmaType)
+matchRetainedLambdaArrow herald arity ty
+  = do { (arg_co, ma, arg_ty, rhs_ty) <- matchActualFunTy herald Nothing arity ty
+       ; unless (isReflCo arg_co) $
+           failWithTc (TcRnRetainedQuantificationError RetainedResultWrapper)
+       ; ma_co <- unifyType Nothing unmatchableDataConTy ma
+       ; unless (isReflCo ma_co) $
+           do { loc <- getCtLocM (TypeEqOrigin unmatchableDataConTy ma Nothing Nothing) Nothing
+              ; emitDelayedErrors (unitBag (DE_RetainedMatchability ma_co loc)) }
+       ; return (arg_ty, rhs_ty) }
+
+{- Note [Ordinary arrows in retained matches]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Core Lam introduces an ordinary arrow with unmatchable metadata. Check
+that metadata when a value pattern consumes an ordinary arrow in a
+retained telescope. This uses the same equality as matchExpectedFunTys.
+Let the solver resolve the equality in its original scope. A matchability
+variable introduced at the call can be untouchable inside an erased forall.
+
+The retained pattern walkers do not carry a cast for the consumed arrow.
+Require reflexivity for both matchability and argument representation.
+Check argument representation before continuing. Check matchability after
+solving, as for submultiplicity. Report an unsolved equality as an ordinary
+type error. A proof from a family equation can still need a cast, which
+these walkers cannot supply. This check cannot be deferred to runtime.
+An arrow with no corresponding pattern keeps its complete type, so an
+existing matchable function can pass through as the result.
+-}
 
 -- | Give each retained wildcard its column's internal Name.
 -- See Note [Wildcard retained binders].
@@ -1306,9 +1338,7 @@ tcRetainedConArgs herald ctxt = go [] []
            ; go (pat_ty : acc) (RetainedConIndex index : argument_plan) (n-1)
                 (applyTypeToArgs ty [Var index]) }
       | FunTy{} <- coreFullView ty
-      = do { (co, _ma, arg_ty, rhs_ty) <- matchActualFunTy herald Nothing (n, ty) ty
-           ; unless (isIdHsWrapper (mkWpCastN co)) $
-               failWithTc (TcRnRetainedQuantificationError RetainedResultWrapper)
+      = do { (arg_ty, rhs_ty) <- matchRetainedLambdaArrow herald (n, ty) ty
            ; go (mkCheckExpFunPatTy arg_ty : acc) (RetainedConValue : argument_plan) (n-1) rhs_ty }
       | otherwise
       = do { (wrap, result) <- matchExpectedFunTys herald ctxt 1 (mkCheckExpType ty) $

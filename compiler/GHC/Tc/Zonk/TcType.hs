@@ -499,6 +499,8 @@ zonkDelayedError (DE_Multiplicity mult_co loc)
   = DE_Multiplicity <$> zonkCo mult_co <*> pure loc
 zonkDelayedError (DE_SourceMethod ev dfun method loc)
   = DE_SourceMethod <$> zonkId ev <*> zonkId dfun <*> pure method <*> pure loc
+zonkDelayedError (DE_RetainedMatchability co loc)
+  = DE_RetainedMatchability <$> zonkCo co <*> pure loc
 
 zonkHole :: Hole -> ZonkM Hole
 zonkHole hole@(Hole { hole_ty = ty })
@@ -836,6 +838,8 @@ tidyDelayedError env (DE_Multiplicity mult_co loc)
   = DE_Multiplicity (tidyCo env mult_co) loc
 tidyDelayedError env (DE_SourceMethod ev dfun method loc)
   = DE_SourceMethod (tidyEvVar env ev) (tidyEvVar env dfun) method loc
+tidyDelayedError env (DE_RetainedMatchability co loc)
+  = DE_RetainedMatchability (tidyCo env co) loc
 
 tidyConcreteError :: TidyEnv -> NotConcreteError -> NotConcreteError
 tidyConcreteError env err@(NCE_FRR { nce_frr_origin = frr_orig })
