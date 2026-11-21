@@ -69,15 +69,16 @@ import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Core.TyCon
 import GHC.Core ( Expr(Var, App, Type), exprToNativeIndex )
-import GHC.Core.TyCo.Rep ( Type(DepFunTy, ExistsTy, ForAllTy, FunTy, TermVarTy, TermAppTy, TyConApp) )
+import GHC.Core.TyCo.Rep ( Type(DepFunTy, ExistsTy, ForAllTy, FunTy, ft_af, TermVarTy, TermAppTy, TyConApp) )
 import GHC.Core.Subst ( extendIdSubstWithClone )
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Type ( coreFullView, isManyTy, splitTyConApp_maybe
                      , anyFreeVarsOfType, typeKind, isNativeIndexFunctionId, isNativeOpaqueValueId
                      , isInvisibleForAllTyFlag, isNativeIndexId, nativeIndexDataConTyArgs
                      , splitFunTy_maybe, substTyWith )
-import GHC.Core.Coercion ( MCoercion(MRefl), mkCoVarCo, mkCoCast, coercionType, isReflCo
-                         , mkSymCo, mkSubCo, coercionKind, coercionLKind
+import GHC.Core.Coercion ( MCoercion(MRefl, MCo), Role(Representational), mkCoVarCo, mkCoCast, coercionType, isReflCo
+                         , mkSymCo, mkSubCo, coercionKind, coercionLKind, coercionRKind
+                         , mkFunCo
                          , mkTransCo, mkNomReflCo, mkRepReflCo, mkDepFunCoWithVis )
 import GHC.Core.DataCon ( DataCon, dataConCannotMatch, dataConName, dataConSourceArity, dataConTyCon, dataConUnivTyVars, dataConWorkId )
 import GHC.Core.ConLike ( ConLike(RealDataCon) )
@@ -107,7 +108,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.Name.Set
 import GHC.Types.Unique.Set (sizeUniqSet)
 import GHC.Types.Id
-import GHC.Types.Var ( binderFlag, EvVar, DepFunTyFlag(..), ExistsTyFlag(ImplicitExists), VarBndr(Bndr), varType, tyVarKind, isId, isCoVar, isTyVar, isVisibleFunArg )
+import GHC.Types.Var ( binderFlag, EvVar, DepFunTyFlag(..), ExistsTyFlag(ImplicitExists), FunTyFlag, VarBndr(Bndr), varType, tyVarKind, isId, isCoVar, isTyVar, isVisibleFunArg )
 import GHC.Types.Var.Env ( mkInScopeSetList, unitVarEnv )
 import GHC.Types.SrcLoc
 import GHC.Types.Basic( VisArity, RecFlag(NonRecursive), Origin(Generated), GenReason(OtherExpansion), DoPmc(SkipPmc) )
@@ -1166,11 +1167,15 @@ tcRetainedVarMatches herald ctxt initial_ty source_pats = go [] initial_ty initi
                _ -> failWithTc (TcRnRetainedQuantificationError RetainedVariablePattern)
            ; let index = mkLocalId name ManyTy (varType binder)
                  pat_ty = mkCheckExpFunPatTy (Scaled ManyTy (varType binder))
-           ; go ((pat_ty, Just name) : acc) (applyTypeToArgs ty [Var index]) pats thing_inside }
-      | FunTy{} <- coreFullView ty
-      = do { (arg_ty, rhs_ty) <- setSrcSpanA (getLoc pat) $
+           ; (wrap, result) <- go ((pat_ty, Just name) : acc)
+                                  (applyTypeToArgs ty [Var index]) pats thing_inside
+           ; return (liftRetainedLambdaWrap index wrap, result) }
+      | FunTy { ft_af = af } <- coreFullView ty
+      = do { (ma_co, arg_ty, rhs_ty) <- setSrcSpanA (getLoc pat) $
                   matchRetainedLambdaArrow herald (length initial_pats, initial_ty) ty
-           ; go ((mkCheckExpFunPatTy arg_ty, Nothing) : acc) rhs_ty pats thing_inside }
+           ; (wrap, result) <- go ((mkCheckExpFunPatTy arg_ty, Nothing) : acc) rhs_ty pats thing_inside
+           ; wrap' <- liftOrdinaryLambdaWrap af ma_co arg_ty rhs_ty wrap
+           ; return (wrap', result) }
       | otherwise
       = do { (wrap, (rest_wrap, result)) <- matchExpectedFunTys herald ctxt 1 (mkCheckExpType ty) $
                \pat_tys rhs_ty ->
@@ -1206,16 +1211,33 @@ tcRetainedVarMatches herald ctxt initial_ty source_pats = go [] initial_ty initi
 -- | Check an ordinary arrow consumed by a new runtime lambda.
 -- See Note [Ordinary arrows in retained matches].
 matchRetainedLambdaArrow :: ExpectedFunTyCtxt -> (VisArity, Type) -> Type
-                         -> TcM (Scaled TcSigmaTypeFRR, TcSigmaType)
+                         -> TcM (TcCoercionN, Scaled TcSigmaTypeFRR, TcSigmaType)
 matchRetainedLambdaArrow herald arity ty
   = do { (arg_co, ma, arg_ty, rhs_ty) <- matchActualFunTy herald Nothing arity ty
        ; unless (isReflCo arg_co) $
            failWithTc (TcRnRetainedQuantificationError RetainedResultWrapper)
        ; ma_co <- unifyType Nothing unmatchableDataConTy ma
-       ; unless (isReflCo ma_co) $
-           do { loc <- getCtLocM (TypeEqOrigin unmatchableDataConTy ma Nothing Nothing) Nothing
-              ; emitDelayedErrors (unitBag (DE_RetainedMatchability ma_co loc)) }
-       ; return (arg_ty, rhs_ty) }
+       ; return (ma_co, arg_ty, rhs_ty) }
+
+-- | Lift a result cast through a retained runtime binder.
+liftRetainedLambdaWrap :: Id -> HsWrapper -> HsWrapper
+liftRetainedLambdaWrap index (WpCast co) =
+  mkWpCastR (mkDepFunCoWithVis DepFunVisible DepFunVisible index MRefl co)
+liftRetainedLambdaWrap _ wrap = wrap
+
+-- | Build the cast for an ordinary runtime lambda and its result.
+liftOrdinaryLambdaWrap :: FunTyFlag -> TcCoercionN -> Scaled TcSigmaTypeFRR
+                       -> TcSigmaType -> HsWrapper -> TcM HsWrapper
+liftOrdinaryLambdaWrap af ma_co (Scaled mult arg_ty) res_ty wrap
+  | isReflCo ma_co, isIdHsWrapper wrap = return idHsWrapper
+  | Just res_co <- hsWrapperCast_maybe wrap =
+      let body_co = case res_co of
+            MRefl -> mkRepReflCo res_ty
+            MCo co -> co
+          co = mkFunCo Representational af ma_co (mkNomReflCo mult)
+                 (mkRepReflCo arg_ty) body_co
+      in return (mkWpCastR co)
+  | otherwise = failWithTc (TcRnRetainedQuantificationError RetainedResultWrapper)
 
 {- Note [Ordinary arrows in retained matches]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1225,12 +1247,12 @@ retained telescope. This uses the same equality as matchExpectedFunTys.
 Let the solver resolve the equality in its original scope. A matchability
 variable introduced at the call can be untouchable inside an erased forall.
 
-The retained pattern walkers do not carry a cast for the consumed arrow.
-Require reflexivity for both matchability and argument representation.
-Check argument representation before continuing. Check matchability after
-solving, as for submultiplicity. Report an unsolved equality as an ordinary
-type error. A proof from a family equation can still need a cast, which
-these walkers cannot supply. This check cannot be deferred to runtime.
+Require reflexive argument representation. In a variable equation, carry
+the matchability proof in a result cast. Lift it through the preceding
+value binders without introducing another lambda or moving any pattern
+match. A preceding erased binder uses its existing wrapper outside this cast.
+The constructor walker still requires reflexive matchability, as it has
+no result wrapper at the match group.
 An arrow with no corresponding pattern keeps its complete type, so an
 existing matchable function can pass through as the result.
 -}
@@ -1338,7 +1360,10 @@ tcRetainedConArgs herald ctxt = go [] []
            ; go (pat_ty : acc) (RetainedConIndex index : argument_plan) (n-1)
                 (applyTypeToArgs ty [Var index]) }
       | FunTy{} <- coreFullView ty
-      = do { (arg_ty, rhs_ty) <- matchRetainedLambdaArrow herald (n, ty) ty
+      = do { (ma_co, arg_ty, rhs_ty) <- matchRetainedLambdaArrow herald (n, ty) ty
+           ; unless (isReflCo ma_co) $
+               do { loc <- getCtLocM (TypeEqOrigin unmatchableDataConTy (coercionRKind ma_co) Nothing Nothing) Nothing
+                  ; emitDelayedErrors (unitBag (DE_RetainedMatchability ma_co loc)) }
            ; go (mkCheckExpFunPatTy arg_ty : acc) (RetainedConValue : argument_plan) (n-1) rhs_ty }
       | otherwise
       = do { (wrap, result) <- matchExpectedFunTys herald ctxt 1 (mkCheckExpType ty) $

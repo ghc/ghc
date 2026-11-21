@@ -321,6 +321,10 @@ test('NativeAlternatingBinders',
       extra_files(['NativeAlternatingBindersProvider.hs', 'NativeAlternatingBindersClient.hs'])],
      run_command, ['bash NativeAlternatingBinders.sh "{compiler}" "{libdir}"'])
 
+test('NativeRetainedMatchability',
+     [req_host_target_ghc, only_ways(['normal'])],
+     run_command, ['bash NativeRetainedMatchability.sh "{compiler}" "{libdir}"'])
+
 test('NativeNestedPackagePat',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['NativeGadtRetainedSumProvider.hs', 'NativeNestedPackagePatProvider.hs',
