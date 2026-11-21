@@ -45,6 +45,33 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At compiler revision `3b5e52d9ad`, an ordinary module can choose the
+types of two successive GADT fields and call an inferred polymorphic
+function that uses erased packages. An interface-only client reads
+two differently typed lists from `LabelledPair` and folds each with
+`totalJobs`. At O2 GHC inlines both calls. The program returns
+`((2,4.0),(7,0.0))`. The second call leaves an undefined element and
+an unused cost function unevaluated. A separate `INLINABLE` version lets
+an importing module specialize the function at `Integer` and `String`.
+[Constructor client](examples/open-evaluation/LabelledValueClient.hs)
+and [recursive job costs](examples/qualified-pi/RecursiveJobs.hs).
+
+Core Lint accepts a constructor application and pattern whose second
+equality uses the first. It rejects a proof with the wrong kind, role
+or scope. This tests the representation needed for homogeneous worker
+arguments. The installed `HRefl` worker still uses its original type.
+At the same checkpoint GHC can read older optimized proofs of both
+`CharToNat` and `NatToChar`. An ordinary source-hidden client that
+uses the numeric, symbol and character deductions returns
+`(2,3,5,7,11)`. [Core Lint regression](../../testsuite/tests/plugins/CoercionForall.hs)
+and [literal proof regression](../../testsuite/tests/ghc-api/AppendSymbolDeductionIface.hs).
+
+The merged release includes the rectangular-table example from
+`e0e3dae8a9`. All 477 rows matched at native O0, O1, O2, and in
+source-loaded GHCi. The 16 selected compiler tests passed. The GHC
+API run matched its 37 expected lines.
+
+
 At compiler revision `00c3df07d4`, a local producer's signature can
 mention a closed family with a standalone kind signature before GHC
 checks the imported family equation that uses the producer. The
