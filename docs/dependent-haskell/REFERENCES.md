@@ -7131,3 +7131,21 @@ a directly declared result package before checking the application.
 The callback's local length cannot escape through that result.
 [Quick Look](https://www.microsoft.com/en-us/research/wp-content/uploads/2020/01/quick-look-icfp20.pdf)
 and [R22 scope](roadmap/R22-existential-quantification.md).
+
+### Coverage for two lists constrained to the same length
+
+Agda's indexed `zipWith` has two clauses. One input is empty only when
+the other input is empty. The fork applies the same observation to
+ordinary lists with a declared equality between their `sourceLength`
+results. Its implementation uses GHC's Given solver and preserves
+Haskell's lazy evaluation of elements.
+[Agda 2.8.0, matching on indexed datatypes](https://agda.readthedocs.io/en/v2.8.0/language/coverage-checking.html#matching-on-indexed-datatypes)
+and [checked source](examples/qualified-pi/AlignedList.hs).
+
+Graf, Peyton Jones and Scott use term and type constraints to check
+whether a counterexample is inhabited. The fork specialises equality
+arguments at the actual constructor choices before counting a missing
+pattern. A pattern synonym or a newtype does not supply that
+constructor fact.
+[Lower Your Guards](https://pp.ipd.kit.edu/uploads/publikationen/graf20lyg.pdf)
+and [checker implementation](../../compiler/GHC/HsToCore/Pmc/Solver.hs).
