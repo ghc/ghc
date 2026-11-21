@@ -642,6 +642,22 @@ prints the complete proof, the two widths, and the partial observation.
 [separate-module check](../../../testsuite/tests/dependent/should_run/NativeClosedWitnessedBatch.sh),
 and [Idris dependent pairs](../REFERENCES.md#recursively-read-back-witnessed-constructors).
 
+An ordinary producer can also return two vectors at the same hidden
+length. The fields can have different element types.
+
+```haskell
+data MaskedRow a where
+    MaskedRow :: SN n -> Vec n a -> Char -> Vec n Bool -> MaskedRow a
+```
+
+The evaluator reads the witness and checks each vector at that index.
+It reads the intervening character at its own type. A complete result
+with the wrong mask length fails at the source call. An outer observation
+of just the width can leave the other three fields undefined. The
+evaluator supports one erased constructor index with a recoverable witness
+in the first field. Each indexed payload must support the checked
+constructor cases described above. [Source and projections](../examples/closed-evaluation/WitnessedBatch.hs).
+
 ## M136. Composing ordinary calls before observation
 
 `LazyParcel` exports an abstract datatype and ordinary functions.

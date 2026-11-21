@@ -1,6 +1,9 @@
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}
 
-module WitnessedBatch (Batch(..), build, partial, partialTail, firstWidth) where
+module WitnessedBatch
+    ( Batch(..), build, partial, partialTail, firstWidth
+    , MaskedRow(..), maskedRow, partialRow, rowWidth
+    ) where
 
 import ExistentialVec (SN(..))
 import IndexedVec (Vec(..))
@@ -30,7 +33,24 @@ partialTail n = Chunk (SS SZ) (VCons n VNil) (error "unavailable next chunk")
 firstWidth :: Batch a -> Natural
 firstWidth End = 0
 firstWidth (Chunk size _ _) = width size
-  where
-    width :: SN n -> Natural
-    width SZ = 0
-    width (SS n) = 1 + width n
+
+-- | The values and their mask share one length.
+data MaskedRow a where
+    MaskedRow :: SN n -> Vec n a -> Char -> Vec n Bool -> MaskedRow a
+
+-- | Make a marked row with one selected value.
+maskedRow :: Natural -> MaskedRow Natural
+maskedRow n = MaskedRow (SS SZ) (VCons n VNil) 'x' (VCons True VNil)
+
+-- | Supply the length alone.
+partialRow :: Natural -> MaskedRow Natural
+partialRow _ = MaskedRow (SS SZ) (error "unused values") (error "unused label") (error "unused mask")
+
+-- | Read the width without inspecting the other fields.
+rowWidth :: MaskedRow a -> Natural
+rowWidth (MaskedRow size _ _ _) = width size
+
+-- | Count the successors of a length witness.
+width :: SN n -> Natural
+width SZ = 0
+width (SS n) = 1 + width n

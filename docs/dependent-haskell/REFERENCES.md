@@ -6082,6 +6082,14 @@ an ordinary consumer stop after reading the first witness.
 [ordinary batch](examples/closed-evaluation/WitnessedBatch.hs),
 and [R15 result check](roadmap/R15-closed-term-evaluator.md#read-back-a-recursive-result-with-witnessed-indices).
 
+Agda can express a row with a length, values, a label and a mask as
+`Σ[ n ∈ ℕ ] (Vec A n × Char × Vec Bool n)`. Both vectors use the
+index bound by the pair. The intervening label has a closed type.
+The fork checks the same relationship when it reads an ordinary Haskell
+constructor back from the interpreter.
+[Agda dependent pairs and products](https://agda.github.io/agda-stdlib/v2.4/Data.Product.Base.html)
+and [Agda vectors](https://agda.github.io/agda-stdlib/v2.4/Data.Vec.Base.html).
+
 ### Observing a composition and returning an open constructor
 
 In Haskell a constructor pattern inspects the outer value. A field

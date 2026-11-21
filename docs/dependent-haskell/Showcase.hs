@@ -1284,6 +1284,11 @@ main = do
             batch@(Batch.Chunk _ _ rest) -> [Batch.firstWidth batch, Batch.firstWidth rest]
             Batch.End -> []
         , Batch.firstWidth (Batch.partial 9) )
+    observe "check values and a mask at one stored length"
+        ( Refl :: Batch.maskedRow 4 :~:
+            'Batch.MaskedRow ('E.SS 'E.SZ) ('IndexedVec.VCons 4 'IndexedVec.VNil)
+                'x' ('IndexedVec.VCons 'True 'IndexedVec.VNil)
+        , Batch.rowWidth (Batch.partialRow 9) )
     observe "read one field of a private parcel without forcing the other"
         (Refl :: LazyParcel.first (LazyParcel.make 7) :~: 7, LazyParcel.first (LazyParcel.make 7))
     observe "construct a result from two symbolic fields"
