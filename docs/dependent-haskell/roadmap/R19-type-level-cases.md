@@ -229,10 +229,24 @@ type codec and rejects a runtime name used as an erased variable.
 [test](../../../testsuite/tests/dependent/should_run/NativeTypeCaseRetainedTh.sh).
 
 The retained and erased binders follow the distinction in proposal #378.
-Proposal #281 establishes visible erased quantification. Raw type-case
-quotation still has its own representation boundary.
+Proposal #281 establishes visible erased quantification.
 [Design #378](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#quantifiers),
 and [proposal #281](https://ghc-proposals.readthedocs.io/en/latest/proposals/0281-visible-forall.html).
+
+An inline case in `[t| foreach (b :: Bool) -> case b of … |]` uses `CaseT`.
+Its rows use the type-pattern syntax of closed family equations. A pattern
+variable binds in the result of its own row. The scrutinee uses `IndexVarT`
+for the actual retained binder. The case and its order survive the quotation.
+
+A declaration splice or a splice that supplies a complete top-level value
+signature can return the quoted type. The existing case checker then lifts
+the rows and preserves ordered reduction. This runs the splice and its
+module finalizer once in the ordinary order. Nested type splices and raw
+cases lifted inside declaration quotes retain their existing diagnostics.
+Reification describes the checked signature and its family applications.
+[External-interpreter fixture](../../../testsuite/tests/dependent/should_run/NativeTypeCaseRetainedThRaw.hs),
+[proposal #378 scoping review](https://github.com/ghc-proposals/ghc-proposals/pull/378#discussion_r524560765),
+and [Eisenberg and Stolarek, §4.7](https://richarde.dev/papers/2014/promotion/promotion.pdf).
 
 ### Quote and reify retained GADT constructors
 
