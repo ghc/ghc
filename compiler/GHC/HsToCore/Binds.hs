@@ -203,7 +203,7 @@ dsHsBind dflags (VarBind { var_id = var
   = do  { core_expr <- dsLExpr expr
                 -- Dictionary bindings are always VarBinds,
                 -- so we only need do this here
-        ; core_bind@(id,_) <- makeCorePair dflags var False core_expr
+        ; core_bind@(id,_) <- makeCorePair dflags (idName var) var False core_expr
         ; let force_var = if xopt LangExt.Strict dflags
                           then [id]
                           else []
@@ -218,7 +218,7 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
 
       ; let body' = mkOptTickBox tick body
             rhs   = core_wrap (mkLams args body')
-      ; core_binds@(id,_) <- makeCorePair dflags fun False rhs
+      ; core_binds@(id,_) <- makeCorePair dflags (idName fun) fun False rhs
       ; let force_var
                 -- Bindings are strict when -XStrict is enabled
               | xopt LangExt.Strict dflags
@@ -308,7 +308,7 @@ dsAbsBinds dflags tyvars dicts exports
        ; (spec_binds, rules) <- dsSpecs rhs prags
 
        ; let global_id' = addIdSpecialisations global_id rules
-       ; main_bind <- makeCorePair dflags global_id' (isDefaultMethod prags) rhs
+       ; main_bind <- makeCorePair dflags (idName global_id) global_id' (isDefaultMethod prags) rhs
 
        ; return (force_vars', fromOL spec_binds ++ [main_bind]) } }
 
@@ -391,10 +391,10 @@ dsAbsBinds dflags tyvars dicts exports
                    concat export_binds_s) }
   where
     mk_aux_bind :: (Id,CoreExpr) -> DsM (Id,CoreExpr)
-    mk_aux_bind (lcl_id, rhs) = let lcl_w_inline = lookupVarEnv inline_env lcl_id
-                                                   `orElse` lcl_id
-                                 in
-                                 makeCorePair dflags lcl_w_inline False rhs
+    mk_aux_bind (lcl_id, rhs) =
+      let lcl_w_inline = lookupVarEnv inline_env lcl_id `orElse` lcl_id
+          pragma_name = idName (lookupVarEnv global_env lcl_id `orElse` lcl_id)
+      in makeCorePair dflags pragma_name lcl_w_inline False rhs
 
     inline_env :: IdEnv Id -- Maps a monomorphic local Id to one with
                            -- the inline pragma from the source
@@ -445,9 +445,9 @@ dsAbsBinds dflags tyvars dicts exports
 -- the unfolding in the interface file is made in `GHC.Iface.Tidy.addExternal`
 -- using this information.
 ------------------------
-makeCorePair :: DynFlags -> Id -> Bool -> CoreExpr
+makeCorePair :: DynFlags -> Name -> Id -> Bool -> CoreExpr
              -> DsM (Id, CoreExpr)
-makeCorePair dflags gbl_id is_default_method rhs
+makeCorePair dflags pragma_name gbl_id is_default_method rhs
   | is_default_method
   , native_rhs
   , isRetainedVanillaDefaultMethod (idName gbl_id) (idType gbl_id)
@@ -471,11 +471,11 @@ makeCorePair dflags gbl_id is_default_method rhs
   , unf@CoreUnfolding { uf_tmpl = tmpl } <- realIdUnfolding (fst pair)
   , hasNativeDependentUnfolding tmpl
   -- See Note [Local retained package unfoldings] in GHC.Core.Tidy.
-  = if (isInternalName (idName gbl_id) || not (hasExistentialExpr tmpl))
+  = if (isInternalName pragma_name || not (hasExistentialExpr tmpl))
        && supportsNativeRuleBinds [NonRec (fst pair) tmpl]
     then pure (setIdUnfolding (fst pair) unf{uf_src = RetainedUserSrc}, snd pair)
-    else putSrcSpanDs (nameSrcSpan (idName gbl_id)) $
-           failWithDs (DsRetainedInlinePragma (idName gbl_id) inline_spec)
+    else putSrcSpanDs (nameSrcSpan pragma_name) $
+           failWithDs (DsRetainedInlinePragma pragma_name inline_spec)
 
   | otherwise
   = pure pair
@@ -529,6 +529,8 @@ GHC.Iface.Tidy.
 A local binding uses the same tag. The retained optimizer sees the
 stable template when it scans the binding. The tag stays attached if
 the binding floats without abstraction or occurs inside an exported template.
+Use the source name that owns the pragma to check the local package case.
+Desugaring can transfer a top-level pragma to an internal worker.
 Compulsory default-method unfoldings still use their separate check.
 An ordinary binding without an unfolding request needs no native scan here.
 -}

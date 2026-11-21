@@ -282,7 +282,7 @@ for opt in -O0 -O1 -O2; do
 done
 
 cat >TopPackage.hs <<'HS'
-{-# LANGUAGE ExperimentalDependentTypes #-}
+{-# LANGUAGE CPP, ExperimentalDependentTypes #-}
 module TopPackage (entry) where
 
 import Data.Kind (Type)
@@ -294,18 +294,25 @@ consume :: Hidden -> Int
 consume _ = 42
 
 {-# INLINABLE disallowed #-}
+#ifdef RECURSIVE
+disallowed n = if n == 0 then consume (Just n :: Hidden) else peer (n - 1)
+peer n = disallowed n
+#else
 disallowed :: Int -> Int
 disallowed n = consume (Just n :: Hidden)
+#endif
 
 entry :: Int -> Int
 entry n = disallowed n
 HS
-if "${ghc[@]}" -O1 -fdiagnostics-color=never -fforce-recomp -c TopPackage.hs > residual.log 2>&1; then
-    echo 'Accepted a top-level stable unfolding containing an erased package operation'
-    exit 1
-fi
-grep -qFx 'TopPackage.hs:14:1: error: [GHC-92256]' residual.log
-grep -q 'The INLINABLE unfolding of .*disallowed.* contains unsupported retained Core.' residual.log
+for define in -URECURSIVE -DRECURSIVE; do
+    if "${ghc[@]}" "$define" -O1 -fdiagnostics-color=never -fforce-recomp -c TopPackage.hs > residual.log 2>&1; then
+        echo "Accepted a top-level package template ($define)"
+        exit 1
+    fi
+    grep -qE '^TopPackage.hs:[0-9]+:1: error: \[GHC-92256\]$' residual.log
+    grep -q 'The INLINABLE unfolding of .*disallowed.* contains unsupported retained Core.' residual.log
+done
 
 cp "$src"/{FinitePosition,ParameterizedIndexLibrary,PackedVecLibrary}.hs .
 cat >FinConstruction.hs <<'HS'
