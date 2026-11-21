@@ -13,3 +13,19 @@ GadtOrderedTelescopeScope.hs:11:34: error: [GHC-39999]
     • In the expression: x == x
       In the expression: \ x -> x == x
       In the pattern: (\ x -> x == x) -> result
+
+GadtOrderedTelescopeScope.hs:17:19: error: [GHC-25897]
+    • Couldn't match type ‘a’ with ‘Int’
+      Expected: (a, a)
+        Actual: (Int, Int)
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          badField :: forall a. Fenced a -> Int
+        at GadtOrderedTelescopeScope.hs:16:1-27
+    • When checking that the pattern signature: (Int, Int)
+        fits the type of its context: (a, a)
+      In the pattern: x :: (Int, Int)
+      In the pattern: Fenced (x :: (Int, Int))
+    • Relevant bindings include
+        badField :: Fenced a -> Int
+          (bound at GadtOrderedTelescopeScope.hs:17:1)
