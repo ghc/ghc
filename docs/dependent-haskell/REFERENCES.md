@@ -3321,12 +3321,21 @@ for the producer's usage. The strict pattern uses the inferred multiplicity
 when matching the payload.
 [GHC Proposal 111, let and where bindings](https://ghc-proposals.readthedocs.io/en/latest/proposals/0111-linear-types.html#let-and-where-bindings).
 
-For a lexical binding, a polymorphic wrapper can forward one closed
-package schema through its result parameter. A leading visible argument
+For a lexical binding, a polymorphic wrapper can forward one package
+schema through its result parameter. A leading visible argument
 can select a declared multiplicity binder. GHC skips inferred binders
 when counting visible type arguments. The probe uses that ordering
 and the ordinary call checker checks the argument and its usage.
 [GHC User's Guide, inferred and specified type variables](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_applications.html#inferred-vs-specified-type-variables).
+
+The forwarded schema can include a scoped parameter, as in
+`exists b. (b, b %1 -> a)`.
+Check that each free variable is rigid and already free in the complete
+type of the selected operand. The probe can skip a producer's `forall` to
+read its result shape. The producer's variables still need instantiation.
+An outer erased opening can supply a rigid variable through its local
+binding's type.
+[GHC User's Guide, lexically scoped type variables](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/scoped_type_variables.html#overview).
 
 Agda checks the clauses of an indexed function against its telescope.
 GHC keeps its ordinary match group for equations on a packaged argument.

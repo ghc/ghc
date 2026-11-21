@@ -405,7 +405,7 @@ for opt in 0 2; do
     "$ghc" "${let_flags[@]}" -c "$src/LexicalLetProvider.hs" -outputdir .
     cd ../client
     cp ../provider/LexicalLetProvider.hi "$src/"{LexicalLetMain,LexicalLetReject,LexicalBangLet,LexicalStrictLet}.hs \
-        "$src/"{LexicalStrictLetReject,LexicalLinearLet,LexicalLinearLetReject}.hs .
+        "$src/"{LexicalStrictLetReject,LexicalLinearLet,LexicalLinearLetReject,LexicalOpenReject}.hs .
     linear_lint=()
     if [[ $opt == 0 ]]; then linear_lint=(-dlinear-core-lint); fi
     "$ghc" "${let_flags[@]}" "${linear_lint[@]}" -c LexicalLinearLet.hs LexicalStrictLet.hs
@@ -414,7 +414,8 @@ for opt in 0 2; do
         ../provider/LexicalLetProvider.o -o run
     ./run >lexical-let.out
     printf '%s\n' '((1,1),(98,98),77)' "(True,(True,98),(True,'x'))" \
-        '(["True","bottom package","bottom package","True"],77,77,98)' '(5,9)' '(5,9,5)' |
+        '(["True","bottom package","bottom package","True"],77,77,98)' '(5,9)' '(5,9,5)' \
+        "(13,'q',120,True,\"bottom package\")" |
         diff -u - lexical-let.out
     if "$ghc" "${let_flags[@]}" -c LexicalLetReject.hs >lexical-let-reject.log 2>&1; then
         echo "LexicalLetReject unexpectedly compiled." >&2
@@ -462,6 +463,19 @@ for opt in 0 2; do
         grep -Eq "^LexicalLinearLetReject.hs:$line:$column: error: \[GHC-$code\]" linear-let-reject.log ||
             { cat linear-let-reject.log >&2; exit 1; }
     done
+    if "$ghc" "${let_flags[@]}" -c LexicalOpenReject.hs >open-let-reject.log 2>&1; then
+        echo "LexicalOpenReject unexpectedly compiled." >&2
+        exit 1
+    fi
+    for rejection in wrongResult:2:6 escapeWitness:2:6 escapeOuter:3:9; do
+        IFS=: read -r reader offset column <<< "$rejection"
+        line=$(grep -n "^$reader .* =$" LexicalOpenReject.hs | cut -d: -f1)
+        grep -Eq "^LexicalOpenReject.hs:$((line + offset)):$column: error: \[GHC-25897\]" open-let-reject.log ||
+            { cat open-let-reject.log >&2; exit 1; }
+    done
+    line=$(grep -nF '(freshOpenPayload True)' LexicalOpenReject.hs | cut -d: -f1)
+    grep -Eq "^LexicalOpenReject.hs:$line:[0-9]+: error: \[GHC-83865\]" open-let-reject.log ||
+        { cat open-let-reject.log >&2; exit 1; }
 done
 
 # Only an opening serialized in the interface needs the linear reader.
