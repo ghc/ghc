@@ -514,6 +514,13 @@ checks the whole retained function and preserves demand on the callback
 and its runtime index.
 [Ordinary client](../examples/open-evaluation/ConstrainedElementsClient.hs).
 
+With `ImpredicativeTypes`, a fixed call telescope can still check a declared
+retained callback by ordinary subsumption. A nested call with a fixed ordinary
+result can use the same check. Quick Look still rejects instantiating a type
+variable with the retained polytype, as in
+`Just reflectMaybe :: Maybe (forall a. Reflection a)`.
+[Quick Look argument checking](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf#page=12).
+
 With `DeepSubsumption`, an ordinary arrow can also
 return a wrapper that supplies a dictionary lambda for the retained suffix.
 Check the instantiated domain first. Then solve the complete retained
