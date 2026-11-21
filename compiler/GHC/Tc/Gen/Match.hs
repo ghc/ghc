@@ -1151,8 +1151,8 @@ tcRetainedVarMatches herald ctxt initial_ty source_pats = go [] initial_ty initi
     go acc ty pats thing_inside
       | (theta, _) <- tcSplitPhiTy ty, not (null theta)
       = split_suffix acc ty pats RetainedContextPattern thing_inside
-      | ForAllTy _ binder _ <- coreFullView ty
-      , isInvisibleForAllTyFlag (binderFlag binder)
+      | ForAllTy{} <- coreFullView ty
+      , not (leading_required ty acc)
       , not (null pats) || trailing_erased
       = split_suffix acc ty pats RetainedResultWrapper thing_inside
     go acc ty [] thing_inside = finish acc (mkCheckExpType ty) Nothing thing_inside
@@ -1186,11 +1186,13 @@ tcRetainedVarMatches herald ctxt initial_ty source_pats = go [] initial_ty initi
       | otherwise = False
 
     split_suffix acc ty pats err thing_inside
-      = do { let prefix = length (filter (isVisibleExpPatType . fst) acc)
-           ; strict <- xoptM LangExt.Strict
-           ; unless (null pats || (not strict && all nonforcing_pattern (take prefix initial_pats))) $
+      = do { strict <- xoptM LangExt.Strict
+           ; let visible = filter isVisibleExpPatType (map fst (reverse acc))
+                 can_split ty pat = not (isExpFunPatType ty) ||
+                                    (not strict && nonforcing_pattern pat)
+           ; unless (null pats || and (zipWith can_split visible initial_pats)) $
                failWithTc (TcRnRetainedQuantificationError err)
-           ; finish acc (mkCheckExpType ty) (Just prefix) thing_inside }
+           ; finish acc (mkCheckExpType ty) (Just (length visible)) thing_inside }
 
     nonforcing_pattern (L _ pat) = case pat of
       VarPat{} -> True
@@ -1265,8 +1267,9 @@ The signature's inner forall alone does not scope a name over the equation.
 A MatchGroupTc stores a list of runtime argument types and one result type.
 It cannot store a type or evidence lambda between runtime arguments.
 Partition the match only when there are no later runtime patterns, or
-when the prefix cannot force an argument. A split at a strict pattern
-would make a partial application force that pattern too early.
+when the prefix cannot force an argument. Count a required type pattern
+in a visible source position. It has no runtime demand. A split at a
+strict value pattern would force that pattern too early.
 See docs/dependent-haskell/REFERENCES.md#alternating-retained-and-erased-binders.
 -}
 

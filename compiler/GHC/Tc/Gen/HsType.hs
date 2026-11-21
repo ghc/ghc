@@ -621,9 +621,9 @@ tcCheckRetainedType allow_function = go
     go mode (L loc ty@(HsForAllTy { hst_tele = tele@HsForAllVis{}
                                  , hst_body = body })) kind
       | allow_function
-      , isEmptyNameEnv (mode_indices mode)
-      , hsHasForEachTy (unLoc body)
+      , not (isEmptyNameEnv (mode_indices mode)) || hsHasForEachTy (unLoc body)
       = setSrcSpanA loc $
+        tcExtendIdEnv (nonDetNameEnvElts (mode_indices mode)) $
         tc_vis_forall_type mode ty tele (go mode body) (Check kind)
     go mode (L loc ty@(HsForEachTy ann bndrs body)) kind
       = setSrcSpanA loc $
@@ -838,8 +838,8 @@ A required forall in a complete signature keeps the retained checker for
 its body. For example, forall (p :: a %U -> Bool) -> can precede a retained
 callback on a. Its type variable is erased, and the ordinary telescope
 checker still binds it. This preserves the required argument and the normal
-ambiguity check. The retained signature checker still rejects a forall that
-would enclose already scoped runtime indices.
+ambiguity check. A required forall can also follow a retained binder in a
+complete signature. Its binder kinds and body can see the preceding indices.
 
 The application checker supplies the closure's expected type. A source lambda
 uses Note [Checked retained lambdas] in GHC.Tc.Gen.Match. A named function can
@@ -6294,6 +6294,7 @@ tcTKTelescope mode tele thing_inside =
       HsForAllVis { hsf_vis_bndrs = bndrs }
         -> do { skol_info <- mkSkolemInfo (ForAllSkol (HsTyVarBndrsRn (unLoc <$> bndrs)))
               ; let skol_mode = smVanilla { sm_clone = False, sm_holes = mode_holes mode
+                                          , sm_indices = mode_indices mode
                                           , sm_tvtv = SMDSkolemTv skol_info }
               ; (req_tv_bndrs, thing) <- tcExplicitTKBndrsX skol_mode bndrs thing_inside
                 -- req_tv_bndrs :: [VarBndr TyVar ()],

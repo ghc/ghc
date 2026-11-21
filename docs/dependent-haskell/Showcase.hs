@@ -266,6 +266,8 @@ booleans = do
         (VisibleRuleClient.readAfter ignoredFirst readingIndex 43)
     observe "select an erased type between two lazy runtime indices"
         (VisibleRuleClient.readTagged ignoredFirst lazyIndex 47)
+    observe "pass a required type between lazy runtime indices"
+        (VisibleRuleClient.readRequired ignoredFirst lazyIndex 53)
     observe "apply a rule declared outside the retained function's module"
         (Rule.readChoice (Rule.keep True (ImportedRetainedRules.tagged 23)))
     observe "choose True has result Int" (choose True)

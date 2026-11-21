@@ -19,7 +19,7 @@ main = do
     m <- newIORef (Just True) >>= readIORef
     bottom <- newIORef (error "forced reading index" :: Maybe Bool) >>= readIORef
     ignored <- newIORef (error "forced first argument") >>= readIORef
-    print (readAt m 37, readAt bottom 19, readAfter ignored m 43, readTagged ignored bottom 47)
+    print (readAt m 37, readAt bottom 19, readAfter ignored m 43, readTagged ignored bottom 47, readRequired ignored bottom 53)
 HS
 
 for opt in 0 2; do
@@ -29,13 +29,14 @@ for opt in 0 2; do
     cd "$out/client"
     "$ghc" "${flags[@]}" -O"$opt" -ddump-rule-firings -c VisibleRuleClient.hs >firings
     if [[ $opt == 2 ]]; then
+        grep -Fq 'Rule fired: keepRequired/Bool (VisibleRuleArguments)' firings || { cat firings; exit 1; }
         grep -Fq 'Rule fired: keepTagged/Bool (VisibleRuleArguments)' firings || { cat firings; exit 1; }
         grep -Fq 'Rule fired: keepAfter/Bool (VisibleRuleArguments)' firings || { cat firings; exit 1; }
         grep -Fq 'Rule fired: keepReading/Bool (VisibleRuleArguments)' firings || { cat firings; exit 1; }
     fi
     "$ghc" "${flags[@]}" -O"$opt" -c Main.hs
     "$ghc" "-B$lib" Main.o VisibleRuleClient.o ../provider/VisibleRuleArguments.o -o observe
-    [[ $(./observe) == '(37,19,43,47)' ]]
+    [[ $(./observe) == '(37,19,43,47,53)' ]]
 done
 
 cd "$out/provider"
@@ -109,3 +110,30 @@ if "$ghc" "${flags[@]}" -O2 -c Independent.hs >bad.log 2>&1 ||
 fi
 sed 's/x :: Reading other/x :: Reading m/' Independent.hs >SameIndex.hs
 "$ghc" "${flags[@]}" -O2 -c SameIndex.hs
+
+cd "$out/client"
+cat >WrongRequired.hs <<'HS'
+{-# LANGUAGE CPP, ExplicitNamespaces, NoExperimentalDependentTypes, RequiredTypeArguments, TypeApplications #-}
+module WrongRequired where
+import VisibleRuleArguments
+
+bad :: Bool -> Maybe Bool -> Int
+#if CASE == 1
+bad tag m = case keepRequired tag m (TaggedReading 0) of TaggedReading n -> n
+#elif CASE == 2
+bad tag m = case keepRequired tag (type Bool) m (TaggedReading 0) True of TaggedReading n -> n
+#else
+bad tag m = case keepRequired tag @Bool m (TaggedReading 0) of TaggedReading n -> n
+#endif
+HS
+for n in 1 2 3; do
+    if "$ghc" "${flags[@]}" "-DCASE=$n" -c WrongRequired.hs >bad.log 2>&1; then
+        echo "Accepted malformed required argument case $n" >&2
+        exit 1
+    fi
+    case $n in
+        1) grep -Fq '[GHC-45510]' bad.log || { cat bad.log; exit 1; } ;;
+        2) grep -Fq 'applied to five visible arguments' bad.log || { cat bad.log; exit 1; } ;;
+        3) grep -Fq '[GHC-95781]' bad.log || { cat bad.log; exit 1; } ;;
+    esac
+done

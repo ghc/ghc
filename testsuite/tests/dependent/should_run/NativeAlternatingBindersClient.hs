@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeApplications, DataKinds, GADTs #-}
+{-# LANGUAGE DataKinds, ExplicitNamespaces, GADTs, RequiredTypeArguments, TypeApplications #-}
 module Main where
 import Control.Exception (ErrorCall, evaluate, try)
 import Data.IORef
@@ -41,3 +41,5 @@ main = do
   proof <- try (evaluate $ case keepCons phase @Bool xs (error "demanded proof") (ConsReading 63) of
                   ConsReading n -> n) :: IO (Either ErrorCall Int)
   print (either ((== "demanded proof") . takeWhile (/= '\n') . show) (const False) proof)
+  print (partlyRequired badB (type Bool) badM (+1) (Reading 70))
+  print (case requiredKind False (type 'EQ) Marker of Marker -> (72 :: Int))

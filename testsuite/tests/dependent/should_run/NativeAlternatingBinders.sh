@@ -41,6 +41,14 @@ if "${ghc[@]}" -XNoExperimentalDependentTypes -c WrongKind.hs >reject.log 2>&1; 
 fi
 grep -Fq "Couldn't match kind ‘Ordering’ with ‘Bool’" reject.log || { cat reject.log >&2; exit 1; }
 
+sed -e 's/TypeApplications/ExplicitNamespaces, RequiredTypeArguments/' \
+    -e "s/forwardKind True @'EQ/requiredKind True (type 'EQ)/" WrongKind.hs >WrongRequiredKind.hs
+if "${ghc[@]}" -XNoExperimentalDependentTypes -c WrongRequiredKind.hs >reject.log 2>&1 ||
+   ! grep -Fq "Couldn't match kind ‘Ordering’ with ‘Bool’" reject.log; then
+    cat reject.log >&2
+    exit 1
+fi
+
 cat >WrongIndex.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, PolyKinds, TypeAbstractions #-}
 module WrongIndex where

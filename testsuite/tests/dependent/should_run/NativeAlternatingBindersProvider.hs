@@ -1,9 +1,9 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, PolyKinds, ScopedTypeVariables #-}
-{-# LANGUAGE GADTs, TypeAbstractions, TypeFamilies, TypeOperators #-}
+{-# LANGUAGE ExplicitNamespaces, GADTs, RequiredTypeArguments, TypeAbstractions, TypeFamilies, TypeOperators #-}
 module NativeAlternatingBindersProvider
   ( Reading(..), Marker(..), keepAfter, keepExplicit, keepImplicit
   , forwardKind, sameSpelling, twice, plainFirst, showAfter
-  , Phase(..), ConsReading(..), keepCons ) where
+  , Phase(..), ConsReading(..), keepCons, requiredKind, partlyRequired ) where
 import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
@@ -63,3 +63,19 @@ keepCons _ _ proof x = case proof of Refl -> x
 
 {-# RULES "keepCons/Bool" forall phase xs proof x.
     keepCons phase @Bool xs proof x = case proof of Refl -> x #-}
+
+requiredKind :: foreach (b :: Bool) -> forall (a :: K b) ->
+                Marker (K b) a -> Marker (K b) a
+requiredKind b (type a) x =
+  let result :: Marker (K b) a
+      result = x
+  in result
+
+readRequired :: forall (r :: Type) -> foreach (b :: Bool) ->
+                forall (a :: Type) -> foreach (m :: Maybe a) ->
+                (Int -> r) -> Reading b m -> r
+readRequired (type r) _ (type a) _ emit (Reading n) = emit n
+
+partlyRequired :: foreach (b :: Bool) -> forall (a :: Type) -> foreach (m :: Maybe a) ->
+                  (Int -> Int) -> Reading b m -> Int
+partlyRequired b = readRequired (type Int) b

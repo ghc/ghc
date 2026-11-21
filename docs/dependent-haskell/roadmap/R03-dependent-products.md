@@ -216,6 +216,14 @@ indices and returns 47. At `-O2`, the imported R05 rule fires.
 [ordinary client](../examples/qualified-pi/VisibleRuleClient.hs) and
 [checks](../examples/qualified-pi/check-visible-rule-arguments.sh).
 
+A required `forall a ->` can also follow a retained argument.
+`keepRequired tag (type Bool) m x` checks the type in that source
+position. Its kind can refer to a preceding runtime index. A partial
+application before the required argument keeps the required binder.
+Flat equations split at that binder when the prefix has no strict
+value patterns. An explicit curried equation can express a strict prefix.
+The R05 rule for `keepRequired` signs its later dependent binders.
+
 ## Completion boundary
 
 Keep R03 open until the supported domain judgment is stable under substitution
