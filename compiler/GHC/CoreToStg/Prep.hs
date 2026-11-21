@@ -10,7 +10,7 @@ Core pass to saturate constructors and PrimOps
 module GHC.CoreToStg.Prep
    ( CorePrepConfig (..)
    , CorePrepPgmConfig (..)
-   , corePrepPgm
+   , corePrepPgm, corePrepScopedDictionaryPgm
    , corePrepExpr
    )
 where
@@ -33,7 +33,8 @@ import GHC.Builtin.WiredIn.Ids ( realWorldPrimId )
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity
 import GHC.Core.Lint    ( EndPassConfig(..), LintPassResultConfig(..), LintFlags(..)
-                        , endPassIO, lintPassResult )
+                        , endPassIO, lintPassResult
+                        , endScopedDictionaryPassIO, lintScopedDictionaryPassResult )
 import GHC.Core hiding( FloatBind(..) )
 import GHC.Core.FVs (exprFreeVars)
 import GHC.Core.Dependent
@@ -244,8 +245,16 @@ corePrepPgm :: Logger
             -> CorePrepPgmConfig
             -> Module -> CoreProgram
             -> IO CoreProgram
-corePrepPgm logger cp_cfg pgm_cfg
-            this_mod binds =
+corePrepPgm = corePrepPgmWith False
+
+-- | Prepare a checked in-memory dictionary program for the native backend.
+corePrepScopedDictionaryPgm :: Logger -> CorePrepConfig -> CorePrepPgmConfig
+                            -> Module -> CoreProgram -> IO CoreProgram
+corePrepScopedDictionaryPgm = corePrepPgmWith True
+
+corePrepPgmWith :: Bool -> Logger -> CorePrepConfig -> CorePrepPgmConfig
+                -> Module -> CoreProgram -> IO CoreProgram
+corePrepPgmWith scoped logger cp_cfg pgm_cfg this_mod binds =
     withTiming logger
                (text "CorePrep"<+>brackets (ppr this_mod))
                (\a -> a `seqList` ()) $ do
@@ -254,6 +263,7 @@ corePrepPgm logger cp_cfg pgm_cfg
     -- See Note [CorePrep for retained dependent programs].
     checked_end_pass_cfg <- if native
       then do
+        unless scoped $ rejectScopedDictionaryProgram binds
         unless (cp_allowNativeDependent cp_cfg) $
           rejectNativeDependentProgram "CorePrep" binds []
         when (cp_specEval cp_cfg || cp_specEvalDFun cp_cfg
@@ -265,14 +275,15 @@ corePrepPgm logger cp_cfg pgm_cfg
             "Native dependent Core requires CorePrep program Lint before and after preparation.")
           Just lint_cfg -> do
             let checked_lint_cfg = lint_cfg { lpr_preSubst = False }
-            lintPassResult logger
+            let lint = if scoped then lintScopedDictionaryPassResult else lintPassResult
+            lint logger
               (checked_lint_cfg { lpr_passPpr = text "before native CorePrep" })
               binds
             let lint_flags = (lpr_makeLintFlags checked_lint_cfg) { lf_after_core_prep = True }
             return (end_pass_cfg { ep_lintPassResult =
                       Just (checked_lint_cfg { lpr_makeLintFlags = lint_flags }) })
       else return end_pass_cfg
-    let initialCorePrepEnv = mkInitialCorePrepEnv cp_cfg
+    let initialCorePrepEnv = mkInitialCorePrepEnv scoped cp_cfg
 
     us <- mkSplitUniqSupply StgTag
     let
@@ -280,14 +291,17 @@ corePrepPgm logger cp_cfg pgm_cfg
                  corePrepTopBinds initialCorePrepEnv binds
         binds_out = deFloatTop native floats
 
-    endPassIO logger checked_end_pass_cfg
-              binds_out []
+    let end_pass = if scoped then endScopedDictionaryPassIO else endPassIO
+    end_pass logger checked_end_pass_cfg binds_out []
 
     return binds_out
 
 {- Note [CorePrep for retained dependent programs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The native program path preserves retained algebraic types until CoreToStg.
+A scoped selector requires a variable receiver until CoreToStg erases
+the index. Preserve a local binding for a constructor such as True
+when inlining its RHS would change a variable index to a constructor.
 The caller must disable speculation and optional arity analysis. It must
 also supply the CorePrep Lint configuration, including its weak-join rules.
 CorePrep checks the input and output even without -dcore-lint. These checks
@@ -307,11 +321,13 @@ docs/dependent-haskell/REFERENCES.md#haskell-evaluation-provenance.
 
 corePrepExpr :: Logger -> CorePrepConfig -> CoreExpr -> IO CoreExpr
 corePrepExpr logger config expr = do
-    unless (cp_allowNativeDependent config) $
-      rejectNativeDependentExpr "CorePrep" expr
+    if cp_allowNativeDependent config
+      then when (hasNativeDependentExpr expr) $
+             rejectScopedDictionaryExpr expr
+      else rejectNativeDependentExpr "CorePrep" expr
     withTiming logger (text "CorePrep [expr]") (\e -> e `seq` ()) $ do
       us <- mkSplitUniqSupply StgTag
-      let initialCorePrepEnv = mkInitialCorePrepEnv config
+      let initialCorePrepEnv = mkInitialCorePrepEnv False config
       let new_expr = initUs_ us (cpeBody initialCorePrepEnv expr)
       putDumpFileMaybe logger Opt_D_dump_prep "CorePrep" FormatCore (ppr new_expr)
       return new_expr
@@ -663,12 +679,20 @@ cpeBind top_lvl env (NonRec bndr rhs)
        ; return (env2, floats1, Nothing) }
   where
     native_rhs_ok bndr rhs
+      | isNativeClassDictionaryId bndr
+      = case rhs of
+          Var actual -> isNativeClassDictionaryId actual && idType actual `eqType` idType bndr
+          _ -> False
       | isNativeIndexFunctionId bndr
       = case rhs of
           Var fun -> isNativeIndexFunctionId fun
                   && idType fun `eqType` idType bndr
           _ -> False
-      | isNativeOpaqueValueId bndr = isJust (exprToNativeIndex rhs)
+      | isNativeOpaqueValueId bndr
+      = case exprToNativeIndex rhs of
+          Just TermVarTy{} -> True
+          Just _ -> not (cpe_scoped_dicts env)
+          Nothing -> False
       | otherwise = True
 
 cpeBind top_lvl env (Rec pairs)
@@ -3186,6 +3210,7 @@ data CorePrepEnv
         -- the case where a function we think should bottom
         -- unexpectedly returns.
 
+        , cpe_scoped_dicts :: Bool -- ^ A selector must retain its receiver variable.
         , cpe_subst :: Subst  -- ^ See Note [CorePrepEnv: cpe_subst]
 
         , cpe_rec_ids :: UnVarSet -- Faster OutIdSet; See Note [Speculative evaluation]
@@ -3193,9 +3218,10 @@ data CorePrepEnv
         , cpe_context :: [OccName] -- ^ See Note [Binder context]
     }
 
-mkInitialCorePrepEnv :: CorePrepConfig -> CorePrepEnv
-mkInitialCorePrepEnv cfg = CPE
-      { cpe_config        = cfg
+mkInitialCorePrepEnv :: Bool -> CorePrepConfig -> CorePrepEnv
+mkInitialCorePrepEnv scoped cfg = CPE
+      { cpe_scoped_dicts  = scoped
+      , cpe_config        = cfg
       , cpe_subst         = emptySubst
       , cpe_rec_ids       = emptyUnVarSet
       , cpe_context       = []

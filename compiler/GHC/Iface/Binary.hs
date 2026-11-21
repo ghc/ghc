@@ -318,7 +318,14 @@ writeBinIface profile traceBinIface compressionLevel hi_path mod_iface = do
           | otherwise = base_version
     writeHeader bh version
     payload <- tellBinWriter bh
-    evidence <- putIfaceWithExtFields traceBinIface compressionLevel bh mod_iface
+    recorded <- putIfaceWithExtFields traceBinIface compressionLevel bh mod_iface
+    -- A selector definition may bind a dictionary without making a dependent
+    -- dictionary application. The complete Core payload still needs its reader.
+    let evidence
+          | isJust (mi_simplified_core mod_iface)
+          , Set.member ExperimentalScopedDictionaryEvidence recorded
+          = Set.insert ExperimentalScopedDictionaryCoreEvidence recorded
+          | otherwise = recorded
     if Set.null evidence
       then writeBinMem bh hi_path
       else do
@@ -342,7 +349,9 @@ evidenceSuffix requirements
     || needs IndexedConstructorExistentialCaseEvidence || needs GeneralIndexedConstructorOperandEvidence
     || needs RetainedUserUnfoldingEvidence || needs LinearUnpackEvidence
     || needs RetainedCharOperandEvidence || needs MatchableProjectionEvidence
-    || needs RetainedNaturalOperandEvidence = feature_set
+    || needs RetainedNaturalOperandEvidence
+    || needs ExperimentalScopedDictionaryEvidence
+    || needs ExperimentalScopedDictionaryCoreEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -372,6 +381,8 @@ legacyEvidenceSuffix LinearUnpackEvidence = featureSetPrefix ++ "linear-unpack"
 legacyEvidenceSuffix RetainedCharOperandEvidence = featureSetPrefix ++ "retained-char-operand"
 legacyEvidenceSuffix MatchableProjectionEvidence = featureSetPrefix ++ "matchable-projection"
 legacyEvidenceSuffix RetainedNaturalOperandEvidence = featureSetPrefix ++ "retained-natural-operand"
+legacyEvidenceSuffix ExperimentalScopedDictionaryEvidence = featureSetPrefix ++ "experimental-scoped-dictionary"
+legacyEvidenceSuffix ExperimentalScopedDictionaryCoreEvidence = featureSetPrefix ++ "experimental-scoped-dictionary-core-v3"
 legacyEvidenceSuffix GeneralIndexedConstructorOperandEvidence = featureSetPrefix ++ "general-indexed-constructor-operand"
 legacyEvidenceSuffix DepFunCoEvidence           = "-retained-depfunco-v1"
 legacyEvidenceSuffix ConstructorCaseEvidence   = "-retained-constructor-case-v1"
@@ -409,7 +420,9 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("linear-unpack", LinearUnpackEvidence)
                       , ("retained-char-operand", RetainedCharOperandEvidence)
                       , ("matchable-projection", MatchableProjectionEvidence)
-                      , ("retained-natural-operand", RetainedNaturalOperandEvidence) ]
+                      , ("retained-natural-operand", RetainedNaturalOperandEvidence)
+                      , ("experimental-scoped-dictionary", ExperimentalScopedDictionaryEvidence)
+                      , ("experimental-scoped-dictionary-core-v3", ExperimentalScopedDictionaryCoreEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion

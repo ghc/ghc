@@ -65,7 +65,7 @@ import {-# SOURCE #-} GHC.Tc.Solver ( tcRewriteFamilyAxioms )
 
 import GHC.Hs
 import GHC.Tc.Errors.Types ( HsCtxt(..), TcRnMessage(TcRnRetainedQuantificationError)
-                           , RetainedQuantificationError(RetainedPatternType) )
+                           , RetainedQuantificationError(RetainedPatternType, RetainedSolverType) )
 import GHC.Tc.Instance.Family ( tcGetFamInstEnvs )
 import GHC.Tc.Utils.Concrete
 import GHC.Tc.Utils.Env
@@ -1783,11 +1783,38 @@ tcSubTypeAmbiguity ctxt ty
              orig = AmbiguityCheckOrigin ctxt
        ; snd <$> checkConstraints sig_skol skol_tvs given
            (if has_retained rho_ty
-            then do { (_, rho_actual) <- topInstantiate orig ty
-                    ; compare_rho rho_actual rho_ty }
+            then do { (_, actual) <- topInstantiate orig ty
+                    ; case coreFullView actual of
+                        DepDictTy{} -> do
+                          align_receivers actual rho_ty
+                          opened <- open_dictionaries orig given actual
+                          tcExtendIdEnv given (compare_rho opened rho_ty)
+                        _ -> compare_rho actual rho_ty }
             else do { _ <- tc_sub_type_shallow (unifyType Nothing) orig ty rho_ty
                     ; pure [] }) }
   where
+    -- See Note [Ambiguity checking retained signatures].
+    align_receivers actual expected = case (coreFullView actual, coreFullView expected) of
+      (DepDictTy _ body, _) -> align_receivers body expected
+      (FunTy af _ _ _ body, _) | isInvisibleFunArg af -> align_receivers body expected
+      (DepFunTy DepFunVisible a as, DepFunTy DepFunVisible e es) -> do
+        when (isJust (getTyVar_maybe (varType a)) && isJust (getTyVar_maybe (varType e))) $
+          void $ unifyType Nothing (varType a) (varType e)
+        align_receivers as es
+      (FunTy af _ _ _ as, FunTy ef _ _ _ es)
+        | isVisibleFunArg af && isVisibleFunArg ef -> align_receivers as es
+      _ -> pure ()
+
+    open_dictionaries orig given actual
+      | DepDictTy binder _ <- coreFullView actual
+      = do { actual' <- liftZonkM (zonkTcType actual)
+           ; pred_ty <- liftZonkM (zonkTcType (varType binder))
+           ; case [d | d <- given, varType d `tcEqType` pred_ty] of
+               [d] -> do { (_, rest) <- topInstantiate orig (applyTypeToArgs actual' [Core.Var d])
+                         ; open_dictionaries orig given rest }
+               _ -> failWithTc $ TcRnRetainedQuantificationError (RetainedSolverType actual') }
+      | otherwise = pure actual
+
     -- Look only at the telescope and at ordinary function arguments.
     has_retained (DepFunTy DepFunVisible _ _) = True
     has_retained (ForAllTy _ _ body)          = has_retained body
@@ -1863,6 +1890,14 @@ Traverse both sides of ordinary arrows. Under an erased forall in a
 higher-rank argument, make a common skolem and keep the body check in
 its implication. Check equality under the binder. Keep the ordinary
 shallow subsumption path for types without a visible retained telescope.
+
+For a scoped class method, the receiver also selects its dictionary.
+Compare the bare type variables in corresponding visible retained domains
+before opening the actual dictionary binder. This is the same domain
+equality that compare_rho checks below. Open the binder with the unique
+Given at its instantiated predicate. Both copies of the method index now
+refer to the same evidence. The ordinary ambiguity check still compares
+the rest of the signature and solves any other class constraints.
 
 The fresh runtime Ids scope over their body constraints and remain
 available during ambiguity solving. The check discards all evidence and
@@ -4259,6 +4294,8 @@ simpleUnifyCheck caller given_eq_lvl lhs_tv rhs
     rhs_is_bad (TermAppTy {}) = True
     rhs_is_bad (TermVarTy {}) = True
     rhs_is_bad (DepFunTy {})  = True
+    rhs_is_bad (ClassAppTy {}) = True
+    rhs_is_bad (DepDictTy {})  = True
     rhs_is_bad ty@ExistsTy{} = lhs_tv_is_concrete || not (isTauTy ty)
     rhs_is_bad (TyVarTy tv) = rhs_tcv_is_bad tv
 
@@ -4949,6 +4986,9 @@ check_ty_eq_rhs flags ty
               ; return (mkDepFunRedn vis index <$> body_res) }
         | otherwise
         -> return $ PuFail impredicativeProblem
+      -- The immutable Given exception above does not validate dictionary scope.
+      ClassAppTy {}   -> return $ PuFail (cteProblem cteSkolemEscape)
+      DepDictTy {}    -> return $ PuFail impredicativeProblem
       LitTy {}        -> return $ okCheckRefl ty
       TyConApp tc tys -> checkTyConApp flags ty tc tys
       TyVarTy tv      -> checkTyVar flags tv

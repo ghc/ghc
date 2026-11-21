@@ -162,6 +162,10 @@ import qualified OpenConstructorWorker as W
 import qualified NativeMultiPackage as Packages
 import Numeric.Natural (Natural)
 import qualified OpenSource
+import qualified OrdinaryScopedComparison
+import qualified OrdinaryScopedChoice
+import qualified ScopedClassMethod as Choice
+import qualified ScopedClassMethodClient
 import qualified Signal
 import qualified PreludePairExport
 import qualified OpaqueCallClient as Opaque
@@ -1020,6 +1024,18 @@ main = do
     enabled <- readIORef fieldFlag
     writeIORef fieldFlag False
     disabled <- readIORef fieldFlag
+    observe "use two caller dictionaries in imported dependent results"
+        (ScopedClassMethodClient.twoDictionaries enabled, ScopedClassMethodClient.twoDictionaries disabled)
+    observe "read a scoped method through a Haskell 2010 client"
+        (ScopedClassMethodClient.ordinaryChoices enabled, ScopedClassMethodClient.ordinaryChoices disabled)
+    observe "infer a payload constraint beside a scoped method"
+        (OrdinaryScopedChoice.readDescription enabled 'q')
+    observe "discard the payload of a locally indexed choice" $
+        let localFlag = False
+        in case Choice.describeChoice localFlag (error "unused payload" :: Char) of
+            (Choice.Tagged flag, _) -> flag
+    observe "compare zero under two caller dictionaries"
+        (map OrdinaryScopedComparison.observations [-2, 0, 2])
     observe "render a field with evidence for its runtime flag" (renderField enabled, renderField disabled)
     observe "format a field with a polymorphic consumer" (formatField enabled, formatField disabled)
     observe "choose a field domain with a required type argument" renderKnownFields

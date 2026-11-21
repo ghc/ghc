@@ -241,6 +241,15 @@ mapTyCo (TyCoMapper { tcm_tyvar = tyvar
     go_ty (TyVarTy tv)    = tyvar tv
     go_ty (TermVarTy v)   = termvar v
     go_ty (TermAppTy f arg) = TermAppTy <$> termfun f <*> go_ty arg
+    go_ty (ClassAppTy f inst dict operand kind)
+      = do { dict' <- go_ty dict
+           ; operand' <- go_ty operand
+           ; case (dict', operand') of
+               (TermVarTy{}, TermVarTy{}) ->
+                 ClassAppTy f <$> go_ty inst <*> pure dict' <*> pure operand' <*> go_ty kind
+               _ -> panic "mapTyCo: experimental class selector requires variable arguments" }
+    go_ty (DepDictTy b body)
+      = termbinder b $ \b' -> DepDictTy b' <$> go_ty body
     go_ty (ExistsTy flag b body)
       = tycobinder b Inferred $ \b' -> ExistsTy flag b' <$> go_ty body
     go_ty (DepFunTy vis b body)

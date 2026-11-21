@@ -2,8 +2,10 @@
 
 R12 is open. It depends on R13 (function promotion) and R24 (constrained
 type families). M82 and M83 can use checked equations after identifying a
-concrete instance method. A type that refers to a method through a caller's
-abstract class dictionary remains open.
+concrete instance method. The experimental compiler retains a unary method
+application through one unique direct Given. It keeps the caller's exact
+dictionary in the result type. Superclass selection, recursive evidence
+and general class promotion remain open.
 [Serokell card](https://ghc.serokell.io/dh#promote-classes) and
 [local dependencies](../ROADMAP.md#upstream-checklist-and-complete-dependency-index).
 
@@ -18,7 +20,7 @@ chooseTagged x = tagBool (choose x)
 ```
 
 `tagBool :: foreach (b :: Bool) -> Tagged b` returns the corresponding
-singleton constructor. GHC reports GHC-70566 for the result type.
+tagged Boolean value. Before scoped dictionary support, the baseline reported GHC-70566 for the result type.
 “Cannot reduce the open call to ‘choose’ in a type.” The explanation is
 “The local dependency choose is not an ordinary function binding.”
 [Target source](../../../testsuite/tests/dependent/should_run/promoted-class/ChooseTarget.hs).
@@ -35,13 +37,13 @@ and [test runner](../../../testsuite/tests/dependent/should_run/NativePromotedCl
 
 ## Evidence needed
 
-The first acceptance criterion is to typecheck `chooseTagged` while
-`a` and its `Choose a` evidence are abstract. The index and the term call
+The compiler typechecks `chooseTagged` while `a` and its
+`Choose a` evidence are abstract. The index and the term call
 must use the same selector, instantiation, operand and evidence. The
 application can stay opaque during type checking. With the constraint
 removed, the call must require `Choose a`.
 
-The retained signature checker currently checks the predicates in
+The retained signature checker on the public baseline checks the predicates in
 `HsQualTy` and builds ordinary constraint arrows with `tcMkPhiTy`.
 Those arrows have no evidence binder in the body type. The local
 dependency scheduler rejects the selector before it reaches that
@@ -91,7 +93,7 @@ order, `db :: Choose b` and then `da :: Choose a`. It emits
 `choose @a da x` and `choose @b db y`. A control that removes `Choose b`
 fails at the second call. The test compiles the term-only program and
 checks that both dictionary fields produce their expected results. The
-indexed signature currently reports GHC-70566 at both occurrences.
+baseline reported GHC-70566 at both occurrences before the index could carry a dictionary.
 [Source controls](../../../testsuite/tests/dependent/should_run/promoted-class/ChooseEvidence.hs).
 
 For this first slice, require a unique direct Given of the instantiated
@@ -126,3 +128,149 @@ syntax. The `@@` notation in #383 illustrates the dictionary argument
 and is not proposed source syntax here.
 [Agda 2.8 instance arguments](https://agda.readthedocs.io/en/v2.8.0/language/instance-arguments.html#usage)
 and [#383 sketch](https://github.com/ghc-proposals/ghc-proposals/issues/383#issuecomment-739058810).
+
+## Private interface experiment on public baseline `526aa52f79`
+
+The private compiler exports `chooseTagged` and `chooseTaggedBoth` as
+signatures. Each selector refers to the dictionary and operand bound in
+its signature. The reader checks both references using the method's
+instantiated type. It derives the index kind from the selector.
+These interfaces use the compositional `experimental-scoped-dictionary`
+feature. Interfaces with only ordinary exports keep their existing
+format. The experiment omits unfolding pragmas for modules with these
+types. GHCi runs their bytecode and skips breakpoint stops whose types
+include scoped dictionaries. HIE renders the source form of the
+constraint and selector. Its type table still uses the exact Core
+dictionary identity when sharing entries.
+
+The wire test compiles a client with only the provider interface
+available. It calls both exported functions, checks the reversed
+dictionary order and both demand cases, and rejects missing or swapped
+evidence. The same interface can carry R24's constrained family version
+and both R22 package markers. The reader still rejects a family use
+without the owner dictionary.
+[Wire test](../../../testsuite/tests/dependent/should_run/NativeScopedDictionaryWire.sh).
+
+
+The Showcase calls the imported selector under two direct Givens,
+one for a Boolean and one for its wrapper with the opposite behavior.
+The signatures use existing class constraints and keep the two
+`Choose` dictionaries distinct.
+[Showcase provider](../examples/open-evaluation/ScopedClassMethod.hs).
+[Showcase client](../examples/open-evaluation/ScopedClassMethodClient.hs).
+
+
+## Reload a scoped dictionary body
+
+A source-hidden Template Haskell client can run the provider from its
+`.hi` and persisted `.gbc`. The `.gbc` already contains bytecode.
+With `-fwrite-if-simplified-core`, the provider can instead supply its
+`.hi` alone. GHC reads the extra Core bindings and generates bytecode.
+The regression tests this with interface pragmas ignored, two distinct
+dictionaries, and a bottom in each of the two lazy positions.
+A second GHCi session reuses the provider interface and regenerates its
+bytecode when a changed client splice calls it.
+[Persistent bytecode implementation](https://gitlab.haskell.org/ghc/ghc/-/commit/6bd8155c991cfce7cca594bc63ba8f6ca6751667).
+[Extra Core help](https://ghc.gitlab.haskell.org/ghc/doc/libraries/ghc-9.15-inplace/src/GHC.Unit.Module.WholeCoreBindings.html).
+[Reload test](../../../testsuite/tests/dependent/should_run/NativeScopedDictionaryCoreReload.sh).
+
+A separate `experimental-scoped-dictionary-core-v3` marker identifies
+serialized bodies. The reader resolves a dictionary application against
+its lexical binder and checks the nominal predicate before constructing
+Core. Whole-module replay checks the admitted forms and runs scoped
+Core Lint. It uses an empty interactive context. The codec leaves
+unfolding pragmas suppressed and keeps the serialization gate for
+other retained proofs and erased package expressions.
+
+An ordinary Haskell 2010 module can call an imported `chooseTagged`
+under `Choose a` and match its result. Its own signature exposes only
+`Choose a => a -> Bool`. The driver selects scoped Core Lint and
+CorePrep from the checked bindings. The same compiled reader uses
+distinct dictionaries at two call sites.
+[Ordinary reader](../examples/open-evaluation/OrdinaryScopedChoice.hs).
+
+
+Public interfaces use expression tag 19 for a retained character
+and tag 20 for a retained `Natural`. The v3 Core format uses tag 21
+for dictionary applications. Earlier private formats used tags 19 and
+20 for that application. Readers reject an unknown Core format in the
+header. Signature-only interfaces keep their existing marker.
+
+The reload test puts a character, a `Natural`, and a dictionary
+application in one optimized provider. A Template Haskell splice
+loads its serialized Core through the provider interface. The expected
+result is `(True,[955,0,128578],23)`.
+[Reload test](../../../testsuite/tests/dependent/should_run/NativeScopedDictionaryCoreReload.sh).
+
+
+## An Ordering result through a direct Given
+
+`compareTagged` retains `compareZero x` at kind `Ordering`. A Haskell
+2010 client matches the imported result directly. One instance compares
+an integer to zero. The second returns `LT` without forcing its operand.
+The client observes all three orderings and passes a bottom to the second
+instance. The wire check also rejects forwarding an independent operand
+at the same class domain.
+[Comparison provider](../examples/open-evaluation/ScopedComparison.hs),
+[ordinary client](../examples/open-evaluation/OrdinaryScopedComparison.hs)
+and [runner](../examples/open-evaluation/check-scoped-comparison.sh).
+
+The same unary selector path checks a user-defined enumeration,
+`Maybe Ordering`, and a result of kind `Maybe a` at the receiver
+parameter `a`. The result kind comes from the selector signature.
+The current source path requires one retained receiver of the class
+parameter's type and one matching direct Given. A binary selector
+and a method whose evidence comes through a superclass are outside
+that path. A function-valued selector result can occur in a signature.
+Passing the selected function to a retained-function binder gives
+GHC-83605. That application requires a local function variable.
+
+The direct case works without solving an equality for an unknown result
+index. Passing the call to a polymorphic accessor requires that equality
+and reports GHC-83605. Access through a pattern synonym and refining GADT
+patterns in the Haskell 2010 reader also remain unsupported.
+[Scoped application checking](../../../compiler/GHC/Tc/Gen/App.hs)
+and [selector shape and result kind](../../../compiler/GHC/Core.hs).
+
+## A constrained family under the method's Given
+
+One library exports the marked family `Element` and a scoped selector in
+the same signature. Its `Collects c` dictionary supplies the formation
+premise for the input and output types `Element c`. The result index uses
+that same dictionary for `compareOrigin x`. An ordinary client can
+supply distinct dictionaries and obtain `((GT,True),(LT,'x'))` from the
+stripped interface. Missing or unrelated class evidence and a crossed
+runtime index each fail. The formation check opens a leading dictionary
+binder. Nested dictionary or selector types that need family formation
+remain outside this check.
+[Mixed provider](../../../testsuite/tests/dependent/should_run/promoted-class/ScopedFamilyMethodProvider.hs)
+and [wire runner](../../../testsuite/tests/dependent/should_run/NativeScopedDictionaryWire.sh).
+
+### Ambiguity in a method-indexed signature
+
+In `inspectPayload :: forall c a. Collects c => foreach (x :: c)
+-> a -> TaggedEntry a (compareOrigin x)`, the receiver determines
+`c`. The ordinary payload determines `a`. GHC compares the retained
+receiver domains before it opens the instantiated dictionary with the
+matching Given. It then runs the usual ambiguity check on the body.
+A redundant constraint on a fresh type parameter can still produce an
+ambiguity error, and `AllowAmbiguousTypes` defers it to the use site.
+At a call site, the receiver fixes the predicate of the scoped dictionary.
+GHC instantiates other erased parameters in dependency order. Ordinary
+constraints can use a functional dependency to fix a payload's encoding.
+[Example](../examples/open-evaluation/OrdinaryScopedChoice.hs).
+The ordinary test client passes a local receiver. Applying the imported
+function directly to a constructor at the method-indexed position still
+requires a local binding for that receiver.
+The client can bind `let high = True` and call `inspectPayload high 'q'`.
+Common subexpression elimination and CorePrep keep a variable for
+the receiver until CoreToStg erases the selector index. A client can
+discard the payload without forcing it.
+[Ambiguity check](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/ambiguous_types.html)
+and [client](../../../testsuite/tests/dependent/should_run/promoted-class/ScopedFamilyMethodClient.hs).
+
+A written Template Haskell quotation can use an imported method in
+a retained index. Reifying the elaborated signature reports GHC-75721.
+The current Template Haskell type representation has no binder for the
+selected dictionary.
+[Reification check](../../../testsuite/tests/dependent/should_run/NativeScopedDictionaryCoreReload.sh).

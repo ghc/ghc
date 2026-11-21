@@ -3996,6 +3996,9 @@ reifyTypeInScope _ ty      | tcIsLiftedTypeKind ty = return TH.StarT
   -- Make sure to use tcIsLiftedTypeKind here, since we don't want to confuse it
   -- with Constraint (#14869).
 reifyTypeInScope _ ty@TermAppTy{} = noTH RetainedRuntimeIndex ty
+-- TH.Type has no binder or reference for the exact scoped dictionary.
+reifyTypeInScope _ ty@DepDictTy{} = noTH RetainedRuntimeIndex ty
+reifyTypeInScope _ ty@ClassAppTy{} = noTH RetainedRuntimeIndex ty
 reifyTypeInScope scope ty@(TermVarTy v)
   | getName v `elemNameSet` scope = pure (TH.IndexVarT (reifyName v))
   | otherwise                    = noTH RetainedRuntimeIndex ty

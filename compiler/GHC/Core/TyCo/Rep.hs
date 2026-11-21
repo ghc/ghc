@@ -254,7 +254,27 @@ data Type
 
   | ExistsTy !ExistsTyFlag !TyVar Type -- ^ See Note [Lifted erased existentials].
 
+  | DepDictTy Id Type
+      -- ^ Private dependent dictionary binder. See Note [Scoped selector applications].
+  | ClassAppTy Id Type Type Type Type
+      -- ^ Selector, type argument, dictionary index, operand index, checked kind.
+
   deriving Data.Data
+
+{- Note [Scoped selector applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+DepDictTy binds the given dictionary Id in its result, not in its
+predicate. The result has kind Type. ClassAppTy records an opaque
+selector application to a type, a local dictionary and a local operand.
+The final field is the instantiated result kind. Core Lint recomputes
+it from the selector and validates the metadata of both occurrences.
+
+A dictionary application passes ordinary evidence at runtime. The scoped
+interface format records the selector and the names of its two local
+arguments. CorePrep erases the type dependency. See Note [Scoped selector
+application prototype] in GHC.Core.Lint. DepFunInvisible describes a
+retained value with different source application rules.
+-}
 
 {- Note [Lifted erased existentials]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2467,6 +2487,9 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_ty (TyVarTy tv)        = tyvar tv
     go_ty (TermVarTy v)       = termvar v
     go_ty (TermAppTy f arg)   = termvar f M.<> go_ty arg
+    go_ty (ClassAppTy _ inst dict operand kind)
+      = go_ty inst M.<> go_ty dict M.<> go_ty operand M.<> go_ty kind
+    go_ty (DepDictTy b body) = go_ty (varType b) M.<> termbinder b (go_ty body)
     go_ty (ExistsTy _ b body) = go_ty (varType b) M.<> tycobinder b (go_ty body)
     go_ty (DepFunTy _ b body) = go_ty (varType b) M.<> termbinder b (go_ty body)
     go_ty (LitTy l)           = lit l
@@ -2565,6 +2588,8 @@ typeSize (TyVarTy {})               = 1
 typeSize (AppTy t1 t2)              = typeSize t1 + typeSize t2
 typeSize (FunTy _ ma _ t1 t2)       = typeSize ma + typeSize t1 + typeSize t2
 typeSize (ForAllTy ma (Bndr tv _) t) = typeSize ma + typeSize (varType tv) + typeSize t
+typeSize (ClassAppTy _ inst dict operand kind) = 1 + sum (map typeSize [inst, dict, operand, kind])
+typeSize (DepDictTy b t) = 1 + typeSize (varType b) + typeSize t
 typeSize (TermAppTy f arg)         = 1 + typeSize (varType f) + typeSize arg
 typeSize (TermVarTy v)             = 1 + typeSize (varType v)
 typeSize (ExistsTy _ b t)            = 1 + typeSize (varType b) + typeSize t

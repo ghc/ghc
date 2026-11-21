@@ -50,11 +50,12 @@ import GHC.Hs.Syn.Type   ( hsLitType )
 
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
-import GHC.Core ( Expr(Coercion), isOrphan )
+import GHC.Core ( Expr(Coercion, Var), isOrphan )
 import qualified GHC.Core as Core
+import GHC.Core.Subst ( extendIdSubst )
 import GHC.Core.Type
 import GHC.Core.Predicate ( getClassPredTys_maybe )
-import GHC.Core.TyCo.Rep ( Type(DepFunTy, TermVarTy, TyVarTy), CoercionN )
+import GHC.Core.TyCo.Rep ( Type(DepFunTy, DepDictTy, TermVarTy, TyVarTy), CoercionN )
 import GHC.Core.Utils ( isVacuousRetainedBinder )
 import GHC.Core.Coercion ( mkNomReflCo )
 import GHC.Core.TyCo.Ppr ( debugPprType )
@@ -254,6 +255,14 @@ topSkolemiseWith purpose skolem_info ty
                 (ev_vars ++ ev_vars1)
                 (pending `unionBags` prefix_implics)
                 inner_ty }
+
+      | DepDictTy previous body <- coreFullView ty
+      = do { given <- newEvVar (substTy subst (varType previous))
+           ; let subst' = extendIdSubst (extendSubstInScope subst given) previous (Var given)
+                 wrap' = case purpose of
+                   RuntimeSkolemisation -> wrap <.> mkWpEvLams [given]
+                   AmbiguitySkolemisation -> idHsWrapper
+           ; go subst' wrap' tv_prs (ev_vars ++ [given]) pending body }
 
       | otherwise
       = return (wrap, tv_prs, ev_vars, substTy subst ty, pending)

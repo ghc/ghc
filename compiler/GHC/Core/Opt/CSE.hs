@@ -8,9 +8,10 @@ module GHC.Core.Opt.CSE (cseProgram, cseProgramWithMode, cseOneExpr) where
 
 import GHC.Prelude
 
+import GHC.Core.Dependent ( hasScopedDictionaryExpr, hasScopedDictionaryProgram )
 import GHC.Core.Subst
 import GHC.Core.Opt.OccurAnal ( SimplCoreMode(..) )
-import GHC.Core.TyCo.Rep ( Type(DepFunTy) )
+import GHC.Core.TyCo.Rep ( Type(DepDictTy, DepFunTy, TermVarTy) )
 import GHC.Types.Var.Env ( mkInScopeSet, mkInScopeSetList )
 import GHC.Types.Id
 import GHC.Core.Utils   ( exprType, mkAltExpr
@@ -392,7 +393,7 @@ cseProgramWithMode :: SimplCoreMode -> CoreProgram -> CoreProgram
 cseProgramWithMode mode binds
   = snd (mapAccumL (cseBind TopLevel) init_env binds)
   where
-    init_env  = emptyCSEnv mode $
+    init_env  = emptyCSEnv mode (mode == RetainedCore && hasScopedDictionaryProgram binds) $
                 mkInScopeSetList (bindersOfBinds binds)
                 -- Put all top-level binders into scope; it is possible to have
                 -- forward references.  See Note [Glomming] in GHC.Core.Opt.OccurAnal
@@ -713,7 +714,7 @@ try_for_cse env expr
 cseOneExpr :: InExpr -> OutExpr
 cseOneExpr e = cseExpr env e
   where
-    env = emptyCSEnv RetainedCore (mkInScopeSet (exprFreeVars e))
+    env = emptyCSEnv RetainedCore (hasScopedDictionaryExpr e) (mkInScopeSet (exprFreeVars e))
 
 cseExpr :: CSEnv -> InExpr -> OutExpr
 cseExpr env (Type t)              = Type (substTyUnchecked (csEnvSubst env) t)
@@ -722,7 +723,10 @@ cseExpr _   (Lit lit)             = Lit lit
 cseExpr env (Var v)               = lookupSubst env v
 cseExpr env (App f a)
   | cs_mode env == RetainedCore
-  , DepFunTy{} <- coreFullView (exprType f)
+  , case coreFullView (exprType f) of
+      DepFunTy{} -> True
+      DepDictTy{} -> True
+      _ -> False
   = App (cseExpr env f) (substExpr (csEnvSubst env) a)
     -- See Note [CSE for retained operands and case evidence]
   | otherwise = App (cseExpr env f) (tryForCSE env a)
@@ -797,6 +801,12 @@ let pair = importedPair in second pair, the local pair can occur in the
 result type of second. An imported value has no local index identity.
 Keep the local binding when its replacement cannot occur in that type.
 A variable used as an index function needs another eligible function head.
+
+A scoped class selector stores its receiver as a variable. In a module
+with such a selector, keep a local variable if its replacement denotes
+a constructor index. For example, replacing x by True in ordering x
+would discard the variable required by the selector. Apply the forward
+substitution to a scoped dictionary argument, as for a retained operand.
 
 The same constraint applies to a nested case on the same call:
 
@@ -915,6 +925,7 @@ the case binder is alive; see Note [DataAlt occ info] in GHC.Core.Opt.Simplify.
 
 data CSEnv
   = CS { cs_mode :: !SimplCoreMode
+       , cs_scoped_dicts :: Bool
        , cs_subst :: Subst  -- Maps InBndrs to OutExprs
             -- The substitution variables to
             -- /trivial/ OutExprs, not arbitrary expressions
@@ -930,9 +941,10 @@ data CSEnv
             -- See Note [CSE for recursive bindings]
        }
 
-emptyCSEnv :: SimplCoreMode -> InScopeSet -> CSEnv
-emptyCSEnv mode in_scope
+emptyCSEnv :: SimplCoreMode -> Bool -> InScopeSet -> CSEnv
+emptyCSEnv mode scoped_dicts in_scope
     = CS { cs_mode    = mode
+         , cs_scoped_dicts = scoped_dicts
          , cs_map     = emptyCoreMap
          , cs_rec_map = emptyCoreMap
          , cs_subst   = mkEmptySubst in_scope }
@@ -974,7 +986,10 @@ extendCSSubst cse x rhs
   where
     preserves_index
       | isNativeIndexFunctionId x = isJust (nativeIndexFunctionVar_maybe rhs)
-      | otherwise                 = isJust (retainedArgIndex rhs)
+      | cs_scoped_dicts cse = case retainedArgIndex rhs of
+          Just TermVarTy{} -> True
+          _ -> False
+      | otherwise = isJust (retainedArgIndex rhs)
 
 -- | Add clones to the substitution to deal with shadowing.  See
 -- Note [Shadowing in CSE] for more details.  You should call this whenever

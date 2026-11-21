@@ -516,6 +516,7 @@ hasIfacePackageExpr = go
     go (IfaceIndexedConArg _ arg) = go arg
     go (IfaceRetainedCharArg arg) = go arg
     go (IfaceRetainedNaturalArg arg) = go arg
+    go (IfaceDictApp fun _) = go fun
     go (IfaceCase scrut _ alts) = go scrut || any (\(IfaceAlt _ _ rhs) -> go rhs) alts
     go (IfaceECase scrut _) = go scrut
     go (IfaceLet binding rhs) = goBind binding || go rhs
@@ -833,6 +834,7 @@ data IfaceExpr
   | IfaceIndexedConArg !IfaceIndexedConShape IfaceExpr
   | IfaceRetainedCharArg IfaceExpr
   | IfaceRetainedNaturalArg IfaceExpr
+  | IfaceDictApp IfaceExpr IfLclName
 
 -- | The constructor shapes that a reader can use as retained operands.
 data IfaceIndexedConShape = IfaceSimpleIndexedCon | IfaceGeneralIndexedCon
@@ -1965,6 +1967,7 @@ pprIfaceExpr add_par app@(IfaceApp _ _) = add_par (pprIfaceApp app [])
 pprIfaceExpr add_par (IfaceIndexedConArg _ arg) = pprIfaceExpr add_par arg
 pprIfaceExpr add_par (IfaceRetainedCharArg arg) = pprIfaceExpr add_par arg
 pprIfaceExpr add_par (IfaceRetainedNaturalArg arg) = pprIfaceExpr add_par arg
+pprIfaceExpr add_par app@IfaceDictApp{} = add_par (pprIfaceApp app [])
 
 pprIfaceExpr add_par i@(IfaceLam _ _)
   = add_par (sep [char '\\' <+> sep (map pprIfaceLamBndr bndrs) <+> arrow,
@@ -2038,6 +2041,7 @@ pprIfaceTickish (IfaceBreakpoint (BreakpointId m ix) fvs)
 pprIfaceApp :: IfaceExpr -> [SDoc] -> SDoc
 pprIfaceApp (IfaceApp fun arg) args = pprIfaceApp fun $
                                           nest 2 (pprParendIfaceExpr arg) : args
+pprIfaceApp (IfaceDictApp fun dict) args = pprIfaceApp fun (ppr dict : args)
 pprIfaceApp fun                args = sep (pprParendIfaceExpr fun : args)
 
 ------------------
@@ -2269,6 +2273,10 @@ freeNamesIfType (IfaceTermAppTy _ arg) = freeNamesIfType arg
 freeNamesIfType (IfaceFreeTermAppTy _ arg) = freeNamesIfType arg
 freeNamesIfType (IfaceDepFunTy _vis (w, _, arg) res)
   = freeNamesIfType w &&& freeNamesIfType arg &&& freeNamesIfType res
+freeNamesIfType (IfaceDepDictTy (w, _, pred_ty) res)
+  = freeNamesIfType w &&& freeNamesIfType pred_ty &&& freeNamesIfType res
+freeNamesIfType (IfaceClassAppTy method inst dict arg)
+  = unitNameSet method &&& freeNamesIfType inst &&& freeNamesIfType dict &&& freeNamesIfType arg
 freeNamesIfType (IfaceTyVar _)        = emptyNameSet
 freeNamesIfType (IfaceAppTy s t)      = freeNamesIfType s &&& freeNamesIfAppArgs t
 freeNamesIfType (IfaceTyConApp tc ts) = freeNamesIfTc tc &&& freeNamesIfAppArgs ts
@@ -2386,6 +2394,7 @@ freeNamesIfExpr (IfaceApp f a)        = freeNamesIfExpr f &&& freeNamesIfExpr a
 freeNamesIfExpr (IfaceIndexedConArg _ a) = freeNamesIfExpr a
 freeNamesIfExpr (IfaceRetainedCharArg a) = freeNamesIfExpr a
 freeNamesIfExpr (IfaceRetainedNaturalArg a) = freeNamesIfExpr a
+freeNamesIfExpr (IfaceDictApp f _) = freeNamesIfExpr f
 freeNamesIfExpr (IfaceCast e co)      = freeNamesIfExpr e &&& freeNamesIfCoercion co
 freeNamesIfExpr (IfaceTick t e)       = freeNamesIfTickish t &&& freeNamesIfExpr e
 freeNamesIfExpr (IfaceECase e ty)     = freeNamesIfExpr e &&& freeNamesIfType ty
@@ -3157,6 +3166,13 @@ instance Binary IfaceExpr where
         requireIfaceEvidenceVersion bh RetainedNaturalOperandEvidence
         putByte bh 20
         put_ bh arg
+    -- Public character and Natural operands use tags 19 and 20.
+    -- The v3 scoped dictionary Core capability selects tag 21.
+    put_ bh (IfaceDictApp f dict) = do
+        requireIfaceEvidenceVersion bh ExperimentalScopedDictionaryCoreEvidence
+        putByte bh 21
+        put_ bh f
+        put_ bh dict
     put_ bh (IfaceApp ag ah) = do
         putByte bh 5
         put_ bh ag
@@ -3263,6 +3279,7 @@ instance Binary IfaceExpr where
             18 -> IfaceIndexedConArg IfaceGeneralIndexedCon <$> get bh
             19 -> IfaceRetainedCharArg <$> get bh
             20 -> IfaceRetainedNaturalArg <$> get bh
+            21 -> IfaceDictApp <$> get bh <*> get bh
             _ -> ioError (userError ("get IfaceExpr: invalid expression tag " ++ show h))
 
 instance Binary IfaceTickish where
@@ -3562,6 +3579,7 @@ instance NFData IfaceExpr where
     IfaceIndexedConArg _ e -> rnf e
     IfaceRetainedCharArg e  -> rnf e
     IfaceRetainedNaturalArg e -> rnf e
+    IfaceDictApp f dict -> rnf f `seq` rnf dict
     IfaceCase e nm alts -> rnf e `seq` rnf nm `seq` rnf alts
     IfaceECase e ty -> rnf e `seq` rnf ty
     IfaceLet bind e -> rnf bind `seq` rnf e
