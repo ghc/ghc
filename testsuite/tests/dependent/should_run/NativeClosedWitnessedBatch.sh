@@ -90,6 +90,7 @@ HS
     cd "../client"
     cp ../producer/*.{hi,o} .
     test ! -e WitnessedBatch.hs
+    test ! -e RectangularTable.hs
     if [[ -f ../producer/WitnessedBatch.dyn_o ]]; then cp ../producer/*.{dyn_hi,dyn_o} .; fi
     cat >Proof.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, PolyKinds, TypeOperators #-}
@@ -306,11 +307,21 @@ HS
         BadWitness.hs >BadMask.hs
     reject BadMask 'The value returned by the interpreter does not match the checked result type.'
 
-    for function in wrongColumns wrongRows wrongCols wrongCellRows wrongCellCols; do
+    for function in wrongColumns wrongRows wrongCols; do
         sed -e 's/module BadWitness/module BadColumns/' -e "s/Wrong.buildWrong/Wrong.$function/" \
             BadWitness.hs >BadColumns.hs
         reject BadColumns 'The value returned by the interpreter does not match the checked result type.'
     done
+
+    for function in wrongCellRows wrongCellCols; do
+        sed -e 's/module BadWitness/module BadCells/' -e "s/Wrong.buildWrong/Wrong.$function/" \
+            -e '/^import qualified WrongWitness/i import RectangularTable (Table(..))' \
+            BadWitness.hs >BadCells.hs
+        reject BadCells 'The value returned by the interpreter does not match the checked result type.'
+    done
+
+    sed -e 's/module BadCells/module HiddenTable/' -e '/^import RectangularTable/d' BadCells.hs >HiddenTable.hs
+    reject HiddenTable 'Cannot inspect the constructors of RectangularTable.Table.'
 
     sed -e 's/module ClassEvidence/module NestedField/' -e 's/W.withEvidence/W.nested/' \
         ClassEvidence.hs >NestedField.hs
