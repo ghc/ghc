@@ -9,4 +9,3 @@ GadtInteriorContextScope.hs:11:13: error: [GHC-25897]
       In an equation for ‘wrong’: wrong (Two (Tag (type Int)) _) = True
     • Relevant bindings include
         wrong :: Two a -> Bool (bound at GadtInteriorContextScope.hs:11:1)
-
