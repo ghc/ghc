@@ -20,7 +20,7 @@ import GHC.Data.FastString
 import GHC.Data.Maybe
 
 -- friends:
-import GHC.Tc.Utils.Unify    ( checkConstraints, tcSubTypeAmbiguity, tcSkolemise
+import GHC.Tc.Utils.Unify    ( checkConstraints, tcSubTypeAmbiguity, tcSkolemiseGeneral
                               , DeepSubsumptionFlag(Shallow), unifyTypeAndEmit )
 import GHC.Tc.Solver         ( simplifyAmbiguityCheck, pushLevelAndSolveEqualities )
 import GHC.Tc.Solver.Monad   ( runTcS )
@@ -497,7 +497,7 @@ checkConstrainedSignature ctxt ty
       = do { let (bndrs, theta, _) = tcSplitSigmaTy sig
            ; traverse_ (checkNoConstrainedFamilyApps . varType . snd) bndrs
            ; traverse_ checkNoConstrainedFamilyApps theta
-           ; void $ tcSkolemise Shallow ctxt sig check_body }
+           ; void $ tcSkolemiseGeneral Shallow ctxt ty sig $ \_ rho -> check_body rho }
 
     check_body (DepFunTy _ index body)
       = do { check_part (varType index)
