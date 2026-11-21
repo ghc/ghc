@@ -80,6 +80,9 @@ test('NativeSourceTableWrong',
      extra_files(['../../../../docs/dependent-haskell/examples/qualified-pi/ClosedTableLibrary.hs']),
      multimod_compile_fail,
      ['NativeSourceTableWrong', '-v0 -fomit-interface-pragmas -fno-write-if-simplified-core'])
+test('NativeIndexedListContents',
+     extra_files(['../../../../docs/dependent-haskell/examples/open-evaluation/IndexedPrefix.hs']),
+     multimod_compile_fail, ['NativeIndexedListContents', '-v0'])
 test('NativeSourceTablePartial', normal, compile_fail, [''])
 test('NativeListBoundaryPartial',
      extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']),

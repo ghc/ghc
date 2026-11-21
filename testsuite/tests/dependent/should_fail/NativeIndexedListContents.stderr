@@ -1,0 +1,6 @@
+NativeIndexedListContents.hs:7:18: error: [GHC-83865]
+    • Couldn't match type ‘not b’ with ‘b’
+      Expected: CheckedList (b : bs)
+        Actual: CheckedList (not b : bs)
+    • In the expression: negatedCons b bs
+      In an equation for ‘wrongHead’: wrongHead b bs = negatedCons b bs
