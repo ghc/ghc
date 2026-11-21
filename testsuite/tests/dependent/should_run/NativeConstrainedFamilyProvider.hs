@@ -1,5 +1,5 @@
-{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, TypeFamilies #-}
-module NativeConstrainedFamilyProvider (Collects(..), Allowed, Defaulted(..), Pair(..), Key, KeyElement) where
+{-# LANGUAGE FlexibleInstances, FunctionalDependencies, MultiParamTypeClasses, TypeFamilies #-}
+module NativeConstrainedFamilyProvider (Collects(..), Allowed, Defaulted(..), Pair(..), Key, KeyElement, Output(..), Projected, Chain(..), Fixed(..)) where
 
 class Allowed a
 instance Allowed Bool
@@ -29,3 +29,26 @@ instance {-# OVERLAPPABLE #-} Collects (Key a) where
 
 -- | Select a domain that an importing module can specialize.
 type KeyElement a = Elem (Key a)
+
+class Output c e | c -> e where
+    type Project c
+    type Explicit c e
+
+instance {-# OVERLAPPABLE #-} Output (Key a) a where
+    type Project (Key a) = Bool
+    type Explicit (Key a) a = Bool
+
+-- | Carry an omitted owner parameter through an imported alias.
+type Projected a = Project (Key a)
+
+class Chain a b c | a -> b, b -> c where
+    type Target a
+
+instance Chain Bool Char Int where
+    type Target Bool = Int
+
+class (e ~ Maybe a) => Fixed a e where
+    type FromFixed a
+
+instance Fixed Bool (Maybe Bool) where
+    type FromFixed Bool = Char
