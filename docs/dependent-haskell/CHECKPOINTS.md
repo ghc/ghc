@@ -28,6 +28,20 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `4e969e6059`, the two-equation list index compiles from source.
+The ordinary client checks a signed offset and looks up the resulting
+position. Partial application to the empty list returns a function. Forcing
+its result with an undefined position raises the exception from the position.
+
+The Stage 2 compiler matched 392 Showcase lines at stripped `-O0`,
+default `-O1` and `-O2`, and in GHCi. All 35 focused tests passed
+across the main run and the corrected list-index test. The Core API
+driver matched its 37-line golden output. The evidence API checks passed.
+The list-index regression checks an inhabited branch, an unresolved
+family, a wildcard, a lazy pattern, and a missing successor pattern.
+[Source and coverage](roadmap/R03-dependent-products.md#omit-an-impossible-list-index-equation)
+and [ordinary client checks](../../testsuite/tests/dependent/should_run/NativeIndexedFin.sh).
+
 At `d35002f260`, `Recipe Map` retains the inferred matchability argument
 of `Map`. A client reads the stripped provider interface, constructs a
 recipe, and obtains `(Just True,[False])`. A shorter receiver specializes
