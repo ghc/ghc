@@ -91,7 +91,7 @@ data Stored (c :: Char) where
 store :: foreach (c :: Char) -> Stored c
 store c = Stored c
 HS
-"${ghc[@]}" -O0 -fomit-interface-pragmas -c Characters.hs
+"${ghc[@]}" -O0 -dynamic-too -fomit-interface-pragmas -c Characters.hs
 sed -e '/^    ) where/a import Characters (Stored(..), store)' -e 's/, observe, observeBoth,/, word, observe, observeBoth,/' "$src/ScopedDictionaryProvider.hs" > Provider.hs
 cat >>Provider.hs <<'HS'
 {-# INLINE word #-}
@@ -105,7 +105,7 @@ HS
 grep -Eq '^ *got .*retained-char-operand\+experimental-scoped-dictionary\+experimental-scoped-dictionary-core-v2$' show
 check_old_reader
 cd ../client
-cp ../producer/{Provider.hi,Characters.hi,Characters.o} .
+cp ../producer/Provider.hi ../producer/Characters.*o ../producer/Characters.*hi .
 cat >Main.hs <<'HS'
 {-# LANGUAGE TemplateHaskell #-}
 module Main where
