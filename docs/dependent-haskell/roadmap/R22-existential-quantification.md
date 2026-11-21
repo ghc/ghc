@@ -551,6 +551,16 @@ The complete bar schema must match, including repeated occurrences.
 An occurrence only under an opaque type family gives no witness.
 The reader's type arguments cannot capture the bar binder. The opened
 dot witness cannot escape in the result.
+
+One call can also open two mixed packages with independent witnesses.
+For `chooseInners :: Inner a -> Bool -> Inner b -> Int`, the two
+opened bar types determine `a` and `b` together. The ordinary argument
+between them still checks against `Bool`. The reader can select either
+package without forcing the other one. Two independent openings of the
+same dot schema supply distinct outer types. The result cannot expose
+either witness. The source-hidden run checks both sides and the selected
+producer's original exception at `-O0` and `-O2`, including a call beneath
+an ordinary `id` with Quick Look enabled.
 [Ordinary client](../examples/erased-existentials/RankedPackageClient.hs),
 [source-hidden regression](../../../testsuite/tests/dependent/should_run/NativeImplicitExistential.sh),
 and [Proposal #473, implicit existential elimination](https://github.com/ghc-proposals/ghc-proposals/pull/473).
