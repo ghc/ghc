@@ -608,7 +608,7 @@ for opt in O0 O2; do
                 "-$opt" -XImpredicativeTypes "-DFORM=$form" -c RankDomainReject.hs
         done
         "${ghc[@]}" "-$opt" -XImpredicativeTypes -c RankDomainScope.hs
-        reject_rank_domain 'This inferred retained type requires an explicit signature:' \
+        reject_rank_domain 'The runtime index ‘index’ is out of scope here.' \
             "-$opt" -XImpredicativeTypes -DESCAPE -c RankDomainScope.hs
         "${ghc[@]}" "-$opt" -XImpredicativeTypes OrdinaryImpred.hs -o ordinary
         printf '%s\n' "('x',True)" | cmp - <(./ordinary)
