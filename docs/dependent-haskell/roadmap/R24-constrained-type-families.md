@@ -428,14 +428,6 @@ The source controls distinguish a representational coercion, a sibling
 parameter, and an argument hidden by a type synonym.
 [Equation controls](../../../testsuite/tests/dependent/should_run/NativeFamilyEquationScope.hs).
 
-The boundary-evidence plugin can provide `Locate 8 '[7, 8]` in a value
-signature. Suppose a family owner supplies
-`forall n. Locate n '[7, 8] => Marker n` and its equation needs `Marker 8`.
-The equation must also obtain `Locate 8 '[7, 8]` from its context.
-Adding that premise to the owner makes the equation valid in readers
-that use ordinary type checking.
-[Membership plugin](../examples/boundary-evidence/LocatePlugin.hs).
-
 An instance selected by the writer can acquire a more specific alternative
 in a later module. The equation proof therefore uses local evidence. A
 top-level family with a ground equation such as `F () = Elem [Bool]` still

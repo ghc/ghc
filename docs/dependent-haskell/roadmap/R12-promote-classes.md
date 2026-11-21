@@ -129,10 +129,10 @@ and is not proposed source syntax here.
 [Agda 2.8 instance arguments](https://agda.readthedocs.io/en/v2.8.0/language/instance-arguments.html#usage)
 and [#383 sketch](https://github.com/ghc-proposals/ghc-proposals/issues/383#issuecomment-739058810).
 
-## Private interface experiment on public baseline `526aa52f79`
+## Exported method signatures
 
-The private compiler exports `chooseTagged` and `chooseTaggedBoth` as
-signatures. Each selector refers to the dictionary and operand bound in
+A library can export `chooseTagged` and `chooseTaggedBoth` in a
+stripped interface. Each selector refers to the dictionary and operand bound in
 its signature. The reader checks both references using the method's
 instantiated type. It derives the index kind from the selector.
 These interfaces use the compositional `experimental-scoped-dictionary`

@@ -1922,6 +1922,7 @@ runInvisibleRetainedModuleChecks libdir = do
             , "        ys = replicateNative @Int bottom 9"
             , "    print (ignoreIndex ys)"
             , "    print (ignoreIndex @Int @{bottom} ys)"
+            , "    print (missingIndex @{S bottom} False)"
             , "    m <- newIORef (S Z) >>= readIORef"
             , "    let zs :: Vec Int m"
             , "        zs = replicateNative @Int m 9"
@@ -1941,7 +1942,7 @@ runInvisibleRetainedModuleChecks libdir = do
         label = "invisible-retained"
     runModuleCases libdir label
         [("PackedVecLibrary", vectors), ("NativeInvisibleRetained", library), ("VisibleIndexConstructor", ordinary)] []
-        consumer (["2", "2", "2", "2", "2", "0", "42", "42"] ++ replicate 4 "[7,7,9]" ++ ["(21,12,22)", "(2,0)", "(42,0)", "(1,1)"])
+        consumer (["2", "2", "2", "2", "2", "0", "42", "42", "42"] ++ replicate 4 "[7,7,9]" ++ ["(21,12,22)", "(2,0)", "(42,0)", "(1,1)"])
     directory <- makeAbsolute ("NativeDependentCoreRun.modules" </> label)
     let artifacts = directory </> "artifacts"
         reject moduleName flags code fragment declarations = do

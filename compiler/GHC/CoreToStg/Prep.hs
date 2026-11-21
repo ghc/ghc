@@ -1439,7 +1439,10 @@ through mkCastTy. The nominal child stays present in the runtime value cast.
 
 A vacuous retained binder has no index to name. Treat its application as
 an ordinary arrow here. Transport its domain if an earlier index occurs
-there, and leave the runtime expression lazy. In particular, a TypeRep
+there. The callee can still inspect the argument. For example, a function
+of type `foreach (n :: Nat). Int` can compute the integer from n. Use
+ordinary argument preparation for a call with `S (S Z)`, as well as one
+with a variable. In particular, a TypeRep
 witness can share an application with a constructed index. See
 Note [Vacuous retained applications] in GHC.Core.Utils.
 
@@ -1680,6 +1683,13 @@ cpeApp top_env expr
                   | otherwise   = n+1
 
 
+    -- A vacuous argument follows the ordinary CorePrep binding and demand rules.
+    -- See Note [Opaque call arguments in CorePrep].
+    needs_retained_index :: CpeApp -> Bool
+    needs_retained_index fun = case coreFullView (exprType fun) of
+      DepFunTy _ binder body -> not (isVacuousRetainedBinder binder body)
+      _ -> False
+
     -- Deconstruct and rebuild the application, floating any non-atomic
     -- arguments to the outside.  We collect the type of the expression,
     -- the head of the application, and the number of actual value arguments,
@@ -1731,7 +1741,7 @@ cpeApp top_env expr
 
       AIApp arg
         | cp_allowNativeDependent (cpe_config env)
-        , DepFunTy {} <- coreFullView (exprType fun')
+        , needs_retained_index fun'
         , Just index <- nativeDeferredArgIndex arg
         -- See Note [Naming computed retained arguments at erasure].
         -> let call = prepare_computation arg in
@@ -1752,14 +1762,11 @@ cpeApp top_env expr
 
       AIApp arg -> do
         -- See Note [Retained constructor arguments in CorePrep].
-        when (cp_allowNativeDependent (cpe_config env)) $
-          case coreFullView (exprType fun') of
-            DepFunTy {}
-              | not (exprIsTrivial arg)
-              , Just {} <- normaliseNativeIndexExpr arg
-              -> throwGhcException (Sorry
-                   "Native dependent Core cannot normalize a non-atomic retained argument across this application spine in CorePrep.")
-            _ -> pure ()
+        when (cp_allowNativeDependent (cpe_config env)
+              && needs_retained_index fun' && not (exprIsTrivial arg)
+              && isJust (normaliseNativeIndexExpr arg)) $
+          throwGhcException (Sorry
+            "Native dependent Core cannot normalize a non-atomic retained argument across this application spine in CorePrep.")
         let (ss1, ss_rest)  -- See Note [lazyId magic] in GHC.Types.Id.Make
                = case (ss, isLazyExpr arg) of
                    (_   : ss_rest, True)  -> (topDmd, ss_rest)
