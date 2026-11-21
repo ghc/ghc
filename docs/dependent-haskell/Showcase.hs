@@ -1805,6 +1805,12 @@ main = do
     rows <- newIORef [[], [False], [True, False]] >>= readIORef
     putStrLn ("prove the filter bound for rows at a runtime cutoff: "
               ++ PreludeFilterCutoff.showCutoffBound (PreludeFilterCutoff.packCutoff cutoff rows))
+    let accepts :: forall a. (a -> Bool) -> a -> Bool
+        accepts predicate value = case PreludeFilterRuntime.decideBy @a predicate value of
+            PreludeFilterRuntime.IsTrue -> True
+            PreludeFilterRuntime.IsFalse -> False
+    observe "check a runtime predicate at Int and at a list of rows"
+        (accepts (> 2) (length rows), accepts null rows)
     gateOff <- newIORef False >>= readIORef
     gateOn <- newIORef True >>= readIORef
     let rest = error "takeWhile forced the tail"

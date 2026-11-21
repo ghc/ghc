@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, Modifiers #-}
 {-# LANGUAGE RankNTypes, RequiredTypeArguments, ScopedTypeVariables, TypeApplications #-}
 module PreludeFilterRuntime
-    ( BooleanResult(..), booleanResult, negationResult
+    ( BooleanResult(..), booleanResult, decideBy, negationResult
     , RuntimeFilterBound(..), runtimeFilterBound, runtimeFilterBoundWith
     , runtimeFilterBoundFor, packRuntimeBound
     , showRuntimeBound ) where
@@ -25,6 +25,13 @@ data BooleanResult (b :: Bool) where
 booleanResult :: foreach (b :: Bool) -> BooleanResult b
 booleanResult True = IsTrue
 booleanResult False = IsFalse
+
+-- | Return constructor evidence for the predicate applied to this value.
+decideBy :: forall (a :: Type). foreach (f :: a -> Bool)
+         -> foreach (x :: a) -> BooleanResult (f x)
+decideBy f x = case f x of
+    True -> IsTrue
+    False -> IsFalse
 
 -- | Retain the result of the installed Boolean negation.
 negationResult :: foreach (x :: Bool) -> BooleanResult (Negation x)
