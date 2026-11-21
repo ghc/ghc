@@ -5233,8 +5233,9 @@ tcTyVar _ name         -- Could be a tyvar, a tycon, or a datacon
              -> do { unless (null (dataConRepArgBinders dc) || dataConHasPromotedRetained dc) $
                        failWithTc $ TcRnRetainedQuantificationError RetainedPackagePromotion
                    ; when (isDataFamInstTyCon (dataConTyCon dc)) $
-                       -- see #15245
-                       promotionErr name FamDataConPE
+                       do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+                          ; unless (enabled && simpleDataFamilyPromotion dc) $
+                              promotionErr name FamDataConPE }
                    ; let (_, _, _, theta, _, _) = dataConFullSig dc
                    ; traceTc "tcTyVar" (ppr dc <+> ppr theta)
                      -- promotionErr: Note [No constraints in kinds] in GHC.Tc.Validity
@@ -5248,6 +5249,35 @@ tcTyVar _ name         -- Could be a tyvar, a tycon, or a datacon
            APromotionErr err -> promotionErr name err
 
            _  -> wrongThingErr WrongThingType thing name }
+
+-- | Admit finished lifted constructors that need no evidence binders.
+-- See Note [Promoting a simple data family instance constructor].
+simpleDataFamilyPromotion :: DataCon -> Bool
+simpleDataFamilyPromotion dc =
+  isVanillaDataCon dc
+  && null (dataConStupidTheta dc)
+  && null (dataConRepArgBinders dc)
+  && not (isNewTyCon (dataConTyCon dc))
+  && isLiftedTypeKind (typeKind (dataConOrigResTy dc))
+  && all (isLiftedTypeKind . typeKind . scaledThing) (dataConOrigArgTys dc)
+
+{- Note [Promoting a simple data family instance constructor]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A data family constructor has a runtime worker that returns the
+representation type. Its wrapper uses the representational instance
+axiom to return the public family application.
+
+The promoted constructor already uses dataConOrigResTy as its result
+kind. For a data family constructor this is the public family
+application. No representation coercion enters the promoted type.
+Use the existing promoted DataCon and its Name. Do not expose the
+representation TyCon.
+
+Discussion #456 distinguishes this case from constructors whose
+promotion needs to bind evidence. Keep that case and constructors of
+unchecked instances out of scope. See Note [AFamDataCon: not
+promoting data family constructors] in GHC.Tc.Utils.Env.
+-}
 
 {-
 Note [Recursion through the kinds]
