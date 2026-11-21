@@ -1884,3 +1884,64 @@ track the selected method and instance when a client imports the proof
 or changes its rules.
 [Provider](../examples/open-evaluation/PreludeMappingProof.hs) and
 [rewrite-rule semantics](../REFERENCES.md#rewrite-rules-and-imported-method-proofs).
+
+### Replay rule dependencies for a closed method
+
+The family-axiom prototype at `68c252d93d` records dependencies for a
+single nullary equation. Its optimized Showcase failed in the specializer
+on the added `IdDetails` case. The `376a415fcf` port moves the marker to
+`IdInfo`. The matched `7cf1f57887` run reached GHC-83605 at the two
+imported `PreludeFoldrProof` uses of `GHC.Internal.Base.foldr`. Disabling
+rules in Showcase alone gave 500 output rows. The separate selected-method
+prototype at `22ee2d86dd` reports that the installed `length` rule blocks
+the closed `Prelude.length '[1, 2, 3]` proof. Its fixture tests that proof
+with rules disabled. An older unmarked interface can already contain the
+normalized method result. Keep the old provider as a separate upgrade
+control and rebuild it to test the new dependency check. Find the
+selected-method fixture with
+`git show 22ee2d86dd:testsuite/tests/dependent/should_run/NativeClosedMethodRule.sh`.
+[Installed length rules](../../../libraries/ghc-internal/src/GHC/Internal/List.hs#L284-L302)
+and [checkpoint](../CHECKPOINTS.md).
+
+Replay the `Origin.Image` interface from the selected-method fixture,
+both as a synonym and as a nullary closed family. Build the provider at
+`-O2` with rules disabled, `-fomit-interface-pragmas`, and
+`-fno-code -fwrite-interface`. Give the ordinary client only its `.hi`.
+The RHS is `Prelude.fmap Prelude.not ('Just 'True)`. The client checks
+`Refl :: Image :~: 'Just 'False`. Try the rule
+`forall f. fmap f (Just True) = Nothing` with `[~1]`. The negative control
+must reject the proof with GHC-83605. Its runtime-only sibling must fire
+the rule and return `Nothing` on `Just True`. For the positive control,
+change just the pattern to `Just False`. The proof and its `Just True`
+observation should succeed, and a second runtime call on `Just False`
+must fire the rule and return `Nothing`. With `[~]` on the matching
+pattern, the proof should succeed and neither call should fire the rule.
+
+The archived `7cf1f57887` driver reproduced this call pair at `-O0`
+and `-O2` with rewrite rules enabled. In all four form and optimization
+combinations, the runtime-only variant fired the active rule at its
+designated constructor. Both active variants gave GHC-83605 at `Refl`.
+The `[~]` rule never fired and all four proofs passed. The separate
+`22ee2d86dd` checker compares the rule head and first nominal type
+constructor, so its source predicts the same rejection for both active
+patterns.
+
+Start with a native check for constructor apartness at this exact closed
+application. Require a visible mismatch in the checked arguments and keep
+the existing rejection when the shape is unknown or another rewrite can
+change it. Also check the selector, dictionary and selected worker. After
+the cold replay, change an imported orphan rule from `Just False` to
+`Just True` and check that the unchanged proof is rechecked. Keep the
+installed `foldr` and `length` rules-on Showcase as separate acceptance
+checks. A rule-firing trace shows what one compilation did. It cannot
+establish apartness at all proof uses.
+
+GHC tests each user rule's activation in the simplifier phase, then matches
+its arguments. The rules are optimizer inputs whose equivalence GHC
+assumes. Agda registers an equality proof as a computation rule and uses
+it on terms left neutral by ordinary reduction. An Agda import brings in
+all global rules transitively, including private ones, to preserve the
+types of imported definitions during reduction. Agda can also check
+confluence. [GHC rule phases and semantics](../../users_guide/exts/rewrite_rules.rst),
+[GHC rule matching](../../../compiler/GHC/Core/Rules.hs#L739-L806)
+and [Agda 2.8.0 rewriting](https://agda.readthedocs.io/en/v2.8.0/language/rewriting.html#importing-rewrite-rules).
