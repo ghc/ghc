@@ -1,9 +1,10 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, FlexibleContexts, FlexibleInstances, GADTs, PolyKinds, RankNTypes, ScopedTypeVariables, TypeApplications, TypeFamilies, TypeOperators #-}
-module ConstrainedElements (Allowed, Collects(..), FieldKey, Field(..), field, applyField, withField, KnownIndex(..), reflectMaybe) where
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, FlexibleContexts, FlexibleInstances, GADTs, Modifiers, PolyKinds, RankNTypes, ScopedTypeVariables, TypeApplications, TypeFamilies, TypeOperators #-}
+module ConstrainedElements (Allowed, Collects(..), FieldKey, Field(..), field, applyField, withField, KnownIndex(..), Reflection, reflectMaybe, MaybeBoolEcho, AtNothing) where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
+import GHC.Matchability (U)
 
 class Allowed a
 instance Allowed Bool
@@ -47,6 +48,15 @@ class KnownIndex (k :: Type) where
 instance Allowed a => KnownIndex (Maybe a) where
     type Echo x = x
 
+-- | The premise provides the domain of each retained index.
+type Reflection a = Allowed a => foreach (x :: Maybe a) -> Echo x :~: x
+
+-- | Pass the family at the kind whose instance is already known.
+type MaybeBoolEcho = Echo :: Maybe Bool %U -> Maybe Bool
+
+-- | Apply an unmatchable function to the empty constructor.
+type AtNothing (f :: Maybe Bool %U -> Maybe Bool) = f 'Nothing
+
 -- | Reflect a runtime index using the instance for its kind.
-reflectMaybe :: forall a. Allowed a => foreach (x :: Maybe a) -> Echo x :~: x
+reflectMaybe :: forall a. Reflection a
 reflectMaybe _ = Refl

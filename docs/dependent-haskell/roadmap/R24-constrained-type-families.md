@@ -235,9 +235,36 @@ A marked family in a written argument must have a domain even if its
 enclosing synonym ignores that argument. For
 `type Ignore a = forall b. Show b => b -> String`, a signature using
 `Ignore (Elem [Int])` reports GHC-39999 for `Allowed Int`.
-Family applications in a synonym's definition and generated newtype or
-via equations still need separate formation rules.
+Generated newtype or via equations still need separate formation rules.
 [Source checks](../../../testsuite/tests/dependent/should_run/NativeRetainedFamilyDomain.hs).
+
+### Domains in type synonyms
+
+The compiler checks a marked family when a synonym is defined. For
+`type E a = Elem [a]`, it reports the missing `Allowed a` at the
+definition. A qualified synonym can state the premise. The Showcase
+exports a proof type that uses this rule.
+
+```haskell
+type Reflection a = Allowed a => foreach (x :: Maybe a) -> Echo x :~: x
+```
+
+An ordinary module can use `forall a. Reflection a` as a callback type.
+It also imports `MaybeBoolEcho`, a synonym for the partial family at the
+kind `Maybe Bool %U -> Maybe Bool`, and proves the result at `'Nothing`.
+
+The reader substitutes its arguments into the family's domain predicate.
+An imported synonym can use a general instance in its defining module.
+A more specific instance in the client can require an additional premise.
+In the regression test, `KeyElement [Bool]` passes and `KeyElement [Int]`
+reports GHC-39999 for `Allowed Int`, even though both family applications
+reduce to `Bool`. The producer source is absent during the client check.
+This check instantiates the source formation rule from section 4.2 of
+Morris and Eisenberg. The partial application also follows the
+right-hand-side arity rule in proposal #242.
+[Formation rule](https://richarde.dev/papers/2017/partiality/partiality.pdf),
+[proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#rhs-of-type-synonyms)
+and [separate compilation test](../../../testsuite/tests/dependent/should_run/NativeConstrainedFamily.sh).
 
 ### Family domains under a retained binder
 
@@ -332,8 +359,8 @@ result kind with GHC-01259. Accepted proposal #547 §1.2 disallows
 constraints in both positions. The 2019 review also asks how the draft
 accounts for #259's restriction on associated kind signatures. A qualifier
 in an ordinary term type
-synonym is legal in stock GHC, and this experiment still rejects a
-marked family in that synonym's right-hand side.
+synonym is legal in stock GHC. The fork checks a marked family in
+that synonym's right-hand side using its written premises.
 [Draft #177](https://github.com/typedrat/ghc-proposals/blob/faf45d2290f06696627b1f5d60ce92741ae9e38b/proposals/0000-simple-constrained-type-families.rst)
 [Eisenberg's 2019 review](https://github.com/ghc-proposals/ghc-proposals/pull/177#issuecomment-549766671),
 and [proposal #547](https://ghc-proposals.readthedocs.io/en/latest/proposals/0547-no-kind-equalities.html#proposed-change-specification).

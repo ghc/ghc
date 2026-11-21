@@ -7,7 +7,16 @@ import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Matchability (U)
 
-#ifdef REQUIRED_KINDS
+#if defined(ALIAS_FIELD)
+type Scoped = foreach (tag :: Bool) -> Collects (FieldKey tag) => Proxy (Elem (FieldKey tag))
+scoped :: Scoped
+scoped _ = Proxy
+#elif defined(ALIAS_OPEN)
+type Missing a = Elem [a]
+#elif defined(ALIAS_ESCAPE)
+type Scoped c = Collects c => Proxy (Elem c) -> Bool
+type Escapes = forall c. Scoped c -> Proxy (Elem c)
+#elif defined(REQUIRED_KINDS)
 project :: forall k -> forall (c :: k) -> Collects c => Proxy (Elem c)
 project (type _) (type _) = Proxy
 

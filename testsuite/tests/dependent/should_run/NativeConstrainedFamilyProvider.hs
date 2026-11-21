@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, TypeFamilies #-}
-module NativeConstrainedFamilyProvider (Collects(..), Allowed, Defaulted(..), Pair(..)) where
+module NativeConstrainedFamilyProvider (Collects(..), Allowed, Defaulted(..), Pair(..), Key, KeyElement) where
 
 class Allowed a
 instance Allowed Bool
@@ -21,3 +21,11 @@ class Pair a b where
 
 instance Pair Bool Int where
     type Swapped Int Bool = Char
+
+data Key a
+
+instance {-# OVERLAPPABLE #-} Collects (Key a) where
+    type Elem (Key a) = Bool
+
+-- | Select a domain that an importing module can specialize.
+type KeyElement a = Elem (Key a)

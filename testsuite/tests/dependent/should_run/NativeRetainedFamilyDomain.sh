@@ -14,13 +14,16 @@ cp ../ConstrainedElements.hi "$src/ConstrainedElementsClient.hs" "$src/NativeRet
 "${ghc[@]}" -DREQUIRED_KINDS -c NativeRetainedFamilyDomain.hs
 "${ghc[@]}" -fforce-recomp -DKNOWN_PREFIX -c NativeRetainedFamilyDomain.hs
 "${ghc[@]}" -fforce-recomp -DVALID_FORGOTTEN -c NativeRetainedFamilyDomain.hs
-for mode in FORGOTTEN MISSING_PREFIX MISSING_KIND WRONG_TAG LATE_GIVEN CALLBACK_ESCAPE CALLBACK_MISSING REQUIRED_MISSING MISSING; do
+"${ghc[@]}" -fforce-recomp -DALIAS_FIELD -c NativeRetainedFamilyDomain.hs
+for mode in ALIAS_OPEN ALIAS_ESCAPE FORGOTTEN MISSING_PREFIX MISSING_KIND WRONG_TAG LATE_GIVEN CALLBACK_ESCAPE CALLBACK_MISSING REQUIRED_MISSING MISSING; do
     if "${ghc[@]}" -fforce-recomp "-D$mode" -fdefer-type-errors -c NativeRetainedFamilyDomain.hs > failure 2>&1; then
         echo "Accepted $mode"
         exit 1
     fi
     grep -Eq '^NativeRetainedFamilyDomain.hs:[0-9]+:[0-9]+: error: \[GHC-39999\]' failure
     case "$mode" in
+        ALIAS_OPEN) grep -Fq 'Allowed a' failure ;;
+        ALIAS_ESCAPE) grep -Fq 'Collects c' failure ;;
         FORGOTTEN|MISSING_PREFIX|MISSING_KIND) grep -Fq 'Allowed Int' failure ;;
         WRONG_TAG)
             grep -Fq 'Could not deduce' failure

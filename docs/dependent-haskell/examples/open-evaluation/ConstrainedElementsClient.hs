@@ -1,8 +1,8 @@
-{-# LANGUAGE DataKinds, ExplicitNamespaces, RequiredTypeArguments, TypeApplications #-}
-{-# LANGUAGE GADTs, NoExperimentalDependentTypes, ScopedTypeVariables, TypeFamilies, TypeOperators #-}
-module ConstrainedElementsClient (constrainedElements, annotatedElement, explicitElements, renderField, formatField, renderKnownFields, retainedMaybeDomain) where
+{-# LANGUAGE DataKinds, ExplicitNamespaces, RequiredTypeArguments, TypeAbstractions, TypeApplications #-}
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes, RankNTypes, ScopedTypeVariables, TypeFamilies, TypeOperators #-}
+module ConstrainedElementsClient (constrainedElements, annotatedElement, explicitElements, renderField, formatField, renderKnownFields, retainedMaybeDomain, aliasedReflection) where
 
-import ConstrainedElements (Collects(..), FieldKey, Field(..), applyField, field, withField, reflectMaybe)
+import ConstrainedElements (Collects(..), FieldKey, Field(..), applyField, field, withField, Reflection, reflectMaybe, MaybeBoolEcho, AtNothing)
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
@@ -78,3 +78,10 @@ retainedMaybeDomain = do
 
     quiet :: Maybe Bool -> Bool
     quiet x = case reflectMaybe x of Refl -> True
+
+-- | Use the partial family and the qualified proof through their imported aliases.
+aliasedReflection :: (Maybe Bool, AtNothing MaybeBoolEcho :~: 'Nothing)
+aliasedReflection = (run (\ @a -> reflectMaybe @a) (Just True), Refl)
+  where
+    run :: (forall a. Reflection a) -> Maybe Bool -> Maybe Bool
+    run proof x = case proof @Bool x of Refl -> x

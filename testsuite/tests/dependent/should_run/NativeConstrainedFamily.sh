@@ -29,6 +29,27 @@ for reader in marked ordinary; do
             cat premise.log
             exit 1
         fi
+        cat >AliasUse.hs <<'HS'
+{-# LANGUAGE CPP, FlexibleInstances, NoExperimentalDependentTypes, TypeFamilies #-}
+module AliasUse where
+import NativeConstrainedFamilyProvider (Allowed, Collects(..), Key, KeyElement)
+instance {-# OVERLAPPING #-} Allowed a => Collects (Key [a]) where
+    type Elem (Key [a]) = Bool
+#ifdef MISSING
+value :: KeyElement [Int]
+#else
+value :: KeyElement [Bool]
+#endif
+value = True
+HS
+        "${ghc[@]}" -c AliasUse.hs
+        if [[ $reader == ordinary ]]; then
+            "${ghc[@]}" -fforce-recomp -DMISSING -c AliasUse.hs
+        elif "${ghc[@]}" -fforce-recomp -DMISSING -fdefer-type-errors -c AliasUse.hs >alias.log 2>&1 ||
+             ! grep -Fq '[GHC-39999]' alias.log || ! grep -Fq 'Allowed Int' alias.log; then
+            cat alias.log
+            exit 1
+        fi
         cat >MissingField.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes, TypeFamilies #-}
 module MissingField where
