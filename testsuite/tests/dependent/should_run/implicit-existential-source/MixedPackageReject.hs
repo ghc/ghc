@@ -52,3 +52,12 @@ captureBoth p = readBoth p
 
 onlyFamilyBoth :: FamilyBoth -> Bool
 onlyFamilyBoth p = ignoreFamilyBoth p
+
+sharedOuter :: Mixed -> Mixed -> Int
+sharedOuter left right = readSameOuter left right
+
+escapeInners :: forall a. Mixed -> Mixed -> a
+escapeInners left right = outerOfInners left right
+
+wrongChoice :: Mixed -> Mixed -> Int
+wrongChoice left right = chooseInners left () right

@@ -52,6 +52,9 @@ readSelection flag left right = withRankedId (\transform ->
 readProducedSelection :: Bool -> Int
 readProducedSelection flag = readBoth (selectRanked id flag (makeBoth True) alternateBoth)
 
+chooseThroughQuickLook :: Bool -> Mixed -> Mixed -> Int
+chooseThroughQuickLook flag left right = id (chooseInners (id left) flag right)
+
 main :: IO ()
 main = do
   print (readMixed named, readMixed applied, readMixed written, readKind kindMixed)
@@ -80,3 +83,12 @@ main = do
   print (readProducedSelection input, readProducedSelection selected,
          readSelection input (makeBoth True) unused,
          readSelection selected unused (makeBoth False))
+  let unusedMixed :: Mixed
+      unusedMixed = error "unselected mixed package"
+  print (chooseInners (chooseMixed input) input (chooseMixed selected),
+         chooseInners (chooseMixed input) selected (chooseMixed selected),
+         chooseThroughQuickLook input (chooseMixed input) unusedMixed,
+         chooseThroughQuickLook selected unusedMixed (chooseMixed selected))
+  demanded <- try (evaluate (chooseThroughQuickLook input
+                 (chooseMixed (error "selected mixed call")) unusedMixed))
+  print (either (\(ErrorCall message) -> message == "selected mixed call") (const False) demanded)

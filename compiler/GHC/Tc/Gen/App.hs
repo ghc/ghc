@@ -465,7 +465,7 @@ tcOrdinaryApp rn_expr rn_fun rn_args exp_res_ty
        ; (tc_fun0, fun_sigma0) <- tcInferAppHead rn_head
        ; let check_call fun sigma args expected =
                do { let check = tcOrdinaryApp' rn_expr rn_head
-                  ; mixed <- tcOpenMixedBarArgument fun sigma args expected check
+                  ; mixed <- tcOpenMixedBarArguments fun sigma args expected check
                   ; case mixed of
                       Just opened -> return opened
                       Nothing -> tcOpenImplicitArgs rn_expr sigma args expected (check fun sigma) }
@@ -498,63 +498,84 @@ tcOrdinaryApp rn_expr rn_fun rn_args exp_res_ty
     ordinary_arg EWrap{} = True
     ordinary_arg _ = False
 
--- | Open a dot operand for a unary consumer of its explicit package.
+-- | Open dot operands for a consumer of their explicit packages.
 -- See Note [Implicit opening for an explicit package argument].
-tcOpenMixedBarArgument
+tcOpenMixedBarArguments
   :: HsExpr GhcTc -> TcSigmaType -> [HsExprArg 'TcpRn] -> ExpRhoType
   -> (HsExpr GhcTc -> TcSigmaType -> [HsExprArg 'TcpRn] -> ExpRhoType -> TcM (HsExpr GhcTc))
   -> TcM (Maybe (HsExpr GhcTc))
-tcOpenMixedBarArgument fun sigma args expected check_app
+tcOpenMixedBarArguments fun sigma args expected check_app
   | hasNoConcreteTyVars fun
-  = do { candidate <- tcFindMixedBarArgument sigma args
-       ; case candidate of
-           Just (binders, rho, domain, operand, expected_schema)
-             -> do { (checked, schema) <- tcScalingUsage ManyTy $
-                       case expected_schema of
-                         Just schema -> (, schema) <$> tcCheckMonoExpr operand schema
-                         Nothing -> do { (checked, actual) <- tcInferRho operand
-                                       ; schema <- liftZonkM (zonkTcType actual)
-                                       ; return (checked, schema) }
-                   ; result <- expTypeToType expected
-                   ; opened <- tcOpenImplicitPackage (getLocA operand) schema checked result $ \payload ->
-                         let ref = mkExpandedLExpr (unLoc operand) (nlHsVar (getName payload))
-                             replace arg@EValArg{} = arg { ea_arg = L (getLoc operand) ref }
-                             replace arg = arg
-                             check fun' ty = tcExtendIdEnv [payload] $
-                               check_app fun' ty (map replace args) (mkCheckExpType result)
-                         in case matchBarPackageWitnesses binders domain (varType payload) of
-                              Just (witnesses, _) ->
-                                check (mkHsWrap (mkWpTyApps witnesses) fun)
-                                      (substTyWith binders witnesses rho)
-                              Nothing -> check fun sigma
-                   ; return (Just opened) }
-           Nothing -> return Nothing }
+  = runMaybeT $ do
+      (binders, rho, spine) <- MaybeT (tcFindMixedBarArguments sigma args)
+      liftMaybeT $ do
+        result <- expTypeToType expected
+        open binders rho result [] [] spine
   | otherwise = return Nothing
+  where
+    open binders rho result rev_args opened [] =
+      let (fun', ty) = case matchBarPackageWitnesses binders (reverse opened) of
+            Just (witnesses, _) ->
+              (mkHsWrap (mkWpTyApps witnesses) fun, substTyWith binders witnesses rho)
+            Nothing -> (fun, sigma)
+      in check_app fun' ty (reverse rev_args) (mkCheckExpType result)
+    open binders rho result rev_args opened (Left arg : rest) =
+      open binders rho result (arg : rev_args) opened rest
+    open binders rho result rev_args opened (Right (domain, loc, operand, wanted, _) : rest) =
+      do { (checked, schema) <- tcScalingUsage ManyTy $
+               case wanted of
+                 Just schema -> (, schema) <$> tcCheckMonoExpr operand schema
+                 Nothing -> do { (checked, actual) <- tcInferRho operand
+                               ; schema <- liftZonkM (zonkTcType actual)
+                               ; return (checked, schema) }
+         ; tcOpenImplicitPackage (getLocA operand) schema checked result $ \payload ->
+             let ref = fmap (\e -> mkExpandedLExpr e (nlHsVar (getName payload))) operand
+             in tcExtendIdEnv [payload] $
+                  open binders rho result (EValArg loc noExtField ref : rev_args)
+                       ((domain, varType payload) : opened) rest }
 
--- | Find the declared mixed operand of a unary call without elaborating it.
+-- | Classify the mixed operands before checking any application arguments.
 -- See Note [Implicit opening for an explicit package argument].
-tcFindMixedBarArgument :: TcSigmaType -> [HsExprArg 'TcpRn]
-                       -> TcM (Maybe ([TyVar], TcSigmaType, TcType, LHsExpr GhcRn, Maybe TcType))
-tcFindMixedBarArgument sigma args
+tcFindMixedBarArguments
+  :: TcSigmaType -> [HsExprArg 'TcpRn] -> TcM (Maybe ([TyVar], TcRhoType, [MixedBarArg]))
+tcFindMixedBarArguments sigma args
   | (tvs@(_:_), rho) <- tcSplitForAllInvisTyVars sigma
   , let binders = map snd tvs
   , all isTyVar binders
-  , FunTy { ft_af = af, ft_mult = mult, ft_arg = domain } <- coreFullView rho
-  , isVisibleFunArg af, isManyTy mult
-  , Just template <- barPackageSignature domain
-  , all (\binder -> isInjectiveInType binder template) binders
-  , [EValArg{ea_arg = operand}] <- filter (not . parens) args
-  = do { declared <- tcPackageOperandResult False operand
-       ; return $ case declared of
-           Just (declared_ty, check_schema)
-             | schema@(ExistsTy ImplicitExists _ inner) <- coreFullView declared_ty
-             , Just _ <- matchBarPackageWitnesses binders domain (implicitPayloadType inner)
-             -> Just (binders, rho, domain, operand, if check_schema then Just schema else Nothing)
-           _ -> Nothing }
+  = runMaybeT $ do
+      spine <- mixed_spine rho args
+      let packages = [(domain, payload) | Right (domain, _, _, _, payload) <- spine]
+          templates = mapMaybe (barPackageSignature . fst) packages
+      guard (all (\binder -> any (isInjectiveInType binder) templates) binders)
+      _ <- MaybeT (pure (matchBarPackageWitnesses binders packages))
+      return (binders, rho, spine)
   | otherwise = return Nothing
   where
-    parens (EWrap EPar{}) = True
-    parens _ = False
+    mixed_spine :: TcRhoType -> [HsExprArg 'TcpRn] -> MaybeT TcM [MixedBarArg]
+    mixed_spine _ [] = return []
+    mixed_spine ty (arg@(EWrap EPar{}) : rest) =
+      (Left arg :) <$> mixed_spine ty rest
+    mixed_spine ty (arg@EValArg{ea_loc_span = loc, ea_arg = operand} : rest)
+      | FunTy{ft_af = af, ft_mult = mult, ft_arg = domain, ft_res = res} <- coreFullView ty
+      , isVisibleFunArg af
+      = do
+          package <- liftMaybeT $
+            if isManyTy mult && isJust (barPackageSignature domain)
+              then tcPackageOperandResult False operand
+              else return Nothing
+          let slot = case package of
+                Just (declared_ty, check_schema)
+                  | schema@(ExistsTy ImplicitExists _ inner) <- coreFullView declared_ty
+                  -> Right (domain, loc, operand, if check_schema then Just schema else Nothing,
+                            implicitPayloadType inner)
+                _ -> Left arg
+          (slot :) <$> mixed_spine res rest
+    mixed_spine _ _ = mzero
+
+-- | An ordinary argument or a mixed-package argument with its bar domain,
+-- source operand, optional checked schema and declared payload type.
+type MixedBarArg = Either (HsExprArg 'TcpRn)
+                          (TcType, HsExprLoc, LHsExpr GhcRn, Maybe TcType, TcType)
 
 {- Note [Implicit opening for an explicit package argument]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -609,11 +630,18 @@ kind under the same substitution, including earlier parameters in the
 telescope. Then compare the complete bar type. A selected type can refer
 to the opened dot witness, but it cannot capture the bar binder.
 
-Infer the operand once and give that checked expression to the existing
-lazy unpack. Recompute the choices from the opened payload so they refer
-to the fresh skolem. Keep the result type outside its scope.
-Continue checking the source application under this opening. The callee
-still controls the explicit unpacking.
+In choose :: forall a b. Bool -> Inner a -> Inner b -> Int, distinct
+operands can fix a and b. Match all declared bar domains against the
+corresponding dot payloads before opening the operands. Keep the ordinary
+arguments in the spine. Each selected domain has multiplicity Many, and
+every head binder needs an injective occurrence across the selected domains.
+
+Check each selected operand once. Give the checked expressions to the
+existing lazy unpacks. Recompute the joint match under the openings, so
+each operand gives a separate fresh witness. A declaration shared by the
+operands cannot justify equating their witnesses. Keep the result type
+outside every opening. Check the original application in these scopes.
+The callee still controls the explicit unpacking.
 
 Proposal #473's IExist rule opens a typed expression. Its alternative Core
 form uses a lazy unpack to keep the witness in scope. The ordinary source
@@ -3167,30 +3195,34 @@ implicitResult _ _ _ expected = return (expected, id)
 matchMixedExistsResult :: Type -> Type -> Maybe (Type, Type)
 matchMixedExistsResult schema actual
   | ExistsTy ImplicitExists outer formal <- coreFullView schema
-  = do { ([witness], inner) <- matchBarPackageWitnesses [outer] formal actual
+  = do { ([witness], [inner]) <- matchBarPackageWitnesses [outer] [(formal, actual)]
        ; return (witness, inner) }
   | otherwise = Nothing
 
--- | Match free template variables across an explicit existential.
+-- | Match free template variables across explicit existential packages.
 -- See Note [Implicit opening for an explicit package argument].
-matchBarPackageWitnesses :: [TyVar] -> Type -> Type -> Maybe ([Type], Type)
-matchBarPackageWitnesses binders formal actual
-  | Just template <- barPackageSignature formal
-  , Just target <- barPackageSignature actual
-  , all supportsQuickLookType [formal, actual]
-  , all noQuickLookVars [formal, actual]
-  = do { let bind_outer tv _ | tv `elem` binders = BindMe
+matchBarPackageWitnesses :: [TyVar] -> [(Type, Type)] -> Maybe ([Type], [Type])
+matchBarPackageWitnesses binders packages
+  | all supportsQuickLookType types
+  , all noQuickLookVars types
+  = do { templates <- traverse barPackageSignature formals
+       ; targets <- traverse barPackageSignature actuals
+       ; let bind_outer tv _ | tv `elem` binders = BindMe
                              | otherwise = DontBindMe
-             empty_subst = Subst.mkEmptySubst (mkInScopeSet (tyCoVarsOfTypes [template, target]))
-             actual_fvs = tyCoVarsOfType actual
-       ; subst <- tcMatchTyX_BM bind_outer empty_subst template target
+             empty_subst = Subst.mkEmptySubst (mkInScopeSet (tyCoVarsOfTypes (templates ++ targets)))
+             actual_fvs = tyCoVarsOfTypes actuals
+       ; subst <- foldM (\s (template, target) -> tcMatchTyX_BM bind_outer s template target)
+                        empty_subst (zip templates targets)
        ; witnesses <- traverse (Subst.lookupTyVar subst) binders
        ; guard (all (`elemVarSet` actual_fvs) (tyCoVarsOfTypesList witnesses))
        ; let kinds = map (Subst.substTy subst . tyVarKind) binders
-             inner = Subst.substTy subst formal
-       ; guard (eqTypes (map typeKind witnesses) kinds && eqType inner actual)
-       ; return (witnesses, inner) }
+             inners = map (Subst.substTy subst) formals
+       ; guard (eqTypes (map typeKind witnesses) kinds && eqTypes inners actuals)
+       ; return (witnesses, inners) }
   | otherwise = Nothing
+  where
+    (formals, actuals) = unzip packages
+    types = formals ++ actuals
 
 -- | Compare the binder kind and body without changing the original mode.
 barPackageSignature :: Type -> Maybe Type
@@ -8330,7 +8362,7 @@ tcQuickLookNeedsOrdinaryArgs (HsVar _ lname) args
            Just var -> do
              { let sigma = varType var
              ; mixed <- if isEmptyNameEnv (idConcreteTvs var)
-                        then tcFindMixedBarArgument sigma args
+                        then tcFindMixedBarArguments sigma args
                         else return Nothing
              ; if isJust mixed || isGroundRankedRetainedCall (length (filter isHsValArg args)) sigma
                then return True

@@ -8,6 +8,7 @@ module MixedPackageProvider
   , DepMixed, depMixed, readDependent, withRankedId, relayRanked
   , selectRanked, alternateBoth
   , UnequalMixed, readEqualSlots, CaptureBoth, FamilyBoth, ignoreFamilyBoth
+  , chooseInners, readSameOuter, outerOfInners
   ) where
 
 import Data.Kind (Type)
@@ -61,6 +62,15 @@ ignoreInner _ = True
 outerValue :: forall a. Inner a -> a
 outerValue p = case p of
   Exists.Pack _ (x, _, _) -> x
+
+chooseInners :: forall a b. Inner a -> Bool -> Inner b -> Int
+chooseInners left flag right = if flag then readInner left else readInner right
+
+readSameOuter :: forall a. Inner a -> Inner a -> Int
+readSameOuter left right = readInner left + readInner right
+
+outerOfInners :: forall a b. Inner a -> Inner b -> a
+outerOfInners left _ = outerValue left
 
 readKindInner :: forall k. KindInner k -> Bool
 readKindInner _ = True

@@ -418,7 +418,7 @@ for opt in 0 2; do
     "$ghc" "${mixed_flags[@]}" -c MixedPackageMain.hs
     "$ghc" "${mixed_flags[@]}" MixedPackageMain.o ../provider/MixedPackageProvider.o -o run
     ./run >mixed.out
-    printf '(11,11,13,True)\n("ignored","ignored")\nTrue\n(13,21,(17,True),True)\nTrue\n(17,29,43,True)\n(17,29,True)\n(17,29,17,29)\n' |
+    printf '(11,11,13,True)\n("ignored","ignored")\nTrue\n(13,21,(17,True),True)\nTrue\n(17,29,43,True)\n(17,29,True)\n(17,29,17,29)\n(13,21,13,21)\nTrue\n' |
         diff -u - mixed.out
     if "$ghc" "${mixed_flags[@]}" -c MixedPackageReject.hs >mixed-reject.log 2>&1; then
         echo "MixedPackageReject unexpectedly compiled." >&2
@@ -426,7 +426,8 @@ for opt in 0 2; do
     fi
     for rejection in wrongWitness:83865 wrongMode:27432 crossed:83865 stale:83865 \
                      escapeCall:25897 captureRank:83865 onlyFamily:83865 linearCall:18872 \
-                     escapeBoth:25897 unequalSlots:83865 captureBoth:83865 onlyFamilyBoth:83865; do
+                     escapeBoth:25897 unequalSlots:83865 captureBoth:83865 onlyFamilyBoth:83865 \
+                     sharedOuter:83865 escapeInners:25897 wrongChoice:83865; do
         line=$(grep -n "^${rejection%:*}.* =" MixedPackageReject.hs | cut -d: -f1)
         grep -Eq "^MixedPackageReject.hs:$line:[0-9]+: error: \[GHC-${rejection#*:}\]" mixed-reject.log ||
             { cat mixed-reject.log >&2; exit 1; }
