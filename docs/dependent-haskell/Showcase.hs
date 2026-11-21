@@ -89,6 +89,7 @@ import qualified IndexBetaClient as IndexBeta
 import qualified IndexedMark
 import qualified IndexedVec
 import qualified CertifiedSplitClient
+import qualified CursorClient
 import qualified FinitePositionClient
 import qualified OrdinaryOpenVectorAppend
 import qualified VectorSplitObservation
@@ -852,6 +853,7 @@ genericSafeIndexing = do
     observe "generic checked Int position" selected
     observe "index a list by its ordinary source length" =<< FinitePositionClient.observeListIndices
     observe "empty-list index forces its position" =<< FinitePositionClient.observeEmptyIndex
+    observe "read checked list positions through ordinary and linear callers" =<< CursorClient.observeCursors
     observe "check a signed position in a packaged vector" $
         case ListVectorClient.fromList values of
             Sigma.Pair _ cells -> FinitePositionClient.lookupVecViaView cells position

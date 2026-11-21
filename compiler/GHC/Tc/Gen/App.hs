@@ -1504,15 +1504,15 @@ tcRetainedKnownValuePlan :: (LHsExpr GhcRn -> TcM (Maybe Type))
                         -> Maybe TcRhoType -> TcSigmaType
                         -> [LHsExpr GhcRn] -> TcM RetainedInstPlan
 tcRetainedKnownValuePlan declared expected sigma values
-  | (tvs, _, tau) <- tcRetainedInstTelescope sigma
+  | (tvs, theta, tau) <- tcRetainedInstTelescope sigma
   , not (null tvs), isRetainedValueType tau
   , not (null values)
   = case coreFullView tau of
       DepFunTy DepFunInvisible binder body ->
         fmap (fmap snd) (tcInferInvisibleRetained tvs binder body values)
-      _ -> choose_erased tvs values (retainedDeclaredDomains (length values) tau)
+      _ -> choose_erased tvs theta tau values (retainedDeclaredDomains (length values) tau)
   where
-    choose_erased tvs values (domains, result)
+    choose_erased tvs theta tau values (domains, result, masked)
       = do { pairs <- fmap catMaybes $ mapM (declared_arg tvs) (zip domains values)
          ; let actuals = map snd pairs
                seed | length domains == length values
@@ -1534,15 +1534,27 @@ tcRetainedKnownValuePlan declared expected sigma values
              Just subst
                | any (hasNativeDependentExpr . Core.Type)
                      (sigma : actuals ++ maybeToList expected)
-               , Just choices <- traverse (Subst.lookupTyVar subst) tvs
-               , not (any (`elemVarSet` tyCoVarsOfTypes choices) tvs)
-               , and (zipWith (\tv ty ->
-                        eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty))
-                      tvs choices)
-               , all (\(formal, actual) -> eqType (Subst.substTy subst formal) actual) pairs
-               , all noQuickLookVars (sigma : actuals ++ choices ++ maybeToList expected)
-               -> do { valid <- tcRetainedInstScope (sigma : actuals ++ choices ++ maybeToList expected)
-                     ; return (if valid then Just choices else Nothing) }
+               -> runMaybeT $ do
+                    let fixed = mapMaybe (Subst.lookupTyVar subst) tvs
+                        -- See Note [Multiplicity of a supplied native argument].
+                        fresh_mult tv = eqType (tyVarKind tv) multiplicityTy
+                          && tv `elemVarSet` tyCoVarsOfType tau
+                          && not (any (anyFreeVarsOfType (== tv))
+                                      (masked : theta ++ map tyVarKind tvs))
+                          && any (hasNativeDependentExpr . Core.Type) fixed
+                        choice tv = case Subst.lookupTyVar subst tv of
+                          Just ty -> pure ty
+                          Nothing -> guard (fresh_mult tv) >> liftMaybeT newMultiplicityVar
+                    choices <- traverse choice tvs
+                    guard (not (any (`elemVarSet` tyCoVarsOfTypes choices) tvs))
+                    guard (and (zipWith (\tv ty ->
+                              eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty)) tvs choices))
+                    guard (all (\(formal, actual) -> eqType (Subst.substTy subst formal) actual) pairs)
+                    let tys = sigma : actuals ++ choices ++ maybeToList expected
+                    guard (all noQuickLookVars tys)
+                    valid <- liftMaybeT (tcRetainedInstScope tys)
+                    guard valid
+                    return choices
              _ -> return Nothing }
 
     -- See Note [Erased arguments in a dependent result].
@@ -1747,7 +1759,7 @@ tcInferInvisibleRetained tvs binder body args
   = do { name <- newSysName (mkTyVarOcc "retained_argument")
        ; let template = mkTyVar name (varType binder)
        ; (indices, suffix) <- collect [(TermVarTy binder, template)] body
-       ; let (domains, _) = retainedDeclaredDomains (length args) suffix
+       ; let (domains, _, _) = retainedDeclaredDomains (length args) suffix
              choose view = do
                { pairs <- catMaybes <$> mapM (declared_pair view indices) (zip domains args)
                ; let determines (formal, _) = template `elemVarSet` injectiveVarsOfType True formal
@@ -1979,31 +1991,49 @@ GHC.Core.TyCo.FVs.
 -- Mark visible retained domains with True. Skip dependent argument domains.
 -- Keep the set of crossed retained binders with the result.
 -- See Note [Declared retained-domain choices].
-retainedDeclaredDomains :: Int -> Type -> ([Maybe (Bool, Type)], Maybe (IdSet, Type))
+retainedDeclaredDomains :: Int -> Type -> ([Maybe (Bool, Type)], Maybe (IdSet, Type), Type)
 retainedDeclaredDomains supplied = go supplied emptyVarSet
   where
     go 0 bound result = result_view bound result
     go remaining bound ty
       | Just ty' <- coreView ty = go remaining bound ty'
-    go _ _ (DepFunTy DepFunInvisible _ _) = ([], Nothing)
+    go _ _ ty@(DepFunTy DepFunInvisible _ _) = ([], Nothing, ty)
     go remaining bound (DepFunTy DepFunVisible binder body)
       = let domain = independent bound True (varType binder)
-            (rest, result) = go (remaining - 1) (extendVarSet bound binder) body
-        in (domain : rest, result)
-    go remaining bound (FunTy af _ _ arg res)
+            (rest, result, masked) = go (remaining - 1) (extendVarSet bound binder) body
+        in (domain : rest, result, DepFunTy DepFunVisible binder masked)
+    go remaining bound ty@(FunTy af _ mult arg res)
       | isVisibleFunArg af
-      = let (rest, result) = go (remaining - 1) bound res
-        in (independent bound False arg : rest, result)
-      | otherwise = go remaining bound res
+      = let (rest, result, masked) = go (remaining - 1) bound res
+            weight | Just _ <- getTyVar_maybe mult = ManyTy
+                   | otherwise = mult
+        in (independent bound False arg : rest, result, ty { ft_mult = weight, ft_res = masked })
+      | otherwise
+      = let (rest, result, masked) = go remaining bound res
+        in (rest, result, ty { ft_res = masked })
     go _ bound result = result_view bound result
 
-    result_view bound result
-      = ([], Just (bound, result))
+    result_view bound result = ([], Just (bound, result), result)
 
     independent bound retained domain
       | mentions bound domain = Nothing
       | otherwise = Just (retained, domain)
     mentions bound = anyFreeVarsOfType (`elemVarSet` bound)
+
+{- Note [Multiplicity of a supplied native argument]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In indexGeneric [v] pos, v can have type Vec Int n for a runtime n.
+The element type must be selected before introducing ordinary metavariables.
+The position arrow also quantifies a multiplicity p. Reading the type of pos
+does not determine how often the function uses it.
+
+Keep the known native element type. Give p an ordinary fresh multiplicity
+variable when it occurs only as the weight of supplied value arrows. The
+third result of retainedDeclaredDomains masks these weights to check that
+condition. Check the original function type and its argument usage with
+the fresh variable. Neither the result nor a cached argument-type view
+can expose a variable introduced by this rule.
+-}
 
 {- Note [Erased arguments in a dependent result]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -5315,7 +5345,7 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
                         do { ty <- liftZonkM (zonkTcType (actual_type entry))
                            ; loc <- getCtLocM (lexprCtOrigin arg) (Just TypeLevel)
                            ; view <- reductionReducedType <$> tcRewriteFamilyAxioms loc ty
-                           ; return (loc, (domain_at pos, view)) }
+                           ; return (loc, (domain_at pos, callback_view (domain_at pos) view)) }
                    match_indices = tcMatchRetainedIndexArgs (bind_outer tvs)
              ; initial_cache <- infer_args needed_tvs inferable domains 1 args
              ; initial_args <- mapM matching_arg initial_cache
@@ -5412,6 +5442,17 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
       = subst
       | otherwise = Subst.emptySubst
 
+    -- See Note [Matching a callback with an inferred multiplicity].
+    callback_view FunTy{ft_af = expected_af, ft_ma = expected_ma, ft_mult = expected_mult} actual
+      | isVisibleFunArg expected_af
+      , isOneTy expected_mult || isManyTy expected_mult
+      , fun@FunTy{ft_af = af, ft_ma = ma, ft_mult = mult} <- coreFullView actual
+      , af == expected_af, eqType ma expected_ma
+      , Just tv <- getTyVar_maybe mult, isMetaTyVar tv
+      , hasNativeDependentExpr (Core.Type actual)
+      = fun { ft_mult = expected_mult }
+    callback_view _ actual = actual
+
     actual_type (_, ty, _) = ty
 
     -- See Note [Partially applied callbacks].
@@ -5440,6 +5481,18 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
     infer_args tvs inferable domains pos (_ : args)
       = infer_args tvs inferable domains pos args
 tcRetainedArgInstCached _ _ _ _ _ fun sigma = return (fun, sigma, [], Nothing)
+
+{- Note [Matching a callback with an inferred multiplicity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In fmap (indexGeneric xs) (mkFinGeneric xs n), the partial lookup can
+have type Fin (sourceLength xs) %p -> a with a fresh multiplicity p.
+The declared callback argument of fmap uses Many. Match the domain and
+result to choose fmap's erased arguments before its input metavariable
+would have to hold sourceLength xs. Use the expected concrete arrow
+multiplicity only in that comparison. Keep the cached callback at its
+actual type. tcValArgsWithCache then checks its multiplicity and emits
+the ordinary subsumption wrapper. Rigid multiplicities are never guessed.
+-}
 
 -- | Match cached index arguments and keep both views used for selection.
 -- See Note [Matching a computed nonempty length].

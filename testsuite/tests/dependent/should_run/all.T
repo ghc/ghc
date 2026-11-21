@@ -452,6 +452,12 @@ test('NativeCertifiedSplit',
       extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/' + f
                    for f in ['PackedVecLibrary.hs', 'CertifiedSplit.hs', 'CertifiedSplitClient.hs']])],
      run_command, ['bash NativeCertifiedSplit.sh "{compiler}" "{libdir}"'])
+
+test('NativeLinearRetainedPackage',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['NativeLinearRetainedPackage' + suffix for suffix in
+                   ['Provider.hs', 'Client.hs', 'Reject.hs', 'OverlapReject.hs']])],
+     run_command, ['bash NativeLinearRetainedPackage.sh "{compiler}" "{libdir}"'])
 test('NativeNamedSplit',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/NamedSplitClient.hs',
@@ -463,7 +469,8 @@ test('NativeIndexedFin',
       extra_files(['NativeIndexedFinGate.hs', 'NativeGeneralGadtOperandProvider.hs', 'NativeIndexedOperandWire.hs',
                    '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']
                   + ['../../../../docs/dependent-haskell/examples/qualified-pi/' + f
-                     for f in ['ParameterizedIndexLibrary.hs', 'FinitePosition.hs', 'FinitePositionClient.hs']])],
+                     for f in ['ParameterizedIndexLibrary.hs', 'FinitePosition.hs', 'FinitePositionClient.hs',
+                               'ListCursor.hs', 'CursorClient.hs']])],
      run_command, ['bash NativeIndexedFin.sh "{compiler}" "{libdir}"'])
 test('NativeOrdinaryInline',
      [req_bco, req_host_target_ghc, only_ways(['normal']),

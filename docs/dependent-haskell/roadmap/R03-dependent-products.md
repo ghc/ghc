@@ -446,3 +446,29 @@ A bottom position raises its own exception.
 [Implementation](../examples/qualified-pi/ParameterizedIndexLibrary.hs),
 [ordinary caller](../examples/qualified-pi/FinitePositionClient.hs)
 and [Agda and Haskell precedents](../REFERENCES.md#omit-an-impossible-list-index-equation).
+
+### Consume a bounded position at its inferred multiplicity
+
+`indexGeneric` quantifies the multiplicity of its position. The same
+two equations support an unrestricted callback to `fmap` and a linear
+reader for a stored cursor. The element type stays the first visible
+type argument. The caller can still write `indexGeneric @Char`.
+
+A cursor stores a runtime list and a position indexed by that list's
+source length. An ordinary module can open an erased package containing
+the cursor and its linear reader. Both lookup paths return the selected
+element on a cyclic list and leave the suffix unevaluated on a partial
+list. A callback restricted to `%1` still fails at ordinary `fmap`.
+A position checked against another list still requires a proof that
+their lengths agree.
+[Cursor](../examples/qualified-pi/ListCursor.hs),
+[ordinary client](../examples/qualified-pi/CursorClient.hs)
+and [prior art](../REFERENCES.md#consume-a-list-position-in-a-linear-function).
+
+The element of the list can itself depend on a runtime input. In
+`indexGeneric [v] pos`, the declaration of `v :: Vec Int n` fixes
+the element type, including the local length `n`. The caller can still
+infer the multiplicity of the position. A fully applied ordinary arrow
+supplies that multiplicity variable. Its use remains subject to GHC's
+linearity check. The Core API exercises this example inside `withPacked`.
+[Runtime-indexed client](../../../testsuite/tests/ghc-api/NativeDependentCoreRun.hs).

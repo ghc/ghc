@@ -1545,7 +1545,6 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
     do { let (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _) = dataConFullSig con
              binders = dataConRepArgBinders con
              con_like = RealDataCon con
-             pat_mult = scaledMult pat_ty_scaled
        ; unless (null ex_tvs && null eq_spec && null theta
                  && binders `equalLength` arg_tys && not (pe_lazy penv)) bad_pattern
        ; case pe_ctxt penv of
@@ -1555,7 +1554,6 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
            PrefixCon ann pats -> return (ann, pats)
            _ -> bad_pattern
        ; check_con_pat_arity con_like (length pats)
-       ; tcSubMult (pe_orig penv) ManyTy pat_mult
        ; let tc = dataConTyCon con
        ; expected <- readExpType_maybe (scaledThing pat_ty_scaled)
        -- See Note [Constructors in a nested dependent sum] in GHC.Tc.Utils.Unify.
@@ -1583,7 +1581,7 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
       = do { res <- thing_inside; return ([], res) }
     check_fields subst refinements position ((mb_binder, arg_ty) : args) (pat : pats)
       = setSrcSpanA (getLoc pat) $
-        do { let original_ty = scaleScaled ManyTy (substScaledTy subst arg_ty)
+        do { let original_ty = scaleScaled (scaledMult pat_ty_scaled) (substScaledTy subst arg_ty)
            ; case mb_binder of
                Nothing ->
                  do { co <- refine_type refinements (scaledThing original_ty)
@@ -1683,19 +1681,17 @@ stay lazy. Reject lazy package and let patterns. A retained telescope belongs
 to its selected constructor; other constructors do not change its field
 scope. matchExpectedConTy checks the parent and instantiates its universal
 arguments. Keep the checks for no existentials, equality specification or
-context, and require an identity result wrapper and unrestricted multiplicity.
+context, and require an identity result wrapper for the ordinary constructor match.
 Match compilation keeps each equation's actual source field Ids in a separate
 case, including when its family has other constructors.
 See Note [Retained package equation scope] in GHC.HsToCore.Match.Constructor.
 
-An ordinary case starts with a fresh multiplicity metavariable. Require Many
-with tcSubMult, as checkManyPattern does for other nonlinear patterns. A
-syntactic isManyTy check would reject this metavariable before it can unify.
-tcSubMult rejects linear or rigid multiplicities through the ordinary
-multiplicity constraints. It also requires reflexive multiplicity evidence;
-see Note [Coercion errors in tcSubMult] in GHC.Tc.Utils.Unify. Check the fields
-at Many immediately. Do not put the unresolved outer multiplicity in a
-retained field Id, whose metadata requires Many.
+Scale each field by the multiplicity of the case. A retained field is declared
+at Many, so its pattern Id still has multiplicity Many in a linear case.
+For an ordinary field, use the multiplicity in the constructor telescope.
+For example, a linear match on Pair can use its retained witness freely.
+A linear match on a constructor with a linear payload must use that payload
+once. See Note [Retained package equation scope] in GHC.HsToCore.Match.Constructor.
 
 Agda's constructor telescope and splitCon provide the scope precedent. See
 docs/dependent-haskell/REFERENCES.md#retained-constructor-field-telescopes.

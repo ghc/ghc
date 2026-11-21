@@ -123,7 +123,7 @@ import Data.Data ( Data, cast, gmapQ, gmapT )
 import Control.Monad
 import Control.Arrow ( second )
 import Data.Foldable (toList)
-import Data.List (find, transpose, zipWith4)
+import Data.List (find, partition, transpose, zipWith4)
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe (mapMaybe)
 
@@ -1720,11 +1720,15 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
              missing = filter (`notElem` cons) domain_cons
        ; unless (cons `equalLength` represented || any has_value_pattern matches) coverage_error
        ; arg_tys <- mapM argument_type pat_tys
+       ; let written = zip constructors matches
+       ; rows <- if any (not . isManyTy . scaledMult) arg_tys
+                 then group_linear_rows written
+                 else return written
        ; absent <- mapM (absurd_row arg_tys) missing
        ; result_ty <- readExpType rhs_ty
        ; (usages, checked) <- mapAndUnzipM
            (\(con, match) -> tcCollectingUsage (check_match con arg_tys result_ty match))
-           (zip constructors matches ++ absent)
+           (rows ++ absent)
        ; tcEmitBindingUsage (supUEs usages)
        ; if null matches
          then empty_matches arg_tys result_ty
@@ -1800,6 +1804,34 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
            ; return (match { m_pats = L pats_loc (reverse prefix ++ [arg_pat])
                            , m_grhss = unguardedGRHSs (getLocA second) body noAnn }) }
       | otherwise = return match
+
+    -- See Note [Linear fields after a retained constructor].
+    group_linear_rows [] = return []
+    group_linear_rows (row@((dc, fields), L row_loc first@Match { m_pats = L pats_loc pats }) : rest)
+      = do { let (same, others) = partition ((== dc) . fst . fst) rest
+           ; combined <- case same of
+               [] -> return row
+               _ | [RetainedConValue] <- argument_plan
+                 , [con_pat, position] <- pats
+                 -> do { name <- newSysName (mkVarOcc "position")
+                       ; alts <- mapM (position_alt fields) (row : same)
+                       ; let cases = group { mg_alts = L loc alts }
+                             body = L (getLoc position) (HsCase CaseAlt (nlHsVar name) cases)
+                             outer = first { m_pats = L pats_loc [bindRetainedConFields fields con_pat, nlVarPat name]
+                                           , m_grhss = unguardedGRHSs (getLocA position) body noAnn }
+                       ; return ((dc, fields), L row_loc outer) }
+               _ -> setSrcSpanA row_loc argument_error
+           ; (combined :) <$> group_linear_rows others }
+
+    position_alt shared ((_, fields), L row_loc source@Match { m_pats = L pats_loc [_, pat] })
+      = do { let names = [(idName own, idName common) | (own, common) <- zipEqual fields shared, own /= common]
+           ; case retainedMatchQuotation source of
+               Just span | not (null names) -> setSrcSpan span $
+                 failWithTc (TcRnRetainedQuantificationError RetainedConstructorQuotation)
+               _ -> return ()
+           ; return (L row_loc (renameRetainedMatch names
+                       (source { m_ctxt = CaseAlt, m_pats = L pats_loc [pat] }))) }
+    position_alt _ (_, L row_loc _) = setSrcSpanA row_loc argument_error
 
     -- See Note [Omitted impossible retained equations].
     absurd_row arg_tys con
@@ -1883,9 +1915,7 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
     argument_error = failWithTc (TcRnRetainedQuantificationError RetainedConstructorArguments)
 
     argument_type (ExpFunPatTy ty)
-      = do { scaled@(Scaled mult _) <- readScaledExpType ty
-           ; unless (isManyTy mult) argument_error
-           ; return scaled }
+      = readScaledExpType ty
     argument_type _ = argument_error
 
     check_match (con, fields) arg_tys result_ty (L match_loc source_match)
@@ -2009,6 +2039,19 @@ bindings in scope while omitting a second check of constructor coverage.
 
 See Agda's indexed coverage and case tree rules. Haskell's argument demand
 also requires the original value lambdas before the first branch.
+-}
+
+{- Note [Linear fields after a retained constructor]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained list index can consume an ordinary position of type Fin n
+linearly. For the two cons equations, split on the list once, then case
+on the position in the cons branch. Independent cons cases would consume
+the position again in the failure continuation of the first equation.
+
+Use the field identities of the first cons pattern throughout that branch.
+Rename each subsequent row's field occurrences before checking its ordinary
+position alternative. Keep the source order and span of each alternative.
+The ordinary pattern checker checks field usage and missing alternatives.
 -}
 
 {- Note [Omitted impossible retained equations]

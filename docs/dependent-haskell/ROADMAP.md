@@ -25,6 +25,14 @@ example. The empty list gives a position of type `Fin 'Z`. GHC checks
 that this type has no constructor and inserts an empty case on the
 position. [Equations and coverage](roadmap/R03-dependent-products.md#omit-an-impossible-list-index-equation).
 
+The same two list equations also accept a linear position. A library
+stores the list together with its checked `Fin` in a dependent pair.
+It can hide that pair behind a linear reader. An ordinary client opens
+the package and passes the position to the reader once. A direct call to
+`fmap (indexGeneric xs)` infers an unrestricted callback.
+[Linear cursor](examples/qualified-pi/ListCursor.hs)
+and [ordinary client](examples/qualified-pi/CursorClient.hs).
+
 A type synonym can use a `case` to choose the argument type of an
 ordinary arrow. For example, one branch can take a pair and another
 a `Char`. An ordinary client sees the selected argument type through

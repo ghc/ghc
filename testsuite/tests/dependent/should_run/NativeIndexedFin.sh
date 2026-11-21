@@ -13,17 +13,18 @@ for opt in -O0 -O1 -O2; do
     "${ghc[@]}" "$opt" -fwrite-source-equations -c PackedVecLibrary.hs
     "${ghc[@]}" "$opt" -Werror=incomplete-patterns -c ParameterizedIndexLibrary.hs
     cd ../proof
-    cp "$src/"{FinitePosition,NativeIndexedFinGate}.hs ../indices/*.hi .
-    "${ghc[@]}" "$opt" -Werror=incomplete-patterns -c FinitePosition.hs NativeIndexedFinGate.hs
+    cp "$src/"{FinitePosition,ListCursor,NativeIndexedFinGate}.hs ../indices/*.hi .
+    "${ghc[@]}" "$opt" -Werror=incomplete-patterns -c FinitePosition.hs ListCursor.hs NativeIndexedFinGate.hs
     cd ../client
-    cp "$src/FinitePositionClient.hs" ../proof/*.hi .
-    "${ghc[@]}" "$opt" -Werror=incomplete-patterns -c FinitePositionClient.hs
+    cp "$src/"{FinitePositionClient,CursorClient}.hs ../proof/*.hi .
+    "${ghc[@]}" "$opt" -Werror=incomplete-patterns -c FinitePositionClient.hs CursorClient.hs
     cat >Main.hs <<'HS'
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}
 module Main where
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Data.IORef (newIORef, readIORef)
 import Data.Maybe (isJust)
+import CursorClient (observeCursors)
 import FinitePositionClient (lookupVecViaView, observeConstructedViews, observeEmptyIndex, observeFinitePosition, observeListIndices)
 import NativeIndexedFinGate (Gate(..), Ticket(..), grant)
 import PackedVecLibrary (Nat(..), Vec(..))
@@ -33,6 +34,10 @@ main :: IO ()
 main = do
     observeFinitePosition >>= print
     observeListIndices >>= print
+    (ordinary, linear) <- observeCursors
+    let expectedCursors = [Just 'c', Nothing, Nothing, Just 'b', Just 'x']
+    if ordinary == expectedCursors && linear == expectedCursors then pure ()
+        else fail (show (ordinary, linear))
     empty <- observeEmptyIndex
     gate <- newIORef (Shut (error "gate field")) >>= readIORef
     denied <- try (evaluate (grant gate (error "ticket"))) :: IO (Either ErrorCall Bool)
@@ -60,7 +65,7 @@ main = do
         actual -> fail (show actual)
 HS
     "${ghc[@]}" "$opt" -c Main.hs
-    "${ghc[@]}" Main.o FinitePositionClient.o ../proof/*.o ../indices/*.o -o run
+    "${ghc[@]}" Main.o FinitePositionClient.o CursorClient.o ../proof/*.o ../indices/*.o -o run
     ./run
 done
 cd "$out/client"
@@ -110,6 +115,34 @@ if "${ghc[@]}" -O0 -Werror=incomplete-patterns -c MissingSuccessor.hs >successor
 fi
 grep -Fq 'MissingSuccessor.hs:6:1: error: [GHC-62161]' successor.log
 grep -Fq 'FS' successor.log
+cat >BadCursor.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, LinearTypes, ScopedTypeVariables, TypeApplications #-}
+module BadCursor where
+import GHC.Types (Multiplicity)
+import PackedVecLibrary (sourceLength)
+import ParameterizedIndexLibrary (Fin, indexGeneric, mkFinGeneric)
+
+onlyOnce :: forall a. foreach (xs :: [a]) -> Fin (sourceLength xs) %1 -> a
+onlyOnce xs i = indexGeneric xs i
+
+fixed :: [Char] -> Int -> Maybe Char
+fixed xs n = fmap (onlyOnce xs) (mkFinGeneric xs n)
+
+independent :: [Char] -> [Char] -> Int -> Maybe Char
+independent xs ys n = fmap (indexGeneric xs) (mkFinGeneric ys n)
+
+rigid :: forall (p :: Multiplicity) a b. (a %p -> b) -> Maybe a -> Maybe b
+rigid f = fmap f
+HS
+if "${ghc[@]}" -O0 -fdiagnostics-color=never -c BadCursor.hs >bad-cursor.log 2>&1; then
+    echo 'Accepted a mismatched callback or an independent position'
+    exit 1
+fi
+grep -Fq 'BadCursor.hs:11:19: error: [GHC-83865]' bad-cursor.log
+grep -Fq 'BadCursor.hs:14:28: error: [GHC-18872]' bad-cursor.log
+grep -Fq 'sourceLength xs' bad-cursor.log
+grep -Fq 'sourceLength ys' bad-cursor.log
+grep -Fq 'BadCursor.hs:17:16: error: [GHC-25897]' bad-cursor.log
 cat >InvalidListIndex.hs <<'HS'
 {-# LANGUAGE DataKinds, LinearTypes, NoExperimentalDependentTypes, ScopedTypeVariables, TypeApplications #-}
 module InvalidListIndex where
