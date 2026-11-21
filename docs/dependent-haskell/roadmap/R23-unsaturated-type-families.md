@@ -672,6 +672,18 @@ kind the compiler keeps the existing saturation rule.
 [Provider](../examples/open-evaluation/InvisibleFamily.hs) and
 [ordinary interface client](../../../testsuite/tests/dependent/should_run/NativeUnsaturatedInvisibleConsumer.hs).
 
+### Passing a family with a required type argument
+
+`Required` has kind `forall k -> @U k %U -> Type`.
+`ApplyRequired Required` passes the family before supplying the
+required kind argument. Its equation uses `Required` at `Bool`
+and `Type`. An ordinary client proves the resulting pair of types
+from a stripped interface. A receiver that requires `@M` still
+rejects the family, and two distinct families with the same
+equations remain unequal.
+[Proposal #242, visible dependent quantifiers](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#other-quantifiers)
+and [source-hidden tests](../../../testsuite/tests/dependent/should_run/NativeUnsaturatedInvisible.sh).
+
 ### Choosing a prefix's matchability from a later argument
 
 In `Receiver (Select 'True) 'Match`, both declarations have an invisible

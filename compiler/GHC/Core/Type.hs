@@ -1941,7 +1941,7 @@ isUnsaturatedUserFamily tc args
 
     unmatchable 0 _ = True
     unmatchable n kind
-      | ForAllTy ma (Bndr tv (Invisible _)) result <- coreFullView kind
+      | ForAllTy ma (Bndr tv _) result <- coreFullView kind
       , isTyVar tv, ma `eqType` unmatchableDataConTy =
           unmatchable (n - 1) result
       | FunTy{ft_af = FTF_T_T, ft_ma = ma, ft_mult = mult, ft_res = result} <- coreFullView kind
@@ -1959,7 +1959,9 @@ Data family representation axioms have their own eta-reduced arity.
 
 Check each missing binder in the instantiated kind, including its
 matchability. A partial family can retain an invisible type binder
-when its receiver already expects the entire polymorphic kind.
+when its receiver already expects the entire polymorphic kind. It can
+also retain a required type binder, as in a family with kind
+forall k -> @U k %U -> Type. These binders quantify types.
 Equality of applications at U gives no inverse for the
 arguments. In particular, failure to split two partial applications
 does not establish their apartness. The source validity check controls

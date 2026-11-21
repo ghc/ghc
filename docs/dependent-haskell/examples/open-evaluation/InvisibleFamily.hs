@@ -1,6 +1,8 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, Modifiers, PolyKinds, RankNTypes #-}
 {-# LANGUAGE StandaloneKindSignatures, TypeAbstractions, TypeApplications, TypeFamilies #-}
-module InvisibleFamily (Test, Observed, Inferred, PickVisible, ObservedVisible, IndexedVisible, ReadAt, ReadFlag, ReadType, wrappedValues) where
+module InvisibleFamily
+  (Test, Observed, Inferred, PickVisible, ObservedVisible, IndexedVisible,
+   ReadAt, ReadFlag, ReadType, Required, RequiredPair, requiredArguments, wrappedValues) where
 
 import Data.Kind (Type)
 import GHC.Exts (M, U)
@@ -54,6 +56,24 @@ type instance ReadAt 'True @Type @Bool = Int
 -- | Let the receiver determine the result kind and supply the input later.
 type ReadFlag = RunVisible @Bool (ReadAt 'True)
 type ReadType = RunVisible @Type (ReadAt 'True)
+
+-- | Take the argument kind as the first required parameter.
+type Required :: forall k -> @U k %U -> Type
+type family Required k a where
+  Required Bool 'True = Int
+  Required Type Bool = Ordering
+
+-- | Use the same type family with arguments at two different kinds.
+type ApplyRequired :: (forall k -> @U k %U -> Type) -> Type
+type family ApplyRequired f where
+  forall (f :: forall k -> @U k %U -> Type).
+    ApplyRequired f = (f Bool 'True, f Type Bool)
+
+type RequiredPair = ApplyRequired Required
+
+-- | Return one result for each use of the required kind argument.
+requiredArguments :: RequiredPair
+requiredArguments = (3, LT)
 
 -- | Select the kind of the type function returned by Wrap.
 type family Arrow (list :: Bool) where

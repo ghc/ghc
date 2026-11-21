@@ -1212,6 +1212,7 @@ main = do
     observe "infer the first invisible family argument and leave the second open"
         (Refl :: InvisibleFamily.ReadFlag :~: 'True, Refl :: InvisibleFamily.ReadType :~: Int)
     observe "apply Maybe and a type family through a computed arrow kind" InvisibleFamily.wrappedValues
+    observe "pass a family before giving its required kind argument" InvisibleFamily.requiredArguments
     observe "map cells with a class method over a family prefix and Maybe" mappedCells
     observe "infer the matchability of a family prefix from a later argument" laterMatchability
     observe "forward an inferred partial-family callback and an ordinary constructor" forwardedMap
