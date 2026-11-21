@@ -61,11 +61,29 @@ The [Showcase](../Showcase.hs) reduces
 `SecondFlag ('Tup2 'True 'False)` to `'False`. GHC checks the result with
 `Refl`.
 
+## Opaque retained domains
+
+A signature can retain a value at a lifted data family application.
+`reflexive :: foreach (t :: Tuple Bool Bool) -> t :~: t` needs the
+identity of its local argument. It can preserve that identity without
+selecting a representation or demanding the value. An ordinary client
+calls the function through a stripped interface. The test also forwards
+two distinct field pairs and rejects equality between independent
+arguments. A stuck ordinary type family still fails the domain check.
+[Retained-domain test](../../../testsuite/tests/dependent/should_run/NativeDataFamilyRetainedDomain.sh).
+
+Proposal #378 §§1.4.6–1.4.8 gives local term variables unique identity
+and requires an explicit dependent signature. Its Static Subset can
+admit a written constructor separately from a local variable. Discussion
+#456 explains the representation cast needed by the term constructor.
+That cast has representational role.
+[Dependent type design](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#term-variables-in-types)
+and [data family discussion](https://github.com/ghc-proposals/ghc-proposals/discussions/456).
+
 ## Next acceptance check
 
-In a separate module, `track :: foreach (t :: Tuple Bool Bool) -> At t`
-currently fails with GHC-83605 at the retained domain. Accept that
-domain and check `track (Tup2 True False) :: At ('Tup2 'True 'False)`
-using the exact imported instance. A different field must fail. This
-requires the retained constructor path to account for the checked
-runtime wrapper and its representation coercion.
+`track (Tup2 True False) :: At ('Tup2 'True 'False)` still fails with
+GHC-83605 at the operand. Accept the checked constructor wrapper and
+its worker with the exact runtime instance coercion. Recover the
+promoted constructor at the public family kind. A different field or
+representation cast must fail.
