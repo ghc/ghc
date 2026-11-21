@@ -3697,6 +3697,17 @@ tcRetainedArg domain arg
                   ; case mb_id of
                       Just arg_id
                         -> do { arg_id <- liftZonkM (zonkId arg_id)
+                              ; arg_id <- case coreFullView (varType arg_id) of
+                                  TyVarTy tv
+                                    | isLocalId arg_id, isTcTyVar tv, isMetaTyVar tv
+                                    , not (isNativeOpaqueValueType (varType arg_id))
+                                    , isNativeOpaqueValueType expected
+                                    -> do { -- See Note [Inferring a local retained operand].
+                                            co <- unifyKind Nothing (tyVarKind tv) liftedTypeKind
+                                          ; co' <- liftZonkM (zonkCo co)
+                                          ; unless (isReflCo co') unsupported
+                                          ; liftZonkM (zonkId arg_id) }
+                                  _ -> return arg_id
                               ; if isNativeOpaqueValueId (setIdMult arg_id ManyTy)
                                 then do
                                   { let mult = idMult arg_id
@@ -3895,6 +3906,16 @@ This step follows tcLookupSourceTableId. It does not certify a function or
 change declaration-group ordering. The defining group must have completed
 its source equations before another group can use them as an operand.
 The final retainedArgIndex check still validates saturation and all domains.
+-}
+
+{- Note [Inferring a local retained operand]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An unsigned binding such as `get xs i = mkListIndex xs i` begins with
+a fresh type variable for xs. Its runtime representation can also be
+unknown. The expected list domain fixes that representation to LiftedRep.
+Unify the kinds before checking whether xs can be an opaque local index.
+Require a reflexive coercion after zonking. The usual variable check then
+checks the full domain, scope and multiplicity of the operand.
 -}
 
 -- | Resolve an index variable at its expected domain. Function values keep
