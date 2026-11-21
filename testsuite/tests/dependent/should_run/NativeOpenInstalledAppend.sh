@@ -128,6 +128,7 @@ build=("${ghc[@]}" -O1 -fforce-recomp -c AppendWorker.hs)
 if grep -Eq 'SourceTable T:append|type family T:append' worker.iface; then
     exit 1
 fi
+
 "${build[@]}"
 "${ghc[@]}" --show-iface AppendWorker.hi >worker.iface
 [[ $(grep -Fc '  FinalCoreSourceTable T:append' worker.iface) == 1 ]]
@@ -142,5 +143,33 @@ fi
 grep -Fq 'Rule fired: drop appended list' worker.rules
 "${ghc[@]}" --show-iface AppendWorker.hi >worker.iface
 if grep -Eq 'SourceTable T:append|type family T:append' worker.iface; then
+    exit 1
+fi
+
+# A composition equation must leave the inner result lazy.
+cat >CompositionWorker.hs <<'HS'
+{-# LANGUAGE CPP #-}
+module CompositionWorker (compose) where
+
+compose :: (b -> c) -> (a -> b) -> a -> c
+#ifdef FORCE_INNER
+compose f g x = let y = g x in y `seq` f y
+#else
+compose f g x = f (g x)
+#endif
+HS
+composition=("${ghc[@]}" -O2 -fforce-recomp -fomit-interface-pragmas
+             -fno-write-if-simplified-core -c CompositionWorker.hs)
+"${composition[@]}" -fno-code -fwrite-interface
+"${ghc[@]}" --show-iface CompositionWorker.hi >composition.iface
+if grep -Eq 'SourceTable T:compose|type family T:compose' composition.iface; then
+    exit 1
+fi
+"${composition[@]}"
+"${ghc[@]}" --show-iface CompositionWorker.hi >composition.iface
+grep -Fxq '  FinalCoreSourceTable T:compose' composition.iface
+"${composition[@]}" -DFORCE_INNER
+"${ghc[@]}" --show-iface CompositionWorker.hi >composition.iface
+if grep -Eq 'SourceTable T:compose|type family T:compose' composition.iface; then
     exit 1
 fi

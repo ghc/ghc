@@ -996,6 +996,7 @@ sourceCaseTables binds = do
       reverse_wrapper_candidate owner =
         generates_code && isJust (listReverseWrapperType (varType owner))
       identity_candidate owner = generates_code && isIdentitySourceType (varType owner)
+      composition_candidate owner = generates_code && isJust (compositionSourceType (varType owner))
       is_exported owner = idName owner `elemNameSet` exported
       eligible owner =
         is_exported owner &&
@@ -1009,7 +1010,8 @@ sourceCaseTables binds = do
       candidates = [(bind, owner) | (bind, owner) <- owners
                     , eligible owner ||
                       (is_exported owner && (identity_candidate owner ||
-                       binary_list_candidate owner || reverse_wrapper_candidate owner || indexed_candidate owner))]
+                       composition_candidate owner || binary_list_candidate owner ||
+                       reverse_wrapper_candidate owner || indexed_candidate owner))]
   if isHsBootOrSig (tcg_src env) || null candidates
     then pure ([], [])
     else do
@@ -1045,6 +1047,10 @@ sourceCaseTables binds = do
                   , Just (projection, recursion) <- checkedIndexedProjection prepare owner body -> do
             checked <- publishIndexedProjection owner projection recursion
             pure (fmap (\table -> (finalOwner owner table, table)) checked, [])
+          Nothing | composition_candidate owner
+                  , Just (telescope, domains, result, row) <- checkedCompositionSource owner body -> do
+            table <- publishConstructorRows owner telescope domains result [row]
+            pure (Just (finalOwner owner table, table), [])
           _ -> pure (Nothing, [])
       let reverse_workers = mkNameEnv
             [(idName worker, table) | (Just (worker, table), _) <- final,
@@ -1281,22 +1287,25 @@ original name and requires no forwarding table.
 constructorHelperType :: Type -> Maybe ([ForAllTyBinder], [Type], Type)
 constructorHelperType ty = do
     let (telescope, body) = splitForAllForAllTyBinders ty
-    binders <- traverse liftedBinder telescope
+    binders <- traverse liftedSourceBinder telescope
     guard (not (null binders))
     let (domains, result) = splitArrows body
         parameters = [mkTyVarTy v | Bndr v _ <- binders]
     guard (not (null domains) && all (caseKind parameters) (result : domains))
     pure (binders, domains, result)
   where
-    liftedBinder (ma, binder@(Bndr a (Invisible _)))
-      | ma `eqType` unmatchableDataConTy
-      , isTyVar a, varType a `eqType` liftedTypeKind = Just binder
-    liftedBinder _ = Nothing
     splitArrows tau
       | Just (FTF_T_T, ma, mult, input, output) <- splitFunTy_maybe tau
       , ma `eqType` unmatchableDataConTy, isManyTy mult
       = let (inputs, result) = splitArrows output in (input : inputs, result)
       | otherwise = ([], tau)
+
+-- | Check an invisible, unmatchable binder over lifted types.
+liftedSourceBinder :: (Matchability, ForAllTyBinder) -> Maybe ForAllTyBinder
+liftedSourceBinder (ma, binder@(Bndr a (Invisible _)))
+  | ma `eqType` unmatchableDataConTy
+  , isTyVar a, varType a `eqType` liftedTypeKind = Just binder
+liftedSourceBinder _ = Nothing
 
 -- | Check a construction using earlier checked helpers and scoped inputs.
 checkedConstructorHelper :: (TyCon -> Bool) -> (Id -> Maybe TyCon) -> Id -> Core.CoreExpr
@@ -1350,6 +1359,53 @@ checkedIdentitySource owner rhs = do
 -- | Recognize an identity whose equation was checked against final Core.
 isFinalCoreIdentity :: Id -> Bool
 isFinalCoreIdentity v = finalCoreMapperOwner v && isIdentitySourceType (varType v)
+
+-- | Recognize the lifted, unrestricted type of function composition.
+compositionSourceType :: Type -> Maybe ([ForAllTyBinder], [Type], Type)
+compositionSourceType ty = do
+    let (parameters, body) = splitForAllForAllTyBinders ty
+    guard (lengthIs parameters 3)
+    telescope <- traverse liftedSourceBinder parameters
+    (f, rest) <- caseArrow body
+    (g, arrow) <- caseArrow rest
+    (input, output) <- caseArrow arrow
+    (middle, f_output) <- caseArrow f
+    (g_input, g_output) <- caseArrow g
+    guard (eqTypes [input, middle, output] [g_input, g_output, f_output])
+    variables <- traverse getTyVar_maybe [input, middle, output]
+    guard (mkUniqSet (binderVars telescope) == mkUniqSet variables)
+    pure (telescope, [f, g, input], output)
+
+-- | Check that composition applies the two original callbacks in order.
+-- See Note [Checked function composition].
+checkedCompositionSource :: Id -> Core.CoreExpr -> Maybe ([ForAllTyBinder], [Type], Type, ConstructorCaseRow)
+checkedCompositionSource owner rhs = do
+    let rhs_type = exprType rhs
+    guard (rhs_type `eqType` varType owner)
+    (signature, _, _) <- compositionSourceType (varType owner)
+    (telescope, domains, result) <- compositionSourceType rhs_type
+    let (binders, body) = Core.collectBinders rhs
+    (parameters, terms@[f, g, x]) <- pure (splitAt (length telescope) binders)
+    guard (parameters == binderVars telescope && all isId terms && eqTypes (map varType terms) domains)
+    Core.App (Core.Var outer) (Core.App (Core.Var inner) (Core.Var arg)) <- pure body
+    guard (outer == f && inner == g && arg == x)
+    let declared = zipWith (\(Bndr v _) (Bndr _ vis) -> Bndr v vis) telescope signature
+        row = ConstructorCaseRow (map CaseField terms) (CaseApply f (CaseApply g (CaseField x)))
+    pure (declared, domains, result, row)
+
+{- Note [Checked function composition]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Prelude's (.) binds two functions and an argument. Its body applies
+the first function to the result of applying the second to the
+argument. Require these exact Core applications before and after
+optimization. A case on the inner result would change demand when the
+outer function ignores its argument, so that body cannot supply this
+equation.
+
+The source table takes all three operands. A type can give it only
+the two callbacks and pass the remaining arrow to map. Reducing the
+complete application checks the source owner and its visible rules.
+-}
 
 {- Note [Identity certificates and open unfoldings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1616,7 +1672,7 @@ data ConstructorCaseTree
   | CaseConstructor DataCon [Type] [ConstructorCaseTree]
   | CaseCall TyCon [Type] [ConstructorCaseTree]
   | CaseSelf [Type] [ConstructorCaseTree]
-  | CaseApply Id Id
+  | CaseApply Id ConstructorCaseTree
 
 -- | A complete path through the Core cases and its checked result.
 data ConstructorCaseRow = ConstructorCaseRow [ConstructorCaseTree] ConstructorCaseTree
@@ -1995,7 +2051,7 @@ directListMapper owner body = do
   case rows of
     [ ConstructorCaseRow [CaseField _, CaseConstructor nil _ []] (CaseConstructor retNil _ [])
       , ConstructorCaseRow [CaseField callback, CaseConstructor cons _ [CaseField h, CaseField t]]
-          (CaseConstructor retCons _ [CaseApply f x, CaseSelf _ [CaseField f', CaseField xs]]) ]
+          (CaseConstructor retCons _ [CaseApply f (CaseField x), CaseSelf _ [CaseField f', CaseField xs]]) ]
       | nil == nilDataCon, retNil == nilDataCon, cons == consDataCon, retCons == consDataCon
       , callback == f, callback == f', h == x, t == xs -> pure result
     _ -> Nothing
@@ -2291,6 +2347,9 @@ verifyFinalCoreMapper binds original =
       , isIdentitySourceType (varType owner)
       -> verifyProjection (unitNameSet (idName owner)) owner expression
       | varType owner `eqType` varType original
+      , isJust (compositionSourceType (varType owner))
+      -> isJust (checkedCompositionSource owner expression)
+      | varType owner `eqType` varType original
       , Just table <- sourceTableId_maybe original
       , isReverseWorkerTable table || isJust (reverseWrapperWorker table)
       -> checkedReverseTable bindings table
@@ -2461,7 +2520,7 @@ checkedConstructorCase visible helper owner rhs = do
       guard (resolve aliases fun == carried && contains field root)
       (input, output) <- caseArrow (varType carried)
       guard (input `eqType` varType field && output `eqType` exprType expr)
-      pure (CaseApply carried field)
+      pure (CaseApply carried (CaseField field))
     checkedCallback _ _ _ _ = Nothing
 
     -- Each entry already names a leaf. Core Id identities keep the alias
@@ -2599,8 +2658,8 @@ publishConstructorRows owner telescope domains result rows = do
     publishResult family instantiate fields (CaseSelf args operands) =
       mkTyConApp family (map instantiate args ++ map (publishResult family instantiate fields) operands)
 
-    publishResult _ _ fields (CaseApply fun arg) =
-      mkAppTy (fieldType fields fun) (fieldType fields arg)
+    publishResult family instantiate fields (CaseApply fun arg) =
+      mkAppTy (fieldType fields fun) (publishResult family instantiate fields arg)
 
     fieldType fields selected = case lookup selected fields of
       Just v -> mkTyVarTy v

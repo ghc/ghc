@@ -1494,25 +1494,28 @@ and [prior art](../REFERENCES.md#distributing-map-over-append).
 
 ### Prove that map composes two traversals
 
-`mapComposition` equates `map f (map g xs)` with one traversal whose
-callback applies `f` to `g x`. It uses the installed `Prelude.map`
-equations for both sides. A separately compiled ordinary module
+`mapComposition` proves `map f (map g xs) = map (f . g) xs` using
+the installed `Prelude.map` and `(.)`. A separately compiled ordinary module
 matches a finite `Spine xs`. The empty case gives reflexivity. The
 cons case has head `f (g x)` on both sides and uses the induction
 hypothesis for the tail. Both callbacks remain abstract and can have
 different input and output types.
 
-The producer defines the composed callback with one type family
-equation, matching the body of Prelude's `(.)`. Direct open evaluation
-of `(.)` still requires checked equations. The runtime check uses
-Prelude's `(.)` and the actual two traversals. Both expose a cons with
-bottom callbacks and fields. Both also return the first mapped value
-when `f` ignores a bottom result from `g`.
+GHC checks the ordinary body of `(.)` in desugared and optimized Core.
+The published equation retains the argument order and the lazy call
+to `g`. A partial application of the checked function can be passed to
+the installed map. When a cons supplies the last argument, the solver
+checks the rules for the exact operator in its defining interface.
+A code build rechecks an older `GHC.Internal.Base` interface once to
+publish this equation.
 
 The regression checks stripped interfaces at `-O0` and `-O2` with
 rewrite rules disabled in the proof module. Removing the induction
-hypothesis fails at `Refl`. HERMIT's Core proof separately covers a
-bottom input spine. The `Spine` proof here covers finite spines.
+hypothesis fails at `Refl`. A composition function that forces the
+result of `g` gets no equation. Both runtime traversals expose a cons
+with bottom callbacks and fields. Both return the first mapped value
+when `f` ignores a bottom result from `g`. HERMIT's Core proof also
+covers a bottom input spine. The `Spine` proof here covers finite spines.
 [Producer](../examples/open-evaluation/PreludeMapCompositionSource.hs),
 [proof](../examples/open-evaluation/PreludeMapCompositionProof.hs),
 [regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledAppend.sh),
