@@ -1039,7 +1039,8 @@ splitGadtTerminal _ _ = Nothing
 
 -- | Split a prefix constructor's remaining telescope into source groups.
 -- The parser has already separated the fields before its first late group.
-splitGadtInterior :: HsConDeclGADTDetails (GhcPass pass) -> LHsType (GhcPass pass)
+splitGadtInterior :: forall pass. IsPass pass
+                  => HsConDeclGADTDetails (GhcPass pass) -> LHsType (GhcPass pass)
                   -> Maybe ([Either (LHsGadtTelescope (GhcPass pass)) (HsConDeclField (GhcPass pass))],
                             LHsType (GhcPass pass))
 splitGadtInterior (PrefixConGADT _ (_ : _)) ty
@@ -1057,11 +1058,17 @@ splitGadtInterior (PrefixConGADT _ (_ : _)) ty
         | not (null (hsConDeclTheta (Just ctxt)))
         -> next (Left (mkHsGadtContext ctxt)) body
       L _ (HsFunTy _ arr arg result) ->
-        next (Right (CDF noAnn NoSrcUnpack NoSrcStrict arr arg Nothing)) result
+        next (Right (gadt_field arr arg)) result
       L _ HsForAllTy{} -> Nothing
       L _ HsForEachTy{} -> Nothing
       L _ HsQualTy{} -> Nothing
       result -> Just ([], result)
+
+    gadt_field :: HsModifiedFunArr (GhcPass pass) -> LHsType (GhcPass pass)
+               -> HsConDeclField (GhcPass pass)
+    gadt_field arr arg = case ghcPass @pass of
+      GhcRn | L _ (XHsType (HsGadtFieldRn field)) <- arg -> field
+      _ -> CDF noAnn NoSrcUnpack NoSrcStrict arr arg Nothing
 
     next group ty = do
       (rest, result) <- go ty

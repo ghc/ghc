@@ -249,7 +249,7 @@ buildDataConWithTelescope late_count retained_binders fam_envs dc_bang_opts src_
                                    stupid_ctxt dc_wrk dc_rep
               dc_wrk = mkDataConWorkId work_name data_con
               (dc_rep, impl_bangs, str_marks)
-                | null retained_binders
+                | null retained_binders || dataConHasRetainedResult data_con
                 = initUs_ us (mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con)
                 | otherwise
                 = (NoDataConRep, map (const HsLazy) arg_tys, [])

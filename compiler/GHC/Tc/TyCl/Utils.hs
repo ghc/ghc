@@ -594,7 +594,9 @@ irDataCon :: DataCon -> RoleM ()
 irDataCon datacon
   = setRoleInferenceVars univ_tvs $
     irExTyVars ex_tvs $ \ ex_var_set ->
-      do mapM_ (irType ex_var_set) (eqSpecPreds eq_spec ++ theta)
+      do let result_scope = extendVarSetList ex_var_set [field | Just field <- field_binders]
+         mapM_ (irType result_scope) (eqSpecPreds eq_spec)
+         mapM_ (irType ex_var_set) theta
          if null field_binders
          then do mapM_ (irType ex_var_set) (map scaledThing arg_tys)
                  mapM_ (markNominal ex_var_set) (map tyVarKind ex_tvs ++ map scaledMult arg_tys)

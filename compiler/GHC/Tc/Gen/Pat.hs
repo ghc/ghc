@@ -1591,8 +1591,10 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
     do { let (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _) = dataConFullSig con
              binders = dataConRepArgBinders con
              con_like = RealDataCon con
-       ; unless (null ex_tvs && null eq_spec && null theta
+       ; unless (null ex_tvs && null theta
                  && binders `equalLength` arg_tys && not (pe_lazy penv)) bad_pattern
+       ; unless (null eq_spec) $
+           checkGADT con_like ex_tvs (eqSpecPreds eq_spec) penv
        ; case pe_ctxt penv of
            LamPat{} -> return ()
            LetPat{} -> bad_pattern
@@ -1600,6 +1602,7 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
            PrefixCon ann pats -> return (ann, pats)
            _ -> bad_pattern
        ; check_con_pat_arity con_like (length pats)
+       ; unless (null eq_spec || all isRetainedVarPat pats) bad_pattern
        ; let tc = dataConTyCon con
        ; expected <- readExpType_maybe (scaledThing pat_ty_scaled)
        ; family_result <- maybe (pure Nothing) (match_family_result tc) expected
@@ -1610,12 +1613,12 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
                          ; return matched }
        ; pat_ty <- readExpType (scaledThing pat_ty_scaled)
        ; subst <- instTyVarsWith PatOrigin univ_tvs ctxt_res_tys
-       ; (pats', res) <- check_fields subst [] 1 (zipEqual binders arg_tys) pats
+       ; (pats', (givens, binds, res)) <- check_fields subst [] 1 (zipEqual binders arg_tys) pats
        ; let pat = ConPat { pat_con = L con_span con_like
                           , pat_args = PrefixCon ann pats'
                           , pat_con_ext = ConPatTc
-                            { cpt_tvs = [], cpt_dicts = []
-                            , cpt_binds = emptyTcEvBinds
+                            { cpt_tvs = [], cpt_dicts = givens
+                            , cpt_binds = binds
                             , cpt_arg_tys = ctxt_res_tys
                             , cpt_wrap = idHsWrapper
                             , cpt_ordered_binds = [] } }
@@ -1677,8 +1680,17 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
         prepend co binds (rest_co, tys, rest_binds) =
           (mkTransCo co rest_co, tys, binds `unionBags` rest_binds)
 
-    check_fields _ _ _ [] []
-      = do { res <- thing_inside; return ([], res) }
+    check_fields subst _ _ [] []
+      | (_, _, [], _, _, _) <- dataConFullSig con
+      = do { res <- thing_inside; return ([], ([], emptyTcEvBinds, res)) }
+      | (_, _, eq_spec, _, _, _) <- dataConFullSig con
+      = do { let mc = case pe_ctxt penv of
+                       LamPat ctxt -> ctxt
+                       LetPat {}   -> PatBindRhs
+           ; skol <- mkSkolemInfo (PatSkol (RealDataCon con) mc)
+           ; givens <- newEvVars (substTheta subst (eqSpecPreds eq_spec))
+           ; (binds, res) <- checkConstraints (getSkolemInfo skol) [] givens thing_inside
+           ; return ([], (givens, binds, res)) }
     check_fields subst refinements position ((mb_binder, arg_ty) : args) (pat : pats)
       = setSrcSpanA (getLoc pat) $
         do { let original_ty = scaleScaled (scaledMult pat_ty_scaled) (substScaledTy subst arg_ty)
@@ -1780,8 +1792,10 @@ Keep prefix patterns in a strict constructor match. The fields themselves
 stay lazy. Reject lazy package and let patterns. A retained telescope belongs
 to its selected constructor; other constructors do not change its field
 scope. matchExpectedConTy checks the parent and instantiates its universal
-arguments. Keep the checks for no existentials, equality specification or
-context, and require an identity result wrapper for the ordinary constructor match.
+arguments. Keep the checks for no existentials or context, and require an
+identity result wrapper for the ordinary constructor match. Check a retained
+result's EqSpec after the source field Id enters scope. See Note [Retained
+constructor result equality] in GHC.Core.DataCon.
 Match compilation keeps each equation's actual source field Ids in a separate
 case, including when its family has other constructors.
 See Note [Retained package equation scope] in GHC.HsToCore.Match.Constructor.

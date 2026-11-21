@@ -183,3 +183,7 @@ test('GadtOrderedTelescopeScope', extra_files(['GadtOrderedTelescopeProvider.hs'
      multimod_compile_fail, ['GadtOrderedTelescopeScope', '-v0'])
 test('GadtInferredTelescopeWire', [req_host_target_ghc, only_ways(['normal'])],
      run_command, ['bash GadtInferredTelescopeWire.sh "{compiler}" "{libdir}"'])
+test('GadtLateFieldTh',
+     [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal']),
+      extra_files(['GadtLateFieldProvider.hs', 'TerminalGadtTh.sh'])],
+     run_command, ['bash TerminalGadtTh.sh "{compiler}" "{libdir}" GadtLateFieldTh GadtLateFieldProvider'])
