@@ -450,3 +450,19 @@ M61 completed nine quiet API checks for bytecode and demand, plus separate
 object-path checks. Its object-path notes distinguish actual backend preparation
 from a preview call. Runtime closure with reflexivity alone cannot establish
 that opaque evidence survived an earlier typed phase.
+
+## Export an ordinary INLINE binding that uses a retained helper
+
+An ordinary signature can use `INLINE` or `INLINABLE` when the stable
+unfolding simplifies to ordinary Core. In `inlineIncrement`, a local
+retained function takes the caller's integer and adds one. Its call
+simplifies to the ordinary addition before publication. The client
+can inline the function from the provider's interface.
+
+If the stable unfolding still contains a retained operation, GHC reports
+GHC-92256 at the binding. An importer can select the ordinary optimizer
+from the signature. The remaining case needs a way to select the
+dependent optimizer before using that unfolding. The test compares
+partial application under the usual flags and `-fpedantic-bottoms`.
+[Example](../examples/qualified-pi/IndexBetaClient.hs) and
+[interface and demand regression](../../../testsuite/tests/dependent/should_run/NativeOrdinaryInline.sh).

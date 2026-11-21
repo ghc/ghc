@@ -28,14 +28,16 @@ For an independently read cut and total, `checkedSplitAtValue` returns
 length leaves the vector unevaluated. Opening the contents proof takes
 the recursive path down the input spine. The expected result and the
 length equality now select the original vector at the constructor call.
+The entire proof fits in the zero and successor equations. The successor
+branch matches the vector and uses the recursive equality directly.
 [Split theorem](examples/packed-vector/CertifiedSplit.hs) and
 [ordinary caller](examples/packed-vector/CertifiedSplitClient.hs).
 
-The 371-line Showcase runs in native code and source-loaded GHCi.
+The 373-line Showcase runs in native code and source-loaded GHCi.
 The source-hidden proof regression passes at `-O0`, `-O1`, and `-O2`.
 Removing the induction premise fails at the final `Refl`. The certified split
-checks without `UndecidableInstances`. The 368-line signed-lookup checkpoint
-also passed both stages of a normal Hadrian build.
+checks without `UndecidableInstances`. The preceding 371-line checkpoint also
+passed both stages of a normal Hadrian build.
 [Verification scope](CHECKPOINTS.md#family-and-package-checkpoints).
 
 A retained function can name an entire indexed vector as its argument.
@@ -310,8 +312,9 @@ and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vecto
    open family applications can expose a solver rewrite cycle.
    [Checked input inference](roadmap/R03-dependent-products.md)
    and [independent inputs](../../testsuite/tests/dependent/should_fail/NativeIrredIndexEvidence.hs).
-2. **R05.** Preserve explicit `INLINE` unfoldings when an ordinary
-   signature has a retained body. Select the required optimizer path
+2. **R05.** Support explicit `INLINE` unfoldings when an ordinary
+   signature still has retained Core after simplification. Wrappers that
+   simplify to ordinary Core can already be exported. Select the required optimizer path
    when another module imports the unfolding. Check the demand of a
    partial application and report unsupported cases at the source.
    [Written unfolding checks](../../compiler/GHC/HsToCore/Binds.hs).

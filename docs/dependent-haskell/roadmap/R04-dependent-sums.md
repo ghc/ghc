@@ -322,8 +322,20 @@ It returns a retained prefix, a retained suffix, and
 `appendVec left right :~: original`. The zero branch stores the
 input as the suffix. The successor branch opens the recursive result
 and uses its equality to put the original head on the prefix.
-Removing the match on the induction premise makes GHC reject the final
-`Refl` with GHC-83865.
+The definition has two equations. The zero equation leaves the vector
+unevaluated. The successor equation matches `VCons x xs` in its second
+argument. The proof field matches the recursive premise only when the
+caller demands that field. Removing this match makes GHC report
+GHC-05617 at the written `Refl`. It shows the unsolved equality
+`appendVec left right ~ xs`.
+
+The first pattern supplies a nominal equality about the second
+argument's type. GHC checks which constructors can inhabit that type
+before accepting the second pattern as exhaustive. If a second
+constructor is possible, the error names it at the pattern. Guards
+still receive ordinary GHC coverage checking.
+[Missing constructor](../../../testsuite/tests/dependent/should_fail/NativeRetainedSecondColumn.stderr)
+and [incomplete guard](../../../testsuite/tests/dependent/should_fail/NativeRetainedSecondGuard.stderr).
 
 A separate ordinary client splits `[True, False, True]` at two and reads
 `[True, False]` and `[True]`. After matching the equality it appends

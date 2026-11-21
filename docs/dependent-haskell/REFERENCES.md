@@ -6612,6 +6612,27 @@ equality while reporting a distinct, unsolved input identity.
 [irreducible solver](../../compiler/GHC/Tc/Solver/Irred.hs) and
 [coercion-hole invariant](../../compiler/GHC/Core/TyCo/Rep.hs).
 
+Agda checks a later argument pattern after earlier patterns refine its
+index. The vector library uses this rule in `splitAt`. The fork ports
+the branch-local GHC check from `7cd725eb05` and `50d68fdcca` to the
+homogeneous equality example. The outer `Z` pattern leaves the vector
+untouched. Only the `S` branch cases on the vector. GHC validates that
+each omitted constructor is impossible at the refined width. It uses
+the generated sum's single checked equation to expose the expected
+type of `Refl`. The ordinary equality solver still checks both endpoints.
+[Agda 2.8 function definitions and case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html),
+[Agda stdlib vector split](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html#splitAt)
+and [GHC branch checking](../../compiler/GHC/Tc/Gen/Match.hs).
+
+The ordinary wrapper example uses GHC's existing `INLINE` and
+`INLINABLE` pragmas. GHC builds the stable unfolding first. The fork
+can export it to an ordinary client when the retained call has
+simplified away. The `-fpedantic-bottoms` check keeps partial
+application demand observable in the regression.
+[GHC user guide on INLINE and INLINABLE](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/pragmas.html#inline-and-noinline-pragmas),
+[GHC optimization flags](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/using-optimisation.html#ghc-flag-fpedantic-bottoms)
+and [GHC unfolding construction](../../compiler/GHC/HsToCore/Binds.hs).
+
 ### Recover the predecessor of a bounded position
 
 Agda's `Fin.zero` has type `Fin (suc n)`. Its predecessor bound `n`
