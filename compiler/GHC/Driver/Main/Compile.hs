@@ -47,6 +47,7 @@ import GHC.Driver.Env
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Driver.ByteCode
 import GHC.Driver.Env.KnotVars
+import GHC.Runtime.Context (emptyInteractiveContext)
 import GHC.Driver.Errors.Types
 import GHC.Driver.CodeOutput
 import GHC.Driver.Config.Cmm.Parser (initCmmParserConfig)
@@ -334,7 +335,10 @@ compileWholeCoreBindings hsc_env type_env wcb = do
                       (typeEnvTyCons type_env) stubs foreign_files
                       wcb_modBreaks [] NoHpcInfo
       trace_if logger (text "Generating ByteCode for" <+> ppr wcb_module)
-      mkModuleByteCode hsc_env wcb_module wcb_mod_location cgi_guts
+      -- Interface bindings are closed over the provider module. The
+      -- one-shot interface loader has discarded its interactive context.
+      let module_env = hsc_env { hsc_IC = emptyInteractiveContext (hsc_dflags hsc_env) }
+      mkModuleByteCode module_env wcb_module wcb_mod_location cgi_guts
 
     WholeCoreBindings {wcb_module, wcb_mod_location, wcb_foreign, wcb_modBreaks} = wcb
 
