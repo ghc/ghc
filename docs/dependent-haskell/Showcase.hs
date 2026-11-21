@@ -167,6 +167,7 @@ import qualified NamedSplitClient
 import qualified ParameterizedIndexLibrary as Parameterized
 import qualified PackedProjection
 import qualified PackageEquality
+import AppendLengthClient (appendTwoAndOne)
 import PackedVecLibrary
 import RetainedNat (Retained(..), constantPackage, withRetained)
 import qualified DependentPair as Pair
@@ -350,6 +351,7 @@ vectors = do
     let sample = PackVec 3 (VCons (1 :: Int) (VCons 2 (VCons 3 VNil)))
     observe "reverse preserves length" (renderPacked (reversePacked sample))
     observe "append computes its result length" (renderPacked (appendPacked sample package))
+    observe "append two and one at their written sum" appendTwoAndOne
     cutoffCell <- newIORef (1 :: Int)
     cutoff <- readIORef cutoffCell
     observe "filter computes a hidden result length" (renderPacked (filterPacked (> cutoff) sample))

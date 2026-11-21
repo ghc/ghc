@@ -37,6 +37,7 @@ Refl aligns independent runtime indices: [(7,8),(7,8),(7,8)]
 zip packages: [(7,8),(7,8),(7,8)]
 reverse preserves length: (3,[3,2,1])
 append computes its result length: (6,[1,2,3,7,7,7])
+append two and one at their written sum: ("aab",'a',"")
 filter computes a hidden result length: (2,[2,3])
 filter returns a length bound proof: (2,[2,3],2)
 consume a package without its proof: (2,[2,3])
