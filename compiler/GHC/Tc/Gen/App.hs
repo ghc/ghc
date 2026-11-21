@@ -2650,7 +2650,11 @@ finishAppWithScopedCache fields cache do_ql rn_expr fun_loc rn_fun tc_fun inst_a
                       ; setSrcSpan fun_loc $ rejectNativeQLInstArgs inst_args }
 
          -- See Note [Introducing an implicit existential].
-       ; Reduction scope_co app_res_rho <- tcCloseRuntimeScope fields (exprCtOrigin rn_expr) app_res_rho
+       ; (app_res_rho, scope_wrap) <- case fields of
+           [] -> return (app_res_rho, idHsWrapper)
+           _ -> do { Reduction co reduced <-
+                       tcCloseRuntimeScope fields (exprCtOrigin rn_expr) app_res_rho
+                   ; return (reduced, mkWpCastN co) }
        ; (result_expected, pack) <- implicitResult do_ql rn_expr app_res_rho exp_res_ty
 
          -- Step 4.1: monomorphise un-unified QuickLook instantiation variables
@@ -2686,7 +2690,7 @@ finishAppWithScopedCache fields cache do_ql rn_expr fun_loc rn_fun tc_fun inst_a
                      else return (rebuildHsApps tc_fun tc_args)
 
        ; traceTc "End tcApp }" (ppr tc_fun)
-       ; return (pack (mkHsWrap (res_wrap <.> mkWpCastN branch_co <.> mkWpCastN scope_co) res_expr)) }
+       ; return (pack (mkHsWrap (res_wrap <.> mkWpCastN branch_co <.> scope_wrap) res_expr)) }
 
 -- | Refine the result of applying a retained function to the branch index.
 -- See Note [Source retained case refinement] in GHC.Tc.Gen.Match.

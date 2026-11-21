@@ -2447,15 +2447,14 @@ tcCloseRuntimeScope :: [Name] -> CtOrigin -> Type -> TcM Reduction
 tcCloseRuntimeScope [] _ ty = return (Reduction (mkNomReflCo ty) ty)
 tcCloseRuntimeScope bound origin ty
   = do { actual <- liftZonkM (zonkTcType ty)
-       ; case local_indices actual of
-           [] -> return (Reduction (mkNomReflCo actual) actual)
-           _ -> do { loc <- getCtLocM origin (Just TypeLevel)
-                   ; reduction@(Reduction _ reduced) <- tcRewriteFamilyAxioms loc actual
-                   ; case local_indices reduced of
-                       index : _ -> failWithTc $ TcRnRetainedQuantificationError (RetainedIndexOutOfScope index)
-                       [] -> return reduction } }
+       ; if anyFreeVarsOfType mentions_local actual
+         then do { loc <- getCtLocM origin (Just TypeLevel)
+                 ; reduction@(Reduction _ reduced) <- tcRewriteFamilyAxioms loc actual
+                 ; case find mentions_local (tyCoVarsOfTypeList reduced) of
+                     Just index -> failWithTc $ TcRnRetainedQuantificationError (RetainedIndexOutOfScope index)
+                     Nothing -> return reduction }
+         else return (Reduction (mkNomReflCo actual) actual) }
   where
-    local_indices = filter mentions_local . tyCoVarsOfTypeList
     mentions_local var = isId var && not (isCoVar var) && getName var `elem` bound
 
 {- Note [Closing an inferred runtime index scope]
