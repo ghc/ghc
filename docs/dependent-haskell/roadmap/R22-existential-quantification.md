@@ -623,12 +623,19 @@ For an expected `exists t. Bool -> Callback t`, the lambda
 types before it checks the lambda patterns. The usual lambda check then
 checks the operands and their usage. A pattern-local type cannot supply
 the outer witness. A guarded or multi-equation lambda uses the first
-matching result declaration in source order. Every guard and result
-checks against the same witness. For example, a declared consumer that
+matching result declaration in source order. An ordinary `if` in a lambda result can
+also supply a declared witness from either arm. The caller can supply
+the expected package type. Every guard and result checks against the
+same witness. That check includes unreachable arms. Runtime evaluation
+still uses only the selected arm. For example, a declared consumer that
 takes a polymorphic callback and returns `Payload PolyId` can fix the
 witness for a different branch that constructs `Payload id atTwoTypes`.
 A branch with an incompatible result still reports a type error when
 its guard is unreachable.
+The ordinary Showcase client supplies its conditional producer directly
+to the caller that expects the package. The first route leaves its
+second input unevaluated.
+[Conditional producer](../examples/erased-existentials/RankedPackageClient.hs).
 Leading visible type applications can choose input types when the
 declared result type is independent of the supplied type arguments.
 The ordinary checker checks those applications at their source spans.

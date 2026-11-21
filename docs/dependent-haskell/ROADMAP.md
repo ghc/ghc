@@ -40,6 +40,13 @@ in a linear package can also bind a predecessor used by a later field.
 [Lookup with a continuation](examples/qualified-pi/ListCursor.hs)
 and [pattern evidence](roadmap/R04-dependent-sums.md#repeated-retained-constructors-in-linear-packages).
 
+Two lists of different element types can share a checked position.
+An ordinary client asks for both elements at a signed offset. The
+provider checks the offset on the first list and compares the list
+lengths. The equality from that comparison justifies the second
+lookup. A length mismatch returns `Nothing`.
+[Paired lookup and coverage](roadmap/R03-dependent-products.md#use-one-position-on-two-lists-of-equal-length).
+
 A type synonym can use a `case` to choose the argument type of an
 ordinary arrow. For example, one branch can take a pair and another
 a `Char`. An ordinary client sees the selected argument type through

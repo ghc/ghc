@@ -17,7 +17,7 @@ module GHC.Tc.Gen.Match
    ( tcFunBindMatches
    , tcCaseMatches, tcIndexedCaseMatches
    , tcRetainedCase
-   , tcRetainedCallCase
+   , tcRetainedCallCase, tcEmptyRetainedScrutinee
    , tcLambdaMatches
    , tcMatches
    , tcOpenImplicitPackage
@@ -50,6 +50,8 @@ import GHC.Rename.Utils ( bindLocalNames, wrapGenSpan' )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
+import GHC.Tc.Solver ( tcCheckGivens, tcNormalise )
+import GHC.Tc.Solver.InertSet ( emptyInertSet )
 import GHC.Tc.Solver.Monad ( runTcSEqualities )
 import GHC.Tc.Solver.Rewrite ( rewriteFamilyAxioms )
 import GHC.Tc.Zonk.TcType ( zonkTcType )
@@ -82,9 +84,9 @@ import GHC.Core.Coercion ( MCoercion(MRefl, MCo), Role(Representational), mkCoVa
                          , mkTransCo, mkNomReflCo, mkRepReflCo, mkDepFunCoWithVis )
 import GHC.Core.DataCon ( DataCon, dataConCannotMatch, dataConName, dataConSourceArity, dataConTyCon, dataConUnivTyVars, dataConWorkId )
 import GHC.Core.ConLike ( ConLike(RealDataCon) )
-import GHC.Core.Predicate ( mkNomEqPred, scopedSort )
+import GHC.Core.Predicate ( isEqClassPred, getEqPredTys_maybe, mkNomEqPred, scopedSort )
 import GHC.Core.Reduction ( Reduction(..) )
-import GHC.Core.Utils ( applyTypeToArgs, exprType )
+import GHC.Core.Utils ( applyTypeToArgs, exprType, isEmptyTy )
 -- Create chunkified tuple types for monad comprehensions
 import GHC.Core.Make.BigTuple
 
@@ -1811,9 +1813,10 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
       = do { let (same, others) = partition ((== dc) . fst . fst) rest
            ; combined <- case same of
                [] -> return (row, Nothing)
-               _ | all is_value argument_plan
-                 , con_pat : args@(first_arg : _) <- pats
-                 , length args == length argument_plan
+               _ | con_pat : args@(first_arg : _) <- pats
+                 , let written_args = filter visible argument_plan
+                 , all is_value written_args
+                 , args `equalLength` written_args
                  -> do { names <- mapM (const (newSysName (mkVarOcc "arg"))) args
                        ; let ctxt = case args of [_] -> CaseAlt; _ -> LamAlt LamCases
                        ; alts <- mapM (value_alt fields ctxt) (row : same)
@@ -1853,10 +1856,14 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
                  rows = [drop 1 (filter isVisArgLPat (hsLMatchPats row)) | row <- matches]
                  columns = zip3 [0 :: Int ..] arguments (transpose rows)
            ; unless (all (equalLength arguments) rows) (missing_equation con)
-           ; witness <- firstJustsM [empty_field (mkCoVarCo eq) n ty
-                                    | (n, (RetainedConValue, Scaled _ ty), pats) <- columns
-                                    , any constructor_pattern pats
-                                    , anyFreeVarsOfType (== index) ty]
+           ; let inspected = [(n, ty) | (n, (RetainedConValue, Scaled _ ty), pats) <- columns
+                                     , any constructor_pattern pats]
+                 branch = mkCoVarCo eq
+           ; direct <- firstJustsM [empty_field branch n ty | (n, ty) <- inspected
+                                     , anyFreeVarsOfType (== index) ty]
+           ; witness <- case direct of
+               Just _ -> return direct
+               Nothing -> empty_under_givens branch inspected
            ; case witness of
                Nothing -> missing_equation con
                Just n -> do
@@ -1885,10 +1892,27 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
            ; loc <- getCtLocM PatCheckOrigin Nothing
            ; Reduction _ domain <- runTcSEqualities $
                rewriteFamilyAxioms loc (pSnd (coercionKind co))
-           ; return $ case splitTyConApp_maybe (coreFullView domain) of
-               Just (tc, args) | Just cons <- tyConDataCons_maybe tc
-                               , all (dataConCannotMatch args) cons -> Just n
-               _ -> Nothing }
+           ; return (if isEmptyTy domain then Just n else Nothing) }
+
+    -- See Note [Empty positions under an index equality].
+    empty_under_givens eq inspected
+      | not (null inspected)
+      , let predicates = [varType dict | RetainedConDict dict <- argument_plan
+                                       , isCoverageEquality (varType dict)]
+      , any (anyFreeVarsOfType (== index)) predicates
+      = do { level <- getTcLevel
+           ; let solve tys = newEvVars tys >>= tcCheckGivens (emptyInertSet level) . listToBag
+                 specialise ty = pSnd . coercionKind <$> tcRetainedCoercion index eq ty
+           ; before <- solve predicates
+           ; after <- mapM specialise predicates >>= solve
+           ; case (before, after) of
+               (Just outer, Just local) -> firstJustsM
+                 [ do { original <- tcNormalise outer ty
+                      ; refined <- specialise ty >>= tcNormalise local
+                      ; return (if not (isEmptyTy original) && isEmptyTy refined
+                                then Just n else Nothing) } | (n, ty) <- inspected ]
+               _ -> return Nothing }
+      | otherwise = return Nothing
 
     empty_matches arg_tys result_ty
       = do { arguments <- zipWithM (\argument (Scaled mult ty) ->
@@ -1963,11 +1987,12 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
                                       _ -> m_ctxt renamed }
                  check_body (L body_loc (HsLam _ LamCases cases)) expected
                    | Just (names@(_ : _ : _), originals) <- operands = do
+                       let domains = [dom | (RetainedConValue, dom) <- zip argument_plan refined_domains]
                        checked <- tcMatchesFromWithIndex Nothing (const originals)
-                                    (LamAlt LamCases) tcBody refined_args expected cases
+                                    (LamAlt LamCases) tcBody (map mkCheckExpFunPatTy domains) expected cases
                        args <- zipWithM (\name (Scaled mult ty) ->
                                   tcScalingUsage mult (tcBody (nlHsVar name) (mkCheckExpType ty)))
-                                  names refined_domains
+                                  names domains
                        return (mkHsApps (L body_loc (HsLam noAnn LamCases checked)) args)
                  check_body body expected = tcBody body expected
                  original = case operands of
@@ -2094,6 +2119,45 @@ their usage. The written patterns still determine demand in each row.
 On an omitted impossible branch, bind each linear operand even if the
 branch ends in an empty case. A wildcard would require Many before GHC
 checks that the branch is impossible.
+-}
+
+-- | Give an explicit empty case its checked domain in a retained constructor branch.
+tcEmptyRetainedScrutinee :: LHsExpr GhcTc -> Type -> TcM (LHsExpr GhcTc, Type)
+tcEmptyRetainedScrutinee scrut ty = do
+  givens <- getLexicalGivens
+  let retained cv = isCoVar cv && case getEqPredTys_maybe (varType cv) of
+        Just (Nominal, TermVarTy v, _) -> isRetainedConstructorProof v (mkCoVarCo cv)
+        _ -> False
+  if not (any retained givens) || isEmptyTy ty then pure (scrut, ty) else do
+    level <- getTcLevel
+    inerts <- tcCheckGivens (emptyInertSet level) (listToBag (filter (isCoverageEquality . varType) givens))
+    case inerts of
+      Just local -> do
+        refined <- tcNormalise local ty
+        if isEmptyTy refined then do
+          co <- unifyType Nothing ty refined
+          pure (mkLHsWrapCo co scrut, refined)
+        else pure (scrut, ty)
+      Nothing -> pure (scrut, ty)
+
+-- | Select the equality assumptions available to the coverage check.
+isCoverageEquality :: Type -> Bool
+isCoverageEquality ty = isEqClassPred ty || case getEqPredTys_maybe ty of
+  Just (Nominal, _, _) -> True
+  _ -> False
+
+{- Note [Empty positions under an index equality]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In foreach xs -> (n ~ sourceLength xs) => Fin n %1 -> a the position
+mentions n. Its type has no direct occurrence of xs. Reuse the ordinary
+pattern checker's Given solver to normalise the inspected position before
+and after specialising the declared equalities to the missing constructor.
+At [], Fin n becomes Fin Z. Require this change before inserting a row.
+An unrelated empty type or contradictory context cannot select a witness.
+Check the resulting empty case in GHC's usual branch scope. For a written
+empty case, establish its specialised scrutinee type with a checked cast.
+The pattern checker then sees Fin Z even when the branch has no RHS that
+would otherwise keep the transported dictionary alive.
 -}
 
 {- Note [Omitted impossible retained equations]

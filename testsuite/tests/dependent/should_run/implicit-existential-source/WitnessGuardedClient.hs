@@ -13,6 +13,14 @@ viaGuarded = \cases
     True b  | b -> consumeAt @True Proxy id b
             | otherwise -> buildAt b
 
+observeConditional :: Bool -> Bool -> (Int, Bool)
+observeConditional flag b =
+    observeGuarded
+        (\choose value -> if choose
+            then Payload id atTwoTypes
+            else if value then buildAt (not value) else error "selected conditional branch")
+        flag b
+
 viaGuardedAnnotated :: GuardedBuilder
 viaGuardedAnnotated =
     (\cases
@@ -51,6 +59,9 @@ main = do
         guarded = results viaGuarded
     unless (guarded == results viaGuardedAnnotated) $
         fail "the annotation changed the guarded results"
+    unless (observeConditional True (error "unselected condition") == (7, True)
+         && observeConditional False True == (9, False)) $
+        fail "the conditional forced an unselected arm"
     print guarded
     checkGuard viaGuarded
     checkGuard viaGuardedAnnotated
