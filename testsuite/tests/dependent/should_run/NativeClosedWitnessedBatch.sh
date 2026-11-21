@@ -8,7 +8,8 @@ src=$PWD
 out=$(mktemp -d)
 trap 'rm -rf -- "$out"' EXIT
 producer_flags=(-fomit-interface-pragmas -fno-write-if-simplified-core)
-if "${ghc[@]}" --info | grep -F '("Support dynamic-too","YES")' >/dev/null; then
+if [[ " $* " != *" -dynamic "* ]] &&
+   "${ghc[@]}" --info | grep -F '("Support dynamic-too","YES")' >/dev/null; then
     producer_flags+=(-dynamic-too)
 fi
 
