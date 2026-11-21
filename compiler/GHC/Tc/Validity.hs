@@ -76,7 +76,7 @@ import GHC.Types.Name.Reader (unLocWithUserRdr)
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Var     ( Id, ExistsTyFlag(ImplicitExists), VarBndr(..)
-                        , isInvisibleFunArg, mkTyVar, tyVarName
+                        , isInvisibleFunArg, isVisibleFunArg, mkTyVar, tyVarName
                         , isId, isCoVar, varType )
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
@@ -479,7 +479,7 @@ checkConstrainedSignature ctxt ty
   | checks_domain ctxt
   = do { givens <- getLexicalGivens
        ; (_, wanted) <- captureConstraints $
-           checkConstraints (SigSkol ctxt ty []) [] givens (check_telescope ty)
+           checkConstraints (SigSkol ctxt ty []) [] givens (check_telescope ctxt ty)
        ; (unsolved, _) <- runTcS (solveWanteds wanted)
        ; reportAllUnsolved unsolved }
   | otherwise
@@ -493,23 +493,25 @@ checkConstrainedSignature ctxt ty
     checks_domain _ = False
 
     -- See Note [Family domains beneath retained binders].
-    check_telescope sig
-      | not (isSigmaTy sig) = check_body sig
-      | otherwise
-      = do { let (bndrs, theta, _) = tcSplitSigmaTy sig
-           ; traverse_ (checkNoConstrainedFamilyApps . varType . snd) bndrs
-           ; traverse_ checkNoConstrainedFamilyApps theta
-           ; void $ tcSkolemiseGeneral Shallow ctxt ty sig $ \_ rho -> check_body rho }
+    check_telescope origin whole = go whole
+      where
+        go sig
+          | not (isSigmaTy sig) = check_body sig
+          | otherwise
+          = do { let (bndrs, theta, _) = tcSplitSigmaTy sig
+               ; traverse_ (checkNoConstrainedFamilyApps . varType . snd) bndrs
+               ; traverse_ checkNoConstrainedFamilyApps theta
+               ; void $ tcSkolemiseGeneral Shallow origin whole sig $ \_ rho -> check_body rho }
 
-    check_body (DepFunTy _ index body)
-      = do { check_part (varType index)
-           ; tcExtendIdEnv [index] (check_telescope body) }
-    check_body (FunTy af ma mult arg result)
-      | not (isInvisibleFunArg af)
-      = do { mapM_ check_part [ma, mult]
-           ; check_telescope arg
-           ; check_telescope result }
-    check_body body = check_part body
+        check_body (DepFunTy _ index body)
+          = do { check_part (varType index)
+               ; tcExtendIdEnv [index] (go body) }
+        check_body (FunTy af ma mult arg result)
+          | isVisibleFunArg af
+          = do { mapM_ check_part [ma, mult]
+               ; check_telescope GenSigCtxt arg
+               ; go result }
+        check_body body = check_part body
 
     check_part part
       = do { checkNested part
@@ -601,7 +603,10 @@ cannot justify an application in an earlier argument.
 An ordinary argument can be a callback with its own class context.
 For (forall c. Collects c => Proxy c -> Elem c -> Elem c) -> result,
 skolemise the callback independently. Its Given justifies both occurrences
-of Elem c inside the callback. The result cannot use this Given.
+of Elem c inside the callback. The result cannot use this Given. Report
+an unsolved constraint on c against the callback. Suggesting it on the
+enclosing function would put c outside its scope.
+See Note [Setting the argument context] in GHC.Tc.Utils.Unify.
 
 The nested checks share the signature's formation check, including its
 treatment of unsolved premises under deferred type errors. See
