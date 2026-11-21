@@ -63,6 +63,20 @@ constructors on each side. The elements keep their ordinary numeric
 meaning and stay lazy until the result demands them.
 [Written list example](roadmap/R03-dependent-products.md#zip-two-lists-at-a-common-length).
 
+An ordinary module can also give a vector append the result length
+`Length (2 N.+ 1)`. Appending two copies of `'a'` and one `'b'` yields
+`"aab"`. GHC rejects a result annotation of length four and a call to
+`headVec` on a vector of length zero.
+[Ordinary append client](examples/packed-vector/AppendLengthClient.hs).
+
+The open evaluator checks equations about the installed `Prelude.span`.
+When the first element fails the predicate, its suffix is the entire
+input, even with an unknown tail. A proof by induction can rejoin the
+two projected lists when the caller supplies the predicate decisions.
+The proof module disables rewrite rules when it uses these equations.
+[Source proof](examples/open-evaluation/PreludeSpanProof.hs) and
+[R16 scope](roadmap/R16-open-term-evaluator.md).
+
 A column can store a `TypeRep a` beside values of hidden element type
 `a`. A caller supplies the type it wants and a signed offset. A type
 comparison refines the element type. A bounded position permits the

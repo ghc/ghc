@@ -28,6 +28,23 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `4910df774c`, a regular Hadrian Stage 2 rebuilt the stock Base, List
+and Foldable modules with Core and STG Lint. The installed list interface
+exported checked equations for `span`. All 432 expected Showcase rows
+matched at native `-O0`, `-O1`, `-O2` and in GHCi. The registered
+selection had 15 passes. Its platform predicate skipped the native Core
+API driver. The later `04ba4bc839` compiler passed its eight registered
+tests and all 434 Showcase rows in the same four modes.
+
+The combined compiler at `8a431a16cc` includes the public family domains
+and the open evaluator for `span`. The build recompiled 52 affected
+modules and boot interfaces against the regular compiler, then linked
+the 888-member archive. Eleven registered tests passed. At `9eb0b0b0e2`, the same compiler matched all 437
+Showcase rows at native `-O0`, `-O1`, `-O2` and in GHCi. The ordinary
+append client and open arrow kind checks passed at `-O0` and `-O2`.
+[Append check](examples/packed-vector/check-append-length.sh) and
+[span proof](examples/open-evaluation/PreludeSpanProof.hs).
+
 At `b4e8ac6ced`, the numeric zip and the two matchable projections
 passed together. All 431 Showcase rows matched in native code at
 `-O0`, `-O1` and `-O2` and in source-loaded GHCi. Nine registered
