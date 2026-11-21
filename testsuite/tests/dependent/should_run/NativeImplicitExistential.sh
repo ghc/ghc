@@ -115,7 +115,7 @@ cp "$src/"{QuickLookForward,QuickLookRuntime}.hs .
     -o quick-look -main-is QuickLookForward
 ./quick-look
 cp "$src/RankedFilterReject.hs" .
-for rejection in ESCAPE_LENGTH LATE_BINDER BAD_PREDICATE SHARED_CALLBACK SHARED_INPUTS SHARED_RESULT ESCAPING_SECOND; do
+for rejection in ESCAPE_LENGTH LATE_BINDER LATE_CONSTRAINT BAD_PREDICATE SHARED_CALLBACK SHARED_INPUTS SHARED_RESULT ESCAPING_SECOND; do
     if "$ghc" "${flags[@]}" "-D$rejection" -c RankedFilterReject.hs > ranked-filter.log 2>&1; then
         echo "Accepted the ranked filter control $rejection." >&2
         exit 1
@@ -123,6 +123,7 @@ for rejection in ESCAPE_LENGTH LATE_BINDER BAD_PREDICATE SHARED_CALLBACK SHARED_
     case "$rejection" in
         ESCAPE_LENGTH) operand='keepInput'; column=32; code=91028; detail='Restricted j Int' ;;
         LATE_BINDER) operand='lateResult True'; column=33; code=91028; detail='Stamped stamp0 Int' ;;
+        LATE_CONSTRAINT) operand='qualifiedResult True'; column=33; code=39999; detail='No instance for .Show a.' ;;
         BAD_PREDICATE) operand='filterVec (\_ -> ())'; column=50; code=83865; detail='expected type .Bool.' ;;
         SHARED_CALLBACK) operand='withBoth producer'; column=27; code=25897; detail='first argument.*producer' ;;
         SHARED_INPUTS) operand='withBoth producer'; column=55; code=25897; detail='third argument.*filterVec even ys' ;;

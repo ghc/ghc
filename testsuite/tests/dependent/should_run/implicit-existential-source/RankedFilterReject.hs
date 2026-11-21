@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP, ImpredicativeTypes, NoExperimentalDependentTypes #-}
 module RankedFilterReject where
 
-import Filter (filterVec, toList)
+import Filter (Hidden, filterVec, toList)
 import ForwardSchemas (keepInput, lateResult)
 import Vector (Vec, consumeVector)
 #if defined(SHARED_CALLBACK) || defined(SHARED_INPUTS) || defined(SHARED_RESULT) || defined(ESCAPING_SECOND)
@@ -15,6 +15,14 @@ escapeLength :: Vec n Int -> ()
 escapeLength xs =
     let result = consumeVector keepInput (filterVec odd xs)
     in result `seq` ()
+#elif defined(LATE_CONSTRAINT)
+qualifiedResult :: Bool -> forall j a. Show a => Vec j a -> Hidden a
+qualifiedResult _ = filterVec (const True)
+
+missingShow :: Vec n a -> [a]
+missingShow xs =
+    let result = consumeVector (qualifiedResult True) (filterVec (const True) xs)
+    in toList result
 #elif defined(LATE_BINDER)
 lateBinder :: Vec n Int -> ()
 lateBinder xs =
