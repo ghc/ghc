@@ -16,7 +16,8 @@ module GHC.Core.DataCon (
 
         -- ** Equality specs
         EqSpec, mkEqSpec, eqSpecTyVar, eqSpecType,
-        eqSpecPair, eqSpecPreds,
+        eqSpecPair, eqSpecPreds, buildGadtProofs_maybe, dataConGadtProof_maybe,
+        dataConGadtSourceCoercions_maybe,
 
         -- ** Field labels
         FieldLabel(..), flLabel, FieldLabelString,
@@ -99,6 +100,7 @@ import GHC.Utils.Binary
 import GHC.Types.Unique ( UniqueTag (BoxingTyConTag), unpkUnique )
 import GHC.Types.Unique.FM ( UniqFM )
 import GHC.Types.Unique.Set
+import GHC.Types.Unique.Supply ( UniqSupply, takeUniqFromSupply )
 import GHC.Builtin.Uniques( mkAlphaTyVarUnique )
 import GHC.Data.Graph.UnVar  -- UnVarSet and operations
 
@@ -113,7 +115,7 @@ import qualified Data.ByteString.Builder as BSB
 import qualified Data.ByteString.Lazy    as LBS
 import qualified Data.Data as Data
 import Data.Char
-import Data.List( find )
+import Data.List( find, mapAccumL )
 import Data.Maybe ( isJust )
 
 {-
@@ -910,6 +912,168 @@ eqSpecPreds :: [EqSpec] -> ThetaType
 eqSpecPreds spec = [ mkNomEqPred (mkTyVarTy tv) ty
                    | EqSpec tv ty <- spec ]
 
+-- | A worker field and any coercion needed to recover the source endpoints.
+type GadtProofField = (PredType, Maybe (Either Coercion Coercion))
+
+-- | Build a proof field using evidence from earlier worker binders.
+type GadtProofStep = LiftingContext -> GadtProofField
+
+-- | Build the worker binders for a source GADT. See Note [Kind evidence in GADT workers].
+buildGadtProofs_maybe :: UniqSupply -> [EqSpec] -> Maybe ([CoVar], UniqSupply)
+buildGadtProofs_maybe us spec = do
+  (lc, binders, _) <- gadtKindTransport_maybe spec
+  let ((rest, _), cvs) = mapAccumL build (us, lc) binders
+  return (cvs, rest)
+  where
+    build (supply, lc) (tv, step) =
+      let (unique, rest) = takeUniqFromSupply supply
+          field = step lc
+          cv = mkCoVar (mkSystemVarName unique (fsLit "ck")) (fst field)
+      in ((rest, extendGadtProof lc tv field cv), cv)
+
+-- | The initial lifting context, ordered binder steps, and remaining fields.
+gadtKindTransport_maybe
+  :: [EqSpec] -> Maybe (LiftingContext, [(TyVar, GadtProofStep)], [GadtProofStep])
+gadtKindTransport_maybe spec@(_:_:_)
+  | not (null prefix), not (null indices)
+  = do { binders <- sequence binder_steps
+       ; fields <- traverse (transport prefix) indices
+       ; return (emptyLiftingContext in_scope, binders, fields) }
+  where
+    (homogeneous, suffix) = span is_homogeneous spec
+    needed = tyCoVarsOfTypes [tyVarKind (eqSpecTyVar eq) | eq <- suffix, not (is_homogeneous eq)]
+    last_needed = last (0 : [i | (i, eq) <- zip [1..] suffix, eqSpecTyVar eq `elemVarSet` needed])
+    (extra, indices) = splitAt last_needed suffix
+    prefix = homogeneous ++ extra
+
+    (_, binder_steps) = mapAccumL plan_step [] prefix
+    plan_step prev eq = (eq : prev, (,) (eqSpecTyVar eq) <$> transport prev eq)
+    is_homogeneous (EqSpec tv rhs) = tyVarKind tv `eqType` typeKind rhs
+    in_scope = mkInScopeSet (tyCoVarsOfTypes (map eqSpecType spec ++ map (tyVarKind . eqSpecTyVar) spec))
+
+    transport earlier (EqSpec tv rhs_index)
+      | lhs_kind `eqType` rhs_kind
+      = Just (const (mkNomEqPred lhs_index rhs_index, Nothing))
+      | isTauTy lhs_kind
+      , allVarSet independent (tyCoVarsOfType lhs_kind)
+      , substTyWithInScope in_scope kvs rhses lhs_kind `eqType` rhs_kind
+      = Just $ \lc ->
+          let kind_co = liftCoSubst Nominal lc lhs_kind
+          in if isTyVarTy rhs_index
+             then ( mkNomEqPred (mkCastTy lhs_index kind_co) rhs_index
+                  , Just (Left (mkGReflRightCo Nominal lhs_index kind_co)) )
+             else ( mkNomEqPred lhs_index (mkCastTy rhs_index (mkSymCo kind_co))
+                  , Just (Right (mkGReflLeftCo Nominal rhs_index (mkSymCo kind_co))) )
+      | otherwise
+      = Nothing
+      where
+        (kvs, rhses) = unzip (map eqSpecPair earlier)
+        refined = mkVarSet kvs
+        independent v = isTyVar v &&
+          (v `elemVarSet` refined || disjointVarSet refined (tyCoVarsOfType (tyVarKind v)))
+        lhs_index = mkTyVarTy tv
+        lhs_kind = tyVarKind tv
+        rhs_kind = typeKind rhs_index
+gadtKindTransport_maybe _ = Nothing
+
+-- | Extend a lifting context with the original equality represented by a binder.
+extendGadtProof :: LiftingContext -> TyVar -> GadtProofField -> CoVar -> LiftingContext
+extendGadtProof lc tv field cv =
+  extendLiftingContextAndInScope lc tv (restoreGadtProof id field (mkCoVarCo cv))
+
+-- | Use the inverse transport to recover the original endpoints.
+restoreGadtProof :: (Coercion -> Coercion) -> GadtProofField -> Coercion -> Coercion
+restoreGadtProof _ (_, Nothing) co = co
+restoreGadtProof inst (_, Just (Left before)) co = inst before `mkTransCo` co
+restoreGadtProof inst (_, Just (Right after)) co = co `mkTransCo` inst after
+
+-- | The worker proof binders and the types of its remaining proof fields.
+dataConGadtProof_maybe :: DataCon -> Maybe ([CoVar], ThetaType)
+dataConGadtProof_maybe con = do
+  (_, cvs, _, fields) <- dataConGadtFields_maybe con
+  return (cvs, map fst fields)
+
+-- | Validate the stored binders in worker order and reconstruct each field.
+dataConGadtFields_maybe :: DataCon -> Maybe ([TyVar], [CoVar], [GadtProofField], [GadtProofField])
+dataConGadtFields_maybe (MkData { dcExTyCoVars = exs, dcEqSpec = spec })
+  | (source_exs, cvs@(_:_)) <- span isTyVar exs
+  = do { (initial, binders, fields) <- gadtKindTransport_maybe spec
+       ; (lc, bound_fields) <- check initial binders cvs
+       ; return (source_exs, cvs, bound_fields, map ($ lc) fields) }
+  where
+    check lc [] [] = Just (lc, [])
+    check lc ((tv, step) : bs) (cv : rest)
+      | isCoVar cv, let field = step lc, varType cv `eqType` fst field
+      = do { (lc', fields) <- check (extendGadtProof lc tv field cv) bs rest
+           ; return (lc', field : fields) }
+    check _ _ _ = Nothing
+dataConGadtFields_maybe _ = Nothing
+
+-- | Recover the source equalities from the proofs bound in a GADT pattern.
+-- The caller supplies the instantiated universal and source existential
+-- arguments in order and the Givens in worker order. The result only
+-- contains the restored EqSpec proofs.
+-- See Note [Kind evidence in GADT workers].
+dataConGadtSourceCoercions_maybe :: DataCon -> [Type] -> [EvVar] -> Maybe [Coercion]
+dataConGadtSourceCoercions_maybe con source_tys evs = do
+  (source_exs, cvs, bound_fields, fields) <- dataConGadtFields_maybe con
+  let (prefix_evs, rest_evs) = splitAtList cvs evs
+      (index_evs, context_evs) = splitAtList fields rest_evs
+      proof_evs = prefix_evs ++ index_evs
+      subst = foldl2 extendCvSubstWithClone
+                (zipTvSubst (dataConUnivTyVars con ++ source_exs) source_tys)
+                cvs prefix_evs
+  assertPpr (all isCoVar proof_evs && prefix_evs `equalLength` cvs
+             && index_evs `equalLength` fields
+             && context_evs `equalLength` dataConOtherTheta con)
+            (ppr con $$ ppr evs) $
+    return (zipWith (restoreGadtProof (substCo subst))
+                    (bound_fields ++ fields) (map mkCoVarCo proof_evs))
+
+{- Note [Kind evidence in GADT workers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A source GADT can have earlier EqSpecs that relate the kinds of its
+later index EqSpecs. The source EqSpecs follow the order of the
+universal binders. Bind the initial homogeneous proofs as existential
+CoVars. If a later kind mentions a refined index, extend this prefix
+through the proof for that index. Build each binder using earlier
+binders only. The wrapper supplies reflexive proofs in source order.
+
+Check that substituting earlier EqSpecs into each heterogeneous
+index kind gives the kind of the other index. Lift their nominal
+proofs over the kind. A transported binder supplies a homogeneous
+proof. Compose it with its inverse transport to extend the lifting
+context with the original endpoints. For a later kind At a, the
+lift can then use the proof for a as well as the proof for its kind.
+
+When the right index is a type variable, keep the existing
+left-hand cast. Otherwise use the symmetry of the kind proof to
+cast the right index. The endpoint opposite the cast stays a
+canonical left-hand side for the solver. See (EIK3) in Note
+[Equalities with heterogeneous kinds] in GHC.Tc.Solver.Equality.
+Pattern synonym inference composes the worker proof with the inverse
+transport. The resulting coercion can use the local kind proof, but its
+endpoints are the source EqSpec endpoints and can appear in a signature.
+
+Preserve source existential TyVars before the synthesized CoVars.
+A proof can mention a source existential, so the wrapper and the
+matcher instantiate source existentials first. Put the proof fields
+before the source context dictionaries and ordinary fields. The
+wrapper skips the remaining proof fields before applying unboxers to
+the dictionaries and fields. Pattern synonym inference restores the
+proof prefix and retains the source context evidence verbatim.
+The index kind must be a monotype.
+Its free variables must be type variables. Each variable either has
+an earlier proof in scope or has a kind independent of their refinements.
+
+Keep the source EqSpecs for the source constructor signature and
+pattern-match oracle. The interface records the worker binders in
+ifConExTCvs. They must have the predicates of the supported prefix in
+order. The reader uses the EqSpecs to reconstruct the same index proof
+fields. HEq# has its own wired-in telescope and has no EqSpecs.
+See 'GHC.Settings.Constants.hiVersion' for the interface gate.
+-}
+
 instance Outputable EqSpec where
   ppr (EqSpec tv ty) = ppr (tv, ty)
 
@@ -1267,7 +1431,7 @@ mkDataConWithTelescope source_order arg_binders name declared_infix prom_info
 
     is_vanilla = null ex_tvs && null eq_spec && null theta
     str_marks' | not $ any isMarkedStrict str_marks = []
-               | otherwise                          = str_marks
+               | otherwise = replicate (count isCoVar ex_tvs) NotMarkedStrict ++ str_marks
 
     con = MkData {dcName = name, dcUnique = nameUnique name,
                   dcVanilla = is_vanilla, dcInfix = declared_infix,
@@ -1305,19 +1469,16 @@ mkDataConWithTelescope source_order arg_binders name declared_infix prom_info
         mkRetainedArgTys arg_binders orig_arg_tys $
         mkScaledFunctionTysU (map unrestricted (eqSpecPreds eq_spec)) $
         mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
-      | otherwise = case rep of
-        -- If the DataCon has no wrapper, then the worker's type *is* the
-        -- user-facing type, so we can simply use dataConWrapperType.
-        NoDataConRep -> dataConWrapperTypeUnchecked con
-        -- If the DataCon has a wrapper, then the worker's type is never seen
-        -- by the user. The visibilities we pick do not matter here.
-        DCR{} -> mkInfForAllTys [(unmatchableDataConTy, tv) | tv <- univ_tvs] $
-                 mkTyCoInvForAllTys [(unmatchableDataConTy, tv) | tv <- ex_tvs] $
-                 mkScaledFunctionTysU rep_arg_tys $
-                 mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
-                 -- res_arg_tys is a mixture of TypeLike and ConstraintLike,
-                 -- so we don't know which FunTyFlag to use
-                 -- Hence using mkScaledFunctionTys.
+      | NoDataConRep <- rep, not (name `hasKey` heqDataConKey)
+      = dataConWrapperTypeUnchecked con
+        -- With no wrapper, the worker usually has the user-facing type.
+      | otherwise
+      = mkInfForAllTys [(unmatchableDataConTy, tv) | tv <- univ_tvs] $
+        mkTyCoInvForAllTys [(unmatchableDataConTy, tv) | tv <- ex_tvs] $
+        mkScaledFunctionTysU rep_arg_tys $
+        mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
+        -- HEq# uses the worker telescope without a wrapper.
+        -- See Note [The HEq# evidence telescope] in GHC.Builtin.WiredIn.Types.
 
       -- See Note [Promoted data constructors] in GHC.Core.TyCon
     prom_tv_bndrs = [ mkNamedTyConBinder vis tv
@@ -1575,6 +1736,8 @@ dataConUserTyVarGroups con
 -- There are extracted from the existential variables.
 -- See Note [Existential coercion variables]
 dataConKindEqSpec :: DataCon -> [EqSpec]
+dataConKindEqSpec con
+  | Just _ <- dataConGadtProof_maybe con = []
 dataConKindEqSpec (MkData {dcExTyCoVars = ex_tcvs})
   -- It is used in 'dataConEqSpec' (maybe also 'dataConFullSig' in the future),
   -- which are frequently used functions.
@@ -1697,8 +1860,8 @@ isLazyDataConRep dc = null (dcStricts dc)
 dataConRepStrictness :: DataCon -> [StrictnessMark]
 -- ^ Give the demands on the runtime arguments of a Core DataCon worker
 -- application.
--- The length of the list matches `dataConRepArgTys` (e.g., the number
--- of runtime arguments).
+-- There is one mark per worker argument, including each existential
+-- coercion binder.
 dataConRepStrictness dc
   | isLazyDataConRep dc
   = replicate (dataConRepArity dc) NotMarkedStrict
@@ -1725,7 +1888,7 @@ dataConInstSig
 --     , instantiated constraints including dependent GADT equalities
 --         which are *also* listed in the instantiated existentials
 --     , instantiated args)
-dataConInstSig con@(MkData { dcUnivTyVars = univ_tvs, dcExTyCoVars = ex_tvs
+dataConInstSig con@(MkData { dcUnivTyVars = univ_tvs
                            , dcOrigArgTys = arg_tys })
                univ_tys
   | not (null (dataConRepArgBinders con))
@@ -1736,6 +1899,7 @@ dataConInstSig con@(MkData { dcUnivTyVars = univ_tvs, dcExTyCoVars = ex_tvs
     , substTheta subst (dataConTheta con)
     , substTys subst (map scaledThing arg_tys))
   where
+    (_, ex_tvs, _, _, _, _) = dataConFullSig con
     univ_subst = zipTvSubst univ_tvs univ_tys
     (subst, ex_tvs') = Type.substVarBndrs univ_subst ex_tvs
 
@@ -1744,7 +1908,7 @@ dataConInstSig con@(MkData { dcUnivTyVars = univ_tvs, dcExTyCoVars = ex_tvs
 --
 -- 1) The result of 'dataConUnivTyVars'
 --
--- 2) The result of 'dataConExTyCoVars'
+-- 2) The source existential variables. See Note [Kind evidence in GADT workers].
 --
 -- 3) The non-dependent GADT equalities.
 --    Dependent GADT equalities are implied by coercion variables in
@@ -1760,10 +1924,13 @@ dataConInstSig con@(MkData { dcUnivTyVars = univ_tvs, dcExTyCoVars = ex_tvs
 -- 6) The original result type of the 'DataCon'
 dataConFullSig :: DataCon
                -> ([TyVar], [TyCoVar], [EqSpec], ThetaType, [Scaled Type], Type)
-dataConFullSig (MkData {dcUnivTyVars = univ_tvs, dcExTyCoVars = ex_tvs,
+dataConFullSig con@(MkData {dcUnivTyVars = univ_tvs, dcExTyCoVars = ex_tvs,
                         dcEqSpec = eq_spec, dcOtherTheta = theta,
                         dcOrigArgTys = arg_tys, dcOrigResTy = res_ty})
-  = (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, res_ty)
+  = (univ_tvs, source_exs, eq_spec, theta, arg_tys, res_ty)
+  where
+    source_exs | Just (source_tvs, _, _, _) <- dataConGadtFields_maybe con = source_tvs
+               | otherwise = ex_tvs
 
 dataConOrigResTy :: DataCon -> Type
 dataConOrigResTy dc = dcOrigResTy dc
@@ -1809,7 +1976,8 @@ dataConWrapperType :: DataCon -> Type
 -- NB: If the constructor is part of a data instance, the result type
 -- mentions the family tycon, not the internal one.
 dataConWrapperType con
-  | null (dataConRepArgBinders con) || dataConHasRetainedResult con
+  | not (con `hasKey` heqDataConKey)
+  , null (dataConRepArgBinders con) || dataConHasRetainedResult con
   = dataConWrapperTypeUnchecked con
   | otherwise = dataConRepType con
 
@@ -2051,8 +2219,7 @@ dataConInstOrigArgTys
 -- But for the call in GHC.HsToCore.Match.Constructor, we really do want just
 -- the value args
 dataConInstOrigArgTys dc@(MkData {dcOrigArgTys = arg_tys,
-                                  dcUnivTyVars = univ_tvs,
-                                  dcExTyCoVars = ex_tvs}) inst_tys
+                                  dcUnivTyVars = univ_tvs}) inst_tys
   | not (null (dataConRepArgBinders dc))
   = pprPanic "dataConInstOrigArgTys: retained constructor field telescope" (ppr dc)
   | otherwise
@@ -2060,6 +2227,7 @@ dataConInstOrigArgTys dc@(MkData {dcOrigArgTys = arg_tys,
               (text "dataConInstOrigArgTys" <+> ppr dc $$ ppr tyvars $$ ppr inst_tys) $
     substScaledTys subst arg_tys
   where
+    (_, ex_tvs, _, _, _, _) = dataConFullSig dc
     tyvars = univ_tvs ++ ex_tvs
     subst  = zipTCvSubst tyvars inst_tys
 

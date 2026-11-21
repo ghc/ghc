@@ -7,8 +7,9 @@ import GHC.Settings.Config
 
 hiVersion :: Integer
 -- The suffix changes when the fork changes a common interface payload.
--- Reject interfaces before decoding unknown coercion rule names.
-hiVersion = read (cProjectVersionInt ++ cProjectPatchLevel ++ "69") :: Integer
+-- Reject old HEq# applications and heq_sel references before decoding Core.
+-- This generation combines the scoped workers with the public evidence payloads.
+hiVersion = read (cProjectVersionInt ++ cProjectPatchLevel ++ "79") :: Integer
 
 -- All pretty arbitrary:
 

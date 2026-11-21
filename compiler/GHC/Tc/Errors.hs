@@ -1764,11 +1764,7 @@ validHoleFits ctxt@(CEC { cec_encl = implics
     mk_wanted :: ErrorItem -> Maybe CtEvidence
     mk_wanted (EI { ei_pred = pred, ei_evdest = m_dest, ei_loc = loc })
       | Just dest <- m_dest
-      = Just $ CtWanted $
-          WantedCt { ctev_pred      = pred
-                   , ctev_dest      = dest
-                   , ctev_loc       = loc
-                   , ctev_rewriters = emptyCoHoleSet }
+      = Just $ CtWanted $ mkWantedCt loc emptyCoHoleSet pred dest
       | otherwise
       = Nothing   -- The ErrorItem was a Given
 

@@ -28,7 +28,7 @@ module GHC.Tc.Types.Evidence (
 
   -- * EvTerm (already a CoreExpr)
   EvTerm(..), EvExpr,
-  evId, evCoercion, evCast, evCastE, evDFunApp,  evDictApp, evSelector, evDelayedError,
+  evId, evCoercion, evCast, evCastE, evDFunApp, evDictApp, evHEqDict, evSelector, evDelayedError,
   mkEvScSelectors, evTypeable,
   evWrapIPE, evUnwrapIPE, evUnaryDictAppE,
   mkEvCast,
@@ -66,13 +66,14 @@ import GHC.Core.TyCo.Rep (Coercion(SubCo), UnivCoProvenance(..))
 import GHC.Core.TyCon
 import GHC.Core.Make    ( mkWildCase, mkRuntimeErrorApp, tYPE_ERROR_ID )
 import GHC.Core.Class   ( classTyCon )
-import GHC.Core.DataCon ( dataConWrapId )
+import GHC.Core.DataCon ( dataConWrapId, dataConWorkId )
 import GHC.Core.Class (Class, classSCSelId )
 import GHC.Core.FVs
 import GHC.Core.InstEnv ( CanonicalEvidence(..) )
 
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.FM
+import GHC.Types.Unique ( hasKey )
 import GHC.Types.Name( isInternalName )
 import GHC.Types.Var
 import GHC.Types.Id( idType )
@@ -82,8 +83,9 @@ import GHC.Types.Var.FV
 import GHC.Types.Basic
 
 import GHC.Builtin.KnownKeys
-import GHC.Builtin.WiredIn.Types( unitTy, unmatchableDataConTy )
+import GHC.Builtin.WiredIn.Types( heqDataCon, unitTy, unmatchableDataConTy )
 
+import GHC.Data.Pair ( Pair(..) )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
@@ -982,7 +984,25 @@ evDFunAppE df tys ets = Var df `mkTyApps` tys `mkApps` ets
 evDictApp :: Class -> [Type] -> [EvExpr] -> EvTerm
 evDictApp cls tys args = EvExpr (evDictAppE cls tys args)
 
+-- | Pack nominal evidence for the endpoints of a boxed heterogeneous equality.
+-- See Note [The HEq# evidence telescope] in GHC.Builtin.WiredIn.Types.
+evHEqDict :: [Type] -> TcCoercionN -> EvTerm
+evHEqDict tys co = EvExpr (evHEqDictE tys co)
+
+evHEqDictE :: [Type] -> TcCoercionN -> EvExpr
+evHEqDictE tys co
+  = assert (coercionRole co == Nominal) $
+    evDFunAppE (dataConWorkId heqDataCon) tys [Coercion kind_co, Coercion index_co]
+  where
+    Pair lhs _ = coercionKind co
+    kind_co = mkKindCo co
+    index_co = mkGReflLeftCo Nominal lhs kind_co `mkTransCo` co
+
 evDictAppE :: Class -> [Type] -> [EvExpr] -> EvExpr
+evDictAppE cls tys [arg]
+  | cls `hasKey` heqTyConKey
+  = evHEqDictE tys (evExprCoercion arg)
+    -- Keep the evidence builder for callers with one coercion term.
 evDictAppE cls tys args
   = case tyConSingleDataCon_maybe (classTyCon cls) of
       Just dc -> evDFunAppE (dataConWrapId dc) tys args

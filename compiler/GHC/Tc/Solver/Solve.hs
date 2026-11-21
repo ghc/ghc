@@ -1462,7 +1462,7 @@ solveCt (CQuantCan qci@(QCI { qci_ev = ev }))
          -- It is (much) easier to rewrite and re-classify than to
          -- rewrite the pieces and build a Reduction that will rewrite
          -- the whole constraint
-       ; case classifyPredType (ctEvPred ev') of
+       ; case classifyCtEvidence ev' of
            ForAllPred tvs theta body_pred
              -> solveForAll (qci { qci_ev = ev', qci_tvs = tvs
                                  , qci_theta = theta, qci_body = body_pred })
@@ -1473,7 +1473,7 @@ solveCt (CDictCan (DictCt { di_ev = ev, di_pend_sc = pend_sc }))
          -- It is easier to rewrite and re-classify than to rewrite
          -- the pieces and build a Reduction that will rewrite the
          -- whole constraint
-       ; case classifyPredType (ctEvPred ev) of
+       ; case classifyCtEvidence ev of
            ClassPred cls tys
              -> solveDict (DictCt { di_ev = ev, di_cls = cls
                                   , di_tys = tys, di_pend_sc = pend_sc })
@@ -1489,7 +1489,7 @@ solveNC ev
     -- type function expansion.  Instead, canEqNC just applies
     -- the substitution to the predicate, and may do decomposition;
     --    e.g. a ~ [a], where [G] a ~ [Int], can decompose
-    case classifyPredType (ctEvPred ev) of {
+    case classifyCtEvidence ev of {
         EqPred eq_rel ty1 ty2 -> solveEquality ev eq_rel ty1 ty2 ;
         _ ->
 
@@ -1497,7 +1497,7 @@ solveNC ev
     do { ev <- rewriteDictEvidence ev
 
     -- And then re-classify
-       ; case classifyPredType (ctEvPred ev) of
+       ; case classifyCtEvidence ev of
            ClassPred cls tys     -> solveDictNC ev cls tys
            ForAllPred tvs th p   -> solveForAllNC ev tvs th p
            IrredPred {}          -> solveIrred (IrredCt { ir_ev = ev, ir_reason = IrredShapeReason })
@@ -1806,9 +1806,10 @@ solveWantedQCI :: TcSMode
 solveWantedQCI mode ct@(CQuantCan (QCI { qci_ev =  ev, qci_tvs = tvs
                                        , qci_theta = theta, qci_body = body_pred }))
   -- A worry: This quantified constraint is not fully zonked.  Does that matter?
-  | CtWanted (WantedCt { ctev_pred = forall_pred, ctev_dest = dest
-                       , ctev_rewriters = rewriters, ctev_loc = loc }) <- ev
-  , let is_qc = IsQC forall_pred (ctLocOrigin loc)
+  | CtWanted wanted@(WantedCt { ctev_dest = dest
+                              , ctev_rewriters = rewriters, ctev_loc = loc }) <- ev
+  , let forall_pred = wantedCtPredType wanted
+        is_qc = IsQC forall_pred (ctLocOrigin loc)
         empty_subst = mkEmptySubst $ mkInScopeSet $ tyCoVarsOfType forall_pred
   = TcS.setSrcSpan (getCtLocEnvLoc $ ctLocEnv loc) $
     -- This setSrcSpan is important: the TcM.newImplication uses that

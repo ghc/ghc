@@ -2239,10 +2239,11 @@ lintTyCoBndr tcv thing_inside
               lintL (isLiftedTypeKind tcv_kind) $
               hang (text "TyVar whose kind does not have kind Type:")
                  2 (ppr tcv <+> dcolon <+> ppr tcv_type <+> dcolon <+> ppr tcv_kind)
-         else -- Check that in (forall (cv::ty). blah),
-              -- then ty looks like (t1 ~# t2)
-              lintL (isCoVarType tcv_type) $
-              text "CoVar with non-coercion type:" <+> pprTyVar tcv
+         else do { lintL (isCoVarType tcv_type) $
+                     text "CoVar with non-coercion type:" <+> pprTyVar tcv
+                 ; let (lhs, rhs, _) = coVarTypesRole tcv
+                 ; lintL (typeKind lhs `eqType` typeKind rhs) $
+                     text "R11 mixed-kind coercion binder:" <+> ppr tcv_type }
 
        ; addInScopeTyCoVar tcv thing_inside }
 

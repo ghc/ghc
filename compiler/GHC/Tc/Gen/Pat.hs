@@ -1387,7 +1387,13 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
 
         ; when (not (null eq_spec) || any isEqClassPred theta) warnMonoLocalBinds
 
-        ; given <- newEvVars theta'
+        ; given <- case dataConGadtProof_maybe data_con of
+            Nothing -> newEvVars theta'
+            Just (proof_bndrs, index_preds) -> do
+              { (proof_subst, kind_vars) <- freshenCoVarBndrsX tenv proof_bndrs
+              ; index_vars <- newEvVars (substTheta proof_subst index_preds)
+              ; context_vars <- newEvVars (substTheta tenv theta)
+              ; return (kind_vars ++ index_vars ++ context_vars) }
         ; let indexed_fields
                 | Just scrut <- index, [eq] <- given
                 , not trailing_context, LegacyConOrder _ <- source_order

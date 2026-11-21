@@ -662,6 +662,8 @@ canUnboxArg fam_envs ty (n :* sd)
   | Just (tc, tc_args, co) <- normSplitTyConApp_maybe fam_envs ty
   , Just [dc] <- canUnboxTyCon tc  -- tc is never a newtype
   , null (dataConRepArgBinders dc)
+  , not (any isCoVar (dataConExTyCoVars dc))
+    -- The field demands do not describe existential coercion binders.
   , let arity = dataConRepArity dc
   , Just (Unboxed, dmds) <- viewProd arity sd -- See Note [Boxity analysis]
   , dmds `lengthIs` dataConRepArity dc
@@ -1502,6 +1504,7 @@ findTypeShape fam_envs ty
 
        | not (isNewTyCon tc)
        , Just con <- tyConSingleDataCon_maybe tc
+       , not (any isCoVar (dataConExTyCoVars con))
        , Just rec_tc <- if isTupleTyCon tc
                         then Just rec_tc
                         else checkRecTc rec_tc tc

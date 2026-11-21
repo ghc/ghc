@@ -268,7 +268,7 @@ extendWorkListNonEq ct wl = wl { wl_rest = ct : wl_rest wl }
 extendWorkListCt :: Ct -> WorkList -> WorkList
 -- Agnostic about what kind of constraint
 extendWorkListCt ct wl
- = case classifyPredType (ctEvPred ev) of
+ = case classifyCtEvidence ev of
      EqPred {}
        -> extendWorkListEq rewriters ct wl
 
@@ -1934,7 +1934,7 @@ noGivenNewtypeReprEqs tc (IS { inert_cans = inerts })
     -- Look in both inert_irreds /and/ inert_qcis (#26020)
   where
     might_help_irred (IrredCt { ir_ev = ev })
-      | EqPred ReprEq t1 t2 <- classifyPredType (ctEvPred ev)
+      | EqPred ReprEq t1 t2 <- classifyCtEvidence ev
       = headed_by_tc t1 t2
       | otherwise
       = False

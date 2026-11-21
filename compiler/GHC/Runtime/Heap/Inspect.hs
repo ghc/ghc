@@ -65,7 +65,9 @@ import GHC.Unit.Module
 import GHC.Iface.Env
 import GHC.Utils.Misc
 import GHC.Types.Var.Set
+import GHC.Types.Unique ( hasKey )
 import GHC.Types.Basic ( Boxity(..) )
+import GHC.Builtin.KnownKeys ( heqDataConKey )
 import GHC.Builtin.WiredIn.Prim
 import GHC.Builtin.WiredIn.Types
 import GHC.Driver.DynFlags
@@ -266,11 +268,13 @@ ppr_termM y p Term{dc=Right dc, subTerms=tt}
 -} -- TODO Printing infix constructors properly
   = do { tt_docs' <- mapM (y app_prec) tt
        ; return $ ifPprDebug (show_tm tt_docs')
-                             (show_tm (dropList (dataConTheta dc) tt_docs'))
-                  -- Don't show the dictionary arguments to
-                  -- constructors unless -dppr-debug is on
+                             (show_tm (dropList theta tt_docs'))
        }
   where
+    -- The heap inspector already drops the transported proof fields.
+    -- For other constructors, hide dictionaries unless -dppr-debug is on.
+    theta | Just _ <- dataConGadtProof_maybe dc = dataConOtherTheta dc
+          | otherwise = dataConTheta dc
     show_tm tt_docs
       | null tt_docs = ppr dc
       | otherwise    = cparen (p >= app_prec) $
@@ -1181,12 +1185,21 @@ getDataConArgTys dc con_app_ty
        ; (subst, _) <- instTyVars (univ_tvs ++ ex_tvs)
        ; addConstraint rep_con_app_ty (substTy subst (dataConOrigResTy dc))
               -- See Note [Constructor arg types]
-       ; let con_arg_tys = substTys subst (map scaledThing $ dataConRepArgTys dc)
+       ; let con_arg_tys = substTys subst (map scaledThing rep_arg_tys)
        ; traceTR (text "getDataConArgTys 2" <+> (ppr rep_con_app_ty $$ ppr con_arg_tys $$ ppr subst))
        ; return con_arg_tys }
   where
     univ_tvs = dataConUnivTyVars dc
-    ex_tvs   = dataConExTyCoVars dc
+    -- Skip erased proof binders. Keep the result constraint and any
+    -- ordinary fields after the transported proofs.
+    ex_tvs | dc `hasKey` heqDataConKey = []
+           | otherwise = source_ex_tvs
+    (_, source_ex_tvs, _, _, _, _) = dataConFullSig dc
+    rep_arg_tys
+      | dc `hasKey` heqDataConKey = []
+      | Just (_, proof_fields) <- dataConGadtProof_maybe dc
+      = dropList proof_fields (dataConRepArgTys dc)
+      | otherwise = dataConRepArgTys dc
 
 {- Note [Constructor arg types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

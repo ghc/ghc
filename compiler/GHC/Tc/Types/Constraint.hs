@@ -1,5 +1,6 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 -- | This module defines types and simple operations over constraints, as used
 -- in the type-checker and constraint solver.
@@ -70,19 +71,22 @@ module GHC.Tc.Types.Constraint (
         CtLocEnv(..), setCtLocEnvLoc, setCtLocEnvLvl, getCtLocEnvLoc, getCtLocEnvLvl, ctLocEnvInGeneratedCode,
 
         -- CtEvidence
-        CtEvidence(..), TcEvDest(..),
+        CtEvidence(CtGiven, CtWanted), TcEvDest(..),
         isWanted, isGiven,
-        ctEvPred, ctEvLoc, ctEvOrigin, ctEvEqRel,
+        ctEvPred, wantedCtPredType, classifyCtEvidence, traverseCtEvPred,
+        ctEvLoc, ctEvOrigin, ctEvEqRel,
         ctEvExpr, ctEvTerm,
         ctEvCoercion, wantedCtEvCoercion, givenCtEvCoercion,
         ctEvEvId, wantedCtEvEvId,
         ctEvRewriters, ctEvCoHoleSet, setWantedCtEvRewriters,
+        setCtEvRewriters, setCtEvDest,
         ctEvUnique, tcEvDestUnique,
         ctEvRewriteRole, ctEvRewriteEqRel, setCtEvPredType, setCtEvLoc,
         tyCoVarsOfCtEvList, tyCoVarsOfCtEv, tyCoVarsOfCtEvsList,
 
         -- CtEvidence constructors
-        GivenCtEvidence(..), WantedCtEvidence(..),
+        GivenCtEvidence(..), mkGivenCt, mkGivenEqCt,
+        WantedCtEvidence(..), mkWantedCt, mkWantedEqCt,
 
         -- CoHoleSet and CoercionPlusHoles
         --   CoHoleSet(..) is exported concretely only for zonkCoHoleSet
@@ -673,9 +677,9 @@ Example 2:  a ~ b, where a :: *, b :: k, where k is a kind variable
 
 Note [Ct/evidence invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If  ct :: Ct, then extra fields of 'ct' cache precisely the ctev_pred field
-of (cc_ev ct), and is fully rewritten wrt the substitution.   Eg for DictCt,
-   ctev_pred (di_ev ct) = (di_cls ct) (di_tys ct)
+If ct :: Ct, then the extra fields of ct cache the predicate of its
+evidence, fully rewritten with respect to the substitution. For DictCt,
+   ctEvPred (di_ev ct) = (di_cls ct) (di_tys ct)
 This holds by construction; look at the unique place where DictCt is
 built (in GHC.Tc.Solver.Dict.canDictNC).
 
@@ -694,9 +698,7 @@ mkGivens :: CtLoc -> [EvId] -> [Ct]
 mkGivens loc ev_ids
   = map mk ev_ids
   where
-    mk ev_id = mkNonCanonical (CtGiven (GivenCt { ctev_evar = ev_id
-                                               , ctev_pred = evVarPred ev_id
-                                               , ctev_loc = loc }))
+    mk ev_id = mkNonCanonical (CtGiven (mkGivenCt loc (evVarPred ev_id) ev_id))
 
 ctEvidence :: Ct -> CtEvidence
 ctEvidence (CQuantCan (QCI { qci_ev = ev }))    = ev
@@ -2281,11 +2283,13 @@ wrapType ty skols givens = mkSpecForAllTys [(unmatchableDataConTy, tv) | tv <- s
 
 Note [CtEvidence invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The `ctev_pred` field of a `CtEvidence` is a just a cache for the type
-of the evidence. More precisely:
+The predicate of a CtEvidence agrees with the type of its evidence.
+More precisely, during solving:
 
-* For Givens, `ctev_pred` = `varType ctev_evar`
-* For Wanteds, `ctev_pred` = `evDestType ctev_dest`
+* For Givens, `ctEvPred` = `varType ctev_evar`
+  See Note [Given equality predicates].
+* For Wanteds, `ctEvPred` = `evDestType ctev_dest`
+  See Note [Wanted equality predicates].
 
 where
 
@@ -2293,8 +2297,9 @@ where
   evDestType (EvVarDest evVar)       = varType evVar
   evDestType (HoleDest coercionHole) = varType (coHoleCoVar coercionHole)
 
-The invariant is maintained by `setCtEvPredType`, the only function that
-updates the `ctev_pred` field of a `CtEvidence`.
+During solving, setCtEvPredType updates the predicate and evidence
+together. zonkCtEvidence produces a zonked predicate for reporting
+and plugin use. The evidence is zonked separately.
 
 Why is the invariant important? Because when the evidence is a coercion, it may
 be used in (CastTy ty co); and then we may call `typeKind` on that type (e.g.
@@ -2311,7 +2316,54 @@ and expect a zonked result.  (For example, in the kind-check
 of `eqType`.)
 
 The safest thing is simply to keep `ctev_evar`/`ctev_dest` in sync
-with `ctev_pred`, as stated in `Note [CtEvidence invariants]`.
+with the predicate, as stated in Note [CtEvidence invariants].
+
+Note [Typed evidence records]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Plugins can construct, match, and update GivenCt and WantedCt records.
+Keep their fields and constructors on the public CtGiven and CtWanted
+patterns. A constraint constructed with either pattern uses the supplied
+predicate type. For an equality created from endpoints, the solver stores
+those endpoints in CtEvidence and the public record supplies a lazy typed
+view. The Wanted record shares the type in the destination's CoVar.
+
+Solver operations that update a location, destination, rewriter set, or
+predicate keep the structured information with the new evidence. Zonk the
+endpoints and update the typed view together when reporting the constraint.
+See Note [CtEvidence invariants].
+
+Note [Wanted equality predicates]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An equality created from an equality role and two endpoints stores
+these fields directly. The solver can classify them as an EqPred
+without building a primitive equality type and then taking it apart.
+This prepares for #17368, where a heterogeneous solver equality will
+have no corresponding primitive type.
+
+mkWantedEqCt uses a coercion hole as its evidence destination. The type
+of its current CoVar is the type of the equality that fills it. Rewriting with
+reflexive evidence updates both the structured predicate and the type of
+that CoVar. Neither update changes the hole's identity or contents.
+
+mkWantedCt retains the supplied predicate type. This includes predicates
+supplied by plugins and types that can change shape as metavariables are
+filled. Zonk a structured equality's endpoints directly. Zonk a type
+supplied at the typed boundary as a whole.
+
+Note [Given equality predicates]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The selector for a Given (~) or Coercible dictionary yields a primitive
+equality. Each dictionary quantifies one kind for both endpoints. The
+kind equality derived from a heterogeneous Given also has endpoints of
+one kind. mkGivenEqCt checks the bound CoVar's primitive equality type
+and stores its role and endpoints. The typed view retains the CoVar's
+original type. The solver can classify the predicate from the endpoints.
+
+Given (~~) and Givens supplied as predicate types keep their typed
+representation. A predicate update keeps a structured Given only when
+the new equality still has one kind for both endpoints. Zonk a structured
+Given by zonking its endpoints. See Note [CtEvidence invariants].
+This increment keeps the typed binders that currently carry evidence.
 
 Note [Bind new Givens immediately]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2366,29 +2418,112 @@ data TcEvDest
               -- See Note [Coercion holes] in GHC.Core.TyCo.Rep
 
 data CtEvidence
-  = CtGiven  GivenCtEvidence
-  | CtWanted WantedCtEvidence
+  = CtGivenInternal CtEqEndpoints GivenCtEvidence
+  | CtWantedInternal CtEqEndpoints WantedCtEvidence
 
--- | Evidence for a Given constraint
+-- | The equality endpoints stored in structured solver evidence.
+data CtEqEndpoints
+  = NoCtEqEndpoints
+  | CtEqEndpoints EqRel TcType TcType
+
+-- | Access a Given through its typed evidence record.
+pattern CtGiven :: GivenCtEvidence -> CtEvidence
+pattern CtGiven given <- CtGivenInternal _ given
+  where CtGiven given = CtGivenInternal NoCtEqEndpoints given
+
+-- | Access a Wanted through its typed evidence record.
+pattern CtWanted :: WantedCtEvidence -> CtEvidence
+pattern CtWanted wanted <- CtWantedInternal _ wanted
+  where CtWanted wanted = CtWantedInternal NoCtEqEndpoints wanted
+
+{-# COMPLETE CtGiven, CtWanted #-}
+
+-- | Evidence for a Given constraint.
 data GivenCtEvidence =
   GivenCt
-    { ctev_pred :: TcPredType      -- See Note [Ct/evidence invariant]
-    , ctev_evar :: EvVar           -- See Note [CtEvidence invariants]
+    { ctev_pred :: TcPredType   -- See Note [Typed evidence records]
+    , ctev_evar :: EvVar        -- See Note [CtEvidence invariants]
     , ctev_loc  :: CtLoc }
 
--- | Evidence for a Wanted constraint
+-- | Create evidence for a Given supplied as a predicate type.
+mkGivenCt :: CtLoc -> TcPredType -> EvVar -> GivenCtEvidence
+mkGivenCt loc pred evar = GivenCt pred evar loc
+
+-- | Create structured evidence from a homogeneous primitive CoVar.
+-- See Note [Given equality predicates].
+mkGivenEqCt :: HasDebugCallStack => CtLoc -> CoVar -> CtEvidence
+mkGivenEqCt loc co_var
+  | isCoVar co_var
+  , EqPred rel lhs rhs <- classifyPredType pred
+  , typeKind lhs `tcEqType` typeKind rhs
+  = CtGivenInternal (CtEqEndpoints rel lhs rhs) (GivenCt pred co_var loc)
+  | otherwise
+  = pprPanic "mkGivenEqCt: expected a homogeneous coercion variable"
+             (ppr co_var <+> dcolon <+> ppr pred)
+  where
+    pred = varType co_var
+
+-- | Evidence for a Wanted constraint.
 data WantedCtEvidence =
   WantedCt
-    { ctev_pred      :: TcPredType   -- See Note [Ct/evidence invariant]
+    { ctev_pred      :: TcPredType   -- See Note [Typed evidence records]
     , ctev_dest      :: TcEvDest     -- See Note [CtEvidence invariants]
     , ctev_loc       :: CtLoc
     , ctev_rewriters :: CoHoleSet }  -- See (WRW1) in
-                                     -- Note [Wanteds rewrite Wanteds: rewriter-sets]
+                                       -- Note [Wanteds rewrite Wanteds: rewriter-sets]
+
+-- | Create evidence for a Wanted supplied as a predicate type.
+mkWantedCt :: CtLoc -> CoHoleSet -> TcPredType -> TcEvDest -> WantedCtEvidence
+mkWantedCt loc rewriters pred dest = WantedCt pred dest loc rewriters
+
+-- | Create evidence for a Wanted equality with a matching coercion hole.
+mkWantedEqCt :: CtLoc -> CoHoleSet -> Role -> TcType -> TcType
+             -> CoercionHole -> CtEvidence
+mkWantedEqCt loc rewriters role lhs rhs hole =
+  CtWantedInternal (CtEqEndpoints rel lhs rhs)
+                   (WantedCt (varType (coHoleCoVar hole)) (HoleDest hole) loc rewriters)
+  where
+    rel = case role of
+      Nominal          -> NomEq
+      Representational -> ReprEq
+      Phantom          -> panic "mkWantedEqCt: phantom role"
+
+-- | View the predicate of a Wanted as its current evidence type.
+wantedCtPredType :: WantedCtEvidence -> TcPredType
+wantedCtPredType (WantedCt { ctev_pred = pred }) = pred
+
+-- | Get the stored equality endpoints of evidence, when available.
+ctEvEqEndpoints :: CtEvidence -> CtEqEndpoints
+ctEvEqEndpoints (CtGivenInternal eq _) = eq
+ctEvEqEndpoints (CtWantedInternal eq _) = eq
+
+-- | Classify evidence without rebuilding the type of a structured equality.
+classifyCtEvidence :: HasDebugCallStack => CtEvidence -> Pred
+classifyCtEvidence ev =
+  case ctEvEqEndpoints ev of
+    CtEqEndpoints rel lhs rhs -> EqPred rel lhs rhs
+    NoCtEqEndpoints -> classifyPredType (ctEvPred ev)
+
+-- | Apply a type traversal to the predicate without changing its evidence.
+traverseCtEvPred :: Applicative f
+                 => (TcType -> f TcType) -> CtEvidence -> f CtEvidence
+traverseCtEvPred f ev =
+  case ctEvEqEndpoints ev of
+    NoCtEqEndpoints -> set_pred NoCtEqEndpoints <$> f (ctEvPred ev)
+    CtEqEndpoints rel lhs rhs -> set_eq rel <$> f lhs <*> f rhs
+  where
+    set_eq rel lhs rhs = set_pred (CtEqEndpoints rel lhs rhs) (mkEqPred rel lhs rhs)
+
+    set_pred eq pred = case ev of
+      CtGiven (GivenCt _ evar loc) ->
+        CtGivenInternal eq (GivenCt pred evar loc)
+      CtWanted (WantedCt _ dest loc rwrs) ->
+        CtWantedInternal eq (WantedCt pred dest loc rwrs)
 
 ctEvPred :: CtEvidence -> TcPredType
 -- The predicate of a flavor
-ctEvPred (CtGiven (GivenCt { ctev_pred = pred }))  = pred
-ctEvPred (CtWanted (WantedCt { ctev_pred = pred })) = pred
+ctEvPred (CtGiven (GivenCt { ctev_pred = pred })) = pred
+ctEvPred (CtWanted wanted) = wantedCtPredType wanted
 
 ctEvLoc :: CtEvidence -> CtLoc
 ctEvLoc (CtGiven (GivenCt { ctev_loc = loc }))  = loc
@@ -2399,7 +2534,10 @@ ctEvOrigin = ctLocOrigin . ctEvLoc
 
 -- | Get the equality relation relevant for a 'CtEvidence'
 ctEvEqRel :: HasDebugCallStack => CtEvidence -> EqRel
-ctEvEqRel = predTypeEqRel . ctEvPred
+ctEvEqRel ev =
+  case ctEvEqEndpoints ev of
+    CtEqEndpoints rel _ _ -> rel
+    NoCtEqEndpoints -> predTypeEqRel (ctEvPred ev)
 
 -- | Get the rewrite-role relevant for a 'CtEvidence'
 -- See Note [The rewrite-role of a constraint]
@@ -2410,7 +2548,7 @@ ctEvRewriteEqRel :: CtEvidence -> EqRel
 -- ^ Return the rewrite-role of an abitrary CtEvidence
 -- See Note [The rewrite-role of a constraint]
 -- We return ReprEq for (a ~R# b) and NomEq for all other preds
-ctEvRewriteEqRel = predTypeEqRel . ctEvPred
+ctEvRewriteEqRel = ctEvEqRel
 
 ctEvTerm :: CtEvidence -> EvTerm
 ctEvTerm ev = EvExpr (ctEvExpr ev)
@@ -2433,9 +2571,21 @@ wantedCtHasNoRewriters :: WantedCtEvidence -> Bool
 wantedCtHasNoRewriters (WantedCt { ctev_rewriters = rws })
   = isEmptyCoHoleSet rws
 
--- | Set the rewriter set of a Wanted constraint.
+-- | Set the rewriter set of a Wanted record.
 setWantedCtEvRewriters :: WantedCtEvidence -> CoHoleSet -> WantedCtEvidence
-setWantedCtEvRewriters ev rs = ev { ctev_rewriters = rs }
+setWantedCtEvRewriters ev rws = ev { ctev_rewriters = rws }
+
+-- | Set the rewriter set of a Wanted. Return Given evidence as supplied.
+setCtEvRewriters :: CtEvidence -> CoHoleSet -> CtEvidence
+setCtEvRewriters (CtWantedInternal eq wanted) rws =
+  CtWantedInternal eq (setWantedCtEvRewriters wanted rws)
+setCtEvRewriters given _ = given
+
+-- | Set a Wanted's destination after cloning it with the same predicate type.
+setCtEvDest :: CtEvidence -> TcEvDest -> CtEvidence
+setCtEvDest (CtWantedInternal eq wanted) dest =
+  CtWantedInternal eq (wanted { ctev_dest = dest })
+setCtEvDest given _ = given
 
 ctEvCoHoleSet :: CtEvidence -> CoHoleSet
 -- Returns the set of holes (empty or singleton) for the evidence itself
@@ -2501,23 +2651,36 @@ tcEvDestUnique dest = varUnique (tcEvDestVar dest)
 
 
 setCtEvLoc :: CtEvidence -> CtLoc -> CtEvidence
-setCtEvLoc (CtGiven (GivenCt pred evar _)) loc = CtGiven (GivenCt pred evar loc)
-setCtEvLoc (CtWanted (WantedCt pred dest _ rwrs)) loc = CtWanted (WantedCt pred dest loc rwrs)
+setCtEvLoc (CtGivenInternal eq (GivenCt pred evar _)) loc =
+  CtGivenInternal eq (GivenCt pred evar loc)
+setCtEvLoc (CtWantedInternal eq (WantedCt pred dest _ rwrs)) loc =
+  CtWantedInternal eq (WantedCt pred dest loc rwrs)
 
 -- | Set the type of CtEvidence.
 --
 -- This function ensures that the invariants on 'CtEvidence' hold, by updating
--- the evidence and the ctev_pred in sync with each other.
+-- the evidence and the predicate together.
 -- See Note [CtEvidence invariants].
 setCtEvPredType :: HasDebugCallStack => CtEvidence -> Type -> CtEvidence
-setCtEvPredType (CtGiven old_ev@(GivenCt { ctev_evar = ev })) new_pred
-  = CtGiven (old_ev { ctev_pred = new_pred
-                    , ctev_evar = setVarType ev new_pred })
-
-setCtEvPredType (CtWanted old_ev@(WantedCt { ctev_dest = dest })) new_pred
-  = CtWanted (old_ev { ctev_pred = new_pred
-                     , ctev_dest = new_dest })
+setCtEvPredType (CtGivenInternal old_eq (GivenCt _ ev loc)) new_pred
+  = CtGivenInternal new_eq (GivenCt new_pred (setVarType ev new_pred) loc)
   where
+    new_eq
+      | CtEqEndpoints {} <- old_eq
+      , EqPred rel lhs rhs <- classifyPredType new_pred
+      , typeKind lhs `tcEqType` typeKind rhs
+      = CtEqEndpoints rel lhs rhs
+      | otherwise = NoCtEqEndpoints
+
+setCtEvPredType (CtWantedInternal old_eq (WantedCt _ dest loc rwrs)) new_pred
+  = CtWantedInternal new_eq (WantedCt new_pred new_dest loc rwrs)
+  where
+    new_eq
+      | CtEqEndpoints {} <- old_eq
+      , EqPred rel lhs rhs <- classifyPredType new_pred
+      = CtEqEndpoints rel lhs rhs
+      | otherwise = NoCtEqEndpoints
+
     new_dest = case dest of
       EvVarDest ev -> EvVarDest (setVarType ev new_pred)
       HoleDest h   -> HoleDest  (setCoHoleType h new_pred)

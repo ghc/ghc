@@ -751,7 +751,7 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
                      -- See Note [Retained constructor result equality] in GHC.Core.DataCon.
                      ; return (args, mkCoApps (mkVarApps initial_wrap_app args) refls) }
              else do { args <- mapM (newLocal (fsLit "conrep")) wrap_arg_tys
-                     ; body <- mk_rep_app (dropList stupid_theta args `zip` dropList eq_spec unboxers)
+                     ; body <- mk_rep_app (dropList stupid_theta args `zip` dropList eq_tys unboxers)
                                           (mkCoApps initial_wrap_app refls)
                      ; return (args, body) }
            -- Drop the stupid theta arguments, as per
@@ -842,15 +842,20 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
                 , arg_ibangs, rep_strs) }
 
   where
-    (univ_tvs, ex_tvs, eq_spec, theta, orig_arg_tys, _orig_res_ty)
+    (univ_tvs, source_exs, eq_spec, theta, orig_arg_tys, _orig_res_ty)
                  = dataConFullSig data_con
+    ex_tvs = dataConExTyCoVars data_con
+    gadt_proof = dataConGadtProof_maybe data_con
     stupid_theta = dataConStupidTheta data_con
     (early_tvbs, late_tvbs) = dataConUserTyVarGroups data_con
     res_ty_args  = dataConResRepTyArgs data_con
 
     tycon        = dataConTyCon data_con       -- The representation TyCon (not family)
     wrap_ty      = dataConWrapperType data_con
-    ev_tys       = eqSpecPreds eq_spec ++ theta
+    eq_tys       = case gadt_proof of
+                     Just (_, index_preds) -> index_preds
+                     Nothing -> eqSpecPreds eq_spec
+    ev_tys       = eq_tys ++ theta
     retained_result = dataConHasRetainedResult data_con
     all_arg_tys
       | retained_result = orig_arg_tys ++ map unrestricted ev_tys
@@ -872,7 +877,7 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
       | otherwise
       = Nothing
 
-    wrap_arity   = count isCoVar ex_tvs + length wrap_arg_tys
+    wrap_arity   = count isCoVar source_exs + length wrap_arg_tys
              -- The wrap_args are the arguments *other than* the eq_spec
              -- Because we are going to apply the eq_spec args manually in the
              -- wrapper
@@ -944,14 +949,14 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
 
     initial_wrap_app = Var (dataConWorkId data_con)
                        `mkTyApps`  res_ty_args
-                       `mkVarApps` ex_tvs
+                       `mkVarApps` source_exs
     refls = map (mkReflCo Nominal . eqSpecType) eq_spec
 
     mk_boxer :: [Boxer] -> DataConBoxer
     mk_boxer boxers = DCB (\ ty_args src_vars ->
                       do { let (ex_vars, term_vars) = splitAtList ex_tvs src_vars
                                subst1 = zipTvSubst univ_tvs ty_args
-                               subst2 = foldl2 extendTvSubstWithClone subst1 ex_tvs ex_vars
+                               subst2 = foldl2 extendTCvSubstWithClone subst1 ex_tvs ex_vars
                          ; (rep_ids, binds) <- go subst2 boxers term_vars
                          ; return (ex_vars ++ rep_ids, binds) } )
 

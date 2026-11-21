@@ -168,7 +168,8 @@ conLikeUserTyVarBinders (PatSynCon pat_syn) =
 
 -- | Existentially quantified type/coercion variables
 conLikeExTyCoVars :: ConLike -> [TyCoVar]
-conLikeExTyCoVars (RealDataCon dcon1) = dataConExTyCoVars dcon1
+conLikeExTyCoVars (RealDataCon dcon1) = ex_tvs
+  where (_, ex_tvs, _, _, _, _) = dataConFullSig dcon1
 conLikeExTyCoVars (PatSynCon psyn1)   = patSynExTyVars psyn1
 
 conLikeName :: ConLike -> Name

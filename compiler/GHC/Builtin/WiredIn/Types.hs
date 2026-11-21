@@ -194,13 +194,13 @@ import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Core.TyCon
 import GHC.Core.Class     ( Class, mkClass )
-import qualified GHC.Core.TyCo.Rep as TyCoRep ( Type(TyConApp) )
+import qualified GHC.Core.TyCo.Rep as TyCoRep ( Coercion(CoVarCo), Type(TyConApp) )
 
 import GHC.Hs.Extension (GhcTc)
 
 import GHC.Types.TyThing
 import GHC.Types.SourceText
-import GHC.Types.Var ( VarBndr (Bndr), tyVarName )
+import GHC.Types.Var ( VarBndr (Bndr), mkCoVar, tyVarName )
 import GHC.Types.RepType
 import GHC.Types.Name.Reader
 import GHC.Types.Name as Name
@@ -365,10 +365,9 @@ eqTyCon_RDR = nameRdrName eqTyConName
 
 -- See Note [Kind-changing of (~) and Coercible]
 -- in libraries/ghc-prim/GHC/Types.hs
-heqTyConName, heqDataConName, heqSCSelIdName :: Name
+heqTyConName, heqDataConName :: Name
 heqTyConName   = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "~~")   heqTyConKey      heqTyCon
 heqDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "HEq#") heqDataConKey heqDataCon
-heqSCSelIdName = mkWiredInIdName gHC_TYPES (fsLit "heq_sel") heqSCSelIdKey heqSCSelId
 
 -- See Note [Kind-changing of (~) and Coercible] in libraries/ghc-prim/GHC/Types.hs
 coercibleTyConName, coercibleDataConName, coercibleSCSelIdName :: Name
@@ -1758,14 +1757,10 @@ mk_sum arity = (tycon, sum_cons)
 -- See Note [The equality types story] in GHC.Builtin.WiredIn.Prim
 -- ((~~) :: forall k1 k2 (a :: k1) (b :: k2). a -> b -> Constraint)
 --
--- It's tempting to put functional dependencies on (~~), but it's not
--- necessary because the functional-dependency coverage check looks
--- through superclasses, and (~#) is handled in that check.
-
 eqTyCon,   heqTyCon,   coercibleTyCon   :: TyCon
 eqClass,   heqClass,   coercibleClass   :: Class
 eqDataCon, heqDataCon, coercibleDataCon :: DataCon
-eqSCSelId, heqSCSelId, coercibleSCSelId :: Id
+eqSCSelId, coercibleSCSelId :: Id
 
 (eqTyCon, eqClass, eqDataCon, eqSCSelId)
   = (tycon, klass, datacon, sc_sel_id)
@@ -1789,14 +1784,16 @@ eqSCSelId, heqSCSelId, coercibleSCSelId :: Id
     sc_pred     = mkTyConApp eqPrimTyCon (mkTyVarTys [k,k,a,b])
     sc_sel_id   = mkDictSelId eqSCSelIdName klass
 
-(heqTyCon, heqClass, heqDataCon, heqSCSelId)
-  = (tycon, klass, datacon, sc_sel_id)
+(heqTyCon, heqClass, heqDataCon)
+  = (tycon, klass, datacon)
   where
     tycon     = mkClassTyCon heqTyConName kind binders roles
                              rhs klass
                              (mkPrelTyConRepName heqTyConName)
-    klass     = mk_class tycon sc_pred sc_sel_id
-    datacon   = pcDataConConstraint heqDataConName tvs [sc_pred] tycon
+    -- See Note [The HEq# evidence telescope].
+    klass     = mkClass heqTyConName tvs [] [] [] [] [] (mkAnd []) tycon
+    datacon   = pcDataConWithFixity False heqDataConName tvs [ck]
+                  noConcreteTyVars tvs [index_pred] [] tycon
 
     -- Kind: forall k1 k2. k1 -> k2 -> Constraint
     binders   = mkTemplateTyConBinders [liftedTypeKind, liftedTypeKind] id
@@ -1805,8 +1802,24 @@ eqSCSelId, heqSCSelId, coercibleSCSelId :: Id
     rhs       = mkDataTyConRhs [datacon]
 
     tvs       = binderVars binders
-    sc_pred   = mkTyConApp eqPrimTyCon (mkTyVarTys tvs)
-    sc_sel_id = mkDictSelId heqSCSelIdName klass
+    [k_ty,l_ty,a_ty,b_ty] = mkTyVarTys tvs
+    ck = mkCoVar (mkSystemVarName (mkAlphaTyVarUnique 4) (fsLit "ck"))
+                 (mkTyConApp eqPrimTyCon [liftedTypeKind, liftedTypeKind, k_ty, l_ty])
+    index_pred = mkTyConApp eqPrimTyCon [l_ty, l_ty, mkCastTy a_ty (TyCoRep.CoVarCo ck), b_ty]
+
+{- Note [The HEq# evidence telescope]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The boxed equality class (a :: k) ~~ (b :: l) has a worker of type
+
+  HEq# :: forall k l (a :: k) (b :: l). forall (ck :: k ~# l).
+          (a |> ck) ~# b => a ~~ b
+
+The kind and index coercion variables are both homogeneous. The index
+field depends on the existential kind coercion. A class superclass
+selector cannot bind this existential in its result, so (~~) has no
+ordinary superclass selector. The solver matches the worker directly.
+See Note [Projecting HEq# evidence] in GHC.Tc.Solver.Monad.
+-}
 
 (coercibleTyCon, coercibleClass, coercibleDataCon, coercibleSCSelId)
   = (tycon, klass, datacon, sc_sel_id)

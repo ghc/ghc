@@ -39,6 +39,9 @@ import GHC.Tc.Solver.Rewrite (rewriteFamilyAxioms)
 import GHC.Tc.TyCl.Build
 
 import GHC.Core.Reduction (reductionReducedType)
+import GHC.Core.Coercion ( Coercion, coercionType, mkCoVarCo )
+import GHC.Core.DataCon ( DataCon, dataConGadtSourceCoercions_maybe )
+import GHC.Core ( Expr(Coercion) )
 import GHC.Core.Multiplicity
 import GHC.Core.Type ( typeKind, isManyTy, mkTYPEapp, definitelyLiftedType )
 import GHC.Core.TyCo.Subst( extendTvSubstWithClone )
@@ -71,7 +74,7 @@ import GHC.Driver.DynFlags ( getDynFlags, xopt_FieldSelectors )
 
 import qualified GHC.LanguageExtensions as LangExt
 
-import Data.Maybe( mapMaybe )
+import Data.Maybe( fromMaybe, mapMaybe )
 import Control.Monad ( zipWithM )
 import Data.List( partition, mapAccumL )
 import Data.List.NonEmpty (NonEmpty, nonEmpty)
@@ -143,7 +146,7 @@ tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
                tcInferPat FRRPatSynArg PatSynCtx lpat $
                mapM tcLookupPatSynArg arg_names
 
-       ; let (ex_tvs, prov_dicts) = tcCollectEx lpat'
+       ; let (ex_tvs, prov_groups) = tcCollectEx lpat'
 
              named_taus = (name, pat_ty) : map mk_named_tau args
              mk_named_tau arg
@@ -161,8 +164,8 @@ tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
        ; top_ev_binds <- checkNoErrs (simplifyTop residual)
        ; addTopEvBinds top_ev_binds $
 
-    do { prov_dicts <- liftZonkM $ mapM zonkId prov_dicts
-       ; let filtered_prov_dicts = mkMinimalBySCs evVarPred prov_dicts
+    do { prov_dicts <- liftZonkM $ concat <$> traverse zonkPatSynEvidence prov_groups
+       ; let filtered_prov_dicts = mkMinimalBySCs patSynEvidencePred prov_dicts
              -- Filtering: see Note [Remove redundant provided dicts]
              (prov_theta, prov_evs)
                  = unzip (mapMaybe mkProvEvidence filtered_prov_dicts)
@@ -171,11 +174,13 @@ tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
        -- Report coercions that escape
        -- See Note [Coercions that escape]
        ; args <- liftZonkM $ mapM zonkId args
-       ; let bad_arg arg = fmap (\bad_cos -> (arg, bad_cos)) $
-                           nonEmpty $
-                           dVarSetElems $
-                           filterDVarSet isId (tyCoVarsOfTypeDSet (idType arg))
-             bad_args = mapMaybe bad_arg (args ++ prov_dicts)
+       ; let bad_arg (arg, ty) = fmap (\bad_cos -> (arg, bad_cos)) $
+                                 nonEmpty $
+                                 dVarSetElems $
+                                 filterDVarSet isId (tyCoVarsOfTypeDSet ty)
+             bad_args = mapMaybe bad_arg $
+               [(arg, idType arg) | arg <- args] ++
+               [(ev, patSynEvidencePred evidence) | evidence@(ev, _) <- prov_dicts]
        ; mapM_ dependentArgErr bad_args
 
        -- Report un-quantifiable type variables:
@@ -196,9 +201,29 @@ tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
                           (map nlHsVar args, map idType args)
                           pat_ty rec_fields } }
 
-mkProvEvidence :: EvId -> Maybe (PredType, EvTerm)
+-- | Constructor evidence collected from a pattern before zonking.
+data PatSynEvidenceGroup = PatSynEvidenceGroup (Maybe (DataCon, [Type])) [EvVar]
+
+-- | A zonked Given and its source coercion, if the worker transported it.
+type PatSynEvidence = (EvVar, Maybe Coercion)
+
+zonkPatSynEvidence :: PatSynEvidenceGroup -> ZonkM [PatSynEvidence]
+zonkPatSynEvidence (PatSynEvidenceGroup origin evs) = do
+  evs' <- traverse zonkId evs
+  case origin of
+    Nothing -> return [(ev, Nothing) | ev <- evs']
+    Just (con, source_tys) -> do
+      tys' <- zonkTcTypes source_tys
+      return $ case dataConGadtSourceCoercions_maybe con tys' evs' of
+        Nothing -> [(ev, Nothing) | ev <- evs']
+        Just cos -> zip evs' (map Just cos ++ repeat Nothing)
+
+patSynEvidencePred :: PatSynEvidence -> PredType
+patSynEvidencePred (ev, source_co) = maybe (evVarPred ev) coercionType source_co
+
+mkProvEvidence :: PatSynEvidence -> Maybe (PredType, EvTerm)
 -- See Note [Equality evidence in pattern synonyms]
-mkProvEvidence ev_id
+mkProvEvidence evidence@(ev_id, source_co)
   | EqPred r ty1 ty2 <- classifyPredType pred
   , let k1 = typeKind ty1
         k2 = typeKind ty2
@@ -215,13 +240,13 @@ mkProvEvidence ev_id
                      , evDictApp   eqClass homo_tys eq_con_args )
              | otherwise
              -> Just ( mkClassPred heqClass hetero_tys
-                     , evDictApp   heqClass hetero_tys eq_con_args )
+                     , evHEqDict hetero_tys (fromMaybe (mkCoVarCo ev_id) source_co) )
 
   | otherwise
   = Just (pred, EvExpr (evId ev_id))
   where
-    pred = evVarPred ev_id
-    eq_con_args = [evId ev_id]
+    pred = patSynEvidencePred evidence
+    eq_con_args = [maybe (evId ev_id) Coercion source_co]
 
 dependentArgErr :: (Id, NonEmpty CoVar) -> TcM ()
 -- See Note [Coercions that escape]
@@ -302,6 +327,11 @@ and is not implicitly instantiated.
 
 So in mkProvEvidence we lift (a ~# b) to (a ~ b).  Tiresome, and
 marginally less efficient, if the builder/matcher are not inlined.
+
+A GADT worker can bind a kind proof before a transported index proof.
+Recover the source equality before checking the inferred signature for
+escaping coercions. The boxed evidence still uses both local proofs.
+See Note [Kind evidence in GADT workers] in GHC.Core.DataCon.
 
 See also Note [Lift equality constraints when quantifying] in GHC.Tc.Solver
 
@@ -1392,15 +1422,17 @@ tcCollectEx
   :: LPat GhcTc
   -> ( [TyVar]        -- Existentially-bound type variables
                       -- in correctly-scoped order; e.g. [ k:*, x:k ]
-     , [EvVar] )      -- and evidence variables
+     , [PatSynEvidenceGroup] )  -- and evidence variables
 
 tcCollectEx pat = go pat
   where
-    go :: LPat GhcTc -> ([TyVar], [EvVar])
+    go :: LPat GhcTc -> ([TyVar], [PatSynEvidenceGroup])
     go = go1 . unLoc
 
-    go1 :: Pat GhcTc -> ([TyVar], [EvVar])
-    go1 (LazyPat _ p)      = go p
+    go1 :: Pat GhcTc -> ([TyVar], [PatSynEvidenceGroup])
+    -- A lazy pattern provides no evidence to the continuation.
+    -- See Note [Hopping the LIE in lazy patterns] in GHC.Tc.Gen.Pat.
+    go1 (LazyPat _ _)      = empty
     go1 (AsPat _ _ p)      = go p
     go1 (ParPat _ p)       = go p
     go1 (BangPat _ p)      = go p
@@ -1408,9 +1440,14 @@ tcCollectEx pat = go pat
     go1 (TuplePat _ ps _)  = mergeMany . map go $ ps
     go1 (SumPat _ p _ _)   = go p
     go1 (ViewPat _ _ p)    = go p
-    go1 con@ConPat{ pat_con_ext = con' }
-                           = merge (cpt_tvs con', cpt_dicts con') $
-                              goConDetails $ pat_args con
+    go1 ConPat{ pat_con = L _ con, pat_con_ext = con', pat_args = args }
+      = let origin = case con of
+              RealDataCon dc -> Just (dc, cpt_arg_tys con' ++ mkTyVarTys (cpt_tvs con'))
+              PatSynCon _ -> Nothing
+        in merge (cpt_tvs con', [PatSynEvidenceGroup origin evs | not (null evs)])
+                 (goConDetails args)
+      where
+        evs = cpt_dicts con'
     go1 (SigPat _ p _)     = go p
     go1 (XPat ext) = case ext of
       CoPat _ p _      -> go1 p
@@ -1420,13 +1457,13 @@ tcCollectEx pat = go pat
       = pprPanic "TODO: NPlusKPat" $ ppr n $$ ppr k $$ ppr geq $$ ppr subtract
     go1 _                   = empty
 
-    goConDetails :: HsConPatDetails GhcTc -> ([TyVar], [EvVar])
+    goConDetails :: HsConPatDetails GhcTc -> ([TyVar], [PatSynEvidenceGroup])
     goConDetails (PrefixCon _ ps)   = mergeMany . map go $ ps
     goConDetails (InfixCon _ p1 p2) = go p1 `merge` go p2
     goConDetails (RecCon _ HsRecFields{ rec_flds = flds })
       = mergeMany . map goRecFd $ flds
 
-    goRecFd :: LHsRecField GhcTc (LPat GhcTc) -> ([TyVar], [EvVar])
+    goRecFd :: LHsRecField GhcTc (LPat GhcTc) -> ([TyVar], [PatSynEvidenceGroup])
     goRecFd (L _ HsFieldBind{ hfbRHS = p }) = go p
 
     merge (vs1, evs1) (vs2, evs2) = (vs1 ++ vs2, evs1 ++ evs2)

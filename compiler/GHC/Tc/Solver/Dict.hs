@@ -29,7 +29,7 @@ import GHC.Tc.Utils.Unify( uType, mightEqualLater )
 import GHC.Core
 import GHC.Core.Make
 import GHC.Core.Type
-import GHC.Builtin.WiredIn.Types ( unmatchableDataConTy )
+import GHC.Builtin.WiredIn.Types ( heqClass, unmatchableDataConTy )
 import GHC.Core.Class
 import GHC.Core.Predicate
 import GHC.Core.InstEnv( DFunInstType )
@@ -527,11 +527,11 @@ There are two more similar "equality classes" like this.  The full list is
   on the grounds of Note [Instance and Given overlap], because many good
   things flow from [W] t1 ~# t2.
 
-Conclusion: we have a special solver pipeline for equality-class constraints,
-`solveEqualityDict`.  It aggressively decomposes the boxed equality constraint
-into an unboxed coercion, both for Givens and Wanteds, and /replaces/ the
-boxed equality constraint with the unboxed one, so that the inert set never
-contains the boxed one.
+The solver replaces equality-class Givens with primitive Givens and
+solves equality-class Wanteds via primitive equality. The inert set
+never contains a boxed equality. For a (~~) Given, the solver emits
+both the kind and the transported index equality. See Note [Projecting
+HEq# evidence] in GHC.Tc.Solver.Monad.
 
 Note [Solving tuple constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -571,15 +571,24 @@ solveEqualityDict :: CtEvidence -> Class -> [Type] -> SolverStage Void
 -- Precondition: (isEqualityClass cls) True, so cls is (~), (~~), or Coercible
 solveEqualityDict ev cls tys
   | CtGiven (GivenCt { ctev_evar = ev_id }) <- ev
-  , [sel_id] <- classSCSelIds cls  -- Equality classes have just one superclass
+  , cls == heqClass
+  , [_,_,lhs,rhs] <- tys
+  = Stage $
+    do { let loc = ctEvLoc ev
+             kind_loc = mkKindEqLoc lhs rhs loc
+       ; (kind_var, index_var) <- newHEqEvVars mkGivenEvBind tys ev_id
+       ; emitWorkNC [mkGivenEqCt loc index_var]
+       ; startAgainWith (mkNonCanonical (mkGivenEqCt kind_loc kind_var)) }
+
+  | CtGiven (GivenCt { ctev_evar = ev_id }) <- ev
+  , [sel_id] <- classSCSelIds cls  -- (~) and Coercible have one superclass
   = Stage $
     do { let loc = ctEvLoc ev
              sc_pred = classMethodInstTy sel_id tys
              ev_expr = EvExpr $ Var sel_id `mkTyApps` tys `App` evId ev_id
        -- See (EQC1) in Note [Solving equality classes]
-       -- This call to newGivenEv makes the evidence binding for the (unboxed) coercion
-       ; given_ev <- newGivenEv loc (sc_pred, ev_expr)
-       ; startAgainWith (mkNonCanonical $ CtGiven given_ev) }
+       ; co_id <- newBoundEvVarId sc_pred ev_expr
+       ; startAgainWith (mkNonCanonical (mkGivenEqCt loc co_id)) }
 
   | CtWanted (WantedCt { ctev_dest = dest }) <- ev
   = Stage $
@@ -590,7 +599,8 @@ solveEqualityDict ev cls tys
                                 uType uenv t1 t2
          -- Set  d :: (t1~t2) = Eq# co
        ; setWantedDict dest EvCanonical $
-         evDictApp cls tys [Coercion co]
+         if cls == heqClass then evHEqDict tys co
+                            else evDictApp cls tys [Coercion co]
        ; stopWith ev "Solved wanted lifted equality" }
 
   | otherwise
@@ -876,8 +886,8 @@ tryShortCutSolver _ _ DictCt { di_ev = ev }
 tryShortCutSolver dflags try_short_cut dict_w
   | try_short_cut
   , DictCt { di_ev = ev_w } <- dict_w
-  , CtWanted (WantedCt { ctev_pred = pred_w }) <- ev_w
-  , not (couldBeIPLike pred_w)   -- Not for implicit parameters (#18627)
+  , CtWanted wanted <- ev_w
+  , not (couldBeIPLike (wantedCtPredType wanted))   -- Not for implicit parameters (#18627)
 
   , not (xopt LangExt.IncoherentInstances dflags)
               -- If IncoherentInstances is on then we cannot rely on coherence of proofs
@@ -940,12 +950,13 @@ try_instances inerts work_item@(DictCt { di_ev = ev@(CtWanted wev), di_cls = cls
 
 chooseInstance :: WantedCtEvidence -> ClsInstResult -> TcS ()
 chooseInstance work_item@(WantedCt { ctev_dest = dest, ctev_rewriters = rws
-                                   , ctev_loc = loc, ctev_pred = pred })
+                                   , ctev_loc = loc })
                (OneInst { cir_new_theta   = theta
                         , cir_what        = what
                         , cir_mk_ev       = mk_ev
                         , cir_canonical   = canonical })
-  = do { traceTcS "doTopReact/found instance for" $ ppr work_item
+  = do { let pred = wantedCtPredType work_item
+       ; traceTcS "doTopReact/found instance for" $ ppr work_item
 
       -- Check that the dfun is well-staged in the Template Haskell sense
        ; checkWellLevelledDFun loc what pred
@@ -1025,8 +1036,8 @@ noMatchableGivenDicts inerts@(IS { inert_cans = inert_cans }) loc_w clas tys
 
     matchable_given :: DictCt -> Bool
     matchable_given (DictCt { di_ev = ev })
-      | CtGiven (GivenCt { ctev_loc = loc_g, ctev_pred = pred_g }) <- ev
-      = isJust $ mightEqualLater inerts pred_g loc_g pred_w loc_w
+      | CtGiven (GivenCt { ctev_loc = loc_g }) <- ev
+      = isJust $ mightEqualLater inerts (ctEvPred ev) loc_g pred_w loc_w
 
       | otherwise
       = False
@@ -1845,7 +1856,7 @@ mk_strict_superclasses fuel rec_clss ev@(CtGiven (GivenCt { ctev_evar = evar }))
 
 -- Wanted case
 mk_strict_superclasses fuel rec_clss
-  (CtWanted (WantedCt { ctev_pred = pty, ctev_loc = loc0, ctev_rewriters = rws }))
+  (CtWanted wanted@(WantedCt { ctev_loc = loc0, ctev_rewriters = rws }))
   tvs theta cls tys
   | all noFreeVarsOfType tys
   = return [] -- Wanteds with no variables yield no superclass constraints.
@@ -1856,7 +1867,7 @@ mk_strict_superclasses fuel rec_clss
   = assertPpr (null tvs && null theta) (ppr tvs $$ ppr theta) $
     concatMapM do_one (immSuperClasses cls tys)
   where
-    loc = loc0 `updateCtLocOrigin` WantedSuperclassOrigin pty
+    loc = loc0 `updateCtLocOrigin` WantedSuperclassOrigin (wantedCtPredType wanted)
 
     do_one sc_pred
       = do { traceTcS "mk_strict_superclasses Wanted" (ppr (mkClassPred cls tys) $$ ppr sc_pred)

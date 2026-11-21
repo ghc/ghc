@@ -1806,7 +1806,11 @@ ordinaryClosedTyCon :: TyCon -> [Type] -> Bool
 ordinaryClosedTyCon tc args =
   isVanillaAlgTyCon tc && isBoxedDataTyCon tc && isLiftedAlgTyCon tc &&
   lengthIs args (tyConArity tc) && null (tyConStupidTheta tc) &&
-  all (closedGroundField . tyVarKind) (tyConTyVars tc) && all closedGroundType args
+  all closedGroundType args &&
+  all (closedGroundField . instantiate . tyVarKind) tvs
+  where
+    tvs = tyConTyVars tc
+    instantiate = substTyWith tvs args
 
 -- | Check that a kind or type has no unresolved information.
 closedGroundType :: Type -> Bool
@@ -1893,11 +1897,14 @@ closedConstructorPlan checked_args here args con
           instantiate = substTyWith variables arguments
           fields = map (instantiate . scaledThing) (dataConOrigArgTys con)
           rep = map (instantiate . scaledThing) (dataConRepArgTys con)
-          (evidence, rep_fields) = splitAt (length specs) rep
-          expected_evidence = map instantiate (eqSpecPreds specs)
+          (scope_binders, proof_preds) =
+            fromMaybe ([], eqSpecPreds specs) (dataConGadtProof_maybe con)
+          (evidence, rep_fields) = splitAt (length proof_preds) rep
+          expected_evidence = map instantiate proof_preds
       unless (instantiate (dataConOrigResTy con) `tcEqType` here &&
               all (\(lhs, rhs) -> instantiate lhs `tcEqType` instantiate rhs) equations &&
-              all closedGroundField fields && dataConRepArity con == length rep &&
+              all closedGroundField fields &&
+              dataConRepArity con == length scope_binders + length rep &&
               equalLength evidence expected_evidence && and (zipWith tcEqType evidence expected_evidence) &&
               equalLength fields rep_fields && and (zipWith tcEqType fields rep_fields)) $
         Left UnsupportedClosedShape
@@ -1911,11 +1918,9 @@ closedConstructorPlan checked_args here args con
   | otherwise = Left UnsupportedClosedShape
 
 -- | Project the actual case evidence and orient it from the local index to ground.
-closedIndexCoercion :: [Var] -> TyVar -> ClosedIndex -> Maybe Coercion
+closedIndexCoercion :: [Coercion] -> TyVar -> ClosedIndex -> Maybe Coercion
 closedIndexCoercion evidence tv (ClosedIndex ground evidence_pos path) = do
-  ev <- listToMaybe (drop evidence_pos evidence)
-  guard (isCoVar ev)
-  let co = mkCoVarCo ev
+  co <- listToMaybe (drop evidence_pos evidence)
   guard (coercionRole co == Nominal)
   projected <- foldM project co path
   guard (coercionLKind projected `tcEqType` ground &&
@@ -2157,21 +2162,27 @@ closedCallRenderer name (ClosedCodec shape nodes) = do
           binder <- mkSysLocalM (fsLit "closed_data") ManyTy (closedShapeKind current)
           render_alts <- forM alternatives $ \(ClosedConstructor tag con fields) -> do
             uniques <- getUniquesM
-            let (existentials, binders) = dataConRepInstPat uniques ManyTy con kinds
+            let (worker_binders, binders) = dataConRepInstPat uniques ManyTy con kinds
+                (existentials, scope_evidence) = span isTyVar worker_binders
             render_body <- case fields of
               ClosedStaticFields (ClosedConstructorPlan _ indices) codecs -> do
-                let (evidence, value_binders) = splitAt (length (dataConTheta con)) binders
+                let proof_fields = length (dataConTheta con) - length scope_evidence
+                    (evidence, value_binders) = splitAt proof_fields binders
                     checked = do
-                      guard (equalLength indices existentials && all isTyVar existentials &&
+                      guard (equalLength indices existentials && all isCoVar scope_evidence &&
                              all isCoVar evidence && equalLength codecs value_binders)
-                      cos <- zipWithM (closedIndexCoercion evidence) existentials indices
+                      source_evidence <- if null scope_evidence
+                        then return (map mkCoVarCo evidence)
+                        else dataConGadtSourceCoercions_maybe con (kinds ++ mkTyVarTys existentials)
+                               (scope_evidence ++ evidence)
+                      cos <- zipWithM (closedIndexCoercion source_evidence) existentials indices
                       zipWithM (cast_field existentials cos) codecs value_binders
                 values <- maybe (failWithTc (TcRnClosedTypeEval name "Unexpected constructor representation."))
                                 return checked
                 renderers <- mapM (renderFields refs quote) codecs
                 return (foldr (.) id (zipWith ($) renderers values))
               ClosedWitnessedFields templates codecs
-                | equalLength templates existentials, all isTyVar existentials
+                | null scope_evidence, equalLength templates existentials, all isTyVar existentials
                 , and (zipWith (\t v -> tyVarKind t `tcEqType` tyVarKind v) templates existentials)
                 , equalLength codecs binders -> do
                     let actuals = zipTvSubst templates (map mkTyVarTy existentials)
@@ -2182,7 +2193,7 @@ closedCallRenderer name (ClosedCodec shape nodes) = do
                   let body = render_body suffix
                       emit c = mkConsExpr charTy (mkCharExpr c)
                       tagged = maybe body (foldr emit body) tag
-                  in Core.Alt (Core.DataAlt con) (existentials ++ binders) tagged
+                  in Core.Alt (Core.DataAlt con) (worker_binders ++ binders) tagged
             return alt
           let select value suffix = Core.Case value binder stringTy (map ($ suffix) render_alts)
           case render_alts of
@@ -2439,6 +2450,11 @@ codec type. Lift through the field at Nominal before downgrading that
 whole field coercion to Representational. The wire has only the tag and
 source fields. Promoted applications and runtime wrappers use the
 statically solved source arguments.
+
+A GADT worker can bind kind evidence before its remaining index fields.
+The plan still solves the source EqSpecs. Check the worker field types
+against the validated proof telescope. The case binds the whole worker
+telescope and restores the source proofs before projecting index casts.
 
 A checked promoted operand already carries the source constructor's
 erased arguments. Use those arguments directly. Check the resulting
