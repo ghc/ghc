@@ -58,3 +58,10 @@ GadtRepeatedForAll:
 	@'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -O2 -dcore-lint -dstg-lint -i -i. -outputdir . -c GadtRepeatedForAll.hs
 	@'$(TEST_HC)' $(TEST_HC_OPTS) -v0 Main.o GadtRepeatedForAllProvider.o -o GadtRepeatedForAll$(exeext)
 	@./GadtRepeatedForAll$(exeext)
+
+.PHONY: GadtOrderedTelescope
+GadtOrderedTelescope:
+	@'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -O2 -dcore-lint -dstg-lint -fomit-interface-pragmas -fno-write-if-simplified-core -outputdir . -c GadtOrderedTelescopeProvider.hs
+	@'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -O2 -dcore-lint -dstg-lint -i -i. -outputdir . -c GadtOrderedTelescope.hs
+	@'$(TEST_HC)' $(TEST_HC_OPTS) -v0 Main.o GadtOrderedTelescopeProvider.o -o GadtOrderedTelescope$(exeext)
+	@./GadtOrderedTelescope$(exeext)

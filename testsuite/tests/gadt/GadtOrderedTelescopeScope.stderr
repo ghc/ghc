@@ -1,0 +1,5 @@
+GadtOrderedTelescopeScope.hs:8:21: error: [GHC-14964]
+    • Illegal invisible type pattern: @b
+      An invisible type pattern must be checked against a forall.
+    • In the pattern: Mixed n @a x @b
+      In an equation for ‘wrong’: wrong (Mixed n @a x @b) = x == x

@@ -9,6 +9,7 @@
 - [x] Match a second field under a context placed between two prefix fields.
 - [x] Place a specified forall between two prefix fields, including existential binders.
 - [x] Repeat the specified forall and field groups.
+- [x] Interleave specified forall groups, contexts, and fields in a lifted prefix constructor.
 - [ ] Support the remaining orders of fields, contexts, and quantifiers in prefix constructors.
 
 The [Showcase](../Showcase.hs) defines a constructor with fields of
@@ -66,8 +67,8 @@ This slice places one context between two fields of a lifted prefix
 constructor. All type binders precede the fields. Its interface records
 the source order over the existing type binders, predicates, and
 fields. The worker still takes evidence before its representation fields.
-Template Haskell can reify the wrapper type. Whole-declaration quotation
-and reification report an unsupported form.
+Template Haskell can reify the wrapper type and preserve the context
+in the declaration suffix.
 
 A specified forall can also appear between two fields of a lifted
 prefix constructor with no constructor context. For example,
@@ -98,3 +99,12 @@ its unused lazy siblings unevaluated. The
 [TH test](../../../testsuite/tests/gadt/GadtRepeatedForAllTh.hs)
 quotes and reifies multiple groups and splices them with their
 original type variable scope and field multiplicities.
+
+A prefix constructor can interleave its specified foralls and contexts.
+For example, `Mixed :: !Int -> forall a. Eq a => a -> Mixed a`
+binds `a` and supplies its dictionary after the first field. The
+[client](../../../testsuite/tests/gadt/GadtOrderedTelescope.hs) also
+uses a context before a later forall and checks a constructor with
+several context boundaries. Earlier field patterns can supply evidence
+for a later context. A field pattern cannot use evidence from a
+context that follows it.

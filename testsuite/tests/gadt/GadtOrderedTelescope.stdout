@@ -1,0 +1,3 @@
+(True,False,(True,'c'),("NaN",False,"'q'"),41,0,(EQ,"59!"))
+((True,False),(False,True),(1,2,True,3,4))
+(False,False,True,False)

@@ -167,3 +167,10 @@ test('GadtRepeatedForAllTh',
      [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal']),
       extra_files(['GadtRepeatedForAllProvider.hs', 'TerminalGadtTh.sh'])],
      run_command, ['bash TerminalGadtTh.sh "{compiler}" "{libdir}" GadtRepeatedForAllTh GadtRepeatedForAllProvider'])
+test('GadtOrderedTelescope', extra_files(['GadtOrderedTelescopeProvider.hs']),
+     makefile_test, [])
+test('GadtOrderedTelescopeTh',
+     [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal']),
+      extra_files(['GadtOrderedTelescopeProvider.hs', 'TerminalGadtTh.sh'])],
+     run_command, ['bash TerminalGadtTh.sh "{compiler}" "{libdir}" GadtOrderedTelescopeTh GadtOrderedTelescopeProvider'])
+test('GadtOrderedTelescopeScope', normal, compile_fail, [''])
