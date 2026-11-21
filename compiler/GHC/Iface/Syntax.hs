@@ -1713,11 +1713,13 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
                  ifConArgBinders = arg_binders,
                  ifConStricts = stricts, ifConFields = fields,
                  ifConSourceOrder = source_order })
-  | gadt_style || late_count /= 0 || isJust interior = pp_prefix_con <+> dcolon <+> ppr_gadt_ty
+  | gadt_style || late_count /= 0 || isJust ordered = pp_prefix_con <+> dcolon <+> ppr_gadt_ty
   | otherwise  = ppr_ex_quant pp_h98_con
   where
     late_count = legacyConOrder source_order
-    interior = conInteriorContext source_order
+    ordered = case source_order of
+      OrderedConArgs groups -> Just groups
+      LegacyConOrder _ -> Nothing
 
     pp_h98_con
       | not (null fields) = pp_prefix_con <+> pp_field_args
@@ -1744,21 +1746,21 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
       | late_count <= 0 = (user_tvbs, [])
       | otherwise = splitAt (length user_tvbs - late_count) user_tvbs
     (early_ctxt, late_ctxt)
-      | isJust interior = ([], [])
       | late_count == gadtTrailingContextOnly || ifaceHasTrailingContext late = ([], ctxt)
       | otherwise = (ctxt, [])
     pp_gadt_res_ty = pprIfaceForAllPart (map (ifaceUnmatchable,) late) late_ctxt
                                        (mk_user_con_res_ty eq_spec)
-    ppr_gadt_ty = pprIfaceForAllPart (map (ifaceUnmatchable,) early) early_ctxt pp_tau
+    ppr_gadt_ty
+      | Just groups <- ordered =
+        foldConSourceGroups print_forall (\ps doc -> pprIfaceContextArr ps <+> doc)
+          (\fs doc -> fsep (fs ++ [doc]))
+          groups user_tvbs ctxt (zipWith (<+>) pp_args (map (ppr_arr . fst) arg_tys)) pp_gadt_res_ty
+      | otherwise = pprIfaceForAllPart (map (ifaceUnmatchable,) early) early_ctxt pp_tau
+    print_forall bs = pprIfaceForAllPart (map (ifaceUnmatchable,) bs) []
 
         -- A bit gruesome this, but we can't form the full con_tau, and ppr it,
         -- because we don't have a Name for the tycon, only an OccName
-    pp_tau | Just n <- interior
-           , (prefix, suffix) <- splitAt n (zip pp_args (map (ppr_arr . fst) arg_tys))
-           = fsep ([ty <+> arr | (ty, arr) <- prefix] ++
-                   [pprIfaceContextArr ctxt] ++
-                   [ty <+> arr | (ty, arr) <- suffix] ++ [pp_gadt_res_ty])
-           | not (null arg_binders)
+    pp_tau | not (null arg_binders)
            = pp_retained_args arg_binders arg_tys
            | null fields
            = case pp_args ++ [pp_gadt_res_ty] of
@@ -2827,7 +2829,10 @@ instance Binary IfaceConDecls where
     put_ bh IfAbstractTyCon  = putByte bh 0
     put_ bh (IfDataTyCon False cs)
       | any ordered orders = do
-          requireIfaceEvidenceVersion bh InteriorGadtContextEvidence
+          when (any (isJust . conInteriorContext) orders) $
+            requireIfaceEvidenceVersion bh InteriorGadtContextEvidence
+          when (any (isJust . conInteriorForAll) orders) $
+            requireIfaceEvidenceVersion bh InteriorGadtForAllEvidence
           record_legacy
           putByte bh 5
           put_ bh cs

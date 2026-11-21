@@ -1262,19 +1262,28 @@ tcIfaceDataCons tycon_name tycon if_cons
                          ifConSourceOrder = source_order})
      = do { let terminal_order = legacyConOrder source_order
                 context_only = terminal_order == gadtTrailingContextOnly
+                interior_forall = conInteriorForAll source_order
                 late_count = max 0 terminal_order
+                ordered_late_count = maybe late_count snd interior_forall
                 admissible_order
                   | context_only = not (null ctxt) && ordinary_data && all type_binder ex_bndrs
                   | otherwise = late_count > 0 && late_count <= length user_bndrs && null ex_bndrs
           ; case source_order of
               LegacyConOrder _ -> pure ()
               OrderedConArgs groups ->
-                unless (groups == [ConTypeArgs (length user_bndrs), ConValueArgs 1,
-                                   ConContextArgs (length ctxt), ConValueArgs 1]
-                        && length args == 2 && not (null ctxt) && ordinary_data
-                        && has_wrapper && null arg_binders && null spec
-                        && null ex_bndrs && null lbl_names) $
-                  failIfM (text "Invalid interior constructor context in interface:" <+> ppr dc_name)
+                let valid_group = case interior_forall of
+                      Nothing ->
+                        groups == [ConTypeArgs (length user_bndrs), ConValueArgs 1,
+                                   ConContextArgs (length ctxt), ConValueArgs 1] &&
+                        not (null ctxt) && null ex_bndrs
+                      Just (_, n) ->
+                        n > 0 && n <= length user_bndrs &&
+                        groups == [ConTypeArgs (length user_bndrs - n), ConValueArgs 1,
+                                   ConTypeArgs n, ConValueArgs 1] &&
+                        null ctxt && all type_binder ex_bndrs
+                in unless (valid_group && length args == 2 && ordinary_data &&
+                           has_wrapper && null arg_binders && null spec && null lbl_names) $
+                     failIfM (text "Invalid interior constructor group in interface:" <+> ppr dc_name)
           ; when (terminal_order /= 0) $
               unless (admissible_order && has_wrapper && not (null args) &&
                       null arg_binders && null spec &&
@@ -1297,13 +1306,17 @@ tcIfaceDataCons tycon_name tycon if_cons
                             <+> ppr dc_name
                             $$ text "Universal and user binder kinds disagree:" <+> ppr tv) }
 
-        ; let (early, late) = splitAt (length user_tvs - late_count) user_tvs
+        ; let (early, late) = splitAt (length user_tvs - ordered_late_count) user_tvs
               late_vars = mkVarSet (binderVars late)
               trailing_context = context_only ||
                 (late_count /= 0 && all (isSpecifiedForAllTyFlag . binderFlag) late)
-              check_prefix_scope tys = when (late_count /= 0) $
+              check_prefix_scope tys = when (ordered_late_count /= 0) $
                 unless (disjointVarSet late_vars (tyCoVarsOfTypes tys)) $
                   failIfM (text "Invalid terminal constructor binder scope:" <+> ppr dc_name)
+        ; when (isJust interior_forall) $
+            unless (all (isSpecifiedForAllTyFlag . binderFlag) late &&
+                    late_vars `subVarSet` mkVarSet (univ_tvs ++ ex_tvs)) $
+              failIfM (text "Invalid interior constructor binder scope:" <+> ppr dc_name)
         ; when (late_count /= 0) $
             unless ((all isVisibleForAllTyBinder late || (trailing_context && not (null ctxt))) &&
                     late_vars `subVarSet` mkVarSet univ_tvs) $
@@ -1331,7 +1344,8 @@ tcIfaceDataCons tycon_name tycon if_cons
                     if null arg_binders
                     then do { arg_tys <- forkM (mk_doc dc_name <+> text "arg_tys") $
                                   do { tys <- mapM (\(w, ty) -> mkScaled <$> tcIfaceType w <*> tcIfaceType ty) args
-                                     ; check_prefix_scope (concatMap (\(Scaled mult ty) -> [mult, ty]) tys)
+                                     ; let prefix = maybe tys (\(n, _) -> take n tys) interior_forall
+                                     ; check_prefix_scope (concatMap (\(Scaled mult ty) -> [mult, ty]) prefix)
                                      ; return tys }
                             ; return ([], arg_tys) }
                     else tc_retained_args dc_name emptyVarSet arg_binders args
