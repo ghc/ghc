@@ -83,7 +83,7 @@ Agda's `Σ` record gives the second projection a result type indexed by
 the first projection of the same pair. The corresponding source test
 for the fork uses the existing `PackedVec` type and an ordinary length
 projection. [Agda's built-in Sigma record](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#the-s-type)
-and [Eisenberg's thesis, §8.8](https://www.cis.upenn.edu/~sweirich/papers/eisenberg-thesis.pdf#page=219).
+and [Eisenberg's thesis, §8.8](https://www.cis.upenn.edu/~sweirich/papers/eisenberg-thesis.pdf#page=220).
 
 ```haskell
 payload :: foreach (p :: PackedVec a) -> Vec a (packageLength p)
@@ -251,6 +251,42 @@ family can leave the application stuck.
 [Repeated argument example](../examples/erased-existentials/PackageEquality.hs).
 [Serokell’s R04 card](https://ghc.serokell.io/dh#dependent-sums)
 and [type-lambda elaboration](R17-type-level-lambdas.md#source-and-evidence).
+
+## Return a dependent sum from a closed type family
+
+A closed family equation can return a sum directly. The second equation
+captures `a` from its own pattern. Each equation can choose its own
+payload type.
+
+```haskell
+type family Pack (select :: Bool) (a :: Type) :: Type where
+    Pack False unused = some (tag :: Bool) | Tagged tag Bool
+    Pack True a = some (tag :: Bool) | Tagged tag a
+```
+
+An ordinary module imports `Pack` and constructs `Pack True Char` with
+`Pair True (TrueTag 'x')`. It can read the witness with `GHC.Sigma.first`.
+This observation also succeeds with an undefined payload. GHC rejects a
+payload for a different tag at the written payload. An equation that
+uses a binder from another equation fails at that variable's occurrence.
+The regression checks both errors at `-O0` and `-O2`. The client sees
+only the provider's interface during typechecking.
+[Provider](../../../testsuite/tests/dependent/should_run/NativeClosedFamilySumProvider.hs),
+[ordinary client](../../../testsuite/tests/dependent/should_run/NativeClosedFamilySumClient.hs),
+and [regression](../../../testsuite/tests/dependent/should_run/NativeClosedFamilySum.sh).
+
+The interface contains the `Pack` equations in terms of `GHC.Sigma.Sigma`
+and a private payload family for each sum. `--show-iface` displays this
+representation. GHCi's `:info` also shows the lowered family equations.
+The family termination check still applies. An equation
+such as `PackOne a = some (tag :: Bool) | Tagged tag a` passes `a` to a
+payload family of the same size, so it requires `UndecidableInstances`.
+Returning a named sum with the same payload has the same requirement.
+
+Agda can write a function returning a type whose result uses `Σ A B`,
+with `B` chosen from the function's arguments. The standard library
+provides the same construction with the syntax `Σ[ x ∈ A ] B`.
+[Agda's `Data.Product.Base`](https://agda.github.io/agda-stdlib/v2.4/Data.Product.Base.html#37).
 
 ## Partition at the original length
 
