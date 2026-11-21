@@ -12,6 +12,10 @@ equalMixed (Mixed _ @a (x :: a)) = x == x
 readFieldCheck :: FieldCheck a -> Bool
 readFieldCheck (FieldCheck _ ((\x -> x == x) -> result)) = result
 
+readRequiredFieldCheck :: RequiredFieldCheck -> (String, Bool)
+readRequiredFieldCheck (RequiredFieldCheck _ (type a) (show @a -> shown) ((\x -> x == x) -> equal)) =
+  (shown, equal)
+
 equalPair :: Reversed a b -> (Bool, b)
 equalPair (Reversed @a _ @b ((a :: a), (b :: b))) = (a == a, b)
 
@@ -67,6 +71,8 @@ main = do
          readF5 (MkF5 1 2 @Bool True 3 4 @Char 'x'))
   print ( readFieldCheck (FieldCheck (error "unused earlier field") True)
         , readFieldCheck (FieldCheck (error "unused earlier field") (0/0 :: Double)) )
+  print ( readRequiredFieldCheck (RequiredFieldCheck 1 (type Bool) True False)
+        , readRequiredFieldCheck (RequiredFieldCheck 2 (type Double) 1 (0/0)) )
   let bad = error "strict prefix" :: Int
   partial <- throws (seq @(forall a. Eq a => a -> Mixed a) (Mixed bad) True)
   typed <- throws (Mixed bad @Bool)
