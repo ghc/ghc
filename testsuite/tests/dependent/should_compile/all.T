@@ -96,6 +96,7 @@ test('T25238', normal, compile, [''])
 test('T25834', normal, compile, [''])
 test('GADTSingletons', normal, compile, [''])
 test('NativeNestedSumCapture', normal, compile, [''])
+test('NativeDependentResultBinders', normal, compile, [''])
 
 test('NativeSourceCallIface',
      extra_files(['../../../../docs/dependent-haskell/examples/qualified-pi/ClosedTableLibrary.hs',

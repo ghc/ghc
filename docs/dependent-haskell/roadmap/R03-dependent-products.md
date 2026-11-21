@@ -365,3 +365,22 @@ interface header. Pass the previous compiler as the third argument of
 the regression to check both headers.
 [Source diagnostic](../../../testsuite/tests/dependent/should_fail/NativeIndexOperandFamily.stderr)
 and [cross-module checks](../../../testsuite/tests/dependent/should_run/NativeIndexedFin.sh).
+
+### Infer two retained indices from a constructor result
+
+An ordinary caller can split two vectors at one runtime cut. A successful
+bounds check identifies the common length with the sum of the two piece
+lengths. The expected result of `SplitBothAtWidth @a @cut @suffix`
+identifies each original vector. Each reconstruction proof belongs to its
+own input. The caller can open the first proof while the second vector is
+undefined. An excessive cut returns `Nothing`.
+
+GHC selects an omitted index only when it occupies a unique direct position
+in the result of the same data constructor type. It collects all choices
+before emitting kind equalities. It then checks them in binder order so a
+later kind can mention an earlier choice. The type checker still checks
+both fields against the instantiated constructor signature. Exchanging
+two vectors of equal length fails at the first exchanged field.
+[Source](../examples/packed-vector/CertifiedSplit.hs),
+[ordinary client](../examples/packed-vector/CertifiedSplitClient.hs),
+and [dependent binder regression](../../../testsuite/tests/dependent/should_compile/NativeDependentResultBinders.hs).

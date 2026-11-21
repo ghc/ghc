@@ -307,10 +307,12 @@ reconstruction proof for an arbitrary cut within the vector.
 [Split evidence](roadmap/R04-dependent-sums.md#prove-a-split-preserves-the-original-vector)
 and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vector-append-preserves-its-right-operand).
 
-1. **R03 and R05.** Extend the checked match beyond the one exact
-   expected result slot used by the split. Keep ordinary type errors
-   for independent values at one index. A Given equality between
-   open family applications can expose a solver rewrite cycle.
+1. **R03 and R05.** The expected constructor result can now identify
+   two original vectors after one bounds check. A later inferred operand
+   can also depend on an earlier one. The remaining work includes mixed
+   erased arguments whose values are only partly determined by the
+   result. A Given equality between open family applications can still
+   expose a solver rewrite cycle.
    [Checked input inference](roadmap/R03-dependent-products.md)
    and [independent inputs](../../testsuite/tests/dependent/should_fail/NativeIrredIndexEvidence.hs).
 2. **R05.** Support explicit `INLINE` unfoldings when an ordinary

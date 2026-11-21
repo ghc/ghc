@@ -6851,3 +6851,16 @@ a bottom spine. The finite-spine witness here covers the empty and cons
 cases.
 [Agda stdlib v2.3 list properties](https://agda.github.io/agda-stdlib/v2.3/Data.List.Properties.html)
 and [Haskell map composition proof](examples/open-evaluation/PreludeMapCompositionProof.hs).
+
+### Infer the original values of two vectors
+
+Agda permits several implicit arguments of a function to depend on one
+another. Its `subst` example omits both endpoints while using an equality
+to transport a value. The GHC User’s Guide gives an ordinary GADT pair
+constructor whose result contains both component types. The fork combines
+these ideas for two retained vector values. The expected constructor
+result names each value. A separate GADT equality justifies transporting
+its kind. Equality of lengths alone never identifies the two vectors.
+[Agda 2.8 implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html),
+[GHC GADT constructors](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/gadt.html),
+and [paired vector split](examples/packed-vector/CertifiedSplit.hs).
