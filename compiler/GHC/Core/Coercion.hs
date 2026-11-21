@@ -32,7 +32,7 @@ module GHC.Core.Coercion (
         mkAxInstLHS, mkUnbranchedAxInstLHS,
         mkPiCo, mkPiCos, mkCoCast,
         mkSymCo, mkTransCo,
-        mkSelCo, mkSelCoResRole, getNthFun, selectFromType, mkLRCo, matchableAppProjectionRule,
+        mkSelCo, mkSelCoResRole, getNthFun, selectFromType, mkLRCo, matchableAppProjectionRule, ordinaryAppProjection_maybe,
         mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo,
         mkFunCo, mkFunCo2, mkFunCoNoFTF, mkFunResCo,
         mkNakedFunCo,
@@ -1023,9 +1023,7 @@ mkLRCo lr co
 matchableAppProjectionRule :: LeftOrRight -> (FastString, CoAxiomRule)
 matchableAppProjectionRule lr = (name, BuiltInRule name Nominal (replicate 5 Nominal) proves)
   where
-    name = case lr of
-      CLeft  -> fsLit "MatchableAppLeft"
-      CRight -> fsLit "MatchableAppRight"
+    name = matchableProjectionName lr
     proves [Pair lhs rhs, Pair f _, Pair x _, Pair _ g, Pair _ y]
       | matches lhs f x, matches rhs g y
       = Just (Pair (pickLR lr (f, x)) (pickLR lr (g, y)))
@@ -1037,6 +1035,25 @@ matchableAppProjectionRule lr = (name, BuiltInRule name Nominal (replicate 5 Nom
         && piTyBinderType binder `eqType` typeKind arg
         && mkAppTy fun arg `eqType` app
       | otherwise = False
+
+-- | Recover an ordinary projection when the equality alone proves its head kinds.
+-- See Note [Matchability in application projection evidence].
+ordinaryAppProjection_maybe :: CoAxiomRule -> [Coercion] -> Maybe (LeftOrRight, Coercion)
+ordinaryAppProjection_maybe (BuiltInRule name Nominal _ _) [co, cf, cx, cg, cy]
+  | Just lr <- direction
+  , Pair lhs rhs <- coercionKind co
+  , Just (f, x) <- splitAppTy_maybe lhs
+  , Just (g, y) <- splitAppTy_maybe rhs
+  , isMatchableFunTy (typeKind f), isMatchableFunTy (typeKind g)
+  , same f (coercionLKind cf), same x (coercionLKind cx)
+  , same g (coercionRKind cg), same y (coercionRKind cy)
+  = Just (lr, co)
+  where
+    direction | name == matchableProjectionName CLeft  = Just CLeft
+              | name == matchableProjectionName CRight = Just CRight
+              | otherwise                              = Nothing
+    same a b = typeKind a `eqType` typeKind b && a `eqType` b
+ordinaryAppProjection_maybe _ _ = Nothing
 
 {- Note [Matchability in application projection evidence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1051,6 +1068,12 @@ can be substituted. Each head must still be matchable after substitution.
 Check the kind of its argument and reconstruct its side of the original
 equality before projecting either component. The head premise retains the
 scoped proof m ~ M even when application has erased that cast.
+
+When the plain equality still supplies both matchable heads and the
+same arguments, write the ordinary LRCo interface form. Read that form
+through mkLRCo so later substitution can retain its original heads.
+A projection that needs the scoped proof must keep the checked rule in
+the interface. Its header records that requirement.
 -}
 
 -- | Instantiates a 'Coercion'.

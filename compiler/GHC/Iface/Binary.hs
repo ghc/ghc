@@ -329,7 +329,8 @@ evidenceSuffix requirements
     || needs IndexedConstructorCaseEvidence || needs IndexedConstructorFieldsEvidence
     || needs IndexedConstructorOperandEvidence
     || needs IndexedConstructorExistentialCaseEvidence || needs GeneralIndexedConstructorOperandEvidence
-    || needs RetainedUserUnfoldingEvidence || needs LinearUnpackEvidence = feature_set
+    || needs RetainedUserUnfoldingEvidence || needs LinearUnpackEvidence
+    || needs MatchableProjectionEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -356,6 +357,7 @@ legacyEvidenceSuffix IndexedConstructorOperandEvidence = featureSetPrefix ++ "in
 legacyEvidenceSuffix IndexedConstructorExistentialCaseEvidence = featureSetPrefix ++ "indexed-constructor-existential-case"
 legacyEvidenceSuffix RetainedUserUnfoldingEvidence = featureSetPrefix ++ "retained-user-unfolding"
 legacyEvidenceSuffix LinearUnpackEvidence = featureSetPrefix ++ "linear-unpack"
+legacyEvidenceSuffix MatchableProjectionEvidence = featureSetPrefix ++ "matchable-projection"
 legacyEvidenceSuffix GeneralIndexedConstructorOperandEvidence = featureSetPrefix ++ "general-indexed-constructor-operand"
 legacyEvidenceSuffix DepFunCoEvidence           = "-retained-depfunco-v1"
 legacyEvidenceSuffix ConstructorCaseEvidence   = "-retained-constructor-case-v1"
@@ -390,7 +392,8 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("indexed-constructor-existential-case", IndexedConstructorExistentialCaseEvidence)
                       , ("general-indexed-constructor-operand", GeneralIndexedConstructorOperandEvidence)
                       , ("retained-user-unfolding", RetainedUserUnfoldingEvidence)
-                      , ("linear-unpack", LinearUnpackEvidence) ]
+                      , ("linear-unpack", LinearUnpackEvidence)
+                      , ("matchable-projection", MatchableProjectionEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion

@@ -55,6 +55,7 @@ import GHC.StgToCmm.Types
 
 import GHC.Core
 import GHC.Core.TyCon hiding ( pprPromotionQuote )
+import GHC.Core.Coercion (ordinaryAppProjection_maybe)
 import GHC.Core.Coercion.Axiom
 import GHC.Core.DataCon
 import GHC.Core.Type
@@ -350,7 +351,9 @@ toIfaceCoercionX fr co
     go (InstCo co arg)     = IfaceInstCo (go co) (go arg)
     go (KindCo c)          = IfaceKindCo (go c)
     go (SubCo co)          = IfaceSubCo (go co)
-    go (AxiomCo ax cs)     = IfaceAxiomCo (toIfaceAxiomRule ax) (map go cs)
+    go (AxiomCo ax cs)
+      | Just (lr, co) <- ordinaryAppProjection_maybe ax cs = IfaceLRCo lr (go co)
+      | otherwise = IfaceAxiomCo (toIfaceAxiomRule ax) (map go cs)
     go (UnivCo { uco_prov = p, uco_role = r, uco_lty = t1, uco_rty = t2, uco_deps = deps })
         = IfaceUnivCo p r (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
                       (go_deps deps)

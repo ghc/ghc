@@ -2381,7 +2381,7 @@ tcIfaceCo = go
                                             <*> go t2
     go (IfaceSelCo d c)          = do { c' <- go c
                                       ; return $ mkSelCo d c' }
-    go (IfaceLRCo lr c)          = LRCo lr  <$> go c
+    go (IfaceLRCo lr c)          = mkLRCo lr <$> go c
     go (IfaceKindCo c)           = KindCo   <$> go c
     go (IfaceSubCo c)            = SubCo    <$> go c
     go (IfaceAxiomCo ax cos)     = AxiomCo <$> tcIfaceAxiomRule ax
