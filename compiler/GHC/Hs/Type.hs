@@ -560,7 +560,7 @@ data HsTypeGhcPsExt
                 (LHsType GhcPs)
     -- See Note [Parsing data type declarations]
 
-  | HsTypeLambda (EpToken "(", EpToken "\\", EpUniToken "->" "→", EpToken ")")
+  | HsTypeLambda (EpToken "\\", EpUniToken "->" "→")
                  [LocatedN RdrName] (LHsType GhcPs)
 
   | HsTypeExists (EpToken "exists", Either (EpToken "|") (EpToken "."))
@@ -1698,7 +1698,7 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
     HsCoreTy ty     -> ppr ty
     HsBangTy _ b ty -> ppr b <> ppr_mono_lty ty
     HsRecTy _ flds  -> pprHsConDeclRecFields (unLoc flds)
-    HsTypeLambda _ vars body -> parens (char '\\' <> hsep (map ppr vars) <+> arrow <+> ppr_mono_lty body)
+    HsTypeLambda _ vars body -> char '\\' <> hsep (map ppr vars) <+> arrow <+> ppr_mono_lty body
     HsTypeCase _ _ scrutinee alts ->
       text "case" <+> ppr_mono_lty scrutinee <+> text "of"
         $$ nest 2 (vcat [ppr_mono_lty pat <+> arrow <+> ppr_mono_lty rhs
@@ -1792,7 +1792,7 @@ hsTypeNeedsParens p = go_hs_ty
         HsCoreTy ty -> go_core_ty ty
         HsBangTy{}  -> p > topPrec
         HsRecTy{}   -> False
-        HsTypeLambda{} -> False
+        HsTypeLambda{} -> p >= topPrec
         HsTypeCaseHead{} -> False
         HsTypeSome{} -> p >= topPrec
         HsTypeCaseAlias{} -> p >= topPrec

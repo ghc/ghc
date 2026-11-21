@@ -2311,6 +2311,9 @@ ctype   :: { LHsType GhcPs }
                                                HsForEachTy { hst_xforeach = (epTok $1, $3)
                                                            , hst_bndrs = bndrs
                                                            , hst_body = $4 }) } }
+        | '\\' type_lambda_binders '->' ctype
+                                     {% amsA' (sLL $1 $> $
+                                          XHsType (HsTypeLambda (epTok $1, epUniTok $3) $2 $4)) }
         | 'some' '(' tyvar '::' ctype ')' '|' ctype
                                      {% amsA' (sLL $1 $> $ XHsType
                                            (HsTypeSome (epTok $1, epTok $2, epUniTok $4, epTok $6, epTok $7)
@@ -2459,8 +2462,6 @@ atype :: { LHsType GhcPs }
         | '(#' bar_types2 '#)'        {% do { requireLTPuns PEP_SumSyntaxType $1 $>
                                       ; amsA' (sLL $1 $> $ HsSumTy (AnnParensHash (epTok $1) (epTok $3)) $2) } }
         | '[' ktype ']'               {% amsA' . sLL $1 $> =<< (mkListSyntaxTy1 (epTok $1) $2 (epTok $3)) }
-        | '(' '\\' type_lambda_binders '->' ctype ')' {% amsA' (sLL $1 $> $
-                            XHsType (HsTypeLambda (epTok $1, epTok $2, epUniTok $4, epTok $6) $3 $5)) }
         | '(' ktype ')'               {% amsA' (sLL $1 $> $ HsParTy (epTok $1, epTok $3) $2) }
                                       -- see Note [Promotion] for the followings
         | SIMPLEQUOTE '(' ')'         {% do { requireLTPuns PEP_QuoteDisambiguation $1 $>
