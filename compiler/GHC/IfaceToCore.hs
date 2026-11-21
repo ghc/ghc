@@ -74,7 +74,7 @@ import GHC.Core.TyCon.Set
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.Dependent
-  ( hasNativeDependentExprRhs, hasNativeDependentUnfolding
+  ( hasExistentialExpr, hasNativeDependentExprRhs, hasNativeDependentUnfolding
   , isRetainedVanillaDefaultMethod, hasRetainedRuleHead, supportsLocalUserRule
   , supportsErasedUserRule, supportsImportedErasedRule, supportsImportedUserRule )
 import GHC.Core.Predicate ( mkNomEqPred )
@@ -3006,6 +3006,7 @@ tcUnfoldingRhs source toplvl name declared_ty expr
     -- See Note [Native dependent unfolding templates] in GHC.Core.Unfold.Make.
     let native = hasNativeDependentExprRhs core_expr'
                  || hasNativeDependentExprRhs (Type declared_ty)
+                 || case source of { RetainedUserSrc -> True; _ -> False }
     -- See Note [Compulsory retained defaults] in GHC.Iface.Tidy.
     case source of
       RetainedDefaultSrc ->
@@ -3014,6 +3015,10 @@ tcUnfoldingRhs source toplvl name declared_ty expr
       CompulsorySrc ->
         when native $
           failIfM (text "Unsupported compulsory retained unfolding:" <+> ppr name)
+      RetainedUserSrc ->
+        unless (isTopLevel toplvl && not (hasNativeDependentExprRhs (Type declared_ty))
+                && not (hasExistentialExpr core_expr')) $
+          failIfM (text "Invalid retained user unfolding:" <+> ppr name)
       _ -> pure ()
     dflags <- getDynFlags
     -- Check for type consistency in the unfolding

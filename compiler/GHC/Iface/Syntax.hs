@@ -3031,6 +3031,7 @@ instance Binary IfaceUnfolding where
     put_ bh (IfCoreUnfold s c g e) = do
         case s of
           RetainedDefaultSrc -> requireIfaceEvidenceVersion bh RetainedDefaultEvidence
+          RetainedUserSrc -> requireIfaceEvidenceVersion bh RetainedUserUnfoldingEvidence
           _ -> pure ()
         putByte bh 0
         put_ bh s

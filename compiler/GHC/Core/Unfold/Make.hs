@@ -446,6 +446,7 @@ certainlyWillInline mode opts fn_info rhs'
                         -> do_cunf size args src' tmpl'
         where
           src' | isCompulsorySource src = src  -- Do not change InlineCompulsory!
+               | RetainedUserSrc <- src = src
                | otherwise              = StableSystemSrc
 
           tmpl' | isStableSource src = uf_tmpl fn_unf

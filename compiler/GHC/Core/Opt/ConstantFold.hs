@@ -2704,8 +2704,10 @@ match_inline :: CFRuleFun CoreExpr
 match_inline _ _ _ (Type _ : e : _) = go e
   -- Maybe Monad ahead:
   where
-    go (Var f)      = -- Ignore the IdUnfoldingFun here!
-                      (maybeUnfoldingTemplate (realIdUnfolding f))
+    go (Var f)
+      | let unf = realIdUnfolding f  -- Ignore the IdUnfoldingFun here.
+      , not (isRetainedUserUnfolding unf)
+      = maybeUnfoldingTemplate unf
     go (App f a)    = do { f' <- go f; pure $ App f' a }
     -- inline (f |> co)
     go (Cast e co)  = do { app <- go e; pure (Cast app co) }

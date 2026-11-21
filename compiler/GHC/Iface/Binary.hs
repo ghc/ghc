@@ -326,7 +326,8 @@ evidenceSuffix requirements
     || needs RetainedUserRuleEvidence || needs ImportedRetainedRuleEvidence
     || needs IndexedConstructorCaseEvidence || needs IndexedConstructorFieldsEvidence
     || needs IndexedConstructorOperandEvidence
-    || needs IndexedConstructorExistentialCaseEvidence || needs GeneralIndexedConstructorOperandEvidence = feature_set
+    || needs IndexedConstructorExistentialCaseEvidence || needs GeneralIndexedConstructorOperandEvidence
+    || needs RetainedUserUnfoldingEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -351,6 +352,7 @@ legacyEvidenceSuffix IndexedConstructorCaseEvidence = featureSetPrefix ++ "index
 legacyEvidenceSuffix IndexedConstructorFieldsEvidence = featureSetPrefix ++ "indexed-constructor-fields"
 legacyEvidenceSuffix IndexedConstructorOperandEvidence = featureSetPrefix ++ "indexed-constructor-operand"
 legacyEvidenceSuffix IndexedConstructorExistentialCaseEvidence = featureSetPrefix ++ "indexed-constructor-existential-case"
+legacyEvidenceSuffix RetainedUserUnfoldingEvidence = featureSetPrefix ++ "retained-user-unfolding"
 legacyEvidenceSuffix GeneralIndexedConstructorOperandEvidence = featureSetPrefix ++ "general-indexed-constructor-operand"
 legacyEvidenceSuffix DepFunCoEvidence           = "-retained-depfunco-v1"
 legacyEvidenceSuffix ConstructorCaseEvidence   = "-retained-constructor-case-v1"
@@ -383,7 +385,8 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("indexed-constructor-fields", IndexedConstructorFieldsEvidence)
                       , ("indexed-constructor-operand", IndexedConstructorOperandEvidence)
                       , ("indexed-constructor-existential-case", IndexedConstructorExistentialCaseEvidence)
-                      , ("general-indexed-constructor-operand", GeneralIndexedConstructorOperandEvidence) ]
+                      , ("general-indexed-constructor-operand", GeneralIndexedConstructorOperandEvidence)
+                      , ("retained-user-unfolding", RetainedUserUnfoldingEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion

@@ -2555,6 +2555,7 @@ instance Binary UnfoldingSource where
     put_ bh StableSystemSrc = putByte bh 2
     put_ bh VanillaSrc      = putByte bh 3
     put_ bh RetainedDefaultSrc = putByte bh 4
+    put_ bh RetainedUserSrc = putByte bh 5
     get bh = do
         h <- getByte bh
         case h of
@@ -2562,6 +2563,7 @@ instance Binary UnfoldingSource where
             1 -> return StableUserSrc
             2 -> return StableSystemSrc
             4 -> return RetainedDefaultSrc
+            5 -> return RetainedUserSrc
             _ -> return VanillaSrc
 
 instance Binary TypeOrConstraint where

@@ -2920,6 +2920,7 @@ isValue env (Var v)
                -- case we are in, which is the whole point
 
   | not (isLocalId v)
+  , not (isRetainedUserUnfolding unf)
   , isCheapUnfolding unf
   , Just rhs <- maybeUnfoldingTemplate unf  -- Succeds if isCheapUnfolding does
   = isValue env rhs   -- Can't use isEvaldUnfolding because

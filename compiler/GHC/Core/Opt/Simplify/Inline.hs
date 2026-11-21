@@ -25,6 +25,7 @@ import GHC.Core.Opt.Simplify.Env
 import GHC.Core
 import GHC.Core.Unfold
 import GHC.Core.FVs( exprFreeIds )
+import GHC.Core.Opt.OccurAnal ( SimplCoreMode(..) )
 
 import GHC.Types.Id
 import GHC.Types.Var.Env( InScopeSet, lookupInScope )
@@ -121,7 +122,10 @@ callSiteInline env logger id lone_variable arg_infos cont_info
 
 activeUnfolding :: SimplMode -> Id -> Bool
 activeUnfolding mode id
-  | isCompulsoryUnfolding (realIdUnfolding id)
+  | OrdinaryCore <- sm_core_mode mode
+  , isRetainedUserUnfolding unf
+  = False
+  | isCompulsoryUnfolding unf
   = True   -- Even sm_inline can't override compulsory unfoldings
   | otherwise
   =  isActive (sm_phase mode) (idInlineActivation id)
@@ -131,6 +135,8 @@ activeUnfolding mode id
       --  (a) they are active
       --  (b) sm_inline says so, except that for stable unfoldings
       --                         (ie pragmas) we inline anyway
+  where
+    unf = realIdUnfolding id
 
 -- | Report the inlining of an identifier's RHS to the user, if requested.
 traceInline :: Logger -> UnfoldingOpts -> Id -> String -> SDoc -> a -> a

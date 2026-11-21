@@ -73,7 +73,7 @@ instance Monoid NativeScan where
     mempty = NativeScan (pure False)
 
 {- | Inspect bindings, rules, and metadata on bound identifiers.
-Do not follow unfoldings attached to variable occurrences.
+Read the source tag of imported unfoldings. Do not follow their templates.
 -}
 hasNativeDependentProgram :: CoreProgram -> [CoreRule] -> Bool
 hasNativeDependentProgram binds rules =
@@ -298,9 +298,16 @@ rejectNative context found =
                 )
             )
 
--- | Inspect expression annotations without following occurrence unfoldings.
+-- | Inspect expression annotations. Pipeline selection also checks the source
+-- tag of imported unfoldings. The tag is available before the template.
 scanExpr :: CoreExpr -> NativeScan
-scanExpr (Var v) = scanAnnotations v
+scanExpr (Var v) = scanAnnotations v <> NativeScan (do
+    purpose <- gets scanPurpose
+    metadata <- gets scanMetadata
+    pure $ case purpose of
+      DetectNative -> metadata == AllMetadata && isGlobalId v
+                      && isRetainedUserUnfolding (realIdUnfolding v)
+      _ -> False)
 scanExpr (Lit lit) = scanType (literalType lit)
 scanExpr (App fun arg) = scanExpr fun <> scanExpr arg
 scanExpr (Lam b body) = scanBinder b <> scanExpr body

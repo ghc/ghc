@@ -442,8 +442,10 @@ tidyProgram opts (ModGuts { mg_module           = mod
                           , mg_hpc_info         = hpc_info
                           }) = do
 
-  (unfold_env, tidy_occ_env) <- chooseExternalIds opts mod tcs binds imp_rules
-  let (trimmed_binds, trimmed_rules) = findExternalRules opts mod binds imp_rules unfold_env
+  let marked = retainedUserReferences binds
+      mentions_marked = not . isEmptyVarSet . exprSomeFreeVars marked
+  (unfold_env, tidy_occ_env) <- chooseExternalIds opts mod tcs binds imp_rules mentions_marked
+  let (trimmed_binds, trimmed_rules) = findExternalRules opts mod binds imp_rules unfold_env mentions_marked
 
   when (opt_has_retained_core opts) $ do
     forM_ (bindersOfBinds trimmed_binds) $ \ bndr ->
@@ -456,7 +458,8 @@ tidyProgram opts (ModGuts { mg_module           = mod
                  "Invalid compulsory retained default method."
                  (ppr bndr)
           | isCompulsorySource src
-          , hasNativeDependentExprRhs (Type (idType bndr)) || hasNativeDependentUnfolding rhs
+          , hasNativeDependentExprRhs (Type (idType bndr))
+            || hasNativeDependentUnfolding rhs || mentions_marked rhs
           -> throwGhcExceptionIO $ PprProgramError
                "Cannot export a compulsory unfolding that contains retained Core."
                (ppr bndr)
@@ -466,8 +469,11 @@ tidyProgram opts (ModGuts { mg_module           = mod
       checked <- case lookupNameEnv heads (ru_fn rule) of
         Just fun -> pure (Just (fun, supportsLocalUserRule fun rule))
         Nothing -> opt_check_imported_rule opts rule
-      when (maybe False (hasRetainedRuleHead . fst) checked || hasNativeDependentProgram [] [rule]) $
-        unless (maybe False snd checked) $ throwGhcExceptionIO $ PprProgramError
+      let refers_to_marked = mentionsRetainedUserRule mentions_marked rule
+      when (refers_to_marked ||
+            ((maybe False (hasRetainedRuleHead . fst) checked || hasNativeDependentProgram [] [rule])
+             && not (maybe False snd checked))) $
+        throwGhcExceptionIO $ PprProgramError
           "Cannot export a rewrite rule that contains retained Core."
           (ppr rule)
 
@@ -678,10 +684,11 @@ chooseExternalIds :: TidyOpts
                   -> [TyCon]
                   -> [CoreBind]
                   -> [CoreRule]
+                  -> (CoreExpr -> Bool) -- Refers to a retained user unfolding
                   -> IO (UnfoldEnv, TidyOccEnv)
                   -- Step 1 from the notes above
 
-chooseExternalIds opts mod tcs binds imp_id_rules
+chooseExternalIds opts mod tcs binds imp_id_rules mentions_marked
   = do { (unfold_env1,occ_env1) <- search init_work_list emptyVarEnv init_occ_env
        ; let internal_ids = filter (not . (`elemVarEnv` unfold_env1)) binders
        ; tidy_internal internal_ids unfold_env1 occ_env1 }
@@ -752,7 +759,7 @@ chooseExternalIds opts mod tcs binds imp_id_rules
     | otherwise = do
       (occ_env', name') <- tidyTopName mod name_cache (Just referrer) occ_env idocc
       let
-          (new_ids, show_unfold) = addExternal opts (lookupVarEnv rhs_env idocc) refined_id
+          (new_ids, show_unfold) = addExternal opts mentions_marked (lookupVarEnv rhs_env idocc) refined_id
 
                 -- 'idocc' is an *occurrence*, but we need to see the
                 -- unfolding in the *definition*; so look up in binder_set
@@ -774,8 +781,8 @@ chooseExternalIds opts mod tcs binds imp_id_rules
       let unfold_env' = extendVarEnv unfold_env id (name',False)
       tidy_internal ids unfold_env' occ_env'
 
-addExternal :: TidyOpts -> Maybe CoreExpr -> Id -> ([Id], Bool)
-addExternal opts mb_rhs id
+addExternal :: TidyOpts -> (CoreExpr -> Bool) -> Maybe CoreExpr -> Id -> ([Id], Bool)
+addExternal opts mentions_marked mb_rhs id
   | ExposeNone <- opt_expose_unfoldings opts
   , not (isCompulsoryUnfolding unfolding)
   = ([], False)  -- See Note [Always expose compulsory unfoldings]
@@ -804,7 +811,7 @@ addExternal opts mb_rhs id
     show_unfolding (CoreUnfolding { uf_src = src, uf_tmpl = rhs
                                    , uf_guidance = guidance })
        = (stable || profitable || explicitly_requested)
-         && can_expose_body exposed_rhs
+         && can_expose_body src exposed_rhs
          -- See Note [Retained Core across module boundaries]
        where
         -- Core Tidy regenerates non-stable templates from the binding RHS.
@@ -837,15 +844,57 @@ addExternal opts mb_rhs id
 
     show_unfolding (DFunUnfolding { df_bndrs = bs, df_con = con, df_args = args })
        = not (opt_has_retained_core opts)
-         || not (hasNativeDependentUnfolding
-                   (mkLams bs (mkApps (Var (dataConWorkId con)) args)))
+         || not (hasNativeDependentUnfolding body || mentions_marked body)
+       where
+         body = mkLams bs (mkApps (Var (dataConWorkId con)) args)
     show_unfolding _                  = False
 
-    can_expose_body rhs
+    can_expose_body src rhs
       = not (opt_has_retained_core opts)
         || (not (hasExistentialExpr rhs) &&
             (hasNativeDependentExprRhs (Type (idType id))
-              || not (hasNativeDependentUnfolding rhs)))
+              || case src of
+                   RetainedUserSrc -> True
+                   _ -> not (hasNativeDependentUnfolding rhs || mentions_marked rhs)))
+
+-- | Recognize marked imports and original top-level definitions.
+-- See Note [Retained user unfoldings across modules].
+retainedUserReferences :: CoreProgram -> Id -> Bool
+retainedUserReferences binds = marked
+  where
+    local_marked = mkVarSet (filter (isRetainedUserUnfolding . realIdUnfolding) (bindersOfBinds binds))
+    marked v = v `elemVarSet` local_marked
+               || (isGlobalId v && isRetainedUserUnfolding (realIdUnfolding v))
+
+mentionsRetainedUserRule :: (CoreExpr -> Bool) -> CoreRule -> Bool
+mentionsRetainedUserRule mentions Rule{ru_args = args, ru_rhs = rhs} =
+    any mentions (rhs : args)
+mentionsRetainedUserRule _ BuiltinRule{} = False
+
+{- Note [Retained user unfoldings across modules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An explicit INLINE can supply a retained template for an ordinary signature.
+The retained optimizer supports the template. Its source tag is available
+without loading the template. A reference to the imported Id selects the
+retained pipeline in batch compilation and GHCi.
+
+An unmarked ordinary template can introduce a call to a marked Id after
+pipeline selection. Keep that template private. Test imported Ids and the
+original local definitions. A local occurrence can lack the unfolding
+attached to its definition. Check the old bindings before Tidy ties the knot
+on the final IdInfo. Apply the same check to rules and dictionary unfoldings.
+A compulsory default has its own retained type and validation.
+
+An intermediate module can compile with -fignore-interface-pragmas. It
+can expose a template that refers to a marked Id without seeing the tag.
+The client can inline the intermediate template in the ordinary pipeline.
+Ordinary inlining, constructor queries, imported specialization, and
+the built-in `inline` rule must leave the marked call intact.
+
+GHC.Iface.Syntax records a version feature with the tag. The wire check
+prevents an older reader from using the template without its pipeline check.
+The same source tag reaches --make clients through ModDetails.
+-}
 
 {- Note [Retained Core across module boundaries]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1137,9 +1186,10 @@ findExternalRules :: TidyOpts
                   -> [CoreBind]
                   -> [CoreRule] -- Local rules for imported fns
                   -> UnfoldEnv  -- Ids that are exported, so we need their rules
+                  -> (CoreExpr -> Bool) -- Refers to a retained user unfolding
                   -> ([CoreBind], [CoreRule])
 -- See Note [Finding external rules]
-findExternalRules opts mod binds imp_id_rules unfold_env
+findExternalRules opts mod binds imp_id_rules unfold_env mentions_marked
   = (trimmed_binds, filter keep_rule all_rules)
   where
     imp_rules | opt_expose_rules opts = filter expose_rule imp_id_rules
@@ -1173,6 +1223,10 @@ findExternalRules opts mod binds imp_id_rules unfold_env
                 -- See Note [Which rules to expose]
 
     expose_auto_rule rule
+      | opt_has_retained_core opts
+      , isAutoRule rule
+      , mentionsRetainedUserRule mentions_marked rule
+      = False
       | opt_has_retained_core opts
       , isAutoRule rule
       , hasNativeDependentProgram [] [rule]

@@ -44,8 +44,8 @@ import GHC.HsToCore.Pmc ( addTyCs, pmcGRHSs )
 import GHC.Hs             -- lots of things
 import GHC.Core           -- lots of things
 import GHC.Core.Dependent
-  ( hasNativeDependentExpr, hasNativeDependentExprRhs, hasNativeDependentUnfolding
-  , isRetainedVanillaDefaultMethod )
+  ( hasExistentialExpr, hasNativeDependentExpr, hasNativeDependentExprRhs, hasNativeDependentUnfolding
+  , isRetainedVanillaDefaultMethod, supportsNativeRuleBinds )
 import GHC.Core.SimpleOpt
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Core.InstEnv ( CanonicalEvidence(..) )
@@ -468,10 +468,13 @@ makeCorePair dflags gbl_id is_default_method rhs
   | isInlinePragma inline_prag || isInlinablePragma inline_prag
   , native_rhs
   , not (hasNativeDependentExprRhs (Type (idType gbl_id)))
-  , CoreUnfolding { uf_tmpl = tmpl } <- realIdUnfolding (fst pair)
+  , unf@CoreUnfolding { uf_tmpl = tmpl } <- realIdUnfolding (fst pair)
   , hasNativeDependentUnfolding tmpl
-  = putSrcSpanDs (nameSrcSpan (idName gbl_id)) $
-    failWithDs (DsRetainedInlinePragma (idName gbl_id) inline_spec)
+  = if isInlinePragma inline_prag && isExternalName (idName gbl_id)
+       && not (hasExistentialExpr tmpl) && supportsNativeRuleBinds [NonRec (fst pair) tmpl]
+    then pure (setIdUnfolding (fst pair) unf{uf_src = RetainedUserSrc}, snd pair)
+    else putSrcSpanDs (nameSrcSpan (idName gbl_id)) $
+           failWithDs (DsRetainedInlinePragma (idName gbl_id) inline_spec)
 
   | otherwise
   = pure pair

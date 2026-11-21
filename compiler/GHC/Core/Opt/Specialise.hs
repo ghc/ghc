@@ -910,6 +910,9 @@ spec_import env callers dict_binds cis@(CIS fn _)
 
 canSpecImport :: DynFlags -> Id -> Maybe CoreExpr
 canSpecImport dflags fn
+  | isRetainedUserUnfolding unf
+  = Nothing   -- Only the retained inliner can import this template.
+
   | isDataConWrapId fn
   = Nothing   -- Don't specialise data-con wrappers, even if they
               -- have dict args; there is no benefit.
@@ -3099,7 +3102,9 @@ interestingDict :: SpecEnv -> CoreExpr -> Bool
 -- See Note [Interesting dictionary arguments]
 interestingDict env (Var v)  -- See (ID3) and (ID5)
   -- (ID6.a) Might fail for loop breaker dicts but that seems fine.
-  | Just rhs <- maybeUnfoldingTemplate (idUnfolding v)
+  | let unf = idUnfolding v
+  , not (isRetainedUserUnfolding unf)
+  , Just rhs <- maybeUnfoldingTemplate unf
   = interestingDict env rhs
 
 interestingDict env arg  -- Main Plan: use exprIsConApp_maybe

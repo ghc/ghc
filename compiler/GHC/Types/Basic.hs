@@ -1076,9 +1076,11 @@ data UnfoldingSource
                     -- (see "GHC.Types.Id.Make", calls to mkCompulsoryUnfolding).
                     -- Inline absolutely always, however boring the context.
   | RetainedDefaultSrc -- A compulsory template for a checked retained default.
+  | RetainedUserSrc -- An optional template that requires the retained optimizer.
 
 isStableUserSource :: UnfoldingSource -> Bool
 isStableUserSource StableUserSrc = True
+isStableUserSource RetainedUserSrc = True
 isStableUserSource _             = False
 
 isStableSystemSource :: UnfoldingSource -> Bool
@@ -1095,12 +1097,14 @@ isStableSource CompulsorySrc   = True
 isStableSource RetainedDefaultSrc = True
 isStableSource StableSystemSrc = True
 isStableSource StableUserSrc   = True
+isStableSource RetainedUserSrc = True
 isStableSource VanillaSrc      = False
 
 instance NFData UnfoldingSource where
   rnf = \case
     CompulsorySrc -> ()
     RetainedDefaultSrc -> ()
+    RetainedUserSrc -> ()
     StableUserSrc -> ()
     StableSystemSrc -> ()
     VanillaSrc -> ()
@@ -1108,6 +1112,7 @@ instance NFData UnfoldingSource where
 instance Outputable UnfoldingSource where
   ppr CompulsorySrc     = text "Compulsory"
   ppr RetainedDefaultSrc = text "CompulsoryRetainedDefault"
+  ppr RetainedUserSrc   = text "StableRetainedUser"
   ppr StableUserSrc     = text "StableUser"
   ppr StableSystemSrc   = text "StableSystem"
   ppr VanillaSrc        = text "<vanilla>"

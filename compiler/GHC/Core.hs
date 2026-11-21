@@ -75,6 +75,7 @@ module GHC.Core (
         isValueUnfolding, isEvaldUnfolding, isCheapUnfolding,
         isExpandableUnfolding, isConLikeUnfolding, isCompulsoryUnfolding,
         isStableUnfolding, isStableUserUnfolding, isStableSystemUnfolding,
+        isRetainedUserUnfolding,
         isInlineUnfolding, isBootUnfolding, isBetterUnfoldingThan,
         hasCoreUnfolding, hasSomeUnfolding,
         canUnfold, neverUnfoldGuidance, isStableSource,
@@ -2157,6 +2158,9 @@ expandUnfolding_maybe :: Unfolding -> Maybe CoreExpr
 -- Expand an expandable unfolding; this is used in rule matching
 --   See Note [Expanding variables] in GHC.Core.Rules
 -- The key point here is that CONLIKE things can be expanded
+-- Optional retained templates can enter Core only through the retained inliner.
+-- See Note [Retained user unfoldings across modules] in GHC.Iface.Tidy.
+expandUnfolding_maybe CoreUnfolding { uf_src = RetainedUserSrc } = Nothing
 expandUnfolding_maybe (CoreUnfolding { uf_cache = cache, uf_tmpl = rhs })
   | uf_expandable cache
     = Just rhs
@@ -2164,6 +2168,7 @@ expandUnfolding_maybe _ = Nothing
 
 -- Expand an unfolding, ignoring if it is expandable or not
 expandUnfolding_always :: Unfolding -> Maybe CoreExpr
+expandUnfolding_always CoreUnfolding { uf_src = RetainedUserSrc } = Nothing
 expandUnfolding_always (CoreUnfolding { uf_tmpl = rhs }) = Just rhs
 expandUnfolding_always _ = Nothing
 
@@ -2182,6 +2187,11 @@ isStableUserUnfolding :: Unfolding -> Bool
 -- True of unfoldings that arise from an INLINE or INLINEABLE pragma
 isStableUserUnfolding (CoreUnfolding { uf_src = src }) = isStableUserSource src
 isStableUserUnfolding _                                = False
+
+-- | Does the optional template require the retained optimizer?
+isRetainedUserUnfolding :: Unfolding -> Bool
+isRetainedUserUnfolding CoreUnfolding { uf_src = RetainedUserSrc } = True
+isRetainedUserUnfolding _ = False
 
 isStableSystemUnfolding :: Unfolding -> Bool
 -- True of unfoldings that arise from an INLINE or INLINEABLE pragma
