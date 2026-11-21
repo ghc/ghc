@@ -160,3 +160,93 @@ mkdir coarse
         exit 1
     fi
 )
+
+# A consumer can rewrite its own expression without changing an opaque observation.
+cd "$out"
+mkdir opaque-provider opaque-client
+cat > opaque-provider/Observed.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, ExplicitForAll, GADTs, TypeFamilies, TypeOperators #-}
+module Observed
+    (Box(..), boxed, aliasProof, familyProof, inlinable, manifest, observation, quantified, run)
+where
+import Data.Type.Equality ((:~:)(Refl))
+
+type Image = Prelude.fmap Prelude.not ('Just 'True)
+type family Family where
+    Family = Prelude.fmap Prelude.not ('Just 'True)
+
+{-# OPAQUE aliasProof #-}
+aliasProof :: Image :~: 'Just 'False
+aliasProof = Refl
+
+{-# OPAQUE familyProof #-}
+familyProof :: Family :~: 'Just 'False
+familyProof = Refl
+
+data Box where
+    Box :: (Family :~: 'Just 'False) -> Box
+
+{-# OPAQUE boxed #-}
+boxed :: Box
+boxed = Box familyProof
+
+{-# INLINABLE inlinable #-}
+inlinable :: String
+inlinable = case familyProof of Refl -> "inlinable"
+
+{-# OPAQUE manifest #-}
+manifest :: 'True :~: 'True
+manifest = case aliasProof of Refl -> Refl
+
+{-# OPAQUE observation #-}
+observation :: String
+observation = case familyProof of Refl -> "closed observation"
+
+{-# OPAQUE quantified #-}
+quantified :: forall (p :: Family :~: 'Just 'False). String
+quantified = case familyProof of Refl -> "quantified"
+
+{-# OPAQUE run #-}
+run :: Bool -> Maybe Bool
+run x = Prelude.fmap not (Just x)
+HS
+cat > opaque-client/Main.hs <<'HS'
+{-# LANGUAGE CPP, GADTs, NoExperimentalDependentTypes #-}
+module Main where
+import Observed
+
+{-# RULES "r16/observing-fmap" [~1] forall f. fmap f (Just True) = Nothing #-}
+
+main :: IO ()
+main = do
+#ifdef ALIAS
+    print aliasProof
+#elif defined(FAMILY)
+    print familyProof
+#elif defined(INLINABLE)
+    putStrLn inlinable
+#elif defined(BOX)
+    case boxed of Box proof -> print proof
+#elif defined(QUANTIFIED)
+    putStrLn quantified
+#else
+    print manifest
+    putStrLn observation
+    print (run True, Prelude.fmap not (Just True))
+#endif
+HS
+(cd opaque-provider && "${ghc[@]}" -fno-enable-rewrite-rules -fexpose-all-unfoldings -c Observed.hs)
+cp opaque-provider/Observed.hi opaque-client/
+cd opaque-client
+"${ghc[@]}" -fenable-rewrite-rules -ddump-rule-firings -c Main.hs >firings.log
+# The consumer rule can change its own call. The compiled provider stays unchanged.
+grep -Fq 'Rule fired: r16/observing-fmap' firings.log
+"${ghc[@]}" Main.o ../opaque-provider/Observed.o -o observed
+diff -u <(printf 'Refl\nclosed observation\n(Just False,Nothing)\n') <(./observed)
+for variant in ALIAS FAMILY INLINABLE BOX QUANTIFIED; do
+    if "${ghc[@]}" -fenable-rewrite-rules -fforce-recomp -D"$variant" -c Main.hs >rejected.log 2>&1 ||
+       ! grep -Fq 'error: [GHC-83605]' rejected.log; then
+        cat rejected.log >&2
+        exit 1
+    fi
+done

@@ -1804,8 +1804,11 @@ pragmas are available. The proof disables rewrite rules for the list worker.
 Induction on a finite list spine proves that `foldr k z (map f xs)` equals
 `foldr (k . f) z xs`. The step, mapper, and seed can stay abstract. The
 proof uses the installed `foldr`, `map`, and `(.)` with rewrite rules
-disabled. In the runtime example, both folds skip an undefined seed and
-tail. A step that ignores its head also skips the mapper and input head.
+disabled in the provider. Its generic proof exports retain their rule
+dependencies. The Showcase imports two `OPAQUE` observations whose written
+results are `'True :~: 'True` and `String`. The consumer can keep rewrite
+rules enabled. In the provider, both folds skip an undefined seed and tail.
+A step that ignores its head also skips the mapper and input head.
 [Source proof](../examples/open-evaluation/PreludeFoldrProof.hs) and
 [Agda's list law](../REFERENCES.md#right-fold-after-map).
 
@@ -1926,15 +1929,13 @@ The `[~]` rule never fired and all four proofs passed. The separate
 constructor, so its source predicts the same rejection for both active
 patterns.
 
-Start with a native check for constructor apartness at this exact closed
-application. Require a visible mismatch in the checked arguments and keep
-the existing rejection when the shape is unknown or another rewrite can
-change it. Also check the selector, dictionary and selected worker. After
-the cold replay, change an imported orphan rule from `Just False` to
-`Just True` and check that the unchanged proof is rechecked. Keep the
-installed `foldr` and `length` rules-on Showcase as separate acceptance
-checks. A rule-firing trace shows what one compilation did. It cannot
-establish apartness at all proof uses.
+The check can rule out an active rewrite by comparing the written
+constructors of stable arguments. Unknown operands keep a conservative
+rule dependency. The compiler also checks rules on the selected
+selector, dictionary and worker. A fold proof that exposes an open
+`foldr` dependency still needs a rule certificate when imported with
+rules enabled. This includes the `foldr` append and map laws.
+[Closed method controls](../../../testsuite/tests/dependent/should_run/NativeClosedMethodApartness.sh).
 
 GHC tests each user rule's activation in the simplifier phase, then matches
 its arguments. The rules are optimizer inputs whose equivalence GHC
@@ -2058,7 +2059,8 @@ An interface from the previous compiler can contain the same
 normalized axiom and provider ABI for the promoted and literal
 RHSs. A new compiler reads those existing interfaces in warm home
 builds and in installed packages. Rebuild the checked provider to
-write the dependency and protect future proof uses. The new axiom
+write the dependency and protect future proof uses.
+[Old provider rebuild control](../examples/open-evaluation/check-source-proof-provider-upgrade.sh). The new axiom
 fingerprint invalidates a dependent module with the same normalized
 family result. The same writer uses the established interface
 encoding for an ordinary literal equation.

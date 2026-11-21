@@ -51,6 +51,7 @@ import GHC.Tc.Utils.Unify( DeepSubsumptionFlag(..), tcSkolemise, unifyType, buil
 import GHC.Tc.Utils.Instantiate( topInstantiate, tcInstType, tcInstTypeBndrs )
 import GHC.Tc.Utils.Env
 
+import GHC.Tc.Types (TcGblEnv(tcg_source_rule_types), SourceRuleUses(sourceProofClosedResults))
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.ErrCtxt( ReportRedundantConstraints(..) )
 import GHC.Tc.Types.Evidence
@@ -61,6 +62,7 @@ import GHC.Tc.Zonk.Type
 
 import GHC.Core( Expr(Type, Var), hasSomeUnfolding )
 import GHC.Core.Dependent ( hasNativeDependentExpr, hasRetainedRuleHead )
+import GHC.Core.DataCon ( dataConName )
 import GHC.Core.Utils ( applyTypeToArgs )
 import GHC.Core.Unify ( matchBindTv, tcMatchRetainedTyX_BM )
 import GHC.Core.Type
@@ -77,10 +79,13 @@ import GHC.Types.InlinePragma
 import GHC.Types.Basic
 import GHC.Types.Name
 import GHC.Types.Name.Env
+import GHC.Types.Name.Reader (unLocWithUserRdr)
 import GHC.Types.Name.Set
 import GHC.Types.SrcLoc
 
-import GHC.Builtin.WiredIn.Types (unmatchableDataConTy)
+import GHC.Builtin.WiredIn.Types (boolTyConName, charTyConName, falseDataCon, intTyConName,
+                                 stringTyConName, trueDataCon, unmatchableDataConTy)
+import GHC.Builtin.Modules (mkGhcInternalModule)
 import GHC.Builtin( mkUnboundName )
 import GHC.Unit.Module( Module, getModule )
 
@@ -91,7 +96,7 @@ import GHC.Utils.Panic
 import GHC.Data.Bag
 import GHC.Data.Maybe( orElse, whenIsJust )
 
-import Control.Monad( unless )
+import Control.Monad( unless, when )
 import Data.Foldable ( toList )
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe( fromMaybe, mapMaybe )
@@ -238,6 +243,10 @@ tcUserTypeSig loc hs_sig_ty mb_name
                Just _ -> True
                Nothing -> False
        ; sigma_ty <- withSourceProofSignature mb_name $ tcHsSigWcType allow_function ctxt_no_rrc hs_sig_ty
+       ; when (isExternalName name && closedSourceProofResult hs_sig_ty) $ do
+           env <- getGblEnv
+           updTcRef (tcg_source_rule_types env) $ \state ->
+             state { sourceProofClosedResults = extendNameSet (sourceProofClosedResults state) name }
        ; traceTc "tcuser" (ppr sigma_ty)
        ; return $ TcCompleteSig $
          CSig { sig_bndr  = mkLocalId name ManyTy sigma_ty
@@ -266,6 +275,36 @@ tcUserTypeSig loc hs_sig_ty mb_name
     ctxt_fn rcc = case mb_name of
                Just n  -> FunSigCtxt n rcc
                Nothing -> ExprSigCtxt rcc
+
+-- | Check the written result of an observation before type checking can
+-- erase an alias or family. See Note [Opaque source proof observations]
+-- in GHC.Tc.Gen.SourceTable.
+closedSourceProofResult :: LHsSigWcType GhcRn -> Bool
+closedSourceProofResult (HsWC { hswc_body = L _ (HsSig
+    { sig_bndrs = HsOuterImplicit { hso_ximplicit = [] }, sig_body = body }) })
+  = case unLoc (ignoreParens body) of
+      HsOpTy _ left op right
+        | Just eq <- ty_name op
+        , nameModule_maybe eq == Just equality_module
+        , occNameFS (nameOccName eq) == fsLit ":~:"
+        , Just con <- ty_name left
+        , con == dataConName trueDataCon || con == dataConName falseDataCon
+        -> ty_name right == Just con
+      _ -> closed_value_type body
+  where
+    closed_value_type :: LHsType GhcRn -> Bool
+    closed_value_type ty = case unLoc (ignoreParens ty) of
+      HsTyVar _ _ name ->
+        unLocWithUserRdr name `elem` [boolTyConName, charTyConName, intTyConName, stringTyConName]
+      HsListTy _ item -> closed_value_type item
+      _ -> False
+
+    equality_module = mkGhcInternalModule (fsLit "GHC.Internal.Data.Type.Equality")
+    ty_name :: LHsType GhcRn -> Maybe Name
+    ty_name ty = case unLoc (ignoreParens ty) of
+      HsTyVar _ _ name -> Just (unLocWithUserRdr name)
+      _ -> Nothing
+closedSourceProofResult _ = False
 
 lhsSigWcTypeContextSpan :: LHsSigWcType GhcRn -> ReportRedundantConstraints
 -- | Find the location of the top-level context of a HsType.  For example:

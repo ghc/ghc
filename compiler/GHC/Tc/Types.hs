@@ -533,11 +533,12 @@ data SourceRuleUses = SourceRuleUses
   , sourceProofSignature :: Maybe Name
   , sourceProofDefinitions :: NameEnv [SourceProofRule]
   , sourceProofOccurrences :: [(Name, SrcSpan, [SourceProofRule])]
+  , sourceProofClosedResults :: NameSet
   }
 
 -- | No checked source applications or imported proof occurrences.
 emptySourceRuleUses :: SourceRuleUses
-emptySourceRuleUses = SourceRuleUses emptyNameEnv Nothing emptyNameEnv []
+emptySourceRuleUses = SourceRuleUses emptyNameEnv Nothing emptyNameEnv [] emptyNameSet
 
 -- | 'TcGblEnv' describes the top-level of the module at the
 -- point at which the typechecker is finished work.
