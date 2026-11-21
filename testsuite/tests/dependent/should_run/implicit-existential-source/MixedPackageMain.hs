@@ -45,6 +45,13 @@ readRankedBoth :: Bool -> Int
 readRankedBoth flag = withRankedId (\transform ->
   readBoth (relayRanked transform flag (makeBoth flag)))
 
+readSelection :: Bool -> BothMixed -> BothMixed -> Int
+readSelection flag left right = withRankedId (\transform ->
+  readBoth (selectRanked transform flag left right))
+
+readProducedSelection :: Bool -> Int
+readProducedSelection flag = readBoth (selectRanked id flag (makeBoth True) alternateBoth)
+
 main :: IO ()
 main = do
   print (readMixed named, readMixed applied, readMixed written, readKind kindMixed)
@@ -67,3 +74,9 @@ main = do
   fourth <- readRankedBoth <$> readIORef flag
   print (readRankedBoth input, fourth, ignoreBoth (relayRanked id (error "unused label" :: Bool)
          (makeBoth (error "unused ranked producer input"))))
+  selected <- readIORef flag
+  let unused :: BothMixed
+      unused = error "unselected neighbouring package"
+  print (readProducedSelection input, readProducedSelection selected,
+         readSelection input (makeBoth True) unused,
+         readSelection selected unused (makeBoth False))

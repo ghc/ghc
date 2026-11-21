@@ -350,7 +350,7 @@ for opt in 0 2; do
     "$ghc" "${mixed_flags[@]}" -c MixedPackageMain.hs
     "$ghc" "${mixed_flags[@]}" MixedPackageMain.o ../provider/MixedPackageProvider.o -o run
     ./run >mixed.out
-    printf '(11,11,13,True)\n("ignored","ignored")\nTrue\n(13,21,(17,True),True)\nTrue\n(17,29,43,True)\n(17,29,True)\n' |
+    printf '(11,11,13,True)\n("ignored","ignored")\nTrue\n(13,21,(17,True),True)\nTrue\n(17,29,43,True)\n(17,29,True)\n(17,29,17,29)\n' |
         diff -u - mixed.out
     if "$ghc" "${mixed_flags[@]}" -c MixedPackageReject.hs >mixed-reject.log 2>&1; then
         echo "MixedPackageReject unexpectedly compiled." >&2
@@ -379,6 +379,12 @@ for opt in 0 2; do
         grep -Eq "^RankedForwardReject.hs:$line:[0-9]+: error: \[GHC-${rejection#*:}\]" RankedForwardReject.log ||
             { cat RankedForwardReject.log >&2; exit 1; }
     done
+    selection='  readBoth (selectRanked id flag left right)'
+    line=$(grep -nFx "$selection" RankedForwardReject.hs | cut -d: -f1)
+    before_right=${selection%right)}
+    column=$((${#before_right} + 1))
+    grep -Eq "^RankedForwardReject.hs:$line:$column: error: \[GHC-83865\]" RankedForwardReject.log ||
+        { cat RankedForwardReject.log >&2; exit 1; }
     line=$(grep -n '^badRankedEvidence.* =' RankedForwardEvidenceReject.hs | cut -d: -f1)
     grep -Eq "^RankedForwardEvidenceReject.hs:$line:[0-9]+: error: \[GHC-39999\]" RankedForwardEvidenceReject.log ||
         { cat RankedForwardEvidenceReject.log >&2; exit 1; }

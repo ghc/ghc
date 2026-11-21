@@ -16,7 +16,7 @@ module GHC.Tc.Gen.App
        , tcImplicitOperand
        , tcRetainedInferableArg, tcRetainedArg, tcOptionalLetOperand ) where
 
-import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcCheckPolyExpr, tcPolyExpr, tcInferRho )
+import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcCheckMonoExpr, tcCheckPolyExpr, tcPolyExpr, tcInferRho )
 
 import GHC.Hs
 
@@ -502,9 +502,13 @@ tcOpenMixedBarArgument fun sigma args expected check_app
   | hasNoConcreteTyVars fun
   = do { candidate <- tcFindMixedBarArgument sigma args
        ; case candidate of
-           Just (binders, rho, domain, operand)
-             -> do { (checked, actual) <- tcScalingUsage ManyTy $ tcInferRho operand
-                   ; schema <- liftZonkM (zonkTcType actual)
+           Just (binders, rho, domain, operand, expected_schema)
+             -> do { (checked, schema) <- tcScalingUsage ManyTy $
+                       case expected_schema of
+                         Just schema -> (, schema) <$> tcCheckMonoExpr operand schema
+                         Nothing -> do { (checked, actual) <- tcInferRho operand
+                                       ; schema <- liftZonkM (zonkTcType actual)
+                                       ; return (checked, schema) }
                    ; result <- expTypeToType expected
                    ; opened <- tcOpenImplicitPackage (getLocA operand) schema checked result $ \payload ->
                          let ref = mkExpandedLExpr (unLoc operand) (nlHsVar (getName payload))
@@ -524,7 +528,7 @@ tcOpenMixedBarArgument fun sigma args expected check_app
 -- | Find the declared mixed operand of a unary call without elaborating it.
 -- See Note [Implicit opening for an explicit package argument].
 tcFindMixedBarArgument :: TcSigmaType -> [HsExprArg 'TcpRn]
-                       -> TcM (Maybe ([TyVar], TcSigmaType, TcType, LHsExpr GhcRn))
+                       -> TcM (Maybe ([TyVar], TcSigmaType, TcType, LHsExpr GhcRn, Maybe TcType))
 tcFindMixedBarArgument sigma args
   | (tvs@(_:_), rho) <- tcSplitForAllInvisTyVars sigma
   , let binders = map snd tvs
@@ -535,10 +539,11 @@ tcFindMixedBarArgument sigma args
   , all (\binder -> isInjectiveInType binder template) binders
   , [EValArg{ea_arg = operand}] <- filter (not . parens) args
   = do { declared <- tcMixedOperandResult operand
-       ; return $ case coreFullView <$> declared of
-           Just (ExistsTy ImplicitExists _ inner)
-             | Just _ <- matchBarPackageWitnesses binders domain (implicitPayloadType inner)
-             -> Just (binders, rho, domain, operand)
+       ; return $ case declared of
+           Just (declared_ty, check_schema)
+             | schema@(ExistsTy ImplicitExists _ inner) <- coreFullView declared_ty
+             , Just _ <- matchBarPackageWitnesses binders domain (implicitPayloadType inner)
+             -> Just (binders, rho, domain, operand, if check_schema then Just schema else Nothing)
            _ -> Nothing }
   | otherwise = return Nothing
   where
@@ -554,13 +559,26 @@ can determine the erased type application. Read these declarations
 before creating inference variables. The ordinary unifier treats the
 bar type as opaque.
 
-Follow a leading invisible result parameter only when exactly one
-written value argument has that same parameter as its complete
-domain. For example, forall a b. Show b => b -> a -> a identifies
-the second argument. This probe selects the inference path. The
-ordinary expression checker still instantiates the head and checks
-all constraints. A family application or an unconstrained result
-parameter cannot identify a package through this probe.
+Follow a leading invisible result parameter through written value
+arguments whose complete domain is that parameter. For example,
+forall a b. Show b => b -> a -> a identifies the second argument.
+This probe selects the inference path. The ordinary expression
+checker still instantiates the head and checks all constraints.
+A family application or an unconstrained result parameter cannot
+identify a package through this probe.
+
+For select :: Bool -> a -> a -> a, both alternatives must supply
+the same closed dot schema. Comparing declared results with free
+variables could mistake a binder stripped from a producer signature
+for a type already in scope in the caller. Agreement on an open schema
+would also need evidence that each free variable is rigid in the
+caller and independent of the producer's omitted arguments.
+
+Use the common schema as the expected type of the complete selector
+call. Its ordinary checker checks every operand and all uses at that
+instantiation. Open only the checked result. The alternatives can
+hide different witnesses. The selector determines which value is
+returned and how much of each operand it evaluates.
 
 An independent higher-rank callback does not obscure the result
 parameter. For relay :: (forall x. x -> x) -> a -> a, the second
@@ -934,9 +952,10 @@ tcDeclaredOperandResult operand =
   fmap (>>= \(ident, args) -> implicitSpineResult (length args) (varType ident))
        (tcDeclaredOperandSpine operand)
 
--- | Read a package result through a directly forwarded argument type.
+-- | Read a package result through directly forwarded argument types.
+-- The flag asks the caller to check the whole operand at the common schema.
 -- See Note [Implicit opening for an explicit package argument].
-tcMixedOperandResult :: LHsExpr GhcRn -> TcM (Maybe TcType)
+tcMixedOperandResult :: LHsExpr GhcRn -> TcM (Maybe (TcType, Bool))
 tcMixedOperandResult operand = runMaybeT $ do
   (ident, args) <- MaybeT (tcDeclaredOperandSpine operand)
   let sigma = varType ident
@@ -951,11 +970,24 @@ tcMixedOperandResult operand = runMaybeT $ do
       , domains `equalLength` args
       , getTyVar_maybe (coreFullView final) == Just v
       , all isTauTy matches, all (ordinary_domain v) domains
-      , [source] <- [arg | (Scaled _ domain, arg) <- zip domains args
-                        , getTyVar_maybe (coreFullView domain) == Just v]
-      -> MaybeT (tcMixedOperandResult source)
-    _ -> pure result
+      , first : rest <- [arg | (Scaled _ domain, arg) <- zip domains args
+                             , getTyVar_maybe (coreFullView domain) == Just v]
+      -> do { selected@(schema, _) <- MaybeT (tcMixedOperandResult first)
+            ; case rest of
+                [] -> pure selected
+                _ -> do { guard (closed_dot_schema schema)
+                        ; alternatives <- traverse (MaybeT . tcMixedOperandResult) rest
+                        ; guard (all (agrees_with schema . fst) alternatives)
+                        ; pure (schema, True) } }
+    _ -> pure (result, False)
   where
+    closed_dot_schema ty
+      | schema@(ExistsTy ImplicitExists _ _) <- coreFullView ty
+      = noFreeVarsOfType schema
+      | otherwise = False
+
+    agrees_with schema other = closed_dot_schema other && eqType schema other
+
     ordinary_domain v (Scaled mult domain) =
       isTauTy mult && (isTauTy domain || independent_callback v domain)
 

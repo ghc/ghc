@@ -438,6 +438,16 @@ ordinary check validates the complete producer call before opening the
 package. It checks the callback type, the producer's constraints, and
 argument use. The result still cannot expose the hidden witness.
 
+A selector such as `Bool -> a -> a -> a` can forward either operand
+when both declare the same closed erased package schema. GHC checks
+the complete selector at the common schema, then opens the result.
+The two alternatives can hide different witnesses. The selector chooses
+the value at runtime. A lazy selector can leave the unused package
+unevaluated. An incompatible branch still fails at that argument.
+To extend this match to types with free variables, the checker needs
+evidence that those variables are rigid in the caller's scope. A fresh
+variable from an omitted producer argument cannot supply that evidence.
+
 A result parameter with no corresponding argument type can remain
 ambiguous. An opaque family result stays opaque.
 An `if` whose branches return `Mixed` can infer that type on its own.

@@ -6,6 +6,7 @@ module MixedPackageProvider
   , RankedMixed, rankedMixed, readRankInner, BadRank, FamilyMixed, ignoreFamily
   , BothMixed, makeBoth, readBoth, ignoreBoth, outerOfBoth
   , DepMixed, depMixed, readDependent, withRankedId, relayRanked
+  , selectRanked, alternateBoth
   , UnequalMixed, readEqualSlots, CaptureBoth, FamilyBoth, ignoreFamilyBoth
   ) where
 
@@ -119,6 +120,14 @@ withRankedId observe = observe id
 
 relayRanked :: forall tag a. Show tag => (forall x. x -> x) -> tag -> a -> a
 relayRanked transform tag payload = show tag `seq` transform payload
+
+selectRanked :: forall a. (forall x. x -> x) -> Bool -> a -> a -> a
+selectRanked transform flag left right = transform (if flag then left else right)
+
+type AlternateBoth = exists outer. BothInner outer Char
+
+alternateBoth :: AlternateBoth
+alternateBoth = Exists.Pack @(BothInner Int Char) (type Bool) (3, 'y', False, 29)
 
 type UnequalMixed = exists a. exists c | (a, Char, Bool, c, Int)
 
