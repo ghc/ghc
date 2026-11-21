@@ -101,7 +101,7 @@ import qualified Control.Monad.Trans.State.Strict as State
 import Data.Data (Data, cast, gmapQ)
 import Data.Foldable
 import Data.Function
-import Data.List        ( nubBy, (\\) )
+import Data.List        ( nubBy, partition, (\\) )
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty ( NonEmpty(..) )
 
@@ -555,8 +555,15 @@ withFamilyDomainScope origin whole n sig inside = case familyDomainPrefix n sig 
     (subst, skolems) <- tcInstSkolTyVarsX info (mkEmptySubst in_scope) tvs
     let sig_skol = SigSkol origin whole (zip (map tyVarName tvs) skolems)
     traverse_ checkNoConstrainedFamilyApps (map fst bndrs ++ map varType tvs)
-    traverse_ checkNoConstrainedFamilyApps theta
-    given <- newEvVars (substTheta subst theta)
+    let theta' = substTheta subst theta
+        (plain, guarded) = partition (null . constrainedFamilyApps) theta'
+    unless (null guarded) $ do
+      premises <- newEvVars plain
+      void $ checkConstraints sig_skol skolems premises $
+        forM_ guarded $ \pred -> do
+          uses <- familyDomainObligations pred
+          mapM_ (emitFamilyDomain origin whole) uses
+    given <- newEvVars theta'
     void $ checkConstraints sig_skol skolems given (inside (substTy subst body))
 
 -- | Separate the lexical binders from the owner's inferred parameters.
@@ -721,11 +728,15 @@ familyDomainObligations ty = State.evalStateT (go ty) emptyUFM
       kinds <- forbidden [ma, binderType b]
       uses <- go body
       pure (kinds ++ map (mapSigma (ForAllTy ma b)) uses)
-    go (FunTy af ma mult arg res)
+    go ty@(FunTy af ma mult arg res)
       | isInvisibleFunArg af = do
-          preds <- forbidden [ma, mult, arg]
-          uses <- go res
-          pure $ preds ++ map (mapSigma (tcMkDFunPhiTy [arg])) uses
+          let (arrow_tys, theta, body) = qualifiers ty
+              plain = filter (null . constrainedFamilyApps) theta
+          kinds <- forbidden arrow_tys
+          predicates <- concat <$> traverse go theta
+          uses <- go body
+          pure $ kinds ++ map (mapSigma (tcMkDFunPhiTy plain)) predicates
+                       ++ map (mapSigma (tcMkDFunPhiTy theta)) uses
       | otherwise = do
           kinds <- forbidden [ma, mult]
           domain <- go arg
@@ -740,6 +751,13 @@ familyDomainObligations ty = State.evalStateT (go ty) emptyUFM
     go (TermAppTy _ arg) = go arg
     go (CastTy t _) = go t
     go _ = pure []
+
+    -- Preserve the written predicates and their unexpanded arguments.
+    qualifiers (FunTy af ma mult arg rest)
+      | isInvisibleFunArg af =
+          let (kinds, theta, body) = qualifiers rest
+          in (ma : mult : kinds, arg : theta, body)
+    qualifiers body = ([], [], body)
 
     -- See Note [Retained indices in domain predicates].
     close_retained v uses
@@ -799,6 +817,13 @@ For example, type Q a = Allowed a => Proxy (Elem [a]) -> () gives the
 obligation Allowed a => Collects [a]. Substitute for a in the whole type
 when a client uses Q. A premise in Q cannot discharge a separate
 obligation in a written argument to Q.
+
+In (Collects c, Show (Elem c)) => body, Collects c establishes the
+domain of Elem c inside the other predicate. Check the predicates that
+mention marked families using the family-free premises of the same
+context. Their order does not matter. Thus a predicate cannot establish
+the domain of one of its own arguments by projecting a superclass.
+All the checked premises are available in the body.
 
 Traverse the argument and result of a function separately. In
 (forall a. Allowed a => Proxy a -> Elem [a]) -> Elem [Int], the Given
