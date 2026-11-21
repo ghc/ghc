@@ -914,14 +914,42 @@ someTypeRepFingerprint (SomeTypeRep t) = typeRepFingerprint t
 instance Show (TypeRep (a :: k)) where
     showsPrec = showTypeable
 
-
 showTypeable :: Int -> TypeRep (a :: k) -> ShowS
-showTypeable _ TrType = showChar '*'
-showTypeable _ rep
+showTypeable = showTypeableWithMatchability trUnmatchable
+
+{- Note [Showing reflected matchability]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The default matchability for an ordinary arrow is U. The default inside
+a TyCon's reflected kind arguments is M. Use the context's default
+throughout each argument. Print the other selector as a modifier.
+
+Raw FUN has matchability as its first stored argument. Omit that argument
+when it is U, as with an ordinary arrow. A raw FUN with M still prints the
+selector. Keep all matchability data in the representation.
+
+Render TrFun before the list and tuple cases. Those cases use splitApps,
+which only supports unrestricted function types.
+
+Proposal #242 specifies a compiler print flag. Reflecting a type at
+runtime uses these defaults because Show does not take compiler flags.
+-}
+
+showTypeableWithMatchability :: TypeRep (d :: Matchability) -> Int -> TypeRep (a :: k) -> ShowS
+showTypeableWithMatchability _ _ TrType = showChar '*'
+showTypeableWithMatchability def p (TrFun {trFunMatch = ma, trFunMul = mul, trFunArg = x, trFunRes = r})
+  = showParen (p > 8) $
+    showTypeableWithMatchability def 9 x . show_mult . show_match .
+    showString " -> " . showTypeableWithMatchability def 8 r
+  where
+    show_mult | Just HRefl <- eqTypeRep trMany mul = id
+              | otherwise = showString " %" . showsPrec 10 mul
+    show_match | Just HRefl <- eqTypeRep def ma = id
+               | otherwise = showString " %" . showsPrec 10 ma
+showTypeableWithMatchability def _ rep
   | isListTyCon tc, [] <- tys =
     showString "[]"
   | isListTyCon tc, [ty] <- tys =
-    showChar '[' . shows ty . showChar ']'
+    showChar '[' . showSomeTypeable def 0 ty . showChar ']'
 
     -- Take care only to render saturated tuple tycon applications
     -- with tuple notation (#14341).
@@ -942,33 +970,34 @@ showTypeable _ rep
           True -> ("(", ")")
           False -> ("(#", "#)")
         commas = showString (replicate (n-1) ',')
-        args = showArgs (showString ",") tys
+        args = showArgs (showSomeTypeable def 10) (showString ",") tys
         args' = case (boxed, sat) of
           (True, True) -> args
           (False, True) -> showChar ' ' . args . showChar ' '
           (_, False) -> commas
       in showString lpar . args' . showString rpar
 
-showTypeable _ (TrTyCon {trTyCon = tycon, trKindVars = []})
+showTypeableWithMatchability _ _ (TrTyCon {trTyCon = tycon, trKindVars = []})
   = showTyCon tycon
-showTypeable p (TrTyCon {trTyCon = tycon, trKindVars = args})
+showTypeableWithMatchability _ p (TrTyCon {trTyCon = tycon, trKindVars = args})
   = showParen (p > 9) $
     showTyCon tycon .
     showChar ' ' .
-    showArgs (showChar ' ') args
-showTypeable p (TrFun {trFunMatch = ma, trFunMul = mul, trFunArg = x, trFunRes = r})
-  = showParen (p > 8) $
-    showsPrec 9 x . show_mult . showString " -> " . show_match . showsPrec 8 r
+    showArgs (showSomeTypeable trMatchable 10) (showChar ' ') shown_args
   where
-    show_mult | Just HRefl <- eqTypeRep trMany mul = id
-              | otherwise = showString " %" . showsPrec 10 mul
-    show_match | Just HRefl <- eqTypeRep trUnmatchable ma = id
-               | otherwise = showString "@(" . shows ma . showString ") "
-showTypeable p (TrApp {trAppFun = f, trAppArg = x})
+    shown_args
+      | tycon == funTyCon
+      , SomeTypeRep ma : rest@[_, _, _] <- args
+      , Just HRefl <- eqTypeRep trUnmatchable ma = rest
+      | otherwise = args
+showTypeableWithMatchability def p (TrApp {trAppFun = f, trAppArg = x})
   = showParen (p > 9) $
-    showsPrec 8 f .
+    showTypeableWithMatchability def 8 f .
     showChar ' ' .
-    showsPrec 10 x
+    showTypeableWithMatchability def 10 x
+
+showSomeTypeable :: TypeRep (d :: Matchability) -> Int -> SomeTypeRep -> ShowS
+showSomeTypeable def p (SomeTypeRep ty) = showTypeableWithMatchability def p ty
 
 -- | @since base-4.10.0.0
 instance Show SomeTypeRep where
@@ -1057,10 +1086,10 @@ isOperatorTyCon tc
 showTyCon :: TyCon -> ShowS
 showTyCon tycon = showParen (isOperatorTyCon tycon) (shows tycon)
 
-showArgs :: Show a => ShowS -> [a] -> ShowS
-showArgs _   []     = id
-showArgs _   [a]    = showsPrec 10 a
-showArgs sep (a:as) = showsPrec 10 a . sep . showArgs sep as
+showArgs :: (a -> ShowS) -> ShowS -> [a] -> ShowS
+showArgs _      _   []     = id
+showArgs render _   [a]    = render a
+showArgs render sep (a:as) = render a . sep . showArgs render sep as
 
 -- | Helper to fully evaluate 'TypeRep' for use as @NFData(rnf)@ implementation
 --
