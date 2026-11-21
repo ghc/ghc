@@ -3676,6 +3676,13 @@ reifyDataCon isGadtDataCon tys dc
                | otherwise = (g_theta, [])
              g_arg_tys = map (substScaledTy tvb_subst) g_arg_tys'
              g_res_ty  = substTy tvb_subst g_res_ty'
+             leading_order
+               | OrderedConArgs groups@(_ : ConContextArgs{} : rest) <- dataConSourceOrder dc
+               , any is_type_group (takeWhile (not . is_field) rest)
+               = Just groups
+               | otherwise = Nothing
+             is_type_group ConTypeArgs{} = True
+             is_type_group _ = False
              ordered_parts
                | OrderedConArgs (_ : groups) <- dataConSourceOrder dc
                , (before, ConValueArgs n : suffix) <- break is_field groups
@@ -3692,46 +3699,26 @@ reifyDataCon isGadtDataCon tys dc
          else pure []
 
        ; main_con <-
-           if | Just (_, n, remaining) <- ordered_parts
+           if | Just groups <- leading_order -> do
+                  { ma <- reifyType unmatchableDataConTy
+                  ; ordered <- reifyOrderedArgs ma groups g_user_tvs g_theta
+                                                (zip dcdBangs g_arg_tys)
+                  ; result <- reifyType g_res_ty
+                  ; pure (TH.RetainedGadtC [name] ordered result) }
+              | Just (_, n, remaining) <- ordered_parts
               , (prefix, suffix) <- splitAt n g_arg_tys -> do
                   { (args, result) <- reifyRetainedGadtArgs (replicate n Nothing)
                       (take n dcdBangs) prefix g_res_ty
                   ; ma <- reifyType unmatchableDataConTy
-                  ; let reify_group :: (TH.Type -> [TH.TyVarBndr ()] -> a -> a)
-                                    -> (TH.Type -> [TH.TyVarBndr TH.Specificity] -> a -> a)
-                                    -> [TyVarBinder] -> TcM a -> TcM a
-                        reify_group required invisible bs rest
-                          | all isVisibleForAllTyBinder bs = do
-                              tvs <- reifyTyVarBndrs [Bndr (binderVar tv) () | tv <- bs]
-                              required ma tvs <$> rest
-                          | Just invis <- to_invis_bndrs bs = do
-                              tvs <- reifyTyVarBndrs invis
-                              invisible ma tvs <$> rest
-                          | otherwise = panic "reifyDataCon: mixed visibility in constructor group"
-                        reify_context context ps rest = do
-                          ctxt <- reifyCxt ps
-                          context ctxt <$> rest
-                        reify_field (Scaled mult ty) rest = do
-                          multiplicity <- reifyType mult
-                          domain <- reifyType ty
-                          TH.AppT (TH.AppT (TH.AppT TH.MulArrowT multiplicity) domain) <$> rest
-                        reify_arg (bang, Scaled mult ty) rest = do
-                          multiplicity <- reifyType mult
-                          domain <- reifyType ty
-                          (TH.GadtValueArg bang multiplicity domain :) <$> rest
-                        late_bangs = drop n dcdBangs
+                  ; let late_bangs = drop n dcdBangs
                   ; if any (/= TH.Bang TH.NoSourceUnpackedness TH.NoSourceStrictness) late_bangs
                     then do
-                      ordered <- foldConSourceGroups
-                        (reify_group (\m tvs rest -> TH.GadtRequiredArgs m tvs : rest)
-                                     (\m tvs rest -> TH.GadtInvisibleArgs m tvs : rest))
-                        (reify_context (\ctxt rest -> TH.GadtContextArgs ctxt : rest))
-                        (flip (foldr reify_arg))
-                        remaining late_tvs late_theta (zip late_bangs suffix) (pure [])
+                      ordered <- reifyOrderedArgs ma remaining late_tvs late_theta
+                                                  (zip late_bangs suffix)
                       pure (TH.RetainedGadtC [name] (args ++ ordered) result)
                     else do
                       body <- foldConSourceGroups
-                        (reify_group (\m tvs -> TH.ForallMatchT m . TH.ForallVisT tvs)
+                        (reify_group ma (\m tvs -> TH.ForallMatchT m . TH.ForallVisT tvs)
                                      (\m tvs -> TH.ForallMatchT m . TH.ForallT tvs []))
                         (reify_context (TH.ForallT [])) (flip (foldr reify_field))
                         remaining late_tvs late_theta suffix (pure result)
@@ -3779,7 +3766,8 @@ reifyDataCon isGadtDataCon tys dc
                                | otherwise     = assert (all isTyVar ex_tvs)
                                                  -- no covars for haskell syntax
                                                  (map mk_specified ex_tvs, theta)
-             ret_con | null ex_tvs' && null theta' = return main_con
+             ret_con | isJust leading_order       = return main_con
+                     | null ex_tvs' && null theta' = return main_con
                      | otherwise                   = do
                          { cxt <- reifyCxt theta'
                          ; ex_tvs'' <- case to_invis_bndrs ex_tvs' of
@@ -3792,6 +3780,48 @@ reifyDataCon isGadtDataCon tys dc
        ; assert (not (null ordered_args) || r_arg_tys `equalLength` dcdBangs)
          ret_con }
   where
+    -- The first source group counts both the outer invisible binders and
+    -- the leading required binders. Its TH representation uses one group
+    -- for each consecutive run of binders with the same visibility.
+    reifyOrderedArgs ma groups tvs theta fields =
+      foldConSourceGroups reify_groups
+        (reify_context (\ctxt rest -> TH.GadtContextArgs ctxt : rest))
+        (flip (foldr reify_arg)) groups tvs theta fields (pure [])
+      where
+        reify_groups [] rest = rest
+        reify_groups (b : bs) rest =
+          let (group, remaining) =
+                span ((== isVisibleForAllTyBinder b) . isVisibleForAllTyBinder) bs
+          in reify_group ma (\m tvs rest -> TH.GadtRequiredArgs m tvs : rest)
+                            (\m tvs rest -> TH.GadtInvisibleArgs m tvs : rest)
+                            (b : group) (reify_groups remaining rest)
+
+    reify_group :: TH.Type -> (TH.Type -> [TH.TyVarBndr ()] -> a -> a)
+                -> (TH.Type -> [TH.TyVarBndr TH.Specificity] -> a -> a)
+                -> [TyVarBinder] -> TcM a -> TcM a
+    reify_group ma required invisible bs rest
+      | all isVisibleForAllTyBinder bs = do
+          tvs <- reifyTyVarBndrs [Bndr (binderVar tv) () | tv <- bs]
+          required ma tvs <$> rest
+      | Just invis <- to_invis_bndrs bs = do
+          tvs <- reifyTyVarBndrs invis
+          invisible ma tvs <$> rest
+      | otherwise = panic "reifyDataCon: mixed visibility in constructor group"
+
+    reify_context context ps rest = do
+      ctxt <- reifyCxt ps
+      context ctxt <$> rest
+
+    reify_field (Scaled mult ty) rest = do
+      multiplicity <- reifyType mult
+      domain <- reifyType ty
+      TH.AppT (TH.AppT (TH.AppT TH.MulArrowT multiplicity) domain) <$> rest
+
+    reify_arg (bang, Scaled mult ty) rest = do
+      multiplicity <- reifyType mult
+      domain <- reifyType ty
+      (TH.GadtValueArg bang multiplicity domain :) <$> rest
+
     mk_specified tv = Bndr tv Specified
 
     to_invis_bndrs :: [TyVarBinder] -> Maybe [InvisTVBinder]

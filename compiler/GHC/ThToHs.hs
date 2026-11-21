@@ -757,7 +757,7 @@ cvtConstr _ do_con_name (GadtC c strtys ty) = case nonEmpty c of
         { c'      <- mapM do_con_name c
         ; args    <- mapM cvt_arg strtys
         ; ty'     <- cvtType ty
-        ; mk_gadt_decl c' (PrefixConGADT noExtField args) ty'}
+        ; mk_gadt_decl c' [] (PrefixConGADT noExtField args) ty'}
 
 cvtConstr parent_con do_con_name (RecGadtC c varstrtys ty) = case nonEmpty c of
     Nothing -> failWith RecGadtNoCons
@@ -766,31 +766,43 @@ cvtConstr parent_con do_con_name (RecGadtC c varstrtys ty) = case nonEmpty c of
         ; ty'      <- cvtType ty
         ; rec_flds <- mapM (cvt_id_arg parent_con) varstrtys
         ; lrec_flds <- returnLA rec_flds
-        ; mk_gadt_decl c' (RecConGADT noAnn lrec_flds) ty' }
+        ; mk_gadt_decl c' [] (RecConGADT noAnn lrec_flds) ty' }
 
 cvtConstr _ do_con_name (RetainedGadtC names args result) = case nonEmpty names of
   Nothing -> failWith GadtNoCons
   Just names -> do
     names' <- mapM do_con_name names
-    (prefix, suffix) <- cvtRetainedGadtArgs args result
-    mk_gadt_decl names' (PrefixConGADT noExtField prefix) suffix
+    (telescope, fields, suffix) <- cvtRetainedGadtArgs args result
+    mk_gadt_decl names' telescope (PrefixConGADT noExtField fields) suffix
 
 -- | Convert the prefix value fields and the ordered suffix separately.
 -- See Note [Terminal constructor foralls in TH].
 cvtRetainedGadtArgs :: [TH.RetainedGadtArg] -> TH.Type
-                    -> CvtM ([HsConDeclField GhcPs], LHsType GhcPs)
+                    -> CvtM ([LHsGadtTelescope GhcPs], [HsConDeclField GhcPs], LHsType GhcPs)
 cvtRetainedGadtArgs args result = do
   (fields, binders) <- prefix args
   body <- suffix binders
   let prefix_fields = PrefixConGADT noExtField fields
-      supported_interior = not (null fields) &&
-                           isJust (HsDecls.splitGadtInterior prefix_fields body)
+      (telescope, interior)
+        | null fields, any required_group (takeWhile forall_group_arg binders)
+        , (_, leading, remaining) <- splitLHsGadtTy (noLocA (mkHsImplicitSigType body))
+        = (leading, remaining)
+        | otherwise = ([], body)
+      supported_interior = (not (null fields) || not (null telescope)) &&
+                           isJust (HsDecls.splitGadtInterior prefix_fields interior)
   when (not supported_interior &&
         (any explicit_group binders ||
          (null binders && isNothing (HsDecls.splitGadtTerminal prefix_fields body)))) $
     failWith (MalformedType TypeLevel result)
-  pure (fields, body)
+  pure (telescope, fields, interior)
   where
+    required_group (GadtRequiredArgs _ (_ : _)) = True
+    required_group _ = False
+
+    forall_group_arg GadtInvisibleArgs{} = True
+    forall_group_arg GadtRequiredArgs{} = True
+    forall_group_arg _ = False
+
     explicit_group GadtInvisibleArgs{} = True
     explicit_group GadtRequiredArgs{} = True
     explicit_group GadtContextArgs{} = True
@@ -847,8 +859,10 @@ Keep the matchability annotation when present. A ForallC wraps the leading
 invisible binders and context.
 
 Use the same shape check as for source declarations. A grouped argument list
-needs a nonempty prefix of value fields and an interior telescope. A suffix
-stored as a Type can contain an interior or terminal telescope.
+can start with value fields or with leading foralls that include a required
+binder. In the second case, split off the leading foralls as in the parser.
+The remaining groups must form an interior telescope. A suffix stored as a
+Type can contain an interior or terminal telescope.
 -}
 
 -- | Constructor arrows can default to One. Keep a Many annotation explicit.
@@ -860,15 +874,15 @@ cvtGadtArgMult mult = do
       HsModifiedFunArr x [noLocA (HsModifier noAnn ty)] arr
     arrow -> arrow
 
-mk_gadt_decl :: NonEmpty (LocatedN RdrName) -> HsConDeclGADTDetails GhcPs -> LHsType GhcPs
-             -> CvtM (LConDecl GhcPs)
-mk_gadt_decl names args res_ty
+mk_gadt_decl :: NonEmpty (LocatedN RdrName) -> [LHsGadtTelescope GhcPs]
+             -> HsConDeclGADTDetails GhcPs -> LHsType GhcPs -> CvtM (LConDecl GhcPs)
+mk_gadt_decl names telescope args res_ty
   = do outer_bndrs <- returnLA mkHsOuterImplicit
        returnLA $ ConDeclGADT
                    { con_g_ext  = noAnn
                    , con_names  = names
                    , con_outer_bndrs = outer_bndrs
-                   , con_telescope = []
+                   , con_telescope = telescope
                    , con_g_args = args
                    , con_res_ty = res_ty
                    , con_modifiers = []
