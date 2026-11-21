@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, GADTs, ImpredicativeTypes, LambdaCase, NoExperimentalDependentTypes, RequiredTypeArguments, TypeApplications #-}
+{-# LANGUAGE DataKinds, GADTs, ImpredicativeTypes, LambdaCase, MultiWayIf, NoExperimentalDependentTypes, RequiredTypeArguments, TypeApplications #-}
 module WitnessGuardedClient where
 
 import Control.Exception (ErrorCall, displayException, evaluate, try)
@@ -27,6 +27,15 @@ observeCase tag input branch =
         (\choose ready -> case (choose, tag) of
             (True, _) -> Payload id atTwoTypes
             (False, Flag) -> if ready then buildAt (not input) else error "selected case arm")
+        branch True
+
+observeGuardedExpr :: Flag a -> a -> Bool -> (Int, Bool)
+observeGuardedExpr tag input branch =
+    observeGuarded
+        (\choose ready -> if
+            | choose -> Payload id atTwoTypes
+            | ready, Flag <- tag -> buildAt (not input)
+            | otherwise -> error "selected guard")
         branch True
 
 viaGuardedAnnotated :: GuardedBuilder
@@ -73,6 +82,9 @@ main = do
     unless (observeCase (error "unused case tag" :: Flag Bool) (error "unused case input") True == (7, True)
          && observeCase Flag True False == (9, False)) $
         fail "the case producer selected the wrong arm"
+    unless (observeGuardedExpr (error "unused guard tag" :: Flag Bool) (error "unused guard input") True == (7, True)
+         && observeGuardedExpr Flag True False == (9, False)) $
+        fail "the multi-way if selected the wrong arm"
     print guarded
     checkGuard viaGuarded
     checkGuard viaGuardedAnnotated

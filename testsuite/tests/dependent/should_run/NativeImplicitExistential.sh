@@ -215,6 +215,21 @@ line=$(grep -nF 'CapturedMono value -> if flag then value' WitnessGuardedReject.
 grep -Fq "WitnessGuardedReject.hs:$line:40: error: [GHC-46956]" case-escape.log
 grep -Fq 'would escape its scope' case-escape.log
 grep -Fq 'CapturedMono :: forall t. Payload t -> CapturedMono' case-escape.log
+if "$ghc" "${flags[@]}" -DMULTIWAY_CONFLICT -c WitnessGuardedReject.hs >multiway-conflict.log 2>&1; then
+    echo "The multi-way if accepted two different witnesses." >&2
+    exit 1
+fi
+line=$(grep -nF '| never -> (different b :: Payload PolyMaybe)' WitnessGuardedReject.hs | cut -d: -f1)
+grep -Fq "WitnessGuardedReject.hs:$line:17: error: [GHC-83865]" multiway-conflict.log
+grep -Fq 'Actual: Payload PolyMaybe' multiway-conflict.log
+if "$ghc" "${flags[@]}" -DMULTIWAY_ESCAPE -c WitnessGuardedReject.hs >multiway-escape.log 2>&1; then
+    echo "The multi-way if let a witness escape its guard." >&2
+    exit 1
+fi
+line=$(grep -nF '| flag, CapturedMono value <- capture -> value' WitnessGuardedReject.hs | cut -d: -f1)
+grep -Fq "WitnessGuardedReject.hs:$line:46: error: [GHC-46956]" multiway-escape.log
+grep -Fq 'would escape its scope' multiway-escape.log
+grep -Fq 'a multi-way if alternative' multiway-escape.log
 if "$ghc" "${flags[@]}" -c WitnessJointReject.hs >joint-reject.log 2>&1; then
     echo "The joint witness check accepted a conflicting or local witness." >&2
     exit 1

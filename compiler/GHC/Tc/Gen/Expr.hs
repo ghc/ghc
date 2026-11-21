@@ -476,6 +476,7 @@ declaredLambdaResults skip_invisible body (MG { mg_alts = L _ matches }) select 
         result_arms expr rest
           = case unLoc (stripParensLHsExpr expr) of
               HsIf _ _ yes no -> result_arms yes (result_arms no rest)
+              HsMultiIf _ rhss -> foldr (rhs_results formal) rest rhss
               HsCase _ _ (MG { mg_alts = L _ alts }) ->
                 foldr (case_results formal) rest alts
               _ -> rhs_result formal expr : rest
@@ -574,7 +575,9 @@ declaration lookup. The predicate and the result arms still go through
 the ordinary expression check. Rebindable if is already an expanded
 application at this stage. The selected declaration supplies no local
 evidence. A head bound by a pattern or guard is unavailable at this
-point. A case adds the right-hand sides of its alternatives in source order.
+point. A multi-way if adds its result arms in guard order. Pattern guards
+bring their binders and Givens into scope during the ordinary check.
+A case adds the right-hand sides of its alternatives in source order.
 Skip alternatives with local bindings. The probe uses the outer environment
 for every lookup. Case patterns and their Givens enter scope during normal
 checking, after the witness is selected. Every result checks with the same

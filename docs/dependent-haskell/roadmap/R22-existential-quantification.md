@@ -640,7 +640,8 @@ A `case` result can read the witness from a declaration in the outer
 scope. The probe skips alternatives with local bindings. Case patterns
 can refine how an arm checks. The witness itself is chosen outside
 those patterns, so a pattern-bound type cannot become the outer
-package's witness.
+package's witness. A multi-way `if` can also read a declaration from a
+result arm. A pattern guard can refine its own arm after witness selection.
 Leading visible type applications can choose input types when the
 declared result type is independent of the supplied type arguments.
 The ordinary checker checks those applications at their source spans.
