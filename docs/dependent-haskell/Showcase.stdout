@@ -30,6 +30,7 @@ reflect a runtime Maybe index using its kind: (Just False,Nothing,True)
 use a qualified proof and a partial family through imported type synonyms: (Just True,Refl)
 render a retained callback with ImpredicativeTypes enabled: ["Just True","Nothing"]
 forward a runtime element with a quantified partial signature: (True,False)
+render a raw view through an ordinary wrapper around a partial family: "[True,False]"
 split collections whose types determine their elements: (Just (True,[False]),Just ('x',()),Nothing)
 show the rest of a collection: (Just "[False]",Just "()",Nothing)
 print a cursor through its constraint synonym: (Just "[False]",Nothing,Just "()")
