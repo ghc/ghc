@@ -32,9 +32,10 @@ import GHC.Hs.Syn.Type
 import GHC.Rename.Utils
 import GHC.Tc.Errors.Types
 import GHC.Tc.Gen.Sig( TcPragEnv, lookupPragEnv, addInlinePrags )
-import GHC.Tc.Solver.Monad (bumpReductionDepth, matchFam, runTcSEqualities)
+import GHC.Tc.Solver.Monad (bumpReductionDepthTcM, matchFamTcM)
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Instantiate
+import GHC.Tc.Validity (checkConstrainedSignature)
 import GHC.Types.Basic (TypeOrKind(TypeLevel))
 import GHC.Types.FieldLabel
 import GHC.Types.Id
@@ -47,7 +48,7 @@ import qualified GHC.Core.Subst as CoreSubst
 import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_kind )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
-import GHC.Tc.Zonk.TcType (zonkTcType)
+import GHC.Tc.Zonk.TcType (zonkTcType, zonkTcTypes)
 import GHC.Core.TyCo.Ppr ( pprTyVars )
 import GHC.Core.TyCo.Rep ( Type(ExistsTy, TermVarTy) )
 import GHC.Tc.Utils.TcType
@@ -1587,25 +1588,27 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
     match_family_result :: TyCon -> TcType -> TcM (Maybe (TcCoercionN, [TcType]))
     match_family_result parent ty
       | Just (family, _) <- tcSplitTyConApp_maybe ty
-      , reducible_family family
+      , isTypeFamilyTyCon family
       = do { loc <- getCtLocM (OccurrenceOf (tyConName family)) (Just TypeLevel)
            ; ty <- liftZonkM (zonkTcType ty)
-           ; runTcSEqualities (go loc ty) }
+           ; go loc ty }
       | otherwise = return Nothing
       where
         go loc ty = case tcSplitTyConApp_maybe ty of
           Just (tc, args)
             | tc == parent -> return (Just (mkNomReflCo ty, args))
-            | reducible_family tc ->
-                do { reduction <- matchFam tc args
+            | isTypeFamilyTyCon tc ->
+                do { args <- if isConstrainedFamilyTyCon tc && args `lengthAtLeast` tyConArity tc
+                             then do { checkNoErrs $ checkConstrainedSignature TypeAppCtxt ty
+                                     ; liftZonkM (zonkTcTypes args) }
+                             else return args
+                   ; reduction <- matchFamTcM tc args
                    ; case reduction of
                        Nothing -> return Nothing
                        Just (Reduction co rhs) ->
-                         do { loc <- bumpReductionDepth loc ty
+                         do { loc <- bumpReductionDepthTcM loc ty
                             ; fmap (first (mkTransCo co)) <$> go loc rhs } }
           _ -> return Nothing
-
-        reducible_family tc = isTypeFamilyTyCon tc && not (isConstrainedFamilyTyCon tc)
 
     check_fields _ _ _ [] []
       = do { res <- thing_inside; return ([], res) }
@@ -1717,10 +1720,18 @@ case, including when its family has other constructors.
 See Note [Retained package equation scope] in GHC.HsToCore.Match.Constructor.
 
 A type family can return the package. Reduce only the head of the expected
-type. matchFam uses the ordinary nominal solver rule and its instance
-environment, including imported open family instances. The rule for
-constrained families needs separate premise checking. Leave those families
-outside this path.
+type. Before each step through a saturated constrained family, check the
+domain in the pattern's lexical scope. See Note [Constrained associated
+family formation] in GHC.Tc.Validity. The match can infer the scrutinee's
+type from an expression without a written signature at the use site.
+The nominal axiom does not carry the domain dictionary. Check the
+domain even when the family itself matches an equation.
+
+The separate check uses the existing lexical Givens and instance
+environment. A missing domain is an error, including when the caller
+defers term errors. No domain dictionary enters the pattern wrapper.
+matchFamTcM then uses the ordinary nominal solver rule and its instance
+environment, including imported open family instances.
 
 Compose the nominal coercions and use the result when its head is the
 selected constructor's parent. Put that cast on the scrutinee so the fields
