@@ -693,4 +693,5 @@ vector and checks its reader at that vector's hidden length.
 The expected type supplies the tuple shape and the reader can ignore
 the vector. Two separate filters cannot supply two fields that require
 the same length. Each filter has its own rigid witness.
-[Source-hidden tuple client](../../../testsuite/tests/dependent/should_run/implicit-existential-source/CaseMain.hs).
+[Ordinary package and reader](../examples/erased-existentials/RankedPackageClient.hs)
+and [source-hidden tuple client](../../../testsuite/tests/dependent/should_run/implicit-existential-source/CaseMain.hs).

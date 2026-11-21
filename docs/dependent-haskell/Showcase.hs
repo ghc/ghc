@@ -1096,6 +1096,11 @@ main = do
             (VCons (3 :: Int) (VCons 7 (error "unused refilter tail")))))
         , ImplicitVector.cells (RankedPackageClient.refilter odd (> 3)
             (VCons (2 :: Int) (VCons 7 (VCons 9 VNil)))) )
+    observe "attach a reader at the hidden length of a filtered vector"
+        ( RankedPackageClient.readFiltered (RankedPackageClient.packageFiltered odd
+            (Data.Maybe.listToMaybe . toList) (VCons (7 :: Int) (error "unused packaged tail")))
+        , RankedPackageClient.readFiltered (RankedPackageClient.packageFiltered odd
+            (const True) (error "unused packaged input" :: Vec Int 'Z)) )
     observe "project a stored vector from a strict record field"
         (StoredVector.cells (StoredVector.singleton 'h'))
     observe "read a retained length through a newtype record selector" $

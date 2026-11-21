@@ -272,6 +272,7 @@ use a Show superclass to format a reopened package: ("True","'q'")
 filter a vector without forcing the tail to learn the result length: ([7],[7,9])
 infer the hidden lengths of a lazy filter and a retained vector: ([7],[],[9])
 refilter a vector through a rank-2 callback at its hidden length: ([7],[7,9])
+attach a reader at the hidden length of a filtered vector: (Just 7,True)
 project a stored vector from a strict record field: "h"
 read a retained length through a newtype record selector: (2,"hs")
 read a GADT newtype length without forcing its vector: 1

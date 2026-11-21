@@ -2,13 +2,13 @@
 module RankedPackageClient
     ( runGuarded, runConditional, runProjections, projectAt, runDeclaredWitnesses, runExplicitBranches
     , runMixedPackage, runProducedPackage, runForwardedPackage, runLabelledPackage
-    , runSelectedPackage, runLocalPattern, readCount, refilter
+    , runSelectedPackage, runLocalPattern, readCount, refilter, packageFiltered, readFiltered
     ) where
 
 import Data.Bool (bool)
 import Data.Proxy (Proxy(..))
 import qualified ErasedPackage
-import ImplicitVector (Filtered, filterVec, withVector)
+import ImplicitVector (Filtered, FilteredWith, filterVec, withVector)
 import PackedVecLibrary (Vec)
 import RankedPackage
     ( Callback(..), CallbackPair, GuardedBuilder, Hidden, PolyId, PolyMaybe
@@ -119,6 +119,14 @@ refilter :: (a -> Bool) -> (a -> Bool) -> Vec a n -> Filtered a
 refilter first second xs =
     let kept = withVector (filterVec second) (filterVec first xs)
     in kept
+
+-- | Store a vector with a reader at the length chosen by the filter.
+packageFiltered :: (a -> Bool) -> (forall k. Vec a k -> r) -> Vec a n -> FilteredWith a r
+packageFiltered predicate reader xs = (filterVec predicate xs, reader)
+
+-- | Open the stored vector and apply its reader.
+readFiltered :: FilteredWith a r -> r
+readFiltered package = let (xs, reader) = package in reader xs
 
 -- | Open the hidden state and pass it once to the stored reader.
 readCount :: ErasedPackage.EncodedCount %1 -> Int
