@@ -7311,3 +7311,26 @@ the nominal evidence in Core even after type inference has finished.
 [Agda injectivity pragmas](https://agda.readthedocs.io/en/v2.8.0/language/pragmas.html#the-injective-pragma),
 [Proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html)
 and [Higher-Order Type-Level Programming in Haskell, sections 4 and 5](https://simon.peytonjones.org/assets/pdfs/higher-order-type.pdf).
+
+### Written retained Natural literals
+
+Proposal #364 makes `GHC.TypeNats.Nat` a synonym for `Natural`. GHC
+already gives type-level numerals this kind. A nonnegative retained
+numeral uses the same `NumTyLit` when the ordinary checker selects the
+standard `Num Natural` dictionary. A local `fromInteger` or a separate
+Given cannot justify that conversion. The fork's Peano `Nat` still uses
+checked zero and successor equations.
+
+Agda uses its built-in `Nat` for numerals by default and uses a separate
+`FROMNAT` hook for overloaded conversions. This patch reuses the
+built-in GHC kind and the ordinary numeric literal shortcut.
+
+For small naturals, Core uses `NS` with a word literal. For large
+naturals, it uses `NB` with a BigNat literal. CorePrep retains the
+checked boxed constant for Lint on the evaluated alias binder when
+lowering the large literal to a byte array. Interface readers check
+the original boxed Core. An unfolding that contains a retained
+Natural operand adds the `retained-natural-operand` requirement.
+[GHC proposal #364](https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0364-unify-natural.rst),
+[Agda literal overloading](https://agda.readthedocs.io/en/stable/language/literal-overloading.html#natural-numbers),
+and [ordinary Natural client](examples/qualified-pi/RetainedNaturalClient.hs).

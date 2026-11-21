@@ -179,6 +179,11 @@ test('NativeRetainedChar',
       extra_files(['../../../../docs/dependent-haskell/examples/qualified-pi/' + f
                    for f in ['RetainedCharacters.hs', 'RetainedCharacterClient.hs']])],
      run_command, ['bash NativeRetainedChar.sh "{compiler}" "{libdir}"'])
+test('NativeRetainedNatural',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['../../../../docs/dependent-haskell/examples/qualified-pi/' + f
+                   for f in ['RetainedNaturals.hs', 'RetainedNaturalClient.hs']])],
+     run_command, ['bash NativeRetainedNatural.sh "{compiler}" "{libdir}"'])
 test('NativeOpenRetry',
      [req_interp, req_rts_linker, only_ways(['normal']), extra_files(['NativeOpenRetryLib.hs'])],
      multimod_compile_and_run,

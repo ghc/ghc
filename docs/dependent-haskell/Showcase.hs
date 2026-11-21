@@ -185,6 +185,7 @@ import qualified ReadNatural
 import qualified Type.Reflection as Reflection
 import qualified UnicodeExport
 import qualified RetainedCharacterClient
+import qualified RetainedNaturalClient
 
 {- Note [Maintaining the Dependent Haskell showcase]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1076,6 +1077,7 @@ main = do
         (RetainedCharacterClient.observeCharacters (error "forced the later character"))
     observe "quoted retained string with an embedded NUL"
         (RetainedCharacterClient.observeQuoted (error "forced the later string"))
+    observe "small and large Natural literals at their exact indices" RetainedNaturalClient.observeNaturals
     observe "greatest common divisor checked in a type"
         (TypeNats.natVal (Proxy @(Prelude.gcd 18 24)))
     observe "first and second fields proved through an imported pair equality"
