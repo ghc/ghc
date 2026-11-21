@@ -143,7 +143,7 @@ if "${ghc[@]}" -O0 -fforce-recomp -DBAD_INDEX -fdiagnostics-color=never -c Indep
     echo 'Generalized a certified source function over a wrong argument kind'
     exit 1
 fi
-grep -Eq '^IndependentLengths.hs:17:[0-9]+: error: .GHC-25897.' wrong-length.log
+grep -Eq '^IndependentLengths.hs:17:[0-9]+: error: .GHC-83865.' wrong-length.log
 cat >ScopedLength.hs <<'HS'
 {-# LANGUAGE CPP, EmptyCase, ExperimentalDependentTypes, GADTs, LinearTypes, ScopedTypeVariables #-}
 module ScopedLength where

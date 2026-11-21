@@ -51,7 +51,7 @@ lookupAligned xs ys k = case mkFinGeneric xs k of
 
 -- | Store a checked position for each of two independent lists.
 data TwoPositions a b where
-    Positions :: forall a b. foreach (xs :: [a]) -> Fin (sourceLength xs) %1
+    Positions :: foreach (xs :: [a]) -> Fin (sourceLength xs) %1
               -> foreach (ys :: [b]) -> Fin (sourceLength ys) %1 -> TwoPositions a b
 
 -- | Consume both checked positions and read their elements.
