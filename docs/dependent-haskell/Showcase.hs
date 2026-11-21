@@ -104,7 +104,7 @@ import qualified InterpretedKind
 import qualified InterpretedKindUseSite
 import qualified NestedFunctionClient
 import qualified InvisibleFamily
-import ConstrainedElementsClient (annotatedElement, constrainedElements, explicitElements)
+import ConstrainedElementsClient (annotatedElement, constrainedElements, explicitElements, renderField)
 import IndexedMapClient (mappedCells)
 import LaterMatchabilityClient (annotatedMap, appliedCallback, boxedCallbacks, flippedCallbacks, forwardedMap,
                                 laterMatchability, nestedCallback, rankedMap)
@@ -953,6 +953,11 @@ main = do
     observe "form an associated family type from its class evidence" constrainedElements
     observe "form an expression annotation with the matched dictionary" annotatedElement
     observe "pass an associated type as a specified and a required argument" explicitElements
+    fieldFlag <- newIORef True
+    enabled <- readIORef fieldFlag
+    writeIORef fieldFlag False
+    disabled <- readIORef fieldFlag
+    observe "render a field with evidence for its runtime flag" (renderField enabled, renderField disabled)
     putStrLn "Dependent Haskell: completed source features"
     booleans
     finiteDomains

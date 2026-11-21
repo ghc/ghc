@@ -41,6 +41,17 @@ in kinds. The R24 card links the review questions to the interface test.
 [Disallow constraints in kinds](https://ghc-proposals.readthedocs.io/en/latest/proposals/0547-no-kind-equalities.html)
 and [R24 source syntax](roadmap/R24-constrained-type-families.md#source-syntax-and-separate-compilation).
 
+Morris and Eisenberg require the typing context to entail the domain of a
+family application at its occurrence. Agda searches the instances in scope
+for the requested type. For the fork's retained `foreach`, this means
+that a dictionary for `FieldKey tag` becomes available after the flag
+and its class constraint. It can justify the dependent result and later
+arguments. GHC's constraint solver also checks the ordinary module that
+opens the GADT and calls the function.
+[Morris and Eisenberg, §4.2](https://richarde.dev/papers/2017/partiality/partiality.pdf),
+[Agda instance candidates](https://agda.readthedocs.io/en/v2.8.0/language/instance-arguments.html)
+and [retained field example](roadmap/R24-constrained-type-families.md#family-domains-under-a-retained-binder).
+
 The [program roadmap](ROADMAP.md) owns the work queue and the upstream task
 index. The 2026-11-16 review adds feature pages that connect research to the
 next implementation obligations:

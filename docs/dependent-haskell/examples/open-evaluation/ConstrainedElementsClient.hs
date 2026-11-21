@@ -1,8 +1,8 @@
 {-# LANGUAGE ExplicitNamespaces, RequiredTypeArguments, TypeApplications #-}
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes, ScopedTypeVariables, TypeFamilies, TypeOperators #-}
-module ConstrainedElementsClient (constrainedElements, annotatedElement, explicitElements) where
+module ConstrainedElementsClient (constrainedElements, annotatedElement, explicitElements, renderField) where
 
-import ConstrainedElements (Collects(..))
+import ConstrainedElements (Collects(..), Field(..), applyField, field)
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
 
@@ -41,3 +41,9 @@ explicitElements = (id @(Elem [Bool]) True, required (type (Elem [Bool])) False)
 constrainedElements :: (Bool :~: Bool, Bool :~: Bool, Bool)
 constrainedElements =
     (assumed (Proxy :: Proxy [Bool]), ground, fromWitness (Witness Proxy :: Witness [Bool]))
+
+-- | Use the dictionary from the field at the flag supplied by the caller.
+renderField :: Bool -> Maybe String
+renderField tag = case field tag of
+    Nothing -> Nothing
+    Just (Field value render) -> Just (applyField tag render value)

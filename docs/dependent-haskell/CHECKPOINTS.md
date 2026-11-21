@@ -28,6 +28,15 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `00b4822dd4`, a family domain can use the preceding retained
+argument. A dictionary from a GADT pattern justifies the element type
+for that same flag. The combined Stage 2 compiler passed the 402-row
+Showcase at stripped `-O0`, default `-O1`, default `-O2` and in GHCi.
+Five focused registered tests passed, including wrong-flag and
+out-of-scope evidence checks.
+[Runtime example](examples/open-evaluation/ConstrainedElementsClient.hs)
+and [scope checks](../../testsuite/tests/dependent/should_run/NativeRetainedFamilyDomain.sh).
+
 At `5af708d0cc`, the ordinary client checks the class domain of a
 fully applied associated family from an imported interface. The same
 interface supplies a retained unfolding and a rewrite rule for linear

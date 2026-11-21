@@ -544,6 +544,12 @@ test('NativeConstrainedFamilyRules',
                      for f in ['ParameterizedIndexLibrary.hs', 'FinitePosition.hs']])],
      run_command, ['bash NativeConstrainedFamilyRules.sh "{compiler}" "{libdir}"'])
 
+test('NativeRetainedFamilyDomain',
+     [only_ways(['normal']),
+      extra_files(['../../../../docs/dependent-haskell/examples/open-evaluation/' + f
+                   for f in ['ConstrainedElements.hs', 'ConstrainedElementsClient.hs']])],
+     run_command, ['bash NativeRetainedFamilyDomain.sh "{compiler}" "{libdir}"'])
+
 test('NativeConstrainedFamily',
      [only_ways(['normal']),
       extra_files(['NativeConstrainedFamilyProvider.hs', 'NativeConstrainedFamilyClient.hs'])],

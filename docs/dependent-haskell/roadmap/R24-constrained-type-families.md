@@ -217,6 +217,29 @@ Formation checks run before inference can add a missing constraint. General kind
 in aliases, generated newtype or via equations,
 and partial applications also need separate formation rules.
 
+### Family domains under a retained binder
+
+```haskell
+applyField :: foreach (tag :: Bool) -> Collects (FieldKey tag)
+           => (Elem (FieldKey tag) -> String) -> Elem (FieldKey tag) -> String
+applyField _ render value = render value
+```
+
+The class predicate refers to the runtime argument. A separate ordinary
+client reads the flag and matches on `field tag`. A successful match
+provides the dictionary, the element and its renderer. The client calls
+`applyField tag render value` using that dictionary. The Showcase produces
+`(Just "x",Nothing)` for the enabled and disabled flags.
+
+A predicate for flag `a` cannot justify an element for flag `b`. A
+predicate to the right of an arrow cannot justify a family application
+in its argument. Both signatures report GHC-39999, including with deferred
+term errors. A higher-rank callback with its own family constraint still
+requires a separate formation check.
+[Provider](../examples/open-evaluation/ConstrainedElements.hs),
+[ordinary client](../examples/open-evaluation/ConstrainedElementsClient.hs)
+and [scope regression](../../../testsuite/tests/dependent/should_run/NativeRetainedFamilyDomain.hs).
+
 ### Associated newtype representation
 
 The review of #177 asks where an associated newtype could store the

@@ -42,7 +42,8 @@ the parent class. An ordinary client can prove `Elem [Bool] :~: Bool`
 when `Allowed Bool` supplies the instance. Writing `Elem [Int] :~: Int`
 in the same client reports the missing `Allowed Int` at compile time,
 even though the family equation could reduce to `Int`. A GADT pattern
-can also supply the class dictionary locally.
+can also supply the class dictionary locally. The Showcase opens a field
+with evidence for its runtime flag and renders it in an ordinary client.
 [Ordinary client](examples/open-evaluation/ConstrainedElementsClient.hs)
 and [R24 scope](roadmap/R24-constrained-type-families.md).
 
