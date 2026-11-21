@@ -1227,15 +1227,12 @@ mkDataConWithTelescope source_order arg_binders name declared_infix prom_info
       , Just (parent, [TermVarTy result]) <- splitTyConApp_maybe orig_res_ty
       = t == univ && rhs == field && result == field && parent == rep_tycon
         && varType field `eqType` varType univ
-        && all independent_result_field orig_arg_tys
+        && all (not . anyFreeVarsOfType isId . scaledMult) orig_arg_tys
         && case rep of { DCR {} -> True; _ -> False }
       | otherwise
       = null eq_spec && not (anyFreeVarsOfType isId orig_res_ty)
         && valid_universals
         && case rep of { NoDataConRep -> True; _ -> False }
-
-    independent_result_field (Scaled mult ty)
-      = not (anyFreeVarsOfType isId mult || anyFreeVarsOfType isId ty)
 
     valid_universals
       = all isTyVar univ_tvs && all isTyVar user_tvs
@@ -1927,10 +1924,11 @@ binders in GHC.Core.Utils and when checking them in GHC.Core.Lint. An
 interface decodes the proof's type in the scope of the decoded field.
 
 This shape has one retained field at a closed structural index type, one
-result index and no contexts or existentials. Ordinary field types and
-multiplicities must be independent of the retained field. A variable or
-wildcard can match the retained field. The equality is an ordinary nominal
-Given after the fields are in scope.
+result index and no contexts or existentials. An ordinary field type
+can refer to an earlier retained field. Its multiplicity must be
+independent of the retained field. A variable
+or wildcard can match the retained field. The equality is an ordinary
+nominal Given after the fields are in scope.
 -}
 
 -- | Rebuild a constructor field telescope without erasing runtime binders.

@@ -1370,7 +1370,7 @@ tcIfaceDataCons tycon_name tycon if_cons
                         { valid <- evaluateIfaceNativeDomain (ppr dc_name)
                             (isNativeClosedIndexType (varType field)
                              && varType field `eqType` varType univ
-                             && all independent_result_field arg_tys)
+                             && all (not . anyFreeVarsOfType isId . scaledMult) arg_tys)
                         ; unless valid $
                             failIfM (text "Invalid retained result field in interface:" <+> ppr dc_name) }
                       _ -> failIfM (text "Invalid retained result field in interface:" <+> ppr dc_name)
@@ -1455,9 +1455,6 @@ tcIfaceDataCons tycon_name tycon if_cons
         lazy_bang _        = False
         lazy_src_bang (IfSrcBang unpack strict)
           = not (isSrcUnpacked unpack) && not (isSrcStrict strict)
-
-    independent_result_field (Scaled mult ty)
-      = not (anyFreeVarsOfType isId mult || anyFreeVarsOfType isId ty)
 
     -- Allocate the lexical binder skeleton before forcing its domain.
     -- See Note [Importing retained constructor field telescopes].

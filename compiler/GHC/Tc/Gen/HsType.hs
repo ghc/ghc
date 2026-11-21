@@ -748,8 +748,7 @@ tcCheckRetainedConType validate_domain allow_result tc_field_mult
       = setSrcSpanA loc $
         do { arg_ty <- tc_check_lhs_type mode arg liftedTypeKind
            ; mult_ty <- tc_field_mult mult
-           ; let independent = not (anyFreeVarsOfType isId arg_ty
-                                 || anyFreeVarsOfType isId mult_ty)
+           ; let independent = not (anyFreeVarsOfType isId mult_ty)
            ; (binders, body_ty) <- go (allow && independent) mode res
            ; return (Nothing : binders, tcMkVisFunTy unmatchableDataConTy mult_ty arg_ty body_ty) }
     go _ _ (L loc HsForAllTy{}) = unsupported loc

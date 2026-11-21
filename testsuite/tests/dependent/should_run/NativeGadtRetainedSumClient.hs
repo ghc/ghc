@@ -3,6 +3,7 @@ module Main (main) where
 
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Control.Monad (unless)
+import Data.IORef (newIORef, readIORef)
 import Data.List (isPrefixOf)
 import Data.Maybe (isJust)
 import GHC.Sigma (Sigma(Pair))
@@ -16,6 +17,14 @@ outerCells (Nested (Pair _ (xs, _))) = cells xs
 
 isEmptyPack :: Packed Bool -> Bool
 isEmptyPack (Pair _ xs) = isJust (emptyWitness xs)
+
+rebuildDirect :: DirectVec n -> DirectVec n
+rebuildDirect (DirectVec n xs) = DirectVec n xs
+
+openDirect :: Packed Bool -> [Bool]
+openDirect (Pair n xs) =
+    let wrapped = DirectVec n xs
+    in case rebuildDirect wrapped of DirectVec _ ys -> cells ys
 
 phantomPayload :: Phantom -> Bool
 phantomPayload (Pair _ xs) = sameLength xs empty
@@ -44,6 +53,18 @@ main = do
     require (not (isEmptyPack (pack (S Z) (VCons True (error "unused tail")))))
         "inferred nonempty payload index without demanding its tail"
     require (phantomPayload phantom) "the reduced payload determines the index"
+    require (take 1 (openDirect (pack (S Z) (VCons True (error "direct tail")))) == [True])
+        "a direct result keeps the index opened by the dependent sum"
+    n <- newIORef (S Z) >>= readIORef
+    unused <- newIORef (error "direct length" :: Nat) >>= readIORef
+    let vector = DirectVec n (error "direct vector")
+        atLength = DirectAtLength unused (AtLength 37)
+    require ((case rebuildDirect vector of DirectVec len _ -> lengthValue len) == 1)
+        "a direct result leaves the vector unevaluated"
+    require ((case atLength of DirectAtLength _ (AtLength value) -> value) == 37)
+        "a direct result leaves the length unevaluated"
+    throws "direct vector" (case rebuildDirect vector of DirectVec _ xs -> cells xs)
+    throws "direct length" (case atLength of DirectAtLength len _ -> lengthValue len)
     require (storedLengths value == (1, 2)) "stored lengths"
     require (innerCells value == [False, True]) "inner cells"
     require (paired value == aligned) "shared outer index"

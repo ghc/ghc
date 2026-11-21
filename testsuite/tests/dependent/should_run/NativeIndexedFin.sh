@@ -196,8 +196,6 @@ data CheckedList (xs :: [Bool]) where
     CheckedList :: foreach (ys :: [Bool]) -> CheckedList (True ': ys)
 #elif defined(TWO_FIELDS_RESULT)
     CheckedList :: foreach (ys :: [Bool]) (zs :: [Bool]) -> CheckedList ys
-#elif defined(DEPENDENT_PAYLOAD_RESULT)
-    CheckedList :: foreach (ys :: [Bool]) -> CheckedList ys -> CheckedList ys
 #else
     CheckedList :: forall xs. foreach (ys :: [Bool]) -> (xs :~: ys) -> CheckedList xs
 
@@ -215,7 +213,7 @@ data Cell (layout :: [Bool]) where
 #endif
 HS
 "${ghc[@]}" -O0 -c CheckedList.hs
-for shape in COMPOUND_RESULT TWO_FIELDS_RESULT DEPENDENT_PAYLOAD_RESULT; do
+for shape in COMPOUND_RESULT TWO_FIELDS_RESULT; do
     if "${ghc[@]}" -O0 -fforce-recomp "-D$shape" -ferror-spans \
             -fdiagnostics-color=never -c CheckedList.hs >result.log 2>&1; then
         echo "Accepted an unsupported retained constructor result ($shape)"
@@ -227,9 +225,6 @@ for shape in COMPOUND_RESULT TWO_FIELDS_RESULT DEPENDENT_PAYLOAD_RESULT; do
             grep -Eq 'The result type is .CheckedList \(True : ys\).\.' result.log ;;
         TWO_FIELDS_RESULT)
             grep -Fq 'CheckedList.hs:11:61-74: error: [GHC-83605]' result.log
-            grep -Eq 'The result type is .CheckedList ys.\.' result.log ;;
-        DEPENDENT_PAYLOAD_RESULT)
-            grep -Fq 'CheckedList.hs:13:64-77: error: [GHC-83605]' result.log
             grep -Eq 'The result type is .CheckedList ys.\.' result.log ;;
     esac
     grep -Fq 'A constructor may use its only retained field as the sole result index.' result.log

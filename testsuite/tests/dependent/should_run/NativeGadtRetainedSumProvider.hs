@@ -110,6 +110,17 @@ type Packed a = some (n :: Nat) | Vec a n
 pack :: foreach (n :: Nat) -> Vec Bool n -> Packed Bool
 pack n xs = Pair n xs
 
+-- | Store a vector at the length supplied by the first field.
+data DirectVec (n :: Nat) where
+    DirectVec :: foreach (n :: Nat) -> Vec Bool n -> DirectVec n
+
+-- | Store a value at any length.
+data AtLength (n :: Nat) = AtLength Int
+
+-- | Store a payload whose type uses the length without demanding it.
+data DirectAtLength (n :: Nat) where
+    DirectAtLength :: foreach (n :: Nat) -> AtLength n -> DirectAtLength n
+
 -- | Store an unrelated runtime witness beside an empty vector.
 type Phantom = some (n :: Nat) | Vec Bool Z
 
