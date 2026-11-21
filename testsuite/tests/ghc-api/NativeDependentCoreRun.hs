@@ -2665,7 +2665,7 @@ retainedFunctionBinderSource moduleName observation =
         , "            Z -> let payload :: Vec Int (f n); payload = VNil in vecList (caller payload)"
         , "            S k -> let payload :: Vec Int (f n); payload = VCons 42 (replicateNative @Int k 42) in vecList (caller payload)"
         , ""
-        , "-- | Keep independently closed input and result domains on a function binder."
+        , "-- | Keep distinct input and result domains on a function binder."
         , "keepMixedCall :: foreach (f :: Bool -> Nat) -> foreach (b :: Bool) -> Vec Int (f b) -> Int"
         , "keepMixedCall f b payload = 42"
         , ""

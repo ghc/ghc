@@ -1638,7 +1638,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             importTemplate :: HscEnv -> IfaceType -> IfaceExpr -> IO CoreExpr
             importTemplate importEnv declared body = do
                 let name = mkExternalName (unique 330) ifaceModule (mkVarOcc "native_unfolding") noSrcSpan
-                    declaration = IfaceId name declared IfVanillaId [HsUnfold False (IfCoreUnfold VanillaSrc cache (IfWhen 0 False False) body)]
+                    declaration = IfaceId name declared IfVanillaId [HsUnfold False (IfCoreUnfold VanillaSrc cache (IfWhen 0 False False) body)] []
                 thing <-
                     initIfaceLoad importEnv
                         $ initIfaceLcl ifaceModule (text "native unfolding test") NotBoot
@@ -2129,6 +2129,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                     []
                     (toIfaceType liftedTypeKind)
                     rhs
+                    []
             selfAlias = synonym 9970 "IfaceGenericSelfAlias" (reference aliasSelf)
             aliasSelf = genericScalarDomain selfAlias (recursiveDeclaration 9980 "IfaceGenericAliasSelf")
             fieldAlias = synonym 10100 "IfaceGenericFieldAlias" (scalarPi hiddenSelf)
@@ -2222,7 +2223,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             ignoredBinders = [mkAnonTyConBinder ignoredParameter]
             forgetful = mkSynonymTyCon
                 (mkExternalName (unique 10300) (nameModule (ifName declaration)) (mkTcOcc "IfaceForgetfulDomain") noSrcSpan)
-                (mkTyConKindWithMatchability unmatchableDataConTy ignoredBinders liftedTypeKind) ignoredBinders liftedTypeKind [Phantom] boolTy True True True True
+                (mkTyConKindWithMatchability unmatchableDataConTy ignoredBinders liftedTypeKind) ignoredBinders liftedTypeKind [Phantom] boolTy Nothing True True True True
             forgetfulDeclaration = tyThingToIfaceDecl (ATyCon forgetful)
             appliedForgetful = toIfaceType (mkTyConApp forgetful [intTy])
             forgetfulHolder = ordinaryField (IfaceDepFunTy DepFunVisible (many, firstName, appliedForgetful) (toIfaceType intTy)) (recursiveDeclaration 10310 "IfaceForgetfulHolder")
@@ -2278,8 +2279,12 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
         cachedOpaque <- restore [cachedIndex] (IfaceTermVar (mkIfLclName (fsLit "cached_domain_index")))
         checkType dflags "opaque identity does not inspect a structural raw view" (TermVarTy cachedIndex) cachedOpaque
         let cachedHead = local 110420 "cached_domain_head" (mkVisFunTyManyU (mkTyConTy cachedDomain) boolTy)
-        rejectsIface "cached raw view rejects a fixed native endpoint" "Unsupported retained domain shape." [cachedHead, cachedIndex] $
-            IfaceTermAppTy (mkIfLclName (fsLit "cached_domain_head")) (IfaceTermVar (mkIfLclName (fsLit "cached_domain_index")))
+            cachedResultHead = setIdType cachedHead (mkVisFunTyManyU boolTy (mkTyConTy cachedDomain))
+            wireCall arg = IfaceTermAppTy (mkIfLclName (fsLit "cached_domain_head")) (toIfaceType (TermVarTy arg))
+        cachedCall <- restore [cachedHead, cachedIndex] (wireCall cachedIndex)
+        checkType dflags "cached raw view permits an opaque input" (TermAppTy cachedHead (TermVarTy cachedIndex)) cachedCall
+        rejectsIface "cached raw view rejects a structural result" "Unsupported retained domain shape." [cachedResultHead, uncachedIndex] $
+            wireCall uncachedIndex
         check "wired Bool has no imported raw view" $ case tyConNativeDomainShape boolTyCon of
             Nothing -> True
             _ -> False
@@ -2417,6 +2422,12 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             callCo = mkTermAppCo callF (mkCoVarCo callCv)
             callCoWire = toIfaceCoercion callCo
             reservedCo = IfaceTermAppCo callName (toIfaceCoercion (mkCoVarCo callCv))
+            erasedInput = mkTyVar (mkSystemName (unique 9113) (mkTyVarOcc "input")) liftedTypeKind
+            inputTy = mkTyVarTy erasedInput
+            liftedHead = setIdType callF (mkVisFunTyManyU inputTy boolTy)
+            liftedArg = setIdType callN inputTy
+            liftedCalls = mkForAllTy unmatchableDataConTy (Bndr erasedInput Specified) $
+                mkDepFunTy liftedHead (mkDepFunTy liftedArg (indexed (TermAppTy liftedHead (TermVarTy liftedArg))))
         forM_ [NormalCompression, SafeExtraCompression, MaximumCompression] $ \compression -> do
             wire <- roundtrip compression openCalls
             restored <- restore [callF, callN] wire
@@ -2472,6 +2483,9 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                                 check "function Pi endpoints share actual imported head and index" (left == headId && right == headId && ln == indexId && rn == indexId)
                             _ -> fail "FAIL: function Pi codec lost repeated call endpoints"
                 _ -> fail "FAIL: function Pi codec lost its runtime telescope"
+            restoredLifted <- restore [] =<< roundtrip compression (toIfaceType (tidyTopType liftedCalls))
+            checkType dflags "lifted call codec preserves erased scope" liftedCalls restoredLifted
+            lintAccepts dflags "restored lifted call telescope" [] (Coercion (mkNomReflCo restoredLifted))
             let shadowHead = local 9110 "wire_call" (idType callF)
                 shadowCalls = mkDepFunTy callF (mkDepFunTy shadowHead (mkDepFunTy callN $
                     mkFunctionType unmatchableDataConTy ManyTy (mkTyConApp eqTyCon [boolTy, TermAppTy callF (TermVarTy callN), TermAppTy shadowHead (TermVarTy callN)]) intTy))
@@ -2490,17 +2504,19 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                         badDomain (toIfaceType (mkFunctionType unmatchableDataConTy OneTy boolTy boolTy))
                     rejectsIface "native call rejects an opaque unsupported result domain" "Invalid retained call head" [] $
                         badDomain (toIfaceType (mkFunctionType unmatchableDataConTy ManyTy boolTy intTy))
+                    rejectsIface "native call rejects an unlifted argument domain" "Invalid retained call head" [] $
+                        badDomain (toIfaceType (mkVisFunTyManyU intPrimTy boolTy))
                     let missingType = mkTyVar (mkSystemName (unique 9111) (mkTyVarOcc "missing_domain")) liftedTypeKind
                     rejectsIface "function Pi cannot import a free domain variable" "Iface type variable out of scope" [] $
                         badDomain (toIfaceType (mkFunctionType unmatchableDataConTy ManyTy (mkTyVarTy missingType) boolTy))
                     let boundDomainName = mkIfLclName (fsLit "bound_domain")
                         nonclosedDomain = case domain of
-                            IfaceFunTy flag ma arrowMult _ result -> IfaceFunTy flag ma arrowMult (IfaceTyVar boundDomainName) result
+                            IfaceFunTy flag ma arrowMult argument _ -> IfaceFunTy flag ma arrowMult argument (IfaceTyVar boundDomainName)
                             _ -> error "FAIL: function Pi domain is not an ordinary arrow"
                         boundDomainPi = IfaceForAllTy (toIfaceType unmatchableDataConTy)
                             (mkIfaceForAllTvBndr Specified (boundDomainName, toIfaceType liftedTypeKind))
                             (badDomain nonclosedDomain)
-                    rejectsIface "native call rejects an opaque in-scope nonclosed domain" "Invalid retained call head" [] boundDomainPi
+                    rejectsIface "native call rejects an in-scope nonclosed result" "Invalid retained call head" [] boundDomainPi
                     rejectsIface "function-value index cannot be a retained function result" "Invalid retained function result" [] $
                         IfaceDepFunTy vis (mult, name, domain) (IfaceTermVar name)
                     rejectsIface "call argument cannot refer to a later scalar binder" "Iface id out of scope" [] $
@@ -2635,7 +2651,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             let name = mkExternalName (unique 337) ifaceModule (mkVarOcc "native_dictionary") noSrcSpan
                 dfunType = mkTyConApp eqTyCon [liftedTypeKind, original, original]
                 operators = map toIfaceExpr [Type liftedTypeKind, Type original, Type original, Coercion (mkNomReflCo original)]
-                declaration = IfaceId name (toIfaceType dfunType) IfDFunId [HsUnfold False (IfDFunUnfold [] operators)]
+                declaration = IfaceId name (toIfaceType dfunType) IfDFunId [HsUnfold False (IfDFunUnfold [] operators)] []
             thing <-
                 initIfaceLoad importEnv
                     $ initIfaceLcl ifaceModule (text "native dictionary test") NotBoot
@@ -2909,7 +2925,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             hiddenTypes =
                 map (tidyTopType . mkDepFunTyWithVis DepFunInvisible b) [intTy, keepResult (TermVarTy b)]
             hiddenDecl (u, ty) =
-                (fingerprint0, IfaceId name (toIfaceType ty) IfVanillaId [])
+                (fingerprint0, IfaceId name (toIfaceType ty) IfVanillaId [] [])
               where
                 name = mkExternalName (unique u) hiddenModule (mkVarOcc ("hidden" ++ show u)) noSrcSpan
             hiddenIface = set_mi_decls (map hiddenDecl (zip [17206, 17207] hiddenTypes)) (emptyFullModIface hiddenModule)
@@ -2924,7 +2940,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             check "versioned hidden retained interface declaration count" (length (mi_decls decoded) == length hiddenTypes)
             forM_ (zip hiddenTypes (mi_decls decoded)) $ \(hidden, (_, decl)) ->
                 case decl of
-                    IfaceId _ converted@(IfaceDepFunTy DepFunInvisible _ _) _ _ -> do
+                    IfaceId _ converted@(IfaceDepFunTy DepFunInvisible _ _) _ _ _ -> do
                         restored <- restore [] converted
                         checkType dflags "hidden retained interface round trip" hidden restored
                     _ -> fail "FAIL: the interface lost a hidden retained binder"
@@ -3050,7 +3066,7 @@ runOpaqueCallChecks dflags = do
         _ -> fail "FAIL: Core substitution changed the head capture control shape"
     let unused = mkTyVar (mkSystemName (unique 6212) (mkTyVarOcc "unused_head_parameter")) liftedTypeKind
         unusedBinders = [mkAnonTyConBinder unused]
-        erasedHead = mkSynonymTyCon (mkSystemName (unique 6213) (mkTcOcc "ErasedHeadParameter")) (mkTyConKindWithMatchability unmatchableDataConTy unusedBinders liftedTypeKind) unusedBinders liftedTypeKind [Phantom] (idType f) True True True False
+        erasedHead = mkSynonymTyCon (mkSystemName (unique 6213) (mkTcOcc "ErasedHeadParameter")) (mkTyConKindWithMatchability unmatchableDataConTy unusedBinders liftedTypeKind) unusedBinders liftedTypeKind [Phantom] (idType f) Nothing True True True False
         hiddenFree = mkTyConApp erasedHead [mkTyVarTy unused]
         hiddenHead = local 6214 "hidden_free_head" hiddenFree
         escapedPayload = local 6215 "head_dependent_payload" (indexed call)
@@ -4012,6 +4028,7 @@ runDepFunCoChecks dflags = do
                 liftedTypeKind
                 [Phantom]
                 concrete
+                Nothing
                 True
                 False
                 True
@@ -4165,6 +4182,7 @@ runDepFunCoChecks dflags = do
                 liftedTypeKind
                 [Phantom]
                 intTy
+                Nothing
                 True
                 True
                 True
@@ -4287,6 +4305,7 @@ runDepFunCoChecks dflags = do
                 liftedTypeKind
                 [Phantom]
                 domainA
+                Nothing
                 True
                 False
                 True
@@ -4837,6 +4856,7 @@ runChecks dflags = do
                 liftedTypeKind
                 []
                 workerTy
+                Nothing
                 True
                 False
                 False
@@ -4852,6 +4872,7 @@ runChecks dflags = do
                 liftedTypeKind
                 [Phantom]
                 intTy
+                Nothing
                 True
                 True
                 True
@@ -4868,6 +4889,7 @@ runChecks dflags = do
                 liftedTypeKind
                 [Representational]
                 (mkTyVarTy identityParameter)
+                Nothing
                 True
                 True
                 False
