@@ -463,7 +463,8 @@ test('NativeIndexedFin',
       extra_files(['NativeIndexedFinGate.hs', 'NativeGeneralGadtOperandProvider.hs', 'NativeIndexedOperandWire.hs',
                    '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']
                   + ['../../../../docs/dependent-haskell/examples/qualified-pi/' + f
-                     for f in ['ParameterizedIndexLibrary.hs', 'FinitePosition.hs', 'FinitePositionClient.hs']])],
+                     for f in ['ParameterizedIndexLibrary.hs', 'FinitePosition.hs', 'FinitePositionClient.hs',
+                               'ListCursor.hs', 'CursorClient.hs']])],
      run_command, ['bash NativeIndexedFin.sh "{compiler}" "{libdir}"'])
 test('NativeOrdinaryInline',
      [req_bco, req_host_target_ghc, only_ways(['normal']),

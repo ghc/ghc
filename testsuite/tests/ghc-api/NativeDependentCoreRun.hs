@@ -4792,7 +4792,7 @@ runSourceRejectChecks = do
         , ("duplicate constructor equation", 83605, "requires unguarded equations", [], local [] chooser ["keep True = 42", "keep True = 43"] "42")
         , ("guarded constructor equation", 83605, "requires unguarded equations", [], local [] chooser ["keep True | True = 42", "keep False = False"] "42")
         , ("wrong later constructor argument", 83865, "False", [], local [] selection ["keep True False = 42", "keep False x = x"] "42")
-        , ("linear constructor argument", 83605, "unrestricted multiplicities", ["LinearTypes"], local [] "foreach (b :: Bool) -> Select b %1 -> Select b" ["keep True x = x", "keep False x = x"] "42")
+        , ("discarded linear constructor argument", 18872, "multiplicity", ["LinearTypes"], local [] "foreach (b :: Bool) -> Select b %1 -> Select b" ["keep True x = 42", "keep False x = x"] "42")
         ,
             ( "independent choose and keep indices"
             , 83865
