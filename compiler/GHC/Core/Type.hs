@@ -2522,7 +2522,7 @@ nativeIndexType structural_fields = go []
       , parameter
       = isNativeOpaqueValueType ty
       | structural_fields
-      , isJust (nativeIndexFunctionTypeTys_maybe ty)
+      , isNativeStructuralFunctionType ty
       = True
       | otherwise
       = go path ty
@@ -2615,12 +2615,21 @@ nativeIndexFunctionTypeTys_maybe ty
   , af == FTF_T_T, eqType ma unmatchableDataConTy, isManyTy mult
   , noFreeVarsOfType ma, noFreeVarsOfType mult, noFreeVarsOfType res
   , isNativeOpaqueValueType arg, isNativeClosedIndexType res
+  , let arg_vars = tyCoVarsOfType arg
+  , not (anyFreeVarsOfType (not . (`elemVarSet` arg_vars)) ty)
   = Just (arg, res)
   | otherwise = Nothing
 
 -- | Test whether an identifier is an eligible opaque native call head.
 isNativeIndexFunctionId :: Id -> Bool
 isNativeIndexFunctionId = isJust . nativeIndexFunctionTys_maybe
+
+-- | Check a function field in a structural index schema.
+-- See Note [Function fields in native index domains].
+isNativeStructuralFunctionType :: Type -> Bool
+isNativeStructuralFunctionType ty
+  = noFreeVarsOfType ty
+    && maybe False (isNativeClosedIndexType . fst) (nativeIndexFunctionTypeTys_maybe ty)
 
 {- Note [Int# family pattern binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2728,14 +2737,17 @@ isNativeRetainedBinderType ty
 -- See Note [Opaque algebraic retained binders].
 isNativeRetainedField :: Id -> Bool
 isNativeRetainedField v
-  = isNativeIndexId v || isNativeIndexFunctionId v
-    || (isTyVarTy (varType v) && isNativeOpaqueValueId v)
+  = isNativeOpaqueValueId v
+    && (isNativeIndexType ty || isTyVarTy ty
+        || (noFreeVarsOfType (idMult v) && isNativeStructuralFunctionType ty))
+  where
+    ty = varType v
 
 -- | Check the domain of a retained constructor field before making its Id.
 -- See Note [Opaque algebraic retained binders].
 isNativeRetainedFieldType :: Type -> Bool
 isNativeRetainedFieldType ty
-  = isNativeIndexType ty || isJust (nativeIndexFunctionTypeTys_maybe ty)
+  = isNativeIndexType ty || isNativeStructuralFunctionType ty
     || (isTyVarTy ty && isNativeOpaqueValueType ty)
 
 -- | Test the head of an opaque value domain after expanding synonyms.
@@ -2808,10 +2820,11 @@ with a closed ordinary U/Many arrow. Keep all other algebraic-domain checks.
 The function remains a runtime Id. Its TermVarTy records identity without
 evaluating the function or comparing its behavior.
 
-Function results keep the closed function-free algebraic policy.
+A structural function field requires independently closed function-free
+argument and result domains. Native calls also require that result policy.
 nativeIndexType False checks every instantiated field structurally. It
 requires closed monotype parameters and disables opaque parameter fields.
-Do not use the broader predicate for results. A datatype such as
+Do not use the broader predicate for these checks. A datatype such as
 
   data Loop = Loop (Bool -> Loop)
 

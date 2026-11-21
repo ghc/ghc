@@ -305,8 +305,8 @@ Native coercion serialization and import remain blocked.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 IfaceTermAppTy stores a local function name and its index argument with tag 12.
 The enclosing telescope writes the function's domain before that name enters
-scope. The importer resolves the actual local Id and checks its closed Many
-function domain and the argument kind before constructing TermAppTy. Constructor
+scope. The importer resolves the actual local Id and checks its Many arrow,
+lifted argument domain, closed result domain and argument kind. Constructor
 fields can refer only to earlier fields. A function-valued IfaceDepFunTy uses
 the same domain check. See Note [Exported function-valued retained signatures]
 in GHC.Tc.Gen.HsType. This encoding adds no runtime call or function equality.

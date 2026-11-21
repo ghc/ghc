@@ -1929,7 +1929,8 @@ tcIfaceDomainShape IfaceLitTy{} = return NativeInvalidDomain
 tcIfaceDomainShape _ = return NativeUnknownDomain
 
 -- | Select the existing eligibility policy for a shape precheck.
-data NativeDomainUse = NativeScalarUse | NativeFunctionUse | NativeRetainedUse | NativeOpaqueUse
+data NativeDomainUse = NativeScalarUse | NativeFunctionUse | NativeStructuralFunctionUse
+                     | NativeRetainedUse | NativeOpaqueUse
                      | NativeFunctionEndpointUse
                      | NativeFieldMultUse | NativeManyMultUse | NativeUnmatchableUse
   deriving Eq
@@ -1963,7 +1964,7 @@ nativeDomainShapePossible use shape = go emptyTyConSet emptyTyConSet use shape
     go _ _ NativeOpaqueUse _ = True
     go seen aliases NativeRetainedUse shape
       = go seen aliases NativeScalarUse shape
-        || go seen aliases NativeFunctionUse shape
+        || go seen aliases NativeStructuralFunctionUse shape
     go seen aliases mode (NativeTyConDomain tc)
       | mode == NativeUnmatchableUse, tc == unmatchableDataConTyCon = True
       | mode == NativeUnmatchableUse, tc == matchableDataConTyCon = False
@@ -1985,9 +1986,9 @@ nativeDomainShapePossible use shape = go emptyTyConSet emptyTyConSet use shape
     go _ _ _ NativeUnknownDomain = True
     go _ _ _ NativeInvalidDomain = False
     go _ aliases mode (NativePiDomain mult arg res)
-      = mode == NativeFunctionUse
+      = function_use mode
         && go emptyTyConSet aliases NativeManyMultUse mult
-        && go emptyTyConSet aliases NativeFunctionEndpointUse arg
+        && go emptyTyConSet aliases (function_argument_use mode) arg
         && go emptyTyConSet aliases NativeFunctionEndpointUse res
     go seen _ mode (NativeDataDomain fields)
       = data_use mode && all field fields
@@ -1997,14 +1998,17 @@ nativeDomainShapePossible use shape = go emptyTyConSet emptyTyConSet use shape
         field_use | mode == NativeScalarUse = NativeRetainedUse
                   | otherwise = NativeFunctionEndpointUse
     go seen aliases mode (NativeFunctionDomain ma mult arg res)
-      = mode == NativeFunctionUse
+      = function_use mode
         && go seen aliases NativeUnmatchableUse ma
         && go seen aliases NativeManyMultUse mult
-        && go emptyTyConSet aliases NativeFunctionEndpointUse arg
+        && go emptyTyConSet aliases (function_argument_use mode) arg
         && go emptyTyConSet aliases NativeFunctionEndpointUse res
     go seen aliases mode (NativeSynonymDomain rhs) = go seen aliases mode rhs
 
     data_use mode = mode == NativeScalarUse || mode == NativeFunctionEndpointUse
+    function_use mode = mode == NativeFunctionUse || mode == NativeStructuralFunctionUse
+    function_argument_use NativeFunctionUse = NativeOpaqueUse
+    function_argument_use _ = NativeFunctionEndpointUse
 
 -- | Preserve the Id guards before inspecting its imported domain view.
 nativeIdDomainShapePossible :: NativeDomainUse -> Id -> Bool
@@ -2013,13 +2017,13 @@ nativeIdDomainShapePossible use v
   | use == NativeRetainedUse
   = nativeDomainShapePossible NativeScalarUse shape
     || not function_guards
-    || nativeDomainShapePossible NativeFunctionUse shape
+    || nativeDomainShapePossible NativeStructuralFunctionUse shape
   | use == NativeFunctionUse, not function_guards = True
   | otherwise = nativeDomainShapePossible use shape
   where
     shape = nativeTypeDomainShape (varType v)
     function_guards = not (isJoinIdDetails (idDetails v))
-                   && noFreeVarsOfType (idMult v) && noFreeVarsOfType (varType v)
+                   && noFreeVarsOfType (idMult v)
 
 -- | Report an early domain rejection without printing unfinished Types.
 -- See Note [Checking native domain shapes].
@@ -2043,15 +2047,16 @@ Keep the Id precheck and the typed checks after allocation as well.
 Fields permit One or Many. Function arrows and retained binders require Many.
 Function arrows require U matchability. Resolve metadata by wired TyCon
 identity, including nullary aliases.
-An algebraic domain can contain an eligible function leaf. Check its fields
-with the retained union, but check each function endpoint with the old
-function-free algebraic policy. Start a separate data visited set for each
-endpoint. An enclosing data back-edge must not certify that endpoint.
+An algebraic domain can contain an eligible function leaf. Check each
+endpoint of a structural field with the function-free algebraic policy.
+The function in a call can take an opaque lifted argument. Check its
+result with the function-free policy. Start a separate data visited set for
+each endpoint. An enclosing data back-edge must not certify that endpoint.
 A raw Pi is not scalar. mkDepFunTyWithVis can convert a vacuous visible Pi
 to an ordinary arrow. A hidden Pi remains retained. Keep the domain projection
-conservative for both flags. Retain the multiplicity, argument and result shapes. Check its possible
-function endpoints with the function-free policy before decoding its binder.
-This rejects recursive domains through a Pi without forcing their Type knots.
+conservative for both flags. Check the multiplicity, argument and result
+before decoding its binder. This rejects recursive structural domains
+through a Pi without forcing their Type knots.
 Applied synonyms and casts remain
 unknown. The precheck must not reject their possible normalization results.
 Leave constraint arrows unknown so that their decoders check scoped indices
@@ -2107,7 +2112,7 @@ tcIfaceType = go
            ; case fun_tys of
                Nothing ->
                  failIfM (text "Invalid retained call head in interface:" <+> ppr fun
-                          $$ text "Expected a local unrestricted function with closed supported domains."
+                          $$ text "Expected a local unrestricted function with a lifted argument and closed structural result."
                           $$ text "Actual type:" <+> ppr (varType f)
                           $$ text "Actual multiplicity:" <+> ppr (idMult f))
                Just (domain, _) ->
