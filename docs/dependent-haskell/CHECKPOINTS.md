@@ -28,6 +28,17 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+The combined compiler at `0869c02fcf` passed all 420 Showcase outputs
+in stripped native code at `-O0`, source-loaded GHCi and native code
+at `-O1` and `-O2`. Eighteen registered tests, the 37-row Core test
+and the evidence API checks passed.
+
+A separate ordinary client used only the provider interfaces at compile
+time. It read `Just (Token 2)` from a column of its own `Token` type.
+A type mismatch and a negative offset both returned `Nothing`. The
+test passed at `-O2` with Core and STG Lint and stripped interfaces.
+[Runtime type and bounded position](examples/qualified-pi/RuntimeTypeColumn.hs).
+
 The written-list and callback changes at `3b90104b36` passed all 417
 Showcase rows in stripped native code at `-O0`, source-loaded GHCi, and
 native code at `-O1` and `-O2`. Fourteen registered tests passed. The
