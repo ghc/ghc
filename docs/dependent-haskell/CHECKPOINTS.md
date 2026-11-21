@@ -28,6 +28,22 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `f3cc8c7849` the same two list-index equations accept a linear
+position or an unrestricted one. An ordinary client checks a runtime
+offset, packages the list and position, then opens the package and calls
+its linear reader. The direct and packaged clients both select from a
+cyclic list. A negative offset leaves an undefined list unevaluated.
+An unsupported repeated linear package pattern reports GHC-47619
+at the source pattern.
+
+The combined Stage 2 compiler matched all 407 Showcase rows at stripped
+`-O0`, default `-O1`, default `-O2`, and in GHCi. Eleven registered tests
+passed on the final family-domain integration. Its predecessor passed
+44 registered tests and the full 37-row Core API and evidence checks.
+[Linear reader](examples/qualified-pi/CursorClient.hs),
+[bounded lookup](examples/qualified-pi/ParameterizedIndexLibrary.hs)
+and [linear package regression](../../testsuite/tests/dependent/should_run/NativeLinearRetainedPackage.sh).
+
 At `189b97bf90`, an ordinary module writes a family domain below a
 required type argument. The same `renderKnown` works at `[Bool]` and
 `FieldKey 'True`. A missing domain still fails at the signature. The
