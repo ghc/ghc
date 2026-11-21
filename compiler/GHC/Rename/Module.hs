@@ -82,7 +82,7 @@ import Language.Haskell.Syntax.Specificity (Specificity(SpecifiedSpec))
 import Control.Monad
 import Data.Bifunctor ( first, second )
 import Data.Foldable ( toList, for_ )
-import Data.List ( elemIndex, find, mapAccumL, nub, partition, unzip4 )
+import Data.List ( elemIndex, find, mapAccumL, nub, partition, sortBy, unzip4 )
 import Data.List.NonEmpty ( NonEmpty(..), head, nonEmpty )
 import Data.Data (Data, cast, gmapQ, gmapT)
 import Data.Maybe (catMaybes,  isJust, isNothing, fromMaybe, mapMaybe, maybeToList )
@@ -1542,6 +1542,35 @@ liftTypeChildren visit ty@(L loc node) salt = case node of
           (ts', lifted) = unzip results
       in (L loc (rebuild ts'), concat lifted, end)
 
+-- | Report type and term definitions that share a spelling in this group.
+-- See Note [Top-level pun binding warnings].
+warnTopLevelPunBindings :: NameSet -> RnM ()
+warnTopLevelPunBindings binders =
+  forM_ (equivClasses compareSpelling names) $ \same_spelling ->
+    case partition (isTcOcc . nameOccName) (sortBy byLocation (toList same_spelling)) of
+      (type_name : _, term_name : _) ->
+        let (first_name, second_name)
+              | byLocation type_name term_name == GT = (term_name, type_name)
+              | otherwise = (type_name, term_name)
+        in addDiagnosticAt (nameSrcSpan second_name) (TcRnPunBinding second_name first_name)
+      _ -> pure ()
+  where
+    names = filter (isGoodSrcSpan . nameSrcSpan) (nonDetEltsUniqSet binders)
+    spelling = occNameFS . nameOccName
+    compareSpelling a b = lexicalCompareFS (spelling a) (spelling b)
+    byLocation a b = leftmost_smallest (nameSrcSpan a) (nameSrcSpan b)
+
+{- Note [Top-level pun binding warnings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Proposal #765 diagnoses definitions which would conflict in a single
+namespace. A local definition would shadow an import in that namespace.
+Use the names introduced by this declaration group so that imports and
+binders from an enclosing quotation scope do not cause binding warnings.
+Wait until both type and value binders are available. The diagnostic
+uses their source locations, independent of the order the renamer
+brings them into scope.
+-}
+
 {- | @rnSourceDecl@ "renames" declarations.
 It simultaneously performs dependency analysis and precedence parsing.
 It also does the following error checks:
@@ -1638,6 +1667,8 @@ rnSrcDeclsWithLambdas sigma named_wildcards lift_cases early_hidden early_scopes
                     -- They are already in scope
    traceRn "rnSrcDecls" (ppr id_bndrs) ;
    (gbl_env, lcl_env) <- extendGlobalRdrEnvRn (map (mkLocalVanillaGRE NoParent) id_bndrs) local_fix_env ;
+   whenWOptM Opt_WarnPunBindings $
+     warnTopLevelPunBindings (tc_bndrs `unionNameSet` mkNameSet (pat_syn_bndrs ++ id_bndrs)) ;
    -- See Note [Ordering local source tables].
    dependent <- xoptM LangExt.ExperimentalDependentTypes ;
    tables <- if dependent then localSourceTableBinders binds' sigs' else pure [] ;
