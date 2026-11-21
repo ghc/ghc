@@ -44,6 +44,12 @@ in a consumer that still uses the `Either` proof. Rebuild older providers
 to add the mandatory method evidence used by these tests.
 [Given and rewrite controls](../../../testsuite/tests/dependent/should_run/NativeOpenEitherFmap.sh).
 
+The `polymorphic-source-method` interface feature marks the new receiver
+evidence. A new reader can import an old unmarked interface for ordinary
+code. Promotion needs the rebuilt provider. An old reader reports GHC-47808
+when it imports the new marked interface.
+[Interface upgrade check](../examples/open-evaluation/check-polymorphic-method-upgrade.sh).
+
 ## A method in a retained result type
 
 ```haskell
