@@ -68,6 +68,28 @@ source revisions and rebuild commands, then remove both sets of outputs
 after the last live user finishes. The 200 GB threshold is a backup for
 this cleanup.
 
+## R11 retained vector equality
+
+On `5f70c2bdfc` and both normal stages of `2aacad1cf1`, matching
+`HRefl` between a successor-length vector and `VNil` reached Core Lint
+with a mixed-kind coercion binder. The same error occurred on a reachable
+match with an unknown length. The source regression is
+[NativeRetainedPackage](../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh).
+
+Rebuilding the two solver modules from `2e8659f1bc` against the
+`2aacad1cf1` compiler restored the source diagnostic. Both orientations
+of the impossible match failed with GHC-40564 at `HRefl`. Suppressing
+the warning let the same module pass Core and STG Lint at `-O0` and
+`-O2`. At both optimization levels a client ran the reachable cases
+through a stripped provider interface. A proof for a different vector
+failed with GHC-83865. The full retained-package test also passed.
+
+The ordinary pattern-synonym test `T11711` passed Core and STG Lint
+before and after the repair. Five interleaved `-fno-code` runs of
+`T9872d` allocated a median of 388,286,296 bytes before the repair
+and 388,285,656 bytes after it.
+[Design and source example](roadmap/R11-homogeneous-equality.md#an-equality-with-the-empty-vector).
+
 ## Shared R11 and R16 rebuild
 
 The v69 comparison compiler at `ae563bb342` matched all 517 Showcase

@@ -23,13 +23,13 @@ depend on others, so this count cannot estimate the remaining work time.
 | Declaration dependencies, families and GADTs | R21, R23, R24, R41 |
 | Namespace warnings | R36 |
 
-The 517-output Showcase includes a square whose row count is also its
-column count, a polymorphic vector package with a runtime length, and a
-closed family that matches `Int#`. A group of type-level let bindings can
-name the width and the type of a vector with an optional header.
-An ordinary consumer can open two vector packages independently, or
-regroup two partitions at their original length.
-[Two-stage verification](CHECKPOINTS.md#shared-r11-and-r16-rebuild).
+The 519-output Showcase proves that filtering a finite list with a
+runtime predicate cannot increase its length. The predicate can close over
+a cutoff read from `IO`. An erased package can infer its witness from
+a declared rank-n callback. A consumer can reverse the proof that a
+vector with an unknown length is empty. [Filter bound](examples/open-evaluation/PreludeFilterRuntime.hs),
+[erased callback](examples/erased-existentials/RankedPackageClient.hs)
+and [empty-vector proof](roadmap/R11-homogeneous-equality.md#an-equality-with-the-empty-vector).
 
 Earlier [Showcase milestones and examples](CHECKPOINTS.md#showcase-history-through-502-outputs)
 record how each behavior was introduced.
@@ -87,8 +87,12 @@ R16 records the method and arguments used by a checked proof. A
 client with a conflicting rewrite rule receives GHC-83605 at the
 proof use. An explicitly opaque, closed observation computed in a
 rules-off provider can be used by an optimized ordinary client.
-The next family case is a checked method in one equation of a family
-with arguments, where a disjoint equation remains usable.
+The next R12/R16 check uses a method inside a nested family application.
+A rule that changes the selected method must invalidate a proof that
+uses its result. A family equation that ignores the method result must
+still compile. R13 is testing two-list recursion with different element
+types. The first empty list must determine the result even when the
+second spine is undefined.
 [Open evaluation](roadmap/R16-open-term-evaluator.md) and
 [upgrade checks](CHECKPOINTS.md#shared-r11-and-r16-rebuild).
 
