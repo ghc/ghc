@@ -399,6 +399,11 @@ test('NativeAlternatingBinders',
       extra_files(['NativeAlternatingBindersProvider.hs', 'NativeAlternatingBindersClient.hs'])],
      run_command, ['bash NativeAlternatingBinders.sh "{compiler}" "{libdir}"'])
 
+test('NativeLiftedCallback',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['NativeLiftedCallbackProvider.hs', 'NativeLiftedCallbackClient.hs'])],
+     run_command, ['bash NativeLiftedCallback.sh "{compiler}" "{libdir}"'])
+
 test('NativeRetainedMatchability',
      [req_host_target_ghc, only_ways(['normal'])],
      run_command, ['bash NativeRetainedMatchability.sh "{compiler}" "{libdir}"'])

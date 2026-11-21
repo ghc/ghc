@@ -65,7 +65,7 @@ import {-# SOURCE #-} GHC.Core ( CoreExpr, retainedArgIndex, normaliseNativeInde
                                 nativeComputedIndex, varToCoreExpr, termVar_maybe, nativeIndexFunctionVar_maybe )
 import {-# SOURCE #-} GHC.Core.Subst ( substExpr )
 import {-# SOURCE #-} GHC.Core.Type( isCoercionTy, isNativeIndexFunctionId
-                                 , nativeIndexFunctionTys_maybe, typeKind, coreFullView )
+                                 , typeKind, coreFullView )
 
 import GHC.Core.TyCo.Make
 import {-# SOURCE #-} GHC.Core.TyCo.Compare ( eqType )
@@ -877,11 +877,12 @@ substTyCoMapper
 -- | Rename a checked function head. Return a stored range only once.
 -- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
 substNativeIndexFunction :: Subst -> Id -> Id
-substNativeIndexFunction (Subst in_scope ids _ _) f
-  = case (nativeIndexFunctionTys_maybe f, nativeIndexFunctionTys_maybe actual) of
-      (Just (arg, res), Just (arg', res'))
-        | same_domain arg arg', same_domain res res' -> actual
-      _ -> pprPanic "substTy: invalid native function head" (ppr actual)
+substNativeIndexFunction subst@(Subst in_scope ids _ _) f
+  | isNativeIndexFunctionId f, isNativeIndexFunctionId actual
+  , substTy subst (varType f) `eqType` varType actual
+  = actual
+  | otherwise = pprPanic "substTy: invalid native function head"
+                  (ppr f <+> ppr actual)
   where
     actual = case lookupVarEnv ids f of
       Nothing -> lookupInScope in_scope f `orElse` f
@@ -889,7 +890,6 @@ substNativeIndexFunction (Subst in_scope ids _ _) f
         Just g -> g
         Nothing -> pprPanic "substTy: unsupported native function range"
                      (ppr f <+> text ":=" <+> ppr rhs)
-    same_domain = eqType
 
 -- | Substitute a source index occurrence and return its target only once.
 -- See Note [Substituting runtime Id metadata].

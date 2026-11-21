@@ -4427,7 +4427,7 @@ in Note [Retained Pi type arguments].
 A complete local type can mention a lexical function in a saturated call,
 for example Vec Int (f n). The renamer keeps the actual term Names. Register
 eligible function heads in mode_indices along with scalar indices. Require
-the closed ordinary Many arrow accepted by nativeIndexFunctionTys_maybe.
+the ordinary Many arrow accepted by nativeIndexFunctionTys_maybe.
 Keep function-head eligibility separate from scalar-index eligibility.
 
 Recognize the registered head before tcInferTyApps. Check its sole value

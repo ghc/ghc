@@ -1816,14 +1816,14 @@ checkedNativeCallIndex expr result_ty
            return (TermAppTy head_id arg_index) }
   | otherwise = return Nothing
 
--- | Reconstruct a checked scalar argument for classification, not execution.
+-- | Reconstruct a checked call argument for classification, not execution.
 -- See Note [Checked source call arguments] and Note [Signed source call beta].
 checkedNativeCallArgument :: NameEnv Id -> LHsExpr GhcTc -> TcM (Maybe Core.CoreExpr)
 checkedNativeCallArgument bound expr
   = case unLoc (stripParensLHsExpr expr) of
       HsVar _ (L _ arg_id)
         | let actual = fromMaybe arg_id (lookupNameEnv bound (idName arg_id))
-        , isNativeIndexId actual -> return (Just (Core.Var actual))
+        , isNativeOpaqueValueId actual -> return (Just (Core.Var actual))
       XExpr (ConLikeTc (RealDataCon con))
         -> return (Just (Core.Var (dataConWrapId con)))
       HsApp _ fun arg
