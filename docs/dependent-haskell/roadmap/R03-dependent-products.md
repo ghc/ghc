@@ -603,3 +603,17 @@ With `[x, u]` as the first list, GHC-25897 points to the element `u`.
 With `OverloadedLists`, GHC checks the selected `fromListN` implementation
 as a function call. The ordinary list constructors do not justify equations
 for an arbitrary `IsList` instance.
+
+An ordinary caller can write `toList (zipWithExact [1,2] [10,20] (+)) :: [Int]`.
+The checked equations reduce the length of each written spine for
+arbitrary element values. GHC binds those expressions lazily and uses
+each binding in the index and in the runtime list. A later bottom remains
+unforced when the caller needs only the first result. The same scope can
+return a vector of closed length. A result that still refers to a local
+element is rejected at the source, and two local elements do not acquire
+an equality from their list lengths. This rule applies to leading written
+list operands when checked family axioms remove their element identities
+from the remaining type and constraints.
+[Haskell 2010 Report, let expressions](https://haskell.foundation/haskell-2010-revised-report/expressions.html#let-expressions),
+[GHC proposal #378, dependent application](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#dependent-application-and-the-static-subset),
+and [Agda's length-indexed zip](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html).

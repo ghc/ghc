@@ -25,19 +25,36 @@ for opt in -O0 -O1 -O2; do
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}
 module Main where
 import Control.Exception (ErrorCall, displayException, evaluate, try)
+import AlignedList (zipWithExact)
 import Data.IORef (newIORef, readIORef)
 import Data.Maybe (isJust)
 import CursorClient (observeBoth, observeZip, observeAligned, observeCursors, observeIndexedCallback, zipTwoPairs)
 import NativeLinearIndexColumns (choose)
 import FinitePositionClient (lookupVecViaView, observeConstructedViews, observeEmptyIndex, observeFinitePosition, observeListIndices)
 import NativeIndexedFinGate (Gate(..), Ticket(..), grant)
-import PackedVecLibrary (Nat(..), Vec(..))
+import PackedVecLibrary (Nat(..), Vec(..), toList)
 import ParameterizedIndexLibrary (indexVec, lookupVecChecked, mkFinGeneric, mkFinVec)
+
+written = toList (zipWithExact [1,2] [10,20] (+)) :: [Int]
+
+scopedVector =
+    let a = 1 :: Int; b = 2 :: Int; c = 10 :: Int; d = 20 :: Int
+    in zipWithExact [a,b] [c,d] (+)
+
+scopedLambda =
+    toList ((\ ~a ~b ~c ~d -> zipWithExact [a,b] [c,d] (+)) 1 2 10 20) :: [Int]
 
 main :: IO ()
 main = do
     observeFinitePosition >>= print
     observeListIndices >>= print
+    let lazyOperands =
+            take 1 (toList (zipWithExact [5 + 1, error "forced later left field"]
+                [10, error "forced later right field"] (+))) :: [Int]
+    if (written, toList scopedVector, scopedLambda, lazyOperands) ==
+        ([11,22], [11,22], [11,22], [16])
+    then pure ()
+    else fail "the retained list spine changed a field or closed result"
     both <- observeBoth
     if both == [Just ('b', 10), Just ('b', 20), Nothing] then pure () else fail (show both)
     zipped <- observeZip
@@ -216,6 +233,37 @@ if "${ghc[@]}" -O0 -DWRONG_ELEMENT -fdiagnostics-color=never -c WrittenLists.hs 
     exit 1
 fi
 grep -Fq 'WrittenLists.hs:7:42: error: [GHC-25897]' element.log
+cat >ScopedFields.hs <<'HS'
+{-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, TypeFamilies #-}
+module ScopedFields where
+import Data.Proxy
+
+remember :: foreach (xs :: [Int]) -> Proxy xs
+remember _ = Proxy
+
+sameContents :: foreach (xs :: [Int]) -> foreach (ys :: [Int]) -> (xs ~ ys) => Bool
+sameContents _ _ = True
+
+#ifdef ESCAPE
+result = let element = 1 :: Int in remember [element]
+#elif defined(DIFFERENT)
+result = let left = 1 :: Int; right = 2 :: Int in sameContents [left] [right]
+#else
+result = let element = 1 :: Int in sameContents [element] [element]
+#endif
+HS
+"${ghc[@]}" -O0 -c ScopedFields.hs
+if "${ghc[@]}" -O0 -fforce-recomp -DESCAPE -c ScopedFields.hs >escape-field.log 2>&1; then
+    echo 'Accepted a returned local element index'
+    exit 1
+fi
+grep -Eq '^ScopedFields.hs:12:[0-9]+: error: .GHC-83605.' escape-field.log
+grep -Eq 'The runtime index .element. is out of scope here\.' escape-field.log
+if "${ghc[@]}" -O0 -fforce-recomp -DDIFFERENT -c ScopedFields.hs >field-contents.log 2>&1; then
+    echo 'Equated different list contents'
+    exit 1
+fi
+grep -Eq '^ScopedFields.hs:14:[0-9]+: error: .GHC-18872.' field-contents.log
 
 cat >MatrixLength.hs <<'HS'
 {-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, ScopedTypeVariables, TypeFamilies #-}
