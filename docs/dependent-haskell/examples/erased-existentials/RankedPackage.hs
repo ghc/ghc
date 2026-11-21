@@ -4,6 +4,7 @@ module RankedPackage
     ( runCallback, runPair, runBuilder, CallbackPair, pairFor
     , Callback(..), GuardedBuilder, atTwoTypes, consumeIdentity, observeGuarded
     , PolyId, withWitness, TwoWitnessBuilder, fromLeft, fromRight, observeTwo
+    , InputAt, RankedInput, observeRankedInput
     , Hidden, PolyMaybe, observeCallback
     ) where
 
@@ -13,6 +14,14 @@ import Data.Proxy (Proxy)
 data Callback t = Callback t (t -> (Int, Bool))
 type Hidden = exists (t :: Type). Callback t
 type PolyId = forall a. a -> a
+
+type InputAt t = forall r. (t -> r) -> t -> Maybe r
+type RankedInput = exists (t :: Type). InputAt t -> Int
+
+-- | Let the receiver apply the callback or request the default.
+observeRankedInput :: Bool -> RankedInput -> Int
+observeRankedInput useCallback producer =
+    producer (\callback value -> if useCallback then Just (callback value) else Nothing)
 
 -- | Store one polymorphic identity function and use it at two types.
 hidden :: Hidden

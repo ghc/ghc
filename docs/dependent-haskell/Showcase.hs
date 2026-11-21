@@ -1395,6 +1395,8 @@ main = do
     observe "apply the second projection to the first in an ordinary module" RankedPackageClient.runProjections
     observe "project twice from the same package producer call" (map RankedPackageClient.projectAt [True,False])
     observe "infer a polymorphic lambda witness and call its builder at Int" (RankedPackage.runBuilder 11)
+    observe "infer a polymorphic witness under a callback forall"
+        (map RankedPackageClient.runRankedInput [chooseLeft, chooseRight])
     observe "infer a guarded callback and skip an unused input" RankedPackageClient.runGuarded
     observe "infer a hidden callback type from an application argument"
         (map RankedPackageClient.runArgumentWitness [False, True])
