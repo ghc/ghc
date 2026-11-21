@@ -1,7 +1,8 @@
-{-# LANGUAGE Haskell2010, NoExperimentalDependentTypes #-}
-module StoredDictionaryClient (storedDecisions) where
+{-# LANGUAGE BangPatterns, Haskell2010, NoExperimentalDependentTypes #-}
+module StoredDictionaryClient (storedDecisions, bindingDemand) where
 
-import RetainedStoredDictionary (Result(..), inspectStored)
+import Control.Exception (ErrorCall, evaluate, try)
+import RetainedStoredDictionary (Result(..), ignoreStored, inspectStored)
 import StoredDictionary (Cell(Stored), Pick(..), pack, readStored)
 
 instance Pick Bool where
@@ -14,3 +15,19 @@ storedDecisions =
         second = Stored True
         readRetained cell = case inspectStored cell of Result b -> b
     in ((readStored first, readStored second), (readRetained first, readRetained second))
+
+-- | Force the cell with a bang and leave it unevaluated with a lazy binding.
+bindingDemand :: IO (Bool, Bool)
+bindingDemand = do
+    forced <- try (evaluate strict)
+    let caught = case (forced :: Either ErrorCall Bool) of
+            Left _ -> True
+            Right _ -> False
+    pure (caught, lazy)
+  where
+    strict =
+        let !cell = error "strict cell" :: Cell [Bool]
+        in case ignoreStored cell of Result b -> b
+    lazy =
+        let cell = error "unused lazy cell" :: Cell [Bool]
+        in case ignoreStored cell of Result b -> b
