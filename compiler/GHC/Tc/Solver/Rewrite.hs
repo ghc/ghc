@@ -71,34 +71,38 @@ import qualified GHC.Data.List.Infinite as Inf
 ************************************************************************
 -}
 
--- | The 'RewriteM' monad is a wrapper around 'TcS' with a 'RewriteEnv'
+-- | The family evidence on the current path.
+-- See Note [Mixed-flavour family rewrite cycles].
+type FamilyEvidencePath = [(EqRel, TcType)]
+
+-- | The 'RewriteM' monad is a wrapper around 'TcS' with a 'RewriteEnv'.
 newtype RewriteM a
-  = RewriteM { runRewriteM :: RewriteEnv -> TcS a }
+  = RewriteM { runRewriteM :: RewriteEnv -> FamilyEvidencePath -> TcS a }
 
 -- | Smart constructor for 'RewriteM', as describe in Note [The one-shot state
 -- monad trick] in "GHC.Utils.Monad".
-mkRewriteM :: (RewriteEnv -> TcS a) -> RewriteM a
-mkRewriteM f = RewriteM (oneShot f)
+mkRewriteM :: (RewriteEnv -> FamilyEvidencePath -> TcS a) -> RewriteM a
+mkRewriteM f = RewriteM (oneShot (\env -> oneShot (f env)))
 {-# INLINE mkRewriteM #-}
 
 instance Monad RewriteM where
-  m >>= k  = mkRewriteM $ \env ->
-             do { a  <- runRewriteM m env
-                ; runRewriteM (k a) env }
+  m >>= k  = mkRewriteM $ \env path ->
+             do { a  <- runRewriteM m env path
+                ; runRewriteM (k a) env path }
 
 instance Applicative RewriteM where
-  pure x = mkRewriteM $ \_ -> pure x
+  pure x = mkRewriteM $ \_ _ -> pure x
   (<*>) = ap
 
 instance Functor RewriteM where
-  fmap f (RewriteM x) = mkRewriteM $ \env -> fmap f (x env)
+  fmap f (RewriteM x) = mkRewriteM $ \env path -> fmap f (x env path)
 
 instance HasDynFlags RewriteM where
   getDynFlags = liftTcS getDynFlags
 
 liftTcS :: TcS a -> RewriteM a
 liftTcS thing_inside
-  = mkRewriteM $ \_ -> thing_inside
+  = mkRewriteM $ \_ _ -> thing_inside
 
 -- convenient wrapper when you have a CtEvidence describing
 -- the rewriting operation
@@ -129,7 +133,7 @@ runRewrite loc flav eq_rel thing_inside
                         , re_zap_coercions = isEmptyVarEnv source_lets
                                              && isEmptyVarSet native_binders
                                              && gopt Opt_ZapCoercions dflags }
-       ; res <- runRewriteM thing_inside fmode
+       ; res <- runRewriteM thing_inside fmode []
        ; rewriters <- readTcRef rewriters_ref
        ; return (res, rewriters) }
 
@@ -138,12 +142,17 @@ traceRewriteM herald doc = liftTcS $ traceTcS herald doc
 {-# INLINE traceRewriteM #-}  -- see Note [INLINE conditional tracing utilities]
 
 getRewriteEnv :: RewriteM RewriteEnv
-getRewriteEnv
-  = mkRewriteM $ \env -> return env
+getRewriteEnv = getRewriteEnvField id
 
 getRewriteEnvField :: (RewriteEnv -> a) -> RewriteM a
 getRewriteEnvField accessor
-  = mkRewriteM $ \env -> return (accessor env)
+  = mkRewriteM $ \env _ -> return (accessor env)
+
+-- | Change the plugin-visible fields and keep the current rewrite path.
+withRewriteEnv :: (RewriteEnv -> RewriteEnv) -> RewriteM a -> RewriteM a
+withRewriteEnv f action = mkRewriteM $ \env path ->
+  runRewriteM action (f env) path
+{-# INLINE withRewriteEnv #-}
 
 getEqRel :: RewriteM EqRel
 getEqRel = getRewriteEnvField re_eq_rel
@@ -163,45 +172,43 @@ getFlavourRole
 -- | Change the 'EqRel' in a 'RewriteM'.
 setEqRel :: EqRel -> RewriteM a -> RewriteM a
 setEqRel new_eq_rel thing_inside
-  = mkRewriteM $ \env ->
+  = mkRewriteM $ \env path ->
     if new_eq_rel == re_eq_rel env
-    then runRewriteM thing_inside env
-    else runRewriteM thing_inside (env { re_eq_rel = new_eq_rel })
+    then runRewriteM thing_inside env path
+    else runRewriteM thing_inside (env { re_eq_rel = new_eq_rel }) path
 {-# INLINE setEqRel #-}
 
 -- | Normalize a retained body with its runtime binder in scope.
 -- See Note [Rewriting retained dependent functions].
 withNativeBinder :: Id -> RewriteM a -> RewriteM a
 withNativeBinder b thing_inside
-  = mkRewriteM $ \env ->
-    runRewriteM thing_inside
-      (env { re_native_binders = extendVarSet (re_native_binders env) b
-           , re_zap_coercions = False })
+  = withRewriteEnv (\env -> env { re_native_binders = extendVarSet (re_native_binders env) b
+                               , re_zap_coercions = False }) thing_inside
 {-# INLINE withNativeBinder #-}
 
 -- | Extend the runtime relation together with its side-effect scope.
 withNativeLifting :: LiftingContext -> Id -> RewriteM a -> RewriteM a
-withNativeLifting lc b thing_inside = mkRewriteM $ \env ->
-  runRewriteM (withNativeBinder b thing_inside) (env { re_native_lifting = lc })
+withNativeLifting lc b thing_inside =
+  withRewriteEnv (\env -> env { re_native_lifting = lc }) (withNativeBinder b thing_inside)
 
 -- | Skip external evidence during axiom-only reduction or under a runtime binder.
 -- See Note [Solving retained function equalities] in GHC.Tc.Solver.Equality.
 withoutExternalEvidence :: a -> RewriteM a -> RewriteM a
 withoutExternalEvidence fallback thing_inside
-  = mkRewriteM $ \env ->
+  = mkRewriteM $ \env path ->
     if not (re_fam_axioms_only env) && isEmptyVarSet (re_native_binders env)
-    then runRewriteM thing_inside env
+    then runRewriteM thing_inside env path
     else return fallback
 {-# INLINE withoutExternalEvidence #-}
 
 bumpReductionDepthRM :: Type -> RewriteM a -> RewriteM a
 bumpReductionDepthRM ty (RewriteM thing_inside)
-  = mkRewriteM $ \env -> do
+  = mkRewriteM $ \env path -> do
       { loc' <- TcS.bumpReductionDepth (re_loc env) ty
       ; let !env' = env { re_loc = loc' }
             -- !env: bumpReductionDepth can be called a lot during rewriting
             -- so we force the new env to avoid accumulating thunks
-      ; thing_inside env' }
+      ; thing_inside env' path }
 
 recordRewriter :: CtEvidence -> RewriteM ()
 -- ^ Record that we have rewritten the target with this (equality) evidence
@@ -212,11 +219,11 @@ recordRewriter :: CtEvidence -> RewriteM ()
 --
 -- Also records the evidence coercion in 're_used_cos',
 -- as per Note [Computing coercion dependencies].
-recordRewriter (CtGiven (GivenCt { ctev_evar = evar })) = mkRewriteM $ \env ->
+recordRewriter (CtGiven (GivenCt { ctev_evar = evar })) = mkRewriteM $ \env _ ->
   updTcRef (re_used_cos env) (addUnivCoDepCoVar evar)
 recordRewriter (CtWanted (WantedCt { ctev_dest = dest })) =
   case dest of
-    HoleDest hole -> mkRewriteM $ \env ->
+    HoleDest hole -> mkRewriteM $ \env _ ->
       do { updTcRef (re_rewriters env) (`addRewriter` hole)
          ; updTcRef (re_used_cos env) (addUnivCoDepHole hole) }
     other -> pprPanic "recordRewriter: non-equality constraint" (ppr other)
@@ -350,10 +357,9 @@ rewriteType loc ty
 rewriteFamilyAxioms :: CtLoc -> TcType -> TcS Reduction
 rewriteFamilyAxioms loc ty
   = do { (redn, rewriters) <- runRewrite loc Given NomEq $
-           mkRewriteM $ \env ->
-             runRewriteM (rewrite_one ty)
-               (env { re_fam_axioms_only = True, re_zap_coercions = False
-                    , re_source_lets = emptyVarEnv })
+           withRewriteEnv (\env -> env { re_fam_axioms_only = True
+                                      , re_zap_coercions = False
+                                      , re_source_lets = emptyVarEnv }) (rewrite_one ty)
        ; massert (isEmptyCoHoleSet rewriters)
        ; return redn }
 
@@ -801,7 +807,7 @@ rewrite_one ty@(TermVarTy v)
              ; let redn = downgradeRedn role Nominal (coercionRedn (mkCoVarCo proof))
              ; let rhs_env = env { re_source_lets = delVarEnv (re_source_lets env) v
                                  , re_fam_axioms_only = True }
-             ; mkRewriteM $ \_ -> runRewriteM (bumpReductionDepthRM ty (rewrite_reduction redn)) rhs_env }
+             ; withRewriteEnv (const rhs_env) (bumpReductionDepthRM ty (rewrite_reduction redn)) }
            _ -> return $! coercionRedn (liftCoSubstNative (re_native_lifting env) role v) }
   | otherwise
   = liftTcS $ failTcS $ TcRnRetainedQuantificationError (RetainedSolverType ty)
@@ -1175,7 +1181,7 @@ rewriteExactFamApp tc tys =
          FamAppNotReduced redn ->
             -- We only rewrote the arguments: nothing to zap nor cache.
            return redn
-         FamAppReduced redn worth_caching ->
+         FamAppReduced redn worth_caching _ ->
            do { -- Zap the reduction (when -fzap-coercions is on).
               ; zapped_redn <- zapRedn deps fam_ty redn
 
@@ -1206,11 +1212,12 @@ rewrite_exact_fam_app fam_ty tc tys
            -- STEP 5 (GIVEUP): the type family application did not reduce.
            FamAppNotReduced {} -> return step
            -- REWRITE-RESULT: 'F tys' rewrote to 'rhs'; now rewrite 'rhs'.
-           FamAppReduced (Reduction co rhs) worth_caching
+           FamAppReduced (Reduction co rhs) worth_caching evidence_args
              -> do { (rest_redn, rest_worth_caching)
-                       <- bumpReductionDepthRM fam_ty $ rewrite_rhs rhs
+                       <- withFamilyEvidence tc evidence_args $
+                          bumpReductionDepthRM fam_ty $ rewrite_rhs rhs
                    ; return $! FamAppReduced (co `mkTransRedn` rest_redn)
-                                             (worth_caching || rest_worth_caching) } }
+                                             (worth_caching || rest_worth_caching) Nothing } }
   where
     -- Rewrite the right-hand side of a type family reduction.
     -- Also returns whether the reduction is worth adding to the famapp cache.
@@ -1239,7 +1246,8 @@ rewrite_exact_fam_app_step tc tys
        ; case result1 of
              -- We reduced without rewriting any arguments: not worth caching.
              -- See Note [When is a reduction worth caching?]
-         { Just redn -> return $! FamAppReduced redn False
+         { Just (FreshReduction redn) -> return $! FamAppReduced redn False Nothing
+         ; Just (CachedReduction redn) -> return $! FamAppReduced redn False (Just tys)
          ; Nothing ->
 
         -- That didn't work. So reduce the arguments, in STEP 2.
@@ -1283,14 +1291,15 @@ rewrite_exact_fam_app_step tc tys
          -- STEP 3: try the inerts
        ; flavour <- getFlavour
        ; mb_eq <- withoutExternalEvidence Nothing $
-                    liftTcS $ lookupFamAppInert (`eqCanRewriteFR` (flavour, eq_rel)) tc xis
+                    lookupOnceAtFamilyApp tc xis $
+                      lookupFamAppInert (`eqCanRewriteFR` (flavour, eq_rel)) tc xis
        ; case mb_eq of
          { Just (EqCt { eq_ev = inert_ev, eq_rhs = inert_rhs, eq_eq_rel = inert_eq_rel })
              -> do { traceRewriteM "rewrite family application with inert"
                                 (ppr tc <+> ppr xis $$ ppr redn)
                    ; recordRewriter inert_ev
                      -- (WorthCaching2) in Note [When is a reduction worth caching?]
-                   ; return $! FamAppReduced (redn_args_and_then downgraded_redn) True }
+                   ; return $! FamAppReduced (redn_args_and_then downgraded_redn) True (Just xis) }
                -- This will sometimes duplicate an inert in the cache,
                -- but avoiding doing so had no impact on performance, and
                -- it seems easier not to weed out that special case
@@ -1306,13 +1315,57 @@ rewrite_exact_fam_app_step tc tys
     do { result3 <- try_to_reduce tc xis tc_rewriters
        ; case result3 of
            -- (WorthCaching1) in Note [When is a reduction worth caching?]
-           Just redn -> return $! FamAppReduced (redn_args_and_then redn) True
+           Just (FreshReduction redn) -> return $! FamAppReduced (redn_args_and_then redn) True Nothing
+           Just (CachedReduction redn) -> return $! FamAppReduced (redn_args_and_then redn) True (Just xis)
            Nothing -> do
              guarded <- rewriteFilterGuard tc xis tc_rewriters
              return $! case guarded of
-               Just redn -> FamAppReduced (redn_args_and_then redn) True
+               Just redn -> FamAppReduced (redn_args_and_then redn) True Nothing
                -- We have made no progress at all: STEP 5 (GIVEUP).
                Nothing -> FamAppNotReduced give_up }}}}}
+
+-- | Follow inert or cached family evidence while rewriting its right-hand side.
+-- See Note [Mixed-flavour family rewrite cycles].
+withFamilyEvidence :: TyCon -> Maybe [TcType] -> RewriteM a -> RewriteM a
+withFamilyEvidence _ Nothing action = action
+withFamilyEvidence tc (Just args) action = mkRewriteM $ \env path ->
+  runRewriteM action env ((re_eq_rel env, mkTyConApp tc args) : path)
+
+-- | Look up family evidence that this path has yet to use.
+lookupFamilyEvidence :: EqRel -> FamilyEvidencePath -> TyCon -> [TcType]
+                     -> TcS (Maybe a) -> TcS (Maybe a)
+lookupFamilyEvidence eq_rel path tc args lookup_evidence = do
+  { evidence <- lookup_evidence
+  ; case evidence of
+      Just _ | any same_key path -> return Nothing
+      _ -> return evidence }
+  where
+    app = mkTyConApp tc args
+    same_key (role, ty) = role == eq_rel && app `eqType` ty
+
+-- | Look up family evidence in the current rewriting context.
+lookupOnceAtFamilyApp :: TyCon -> [TcType] -> TcS (Maybe a) -> RewriteM (Maybe a)
+lookupOnceAtFamilyApp tc args lookup_evidence = mkRewriteM $ \env path ->
+  lookupFamilyEvidence (re_eq_rel env) path tc args lookup_evidence
+
+{- Note [Mixed-flavour family rewrite cycles]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose the inert set contains [G] F p ~ F q and [W] q ~ p. When
+rewriting a Wanted that mentions F q, the Wanted in the inert set can
+rewrite the argument q to p. The Given then rewrites F p back to F q.
+Wanted equalities cannot rewrite or kick out the Given, so the two
+rules can coexist even though they cycle when applied to this Wanted.
+See Note [inert_eqs: the inert equalities] in GHC.Tc.Solver.InertSet.
+
+Keep the family application and equality relation used by an inert or
+cached reduction on the path while rewriting its result. If we reach
+the same key again, leave the inert or cached evidence alone. We can
+still use a family axiom or a plugin rewrite, and the reduction-depth
+limit still applies to those rewrites. The path is local to the right-hand side:
+another occurrence in the enclosing type can use the same evidence.
+The returned coercion and its rewriter set contain only the reductions
+we performed.
+-}
 
 {- Note [Given results of checked filter predicates]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1346,7 +1399,7 @@ rewriteFilterGuard tc tys tc_rewriters
         Nothing -> return Nothing
         Just (ev, result, co) -> do
           reduced <- try_to_reduce tc (params ++ (result : rest)) tc_rewriters
-          traverse (compose ev co params rest) reduced
+          traverse (compose ev co params rest . familyReduction) reduced
   | otherwise = return Nothing
   where
     givenResult test ev
@@ -1376,6 +1429,7 @@ data FamAppRewrite
       !Reduction -- ^ the type family reduction @F tys ~ rhs@
       !Bool -- ^ is this reduction worth caching?
             -- See (FAC_WorthCaching) in Note [The family application cache].
+      !(Maybe [TcType]) -- ^ arguments used to find inert or cached evidence
 
   -- | The type family application was not reduced, but we have rewritten
   -- its arguments.
@@ -1384,7 +1438,7 @@ data FamAppRewrite
 -- | The 'Reduction' obtained by rewriting a type family application, together
 -- with whether it is worth recording in the family application cache.
 famAppRewriteRedn :: FamAppRewrite -> (Reduction, Bool)
-famAppRewriteRedn (FamAppReduced redn worth_caching) = (redn, worth_caching)
+famAppRewriteRedn (FamAppReduced redn worth_caching _) = (redn, worth_caching)
 famAppRewriteRedn (FamAppNotReduced redn)            = (redn, False)
 
 -- | Is this type a (possibly oversaturated) type family application?
@@ -1410,12 +1464,12 @@ splitTyFamApp_maybe ty
 --
 -- See Note [Computing coercion dependencies].
 trackingDependencies :: RewriteM a -> RewriteM (UnivCoDeps, a)
-trackingDependencies thing_inside = mkRewriteM $ \ env ->
+trackingDependencies thing_inside = mkRewriteM $ \env path ->
   do { let ref = re_used_cos env
      ; outer_deps <- readTcRef ref
      ; unless (isEmptyUnivCoDeps outer_deps) $
          writeTcRef ref emptyUnivCoDeps
-     ; res  <- runRewriteM thing_inside env
+     ; res  <- runRewriteM thing_inside env path
      ; deps <- readTcRef ref
        -- Restore the outer dependencies, adding on the inner ones.
      ; unless (isEmptyUnivCoDeps outer_deps) $
@@ -1868,7 +1922,7 @@ zapRedn :: UnivCoDeps -- ^ dependencies of the coercion being zapped
         -> TcType     -- ^ LHS type of the reduction
         -> Reduction
         -> RewriteM Reduction
-zapRedn deps lhs redn@(Reduction _co xi) = mkRewriteM $ \env ->
+zapRedn deps lhs redn@(Reduction _co xi) = mkRewriteM $ \env _ ->
   if not (re_zap_coercions env)
   then return redn
   else
@@ -1973,15 +2027,22 @@ checkZappedRedn dflags deps r lhs_ty (Reduction co xi)
                          ]
        }
 
--- | Try to reduce a type family application.
--- Returns a 'Reduction' whose role is the role in the 'RewriteM' monad.
+-- | The reducer distinguishes cached evidence from fresh reductions.
+data FamilyReduction = FreshReduction !Reduction | CachedReduction !Reduction
+
+-- | Get the reduction without its source.
+familyReduction :: FamilyReduction -> Reduction
+familyReduction (FreshReduction redn) = redn
+familyReduction (CachedReduction redn) = redn
+
+-- | Try to reduce a type family application at the current role.
 --
 -- See Note [How to normalise a family application]
 try_to_reduce :: TyCon -> [TcType] -> [TcPluginRewriter]
-              -> RewriteM (Maybe Reduction)
+              -> RewriteM (Maybe FamilyReduction)
 try_to_reduce tc tys tc_rewriters
-  = do { rewrite_env <- getRewriteEnv
-       ; let -- Record the dependencies of this reduction, to handle any
+  = mkRewriteM $ \rewrite_env path ->
+    do { let -- Record the dependencies of this reduction, to handle any
              -- reduction introduced by plugins or looked up in the famapp cache.
              record_deps :: Maybe Reduction -> TcS (Maybe Reduction)
              record_deps mb_redn
@@ -1997,39 +2058,38 @@ try_to_reduce tc tys tc_rewriters
              match_fam = wrapTcS $ TcM.setCtLocM (re_loc rewrite_env) $
                            matchFamTcM tc tys
 
-       ; result <- liftTcS $
-           if re_fam_axioms_only rewrite_env
+       ; let eq_rel = re_eq_rel rewrite_env
+       ; result <- if re_fam_axioms_only rewrite_env
               || not (isEmptyVarSet (re_native_binders rewrite_env))
            -- Global family axioms do not emit constraints or update caches.
            -- See Note [Rewriting retained dependent functions].
-           then match_fam
+           then fmap FreshReduction <$> match_fam
            else firstJustsM
               [ -- STEP 1a & STEP 4a
-                record_deps
-                  =<< runTcPluginRewriters rewrite_env tc_rewriters tys
+                fmap FreshReduction <$> (record_deps
+                  =<< runTcPluginRewriters rewrite_env tc_rewriters tys)
               , -- STEP 1b & STEP 4b
-                record_deps
-                  =<< lookupFamAppCache tc tys
+                fmap CachedReduction <$> (record_deps =<<
+                  lookupFamilyEvidence eq_rel path tc tys (lookupFamAppCache tc tys))
               , -- STEP 1c & STEP 4c
-                match_fam
+                fmap FreshReduction <$> match_fam
               ]
-       ; traverse downgrade result }
+       ; traverse (downgrade eq_rel) result }
   where
     -- The result above is always Nominal. We might want a Representational
     -- coercion; this downgrades (and prints, out of convenience).
-    downgrade :: Reduction -> RewriteM Reduction
-    downgrade redn
-      = do { traceRewriteM "Eager T.F. reduction success" $
+    downgrade :: EqRel -> FamilyReduction -> TcS FamilyReduction
+    downgrade eq_rel result
+      = do { traceTcS "Eager T.F. reduction success" $
              vcat [ ppr tc
                   , ppr tys
-                  , ppr redn
+                  , ppr (familyReduction result)
                   ]
-           ; eq_rel <- getEqRel
-              -- manually doing it this way avoids allocation in the vastly
-              -- common NomEq case
-           ; case eq_rel of
-               NomEq  -> return redn
-               ReprEq -> return $! mkSubRedn redn }
+             -- Return the original result in the common nominal case.
+           ; return $! case (eq_rel, result) of
+               (NomEq, _) -> result
+               (ReprEq, FreshReduction redn) -> FreshReduction (mkSubRedn redn)
+               (ReprEq, CachedReduction redn) -> CachedReduction (mkSubRedn redn) }
 
 -- Retrieve all type-checking plugins that can rewrite a (saturated) type-family application
 -- headed by the given 'TyCon`.

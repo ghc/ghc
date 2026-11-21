@@ -1,0 +1,58 @@
+WantedFamilyRewriteCycle.hs:15:18: error: [GHC-25897]
+    • Could not deduce ‘q ~ p’
+      from the context: Width p ~ Width q
+        bound by the type signature for:
+                   badDirect :: forall (p :: Bool) (q :: Bool).
+                                (Width p ~ Width q) =>
+                                Proxy p -> Proxy q -> (q :~: p, Width q :~: Width p)
+        at WantedFamilyRewriteCycle.hs:(13,1)-(14,65)
+      Expected: q :~: p
+        Actual: q :~: q
+      ‘q’ is a rigid type variable bound by
+        the type signature for:
+          badDirect :: forall (p :: Bool) (q :: Bool).
+                       (Width p ~ Width q) =>
+                       Proxy p -> Proxy q -> (q :~: p, Width q :~: Width p)
+        at WantedFamilyRewriteCycle.hs:(13,1)-(14,65)
+      ‘p’ is a rigid type variable bound by
+        the type signature for:
+          badDirect :: forall (p :: Bool) (q :: Bool).
+                       (Width p ~ Width q) =>
+                       Proxy p -> Proxy q -> (q :~: p, Width q :~: Width p)
+        at WantedFamilyRewriteCycle.hs:(13,1)-(14,65)
+    • In the expression: Refl
+      In the expression: (Refl, Refl)
+      In an equation for ‘badDirect’: badDirect _ _ = (Refl, Refl)
+    • Relevant bindings include
+        badDirect :: Proxy p -> Proxy q -> (q :~: p, Width q :~: Width p)
+          (bound at WantedFamilyRewriteCycle.hs:15:1)
+
+WantedFamilyRewriteCycle.hs:19:18: error: [GHC-25897]
+    • Could not deduce ‘q ~ p’
+      from the context: Payload p ~ Maybe (Payload q)
+        bound by the type signature for:
+                   badNested :: forall (p :: Bool) (q :: Bool).
+                                (Payload p ~ Maybe (Payload q)) =>
+                                Proxy p -> Proxy q -> (q :~: p, Payload p :~: Maybe (Payload q))
+        at WantedFamilyRewriteCycle.hs:(17,1)-(18,77)
+      Expected: q :~: p
+        Actual: q :~: q
+      ‘q’ is a rigid type variable bound by
+        the type signature for:
+          badNested :: forall (p :: Bool) (q :: Bool).
+                       (Payload p ~ Maybe (Payload q)) =>
+                       Proxy p -> Proxy q -> (q :~: p, Payload p :~: Maybe (Payload q))
+        at WantedFamilyRewriteCycle.hs:(17,1)-(18,77)
+      ‘p’ is a rigid type variable bound by
+        the type signature for:
+          badNested :: forall (p :: Bool) (q :: Bool).
+                       (Payload p ~ Maybe (Payload q)) =>
+                       Proxy p -> Proxy q -> (q :~: p, Payload p :~: Maybe (Payload q))
+        at WantedFamilyRewriteCycle.hs:(17,1)-(18,77)
+    • In the expression: Refl
+      In the expression: (Refl, Refl)
+      In an equation for ‘badNested’: badNested _ _ = (Refl, Refl)
+    • Relevant bindings include
+        badNested :: Proxy p
+                     -> Proxy q -> (q :~: p, Payload p :~: Maybe (Payload q))
+          (bound at WantedFamilyRewriteCycle.hs:19:1)
