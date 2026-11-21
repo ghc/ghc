@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
-module IndexedPrefix (CheckedList, negatedCons, elements) where
+module IndexedPrefix (CheckedList, negatedCons, elements, withElements) where
 
 import Data.Type.Equality ((:~:)(Refl))
 
@@ -14,3 +14,8 @@ negatedCons b bs = CheckedList (not b : bs) Refl
 -- | Read the stored list without inspecting its elements.
 elements :: CheckedList xs -> [Bool]
 elements (CheckedList ys _) = ys
+
+-- | Pass the stored list and its index equality to a consumer.
+withElements :: CheckedList xs
+             -> (foreach (ys :: [Bool]) -> (xs :~: ys) -> r) -> r
+withElements (CheckedList ys proof) k = k ys proof
