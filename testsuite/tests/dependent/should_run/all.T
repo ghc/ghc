@@ -616,6 +616,11 @@ test('NativeDataFamilyRetainedDomain',
       extra_files(['data-family-promotion'])],
      run_command, ['bash NativeDataFamilyRetainedDomain.sh "{compiler}" "{libdir}"'])
 
+test('NativeDataFamilyConstructorOperands',
+     [req_host_target_ghc, req_interp, only_ways(['normal']),
+      extra_files(['data-family-promotion'])],
+     run_command, ['bash NativeDataFamilyConstructorOperands.sh "{compiler}" "{libdir}"'])
+
 test('NativePromotedClassBoundary',
      [req_host_target_ghc, only_ways(['normal']), extra_files(['promoted-class'])],
      run_command, ['bash NativePromotedClassBoundary.sh "{compiler}" "{libdir}"'])

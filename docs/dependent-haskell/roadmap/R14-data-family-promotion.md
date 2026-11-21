@@ -80,10 +80,29 @@ That cast has representational role.
 [Dependent type design](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#term-variables-in-types)
 and [data family discussion](https://github.com/ghc-proposals/ghc-proposals/discussions/456).
 
+## Written constructor operands
+
+An ordinary client can call an imported dependent function with
+`Tup2 True False`. The result can name the exact promoted constructor
+at the public kind `Tuple Bool Bool`. The check accepts the constructor
+wrapper or its worker with the matching data family instance axiom. It
+checks both endpoints at representational role and uses the public
+constructor directly as the type index. It keeps the original runtime
+cast and preserves lazy fields.
+
+An optimized unfolding that contains a retained data family constructor
+operand uses the `retained-data-family-constructor-operand` interface
+marker. It can also carry the Natural literal marker. The current reader
+checks the constructor fields against the promoted telescope, including
+fields that refer to local runtime binders. An older reader refuses the
+new marker at the interface header. The test checks the nominal result,
+an ordinary source-hidden client, an undemanded field, and rejection of
+wrong fields and strict constructors.
+[Constructor operand test](../../../testsuite/tests/dependent/should_run/NativeDataFamilyConstructorOperands.sh).
+
 ## Next acceptance check
 
-`track (Tup2 True False) :: At ('Tup2 'True 'False)` still fails with
-GHC-83605 at the operand. Accept the checked constructor wrapper and
-its worker with the exact runtime instance coercion. Recover the
-promoted constructor at the public family kind. A different field or
-representation cast must fail.
+Test a constructor with a context or a result refinement after specifying
+how its promoted telescope carries the required evidence. Discussion #456
+identifies the coercion binder question for constrained constructors.
+[Discussion #456](https://github.com/ghc-proposals/ghc-proposals/discussions/456).
