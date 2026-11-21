@@ -317,6 +317,32 @@ types.
 [Quick Look, Figure 5](https://www.microsoft.com/en-us/research/wp-content/uploads/2020/01/quick-look-icfp20.pdf),
 and [Agda's erased vector indices](https://agda.readthedocs.io/en/stable/language/runtime-irrelevance.html).
 
+With `ImpredicativeTypes`, the callback can also consume two independently
+filtered vectors and return one package with two hidden lengths. In the
+source-hidden test,
+`withBoth (producer id) (filterVec odd xs) (filterVec even ys)` supplies the
+result of an unsigned local binding. The local producer takes a rank-2
+transformer and returns a declared `PackedPair a`. The checker matches both
+callback inputs with one substitution and checks the complete package before
+it opens the inputs. The caller's element type stays in scope. A callback
+that requires the lengths to coincide, or leaves either input length free
+in its result, cannot supply this schema. A consumer that demands one
+common input length fails at the second input. A reader that demands one
+common output length fails at the inferred result binding's use.
+Reading the first cell of either result leaves its tail and the other
+input lazy.
+
+An Agda record can bind two erased length fields and give each vector
+field its own length index. Matching the record brings each field into
+scope. In GHC the declared dot package supplies that relationship before
+ordinary application checking. The probe handles leading callback
+quantifiers and directly opened payload arguments. A quantifier after a
+supplied value argument still needs a result annotation. A consumer with
+a fixed package result works without `ImpredicativeTypes`.
+[Source-hidden local producer](../../../testsuite/tests/dependent/should_run/implicit-existential-source/QuickLookForward.hs),
+[Agda record telescopes](https://agda.readthedocs.io/en/v2.8.0/language/record-types.html),
+and [Agda erased record fields](https://agda.readthedocs.io/en/v2.8.0/language/runtime-irrelevance.html#syntax).
+
 ### A nonrecursive local package pattern
 
 An ordinary client can write `let (value, reader) = p in reader value`

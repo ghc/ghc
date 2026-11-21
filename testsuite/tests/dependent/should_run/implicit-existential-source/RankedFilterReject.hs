@@ -4,6 +4,11 @@ module RankedFilterReject where
 import Filter (filterVec, toList)
 import ForwardSchemas (keepInput, lateResult)
 import Vector (Vec, consumeVector)
+#if defined(SHARED_CALLBACK) || defined(SHARED_INPUTS) || defined(SHARED_RESULT) || defined(ESCAPING_SECOND)
+import ForwardSchemas (Restricted, restrict)
+import Nested (packPair)
+import NestedSignature (PackedPair)
+#endif
 
 #ifdef ESCAPE_LENGTH
 escapeLength :: Vec n Int -> ()
@@ -15,6 +20,38 @@ lateBinder :: Vec n Int -> ()
 lateBinder xs =
     let result = consumeVector (lateResult True) (filterVec odd xs)
     in result `seq` ()
+#elif defined(SHARED_CALLBACK) || defined(SHARED_INPUTS) || defined(SHARED_RESULT) || defined(ESCAPING_SECOND)
+reject :: Vec i Int -> Vec j Int -> ()
+reject xs ys =
+    let result = withBoth producer (filterVec odd xs) (filterVec even ys)
+#ifdef SHARED_RESULT
+    in commonLength result
+#else
+    in result `seq` ()
+#endif
+  where
+#if defined(SHARED_CALLBACK)
+    producer :: forall n. Vec n Int -> Vec n Int -> PackedPair Int
+    producer left right = packPair left right
+#elif defined(ESCAPING_SECOND)
+    producer :: forall n m. Vec n Int -> Vec m Int -> Restricted m Int
+    producer left right = restrict right left
+#else
+    producer :: forall n m. Vec n Int -> Vec m Int -> PackedPair Int
+    producer left right = packPair left right
+#endif
+
+#ifdef SHARED_INPUTS
+    withBoth :: (forall n m. Vec n Int -> Vec m Int -> r) -> Vec k Int -> Vec k Int -> r
+#else
+    withBoth :: (forall n m. Vec n Int -> Vec m Int -> r) -> Vec l Int -> Vec k Int -> r
+#endif
+    withBoth use left right = use left right
+
+#ifdef SHARED_RESULT
+    commonLength :: (Vec n Int, Vec n Int) -> ()
+    commonLength _ = ()
+#endif
 #else
 badPredicate :: Vec n Int -> [Int]
 badPredicate xs =
