@@ -28,6 +28,13 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+The regular Hadrian self-host at `74731c9f19` completed with the stock
+libraries and all 429 Showcase rows in the four modes. The source change
+at `0609d6bf6b` passed 430 rows in those modes. An ordinary `[Int]`
+client obtained `[11,22]` from two written lists. Source-hidden tests
+checked sharing and an undefined later element under ordinary and strict
+defaults at `-O0`, `-O1` and `-O2`. Four registered tests passed.
+
 At `16b14c445e`, Hadrian built a regular Stage 2 compiler and the stock
 libraries. This compiler rebuilt `GHC.Internal.Base` and stripped
 `GHC.Internal.Data.Foldable` with Core and STG Lint. The installed list

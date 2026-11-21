@@ -7203,6 +7203,16 @@ original fields and the equality of the two lengths at the call.
 [Agda 2.8.0, implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html)
 and [Agda standard library 2.3, vector operations](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html).
 
+### Ordinary fields in a list indexed by its length
+
+Agda's `Vec.zipWith` requires a common length and permits different
+element types. A Haskell caller can establish that same length from the
+constructors of two written lists. A field can contain an overloaded
+literal or a computation. The fork shares that expression in an explicitly
+lazy binding so that constructing the spine preserves demand under `Strict`.
+[Agda standard library, vector operations](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html)
+and [GHC User's Guide, strict-by-default pattern bindings](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/strict.html#strict-by-default-pattern-bindings).
+
 ### Written character indices
 
 GHC proposal #387 supplies `Char` literals in types and `KnownChar`.

@@ -57,6 +57,10 @@ rank-2 callback and infer the hidden length of the second filter.
 
 An ordinary caller can write `zipWithExact [x, y] [u, v] (,)`. GHC
 checks both lengths at compile time and infers both element types.
+The same caller can write `toList (zipWithExact [1, 2] [10, 20] (+))`
+at type `[Int]` and obtain `[11,22]`. The proof uses the two list
+constructors on each side. The elements keep their ordinary numeric
+meaning and stay lazy until the result demands them.
 [Written list example](roadmap/R03-dependent-products.md#zip-two-lists-at-a-common-length).
 
 A column can store a `TypeRep a` beside values of hidden element type
