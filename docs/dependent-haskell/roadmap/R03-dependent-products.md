@@ -293,7 +293,7 @@ representation with its values. On a successful `eqTypeRep` comparison,
 checks the signed offset against those values. A type mismatch leaves
 both the offset and the values unevaluated. A negative offset at the
 correct type leaves the values unevaluated.
-The same example uses an invisible binder in `lookupColumnInferred`.
+The same example uses a leading invisible binder in `lookupColumnInferred`.
 The expected `Maybe Char` supplies the requested type. A column of Bool
 still leaves the offset and its values unevaluated.
 
@@ -369,6 +369,8 @@ An exported unfolding can use the existing representational visibility cast
 when its result type does not refer to the runtime argument. The direct call
 `map selected` works with shallow and deep subsumption. Quick Look still
 rejects `map $ selected` and the direct call with `ImpredicativeTypes`.
+A flat equation cannot yet name a runtime TypeRep witness whose invisible
+binder follows a visible retained binder.
 
 - [x] Give a visible source binder an erased type variable and a value
   whose representation is `TypeRep a`. Check a provider and a source-hidden

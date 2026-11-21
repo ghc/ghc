@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE NoExperimentalDependentTypes #-}
 {-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RankNTypes #-}
@@ -29,3 +30,6 @@ main = do
   print (map selected [(), ()], selectInts [4], useOrdinary selected)
   print (id reflected :: TypeRep Bool)
   print (selected (error "unused payload" :: Int))
+  let label :: Label 18446744073709551616
+      label = labelWith 18446744073709551616 (error "unused payload" :: Bool)
+  print (readLabel label)

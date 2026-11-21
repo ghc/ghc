@@ -1,13 +1,17 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ExperimentalDependentTypes #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 module NativeRetainedTypeWitnessLib
-  (preserve, duplicate, onlyBool, selected, preserveImplicit, reflected) where
+  (preserve, duplicate, onlyBool, selected, preserveImplicit, reflected,
+   Label, labelWith, readLabel) where
 
 import Data.Kind (Type)
+import Numeric.Natural (Natural)
 import Type.Reflection
 
 preserve :: foreach (a :: Type) -> a -> a
@@ -35,3 +39,12 @@ preserveImplicit x = x
 
 reflected :: foreach (a :: Type). TypeRep a
 reflected = a
+
+type role Label nominal
+data Label (n :: Natural) = Label Natural String
+
+labelWith :: foreach (a :: Type). foreach (n :: Natural) -> a -> Label n
+labelWith n _ = Label n (show a)
+
+readLabel :: Label n -> (Natural, String)
+readLabel (Label n name) = (n, name)
