@@ -89,6 +89,7 @@ import GHC.Tc.Utils.TcMType qualified as TcM
 import GHC.Tc.Solver.InertSet
 
 import GHC.Core.ConLike (ConLike(..))
+import GHC.Core.DataCon (dataConContextFieldCount)
 import GHC.Core.FamInstEnv ( reduceScopedSumPayload_maybe, reduceTyFamApp_maybe )
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr )
@@ -2556,14 +2557,25 @@ tc_sub_type_deep fun_pos@(tc_fun, pos) ds_depth unify inst_orig ctxt ty_actual t
              Just (witness, res) -> (<.> witness) <$> go res ty_e'
              Nothing -> go1 ty_a' ty_e' }
 
-    -- If ty_actual is not a rho-type, instantiate it first; otherwise
-    -- unification has no chance of succeeding.
+    -- TopSub leaves the expected terminal context quantified. Match an
+    -- equal sigma before instantiating it. Read the metavariables already
+    -- solved by the preceding fields. Their multiplicity still uses the
+    -- normal constructor subsumption rule.
     go1 ty_a ty_e
-      | let (tvs, theta, _) = tcSplitSigmaTy ty_a
-      , not (null tvs && null theta)
-      = do { (in_wrap, in_rho) <- topInstantiate inst_orig ty_a
-           ; body_wrap <- go in_rho ty_e
-           ; return (body_wrap <.> in_wrap) }
+      | TopSub <- ds_depth
+      , Just (XExpr (ConLikeTc (RealDataCon con))) <- tc_fun
+      , Just _ <- dataConContextFieldCount con
+      , isSigmaTy ty_a, isSigmaTy ty_e
+      = do { actual <- liftZonkM $ zonkTcType ty_a
+           ; expected <- liftZonkM $ zonkTcType ty_e
+           ; if tcEqType actual expected
+             then just_unify actual expected
+             else instantiate_actual ty_a ty_e }
+
+    -- Instantiate an actual sigma before comparing its result.
+    go1 ty_a ty_e
+      | isSigmaTy ty_a
+      = instantiate_actual ty_a ty_e
 
     -- Main case: FunTy vs FunTy. go_fun does the work.
     go1 (FunTy { ft_af = af1, ft_ma = act_ma, ft_mult = act_mult, ft_arg = act_arg, ft_res = act_res })
@@ -2625,6 +2637,11 @@ tc_sub_type_deep fun_pos@(tc_fun, pos) ds_depth unify inst_orig ctxt ty_actual t
                               ; return (mkWpCastN cow) }
 
     -- FunTy/FunTy case: this is where we insert any necessary eta-expansions.
+    instantiate_actual ty_a ty_e
+      = do { (in_wrap, in_rho) <- topInstantiate inst_orig ty_a
+           ; body_wrap <- go in_rho ty_e
+           ; return (body_wrap <.> in_wrap) }
+
     go_fun :: FunTyFlag -> Type -> Mult -> TcType -> TcType -- actual FunTy
            -> FunTyFlag -> Type -> Mult -> TcType -> TcType -- expected FunTy
            -> TcM HsWrapper

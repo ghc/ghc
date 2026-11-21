@@ -3602,6 +3602,9 @@ reifyTyCon tc
 
 reifyDataCon :: Bool -> [Type] -> DataCon -> TcM TH.Con
 reifyDataCon isGadtDataCon tys dc
+  | Just _ <- dataConInteriorContext dc
+  = noTH InteriorConstructorContext (dataConWrapperType dc)
+  | otherwise
   = do { let -- used for H98 data constructors
              (ex_tvs, theta, arg_tys)
                  = dataConInstSig dc tys
@@ -3629,10 +3632,13 @@ reifyDataCon isGadtDataCon tys dc
                | otherwise = splitAt (length g_user_tvs - late_count) g_user_tvs
              late_count = dataConLateTyVarCount dc
              g_theta   = substTys tvb_subst g_theta'
+             (early_theta, late_theta)
+               | dataConHasTrailingContext dc = ([], g_theta)
+               | otherwise = (g_theta, [])
              g_arg_tys = map (substScaledTy tvb_subst) g_arg_tys'
              g_res_ty  = substTy tvb_subst g_res_ty'
              ordered_args
-               | null late_tvs = retained
+               | dataConTerminalOrder dc == 0 = retained
                | otherwise = map (const Nothing) g_arg_tys
 
        ; r_arg_tys <- if null ordered_args
@@ -3643,12 +3649,18 @@ reifyDataCon isGadtDataCon tys dc
            if | not (null ordered_args) -> do
                   { (args, result) <- reifyRetainedGadtArgs ordered_args dcdBangs g_arg_tys g_res_ty
                   ; result' <- case late_tvs of
-                      [] -> pure result
-                      -- Keep the whole group in one ForallVisT.
+                      [] -> do { ctxt <- reifyCxt late_theta
+                               ; pure (if null ctxt then result else TH.ForallT [] ctxt result) }
+                      -- Keep the whole group in one forall node.
                       -- See Note [Terminal constructor foralls in TH] in GHC.ThToHs.
-                      _ -> do { tvs <- reifyTyVarBndrs [Bndr (binderVar tv) () | tv <- late_tvs]
-                              ; ma <- reifyType unmatchableDataConTy
-                              ; pure (TH.ForallMatchT ma (TH.ForallVisT tvs result)) }
+                      _ -> do { ma <- reifyType unmatchableDataConTy
+                              ; group <- if dataConHasTrailingContext dc
+                                  then do { tvs <- reifyTyVarBndrs [Bndr (binderVar tv) SpecifiedSpec | tv <- late_tvs]
+                                          ; ctxt <- reifyCxt late_theta
+                                          ; pure (TH.ForallT tvs ctxt result) }
+                                  else do { tvs <- reifyTyVarBndrs [Bndr (binderVar tv) () | tv <- late_tvs]
+                                          ; pure (TH.ForallVisT tvs result) }
+                              ; pure (TH.ForallMatchT ma group) }
                   ; pure (TH.RetainedGadtC [name] args result') }
               | not (null fields) && not isGadtDataCon ->
                   return $ TH.RecC name (zip3 (map reifyFieldLabel fields)
@@ -3673,7 +3685,7 @@ reifyDataCon isGadtDataCon tys dc
               | otherwise ->
                   return $ TH.NormalC name (dcdBangs `zip` r_arg_tys)
 
-       ; let (ex_tvs', theta') | isGadtDataCon = (early_tvs, g_theta)
+       ; let (ex_tvs', theta') | isGadtDataCon = (early_tvs, early_theta)
                                | otherwise     = assert (all isTyVar ex_tvs)
                                                  -- no covars for haskell syntax
                                                  (map mk_specified ex_tvs, theta)

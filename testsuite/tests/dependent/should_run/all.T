@@ -626,8 +626,14 @@ test('NativePromotedClassBoundary',
       extra_files(['promoted-class',
                    '../../../../docs/dependent-haskell/examples/erased-existentials/ImplicitVector.hs',
                    '../../../../docs/dependent-haskell/examples/open-evaluation/ScopedClassMethod.hs',
+                   '../../../../docs/dependent-haskell/examples/qualified-pi/RetainedNaturals.hs',
                    '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs'])],
      run_command, ['bash NativePromotedClassBoundary.sh "{compiler}" "{libdir}"'])
+
+test('NativeScopedStoredDictionary',
+     [req_host_target_ghc, req_interp, only_ways(['normal']),
+      extra_files(['promoted-class'])],
+     run_command, ['bash NativeScopedStoredDictionary.sh "{compiler}" "{libdir}"'])
 
 test('NativeScopedDictionaryWire',
      [req_host_target_ghc, req_interp, req_rts_linker, only_ways(['normal']),

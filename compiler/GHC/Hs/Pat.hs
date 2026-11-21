@@ -331,8 +331,10 @@ data ConPatTc
       cpt_binds :: TcEvBinds
 
     , -- | Extra wrapper to pass to the matcher
-      -- Only relevant for pattern-synonyms;
-      --   ignored for data cons
+      -- For a pattern synonym, apply the required arguments.
+      -- For a constructor with a trailing context, bind evidence from
+      -- checking its fields before the trailing context enters scope.
+      -- See Note [Trailing constructor evidence] in GHC.HsToCore.Match.Constructor.
       cpt_wrap  :: HsWrapper
     }
 

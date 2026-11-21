@@ -2796,10 +2796,15 @@ kcConDecl _ new_or_data _tc_res_kind
     kcRuntimeGadtConBndrs outer_bndrs inner_bndrs $
     do { traceTc "kcConDecl:GADT {" (ppr names $$ ppr res_ty)
        ; con_res_kind <- newOpenTypeKind
-       ; case HsDecls.splitGadtTerminalForAll args res_ty of
-           Nothing -> discardResult $ tcCheckLHsTypeInContext res_ty (TheKind con_res_kind)
-           Just (tele, _, result) ->
-             kcRuntimeConTelescope [tele] $
+       ; case HsDecls.splitGadtTerminal args res_ty of
+           Nothing
+             | Just (context, field, result) <- HsDecls.splitGadtInteriorContext args res_ty ->
+               kcRuntimeConTelescope [context] $
+               do { discardResult $ tcCheckLHsTypeInContext result (TheKind con_res_kind)
+                  ; discardResult $ tcConArg (getArgExpKind new_or_data con_res_kind) IsPrefixConGADT field }
+             | otherwise -> discardResult $ tcCheckLHsTypeInContext res_ty (TheKind con_res_kind)
+           Just (nodes, _, result) ->
+             kcRuntimeConTelescope nodes $
              discardResult $ tcCheckLHsTypeInContext result (TheKind con_res_kind)
 
        ; let arg_exp_kind = getArgExpKind new_or_data con_res_kind
@@ -5343,7 +5348,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _ tag_map
        ; dflags <- getDynFlags
        ; let build_one (L loc con_name) = setSrcSpanA loc $
                do { rep_nm <- newTyConRepName con_name
-                  ; buildDataConWithTelescope 0 retained fam_envs
+                  ; buildDataConWithTelescope (LegacyConOrder 0) retained fam_envs
                       (SrcBangOpts (initBangOpts dflags)) con_name False rep_nm
                       bangs
                       [] univ_tvs ex_tvs user_bndrs eq_preds [] arg_tys' res_ty' rep_tycon tag_map }
@@ -5360,11 +5365,20 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
   = addErrCtxt (DataConDefCtxt names) $
     do { traceTc "tcConDecl 1 gadt" (ppr names)
        ; let L _ name :| _ = names
-       ; let (terminal, late_count, hs_result)
-               = case HsDecls.splitGadtTerminalForAll hs_args hs_res_ty of
-                   Nothing -> ([], 0, hs_res_ty)
-                   Just (group, count, result) -> ([group], count, result)
-       ; when (late_count /= 0 && new_or_data == NewType) $
+       ; let (terminal, terminal_order, final_field, hs_result)
+               = case HsDecls.splitGadtInteriorContext hs_args hs_res_ty of
+                   Just (context, field, result) -> ([context], 0, Just field, result)
+                   Nothing -> case HsDecls.splitGadtTerminal hs_args hs_res_ty of
+                     Nothing -> ([], 0, Nothing, hs_res_ty)
+                     Just (groups, count, result) -> (groups, count, Nothing, result)
+       ; let is_context (L _ HsGadtContext{}) = True
+             is_context _ = False
+             fields = case (hs_args, final_field) of
+               (PrefixConGADT ann prefix, Just field) -> PrefixConGADT ann (prefix ++ [field])
+               _ -> hs_args
+       ; when ((terminal_order /= 0 || isJust final_field) &&
+               (new_or_data == NewType ||
+                (any is_context terminal && any is_context inner_bndrs))) $
            setSrcSpanA (getLoc hs_res_ty) $
            failWithTc (TcRnNestedForallsContexts NFC_GadtConSig)
        ; skol_info <- mkSkolemInfo (DataConSkol name)
@@ -5389,7 +5403,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
 
                    -- See Note [Datatype return kinds]
                  ; let exp_kind = getArgExpKind new_or_data res_kind
-                 ; btys <- tcConGADTArgs exp_kind hs_args
+                 ; btys <- tcConGADTArgs exp_kind fields
 
                  ; let (arg_tys, stricts) = unzip btys
                  ; field_lbls <- lookupConstructorFields $ noUserRdr name
@@ -5430,11 +5444,16 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
        ; dflags <- getDynFlags
        ; let
            buildOneDataCon (L _ name) = do
-             { is_infix <- tcConIsInfixGADT name hs_args
+             { is_infix <- tcConIsInfixGADT name fields
              ; rep_nm   <- newTyConRepName name
 
              ; let bang_opts = SrcBangOpts (initBangOpts dflags)
-             ; buildDataConWithTelescope late_count [] fam_envs bang_opts name is_infix
+             ; let order
+                     | isJust final_field =
+                         OrderedConArgs [ConTypeArgs (length tvbndrs'), ConValueArgs 1,
+                                         ConContextArgs (length ctxt'), ConValueArgs 1]
+                     | otherwise = LegacyConOrder terminal_order
+             ; buildDataConWithTelescope order [] fam_envs bang_opts name is_infix
                             rep_nm stricts field_lbls
                             univ_tvs ex_tvs tvbndrs' eq_preds
                             ctxt' arg_tys' res_ty' rep_tycon tag_map
@@ -6443,13 +6462,17 @@ checkValidDataCon dflags existential_ok tc con
             --    type family Star where Star = Type
             --    newtype T :: Type where MkT :: Int -> (T :: Star)
 
-        ; when (dataConLateTyVarCount con /= 0) $
+        ; when (dataConTerminalOrder con /= 0 || isJust (dataConInteriorContext con)) $
             do { let (early, late) = dataConUserTyVarGroups con
                      (_, ex_tvs, eq_spec, theta, _, _) = dataConFullSig con
-                     prefix_types = map (varType . binderVar) early ++ theta ++
+                     prefix_theta = if dataConHasTrailingContext con then [] else theta
+                     prefix_types = map (varType . binderVar) early ++ prefix_theta ++
                        concatMap (\(Scaled mult ty) -> [mult, ty]) arg_tys
                      late_vars = mkVarSet (binderVars late)
-               ; checkTc (null ex_tvs && null eq_spec
+               ; checkTc ((null ex_tvs ||
+                            (dataConTerminalOrder con == gadtTrailingContextOnly &&
+                             all isTyVar ex_tvs))
+                          && null eq_spec
                           && null (dataConStupidTheta con)
                           && not (isDataFamInstTyCon tc)
                           && not (isTypeDataCon con)

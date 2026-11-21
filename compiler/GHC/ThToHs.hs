@@ -782,7 +782,7 @@ cvtRetainedGadtArgs :: [TH.RetainedGadtArg] -> TH.Type
 cvtRetainedGadtArgs args result = do
   (fields, binders) <- prefix args
   body <- suffix binders
-  when (null binders && isNothing (HsDecls.splitGadtTerminalForAll (PrefixConGADT noExtField fields) body)) $
+  when (null binders && isNothing (HsDecls.splitGadtTerminal (PrefixConGADT noExtField fields) body)) $
     failWith (MalformedType TypeLevel result)
   pure (fields, body)
   where
@@ -808,15 +808,16 @@ cvtRetainedGadtArgs args result = do
 
 {- Note [Terminal constructor foralls in TH]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For a prefix constructor with a terminal required group, use RetainedGadtC.
+For a prefix constructor with a terminal forall or context, use RetainedGadtC.
 Each GadtValueArg represents a retained value field and carries its source
 bang and multiplicity. GadtC carries only the bang and field type. The
-terminal required group sits in the result Type as a ForallVisT, with its
-matchability annotation when present. A ForallC still wraps the leading
-invisible binders and context.
+result Type contains a ForallVisT for a required group or a ForallT with
+its trailing context. A context alone uses ForallT without binders.
+Keep the matchability annotation when present.
+A ForallC still wraps the leading invisible binders and context.
 
 If the argument list has no GadtIndexArg, accept this representation only
-for a nonempty field prefix followed by a terminal required group. Use the
+for a nonempty field prefix followed by a supported terminal group. Use the
 same shape check as for the source declaration. This preserves the scope of
 the required variables and rejects suffixes outside the supported syntax.
 The existing binary representation carries all these fields.

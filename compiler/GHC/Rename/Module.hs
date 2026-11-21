@@ -4571,11 +4571,17 @@ rnConDecl (ConDeclGADT { con_names   = names
             else rnLHsType ctxt res_ty
         ; (mods', mods_fvs) <- rnModifiersContextAndWarn ctxt mods
 
-         -- Keep a terminal required group on the source side of the
-         -- declaration. Check the result after that group.
-       ; let con_result = case HsDecls.splitGadtTerminalForAll new_args new_res_ty of
-                            Just (_, _, result) -> result
-                            Nothing             -> new_res_ty
+         -- Keep terminal groups on the source side of the declaration.
+         -- The prefix fields have already been renamed in their own scope.
+       ; let has_leading_context = not (null (gadtTelescopeContexts inner_bndrs'))
+             con_result
+               | Just (groups, _, result) <- HsDecls.splitGadtTerminal new_args new_res_ty
+               , not has_leading_context || null (gadtTelescopeContexts groups)
+               = result
+               | not has_leading_context
+               , Just (_, _, result) <- HsDecls.splitGadtInteriorContext new_args new_res_ty
+               = result
+               | otherwise = new_res_ty
        ; addNoNestedForallsContextsErr ctxt NFC_GadtConSig con_result
 
         ; let all_fvs = fvs2 `plusFN` fvs3 `plusFN` mods_fvs

@@ -3,6 +3,7 @@ module GHC.Core.Dependent (
     hasNativeDependentProgram,
     supportsNativeGentle,
     supportsNativeRuleBinds,
+    supportsNativeUserUnfolding,
     supportsScopedDictionaryCore,
     hasRetainedRuleHead, supportsLocalUserRule, supportsErasedUserRule,
     supportsImportedErasedRule, supportsImportedUserRule,
@@ -14,7 +15,8 @@ module GHC.Core.Dependent (
     isRetainedVanillaDefaultMethod,
     rejectNativeDependentProgram,
     rejectNativeDependentExpr,
-    hasScopedDictionaryProgram, hasScopedDictionaryExpr, hasScopedDictionaryType, rejectScopedDictionaryProgram, rejectScopedDictionaryExpr,
+    hasScopedDictionaryProgram, hasScopedDictionaryExpr, hasScopedDictionaryType,
+    isScopedSelectorReceiver, rejectScopedDictionaryProgram, rejectScopedDictionaryExpr,
 ) where
 
 import GHC.Prelude
@@ -60,7 +62,7 @@ data ScanState = ScanState
 -- | Select which retained forms the scan looks for.
 data ScanPurpose
     = DetectNative | CheckGentle | CheckUserRules | CheckErasedTypes | DetectScopedDictionaries
-    | CheckScopedDictionaryCore
+    | CheckScopedDictionaryCore | FindScopedSelectorReceiver Id
 
 -- | Select which bound-Id metadata a boundary can demand.
 data MetadataScan = AllMetadata | StableMetadata | NoMetadata
@@ -94,6 +96,11 @@ supportsNativeGentle binds =
 supportsNativeRuleBinds :: CoreProgram -> Bool
 supportsNativeRuleBinds binds =
     not (runScanFor CheckUserRules AllMetadata (foldMap scanBind binds))
+
+-- | Check the expression forms in a retained unfolding without forcing IdInfo.
+supportsNativeUserUnfolding :: CoreExpr -> Bool
+supportsNativeUserUnfolding expr =
+    not (runScanFor CheckUserRules NoMetadata (scanExpr expr))
 
 -- | Admit the scoped dictionary codec and the retained binders it needs.
 -- Other retained proofs and computations still require separate validation.
@@ -286,6 +293,24 @@ hasScopedDictionaryType :: Type -> Bool
 hasScopedDictionaryType =
     runScanFor DetectScopedDictionaries NoMetadata . scanType
 
+-- | Does this binder occur as the receiver of a selector in the remaining type?
+-- See Note [Arguments of a method-indexed function].
+isScopedSelectorReceiver :: Id -> Type -> Bool
+isScopedSelectorReceiver binder =
+    runScanFor (FindScopedSelectorReceiver binder) NoMetadata . scanType
+
+{- Note [Arguments of a method-indexed function]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In a signature such as
+
+  inspect :: Choose a => foreach (x :: a) -> foreach (n :: Natural)
+                      -> Mark (choose x) n
+
+the selector needs the local identity of x. Substituting a literal for
+n preserves that identity. Check the actual receiver throughout the
+remaining type, including the domain of a later binder.
+-}
+
 -- | Keep experimental dictionary types out of ordinary CorePrep.
 rejectScopedDictionaryProgram :: CoreProgram -> IO ()
 rejectScopedDictionaryProgram binds =
@@ -317,6 +342,7 @@ gentleForm scan = NativeScan $ do
         CheckGentle    -> runNativeScan scan
         CheckUserRules -> runNativeScan scan
         DetectScopedDictionaries -> runNativeScan scan
+        FindScopedSelectorReceiver{} -> runNativeScan scan
         _           -> pure True
 
 -- | Check retained binders and operands in the scoped dictionary codec.
@@ -327,12 +353,14 @@ dictionaryOperandForm children = NativeScan $ do
       CheckScopedDictionaryCore -> children
       _ -> gentleForm children
 
--- | Check the children of a dictionary form only at its Core interface boundary.
-scopedDictionaryForm :: NativeScan -> NativeScan
-scopedDictionaryForm children = NativeScan $ do
+-- | A selector carries a receiver. A dictionary binder only scopes its body.
+scopedDictionaryForm :: Maybe Id -> NativeScan -> NativeScan
+scopedDictionaryForm receiver children = NativeScan $ do
     purpose <- gets scanPurpose
     case purpose of
       CheckScopedDictionaryCore -> runNativeScan children
+      FindScopedSelectorReceiver target
+        | receiver /= Just target -> runNativeScan children
       _ -> pure True
 
 -- | Exclude shape diagnostics from the scan for actual dictionary forms.
@@ -341,6 +369,7 @@ unsupportedShape invalid = NativeScan $ do
     purpose <- gets scanPurpose
     pure $ case purpose of
       DetectScopedDictionaries -> False
+      FindScopedSelectorReceiver{} -> False
       _ -> invalid
 
 -- | Detect an erased form and check its children at each supported use.
@@ -483,10 +512,10 @@ scanSynonym tc
 -- | Inspect syntax and synonym bodies, including unused synonym arguments.
 scanType :: Type -> NativeScan
 scanType (DepDictTy dict body) =
-    scopedDictionaryForm (unsupportedShape (not (isNativeClassDictionaryId dict))
+    scopedDictionaryForm Nothing (unsupportedShape (not (isNativeClassDictionaryId dict))
                           <> scanAnnotations dict <> scanType body)
-scanType (ClassAppTy _ inst (TermVarTy dict) arg@(TermVarTy _) kind) =
-    scopedDictionaryForm (unsupportedShape (not (isNativeClassDictionaryId dict))
+scanType (ClassAppTy _ inst (TermVarTy dict) arg@(TermVarTy receiver) kind) =
+    scopedDictionaryForm (Just receiver) (unsupportedShape (not (isNativeClassDictionaryId dict))
                           <> scanAnnotations dict <> scanType inst <> scanType arg <> scanType kind)
 scanType ClassAppTy{} = NativeScan (pure True)
 scanType (TyVarTy tv) = scanVarKind tv
@@ -510,7 +539,11 @@ scanType (CoercionTy co) = scanCo co
 -- | Apply the retained binder checks, including Note [Abstract witness domains]
 -- in GHC.Core.Type.
 scanRetainedIndex :: Var -> NativeScan
-scanRetainedIndex v = unsupportedShape (not (isNativeRetainedBinder v))
+scanRetainedIndex v = NativeScan $ do
+    purpose <- gets scanPurpose
+    runNativeScan $ case purpose of
+      FindScopedSelectorReceiver{} -> scanAnnotations v
+      _ -> unsupportedShape (not (isNativeRetainedBinder v))
 
 -- | Check the head and its annotation without examining the function body.
 scanCallHead :: Id -> NativeScan

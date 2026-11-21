@@ -1,0 +1,11 @@
+GadtInteriorContextScope.hs:11:13: error: [GHC-25897]
+    • Couldn't match expected type ‘a’ with actual type ‘Int’
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          wrong :: forall a. Two a -> Bool
+        at GadtInteriorContextScope.hs:10:1-22
+    • In the pattern: Tag (type Int)
+      In the pattern: Two (Tag (type Int)) _
+      In an equation for ‘wrong’: wrong (Two (Tag (type Int)) _) = True
+    • Relevant bindings include
+        wrong :: Two a -> Bool (bound at GadtInteriorContextScope.hs:11:1)

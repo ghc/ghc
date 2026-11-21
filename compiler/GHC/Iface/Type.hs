@@ -3033,6 +3033,9 @@ data IfaceEvidence
   | RetainedDataFamilyConOperandEvidence
   | TerminalGadtForAllEvidence
   | TerminalGadtContextEvidence
+  | TerminalGadtTrailingContextEvidence
+  | TerminalGadtContextOnlyEvidence
+  | InteriorGadtContextEvidence
   deriving (Bounded, Enum, Eq, Ord)
 
 -- | Requirements of an interface payload. See Note [Versioning retained evidence]

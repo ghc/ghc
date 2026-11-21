@@ -32,7 +32,8 @@ module GHC.Core.DataCon (
         dataConUnivTyVars, dataConExTyCoVars, dataConUnivAndExTyCoVars,
         dataConConcreteTyVars,
         dataConUserTyVars, dataConUserTyVarBinders,
-        dataConLateTyVarCount, dataConUserTyVarGroups,
+        dataConTerminalOrder, dataConLateTyVarCount, dataConUserTyVarGroups, dataConHasTrailingContext,
+        dataConSourceOrder, dataConInteriorContext, dataConContextFieldCount,
         dataConTheta,
         dataConStupidTheta,
         dataConOtherTheta,
@@ -463,7 +464,7 @@ data DataCon
         --    with the set of dcUnivTyVars whose tyvars do not appear in dcEqSpec
         -- So dcUserTyVarBinders is a subset of (dcUnivTyVars ++ dcExTyCoVars)
         -- See Note [DataCon user type variable binders]
-        dcLateTyVarCount :: !Int,
+        dcSourceOrder :: !ConSourceOrder,
         dcUserTyVarBinders :: [TyVarBinder],
 
         dcEqSpec :: [EqSpec],   -- Equalities derived from the result type,
@@ -1153,11 +1154,11 @@ mkDataConWithRetainedArgs :: [Maybe Id] -- ^ Retained binders, aligned with orig
           -> DataCon
   -- Can get the tag from the TyCon
 
-mkDataConWithRetainedArgs = mkDataConWithTelescope 0
+mkDataConWithRetainedArgs = mkDataConWithTelescope (LegacyConOrder 0)
 
 -- | Build a constructor with an ordered source telescope.
 -- See Notes [Terminal constructor type arguments] and [Retained constructor field telescopes].
-mkDataConWithTelescope :: Int          -- ^ Type binders following the value fields
+mkDataConWithTelescope :: ConSourceOrder -- ^ Constructor argument order
           -> [Maybe Id]               -- ^ Retained binders, aligned with original fields
           -> Name
           -> Bool               -- ^ Is the constructor declared infix?
@@ -1187,7 +1188,7 @@ mkDataConWithTelescope :: Int          -- ^ Type binders following the value fie
           -> DataCon
   -- Can get the tag from the TyCon
 
-mkDataConWithTelescope late_tyvar_count arg_binders name declared_infix prom_info
+mkDataConWithTelescope source_order arg_binders name declared_infix prom_info
           arg_stricts  -- Must match orig_arg_tys 1-1
           impl_bangs   -- Must match orig_arg_tys 1-1
           str_marks    -- Must be empty or match dataConRepArgTys 1-1
@@ -1257,7 +1258,7 @@ mkDataConWithTelescope late_tyvar_count arg_binders name declared_infix prom_inf
                   dcExTyCoVars = ex_tvs,
                   dcConcreteTyVars = conc_tvs,
                   dcUserTyVarBinders = user_tvbs,
-                  dcLateTyVarCount = late_tyvar_count,
+                  dcSourceOrder = source_order,
                   dcEqSpec = eq_spec,
                   dcOtherTheta = theta,
                   dcStupidTheta = stupid_theta,
@@ -1306,8 +1307,9 @@ mkDataConWithTelescope late_tyvar_count arg_binders name declared_infix prom_inf
       -- Tiresome!  And unnecessary because these tyvars are never looked at
     prom_arg_bndrs   = [ mkAnonTyConBinder (mkTyVar n t)
      {- Visible -}     | (n,t) <- dropList theta fresh_names `zip` map scaledThing orig_arg_tys ]
+    late_tyvar_count = legacyConOrder source_order
     (early_prom_bndrs, late_prom_bndrs)
-      | late_tyvar_count == 0 = (prom_tv_bndrs, [])
+      | late_tyvar_count <= 0 = (prom_tv_bndrs, [])
       | otherwise = splitAt (length prom_tv_bndrs - late_tyvar_count) prom_tv_bndrs
     prom_bndrs       = early_prom_bndrs ++ prom_arg_bndrs ++ late_prom_bndrs
     prom_res_kind    = orig_res_ty
@@ -1327,7 +1329,7 @@ mkDataConWithTelescope late_tyvar_count arg_binders name declared_infix prom_inf
       = pprPanic "promoteDataCon: retained field telescope" (ppr name)
 
     roles field_role
-      | late_tyvar_count /= 0
+      | late_tyvar_count > 0
       = map (const Nominal) early_prom_bndrs
         ++ map (const field_role) prom_arg_bndrs
         ++ map (const Nominal) late_prom_bndrs
@@ -1476,15 +1478,45 @@ dataConUserTyVars (MkData { dcUserTyVarBinders = tvbs }) = binderVars tvbs
 dataConUserTyVarBinders :: DataCon -> [TyVarBinder]
 dataConUserTyVarBinders = dcUserTyVarBinders
 
--- | Number of required type arguments after the value fields.
+-- | Source order attached to the constructor's existing argument arrays.
+-- See Note [Interior constructor contexts].
+dataConSourceOrder :: DataCon -> ConSourceOrder
+dataConSourceOrder = dcSourceOrder
+
+-- | The historical terminal order.
+dataConTerminalOrder :: DataCon -> Int
+dataConTerminalOrder = legacyConOrder . dataConSourceOrder
+
+-- | Number of fields checked before an interior context.
+dataConInteriorContext :: DataCon -> Maybe Int
+dataConInteriorContext = conInteriorContext . dataConSourceOrder
+
+-- | Position of a written context after at least one field.
+dataConContextFieldCount :: DataCon -> Maybe Int
+dataConContextFieldCount con
+  | dataConHasTrailingContext con = Just (dataConSourceArity con)
+  | otherwise = dataConInteriorContext con
+
+-- | Number of type arguments after the value fields.
 dataConLateTyVarCount :: DataCon -> Int
-dataConLateTyVarCount = dcLateTyVarCount
+dataConLateTyVarCount = max 0 . dataConTerminalOrder
+
+-- | Does the context follow the fields and any late type binders?
+-- See Note [Terminal constructor type arguments].
+dataConHasTrailingContext :: DataCon -> Bool
+dataConHasTrailingContext con
+  | dataConTerminalOrder con == gadtTrailingContextOnly = True
+  | (_, Bndr _ vis : _) <- dataConUserTyVarGroups con = isSpecifiedForAllTyFlag vis
+  | otherwise = False
 
 -- | The type binders before and after the value fields.
 dataConUserTyVarGroups :: DataCon -> ([TyVarBinder], [TyVarBinder])
-dataConUserTyVarGroups (MkData { dcUserTyVarBinders = binders, dcLateTyVarCount = late })
+dataConUserTyVarGroups con
   | late == 0 = (binders, [])
   | otherwise = splitAt (length binders - late) binders
+  where
+    binders = dataConUserTyVarBinders con
+    late = dataConLateTyVarCount con
 
 -- | Dependent (kind-level) equalities in a constructor.
 -- There are extracted from the existential variables.
@@ -1733,25 +1765,64 @@ dataConWrapperTypeUnchecked con@(MkData { dcOtherTheta = theta, dcOrigArgTys = a
                                  dcOrigArgBinders = arg_binders,
                                  dcOrigResTy = res_ty,
                                  dcStupidTheta = stupid_theta })
+  | Just n <- dataConInteriorContext con
+  , (prefix, suffix) <- splitAt n arg_tys
   = mkForAllTys [(unmatchableDataConTy, bndr) | bndr <- early] $
-    mkInvisFunTys (stupid_theta ++ theta) $
+    mkInvisFunTys stupid_theta $
+    mkRetainedArgTys [] prefix $
+    mkInvisFunTys theta $
+    mkRetainedArgTys [] suffix res_ty
+  | otherwise
+  = mkForAllTys [(unmatchableDataConTy, bndr) | bndr <- early] $
+    mkInvisFunTys (stupid_theta ++ early_theta) $
     mkRetainedArgTys arg_binders arg_tys $
-    mkForAllTys [(unmatchableDataConTy, bndr) | bndr <- late] res_ty
+    mkForAllTys [(unmatchableDataConTy, bndr) | bndr <- late] $
+    mkInvisFunTys late_theta res_ty
   where
     (early, late) = dataConUserTyVarGroups con
+    (early_theta, late_theta)
+      | dataConHasTrailingContext con = ([], theta)
+      | otherwise = (theta, [])
 
 {- Note [Terminal constructor type arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A source type such as `forall a. Int -> forall b -> G a b` puts the required
-type argument after the field. Keep its position in the wrapper and in
-pattern checking. The worker still binds all type variables before its
-representation fields. The source context comes before the fields and can
-use only the early binders. When checking a pattern, its Givens are in
-scope for the field patterns, the terminal type patterns, and the RHS.
-Store the size of one terminal required group. The promoted constructor
-follows source argument order.
+The source type can put a required or specified type group after its fields.
+Keep its position in the wrapper and in pattern checking. The worker still
+binds all type variables and evidence before its representation fields.
+
+The supported terminal groups are distinct. A required group can have a
+context before the fields. A specified group has its context after its
+binders and has no context before the fields. A context alone can also
+follow the fields. It uses the context-only marker in the terminal order
+field. The wrapper and pattern operations use the decoded binder count
+and context position. A pattern receives the Givens from a trailing context after its earlier
+field and type patterns. The wrapper takes each dictionary in the same
+place as its source constraint. The promoted constructor follows source
+argument order when it has a promotable context.
 Its term wrapper disqualifies it from structural native index domains.
 See Note [Algebraic runtime index domains] in GHC.Core.Type.
+-}
+
+{- Note [Interior constructor contexts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A prefix GADT constructor can have a context between two fields.
+
+  Two :: forall a. Tag a -> (a ~ Int) => Tag a -> Two a
+
+Store the source order in groups of type binders, fields and predicates.
+Each group consumes its entries from the existing DataCon arrays. The
+wrapper takes its arguments in this order. The worker still takes its
+type arguments and evidence before its representation fields.
+
+Pattern checking introduces the written equality after the first
+field pattern. The second pattern can use it. Zonking and desugaring
+bind the resulting evidence at the same boundary. See Note [Trailing
+constructor evidence] in GHC.HsToCore.Match.Constructor.
+
+Ordinary and terminal forms still use LegacyConOrder. Their interface
+tags and payloads are the same. An interface with an interior context
+stores the full group order for that constructor and checks it against
+its decoded arrays. See GHC.IfaceToCore.tcIfaceDataCons.
 -}
 
 -- | Return retained binders for representation fields. An empty list denotes
@@ -2173,12 +2244,15 @@ dataConUserTyVarBindersNeedWrapper :: DataCon -> Bool
 dataConUserTyVarBindersNeedWrapper (MkData { dcUnivTyVars = univ_tvs
                                            , dcExTyCoVars = ex_tvs
                                            , dcUserTyVarBinders = user_tvbs
-                                           , dcLateTyVarCount = late_tyvars
+                                           , dcSourceOrder = source_order
                                            , dcEqSpec = eq_spec })
   = assert (null eq_spec || answer)  -- all GADTs should say "yes" here
     answer
   where
-    answer = late_tyvars /= 0 || need_reorder || need_flag_cast
+    answer = noncanonical || need_reorder || need_flag_cast
+    noncanonical = case source_order of
+      LegacyConOrder n -> n /= 0
+      OrderedConArgs{} -> True
     need_reorder   = (univ_tvs ++ ex_tvs) /= binderVars user_tvbs
     need_flag_cast = any (not . isCoreTyLamForAllTyFlag)
                          (binderFlags user_tvbs)

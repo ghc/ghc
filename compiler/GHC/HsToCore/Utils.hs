@@ -198,14 +198,14 @@ worthy of a type synonym and a few handy functions.
 
 firstPat :: EquationInfoNE -> Pat GhcTc
 firstPat (EqnMatch { eqn_pat = pat }) = unLoc pat
-firstPat (EqnDone {}) = error "firstPat: no patterns"
+firstPat _ = error "firstPat: expected a match column"
 
 shiftEqns :: Functor f => f EquationInfoNE -> f EquationInfo
 -- Drop the first pattern in each equation
 shiftEqns = fmap shift
   where
     shift (EqnMatch { eqn_rest = rest }) = rest
-    shift eqn@(EqnDone {}) = pprPanic "shiftEqns" (ppr eqn)
+    shift eqn = pprPanic "shiftEqns" (ppr eqn)
 
 combineEqnRhss :: NonEmpty EquationInfo -> DsM (MatchResult CoreExpr)
 combineEqnRhss = pure . foldr1 combineMatchResults . fmap eqnMatchResult

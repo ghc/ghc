@@ -53,7 +53,8 @@ import GHC.Core.Class ( Class, classTyVars )
 import GHC.Core.ConLike ( ConLike(..) )
 import GHC.Core.DataCon ( DataCon, dataConConcreteTyVars, dataConFullSig, dataConName, isNewDataCon, dataConOrigArgTys, dataConOrigResTy, dataConRepArgBinders, dataConTyCon, dataConUserTyVars, dataConWorkId, dataConWrapId )
 import qualified GHC.Core as Core
-import GHC.Core.Dependent ( hasNativeDependentExpr, supportsQuickLookType )
+import GHC.Core.Dependent ( hasNativeDependentExpr, hasScopedDictionaryType
+                          , isScopedSelectorReceiver, supportsQuickLookType )
 import GHC.Core.FamInstEnv (FamInstEnvs, reduceTyFamApp_maybe)
 import GHC.Core.Make ( mkCharExpr, mkNaturalExpr )
 import GHC.Core.Reduction ( Reduction(..) )
@@ -3615,15 +3616,16 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
     go1 plan fun_orig pos acc fun_ty args
       | DepDictTy binder _ <- coreFullView fun_ty
       , not (null args), inst_fun args Inferred
-      = do { givens <- getLexicalGivens
+      = do { givens <- liftZonkM . mapM zonkId =<< getLexicalGivens
+           ; predicate <- liftZonkM (zonkTcType (varType binder))
            ; dict <- case filter (\d -> isNativeClassDictionaryId d
-                                    && varType d `tcEqType` varType binder) givens of
+                                    && varType d `tcEqType` predicate) givens of
                [dict] -> return dict
-               [] | noFreeVarsOfType (varType binder) ->
+               [] | noFreeVarsOfType predicate ->
                  do { defer <- goptM Opt_DeferTypeErrors
                     ; when defer $
                         failWithTc $ TcRnRetainedQuantificationError (RetainedSolverType fun_ty)
-                    ; ev <- newWanted fun_orig Nothing (varType binder)
+                    ; ev <- newWanted fun_orig Nothing predicate
                     ; emitSimple (mkNonCanonical ev)
                     ; return (ctEvEvId ev) }
                _ -> failWithTc $ TcRnRetainedQuantificationError (RetainedSolverType fun_ty)
@@ -3666,12 +3668,13 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
     -- See Note [Retained argument application].
     go1 plan fun_orig pos acc fun_ty
         (EValArg { ea_arg = arg, ea_loc_span = ctxt } : rest_args)
-      | DepFunTy DepFunVisible binder _ <- coreFullView fun_ty
+      | DepFunTy DepFunVisible binder body <- coreFullView fun_ty
       = do { (core_arg, runtime_arg) <- tcRetainedOperand binder arg
            ; case core_arg of
                Core.Var index | isNativeOpaqueValueId index -> pure ()
-               _ | hasScopedDictionaryPrefix fun_sigma ->
-                     failWithTc $ TcRnRetainedQuantificationError RetainedCallIndex
+               _ | isScopedSelectorReceiver binder body ->
+                     setSrcSpanA (getLoc arg) $
+                       failWithTc $ TcRnRetainedQuantificationError RetainedSelectorReceiver
                  | otherwise -> pure ()
            ; body_ty <- retainedAppResult fun_ty binder core_arg
            ; arg_co <- retainedVariableCast core_arg runtime_arg
@@ -3983,6 +3986,11 @@ result can consume the indexed call while the ID is in scope. The
 retained-index escape checks still apply if the ID occurs in the result.
 Disallow deferred type errors on this path. The source prototype cannot
 assert that an unsolved predicate supplies a class dictionary.
+
+A constructor pattern can instantiate its dictionary with type metavariables
+that the scrutinee has already fixed. Zonk the predicates before comparing
+them. Keep the original evidence Id and reject competing lexical Givens
+before asking the ordinary solver for a ground instance.
 -}
 
 -- | Resolve the index at the binder's checked scalar or function domain.
@@ -4090,10 +4098,13 @@ tcScopedClassOperand result_ty call
        ; if not enabled then return Nothing else do
        { selector <- tcLookupIdMaybe (unLocWithUserRdr method_name)
        ; actual <- tcLookupLcl_maybe (unLocWithUserRdr operand_name)
-       ; givens <- getLexicalGivens
+       ; index_id <- case actual of
+           Just ATcId{tct_id = index} -> Just <$> liftZonkM (zonkId index)
+           _ -> return Nothing
+       ; givens <- liftZonkM . mapM zonkId =<< getLexicalGivens
        ; return $ do
            sel <- selector
-           ATcId{tct_id = index} <- actual
+           index <- index_id
            guard (isNativeOpaqueValueId index)
            let inst = varType index
            (predicate, domain, result) <- Core.nativeClassSelectorTys sel inst
@@ -4115,6 +4126,8 @@ An ordinary Wanted can solve to the right Given but produce a fresh
 dictionary let binder. Keeping that alias in the result would allow a
 let-bound index to escape. Do not make this alias equal to the Given.
 Only a unique lexical Given of the selector's exact predicate qualifies.
+Read the operand's instantiated type and multiplicity before matching a
+constructor field. Use the original operand and evidence Ids.
 This path does not look for superclasses or global instances.
 -}
 
@@ -6040,7 +6053,10 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
                      in addArgCtxt (pos + fromMaybe 0 after_vta) rn_head arg $
                         do { ty <- liftZonkM (zonkTcType (actual_type entry))
                            ; loc <- getCtLocM (lexprCtOrigin arg) (Just TypeLevel)
-                           ; view <- reductionReducedType <$> tcRewriteFamilyAxioms loc ty
+                           ; view <- if not native_worker && not index_route
+                                        && hasScopedDictionaryType ty && isTauTy ty && isFamFreeTy ty
+                                     then return ty
+                                     else reductionReducedType <$> tcRewriteFamilyAxioms loc ty
                            ; return (loc, (domain_at pos, callback_view (domain_at pos) view)) }
                    match_indices = tcMatchRetainedIndexArgs (bind_outer tvs)
              ; initial_cache <- infer_args needed_tvs inferable domains 1 args
@@ -6338,6 +6354,13 @@ argument list and VTA offset as infer_args. The depth diagnostic must identify
 that argument. See Note [Bounded frontend family views] in GHC.Tc.Solver.
 Use the same normalized views for initial matching, extra matching and the
 final exact-domain check. This does not unwrap newtypes or invert families.
+
+For a family-free tau type with a scoped selector, keep the zonked type.
+For example, the first field of the pair passed to snd can contain
+compareOrigin @c dict x. The family rewriter cannot rewrite that selector.
+Match it as part of the original type. The complete choices still pass
+tcRetainedInstScope, which checks the receiver and the exact lexical Given.
+This path does not provide a coercion for a different selector application.
 
 Keep the original expression, inferred type and usage in each cache entry.
 tcValArgsWithCache checks that original type against the selected domain with

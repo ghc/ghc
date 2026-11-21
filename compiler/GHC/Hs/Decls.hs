@@ -74,7 +74,7 @@ module GHC.Hs.Decls (
   ConDecl(..), LConDecl,
   HsConDeclH98Details, HsConDeclGADTDetails(..),
   AnnConDeclGADT(..),
-  hsConDeclTheta, splitGadtTerminalForAll,
+  hsConDeclTheta, splitGadtTerminal, splitGadtInteriorContext,
   getConNames, getRecConArgs_maybe,
   -- ** Document comments
   DocDecl(..), LDocDecl, docDeclDoc,
@@ -116,6 +116,7 @@ import GHC.Hs.Binds (ActivationAnn(..),
 import GHC.Hs.Type
 import GHC.Hs.Doc
 import GHC.Types.Basic
+import GHC.Types.Var (Specificity(SpecifiedSpec))
 import GHC.Core.Coercion
 
 import GHC.Hs.Basic
@@ -996,23 +997,56 @@ pprConDeclTelescope teles body = foldr step (body <> closes) teles
       = forAllLit <> dot <+> rest
       | otherwise = pprHsForAllTelescope tele <+> rest
 
--- | Recognize a required group between a nonempty prefix of fields and the
--- result. Keep the group in the parsed result to preserve its source order.
-splitGadtTerminalForAll :: HsConDeclGADTDetails (GhcPass pass) -> LHsType (GhcPass pass)
-                        -> Maybe (LHsGadtTelescope (GhcPass pass), Int, LHsType (GhcPass pass))
-splitGadtTerminalForAll (PrefixConGADT _ (_ : _)) ty
-  | L loc HsForAllTy { hst_tele = tele@HsForAllVis { hsf_vis_bndrs = binders }
-                    , hst_body = result } <- ignoreParens ty
-  , not (null binders)
-  , plain_result (unLoc (ignoreParens result))
-  = Just (L loc (HsGadtForAll noExtField tele), length binders, result)
+-- | Recognize the supported groups after a nonempty prefix of fields.
+-- Keep them in the parsed result to preserve their source order.
+splitGadtTerminal :: HsConDeclGADTDetails (GhcPass pass) -> LHsType (GhcPass pass)
+                        -> Maybe ([LHsGadtTelescope (GhcPass pass)], Int, LHsType (GhcPass pass))
+splitGadtTerminal (PrefixConGADT _ (_ : _)) ty
+  | L loc HsForAllTy { hst_tele = tele, hst_body = body } <- ignoreParens ty
+  , let group = L loc (HsGadtForAll noExtField tele)
+  = case tele of
+      HsForAllVis { hsf_vis_bndrs = binders }
+        | not (null binders), plain_result body ->
+          Just ([group], length binders, body)
+      HsForAllInvis { hsf_invis_bndrs = binders }
+        | not (null binders)
+        , all ((== SpecifiedSpec) . hsTyVarBndrFlag . unLoc) binders
+        , L _ HsQualTy { hst_ctxt = ctxt, hst_body = result } <- ignoreParens body
+        , not (null (hsConDeclTheta (Just ctxt)))
+        , plain_result result ->
+          Just ([group, mkHsGadtContext ctxt], length binders, result)
+      _ -> Nothing
+  | L _ HsQualTy { hst_ctxt = ctxt, hst_body = result } <- ignoreParens ty
+  , not (null (hsConDeclTheta (Just ctxt)))
+  , plain_result result
+  = Just ([mkHsGadtContext ctxt], gadtTrailingContextOnly, result)
   where
-    plain_result HsForAllTy{} = False
-    plain_result HsForEachTy{} = False
-    plain_result HsFunTy{} = False
-    plain_result HsQualTy{} = False
-    plain_result _ = True
-splitGadtTerminalForAll _ _ = Nothing
+    plain_result result = case unLoc (ignoreParens result) of
+      HsForAllTy{} -> False
+      HsForEachTy{} -> False
+      HsFunTy{} -> False
+      HsQualTy{} -> False
+      _ -> True
+splitGadtTerminal _ _ = Nothing
+
+-- | Recognize one field, one context and one further field.
+splitGadtInteriorContext :: HsConDeclGADTDetails (GhcPass pass) -> LHsType (GhcPass pass)
+                         -> Maybe (LHsGadtTelescope (GhcPass pass),
+                                   HsConDeclField (GhcPass pass), LHsType (GhcPass pass))
+splitGadtInteriorContext (PrefixConGADT _ [_]) ty
+  | L _ HsQualTy { hst_ctxt = ctxt, hst_body = body } <- ignoreParens ty
+  , not (null (hsConDeclTheta (Just ctxt)))
+  , L _ (HsFunTy _ arr arg result) <- ignoreParens body
+  , plain_result result
+  = Just (mkHsGadtContext ctxt, CDF noAnn NoSrcUnpack NoSrcStrict arr arg Nothing, result)
+  where
+    plain_result result = case unLoc (ignoreParens result) of
+      HsForAllTy{} -> False
+      HsForEachTy{} -> False
+      HsFunTy{} -> False
+      HsQualTy{} -> False
+      _ -> True
+splitGadtInteriorContext _ _ = Nothing
 
 {- Note [Constructor telescope contexts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

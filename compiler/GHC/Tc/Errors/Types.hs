@@ -5436,6 +5436,7 @@ data RetainedQuantificationError
   | RetainedUncoveredConstructors Name [Name]
   | RetainedMissingEquation Name
   | RetainedTypeOperandContext (Maybe Type)
+  | RetainedSelectorReceiver
 
 -- | An error in the implementation of an abstract datatype using
 -- a type synonym.
@@ -7367,6 +7368,7 @@ data UnrepresentableTypeDescr
   | FirstClassExistential
   | RetainedFunctionType
   | RetainedRuntimeIndex
+  | InteriorConstructorContext
 
 -- FFI error types
 data IllegalForeignTypeReason

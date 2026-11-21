@@ -464,11 +464,10 @@ and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vecto
    at that constructor's field.
    [Checked input inference](roadmap/R03-dependent-products.md)
    and [independent inputs](../../testsuite/tests/dependent/should_fail/NativeIrredIndexEvidence.hs).
-2. **R05.** Check scope and demand when carrying local package templates
-   across interfaces. The retained optimizer can inline a local `INLINE`
-   helper that constructs or opens an erased package. A local `INLINABLE`
-   helper preserves its checked template, but package operations still
-   need an inlining cost model. Tidy drops package-bearing templates.
+2. **R05.** Check package templates for recursive groups that abstract
+   over types or dictionaries. An inferred monomorphic group can use a
+   direct alias to export a checked worker unfolding. The interface keeps
+   the loop breaker, and older readers can call the object code.
    [Retained unfolding checks](roadmap/R05-dependent-core.md#export-retained-unfoldings-at-ordinary-signatures).
 
 ### Other open work
@@ -673,7 +672,7 @@ still require substantial research.
 - [x] **R38 [No list or tuple puns](https://ghc.serokell.io/dh#no-list-or-tuple-puns)** — Completed. Needs/includes: no outgoing graph edge.
 - [x] **R39 [Visible forall](https://ghc.serokell.io/dh#visible-forall)** — Completed. Needs/includes: R34 (loose end), R40, R41 (loose end), R43.
 - [x] **R40 [Visibility coercions](https://ghc.serokell.io/dh#visibility-coercions)** — Completed. Needs/includes: no outgoing graph edge.
-- [ ] **R41 [Nested quantification in GADTs](https://ghc.serokell.io/dh#nested-quantification-in-gadts)** — Accepted. Needs/includes: no outgoing graph edge. Prefix constructors accept consecutive constraint groups before the first field ([GHC proposal #402](https://ghc-proposals.readthedocs.io/en/latest/proposals/0402-gadt-syntax.html), [#27424](https://gitlab.haskell.org/ghc/ghc/-/issues/27424)). An ordinary prefix constructor can end with a required forall after its last field. Its wrapper and pattern keep written argument order. A context before the fields can refer to the earlier type binders. Its constraints are available when checking the field and terminal type patterns. The promoted kind keeps written argument order when the constructor is promotable. Template Haskell can round-trip terminal-group prefix declarations with field bangs and multiplicities. Further interleaving needs a general ordered constructor telescope ([#27425](https://gitlab.haskell.org/ghc/ghc/-/issues/27425), [#27426](https://gitlab.haskell.org/ghc/ghc/-/issues/27426)). [Checklist and source example](roadmap/R41-nested-quantification-in-gadts.md).
+- [ ] **R41 [Nested quantification in GADTs](https://ghc.serokell.io/dh#nested-quantification-in-gadts)** — Accepted. Needs/includes: no outgoing graph edge. Prefix constructors accept consecutive constraint groups before the first field ([GHC proposal #402](https://ghc-proposals.readthedocs.io/en/latest/proposals/0402-gadt-syntax.html), [#27424](https://gitlab.haskell.org/ghc/ghc/-/issues/27424)). An ordinary prefix constructor can end with a required forall after its last field. Its wrapper and pattern keep written argument order. A context before the fields can refer to the earlier type binders. Its constraints are available when checking the field and terminal type patterns. The promoted kind keeps written argument order when the constructor is promotable. Template Haskell can round-trip terminal-group prefix declarations with field bangs and multiplicities. A prefix constructor can also use `Int -> forall a. Eq a => T a`. Its caller supplies the field before the type argument and dictionary. A context can also follow the fields directly, as in `K :: a -> Eq a => F`. Pattern matching introduces the existential field type before checking the field and the dictionary afterward. Further interleaving needs a general ordered constructor telescope ([#27425](https://gitlab.haskell.org/ghc/ghc/-/issues/27425), [#27426](https://gitlab.haskell.org/ghc/ghc/-/issues/27426)). [Checklist and source example](roadmap/R41-nested-quantification-in-gadts.md).
 - [x] **R42 [Embed types](https://ghc.serokell.io/dh#embed-types)** — Completed. Needs/includes: no outgoing graph edge.
 - [x] **R43 [Term variable capture](https://ghc.serokell.io/dh#term-variable-capture)** — Completed. Needs/includes: no outgoing graph edge.
 - [x] **R44 [No star kind syntax](https://ghc.serokell.io/dh#no-star-kind-syntax)** — Completed. Needs/includes: R50.

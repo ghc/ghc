@@ -3133,8 +3133,10 @@ repGadtDataCons cons details res_ty
     = do cons' <- mapM lookupLOcc cons -- See Note [Binders and occurrences]
          case details of
            PrefixConGADT _ ps
+             | Just _ <- HsDecls.splitGadtInteriorContext details res_ty
+             -> notHandledL (locA (getLoc res_ty)) (ThExoticFormOfType (unLoc res_ty))
              | hsHasForEachTy (unLoc res_ty)
-             || isJust (HsDecls.splitGadtTerminalForAll details res_ty) -> do
+             || isJust (HsDecls.splitGadtTerminal details res_ty) -> do
                prefix <- mapM rep_field ps
                repRetainedGadt (nonEmptyCoreList' cons') prefix res_ty
            PrefixConGADT _ ps -> do
@@ -3150,7 +3152,7 @@ repGadtDataCons cons details res_ty
     rep_field (CDF { cdf_unpack, cdf_bang, cdf_multiplicity, cdf_type }) =
       repGadtValueArg cdf_unpack cdf_bang cdf_multiplicity cdf_type
 
--- | Quote the constructor suffix with retained names in scope.
+-- | Quote the constructor suffix with its retained names or terminal foralls.
 -- See Note [Terminal constructor foralls in TH] in GHC.ThToHs.
 repRetainedGadt :: Core [TH.Name] -> [Core (M TH.RetainedGadtArg)]
                 -> LHsType GhcRn -> MetaM (Core (M TH.Con))

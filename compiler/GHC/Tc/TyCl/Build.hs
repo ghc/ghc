@@ -196,11 +196,11 @@ buildDataConWithRetainedArgs :: [Maybe Id] -- ^ Retained field binders, or []
 --   a) makes the worker Id
 --   b) makes the wrapper Id if necessary, including
 --      allocating its unique (hence monadic)
-buildDataConWithRetainedArgs = buildDataConWithTelescope 0
+buildDataConWithRetainedArgs = buildDataConWithTelescope (LegacyConOrder 0)
 
 -- | Build a constructor with an ordered source telescope.
 -- Retained fields use the direct lazy representation, without a wrapper.
-buildDataConWithTelescope :: Int         -- ^ Required type binders after fields
+buildDataConWithTelescope :: ConSourceOrder -- ^ Constructor argument order
                             -> [Maybe Id] -- ^ Retained field binders, or []
                             -> FamInstEnvs
             -> DataConBangOpts

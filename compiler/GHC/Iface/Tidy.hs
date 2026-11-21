@@ -51,7 +51,7 @@ import GHC.Core.FVs
 import GHC.Core.Rules (canShareRetainedSpecRule)
 import GHC.Core.Dependent
     ( hasExistentialExpr, hasNativeDependentExprRhs, hasNativeDependentProgram, hasRetainedRuleHead, supportsLocalUserRule
-    , hasNativeDependentUnfolding, isRetainedVanillaDefaultMethod )
+    , hasNativeDependentUnfolding, isRetainedVanillaDefaultMethod, supportsNativeUserUnfolding )
 import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.Tidy
 import GHC.Core.Seq         ( seqBinds )
@@ -850,12 +850,13 @@ addExternal opts mentions_marked mb_rhs id
     show_unfolding _                  = False
 
     can_expose_body src rhs
-      = not (opt_has_retained_core opts)
-        || (not (hasExistentialExpr rhs) &&
-            (hasNativeDependentExprRhs (Type (idType id))
-              || case src of
-                   RetainedUserSrc -> True
-                   _ -> not (hasNativeDependentUnfolding rhs || mentions_marked rhs)))
+      | not (opt_has_retained_core opts) = True
+      | RetainedUserSrc <- src
+      = not (hasExistentialExpr rhs) || supportsNativeUserUnfolding rhs
+      | otherwise
+      = not (hasExistentialExpr rhs) &&
+        (hasNativeDependentExprRhs (Type (idType id))
+         || not (hasNativeDependentUnfolding rhs || mentions_marked rhs))
 
 -- | Recognize marked imports and original top-level definitions.
 -- See Note [Retained user unfoldings across modules].

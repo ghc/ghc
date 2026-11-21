@@ -1,6 +1,9 @@
-{-# LANGUAGE Haskell2010, NoExperimentalDependentTypes, MultiParamTypeClasses, TypeFamilies #-}
+{-# LANGUAGE DataKinds, Haskell2010, NoExperimentalDependentTypes, MultiParamTypeClasses, TypeFamilies #-}
 module Main where
 
+import Data.Proxy (Proxy)
+import GHC.TypeLits (natVal)
+import Numeric.Natural (Natural)
 import ScopedFamilyMethodProvider
 
 instance Collects Int where
@@ -27,6 +30,13 @@ readPayload :: Collects c => c -> a -> (Ordering, a)
 readPayload x payload = case inspectPayload x payload of
     TaggedEntry order item -> (order, item)
 
+measureFive :: Collects c => c -> (Ordering, Natural)
+measureFive x = case measuredEntry x 5 of
+    (TaggedEntry order n, _) -> (order, n)
+
+projectFive :: Collects c => c -> Proxy 5
+projectFive x = snd (id (measuredEntry x 5))
+
 main :: IO ()
 main = do
     print (readEntry (2 :: Int) True, readEntry (error "unforced" :: AlwaysBelow) 'x')
@@ -38,3 +48,5 @@ main = do
         unused = error "forced unused local payload" :: Char
     print (case inspectPayload high 'q' of TaggedEntry order value -> (order, value))
     print (case inspectPayload low unused of TaggedEntry order _ -> order)
+    print (measureFive True, measureFive False)
+    print (natVal (projectFive True))

@@ -76,7 +76,8 @@ import GHC.Core.DataCon
 import GHC.Core.Dependent
   ( hasExistentialExpr, hasNativeDependentExprRhs, hasNativeDependentUnfolding
   , isRetainedVanillaDefaultMethod, hasRetainedRuleHead, supportsLocalUserRule
-  , supportsErasedUserRule, supportsImportedErasedRule, supportsImportedUserRule )
+  , supportsErasedUserRule, supportsImportedErasedRule, supportsImportedUserRule
+  , supportsNativeUserUnfolding )
 import GHC.Core.Predicate ( mkNomEqPred )
 import GHC.Core.Opt.OccurAnal ( occurAnalyseBndrsAndExpr )
 import GHC.Core.Ppr
@@ -1071,16 +1072,19 @@ ifaceDeclsForTc iface
     prune decl = decl
 
     keep (HsUnfold _ (IfCoreUnfold src _ _ rhs))
-      = isCompulsorySource src || not (hasIfacePackageExpr rhs)
+      | RetainedUserSrc <- src = True
+      | otherwise = isCompulsorySource src || not (hasIfacePackageExpr rhs)
     keep _ = True
 
 {- Note [Erased package unfoldings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-An existential type can pass through an optimized module as an abstract
-value. The optimized simplifier cannot process Pack and Unpack yet.
-The reader withholds optional templates containing these expressions.
-An importer can still call the original object code. Core Tidy applies
-the same rule to optional templates in memory.
+The retained optimizer can process Pack and Unpack. An optional template
+with these expressions can cross an interface when its top-level binding
+has the RetainedUserSrc tag. The tag selects that optimizer in a client.
+Check the expression forms, types and scope before using the template.
+Check nested unfolding templates in their own thunks. Older readers know
+the package and stable-template tags and discard the optional template.
+They can still call the original object code.
 
 Check the serialized syntax only when the interface header records an
 erased existential tag. This leaves ordinary interface loading unchanged
@@ -1255,11 +1259,25 @@ tcIfaceDataCons tycon_name tycon if_cons
                          ifConArgTys = args, ifConFields = lbl_names,
                          ifConStricts = if_stricts,
                          ifConSrcStricts = if_src_stricts,
-                         ifConLateTyVarCount = late_count})
-     = do { when (late_count /= 0) $
-              unless (late_count > 0 && late_count <= length user_bndrs &&
-                      has_wrapper && not (null args) &&
-                      null arg_binders && null ex_bndrs && null spec &&
+                         ifConSourceOrder = source_order})
+     = do { let terminal_order = legacyConOrder source_order
+                context_only = terminal_order == gadtTrailingContextOnly
+                late_count = max 0 terminal_order
+                admissible_order
+                  | context_only = not (null ctxt) && ordinary_data && all type_binder ex_bndrs
+                  | otherwise = late_count > 0 && late_count <= length user_bndrs && null ex_bndrs
+          ; case source_order of
+              LegacyConOrder _ -> pure ()
+              OrderedConArgs groups ->
+                unless (groups == [ConTypeArgs (length user_bndrs), ConValueArgs 1,
+                                   ConContextArgs (length ctxt), ConValueArgs 1]
+                        && length args == 2 && not (null ctxt) && ordinary_data
+                        && has_wrapper && null arg_binders && null spec
+                        && null ex_bndrs && null lbl_names) $
+                  failIfM (text "Invalid interior constructor context in interface:" <+> ppr dc_name)
+          ; when (terminal_order /= 0) $
+              unless (admissible_order && has_wrapper && not (null args) &&
+                      null arg_binders && null spec &&
                       null lbl_names) $
                 failIfM (text "Invalid terminal constructor foralls in interface:" <+> ppr dc_name)
           ; unless (null arg_binders) $
@@ -1281,11 +1299,13 @@ tcIfaceDataCons tycon_name tycon if_cons
 
         ; let (early, late) = splitAt (length user_tvs - late_count) user_tvs
               late_vars = mkVarSet (binderVars late)
+              trailing_context = context_only ||
+                (late_count /= 0 && all (isSpecifiedForAllTyFlag . binderFlag) late)
               check_prefix_scope tys = when (late_count /= 0) $
                 unless (disjointVarSet late_vars (tyCoVarsOfTypes tys)) $
                   failIfM (text "Invalid terminal constructor binder scope:" <+> ppr dc_name)
         ; when (late_count /= 0) $
-            unless (all isVisibleForAllTyBinder late &&
+            unless ((all isVisibleForAllTyBinder late || (trailing_context && not (null ctxt))) &&
                     late_vars `subVarSet` mkVarSet univ_tvs) $
               failIfM (text "Invalid terminal constructor binder scope:" <+> ppr dc_name)
 
@@ -1299,7 +1319,8 @@ tcIfaceDataCons tycon_name tycon if_cons
                 ; theta   <- tcIfaceCtxt ctxt
                 -- A predicate or field can refer to this TyCon. Check its
                 -- scope in the same lazy computation that reads the type.
-                ; check_prefix_scope (map (varType . binderVar) early ++ theta)
+                ; let prefix_theta = if trailing_context then [] else theta
+                ; check_prefix_scope (map (varType . binderVar) early ++ prefix_theta)
                 -- This fixes #13710.  The enclosing lazy thunk gets
                 -- forced when typechecking record wildcard pattern
                 -- matching (it's not completely clear why this
@@ -1331,7 +1352,7 @@ tcIfaceDataCons tycon_name tycon if_cons
             -- it'll use these to guide the construction of a worker.
             -- See Note [Bangs on imported data constructors] in GHC.Types.Id.Make
 
-        ; con <- buildDataConWithTelescope late_count
+        ; con <- buildDataConWithTelescope source_order
                        (if null arg_binders then [] else retained_binders)
                        (pprPanic "tcIfaceDataCons: FamInstEnvs" (ppr dc_name))
                        bang_opts
@@ -1343,6 +1364,13 @@ tcIfaceDataCons tycon_name tycon if_cons
                        arg_tys orig_res_ty tycon tag_map
         ; traceIf (text "Done interface-file tc_con_decl" <+> ppr dc_name)
         ; return con } }
+
+    ordinary_data = case if_cons of
+                      IfDataTyCon False _ -> True
+                      _                   -> False
+
+    type_binder (IfaceTvBndr _) = True
+    type_binder _              = False
 
     -- Check only interface syntax here. The parent TyCon is still knot-tied.
     check_retained_shape name wrapper binders args univs users exs spec ctxt fields bangs src_bangs
@@ -1367,11 +1395,6 @@ tcIfaceDataCons tycon_name tycon if_cons
         names = [n | Just n <- binders]
         univ_names = map ifaceBndrName univs
         user_names = [ifaceBndrName b | Bndr b _ <- users]
-        ordinary_data = case if_cons of
-                          IfDataTyCon False _ -> True
-                          _                   -> False
-        type_binder (IfaceTvBndr _) = True
-        type_binder _              = False
         lazy_bang IfNoBang = True
         lazy_bang _        = False
         lazy_src_bang (IfSrcBang unpack strict)
@@ -3122,10 +3145,10 @@ tcUnfoldingRhs source toplvl name declared_ty expr
         when native $
           failIfM (text "Unsupported compulsory retained unfolding:" <+> ppr name)
       RetainedUserSrc ->
-        -- Local stable templates use the same tag. Lint them in their
-        -- enclosing interface scope below.
+        -- See Note [Erased package unfoldings].
         unless (not (hasNativeDependentExprRhs (Type declared_ty))
-                && not (hasExistentialExpr core_expr')) $
+                && (not (hasExistentialExpr core_expr')
+                    || (isTopLevel toplvl && supportsNativeUserUnfolding core_expr'))) $
           failIfM (text "Invalid retained user unfolding:" <+> ppr name)
       _ -> pure ()
     dflags <- getDynFlags
