@@ -1638,26 +1638,6 @@ tcOptionalLet checked rest expected
       | Just rhs <- lazyLetRhs matches = Just (binder, rhs)
     binding_rhs _ = Nothing
 
--- | Read a single lazy value equation without guards or local declarations.
-lazyLetRhs :: MatchGroup (GhcPass p) (LHsExpr (GhcPass p)) -> Maybe (LHsExpr (GhcPass p))
-lazyLetRhs MG { mg_alts = L _ [L _ match] }
-  | Match { m_ctxt = FunRhs { mc_strictness = NoSrcStrict }, m_pats = L _ []
-          , m_grhss = grhss } <- match
-  = unguardedRhs grhss
-lazyLetRhs _ = Nothing
-
-unguardedRhs :: GRHSs (GhcPass p) (LHsExpr (GhcPass p)) -> Maybe (LHsExpr (GhcPass p))
-unguardedRhs GRHSs { grhssGRHSs = L _ (GRHS _ [] rhs) NE.:| []
-                   , grhssLocalBinds = L _ EmptyLocalBinds{} } = Just rhs
-unguardedRhs _ = Nothing
-
--- | Recognise the result of a forwarding let or case.
--- See Note [Repacking through a local binding].
-returnsLocal :: Name -> LHsExpr GhcRn -> Bool
-returnsLocal name expr = case unLoc (stripParensLHsExpr expr) of
-  HsVar _ ref -> unLocWithUserRdr ref == name
-  _ -> False
-
 {- Note [Repacking through a local binding]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this ordinary function with a checked result of type Packed a:

@@ -20,6 +20,13 @@ readViaBar p = readInner p
 readViaProducer :: Bool -> Int
 readViaProducer flag = readInner (id (chooseMixed flag))
 
+readViaLocalCase :: Bool -> Int
+readViaLocalCase flag = readInner
+  (let p = chooseMixed flag
+   in case flag of
+        True -> p
+        False -> p)
+
 forward :: Show a => a -> b -> b
 forward flag payload = show flag `seq` payload
 
@@ -68,7 +75,11 @@ main = do
     then pure ()
     else fail "Different result through a named mixed package"
   writeIORef flag False
-  second <- readInsideQuickLook <$> readIORef flag
+  other <- readIORef flag
+  let second = readInsideQuickLook other
+  if first == readViaLocalCase input && second == readViaLocalCase other
+    then pure ()
+    else fail "Different result through a locally bound mixed package"
   print (first, second, readViaRank rankedMixed, readKindInner kindMixed)
   print (ignoreViaBar (error "unused package") && ignoreViaProducer (error "unused producer input"))
   third <- readProducedBoth <$> readIORef flag

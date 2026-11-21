@@ -33,6 +33,7 @@ module GHC.Hs.Utils(
   mkHsPar, mkHsApp, mkHsAppWith, mkHsApps, mkHsAppsWith, mkHsSyntaxApps,
   mkHsAppType, mkHsAppTypes, mkHsCaseAlt,
   mkSimpleMatch, unguardedGRHSs, unguardedRHS,
+  lazyLetRhs, unguardedRhs, returnsLocal,
   mkMatchGroup, mkLamCaseMatchGroup, mkMatch, mkPrefixFunRhs, mkHsLam, mkHsIf,
   mkHsWrap, mkLHsWrap, mkHsWrapCo, mkHsWrapCoR, mkLHsWrapCo,
   mkHsDictLet, mkHsLams,
@@ -200,6 +201,27 @@ unguardedRHS :: Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
              => EpAnn GrhsAnn -> SrcSpan -> LocatedA (body (GhcPass p))
              -> NonEmpty (LGRHS (GhcPass p) (LocatedA (body (GhcPass p))))
 unguardedRHS an loc rhs = NE.singleton $ L (noAnnSrcSpan loc) (GRHS an [] rhs)
+
+-- | Read a single lazy value equation without guards or local declarations.
+lazyLetRhs :: MatchGroup (GhcPass p) (LHsExpr (GhcPass p)) -> Maybe (LHsExpr (GhcPass p))
+lazyLetRhs MG { mg_alts = L _ [L _ match] }
+  | Match { m_ctxt = FunRhs { mc_strictness = NoSrcStrict }, m_pats = L _ []
+          , m_grhss = grhss } <- match
+  = unguardedRhs grhss
+lazyLetRhs _ = Nothing
+
+-- | Read one right-hand side without guards or local declarations.
+unguardedRhs :: GRHSs (GhcPass p) (LHsExpr (GhcPass p)) -> Maybe (LHsExpr (GhcPass p))
+unguardedRhs GRHSs { grhssGRHSs = L _ (GRHS _ [] rhs) NE.:| []
+                   , grhssLocalBinds = L _ EmptyLocalBinds{} } = Just rhs
+unguardedRhs _ = Nothing
+
+-- | Recognise the result of a forwarding let or case.
+-- See Note [Repacking through a local binding] in GHC.Tc.Gen.Expr.
+returnsLocal :: Name -> LHsExpr GhcRn -> Bool
+returnsLocal name expr = case unLoc (stripParensLHsExpr expr) of
+  HsVar _ ref -> unLocWithUserRdr ref == name
+  _ -> False
 
 type AnnoBody p body
   = ( XMG (GhcPass p) (LocatedA (body (GhcPass p))) ~ (Origin, MatchGroupAnn)

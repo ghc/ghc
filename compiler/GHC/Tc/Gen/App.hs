@@ -1304,6 +1304,14 @@ tcPackageOperandResult :: Bool -> LHsExpr GhcRn -> TcM (Maybe (TcType, Bool))
 tcPackageOperandResult lexical = go False
   where
     go _ operand
+      | HsLet _ (L _ (HsValBinds _ (XValBindsLR (HsVBG [(NonRecursive, [L _ binding])] [])))) body
+          <- unLoc (stripParensLHsExpr operand)
+      , FunBind { fun_id = L _ name, fun_matches = matches } <- binding
+      , Just rhs <- lazyLetRhs matches
+      , all (returnsLocal name) (fromMaybe (NE.singleton body) (resultBranches body))
+      = do { declared <- go True rhs
+           ; pure ((\(schema, _) -> (schema, True)) <$> declared) }
+    go _ operand
       | Just (first NE.:| rest) <- resultBranches operand
       = runMaybeT $ do
           (schema, _) <- MaybeT (go True first)
@@ -1364,6 +1372,12 @@ tcPackageOperandResult lexical = go False
 
 {- Note [Scope of a forwarded package schema]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A nonrecursive local binding can forward its declared package through a case.
+For example, in let p = chooseMixed flag in case flag of { True -> p; False -> p },
+each result is the same renamed variable. Read the schema from the defining
+expression. Check the original let at that schema once. A shadowing pattern
+has a different Name and cannot select the outer binding's schema here.
+
 A lexical tuple binding checks a forwarding call at the selected package
 schema before opening it. The schema can mention a rigid type variable from
 the caller, or a witness opened by an enclosing binding. Use the complete
