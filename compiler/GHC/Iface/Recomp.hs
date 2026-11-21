@@ -902,6 +902,12 @@ checkFlagHash hsc_env iface self_recomp = do
           | nullary_candidate, not checked_nullary =
               liftIO $ recheck "Compiler now infers matchability for nullary family results"
           | otherwise = pure UpToDate
+        check_mapping
+          | mi_hsc_src iface == HsSrcFile
+          , not (Map.member mappingField (getExtensibleFields (mi_ext_fields iface)))
+          , couldSupplyMapping (mi_exports iface) (map snd (mi_decls iface)) =
+              liftIO $ recheck "Compiler now checks mapping workers and their instance aliases"
+          | otherwise = pure UpToDate
         check_liberal_synonym
           | xopt LangExt.LiberalTypeSynonyms dflags
           , not (Map.member liberalSynonymCallbackField (getExtensibleFields (mi_ext_fields iface)))
@@ -922,7 +928,8 @@ checkFlagHash hsc_env iface self_recomp = do
                                      `recompThen` check_binary_enum
                                      `recompThen` check_retained_signature
                                      `recompThen` check_nullary_family
-                                     `recompThen` check_liberal_synonym)
+                                     `recompThen` check_liberal_synonym
+                                     `recompThen` check_mapping)
 
 {- Note [Recompiling liberal synonym callbacks]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -937,6 +944,54 @@ in a separate extensible field. Include its name in the interface hash
 so GHC writes the field even if the ABI and flags are unchanged. The
 field does not alter the flag generation or need to load rules.
 -}
+
+{- Note [Recompiling mapping workers and instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An old interface can omit a mapping equation for an imported datatype.
+An instance in another module can also omit the alias to the worker.
+A reader can only use the equation after both providers are rebuilt.
+
+A stripped interface loses the method body. Recheck a ground dictionary
+if its argument could still take a type parameter. Local data declarations
+and wired-in types give us their arity. For a type from another module,
+allow for an unsaturated datatype or a synonym. A callback's arrow can
+also be behind a synonym. Mark these candidates after checking them, even
+when the source does not define an eligible equation.
+-}
+
+-- | Identify modules that need a one-time check for mapping evidence.
+couldSupplyMapping :: [IfaceExport] -> [IfaceDecl] -> Bool
+couldSupplyMapping exports decls = any candidate decls
+  where
+    exported = mkNameSet (concatMap availNames exports)
+    local_data = mkNameEnv [(n, length bs) | IfaceData{ifName = n, ifBinders = bs} <- decls]
+    arity n
+      | Just (ATyCon tc) <- wiredInNameTyThing_maybe n = Just (tyConArity tc)
+      | otherwise = lookupNameEnv local_data n
+
+    candidate IfaceId{ifIdDetails = details, ifName = n, ifType = ty} = case details of
+      IfDFunId -> dictionary ty
+      IfSourceDFunId{} -> dictionary ty
+      _ -> n `elemNameSet` exported && callback ty
+    candidate _ = False
+
+    dictionary (IfaceTyConApp _ (IA_Arg (IfaceTyConApp tc args) _ IA_Nil)) =
+      maybe True (> length (appArgsIfaceTypes args)) (arity (ifaceTyConName tc))
+    dictionary _ = False
+
+    callback (IfaceForAllTy _ _ body) = callback body
+    callback (IfaceFunTy FTF_T_T _ _ f rest) = arrow f && arrow rest
+    callback ty = opaque ty
+    arrow IfaceFunTy{} = True
+    arrow ty = opaque ty
+    opaque (IfaceTyConApp tc _) = isNothing (arity (ifaceTyConName tc))
+    opaque IfaceCastTy{} = True
+    opaque IfaceAppTy{} = True
+    opaque _ = False
+
+-- | Mark interfaces checked for both the method alias and its worker.
+mappingField :: String
+mappingField = "checked-container-mapping-v1"
 
 -- | Record that a potential old synonym provider was checked once.
 liberalSynonymCallbackField :: String
@@ -2714,6 +2769,8 @@ addFingerprints hsc_env iface0 = do
   let stamp_retained = couldExportRetainedSignatureCase (mi_semantic_module iface0)
                         (mi_exports iface0) (mi_decls iface0)
       stamp_nullary = couldInferNullaryClosedMatchability (mi_decls iface0)
+      stamp_mapping = mi_hsc_src iface0 == HsSrcFile &&
+                      couldSupplyMapping (mi_exports iface0) (mi_decls iface0)
       stamp_liberal = xopt LangExt.LiberalTypeSynonyms (hsc_dflags hsc_env)
                    && couldInferLiberalSynonymMatchability (mi_exports iface0) (mi_decls iface0)
       iface
@@ -2731,17 +2788,23 @@ addFingerprints hsc_env iface0 = do
                         (mi_abi_mod_hash abiHashes,
                          mi_self_recomp_info iface,
                          mi_deps iface0)
-      checked_hash | stamp_liberal =
+      liberal_hash | stamp_liberal =
                        computeFingerprint putNameLiterally (base_hash, liberalSynonymCallbackField)
                    | otherwise = base_hash
+      checked_hash | stamp_mapping = computeFingerprint putNameLiterally (liberal_hash, mappingField)
+                   | otherwise = liberal_hash
       !iface_hash = case sourceTableLocations sorted_decls of
         []   -> checked_hash
         locs -> computeFingerprint putNameLiterally (checked_hash, locs)
 
-  checked_iface <- if stamp_liberal
+  liberal_iface <- if stamp_liberal
                    then do fields <- writeField liberalSynonymCallbackField () (mi_ext_fields iface)
                            pure (set_mi_ext_fields fields iface)
                    else pure iface
+  checked_iface <- if stamp_mapping
+                   then do fields <- writeField mappingField () (mi_ext_fields liberal_iface)
+                           pure (set_mi_ext_fields fields liberal_iface)
+                   else pure liberal_iface
 
   let final_iface = completePartialModIface checked_iface iface_hash
                      sorted_decls sorted_extra_decls abiHashes caches
