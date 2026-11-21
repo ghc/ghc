@@ -3,11 +3,17 @@
 {-# LANGUAGE RecursiveDo #-}
 
 module GHC.Tc.Solver.Irred(
-     solveIrred
+     solveIrred, isOpaqueTermIndex
   ) where
 
 import GHC.Prelude
 
+import GHC.Core.Coercion
+import GHC.Core.Predicate
+import GHC.Core.Type
+import GHC.Core.TyCo.Compare ( tcEqType )
+import GHC.Core.TyCo.FVs ( mkUnivCoDeps, univCoDepsHoles )
+import GHC.Core.TyCo.Rep ( Type(..) )
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Solver.InertSet
 import GHC.Tc.Solver.Dict( matchLocalInst, chooseInstance )
@@ -21,6 +27,7 @@ import GHC.Utils.Panic
 
 import GHC.Data.Bag
 
+import Control.Applicative ( (<|>) )
 import Data.Void( Void )
 
 
@@ -74,11 +81,60 @@ try_inert_irreds inerts irred_w@(IrredCt { ir_ev = ev_w, ir_reason = reason })
                             ; updInertCans (updIrreds (\_ -> others))
                             ; continueWith () } }
 
+  | CtWanted (WantedCt { ctev_dest = dest }) <- ev_w
+  , EqPred NomEq lhs rhs <- classifyPredType (ctEvPred ev_w)
+  , isOpaqueTermIndex lhs || isOpaqueTermIndex rhs
+  , not (typeKind lhs `tcEqType` typeKind rhs)
+  , Just co <- findCastedIndexGiven (inert_irreds inerts) lhs rhs
+  = do { let holes = foldr (flip addRewriter) emptyCoHoleSet
+                          (univCoDepsHoles (mkUnivCoDeps [co]))
+       ; setWantedEq dest (CPH co holes)
+       ; stopWith ev_w "Solved by transported index Given" }
+
   | otherwise
   = continueWith ()
 
   where
     ct_w = CIrredCan irred_w
+
+-- | Is this the type of an occurrence of a rigid runtime index?
+isOpaqueTermIndex :: Type -> Bool
+isOpaqueTermIndex (TermVarTy v) = isNativeOpaqueValueId v
+isOpaqueTermIndex _ = False
+
+-- | Recover the nominal index equality from a homogeneous Given.
+-- See Note [Using casted index Givens].
+findCastedIndexGiven :: InertIrreds -> Type -> Type -> Maybe Coercion
+findCastedIndexGiven irreds lhs rhs =
+    foldIrreds (\irred rest -> match irred <|> rest) irreds Nothing
+  where
+    match irred
+      | ev@CtGiven {} <- irredCtEvidence irred
+      , EqPred NomEq left right <- classifyPredType (ctEvPred ev)
+      = let co = ctEvCoercion ev
+        in orient left right co <|> orient right left (mkSymCo co)
+      | otherwise = Nothing
+
+    orient (CastTy ty kind_co) other co
+      | ty `tcEqType` lhs, other `tcEqType` rhs
+      = Just (mkGReflRightCo Nominal ty kind_co `mkTransCo` co)
+    orient other (CastTy ty kind_co) co
+      | other `tcEqType` lhs, ty `tcEqType` rhs
+      = Just (co `mkTransCo` mkSymCo (mkGReflRightCo Nominal ty kind_co))
+    orient _ _ _ = Nothing
+
+{- Note [Using casted index Givens]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An HRefl match on xs :~~: 'VNil binds a kind equality and a nominal
+Given ('VNil |> ck) ~# xs. Keeping the cast keeps both kinds equal.
+Reconstructing HRefl can still ask for the original heterogeneous
+index equality. First try the ordinary matching rule. If it fails,
+use the scoped Given with one endpoint cast and compare the endpoints
+before transport, including their kinds. Apply the kind coercion in
+the Wanted proof. No new Given or runtime index assignment is needed.
+
+See Note [Opaque runtime index equalities] in GHC.Tc.Solver.Equality.
+-}
 
 setIrredIfWanted :: CtEvidence -> SwapFlag -> CtEvidence -> TcS ()
 -- Irreds can be equalities or dictionaries

@@ -17,7 +17,7 @@ import GHC.Builtin.WiredIn.Types ( heqClass )
 import GHC.Tc.Gen.SourceTable ( sourceTableFamilyAppUse, sourceTableOwner )
 import GHC.Tc.Errors.Types ( RetainedQuantificationError(..), TcRnMessage(..) )
 
-import GHC.Tc.Solver.Irred( solveIrred )
+import GHC.Tc.Solver.Irred( solveIrred, isOpaqueTermIndex )
 import GHC.Tc.Solver.Dict( matchLocalInst, chooseInstance )
 import GHC.Tc.Solver.Rewrite
 import GHC.Tc.Solver.Monad
@@ -619,10 +619,12 @@ can_eq_nc ces rdr_env envs ev ReprEq ty1 ps_ty1 ty2 ps_ty2
 -- (EQNC3) Get rid of casts
 can_eq_nc ces rdr_env envs ev eq_rel (CastTy ty1 co1) _ ty2 ps_ty2
   | isNothing (canEqLHS_maybe ty2)
+  , bothRewritten ces || not (keepOpaqueCastGiven ev eq_rel ty1 co1 ty2)
   = -- See (EIK3) in Note [Equalities with heterogeneous kinds]
     canEqCast ces rdr_env envs ev eq_rel NotSwapped ty1 co1 ty2 ps_ty2
 can_eq_nc ces rdr_env envs ev eq_rel ty1 ps_ty1 (CastTy ty2 co2) _
   | isNothing (canEqLHS_maybe ty1)
+  , bothRewritten ces || not (keepOpaqueCastGiven ev eq_rel ty2 co2 ty1)
   = -- See (EIK3) in Note [Equalities with heterogeneous kinds]
     canEqCast ces rdr_env envs ev eq_rel IsSwapped ty2 co2 ty1 ps_ty1
 
@@ -954,6 +956,12 @@ generated family application as its declared type. Check the eligibility of
 this term occurrence even when its declaration is not a foreach binder.
 This check supplies no coercion.
 
+If the value Given already has a kind cast on one endpoint, keep that
+homogeneous Given. Removing the cast would bind a mixed-kind CoVar.
+Rewrite both endpoints first. Another Given can rewrite a constructor
+parameter before the lookup, as in 'VNil @a when a ~ Bool is in scope.
+Expose the kind equality and use the kinds before transport to check
+apartness. See Note [Using casted index Givens] in GHC.Tc.Solver.Irred.
 
 A family can return a U or unknown function before its head is exposed.
 For example, Stored container argument can still equal True. Split ordinary
@@ -1547,6 +1555,12 @@ canEqCast _ _ _ ev@(CtGiven (GivenCt { ctev_evar = evar })) NomEq swapped
              selectors = tyConAppGivenSelectors (repeat Nominal) tys1 tys2 parent
        ; emitSelectorGivens loc selectors
        ; stopWith ev "Decomposed casted TyConApp Given" }
+canEqCast _ _ _ ev eq_rel _ ty1 co1 ty2 _
+  | keepOpaqueCastGiven ev eq_rel ty1 co1 ty2
+  = do { emitNewGivens (mkKindEqLoc ty1 ty2 (ctEvLoc ev)) [(Nominal, co1)]
+       ; let reason | typesAreApart (typeKind ty1) (typeKind ty2) = ShapeMismatchReason
+                    | otherwise = IrredShapeReason
+       ; finishCanWithIrred reason ev }
 canEqCast ces rdr_env envs ev eq_rel swapped ty1 co1 ty2 ps_ty2
   = do { traceTcS "Decomposing cast" (vcat [ ppr ev
                                            , ppr ty1 <+> text "|>" <+> ppr co1
@@ -1585,6 +1599,18 @@ canEqCast ces rdr_env envs ev eq_rel swapped ty1 co1 ty2 ps_ty2
     move_cast k1 rhs_kind
       | k1 `tcEqType` rhs_kind = MRefl
       | otherwise             = MCo (mkSymCo co1)
+
+-- | Keep a nominal Given that transports a rigid runtime index or its peer.
+-- See Note [Opaque runtime index equalities].
+keepOpaqueCastGiven :: CtEvidence -> EqRel -> Type -> Coercion -> Type -> Bool
+keepOpaqueCastGiven (CtGiven {}) NomEq lhs co rhs
+  | CastTy {} <- rhs = False
+  | isOpaqueTermIndex lhs || isOpaqueTermIndex rhs
+  , isNothing (canEqLHS_maybe lhs)
+  = let Pair k1 k2 = coercionKind co
+        rhs_kind = typeKind rhs
+    in k2 `tcEqType` rhs_kind && not (k1 `tcEqType` rhs_kind)
+keepOpaqueCastGiven _ _ _ _ _ = False
 
 ------------------------
 canTyConApp :: CtEvidence -> EqRel
