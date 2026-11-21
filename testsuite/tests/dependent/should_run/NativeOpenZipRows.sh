@@ -125,7 +125,8 @@ wrong :: forall (ys :: [Char]). loopLength '[] ys :~: 'Z
 wrong = Refl
 HS
 } >Nondecreasing.hs
-reject '^Nondecreasing.hs:6:33-42: error: \[GHC-70565\]' Nondecreasing.hs
+# The interpreter reports the open operand instead of the function name.
+reject '^Nondecreasing.hs:6:(33-42|48-49): error: \[GHC-70565\]' Nondecreasing.hs
 
 { sed -n '1,5p' WrongDemand.hs | sed 's/WrongDemand/ConsumerRule/'
   cat <<'HS'
