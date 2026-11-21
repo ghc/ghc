@@ -23,7 +23,7 @@ import GHC.HsToCore.Binds
 import GHC.Core.ConLike
 import GHC.Core.Coercion ( MCoercion(..), coercionLKind, mkUnbranchedAxInstCo )
 import GHC.Core.DataCon ( DataCon, dataConRepType, dataConTyCon, dataConTag
-                       , dataConRepArgBinders, dataConRepArity, dataConHasTrailingContext )
+                       , dataConRepArgBinders, dataConRepArity, dataConContextFieldCount )
 import GHC.Core.Type ( coreFullView, isManyTy, isNativeIndexType, mkTyConApp, piResultTys )
 import GHC.Core.TyCon ( isNewTyCon, newTyConCo, tyConDataCons )
 import GHC.Core.FVs ( exprFreeVars )
@@ -396,13 +396,16 @@ matchOneConLike scrut vars ty (eqn1 :| eqns)   -- All eqns for a single construc
                                       , cpt_binds = bind
                                       , cpt_wrap = pat_wrap }})
                     , eqn_rest = rest })
-                | RealDataCon con <- con1, dataConHasTrailingContext con
+                | RealDataCon con <- con1
+                , Just n <- dataConContextFieldCount con
+                , (before, after) <- splitAt n fields
                 = dsHsWrapper pat_wrap $ \early_wrap ->
                   dsTcEvBinds bind $ \ds_bind ->
-                    let scoped
-                          | null ds_bind = rest
-                          | otherwise = EqnScope ds_bind rest
-                    in return (wrap . early_wrap, prependPats fields scoped)
+                    let remaining = prependPats after rest
+                        scoped
+                          | null ds_bind = remaining
+                          | otherwise = EqnScope ds_bind remaining
+                    in return (wrap . early_wrap, prependPats before scoped)
                 | otherwise
                 = dsTcEvBinds bind $ \ds_bind ->
                     return (wrap . mkCoreLets ds_bind, prependPats fields rest)

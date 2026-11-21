@@ -751,7 +751,7 @@ rnIfaceConDecl
           , ifConWrapper       = con_wrapper
           , ifConInfix         = con_infix
           , ifConSrcStricts    = con_src_stricts
-          , ifConLateTyVarCount = late_count
+          , ifConSourceOrder    = source_order
           } ) = do
     let rnIfConEqSpec (n,t) = (,) n <$> rnIfaceType t
         rnIfaceBang (IfUnpackCo co) = IfUnpackCo <$> rnIfaceCo co
@@ -781,7 +781,7 @@ rnIfaceConDecl
         , ifConWrapper       = con_wrapper
         , ifConInfix         = con_infix
         , ifConSrcStricts    = con_src_stricts
-        , ifConLateTyVarCount = late_count
+        , ifConSourceOrder    = source_order
         }
 
 rnIfaceClassOp :: Rename IfaceClassOp

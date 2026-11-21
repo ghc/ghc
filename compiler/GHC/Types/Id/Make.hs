@@ -774,7 +774,9 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
                                                       -- LFInfo stores post-unarisation arity
 
              wrap_arg_dmds
-               | trailing_context = field_dmds ++ dict_dmds
+               | Just n <- dataConContextFieldCount data_con
+               , (prefix, suffix) <- splitAt n field_dmds
+               = prefix ++ dict_dmds ++ suffix
                | otherwise = dict_dmds ++ field_dmds
                where
                  field_dmds = map mk_dmd arg_ibangs
@@ -808,9 +810,13 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
              wrap_rhs = mkCoreTyLams early_tvbs $
                         wrap_lams (wrapFamInstBody tycon res_ty_args non_wrap_arg_ty wrap_body)
              wrap_lams body
-               | trailing_context
+               | Just n <- dataConContextFieldCount data_con
                , (dict_args, field_args) <- splitAt (length theta) wrap_args
-               = mkCoreLams field_args (mkCoreTyLams late_tvbs (mkCoreLams dict_args body))
+               , (prefix, suffix) <- splitAt n field_args
+               = mkCoreLams prefix $
+                 mkCoreTyLams late_tvbs $
+                 mkCoreLams dict_args $
+                 mkCoreLams suffix body
                | otherwise = mkCoreLams wrap_args (mkCoreTyLams late_tvbs body)
 
        ; return (DCR { dcr_wrap_id = wrap_id
@@ -823,7 +829,6 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
                  = dataConFullSig data_con
     stupid_theta = dataConStupidTheta data_con
     (early_tvbs, late_tvbs) = dataConUserTyVarGroups data_con
-    trailing_context = dataConHasTrailingContext data_con
     res_ty_args  = dataConResRepTyArgs data_con
 
     tycon        = dataConTyCon data_con       -- The representation TyCon (not family)

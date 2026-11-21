@@ -7368,6 +7368,7 @@ data UnrepresentableTypeDescr
   | FirstClassExistential
   | RetainedFunctionType
   | RetainedRuntimeIndex
+  | InteriorConstructorContext
 
 -- FFI error types
 data IllegalForeignTypeReason

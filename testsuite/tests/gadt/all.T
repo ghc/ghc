@@ -151,3 +151,6 @@ test('GadtTrailingContext', extra_files(['GadtTrailingContextProvider.hs']),
      makefile_test, [])
 test('GadtTrailingContextScope', normal, compile_fail, [''])
 test('GadtTrailingFieldScope', normal, compile_fail, [''])
+test('GadtInteriorContext', extra_files(['GadtInteriorContextProvider.hs']),
+     makefile_test, [])
+test('GadtInteriorContextScope', normal, compile_fail, [''])

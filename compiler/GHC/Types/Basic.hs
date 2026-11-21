@@ -23,6 +23,7 @@ module GHC.Types.Basic (
 
         ConTag, ConTagZ, fIRST_TAG,
         gadtTrailingContextOnly,
+        ConSourceOrder(..), ConSourceGroup(..), legacyConOrder, conInteriorContext,
 
         Arity, VisArity, RepArity, JoinArity, FullArgCount,
         JoinPointHood(..), isJoinPoint,
@@ -163,6 +164,28 @@ fIRST_TAG =  1
 -- See Note [Terminal constructor type arguments] in GHC.Core.DataCon.
 gadtTrailingContextOnly :: Int
 gadtTrailingContextOnly = -1
+
+-- | Source order for a constructor's existing argument arrays.
+data ConSourceOrder
+  = LegacyConOrder !Int
+  | OrderedConArgs [ConSourceGroup]
+
+-- | Each group consumes the next arguments of its kind.
+data ConSourceGroup
+  = ConTypeArgs !Int
+  | ConContextArgs !Int
+  | ConValueArgs !Int
+  deriving Eq
+
+-- | The historical terminal binder count or context marker.
+legacyConOrder :: ConSourceOrder -> Int
+legacyConOrder (LegacyConOrder n) = n
+legacyConOrder OrderedConArgs{} = 0
+
+-- | Number of fields before the context in the interior form.
+conInteriorContext :: ConSourceOrder -> Maybe Int
+conInteriorContext (OrderedConArgs [ConTypeArgs _, ConValueArgs n, ConContextArgs _, ConValueArgs _]) = Just n
+conInteriorContext _ = Nothing
 
 {-
 ************************************************************************

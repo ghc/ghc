@@ -6,6 +6,7 @@
 - [x] Quote, reify, and splice a declaration with a terminal required group. Preserve its field bangs and multiplicities.
 - [x] Apply a constructor with a specified type argument and its context after a field. Match its field before introducing the dictionary.
 - [x] Match an existential field followed directly by a constructor context.
+- [x] Match a second field under a context placed between two prefix fields.
 - [ ] Support the remaining orders of fields, contexts, and quantifiers in prefix constructors.
 
 The [Showcase](../Showcase.hs) defines a constructor with fields of
@@ -49,3 +50,19 @@ a custom `Eq` instance and tests when a strict field is forced.
 The Showcase also defines `EqSample :: a -> Eq a => EqSample`. A
 consumer compares the hidden value with itself. It observes the usual
 `Bool` and `Double` equality rules, including the result for NaN.
+
+
+The Showcase's `InteriorCount` puts `a ~ Int` between two fields of
+type `CountField a`. The equality is in scope when the second pattern
+checks `(type Int)`. The first field remains lazy. The registered
+[client](../../../testsuite/tests/gadt/GadtInteriorContext.hs) also
+checks fallthrough and saturation of a strict first field. The
+[scope test](../../../testsuite/tests/gadt/GadtInteriorContextScope.hs)
+rejects the same type pattern in the first field at a rigid index.
+
+This slice places one context between two fields of a lifted prefix
+constructor. All type binders precede the fields. Its interface records
+the source order over the existing type binders, predicates, and
+fields. The worker still takes evidence before its representation fields.
+Template Haskell can reify the wrapper type. Whole-declaration quotation
+and reification report an unsupported form.

@@ -58,7 +58,7 @@ import GHC.Tc.Zonk.TcType
 
 import GHC.Core.Coercion
 import GHC.Core.ConLike
-import GHC.Core.DataCon ( dataConHasTrailingContext )
+import GHC.Core.DataCon ( dataConHasTrailingContext, dataConInteriorContext )
 import GHC.Core.PatSyn (PatSyn(..))
 import GHC.Core.TyCo.Ppr ( pprTyVar )
 import GHC.Core.Type
@@ -1638,6 +1638,14 @@ zonk_pat p@(ConPat { pat_con = L con_loc con
           -- cf typecheck/should_compile/tc221.hs
         ; new_evs     <- zonkEvBndrsX evs
         ; (new_binds, new_wrapper, new_args) <- case con of
+            RealDataCon dc
+              | Just n <- dataConInteriorContext dc
+              , PrefixCon x pats <- args
+              , (before, after) <- splitAt n pats ->
+                do { before' <- zonkPats before
+                   ; binds' <- zonkTcEvBinds binds
+                   ; after' <- zonkPats after
+                   ; pure (binds', wrapper, PrefixCon x (before' ++ after')) }
             RealDataCon dc | dataConHasTrailingContext dc ->
               do { wrapper' <- zonkCoFn wrapper
                  ; args' <- zonkConStuff args

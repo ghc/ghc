@@ -1259,12 +1259,22 @@ tcIfaceDataCons tycon_name tycon if_cons
                          ifConArgTys = args, ifConFields = lbl_names,
                          ifConStricts = if_stricts,
                          ifConSrcStricts = if_src_stricts,
-                         ifConLateTyVarCount = terminal_order})
-     = do { let context_only = terminal_order == gadtTrailingContextOnly
+                         ifConSourceOrder = source_order})
+     = do { let terminal_order = legacyConOrder source_order
+                context_only = terminal_order == gadtTrailingContextOnly
                 late_count = max 0 terminal_order
                 admissible_order
                   | context_only = not (null ctxt) && ordinary_data && all type_binder ex_bndrs
                   | otherwise = late_count > 0 && late_count <= length user_bndrs && null ex_bndrs
+          ; case source_order of
+              LegacyConOrder _ -> pure ()
+              OrderedConArgs groups ->
+                unless (groups == [ConTypeArgs (length user_bndrs), ConValueArgs 1,
+                                   ConContextArgs (length ctxt), ConValueArgs 1]
+                        && length args == 2 && not (null ctxt) && ordinary_data
+                        && has_wrapper && null arg_binders && null spec
+                        && null ex_bndrs && null lbl_names) $
+                  failIfM (text "Invalid interior constructor context in interface:" <+> ppr dc_name)
           ; when (terminal_order /= 0) $
               unless (admissible_order && has_wrapper && not (null args) &&
                       null arg_binders && null spec &&
@@ -1342,7 +1352,7 @@ tcIfaceDataCons tycon_name tycon if_cons
             -- it'll use these to guide the construction of a worker.
             -- See Note [Bangs on imported data constructors] in GHC.Types.Id.Make
 
-        ; con <- buildDataConWithTelescope terminal_order
+        ; con <- buildDataConWithTelescope source_order
                        (if null arg_binders then [] else retained_binders)
                        (pprPanic "tcIfaceDataCons: FamInstEnvs" (ppr dc_name))
                        bang_opts
