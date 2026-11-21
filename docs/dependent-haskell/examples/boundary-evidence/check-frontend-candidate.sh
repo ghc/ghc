@@ -46,9 +46,9 @@ id: $unit
 key: $unit
 exposed: True
 exposed-modules: BoundaryEvidence LocatePlugin LatePlugin
-import-dirs: $pkg
-library-dirs: $pkg
-dynamic-library-dirs: $pkg
+import-dirs: \${pkgroot}/plugin
+library-dirs: \${pkgroot}/plugin
+dynamic-library-dirs: \${pkgroot}/plugin
 hs-libraries: HS$unit
 depends: $deps
 EOF

@@ -196,7 +196,8 @@ This proof selects the second field in the `True` branch of the native
 function `choose :: foreach (b :: Bool) -> Result b`. A separately
 compiled ordinary caller reads the stripped interface and prints
 `("eight",True)`. The harness checks both `-O0` and `-O2` with Core
-and STG Lint.
+and STG Lint. The [Showcase](Showcase.hs) replays the saved position
+in the example directory. The command below runs the search as well.
 [Native provider](examples/boundary-evidence/NativeOffer.hs)
 and [ordinary caller](examples/boundary-evidence/UseNativeOffer.hs).
 

@@ -28,7 +28,8 @@
 -- @firstFromProvider = checkedFirst checked@ with the producer's interface
 -- and prints the head inferred through both a Maybe and a list.
 -- In FileOffer.hs, an external search supplies a position for
--- @Member 8 (OrdinaryOffer.offered 7)@. GHC checks the generated path.
+-- @Member 8 (OrdinaryOffer.offered 7)@. NativeOffer replays the saved
+-- position in this Showcase. check-frontend-candidate.sh runs the plugin search.
 -- In GHCi, load PackedVecLibrary with the options in the adjacent README.
 -- Enter these as separate commands to keep a retained function at the prompt.
 --
@@ -121,6 +122,7 @@ import qualified TypeLambda
 import qualified TypeLet
 import qualified NativeCase
 import qualified NativeNestedCase
+import qualified NativeOffer
 import qualified NativeRetainedTH
 import qualified NativeRetainedConTH
 import qualified LocalDataFamily
@@ -206,6 +208,8 @@ Run from the repository root with this fork's matching compiler and libraries:
     -idocs/dependent-haskell/examples/packed-vector \
     -idocs/dependent-haskell/examples/qualified-pi \
     -idocs/dependent-haskell/examples/closed-evaluation \
+    -idocs/dependent-haskell/examples/boundary-evidence \
+    -idocs/dependent-haskell/examples/erased-existentials \
     -idocs/dependent-haskell/examples/open-evaluation \
     -outputdir _build/showcase docs/dependent-haskell/Showcase.hs \
     -o _build/showcase/showcase
@@ -1411,6 +1415,8 @@ main = do
     observe "pass a refined runtime Boolean to a retained field" (firstField, secondField)
     observe "choose a field result by negating its runtime index" (firstNegated, secondNegated)
     observe "choose a result with a quoted retained signature" (firstQuoted, secondQuoted)
+    observe "select a field using a replayed membership proof"
+        (NativeOffer.choose True, NativeOffer.choose False)
     observe "splice a result type selected by a retained Boolean"
         (NativeRetainedTH.quotedCase True (), NativeRetainedTH.quotedCase False ())
     observe "compose two signature splices at a runtime Boolean" (firstSpliced, secondSpliced)
