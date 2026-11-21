@@ -1181,6 +1181,24 @@ tcExpr (HsStatic free_names expr) res_ty
                Just (APromotionErr {}) -> return ()
                Just (AGlobal {})       -> return () }
 
+tcExpr expr@(HsEmbTy _ written) expected@(Check ty)
+  | Just (tc, [kind, _]) <- splitTyConApp_maybe ty
+  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+       ; unless enabled illegal
+       ; selector <- tcLookupKnownOccId typeRepIdOcc
+       ; let (_, _, rep) = tcSplitSigmaTy (idType selector)
+       ; case splitTyConApp_maybe rep of
+           Just (rep_tc, _) | tc == rep_tc ->
+             do { arg <- tcHsTypeApp written kind
+                ; let args = [kind, arg]
+                      (theta, actual) = tcSplitPhiTy (piResultTys (idType selector) args)
+                ; wrap <- instCall (exprCtOrigin expr) args theta
+                ; result <- tcWrapResultMono expr (mkHsWrap wrap (mkHsVar (noLocA selector)))
+                                             actual expected
+                ; return (XExpr (ExpandedThingTc (HSE (ExprCtxt expr) (noLocA result)))) }
+           _ -> illegal }
+  where
+    illegal = failWith (TcRnIllegalTypeExpr TypeKeywordSyntax)
 tcExpr (HsEmbTy _ _)      _ = failWith (TcRnIllegalTypeExpr TypeKeywordSyntax)
 tcExpr (HsQual _ _ _)     _ = failWith (TcRnIllegalTypeExpr ContextArrowSyntax)
 tcExpr (HsForAll _ _ _)   _ = failWith (TcRnIllegalTypeExpr ForallTelescopeSyntax)
