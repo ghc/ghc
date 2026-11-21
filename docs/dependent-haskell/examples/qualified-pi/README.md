@@ -326,9 +326,9 @@ and general optimization remain gated.
 
 ## Generic safe list positions
 
-[ParameterizedIndexLibrary.hs](ParameterizedIndexLibrary.hs) adds three generic
-workers. They reuse the existing Fin datatype and the ordinary sourceLength
-family imported from PackedVecLibrary:
+The three workers in `ParameterizedIndexLibrary` reuse the existing `Fin`
+datatype. Their bound comes from the ordinary function `sourceLength` in
+`PackedVecLibrary`.
 
 ```haskell
 indexGeneric :: forall (a :: Type). foreach (xs :: [a]) -> Fin (sourceLength xs) -> a
