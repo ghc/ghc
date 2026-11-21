@@ -22,7 +22,7 @@ for opt in -O0 -O2; do
 module WrongWitness
     ( buildWrong, wrongMask, wrongColumns, BadField(..), badField
     , wrongRows, wrongCols, wrongCellRows, wrongCellCols, wrongUnlabelled, Nested(..), nested
-    , noRows, noCols
+    , noRows, noCols, LabelledLast(..), labelsLast, wrongLast
     , EvidenceBatch(..), withEvidence, TaggedBatch(..), withEquality
     ) where
 import Data.Proxy (Proxy)
@@ -64,6 +64,15 @@ noCols row = Table (VCons row VNil) VNil (VCons VNil VNil)
 wrongUnlabelled :: Natural -> ColumnTable Natural
 wrongUnlabelled n = case sample n of
     Table _ cols _ -> ColumnTable cols (VCons (unsafeCoerce VNil) VNil)
+
+data LabelledLast a where
+    LabelledLast :: Vec cols Char -> Vec rows (Vec cols a) -> Vec rows Char -> LabelledLast a
+
+labelsLast, wrongLast :: Natural -> LabelledLast Natural
+labelsLast n = case sample n of
+    Table rows cols cells -> LabelledLast cols cells rows
+wrongLast n = case sample n of
+    Table _ cols cells -> LabelledLast cols cells (unsafeCoerce VNil)
 
 data Nested a where
     Nested :: Char -> Vec rows (Vec cols a) -> Nested a
@@ -141,6 +150,10 @@ table = Refl
 unlabelled :: T.withoutRowLabels (T.sample 4) :~: 'T.ColumnTable
                 (Three 'x' 'y' 'z') (Two (Three 1 2 3) (Three 4 5 6))
 unlabelled = Refl
+
+labelsAfterCells :: W.labelsLast 4 :~: 'W.LabelledLast
+                    (Three 'x' 'y' 'z') (Two (Three 1 2 3) (Three 4 5 6)) (Two 'r' 's')
+labelsAfterCells = Refl
 
 unlabelledEmpty :: T.withoutRowLabels (W.noRows 'z') :~: 'T.ColumnTable ('V.VCons 'z' 'V.VNil) 'V.VNil
 unlabelledEmpty = Refl
@@ -327,7 +340,7 @@ HS
         reject BadColumns 'The value returned by the interpreter does not match the checked result type.'
     done
 
-    for function in wrongUnlabelled wrongCellRows wrongCellCols; do
+    for function in wrongLast wrongUnlabelled wrongCellRows wrongCellCols; do
         sed -e 's/module BadWitness/module BadCells/' -e "s/Wrong.buildWrong/Wrong.$function/" \
             -e '/^import qualified WrongWitness/i import RectangularTable (Table(..), ColumnTable(..))' \
             BadWitness.hs >BadCells.hs
