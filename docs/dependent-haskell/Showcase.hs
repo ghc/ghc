@@ -1774,6 +1774,7 @@ arithmeticNotation = do
     let annotated :: Vec Bool 2
         annotated = replicateNative (2 :: Nat) True
     observe "replicateNative (2 :: Nat)" (toList annotated)
+    observe "explicit numeric conversion in an ordinary client" Ordinary.ordinaryConvert
     observe "replicateNative (n + 1)" (toList oneMore)
     observe "vector with length n + 3" (toList joined)
     observe "2 + 3 at runtime" ((2 + 3) :: Nat)

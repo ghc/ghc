@@ -214,6 +214,7 @@ vector with length 3: [True,False,True]
 replicateAt 3: [True,True,True]
 replicateNative 3: [True,True,True]
 replicateNative (2 :: Nat): [True,True]
+explicit numeric conversion in an ordinary client: [True,True,True]
 replicateNative (n + 1): [False,False,False]
 vector with length n + 3: [False,False,True,False,True]
 2 + 3 at runtime: 5

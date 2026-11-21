@@ -29,6 +29,10 @@ NativeSourceCallIface:
 	sed 's/(2 :: Nat)/(2 :: Integer)/' NativeLiteralClient.hs > changed/NativeLiteralClient.hs
 	! $(source_call_hc) -fforce-recomp -c changed/NativeLiteralClient.hs 2>wrong-annotation.stderr
 	grep -q 'cannot use the cast required for this argument as a retained index' wrong-annotation.stderr
+	sed 's/fromInteger 3/fromInteger 2/' NativeLiteralClient.hs > changed/NativeLiteralClient.hs
+	! $(source_call_hc) -fforce-recomp -c changed/NativeLiteralClient.hs 2>wrong-conversion.stderr
+	grep -q 'GHC-83865' wrong-conversion.stderr
+	grep -q 'threeConverted' wrong-conversion.stderr
 	sed 's/n == 0 = Z/n == 0 = S Z/' PackedVecLibrary.hs > changed/PackedVecLibrary.hs
 	$(source_call_hc) -fno-code -fwrite-interface -fforce-recomp -c changed/PackedVecLibrary.hs
 	! $(source_call_hc) -c NativeLiteralClient.hs 2>changed-literal.stderr

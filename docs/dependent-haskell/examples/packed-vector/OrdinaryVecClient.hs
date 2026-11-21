@@ -1,9 +1,10 @@
-{-# LANGUAGE NoExperimentalDependentTypes #-}
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeApplications #-}
 
 -- | Use imported retained contracts from an ordinary source module.
-module OrdinaryVecClient (ordinaryReplicate, ordinaryRoundTrip, ordinaryZipExact) where
+module OrdinaryVecClient (ordinaryReplicate, ordinaryConvert, ordinaryRoundTrip, ordinaryZipExact) where
 
-import PackedVecLibrary (Nat, fromListExact, genericVector, replicateNative, toList, zipVec)
+import GHC.TypeNats.Experimental (FromNatural)
+import PackedVecLibrary (Nat, Vec, fromListExact, genericVector, replicateNative, toList, zipVec)
 
 {- Note [Ordinary callers of retained APIs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -16,6 +17,13 @@ needs the restricted compiler options documented in Showcase.hs.
 -- | Build an indexed vector at a runtime length and return its elements.
 ordinaryReplicate :: Nat -> a -> [a]
 ordinaryReplicate n x = toList (replicateNative n x)
+
+-- | Check the explicit term conversion against the independently registered index.
+ordinaryConvert :: [Bool]
+ordinaryConvert = toList converted
+  where
+    converted :: Vec Bool (FromNatural Nat 3)
+    converted = replicateNative (fromInteger @Nat 3) True
 
 -- | Preserve a list through a vector indexed by the actual input list.
 ordinaryRoundTrip :: [a] -> [a]
