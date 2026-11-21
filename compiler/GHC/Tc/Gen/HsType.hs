@@ -1922,19 +1922,23 @@ tcInferTypeLetRhs mode source
         Just (ATcCaseLet params rhs kind Nothing)
           | equalLength params captures -> do
               actuals <- check [] [] params captures
-              pure (instantiate params actuals rhs kind)
+              instantiate params actuals rhs kind
         Just (ATcCaseLet params rhs kind (Just tc)) -> do
           (applied, _) <- tcInferTyApps mode source (mkTyConTy tc) args
           case splitTyConAppNoView_maybe applied of
             Just (tc', actuals) | tc' == tc, equalLength params actuals ->
-              pure (instantiate params actuals rhs kind)
+              instantiate params actuals rhs kind
             _ -> panic "tcInferTypeLetRhs: checked helper arity"
         _ -> ordinary
   | otherwise = ordinary
   where
     ordinary = tc_infer_lhs_type mode source
-    instantiate params actuals rhs kind =
-      (substTyWith params actuals rhs, substTyWith params actuals kind)
+    instantiate params actuals rhs kind = do
+      -- A capture can occur as the head of an application in rhs. Its
+      -- checked kind must expose the arrows before substitution.
+      -- See Note [The Purely Kinded Type Invariant (PKTI)].
+      args <- liftZonkM (zonkTcTypes actuals)
+      pure (substTyWith params args rhs, substTyWith params args kind)
     capture (HsValArg _ arg@(L _ HsTyVar{})) = Just arg
     capture _ = Nothing
 
