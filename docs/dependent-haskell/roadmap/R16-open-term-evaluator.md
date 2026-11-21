@@ -1865,3 +1865,22 @@ installed `Prelude.fmap`.
 [Core observations and readback](R05-dependent-core.md#open-observation-of-the-installed-maybe-method).
 
 [Source upgrade regression](../examples/open-evaluation/check-mapping-upgrade.sh).
+
+### A rule in the module importing a mapping proof
+
+At compiler revision `bffa69e282`, `mapJust` proves
+`Prelude.fmap f ('Just x) :~: 'Just (f x)`. GHC reports GHC-83605
+if the proof module declares a competing rule for the same call.
+An importing `Main` can still declare this rule and compile at `-O2` with the following rule.
+
+```haskell
+{-# RULES "transport/fmap-maybe" [~1] forall f (x :: Bool).
+    Prelude.fmap f (Just x) = Nothing #-}
+```
+
+In one executable, the imported proof returns `Refl` and the client's
+`Prelude.fmap not (Just True)` returns `Nothing`. R16 still needs to
+track the selected method and instance when a client imports the proof
+or changes its rules.
+[Provider](../examples/open-evaluation/PreludeMappingProof.hs) and
+[rewrite-rule semantics](../REFERENCES.md#rewrite-rules-and-imported-method-proofs).

@@ -7434,3 +7434,15 @@ information. The proof uses an explicit unmatchable arrow.
 [proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html),
 [review questions](https://github.com/ghc-proposals/ghc-proposals/pull/242#issuecomment-502487934),
 and [author's reply](https://github.com/ghc-proposals/ghc-proposals/pull/242#issuecomment-503360362).
+
+### Rewrite rules and imported method proofs
+
+GHC relies on the author of an optimizer rule to preserve the meaning
+of the program. Agda can use declared rewrite rules during conversion.
+Its confluence check considers overlaps between rules. In the fork an
+ordinary GHC rule can change a call that an imported source proof used.
+The R16 example records the compile-time equality and the runtime result
+at the same source revision.
+[GHC rewrite rules](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/rewrite_rules.html),
+[Agda 2.8.0 rewriting](https://agda.readthedocs.io/en/v2.8.0/language/rewriting.html),
+and [R16 mapping proof](roadmap/R16-open-term-evaluator.md#a-rule-in-the-module-importing-a-mapping-proof).
