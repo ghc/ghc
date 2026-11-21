@@ -28,6 +28,21 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `cd14d1268d`, an ordinary reader gets 17, 23 and 29 from a named
+erased package, a producer call, and the same call forwarded through
+`id`. A required erased type can also follow a retained argument.
+The source client calls `keepRequired tag (type Bool) m x` without
+forcing either runtime index. An extra value argument now reports five
+visible arguments supplied and four declared.
+
+The Stage 2 compiler matched all 378 Showcase lines at stripped `-O0`,
+default `-O2`, and in source-loaded GHCi. At `c1372d1ebf`, all twelve
+focused integration tests passed. The subsequent diagnostic change
+matched five existing arity diagnostics against the preceding compiler.
+The ordinary required-argument control also matched GHC 9.14.1.
+[Retained argument checks](examples/qualified-pi/check-visible-rule-arguments.sh)
+and [package reader](examples/erased-existentials/RankedPackageClient.hs).
+
 At `89aa40ec56`, the 376-line Showcase includes a split written as
 two equations, an ordinary `INLINE` wrapper, and finite map composition.
 The split's recursive call supplies the equality that its cons branch
