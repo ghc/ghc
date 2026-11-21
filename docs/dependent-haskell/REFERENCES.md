@@ -5572,6 +5572,15 @@ and [Haskell evaluation provenance](#haskell-evaluation-provenance).
 
 ### The length of zip and demand in a case tree
 
+Agda's `length-zipWith` proves that the length of a zip is the minimum
+of its input lengths. Its inductive step applies successor congruence
+to the proof for the tails. In Haskell, `zipMinimum` matches that proof
+with `Refl`. Its first empty branch leaves the second spine unevaluated.
+A caller can take a prefix of `zipRows` on two infinite lists. Forcing
+the equality proof would keep searching for the end of the zip.
+[Agda standard library 2.3, list properties](https://agda.github.io/agda-stdlib/v2.3/Data.List.Properties.html)
+and [Haskell proof](examples/packed-vector/ZipRows.hs).
+
 A proposed length for zipping two ordinary lists tests the first spine,
 then tests the second spine only if the first has a cell. Agda's `max`
 example shows why a source equation need not reduce when its first

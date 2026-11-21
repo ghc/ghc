@@ -74,12 +74,16 @@ HS
 "${ghc[@]}" -c ZipRows.hs
 
 cat >Main.hs <<'HS'
-{-# LANGUAGE NoExperimentalDependentTypes, TypeApplications #-}
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes, TypeApplications #-}
 module Main where
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Data.List (isPrefixOf)
+import Data.Type.Equality ((:~:)(Refl))
 import PackedVecLibrary (toList)
-import ZipRows (zipRows)
+import ZipRows (zipMinimum, zipRows)
+
+minimumHolds :: [a] -> [b] -> Bool
+minimumHolds xs ys = case zipMinimum xs ys of Refl -> True
 
 main :: IO ()
 main = do
@@ -95,6 +99,8 @@ main = do
     print (length (toList (zipRows [badChar] [badBool])))
     first <- try @ErrorCall (evaluate (null (toList (zipRows badFirst emptyB))))
     print (either (isPrefixOf "first spine" . displayException) (const False) first)
+    print (minimumHolds "" badSecond, minimumHolds [badChar] [badBool],
+           minimumHolds infinite [True, False])
 HS
 "${ghc[@]}" -c Main.hs
 "${ghc[@]}" Main.o ZipRows.o ../provider/{PackedVecLibrary,ZipLengthSource}.o -o run
@@ -105,6 +111,7 @@ diff -u - actual <<'OUT'
 True
 1
 True
+(True,True,True)
 OUT
 
 cat >WrongDemand.hs <<'HS'

@@ -224,7 +224,7 @@ use ordinary vector append in a type: Refl
 prove empty append preserves a runtime vector: [True,False,False]
 prove the first cell of append at runtime: [False,True,False,False]
 prove empty append for two vectors at a shared runtime cut: (True,True)
-zip two lists into a vector at the shorter length: [('a',True),('b',False)]
+prove zip returns the smaller of two runtime lengths: [('a',True),('b',False)]
 split the appended vector at its first length: ([True],[False,False])
 split a vector with a proof of its original contents: (([True,False],[True],[True,False,True]),([True,True],[True]))
 split proof demand (zero ignores input, one ignores fields, one demands the cell): (True,True,True)

@@ -194,7 +194,7 @@ import qualified PackedProjection
 import qualified PackageEquality
 import AppendLengthClient (appendTwoAndOne)
 import PackedVecLibrary
-import ZipRows (zipRows)
+import ZipRows (zipMinimum, zipRows)
 import qualified AppendByMethodClient
 import qualified RetainedSumOperator
 import RetainedNat (Retained(..), constantPackage, withRetained)
@@ -2065,8 +2065,11 @@ sourceAddition = do
     zeroCut <- newIORef (0 :: Nat) >>= readIORef
     observe "prove empty append for two vectors at a shared runtime cut"
         (OrdinaryOpenVectorAppend.observeAppendPair zeroCut, OrdinaryOpenVectorAppend.observeAppendPair n)
-    observe "zip two lists into a vector at the shorter length"
-        (toList (zipRows "abc" [True, False]))
+    labels <- newIORef "abc" >>= readIORef
+    flags <- newIORef [True, False] >>= readIORef
+    case zipMinimum labels flags of
+        Refl -> observe "prove zip returns the smaller of two runtime lengths"
+                    (toList (zipRows labels flags))
     observe "split the appended vector at its first length"
         (toList (fst split), toList (snd split))
     rebuilt <- CertifiedSplitClient.splitObservation

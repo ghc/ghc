@@ -7733,13 +7733,13 @@ row. The client uses nested cases to refine the two indices in order.
 two concrete element kinds, runtime demand, and recompilation after a
 changed equation. It also checks that a rule which changes the final
 result removes the provisional table.
-      Use the existing nested-case path to separate source equation
-      checking from the syntax of two retained clause patterns.
 
-The proposed family can use three ordered branches. In the empty-second
-branch the first pattern must still be a cons. An unrestricted equation
-for an unknown first list could give a type-level result where the
-runtime computation is stuck. [Case-tree and demand references](REFERENCES.md#the-length-of-zip-and-demand-in-a-case-tree).
+`zipMinimum` proves that the result index equals
+`Min (sourceLength xs) (sourceLength ys)`. Its first empty-list
+equation returns `Refl` without inspecting the second list. In the
+two-cons case it uses the proof for the two tails. An ordinary client
+can match the result through a stripped interface. [Case-tree and demand
+references](REFERENCES.md#the-length-of-zip-and-demand-in-a-case-tree).
 
 ## M99: evaluate an imported closed call
 
