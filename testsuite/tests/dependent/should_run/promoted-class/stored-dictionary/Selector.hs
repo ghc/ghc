@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, RoleAnnotations #-}
-module Selector (Tagged(..), observe) where
+module Selector (Tagged(..), tag, observe) where
 import StoredEvidence (Pick(..))
 
 type role Tagged nominal

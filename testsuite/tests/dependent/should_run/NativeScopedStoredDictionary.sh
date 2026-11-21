@@ -5,7 +5,7 @@ out=$(mktemp -d)
 trap 'rm -rf -- "$out"' EXIT
 ghc=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint -fdiagnostics-color=never)
 stripped=(-fomit-interface-pragmas -fno-write-if-simplified-core)
-expected='(True,False)'
+expected='((True,False),(True,False))'
 
 for opt in -O0 -O2; do
     mkdir -p "$out/$opt/"{provider,client}
@@ -22,6 +22,12 @@ for opt in -O0 -O2; do
         fi
         grep -Fq '[GHC-83605]' competing
         grep -Fq 'Constraint solving for this retained function type is not supported yet' competing
+        if "${ghc[@]}" "$opt" "$defer" -DCOMPETING_DICTIONARY -DDIRECT_SELECTOR -fno-code -c FoldCell.hs > direct 2>&1; then
+            echo "Accepted a direct selector with competing constructor dictionaries"
+            exit 1
+        fi
+        grep -Fq '[GHC-83605]' direct
+        grep -Fq 'No checked source equations are available' direct
     done
     if "${ghc[@]}" "$opt" -DLINEAR_FIELD -fno-code -c FoldCell.hs > linear 2>&1; then
         echo "Accepted a linear field as an unrestricted scoped selector operand"

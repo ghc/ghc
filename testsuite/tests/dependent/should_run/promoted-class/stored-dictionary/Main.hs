@@ -1,7 +1,7 @@
 {-# LANGUAGE Haskell2010, NoExperimentalDependentTypes #-}
 module Main where
 
-import FoldCell (At(..), foldCell)
+import FoldCell (At(..), foldCell, foldDirect)
 import StoredEvidence (Cell(Stored), Pick(..), pack)
 
 instance Pick Bool where
@@ -10,5 +10,9 @@ instance Pick Bool where
 readCell :: Cell [Bool] -> Bool
 readCell c = case foldCell c of At b -> b
 
+readDirect :: Cell [Bool] -> Bool
+readDirect c = case foldDirect c of At b -> b
+
 main :: IO ()
-main = print (readCell (pack True), readCell (Stored True))
+main = print ((readCell (pack True), readCell (Stored True)),
+              (readDirect (pack True), readDirect (Stored True)))

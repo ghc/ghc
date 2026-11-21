@@ -251,7 +251,8 @@ and [wire runner](../../../testsuite/tests/dependent/should_run/NativeScopedDict
 `foldCell :: foreach (c :: Cell [Bool]) -> At c` matches the retained
 value with `Stored x`. The pattern introduces the actual `Pick Bool`
 dictionary. The branch can call the imported selector `observe x`
-under this Given and return `At c`. The selector's index stays inside the
+under this Given and return `At c`. It can also call `tag (pick x)`
+directly under the same Given. The selector's index stays inside the
 branch.
 
 The source-hidden client passes two cells with payload `True` and
