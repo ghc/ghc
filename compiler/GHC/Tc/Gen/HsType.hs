@@ -133,7 +133,7 @@ import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.WiredIn.Prim
 
 import GHC.Types.Error
-import GHC.Types.Id ( mkLocalId, mkSysLocalM, sourceTableId_maybe, sourceTableKeepsExecutable )
+import GHC.Types.Id ( isClassOpId_maybe, mkLocalId, mkSysLocalM, sourceTableId_maybe, sourceTableKeepsExecutable )
 import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Set (NameSet, mkNameSet, unionNameSet, emptyNameSet, elemNameSet, extendNameSet)
@@ -613,8 +613,15 @@ tcCheckRetainedType allow_function = go
       | hsHasForEachTy (unLoc body)
       = setSrcSpanA loc $
         do { theta <- tc_hs_context mode ctxt
-           ; body_ty <- go mode body liftedTypeKind
-           ; checkExpKind mode ty (tcMkPhiTy theta body_ty) liftedTypeKind (Check kind) }
+           ; dictionaries <- if allow_function
+                              then newEvVars theta
+                              else pure []
+           ; body_ty <- go (mode { mode_dictionaries = dictionaries ++ mode_dictionaries mode })
+                           body liftedTypeKind
+           ; let sigma
+                   | null dictionaries = tcMkPhiTy theta body_ty
+                   | otherwise = foldr bind_dictionary body_ty dictionaries
+           ; checkExpKind mode ty sigma liftedTypeKind (Check kind) }
     go mode (L loc (HsFunTy _ mult arg res)) kind
       = setSrcSpanA loc $
         tc_fun_type_x (go mode) (pure unmatchableDataConTy) mode mult arg res (Check kind)
@@ -654,6 +661,11 @@ tcCheckRetainedType allow_function = go
                    ; return (mkDepFunTyWithVis (hsForEachVisibility ann) index body_ty) }
               _ -> failWithTc $ TcRnRetainedQuantificationError RetainedBinderCount
     go mode body kind = tc_check_lhs_type mode body kind
+
+    bind_dictionary dict body
+      | isNativeClassDictionaryId dict, dict `elemVarSet` tyCoVarsOfType body
+      = DepDictTy dict body
+      | otherwise = tcMkPhiTy [varType dict] body
 
 {- Note [Local runtime indices in signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1647,6 +1659,7 @@ data TcTyMode
              , mode_callback_arrow :: CallbackArrowMode
              , mode_holes :: HoleInfo
              , mode_indices :: NameEnv Id
+             , mode_dictionaries :: [EvVar]
              , mode_pending_calls :: Maybe (NameEnv TcTyVar, PendingSigCalls, TcRef [TcPendingTypeCall])
                -- See Note [Pending calls in partial signatures] in GHC.Tc.Solver.
              , mode_synonym_metadata :: Maybe (Name -> Int -> TcM [Type], Maybe (TcM Matchability))
@@ -1682,6 +1695,7 @@ mkMode tyki = TcTyMode { mode_tyki = tyki, mode_holes = Nothing
                       , mode_declaration = False
                       , mode_callback_arrow = OrdinaryArrowChecking
                       , mode_indices = emptyNameEnv
+                      , mode_dictionaries = []
                       , mode_pending_calls = Nothing
                       , mode_synonym_metadata = Nothing
                       , mode_complete_type_arg = Nothing }
@@ -1699,6 +1713,7 @@ mkHoleMode tyki hm
                          , mode_callback_arrow = OrdinaryArrowChecking
                           , mode_holes = Just (lvl,hm)
                           , mode_indices = emptyNameEnv
+                          , mode_dictionaries = []
                           , mode_pending_calls = Nothing
                           , mode_synonym_metadata = Nothing
                           , mode_complete_type_arg = Nothing }) }
@@ -2742,6 +2757,32 @@ tcInferTyAppHead mode ty _
 
 tc_app_ty :: TcTyMode -> HsType GhcRn -> ExpKind -> TcM TcType
 tc_app_ty mode rn_ty exp_kind
+  | not (null (mode_dictionaries mode))
+  , ( L _ (HsTyVar _ NotPromoted (L loc (WithUserRdr _ method)))
+    , [HsValArg _ arg]) <- splitHsAppTys rn_ty
+  , L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ operand))) <- ignoreParens arg
+  , Just index <- lookupNameEnv (mode_indices mode) operand
+  , isVarName method
+  = do { mb_sel <- tcLookupIdMaybe method
+       ; case mb_sel of
+           Just sel | isJust (isClassOpId_maybe sel)
+             -> setSrcSpanA loc $ do
+                  let inst = varType index
+                      invalid = failWithTc (TcRnRetainedQuantificationError RetainedCallIndex)
+                  case Core.nativeClassSelectorTys sel inst of
+                    Just (predicate, domain, result)
+                      | domain `tcEqType` inst
+                      , [dict] <- filter (\d -> varType d `tcEqType` predicate) (mode_dictionaries mode)
+                      , isNativeClassDictionaryId dict
+                      -> checkExpKind mode rn_ty
+                           (ClassAppTy sel inst (TermVarTy dict) (TermVarTy index) result) result exp_kind
+                    _ -> invalid
+           _ -> tc_app_ty_other mode rn_ty exp_kind }
+
+  | otherwise = tc_app_ty_other mode rn_ty exp_kind
+
+tc_app_ty_other :: TcTyMode -> HsType GhcRn -> ExpKind -> TcM TcType
+tc_app_ty_other mode rn_ty exp_kind
   | L _ (HsTyVar _ _ (L _ (WithUserRdr _ name))) <- hs_fun_ty
   , Just head_id <- lookupNameEnv (mode_indices mode) name
   , isNativeIndexFunctionId head_id
@@ -2761,7 +2802,7 @@ tc_app_ty mode rn_ty exp_kind
     invalid_call :: TcM a
     invalid_call = failWithTc $ TcRnRetainedQuantificationError RetainedCallIndex
     (hs_fun_ty, hs_args) = splitHsAppTys rn_ty
-tc_app_ty mode rn_ty exp_kind
+tc_app_ty_other mode rn_ty exp_kind
   | L _ (HsTyVar _ NotPromoted (L loc (WithUserRdr rdr name))) <- hs_fun_ty
   , isVarName name
   , isExternalName name
@@ -2869,7 +2910,7 @@ tc_app_ty mode rn_ty exp_kind
       | Just (_, RetrySigCalls, _) <- mode_pending_calls mode = True
       | otherwise = False
     unsupported = failWithTc . TcRnNoSourceTable
-tc_app_ty mode rn_ty exp_kind
+tc_app_ty_other mode rn_ty exp_kind
   | L _ (HsTyVar _ NotPromoted (L loc (WithUserRdr rdr name))) <- hs_fun_ty
   , isSourceFamilyName name
   , Just args <- traverse value_arg (filterOut is_par hs_args)
@@ -2912,7 +2953,7 @@ tc_app_ty mode rn_ty exp_kind
       observe <- prepareClosedCallResult kind value
       result <- observe
       checkExpKind mode rn_ty result kind exp_kind
-tc_app_ty mode rn_ty exp_kind = tc_app_ty_generic mode rn_ty exp_kind
+tc_app_ty_other mode rn_ty exp_kind = tc_app_ty_generic mode rn_ty exp_kind
 
 tc_app_ty_generic :: TcTyMode -> HsType GhcRn -> ExpKind -> TcM TcType
 tc_app_ty_generic mode rn_ty exp_kind
@@ -6626,6 +6667,7 @@ bindExplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_ki
                          , mode_declaration = False
                          , mode_callback_arrow = OrdinaryArrowChecking
                          , mode_indices = indices
+                         , mode_dictionaries = []
                          , mode_pending_calls = Nothing
                          , mode_synonym_metadata = if family_metadata then familyKindMetadata else Nothing
                          , mode_complete_type_arg = Nothing }
