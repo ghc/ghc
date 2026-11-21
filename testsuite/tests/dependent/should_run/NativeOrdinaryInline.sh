@@ -213,17 +213,13 @@ packed offset keep n =
         packLocal n = inspect ((if keep then Just n else Nothing, (+ offset)) :: Hidden)
     in packLocal n + 1
 
-{-# NOINLINE callTwice #-}
-callTwice :: (Int -> Int) -> Int -> Int
-callTwice f n = f n + f 2
-
 opened :: Int -> Int -> Int
 opened offset n =
     let {-# INLINABLE openLocal #-}
         openLocal :: Int -> Int
         openLocal n = case hide n (+ offset) of
             (value, render) -> maybe 0 render value
-    in callTwice openLocal n
+    in openLocal n + openLocal 2
 
 unopened :: Int -> Int
 unopened offset =
@@ -256,8 +252,10 @@ for opt in -O0 -O1 -O2; do
     cp PackageClient.hs "$out/client/Main.hs"
     (
         cd "$out/provider"
+        # Keep the INLINABLE opener so Tidy must discard its template.
         "${ghc[@]}" "$opt" -ddump-ds -ddump-simpl -ddump-inlinings -dverbose-core2core \
-            -dsuppress-uniques -c LocalPackage.hs > provider.core 2> provider.log
+            -funfolding-creation-threshold=0 -dsuppress-uniques \
+            -c LocalPackage.hs > provider.core 2> provider.log
         for binder in packLocal openLocal; do
             grep -m1 -A7 "$binder \[InlPrag=" provider.core | grep -F 'Src=StableRetainedUser' >/dev/null
         done
