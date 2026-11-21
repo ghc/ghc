@@ -674,6 +674,72 @@ and [interface and recompilation check](../../../testsuite/tests/dependent/shoul
 M166 also excluded omitted invisible binders. The next two cases
 describe the later support for them.
 
+### Returning a family at arity zero
+
+Proposal #242 gives the example `Bar = Foo`. `Bar` has arity zero
+even though its result kind is `Type %U -> Type`. Its equation can
+reduce immediately. `Foo` still needs its argument, and pointwise
+agreement does not give equality between two unapplied families.
+[Proposal #242 on arity](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#arity-of-type-families)
+and [the author's review reply of June 19, 2019](https://github.com/ghc-proposals/ghc-proposals/pull/242).
+
+```haskell
+type family Foo (a :: Type) :: Type where
+  Foo a = [a]
+
+type family Apply (f :: Type %U -> Type) (a :: Type) :: Type where
+  Apply f a = f a
+
+type family Bar :: Type %U -> Type where
+  Bar = Foo
+
+type Result = Apply Bar Int
+```
+
+At `204567ceb4`, `Apply Foo Int` works. GHC-22979 rejects
+`Bar = Foo` because the call has the same size as the nullary
+left-hand side. With `UndecidableInstances` on the module defining
+`Bar`, an ordinary client reads only the provider interfaces, proves
+`Result :~: [Int]` with `Refl`, and prints `[7]` at O0 and O2.
+A constant callback gives the same result for `Int` and `Char`.
+GHC-25897 rejects a proof that their equal results determine their inputs.
+
+A synonym is an option when the API does not need a family equation.
+With `ExperimentalDependentTypes` on the provider, the standalone
+signature `type Alias :: Type %U -> Type` and the definition
+`type Alias = Foo` give the same client result without
+`UndecidableInstances`. GHC expands the synonym when it checks
+`Grow a = Alias (Grow a)`, so it rejects that recursion.
+
+A blanket exception for partial calls admits a cycle. In
+`Forward = Feedback` with `Feedback a = Forward a`, the current
+size check rejects only the first equation. For an acyclic `Bar`,
+expanding `Bar (Grow a)` to `Foo (Grow a)` at the use catches a
+nested family call. The latter spelling gets GHC-22979. The former
+compiles against the opted-in provider and forcing the result gets
+GHC-40404. The existing arity check counts the arguments of the
+nullary `Bar` and omits the argument to its result.
+[Existing arity check](../../../compiler/GHC/Tc/Utils/TcType.hs).
+
+Checking direct uses of a known forwarding equation would miss a
+later open-family instance. An ordinary client of
+`type family OpenBridge (a :: Type) :: Type %U -> Type` can define
+`Grow [a] = OpenBridge a (Grow [a])`. A separate module adds
+`type instance OpenBridge Int = Bar`. Both modules compile with
+`UndecidableInstances` off. A client that imports the instance and
+forces `Grow [Int]` gets GHC-40404 at O0 and O2. The intermediate
+modules also pass when the sources are hidden behind stripped interfaces.
+Stock GHC 9.14.1 already permits the analogous oversaturated recursion
+through a nullary family returning `Maybe`.
+
+Keep the current diagnostic and the provider-local opt-in until
+a termination rule covers applications through both closed and open
+families. A rule that checks later arguments to a family result would
+cover the open example, but it would change existing checks for
+oversaturated families. An interface contract about the resulting
+callback would need to apply to every open-family equation, including
+later providers.
+
 ### Passing a family with an invisible argument
 
 `InvisibleFamily` defines a family `Select` with kind
