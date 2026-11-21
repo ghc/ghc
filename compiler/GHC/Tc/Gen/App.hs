@@ -53,7 +53,7 @@ import GHC.Core.Class ( Class, classTyVars )
 import GHC.Core.ConLike ( ConLike(..) )
 import GHC.Core.DataCon ( DataCon, dataConConcreteTyVars, dataConFullSig, dataConName, isNewDataCon, dataConOrigArgTys, dataConOrigResTy, dataConRepArgBinders, dataConTyCon, dataConUserTyVars, dataConWorkId, dataConWrapId )
 import qualified GHC.Core as Core
-import GHC.Core.Dependent ( hasNativeDependentExpr, supportsQuickLookType )
+import GHC.Core.Dependent ( hasNativeDependentExpr, isScopedSelectorReceiver, supportsQuickLookType )
 import GHC.Core.FamInstEnv (FamInstEnvs, reduceTyFamApp_maybe)
 import GHC.Core.Make ( mkCharExpr, mkNaturalExpr )
 import GHC.Core.Reduction ( Reduction(..) )
@@ -3667,12 +3667,13 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
     -- See Note [Retained argument application].
     go1 plan fun_orig pos acc fun_ty
         (EValArg { ea_arg = arg, ea_loc_span = ctxt } : rest_args)
-      | DepFunTy DepFunVisible binder _ <- coreFullView fun_ty
+      | DepFunTy DepFunVisible binder body <- coreFullView fun_ty
       = do { (core_arg, runtime_arg) <- tcRetainedOperand binder arg
            ; case core_arg of
                Core.Var index | isNativeOpaqueValueId index -> pure ()
-               _ | hasScopedDictionaryPrefix fun_sigma ->
-                     failWithTc $ TcRnRetainedQuantificationError RetainedCallIndex
+               _ | isScopedSelectorReceiver binder body ->
+                     setSrcSpanA (getLoc arg) $
+                       failWithTc $ TcRnRetainedQuantificationError RetainedSelectorReceiver
                  | otherwise -> pure ()
            ; body_ty <- retainedAppResult fun_ty binder core_arg
            ; arg_co <- retainedVariableCast core_arg runtime_arg
