@@ -117,23 +117,33 @@ cat >WrongRequired.hs <<'HS'
 module WrongRequired where
 import VisibleRuleArguments
 
+#if CASE == 4
+ordinary :: forall a. Bool -> forall b -> (a, b) -> Int
+ordinary _ (type b) _ = 0
+#endif
+
 bad :: Bool -> Maybe Bool -> Int
 #if CASE == 1
 bad tag m = case keepRequired tag m (TaggedReading 0) of TaggedReading n -> n
 #elif CASE == 2
 bad tag m = case keepRequired tag (type Bool) m (TaggedReading 0) True of TaggedReading n -> n
-#else
+#elif CASE == 3
 bad tag m = case keepRequired tag @Bool m (TaggedReading 0) of TaggedReading n -> n
+#else
+bad tag _ = ordinary @Int tag (type Bool) (0, True) False
 #endif
 HS
-for n in 1 2 3; do
+for n in 1 2 3 4; do
     if "$ghc" "${flags[@]}" "-DCASE=$n" -c WrongRequired.hs >bad.log 2>&1; then
         echo "Accepted malformed required argument case $n" >&2
         exit 1
     fi
     case $n in
         1) grep -Fq '[GHC-45510]' bad.log || { cat bad.log; exit 1; } ;;
-        2) grep -Fq 'applied to five visible arguments' bad.log || { cat bad.log; exit 1; } ;;
+        2) grep -Fq 'applied to five visible arguments' bad.log &&
+           grep -Fq 'has only four' bad.log || { cat bad.log; exit 1; } ;;
         3) grep -Fq '[GHC-95781]' bad.log || { cat bad.log; exit 1; } ;;
+        4) grep -Fq 'applied to four visible arguments' bad.log &&
+           grep -Fq 'has only three' bad.log || { cat bad.log; exit 1; } ;;
     esac
 done

@@ -1068,10 +1068,14 @@ mkFunTysMsg :: ExpectedFunTyCtxt
             -> HsCtxt
 -- See Note [Reporting application arity errors]
 mkFunTysMsg herald (n_vis_args_in_call, fun_ty)
-  = do { let (_, pi_ty_bndrs, _) = splitPiTys fun_ty
-             n_fun_args = count isVisiblePiTyBinder pi_ty_bndrs
-
-       ; FunTysCtxt herald fun_ty n_vis_args_in_call n_fun_args }
+  = FunTysCtxt herald fun_ty n_vis_args_in_call (visible_arity fun_ty)
+  where
+    visible_arity ty
+      = let (_, binders, residual) = splitPiTys ty
+        in count isVisiblePiTyBinder binders + case coreFullView residual of
+             DepFunTy DepFunVisible _ body -> 1 + visible_arity body
+             DepFunTy DepFunInvisible _ body -> visible_arity body
+             _ -> 0
 
 
 {- Note [Reporting application arity errors]
@@ -1102,7 +1106,9 @@ the /instantiated/ type, and GHC used to do so.  But it's more work, and in
 some ways more confusing, especially when nested quantifiers are concerned, e.g.
     f :: Bool -> forall t. t Int Int
 
-So we just keep it simple and report the original function type.
+So we report the original function type. splitPiTys counts ordinary and
+required erased arguments through isVisiblePiTyBinder. It stops at a retained
+binder. Count a visible retained binder and continue through either visibility.
 
 
 ************************************************************************
