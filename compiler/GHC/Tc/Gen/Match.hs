@@ -77,7 +77,7 @@ import GHC.Core.Type ( coreFullView, isManyTy, splitTyConApp_maybe
 import GHC.Core.Coercion ( MCoercion(MRefl), mkCoVarCo, mkCoCast, coercionType, isReflCo
                          , mkSymCo, mkSubCo, coercionKind, coercionLKind
                          , mkTransCo, mkNomReflCo, mkRepReflCo, mkDepFunCoWithVis )
-import GHC.Core.DataCon ( DataCon, dataConCannotMatch, dataConName, dataConSourceArity, dataConUnivTyVars, dataConWorkId )
+import GHC.Core.DataCon ( DataCon, dataConCannotMatch, dataConName, dataConSourceArity, dataConTyCon, dataConUnivTyVars, dataConWorkId )
 import GHC.Core.ConLike ( ConLike(RealDataCon) )
 import GHC.Core.Predicate ( mkNomEqPred, scopedSort )
 import GHC.Core.Reduction ( Reduction(..) )
@@ -1668,8 +1668,14 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
            ; Reduction _ domain <- runTcSEqualities (rewriteFamilyAxioms loc domain)
            ; case (con_like, splitTyConApp_maybe (coreFullView domain)) of
                (RealDataCon con, Just (tc, args))
-                 | [possible] <- filter (not . dataConCannotMatch args) (tyConDataCons tc)
-                 , con == possible -> return ()
+                 | tc == dataConTyCon con
+                 , let possible = filter (not . dataConCannotMatch args) (tyConDataCons tc)
+                 -> case possible of
+                      [only] | only == con -> return ()
+                      _ | missing@(_ : _) <- filter (/= con) possible ->
+                            failWithTc (TcRnRetainedQuantificationError
+                              (RetainedUncoveredConstructors (dataConName con) (map dataConName missing)))
+                        | otherwise -> failWithTc (TcRnRetainedQuantificationError RetainedMatrixCoverage)
                _ -> failWithTc (TcRnRetainedQuantificationError RetainedMatrixCoverage)
            ; name <- newSysName (mkVarOcc "retained_case")
            ; let arg_pat = L (getLoc second) (VarPat noExtField (noLocA name))

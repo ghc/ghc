@@ -3739,6 +3739,9 @@ pprRetainedQuantificationError reason = case reason of
   RetainedMatrixCoverage ->
     vcat [text "A retained constructor matrix requires one unguarded clause for each pair of constructors of its two index domains."
          ,text "A final equation with bare variables or wildcards in both index columns can cover the remaining pairs."]
+  RetainedUncoveredConstructors con missing ->
+    vcat [ text "The pattern" <+> quotes (ppr con) <+> text "does not cover this retained argument."
+         , text "Missing constructors:" <+> pprWithCommas (quotes . ppr) missing ]
   RetainedMatrixDuplicate ->
     text "This retained constructor pair is matched by an earlier equation."
   RetainedMatrixFallback ->

@@ -5430,6 +5430,7 @@ data RetainedQuantificationError
   | RetainedPackageDeclaration
   | RetainedPackagePromotion
   | RetainedPackagePattern
+  | RetainedUncoveredConstructors Name [Name]
 
 -- | An error in the implementation of an abstract datatype using
 -- a type synonym.
