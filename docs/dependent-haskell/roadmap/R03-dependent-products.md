@@ -472,3 +472,20 @@ infer the multiplicity of the position. A fully applied ordinary arrow
 supplies that multiplicity variable. Its use remains subject to GHC's
 linearity check. The Core API exercises this example inside `withPacked`.
 [Runtime-indexed client](../../../testsuite/tests/ghc-api/NativeDependentCoreRun.hs).
+
+### Consume a checked position and a continuation
+
+`withIndex xs pos visit` consumes two linear arguments. The cons equations
+match on the position and bind the continuation. An ordinary client
+checks an offset before supplying both. A negative offset leaves the
+list unevaluated. Partial application to the list and position waits for
+the continuation before inspecting either input.
+
+A strict function can match an additional flag in the same equations.
+A written `~_` keeps an unused fallback lazy in the selected row. A
+callback used twice or discarded reports GHC-18872 at its binder in the
+source equation. The check covers ordinary suffix arguments. Later
+retained indices still use the separate dependent-pattern rules.
+[Source function](../examples/qualified-pi/ListCursor.hs),
+[ordinary caller](../examples/qualified-pi/CursorClient.hs)
+and [strict pattern control](../../../testsuite/tests/dependent/should_run/NativeLinearIndexColumns.hs).

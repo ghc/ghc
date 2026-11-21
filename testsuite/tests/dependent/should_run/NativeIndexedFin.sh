@@ -13,8 +13,11 @@ for opt in -O0 -O1 -O2; do
     "${ghc[@]}" "$opt" -fwrite-source-equations -c PackedVecLibrary.hs
     "${ghc[@]}" "$opt" -Werror=incomplete-patterns -c ParameterizedIndexLibrary.hs
     cd ../proof
-    cp "$src/"{FinitePosition,ListCursor,NativeIndexedFinGate}.hs ../indices/*.hi .
+    cp "$src/"{FinitePosition,ListCursor,NativeIndexedFinGate,NativeLinearIndexColumns}.hs ../indices/*.hi .
     "${ghc[@]}" "$opt" -Werror=incomplete-patterns -c FinitePosition.hs ListCursor.hs NativeIndexedFinGate.hs
+    lint=()
+    if [[ $opt == -O0 ]]; then lint=(-dlinear-core-lint); fi
+    "${ghc[@]}" "$opt" "${lint[@]}" -Werror=incomplete-patterns -c NativeLinearIndexColumns.hs
     cd ../client
     cp "$src/"{FinitePositionClient,CursorClient}.hs ../proof/*.hi .
     "${ghc[@]}" "$opt" -Werror=incomplete-patterns -c FinitePositionClient.hs CursorClient.hs
@@ -24,16 +27,26 @@ module Main where
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Data.IORef (newIORef, readIORef)
 import Data.Maybe (isJust)
-import CursorClient (observeCursors)
+import CursorClient (observeCursors, observeIndexedCallback)
+import NativeLinearIndexColumns (choose)
 import FinitePositionClient (lookupVecViaView, observeConstructedViews, observeEmptyIndex, observeFinitePosition, observeListIndices)
 import NativeIndexedFinGate (Gate(..), Ticket(..), grant)
 import PackedVecLibrary (Nat(..), Vec(..))
-import ParameterizedIndexLibrary (indexVec, lookupVecChecked, mkFinVec)
+import ParameterizedIndexLibrary (indexVec, lookupVecChecked, mkFinGeneric, mkFinVec)
 
 main :: IO ()
 main = do
     observeFinitePosition >>= print
     observeListIndices >>= print
+    callbacks <- observeIndexedCallback
+    if callbacks == (Just "cc", Nothing, True) then pure () else fail (show callbacks)
+    word <- newIORef "xz" >>= readIORef
+    case mkFinGeneric word 1 of
+        Nothing -> fail "missing position"
+        Just pos -> do
+            let selected = choose word pos True (error "forced explicitly lazy argument")
+                fallback = choose word pos False '!'
+            if (selected, fallback) == ('z', '!') then pure () else fail "wrong branch"
     (ordinary, linear) <- observeCursors
     let expectedCursors = [Just 'c', Nothing, Nothing, Just 'b', Just 'x']
     if ordinary == expectedCursors && linear == expectedCursors then pure ()
@@ -115,6 +128,17 @@ if "${ghc[@]}" -O0 -Werror=incomplete-patterns -c MissingSuccessor.hs >successor
 fi
 grep -Fq 'MissingSuccessor.hs:6:1: error: [GHC-62161]' successor.log
 grep -Fq 'FS' successor.log
+for variant in DISCARD DUPLICATE; do
+    cp "$src/NativeLinearIndexColumns.hs" .
+    if "${ghc[@]}" -O0 -fforce-recomp "-D$variant" -fdiagnostics-color=never -c NativeLinearIndexColumns.hs >bad-columns.log 2>&1; then
+        echo "Accepted $variant of a linear callback"
+        exit 1
+    fi
+    grep -Fq '[GHC-18872]' bad-columns.log
+    test "$(grep -Fc 'In an equation for' bad-columns.log)" = 1
+    grep -Fq "multiplicity of" bad-columns.log
+done
+
 cat >BadCursor.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, LinearTypes, ScopedTypeVariables, TypeApplications #-}
 module BadCursor where
