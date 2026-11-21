@@ -7560,3 +7560,19 @@ substitution at dependent application in sections 1.4.4 and 1.4.7.
 [Agda's Boolean decision](https://agda.github.io/agda-stdlib/master/Relation.Nullary.Decidable.Core.html),
 [GHC proposal #378](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#dependent-application-and-the-static-subset)
 and [Haskell predicate](examples/open-evaluation/PreludeFilterRuntime.hs).
+
+## Transport a retained vector index
+
+Agda's built-in equality puts both endpoints in one type. The annotated
+calculus in *A Specification for Dependent Types in Haskell* gives the
+closer Core precedent. A claim about terms of different types can carry
+a cast on one endpoint. The resulting equality proposition has endpoints
+of the same type. [Agda 2.8 built-in equality](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#equality)
+and [Weirich et al., §6.2](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf#page=21).
+
+The R11 implementation at `db329db55a` applies this representation to
+a retained index. Matching `HRefl` introduces a kind proof and a
+homogeneous equality with a cast. The solver keeps that equality in
+scope. It uses the kind proof to reject incompatible vector lengths or
+to reconstruct a proof with the original endpoints.
+[Source example and diagnostics](roadmap/R11-homogeneous-equality.md#an-equality-with-the-empty-vector).

@@ -9,6 +9,26 @@ Source `~`, `~~`, `:~:`, and `:~~:` keep their current meanings.
 [GHC phase 2a](https://gitlab.haskell.org/ghc/ghc/-/wikis/dependent-haskell/phase2#phase-2a-homogeneous-equality),
 [open GHC issue #17368](https://gitlab.haskell.org/ghc/ghc/-/work_items/17368).
 
+## An equality with the empty vector
+
+An ordinary `HRefl` pattern can refine the length of a retained vector.
+For an unknown length the following function returns the reversed proof.
+The first match also refines the element type.
+
+```haskell
+reverseZero :: foreach (xs :: Vec a n) -> a :~: Bool ->
+    xs :~~: ('VNil :: Vec a 'Z) -> ('VNil :: Vec Bool 'Z) :~~: xs
+reverseZero _ Refl HRefl = HRefl
+```
+
+If the input already has a successor length, the same `HRefl` pattern
+would require `'Z` and `'S n` to be equal. With
+`-Werror=inaccessible-code`, GHC reports GHC-40564 at that pattern.
+A proof about `xs` cannot establish equality for a second vector `ys`
+of the same length. GHC reports GHC-83865 at the attempted `HRefl`.
+[Source and diagnostic checks](../../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh)
+and [equality representation](../REFERENCES.md#transport-a-retained-vector-index).
+
 ## Compatibility example
 
 The roadmap card gives no source example. Its linked GHC design uses this

@@ -392,7 +392,7 @@ cp "$src/"{StoredVector,ConservedPartition}.hs .
 "${g[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core -c StoredVector.hs ConservedPartition.hs
 cat >VectorIdentity.hs <<'HS'
 {-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, PolyKinds #-}
-module VectorIdentity (vectorRefl, forwardVector, zeroRefl, matchZero) where
+module VectorIdentity (vectorRefl, forwardVector, zeroRefl, matchZero, reverseZero) where
 
 import Data.Type.Equality ((:~:)(Refl), (:~~:)(HRefl))
 import PackedVecLibrary (Nat(..), Vec(..))
@@ -421,6 +421,16 @@ wrongZero :: foreach (xs :: Vec Bool 'Z) -> foreach (ys :: Vec Bool 'Z) ->
 wrongZero xs _ = case xs of
     VNil -> (Refl, Refl)
 #endif
+
+reverseZero :: foreach (xs :: Vec a n) -> a :~: Bool ->
+    xs :~~: ('VNil :: Vec a 'Z) -> ('VNil :: Vec Bool 'Z) :~~: xs
+reverseZero _ Refl HRefl = HRefl
+
+#ifdef WRONG_VECTOR
+crossed :: foreach (xs :: Vec Bool n) -> foreach (ys :: Vec Bool n) ->
+    xs :~~: ('VNil :: Vec Bool 'Z) -> ('VNil :: Vec Bool 'Z) :~~: ys
+crossed _ _ HRefl = HRefl
+#endif
 HS
 "${g[@]}" -O2 -Werror=inaccessible-code -Werror=overlapping-patterns \
     -fno-omit-interface-pragmas -fno-write-if-simplified-core -c VectorIdentity.hs
@@ -428,7 +438,8 @@ HS
 grep -Fq 'indexed-constructor-case' vector-identity.iface
 if "${g[@]}" -ferror-spans -fforce-recomp -DWRONG_VECTOR -c VectorIdentity.hs >wrong-vector.log 2>&1 ||
    ! grep -Fq 'VectorIdentity.hs:24:19-22: error: [GHC-83865]' wrong-vector.log ||
-   ! grep -Fq 'VectorIdentity.hs:29:20-23: error: [GHC-83865]' wrong-vector.log; then
+   ! grep -Fq 'VectorIdentity.hs:29:20-23: error: [GHC-83865]' wrong-vector.log ||
+   ! grep -Fq 'VectorIdentity.hs:39:21-25: error: [GHC-83865]' wrong-vector.log; then
     cat wrong-vector.log >&2
     exit 1
 fi
@@ -469,7 +480,7 @@ import ListVectorClient
 import PackedVecLibrary (Add, CheckedSplit, Nat(..), Vec(..), appendNative, appendVec, dropVec, replicateNative,
                          splitAtVec, splitAtVecChecked, takeVec, toList)
 import StoredVector (ListVector)
-import VectorIdentity (forwardVector, matchZero, vectorRefl, zeroRefl)
+import VectorIdentity (forwardVector, matchZero, reverseZero, vectorRefl, zeroRefl)
 observe :: ListVector Char -> (Int, String)
 observe = contents
 empty :: Split Int 'Z
@@ -524,7 +535,7 @@ main = do
         nonzero = VCons (error "unused head") (error "unused tail" :: Vec Bool 'Z)
         knownZero = case zeroRefl zero of Refl -> True
         openZero = case matchZero zero of
-            Just HRefl -> True
+            Just proof -> case reverseZero zero Refl proof of HRefl -> True
             Nothing -> False
         lazyCons = case matchZero nonzero of
             Nothing -> True
