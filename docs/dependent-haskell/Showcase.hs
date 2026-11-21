@@ -1035,7 +1035,7 @@ data Labelled a where
 
 -- | Compare two values with the dictionary that the constructor stored.
 compareLabel :: Labelled a -> a -> a -> (Int, Bool)
-compareLabel (Labelled n @a) x y = (n, x == y)
+compareLabel (Labelled n) x y = (n, x == y)
 
 -- | Hide the field type and retain both dictionaries for its consumer.
 data PrintablePair where
