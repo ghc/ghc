@@ -5403,7 +5403,7 @@ data RetainedQuantificationError
   | RetainedMatrixDuplicate
   | RetainedMatrixFallback
   | RetainedMatrixPattern
-  | RetainedMatrixContext
+  | RetainedMissingConstructorPair Name Name
   | RetainedCasePatterns
   | RetainedCaseQuotation
   | RetainedConstructorQuotation

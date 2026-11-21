@@ -13,8 +13,8 @@ for opt in -O0 -O1 -O2; do
     "${ghc[@]}" "$opt" -fwrite-source-equations -c PackedVecLibrary.hs
     "${ghc[@]}" "$opt" -Werror=incomplete-patterns -c ParameterizedIndexLibrary.hs
     cd ../proof
-    cp "$src/"{FinitePosition,ListCursor,NativeIndexedFinGate,NativeLinearIndexColumns}.hs ../indices/*.hi .
-    "${ghc[@]}" "$opt" -Werror=incomplete-patterns -c FinitePosition.hs NativeIndexedFinGate.hs
+    cp "$src/"{FinitePosition,ListCursor,AlignedList,NativeIndexedFinGate,NativeLinearIndexColumns}.hs ../indices/*.hi .
+    "${ghc[@]}" "$opt" -Werror=incomplete-patterns -c FinitePosition.hs AlignedList.hs NativeIndexedFinGate.hs
     lint=()
     if [[ $opt == -O0 ]]; then lint=(-dlinear-core-lint); fi
     "${ghc[@]}" "$opt" "${lint[@]}" -Werror=incomplete-patterns -c ListCursor.hs NativeLinearIndexColumns.hs
@@ -27,7 +27,7 @@ module Main where
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Data.IORef (newIORef, readIORef)
 import Data.Maybe (isJust)
-import CursorClient (observeBoth, observeAligned, observeCursors, observeIndexedCallback)
+import CursorClient (observeBoth, observeZip, observeAligned, observeCursors, observeIndexedCallback)
 import NativeLinearIndexColumns (choose)
 import FinitePositionClient (lookupVecViaView, observeConstructedViews, observeEmptyIndex, observeFinitePosition, observeListIndices)
 import NativeIndexedFinGate (Gate(..), Ticket(..), grant)
@@ -40,6 +40,8 @@ main = do
     observeListIndices >>= print
     both <- observeBoth
     if both == [Just ('b', 10), Just ('b', 20), Nothing] then pure () else fail (show both)
+    zipped <- observeZip
+    if zipped == (Just [('a', 10), ('b', 20)], Nothing, Just 30, [('x', 'x')]) then pure () else fail (show zipped)
     aligned <- observeAligned
     if aligned == [Just ('b', 20), Nothing, Nothing] then pure () else fail (show aligned)
     callbacks <- observeIndexedCallback
@@ -172,6 +174,45 @@ if "${ghc[@]}" -O0 -fforce-recomp -DUNRELATED -DOMIT -fdefer-type-errors -fdiagn
     exit 1
 fi
 grep -Fq 'ScopedLength.hs:13:1: error: [GHC-83605]' unrelated.log
+cat >MatrixLength.hs <<'HS'
+{-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, ScopedTypeVariables, TypeFamilies #-}
+module MatrixLength where
+import AlignedList (zipWithExact)
+import PackedVecLibrary (Nat(..), Vec(..), sourceLength, toList)
+
+#ifdef OMIT
+onlyNil :: forall a b. foreach (xs :: [a]) -> foreach (ys :: [b])
+        -> (sourceLength xs ~ sourceLength ys) => Vec (a, b) (sourceLength xs)
+onlyNil [] [] = VNil
+#elif defined(WRONG)
+wrong :: forall a b. foreach (xs :: [a]) -> foreach (ys :: [b])
+      -> (sourceLength xs ~ sourceLength ys) => Vec (a, b) (sourceLength xs)
+wrong [] [] = VNil
+wrong (x : xs) (y : ys) = VNil
+#else
+useFallback :: forall a b. foreach (xs :: [a]) -> foreach (ys :: [b])
+            -> (sourceLength xs ~ sourceLength ys) => [(a, b)]
+useFallback [] [] = []
+useFallback xs ys = contents
+  where contents = toList (zipWithExact xs ys (,))
+
+oneSided :: foreach (n :: Nat) -> (n ~ 'Z) => foreach (m :: Nat) -> Vec Bool m
+oneSided Z Z = VNil
+oneSided Z (S k) = VCons False (oneSided Z k)
+#endif
+HS
+"${ghc[@]}" -O0 -Werror=incomplete-patterns -c MatrixLength.hs
+if "${ghc[@]}" -O0 -DOMIT -fforce-recomp -fdefer-type-errors -fdiagnostics-color=never -c MatrixLength.hs >pair.log 2>&1; then
+    echo 'Accepted an omitted cons/cons equation'
+    exit 1
+fi
+grep -Fq 'MatrixLength.hs:10:1: error: [GHC-83605]' pair.log
+grep -Fq 'Missing equation for the retained constructor pair (:, :).' pair.log
+if "${ghc[@]}" -O0 -DWRONG -fforce-recomp -fdiagnostics-color=never -c MatrixLength.hs >result.log 2>&1; then
+    echo 'Accepted an empty result for two nonempty lists'
+    exit 1
+fi
+grep -Fq 'MatrixLength.hs:15:27: error: [GHC-83865]' result.log
 cat >MissingSuccessor.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, ScopedTypeVariables #-}
 module MissingSuccessor where

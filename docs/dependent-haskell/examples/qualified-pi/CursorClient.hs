@@ -1,8 +1,10 @@
 {-# LANGUAGE BangPatterns, LinearTypes, MonoLocalBinds, NoExperimentalDependentTypes #-}
 
 -- | Open a checked list selection in an ordinary module.
-module CursorClient (observeCursors, observeIndexedCallback, observeAligned, observeBoth) where
+module CursorClient (observeCursors, observeIndexedCallback, observeAligned, observeBoth, observeZip) where
 
+import AlignedList (checkedZipWith, zipWithExact)
+import PackedVecLibrary (toList)
 import Data.IORef (newIORef, readIORef)
 import ListCursor (Selection, cursor, lookupAligned, positions, prepare, readBoth, withIndex)
 import ParameterizedIndexLibrary (indexGeneric, mkFinGeneric)
@@ -54,3 +56,18 @@ observeBoth = do
     pure [readAt word k [10, 20, 30, 40] 0,
           readAt (cycle "ab") 3 (cycle [10, 20]) 3,
           readAt word (-1) (error "forced right list") 0]
+
+-- | Check two input lengths and use the indexed result from ordinary code.
+observeZip :: IO (Maybe [(Char, Int)], Maybe [Int], Maybe Int, [(Char, Char)])
+observeZip = do
+    word <- newIORef "ab" >>= readIORef
+    numbers <- newIORef [10, 20] >>= readIORef
+    lazyWord <- newIORef [error "forced head", 'x'] >>= readIORef
+    prefix <- newIORef ('x' : error "forced suffix") >>= readIORef
+    let exact = fmap toList (checkedZipWith word numbers (,))
+        mismatch = fmap toList (checkedZipWith word (take 1 numbers) (error "forced callback"))
+        selected = case checkedZipWith lazyWord numbers (flip const) of
+            Just vector -> Just (sum (toList vector))
+            Nothing -> Nothing
+        sameInput = take 1 (toList (zipWithExact prefix prefix (,)))
+    pure (exact, mismatch, selected, sameInput)
