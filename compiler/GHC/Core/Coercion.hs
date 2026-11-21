@@ -1024,23 +1024,34 @@ matchableAppProjectionRule :: LeftOrRight -> (FastString, CoAxiomRule)
 matchableAppProjectionRule lr = (name, BuiltInRule name Nominal (replicate 5 Nominal) proves)
   where
     name = matchableProjectionName lr
-    proves [Pair lhs rhs, Pair f _, Pair x _, Pair _ g, Pair _ y]
-      | matches lhs f x, matches rhs g y
-      = Just (Pair (pickLR lr (f, x)) (pickLR lr (g, y)))
+    proves [Pair lhs rhs, Pair f _, Pair x _, Pair _ g, Pair _ y] =
+      Pair <$> projectMatchableApp lr lhs f x <*> projectMatchableApp lr rhs g y
     proves _ = Nothing
 
-    matches app fun arg
-      | Just (_, binder, _) <- splitPiTy_maybe (typeKind fun)
-      = isMatchableFunTy (typeKind fun)
-        && piTyBinderType binder `eqType` typeKind arg
-        && mkAppTy fun arg `eqType` app
-      | otherwise = False
+-- | Check the head and argument saved for one side of the application.
+projectMatchableApp :: LeftOrRight -> Type -> Type -> Type -> Maybe Type
+projectMatchableApp lr app fun arg
+  | Just (_, binder, _) <- splitPiTy_maybe fun_kind
+  , isMatchableFunTy fun_kind
+  , piTyBinderType binder `eqType` typeKind arg
+  , mkAppTy fun arg `eqType` app
+  = Just (pickLR lr (fun, arg))
+  | otherwise = Nothing
+  where
+    fun_kind = typeKind fun
+
+-- | Decode the component selected by this built-in rule.
+matchableProjectionDirection :: FastString -> Maybe LeftOrRight
+matchableProjectionDirection name
+  | name == matchableProjectionName CLeft  = Just CLeft
+  | name == matchableProjectionName CRight = Just CRight
+  | otherwise                              = Nothing
 
 -- | Recover an ordinary projection when the equality alone proves its head kinds.
 -- See Note [Matchability in application projection evidence].
 ordinaryAppProjection_maybe :: CoAxiomRule -> [Coercion] -> Maybe (LeftOrRight, Coercion)
 ordinaryAppProjection_maybe (BuiltInRule name Nominal _ _) [co, cf, cx, cg, cy]
-  | Just lr <- direction
+  | Just lr <- matchableProjectionDirection name
   , Pair lhs rhs <- coercionKind co
   , Just (f, x) <- splitAppTy_maybe lhs
   , Just (g, y) <- splitAppTy_maybe rhs
@@ -1049,9 +1060,6 @@ ordinaryAppProjection_maybe (BuiltInRule name Nominal _ _) [co, cf, cx, cg, cy]
   , same g (coercionRKind cg), same y (coercionRKind cy)
   = Just (lr, co)
   where
-    direction | name == matchableProjectionName CLeft  = Just CLeft
-              | name == matchableProjectionName CRight = Just CRight
-              | otherwise                              = Nothing
     same a b = typeKind a `eqType` typeKind b && a `eqType` b
 ordinaryAppProjection_maybe _ _ = Nothing
 
@@ -1074,6 +1082,11 @@ same arguments, write the ordinary LRCo interface form. Read that form
 through mkLRCo so later substitution can retain its original heads.
 A projection that needs the scoped proof must keep the checked rule in
 the interface. Its header records that requirement.
+
+Computing one endpoint checks the application on that side only.
+Computing both for each nested projection would double the work at
+each level. Core Lint calls the rule on both complete endpoints.
+See Note [coercionKind performance].
 -}
 
 -- | Instantiates a 'Coercion'.
@@ -2605,6 +2618,12 @@ coercion_lr_kind which orig_co
     go_ax axr@(BuiltInFamRew  bif) cos  = check_bif_res axr (bifrw_proves  bif (map coercionKind cos))
     go_ax axr@(BuiltInFamInj bif) [co]  = check_bif_res axr (bifinj_proves bif (coercionKind co))
     go_ax axr@(BuiltInFamInj {})  _     = crash axr
+    go_ax axr@(BuiltInRule name Nominal _ _) [co, cf, cx, cg, cy]
+      | Just lr <- matchableProjectionDirection name
+      = let (fun, arg) = pickLR which ((cf, cx), (cg, cy))
+        in case projectMatchableApp lr (go co) (go fun) (go arg) of
+             Just ty -> ty
+             Nothing -> crash axr
     go_ax axr@(BuiltInRule _ _ _ proves) cos =
       check_bif_res axr (proves (map coercionKind cos))
     go_ax     (UnbranchedAxiom ax) cos  = go_branch ax (coAxiomSingleBranch ax) cos
