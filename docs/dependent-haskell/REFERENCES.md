@@ -6439,6 +6439,18 @@ Core equations. [GHC pragmas](../users_guide/exts/pragmas.rst),
 [GHC rewrite rule semantics](../users_guide/exts/rewrite_rules.rst),
 and [R16 application](roadmap/R16-open-term-evaluator.md#use-an-ordinary-identity-as-an-open-callback).
 
+### Ending a list prefix at a decision
+
+Agda's `takeWhile` branches on `does (P? x)` for the first list
+element. A false decision returns the empty list and a true decision
+keeps the element. Agda uses these equations in `takeWhile++dropWhile`.
+The Haskell example checks the installed `Prelude.takeWhile` against the
+same branch shapes. Its runtime tests cover demand on a bottom tail and
+the short circuit of the captured `(&&)`.
+[Agda list definitions](https://agda.github.io/agda-stdlib/v2.4/Data.List.Base.html#330),
+[Agda prefix and suffix law](https://agda.github.io/agda-stdlib/v2.4/Data.List.Properties.html#1575),
+and [R16 prefix](roadmap/R16-open-term-evaluator.md#stop-a-list-prefix-at-the-first-rejected-head).
+
 ### Checked runtime decisions for filter
 
 Agda's `length-filter` takes a `Decidable P` argument. It branches on

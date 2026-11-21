@@ -1242,6 +1242,25 @@ be observed with a bottom tail.
 [Interface and runtime regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh)
 and [prior art](../REFERENCES.md#list-filtering-with-a-known-predicate-result).
 
+### Stop a list prefix at the first rejected head
+
+The checked equations for `Prelude.takeWhile` return `[]` when the
+predicate rejects the head. When it accepts, the equations return the
+original head and leave the recursive call on the original tail. GHC
+checks the branch bodies before and after optimization.
+
+`observePrefix` checks the installed `(&&)` with a runtime gate and the
+current head. The gate remains in the predicate's type. An ordinary
+consumer opens either equation through a stripped interface with rewrite
+rules disabled. Both branches leave a bottom tail lazy. When the gate
+is false, the predicate also leaves a bottom head lazy. A decision about
+a different input gives no equation for the current head. A producer
+that forces the tail before returning `[]` publishes neither prefix
+equation. The installed module rebuilds once to publish the new equations.
+[Example](../examples/open-evaluation/PreludeTakeWhile.hs),
+[regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledTakeWhile.sh),
+and [prior art](../REFERENCES.md#ending-a-list-prefix-at-a-decision).
+
 ### Use an ordinary identity as an open callback
 
 `Prelude.filter Prelude.id` keeps a `True` head and skips a `False`

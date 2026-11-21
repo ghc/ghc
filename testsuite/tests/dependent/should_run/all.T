@@ -82,6 +82,12 @@ test('NativeOpenFilterCutoff',
                    'PreludeFilterSource.hs', 'PreludeFilterLengthProof.hs', 'PreludeFilterRuntime.hs',
                    'PreludeFilterCutoff.hs']])],
      run_command, ['bash NativeOpenFilterCutoff.sh "{compiler}" "{libdir}"'])
+test('NativeOpenInstalledTakeWhile',
+     [only_ways(['normal']),
+      extra_files([open_eval_dir + f for f in ['PreludeMapLengthSize.hs', 'PreludeMapLengthSource.hs',
+                   'PreludeFilterSource.hs', 'PreludeFilterLengthProof.hs', 'PreludeFilterRuntime.hs',
+                   'PreludeTakeWhile.hs']])],
+     run_command, ['bash NativeOpenInstalledTakeWhile.sh "{compiler}" "{libdir}"'])
 
 test('NativeOpenInstalledAppend',
      [only_ways(['normal']),
