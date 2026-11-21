@@ -3033,13 +3033,13 @@ checkEquationFamilyDomains family pats rhs
       case residualPredicates unsolved of
         [] -> reportAllUnsolved unsolved
         missing -> do
-          preds <- liftZonkM $ zonkTcTypes (substTy subst predicate : missing)
-          env <- liftZonkM $ tcInitOpenTidyEnv (tyCoVarsOfTypesList preds)
-          let source : required = tidyTypes env preds
+          source <- liftZonkM $ zonkTcType (substTy subst predicate)
+          required <- liftZonkM $ zonkTcTypes missing
+          env <- liftZonkM $ tcInitOpenTidyEnv (tyCoVarsOfTypesList (source : required))
+          let pp_required = pprWithCommas (quotes . ppr) (tidyTypes env (nubBy eqType required))
           failWithTc $ TcRnConstrainedFamilyUnsupported family $
-            hang (text "The owning class constraint" <+> quotes (ppr source)
-                  <+> text "must provide the equation domain:")
-               2 (pprWithCommas (quotes . ppr) (nubBy eqType required))
+            sep [ text "The equation requires" <+> pp_required
+                , text "from its owning class constraint" <+> quotes (ppr (tidyType env source)) <> dot ]
   where
     residualPredicates wc = map ctPred (toList (wc_simple wc)) ++
                             concatMap (residualPredicates . ic_wanted) (wc_impl wc)
