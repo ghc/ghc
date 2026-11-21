@@ -86,6 +86,7 @@ import GHC.Types.Id.Info
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
+import GHC.Types.Name.Set (extendNameSet)
 import GHC.Types.SrcLoc
 
 import GHC.Types.Var.Env (emptyVarEnv)
@@ -902,20 +903,24 @@ tcExpr (ExplicitSum _ alt arity expr) res_ty
 ************************************************************************
 -}
 
-tcExpr original@(HsLet x (L loc binds) body) res_ty
-  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
-       ; expansion <- case res_ty of
-             Check expected | enabled
-                            , hasNativeDependentExpr (Core.Type expected)
-                              || (isTauTy expected && not (anyFreeVarsOfType
-                                            (\v -> isTyVar v && isMetaTyVar v) expected)) ->
-               do { strict <- xoptM LangExt.Strict
-                  ; if strict then return Nothing else tcNativeLet original (L loc binds) body expected }
-             _ -> return Nothing
-       ; case expansion of
+tcExpr original@(HsLet x local_binds@(L loc binds) body) res_ty
+  = do { opened <- tcLexicalExistsLet original local_binds body res_ty
+       ; case opened of
            Just expr -> return expr
-           Nothing -> do { (binds', body') <- tcLocalBinds binds (tcMonoLExpr body res_ty)
-                         ; return (HsLet x (L loc binds') body') } }
+           Nothing -> do
+             { enabled <- xoptM LangExt.ExperimentalDependentTypes
+             ; expansion <- case res_ty of
+                   Check expected | enabled
+                                  , hasNativeDependentExpr (Core.Type expected)
+                                    || (isTauTy expected && not (anyFreeVarsOfType
+                                                  (\v -> isTyVar v && isMetaTyVar v) expected)) ->
+                     do { strict <- xoptM LangExt.Strict
+                        ; if strict then return Nothing else tcNativeLet original local_binds body expected }
+                   _ -> return Nothing
+             ; case expansion of
+                 Just expr -> return expr
+                 Nothing -> do { (binds', body') <- tcLocalBinds binds (tcMonoLExpr body res_ty)
+                               ; return (HsLet x (L loc binds') body') } } }
 
 tcExpr expr@(HsCase ctxt scrut matches) res_ty
   = do { opened <- tcExistsCase expr res_ty
@@ -1275,6 +1280,66 @@ tcExpr e res_ty
        ; case mb_hse of
            Just hse -> tcHsExpansion hse res_ty
            Nothing  -> pprPanic "tcExpr: unhandled case:" (ppr e) }
+
+-- | Open a dot package for one lazy local pattern binding and its body.
+-- See Note [Scope for a local erased package pattern].
+tcLexicalExistsLet :: HsExpr GhcRn -> LHsLocalBinds GhcRn -> LHsExpr GhcRn
+                   -> ExpRhoType -> TcM (Maybe (HsExpr GhcTc))
+tcLexicalExistsLet original (L bind_loc (HsValBinds ann (XValBindsLR (HsVBG groups [])))) body expected
+  | [(NonRecursive, [L pat_bind_loc binding@PatBind
+      { pat_lhs = pat, pat_mods = [], pat_rhs = grhss }])] <- groups
+  , plain_tuple pat
+  , GRHSs { grhssGRHSs = L rhs_loc (GRHS rhs_ann [] rhs) NE.:| []
+          , grhssLocalBinds = L _ EmptyLocalBinds{} } <- grhss
+  = runMaybeT $ do
+      strict <- liftMaybeT (xoptM LangExt.Strict)
+      guard (not strict)
+      schema <- MaybeT (tcDeclaredOperandResult rhs)
+      case coreFullView schema of
+        ExistsTy ImplicitExists _ _ -> guard (matchesImplicitPayloadPat schema pat)
+        _ -> mzero
+      liftMaybeT $ do
+        (checked, actual) <- tcScalingUsage ManyTy $ tcInferRhoFRR FRRPatBind rhs
+        result_ty <- expTypeToType expected
+        opened <- tcOpenImplicitPackage (getLocA rhs) actual checked result_ty $ \payload -> do
+          let name = getName payload
+              replacement = fmap (\source -> mkExpandedLExpr source (nlHsVar name)) rhs
+              binding' = binding
+                { pat_ext = extendNameSet (pat_ext binding) name
+                , pat_rhs = grhss { grhssGRHSs = L rhs_loc (GRHS rhs_ann [] replacement) NE.:| [] } }
+              scope = HsValBinds ann (XValBindsLR (HsVBG [(NonRecursive, [L pat_bind_loc binding'])] []))
+          (decls, body') <- tcExtendIdEnv [payload] $
+            tcLocalBinds scope (tcMonoLExpr body (mkCheckExpType result_ty))
+          return (HsLet noExtField (L bind_loc decls) body')
+        return (mkExpandedExprTc original opened)
+  where
+    plain_tuple (L _ (ParPat _ nested)) = plain_tuple nested
+    plain_tuple (L _ (TuplePat _ fields Boxed)) = all plain_field fields
+    plain_tuple _ = False
+
+    plain_field (L _ (ParPat _ nested)) = plain_field nested
+    plain_field (L _ VarPat{}) = True
+    plain_field (L _ WildPat{}) = True
+    plain_field _ = False
+tcLexicalExistsLet _ _ _ _ = return Nothing
+
+{- Note [Scope for a local erased package pattern]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In let (value, reader) = package in reader value, the two fields mention
+the same witness. Open the declared dot package once. Bind the witness
+around the original pattern binding and its body. Replace the original
+RHS with the shared payload Id. Then use tcLocalBinds to infer the pattern
+binding and check its usage. Include the payload Id in the binding's
+free variables, since it carries the local witness. Keep the result type
+outside the opening.
+
+The package opening is lazy. The ordinary binding still determines when
+to match the tuple and how to share its fields. Restrict this entry to an
+unsigned singleton nonrecursive binding with an unguarded RHS. Accept a
+boxed tuple of variables or wildcards with Strict off. A recursive group,
+a signature, or a pattern with its own evidence needs a separate rule.
+See also Note [Typechecking pattern bindings] in GHC.Tc.Gen.Bind.
+-}
 
 -- | Elaborate a nonrecursive index definition through dependent application.
 -- See Note [Equality for lazy local definitions].

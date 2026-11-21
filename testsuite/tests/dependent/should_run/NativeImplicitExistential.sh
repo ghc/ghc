@@ -396,3 +396,28 @@ for opt in 0 2; do
             { cat mixed-reject.log >&2; exit 1; }
     done
 done
+
+# Open a package once around a lazy local tuple binding.
+for opt in 0 2; do
+    mkdir -p "$out/lexical-let-$opt/"{provider,client}
+    cd "$out/lexical-let-$opt/provider"
+    let_flags=("${flags[@]}" "-O$opt")
+    "$ghc" "${let_flags[@]}" -c "$src/LexicalLetProvider.hs" -outputdir .
+    cd ../client
+    cp ../provider/LexicalLetProvider.hi "$src/"{LexicalLetMain,LexicalLetReject}.hs .
+    "$ghc" "${let_flags[@]}" -c LexicalLetMain.hs
+    "$ghc" "${let_flags[@]}" LexicalLetMain.o ../provider/LexicalLetProvider.o -o run
+    ./run >lexical-let.out
+    printf '%s\n' '((1,1),(98,98),77)' "(True,(True,98),(True,'x'))" |
+        diff -u - lexical-let.out
+    if "$ghc" "${let_flags[@]}" -c LexicalLetReject.hs >lexical-let-reject.log 2>&1; then
+        echo "LexicalLetReject unexpectedly compiled." >&2
+        exit 1
+    fi
+    escape_line=$(grep -n '^  in value$' LexicalLetReject.hs | cut -d: -f1)
+    join_line=$(grep -n '^     in reader value$' LexicalLetReject.hs | cut -d: -f1)
+    grep -Eq "^LexicalLetReject.hs:$escape_line:6: error: \[GHC-25897\]" lexical-let-reject.log ||
+        { cat lexical-let-reject.log >&2; exit 1; }
+    grep -Eq "^LexicalLetReject.hs:$join_line:16: error: \[GHC-25897\]" lexical-let-reject.log ||
+        { cat lexical-let-reject.log >&2; exit 1; }
+done

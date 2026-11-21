@@ -13,7 +13,7 @@ module GHC.Tc.Gen.App
        ( tcApp, tcRuleAppPrefix, RuleAppPrefix(..)
        , tcExprPrag
        , matchPolytypeExistsWitness
-       , tcImplicitOperand
+       , tcImplicitOperand, tcDeclaredOperandResult
        , tcRetainedInferableArg, tcRetainedArg, tcOptionalLetOperand ) where
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcCheckMonoExpr, tcCheckPolyExpr, tcPolyExpr, tcInferRho )

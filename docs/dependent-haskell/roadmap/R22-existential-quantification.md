@@ -300,6 +300,28 @@ outside the opening. The observer's argument-only length can still
 match the witness inside. The checker rejects an observer whose
 result would keep that opened length as a free index.
 
+### A nonrecursive local package pattern
+
+An ordinary client can write `let (value, reader) = p in reader value`
+when `p :: exists a. (a, a -> Int)`. The typechecker opens the package
+once and keeps its witness in scope for the original binding and the
+body. The result type stays outside that scope. Returning `value` at
+a caller-chosen type fails at the returned field. Fields from separate
+openings keep separate witnesses.
+
+The binding stays lazy and shares both fields of its RHS. A consumer
+can ignore a bottom package. The normal local binding checker handles
+pattern typing, usage, and generalization. A local identity function
+in the body still works at two types.
+
+This path accepts one unsigned nonrecursive boxed tuple binding with
+variable or wildcard fields and `Strict` off. The unguarded RHS must
+be a name or ordinary application whose declaration exposes the dot
+package. The usual binding rules still apply to recursive groups,
+signed bindings, and patterns that bring their own evidence.
+[Source-hidden regression](../../../testsuite/tests/dependent/should_run/NativeImplicitExistential.sh)
+and [GHC's existential constructor restrictions](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/existential_quantification.html#restrictions).
+
 ### Repeated uses of a local package
 
 `firstPair p p` can pass the same local package to two arguments that

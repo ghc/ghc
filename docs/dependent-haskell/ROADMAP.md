@@ -367,7 +367,8 @@ and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vecto
    list-to-vector producer carries a computed witness.
    [Mixed package readers](roadmap/R22-existential-quantification.md#a-package-with-nested-dot-binders),
    [Retained list pairs](roadmap/R04-dependent-sums.md),
-   [Guarded witness](roadmap/R22-existential-quantification.md#inferring-a-higher-rank-witness)
+   [Guarded witness](roadmap/R22-existential-quantification.md#inferring-a-higher-rank-witness),
+   [local package pattern](roadmap/R22-existential-quantification.md#a-nonrecursive-local-package-pattern),
    and [nested patterns](roadmap/R22-existential-quantification.md#constructor-cases-on-the-payload).
 4. **R19.** A branch on an ordinary Boolean can pass that same value to
    a retained field. Matching on an expression such as `not b` in

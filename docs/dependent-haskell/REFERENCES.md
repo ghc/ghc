@@ -3292,6 +3292,16 @@ operand retains the demand of the selector.
 [Data.Bool](https://hackage.haskell.org/package/base/docs/Data-Bool.html#v:bool),
 and [Showcase selector](examples/erased-existentials/RankedPackageClient.hs).
 
+GHC's ordinary existential data constructors restrict pattern
+destructuring in a local binding group. A local pattern binding needs
+a witness in scope across the rest of the expression. The fork uses
+one outer lazy opening for a nonrecursive tuple pattern on a dot
+package. The existing local binding checker then sees the ordinary tuple payload
+under the fresh witness. It still checks usage and generalizes bindings.
+The witness cannot leave the complete let expression.
+[GHC User's Guide, existential restrictions](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/existential_quantification.html#restrictions)
+and [paper, figure 9](https://richarde.dev/papers/2021/exists/exists.pdf#page=19).
+
 Agda checks the clauses of an indexed function against its telescope.
 GHC keeps its ordinary match group for equations on a packaged argument.
 It opens the hidden indices before checking the payload patterns in that
