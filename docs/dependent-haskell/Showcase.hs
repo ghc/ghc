@@ -45,6 +45,7 @@ import DefaultVector (DefaultElement(..))
 import qualified ErasedPackage
 import FamilyTuple (Tuple(Tup2))
 import qualified FamilyRefinementClient
+import qualified LabelledValueClient
 import qualified QuotedColumn
 import qualified RetainedFamilyTuple
 import qualified ForgetWitness
@@ -1081,6 +1082,7 @@ main = do
         (equalToSelf (EqSample True), equalToSelf (EqSample (0 / 0 :: Double)))
     observe "use an equality between two constructor fields"
         (readInteriorCount (InteriorCount @Int (error "unused first field") (CountField (type Int) 47)))
+    observe "choose a type between two constructor fields" LabelledValueClient.labelledValues
     observe "duplicate the unrestricted field of a quoted constructor" (QuotedColumn.readQuoted 17)
     observe "recover consecutive GADT constraints" (describePair (PrintablePair False True))
     observe "form an associated family type from its class evidence" constrainedElements

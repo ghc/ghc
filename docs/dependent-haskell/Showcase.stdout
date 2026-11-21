@@ -6,6 +6,7 @@ use a stored equality in a later constructor type pattern: 41
 use the dictionary supplied after a constructor field: ((29,True),(31,False))
 compare a hidden field with the dictionary supplied after it: (True,False)
 use an equality between two constructor fields: 47
+choose a type between two constructor fields: ((53,True),(59,'q'))
 duplicate the unrestricted field of a quoted constructor: (17,17)
 recover consecutive GADT constraints: (False,"True")
 form an associated family type from its class evidence: (Refl,Refl,True)
