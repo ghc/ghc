@@ -345,6 +345,17 @@ and [reproduction script](../examples/open-evaluation/check-singletons-arrows.sh
 
 ### Arrow patterns in family equations
 
+In the staged `T12088sg2` example, the constructor `TyCon1` needs the
+matchable arrow case. With `Modifiers` and `M` in scope, change the
+equation to `Demote (TyFun a b %M -> Type) = DemoteX a -> DemoteX b`.
+The right-hand arrow can stay bare. The same change works with and
+without the declaration splice. An ordinary client can distinguish
+separate U and M equations through a stripped provider interface.
+Generalizing the bare pattern over both arrows can make the equations
+overlap (GHC-34447).
+[Original test](../../../testsuite/tests/dependent/should_compile/T12088sg2.hs)
+and [proposal #242 on matchability](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html).
+
 GHC 9.14.1 accepts the legacy spelling of the two-module reduction.
 The reproduction script removes the `%M` synonym annotation and the
 separate M equation for that check. On `4bb020f702` and the solver
@@ -874,6 +885,15 @@ This does not implement source family unsaturation or close R23.
       and [backwards compatibility](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#unresolved-questions).
 - [ ] Complete source unsaturation, inference/defaulting, arity rules,
       application, interfaces and the higher-order family examples.
+
+At `b11b85c2b7`, the ordinary skolem-escape diagnostics for `T15076`
+and `T15076b` match stock GHC 9.14.1. The message shows the escaping
+application `f @x0`. Printing its kind does not expose fixed matchability
+on an invisible binder. `-fprint-explicit-matchabilities` and `Modifiers`
+still show that annotation, and `-fprint-explicit-kinds` still shows
+matchability on a visible telescope binder.
+[Skolem-escape diagnostic](../../../testsuite/tests/dependent/should_fail/T15076b.stderr)
+and [proposal #242 on displaying matchability](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#showing-matchabilities).
 
 Default diagnostics for an ill-scoped telescope show its binder order without
 fixed matchability annotations. The explicit print flag shows the annotations.
