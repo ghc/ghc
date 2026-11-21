@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
-module Filter (Hidden, filterVec, partitionVec, toList) where
+module Filter (Hidden, filterVec, partitionVec, toList, fromList) where
 import Vector
 
 type Hidden a = exists (m :: Nat). Vec m a
@@ -22,3 +22,8 @@ toList xs = go xs
     go :: Vec n a -> [a]
     go Nil = []
     go (Cons x rest) = x : go rest
+
+-- | Build a vector that hides the length of the input list.
+fromList :: [a] -> Hidden a
+fromList [] = Nil
+fromList (x:xs) = Cons x (fromList xs)

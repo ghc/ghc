@@ -1097,16 +1097,29 @@ tcImplicitAppArgs ty (ordinary@EValArg{ea_loc_span = loc, ea_arg = arg} : rest)
   , isVisibleFunArg af
   = do { implicit <- if (isManyTy mult || isOneTy mult)
                         && demands_payload (coreFullView domain)
-                     then classify mult
+                     then classify mult domain
                      else return Nothing
        ; let operand = maybe (Left ordinary) Right implicit
        ; (operand :) <$> tcImplicitAppArgs result rest }
   where
-    classify mult = case unLoc (stripParensLHsExpr arg) of
-      HsIf{} -> fmap (fmap (\(schema, _) -> (loc, mult, arg, Nothing, Just schema)))
-                     (tcPackageOperandResult False arg)
+    classify mult domain = case unLoc (stripParensLHsExpr arg) of
+      HsIf _ _ left right
+        | isGuardedTy domain ->
+          do { declared <- tcPackageOperandResult False arg
+             ; case declared of
+                 Just (schema, _) -> return (Just (loc, mult, arg, Nothing, Just schema))
+                 Nothing -> do { left_package <- declared_package left
+                               ; right_package <- if left_package then declared_package right else return False
+                               ; return (if right_package then Just (loc, mult, arg, Nothing, Nothing)
+                                                          else Nothing) } }
       _ -> fmap (fmap (\(package, replace) -> (loc, mult, package, replace, Nothing)))
                 (tcImplicitOperand arg)
+
+    declared_package expr = do
+      result <- tcDeclaredOperandResult expr
+      return $ case result of
+        Just (ExistsTy ImplicitExists _ _) -> True
+        _ -> False
 tcImplicitAppArgs _ rest = return (map Left rest)
 
 -- | Check if a declared argument domain requests the payload of a package.
@@ -1389,9 +1402,18 @@ can supply the same dot schema. Read both without checking the terms.
 Each must expose the same complete package type with only rigid free
 variables. Check the conditional at that schema before opening it.
 The ordinary conditional checker keeps its branch usage and demand.
-When either branch needs an expected type to expose its schema, keep
-ordinary checking at the formal domain. This preserves, for example,
-an ignored conditional whose branches both call error.
+
+For if flag then fromList xs else fromList ys, both producer declarations
+promise a dot result. Their element type comes from the operands. Infer
+the type of the whole conditional once and open its checked result. The
+probe only reads the head declarations. Ordinary inference checks both
+branches, including their arguments, constraints, and splices. A renamed
+rebindable ifThenElse is an application expansion and keeps its own rules.
+
+Require a guarded formal domain for either conditional rule. A type family
+may reduce to a package after ordinary instantiation. When a branch does
+not identify a dot result, keep ordinary checking at the formal domain.
+This preserves an ignored conditional whose branches both call error.
 
 A dot package with an arrow payload can also head a value application.
 Instantiate the head's ordinary invisible prefix before opening the package.

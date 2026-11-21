@@ -1,10 +1,11 @@
-{-# LANGUAGE ImpredicativeTypes, NoExperimentalDependentTypes, ScopedTypeVariables #-}
+{-# LANGUAGE DataKinds, ImpredicativeTypes, NoExperimentalDependentTypes, ScopedTypeVariables, TypeFamilies #-}
 module QuickLookForward where
 
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Control.Monad (unless)
 import Data.Bool (bool)
-import Filter (Hidden, filterVec, partitionVec, toList)
+import Data.Proxy (Proxy(..))
+import Filter (Hidden, filterVec, fromList, partitionVec, toList)
 import ForwardSchemas
 import Nested (packPair)
 import NestedSignature (PackedPair)
@@ -33,6 +34,22 @@ refilter xs =
 firstSelected :: Bool -> Hidden a -> Hidden a -> [a]
 firstSelected flag left right =
     take 1 (listCells (if flag then id left else right))
+
+-- | Read one cell from the selected list.
+firstFromList :: Bool -> [a] -> [a] -> [a]
+firstFromList flag left right =
+    take 1 (listCells (if flag then fromList left else fromList right))
+
+type family Forwarded (tag :: Bool) a where
+    Forwarded 'True a = a
+
+-- | Keep a package when the formal type reduces to that package.
+forwardConditional :: Proxy (Hidden Int) -> Bool -> Hidden Int -> Hidden Int -> Bool
+forwardConditional shape flag left right =
+    accepts (Proxy :: Proxy 'True) shape (if flag then left else right)
+  where
+    accepts :: Proxy tag -> Proxy a -> Forwarded tag a -> Bool
+    accepts _ _ _ = True
 
 -- | Infer the result of a callback whose element type is fixed.
 refilterMapped :: Vec n Int -> Hidden Int
@@ -82,6 +99,11 @@ main = do
     unless (firstSelected True oddCells unused == [7]
          && firstSelected False unused evenCells == [2]) $
         fail "opening a conditional changed branch or tail demand"
+    unless (firstFromList True (7 : error "unused list tail") (error "unused right list") == [7 :: Int]
+         && firstFromList False (error "unused left list") ('a' : error "unused list tail") == "a") $
+        fail "inferring a conditional changed list demand"
+    unless (forwardConditional Proxy (error "unused flag") unused unused) $
+        fail "forwarding at a family domain forced a package"
     let filteredCells input = toList (refilter input)
     unless (take 1 (filteredCells (Cons 3 (Cons 7 (error "unused refilter tail")))) == [7]
          && filteredCells (Cons 3 (Cons 7 (Cons 8 (Cons 9 Nil)))) == [7, 9]
