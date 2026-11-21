@@ -61,6 +61,31 @@ equation and supplies nominal evidence for beta reduction. A constant
 lambda can discard its argument, so its result cannot establish
 equality between the arguments of two calls.
 
+A separate signature can use the same lambda with a different binder
+name. For example, `forwardErrors` passes its arguments to `withErrors`
+while its result still has the unknown index `xs` in
+`Fields (Map (\field -> Either e field) xs)`. GHC compares the generated
+closures and their checked equations. It then carries that nominal
+equality through the common `Map` application. The same rule applies
+when `Map` is an open family. The proof preserves
+capture bindings and the order of the type case branches. A different
+body or a different opaque callback cannot supply that proof.
+[Forwarding client](../examples/open-evaluation/TypeLambdaClient.hs)
+and [source-hidden regression](../../../testsuite/tests/dependent/should_run/NativeTypeLambda.sh).
+
+The interface records the `scoped-lambda` feature when it stores a
+generated lambda root or retains a proof that uses one. An earlier
+reader rejects that version at the header. A current reader can still
+reduce applications from an earlier unmarked provider at known
+indices. Forwarding its opaque callback at an unknown index needs the
+provider's closure metadata.
+
+A closed family can also match two equivalent closures against one
+repeated variable. For `Same x x = 'True`, GHC proves the argument
+conversion before applying the branch axiom. It checks apartness with
+the arguments on both sides of that conversion. Unrelated opaque
+callbacks keep the family stuck when GHC cannot check apartness.
+
 In `Shadowed (q :: Type) (a :: q)`, the lambda binds a new `q`.
 The family header keeps the outer `q` in scope for the kind of `a`.
 The family equation uses the inner `q` for its input. At

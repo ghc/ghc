@@ -338,7 +338,9 @@ test('NativeUnsaturatedInvisible',
 
 test('NativeTypeLambda',
      [only_ways(['normal']),
-      extra_files([open_eval_dir + 'TypeLambda.hs', open_eval_dir + 'SchemaColumns.hs', 'NativeTypeLambdaScope.hs'])],
+      extra_files([open_eval_dir + 'TypeLambda.hs', open_eval_dir + 'TypeLambdaClient.hs',
+                   open_eval_dir + 'SchemaColumns.hs',
+                   'NativeTypeLambdaScope.hs'])],
      run_command, ['bash NativeTypeLambda.sh "{compiler}" "{libdir}"'])
 test('NativeTypeLambdaReify',
      [req_interp, req_rts_linker, only_ways(['normal']),

@@ -846,6 +846,8 @@ tc_iface_decl parent _ (IfaceFamily {ifName = tc_name,
                   || (owner == local && not is_sum))
               (failIfM (text "Invalid lexical scope for a retained-sum family:" <+> ppr local))
             CTF_Scoped owner is_sum <$> tcIfaceBranchedAxiom ax_name
+        IfaceLambdaClosedTyFamTyCon (ax_name, _) ->
+            CTF_Scoped local False <$> tcIfaceBranchedAxiom ax_name
         IfaceAbstractClosedTyFamTyCon -> return CTF_Abstract
         IfaceBuiltInClosedTyFamTyCon ->
           pprPanic "tc_iface_decl" $

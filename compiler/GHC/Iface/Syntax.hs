@@ -324,6 +324,7 @@ data IfaceClosedTyFamTyCon
   | IfaceAbstractClosedTyFamTyCon
   | IfaceBuiltInClosedTyFamTyCon
   | IfaceScopedClosedTyFamTyCon !IfExtName !Bool (IfExtName, [IfaceAxBranch])
+  | IfaceLambdaClosedTyFamTyCon (IfExtName, [IfaceAxBranch])
 
 -- | The checked axiom and its rows, including private retained-sum families.
 ifaceClosedFamilyAxiom_maybe :: IfaceFamTyConFlav -> Maybe (IfExtName, [IfaceAxBranch])
@@ -331,6 +332,7 @@ ifaceClosedFamilyAxiom_maybe (IfaceClosedTypeFamilyTyCon ctf) =
   case ctf of
     IfaceClosedTyFamTyCon mb_ax -> mb_ax
     IfaceScopedClosedTyFamTyCon _ _ ax -> Just ax
+    IfaceLambdaClosedTyFamTyCon ax -> Just ax
     _ -> Nothing
 ifaceClosedFamilyAxiom_maybe _ = Nothing
 
@@ -1522,6 +1524,8 @@ pprIfaceDecl ss decl@(IfaceFamily { ifName = tycon
       = text "where"
     pp_where (IfaceClosedTypeFamilyTyCon (IfaceScopedClosedTyFamTyCon {}))
       = text "where"
+    pp_where (IfaceClosedTypeFamilyTyCon (IfaceLambdaClosedTyFamTyCon {}))
+      = text "where"
     pp_where _
       = empty
 
@@ -1548,11 +1552,13 @@ pprIfaceDecl ss decl@(IfaceFamily { ifName = tycon
             empty -- see pp_branches
           IfaceScopedClosedTyFamTyCon owner is_sum _ ->
             ppShowIface ss (text (if is_sum then "sum codomain of" else "decision in") <+> ppr owner)
+          IfaceLambdaClosedTyFamTyCon {} -> ppShowIface ss (text "type lambda closure")
           IfaceBuiltInClosedTyFamTyCon ->
             ppShowIface ss (text "built-in")
 
     pp_branches (IfaceClosedTypeFamilyTyCon (IfaceClosedTyFamTyCon (Just ax))) = pp_equations ax
     pp_branches (IfaceClosedTypeFamilyTyCon (IfaceScopedClosedTyFamTyCon _ _ ax)) = pp_equations ax
+    pp_branches (IfaceClosedTypeFamilyTyCon (IfaceLambdaClosedTyFamTyCon ax)) = pp_equations ax
     pp_branches _ = Outputable.empty
 
     pp_equations (ax, brs)
@@ -2232,6 +2238,8 @@ freeNamesIfFamFlav (IfaceClosedTypeFamilyTyCon ctf) =
     IfaceClosedTyFamTyCon Nothing -> emptyNameSet
     IfaceScopedClosedTyFamTyCon owner _ (ax, br) ->
       mkNameSet [owner, ax] &&& fnList freeNamesIfAxBranch br
+    IfaceLambdaClosedTyFamTyCon (ax, br) ->
+      unitNameSet ax &&& fnList freeNamesIfAxBranch br
     IfaceBuiltInClosedTyFamTyCon -> emptyNameSet
     IfaceAbstractClosedTyFamTyCon -> emptyNameSet
 
@@ -2765,6 +2773,9 @@ instance Binary IfaceFamTyConFlav where
         IfaceScopedClosedTyFamTyCon owner is_sum ax -> do
           requireIfaceEvidenceVersion bh ScopedSigmaEvidence
           putByte bh 4 >> put_ bh owner >> put_ bh is_sum >> put_ bh ax
+        IfaceLambdaClosedTyFamTyCon ax -> do
+          requireIfaceEvidenceVersion bh ScopedLambdaEvidence
+          putByte bh 6 >> put_ bh ax
         IfaceBuiltInClosedTyFamTyCon  ->
           pprPanic "Cannot serialize IfaceBuiltInClosedTyFamTyCon (pretty-printing only)" Outputable.empty
 
@@ -2778,6 +2789,7 @@ instance Binary IfaceFamTyConFlav where
                     4 -> IfaceClosedTypeFamilyTyCon <$>
                            (IfaceScopedClosedTyFamTyCon <$> get bh <*> get bh <*> get bh)
                     5 -> return IfaceConstrainedTypeFamilyTyCon
+                    6 -> IfaceClosedTypeFamilyTyCon . IfaceLambdaClosedTyFamTyCon <$> get bh
                     _ -> pprPanic "Binary.get(IfaceFamTyConFlav): Invalid tag"
                                   (ppr (fromIntegral h :: Int)) }
 
@@ -3770,6 +3782,7 @@ instance NFData IfaceClosedTyFamTyCon where
     IfaceAbstractClosedTyFamTyCon -> ()
     IfaceBuiltInClosedTyFamTyCon -> ()
     IfaceScopedClosedTyFamTyCon owner is_sum ax -> rnf owner `seq` rnf is_sum `seq` rnf ax
+    IfaceLambdaClosedTyFamTyCon ax -> rnf ax
 
 instance NFData IfaceTickish where
   rnf = \case

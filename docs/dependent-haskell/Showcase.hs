@@ -125,6 +125,7 @@ import LaterMatchabilityClient (annotatedMap, appliedCallback, boxedCallbacks, c
                                 laterMatchability, nestedCallback, rankedMap)
 import qualified SchemaColumns
 import qualified TypeLambda
+import qualified TypeLambdaClient
 import qualified TypeLet
 import qualified NativeCase
 import qualified NativeNestedCase
@@ -1476,6 +1477,11 @@ main = do
     observe "recover a table's row count from its cells"
         (Refl :: Table.withoutRowLabels (Table.sample 4) :~: 'Table.ColumnTable
             (Vec3 'x' 'y' 'z') (Vec2 (Vec3 1 2 3) (Vec3 4 5 6)))
+    observe "recover one side length for every row of a square"
+        (Refl :: Table.square 1 :~: 'Table.Square (Vec2 (Vec2 1 2) (Vec2 3 4)))
+    observe "check each row against column labels stored after the cells"
+        (Refl :: Table.matrix (Table.sample 4) :~: 'Table.Matrix
+            (Vec2 (Vec3 1 2 3) (Vec3 4 5 6)) (Vec3 'x' 'y' 'z'))
     observe "read one field of a private parcel without forcing the other"
         (Refl :: LazyParcel.first (LazyParcel.make 7) :~: 7, LazyParcel.first (LazyParcel.make 7))
     observe "construct a result from two symbolic fields"
@@ -1579,6 +1585,10 @@ main = do
     case TypeLambda.withErrors (Proxy @String) fields of
         TypeLambda.Field x (TypeLambda.Field y TypeLambda.End) ->
             observe "give every field in a row the same error type" (x, y)
+    let lazyFields = TypeLambda.Field 'x' (TypeLambda.Field (error "unused field" :: Bool) TypeLambda.End)
+    case TypeLambdaClient.forwardErrors (Proxy @String) lazyFields of
+        TypeLambda.Field first _ ->
+            observe "forward a row with the same callback across modules" first
     let optional :: TypeLambda.Fields (TypeLambda.Columns TypeLambda.Optional '[Int])
         optional = TypeLambda.Field (Just 42) TypeLambda.End
         checked :: TypeLambda.Fields (TypeLambda.Columns (SchemaColumns.Checked String) '[Bool])

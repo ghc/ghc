@@ -8,7 +8,7 @@ module GHC.Core.TyCo.Compare (
 
     -- * Type equality
     eqType, eqTypeIgnoringMultiplicity, eqTypeX, eqTypes,
-    eqVarBndrs, eqScopedSigmaClosures,
+    eqVarBndrs, eqScopedSigmaClosures, eqScopedLambdaClosures,
 
     pickyEqType, tcEqType, tcEqKind, tcEqTypeNoKindCheck,
     tcEqTyConApps, tcEqTyConAppArgs,
@@ -307,17 +307,40 @@ nominal identity. A cycle stops comparison. Ordinary eqType uses the
 nominal names of all families.
 See GHC.Builtin.CoercionRules for construction and rechecking of its
 nominal evidence.
+
+A type lambda outside a retained sum uses the same scope record. Its
+generated root has its own Name as the owner and the sum flag is False.
+Its generated decisions can carry that owner, but each has a different
+Name. A retained-sum root still has the sum flag. The interface has a
+separate tag for a type lambda root, which restores its own Name as the
+owner when GHC reads the declaration.
 -}
 -- | Check alpha-equivalence of two generated retained-sum codomains.
 eqScopedSigmaClosures :: Type -> Type -> Bool
-eqScopedSigmaClosures lhs rhs
+eqScopedSigmaClosures = eqScopedClosures sigmaRoot
+  where
+    sigmaRoot tc args
+      | Just (owner, True) <- closedFamilyScope_maybe tc
+      , length args + 1 == tyConArity tc = Just owner
+      | otherwise = Nothing
+
+-- | Check alpha-equivalence of two generated, partially applied type lambdas.
+eqScopedLambdaClosures :: Type -> Type -> Bool
+eqScopedLambdaClosures lhs rhs = eqScopedClosures lambdaRoot lhs rhs
+                               && typeKind lhs `eqType` typeKind rhs
+  where
+    lambdaRoot tc _
+      | Just (owner, False) <- closedFamilyScope_maybe tc
+      , owner == tyConName tc = Just owner
+      | otherwise = Nothing
+
+eqScopedClosures :: (TyCon -> [Type] -> Maybe Name) -> Type -> Type -> Bool
+eqScopedClosures scopeRoot lhs rhs
   | Just (tc1, as1) <- splitTyConApp_maybe lhs
   , Just (tc2, as2) <- splitTyConApp_maybe rhs
   , tc1 /= tc2
-  , Just (owner1, True) <- closedFamilyScope_maybe tc1
-  , Just (owner2, True) <- closedFamilyScope_maybe tc2
-  , length as1 + 1 == tyConArity tc1
-  , length as2 + 1 == tyConArity tc2
+  , Just owner1 <- scopeRoot tc1 as1
+  , Just owner2 <- scopeRoot tc2 as2
   , isUnsaturatedUserFamily tc1 as1
   , isUnsaturatedUserFamily tc2 as2
   = fullEq (generic_eq_type_x (ScopedClosures (owner1, owner2) [])
