@@ -4980,6 +4980,11 @@ source synonym again if expanding it gives the same private family
 and arguments. This also works for a client alias of Rebuild. Two uses
 of one lambda can have different captures or inputs. Only the diagnostic uses this
 view. The expanded-types diagnostic can still show the family.
+
+A retained sum synonym expands to Sigma applied to its domain and a
+partially applied payload family. The solver can report a mismatch on
+just the two payload families. Use the whole written types when each
+family is the exact payload of its respective synonym application.
 -}
 
 -- | Show the constructor case checked by a private family, without reducing it.
@@ -5133,8 +5138,6 @@ pprMismatchMsg ctxt
         | otherwise
         = bale_out_msg
 
-    -- A named retained sum expands to Sigma applied to a payload family.
-    -- A mismatch between those exact closures is clearer at the written types.
     -- See Note [Printing lifted type lambdas in a client].
     sum_payload written closure
       | Just (syn, _) <- splitTyConAppNoView_maybe written
@@ -5920,6 +5923,8 @@ pprAmbiguityInfo (Ambiguity prepend_msg (ambig_kvs, ambig_tvs)) = msg
       = text "The" <+> what <+> text "variable" <> plural tkvs
         <+> pprQuotedList tkvs <+> isOrAre tkvs <+> text "ambiguous"
 pprAmbiguityInfo (NonInjectiveTyFam tc)
+  | Just (_, True) <- closedFamilyScope_maybe tc
+  = note $ text "GHC cannot infer the captured indices of this retained sum from its payload type"
   | Just source <- liftedTypeContext (tyConName tc)
   = note $ text "GHC cannot determine the arguments of the" <+> source <+> text "from its result"
   | otherwise

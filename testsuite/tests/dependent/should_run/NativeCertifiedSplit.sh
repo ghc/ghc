@@ -60,3 +60,24 @@ if "${ghc[@]}" -O0 -fforce-recomp -c OtherVector.hs >other.log 2>&1 ||
     cat other.log >&2
     exit 1
 fi
+
+# Each proof must identify the vector in its own result position.
+sed 's/(splitAtValue @a @suffix cut xs) (splitAtValue @a @suffix cut ys)/(splitAtValue @a @suffix cut ys) (splitAtValue @a @suffix cut xs)/' \
+    CertifiedSplit.hs >SwappedVectors.hs
+if "${ghc[@]}" -O0 -ferror-spans -fforce-recomp -c SwappedVectors.hs >swapped.log 2>&1; then
+    echo 'Accepted exchanged reconstruction proofs'
+    exit 1
+fi
+for input in xs ys; do
+    span=$(awk -v expr="splitAtValue @a @suffix cut $input" '
+        /cut ys\) \(splitAtValue @a @suffix cut xs/ {
+            col = index($0, expr); print NR ":" col "-" col + length(expr) - 1
+        }' SwappedVectors.hs)
+    grep -Fq "SwappedVectors.hs:$span: error: [GHC-83865]" swapped.log
+    grep -Fq "actual type: SplitAtValue a cut suffix $input" swapped.log
+done
+grep -Fq 'GHC cannot infer the captured indices of this retained sum from its payload type' swapped.log
+if grep -Fq '$lambda:' swapped.log; then
+    cat swapped.log >&2
+    exit 1
+fi
