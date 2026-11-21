@@ -5431,6 +5431,7 @@ data RetainedQuantificationError
   | RetainedPackagePromotion
   | RetainedPackagePattern
   | RetainedUncoveredConstructors Name [Name]
+  | RetainedMissingEquation Name
 
 -- | An error in the implementation of an abstract datatype using
 -- a type synonym.

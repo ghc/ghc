@@ -115,7 +115,7 @@ import GHC.Types.Basic( VisArity, RecFlag(NonRecursive), Origin(Generated), GenR
 import GHC.Data.Bag ( listToBag, unitBag, unionBags )
 import GHC.Data.FastString ( fsLit )
 import GHC.Data.Pair ( pSnd )
-import GHC.Data.Maybe ( catMaybes, fromMaybe, isJust, isNothing )
+import GHC.Data.Maybe ( catMaybes, firstJustsM, fromMaybe, isJust, isNothing )
 
 import qualified GHC.Data.List.NonEmpty as NE
 import Data.Data ( Data, cast, gmapQ, gmapT )
@@ -1707,14 +1707,15 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
              has_value_pattern (L _ (Match { m_pats = L _ pats })) =
                or [not (isRetainedVarPat pat) | (Nothing, pat) <- zip columns (filter isVisArgLPat pats)]
        -- See Note [Ordinary patterns after a retained constructor].
-       ; unless (all (`elem` cons) domain_cons &&
-                 (cons `equalLength` domain_cons || any has_value_pattern matches)) $
-           failWithTc (TcRnRetainedQuantificationError RetainedConstructorCoverage)
+       ; let represented = filter (`elem` cons) domain_cons
+             missing = filter (`notElem` cons) domain_cons
+       ; unless (cons `equalLength` represented || any has_value_pattern matches) coverage_error
        ; arg_tys <- mapM argument_type pat_tys
+       ; absent <- mapM (absurd_row arg_tys) missing
        ; result_ty <- readExpType rhs_ty
        ; (usages, checked) <- mapAndUnzipM
            (\(con, match) -> tcCollectingUsage (check_match con arg_tys result_ty match))
-           (zip constructors matches)
+           (zip constructors matches ++ absent)
        ; tcEmitBindingUsage (supUEs usages)
        ; if null matches
          then empty_matches arg_tys result_ty
@@ -1790,6 +1791,54 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
            ; return (match { m_pats = L pats_loc (reverse prefix ++ [arg_pat])
                            , m_grhss = unguardedGRHSs (getLocA second) body noAnn }) }
       | otherwise = return match
+
+    -- See Note [Omitted impossible retained equations].
+    absurd_row arg_tys con
+      | L _ first : _ <- matches
+      = do { let con_pat = nlConPatName (dataConName con)
+                             (replicate (dataConSourceArity con) nlWildPatName)
+           ; resolved <- tcRetainedCon (varType index) con_pat
+           ; (dc, fields) <- maybe (missing_equation con) return resolved
+           ; eq <- newEvVar (mkNomEqPred (TermVarTy index)
+                                         (retainedConIndex (varType index) dc fields))
+           ; let arguments = [(arg, ty) | (arg, ty) <- zip argument_plan arg_tys, visible arg]
+                 rows = [drop 1 (filter isVisArgLPat (hsLMatchPats row)) | row <- matches]
+                 columns = zip3 [0 :: Int ..] arguments (transpose rows)
+           ; unless (all (equalLength arguments) rows) (missing_equation con)
+           ; witness <- firstJustsM [empty_field (mkCoVarCo eq) n ty
+                                    | (n, (RetainedConValue, Scaled _ ty), pats) <- columns
+                                    , any constructor_pattern pats
+                                    , anyFreeVarsOfType (== index) ty]
+           ; case witness of
+               Nothing -> missing_equation con
+               Just n -> do
+                 { name <- newSysName (mkVarOcc "impossible")
+                 ; let pats = [if i == n then nlVarPat name else nlWildPatName
+                              | (i, _, _) <- columns]
+                       empty = MG (Generated OtherExpansion SkipPmc, snd (mg_ext group)) (L loc [])
+                       rhs = noLocA (HsCase CaseAlt (nlHsVar name) empty)
+                 ; return ((dc, fields), mkSimpleMatch (m_ctxt first) (noLocA (con_pat : pats)) rhs) } }
+      | otherwise = missing_equation con
+
+    missing_equation con = failWithTc (TcRnRetainedQuantificationError
+                                         (RetainedMissingEquation (dataConName con)))
+
+    visible RetainedConDict{} = False
+    visible _ = True
+
+    constructor_pattern pat = case unLoc (case_pattern pat) of
+      ConPat{} -> True
+      _ -> False
+
+    empty_field eq n ty
+      = do { co <- tcRetainedCoercion index eq ty
+           ; loc <- getCtLocM PatCheckOrigin Nothing
+           ; Reduction _ domain <- runTcSEqualities $
+               rewriteFamilyAxioms loc (pSnd (coercionKind co))
+           ; return $ case splitTyConApp_maybe (coreFullView domain) of
+               Just (tc, args) | Just cons <- tyConDataCons_maybe tc
+                               , all (dataConCannotMatch args) cons -> Just n
+               _ -> Nothing }
 
     empty_matches arg_tys result_ty
       = do { arguments <- zipWithM (\argument (Scaled mult ty) ->
@@ -1951,6 +2000,23 @@ bindings in scope while omitting a second check of constructor coverage.
 
 See Agda's indexed coverage and case tree rules. Haskell's argument demand
 also requires the original value lambdas before the first branch.
+-}
+
+{- Note [Omitted impossible retained equations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For index (x : xs) FZ and index (x : xs) (FS i), the missing [] row
+has a position of type Fin (sourceLength []). Specialising the retained
+list and reducing checked family axioms gives Fin Z. No constructor of
+Fin can return that type. Insert the same row as an explicit empty case
+on the position. Partial application still binds all source arguments.
+
+Only consider ordinary columns that a written constructor pattern inspects.
+In particular, a variable or lazy pattern does not select that column.
+If several columns prove the branch empty, use the first in source order.
+Check each omitted first constructor independently. Use a nominal branch
+equality and the complete constructors of the specialised argument datatype.
+An abstract type, a stuck index, or a constructor that can match does not
+establish emptiness. The ordinary pattern checker still checks the written rows.
 -}
 
 {- Note [Ordinary patterns after a retained constructor]

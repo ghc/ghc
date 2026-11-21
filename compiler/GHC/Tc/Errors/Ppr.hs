@@ -3734,11 +3734,14 @@ pprRetainedQuantificationError reason = case reason of
   RetainedStaging ->
     text "Retained quantification in Template Haskell quotations or splices is not supported yet."
   RetainedConstructorCoverage ->
-    vcat [text "A retained constructor match requires at least one unguarded clause for each constructor of its domain."
+    vcat [text "A retained constructor match requires unguarded equations."
          ,text "Repeated constructors need a later ordinary pattern to distinguish the equations."]
   RetainedMatrixCoverage ->
     vcat [text "A retained constructor matrix requires one unguarded clause for each pair of constructors of its two index domains."
          ,text "A final equation with bare variables or wildcards in both index columns can cover the remaining pairs."]
+  RetainedMissingEquation con ->
+    vcat [ text "Missing equation for the retained constructor" <+> quotes (ppr con) <> dot
+         , text "To omit this equation, match on a later argument whose type has no possible constructors in this branch." ]
   RetainedUncoveredConstructors con missing ->
     vcat [ text "The pattern" <+> quotes (ppr con) <+> text "does not cover this retained argument."
          , text "Missing constructors:" <+> pprWithCommas (quotes . ppr) missing ]
