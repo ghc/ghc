@@ -114,7 +114,7 @@ import GHC.Core.Type
 import GHC.Core.TyCo.Compare ( eqType )
 import GHC.Core.TyCo.Rep ( Type(TermVarTy, TermAppTy, TyConApp, CastTy), Coercion(SubCo), Scaled(..) )
 import qualified GHC.Core.TyCo.Subst as TyCoSubst
-import GHC.Builtin.KnownKeys ( boolTyConKey, charDataConKey )
+import GHC.Builtin.KnownKeys ( boolTyConKey, charDataConKey, naturalNSDataConKey, naturalNBDataConKey )
 import GHC.Core.Coercion
 import GHC.Core.Rules.Config ( RuleOpts )
 import GHC.Core.DataCon
@@ -2818,6 +2818,9 @@ nativeIndexExprWith allow_conversions extra = go emptyVarEnv
       -- See Note [Boxed character literal indices].
       | Just c <- boxedCharLiteral_maybe expr
       = Just (expr, mkCharLitTy c)
+      -- See Note [Boxed natural literal indices].
+      | Just n <- boxedNaturalLiteral_maybe expr
+      = Just (expr, mkNumLitTy n)
       | Var v <- expr, isNativeOpaqueValueId v
       = case lookupVarEnv env v of
           Just result@(_, index)
@@ -3066,6 +3069,27 @@ boxedCharLiteral_maybe (App (Var worker) (Lit (LitChar c)))
   | Just con <- isDataConWorkId_maybe worker
   , con `hasKey` charDataConKey = Just c
 boxedCharLiteral_maybe _ = Nothing
+
+-- | Recognise a literal formed by the existing boxed Natural constructors.
+boxedNaturalLiteral_maybe :: CoreExpr -> Maybe Integer
+boxedNaturalLiteral_maybe (App (Var worker) (Lit (LitNumber tag n)))
+  | Just con <- isDataConWorkId_maybe worker
+  , n >= 0
+  , case tag of
+      LitNumWord -> con `hasKey` naturalNSDataConKey
+      LitNumBigNat -> con `hasKey` naturalNBDataConKey
+      _ -> False
+  = Just n
+boxedNaturalLiteral_maybe _ = Nothing
+
+{- Note [Boxed natural literal indices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+mkNaturalExpr selects either the NS constructor with a Word# literal or
+the NB constructor with a BigNat# literal. Recover the same NumTyLit at
+kind Natural from either form. As usual for the internal Natural
+constructors, well-formed values use NB only above the target's Word range.
+Neither bare primitive literal forms a retained index.
+-}
 
 -- | Detect a boxed character literal in the runtime part of a retained operand.
 containsRetainedCharLiteral :: CoreExpr -> Bool

@@ -55,7 +55,7 @@ import GHC.Core.DataCon ( DataCon, dataConConcreteTyVars, dataConFullSig, dataCo
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr, supportsQuickLookType )
 import GHC.Core.FamInstEnv (FamInstEnvs, reduceTyFamApp_maybe)
-import GHC.Core.Make ( mkCharExpr )
+import GHC.Core.Make ( mkCharExpr, mkNaturalExpr )
 import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.Utils ( applyTypeToArgs, exprType )
 import GHC.Core.FVs ( exprFreeVarsList )
@@ -3983,8 +3983,14 @@ tcRetainedNumeral domain from n = do
     Just cls | cls `hasKey` numClassKey, noFreeVarsOfType domain -> return cls
     _ -> unverified
   dfun <- tcRetainedDFun from cls domain >>= maybe unverified return
-  (zero, succ_con) <- maybe unverified return (sourceLiteralCons_maybe dfun sel)
-  buildRetainedNumeral dfun sel zero succ_con n
+  if isNaturalTy domain
+    then do
+      platform <- getPlatform
+      wantRetainedMethod sel dfun
+      return (mkNaturalExpr platform n, nlHsLit (HsNatural noExtField (mkIntegralLit n)))
+    else do
+      (zero, succ_con) <- maybe unverified return (sourceLiteralCons_maybe dfun sel)
+      buildRetainedNumeral dfun sel zero succ_con n
 
 -- | Build the index and runtime operand from a checked nonnegative conversion.
 buildRetainedNumeral :: Id -> Id -> DataCon -> DataCon -> Integer
@@ -4015,6 +4021,12 @@ literal shortcut for its argument. Require a non-rebound literal that the
 shortcut accepts at Integer. The outer method still needs the certificate
 and the exact dictionary. A rebound literal or a computed Integer argument
 can have a different meaning.
+
+The wired-in Natural domain uses the ordinary boxed literal and the
+DataKinds NumTyLit at the same kind. The standard Num Natural method maps a
+nonnegative Integer to exactly that value. Require its dictionary before
+using the literal shortcut. A local fromInteger cannot select this branch.
+A different Given will fail the dictionary check.
 
 A result signature such as Vec a 3 resolves its numeral independently through
 FromNatural. Ordinary type equality checks that the two meanings agree.
