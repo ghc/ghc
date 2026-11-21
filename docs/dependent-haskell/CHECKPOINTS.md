@@ -52,6 +52,22 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At compiler revision `f1fb064fa5`, Template Haskell can quote and
+splice a type-level let. Its right-hand side sees the outer binder.
+In the same compiler, a GADT constructor can take an ordinary field,
+a required type argument and a dictionary for that type, in that
+order. An ordinary client recovers the type with `typeRep`.
+[Type let](roadmap/R18-type-level-lets.md#type-quotations-and-splices)
+and [constructor round trip](../../testsuite/tests/gadt/TerminalGadtContextTh.hs).
+
+All 495 Showcase outputs matched at native O0 and O2 and in source
+GHCi. The type-let and constructor round trips passed in both
+interpreter modes. Thirteen registered tests passed. The linked
+GHC API tests matched all 37 dependent-program and 18 open-evaluation
+outputs. The constructor and coercion checks in `NativeDependentCore`
+also passed. The build reused the verified target libraries. Its
+`ghc-boot` library reports the donor Git revision in `--info`.
+
 At compiler revision `5e857a0d67`, the ordered GADT constructor
 `InferredPair :: Int -> forall {a} b. Show b => (a, b) -> InferredPair`
 accepts `InferredPair 61 @Bool ('x', True)`. The visible type argument

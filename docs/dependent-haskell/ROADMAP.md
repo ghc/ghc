@@ -22,6 +22,11 @@ depend on others, so this count cannot estimate the remaining work time.
 | Promotion and evaluation | R07, R12, R13, R14, R15, R16, R17, R18, R19 |
 | Declaration dependencies, families and GADTs | R21, R23, R24, R41 |
 
+Type-level lets can now appear in Template Haskell type quotations.
+A GADT constructor can also place a `Typeable` constraint after a
+required type argument that follows an ordinary field. The 495-output
+checkpoint includes both forms. [Verification](CHECKPOINTS.md#family-and-package-checkpoints).
+
 A closed type family can pass `\a -> Either e a` to `Map`. Its
 equation binds `e` in the pattern `'Just e`. A client can use the
 result through the producer's compiled interface. All 493 Showcase
