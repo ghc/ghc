@@ -119,6 +119,7 @@ import qualified OpenMapProof
 import qualified OpenMapWorker
 import qualified InstalledNotProof
 import qualified OrderingPayload
+import qualified PreludeDropWhileRuntime
 import qualified PreludeFilterAppendProof
 import qualified PreludeFilterCutoff
 import qualified PreludeFilterDecider
@@ -1343,6 +1344,9 @@ main = do
         prefix gate x = PreludeTakeWhile.prefixObservation (PreludeTakeWhile.observePrefix gate x rest)
     observe "stop or keep a lazy list prefix with a runtime gate"
         (prefix gateOff (error "disabled gate forced the head"), prefix gateOn True)
+    prefixInput <- newIORef (False : True : error "prefix and suffix forced the rejected tail") >>= readIORef
+    putStrLn ("recover a list from its checked prefix and suffix: "
+              ++ PreludeDropWhileRuntime.showPrefixAndSuffix prefixInput)
     pivot <- newIORef True >>= readIORef
     let unused = error "comparison forced an unused payload"
     observe "select a payload with a checked runtime comparison"

@@ -1279,9 +1279,15 @@ proof leaves the remaining decisions lazy. The runtime suffix also
 leaves both fields of the rejected cons lazy. An accepted head requires
 the next spine cell. The regression rejects a different predicate input,
 changed recursion arguments, and a forced tail in the rejecting branch.
+The Showcase computes decisions with `Prelude.not` from the same retained
+runtime list as the proof. It observes `Refl` and the first two elements
+of the original and reconstructed lists. The tail that follows the
+rejected head stays undefined.
 [Source alias](../examples/open-evaluation/PreludeDropWhileSource.hs),
-[proof](../examples/open-evaluation/PreludeDropWhileProof.hs), and
-[regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledDropWhile.sh).
+[proof](../examples/open-evaluation/PreludeDropWhileProof.hs),
+[runtime observation](../examples/open-evaluation/PreludeDropWhileRuntime.hs),
+[regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledDropWhile.sh),
+and [Agda's prefix and suffix law](../REFERENCES.md#ending-a-list-prefix-at-a-decision).
 
 ### Use an ordinary identity as an open callback
 

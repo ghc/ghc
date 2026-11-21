@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeApplications, TypeOperators #-}
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
-module PreludeFilterAppendRuntime (RuntimeFilterAppend(..), packFilterAppend) where
+module PreludeFilterAppendRuntime (RuntimeFilterAppend(..), packFilterAppend, decisionsForNot) where
 
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:))
@@ -26,7 +26,7 @@ filterAppendAt :: foreach (xs :: [Bool]) -> foreach (ys :: [Bool])
                   :~: Appended (FilterWith Negation xs) (FilterWith Negation ys)
 filterAppendAt xs ys = filterAppend (decisionsForNot xs) (Proxy @ys)
 
--- | Record the decision for each head of the left list.
+-- | Record the negation decision at each head as the proof needs it.
 decisionsForNot :: foreach (xs :: [Bool]) -> FilterDecisions Negation xs
 decisionsForNot [] = Done
 decisionsForNot (x : xs) = Decide (negationResult x) (decisionsForNot xs)
