@@ -33,9 +33,10 @@ in the Showcase when the fork accepts it. Keep an explicit constructor
 application when the example tests the representation itself.
 
 For R24, proposal #177 derives the domain of an associated family from
-its enclosing class. Proposal #547 records GHC's current restriction
-on constraints in kinds. The R24 card tracks their different purposes,
-the review status and the interface experiment.
+its enclosing class. The review of #154 connects numeric promotion to
+local class evidence. Amendment #259 records the decision on standalone
+signatures for associated families. Proposal #547 restricts constraints
+in kinds. The R24 card links the review questions to the interface test.
 [Simple constrained type families](https://github.com/ghc-proposals/ghc-proposals/pull/177),
 [Disallow constraints in kinds](https://ghc-proposals.readthedocs.io/en/latest/proposals/0547-no-kind-equalities.html)
 and [R24 source syntax](roadmap/R24-constrained-type-families.md#source-syntax-and-separate-compilation).

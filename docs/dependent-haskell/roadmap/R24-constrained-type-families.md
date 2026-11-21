@@ -43,6 +43,15 @@ It accepts `[Bool]` or a local `Collects c` assumption. Calling it at
 
 ## Source syntax and separate compilation
 
+The review of literal promotion in #154 led to the separate proposal
+#177. Peyton Jones asks which numeric domain applies to
+`Proxy a -> Proxy b -> Proxy (a + b)`. Eisenberg asks how Core would
+use a dictionary supplied by a GADT match or a quantified constraint.
+An R24 test should therefore form a family application using evidence
+that becomes available inside a pattern match.
+[Arithmetic example](https://github.com/ghc-proposals/ghc-proposals/pull/154#issuecomment-407925931)
+and [local evidence](https://github.com/ghc-proposals/ghc-proposals/pull/154#issuecomment-408569969).
+
 GHC proposal #177, *Simple constrained type families*, keeps the
 declaration `type Elem c` inside `class Collects c`. The class supplies
 the domain. A client must establish `Collects c` to form `Elem c`, even
@@ -71,6 +80,17 @@ cost of changing constructor elaboration before the dependent-type
 design is settled.
 [Eisenberg's questions](https://github.com/ghc-proposals/ghc-proposals/pull/177#issuecomment-549766671)
 and [Peyton Jones's reply](https://github.com/ghc-proposals/ghc-proposals/pull/177#issuecomment-549934585).
+
+Eisenberg's review of #177 also points to the accepted amendment #259.
+In a class body, `type T :: a` already declares a nullary family with
+result kind `a`. Using the same spelling for a standalone signature
+would make that line ambiguous. The earlier PR #227 considered moving
+the signature outside the class. The committee left associated families
+out of standalone kind signatures. The existing family header can still
+give its result kind.
+[Associated types in #54](https://ghc-proposals.readthedocs.io/en/latest/proposals/0054-kind-signatures.html#associated-types),
+[placement discussion in #227](https://github.com/ghc-proposals/ghc-proposals/pull/227#issuecomment-497878018)
+and [accepted amendment #259](https://github.com/ghc-proposals/ghc-proposals/pull/259).
 
 The accepted proposal #547 disallows `=>` in family result kind
 annotations and standalone kind signatures. Class constraints were
