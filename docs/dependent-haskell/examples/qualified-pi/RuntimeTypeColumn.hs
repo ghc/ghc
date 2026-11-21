@@ -1,7 +1,8 @@
 {-# LANGUAGE ExperimentalDependentTypes, GADTs #-}
 
 -- | Read a bounded element from a column with a runtime type witness.
-module RuntimeTypeColumn (Column(..), lookupColumn, lookupColumnInferred) where
+module RuntimeTypeColumn
+    (Column(..), ColumnChoice(..), lookupColumn, lookupColumnInferred, lookupColumnWhen) where
 
 import Data.Kind (Type)
 import ParameterizedIndexLibrary (indexGeneric, mkFinGeneric)
@@ -21,3 +22,16 @@ lookupColumn wanted (Column actual values) offset =
 -- | Use the requested result type to choose the column's element type.
 lookupColumnInferred :: foreach (a :: Type). Column -> Int -> Maybe a
 lookupColumnInferred = lookupColumn a
+
+-- | Request an offset only when the column is enabled.
+data ColumnChoice (enabled :: Bool) where
+    SkipColumn :: ColumnChoice False
+    ReadColumn :: Int -> ColumnChoice True
+
+-- | Read the selected column at the requested element type.
+lookupColumnWhen :: foreach (enabled :: Bool) -> foreach (a :: Type).
+                    ColumnChoice enabled -> Column -> Maybe a
+lookupColumnWhen _ choice column =
+    case choice of
+        SkipColumn -> Nothing
+        ReadColumn offset -> lookupColumn a column offset

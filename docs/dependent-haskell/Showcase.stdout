@@ -188,6 +188,7 @@ zip integer literals at a proven common length: [11,22]
 zip with the first list at Int8: [137,-108]
 read a column at a runtime type and offset: (Just 'b',Nothing,Nothing)
 infer the column element type from the result: (Just 'b',Nothing)
+skip a typed column request without forcing its witness: (Just 'b',Nothing)
 check a signed position in a packaged vector: Just 22
 generic negative position ignores list: Nothing
 generic checked function position: Just 42
