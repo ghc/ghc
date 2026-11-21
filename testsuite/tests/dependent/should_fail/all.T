@@ -270,5 +270,7 @@ test('NativeTypeCaseRetainedReify', [req_th, only_ways(['normal'])],
 test('NativeNestedSumCaptureWrong', normal, compile_fail, [''])
 test('NativeIrredIndexEvidence', normal, compile_fail, [''])
 test('NativeIndexOperandFamily', normal, compile_fail, [''])
+test('NativeRetainedSecondColumn', normal, compile_fail, [''])
+test('NativeRetainedSecondGuard', normal, compile_fail, ['-Werror=incomplete-patterns'])
 test('NativeNestedSumRecursiveAlias', normal, compile_fail, [''])
 test('NativeNestedSumFamilyReturn', normal, compile_fail, [''])
