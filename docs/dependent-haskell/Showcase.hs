@@ -163,6 +163,7 @@ import Numeric.Natural (Natural)
 import qualified OpenSource
 import qualified OrdinaryScopedComparison
 import qualified OrdinaryScopedChoice
+import qualified ScopedClassMethod as Choice
 import qualified ScopedClassMethodClient
 import qualified Signal
 import qualified PreludePairExport
@@ -1024,6 +1025,10 @@ main = do
         (ScopedClassMethodClient.ordinaryChoices enabled, ScopedClassMethodClient.ordinaryChoices disabled)
     observe "infer a payload constraint beside a scoped method"
         (OrdinaryScopedChoice.readDescription enabled 'q')
+    observe "discard the payload of a locally indexed choice" $
+        let localFlag = False
+        in case Choice.describeChoice localFlag (error "unused payload" :: Char) of
+            (Choice.Tagged flag, _) -> flag
     observe "compare zero under two caller dictionaries"
         (map OrdinaryScopedComparison.observations [-2, 0, 2])
     observe "render a field with evidence for its runtime flag" (renderField enabled, renderField disabled)
