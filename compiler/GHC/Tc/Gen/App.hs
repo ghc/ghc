@@ -3988,6 +3988,13 @@ and emits the required equality evidence. For example, a non-reflexive Refl
 still fails without a suitable Given. Never replace the actual result with
 the expected result, or use a reflexive coercion for this check.
 
+For a retained sum, the payload family can reduce to an ordinary data
+type such as appendVec left right :~: input. Read its arguments through
+the checked scoped family equation in matchSumPayload. This lets Refl
+choose an endpoint. Final nominal subsumption must still prove that the
+two endpoints agree in this branch. A missing induction premise must
+therefore fail at Refl.
+
 The expected algebraic result can contain a supported retained function type.
 For example, Refl can be checked at value :~: QPi under value ~ QPi. Choose
 its repeated endpoint immutably. Keep the actual reflexive result and let
@@ -4039,7 +4046,7 @@ tcRetainedResultIndexCast NoQL (Just expected) args fun sigma
   , Just (tc, templates) <- splitTyConApp_maybe result
   , tc == dataConTyCon dc, isGenerativeTyCon tc Nominal
   , length templates == tyConArity tc
-  , Just actuals <- result_args tc expected
+  , Just actuals <- retainedResultArgs tc expected
   , templates `equalLength` actuals
   , [index@TermVarTy{}] <- [ actual | (formal, actual) <- zip templates actuals
                                    , getTyVar_maybe formal == Just tv ]
@@ -4051,13 +4058,16 @@ tcRetainedResultIndexCast NoQL (Just expected) args fun sigma
             ; let choice = mkCastTy index co
             ; return (Just ([choice], substTyWith [tv] [choice] body)) } }
   where
-    result_args tc ty
-      | Just (head_tc, params) <- splitTyConApp_maybe ty, head_tc == tc = Just params
-      | otherwise = snd <$> matchSumPayload tc ty
-
     is_type_arg ETypeArg{} = True
     is_type_arg _ = False
 tcRetainedResultIndexCast _ _ _ _ _ = return Nothing
+
+-- | Read the expected data arguments, including a checked sum payload.
+-- See Note [Transporting a retained result index].
+retainedResultArgs :: TyCon -> Type -> Maybe [Type]
+retainedResultArgs tc ty
+  | Just (head_tc, params) <- splitTyConApp_maybe ty, head_tc == tc = Just params
+  | otherwise = snd <$> matchSumPayload tc ty
 
 {- Note [Transporting a retained result index]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -4092,7 +4102,7 @@ tcRetainedResultCandidate NoQL (Just expected) args fun sigma
   , (ma_tvs, body) <- tcSplitForAllInvisTyVars sigma
   , let tvs = map snd ma_tvs
         (_, tau) = tcSplitPhiTy body
-  , not (null tvs), isTauTy tau, isRetainedValueType expected
+  , not (null tvs), isTauTy tau
   , not (hasNativeDependentExpr (Core.Type body))
   , Just result <- tcRetainedOrdinaryResult (count isHsValArg args) tau
   , Just pairs <- candidate_pairs body result expected
@@ -4119,7 +4129,7 @@ tcRetainedResultCandidate NoQL (Just expected) args fun sigma
 
     candidate_pairs body result expected
       | XExpr (ConLikeTc (RealDataCon _)) <- fun
-      , isFunTy result
+      , isFunTy result, isRetainedValueType expected
       = callback_pairs result expected
       | isTauTy body
       , Just (tc, templates) <- splitTyConApp_maybe result
@@ -4129,8 +4139,8 @@ tcRetainedResultCandidate NoQL (Just expected) args fun sigma
           XExpr (ConLikeTc (RealDataCon dc)) -> tc == dataConTyCon dc
           _ -> False
       , length templates == tyConArity tc
-      , Just (expected_tc, actuals) <- splitTyConApp_maybe expected
-      , tc == expected_tc, templates `equalLength` actuals
+      , Just actuals <- retainedResultArgs tc expected
+      , templates `equalLength` actuals, isRetainedValueType (mkTyConApp tc actuals)
       = Just (zip templates actuals)
       | otherwise = Nothing
 
