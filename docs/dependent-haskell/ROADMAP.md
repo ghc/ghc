@@ -67,10 +67,11 @@ for all cards that change the same checker or interface format.
 | [R36](roadmap/R36-pun-warnings.md) | The renamer can warn when a type and a term share a name at an unqualified use. | Check qualified and explicitly disambiguated uses, implicit binders, diagnostic locations, and `-Werror=pun-uses`. |
 | [R18](roadmap/R18-type-level-lets.md#ordered-binding-groups) | A group of type-level let bindings uses source order. A later binding can refer to an earlier binding with the same name. Both braced and layout groups work directly in source. | Check free variables in implicitly quantified signatures, an out-of-scope forward reference, an interface-only client, quotations, and exact and ordinary printing. |
 
-The branch audit found a recompilation error in R05/R16. Adding an active
-rewrite rule in a transitive home module can leave a warm proof accepted
-when a clean build rejects it. The recovery test must exercise both object
-code and `-fno-code`, including a second build with no further edits.
+The R05/R16 compiler at `fd5a526ea1` checks the full interfaces of home
+modules whose rewrite rules a final Core proof consulted. Adding an
+applicable rule now invalidates the warm proof in both object-code and
+`-fno-code` builds. The registered regression also checks the next build
+with no further edits.
 [Recovered branches and remaining checks](BRANCHES.md).
 
 Two changes need separate decisions before integration.
