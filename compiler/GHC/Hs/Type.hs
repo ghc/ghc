@@ -20,7 +20,8 @@ module GHC.Hs.Type (
         pprHsModifiedFunArr, pprHsModifier, pprLHsModifiers,
 
         HsType(..), HsCoreTy, LHsType, HsKind, LHsKind,
-        HsTypeGhcPsExt(..), HsTypeCaseAlt(..), HsTypeGhcRnExt(..), hsExistsTyFlag,
+        HsTypeGhcPsExt(..), HsTypeCaseAlt(..), HsTypeLetBind(..), HsTypeGhcRnExt(..), hsExistsTyFlag,
+        mkHsSingleTypeLet, splitHsTypeLet,
         HsForAllTelescope(..), EpAnnForallVis, EpAnnForallInvis,
         HsTyVarBndr(..), LHsTyVarBndr, AnnTyVarBndr(..),
         HsBndrKind(..),
@@ -127,6 +128,8 @@ import GHC.Utils.Outputable
 import GHC.Utils.Misc (count)
 
 import Data.Maybe
+import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as NE
 import Data.Data (Data)
 
 import qualified Data.Semigroup as S
@@ -567,8 +570,8 @@ data HsTypeGhcPsExt
 
   | HsTypeExists (EpToken "exists", Either (EpToken "|") (EpToken "."))
       (LHsTyVarBndr Specificity GhcPs) (LHsType GhcPs)
-  | HsTypeLet (EpToken "let", EpToken "=", EpToken "in") (LocatedN RdrName)
-              (LHsType GhcPs) (LHsType GhcPs)
+  | HsTypeLet (EpToken "let", EpToken "in") (Maybe (EpToken "{", EpToken "}"))
+              (NonEmpty (LocatedA HsTypeLetBind)) (LHsType GhcPs)
 
   | HsTypeCase (EpToken "case", EpToken "of")
                (Maybe (EpToken "{", EpToken "}"))
@@ -585,6 +588,39 @@ data HsTypeGhcPsExt
 
   | HsTypeSome (EpToken "some", EpToken "(", EpUniToken "::" "∷", EpToken ")", EpToken "|")
                (LocatedN RdrName) (LHsType GhcPs) (LHsType GhcPs)
+
+-- | One abbreviation in a source type let.
+data HsTypeLetBind = HsTypeLetBind (LocatedN RdrName) (EpToken "=") (LHsType GhcPs)
+
+-- | Construct one binding during renaming or TH conversion.
+mkHsSingleTypeLet :: (EpToken "let", EpToken "in") -> LocatedN RdrName
+                  -> LHsType GhcPs -> LHsType GhcPs -> HsTypeGhcPsExt
+mkHsSingleTypeLet ann name rhs body =
+  HsTypeLet ann Nothing (noLocA (HsTypeLetBind name noAnn rhs) :| []) body
+
+-- | Expose the first binding and its scope. See Note [Ordered type let bindings].
+splitHsTypeLet :: NonEmpty (LocatedA HsTypeLetBind) -> LHsType GhcPs
+               -> (LocatedN RdrName, LHsType GhcPs, LHsType GhcPs)
+splitHsTypeLet (L _ (HsTypeLetBind name _ rhs) :| binds) body =
+  (name, rhs, case binds of
+    [] -> body
+    b : bs -> L (noAnnSrcSpan (getLocA b `combineSrcSpans` getLocA body))
+                (XHsType (HsTypeLet noAnn Nothing (b :| bs) body)))
+
+{- Note [Ordered type let bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The parser keeps the binding group, braces and separators for exact printing.
+Each RHS sees the enclosing scope and the preceding binders. A later binder
+can shadow an earlier one. For example,
+
+  let { x = a; x = Maybe x } in x
+
+has the scope of `let x = a in let x = Maybe x in x`. Expose one binding
+at a time to free-variable collection, declaration lifting and renaming.
+This gives each of them the same scope, including in signatures with
+implicit quantification. The renamed tree already represents nested lets,
+so kind checking and Template Haskell use their existing single-binder rules.
+-}
 
 -- | A parsed constructor alternative in a type case.
 data HsTypeCaseAlt
@@ -1721,9 +1757,13 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
         <+> char '|' <+> ppr_mono_lty body
     HsTypeCaseAlias _ _ body -> ppr_mono_lty body
     HsTypeExists (_, sep_tok) b body -> pprExistsTy (hsExistsTyFlag sep_tok) (ppr b) (ppr_mono_lty body)
-    HsTypeLet _ v rhs body ->
-      text "let" <+> ppr v <+> equals <+> ppr_mono_lty rhs
-        <+> text "in" <+> ppr_mono_lty body
+    HsTypeLet _ brackets binds body ->
+      let binding (L _ (HsTypeLetBind v _ rhs)) =
+            ppr v <+> equals <+> ppr_mono_lty rhs
+          bindings = case (brackets, binds) of
+            (Nothing, b :| []) -> binding b
+            _ -> braces (sep (punctuate semi (map binding (NE.toList binds))))
+      in text "let" <+> bindings <+> text "in" <+> ppr_mono_lty body
   GhcRn -> case t of
     HsCoreTyRn ty -> ppr ty
     HsGadtFieldRn field -> pprHsConDeclFieldNoMult field

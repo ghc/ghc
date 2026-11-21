@@ -48,7 +48,10 @@ import qualified GHC.Data.BooleanFormula as BF
 import GHC.Data.FastString
 import qualified GHC.Data.Strict as Strict
 import GHC.Hs.Decls.Overlap (OverlapMode(..))
-import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLambda, HsTypeLet, HsTypeCase, HsTypeCaseAlias, HsTypeCaseHead, HsTypeExists, HsTypeSome), HsTypeCaseAlt(..)) -- Required for HsConDetails type-family instances
+import GHC.Hs.Type
+  ( HsTypeGhcPsExt(HsTypeLambda, HsTypeLet, HsTypeCase, HsTypeCaseAlias, HsTypeCaseHead, HsTypeExists, HsTypeSome)
+  , HsTypeCaseAlt(..), HsTypeLetBind(..)
+  )
 import GHC.TypeLits
 import GHC.Types.ForeignCall
 import GHC.Types.InlinePragma (ActivationGhc, inlinePragmaActivation, inlinePragmaSource)
@@ -4161,14 +4164,18 @@ instance ExactPrint (HsType GhcPs) where
     body' <- markAnnotated body
     return (XHsType (HsTypeExists (exists', sep_tok') binder' body'))
 
-  exact (XHsType (HsTypeLet (let_tok, eq, in_tok) var rhs body)) = do
+  exact (XHsType (HsTypeLet (let_tok, in_tok) braces binds body)) = setLayoutBoth $ do
     let' <- markEpToken let_tok
-    var' <- markAnnotated var
-    eq' <- markEpToken eq
-    rhs' <- markAnnotated rhs
+    (braces', binds') <- case braces of
+      Nothing -> (Nothing,) <$> setLayoutBoth (traverse markAnnotated binds)
+      Just (open, close) -> do
+        open' <- markEpToken open
+        binds' <- setLayoutBoth $ traverse markAnnotated binds
+        close' <- markEpToken close
+        return (Just (open', close'), binds')
     in' <- markEpToken in_tok
     body' <- markAnnotated body
-    return (XHsType (HsTypeLet (let', eq', in') var' rhs' body'))
+    return (XHsType (HsTypeLet (let', in') braces' binds' body'))
   exact (XHsType (HsBangTy ann (HsSrcBang mt up str) ty)) = do
     (ann', mt') <- exactBang (ann, mt) str
     ty' <- markAnnotated ty
@@ -4336,6 +4343,12 @@ instance ExactPrint HsTypeCaseAlt where
   setAnnotationAnchor alt _ _ _ = alt
   exact (HsTypeCaseAlt pat arr rhs) =
     HsTypeCaseAlt <$> markAnnotated pat <*> markEpUniToken arr <*> markAnnotated rhs
+
+instance ExactPrint HsTypeLetBind where
+  getAnnotationEntry = const NoEntryVal
+  setAnnotationAnchor bind _ _ _ = bind
+  exact (HsTypeLetBind var eq rhs) =
+    HsTypeLetBind <$> markAnnotated var <*> markEpToken eq <*> markAnnotated rhs
 
 instance ExactPrint (LocatedN RdrName) where
   getAnnotationEntry (L sann _) = fromAnn sann

@@ -1966,7 +1966,7 @@ cvtTypeKind typeOrKind ty
              name' <- tNameN name
              rhs'  <- cvtTypeKind typeOrKind rhs
              body' <- cvtTypeKind typeOrKind body
-             mk_apps (XHsType (HsTypeLet (noEpTok, noEpTok, noEpTok) name' rhs' body')) tys'
+             mk_apps (XHsType (mkHsSingleTypeLet noAnn name' rhs' body')) tys'
 
            SigT ty ki
              -> do { ty' <- cvtType ty

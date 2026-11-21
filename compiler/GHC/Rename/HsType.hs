@@ -55,7 +55,7 @@ import GHC.Driver.Flags
 import GHC.Data.List.SetOps (findDupsEq)
 import GHC.Parser.PostProcess (setRdrNameSpace)
 
-import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLet, HsTypeCase, HsTypeCaseAlias, HsTypeCaseHead, HsTypeSome), HsTypeGhcRnExt(..), HsTypeCaseAlt(..))
+import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLet, HsTypeCase, HsTypeCaseAlias, HsTypeCaseHead, HsTypeSome), HsTypeGhcRnExt(..), HsTypeCaseAlt(..), splitHsTypeLet)
 import GHC.Hs
 
 import GHC.Rename.Env
@@ -1119,7 +1119,8 @@ rnHsTyKi env (XHsType (HsTypeCaseAlias generated (owner, index, alias) body)) = 
   (body', fvs) <- bindLocalNamesFV (maybeToList (unLoc <$> alias')) (rnLHsTyKi env body)
   pure (XHsType (HsTypeCaseAliasRn (unLoc owner', index, alias') body'), extendNameSetList fvs generated_names)
 
-rnHsTyKi env (XHsType (HsTypeLet (let_kw, _, _) binder rhs body)) = do
+rnHsTyKi env (XHsType (HsTypeLet (let_kw, _) _ binds result)) = do
+  let (binder, rhs, body) = splitHsTypeLet binds result
   enabled <- xoptM LangExt.ExperimentalDependentTypes
   unless enabled $
     setSrcSpan (getEpTokenSrcSpan let_kw) $ failWithTc TcRnTypeLetDisabled
@@ -2835,8 +2836,9 @@ extract_lty (L _ ty) acc
         filter (\v -> Just (unLoc v) /= (unLoc <$> alias)) (extract_lty body []) ++ acc
       XHsType (HsTypeLambda _ binders body)
                                   -> extract_body (map unLoc binders) body acc
-      XHsType (HsTypeLet _ binder rhs body)
-                                  -> extract_lty rhs (extract_body [unLoc binder] body acc)
+      XHsType (HsTypeLet _ _ binds result) ->
+        let (binder, rhs, body) = splitHsTypeLet binds result
+        in extract_lty rhs (extract_body [unLoc binder] body acc)
       XHsType (HsTypeSome _ binder domain body)
                                   -> extract_lty domain (extract_body [unLoc binder] body acc)
       XHsType (HsTypeCase _ _ scrutinee alts)

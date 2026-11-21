@@ -23,7 +23,7 @@ import {-# SOURCE #-} GHC.Rename.Splice ( rnSpliceDecl, rnTopSpliceDecls, rnSpli
 
 import GHC.Hs
 import qualified GHC.Hs.Decls as HsDecls
-import GHC.Hs.Type (mkHsImplicitSigType, HsTypeGhcPsExt(HsTypeCase, HsTypeCaseAlias, HsTypeLet, HsTypeSome), HsTypeCaseAlt(..))
+import GHC.Hs.Type (mkHsImplicitSigType, HsTypeGhcPsExt(HsTypeCase, HsTypeCaseAlias, HsTypeLet, HsTypeSome), HsTypeCaseAlt(..), mkHsSingleTypeLet, splitHsTypeLet)
 import GHC.Hs.Decls.Overlap ( OverlapMode(..) )
 import GHC.Iface.Env ( lookupOrig )
 
@@ -315,8 +315,9 @@ liftTypeLambdas sigma group = do
     liftRhs lift_sum scoped owner captures (L loc (HsKindSig ann body kind)) salt =
       let (body', families, next) = liftRhs lift_sum scoped owner captures body salt
       in (L loc (HsKindSig ann body' kind), families, next)
-    liftRhs _ scoped owner captures (L loc (XHsType (HsTypeLet ann binder rhs body))) salt =
-      let (rhs', rhs_families, next) = liftRhs False scoped owner captures rhs salt
+    liftRhs _ scoped owner captures (L loc (XHsType (HsTypeLet ann _ binds result_ty))) salt =
+      let (binder, rhs, body) = splitHsTypeLet binds result_ty
+          (rhs', rhs_families, next) = liftRhs False scoped owner captures rhs salt
           saved = privateName "let-outer" next 0 binder
           header = liftedTypeVarBinder (privateName "let-header" next 0 binder)
           shadowed (_, name) = sameBinder binder name
@@ -324,9 +325,9 @@ liftTypeLambdas sigma group = do
                             | otherwise  = c
           scope = map save captures ++ [(header, binder)]
           (body', body_families, end) = liftRhs False scoped owner scope body (next + 1)
-          local = L loc (XHsType (HsTypeLet ann binder rhs' body'))
+          local = L loc (XHsType (mkHsSingleTypeLet ann binder rhs' body'))
           result | not (null body_families), any shadowed captures
-                 = L loc (XHsType (HsTypeLet (noAnn, noAnn, noAnn) saved (typeName binder) local))
+                 = L loc (XHsType (mkHsSingleTypeLet noAnn saved (typeName binder) local))
                  | otherwise = local
       in (result, rhs_families ++ body_families, if null body_families then next else end)
     liftRhs _ scoped owner captures (L loc (XHsType (HsTypeLambda _ vars body))) salt =
@@ -406,7 +407,7 @@ liftTypeLambdas sigma group = do
         restore (L _ HsTvb{tvb_var = HsBndrVar _ header}, source) body
           | not (sameBinder header source)
           , unLoc source `Set.member` free
-          = L (getLoc body) (XHsType (HsTypeLet (noAnn, noAnn, noAnn) source (typeName header) body))
+          = L (getLoc body) (XHsType (mkHsSingleTypeLet noAnn source (typeName header) body))
         restore _ body = body
 
     -- For example, a bare arrow can change matchability in a kind.
@@ -833,7 +834,7 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
         restoreKind (L _ HsTvb{tvb_kind = kind}) = kind
 
     bindTypeName binder rhs body =
-      L (getLoc body) (XHsType (HsTypeLet (noAnn, noAnn, noAnn) binder (typeName rhs) body))
+      L (getLoc body) (XHsType (mkHsSingleTypeLet noAnn binder (typeName rhs) body))
 
     localKindsInScope _ [] = True
     localKindsInScope hidden ((binder, name):locals) =
@@ -1340,8 +1341,9 @@ liftTypeCases group =
                                    (scrutinee, scrut_kind) (Just kind) patterns salt
         in (L loc (HsKindSig ann body' kind), cases, next)
     liftRhs owner independent captures aliases
-      (L loc (XHsType (HsTypeLet ann binder rhs body))) salt
+      (L loc (XHsType (HsTypeLet ann _ binds result_ty))) salt
       | not independent
+      , let (binder, rhs, body) = splitHsTypeLet binds result_ty
       , letCaseBody body
       , Just (used, references) <- rhsCaptures captures aliases rhs
       , let owner_occ = rdrNameOcc (unLoc owner)
@@ -1365,8 +1367,9 @@ liftTypeCases group =
               | any shadowed captures = letTy loc ann saved (typeName binder) result
               | otherwise = result
         in (result', (helper, (occ, Just owner_occ)) : generated, next)
-    liftRhs owner False captures aliases (L loc (XHsType (HsTypeLet ann v rhs body))) salt =
-      let (rhs', cases, next) = liftRhs owner False captures aliases rhs salt
+    liftRhs owner False captures aliases (L loc (XHsType (HsTypeLet ann _ binds result_ty))) salt =
+      let (v, rhs, body) = splitHsTypeLet binds result_ty
+          (rhs', cases, next) = liftRhs owner False captures aliases rhs salt
       in (letTy loc ann v rhs' body, cases, next)
     liftRhs owner independent captures aliases (L loc (HsFunTy ann arrow domain result)) salt =
       let (domain', domain_cases, next) = liftRhs owner independent captures aliases domain salt
@@ -1423,13 +1426,15 @@ liftTypeCases group =
       = Just (HsBndrKind noExtField kind)
     caseScrutineeKind _ _ _ = Nothing
 
-    letTy loc ann v rhs body = L loc (XHsType (HsTypeLet ann v rhs body))
+    letTy loc ann v rhs body = L loc (XHsType (mkHsSingleTypeLet ann v rhs body))
     applyType loc name = foldl' (\f x -> L loc (HsAppTy noExtField f x)) (typeName name)
 
     -- Follow a chain of nonrecursive lets to the ordered case.
     letCaseBody ty = case unLoc (ignoreParens ty) of
       XHsType (HsTypeCase _ _ _ alts) -> all (isJust . checkAlt) alts
-      XHsType (HsTypeLet _ _ rhs body) -> isJust (lexicalNames rhs) && letCaseBody body
+      XHsType (HsTypeLet _ _ binds result_ty) ->
+        let (_, rhs, body) = splitHsTypeLet binds result_ty
+        in isJust (lexicalNames rhs) && letCaseBody body
       _ -> False
 
     -- Include the captures of every referenced alias, and their kinds.

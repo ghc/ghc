@@ -43,7 +43,7 @@ import qualified Data.List.NonEmpty as NE
 import qualified Prelude -- for happy-generated code
 
 import GHC.Hs
-import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLambda, HsTypeLet, HsTypeCase, HsTypeExists, HsTypeSome), HsTypeCaseAlt(..))
+import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLambda, HsTypeLet, HsTypeCase, HsTypeExists, HsTypeSome), HsTypeCaseAlt(..), HsTypeLetBind(..))
 import GHC.Hs.Decls.Overlap ( OverlapMode(..) )
 
 import GHC.Driver.Backpack.Syntax
@@ -2367,10 +2367,14 @@ type :: { LHsType GhcPs }
                                        {% amsA' (sLL $1 $6 $ XHsType
                                            (HsTypeCase (epTok $1, epTok $3) (Just (epTok $4, epTok $6))
                                                 $2 (reverse (unLoc $5)))) }
-        | 'let' vocurly tyvar '=' ctype close 'in' ctype
-                                       {% amsA' (sLL $1 $> $
-                                          XHsType (HsTypeLet (epTok $1, epTok $4, epTok $7)
-                                            $3 $5 $8)) }
+        | 'let' vocurly typelet_binds close 'in' ctype
+                                       {% amsA' (sLL $1 $> $ XHsType
+                                            (HsTypeLet (epTok $1, epTok $5) Nothing
+                                               (NE.reverse (unLoc $3)) $6)) }
+        | 'let' '{' typelet_binds '}' 'in' ctype
+                                       {% amsA' (sLL $1 $> $ XHsType
+                                            (HsTypeLet (epTok $1, epTok $5) (Just (epTok $2, epTok $4))
+                                               (NE.reverse (unLoc $3)) $6)) }
         | btype '->' ctype             {% let arr = HsModifiedFunArr noExtField
                                                                      []
                                                                      (HsStandardArr $ EpArrow $ epUniTok $2)
@@ -2388,6 +2392,19 @@ type :: { LHsType GhcPs }
                                                                      (reverse $ unLoc $2)
                                                                      (HsLinearArr $ epTok $3)
                                           in amsA' (sLL $1 $> $ HsFunTy noExtField arr $1 $4) }
+
+-- In reverse source order. Literal separators belong to the preceding binding.
+typelet_binds :: { Located (NonEmpty (LocatedA HsTypeLetBind)) }
+        : typelet_bind                   { sL1 $1 (NE.singleton $1) }
+        | typelet_binds ';' typelet_bind {% case unLoc $1 of
+              b :| bs -> do { b' <- addTrailingSemiA b (mzEpTok $2)
+                            ; return (sLL $1 $> ($3 :| b' : bs)) } }
+        | typelet_binds ';'              {% case unLoc $1 of
+              b :| bs -> do { b' <- addTrailingSemiA b (mzEpTok $2)
+                            ; return (sLL $1 $> (b' :| bs)) } }
+
+typelet_bind :: { LocatedA HsTypeLetBind }
+        : tyvar '=' ctype                {% amsA' (sLL $1 $> (HsTypeLetBind $1 (epTok $2) $3)) }
 
 typecase_alts :: { Located [LocatedA HsTypeCaseAlt] }
         : typecase_alt                   { sL1 $1 [$1] }
