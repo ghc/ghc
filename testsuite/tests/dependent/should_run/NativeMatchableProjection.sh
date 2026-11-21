@@ -13,6 +13,8 @@ if grep -Eq '^ *got .*matchable-projection' lib.iface; then
     echo 'A projection with two statically matchable heads requested the scoped rule.'
     exit 1
 fi
+cp "$src/NativeNestedMatchableProjection.hs" .
+"${ghc[@]}" -O1 -c NativeNestedMatchableProjection.hs
 cd ../provider
 cp ../lib/*.hi "$src/MatchableView.hs" .
 for opt in -O0 -O2; do

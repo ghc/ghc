@@ -42,5 +42,8 @@ main = do
         wrongHead = args lhs rhs g boolTy g charTy
         wrongArg = args lhs rhs f charTy g charTy
         wrongKind = args (mkAppTy f matchableDataConTy) rhs f matchableDataConTy g charTy
-    unless (all (isNothing . check CLeft) [noHead, wrongHead, wrongArg, wrongKind, tail ok]) $
+        noRightHead = args lhs (mkAppTy u charTy) f boolTy u charTy
+        wrongRightArg = args lhs rhs f boolTy g boolTy
+        invalid = [noHead, wrongHead, wrongArg, wrongKind, noRightHead, wrongRightArg, tail ok]
+    unless (all (\lr -> all (isNothing . check lr) invalid) [CLeft, CRight]) $
         fail "accepted a projection with an unproved head, argument, or kind"
