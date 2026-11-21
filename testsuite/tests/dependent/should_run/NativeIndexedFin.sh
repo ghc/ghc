@@ -206,13 +206,17 @@ if "${ghc[@]}" -O0 -DOMIT -fforce-recomp -fdefer-type-errors -fdiagnostics-color
     echo 'Accepted an omitted cons/cons equation'
     exit 1
 fi
-grep -Fq 'MatrixLength.hs:10:1: error: [GHC-83605]' pair.log
+grep -Fq 'MatrixLength.hs:9:1: error: [GHC-83605]' pair.log
 grep -Fq 'Missing equation for the retained constructor pair (:, :).' pair.log
 if "${ghc[@]}" -O0 -DWRONG -fforce-recomp -fdiagnostics-color=never -c MatrixLength.hs >result.log 2>&1; then
     echo 'Accepted an empty result for two nonempty lists'
     exit 1
 fi
-grep -Fq 'MatrixLength.hs:15:27: error: [GHC-83865]' result.log
+grep -Fq 'MatrixLength.hs:14:27: error: [GHC-83865]' result.log
+if grep -Fq '$d~' result.log; then
+    echo 'Reported an implicit dictionary as a source binding'
+    exit 1
+fi
 cat >MissingSuccessor.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, ScopedTypeVariables #-}
 module MissingSuccessor where
