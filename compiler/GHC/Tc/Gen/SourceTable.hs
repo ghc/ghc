@@ -2229,11 +2229,11 @@ directListAppend owner body = do
       , right == returned, h == head', t == tail', right' == carried -> pure result
     _ -> Nothing
 
--- | Check the lifted two-parameter signature of a right list fold.
+-- | Check the ordinary, lifted signature of a right list fold.
 listFoldType :: Type -> Maybe ConstructorCaseType
 listFoldType ty = do
   let (telescope, body) = splitForAllForAllTyBinders ty
-  binders@[first, second] <- traverse ordinaryCaseBinder telescope
+  binders <- traverse ordinaryCaseBinder telescope
   guard (all (isLiftedTypeKind . varType . binderVar) binders)
   (callback, rest) <- caseArrow body
   (seed, rest') <- caseArrow rest
@@ -2241,11 +2241,12 @@ listFoldType ty = do
   (element, callback_rest) <- caseArrow callback
   (state, output) <- caseArrow callback_rest
   (tc, [parameter]) <- caseDatatype list
-  let a = mkTyVarTy (binderVar first)
-      b = mkTyVarTy (binderVar second)
   guard (tc == listTyCon && element `eqType` parameter &&
-         (eqTypes [element, seed] [a, b] || eqTypes [element, seed] [b, a]) &&
          all (eqType seed) [state, output, result])
+  case mkTyVarTys (binderVars binders) of
+    [] -> guard (noFreeVarsOfType element && noFreeVarsOfType seed)
+    [a, b] -> guard (eqTypes [element, seed] [a, b] || eqTypes [element, seed] [b, a])
+    _ -> Nothing
   pure (ConstructorCaseType binders tc [element] [callback, seed, list] 2 result)
 
 -- | Recognize the compiler-generated nominal family for a right list fold.
@@ -2268,7 +2269,8 @@ its operands, or the fold terminate.
 A fold can recurse directly or use a local worker with the callback and
 seed in its scope. The installed list binding uses the local worker.
 Accept only an exact invocation of that worker on the list; the final
-Core may add an eta binder. The same check runs before and after Core
+Core may add an eta binder. A monomorphic fold can use closed lifted
+element and seed types. The same check runs before and after Core
 optimization. In GHCi, read through debugger breakpoints on the empty
 result, the callback application, and the recursive call. The executable
 Core keeps these ticks. Rules that can replace the fold call remain a
@@ -2312,8 +2314,10 @@ directListFold owner original = do
               (CaseApply callback [CaseField head_arg, self]) ])
   where
     directCall expected callback seed tail_arg expr = case Core.collectArgs expr of
-      (Core.Var callee, [Core.Type a, Core.Type b, Core.Var f, Core.Var z, Core.Var xs]) ->
-        callee == owner && eqTypes [a, b] expected && f == callback && z == seed && xs == tail_arg
+      (Core.Var callee, args)
+        | (types, [Core.Var f, Core.Var z, Core.Var xs]) <- span Core.isTypeArg args ->
+            callee == owner && eqTypes (map Core.exprToType types) expected &&
+            f == callback && z == seed && xs == tail_arg
       _ -> False
     localCall worker tail_arg expr = case expr of
       Core.App (Core.Var callee) (Core.Var xs) -> callee == worker && xs == tail_arg
