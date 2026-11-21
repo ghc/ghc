@@ -1083,6 +1083,7 @@ main = do
     observe "use an equality between two constructor fields"
         (readInteriorCount (InteriorCount @Int (error "unused first field") (CountField (type Int) 47)))
     observe "choose a type between two constructor fields" LabelledValueClient.labelledValues
+    observe "choose the types of two successive fields" LabelledValueClient.labelledPair
     observe "duplicate the unrestricted field of a quoted constructor" (QuotedColumn.readQuoted 17)
     observe "recover consecutive GADT constraints" (describePair (PrintablePair False True))
     observe "form an associated family type from its class evidence" constrainedElements
