@@ -8,7 +8,7 @@ module ListVectorClient
 
 import ConservedPartition (Branch, Split, partitionVec)
 import Data.Type.Equality ((:~:)(Refl))
-import GHC.Sigma (Sigma(Pair), first)
+import GHC.Sigma (Sigma(Pair))
 import PackedVecLibrary (CheckedSplit, Nat(..), Vec, appendVec, natToInt, sourceLength, sourceVector,
                          splitAtVecChecked, toList)
 import StoredVector (ListVector, VectorResult)
@@ -23,7 +23,10 @@ contents (Pair n xs) = (natToInt n, toList xs)
 
 -- | Read the length of a family result without demanding its vector.
 familyResultLength :: Nat -> Int
-familyResultLength n = natToInt (first (Pair n (error "unused vector") :: VectorResult True Char))
+familyResultLength n = resultLength (Pair n (error "unused vector"))
+  where
+    resultLength :: VectorResult True Char -> Int
+    resultLength (Pair index _) = natToInt index
 
 -- | Put the elements that pass the predicate first, at the same length.
 regroup :: (a -> Bool) -> Vec a n -> Vec a n

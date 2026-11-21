@@ -265,9 +265,22 @@ type family Pack (select :: Bool) (a :: Type) :: Type where
 ```
 
 An ordinary module imports `Pack` and constructs `Pack True Char` with
-`Pair True (TrueTag 'x')`. It can read the witness with `GHC.Sigma.first`.
-This observation also succeeds with an undefined payload. GHC rejects a
-payload for a different tag at the written payload. An equation that
+`Pair True (TrueTag 'x')`. An ordinary constructor pattern can bind the
+actual stored witness.
+
+```haskell
+size :: Pack True Char -> Bool
+size (Pair tag _) = tag
+```
+
+GHC uses one nominal family reduction to expose the package constructor.
+The equation can return a sum directly or name a synonym for it. The
+pattern demands the outer pair and leaves an ignored payload lazy. A
+lazy tuple pattern inside an ordinary payload field keeps that field lazy.
+A lazy pattern around the whole package still fails. So does a match on
+a stuck family or through a newtype wrapper.
+
+GHC rejects a payload for a different tag at the written payload. An equation that
 uses a binder from another equation fails at that variable's occurrence.
 The regression checks both errors at `-O0` and `-O2`. The client sees
 only the provider's interface during typechecking. An explicit `forall`
