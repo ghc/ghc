@@ -1615,7 +1615,8 @@ normalise_type ty
   = go ty
   where
     go :: Type -> NormM Reduction
-    -- Keep the head identical on both sides; lift only nominal argument evidence.
+    -- Keep the substituted head identical on both sides. An enclosing erased
+    -- binder can have a fresh name. Lift only nominal argument evidence.
     -- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
     go ty@(TermAppTy f arg)
       | Just (domain, _) <- nativeIndexFunctionTys_maybe f
@@ -1627,7 +1628,7 @@ normalise_type ty
            ; case (left, right) of
                (TermAppTy f' _, TermAppTy g' _)
                  | f' == g', isNativeIndexFunctionId f'
-                 , varType f' `eqType` varType f
+                 , varType f' `eqType` varType g'
                  -> do { Reduction co arg' <- withRole Nominal $ go arg
                        ; return $ downgradeRedn role Nominal $
                            mkReduction (mkTermAppCo f' co) (TermAppTy f' arg') }
