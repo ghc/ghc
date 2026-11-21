@@ -634,3 +634,6 @@ test('T27737a', normal, compile, ['-O'])
 test('T27910', grep_errmsg(r'KnownBranch'), compile, ['-O -dno-typeable-binds -ddump-simpl-stats -dsuppress-uniques'])
 test('T27892', grep_errmsg(r'^f = g$'), compile, ['-O -ddump-cse -dsuppress-all -dsuppress-uniques'])
 test('T28095a', grep_errmsg(r'^f = g$'), compile, ['-O -ddump-cse -dsuppress-all -dsuppress-uniques'])
+
+# T28164S: the idea is there should be only one 'case k' in 'step'
+test('T28164S', grep_errmsg(r'case k'), compile, ['-O2 -ddump-simpl'])

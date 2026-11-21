@@ -3785,30 +3785,24 @@ simplAlt env _scrut' imposs_deflt_cons case_bndr' bndr_swap' cont' (Alt DEFAULT 
         ; (floats, rhs') <- simplExprF env' rhs cont'
         ; return (DEFAULT, [], floats, rhs') }
 
-simplAlt env _scrut' _ case_bndr' bndr_swap' cont' (Alt (LitAlt lit) bndrs rhs)
+simplAlt env _scrut' _ case_bndr' bndr_swap' cont' (Alt lit_alt@(LitAlt {}) bndrs rhs)
   = assert (null bndrs) $
-    do  { let env' = addAltUnfoldings env case_bndr' bndr_swap' (Lit lit)
+    do  { let env' = addAltUnfoldings env case_bndr' bndr_swap' lit_alt []
         ; (floats, rhs') <- simplExprF env' rhs cont'
-        ; return (LitAlt lit, [], floats, rhs') }
+        ; return (lit_alt, [], floats, rhs') }
 
-simplAlt env scrut' _ case_bndr' bndr_swap' cont' (Alt (DataAlt con) vs rhs)
+simplAlt env scrut' _ case_bndr' bndr_swap' cont' (Alt data_alt@(DataAlt con) vs rhs)
   = do  { -- See Note [Adding evaluatedness info to pattern-bound variables]
           -- and Note [DataAlt occ info]
         ; let vs_with_info = adjustFieldsIdInfo scrut' case_bndr' bndr_swap' con vs
+        ; (env', vs') <- simplBinders env vs_with_info
           -- Adjust evaluated-ness and occ-info flags before `simplBinders`
           -- because the latter extends the in-scope set, which propagates this
           -- adjusted info to use sites.
 
-        ; (env', vs') <- simplBinders env vs_with_info
-
-                -- Bind the case-binder to (con args)
-        ; let inst_tys' = tyConAppArgs (idType case_bndr')
-              con_app :: OutExpr
-              con_app = mkConApp2 con inst_tys' vs'
-              env''   = addAltUnfoldings env' case_bndr' bndr_swap' con_app
-
+        ; let env'' = addAltUnfoldings env' case_bndr' bndr_swap' data_alt vs'
         ; (floats, rhs') <- simplExprF env'' rhs cont'
-        ; return (DataAlt con, vs', floats, rhs') }
+        ; return (data_alt, vs', floats, rhs') }
 
 {- Note [Adding evaluatedness info to pattern-bound variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3911,12 +3905,17 @@ addDefaultUnfoldings env case_bndr bndr_swap imposs_deflt_cons
          | otherwise = env1
 
 
-addAltUnfoldings :: SimplEnv -> OutId -> BinderSwapDecision -> OutExpr -> SimplEnv
-addAltUnfoldings env case_bndr bndr_swap con_app
+addAltUnfoldings :: SimplEnv -> OutId -> BinderSwapDecision
+                 -> AltCon -> [OutVar] -> SimplEnv
+addAltUnfoldings env case_bndr bndr_swap con bndrs
   = env2
   where
-    con_app_unf = mk_simple_unf con_app
-    env1 = addBinderUnfolding env case_bndr con_app_unf
+    -- Add unfolding for case_bndr
+    -- See #28164
+    env1 | seCaseCase env || null bndrs
+         = addBinderUnfolding env case_bndr con_app_unf
+         | otherwise
+         = env
 
     -- See Note [Add unfolding for scrutinee]
     -- e.g. case (x |> co) of K a b -> blah
@@ -3928,6 +3927,18 @@ addAltUnfoldings env case_bndr bndr_swap con_app
               else mk_simple_unf (mkCastMCo con_app (mkSymMCo mco))
 
          | otherwise = env1
+
+    -- Bind the case-binder to (con args)
+    con_app_unf :: Unfolding
+    con_app_unf = mk_simple_unf con_app
+
+    con_app :: OutExpr
+    con_app = case con of
+          DEFAULT     -> pprPanic "addAltUnfoldings" (ppr case_bndr)
+          LitAlt lit  -> Lit lit
+          DataAlt con -> mkConApp2 con inst_tys bndrs
+            where
+              inst_tys = tyConAppArgs (idType case_bndr)
 
     -- Force the opts, so that the whole SimplEnv isn't retained
     !opts = seUnfoldingOpts env
