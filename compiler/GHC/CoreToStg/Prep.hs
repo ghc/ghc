@@ -1204,6 +1204,11 @@ nameNativeConstructorArgs platform expr
       = do { co <- liftNativeIndexTransport platform "the application result" transport ty
            ; return (wrap (mkCast app (mkSubCo co))) }
     build ty app transport wrap (arg : rest)
+      | DepDictTy dict _ <- coreFullView ty
+      = keep_variable dict
+      | DepFunTy _ binder body <- coreFullView ty
+      , isScopedSelectorReceiver binder body
+      = keep_variable binder
       | DepFunTy _ index body <- coreFullView ty
       , isVacuousRetainedBinder index body
       = apply_argument (varType index) body
@@ -1245,6 +1250,15 @@ nameNativeConstructorArgs platform expr
            ; build (applyTypeToArgs ty [arg]) (App app arg) transport wrap rest }
       | otherwise = pprPanic "nameNativeConstructorArgs: application type" (ppr ty $$ ppr expr)
       where
+        -- The selector records these variables by identity. Do not replace
+        -- either of them with the marker used to name a later constructor.
+        keep_variable binder
+          = do { co <- liftNativeIndexTransport platform "a scoped method argument" transport (varType binder)
+               ; case arg of
+                   Var v | isReflCo co, varType v `eqType` varType binder ->
+                     build (applyTypeToArgs ty [arg]) (App app arg) transport wrap rest
+                   _ -> nativeIndexTransportError "a scoped method argument" }
+
         apply_argument arg_ty res_ty
           = do { co <- liftNativeIndexTransport platform "a later argument" transport arg_ty
                ; let arg' = mkCast arg (mkSymCo (mkSubCo co))
