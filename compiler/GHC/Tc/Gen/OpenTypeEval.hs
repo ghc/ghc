@@ -26,7 +26,7 @@ import GHC.Core.Make (mkCoreBoxedTuple)
 import GHC.Core.Predicate (classMethodInstTy, getClassPredTys_maybe)
 import GHC.Core.Type (Kind, Type, FunTyFlag(FTF_T_T), getTyVar_maybe, isLiftedTypeKind, isManyTy,
                       mkTyConApp, mkTyVarTy, mkVisFunTyManyU, splitForAllForAllTyBinders,
-                      splitFunTy_maybe, splitTyConApp_maybe, typeKind)
+                      splitAppTysNoView, splitFunTy_maybe, splitTyConApp_maybe, typeKind)
 import GHC.Core.Utils (exprType, mkCast)
 import GHC.Core.TyCo.Subst (lookupTyVar, substTy)
 import GHC.Core.Unify (tcMatchTys)
@@ -77,7 +77,7 @@ data OpenTypeFailure
 
 -- | A checked source argument and its lazy constructor fields.
 data OpenArgument
-  = OpenRigid TyVar
+  = OpenRigid TyVar [OpenArgument]
   | OpenGroundType Type
   | OpenPair TyVar TyVar
   | OpenConstructor DataCon [Type] [OpenArgument]
@@ -165,7 +165,9 @@ observeOpenType local_call instantiated result_kind operands
       | otherwise = False
 
     checkedOperand ty
-      | Just skolem <- getTyVar_maybe ty, rigid skolem = Just (OpenRigid skolem)
+      | (head_ty, args) <- splitAppTysNoView ty
+      , Just skolem <- getTyVar_maybe head_ty, rigid skolem
+      = OpenRigid skolem <$> checkArgs (tyVarKind skolem) args
       | Just (tuple, [ka, kb, a, b]) <- splitTyConApp_maybe ty
       , tuple == promotedTupleDataCon Boxed 2
       , all (`tcEqType` liftedTypeKind) [ka, kb]
@@ -188,11 +190,22 @@ observeOpenType local_call instantiated result_kind operands
       = Just (OpenGroundType ty)
       | otherwise = Nothing
 
+    -- Reflect the same unmatchable applications that readback can produce.
+    -- See Note [Readback of a rigid callback application] in GHC.Core.OpenWhnf.
+    checkArgs _ [] = Just []
+    checkArgs kind (arg : rest) = do
+      (FTF_T_T, ma, mult, domain, result) <- splitFunTy_maybe kind
+      guard (ma `tcEqType` unmatchableDataConTy && isManyTy mult && typeKind arg `tcEqType` domain)
+      (:) <$> checkedOperand arg <*> checkArgs result rest
+
     buildArgument (state, args) operand = do
       (state', arg) <- buildOperand state operand
       pure (state', arg : args)
 
-    buildOperand state (OpenRigid skolem) = symbolFor state skolem
+    buildOperand state (OpenRigid skolem args) = do
+      (state', head_expr) <- symbolFor state skolem
+      (final, revArgs) <- foldM buildArgument (state', []) args
+      pure (final, foldl App head_expr (reverse revArgs))
     -- See Note [Ground type operands of local calls].
     buildOperand (symbols, origins) (OpenGroundType ty) = do
       symbol <- freshSymbol liftedTypeKind
@@ -323,8 +336,9 @@ imported worker of the specialized method type.
 The caller records the selector, dictionary, and worker for rule checks
 and recompilation. The observer reads the worker body on demand and
 records any further calls it follows. A method can return a constructor
-without inspecting its callback. A demanded application of a rigid
-callback still stops readback.
+without inspecting its callback. A rigid callback with a type-variable origin
+can also occur in a returned field. The next call can use that field as
+a symbolic input. A case that needs its value remains stuck.
 -}
 
 -- | Read the direct method field of the imported ground dictionary.

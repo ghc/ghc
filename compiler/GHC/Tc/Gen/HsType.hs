@@ -3009,7 +3009,7 @@ tc_app_ty_other mode rn_ty exp_kind
               case table of
                 Just checked -> pure (Just (checkTableMethod fun checked))
                 Nothing | isOpenTypeOperand left
-                        , isOpenTypeOperand right || promotedHead right ->
+                        , isOpenTypeOperand right || promotedReceiver receiver ->
                   fmap (checkOpenMethod fun left receiver) <$> lookupSourceGroundDFun cls domain
                 Nothing -> pure Nothing
             Nothing -> pure Nothing
@@ -3041,9 +3041,10 @@ tc_app_ty_other mode rn_ty exp_kind
           result <- tcObserveOpenTypeCall local name method result_kind [checked_callback, checked_receiver]
           checkExpKind mode rn_ty result result_kind exp_kind
 
-    promotedHead arg = case unLoc (indexed_operand arg) of
-      HsTyVar _ IsPromoted (L _ (WithUserRdr _ name)) -> isDataConName name
-      _ -> False
+    -- An inner checked call can return a constructor as its source type.
+    promotedReceiver ty = case splitTyConApp_maybe ty of
+      Just (tc, _) -> isJust (isPromotedDataCon_maybe tc)
+      Nothing      -> False
 
     -- A retained operand fixes the class parameter for a method of
     -- type a -> a -> a. Check both original operands against its table.

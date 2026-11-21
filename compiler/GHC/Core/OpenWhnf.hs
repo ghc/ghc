@@ -168,7 +168,7 @@ openReadbackM local_families limit obtain local origin visible expected expr =
         case splitFunTy_maybe (typeKind f) of
           Just (FTF_T_T, ma, mult, domain, _)
             | ma `eqType` unmatchableDataConTy, isManyTy mult
-            , exprType operand `eqType` domain -> do
+            , not (isTyCoArg operand), exprType operand `eqType` domain -> do
                 (arg, used'') <- readback used' domain field
                 pure (mkAppTy f arg, used'')
           _ -> opaque
