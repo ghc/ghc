@@ -1017,7 +1017,7 @@ main = do
         (Refl :: LocalOpen.LazyFirst Char Bool :~: Char, LocalOpen.lazyFirst 'x' 'y')
     observe "open erased packages and leave an unused payload lazy"
         ErasedPackage.observation
-    observe "hide an outer witness in an ordinary module"
+    observe "pass an erased package directly to a polymorphic reader"
         (RankedPackageClient.runMixedPackage 17)
     observe "filter a vector without forcing the tail to learn the result length"
         ErasedPackage.filterObservation
