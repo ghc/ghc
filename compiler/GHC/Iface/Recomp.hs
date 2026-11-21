@@ -914,6 +914,11 @@ checkFlagHash hsc_env iface self_recomp = do
           , couldInferLiberalSynonymMatchability (mi_exports iface) (map snd (mi_decls iface)) =
               liftIO $ recheck "Compiler now infers matchability for liberal synonym callbacks"
           | otherwise = pure UpToDate
+        check_source_proof_branches
+          | not (Map.member sourceProofBranchesField (getExtensibleFields (mi_ext_fields iface)))
+          , couldHaveUncheckedSourceProofBranches dflags (mi_hsc_src iface) (map snd (mi_decls iface)) =
+              liftIO $ recheck "Compiler now checks source proof dependencies by family branch"
+          | otherwise = pure UpToDate
         check_home_rule_closures
           | checkRuleClosures dflags iface
           , not (Map.member homeRuleClosuresField (getExtensibleFields (mi_ext_fields iface)))
@@ -938,6 +943,7 @@ checkFlagHash hsc_env iface self_recomp = do
                                      `recompThen` check_nullary_family
                                      `recompThen` check_liberal_synonym
                                      `recompThen` check_mapping
+                                     `recompThen` check_source_proof_branches
                                      `recompThen` check_home_rule_closures)
 
 {- Note [Recompiling liberal synonym callbacks]
@@ -1005,6 +1011,42 @@ mappingField = "checked-container-mapping-v1"
 -- | Record that a potential old synonym provider was checked once.
 liberalSynonymCallbackField :: String
 liberalSynonymCallbackField = "liberal-synonym-callback-v1"
+
+{- Note [Recompiling source proof family branches]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An older compiler can evaluate a method in a closed family equation
+and omit the proof dependencies. The old interface keeps the resulting
+type. A literal equation can produce the same type and the same ABI.
+The module's usages do not identify the source of each equation.
+
+Recheck a home source module once if it enables ExperimentalDependentTypes
+and defines a closed family in the newly checked subset. Single nullary
+equations and synonyms keep their existing formats outside this migration.
+Generated source tables and scoped case families do not enter this check.
+
+Record the review even when there are no dependencies. Include the
+field in the full interface hash so a literal provider writes the new
+review marker. Only actual dependencies change a declaration's ABI.
+An installed interface that omitted dependencies still needs a rebuild
+from its source.
+-}
+
+-- | Mark a home interface reviewed for indexed proof dependencies.
+sourceProofBranchesField :: String
+sourceProofBranchesField = "source-proof-branches-reviewed-v1"
+
+-- | Find user closed families whose equations need the branch check.
+-- See Note [Recompiling source proof family branches].
+couldHaveUncheckedSourceProofBranches :: DynFlags -> HscSource -> [IfaceDecl] -> Bool
+couldHaveUncheckedSourceProofBranches dflags src decls =
+    src == HsSrcFile && xopt LangExt.ExperimentalDependentTypes dflags && any candidate decls
+  where
+    candidate IfaceFamily { ifName = name, ifBinders = binders
+                          , ifFamFlav = IfaceClosedTypeFamilyTyCon
+                              (IfaceClosedTyFamTyCon (Just (_, _ : more))) }
+      = isNothing (sourceTableTermOcc (nameOccName name))
+        && (not (null binders) || not (null more))
+    candidate _ = False
 
 {- Note [Recompiling final Core rule dependencies]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2837,6 +2879,8 @@ addFingerprints hsc_env iface0 = do
                       couldSupplyMapping (mi_exports iface0) (mi_decls iface0)
       stamp_liberal = xopt LangExt.LiberalTypeSynonyms (hsc_dflags hsc_env)
                    && couldInferLiberalSynonymMatchability (mi_exports iface0) (mi_decls iface0)
+      stamp_source_proof_branches = couldHaveUncheckedSourceProofBranches (hsc_dflags hsc_env)
+                                      (mi_hsc_src iface0) (mi_decls iface0)
       iface
         | mi_hsc_src iface0 == HsSrcFile
         , Just info <- mi_self_recomp_info iface0
@@ -2855,6 +2899,7 @@ addFingerprints hsc_env iface0 = do
       checked_fields = [liberalSynonymCallbackField | stamp_liberal]
                     ++ [mappingField | stamp_mapping]
                     ++ [homeRuleClosuresField | stamp_home_rules]
+                    ++ [sourceProofBranchesField | stamp_source_proof_branches]
       checked_hash = foldl' (\fp field -> computeFingerprint putNameLiterally (fp, field))
                             base_hash checked_fields
       !iface_hash = case sourceTableLocations sorted_decls of
