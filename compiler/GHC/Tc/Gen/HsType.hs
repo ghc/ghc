@@ -652,7 +652,7 @@ tcCheckRetainedType allow_function witness_skol = go
               HsTvb _ () (HsBndrVar _ (L _ name)) (HsBndrKind _ domain) ->
                 do { domain_ty <- tcRetainedBinderDomain valid_domain mode domain
                    ; case witness_skol of
-                       Just skol | visible, isLiftedTypeKind domain_ty ->
+                       Just skol | isLiftedTypeKind domain_ty ->
                          -- See Note [Explicit retained Type witnesses].
                          do { tv_name <- newSysName (mkTyVarOccFS (occNameFS (nameOccName name)))
                             ; tv <- newSkolemTyVar skol tv_name liftedTypeKind
@@ -661,8 +661,10 @@ tcCheckRetainedType allow_function witness_skol = go
                                     piResultTys (varType selector) [liftedTypeKind, mkTyVarTy tv]
                             ; body_ty <- tcExtendNameTyVarEnv [(name, tv)] $
                                            check_bndrs mode rest
-                            ; return $ mkInfForAllTy unmatchableDataConTy tv $
-                                       tcMkVisFunTy unmatchableDataConTy ManyTy rep_ty body_ty }
+                            ; let fun_ty | visible = tcMkVisFunTy unmatchableDataConTy ManyTy rep_ty body_ty
+                                         | otherwise = mkDepFunTyWithVis DepFunInvisible
+                                                         (mkLocalId name ManyTy rep_ty) body_ty
+                            ; return (mkInfForAllTy unmatchableDataConTy tv fun_ty) }
                        _ ->
                          do { when (not allow_function && isFunTy domain_ty) $
                                 failWithTc $ TcRnRetainedQuantificationError $
@@ -677,7 +679,7 @@ tcCheckRetainedType allow_function witness_skol = go
 
         visible = hsForEachVisibility ann == DepFunVisible
         valid_domain ty = isNativeRetainedBinderType ty
-                       || (visible && isJust witness_skol && isLiftedTypeKind ty)
+                       || (isJust witness_skol && isLiftedTypeKind ty)
     go mode body kind = tc_check_lhs_type mode body kind
 
 {- Note [Local runtime indices in signatures]
@@ -822,9 +824,14 @@ explicit TypeRep argument. The interface stores the inferred forall and
 ordinary arrow, so a client can read and use them with the extension off.
 The interface does not record the original foreach spelling.
 
-Keep invisible Type binders, constructor telescopes, and retained Type
-binders in general type arguments outside this translation. See the phase
-distinction in GHC proposal #378.
+An invisible `foreach (a :: Type).` uses the same erased binder and an
+invisible runtime TypeRep binder. An explicit operand is still a value.
+Omission constructs the witness using Typeable. See Note [Instantiating a
+retained Type witness] in GHC.Tc.Utils.Instantiate.
+
+Constructor telescopes and retained Type binders in general type arguments
+are outside this translation. See the phase distinction in GHC proposal
+#378.
 -}
 
 {- Note [Exported function-valued retained signatures]

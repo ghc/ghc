@@ -11,7 +11,7 @@
 module GHC.Tc.Utils.Instantiate (
      topSkolemise, topSkolemiseWith, SkolemisePurpose(..),
      skolemiseRequired, tcRuntimeForAllBndrs,
-     topInstantiate,
+     topInstantiate, tcInstInvisibleTypeWitness,
      instCall, instDFunType, instStupidTheta, instTyVarsWith,
      newWanted, newWanteds,
 
@@ -41,7 +41,7 @@ import GHC.Prelude
 import GHC.Driver.Session
 import GHC.Driver.Env
 
-import GHC.Builtin.KnownOccs( rationalTyConOcc )
+import GHC.Builtin.KnownOccs( rationalTyConOcc, typeRepIdOcc )
 import GHC.Builtin.WiredIn.Types( boolTy, eqClass, integerTy, matchabilityTy,
                                 matchableDataConTy, unmatchableDataConTy )
 
@@ -51,9 +51,11 @@ import GHC.Hs.Syn.Type   ( hsLitType )
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import GHC.Core ( Expr(Coercion), isOrphan )
+import qualified GHC.Core as Core
 import GHC.Core.Type
 import GHC.Core.Predicate ( getClassPredTys_maybe )
-import GHC.Core.TyCo.Rep ( Type(TermVarTy), CoercionN )
+import GHC.Core.TyCo.Rep ( Type(DepFunTy, TermVarTy, TyVarTy), CoercionN )
+import GHC.Core.Utils ( isVacuousRetainedBinder )
 import GHC.Core.Coercion ( mkNomReflCo )
 import GHC.Core.TyCo.Ppr ( debugPprType )
 import GHC.Core.TyCo.Subst ( extendSubstInScopeSetFromSource )
@@ -401,6 +403,54 @@ So we simply check for this case and make the right boxing of evidence.
 -}
 
 ----------------
+-- | Instantiate a leading retained TypeRep binder when an ordinary argument
+-- follows or the expected result calls for instantiation.
+-- See Note [Instantiating a retained Type witness].
+tcInstInvisibleTypeWitness :: CtOrigin -> Maybe TcType -> TcType
+                           -> TcM (Maybe (HsWrapper, TcRhoType))
+tcInstInvisibleTypeWitness orig expected actual
+  | DepFunTy DepFunInvisible binder body <- coreFullView actual
+  , Just (tc, tys@[_, _]) <- splitTyConApp_maybe (varType binder)
+  , isVacuousRetainedBinder binder body
+  = do { instantiate <- maybe (pure True) wants_witness expected
+       ; if instantiate then supply_witness tc tys body else pure Nothing }
+  | otherwise = pure Nothing
+  where
+    supply_witness tc tys body
+      = do { selector <- tcLookupKnownOccId typeRepIdOcc
+           ; let (theta, rep) = tcSplitPhiTy (piResultTys (varType selector) tys)
+           ; case splitTyConApp_maybe rep of
+               Just (rep_tc, _) | tc == rep_tc ->
+                 do { wanteds <- mapM (emitWantedEvVar orig) theta
+                    ; let witness = Core.mkApps (Core.mkTyApps (Core.Var selector) tys)
+                                                (map Core.Var wanteds)
+                    ; return (Just (mkWpEvApps [EvExpr witness], body)) }
+               _ -> return Nothing }
+
+    wants_witness ty = case coreFullView tau of
+      DepFunTy DepFunInvisible _ _ -> pure False
+      TyVarTy tv | isMetaTyVar tv ->
+        isFilledMetaTyVar_maybe tv >>= maybe (pure False) wants_witness
+      _ -> pure True
+      where (_, _, tau) = tcSplitSigmaTy ty
+
+{- Note [Instantiating a retained Type witness]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An invisible retained Type binder elaborates to an erased type variable
+and a following runtime TypeRep argument. The result can refer to the type
+variable. It does not refer to the value of the witness.
+
+A following value argument requests instantiation. Subsumption can also
+request it when a known expected type has no invisible retained binder.
+Leave the binder intact when the expected type retains it or has no known
+shape. The witness comes from an ordinary Typeable wanted. The result or
+later arguments can determine its type. During subsumption the wanted is
+emitted inside the expected type's skolem scope, where its Typeable givens
+are available. See Note [Vacuous retained applications] in GHC.Core.Utils.
+-}
+
+----------------
+
 instCall :: CtOrigin -> [TcType] -> TcThetaType -> TcM HsWrapper
 -- Instantiate the constraints of a call
 --      (instCall o tys theta)

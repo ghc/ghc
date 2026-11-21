@@ -1964,8 +1964,12 @@ tc_sub_type_shallow :: (TcType -> TcType -> TcM TcCoercionN)
                     -> TcM HsWrapper
 tc_sub_type_shallow unify inst_orig ty_actual sk_rho
   = do { (wrap, rho_a) <- topInstantiate inst_orig ty_actual
-       ; cow           <- unify_retained_rho unify rho_a sk_rho
-       ; return (mkWpCastN cow <.> wrap) }
+       ; reflected <- tcInstInvisibleTypeWitness inst_orig (Just sk_rho) rho_a
+       ; result_wrap <- case reflected of
+           Just (witness, res) ->
+             (<.> witness) <$> tc_sub_type_shallow unify inst_orig res sk_rho
+           Nothing -> mkWpCastN <$> unify_retained_rho unify rho_a sk_rho
+       ; return (result_wrap <.> wrap) }
 
 {- Note [Retained domains after instantiation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1991,7 +1995,7 @@ unify_retained_rho unify actual expected
   | DepFunTy vis_a b_a _ <- coreFullView actual
   , DepFunTy vis_e b_e _ <- coreFullView expected
   , vis_a == vis_e
-  , isNativeIndexId b_a, isNativeIndexId b_e
+  , isNativeOpaqueValueId b_a, isNativeOpaqueValueId b_e
   , let domain_a = varType b_a
         domain_e = varType b_e
   , not (domain_a `tcEqType` domain_e)
@@ -2512,7 +2516,10 @@ tc_sub_type_deep fun_pos@(tc_fun, pos) ds_depth unify inst_orig ctxt ty_actual t
     go ty_a ty_e =
       do { ty_a' <- unwrap ty_a
          ; ty_e' <- unwrap ty_e
-         ; go1 ty_a' ty_e' }
+         ; reflected <- tcInstInvisibleTypeWitness inst_orig (Just ty_e') ty_a'
+         ; case reflected of
+             Just (witness, res) -> (<.> witness) <$> go res ty_e'
+             Nothing -> go1 ty_a' ty_e' }
 
     -- If ty_actual is not a rho-type, instantiate it first; otherwise
     -- unification has no chance of succeeding.

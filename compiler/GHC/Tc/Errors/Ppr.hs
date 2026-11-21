@@ -3703,7 +3703,7 @@ pprRetainedQuantificationError reason = case reason of
     | isLiftedTypeKind ty ->
       vcat [ text "A retained binder with domain" <+> quotes (text "Type")
                <+> text "is not supported in this position."
-           , text "Use a visible" <+> quotes (text "foreach (a :: Type) ->")
+           , text "Use a retained" <+> quotes (text "foreach (a :: Type)")
                <+> text "binder in a complete value signature,"
            , text "or use an explicit" <+> quotes (text "TypeRep a") <+> text "parameter from"
                <+> quotes (text "Type.Reflection") <> dot ]

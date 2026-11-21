@@ -57,7 +57,7 @@ import GHC.Core.Dependent ( hasNativeDependentExpr, supportsQuickLookType )
 import GHC.Core.FamInstEnv (FamInstEnvs, reduceTyFamApp_maybe)
 import GHC.Core.Make ( mkCharExpr, mkNaturalExpr )
 import GHC.Core.Reduction ( Reduction(..) )
-import GHC.Core.Utils ( applyTypeToArgs, exprType )
+import GHC.Core.Utils ( applyTypeToArgs, exprType, isVacuousRetainedBinder )
 import GHC.Core.FVs ( exprFreeVarsList )
 import GHC.Core.InstEnv ( lookupUniqueInstEnv, instanceDFunId )
 import GHC.Core.Predicate ( classMethodInstTy )
@@ -3529,37 +3529,52 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
 
     -- See Note [Explicit invisible retained arguments].
     go1 plan fun_orig pos acc fun_ty (ERetainedArg _ loc _ arg _ _ : rest_args)
-      = do { (binder, (operand, runtime_arg)) <-
+      | DepFunTy DepFunInvisible binder body <- coreFullView fun_ty
+      = do { (runtime_arg, res_ty, arg_co) <-
                addArgCtxt (pos + count written_prefix_arg acc) rn_head arg $
-               case coreFullView fun_ty of
-                 DepFunTy DepFunInvisible binder _ ->
-                   (binder,) <$> tcRetainedOperand binder arg
-                 _ -> failWithTc
-                        (TcRnRetainedQuantificationError (RetainedExplicitArgument fun_ty))
-           ; res_ty <- retainedAppResult fun_ty binder operand
-           ; arg_co <- retainedVariableCast operand runtime_arg
-           ; let checked = ERetainedArg DepFunInvisible loc (Scaled ManyTy (varType binder)) runtime_arg res_ty
-                                            arg_co
+               if isVacuousRetainedBinder binder body
+               then return (arg, body, Nothing)
+               else do { (operand, runtime_arg) <- tcRetainedOperand binder arg
+                       ; res <- retainedAppResult fun_ty binder operand
+                       ; co <- retainedVariableCast operand runtime_arg
+                       ; return (runtime_arg, res, co) }
+           ; let checked = ERetainedArg DepFunInvisible loc (Scaled ManyTy (varType binder))
+                                        runtime_arg res_ty arg_co
            ; go plan fun_orig pos (checked : acc) res_ty rest_args }
+      | otherwise = addArgCtxt (pos + count written_prefix_arg acc) rn_head arg $
+                    failWithTc (TcRnRetainedQuantificationError (RetainedExplicitArgument fun_ty))
 
     -- See Note [Inferring an invisible retained argument].
     go1 plan fun_orig pos acc fun_ty args@(EValArg { ea_arg = first } : _)
       | DepFunTy DepFunInvisible binder body <- coreFullView fun_ty
-      = do { InvisibleOperand operand record_usage <- addArgCtxt (pos + count written_prefix_arg acc) rn_head first $
-                 do { selected <- tcInferInvisibleRetained [] binder body
-                                    [arg | EValArg { ea_arg = arg } <- args]
-                    ; case selected of
-                        Just (actual, _) -> return actual
-                        Nothing -> failWithTc (TcRnRetainedQuantificationError
-                                                (RetainedInvisibleArgument binder)) }
-           ; tcScalingUsage ManyTy record_usage
-           ; let wrap = mkWpEvApps [EvExpr operand]
-           ; go plan fun_orig pos (addArgWrap wrap acc) (applyTypeToArgs fun_ty [operand]) args }
+      = do { reflected <- tcInstInvisibleTypeWitness fun_orig Nothing fun_ty
+           ; case reflected of
+               Just (wrap, res) -> go plan fun_orig pos (addArgWrap wrap acc) res args
+               Nothing -> infer_index binder body }
+      where
+        infer_index binder body
+          = do { InvisibleOperand operand record_usage <- addArgCtxt (pos + count written_prefix_arg acc) rn_head first $
+                   do { selected <- tcInferInvisibleRetained [] binder body
+                                      [arg | EValArg { ea_arg = arg } <- args]
+                      ; case selected of
+                          Just (actual, _) -> return actual
+                          Nothing -> failWithTc (TcRnRetainedQuantificationError
+                                                  (RetainedInvisibleArgument binder)) }
+               ; tcScalingUsage ManyTy record_usage
+               ; let wrap = mkWpEvApps [EvExpr operand]
+               ; go plan fun_orig pos (addArgWrap wrap acc) (applyTypeToArgs fun_ty [operand]) args }
 
     -- Rule IRESULT from Fig 4 of the QL paper; no more arguments
-    go1 plan _fun_orig _pos acc fun_ty []
+    go1 plan fun_orig pos acc fun_ty []
        | Just (_ : _) <- plan
        = pprPanic "tcInstFun: unused retained instantiations" (ppr plan)
+       | inst_final
+       , DepFunTy DepFunInvisible _ _ <- coreFullView fun_ty
+       , Just expected <- expected_rho
+       = do { reflected <- tcInstInvisibleTypeWitness fun_orig (Just expected) fun_ty
+            ; case reflected of
+                Just (wrap, res) -> go plan fun_orig pos (addArgWrap wrap acc) res []
+                Nothing -> return (reverse acc, fun_ty) }
        | XExpr (ConLikeTc (RealDataCon dc)) <- tc_fun
        , isNewDataCon dc
        , [Scaled _ orig_arg_ty] <- dataConOrigArgTys dc
@@ -4596,11 +4611,13 @@ syntax. See docs/dependent-haskell/REFERENCES.md#invisible-retained-binders-next
 
 Instantiate preceding erased foralls and dictionaries before consuming the
 invisible retained binder. Declaration advice can choose erased arguments.
-Substitute the written operand, resolved by the same rules as a visible
-retained argument. An inferred operand cannot replace it. Check the original
-expression at the binder's domain and multiplicity Many exactly once. Store
-the substituted result type in HsAppRetained. Desugar its expression to a
-runtime value application.
+When the result mentions the binder, resolve the written operand by the same
+index rules as a visible retained argument and substitute it into the result.
+A vacuous binder needs only a checked runtime argument. See Note [Vacuous
+retained applications] in GHC.Core.Utils. An inferred operand cannot replace
+the written one. Check the expression at the binder's domain and multiplicity
+Many exactly once. Store the result type in HsAppRetained and desugar the
+operand to a runtime value application.
 
 Keep the written visibility in ERetainedArg and HsAppRetained. A visible
 operand uses ordinary value checking. Its stored result type keeps later
