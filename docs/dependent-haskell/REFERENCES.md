@@ -7186,6 +7186,16 @@ each other. See Note [Mixed-flavour family rewrite cycles] in
 [GHC's injective families](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_families.html#injective-type-families)
 and [Agda 2.8.0 on injectivity](https://agda.readthedocs.io/en/v2.8.0/language/pragmas.html#the-injective-pragma).
 
+### A list indexed by its contents
+
+Agda's `inspect` supplies an equality between a computed expression and
+its result. The Haskell example stores a runtime list `ys` with evidence
+`xs :~: ys`. At construction, `Refl` checks that the expression for the
+stored list matches the public index `xs`. Reading the list can leave the
+evidence and the list elements unevaluated.
+[Agda propositional equality](https://agda.github.io/agda-stdlib/v2.4/Relation.Binary.PropositionalEquality.html)
+and [indexed list example](examples/open-evaluation/IndexedPrefix.hs).
+
 ### Index an ordinary list at its source length
 
 Serokell's opening example bounds a list position by the length of the

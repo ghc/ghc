@@ -205,7 +205,11 @@ The constructor result has the enclosing telescope scope. A witness
 bound inside a field cannot escape into that result. The usual retained
 constructor restriction requires the erased quantifiers to name the
 datatype parameters. It rejects a constructor result indexed by one
-of its retained arguments.
+of its retained arguments. A public index parameter can still describe
+the exact stored value. For example, the constructor
+`CheckedList :: foreach (ys :: [Bool]) -> (xs :~: ys) -> CheckedList xs`
+stores the runtime list `ys`. Constructing it with `Refl` checks the
+public index `xs` against that list. [Indexed list](../examples/open-evaluation/IndexedPrefix.hs).
 [Agda 2.8.0 telescopes](https://agda.readthedocs.io/en/v2.8.0/language/telescopes.html).
 [Interface and demand test](../../../testsuite/tests/dependent/should_run/NativeGadtRetainedSum.sh).
 

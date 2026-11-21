@@ -1289,6 +1289,22 @@ rejected head stays undefined.
 [regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledDropWhile.sh),
 and [Agda's prefix and suffix law](../REFERENCES.md#ending-a-list-prefix-at-a-decision).
 
+### A runtime list at its exact contents
+
+`negatedCons` prepends a Boolean and preserves the caller's tail in the index.
+
+```haskell
+negatedCons :: foreach (b :: Bool) -> foreach (bs :: [Bool]) -> CheckedList (not b ': bs)
+negatedCons b bs = CheckedList (not b : bs) Refl
+```
+
+An ordinary caller can read the first cell without evaluating the tail.
+Testing for an empty list also leaves the head unevaluated. Changing the
+result index to `b ': bs` gives `GHC-83865` at the call to `negatedCons`
+because `not b` cannot match an unknown `b`.
+[Source](../examples/open-evaluation/IndexedPrefix.hs)
+and [equality witness](../REFERENCES.md#a-list-indexed-by-its-contents).
+
 ### Project and rejoin a guarded split
 
 The ordinary proof can put the checked prefix and suffix in a promoted
