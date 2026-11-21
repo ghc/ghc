@@ -188,3 +188,11 @@ field types infer `b`. The consumer uses each dictionary in its field
 pattern. The [source-hidden TH test](../../../testsuite/tests/gadt/GadtLeadingRequiredTh.hs)
 also reifies and splices the declaration. It checks that the partial
 application is lazy and that supplying the last field forces it.
+
+The interface header marks two orders that earlier readers reject. These
+are an existential binder in the interior-context format and a binder
+group after a leading context and before the first value field. The
+`extended-ordered-gadt-telescope` marker lets an earlier reader reject
+the interface before it starts an external Template Haskell splice.
+The existing payload encodings stay the same.
+[Writer and reader test](../../../testsuite/tests/gadt/GadtExtendedOrderedWire.sh).
