@@ -161,6 +161,7 @@ split the appended vector at its first length: ([True],[False,False])
 split a vector with a proof of its original contents: (([True,False],[True],[True,False,True]),([True,True],[True]))
 check a runtime cut and prove the original contents: [Just (1,[True],[False],[True,False]),Nothing]
 recover the checked predecessor of a finite position: ((Nothing,Just 1),(True,False,True,True))
+pass zero and a written successor to a retained function: (Just 1,True)
 take and drop at the first runtime length: ([True],[False,False])
 prove the runtime vector is VNil in the empty branch: (True,False)
 check a runtime cut against a vector length: (Just (1,[True],[False]),Nothing)

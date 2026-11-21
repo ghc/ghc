@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, ScopedTypeVariables, TypeApplications #-}
-module FinitePositionClient (lookupVecViaView, observeFinitePosition) where
+module FinitePositionClient (lookupVecViaView, observeFinitePosition, observeConstructedViews) where
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Data.IORef (newIORef, readIORef)
 import Data.Type.Equality ((:~:)(Refl))
@@ -50,3 +50,14 @@ observeFinitePosition = do
     let demanded = either ((== "forced position") . takeWhile (/= '\n') . displayException) (const False) raised
     pure ((position (FZ :: Fin ('S 'Z)), position i),
           (isZero (FZ :: Fin ('S 'Z)), isZero (FS bad), lazy (FS bad), demanded))
+
+-- | Read a position and recover it from a written successor constructor.
+observeConstructedViews :: IO (Maybe Int, Bool)
+observeConstructedViews = do
+    positionFromIO <- newIORef (FS FZ :: Fin ('S ('S 'Z))) >>= readIORef
+    let firstAndSucc :: Fin n -> (Bool, Maybe Int)
+        firstAndSucc i = case constructedViews i of
+            (AtZero, AtSucc (Pair p Refl)) -> (True, Just (rank p))
+            _ -> (False, Nothing)
+    pure (snd (firstAndSucc positionFromIO),
+          fst (firstAndSucc (error "forced predecessor" :: Fin ('S 'Z))))

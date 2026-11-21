@@ -1,0 +1,11 @@
+NativeIndexOperandFamily.hs:17:13: error: [GHC-83865]
+    • Couldn't match type ‘y’ with ‘x’
+      Expected: Proxy (Hide x)
+        Actual: Proxy (Hide y)
+    • In the expression: retain @(Width p) (Hide y)
+      In an equation for ‘wrong’: wrong x y = retain @(Width p) (Hide y)
+    • Relevant bindings include
+        y :: Proxy p (bound at NativeIndexOperandFamily.hs:17:9)
+        x :: Proxy p (bound at NativeIndexOperandFamily.hs:17:7)
+        wrong :: foreach (x :: Proxy p) -> Proxy p -> Proxy (Hide x)
+          (bound at NativeIndexOperandFamily.hs:17:1)

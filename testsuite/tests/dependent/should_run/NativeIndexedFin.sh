@@ -23,13 +23,15 @@ for opt in -O0 -O1 -O2; do
 module Main where
 import Data.IORef (newIORef, readIORef)
 import Data.Maybe (isJust)
-import FinitePositionClient (lookupVecViaView, observeFinitePosition)
+import FinitePositionClient (lookupVecViaView, observeConstructedViews, observeFinitePosition)
 import PackedVecLibrary (Nat(..), Vec(..))
 import ParameterizedIndexLibrary (indexVec, lookupVecChecked, mkFinVec)
 
 main :: IO ()
 main = do
     observeFinitePosition >>= print
+    views <- observeConstructedViews
+    if views == (Just 1, True) then pure () else fail (show views)
     positions <- newIORef [minBound, -1, 0, 1, 2, 3, maxBound] >>= readIORef
     let cells = VCons (7 :: Int) (VCons 9 (VCons 13 VNil))
         other = VCons (11 :: Int) (VCons 19 (VCons 23 VNil))
@@ -65,3 +67,24 @@ if "${ghc[@]}" -O0 -ferror-spans -c DifferentPredecessor.hs >reject.log 2>&1; th
     exit 1
 fi
 grep -F 'DifferentPredecessor.hs:6:13-16: error:' reject.log >/dev/null
+
+# A previous reader can still read a vector operand with the original shape.
+cp "$src"/{NativeGeneralGadtOperandProvider,NativeIndexedOperandWire}.hs .
+"${ghc[@]}" -O2 -c NativeGeneralGadtOperandProvider.hs NativeIndexedOperandWire.hs
+"${ghc[@]}" --show-iface NativeGeneralGadtOperandProvider.hi > new-wire.log
+grep -Fq 'general-indexed-constructor-operand' new-wire.log
+"${ghc[@]}" --show-iface NativeIndexedOperandWire.hi > vector-wire.log
+grep -Fq 'indexed-constructor-operand' vector-wire.log
+if grep -Fq 'general-indexed-constructor-operand' vector-wire.log; then
+    echo 'Wrote the extended operand header for a vector'
+    exit 1
+fi
+if [[ $# -ge 3 ]]; then
+    "$3" "-B$2" --show-iface NativeIndexedOperandWire.hi > old-vector.log
+    if "$3" "-B$2" --show-iface NativeGeneralGadtOperandProvider.hi > old-fields.log 2>&1; then
+        echo 'Previous reader accepted the new operand header'
+        exit 1
+    fi
+    grep -Fq 'mismatched interface file versions' old-fields.log
+    grep -Fq 'general-indexed-constructor-operand' old-fields.log
+fi

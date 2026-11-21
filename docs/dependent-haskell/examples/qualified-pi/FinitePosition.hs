@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables, StandaloneKindSignatures, TypeApplications, TypeOperators #-}
-module FinitePosition (FinView(..), viewFin) where
+module FinitePosition (FinView(..), viewFin, constructedViews) where
 
 import Data.Kind (Type)
 import Data.Type.Equality ((:~:)(Refl))
@@ -23,3 +23,8 @@ viewFin i = case i of
     FS p -> let proof :: 'FS p :~: 'FS p
                 proof = Refl
             in AtSucc @_ @('FS p) (Pair p proof)
+
+-- | View the first position and the successor of the supplied position.
+{-# INLINE constructedViews #-}
+constructedViews :: forall n. foreach (p :: Fin n) -> (FinView ('FZ @n), FinView ('FS p))
+constructedViews p = (viewFin @('S n) FZ, viewFin @('S n) (FS p))
