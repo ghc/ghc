@@ -397,18 +397,20 @@ for opt in 0 2; do
     done
 done
 
-# Open a package once around a lazy local tuple binding.
+# Open a package once and keep the tuple binding's demand.
 for opt in 0 2; do
     mkdir -p "$out/lexical-let-$opt/"{provider,client}
     cd "$out/lexical-let-$opt/provider"
     let_flags=("${flags[@]}" "-O$opt")
     "$ghc" "${let_flags[@]}" -c "$src/LexicalLetProvider.hs" -outputdir .
     cd ../client
-    cp ../provider/LexicalLetProvider.hi "$src/"{LexicalLetMain,LexicalLetReject}.hs .
-    "$ghc" "${let_flags[@]}" -c LexicalLetMain.hs
-    "$ghc" "${let_flags[@]}" LexicalLetMain.o ../provider/LexicalLetProvider.o -o run
+    cp ../provider/LexicalLetProvider.hi "$src/"{LexicalLetMain,LexicalLetReject,LexicalBangLet,LexicalStrictLet}.hs \
+        "$src/"{LexicalStrictLetReject,LexicalLinearLetReject}.hs .
+    "$ghc" "${let_flags[@]}" -c LexicalBangLet.hs LexicalStrictLet.hs LexicalLetMain.hs
+    "$ghc" "${let_flags[@]}" LexicalLetMain.o LexicalBangLet.o LexicalStrictLet.o ../provider/LexicalLetProvider.o -o run
     ./run >lexical-let.out
-    printf '%s\n' '((1,1),(98,98),77)' "(True,(True,98),(True,'x'))" |
+    printf '%s\n' '((1,1),(98,98),77)' "(True,(True,98),(True,'x'))" \
+        '(["True","bottom package","bottom package","True"],77,77,98)' |
         diff -u - lexical-let.out
     if "$ghc" "${let_flags[@]}" -c LexicalLetReject.hs >lexical-let-reject.log 2>&1; then
         echo "LexicalLetReject unexpectedly compiled." >&2
@@ -420,4 +422,24 @@ for opt in 0 2; do
         { cat lexical-let-reject.log >&2; exit 1; }
     grep -Eq "^LexicalLetReject.hs:$join_line:16: error: \[GHC-25897\]" lexical-let-reject.log ||
         { cat lexical-let-reject.log >&2; exit 1; }
+    if "$ghc" "${let_flags[@]}" -c LexicalStrictLetReject.hs >strict-let-reject.log 2>&1; then
+        echo "LexicalStrictLetReject unexpectedly compiled." >&2
+        exit 1
+    fi
+    for escape in escapeTilde escapeBang escapeStrict; do
+        field=$(grep -n "^${escape} package =" LexicalStrictLetReject.hs)
+        line=${field%%:*}
+        prefix=${field#*:}
+        prefix=${prefix%value}
+        column=$((${#prefix} + 1))
+        grep -Eq "^LexicalStrictLetReject.hs:$line:$column: error: \[GHC-25897\]" strict-let-reject.log ||
+            { cat strict-let-reject.log >&2; exit 1; }
+    done
+    if "$ghc" "${let_flags[@]}" -c LexicalLinearLetReject.hs >linear-let-reject.log 2>&1; then
+        echo "LexicalLinearLetReject unexpectedly compiled." >&2
+        exit 1
+    fi
+    line=$(grep -n '^readLinear package =' LexicalLinearLetReject.hs | cut -d: -f1)
+    grep -Eq "^LexicalLinearLetReject.hs:$line:12: error: \[GHC-18872\]" linear-let-reject.log ||
+        { cat linear-let-reject.log >&2; exit 1; }
 done

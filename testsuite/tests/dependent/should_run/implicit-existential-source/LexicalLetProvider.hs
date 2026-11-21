@@ -1,5 +1,8 @@
-{-# LANGUAGE ExperimentalDependentTypes #-}
-module LexicalLetProvider (HiddenPayload, producePayload, lazyPayload) where
+{-# LANGUAGE ExperimentalDependentTypes, LinearTypes #-}
+module LexicalLetProvider
+  ( HiddenPayload, producePayload, lazyPayload, bottomPayload
+  , LinearPayload
+  ) where
 
 type HiddenPayload = exists a. (a, a -> Int)
 
@@ -10,3 +13,8 @@ producePayload False = ('b', fromEnum)
 
 lazyPayload :: HiddenPayload
 lazyPayload = (error "unused payload field" :: Bool, const 77)
+
+bottomPayload :: Bool -> HiddenPayload
+bottomPayload _ = error "bottom package"
+
+type LinearPayload = exists a. (a, a %1 -> Int)

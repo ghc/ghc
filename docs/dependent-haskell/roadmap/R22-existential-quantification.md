@@ -309,21 +309,43 @@ body. The result type stays outside that scope. Returning `value` at
 a caller-chosen type fails at the returned field. Fields from separate
 openings keep separate witnesses.
 
-The binding stays lazy and shares both fields of its RHS. A consumer
-can ignore a bottom package. The normal local binding checker handles
-pattern typing, usage, and generalization. A local identity function
-in the body still works at two types. The Showcase client reads an
+The ordinary local binding checker handles pattern typing, usage,
+and generalization. A local identity function in the body still
+works at two types. The binding shares its RHS across both fields.
+The Showcase client reads an
 `Int` and a `Char` with their respective callbacks on the two runtime
 branches.
 
+Without `Strict`, a plain tuple binding or `~(value, reader)` can
+ignore a bottom package. With `Strict`, the outer tilde still keeps
+the binding lazy. An explicit `!(value, reader)` or the `Strict` default
+forces the package to a tuple before evaluating the body. This force
+leaves the fields lazy. Demand leaves the witness scope unchanged.
+A caller can return the fields in another erased package with a closed
+result type. This opening consumes the package at `Many`. A linear
+strict binding needs a package opening that can bind a linear payload.
+
+The ordinary strict binding below accepts its input at `%1`:
+```haskell
+readPlain :: (Bool, Bool %1 -> Int) %1 -> Int
+readPlain pair = let !(value, reader) = pair in reader value
+```
+With `LinearPayload = exists a. (a, a %1 -> Int)`, the same definition
+at `LinearPayload %1 -> Int` reports GHC-18872 on the package input.
+Both controls use `LinearTypes`, `MonoLocalBinds`, and `BangPatterns`.
+The Core `Unpack` binder is currently unrestricted. Accepting the linear
+source call without changing this invariant fails linear Core Lint.
+
 This path accepts one unsigned nonrecursive boxed tuple binding with
-variable or wildcard fields and `Strict` off. The unguarded RHS must
-be a name or ordinary application whose declaration exposes the dot
-package. The usual binding rules still apply to recursive groups,
-signed bindings, and patterns that bring their own evidence.
+variable or wildcard fields and at most one outer bang or tilde. The
+unguarded RHS must be a name or ordinary application whose declaration
+exposes the dot package. The usual binding rules still apply to
+recursive groups, signed bindings, and patterns that bring their own
+evidence.
 [Ordinary client](../examples/erased-existentials/RankedPackageClient.hs),
 [source-hidden regression](../../../testsuite/tests/dependent/should_run/NativeImplicitExistential.sh),
-and [GHC's existential constructor restrictions](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/existential_quantification.html#restrictions).
+[GHC's existential constructor restrictions](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/existential_quantification.html#restrictions),
+and [GHC's strict binding rules](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/strict.html).
 
 ### Repeated uses of a local package
 

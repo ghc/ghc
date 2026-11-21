@@ -1281,19 +1281,17 @@ tcExpr e res_ty
            Just hse -> tcHsExpansion hse res_ty
            Nothing  -> pprPanic "tcExpr: unhandled case:" (ppr e) }
 
--- | Open a dot package for one lazy local pattern binding and its body.
+-- | Open a dot package for one local pattern binding and its body.
 -- See Note [Scope for a local erased package pattern].
 tcLexicalExistsLet :: HsExpr GhcRn -> LHsLocalBinds GhcRn -> LHsExpr GhcRn
                    -> ExpRhoType -> TcM (Maybe (HsExpr GhcTc))
 tcLexicalExistsLet original (L bind_loc (HsValBinds ann (XValBindsLR (HsVBG groups [])))) body expected
   | [(NonRecursive, [L pat_bind_loc binding@PatBind
       { pat_lhs = pat, pat_mods = [], pat_rhs = grhss }])] <- groups
-  , plain_tuple pat
+  , tuple_pattern pat
   , GRHSs { grhssGRHSs = L rhs_loc (GRHS rhs_ann [] rhs) NE.:| []
           , grhssLocalBinds = L _ EmptyLocalBinds{} } <- grhss
   = runMaybeT $ do
-      strict <- liftMaybeT (xoptM LangExt.Strict)
-      guard (not strict)
       schema <- MaybeT (tcDeclaredOperandResult rhs)
       case coreFullView schema of
         ExistsTy ImplicitExists _ _ -> guard (matchesImplicitPayloadPat schema pat)
@@ -1308,11 +1306,22 @@ tcLexicalExistsLet original (L bind_loc (HsValBinds ann (XValBindsLR (HsVBG grou
                 { pat_ext = extendNameSet (pat_ext binding) name
                 , pat_rhs = grhss { grhssGRHSs = L rhs_loc (GRHS rhs_ann [] replacement) NE.:| [] } }
               scope = HsValBinds ann (XValBindsLR (HsVBG [(NonRecursive, [L pat_bind_loc binding'])] []))
-          (decls, body') <- tcExtendIdEnv [payload] $
-            tcLocalBinds scope (tcMonoLExpr body (mkCheckExpType result_ty))
+          (usage, (decls, body')) <- tcCollectingUsage $
+            tcExtendIdEnv [payload] $
+              tcLocalBinds scope (tcMonoLExpr body (mkCheckExpType result_ty))
+          let (payload_use, body_usage) = popUE usage payload
+          case payload_use of
+            MUsage mult -> void (unifyType Nothing mult ManyTy)
+            _ -> return ()
+          tcEmitBindingUsage body_usage
           return (HsLet noExtField (L bind_loc decls) body')
         return (mkExpandedExprTc original opened)
   where
+    tuple_pattern (L _ (ParPat _ nested)) = tuple_pattern nested
+    tuple_pattern (L _ (LazyPat _ nested)) = plain_tuple nested
+    tuple_pattern (L _ (BangPat _ nested)) = plain_tuple nested
+    tuple_pattern pat = plain_tuple pat
+
     plain_tuple (L _ (ParPat _ nested)) = plain_tuple nested
     plain_tuple (L _ (TuplePat _ fields Boxed)) = all plain_field fields
     plain_tuple _ = False
@@ -1333,12 +1342,23 @@ binding and check its usage. Include the payload Id in the binding's
 free variables, since it carries the local witness. Keep the result type
 outside the opening.
 
-The package opening is lazy. The ordinary binding still determines when
-to match the tuple and how to share its fields. Restrict this entry to an
-unsigned singleton nonrecursive binding with an unguarded RHS. Accept a
-boxed tuple of variables or wildcards with Strict off. A recursive group,
-a signature, or a pattern with its own evidence needs a separate rule.
-See also Note [Typechecking pattern bindings] in GHC.Tc.Gen.Bind.
+The opening is lazy for every pattern. Keep the source pattern so ordinary
+desugaring determines whether the binding forces the tuple before its body.
+A source bang or the Strict default forces the tuple to WHNF. A source
+tilde keeps it lazy, including under Strict. See Note [decideBangHood]
+in GHC.HsToCore.Utils. The type of the complete let cannot mention the
+hidden witness in any of these cases.
+
+Unpack binds an unrestricted payload. Check the original package and
+the synthetic pattern RHS at Many. An ordinary strict binding can infer
+linear use, but then its Core case needs a linear scrutinee. The
+unrestricted Unpack binder cannot serve as that scrutinee. Delete the
+synthetic Id from the usage environment before leaving the opening.
+
+Restrict this entry to an unsigned singleton nonrecursive binding with
+an unguarded RHS, and a boxed tuple of variables or wildcards with at most
+one outer bang or tilde. A recursive group, a signature, or a pattern
+with its own evidence needs a separate rule. See also Note [Typechecking pattern bindings] in GHC.Tc.Gen.Bind.
 -}
 
 -- | Elaborate a nonrecursive index definition through dependent application.

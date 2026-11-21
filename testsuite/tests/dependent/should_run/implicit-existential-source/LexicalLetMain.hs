@@ -1,7 +1,10 @@
 {-# LANGUAGE NoExperimentalDependentTypes #-}
 module Main where
 
+import Control.Exception (ErrorCall(..), evaluate, try)
 import Data.IORef
+import LexicalBangLet
+import LexicalStrictLet
 import LexicalLetProvider
 
 readPayload :: HiddenPayload -> Int
@@ -26,6 +29,13 @@ ordinaryTuple =
   let (identity, _) = (id, ())
   in (identity True, identity 'x')
 
+observeDemand :: Bool -> IO String
+observeDemand value = do
+  result <- try (evaluate value)
+  case result of
+    Left (ErrorCall problem) -> pure problem
+    Right answer -> pure (show answer)
+
 main :: IO ()
 main = do
   flag <- newIORef True
@@ -34,3 +44,7 @@ main = do
   second <- readIORef flag
   print (readTwice first, readTwice second, readPayload lazyPayload)
   print (ignorePayload (error "unused package"), localPolymorphism (producePayload second), ordinaryTuple)
+  demand <- traverse observeDemand [ignoreTilde first, ignoreBang first,
+                                   ignoreStrict first, ignoreStrictTilde first]
+  print (demand, readBangField, readStrictField,
+         readPayload (repackStrict (producePayload second)))

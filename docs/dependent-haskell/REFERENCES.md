@@ -3302,6 +3302,17 @@ The witness cannot leave the complete let expression.
 [GHC User's Guide, existential restrictions](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/existential_quantification.html#restrictions)
 and [paper, figure 9](https://richarde.dev/papers/2021/exists/exists.pdf#page=19).
 
+Agda allows a local record pattern to bind fields through projections.
+For its dependent pair, the second field's type mentions the first.
+Agda inlines local bindings during type checking. GHC retains the
+original local pattern binding for demand and sharing. Its
+`decideBangHood` implements the outer strict default and the explicit
+lazy override. The fork keeps the witness scope the same for either
+demand choice.
+[Agda record let patterns](https://agda.readthedocs.io/en/v2.8.0/language/let-and-where.html#let-binding-record-patterns),
+[Agda dependent pairs](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#the-s-type),
+and [GHC bang-pattern desugaring](https://github.com/ghc/ghc/blob/master/compiler/GHC/HsToCore/Utils.hs#L910).
+
 Agda checks the clauses of an indexed function against its telescope.
 GHC keeps its ordinary match group for equations on a packaged argument.
 It opens the hidden indices before checking the payload patterns in that
