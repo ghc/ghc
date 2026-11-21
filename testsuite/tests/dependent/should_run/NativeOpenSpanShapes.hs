@@ -1,5 +1,11 @@
+{-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -fwrite-source-equations #-}
-module NativeOpenSpanShapes (lazySpan, strictSpan) where
+module NativeOpenSpanShapes (Shape, lazySpan, strictSpan) where
+
+import Data.Kind (Type)
+
+type family Shape where
+    Shape = Type -> Type
 
 lazySpan :: (a -> Bool) -> [a] -> ([a], [a])
 lazySpan _ [] = ([], [])

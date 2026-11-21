@@ -21,6 +21,8 @@ files+=(SpanShapeSource.hs)
 "${ghc[@]}" --show-iface NativeOpenSpanShapes.hi >SpanShapes.iface
 grep -Fxq '  FinalCoreSourceTable T:lazySpan' SpanShapes.iface
 if grep -Fq 'T:strictSpan' SpanShapes.iface; then exit 1; fi
+"${ghc[@]}" -O2 "${stripped[@]}" -v1 -c NativeOpenSpanShapes.hs >span-warm.log 2>&1
+grep -Fxq 'compilation IS NOT required' span-warm.log || { cat span-warm.log >&2; exit 1; }
 
 cd "$out/client"
 cp ../provider/*.hi "$src"/Prelude{DropWhileProof,SpanProof}.hs .

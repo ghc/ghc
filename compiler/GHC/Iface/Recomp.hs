@@ -620,7 +620,7 @@ checkFlagHash hsc_env iface self_recomp = do
         -- See Note [Recompiling nullary closed arrow families].
         nullary_candidate = mi_hsc_src iface == HsSrcFile &&
                            couldInferNullaryClosedMatchability (map snd (mi_decls iface))
-        list_fps = [reverse_fp, fold_fp, fold_method_fp, monomorphic_fold_fp]
+        list_fps = [reverse_fp, fold_fp, fold_method_fp, monomorphic_fold_fp, guarded_pair_fp]
         nullary_base_fps = new_fp : list_fps
                         ++ [stamp fp | Just (stamp, _) <- [source_provider], fp <- list_fps]
                         ++ [guardedPrefixFingerprint reverse_fp
