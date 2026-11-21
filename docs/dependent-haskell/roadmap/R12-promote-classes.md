@@ -196,10 +196,10 @@ for dictionary applications. Earlier private formats used tags 19 and
 20 for that application. Readers reject an unknown Core format in the
 header. Signature-only interfaces keep their existing marker.
 
-The reload test puts a character, a `Natural`, and a dictionary
-application in one optimized provider. A Template Haskell splice
+The reload test puts a character, a `Natural`, a dictionary application,
+and a data family constructor operand in one optimized provider. A Template Haskell splice
 loads its serialized Core through the provider interface. The expected
-result is `(True,[955,0,128578],23)`.
+result is `(True,[955,0,128578],23,True)`.
 [Reload test](../../../testsuite/tests/dependent/should_run/NativeScopedDictionaryCoreReload.sh).
 
 

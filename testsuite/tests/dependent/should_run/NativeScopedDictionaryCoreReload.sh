@@ -83,9 +83,18 @@ done
 mkdir -p "$out/unicode"/{producer,client}
 cd "$out/unicode/producer"
 cat >Characters.hs <<'HS'
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
-module Characters (Stored(..), store, Counted(..), count) where
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, RoleAnnotations, TypeFamilies #-}
+module Characters (Stored(..), store, Counted(..), count, Switch(Switch), StoredSwitch(..), mark) where
 import Numeric.Natural (Natural)
+
+data family Switch a
+data instance Switch Bool = Switch Bool
+
+type role StoredSwitch nominal
+data StoredSwitch (p :: Switch Bool) = StoredSwitch Bool
+{-# NOINLINE mark #-}
+mark :: foreach (p :: Switch Bool) -> StoredSwitch p
+mark p = case p of Switch b -> StoredSwitch b
 
 data Counted (n :: Natural) = Counted Natural
 {-# NOINLINE count #-}
@@ -99,8 +108,12 @@ store :: foreach (c :: Char) -> Stored c
 store c = Stored c
 HS
 "${ghc[@]}" -O0 -dynamic-too -fomit-interface-pragmas -c Characters.hs
-sed -e '/^    ) where/a import Characters (Stored(..), store, Counted(..), count)' -e 's/, observe, observeBoth,/, word, amount, observe, observeBoth,/' "$src/ScopedDictionaryProvider.hs" > Provider.hs
+sed -e '/^    ) where/a import Characters (Stored(..), store, Counted(..), count, Switch(Switch), StoredSwitch(..), mark)' -e 's/, observe, observeBoth,/, word, amount, checkedFlag, observe, observeBoth,/' "$src/ScopedDictionaryProvider.hs" > Provider.hs
 cat >>Provider.hs <<'HS'
+{-# INLINE checkedFlag #-}
+checkedFlag :: () -> Bool
+checkedFlag _ = case mark (Switch True) of StoredSwitch b -> b
+
 {-# INLINE amount #-}
 amount :: () -> Integer
 amount _ = case count 23 of Counted n -> toInteger n
@@ -113,23 +126,23 @@ word _ = [ case store 'λ' of Stored c -> c
 HS
 "${ghc[@]}" -O2 -DSCOPED_DICTIONARY_EXPORT -fwrite-if-simplified-core -c Provider.hs
 "${ghc[@]}" --show-iface Provider.hi >show
-grep -Eq '^ *got .*retained-char-operand\+retained-natural-operand\+experimental-scoped-dictionary\+experimental-scoped-dictionary-core-v3$' show
+grep -Eq '^ *got .*retained-char-operand\+retained-natural-operand\+experimental-scoped-dictionary\+experimental-scoped-dictionary-core-v3\+retained-data-family-constructor-operand$' show
 check_old_reader
 cd ../client
 cp ../producer/Provider.hi ../producer/Characters.*o ../producer/Characters.*hi .
 cat >Main.hs <<'HS'
 {-# LANGUAGE TemplateHaskell #-}
 module Main where
-import Provider (observe, word, amount)
+import Provider (observe, word, amount, checkedFlag)
 import Language.Haskell.TH.Syntax (lift)
-result :: (Bool, [Int], Integer)
-result = $(lift (observe True, map fromEnum (word ()), amount ()))
+result :: (Bool, [Int], Integer, Bool)
+result = $(lift (observe True, map fromEnum (word ()), amount (), checkedFlag ()))
 main :: IO ()
 main = print result
 HS
 "${ghc[@]}" -O0 -fprefer-byte-code -fignore-interface-pragmas -c Main.hs
 "${ghc[@]}" Main.o -o read-core
-test "$(./read-core)" = '(True,[955,0,128578],23)'
+test "$(./read-core)" = '(True,[955,0,128578],23,True)'
 
 # Reification has no TH.Type form for the exact scoped dictionary.
 mkdir "$out/reify"
