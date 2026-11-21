@@ -75,7 +75,7 @@ module Language.Haskell.TH(
     -- quotations (@[| |]@) and splices (@$( ... )@)
 
     -- ** Declarations
-        Dec(..), Con(..), Clause(..),
+        Dec(..), Con(..), RetainedGadtArg(..), Clause(..),
         SourceUnpackedness(..), SourceStrictness(..), DecidedStrictness(..),
         Bang(..), Strict, Foreign(..), Callconv(..), Safety(..), Pragma(..),
         Inline(..), RuleMatch(..), Phases(..), RuleBndr(..), AnnTarget(..),
