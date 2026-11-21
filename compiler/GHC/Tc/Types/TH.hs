@@ -19,13 +19,13 @@ module GHC.Tc.Types.TH (
 import GHC.Prelude
 import GHCi.RemoteTypes
 import qualified GHC.Boot.TH.Monad  as TH
+import GHC.Tc.Types.BasicTypes ( LexicalGivens )
 import GHC.Tc.Types.Evidence
 import GHC.Utils.Outputable
 import GHC.Tc.Types.TcRef
 import GHC.Tc.Types.Constraint
 import GHC.Hs.Expr ( PendingTcSplice, PendingRnSplice )
 import GHC.Types.ThLevelIndex
-import GHC.Types.Var ( EvVar )
 
 ---------------------------
 -- Template Haskell stages and levels
@@ -72,7 +72,7 @@ data PendingStuff
   | TcPending                     -- Typechecking the inside of a typed bracket
       (TcRef [PendingTcSplice])   --   Accumulate pending splices here
       (TcRef WantedConstraints)   --     and type constraints here
-      [EvVar]                    -- Lexical Givens from outside the bracket.
+      LexicalGivens              -- Lexical Givens from outside the bracket.
                                   -- Restore these when checking nested splices.
       QuoteWrapper                -- A type variable and evidence variable
                                   -- for the overall monad of

@@ -480,8 +480,9 @@ checkConstrainedSignature ctxt ty
   = pure ()
   | checks_domain ctxt
   = do { givens <- getLexicalGivens
+       ; premises <- getPartialSigPredicates >>= newEvVars
        ; (_, wanted) <- captureConstraints $
-           checkConstraints (SigSkol ctxt ty []) [] givens (check_telescope ctxt ty)
+           checkConstraints (SigSkol ctxt ty []) [] (premises ++ givens) (check_telescope ctxt ty)
        ; (unsolved, _) <- runTcS (solveWanteds wanted)
        ; reportAllUnsolved unsolved }
   | otherwise

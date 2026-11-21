@@ -557,7 +557,8 @@ tcExprSig expr sig@(TcPartialSig (PSig { psig_name = name, psig_loc = loc }))
     do { (tclvl, wanted, (expr', sig_inst))
              <- pushLevelAndCaptureConstraints  $
                 do { sig_inst <- tcInstSig RetrySigCalls sig
-                   ; expr' <- tcExtendNameTyVarEnv (mapSnd (binderVar . snd) $ sig_inst_skols sig_inst) $
+                   ; expr' <- tcWithPartialSigContext sig_inst $
+                              tcExtendNameTyVarEnv (mapSnd (binderVar . snd) $ sig_inst_skols sig_inst) $
                               tcExtendNameTyVarEnv (sig_inst_wcs   sig_inst) $
                               tcCheckPolyExprNC expr (sig_inst_tau sig_inst)
                    ; return (expr', sig_inst) }
