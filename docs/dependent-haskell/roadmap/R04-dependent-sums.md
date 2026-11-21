@@ -213,6 +213,14 @@ public index `xs` against that list. [Indexed list](../examples/open-evaluation/
 [Agda 2.8.0 telescopes](https://agda.readthedocs.io/en/v2.8.0/language/telescopes.html).
 [Interface and demand test](../../../testsuite/tests/dependent/should_run/NativeGadtRetainedSum.sh).
 
+An ordinary caller can use `withElements` to match the stored `Refl`.
+The match gives the callback `xs ~ ys` and leaves both fields of the
+list unevaluated. Agda's `inspect` similarly keeps the equality between
+a computed expression and the result abstracted by `with`.
+[Client](../examples/open-evaluation/IndexedPrefixClient.hs),
+[source-hidden check](../examples/open-evaluation/check-source.sh),
+and [Agda's inspect idiom](../REFERENCES.md#a-list-indexed-by-its-contents).
+
 Agda's dependent pair uses the stored first component to type the
 second field. The GHC newtype wraps that pair as a whole.
 [Agda's dependent pair](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#the-s-type).

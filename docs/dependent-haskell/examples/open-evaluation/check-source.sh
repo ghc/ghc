@@ -126,6 +126,25 @@ HS
     done
 )
 
+# Check the list index equality with the provider source hidden.
+cp "$src/IndexedPrefix.hs" producer/
+cp "$src/IndexedPrefixClient.hs" consumer/
+(cd producer && "${ghc[@]}" -c IndexedPrefix.hs)
+cp producer/IndexedPrefix.hi artifacts/
+cat >consumer/RunIndexedPrefix.hs <<'HS'
+module Main where
+import IndexedPrefixClient (matchIndex)
+
+main :: IO ()
+main = matchIndex >>= print
+HS
+(
+    cd consumer
+    "${ghc[@]}" -i. -i../artifacts -c IndexedPrefixClient.hs RunIndexedPrefix.hs
+    "${ghc[@]}" RunIndexedPrefix.o IndexedPrefixClient.o ../producer/IndexedPrefix.o -o indexed-prefix
+    [[ $(./indexed-prefix) == True ]]
+)
+
 # A certified identity still supports ordinary symbolic calls with rules on.
 mkdir optimized
 cat >optimized/UnfoldedIdentity.hs <<'HS'
