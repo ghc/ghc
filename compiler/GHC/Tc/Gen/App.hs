@@ -4021,6 +4021,9 @@ tcRetainedExpectedInst :: QLFlag -> ExpRhoType -> [HsExprArg 'TcpRn]
                        -> TcM (HsExpr GhcTc, TcSigmaType)
 tcRetainedExpectedInst do_ql expected args fun sigma
   = do { matched <- tcRetainedResultInst do_ql expected_rho args fun sigma
+       ; matched <- case matched of
+           Just _ -> return matched
+           Nothing -> tcRetainedResultIndexCast do_ql expected_rho args fun sigma
        ; case matched of
            Just (_, body)
              | XExpr (ConLikeTc (RealDataCon _)) <- fun
