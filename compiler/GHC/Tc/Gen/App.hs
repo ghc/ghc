@@ -55,6 +55,7 @@ import GHC.Core.DataCon ( dataConConcreteTyVars, dataConFullSig, dataConName, is
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr, supportsQuickLookType )
 import GHC.Core.FamInstEnv (FamInstEnvs, reduceTyFamApp_maybe)
+import GHC.Core.Make ( mkCharExpr )
 import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.Utils ( applyTypeToArgs, exprType )
 import GHC.Core.FVs ( exprFreeVarsList )
@@ -71,7 +72,7 @@ import GHC.Core.UsageEnv ( UsageEnv, singleUsageUE, zeroUE )
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom (coAxiomBranches, coAxBranchLHS, coAxBranchRHS, coAxBranchCoVars, fromBranches)
 
-import GHC.Builtin.WiredIn.Types ( multiplicityTy, runtimeRepTy, nilDataCon, consDataCon, mkListTy, unmatchableDataConTy )
+import GHC.Builtin.WiredIn.Types ( charTy, multiplicityTy, runtimeRepTy, nilDataCon, consDataCon, mkListTy, unmatchableDataConTy )
 import GHC.Builtin.PrimOps( tagToEnumKey )
 import GHC.Builtin.KnownKeys
 
@@ -1782,6 +1783,7 @@ tcRetainedDeclaredArgType :: (Type -> TcM Type) -> LHsExpr GhcRn -> TcM (Maybe T
 tcRetainedDeclaredArgType view (L _ (HsPar _ arg)) = tcRetainedDeclaredArgType view arg
 tcRetainedDeclaredArgType view (L _ (ExplicitList _ fields))
   = fmap (fmap mkListTy) (tcRetainedListElementType (tcRetainedDeclaredArgType view) fields)
+tcRetainedDeclaredArgType _ (L _ (HsLit _ HsChar{})) = return (Just charTy)
 tcRetainedDeclaredArgType view_type (L loc (HsVar _ lname))
   | not (isDataOcc (nameOccName (unLocWithUserRdr lname)))
   = setSrcSpan (locA loc) $
@@ -3928,6 +3930,9 @@ tcRetainedArg domain arg
           XExpr (ExpandedThingRn (HSE ctxt arg)) -> do
             (core, arg') <- resolve env expected arg
             return (core, L loc (XExpr (ExpandedThingRn (HSE ctxt arg'))))
+          HsLit _ (HsChar _ c)
+            | charTy `tcEqType` expected
+            -> return (mkCharExpr c, original)
           HsOverLit _ (OverLit OverLitRn{ol_from_fun = L _ from} (HsIntegral lit))
             | let n = il_value lit, n >= 0
             -> do { (core, generated) <- tcRetainedNumeral expected from n

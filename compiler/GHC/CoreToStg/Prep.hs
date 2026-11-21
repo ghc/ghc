@@ -1211,22 +1211,27 @@ nameNativeIndexArg result_ty arg
   | otherwise = nativeIndexTransportError "an unsupported retained argument"
   where
     name_constructor normal index
+      | Just _ <- isCharLitTy index
+      -- See Note [Boxed character literal indices] in GHC.Core.
+      = name_value normal normal (mkNomReflCo index) id
       | Just (con, tys, build, fields) <- nativeConFields_maybe normal
       , not (null fields) || isNativeConstructedGadtIndex index
       = do { (scrut, field_co, wrap_fields) <-
                  nameNativeConFields result_ty con tys build fields
-           ; let scrut_index = coercionLKind field_co
-           ; value <- mkSysLocalM (fsLit "retained_arg") ManyTy (exprType normal)
-           ; proof <- mkSysLocalOrCoVarM (fsLit "retained_alias") ManyTy
-                        (mkNomEqPred (TermVarTy value) scrut_index)
-           ; let co = mkTransCo (mkCoVarCo proof) field_co
-                 wrap body = wrap_fields $
-                   Case scrut value result_ty [Alt DEFAULT [proof] body]
-           ; assertPpr (coercionRKind co `eqType` index) (ppr co $$ ppr arg) $
-               return (Var value, co, wrap) }
+           ; assertPpr (coercionRKind field_co `eqType` index) (ppr field_co $$ ppr arg) $
+                name_value normal scrut field_co wrap_fields }
       | (Var _, args) <- collectArgs normal, all isTypeArg args
       = return (normal, mkNomReflCo index, id)
       | otherwise = nativeIndexTransportError "an unsupported normalized retained argument"
+
+    name_value normal scrut field_co wrap_fields
+      = do { value <- mkSysLocalM (fsLit "retained_arg") ManyTy (exprType normal)
+           ; proof <- mkSysLocalOrCoVarM (fsLit "retained_alias") ManyTy
+                        (mkNomEqPred (TermVarTy value) (coercionLKind field_co))
+           ; let co = mkTransCo (mkCoVarCo proof) field_co
+                 wrap body = wrap_fields $
+                   Case scrut value result_ty [Alt DEFAULT [proof] body]
+           ; return (Var value, co, wrap) }
 
 -- | Split a checked constructor application into its promotion arguments and builder.
 -- See Note [Naming fields of a dependent case scrutinee].
@@ -1670,6 +1675,7 @@ cpeApp top_env expr
           prepare_computation (Type ty) = Type (cpSubstTy env ty)
           prepare_computation (Coercion co) = Coercion (cpSubstCo env co)
           prepare_computation (Var v) = lookupCorePrepEnv env v
+          prepare_computation literal@(Lit LitChar{}) = literal
           prepare_computation e = pprPanic "CorePrep: malformed retained computation" (ppr e)
 
       AIApp arg -> do

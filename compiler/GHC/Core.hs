@@ -114,12 +114,12 @@ import GHC.Core.Type
 import GHC.Core.TyCo.Compare ( eqType )
 import GHC.Core.TyCo.Rep ( Type(TermVarTy, TermAppTy, TyConApp, CastTy), Coercion(SubCo), Scaled(..) )
 import qualified GHC.Core.TyCo.Subst as TyCoSubst
-import GHC.Builtin.KnownKeys ( boolTyConKey )
+import GHC.Builtin.KnownKeys ( boolTyConKey, charDataConKey )
 import GHC.Core.Coercion
 import GHC.Core.Rules.Config ( RuleOpts )
 import GHC.Core.DataCon
 import GHC.Core.TyCon ( isPromotedDataCon_maybe, isVanillaAlgTyCon, isBoxedDataTyCon,
-                        tyConTyVars, tyConResKind, tyConKind )
+                        tyConTyVars, tyConResKind, tyConKind, tyConSingleDataCon_maybe )
 import GHC.Unit.Module
 
 import GHC.Types.InlinePragma
@@ -2782,6 +2782,7 @@ exprToNativeCaseIndex (Var v)
 exprToNativeCaseIndex expr
   | Just index <- exprToNativeIndex expr
   , isNativeIndexType (typeKind index) || isNativeCaseValueIndex index
+    || isJust (isCharLitTy index)
   = Just index
   | otherwise = Nothing
 
@@ -2814,6 +2815,11 @@ nativeIndexExprWith allow_conversions extra = go emptyVarEnv
   where
     go :: IdEnv (CoreExpr, Type) -> CoreExpr -> Maybe (CoreExpr, Type)
     go env expr
+      -- See Note [Boxed character literal indices].
+      | App (Var worker) (Lit (LitChar c)) <- expr
+      , Just con <- isDataConWorkId_maybe worker
+      , con `hasKey` charDataConKey
+      = Just (expr, mkCharLitTy c)
       | Var v <- expr, isNativeOpaqueValueId v
       = case lookupVarEnv env v of
           Just result@(_, index)
@@ -3028,6 +3034,11 @@ mapNativeIndex subst expr
          Nothing -> pprPanic "mapNativeIndex: unsupported substituted index" (ppr index')
   | otherwise = expr
   where
+    from_index ty
+      | Just c <- isCharLitTy ty
+      , TyConApp tc [] <- typeKind ty
+      , Just con <- tyConSingleDataCon_maybe tc
+      = Just (mkConApp con [mkCharLit c])
     from_index (TermVarTy v)
       | isNativeOpaqueValueId v = Just (Var v)
     from_index (CastTy index delta)
@@ -3050,6 +3061,21 @@ mapNativeIndex subst expr
       = do { values <- traverse from_index fields
            ; return (mkConApp con (map Type tys ++ values)) }
     from_index _ = Nothing
+
+{- Note [Boxed character literal indices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained character literal has the ordinary runtime form C# (LitChar c).
+Recover the existing DataKinds CharTyLit from that exact wired-in worker
+application. Keep LitChar at its existing Char# field type. The index
+belongs to the boxed Char. To rebuild the literal, get the single
+constructor of the literal's kind, which is the wired-in Char type.
+
+The same boxed form can be a leaf of a retained constructor tree. Use the
+inverse mapping when substituting an index. CorePrep can name the boxed
+literal with ordinary alias evidence because the boxed value is already
+in weak head normal form. The alias case leaves other constructor fields
+lazy.
+-}
 
 -- | Instantiate the constructor wrapper from its known result domain.
 -- See Note [Indexed GADT constructor operands].
@@ -3343,12 +3369,14 @@ isNativeIndexAliasAlt :: CoreAlt -> Bool
 isNativeIndexAliasAlt (Alt DEFAULT args _) = any isCoVar args
 isNativeIndexAliasAlt _ = False
 
--- | Check the binder of a structural alias or an alias for a known GADT application.
--- See Note [Indexed GADT constructor operands].
+-- | Check the binder of an alias for a supported runtime index.
+-- See Notes [Indexed GADT constructor operands] and [Boxed character literal indices].
 isNativeIndexAliasBinder :: CoreExpr -> Id -> Bool
 isNativeIndexAliasBinder expr binder = isNativeIndexId binder
   || (isNativeOpaqueValueId binder &&
-      maybe False isNativeConstructedGadtIndex (exprToNativeCaseIndex expr))
+      maybe False boxed_index (exprToNativeCaseIndex expr))
+  where
+    boxed_index index = isNativeConstructedGadtIndex index || isJust (isCharLitTy index)
 
 -- | Convert a Boolean argument through the restricted frontend index language.
 exprToBoolIndex :: CoreExpr -> Maybe Type
