@@ -8,6 +8,7 @@
 - [x] Match an existential field followed directly by a constructor context.
 - [x] Match a second field under a context placed between two prefix fields.
 - [x] Place a specified forall between two prefix fields, including existential binders.
+- [x] Repeat the specified forall and field groups.
 - [ ] Support the remaining orders of fields, contexts, and quantifiers in prefix constructors.
 
 The [Showcase](../Showcase.hs) defines a constructor with fields of
@@ -86,3 +87,14 @@ A declaration quote or reification uses `RetainedGadtC` for the
 prefix and stores the specified forall and final field in its
 `Type` suffix. This keeps the prefix bang and the final field's
 multiplicity when the declaration is spliced.
+
+A prefix constructor can repeat the specified forall and field group.
+In `Parcel :: !Int -> forall a. a -> forall a. a -> Parcel`,
+the two `a` binders are distinct. The
+[client](../../../testsuite/tests/gadt/GadtRepeatedForAll.hs)
+supplies different types for the two binders. It also checks that the
+strict first field is forced at saturation and that matching leaves
+its unused lazy siblings unevaluated. The
+[TH test](../../../testsuite/tests/gadt/GadtRepeatedForAllTh.hs)
+quotes and reifies multiple groups and splices them with their
+original type variable scope and field multiplicities.

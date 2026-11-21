@@ -161,3 +161,9 @@ test('GadtInteriorForAllTh',
      [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal']),
       extra_files(['GadtInteriorForAllProvider.hs', 'TerminalGadtTh.sh'])],
      run_command, ['bash TerminalGadtTh.sh "{compiler}" "{libdir}" GadtInteriorForAllTh GadtInteriorForAllProvider'])
+test('GadtRepeatedForAll', extra_files(['GadtRepeatedForAllProvider.hs']),
+     makefile_test, [])
+test('GadtRepeatedForAllTh',
+     [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal']),
+      extra_files(['GadtRepeatedForAllProvider.hs', 'TerminalGadtTh.sh'])],
+     run_command, ['bash TerminalGadtTh.sh "{compiler}" "{libdir}" GadtRepeatedForAllTh GadtRepeatedForAllProvider'])
