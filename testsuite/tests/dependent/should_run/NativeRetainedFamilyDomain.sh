@@ -11,7 +11,7 @@ cp "$src/ConstrainedElements.hs" .
 cd client
 cp ../ConstrainedElements.hi "$src/ConstrainedElementsClient.hs" "$src/NativeRetainedFamilyDomain.hs" .
 "${ghc[@]}" -c ConstrainedElementsClient.hs
-for mode in WRONG_TAG LATE_GIVEN MISSING; do
+for mode in WRONG_TAG LATE_GIVEN CALLBACK_ESCAPE CALLBACK_MISSING MISSING; do
     if "${ghc[@]}" -fforce-recomp "-D$mode" -fdefer-type-errors -c NativeRetainedFamilyDomain.hs > failure 2>&1; then
         echo "Accepted $mode"
         exit 1
@@ -25,6 +25,8 @@ for mode in WRONG_TAG LATE_GIVEN MISSING; do
             grep -A3 'bound by the type signature for:' failure | grep -Fq 'foreach (a :: Bool)'
             ;;
         LATE_GIVEN) grep -Fq "Collects (FieldKey 'False)" failure ;;
+        CALLBACK_ESCAPE) grep -Fq 'Collects a' failure ;;
+        CALLBACK_MISSING) grep -Fq 'Collects c' failure ;;
         MISSING) grep -Fq 'Collects (FieldKey tag)' failure ;;
     esac
 done

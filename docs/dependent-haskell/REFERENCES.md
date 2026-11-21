@@ -47,7 +47,10 @@ for the requested type. For the fork's retained `foreach`, this means
 that a dictionary for `FieldKey tag` becomes available after the flag
 and its class constraint. It can justify the dependent result and later
 arguments. GHC's constraint solver also checks the ordinary module that
-opens the GADT and calls the function.
+opens the GADT and calls the function. If an ordinary arrow accepts a
+higher-rank callback, the callback's class context applies within its
+argument type. It does not supply evidence to the surrounding result.
+[GHC higher-rank arguments](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/rank_polymorphism.html),
 [Morris and Eisenberg, §4.2](https://richarde.dev/papers/2017/partiality/partiality.pdf),
 [Agda instance candidates](https://agda.readthedocs.io/en/v2.8.0/language/instance-arguments.html)
 and [retained field example](roadmap/R24-constrained-type-families.md#family-domains-under-a-retained-binder).

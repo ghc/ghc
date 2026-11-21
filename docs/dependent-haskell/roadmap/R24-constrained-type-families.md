@@ -234,8 +234,15 @@ provides the dictionary, the element and its renderer. The client calls
 A predicate for flag `a` cannot justify an element for flag `b`. A
 predicate to the right of an arrow cannot justify a family application
 in its argument. Both signatures report GHC-39999, including with deferred
-term errors. A higher-rank callback with its own family constraint still
-requires a separate formation check.
+term errors.
+
+A callback can also bring its own domain. The ordinary client supplies
+a formatter to `withField`. The callback accepts any `c :: Type` with a
+`Collects c` instance. It receives that field's element and renderer.
+Its local `Collects c` checks the family applications inside the callback.
+Leaving it out fails at the signature. Moving a use outside the callback
+requires independent evidence there.
+
 [Provider](../examples/open-evaluation/ConstrainedElements.hs),
 [ordinary client](../examples/open-evaluation/ConstrainedElementsClient.hs)
 and [scope regression](../../../testsuite/tests/dependent/should_run/NativeRetainedFamilyDomain.hs).

@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, FlexibleContexts, TypeFamilies #-}
+{-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, FlexibleContexts, RankNTypes, ScopedTypeVariables, TypeFamilies #-}
 module NativeRetainedFamilyDomain where
 
 import ConstrainedElements (Collects(..), FieldKey)
@@ -12,6 +12,12 @@ different _ _ = Proxy
 earlier :: Proxy (Elem (FieldKey 'False))
         -> foreach (b :: Bool) -> Collects (FieldKey 'False) => Proxy b
 earlier _ _ = Proxy
+#elif defined(CALLBACK_ESCAPE)
+escape :: forall a. (Collects a => Proxy (Elem a)) -> Proxy (Elem a)
+escape _ = Proxy
+#elif defined(CALLBACK_MISSING)
+unqualified :: (forall c. Proxy c -> Elem c -> Elem c) -> Bool
+unqualified _ = True
 #else
 missing :: foreach (tag :: Bool) -> Proxy (Elem (FieldKey tag))
 missing _ = Proxy
