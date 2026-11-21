@@ -1,8 +1,9 @@
 {-# LANGUAGE DataKinds, ExplicitNamespaces, RequiredTypeArguments, TypeApplications #-}
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes, ScopedTypeVariables, TypeFamilies, TypeOperators #-}
-module ConstrainedElementsClient (constrainedElements, annotatedElement, explicitElements, renderField, formatField, renderKnownFields) where
+module ConstrainedElementsClient (constrainedElements, annotatedElement, explicitElements, renderField, formatField, renderKnownFields, retainedMaybeDomain) where
 
-import ConstrainedElements (Collects(..), FieldKey, Field(..), applyField, field, withField)
+import ConstrainedElements (Collects(..), FieldKey, Field(..), applyField, field, withField, reflectMaybe)
+import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
@@ -62,3 +63,18 @@ renderKnown (type _) render value = render value
 -- | Use two class instances in a module with ordinary required type arguments.
 renderKnownFields :: (String, String)
 renderKnownFields = (renderKnown (type [Bool]) show True, renderKnown (type (FieldKey 'True)) (: []) 'x')
+
+-- | Use the polymorphic proof with two runtime constructors and an unused bottom.
+retainedMaybeDomain :: IO (Maybe Bool, Maybe Bool, Bool)
+retainedMaybeDomain = do
+    ref <- newIORef (Just False)
+    first <- checked <$> readIORef ref
+    writeIORef ref Nothing
+    second <- checked <$> readIORef ref
+    pure (first, second, quiet (error "forced Maybe index"))
+  where
+    checked :: Maybe Bool -> Maybe Bool
+    checked x = case reflectMaybe x of Refl -> x
+
+    quiet :: Maybe Bool -> Bool
+    quiet x = case reflectMaybe x of Refl -> True

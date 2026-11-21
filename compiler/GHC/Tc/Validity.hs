@@ -56,6 +56,7 @@ import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Core.TyCon.Set (emptyTyConSet, elemTyConSet, extendTyConSet)
 import GHC.Core.Predicate
+import GHC.Core.Reduction ( Reduction(..), mkReflRedn, mkReduction, mkFunRedn, mkForAllRedn )
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr
@@ -79,7 +80,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Var     ( Id, ExistsTyFlag(ImplicitExists), VarBndr(..)
                         , isInvisibleFunArg, isVisibleFunArg, mkTyVar, tyVarName
-                        , isId, isCoVar, varType )
+                        , isId, isCoVar, varType, setVarType )
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing ( TyThing(..) )
@@ -457,7 +458,7 @@ checkValidMonoType :: Type -> TcM ()
 -- Assumes argument is fully zonked
 checkValidMonoType = check_valid_mono_type Nothing
 
-check_valid_mono_type :: Maybe SkolemInfoAnon -> Type -> TcM ()
+check_valid_mono_type :: Maybe (SkolemInfoAnon, CoercionN -> TcM ()) -> Type -> TcM ()
 check_valid_mono_type instance_pat ty
   = do { env <- liftZonkM $ tcInitOpenTidyEnv (tyCoVarsOfTypeList ty)
        ; expand <- initialExpandMode
@@ -497,19 +498,26 @@ checkConstrainedSignature ctxt ty
     -- See Note [Family domains beneath retained binders].
     check_telescope origin whole = go whole
       where
-        go sig
-          | (bndrs, phi) <- tcSplitForAllTyVarBinders sig
-          , let (theta, rho) = tcSplitPhiTy phi
-          , not (null bndrs && null theta)
-          = do { let tvs = map (binderVar . snd) bndrs
-                     in_scope = mkInScopeSet (tyCoVarsOfType sig)
-               ; traverse_ checkNoConstrainedFamilyApps (map fst bndrs ++ map varType tvs ++ theta)
-               ; rec { skol_info <- mkSkolemInfo origin_info
-                     ; (subst, skols) <- tcInstSkolTyVarsX skol_info (mkEmptySubst in_scope) tvs
-                     ; let origin_info = SigSkol origin whole (map tyVarName tvs `zip` skols) }
-               ; given <- newEvVars (substTheta subst theta)
-               ; void $ checkConstraints origin_info skols given (go (substTy subst rho)) }
-          | otherwise = check_body sig
+        go sig = case written_prefix sig of
+          ([], [], body) -> check_body body
+          (bndrs, theta, body) -> mdo
+            info <- mkSkolemInfo sig_skol
+            let tvs = map snd bndrs
+                in_scope = mkInScopeSet (tyCoVarsOfType sig)
+            (subst, skolems) <- tcInstSkolTyVarsX info (mkEmptySubst in_scope) tvs
+            let sig_skol = SigSkol origin whole (zip (map tyVarName tvs) skolems)
+            traverse_ checkNoConstrainedFamilyApps (map fst bndrs ++ map varType tvs)
+            traverse_ checkNoConstrainedFamilyApps theta
+            given <- newEvVars (substTheta subst theta)
+            void $ checkConstraints sig_skol skolems given (check_body (substTy subst body))
+
+        -- Stop at a synonym so that check_part sees its written arguments.
+        written_prefix (ForAllTy ma (Bndr tv _) rest)
+          = let (bndrs, theta, body) = written_prefix rest in ((ma, tv) : bndrs, theta, body)
+        written_prefix (FunTy af _ _ pred_ty rest)
+          | isInvisibleFunArg af
+          = let (tvs, theta, body) = written_prefix rest in (tvs, pred_ty : theta, body)
+        written_prefix rest = ([], [], rest)
 
         check_body (DepFunTy _ index body)
           = do { check_part (varType index)
@@ -529,8 +537,10 @@ checkConstrainedSignature ctxt ty
                  failWithTc $ TcRnConstrainedFamilyUnsupported fam $
                    text "This occurrence comes from a type synonym definition." }
 
-    checkNested rho
-      | isSigmaTy rho = checkNoConstrainedFamilyApps rho
+    checkNested rho@(ForAllTy _ (Bndr _ vis) _)
+      | isInvisibleForAllTyFlag vis = checkNoConstrainedFamilyApps rho
+    checkNested rho@(FunTy af _ _ _ _)
+      | isInvisibleFunArg af = checkNoConstrainedFamilyApps rho
     checkNested (FunTy _ _ _ a b) = checkNested a >> checkNested b
     checkNested (TyConApp _ args) = traverse_ checkNested args
     checkNested (AppTy f a) = checkNested f >> checkNested a
@@ -539,25 +549,47 @@ checkConstrainedSignature ctxt ty
     checkNested ty@ExistsTy{} = checkNoConstrainedFamilyApps ty
     checkNested _ = pure ()
 
-    emit_domain fam args
-      | Just parent <- tyConAssoc_maybe fam
-      , Just cls <- tyConClass_maybe parent
-      , args `lengthIs` tyConArity fam
-      , let env = zipVarEnv (tyConTyVars fam) args
-      , Just class_args <- traverse (lookupVarEnv env) (classTyVars cls)
-      = do { ev <- newWanted (OccurrenceOf (tyConName fam)) (Just TypeLevel)
-                             (mkClassPred cls class_args)
-           ; emitSimple (mkNonCanonical ev) }
-      | otherwise =
-        failWithTc $ TcRnConstrainedFamilyUnsupported fam $
-          text "The family must be fully applied at this occurrence."
+    emit_domain fam args = case associatedFamilyDomain fam args of
+      Left reason -> failWithTc (TcRnConstrainedFamilyUnsupported fam reason)
+      Right pred_ty -> do
+        ev <- newWanted (OccurrenceOf (tyConName fam)) (Just TypeLevel) pred_ty
+        emitSimple (mkNonCanonical ev)
+
+-- | Recover the owner predicate from the supplied family arguments.
+-- See Note [Associated family domain arguments].
+associatedFamilyDomain :: TyCon -> [Type] -> Either SDoc PredType
+associatedFamilyDomain fam args
+  | Just cls <- tyConAssoc_maybe fam >>= tyConClass_maybe
+  = let supplied = mkVarEnv (zip (tyConTyVars fam) args)
+        actual v = lookupVarEnv supplied v
+        formals = classTyVars cls
+    in case traverse actual formals of
+      Just class_args -> Right (mkClassPred cls class_args)
+      Nothing -> Left $ sep
+        [ text "Supply" <+> pprWithCommas (quotes . ppr) (filter (isNothing . actual) formals)
+        , text "to determine the instance of" <+> quotes (ppr (className cls)) <> dot ]
+  | otherwise = Left (text "The family declaration has no associated class.")
+
+{- Note [Associated family domain arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The family binders include the kind variables that appear in argument types.
+Pair the supplied arguments with those binders. Look up each class binder
+in this environment, in the order of the class declaration. Ignore extra
+family arguments when forming the class predicate.
+
+For example, in class KnownIndex k, the family Echo (x :: k) :: k has
+the invisible argument k. The partial application Echo :: Bool %U -> Bool
+already determines the domain KnownIndex Bool. Bare Elem from class
+Collects c does not determine c. The ordinary arity and matchability
+checks still apply to a prefix that determines its domain.
+-}
 
 -- | Refuse contexts that have no formation rule in this experiment.
 checkNoConstrainedFamilyApps :: Type -> TcM ()
 checkNoConstrainedFamilyApps ty
   | use : _ <- constrainedFamilyApps ty
   = failWithTc $ TcRnConstrainedFamilyUnsupported (familyTyCon use) $
-      text "Use a saturated application in a value signature, expression annotation, constructor field, or explicit type argument."
+      text "Use the family in a value signature, expression annotation, constructor field, or explicit type argument."
   | otherwise = pure ()
   where
     familyTyCon (WrittenFamily fam _) = fam
@@ -620,6 +652,12 @@ A required type argument has the same scope as a specified type argument.
 Skolemise both when checking formation. Do not build a runtime type-lambda
 wrapper for a family occurrence in a type. See Note [Ambiguity skolemisation is not runtime abstraction]
 in GHC.Tc.Utils.Instantiate.
+
+Read the written forall binders and predicates before expanding a synonym.
+For type Ignore a = forall b. Show b => b -> String, Ignore (Elem [Int])
+still requires Collects [Int]. Splitting the sigma type through Ignore
+would erase that argument. A constraint introduced by Ignore also cannot
+justify a written argument to Ignore.
 
 The nested checks share the signature's formation check, including its
 treatment of unsolved premises under deferred type errors. See
@@ -951,7 +989,7 @@ data ValidityEnv = ValidityEnv
   , ve_indices  :: VarSet
   , ve_imported_synonym :: Bool
   , ve_partial_family_hint :: Bool
-  , ve_instance_pat :: Maybe SkolemInfoAnon }  -- When checking a matching pattern
+  , ve_instance_pat :: Maybe (SkolemInfoAnon, CoercionN -> TcM ()) }  -- When checking a matching pattern
 
 instance Outputable ValidityEnv where
   ppr (ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
@@ -1001,7 +1039,7 @@ check_type ve (AppTy ty1 ty2)
         ; check_arg_type False ve ty2
         ; case (ve_instance_pat ve, ve_expand ve) of
             (_, NoExpand) -> pure ()
-            (Just skol_info, _) -> checkPatternMatchability skol_info ty1
+            (Just (skol_info, record), _) -> checkPatternMatchability skol_info record ty1
             _ -> pure () }
 
 check_type ve ty@(TyConApp tc tys)
@@ -1183,8 +1221,8 @@ check_syn_tc_app (ve@ValidityEnv{ ve_ctxt = ctxt, ve_expand = expand })
   = check_args_only expand
 
   | isConstrainedFamilyTyCon tc
-  = failWithTc $ TcRnConstrainedFamilyUnsupported tc $
-      text "The family must be fully applied at this occurrence."
+  , Left reason <- associatedFamilyDomain tc tys
+  = failWithTc (TcRnConstrainedFamilyUnsupported tc reason)
 
   | isUnsaturatedUserFamily tc tys
   = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
@@ -1944,11 +1982,14 @@ We can also have instances for functions: @instance Foo (a -> b) ...@.
 -}
 
 checkValidInstHead :: UserTypeCtxt -> Class -> [Type] -> TcM ()
-checkValidInstHead ctxt clas cls_args
+checkValidInstHead = checkValidInstHeadWith (const (pure ()))
+
+checkValidInstHeadWith :: (CoercionN -> TcM ()) -> UserTypeCtxt -> Class -> [Type] -> TcM ()
+checkValidInstHeadWith record ctxt clas cls_args
   = do { dflags   <- getDynFlags
        ; hsc_src  <- tcHscSource
        ; check_special_inst_head dflags hsc_src ctxt clas cls_args
-       ; checkValidTypePats (classTyCon clas) cls_args
+       ; checkValidTypePats record (classTyCon clas) cls_args
        }
 
 {-
@@ -2503,16 +2544,23 @@ if we find a constraint tuple.
 -}
 
 
-checkValidInstance :: UserTypeCtxt -> LHsSigType GhcRn -> Type -> TcM ()
+checkValidInstance :: UserTypeCtxt -> LHsSigType GhcRn -> Type -> TcM Type
 checkValidInstance ctxt hs_type ty = case tau of
   -- See Note [Instances and constraint synonyms]
   TyConApp tc inst_tys
     | Just clas <- tyConClass_maybe tc
     -> do
-        { setSrcSpanA head_loc $
-          checkValidInstHead ctxt clas inst_tys
+        { proofs <- newTcRef []
+        ; setSrcSpanA head_loc $
+          checkValidInstHeadWith (\co -> updTcRef proofs (co :)) ctxt clas inst_tys
 
-        ; traceTc "checkValidInstance {" (ppr ty)
+        ; cos <- readTcRef proofs
+        ; ty' <- if null cos
+                 then return ty
+                 else do { cos' <- liftZonkM $ traverse zonkCo cos
+                         ; return $ normaliseInstBinderKinds (tyCoVarsOfTypes inst_tys) cos' ty }
+
+        ; traceTc "checkValidInstance {" (ppr ty')
 
         ; env0 <- liftZonkM $ tcInitTidyEnv
         ; expand <- initialExpandMode
@@ -2530,7 +2578,7 @@ checkValidInstance ctxt hs_type ty = case tau of
         --   in the constraint than in the head
         ; undecidable_ok <- xoptM LangExt.UndecidableInstances
         ; if undecidable_ok
-          then checkAmbiguity ctxt ty
+          then checkAmbiguity ctxt ty'
           else checkInstTermination theta tau
 
         ; traceTc "cvi 2" (ppr ty)
@@ -2542,7 +2590,8 @@ checkValidInstance ctxt hs_type ty = case tau of
               -> addErrTc $ mk_err
                           $ IllegalInstanceFailsCoverageCondition clas coverageInstErr
 
-        ; traceTc "End checkValidInstance }" empty }
+        ; traceTc "End checkValidInstance }" empty
+        ; return ty' }
     | otherwise
     -> failWithTc $ mk_err $ IllegalInstanceHead
                            $ InstHeadNonClassHead
@@ -2737,7 +2786,7 @@ checkValidTyFamEqn :: TyCon    -- ^ of the type family
                    -> Type     -- ^ Rhs
                    -> TcM ()
 checkValidTyFamEqn fam_tc typats rhs
-  = do { checkValidTypePats fam_tc typats
+  = do { checkValidTypePats (const (pure ())) fam_tc typats
 
          -- Check for oversaturated visible kind arguments in a type family
          -- equation.
@@ -3046,8 +3095,8 @@ checkFamPatBinders fam_tc qtvs non_user_tvs pats rhs
 --    * All monotypes
 --    * No type-family applications
 --    * Matchable application heads
-checkValidTypePats :: TyCon -> [Type] -> TcM ()
-checkValidTypePats tc pat_ty_args
+checkValidTypePats :: (CoercionN -> TcM ()) -> TyCon -> [Type] -> TcM ()
+checkValidTypePats record tc pat_ty_args
   = do { -- Check that each of pat_ty_args is a monotype.
          -- One could imagine generalising to allow
          --      instance C (forall a. a->a)
@@ -3055,7 +3104,7 @@ checkValidTypePats tc pat_ty_args
          --
          -- Suppress the opt-in hint when the expanded pattern still
          -- contains a family application. The extension cannot make it legal.
-         traverse_ (check_valid_mono_type (Just skol_info)) pat_ty_args
+         traverse_ (check_valid_mono_type (Just (skol_info, record))) pat_ty_args
 
        -- Ensure that no type family applications occur a type pattern
        ; case tcTyConAppTyFamInstsAndVis tc pat_ty_args of
@@ -3072,16 +3121,65 @@ checkValidTypePats tc pat_ty_args
 
 -- | Check the consumed kind binder of an application in an instance pattern.
 -- See Note [Matchability of instance patterns].
-checkPatternMatchability :: SkolemInfoAnon -> Type -> TcM ()
-checkPatternMatchability skol_info head_ty
+checkPatternMatchability :: SkolemInfoAnon -> (CoercionN -> TcM ()) -> Type -> TcM ()
+checkPatternMatchability skol_info record head_ty
   | Just (ma, _, _) <- splitPiTy_maybe (typeKind head_ty)
   , not (ma `eqType` matchableDataConTy)
-  = pushLevelAndSolveEqualities skol_info [] $
-      void $ unifyTypeAndEmit KindLevel (origin ma) ma matchableDataConTy
+  = do { co <- pushLevelAndSolveEqualities skol_info [] $
+                 unifyTypeAndEmit KindLevel (origin ma) ma matchableDataConTy
+       ; record co }
   | otherwise = pure ()
   where
     origin ma = TypeEqOrigin { uo_actual = ma, uo_expected = matchableDataConTy
                              , uo_thing = Nothing, uo_invisible = Nothing }
+
+-- | Record the selectors proved by instance-head validation on the dictionary
+-- binders. See Note [Computed matchability in instance binders].
+normaliseInstBinderKinds :: TyCoVarSet -> [CoercionN] -> Type -> Type
+normaliseInstBinderKinds head_vars proofs ty =
+    rebind (mkEmptySubst (mkInScopeSet (tyCoVarsOfType ty))) ty
+  where
+    rebind subst (ForAllTy ma (Bndr tv vis) body)
+      = mkTyCoForAllTy (substTy subst ma) tv' vis (rebind subst' body)
+      where
+        (subst', tv')
+          | isTyVar tv, tv `elemVarSet` head_vars
+          , Reduction co kind <- normalise_kind (varType tv)
+          , not (isReflCo co)
+          = let tv' = setVarType tv (substTy subst kind)
+                old = mkCastTy (mkTyVarTy tv') (mkSymCo (substCo subst co))
+            in (extendTvSubstAndInScope subst tv old, tv')
+          | otherwise
+          = substVarBndr subst tv
+    rebind subst body = substTy subst body
+
+    normalise_kind kind
+      | FunTy flag ma mult arg res <- coreFullView kind
+      = mkFunRedn Nominal flag (selector ma) (refl mult) (refl arg) (normalise_kind res)
+      | ForAllTy ma (Bndr tv vis) res <- coreFullView kind
+      = mkForAllRedn vis tv (selector ma) (refl (varType tv)) (normalise_kind res)
+      | otherwise = refl kind
+
+    selector ma = case find (eqType ma . coercionLKind) proofs of
+      Just co -> mkReduction co matchableDataConTy
+      Nothing -> refl ma
+
+    refl = mkReflRedn Nominal
+
+{- Note [Computed matchability in instance binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Instance-head validity can prove that Flip U is M. Instance lookup uses
+the pure matcher, which cannot reduce Flip U to see that f x is matchable.
+Keep the proof that validation used and rewrite the corresponding
+selector in f's dictionary binder. A substitution casts occurrences
+that still need the old kind. For f x the application constructor pushes
+the cast through the application and exposes the M arrow to the matcher.
+
+Use only the nominal equalities checked in the head. A selector in an
+unused quantified kind can diverge. The left endpoint of the equality
+must agree with the selector in the uninstantiated kind. A proof that
+Pick Bool is M is insufficient to rewrite Pick a under forall a.
+-}
 
 {- Note [Matchability of instance patterns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

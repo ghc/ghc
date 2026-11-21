@@ -405,8 +405,14 @@ A variable-headed pattern such as `f x` requires M at the
 consumed argument. GHC checks the kind of the function in
 class and family instance heads after synonym expansion.
 Binding `f` and `x` elsewhere on the same LHS does not make
-a U application valid. A computed selector can reduce to M.
-[Pattern tests](../../../testsuite/tests/dependent/should_run/NativeUnsaturatedFamily.sh).
+a U application valid. If the selector reduces to M during instance-head
+validation, GHC uses the proof to record M in the dictionary type. For example,
+`Flip (InitialSelector flag)` reduces to M for any `flag` when
+`InitialSelector flag = U` and `Flip U = M`. An ordinary client
+selects the dictionary for `Maybe Bool` from a stripped interface.
+The instance context cannot supply the proof. Validation only checks
+consumed selectors. An unused recursive selector still compiles.
+[Pattern and interface tests](../../../testsuite/tests/dependent/should_run/NativeUnsaturatedFamily.sh).
 
 In `T12088sg3`, the two saturated `TyCon2 (->)` patterns select
 different arrows. After the synonym and `Promote` migration above,

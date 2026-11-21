@@ -1,8 +1,9 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, FlexibleContexts, FlexibleInstances, GADTs, RankNTypes, ScopedTypeVariables, TypeApplications, TypeFamilies #-}
-module ConstrainedElements (Allowed, Collects(..), FieldKey, Field(..), field, applyField, withField) where
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, FlexibleContexts, FlexibleInstances, GADTs, PolyKinds, RankNTypes, ScopedTypeVariables, TypeApplications, TypeFamilies, TypeOperators #-}
+module ConstrainedElements (Allowed, Collects(..), FieldKey, Field(..), field, applyField, withField, KnownIndex(..), reflectMaybe) where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
+import Data.Type.Equality ((:~:)(Refl))
 
 class Allowed a
 instance Allowed Bool
@@ -38,3 +39,14 @@ applyField _ render value = render value
 withField :: (forall (c :: Type). Collects c => Proxy c -> (Elem c -> String) -> Elem c -> r)
           -> foreach (tag :: Bool) -> Field tag -> r
 withField visit tag (Field value render) = visit (Proxy @(FieldKey tag)) render value
+
+-- | Select the associated family by the kind of its argument.
+class KnownIndex (k :: Type) where
+    type Echo (x :: k) :: k
+
+instance Allowed a => KnownIndex (Maybe a) where
+    type Echo x = x
+
+-- | Reflect a runtime index using the instance for its kind.
+reflectMaybe :: forall a. Allowed a => foreach (x :: Maybe a) -> Echo x :~: x
+reflectMaybe _ = Refl

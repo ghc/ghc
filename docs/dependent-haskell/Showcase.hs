@@ -105,9 +105,9 @@ import qualified InterpretedKind
 import qualified InterpretedKindUseSite
 import qualified NestedFunctionClient
 import qualified InvisibleFamily
-import ConstrainedElementsClient (annotatedElement, constrainedElements, explicitElements, formatField, renderField, renderKnownFields)
+import ConstrainedElementsClient (annotatedElement, constrainedElements, explicitElements, formatField, renderField, renderKnownFields, retainedMaybeDomain)
 import IndexedMapClient (mappedCells)
-import LaterMatchabilityClient (annotatedMap, appliedCallback, boxedCallbacks, flippedCallbacks, forwardedMap,
+import LaterMatchabilityClient (annotatedMap, appliedCallback, boxedCallbacks, computedDictionary, flippedCallbacks, forwardedMap,
                                 laterMatchability, nestedCallback, rankedMap)
 import qualified TypeLambda
 import qualified TypeLet
@@ -962,6 +962,7 @@ main = do
     observe "render a field with evidence for its runtime flag" (renderField enabled, renderField disabled)
     observe "format a field with a polymorphic consumer" (formatField enabled, formatField disabled)
     observe "choose a field domain with a required type argument" renderKnownFields
+    retainedMaybeDomain >>= observe "reflect a runtime Maybe index using its kind"
     putStrLn "Dependent Haskell: completed source features"
     booleans
     finiteDomains
@@ -1244,6 +1245,7 @@ main = do
     observe "store the result of Maybe and an imported open family" boxedCallbacks
     observe "use one polymorphic map with Maybe and a type family" rankedMap
     observe "apply a callback with matchability computed in its declared kind" flippedCallbacks
+    observe "select a dictionary with computed matchability" computedDictionary
     observe "interpret a kind code as an ordinary type constructor" InterpretedKind.optionalFlag
     observe "interpret two applications of the optional type constructor" InterpretedKind.nestedOptional
     observe "choose an interpreted arrow from its expected kind"

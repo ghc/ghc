@@ -159,7 +159,8 @@ class C a b where
 HS
 (cd provider && "${ghc[@]}" -XNoExperimentalDependentTypes -c MissingBinder.hs)
 if (cd provider && "${ghc[@]}" -XExperimentalDependentTypes -c MissingBinder.hs) >missing-binder.log 2>&1 ||
-   ! grep -Fq 'same binders as its class' missing-binder.log; then
+   ! grep -Fq 'Missing class parameters in the family declaration' missing-binder.log ||
+   ! grep -Eq 'Missing class parameters in the family declaration.*\bb\b' missing-binder.log; then
     cat missing-binder.log
     exit 1
 fi
@@ -176,7 +177,7 @@ partial = Uses
 HS
 for mode in NoExperimentalDependentTypes ExperimentalDependentTypes; do
     if (cd marked && "${ghc[@]}" -X"$mode" -c Partial.hs) >partial.log 2>&1 ||
-       ! grep -Fq 'must be fully applied' partial.log; then
+       ! grep -Fq 'Supply ‘c’ to determine the instance of ‘Collects’.' partial.log; then
         cat partial.log
         exit 1
     fi

@@ -4,6 +4,7 @@ pass an associated type as a specified and a required argument: (True,False)
 render a field with evidence for its runtime flag: (Just "x",Nothing)
 format a field with a polymorphic consumer: (Just "[x]",Nothing)
 choose a field domain with a required type argument: ("True","x")
+reflect a runtime Maybe index using its kind: (Just False,Nothing,True)
 Dependent Haskell: completed source features
 runtime Bool choice: "42"
 apply retained function rules without forcing an unused index: (7,11,19)
@@ -345,6 +346,7 @@ infer an unsigned synonym kind from a bare callback use: [True]
 store the result of Maybe and an imported open family: (Just True,[False])
 use one polymorphic map with Maybe and a type family: (Just True,[False])
 apply a callback with matchability computed in its declared kind: (Just False,[True])
+select a dictionary with computed matchability: True
 interpret a kind code as an ordinary type constructor: Just True
 interpret two applications of the optional type constructor: Just (Just True)
 choose an interpreted arrow from its expected kind: (Just 3,Right 3)
