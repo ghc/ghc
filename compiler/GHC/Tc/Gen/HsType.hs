@@ -75,6 +75,7 @@ module GHC.Tc.Gen.HsType (
 
    ) where
 
+import Control.Applicative ((<|>))
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Maybe (MaybeT(..))
 
@@ -97,7 +98,7 @@ import GHC.Tc.Gen.OpenTypeEval (instantiateOpenTypeFunction, observeOpenType, op
 import GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourceTableFamilyUse, sourceTableTypeUses,
                               sourceCaseKindUse, sourceTableReferenceUse, indexedProjectionSource, isSourceConstructorCase, monomorphicEnumCaseArity, sourceCaseVisibleArity, sourceTableOwner, sourcePairBuilderField,
                               lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource,
-                              lookupSourceListFoldMethod, recordSourceMethodUse)
+                              lookupSourceBinaryMethod, lookupSourceListFoldMethod, recordSourceMethodUse)
 import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcPrepareClosedApplication, tcPrepareClosedFunctionValue, tcPrepareClosedResult, tcPrepareClosedObservation, tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand, tcHasClosedCallExecutable)
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Instance.Family (tcGetFamInstEnvs)
@@ -2879,7 +2880,7 @@ tc_app_ty mode rn_ty exp_kind
                                ; checkExpKind mode rn_ty result result_kind exp_kind }
                          | not (null args)
                          , ordinary_call || (isQual rdr && ready_partial_call && length args == 1)
-                         -> do { selected <- if ordinary_call then checkedClassFold fun args else pure Nothing
+                         -> do { selected <- if ordinary_call then checkedClassMethod fun args else pure Nothing
                                ; case selected of
                                    Just (dfun, target, table) -> do
                                      recordSourceMethodUse dfun fun target
@@ -2921,7 +2922,7 @@ tc_app_ty mode rn_ty exp_kind
       | Just (_, RetrySigCalls, _) <- mode_pending_calls mode = True
       | otherwise = False
     unsupported = failWithTc . TcRnNoSourceTable
-    checkedClassFold fun args@[_, _, receiver]
+    checkedClassMethod fun args@[_, _, receiver]
       | Just _ <- isClassOpId_maybe fun
       , any isOpenTypeOperand args = do
           (_, kind) <- tc_infer_lhs_type mode receiver
@@ -2929,7 +2930,20 @@ tc_app_ty mode rn_ty exp_kind
           case splitTyConApp_maybe actual of
             Just (tc, [_]) | tc == listTyCon -> lookupSourceListFoldMethod fun (mkTyConTy tc)
             _ -> pure Nothing
-    checkedClassFold _ _ = pure Nothing
+    checkedClassMethod fun [left, right]
+      | Just _ <- isClassOpId_maybe fun
+      , Just domain <- retainedDomain left <|> retainedDomain right
+      = liftZonkM (zonkTcType domain) >>= lookupSourceBinaryMethod fun
+    checkedClassMethod _ _ = pure Nothing
+
+    -- A retained operand fixes the class parameter for a method of
+    -- type a -> a -> a. Check both original operands against its table.
+    retainedDomain arg
+      | L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ name))) <- ignoreParens arg
+      , Just index <- lookupNameEnv (mode_indices mode) name
+      , isNativeOpaqueValueId index
+      = Just (varType index)
+      | otherwise = Nothing
 tc_app_ty mode rn_ty exp_kind
   | L _ (HsTyVar _ NotPromoted (L loc (WithUserRdr rdr name))) <- hs_fun_ty
   , isSourceFamilyName name

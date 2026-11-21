@@ -3,7 +3,7 @@ module GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourc
                               sourceTableCallees, sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
                               sourceTableFamilyAppUse, sourceTableReferenceUse, sourceCaseKindUse, sourceCaseVisibleArity, isSourceConstructorCase, sourceTableOwner, monomorphicEnumCaseArity, groundFirstHead,
                               visibleSourceMethodRules, hasSourceMethodRule, hasSourceMethodRuleAt,
-                              lookupSourceListFoldMethod, publishListFoldMethods, sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers, isSourceFilterGuard,
+                              sourceBinarySelector, lookupSourceBinaryMethod, lookupSourceListFoldMethod, publishListFoldMethods, sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers, isSourceFilterGuard,
                               OptionalSourceUses, optionalSourceUses, registerOptionalSourceUses,
                               checkOptionalSourceUses, checkSourceMethodUses) where
 
@@ -505,13 +505,64 @@ shortcut can bypass a Given. Record the selector, dictionary and worker
 so that a change to the provider invalidates the proof.
 -}
 
+-- | Read the class parameter shared by both operands and the result.
+sourceBinarySelector :: Id -> Maybe Class
+sourceBinarySelector selector = do
+    cls <- isClassOpId_maybe selector
+    [parameter] <- pure (classTyVars cls)
+    let a = mkTyVarTy parameter
+    (left, rest) <- caseArrow (classMethodInstTy selector [a])
+    (right, result) <- caseArrow rest
+    guard (all (eqType a) [left, right, result])
+    pure cls
+
+-- | Resolve a saturated homogeneous selector to its certified source worker.
+lookupSourceBinaryMethod :: Id -> Type -> TcM (Maybe (Id, Id, TyCon))
+lookupSourceBinaryMethod selector domain
+  | Just cls <- sourceBinarySelector selector
+  = do
+      selected <- lookupSourceGroundDFun cls domain
+      case selected of
+        Just dfun | Just name <- sourceMethodTarget_maybe dfun selector -> do
+          worker <- tcLookupIdMaybe name
+          pure $ do
+            method <- worker
+            guard (varType method `eqType` classMethodInstTy selector [domain])
+            table <- sourceTableId_maybe method
+            pure (dfun, method, table)
+        _ -> pure Nothing
+  | otherwise = pure Nothing
+
 -- | Find a visible ground dictionary whose exact method is a checked list fold.
 -- See Note [Select the dictionary for a promoted list fold].
 lookupSourceListFoldMethod :: Id -> Type -> TcM (Maybe (Id, Id, TyCon))
 lookupSourceListFoldMethod selector domain
   | Just cls <- isClassOpId_maybe selector
   , listFoldSelector cls selector
-  , noFreeVarsOfType domain, isTyFamFree domain = do
+  = do
+      selected <- lookupSourceGroundDFun cls domain
+      case selected of
+        Just dfun -> do
+          target <- case sourceMethodTarget_maybe dfun selector of
+            Just term -> tcLookupIdMaybe term
+            Nothing -> pure $ do
+              Core.DFunUnfolding [] con fields <- pure (idUnfolding dfun)
+              slots <- dictionarySlots cls domain con fields
+              Core.Var method <- lookup selector slots
+              pure method
+          pure $ do
+            method <- target
+            guard (varType method `eqType` classMethodInstTy selector [domain])
+            table <- sourceTableId_maybe method
+            guard (isListFoldTable table)
+            pure (dfun, method, table)
+        _ -> pure Nothing
+  | otherwise = pure Nothing
+
+-- | Find a complete, imported dictionary with no instance context.
+lookupSourceGroundDFun :: Class -> Type -> TcM (Maybe Id)
+lookupSourceGroundDFun cls domain
+  | noFreeVarsOfType domain, isTyFamFree domain = do
       insts <- tcGetInstEnvs
       env <- getGblEnv
       case lookupUniqueInstEnv insts cls [domain] of
@@ -519,22 +570,10 @@ lookupSourceListFoldMethod selector domain
           | let name = idName (instanceDFunId inst)
           , nameModule_maybe name /= Just (tcg_semantic_mod env) -> do
               candidate <- tcLookupIdMaybe name
-              case candidate of
-                Just dfun | varType dfun `eqType` mkClassPred cls [domain] -> do
-                  target <- case sourceMethodTarget_maybe dfun selector of
-                    Just term -> tcLookupIdMaybe term
-                    Nothing -> pure $ do
-                      Core.DFunUnfolding [] con fields <- pure (idUnfolding dfun)
-                      slots <- dictionarySlots cls domain con fields
-                      Core.Var method <- lookup selector slots
-                      pure method
-                  pure $ do
-                    method <- target
-                    guard (varType method `eqType` classMethodInstTy selector [domain])
-                    table <- sourceTableId_maybe method
-                    guard (isListFoldTable table)
-                    pure (dfun, method, table)
-                _ -> pure Nothing
+              pure $ do
+                dfun <- candidate
+                guard (varType dfun `eqType` mkClassPred cls [domain])
+                pure dfun
         _ -> pure Nothing
   | otherwise = pure Nothing
 

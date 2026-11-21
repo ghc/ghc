@@ -26,6 +26,10 @@ NativeSourceCallIface:
 	grep -q 'forwardProof' changed-method.stderr
 	$(source_call_hc) -fno-code -fwrite-interface -c PackedVecLibrary.hs
 	$(source_call_hc) -c NativeLiteralClient.hs
+	$(source_call_hc) -c NativeSourceBinaryMethod.hs
+	sed 's/foreach (y :: Nat) -> Vec Bool (x P.+ y)/foreach (y :: Bool) -> Vec Bool (x P.+ y)/' NativeSourceBinaryMethod.hs > changed/NativeSourceBinaryMethod.hs
+	! $(source_call_hc) -fforce-recomp -c changed/NativeSourceBinaryMethod.hs 2>wrong-source-operator.stderr
+	grep -q 'GHC-83865' wrong-source-operator.stderr
 	sed 's/(2 :: Nat)/(2 :: Integer)/' NativeLiteralClient.hs > changed/NativeLiteralClient.hs
 	! $(source_call_hc) -fforce-recomp -c changed/NativeLiteralClient.hs 2>wrong-annotation.stderr
 	grep -q 'cannot use the cast required for this argument as a retained index' wrong-annotation.stderr

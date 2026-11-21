@@ -88,6 +88,7 @@ import GHC.Builtin.WiredIn.Types( oneDataConName )
 
 import GHC.Unit.Module ( getModule )
 
+import GHC.Utils.Lexeme (isLexVarSym)
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -1245,7 +1246,12 @@ rnHsTyOp :: RnTyKiEnv -> HsType GhcPs -> LHsType GhcPs
          -> RnM (LHsType GhcRn, FreeNames)
 rnHsTyOp env overall_ty tyop
   | L l (HsTyVar ann prom (L loc op)) <- tyop
-  = do { opgre <- lookupTypeAppHeadRn False op
+  = do { let open_operands
+                 | isLexVarSym (occNameFS (rdrNameOcc op))
+                 , HsOpTy _ left _ right <- overall_ty
+                 = any (isOpenTypeOperandWith isRdrTyVar (isDataOcc . rdrNameOcc)) [left, right]
+                 | otherwise = False
+       ; opgre <- lookupTypeAppHeadRn open_operands op
        ; checkNamedWildCard env (greName opgre)
        ; let opName = greName opgre
        ; unlessXOptM LangExt.TypeOperators $

@@ -67,7 +67,7 @@ import GHC.Hs
 import GHC.Types.Name.Reader
 import GHC.Tc.Errors.Types
 import GHC.Tc.Errors.Ppr (pprScopeError)
-import GHC.Tc.Gen.SourceTable (indexedProjectionSource, isFinalCoreIdentity, isFinalCoreReverseWrapper)
+import GHC.Tc.Gen.SourceTable (indexedProjectionSource, isFinalCoreIdentity, isFinalCoreReverseWrapper, sourceBinarySelector)
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.LclEnv
 import GHC.Tc.Utils.Monad
@@ -1257,8 +1257,10 @@ lookupTypeOcc position rdr_name
                 ; explicit_levels <- xoptM LangExt.ExplicitLevelImports
                 ; demands <- tcg_local_open_demands <$> getGblEnv
                 ; let name = greName gre
-                ; if isLexVarId (occNameFS (greOccName gre))
-                     && isImportedGRE gre && not (nameIsLocalOrFrom this_mod name)
+                ; imported <- if isImportedGRE gre && not (nameIsLocalOrFrom this_mod name)
+                              then imported_head open_operands gre
+                              else pure False
+                ; if imported
                     then do { unless (any ((== NotBoot) . is_isboot . is_decl) (gre_imp gre)) $
                                 if isQual term_rdr
                                   then failWithTc (TcRnClosedTypeEval name
@@ -1283,6 +1285,17 @@ lookupTypeOcc position rdr_name
               addNameClashErrRn term_rdr (gre NE.:| map fst rest)
               return (mkUnboundGRE (rdrNameOcc rdr_name))
         _ -> lookup_demoted rdr_name
+
+    -- A class operator gets its source table from the selected dictionary.
+    -- Leave the kind, dictionary and saturation checks to the type checker.
+    imported_head open_operands gre
+      | isLexVarId (occNameFS (greOccName gre)) = pure True
+      | TypeApplicationHead{} <- position, open_operands = do
+          thing <- tcLookupGlobal (greName gre)
+          pure $ case thing of
+            AnId selector -> isJust (sourceBinarySelector selector)
+            _ -> False
+      | otherwise = pure False
 
     -- Keep literal reversal on its existing staged path.
     preserveClosedReverse candidate@(gre, Just _)
