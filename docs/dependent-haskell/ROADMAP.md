@@ -25,11 +25,20 @@ example. The empty list gives a position of type `Fin 'Z`. GHC checks
 that this type has no constructor and inserts an empty case on the
 position. [Equations and coverage](roadmap/R03-dependent-products.md#omit-an-impossible-list-index-equation).
 
+A type synonym can use a `case` to choose the argument type of an
+ordinary arrow. For example, one branch can take a pair and another
+a `Char`. An ordinary client sees the selected argument type through
+the provider's interface. [R19 example and limits](roadmap/R19-type-level-cases.md).
+
 An opted-in provider can pass the type family `Map` itself to a GADT.
 The GADT uses it once with the matchable constructor `Maybe` and once
 with an unmatchable type family. An ordinary client uses both results
 through the provider's interface. An explicit equation binder can also
 carry the polymorphic kind into the right-hand side of a type family.
+A declaration can compute its callback's matchability with a family such
+as `Flip m`. A higher-order family can also take an unmatchable family
+whose first argument is a required type. The ordinary client invokes it
+at two kinds and obtains `(3,LT)`.
 [R23 examples and limits](roadmap/R23-unsaturated-type-families.md#passing-a-polymorphic-mapper-at-its-full-kind).
 
 An ordinary module can check a signed offset once against a vector.

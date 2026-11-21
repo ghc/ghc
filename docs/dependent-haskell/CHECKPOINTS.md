@@ -28,6 +28,30 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `f90de7ce0c`, a family equation can apply its callback when the
+declared kind computes its matchability with `Flip m`. The ordinary
+client reads a stripped interface and returns `(Just False,[True])`.
+The two-equation bounded list index also passes in the same compiler.
+[Callback check](../../testsuite/tests/dependent/should_run/NativeLaterMatchability.sh)
+and [bounded index check](../../testsuite/tests/dependent/should_run/NativeIndexedFin.sh).
+
+At `87107252ab`, a higher-order family can take another family with
+a required type binder. The remaining binders must be unmatchable.
+The client observes `(3,LT)` after applying the family at two kinds.
+A matchable receiver, an extra equation parameter, and a proof equating
+two distinct family heads still fail. [Provider](examples/open-evaluation/InvisibleFamily.hs)
+and [source-hidden check](../../testsuite/tests/dependent/should_run/NativeUnsaturatedInvisible.sh).
+
+At `8c11606405`, a type synonym can contain a case in the argument
+of an ordinary arrow. The Showcase client returns `(7,120)`. A second
+client combines this case with `RequiredPair` through two stripped
+interfaces. It returns `(3,1)` at `-O0` and `-O2`. Passing `False` to
+the branch that expects `(Int, Ordering)` reports GHC-83865 at that
+argument. The provider enables `UndecidableInstances` for the nested
+type family in this combined example. The Stage 2 compiler matched
+all 395 Showcase lines at stripped `-O0`, default `-O2`, and in
+source-loaded GHCi. [Arrow-domain regression](../../testsuite/tests/dependent/should_run/NativeTypeCase.sh).
+
 At `4e969e6059`, the two-equation list index compiles from source.
 The ordinary client checks a signed offset and looks up the resulting
 position. Partial application to the empty list returns a function. Forcing
