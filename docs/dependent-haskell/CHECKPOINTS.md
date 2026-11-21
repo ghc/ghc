@@ -28,6 +28,11 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+The join-point integration at `418cd6f6bb` also passed all 414 rows in
+the same four modes. Fourteen registered tests passed on that revision.
+The recorded join fixture runs inside `NativeTypeCase`. The 37-row Core
+API check and its evidence checks passed with the new join-result rules.
+
 At `973445d496`, the linear `TwoPositions` reader matches both stored
 positions. Each position has the length of its own list as its bound.
 GHC infers separate element types for the two calls to `sourceLength`
