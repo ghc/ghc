@@ -79,7 +79,7 @@ import qualified ImportedRetainedRules
 import qualified FunctionPackageLibrary as FunctionPackages
 import qualified FunctionSignatureLibrary as FunctionSignatures
 import qualified GroundApplicationClient as Ground
-import GHC.Exts (FUN, Multiplicity (Many))
+import GHC.Exts (FUN, Multiplicity (Many, One))
 import GHC.Matchability (M, U, Matchability(..))
 import qualified GHC.TypeNats as TypeNats
 import GHC.TypeLits (charVal)
@@ -943,6 +943,10 @@ constructorFieldCases =
           NativeNestedCase.CaseField n -> n
       , select NativeNestedCase.CaseMissing )
 
+-- | Select the input type of an arrow with a quantified multiplicity.
+type PairCaseArrow (b :: Bool) = forall (p :: Multiplicity).
+    (case b of { True -> (Int, Char); False -> Bool }) %p -> (Int, Char)
+
 main :: IO ()
 main = do
     putStrLn "Dependent Haskell: completed source features"
@@ -1310,6 +1314,14 @@ main = do
         arrowMissing c = fromEnum c
     observe "select the input type of an ordinary arrow"
         (arrowInput (Proxy, 7), arrowMissing 'x')
+    let linearInput :: NativeNestedCase.LinearArrowDomain 'True
+        linearInput x = x
+        pairIdentity :: PairCaseArrow 'True
+        pairIdentity x = x
+        pairAtOne :: (Int, Char) %1 -> (Int, Char)
+        pairAtOne x = pairIdentity @'One x
+    observe "select linear and multiplicity-polymorphic arrow inputs"
+        (linearInput 7, pairAtOne (19, 'q'), fst (pairIdentity @'Many (29, error "unused pair field")))
     observe "match Bool and Ordering directly in a type"
         (7 :: NativeCase.ByType Bool, 'x' :: NativeCase.ByType Ordering)
     observe "remove a Maybe layer and keep any other type"
