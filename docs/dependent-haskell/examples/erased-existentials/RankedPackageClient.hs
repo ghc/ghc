@@ -59,7 +59,7 @@ runRankedInput :: Bool -> Int
 runRankedInput useCallback = observeRankedInput useCallback packed
   where
     packed :: RankedInput
-    packed = produce
+    packed = \receive -> produce receive
 
     produce :: InputAt PolyId -> Int
     produce receive = fromMaybe 43 (receive readIdentity id)

@@ -3467,6 +3467,14 @@ uses its usual subsumption check for a function payload.
 [GenImpredicative, Figure 10](https://richarde.dev/papers/2021/exists/exists.pdf#page=22)
 and [executable example](examples/erased-existentials/RankedPackage.hs).
 
+In the forwarding lambda `\receive -> produce receive`, the declared
+argument of `produce` fixes the hidden witness `forall a. a -> a`.
+The fork checks that this witness is independent of every binder in the
+callback type. It then checks the lambda at the instantiated payload type.
+This inference rule uses Quick Look's restriction on substitutions under
+a quantifier. [Quick Look, §5.2](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf#page=12)
+and [ordinary forwarding client](examples/erased-existentials/RankedPackageClient.hs).
+
 Figure 1(b) of *An Existential Crisis Resolved* gives the source rule for
 the [implicit vector filter](examples/erased-existentials/ImplicitVector.hs).
 The passing branch constructs a cell from a recursive call with a fresh
