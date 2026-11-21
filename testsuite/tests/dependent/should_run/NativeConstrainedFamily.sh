@@ -160,7 +160,7 @@ HS
 (cd provider && "${ghc[@]}" -XNoExperimentalDependentTypes -c MissingBinder.hs)
 if (cd provider && "${ghc[@]}" -XExperimentalDependentTypes -c MissingBinder.hs) >missing-binder.log 2>&1 ||
    ! grep -Fq 'Missing class parameters in the family declaration' missing-binder.log ||
-   ! grep -Eq '^[[:space:]]+b$' missing-binder.log; then
+   ! grep -Eq 'Missing class parameters in the family declaration.*\bb\b' missing-binder.log; then
     cat missing-binder.log
     exit 1
 fi

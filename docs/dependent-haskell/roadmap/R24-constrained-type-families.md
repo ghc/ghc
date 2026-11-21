@@ -208,14 +208,22 @@ omits kinds, classes and partial applications.
   [ordinary client](../examples/open-evaluation/ConstrainedElementsClient.hs)
   and [stripped-interface check](../../../testsuite/tests/dependent/should_run/NativeConstrainedFamily.sh).
 
-The experiment covers fully applied associated type families with result
-kind `Type` and the same binders as their owner class. It permits a
-different binder order. Each instance supplies an equation or a default.
-The check uses Givens in the written signature, Givens from enclosing
-functions or GADT patterns, and the imported class instance environment.
-Formation checks run before inference can add a missing constraint. General kinds, family occurrences
-in aliases, generated newtype or via equations,
-and partial applications also need separate formation rules.
+The family must mention every class parameter. A parameter can occur as an
+invisible kind argument. The family can take extra arguments and return a
+type of any kind. For example, `Echo (x :: k) :: k` in class `KnownIndex k`
+requires `KnownIndex (Maybe a)` when applied to a runtime `x :: Maybe a`.
+The Showcase uses `Allowed a` to satisfy that instance. It checks a
+`Just False`, a `Nothing`, and a proof whose index is left unevaluated.
+
+A partial application in a written value signature can determine the
+whole domain. For example, `Echo :: Maybe Bool %U -> Maybe Bool` already
+supplies the class parameter. Bare `Elem` still needs the parameter of
+`Collects c`. R23 also checks the matchability and the reader's permission
+to write a partial application. Each marked instance needs an equation
+or default. Family occurrences in type synonym definitions and generated
+newtype or via equations still need separate formation rules.
+[Proposal #177 and its review](https://github.com/ghc-proposals/ghc-proposals/pull/177)
+and [proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html).
 
 ### Family domains under a retained binder
 

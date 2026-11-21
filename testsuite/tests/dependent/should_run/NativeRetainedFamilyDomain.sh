@@ -11,13 +11,15 @@ cp "$src/ConstrainedElements.hs" .
 cd client
 cp ../ConstrainedElements.hi "$src/ConstrainedElementsClient.hs" "$src/NativeRetainedFamilyDomain.hs" .
 "${ghc[@]}" -c ConstrainedElementsClient.hs
-for mode in WRONG_TAG LATE_GIVEN CALLBACK_ESCAPE CALLBACK_MISSING MISSING; do
+"${ghc[@]}" -fforce-recomp -DKNOWN_PREFIX -c NativeRetainedFamilyDomain.hs
+for mode in MISSING_PREFIX MISSING_KIND WRONG_TAG LATE_GIVEN CALLBACK_ESCAPE CALLBACK_MISSING MISSING; do
     if "${ghc[@]}" -fforce-recomp "-D$mode" -fdefer-type-errors -c NativeRetainedFamilyDomain.hs > failure 2>&1; then
         echo "Accepted $mode"
         exit 1
     fi
     grep -Eq '^NativeRetainedFamilyDomain.hs:[0-9]+:[0-9]+: error: \[GHC-39999\]' failure
     case "$mode" in
+        MISSING_PREFIX|MISSING_KIND) grep -Fq 'Allowed Int' failure ;;
         WRONG_TAG)
             grep -Fq 'Could not deduce' failure
             grep -Fq 'Collects (FieldKey b)' failure

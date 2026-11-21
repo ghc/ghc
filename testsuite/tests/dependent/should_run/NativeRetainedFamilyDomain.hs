@@ -1,10 +1,23 @@
-{-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, FlexibleContexts, RankNTypes, ScopedTypeVariables, TypeFamilies #-}
+{-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, FlexibleContexts, Modifiers, RankNTypes, ScopedTypeVariables, TypeFamilies, TypeOperators #-}
 module NativeRetainedFamilyDomain where
 
-import ConstrainedElements (Collects(..), FieldKey)
+import ConstrainedElements (Collects(..), FieldKey, KnownIndex(..))
 import Data.Proxy (Proxy(..))
+import Data.Type.Equality ((:~:)(Refl))
+import GHC.Matchability (U)
 
-#ifdef WRONG_TAG
+#if defined(KNOWN_PREFIX)
+data Uses (f :: Maybe Bool %U -> Maybe Bool) = Uses
+prefix :: Uses Echo
+prefix = Uses
+#elif defined(MISSING_PREFIX)
+data Uses (f :: Maybe Int %U -> Maybe Int) = Uses
+prefix :: Uses Echo
+prefix = Uses
+#elif defined(MISSING_KIND)
+missingKind :: Echo ('Nothing :: Maybe Int) :~: 'Nothing
+missingKind = Refl
+#elif defined(WRONG_TAG)
 different :: foreach (a :: Bool) -> foreach (b :: Bool)
           -> Collects (FieldKey a) => Proxy '(a, Elem (FieldKey b))
 different _ _ = Proxy
