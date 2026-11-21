@@ -2,7 +2,7 @@
 module PreludeFilterCutoff (CutoffBound(..), decideRow, packCutoff, showCutoffBound) where
 
 import PreludeFilterLengthProof (AtMost)
-import PreludeFilterRuntime (BooleanResult, decideBy, runtimeFilterBoundFor)
+import PreludeFilterRuntime (BooleanResult, decideBy, filterBoundBy)
 import PreludeFilterSource (FilterWith)
 import PreludeMapLengthSize (Size(..), size)
 import PreludeMapLengthSource (Count)
@@ -33,7 +33,7 @@ packCutoff :: Size -> [[Bool]] -> CutoffBound
 packCutoff cutoff rows =
     let predicate :: [Bool] -> Bool
         predicate row = fits cutoff row
-        bound = runtimeFilterBoundFor @[Bool] (type predicate) (decideRow predicate) rows
+        bound = filterBoundBy @[Bool] predicate rows
     in CutoffBound predicate rows bound
 
 -- | Show the bound, the retained row sizes, and the original row count.

@@ -3,7 +3,7 @@
 module PreludeFilterRuntime
     ( BooleanResult(..), booleanResult, decideBy, negationResult
     , RuntimeFilterBound(..), runtimeFilterBound, runtimeFilterBoundWith
-    , runtimeFilterBoundFor, packRuntimeBound
+    , runtimeFilterBoundFor, filterBoundBy, filterReport, packRuntimeBound
     , showRuntimeBound ) where
 
 import Data.Kind (Type)
@@ -53,6 +53,19 @@ runtimeFilterBoundFor :: forall (a :: Type). forall (p :: a %U -> Bool) ->
                       -> foreach (xs :: [a])
                       -> AtMost (Count (FilterWith p xs)) (Count xs)
 runtimeFilterBoundFor (type p) decide xs = filterLengthBound (runtimeSteps @a @p decide xs)
+
+-- | Bound a finite filter using the predicate that runs on its elements.
+filterBoundBy :: forall (a :: Type). foreach (p :: a -> Bool)
+              -> foreach (xs :: [a]) -> AtMost (Count (FilterWith p xs)) (Count xs)
+filterBoundBy p xs = runtimeFilterBoundFor @a (type p) (decideBy @a p) xs
+
+-- | Show a filter bound in the scope of its predicate and input.
+filterReport :: forall (a :: Type). foreach (p :: a -> Bool)
+             -> foreach (xs :: [a]) -> ([a], String)
+filterReport p xs = (P.filter p xs, show bound)
+  where
+    bound :: AtMost (Count (FilterWith p xs)) (Count xs)
+    bound = filterBoundBy @a p xs
 
 -- | Bound the filtered size of a finite Boolean list with a checked decider.
 runtimeFilterBoundWith :: forall (p :: Bool %U -> Bool) ->
