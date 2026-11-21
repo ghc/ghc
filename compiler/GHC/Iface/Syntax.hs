@@ -403,7 +403,7 @@ data IfaceConDecl
           -- or 1-1 corresp with arg tys
           -- See Note [Bangs on imported data constructors] in GHC.Types.Id.Make
         ifConSrcStricts :: [IfaceSrcBang], -- empty meaning no src stricts
-        ifConLateTyVarCount :: !Int } -- Required binders after the value fields
+        ifConLateTyVarCount :: !Int } -- Late binder count or context-only marker
 
 type IfaceEqSpec = [(IfLclName,IfaceType)]
 
@@ -1737,10 +1737,10 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
     ex_tvbs = dropList tc_binders user_tvbs
     ppr_ex_quant = pprIfaceForAllPartMust (map (ifaceUnmatchable,) ex_tvbs) ctxt
     (early, late)
-      | late_count == 0 = (user_tvbs, [])
+      | late_count <= 0 = (user_tvbs, [])
       | otherwise = splitAt (length user_tvbs - late_count) user_tvbs
     (early_ctxt, late_ctxt)
-      | ifaceHasTrailingContext late = ([], ctxt)
+      | late_count == gadtTrailingContextOnly || ifaceHasTrailingContext late = ([], ctxt)
       | otherwise = (ctxt, [])
     pp_gadt_res_ty = pprIfaceForAllPart (map (ifaceUnmatchable,) late) late_ctxt
                                        (mk_user_con_res_ty eq_spec)
@@ -2817,7 +2817,10 @@ instance Binary IfaceConDecls where
     put_ bh IfAbstractTyCon  = putByte bh 0
     put_ bh (IfDataTyCon False cs)
       | any (/= 0) late = do
-          requireIfaceEvidenceVersion bh TerminalGadtForAllEvidence
+          when (any (> 0) late) $
+            requireIfaceEvidenceVersion bh TerminalGadtForAllEvidence
+          when (gadtTrailingContextOnly `elem` late) $
+            requireIfaceEvidenceVersion bh TerminalGadtContextOnlyEvidence
           when (any has_trailing_context cs) $
             requireIfaceEvidenceVersion bh TerminalGadtTrailingContextEvidence
           when (any has_leading_context cs) $
@@ -2829,11 +2832,11 @@ instance Binary IfaceConDecls where
       where
         late = map ifConLateTyVarCount cs
         has_trailing_context con =
-          ifConLateTyVarCount con /= 0 &&
+          ifConLateTyVarCount con > 0 &&
           let binders = ifConUserTvBinders con
           in ifaceHasTrailingContext (drop (length binders - ifConLateTyVarCount con) binders)
         has_leading_context con =
-          ifConLateTyVarCount con /= 0 && not (null (ifConCtxt con)) &&
+          ifConLateTyVarCount con > 0 && not (null (ifConCtxt con)) &&
           not (has_trailing_context con)
     put_ bh (IfDataTyCon True cs) = putByte bh 2 >> put_ bh cs
     put_ bh (IfNewTyCon c)   = putByte bh 3 >> put_ bh c
@@ -2847,7 +2850,9 @@ instance Binary IfaceConDecls where
             4 -> do
                 cons <- get bh
                 late <- get bh
-                if cons `equalLength` late && all (>= 0) late && any (> 0) late
+                if cons `equalLength` late
+                   && all (\n -> n >= 0 || n == gadtTrailingContextOnly) late
+                   && any (/= 0) late
                   then return (IfDataTyCon False (zipWith set_count cons late))
                   else fail "Invalid terminal constructor foralls in interface"
             _ -> error "Binary(IfaceConDecls).get: Invalid IfaceConDecls"

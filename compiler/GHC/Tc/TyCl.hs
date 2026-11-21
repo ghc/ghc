@@ -2796,7 +2796,7 @@ kcConDecl _ new_or_data _tc_res_kind
     kcRuntimeGadtConBndrs outer_bndrs inner_bndrs $
     do { traceTc "kcConDecl:GADT {" (ppr names $$ ppr res_ty)
        ; con_res_kind <- newOpenTypeKind
-       ; case HsDecls.splitGadtTerminalForAll args res_ty of
+       ; case HsDecls.splitGadtTerminal args res_ty of
            Nothing -> discardResult $ tcCheckLHsTypeInContext res_ty (TheKind con_res_kind)
            Just (nodes, _, result) ->
              kcRuntimeConTelescope nodes $
@@ -5360,13 +5360,13 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
   = addErrCtxt (DataConDefCtxt names) $
     do { traceTc "tcConDecl 1 gadt" (ppr names)
        ; let L _ name :| _ = names
-       ; let (terminal, late_count, hs_result)
-               = case HsDecls.splitGadtTerminalForAll hs_args hs_res_ty of
+       ; let (terminal, terminal_order, hs_result)
+               = case HsDecls.splitGadtTerminal hs_args hs_res_ty of
                    Nothing -> ([], 0, hs_res_ty)
                    Just groups -> groups
        ; let is_context (L _ HsGadtContext{}) = True
              is_context _ = False
-       ; when (late_count /= 0 &&
+       ; when (terminal_order /= 0 &&
                (new_or_data == NewType ||
                 (any is_context terminal && any is_context inner_bndrs))) $
            setSrcSpanA (getLoc hs_res_ty) $
@@ -5438,7 +5438,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
              ; rep_nm   <- newTyConRepName name
 
              ; let bang_opts = SrcBangOpts (initBangOpts dflags)
-             ; buildDataConWithTelescope late_count [] fam_envs bang_opts name is_infix
+             ; buildDataConWithTelescope terminal_order [] fam_envs bang_opts name is_infix
                             rep_nm stricts field_lbls
                             univ_tvs ex_tvs tvbndrs' eq_preds
                             ctxt' arg_tys' res_ty' rep_tycon tag_map
@@ -6447,14 +6447,17 @@ checkValidDataCon dflags existential_ok tc con
             --    type family Star where Star = Type
             --    newtype T :: Type where MkT :: Int -> (T :: Star)
 
-        ; when (dataConLateTyVarCount con /= 0) $
+        ; when (dataConTerminalOrder con /= 0) $
             do { let (early, late) = dataConUserTyVarGroups con
                      (_, ex_tvs, eq_spec, theta, _, _) = dataConFullSig con
                      prefix_theta = if dataConHasTrailingContext con then [] else theta
                      prefix_types = map (varType . binderVar) early ++ prefix_theta ++
                        concatMap (\(Scaled mult ty) -> [mult, ty]) arg_tys
                      late_vars = mkVarSet (binderVars late)
-               ; checkTc (null ex_tvs && null eq_spec
+               ; checkTc ((null ex_tvs ||
+                            (dataConTerminalOrder con == gadtTrailingContextOnly &&
+                             all isTyVar ex_tvs))
+                          && null eq_spec
                           && null (dataConStupidTheta con)
                           && not (isDataFamInstTyCon tc)
                           && not (isTypeDataCon con)

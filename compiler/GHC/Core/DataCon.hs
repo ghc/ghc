@@ -32,7 +32,7 @@ module GHC.Core.DataCon (
         dataConUnivTyVars, dataConExTyCoVars, dataConUnivAndExTyCoVars,
         dataConConcreteTyVars,
         dataConUserTyVars, dataConUserTyVarBinders,
-        dataConLateTyVarCount, dataConUserTyVarGroups, dataConHasTrailingContext,
+        dataConTerminalOrder, dataConLateTyVarCount, dataConUserTyVarGroups, dataConHasTrailingContext,
         dataConTheta,
         dataConStupidTheta,
         dataConOtherTheta,
@@ -463,7 +463,7 @@ data DataCon
         --    with the set of dcUnivTyVars whose tyvars do not appear in dcEqSpec
         -- So dcUserTyVarBinders is a subset of (dcUnivTyVars ++ dcExTyCoVars)
         -- See Note [DataCon user type variable binders]
-        dcLateTyVarCount :: !Int,
+        dcLateTyVarCount :: !Int, -- Includes the context-only marker
         dcUserTyVarBinders :: [TyVarBinder],
 
         dcEqSpec :: [EqSpec],   -- Equalities derived from the result type,
@@ -1157,7 +1157,7 @@ mkDataConWithRetainedArgs = mkDataConWithTelescope 0
 
 -- | Build a constructor with an ordered source telescope.
 -- See Notes [Terminal constructor type arguments] and [Retained constructor field telescopes].
-mkDataConWithTelescope :: Int          -- ^ Type binders following the value fields
+mkDataConWithTelescope :: Int          -- ^ Terminal constructor order
           -> [Maybe Id]               -- ^ Retained binders, aligned with original fields
           -> Name
           -> Bool               -- ^ Is the constructor declared infix?
@@ -1307,7 +1307,7 @@ mkDataConWithTelescope late_tyvar_count arg_binders name declared_infix prom_inf
     prom_arg_bndrs   = [ mkAnonTyConBinder (mkTyVar n t)
      {- Visible -}     | (n,t) <- dropList theta fresh_names `zip` map scaledThing orig_arg_tys ]
     (early_prom_bndrs, late_prom_bndrs)
-      | late_tyvar_count == 0 = (prom_tv_bndrs, [])
+      | late_tyvar_count <= 0 = (prom_tv_bndrs, [])
       | otherwise = splitAt (length prom_tv_bndrs - late_tyvar_count) prom_tv_bndrs
     prom_bndrs       = early_prom_bndrs ++ prom_arg_bndrs ++ late_prom_bndrs
     prom_res_kind    = orig_res_ty
@@ -1327,7 +1327,7 @@ mkDataConWithTelescope late_tyvar_count arg_binders name declared_infix prom_inf
       = pprPanic "promoteDataCon: retained field telescope" (ppr name)
 
     roles field_role
-      | late_tyvar_count /= 0
+      | late_tyvar_count > 0
       = map (const Nominal) early_prom_bndrs
         ++ map (const field_role) prom_arg_bndrs
         ++ map (const Nominal) late_prom_bndrs
@@ -1476,21 +1476,26 @@ dataConUserTyVars (MkData { dcUserTyVarBinders = tvbs }) = binderVars tvbs
 dataConUserTyVarBinders :: DataCon -> [TyVarBinder]
 dataConUserTyVarBinders = dcUserTyVarBinders
 
--- | Number of required type arguments after the value fields.
-dataConLateTyVarCount :: DataCon -> Int
-dataConLateTyVarCount = dcLateTyVarCount
+-- | Encoded terminal order for the interface writer.
+dataConTerminalOrder :: DataCon -> Int
+dataConTerminalOrder = dcLateTyVarCount
 
--- | Does the constructor's context follow its fields and specified binders?
+-- | Number of type arguments after the value fields.
+dataConLateTyVarCount :: DataCon -> Int
+dataConLateTyVarCount = max 0 . dcLateTyVarCount
+
+-- | Does the context follow the fields and any late type binders?
 -- See Note [Terminal constructor type arguments].
 dataConHasTrailingContext :: DataCon -> Bool
 dataConHasTrailingContext con
+  | dataConTerminalOrder con == gadtTrailingContextOnly = True
   | (_, Bndr _ vis : _) <- dataConUserTyVarGroups con = isSpecifiedForAllTyFlag vis
   | otherwise = False
 
 -- | The type binders before and after the value fields.
 dataConUserTyVarGroups :: DataCon -> ([TyVarBinder], [TyVarBinder])
 dataConUserTyVarGroups (MkData { dcUserTyVarBinders = binders, dcLateTyVarCount = late })
-  | late == 0 = (binders, [])
+  | late <= 0 = (binders, [])
   | otherwise = splitAt (length binders - late) binders
 
 -- | Dependent (kind-level) equalities in a constructor.
@@ -1759,9 +1764,10 @@ binds all type variables and evidence before its representation fields.
 
 The supported terminal groups are distinct. A required group can have a
 context before the fields. A specified group has its context after its
-binders and has no context before the fields. The late binder count and
-its visibility identify these forms without another DataCon field. A
-pattern receives the Givens from a trailing context after its earlier
+binders and has no context before the fields. A context alone can also
+follow the fields. It uses the context-only marker in the terminal order
+field. The wrapper and pattern operations use the decoded binder count
+and context position. A pattern receives the Givens from a trailing context after its earlier
 field and type patterns. The wrapper takes each dictionary in the same
 place as its source constraint. The promoted constructor follows source
 argument order when it has a promotable context.

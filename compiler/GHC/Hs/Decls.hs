@@ -74,7 +74,7 @@ module GHC.Hs.Decls (
   ConDecl(..), LConDecl,
   HsConDeclH98Details, HsConDeclGADTDetails(..),
   AnnConDeclGADT(..),
-  hsConDeclTheta, splitGadtTerminalForAll,
+  hsConDeclTheta, splitGadtTerminal,
   getConNames, getRecConArgs_maybe,
   -- ** Document comments
   DocDecl(..), LDocDecl, docDeclDoc,
@@ -999,9 +999,9 @@ pprConDeclTelescope teles body = foldr step (body <> closes) teles
 
 -- | Recognize the supported groups after a nonempty prefix of fields.
 -- Keep them in the parsed result to preserve their source order.
-splitGadtTerminalForAll :: HsConDeclGADTDetails (GhcPass pass) -> LHsType (GhcPass pass)
+splitGadtTerminal :: HsConDeclGADTDetails (GhcPass pass) -> LHsType (GhcPass pass)
                         -> Maybe ([LHsGadtTelescope (GhcPass pass)], Int, LHsType (GhcPass pass))
-splitGadtTerminalForAll (PrefixConGADT _ (_ : _)) ty
+splitGadtTerminal (PrefixConGADT _ (_ : _)) ty
   | L loc HsForAllTy { hst_tele = tele, hst_body = body } <- ignoreParens ty
   , let group = L loc (HsGadtForAll noExtField tele)
   = case tele of
@@ -1016,6 +1016,10 @@ splitGadtTerminalForAll (PrefixConGADT _ (_ : _)) ty
         , plain_result result ->
           Just ([group, mkHsGadtContext ctxt], length binders, result)
       _ -> Nothing
+  | L _ HsQualTy { hst_ctxt = ctxt, hst_body = result } <- ignoreParens ty
+  , not (null (hsConDeclTheta (Just ctxt)))
+  , plain_result result
+  = Just ([mkHsGadtContext ctxt], gadtTrailingContextOnly, result)
   where
     plain_result result = case unLoc (ignoreParens result) of
       HsForAllTy{} -> False
@@ -1023,7 +1027,7 @@ splitGadtTerminalForAll (PrefixConGADT _ (_ : _)) ty
       HsFunTy{} -> False
       HsQualTy{} -> False
       _ -> True
-splitGadtTerminalForAll _ _ = Nothing
+splitGadtTerminal _ _ = Nothing
 
 {- Note [Constructor telescope contexts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -200,7 +200,7 @@ buildDataConWithRetainedArgs = buildDataConWithTelescope 0
 
 -- | Build a constructor with an ordered source telescope.
 -- Retained fields use the direct lazy representation, without a wrapper.
-buildDataConWithTelescope :: Int         -- ^ Type binders after fields
+buildDataConWithTelescope :: Int         -- ^ Terminal constructor order
                             -> [Maybe Id] -- ^ Retained field binders, or []
                             -> FamInstEnvs
             -> DataConBangOpts

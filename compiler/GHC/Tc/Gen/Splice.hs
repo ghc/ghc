@@ -3635,7 +3635,7 @@ reifyDataCon isGadtDataCon tys dc
              g_arg_tys = map (substScaledTy tvb_subst) g_arg_tys'
              g_res_ty  = substTy tvb_subst g_res_ty'
              ordered_args
-               | null late_tvs = retained
+               | dataConTerminalOrder dc == 0 = retained
                | otherwise = map (const Nothing) g_arg_tys
 
        ; r_arg_tys <- if null ordered_args
@@ -3646,7 +3646,8 @@ reifyDataCon isGadtDataCon tys dc
            if | not (null ordered_args) -> do
                   { (args, result) <- reifyRetainedGadtArgs ordered_args dcdBangs g_arg_tys g_res_ty
                   ; result' <- case late_tvs of
-                      [] -> pure result
+                      [] -> do { ctxt <- reifyCxt late_theta
+                               ; pure (if null ctxt then result else TH.ForallT [] ctxt result) }
                       -- Keep the whole group in one forall node.
                       -- See Note [Terminal constructor foralls in TH] in GHC.ThToHs.
                       _ -> do { ma <- reifyType unmatchableDataConTy

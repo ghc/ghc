@@ -22,6 +22,7 @@ module GHC.Types.Basic (
         pickLR,
 
         ConTag, ConTagZ, fIRST_TAG,
+        gadtTrailingContextOnly,
 
         Arity, VisArity, RepArity, JoinArity, FullArgCount,
         JoinPointHood(..), isJoinPoint,
@@ -156,6 +157,12 @@ fIRST_TAG :: ConTag
 -- ^ Tags are allocated from here for real constructors
 --   or for superclass selectors
 fIRST_TAG =  1
+
+-- | Terminal constructor order for a context with no late type binders.
+-- Zero denotes the ordinary order. Positive values count late type binders.
+-- See Note [Terminal constructor type arguments] in GHC.Core.DataCon.
+gadtTrailingContextOnly :: Int
+gadtTrailingContextOnly = -1
 
 {-
 ************************************************************************

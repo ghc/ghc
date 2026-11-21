@@ -353,7 +353,7 @@ evidenceSuffix requirements
     || needs ExperimentalScopedDictionaryEvidence
     || needs ExperimentalScopedDictionaryCoreEvidence || needs RetainedDataFamilyConOperandEvidence
     || needs TerminalGadtForAllEvidence || needs TerminalGadtContextEvidence
-    || needs TerminalGadtTrailingContextEvidence = feature_set
+    || needs TerminalGadtTrailingContextEvidence || needs TerminalGadtContextOnlyEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -389,6 +389,7 @@ legacyEvidenceSuffix RetainedDataFamilyConOperandEvidence = featureSetPrefix ++ 
 legacyEvidenceSuffix TerminalGadtForAllEvidence = featureSetPrefix ++ "terminal-gadt-forall"
 legacyEvidenceSuffix TerminalGadtContextEvidence = featureSetPrefix ++ "terminal-gadt-context"
 legacyEvidenceSuffix TerminalGadtTrailingContextEvidence = featureSetPrefix ++ "terminal-gadt-trailing-context"
+legacyEvidenceSuffix TerminalGadtContextOnlyEvidence = featureSetPrefix ++ "terminal-gadt-context-only"
 legacyEvidenceSuffix GeneralIndexedConstructorOperandEvidence = featureSetPrefix ++ "general-indexed-constructor-operand"
 legacyEvidenceSuffix DepFunCoEvidence           = "-retained-depfunco-v1"
 legacyEvidenceSuffix ConstructorCaseEvidence   = "-retained-constructor-case-v1"
@@ -432,7 +433,8 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("retained-data-family-constructor-operand", RetainedDataFamilyConOperandEvidence)
                       , ("terminal-gadt-forall", TerminalGadtForAllEvidence)
                       , ("terminal-gadt-context", TerminalGadtContextEvidence)
-                      , ("terminal-gadt-trailing-context", TerminalGadtTrailingContextEvidence) ]
+                      , ("terminal-gadt-trailing-context", TerminalGadtTrailingContextEvidence)
+                      , ("terminal-gadt-context-only", TerminalGadtContextOnlyEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion

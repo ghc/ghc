@@ -243,7 +243,7 @@ tyConToIfaceDecl env tycon
                     ifConUnivTvs = map toIfaceBndr univ_tvs',
                     ifConExTCvs  = map toIfaceBndr ex_tvs',
                     ifConUserTvBinders = toIfaceForAllTyBndrs user_bndrs',
-                    ifConLateTyVarCount = dataConLateTyVarCount data_con,
+                    ifConLateTyVarCount = dataConTerminalOrder data_con,
                     ifConEqSpec  = map (to_eq_spec . eqSpecPair) eq_spec,
                     ifConCtxt    = tidyToIfaceContext con_env3 theta,
                     ifConArgTys  = if_arg_tys,

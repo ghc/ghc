@@ -1639,9 +1639,10 @@ zonk_pat p@(ConPat { pat_con = L con_loc con
         ; new_evs     <- zonkEvBndrsX evs
         ; (new_binds, new_wrapper, new_args) <- case con of
             RealDataCon dc | dataConHasTrailingContext dc ->
-              do { args' <- zonkConStuff args
+              do { wrapper' <- zonkCoFn wrapper
+                 ; args' <- zonkConStuff args
                  ; binds' <- zonkTcEvBinds binds
-                 ; pure (binds', wrapper, args') }
+                 ; pure (binds', wrapper', args') }
             _ -> do { binds' <- zonkTcEvBinds binds
                     ; wrapper' <- zonkCoFn wrapper
                     ; args' <- zonkConStuff args

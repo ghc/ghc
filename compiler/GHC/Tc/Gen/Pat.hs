@@ -1396,18 +1396,23 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
                   Nothing -> return Nothing
                 result <- thing_inside proof
                 return (proof, result)
-        ; (ev_binds, (arg_pats', (extra_proof, res)))
+        ; let skol = getSkolemInfo skol_info
+        ; (early_wrap, ev_binds, arg_pats', (extra_proof, res))
              <- tcConTyArgs tenv penv univ_ty_args $
                 if trailing_context
-                then do { (arg_pats', (ev_binds, result)) <-
+                then do { (early_binds, (pats, (late_binds, result))) <-
+                            checkConstraints skol ex_tvs' [] $
+                            tcConTyArgs tenv penv ex_ty_args $
                             tcConValArgs con_like field_tys penv val_arg_pats $
                             tcConTyArgs tenv penv late_ty_args $
-                            checkConstraints (getSkolemInfo skol_info) ex_tvs' given check_body
-                        ; return (ev_binds, (arg_pats', result)) }
-                else checkConstraints (getSkolemInfo skol_info) ex_tvs' given $
-                     tcConTyArgs tenv penv ex_ty_args $
-                     tcConValArgs con_like field_tys penv val_arg_pats $
-                     tcConTyArgs tenv penv late_ty_args check_body
+                            checkConstraints skol [] given check_body
+                        ; return (mkWpLet early_binds, late_binds, pats, result) }
+                else do { (binds, (pats, result)) <-
+                             checkConstraints skol ex_tvs' given $
+                             tcConTyArgs tenv penv ex_ty_args $
+                             tcConValArgs con_like field_tys penv val_arg_pats $
+                             tcConTyArgs tenv penv late_ty_args check_body
+                        ; return (idHsWrapper, binds, pats, result) }
 
         ; let res_pat = ConPat
                 { pat_con   = header
@@ -1417,7 +1422,7 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
                   , cpt_dicts = given ++ maybeToList extra_proof
                   , cpt_binds = ev_binds
                   , cpt_arg_tys = ctxt_res_tys
-                  , cpt_wrap  = idHsWrapper
+                  , cpt_wrap  = early_wrap
                   }
                 }
         ; return (mkHsWrapPat wrap res_pat pat_ty, res)

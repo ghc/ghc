@@ -1259,11 +1259,15 @@ tcIfaceDataCons tycon_name tycon if_cons
                          ifConArgTys = args, ifConFields = lbl_names,
                          ifConStricts = if_stricts,
                          ifConSrcStricts = if_src_stricts,
-                         ifConLateTyVarCount = late_count})
-     = do { when (late_count /= 0) $
-              unless (late_count > 0 && late_count <= length user_bndrs &&
-                      has_wrapper && not (null args) &&
-                      null arg_binders && null ex_bndrs && null spec &&
+                         ifConLateTyVarCount = terminal_order})
+     = do { let context_only = terminal_order == gadtTrailingContextOnly
+                late_count = max 0 terminal_order
+                admissible_order
+                  | context_only = not (null ctxt) && ordinary_data && all type_binder ex_bndrs
+                  | otherwise = late_count > 0 && late_count <= length user_bndrs && null ex_bndrs
+          ; when (terminal_order /= 0) $
+              unless (admissible_order && has_wrapper && not (null args) &&
+                      null arg_binders && null spec &&
                       null lbl_names) $
                 failIfM (text "Invalid terminal constructor foralls in interface:" <+> ppr dc_name)
           ; unless (null arg_binders) $
@@ -1285,7 +1289,8 @@ tcIfaceDataCons tycon_name tycon if_cons
 
         ; let (early, late) = splitAt (length user_tvs - late_count) user_tvs
               late_vars = mkVarSet (binderVars late)
-              trailing_context = late_count /= 0 && all (isSpecifiedForAllTyFlag . binderFlag) late
+              trailing_context = context_only ||
+                (late_count /= 0 && all (isSpecifiedForAllTyFlag . binderFlag) late)
               check_prefix_scope tys = when (late_count /= 0) $
                 unless (disjointVarSet late_vars (tyCoVarsOfTypes tys)) $
                   failIfM (text "Invalid terminal constructor binder scope:" <+> ppr dc_name)
@@ -1337,7 +1342,7 @@ tcIfaceDataCons tycon_name tycon if_cons
             -- it'll use these to guide the construction of a worker.
             -- See Note [Bangs on imported data constructors] in GHC.Types.Id.Make
 
-        ; con <- buildDataConWithTelescope late_count
+        ; con <- buildDataConWithTelescope terminal_order
                        (if null arg_binders then [] else retained_binders)
                        (pprPanic "tcIfaceDataCons: FamInstEnvs" (ppr dc_name))
                        bang_opts
@@ -1349,6 +1354,13 @@ tcIfaceDataCons tycon_name tycon if_cons
                        arg_tys orig_res_ty tycon tag_map
         ; traceIf (text "Done interface-file tc_con_decl" <+> ppr dc_name)
         ; return con } }
+
+    ordinary_data = case if_cons of
+                      IfDataTyCon False _ -> True
+                      _                   -> False
+
+    type_binder (IfaceTvBndr _) = True
+    type_binder _              = False
 
     -- Check only interface syntax here. The parent TyCon is still knot-tied.
     check_retained_shape name wrapper binders args univs users exs spec ctxt fields bangs src_bangs
@@ -1373,11 +1385,6 @@ tcIfaceDataCons tycon_name tycon if_cons
         names = [n | Just n <- binders]
         univ_names = map ifaceBndrName univs
         user_names = [ifaceBndrName b | Bndr b _ <- users]
-        ordinary_data = case if_cons of
-                          IfDataTyCon False _ -> True
-                          _                   -> False
-        type_binder (IfaceTvBndr _) = True
-        type_binder _              = False
         lazy_bang IfNoBang = True
         lazy_bang _        = False
         lazy_src_bang (IfSrcBang unpack strict)

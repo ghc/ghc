@@ -3134,7 +3134,7 @@ repGadtDataCons cons details res_ty
          case details of
            PrefixConGADT _ ps
              | hsHasForEachTy (unLoc res_ty)
-             || isJust (HsDecls.splitGadtTerminalForAll details res_ty) -> do
+             || isJust (HsDecls.splitGadtTerminal details res_ty) -> do
                prefix <- mapM rep_field ps
                repRetainedGadt (nonEmptyCoreList' cons') prefix res_ty
            PrefixConGADT _ ps -> do

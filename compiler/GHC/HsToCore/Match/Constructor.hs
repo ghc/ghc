@@ -393,15 +393,22 @@ matchOneConLike scrut vars ty (eqn1 :| eqns)   -- All eqns for a single construc
                                     , pat_con_ext = ConPatTc
                                       { cpt_tvs = tvs
                                       , cpt_dicts = ds
-                                      , cpt_binds = bind }})
+                                      , cpt_binds = bind
+                                      , cpt_wrap = pat_wrap }})
                     , eqn_rest = rest })
-                = dsTcEvBinds bind $ \ds_bind -> do
-                    let wrap = wrapBinds (tvs `zip` tvs1) . wrapBinds (ds `zip` dicts1)
-                        fields = conArgPats val_arg_tys args
-                    return $ case con1 of
-                      RealDataCon con | dataConHasTrailingContext con, not (null ds_bind) ->
-                        (wrap, prependPats fields (EqnScope ds_bind rest))
-                      _ -> (wrap . mkCoreLets ds_bind, prependPats fields rest)
+                | RealDataCon con <- con1, dataConHasTrailingContext con
+                = dsHsWrapper pat_wrap $ \early_wrap ->
+                  dsTcEvBinds bind $ \ds_bind ->
+                    let scoped
+                          | null ds_bind = rest
+                          | otherwise = EqnScope ds_bind rest
+                    in return (wrap . early_wrap, prependPats fields scoped)
+                | otherwise
+                = dsTcEvBinds bind $ \ds_bind ->
+                    return (wrap . mkCoreLets ds_bind, prependPats fields rest)
+                where
+                  wrap = wrapBinds (tvs `zip` tvs1) . wrapBinds (ds `zip` dicts1)
+                  fields = conArgPats val_arg_tys args
               shift (_, eqn) = pprPanic "matchOneCon/shift" (ppr eqn)
         ; let scaled_arg_tys = map (scaleScaled mult) val_arg_tys
             -- The 'val_arg_tys' are taken from the data type definition, they
@@ -535,6 +542,11 @@ The outer constructor case binds the stored Eq dictionary. The Evidence case
 binds Ord. Bind the solved evidence after all field patterns, before any
 following argument patterns or guards. EqnScope records this point in the
 row. Its bindings are available only after the preceding patterns match.
+
+For a context after fields without a late forall, early existential binders
+are in scope during field checking. Check the fields under those skolems
+and bring in the trailing Givens in a separate implication. The pattern
+wrapper binds evidence from field checking before matching the fields.
 -}
 
 -- | Rename a later row's retained fields to the fields bound by the shared case.
