@@ -7318,8 +7318,10 @@ Proposal #364 makes `GHC.TypeNats.Nat` a synonym for `Natural`. GHC
 already gives type-level numerals this kind. A nonnegative retained
 numeral uses the same `NumTyLit` when the ordinary checker selects the
 standard `Num Natural` dictionary. A local `fromInteger` or a separate
-Given cannot justify that conversion. The fork's Peano `Nat` still uses
-checked zero and successor equations.
+Given cannot justify that conversion. The proposal discussion preserves
+the distinction between nonnegative type-level literals and negative
+term syntax that can underflow. The fork's Peano `Nat` still uses checked
+zero and successor equations.
 
 Agda uses its built-in `Nat` for numerals by default and uses a separate
 `FROMNAT` hook for overloaded conversions. This patch reuses the
@@ -7332,5 +7334,6 @@ lowering the large literal to a byte array. Interface readers check
 the original boxed Core. An unfolding that contains a retained
 Natural operand adds the `retained-natural-operand` requirement.
 [GHC proposal #364](https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0364-unify-natural.rst),
+[discussion of negative literals](https://github.com/ghc-proposals/ghc-proposals/pull/364#discussion_r488890272),
 [Agda literal overloading](https://agda.readthedocs.io/en/stable/language/literal-overloading.html#natural-numbers),
 and [ordinary Natural client](examples/qualified-pi/RetainedNaturalClient.hs).
