@@ -1,6 +1,9 @@
 passed symbolic term is typed at the kind of the source skolem
 passed Prelude.id returns the symbolic operand at the skolem's kind
 passed a distinct neutral keeps its identity at the same spelling and kind
+passed read an erased callback at its source argument
+passed keep a runtime callback opaque in a lazy field
+passed reject a type argument in a value application
 passed imported Prelude.id with a rigid argument
 passed nested closure under same-spelling binders
 passed projection does not demand its divergent operand

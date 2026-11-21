@@ -12,8 +12,9 @@ import GHC.Core (Alt(..), AltCon(..), Bind(..), CoreExpr, Expr(..), maybeUnfoldi
 import GHC.Core.Make (mkCoreBoxedTuple)
 import GHC.Core.OpenWhnf
 import GHC.Core.FVs (exprSomeFreeVarsList)
-import GHC.Core.Type (Type, mkTyVarTy, mkVisFunTyManyU, typeKind)
+import GHC.Core.Type (Type, mkAppTy, mkTyVarTy, mkVisFunTyManyU, typeKind)
 import GHC.Core.TyCo.Compare (eqType)
+import GHC.Core.TyCo.Rep (Type(TermVarTy))
 import GHC.Core.Utils (exprType)
 import GHC.Data.FastString (fsLit)
 import GHC.Driver.Session (GeneralFlag(Opt_IgnoreInterfacePragmas), gopt_unset)
@@ -94,6 +95,7 @@ controls identity unfolding = do
       solved = available {definitions = extendVarEnv (definitions available) scrut (Lit (mkLitChar 'a'))}
 
   skolemControls inputs identity
+  callbackReadbackControls
   expect "imported Prelude.id with a rigid argument"
     (isRigid rigid idCall (openWhnf 32 inputs idCall))
   expect "nested closure under same-spelling binders"
@@ -193,6 +195,34 @@ skolemControls inputs identity = do
   let otherResult = openWhnf 32 inputs wrongCall
   expect "a distinct neutral keeps its identity at the same spelling and kind"
     (isRigid different wrongCall otherResult && not (isRigid operand wrongCall otherResult))
+
+-- | Read back a rigid application only with a source type variable as its head.
+callbackReadbackControls :: IO ()
+callbackReadbackControls = do
+  fUnique <- uniqFromTag LocalTag
+  xUnique <- uniqFromTag LocalTag
+  let arrow = mkVisFunTyManyU boolTy boolTy
+      f = local "callback" 30 arrow
+      x = local "payload" 31 boolTy
+      tyvar u s k = mkTyVarTy (mkTcTyVar (mkSysTvName u (fsLit s)) k vanillaSkolemTvUnk)
+      fType = tyvar fUnique "f" arrow
+      xType = tyvar xUnique "x" boolTy
+      call = App (Var f) (Var x)
+      observe head_ty expr = runIdentity $
+        openReadbackM False 32 (\_ _ -> pure Nothing) (\_ -> pure ())
+          (\v -> lookup v [(f, head_ty), (x, xType)]) (\_ -> pure True) boolTy expr
+  expect "read an erased callback at its source argument"
+    (case observe fType call of
+       Right (ty, []) -> ty `eqType` mkAppTy fType xType
+       _ -> False)
+  expect "keep a runtime callback opaque in a lazy field"
+    (case observe (TermVarTy f) call of
+       Left ReadbackOpaque{} -> True
+       _ -> False)
+  expect "reject a type argument in a value application"
+    (case observe fType (App (Var f) (Type boolTy)) of
+       Left ReadbackOpaque{} -> True
+       _ -> False)
 
 -- | Check the residual variable identity and its observed type.
 isRigid :: Id -> CoreExpr -> Either EvalFailure Whnf -> Bool
