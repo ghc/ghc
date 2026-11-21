@@ -79,6 +79,47 @@ for opt in -O0 -O2; do
     test "$(./run)" = "$expected"
 done
 
+# Read both a retained character operand and a scoped dictionary application.
+mkdir -p "$out/unicode"/{producer,client}
+cd "$out/unicode/producer"
+cat >Characters.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
+module Characters (Stored(..), store) where
+data Stored (c :: Char) where
+    Stored :: Char -> Stored c
+{-# NOINLINE store #-}
+store :: foreach (c :: Char) -> Stored c
+store c = Stored c
+HS
+"${ghc[@]}" -O0 -fomit-interface-pragmas -c Characters.hs
+sed -e '/^    ) where/a import Characters (Stored(..), store)' -e 's/, observe, observeBoth,/, word, observe, observeBoth,/' "$src/ScopedDictionaryProvider.hs" > Provider.hs
+cat >>Provider.hs <<'HS'
+{-# INLINE word #-}
+word :: () -> String
+word _ = [ case store 'λ' of Stored c -> c
+         , case store '\0' of Stored c -> c
+         , case store '🙂' of Stored c -> c ]
+HS
+"${ghc[@]}" -O2 -DSCOPED_DICTIONARY_EXPORT -fwrite-if-simplified-core -c Provider.hs
+"${ghc[@]}" --show-iface Provider.hi >show
+grep -Eq '^ *got .*retained-char-operand\+experimental-scoped-dictionary\+experimental-scoped-dictionary-core-v2$' show
+check_old_reader
+cd ../client
+cp ../producer/{Provider.hi,Characters.hi,Characters.o} .
+cat >Main.hs <<'HS'
+{-# LANGUAGE TemplateHaskell #-}
+module Main where
+import Provider (observe, word)
+import Language.Haskell.TH.Syntax (lift)
+result :: (Bool, [Int])
+result = $(lift (observe True, map fromEnum (word ())))
+main :: IO ()
+main = print result
+HS
+"${ghc[@]}" -O0 -fprefer-byte-code -fignore-interface-pragmas -c Main.hs
+"${ghc[@]}" Main.o -o read-core
+test "$(./read-core)" = '(True,[955,0,128578])'
+
 # A fresh GHCi session can reuse the provider interface and regenerate code
 # when a changed splice needs it.
 mkdir "$out/incremental"

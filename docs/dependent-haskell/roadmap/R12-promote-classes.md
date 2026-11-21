@@ -193,3 +193,10 @@ application both used expression tag 19. Public character interfaces
 keep tag 19. The combined compiler writes tag 20 for dictionary
 applications. Its v2 Core marker rejects older private serialized bodies
 at the header. Signature-only interfaces keep their existing marker.
+
+The reload test puts retained character operands and a class dictionary
+application in the same optimized provider. A Template Haskell splice
+loads its serialized Core from the provider interface. The client prints
+`(True,[955,0,128578])`. This checks that the reader distinguishes the
+retained character tag from the dictionary application tag.
+[Reload test](../../../testsuite/tests/dependent/should_run/NativeScopedDictionaryCoreReload.sh).
