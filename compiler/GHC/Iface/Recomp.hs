@@ -19,7 +19,7 @@ where
 
 import GHC.Prelude
 import GHC.Data.FastString
-import GHC.Builtin.Modules (gHC_INTERNAL_BASE, gHC_INTERNAL_ERR)
+import GHC.Builtin.Modules (gHC_INTERNAL_BASE, gHC_INTERNAL_ERR, mkGhcInternalModule)
 import GHC.Builtin.WiredIn.Types
   (boolTyConName, charTyConName, listTyConName, manyDataConName, naturalTyConName, pairTyCon
   , matchabilityTyConName, matchableDataConName, unmatchableDataConName)
@@ -612,13 +612,13 @@ checkFlagHash hsc_env iface self_recomp = do
         stamp_rules = packageRuleProviderFingerprint (mi_rules iface)
         append_fps = [append_fp, stamp_rules append_fp]
         reverse_fps = [reverse_fp, stamp_rules reverse_fp]
-        composition_stamp
-          | mi_module iface == gHC_INTERNAL_BASE =
-              find (\stamp -> stamp (checkedCompositionFingerprint reverse_fp) == file_fp)
-                [id, stamp_rules, retainedSignatureCaseFingerprint,
-                 retainedSignatureCaseFingerprint . stamp_rules]
-          | otherwise = Nothing
-        stored_fp = maybe file_fp (\stamp -> stamp reverse_fp) composition_stamp
+        source_provider = checkedSourceProvider (mi_module iface)
+        provider_stamp = do
+          (fingerprint, _) <- source_provider
+          find (\stamp -> stamp (fingerprint reverse_fp) == file_fp)
+            [id, stamp_rules, retainedSignatureCaseFingerprint,
+             retainedSignatureCaseFingerprint . stamp_rules]
+        stored_fp = maybe file_fp (\stamp -> stamp reverse_fp) provider_stamp
         (old_fp, checked_append, checked_reverse, shared_retained_cases)
           | stored_fp `elem` reverse_fps = (new_fp, True, True, False)
           | stored_fp `elem` map retainedSignatureCaseFingerprint reverse_fps = (new_fp, True, True, True)
@@ -779,12 +779,11 @@ checkFlagHash hsc_env iface self_recomp = do
                 then liftIO $ recheck "Compiler now checks list reverse equations"
                 else pure UpToDate
           | otherwise = pure UpToDate
-        check_composition
-          | isNothing composition_stamp
-          , mi_module iface == gHC_INTERNAL_BASE
+        check_source_provider
+          | isNothing provider_stamp
+          , Just (_, reason) <- source_provider
           , mi_hsc_src iface == HsSrcFile
-          , backendGeneratesCode (backend dflags) =
-              liftIO $ recheck "Compiler now checks function composition equations in GHC.Internal.Base"
+          , backendGeneratesCode (backend dflags) = liftIO $ recheck reason
           | otherwise = pure UpToDate
         check_family_uses
           | old_fp `elem` (staged_fp : class_generations) = pure UpToDate
@@ -820,7 +819,7 @@ checkFlagHash hsc_env iface self_recomp = do
     pure (flags, check_identity `recompThen` check_guarded_filter
                                      `recompThen` check_append
                                      `recompThen` check_reverse
-                                     `recompThen` check_composition
+                                     `recompThen` check_source_provider
                                      `recompThen` check_family_uses
                                      `recompThen` check_forwarded_result
                                      `recompThen` check_scoped_case
@@ -941,11 +940,26 @@ checkedListReverseFingerprint :: Fingerprint -> Fingerprint
 checkedListReverseFingerprint fp =
     computeFingerprint putNameLiterally (fp, "checked-list-reverse-v1" :: String)
 
+-- | Recheck installed providers once when a source equation is added.
+checkedSourceProvider :: Module -> Maybe (Fingerprint -> Fingerprint, String)
+checkedSourceProvider mod
+  | mod == gHC_INTERNAL_BASE =
+      Just (checkedCompositionFingerprint, "Compiler now checks function composition equations in GHC.Internal.Base")
+  | mod == mkGhcInternalModule (fsLit "GHC.Internal.List") =
+      Just (guardedPrefixFingerprint, "Compiler now checks takeWhile equations in GHC.Internal.List")
+  | otherwise = Nothing
+
 -- | Record the composition check for installed GHC.Internal.Base.
 -- See Note [Checked function composition] in GHC.Tc.Gen.SourceTable.
 checkedCompositionFingerprint :: Fingerprint -> Fingerprint
 checkedCompositionFingerprint fp =
     computeFingerprint putNameLiterally (fp, "checked-function-composition-v1" :: String)
+
+-- | Mark the installed provider checked for a guarded prefix.
+-- See Note [Checked guarded list equations] in GHC.Tc.Gen.SourceTable.
+guardedPrefixFingerprint :: Fingerprint -> Fingerprint
+guardedPrefixFingerprint fp =
+    computeFingerprint putNameLiterally (fp, "checked-guarded-list-prefix-v1" :: String)
 
 -- | Record that the compiler checked for equations derived from constructor cases.
 caseTreeFingerprint :: Fingerprint -> Fingerprint
@@ -2360,12 +2374,10 @@ mkSelfRecomp hsc_env this_mod src_hash usages = do
       let dflags = hsc_dflags hsc_env
 
       let (flag_hash, flags) = fingerprintDynFlags hsc_env this_mod putNameLiterally
-          stamp_composition
-            | this_mod == gHC_INTERNAL_BASE = checkedCompositionFingerprint
-            | otherwise = id
+          stamp_provider = maybe id fst (checkedSourceProvider this_mod)
           list_stamp
             | backendGeneratesCode (backend dflags) =
-                stamp_composition . checkedListReverseFingerprint . checkedListAppendFingerprint
+                stamp_provider . checkedListReverseFingerprint . checkedListAppendFingerprint
             | otherwise = id
           current_flag_hash = list_stamp
                             $ binaryEnumFingerprint
