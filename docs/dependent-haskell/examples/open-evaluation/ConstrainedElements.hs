@@ -1,7 +1,7 @@
-{-# LANGUAGE ConstraintKinds, DataKinds, ExperimentalDependentTypes, FlexibleContexts, FlexibleInstances, FunctionalDependencies, GADTs, Modifiers, PolyKinds, RankNTypes, ScopedTypeVariables, TypeApplications, TypeFamilies, TypeOperators, UndecidableInstances #-}
-module ConstrainedElements (Cursor(..), PrintableCursor, Collection(..), Allowed, Collects(..), FieldKey, Field(..), field, applyField, withField, KnownIndex(..), Reflection, reflectMaybe, MaybeBoolEcho, AtNothing, FormatKey, RenderFormat(..), Formatted, FieldViews(..), ViewsFor) where
+{-# LANGUAGE ConstraintKinds, DataKinds, ExperimentalDependentTypes, FlexibleContexts, FlexibleInstances, FunctionalDependencies, GADTs, Modifiers, PolyKinds, RankNTypes, ScopedTypeVariables, TypeApplications, TypeFamilies, TypeOperators, UndecidableInstances, UndecidableSuperClasses #-}
+module ConstrainedElements (Cursor(..), PrintableCursor, Collection(..), Allowed, Collects(..), BufferSource(..), BackingDomain, FieldKey, Field(..), field, applyField, withField, KnownIndex(..), Reflection, reflectMaybe, MaybeBoolEcho, AtNothing, FormatKey, RenderFormat(..), Formatted, FieldViews(..), ViewsFor) where
 
-import Data.Kind (Type)
+import Data.Kind (Constraint, Type)
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Matchability (U)
@@ -14,6 +14,20 @@ class Collects c where
 
 instance Allowed a => Collects [a] where
     type Elem [a] = a
+
+-- | The premise a buffer supplies for its representation.
+type family BackingDomain c :: Constraint
+type instance BackingDomain [a] = ()
+
+-- | Read the first value in a buffer at its element type.
+class BackingDomain c => BufferSource c where
+    type BufferElement c
+    firstBuffered :: c -> Maybe (BufferElement c)
+
+instance Allowed a => BufferSource [a] where
+    type BufferElement [a] = a
+    firstBuffered [] = Nothing
+    firstBuffered (x:_) = Just x
 
 -- | Select the element domain for a runtime flag.
 data FieldKey (tag :: Bool)

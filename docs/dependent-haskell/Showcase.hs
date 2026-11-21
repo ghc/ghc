@@ -111,7 +111,7 @@ import qualified InterpretedKindUseSite
 import qualified NestedFunctionClient
 import qualified InvisibleFamily
 import qualified LiberalCallback
-import ConstrainedElementsClient (advanceCursor, showAdvance, showRemainder, splitCollection, partialElement, aliasedReflection, annotatedElement, constrainedElements, explicitElements, formatField, renderField, renderKnownFields, retainedMaybeDomain)
+import ConstrainedElementsClient (advanceCursor, showAdvance, showRemainder, splitCollection, Buffered(..), firstBuffered, partialElement, aliasedReflection, annotatedElement, constrainedElements, explicitElements, formatField, renderField, renderKnownFields, retainedMaybeDomain)
 import ConstrainedElementsQuickLook (showReflection)
 import ConstrainedFormatClient (renderedRawView)
 import OpenArrowKindClient (openKindRows)
@@ -1135,6 +1135,8 @@ main = do
     observe "render a raw view through an ordinary wrapper around a partial family" renderedRawView
     observe "split collections whose types determine their elements"
         (splitCollection [enabled, disabled], splitCollection (Just 'x'), splitCollection (Nothing :: Maybe Char))
+    observe "read the derived element type of a list-backed buffer"
+        (firstBuffered (Buffered [enabled, disabled]), firstBuffered (Buffered [] :: Buffered Bool))
     observe "show the rest of a collection"
         (showRemainder [enabled, disabled], showRemainder (Just 'x'), showRemainder ([] :: [Bool]))
     observe "print a cursor through its constraint synonym"
