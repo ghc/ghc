@@ -2232,6 +2232,14 @@ pprTyTcApp ctxt_prec tc tys =
          $ char '?' <> ftext (getLexicalFastString n) <> dcolon <> ppr_ty topPrec ty
 
        | userStyle style, not debug, print_type_abbreviations
+       , Just owner <- stripLiftedTypeOwner "$signature-lambda:"
+                        (occNameString (nameOccName (ifaceTyConName tc)))
+       -> pprIfacePrefixApp ctxt_prec
+            (parens (text "type lambda in the signature for" <+> quotes (text owner)))
+            (map (ppr_app_arg appPrec) (appArgsIfaceTypesForAllTyFlags $
+              stripInvisArgs (PrintExplicitKinds print_kinds) tys))
+
+       | userStyle style, not debug, print_type_abbreviations
        , Just owner <- stripLiftedTypeOwner "$signature-case:"
                         (occNameString (nameOccName (ifaceTyConName tc)))
        -> maybeParen ctxt_prec funPrec $

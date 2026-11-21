@@ -4926,6 +4926,9 @@ liftedTypeOwner prefix = stripLiftedTypeOwner prefix . occNameString . getOccNam
 liftedTypeContext :: Name -> Maybe SDoc
 liftedTypeContext name
   | Just synonym <- liftedTypeOwner "$lambda:" name
+  , Just owner <- stripLiftedTypeOwner "$signature-lambda:" synonym
+  = Just (text "type lambda in the signature for" <+> quotes (text owner))
+  | Just synonym <- liftedTypeOwner "$lambda:" name
   , Just owner <- stripLiftedTypeOwner "$signature-sum:" synonym
   = Just (text "retained sum in the signature for" <+> quotes (text owner))
   | Just synonym <- liftedTypeOwner "$lambda:" name
