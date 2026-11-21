@@ -115,8 +115,7 @@ matchConFamily (var :| vars) ty groups@(group1 :| other_groups)
 
   -- See Note [Retained package equation scope].
   -- See Note [Retained constructor equation scope].
-  | any (any has_retained_fields) groups
-    || any (any has_native_proof) groups
+  | any needs_separate_rows groups
   = do { results <- mapM match_retained_row (join groups)
        ; return (foldr1 combineMatchResults results) }
 
@@ -131,6 +130,9 @@ matchConFamily (var :| vars) ty groups@(group1 :| other_groups)
        return (mkDataConCase var ty alts)
   where
     ConPat { pat_con = L _ con1 } = firstPat (NE.head group1)
+
+    needs_separate_rows (first :| rest) =
+      not (null rest) && (has_retained_fields first || any has_native_proof (first : rest))
 
     -- Compile one equation with its own runtime index binders.
     match_retained_row :: EquationInfoNE -> DsM (MatchResult CoreExpr)
@@ -252,12 +254,13 @@ Each package equation binds its own runtime index Id. Later field types and
 the typed RHS refer to that Id. Sharing the first equation's fields with a
 later equation through ordinary let aliases does not substitute those types.
 
-A constructor family can contain both ordinary and retained constructors.
-Select this path if any group has retained fields, regardless of the first
-group. Do not share retained fields through the ordinary grouping path.
+A singleton group keeps all its original fields and evidence. Use one outer
+case when each retained constructor has a singleton group. This also works
+when the constructor family contains ordinary constructors.
 
-Compile each equation with its own constructor case on the original shared
-scrutinee. Combine the groups in their existing order and preserve source
+When a retained constructor has several rows, compile each equation with its
+own constructor case on the original shared scrutinee. Combine the groups in
+their existing order and preserve source
 order within each constructor group. Different constructors do not overlap.
 A singleton case in a multi-constructor family keeps its DEFAULT failure
 continuation. A failed field pattern or guard then tries the next row outside
@@ -287,7 +290,7 @@ grouping shares the first row's fields and introduces evidence aliases. Those
 aliases do not substitute the runtime Ids in later proof types or RHS types.
 
 Use the separate-row strategy from Note [Retained package equation scope] when
-a checked native constructor pattern carries a virtual proof. Compile each row
+a group with several rows carries a virtual proof. Compile each row
 with its own fields and proof. Keep source order within each constructor group.
 Different constructors do not overlap. Each case uses the existing DEFAULT
 failure path for other constructors. A failed later column or guard tries the
