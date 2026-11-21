@@ -3,7 +3,7 @@
 
 -- | Observe payloads whose type witness is erased.
 module ErasedPackage
-  ( observation, MixedNumber, packNumber, readMixedNumber
+  ( observation, MixedNumber, packNumber, readMixedNumber, readNumber
   , Filtered, filterVec, cells, filterObservation
   ) where
 
@@ -41,10 +41,11 @@ packNumber n = Pack (type Char) (True, 'x', n)
 -- | Open both packages and read the number.
 readMixedNumber :: MixedNumber -> Int
 readMixedNumber p = readNumber p
-  where
-    readNumber :: forall a. NumberPackage a -> Int
-    readNumber q = case q of
-      Pack (type b) (_, _ :: b, n) -> n
+
+-- | Read the number without exposing either witness in the result.
+readNumber :: forall a. NumberPackage a -> Int
+readNumber q = case q of
+  Pack (type b) (_, _ :: b, n) -> n
 
 -- | A vector whose result length is known only to its producer.
 type Filtered a = exists (m :: Nat) | Vec a m

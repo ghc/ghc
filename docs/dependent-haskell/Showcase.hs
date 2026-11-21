@@ -1021,7 +1021,7 @@ main = do
     observe "open erased packages and leave an unused payload lazy"
         ErasedPackage.observation
     observe "pass an erased package directly to a polymorphic reader"
-        (RankedPackageClient.runMixedPackage 17)
+        (RankedPackageClient.runMixedPackage 17, RankedPackageClient.runProducedPackage 23)
     observe "filter a vector without forcing the tail to learn the result length"
         ErasedPackage.filterObservation
     observe "infer the hidden lengths of a lazy filter and a retained vector"
