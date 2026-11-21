@@ -49,6 +49,33 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At compiler revision `bffa69e282`, the fork reads the selected
+`Prelude.fmap` method from the installed `Functor Maybe` dictionary.
+In the `Just` case the callback and payload stay abstract. A second
+mapping can use the first call's result. Both source proofs use
+`Refl`. The runtime program observes the outer constructor without
+forcing the callback or payload.
+[Proofs and runtime example](examples/open-evaluation/PreludeMappingProof.hs).
+
+The source tests reject a different callback, a different operand, a
+locally supplied dictionary, a changed rule, and an opaque worker.
+Matching a proof of equality between two mapped results still cannot
+establish equality between the inputs. A test instance that forces the
+callback result also rejects the lazy `Just` equation.
+
+All 491 Showcase outputs matched at native O0 and O2 and in
+source-loaded GHCi. Ten distinct registered tests passed. The native
+GHC API executable matched all 37 outputs. The Core checks also cover
+curried and nested callbacks, a blocked case, a runtime callback head,
+wrong kinds, and the shared reduction budget.
+[Core tests](../../testsuite/tests/ghc-api/OpenTermWhnf.hs).
+
+The earlier clean build at `28055fe292` compiled both Hadrian stages
+and passed 461 Showcase outputs at each stage and 36 registered tests.
+The linker printed the expected archive through `lib/../lib`. Checking
+the file identity confirmed the link, and the original executable then
+matched all 37 GHC API outputs.
+
 At compiler revision `e3c9d53c0b`, the ordinary `MappingWorker`
 module exports a ground instance whose mapping method selects a named
 worker. The proof module checks the `Nothing` and `Just x` equations
