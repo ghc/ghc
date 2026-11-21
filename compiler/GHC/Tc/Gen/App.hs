@@ -532,7 +532,7 @@ tcFindMixedBarArgument sigma args
   , Just template <- barPackageSignature domain
   , isInjectiveInType binder template
   , [EValArg{ea_arg = operand}] <- filter (not . parens) args
-  = do { declared <- tcDeclaredOperandResult operand
+  = do { declared <- tcMixedOperandResult operand
        ; return $ case coreFullView <$> declared of
            Just (ExistsTy ImplicitExists _ inner)
              | Just _ <- matchBarPackageWitness binder domain (implicitPayloadType inner)
@@ -545,11 +545,20 @@ tcFindMixedBarArgument sigma args
 
 {- Note [Implicit opening for an explicit package argument]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For inspectInner (make flag), the formal domain is exists b | (a, b) under
-forall a. If make returns a declared mixed package, its opened bar type
-can determine the erased type application. Read the operand's declared
-result before creating inference variables. The ordinary unifier treats
-the bar type as opaque.
+For inspectInner (forward (make flag)), the formal domain is
+exists b | (a, b) under forall a. If make returns a mixed package and
+forward passes its argument's type to its result, the opened bar type
+can determine the erased type application. Read these declarations
+before creating inference variables. The ordinary unifier treats the
+bar type as opaque.
+
+Follow a leading invisible result parameter only when exactly one
+written value argument has that same parameter as its complete
+domain. For example, forall a b. Show b => b -> a -> a identifies
+the second argument. This probe selects the inference path. The
+ordinary expression checker still instantiates the head and checks
+all constraints. A family application or an unconstrained result
+parameter cannot identify a package through this probe.
 
 Require an injective occurrence of the parameter in the bar binder's kind
 or body. The scoped comparison selects a type, then checks the complete bar
@@ -905,15 +914,42 @@ implicitSpineResult n ty
 -- | Read the declared result of a named head and its ordinary value arguments.
 -- The caller still checks the whole operand, including its constraints.
 tcDeclaredOperandResult :: LHsExpr GhcRn -> TcM (Maybe TcType)
-tcDeclaredOperandResult = go 0
+tcDeclaredOperandResult operand =
+  fmap (>>= \(ident, args) -> implicitSpineResult (length args) (varType ident))
+       (tcDeclaredOperandSpine operand)
+
+-- | Read a package result through a directly forwarded argument type.
+-- See Note [Implicit opening for an explicit package argument].
+tcMixedOperandResult :: LHsExpr GhcRn -> TcM (Maybe TcType)
+tcMixedOperandResult operand = runMaybeT $ do
+  (ident, args) <- MaybeT (tcDeclaredOperandSpine operand)
+  let sigma = varType ident
+      arity = length args
+  result <- MaybeT (pure (implicitSpineResult arity sigma))
+  case result of
+    TyVarTy v
+      | isEmptyNameEnv (idConcreteTvs ident)
+      , (tvs, _, tau) <- tcRetainedInstTelescope sigma
+      , v `elem` tvs, isTauTy tau
+      , (_, domains, final) <- splitFunTys tau
+      , domains `equalLength` args
+      , getTyVar_maybe (coreFullView final) == Just v
+      , [source] <- [arg | (Scaled _ domain, arg) <- zip domains args
+                        , getTyVar_maybe (coreFullView domain) == Just v]
+      -> MaybeT (tcMixedOperandResult source)
+    _ -> pure result
+
+-- | Read the head and written ordinary arguments without elaboration.
+tcDeclaredOperandSpine :: LHsExpr GhcRn -> TcM (Maybe (Id, [LHsExpr GhcRn]))
+tcDeclaredOperandSpine = go []
   where
-    go n (L _ (HsApp _ fun _)) = go (n + 1) fun
-    go n (L _ (HsPar _ fun)) = go n fun
-    go n (L _ (HsVar _ lname))
+    go args (L _ (HsApp _ fun arg)) = go (arg : args) fun
+    go args (L _ (HsPar _ fun)) = go args fun
+    go args (L _ (HsVar _ lname))
       | let name = unLocWithUserRdr lname
       , not (isDataOcc (nameOccName name))
       = do { ident <- tcLookupIdMaybe name
-           ; return (ident >>= implicitSpineResult n . varType) }
+           ; return ((, args) <$> ident) }
     go _ _ = return Nothing
 
 -- | Recognize a written dot type without checking the expression or signature.

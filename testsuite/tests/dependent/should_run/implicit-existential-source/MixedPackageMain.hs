@@ -18,10 +18,13 @@ readViaBar :: Mixed -> Int
 readViaBar p = readInner p
 
 readViaProducer :: Bool -> Int
-readViaProducer flag = readInner (chooseMixed flag)
+readViaProducer flag = readInner (id (chooseMixed flag))
+
+forward :: Show a => a -> b -> b
+forward flag payload = show flag `seq` payload
 
 readInsideQuickLook :: Bool -> Int
-readInsideQuickLook flag = id ((readInner) (chooseMixed flag))
+readInsideQuickLook flag = id ((readInner) (forward flag (chooseMixed flag)))
 
 ignoreViaBar :: Mixed -> Bool
 ignoreViaBar p = ignoreInner p

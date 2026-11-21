@@ -344,8 +344,8 @@ and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vecto
 3. **R22 and R04.** An ordinary module can put an explicit existential
    package inside an implicit one and open both in a pattern. A direct call
    can infer a polymorphic consumer's parameter from a named mixed
-   package or a call with a declared mixed result. The next boundary is
-   a producer whose result type also needs inference.
+   package, a call with a declared mixed result, or a polymorphic call
+   that forwards a supplied package type directly to its result.
    The list-to-vector producer carries a computed witness.
    [Retained list pairs](roadmap/R04-dependent-sums.md),
    [Guarded witness](roadmap/R22-existential-quantification.md#inferring-a-higher-rank-witness)

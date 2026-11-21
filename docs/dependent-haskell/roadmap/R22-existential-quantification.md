@@ -412,10 +412,15 @@ compares the call with a named package. A consumer that ignores the
 package also leaves a bottom producer argument unevaluated.
 [Proposal #473, implicit existential elimination](https://github.com/ghc-proposals/ghc-proposals/pull/473).
 
-The checker reads the producer's declared result at the written value
-arguments. For an expression such as `id (make flag)`, the result type
-depends on inference. Bind that expression at `Mixed` before passing it
-to the consumer.
+The caller can also write `inspectInner (id (make flag))`. A
+polymorphic producer can forward the type of one written ordinary
+argument directly to its result. For example, a function of type
+`Show a => a -> b -> b` forwards the second argument type. The
+compiler opens the checked expression, including its type and evidence
+applications. A result parameter with no corresponding argument type
+can remain ambiguous. An opaque family result stays opaque.
+An `if` whose branches return `Mixed` can infer that type on its own.
+Bind the conditional at `Mixed` before passing it to the consumer.
 
 A local binding can store the whole nested package. For example,
 `let rows = partitionPair p xs in roundTrip rows` keeps both lengths
