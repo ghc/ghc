@@ -1510,6 +1510,8 @@ main = do
     observe "retain the kind of a matched Nothing"
         (Refl :: TypeLambda.Rebuild ('Nothing :: Maybe Ordering) :~: Proxy ('Nothing :: Maybe Ordering))
     observe "name and reuse a type-level intermediate result" TypeLet.roadmap
+    observe "splice a type let that shadows its outer binder"
+        (Right (Just True) :: $([t| let a = Bool in let a = Maybe a in Either a a |]))
     let row = VCons 'x' (VCons 'y' VNil)
     observe "select a vector header with a runtime flag and a computed width"
         (TypeLet.frameValues enabled 2 ':' row,

@@ -1506,8 +1506,12 @@ repLTyAt tyki (L _ (XHsType (HsTypeCaseRn scrutinee rows))) = do
       rep2 typeCaseAltName [pat', rhs']
 repLTyAt _ (L loc (XHsType HsTypeCaseAliasRn{})) =
   notHandledL (locA loc) ThTypeCase
-repLTyAt _ (L loc (XHsType HsTypeLetRn{})) =
-  notHandledL (locA loc) ThTypeLet
+repLTyAt tyki (L _ (XHsType (HsTypeLetRn (L _ name) rhs body))) = do
+  MkC rhs' <- repLTyAt tyki rhs
+  addSimpleTyVarBinds FreshNamesOnly [name] $ do
+    MkC name' <- lookupOcc name
+    MkC body' <- repLTyAt tyki body
+    rep2 letTName [name', rhs', body']
 repLTyAt tyki ty = repTy tyki (unLoc ty)
 
 -- | Quote a type without merging its source forall groups.

@@ -811,6 +811,10 @@ indexVarT = pure . IndexVarT
 caseT :: Quote m => m Type -> [m TypeCaseAlt] -> m Type
 caseT scrutinee rows = CaseT <$> scrutinee <*> sequenceA rows
 
+-- | Construct a nonrecursive type let. The name is in scope in the body.
+letT :: Quote m => Name -> m Type -> m Type -> m Type
+letT name rhs body = LetT name <$> rhs <*> body
+
 -- | Construct one pattern and result of an ordered type case.
 typeCaseAlt :: Quote m => m Type -> m Type -> m TypeCaseAlt
 typeCaseAlt pat rhs = TypeCaseAlt <$> pat <*> rhs

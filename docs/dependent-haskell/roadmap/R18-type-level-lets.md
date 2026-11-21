@@ -38,16 +38,36 @@ and [Eisenberg and Stolarek on case lifting, §4.5](https://richarde.dev/papers/
 
 The source form supports one variable per binding and nested lets.
 Binding groups, local patterns, and combining lets with general
-type-level lambdas and cases remain open. Raw Template Haskell type
-quotation reports an error at the let.
+type-level lambdas and cases remain open.
+
+## Type quotations and splices
+
+A type quotation represents `let a = rhs in body` as `LetT a rhs body`.
+The right-hand side sees the enclosing scope. Each quotation allocates a
+fresh name for the binder. In the following type, the argument of
+`Maybe` refers to the first binder. Both arguments of `Either` refer
+to the second binder.
+
+```haskell
+[t| let a = Bool in let a = Maybe a in Either a a |]
+```
+
+Splicing the quotation checks the type at the splice site.
+An ordinary client can import a value with that type and observe
+`Right (Just True)`. Reification of a checked type can expand the
+abbreviation. The TH constructor and `letT` smart constructor are
+specific to this fork. Proposal #378 describes the source-level
+design. The review discusses using the same written identifier for a
+term and a type. [Design proposal](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html)
+and [review discussion](https://github.com/ghc-proposals/ghc-proposals/pull/378#discussion_r524560765).
+[Quotation and splice test](../../../testsuite/tests/dependent/should_run/NativeTypeLetQuote.hs).
 
 ## A vector with an optional header
 
 `Frame n b a` binds `width = 1 + n` before matching the flag `b`.
 The header branch returns a `Vec a width`. The other branch returns a
 `Vec a n`. An ordinary client passes the same runtime flag to `frameRow` and
-`frameToList`. An
-ordinary client obtains `":xy"` or `"xy"` from the same two cells.
+`frameToList`. It obtains `":xy"` or `"xy"` from the same two cells.
 The second branch leaves the unused header unevaluated.
 [Source](../examples/open-evaluation/TypeLet.hs) and
 [ordinary client and width checks](../../../testsuite/tests/dependent/should_run/NativeTypeLet.sh).

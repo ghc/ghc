@@ -4,6 +4,7 @@
   * Add `RetainedGadtC` and `RetainedGadtArg` for prefix GADT constructors with runtime binders.
   * Add `ForEachT` for retained function types and `IndexVarT` for their runtime indices.
   * Add `CaseT` and `TypeCaseAlt` for ordered type cases in type quotations.
+  * Add `LetT` and `letT` for nonrecursive type lets in quotations and splices.
   * Introduce `namedDefaultQuasiQuoter` and `defaultQuasiQuoter`, which fail with a helpful error when used in an inappropriate context.
 
 ## 2.24.0.0
