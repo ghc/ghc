@@ -7,6 +7,11 @@ instance Collects Int where
     type Element Int = Bool
     compareOrigin x = compare x 0
 
+instance Collects Bool where
+    type Element Bool = Char
+    compareOrigin True = GT
+    compareOrigin False = LT
+
 data AlwaysBelow = AlwaysBelow
 instance Collects AlwaysBelow where
     type Element AlwaysBelow = Char
@@ -32,3 +37,9 @@ main = do
     print (readEntry (2 :: Int) True, readEntry (error "unforced" :: AlwaysBelow) 'x')
     print (readPayload (2 :: Int) 'q', fst (readPayload AlwaysBelow (error "unforced payload" :: Char)))
     print (readEncoding (2 :: Int) 'q', readEncoding AlwaysBelow 'x')
+
+    let high = True
+        low = False
+        unused = error "forced unused local payload" :: Char
+    print (case inspectPayload high 'q' of TaggedEntry order value -> (order, value))
+    print (case inspectPayload low unused of TaggedEntry order _ -> order)

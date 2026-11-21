@@ -263,6 +263,10 @@ constraints can use a functional dependency to fix a payload's encoding.
 The ordinary test client passes a local receiver. Applying the imported
 function directly to a constructor at the method-indexed position still
 requires a local binding for that receiver.
+The client can bind `let high = True` and call `inspectPayload high 'q'`.
+Common subexpression elimination and CorePrep keep a variable for
+the receiver until CoreToStg erases the selector index. A client can
+discard the payload without forcing it.
 [Ambiguity check](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/ambiguous_types.html)
 and [client](../../../testsuite/tests/dependent/should_run/promoted-class/ScopedFamilyMethodClient.hs).
 
