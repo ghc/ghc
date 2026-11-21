@@ -54,7 +54,7 @@ module GHC.Tc.Solver.Monad (
     setEvBind, setWantedEq, setWantedDict, setEqIfWanted, setDictIfWanted,
     fillCoercionHole,
     newEvVar, newGivenEv, emitNewGivens,
-    emitChildEqs, bumpReductionDepth,
+    emitChildEqs, bumpReductionDepth, bumpReductionDepthTcM,
 
     getInstEnvs, getFamInstEnvs,                -- Getting the environments
     getTopEnv, getGblEnv, getLclEnv, setSrcSpan,
@@ -2342,10 +2342,14 @@ newWantedNC loc rewriters pty
 bumpReductionDepth :: CtLoc
                    -> TcType   -- ^ type or constraint being reduced
                    -> TcS CtLoc
-bumpReductionDepth loc ty
+bumpReductionDepth loc ty = wrapTcS (bumpReductionDepthTcM loc ty)
+
+-- | Check and advance the solver's reduction depth in the type checker.
+bumpReductionDepthTcM :: CtLoc -> TcType -> TcM CtLoc
+bumpReductionDepthTcM loc ty
   = do { dflags <- getDynFlags
        ; when (subGoalDepthExceeded (reductionDepth dflags) (ctLocDepth loc)) $
-         wrapErrTcS $ solverDepthError loc ty
+         solverDepthError loc ty
        ; return (bumpCtLocDepth loc) }
 
 matchFam :: TyCon -> [Type] -> TcS (Maybe ReductionN)

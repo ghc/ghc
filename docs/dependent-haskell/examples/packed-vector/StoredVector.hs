@@ -1,7 +1,7 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, ExplicitForAll, GADTs, ScopedTypeVariables, UndecidableInstances #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, ExplicitForAll, GADTs, ScopedTypeVariables, TypeFamilies, UndecidableInstances #-}
 
 -- | Store vectors of different lengths behind one record type.
-module StoredVector (ListVector, Batch(..), singleton, cells, Wrapped(..), wrapVector, wrappedContents, gadtLength, nestedObservation, viewSelection) where
+module StoredVector (ListVector, VectorResult, Batch(..), singleton, cells, Wrapped(..), wrapVector, wrappedContents, gadtLength, nestedObservation, viewSelection) where
 
 import GHC.Sigma (Sigma(Pair))
 import GHC.Sigma.Projection (second)
@@ -9,6 +9,11 @@ import PackedVecLibrary (Nat(..), Vec(..), natToInt, toList, zipVec)
 
 -- | A runtime length paired with a vector at that length.
 type ListVector a = some (n :: Nat) | Vec a n
+
+-- | Choose the element type while keeping the length at runtime.
+type family VectorResult (keepElement :: Bool) a where
+    VectorResult False _ = some (n :: Nat) | Vec Bool n
+    VectorResult True a = some (n :: Nat) | Vec a n
 
 -- | The field is strict in the pair. Its vector and length remain lazy.
 data Batch a = Batch { stored :: !(some (n :: Nat) | Vec a n) }
