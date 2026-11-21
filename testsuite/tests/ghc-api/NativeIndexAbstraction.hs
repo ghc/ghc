@@ -1,4 +1,4 @@
-{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ExplicitNamespaces #-}
 module Main where
 
 import Control.Monad (unless)
@@ -7,7 +7,7 @@ import GHC.Builtin.WiredIn.Types (liftedTypeKind, maybeTyCon)
 import GHC.Core.Coercion (Role(Nominal), abstractNativeIndices, mkCoVarCo, mkTyConAppCo)
 import GHC.Core.Predicate (mkNomEqPred)
 import GHC.Core.TyCo.Rep (Type(..))
-import GHC.Core.Type (mkTyConApp, mkTyVarTy, pattern ManyTy)
+import GHC.Core.Type (mkTyConApp, mkTyVarTy, data ManyTy)
 import GHC.Data.FastString (fsLit)
 import GHC.Types.Id (mkSysLocal, mkSysLocalOrCoVar)
 import GHC.Types.Name (mkSystemName)
