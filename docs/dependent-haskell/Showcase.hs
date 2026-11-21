@@ -194,7 +194,7 @@ import qualified PackedProjection
 import qualified PackageEquality
 import AppendLengthClient (appendTwoAndOne)
 import PackedVecLibrary
-import ZipRows (zipMinimum, zipRows)
+import OrdinaryZipRows (zipReport)
 import qualified AppendByMethodClient
 import qualified RetainedSumOperator
 import RetainedNat (Retained(..), constantPackage, withRetained)
@@ -2067,9 +2067,7 @@ sourceAddition = do
         (OrdinaryOpenVectorAppend.observeAppendPair zeroCut, OrdinaryOpenVectorAppend.observeAppendPair n)
     labels <- newIORef "abc" >>= readIORef
     flags <- newIORef [True, False] >>= readIORef
-    case zipMinimum labels flags of
-        Refl -> observe "prove zip returns the smaller of two runtime lengths"
-                    (toList (zipRows labels flags))
+    putStrLn ("prove zip returns the smaller of two runtime lengths: " ++ zipReport labels flags)
     observe "split the appended vector at its first length"
         (toList (fst split), toList (snd split))
     rebuilt <- CertifiedSplitClient.splitObservation

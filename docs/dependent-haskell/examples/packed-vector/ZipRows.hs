@@ -22,8 +22,6 @@ type family Min (n :: Nat) (m :: Nat) :: Nat where
 -- | Prove the output length by induction on the paired cells.
 zipMinimum :: forall a b. foreach (xs :: [a]) -> foreach (ys :: [b]) ->
     zipLength xs ys :~: Min (sourceLength xs) (sourceLength ys)
-zipMinimum xs ys = case xs of
-    [] -> Refl
-    _ : xt -> case ys of
-        [] -> Refl
-        _ : yt -> case zipMinimum @a @b xt yt of Refl -> Refl
+zipMinimum [] _ = Refl
+zipMinimum (_ : _) [] = Refl
+zipMinimum (_ : xs) (_ : ys) = case zipMinimum xs ys of Refl -> Refl

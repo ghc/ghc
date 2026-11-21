@@ -7741,9 +7741,11 @@ result removes the provisional table.
 `zipMinimum` proves that the result index equals
 `Min (sourceLength xs) (sourceLength ys)`. Its first empty-list
 equation returns `Refl` without inspecting the second list. In the
-two-cons case it uses the proof for the two tails. An ordinary client
-can match the result through a stripped interface. [Case-tree and demand
-references](REFERENCES.md#the-length-of-zip-and-demand-in-a-case-tree).
+two-cons case it infers the element types from the tails passed to the
+recursive call. An [ordinary client](examples/packed-vector/OrdinaryZipRows.hs)
+prints the rows and the proof in one tuple. The test also prints
+`([],Refl)` with an empty first list and an undefined second list.
+[Case-tree and demand references](REFERENCES.md#the-length-of-zip-and-demand-in-a-case-tree).
 
 ## M99: evaluate an imported closed call
 

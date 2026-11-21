@@ -72,6 +72,8 @@ concrete = Refl
 HS
 "${ghc[@]}" -fenable-rewrite-rules -c Laws.hs
 "${ghc[@]}" -Werror=incomplete-patterns -Werror=overlapping-patterns -c ZipRows.hs
+cp "$src/OrdinaryZipRows.hs" .
+"${ghc[@]}" -c OrdinaryZipRows.hs
 
 cat >LaterFallback.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, KindSignatures #-}
@@ -96,6 +98,7 @@ import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Data.List (isPrefixOf)
 import Data.Type.Equality ((:~:)(Refl))
 import LaterFallback (which, choiceNumber)
+import OrdinaryZipRows (zipReport)
 import PackedVecLibrary (toList)
 import ZipRows (zipMinimum, zipRows)
 
@@ -124,9 +127,11 @@ main = do
     print (either (isPrefixOf "second spine" . displayException) (const False) second)
     print (minimumHolds "" badSecond, minimumHolds [badChar] [badBool],
            minimumHolds infinite [True, False])
+    putStrLn (zipReport "abc" [True, False])
+    putStrLn (zipReport "" badSecond)
 HS
 "${ghc[@]}" -c Main.hs
-"${ghc[@]}" Main.o ZipRows.o LaterFallback.o ../provider/{PackedVecLibrary,ZipLengthSource}.o -o run
+"${ghc[@]}" Main.o OrdinaryZipRows.o ZipRows.o LaterFallback.o ../provider/{PackedVecLibrary,ZipLengthSource}.o -o run
 ./run >actual
 diff -u - actual <<'OUT'
 ([('a',True)],[('a',True)])
@@ -138,6 +143,8 @@ True
 (0,1,2)
 True
 (True,True,True)
+([('a',True),('b',False)],Refl)
+([],Refl)
 OUT
 
 awk '{sub(/^module ZipRows /,"module ShadowedRow "); print}
