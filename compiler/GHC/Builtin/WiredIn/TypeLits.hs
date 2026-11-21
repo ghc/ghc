@@ -769,12 +769,12 @@ axAppendInjectivity
      do { rs <- isStrLitTy r; guard (nullFS rs); return (Pair b nullStrLitTy) }
 
    , -- (AppendSymbol "foo" b ~ "foobar") => (b ~ "bar")
-     mkTopBinFamDeduction "AppendSymbolT3" tc $ \ a b r ->
+     mkTopBinFamDeduction "AppendSymbolKnownPrefix" tc $ \ a b r ->
      do { as <- isStrLitTyS a; rs <- isStrLitTyS r; guard (as `isPrefixOf` rs)
         ; return (Pair b (mkStrLitTyS (drop (length as) rs))) }
 
    , -- (AppendSymbol f "bar" ~ "foobar") => (f ~ "foo")
-     mkTopBinFamDeduction "AppendSymbolT3" tc $ \ a b r ->
+     mkTopBinFamDeduction "AppendSymbolKnownSuffix" tc $ \ a b r ->
      do { bs <- isStrLitTyS b; rs <- isStrLitTyS r; guard (bs `isSuffixOf` rs)
         ; return (Pair a (mkStrLitTyS (take (length rs - length bs) rs))) }
 

@@ -2470,8 +2470,8 @@ tcIfaceCo = go
     go (IfaceKindCo c)           = KindCo   <$> go c
     go (IfaceSubCo c)            = SubCo    <$> go c
     go (IfaceAxiomCo ax cos)
-      = do { rule <- tcIfaceAxiomRule ax
-           ; args <- mapM go cos
+      = do { args <- mapM go cos
+           ; rule <- tcIfaceAxiomRule ax args
            ; case rule of
                BuiltInRule name _ roles proves
                  | Just _ <- matchableProjectionDirection name
@@ -3245,16 +3245,54 @@ tcIfaceTyCon (IfaceTyCon name _info)
                       ; return (promoteDataCon dc) }
               _ -> pprPanic "tcIfaceTyCon" (ppr thing) }
 
-tcIfaceAxiomRule :: IfaceAxiomRule -> IfL CoAxiomRule
+tcIfaceAxiomRule :: IfaceAxiomRule -> [Coercion] -> IfL CoAxiomRule
 -- Unlike CoAxioms, which arise from user 'type instance' declarations,
 -- built-in rules have stable names in builtInCoAxiomRules.
-tcIfaceAxiomRule (IfaceAR_X n)
-  | Just axr <- lookupUFM builtInCoAxiomRules (ifLclNameFS n)
+tcIfaceAxiomRule (IfaceAR_X n) args
+  | key == fsLit "AppendSymbolT3"
+  = read_append_symbol_rule append_symbol_rules
+  | key `elem` append_symbol_rules
+  = read_append_symbol_rule [key]
+  | Just axr <- lookupUFM builtInCoAxiomRules key
   = return axr
   | otherwise
   = failIfM (text "Unknown built-in coercion rule in interface:" <+> ppr n)
-tcIfaceAxiomRule (IfaceAR_U name)   = do { ax <- tcIfaceUnbranchedAxiom name; return (UnbranchedAxiom ax) }
-tcIfaceAxiomRule (IfaceAR_B name i) = do { ax <- tcIfaceBranchedAxiom name;   return (BranchedAxiom ax i) }
+  where
+    key = ifLclNameFS n
+    append_symbol_rules = [fsLit "AppendSymbolKnownPrefix", fsLit "AppendSymbolKnownSuffix"]
+
+    -- See Note [AppendSymbol deductions in interfaces].
+    read_append_symbol_rule candidates = case args of
+      [arg] | coercionRole arg == Nominal ->
+        case [ rule
+             | candidate <- candidates
+             , Just rule@(BuiltInFamInj inj) <- [lookupUFM builtInCoAxiomRules candidate]
+             , isJust (bifinj_proves inj (coercionKind arg)) ] of
+          [rule] -> return rule
+          []     -> invalid
+          _      -> failIfM (text "Ambiguous legacy AppendSymbol deduction in interface. Recompile the producer.")
+      _ -> invalid
+
+    invalid = failIfM (text "Invalid AppendSymbol deduction in interface:" <+> ppr n)
+tcIfaceAxiomRule (IfaceAR_U name)   _ = do { ax <- tcIfaceUnbranchedAxiom name; return (UnbranchedAxiom ax) }
+tcIfaceAxiomRule (IfaceAR_B name i) _ = do { ax <- tcIfaceBranchedAxiom name;   return (BranchedAxiom ax i) }
+
+{- Note [AppendSymbol deductions in interfaces]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Older modules wrote the same name, AppendSymbolT3, for the two rules that
+remove a known prefix or suffix. The rule table kept only one entry. An
+optimized client could read the other rule and panic in coercionKind.
+
+Read the nominal premise before selecting the rule. Both rules compare
+literals, so a substitution can make a second rule applicable. It cannot
+invalidate the first rule. Recover the legacy rule only when exactly one
+rule applies. With two applicable rules the old interface does not specify
+which operand the proof equates. Reject it before constructing AxiomCo.
+
+Fresh modules write distinct rule names. Older readers reject an unknown
+name when they load an affected unfolding. The ordinary interface format
+and other rule names remain available for imports.
+-}
 
 tcIfaceUnbranchedAxiom :: IfExtName -> IfL (CoAxiom Unbranched)
 tcIfaceUnbranchedAxiom name
