@@ -15,7 +15,9 @@ import GHC.Driver.Config
 import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 
 import GHC.Core.Type  hiding( substTy, substCo, extendTvSubst, zapSubst )
-import GHC.Core.SimpleOpt( defaultSimpleOpts, simpleOptExprWith, exprIsConApp_maybe )
+import GHC.Core.SimpleOpt( defaultSimpleOpts, simpleOptExprWith, simpleOptNativeExpr, exprIsConApp_maybe )
+import GHC.Core.Dependent (hasNativeDependentUnfolding)
+import GHC.Core.Opt.OccurAnal (SimplCoreMode(..))
 import GHC.Core.Predicate
 import GHC.Core.Class( classMethods )
 import GHC.Core.Coercion( Coercion )
@@ -640,8 +642,8 @@ Hence, the invariant is this:
 -}
 
 -- | Specialise calls to type-class overloaded functions occurring in a program.
-specProgram :: ModGuts -> CoreM ModGuts
-specProgram guts@(ModGuts { mg_module = this_mod
+specProgram :: SimplCoreMode -> ModGuts -> CoreM ModGuts
+specProgram mode guts@(ModGuts { mg_module = this_mod
                           , mg_rules  = local_rules
                           , mg_binds  = binds })
   = do { dflags   <- getDynFlags
@@ -657,7 +659,8 @@ specProgram guts@(ModGuts { mg_module = this_mod
                                        mkInScopeSetBndrs binds
                           , se_module = this_mod
                           , se_rules  = rule_env
-                          , se_dflags = dflags }
+                          , se_dflags = dflags
+                          , se_core_mode = mode }
 
              go []           = return ([], emptyUDs)
              go (bind:binds) = do (bind', binds', uds') <- specBind TopLevel top_env bind $ \_ ->
@@ -849,7 +852,7 @@ spec_import env callers dict_binds cis@(CIS fn _)
 --        debugTraceMsg (text "specImport1-no-good" <+> (ppr cis $$ text "dict_binds" <+> ppr dict_binds))
        ; return (env, [], []) }
 
-  | Just rhs <- canSpecImport dflags fn
+  | Just rhs <- canSpecImport (se_core_mode env) dflags fn
   = do {     -- Get rules from the external package state
              -- We keep doing this in case we "page-fault in"
              -- more rules as we go along
@@ -908,10 +911,12 @@ spec_import env callers dict_binds cis@(CIS fn _)
        -- SUPER IMPORTANT!  Drop calls that (directly or indirectly) refer to fn
        -- See Note [Avoiding loops in specImports]
 
-canSpecImport :: DynFlags -> Id -> Maybe CoreExpr
-canSpecImport dflags fn
+canSpecImport :: SimplCoreMode -> DynFlags -> Id -> Maybe CoreExpr
+canSpecImport mode dflags fn
   | isRetainedUserUnfolding unf
-  = Nothing   -- Only the retained inliner can import this template.
+  = case mode of
+      RetainedCore | isInlinablePragma (idInlinePragma fn) -> maybeUnfoldingTemplate unf
+      _ -> Nothing
 
   | isDataConWrapId fn
   = Nothing   -- Don't specialise data-con wrappers, even if they
@@ -1184,6 +1189,7 @@ data SpecEnv
        , se_module :: Module
        , se_rules  :: RuleEnv  -- From the home package and this module
        , se_dflags :: DynFlags
+       , se_core_mode :: !SimplCoreMode
      }
 
 instance Outputable SpecEnv where
@@ -1287,7 +1293,12 @@ fireRewriteRules env (Var f) args
   , Just (rule, expr) <- specLookupRule env f args activeInInitialPhase rules
   , let rest_args    = drop (ruleArity rule) args -- See Note [Extra args in the target]
         zapped_subst = se_subst env   -- Just needed for the InScopeSet
-        expr'        = simpleOptExprWith defaultSimpleOpts zapped_subst (mkApps expr rest_args)
+        rule_app     = mkApps expr rest_args
+        expr' | RetainedCore <- se_core_mode env
+              , hasNativeDependentUnfolding rule_app
+              = simpleOptNativeExpr rule_app
+              | otherwise
+              = simpleOptExprWith defaultSimpleOpts zapped_subst rule_app
                        -- simplOptExpr needed because lookupRule returns
                        --   (\x y. rhs) arg1 arg2
   , (fun', args') <- collectArgs expr'

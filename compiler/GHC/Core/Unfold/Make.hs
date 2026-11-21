@@ -122,11 +122,11 @@ mkDataConUnfolding expr
             --    \@a p q. K @a <coercion> p q
             -- and then we definitely want to inline it #25713
 
-mkWrapperUnfolding :: SimplCoreMode -> SimpleOpts -> CoreExpr -> Arity -> Unfolding
+mkWrapperUnfolding :: SimplCoreMode -> SimpleOpts -> UnfoldingSource -> CoreExpr -> Arity -> Unfolding
 -- Make the unfolding for the wrapper in a worker/wrapper split
 -- after demand/CPR analysis
-mkWrapperUnfolding mode opts expr arity
-  = mkCoreUnfolding StableSystemSrc True
+mkWrapperUnfolding mode opts src expr arity
+  = mkCoreUnfolding src True
                     (simpleOptWwTemplate mode opts expr) Nothing
                     (UnfWhen { ug_arity     = arity
                              , ug_unsat_ok  = unSaturatedOk

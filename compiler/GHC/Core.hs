@@ -2158,7 +2158,7 @@ expandUnfolding_maybe :: Unfolding -> Maybe CoreExpr
 -- Expand an expandable unfolding; this is used in rule matching
 --   See Note [Expanding variables] in GHC.Core.Rules
 -- The key point here is that CONLIKE things can be expanded
--- Optional retained templates can enter Core only through the retained inliner.
+-- Only mode-aware optimizer paths can unfold optional retained templates.
 -- See Note [Retained user unfoldings across modules] in GHC.Iface.Tidy.
 expandUnfolding_maybe CoreUnfolding { uf_src = RetainedUserSrc } = Nothing
 expandUnfolding_maybe (CoreUnfolding { uf_cache = cache, uf_tmpl = rhs })

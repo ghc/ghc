@@ -442,6 +442,9 @@ test('NativeOrdinaryInline',
                    '../../../../docs/dependent-haskell/examples/qualified-pi/ParameterizedIndexLibrary.hs',
                    '../../../../docs/dependent-haskell/examples/qualified-pi/FinitePosition.hs'])],
      run_command, ['bash NativeOrdinaryInline.sh "{compiler}" "{libdir}"'])
+test('NativeOrdinaryInlinable',
+     [req_host_target_ghc, only_ways(['normal'])],
+     run_command, ['bash NativeOrdinaryInlinable.sh "{compiler}" "{libdir}"'])
 test('NativeIndexedConsProof',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['NativeIndexedConsProof.hs', 'NativeIndexedConsProofClient.hs',

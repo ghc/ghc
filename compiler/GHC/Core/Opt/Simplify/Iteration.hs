@@ -664,7 +664,7 @@ tryCastWorkerWrapper env bind_cxt old_bndr bndr (Cast rhs co)
                            , extendIdSubst (setInScopeFromF env floats) old_bndr $
                              DoneEx triv_rhs NotJoinPoint ) }
 
-          else do { wrap_unf <- mkLetUnfolding env top_lvl VanillaSrc bndr False triv_rhs
+          else do { wrap_unf <- mkLetUnfolding env top_lvl wrap_src bndr False triv_rhs
                   ; let bndr' = bndr `setInlinePragma` mkCastWrapperInlinePrag (idInlinePragma bndr)
                                 `setIdUnfolding`  wrap_unf
                         floats' = floats `extendFloats` NonRec bndr' triv_rhs
@@ -674,6 +674,9 @@ tryCastWorkerWrapper env bind_cxt old_bndr bndr (Cast rhs co)
     !occ_fs = getOccFS bndr
     work_ty = coercionLKind co
     info   = idInfo bndr
+    wrap_src | isRetainedUserUnfolding (realUnfoldingInfo info) = RetainedUserSrc
+             | otherwise = VanillaSrc
+      -- See Note [Retained user unfoldings across modules] in GHC.Iface.Tidy.
     work_arity = arityInfo info `min` typeArity work_ty
 
     work_info = vanillaIdInfo `setDmdSigInfo`     dmdSigInfo info

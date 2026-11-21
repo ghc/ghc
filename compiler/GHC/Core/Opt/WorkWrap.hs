@@ -950,7 +950,11 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
 
     wrap_rhs  = wrap_fn work_id
     wrap_prag = mkStrWrapperInlinePrag fn_inl_prag fn_rules
-    wrap_unf  = mkWrapperUnfolding (wo_core_mode ww_opts) simpl_opts wrap_rhs arity
+    wrap_unf  = mkWrapperUnfolding (wo_core_mode ww_opts) simpl_opts wrap_src wrap_rhs arity
+    wrap_src | isRetainedUserUnfolding fn_unfolding = RetainedUserSrc
+             | otherwise                           = StableSystemSrc
+      -- The wrapper can introduce a call to a marked worker. Select the
+      -- retained pipeline before either template can enter the caller.
 
     wrap_id   = fn_id `setIdUnfolding`  wrap_unf
                       `setInlinePragma` wrap_prag

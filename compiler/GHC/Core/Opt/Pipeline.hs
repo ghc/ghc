@@ -741,7 +741,7 @@ doCorePassFor core_mode pass guts = do
                                                us)
 
     CoreDoSpecialising        -> {-# SCC "Specialise" #-}
-                                 specProgram guts
+                                 specProgram core_mode guts
 
     CoreDoSpecConstr          -> {-# SCC "SpecConstr" #-}
                                  specConstrProgram guts

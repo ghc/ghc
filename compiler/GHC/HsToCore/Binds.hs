@@ -470,7 +470,7 @@ makeCorePair dflags gbl_id is_default_method rhs
   , not (hasNativeDependentExprRhs (Type (idType gbl_id)))
   , unf@CoreUnfolding { uf_tmpl = tmpl } <- realIdUnfolding (fst pair)
   , hasNativeDependentUnfolding tmpl
-  = if isInlinePragma inline_prag && isExternalName (idName gbl_id)
+  = if isExternalName (idName gbl_id)
        && not (hasExistentialExpr tmpl) && supportsNativeRuleBinds [NonRec (fst pair) tmpl]
     then pure (setIdUnfolding (fst pair) unf{uf_src = RetainedUserSrc}, snd pair)
     else putSrcSpanDs (nameSrcSpan (idName gbl_id)) $
@@ -1093,7 +1093,12 @@ dsSpec_help poly_nm poly_id poly_rhs spec_inl orig_bndrs ds_call
 
              simpl_opts = initSimpleOpts dflags
              fn_unf     = realIdUnfolding poly_id
-             spec_unf   = specUnfolding simpl_opts spec_bndrs mk_spec_body rule_lhs_args fn_unf
+             spec_unf
+               | isInlinablePragma id_inl, isRetainedUserUnfolding fn_unf = noUnfolding
+               | otherwise = specUnfolding simpl_opts spec_bndrs mk_spec_body rule_lhs_args fn_unf
+               -- Publish the ordinary specialized call in the user's rule.
+               -- Do not inherit a marked wrapper template on that call.
+               -- See Note [Retained user unfoldings across modules] in GHC.Iface.Tidy.
              spec_info  = vanillaIdInfo
                           `setInlinePragInfo` specFunInlinePrag poly_id id_inl spec_inl
                           `setUnfoldingInfo`  spec_unf

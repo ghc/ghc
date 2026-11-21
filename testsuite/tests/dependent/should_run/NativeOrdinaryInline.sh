@@ -90,16 +90,18 @@ choose True = 42
 choose False = False
 
 ordinary :: Int
-ordinary = choose True
+ordinary =
+    let {-# INLINABLE local #-}
+        local :: Int
+        local = choose True
+    in local
 HS
-"${ghc[@]}" -O1 -c Residual.hs
-printf '{-# INLINABLE ordinary #-}\n' >> Residual.hs
 if "${ghc[@]}" -O1 -fdiagnostics-color=never -fforce-recomp -c Residual.hs > residual.log 2>&1; then
-    echo 'Accepted residual retained Core under INLINABLE'
+    echo 'Accepted a local INLINABLE template containing retained Core'
     exit 1
 fi
-grep -qFx 'Residual.hs:14:1: error: [GHC-92256]' residual.log
-grep -q 'The INLINABLE unfolding of .*ordinary.* still contains retained Core.' residual.log
+grep -qFx 'Residual.hs:17:9: error: [GHC-92256]' residual.log
+grep -q 'The INLINABLE unfolding of .*local.* still contains retained Core.' residual.log
 
 cp "$src"/{FinitePosition,ParameterizedIndexLibrary,PackedVecLibrary}.hs .
 cat >FinConstruction.hs <<'HS'

@@ -888,8 +888,14 @@ A compulsory default has its own retained type and validation.
 An intermediate module can compile with -fignore-interface-pragmas. It
 can expose a template that refers to a marked Id without seeing the tag.
 The client can inline the intermediate template in the ordinary pipeline.
-Ordinary inlining, constructor queries, imported specialization, and
-the built-in `inline` rule must leave the marked call intact.
+Ordinary inlining, constructor queries, and the built-in `inline` rule
+must leave the marked call intact. Imported specialization can use a
+marked INLINABLE unfolding only in the retained pipeline. After a
+demand or cast worker/wrapper split, mark both unfoldings. The wrapper
+can introduce a call to the marked worker. A source SPECIALISE on a marked
+INLINABLE binding exports a rule to the ordinary compiled specialization.
+Do not inherit the marked wrapper template on that specialization. The
+usual Tidy checks still apply to its optional unfolding.
 
 GHC.Iface.Syntax records a version feature with the tag. The wire check
 prevents an older reader from using the template without its pipeline check.
