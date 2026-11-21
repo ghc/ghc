@@ -38,7 +38,8 @@ module GHC.Tc.Gen.HsType (
         -- Type checking type and class decls, and instances thereof
         bindTyClTyVars, bindTyClTyVarsAndZonk,
         tcFamTyPats, tcInferredMatchabilityFamPats, matchabilityArrow, tcCheckMatchabilityArrow,
-        inferredMatchabilityIndex, familyKindUsesMatchability, tcCheckMatchabilitySynRhs, tcCheckSynonymMetadata,
+        inferredMatchabilityIndex, familyKindUsesMatchability, tcCheckMatchabilitySynRhs,
+        synonymCallbackIndex, tcCheckSynonymMetadata,
         maybeEtaExpandAlgTyCon, tcbVisibilities,
         etaExpandAlgTyCon,
 
@@ -1692,7 +1693,7 @@ data TcTyMode
              , mode_indices :: NameEnv Id
              , mode_pending_calls :: Maybe (NameEnv TcTyVar, PendingSigCalls, TcRef [TcPendingTypeCall])
                -- See Note [Pending calls in partial signatures] in GHC.Tc.Solver.
-             , mode_synonym_metadata :: Maybe (Name -> Int -> TcM [Type], Maybe (TcM Matchability))
+             , mode_synonym_metadata :: Maybe (Name -> [Bool] -> TcM [Type], Maybe (TcM Matchability))
              , mode_complete_type_arg :: Maybe Bool }
                -- Nothing outside a visible type argument. Just records
                -- completeness of the whole argument, not the current child.
@@ -2531,8 +2532,16 @@ familyKindUsesMatchability tc b =
   any (elemVarSet (binderVar b) . tyCoVarsOfType)
       (tyConResKind tc : map (tyVarKind . binderVar) (tyConBinders tc))
 
+-- | Does the index annotate a curried arrow in a synonym parameter's kind?
+synonymCallbackIndex :: TyVar -> Kind -> Bool
+synonymCallbackIndex tv domain
+  | Just (arrow, _, result) <- tcSplitFunTy_maybe domain =
+      getTyVar_maybe arrow == Just tv || synonymCallbackIndex tv result
+  | otherwise = False
+
 -- | Check a synonym RHS with controlled instantiation of metadata.
-tcCheckSynonymMetadata :: (Name -> Int -> TcM [Type]) -> Maybe (TcM Matchability)
+-- The flag for each index records whether it occurs on a callback arrow.
+tcCheckSynonymMetadata :: (Name -> [Bool] -> TcM [Type]) -> Maybe (TcM Matchability)
                        -> LHsType GhcRn -> TcKind -> TcM TcType
 tcCheckSynonymMetadata get_indices callback_arrow rhs kind =
   addTypeCtxt rhs $
@@ -4345,8 +4354,14 @@ tcInferTyApps_nosat index_level expected_kind mode orig_hs_ty fun orig_hs_args
        ; fun <- case (mode_synonym_metadata mode, fun) of
            _ | keep_inferred_prefix -> pure fun
            (Just (get_indices, _), TyConApp tc []) | hasInferredMatchability tc -> do
-             args <- get_indices (tyConName tc)
-                       (length (takeWhile inferredMatchabilityIndex (tyConBinders tc)))
+             let binders = tyConBinders tc
+                 indices = takeWhile inferredMatchabilityIndex binders
+                 domains = [tyVarKind (binderVar b) | b <- binders, isVisibleTyConBinder b]
+                 from_argument b
+                   | TypeSynonymFlavour <- tyConFlavour tc =
+                       any (synonymCallbackIndex (binderVar b)) domains
+                   | otherwise = False
+             args <- get_indices (tyConName tc) (map from_argument indices)
              pure (mkTyConApp tc args)
            (Nothing, TyConApp tc [])
              | TypeLevel <- mode_tyki mode
@@ -4533,6 +4548,16 @@ tcInferTyApps_nosat index_level expected_kind mode orig_hs_ty fun orig_hs_args
                  -- of ki_binder.  So we don't need mkAppTyM here.
 
         choose_matchability tv flag inner_ki
+          -- See Note [Callback arrows in inferred synonym kinds] in GHC.Tc.TyCl.
+          | Inferred <- flag
+          , tyVarKind tv `tcEqType` matchabilityTy
+          , Just (tc, _) <- tcSplitTyConApp_maybe fun
+          , TypeSynonymFlavour <- tyConFlavour tc
+          , any (synonymCallbackIndex tv) (take supplied_args (visible_domains inner_ki))
+          = do { owner <- tcl_kind_arrow_defaults <$> getLclEnv
+               ; case owner of
+                   Just (defaults, _) -> bind <$> fresh_kind_arrow KindLevel defaults
+                   Nothing -> fresh }
           -- See Note [Inferred datatype callback arrows].
           | Inferred <- flag
           , tyVarKind tv `tcEqType` matchabilityTy
@@ -4642,7 +4667,8 @@ tcInferTyApps_nosat index_level expected_kind mode orig_hs_ty fun orig_hs_args
       let deferred_mode = case mode_synonym_metadata mode of
             Just _ -> mode
             Nothing -> mode {mode_synonym_metadata =
-                       Just (\_ n -> replicateM n (fresh_kind_arrow TypeLevel defaults), Nothing)}
+                       Just (\_ callbacks -> traverse (const (fresh_kind_arrow TypeLevel defaults)) callbacks
+                            , Nothing)}
       in tc_check_lhs_type deferred_mode arg expected
 
     missing_arrow
@@ -8030,11 +8056,11 @@ tcLHsFamilyResultKindSig = tc_lhs_kind_sig
   (kindLevelMode { mode_synonym_metadata = familyKindMetadata })
 
 -- | Give each checked kind application its own metadata variables.
-familyKindMetadata :: Maybe (Name -> Int -> TcM [Type], Maybe (TcM Matchability))
+familyKindMetadata :: Maybe (Name -> [Bool] -> TcM [Type], Maybe (TcM Matchability))
 familyKindMetadata = Just (indices, Nothing)
   where
-    indices _ n = do
-      vars <- replicateM n (newFlexiTyVar matchabilityTy)
+    indices _ callbacks = do
+      vars <- mapM (const (newFlexiTyVar matchabilityTy)) callbacks
       owner <- tcl_kind_arrow_defaults <$> getLclEnv
       forM_ owner $ \(_, ref) -> updTcRef ref (vars ++)
       pure (mkTyVarTys vars)
