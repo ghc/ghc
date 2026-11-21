@@ -28,6 +28,24 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `b4e8ac6ced`, the numeric zip and the two matchable projections
+passed together. All 431 Showcase rows matched in native code at
+`-O0`, `-O1` and `-O2` and in source-loaded GHCi. Nine registered
+tests passed. The GHC API reader accepted valid evidence for either
+projection. It rejected a wrong argument, a representational premise
+and a missing premise for each direction. A module that also stored
+a retained character requested both interface features.
+
+On the projection change alone, 98 ordinary GADT tests produced the
+same 96 passes and two expected failures as the predecessor. A source
+stress test cancelled 16 nested applications. Calling the full proof
+rule to compute one endpoint hit a 12-second time limit. Reading the
+checked component completed in 0.30 s at `-O1` with Core Lint. At 96
+applications the predecessor allocated 1.05 GB and the revised compiler
+allocated 2.25 GB. These figures count compiler allocations on this
+test. [Rule and limits](roadmap/R23-unsaturated-type-families.md#preserve-a-matchable-head-through-inlining)
+and [nested source test](../../testsuite/tests/dependent/should_run/NativeNestedMatchableProjection.hs).
+
 The regular Hadrian self-host at `74731c9f19` completed with the stock
 libraries and all 429 Showcase rows in the four modes. The source change
 at `0609d6bf6b` passed 430 rows in those modes. An ordinary `[Int]`
