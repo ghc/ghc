@@ -18,7 +18,7 @@ direction and leaves the general design open.
 [Discussion #456](https://github.com/ghc-proposals/ghc-proposals/discussions/456)
 and [GHC issue #15245](https://gitlab.haskell.org/ghc/ghc/-/issues/15245).
 
-The private experiment admits a checked, lifted data instance
+The experiment admits a checked, lifted data instance
 constructor with no context, existential, index refinement, or retained
 binder. Its fields are lifted. The module that names the constructor in
 a type enables `ExperimentalDependentTypes` and uses the normal
@@ -56,6 +56,10 @@ of such values in dependent programs. Haskell's open data family
 instances add a separate representation boundary.
 [Agda indexed datatypes](https://agda.readthedocs.io/en/latest/language/data-types.html#indexed-datatypes)
 and [Idris vectors](https://idris2.readthedocs.io/en/latest/tutorial/typesfuns.html#vectors).
+
+The [Showcase](../Showcase.hs) reduces
+`SecondFlag ('Tup2 'True 'False)` to `'False`. GHC checks the result with
+`Refl`.
 
 ## Next acceptance check
 
