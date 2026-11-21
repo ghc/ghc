@@ -3602,9 +3602,6 @@ reifyTyCon tc
 
 reifyDataCon :: Bool -> [Type] -> DataCon -> TcM TH.Con
 reifyDataCon isGadtDataCon tys dc
-  | Just _ <- dataConInteriorContext dc
-  = noTH InteriorConstructorContext (dataConWrapperType dc)
-  | otherwise
   = do { let -- used for H98 data constructors
              (ex_tvs, theta, arg_tys)
                  = dataConInstSig dc tys
@@ -3633,13 +3630,20 @@ reifyDataCon isGadtDataCon tys dc
              late_count = dataConLateTyVarCount dc
              g_theta   = substTys tvb_subst g_theta'
              (early_theta, late_theta)
+               | Just (n, _, _) <- ordered_parts = splitAt n g_theta
                | dataConHasTrailingContext dc = ([], g_theta)
                | otherwise = (g_theta, [])
              g_arg_tys = map (substScaledTy tvb_subst) g_arg_tys'
              g_res_ty  = substTy tvb_subst g_res_ty'
-             interior_forall = dataConInteriorForAll dc
+             ordered_parts
+               | OrderedConArgs (_ : groups) <- dataConSourceOrder dc
+               , (before, ConValueArgs n : suffix) <- break is_field groups
+               = Just (sum [m | ConContextArgs m <- before], n, suffix)
+               | otherwise = Nothing
+             is_field ConValueArgs{} = True
+             is_field _ = False
              ordered_args
-               | dataConTerminalOrder dc == 0, isNothing interior_forall = retained
+               | dataConTerminalOrder dc == 0, isNothing ordered_parts = retained
                | otherwise = map (const Nothing) g_arg_tys
 
        ; r_arg_tys <- if null ordered_args
@@ -3647,8 +3651,7 @@ reifyDataCon isGadtDataCon tys dc
          else pure []
 
        ; main_con <-
-           if | Just ((n, _) : _) <- interior_forall
-              , OrderedConArgs (_ : _ : remaining) <- dataConSourceOrder dc
+           if | Just (_, n, remaining) <- ordered_parts
               , (prefix, suffix) <- splitAt n g_arg_tys -> do
                   { (args, result) <- reifyRetainedGadtArgs (replicate n Nothing)
                       (take n dcdBangs) prefix g_res_ty
@@ -3656,13 +3659,16 @@ reifyDataCon isGadtDataCon tys dc
                   ; let reify_group bs rest = do
                           tvs <- reifyTyVarBndrs [Bndr (binderVar tv) SpecifiedSpec | tv <- bs]
                           TH.ForallMatchT ma . TH.ForallT tvs [] <$> rest
+                        reify_context ps rest = do
+                          ctxt <- reifyCxt ps
+                          TH.ForallT [] ctxt <$> rest
                         -- Use the field arrow syntax accepted by cvtRetainedGadtArgs.
                         reify_field (Scaled mult ty) rest = do
                           multiplicity <- reifyType mult
                           domain <- reifyType ty
                           TH.AppT (TH.AppT (TH.AppT TH.MulArrowT multiplicity) domain) <$> rest
-                  ; body <- foldConSourceGroups reify_group (const id) (flip (foldr reify_field))
-                      remaining late_tvs [] suffix (pure result)
+                  ; body <- foldConSourceGroups reify_group reify_context (flip (foldr reify_field))
+                      remaining late_tvs late_theta suffix (pure result)
                   ; pure (TH.RetainedGadtC [name] args body) }
               | not (null ordered_args) -> do
                   { (args, result) <- reifyRetainedGadtArgs ordered_args dcdBangs g_arg_tys g_res_ty

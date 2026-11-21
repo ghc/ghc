@@ -61,7 +61,7 @@ import Data.Foldable (for_)
 import Data.List (isPrefixOf)
 import Data.List.NonEmpty( NonEmpty (..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
-import Data.Maybe( catMaybes, isNothing )
+import Data.Maybe( catMaybes, isJust, isNothing )
 import Data.Word (Word64)
 import GHC.Boot.TH.Syntax as TH
 import Foreign.ForeignPtr
@@ -783,9 +783,7 @@ cvtRetainedGadtArgs args result = do
   (fields, binders) <- prefix args
   body <- suffix binders
   let prefix_fields = PrefixConGADT noExtField fields
-      supported_interior = case HsDecls.splitGadtInterior prefix_fields body of
-        Just ((L _ HsGadtForAll{}, _) : _, _) -> True
-        _ -> False
+      supported_interior = isJust (HsDecls.splitGadtInterior prefix_fields body)
   when (null binders &&
         isNothing (HsDecls.splitGadtTerminal prefix_fields body) && not supported_interior) $
     failWith (MalformedType TypeLevel result)

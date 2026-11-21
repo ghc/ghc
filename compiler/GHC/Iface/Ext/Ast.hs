@@ -1035,6 +1035,8 @@ instance (Data (HsModifier (GhcPass p)), HiePass p) => ToHie (PScoped (LocatedA 
                   wrap = cpt_wrap ext
                   evscope = mkScope ospan `combineScopes` scope `combineScopes` pscope
                  in concatM [ toHie $ EvBindContext scope rsp $ L ospan ev_binds
+                            , concatM [toHie $ EvBindContext scope rsp $ L ospan bs
+                                      | (_, bs) <- cpt_ordered_binds ext]
                             , toHie $ L ospan wrap
                             , toHie $ map (C (EvidenceVarBind EvPatternBind evscope rsp)
                                           . L ospan) ev_vars

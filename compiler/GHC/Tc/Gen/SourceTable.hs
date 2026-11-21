@@ -3708,7 +3708,7 @@ ordinaryDataType ty
 -- | Read one unguarded source equation with no local bindings.
 sourceRow :: (Id -> Bool) -> LMatch GhcTc (LHsExpr GhcTc) -> Maybe (TcEvBinds, SourceRow)
 sourceRow self (L loc (Match { m_pats = L _ (pat : rest), m_grhss = rhss }))
-  | ConPat (ConPatTc params [] [] evs WpHole) (L _ (RealDataCon input)) details <- unParen pat
+  | ConPat (ConPatTc params [] [] evs WpHole []) (L _ (RealDataCon input)) details <- unParen pat
   , GRHSs _ (L _ (GRHS _ [] (L _ rhs)) :| []) (L _ (EmptyLocalBinds _)) <- rhss
   = do
       fields <- case details of

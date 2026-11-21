@@ -24,7 +24,7 @@ module GHC.Types.Basic (
         ConTag, ConTagZ, fIRST_TAG,
         gadtTrailingContextOnly,
         ConSourceOrder(..), ConSourceGroup(..), legacyConOrder, conInteriorContext, conInteriorForAll,
-        foldConSourceGroups,
+        foldConSourceGroups, orderedConTypeGroups,
 
         Arity, VisArity, RepArity, JoinArity, FullArgCount,
         JoinPointHood(..), isJoinPoint,
@@ -198,6 +198,15 @@ conInteriorForAll (OrderedConArgs (ConTypeArgs _ : ConValueArgs n : ConTypeArgs 
       ((fields, binders) :) <$> go gs
     go _ = Nothing
 conInteriorForAll _ = Nothing
+
+-- | Later type groups with the number of intervening value fields.
+orderedConTypeGroups :: [ConSourceGroup] -> [(Int, Int)]
+orderedConTypeGroups groups = go 0 (drop 1 groups)
+  where
+    go _ [] = []
+    go fields (ConValueArgs n : rest) = go (fields + n) rest
+    go fields (ConContextArgs _ : rest) = go fields rest
+    go fields (ConTypeArgs n : rest) = (fields, n) : go 0 rest
 
 -- | Consume the three arrays according to a checked source order.
 foldConSourceGroups :: ([ty] -> r -> r) -> ([ev] -> r -> r) -> ([field] -> r -> r)

@@ -249,7 +249,7 @@ matchNewtypeCon var vars ty eqns
 -- | Is this 'ConPatTc' trivial, in that it contains no existentials, no
 -- dictionaries or evidence bindings, only identity 'HsWrapper's, etc?
 isTrivialConPatTc :: ConPatTc -> Bool
-isTrivialConPatTc (ConPatTc _arg_tys tvs dicts binds wrap) =
+isTrivialConPatTc (ConPatTc _arg_tys tvs dicts binds wrap ordered_binds) =
   -- NB: Use a positional pattern match in order to guarantee that all fields
   --     will continue to be handled if new fields are added.
   and
@@ -257,6 +257,7 @@ isTrivialConPatTc (ConPatTc _arg_tys tvs dicts binds wrap) =
     , null dicts
     , isEmptyTcEvBinds binds
     , isIdHsWrapper wrap
+    , null ordered_binds
     ]
 
 matchPatSyn :: NonEmpty MatchId
@@ -394,8 +395,13 @@ matchOneConLike scrut vars ty (eqn1 :| eqns)   -- All eqns for a single construc
                                       { cpt_tvs = tvs
                                       , cpt_dicts = ds
                                       , cpt_binds = bind
-                                      , cpt_wrap = pat_wrap }})
+                                      , cpt_wrap = pat_wrap
+                                      , cpt_ordered_binds = ordered_binds }})
                     , eqn_rest = rest })
+                | not (null ordered_binds)
+                = dsTcEvBinds bind $ \early -> do
+                    row <- scope_contexts 0 fields ordered_binds
+                    return (wrap . mkCoreLets early, row)
                 | RealDataCon con <- con1
                 , Just n <- dataConContextFieldCount con
                 , (before, after) <- splitAt n fields
@@ -412,6 +418,13 @@ matchOneConLike scrut vars ty (eqn1 :| eqns)   -- All eqns for a single construc
                 where
                   wrap = wrapBinds (tvs `zip` tvs1) . wrapBinds (ds `zip` dicts1)
                   fields = conArgPats val_arg_tys args
+                  scope_contexts _ fields [] = return (prependPats fields rest)
+                  scope_contexts entered fields ((n, binds) : groups) =
+                    dsTcEvBinds binds $ \dbinds -> do
+                      let (before, after) = splitAt (n - entered) fields
+                      following <- scope_contexts n after groups
+                      let scoped = if null dbinds then following else EqnScope dbinds following
+                      return (prependPats before scoped)
               shift (_, eqn) = pprPanic "matchOneCon/shift" (ppr eqn)
         ; let scaled_arg_tys = map (scaleScaled mult) val_arg_tys
             -- The 'val_arg_tys' are taken from the data type definition, they
@@ -545,6 +558,13 @@ The outer constructor case binds the stored Eq dictionary. The Evidence case
 binds Ord. Bind the solved evidence after all field patterns, before any
 following argument patterns or guards. EqnScope records this point in the
 row. Its bindings are available only after the preceding patterns match.
+
+For an ordered telescope, store one boundary and solved binding group per
+context. For example, an equality after one field can transport that
+field's dictionary. Later fields may introduce more Givens before a second
+context. Keep each group's bindings at its own boundary during zonking and
+desugaring. The Core alternative can bind all the stored dictionaries
+before the value fields.
 
 For a context after fields without a late forall, early existential binders
 are in scope during field checking. Check the fields under those skolems

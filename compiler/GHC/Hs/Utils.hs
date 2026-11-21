@@ -1298,6 +1298,7 @@ collect_pat flag pat bndrs = case pat of
     CollNoDictBinders   -> foldr (collect_lpat flag) bndrs (hsConPatArgs ps)
     CollWithDictBinders -> foldr (collect_lpat flag) bndrs (hsConPatArgs ps)
                            ++ collectEvBinders (cpt_binds (pat_con_ext pat))
+                           ++ concatMap (collectEvBinders . snd) (cpt_ordered_binds (pat_con_ext pat))
     CollVarTyVarBinders -> foldr (collect_lpat flag) bndrs (hsConPatArgs ps)
 
 collectEvBinders :: TcEvBinds -> [Id]

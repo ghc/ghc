@@ -336,6 +336,11 @@ data ConPatTc
       -- checking its fields before the trailing context enters scope.
       -- See Note [Trailing constructor evidence] in GHC.HsToCore.Match.Constructor.
       cpt_wrap  :: HsWrapper
+
+    , -- | Solved bindings after the indicated number of field patterns.
+      -- The entries are in source order. See Note [Trailing constructor evidence]
+      -- in GHC.HsToCore.Match.Constructor.
+      cpt_ordered_binds :: [(Int, TcEvBinds)]
     }
 
 
@@ -477,11 +482,12 @@ pprPat (ConPat { pat_con = con
           -- error message, and we want to make sure it prints nicely
           ppr con
             <> braces (sep [ hsep (map pprPatBndr (tvs ++ dicts))
-                           , ppr binds ])
+                           , ppr binds, if null ordered_binds then empty else ppr ordered_binds ])
             <+> pprConArgs details
         where ConPatTc { cpt_tvs = tvs
                        , cpt_dicts = dicts
                        , cpt_binds = binds
+                       , cpt_ordered_binds = ordered_binds
                        } = ext
 pprPat (EmbTyPat _ tp) = text "type" <+> ppr tp
 pprPat (InvisPat x tp) = char '@' <> delimit (ppr tp)
@@ -543,6 +549,7 @@ mkPrefixConPat dc pats tys
                       , cpt_binds = emptyTcEvBinds
                       , cpt_arg_tys = tys
                       , cpt_wrap = idHsWrapper
+                      , cpt_ordered_binds = []
                       }
                     }
 

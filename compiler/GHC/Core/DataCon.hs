@@ -34,7 +34,7 @@ module GHC.Core.DataCon (
         dataConUserTyVars, dataConUserTyVarBinders,
         dataConTerminalOrder, dataConLateTyVarCount, dataConUserTyVarGroups, dataConHasTrailingContext,
         dataConSourceOrder, dataConInteriorContext, dataConContextFieldCount, dataConInteriorForAll,
-        orderedConForAllScope,
+        orderedConArgsHaveScope,
         dataConTheta,
         dataConStupidTheta,
         dataConOtherTheta,
@@ -1314,7 +1314,6 @@ mkDataConWithTelescope source_order arg_binders name declared_infix prom_info
       | otherwise = splitAt (length prom_tv_bndrs - late_tyvar_count) prom_tv_bndrs
     prom_bndrs
       | OrderedConArgs groups <- source_order
-      , Just _ <- conInteriorForAll source_order
       = foldConSourceGroups (++) (const id) (++) groups prom_tv_bndrs theta prom_arg_bndrs []
       | otherwise = early_prom_bndrs ++ prom_arg_bndrs ++ late_prom_bndrs
     prom_res_kind    = orig_res_ty
@@ -1335,7 +1334,6 @@ mkDataConWithTelescope source_order arg_binders name declared_infix prom_info
 
     roles field_role
       | OrderedConArgs groups <- source_order
-      , Just _ <- conInteriorForAll source_order
       = foldConSourceGroups (\ts -> (replicate (length ts) Nominal ++)) (const id)
           (\fs -> (replicate (length fs) field_role ++)) groups prom_tv_bndrs theta prom_arg_bndrs []
       | late_tyvar_count > 0
@@ -1508,21 +1506,25 @@ dataConContextFieldCount con
 
 -- | The field and binder counts for the interior forall groups.
 dataConInteriorForAll :: DataCon -> Maybe [(Int, Int)]
-dataConInteriorForAll = conInteriorForAll . dataConSourceOrder
+dataConInteriorForAll con
+  | OrderedConArgs groups <- dataConSourceOrder con
+  , type_groups@(_ : _) <- orderedConTypeGroups groups
+  = Just type_groups
+  | otherwise = Nothing
 
 -- | Check each argument against the binders still to come.
 -- See Note [Interior constructor telescopes].
-orderedConForAllScope :: [ConSourceGroup] -> [TyVarBinder] -> [Scaled Type] -> Bool
-orderedConForAllScope groups binders fields =
-  snd (foldConSourceGroups add_binders (const id) check_fields
-         groups binders [] fields (emptyVarSet, True))
+orderedConArgsHaveScope :: [ConSourceGroup] -> [TyVarBinder] -> ThetaType -> [Scaled Type] -> Bool
+orderedConArgsHaveScope groups binders theta fields =
+  snd (foldConSourceGroups add_binders check_context check_fields
+         groups binders theta fields (emptyVarSet, True))
   where
     add_binders bs (late, valid) =
       (extendVarSetList late (binderVars bs),
        valid && disjointVarSet late (tyCoVarsOfTypes (map (varType . binderVar) bs)))
-    check_fields fs (late, valid) =
-      (late, valid && disjointVarSet late
-        (tyCoVarsOfTypes (concatMap (\(Scaled m ty) -> [m, ty]) fs)))
+    check_context theta (late, valid) =
+      (late, valid && disjointVarSet late (tyCoVarsOfTypes theta))
+    check_fields fs = check_context (concatMap (\(Scaled m ty) -> [m, ty]) fs)
 
 -- | Number of type arguments after the initial value fields.
 dataConLateTyVarCount :: DataCon -> Int
@@ -1833,21 +1835,23 @@ See Note [Algebraic runtime index domains] in GHC.Core.Type.
 
 {- Note [Interior constructor telescopes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A prefix GADT constructor can have a context or one or more specified
-forall groups between fields.
+A prefix GADT constructor can have contexts and specified forall
+groups between fields.
 
   Two  :: forall a. Tag a -> (a ~ Int) => Tag a -> Two a
   Pack :: Int -> forall a. a -> Pack
   Parcel :: Int -> forall a. a -> forall a. a -> Parcel
+  Stored :: Int -> forall a. Eq a => a -> Stored a
 
 Store the source order in groups of type binders, fields and predicates.
 Each group consumes its entries from the existing DataCon arrays. The
-wrapper takes its arguments in this order. The worker still takes its
-type arguments and evidence before its representation fields.
+wrapper takes its arguments in this order. Its demand signature uses
+the same order. The worker still takes its type arguments and evidence
+before its representation fields.
 
-Pattern checking introduces the written equality after the first
-field pattern. The second pattern can use it. Zonking and desugaring
-bind the resulting evidence at the same boundary. See Note [Trailing
+Pattern checking introduces each context after its preceding fields.
+The following fields can use its evidence. Zonking and desugaring
+bind the solved evidence at that boundary. See Note [Trailing
 constructor evidence] in GHC.HsToCore.Match.Constructor.
 
 The kind or type of an earlier argument must be independent of a later
@@ -1856,7 +1860,8 @@ existential skolems in the constructor case. A written type pattern
 introduces its source binders after the preceding field patterns. Their
 Givens are available at that type pattern. The two binders in Parcel
 have different Names. The scope check walks the same groups from right
-to left to find the binders that are unavailable at each argument. See
+to left to find the binders that are unavailable at each argument.
+Check a context against exactly those binders that follow it. See
 GHC.Tc.Gen.Pat.tcDataConPatWithIndex.
 
 Ordinary and terminal forms still use LegacyConOrder. Their interface

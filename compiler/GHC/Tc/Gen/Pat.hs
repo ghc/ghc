@@ -65,6 +65,7 @@ import GHC.Core.ConLike
 import GHC.Builtin.KnownKeys
 import GHC.Driver.DynFlags
 import GHC.Types.SrcLoc
+import GHC.Types.Basic (ConSourceOrder(..), ConSourceGroup(..))
 import GHC.Types.Var.Set
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
@@ -1322,7 +1323,7 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
               arg_tys_scaled = map (scaleScaled pat_mult) (substScaledTys tenv arg_tys)
               con_like       = RealDataCon data_con
               trailing_context = dataConHasTrailingContext data_con
-              interior_context = dataConInteriorContext data_con
+              source_order = dataConSourceOrder data_con
 
         ; traceTc "tcConPat" (vcat [ text "con_name:" <+> ppr con_name
                                    , text "univ_tvs:" <+> pprTyVars univ_tvs
@@ -1343,23 +1344,13 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
 
         ; let check_fields :: [Scaled TcSigmaType] -> TcM r -> TcM (HsConPatDetails GhcTc, r)
               check_fields tys action
-                | Just _ <- dataConInteriorForAll data_con
-                , PrefixCon _ ps <- val_arg_pats
-                = do { (checked, result) <- check_groups 1 tys ps late_ty_args
-                     ; return (PrefixCon noExtField checked, result) }
+                | OrderedConArgs (_ : groups) <- source_order
+                = do { (pats, _, result) <- tcOrderedConArgs con_like penv tenv
+                         (getSkolemInfo skol_info) groups tys val_arg_pats late_ty_args [] action
+                     ; return (pats, result) }
                 | otherwise
                 = tcConValArgs con_like tys penv val_arg_pats $
                     tcConTyArgs tenv penv (concatMap snd late_ty_args) action
-                where
-                  check_groups start ts ps [] = tcConPrefixArgs con_like penv start ts ps action
-                  check_groups start ts ps ((n, type_pats) : gs) = do
-                    let (before_tys, after_tys) = splitAt n ts
-                        (before_pats, after_pats) = splitAt n ps
-                    (before, (after, result)) <-
-                      tcConPrefixArgs con_like penv start before_tys before_pats $
-                      tcConTyArgs tenv penv type_pats $
-                      check_groups (start + n) after_tys after_pats gs
-                    return (before ++ after, result)
 
         ; if null ex_tvs && null eq_spec && null theta
           then do { -- The common case; no class bindings etc
@@ -1374,6 +1365,7 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
                                            , cpt_binds = emptyTcEvBinds
                                            , cpt_arg_tys = ctxt_res_tys
                                            , cpt_wrap = idHsWrapper
+                                           , cpt_ordered_binds = []
                                            }
                                          }
 
@@ -1390,7 +1382,7 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
         ; given <- newEvVars theta'
         ; let indexed_fields
                 | Just scrut <- index, [eq] <- given
-                , not trailing_context, Nothing <- interior_context
+                , not trailing_context, LegacyConOrder _ <- source_order
                 , isIdHsWrapper wrap, isNativeIndexedGadtCon data_con
                 , PrefixCon _ fields <- val_arg_pats
                 , Just names <- traverse index_field_name fields
@@ -1415,28 +1407,30 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
                 result <- thing_inside proof
                 return (proof, result)
         ; let skol = getSkolemInfo skol_info
-        ; (early_wrap, ev_binds, arg_pats', (extra_proof, res))
+        ; (early_wrap, ev_binds, ordered_binds, arg_pats', (extra_proof, res))
              <- tcConTyArgs tenv penv univ_ty_args $
-                case interior_context of
-                  Just prefix_len -> do
-                    { (pats, (binds, result)) <-
-                        tcConInteriorArgs con_like prefix_len field_tys penv val_arg_pats
-                          (checkConstraints skol [] given) check_body
-                    ; return (idHsWrapper, binds, pats, result) }
-                  Nothing | trailing_context ->
+                case source_order of
+                  OrderedConArgs (_ : groups) -> do
+                    { (binds, (pats, scopes, result)) <-
+                        checkConstraints skol ex_tvs' [] $
+                        tcConTyArgs tenv penv ex_ty_args $
+                        tcOrderedConArgs con_like penv tenv skol groups
+                          field_tys val_arg_pats late_ty_args given check_body
+                    ; return (idHsWrapper, binds, scopes, pats, result) }
+                  _ | trailing_context ->
                     do { (early_binds, (pats, (late_binds, result))) <-
                            checkConstraints skol ex_tvs' [] $
                            tcConTyArgs tenv penv ex_ty_args $
                            tcConValArgs con_like field_tys penv val_arg_pats $
                            tcConTyArgs tenv penv (concatMap snd late_ty_args) $
                            checkConstraints skol [] given check_body
-                       ; return (mkWpLet early_binds, late_binds, pats, result) }
-                  Nothing ->
+                       ; return (mkWpLet early_binds, late_binds, [], pats, result) }
+                  _ ->
                     do { (binds, (pats, result)) <-
                            checkConstraints skol ex_tvs' given $
                            tcConTyArgs tenv penv ex_ty_args $
                            check_fields field_tys check_body
-                       ; return (idHsWrapper, binds, pats, result) }
+                       ; return (idHsWrapper, binds, [], pats, result) }
 
         ; let res_pat = ConPat
                 { pat_con   = header
@@ -1447,6 +1441,7 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
                   , cpt_binds = ev_binds
                   , cpt_arg_tys = ctxt_res_tys
                   , cpt_wrap  = early_wrap
+                  , cpt_ordered_binds = ordered_binds
                   }
                 }
         ; return (mkHsWrapPat wrap res_pat pat_ty, res)
@@ -1614,7 +1609,8 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
                             { cpt_tvs = [], cpt_dicts = []
                             , cpt_binds = emptyTcEvBinds
                             , cpt_arg_tys = ctxt_res_tys
-                            , cpt_wrap = idHsWrapper } }
+                            , cpt_wrap = idHsWrapper
+                            , cpt_ordered_binds = [] } }
        ; return (mkHsWrapPat wrap pat pat_ty, res) }
   where
     bad_pattern :: TcM a
@@ -1822,6 +1818,7 @@ tcPatSynPat (L con_span con_name) pat_syn pat_ty penv arg_pats thing_inside
                                  { cpt_tvs   = ex_tvs'
                                  , cpt_dicts = prov_dicts'
                                  , cpt_binds = ev_binds
+                                 , cpt_ordered_binds = []
                                  , cpt_arg_tys = mkTyVarTys univ_tvs'
                                  , cpt_wrap  = req_wrap
                                  }
@@ -2230,23 +2227,39 @@ tcConPrefixArgs con_like penv start tys pats thing_inside = do
   assert (length pats == length tys) $
     tcMultiple (tcConArg con_like) penv (zip3 [start..] pats tys) thing_inside
 
--- | Enter the interior context after checking the first field patterns.
-tcConInteriorArgs :: ConLike -> Int -> [Scaled TcSigmaType] -> PatEnv
-                  -> HsConPatDetails GhcRn
-                  -> (TcM ([LPat GhcTc], a) -> TcM (b, ([LPat GhcTc], a)))
-                  -> TcM a -> TcM (HsConPatDetails GhcTc, (b, a))
-tcConInteriorArgs con_like n tys penv args enter_group thing_inside = do
+-- | Match fields and introduce each group of Givens in source order.
+tcOrderedConArgs :: ConLike -> PatEnv -> Subst -> SkolemInfoAnon
+                 -> [ConSourceGroup] -> [Scaled TcSigmaType] -> HsConPatDetails GhcRn
+                 -> [(Int, [(HsTyPat GhcRn, TyVar)])] -> [EvVar]
+                 -> TcM a -> TcM (HsConPatDetails GhcTc, [(Int, TcEvBinds)], a)
+tcOrderedConArgs con_like penv subst skol groups tys args ty_pats given thing_inside = do
   let pats = case args of
         PrefixCon _ ps -> ps
         InfixCon _ p q -> [p, q]
-        _ -> panic "tcConInteriorArgs: record arguments"
-      (before, after) = splitAt n pats
-      (before_tys, after_tys) = splitAt n tys
-  (before', (binds, (after', res))) <-
-    tcConPrefixArgs con_like penv 1 before_tys before $
-      enter_group $
-        tcConPrefixArgs con_like penv (n+1) after_tys after thing_inside
-  return (PrefixCon noExtField (before' ++ after'), (binds, res))
+        _ -> panic "tcOrderedConArgs: record arguments"
+  (checked, scopes, result) <- go 0 groups tys pats ty_pats given
+  return (PrefixCon noExtField checked, scopes, result)
+  where
+    go entered [] [] ps [] [] = do
+      -- Any remaining patterns are invalid invisible arguments.
+      (checked, result) <- tcConPrefixArgs con_like penv (entered + 1) [] ps thing_inside
+      return (checked, [], result)
+    go entered (ConValueArgs n : gs) ts ps ts_pats es = do
+      let (before_tys, after_tys) = splitAt n ts
+          (before_pats, after_pats) = splitAt n ps
+      (before, (after, scopes, result)) <-
+        tcConPrefixArgs con_like penv (entered + 1) before_tys before_pats $
+        go (entered + n) gs after_tys after_pats ts_pats es
+      return (before ++ after, scopes, result)
+    go entered (ConTypeArgs _ : gs) ts ps ((_, type_pats) : rest) es =
+      tcConTyArgs subst penv type_pats $
+      go entered gs ts ps rest es
+    go entered (ConContextArgs n : gs) ts ps ts_pats es = do
+      let (group, later) = splitAt n es
+      (binds, (checked, scopes, result)) <- checkConstraints skol [] group $
+        go entered gs ts ps ts_pats later
+      return (checked, (entered, binds) : scopes, result)
+    go _ _ _ _ _ _ = panic "tcOrderedConArgs: invalid argument groups"
 
 check_con_pat_arity :: ConLike -> Int -> TcM ()
 check_con_pat_arity con_like no_of_vis_args =

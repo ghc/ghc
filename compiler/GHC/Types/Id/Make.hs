@@ -774,6 +774,9 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
                                                       -- LFInfo stores post-unarisation arity
 
              wrap_arg_dmds
+               | OrderedConArgs groups <- dataConSourceOrder data_con
+               = replicate (length stupid_theta) topDmd ++
+                 foldConSourceGroups (const id) (++) (++) groups ([] :: [()]) dict_dmds field_dmds []
                | Just n <- dataConContextFieldCount data_con
                , (prefix, suffix) <- splitAt n field_dmds
                = prefix ++ dict_dmds ++ suffix

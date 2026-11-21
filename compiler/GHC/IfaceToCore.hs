@@ -1262,27 +1262,34 @@ tcIfaceDataCons tycon_name tycon if_cons
                          ifConSourceOrder = source_order})
      = do { let terminal_order = legacyConOrder source_order
                 context_only = terminal_order == gadtTrailingContextOnly
-                interior_forall = conInteriorForAll source_order
                 late_count = max 0 terminal_order
-                ordered_late_count = maybe late_count (sum . map snd) interior_forall
+                ordered_late_count = case source_order of
+                  OrderedConArgs groups -> sum (map snd (orderedConTypeGroups groups))
+                  LegacyConOrder _ -> late_count
                 admissible_order
                   | context_only = not (null ctxt) && ordinary_data && all type_binder ex_bndrs
                   | otherwise = late_count > 0 && late_count <= length user_bndrs && null ex_bndrs
           ; case source_order of
               LegacyConOrder _ -> pure ()
               OrderedConArgs groups ->
-                let valid_group = case interior_forall of
-                      Nothing ->
-                        groups == [ConTypeArgs (length user_bndrs), ConValueArgs 1,
-                                   ConContextArgs (length ctxt), ConValueArgs 1] &&
-                        not (null ctxt) && null ex_bndrs && length args == 2
-                      Just type_groups ->
-                        all (\(fields, binders) -> fields == 1 && binders > 0) type_groups &&
-                        ordered_late_count <= length user_bndrs &&
-                        take 1 groups == [ConTypeArgs (length user_bndrs - ordered_late_count)] &&
-                        length args == length type_groups + 1 &&
-                        null ctxt && all type_binder ex_bndrs
-                in unless (valid_group && ordinary_data &&
+                let valid_group = case groups of
+                      ConTypeArgs initial : rest ->
+                        initial >= 0 && all positive rest &&
+                        initial + ordered_late_count == length user_bndrs &&
+                        sum [n | ConContextArgs n <- rest] == length ctxt &&
+                        sum [n | ConValueArgs n <- rest] == length args &&
+                        length args >= 2 &&
+                        any non_field (drop 1 (dropWhile non_field rest))
+                      _ -> False
+                    positive (ConTypeArgs n) = n > 0
+                    positive (ConContextArgs n) = n > 0
+                    positive (ConValueArgs n) = n > 0
+                    non_field ConValueArgs{} = False
+                    non_field _ = True
+                    admissible_binders
+                      | Just _ <- conInteriorContext source_order = null ex_bndrs
+                      | otherwise = all type_binder ex_bndrs
+                in unless (valid_group && admissible_binders && ordinary_data &&
                            has_wrapper && null arg_binders && null spec && null lbl_names) $
                      failIfM (text "Invalid interior constructor group in interface:" <+> ppr dc_name)
           ; when (terminal_order /= 0) $
@@ -1314,10 +1321,12 @@ tcIfaceDataCons tycon_name tycon if_cons
               check_prefix_scope tys = when (ordered_late_count /= 0) $
                 unless (disjointVarSet late_vars (tyCoVarsOfTypes tys)) $
                   failIfM (text "Invalid terminal constructor binder scope:" <+> ppr dc_name)
-        ; when (isJust interior_forall) $
-            unless (all (isSpecifiedForAllTyFlag . binderFlag) late &&
-                    late_vars `subVarSet` mkVarSet (univ_tvs ++ ex_tvs)) $
-              failIfM (text "Invalid interior constructor binder scope:" <+> ppr dc_name)
+        ; case source_order of
+            OrderedConArgs _ ->
+              unless (all (isSpecifiedForAllTyFlag . binderFlag) late &&
+                      late_vars `subVarSet` mkVarSet (univ_tvs ++ ex_tvs)) $
+                failIfM (text "Invalid interior constructor binder scope:" <+> ppr dc_name)
+            LegacyConOrder _ -> pure ()
         ; when (late_count /= 0) $
             unless ((all isVisibleForAllTyBinder late || (trailing_context && not (null ctxt))) &&
                     late_vars `subVarSet` mkVarSet univ_tvs) $
@@ -1334,7 +1343,8 @@ tcIfaceDataCons tycon_name tycon if_cons
                 -- A predicate or field can refer to this TyCon. Check its
                 -- scope in the same lazy computation that reads the type.
                 ; let prefix_theta = if trailing_context then [] else theta
-                ; check_prefix_scope (map (varType . binderVar) early ++ prefix_theta)
+                ; when (terminal_order /= 0) $
+                    check_prefix_scope (map (varType . binderVar) early ++ prefix_theta)
                 -- This fixes #13710.  The enclosing lazy thunk gets
                 -- forced when typechecking record wildcard pattern
                 -- matching (it's not completely clear why this
@@ -1346,8 +1356,8 @@ tcIfaceDataCons tycon_name tycon if_cons
                     then do { arg_tys <- forkM (mk_doc dc_name <+> text "arg_tys") $
                                   do { tys <- mapM (\(w, ty) -> mkScaled <$> tcIfaceType w <*> tcIfaceType ty) args
                                      ; case source_order of
-                                         OrderedConArgs groups | isJust interior_forall ->
-                                           unless (orderedConForAllScope groups user_tvs tys) $
+                                         OrderedConArgs groups ->
+                                           unless (orderedConArgsHaveScope groups user_tvs theta tys) $
                                              failIfM (text "Invalid interior constructor binder scope:" <+> ppr dc_name)
                                          _ -> check_prefix_scope (concatMap (\(Scaled mult ty) -> [mult, ty]) tys)
                                      ; return tys }

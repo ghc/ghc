@@ -109,7 +109,7 @@ import Language.Haskell.Syntax.Text
 
 import Control.Monad
 import Control.DeepSeq
-import Data.Maybe (isJust, mapMaybe)
+import Data.Maybe (isJust, isNothing, mapMaybe)
 import Data.Proxy
 import qualified Data.Set as Set
 
@@ -2836,6 +2836,8 @@ instance Binary IfaceConDecls where
             requireIfaceEvidenceVersion bh InteriorGadtForAllEvidence
           when (any (\gs -> gs `lengthExceeds` 1) forall_groups) $
             requireIfaceEvidenceVersion bh RepeatedInteriorGadtForAllEvidence
+          when (any wider_order orders) $
+            requireIfaceEvidenceVersion bh OrderedGadtTelescopeEvidence
           record_legacy
           putByte bh 5
           put_ bh cs
@@ -2851,6 +2853,8 @@ instance Binary IfaceConDecls where
         late = map legacyConOrder orders
         ordered OrderedConArgs{} = True
         ordered _ = False
+        wider_order order =
+          ordered order && isNothing (conInteriorContext order) && isNothing (conInteriorForAll order)
         record_legacy = do
           when (any (> 0) late) $
             requireIfaceEvidenceVersion bh TerminalGadtForAllEvidence

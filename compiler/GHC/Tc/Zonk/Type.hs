@@ -58,7 +58,7 @@ import GHC.Tc.Zonk.TcType
 
 import GHC.Core.Coercion
 import GHC.Core.ConLike
-import GHC.Core.DataCon ( dataConHasTrailingContext, dataConInteriorContext )
+import GHC.Core.DataCon ( dataConHasTrailingContext )
 import GHC.Core.PatSyn (PatSyn(..))
 import GHC.Core.TyCo.Ppr ( pprTyVar )
 import GHC.Core.Type
@@ -1627,6 +1627,7 @@ zonk_pat p@(ConPat { pat_con = L con_loc con
                      , cpt_dicts = evs
                      , cpt_binds = binds
                      , cpt_wrap = wrapper
+                     , cpt_ordered_binds = ordered_binds
                      , cpt_arg_tys = tys
                      })
                    })
@@ -1637,24 +1638,20 @@ zonk_pat p@(ConPat { pat_con = L con_loc con
           -- /kind/ need potential zonking.
           -- cf typecheck/should_compile/tc221.hs
         ; new_evs     <- zonkEvBndrsX evs
-        ; (new_binds, new_wrapper, new_args) <- case con of
-            RealDataCon dc
-              | Just n <- dataConInteriorContext dc
-              , PrefixCon x pats <- args
-              , (before, after) <- splitAt n pats ->
-                do { before' <- zonkPats before
-                   ; binds' <- zonkTcEvBinds binds
-                   ; after' <- zonkPats after
-                   ; pure (binds', wrapper, PrefixCon x (before' ++ after')) }
+        ; (new_binds, new_wrapper, new_args, new_ordered) <- case con of
+            _ | not (null ordered_binds), PrefixCon x pats <- args ->
+                do { binds' <- zonkTcEvBinds binds
+                   ; (pats', scopes) <- zonkOrderedConPats 0 pats ordered_binds
+                   ; pure (binds', wrapper, PrefixCon x pats', scopes) }
             RealDataCon dc | dataConHasTrailingContext dc ->
               do { wrapper' <- zonkCoFn wrapper
                  ; args' <- zonkConStuff args
                  ; binds' <- zonkTcEvBinds binds
-                 ; pure (binds', wrapper', args') }
+                 ; pure (binds', wrapper', args', []) }
             _ -> do { binds' <- zonkTcEvBinds binds
                     ; wrapper' <- zonkCoFn wrapper
                     ; args' <- zonkConStuff args
-                    ; pure (binds', wrapper', args') }
+                    ; pure (binds', wrapper', args', []) }
         ; new_con     <- case con of
             RealDataCon {} -> return con
               -- Data constructors never contain metavariables: they are
@@ -1670,6 +1667,7 @@ zonk_pat p@(ConPat { pat_con = L con_loc con
                    , cpt_dicts = new_evs
                    , cpt_binds = new_binds
                    , cpt_wrap = new_wrapper
+                   , cpt_ordered_binds = new_ordered
                    }
                  }
         }
@@ -1753,6 +1751,17 @@ zonkConStuff (RecCon xx (HsRecFields x rpats dd))
         -- Field selectors have declared types; hence no zonking
 
 ---------------------------
+-- | Zonk each context after the patterns that can bind its evidence.
+zonkOrderedConPats :: Int -> [LPat GhcTc] -> [(Int, TcEvBinds)]
+                   -> ZonkBndrTcM ([LPat GhcTc], [(Int, TcEvBinds)])
+zonkOrderedConPats _ pats [] = (, []) <$> zonkPats pats
+zonkOrderedConPats entered pats ((n, evs) : groups) = do
+  let (before, after) = splitAt (n - entered) pats
+  before' <- zonkPats before
+  evs' <- zonkTcEvBinds evs
+  (after', groups') <- zonkOrderedConPats n after groups
+  return (before' ++ after', (n, evs') : groups')
+
 zonkPats :: Traversable f => f (LPat GhcTc) -> ZonkBndrTcM (f (LPat GhcTc))
 zonkPats = traverse zonkPat
 {-# SPECIALISE zonkPats :: [LPat GhcTc] -> ZonkBndrTcM [LPat GhcTc] #-}
