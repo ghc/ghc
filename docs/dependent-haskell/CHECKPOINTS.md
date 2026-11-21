@@ -33,6 +33,12 @@ The next run rebuilds the helper from that source.
 For a normal two-stage build, the timer can reclaim the RTS C objects and
 dependency files after both compilers pass the same Showcase at the recorded
 Git revision. The normal build script can regenerate those files.
+When several experiments use each other's compilers, check their libraries,
+linker response files and thin archives together. Keep the inputs of any
+running or queued job. Record the configured compiler revision as well as
+the checkout revision when the checkout has advanced. A sparse historical
+checkout restores its tracked tests with `git sparse-checkout disable`.
+
 For other products, keep the completion log outside `_build`. After the last
 consumer finishes, record the source revision and build command.
 
@@ -52,6 +58,48 @@ reads. Release those build products when the last consumer finishes.
 Rebuild the pinned revision when that comparison is needed again.
 [Append upgrade test](examples/open-evaluation/check-append-upgrade.sh)
 and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
+
+## Combined matrix and retained constructor checkpoint
+
+At `dc31b96c26`, normal quick Hadrian builds of Stage 1 and Stage 2
+passed. Both built and ran all 510 Showcase rows at native `-O0` and
+`-O2`. Stage 2 also matched those rows in source GHCi. The combined
+testsuite run had 24 expected passes and zero unexpected outcomes.
+
+* **R03, R04 and R41.** A nested constructor call can supply a runtime
+  result index. A vector package can carry different element types
+  without forcing its witness. Quoting a GADT preserves its ordered
+  binders and fields. The wire test included an earlier compiler reader.
+* **R10.** A closed family can match a signed `Int#`. The source-hidden
+  client passed with both compilers and both optimization levels on the
+  64-bit host. The API probe checked raw literals and target-width conversion.
+* **R15 and R17.** Closed evaluation recovered both dimensions of a square
+  and checked labels stored after the cells of a matrix. The registered
+  tests cover invalid dimensions and imported lambda closures.
+* **R36.** Registered positive and negative cases cover pun warnings at
+  unqualified uses, implicit binders and explicit disambiguation.
+
+The normal first-stage compilers at `e5b6168b83` and `dc31b96c26`
+reported the same errors for nested family applications at depths 32,
+128 and 512. At depth 512, compiler allocation changed from 665,688,176
+to 665,765,448 bytes. The 480-call ordinary Quick Look program compiled
+on both and changed from 42,072,608 to 42,213,248 bytes. These figures
+are single runs of the same sources with `-O0 -fno-code`.
+
+Two experiments remain available for separate decisions.
+
+* **R11.** Worker ABI v79 at `04c39c5989` passed source-hidden worker and
+  interface checks. An earlier normal build at `b9a090f1dd` matched 481
+  Showcase rows with each compiler, passed 71 registered tests, and
+  matched all 37 native API outputs. A v69 provider can retain the old
+  selector in native code even when its interface ABI hash matches.
+  Adopting v79 requires a coordinated native package rebuild.
+* **R16.** The family-axiom prototype is saved at `68c252d93d`. The
+  proof-identifier port is `376a415fcf`, and the selected-method
+  prototype is `22ee2d86dd`. An unmarked older interface can carry a
+  normalized result with no record of the original method. The
+  selected-method prototype also rejects an installed rewrite rule in
+  the optimized Showcase. The next check must cover both cases.
 
 ## Family and package checkpoints
 
@@ -6937,3 +6985,484 @@ and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vecto
    splice group gives GHC-76037 at the function name. A worker that needs
    the unfinished constructor still gives GHC-68947.
    [Declaration groups and aliases](roadmap/R21-dependency-analysis.md#local-synonyms-in-a-retained-field-worker).
+
+## Showcase history through 502 outputs
+
+The 502-output Showcase proves a rectangular table's contents after the
+producer discards its row labels. The evaluator recovers the row count
+from the outer vector. Column labels still establish the width, even
+for an empty table. [Table example and limits](roadmap/R15-closed-term-evaluator.md#read-the-stored-cells-of-a-rectangular-table).
+
+A library can declare an open row schema. Another module can supply an
+instance whose type lambda captures its error type. A client can use
+both the optional schema and the error schema from compiled interfaces.
+The two instances appear in the 501-output Showcase.
+[Schema library](examples/open-evaluation/TypeLambda.hs) and
+[separate instance](examples/open-evaluation/SchemaColumns.hs).
+
+Proposal #765 adds pun warnings. With `-Wpun-bindings`, `data T = T`
+reports both declaration locations. The warning also covers explicit
+type and term binders with the same name in one function or lambda
+match. A binder can still shadow a name from an enclosing scope.
+Implicit local type binders and use-site pun warnings remain open.
+[Accepted proposal and review](https://github.com/ghc-proposals/ghc-proposals/pull/765)
+and [binding examples](roadmap/R36-pun-warnings.md).
+
+A separately compiled producer can return a rectangular table whose
+type hides its dimensions. The client can prove every stored cell at
+compile time, including the shape of empty tables. A recursive function
+over a heterogeneous row can now put its type lambda directly in the
+value signature. The 500-output Showcase includes both programs.
+[Table proof](roadmap/R15-closed-term-evaluator.md#read-the-stored-cells-of-a-rectangular-table)
+and [row function](roadmap/R17-type-level-lambdas.md#mapping-a-row-in-a-value-signature).
+
+A typed column reader can accept a visible Boolean followed by an
+invisible type witness. The skip branch returns `Nothing` even when
+both the witness and the column are undefined. A type-level let can
+now use the ordinary lambda spelling `let wrap = \a -> Either e a`.
+Both examples are part of the 498-output Showcase.
+[Column reader](examples/qualified-pi/RuntimeTypeColumn.hs),
+[type-level lambda](roadmap/R17-type-level-lambdas.md) and
+[verification](CHECKPOINTS.md#family-and-package-checkpoints).
+
+A type-level `let` can name a callback and pass it to `Map` after
+an inner `let` shadows a captured type name. An ordinary client with
+`ImpredicativeTypes` can return an existentially packaged callback
+without naming its polymorphic witness. All 497 Showcase outputs
+matched at native `-O0`, native `-O2` and in source GHCi.
+[Scoped row](examples/open-evaluation/TypeLambda.hs) and
+[verification](CHECKPOINTS.md#family-and-package-checkpoints).
+
+Type-level lets can now appear in Template Haskell type quotations.
+A GADT constructor can also place a `Typeable` constraint after a
+required type argument that follows an ordinary field. The 495-output
+checkpoint includes both forms. [Verification](CHECKPOINTS.md#family-and-package-checkpoints).
+
+A closed type family can pass `\a -> Either e a` to `Map`. Its
+equation binds `e` in the pattern `'Just e`. A client can use the
+result through the producer's compiled interface. All 493 Showcase
+outputs at this revision agree at native O0 and O2 and in GHCi.
+[Closed family example](examples/open-evaluation/TypeLambda.hs)
+and [remaining work by area](ROADMAP.md#remaining-work-by-roadmap-area).
+
+An ordinary client can supply `@Bool` and `@Char` between the value
+arguments of one constructor. Another client can inline a recursive
+function that hides its job payload type and uses an inferred
+`Num` dictionary. Both compile against the provider's interface.
+[Ordered fields](examples/open-evaluation/LabelledValueClient.hs),
+[recursive jobs](examples/qualified-pi/RecursiveJobs.hs), and
+[combined verification](CHECKPOINTS.md#family-and-package-checkpoints).
+
+The roadmap's bounded list index works from source. Its type is
+`foreach (xs :: [a]) -> Fin (sourceLength xs) -> a`, where
+`sourceLength` is the ordinary list function. In a separately compiled
+ordinary module, GHC infers the local list argument in
+`checked xs n = fmap (indexGeneric xs) (mkFinGeneric xs n)`.
+`checked "abc" 1` returns `Just 'b'`. A negative position returns
+`Nothing` before inspecting the list. A written `FZ` at the empty list
+fails at compile time. A finite position can select from a cyclic list.
+[Implementation](examples/qualified-pi/ParameterizedIndexLibrary.hs)
+and [ordinary caller](examples/qualified-pi/FinitePositionClient.hs).
+
+The bounded list index now has the two cons equations in Serokell's
+example. The empty list gives a position of type `Fin 'Z`. GHC checks
+that this type has no constructor and inserts an empty case on the
+position. [Equations and coverage](roadmap/R03-dependent-products.md#omit-an-impossible-list-index-equation).
+
+The same two list equations also accept a linear position. A library
+stores the list together with its checked `Fin` in a dependent pair.
+It can hide that pair behind a linear reader. An ordinary client opens
+the package and passes the position to the reader once. A direct call to
+`fmap (indexGeneric xs)` infers an unrestricted callback.
+[Linear cursor](examples/qualified-pi/ListCursor.hs)
+and [ordinary client](examples/qualified-pi/CursorClient.hs).
+
+A bounded lookup can consume both its position and a callback linearly.
+Each cons equation calls or forwards the callback once. Grouped ordinary
+patterns retain their original demand under `Strict`. A repeated constructor
+in a linear package can also bind a predecessor used by a later field.
+[Lookup with a continuation](examples/qualified-pi/ListCursor.hs)
+and [pattern evidence](roadmap/R04-dependent-sums.md#repeated-retained-constructors-in-linear-packages).
+
+Two lists of different element types can share a checked position.
+An ordinary client asks for both elements at a signed offset. The
+provider checks the offset on the first list and compares the list
+lengths. The equality from that comparison justifies the second
+lookup. A length mismatch returns `Nothing`.
+[Paired lookup and coverage](roadmap/R03-dependent-products.md#use-one-position-on-two-lists-of-equal-length).
+
+A library can also store one position for each of two independent lists.
+Its linear reader matches both positions directly. The lists can have
+different lengths and element types. A finite offset works on a cyclic
+list. An ordinary vector client can pass its filtered result to a
+rank-2 callback and infer the hidden length of the second filter.
+[Two positions](examples/qualified-pi/ListCursor.hs) and
+[ordinary filter client](examples/erased-existentials/RankedPackageClient.hs).
+
+An ordinary caller can write `zipWithExact [x, y] [u, v] (,)`. GHC
+checks both lengths at compile time and infers both element types.
+The same caller can write `toList (zipWithExact [1, 2] [10, 20] (+))`
+at type `[Int]` and obtain `[11,22]`. The proof uses the two list
+constructors on each side. The elements keep their ordinary numeric
+meaning and stay lazy until the result demands them.
+[Written list example](roadmap/R03-dependent-products.md#zip-two-lists-at-a-common-length).
+
+An ordinary module can also give a vector append the result length
+`Length (2 N.+ 1)`. Appending two copies of `'a'` and one `'b'` yields
+`"aab"`. GHC rejects a result annotation of length four and a call to
+`headVec` on a vector of length zero.
+[Ordinary append client](examples/packed-vector/AppendLengthClient.hs).
+
+The open evaluator checks equations about the installed `Prelude.span`.
+When the first element fails the predicate, its suffix is the entire
+input, even with an unknown tail. A proof by induction can rejoin the
+two projected lists when the caller supplies the predicate decisions.
+The proof module disables rewrite rules when it uses these equations.
+[Source proof](examples/open-evaluation/PreludeSpanProof.hs) and
+[R16 scope](roadmap/R16-open-term-evaluator.md).
+
+A column can store a `TypeRep a` beside values of hidden element type
+`a`. A caller supplies the type it wants and a signed offset. A type
+comparison refines the element type. A bounded position permits the
+lookup. A type mismatch leaves the offset and values unevaluated.
+[Runtime type and position](examples/qualified-pi/RuntimeTypeColumn.hs).
+
+A producer can zip two ordinary lists into a vector whose length is
+the length of the first input. Its signature requires equal input
+lengths. For two independent inputs, a runtime comparison supplies
+that equality. Passing the same list twice supplies it by reflexivity
+and allows the first result cell to be read without inspecting the tail.
+[Source and coverage](roadmap/R03-dependent-products.md#zip-two-lists-at-a-common-length).
+
+An ordinary client can filter two vectors independently, pass them to
+a higher-rank callback, and infer the package returned by the callback.
+It can read the first result from either vector while the other input is
+undefined. The second filter can change the two lengths independently.
+[Two-vector example](examples/erased-existentials/RankedPackageClient.hs)
+and [inference and escape checks](roadmap/R22-existential-quantification.md).
+
+An ordinary client can request `Show (Rest c)` alongside `Collection c e`.
+The collection constraint supplies the domain of its associated type.
+A library can export the same pair of constraints as a synonym.
+[Showing the rest of a collection](roadmap/R24-constrained-type-families.md#family-applications-in-a-signature-constraint).
+
+A type synonym can use a `case` to choose the argument type of an
+ordinary arrow. For example, one branch can take a pair and another
+a `Char`. An ordinary client sees the selected argument type through
+the provider's interface. A case in the domain also works under a
+multiplicity annotation. One identity can be called at `One` and
+`Many`. The ordinary linearity checks still apply to each call.
+[R19 example and limits](roadmap/R19-type-level-cases.md).
+
+An application pattern `f x` in a type family equation or class instance
+requires a matchable `f`. GHC checks the declared arrow modifier, even
+when another pattern determines `f` and `x`. [R23 pattern checks](roadmap/R23-unsaturated-type-families.md).
+
+An opted-in library can declare an associated type whose use requires
+the parent class. An ordinary client can prove `Elem [Bool] :~: Bool`
+when `Allowed Bool` supplies the instance. Writing `Elem [Int] :~: Int`
+in the same client reports the missing `Allowed Int` at compile time,
+even though the family equation could reduce to `Int`. A GADT pattern
+can also supply the class dictionary locally. The Showcase opens a field
+with evidence for its runtime flag. An ordinary client supplies a polymorphic
+formatter that works for any field with that evidence.
+[Ordinary client](examples/open-evaluation/ConstrainedElementsClient.hs)
+and [R24 scope](roadmap/R24-constrained-type-families.md).
+
+An opted-in provider can pass the type family `Map` itself to a GADT.
+The GADT uses it once with the matchable constructor `Maybe` and once
+with an unmatchable type family. An ordinary client uses both results
+through the provider's interface. An explicit equation binder can also
+carry the polymorphic kind into the right-hand side of a type family.
+A declaration can compute its callback's matchability with a family such
+as `Flip m`. A higher-order family can also take an unmatchable family
+whose first argument is a required type. The ordinary client invokes it
+at two kinds and obtains `(3,LT)`.
+[R23 examples and limits](roadmap/R23-unsaturated-type-families.md#passing-a-polymorphic-mapper-at-its-full-kind).
+
+An ordinary module can open an erased state and its linear reader in a
+strict tuple binding. A local `INLINE` function can use a retained
+call with a captured element. The Showcase reads both an encoded Boolean
+and an encoded integer, and replicates a captured element at two runtime
+lengths. [Release and interface checks](CHECKPOINTS.md#family-and-package-checkpoints).
+
+An ordinary module can check a signed offset once against a vector.
+On success, `mkFinVec` returns a position of type `Fin n`. The caller
+can use that position on any vector of length `n`. A negative offset
+returns `Nothing` without inspecting the vector. A match on `FS p` in
+a retained function identifies the actual predecessor `p`. Its proof
+leaves that predecessor unevaluated. The same function accepts written
+`FZ` and `FS p` as retained arguments. A constructor result can also
+determine multiple erased parameters.
+[Written constructors](roadmap/R03-dependent-products.md#write-indexed-constructors-in-retained-applications)
+and [signed lookup and predecessor proof](roadmap/R03-dependent-products.md#retain-a-bounded-position-and-its-actual-predecessor).
+
+An ordinary caller can split a vector at a runtime cut and obtain a
+proof that appending the two pieces gives back its original input.
+`splitAtValue` returns two retained vectors and a homogeneous equality.
+For an independently read cut and total, `checkedSplitAtValue` returns
+`Nothing` if the cut exceeds the total. On success, checking the suffix
+length leaves the vector unevaluated. Opening the contents proof takes
+the recursive path down the input spine. The expected result and the
+length equality now select the original vector at the constructor call.
+The entire proof fits in the zero and successor equations. The successor
+branch matches the vector and uses the recursive equality directly.
+[Split theorem](examples/packed-vector/CertifiedSplit.hs) and
+[ordinary caller](examples/packed-vector/CertifiedSplitClient.hs).
+
+One bounds check can also split two different vectors. Each proof names
+its original input. The vectors can contain different element types.
+Both calls are written as `splitAtValue cut xs` or
+`splitAtValue cut ys`. The expected types of the pieces determine the
+common suffix. Inspecting the first proof leaves the second vector
+unevaluated. Exchanging the proofs reports the two written `SplitAtValue`
+types at the exchanged arguments.
+
+The Showcase includes ordinary clients of the `INLINE` and `INLINABLE`
+finite zero views. It also includes finite-list proofs for the installed
+Prelude definitions of `map`, `(.)`, `filter`, `takeWhile`, `dropWhile`,
+and `(++)`. One proof recovers the original finite list by appending its
+prefix and suffix. Another ordinary client opens an erased package in a
+local tuple binding. It can use both fields while the witness stays local.
+The source-hidden
+split regression passes at `-O0`, `-O1`, and `-O2`. Removing the induction
+premise fails at the final `Refl`. A normal two-stage Hadrian build also
+passed on the 378-line paired-split revision.
+[Verification scope](CHECKPOINTS.md#family-and-package-checkpoints).
+
+A retained function can name an entire indexed vector as its argument.
+`foreach (xs :: Vec a n) -> xs :~: xs` returns `Refl` even for an
+undefined vector. Using two different vector binders in the same equality
+fails at `Refl`. A type synonym can also name a dependent consumer. An
+ordinary module uses the exported synonym to pass an indexed payload.
+A match on `VNil` now refines the value `xs` and its length. The
+branch can return a heterogeneous equality between `xs` and `VNil`.
+Matching `VCons x rest` refines the input to its actual head and tail.
+The match forces the outer constructor. The fields stay lazy until the
+caller inspects them.
+[Dependent products](roadmap/R03-dependent-products.md) and
+[named consumer](examples/packed-vector/DependentPair.hs).
+
+`splitAtVec` takes a runtime cut `n` and a vector of length `Add n m`.
+It returns two vectors of lengths `n` and `m`. An expected pair of
+vectors determines the suffix length. So does the result of `dropVec`.
+Use `takeVec @m` when only the prefix occurs in the result.
+
+For a cut read independently of the vector, `splitAtVecChecked cut total xs`
+returns `Nothing` when the cut exceeds the length. A successful split
+packages a suffix length, the two vectors, and a proof of
+`Add cut suffix :~: total`. An ordinary caller can match on `Refl` and
+rejoin the vectors at the original length. Checking the bound only inspects
+the lengths. [Checked split](examples/packed-vector/PackedVecLibrary.hs)
+and [ordinary caller](examples/packed-vector/ListVectorClient.hs).
+
+The Showcase also
+checks the contents of a concrete split. Appending the two parts of
+`[True, False]` gives that same vector. Swapping the elements makes the
+equality proof fail at `Refl`. The ordinary polymorphic `appendVec` can itself appear in a type.
+GHC infers the input lengths of two written vectors, reduces their sum,
+and checks the exact output elements. An ordinary client can also use
+`appendEmptyAt xs` to prove that appending an empty vector preserves
+its runtime input. The proof does not inspect `xs`. The recursive
+equation also applies to a runtime head, left tail, and right vector.
+The successor branch of `splitAtValue` uses this equation and the
+recursive proof to reconstruct an arbitrary input after splitting.
+[Split and prior art](REFERENCES.md#split-a-vector-at-a-retained-length) and
+[contents proof](../../testsuite/tests/dependent/should_run/NativeClosedIndexedVec.hs).
+
+A case on an ordinary comparator can return a witness for `p x` in all
+three `Ordering` branches. A separately compiled ordinary module uses
+the witness to choose an `Int`, `Bool`, or `Char` payload. It leaves the
+other two payloads unevaluated. [Provider](examples/open-evaluation/RuntimeOrdering.hs)
+and [ordinary client](examples/open-evaluation/OrderingPayload.hs).
+
+An ordinary client can partition a vector with a runtime predicate and
+return the two parts appended at the original input length. The producer
+returns two nested `some` packages and proves that their lengths add up to
+the input length. Returning just the kept vector at that length fails at
+the returned expression. A caller can also choose either partition at
+runtime and pass its length and vector to the same consumer. [Partition proof](examples/packed-vector/ConservedPartition.hs),
+[ordinary caller](examples/packed-vector/ListVectorClient.hs) and
+[verification](CHECKPOINTS.md#family-and-package-checkpoints).
+
+A function can read a Boolean from an `IORef` and use it as the index
+of an ordered type case in a value signature. The sample renders the
+two results as `"7"` and `"'f'"`. A call that ignores its arguments
+still returns 42 with an undefined index and payload. An ordinary client
+can also open a hidden vector inside a pair without forcing the other
+field. In a GADT field example, each branch passes the original runtime
+Boolean to the field. Its result has type `Int` at `True` and `Char` at
+`False`.
+[Showcase](Showcase.hs) and [verification](CHECKPOINTS.md#family-and-package-checkpoints).
+
+A rewrite rule can omit the types of its Boolean index and dependent
+payload. GHC infers both from the function's retained signature. An
+ordinary client can use the optimized rule. The rule fires even when the index comes from
+an `IORef`. A call whose result ignores the index can return 19 with an
+undefined Boolean. GHC checks type cases in ordinary and rank-n
+constructor fields. The same higher-order class method can map over
+values indexed by `Maybe` or by a partially applied type family.
+[Rewrite rules](examples/qualified-pi/RetainedRules.hs),
+[field cases](examples/open-evaluation/NativeNestedCase.hs) and
+[class method client](examples/open-evaluation/IndexedMapClient.hs).
+
+The module that defines the Peano list `size` can keep dependent syntax
+off. Its `-fwrite-source-equations` option publishes the checked
+recursive equations, including when compiling without object code.
+The same source function runs at runtime. Separate ordinary proof
+modules use its interface to reason about installed `map` and `filter`.
+[Size definition](examples/open-evaluation/PreludeMapLengthSize.hs)
+and [ordinary proof module](examples/open-evaluation/PreludeMapLengthProof.hs).
+
+An ordinary caller can package a list's computed length with the vector
+indexed by that length. A separate proof module uses the checked
+equations for Prelude `(++)` to prove that append adds lengths and that
+`map` distributes over append for finite lists. Its tests also check
+that the right list and the elements remain lazy where promised.
+[List-to-vector example](roadmap/R04-dependent-sums.md)
+and [append proofs](roadmap/R16-open-term-evaluator.md#prove-that-map-distributes-over-append).
+
+GHC checks that filtering a finite list cannot increase its `size`.
+The list and the cutoff captured by its predicate can both come from
+`IO`. A case on the predicate result supplies the evidence for the
+checked `Prelude.filter` equation at that element. The proof takes an
+explicit predicate argument that GHC erases. A decider for a different
+predicate fails to typecheck. Observing the complete proof requires a
+defined decision at each element.
+[Filter proof](examples/open-evaluation/PreludeFilterLengthProof.hs),
+[runtime cutoff](examples/open-evaluation/PreludeFilterCutoff.hs) and
+[verification](CHECKPOINTS.md#family-and-package-checkpoints).
+
+A function can repeat the same type-level case in its argument and result.
+For `caseIdentity`, the result type is `Int` at `True` and `Bool` at
+`False`. The body simply returns its argument even while the index is
+unknown. An ordinary client reads the signature through the provider
+interface and obtains `(42,False)`. A second example checks that an outer
+index under a type family stays distinct from a shadowing pattern binder.
+A staged interpreter can use the arrow kind supplied by its caller to
+produce `(Just 3,Right 3)`.
+[Value signature](examples/open-evaluation/NativeCase.hs),
+[scoped indices](examples/open-evaluation/NativeNestedCase.hs) and
+[staged interpreter](examples/open-evaluation/InterpretedKindUseSite.hs).
+
+An ordinary module proves that `Prelude.map` preserves the length of
+any finite list spine for any callback. The proof counts constructors
+with the same Haskell `size` function that the program calls at runtime.
+The empty case is immediate. The cons case uses the installed map equation
+and the induction hypothesis for the tail. A claim that mapping adds one
+element fails at the empty case. Omitting the induction hypothesis leaves
+the tail equality unsolved. The runtime example counts two elements
+without evaluating the callback.
+[Proof](examples/open-evaluation/PreludeMapLengthProof.hs)
+and [assumptions and checks](roadmap/R16-open-term-evaluator.md#prove-that-map-preserves-length).
+
+A GADT field can package three vectors with two runtime lengths. Two
+vectors share the outer length and can be zipped directly. The third
+uses the inner length. The sample reads lengths 2 and 1 and the first
+aligned pair `('h','s')` without evaluating either remaining tail or
+the third vector. Giving either length the wrong vector is a type error
+in the client that constructs the package.
+[Source](examples/packed-vector/StoredVector.hs)
+and [constructor and interface checks](roadmap/R04-dependent-sums.md#sums-in-constructor-fields).
+
+A vector partition can store its two result lengths in one erased package.
+The producer writes `Rows yes no`. An ordinary function equation can
+inspect the passing vector with `firstPassing (Rows (VCons x _) _) = Just x`.
+The match leaves both unused tails lazy. With `ImpredicativeTypes`, a
+client can use `map rowLists` over partitions with different hidden lengths.
+Quick Look can infer a complete erased package as a type argument. It
+still checks runtime dependencies under the package binder.
+[Partition equations](examples/erased-existentials/ImplicitVector.hs)
+and [ordinary list client](examples/erased-existentials/PartitionChoices.hs).
+
+A function with a proof of `a :~: b` can change a filtered vector's
+element type from `a` to `b` under the same hidden length. A type-level
+case can also use an equality for an earlier constructor index when
+checking a later argument whose kind refers to that index. When a family
+cannot reduce, the case still waits for more information.
+[Type-level case](examples/open-evaluation/NativeNestedCase.hs).
+
+An existential witness can itself be polymorphic. A producer can write
+`(id, atTwoTypes)` for `exists t. (t, t -> (Int, Bool))`. The second field
+determines that the first has type `forall a. a -> a`. A consumer can write
+`observePair (f, k) = k f`. If it tries to return `f` at an arbitrary type,
+the error identifies both the use and the pattern that opened the package.
+A function can also hide the witness shared by all its calls. The consumer
+can write `case builder @Int n of Callback f call -> call f` and use `f` at
+both `Int` and `Bool` inside the case.
+[Callback example](examples/erased-existentials/RankedPackage.hs).
+
+A library can export optimizer rules that construct or open an erased
+package. For example, a rule for `readHidden (x, k) = k x` with
+`x :: Int` fires for an integer package. A package that holds a `Bool`
+keeps its own callback. Both the provider and a client compiled from
+its interface fire all four example rules at default `-O1` and `-O2`.
+[Rules and provider](examples/erased-existentials/LexicalPackageRules.hs).
+
+A stream can hide its state in an ordinary tuple with its step function.
+The same consumer reads a list-backed stream and an integer stream that
+skips even values. A one-element prefix leaves the rest of the input list
+unevaluated. [Stream example](examples/erased-existentials/ErasedStream.hs).
+
+A kind family can select a matchable arrow for `Maybe` and an unmatchable
+arrow for a type family. Both results apply to `Int`. Before this change,
+the fork rejected the second application. An ordinary client now prints
+`(Just 7,[7])` from the producer interface. [Computed arrow kinds](examples/open-evaluation/InvisibleFamily.hs).
+
+An interpreter can define arrow kinds before a declaration splice and
+apply the interpreted type constructor after it. Interpreting two
+applications of `Maybe` gives `Just (Just True)`. A class can also give
+one associated type default, `type Callback a = a -> Maybe a`. An
+ordinary client uses the default as both the kind of the promoted
+constructor `'Just` and the type of a runtime callback.
+[Interpreter](examples/open-evaluation/InterpretedKind.hs) and
+[callback client](examples/open-evaluation/LegacyKindArgument.hs).
+
+A second interpreter can apply `Either` to two argument types and can
+also describe the type of `(&&)`. The choice of arrow in a family's
+result can differ from the choice in its kind. The client prints
+`(Right 7,False)` and leaves the second Boolean unevaluated. The
+original `GADTSingletons` program compiles with a matchable arrow on
+`(~>)` and a separate matchable `Promote` equation. Its bare equation
+continues to handle ordinary function types.
+[Interpreter and compatibility boundary](roadmap/R23-unsaturated-type-families.md#compatibility-with-existing-haskell).
+
+The list interface of a stream with hidden state supports two ordinary
+`foldr` consumers. With a separately compiled provider, both consume the
+producer's builder at `-O1` and `-O2`. The first-element fold returns
+`Just True` for a stream with an undefined tail. The integer fold reads
+the odd digits in order and gives 531. The focused checks also run the
+same source at `-O0`.
+[Source folds](examples/erased-existentials/StreamFold.hs) and
+[Core and recompilation checks](roadmap/R05-dependent-core.md#a-list-fold-over-a-hidden-stream-state).
+
+A family argument can keep its last invisible binder while GHC infers
+the earlier ones. For `RunVisible @Bool (ReadAt 'True)`, GHC infers
+the result kind `Bool` and leaves the input type for `RunVisible`.
+The same family produces `Int` when the receiver requests kind `Type`.
+[Source and ordinary client](roadmap/R23-unsaturated-type-families.md#inferring-a-kind-after-supplying-a-visible-argument).
+
+An ordinary client can prove two equations about the installed
+`Prelude.filter Prelude.not`. A `False` head survives. A `True` head
+is skipped. Both proofs leave the list tail unknown. The client reads
+only the producer interface and disables rewrite rules in the module
+that proves the equations. Keeping rewrite rules enabled reports
+GHC-83605 at the proof. A runtime check reads the kept head with an
+undefined tail. The Showcase checks the two proofs and this
+demand behavior.
+[Proof source](examples/open-evaluation/PreludeFilterProof.hs),
+[filter alias](examples/open-evaluation/PreludeFilterSource.hs)
+and [Showcase](Showcase.hs).
+
+The upgrade tests cover a change to a family, a packed projection from
+a home or installed module, and combinations of dependent projections
+and ordered type cases. They check a first rebuild, reuse on a second
+build, and rejection of stale evidence. The old and new compilers use
+the same target libraries for each comparison. At three interface
+compression levels the old reader rejects new constructor evidence at
+the header. The new reader checks the coercion's role and scope.
+For a provider that exports both an ordered case and a list filter, either
+older compiler rebuilds that provider exactly once. A provider that needs only
+the check its compiler already performed stays up to date.
+[R05 interface checks](roadmap/R05-dependent-core.md#default-optimized-interfaces)
+and [two-way filter and case upgrade](examples/open-evaluation/check-filter-scope-upgrade.sh).
