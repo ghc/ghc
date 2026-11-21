@@ -144,3 +144,104 @@ for opt in O0 O2; do
         fi
     done
 done
+
+cat >RankProbe.hs <<'HS'
+{-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, PolyKinds, RankNTypes #-}
+{-# LANGUAGE TypeAbstractions, TypeApplications #-}
+#ifdef DEEP
+{-# LANGUAGE DeepSubsumption #-}
+#endif
+module RankProbe (probe) where
+import Data.Kind (Type)
+import NativeAlternatingBindersProvider
+
+#if FORM == 2
+-- Ordinary arrows still permit a wrapper around an exact retained suffix.
+type Worker = () -> forall a. Show a => foreach (m :: Maybe a) -> Reading True m -> Reading True m
+#elif FORM == 3 || FORM == 4
+-- The analogous dictionary wrapper is now below the first retained argument.
+type Worker = foreach (b :: Bool) -> forall a. Show a => foreach (m :: Maybe a) -> Reading b m -> Reading b m
+#else
+type Worker = foreach (b :: Bool) -> forall (a :: Type). foreach (m :: Maybe a) -> Reading b m -> Reading b m
+#endif
+
+probe :: Maybe Bool -> Maybe Char -> (Int, Int)
+probe ib ic =
+    let {-# INLINABLE applyBoth #-}
+        applyBoth :: Worker -> (Int, Int)
+#if FORM == 2
+        applyBoth f = (readInt (f () @Bool ib (Reading 41)), readInt (f () @Char ic (Reading 42)))
+    in applyBoth plainFirst
+#else
+        applyBoth f = (readInt (f True @Bool ib (Reading 41)), readInt (f False @Char ic (Reading 42)))
+#if FORM == 4
+    in applyBoth (\b @a m x -> keepAfter b @a m x)
+#else
+    in applyBoth keepAfter
+#endif
+#endif
+  where
+    readInt (Reading n) = n
+HS
+
+cat >OrdinaryRank.hs <<'HS'
+{-# LANGUAGE DeepSubsumption, NoExperimentalDependentTypes, RankNTypes, TypeApplications #-}
+module OrdinaryRank (pair) where
+
+{-# NOINLINE worker #-}
+worker :: Bool -> forall a. Maybe a -> Int -> Int
+worker _ _ x = x
+
+pair :: Maybe Bool -> Maybe Char -> (Int, Int)
+pair ib ic =
+    let {-# INLINABLE applyBoth #-}
+        applyBoth :: (Bool -> forall a. Show a => Maybe a -> Int -> Int) -> (Int, Int)
+        applyBoth f = (f True @Bool ib 41, f False @Char ic 42)
+    in applyBoth worker
+HS
+
+cat >HigherRankMain.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module Main where
+import RankProbe
+import qualified OrdinaryRank
+
+main :: IO ()
+main = print (probe first second, OrdinaryRank.pair first second)
+  where
+    first = error "first index"
+    second = error "second index"
+HS
+
+for opt in O1 O2; do
+    mkdir -p "$out/rank-$opt"/{provider,client}
+    cp "$src/$provider.hs" "$out/rank-$opt/provider/"
+    cp {RankProbe,OrdinaryRank,HigherRankMain}.hs "$out/rank-$opt/client/"
+    (
+        cd "$out/rank-$opt/provider"
+        "${ghc[@]}" "-$opt" -c "$provider.hs"
+        cp "$provider.hi" ../client/
+        cd ../client
+        "${ghc[@]}" "-$opt" -c OrdinaryRank.hs
+        for form in 1 2 4; do
+            mode=()
+            if [[ "$form" == 2 ]]; then mode=(-DDEEP); fi
+            "${ghc[@]}" "-$opt" "${mode[@]}" "-DFORM=$form" -fforce-recomp -c RankProbe.hs
+            "${ghc[@]}" "-$opt" -fforce-recomp -c HigherRankMain.hs -o HigherRankMain.o
+            "${ghc[@]}" HigherRankMain.o RankProbe.o OrdinaryRank.o "../provider/$provider.o" -o run
+            printf '%s\n' '((41,42),(41,42))' | cmp - <(./run)
+        done
+        if "${ghc[@]}" "-$opt" -DFORM=2 -fforce-recomp -c RankProbe.hs >reject.log 2>&1 ||
+           ! grep -Fq 'error: [GHC-83865]' reject.log ||
+           ! grep -Fq 'first argument of ‘applyBoth’, namely ‘plainFirst’' reject.log; then
+            cat reject.log >&2
+            exit 1
+        fi
+        if "${ghc[@]}" "-$opt" -DDEEP -DFORM=3 -fforce-recomp -c RankProbe.hs >reject.log 2>&1 ||
+           ! grep -Fq 'error: [GHC-83865]' reject.log ||
+           ! grep -Fq 'first argument of ‘applyBoth’, namely ‘keepAfter’' reject.log; then
+            cat reject.log >&2
+            exit 1
+        fi
+    )
+done

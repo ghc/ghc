@@ -2526,6 +2526,14 @@ tc_sub_type_deep fun_pos@(tc_fun, pos) ds_depth unify inst_orig ctxt ty_actual t
              -- fun_wrap :: act_funTy ~~> ty_e
            }
 
+    -- See Note [Retained domains after deep instantiation].
+    go1 ty_a@(DepFunTy vis_a b_a _) ty_e@(DepFunTy vis_e b_e _)
+      | DeepSub <- ds_depth
+      , vis_a == vis_e
+      , isNativeIndexId b_a, isNativeIndexId b_e
+      = do { _ <- unify (varType b_a) (varType b_e)
+           ; just_unify ty_a ty_e }
+
     -- Otherwise, revert to unification.
     go1 ty_a ty_e = just_unify ty_a ty_e
 
@@ -2590,6 +2598,21 @@ tc_sub_type_deep fun_pos@(tc_fun, pos) ds_depth unify inst_orig ctxt ty_actual t
           TopSub  -> True
           DeepSub -> isDeeplySkolemised ty_expected
 
+
+{- Note [Retained domains after deep instantiation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An ordinary arrow can return a polymorphic retained function. During deep
+subsumption, topInstantiate can introduce a type variable into its retained
+domain. For example, the actual suffix takes Maybe alpha, and the expected
+suffix takes Maybe a. The whole-function equality solver opens the retained
+bodies only when their domains already agree or normalize to the same type.
+Check the ordinary nominal domain equality first so that it can assign alpha.
+
+Still check the whole retained function equality. This supplies the coercion
+and checks the runtime index scope. Use that equality as a cast for the
+retained suffix. A source lambda can place a dictionary or forall below a
+retained binder.
+-}
 
 -- | Whether to do deep subsumption when recurring inside arguments.
 recurInArgumentDSFlag :: DeepSubsumptionDepth -> DeepSubsumptionFlag
