@@ -1,0 +1,30 @@
+NativeFamilyIndexEvidence.hs:18:37: error: [GHC-25897]
+    • Could not deduce ‘q ~ p’
+      from the context: Width p ~ Width q
+        bound by the type signature for:
+                   wrong :: forall (p :: Bool) (q :: Bool).
+                            (Width p ~ Width q) =>
+                            foreach (x :: Proxy p) -> Proxy q -> Proxy (Hide x)
+        at NativeFamilyIndexEvidence.hs:(16,1)-(17,76)
+      Expected: Proxy p
+        Actual: Proxy q
+      ‘q’ is a rigid type variable bound by
+        the type signature for:
+          wrong :: forall (p :: Bool) (q :: Bool).
+                   (Width p ~ Width q) =>
+                   foreach (x :: Proxy p) -> Proxy q -> Proxy (Hide x)
+        at NativeFamilyIndexEvidence.hs:(16,1)-(17,76)
+      ‘p’ is a rigid type variable bound by
+        the type signature for:
+          wrong :: forall (p :: Bool) (q :: Bool).
+                   (Width p ~ Width q) =>
+                   foreach (x :: Proxy p) -> Proxy q -> Proxy (Hide x)
+        at NativeFamilyIndexEvidence.hs:(16,1)-(17,76)
+    • In the expression: retain @(Width p) (Hide y)
+      In an equation for ‘wrong’: wrong _ y = retain @(Width p) (Hide y)
+    • Relevant bindings include
+        y :: Proxy q (bound at NativeFamilyIndexEvidence.hs:18:9)
+        __aAk :: Proxy p (bound at <no location info>)
+        wrong :: foreach (x :: Proxy p) -> Proxy q -> Proxy (Hide x)
+          (bound at NativeFamilyIndexEvidence.hs:18:1)
+
