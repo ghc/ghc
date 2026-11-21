@@ -69,7 +69,7 @@ module GHC.Tc.Errors.Types (
   , FitsMbSuppressed(..)
   , ValidHoleFits(..), noValidHoleFits
   , HoleFitDispConfig(..)
-  , RelevantBindings(..), pprRelevantBindings
+  , RelevantBindings(..), pprRelevantBindings, diagnosticSumPayload
   , PromotionErr(..), pprPECategory, peCategory
   , TermLevelUseErr(..), teCategory
   , NotInScopeError(..)
@@ -227,12 +227,13 @@ import GHC.Core.Coercion (Coercion)
 import GHC.Core.Coercion.Axiom (CoAxBranch)
 import GHC.Core.ConLike (ConLike)
 import GHC.Core.DataCon (DataCon, FieldLabel)
-import GHC.Core.FamInstEnv (FamInst)
+import GHC.Core.FamInstEnv (FamInst, reduceScopedSumPayload_maybe)
+import GHC.Core.Reduction (reductionReducedType)
 import GHC.Core.InstEnv (LookupInstanceErrReason, ClsInst, DFunId)
 import GHC.Core.PatSyn (PatSyn)
 import GHC.Core.Predicate (EqRel, predTypeEqRel)
 import GHC.Core.TyCon (TyCon, FamTyConFlav, AlgTyConRhs)
-import GHC.Core.Type (Kind, Type, ThetaType, PredType, ErrorMsgType, ForAllTyFlag, ForAllTyBinder)
+import GHC.Core.Type (Kind, Type, ThetaType, PredType, ErrorMsgType, ForAllTyFlag, ForAllTyBinder, splitTyConAppNoView_maybe)
 
 import GHC.Driver.Backend (Backend)
 
@@ -6372,6 +6373,13 @@ data RelevantBindings
     , ranOutOfFuel               :: Bool -- ^ Whether we ran out of fuel generating the bindings.
     }
 
+-- | Show the instantiated source payload in place of its generated family.
+-- Only inspect the outer constructor. Preserve a user-written type synonym.
+diagnosticSumPayload :: Type -> Maybe Type
+diagnosticSumPayload ty = do
+  (family, args) <- splitTyConAppNoView_maybe ty
+  reductionReducedType <$> reduceScopedSumPayload_maybe family args
+
 -- | Display some relevant bindings.
 pprRelevantBindings :: RelevantBindings -> SDoc
 -- This function should be in "GHC.Tc.Errors.Ppr",
@@ -6382,7 +6390,7 @@ pprRelevantBindings (RelevantBindings bds ran_out_of_fuel) =
        2 (vcat (map ppr_binding rel_bds) $$ ppWhen ran_out_of_fuel discardMsg)
   where
     ppr_binding (nm, tidy_ty) =
-      sep [ pprPrefixOcc nm <+> dcolon <+> ppr tidy_ty
+      sep [ pprPrefixOcc nm <+> dcolon <+> maybe (ppr tidy_ty) ppr (diagnosticSumPayload tidy_ty)
           , nest 2 (parens (text "bound at"
                <+> ppr (getSrcLoc nm)))]
     rel_bds = filter (not . isGeneratedSrcSpan . getSrcSpan . fst) bds

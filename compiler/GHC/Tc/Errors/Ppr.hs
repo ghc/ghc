@@ -4982,6 +4982,8 @@ view. The expanded-types diagnostic can still show the family.
 -- | Show the constructor case checked by a private family, without reducing it.
 pprTypeCaseMismatch :: Type -> SDoc
 pprTypeCaseMismatch ty
+  | Just payload <- diagnosticSumPayload ty
+  = ppr payload
   | Just (tc, _) <- splitTyConAppNoView_maybe ty
   , Just owner <- liftedTypeOwner "$case-node:" (tyConName tc)
   = text "the" <+> pprTypeCaseOwner owner

@@ -28,7 +28,7 @@ module GHC.Core.FamInstEnv (
         -- Normalisation
         topNormaliseType, topNormaliseType_maybe,
         normaliseType, normaliseTcApp,
-        topReduceTyFamApp_maybe, reduceTyFamApp_maybe
+        topReduceTyFamApp_maybe, reduceTyFamApp_maybe, reduceScopedSumPayload_maybe
     ) where
 
 import GHC.Prelude
@@ -1213,6 +1213,15 @@ isDominatedBy branch branches
 The lookupFamInstEnv function does a nice job for *open* type families,
 but we also need to handle closed ones when normalising a type:
 -}
+
+-- | Reduce one checked payload of a retained sum.
+-- See Note [Constructors in a nested dependent sum] in GHC.Tc.Utils.Unify.
+reduceScopedSumPayload_maybe :: TyCon -> [Type] -> Maybe ReductionN
+reduceScopedSumPayload_maybe family args
+  | Just (_, True) <- closedFamilyScope_maybe family
+  = reduceTyFamApp_maybe emptyFamInstEnvs Nominal family args
+  | otherwise = Nothing
+
 
 reduceTyFamApp_maybe :: FamInstEnvs
                      -> Role              -- Desired role of result coercion

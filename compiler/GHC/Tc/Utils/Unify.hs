@@ -89,7 +89,7 @@ import GHC.Tc.Utils.TcMType qualified as TcM
 import GHC.Tc.Solver.InertSet
 
 import GHC.Core.ConLike (ConLike(..))
-import GHC.Core.FamInstEnv ( emptyFamInstEnvs, reduceTyFamApp_maybe )
+import GHC.Core.FamInstEnv ( reduceScopedSumPayload_maybe, reduceTyFamApp_maybe )
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr )
 import GHC.Core.Utils ( applyTypeToArgs )
@@ -1123,8 +1123,7 @@ matchExpectedListTy exp_ty
 matchSumPayload :: TyCon -> TcType -> Maybe (TcCoercionN, [TcType])
 matchSumPayload expected_tc ty
   | Just (family, args) <- tcSplitTyConApp_maybe ty
-  , Just (_, True) <- closedFamilyScope_maybe family
-  , Just (Reduction co result) <- reduceTyFamApp_maybe emptyFamInstEnvs Nominal family args
+  , Just (Reduction co result) <- reduceScopedSumPayload_maybe family args
   , Just (tc, params) <- tcSplitTyConApp_maybe result
   , tc == expected_tc
   = Just (co, params)
