@@ -239,8 +239,10 @@ liftTypeLambdas sigma group = do
       | let liftFor name = liftEquation inherited name (0 :: Int) (L loc eqn)
             (_, (_, candidates)) = liftFor owner
       , not (null candidates) = do
-          let prefix = if sumResult rhs then "$sum:" else "$callback:"
-          occ <- chooseUniqueOccTc (mkInstTyTcOcc (prefix ++ occNameString (rdrNameOcc (unLoc owner))))
+          let family = occNameString (rdrNameOcc (unLoc owner))
+              stem | sumResult rhs = "$sum:" ++ family
+                   | otherwise = "$callback:" ++ family ++ ":instance"
+          occ <- chooseUniqueOccTc (mkInstTyTcOcc stem)
           let instance_owner = L (getLoc owner) (mkRdrUnqual occ)
               (_, (L _ eqn', lifted)) = liftFor instance_owner
           return (L loc inst{tfid_inst = decl{tfid_eqn = eqn'}}, lifted)
