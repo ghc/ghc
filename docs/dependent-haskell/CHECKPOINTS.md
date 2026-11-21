@@ -30,6 +30,9 @@ reports and checks for live, queued and linked users before removal.
 The timer can also remove the compiled `ghc-config` helper in a completed
 test run. It checks the reports, the helper's source and the Makefile rule.
 The next run rebuilds the helper from that source.
+For a normal two-stage build, the timer can reclaim the RTS C objects and
+dependency files after both compilers pass the same Showcase at the recorded
+Git revision. The normal build script can regenerate those files.
 For other products, keep the completion log outside `_build`. After the last
 consumer finishes, record the source revision and build command.
 
