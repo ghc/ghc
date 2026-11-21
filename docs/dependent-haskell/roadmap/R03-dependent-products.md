@@ -504,3 +504,28 @@ the second lookup. Equal lengths require traversing both finite spines.
 A negative offset returns before inspecting either list.
 [Library](../examples/qualified-pi/ListCursor.hs) and
 [ordinary client](../examples/qualified-pi/CursorClient.hs).
+
+### Zip two lists at a common length
+
+```haskell
+zipWithExact :: forall a b c. foreach (xs :: [a]) -> foreach (ys :: [b])
+             -> (sourceLength xs ~ sourceLength ys) => (a -> b -> c) -> Vec c (sourceLength xs)
+zipWithExact [] [] _ = VNil
+zipWithExact (x : xs) (y : ys) f = VCons (f x y) (zipWithExact xs ys f)
+```
+
+At two cons cells the signature gives equality of the tail lengths.
+At a cons and an empty list it would equate a successor with zero.
+GHC checks each omitted pair against the declared equalities and the
+enclosing nominal Givens. The warning checker tests that the remaining
+counterexamples satisfy their specialised equality dictionaries.
+
+For independent inputs, `checkedZipWith` first compares the two finite
+spines with `sameNat`. Unequal lengths return `Nothing` before the
+callback runs. For two occurrences of the same input, an ordinary
+caller can use `zipWithExact xs xs` directly. The first output cell
+then leaves the tail of `xs` unevaluated. A cons equation that returns
+`VNil` reports GHC-83865 at its result. Omitting the possible cons/cons
+equation reports GHC-83605 with the two constructors.
+[Producer](../examples/qualified-pi/AlignedList.hs) and
+[ordinary caller](../examples/qualified-pi/CursorClient.hs).

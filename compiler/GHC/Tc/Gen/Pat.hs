@@ -58,7 +58,7 @@ import GHC.Tc.Types.Origin
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Coercion
-import GHC.Core.Predicate ( mkNomEqPred )
+import GHC.Core.Predicate ( isEvId, mkNomEqPred )
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Core.ConLike
@@ -678,8 +678,11 @@ tc_pat scaled_exp_pat_ty@(Scaled w_pat exp_pat_ty) penv ps_pat thing_inside =
 
     VarPat x (L l name) -> do
       { (wrap, id) <- tcPatBndr penv name scaled_exp_pat_ty
-      ; res <- tcCheckUsage name w_pat $
-               tcExtendIdEnv1 name id thing_inside
+      ; let extend | isSystemName name, isEvId id = tcExtendGeneratedIdEnv id
+                   | otherwise = tcExtendIdEnv1 name id
+            -- Implicit dictionary patterns have no source binder to report.
+            -- See Note [Retained constructor matrices] in GHC.Tc.Gen.Match.
+      ; res <- tcCheckUsage name w_pat (extend thing_inside)
       ; pat_ty <- readExpType exp_pat_ty
       ; return (mkHsWrapPat wrap (VarPat x (L l id)) pat_ty, res) }
 

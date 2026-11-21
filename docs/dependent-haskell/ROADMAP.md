@@ -55,6 +55,13 @@ rank-2 callback and infer the hidden length of the second filter.
 [Two positions](examples/qualified-pi/ListCursor.hs) and
 [ordinary filter client](examples/erased-existentials/RankedPackageClient.hs).
 
+A producer can zip two ordinary lists into a vector whose length is
+the length of the first input. Its signature requires equal input
+lengths. For two independent inputs, a runtime comparison supplies
+that equality. Passing the same list twice supplies it by reflexivity
+and allows the first result cell to be read without inspecting the tail.
+[Source and coverage](roadmap/R03-dependent-products.md#zip-two-lists-at-a-common-length).
+
 A type synonym can use a `case` to choose the argument type of an
 ordinary arrow. For example, one branch can take a pair and another
 a `Char`. An ordinary client sees the selected argument type through

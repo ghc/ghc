@@ -51,7 +51,7 @@ import GHC.Types.Unique.SDFM
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Reader (lookupGRE_Name, GlobalRdrEnv)
-import GHC.Types.Var         (EvVar)
+import GHC.Types.Var         (EvVar, isId)
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Unique.Supply
@@ -63,10 +63,11 @@ import GHC.Core.Dependent   (hasNativeDependentExprRhs)
 import GHC.Core.FVs         (exprFreeVars)
 import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.Map.Expr
-import GHC.Core.Predicate (typeDeterminesValue, mkNomEqPred)
+import GHC.Core.Predicate (isEqClassPred, typeDeterminesValue, mkNomEqPred)
+import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.SimpleOpt (simpleOptExpr, exprIsConApp_maybe)
 import GHC.Core.Utils     (exprType, dataConRepInstPat)
-import GHC.Core.Make      (mkListExpr, mkCharExpr, mkImpossibleExpr)
+import GHC.Core.Make      (mkCoreConApps, mkListExpr, mkCharExpr, mkImpossibleExpr)
 
 import GHC.Data.FastString
 import GHC.Types.SrcLoc
@@ -2020,7 +2021,29 @@ generateInhabitingPatterns :: GenerateInhabitingPatternsMode -> [Id] -> Int -> N
 -- See Note [Why inhabitationTest doesn't call generateInhabitingPatterns]
 generateInhabitingPatterns _    _      0 _     = pure []
 generateInhabitingPatterns _    []     _ nabla = pure [nabla]
-generateInhabitingPatterns mode (x:xs) n nabla = do
+generateInhabitingPatterns mode (x:xs) n nabla
+  -- See Note [Retained equalities in uncovered patterns].
+  | let pred_ty = idType x
+  , isEqClassPred pred_ty
+  , anyFreeVarsOfType (\v -> isId v && isNativeIndexId v) pred_ty
+  = do { let uses = [ (v, rhs)
+                    | v <- dVarSetElems (tyCoVarsOfTypeDSet pred_ty)
+                    , isId v, isNativeIndexId v
+                    , PACA (PmAltConLike (RealDataCon dc)) [] fields <- vi_pos (lookupVarInfo (nabla_tm_st nabla) v)
+                    , not (isNewDataCon dc)
+                    , Just args <- [nativeIndexDataConTyArgs (idType v) dc]
+                    , let rhs = mkCoreConApps dc (map Type args ++ map Var fields)
+                    , Just index <- [exprToNativeIndex rhs]
+                    , typeKind index `eqType` idType v ]
+             scope = mkInScopeSet (tyCoVarsOfType pred_ty `unionVarSet` unionVarSets (map (exprFreeVars . snd) uses))
+             subst = foldl' (\s (v, rhs) -> CoreSubst.extendIdSubst s v rhs) (mkEmptySubst scope) uses
+       ; result <- runMaybeT (addTyCts nabla (unitBag (substTy subst pred_ty)))
+       ; maybe (pure []) (generateForScrutinee mode x xs n) result }
+  | otherwise = generateForScrutinee mode x xs n nabla
+
+-- | Generate alternatives for one scrutinee in the current refinement.
+generateForScrutinee :: GenerateInhabitingPatternsMode -> Id -> [Id] -> Int -> Nabla -> DsM [Nabla]
+generateForScrutinee mode x xs n nabla = do
   tracePm "generateInhabitingPatterns" (ppr mode <+> ppr n <+> ppr (x:xs) $$ ppr nabla)
   let VI{ vi_pos = pos, vi_neg = neg } = lookupVarInfo (nabla_tm_st nabla) x
   case pos of
@@ -2120,6 +2143,19 @@ generateInhabitingPatterns mode (x:xs) n nabla = do
         Just nabla' -> generateInhabitingPatterns mode xs n nabla'
       other_cons_nablas <- instantiate_cons x ty xs (n - length con_nablas) nabla cls
       pure (map (Just cl,) con_nablas ++ other_cons_nablas)
+
+{- Note [Retained equalities in uncovered patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A candidate for zipWithExact may assign [] to xs and (:) to ys.
+Its final argument is evidence for sourceLength xs ~ sourceLength ys.
+Specialise this predicate with the constructor facts already chosen
+for its arguments. Ask the type oracle if the candidate is inhabited
+before counting it towards the limit on reported counterexamples.
+Use only real constructor applications at the retained variable's kind.
+A newtype pattern does not establish that the scrutinee is in WHNF.
+Leave a variable with no suitable constructor fact unchanged.
+See Note [Retained constructor matrices] in GHC.Tc.Gen.Match.
+-}
 
 -- | If multiple residual COMPLETE sets apply, pick one as follows:
 --

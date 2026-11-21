@@ -3744,7 +3744,7 @@ pprRetainedQuantificationError reason = case reason of
     vcat [text "A retained constructor match requires unguarded equations."
          ,text "Repeated constructors need a later ordinary pattern to distinguish the equations."]
   RetainedMatrixCoverage ->
-    vcat [text "A retained constructor matrix requires one unguarded clause for each pair of constructors of its two index domains."
+    vcat [text "A retained constructor matrix requires an unguarded equation for each possible constructor pair."
          ,text "A final equation with bare variables or wildcards in both index columns can cover the remaining pairs."]
   RetainedMissingEquation con ->
     vcat [ text "Missing equation for the retained constructor" <+> quotes (ppr con) <> dot
@@ -3759,8 +3759,10 @@ pprRetainedQuantificationError reason = case reason of
   RetainedMatrixPattern ->
     vcat [text "A retained constructor matrix requires constructor patterns in both selected index columns, with variables or wildcards as fields."
          ,text "One final equation can use bare variables or wildcards in both columns."]
-  RetainedMatrixContext ->
-    text "Constraints within a retained constructor matrix are not supported yet."
+  RetainedMissingConstructorPair first second ->
+    vcat [ text "Missing equation for the retained constructor pair" <+>
+             parens (ppr first <> comma <+> ppr second) <> dot
+         , text "Add an equation for this pair or a final equation that covers it." ]
   RetainedCasePatterns ->
     text "Dependent case refinement requires one unguarded match for each constructor, with variables or wildcards as fields."
   RetainedCaseQuotation ->
