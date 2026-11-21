@@ -784,3 +784,22 @@ A consumer can use the ordinary equation `observePair (f, k) = k f`.
 A witness that escapes the match produces a type error at its use.
 The diagnostic identifies the source location where GHC opened the package.
 [Tuple example](../examples/erased-existentials/RankedPackage.hs).
+
+The expected package can also tell a boxed tuple to open a field.
+For `exists n. (Vec n a, Vec n a -> r)`, an ordinary client writes
+`(filterVec predicate xs, firstCell)`. The tuple stores the filtered
+vector and checks its reader at that vector's hidden length.
+The expected type supplies the tuple shape and the reader can ignore
+the vector. Two separate filters cannot supply two fields that require
+the same length. Each filter has its own rigid witness.
+[Ordinary package and reader](../examples/erased-existentials/RankedPackageClient.hs)
+and [source-hidden tuple client](../../../testsuite/tests/dependent/should_run/implicit-existential-source/CaseMain.hs).
+
+The result type can also supply the fields of a plain user product.
+For `Product a b` with fields `a` and `b`, both its constructor and the
+ordinary function `makeProduct :: a -> b -> Product a b` use the
+expected field types in a fully applied call. A fully applied section
+can expose the same declaration. The checker still opens each filter
+separately. A tuple used inside a wrapper with a plain pair field can
+get its own package expectation from a written expression signature.
+[Source-hidden product client](../../../testsuite/tests/dependent/should_run/implicit-existential-source/CaseMain.hs).

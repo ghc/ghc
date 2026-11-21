@@ -1346,6 +1346,11 @@ main = do
             1 (error "unused left suffix") 6 (error "unused right suffix"))
         , RankedPackageClient.refilterNumericZip (> cutoff) 1 2 6 2
         , RankedPackageClient.refilterNumericZip (> cutoff) 0 2 5 2 )
+    observe "attach a reader at the hidden length of a filtered vector"
+        ( RankedPackageClient.readFiltered (RankedPackageClient.packageFiltered odd
+            (Data.Maybe.listToMaybe . toList) (VCons (7 :: Int) (error "unused packaged tail")))
+        , RankedPackageClient.readFiltered (RankedPackageClient.packageFiltered odd
+            (const True) (error "unused packaged input" :: Vec Int 'Z)) )
     observe "project a stored vector from a strict record field"
         (StoredVector.cells (StoredVector.singleton 'h'))
     observe "read a retained length through a newtype record selector" $

@@ -21,7 +21,7 @@ import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcCheckMonoExpr, tcCheckPolyExpr, tcPolyE
 import GHC.Hs
 
 import GHC.Rename.Env ( addUsedGRE, DeprecationWarnings(NoDeprecationWarnings) )
-import GHC.Rename.Utils ( mkExpandedLExpr )
+import GHC.Rename.Utils ( mkExpandedLExpr, wrapGenSpan )
 import GHC.Tc.Gen.Head
 import GHC.Tc.Gen.Match ( tcMatches, tcBody, tcOpenImplicitPackage, tcOpenImplicitPackageAt
                         , implicitPayloadType, tcCloseRuntimeScope )
@@ -53,7 +53,7 @@ import GHC.Tc.Zonk.TcType
 
 import GHC.Core.Class ( Class, classTyVars )
 import GHC.Core.ConLike ( ConLike(..) )
-import GHC.Core.DataCon ( DataCon, dataConConcreteTyVars, dataConFullSig, dataConName, isNewDataCon, dataConOrigArgTys, dataConOrigResTy, dataConSourceArity, dataConHasRetainedResult, dataConRepArgBinders, dataConTyCon, dataConUserTyVars, dataConWorkId, dataConWrapId )
+import GHC.Core.DataCon ( DataCon, dataConConcreteTyVars, dataConFullSig, dataConName, isNewDataCon, isVanillaDataCon, dataConOrigArgTys, dataConOrigResTy, dataConSourceArity, dataConHasRetainedResult, dataConRepArgBinders, dataConTyCon, dataConUserTyVars, dataConWorkId, dataConWrapId )
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr, hasScopedDictionaryType
                           , isScopedSelectorReceiver, supportsQuickLookType )
@@ -468,7 +468,8 @@ tcOrdinaryApp rn_expr rn_fun rn_args exp_res_ty
                   ; mixed <- tcOpenMixedBarArguments fun sigma args expected check
                   ; case mixed of
                       Just opened -> return opened
-                      Nothing -> tcOpenImplicitArgs rn_expr sigma args expected (check fun sigma) }
+                      Nothing -> tcOpenImplicitArgs rn_expr (implicitProductSpine sigma args expected)
+                                                   args expected (check fun sigma) }
              -- See Note [Type arguments before an implicit package head].
              (type_prefix, payload_args)
                | let (prefix, rest) = span prefix_arg rn_args
@@ -908,6 +909,56 @@ tcOrdinaryAppScoped fields checked_prefix rn_expr rn_head@(rn_fun, fun_lspan) tc
       = original
       | otherwise = rn_fun
 
+-- | Use expected product fields to decide which operands request opening.
+-- See Note [Implicit opening for a product payload].
+implicitProductSpine :: TcSigmaType -> [HsExprArg 'TcpRn] -> ExpRhoType -> TcSigmaType
+implicitProductSpine sigma args expected
+  | Check schema <- expected
+  , ExistsTy ImplicitExists _ payload <- coreFullView schema
+  , Just (tc, fields) <- tcSplitTyConApp_maybe (implicitPayloadType payload)
+  , Just dc <- tyConSingleDataCon_maybe tc
+  , isVanillaDataCon dc, not (isNewDataCon dc)
+  , Just (_, components) <- tcSplitTyConApp_maybe (dataConOrigResTy dc)
+  , eqTypes (map scaledThing (dataConOrigArgTys dc)) components
+  , (binders, body) <- tcSplitForAllInvisTyVars sigma
+  , let (_, domains, result) = splitFunTys body
+  , count isHsValArg args == length domains
+  , Just (result_tc, ts) <- tcSplitTyConApp_maybe result
+  , result_tc == tc
+  , eqTypes (map scaledThing domains) ts
+  , Just vars <- traverse getTyVar_maybe ts
+  , all (`elem` map snd binders) vars
+  , sizeVarSet (mkVarSet vars) == length vars
+  , vars `equalLength` fields
+  = substTyWith vars fields body
+  | otherwise = sigma
+
+{- Note [Implicit opening for a product payload]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For (filterVec p xs, first) checked at
+  exists n. (Vec a n, Vec a n -> Maybe a)
+the constructor's declared arguments are just type variables. The first
+field of the expected product requests a vector payload. Read those
+fields before checking the application and use their shapes to select
+openings.
+
+The same rule applies to Product x y or makeProduct x y at
+  exists n. Product (Vec a n) (Vec a n -> Maybe a)
+when the callable declares a -> b -> Product a b. Require a plain
+data product with one constructor and one field for each parameter.
+The declared argument types must be the distinct parameters of the
+nominal result in field order. A partial application does not select
+this rule.
+
+The substitution supplies a shape only to the read-only argument
+classifier. The checker uses the original function type and argument
+multiplicities. It instantiates the output witness inside the openings.
+Independent openings introduce distinct skolems, so two filtered vectors
+cannot stand for fields at the same length. A field whose declared type
+is itself a package still forwards that package. Each opening keeps
+the original argument lazy.
+-}
+
 -- | Scope implicit existential value arguments over the rest of the application.
 -- See Note [Implicit existential arguments].
 tcOpenImplicitArgs :: HsExpr GhcRn -> TcSigmaType -> [HsExprArg 'TcpRn] -> ExpRhoType
@@ -1044,7 +1095,7 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
                  guard (eqType previous schema)
                  return payload
                continue env payload =
-                 let payload_ref = nlHsVar (getName payload)
+                 let payload_ref = wrapGenSpan (mkHsVar (wrapGenSpan (getName payload)))
                      ref = EValArg loc noExtField $
                        fromMaybe id rebuild (fmap (\e -> mkExpandedLExpr e payload_ref) arg)
                  in open result_ty env (ref : rev_args) rest
@@ -1054,7 +1105,7 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
                let env = case key of
                      Just identity -> Map.insert identity (schema, payload) opened
                      Nothing -> opened
-               in tcExtendIdEnv [payload] $ continue env payload }
+               in tcExtendGeneratedIdEnv payload $ continue env payload }
 
     openingKey :: LHsExpr GhcRn -> LHsExpr GhcTc -> TcM (Maybe (Name, Maybe Name))
     openingKey original checked

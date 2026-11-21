@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, RankNTypes, TypeOperators #-}
 
 -- | Filter a vector without writing a package constructor or a witness.
-module ImplicitVector (Filtered, filterVec, withVector, partitionVec, firstKept, HiddenRows, packRows, partitionRows, rowLists, firstPassing, cells, transportFiltered, pairWithSelf, forgetLength, observations, singletonBuilder, runBuilder) where
+module ImplicitVector (Filtered, FilteredWith, filterVec, withVector, partitionVec, firstKept, HiddenRows, packRows, partitionRows, rowLists, firstPassing, cells, transportFiltered, pairWithSelf, forgetLength, observations, singletonBuilder, runBuilder) where
 
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Sigma (Sigma(Pair))
@@ -9,6 +9,9 @@ import PackedVecLibrary (Nat(..), Vec(..), toList, zipVec)
 
 -- | A vector whose producer chooses its length.
 type Filtered a = exists (n :: Nat). Vec a n
+
+-- | A vector and a reader of that same vector length.
+type FilteredWith a r = exists (n :: Nat). (Vec a n, Vec a n -> r)
 
 -- | Keep each passing element in order.
 filterVec :: (a -> Bool) -> Vec a n -> Filtered a
