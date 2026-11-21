@@ -7427,9 +7427,10 @@ tcHsPartialSigType call_owner ctxt sig_ty
        ; traceTc "tcHsPartialSigType 3" empty
 
          -- No kind-generalization here:
-       ; kindGeneralizeNone (mkInvisForAllTys outer_tv_bndrs $
-                             tcMkPhiTy theta $
-                             tau)
+       ; let written_ty = mkInvisForAllTys outer_tv_bndrs (tcMkPhiTy theta tau)
+       ; kindGeneralizeNone written_ty
+       ; checkConstrainedSignature ctxt written_ty
+         -- See Note [Constrained associated family formation] in GHC.Tc.Validity.
 
        -- Spit out the wildcards (including the extra-constraints one)
        -- as "hole" constraints, so that they'll be reported if necessary

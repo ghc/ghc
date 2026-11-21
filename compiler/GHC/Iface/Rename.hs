@@ -716,6 +716,7 @@ rnIfaceFamTyConFlav (IfaceClosedTypeFamilyTyCon ctf)
     rn_coax (n, axs) = ((,) <$> rnIfaceNeverExported n
                             <*> mapM rnIfaceAxBranch axs)
 rnIfaceFamTyConFlav IfaceOpenTypeFamilyTyCon = pure IfaceOpenTypeFamilyTyCon
+rnIfaceFamTyConFlav IfaceConstrainedTypeFamilyTyCon = pure IfaceConstrainedTypeFamilyTyCon
 rnIfaceFamTyConFlav IfaceDataFamilyTyCon = pure IfaceDataFamilyTyCon
 
 rnIfaceAT :: Rename IfaceAT
