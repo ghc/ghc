@@ -1384,6 +1384,7 @@ deriving instance Data TH.Phases
 deriving instance Data TH.PkgName
 deriving instance Data TH.Pragma
 deriving instance Data TH.Range
+deriving instance Data TH.RetainedGadtArg
 deriving instance Data TH.Role
 deriving instance Data TH.RuleBndr
 deriving instance Data TH.RuleMatch
