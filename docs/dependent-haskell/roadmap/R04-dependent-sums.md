@@ -374,3 +374,20 @@ payload remain lazy. A pattern combination that still requires separate
 matches on the linear package reports GHC-47619.
 [Provider](../../../testsuite/tests/dependent/should_run/NativeLinearRetainedPackageProvider.hs)
 and [rejection controls](../../../testsuite/tests/dependent/should_run/NativeLinearRetainedPackageEvidenceReject.hs).
+
+### Consume positions from two independent lists
+
+`TwoPositions a b` stores two lists and two positions. Each position
+uses its own list's length. Both positions are linear. The reader
+matches the first position before it inspects the second one. Its
+right-hand sides can use each checked tail directly. An empty list
+has no position. The empty case on that position forces it.
+
+The ordinary client can read unrelated offsets, including finite
+offsets on cyclic lists. Checking a negative first offset leaves the
+second list unevaluated. GHC can also share a nested `Sigma.Pair`
+alternative when its witness, payload and nominal proof align in
+both equations. A fallthrough that reuses a consumed package reports
+GHC-47619 at the source pattern.
+[Library](../examples/qualified-pi/ListCursor.hs) and
+[ordinary client](../examples/qualified-pi/CursorClient.hs).

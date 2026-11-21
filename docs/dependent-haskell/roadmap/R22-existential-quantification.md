@@ -300,6 +300,23 @@ outside the opening. The observer's argument-only length can still
 match the witness inside. The checker rejects an observer whose
 result would keep that opened length as a free index.
 
+An ordinary client can also infer this result from a declared rank-2
+callback. With `consumeVector :: (forall j. Vec j a -> r) -> Vec k a -> r`,
+the call `consumeVector (filterVec (> 3)) (filterVec odd xs)` opens the
+filtered input. The callback's declaration supplies the result package
+before the input is opened, so the result hides its own length and can
+be kept in an unsigned local binding. The callback must return a package
+whose type is independent of its universally bound input length.
+Reading one kept element leaves the remaining vector lazy. Quick Look
+skips a callback whose expected type starts with `forall`. The package
+check uses its declared input type and leaves its ordinary checking in
+that scope. Agda likewise permits erased vector indices in compile-time
+types.
+[Ordinary refilter client](../examples/erased-existentials/RankedPackageClient.hs),
+[Source-hidden refilter](../../../testsuite/tests/dependent/should_run/implicit-existential-source/QuickLookForward.hs),
+[Quick Look, Figure 5](https://www.microsoft.com/en-us/research/wp-content/uploads/2020/01/quick-look-icfp20.pdf),
+and [Agda's erased vector indices](https://agda.readthedocs.io/en/stable/language/runtime-irrelevance.html).
+
 ### A nonrecursive local package pattern
 
 An ordinary client can write `let (value, reader) = p in reader value`
@@ -636,6 +653,12 @@ The ordinary Showcase client supplies its conditional producer directly
 to the caller that expects the package. The first route leaves its
 second input unevaluated.
 [Conditional producer](../examples/erased-existentials/RankedPackageClient.hs).
+A `case` result can read the witness from a declaration in the outer
+scope. The probe skips alternatives with local bindings. Case patterns
+can refine how an arm checks. The witness itself is chosen outside
+those patterns, so a pattern-bound type cannot become the outer
+package's witness. A multi-way `if` can also read a declaration from a
+result arm. A pattern guard can refine its own arm after witness selection.
 Leading visible type applications can choose input types when the
 declared result type is independent of the supplied type arguments.
 The ordinary checker checks those applications at their source spans.

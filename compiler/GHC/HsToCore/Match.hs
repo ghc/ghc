@@ -73,6 +73,7 @@ import GHC.Types.Unique
 import GHC.Types.Unique.DFM
 
 import Control.Monad ( zipWithM, unless )
+import Data.Foldable ( find )
 import Data.List.NonEmpty (NonEmpty(..), nonEmpty)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
@@ -190,11 +191,25 @@ match (v:vs) ty eqns    -- Eqns can be empty, but each equation is nonempty
         ; whenDOptM Opt_D_dump_view_pattern_commoning (debug grouped)
 
         ; match_results <- match_groups grouped
+        ; unless (isManyTy (matchIdMult v)) $
+            check_linear_fallthrough (zip grouped (NE.toList match_results))
         ; return $ foldr (.) id aux_binds <$>
             foldr1 combineMatchResults match_results
         }
   where
     vars = v :| vs
+
+    -- A later group would match the original package after this group
+    -- consumed it. Fallthrough within the package's field matrix is safe.
+    check_linear_fallthrough ((group, result) : later@(_ : _))
+      | not (matchCanFail result) = return ()
+      | Just (_, row) <- find is_retained_package group
+      = putSrcSpanDsA (getLoc (eqn_pat row)) $ failWithDs DsLinearRetainedPackageRows
+      | otherwise = check_linear_fallthrough later
+    check_linear_fallthrough _ = return ()
+
+    is_retained_package (PgCon con, _) = not (null (dataConRepArgBinders con))
+    is_retained_package _ = False
 
     dropGroup :: Functor f => f (PatGroup,EquationInfo) -> f EquationInfo
     dropGroup = fmap snd
@@ -267,7 +282,7 @@ matchCoercion (var :| vars) ty eqns@(eqn1 :| _)
             Nothing ->
               do { let pat_ty' = hsPatType pat
                  ; var' <- newUniqueId (matchId var) (matchIdMult var) pat_ty'
-                 ; match_result <- match (mkMatchId var' : vars) ty inner_eqns
+                 ; match_result <- match (cloneMatchId var var' : vars) ty inner_eqns
                  ; dsHsWrapper wrap $ \core_wrap -> do
                  { let bind = NonRec var' (core_wrap (matchIdExpr var))
                  ; return (mkCoLetMatchResult bind match_result) } } }
@@ -284,7 +299,7 @@ matchExists (var :| vars) ty eqns@(first :| _)
     match_row witness payload eqn
       | XPat (NativeExistsPat _ row_witness row_payload ev_binds pat) <- firstPat eqn
       = dsTcEvBinds ev_binds $ \binds ->
-        do { result <- match (mkMatchId row_payload : vars) ty
+        do { result <- match (cloneMatchId var row_payload : vars) ty
                               [decomposeFirstPat (const pat) eqn]
            ; let share body
                    | row_witness == witness = body
@@ -309,7 +324,7 @@ matchView (var :| vars) ty eqns@(eqn1 :| _)
          -- do the rest of the compilation
         ; let pat_ty' = hsPatType pat
         ; var' <- newUniqueId (matchId var) (matchIdMult var) pat_ty'
-        ; match_result <- match (mkMatchId var' : vars) ty $ NE.toList $
+        ; match_result <- match (cloneMatchId var var' : vars) ty $ NE.toList $
             decomposeFirstPat getViewPat <$> eqns
          -- compile the view expressions
         ; viewExpr' <- dsExpr viewExpr

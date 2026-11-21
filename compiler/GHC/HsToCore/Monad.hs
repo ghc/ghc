@@ -50,7 +50,7 @@ module GHC.HsToCore.Monad (
         -- Data types
         DsMatchContext(..),
         EquationInfo(..), EquationInfoNE, prependPats, mkEqnInfo, eqnMatchResult,
-        MatchId(..), mkMatchId, castMatchId,
+        MatchId(..), mkMatchId, castMatchId, cloneMatchId,
         matchIdExpr, matchIdType, matchIdMult, matchIdScaledType,
         MatchResult (..), runMatchResult, DsWrapper, idDsWrapper,
 
@@ -240,6 +240,8 @@ data MatchId
       { matchId :: Id
         -- ^ The match variable.
       , matchCo :: MCoercionR
+      , matchInLinearPackage :: Bool
+        -- ^ Separate retained cases here can recapture a linear field.
       }
 
 instance Outputable MatchId where
@@ -247,22 +249,26 @@ instance Outputable MatchId where
 
 -- | Create a 'MatchId' from a match variable.
 mkMatchId :: Id -> MatchId
-mkMatchId v = MatchId { matchId = v, matchCo = MRefl }
+mkMatchId v = MatchId { matchId = v, matchCo = MRefl, matchInLinearPackage = False }
+
+-- | Use a new scrutinee with the same package matching context.
+cloneMatchId :: MatchId -> Id -> MatchId
+cloneMatchId mid v = (mkMatchId v) { matchInLinearPackage = matchInLinearPackage mid }
 
 -- | Cast a 'MatchId'.
 castMatchId :: MatchId -> MCoercionR -> MatchId
-castMatchId (MatchId v mco) mco' = MatchId v (mco `mkTransMCo` mco')
+castMatchId mid mco = mid { matchCo = matchCo mid `mkTransMCo` mco }
 
 -- | Compute the scrutinee expression corresponding to a 'MatchId': the casted
 -- match varible.
 matchIdExpr :: MatchId -> CoreExpr
-matchIdExpr (MatchId v MRefl)    = Var v
-matchIdExpr (MatchId v (MCo co)) = Var v `Cast` co
+matchIdExpr MatchId{ matchId = v, matchCo = MRefl }    = Var v
+matchIdExpr MatchId{ matchId = v, matchCo = MCo co } = Var v `Cast` co
 
 -- | The type of the scrutinee expression ('matchIdExpr').
 matchIdType :: MatchId -> Type
-matchIdType (MatchId v MRefl)    = idType v
-matchIdType (MatchId _ (MCo co)) = coercionRKind co
+matchIdType MatchId{ matchId = v, matchCo = MRefl }    = idType v
+matchIdType MatchId{ matchCo = MCo co } = coercionRKind co
 
 -- | The multiplicity at which this column of the pattern match was typechecked.
 matchIdMult :: MatchId -> Mult

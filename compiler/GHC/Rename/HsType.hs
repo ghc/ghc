@@ -32,7 +32,7 @@ module GHC.Rename.HsType (
         bindHsOuterTyVarBndrs, bindHsForAllTelescope, bindHsGadtTelescopes,
         bindLHsTyVarBndr, bindLHsTyVarBndrs, WarnUnusedForalls(..),
         rnImplicitTvOccs, bindSigTyVarsFV, bindHsQTyVars, hsQTyVarKindOccs,
-        FreeKiTyVars, filterInScopeM,
+        FreeKiTyVars, filterInScopeM, filterSourceTableNames,
         extractHsTyRdrTyVars, extractHsTyRdrTyVarsKindVars,
         extractHsTysRdrTyVars, extractRdrKindSigVars,
         extractConDeclGADTDetailsTyVars, extractDataDefnKindVars,
@@ -2469,6 +2469,8 @@ filterInScopeNonClassM cls_tvs vars
        ; filterSourceTableNames envs (filterInScopeNonClass cls_tvs tvc envs vars) }
 
 -- | Exclude finite source functions before binding implicit type variables.
+-- GADT constructor signatures use this filter with an empty local environment.
+-- An implicit binder would hide the source table and give all calls one kind.
 -- Keep the earlier implicit binding for a newly certified identity.
 -- See Note [Names of finite source functions] in GHC.Rename.Env.
 filterSourceTableNames :: (GlobalRdrEnv, LocalRdrEnv) -> FreeKiTyVars -> RnM FreeKiTyVars

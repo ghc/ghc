@@ -28,6 +28,24 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+The join-point integration at `418cd6f6bb` also passed all 414 rows in
+the same four modes. Fourteen registered tests passed on that revision.
+The recorded join fixture runs inside `NativeTypeCase`. The 37-row Core
+API check and its evidence checks passed with the new join-result rules.
+
+At `973445d496`, the linear `TwoPositions` reader matches both stored
+positions. Each position has the length of its own list as its bound.
+GHC infers separate element types for the two calls to `sourceLength`
+in the constructor declaration. The ordinary client also runs two
+vector filters through a rank-2 callback at an erased length.
+
+All 414 Showcase rows matched at native `-O0`, `-O1`, `-O2` and in GHCi.
+Thirteen registered tests, the 37-row Core API test and the evidence
+API test passed. A separate clean two-stage Hadrian build of the preceding
+`ee2fdead20` revision passed all 410 rows at native `-O0` and in GHCi.
+[Linear reader](examples/qualified-pi/ListCursor.hs) and
+[ranked callback](examples/erased-existentials/RankedPackageClient.hs).
+
 At `274ea2ece0`, an ordinary client reuses a bounded list position after
 a comparison proves that two runtime lists have equal lengths. The
 three observations are `[Just ('b',20),Nothing,Nothing]` for a valid

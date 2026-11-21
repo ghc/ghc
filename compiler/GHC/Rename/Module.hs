@@ -4308,12 +4308,14 @@ rnConDecl (ConDeclGADT { con_names   = names
               -- That order governs the order the implicitly-quantified type
               -- variable, and hence the order needed for visible type application
               -- See #14808.
-              implicit_bndrs =
+              free_vars =
                 extractHsOuterTvBndrs outer_bndrs           $
                 extractHsGadtTelescopes inner_bndrs         $
                 extractConDeclGADTDetailsTyVars args        $
                 extractHsTysRdrTyVars [res_ty] []
 
+        ; envs <- getRdrEnvs
+        ; implicit_bndrs <- filterSourceTableNames envs free_vars
         ; let ctxt = ConDeclCtx (toList new_names)
 
         ; bindHsOuterTyVarBndrs ctxt Nothing implicit_bndrs outer_bndrs $ \outer_bndrs' ->

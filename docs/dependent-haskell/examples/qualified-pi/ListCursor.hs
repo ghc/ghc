@@ -2,7 +2,7 @@
 {-# LANGUAGE TypeApplications, UndecidableInstances #-}
 
 -- | Store an ordinary list with a position checked against that list.
-module ListCursor (Cursor, Selection, cursor, prepare, withIndex, lookupAligned) where
+module ListCursor (Cursor, Selection, cursor, prepare, withIndex, lookupAligned, TwoPositions, positions, readBoth) where
 
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Sigma (Sigma(Pair))
@@ -48,3 +48,24 @@ lookupAligned xs ys k = case mkFinGeneric xs k of
     Just i -> case sameNat (sourceLength xs) (sourceLength ys) of
         Nothing -> Nothing
         Just Refl -> Just (indexAtLength xs i, indexAtLength ys i)
+
+-- | Store a checked position for each of two independent lists.
+data TwoPositions a b where
+    Positions :: foreach (xs :: [a]) -> Fin (sourceLength xs) %1
+              -> foreach (ys :: [b]) -> Fin (sourceLength ys) %1 -> TwoPositions a b
+
+-- | Consume both checked positions and read their elements.
+readBoth :: TwoPositions a b %1 -> (a, b)
+readBoth (Positions [] i _ _unused) = case i of {}
+readBoth (Positions (x : _) FZ ys j) = (x, indexGeneric ys j)
+readBoth (Positions (_ : xs) (FS i) [] j) = case j of {}
+readBoth (Positions (_ : xs) (FS i) (y : _) FZ) = (indexGeneric xs i, y)
+readBoth (Positions (_ : xs) (FS i) (_ : ys) (FS j)) = (indexGeneric xs i, indexGeneric ys j)
+
+-- | Check the left offset before inspecting the right list.
+positions :: forall a b. foreach (xs :: [a]) -> Int -> foreach (ys :: [b]) -> Int -> Maybe (TwoPositions a b)
+positions xs i ys j = case mkFinGeneric xs i of
+    Nothing -> Nothing
+    Just p -> case mkFinGeneric ys j of
+        Nothing -> Nothing
+        Just q -> Just (Positions xs p ys q)

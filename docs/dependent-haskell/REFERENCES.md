@@ -7113,3 +7113,21 @@ The indexed lookup regression checks this demand in the ordinary client.
 [GHC lambda-case](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/lambda_case.html),
 [GHC strict patterns](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/strict.html)
 and [strict multi-column example](../../testsuite/tests/dependent/should_run/NativeLinearIndexColumns.hs).
+
+### Two indexed positions and an erased filter result
+
+Agda's indexed lookup establishes the relation between one position
+and its domain. `TwoPositions` stores two independent instances of this
+relation. GHC's ordinary match order determines which field the linear
+reader inspects first. The constructor signature uses GHC's existing
+implicit quantification rules to resolve each occurrence of the same
+source function at its own element type.
+[Agda indexed lookup](https://agda.readthedocs.io/en/v2.8.0/language/coverage-checking.html#matching-on-indexed-datatypes)
+and [R04 implementation](roadmap/R04-dependent-sums.md#consume-positions-from-two-independent-lists).
+
+Quick Look supplies the argument checking rules for a polymorphic
+callback. When opening a filtered vector, the fork additionally reads
+a directly declared result package before checking the application.
+The callback's local length cannot escape through that result.
+[Quick Look](https://www.microsoft.com/en-us/research/wp-content/uploads/2020/01/quick-look-icfp20.pdf)
+and [R22 scope](roadmap/R22-existential-quantification.md).

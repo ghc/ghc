@@ -114,6 +114,21 @@ cp "$src/"{QuickLookForward,QuickLookRuntime}.hs .
 "$ghc" "${flags[@]}" QuickLookForward.o ../provider/{Filter,ForwardSchemas,Vector}.o \
     -o quick-look -main-is QuickLookForward
 ./quick-look
+cp "$src/RankedFilterReject.hs" .
+for rejection in ESCAPE_LENGTH LATE_BINDER BAD_PREDICATE; do
+    if "$ghc" "${flags[@]}" "-D$rejection" -c RankedFilterReject.hs > ranked-filter.log 2>&1; then
+        echo "Accepted the ranked filter control $rejection." >&2
+        exit 1
+    fi
+    case "$rejection" in
+        ESCAPE_LENGTH) operand='keepInput'; column=32; code=91028; detail='Restricted j Int' ;;
+        LATE_BINDER) operand='lateResult True'; column=33; code=91028; detail='Stamped stamp0 Int' ;;
+        BAD_PREDICATE) operand='filterVec (\_ -> ())'; column=50; code=83865; detail='expected type .Bool.' ;;
+    esac
+    line=$(grep -nF "$operand" RankedFilterReject.hs | tail -1 | cut -d: -f1)
+    grep -Fq "RankedFilterReject.hs:$line:$column: error: [GHC-$code]" ranked-filter.log
+    grep -Eq "$detail" ranked-filter.log
+done
 if "$ghc" "${flags[@]}" -c QuickLookRuntime.hs >quick-look-runtime.log 2>&1; then
     echo "Quick Look accepted a runtime dependency" >&2
     exit 1
@@ -200,6 +215,36 @@ line=$(grep -nF 'if flag then value else value' WitnessGuardedReject.hs | cut -d
 grep -Fq "WitnessGuardedReject.hs:$line:18: error: [GHC-46956]" conditional-escape.log
 grep -Fq 'would escape its scope' conditional-escape.log
 grep -Fq 'CapturedMono :: forall t. Payload t -> CapturedMono' conditional-escape.log
+if "$ghc" "${flags[@]}" -DCASE_CONFLICT -c WitnessGuardedReject.hs >case-conflict.log 2>&1; then
+    echo "The case producer accepted two different witnesses." >&2
+    exit 1
+fi
+line=$(grep -nF 'False -> (different b :: Payload PolyMaybe)' WitnessGuardedReject.hs | cut -d: -f1)
+grep -Fq "WitnessGuardedReject.hs:$line:15: error: [GHC-83865]" case-conflict.log
+grep -Fq 'Actual: Payload PolyMaybe' case-conflict.log
+if "$ghc" "${flags[@]}" -DCASE_ESCAPE -c WitnessGuardedReject.hs >case-escape.log 2>&1; then
+    echo "The case producer let a witness escape its pattern." >&2
+    exit 1
+fi
+line=$(grep -nF 'CapturedMono value -> if flag then value' WitnessGuardedReject.hs | cut -d: -f1)
+grep -Fq "WitnessGuardedReject.hs:$line:40: error: [GHC-46956]" case-escape.log
+grep -Fq 'would escape its scope' case-escape.log
+grep -Fq 'CapturedMono :: forall t. Payload t -> CapturedMono' case-escape.log
+if "$ghc" "${flags[@]}" -DMULTIWAY_CONFLICT -c WitnessGuardedReject.hs >multiway-conflict.log 2>&1; then
+    echo "The multi-way if accepted two different witnesses." >&2
+    exit 1
+fi
+line=$(grep -nF '| never -> (different b :: Payload PolyMaybe)' WitnessGuardedReject.hs | cut -d: -f1)
+grep -Fq "WitnessGuardedReject.hs:$line:17: error: [GHC-83865]" multiway-conflict.log
+grep -Fq 'Actual: Payload PolyMaybe' multiway-conflict.log
+if "$ghc" "${flags[@]}" -DMULTIWAY_ESCAPE -c WitnessGuardedReject.hs >multiway-escape.log 2>&1; then
+    echo "The multi-way if let a witness escape its guard." >&2
+    exit 1
+fi
+line=$(grep -nF '| flag, CapturedMono value <- capture -> value' WitnessGuardedReject.hs | cut -d: -f1)
+grep -Fq "WitnessGuardedReject.hs:$line:46: error: [GHC-46956]" multiway-escape.log
+grep -Fq 'would escape its scope' multiway-escape.log
+grep -Fq 'a multi-way if alternative' multiway-escape.log
 if "$ghc" "${flags[@]}" -c WitnessJointReject.hs >joint-reject.log 2>&1; then
     echo "The joint witness check accepted a conflicting or local witness." >&2
     exit 1

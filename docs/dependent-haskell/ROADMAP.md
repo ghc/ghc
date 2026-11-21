@@ -47,6 +47,14 @@ lengths. The equality from that comparison justifies the second
 lookup. A length mismatch returns `Nothing`.
 [Paired lookup and coverage](roadmap/R03-dependent-products.md#use-one-position-on-two-lists-of-equal-length).
 
+A library can also store one position for each of two independent lists.
+Its linear reader matches both positions directly. The lists can have
+different lengths and element types. A finite offset works on a cyclic
+list. An ordinary vector client can pass its filtered result to a
+rank-2 callback and infer the hidden length of the second filter.
+[Two positions](examples/qualified-pi/ListCursor.hs) and
+[ordinary filter client](examples/erased-existentials/RankedPackageClient.hs).
+
 A type synonym can use a `case` to choose the argument type of an
 ordinary arrow. For example, one branch can take a pair and another
 a `Char`. An ordinary client sees the selected argument type through
