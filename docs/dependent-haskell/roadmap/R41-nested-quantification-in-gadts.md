@@ -14,7 +14,10 @@
 - [x] Place a required forall between two prefix fields in a lifted constructor.
 - [x] Follow a terminal required forall with a constructor context.
 - [x] Place inferred and specified type variables in the same forall between prefix fields.
-- [ ] Preserve a field's bang after a nested quantifier.
+- [x] Preserve a lifted prefix field's bang after a nested quantifier through quotation, reification, and splicing.
+- [x] Match an existential field under a context between two prefix fields.
+- [x] Place a context and a later inferred and specified group after a leading required binder.
+- [x] Quote, reify, and splice that leading-required telescope with its field bangs.
 - [ ] Support the remaining orders of fields, contexts, and quantifiers in prefix constructors.
 
 The [Showcase](../Showcase.hs) defines a constructor with fields of
@@ -159,11 +162,29 @@ accepts the earlier, unmarked inferred group. Rebuilding the provider
 writes the new header. The marker leaves the payload encoding unchanged.
 [Writer and reader test](../../../testsuite/tests/gadt/GadtInferredTelescopeWire.sh).
 
-Proposal #402 permits a strictness annotation on a prefix field in any
-position. The compiler currently reports GHC-18932 for
-`Late :: Int -> forall a -> !a -> Late`, including when the first
-field and required binder are valid. The parser keeps bangs on the
-initial fields. The ordered suffix in a TH `RetainedGadtC` is a
-`Type` and carries a field type and multiplicity. Supporting a bang
-after a nested quantifier requires keeping that bang through both
-declaration quotation and reification.
+A field after a nested quantifier can be strict. For
+`Late :: Int -> forall a -> !a -> Late`, a partial application leaves the
+first field lazy. Saturating the constructor forces the last field.
+Template Haskell uses the ordered list in `RetainedGadtC` to keep the
+later field's bang and multiplicity through quotation and reification.
+[Late-field test](../../../testsuite/tests/gadt/GadtLateFieldTh.hs).
+
+A prefix constructor can pass an existential type from an initial
+binder through an interior context. In
+`C :: forall a. Int -> Eq a => a -> T`, the first field is matched
+before the dictionary enters scope. The [existential context test](../../../testsuite/tests/gadt/GadtInteriorContext.hs)
+uses the dictionary at the later field.
+
+The [Showcase](../Showcase.hs) quotes and splices a constructor with
+a leading required binder, followed by `Eq a` and a later binder group.
+
+```haskell
+QuotedComparison :: forall a -> Eq a => forall {b} c. Show c
+                 => a -> !(b, c) -> QuotedComparison
+```
+
+The call supplies `a` with `(type Int)`, and `c` with `@Bool`. The
+field types infer `b`. The consumer uses each dictionary in its field
+pattern. The [source-hidden TH test](../../../testsuite/tests/gadt/GadtLeadingRequiredTh.hs)
+also reifies and splices the declaration. It checks that the partial
+application is lazy and that supplying the last field forces it.
