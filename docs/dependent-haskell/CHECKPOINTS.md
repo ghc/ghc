@@ -55,6 +55,24 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At compiler revision `d002ca9da1`, a closed family can match the
+`Int#` field of promoted `I#`. Clients with the extension disabled
+proved reduction at a concrete field through the hidden provider
+interface. Named, wildcard, and written field binders all passed. The
+64-bit machine literal wrapped at its target width. An unknown `Int`
+application stayed stuck, and an ordinary `forall` over an `Int#` index
+still gave GHC-83865. A matched Core API check also rejected raw
+runtime-index readback.
+
+The normal Hadrian `quick` build completed both compiler stages. Both
+matched all 501 Showcase outputs at native `-O0` with stripped
+interfaces and at native `-O2` with default interfaces. The self-hosted
+compiler also matched in source GHCi. Both compilers ran the focused
+check at `-O0` and `-O2` with Core and STG Lint.
+[Showcase checks](check-showcase.sh),
+[focused interface check](examples/open-evaluation/check-int-prim-family.sh),
+and [R10 scope](roadmap/R10-unboxed-promotion.md#machine-integer-family-patterns).
+
 At compiler revision `2a1003b253`, a client proves the contents of
 `Table.withoutRowLabels (Table.sample 4)` from a compiled producer.
 The outer cell vector supplies its own length. A later vector of row
