@@ -10,7 +10,7 @@
 
 module GHC.Tc.Solver.Rewrite(
    rewrite, rewriteForErrors, rewriteArgsNom,
-   rewriteType, rewriteFamilyAxioms
+   rewriteType, rewriteFamilyAxioms, rewriteTyConAppArgsNom
  ) where
 
 import GHC.Prelude
@@ -353,6 +353,18 @@ rewriteType loc ty
                      -- (Shouldn't matter, if only Givens are present
                      -- anyway)
        ; return $ reductionReducedType redn }
+
+-- | Rewrite the arguments of an application at nominal role with Givens.
+-- Keep its head. Callers that require no family reduction supply
+-- family-free arguments and Givens.
+rewriteTyConAppArgsNom :: CtLoc -> TyCon -> [TcType] -> TcS Reduction
+rewriteTyConAppArgsNom loc tc args
+  = do { (redn, rewriters) <- runRewrite loc Given NomEq $
+           withRewriteEnv (\env -> env { re_zap_coercions = False
+                                      , re_source_lets = emptyVarEnv })
+             (rewrite_ty_con_app tc args)
+       ; massert (isEmptyCoHoleSet rewriters)
+       ; return redn }
 
 -- | Reduce family axioms at nominal role with the solver reduction-depth limit.
 -- See Note [Solving retained function equalities] in GHC.Tc.Solver.Equality.
