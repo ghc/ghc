@@ -873,12 +873,12 @@ genericSafeIndexing = do
         CursorClient.zipTwoPairs 'a' 'b' (10 :: Int) 20
     observe "zip integer literals at a proven common length" CursorClient.zipIntLiterals
     observe "zip with the first list at Int8" CursorClient.zipInt8Literals
-    let chars = Column.Column (Reflection.typeRep @Char) "abc"
-        unused = Column.Column (Reflection.typeRep @Bool) (error "forced column")
+    let chars = Column.Column (type Char) "abc"
+        unused = Column.Column (type Bool) (error "forced column")
     observe "read a column at a runtime type and offset"
-        ( Column.lookupColumn (Reflection.typeRep @Char) chars position
-        , Column.lookupColumn (Reflection.typeRep @Char) unused (error "forced offset")
-        , Column.lookupColumn (Reflection.typeRep @Bool) unused (-1) )
+        ( Column.lookupColumn (type Char) chars position
+        , Column.lookupColumn (type Char) unused (error "forced offset")
+        , Column.lookupColumn (type Bool) unused (-1) )
     observe "check a signed position in a packaged vector" $
         case ListVectorClient.fromList values of
             Sigma.Pair _ cells -> FinitePositionClient.lookupVecViaView cells position

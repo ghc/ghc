@@ -528,6 +528,7 @@ data CtOrigin
       Type   -- the instantiated type of the method
   | AmbiguityCheckOrigin UserTypeCtxt
   | ImplicitLiftOrigin HsImplicitLiftSplice
+  | TypeOperandOrigin (LHsWcType GhcRn)
 
 
 data NonLinearPatternReason
@@ -634,7 +635,7 @@ exprCtOrigin (HsTypedSplice {})    = Shouldn'tHappenOrigin "TH typed splice"
 exprCtOrigin (HsUntypedSplice {})  = Shouldn'tHappenOrigin "TH untyped splice"
 exprCtOrigin (HsProc {})         = Shouldn'tHappenOrigin "proc"
 exprCtOrigin (HsStatic {})       = Shouldn'tHappenOrigin "static expression"
-exprCtOrigin (HsEmbTy {})        = Shouldn'tHappenOrigin "type expression"
+exprCtOrigin (HsEmbTy _ ty)      = TypeOperandOrigin ty
 exprCtOrigin (HsStar {})         = Shouldn'tHappenOrigin "star expression"
 exprCtOrigin (HsHole _)          = Shouldn'tHappenOrigin "hole expression"
 exprCtOrigin (HsForAll {})       = Shouldn'tHappenOrigin "forall telescope"    -- See Note [Types in terms]
@@ -800,6 +801,7 @@ ppr_br :: CtOrigin -> SDoc
 ppr_br (OccurrenceOf name)   = hsep [text "a use of", quotes (ppr name)]
 ppr_br (OccurrenceOfRecSel name) = hsep [text "a use of", quotes (ppr name)]
 ppr_br AppOrigin             = text "an application"
+ppr_br (TypeOperandOrigin ty) = text "the type operand" <+> quotes (text "type" <+> ppr ty)
 ppr_br (IPOccOrigin name)    = hsep [text "a use of implicit parameter", quotes (ppr name)]
 ppr_br (PushedCallStackOrigin fs) = hsep [text "a use of", quotes (ftext fs)]
 ppr_br (OverLabelOrigin l)   = hsep [text "the overloaded label"
@@ -915,6 +917,7 @@ foldMapCtOrigin f = go
         IPOccOrigin {} -> f orig
         PushedCallStackOrigin {} -> f orig
         OverLabelOrigin {} -> f orig
+        TypeOperandOrigin {} -> f orig
         LiteralOrigin {} -> f orig
         QualLiteralOrigin {} -> f orig
         NegateOrigin {} -> f orig
