@@ -1433,6 +1433,49 @@ retainedColumnNames first plan = Just (idName first) : foldr column [] plan
     column RetainedConValue rest = Nothing : rest
     column RetainedConDict{} rest = rest
 
+-- | Bind implicit dictionaries in their original argument positions.
+insertRetainedDictionaries :: [RetainedConArg] -> [LPat GhcRn] -> [LPat GhcRn]
+insertRetainedDictionaries ds = before_index
+  where
+    before_index (pat : pats)
+      | isVisArgLPat pat = pat : insert ds pats
+      | otherwise = pat : before_index pats
+    before_index [] = panic "insertRetainedDictionaries: missing source index"
+
+    insert [] pats = pats
+    insert (RetainedConDict dict : rest) pats
+      = noLocA (VarPat noExtField (noLocA (idName dict))) : insert rest pats
+    insert ds@(_ : rest) (pat : pats)
+      | isVisArgLPat pat = pat : insert rest pats
+      | otherwise = pat : insert ds pats
+    insert _ [] = panic "insertRetainedDictionaries: missing source argument"
+
+-- | Check one equation with its constructor proofs and transported dictionaries.
+withRetainedRowGivens :: SkolemInfoAnon -> [EvVar] -> [RetainedConArg] -> [TcCoercionN]
+                      -> TcM a -> TcM (TcEvBinds, a)
+withRetainedRowGivens origin proofs plan arg_cos action
+  = do { let dictionary_cos = [(dict, co) | (RetainedConDict dict, co) <- zip plan arg_cos]
+             domain_cos = [co | (RetainedConIndex _, co) <- zip plan arg_cos
+                              , not (isReflCo co)]
+       ; refined_givens <- newEvVars (map (pSnd . coercionKind . snd) dictionary_cos)
+       ; domain_givens <- newEvVars (map coercionType domain_cos)
+       ; (ev_binds, result) <-
+           checkConstraints origin []
+             (proofs ++ refined_givens ++ domain_givens) action
+       ; let given_binds = zipWith (\given (dict, co) ->
+                               mkGivenEvBind given
+                                 (if isCoVar dict
+                                  then evCoercion (mkCoCast (mkCoVarCo dict) (mkSubCo co))
+                                  else evCast (Var dict) (mkSubCo co)))
+                             refined_givens dictionary_cos
+                          ++ zipWith (\given co -> mkGivenEvBind given (evCoercion co))
+                                     domain_givens domain_cos
+       ; branch_binds <- case ev_binds of
+           TcEvBinds binds -> do { mapM_ (addTcEvBind binds) given_binds
+                                 ; return ev_binds }
+           EvBinds binds -> return (EvBinds (listToBag given_binds `unionBags` binds))
+       ; return (branch_binds, result) }
+
 -- | Select a later retained constructor column without counting dictionaries.
 retainedMatrixColumn :: [RetainedConArg]
                      -> MatchGroup GhcRn (LHsExpr GhcRn) -> Maybe (Int, Id)
@@ -1463,15 +1506,13 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
                        pat_tys plan rhs_ty
                        (MG { mg_alts = L loc matches, mg_ext = (origin, _) })
   = setSrcSpanA loc $
-    do { when (any dictionary plan) $
-           failWithTc (TcRnRetainedQuantificationError RetainedMatrixContext)
-       ; rows <- zipWithM constructors [1..] matches
+    do { rows <- zipWithM constructors [1..] matches
        ; _ <- foldM unique_pair [] (zip rows matches)
        ; let pairs = [(fst first, fst second) | (first, second) <- catMaybes rows]
              expected = [(first, second) | first <- domain_cons first_index
                                          , second <- domain_cons second_index]
-       ; unless (any isNothing rows ||
-                 (pairs `equalLength` expected && all (`elem` pairs) expected)) coverage_error
+       ; unless (any isNothing rows) $
+           forM_ (filter (`notElem` pairs) expected) check_missing
        ; arg_tys <- mapM argument_type pat_tys
        ; result_ty <- readExpType rhs_ty
        ; (usages, checked) <- mapAndUnzipM
@@ -1482,8 +1523,44 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
                     , mg_ext = MatchGroupTc (Scaled ManyTy (varType first_index) : arg_tys)
                                 result_ty origin }) }
   where
-    dictionary RetainedConDict{} = True
-    dictionary _ = False
+    dictionaries = [d | RetainedConDict d <- plan]
+    source_column = length [() | arg <- take second_column plan, written arg]
+    written RetainedConDict{} = False
+    written _ = True
+
+    -- An omitted constructor pair must contradict a declared equality.
+    check_missing (one, two)
+      | any (anyFreeVarsOfType (\v -> v == first_index || v == second_index)) predicates
+      = do { level <- getTcLevel
+           ; ambient <- filter (isCoverageEquality . varType) <$> getLexicalGivens
+           ; let satisfiable tys = do
+                   givens <- newEvVars tys
+                   tcCheckGivens (emptyInertSet level) (listToBag (ambient ++ givens))
+           ; before <- satisfiable predicates
+           ; when (isNothing before) missing_pair
+           ; co1 <- hypothetical first_index one
+           ; co2 <- hypothetical second_index two
+           ; specialised <- mapM (fmap (pSnd . coercionKind) . transport_pair co1 co2) predicates
+           ; after <- satisfiable specialised
+           ; when (isJust after) missing_pair }
+      | otherwise = missing_pair
+      where
+        missing_pair :: TcM a
+        missing_pair = failWithTc (TcRnRetainedQuantificationError
+                         (RetainedMissingConstructorPair (dataConName one) (dataConName two)))
+        predicates = [varType d | RetainedConDict d <- plan, isCoverageEquality (varType d)]
+        hypothetical index con = do
+          let pat = nlConPatName (dataConName con) (replicate (dataConSourceArity con) nlWildPatName)
+          resolved <- tcRetainedCon (varType index) pat
+          case resolved of
+            Just (dc, fields) -> mkCoVarCo <$> newEvVar (mkNomEqPred (TermVarTy index)
+                                      (retainedConIndex (varType index) dc fields))
+            Nothing -> missing_pair
+
+    transport_pair first_co second_co ty = do
+      one <- tcRetainedCoercion first_index first_co ty
+      two <- tcRetainedCoercion second_index second_co (pSnd (coercionKind one))
+      return (mkTransCo one two)
     domain_cons index = case splitTyConApp_maybe (coreFullView (varType index)) of
       Just (tc, _) -> tyConDataCons tc
       _ -> []
@@ -1493,7 +1570,7 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
 
     row_patterns (Match { m_pats = L _ pats })
       = case filter isVisArgLPat pats of
-          first : later -> case drop second_column later of
+          first : later -> case drop source_column later of
             second : _ -> return (first, second)
             _ -> pattern_error
           _ -> pattern_error
@@ -1563,10 +1640,7 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
                     ; return (Just (first_cv, second_cv)) }
            ; let transport ty = case cvs of
                    Nothing -> return (mkNomReflCo ty)
-                   Just (first_cv, second_cv) -> do
-                     one <- tcRetainedCoercion first_index (mkCoVarCo first_cv) ty
-                     two <- tcRetainedCoercion second_index (mkCoVarCo second_cv) (pSnd (coercionKind one))
-                     return (mkTransCo one two)
+                   Just (first_cv, second_cv) -> transport_pair (mkCoVarCo first_cv) (mkCoVarCo second_cv) ty
            ; arg_cos <- mapM (transport . scaledThing) arg_tys
            ; result_co <- transport result_ty
            -- Keep later retained arguments at their incoming types.
@@ -1580,10 +1654,10 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
                    = renameRetainedMatch names match
                  constructor_columns = case row of
                    Just ((_, first_fields), (_, second_fields)) ->
-                     [(0, first_fields), (second_column+1, second_fields)]
+                     [(0, first_fields), (source_column+1, second_fields)]
                    Nothing -> []
                  prepared = renamed { m_pats = L renamed_loc
-                   (retainedConPats constructor_columns $
+                   (insertRetainedDictionaries plan $ retainedConPats constructor_columns $
                     bindRetainedWildcards (retainedColumnNames first_index plan) renamed_pats) }
                  check = do
                    clause <- if length matches == 1
@@ -1593,11 +1667,12 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
                    tcMatchWithSource tcBody (invis_pat_tys ++ first_arg : refined_args)
                      (mkCheckExpType (pSnd (coercionKind result_co))) match clause
            ; (ev_binds, L checked_loc checked) <- case (row, cvs) of
-               (Nothing, Nothing) ->
-                 do { checked <- check; return (emptyTcEvBinds, checked) }
+               (Nothing, Nothing)
+                 | null dictionaries -> do { checked <- check; return (emptyTcEvBinds, checked) }
+                 | otherwise -> checkConstraints (SigTypeSkol GenSigCtxt) [] dictionaries check
                (Just ((first_con, _), _), Just (first_cv, second_cv)) ->
-                 checkConstraints (PatSkol (RealDataCon first_con) (m_ctxt match)) []
-                   [first_cv, second_cv] check
+                 withRetainedRowGivens (PatSkol (RealDataCon first_con) (m_ctxt match))
+                   [first_cv, second_cv] plan arg_cos check
                _ -> panic "tcRetainedMatrixMatches: inconsistent constructor proofs"
            ; let Match { m_pats = L pats_loc checked_pats, m_grhss = grhss } = checked
                  wrap_index _ Nothing _ pat = pat
@@ -1615,10 +1690,23 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
                    [] -> panic "tcRetainedMatrixMatches: missing first pattern"
                  cast_rhs (L rhs_loc (GRHS x guards rhs))
                    = L rhs_loc (GRHS x guards (mkLHsWrapCo (mkSymCo result_co) rhs))
+                 fallback_binds = isNothing cvs && not (null dictionaries)
+                 where_binds = grhssLocalBinds grhss
+                 wrap_fallback (L rhs_loc (GRHS x guards rhs))
+                   | fallback_binds =
+                       let body = case unLoc where_binds of
+                             EmptyLocalBinds{} -> rhs
+                             _ -> L (getLoc rhs) (HsLet noExtField where_binds rhs)
+                       in L rhs_loc (GRHS x guards (mkHsDictLet ev_binds body))
+                   | otherwise = cast_rhs (L rhs_loc (GRHS x guards rhs))
+                 locals | fallback_binds = fmap (const emptyLocalBinds) where_binds
+                        | otherwise = where_binds
            ; return (L checked_loc (checked { m_pats = L pats_loc checked_pats'
-                       , m_grhss = grhss { grhssGRHSs = fmap cast_rhs (grhssGRHSs grhss) } })) }
+                       , m_grhss = grhss { grhssGRHSs = fmap wrap_fallback (grhssGRHSs grhss)
+                                         , grhssLocalBinds = locals } })) }
 
     check_later _ [] [] = return []
+    check_later column (RetainedConDict _ : args) pats = check_later (column+1) args pats
     check_later column (argument : args) (pat@(L pat_loc inner) : pats)
       | RetainedConIndex shared <- argument
       = setSrcSpanA pat_loc $
@@ -1646,11 +1734,20 @@ original result. No equality follows from an alias or a shared source spelling.
 Attach each proof to its own ConPat, inside an outer AsPat for its whole Id.
 Keep the original MatchGroupTc types and all source argument lambdas. Ordinary
 payload CoPats preserve their outer types. A payload before the second index
-cannot mention that binder; its second transport is reflexive. Retained domains
-must have reflexive transport. Reject contexts in this initial matrix telescope.
-Combined dictionary bindings would need the scope of both constructor proofs.
+cannot mention that binder; its second transport is reflexive. Keep retained domains at their incoming types. The branch implication
+contains their transported equalities and the specialised dictionaries.
+Attach its evidence bindings to the second constructor where both proofs
+are in scope. A variable fallback uses the original dictionaries and
+keeps its evidence outside its local definitions and RHS.
 
-Check unique complete constructor pairs, or use a final fallback equation as
+For an omitted pair, instantiate each constructor with fresh fields.
+Specialise the declared nominal equalities to that pair. Check them with
+the enclosing nominal Givens. Accept the omission only if the ordinary
+Given solver refutes the specialised equalities. A stuck family can leave
+the pair possible. See also
+Note [Retained equalities in uncovered patterns] in GHC.HsToCore.Pmc.Solver.
+
+Check unique feasible constructor pairs, or use a final fallback equation as
 described in Note [Retained variable fallback]. Reject mixed constructor/variable
 rows and keep bare subfields. Ordinary grouping of
 repeated constructors would alias distinct native fields and proofs. Desugar
@@ -1966,11 +2063,6 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
                    failWithTc (TcRnRetainedQuantificationError RetainedConstructorQuotation)
            -- Keep later retained arguments at their incoming types.
            -- See Note [Refining later retained domains].
-           ; let dictionary_cos = [(dict, co) | (RetainedConDict dict, co) <- zip argument_plan arg_cos]
-                 domain_cos = [co | (RetainedConIndex _, co) <- zip argument_plan arg_cos
-                                  , not (isReflCo co)]
-           ; refined_givens <- newEvVars (map (pSnd . coercionKind . snd) dictionary_cos)
-           ; domain_givens <- newEvVars (map coercionType domain_cos)
            ; let refined_domains = zipWith3 (\dictionary (Scaled mult ty) co ->
                                    Scaled mult (case dictionary of
                                      RetainedConValue -> pSnd (coercionKind co)
@@ -1979,7 +2071,7 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
                  refined_args = map mkCheckExpFunPatTy refined_domains
                  index_arg = mkCheckExpFunPatTy (Scaled ManyTy (varType index))
                  renamed = renameRetainedMatch names match
-                 prepare = insert_dictionaries argument_plan . retainedConPats [(0, fields)]
+                 prepare = insertRetainedDictionaries argument_plan . retainedConPats [(0, fields)]
                          . bindRetainedWildcards (retainedColumnNames index argument_plan)
                  match' = renamed { m_pats = fmap prepare (m_pats renamed)
                                   , m_ctxt = case operands of
@@ -2005,21 +2097,9 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
                      else return (L match_loc match')
                    tcMatchWithSource check_body (invis_pat_tys ++ index_arg : refined_args)
                      (mkCheckExpType (pSnd (coercionKind result_co))) original clause
-           ; (ev_binds, L checked_loc checked) <-
-               checkConstraints (PatSkol (RealDataCon con) (m_ctxt match)) []
-                 (cv : refined_givens ++ domain_givens) check
-           ; let given_binds = zipWith (\given (dict, co) ->
-                                   mkGivenEvBind given
-                                     (if isCoVar dict
-                                      then evCoercion (mkCoCast (mkCoVarCo dict) (mkSubCo co))
-                                      else evCast (Var dict) (mkSubCo co)))
-                                 refined_givens dictionary_cos
-                              ++ zipWith (\given co -> mkGivenEvBind given (evCoercion co))
-                                         domain_givens domain_cos
-           ; branch_binds <- case ev_binds of
-               TcEvBinds binds -> do { mapM_ (addTcEvBind binds) given_binds
-                                     ; return ev_binds }
-               EvBinds binds -> return (EvBinds (listToBag given_binds `unionBags` binds))
+           ; (branch_binds, L checked_loc checked) <-
+               withRetainedRowGivens (PatSkol (RealDataCon con) (m_ctxt match))
+                 [cv] argument_plan arg_cos check
            ; strict <- xoptM LangExt.Strict
            ; let Match { m_pats = L pats_loc checked_pats, m_grhss = grhss } = checked
                  generated pat@(L l _) | strict && isJust operands = L l (LazyPat noExtField pat)
@@ -2040,21 +2120,6 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
            ; return (L checked_loc (checked { m_pats = L pats_loc checked_pats'
                                           , m_ctxt = m_ctxt source_match
                                           , m_grhss = grhss' })) }
-
-    insert_dictionaries ds = before_index
-      where
-        before_index (pat : pats)
-          | isVisArgLPat pat = pat : insert ds pats
-          | otherwise = pat : before_index pats
-        before_index [] = panic "tcRetainedConMatches: missing source index"
-
-        insert [] pats = pats
-        insert (RetainedConDict dict : rest) pats
-          = noLocA (VarPat noExtField (noLocA (idName dict))) : insert rest pats
-        insert ds@(_ : rest) (pat : pats)
-          | isVisArgLPat pat = pat : insert rest pats
-          | otherwise = pat : insert ds pats
-        insert _ [] = panic "tcRetainedConMatches: missing source argument"
 
     -- Match shared retained positions to the row's resolved variable Names.
     retained_names :: [RetainedConArg] -> [LPat GhcRn] -> TcM [(Name, Name)]
