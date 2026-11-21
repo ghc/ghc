@@ -25,7 +25,7 @@ import GHC.Core.Coercion ( MCoercion(..), coercionLKind, mkUnbranchedAxInstCo )
 import GHC.Core.DataCon ( DataCon, dataConRepType, dataConTyCon, dataConTag
                        , dataConRepArgBinders, dataConRepArity, dataConContextFieldCount
                        , dataConHasRetainedResult )
-import GHC.Core.Type ( coreFullView, isManyTy, isNativeIndexType, mkTyConApp, piResultTys )
+import GHC.Core.Type ( coreFullView, isManyTy, isNativeIndexType, mkTyConApp, piResultTys, splitInvisPiTys )
 import GHC.Core.TyCon ( isNewTyCon, newTyConCo, tyConDataCons )
 import GHC.Core.FVs ( exprFreeVars )
 import qualified GHC.Core.Subst as Subst
@@ -360,7 +360,8 @@ matchOneConLike scrut vars ty (eqn1 :| eqns)   -- All eqns for a single construc
               putSrcSpanDsA (getLoc (eqn_pat eqn1)) $
                   case args1 of
                     PrefixCon _ pats ->
-                      Just <$> retained_fields (piResultTys (dataConRepType con) arg_tys) pats
+                      let (_, _, fields) = splitInvisPiTys (piResultTys (dataConRepType con) arg_tys)
+                      in Just <$> retained_fields fields pats
                     _ -> package_error
             _ -> return Nothing
         ; let inst_tys = assert (all tcIsTcTyVar ex_tvs) $
@@ -460,7 +461,7 @@ matchOneConLike scrut vars ty (eqn1 :| eqns)   -- All eqns for a single construc
                                 RealDataCon con
                                   | dataConHasRetainedResult con
                                   -> arg_vars ++ dicts1
-                                  | null tvs1, [_] <- dicts1
+                                  | null tvs1, [proof] <- dicts1, isCoVar proof
                                   , isNativeIndexType (mkTyConApp (dataConTyCon con) arg_tys)
                                   -- See Note [Retained constructor field scope].
                                   -> arg_vars ++ dicts1

@@ -3884,8 +3884,9 @@ pprRetainedQuantificationError reason = case reason of
     text "A runtime index in a visible type argument must refer to an already-bound unrestricted local value of a supported index domain."
   RetainedPackageDeclaration ->
     vcat [ text "A retained constructor requires a lazy ordinary data declaration with a lifted result kind."
-         , text "Records, contexts, existential binders, equality specifications, and StrictData are not supported."
-         , text "Its erased quantifiers must name exactly the datatype parameters." ]
+         , text "Records, existential binders, equality specifications, and StrictData are not supported."
+         , text "Its erased quantifiers must name exactly the datatype parameters."
+         , text "A context may contain only homogeneous (~) constraints and requires datatype parameter order." ]
   RetainedConstructorResult ty ->
     vcat [ text "A constructor may use its only retained field directly in the result type."
          , text "The field must have a closed structural index type."

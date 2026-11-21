@@ -1342,6 +1342,8 @@ tcIfaceDataCons tycon_name tycon if_cons
         --     they are really needed
         ; ~(eq_spec, theta, retained_binders, arg_tys, stricts) <- forkM (mk_doc dc_name) $
              do { theta <- tcIfaceCtxt ctxt
+                ; unless (null arg_binders || validRetainedConTheta theta) $
+                    failIfM (text "Invalid retained constructor context in interface:" <+> ppr dc_name)
                 -- A predicate or field can refer to this TyCon. Check its
                 -- scope in the same lazy computation that reads the type.
                 ; let prefix_theta = if trailing_context then [] else theta
@@ -1430,7 +1432,8 @@ tcIfaceDataCons tycon_name tycon if_cons
                 && all type_binder univs && all (\(Bndr b _) -> type_binder b) users
                 && length univ_names == length (nub univ_names)
                 && length user_names == length (nub user_names)
-                && valid_result && null exs && null ctxt && null fields
+                && valid_result && null exs && null fields
+                && (null ctxt || (not wrapper && null spec && user_names == univ_names))
                 && ordinary_data
                 && (null bangs || bangs `equalLength` args)
                 && all lazy_bang bangs
@@ -1438,7 +1441,7 @@ tcIfaceDataCons tycon_name tycon if_cons
                 && all lazy_src_bang src_bangs) $
           failIfM (text "Invalid retained constructor fields in interface:" <+> ppr name
                    $$ text "Expected aligned distinct field names and a lazy data constructor"
-                   $$ text "without a context, existential, or record field."
+                   $$ text "without an existential or record field."
                    $$ text "User type binders must match the universal binders outside the result equality.")
       where
         names = [n | Just n <- binders]

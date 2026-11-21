@@ -357,7 +357,8 @@ evidenceSuffix requirements
     || needs InteriorGadtContextEvidence || needs InteriorGadtForAllEvidence
     || needs RepeatedInteriorGadtForAllEvidence || needs OrderedGadtTelescopeEvidence
     || needs InferredOrderedGadtBindersEvidence
-    || needs ExtendedOrderedGadtTelescopeEvidence || needs ScopedLambdaEvidence = feature_set
+    || needs ExtendedOrderedGadtTelescopeEvidence || needs ScopedLambdaEvidence
+    || needs RetainedConstructorContextEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -402,6 +403,7 @@ legacyEvidenceSuffix OrderedGadtTelescopeEvidence = featureSetPrefix ++ "ordered
 legacyEvidenceSuffix InferredOrderedGadtBindersEvidence = featureSetPrefix ++ "inferred-ordered-gadt-binders"
 legacyEvidenceSuffix ExtendedOrderedGadtTelescopeEvidence = featureSetPrefix ++ "extended-ordered-gadt-telescope"
 legacyEvidenceSuffix ScopedLambdaEvidence = featureSetPrefix ++ "scoped-lambda"
+legacyEvidenceSuffix RetainedConstructorContextEvidence = featureSetPrefix ++ "retained-constructor-context"
 legacyEvidenceSuffix GeneralIndexedConstructorOperandEvidence = featureSetPrefix ++ "general-indexed-constructor-operand"
 legacyEvidenceSuffix DepFunCoEvidence           = "-retained-depfunco-v1"
 legacyEvidenceSuffix ConstructorCaseEvidence   = "-retained-constructor-case-v1"
@@ -454,7 +456,8 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("ordered-gadt-telescope", OrderedGadtTelescopeEvidence)
                       , ("inferred-ordered-gadt-binders", InferredOrderedGadtBindersEvidence)
                       , ("extended-ordered-gadt-telescope", ExtendedOrderedGadtTelescopeEvidence)
-                      , ("scoped-lambda", ScopedLambdaEvidence) ]
+                      , ("scoped-lambda", ScopedLambdaEvidence)
+                      , ("retained-constructor-context", RetainedConstructorContextEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion
@@ -539,6 +542,13 @@ accept specified binders in a late invisible group. Record the new
 requirement for that group so those readers reject the interface header.
 Inferred binders before the first field use the existing format.
 See Note [Terminal constructor type arguments] in GHC.Core.DataCon.
+
+The existing interface constructor already stores its context and its
+retained field names. Older readers reject their combination while loading
+the constructor. Mark it when writing the declaration so these readers
+reject the header, even when interface pragmas are omitted. Ordinary
+constructor contexts and retained constructors without a context keep
+their existing header.
 
 A compulsory retained default includes the older index alias, rule and
 coercion forms. Erased existentials and scoped sums have independent
