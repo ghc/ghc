@@ -269,9 +269,9 @@ selector application to a type, a local dictionary and a local operand.
 The final field is the instantiated result kind. Core Lint recomputes
 it from the selector and validates the metadata of both occurrences.
 
-These nodes are private Core syntax. Only the standalone scope checker
-accepts them. Runtime application and interface serialization fail
-explicitly. Do not use DepFunInvisible for the dictionary binder:
+These nodes are private Core syntax. Only the standalone Lint checker
+accepts them. Core expression typing supports a variable dictionary
+argument. CorePrep and interface serialization refuse these forms. Do not use DepFunInvisible for the dictionary binder:
 it describes a retained value with different source application rules.
 -}
 

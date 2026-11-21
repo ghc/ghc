@@ -8,32 +8,37 @@ import Control.Monad.IO.Class (liftIO)
 import Data.List (isInfixOf)
 import Data.Maybe (isNothing)
 import qualified Data.List.NonEmpty as NE
-import GHC (InteractiveImport (IIDecl), getSessionDynFlags, lookupName, parseImportDecl, parseName, runGhc, setContext, setSessionDynFlags)
+import GHC (InteractiveImport (IIDecl), getSession, getSessionDynFlags, lookupName, parseImportDecl, parseName, runGhc, setContext, setSessionDynFlags)
 import GHC.Builtin.WiredIn.Types (boolTy, constraintKind, liftedTypeKind, mkBoxedTupleTy, stringTy, unmatchableDataConTy)
-import GHC.Core (Bind (NonRec), Expr (Lam, Let, Type, Var))
+import GHC.Core (Bind (NonRec), Expr (App, Lam, Let, Type, Var), mkApps)
+import GHC.Core.DataCon (dataConWorkId)
 import GHC.Core.Lint
     ( LintConfig, checkScopedSelectorApp, eqScopedSelectorApp, lintExpr
-    , lintScopedDictionaryType, scopedSelectorResultKind, substScopedSelectorApp
+    , lintScopedDictionaryExpr, lintScopedDictionaryType, scopedSelectorResultKind, substScopedSelectorApp
     )
 import qualified GHC.Core.Subst as Subst
 import GHC.Core.TyCo.Compare (eqType, eqTypeX, eqVarBndrs, nonDetCmpType)
 import GHC.Core.TyCo.FVs (tyCoVarsOfType)
 import GHC.Core.TyCo.Rep (Type (ClassAppTy, DepDictTy, DepFunTy, TermVarTy))
 import GHC.Core.TyCo.Tidy (tidyTopType)
-import GHC.Core.TyCon (FamTyConFlav (OpenTypeFamilyTyCon), Injectivity (NotInjective), mkAnonTyConBinder, mkFamilyTyCon, mkNamedTyConBinder, mkTyConKindWithMatchability)
-import GHC.Core.Type (pattern ManyTy, mkForAllTys, mkTyConApp, mkTyVarTy, typeKind)
-import GHC.Core.Utils (applyTypeToArgs)
-import GHC.CoreToIface (toIfaceType)
+import GHC.Core.TyCon (FamTyConFlav (OpenTypeFamilyTyCon), Injectivity (NotInjective), mkAnonTyConBinder, mkFamilyTyCon, mkNamedTyConBinder, mkTyConKindWithMatchability, tyConDataCons)
+import GHC.Core.Type (pattern ManyTy, mkForAllTys, mkFunctionType, mkTyConApp, mkTyVarTy, typeKind)
+import GHC.Core.Utils (applyTypeToArgs, exprType, mkLamType)
+import GHC.CoreToStg.Prep (corePrepExpr, corePrepPgm)
+import GHC.CoreToIface (toIfaceExpr, toIfaceType)
 import GHC.Data.FastString (fsLit)
 import GHC.Driver.Config.Core.Lint (initLintConfig)
+import GHC.Driver.Config.CoreToStg.Prep (initCorePrepConfigFor, initCorePrepPgmConfig)
 import GHC.Types.Id (mkSysLocal, setIdType)
 import GHC.Types.Name (mkSystemName)
 import GHC.Types.Name.Occurrence (mkTcOcc, mkTyVarOcc)
 import GHC.Types.TyThing (TyThing (ATyCon, AnId))
 import GHC.Types.Unique (mkUniqueGrimilyWithTag)
-import GHC.Types.Var (DepFunTyFlag (DepFunVisible), ForAllTyFlag (Invisible), Specificity (SpecifiedSpec), VarBndr (Bndr), mkTyVar, varType)
+import GHC.Types.Var (Id, DepFunTyFlag (DepFunVisible), ForAllTyFlag (Invisible), Specificity (SpecifiedSpec), VarBndr (Bndr), mkTyVar, varType)
 import GHC.Types.Var.Env (emptyInScopeSet, mkInScopeSetList, mkRnEnv2)
 import GHC.Types.Var.Set (elemVarSet, isEmptyVarSet)
+import GHC.Unit.Types (mainUnit, mkModule, mkModuleName)
+import GHC.Utils.Logger (initLogger)
 import GHC.Utils.Outputable (ppr, showSDocUnsafe)
 import System.Environment (getArgs)
 import System.IO (BufferMode (LineBuffering), hSetBuffering, stdout)
@@ -92,6 +97,7 @@ main = do
             escaped = close (bind db (observe da))
             mislabeled = close (bind db (bind da (observe (setIdType da (predicate b)))))
             cfg = initLintConfig flags []
+        env <- getSession
         liftIO $ do
             pass cfg "two dictionary binders" both
             pass cfg "first dictionary reference" scoped
@@ -226,9 +232,60 @@ main = do
                 "experimental dependent dictionary binder" (toIfaceType (qualified ea x selectA))
             rejectsPhase "interface write of a selector application"
                 "experimental class selector application" (toIfaceType selectA)
-            rejectsPhase "runtime application of a dependent dictionary"
+            rejectsPhase "runtime application with mismatched evidence"
+                "invalid dependent dictionary argument"
+                (applyTypeToArgs (qualified ea x selectA) [Var eb])
+
+            let [proxyCon] = tyConDataCons proxy
+                proxyFor index = mkApps (Var (dataConWorkId proxyCon)) [Type (typeKind index), Type index]
+                abstract = Lam a (Lam ea (Lam x (proxyFor selectA)))
+                abstractType = mkLamType a (qualified ea x selectA)
+                ordinary = Lam a (Lam ea (Lam x (mkApps (Var suc) [Type (mkTyVarTy a), Var ea, Var x])))
+                arrow = mkFunctionType unmatchableDataConTy ManyTy
+                ordinaryType = mkLamType a (arrow (varType ea) (arrow (mkTyVarTy a) (mkTyVarTy a)))
+                apply evidence operand = mkApps abstract [Type (varType operand), evidence, Var operand]
+                applied = apply (Var eb) y
+            passExpr cfg "abstract dictionary and retained operand" abstract abstractType
+            passExpr cfgB "apply dependent dictionary after type substitution" applied (resultUnder selectB)
+            unless (isNothing (lintExpr cfg ordinary)) (fail "ordinary Lint rejected a constraint arrow")
+            passExpr cfg "ordinary dictionary abstraction" ordinary ordinaryType
+            let ordinaryCall = mkApps ordinary [Type (mkTyVarTy b), Var eb, Var y]
+            passExpr cfgB "ordinary dictionary application" ordinaryCall (mkTyVarTy b)
+            rejectExpr cfgAB "reject wrong dictionary for instantiated class"
+                (apply (Var ea) y) (resultUnder selectB)
+            rejectExpr (initLintConfig flags [b, y]) "reject an unbound dictionary argument"
+                applied (mkTyConApp proxy [liftedTypeKind, mkTyVarTy b])
+            rejectExpr cfgB "reject a computed dictionary expression"
+                (apply (Let (NonRec alias (Var eb)) (Var alias)) y) (resultUnder selectB)
+
+            let inner = enumDict 21 "sameName" (mkTyVarTy a)
+                outer = enumDict 22 "sameName" (mkTyVarTy a)
+                selected d = selectorAt suc (mkTyVarTy a) d x (mkTyVarTy a)
+                innerLambda = Lam inner (Lam x (proxyFor (selected inner)))
+                shadow = Lam outer (App innerLambda (Var outer))
+                shadowType = qualified outer x (selected outer)
+                nextType = DepFunTy DepFunVisible x (resultUnder (selected ea2))
+            let shadowCfg = initLintConfig flags [a, ea2]
+            passExpr shadowCfg "shadowed abstraction uses the outer dictionary after application" shadow shadowType
+            passExpr shadowCfg "the second call substitutes a new same-predicate dictionary"
+                (App shadow (Var ea2)) nextType
+
+            when (isNothing (lintExpr cfg abstract)) $
+                fail "ordinary Core Lint accepted a dependent dictionary lambda"
+            let receiver = valueId 23 "receiver" (qualified ea x selectA)
+            rejectsPhase "interface conversion of a dependent dictionary application"
                 "experimental dependent dictionary application"
-                (applyTypeToArgs (qualified ea x selectA) [Var ea])
+                (toIfaceExpr (App (Var receiver) (Var ea2)))
+            prep <- initCorePrepConfigFor True env
+            logger <- initLogger
+            rejectsIOPhase "CorePrep rejects dependent dictionary expressions"
+                "CorePrep does not support experimental dependent dictionaries"
+                (corePrepExpr logger prep abstract)
+            let top = valueId 24 "top" abstractType
+                thisModule = mkModule mainUnit (mkModuleName "ScopedDictionaryFixture")
+            rejectsIOPhase "CorePrep rejects a dependent dictionary program"
+                "CorePrep does not support experimental dependent dictionaries"
+                (corePrepPgm logger prep (initCorePrepPgmConfig flags []) thisModule [NonRec top abstract])
 
 pass :: LintConfig -> String -> Type -> IO ()
 pass cfg label ty = case lintScopedDictionaryType cfg ty of
@@ -241,10 +298,25 @@ reject cfg label ty = case lintScopedDictionaryType cfg ty of
     Nothing -> fail (label ++ ": accepted")
 
 rejectsPhase :: String -> String -> a -> IO ()
-rejectsPhase label diagnostic result = do
-    checked <- try (evaluate result)
+rejectsPhase label diagnostic = rejectsIOPhase label diagnostic . evaluate
+
+rejectsIOPhase :: String -> String -> IO a -> IO ()
+rejectsIOPhase label diagnostic action = do
+    checked <- try action
     case checked of
         Left err | diagnostic `isInfixOf` displayException (err :: SomeException) ->
             putStrLn (label ++ ": rejected")
         Left err -> fail (label ++ ": " ++ displayException err)
         Right _ -> fail (label ++ ": accepted")
+
+passExpr :: LintConfig -> String -> Expr Id -> Type -> IO ()
+passExpr cfg label expr ty = do
+    unless (isNothing (lintScopedDictionaryExpr cfg expr ty) && eqType (exprType expr) ty) $
+        fail (label ++ ": rejected or has the wrong result type")
+    putStrLn (label ++ ": accepted")
+
+rejectExpr :: LintConfig -> String -> Expr Id -> Type -> IO ()
+rejectExpr cfg label expr ty =
+    if isNothing (lintScopedDictionaryExpr cfg expr ty)
+    then fail (label ++ ": accepted")
+    else putStrLn (label ++ ": rejected")

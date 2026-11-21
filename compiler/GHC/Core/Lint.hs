@@ -19,7 +19,7 @@ module GHC.Core.Lint (
     WarnsAndErrs,
 
     lintCoreBindings, lintUnfolding,
-    lintPassResult, lintExpr, lintRule, lintScopedDictionaryType,
+    lintPassResult, lintExpr, lintRule, lintScopedDictionaryType, lintScopedDictionaryExpr,
     ScopedSelectorApp, checkScopedSelectorApp, eqScopedSelectorApp,
     substScopedSelectorApp, scopedSelectorResultKind,
     lintAxioms,
@@ -513,14 +513,25 @@ lintExpr cfg expr
 -- This entry point is only for an in-memory scope experiment. It does not
 -- authorise ordinary Core or interface types with these evidence binders.
 lintScopedDictionaryType :: LintConfig -> Type -> Maybe (Bag SDoc)
-lintScopedDictionaryType cfg ty
+lintScopedDictionaryType cfg ty = lintScopedDictionary cfg (lintValueType ty)
+
+-- | Check a private dictionary expression and its expected type in memory.
+lintScopedDictionaryExpr :: LintConfig -> CoreExpr -> Type -> Maybe (Bag SDoc)
+lintScopedDictionaryExpr cfg expr expected =
+  lintScopedDictionary cfg $
+    do { lintValueType expected
+       ; (actual, _) <- lintCoreExpr expr
+       ; lintL (actual `eqType` expected) (text "Wrong dependent dictionary expression type") }
+
+lintScopedDictionary :: LintConfig -> LintM () -> Maybe (Bag SDoc)
+lintScopedDictionary cfg check
   | isEmptyBag errs = Nothing
   | otherwise       = Just errs
   where
     (_, errs) = initL cfg $
       addLoc TopLevelBindings $
         LintM $ \env lint_errs ->
-          unLintM (lintValueType ty) (env { le_scoped_dictionaries = True }) lint_errs
+          unLintM check (env { le_scoped_dictionaries = True }) lint_errs
 
 -- | An experimental neutral selector application held outside the Type AST.
 -- See Note [Scoped selector application prototype].
@@ -551,7 +562,7 @@ checkScopedSelectorShape scope selector inst dictionary operand
              actual <- lookupInScope scope var
              guard (eligible var && eligible actual && varType actual `eqType` varType var)
              return actual
-       dict <- checked_occ isScopedDictionary dictionary
+       dict <- checked_occ isNativeClassDictionaryId dictionary
        arg <- checked_occ isNativeOpaqueValueId operand
        guard (varType dict `eqType` instantiate predicate && varType arg `eqType` instantiate domain)
        return (ScopedSelectorApp selector inst dict arg (instantiate result))
@@ -1216,11 +1227,13 @@ lintLambda var lintBody =
     addLoc (LambdaBodyOf var) $
     lintBinder LambdaBind var $
     do { (body_ty, ue) <- lintBody
-       ; lintL (not (isNonCoVarId var)
-                  || not (anyFreeVarsOfType (== var) body_ty)
-                  || isNativeOpaqueValueId var)
-           (text "Unsupported runtime dependency in lambda result:" <+> ppr var
-            $$ ppr body_ty)
+       ; when (isNonCoVarId var && anyFreeVarsOfType (== var) body_ty
+                              && not (isNativeOpaqueValueId var)) $
+         do { allow_dicts <- lintScopedDictionaryMode
+            ; lintL (allow_dicts && isNativeClassDictionaryId var
+                                 && typeKind body_ty `eqType` liftedTypeKind)
+                (text "Unsupported runtime dependency in lambda result:" <+> ppr var
+                 $$ ppr body_ty) }
        ; ue' <- checkLinearity ue var
        ; return (mkLamType var body_ty, ue') }
 
@@ -2287,13 +2300,6 @@ lintNativeIndexFunction f
            Just domains -> return domains
            Nothing -> failWithL (text "Unsupported opaque runtime call head:" <+> ppr f) }
 
--- A private evidence binder must name an unrestricted dictionary of
--- a class predicate, with the ordinary lexical scope rules.
-isScopedDictionary :: Id -> Bool
-isScopedDictionary v
-  = isLocalId v && not (isCoVar v) && not (isJoinId v) && isManyTy (idMult v)
-    && isJust (getClassPredTys_maybe (varType v))
-
 lintScopedDictionaryMode :: LintM Bool
 lintScopedDictionaryMode = LintM $ \env errs ->
   fromBoxedLResult (Just (le_scoped_dictionaries env), errs)
@@ -2313,7 +2319,7 @@ lintType (TyVarTy tv)
 lintType (TermVarTy v)
   = do { in_scope <- getInScope
        ; allow_dicts <- lintScopedDictionaryMode
-       ; let eligible b = isNativeOpaqueValueId b || (allow_dicts && isScopedDictionary b)
+       ; let eligible b = isNativeOpaqueValueId b || (allow_dicts && isNativeClassDictionaryId b)
        ; lintL (eligible v
                  && maybe False (\b -> eligible b && varType b `eqType` varType v)
                                 (lookupInScope in_scope v))
@@ -2340,7 +2346,7 @@ lintType (ExistsTy _ b body)
 lintType (DepDictTy b body)
   = do { allow_dicts <- lintScopedDictionaryMode
        ; lintL allow_dicts (text "Experimental dependent dictionary binder")
-       ; lintL (isScopedDictionary b) (text "Invalid scoped dictionary binder:" <+> ppr b)
+       ; lintL (isNativeClassDictionaryId b) (text "Invalid scoped dictionary binder:" <+> ppr b)
        ; lintBinder LambdaBind b $
          do { lintType body
             ; lintL (typeKind body `eqType` liftedTypeKind)
@@ -2604,6 +2610,21 @@ lintApp msg lint_forall_arg lint_arrow_arg runtime_arg !orig_fun_ty all_args acc
                             (hang (text "Forall:" <+> (ppr tv $$ ppr tv_kind))
                                 2 (ppr arg' <+> dcolon <+> ppr karg'))
                       ; go subst' body_ty acc args }
+
+               go subst (DepDictTy b body_ty) acc (arg:args)
+                 = do { allow_dicts <- lintScopedDictionaryMode
+                      ; lintL allow_dicts (text "Experimental dependent dictionary application")
+                      ; case runtime_arg of
+                          Just to_core | Var dict <- to_core arg -> do
+                            { (arg_ty, acc') <- lint_arrow_arg arg ManyTy acc
+                            ; lintL (isNativeClassDictionaryId b
+                                        && isNativeClassDictionaryId dict
+                                        && substTy subst (varType b) `eqType` arg_ty)
+                                (text "Invalid dependent dictionary argument")
+                            ; let Subst in_scope ids tvs cvs = subst
+                                  subst' = Subst in_scope (extendVarEnv ids b (Var dict)) tvs cvs
+                            ; go subst' body_ty acc' args }
+                          _ -> failWithL (text "Dependent dictionary application requires a variable argument") }
 
                go subst (DepFunTy _ b body_ty) acc (arg:args)
                  = case runtime_arg of

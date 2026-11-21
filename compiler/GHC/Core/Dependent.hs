@@ -13,6 +13,7 @@ module GHC.Core.Dependent (
     isRetainedVanillaDefaultMethod,
     rejectNativeDependentProgram,
     rejectNativeDependentExpr,
+    rejectScopedDictionaryProgram, rejectScopedDictionaryExpr,
 ) where
 
 import GHC.Prelude
@@ -55,7 +56,8 @@ data ScanState = ScanState
     }
 
 -- | Select which retained forms the scan looks for.
-data ScanPurpose = DetectNative | CheckGentle | CheckUserRules | CheckErasedTypes
+data ScanPurpose
+    = DetectNative | CheckGentle | CheckUserRules | CheckErasedTypes | DetectScopedDictionaries
 
 -- | Select which bound-Id metadata a boundary can demand.
 data MetadataScan = AllMetadata | StableMetadata | NoMetadata
@@ -260,6 +262,20 @@ rejectNativeDependentExpr :: String -> CoreExpr -> IO ()
 rejectNativeDependentExpr context expr =
     rejectNative context (hasNativeDependentExpr expr)
 
+-- | Keep experimental dictionary types out of CorePrep.
+rejectScopedDictionaryProgram :: CoreProgram -> IO ()
+rejectScopedDictionaryProgram binds =
+    rejectScopedDictionaries (foldMap scanBind binds)
+
+-- | Keep experimental dictionary applications out of interactive CorePrep.
+rejectScopedDictionaryExpr :: CoreExpr -> IO ()
+rejectScopedDictionaryExpr = rejectScopedDictionaries . scanExpr
+
+rejectScopedDictionaries :: NativeScan -> IO ()
+rejectScopedDictionaries scan =
+    when (runScanFor DetectScopedDictionaries AllMetadata scan) $
+      throwGhcExceptionIO (Sorry "CorePrep does not support experimental dependent dictionaries")
+
 -- | Run a scan with empty metadata, kind, and synonym caches.
 runScan :: MetadataScan -> NativeScan -> Bool
 runScan = runScanFor DetectNative
@@ -276,6 +292,7 @@ gentleForm scan = NativeScan $ do
     case purpose of
         CheckGentle    -> runNativeScan scan
         CheckUserRules -> runNativeScan scan
+        DetectScopedDictionaries -> runNativeScan scan
         _           -> pure True
 
 -- | Detect an erased form and check its children at each supported use.
@@ -416,6 +433,8 @@ scanSynonym tc
 
 -- | Inspect syntax and synonym bodies, including unused synonym arguments.
 scanType :: Type -> NativeScan
+scanType DepDictTy{} = NativeScan (pure True)
+scanType ClassAppTy{} = NativeScan (pure True)
 scanType (TyVarTy tv) = scanVarKind tv
 scanType (TermVarTy v) =
     gentleForm (NativeScan (pure (not (isNativeOpaqueValueId v))) <> scanVarKind v)

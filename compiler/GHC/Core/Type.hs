@@ -66,7 +66,7 @@ module GHC.Core.Type (
         isNativeIndexId, isNativeIndexType, isNativeClosedIndexType, nativeIndexDataConTyArgs,
         isNativeIndexFunctionId, nativeIndexFunctionTys_maybe,
         nativeIndexFunctionTypeTys_maybe,
-        isNativeOpaqueValueId, isNativeOpaqueValueType,
+        isNativeOpaqueValueId, isNativeOpaqueValueType, isNativeClassDictionaryId,
         isNativeIndexDomainConversion,
         isNativeRetainedBinder, isNativeRetainedBinderType,
         isNativeRetainedField, isNativeRetainedFieldType,
@@ -2550,6 +2550,15 @@ isNativeOpaqueValueId v
   = isLocalId v && not (isCoVar v)
     && not (isJoinIdDetails (idDetails v))
     && isManyTy (idMult v) && isNativeOpaqueValueType (varType v)
+
+-- | A local unrestricted class dictionary eligible for a dependent binder.
+isNativeClassDictionaryId :: Id -> Bool
+isNativeClassDictionaryId v
+  = isLocalId v && not (isCoVar v) && not (isJoinIdDetails (idDetails v))
+    && isManyTy (idMult v)
+    && case coreFullView (varType v) of
+         TyConApp tc _ -> isJust (tyConClass_maybe tc)
+         _ -> False
 
 -- | Check nominal index-conversion endpoints without checking the evidence.
 -- Eligible native function heads retain their complete fixed type.

@@ -253,6 +253,7 @@ corePrepPgm logger cp_cfg pgm_cfg
     -- See Note [CorePrep for retained dependent programs].
     checked_end_pass_cfg <- if native
       then do
+        rejectScopedDictionaryProgram binds
         unless (cp_allowNativeDependent cp_cfg) $
           rejectNativeDependentProgram "CorePrep" binds []
         when (cp_specEval cp_cfg || cp_specEvalDFun cp_cfg
@@ -304,8 +305,10 @@ docs/dependent-haskell/REFERENCES.md#haskell-evaluation-provenance.
 
 corePrepExpr :: Logger -> CorePrepConfig -> CoreExpr -> IO CoreExpr
 corePrepExpr logger config expr = do
-    unless (cp_allowNativeDependent config) $
-      rejectNativeDependentExpr "CorePrep" expr
+    if cp_allowNativeDependent config
+      then when (hasNativeDependentExpr expr) $
+             rejectScopedDictionaryExpr expr
+      else rejectNativeDependentExpr "CorePrep" expr
     withTiming logger (text "CorePrep [expr]") (\e -> e `seq` ()) $ do
       us <- mkSplitUniqSupply StgTag
       let initialCorePrepEnv = mkInitialCorePrepEnv config

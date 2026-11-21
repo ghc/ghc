@@ -194,19 +194,26 @@ mkLamType v body_ty
      -- See Note [Unused coercion variable in ForAllTy] in GHC.Core.TyCo.Rep
    = mkForAllTy unmatchableDataConTy (Bndr v coreTyLamForAllTyFlag) body_ty
 
-   | anyFreeVarsOfType (== v) body_ty
+   | depends_on_v
+   , isNativeClassDictionaryId v
+   , typeKind body_ty `eqType` liftedTypeKind
+   = DepDictTy v body_ty
+
+   | depends_on_v
    , isNativeOpaqueValueId v
      -- See Note [Opaque runtime index values] in GHC.Core.Type.
    = assertPpr (isNativeOpaqueValueId v && typeKind body_ty `eqType` liftedTypeKind)
        (text "Unsupported retained dependent lambda:" <+> ppr v <+> dcolon <+> ppr body_ty) $
      DepFunTy DepFunVisible v body_ty
 
-   | anyFreeVarsOfType (== v) body_ty
+   | depends_on_v
    = pprPanic "mkLamType: unsupported runtime dependency"
        (ppr v $$ ppr body_ty)
 
    | otherwise
    = mkFunctionType unmatchableDataConTy (idMult v) (idType v) body_ty
+  where
+    depends_on_v = anyFreeVarsOfType (== v) body_ty
 
 mkLamTypes vs ty = foldr mkLamType ty vs
 
@@ -256,9 +263,16 @@ applyTypeToArgs op_ty args
     go op_ty []                   = op_ty
     go op_ty (Type ty : args)     = go_ty_args op_ty [ty] args
     go op_ty (Coercion co : args) = go_ty_args op_ty [mkCoercionTy co] args
-    go op_ty (_ : _)
-      | DepDictTy{} <- coreFullView op_ty
-      = panic "applyTypeToArgs: experimental dependent dictionary application"
+    go op_ty (arg : args)
+      | DepDictTy b res_ty <- coreFullView op_ty
+      = case arg of
+          Var dict
+            | isNativeClassDictionaryId b
+            , isNativeClassDictionaryId dict
+            , varType b `eqType` varType dict
+            -> let in_scope = mkInScopeSet (tyCoVarsOfType res_ty `unionVarSet` exprFreeVars arg)
+               in go (substTy (Subst in_scope (unitVarEnv b arg) emptyVarEnv emptyVarEnv) res_ty) args
+          _ -> panic "applyTypeToArgs: invalid dependent dictionary argument"
     go op_ty (arg : args)
       | DepFunTy _ b res_ty <- coreFullView op_ty
       , isNativeOpaqueValueId b

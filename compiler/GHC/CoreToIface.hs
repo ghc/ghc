@@ -797,6 +797,9 @@ toIfaceApp e as = mkIfaceApps (exprType e) (toIfaceExpr e) as
 
 mkIfaceApps :: Type -> IfaceExpr -> [CoreExpr] -> IfaceExpr
 mkIfaceApps _ iface [] = iface
+mkIfaceApps ty _ (_ : _)
+  | DepDictTy{} <- coreFullView ty
+  = panic "mkIfaceApps: experimental dependent dictionary application"
 mkIfaceApps ty iface (arg : rest)
   = mkIfaceApps result (IfaceApp iface encoded) rest
   where
