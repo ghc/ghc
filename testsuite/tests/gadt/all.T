@@ -135,3 +135,5 @@ test('T23298', normal, compile_fail, [''])
 
 test('T27423a', normal, compile, [''])
 test('T27423b', normal, compile_fail, [''])
+test('CurriedGadtContexts', extra_files(['CurriedGadtContextsProvider.hs']),
+     multimod_compile_and_run, ['CurriedGadtContexts', '-dcore-lint -dstg-lint'])

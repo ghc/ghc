@@ -1010,8 +1010,11 @@ as its own node. Do not insert an empty explicit forall, because it would
 change implicit quantification in a GADT signature.
 
 Each context child owns its arrow token and comments. The enclosing node
-has no copy of them. Source constructors keep their existing prenex syntax
-restrictions. TH prefixes can contain contexts before later forall groups.
+has no copy of them. Prefix source signatures can contain consecutive
+contexts after the foralls. This is the curried-context part of proposal
+#402 and issue #27424. Record source signatures allow one context.
+A forall or context after a field needs an ordered DataCon telescope.
+TH prefixes can contain contexts before later forall groups.
 After renaming and kind checking, the Core constructor type can combine the
 contexts. The resolved Names retain their scopes.
 
