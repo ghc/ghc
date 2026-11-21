@@ -1646,7 +1646,7 @@ tcModifiersMult = tc_modifiers_mult typeLevelMode
 data TcTyMode
   = TcTyMode { mode_tyki :: TypeOrKind
              , mode_declaration :: Bool
-             , mode_callback_arrow :: FamilyArrowMode
+             , mode_callback_arrow :: CallbackArrowMode
              , mode_source_givens :: [PredType]
              , mode_holes :: HoleInfo
              , mode_indices :: NameEnv Id
