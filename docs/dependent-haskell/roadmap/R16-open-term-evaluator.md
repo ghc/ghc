@@ -1492,6 +1492,32 @@ callback, head, left tail, and right list.
 [regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledAppend.sh),
 and [prior art](../REFERENCES.md#distributing-map-over-append).
 
+### Prove that map composes two traversals
+
+`mapComposition` equates `map f (map g xs)` with one traversal whose
+callback applies `f` to `g x`. It uses the installed `Prelude.map`
+equations for both sides. A separately compiled ordinary module
+matches a finite `Spine xs`. The empty case gives reflexivity. The
+cons case has head `f (g x)` on both sides and uses the induction
+hypothesis for the tail. Both callbacks remain abstract and can have
+different input and output types.
+
+The producer defines the composed callback with one type family
+equation, matching the body of Prelude's `(.)`. Direct open evaluation
+of `(.)` still requires checked equations. The runtime check uses
+Prelude's `(.)` and the actual two traversals. Both expose a cons with
+bottom callbacks and fields. Both also return the first mapped value
+when `f` ignores a bottom result from `g`.
+
+The regression checks stripped interfaces at `-O0` and `-O2` with
+rewrite rules disabled in the proof module. Removing the induction
+hypothesis fails at `Refl`. HERMIT's Core proof separately covers a
+bottom input spine. The `Spine` proof here covers finite spines.
+[Producer](../examples/open-evaluation/PreludeMapCompositionSource.hs),
+[proof](../examples/open-evaluation/PreludeMapCompositionProof.hs),
+[regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledAppend.sh),
+and [HERMIT's map fusion proof](../papers/README.md#checking-ghc-rewrite-equations-with-hermit-haskell-2015).
+
 ### Prove that reverse preserves list length
 
 `lengthReverse` relates the result of installed `Prelude.reverse` to

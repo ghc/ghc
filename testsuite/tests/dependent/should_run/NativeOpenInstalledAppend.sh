@@ -12,28 +12,34 @@ mkdir "$out"/{provider,client}
 
 # The client reads the append alias, arithmetic and list count from interfaces.
 cd "$out/provider"
-cp "$src"/PreludeMapLength{Size,Source,Proof}.hs "$src/PreludeAppendLengthSource.hs" .
+cp "$src"/PreludeMapLength{Size,Source,Proof}.hs "$src/PreludeAppendLengthSource.hs" \
+   "$src/PreludeMapCompositionSource.hs" .
 "${ghc[@]}" -O1 -fomit-interface-pragmas -fno-write-if-simplified-core -c \
-    PreludeMapLengthSize.hs PreludeMapLengthSource.hs PreludeMapLengthProof.hs PreludeAppendLengthSource.hs
+    PreludeMapLengthSize.hs PreludeMapLengthSource.hs PreludeMapLengthProof.hs PreludeAppendLengthSource.hs \
+    PreludeMapCompositionSource.hs
 cd "$out/client"
-cp ../provider/*.hi "$src"/PreludeAppendLengthProof.hs "$src"/PreludeMapAppendProof.hs .
+cp ../provider/*.hi "$src"/PreludeAppendLengthProof.hs "$src"/PreludeMapAppendProof.hs \
+   "$src"/PreludeMapCompositionProof.hs .
 
 cat >Main.hs <<'HS'
 module Main where
 
 import PreludeAppendLengthProof (showPreludeAppendLength)
 import PreludeMapAppendProof (showPreludeMapAppend)
+import PreludeMapCompositionProof (showPreludeMapComposition)
 
 main :: IO ()
 main = do
     putStrLn showPreludeAppendLength
     putStrLn showPreludeMapAppend
+    putStrLn showPreludeMapComposition
 HS
 for optimization in -O0 -O2; do
     "${ghc[@]}" "$optimization" -fenable-rewrite-rules -fforce-recomp -c \
-        PreludeAppendLengthProof.hs PreludeMapAppendProof.hs Main.hs
-    "${ghc[@]}" Main.o PreludeAppendLengthProof.o PreludeMapAppendProof.o ../provider/*.o -o append-run
-    [[ $(./append-run) == $'(Refl,Succ (Succ (Succ Zero)),Succ (Succ (Succ Zero)),True)\n(Refl,[False,True,False],[False,True,False],(True,True))' ]]
+        PreludeAppendLengthProof.hs PreludeMapAppendProof.hs PreludeMapCompositionProof.hs Main.hs
+    "${ghc[@]}" Main.o PreludeAppendLengthProof.o PreludeMapAppendProof.o PreludeMapCompositionProof.o \
+        ../provider/*.o -o append-run
+    [[ $(./append-run) == $'(Refl,Succ (Succ (Succ Zero)),Succ (Succ (Succ Zero)),True)\n(Refl,[False,True,False],[False,True,False],(True,True))\n(Refl,[4,5],[4,5],(True,True),(True,True))' ]]
 done
 
 cat >FalseLength.hs <<'HS'
@@ -74,6 +80,16 @@ if "${ghc[@]}" -O1 -c MissingMapHypothesis.hs >missing-map-hypothesis.log 2>&1 |
    ! grep -Fq '[GHC-05617]' missing-map-hypothesis.log ||
    ! grep -Fq 'mapAppend _ (Cons _) _ = Refl' missing-map-hypothesis.log; then
     cat missing-map-hypothesis.log >&2
+    exit 1
+fi
+
+sed -e 's/^mapComposition f g (Cons xs) = .*$/mapComposition _ _ (Cons _) = Refl/' \
+    -e '/^    Refl -> Refl$/d' PreludeMapCompositionProof.hs >MissingCompositionHypothesis.hs
+line=$(awk '/^mapComposition _ _ \(Cons _\) = Refl/ { print NR }' MissingCompositionHypothesis.hs)
+if "${ghc[@]}" -O1 -c MissingCompositionHypothesis.hs >missing-composition-hypothesis.log 2>&1 ||
+   ! grep -Fq "MissingCompositionHypothesis.hs:$line:" missing-composition-hypothesis.log ||
+   ! grep -Fq '[GHC-05617]' missing-composition-hypothesis.log; then
+    cat missing-composition-hypothesis.log >&2
     exit 1
 fi
 
