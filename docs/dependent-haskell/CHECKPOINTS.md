@@ -28,6 +28,15 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `0ae49102b4`, the unsigned datatype `data Box f = Box (f Bool)`
+works alongside the signed finite-position lookup and the certified vector
+split. The self-hosted compiler matched all 370 Showcase lines at stripped
+`-O0`, default `-O2`, and in source-loaded GHCi. Four tests covered
+the callback, finite positions, a cyclic nested family, and the diagnostic
+for independent inputs. Its parent `32242d14fb` passed 15 focused tests.
+[Callback example](examples/open-evaluation/LaterMatchabilityClient.hs)
+and [finite-position example](examples/qualified-pi/FinitePositionClient.hs).
+
 At `75e123a31c`, the Stage 2 relink produced all 368 Showcase lines at
 stripped `-O0`, default `-O1`, default `-O2`, and in source-loaded GHCi.
 The separately compiled finite-position client tested signed offsets from
