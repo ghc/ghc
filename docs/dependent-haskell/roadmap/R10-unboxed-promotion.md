@@ -138,7 +138,7 @@ Core Lint checks a constructor whose second equality argument uses its
 first. Given a nominal proof `ck :: k1 ~# k2`, the next proof can compare
 `a |> ck` and `b` at kind `k2`. Constructor application and pattern
 matching both substitute the first proof before checking the second.
-The [Core test](../../../testsuite/tests/plugins/CoercionForallPlugin.hs)
+The [Core test](../../../testsuite/tests/plugins/CoercionForall.hs)
 checks both directions and rejects arguments with the wrong kind,
 role or scope. The installed constructor worker still has its old type.
 
