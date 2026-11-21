@@ -1,10 +1,11 @@
-{-# LANGUAGE BangPatterns, LinearTypes, MonoLocalBinds, NoExperimentalDependentTypes #-}
+{-# LANGUAGE BangPatterns, LinearTypes, MonoLocalBinds, NoExperimentalDependentTypes, TypeApplications #-}
 
 -- | Open a checked list selection in an ordinary module.
-module CursorClient (observeCursors, observeIndexedCallback, observeAligned, observeBoth, observeZip, zipTwoPairs, zipIntLiterals) where
+module CursorClient (observeCursors, observeIndexedCallback, observeAligned, observeBoth, observeZip, zipTwoPairs, zipIntLiterals, zipInt8Literals) where
 
 import AlignedList (checkedZipWith, zipWithExact)
 import PackedVecLibrary (toList)
+import Data.Int (Int8)
 import Data.IORef (newIORef, readIORef)
 import ListCursor (Selection, cursor, lookupAligned, positions, prepare, readBoth, withIndex)
 import ParameterizedIndexLibrary (indexGeneric, mkFinGeneric)
@@ -78,3 +79,9 @@ zipTwoPairs x y u v = toList (zipWithExact [x, y] [u, v] (,))
 -- | Zip ordinary machine integers using the written lists' common length.
 zipIntLiterals :: [Int]
 zipIntLiterals = toList (zipWithExact [1, 2] [10, 20] (+))
+
+-- | Choose Int8 for the first list before combining the elements as Int.
+zipInt8Literals :: [Int]
+zipInt8Literals =
+    toList ((zipWithExact @Int8 [127, 127 + 1]) [10, 20]
+        (\x y -> fromIntegral x + y))

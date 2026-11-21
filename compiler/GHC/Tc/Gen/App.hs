@@ -693,15 +693,20 @@ tcRetainedSpineFields expr sigma args
   | not (any needs_fields args) = return (args, [])
   | (_, _, tau) <- tcRetainedInstTelescope sigma
   , DepFunTy DepFunVisible _ _ <- coreFullView tau
-  = do { plan <- tryTcDiscardingErrs (return Nothing) $
-           runMaybeT (scan tau args [])
+  = do { let (prefix, operands) = span spine_prefix args
+       ; plan <- tryTcDiscardingErrs (return Nothing) $
+           runMaybeT (scan tau operands [])
        ; case plan of
            Nothing -> return (args, [])
            Just count -> do
-             { changed <- traverse prepare (take count args)
-             ; return (map fst changed ++ drop count args, concatMap snd changed) } }
+             { changed <- traverse prepare (take count operands)
+             ; return (prefix ++ map fst changed ++ drop count operands, concatMap snd changed) } }
   | otherwise = return (args, [])
   where
+    spine_prefix ETypeArg{} = True
+    spine_prefix (EWrap EPar{}) = True
+    spine_prefix _ = False
+
     needs_fields = maybe False (any opaque . snd) . list_fields
     list_fields EValArg{ea_arg = arg}
       | L loc (ExplicitList _ elements) <- stripParensLHsExpr arg = Just (loc, elements)
@@ -713,6 +718,8 @@ tcRetainedSpineFields expr sigma args
       HsLit _ HsString{} -> False
       _ -> True
 
+    scan ty (EWrap EPar{} : rest) fields
+      = (1 +) <$> scan ty rest fields
     scan ty (arg : rest) fields
       | DepFunTy DepFunVisible binder _ <- coreFullView ty
       , Just (_, elements) <- list_fields arg
@@ -753,6 +760,14 @@ fields before changing an argument. Checked family reduction must remove
 these fields from the entire telescope, including its constraints.
 A result or constraint that compares contents keeps the original checking
 rule. A successful projection does not establish any new field equality.
+
+Ignore leading written type arguments and parentheses in this scan. A
+conversion valid before substituting the quantified type variables is valid
+after substitution. Keep the written arguments and parentheses in the
+application. The usual type application rules still check the type arguments
+and determine the actual field types. A checked RULE prefix can already
+contain retained value operands. This rewrite applies to the source spine
+before checking such operands.
 
 Check each new RHS once as a monomorphic ordinary expression. A lazy binding
 owns the fresh Id used by both the retained index and the runtime list. Bind
