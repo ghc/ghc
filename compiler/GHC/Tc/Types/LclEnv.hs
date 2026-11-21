@@ -44,7 +44,6 @@ import GHC.Types.Name.Reader ( LocalRdrEnv )
 import GHC.Types.Name.Env ( NameEnv )
 import GHC.Types.SrcLoc ( RealSrcSpan )
 import GHC.Types.Basic ( TopLevelFlag, TypeOrKind )
-import GHC.Types.Var ( EvVar )
 import GHC.Types.Var.Env ( VarEnv )
 
 import GHC.Types.Error ( Messages )
@@ -100,8 +99,7 @@ data TcLclCtxt
         tcl_in_gen_code :: Bool,            -- Are we type checking a generated expression?
         tcl_err_ctxt    :: ErrCtxtStack,
         tcl_tclvl       :: TcLevel,
-        tcl_lexical_givens :: [EvVar],       -- Lexical evidence parameters,
-                                            -- including equality CoVars.
+        tcl_lexical_givens :: LexicalGivens, -- Evidence parameters and written premises.
                                             -- See Note [Lexical Givens]
                                             -- in GHC.Tc.Utils.Monad.
         tcl_source_let_views :: VarEnv TcType, -- Candidates for argument selection.
@@ -267,4 +265,4 @@ cannot capture dictionaries introduced inside the proc.
 
 data ArrowCtxt   -- Note [Escaping the arrow scope]
   = NoArrowCtxt
-  | ArrowCtxt LocalRdrEnv (TcRef WantedConstraints) [EvVar] (VarEnv TcType)
+  | ArrowCtxt LocalRdrEnv (TcRef WantedConstraints) LexicalGivens (VarEnv TcType)

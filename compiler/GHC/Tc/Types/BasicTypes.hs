@@ -4,6 +4,9 @@ module GHC.Tc.Types.BasicTypes (
   , TcId
   , TcBinder(..)
 
+  -- * Givens in the current source scope
+  , LexicalGivens(..), emptyLexicalGivens
+
   -- * Signatures
   , TcSigFun, TcSigInfo(..), TcIdSig(..)
   , TcCompleteSig(..), TcPartialSig(..), TcPatSynSig(..)
@@ -93,6 +96,16 @@ instance HasOccName TcBinder where
 -- These data types need to be here only because
 -- GHC.Tc.Solver uses them, and GHC.Tc.Solver is fairly
 -- low down in the module hierarchy
+
+-- | Evidence parameters and written premises in the current source scope.
+-- See Note [Lexical Givens] in GHC.Tc.Utils.Monad.
+data LexicalGivens = LexicalGivens
+  { lexicalEvidence :: [EvVar]
+  , partialSigPredicates :: TcThetaType }
+
+-- | The initial context for a module or static form.
+emptyLexicalGivens :: LexicalGivens
+emptyLexicalGivens = LexicalGivens [] []
 
 type TcSigFun  = Name -> Maybe TcSigInfo
 

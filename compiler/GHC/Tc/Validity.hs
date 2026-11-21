@@ -472,7 +472,7 @@ check_valid_mono_type instance_pat ty
        ; check_type ve ty
        ; checkNoConstrainedFamilyApps ty }
 
--- | Check the domain of each family in a written signature.
+-- | Check each family domain in the signature's own context.
 -- See Note [Constrained associated family formation].
 checkConstrainedSignature :: UserTypeCtxt -> Type -> TcM ()
 checkConstrainedSignature ctxt ty
@@ -480,8 +480,9 @@ checkConstrainedSignature ctxt ty
   = pure ()
   | checks_domain ctxt
   = do { givens <- getLexicalGivens
+       ; premises <- getPartialSigPredicates >>= newEvVars
        ; (_, wanted) <- captureConstraints $
-           checkConstraints (SigSkol ctxt ty []) [] givens (check_telescope ctxt ty)
+           checkConstraints (SigSkol ctxt ty []) [] (premises ++ givens) (check_telescope ctxt ty)
        ; (unsolved, _) <- runTcS (solveWanteds wanted)
        ; reportAllUnsolved unsolved }
   | otherwise
@@ -489,6 +490,7 @@ checkConstrainedSignature ctxt ty
   where
     uses = constrainedFamilyApps ty
     checks_domain FunSigCtxt{} = True
+    checks_domain InfSigCtxt{} = True
     checks_domain ExprSigCtxt{} = True
     checks_domain TypeAppCtxt = True
     checks_domain ConArgCtxt{} = True
@@ -802,6 +804,10 @@ use the same domain check as named signatures. For a partial signature,
 check the written type before the expression or binding fixes a wildcard.
 For example, checking Refl can reduce Elem [Int] to Int and fill the hole
 in Elem [Int] :~: _. Checking the inferred type then loses that use of Elem.
+After generalisation, the inferred type can still mention the family. Check
+its domain under the final binders and predicates. For example, an inferred
+result hole can contain Elem (f a) when the signature supplies Collects (f a).
+At this point the context is fixed. This check cannot generalise a new Wanted.
 For a written type argument, tcHsTypeApp checks formation before the
 function can discard the argument or reduce the family. Both @t and a
 required (type t) argument use that path. This source check

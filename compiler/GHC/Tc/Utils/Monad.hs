@@ -19,6 +19,7 @@ module GHC.Tc.Utils.Monad(
   getTopEnv, updTopEnv, updTopEnvIO, getGblEnv, updGblEnv,
   setGblEnv, getLclEnv, updLclEnv, updLclCtxt, setLclEnv, restoreLclEnv,
   tcExtendLexicalGivens, getLexicalGivens, getNativeGivens, tcWithSourceLetView,
+  tcWithPartialSigContext, getPartialSigPredicates,
   updTopFlags,
   getEnvs, setEnvs, updEnvs, restoreEnvs,
   xoptM, doptM, goptM, woptM,
@@ -496,7 +497,7 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 tcl_arrow_ctxt = NoArrowCtxt,
                 tcl_env        = emptyNameEnv,
                 tcl_bndrs      = [],
-                tcl_lexical_givens = [],
+                tcl_lexical_givens = emptyLexicalGivens,
                 tcl_source_let_views = emptyVarEnv,
                 tcl_tclvl      = topTcLevel
                 },
@@ -612,12 +613,26 @@ tcWithSourceLetView value rhs = updLclCtxt $ \ctxt ->
 tcExtendLexicalGivens :: [EvVar] -> TcM a -> TcM a
 tcExtendLexicalGivens [] thing_inside = thing_inside
 tcExtendLexicalGivens givens thing_inside =
-  updLclCtxt (\ctxt -> ctxt
-    { tcl_lexical_givens = givens ++ tcl_lexical_givens ctxt }) thing_inside
+  updLexicalGivens (\scope -> scope { lexicalEvidence = givens ++ lexicalEvidence scope }) thing_inside
+
+-- | Scope the premises written in a partial signature over its right-hand side.
+-- See Note [Lexical Givens].
+tcWithPartialSigContext :: TcIdSigInst -> TcM a -> TcM a
+tcWithPartialSigContext TISI { sig_inst_sig = TcPartialSig{}, sig_inst_theta = theta@(_:_) } =
+  updLexicalGivens $ \scope -> scope { partialSigPredicates = theta ++ partialSigPredicates scope }
+tcWithPartialSigContext _ = id
+
+-- | Update the Given context without changing the enclosing scope.
+updLexicalGivens :: (LexicalGivens -> LexicalGivens) -> TcM a -> TcM a
+updLexicalGivens f = updLclCtxt $ \ctxt -> ctxt { tcl_lexical_givens = f (tcl_lexical_givens ctxt) }
+
+-- | Get only the written premises of enclosing partial signatures.
+getPartialSigPredicates :: TcM TcThetaType
+getPartialSigPredicates = partialSigPredicates . tcl_lexical_givens . tcl_lcl_ctxt <$> getLclEnv
 
 -- | Get the evidence parameters of the enclosing implications.
 getLexicalGivens :: TcM [EvVar]
-getLexicalGivens = tcl_lexical_givens . tcl_lcl_ctxt <$> getLclEnv
+getLexicalGivens = lexicalEvidence . tcl_lexical_givens . tcl_lcl_ctxt <$> getLclEnv
 
 -- | Get the lexical evidence parameters with native-dependent predicates.
 getNativeGivens :: TcM [EvVar]
@@ -638,7 +653,14 @@ parameters. Use TcS to derive superclass evidence and solve constraints.
 Retained source cases select native-dependent predicates, including equality
 CoVars. Mutable metavariables cannot be filled with native syntax.
 
-Static forms clear the list because StaticFormSkol excludes enclosing Givens.
+For a partial signature, simplifyInfer binds the evidence after checking
+the right-hand side. Record its written predicates while checking that
+expression. A family formation check can assume them in its own implication.
+That check discards its evidence. Keep those predicates separate from the
+evidence parameters used to build Core. An extra-constraints wildcard cannot
+supply a premise.
+
+Static forms clear the context because StaticFormSkol excludes enclosing Givens.
 Arrow scope escape restores the enclosing list with the original constraint
 accumulator. Nested typed splices restore the list saved at bracket entry.
 -}

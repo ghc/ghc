@@ -68,6 +68,7 @@ module GHC.Tc.Types(
 
         -- TcSigInfo
         TcSigFun,
+        LexicalGivens(..), emptyLexicalGivens,
         TcSigInfo(..), TcIdSig(..),
         TcCompleteSig(..), TcPartialSig(..), TcPatSynSig(..),
         TcIdSigInst(..), TcPendingTypeCall(..),

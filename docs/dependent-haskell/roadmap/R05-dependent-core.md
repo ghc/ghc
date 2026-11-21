@@ -508,7 +508,13 @@ and [INLINABLE regression](../../../testsuite/tests/dependent/should_run/NativeO
 ## Higher-rank wrappers around ordinary and retained arrows
 
 A local helper can accept a named retained consumer with matching
-higher-rank arguments. With `DeepSubsumption`, an ordinary arrow can also
+higher-rank arguments. For `run reflectMaybe`, shallow subsumption infers
+the callback's type argument from its nominal `Maybe` domain. The cast
+checks the whole retained function and preserves demand on the callback
+and its runtime index.
+[Ordinary client](../examples/open-evaluation/ConstrainedElementsClient.hs).
+
+With `DeepSubsumption`, an ordinary arrow can also
 return a wrapper that supplies a dictionary lambda for the retained suffix.
 Check the instantiated domain first. Then solve the complete retained
 function equality and use its coercion for the suffix. With

@@ -1695,11 +1695,11 @@ tcSubTypeApp rn_expr tc_fun app_res_rho (Check exp_rho)
                , text "ds_flag:" <+> ppr ds_flag ]
       ; wrap <- case ds_flag of
           Shallow -- No deep subsumption
-            -- app_res_rho and res_ty are both rho-types,
-            -- so with simple subsumption we can just unify them
-            -- No need to zonk; the unifier does that
-            -> do { co <- unifyExprType rn_expr app_res_rho exp_rho
-                  ; return (mkWpCastN co) }
+            -- app_res_rho and exp_rho are both rho-types,
+            -- so with simple subsumption we can unify them.
+            -- See Note [Retained domains after instantiation].
+            -> mkWpCastN <$> unify_retained_rho (unifyExprType rn_expr)
+                             app_res_rho exp_rho
 
           Deep ds_depth -- Deep subsumption is ON
             -- Even though both app_res_rho and res_ty are rho-types,
@@ -1964,8 +1964,41 @@ tc_sub_type_shallow :: (TcType -> TcType -> TcM TcCoercionN)
                     -> TcM HsWrapper
 tc_sub_type_shallow unify inst_orig ty_actual sk_rho
   = do { (wrap, rho_a) <- topInstantiate inst_orig ty_actual
-       ; cow           <- unify rho_a sk_rho
+       ; cow           <- unify_retained_rho unify rho_a sk_rho
        ; return (mkWpCastN cow <.> wrap) }
+
+{- Note [Retained domains after instantiation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A higher-rank argument can take a polymorphic retained function. After
+skolemisation and instantiation, the actual domain may be Maybe alpha and
+the expected domain Maybe a, where a is a skolem. Deep subsumption can reach
+the same pair at the result of an ordinary arrow.
+
+The whole-function equality solver opens retained bodies only when their
+domains agree or normalize to the same type. Check the nominal equality of
+the domains first in the current implication. This lets the ordinary unifier
+assign alpha to a.
+
+Then check the whole retained function equality for the cast and the runtime
+index scope. This check adds no runtime lambda. Deep subsumption has a separate
+rule for an expected dictionary immediately below a retained binder.
+-}
+
+-- See Note [Retained domains after instantiation].
+unify_retained_rho :: (TcType -> TcType -> TcM TcCoercionN)
+                   -> TcRhoType -> TcRhoType -> TcM TcCoercionN
+unify_retained_rho unify actual expected
+  | DepFunTy vis_a b_a _ <- coreFullView actual
+  , DepFunTy vis_e b_e _ <- coreFullView expected
+  , vis_a == vis_e
+  , isNativeIndexId b_a, isNativeIndexId b_e
+  , let domain_a = varType b_a
+        domain_e = varType b_e
+  , not (domain_a `tcEqType` domain_e)
+  = do { _ <- unify domain_a domain_e
+       ; unify actual expected }
+  | otherwise
+  = unify actual expected
 
 ----------------------
 definitely_poly :: TcType -> Bool
@@ -2539,13 +2572,9 @@ tc_sub_type_deep fun_pos@(tc_fun, pos) ds_depth unify inst_orig ctxt ty_actual t
                  (open ty_a) (open ty_e)
            ; return (mkWpRetainedFun b wrap) }
 
-    -- See Note [Retained domains after deep instantiation].
-    go1 ty_a@(DepFunTy vis_a b_a _) ty_e@(DepFunTy vis_e b_e _)
+    go1 ty_a@DepFunTy{} ty_e@DepFunTy{}
       | DeepSub <- ds_depth
-      , vis_a == vis_e
-      , isNativeIndexId b_a, isNativeIndexId b_e
-      = do { _ <- unify (varType b_a) (varType b_e)
-           ; just_unify ty_a ty_e }
+      = mkWpCastN <$> unify_retained_rho unify ty_a ty_e
 
     -- Otherwise, revert to unification.
     go1 ty_a ty_e = just_unify ty_a ty_e
@@ -2626,21 +2655,6 @@ function identity or DepFunCo. A dictionary wrapper introduces the value
 lambda, as an explicit source adapter would. This rule applies to an expected
 context immediately below a visible retained arrow. Domain conversion and
 equality between independent runtime values use their existing checks.
--}
-
-{- Note [Retained domains after deep instantiation]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-An ordinary arrow can return a polymorphic retained function. During deep
-subsumption, topInstantiate can introduce a type variable into its retained
-domain. For example, the actual suffix takes Maybe alpha, and the expected
-suffix takes Maybe a. The whole-function equality solver opens the retained
-bodies only when their domains already agree or normalize to the same type.
-Check the ordinary nominal domain equality first so that it can assign alpha.
-
-Still check the whole retained function equality. This supplies the coercion
-and checks the runtime index scope. Use that equality as a cast for the
-retained suffix. A source lambda can place a dictionary or forall below a
-retained binder.
 -}
 
 -- | Whether to do deep subsumption when recurring inside arguments.
