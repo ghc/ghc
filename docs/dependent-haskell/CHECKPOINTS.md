@@ -49,6 +49,25 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At compiler revision `5e857a0d67`, the ordered GADT constructor
+`InferredPair :: Int -> forall {a} b. Show b => (a, b) -> InferredPair`
+accepts `InferredPair 61 @Bool ('x', True)`. The visible type argument
+selects `b`. Reification and splicing preserve both binder flags.
+[Ordered-binder tests](../../testsuite/tests/gadt/GadtOrderedTelescopeTh.hs).
+
+An ordinary instance can use `(Collects c, Show (Elem c))` as its
+context when the provider marks `Elem` as a constrained family.
+A missing domain in a ground instance reports GHC-39999 at the
+instance context, including with deferred type errors.
+[Instance premises](roadmap/R24-constrained-type-families.md#family-applications-in-a-signature-constraint).
+
+The combined compiler passed 11 registered tests. All 493 Showcase
+outputs matched at native `-O0`, native `-O2`, and in GHCi. The split
+example uses ordinary `2` and `cut + 1`. The opted-in package example
+uses `1` as its type index.
+[Vector split](examples/packed-vector/CertifiedSplitClient.hs) and
+[one-cell package](examples/packed-vector/PackedProjection.hs).
+
 At compiler revision `bffa69e282`, the fork reads the selected
 `Prelude.fmap` method from the installed `Functor Maybe` dictionary.
 In the `Just` case the callback and payload stay abstract. A second
