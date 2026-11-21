@@ -55,6 +55,25 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At compiler revision `da6124e9a1`, a closed call reads the stored
+`Vec rows (Vec cols a)` from an ordinary table producer. Row and
+column labels establish the dimensions before the evaluator checks
+the cells. A source-hidden client proved all six cells of a two-by-three
+table and both zero-dimension cases. The evaluator rejected a wrong
+outer count and a short second row.
+[Table tests](../../testsuite/tests/dependent/should_run/NativeClosedWitnessedBatch.sh).
+
+The row function `withErrors` accepts a different type in each field.
+Its signature passes `\a -> Either e a` to `Map`. An ordinary
+interface-only caller can read the first output with an undefined
+second field. Template Haskell reified and spliced local and imported
+signatures. All 500 Showcase outputs matched at native `-O0`,
+native `-O2` and in source GHCi. The 16 selected registered tests
+passed. The linked GHC API checks matched 37 dependent-program and
+18 open-evaluation outputs. The constructor and coercion checks passed.
+[Row source](examples/open-evaluation/TypeLambda.hs) and
+[reification tests](../../testsuite/tests/dependent/should_run/NativeTypeLambdaReify.hs).
+
 At compiler revision `6a32ffff94`, `lookupColumnWhen` takes a visible
 retained Boolean and an invisible runtime type witness. An ordinary
 client read a matching element and skipped a column with an undefined

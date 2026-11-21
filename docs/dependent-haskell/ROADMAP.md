@@ -9,7 +9,7 @@ records every edge. The R numbers are local labels for those cards.
 
 ## Where this fork stands
 
-At `6a32ffff94`, **23 of 50 cards (46%) are complete** on the upstream
+At `da6124e9a1`, **23 of 50 cards (46%) are complete** on the upstream
 checklist. The fork adds a tested part of **18 of the 27 open cards**.
 This count includes a card when the fork demonstrates a behavior in
 source Haskell or in compiled Core. Each card counts once, regardless
@@ -21,6 +21,14 @@ depend on others, so this count cannot estimate the remaining work time.
 | Dependent binders, Core and equality | R03, R04, R05, R11, R22 |
 | Promotion and evaluation | R07, R12, R13, R14, R15, R16, R17, R18, R19 |
 | Declaration dependencies, families and GADTs | R21, R23, R24, R41 |
+
+A separately compiled producer can return a rectangular table whose
+type hides its dimensions. The client can prove every stored cell at
+compile time, including the shape of empty tables. A recursive function
+over a heterogeneous row can now put its type lambda directly in the
+value signature. The 500-output Showcase includes both programs.
+[Table proof](roadmap/R15-closed-term-evaluator.md#read-the-stored-cells-of-a-rectangular-table)
+and [row function](roadmap/R17-type-level-lambdas.md#mapping-a-row-in-a-value-signature).
 
 A typed column reader can accept a visible Boolean followed by an
 invisible type witness. The skip branch returns `Nothing` even when
@@ -477,7 +485,7 @@ and [two-way filter and case upgrade](examples/open-evaluation/check-filter-scop
 | --- | --- | --- |
 | [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | GADT constructors can store nested retained sums that refer to erased parameters. An ordinary client can construct and match a `Pair` when its expected type reduces to a retained sum. | Broaden dependent product domains and inference. Support constructor results indexed directly by a retained field. |
 | [R05 dependent Core](roadmap/R05-dependent-core.md) | The standard `-O2` pipeline specializes a recursive consumer and keeps retained case proofs scoped. A provider and an interface-only client can match rules that construct or open an erased package. Source rules can have an imported head and a local anchor, or come from a visible orphan module. | Rules for retained functions and general dependent coercions remain open. |
-| [R15 closed evaluator](roadmap/R15-closed-term-evaluator.md#read-independent-row-and-column-counts) | An ordinary function returns a table with distinct hidden row and column counts. A dependent client proves its exact labels and totals from a compiled producer. | A field whose type uses both hidden counts, such as a nested vector of cells, still needs a rule for recovering its indices. |
+| [R15 closed evaluator](roadmap/R15-closed-term-evaluator.md#read-independent-row-and-column-counts) | A client proves the labels and all cells of a compiled rectangular table with two hidden dimensions. | The nested field needs earlier fields that establish its dimensions. General readback of fields with unknown indices remains open. |
 | [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The installed `filter not` handles a known Boolean head and an unknown tail. A separate ordinary client proves length preservation for the installed `map` by induction over a finite spine. | General open evaluation across arbitrary ordinary definitions. |
 | [R19 type-level cases](roadmap/R19-type-level-cases.md) | Retained signatures can match a runtime index or an application of a checked function. Two qualified imports of the same checked function can share a case in one declaration group. The upgrade test rebuilds an affected home provider once. | Separately compiled modules still need a shared result type at an unknown index. Older installed providers need rebuilding to export a shared result. |
 | [R22 erased existentials](roadmap/R22-existential-quantification.md) | A constructor pattern can open a hidden vector length inside a tuple. A typed consumer can fix the higher-rank witness of a guarded callback. | Extend inference to callbacks without a result declaration that determines the witness. |
