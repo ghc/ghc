@@ -101,7 +101,7 @@ import qualified Control.Monad.Trans.State.Strict as State
 import Data.Data (Data, cast, gmapQ)
 import Data.Foldable
 import Data.Function
-import Data.List        ( nubBy, partition, (\\) )
+import Data.List        ( nubBy, (\\) )
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty ( NonEmpty(..) )
 
@@ -501,7 +501,18 @@ checkConstrainedSignature ctxt ty
     -- See Note [Family domains beneath retained binders].
     check_telescope origin whole = go whole
       where
-        go sig = withFamilyDomainScope origin whole 0 sig check_body
+        go sig = do
+          let (_, theta, _) = familyDomainPrefix 0 sig
+          unless (all (null . constrainedFamilyApps) theta) $ do
+            uses <- familyDomainObligations (qualifierPrefix sig)
+            mapM_ (emitFamilyDomain origin whole) uses
+          withFamilyDomainScope origin whole 0 sig check_body
+
+        -- Check only the written prefix here. The body has its own scope.
+        qualifierPrefix (ForAllTy ma b rest) = ForAllTy ma b (qualifierPrefix rest)
+        qualifierPrefix (FunTy af ma mult pred_ty rest)
+          | isInvisibleFunArg af = FunTy af ma mult pred_ty (qualifierPrefix rest)
+        qualifierPrefix _ = unitTy
 
         check_body (DepFunTy _ index body)
           = do { check_part (varType index)
@@ -555,15 +566,7 @@ withFamilyDomainScope origin whole n sig inside = case familyDomainPrefix n sig 
     (subst, skolems) <- tcInstSkolTyVarsX info (mkEmptySubst in_scope) tvs
     let sig_skol = SigSkol origin whole (zip (map tyVarName tvs) skolems)
     traverse_ checkNoConstrainedFamilyApps (map fst bndrs ++ map varType tvs)
-    let theta' = substTheta subst theta
-        (plain, guarded) = partition (null . constrainedFamilyApps) theta'
-    unless (null guarded) $ do
-      premises <- newEvVars plain
-      void $ checkConstraints sig_skol skolems premises $
-        forM_ guarded $ \pred -> do
-          uses <- familyDomainObligations pred
-          mapM_ (emitFamilyDomain origin whole) uses
-    given <- newEvVars theta'
+    given <- newEvVars (substTheta subst theta)
     void $ checkConstraints sig_skol skolems given (inside (substTy subst body))
 
 -- | Separate the lexical binders from the owner's inferred parameters.
@@ -823,7 +826,9 @@ domain of Elem c inside the other predicate. Check the predicates that
 mention marked families using the family-free premises of the same
 context. Their order does not matter. Thus a predicate cannot establish
 the domain of one of its own arguments by projecting a superclass.
-All the checked premises are available in the body.
+A later forall starts a separate context. Its premises cannot establish
+the domain of an earlier predicate. All checked premises are available
+in the body.
 
 Traverse the argument and result of a function separately. In
 (forall a. Allowed a => Proxy a -> Elem [a]) -> Elem [Int], the Given
