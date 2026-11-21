@@ -780,6 +780,28 @@ remaining family arrow is U. A saturated family can return a
 matchable arrow. [Source-hidden regression](../../../testsuite/tests/dependent/should_run/NativeUnsaturatedFamily.sh)
 and [proposal #242 on family arity](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#arity-of-type-families).
 
+### Passing a polymorphic mapper at its full kind
+
+`Recipe Map` passes the entire inferred matchability telescope of
+`Map` to a GADT with a rank-polymorphic parameter. Its fields
+instantiate the mapper at M for `Maybe` and at U for the list
+family behind `KnownListCallback`. The provider exports `ListRecipe`
+so an ordinary client can read both fields from its stripped interface. Naming
+`Recipe Map` directly still requires `ExperimentalDependentTypes`.
+A mapper that accepts only M fails the rank check.
+
+This combines the proposal's inferred `Map` with its `D F`
+example of passing a family at a polymorphic kind. The earlier
+checker instantiated the hidden matchability before checking
+the receiver's kind. A closed family can also accept `Map`.
+To use both matchabilities in one equation, bind the argument
+with `forall (mapper :: Mapper).` on that equation. With an
+implicit equation binder, even a complete family header leaves
+`mapper @M` with an unknown kind during RHS checking (GHC-20967).
+[Source and interface checks](../../../testsuite/tests/dependent/should_run/NativeLaterMatchability.sh),
+[proposal #242, other quantifiers](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#other-quantifiers)
+and [proposal review](https://github.com/ghc-proposals/ghc-proposals/pull/242).
+
 ### Inferring a callback arrow from a datatype field
 
 In `data FamilyBox f = FamilyBox (f Bool)`, the field fixes the domain

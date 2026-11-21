@@ -4220,7 +4220,16 @@ tcInferTyApps_nosat :: TypeOrKind -> Maybe Kind -> TcTyMode -> LHsType GhcRn -> 
                     -> [LHsTypeArg GhcRn] -> TcM (TcType, TcKind)
 tcInferTyApps_nosat index_level expected_kind mode orig_hs_ty fun orig_hs_args
   = do { traceTc "tcInferTyApps {" (ppr orig_hs_ty $$ ppr orig_hs_args)
+       ; keep_inferred_prefix <- case (expected_kind, fun) of
+           (Just expected, TyConApp tc [])
+             | hasInferredMatchability tc
+             , isUnsaturatedUserFamily tc []
+             , all is_par orig_hs_args
+             , invisibleBndrCount expected == invisibleBndrCount (typeKind fun)
+             -> xoptM LangExt.ExperimentalDependentTypes
+           _ -> pure False
        ; fun <- case (mode_synonym_metadata mode, fun) of
+           _ | keep_inferred_prefix -> pure fun
            (Just (get_indices, _), TyConApp tc []) | hasInferredMatchability tc -> do
              args <- get_indices (tyConName tc)
                        (length (takeWhile inferredMatchabilityIndex (tyConBinders tc)))
@@ -4864,8 +4873,12 @@ partial user family. For example, F True might have kind
 where the receiver expects forall b. Bool. Keep the partial application
 until checkExpectedKind. It instantiates a, checks the remaining forall,
 and learns a ~ Bool. Saturating both binders here would discard b before
-the receiver could use it. Inference without an expected kind keeps the
-ordinary saturation rule. See Note [Partial type family applications]
+the receiver could use it. If a bare family has inferred matchability
+parameters and the expected kind needs its whole invisible telescope,
+keep those parameters before the argument loop as well. For example,
+a receiver can take the polymorphic Map itself before applying it at a
+particular callback matchability. Inference without an expected kind
+keeps the ordinary saturation rule. See Note [Partial type family applications]
 in GHC.Core.Type for the eligible families.
 -}
 

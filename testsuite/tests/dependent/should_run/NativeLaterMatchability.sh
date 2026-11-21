@@ -21,9 +21,92 @@ grep -Eq 'type DefaultPrefix = AnchorReceiver.Select @.*Unmatchable ' client.ifa
 grep -Eq 'type FamilyBox :: forall \{.*:: .*Matchability\}' client.iface
 
 # An ordinary client checks the result using only interfaces.
-rm LaterMatchability.hs LaterMatchability.o
+rm LaterMatchability.hs
+mv LaterMatchability.o ../provider/
 cp "$src/LaterMatchabilityClient.hs" .
 "${ghc[@]}" -c LaterMatchabilityClient.hs
+
+cat >Main.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module Main where
+
+import LaterMatchabilityClient (rankedMap)
+
+main :: IO ()
+main = print rankedMap
+HS
+"${ghc[@]}" -c Main.hs
+"${ghc[@]}" Main.o LaterMatchabilityClient.o ../provider/{AnchorReceiver,LaterMatchability}.o -o ranked-map
+test "$(./ranked-map)" = '(Just True,[False])'
+
+cat >RankMismatch.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, KindSignatures, Modifiers, TypeFamilies #-}
+module RankMismatch where
+
+import Data.Kind (Type)
+import GHC.Matchability (M)
+import LaterMatchability (Recipe)
+
+type family MOnly (f :: Type %M -> Type) (xs :: [Type]) :: [Type]
+type Bad = Recipe MOnly
+HS
+if "${ghc[@]}" -c RankMismatch.hs >rank-mismatch.log 2>&1 ||
+   ! grep -Fq '[GHC-83865]' rank-mismatch.log || ! grep -Fq 'Recipe MOnly' rank-mismatch.log; then
+    cat rank-mismatch.log >&2
+    exit 1
+fi
+
+cat >RankTelescope.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, Modifiers, PolyKinds, RankNTypes #-}
+{-# LANGUAGE StandaloneKindSignatures, TypeApplications, TypeFamilies, TypeOperators, UndecidableInstances #-}
+module RankTelescope where
+
+import Data.Kind (Type)
+import Data.Type.Equality ((:~:)(Refl))
+import GHC.Matchability (M, U)
+import LaterMatchability (KnownListCallback, Map, Mapper)
+
+type ShortMapper = forall {b} {a}. @U (a %M -> b) %U -> [a] %U -> [b]
+type Short :: ShortMapper -> Type
+data Short f = Short
+
+type Specialized = Short Map
+
+type family AtBoth (mapper :: Mapper) :: ([Type], [Type]) where
+  forall (mapper :: Mapper).
+    AtBoth mapper = '(mapper @M Maybe '[Bool], mapper @U KnownListCallback '[Bool])
+
+both :: AtBoth Map :~: '( '[Maybe Bool], '[[Bool]])
+both = Refl
+HS
+"${ghc[@]}" -c RankTelescope.hs
+cat >>RankTelescope.hs <<'HS'
+
+type WrongMapper = forall (flag :: Bool) {b} {a}. @U (a %M -> b) %U -> [a] %U -> [b]
+type Wrong :: WrongMapper -> Type
+data Wrong f = Wrong
+
+type BadKind = Wrong Map
+HS
+if "${ghc[@]}" -c RankTelescope.hs >rank-telescope.log 2>&1 ||
+   ! grep -Fq '[GHC-83865]' rank-telescope.log || ! grep -Fq 'Wrong Map' rank-telescope.log; then
+    cat rank-telescope.log >&2
+    exit 1
+fi
+
+cat >RankOptIn.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module RankOptIn where
+
+import LaterMatchability (Map, Recipe)
+
+type Bad = Recipe Map
+HS
+if "${ghc[@]}" -c RankOptIn.hs >rank-opt-in.log 2>&1 ||
+   ! grep -Fq '[GHC-83865]' rank-opt-in.log || ! grep -Fq 'Recipe Map' rank-opt-in.log; then
+    cat rank-opt-in.log >&2
+    exit 1
+fi
 
 cat >ScopeControls.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, Modifiers, PolyKinds #-}
