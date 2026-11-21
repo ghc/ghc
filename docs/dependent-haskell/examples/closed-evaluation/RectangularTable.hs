@@ -1,5 +1,5 @@
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
-module RectangularTable (Table(..), totals, sample, selectedTotals) where
+module RectangularTable (Table(..), ColumnTable(..), withoutRowLabels, totals, sample, selectedTotals) where
 
 import IndexedVec (Vec(..))
 import Numeric.Natural (Natural)
@@ -8,6 +8,14 @@ import WitnessedBatch (TableMargins(..), lookupTotals)
 -- | Each row has one cell for each column label.
 data Table a where
     Table :: Vec rows Char -> Vec cols Char -> Vec rows (Vec cols a) -> Table a
+
+-- | Keep the column labels and the cells of each row.
+data ColumnTable a where
+    ColumnTable :: Vec cols Char -> Vec rows (Vec cols a) -> ColumnTable a
+
+-- | Discard the row labels. The outer vector still determines the row count.
+withoutRowLabels :: Table a -> ColumnTable a
+withoutRowLabels (Table _ cols cells) = ColumnTable cols cells
 
 -- | Sum each row and column with its original labels.
 totals :: Table Natural -> TableMargins Natural

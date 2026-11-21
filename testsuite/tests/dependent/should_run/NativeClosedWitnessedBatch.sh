@@ -21,7 +21,7 @@ for opt in -O0 -O2; do
 {-# LANGUAGE DataKinds, GADTs, KindSignatures #-}
 module WrongWitness
     ( buildWrong, wrongMask, wrongColumns, BadField(..), badField
-    , wrongRows, wrongCols, wrongCellRows, wrongCellCols, Nested(..), nested
+    , wrongRows, wrongCols, wrongCellRows, wrongCellCols, wrongUnlabelled, Nested(..), nested
     , noRows, noCols
     , EvidenceBatch(..), withEvidence, TaggedBatch(..), withEquality
     ) where
@@ -29,7 +29,7 @@ import Data.Proxy (Proxy)
 import ExistentialVec (SN(..))
 import IndexedVec (N(..), Vec(..))
 import Numeric.Natural (Natural)
-import RectangularTable (Table(..), sample)
+import RectangularTable (Table(..), ColumnTable(..), sample)
 import Unsafe.Coerce (unsafeCoerce)
 import WitnessedBatch (Batch(..), MaskedRow(..), KeyedRow(..), TableMargins(..), tableMargins)
 
@@ -61,8 +61,12 @@ noRows, noCols :: Char -> Table Natural
 noRows col = Table VNil (VCons col VNil) VNil
 noCols row = Table (VCons row VNil) VNil (VCons VNil VNil)
 
+wrongUnlabelled :: Natural -> ColumnTable Natural
+wrongUnlabelled n = case sample n of
+    Table _ cols _ -> ColumnTable cols (VCons (unsafeCoerce VNil) VNil)
+
 data Nested a where
-    Nested :: Vec cols Char -> Vec rows (Vec cols a) -> Nested a
+    Nested :: Char -> Vec rows (Vec cols a) -> Nested a
 
 nested :: Natural -> Nested Natural
 nested _ = error "unsupported nested field was evaluated"
@@ -133,6 +137,16 @@ type Three x y z = 'V.VCons x (Two y z)
 table :: T.sample 4 :~: 'T.Table (Two 'r' 's') (Three 'x' 'y' 'z')
                                 (Two (Three 1 2 3) (Three 4 5 6))
 table = Refl
+
+unlabelled :: T.withoutRowLabels (T.sample 4) :~: 'T.ColumnTable
+                (Three 'x' 'y' 'z') (Two (Three 1 2 3) (Three 4 5 6))
+unlabelled = Refl
+
+unlabelledEmpty :: T.withoutRowLabels (W.noRows 'z') :~: 'T.ColumnTable ('V.VCons 'z' 'V.VNil) 'V.VNil
+unlabelledEmpty = Refl
+
+unlabelledNoCols :: T.withoutRowLabels (W.noCols 's') :~: 'T.ColumnTable 'V.VNil ('V.VCons 'V.VNil 'V.VNil)
+unlabelledNoCols = Refl
 
 emptyRows :: W.noRows 'z' :~: 'T.Table 'V.VNil ('V.VCons 'z' 'V.VNil) 'V.VNil
 emptyRows = Refl
@@ -313,7 +327,7 @@ HS
         reject BadColumns 'The value returned by the interpreter does not match the checked result type.'
     done
 
-    for function in wrongCellRows wrongCellCols; do
+    for function in wrongCellRows wrongCellCols wrongUnlabelled; do
         sed -e 's/module BadWitness/module BadCells/' -e "s/Wrong.buildWrong/Wrong.$function/" \
             -e '/^import qualified WrongWitness/i import RectangularTable (Table(..))' \
             BadWitness.hs >BadCells.hs
@@ -327,7 +341,7 @@ HS
         ClassEvidence.hs >NestedField.hs
     reject NestedField 'Cannot reify field 2 of'
     grep -Eq 'multiple hidden indices \((cols, rows|rows, cols)\)' reject.log
-    grep -Fq 'determining its indices from earlier fields' reject.log
+    grep -Fq 'Earlier fields must determine the other indices.' reject.log
     if grep -Fq 'unsupported nested field was evaluated' reject.log; then cat reject.log >&2; exit 1; fi
 
     sed -e 's/module ClassEvidence/module UnsupportedField/' -e 's/W.withEvidence/W.badField/' \

@@ -726,9 +726,13 @@ the result of `totals (sample 4)`, whose row totals are `[6,15]` and column
 totals are `[5,7,9]`. GHC reads the producer's interface and runs its
 object code.
 
-A field that uses several hidden indices must follow fields that establish
-all of them. GHC reports GHC-70565 at the producer call if an index is
-missing. It names the constructor, field number and indices before
+A field that uses several hidden indices can determine its own structural
+index. In `ColumnTable cols cells`, the labels establish the column count.
+The constructors of the outer vector establish the row count. The type of
+each inner vector still uses the established column count. An empty outer
+vector establishes zero rows. A nonempty vector of empty rows establishes
+a positive row count and zero columns. GHC reports GHC-70565 at the
+producer call if another required index is missing. It names the constructor, field number and indices before
 running the producer. An inconsistent row or column count returned by the
 interpreter also gives GHC-70565 at the call. In ordinary term code a
 ragged row gives GHC-83865 at the incorrect constructor field.

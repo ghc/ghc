@@ -1085,6 +1085,12 @@ data PrintablePair where
 describePair :: PrintablePair -> (Bool, String)
 describePair (PrintablePair a b) = (a == b, show b)
 
+-- | A two-element vector used in the table proofs.
+type Vec2 x y = 'IndexedVec.VCons x ('IndexedVec.VCons y 'IndexedVec.VNil)
+
+-- | A three-element vector used in the table proofs.
+type Vec3 x y z = 'IndexedVec.VCons x (Vec2 y z)
+
 main :: IO ()
 main = do
     observe "select the second field of a promoted data family pair" secondFlag
@@ -1445,14 +1451,11 @@ main = do
             ('IndexedVec.VCons 5 ('IndexedVec.VCons 7 ('IndexedVec.VCons 9 'IndexedVec.VNil)))
         , Table.selectedTotals (Table.sample 4) )
     observe "read back the stored cells at both table dimensions"
-        (Refl :: Table.sample 4 :~: 'Table.Table
-            ('IndexedVec.VCons 'r' ('IndexedVec.VCons 's' 'IndexedVec.VNil))
-            ('IndexedVec.VCons 'x' ('IndexedVec.VCons 'y' ('IndexedVec.VCons 'z' 'IndexedVec.VNil)))
-            ('IndexedVec.VCons
-                ('IndexedVec.VCons 1 ('IndexedVec.VCons 2 ('IndexedVec.VCons 3 'IndexedVec.VNil)))
-                ('IndexedVec.VCons
-                    ('IndexedVec.VCons 4 ('IndexedVec.VCons 5 ('IndexedVec.VCons 6 'IndexedVec.VNil)))
-                    'IndexedVec.VNil)))
+        (Refl :: Table.sample 4 :~: 'Table.Table (Vec2 'r' 's') (Vec3 'x' 'y' 'z')
+            (Vec2 (Vec3 1 2 3) (Vec3 4 5 6)))
+    observe "recover a table's row count from its cells"
+        (Refl :: Table.withoutRowLabels (Table.sample 4) :~: 'Table.ColumnTable
+            (Vec3 'x' 'y' 'z') (Vec2 (Vec3 1 2 3) (Vec3 4 5 6)))
     observe "read one field of a private parcel without forcing the other"
         (Refl :: LazyParcel.first (LazyParcel.make 7) :~: 7, LazyParcel.first (LazyParcel.make 7))
     observe "construct a result from two symbolic fields"
