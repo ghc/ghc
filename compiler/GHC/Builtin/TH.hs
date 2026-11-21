@@ -255,6 +255,11 @@ retainedGadtCOcc = mkVarOcc "retainedGadtC"
 gadtValueArgOcc = mkVarOcc "gadtValueArg"
 gadtIndexArgOcc = mkVarOcc "gadtIndexArg"
 retainedGadtArgTyConOcc = mkTcOcc "RetainedGadtArg"
+
+gadtInvisibleArgsOcc, gadtRequiredArgsOcc, gadtContextArgsOcc :: KnownOcc
+gadtInvisibleArgsOcc = mkVarOcc "gadtInvisibleArgs"
+gadtRequiredArgsOcc = mkVarOcc "gadtRequiredArgs"
+gadtContextArgsOcc = mkVarOcc "gadtContextArgs"
 recGadtCOcc = mkVarOcc "recGadtC"
 
 -- data Bang = ...

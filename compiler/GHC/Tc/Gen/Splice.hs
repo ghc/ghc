@@ -3657,25 +3657,45 @@ reifyDataCon isGadtDataCon tys dc
                   { (args, result) <- reifyRetainedGadtArgs (replicate n Nothing)
                       (take n dcdBangs) prefix g_res_ty
                   ; ma <- reifyType unmatchableDataConTy
-                  ; let reify_group bs rest
+                  ; let reify_group :: (TH.Type -> [TH.TyVarBndr ()] -> a -> a)
+                                    -> (TH.Type -> [TH.TyVarBndr TH.Specificity] -> a -> a)
+                                    -> [TyVarBinder] -> TcM a -> TcM a
+                        reify_group required invisible bs rest
                           | all isVisibleForAllTyBinder bs = do
                               tvs <- reifyTyVarBndrs [Bndr (binderVar tv) () | tv <- bs]
-                              TH.ForallMatchT ma . TH.ForallVisT tvs <$> rest
+                              required ma tvs <$> rest
                           | Just invis <- to_invis_bndrs bs = do
                               tvs <- reifyTyVarBndrs invis
-                              TH.ForallMatchT ma . TH.ForallT tvs [] <$> rest
+                              invisible ma tvs <$> rest
                           | otherwise = panic "reifyDataCon: mixed visibility in constructor group"
-                        reify_context ps rest = do
+                        reify_context context ps rest = do
                           ctxt <- reifyCxt ps
-                          TH.ForallT [] ctxt <$> rest
-                        -- Use the field arrow syntax accepted by cvtRetainedGadtArgs.
+                          context ctxt <$> rest
                         reify_field (Scaled mult ty) rest = do
                           multiplicity <- reifyType mult
                           domain <- reifyType ty
                           TH.AppT (TH.AppT (TH.AppT TH.MulArrowT multiplicity) domain) <$> rest
-                  ; body <- foldConSourceGroups reify_group reify_context (flip (foldr reify_field))
-                      remaining late_tvs late_theta suffix (pure result)
-                  ; pure (TH.RetainedGadtC [name] args body) }
+                        reify_arg (bang, Scaled mult ty) rest = do
+                          multiplicity <- reifyType mult
+                          domain <- reifyType ty
+                          (TH.GadtValueArg bang multiplicity domain :) <$> rest
+                        late_bangs = drop n dcdBangs
+                  ; if any (/= TH.Bang TH.NoSourceUnpackedness TH.NoSourceStrictness) late_bangs
+                    then do
+                      ordered <- foldConSourceGroups
+                        (reify_group (\m tvs rest -> TH.GadtRequiredArgs m tvs : rest)
+                                     (\m tvs rest -> TH.GadtInvisibleArgs m tvs : rest))
+                        (reify_context (\ctxt rest -> TH.GadtContextArgs ctxt : rest))
+                        (flip (foldr reify_arg))
+                        remaining late_tvs late_theta (zip late_bangs suffix) (pure [])
+                      pure (TH.RetainedGadtC [name] (args ++ ordered) result)
+                    else do
+                      body <- foldConSourceGroups
+                        (reify_group (\m tvs -> TH.ForallMatchT m . TH.ForallVisT tvs)
+                                     (\m tvs -> TH.ForallMatchT m . TH.ForallT tvs []))
+                        (reify_context (TH.ForallT [])) (flip (foldr reify_field))
+                        remaining late_tvs late_theta suffix (pure result)
+                      pure (TH.RetainedGadtC [name] args body) }
               | not (null ordered_args) -> do
                   { (args, result) <- reifyRetainedGadtArgs ordered_args dcdBangs g_arg_tys g_res_ty
                   ; result' <- case late_tvs of

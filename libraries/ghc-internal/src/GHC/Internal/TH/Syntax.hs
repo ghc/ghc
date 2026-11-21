@@ -1329,18 +1329,24 @@ data Con =
              Type -- ^ See Note [GADT return type]
   | ForallMatchC Type Con
   | RetainedGadtC [Name] [RetainedGadtArg] Type
-    -- ^ A prefix GADT constructor with a retained index argument or a
-    -- terminal forall. The argument list is in source order.
-    -- A terminal forall and its context wrap the result type.
+    -- ^ A prefix GADT constructor with a retained index or late group.
+    -- The argument list is in source order. A trailing forall and its
+    -- context can also wrap the result type.
         deriving (Show, Eq, Ord, Generic)
 
--- | An argument of a prefix GADT constructor with retained arguments.
+-- | An argument or group in the ordered signature of a prefix GADT constructor.
 data RetainedGadtArg
   = GadtValueArg Bang Type Type
     -- ^ Source bang, multiplicity, and type of an ordinary field.
   | GadtIndexArg Name Type
     -- ^ A visible runtime binder and its domain. The name scopes over the
     -- later arguments and the constructor result.
+  | GadtInvisibleArgs Type [TyVarBndr Specificity]
+    -- ^ Matchability and binders of a nonempty invisible forall group.
+  | GadtRequiredArgs Type [TyVarBndr ()]
+    -- ^ Matchability and binders of a nonempty required forall group.
+  | GadtContextArgs Cxt
+    -- ^ Predicates of a nonempty context group.
   deriving (Show, Eq, Ord, Generic)
 
 -- Note [GADT return type]

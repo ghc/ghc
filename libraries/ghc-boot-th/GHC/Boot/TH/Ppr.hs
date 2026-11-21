@@ -768,6 +768,11 @@ instance Ppr Con where
       ppr_retained_arg (GadtIndexArg name domain) =
         text "foreach" <+>
         parens (pprName' Applied name <+> dcolon <+> ppr domain) <+> text "->"
+      ppr_retained_arg (GadtInvisibleArgs ma tvs) =
+        pprForallMatch ForallInvis (Just ma) tvs []
+      ppr_retained_arg (GadtRequiredArgs ma tvs) =
+        pprForallMatch ForallVis (Just ma) tvs []
+      ppr_retained_arg (GadtContextArgs ctxt) = pprCxt ctxt
 
 instance Ppr PatSynDir where
   ppr Unidir        = text "<-"
