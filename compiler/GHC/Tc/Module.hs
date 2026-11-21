@@ -1889,11 +1889,20 @@ tcTopSrcDeclsThen :: [(Name, SrcSpan)] -> HsGroup GhcRn
                   -> ((TcGblEnv, TcLclEnv) -> TcM (TcGblEnv, TcLclEnv))
                   -> TcM (TcGblEnv, TcLclEnv)
 tcTopSrcDeclsThen [] group finish = tcTopSrcTables group >>= finish
-tcTopSrcDeclsThen demands group finish = do
+tcTopSrcDeclsThen requests group finish = do
+    experimental <- xoptM LangExt.ExperimentalDependentTypes
+    let selectors = mkNameSet
+          [unLoc name
+          | grp <- hs_tyclds group
+          , L _ ClassDecl{tcdCExt = (HsNestedGroup{ng_sigs = sigs}, _)} <- group_tyclds grp
+          , L _ (ClassOpSig _ _ names _) <- sigs
+          , name <- names]
+        demands | experimental = filter (not . (`elemNameSet` selectors) . fst) requests
+                | otherwise = requests
     defer <- goptM Opt_DeferTypeErrors
     holes <- goptM Opt_DeferTypedHoles
     not_in_scope <- goptM Opt_DeferOutOfScopeVariables
-    when (defer || holes || not_in_scope) $
+    when (not (null demands) && (defer || holes || not_in_scope)) $
       rejectLocalOpen demands "Disable deferred errors before observing a local definition."
     env <- getGblEnv
     let checked = mkNameSet

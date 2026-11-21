@@ -233,6 +233,10 @@ getTypeIndex t
 
     go (TermVarTy v) = return $ HTermVarTy (varName v)
     go (TermAppTy fun arg) = HTermAppTy (varName fun) <$> getTypeIndex arg
+    -- The source signature leaves the dictionary and type arguments implicit.
+    -- Keep their identities in the type-map key. Use the source view in HIE.
+    go (ClassAppTy method _ _ arg _) = HTermAppTy (varName method) <$> getTypeIndex arg
+    go (DepDictTy dict body) = HQualTy <$> getTypeIndex (varType dict) <*> getTypeIndex body
     go (ExistsTy flag binder body) = do
       kind <- getTypeIndex (varType binder)
       HExistsTy flag (varName binder, kind) <$> getTypeIndex body

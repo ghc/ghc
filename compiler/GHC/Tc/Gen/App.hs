@@ -76,7 +76,7 @@ import GHC.Builtin.WiredIn.Types ( charTy, integerTy, multiplicityTy, runtimeRep
 import GHC.Builtin.PrimOps( tagToEnumKey )
 import GHC.Builtin.KnownKeys
 
-import GHC.Driver.DynFlags ( DynFlags(reductionDepth), HasDynFlags(getDynFlags) )
+import GHC.Driver.DynFlags ( GeneralFlag(Opt_DeferTypeErrors), DynFlags(reductionDepth), HasDynFlags(getDynFlags) )
 import GHC.Types.TyThing ( TyThing(AnId, AConLike, ATyCon) )
 import GHC.Types.Basic ( RecFlag(NonRecursive), TypeOrKind(TypeLevel), IntWithInf, intGtLimit )
 import GHC.Types.TypeEnv ( lookupTypeEnv )
@@ -784,6 +784,7 @@ tcOrdinaryAppScoped fields checked_prefix rn_expr rn_head@(rn_fun, fun_lspan) tc
        ; native_app <- tcRetainedAppCapability fun_sigma0 exp_res_ty rn_args
        -- See Note [Known native variables with ImpredicativeTypes].
        ; head_ql <- if not (null fields) || any isExplicitRetainedArg rn_args
+                        || (native_app && hasScopedDictionaryPrefix fun_sigma0)
                     then return NoQL
                     else tcRetainedKnownHeadQL native_app wanted_ql rn_args exp_res_ty tc_fun0 fun_sigma0
        ; tcRetainedAppEvidence native_app $
@@ -1733,7 +1734,7 @@ tcRetainedKnownValuePlan :: (LHsExpr GhcRn -> TcM (Maybe Type))
                         -> [LHsExpr GhcRn] -> TcM RetainedInstPlan
 tcRetainedKnownValuePlan declared expected sigma values
   | (tvs, theta, tau) <- tcRetainedInstTelescope sigma
-  , not (null tvs), isRetainedValueType tau
+  , not (null tvs), isRetainedValueType (withoutScopedDictionaries tau)
   , not (null values)
   = case coreFullView tau of
       DepFunTy DepFunInvisible binder body ->
@@ -2219,6 +2220,19 @@ malformed type graphs. See Note [Computing deep free variables] in
 GHC.Core.TyCo.FVs.
 -}
 
+-- | Check for a dependent dictionary before the first written value argument.
+hasScopedDictionaryPrefix :: TcSigmaType -> Bool
+hasScopedDictionaryPrefix sigma
+  | (_, _, rho) <- tcRetainedInstTelescope sigma
+  , DepDictTy{} <- coreFullView rho = True
+  | otherwise = False
+
+-- | Read past the private evidence prefix for declaration matching only.
+withoutScopedDictionaries :: Type -> Type
+withoutScopedDictionaries ty
+  | DepDictTy _ body <- coreFullView ty = withoutScopedDictionaries body
+  | otherwise = ty
+
 -- | Collect declared domains for the written value-argument prefix.
 -- Mark visible retained domains with True. Skip dependent argument domains.
 -- Keep the set of crossed retained binders with the result.
@@ -2229,6 +2243,9 @@ retainedDeclaredDomains supplied = go supplied emptyVarSet
     go 0 bound result = result_view bound result
     go remaining bound ty
       | Just ty' <- coreView ty = go remaining bound ty'
+    go remaining bound (DepDictTy dict body)
+      = let (domains, result, masked) = go remaining (extendVarSet bound dict) body
+        in (domains, result, DepDictTy dict masked)
     go _ _ ty@(DepFunTy DepFunInvisible _ _) = ([], Nothing, ty)
     go remaining bound (DepFunTy DepFunVisible binder body)
       = let domain = independent bound True (varType binder)
@@ -3096,7 +3113,14 @@ tcValArg _ _ _ (EWrap ew)          = return (EWrap ew)
 
 tcValArg do_ql pos rn_head (ERetainedArg DepFunVisible loc (Scaled mult ty) arg res_ty co)
   = do { let checked_ty = maybe ty coercionLKind co
-       ; checked <- tcValArgExpr do_ql pos rn_head loc (Scaled mult checked_ty) arg
+       ; scoped <- tcScopedClassOperand checked_ty arg
+       ; checked <- case scoped of
+           Just (selector, inst, dict, _, operand) ->
+             do { checked_operand <- tcValArgExpr do_ql pos rn_head loc (Scaled mult inst) operand
+                ; let wrapper = mkWpEvApps [EvExpr (Core.Var dict)] <.> mkWpTyApps [inst]
+                      method = noLocA (mkHsWrap wrapper (mkHsVar (noLocA selector)))
+                ; return (mkHsApps method [checked_operand]) }
+           _ -> tcValArgExpr do_ql pos rn_head loc (Scaled mult checked_ty) arg
        ; return (ERetainedArg DepFunVisible loc noExtField
                    (maybe checked (`mkLHsWrapCo` checked) co) res_ty noExtField) }
 tcValArg _ pos rn_head (ERetainedArg DepFunInvisible loc (Scaled mult ty) arg res_ty co)
@@ -3466,6 +3490,16 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
       , not (no_tvs && no_theta)
       = do { selected <- case plan of
                 Just (_ : _) -> return plan
+                _ | not prefix_only, not no_tvs
+                  , DepDictTy{} <- coreFullView body2
+                  -- See Note [Applying a scoped dictionary].
+                  -> do { sigma <- liftZonkM (zonkTcType fun_ty)
+                        ; choice <- tcRetainedKnownArgPlan (tcRetainedDeclaredArgType pure)
+                                                            Nothing tc_fun sigma args
+                        ; case choice of
+                            Just _ -> return choice
+                            Nothing -> failWithTc $ TcRnRetainedQuantificationError
+                                                     (RetainedSolverType fun_ty) }
                 _ | NoQL <- do_ql, not prefix_only, pos > 1, not no_tvs
                   , DepFunTy DepFunVisible _ _ <- coreFullView body2
                   , arg@EValArg{} : _ <- args
@@ -3538,6 +3572,29 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
            ; let wrap = mkWpEvApps [EvExpr operand]
            ; go plan fun_orig pos (addArgWrap wrap acc) (applyTypeToArgs fun_ty [operand]) args }
 
+    -- See Note [Applying a scoped dictionary].
+    go1 plan fun_orig pos acc fun_ty args
+      | DepDictTy binder _ <- coreFullView fun_ty
+      , not (null args), inst_fun args Inferred
+      = do { givens <- getLexicalGivens
+           ; dict <- case filter (\d -> isNativeClassDictionaryId d
+                                    && varType d `tcEqType` varType binder) givens of
+               [dict] -> return dict
+               [] | noFreeVarsOfType (varType binder) ->
+                 do { defer <- goptM Opt_DeferTypeErrors
+                    ; when defer $
+                        failWithTc $ TcRnRetainedQuantificationError (RetainedSolverType fun_ty)
+                    ; ev <- newWanted fun_orig Nothing (varType binder)
+                    ; emitSimple (mkNonCanonical ev)
+                    ; return (ctEvEvId ev) }
+               _ -> failWithTc $ TcRnRetainedQuantificationError (RetainedSolverType fun_ty)
+           ; let evidence = Core.Var dict
+                 wrap = mkWpEvApps [EvExpr evidence]
+           ; go plan fun_orig pos (addArgWrap wrap acc) (applyTypeToArgs fun_ty [evidence]) args }
+    go1 _ _ _ _ fun_ty _
+      | DepDictTy{} <- coreFullView fun_ty
+      = failWithTc $ TcRnRetainedQuantificationError (RetainedSolverType fun_ty)
+
     -- Rule IRESULT from Fig 4 of the QL paper; no more arguments
     go1 plan _fun_orig _pos acc fun_ty []
        | Just (_ : _) <- plan
@@ -3565,6 +3622,11 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
         (EValArg { ea_arg = arg, ea_loc_span = ctxt } : rest_args)
       | DepFunTy DepFunVisible binder _ <- coreFullView fun_ty
       = do { (core_arg, runtime_arg) <- tcRetainedOperand binder arg
+           ; case core_arg of
+               Core.Var index | isNativeOpaqueValueId index -> pure ()
+               _ | hasScopedDictionaryPrefix fun_sigma ->
+                     failWithTc $ TcRnRetainedQuantificationError RetainedCallIndex
+                 | otherwise -> pure ()
            ; body_ty <- retainedAppResult fun_ty binder core_arg
            ; arg_co <- retainedVariableCast core_arg runtime_arg
            ; let arg' = ERetainedArg DepFunVisible ctxt (Scaled ManyTy (varType binder)) runtime_arg body_ty
@@ -3845,6 +3907,31 @@ Finally, retainedArgIndex checks the saturated canonical tree and its domains.
 This operation emits no constraints, usage obligations or method checks.
 -}
 
+{- Note [Applying a scoped dictionary]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Use declared value domains to fix erased parameters before choosing any
+dictionary. Use the declaration path also with ImpredicativeTypes.
+Quick Look cannot assign a type with this private evidence prefix.
+The declaration pass reads through the evidence prefix. It keeps the
+dictionaries bound and cannot infer an argument from a selector
+application in the result. A dictionary in an expected result must
+match the identity and predicate of an actual lexical Given.
+
+At the call, prefer the unique lexical Given with the exact predicate.
+A Wanted for the same predicate can produce a fresh let-bound alias.
+That alias would change the index and could escape its binder.
+
+The Core index currently represents a selector on a variable operand.
+Reject a constructor or other non-variable before substituting it.
+
+A closed predicate with no direct Given can use an ordinary Wanted. Its
+fresh evidence ID belongs to the existing evidence bindings. An ordinary
+result can consume the indexed call while the ID is in scope. The
+retained-index escape checks still apply if the ID occurs in the result.
+Disallow deferred type errors on this path. The source prototype cannot
+assert that an unsolved predicate supplies a class dictionary.
+-}
+
 -- | Resolve the index at the binder's checked scalar or function domain.
 tcRetainedOperand :: Id -> LHsExpr GhcRn -> TcM (Core.CoreExpr, LHsExpr GhcRn)
 tcRetainedOperand binder arg
@@ -3890,39 +3977,44 @@ tcRetainedValueOperand resolve domain arg@(L loc original)
         Just sel | Just cls <- isClassOpId_maybe sel -> do
           let unchecked :: TcM a
               unchecked = failWithTc (TcRnRetainedQuantificationError (RetainedUncheckedSourceCall name))
-          case tcSplitSigmaTy (varType sel) of
-            ([(_, tv)], [theta], rho)
-              | let (_, _, result) = splitFunTys rho
-              , result `tcEqType` mkTyVarTy tv
-              , theta `tcEqType` mkClassPred cls [mkTyVarTy tv]
-              , noFreeVarsOfType domain, typeKind domain `tcEqType` tyVarKind tv -> return ()
-            _ -> unchecked
-          forM_ type_arg $ \ty -> do
-            (supplied, _) <- tcVTA (idConcreteTvs sel) (varType sel) ty
-            unless (supplied `tcEqType` domain) unchecked
-          dfun <- tcRetainedDFun name cls domain >>= maybe unchecked return
-          platform <- getPlatform
-          case args of
-            [operand]
-              | Just (zero, successor) <- sourceLiteralCons_maybe dfun sel
-              , HsOverLit _ (OverLit OverLitRn{ol_rebindable = False} literal)
-                  <- unLoc (stripParensLHsExpr operand)
-              , Just (HsLit _ (XLit (HsInteger _ n _)))
-                  <- shortCutLit platform literal integerTy
-              , n >= 0
-              -> do { (core, generated) <- buildRetainedNumeral dfun sel zero successor n
-                    ; return (core, L loc (mkExpandedLExpr original generated)) }
-            _ -> do
-              target_name <- maybe unchecked return (sourceMethodTarget_maybe dfun sel)
-              target <- tcLookupIdMaybe target_name >>= maybe unchecked return
-              unless (varType target `tcEqType` classMethodInstTy sel [domain]) unchecked
+          scoped <- tcScopedClassOperand domain arg
+          case scoped of
+            Just (selector, inst, dict, index, _) ->
+              pure (Core.mkApps (Core.Var selector) [Core.Type inst, Core.Var dict, Core.Var index], arg)
+            Nothing -> do
+              case tcSplitSigmaTy (varType sel) of
+                ([(_, tv)], [theta], rho)
+                  | let (_, _, result) = splitFunTys rho
+                  , result `tcEqType` mkTyVarTy tv
+                  , theta `tcEqType` mkClassPred cls [mkTyVarTy tv]
+                  , noFreeVarsOfType domain, typeKind domain `tcEqType` tyVarKind tv -> return ()
+                _ -> unchecked
+              forM_ type_arg $ \ty -> do
+                (supplied, _) <- tcVTA (idConcreteTvs sel) (varType sel) ty
+                unless (supplied `tcEqType` domain) unchecked
+              dfun <- tcRetainedDFun name cls domain >>= maybe unchecked return
+              platform <- getPlatform
+              case args of
+                [operand]
+                  | Just (zero, successor) <- sourceLiteralCons_maybe dfun sel
+                  , HsOverLit _ (OverLit OverLitRn{ol_rebindable = False} literal)
+                      <- unLoc (stripParensLHsExpr operand)
+                  , Just (HsLit _ (XLit (HsInteger _ n _)))
+                      <- shortCutLit platform literal integerTy
+                  , n >= 0
+                  -> do { (core, generated) <- buildRetainedNumeral dfun sel zero successor n
+                        ; return (core, L loc (mkExpandedLExpr original generated)) }
+                _ -> do
+                  target_name <- maybe unchecked return (sourceMethodTarget_maybe dfun sel)
+                  target <- tcLookupIdMaybe target_name >>= maybe unchecked return
+                  unless (varType target `tcEqType` classMethodInstTy sel [domain]) unchecked
 
-              let target_head = L head_loc (HsVar noExtField (fmap (const (noUserRdr target_name)) lname))
-                  runtime_arg = L loc (mkExpandedLExpr original (mkHsApps target_head args))
-              checked <- resolve runtime_arg
-              recordSourceMethodUse dfun sel target
-              wantRetainedMethod sel dfun
-              return checked
+                  let target_head = L head_loc (HsVar noExtField (fmap (const (noUserRdr target_name)) lname))
+                      runtime_arg = L loc (mkExpandedLExpr original (mkHsApps target_head args))
+                  checked <- resolve runtime_arg
+                  recordSourceMethodUse dfun sel target
+                  wantRetainedMethod sel dfun
+                  return checked
         _ -> ordinary
   | otherwise = ordinary
   where
@@ -3932,6 +4024,46 @@ tcRetainedValueOperand resolve domain arg@(L loc original)
     split_call (L _ (HsApp _ f a)) args = split_call f (a:args)
     split_call (L _ (OpApp _ a op b)) args = split_call op (a:b:args)
     split_call e args = (e, args)
+
+-- | Resolve a direct selector call to the exact Given used in its index.
+-- See Note [Scoped Given indices].
+tcScopedClassOperand :: Type -> LHsExpr GhcRn
+                     -> TcM (Maybe (Id, Type, Id, Id, LHsExpr GhcRn))
+tcScopedClassOperand result_ty call
+  | HsApp _ method operand <- unLoc (stripParensLHsExpr call)
+  , HsVar _ method_name <- unLoc (stripParensLHsExpr method)
+  , HsVar _ operand_name <- unLoc (stripParensLHsExpr operand)
+  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+       ; if not enabled then return Nothing else do
+       { selector <- tcLookupIdMaybe (unLocWithUserRdr method_name)
+       ; actual <- tcLookupLcl_maybe (unLocWithUserRdr operand_name)
+       ; givens <- getLexicalGivens
+       ; return $ do
+           sel <- selector
+           ATcId{tct_id = index} <- actual
+           guard (isNativeOpaqueValueId index)
+           let inst = varType index
+           (predicate, domain, result) <- Core.nativeClassSelectorTys sel inst
+           guard (inst `tcEqType` domain && result `tcEqType` result_ty)
+           [dict] <- pure (filter (\d -> varType d `tcEqType` predicate) givens)
+           let core = Core.mkApps (Core.Var sel) [Core.Type inst, Core.Var dict, Core.Var index]
+           _ <- Core.nativeClassSelectorIndex core
+           pure (sel, inst, dict, index, operand) } }
+tcScopedClassOperand _ _ = return Nothing
+
+{- Note [Scoped Given indices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The complete signature can refer to a direct class Given in the result
+of a retained arrow. During application instantiation, use that same
+Given to form the index. During argument checking, apply the selector
+to the Given explicitly and check the value operand as usual.
+
+An ordinary Wanted can solve to the right Given but produce a fresh
+dictionary let binder. Keeping that alias in the result would allow a
+let-bound index to escape. Do not make this alias equal to the Given.
+Only a unique lexical Given of the selector's exact predicate qualifies.
+This path does not look for superclasses or global instances.
+-}
 
 -- | Look up a completed, ground instance with no context.
 tcRetainedDFun :: Name -> Class -> Type -> TcM (Maybe Id)
@@ -6656,6 +6788,14 @@ tcRetainedInstScope tys
                  && eqType (varType occurrence) (varType binding)
                  && isManyTy (idMult occurrence) && isManyTy (idMult binding)
              valid_runtime_id v
+               | isNativeClassDictionaryId v
+               = do { scoped <- getLexicalGivens
+                    ; occurrence <- liftZonkM (zonkId v)
+                    ; actuals <- liftZonkM (mapM zonkId (filter (== v) scoped))
+                    ; return $ case actuals of
+                        [actual] -> isNativeClassDictionaryId actual
+                                 && varType occurrence `eqType` varType actual
+                        _ -> False }
                | not (isNonCoVarId v) = return True
                | otherwise
                = do { occurrence <- liftZonkM (zonkId v)

@@ -21,3 +21,7 @@ test('T22807_ghci', [req_th, unless(ghc_dynamic(), skip), extra_files(['T22807_g
              , makefile_test, ['T22807_ghci'])
 
 
+
+test('fatCoreLint', [req_th, unless(ghc_dynamic(), skip), only_ways(['normal']),
+                     extra_files(['FatTH.hs', 'FatQuote.hs'])],
+     makefile_test, ['fatCoreLint'])

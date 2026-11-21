@@ -22,7 +22,7 @@ module GHC.Driver.Main.Compile
     , loadIfaceByteCodeLazy
     , hscMaybeWriteIface
     , hscCompileCmmFile
-    , hscGenHardCode
+    , hscGenHardCode, hscGenScopedDictionaryHardCode
 
     , hscInteractive
     , mkCgInteractiveGuts
@@ -46,6 +46,7 @@ import GHC.Driver.Backend
 import GHC.Driver.Env
 import GHC.Driver.ByteCode
 import GHC.Driver.Env.KnotVars
+import GHC.Runtime.Context (emptyInteractiveContext)
 import GHC.Driver.Errors.Types
 import GHC.Driver.CodeOutput
 import GHC.Driver.Config.Cmm.Parser (initCmmParserConfig)
@@ -75,13 +76,14 @@ import GHC.Iface.Load   ( writeIface, flagsToIfCompression )
 import qualified GHC.ByteCode.Serialize as ByteCode
 
 import GHC.Core
-import GHC.Core.Dependent ( rejectNativeDependentProgram )
+import GHC.Core.Dependent ( hasScopedDictionaryProgram, supportsScopedDictionaryCore
+                          , rejectNativeDependentProgram )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.TyCon
 import GHC.Core.LateCC
 import GHC.Core.LateCC.Types
 
-import GHC.CoreToStg.Prep( CorePrepPgmConfig, corePrepPgm )
+import GHC.CoreToStg.Prep( CorePrepPgmConfig, corePrepPgm, corePrepScopedDictionaryPgm )
 import GHC.CoreToStg.AddImplicitBinds( addImplicitBinds )
 import GHC.CoreToStg    ( coreToStg )
 
@@ -311,6 +313,8 @@ compileWholeCoreBindings ::
   IO ModuleByteCode
 compileWholeCoreBindings hsc_env type_env wcb = do
   core_binds <- typecheck
+  when (hasScopedDictionaryProgram core_binds && not (supportsScopedDictionaryCore core_binds)) $
+    throwGhcExceptionIO (Sorry "Unsupported retained forms in a scoped dictionary Core interface.")
   (stubs, foreign_files) <- decode_foreign
   gen_bytecode core_binds stubs foreign_files
   where
@@ -333,7 +337,10 @@ compileWholeCoreBindings hsc_env type_env wcb = do
                       (typeEnvTyCons type_env) stubs foreign_files
                       wcb_modBreaks [] NoHpcInfo
       trace_if logger (text "Generating ByteCode for" <+> ppr wcb_module)
-      mkModuleByteCode hsc_env wcb_module wcb_mod_location cgi_guts
+      -- Interface bindings are closed over the provider module. The
+      -- one-shot interface loader has discarded its interactive context.
+      let module_env = hsc_env { hsc_IC = emptyInteractiveContext (hsc_dflags hsc_env) }
+      mkModuleByteCode module_env wcb_module wcb_mod_location cgi_guts
 
     WholeCoreBindings {wcb_module, wcb_mod_location, wcb_foreign, wcb_modBreaks} = wcb
 
@@ -539,6 +546,12 @@ hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
 -- BackEnd combinators
 --------------------------------------------------------------
 
+-- | Generate object code for checked dictionary Core supplied through the GHC API.
+hscGenScopedDictionaryHardCode
+    :: HscEnv -> CgGuts -> ModLocation -> FilePath
+    -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)], Maybe StgCgInfos, Maybe CmmCgInfos)
+hscGenScopedDictionaryHardCode = hscGenHardCode
+
 -- | Compile to hard-code.
 hscGenHardCode :: HscEnv -> CgGuts -> ModLocation -> FilePath
                -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)], Maybe StgCgInfos, Maybe CmmCgInfos )
@@ -553,6 +566,7 @@ hscGenHardCode hsc_env cgguts mod_loc output_filename = do
         -- See Note [Compiling native dependent modules] in GHC.Driver.Main.Passes.
         native <- checkNativeDependentModule hsc_env core_binds [] (cg_tycons cgguts)
         let dflags = nativeCodeGenFlags native (hsc_dflags hsc_env)
+            scoped = native && hasScopedDictionaryProgram core_binds
         when (native && not (backendWritesFiles (backend dflags))) $
           throwGhcExceptionIO (Sorry "Native dependent Core requires an object backend at hscGenHardCode.")
 
@@ -642,8 +656,9 @@ hscGenHardCode hsc_env cgguts mod_loc output_filename = do
         unless native $
           rejectNativeDependentProgram "unchecked late-plugin or implicit-binding output" binds_to_prep []
         cp_cfg <- initCorePrepConfigFor native hsc_env
-        (prepd_binds) <- {-# SCC "CorePrep" #-}
-                         corePrepPgm
+        let prepare = if scoped then corePrepScopedDictionaryPgm else corePrepPgm
+        prepd_binds <- {-# SCC "CorePrep" #-}
+                         prepare
                            (hsc_logger hsc_env) cp_cfg cp_pgm_cfg
                            this_mod binds_to_prep
 
@@ -782,7 +797,8 @@ hscGenerateByteCode hsc_env cgguts location = do
 
     -- See Note [Compiling native dependent modules] in GHC.Driver.Main.Passes.
     native <- checkNativeDependentModule hsc_env core_binds [] tycons
-    let dflags = nativeCodeGenFlags native (hsc_dflags hsc_env)
+    let scoped = native && hasScopedDictionaryProgram core_binds
+        dflags = nativeCodeGenFlags native (hsc_dflags hsc_env)
         platform = targetPlatform dflags
 
     -------------------
@@ -798,8 +814,9 @@ hscGenerateByteCode hsc_env cgguts location = do
     unless native $
       rejectNativeDependentProgram "unchecked implicit-binding output" binds_to_prep []
     cp_cfg <- initCorePrepConfigFor native hsc_env
+    let prepare = if scoped then corePrepScopedDictionaryPgm else corePrepPgm
     prepd_binds <- {-# SCC "CorePrep" #-}
-                   corePrepPgm (hsc_logger hsc_env) cp_cfg cp_pgm_cfg
+                   prepare (hsc_logger hsc_env) cp_cfg cp_pgm_cfg
                                this_mod binds_to_prep
 
     -- The stg cg info only provides a runtime benfit, but is not requires so we just

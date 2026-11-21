@@ -12,11 +12,13 @@ import GHC.Driver.Flags
 import GHC.Core
 import GHC.Core.Rules
 import GHC.Core.Ppr     ( pprCoreBindings, pprCoreExpr )
-import GHC.Core.Opt.OccurAnal ( OccurAnalOpts(..), occurAnalysePgm, occurAnalyseExpr )
+import GHC.Core.Opt.OccurAnal ( OccurAnalOpts(..), SimplCoreMode(RetainedCore), occurAnalysePgm, occurAnalyseExpr )
 import GHC.Core.Stats   ( coreBindsSize, coreBindsStats, exprSize )
 import GHC.Core.FVs     ( exprFreeVars )
 import GHC.Core.Utils   ( mkTicks, stripTicksTop )
-import GHC.Core.Lint    ( LintPassResultConfig, dumpPassResult, lintPassResult )
+import GHC.Core.Lint    ( LintPassResultConfig, dumpPassResult, lintPassResult
+                        , lintScopedDictionaryPassResult )
+import GHC.Core.Dependent (hasScopedDictionaryProgram)
 import GHC.Core.Opt.Simplify.Iteration ( simplTopBinds, simplExpr, simplImpRules )
 import GHC.Core.Opt.Simplify.Utils  ( activeRule )
 import GHC.Core.Opt.Simplify.Inline ( activeUnfolding )
@@ -327,7 +329,10 @@ simplifyPgm logger unit_env name_ppr_ctx opts
            dump_end_iteration logger dump_core_sizes name_ppr_ctx iteration_no counts1 binds2 rules1 ;
 
            for_ (so_pass_result_cfg opts) $ \pass_result_cfg ->
-             lintPassResult logger pass_result_cfg binds2 ;
+             let lint | sm_core_mode mode == RetainedCore && hasScopedDictionaryProgram binds2
+                      = lintScopedDictionaryPassResult
+                      | otherwise = lintPassResult
+             in lint logger pass_result_cfg binds2 ;
 
                 -- Loop
            do_iteration (iteration_no + 1) (counts1:counts_so_far) binds2 rules1
