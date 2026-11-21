@@ -528,6 +528,7 @@ data CtOrigin
       Type   -- the instantiated type of the method
   | AmbiguityCheckOrigin UserTypeCtxt
   | ImplicitLiftOrigin HsImplicitLiftSplice
+  | RetainedMethodOrigin Name -- ^ A dictionary that justifies a retained index.
 
 
 data NonLinearPatternReason
@@ -798,6 +799,7 @@ pprCtOriginBriefly = ppr_br  -- ppr_br is a local function with a short name!
 
 ppr_br :: CtOrigin -> SDoc
 ppr_br (OccurrenceOf name)   = hsep [text "a use of", quotes (ppr name)]
+ppr_br (RetainedMethodOrigin name) = ppr_br (OccurrenceOf name)
 ppr_br (OccurrenceOfRecSel name) = hsep [text "a use of", quotes (ppr name)]
 ppr_br AppOrigin             = text "an application"
 ppr_br (IPOccOrigin name)    = hsep [text "a use of implicit parameter", quotes (ppr name)]
@@ -908,6 +910,7 @@ foldMapCtOrigin f = go
         GivenOrigin {} -> f orig
         GivenSCOrigin {} -> f orig
         OccurrenceOf {} -> f orig
+        RetainedMethodOrigin {} -> f orig
         OccurrenceOfRecSel {} -> f orig
         AppOrigin {} -> f orig
         SpecPragOrigin {} -> f orig

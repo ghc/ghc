@@ -3968,7 +3968,7 @@ tcRetainedDFun method cls domain = do
 wantRetainedMethod :: Id -> Id -> TcM ()
 wantRetainedMethod sel dfun = do
   let name = getName sel
-  ev <- newWanted (OccurrenceOf name) Nothing (varType dfun)
+  ev <- newWanted (RetainedMethodOrigin name) Nothing (varType dfun)
   emitSimple (mkNonCanonical ev)
   emitDelayedErrors (unitBag (DE_SourceMethod (ctEvEvId ev) dfun name (ctEvLoc ev)))
 

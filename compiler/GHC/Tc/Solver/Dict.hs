@@ -867,6 +867,12 @@ tryShortCutSolver :: DynFlags
 -- Note that we only do this for the sake of performance. Exactly the same
 -- programs should typecheck regardless of whether we take this step or
 -- not. See Note [Shortcut solving]
+tryShortCutSolver _ _ DictCt { di_ev = ev }
+  | RetainedMethodOrigin{} <- ctLocOrigin (ctEvLoc ev)
+  = return False
+    -- A retained index depends on this evidence. Use the same lexical Given
+    -- at every optimization level. See Note [Checked source method evidence]
+    -- in GHC.Tc.Solver.Solve.
 tryShortCutSolver dflags try_short_cut dict_w
   | try_short_cut
   , DictCt { di_ev = ev_w } <- dict_w
