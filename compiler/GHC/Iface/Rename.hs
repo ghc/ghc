@@ -851,6 +851,7 @@ rnIfaceExpr (IfaceApp fun arg)
     = IfaceApp <$> rnIfaceExpr fun <*> rnIfaceExpr arg
 rnIfaceExpr (IfaceIndexedConArg shape arg) = IfaceIndexedConArg shape <$> rnIfaceExpr arg
 rnIfaceExpr (IfaceRetainedCharArg arg) = IfaceRetainedCharArg <$> rnIfaceExpr arg
+rnIfaceExpr (IfaceDictApp f dict) = IfaceDictApp <$> rnIfaceExpr f <*> pure dict
 rnIfaceExpr (IfaceCase scrut case_bndr alts)
     = IfaceCase <$> rnIfaceExpr scrut
                 <*> pure case_bndr
@@ -968,6 +969,11 @@ rnIfaceType (IfaceTermAppTy fun arg) = IfaceTermAppTy fun <$> rnIfaceType arg
 rnIfaceType (IfaceFreeTermAppTy fun arg) = IfaceFreeTermAppTy fun <$> rnIfaceType arg
 rnIfaceType (IfaceExistsTy flag bndr body)
     = IfaceExistsTy flag <$> rnIfaceTvBndr bndr <*> rnIfaceType body
+rnIfaceType (IfaceDepDictTy bndr body)
+    = IfaceDepDictTy <$> rnIfaceIdBndr bndr <*> rnIfaceType body
+rnIfaceType (IfaceClassAppTy method inst dict arg)
+    = IfaceClassAppTy <$> rnIfaceGlobal method <*> rnIfaceType inst
+                      <*> rnIfaceType dict <*> rnIfaceType arg
 rnIfaceType (IfaceDepFunTy vis bndr body)
     = IfaceDepFunTy vis <$> rnIfaceIdBndr bndr <*> rnIfaceType body
 rnIfaceType (IfaceAppTy t1 t2)

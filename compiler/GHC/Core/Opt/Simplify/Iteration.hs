@@ -16,7 +16,7 @@ import GHC.Driver.Flags
 
 import GHC.Core
 import GHC.Core.Opt.OccurAnal (SimplCoreMode(..))
-import GHC.Core.TyCo.Rep (Type(DepFunTy))
+import GHC.Core.TyCo.Rep (Type(DepDictTy, DepFunTy))
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Opt.ConstantFold
 import GHC.Core.Opt.Stats ( Tick(..) )
@@ -69,7 +69,7 @@ import GHC.Builtin.KnownKeys( runRWKey, seqHashKey )
 import GHC.Builtin.WiredIn.Ids( seqId )
 
 import qualified GHC.Data.List.Infinite as Inf
-import GHC.Data.Maybe   ( isNothing, orElse, mapMaybe )
+import GHC.Data.Maybe   ( isJust, isNothing, orElse, mapMaybe )
 import GHC.Data.FastString
 import GHC.Unit.Module ( moduleName )
 import GHC.Utils.Outputable
@@ -864,7 +864,7 @@ prepareRhs env top_lvl occ rhs0
              ; return (floats, App rhs' (Type ty)) }
     anfise (App fun arg)
         | sm_core_mode (seMode env) == RetainedCore
-        , DepFunTy{} <- coreFullView (exprType fun)
+        , Just _ <- retainedArgBinder (exprType fun)
         -- See Note [Keep retained arguments in prepareRhs].
         = do { (floats, fun') <- anfise fun
              ; return (floats, App fun' arg) }
@@ -1971,21 +1971,32 @@ simplArg _ _ _ (Simplified {}) arg mco
        MCo co -> return (mkCast arg co)
 simplArg env mb_arg_info fun_ty (UnSimplified arg_se) arg mco
   | sm_core_mode (seMode env) == RetainedCore
-  , DepFunTy{} <- coreFullView fun_ty
-  , Just _ <- nativeComputedIndex arg
+  , keep_retained_operand
   -- See Note [Keep checked source calls in retained arguments].
   = return (mkCastMCo (CoreSubst.substExpr (getFullSubst (getInScope env) arg_se) arg) mco)
   | otherwise
   = do { let arg_env' = arg_se `setInScopeFromE` env
              arg_ty
                | sm_core_mode (seMode env) == RetainedCore
-               , DepFunTy _ b _ <- coreFullView fun_ty = varType b
+               , Just b <- retainedArgBinder fun_ty = varType b
                | otherwise = funArgTy fun_ty
              stop     = case mb_arg_info of
                            Nothing -> mkBoringStop arg_ty
                            Just ai -> mkLazyArgStop arg_ty ai
              cont     = addCastMCo mco stop
        ; simplExprC arg_env' arg cont }
+  where
+    keep_retained_operand = case coreFullView fun_ty of
+      DepDictTy{} -> True
+      DepFunTy{} -> isJust (nativeComputedIndex arg) || isJust (nativeClassSelectorIndex arg)
+      _ -> False
+
+-- | Find the argument binder of a retained value or private dictionary arrow.
+retainedArgBinder :: Type -> Maybe Id
+retainedArgBinder ty = case coreFullView ty of
+  DepFunTy _ b _ -> Just b
+  DepDictTy b _ -> Just b
+  _ -> Nothing
 
 {- Note [Keep checked source calls in retained arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2041,10 +2052,7 @@ simpl_lam env bndr body (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = cont })
 -- See Note [Retained Core in the Gentle simplifier] in GHC.Driver.Main.Passes.
 simpl_lam env bndr body cont@ApplyToVal{sc_hole_ty = fun_ty}
   | sm_core_mode (seMode env) == RetainedCore
-  , let retained_arrow = case coreFullView fun_ty of
-          DepFunTy{} -> True
-          _ -> False
-  , retained_arrow || retainedAnnotationUse env bndr body
+  , isJust (retainedArgBinder fun_ty) || retainedAnnotationUse env bndr body
   = do { let (inner_bndrs, inner_body) = collectBinders body
        ; (env', bndrs') <- simplLamBndrs env (bndr:inner_bndrs)
        ; body' <- simplExpr env' inner_body
@@ -2129,6 +2137,8 @@ their runtime Ids in types. Keeping a binding alone is insufficient.
 If its unfolding replaced a retained operand, the term could use a
 different index while the type still refers to the original binder.
 Leave the binding in scope and do not install an unfolding for it.
+A private class selector type can also refer to its evidence variable.
+Keep that dictionary binder under the same condition.
 
 The same restriction applies to known constructor elimination. It creates
 auxiliary bindings for the case binder and payload fields. Do not enter
@@ -2143,7 +2153,7 @@ guards when it updates term and annotation occurrences together.
 retainedAnnotationUse :: SimplEnv -> InId -> InExpr -> Bool
 retainedAnnotationUse env bndr body =
   sm_core_mode (seMode env) == RetainedCore
-  && isNativeOpaqueValueId bndr
+  && (isNativeOpaqueValueId bndr || isNativeClassDictionaryId bndr)
   && hasFreeVarInCoreAnnotations bndr body
 
 simplNonRecE :: HasDebugCallStack
@@ -2667,9 +2677,7 @@ rebuildCall env fun_info
   where
     -- StrictArg moves evaluation contexts across a call argument. Keep a
     -- retained argument's expression in place for result-type instantiation.
-    is_retained_arrow ty = case coreFullView ty of
-      DepFunTy{} -> True
-      _ -> False
+    is_retained_arrow = isJust . retainedArgBinder
 
 ---------- No further useful info, revert to generic rebuild ------------
 rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_arg_specs, ai_rules = rules }) cont

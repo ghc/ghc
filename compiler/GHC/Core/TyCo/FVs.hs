@@ -948,6 +948,10 @@ almost_devoid_co_var_of_cos (co:cos) cv
 
 almost_devoid_co_var_of_type :: Type -> CoVar -> Bool
 almost_devoid_co_var_of_type (TyVarTy _) _ = True
+almost_devoid_co_var_of_type (ClassAppTy _ inst dict operand kind) cv
+  = all (flip almost_devoid_co_var_of_type cv) [inst, dict, operand, kind]
+almost_devoid_co_var_of_type (DepDictTy v ty) cv
+  = almost_devoid_co_var_of_type (varType v) cv && almost_devoid_co_var_of_type ty cv
 almost_devoid_co_var_of_type (TermAppTy f arg) cv
   = almost_devoid_co_var_of_type (varType f) cv
   && almost_devoid_co_var_of_type arg cv
@@ -1006,6 +1010,8 @@ visVarsOfType orig_ty = Pair invis_vars vis_vars
     invis_vars = invis_vars1 `minusVarSet` vis_vars
 
     go (TyVarTy tv)      = Pair (tyCoVarsOfType $ tyVarKind tv) (unitVarSet tv)
+    go (ClassAppTy _ inst dict operand kind) = invisible (tyCoVarsOfTypes [inst, dict, kind]) `mappend` go operand
+    go (DepDictTy v ty) = ((`delVarSet` v) <$> go ty) `mappend` invisible (tyCoVarsOfType (varType v))
     go (TermAppTy f arg) = go (TermVarTy f) `mappend` go arg
     go (TermVarTy v)     = Pair (tyCoVarsOfType $ varType v) (unitVarSet v)
     go (ExistsTy _ v ty)
@@ -1072,6 +1078,8 @@ isInjectiveInType tv ty
   where
     go ty | Just ty' <- rewriterView ty = go ty'
     go (TyVarTy tv')                    = tv' == tv
+    go ClassAppTy{}                     = False
+    go DepDictTy{}                      = False
     go (TermAppTy {})                   = False
     go (TermVarTy v)                    = v == tv
     go (ExistsTy {})                    = False
@@ -1145,6 +1153,8 @@ inj_vars_of_type look_under_tfs = go
   where
     go ty | Just ty' <- rewriterView ty = go ty'
     go (TyVarTy v)                      = deepUnitFV (go . varType) v
+    go ClassAppTy{}                     = mempty
+    go DepDictTy{}                      = mempty
     go (TermAppTy {})                   = mempty
     go (TermVarTy v)                    = deepUnitFV (go . varType) v
     go (ExistsTy {})                    = mempty
@@ -1200,6 +1210,9 @@ invisibleVarsOfType = go
     go ty                  | Just ty' <- coreView ty
                            = go ty'
     go (TyVarTy v)         = go (tyVarKind v)
+    go (ClassAppTy _ inst dict operand kind)
+      = tyCoVarsOfTypes [inst, dict, kind] `unionVarSet` go operand
+    go (DepDictTy v ty) = tyCoVarsOfType (varType v) `unionVarSet` (go ty `delVarSet` v)
     go (TermAppTy f arg)   = go (varType f) `unionVarSet` go arg
     go (TermVarTy v)       = go (varType v)
     go (ExistsTy _ v ty)
@@ -1356,6 +1369,8 @@ tyConsOfType ty
      go :: Type -> UniqSet TyCon  -- The UniqSet does duplicate elim
      go ty | Just ty' <- coreView ty = go ty'
      go (TyVarTy {})                = emptyUniqSet
+     go (ClassAppTy _ inst dict operand kind) = tyConsOfTypes [inst, dict, operand, kind]
+     go (DepDictTy v ty) = go (varType v) `unionUniqSets` go ty
      go (TermAppTy f arg)           = go (varType f) `unionUniqSets` go arg
      go (TermVarTy v)               = go (varType v)
      go (ExistsTy _ v ty)             = go (varType v) `unionUniqSets` go ty
@@ -1503,6 +1518,12 @@ occCheckExpand vs_to_avoid ty
       | bad_var_occ as tv               = Nothing
       | otherwise                       = return ty
 
+    go cxt (ClassAppTy f inst dict operand kind)
+      = ClassAppTy f <$> go cxt inst <*> go cxt dict <*> go cxt operand <*> go cxt kind
+    go cxt@(as, env) (DepDictTy v body)
+      = do { predicate <- go cxt (varType v)
+           ; let v' = setVarType v predicate
+           ; DepDictTy v' <$> go (as `delVarSet` v, extendVarEnv env v v') body }
     go cxt@(as, env) (TermAppTy f arg)
       | bad_var_occ as f = Nothing
       | otherwise = TermAppTy (lookupVarEnv env f `orElse` f) <$> go cxt arg
