@@ -1,21 +1,6 @@
-NativeIrredIndexEvidence.hs:21:26: error: [GHC-83865]
-    • Couldn't match type ‘v0’ with ‘v’
-      Expected: View a b v
-        Actual: View a (Flip a) v0
-      ‘v0’ is untouchable
-        inside the constraints: ()
-        bound by a retained application
-        at NativeIrredIndexEvidence.hs:21:26-47
-    • In the expression: View @a (Proxy @other)
-      In an equation for ‘wrong’:
-          wrong a b v other Refl = View @a (Proxy @other)
-    • Relevant bindings include
-        other :: Token b (bound at NativeIrredIndexEvidence.hs:21:13)
-        v :: Token b (bound at NativeIrredIndexEvidence.hs:21:11)
-
 NativeIrredIndexEvidence.hs:21:35: error: [GHC-18872]
     • Couldn't match type ‘p0’ with ‘Flip a’
-        arising from a type equality Proxy other ~ Proxy v0
+        arising from a type equality Proxy other1 ~ Proxy v1
       ‘p0’ is untouchable
         inside the constraints: ()
         bound by a retained application
@@ -24,3 +9,22 @@ NativeIrredIndexEvidence.hs:21:35: error: [GHC-18872]
       In the expression: View @a (Proxy @other)
       In an equation for ‘wrong’:
           wrong a b v other Refl = View @a (Proxy @other)
+
+NativeIrredIndexEvidence.hs:33:45: error: [GHC-05617]
+    • Could not deduce ‘other ~ v’
+      from the context: b ~ Flip a
+        bound by a pattern with constructor:
+                   Refl :: forall {k} (a :: k). a :~: a,
+                 in an equation for ‘wrongFixed’
+        at NativeIrredIndexEvidence.hs:33:24-27
+      Expected: Payload (Flip a1) v
+        Actual: Payload (Flip a1) other
+    • In the second argument of ‘FixedView’, namely
+        ‘(Payload @(Flip a) @other)’
+      In the expression: FixedView @a (Payload @(Flip a) @other)
+      In an equation for ‘wrongFixed’:
+          wrongFixed a b v other Refl
+            = FixedView @a (Payload @(Flip a) @other)
+    • Relevant bindings include
+        other :: Token b (bound at NativeIrredIndexEvidence.hs:33:18)
+        v :: Token b (bound at NativeIrredIndexEvidence.hs:33:16)

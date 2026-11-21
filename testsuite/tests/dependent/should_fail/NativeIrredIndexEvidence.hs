@@ -19,3 +19,15 @@ data View a b v where
 wrong :: foreach (a :: Bool) -> foreach (b :: Bool) -> foreach (v :: Token b)
       -> foreach (other :: Token b) -> Flip a :~: b -> View a b v
 wrong a b v other Refl = View @a (Proxy @other)
+
+type Payload :: forall (b :: Bool) -> Token b -> Type
+data Payload b v = Payload
+type FixedView :: forall (a :: Bool) -> forall (b :: Bool) -> Token b -> Type
+data FixedView a b v where
+    FixedView :: forall a (v :: Token (Flip a)).
+                 Payload (Flip a) v -> FixedView a (Flip a) v
+
+-- Fix the payload kind so the diagnostic reaches the two value indices.
+wrongFixed :: foreach (a :: Bool) -> foreach (b :: Bool) -> foreach (v :: Token b)
+           -> foreach (other :: Token b) -> Flip a :~: b -> FixedView a b v
+wrongFixed a b v other Refl = FixedView @a (Payload @(Flip a) @other)

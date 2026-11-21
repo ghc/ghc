@@ -2747,6 +2747,9 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
      = go1 plan fun_orig pos acc fun_ty args
      | otherwise
      = do { matched <- tcRetainedResultInst do_ql expected_rho args tc_fun fun_ty
+          ; matched <- case matched of
+              Just _ -> return matched
+              Nothing -> tcRetainedResultIndexCast do_ql expected_rho args tc_fun fun_ty
           ; case matched of
               Just (inst_tys, body)
                 -> go plan fun_orig pos (addArgWrap (mkWpTyApps inst_tys) acc) body args
@@ -3902,6 +3905,62 @@ tcRetainedResultInst do_ql expected args fun sigma
        ; case matched of
            Just _ -> return matched
            Nothing -> tcRetainedResultCandidate do_ql expected args fun sigma }
+
+-- | Instantiate the last erased constructor binder from an exact result index.
+-- See Note [Transporting a retained result index].
+tcRetainedResultIndexCast :: QLFlag -> Maybe TcRhoType -> [HsExprArg 'TcpRn]
+                         -> HsExpr GhcTc -> TcSigmaType
+                         -> TcM (Maybe ([Type], TcSigmaType))
+tcRetainedResultIndexCast NoQL (Just expected) args fun sigma
+  | XExpr (ConLikeTc (RealDataCon dc)) <- fun
+  , hasNoConcreteTyVars fun
+  , not (any is_type_arg args)
+  , ([(_, tv)], body) <- tcSplitForAllInvisTyVars sigma
+  , isTauTy body
+  , Just result <- tcRetainedOrdinaryResult (count isHsValArg args) body
+  , Just (tc, templates) <- splitTyConApp_maybe result
+  , tc == dataConTyCon dc, isGenerativeTyCon tc Nominal
+  , length templates == tyConArity tc
+  , Just actuals <- result_args tc expected
+  , templates `equalLength` actuals
+  , [index@TermVarTy{}] <- [ actual | (formal, actual) <- zip templates actuals
+                                   , getTyVar_maybe formal == Just tv ]
+  , not (typeKind index `eqType` tyVarKind tv)
+  , all noQuickLookVars [body, expected]
+  = do { valid <- tcRetainedInstScope [index, body, expected]
+       ; if not valid then return Nothing else
+         do { co <- unifyKind Nothing (typeKind index) (tyVarKind tv)
+            ; let choice = mkCastTy index co
+            ; return (Just ([choice], substTyWith [tv] [choice] body)) } }
+  where
+    result_args tc ty
+      | Just (head_tc, params) <- splitTyConApp_maybe ty, head_tc == tc = Just params
+      | otherwise = snd <$> matchSumPayload tc ty
+
+    is_type_arg ETypeArg{} = True
+    is_type_arg _ = False
+tcRetainedResultIndexCast _ _ _ _ _ = return Nothing
+
+{- Note [Transporting a retained result index]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In a checked split, a constructor returns Width (Add cut suffix) p
+while the expected result is Width total v. The length proof can
+establish the kind equality Vec a total ~# Vec a (Add cut suffix).
+The expected result supplies the exact value v. An instantiation
+metavariable cannot hold that value, even after kind transport.
+
+For a saturated real constructor with one invisible binder left, take
+the index only from a direct result argument of the same data TyCon.
+Use ordinary nominal kind checking, as for a written type application,
+and cast that same scoped index. This produces an immutable application.
+Emit the kind equality in IALL when the caller commits to this application.
+The enclosing implication must solve it. The application checker still
+checks all field arguments and the entire result.
+For a generated sum payload, read the result arguments after the checked
+family reduction in matchSumPayload. That reduction goes from the family
+application to the expected data type. Only the data type has a slot that
+selects the index. See Note [Rigid retained indices] in GHC.Tc.Utils.Unify.
+-}
 
 -- | Choose immutable type arguments from independent algebraic result arguments.
 -- Keep the actual result type for the subsequent subsumption check.
