@@ -179,6 +179,61 @@ QuickCheck uses generated inputs to test Haskell properties. Agda's
 [QuickCheck paper](https://www.cis.upenn.edu/~bcpierce/courses/552-2008/resources/icfp-quickcheck.pdf)
 and [Agda standard library, Any](https://agda.github.io/agda-stdlib/v2.3/Data.List.Relation.Unary.Any.html).
 
+### Replay a candidate from an installed plugin
+
+An installed typechecker plugin can search for an ordinary `Locate`
+constraint in a separate frontend invocation. For
+`Locate 8 (OrdinaryOffer.offered 7)`, the plugin writes position `1`.
+The frontend uses `-fno-code` and emits neither a module interface nor
+an object. It uses the dictionary returned by the solver to finish
+typechecking the request. Only the position file passes to the native
+build.
+
+The native invocation uses the global package database and the
+ordinary producer source. It uses `emitFilePosition` to build
+`There Here` at the source type `Member 8 (OrdinaryOffer.offered 7)`.
+This proof selects the second field in the `True` branch of the native
+function `choose :: foreach (b :: Bool) -> Result b`. A separately
+compiled ordinary caller reads the stripped interface and prints
+`("eight",True)`. The harness checks both `-O0` and `-O2` with Core
+and STG Lint.
+[Native provider](examples/boundary-evidence/NativeOffer.hs)
+and [ordinary caller](examples/boundary-evidence/UseNativeOffer.hs).
+
+With producer input `8`, the plugin finds position `0`. Replacing only
+the position file makes the native invocation recheck the same proof.
+It rejects `Here` at the unchanged obligation for input `7`.
+The successful proof concerns one finite list at one input.
+Its validity comes from the constructors that GHC checks during replay.
+It gives no guarantee about the plugin's search or any other input.
+
+Source plugins can transform compiler state. The review of GHC proposal
+107 also raised how a typechecker plugin can solve constraints on its
+own authority. A GHC `TcPlugin` can supply evidence terms and run
+`IO`. Even Core Lint assumes the validity of plugin-supplied coercions.
+The native module gate continues to reject plugins in the invocation
+that compiles retained Core. The harness checks the rejection for both
+the membership solver and an installed Core pass. The example assumes
+the source, checker, compiler and build environment are trusted. A
+process with access to those files can still modify them.
+[Source plugins proposal](https://ghc-proposals.readthedocs.io/en/latest/proposals/0107-source-plugins.html),
+[proposal review](https://github.com/ghc-proposals/ghc-proposals/pull/107#issuecomment-361558362),
+[typechecker plugins](../users_guide/extending_ghc.rst#typechecker-plugins)
+and [Core Lint assumptions](../../compiler/GHC/Core/Lint.hs).
+
+Run the installed package and native replay checks with a compiler and
+package tool from the same Linux build.
+
+```sh
+bash docs/dependent-haskell/examples/boundary-evidence/check-frontend-candidate.sh \
+  "$PWD/_build/stage1/bin/ghc" "$PWD/_build/stage1/lib" \
+  "$PWD/_build/stage1/bin/ghc-pkg" /tmp/boundary-candidate
+```
+
+Use an output path that does not exist. The script keeps the candidate
+files, the stripped interfaces, the native results, and the failure
+diagnostics.
+
 ## What does an observation establish?
 
 The [pair readback experiment](roadmap/R15-closed-term-evaluator.md#m161-observe-a-field-decision-from-the-loaded-executable)
@@ -233,7 +288,7 @@ this observation exactly when `e` reaches `()`. A procedure that decided
 all such equivalences would decide termination.
 [Schmidt-Schauß, Sabel and Machkasova, Definition 2.2](https://lmcs.episciences.org/930/pdf#page=6).
 
-The two membership examples make the same distinction. Template Haskell
+The membership examples make the same distinction. Template Haskell
 emits constructor syntax that GHC checks at the splice. The trusted solver
 plugin supplies a method dictionary containing a path. Both yield
 `Member 8 (OrdinaryOffer.offered 7)`. The exact proposition determines

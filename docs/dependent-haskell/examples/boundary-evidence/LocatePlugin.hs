@@ -10,13 +10,14 @@ import GHC.Core.Class (Class)
 import GHC.Core.DataCon (classDataCon)
 import GHC.Core.Make (mkCoreApps, mkCoreConApps)
 import GHC.Core.Type (Type, isNumLitTy, splitTyConApp_maybe)
-import GHC.Plugins (Plugin (..), defaultPlugin, purePlugin)
-import GHC.Tc.Plugin (TcPluginM, lookupTHName, tcLookupClass, tcLookupId)
+import GHC.Plugins (Plugin (..), defaultPlugin, impurePlugin, purePlugin)
+import GHC.Tc.Plugin (TcPluginM, lookupTHName, tcLookupClass, tcLookupId, tcPluginIO)
 import GHC.Tc.Types (TcPlugin (..), TcPluginSolveResult (..))
 import GHC.Tc.Types.Constraint (Ct (CDictCan), DictCt (..))
 import GHC.Tc.Types.Evidence (EvTerm (EvExpr))
 import GHC.Types.Id (Id)
 import GHC.Types.Unique.FM (emptyUFM)
+import Numeric.Natural (Natural)
 
 -- | The exact class and the two Haskell proof constructors used by the solver.
 data Definitions = Definitions Class Id Id
@@ -25,16 +26,22 @@ data Definitions = Definitions Class Id Id
 plugin :: Plugin
 plugin =
     defaultPlugin
-        { tcPlugin = \_ -> Just solver
-        , pluginRecompile = purePlugin
+        { tcPlugin = Just . solver
+        , pluginRecompile = \options ->
+            if null options then purePlugin options else impurePlugin options
         }
 
 -- | Resolve names once, then answer requests with typed membership paths.
-solver :: TcPlugin
-solver =
+solver :: [String] -> TcPlugin
+solver options =
     TcPlugin
         { tcPluginInit = definitions
-        , tcPluginSolve = \defs _ _ wanteds -> pure (TcPluginOk (mapMaybe (solve defs) wanteds) [])
+        , tcPluginSolve = \defs _ _ wanteds -> do
+            let solved = mapMaybe (solve defs) wanteds
+            case (options, solved) of
+                ([file], [(position, _)]) -> tcPluginIO (writeFile file (show position ++ "\n"))
+                _ -> pure ()
+            pure (TcPluginOk (map snd solved) [])
         , tcPluginRewrite = const emptyUFM
         , tcPluginPostTc = const (pure ())
         , tcPluginShutdown = const (pure ())
@@ -49,26 +56,26 @@ definitions = do
     Definitions <$> tcLookupClass cls <*> tcLookupId atHead <*> tcLookupId inTail
 
 -- | Build the dictionary from a path with the requested label and list type.
-solve :: Definitions -> Ct -> Maybe (EvTerm, Ct)
+solve :: Definitions -> Ct -> Maybe (Natural, (EvTerm, Ct))
 solve (Definitions cls atHead inTail) ct@(CDictCan dict)
     | di_cls dict == cls
     , [label, labels] <- di_tys dict
     , Just key <- isNumLitTy label = do
-        path <- search key label labels
+        (position, path) <- search key label labels
         let dictionary = mkCoreConApps (classDataCon cls) [Type label, Type labels, path]
-        pure (EvExpr dictionary, ct)
+        pure (position, (EvExpr dictionary, ct))
   where
     -- See Note [Evidence for finite membership].
-    search :: Integer -> Type -> Type -> Maybe CoreExpr
+    search :: Integer -> Type -> Type -> Maybe (Natural, CoreExpr)
     search key label labels
         | Just (con, [_, first, rest]) <- splitTyConApp_maybe labels
         , con == promotedConsDataCon
         , Just n <- isNumLitTy first =
             if n == key
-                then Just (mkCoreApps (Var atHead) [Type label, Type rest])
+                then Just (0, mkCoreApps (Var atHead) [Type label, Type rest])
                 else do
-                    path <- search key label rest
-                    pure (mkCoreApps (Var inTail) [Type label, Type first, Type rest, path])
+                    (position, path) <- search key label rest
+                    pure (position + 1, mkCoreApps (Var inTail) [Type label, Type first, Type rest, path])
         | otherwise = Nothing
 solve _ _ = Nothing
 
