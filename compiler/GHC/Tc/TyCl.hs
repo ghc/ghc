@@ -5514,11 +5514,11 @@ checkRetainedConShape new_or_data telescope args res_ty
     plain_field (CDF _ unpack strict _ _ _)
       = not (isSrcUnpacked unpack) && not (isSrcStrict strict)
 
--- | The first retained result form takes exactly one runtime field.
+-- | A retained result has no erased binders or context.
 retainedResultAllowed :: HsOuterSigTyVarBndrs GhcRn
                       -> [LHsGadtTelescope GhcRn] -> HsConDeclGADTDetails GhcRn
                       -> Bool
-retainedResultAllowed HsOuterImplicit{} [] (PrefixConGADT _ []) = True
+retainedResultAllowed HsOuterImplicit{} [] PrefixConGADT{} = True
 retainedResultAllowed _ _ _ = False
 
 -- | Split fields with their explicit metadata, including vacuous binders.

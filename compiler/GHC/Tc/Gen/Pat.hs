@@ -1602,7 +1602,8 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
            PrefixCon ann pats -> return (ann, pats)
            _ -> bad_pattern
        ; check_con_pat_arity con_like (length pats)
-       ; unless (null eq_spec || all isRetainedVarPat pats) bad_pattern
+       ; unless (null eq_spec || all isRetainedVarPat
+                   [pat | (Just _, pat) <- zipEqual binders pats]) bad_pattern
        ; let tc = dataConTyCon con
        ; expected <- readExpType_maybe (scaledThing pat_ty_scaled)
        ; family_result <- maybe (pure Nothing) (match_family_result tc) expected

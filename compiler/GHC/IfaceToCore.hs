@@ -1362,13 +1362,15 @@ tcIfaceDataCons tycon_name tycon if_cons
                                      ; return tys }
                             ; return ([], arg_tys) }
                     else tc_retained_args dc_name emptyVarSet arg_binders args
-                ; eq_spec <- extendIfaceIdEnv [field | Just field <- retained_binders] $
-                               tcIfaceEqSpec spec
+                ; let retained_fields = [field | Just field <- retained_binders]
+                ; eq_spec <- extendIfaceIdEnv retained_fields $ tcIfaceEqSpec spec
                 ; when (not (null arg_binders) && not (null spec)) $
-                    case retained_binders of
-                      [Just field] -> do
+                    case (retained_fields, univ_tvs) of
+                      ([field], [univ]) -> do
                         { valid <- evaluateIfaceNativeDomain (ppr dc_name)
-                            (isNativeClosedIndexType (varType field))
+                            (isNativeClosedIndexType (varType field)
+                             && varType field `eqType` varType univ
+                             && all independent_result_field arg_tys)
                         ; unless valid $
                             failIfM (text "Invalid retained result field in interface:" <+> ppr dc_name) }
                       _ -> failIfM (text "Invalid retained result field in interface:" <+> ppr dc_name)
@@ -1441,7 +1443,7 @@ tcIfaceDataCons tycon_name tycon if_cons
         user_names = [ifaceBndrName b | Bndr b _ <- users]
         valid_result
           | wrapper
-          , [Just field] <- binders
+          , [field] <- names
           , [univ] <- univ_names
           , [] <- user_names
           , [(lhs, IfaceTermVar rhs)] <- spec
@@ -1453,6 +1455,9 @@ tcIfaceDataCons tycon_name tycon if_cons
         lazy_bang _        = False
         lazy_src_bang (IfSrcBang unpack strict)
           = not (isSrcUnpacked unpack) && not (isSrcStrict strict)
+
+    independent_result_field (Scaled mult ty)
+      = not (anyFreeVarsOfType isId mult || anyFreeVarsOfType isId ty)
 
     -- Allocate the lexical binder skeleton before forcing its domain.
     -- See Note [Importing retained constructor field telescopes].

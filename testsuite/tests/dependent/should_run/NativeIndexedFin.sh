@@ -196,6 +196,8 @@ data CheckedList (xs :: [Bool]) where
     CheckedList :: foreach (ys :: [Bool]) -> CheckedList (True ': ys)
 #elif defined(TWO_FIELDS_RESULT)
     CheckedList :: foreach (ys :: [Bool]) (zs :: [Bool]) -> CheckedList ys
+#elif defined(DEPENDENT_PAYLOAD_RESULT)
+    CheckedList :: foreach (ys :: [Bool]) -> CheckedList ys -> CheckedList ys
 #else
     CheckedList :: forall xs. foreach (ys :: [Bool]) -> (xs :~: ys) -> CheckedList xs
 
@@ -207,10 +209,13 @@ checked = CheckedList [True] Refl
 data Tagged (tag :: Ordering) where
     Dynamic :: foreach (tag :: Ordering) -> Tagged tag
     Fixed :: Tagged 'EQ
+
+data Cell (layout :: [Bool]) where
+    Cell :: foreach (layout :: [Bool]) -> Int -> Cell layout
 #endif
 HS
 "${ghc[@]}" -O0 -c CheckedList.hs
-for shape in COMPOUND_RESULT TWO_FIELDS_RESULT; do
+for shape in COMPOUND_RESULT TWO_FIELDS_RESULT DEPENDENT_PAYLOAD_RESULT; do
     if "${ghc[@]}" -O0 -fforce-recomp "-D$shape" -ferror-spans \
             -fdiagnostics-color=never -c CheckedList.hs >result.log 2>&1; then
         echo "Accepted an unsupported retained constructor result ($shape)"
@@ -223,8 +228,11 @@ for shape in COMPOUND_RESULT TWO_FIELDS_RESULT; do
         TWO_FIELDS_RESULT)
             grep -Fq 'CheckedList.hs:11:61-74: error: [GHC-83605]' result.log
             grep -Eq 'The result type is .CheckedList ys.\.' result.log ;;
+        DEPENDENT_PAYLOAD_RESULT)
+            grep -Fq 'CheckedList.hs:13:64-77: error: [GHC-83605]' result.log
+            grep -Eq 'The result type is .CheckedList ys.\.' result.log ;;
     esac
-    grep -Fq 'A constructor may use its only field as the sole result index.' result.log
+    grep -Fq 'A constructor may use its only retained field as the sole result index.' result.log
     grep -Fq 'propositional equality field' result.log
 done
 if "${ghc[@]}" -O0 -fforce-recomp -XStrictData -fdiagnostics-color=never \
@@ -249,6 +257,16 @@ roundTag :: Tagged tag -> Tagged tag
 roundTag (Dynamic stored) = Dynamic stored
 roundTag Fixed = Fixed
 
+roundCell :: Cell layout -> Cell layout
+roundCell (Cell stored payload) = Cell stored payload
+
+readLayout :: Cell layout -> [Bool]
+readLayout (Cell stored _) = stored
+
+hasPayload :: Cell layout -> Bool
+hasPayload (Cell _ 37) = True
+hasPayload (Cell _ _) = False
+
 dynamic :: Tagged tag -> Bool
 dynamic (Dynamic _) = True
 dynamic Fixed = False
@@ -257,13 +275,29 @@ main :: IO ()
 main = do
     xs <- newIORef (error "forced retained list" :: [Bool]) >>= readIORef
     tag <- newIORef (error "forced retained ordering" :: Ordering) >>= readIORef
+    layout <- newIORef [True] >>= readIORef
+    payload <- newIORef (37 :: Int) >>= readIORef
+    unusedPayload <- newIORef (error "forced ordinary payload" :: Int) >>= readIORef
     let listLazy = case roundList (CheckedList xs) of CheckedList _ -> True
         tagLazy = case roundTag (Dynamic tag) of
             Dynamic _ -> True
             Fixed -> False
+        readWithBottomPayload = Cell layout unusedPayload
+        readWithBottomLayout = Cell xs payload
     if listLazy && tagLazy && not (dynamic (roundTag Fixed))
+       && readLayout (roundCell readWithBottomPayload) == [True]
+       && hasPayload (roundCell readWithBottomLayout)
         then pure ()
         else fail "retained constructor result changed its runtime witness"
+HS
+cat >"$tmp/result/client/WrongCell.hs" <<'HS'
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
+module WrongCell where
+
+import CheckedList (Cell(Cell))
+
+wrong :: Cell layout -> Cell other
+wrong (Cell stored payload) = Cell stored payload
 HS
 for opt in -O0 -O2; do
     (
@@ -277,6 +311,12 @@ for opt in -O0 -O2; do
             "${ghc[@]}" "$opt" ResultClient.o ../provider/CheckedList.o -o result-client
             ./result-client
         done
+        if "${ghc[@]}" "$opt" -fno-code -ferror-spans -fdiagnostics-color=never \
+                -c WrongCell.hs >wrong-cell.log 2>&1; then
+            echo 'Rebuilt an indexed constructor at a different index'
+            exit 1
+        fi
+        grep -Eq '^WrongCell.hs:7:[0-9]+-[0-9]+: error: \[GHC-25897\]' wrong-cell.log
     )
 done
 (

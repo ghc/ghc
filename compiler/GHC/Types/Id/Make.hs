@@ -743,12 +743,14 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
 
   | otherwise
   = do { (wrap_args, wrap_body) <-
-           case dataConRepArgBinders data_con of
-             [Just field] | retained_result ->
-               -- Reuse the binder referenced by the result and by reflexivity.
-               -- See Note [Retained constructor result equality] in GHC.Core.DataCon.
-               return ([field], mkCoApps (App initial_wrap_app (Var field)) refls)
-             _ -> do { args <- mapM (newLocal (fsLit "conrep")) wrap_arg_tys
+           if retained_result
+             then do { args <- sequence
+                        [maybe (newLocal (fsLit "conrep") ty) pure mb
+                        | (mb, ty) <- zipEqual (dataConRepArgBinders data_con) wrap_arg_tys]
+                     -- Reuse the retained Id in the result and in reflexivity.
+                     -- See Note [Retained constructor result equality] in GHC.Core.DataCon.
+                     ; return (args, mkCoApps (mkVarApps initial_wrap_app args) refls) }
+             else do { args <- mapM (newLocal (fsLit "conrep")) wrap_arg_tys
                      ; body <- mk_rep_app (dropList stupid_theta args `zip` dropList eq_spec unboxers)
                                           (mkCoApps initial_wrap_app refls)
                      ; return (args, body) }

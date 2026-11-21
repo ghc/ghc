@@ -1220,18 +1220,22 @@ mkDataConWithTelescope source_order arg_binders name declared_infix prom_info
         && valid_result
 
     valid_result
-      | [Just field] <- arg_binders
+      | [field] <- [b | Just b <- arg_binders]
       , [univ] <- univ_tvs
       , [] <- user_tvbs
       , [EqSpec t (TermVarTy rhs)] <- eq_spec
       , Just (parent, [TermVarTy result]) <- splitTyConApp_maybe orig_res_ty
       = t == univ && rhs == field && result == field && parent == rep_tycon
         && varType field `eqType` varType univ
+        && all independent_result_field orig_arg_tys
         && case rep of { DCR {} -> True; _ -> False }
       | otherwise
       = null eq_spec && not (anyFreeVarsOfType isId orig_res_ty)
         && valid_universals
         && case rep of { NoDataConRep -> True; _ -> False }
+
+    independent_result_field (Scaled mult ty)
+      = not (anyFreeVarsOfType isId mult || anyFreeVarsOfType isId ty)
 
     valid_universals
       = all isTyVar univ_tvs && all isTyVar user_tvs
@@ -1903,27 +1907,30 @@ dataConHasRetainedResult con
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A constructor with this source type:
 
-  Indexed :: foreach (ys :: [Bool]) -> Indexed ys
+  Cell :: foreach (ys :: [Bool]) -> Int -> Cell ys
 
 has a worker with a uniform result:
 
-  Indexed :: forall xs. foreach (ys :: [Bool]) -> (xs ~# ys) -> Indexed xs
+  Cell :: forall xs. foreach (ys :: [Bool]) -> Int %1 -> (xs ~# ys) -> Cell xs
 
 The data constructor's EqSpec records xs ~# ys. The worker places that
-coercion argument after the field because its type depends on the field.
-A wrapper applies the worker at ys and supplies reflexivity. A case
-alternative binds a fresh field Id and then the stored coercion at that Id.
-The coercion has no runtime representation. Neither operation evaluates ys.
+coercion argument after the source fields, in the scope of the retained
+field. A wrapper applies the worker at ys. It passes the fields in source
+order and supplies reflexivity. A case alternative binds the fields, then
+the coercion at the fresh retained field Id. The coercion has no runtime
+representation. Building the constructor or binding its fields leaves
+the fields unevaluated.
 
 Do not put this proof in the ordinary EqSpec prefix. The source field Id
 would be out of scope there. Keep the same order when copying alternative
 binders in GHC.Core.Utils and when checking them in GHC.Core.Lint. An
 interface decodes the proof's type in the scope of the decoded field.
 
-The admitted shape has one field at a closed structural index type, one
-result index and no contexts or existentials. Only a variable or wildcard
-can match the field. The resulting
-equality is an ordinary nominal Given for the rest of the pattern match.
+This shape has one retained field at a closed structural index type, one
+result index and no contexts or existentials. Ordinary field types and
+multiplicities must be independent of the retained field. A variable or
+wildcard can match the retained field. The equality is an ordinary nominal
+Given after the fields are in scope.
 -}
 
 -- | Rebuild a constructor field telescope without erasing runtime binders.
