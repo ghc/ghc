@@ -575,6 +575,13 @@ Wrinkles
    will kill worker-wrapper.  Well, so be it.  They are pretty suspicious anyway;
    see Note [Checking for INLINE loop breakers].
 
+(CWW5) A top-level worker type must not refer to a local runtime index.
+   For example, a cast can close the result of a retained list application by
+   reducing its length. Tidy can restore a local alias inside a top-level
+   RHS but cannot bind that alias in the worker's type. Keep the cast when
+   the worker would violate the same invariant as a top-level binding in
+   Note [Keep retained arguments in prepareRhs].
+
 All these wrinkles are exactly like worker/wrapper for strictness analysis:
   f is the wrapper and must inline like crazy
   $wf is the worker and must carry f's original pragma
@@ -643,6 +650,9 @@ tryCastWorkerWrapper env bind_cxt old_bndr bndr (Cast rhs co)
   , typeHasFixedRuntimeRep work_ty   -- Don't peel off a cast if doing so would
                                      -- lose the underlying runtime representation.
                                      -- See Note [Preserve RuntimeRep info in cast w/w]
+  , not (isTopLevel top_lvl                         -- See (CWW5)
+         && sm_core_mode (seMode env) == RetainedCore
+         && anyFreeVarsOfType isNonCoVarId work_ty)
   , not (isOpaquePragma (idInlinePragma old_bndr)) -- Not for OPAQUE bindings
                                                    -- See Note [OPAQUE pragma]
   = do  { uniq <- getUniqueM
