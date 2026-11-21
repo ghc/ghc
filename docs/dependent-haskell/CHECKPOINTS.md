@@ -28,6 +28,21 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `274ea2ece0`, an ordinary client reuses a bounded list position after
+a comparison proves that two runtime lists have equal lengths. The
+three observations are `[Just ('b',20),Nothing,Nothing]` for a valid
+pair, unequal lengths and a negative offset. A written empty case and
+an omitted empty equation both pass under a chain of length equalities.
+An unrelated equality reports GHC-83605 at the first written equation.
+
+The Stage 2 compiler matched 412 Showcase rows in source GHCi and at
+native `-O0`, `-O1` and `-O2`. Seven registered tests passed, including
+the separately compiled list client and higher-rank existential tests.
+The direct linear cursor preserves demand on its selected field. A
+conditional producer can infer one hidden callback type for both arms.
+[Checked lists](examples/qualified-pi/ListCursor.hs) and
+[conditional producer](examples/erased-existentials/RankedPackageClient.hs).
+
 At `1610131f91`, `withIndex` consumes both a bounded position and a
 callback linearly. A discarded or duplicated callback reports GHC-18872
 at its binder in the written equation. A repeated retained constructor
