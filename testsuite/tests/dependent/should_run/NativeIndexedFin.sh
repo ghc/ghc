@@ -88,3 +88,29 @@ if [[ $# -ge 3 ]]; then
     grep -Fq 'mismatched interface file versions' old-fields.log
     grep -Fq 'general-indexed-constructor-operand' old-fields.log
 fi
+
+mkdir "$tmp/multi-index-client"
+cp NativeGeneralGadtOperandProvider.hi "$tmp/multi-index-client/"
+cd "$tmp/multi-index-client"
+cat >Main.hs <<'HS'
+{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}
+module Main where
+
+import Data.Proxy (Proxy(..))
+import NativeGeneralGadtOperandProvider (Both(..), make)
+
+fixed :: (Both (Maybe Bool) [Ordering], Proxy ('Mk2 'LT 'False))
+fixed = make False LT
+
+lazy :: Bool -> Char -> Bool
+lazy x y = case fst (make x y) of Mk2 _ _ -> True
+
+main :: IO ()
+main = case (fixed, lazy undefined undefined) of
+    ((Mk2 LT False, Proxy), True) -> pure ()
+    _ -> fail "wrong indexed constructor fields"
+HS
+"${ghc[@]}" -O2 -ddump-inlinings -dsuppress-module-prefixes -c Main.hs > inlinings.log
+grep -Fxq 'Inlining done: make' inlinings.log
+"${ghc[@]}" Main.o "$out/client/NativeGeneralGadtOperandProvider.o" -o run
+./run
