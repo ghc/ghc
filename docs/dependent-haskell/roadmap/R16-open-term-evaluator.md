@@ -2114,7 +2114,16 @@ interface. This migration leaves
 the earlier single nullary equation and synonym formats in place.
 
 An installed interface can omit dependencies without losing its
-normalized equation. Rebuild the installed provider from source to
-recover those dependencies.
+normalized equation. To recover those dependencies in a Cabal project,
+list the provider's source checkout as a local package alongside the
+client. For example, put `packages: ./provider ./client` in
+`cabal.project`. Build both packages in a fresh build directory with
+the matching tools from the new compiler installation.
+
+```sh
+cabal build all --builddir=dist-r16 \
+  --with-compiler=/path/to/new/bin/ghc --with-hc-pkg=/path/to/new/bin/ghc-pkg
+```
+
 [Two-compiler warm check](../examples/open-evaluation/check-source-proof-branch-upgrade.sh)
 and [home recompilation check](../../../compiler/GHC/Iface/Recomp.hs).
