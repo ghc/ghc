@@ -1,9 +1,9 @@
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 {-# LANGUAGE DataKinds, ExplicitNamespaces, FlexibleContexts, RequiredTypeArguments, TypeApplications #-}
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes, PartialTypeSignatures, QuantifiedConstraints, RankNTypes, ScopedTypeVariables, TypeFamilies, TypeOperators #-}
-module ConstrainedElementsClient (advanceCursor, showRemainder, splitCollection, constrainedElements, annotatedElement, explicitElements, renderField, formatField, renderKnownFields, retainedMaybeDomain, aliasedReflection, runReflection, partialElement) where
+module ConstrainedElementsClient (advanceCursor, showAdvance, showRemainder, splitCollection, constrainedElements, annotatedElement, explicitElements, renderField, formatField, renderKnownFields, retainedMaybeDomain, aliasedReflection, runReflection, partialElement) where
 
-import ConstrainedElements (Cursor(..), Collection(..), Allowed, Collects(..), FieldKey, Field(..), applyField, field, withField, Reflection, reflectMaybe, MaybeBoolEcho, AtNothing)
+import ConstrainedElements (Cursor(..), PrintableCursor, Collection(..), Allowed, Collects(..), FieldKey, Field(..), applyField, field, withField, Reflection, reflectMaybe, MaybeBoolEcho, AtNothing)
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
@@ -107,3 +107,7 @@ showRemainder = fmap (show . snd) . uncons
 -- | Check the remaining input under the imported cursor constraint.
 advanceCursor :: Cursor c e => (e -> Bool) -> c -> Maybe (Remaining c)
 advanceCursor = advanceIf
+
+-- | Print the remaining collection when the predicate accepts its first element.
+showAdvance :: PrintableCursor c e => (e -> Bool) -> c -> Maybe String
+showAdvance p = fmap show . advanceIf p

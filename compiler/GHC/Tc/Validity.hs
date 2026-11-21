@@ -84,7 +84,7 @@ import GHC.Types.Var     ( Id, ExistsTyFlag(ImplicitExists), VarBndr(..)
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing ( TyThing(..) )
-import GHC.Types.Unique.FM ( addToUFM, emptyUFM, lookupUFM )
+import GHC.Types.Unique.FM ( addToUFM, emptyUFM, lookupUFM, lookupWithDefaultUFM )
 import GHC.Types.Unique.Set ( addOneToUniqSet, elementOfUniqSet, emptyUniqSet
                             , isEmptyUniqSet, nonDetEltsUniqSet )
 
@@ -499,7 +499,10 @@ checkConstrainedSignature ctxt ty
     checks_domain _ = False
 
     -- See Note [Family domains beneath retained binders].
-    check_telescope origin whole = go whole
+    check_telescope origin whole
+      | TySynCtxt{} <- origin, isConstraintKind (typeKind whole)
+      = go (tcMkDFunPhiTy [whole] unitTy)
+      | otherwise = go whole
       where
         go sig = do
           let (_, theta, _) = familyDomainPrefix 0 sig
@@ -708,6 +711,47 @@ data ConstrainedFamilyUse
   = ScopedFamily TyCon Int PredType
   | UnsupportedFamily TyCon SDoc
 
+-- | Collect the independent premises of one constraint context.
+-- See Note [Family domains in constraint tuples].
+familyDomainGivens :: ThetaType -> ThetaType
+familyDomainGivens theta = nubBy eqType $
+    State.evalState (concat <$> traverse collect theta) emptyUFM
+  where
+    collect pred_ty
+      | null (constrainedFamilyApps pred_ty) = pure [pred_ty]
+    collect pred_ty@(TyConApp tc args)
+      | Just cls <- tyConClass_maybe tc, isCTupleClass cls
+      = concat <$> traverse collect args
+      | not (isForgetfulSynTyCon tc) || all (null . constrainedFamilyApps) args
+      , Just rhs <- coreView pred_ty
+      = do
+          cache <- State.get
+          let visited = lookupWithDefaultUFM cache [] tc
+          if any (pickyEqType pred_ty) visited
+            then pure []
+            else do
+              State.put $! addToUFM cache tc (pred_ty : visited)
+              collect rhs
+    collect _ = pure []
+
+{- Note [Family domains in constraint tuples]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In (Collects c, Show (Elem c)) => r, the first dictionary establishes
+the domain of Elem c in the second predicate. Nested constraint tuples
+and synonyms for those tuples provide the same component dictionaries.
+Check a constraint synonym declaration in the context it describes.
+A use as an ordinary type argument, such as Proxy (CanDisplay c), has
+no such context. It still needs the domain at the use site.
+
+Only use a component that has no marked family applications. A class
+cannot justify its own argument by projecting a superclass. A forgetful
+synonym can erase a written argument with a family obligation. Check
+such an argument independently before using that synonym as evidence.
+Compare visited applications without unfolding synonyms. Different
+written arguments can carry different obligations even if they reduce
+to the same type.
+-}
+
 -- | Collect family applications before a synonym can discard a written argument.
 -- See Note [Domains in type synonyms].
 familyDomainObligations :: Type -> TcM [ConstrainedFamilyUse]
@@ -734,7 +778,7 @@ familyDomainObligations ty = State.evalStateT (go ty) emptyUFM
     go ty@(FunTy af ma mult arg res)
       | isInvisibleFunArg af = do
           let (arrow_tys, theta, body) = qualifiers ty
-              plain = filter (null . constrainedFamilyApps) theta
+              plain = familyDomainGivens theta
           kinds <- forbidden arrow_tys
           predicates <- concat <$> traverse go theta
           uses <- go body

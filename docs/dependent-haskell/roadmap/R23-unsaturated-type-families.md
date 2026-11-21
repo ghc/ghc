@@ -673,6 +673,43 @@ and a family declaration whose argument is marked matchable. The
 compatibility failures above also need a policy for arrows in the
 *result* of a family equation.
 
+### Separate open equations at explicit matchability
+
+An open family with no visible arguments can declare a matchability
+parameter in its kind signature and bind it in the family header.
+
+```haskell
+type OpenKind :: forall (m :: Matchability). Type
+type family OpenKind @m
+```
+
+One module writes `OpenKind @M = Type %M -> Type`. A second module writes
+`OpenKind @U = Bool %U -> Bool`. The ordinary client imports both equations.
+It uses the M row as the kind of `Maybe` and the U row as the type of a
+runtime Boolean function. The two nominal patterns are apart. Two writers
+whose patterns overlap can coexist when their results agree on that overlap.
+An unindexed nullary family has an empty pattern in both equations, so
+different results conflict. The U case still forbids inverse decomposition.
+[Source and stripped-interface checks](../examples/open-evaluation/check-open-arrow-kind.sh).
+
+Proposal #425 puts the written `@m` in the family arity. With only the
+kind signature, `@M` in an equation is oversaturated. Proposal #242 covers
+matchability variables, nominal decomposition and kind defaults. Proposal
+#370 gives the modifier syntax used here. The example passes on `a765a25aa7`,
+before the fork's closed-nullary result-selector experiment. Both equation
+writers use the kind that the open family owner published.
+[Invisible declaration binders](https://ghc-proposals.readthedocs.io/en/latest/proposals/0425-decl-invis-binders.html#argument-5-arity-inference),
+[matchability](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#matchabilities),
+and [modifiers](https://ghc-proposals.readthedocs.io/en/latest/proposals/0370-modifiers.html).
+
+An associated type family can also supply a finite callback. For
+`Entry mode (flag :: Bool)`, `Store (Entry 'Compact)` checks with
+`Store :: (Bool %U -> Type) -> Type`. Saturated applications at `'False`
+and `'True` use the associated equations. Writing the partial application
+uses `ExperimentalDependentTypes`. An ordinary client can consume the
+stored values through interfaces. An M receiver or a family equation
+pattern containing that partial family still fails.
+
 ### Inferring a kind after supplying a visible argument
 
 `RunVisible (PickVisible 'True)` retains the invisible argument of
