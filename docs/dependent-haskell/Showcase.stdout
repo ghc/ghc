@@ -361,6 +361,7 @@ choose a field result by negating its runtime index: ("t","41")
 choose a retained field result through a saturated type synonym: ("f","41")
 select through an ordinary type constructor: (7,'x',())
 select an arrow result inside forall: ((Proxy,1),(Proxy,'?'))
+select the input type of an ordinary arrow: (7,120)
 match Bool and Ordering directly in a type: (7,'x')
 remove a Maybe layer and keep any other type: (7,'x')
 use a local type in a constructor case: Just True

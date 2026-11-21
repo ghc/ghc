@@ -1299,6 +1299,12 @@ main = do
     observe "select an arrow result inside forall"
         ( NativeNestedCase.forallResult (Proxy @'LT) NativeNestedCase.CaseOn
         , NativeNestedCase.forallResult (Proxy @'False) NativeNestedCase.CaseMissing )
+    let arrowInput :: NativeNestedCase.ArrowDomain 'LT ('Just ('Just 'True))
+        arrowInput (_, value) = value
+        arrowMissing :: NativeNestedCase.ArrowDomain 'EQ 'Nothing
+        arrowMissing c = fromEnum c
+    observe "select the input type of an ordinary arrow"
+        (arrowInput (Proxy, 7), arrowMissing 'x')
     observe "match Bool and Ordering directly in a type"
         (7 :: NativeCase.ByType Bool, 'x' :: NativeCase.ByType Ordering)
     observe "remove a Maybe layer and keep any other type"
