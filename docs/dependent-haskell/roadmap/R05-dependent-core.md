@@ -514,13 +514,20 @@ checks the whole retained function and preserves demand on the callback
 and its runtime index.
 [Ordinary client](../examples/open-evaluation/ConstrainedElementsClient.hs).
 
-With `ImpredicativeTypes`, a fixed call telescope can still check a declared
+With `ImpredicativeTypes`, a complete call telescope can check a declared
 retained callback by ordinary subsumption. A nested call with a fixed ordinary
-result can use the same check. Quick Look still rejects instantiating a type
-variable with the retained polytype, as in
-`Just reflectMaybe :: Maybe (forall a. Reflection a)`.
+result can use the same check.
 [Showcase client](../examples/open-evaluation/ConstrainedElementsQuickLook.hs).
 [Quick Look argument checking](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf#page=12).
+
+An ordinary algebraic constructor can store the whole retained polytype.
+With `type Callback = forall a. Reflection a`, both
+`Just @Callback reflectMaybe` and `Just reflectMaybe :: Maybe Callback`
+use the known type argument. The second form obtains it from the expected
+result. The compiler checks each field, including its class constraints.
+A separately compiled reader can match the constructor and instantiate the
+stored callback. The field stays lazy. The unannotated `Just reflectMaybe`
+still reports GHC-83605 when the result type gives no choice.
 
 With `DeepSubsumption`, an ordinary arrow can also
 return a wrapper that supplies a dictionary lambda for the retained suffix.

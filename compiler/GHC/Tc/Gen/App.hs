@@ -1504,7 +1504,10 @@ tcRetainedGroundApp True DoQL exp_ty rn_head fun sigma args
                    ; case matched of
                        Just (choices, body)
                          | let (remaining_tvs, _, body_tau) = tcRetainedInstTelescope body
-                         , null remaining_tvs, isRetainedValueType body_tau
+                         , null remaining_tvs
+                         , isRetainedValueType body_tau
+                             || (maybe False isRankedRetainedContainer expected
+                                 && isGroundRetainedCallType body_tau)
                          -> do { choices <- liftZonkM (zonkTcTypes choices)
                                ; body <- liftZonkM (zonkTcType body)
                                ; valid_choices <- tcRetainedInstScope (body : choices)
@@ -2277,6 +2280,13 @@ the field and the result. Keep this type argument in the checked prefix
 and use ordinary checking for that field. The callback keeps its binders,
 constraints and scope. Quick Look does not assign an instantiation
 variable to Callback.
+
+An expected result can determine the same choice for Just reflect. Match
+the ordinary constructor result Maybe alpha against Maybe Callback.
+With ImpredicativeTypes, this match can use a ranked retained type argument
+from an algebraic result. Require the same exact result, complete choices,
+kinds and scope as a written application. Check the field against Callback
+afterwards. The expected result supplies the choice before argument checking.
 
 Alternatively, use the existing immutable expected-result selection, including
 its algebraic candidate fallback. Keep the actual substituted signature. Append
@@ -4651,8 +4661,14 @@ tcRetainedResultMatch NoQL (Just expected) args fun sigma
   , let (theta, tau) = tcSplitPhiTy body
   , null theta || hasNoConcreteTyVars fun
   , Just result <- tcRetainedOrdinaryResult (count isHsValArg args) tau
-  , isTauTy expected || (hasNoConcreteTyVars fun
-                         && (isRetainedValueType expected || exactPackageResult tvs result expected))
+  , let tau_expected = isTauTy expected
+        ranked_constructor
+          | not tau_expected
+          , XExpr (ConLikeTc (RealDataCon _)) <- fun = isRankedRetainedContainer expected
+          | otherwise = False
+  , tau_expected || (hasNoConcreteTyVars fun
+                     && (isRetainedValueType expected || ranked_constructor
+                         || exactPackageResult tvs result expected))
   , isTauTy result
   , not (hasNativeDependentExpr (Core.Type body))
   , Just kind_subst <- tcMatchTyX_BM (bind_outer tvs) Subst.emptySubst
@@ -4661,7 +4677,12 @@ tcRetainedResultMatch NoQL (Just expected) args fun sigma
   , Just inst_tys <- traverse (Subst.lookupTyVar subst) tvs
   , and (zipWith (kind_agrees subst) tvs inst_tys)
   , eqType (Subst.substTy subst result) expected
-  = do { valid <- tcRetainedInstScope inst_tys
+  = do { enabled <- if ranked_constructor
+                    then xoptM LangExt.ImpredicativeTypes
+                    else return True
+       ; valid <- if enabled && (not ranked_constructor || all noQuickLookVars (expected : inst_tys))
+                  then tcRetainedInstScope inst_tys
+                  else return False
        ; return (if valid then Just (inst_tys, Subst.substTy subst body) else Nothing) }
   where
     is_type_arg ETypeArg{} = True

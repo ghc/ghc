@@ -402,9 +402,15 @@ runUnrelated _ = True
 bad :: Bool
 bad = runUnrelated reflect
 #elif FORM == 6
-type Callback = forall a. Show a => Reflect a
-bad :: Maybe Callback
 bad = Just reflect
+#elif FORM == 7 || FORM == 8
+type Callback = forall a. Reflect a
+bad :: Maybe Callback
+#if FORM == 7
+bad = Just @Callback reflect
+#else
+bad = Just reflect
+#endif
 #endif
 HS
 
@@ -419,11 +425,80 @@ run :: (forall a. Show a => Reflect a) ->
        foreach (index :: Maybe Bool) -> index :~: index
 run worker index = worker @Bool index
 
+data CaptureValue (tag :: Bool) (index :: Maybe a) = CaptureValue Int
+type Captured tag = forall a. Show a => foreach (index :: Maybe a) -> CaptureValue tag index
+
+capture :: foreach (tag :: Bool) -> Maybe (Captured tag)
+capture tag = Just worker
+  where
+    worker :: Captured tag
+    worker _ = CaptureValue 42
+
 #ifdef ESCAPE
 escape = \index -> run reflect index
 #else
 within :: Maybe Bool -> Bool
 within index = case run reflect index of Refl -> True
+#endif
+HS
+
+cat >StoredCallback.hs <<'HS'
+{-# LANGUAGE CPP, ImpredicativeTypes, NoDeepSubsumption, NoExperimentalDependentTypes #-}
+{-# LANGUAGE RankNTypes, TypeApplications #-}
+module StoredCallback (Callback, boxed, empty, bottomBox) where
+import RankDomainProvider (Reflect, bottomReflect, reflect)
+
+type Callback = forall a. Show a => Reflect a
+
+boxed, empty, bottomBox :: Maybe Callback
+#ifdef EXPLICIT
+boxed = Just @Callback reflect
+empty = Nothing @Callback
+bottomBox = Just @Callback bottomReflect
+#else
+boxed = Just reflect
+empty = Nothing
+bottomBox = Just bottomReflect
+#endif
+HS
+
+cat >StoredReader.hs <<'HS'
+{-# LANGUAGE BangPatterns, CPP, GADTs, NoExperimentalDependentTypes #-}
+{-# LANGUAGE NoImpredicativeTypes, RankNTypes, TypeApplications #-}
+module Main where
+
+#ifdef ESCAPE
+import RankDomainScope (capture)
+
+escape = \tag -> capture tag
+main :: IO ()
+main = pure ()
+#else
+import Control.Exception (ErrorCall, displayException, evaluate, try)
+import Data.IORef (newIORef, readIORef)
+import Data.List (isInfixOf)
+import Data.Type.Equality ((:~:)(Refl))
+import StoredCallback (bottomBox, boxed, empty)
+
+main :: IO ()
+main = do
+    b <- newIORef (error "Bool index forced") >>= readIORef
+    c <- newIORef (error "Char index forced") >>= readIORef
+    let withBoth = case boxed of
+          Nothing -> (False, False)
+          Just worker -> (case worker @Bool b of Refl -> True,
+                          case worker @Char c of Refl -> True)
+        isEmpty = case empty of Nothing -> True; Just _ -> False
+        isLazy = case bottomBox of Just _ -> True; Nothing -> False
+        demand = case bottomBox of
+          Nothing -> ()
+          Just worker -> case worker @Bool of !_ -> ()
+    print (withBoth, isEmpty, isLazy)
+    forced <- try (evaluate demand)
+    case forced of
+      Left e | "callback bottom" `isInfixOf` displayException (e :: ErrorCall) ->
+          putStrLn "stored callback bottom: forced"
+      _ -> fail "unexpected callback demand"
 #endif
 HS
 
@@ -454,6 +529,9 @@ for opt in O0 O2; do
     mkdir -p "$out/domain-$opt"/{provider,client}
     cp RankDomainProvider.hs "$out/domain-$opt/provider/"
     cp {RankDomainClient,RankDomainReject,RankDomainScope,OrdinaryImpred}.hs "$out/domain-$opt/client/"
+    cp StoredCallback.hs "$out/domain-$opt/provider/"
+    mkdir -p "$out/domain-$opt/reader"
+    cp StoredReader.hs "$out/domain-$opt/reader/"
     (
         cd "$out/domain-$opt/provider"
         flags=("-$opt")
@@ -477,10 +555,28 @@ for opt in O0 O2; do
         done
         reject_rank_domain 'Quick Look inference does not support this retained type yet:' \
             "-$opt" -XImpredicativeTypes -DFORM=6 -c RankDomainReject.hs
+        for form in 7 8; do
+            reject_rank_domain 'No instance for ‘Show a’' \
+                "-$opt" -XImpredicativeTypes "-DFORM=$form" -c RankDomainReject.hs
+        done
         "${ghc[@]}" "-$opt" -XImpredicativeTypes -c RankDomainScope.hs
         reject_rank_domain 'This inferred retained type requires an explicit signature:' \
             "-$opt" -XImpredicativeTypes -DESCAPE -c RankDomainScope.hs
         "${ghc[@]}" "-$opt" -XImpredicativeTypes OrdinaryImpred.hs -o ordinary
         printf '%s\n' "('x',True)" | cmp - <(./ordinary)
+
+        cp RankDomainScope.hi RankDomainProvider.hi ../reader/
+        cd ../reader
+        reject_rank_domain 'is out of scope here' "-$opt" -DESCAPE -c StoredReader.hs
+        for mode in EXPLICIT INFERRED; do
+            (
+                cd ../provider
+                "${ghc[@]}" "${flags[@]}" "-D$mode" -fforce-recomp -c StoredCallback.hs
+                cp StoredCallback.hi ../reader/
+            )
+            "${ghc[@]}" "-$opt" -fforce-recomp -c StoredReader.hs
+            "${ghc[@]}" "-$opt" StoredReader.o ../provider/{StoredCallback,RankDomainProvider}.o -o stored
+            printf '%s\n' '((True,True),True,True)' 'stored callback bottom: forced' | cmp - <(./stored)
+        done
     )
 done
