@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, ImpredicativeTypes, LambdaCase, NoExperimentalDependentTypes, RequiredTypeArguments, TypeApplications #-}
+{-# LANGUAGE DataKinds, GADTs, ImpredicativeTypes, LambdaCase, NoExperimentalDependentTypes, RequiredTypeArguments, TypeApplications #-}
 module WitnessGuardedClient where
 
 import Control.Exception (ErrorCall, displayException, evaluate, try)
@@ -20,6 +20,14 @@ observeConditional flag b =
             then Payload id atTwoTypes
             else if value then buildAt (not value) else error "selected conditional branch")
         flag b
+
+observeCase :: Flag a -> a -> Bool -> (Int, Bool)
+observeCase tag input branch =
+    observeGuarded
+        (\choose ready -> case (choose, tag) of
+            (True, _) -> Payload id atTwoTypes
+            (False, Flag) -> if ready then buildAt (not input) else error "selected case arm")
+        branch True
 
 viaGuardedAnnotated :: GuardedBuilder
 viaGuardedAnnotated =
@@ -62,6 +70,9 @@ main = do
     unless (observeConditional True (error "unselected condition") == (7, True)
          && observeConditional False True == (9, False)) $
         fail "the conditional forced an unselected arm"
+    unless (observeCase (error "unused case tag" :: Flag Bool) (error "unused case input") True == (7, True)
+         && observeCase Flag True False == (9, False)) $
+        fail "the case producer selected the wrong arm"
     print guarded
     checkGuard viaGuarded
     checkGuard viaGuardedAnnotated
