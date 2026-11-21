@@ -56,4 +56,4 @@ checkedSplitAtValue :: forall a. foreach (cut :: P.Nat) -> foreach (total :: P.N
 checkedSplitAtValue cut total v = case P.cutRemainder cut total of
     Nothing -> Nothing
     Just (Pair suffix Refl) ->
-        Just (Pair suffix (SplitAtWidth @a @cut @suffix @v (splitAtValue @a @suffix cut v)))
+        Just (Pair suffix (SplitAtWidth @a @cut @suffix (splitAtValue @a @suffix cut v)))

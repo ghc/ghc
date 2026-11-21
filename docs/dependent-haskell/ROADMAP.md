@@ -306,10 +306,6 @@ and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vecto
    `FS p`. Passing either directly to a retained function still gives
    GHC-83605. Keep nested operands lazy and test separate compilation.
    [Finite positions](examples/qualified-pi/FinitePosition.hs).
-2. **R03 and R05.** Infer the input index of a GADT result after matching
-   a length equality. The checked split currently writes that argument
-   explicitly. A failed inference must give a located type error.
-   [Checked constructor](examples/packed-vector/CertifiedSplit.hs).
 
 ### Other open work
 
