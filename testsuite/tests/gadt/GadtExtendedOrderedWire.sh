@@ -11,17 +11,25 @@ marker=extended-ordered-gadt-telescope
 out=$(mktemp -d)
 trap 'rm -rf -- "$out"' EXIT
 
-cat >"$out/Provider.hs" <<'SOURCE'
-{-# LANGUAGE CPP, GADTs, RequiredTypeArguments #-}
+# CPP records the installation path of ghcversion.h in the interface.
+# Use plain Haskell for the byte comparison between separate installations.
+cat >"$out/header" <<'SOURCE'
+{-# LANGUAGE GADTs, RequiredTypeArguments #-}
 module Provider where
 
-#ifdef LEADING
+SOURCE
+
+cat >"$out/LEADING" <<'SOURCE'
 data T where
     C :: forall a -> Eq a => forall {b} c. Show c => a -> !(b, c) -> T
-#elif defined(EXISTENTIAL)
+SOURCE
+
+cat >"$out/EXISTENTIAL" <<'SOURCE'
 data T where
     C :: forall a. Int -> Eq a => a -> T
-#else
+SOURCE
+
+cat >"$out/CONTROL" <<'SOURCE'
 data Tag a where
     Tag :: forall a -> Tag a
 
@@ -30,7 +38,6 @@ data Interior a where
 
 data T where
     C :: Int -> forall {b} c. Show c => (b, c) -> T
-#endif
 SOURCE
 
 cat >"$out/Read.hs" <<'SOURCE'
@@ -47,9 +54,10 @@ for compression in 0 1 2; do
     for shape in LEADING EXISTENTIAL CONTROL; do
         work="$out/$compression/$shape"
         mkdir -p "$work/"{new,read}
+        cat "$out/header" "$out/$shape" > "$work/Provider.hs"
         (
             cd "$work/new"
-            "${new[@]}" "${flags[@]}" "-D$shape" "-fwrite-if-compression=$compression" -c "$out/Provider.hs"
+            "${new[@]}" "${flags[@]}" "-fwrite-if-compression=$compression" -c "$work/Provider.hs"
             "${new[@]}" --show-iface Provider.hi > iface
             if [[ "$shape" == CONTROL ]]; then
                 if grep -Fq "$marker" iface; then
@@ -71,7 +79,7 @@ for compression in 0 1 2; do
             (
                 cd "$work/old"
                 if [[ "$shape" == CONTROL ]]; then
-                    "${old[@]}" "${flags[@]}" "-D$shape" "-fwrite-if-compression=$compression" -c "$out/Provider.hs"
+                    "${old[@]}" "${flags[@]}" "-fwrite-if-compression=$compression" -c "$work/Provider.hs"
                     cmp Provider.hi "$work/new/Provider.hi"
                     cp "$work/new/Provider.hi" Provider.hi
                     "${old[@]}" "${flags[@]}" -fexternal-interpreter -c "$out/Read.hs"
