@@ -497,8 +497,15 @@ can use the same checked tag. Restricted SimpleOpt substitutes its lexical
 captures into the stable template. Both float passes keep a marked binding
 in scope when moving it would require abstraction. A local template inside
 an exported unfolding is checked in its enclosing interface scope.
-An unsupported template, such as one with an erased package operation,
-reports GHC-92256 at the binding.
+
+In the defining module, a local ordinary-typed template can construct or
+open an erased package. `inlinePacked` inlines a local `INLINE` helper
+that captures an offset and a flag. The false case leaves the offset and
+payload unevaluated. `INLINABLE` retains the checked template before Tidy.
+The size model still gives a template with a package operation no inlining
+guidance. Tidy drops package-bearing local templates before it exports
+metadata. A top-level ordinary signature with an explicit package-bearing
+template still reports GHC-92256 at the binding.
 [Simplified wrapper](../examples/qualified-pi/IndexBetaClient.hs),
 [finite view producer](../examples/qualified-pi/FinitePosition.hs),
 [ordinary client](../examples/qualified-pi/FinitePositionClient.hs),

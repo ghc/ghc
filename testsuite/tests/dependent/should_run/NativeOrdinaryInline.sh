@@ -190,9 +190,100 @@ for opt in -O0 -O1 -O2; do
     )
 done
 
-cat >LocalReject.hs <<'HS'
+cat >LocalPackage.hs <<'HS'
 {-# LANGUAGE ExperimentalDependentTypes #-}
-module LocalReject where
+module LocalPackage (packed, opened, unopened) where
+
+import Data.Kind (Type)
+
+type Hidden = exists (a :: Type). (Maybe a, a -> Int)
+
+{-# NOINLINE inspect #-}
+inspect :: Hidden -> Int
+inspect (value, render) = maybe 0 render value
+
+{-# NOINLINE hide #-}
+hide :: a -> (a -> Int) -> Hidden
+hide value render = (Just value, render)
+
+packed :: Int -> Bool -> Int -> Int
+packed offset keep n =
+    let {-# INLINE packLocal #-}
+        packLocal :: Int -> Int
+        packLocal n = inspect ((if keep then Just n else Nothing, (+ offset)) :: Hidden)
+    in packLocal n + 1
+
+opened :: Int -> Int -> Int
+opened offset n =
+    let {-# INLINABLE openLocal #-}
+        openLocal :: Int -> Int
+        openLocal n = case hide n (+ offset) of
+            (value, render) -> maybe 0 render value
+    in openLocal n + openLocal 2
+
+unopened :: Int -> Int
+unopened offset =
+    let {-# INLINE unusedLocal #-}
+        unusedLocal :: Int -> Int
+        unusedLocal _ = case (error "forced unused package" :: Hidden) of
+            (value, render) -> maybe 0 render value
+    in offset
+HS
+
+cat >PackageClient.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module Main (main) where
+
+import Control.Exception (ErrorCall, evaluate, try)
+import LocalPackage (packed, opened, unopened)
+
+main :: IO ()
+main = do
+    forced <- try (evaluate (packed 10 True (error "forced retained payload"))) :: IO (Either ErrorCall Int)
+    let demanded = either (const True) (const False) forced
+    print (packed 10 True 7, packed (error "forced unused offset") False (error "forced unused payload"),
+           opened 10 7, unopened 42, demanded)
+HS
+
+for opt in -O0 -O1 -O2; do
+    out="$tmp/package/$opt"
+    mkdir -p "$out"/{provider,client}
+    cp LocalPackage.hs "$out/provider/"
+    cp PackageClient.hs "$out/client/Main.hs"
+    (
+        cd "$out/provider"
+        "${ghc[@]}" "$opt" -ddump-ds -ddump-simpl -ddump-inlinings -dverbose-core2core \
+            -dsuppress-uniques -c LocalPackage.hs > provider.core 2> provider.log
+        for binder in packLocal openLocal; do
+            grep -m1 -A7 "$binder \[InlPrag=" provider.core | grep -F 'Src=StableRetainedUser' >/dev/null
+        done
+        if [[ "$opt" != -O0 ]]; then
+            grep -Fx 'Inlining done: packLocal' provider.core >/dev/null
+        fi
+        sed -n '/==== Tidy Core/,$p' provider.core > tidy.core
+        grep -F 'openLocal [InlPrag=INLINABLE' tidy.core >/dev/null
+        if grep -Fq 'Src=StableRetainedUser' tidy.core; then
+            echo 'Tidy retained a local template with an erased package operation'
+            exit 1
+        fi
+        "${ghc[@]}" --show-iface LocalPackage.hi > provider.iface
+        if grep -Fq 'Unfolding: Core: StableRetainedUser' provider.iface; then
+            echo 'Exported a local template with an erased package operation'
+            exit 1
+        fi
+        cp LocalPackage.hi ../client/
+    )
+    (
+        cd "$out/client"
+        "${ghc[@]}" "$opt" -c Main.hs
+        "${ghc[@]}" Main.o ../provider/LocalPackage.o -o run
+        printf '%s\n' '(18,1,29,42,True)' | cmp - <(./run)
+    )
+done
+
+cat >TopPackage.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes #-}
+module TopPackage (entry) where
 
 import Data.Kind (Type)
 
@@ -202,19 +293,19 @@ type Hidden = exists (a :: Type). Maybe a
 consume :: Hidden -> Int
 consume _ = 42
 
-reject :: Int -> Int
-reject n =
-    let {-# INLINABLE local #-}
-        local :: Int -> Int
-        local x = consume (Just x :: Hidden)
-    in local n
+{-# INLINABLE disallowed #-}
+disallowed :: Int -> Int
+disallowed n = consume (Just n :: Hidden)
+
+entry :: Int -> Int
+entry n = disallowed n
 HS
-if "${ghc[@]}" -O1 -fdiagnostics-color=never -fforce-recomp -c LocalReject.hs > residual.log 2>&1; then
-    echo 'Accepted a local stable unfolding containing a retained package operation'
+if "${ghc[@]}" -O1 -fdiagnostics-color=never -fforce-recomp -c TopPackage.hs > residual.log 2>&1; then
+    echo 'Accepted a top-level stable unfolding containing an erased package operation'
     exit 1
 fi
-grep -qFx 'LocalReject.hs:16:9: error: [GHC-92256]' residual.log
-grep -q 'The INLINABLE unfolding of .*local.* contains unsupported retained Core.' residual.log
+grep -qFx 'TopPackage.hs:14:1: error: [GHC-92256]' residual.log
+grep -q 'The INLINABLE unfolding of .*disallowed.* contains unsupported retained Core.' residual.log
 
 cp "$src"/{FinitePosition,ParameterizedIndexLibrary,PackedVecLibrary}.hs .
 cat >FinConstruction.hs <<'HS'

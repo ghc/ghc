@@ -463,10 +463,11 @@ and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vecto
    at that constructor's field.
    [Checked input inference](roadmap/R03-dependent-products.md)
    and [independent inputs](../../testsuite/tests/dependent/should_fail/NativeIrredIndexEvidence.hs).
-2. **R05.** Extend checked retained templates to local bindings.
-   Top-level `INLINE` and `INLINABLE` templates carry a source tag
-   that selects the retained optimizer. Local residual templates
-   still report GHC-92256.
+2. **R05.** Check scope and demand when carrying local package templates
+   across interfaces. The retained optimizer can inline a local `INLINE`
+   helper that constructs or opens an erased package. A local `INLINABLE`
+   helper preserves its checked template, but package operations still
+   need an inlining cost model. Tidy drops package-bearing templates.
    [Retained unfolding checks](roadmap/R05-dependent-core.md#export-retained-unfoldings-at-ordinary-signatures).
 
 ### Other open work

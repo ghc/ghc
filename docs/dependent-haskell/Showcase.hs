@@ -410,6 +410,9 @@ vectors = do
     observe "inline an ordinary function that calls a retained helper" (IndexBeta.inlineIncrement 41)
     observe "replicate a captured element at two runtime lengths"
         (IndexBeta.replicateTwice 7 (S Z) (S (S Z)))
+    observe "inline a local package helper with captured values"
+        (inlinePacked 10 True 7,
+         inlinePacked (error "unused offset") False (error "unused payload"))
     observe "explicit erased choices and qualified Pi" (toList (Ground.groundDirect n Qualified.fixedQ))
     observe "known arguments select erased choices" (toList (Known.knownDirect n Qualified.fixedQ))
     observe "generic consumer of a native function" (Known.knownGenericIgnore Qualified.fixedQ)
@@ -421,6 +424,15 @@ vectors = do
     observe "constructor argument call index" (Constructor.constructorLength Opaque.identityNat n xs)
     observe "signed beta inside an opaque call" (Beta.betaCallSuccessor Opaque.identityNat n xs)
     observe "guarded package rows" (renderPacked (guardedRepack False sample))
+
+-- | Inline a local package constructor that captures an offset and a flag.
+inlinePacked :: Int -> Bool -> Int -> Int
+inlinePacked offset keep value =
+    let {-# INLINE readValue #-}
+        readValue :: Int -> Int
+        readValue value = PackageRules.open ((value, render) :: PackageRules.Hidden)
+        render stored = if keep then offset + stored else 0
+    in readValue value + 1
 
 -- | Pass runtime function values as retained binders and use exact call evidence.
 functions :: IO ()
