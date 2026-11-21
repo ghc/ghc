@@ -2526,6 +2526,19 @@ tc_sub_type_deep fun_pos@(tc_fun, pos) ds_depth unify inst_orig ctxt ty_actual t
              -- fun_wrap :: act_funTy ~~> ty_e
            }
 
+    -- See Note [Deep subsumption below a retained arrow].
+    go1 ty_a@(DepFunTy DepFunVisible b_a _) ty_e@(DepFunTy DepFunVisible b_e res_e)
+      | DeepSub <- ds_depth
+      , isNativeIndexId b_a, isNativeIndexId b_e
+      , varType b_a `tcEqType` varType b_e
+      , (_, _ : _, _) <- tcSplitSigmaTy res_e
+      = do { b <- newSysLocalId (fsLit "retained") ManyTy (varType b_e)
+           ; let open ty = applyTypeToArgs ty [Core.Var b]
+           ; wrap <- tcExtendIdEnv [b] $
+               tc_sub_type_ds (tc_fun, Result pos) (Deep DeepSub) unify inst_orig ctxt
+                 (open ty_a) (open ty_e)
+           ; return (mkWpRetainedFun b wrap) }
+
     -- See Note [Retained domains after deep instantiation].
     go1 ty_a@(DepFunTy vis_a b_a _) ty_e@(DepFunTy vis_e b_e _)
       | DeepSub <- ds_depth
@@ -2598,6 +2611,22 @@ tc_sub_type_deep fun_pos@(tc_fun, pos) ds_depth unify inst_orig ctxt ty_actual t
           TopSub  -> True
           DeepSub -> isDeeplySkolemised ty_expected
 
+
+{- Note [Deep subsumption below a retained arrow]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A visible retained arrow can return a function with an ordinary context.
+DeepSubsumption can adapt the result using the same dictionary wrapper as
+subsumption after an ordinary arrow. Open both function bodies with one
+fresh runtime binder at their common domain. Check the result wrapper in
+that binder's scope. Desugaring uses the same binder in the lambda, the
+application and the result types.
+
+For an identity or cast-only result wrapper, use the corresponding whole
+function identity or DepFunCo. A dictionary wrapper introduces the value
+lambda, as an explicit source adapter would. This rule applies to an expected
+context immediately below a visible retained arrow. Domain conversion and
+equality between independent runtime values use their existing checks.
+-}
 
 {- Note [Retained domains after deep instantiation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

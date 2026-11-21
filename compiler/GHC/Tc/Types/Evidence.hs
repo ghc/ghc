@@ -6,7 +6,7 @@ module GHC.Tc.Types.Evidence (
   -- * HsWrapper
   HsWrapper(..),
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams, mkWpForAllCast,
-  mkWpEvLams, mkWpLet, mkWpFun, mkWpCastN, mkWpCastR, mkWpEta, mkWpSubType,
+  mkWpEvLams, mkWpLet, mkWpFun, mkWpRetainedFun, mkWpCastN, mkWpCastR, mkWpEta, mkWpSubType,
   SubMultCo(..), mkSubMultFunCo, subMultCoRKind,
   collectHsWrapBinders,
   idHsWrapper, isIdHsWrapper, hsWrapperCast_maybe,
@@ -307,6 +307,10 @@ data HsWrapper
   -- so that the identity 'HsWrapper' is always exactly 'WpHole'.
   | WpLet TcEvBinds
 
+  -- | @WpRetainedFun x w[e] = \x. w[e x]@. The binder scopes over @w@.
+  -- Both function types have the same visible retained domain.
+  | WpRetainedFun Id HsWrapper
+
   deriving Data.Data
 
 -- | The Semigroup instance is a bit fishy, since @WpCompose@, as a data
@@ -423,6 +427,12 @@ mkWpFun w1 w2 (wp_mult, t1) t2
     mk_wp_fun_co = mkSubMultFunCo FTF_T_T FTF_T_T
                     (mkNomReflCo unmatchableDataConTy) wp_mult
       -- FTF_T_T: WpFun is always (->)
+
+-- | Adapt the result of a visible retained function at its actual argument.
+mkWpRetainedFun :: Id -> HsWrapper -> HsWrapper
+mkWpRetainedFun _ WpHole = WpHole
+mkWpRetainedFun b (WpCast co) = mkWpCastR (mkDepFunCo b co)
+mkWpRetainedFun b wrap = WpRetainedFun b wrap
 
 mkWpSubType :: HsWrapper -> HsWrapper
 -- See (DSST2) in Note [Deep subsumption and WpSubType]
@@ -542,6 +552,7 @@ hsWrapDictBinders wrap = go wrap
    go (WpTyLam {})        = emptyBag
    go (WpTyApp {})        = emptyBag
    go (WpLet   {})        = emptyBag
+   go (WpRetainedFun {})  = emptyBag
 
 collectHsWrapBinders :: HsWrapper -> ([Var], HsWrapper)
 -- Collect the outer lambda binders of a HsWrapper,
@@ -586,6 +597,11 @@ optSubTypeHsWrapper wrap
     opt1 w@(WpEvApp {})         ws = w : ws
     opt1 (WpFun mult_co arg_wrap res_wrap arg_ty res_ty) ws
       = opt_fun mult_co arg_wrap res_wrap arg_ty res_ty ws
+    opt1 (WpRetainedFun b w) ws
+      = case mkWpRetainedFun b (opt w) of
+          WpHole    -> ws
+          WpCast co -> opt_co co ws
+          w'        -> w' : ws
 
     -----------------
     -- (WpTyLam a <.> WpTyApp a <.> w) = w
@@ -659,6 +675,7 @@ optSubTypeHsWrapper wrap
     not_in _ (WpTyLam {}) = False    -- Give  up; conservative
     not_in _ (WpEvLam {}) = False    -- Ditto
     not_in _ (WpLet {})   = False    -- Ditto
+    not_in _ (WpRetainedFun {}) = False
 
     not_in_submult :: TyVar -> SubMultCo -> Bool
     not_in_submult v = \case
@@ -1433,6 +1450,9 @@ pprHsWrapper wrap pp_thing_inside
     help it (WpFun w arg_wrap res_wrap t1 _t2)
       = add_parens $ text "\\(x" <> dcolon <> brackets (ppr $ subMultCoRKind w) <> ppr t1 <> text ")." <+>
                      help (\_ -> it True <+> help (\_ -> text "x") arg_wrap True) res_wrap False
+    help it (WpRetainedFun b w)
+      = add_parens $ text "\\" <> pprLamBndr b <> dot <+>
+                     help (\_ -> it True <+> ppr b) w False
     help it (WpCast co)   = add_parens $ sep [it False, nest 2 (text "|>"
                                               <+> pprParendCo co)]
     help it (WpEvApp id)  = no_parens  $ sep [it True, nest 2 (ppr id)]

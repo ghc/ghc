@@ -165,17 +165,17 @@ type Worker = foreach (b :: Bool) -> forall a. Show a => foreach (m :: Maybe a) 
 type Worker = foreach (b :: Bool) -> forall (a :: Type). foreach (m :: Maybe a) -> Reading b m -> Reading b m
 #endif
 
-probe :: Maybe Bool -> Maybe Char -> (Int, Int)
-probe ib ic =
+probe :: Bool -> Maybe Bool -> Maybe Char -> (Int, Int)
+probe tag ib ic =
     let {-# INLINABLE applyBoth #-}
         applyBoth :: Worker -> (Int, Int)
 #if FORM == 2
         applyBoth f = (readInt (f () @Bool ib (Reading 41)), readInt (f () @Char ic (Reading 42)))
     in applyBoth plainFirst
 #else
-        applyBoth f = (readInt (f True @Bool ib (Reading 41)), readInt (f False @Char ic (Reading 42)))
+        applyBoth f = (readInt (f tag @Bool ib (Reading 41)), readInt (f False @Char ic (Reading 42)))
 #if FORM == 4
-    in applyBoth (\b @a m x -> keepAfter b @a m x)
+    in applyBoth (\b @a -> keepAfter b @a)
 #else
     in applyBoth keepAfter
 #endif
@@ -203,33 +203,72 @@ HS
 cat >HigherRankMain.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes #-}
 module Main where
+import ForwardDict
 import RankProbe
 import qualified OrdinaryRank
 
 main :: IO ()
-main = print (probe first second, OrdinaryRank.pair first second)
+main = do
+    print (probe tag first second, OrdinaryRank.pair first second)
+    print (forward tag first second)
   where
+    tag = error "retained tag"
     first = error "first index"
     second = error "second index"
 HS
 
-for opt in O1 O2; do
+cat >ForwardDict.hs <<'HS'
+{-# LANGUAGE DataKinds, DeepSubsumption, ExperimentalDependentTypes, PolyKinds, RankNTypes, TypeApplications #-}
+module ForwardDict (forward) where
+import NativeAlternatingBindersProvider (Reading(..), showAfter)
+
+class Show a => Display a
+instance Display Bool
+instance Display Char
+
+forward :: Bool -> Maybe Bool -> Maybe Char -> ((String, Int), (String, Int))
+forward tag ib ic =
+    let apply :: (foreach (b :: Bool) -> forall a. Display a => foreach (m :: Maybe a) ->
+                  a -> Reading b m -> (String, Int)) -> ((String, Int), (String, Int))
+        apply worker = (worker tag @Bool ib True (Reading 41), worker False @Char ic 'x' (Reading 42))
+    in apply showAfter
+HS
+
+cat >IndependentRank.hs <<'HS'
+{-# LANGUAGE DataKinds, DeepSubsumption, ExperimentalDependentTypes, PolyKinds, RankNTypes #-}
+module IndependentRank where
+import Data.Proxy (Proxy)
+import NativeAlternatingBindersProvider (Reading(..))
+
+bad :: foreach (left :: Bool) -> foreach (right :: Bool) ->
+       (foreach (b :: Bool) -> forall a. foreach (m :: Maybe a) -> (Reading left m, Proxy b)) ->
+       Reading right ('Nothing :: Maybe Bool)
+bad left right worker =
+    let use :: (foreach (b :: Bool) -> forall a. Show a =>
+                  foreach (m :: Maybe a) -> (Reading right m, Proxy b)) ->
+               Reading right ('Nothing :: Maybe Bool)
+        use _ = Reading 42
+    in use worker
+HS
+
+for opt in O0 O1 O2; do
     mkdir -p "$out/rank-$opt"/{provider,client}
     cp "$src/$provider.hs" "$out/rank-$opt/provider/"
-    cp {RankProbe,OrdinaryRank,HigherRankMain}.hs "$out/rank-$opt/client/"
+    cp {RankProbe,OrdinaryRank,HigherRankMain,ForwardDict,IndependentRank}.hs "$out/rank-$opt/client/"
     (
         cd "$out/rank-$opt/provider"
         "${ghc[@]}" "-$opt" -c "$provider.hs"
         cp "$provider.hi" ../client/
         cd ../client
         "${ghc[@]}" "-$opt" -c OrdinaryRank.hs
-        for form in 1 2 4; do
+        "${ghc[@]}" "-$opt" -c ForwardDict.hs
+        for form in 1 2 3 4; do
             mode=()
-            if [[ "$form" == 2 ]]; then mode=(-DDEEP); fi
+            if [[ "$form" == 2 || "$form" == 3 ]]; then mode=(-DDEEP); fi
             "${ghc[@]}" "-$opt" "${mode[@]}" "-DFORM=$form" -fforce-recomp -c RankProbe.hs
             "${ghc[@]}" "-$opt" -fforce-recomp -c HigherRankMain.hs -o HigherRankMain.o
-            "${ghc[@]}" HigherRankMain.o RankProbe.o OrdinaryRank.o "../provider/$provider.o" -o run
-            printf '%s\n' '((41,42),(41,42))' | cmp - <(./run)
+            "${ghc[@]}" HigherRankMain.o RankProbe.o OrdinaryRank.o ForwardDict.o "../provider/$provider.o" -o run
+            printf '%s\n' '((41,42),(41,42))' "((\"True\",41),(\"'x'\",42))" | cmp - <(./run)
         done
         if "${ghc[@]}" "-$opt" -DFORM=2 -fforce-recomp -c RankProbe.hs >reject.log 2>&1 ||
            ! grep -Fq 'error: [GHC-83865]' reject.log ||
@@ -237,9 +276,16 @@ for opt in O1 O2; do
             cat reject.log >&2
             exit 1
         fi
-        if "${ghc[@]}" "-$opt" -DDEEP -DFORM=3 -fforce-recomp -c RankProbe.hs >reject.log 2>&1 ||
+        if "${ghc[@]}" "-$opt" -DFORM=3 -fforce-recomp -c RankProbe.hs >reject.log 2>&1 ||
            ! grep -Fq 'error: [GHC-83865]' reject.log ||
            ! grep -Fq 'first argument of ‘applyBoth’, namely ‘keepAfter’' reject.log; then
+            cat reject.log >&2
+            exit 1
+        fi
+        if "${ghc[@]}" "-$opt" -fforce-recomp -c IndependentRank.hs >reject.log 2>&1 ||
+           ! grep -Fq 'error: [GHC-83865]' reject.log ||
+           ! grep -Fq 'first argument of ‘use’, namely ‘worker’' reject.log ||
+           ! grep -Fq 'Reading left m' reject.log || ! grep -Fq 'Reading right m' reject.log; then
             cat reject.log >&2
             exit 1
         fi
