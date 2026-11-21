@@ -55,6 +55,19 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At compiler revision `8c4942f617`, a type-level `let` can bind a
+callback that captures an outer type. An inner `let` can shadow that
+type name. Applying the callback still uses the outer type. In an
+ordinary module with `ImpredicativeTypes`, Quick Look can infer the
+erased witness `forall a. a -> a` in `\flag -> id (prepare flag)`.
+[Local type callback](examples/open-evaluation/TypeLambda.hs) and
+[erased witness](roadmap/R22-existential-quantification.md).
+
+All 497 Showcase outputs matched at native `-O0`, native `-O2` and
+in source GHCi. All 15 selected registered tests passed. The linked
+GHC API tests matched 37 dependent-program and 18 open-evaluation
+outputs. The constructor and coercion checks also passed.
+
 At compiler revision `f1fb064fa5`, Template Haskell can quote and
 splice a type-level let. Its right-hand side sees the outer binder.
 In the same compiler, a GADT constructor can take an ordinary field,
