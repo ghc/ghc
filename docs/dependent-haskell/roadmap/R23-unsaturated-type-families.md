@@ -798,6 +798,20 @@ To use both matchabilities in one equation, bind the argument
 with `forall (mapper :: Mapper).` on that equation. With an
 implicit equation binder, even a complete family header leaves
 `mapper @M` with an unknown kind during RHS checking (GHC-20967).
+Stock GHC 9.14.1 gives the same error for this equation without
+any matchability annotations or partial families:
+
+```haskell
+type family Use (f :: forall k. k -> Type) :: Type where
+  Use f = f @Bool 'True
+```
+
+Write `forall (f :: forall k. k -> Type). Use f = f @Bool 'True`
+to give the binder its full kind. A kind annotation around the
+LHS occurrence `(f :: forall k. k -> Type)` still leaves the
+equation binder's kind to inference. A datatype or synonym
+parameter with a declared rank uses that kind directly.
+[Proposal #55 motivation and specification](https://ghc-proposals.readthedocs.io/en/latest/proposals/0055-instance-foralls.html#motivation).
 [Source and interface checks](../../../testsuite/tests/dependent/should_run/NativeLaterMatchability.sh),
 [proposal #242, other quantifiers](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#other-quantifiers)
 and [proposal review](https://github.com/ghc-proposals/ghc-proposals/pull/242).
