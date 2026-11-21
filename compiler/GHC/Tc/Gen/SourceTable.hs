@@ -3,7 +3,7 @@ module GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourc
                               sourceTableCallees, sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
                               sourceTableFamilyAppUse, sourceTableReferenceUse, sourceCaseKindUse, sourceCaseVisibleArity, isSourceConstructorCase, sourceTableOwner, monomorphicEnumCaseArity, groundFirstHead,
                               visibleSourceMethodRules, hasSourceMethodRule, hasSourceMethodRuleAt,
-                              sourceBinarySelector, lookupSourceBinaryMethod, lookupSourceListFoldMethod, publishListFoldMethods, sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers, isSourceFilterGuard,
+                              sourceBinarySelector, sourceMapSelector, lookupSourceBinaryMethod, lookupSourceContainerMethod, publishListFoldMethods, sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers, isSourceFilterGuard,
                               OptionalSourceUses, optionalSourceUses, registerOptionalSourceUses,
                               checkOptionalSourceUses, checkSourceMethodUses) where
 
@@ -538,12 +538,13 @@ lookupSourceBinaryMethod selector domain
         _ -> pure Nothing
   | otherwise = pure Nothing
 
--- | Find a visible ground dictionary whose exact method is a checked list fold.
+-- | Find the checked worker named by a method of a ground container instance.
 -- See Note [Select the dictionary for a promoted method].
-lookupSourceListFoldMethod :: Id -> Type -> TcM (Maybe (Id, Id, TyCon))
-lookupSourceListFoldMethod selector domain
+lookupSourceContainerMethod :: Id -> Type -> TcM (Maybe (Id, Id, TyCon))
+lookupSourceContainerMethod selector domain
   | Just cls <- isClassOpId_maybe selector
-  , listFoldSelector cls selector
+  , let fold_method = listFoldSelector cls selector
+  , fold_method || sourceMapSelector selector
   = do
       selected <- lookupSourceGroundDFun cls domain
       case selected of
@@ -559,7 +560,7 @@ lookupSourceListFoldMethod selector domain
             method <- target
             guard (varType method `eqType` classMethodInstTy selector [domain])
             table <- sourceTableId_maybe method
-            guard (isListFoldTable table)
+            guard (not fold_method || isListFoldTable table)
             pure (dfun, method, table)
         _ -> pure Nothing
   | otherwise = pure Nothing
@@ -595,6 +596,19 @@ listFoldSelector cls selector = isJust $ do
     (receiver, _) <- caseArrow after_seed
     (head_ty, _) <- splitAppTy_maybe receiver
     guard (getTyVar_maybe head_ty == Just parameter)
+
+-- | The receiver and result of a mapping method use the class parameter.
+sourceMapSelector :: Id -> Bool
+sourceMapSelector selector = isJust $ do
+    cls <- isClassOpId_maybe selector
+    [parameter] <- pure (classTyVars cls)
+    let (_, body) = splitForAllForAllTyBinders
+                      (classMethodInstTy selector [mkTyVarTy parameter])
+    (callback, rest) <- caseArrow body
+    (input, output) <- caseArrow callback
+    (receiver, result) <- caseArrow rest
+    let at = mkAppTy (mkTyVarTy parameter)
+    guard (eqType receiver (at input) && eqType result (at output))
 
 -- | Pair the actual fields of a complete ground dictionary with its selectors.
 dictionarySlots :: Class -> Type -> DataCon -> [Core.CoreExpr] -> Maybe [(Id, Core.CoreExpr)]
@@ -1326,7 +1340,7 @@ sourceCaseTables binds = do
       = enum_enabled && all enumVisible kinds
       | Just signature@(ConstructorCaseType _ tc _ domains position _) <- constructorCaseType (varType owner)
       , not (isBinaryListCase signature)
-      = (position == 1 && tc == listTyCon) ||
+      = (position == 1 && (tc == listTyCon || publicCaseType env exported imported tc)) ||
         (nameModule_maybe (tyConName tc) == Just (tcg_semantic_mod env) &&
          publicCaseType env exported (const False) tc) ||
         (maybe False (\(_, domain, _) -> isRetainedCaseRoot domain tc)

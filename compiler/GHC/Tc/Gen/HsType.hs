@@ -99,7 +99,7 @@ import GHC.Tc.Gen.OpenTypeEval (instantiateOpenTypeFunction, observeOpenType, op
 import GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourceTableFamilyUse, sourceTableTypeUses,
                               sourceCaseKindUse, sourceTableReferenceUse, indexedProjectionSource, isSourceConstructorCase, monomorphicEnumCaseArity, sourceCaseVisibleArity, sourceTableOwner, sourcePairBuilderField,
                               lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource,
-                              lookupSourceBinaryMethod, lookupSourceListFoldMethod, recordSourceMethodUse)
+                              lookupSourceBinaryMethod, sourceMapSelector, lookupSourceContainerMethod, recordSourceMethodUse)
 import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcPrepareClosedApplication, tcPrepareClosedFunctionValue, tcPrepareClosedResult, tcPrepareClosedObservation, tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand, tcHasClosedCallExecutable)
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Instance.Family (tcGetFamInstEnvs)
@@ -2996,9 +2996,15 @@ tc_app_ty_other mode rn_ty exp_kind
           (_, kind) <- tc_infer_lhs_type mode receiver
           actual <- liftZonkM (zonkTcType kind)
           case splitTyConApp_maybe actual of
-            Just (tc, [_]) | tc == listTyCon -> lookupSourceListFoldMethod fun (mkTyConTy tc)
+            Just (tc, [_]) | tc == listTyCon -> lookupSourceContainerMethod fun (mkTyConTy tc)
             _ -> pure Nothing
-    checkedClassMethod fun [left, right]
+    checkedClassMethod fun args@[left, right]
+      | sourceMapSelector fun, any isOpenTypeOperand args = do
+          (_, kind) <- tc_infer_lhs_type mode right
+          actual <- liftZonkM (zonkTcType kind)
+          case splitAppTy_maybe actual of
+            Just (domain, _) -> lookupSourceContainerMethod fun domain
+            Nothing -> pure Nothing
       | Just _ <- isClassOpId_maybe fun
       , Just domain <- retainedDomain left <|> retainedDomain right
       = liftZonkM (zonkTcType domain) >>= lookupSourceBinaryMethod fun
