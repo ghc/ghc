@@ -23,6 +23,8 @@ where
 
 import GHC.Prelude
 
+import GHC.Builtin.KnownKeys ( heqTyConKey )
+import GHC.Types.Unique ( hasKey )
 import GHC.Types.Var
 import GHC.Core.Class
 import GHC.Core.Predicate
@@ -517,14 +519,13 @@ Note [Equality superclasses]
 Suppose we have
   class (a ~ [b]) => C a b
 
-Remember from Note [The equality types story] in GHC.Builtin.WiredIn.Prim, that
-  * (a ~~ b) is a superclass of (a ~ b)
-  * (a ~# b) is a superclass of (a ~~ b)
+When closeWrtFunDeps expands superclasses, it gets the primitive
+equality (a ~# [b]). Account for the mutual functional dependencies
+implied by this EqPred. See #10778.
 
-So when closeWrtFunDeps expands superclasses we'll get a (a ~# [b]) superclass.
-But that's an EqPred not a ClassPred, and we jolly well do want to
-account for the mutual functional dependencies implied by (t1 ~# t2).
-Hence the EqPred handling in closeWrtFunDeps.  See #10778.
+The (~~) dictionary has no superclass selector. Account for its
+mutual dependencies in the same way. See Note [The HEq# evidence
+telescope] in GHC.Builtin.WiredIn.Types.
 
 Note [Care with type functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -574,6 +575,9 @@ closeWrtFunDeps preds fixed_tvs
        = case classifyPredType pred of
             EqPred NomEq t1 t2 -> [([t1],[t2]), ([t2],[t1])]
                -- See Note [Equality superclasses]
+
+            ClassPred cls [_,_,t1,t2]
+              | cls `hasKey` heqTyConKey -> [([t1],[t2]), ([t2],[t1])]
 
             ClassPred cls tys | not (isIPClass cls)
                -- isIPClass: see Note [closeWrtFunDeps ignores implicit parameters]

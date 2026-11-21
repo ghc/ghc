@@ -46,10 +46,10 @@ module GHC.Tc.Solver.Monad (
     CanonicalEvidence(..),
 
     newTcEvBinds, newNoTcEvBinds,
-    newWantedEq,
+    newWantedEq, newWantedEqEvidence,
     newWanted,
     newWantedNC, newWantedEvVarNC,
-    newBoundEvVarId,
+    newBoundEvVarId, newHEqEvVars,
     unifyTyVar, reportFineGrainUnifications, reportCoarseGrainUnifications,
     setEvBind, setWantedEq, setWantedDict, setEqIfWanted, setDictIfWanted,
     fillCoercionHole,
@@ -159,7 +159,11 @@ import GHC.Tc.Types.CtLoc
 import GHC.Tc.Types.Constraint
 
 import GHC.Builtin.KnownKeys ( callStackTyConKey, exceptionContextTyConKey )
+import GHC.Builtin.WiredIn.Types ( heqDataCon )
 
+import GHC.Core ( Expr(Var,Coercion), Alt(..), AltCon(DataAlt) )
+import GHC.Core.Make ( mkWildCase )
+import GHC.Core.Multiplicity ( unrestricted )
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep as Rep
 import GHC.Core.TyCo.Tidy
@@ -556,12 +560,12 @@ kickOutAfterFillingCoercionHole hole (CPH { cph_holes = new_holes })
 
     kick_out_eq :: EqCt -> Either EqCt EqCt
     kick_out_eq eq_ct@(EqCt { eq_ev = ev })
-      | CtWanted (wev@(WantedCt { ctev_rewriters = rewriters })) <- ev
+      | CtWanted (WantedCt { ctev_rewriters = rewriters }) <- ev
       , hole `elemCoHoleSet` rewriters
       , is_meta_tv_equality eq_ct
       , let rewriters' = (rewriters `delCoHoleSet` hole) `mappend` new_holes
                          -- Adding new_holes and deleting hole: see (KOC2)
-            eq_ct' = eq_ct { eq_ev = CtWanted (wev { ctev_rewriters = rewriters' }) }
+            eq_ct' = eq_ct { eq_ev = setCtEvRewriters ev rewriters' }
       = if isEmptyCoHoleSet rewriters'
         then Left eq_ct'    -- Kick out, if new rewriter set is empty (KOC1)
         else Right eq_ct'   -- Keep, but with trimmed holes see (KOC2)
@@ -2223,7 +2227,7 @@ newGivenEv :: CtLoc -> (TcPredType, EvTerm) -> TcS GivenCtEvidence
 --   see (EQC1) in Note [Solving equality classes] in GHC.Tc.Solver.Dict
 newGivenEv loc (pred, rhs)
   = do { new_ev <- newBoundEvVarId pred rhs
-       ; return $ GivenCt { ctev_pred = pred, ctev_evar = new_ev, ctev_loc = loc } }
+       ; return $ mkGivenCt loc pred new_ev }
 
 -- | Make a new 'Id' of the given type, bound (in the monad's EvBinds) to the
 -- given term
@@ -2232,6 +2236,45 @@ newBoundEvVarId pred rhs
   = do { new_ev <- newEvVar pred
        ; setEvBind (mkGivenEvBind new_ev rhs)
        ; return new_ev }
+
+-- | Bind the two homogeneous coercions from a boxed heterogeneous equality.
+-- See Note [Projecting HEq# evidence].
+newHEqEvVars :: (EvVar -> EvTerm -> EvBind) -> [Type] -> EvVar -> TcS (CoVar, CoVar)
+newHEqEvVars mk_bind [k,l,a,b] dict
+  = do { kind_var <- newEvVar kind_pred
+       ; kind_rhs <- project kind_pred const
+       ; setEvBind (mk_bind kind_var kind_rhs)
+       ; index_var <- newEvVar (index_pred kind_var)
+       ; index_rhs <- project (index_pred kind_var) (flip const)
+       ; setEvBind (mk_bind index_var index_rhs)
+       ; return (kind_var, index_var) }
+  where
+    kind_pred = mkNomEqPred k l
+    index_pred co = mkNomEqPred (mkCastTy a (mkCoVarCo co)) b
+
+    project result_pred pick
+      = do { inner_kind <- newEvVar kind_pred
+           ; inner_index <- newEvVar (index_pred inner_kind)
+           ; return $ EvExpr $
+               mkWildCase (Var dict) (unrestricted (varType dict)) result_pred
+                 [Alt (DataAlt heqDataCon) [inner_kind, inner_index]
+                      (Coercion (mkCoVarCo (pick inner_kind inner_index)))] }
+newHEqEvVars _ tys _ = pprPanic "newHEqEvVars" (ppr tys)
+
+{- Note [Projecting HEq# evidence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See Note [The HEq# evidence telescope] in GHC.Builtin.WiredIn.Types.
+The solver stores each component in an ordinary evidence binding. Each
+projection matches both fields of the same dictionary.
+
+  ck = case d of HEq# kc vc -> kc
+  cv = case d of HEq# kc vc -> vc :: (a |> ck) ~# b
+
+In the second case, the field has type (a |> kc) ~# b. Its type equals
+the result type (a |> ck) ~# b by proof irrelevance. The type of cv
+depends on ck, so evidence desugaring places ck in scope first. This
+keeps the two coercions in scope without binding a heterogeneous CoVar.
+-}
 
 emitNewGivens :: CtLoc -> [(Role,TcCoercion)] -> TcS ()
 emitNewGivens loc pts
@@ -2260,15 +2303,17 @@ emitChildEqs ev eqs
 -- for an equality between the two types at the given 'Role'.
 newWantedEq :: CtLoc -> CoHoleSet -> Role -> TcType -> TcType
             -> TcS (WantedCtEvidence, CoercionHole)
-newWantedEq loc rewriters role ty1 ty2
-  = do { hole <- wrapTcS $ TcM.newCoercionHole pty
-       ; let wtd = WantedCt { ctev_pred      = pty
-                            , ctev_dest      = HoleDest hole
-                            , ctev_loc       = loc
-                            , ctev_rewriters = rewriters }
-       ; return (wtd, hole) }
+newWantedEq loc rewriters role lhs rhs =
+  do { hole <- wrapTcS $ TcM.newCoercionHole pred
+     ; return (mkWantedCt loc rewriters pred (HoleDest hole), hole) }
   where
-    pty = mkEqPredRole role ty1 ty2
+    pred = mkEqPredRole role lhs rhs
+
+-- | Create structured evidence for a Wanted equality from its endpoints.
+newWantedEqEvidence :: CtLoc -> CoHoleSet -> Role -> TcType -> TcType
+                    -> TcS (CtEvidence, CoercionHole)
+newWantedEqEvidence loc rewriters role lhs rhs =
+  wrapTcS $ TcM.newWantedEqWithLoc loc rewriters role lhs rhs
 
 -- | Create a new Wanted constraint holding an evidence variable.
 --
@@ -2281,11 +2326,7 @@ newWantedEvVarNC loc rewriters pty
     do { new_ev <- newEvVar pty
        ; traceTcS "Emitting new wanted" (ppr new_ev <+> dcolon <+> ppr pty $$
                                          pprCtLoc loc)
-       ; return $ WantedCt { ctev_pred      = pty
-                           , ctev_dest      = EvVarDest new_ev
-                           , ctev_loc       = loc
-                           , ctev_rewriters = rewriters }
-       }
+       ; return $ mkWantedCt loc rewriters pty (EvVarDest new_ev) }
 
 -- | `newWantedEvVar` makes up a fresh evidence variable for the given predicate.
 -- For ClassPred, check if this exact predicate type is in the solved dicts

@@ -148,8 +148,8 @@ tryQCsIrredCt (IrredCt { ir_ev = ev })
   = Stage $ case ev of
       CtGiven {}
         -> continueWith ()
-      CtWanted wev@(WantedCt { ctev_loc = loc, ctev_pred = pred })
-        -> do { res <- matchLocalInst pred loc
+      CtWanted wev@(WantedCt { ctev_loc = loc })
+        -> do { res <- matchLocalInst (wantedCtPredType wev) loc
               ; case res of
                   OneInst {} -> do { chooseInstance wev res
                                    ; stopWith ev "Irred (solved wanted)" }

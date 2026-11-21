@@ -296,8 +296,8 @@ solveImplicationUsingUnsatGiven unsat_given
            ; return $ wc { wc_simple = emptyBag, wc_impl = impls } }
     go_simple :: Ct -> TcS ()
     go_simple ct = case ctEvidence ct of
-      CtWanted (WantedCt { ctev_pred = pty, ctev_dest = dest })
-        -> do { ev_expr <- unsatisfiableEvExpr unsat_given pty
+      CtWanted wanted@(WantedCt { ctev_dest = dest })
+        -> do { ev_expr <- unsatisfiableEvExpr unsat_given (wantedCtPredType wanted)
               ; case dest of
                   EvVarDest {} -> setWantedDict dest EvNonCanonical $ EvExpr ev_expr
                   -- Make sure to handle coercion holes (see #28081):
@@ -1266,11 +1266,11 @@ tryDefaultGroup wanteds (Proposal assignments)
                ; tc_lvl <- TcS.getTcLevel
                ; let loc = mkGivenLoc tc_lvl (getSkolemInfo unkSkol) (mkCtLocEnv lcl_env)
                      new_wtd_ct :: WantedCtEvidence -> TcS Ct
-                     new_wtd_ct (WantedCt { ctev_pred = wtd_pred, ctev_rewriters = rws }) =
+                     new_wtd_ct wanted@(WantedCt { ctev_rewriters = rws }) =
                        mkNonCanonical . CtWanted <$>
                          -- NB: equality constraints are possible,
                          -- due to type defaulting plugins
-                         newWantedNC loc rws (substTy subst wtd_pred)
+                         newWantedNC loc rws (substTy subst (wantedCtPredType wanted))
                ; new_wanteds <- sequence [ new_wtd_ct wtd
                                          | CtWanted wtd <- map ctEvidence wanteds
                                          ]

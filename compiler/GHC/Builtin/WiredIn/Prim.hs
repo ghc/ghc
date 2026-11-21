@@ -1063,12 +1063,9 @@ Within GHC, ~# is called eqPrimTyCon, and it is defined in GHC.Builtin.WiredIn.P
     --------------------------
     (~~) :: forall k1 k2. k1 -> k2 -> Constraint
     --------------------------
-This is (almost) an ordinary class, defined as if by
-  class a ~# b => a ~~ b
-  instance a ~# b => a ~~ b
-Here's what's unusual about it:
-
- * We can't actually declare it that way because we don't have syntax for ~#.
+This is a built-in class. Its dictionary contains nominal evidence
+for equality of the kinds and of the indices after transport.
+See Note [The HEq# evidence telescope] in GHC.Builtin.WiredIn.Types.
 
  * Users cannot write instances of it.
 
@@ -1082,12 +1079,9 @@ Here's what's unusual about it:
    don't worry if a (~~) constraint is too big, as we know that solving
    equality terminates.
 
-On the other hand, this behaves just like any class w.r.t. eager superclass
-unpacking in the solver. So a lifted equality given quickly becomes an unlifted
-equality given. This is good, because the solver knows all about unlifted
-equalities. There is some special-casing in GHC.Tc.Solver.Dict.matchClassInst to
-pretend that there is an instance of this class, as we can't write the instance
-in Haskell.
+The solver unpacks a boxed Given into two primitive Givens. It solves
+a boxed Wanted through primitive equality. See Note [Solving equality
+classes] in GHC.Tc.Solver.Dict.
 
 Within GHC, ~~ is called heqTyCon, and it is defined in GHC.Builtin.WiredIn.Types.
 
@@ -1095,8 +1089,8 @@ Within GHC, ~~ is called heqTyCon, and it is defined in GHC.Builtin.WiredIn.Type
     --------------------------
     (~) :: forall k. k -> k -> Constraint
     --------------------------
-This is /exactly/ like (~~), except with a homogeneous kind.
-It is an almost-ordinary class defined as if by
+This is a built-in equality class with a homogeneous kind. It has
+one primitive superclass, as if defined by
   class a ~# b => (a :: k) ~ (b :: k)
   instance a ~# b => a ~ b
 

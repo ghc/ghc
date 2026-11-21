@@ -2166,7 +2166,8 @@ exprIsConAppFor_maybe mode ise@(ISE in_scope id_unf) expr
         (ty_args, val_args) = splitAtList (dataConUnivAndExTyCoVars dc) args
         (in_scope', floats', val_args') = foldr do_one (in_scope, nilOL, []) $
                                           zipEqual str_marks val_args
-        str_marks = dataConRepStrictness dc
+        str_marks = drop co_arity (dataConRepStrictness dc)
+        co_arity = count isCoVar (dataConExTyCoVars dc)
         do_one (str, arg) (in_scope,floats,args)
           | NotMarkedStrict <- str   = no_seq
           | exprIsHNF arg            = no_seq

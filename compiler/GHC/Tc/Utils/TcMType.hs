@@ -38,7 +38,7 @@ module GHC.Tc.Utils.TcMType (
   --------------------------------
   -- Creating new evidence variables
   newEvVar, newEvVars, newDict,
-  newWantedWithLoc, newWanted, newWanteds, cloneWanted, cloneWC, cloneWantedCtEv,
+  newWantedWithLoc, newWantedEqWithLoc, newWanted, newWanteds, cloneWanted, cloneWC, cloneWantedCtEv,
   emitWanted, emitWantedEq, emitWantedEvVar,
   emitWantedEqs, emitNewExprHole,
   newTcEvBinds, newNoTcEvBinds, addTcEvBind,
@@ -197,11 +197,14 @@ newWantedWithLoc loc pty
   = do dst <- case classifyPredType pty of
                 EqPred {} -> HoleDest  <$> newCoercionHole pty
                 _         -> EvVarDest <$> newEvVar pty
-       return $ CtWanted $
-         WantedCt { ctev_dest      = dst
-                  , ctev_pred      = pty
-                  , ctev_loc       = loc
-                  , ctev_rewriters = emptyCoHoleSet }
+       return $ CtWanted $ mkWantedCt loc emptyCoHoleSet pty dst
+
+-- | Create a Wanted equality and its coercion hole.
+newWantedEqWithLoc :: CtLoc -> CoHoleSet -> Role -> TcType -> TcType
+                   -> TcM (CtEvidence, CoercionHole)
+newWantedEqWithLoc loc rewriters role lhs rhs =
+  do { hole <- newCoercionHole (mkEqPredRole role lhs rhs)
+     ; return (mkWantedEqCt loc rewriters role lhs rhs hole, hole) }
 
 -- | Create a new Wanted constraint with the given 'CtOrigin', and
 -- location information taken from the 'TcM' environment.
@@ -221,12 +224,14 @@ newWanteds orig = mapM (newWanted orig Nothing)
 ----------------------------------------------
 
 cloneWantedCtEv :: CtEvidence -> TcM CtEvidence
-cloneWantedCtEv (CtWanted ctev@(WantedCt { ctev_pred = pty, ctev_dest = HoleDest _ }))
+cloneWantedCtEv ev@(CtWanted ctev@(WantedCt { ctev_dest = HoleDest _ }))
   | isEqPred pty
   = do { co_hole <- newCoercionHole pty
-       ; return $ CtWanted (ctev { ctev_dest = HoleDest co_hole }) }
+       ; return $ setCtEvDest ev (HoleDest co_hole) }
   | otherwise
   = pprPanic "cloneWantedCtEv" (ppr pty)
+  where
+    pty = wantedCtPredType ctev
 cloneWantedCtEv ctev = return ctev
 
 cloneWanted :: Ct -> TcM Ct
@@ -274,16 +279,10 @@ emitWantedEqs origin pairs
 -- | Emits a new equality constraint
 emitWantedEq :: CtOrigin -> TypeOrKind -> Role -> TcType -> TcType -> TcM Coercion
 emitWantedEq origin t_or_k role ty1 ty2
-  = do { hole <- newCoercionHole pty
-       ; loc  <- getCtLocM origin (Just t_or_k)
-       ; emitSimple $ mkNonCanonical $ CtWanted $
-           WantedCt { ctev_pred      = pty
-                    , ctev_dest      = HoleDest hole
-                    , ctev_loc       = loc
-                    , ctev_rewriters = emptyCoHoleSet }
+  = do { loc <- getCtLocM origin (Just t_or_k)
+       ; (wanted, hole) <- newWantedEqWithLoc loc emptyCoHoleSet role ty1 ty2
+       ; emitSimple $ mkNonCanonical wanted
        ; return (HoleCo hole) }
-  where
-    pty = mkEqPredRole role ty1 ty2
 
 -- | Creates a new EvVar and immediately emits it as a Wanted.
 -- No equality predicates here.
@@ -291,10 +290,7 @@ emitWantedEvVar :: CtOrigin -> TcPredType -> TcM EvVar
 emitWantedEvVar origin ty
   = do { new_cv <- newEvVar ty
        ; loc <- getCtLocM origin Nothing
-       ; let ctev = WantedCt { ctev_pred      = ty
-                             , ctev_dest      = EvVarDest new_cv
-                             , ctev_loc       = loc
-                             , ctev_rewriters = emptyCoHoleSet }
+       ; let ctev = mkWantedCt loc emptyCoHoleSet ty (EvVarDest new_cv)
        ; emitSimple $ mkNonCanonical $ CtWanted ctev
        ; return new_cv }
 

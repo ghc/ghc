@@ -101,7 +101,7 @@ import GHC.Core.TyCo.Ppr( debugPprType {- pprTyVar -} )
 import GHC.Core.TyCon
 import GHC.Core.Coercion
 import GHC.Core.Unify
-import GHC.Core.Predicate( EqRel(..), mkEqPredRole, mkNomEqPred )
+import GHC.Core.Predicate( EqRel(..) )
 import GHC.Core.Multiplicity
 import GHC.Core.Reduction
 
@@ -3240,13 +3240,8 @@ uType, uType_defer
 uType_defer (UE { u_loc = loc, u_defer = ref
                 , u_role = role, u_rewriters = rewriters })
             ty1 ty2  -- ty1 is "actual", ty2 is "expected"
-  = do { let pred_ty = mkEqPredRole role ty1 ty2
-       ; hole <- newCoercionHole pred_ty
-       ; let ct = mkNonCanonical $ CtWanted $
-                    WantedCt { ctev_pred      = pred_ty
-                             , ctev_dest      = HoleDest hole
-                             , ctev_loc       = loc
-                             , ctev_rewriters = rewriters }
+  = do { (wanted, hole) <- newWantedEqWithLoc loc rewriters role ty1 ty2
+       ; let ct = mkNonCanonical wanted
              co = HoleCo hole
        ; updTcRef ref (`snocBag` ct)
          -- snocBag: see Note [Work-list ordering] in GHC.Tc.Solver.Equality
@@ -4783,13 +4778,9 @@ famAppBreaker (BreakWanted ev lhs_tv) fam_app   -- Wanteds
               TcM.newConcreteTyVarTyAtLevel conc_info lhs_tv_lvl fam_app_kind
             _ -> TcM.newMetaTyVarTyAtLevel lhs_tv_lvl fam_app_kind
 
-       ; let pty = mkNomEqPred fam_app new_tv_ty
-       ; hole <- TcM.newCoercionHole pty
-       ; let new_ev = WantedCt { ctev_pred      = pty
-                               , ctev_dest      = HoleDest hole
-                               , ctev_loc       = cb_loc
-                               , ctev_rewriters = ctEvRewriters ev }
-       ; return (PuOK (singleCt (mkNonCanonical $ CtWanted new_ev))
+       ; (new_ev, hole) <- newWantedEqWithLoc cb_loc (ctEvRewriters ev)
+                                               Nominal fam_app new_tv_ty
+       ; return (PuOK (singleCt (mkNonCanonical new_ev))
                       (mkReduction (HoleCo hole) new_tv_ty)) } }
   where
     fam_app_kind = typeKind fam_app
@@ -5662,14 +5653,9 @@ makeTypeConcrete occ_fs conc_orig ty =
                 -- Now create the new concrete metavariable.
                 ; conc_tv <- newConcreteTyVar conc_orig occ_fs (coercionRKind kind_co)
                 ; let conc_ty = mkTyVarTy conc_tv
-                      pty = mkEqPredRole Nominal ty' conc_ty
-                ; hole <- newCoercionHole pty
                 ; loc <- getCtLocM orig (Just KindLevel)
-                ; let ct = mkNonCanonical $ CtWanted
-                         $ WantedCt { ctev_pred      = pty
-                                    , ctev_dest      = HoleDest hole
-                                    , ctev_loc       = loc
-                                    , ctev_rewriters = emptyCoHoleSet }
+                ; (wanted, hole) <- newWantedEqWithLoc loc emptyCoHoleSet Nominal ty' conc_ty
+                ; let ct = mkNonCanonical wanted
                 ; return (kind_cts S.<> unitBag ct, HoleCo hole)
                 }
 

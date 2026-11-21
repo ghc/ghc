@@ -13,6 +13,7 @@ import {-# SOURCE #-} GHC.Tc.Solver.Solve( solveSimpleWanteds )
 
 import GHC.Builtin.CoercionRules
   ( proveBoxedPairProjection, proveScopedSigmaClosure, proveScopedLambdaClosure )
+import GHC.Builtin.WiredIn.Types ( heqClass )
 import GHC.Tc.Gen.SourceTable ( sourceTableFamilyAppUse, sourceTableOwner )
 import GHC.Tc.Errors.Types ( RetainedQuantificationError(..), TcRnMessage(..) )
 
@@ -1456,17 +1457,63 @@ canEqCast :: CanEqState
           -> TcType -> Coercion   -- LHS (res. RHS), ty1 |> co1
           -> TcType -> TcType     -- RHS (res. LHS), ty2 both normal and pretty
           -> TcS (StopOrContinue (Either IrredCt EqCt))
+canEqCast _ _ _ ev@(CtGiven (GivenCt { ctev_evar = evar })) NomEq swapped
+          ty1@(TyConApp tc tys1) co1 ty2@(TyConApp tc' tys2) _
+  | tc == tc'
+  , not (isTypeFamilyTyCon tc)
+  , isInjectiveTyCon tc Nominal
+  , tys1 `equalLength` tys2
+  , coercionRKind co1 `tcEqType` typeKind ty2
+  , not (coercionLKind co1 `tcEqType` typeKind ty2)
+  -- See (EIK5) in Note [Equalities with heterogeneous kinds].
+  = do { let loc = ctEvLoc ev
+             cast_ty1 = mkCastTy ty1 co1
+             pred_ty = case swapped of
+                         NotSwapped -> mkNomEqPred cast_ty1 ty2
+                         IsSwapped  -> mkNomEqPred ty2 cast_ty1
+             parent = mkGReflRightCo Nominal ty1 co1 `mkTransCo`
+                        maybeSymCo swapped (mkCoVarCo (setVarType evar pred_ty))
+             selectors = tyConAppGivenSelectors (repeat Nominal) tys1 tys2 parent
+       ; emitSelectorGivens loc selectors
+       ; stopWith ev "Decomposed casted TyConApp Given" }
 canEqCast ces rdr_env envs ev eq_rel swapped ty1 co1 ty2 ps_ty2
   = do { traceTcS "Decomposing cast" (vcat [ ppr ev
                                            , ppr ty1 <+> text "|>" <+> ppr co1
                                            , ppr ps_ty2 ])
+       ; rhs_cast <- cast_rhs
+       ; let rhs_redn = mkGReflRightMRedn role ps_ty2 rhs_cast
+       ; case rhs_cast of
+           MCo kind_co -> emitNewGivens (mkKindEqLoc ty1 ty2 (ctEvLoc ev)) [(Nominal, kind_co)]
+           MRefl       -> return ()
        ; new_ev <- rewriteEqEvidence ev swapped
                       (mkGReflLeftRedn role ty1 co1)
-                      (mkReflRedn role ps_ty2)
+                      rhs_redn
                       emptyCoHoleSet
-       ; can_eq_nc (swapCES swapped ces) rdr_env envs new_ev eq_rel ty1 ty1 ty2 ps_ty2 }
+       ; can_eq_nc (swapCES swapped ces) rdr_env envs new_ev eq_rel
+                   ty1 ty1 (mkCastTyMCo ty2 rhs_cast) (reductionReducedType rhs_redn) }
   where
     role = eqRelRole eq_rel
+    cast_rhs
+      | CtGiven {} <- ev
+      , NomEq <- eq_rel
+      , isJust (canEqLHS_maybe ty1)
+      = do { let Pair k1 k2 = coercionKind co1
+                 rhs_kind = typeKind ty2
+           ; if k2 `tcEqType` rhs_kind
+             then return (move_cast k1 rhs_kind)
+             else do { k1' <- zonkTcType k1
+                     ; k2' <- zonkTcType k2
+                     ; rhs_kind' <- zonkTcType rhs_kind
+                     ; return $ if k2' `tcEqType` rhs_kind'
+                                then move_cast k1' rhs_kind'
+                                else MRefl } }
+      | otherwise
+      = return MRefl
+
+    -- See (EIK4) in Note [Equalities with heterogeneous kinds].
+    move_cast k1 rhs_kind
+      | k1 `tcEqType` rhs_kind = MRefl
+      | otherwise             = MCo (mkSymCo co1)
 
 ------------------------
 canTyConApp :: CtEvidence -> EqRel
@@ -2158,11 +2205,7 @@ canDecomposableTyConAppOK ev eq_rel tc (ty1,tys1) (ty2,tys2)
                    -- setVarType: satisfy Note [mkSelCo precondition] in Coercion.hs
                    -- Remember: ty1/ty2 may be more fully zonked than evar
                    --           See the call to canonicaliseEquality in solveEquality.
-             -> emitSelectorGivens loc
-                       [ (r, mkSelCo (SelTyCon i r) ev_co)
-                       | (r, ty1, ty2, i) <- zip4 tc_roles tys1 tys2 [0..]
-                       , r /= Phantom
-                       , not (isCoercionTy ty1) && not (isCoercionTy ty2) ]
+             -> emitSelectorGivens loc (tyConAppGivenSelectors tc_roles tys1 tys2 ev_co)
 
     ; stopWith ev "Decomposed TyConApp" }
 
@@ -2200,6 +2243,15 @@ canDecomposableTyConAppOK ev eq_rel tc (ty1,tys1) (ty2,tys2)
       let arg_role = tyConRole role tc (arg_no - 1)
           mb_role_expln = tyConAppRoleExplanation role tc (arg_no, arg_role)
       in adjustCtLocTyConBinder mb_bndr mb_role_expln loc
+
+-- | Project the evidence for arguments that can become Given equalities.
+tyConAppGivenSelectors :: [Role] -> [TcType] -> [TcType] -> TcCoercion
+                       -> [(Role, TcCoercion)]
+tyConAppGivenSelectors roles tys1 tys2 co
+  = [ (r, mkSelCo (SelTyCon i r) co)
+    | (r, ty1, ty2, i) <- zip4 roles tys1 tys2 [0..]
+    , r /= Phantom
+    , not (isCoercionTy ty1) && not (isCoercionTy ty2) ]
 
 -- | Bind the non-reflexive projections of a Given.
 -- See Note [Homogeneous selector Givens].
@@ -2500,9 +2552,10 @@ canEqCanLHSHetero ev eq_rel swapped lhs1 ps_xi1 ki1 xi2 ps_xi2 ki2
                                mkKindCo (mkCoVarCo evar)
                     pred_ty  = mkNomEqPred ki2 ki1
                     kind_loc = mkKindEqLoc xi1 xi2 loc
-              ; kind_ev <- newGivenEv kind_loc (pred_ty, evCoercion kind_co)
-              ; emitWorkNC [CtGiven kind_ev]
-              ; finish emptyCoHoleSet (givenCtEvCoercion kind_ev) }
+              ; kind_var <- newBoundEvVarId pred_ty (evCoercion kind_co)
+              ; let kind_ev = mkGivenEqCt kind_loc kind_var
+              ; emitWorkNC [kind_ev]
+              ; finish emptyCoHoleSet (ctEvCoercion kind_ev) }
 
       CtWanted (WantedCt { ctev_loc = loc, ctev_rewriters = rws })
          -> do { (unifs, (kind_co, eqs)) <- reportFineGrainUnifications $
@@ -3170,6 +3223,38 @@ Wrinkles:
      And this is an improvement regardless: because tyvars can, generally,
      unify with casted types, there's no reason to go through the work of
      stripping off the cast when the cast appears opposite a tyvar.
+(EIK4) When a nominal Given has the form (a |> co) ~# rhs and both
+     endpoints have the same kind, canEqCast can move the cast to rhs.
+     Do this when a is a canonical left-hand side. Removing the cast
+     alone would bind heterogeneous evidence before canEqCanLHSHetero
+     casts rhs back. Moving the cast keeps the new Given homogeneous.
+     This also applies when a boxed equality supplied the original Given.
+     Emit the kind Given from the cast, as canEqCanLHSHetero would
+     do after stripping it.
+
+     The shallow zonk in solveEquality can follow a filled variable in
+     rhs while co still mentions that variable's old kind. If their
+     kinds differ, zonk the kinds before comparing them again. Use the
+     original cast as evidence. This keeps the intermediate coercion an
+     expression within the homogeneous proof (T11711).
+
+(EIK5) A nominal Given can have the form (T as |> h) ~# T bs.
+     When T is injective, use the uncast equality as an expression
+     in its selectors. Binding that expression would create a mixed-kind
+     CoVar. A selector can also have different endpoint kinds. Bind
+     its kind equality first and transport the right endpoint, as in
+     canEqCanLHSHetero. This keeps the argument Given homogeneous.
+     For example, this permits decomposition of the boxed Given
+     'Tag @k a ~~ 'Tag @Type Int without a mixed-kind binder.
+     Each recursive decomposition consumes a TyCon application.
+
+     An equality with same-kind endpoints can also have a selector
+     with mixed-kind endpoints. A constructor can have a kind parameter,
+     and two function argument types can have different runtime
+     representations. In these cases transport the selected argument
+     using a nominal kind proof and keep the role of the selector.
+     The same rule applies to both nominal LRCo projections of a
+     matchable application. Continue with the head equality first.
 
 Historical note:
 
@@ -3596,7 +3681,7 @@ rewriteEqEvidence old_ev swapped (Reduction lhs_co nlhs) (Reduction rhs_co nrhs)
 
   | CtWanted (WantedCt { ctev_dest = dest, ctev_rewriters = rewriters }) <- old_ev
   = do { let rewriters' = rewriters S.<> new_holes
-       ; (new_ev, hole) <- newWantedEq loc rewriters' (ctEvRewriteRole old_ev) nlhs nrhs
+       ; (new_ev, hole) <- newWantedEqEvidence loc rewriters' (ctEvRewriteRole old_ev) nlhs nrhs
        ; let co = maybeSymCo swapped $
                   lhs_co `mkTransCo` mkHoleCo hole `mkTransCo` mkSymCo rhs_co
        ; setWantedEq dest (CPH { cph_co    = co
@@ -3607,7 +3692,7 @@ rewriteEqEvidence old_ev swapped (Reduction lhs_co nlhs) (Reduction rhs_co nrhs)
                                                , ppr nrhs
                                                , ppr co
                                                , ppr new_holes ])
-       ; return $ CtWanted new_ev }
+       ; return new_ev }
 
   where
     loc      = ctEvLoc old_ev
@@ -3847,8 +3932,10 @@ Wrinkles:
 
 {- Note [Looking up primitive equalities in quantified constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For equalities (a ~# b) look up (a ~ b), and then do a superclass
-selection. This avoids having to support quantified constraints whose
+For equalities (a ~# b) look up the boxed equality and extract its
+coercion evidence. The (~~) case composes the kind transport and
+index coercion. See Note [Projecting HEq# evidence] in GHC.Tc.Solver.Monad.
+This avoids having to support quantified constraints whose
 kind is not Constraint, such as (forall a. F a ~# b)
 
 See
@@ -3860,7 +3947,7 @@ See
 --------------------
 tryQCsIrredEqCt :: IrredCt -> SolverStage ()
 tryQCsIrredEqCt (IrredCt { ir_ev = ev })
-  | EqPred eq_rel t1 t2 <- classifyPredType (ctEvPred ev)
+  | EqPred eq_rel t1 t2 <- classifyCtEvidence ev
   = lookup_eq_in_qcis ev eq_rel t1 t2
 
   | otherwise  -- All the calls come from in this module, where we deal only with
@@ -3916,9 +4003,8 @@ lookup_eq_in_qcis ev@(CtWanted (WantedCt { ctev_dest = dest, ctev_loc = loc })) 
                 OneInst {}
                   -> do { dict_ev <- newWantedEvVarNC loc emptyCoHoleSet cls_pred
                         ; chooseInstance dict_ev res
-                        ; co_var <- newEvVar (unSwap swap (mkEqPred eq_rel) lhs rhs)
-                        ; setEvBind (mkWantedEvBind co_var EvCanonical (mk_sc_sel cls tys dict_ev))
-                        ; fillCoercionHole hole (CPH { cph_co    = maybeSymCo swap (mkCoVarCo co_var)
+                        ; co <- unbox swap cls tys (wantedCtEvEvId dict_ev)
+                        ; fillCoercionHole hole (CPH { cph_co    = maybeSymCo swap co
                                                      , cph_holes = emptyCoHoleSet })
                         ; stopWith ev "lookup_eq_in_qcis" }
                 _ -> continueWith () }
@@ -3926,11 +4012,20 @@ lookup_eq_in_qcis ev@(CtWanted (WantedCt { ctev_dest = dest, ctev_loc = loc })) 
        | otherwise
        = nopStage ()
 
-    mk_sc_sel cls tys dict_ev
+    unbox swap cls tys dict
+      | cls == heqClass
+      = do { (kind_var, index_var) <- newHEqEvVars bind_wanted tys dict
+           ; let t1 = unSwap swap const lhs rhs
+                 transport = mkGReflRightCo Nominal t1 (mkCoVarCo kind_var)
+           ; return (transport `mkTransCo` mkCoVarCo index_var) }
       | [sc_id] <- classSCSelIds cls  -- Just one superclass for this
-      = EvExpr (Var sc_id `mkTyApps` tys `App` Var (wantedCtEvEvId dict_ev))
+      = do { co_var <- newEvVar (unSwap swap (mkEqPred eq_rel) lhs rhs)
+           ; setEvBind (bind_wanted co_var (EvExpr (Var sc_id `mkTyApps` tys `App` Var dict)))
+           ; return (mkCoVarCo co_var) }
       | otherwise
-      = pprPanic "looup_eq_in_qcis" (ppr dict_ev)
+      = pprPanic "lookup_eq_in_qcis: unbox" (ppr dict)
+
+    bind_wanted var = mkWantedEvBind var EvCanonical
 
 
 {- Note [Instances in no-evidence implications]

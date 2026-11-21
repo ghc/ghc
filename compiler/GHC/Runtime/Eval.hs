@@ -1119,12 +1119,7 @@ getDictionaryBindings theta = do
   let dict_var = mkVanillaGlobal dictName theta
   loc <- getCtLocM (GivenOrigin (getSkolemInfo unkSkol)) Nothing
 
-  return $ CtWanted $ WantedCt {
-    ctev_pred = varType dict_var,
-    ctev_dest = EvVarDest dict_var,
-    ctev_loc = loc,
-    ctev_rewriters = emptyCoHoleSet
-  }
+  return $ CtWanted $ mkWantedCt loc emptyCoHoleSet (varType dict_var) (EvVarDest dict_var)
 
 -- Find instances where the head unifies with the provided type
 findMatchingInstances :: Type -> TcM [(ClsInst, [DFunInstType])]

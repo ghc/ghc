@@ -562,15 +562,10 @@ zonkCt ct
        ; return (mkNonCanonical fl') }
 
 zonkCtEvidence :: CtEvidence -> ZonkM CtEvidence
--- Zonks the ctev_pred and the ctev_rewriters; but not ctev_evar
+-- Zonk the predicate and rewriters. Leave the evidence alone.
 -- For ctev_rewriters, see (WRW11) in Note [Wanteds rewrite Wanteds: rewriter-sets]
-zonkCtEvidence (CtGiven (GivenCt { ctev_pred = pred, ctev_evar = var, ctev_loc = loc }))
-  = do { pred' <- zonkTcType pred
-       ; return (CtGiven (GivenCt { ctev_pred = pred', ctev_evar = var, ctev_loc = loc })) }
-zonkCtEvidence (CtWanted wanted@(WantedCt { ctev_pred = pred, ctev_rewriters = rws }))
-  = do { pred' <- zonkTcType pred
-       ; rws'  <- zonkCoHoleSet rws
-       ; return (CtWanted (wanted { ctev_pred = pred', ctev_rewriters = rws' })) }
+zonkCtEvidence ev =
+  traverseCtEvPred zonkTcType ev >>= zonkCtEvCoHoleSet
 
 zonkSkolemInfo :: SkolemInfo -> ZonkM SkolemInfo
 zonkSkolemInfo (SkolemInfo u sk) = SkolemInfo u <$> zonkSkolemInfoAnon sk
@@ -630,9 +625,9 @@ zonkCtCoHoleSet ct
 zonkCtEvCoHoleSet :: CtEvidence -> ZonkM CtEvidence
 zonkCtEvCoHoleSet ev@(CtGiven {})
   = return ev
-zonkCtEvCoHoleSet ev@(CtWanted wtd)
+zonkCtEvCoHoleSet ev@(CtWanted {})
   = do { rewriters' <- zonkCoHoleSet (ctEvRewriters ev)
-       ; return (CtWanted $ setWantedCtEvRewriters wtd rewriters') }
+       ; return (setCtEvRewriters ev rewriters') }
 
 -- | Zonk a rewriter set; if a coercion hole in the set has been filled,
 -- find all the free un-filled coercion holes in the coercion that fills it

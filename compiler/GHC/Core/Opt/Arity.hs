@@ -3223,13 +3223,21 @@ push_data_con to_tc to_tc_arg_tys dc dc_args co role
       = liftCoSubstWithEx dc_univ_tyvars
                           omegas
                           dc_ex_tcvars
-                          (map exprToType ex_args)
+                          (map ex_arg_type ex_args)
+
+    -- An existential coercion can scope over a following field, as in HEq#.
+    -- The lifting context represents it as a CoercionTy.
+    ex_arg_type (Coercion ex_co) = mkCoercionTy ex_co
+    ex_arg_type arg              = exprToType arg
 
       -- Cast the value arguments (which include dictionaries)
     new_val_args = zipWith cast_arg (map scaledThing arg_tys) val_args
     cast_arg arg_ty arg = mkCast arg (psi_subst arg_ty)
 
-    to_ex_args = map Type to_ex_arg_tys
+    to_ex_args = map to_ex_arg to_ex_arg_tys
+    to_ex_arg ty
+      | Just ex_co <- isCoercionTy_maybe ty = Coercion ex_co
+      | otherwise                         = Type ty
 
     dump_doc = vcat [ppr dc, ppr dc_univ_tyvars, ppr dc_ex_tcvars
                     , ppr arg_tys, ppr dc_args

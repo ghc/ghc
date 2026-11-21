@@ -1434,10 +1434,10 @@ rewriteFilterGuard tc tys tc_rewriters
   where
     givenResult test ev
       | isGiven ev
-      , EqPred NomEq lhs rhs <- classifyPredType (ctEvPred ev)
+      , EqPred NomEq lhs rhs <- classifyCtEvidence ev
       , lhs `tcEqType` test, isResult rhs = Just (ev, rhs, ctEvCoercion ev)
       | isGiven ev
-      , EqPred NomEq lhs rhs <- classifyPredType (ctEvPred ev)
+      , EqPred NomEq lhs rhs <- classifyCtEvidence ev
       , rhs `tcEqType` test, isResult lhs = Just (ev, lhs, mkSymCo (ctEvCoercion ev))
       | otherwise = Nothing
 

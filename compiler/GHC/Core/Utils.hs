@@ -2983,7 +2983,7 @@ dataConInstPat fss uniqs mult con inst_tys
     univ_tvs = dataConUnivTyVars con
     ex_tvs   = dataConExTyCoVars con
     arg_tys  = dataConRepArgTys con
-    arg_strs = dataConRepStrictness con  -- 1-1 with arg_tys
+    arg_strs = drop (count isCoVar ex_tvs) (dataConRepStrictness con)
     n_ex = length ex_tvs
 
       -- split the Uniques and FastStrings

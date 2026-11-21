@@ -66,7 +66,7 @@ import GHC.Core.FamInstEnv     ( FamInstEnv )
 import GHC.Tc.Utils.Monad      ( TcGblEnv, TcLclEnv, TcPluginM
                                , unsafeTcPluginTcM
                                , liftIO, traceTc )
-import GHC.Tc.Types.Constraint ( Ct, CtEvidence(..), GivenCtEvidence(..) )
+import GHC.Tc.Types.Constraint ( Ct, CtEvidence(..), mkGivenCt )
 import GHC.Tc.Types.CtLoc      ( CtLoc )
 
 import GHC.Tc.Utils.TcMType    ( TcTyVar, TcType )
@@ -185,8 +185,7 @@ newGiven :: EvBindsVar -> CtLoc -> PredType -> EvExpr -> TcPluginM CtEvidence
 newGiven tc_evbinds loc pty evtm = do
    new_ev <- newEvVar pty
    setEvBind tc_evbinds $ mkGivenEvBind new_ev (EvExpr evtm)
-   return $ CtGiven $
-     GivenCt { ctev_pred = pty, ctev_evar = new_ev, ctev_loc = loc }
+   return $ CtGiven $ mkGivenCt loc pty new_ev
 
 -- | Create a fresh evidence variable.
 --

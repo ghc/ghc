@@ -45,6 +45,7 @@ import GHC.Utils.Panic
 import GHC.Data.Bag
 
 import GHC.Types.CompleteMatch
+import GHC.Types.Unique ( hasKey )
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.SDFM
@@ -977,8 +978,15 @@ addCoreCt nabla x e = do
     --   4. @x ~ K as ys@
     -- This is quite similar to PmCheck.pmConCts.
     data_con_app :: Id -> InScopeSet -> DataCon -> [CoreExpr] -> StateT Nabla (MaybeT DsM) ()
+    data_con_app x _ dc _
+      | dc `hasKey` heqDataConKey
+      -- HEq# has only erased fields. Its existential coercion does not
+      -- give a type variable for the pattern checker to equate.
+      = modifyT $ \nabla -> addNotBotCt nabla x
     data_con_app x in_scope dc args = do
-      let dc_ex_tvs              = dataConExTyCoVars dc
+      -- Use source existentials. The worker's kind proofs do not bind a
+      -- source type variable. The visible arguments follow all proofs.
+      let (_, dc_ex_tvs, _, _, _, _) = dataConFullSig dc
           arty                   = dataConSourceArity dc
           (ex_ty_args, val_args) = splitAtList dc_ex_tvs args
           ex_tys                 = map exprToType ex_ty_args

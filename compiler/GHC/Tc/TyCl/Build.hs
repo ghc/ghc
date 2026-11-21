@@ -242,15 +242,23 @@ buildDataConWithTelescope late_count retained_binders fam_envs dc_bang_opts src_
               -- See Note [Constructor tag allocation], fixes #14657
               data_con = mkDataConWithTelescope late_count retained_binders src_name declared_infix prom_info
                                    src_bangs impl_bangs str_marks field_lbls
-                                   univ_tvs ex_tvs
+                                   univ_tvs worker_exs
                                    noConcreteTyVars
                                    user_tvbs eq_spec ctxt
                                    arg_tys res_ty NoPromInfo rep_tycon tag
                                    stupid_ctxt dc_wrk dc_rep
               dc_wrk = mkDataConWorkId work_name data_con
+              (worker_exs, worker_us)
+                | SrcBangOpts {} <- dc_bang_opts
+                , null retained_binders, all isTyVar ex_tvs
+                , Just (proofs, rest) <- buildGadtProofs_maybe us eq_spec
+                , not (isTypeDataTyCon rep_tycon || isNewTyCon rep_tycon)
+                = (ex_tvs ++ proofs, rest)
+                | otherwise
+                = (ex_tvs, us)
               (dc_rep, impl_bangs, str_marks)
                 | null retained_binders || dataConHasRetainedResult data_con
-                = initUs_ us (mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con)
+                = initUs_ worker_us (mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con)
                 | otherwise
                 = (NoDataConRep, map (const HsLazy) arg_tys, [])
 

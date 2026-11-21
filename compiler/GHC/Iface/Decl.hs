@@ -257,8 +257,9 @@ tyConToIfaceDecl env tycon
                     ifConSrcStricts = map toIfaceSrcBang
                                           (dataConSrcBangs data_con)}
         where
-          (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _)
+          (univ_tvs, _, eq_spec, theta, arg_tys, _)
             = dataConFullSig data_con
+          ex_tvs = dataConExTyCoVars data_con
           user_bndrs = dataConUserTyVarBinders data_con
 
           -- Start with 'emptyTidyEnv' not 'tc_env1', because the type of the
