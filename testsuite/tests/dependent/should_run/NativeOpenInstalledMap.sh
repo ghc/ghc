@@ -623,3 +623,36 @@ if "${proof[@]}" >changed.log 2>&1 ||
     cat changed.log >&2
     exit 1
 fi
+
+# The same predicate decision applies before and after appending to the tail.
+mkdir "$out"/{filter-append-provider,filter-append-client}
+cd "$out/filter-append-provider"
+cp ../length-source/PreludeMapLength{Size,Source}.hi ../filter/PreludeFilterSource.hi .
+"${filter[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core -odir . -hidir . -c \
+    "$src/PreludeFilterLengthProof.hs" "$src/PreludeFilterRuntime.hs" "$src/PreludeAppendLengthSource.hs"
+cd "$out/filter-append-client"
+cp ../filter-append-provider/*.hi "$src/PreludeFilterAppendProof.hs" .
+cat >Main.hs <<'HS'
+module Main where
+import PreludeFilterAppendProof (showPreludeFilterAppend)
+main :: IO ()
+main = putStrLn showPreludeFilterAppend
+HS
+for level in -O0 -O2; do
+    "${filter[@]}" "$level" -fforce-recomp -c PreludeFilterAppendProof.hs Main.hs
+    "${ghc[@]}" Main.o PreludeFilterAppendProof.o ../filter-append-provider/*.o \
+        ../filter/PreludeFilterSource.o ../length-source/PreludeMapLength{Size,Source}.o -o filter-append-run
+    [[ $(./filter-append-run) == '(Refl,[1,3],[1,3],(True,True))' ]]
+done
+
+sed -e 's/Decide decision xs/Decide _ xs/' -e 's/^    Refl -> case decision of$/    Refl -> Refl/' \
+    -e '/^        IsTrue -> Refl$/d' -e '/^        IsFalse -> Refl$/d' \
+    PreludeFilterAppendProof.hs >WithoutDecision.hs
+line=$(awk '/^    Refl -> Refl$/ { print NR }' WithoutDecision.hs)
+if "${filter[@]}" -c WithoutDecision.hs >without-decision.log 2>&1 ||
+   ! grep -Fq "WithoutDecision.hs:$line:" without-decision.log ||
+   ! grep -Fq '[GHC-05617]' without-decision.log ||
+   ! grep -Fq '#guard:filter (p x)' without-decision.log; then
+    cat without-decision.log >&2
+    exit 1
+fi

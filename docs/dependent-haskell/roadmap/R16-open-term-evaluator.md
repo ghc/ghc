@@ -1318,6 +1318,24 @@ retained operand. Its ordinary calls can still inline.
 [Runtime example](../examples/open-evaluation/PreludeFilterRuntime.hs)
 and [regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh).
 
+### Prove that filter distributes over append
+
+`filterAppend` proves `filter p (xs ++ ys) = filter p xs ++ filter p ys`
+using the installed functions. The ordinary proof takes one
+`BooleanResult (p x)` for each head in the finite left spine. The
+right list stays abstract and needs no decisions. In the empty case
+both sides reduce to `filter p ys`. In the cons case a single decision
+selects the same branch for the original tail and for that tail with
+`ys` appended. The induction hypothesis equates the filtered tails.
+
+The proof reads only stripped provider interfaces at `-O0` and `-O2`.
+Ignoring the decision while keeping the induction hypothesis fails at
+`Refl`. In the runtime check both computations skip a head and expose
+the next cons before demanding the remaining left tail or right list.
+[Proof](../examples/open-evaluation/PreludeFilterAppendProof.hs),
+[regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh),
+and [Agda filter-++](https://agda.github.io/agda-stdlib/v2.2/Data.List.Properties.html).
+
 ### Supply a runtime filter decider
 
 `runtimeFilterBoundWith` takes an erased required type argument `(type p)`
