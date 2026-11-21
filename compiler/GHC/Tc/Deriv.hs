@@ -1888,6 +1888,14 @@ However, we must watch out for three things:
     type at the Core level. See #14728, comment:3 for a sketch of how this
     might work. Until then, we disallow this featurette wholesale.
 
+(e) A marked family equation must form its right-hand side using the owning
+    class constraint. For the generated equation above, C x y (N a) must
+    provide C x y <rep-type>. The derived instance context can construct the
+    first dictionary, but callers cannot recover that context from it.
+    checkValidCoAxBranch checks the generated equation before genFamInsts
+    returns it. See Note [Class evidence in associated family equations]
+    in GHC.Tc.Validity.
+
 The same criteria apply to DerivingVia.
 
 ************************************************************************
@@ -2056,11 +2064,7 @@ genFamInsts spec@(DS { ds_tvs = tyvars, ds_mechanism = mechanism
       DerivSpecVia{dsm_via_ty = via_ty}
         -> gen_newtype_or_via via_ty
   where
-    gen_newtype_or_via ty = do
-      forM_ (filter isConstrainedFamilyTyCon (classATs clas)) $ \fam_tc ->
-        failWithTc $ TcRnConstrainedFamilyUnsupported fam_tc $
-          text "Newtype deriving and DerivingVia cannot provide this family's equation."
-      gen_Newtype_fam_insts loc clas tyvars inst_tys ty
+    gen_newtype_or_via = gen_Newtype_fam_insts loc clas tyvars inst_tys
 
 -- Set the SrcSpan and error context for an action that uses a DerivSpec.
 set_spec_span_and_ctxt :: DerivSpec theta -> TcM a -> TcM a
