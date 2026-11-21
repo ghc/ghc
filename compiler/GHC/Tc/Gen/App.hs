@@ -1102,24 +1102,25 @@ tcImplicitAppArgs ty (ordinary@EValArg{ea_loc_span = loc, ea_arg = arg} : rest)
        ; let operand = maybe (Left ordinary) Right implicit
        ; (operand :) <$> tcImplicitAppArgs result rest }
   where
-    classify mult domain = case unLoc (stripParensLHsExpr arg) of
-      HsIf _ _ left right
-        | isGuardedTy domain ->
-          do { declared <- tcPackageOperandResult False arg
-             ; case declared of
-                 Just (schema, _) -> return (Just (loc, mult, arg, Nothing, Just schema))
-                 Nothing -> do { left_package <- declared_package left
-                               ; right_package <- if left_package then declared_package right else return False
-                               ; return (if right_package then Just (loc, mult, arg, Nothing, Nothing)
-                                                          else Nothing) } }
-      _ -> fmap (fmap (\(package, replace) -> (loc, mult, package, replace, Nothing)))
-                (tcImplicitOperand arg)
+    classify mult domain
+      | isGuardedTy domain
+      , Just branches <- resultBranches arg
+      = do { declared <- tcPackageOperandResult False arg
+           ; case declared of
+               Just (schema, _) -> return (Just (loc, mult, arg, Nothing, Just schema))
+               Nothing -> do { known <- allM declared_package (NE.toList branches)
+                             ; return (if known then Just (loc, mult, arg, Nothing, Nothing)
+                                                else Nothing) } }
+      | otherwise
+      = fmap (fmap (\(package, replace) -> (loc, mult, package, replace, Nothing)))
+             (tcImplicitOperand arg)
 
-    declared_package expr = do
-      result <- tcDeclaredOperandResult expr
-      return $ case result of
-        Just (ExistsTy ImplicitExists _ _) -> True
-        _ -> False
+    declared_package expr
+      | Just branches <- resultBranches expr = allM declared_package (NE.toList branches)
+      | otherwise = do { result <- tcDeclaredOperandResult expr
+                       ; return $ case result of
+                           Just (ExistsTy ImplicitExists _ _) -> True
+                           _ -> False }
 tcImplicitAppArgs _ rest = return (map Left rest)
 
 -- | Check if a declared argument domain requests the payload of a package.
@@ -1181,23 +1182,44 @@ tcDeclaredOperandResult operand =
   fmap (>>= \(ident, args) -> implicitSpineResult (length args) (varType ident))
        (tcDeclaredOperandSpine False operand)
 
+-- | Read the result expressions of a branching operand. Pattern and guard
+-- binders are still outside the typechecking environment of this probe.
+-- See Note [Implicit existential arguments].
+resultBranches :: LHsExpr GhcRn -> Maybe (NE.NonEmpty (LHsExpr GhcRn))
+resultBranches operand = case unLoc (stripParensLHsExpr operand) of
+    HsIf _ _ left right -> Just (left NE.:| [right])
+    HsMultiIf _ rhss -> Just (fmap rhs rhss)
+    HsCase _ _ (MG { mg_alts = L _ alts }) -> do
+      matches <- NE.nonEmpty alts
+      results <- traverse match_results matches
+      pure (join results)
+    _ -> Nothing
+  where
+    match_results (L _ Match { m_grhss = GRHSs _ rhss (L _ EmptyLocalBinds{}) })
+      = Just (fmap rhs rhss)
+    match_results _ = Nothing
+
+    rhs :: LGRHS GhcRn (LHsExpr GhcRn) -> LHsExpr GhcRn
+    rhs (L _ (GRHS _ _ body)) = body
+
 -- | Read a lexical package operand's declared type. A forwarded result
 -- supplies an expected type for checking the original operand.
 tcLexicalPackageOperand :: LHsExpr GhcRn -> TcM (Maybe (TcType, Bool))
 tcLexicalPackageOperand = tcPackageOperandResult True
 
--- | Read a package result from a declaration, forwarding call or conditional.
+-- | Read a package result from a declaration, forwarding call or branching expression.
 -- The result flag asks the caller to check the whole operand at the schema.
 -- See Note [Implicit opening for an explicit package argument].
 tcPackageOperandResult :: Bool -> LHsExpr GhcRn -> TcM (Maybe (TcType, Bool))
 tcPackageOperandResult lexical = go False
   where
-    go forwarded (L _ (HsPar _ operand)) = go forwarded operand
-    go _ (L _ (HsIf _ _ left right)) = runMaybeT $ do
-      (schema, _) <- MaybeT (go True left)
-      (other, _) <- MaybeT (go True right)
-      guard (eqType schema other)
-      pure (schema, True)
+    go _ operand
+      | Just (first NE.:| rest) <- resultBranches operand
+      = runMaybeT $ do
+          (schema, _) <- MaybeT (go True first)
+          others <- traverse (MaybeT . go True) rest
+          guard (all (eqType schema . fst) others)
+          pure (schema, True)
     go forwarded operand = runMaybeT $ do
       (ident, args) <- MaybeT (tcDeclaredOperandSpine lexical operand)
       let sigma = varType ident
@@ -1281,13 +1303,20 @@ tcDeclaredOperandSpine lexical = go []
       , let name = unLocWithUserRdr lname
       , not (isDataOcc (nameOccName name))
       = runMaybeT $ do
-          ident <- MaybeT (tcLookupIdMaybe name)
+          ident <- MaybeT (lookup_declared name)
           let (_, binders, _) = tcSplitForAllTyVarsReqTVBindersN 0 (varType ident)
               specified = take written [binderVar b | (_, b) <- binders
                                                     , isSpecifiedForAllTyFlag (binderFlag b)]
           guard (length specified == written && all (isMultiplicityTy . tyVarKind) specified)
           pure (ident, args)
     go _ _ = return Nothing
+
+    lookup_declared name
+      | isExternalName name = tcLookupIdMaybe name
+      | otherwise = do { local <- tcLookupLcl_maybe name
+                       ; return $ case local of
+                           Just ATcId{tct_id = ident} -> Just ident
+                           _ -> Nothing }
 
     leading_types n (L _ (HsPar _ fun)) = leading_types n fun
     leading_types n (L _ (HsAppType _ fun _)) = leading_types (n + 1) fun
@@ -1403,17 +1432,27 @@ Each must expose the same complete package type with only rigid free
 variables. Check the conditional at that schema before opening it.
 The ordinary conditional checker keeps its branch usage and demand.
 
-For if flag then fromList xs else fromList ys, both producer declarations
-promise a dot result. Their element type comes from the operands. Infer
-the type of the whole conditional once and open its checked result. The
-probe only reads the head declarations. Ordinary inference checks both
-branches, including their arguments, constraints, and splices. A renamed
-rebindable ifThenElse is an application expansion and keeps its own rules.
+For fromList calls in the branches of an if or case, each producer
+declaration promises a dot result. The element type comes from the
+operands. Infer the entire branching expression once and open the
+checked result. Ordinary inference checks the scrutinee, patterns and
+guards, including any splices. The probe only reads result types from
+heads already in scope. A head bound by the checked case or guard is
+unavailable to the probe. A renamed rebindable ifThenElse is an
+application expansion and keeps its ordinary rules.
 
-Require a guarded formal domain for either conditional rule. A type family
-may reduce to a package after ordinary instantiation. When a branch does
-not identify a dot result, keep ordinary checking at the formal domain.
-This preserves an ignored conditional whose branches both call error.
+A guarded formal domain may still supply essential type information.
+For consume (case flag of True -> Env (\f -> (f 1, f True)); ...),
+the type of Env's field tells us that f is polymorphic. If a branch
+does not identify a dot result, check at the formal domain. Keep this
+rule also for non-guarded domains, such as a type family that may reduce
+to a package after ordinary instantiation.
+
+This probe selects a checking path before Quick Look. A Quick Look
+cache can record the result type of an instantiated application spine.
+It has no result for a case expression. The opening uses the complete
+checked operand and keeps the same application continuation for both
+declared and inferred package types.
 
 A dot package with an arrow payload can also head a value application.
 Instantiate the head's ordinary invisible prefix before opening the package.

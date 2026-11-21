@@ -619,6 +619,17 @@ introduced by `RebindableSyntax` keeps its ordinary application rules.
 The Showcase calls `filterVec` on the selected input vector. It reads
 the first retained element and leaves both the other input and the
 selected tail lazy.
+
+The same check handles a case whose alternatives call `fromList`.
+The declaration probe reads every result branch. When they all
+identify a dot result, GHC checks the branching expression once in
+inference mode. The package retains the original branch demand.
+If any branch has no available dot result declaration, GHC checks
+the operand against the formal domain. This keeps the expected
+higher-rank field type for a case that builds a callback. A branch
+local head or a case alternative with local declarations can still
+need an annotation. Quick Look can record a named application's
+result, but its current judgment does not infer case results.
 [Source-hidden consumer](../../../testsuite/tests/dependent/should_run/implicit-existential-source/QuickLookForward.hs).
 
 An ignored conditional can need its expected type. For example,

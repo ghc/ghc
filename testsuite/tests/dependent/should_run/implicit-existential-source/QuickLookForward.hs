@@ -46,6 +46,24 @@ firstFromFilter :: Bool -> (a -> Bool) -> Vec n a -> Vec m a -> [a]
 firstFromFilter flag keep left right =
     take 1 (listCells (if flag then filterVec keep left else filterVec keep right))
 
+-- | Read one cell from a package produced by a case alternative.
+firstFromCase :: Either (Either a [a]) [a] -> [a]
+firstFromCase input = take 1 (listCells (case input of
+    Left (Left x) -> fromList [x]
+    Left (Right xs) -> fromList xs
+    Right ys -> fromList ys))
+
+newtype Env a = Env a
+
+-- | Check a case which needs its expected type to check a callback.
+rankedCase :: Bool -> (Int, Bool)
+rankedCase flag = consume (case flag of
+    True -> Env (\f -> (f (1 :: Int), f True))
+    False -> Env (\f -> (f (2 :: Int), f False)))
+  where
+    consume :: Env ((forall b. b -> b) -> (Int, Bool)) -> (Int, Bool)
+    consume (Env f) = f id
+
 type family Forwarded (tag :: Bool) a where
     Forwarded 'True a = a
 
@@ -120,6 +138,12 @@ main = do
         _ -> fail "the selected filter did not raise its original exception"
     unless (forwardConditional Proxy (error "unused flag") unused unused) $
         fail "forwarding at a family domain forced a package"
+    unless (firstFromCase (Left (Left 'x')) == "x"
+         && firstFromCase (Left (Right ('y' : error "unused left tail"))) == "y"
+         && firstFromCase (Right ('z' : error "unused right tail")) == "z") $
+        fail "opening a case changed branch or tail demand"
+    unless (rankedCase True == (1, True) && rankedCase False == (2, False)) $
+        fail "case checking lost the expected callback type"
     let filteredCells input = toList (refilter input)
     unless (take 1 (filteredCells (Cons 3 (Cons 7 (error "unused refilter tail")))) == [7]
          && filteredCells (Cons 3 (Cons 7 (Cons 8 (Cons 9 Nil)))) == [7, 9]
