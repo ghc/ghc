@@ -1,8 +1,9 @@
-{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, PolyKinds, TypeFamilies #-}
+{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, PolyKinds, TypeFamilies, TypeOperators #-}
 module NativeClosedMatchabilityClient where
 
 import Data.Kind (Type)
-import NativeClosedMatchabilityProvider (Forward, K)
+import Data.Type.Equality ((:~:)(Refl))
+import NativeClosedMatchabilityProvider (Forward, K, Nullary)
 
 type family Interpret (b :: Bool) :: K b
 type instance Interpret 'True = Maybe
@@ -31,3 +32,12 @@ type Projected (b :: Bool) (f :: First (PairOf b 'False)) (g :: K b)
 
 projectedRuntime :: Second (PairOf 'True 'False)
 projectedRuntime x = x
+
+type family NullaryInterpret (b :: Bool) :: Nullary
+type instance NullaryInterpret 'True = Maybe
+
+nullaryIdentity :: Nullary
+nullaryIdentity x = x
+
+recoverNullary :: forall (f :: Nullary) a b. (f a ~ f b) => a :~: b
+recoverNullary = Refl

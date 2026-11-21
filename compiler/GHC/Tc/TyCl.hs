@@ -1523,6 +1523,11 @@ have to make its schemes available to other declarations before
 checking their uses. The closed-family index similarly requires a
 definition in the current declaration. An open family cannot inspect
 the equations in other modules before its kind is published.
+
+A nullary closed family with one bare-arrow equation can use the same
+index. The checked equation binds that index in its LHS. This lets
+`Kind` reduce to a matchable arrow in a kind and an unmatchable arrow in
+a term signature. Preserve any written matchability on the RHS.
 -}
 
 -- Checked application sites and their metadata, in application order.
@@ -1544,11 +1549,11 @@ inferArrowIndices metadata decls tc
             | otherwise = ty
       pure (prefix params, Just [(name, map subst tys) | (name, tys) <- choices])
   | isLiftedTypeKind (tyConResKind tc)
-  , not (null (tyConVisibleTyVars tc))
   , not (any inferredMatchabilityIndex (tyConBinders tc))
   , [FamDecl { tcdFam = FamilyDecl
        { fdInfo = ClosedTypeFamily _ (Just eqns), fdInjectivityAnn = Nothing } }] <-
       [d | L _ d <- decls, tcdName d == tyConName tc]
+  , not (null (tyConVisibleTyVars tc)) || (tyConArity tc == 0 && isSingleton eqns)
   , any (matchabilityArrow . caseAliasBody . feqn_rhs . unLoc) eqns = do
       ma <- newFlexiTyVar matchabilityTy
       pure (prefix [mkTyVar (getName ma) matchabilityTy], Nothing)
