@@ -87,7 +87,6 @@ import Data.Ratio
 import Control.Monad.Trans.Writer.CPS
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
-import Data.Coerce
 
 {-
 *********************************************************
@@ -418,16 +417,16 @@ There are various entry points to renaming patterns, depending on
 -- Those are the only call sites, so we inline it for improved performance.
 -- Kind of like a macro.
 {-# INLINE rn_pats_general #-}
-rn_pats_general :: Traversable f => HsMatchContextRn
-  -> f (LPat GhcPs)
+rn_pats_general :: Foldable f => HsMatchContextRn
+  -> CpsRn (f (LPat GhcRn))
   -> (f (LPat GhcRn) -> RnM (r, FreeNames))
   -> RnM (r, FreeNames)
-rn_pats_general ctxt pats thing_inside = do
+rn_pats_general ctxt rename_pats thing_inside = do
   envs_before <- getRdrEnvs
 
   -- (1) rename the patterns, bringing into scope all of the term variables
   -- (2) then do the thing inside.
-  unCpsRn (rn_pats_fun (matchNameMaker ctxt) pats) $ \ pats' -> do
+  unCpsRn rename_pats $ \ pats' -> do
     -- Check for duplicated and shadowed names
     -- Must do this *after* renaming the patterns
     -- See Note [Collect binders only after renaming] in GHC.Hs.Utils
@@ -443,30 +442,42 @@ rn_pats_general ctxt pats thing_inside = do
          then checkDupNames bndrs
          else checkDupAndShadowedNames envs_before bndrs
     thing_inside pats'
-  where
+-- | Choose the pattern renamer for the current match.
+-- See Note [Invisible binders in functions] in GHC.Hs.Pat.
+rnMatchPat :: HsMatchContextRn -> LPat GhcPs -> CpsRn (LPat GhcRn)
+rnMatchPat ctxt = case ctxt of
+  FunRhs{} -> rnLArgPatAndThen maker
+  LamAlt LamSingle -> rnLArgPatAndThen maker
+  LamAlt LamCases -> rnLArgPatAndThen maker
+  _ -> rnLPatAndThen maker
+  where maker = matchNameMaker ctxt
 
-    -- See Note [Invisible binders in functions] in GHC.Hs.Pat
-    --
-    -- BTW, Or-patterns would be awesome here
-    rn_pats_fun = case ctxt of
-      FunRhs{} -> mapM . rnLArgPatAndThen
-      LamAlt LamSingle -> mapM . rnLArgPatAndThen
-      LamAlt LamCases -> mapM . rnLArgPatAndThen
-      _ -> mapM . rnLPatAndThen
-
+-- | Rename written patterns with signature scopes at their visible positions.
 rnPats :: HsMatchContextRn   -- For error messages and choosing if @-patterns are allowed
+       -> [(VisArity, [Name])]
        -> [LPat GhcPs]
        -> ([LPat GhcRn] -> RnM (a, FreeNames))
        -> RnM (a, FreeNames)
-rnPats = rn_pats_general
+rnPats ctxt scopes pats =
+  rn_pats_general ctxt (walk 0 scopes pats)
+  where
+    rename = rnMatchPat ctxt
+    walk :: VisArity -> [(VisArity, [Name])] -> [LPat GhcPs] -> CpsRn [LPat GhcRn]
+    walk _ [] ps = mapM rename ps
+    walk pos ((start, names) : rest) ps
+      | pos == start, any isVisArgLPat ps =
+          CpsRn $ \k -> bindLocalNamesFV names $ unCpsRn (walk pos rest ps) k
+    walk pos remaining (pat : ps) =
+      (:) <$> rename pat <*> walk (if isVisArgLPat pat then pos + 1 else pos) remaining ps
+    walk _ _ [] = pure []
 
 rnPat :: forall a. HsMatchContextRn      -- For error messages and choosing if @-patterns are allowed
       -> LPat GhcPs
       -> (LPat GhcRn -> RnM (a, FreeNames))
       -> RnM (a, FreeNames)     -- Variables bound by pattern do not
                                -- appear in the result FreeNames
-rnPat
-       = coerce (rn_pats_general @Identity @a)
+rnPat ctxt pat thing_inside =
+  rn_pats_general ctxt (Identity <$> rnMatchPat ctxt pat) (thing_inside . runIdentity)
 
 applyNameMaker :: NameMaker -> LocatedN RdrName -> RnM (LocatedN Name)
 applyNameMaker mk rdr = do { (n, _fvs) <- runCps (newPatLName mk rdr)
