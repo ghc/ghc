@@ -32,7 +32,7 @@ module GHC.Core.Coercion (
         mkAxInstLHS, mkUnbranchedAxInstLHS,
         mkPiCo, mkPiCos, mkCoCast,
         mkSymCo, mkTransCo,
-        mkSelCo, mkSelCoResRole, getNthFun, selectFromType, mkLRCo,
+        mkSelCo, mkSelCoResRole, getNthFun, selectFromType, mkLRCo, matchableAppProjectionRule,
         mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo,
         mkFunCo, mkFunCo2, mkFunCoNoFTF, mkFunResCo,
         mkNakedFunCo,
@@ -1004,8 +1004,54 @@ mkLRCo :: LeftOrRight -> Coercion -> Coercion
 mkLRCo lr co
   | Just (ty, eq) <- isReflCo_maybe co
   = mkReflCo eq (pickLR lr (splitAppTy ty))
+  | Pair lhs rhs <- coercionKind co
+  , Just (f, x) <- splitAppTy_maybe lhs
+  , Just (g, y) <- splitAppTy_maybe rhs
+  , not (fixed_head f && fixed_head g)
+  , isMatchableFunTy (typeKind f), isMatchableFunTy (typeKind g)
+  = AxiomCo (snd (matchableAppProjectionRule lr))
+            (co : map mkNomReflCo [f, x, g, y])
   | otherwise
   = LRCo lr co
+  where
+    fixed_head ty = case splitTyConApp_maybe ty of
+      Just (tc, _) -> isGenerativeTyCon tc Nominal
+      Nothing -> False
+
+-- | Check inverse application at two matchable heads after substitution.
+-- See Note [Matchability in application projection evidence].
+matchableAppProjectionRule :: LeftOrRight -> (FastString, CoAxiomRule)
+matchableAppProjectionRule lr = (name, BuiltInRule name Nominal (replicate 5 Nominal) proves)
+  where
+    name = case lr of
+      CLeft  -> fsLit "MatchableAppLeft"
+      CRight -> fsLit "MatchableAppRight"
+    proves [Pair lhs rhs, Pair f _, Pair x _, Pair _ g, Pair _ y]
+      | matches lhs f x, matches rhs g y
+      = Just (Pair (pickLR lr (f, x)) (pickLR lr (g, y)))
+    proves _ = Nothing
+
+    matches app fun arg
+      | Just (_, binder, _) <- splitPiTy_maybe (typeKind fun)
+      = isMatchableFunTy (typeKind fun)
+        && piTyBinderType binder `eqType` typeKind arg
+        && mkAppTy fun arg `eqType` app
+      | otherwise = False
+
+{- Note [Matchability in application projection evidence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose a GADT match gives m ~ M for f :: Type %m -> Type. A call can
+use f cast to a matchable kind. Inlining that call substitutes the cast
+for a universally quantified matchable head. Application pushes the cast
+through the argument and result. If only matchability changes, the type
+of the equality premise can then show f x with its original kind.
+
+Retain the original heads and arguments as nominal premises when a head
+can be substituted. Each head must still be matchable after substitution.
+Check the kind of its argument and reconstruct its side of the original
+equality before projecting either component. The head premise retains the
+scoped proof m ~ M even when application has erased that cast.
+-}
 
 -- | Instantiates a 'Coercion'.
 -- Works for both tyvar and covar
