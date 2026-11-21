@@ -7065,3 +7065,12 @@ when opening a retained pair. A retained witness has multiplicity
 reader with a strict tuple binding.
 [GHC proposal 111, constructors and pattern matching](https://ghc-proposals.readthedocs.io/en/latest/proposals/0111-linear-types.html#constructors-pattern-matching)
 and [source-hidden client](examples/qualified-pi/CursorClient.hs).
+
+For an element `v :: Vec Int n`, the local index `n` must survive
+instantiation of `indexGeneric [v] pos`. The fork first fixes the
+native element type from `v`. GHC's ordinary multiplicity inference
+checks the use of `pos`. A fresh multiplicity here must occur only
+in supplied arrow weights. The result and class premises cannot
+depend on that fresh choice.
+[GHC multiplicity polymorphism](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/linear_types.html)
+and [Idris 2 multiplicities](https://idris2.readthedocs.io/en/latest/tutorial/multiplicities.html).
