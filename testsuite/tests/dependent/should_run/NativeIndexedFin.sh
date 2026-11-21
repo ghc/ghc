@@ -263,6 +263,9 @@ hasPayload :: Cell layout -> Bool
 hasPayload (Cell _ 37) = True
 hasPayload (Cell _ _) = False
 
+-- Check the payload after inferring the local index variable's domain.
+observedCell layout payload = readLayout (roundCell (Cell layout payload))
+
 dynamic :: Tagged tag -> Bool
 dynamic (Dynamic _) = True
 dynamic Fixed = False
@@ -278,11 +281,9 @@ main = do
         tagLazy = case roundTag (Dynamic tag) of
             Dynamic _ -> True
             Fixed -> False
-        readWithBottomPayload = Cell layout unusedPayload
-        readWithBottomLayout = Cell xs payload
     if listLazy && tagLazy && not (dynamic (roundTag Fixed))
-       && readLayout (roundCell readWithBottomPayload) == [True]
-       && hasPayload (roundCell readWithBottomLayout)
+       && observedCell layout unusedPayload == [True]
+       && hasPayload (roundCell (Cell xs payload))
         then pure ()
         else fail "retained constructor result changed its runtime witness"
 HS
@@ -294,6 +295,19 @@ import CheckedList (Cell(Cell))
 
 wrong :: Cell layout -> Cell other
 wrong (Cell stored payload) = Cell stored payload
+HS
+cat >"$tmp/result/client/BadCellField.hs" <<'HS'
+{-# LANGUAGE CPP, GADTs, LinearTypes, NoExperimentalDependentTypes #-}
+module BadCellField where
+import CheckedList (Cell(Cell))
+rebuild :: Cell layout -> Cell layout
+rebuild (Cell flags n) = Cell flags n
+#ifdef LINEAR_FLAG
+bad :: [Bool] %1 -> Int -> [Bool]
+#else
+bad :: [Bool] -> Char -> [Bool]
+#endif
+bad flags n = case rebuild (Cell flags n) of Cell xs _ -> xs
 HS
 for opt in -O0 -O2; do
     (
@@ -317,6 +331,20 @@ for opt in -O0 -O2; do
 done
 (
     cd "$tmp/result/client"
+    for problem in WRONG_PAYLOAD LINEAR_FLAG; do
+        if "${ghc[@]}" -XImpredicativeTypes "-D$problem" -fno-code -fdiagnostics-color=never \
+                -c BadCellField.hs >bad-field.log 2>&1; then
+            echo "Accepted invalid indexed field ($problem)" >&2
+            exit 1
+        fi
+        case "$problem" in
+            WRONG_PAYLOAD)
+                grep -Fq 'BadCellField.hs:11:40: error: [GHC-83865]' bad-field.log ;;
+            LINEAR_FLAG)
+                grep -Fq 'BadCellField.hs:11:34: error: [GHC-83605]' bad-field.log
+                grep -Fq 'A retained argument must have unrestricted multiplicity Many.' bad-field.log ;;
+        esac
+    done
     cat >IndependentFields.hs <<'HS'
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
 module IndependentFields where

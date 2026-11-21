@@ -53,7 +53,7 @@ import GHC.Tc.Zonk.TcType
 
 import GHC.Core.Class ( Class, classTyVars )
 import GHC.Core.ConLike ( ConLike(..) )
-import GHC.Core.DataCon ( DataCon, dataConConcreteTyVars, dataConFullSig, dataConName, isNewDataCon, dataConOrigArgTys, dataConOrigResTy, dataConHasRetainedResult, dataConRepArgBinders, dataConTyCon, dataConUserTyVars, dataConWorkId, dataConWrapId )
+import GHC.Core.DataCon ( DataCon, dataConConcreteTyVars, dataConFullSig, dataConName, isNewDataCon, dataConOrigArgTys, dataConOrigResTy, dataConSourceArity, dataConHasRetainedResult, dataConRepArgBinders, dataConTyCon, dataConUserTyVars, dataConWorkId, dataConWrapId )
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr, hasScopedDictionaryType
                           , isScopedSelectorReceiver, supportsQuickLookType )
@@ -1963,18 +1963,12 @@ tcRetainedKnownValuePlan _ _ _ _ = return Nothing
 tcRetainedQuickLookArgType :: LHsExpr GhcRn -> TcM (Maybe Type)
 tcRetainedQuickLookArgType arg
   | L _ (HsVar _ con_name) <- head_expr
-  , [field] <- args
+  , not (null args)
   , isDataOcc (nameOccName (unLocWithUserRdr con_name))
-  , HsVar _ field_name <- unLoc (stripParensLHsExpr field)
   = runMaybeT $ do
       RealDataCon dc <- liftMaybeT (tcLookupConLike (unLoc con_name))
-      guard (dataConHasRetainedResult dc)
-      ATcId { tct_id = local } <- MaybeT (tcLookupLcl_maybe (unLocWithUserRdr field_name))
-      actual <- liftMaybeT (liftZonkM (zonkId local))
-      let sigma = idType (dataConWrapId dc)
-      DepFunTy DepFunVisible binder _ <- pure (coreFullView sigma)
-      guard (isNativeOpaqueValueId actual && varType actual `eqType` varType binder)
-      let result = applyTypeToArgs sigma [Core.Var actual]
+      guard (dataConHasRetainedResult dc && length args == dataConSourceArity dc)
+      result <- constructor_result (idType (dataConWrapId dc)) args
       guard (isAlgTyConApp result && noQuickLookVars result)
       guard =<< liftMaybeT (tcRetainedInstScope [result])
       return result
@@ -1982,7 +1976,6 @@ tcRetainedQuickLookArgType arg
   , values@(_ : _) <- args
   , let name = unLocWithUserRdr lname
   , not (isDataOcc (nameOccName name))
-  , all bare_operand values
   = runMaybeT $ do
       fun <- MaybeT (tcLookupIdMaybe name)
       guard (isEmptyNameEnv (idConcreteTvs fun))
@@ -1991,7 +1984,7 @@ tcRetainedQuickLookArgType arg
       guard (null theta && not (null tvs))
       result <- MaybeT (pure (tcRetainedOrdinaryResult (length values) tau))
       guard (isAlgTyConApp result)
-      choices <- MaybeT (tcRetainedKnownValuePlan declared Nothing sigma values)
+      choices <- MaybeT (tcRetainedKnownValuePlan tcRetainedQuickLookArgType Nothing sigma values)
       let ty = substTyWith tvs choices result
       guard (hasNativeDependentExpr (Core.Type ty) && noQuickLookVars ty)
       valid <- liftMaybeT (tcRetainedInstScope [ty])
@@ -2002,13 +1995,35 @@ tcRetainedQuickLookArgType arg
     (head_expr, args) = split_named [] arg
     declared = tcRetainedDeclaredArgType tcRetainedDeclaredTypeView
 
+    constructor_result ty [] = pure ty
+    constructor_result ty (operand : rest) = case coreFullView ty of
+      DepFunTy DepFunVisible binder _ -> do
+        HsVar _ name <- pure (unLoc (stripParensLHsExpr operand))
+        ATcId { tct_id = local } <- MaybeT (tcLookupLcl_maybe (unLocWithUserRdr name))
+        actual <- liftMaybeT (liftZonkM (zonkId local))
+        let domain = varType binder
+        value <- if isNativeOpaqueValueId actual && varType actual `eqType` domain
+                 then pure actual
+                 else do
+                   level <- liftMaybeT getTcLevel
+                   let flexible ty = case coreFullView ty of
+                         TyVarTy tv -> isTcTyVar tv && isMetaTyVar tv
+                                    && not (isQLInstTyVar tv) && isTouchableMetaTyVar level tv
+                         _ -> False
+                   guard (flexible (varType actual) || varType actual `eqType` domain)
+                   guard (isManyTy (idMult actual) || isOneTy (idMult actual)
+                          || flexible (idMult actual))
+                   (Core.Var checked, _) <- liftMaybeT (tcRetainedArg domain operand)
+                   guard (checked == actual && isNativeOpaqueValueId checked)
+                   pure checked
+        constructor_result (applyTypeToArgs ty [Core.Var value]) rest
+      FunTy { ft_af = af, ft_res = result } | isVisibleFunArg af ->
+        constructor_result result rest
+      _ -> mzero
+
     split_named values (L _ (HsPar _ inner)) = split_named values inner
     split_named values (L _ (HsApp _ fun value)) = split_named (value : values) fun
     split_named values fun = (fun, values)
-
-    bare_operand (L _ (HsPar _ inner)) = bare_operand inner
-    bare_operand (L _ HsVar{}) = True
-    bare_operand _ = False
 
     isAlgTyConApp ty = case tcSplitTyConApp_maybe ty of
       Just (tc, _) -> isAlgTyCon tc && not (isClassTyCon tc)
@@ -2024,14 +2039,15 @@ immutable plan available when checking it directly. Instantiation
 variables cannot contain that retained index.
 
 Read the declared result of a simple, fully applied, unconstrained
-inner call using the same immutable selector as a direct call. Limit
-the inner operands to names and use an algebraic result type. Use the
-result only to complete the outer caller's entire plan. If it cannot
-complete this plan, leave normal Quick Look in place. The normal
-checker still checks the inner and outer applications, including their
-argument types, lexical scopes, and usage. No term is evaluated or
-checked during the read, and no Quick Look variable acquires a native
-type.
+inner call using the same immutable selector as a direct call. Inspect
+only operands that determine an erased argument. Each recursive call
+examines a proper subexpression. This also handles an ordinary projection
+of a rebuilt value, such as `readLayout (roundCell (Cell xs value))`.
+Use the algebraic argument type only to complete the outer caller's plan.
+Otherwise leave normal Quick Look in place. The normal checker still
+checks the inner and outer applications, including their argument types,
+lexical scopes and usage. The plan does not evaluate any operand or
+assign a native type to a Quick Look variable.
 
 A constructor can return its own field as an index. In
 `rebuild (IndexedList xs)`, the outer function must instantiate its erased
@@ -2039,7 +2055,14 @@ index with the caller's xs. Its signature alone cannot supply this index.
 The constructor's result equality enables the same argument inference as
 a named value with a retained type. With Quick Look, read the constructor
 wrapper's codomain at the scoped field Id before instantiating rebuild.
-The regular argument check records usage and checks the field type.
+An ordinary payload arrow does not bind an index. Step past each such
+arrow without checking its operand. For example, in
+`adjust f (Reading calibrated value)`, only calibrated fixes the result
+type. For an unsigned local variable, use the ordinary retained-variable
+check to fix its type or multiplicity from the constructor domain. Only
+touchable ordinary metavariables qualify. The head and saturation already
+determine that domain. The normal argument check records field usage. A known linear operand
+gets the retained-variable diagnostic at its source occurrence.
 See Note [Retained constructor result equality] in GHC.Core.DataCon.
 -}
 
@@ -8260,6 +8283,13 @@ argument using the same ordinary path as a direct call. Defer only when its
 declared telescope supplies that argument type and its result is an ordinary
 monotype. Do not change Quick Look's native instantiation or result checks.
 
+A nested projection may have a complete erased argument plan of its own.
+For example, an argument of (&&) may read a field from a rebuilt indexed
+constructor. If that plan selects a runtime index, keep the original
+application for ordinary checking. Instantiating its head again with
+tcInstFun would replace the known index with a Quick Look variable.
+See Note [Nested immutable retained applications].
+
 The classifier accepts only written value arguments and parentheses.
 An expansion in the spine can already have registered an untyped Template
 Haskell finalizer. The ordinary check must not split that expansion again.
@@ -8271,7 +8301,7 @@ tcQuickLookNeedsOrdinaryArgs :: HsExpr GhcRn -> [HsExprArg 'TcpRn] -> TcM Bool
 tcQuickLookNeedsOrdinaryArgs (HsVar _ lname) args
   | let name = unLocWithUserRdr lname
   , not (isDataOcc (nameOccName name))
-  , any isHsValArg args, all plain args
+  , any isHsValArg args, all isPlainQuickLookArg args
   = do { ident <- tcLookupIdMaybe name
        ; case ident of
            Just var -> do
@@ -8283,11 +8313,13 @@ tcQuickLookNeedsOrdinaryArgs (HsVar _ lname) args
                then return True
                else any isRight <$> tcImplicitAppArgs sigma args }
            Nothing -> return False }
-  where
-    plain EValArg{} = True
-    plain (EWrap EPar{}) = True
-    plain _ = False
 tcQuickLookNeedsOrdinaryArgs _ _ = return False
+
+-- | These arguments can be left for ordinary checking without replaying an expansion.
+isPlainQuickLookArg :: HsExprArg 'TcpRn -> Bool
+isPlainQuickLookArg EValArg{} = True
+isPlainQuickLookArg (EWrap EPar{}) = True
+isPlainQuickLookArg _ = False
 
 -- | Select a constructor result from a complete expected type.
 -- See Note [Retained constructors with a known Quick Look result].
@@ -8297,7 +8329,7 @@ tcKnownRetainedConstructorResult args fun@(XExpr (ConLikeTc (RealDataCon dc))) s
   | let fields = dataConRepArgBinders dc
   , any isJust fields
   , length fields == count isHsValArg args
-  , all plain args
+  , all isPlainQuickLookArg args
   = runMaybeT $ do
       expected <- liftMaybeT (liftZonkM (zonkTcType expected))
       guard (not (anyFreeVarsOfType (\v -> isTcTyVar v && isMetaTyVar v) expected))
@@ -8305,9 +8337,6 @@ tcKnownRetainedConstructorResult args fun@(XExpr (ConLikeTc (RealDataCon dc))) s
       _ <- MaybeT (tcRetainedWorkerResultMatch NoQL (Just result) args fun sigma)
       pure result
   where
-    plain EValArg{} = True
-    plain (EWrap EPar{}) = True
-    plain _ = False
 
     resolve parent ty
       | Just (tc, _) <- tcSplitTyConApp_maybe ty
@@ -8388,8 +8417,14 @@ quickLookArg1 pos app_lspan rn_head larg@(L _ arg) sc_arg_ty@(Scaled _ orig_arg_
               , text "level:" <+> ppr lvl ]
 
        ; known_result <- case mb_fun_ty of
-           Just (fun, sigma) -> fmap isJust $ setSrcSpan fun_lspan_arg $
-             tcKnownRetainedConstructorResult rn_args fun sigma orig_arg_rho
+           Just (fun, sigma) -> setSrcSpan fun_lspan_arg $ do
+             result <- tcKnownRetainedConstructorResult rn_args fun sigma orig_arg_rho
+             if isJust result then return True else
+               case fun of
+                 HsVar{} | all isPlainQuickLookArg rn_args -> do
+                   plan <- tcRetainedKnownArgPlan tcRetainedQuickLookArgType Nothing fun sigma rn_args
+                   return (maybe False (any (hasNativeDependentExpr . Core.Type)) plan)
+                 _ -> return False
            Nothing -> return False
 
        ; case mb_fun_ty of {
