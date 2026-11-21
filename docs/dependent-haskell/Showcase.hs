@@ -119,6 +119,7 @@ import qualified OpenMapProof
 import qualified OpenMapWorker
 import qualified InstalledNotProof
 import qualified OrderingPayload
+import qualified PreludeFilterAppendProof
 import qualified PreludeFilterCutoff
 import qualified PreludeFilterDecider
 import qualified PreludeAppendLengthProof
@@ -1312,6 +1313,8 @@ main = do
               ++ PreludeFilterProof.showPreludeFilterProofs)
     putStrLn ("prove filter never increases length: "
               ++ PreludeFilterLengthProof.showPreludeFilterLength)
+    putStrLn ("prove that filter distributes over append: "
+              ++ PreludeFilterAppendProof.showPreludeFilterAppend)
     runtimeList <- newIORef [False, True, False]
     xs <- readIORef runtimeList
     putStrLn ("prove the filter bound from a runtime list: "

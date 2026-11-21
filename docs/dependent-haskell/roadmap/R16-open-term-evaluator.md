@@ -1334,7 +1334,7 @@ Ignoring the decision while keeping the induction hypothesis fails at
 the next cons before demanding the remaining left tail or right list.
 [Proof](../examples/open-evaluation/PreludeFilterAppendProof.hs),
 [regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh),
-and [Agda filter-++](https://agda.github.io/agda-stdlib/v2.2/Data.List.Properties.html).
+and [prior art](../REFERENCES.md#distributing-filter-over-append).
 
 ### Supply a runtime filter decider
 

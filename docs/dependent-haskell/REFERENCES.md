@@ -6399,6 +6399,17 @@ branch equality when the caller matches the witness constructor.
 [GHC proposal 242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#matchability),
 and [R16 length bound](roadmap/R16-open-term-evaluator.md#prove-that-filter-never-increases-length).
 
+### Distributing filter over append
+
+Agda's `filter-++` splits on the predicate decision for the current
+head. When the decision keeps the head, both sides add that head to
+the result of the induction hypothesis. When the decision drops it,
+the induction hypothesis supplies the equality directly. The Haskell
+proof uses `BooleanResult (p x)` to select the same branch for two
+different tails. It needs decisions only for the finite left list.
+[Agda standard library 2.4, filter-++](https://agda.github.io/agda-stdlib/v2.4/Data.List.Properties.html#1652)
+and [R16 filter distribution proof](roadmap/R16-open-term-evaluator.md#prove-that-filter-distributes-over-append).
+
 ### Exporting an ordinary identity equation
 
 Agda defines identity by returning the argument directly. This equation
