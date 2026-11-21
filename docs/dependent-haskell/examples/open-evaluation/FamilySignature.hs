@@ -28,8 +28,11 @@ type instance Payload Word = FamilySignature.direct Bool
 directObserved :: Payload Word
 directObserved = True
 
-direct :: forall a. DirectInput a -> a
+direct :: forall a. InputAlias a -> a
 direct x = x
+
+type InputAlias a = ForwardInput (DirectInput a)
+type ForwardInput a = a
 
 type DirectInput :: Type -> Type
 type family DirectInput a where

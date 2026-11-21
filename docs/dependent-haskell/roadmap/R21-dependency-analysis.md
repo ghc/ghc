@@ -393,8 +393,7 @@ equation when `a` is the producer's scoped type variable.
 
 A helper signature can also depend on a local closed family. GHC checks
 the family, the types used in its equations and the helper before the
-imported instance. In `direct :: forall a. DirectInput a -> a`, the
-call itself requires conversion. GHC uses the closed-family axiom
+imported instance. In `FamilySignature.direct`, the call itself requires conversion. GHC uses the closed-family axiom
 `DirectInput a = a` to adapt the function to the checked argument.
 An ordinary client reads `True :: Payload Word` from the resulting
 interface. A constructor field that refers back to the imported family
@@ -413,3 +412,13 @@ the body's value dependencies in place.
 and [its review discussion on polymorphic recursion](https://github.com/ghc-proposals/ghc-proposals/pull/54#issuecomment-308906690).
 [Checked declarations](../examples/open-evaluation/FamilySignature.hs)
 and [interface, cycle, demand and rule checks](../../../testsuite/tests/dependent/should_run/NativeImportedFamily.sh).
+
+A helper signature can also use a saturated local synonym. In
+`FamilySignature`, `InputAlias a` uses `ForwardInput (DirectInput a)`.
+GHC checks the synonyms and the closed family before the helper.
+It checks every synonym argument for dependencies. The equation still
+creates a cycle through `Discard a (Payload Int)`, even if `Discard`
+omits that argument from its result. Synonym saturation and cycle
+checks still apply.
+[Proposal #425 on arity inference](https://ghc-proposals.readthedocs.io/en/latest/proposals/0425-decl-invis-binders.html#arity-inference)
+and [the review on arity and scoping](https://github.com/ghc-proposals/ghc-proposals/pull/425#issuecomment-973555158).

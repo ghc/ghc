@@ -104,6 +104,19 @@ type family Input a where Input _ = Bool
 HS
 expect_cycle SignatureKindCycle
 
+# The input to Discard still depends on the postponed equation.
+cat >AliasDependencyCycle.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes, TypeFamilies #-}
+module AliasDependencyCycle where
+import ImportedFamilyProvider (Payload)
+type instance Payload Int = AliasDependencyCycle.keep Bool
+keep :: forall a. Input a -> a
+keep x = x
+type Input a = Discard a (Payload Int)
+type Discard a b = a
+HS
+expect_cycle AliasDependencyCycle
+
 # A typed adapter still observes demand and records the RULE owner.
 cat >StrictDirect.hs <<'HS'
 {-# LANGUAGE ExperimentalDependentTypes, TypeFamilies #-}
