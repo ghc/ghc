@@ -1496,6 +1496,11 @@ tcRetainedKnownValuePlan declared expected sigma values
     match_result_fields tvs subst formal actual
       | Just tv <- getTyVar_maybe formal, tv `elem` tvs
       = matchRetainedAppType tvs subst formal actual
+      | FunTy { ft_af = af, ft_ma = ma, ft_mult = m } <- coreFullView formal
+      , FunTy { ft_af = af', ft_ma = ma', ft_mult = m' } <- coreFullView actual
+      , isVisibleFunArg af, af == af', eqType ma ma'
+      , isManyTy m' || isOneTy m'
+      = match_result_fields tvs subst m m'
       | Just (tc, templates) <- splitTyConApp_maybe formal
       , Just (tc', fields) <- splitTyConApp_maybe actual
       , tc == tc', templates `equalLength` fields
