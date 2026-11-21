@@ -7,6 +7,7 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE LinearTypes #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE Modifiers #-}
 {-# LANGUAGE NamedWildCards #-}
 {-# LANGUAGE NoStarIsType #-}
@@ -84,7 +85,7 @@ import qualified ImportedRetainedRules
 import qualified FunctionPackageLibrary as FunctionPackages
 import qualified FunctionSignatureLibrary as FunctionSignatures
 import qualified GroundApplicationClient as Ground
-import GHC.Exts (FUN, Multiplicity (Many, One))
+import GHC.Exts (FUN, Int (I#), Multiplicity (Many, One))
 import GHC.Matchability (M, U, Matchability(..))
 import qualified GHC.TypeNats as TypeNats
 import GHC.TypeLits (charVal)
@@ -1208,6 +1209,7 @@ main = do
     observe "installed Prelude.length converted to a Nat index" (TypeNats.natVal installedLength)
     observe "ordinary identity applied to a type variable" (openIdentity @Int)
     observe "uppercase character and digit proof from Data.Char" checkedCharacters
+    observe "match the Int# field in a closed type family" machineIntProof
     observe "Prelude.const selects the first type variable" (openLeft 'x' (undefined :: Bool))
     observe "Prelude.sum in a type" (TypeNats.natVal (Proxy @(Prelude.sum '[2, 3, 5])))
     observe "title case after the pattern determines the character"
@@ -1865,6 +1867,13 @@ openIdentity = 42
 -- | Reflect an upper-case character and prove that seven is a digit.
 checkedCharacters :: (Char, Data.Char.isDigit '7' :~: 'True)
 checkedCharacters = (charVal (Proxy @(Data.Char.toUpper 'x')), Refl)
+
+type family MatchInt (i :: Int) :: () where
+    MatchInt ('I# x) = '()
+
+-- | Match a concrete machine integer in a closed family.
+machineIntProof :: MatchInt ('I# 3#) :~: '()
+machineIntProof = Refl
 
 -- | The result type selects the first operand even when the argument types differ.
 openLeft :: forall a b. a -> b -> const a b

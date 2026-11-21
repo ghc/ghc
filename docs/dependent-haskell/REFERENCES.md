@@ -7423,7 +7423,8 @@ field of `'I#`. The Core experiment distinguishes the kind of a
 concrete field from the scope of a variable in the axiom. Agda's
 `Word64` and the Idris 2 representation of natural numbers give two
 examples of how a language relates source indices to machine values.
-[R10 experiment](roadmap/R10-unboxed-promotion.md#the-primitive-field-and-the-family-axiom),
+[Core experiment](roadmap/R10-unboxed-promotion.md#the-primitive-field-and-the-family-axiom),
+[R10 implementation](roadmap/R10-unboxed-promotion.md#machine-integer-family-patterns),
 [GHC #14180](https://gitlab.haskell.org/ghc/ghc/-/issues/14180),
 [Agda machine words](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#machine-words)
 and [Idris 2 natural numbers](https://idris2.readthedocs.io/en/latest/reference/builtins.html#natural-numbers).

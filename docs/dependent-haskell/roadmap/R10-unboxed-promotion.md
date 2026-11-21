@@ -105,7 +105,7 @@ the promotion of GADTs with indexed result types.
 [#265](https://ghc-proposals.readthedocs.io/en/latest/proposals/0265-unlifted-datatypes.html),
 [#547 review](https://github.com/ghc-proposals/ghc-proposals/pull/547#discussion_r1012596259).
 
-## Private `Int#` prototype
+## Machine integer family patterns
 
 With `ExperimentalDependentTypes`, the prototype accepts the issue's
 `MatchInt ('I# x) = '()`. The same rule accepts `'I# _` and
@@ -124,8 +124,10 @@ unknown :: forall (i :: Int). MatchInt i :~: '()
 unknown = Refl
 ```
 
-A client with the extension disabled imported a provider alias for
-`'I# 3#` and proved the same equality using only the provider interface.
+The [interface check](../examples/open-evaluation/check-int-prim-family.sh)
+compiles the provider first. A client with the extension disabled
+imports a provider alias for `'I# 3#` and proves the same equality
+using only the provider interface.
 An older compiler rejected that interface at its version check. An
 ordinary interface from the prototype remained readable by the older
 compiler. The binder alone also sets the new interface marker.
