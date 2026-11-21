@@ -1132,6 +1132,12 @@ main = do
         RankedPackageClient.refilterRows odd even (< 10)
             (VCons (7 :: Int) (VCons 11 VNil))
             (VCons 2 (VCons 4 (VCons 10 VNil)))
+    cutoff <- newIORef (7 :: Int) >>= readIORef
+    observe "filter a numeric zip through an Int callback at its hidden length"
+        ( take 1 (RankedPackageClient.refilterNumericZip (> cutoff)
+            1 (error "unused left suffix") 6 (error "unused right suffix"))
+        , RankedPackageClient.refilterNumericZip (> cutoff) 1 2 6 2
+        , RankedPackageClient.refilterNumericZip (> cutoff) 0 2 5 2 )
     observe "project a stored vector from a strict record field"
         (StoredVector.cells (StoredVector.singleton 'h'))
     observe "read a retained length through a newtype record selector" $

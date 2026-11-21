@@ -2,14 +2,15 @@
 module RankedPackageClient
     ( runGuarded, runConditional, runProjections, projectAt, runDeclaredWitnesses, runExplicitBranches
     , runMixedPackage, runProducedPackage, runForwardedPackage, runLabelledPackage
-    , runSelectedPackage, runLocalPattern, readCount, refilter, refilterRows
+    , runSelectedPackage, runLocalPattern, readCount, refilter, refilterRows, refilterNumericZip
     ) where
 
+import AlignedList (zipWithExact)
 import Data.Bool (bool)
 import Data.Proxy (Proxy(..))
 import qualified ErasedPackage
-import ImplicitVector (Filtered, HiddenRows, filterVec, packRows, rowLists, withVector)
-import PackedVecLibrary (Vec)
+import ImplicitVector (Filtered, HiddenRows, cells, filterVec, packRows, rowLists, withVector)
+import PackedVecLibrary (Nat(..), Vec(..))
 import RankedPackage
     ( Callback(..), CallbackPair, GuardedBuilder, Hidden, PolyId, PolyMaybe
     , TwoWitnessBuilder, atTwoTypes, consumeIdentity, fromLeft, fromRight
@@ -136,3 +137,19 @@ refilterRows leftTest rightTest keep left right =
 
     withRows :: (forall i j. Vec a i -> Vec a j -> r) -> Vec a l -> Vec a k -> r
     withRows use xs ys = use xs ys
+
+-- | Zip equal-length inputs, then map and filter at an erased input length.
+refilterNumericZip :: (Int -> Bool) -> Int -> Int -> Int -> Int -> [Int]
+refilterNumericZip keep x y u v =
+    let kept = withVector (mapFilter keep) (filterVec odd zipped)
+    in cells kept
+  where
+    zipped :: Vec Int ('S ('S 'Z))
+    zipped = zipWithExact [x, y] [u, v] (+)
+
+    mapFilter :: (Int -> Bool) -> Vec Int n -> Filtered Int
+    mapFilter p xs = filterVec p (increment xs)
+
+    increment :: Vec Int n -> Vec Int n
+    increment VNil = VNil
+    increment (VCons value rest) = VCons (value + 1) (increment rest)
