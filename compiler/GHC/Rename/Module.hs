@@ -4573,10 +4573,8 @@ rnConDecl (ConDeclGADT { con_names   = names
 
          -- Keep terminal groups on the source side of the declaration.
          -- The prefix fields have already been renamed in their own scope.
-       ; let has_leading_context = not (null (gadtTelescopeContexts inner_bndrs'))
-             con_result
-               | Just (groups, _, result) <- HsDecls.splitGadtTerminal new_args new_res_ty
-               , not has_leading_context || null (gadtTelescopeContexts groups)
+       ; let con_result
+               | Just (_, _, result) <- HsDecls.splitGadtTerminal new_args new_res_ty
                = result
                | Just (_, result) <- HsDecls.splitGadtInterior new_args new_res_ty
                = result

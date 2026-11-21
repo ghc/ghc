@@ -1278,7 +1278,6 @@ tcIfaceDataCons tycon_name tycon if_cons
                         initial + ordered_late_count == length user_bndrs &&
                         sum [n | ConContextArgs n <- rest] == length ctxt &&
                         sum [n | ConValueArgs n <- rest] == length args &&
-                        length args >= 2 &&
                         any non_field (drop 1 (dropWhile non_field rest))
                       _ -> False
                     positive (ConTypeArgs n) = n > 0

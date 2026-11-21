@@ -5368,24 +5368,28 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
   = addErrCtxt (DataConDefCtxt names) $
     do { traceTc "tcConDecl 1 gadt" (ppr names)
        ; let L _ name :| _ = names
-       ; let (terminal, terminal_order, remaining, hs_result)
+       ; let is_context (L _ HsGadtContext{}) = True
+             is_context _ = False
+             (terminal, terminal_order, remaining, hs_result)
                = case HsDecls.splitGadtInterior hs_args hs_res_ty of
                    Just (groups, result) -> ([g | Left g <- groups], 0, groups, result)
                    Nothing -> case HsDecls.splitGadtTerminal hs_args hs_res_ty of
                      Nothing -> ([], 0, [], hs_res_ty)
-                     Just (groups, count, result) -> (groups, count, [], result)
-             interior = not (null remaining)
-       ; let is_context (L _ HsGadtContext{}) = True
-             is_context _ = False
+                     Just (groups, count, result)
+                       -- The historical terminal layout has a single context
+                       -- position. Keep both positions in the ordered layout.
+                       | any is_context inner_bndrs, any is_context groups
+                       -> (groups, 0, map Left groups, result)
+                       | otherwise -> (groups, count, [], result)
+             ordered = not (null remaining)
              is_forall (L _ HsGadtForAll{}) = True
              is_forall _ = False
              fields = case hs_args of
                PrefixConGADT ann prefix -> PrefixConGADT ann (prefix ++ [f | Right f <- remaining])
                _ -> hs_args
-       ; when ((terminal_order /= 0 || interior) &&
+       ; when ((terminal_order /= 0 || ordered) &&
                (new_or_data == NewType ||
-                (terminal_order /= 0 && any is_context terminal && any is_context inner_bndrs) ||
-                (interior && any is_forall (dropWhile (not . is_context) inner_bndrs)))) $
+                (ordered && any is_forall (dropWhile (not . is_context) inner_bndrs)))) $
            setSrcSpanA (getLoc hs_res_ty) $
            failWithTc (TcRnNestedForallsContexts NFC_GadtConSig)
        ; skol_info <- mkSkolemInfo (DataConSkol name)
@@ -5456,7 +5460,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
 
              ; let bang_opts = SrcBangOpts (initBangOpts dflags)
              ; let order
-                     | interior =
+                     | ordered =
                          let suffix = map source_group remaining
                              late_count = sum [n | ConTypeArgs n <- suffix]
                              leading_context = sum [length (hsConDeclTheta (Just ctxt))
