@@ -3611,19 +3611,32 @@ reifyDataCon isGadtDataCon tys dc
            <- freshenTyVarBndrs $
               filterOut (`elemVarSet` eq_spec_tvs) g_univ_tvs
        ; let (tvb_subst, g_user_tvs) = subst_tv_binders univ_subst g_user_tvs'
+             (early_tvs, late_tvs)
+               | late_count == 0 = (g_user_tvs, [])
+               | otherwise = splitAt (length g_user_tvs - late_count) g_user_tvs
+             late_count = dataConLateTyVarCount dc
              g_theta   = substTys tvb_subst g_theta'
-             g_arg_tys = substTys tvb_subst (map scaledThing g_arg_tys')
-             g_res_ty  = substTy  tvb_subst g_res_ty'
+             g_arg_tys = map (substScaledTy tvb_subst) g_arg_tys'
+             g_res_ty  = substTy tvb_subst g_res_ty'
+             ordered_args
+               | null late_tvs = retained
+               | otherwise = map (const Nothing) g_arg_tys
 
-       ; r_arg_tys <- if null retained
-         then reifyTypes (if isGadtDataCon then g_arg_tys else arg_tys)
+       ; r_arg_tys <- if null ordered_args
+         then reifyTypes (if isGadtDataCon then map scaledThing g_arg_tys else arg_tys)
          else pure []
 
        ; main_con <-
-           if | not (null retained) -> do
-                  { (args, result) <- reifyRetainedGadtArgs retained dcdBangs
-                                      (map (substScaledTy tvb_subst) g_arg_tys') g_res_ty
-                  ; pure (TH.RetainedGadtC [name] args result) }
+           if | not (null ordered_args) -> do
+                  { (args, result) <- reifyRetainedGadtArgs ordered_args dcdBangs g_arg_tys g_res_ty
+                  ; result' <- case late_tvs of
+                      [] -> pure result
+                      -- Keep the whole group in one ForallVisT.
+                      -- See Note [Terminal constructor foralls in TH] in GHC.ThToHs.
+                      _ -> do { tvs <- reifyTyVarBndrs [Bndr (binderVar tv) () | tv <- late_tvs]
+                              ; ma <- reifyType unmatchableDataConTy
+                              ; pure (TH.ForallMatchT ma (TH.ForallVisT tvs result)) }
+                  ; pure (TH.RetainedGadtC [name] args result') }
               | not (null fields) && not isGadtDataCon ->
                   return $ TH.RecC name (zip3 (map reifyFieldLabel fields)
                                          dcdBangs r_arg_tys)
@@ -3647,7 +3660,7 @@ reifyDataCon isGadtDataCon tys dc
               | otherwise ->
                   return $ TH.NormalC name (dcdBangs `zip` r_arg_tys)
 
-       ; let (ex_tvs', theta') | isGadtDataCon = (g_user_tvs, g_theta)
+       ; let (ex_tvs', theta') | isGadtDataCon = (early_tvs, g_theta)
                                | otherwise     = assert (all isTyVar ex_tvs)
                                                  -- no covars for haskell syntax
                                                  (map mk_specified ex_tvs, theta)
@@ -3661,7 +3674,7 @@ reifyDataCon isGadtDataCon tys dc
                          ; let con = TH.ForallC ex_tvs'' cxt main_con
                          ; return $ if null ex_tvs'' then con
                                     else TH.ForallMatchC ma con }
-       ; assert (not (null retained) || r_arg_tys `equalLength` dcdBangs)
+       ; assert (not (null ordered_args) || r_arg_tys `equalLength` dcdBangs)
          ret_con }
   where
     mk_specified tv = Bndr tv Specified

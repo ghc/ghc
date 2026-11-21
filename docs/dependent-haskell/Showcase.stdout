@@ -3,6 +3,7 @@ retain a data family pair and read its fields: (Refl,(True,False))
 pass a refined data family constructor from an ordinary client: (Refl,True)
 use earlier field evidence in a later constructor type pattern: 37
 use a stored equality in a later constructor type pattern: 41
+duplicate the unrestricted field of a quoted constructor: (17,17)
 recover consecutive GADT constraints: (False,"True")
 form an associated family type from its class evidence: (Refl,Refl,True)
 form an expression annotation with the matched dictionary: True

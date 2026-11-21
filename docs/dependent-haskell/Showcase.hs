@@ -45,6 +45,7 @@ import DefaultVector (DefaultElement(..))
 import qualified ErasedPackage
 import FamilyTuple (Tuple(Tup2))
 import qualified FamilyRefinementClient
+import qualified QuotedColumn
 import qualified RetainedFamilyTuple
 import qualified ForgetWitness
 import qualified ImplicitVector
@@ -1042,6 +1043,7 @@ main = do
         (columnCount (ColumnSample @Int Refl 37 (type Int)))
     observe "use a stored equality in a later constructor type pattern"
         (columnCount (GivenCount @Int 41 (type Int)))
+    observe "duplicate the unrestricted field of a quoted constructor" (QuotedColumn.readQuoted 17)
     observe "recover consecutive GADT constraints" (describePair (PrintablePair False True))
     observe "form an associated family type from its class evidence" constrainedElements
     observe "form an expression annotation with the matched dictionary" annotatedElement

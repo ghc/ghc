@@ -26,6 +26,7 @@ where
 import GHC.Prelude hiding (init, last, tail)
 
 import GHC.Hs as Hs
+import qualified GHC.Hs.Decls as HsDecls
 import GHC.Tc.Errors.Types
 import GHC.Types.Name.Cache
 import GHC.Types.Name.Reader
@@ -774,19 +775,23 @@ cvtConstr _ do_con_name (RetainedGadtC names args result) = case nonEmpty names 
     (prefix, suffix) <- cvtRetainedGadtArgs args result
     mk_gadt_decl names' (PrefixConGADT noExtField prefix) suffix
 
--- | The source AST stores the prefix fields before the first retained binder
--- separately. Use the retained function type syntax for the suffix.
+-- | Convert the prefix value fields and the ordered suffix separately.
+-- See Note [Terminal constructor foralls in TH].
 cvtRetainedGadtArgs :: [TH.RetainedGadtArg] -> TH.Type
                     -> CvtM ([HsConDeclField GhcPs], LHsType GhcPs)
-cvtRetainedGadtArgs args result = prefix args
+cvtRetainedGadtArgs args result = do
+  (fields, binders) <- prefix args
+  body <- suffix binders
+  when (null binders && isNothing (HsDecls.splitGadtTerminalForAll (PrefixConGADT noExtField fields) body)) $
+    failWith (MalformedType TypeLevel result)
+  pure (fields, body)
   where
     prefix (GadtValueArg bang mult ty : rest) = do
       field <- cvt_arg (bang, ty)
       mult' <- cvtGadtArgMult mult
-      (fields, body) <- prefix rest
-      pure (field { cdf_multiplicity = mult' } : fields, body)
-    prefix binders@(GadtIndexArg{} : _) = ([],) <$> suffix binders
-    prefix [] = failWith (MalformedType TypeLevel result)
+      (fields, binders) <- prefix rest
+      pure (field { cdf_multiplicity = mult' } : fields, binders)
+    prefix binders = pure ([], binders)
 
     suffix [] = cvtType result
     suffix (GadtIndexArg name domain : rest) =
@@ -800,6 +805,22 @@ cvtRetainedGadtArgs args result = prefix args
       mult' <- cvtGadtArgMult mult
       body <- suffix rest
       returnLA (HsFunTy noExtField mult' arg' body)
+
+{- Note [Terminal constructor foralls in TH]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For a prefix constructor with a terminal required group, use RetainedGadtC.
+Each GadtValueArg represents a retained value field and carries its source
+bang and multiplicity. GadtC carries only the bang and field type. The
+terminal required group sits in the result Type as a ForallVisT, with its
+matchability annotation when present. A ForallC still wraps the leading
+invisible binders and context.
+
+If the argument list has no GadtIndexArg, accept this representation only
+for a nonempty field prefix followed by a terminal required group. Use the
+same shape check as for the source declaration. This preserves the scope of
+the required variables and rejects suffixes outside the supported syntax.
+The existing binary representation carries all these fields.
+-}
 
 -- | Constructor arrows can default to One. Keep a Many annotation explicit.
 cvtGadtArgMult :: TH.Type -> CvtM (HsModifiedFunArr GhcPs)

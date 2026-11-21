@@ -3,6 +3,7 @@
 - [x] Accept consecutive constructor contexts before the first field.
 - [x] Accept a terminal group of required universal type arguments after prefix fields in a lifted constructor with distinct result parameters and no constructor context or existentials.
 - [x] Accept a terminal required group when an earlier context supplies a dictionary or equality.
+- [x] Quote, reify, and splice a declaration with a terminal required group. Preserve its field bangs and multiplicities.
 - [ ] Support the remaining orders of fields, contexts, and quantifiers in prefix constructors.
 
 The [Showcase](../Showcase.hs) defines a constructor with fields of
@@ -28,3 +29,10 @@ matching, promotion, and the demand on a strict versus a lazy field
 when the constructor is partially applied.
 [Provider](../../../testsuite/tests/gadt/TerminalGadtForAllProvider.hs)
 and [client](../../../testsuite/tests/gadt/TerminalGadtForAll.hs).
+
+
+[QuotedColumn](../examples/open-evaluation/QuotedColumn.hs) splices a
+constructor declaration with a strict, unrestricted field before a required
+type argument. Its consumer takes the column linearly and returns the
+field twice. The [interface test](../../../testsuite/tests/gadt/TerminalGadtTh.hs)
+also reconstructs a declaration from an imported constructor.
