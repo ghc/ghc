@@ -35,6 +35,12 @@ ignoreViaProducer flag = ignoreInner (chooseMixed flag)
 readViaRank :: RankedMixed -> (Int, Bool)
 readViaRank p = readRankInner p
 
+readNamedBoth :: BothMixed -> Int
+readNamedBoth p = readBoth p
+
+readProducedBoth :: Bool -> Int
+readProducedBoth flag = id (readBoth (makeBoth flag))
+
 main :: IO ()
 main = do
   print (readMixed named, readMixed applied, readMixed written, readKind kindMixed)
@@ -51,3 +57,6 @@ main = do
   second <- readInsideQuickLook <$> readIORef flag
   print (first, second, readViaRank rankedMixed, readKindInner kindMixed)
   print (ignoreViaBar (error "unused package") && ignoreViaProducer (error "unused producer input"))
+  third <- readProducedBoth <$> readIORef flag
+  print (readNamedBoth (makeBoth input), third, readDependent depMixed,
+         ignoreBoth (makeBoth (error "unused multi-parameter producer input")))

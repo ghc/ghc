@@ -4,6 +4,9 @@ module MixedPackageProvider
   ( Inner, Mixed, inner, returnInner, written, lazyInner, ignoreMixed, readMixed
   , kindMixed, readKind, chooseMixed, readInner, ignoreInner, outerValue, readKindInner
   , RankedMixed, rankedMixed, readRankInner, BadRank, FamilyMixed, ignoreFamily
+  , BothMixed, makeBoth, readBoth, ignoreBoth, outerOfBoth
+  , DepMixed, depMixed, readDependent
+  , UnequalMixed, readEqualSlots, CaptureBoth, FamilyBoth, ignoreFamilyBoth
   ) where
 
 import Data.Kind (Type)
@@ -85,3 +88,40 @@ type FamilyMixed = exists a. FamilyInner a
 
 ignoreFamily :: forall a. FamilyInner a -> Bool
 ignoreFamily _ = True
+
+type BothInner a b = exists c | (a, b, c, Int)
+type BothMixed = exists a. BothInner a Char
+
+makeBoth :: Bool -> BothMixed
+makeBoth True = Exists.Pack @(BothInner Bool Char) (type ()) (True, 'x', (), 17)
+makeBoth False = Exists.Pack @(BothInner Int Char) (type ()) (3, 'y', (), 29)
+
+readBoth :: forall a b. BothInner a b -> Int
+readBoth p = case p of Exists.Pack _ (_, _, _, n) -> n
+
+ignoreBoth :: forall a b. BothInner a b -> Bool
+ignoreBoth _ = True
+
+outerOfBoth :: forall a b. BothInner a b -> a
+outerOfBoth p = case p of Exists.Pack _ (x, _, _, _) -> x
+
+type DepInner k (a :: k) = exists (b :: k) | (Proxy a, Proxy b, Int)
+type DepMixed = exists (a :: Bool). DepInner Bool a
+
+depMixed :: DepMixed
+depMixed = Exists.Pack @(DepInner Bool True) (type False) (Proxy, Proxy, 43)
+
+readDependent :: forall k (a :: k). DepInner k a -> Int
+readDependent p = case p of Exists.Pack _ (_, _, n) -> n
+
+type UnequalMixed = exists a. exists c | (a, Char, Bool, c, Int)
+
+readEqualSlots :: forall a b. (exists c | (a, b, b, c, Int)) -> Int
+readEqualSlots p = case p of Exists.Pack _ (_, _, _, _, n) -> n
+
+type CaptureBoth = exists (unused :: Type). exists c | (c, Char, c, Int)
+type FamilyBothInner a b = exists c | (a, FamilyValue b, c, Int)
+type FamilyBoth = exists a. FamilyBothInner a Char
+
+ignoreFamilyBoth :: forall a b. FamilyBothInner a b -> Bool
+ignoreFamilyBoth _ = True

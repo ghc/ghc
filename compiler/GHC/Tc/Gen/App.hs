@@ -501,7 +501,7 @@ tcOpenMixedBarArgument fun sigma args expected check_app
   | hasNoConcreteTyVars fun
   = do { candidate <- tcFindMixedBarArgument sigma args
        ; case candidate of
-           Just (binder, rho, domain, operand)
+           Just (binders, rho, domain, operand)
              -> do { (checked, actual) <- tcScalingUsage ManyTy $ tcInferRho operand
                    ; schema <- liftZonkM (zonkTcType actual)
                    ; result <- expTypeToType expected
@@ -511,10 +511,10 @@ tcOpenMixedBarArgument fun sigma args expected check_app
                              replace arg = arg
                              check fun' ty = tcExtendIdEnv [payload] $
                                check_app fun' ty (map replace args) (mkCheckExpType result)
-                         in case matchBarPackageWitness binder domain (varType payload) of
-                              Just (witness, _) ->
-                                check (mkHsWrap (mkWpTyApps [witness]) fun)
-                                      (substTyWith [binder] [witness] rho)
+                         in case matchBarPackageWitnesses binders domain (varType payload) of
+                              Just (witnesses, _) ->
+                                check (mkHsWrap (mkWpTyApps witnesses) fun)
+                                      (substTyWith binders witnesses rho)
                               Nothing -> check fun sigma
                    ; return (Just opened) }
            Nothing -> return Nothing }
@@ -523,20 +523,21 @@ tcOpenMixedBarArgument fun sigma args expected check_app
 -- | Find the declared mixed operand of a unary call without elaborating it.
 -- See Note [Implicit opening for an explicit package argument].
 tcFindMixedBarArgument :: TcSigmaType -> [HsExprArg 'TcpRn]
-                       -> TcM (Maybe (TyVar, TcSigmaType, TcType, LHsExpr GhcRn))
+                       -> TcM (Maybe ([TyVar], TcSigmaType, TcType, LHsExpr GhcRn))
 tcFindMixedBarArgument sigma args
-  | ForAllTy _ (Bndr binder vis) rho <- coreFullView sigma
-  , isTyVar binder, isInvisibleForAllTyFlag vis
+  | (tvs@(_:_), rho) <- tcSplitForAllInvisTyVars sigma
+  , let binders = map snd tvs
+  , all isTyVar binders
   , FunTy { ft_af = af, ft_mult = mult, ft_arg = domain } <- coreFullView rho
   , isVisibleFunArg af, isManyTy mult
   , Just template <- barPackageSignature domain
-  , isInjectiveInType binder template
+  , all (\binder -> isInjectiveInType binder template) binders
   , [EValArg{ea_arg = operand}] <- filter (not . parens) args
   = do { declared <- tcMixedOperandResult operand
        ; return $ case coreFullView <$> declared of
            Just (ExistsTy ImplicitExists _ inner)
-             | Just _ <- matchBarPackageWitness binder domain (implicitPayloadType inner)
-             -> Just (binder, rho, domain, operand)
+             | Just _ <- matchBarPackageWitnesses binders domain (implicitPayloadType inner)
+             -> Just (binders, rho, domain, operand)
            _ -> Nothing }
   | otherwise = return Nothing
   where
@@ -560,11 +561,17 @@ ordinary expression checker still instantiates the head and checks
 all constraints. A family application or an unconstrained result
 parameter cannot identify a package through this probe.
 
-Require an injective occurrence of the parameter in the bar binder's kind
-or body. The scoped comparison selects a type, then checks the complete bar
-type at that choice. Infer the operand once and give that checked expression
-to the existing lazy unpack. Recompute the choice from the opened payload
-so it refers to the fresh skolem. Keep the result type outside its scope.
+For readBoth :: forall a b. Inner a b -> Int and an operand with type
+exists a. Inner a Char, the opened bar type determines both a and b.
+Require an injective occurrence of each parameter in the bar binder's
+kind or body. Match all parameters together. Check each selected type's
+kind under the same substitution, including earlier parameters in the
+telescope. Then compare the complete bar type. A selected type can refer
+to the opened dot witness, but it cannot capture the bar binder.
+
+Infer the operand once and give that checked expression to the existing
+lazy unpack. Recompute the choices from the opened payload so they refer
+to the fresh skolem. Keep the result type outside its scope.
 Continue checking the source application under this opening. The callee
 still controls the explicit unpacking.
 
@@ -2376,26 +2383,29 @@ implicitResult _ _ _ expected = return (expected, id)
 matchMixedExistsResult :: Type -> Type -> Maybe (Type, Type)
 matchMixedExistsResult schema actual
   | ExistsTy ImplicitExists outer formal <- coreFullView schema
-  = matchBarPackageWitness outer formal actual
+  = do { ([witness], inner) <- matchBarPackageWitnesses [outer] formal actual
+       ; return (witness, inner) }
   | otherwise = Nothing
 
--- | Match one free template variable across an explicit existential.
-matchBarPackageWitness :: TyVar -> Type -> Type -> Maybe (Type, Type)
-matchBarPackageWitness outer formal actual
+-- | Match free template variables across an explicit existential.
+-- See Note [Implicit opening for an explicit package argument].
+matchBarPackageWitnesses :: [TyVar] -> Type -> Type -> Maybe ([Type], Type)
+matchBarPackageWitnesses binders formal actual
   | Just template <- barPackageSignature formal
   , Just target <- barPackageSignature actual
   , all supportsQuickLookType [formal, actual]
   , all noQuickLookVars [formal, actual]
-  = do { let bind_outer tv _ | tv == outer = BindMe
+  = do { let bind_outer tv _ | tv `elem` binders = BindMe
                              | otherwise = DontBindMe
              empty_subst = Subst.mkEmptySubst (mkInScopeSet (tyCoVarsOfTypes [template, target]))
              actual_fvs = tyCoVarsOfType actual
        ; subst <- tcMatchTyX_BM bind_outer empty_subst template target
-       ; witness <- Subst.lookupTyVar subst outer
-       ; guard (all (`elemVarSet` actual_fvs) (tyCoVarsOfTypeList witness))
-       ; let inner = substTyWith [outer] [witness] formal
-       ; guard (eqType (typeKind witness) (tyVarKind outer) && eqType inner actual)
-       ; return (witness, inner) }
+       ; witnesses <- traverse (Subst.lookupTyVar subst) binders
+       ; guard (all (`elemVarSet` actual_fvs) (tyCoVarsOfTypesList witnesses))
+       ; let kinds = map (Subst.substTy subst . tyVarKind) binders
+             inner = Subst.substTy subst formal
+       ; guard (eqTypes (map typeKind witnesses) kinds && eqType inner actual)
+       ; return (witnesses, inner) }
   | otherwise = Nothing
 
 -- | Compare the binder kind and body without changing the original mode.

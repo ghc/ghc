@@ -40,3 +40,15 @@ onlyFamily p = ignoreFamily p
 
 linearCall :: Mixed %1 -> Int
 linearCall p = readInner p
+
+escapeBoth :: forall a. BothMixed -> a
+escapeBoth p = outerOfBoth p
+
+unequalSlots :: UnequalMixed -> Int
+unequalSlots p = readEqualSlots p
+
+captureBoth :: CaptureBoth -> Int
+captureBoth p = readBoth p
+
+onlyFamilyBoth :: FamilyBoth -> Bool
+onlyFamilyBoth p = ignoreFamilyBoth p
