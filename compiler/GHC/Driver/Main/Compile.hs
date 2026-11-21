@@ -44,7 +44,6 @@ import GHC.Driver.Plugins
 import GHC.Driver.Session
 import GHC.Driver.Backend
 import GHC.Driver.Env
-import qualified GHC.LanguageExtensions as LangExt
 import GHC.Driver.ByteCode
 import GHC.Driver.Env.KnotVars
 import GHC.Runtime.Context (emptyInteractiveContext)
@@ -547,22 +546,17 @@ hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
 -- BackEnd combinators
 --------------------------------------------------------------
 
+-- | Generate object code for checked dictionary Core supplied through the GHC API.
+hscGenScopedDictionaryHardCode
+    :: HscEnv -> CgGuts -> ModLocation -> FilePath
+    -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)], Maybe StgCgInfos, Maybe CmmCgInfos)
+hscGenScopedDictionaryHardCode = hscGenHardCode
+
 -- | Compile to hard-code.
 hscGenHardCode :: HscEnv -> CgGuts -> ModLocation -> FilePath
                -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)], Maybe StgCgInfos, Maybe CmmCgInfos )
                 -- ^ @Just f@ <=> _stub.c is f
-hscGenHardCode = hscGenHardCodeWith False
-
--- | Generate code from a checked private dictionary module without an interface.
-hscGenScopedDictionaryHardCode
-    :: HscEnv -> CgGuts -> ModLocation -> FilePath
-    -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)], Maybe StgCgInfos, Maybe CmmCgInfos)
-hscGenScopedDictionaryHardCode = hscGenHardCodeWith True
-
-hscGenHardCodeWith
-    :: Bool -> HscEnv -> CgGuts -> ModLocation -> FilePath
-    -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)], Maybe StgCgInfos, Maybe CmmCgInfos)
-hscGenHardCodeWith private_api hsc_env cgguts mod_loc output_filename = do
+hscGenHardCode hsc_env cgguts mod_loc output_filename = do
         let CgGuts{ cg_module   = this_mod,
                     cg_binds    = core_binds,
                     cg_ccs      = local_ccs
@@ -572,8 +566,7 @@ hscGenHardCodeWith private_api hsc_env cgguts mod_loc output_filename = do
         -- See Note [Compiling native dependent modules] in GHC.Driver.Main.Passes.
         native <- checkNativeDependentModule hsc_env core_binds [] (cg_tycons cgguts)
         let dflags = nativeCodeGenFlags native (hsc_dflags hsc_env)
-            scoped = native && (private_api || xopt LangExt.ExperimentalDependentTypes dflags)
-                            && hasScopedDictionaryProgram core_binds
+            scoped = native && hasScopedDictionaryProgram core_binds
         when (native && not (backendWritesFiles (backend dflags))) $
           throwGhcExceptionIO (Sorry "Native dependent Core requires an object backend at hscGenHardCode.")
 

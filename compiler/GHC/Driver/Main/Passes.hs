@@ -51,7 +51,6 @@ import GHC.Driver.Main.Hsc
 
 import GHC.Driver.Plugins
 import GHC.Driver.Session
-import qualified GHC.LanguageExtensions as LangExt
 import GHC.Driver.Backend
 import GHC.Driver.Env
 import GHC.Driver.Errors
@@ -1575,6 +1574,10 @@ hscSimplify' plugins ds_result = do
 Use retained SimpleOpt at every optimization level. Run the retained
 Core pipeline at the requested optimization level when it is enabled.
 Check private dictionary forms with scoped lint throughout the pipeline.
+An ordinary module can call a function whose imported type binds a
+dictionary in the result. Select the lint, tidy and CorePrep paths from
+the checked Core of that module. The syntax extension governs what the
+module can write. An interface describes the types that it imports.
 A dependent dictionary application keeps its evidence argument in scope.
 The retained simplifier preserves the binder, and SimpleOpt substitutes
 only a matching evidence variable into a private selector type.
@@ -1672,18 +1675,14 @@ myCoreToStg logger dflags ic_inscope for_bytecode this_mod ml prepd_binds = do
     return (stg_binds_with_fvs, denv, cost_centre_info, stg_cg_info)
 
 
-hscTidy :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
-hscTidy = hscTidyWith False
-
--- | Tidy a checked private module for object generation without an interface.
+-- | Tidy a checked dictionary program supplied through the GHC API.
 hscTidyScopedDictionary :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
-hscTidyScopedDictionary = hscTidyWith True
+hscTidyScopedDictionary = hscTidy
 
-hscTidyWith :: Bool -> HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
-hscTidyWith private_api hsc_env guts = do
+hscTidy :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
+hscTidy hsc_env guts = do
   native <- checkNativeDependentModule hsc_env (mg_binds guts) (mg_rules guts) (mg_tcs guts)
-  let scoped = native && (private_api || xopt LangExt.ExperimentalDependentTypes (hsc_dflags hsc_env))
-                       && hasScopedDictionaryProgram (mg_binds guts)
+  let scoped = native && hasScopedDictionaryProgram (mg_binds guts)
       logger   = hsc_logger hsc_env
   let this_mod = mg_module guts
   let lint_env | native = hscUpdateFlags (`gopt_set` Opt_DoCoreLinting) hsc_env

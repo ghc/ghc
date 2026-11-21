@@ -15,7 +15,6 @@ import GHC.Driver.Config.Diagnostic
 import GHC.Core
 import GHC.Core.Lint
 import GHC.Core.Dependent (hasScopedDictionaryProgram)
-import qualified GHC.LanguageExtensions as LangExt
 import GHC.Core.Lint.Interactive
 import GHC.Core.Opt.Pipeline.Types
 import GHC.Core.Opt.Simplify ( SimplifyOpts(..) )
@@ -46,7 +45,6 @@ endPassHscEnvIO :: HscEnv -> NamePprCtx
 endPassHscEnvIO hsc_env name_ppr_ctx pass binds rules
   = do { let dflags = hsc_dflags hsc_env
              finish | gopt Opt_DoCoreLinting dflags
-                    , xopt LangExt.ExperimentalDependentTypes dflags
                     , hasScopedDictionaryProgram binds = endScopedDictionaryPassIO
                     | otherwise = endPassIO
        ; finish
