@@ -28,6 +28,25 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `68207d8a32`, the Stage 2 compiler combined R23 callback
+matchability, written GADT constructor operands and checked-split
+inference. The 371-line Showcase matched at stripped `-O0`, default
+`-O1`, default `-O2`, and in source-loaded GHCi. Ten registered
+integration tests passed. Fourteen ordinary GHC tests gave 26 expected
+passes across their selected ways on both the combined compiler and
+the preceding signed-position compiler. The old reader accepted the
+vector operand interface and rejected the general constructor operand
+header. The ordinary client inlined the multiple-index constructor
+function from its interface and checked its lazy fields.
+[Finite positions](../../testsuite/tests/dependent/should_run/NativeIndexedFin.sh),
+[checked split](../../testsuite/tests/dependent/should_run/NativeCertifiedSplit.sh)
+and [negative index diagnostic](../../testsuite/tests/dependent/should_fail/NativeIndexOperandFamily.stderr).
+
+The preceding signed-position source at `75e123a31c` also passed a normal
+two-stage Hadrian update in the existing build tree. Its compiler ran
+all 368 Showcase lines at the same optimization levels and in GHCi.
+The separately compiled signed lookup and certified split passed.
+
 At `0ae49102b4`, the unsigned datatype `data Box f = Box (f Bool)`
 works alongside the signed finite-position lookup and the certified vector
 split. The self-hosted compiler matched all 370 Showcase lines at stripped
