@@ -496,20 +496,26 @@ checkConstrainedSignature ctxt ty
     checks_domain TypeAppCtxt = True
     checks_domain ConArgCtxt{} = True
     checks_domain TySynCtxt{} = True
+    checks_domain (InstDeclCtxt False) = True
     checks_domain _ = False
 
     -- See Note [Family domains beneath retained binders].
     check_telescope origin whole
       | TySynCtxt{} <- origin, isConstraintKind (typeKind whole)
       = go (tcMkDFunPhiTy [whole] unitTy)
+      | InstDeclCtxt False <- origin
+      = check_qualifiers whole
       | otherwise = go whole
       where
         go sig = do
+          check_qualifiers sig
+          withFamilyDomainScope origin whole 0 sig check_body
+
+        check_qualifiers sig = do
           let (_, theta, _) = familyDomainPrefix 0 sig
           unless (all (null . constrainedFamilyApps) theta) $ do
             uses <- familyDomainObligations (qualifierPrefix sig)
             mapM_ (emitFamilyDomain origin whole) uses
-          withFamilyDomainScope origin whole 0 sig check_body
 
         -- Check only the written prefix here. The body has its own scope.
         qualifierPrefix (ForAllTy ma b rest) = ForAllTy ma b (qualifierPrefix rest)
@@ -964,6 +970,14 @@ After generalisation, the inferred type can still mention the family. Check
 its domain under the final binders and predicates. For example, an inferred
 result hole can contain Elem (f a) when the signature supplies Collects (f a).
 At this point the context is fixed. This check cannot generalise a new Wanted.
+
+Check the premises of an ordinary written instance with the same qualifier
+rule. For example, (Collects c, Show (Elem c)) can supply Collects c while
+checking the second premise. Check before solving the instance constraints can
+reduce an application such as Elem [Int]. The instance-head validity rules
+still check the head. This path checks written class instances. A standalone
+deriving declaration uses its existing deriving checks.
+
 For a written type argument, tcHsTypeApp checks formation before the
 function can discard the argument or reduce the family. Both @t and a
 required (type t) argument use that path. This source check
@@ -2859,6 +2873,9 @@ checkValidInstance ctxt hs_type ty = case tau of
         ; env0 <- liftZonkM $ tcInitTidyEnv
         ; expand <- initialExpandMode
         ; check_valid_theta emptyVarSet env0 ctxt expand theta
+        ; case ctxt of
+            InstDeclCtxt False -> checkConstrainedSignature ctxt ty
+            _ -> return ()
 
         -- The Termination and Coverage Conditions
         -- Check that instance inference will terminate (if we care)

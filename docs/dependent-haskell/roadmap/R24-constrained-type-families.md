@@ -359,6 +359,15 @@ checker preserves the domain checks for an ignored argument when it
 looks for component dictionaries.
 [Stripped-interface test](../../../testsuite/tests/dependent/should_run/NativeConstrainedFamilyClient.hs).
 
+The same rule checks a written instance context. An ordinary reader can
+define `instance (Collects c, Show (Elem c)) => Render (Cell c)` after
+importing the marked family. A superclass can supply `Collects c`.
+A nominal equality such as `a ~ Bool` can also prove the domain of
+`Elem [a]`. The ground context `Show (Elem [Int])` requires `Allowed Int`
+even when the reader defers term errors. The usual instance-head and
+standalone deriving checks keep their existing scope.
+[Stripped-interface instance tests](../../../testsuite/tests/dependent/should_run/NativeConstrainedFamily.sh).
+
 ### Family domains under a retained binder
 
 ```haskell
