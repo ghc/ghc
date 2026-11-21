@@ -234,7 +234,7 @@ recover the checked predecessor of a finite position: ((Nothing,Just 1),(True,Fa
 pass zero and a written successor to a retained function: (Just 1,True)
 open finite zero views with INLINE and INLINABLE: (True,True)
 take and drop at the first runtime length: ([True],[False,False])
-prove the runtime vector is VNil in the empty branch: (True,False)
+reverse the proof that a runtime vector is empty: (True,False)
 check a runtime cut against a vector length: (Just (1,[True],[False]),Nothing)
 pass an unevaluated vector at its branch-refined split width: (True,True)
 use a split proof from IO in the next argument: Just ([True],[False])

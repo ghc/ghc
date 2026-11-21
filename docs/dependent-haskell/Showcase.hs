@@ -2027,6 +2027,11 @@ emptyVectorProof xs = case xs of
     VNil -> Just HRefl
     VCons _ _ -> Nothing
 
+-- | Reverse the proof while the vector length is still an open index.
+reverseEmptyProof :: forall a n. foreach (xs :: Vec a n) ->
+    xs :~~: ('VNil :: Vec a 'Z) -> ('VNil :: Vec a 'Z) :~~: xs
+reverseEmptyProof _ HRefl = HRefl
+
 -- | Use ordinary addition on two unknown lengths in a vector result type.
 sourceAddition :: IO ()
 sourceAddition = do
@@ -2075,9 +2080,9 @@ sourceAddition = do
     checkedInput <- newIORef [True, False] >>= readIORef
     let matchesEmpty input = case ListVectorClient.fromList input of
             Sigma.Pair _ xs -> case emptyVectorProof xs of
-                Just HRefl -> True
+                Just proof -> case reverseEmptyProof xs proof of HRefl -> True
                 Nothing -> False
-    observe "prove the runtime vector is VNil in the empty branch"
+    observe "reverse the proof that a runtime vector is empty"
         (matchesEmpty (drop 2 checkedInput), matchesEmpty checkedInput)
     observe "check a runtime cut against a vector length"
         (ListVectorClient.checkedSplitObservation n checkedInput,
