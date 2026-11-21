@@ -35,7 +35,7 @@ import GHC.Tc.Types.ErrCtxt
 import GHC.Tc.Types.Rank
 import GHC.Tc.Errors ( reportAllUnsolved )
 import GHC.Tc.Errors.Types
-import GHC.Tc.Types.Constraint ( userTypeError_maybe, mkNonCanonical )
+import GHC.Tc.Types.Constraint ( userTypeError_maybe, mkNonCanonical, wc_simple, wc_impl, ic_wanted, ctPred )
 import GHC.Tc.Utils.TcMType (newEvVars, newWanted, newMetaTyVarsX)
 import GHC.Tc.Types.TH ( ThLevel(Comp) )
 import GHC.Tc.Utils.Env (tcLookupId, tcLookupLcl_maybe, tcExtendIdEnv)
@@ -3030,7 +3030,19 @@ checkEquationFamilyDomains family pats rhs
           mapM_ (emitFamilyDomain (TySynCtxt (tyConName family)) rhs) uses
       (unsolved, _) <- runTcS $ setTcSMode (vanillaTcSMode { tcsmGivenOnly = True }) $
                         solveWanteds wanted
-      reportAllUnsolved unsolved
+      case residualPredicates unsolved of
+        [] -> reportAllUnsolved unsolved
+        missing -> do
+          preds <- liftZonkM $ zonkTcTypes (substTy subst predicate : missing)
+          env <- liftZonkM $ tcInitOpenTidyEnv (tyCoVarsOfTypesList preds)
+          let source : required = tidyTypes env preds
+          failWithTc $ TcRnConstrainedFamilyUnsupported family $
+            hang (text "The owning class constraint" <+> quotes (ppr source)
+                  <+> text "must provide the equation domain:")
+               2 (pprWithCommas (quotes . ppr) (nubBy eqType required))
+  where
+    residualPredicates wc = map ctPred (toList (wc_simple wc)) ++
+                            concatMap (residualPredicates . ic_wanted) (wc_impl wc)
 
 {- Note [Class evidence in associated family equations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3040,17 +3052,17 @@ View c dictionary provides Collects c. The same rule applies to an
 explicit associated type instance after substitution of its patterns.
 
 Use the owner and its superclasses to check the right-hand side. An
-overlappable instance available to the equation writer can be specialized
-by an importer. The owner would not guarantee the new instance context.
-An ordinary family also has no domain in its interface.
+importer can specialize an instance available to the equation writer.
+The specialized instance may require an extra constraint. Ordinary
+families carry no owner domain in their interfaces.
 
 An omitted owner parameter is rigid when opening the equation owner.
 Only the inferred parameters of a right-hand-side domain get fresh
 metavariables. The ordinary solver can project superclasses, rewrite
 by a nominal equality and apply a quantified dictionary. Run this
 implication with tcsmGivenOnly so its evidence is available whenever
-the owner is. Use the same scoped templates as signature formation:
-an ignored synonym argument still requires its own domain.
+the owner is. Use the same scoped templates as signature formation.
+An ignored synonym argument still requires its own domain.
 -}
 
 -- | Checks that an associated type family default:
