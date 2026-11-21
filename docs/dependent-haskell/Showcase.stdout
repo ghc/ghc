@@ -340,6 +340,7 @@ select unknown fields from known constructors: ('x',7)
 read a length witness returned by an ordinary function: (Refl,[4,5])
 read independent length witnesses in a recursive batch: (Refl,[1,2],1)
 select values with a mask at the same stored length: (Refl,[5],1)
+look up a column at a shared length carried by the vectors: (Refl,Just 5,Nothing)
 read one field of a private parcel without forcing the other: (Refl,7)
 construct a result from two symbolic fields: Refl
 use a derived instance beside a dependent type: "Second"

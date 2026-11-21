@@ -20,7 +20,7 @@ for opt in -O0 -O2; do
     cat >WrongWitness.hs <<'HS'
 {-# LANGUAGE DataKinds, GADTs, KindSignatures #-}
 module WrongWitness
-    ( buildWrong, wrongMask, BadField(..), badField
+    ( buildWrong, wrongMask, wrongColumns, BadField(..), badField
     , EvidenceBatch(..), withEvidence, TaggedBatch(..), withEquality
     ) where
 import Data.Proxy (Proxy)
@@ -28,7 +28,7 @@ import ExistentialVec (SN(..))
 import IndexedVec (N(..), Vec(..))
 import Numeric.Natural (Natural)
 import Unsafe.Coerce (unsafeCoerce)
-import WitnessedBatch (Batch(..), MaskedRow(..))
+import WitnessedBatch (Batch(..), MaskedRow(..), KeyedRow(..))
 
 buildWrong :: Natural -> Batch Natural
 buildWrong n = Chunk (SS SZ) (VCons n VNil)
@@ -36,6 +36,9 @@ buildWrong n = Chunk (SS SZ) (VCons n VNil)
 
 wrongMask :: Natural -> MaskedRow Natural
 wrongMask n = MaskedRow (SS SZ) (VCons n VNil) 'x' (unsafeCoerce (VNil :: Vec 'Z Bool))
+
+wrongColumns :: Natural -> KeyedRow Natural
+wrongColumns n = KeyedRow 'r' (VCons 'x' VNil) (unsafeCoerce (VCons n (VCons n VNil)))
 
 data BadField a where
     BadField :: SN n -> Vec n a -> Char -> Proxy n -> BadField a
@@ -63,7 +66,7 @@ HS
     if [[ -f ../producer/WitnessedBatch.dyn_o ]]; then cp ../producer/*.{dyn_hi,dyn_o} .; fi
     cat >Proof.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
-module Proof (evenBatch, oddBatch, mask) where
+module Proof (evenBatch, oddBatch, mask, empty, row) where
 
 import Data.Type.Equality ((:~:)(Refl))
 import qualified ExistentialVec as E
@@ -82,6 +85,13 @@ mask :: B.maskedRow 4 :~: 'B.MaskedRow ('E.SS ('E.SS 'E.SZ))
                             ('V.VCons 4 ('V.VCons 5 'V.VNil))
                             'x' ('V.VCons 'False ('V.VCons 'True 'V.VNil))
 mask = Refl
+
+empty :: B.keyedRow 0 :~: 'B.KeyedRow 'e' 'V.VNil 'V.VNil
+empty = Refl
+
+row :: B.keyedRow 4 :~: 'B.KeyedRow 'r' ('V.VCons 'x' ('V.VCons 'y' 'V.VNil))
+                                        ('V.VCons 4 ('V.VCons 5 'V.VNil))
+row = Refl
 HS
     cat >Demand.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeOperators #-}
@@ -100,7 +110,7 @@ module Main where
 import qualified Demand
 import qualified ExistentialVec as E
 import qualified IndexedVec as V
-import Proof (evenBatch, oddBatch, mask)
+import Proof (evenBatch, oddBatch, mask, row, empty)
 import qualified WitnessedBatch as B
 
 skipped :: [Int]
@@ -108,14 +118,19 @@ skipped = B.selectedValues (B.MaskedRow (E.SS E.SZ) (V.VCons (error "unused valu
                             (error "unused label") (V.VCons False V.VNil))
 
 main :: IO ()
-main = print (evenBatch, oddBatch, mask, Demand.firstWidth, Demand.rowWidth,
-              B.firstWidth (B.build 4), B.firstWidth (B.build 3), B.firstWidth (B.partial 9),
-              B.selectedValues (B.maskedRow 4), skipped)
+main = do
+    print (evenBatch, oddBatch, mask, Demand.firstWidth, Demand.rowWidth,
+           B.firstWidth (B.build 4), B.firstWidth (B.build 3), B.firstWidth (B.partial 9),
+           B.selectedValues (B.maskedRow 4), skipped)
+    let short :: B.KeyedRow Int
+        short = B.KeyedRow (error "unused tag") (V.VCons 'x' V.VNil)
+                           (V.VCons 8 (error "unused tail"))
+    print (row, empty, B.lookupColumn 'y' (B.keyedRow 4), B.lookupColumn 'x' short)
 HS
     "${ghc[@]}" "$opt" -c Proof.hs Demand.hs
     "${ghc[@]}" "$opt" -c Main.hs
     "${ghc[@]}" ./*.o -o run
-    test "$(./run)" = '(Refl,Refl,Refl,Refl,Refl,1,2,1,[5],[])'
+    test "$(./run)" = $'(Refl,Refl,Refl,Refl,Refl,1,2,1,[5],[])\n(Refl,Refl,Just 5,Just 8)'
 
     cat >WrongLength.hs <<'HS'
 module WrongLength where
@@ -203,6 +218,10 @@ HS
     sed -e 's/module BadWitness/module BadMask/' -e 's/Wrong.buildWrong/Wrong.wrongMask/' \
         BadWitness.hs >BadMask.hs
     reject BadMask 'The value returned by the interpreter does not match the checked result type.'
+
+    sed -e 's/module BadWitness/module BadColumns/' -e 's/Wrong.buildWrong/Wrong.wrongColumns/' \
+        BadWitness.hs >BadColumns.hs
+    reject BadColumns 'The value returned by the interpreter does not match the checked result type.'
 
     sed -e 's/module ClassEvidence/module UnsupportedField/' -e 's/W.withEvidence/W.badField/' \
         ClassEvidence.hs >UnsupportedField.hs

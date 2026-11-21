@@ -3,6 +3,7 @@
 module WitnessedBatch
     ( Batch(..), build, partial, partialTail, firstWidth
     , MaskedRow(..), maskedRow, partialRow, rowWidth, selectedValues
+    , KeyedRow(..), keyedRow, lookupColumn
     ) where
 
 import ExistentialVec (SN(..))
@@ -60,6 +61,26 @@ selectedValues (MaskedRow _ values _ mask) = select values mask
     select (VCons x xs) (VCons keep rest)
         | keep = x : select xs rest
         | otherwise = select xs rest
+
+-- | The keys and values have the same hidden length.
+data KeyedRow a where
+    KeyedRow :: Char -> Vec n Char -> Vec n a -> KeyedRow a
+
+-- | Construct an empty row at zero and a two-column row otherwise.
+keyedRow :: Natural -> KeyedRow Natural
+keyedRow 0 = KeyedRow 'e' VNil VNil
+keyedRow n = KeyedRow 'r' (VCons 'x' (VCons 'y' VNil))
+                          (VCons n (VCons (n + 1) VNil))
+
+-- | Read the value at the first matching key.
+lookupColumn :: Char -> KeyedRow a -> Maybe a
+lookupColumn key (KeyedRow _ keys values) = go keys values
+  where
+    go :: Vec n Char -> Vec n b -> Maybe b
+    go VNil VNil = Nothing
+    go (VCons k ks) (VCons x xs)
+        | key == k  = Just x
+        | otherwise = go ks xs
 
 -- | Count the successors of a length witness.
 width :: SN n -> Natural

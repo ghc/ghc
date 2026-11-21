@@ -6071,6 +6071,15 @@ and [GHC's declaration scheduler](../../compiler/GHC/Tc/Module.hs).
 
 ### Recursively read back witnessed constructors
 
+Agda's `length-toList` proves the relationship between a vector's index
+and the length of its list representation by induction on the vector.
+The empty case gives `refl`. The cons case applies `cong suc` to the
+recursive proof. R15 uses the constructor equalities of the Haskell GADT
+to recover an existential index from a finite value. Other indexed fields
+must give the same index. An ordinary lookup only evaluates the constructors
+it visits. [Agda vector properties](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Properties.html)
+and [shared vector length](roadmap/R15-closed-term-evaluator.md#recover-a-hidden-length-from-the-vector).
+
 The Idris 2 tutorial's vector filter returns a dependent pair. Its
 recursive branch opens the result of the recursive call before building
 a new pair whose length follows the selected branch. The Haskell batch

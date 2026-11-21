@@ -578,7 +578,7 @@ two :: E.someVec 4 :~: 'E.SomeVec ('E.SS ('E.SS 'E.SZ))
 two = Refl
 ```
 
-The supported package has one constructor, one erased index, and two
+The original M135 package has one constructor, one erased index, and two
 fields. The first field carries a witness whose constructors specify
 a nullary base or a unary successor of another witness. The second
 field has its own indexed datatype. Its recursive field may appear
@@ -593,11 +593,12 @@ and [fare datatype](../../../testsuite/tests/dependent/should_run/NativeClosedIn
 
 Ordinary imports must expose the constructors used by both renderers
 and the promoted index constructors. GHC checks the imports before
-executing the producer. A pair of vectors with an erased shared length
-lacks the explicit witness this procedure requires. A test uses
+executing the producer. A test uses
 `unsafeCoerce` to give a two-cell vector the wrong length. Its runtime
 constructor sequence fails the decoder's check against a one-cell
 witness. A divergent witness can still make closed checking diverge.
+The [shared vector length](#recover-a-hidden-length-from-the-vector) case below
+uses the vector constructors themselves.
 [Import check](../../../testsuite/tests/dependent/should_fail/NativeClosedSomeVecIndexVisibility.hs),
 [missing witness](../../../testsuite/tests/dependent/should_fail/NativeClosedWitnessMissing.hs)
 and [inconsistent result](../../../testsuite/tests/dependent/should_fail/NativeClosedWitnessMismatch.hs).
@@ -658,10 +659,29 @@ of just the width can leave the other three fields undefined.
 excludes unequal spines. Applying the mask `[False, True]` to the values
 `[4, 5]` returns `[5]`. In an ordinary module,
 `MaskedRow (SS SZ) (VCons 4 VNil) 'x' VNil` fails at the last `VNil`
-with GHC-83865. The mask has length zero where the constructor requires one. The
-evaluator supports one erased constructor index with a recoverable witness
-in the first field. Each indexed payload must support the checked
-constructor cases described above. [Source and projections](../examples/closed-evaluation/WitnessedBatch.hs).
+with GHC-83865. The mask has length zero where the constructor requires one.
+[Source and projections](../examples/closed-evaluation/WitnessedBatch.hs).
+
+### Recover a hidden length from the vector
+
+```haskell
+data KeyedRow a where
+    KeyedRow :: Char -> Vec n Char -> Vec n a -> KeyedRow a
+```
+
+GHC reads the tag and both vectors in declaration order. The keys determine
+the hidden length. `VNil` gives zero and each `VCons` adds one. GHC checks
+the values at that length before constructing the promoted row. The empty
+row and the complete two-column row both admit a `Refl` proof.
+`lookupColumn 'y' (keyedRow 4)` returns `Just 5`. Finding the first
+key leaves the rest of the values unevaluated.
+
+The evaluator supports one erased constructor index. Each indexed field
+must have the checked constructor cases described above. A `Proxy n`
+field leaves its index unknown. GHC reports GHC-70565 at the written call
+and names the field and its constructor before executing the producer.
+[Ordinary row](../examples/closed-evaluation/WitnessedBatch.hs) and
+[separate-module checks](../../../testsuite/tests/dependent/should_run/NativeClosedWitnessedBatch.sh).
 
 ## M136. Composing ordinary calls before observation
 
