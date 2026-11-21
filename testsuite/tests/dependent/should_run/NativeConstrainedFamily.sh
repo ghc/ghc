@@ -15,7 +15,7 @@ for reader in marked ordinary; do
         mode=-XNoExperimentalDependentTypes
     fi
     (cd provider && "${ghc[@]}" -fforce-recomp "$mode" -c NativeConstrainedFamilyProvider.hs)
-    cp provider/NativeConstrainedFamilyProvider.hi "$src/"{NativeConstrainedFamilyClient,NativePartialFamilyScope}.hs "$reader/"
+    cp provider/NativeConstrainedFamilyProvider.hi "$src/"{NativeConstrainedFamilyClient,NativePartialFamilyScope,NativeImprovedFamilyScope}.hs "$reader/"
     (
         cd "$reader"
         "${ghc[@]}" -c NativeConstrainedFamilyClient.hs
@@ -29,6 +29,30 @@ for reader in marked ordinary; do
             cat premise.log
             exit 1
         fi
+        improved=(-fforce-recomp -c NativeImprovedFamilyScope.hs)
+        "${ghc[@]}" "${improved[@]}"
+        for site in ALIAS_GUARD MISSING_OWNER WRONG_EXPLICIT EXPLICIT_PREFIX; do
+            case "$site" in
+                ALIAS_GUARD) message='Allowed Int' ;;
+                MISSING_OWNER) message='Output c' ;;
+                WRONG_EXPLICIT) message='Output (Key Bool) Char' ;;
+                EXPLICIT_PREFIX) message='to determine the instance of' ;;
+            esac
+            if [[ $reader == ordinary && $site != EXPLICIT_PREFIX ]]; then
+                "${ghc[@]}" "${improved[@]}" "-D$site"
+            else
+                code=39999
+                if [[ $site == EXPLICIT_PREFIX ]]; then
+                    code=90647
+                    if [[ $reader == ordinary ]]; then code=27346; message='partial type family application'; fi
+                fi
+                if "${ghc[@]}" "${improved[@]}" "-D$site" -fdefer-type-errors >owner.log 2>&1 ||
+                   ! grep -Fq "[GHC-$code]" owner.log || ! grep -Fq "$message" owner.log; then
+                    cat owner.log
+                    exit 1
+                fi
+            fi
+        done
         scoped=(-fforce-recomp -Wno-partial-type-signatures -c NativePartialFamilyScope.hs)
         "${ghc[@]}" "${scoped[@]}"
         for site in MISSING_BINDING MISSING_ANNOTATION CONTEXT_WILDCARD SIBLING STATIC SPLICE_ESCAPE OTHER_INDEX INFERRED_ESCAPE; do

@@ -1,5 +1,5 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, FlexibleContexts, FlexibleInstances, GADTs, Modifiers, PolyKinds, RankNTypes, ScopedTypeVariables, TypeApplications, TypeFamilies, TypeOperators #-}
-module ConstrainedElements (Allowed, Collects(..), FieldKey, Field(..), field, applyField, withField, KnownIndex(..), Reflection, reflectMaybe, MaybeBoolEcho, AtNothing) where
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, FlexibleContexts, FlexibleInstances, FunctionalDependencies, GADTs, Modifiers, PolyKinds, RankNTypes, ScopedTypeVariables, TypeApplications, TypeFamilies, TypeOperators #-}
+module ConstrainedElements (Collection(..), Allowed, Collects(..), FieldKey, Field(..), field, applyField, withField, KnownIndex(..), Reflection, reflectMaybe, MaybeBoolEcho, AtNothing) where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
@@ -60,3 +60,17 @@ type AtNothing (f :: Maybe Bool %U -> Maybe Bool) = f 'Nothing
 -- | Reflect a runtime index using the instance for its kind.
 reflectMaybe :: forall a. Reflection a
 reflectMaybe _ = Refl
+
+-- | Split a collection into one element and the remainder.
+class Collection c e | c -> e where
+    type Rest c
+    uncons :: c -> Maybe (e, Rest c)
+
+instance Collection [a] a where
+    type Rest [a] = [a]
+    uncons [] = Nothing
+    uncons (x:xs) = Just (x, xs)
+
+instance Collection (Maybe a) a where
+    type Rest (Maybe a) = ()
+    uncons = fmap (\x -> (x, ()))

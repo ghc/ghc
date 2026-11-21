@@ -7,7 +7,7 @@
 
 module GHC.Tc.Validity (
   Rank(..), UserTypeCtxt(..), checkValidType, checkValidMonoType,
-  checkValidTheta, checkConstrainedSignature,
+  checkValidTheta, checkConstrainedSignature, checkAssociatedFamilyCoverage,
   checkValidInstance, checkValidInstHead, validDerivPred,
   checkTySynRhs, checkEscapingKind,
   checkValidCoAxiom, checkValidCoAxBranch,
@@ -36,7 +36,7 @@ import GHC.Tc.Types.Rank
 import GHC.Tc.Errors ( reportAllUnsolved )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Constraint ( userTypeError_maybe, mkNonCanonical )
-import GHC.Tc.Utils.TcMType (newEvVars, newWanted)
+import GHC.Tc.Utils.TcMType (newEvVars, newWanted, newMetaTyVarsX)
 import GHC.Tc.Types.TH ( ThLevel(Comp) )
 import GHC.Tc.Utils.Env (tcLookupId, tcLookupLcl_maybe, tcExtendIdEnv)
 import GHC.Tc.Utils.TcType
@@ -500,7 +500,7 @@ checkConstrainedSignature ctxt ty
     -- See Note [Family domains beneath retained binders].
     check_telescope origin whole = go whole
       where
-        go sig = with_scope origin whole sig check_body
+        go sig = with_scope origin whole 0 sig check_body
 
         check_body (DepFunTy _ index body)
           = do { check_part (varType index)
@@ -517,7 +517,12 @@ checkConstrainedSignature ctxt ty
       uses <- familyDomainObligations part
       forM_ uses $ \case
         UnsupportedFamily fam reason -> failWithTc (TcRnConstrainedFamilyUnsupported fam reason)
-        ScopedFamily fam sigma -> with_scope ctxt ty sigma $ \pred_ty -> do
+        ScopedFamily fam n sigma -> with_scope ctxt ty n sigma $ \domain -> do
+          pred_ty <- if n == 0 then pure domain else do
+            let (hidden, predicate) = splitForAllTyVars domain
+                scope = mkEmptySubst (mkInScopeSet (tyCoVarsOfType domain))
+            (subst, _) <- newMetaTyVarsX scope (map snd hidden)
+            pure (substTy subst predicate)
           ev <- newWanted (OccurrenceOf (tyConName fam)) (Just TypeLevel) pred_ty
           emitSimple (mkNonCanonical ev)
 
@@ -533,7 +538,7 @@ checkConstrainedSignature ctxt ty
     checkNested ty@ExistsTy{} = checkNoConstrainedFamilyApps ty
     checkNested _ = pure ()
 
-    with_scope origin whole sig inside = case written_prefix sig of
+    with_scope origin whole n sig inside = case familyDomainPrefix n sig of
       ([], [], body) -> inside body
       (bndrs, theta, body) -> mdo
         info <- mkSkolemInfo sig_skol
@@ -546,7 +551,17 @@ checkConstrainedSignature ctxt ty
         given <- newEvVars (substTheta subst theta)
         void $ checkConstraints sig_skol skolems given (inside (substTy subst body))
 
-    -- Stop at a synonym so that check_part sees its written arguments.
+-- | Separate the lexical binders from the owner's inferred parameters.
+-- See Note [Associated family domain arguments].
+familyDomainPrefix :: Int -> Type -> ([(Matchability, TyVar)], ThetaType, Type)
+familyDomainPrefix n sig
+  | n == 0 = written_prefix sig
+  | otherwise
+  = let (binders, theta, body) = written_prefix sig
+        (scope, hidden) = splitAt (length binders - n) binders
+    in (scope, theta, mkInfForAllTys hidden body)
+  where
+    -- Keep type synonym arguments for the formation check.
     written_prefix (ForAllTy ma (Bndr tv _) rest)
       = let (bndrs, theta, body) = written_prefix rest in ((ma, tv) : bndrs, theta, body)
     written_prefix (FunTy af _ _ pred_ty rest)
@@ -554,21 +569,56 @@ checkConstrainedSignature ctxt ty
       = let (tvs, theta, body) = written_prefix rest in (tvs, pred_ty : theta, body)
     written_prefix rest = ([], [], rest)
 
-
 -- | Recover the owner predicate from the supplied family arguments.
 -- See Note [Associated family domain arguments].
-associatedFamilyDomain :: TyCon -> [Type] -> Either SDoc PredType
+associatedFamilyDomain :: TyCon -> [Type] -> Either SDoc (Int, PredType)
 associatedFamilyDomain fam args
   | Just cls <- tyConAssoc_maybe fam >>= tyConClass_maybe
-  = let supplied = mkVarEnv (zip (tyConTyVars fam) args)
-        actual v = lookupVarEnv supplied v
-        formals = classTyVars cls
-    in case traverse actual formals of
-      Just class_args -> Right (mkClassPred cls class_args)
-      Nothing -> Left $ sep
-        [ text "Supply" <+> pprWithCommas (quotes . ppr) (filter (isNothing . actual) formals)
+  = let formals = classTyVars cls
+        family_vars = tyConTyVars fam
+        supplied = zip family_vars args
+        actuals = mkVarEnv supplied
+        -- Later family arguments can contradict an inferred owner.
+        family_set = mkVarSet family_vars
+        omitted = [v | v <- formals, v `elemVarSet` family_set, not (v `elemVarEnv` actuals)]
+        unknown = undeterminedFamilyParameters cls (map fst supplied)
+        infer subst [] = ([], mkClassPred cls (substTys subst (mkTyVarTys formals)))
+        infer subst (v:vs)
+          | Just arg <- lookupVarEnv actuals v = infer (extendTvSubst subst v arg) vs
+          | otherwise = let (subst', w) = substTyVarBndr subst v
+                            (ws, predicate) = infer subst' vs
+                        in ((unmatchableDataConTy, w) : ws, predicate)
+    in case traverse (lookupVarEnv actuals) formals of
+      Just tys -> Right (0, mkClassPred cls tys)
+      Nothing | null omitted, null unknown ->
+        let (hidden, predicate) = infer (mkEmptySubst (mkInScopeSet (tyCoVarsOfTypes args))) formals
+        in Right (length hidden, mkInfForAllTys hidden predicate)
+      _ -> Left $ sep
+        [ text "Supply" <+> pprWithCommas (quotes . ppr) (if null omitted then unknown else omitted)
         , text "to determine the instance of" <+> quotes (ppr (className cls)) <> dot ]
   | otherwise = Left (text "The family declaration has no associated class.")
+
+-- | Check the owner after GHC has built the class and its superclasses.
+-- See Note [Associated family domain arguments].
+checkAssociatedFamilyCoverage :: Class -> TyCon -> TcM ()
+checkAssociatedFamilyCoverage cls fam
+  | isConstrainedFamilyTyCon fam
+  , let missing = undeterminedFamilyParameters cls (tyConTyVars fam)
+  , not (null missing)
+  = setSrcSpan (getSrcSpan fam) $
+    failWithTc $ TcRnConstrainedFamilyUnsupported fam $
+      hang (text "Missing class parameters in the family declaration")
+           2 (pprWithCommas ppr missing)
+  | otherwise = pure ()
+
+-- | Find owner parameters that the supplied family arguments do not determine.
+undeterminedFamilyParameters :: Class -> [TyVar] -> [TyVar]
+undeterminedFamilyParameters cls supplied
+  = [v | v <- formals, not (v `elemVarSet` known), not (v `elemVarSet` fixed)]
+  where
+    formals = classTyVars cls
+    known = closeOverKinds (mkVarSet supplied)
+    fixed = closeWrtFunDeps [mkClassPred cls (mkTyVarTys formals)] known
 
 {- Note [Associated family domain arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -582,6 +632,15 @@ the invisible argument k. The partial application Echo :: Bool %U -> Bool
 already determines the domain KnownIndex Bool. Bare Elem from class
 Collects c does not determine c. The ordinary arity and matchability
 checks still apply to a prefix that determines its domain.
+
+For class Owner c e | c -> e with type Member c, the family never takes e.
+The template for Member c carries the predicate forall e. Owner c e and a
+count of one inferred owner binder. Each use instantiates this inner binder
+with a fresh metavariable inside its lexical implication. Synonym expansion
+can reuse a template at two different instances. It cannot share the
+metavariable between them. If the family takes e explicitly, require the
+user to supply it. A caller could otherwise apply the partial family at a
+type that contradicts the dependency.
 -}
 
 -- | Refuse contexts that have no formation rule in this experiment.
@@ -624,9 +683,11 @@ constrainedFamilyApps ty = State.evalState (go ty) emptyUniqSet
 
     descend = fmap concat . traverse go
 
--- | A class predicate with the binders and premises in scope at the application.
+-- | The class predicate carries its lexical binders and premises.
+-- The count records its innermost inferred owner binders.
+-- See Note [Associated family domain arguments].
 data ConstrainedFamilyUse
-  = ScopedFamily TyCon PredType
+  = ScopedFamily TyCon Int PredType
   | UnsupportedFamily TyCon SDoc
 
 -- | Collect family applications before a synonym can discard a written argument.
@@ -678,29 +739,30 @@ familyDomainObligations ty = State.evalStateT (go ty) emptyUFM
       | otherwise = do
           name <- lift $ newSysName (mkTyVarOccFS (occNameFS (getOccName v)))
           let tv = mkTyVar name (varType v)
-              close use@(ScopedFamily fam sigma)
+              close use@(ScopedFamily fam n sigma)
                 | mentions use = case abstractNativeIndices [(TermVarTy v, tv)] sigma of
                     Just body | not (v `elemVarSet` tyCoVarsOfType body) ->
-                      ScopedFamily fam (mkSpecForAllTy unmatchableDataConTy tv body)
+                      ScopedFamily fam n (mkSpecForAllTy unmatchableDataConTy tv body)
                     _ -> UnsupportedFamily fam
                            (text "The class domain uses a retained index that cannot be abstracted.")
               close use = use
           pure (map close uses)
       where
-        mentions (ScopedFamily _ sigma) = v `elemVarSet` tyCoVarsOfType sigma
+        mentions (ScopedFamily _ _ sigma) = v `elemVarSet` tyCoVarsOfType sigma
         mentions _ = False
 
-    domain fam args = either (UnsupportedFamily fam) (ScopedFamily fam)
+    domain fam args = either (UnsupportedFamily fam) (uncurry (ScopedFamily fam))
                              (associatedFamilyDomain fam args)
 
     children = fmap (map monotype . concat) . traverse go
     forbidden = fmap (map refuse . concat) . traverse go
-    refuse (ScopedFamily fam _) = UnsupportedFamily fam unsupportedFamilySite
+    refuse (ScopedFamily fam _ _) = UnsupportedFamily fam unsupportedFamilySite
     refuse use = use
-    monotype use@(ScopedFamily _ ForAllTy{}) = refuse use
-    monotype use@(ScopedFamily _ sigma) | isSigmaTy sigma = refuse use
+    monotype use@(ScopedFamily _ n sigma)
+      | ([], [], _) <- familyDomainPrefix n sigma = use
+      | otherwise = refuse use
     monotype use = use
-    mapSigma f (ScopedFamily fam sigma) = ScopedFamily fam (f sigma)
+    mapSigma f (ScopedFamily fam n sigma) = ScopedFamily fam n (f sigma)
     mapSigma _ use = use
 
     templates tc rhs = do
@@ -713,7 +775,7 @@ familyDomainObligations ty = State.evalStateT (go ty) emptyUFM
           State.modify' (\m -> addToUFM m tc uses)
           pure uses
 
-    sameUse (ScopedFamily f t) (ScopedFamily g u) = f == g && eqType t u
+    sameUse (ScopedFamily f n t) (ScopedFamily g m u) = f == g && n == m && eqType t u
     sameUse (UnsupportedFamily f _) (UnsupportedFamily g _) = f == g
     sameUse _ _ = False
 

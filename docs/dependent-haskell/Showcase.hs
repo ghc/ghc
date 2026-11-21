@@ -108,7 +108,8 @@ import qualified InterpretedKind
 import qualified InterpretedKindUseSite
 import qualified NestedFunctionClient
 import qualified InvisibleFamily
-import ConstrainedElementsClient (partialElement, aliasedReflection, annotatedElement, constrainedElements, explicitElements, formatField, renderField, renderKnownFields, retainedMaybeDomain)
+import ConstrainedElementsClient (splitCollection, partialElement, aliasedReflection, annotatedElement, constrainedElements, explicitElements, formatField, renderField, renderKnownFields, retainedMaybeDomain)
+import ConstrainedElementsQuickLook (showReflection)
 import IndexedMapClient (mappedCells)
 import LaterMatchabilityClient (annotatedMap, appliedCallback, boxedCallbacks, computedDictionary, flippedCallbacks, forwardedMap,
                                 laterMatchability, nestedCallback, rankedMap)
@@ -979,7 +980,10 @@ main = do
     observe "choose a field domain with a required type argument" renderKnownFields
     retainedMaybeDomain >>= observe "reflect a runtime Maybe index using its kind"
     observe "use a qualified proof and a partial family through imported type synonyms" aliasedReflection
+    observe "render a retained callback with ImpredicativeTypes enabled" (map showReflection [Just True, Nothing])
     observe "forward a runtime element with a quantified partial signature" (partialElement enabled, partialElement disabled)
+    observe "split collections whose types determine their elements"
+        (splitCollection [enabled, disabled], splitCollection (Just 'x'), splitCollection (Nothing :: Maybe Char))
     putStrLn "Dependent Haskell: completed source features"
     booleans
     finiteDomains

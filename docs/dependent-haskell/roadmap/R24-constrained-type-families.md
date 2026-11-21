@@ -209,12 +209,39 @@ omits kinds, classes and partial applications.
   [ordinary client](../examples/open-evaluation/ConstrainedElementsClient.hs)
   and [stripped-interface check](../../../testsuite/tests/dependent/should_run/NativeConstrainedFamily.sh).
 
-The family must mention every class parameter. A parameter can occur as an
-invisible kind argument. The family can take extra arguments and return a
-type of any kind. For example, `Echo (x :: k) :: k` in class `KnownIndex k`
-requires `KnownIndex (Maybe a)` when applied to a runtime `x :: Maybe a`.
-The Showcase uses `Allowed a` to satisfy that instance. It checks a
-`Just False`, a `Nothing`, and a proof whose index is left unevaluated.
+A family can omit an owner parameter when the supplied parameters determine
+it through functional dependencies or superclass equalities. For example,
+`class Collection c e | c -> e` declares `type Rest c`. The caller supplies
+`c` and GHC checks `Collection c e` with a fresh `e` at each use. The
+Showcase splits a list of Boolean values and an optional character through
+the same imported class method. A functional dependency can also determine
+a second parameter through an intermediate parameter. An unrelated slot
+in a multi-parameter class still makes an associated declaration ambiguous.
+GHC also requires an associated declaration in a non-nullary class to
+mention a class variable. The existing GHC-55912 check still applies to
+`class Only e | -> e` with a nullary associated family.
+[Source provider](../examples/open-evaluation/ConstrainedElements.hs) and
+[ordinary client](../examples/open-evaluation/ConstrainedElementsClient.hs).
+
+A parameter can occur as an invisible kind argument. The family can
+take extra arguments and return a type of any kind. For example,
+`Echo (x :: k) :: k` in class `KnownIndex k` requires
+`KnownIndex (Maybe a)` when applied to a runtime `x :: Maybe a`.
+The Showcase checks a `Just False`, a `Nothing`, and a proof whose index
+is left unevaluated.
+
+A quantified constraint can still leave the hidden owner ambiguous.
+For example, `forall a. Allowed a => Owner (f a) Bool` may prove
+`Owner (f Bool) Bool` directly, yet GHC cannot infer the last parameter
+in `Owner (f Bool) e` from this quantified constraint. GHC 9.14.1
+reports GHC-39999 for the analogous ordinary class method when its result
+type is unknown. Writing its result as `Bool` lets GHC use the quantified
+constraint. The domain check uses the same instance solver. A client can
+specialize the quantified constraint by constructing
+`Dict :: Dict (Owner (f Bool) Bool)`. Matching that dictionary supplies
+the evidence for the nested family application. With `Int` in place of
+`Bool`, GHC reports the missing `Allowed Int` at `Dict`.
+[GHC User’s Guide on quantified constraints](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/quantified_constraints.html#instance-lookup).
 
 A partial application in a written value signature can determine the
 whole domain. For example, `Echo :: Maybe Bool %U -> Maybe Bool` already
@@ -224,8 +251,10 @@ to write a partial application. Each marked instance needs an equation
 or default. The draft of #177 gives both a kind-indexed class and an
 associated family that omits a class parameter. It also considers
 functional dependencies and superclass equalities for recovering a missing
-parameter. The fork currently requires the parameter to occur among the
-family binders. Eisenberg's review gives an existing signature that an
+parameter. If a family does declare the determined parameter, a partial
+application must still supply it. For `type Explicit c e`, a later caller
+could otherwise apply `Explicit c` to an `e` that contradicts `c -> e`.
+Eisenberg's review gives an existing signature that an
 unconditional domain check would reject. The fork keeps the producer
 opt-in for these examples.
 [Draft #177, §3](https://github.com/ghc-proposals/ghc-proposals/blob/faf45d2290f06696627b1f5d60ce92741ae9e38b/proposals/0000-simple-constrained-type-families.rst),
@@ -352,10 +381,12 @@ An ordinary provider allows both `type S = Elem [Int]` and an equation
 `F () = Elem [Int]`. A separately compiled term can use either wrapper
 to prove equality with `Int`, even though there is no `Allowed Int`
 instance. With a marked provider, GHC rejects both right-hand sides
-before the wrappers can be exported. Switching an existing provider to marked mode
-also rechecks the wrappers. The check still rejects a right-hand side
-when the evidence is available, for example for `Elem [Bool]`. The
-current experiment checks evidence in term and constructor signatures.
+before the wrappers can be exported. Switching an existing provider to marked
+mode also rechecks the wrappers. A type synonym for `Elem [Bool]` passes.
+A type family equation with the same right-hand side reports GHC-90647.
+The same error occurs in an associated default and in an explicit associated
+equation even when the owning class has `Collects c` as a superclass.
+These equations still need a rule for checking their right-hand sides.
 
 Draft #177 §3.3 gives a forwarding equation `S a = T a` with a
 standalone kind signature `forall a -> C a => Type`. Both stock GHC

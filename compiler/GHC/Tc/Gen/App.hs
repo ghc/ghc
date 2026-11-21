@@ -614,7 +614,7 @@ form uses a lazy unpack to keep the witness in scope. The ordinary source
 operand remains in the diagnostic context.
 
 Use the same read-only preflight to defer Quick Look when it would skip
-the opening. See Note [Quick Look and implicit existential arguments].
+the opening. See Note [Quick Look and ordinary argument checking].
 -}
 
 tcOrdinaryApp' :: HsExpr GhcRn -> (HsExpr GhcRn, SrcSpan) -> HsExpr GhcTc
@@ -932,7 +932,7 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
 
 -- | Find operands that need an implicit package opening before checking a call.
 -- See Note [Implicit existential arguments].
--- See Note [Quick Look and implicit existential arguments].
+-- See Note [Quick Look and ordinary argument checking].
 tcImplicitAppArgs :: TcType -> [HsExprArg 'TcpRn]
                   -> TcM [Either (HsExprArg 'TcpRn)
                                  (HsExprLoc, Mult, LHsExpr GhcRn, Maybe (LHsExpr GhcRn -> LHsExpr GhcRn))]
@@ -1497,7 +1497,7 @@ tcRetainedGroundApp True DoQL exp_ty rn_head fun sigma args
                  if not (any (hasNativeDependentExpr . Core.Type) tys)
                  then declared_plan else
             do { let (tvs, _, tau) = tcRetainedInstTelescope residual
-               ; if null tvs && isRetainedValueType tau
+               ; if null tvs && isGroundRetainedCallType tau
                  then return (prefix, NoQL, residual, remaining, Nothing)
                  else do
                    { matched <- tcRetainedResultInst NoQL expected remaining fun residual
@@ -2290,7 +2290,7 @@ See docs/dependent-haskell/REFERENCES.md#applications-with-fixed-native-type-cho
 for the pinned source links and the limits of this adaptation.
 -}
 
--- | Use an existing monomorphic native variable without Quick Look.
+-- | Use ordinary checking for a known native value or callback.
 -- See Note [Known native variables with ImpredicativeTypes].
 tcRetainedKnownHeadQL :: Bool -> QLFlag -> [HsExprArg 'TcpRn] -> ExpRhoType
                      -> HsExpr GhcTc -> TcSigmaType -> TcM QLFlag
@@ -2299,12 +2299,57 @@ tcRetainedKnownHeadQL True DoQL [] exp_res_ty HsVar{} actual
        ; expected <- readExpType_maybe exp_res_ty
        ; expected <- mapM (liftZonkM . zonkTcType) expected
        ; let tys = actual : maybeToList expected
-             has_ql_var v = isTcTyVar v && isQLInstTyVar v
-       ; return $ if not (isSigmaTy actual || isForAllTy actual)
-                     && any (hasNativeDependentExpr . Core.Type) tys
-                     && not (any has_ql_var (tyCoVarsOfTypesList tys))
-                  then NoQL else DoQL }
+             known_value
+               = not (isSigmaTy actual || isForAllTy actual)
+                   && any (hasNativeDependentExpr . Core.Type) tys
+             known_callback
+               = isRankedRetainedCallback actual
+                   && maybe False isRetainedCallbackRho expected
+       ; if (known_value || known_callback) && all noQuickLookVars tys
+         then if known_value
+              then return NoQL
+              else do { scoped <- tcRetainedInstScope tys
+                      ; return (if scoped then NoQL else DoQL) }
+         else return DoQL }
 tcRetainedKnownHeadQL _ do_ql _ _ _ _ = return do_ql
+
+-- | Accept a complete call telescope with declared higher-rank inputs.
+-- See Note [Known native variables with ImpredicativeTypes].
+isGroundRetainedCallType :: Type -> Bool
+isGroundRetainedCallType ty
+  | FunTy flag ma mult arg res <- coreFullView ty
+  , isVisibleFunArg flag
+  = isTauTy ma && isTauTy mult
+    && (isRetainedValueType arg || isRankedRetainedCallback arg)
+    && isGroundRetainedCallType res
+  | otherwise
+  = isRetainedValueType ty
+
+isRankedRetainedCallback :: Type -> Bool
+isRankedRetainedCallback ty
+  = case tcRetainedInstTelescope ty of
+      (_ : _, _, rho) -> isRetainedCallbackRho rho
+      _              -> False
+
+isRetainedCallbackRho :: Type -> Bool
+isRetainedCallbackRho ty
+  | DepFunTy{} <- coreFullView ty = isRetainedValueType ty
+  | otherwise                    = False
+
+-- | Defer a nested call with a fixed ordinary result and a ranked retained input.
+-- See Note [Quick Look and ordinary argument checking].
+isGroundRankedRetainedCall :: Int -> Type -> Bool
+isGroundRankedRetainedCall arity ty
+  | has_ranked_input arity ty
+  , Just result <- tcRetainedOrdinaryResult arity ty
+  = supportsQuickLookType result && noQuickLookVars ty
+      && isGroundRetainedCallType ty
+  | otherwise = False
+  where
+    has_ranked_input n ty
+      | n > 0, Just (arg, res) <- splitVisibleFunTy_maybe ty
+      = isRankedRetainedCallback arg || has_ranked_input (n-1) res
+      | otherwise = False
 
 {- Note [Known native variables with ImpredicativeTypes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2327,8 +2372,18 @@ type. Return that existing type through the ordinary InferResult path. Read
 an available expected type without allocating an inference cell. Preserve
 InferResult promotion, level, runtime-representation and branch checks.
 
-All other applications retain their Quick Look guards. In particular, this
-route does not instantiate a polymorphic head or monomorphise QL variables.
+A complete call telescope can also declare a polymorphic retained parameter.
+If the head has no type variables to instantiate, use the ordinary argument
+checker for that call. It pushes the parameter's type into its operand and
+skolemises it. When that operand is a bare name with a retained telescope,
+instantiate it predicatively against the resulting retained type. Check its
+scope and keep the complete subsumption check and dictionary obligations.
+
+The call-telescope check permits a retained polytype at a declared argument.
+It still checks the result and all other domains with isRetainedValueType.
+For example, Just reflect at Maybe (forall a. Reflection a) still needs
+Quick Look to instantiate the constructor's type parameter. The native
+Quick Look guard continues to reject that instantiation.
 See docs/dependent-haskell/REFERENCES.md#qualified-retained-function-types.
 -}
 
@@ -7431,8 +7486,8 @@ isGuardedTy ty
   | Just {} <- tcSplitAppTy_maybe ty        = True
   | otherwise                               = False
 
-{- Note [Quick Look and implicit existential arguments]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Quick Look and ordinary argument checking]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In take 1 (toList (fst (partitionVec odd xs))), checking the call to
 toList opens the package at the head of its argument. Quick Look can
 prepare toList as an EValArgQL for take. Resuming that argument calls
@@ -7446,15 +7501,20 @@ and multiplicities with tcOpenImplicitArgs. Calls without an opening
 can still perform the APP-lightning-bolt step of Quick Look (Figure 5).
 See Note [Quick Look at value arguments].
 
-Do not select this fallback after splitting an expansion. The ordinary
-check would split it again and could repeat an untyped Template Haskell
-splice.
+A plain call such as print (run reflect input) can check run's higher-rank
+argument using the same ordinary path as a direct call. Defer only when its
+declared telescope supplies that argument type and its result is an ordinary
+monotype. Do not change Quick Look's native instantiation or result checks.
+
+The classifier accepts only written value arguments and parentheses.
+An expansion in the spine can already have registered an untyped Template
+Haskell finalizer. The ordinary check must not split that expansion again.
 -}
 
--- | Leave openings in plain named applications to the ordinary checker.
--- See Note [Quick Look and implicit existential arguments].
-tcQuickLookNeedsImplicitArgs :: HsExpr GhcRn -> [HsExprArg 'TcpRn] -> TcM Bool
-tcQuickLookNeedsImplicitArgs (HsVar _ lname) args
+-- | Leave checked native arguments in plain named calls to the ordinary checker.
+-- See Note [Quick Look and ordinary argument checking].
+tcQuickLookNeedsOrdinaryArgs :: HsExpr GhcRn -> [HsExprArg 'TcpRn] -> TcM Bool
+tcQuickLookNeedsOrdinaryArgs (HsVar _ lname) args
   | let name = unLocWithUserRdr lname
   , not (isDataOcc (nameOccName name))
   , any isHsValArg args, all plain args
@@ -7465,13 +7525,15 @@ tcQuickLookNeedsImplicitArgs (HsVar _ lname) args
              ; mixed <- if isEmptyNameEnv (idConcreteTvs var)
                         then tcFindMixedBarArgument sigma args
                         else return Nothing
-             ; if isJust mixed then return True else any isRight <$> tcImplicitAppArgs sigma args }
+             ; if isJust mixed || isGroundRankedRetainedCall (length (filter isHsValArg args)) sigma
+               then return True
+               else any isRight <$> tcImplicitAppArgs sigma args }
            Nothing -> return False }
   where
     plain EValArg{} = True
     plain (EWrap EPar{}) = True
     plain _ = False
-tcQuickLookNeedsImplicitArgs _ _ = return False
+tcQuickLookNeedsOrdinaryArgs _ _ = return False
 
 quickLookArg1 :: Int
               -> HsExprLoc
@@ -7492,8 +7554,8 @@ quickLookArg1 pos app_lspan rn_head larg@(L _ arg) sc_arg_ty@(Scaled _ orig_arg_
        ; fun_lspan_arg <- getFunSrcSpan rn_args
 
        -- Step 1: get the type of the head of the argument
-       ; opens_args <- tcQuickLookNeedsImplicitArgs rn_fun_arg rn_args
-       ; (fun_ue, mb_fun_ty) <- if opens_args || any isExplicitRetainedArg rn_args
+       ; ordinary_args <- tcQuickLookNeedsOrdinaryArgs rn_fun_arg rn_args
+       ; (fun_ue, mb_fun_ty) <- if ordinary_args || any isExplicitRetainedArg rn_args
                                then return (zeroUE, Nothing)
                                else tcCollectingUsage $ tcInferAppHead_maybe rn_fun_arg
          -- tcCollectingUsage: the use of an Id at the head generates usage-info

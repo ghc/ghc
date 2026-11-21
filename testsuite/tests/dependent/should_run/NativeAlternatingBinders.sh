@@ -344,10 +344,8 @@ instance Display Bool
 instance Display Char
 
 run :: (forall a. Display a => Reflect a) -> Maybe Bool -> Maybe Char -> (Bool, Bool)
-run worker b c = (see (worker @Bool b), see (worker @Char c))
-  where
-    see :: x :~: x -> Bool
-    see Refl = True
+run worker b c = (case worker @Bool b of Refl -> True,
+                  case worker @Char c of Refl -> True)
 
 ignore :: (forall a. Display a => Reflect a) -> Bool
 ignore _ = True
@@ -397,14 +395,65 @@ runOpaque :: (forall a. AmbiguousReflect a) -> Bool
 runOpaque _ = True
 bad :: Bool
 bad = runOpaque ambiguous
+#elif FORM == 5
+class Unrelated a
+runUnrelated :: (forall a. Unrelated a => Reflect a) -> Bool
+runUnrelated _ = True
+bad :: Bool
+bad = runUnrelated reflect
+#elif FORM == 6
+type Callback = forall a. Show a => Reflect a
+bad :: Maybe Callback
+bad = Just reflect
 #endif
 HS
+
+cat >RankDomainScope.hs <<'HS'
+{-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs #-}
+{-# LANGUAGE PolyKinds, RankNTypes, TypeApplications, TypeOperators #-}
+module RankDomainScope where
+import Data.Type.Equality ((:~:)(Refl))
+import RankDomainProvider (Reflect, reflect)
+
+run :: (forall a. Show a => Reflect a) ->
+       foreach (index :: Maybe Bool) -> index :~: index
+run worker index = worker @Bool index
+
+#ifdef ESCAPE
+escape = \index -> run reflect index
+#else
+within :: Maybe Bool -> Bool
+within index = case run reflect index of Refl -> True
+#endif
+HS
+
+cat >OrdinaryImpred.hs <<'HS'
+module Main where
+ids :: [forall a. a -> a]
+ids = [id]
+
+observe :: [forall a. a -> a] -> (Char, Bool)
+observe [] = ('?', False)
+observe (f : _) = (f 'x', f True)
+
+main :: IO ()
+main = print (observe (id : ids))
+HS
+
+reject_rank_domain() {
+    local diagnostic=$1
+    shift
+    if "${ghc[@]}" "$@" >reject.log 2>&1 || ! grep -Fq "$diagnostic" reject.log; then
+        cat reject.log >&2
+        exit 1
+    fi
+}
 
 # Exercise shallow subsumption against an interface in an ordinary client.
 for opt in O0 O2; do
     mkdir -p "$out/domain-$opt"/{provider,client}
     cp RankDomainProvider.hs "$out/domain-$opt/provider/"
-    cp {RankDomainClient,RankDomainReject}.hs "$out/domain-$opt/client/"
+    cp {RankDomainClient,RankDomainReject,RankDomainScope,OrdinaryImpred}.hs "$out/domain-$opt/client/"
     (
         cd "$out/domain-$opt/provider"
         flags=("-$opt")
@@ -414,19 +463,24 @@ for opt in O0 O2; do
         "${ghc[@]}" "${flags[@]}" -c RankDomainProvider.hs
         cp RankDomainProvider.hi ../client/
         cd ../client
-        "${ghc[@]}" "-$opt" -c RankDomainClient.hs
-        "${ghc[@]}" "-$opt" RankDomainClient.o ../provider/RankDomainProvider.o -o run
-        ./run >runtime
-        printf '%s\n' '((True,True),(True,True),True,True)' 'callback bottom: forced' | cmp - runtime
+        for mode in NoImpredicativeTypes ImpredicativeTypes; do
+            "${ghc[@]}" "-$opt" "-X$mode" -fforce-recomp -c RankDomainClient.hs
+            "${ghc[@]}" "-$opt" RankDomainClient.o ../provider/RankDomainProvider.o -o run
+            ./run >runtime
+            printf '%s\n' '((True,True),(True,True),True,True)' 'callback bottom: forced' | cmp - runtime
 
-        form=0
-        for diagnostic in 'with ‘Bool’' 'Proxy x' 'with ‘outer’' 'non-injective type family'; do
-            form=$((form + 1))
-            if "${ghc[@]}" "-$opt" "-DFORM=$form" -c RankDomainReject.hs >reject.log 2>&1 ||
-               ! grep -Fq "$diagnostic" reject.log; then
-                cat reject.log >&2
-                exit 1
-            fi
+            form=0
+            for diagnostic in 'with ‘Bool’' 'Proxy x' 'with ‘outer’' 'non-injective type family' 'Could not deduce ‘Show a’'; do
+                form=$((form + 1))
+                reject_rank_domain "$diagnostic" "-$opt" "-X$mode" "-DFORM=$form" -c RankDomainReject.hs
+            done
         done
+        reject_rank_domain 'Quick Look inference does not support this retained type yet:' \
+            "-$opt" -XImpredicativeTypes -DFORM=6 -c RankDomainReject.hs
+        "${ghc[@]}" "-$opt" -XImpredicativeTypes -c RankDomainScope.hs
+        reject_rank_domain 'This inferred retained type requires an explicit signature:' \
+            "-$opt" -XImpredicativeTypes -DESCAPE -c RankDomainScope.hs
+        "${ghc[@]}" "-$opt" -XImpredicativeTypes OrdinaryImpred.hs -o ordinary
+        printf '%s\n' "('x',True)" | cmp - <(./ordinary)
     )
 done
