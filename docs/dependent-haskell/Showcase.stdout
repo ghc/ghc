@@ -168,6 +168,7 @@ check a runtime cut and prove the original contents: [Just (1,[True],[False],[Tr
 split two independent vectors at one checked cut: (Just (([True],[False]),([False],[True])),Just [True],Nothing)
 recover the checked predecessor of a finite position: ((Nothing,Just 1),(True,False,True,True))
 pass zero and a written successor to a retained function: (Just 1,True)
+open finite zero views with INLINE and INLINABLE: (True,True)
 take and drop at the first runtime length: ([True],[False,False])
 prove the runtime vector is VNil in the empty branch: (True,False)
 check a runtime cut against a vector length: (Just (1,[True],[False]),Nothing)

@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, ScopedTypeVariables, TypeApplications #-}
-module FinitePositionClient (lookupVecViaView, observeFinitePosition, observeConstructedViews) where
+module FinitePositionClient (lookupVecViaView, observeFinitePosition, observeConstructedViews, observeZeroViews) where
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Data.IORef (newIORef, readIORef)
 import Data.Type.Equality ((:~:)(Refl))
@@ -61,3 +61,11 @@ observeConstructedViews = do
             _ -> (False, Nothing)
     pure (snd (firstAndSucc positionFromIO),
           fst (firstAndSucc (error "forced predecessor" :: Fin ('S 'Z))))
+
+-- | Inspect the zero views exported with both unfolding pragmas.
+observeZeroViews :: (Bool, Bool)
+observeZeroViews = (isZeroView (zeroView @'Z), isZeroView (zeroViewInlinable @'Z))
+  where
+    isZeroView :: FinView i -> Bool
+    isZeroView AtZero = True
+    isZeroView AtSucc{} = False

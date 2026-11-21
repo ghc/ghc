@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables, StandaloneKindSignatures, TypeApplications, TypeOperators #-}
-module FinitePosition (FinView(..), viewFin, constructedViews) where
+module FinitePosition (FinView(..), viewFin, constructedViews, zeroView, zeroViewInlinable) where
 
 import Data.Kind (Type)
 import Data.Type.Equality ((:~:)(Refl))
@@ -28,3 +28,18 @@ viewFin i = case i of
 {-# INLINE constructedViews #-}
 constructedViews :: forall n. foreach (p :: Fin n) -> (FinView ('FZ @n), FinView ('FS p))
 constructedViews p = (viewFin @('S n) FZ, viewFin @('S n) (FS p))
+
+-- | Keep a retained call in both exported templates.
+{-# NOINLINE inspectPosition #-}
+inspectPosition :: forall n. foreach (i :: Fin n) -> FinView i
+inspectPosition i = viewFin i
+
+-- | Expose the retained call in an ordinary INLINE template.
+{-# INLINE zeroView #-}
+zeroView :: forall n. FinView ('FZ @n)
+zeroView = inspectPosition @('S n) FZ
+
+-- | Keep size guidance for the same retained call.
+{-# INLINABLE zeroViewInlinable #-}
+zeroViewInlinable :: forall n. FinView ('FZ @n)
+zeroViewInlinable = inspectPosition @('S n) FZ

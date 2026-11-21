@@ -6655,14 +6655,20 @@ type of `Refl`. The ordinary equality solver still checks both endpoints.
 [Agda stdlib vector split](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html#splitAt)
 and [GHC branch checking](../../compiler/GHC/Tc/Gen/Match.hs).
 
-The ordinary wrapper example uses GHC's existing `INLINE` and
-`INLINABLE` pragmas. GHC builds the stable unfolding first. The fork
-can export it to an ordinary client when the retained call has
-simplified away. The `-fpedantic-bottoms` check keeps partial
-application demand observable in the regression.
-[GHC user guide on INLINE and INLINABLE](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/pragmas.html#inline-and-noinline-pragmas),
-[GHC optimization flags](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/using-optimisation.html#ghc-flag-fpedantic-bottoms)
-and [GHC unfolding construction](../../compiler/GHC/HsToCore/Binds.hs).
+The ordinary wrappers use GHC's existing `INLINE` and `INLINABLE`
+pragmas. `INLINE` uses the source saturation arity. `INLINABLE`
+preserves size guidance and supports cross-module specialization.
+GHC's worker/wrapper transfers the stable template to the worker.
+The fork carries the retained tag on both entries, because the wrapper
+can introduce the marked worker. The interface reader makes the tag
+available before it reconstructs the body. The importer can select its
+pipeline without loading a dependency used only by an inactive template.
+The `-fpedantic-bottoms` checks observe partial-application demand and
+the demand of the specialized worker.
+[GHC user guide on INLINE and INLINABLE](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/pragmas.html#inlinable-pragma),
+[GHC optimization flags](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/using_optimisation.html#ghc-flag--fpedantic-bottoms),
+[GHC worker/wrapper](../../compiler/GHC/Core/Opt/WorkWrap.hs),
+and [GHC interface loading](../../compiler/GHC/IfaceToCore.hs).
 
 ### Recover the predecessor of a bounded position
 

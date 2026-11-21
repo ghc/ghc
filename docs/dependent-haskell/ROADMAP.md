@@ -38,7 +38,8 @@ its original input. Inspecting the first proof leaves the second vector
 unevaluated. Exchanging the proofs reports the two written `SplitAtValue`
 types at the exchanged arguments.
 
-The 378-line Showcase includes finite-list proofs for the installed
+The Showcase includes ordinary clients of the `INLINE` and `INLINABLE`
+finite zero views. It also includes finite-list proofs for the installed
 Prelude definitions of `map`, `(.)`, `filter`, and `(++)`. The source-hidden
 split regression passes at `-O0`, `-O1`, and `-O2`. Removing the induction
 premise fails at the final `Refl`. Both stages of a normal Hadrian build
@@ -319,12 +320,11 @@ and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vecto
    expose a solver rewrite cycle.
    [Checked input inference](roadmap/R03-dependent-products.md)
    and [independent inputs](../../testsuite/tests/dependent/should_fail/NativeIrredIndexEvidence.hs).
-2. **R05.** Support explicit `INLINE` unfoldings when an ordinary
-   signature still has retained Core after simplification. Wrappers that
-   simplify to ordinary Core can already be exported. Select the required optimizer path
-   when another module imports the unfolding. Check the demand of a
-   partial application and report unsupported cases at the source.
-   [Written unfolding checks](../../compiler/GHC/HsToCore/Binds.hs).
+2. **R05.** Extend checked retained templates to local bindings.
+   Top-level `INLINE` and `INLINABLE` templates carry a source tag
+   that selects the retained optimizer. Local residual templates
+   still report GHC-92256.
+   [Retained unfolding checks](roadmap/R05-dependent-core.md#export-retained-unfoldings-at-ordinary-signatures).
 
 ### Other open work
 

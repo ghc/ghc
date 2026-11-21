@@ -1559,6 +1559,8 @@ sourceAddition = do
     observe "recover the checked predecessor of a finite position" finitePosition
     observe "pass zero and a written successor to a retained function"
         =<< FinitePositionClient.observeConstructedViews
+    observe "open finite zero views with INLINE and INLINABLE"
+        FinitePositionClient.observeZeroViews
     observe "take and drop at the first runtime length" (toList prefix, toList suffix)
     checkedInput <- newIORef [True, False] >>= readIORef
     let matchesEmpty input = case ListVectorClient.fromList input of
