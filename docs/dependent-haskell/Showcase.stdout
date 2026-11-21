@@ -9,6 +9,7 @@ use an equality between two constructor fields: 47
 choose a type between two constructor fields: ((53,True),(59,'q'))
 choose the types of two successive fields: (61,False,'z')
 compare a payload using a dictionary supplied between fields: ((67,True),(71,False))
+use a leading context in a field pattern and a later equality in the branch: (1,73)
 duplicate the unrestricted field of a quoted constructor: (17,17)
 recover consecutive GADT constraints: (False,"True")
 form an associated family type from its class evidence: (Refl,Refl,True)
