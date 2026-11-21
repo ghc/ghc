@@ -1435,7 +1435,12 @@ data ClosedConstructor
 -- | Field codecs use static indices or recover one index from a runtime witness.
 data ClosedConstructorFields
   = ClosedStaticFields ClosedConstructorPlan [ClosedCallShape]
-  | ClosedWitnessedFields ClosedOpenShape ClosedOpenShape [ClosedCallShape]
+  | ClosedWitnessedFields ClosedOpenShape [ClosedWitnessField]
+
+-- | A field after the witness can refer to its index or have a closed type.
+data ClosedWitnessField
+  = AtWitnessIndex ClosedOpenShape
+  | AtGroundType ClosedCallShape
 
 -- | Source type arguments and nominal paths for the Case-bound existentials.
 data ClosedConstructorPlan = ClosedConstructorPlan [Type] [ClosedIndex]
@@ -1475,8 +1480,8 @@ tcClosedCallValueShape owner kind = do
             (tc, [con | ClosedConstructor _ con _ <- alternatives]) :
             concatMap witness_dependencies alternatives
           dependencies _ = []
-          witness_dependencies (ClosedConstructor _ _ (ClosedWitnessedFields witness payload _)) =
-            open_dependencies witness ++ open_dependencies payload
+          witness_dependencies (ClosedConstructor _ _ (ClosedWitnessedFields witness fields)) =
+            open_dependencies witness ++ concatMap open_dependencies [s | AtWitnessIndex s <- fields]
           witness_dependencies _ = []
           open_dependencies (ClosedOpenShape _ tc _ alternatives) =
             (tc, [con | ClosedOpenAlternative con _ _ <- alternatives]) :
@@ -1523,7 +1528,7 @@ reportClosedShapeError owner err = case err of
       "Cannot recover the package index from its first field. Each witness constructor must have no fields or carry only its predecessor witness.")
   UnsupportedClosedPayload ->
     failWithTc (TcRnClosedTypeEval owner
-      "Cannot reify the second field of the package at the index given by its first field.")
+      "Cannot reify a constructor field at the index given by its first field.")
   NonDecreasingClosedShape previous current -> do
       flags <- getDynFlags
       ctx <- getNamePprCtx
@@ -1586,10 +1591,12 @@ closedCallValueShape rdr_env kind = do
               alternatives <- forM (zip possible plans) $ \(con, fields) -> do
                 codecs <- case fields of
                   Left (static, ground) -> ClosedStaticFields static <$> traverse (shape next) ground
-                  Right (index, witness, payload, ground) ->
+                  Right (index, witness, rest) -> do
+                    let field ty
+                          | closedGroundField ty = AtGroundType <$> shape next ty
+                          | otherwise = AtWitnessIndex <$> open_shape False next index ty
                     ClosedWitnessedFields <$> open_shape True next index witness
-                                         <*> open_shape False next index payload
-                                         <*> traverse (shape next) ground
+                                         <*> traverse field rest
                 return (ClosedConstructor (Just (closedConstructorTag con)) con codecs)
               State.modify' ((here, ClosedData tc args alternatives) :)
               return (ClosedRef here)
@@ -1654,7 +1661,7 @@ closedCallValueShape rdr_env kind = do
       | otherwise = False
 
 -- | Check the field representation before planning a runtime witness.
-closedWitnessedFields :: Kind -> [Type] -> DataCon -> Maybe (TyVar, Type, Type, [Type])
+closedWitnessedFields :: Kind -> [Type] -> DataCon -> Maybe (TyVar, Type, [Type])
 closedWitnessedFields here args con = do
   (universals, [index], [], [], fields, result) <- pure (dataConFullSig con)
   guard (isTyVar index && closedGroundField (tyVarKind index))
@@ -1664,11 +1671,12 @@ closedWitnessedFields here args con = do
   let instantiate = substTyWith universals args
       rep = map (instantiate . scaledThing) (dataConRepArgTys con)
       source = map (instantiate . scaledThing) fields
-  witness : payload : ground <- pure source
+  witness : rest <- pure source
   guard (instantiate result `tcEqType` here &&
-         equalLength rep source && and (zipWith tcEqType rep source) &&
-         all closedGroundField ground)
-  return (index, witness, payload, ground)
+         equalLength rep source && and (zipWith tcEqType rep source))
+  -- A lone field must itself identify the index.
+  guard (not (null rest) || isJust (closedOpenAlternatives index witness))
+  return (index, witness, rest)
 
 -- | Check that worker values have the source fields' boxed representation.
 closedOpenRepresentation :: DataCon -> Bool
@@ -2117,21 +2125,26 @@ closedCallRenderer name (ClosedCodec shape nodes) = do
                                 return checked
                 renderers <- mapM (renderFields refs quote) codecs
                 return (foldr (.) id (zipWith ($) renderers values))
-              ClosedWitnessedFields witness@(ClosedOpenShape template _ _ _) payload ground
+              ClosedWitnessedFields witness@(ClosedOpenShape template _ _ _) codecs
                 | [index] <- existentials, isTyVar index
                 , tyVarKind index `tcEqType` tyVarKind template
                 , let idx = mkTyVarTy index
-                , witness_value : payload_value : values <- binders
+                , witness_value : values <- binders
                 , varType witness_value `tcEqType` closedOpenType witness idx
-                , varType payload_value `tcEqType` closedOpenType payload idx
-                , equalLength ground values
-                , and (zipWith (tcEqType . closedShapeKind) ground (map varType values)) -> do
+                , equalLength codecs values -> do
+                    let render_field (AtWitnessIndex field) value
+                          | varType value `tcEqType` closedOpenType field idx = do
+                              render <- renderOpen refs quote field
+                              return (render idx (Core.Var value))
+                        render_field (AtGroundType field) value
+                          | varType value `tcEqType` closedShapeKind field = do
+                              render <- renderFields refs quote field
+                              return (render (Core.Var value))
+                        render_field _ _ = unexpected_rep
                     render_witness <- renderOpen refs quote witness
-                    render_payload <- renderOpen refs quote payload
-                    renderers <- mapM (renderFields refs quote) ground
+                    renderers <- zipWithM render_field codecs values
                     return (render_witness idx (Core.Var witness_value) .
-                            render_payload idx (Core.Var payload_value) .
-                            foldr (.) id (zipWith ($) renderers (map Core.Var values)))
+                            foldr (.) id renderers)
                 | otherwise -> unexpected_rep
             let alt suffix =
                   let body = render_body suffix
@@ -2216,15 +2229,18 @@ decodeClosedCallResult (ClosedCodec shape nodes) rendered = case shape of
         let kind = closedShapeKind current
         case fields of
           ClosedStaticFields (ClosedConstructorPlan source_args _) codecs -> do
-            (values, rest) <- decodeArguments codecs encoded
+            (values, rest) <- decodeArguments decodeFields codecs encoded
             let value = mkTyConApp (promoteDataCon con) (source_args ++ values)
             guard (typeKind value `tcEqType` kind)
             return (value, rest)
-          ClosedWitnessedFields witness payload ground -> do
+          ClosedWitnessedFields witness codecs -> do
             (index, witness_value, remaining) <- decodeOpen witness Nothing encoded
-            (_, payload_value, remaining') <- decodeOpen payload (Just index) remaining
-            (values, rest) <- decodeArguments ground remaining'
-            value <- packConstructor kind kinds con [index] (witness_value : payload_value : values)
+            let field (AtGroundType shape) input = decodeFields shape input
+                field (AtWitnessIndex shape) input = do
+                  (_, value, rest) <- decodeOpen shape (Just index) input
+                  return (value, rest)
+            (values, rest) <- decodeArguments field codecs remaining
+            value <- packConstructor kind kinds con [index] (witness_value : values)
             return (value, rest)
 
     -- The payload follows the checked witness index. Its wire tags may
@@ -2289,10 +2305,10 @@ decodeClosedCallResult (ClosedCodec shape nodes) rendered = case shape of
       [(constructor, rest) | constructor@(ClosedConstructor (Just tag) _ _) <- alternatives
                            , Just rest <- [stripPrefix tag input]]
 
-    decodeArguments [] input = Just ([], input)
-    decodeArguments (field : fields) input = do
-      (value, rest) <- decodeFields field input
-      (values, residual) <- decodeArguments fields rest
+    decodeArguments _ [] input = Just ([], input)
+    decodeArguments decode (field : fields) input = do
+      (value, rest) <- decode field input
+      (values, residual) <- decodeArguments decode fields rest
       return (value : values, residual)
 
     decodeToken scalar is_list input = do
@@ -2322,10 +2338,11 @@ decodeClosedCallResult (ClosedCodec shape nodes) rendered = case shape of
 
 {- Note [Closed results with an existential witness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A constructor can bind one erased index. Its first field witnesses the
-index and its second field carries a payload at that index. Trailing
-fields use the finite graph of ground codecs. A trailing field can
-refer to the same datatype, whose next constructor selects its own index.
+A constructor can bind one erased index. Its first field witnesses that
+index. Check each remaining field in source order. A closed field uses
+its ordinary codec. For an indexed field, plan a codec at the witness
+index. This permits independent payloads such as values and a Boolean
+mask at one length. A recursive field can choose its own index.
 
 Preflight checks the independent recursive schema of each indexed field.
 A base constructor fixes its index to a nullary promoted constructor.
@@ -2334,11 +2351,11 @@ application of its case-bound predecessor. It has one recursive field
 at that predecessor. Other fields use the ordinary ground codec.
 
 The enclosing Core case binds the existential with
-dataConRepInstPat. Check its kind and both fields using that binder.
-The first two fields have separate polymorphic Core workers. Each
+dataConRepInstPat. Check its kind and every indexed field using that binder.
+Each indexed field has a polymorphic Core worker. Each
 recursive case checks its actual nominal equality against the planned
 index pattern. The case evidence supplies no data to the wire. The host
-decoder recovers each index from its witness, checks the payload at that
+decoder recovers each index from its witness, checks all indexed fields at that
 index, and builds the checked promoted constructor. The preflight plan
 determines the constructor tags and visibility checks.
 -}
