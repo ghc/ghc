@@ -23,6 +23,9 @@ The local retention timer checks allocated bytes under the main `_build`
 every 15 minutes. At 200 GB (200,000,000,000 bytes), it collects eligible
 products under `_build/verification`. It recognizes completed native API test
 drivers and uses the existing expiry rule for old native test programs.
+It also removes a testsuite's `tmp/ghctest-*` directory when the test names
+and timestamps match a successful summary and JUnit report. It keeps both
+reports and checks for live, queued and linked users before removal.
 For other products, keep the completion log outside `_build`. After the last
 consumer finishes, record the source revision and build command.
 
