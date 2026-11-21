@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP #-}
 module NativeOpenListFoldrProducer
     ( direct, local, wrongHead, wrongTail, wrongSeed, wrongCallback, wrongOwner
-    , forceStep, forceSeed, forceResult ) where
+    , forceStep, forceSeed, forceResult, foldBits, foldChars, forceBitStep, forceBitSeed ) where
 
 {-# NOINLINE [2] direct #-}
 direct :: (a -> b -> b) -> b -> [a] -> b
@@ -14,6 +14,27 @@ local k z = go
   where
     go [] = z
     go (x : xs) = k x (go xs)
+
+foldBits :: (Bool -> Bool -> Bool) -> Bool -> [Bool] -> Bool
+foldBits _ seed [] = seed
+foldBits step seed (x : xs) = step x (foldBits step seed xs)
+
+{-# INLINE [0] foldChars #-}
+foldChars :: (Char -> Maybe Bool -> Maybe Bool) -> Maybe Bool -> [Char] -> Maybe Bool
+foldChars step seed = go
+  where
+    go [] = seed
+    go (x : xs) = step x (go xs)
+
+forceBitStep :: (Bool -> Bool -> Bool) -> Bool -> [Bool] -> Bool
+forceBitStep step seed xs = step `seq` case xs of
+    [] -> seed
+    x : rest -> step x (forceBitStep step seed rest)
+
+forceBitSeed :: (Bool -> Bool -> Bool) -> Bool -> [Bool] -> Bool
+forceBitSeed step seed xs = seed `seq` case xs of
+    [] -> seed
+    x : rest -> step x (forceBitSeed step seed rest)
 
 wrongHead :: (a -> b -> b) -> b -> [a] -> b
 wrongHead _ z [] = z

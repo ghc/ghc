@@ -9,7 +9,7 @@ src=$PWD
 out=$(mktemp -d)
 trap 'rm -rf -- "$out"' EXIT
 cd "$out"
-cp "$src"/{NativeOpenListFoldrProducer,ListFoldrSource,ListFoldrProof,PreludeFoldrProof}.hs .
+cp "$src"/{NativeOpenListFoldrProducer,NativeOpenListFoldrConcrete,ListFoldrSource,ListFoldrProof,PreludeFoldrProof}.hs .
 cp "$src"/{PreludeMapLengthSize,PreludeMapLengthSource,PreludeMapLengthProof,PreludeAppendLengthSource}.hs .
 cat >UserFoldSource.hs <<'HS'
 {-# LANGUAGE ExperimentalDependentTypes, Modifiers, StandaloneKindSignatures #-}
@@ -47,21 +47,24 @@ local :: forall a b (k :: a %U -> b %U -> b) (z :: b) (x :: a) (xs :: [a]).
       -> FoldLocal k z (x ': xs) :~: k x (FoldLocal k z xs)
 local _ _ _ _ = Refl
 HS
-"${ghc[@]}" -ddump-simpl -ddump-to-file '*UserFoldProof.hs' '*ListFoldrProof.hs' '*PreludeFoldrProof.hs' >lazy.log 2>&1 <<'GHCi' || { cat lazy.log >&2; exit 1; }
-:module + PreludeFoldrProof NativeOpenListFoldrProducer
+"${ghc[@]}" -ddump-simpl -ddump-to-file '*UserFoldProof.hs' '*ListFoldrProof.hs' '*PreludeFoldrProof.hs' \
+    '*NativeOpenListFoldrConcrete.hs' >lazy.log 2>&1 <<'GHCi' || { cat lazy.log >&2; exit 1; }
+:module + PreludeFoldrProof NativeOpenListFoldrProducer NativeOpenListFoldrConcrete
 :{
 print ( PreludeFoldrProof.example
       , NativeOpenListFoldrProducer.direct undefined 's' ([] :: [Char])
       , NativeOpenListFoldrProducer.local (\x _ -> x) undefined ('h' : undefined) )
 :}
+putStrLn showConcreteFold
 GHCi
-if ! grep -Fq "(Refl,'s','h')" lazy.log || grep -Fq 'error:' lazy.log; then
+if ! grep -Fq "(Refl,'s','h')" lazy.log ||
+   ! grep -Fq '(Refl,True,Just True)' lazy.log || grep -Fq 'error:' lazy.log; then
     cat lazy.log >&2
     exit 1
 fi
 producer=NativeOpenListFoldrProducer
 grep -Fq "break<$producer," "$producer.dump-simpl"
-for term in direct local; do
+for term in direct local foldBits foldChars; do
     grep -Fq "FinalCoreSourceTable $producer.T:$term" "$producer.dump-simpl"
 done
 for term in forceStep forceSeed; do
@@ -70,6 +73,14 @@ for term in forceStep forceSeed; do
     if ! grep -Fq 'StrictFold.hs:7:' strict.log ||
        ! grep -Fq '[GHC-70565]' strict.log ||
        ! grep -Fq "F.$term k z xs" strict.log; then
+        cat strict.log >&2
+        exit 1
+    fi
+done
+for mode in FORCE_BIT_STEP FORCE_BIT_SEED; do
+    "${ghc[@]}" "-D$mode" '*NativeOpenListFoldrConcrete.hs' </dev/null >strict.log 2>&1 || true
+    if ! grep -Eq '^NativeOpenListFoldrConcrete.hs:[0-9]+:[0-9]+: error: \[GHC-70565\]' strict.log ||
+       ! grep -Fq 'type synonym declaration for ‘FoldBits’' strict.log; then
         cat strict.log >&2
         exit 1
     fi

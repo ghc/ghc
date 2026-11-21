@@ -1712,6 +1712,19 @@ breakpoints. The regression proves the source equations, checks that
 the strict step and seed variants still fail, and emits no object file.
 [GHCi regression](../../../testsuite/tests/dependent/should_run/NativeOpenListFoldrGhci.sh).
 
+### Fold with fixed element and seed types
+
+An ordinary `foldBits` takes a Boolean step and seed over `[Bool]`.
+The same equations hold for a local worker that folds `[Char]` with a
+`Maybe Bool` seed. The element and seed types are closed. The first
+callback argument must match the list element nominally. The second
+callback argument and both results must match the seed type nominally.
+A callback on a newtype of `Bool` fails at its use. The strict-step
+and strict-seed variants still fail at their aliases. A compiler
+upgrade rechecks an older interface with an eligible signature once.
+[Concrete consumer](../../../testsuite/tests/dependent/should_run/NativeOpenListFoldrConcrete.hs)
+and [native controls](../../../testsuite/tests/dependent/should_run/NativeOpenListFoldr.sh).
+
 ### Select the list instance of `Prelude.foldr`
 
 The receiver kind identifies the list instance of the ordinary selector.
