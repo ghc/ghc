@@ -28,6 +28,22 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `706677658b`, source-loaded GHCi checks the guarded list proof with
+bytecode for the producer. The debugger's breakpoint ticks remain in
+executable Core. Adding strictness to the skipped head prevents the
+client from using the equation. A separate regression checks that a
+strict local tuple pattern opens an erased package with the same demand
+as an ordinary tuple pattern. An outer equality `ma ~ U` also permits
+a fresh ordinary lambda inside a retained variable equation.
+
+The Stage 2 compiler matched all 390 Showcase lines at stripped `-O0`,
+default `-O1` and `-O2`, and in GHCi. All 35 focused tests passed.
+The Core API run matched its 37-line golden. The bytecode test also
+checked that the ordinary producer had no object file.
+[Bytecode regression](../../testsuite/tests/dependent/should_run/NativeOpenConcreteGuardedListGhci.sh),
+[local packages](roadmap/R22-existential-quantification.md#a-nonrecursive-local-package-pattern),
+and [matchability regression](../../testsuite/tests/dependent/should_run/NativeRetainedMatchability.sh).
+
 At `1c7f70b3ef`, the list index accepts `Fin (sourceLength xs)`.
 An unsigned local caller can pass its list to both `mkFinGeneric` and
 `indexGeneric`. The corresponding inputs on the preceding compiler needed
