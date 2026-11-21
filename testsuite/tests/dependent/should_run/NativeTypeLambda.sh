@@ -11,10 +11,18 @@ g=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint
 
 cd "$out/provider"
 cp "$src"/{TypeLambda,NativeTypeLambdaScope}.hs .
-"${g[@]}" -fomit-interface-pragmas -c TypeLambda.hs
+"${g[@]}" -Werror=unused-type-patterns -fomit-interface-pragmas -c TypeLambda.hs
 "${g[@]}" --show-iface TypeLambda.hi >provider.iface
 if sed -n '/^exports:/,/^defaults:/p' provider.iface | grep -F '$lambda:'; then exit 1; fi
 "${g[@]}" -fomit-interface-pragmas -c NativeTypeLambdaScope.hs
+sed 's/, UndecidableInstances//; s/module TypeLambda/module Termination/' TypeLambda.hs >Termination.hs
+if "${g[@]}" -c Termination.hs >termination.log 2>&1 ||
+   ! grep -Fq 'error: [GHC-22979]' termination.log ||
+   ! grep -Fq 'An argument to a type family contains a type lambda.' termination.log ||
+   grep -Fq '$lambda:' termination.log; then
+    cat termination.log >&2
+    exit 1
+fi
 cp TypeLambda.hi NativeTypeLambdaScope.hi "$out/client/"
 cd "$out/client"
 cat >Ordinary.hs <<'HS'
@@ -23,7 +31,7 @@ module Ordinary where
 import Data.Kind (Type)
 import Data.Type.Equality ((:~:)(Refl))
 import NativeTypeLambdaScope
-import TypeLambda (L, Captured, Shadowed, WithError, Mixed, Held, CaseShadow, Rebuild,
+import TypeLambda (L, Captured, Shadowed, WithError, Prefixes, Mixed, Held, CaseShadow, Rebuild,
                    IndexedTag(..), IndexedCase, IndexedCaseInferred)
 import Data.Proxy (Proxy)
 result :: L :~: '[Maybe Int, Either String Int, IO Int]
@@ -34,6 +42,10 @@ shadowed :: Shadowed Bool 'True :~: '[Either Char (Proxy 'True)]
 shadowed = Refl
 partial :: WithError Char :~: Either String Char
 partial = Refl
+capturedRow :: Prefixes ('Just Ordering) '[Char, Bool] :~: '[Either Ordering Char, Either Ordering Bool]
+capturedRow = Refl
+independentRow :: Prefixes 'Nothing '[Char, Bool] :~: '[Maybe Char, Maybe Bool]
+independentRow = Refl
 nested :: Levels Bool 'True :~:
     ((Proxy 'True, Bool), (Proxy 'True, Int, Ordering))
 nested = Refl
@@ -77,6 +89,49 @@ ordinaryLambda :: a -> b -> a
 ordinaryLambda x = (\_ -> x)
 HS
 "${g[@]}" -c Ordinary.hs
+
+cat >RowsMain.hs <<'HS'
+{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, TypeOperators #-}
+module Main where
+import Data.Type.Equality ((:~:)(Refl))
+import Ordinary (capturedRow, independentRow)
+import TypeLambda (Prefixes)
+
+data Fields xs where
+  End :: Fields '[]
+  Field :: a -> Fields xs -> Fields (a ': xs)
+
+withError :: Fields (Prefixes ('Just Ordering) '[Char, Bool])
+withError = case capturedRow of Refl -> Field (Left GT) (Field (Right True) End)
+
+withoutError :: Fields (Prefixes 'Nothing '[Char, Bool])
+withoutError = case independentRow of Refl -> Field (Just 'a') (Field (Just True) End)
+
+main :: IO ()
+main = case (capturedRow, independentRow, withError, withoutError) of
+  (Refl, Refl, Field a (Field b End), Field c (Field d End)) ->
+    print (a, b, c, d)
+HS
+"${g[@]}" -c RowsMain.hs
+"${g[@]}" RowsMain.o Ordinary.o -o rows
+test "$(./rows)" = "(Left GT,Right True,Just 'a',Just True)"
+
+cat >RowScope.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeFamilies #-}
+module RowScope where
+import Data.Kind (Type)
+type Scope :: Maybe Type -> Type
+type family Scope tag where
+  Scope ('Just sibling) = (\argument -> Either sibling argument) Int
+  Scope 'Nothing = (\argument -> Either sibling argument) Char
+HS
+if "${g[@]}" -c RowScope.hs >row-scope.log 2>&1 ||
+   ! grep -Fq 'RowScope.hs:7:41: error: [GHC-76037]' row-scope.log ||
+   ! grep -Fq 'Not in scope: type variable' row-scope.log ||
+   grep -Fq '$lambda:' row-scope.log; then
+    cat row-scope.log >&2
+    exit 1
+fi
 
 cat >RigidCase.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}

@@ -1530,6 +1530,7 @@ main = do
         (NestedFunctionClient.binaryChoice, NestedFunctionClient.conjunction False (error "unused operand"))
     observe "apply a type lambda to Maybe, Either String and IO" TypeLambda.roadmap
     observe "partially apply a two-argument type lambda" TypeLambda.partial
+    observe "map a callback that captures a closed family pattern" TypeLambda.prefixes
     observe "map a type lambda with a constructor case" TypeLambda.mixed
     observe "read fields from two indexed type case branches" TypeLambda.indexedFields
     observe "retain the kind of a matched Nothing"

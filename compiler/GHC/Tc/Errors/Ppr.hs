@@ -139,7 +139,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Foldable ( fold )
 import Data.Function (on)
-import Data.List ( find, groupBy, sortBy, sortOn, tails, partition, unfoldr )
+import Data.List ( find, groupBy, isSuffixOf, sortBy, sortOn, tails, partition, unfoldr )
 import Data.Ord ( comparing )
 import Data.Bifunctor
 
@@ -1150,7 +1150,7 @@ instance Diagnostic TcRnMessage where
            text "A type case needs a supported position in a top-level type synonym, a top-level value signature, or a constructor field."
     TcRnTypeLambdaContext
       -> mkSimpleDecorated $
-           text "This type lambda needs the right-hand side of a top-level synonym with ordinary parameters."
+           text "A type lambda needs a supported position in the right-hand side of a top-level synonym with ordinary parameters or a closed type family equation."
 
     TcRnInvalidVisibleKindArgument arg ty
       -> mkSimpleDecorated $
@@ -8326,8 +8326,12 @@ pprPatersonCondFailure PCF_Size InTyFamEquation lhs rhs =
 pprPatersonCondFailure  (PCF_TyFam tc) InInstanceDecl lhs _rhs =
   hang (text "Illegal use of type family" <+> quotes (ppr tc))
     2 (text "in the constraint" <+> quotes (ppr lhs))
-pprPatersonCondFailure  (PCF_TyFam tc) InTyFamEquation _lhs rhs =
-  hang (text "Illegal nested use of type family" <+> quotes (ppr tc))
+pprPatersonCondFailure  (PCF_TyFam tc) InTyFamEquation _lhs rhs
+  | Just _ <- liftedTypeOwner "$lambda:" (tyConName tc)
+  , not ("-sigma" `isSuffixOf` occNameString (getOccName tc))
+  = text "An argument to a type family contains a type lambda."
+  | otherwise
+  = hang (text "Illegal nested use of type family" <+> quotes (ppr tc))
     2 (text "in the arguments of the type-family application" <+> quotes (ppr rhs))
 
 --------------------------------------------------------------------------------

@@ -423,6 +423,7 @@ choose an interpreted arrow from its expected kind: (Just 3,Right 3)
 use a nested arrow for Either and a short-circuiting callback: (Right 7,False)
 apply a type lambda to Maybe, Either String and IO: Refl
 partially apply a two-argument type lambda: Refl
+map a callback that captures a closed family pattern: (Refl,Refl)
 map a type lambda with a constructor case: Refl
 read fields from two indexed type case branches: (Refl,Refl)
 retain the kind of a matched Nothing: Refl
