@@ -161,6 +161,7 @@ import qualified OrdinaryScopedComparison
 import qualified OrdinaryScopedChoice
 import qualified ScopedClassMethod as Choice
 import qualified ScopedClassMethodClient
+import qualified StoredDictionaryClient
 import qualified Signal
 import qualified PreludePairExport
 import qualified OpaqueCallClient as Opaque
@@ -1054,6 +1055,8 @@ main = do
     disabled <- readIORef fieldFlag
     observe "use two caller dictionaries in imported dependent results"
         (ScopedClassMethodClient.twoDictionaries enabled, ScopedClassMethodClient.twoDictionaries disabled)
+    observe "read the stored dictionary with ordinary and dependent matches"
+        StoredDictionaryClient.storedDecisions
     observe "read a scoped method through a Haskell 2010 client"
         (ScopedClassMethodClient.ordinaryChoices enabled, ScopedClassMethodClient.ordinaryChoices disabled)
     observe "infer a payload constraint beside a scoped method"

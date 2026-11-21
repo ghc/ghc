@@ -267,6 +267,9 @@ instantiated predicates of the lexical Givens before applying a scoped
 selector. A branch with two matching dictionaries fails even under
 `-fdefer-type-errors`.
 [Stored dictionary test](../../../testsuite/tests/dependent/should_run/NativeScopedStoredDictionary.sh).
+The [Showcase client](../examples/open-evaluation/StoredDictionaryClient.hs)
+compares an ordinary match with a dependent match on the same two
+`Stored True` cells. Both matches report `(True,False)`.
 
 ### Ambiguity in a method-indexed signature
 
