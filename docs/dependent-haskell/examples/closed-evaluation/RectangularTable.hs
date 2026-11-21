@@ -1,5 +1,8 @@
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
-module RectangularTable (Table(..), ColumnTable(..), Square(..), withoutRowLabels, square, totals, sample, selectedTotals) where
+module RectangularTable
+    ( Table(..), ColumnTable(..), Square(..), Matrix(..)
+    , withoutRowLabels, square, matrix, totals, sample, selectedTotals
+    ) where
 
 import IndexedVec (Vec(..))
 import Numeric.Natural (Natural)
@@ -26,6 +29,14 @@ square :: Natural -> Square Natural
 square 0 = Square VNil
 square n = Square (VCons (VCons n (VCons 2 VNil))
                   (VCons (VCons 3 (VCons 4 VNil)) VNil))
+
+-- | Store the column labels after the cells they describe.
+data Matrix a where
+    Matrix :: Vec rows (Vec cols a) -> Vec cols Char -> Matrix a
+
+-- | Keep the column labels when a table has no rows.
+matrix :: Table a -> Matrix a
+matrix (Table _ cols cells) = Matrix cells cols
 
 -- | Sum each row and column with its original labels.
 totals :: Table Natural -> TableMargins Natural

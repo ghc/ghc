@@ -22,14 +22,14 @@ for opt in -O0 -O2; do
 module WrongWitness
     ( buildWrong, wrongMask, wrongColumns, BadField(..), badField
     , wrongRows, wrongCols, wrongCellRows, wrongCellCols, wrongUnlabelled, Nested(..), nested
-    , noRows, noCols, wrongSquare, LabelledLast(..), labelsLast, wrongLast
+    , noRows, noCols, wrongSquare, wrongMatrix, LabelledLast(..), labelsLast, wrongLast
     , EvidenceBatch(..), withEvidence, TaggedBatch(..), withEquality
     ) where
 import Data.Proxy (Proxy)
 import ExistentialVec (SN(..))
 import IndexedVec (N(..), Vec(..))
 import Numeric.Natural (Natural)
-import RectangularTable (Table(..), ColumnTable(..), Square(..), sample)
+import RectangularTable (Table(..), ColumnTable(..), Square(..), Matrix(..), sample)
 import Unsafe.Coerce (unsafeCoerce)
 import WitnessedBatch (Batch(..), MaskedRow(..), KeyedRow(..), TableMargins(..), tableMargins)
 
@@ -68,6 +68,10 @@ wrongUnlabelled n = case sample n of
 wrongSquare :: Natural -> Square Natural
 wrongSquare n = Square (VCons (VCons n (VCons n VNil))
                        (VCons (unsafeCoerce (VCons n VNil)) VNil))
+
+wrongMatrix :: Natural -> Matrix Natural
+wrongMatrix n = case sample n of
+    Table _ _ cells -> Matrix cells (unsafeCoerce (VNil :: Vec 'Z Char))
 
 data LabelledLast a where
     LabelledLast :: Vec cols Char -> Vec rows (Vec cols a) -> Vec rows Char -> LabelledLast a
@@ -160,6 +164,13 @@ square = Refl
 
 emptySquare :: T.square 0 :~: 'T.Square 'V.VNil
 emptySquare = Refl
+
+matrix :: T.matrix (T.sample 4) :~: 'T.Matrix
+            (Two (Three 1 2 3) (Three 4 5 6)) (Three 'x' 'y' 'z')
+matrix = Refl
+
+emptyMatrix :: T.matrix (W.noRows 'z') :~: 'T.Matrix 'V.VNil ('V.VCons 'z' 'V.VNil)
+emptyMatrix = Refl
 
 labelsAfterCells :: W.labelsLast 4 :~: 'W.LabelledLast
                     (Three 'x' 'y' 'z') (Two (Three 1 2 3) (Three 4 5 6)) (Two 'r' 's')
@@ -350,9 +361,9 @@ HS
         reject BadColumns 'The value returned by the interpreter does not match the checked result type.'
     done
 
-    for function in wrongSquare wrongLast wrongUnlabelled wrongCellRows wrongCellCols; do
+    for function in wrongMatrix wrongSquare wrongLast wrongUnlabelled wrongCellRows wrongCellCols; do
         sed -e 's/module BadWitness/module BadCells/' -e "s/Wrong.buildWrong/Wrong.$function/" \
-            -e '/^import qualified WrongWitness/i import RectangularTable (Table(..), ColumnTable(..), Square(..))' \
+            -e '/^import qualified WrongWitness/i import RectangularTable (Table(..), ColumnTable(..), Square(..), Matrix(..))' \
             BadWitness.hs >BadCells.hs
         reject BadCells 'The value returned by the interpreter does not match the checked result type.'
     done
