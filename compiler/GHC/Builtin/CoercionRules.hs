@@ -10,7 +10,7 @@ import GHC.Prelude
 
 import GHC.Builtin.WiredIn.TypeLits (typeNatCoAxiomRules)
 import GHC.Builtin.WiredIn.Types (promotedTupleDataCon, tupleTyCon)
-import GHC.Core.Coercion (existsCoRule, mkNomReflCo, mkSymCo)
+import GHC.Core.Coercion (existsCoRule, matchableAppProjectionRule, mkNomReflCo, mkSymCo)
 import GHC.Core.Coercion.Axiom
 import GHC.Core.TyCo.Rep (Coercion(AxiomCo))
 import GHC.Core.TyCo.Compare (eqType, eqTypes, eqScopedSigmaClosures)
@@ -18,7 +18,7 @@ import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Data.FastString
 import GHC.Data.Pair
-import GHC.Types.Basic (Boxity(Boxed))
+import GHC.Types.Basic (Boxity(Boxed), LeftOrRight(..))
 import GHC.Types.Var (ExistsTyFlag(..))
 import GHC.Types.Name (nameOccName)
 import GHC.Types.Name.Occurrence (sourceTableTermOcc)
@@ -34,6 +34,7 @@ builtInCoAxiomRules =
       , (boxedPairReconstructionName, boxedPairReconstructionRule)
       , existsCoRule ExplicitExists Nominal, existsCoRule ExplicitExists Representational
       , existsCoRule ImplicitExists Nominal, existsCoRule ImplicitExists Representational
+      , matchableAppProjectionRule CLeft, matchableAppProjectionRule CRight
       , (scopedSigmaClosureName, scopedSigmaClosureRule) ]
 
 scopedSigmaClosureRule :: CoAxiomRule

@@ -507,6 +507,10 @@ opt_co4' opts env sym rep r (LRCo lr co)
   | Just pr_co <- splitAppCo_maybe co
   = assert (r == Nominal )
     opt_co4 opts env sym rep Nominal (pick_lr lr pr_co)
+  -- Optimisation can substitute a kind cast into an abstract matchable head.
+  -- See Note [Matchability in application projection evidence] in GHC.Core.Coercion.
+  | checked@AxiomCo{} <- mkLRCo lr co
+  = opt_co4 opts env sym rep Nominal checked
   | Just pr_co <- splitAppCo_maybe co'
   = assert (r == Nominal) $
     if rep
@@ -1657,7 +1661,7 @@ etaAppCo_maybe co
   , let isco1 = isCoercionTy t1
   , let isco2 = isCoercionTy t2
   , isco1 == isco2
-  = Just (LRCo CLeft co, LRCo CRight co)
+  = Just (mkLRCo CLeft co, mkLRCo CRight co)
   | otherwise
   = Nothing
 

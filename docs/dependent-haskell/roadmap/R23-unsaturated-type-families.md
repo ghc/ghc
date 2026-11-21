@@ -908,6 +908,24 @@ and projection. Preserve already-derived coercions when substituting that
 field. Rebuilding the resulting type application alone is insufficient.
 M65 checks this transport for function fields in closed algebraic domains.
 
+### Preserve a matchable head through inlining
+
+A GADT pattern can supply `m ~ M` for `f :: Type %m -> Type`.
+Inside that branch, an ordinary client can use a declaration that requires
+a matchable head. Inlining the function or its constructor view can
+substitute a cast for the head. Before the fix, the simplifier could
+produce `Left co` where `co :: f x ~# Maybe Char` still had the
+original abstract head. Core Lint reported an invalid projection.
+
+The checked rule records both application spines and their nominal
+equality. It checks the head kinds, argument kinds and the reconstructed
+endpoints before projecting. The cast in the recorded head keeps the
+GADT's proof in scope. If the equality alone still supplies the
+matchable heads, the interface uses the existing projection encoding.
+A reader that needs the new rule can identify it in the header.
+[Source example](../examples/open-evaluation/MatchableView.hs)
+and [checked-rule controls](../../../testsuite/tests/ghc-api/MatchableProjectionRule.hs).
+
 ## Next increments
 
 The [M63 contract](../PLAN.md#m63-ordinary-arrow-matchability) selects an

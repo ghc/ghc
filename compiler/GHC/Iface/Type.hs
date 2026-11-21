@@ -2985,6 +2985,7 @@ data IfaceEvidence
   | IndexedConstructorOperandEvidence
   | IndexedConstructorExistentialCaseEvidence | GeneralIndexedConstructorOperandEvidence
   | RetainedUserUnfoldingEvidence | LinearUnpackEvidence | RetainedCharOperandEvidence
+  | MatchableProjectionEvidence
   deriving (Bounded, Enum, Eq, Ord)
 
 -- | Requirements of an interface payload. See Note [Versioning retained evidence]
@@ -3169,6 +3170,8 @@ instance Binary IfaceAxiomRule where
       requireIfaceEvidenceVersion bh ErasedExistentialEvidence
     when (uses ImplicitExists) $
       requireIfaceEvidenceVersion bh ImplicitExistentialEvidence
+    when (ifLclNameFS n `elem` map matchableProjectionName [CLeft, CRight]) $
+      requireIfaceEvidenceVersion bh MatchableProjectionEvidence
     when (ifLclNameFS n == scopedSigmaClosureName) $
       requireIfaceEvidenceVersion bh ScopedSigmaEvidence
     putByte bh 0
