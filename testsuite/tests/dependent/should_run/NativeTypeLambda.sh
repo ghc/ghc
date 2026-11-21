@@ -132,7 +132,7 @@ type Bad e = let wrap = (\a -> Either later a) in let later = Maybe e in wrap Ch
 HS
 if "${g[@]}" -c LaterLet.hs >later.log 2>&1; then exit 1; fi
 grep -Fq 'GHC-76037' later.log
-grep -Fq "Not in scope: type variable 'later'" later.log
+grep -Eq "Not in scope: type variable .later." later.log
 
 cat >RowScope.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeFamilies #-}
