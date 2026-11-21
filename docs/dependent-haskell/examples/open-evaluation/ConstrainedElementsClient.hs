@@ -1,8 +1,9 @@
+{-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 {-# LANGUAGE DataKinds, ExplicitNamespaces, RequiredTypeArguments, TypeAbstractions, TypeApplications #-}
-{-# LANGUAGE GADTs, NoExperimentalDependentTypes, RankNTypes, ScopedTypeVariables, TypeFamilies, TypeOperators #-}
-module ConstrainedElementsClient (constrainedElements, annotatedElement, explicitElements, renderField, formatField, renderKnownFields, retainedMaybeDomain, aliasedReflection) where
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes, PartialTypeSignatures, QuantifiedConstraints, RankNTypes, ScopedTypeVariables, TypeFamilies, TypeOperators #-}
+module ConstrainedElementsClient (constrainedElements, annotatedElement, explicitElements, renderField, formatField, renderKnownFields, retainedMaybeDomain, aliasedReflection, partialElement) where
 
-import ConstrainedElements (Collects(..), FieldKey, Field(..), applyField, field, withField, Reflection, reflectMaybe, MaybeBoolEcho, AtNothing)
+import ConstrainedElements (Allowed, Collects(..), FieldKey, Field(..), applyField, field, withField, Reflection, reflectMaybe, MaybeBoolEcho, AtNothing)
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
@@ -85,3 +86,11 @@ aliasedReflection = (run (\ @a -> reflectMaybe @a) (Just True), Refl)
   where
     run :: (forall a. Reflection a) -> Maybe Bool -> Maybe Bool
     run proof x = case proof @Bool x of Refl -> x
+
+-- | Forward a runtime element using the premises of a partial signature.
+partialElement :: Bool -> Bool
+partialElement = forward (Proxy @[]) (Proxy @Bool)
+  where
+    forward :: forall f a. (Allowed a, forall x. Allowed x => Collects (f x))
+            => Proxy f -> Proxy a -> Elem (f a) -> _
+    forward _ _ value = id @(Elem (f a)) value

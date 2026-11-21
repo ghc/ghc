@@ -80,8 +80,16 @@ A complete expression annotation can use the same evidence. GHC also
 checks the written family before it infers a wildcard in an expression
 or binding signature. Thus `Refl :: Elem [Int] :~: _` reports the
 missing `Allowed Int` at `Elem`, including under `-fdefer-type-errors`.
-A nested annotation in the body of a partially signed function can still
-lack the function's quantified premise during inference.
+The compiler scopes the written premises of a partial signature over its
+right-hand side. For example, a nested `id @(Elem (f a))` can use both
+`Allowed a` and `forall x. Allowed x => Collects (f x)` before GHC
+infers the result wildcard. GHC checks a partial expression signature
+the same way. A context wildcard cannot supply a missing premise.
+If the inferred result still contains the family, GHC checks the domain
+again under the final signature. At this point its context is fixed.
+The formation check discards the proof it builds. GHC still infers and
+abstracts the actual dictionary for the function in the usual way.
+[GHC User’s Guide on partial signatures](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/partial_type_signatures.html#extra-constraints-wildcard).
 [Client](../../../testsuite/tests/dependent/should_run/NativeConstrainedFamilyClient.hs).
 
 The same discussion asks whether coverage
