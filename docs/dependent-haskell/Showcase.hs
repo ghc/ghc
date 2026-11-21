@@ -884,6 +884,8 @@ ordinaryModuleCalls = do
     observe "ordinary module generic round-trip" (Ordinary.ordinaryRoundTrip values)
     observe "pair a list's computed length with its vector"
         (ListVectorClient.contents (ListVectorClient.fromList values) :: (Int, [Int]))
+    observe "read a closed family's retained length without its payload"
+        (ListVectorClient.familyResultLength n)
 
 -- | Check finite positions in lists with opaque elements.
 genericSafeIndexing :: IO ()

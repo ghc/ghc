@@ -83,7 +83,7 @@ Agda's `Σ` record gives the second projection a result type indexed by
 the first projection of the same pair. The corresponding source test
 for the fork uses the existing `PackedVec` type and an ordinary length
 projection. [Agda's built-in Sigma record](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#the-s-type)
-and [Eisenberg's thesis, §8.8](https://www.cis.upenn.edu/~sweirich/papers/eisenberg-thesis.pdf#page=219).
+and [Eisenberg's thesis, §8.8](https://www.cis.upenn.edu/~sweirich/papers/eisenberg-thesis.pdf#page=220).
 
 ```haskell
 payload :: foreach (p :: PackedVec a) -> Vec a (packageLength p)
@@ -251,6 +251,201 @@ family can leave the application stuck.
 [Repeated argument example](../examples/erased-existentials/PackageEquality.hs).
 [Serokell’s R04 card](https://ghc.serokell.io/dh#dependent-sums)
 and [type-lambda elaboration](R17-type-level-lambdas.md#source-and-evidence).
+
+## Return a dependent sum from a closed type family
+
+A closed family equation can return a sum directly. The second equation
+captures `a` from its own pattern. Each equation can choose its own
+payload type.
+
+```haskell
+type family Pack (select :: Bool) (a :: Type) :: Type where
+    Pack False unused = some (tag :: Bool) | Tagged tag Bool
+    Pack True a = some (tag :: Bool) | Tagged tag a
+```
+
+An ordinary module imports `Pack` and constructs `Pack True Char` with
+`Pair True (TrueTag 'x')`. An ordinary constructor pattern can bind the
+actual stored witness.
+
+```haskell
+size :: Pack True Char -> Bool
+size (Pair tag _) = tag
+```
+
+GHC follows family equations at the head of the type and composes their
+nominal coercions. For example, `Outer select a = Pack select a`
+can expose the package through `Pack`. The final equation can return a
+sum directly or name a synonym for it. The pattern demands the outer
+pair and leaves an ignored payload lazy. A lazy tuple pattern inside an
+ordinary payload field keeps that field lazy. A lazy pattern around the
+whole package still fails. So does a match on a stuck family or through
+a newtype wrapper.
+
+An imported open family instance can also expose the pair. The test
+provider declares `type instance OpenPackage Bool = Outer True Char`.
+Its separately compiled ordinary client checks the pattern below. The
+match demands the package and leaves the ignored payload lazy.
+
+```haskell
+sizeOpen :: OpenPackage Bool -> Bool
+sizeOpen (Pair tag _) = tag
+```
+
+The pattern checker uses the solver's nominal family rule and follows
+only heads. `OpenPackage Char` has no matching instance. Its `Pair` pattern
+fails at the constructor. Constrained families still need their separate
+premise checks.
+[GHC's open-family compatibility rules](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_families.html#compatibility-and-apartness-of-type-family-equations).
+
+Each step uses the solver's reduction-depth counter. A recursive
+family such as `Loop a = Loop [a]` reaches the configured limit and
+reports GHC-40404 at the written `Pair` pattern. The test checks the
+same limit for an open instance.
+
+GHC rejects a payload for a different tag at the written payload. An equation that
+uses a binder from another equation fails at that variable's occurrence.
+The regression checks both errors at `-O0` and `-O2`. The client sees
+only the provider's interface during typechecking. An explicit `forall`
+also retains a kind variable used only in the kind of a captured binder.
+[Provider](../../../testsuite/tests/dependent/should_run/NativeClosedFamilySumProvider.hs),
+[ordinary client](../../../testsuite/tests/dependent/should_run/NativeClosedFamilySumClient.hs),
+and [regression](../../../testsuite/tests/dependent/should_run/NativeClosedFamilySum.sh).
+
+The Showcase reads a retained vector length without evaluating the vector.
+[Vector result family](../examples/packed-vector/StoredVector.hs) and
+[ordinary length projection](../examples/packed-vector/ListVectorClient.hs).
+
+The interface contains the `Pack` equations in terms of `GHC.Sigma.Sigma`
+and a private payload family for each sum. `--show-iface` displays this
+representation. GHCi's `:info` also shows the lowered family equations.
+The family termination check still applies. An equation
+such as `PackOne a = some (tag :: Bool) | Tagged tag a` passes `a` to a
+payload family of the same size, so it requires `UndecidableInstances`.
+Returning a named sum with the same payload has the same requirement.
+
+Agda can write a function returning a type whose result uses `Σ A B`,
+with `B` chosen from the function's arguments. The standard library
+provides the same construction with the syntax `Σ[ x ∈ A ] B`.
+[Agda's `Data.Product.Base`](https://agda.github.io/agda-stdlib/v2.4/Data.Product.Base.html#37).
+Its `uncurry` matches the pair to pass the witness and its dependent
+field to a function.
+[Agda's dependent pair elimination](https://agda.github.io/agda-stdlib/v2.4/Data.Product.Base.html#126).
+
+## Return a dependent sum from an open type instance
+
+A top-level type instance can write the sum directly, including for a
+family imported from another module.
+
+```haskell
+type instance Provider.DirectOpen [a] = some (tag :: Bool) | Tagged tag a
+```
+
+Here `a` comes from the instance pattern. The witness `tag` scopes over
+`Tagged tag a`. Its domain must already be in scope. The ordinary
+instance checks still apply, including compatibility and termination.
+Keep the usual `data instance` syntax for data families.
+
+Each equation has a private payload family in the instance module.
+An ordinary client sees the instance through its interface and can
+construct or match the result. Two instances of one family keep separate
+payload families. The regression also captures a variable whose kind
+depends on an explicit `forall` binder.
+[Instance provider](../../../testsuite/tests/dependent/should_run/NativeClosedFamilySumChain.hs)
+and [ordinary client](../../../testsuite/tests/dependent/should_run/NativeClosedFamilySumClient.hs).
+
+## Return a dependent sum from an associated equation
+
+An associated type instance can use the enclosing instance variable
+`a` alongside the equation's own `b`.
+
+```haskell
+instance forall a. Build [a] where
+    type forall b. Result [a] b = some (tag :: Bool) | Tagged tag (a, b)
+```
+
+Both variables occur on the family left-hand side. GHC still rejects
+an instance-head variable that the family pattern omits. The test also
+captures an equation variable whose kind depends on another binder.
+[GHC's scope rules for associated instances](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_families.html#scoping-of-class-parameters).
+
+A default has its own scope. In a class with `type Defaulted a`, the
+default `type Defaulted b = some (tag :: Bool) | Tagged tag b` captures
+`b` from its pattern. GHC checks the default before it instantiates it
+in another module. The default still requires distinct variable
+patterns.
+[GHC's associated default rules](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_families.html#associated-type-synonym-defaults).
+
+The ordinary client matches `Pair` on the result of an ordinary
+associated instance. The class declaration lives in a module that uses
+ordinary `TypeFamilies`. This fork marks the family declared under
+`ExperimentalDependentTypes` as constrained.
+[Instance and default provider](../../../testsuite/tests/dependent/should_run/NativeAssociatedSumProvider.hs)
+and [interface-only client](../../../testsuite/tests/dependent/should_run/NativeAssociatedSumClient.hs).
+
+## Match a constrained associated family result
+
+An ordinary client can use `first` or match `Pair` on the same
+`Defaulted Char` result. The class instance provides the domain for
+the default. A separate test matches a result that passes through
+two constrained families. The GADT pattern `Permit` gives the client
+the required `Allowed a` dictionary.
+
+```haskell
+readGiven :: Permit a -> Proxy a -> Bool
+readGiven Permit ix = case make ix of Pair tag _ -> tag
+```
+
+GHC checks each domain in scope at the `Pair` pattern before it
+reduces that family head. For `make (Proxy :: Proxy Int)`, the
+scrutinee type is inferred and GHC reports the missing `Allowed Int`
+at `Pair`, including with `-fdefer-type-errors`. Reduction must
+reach the package constructor's parent. A stuck application or a
+newtype around a package still fails at the pattern.
+
+The match forces the outer pair and keeps an unused payload lazy.
+The regression compares a named sum and direct `some` at `-O0`
+and `-O2` with the provider source hidden from the client.
+
+An ordinary reader can also use a nominal equality to expose the
+family equation. The same match works after a GADT pattern supplies
+that equality.
+
+```haskell
+readRefined :: (a ~ Bool) => Shape a Char -> Bool
+readRefined pkg = case pkg of Pair tag _ -> tag
+```
+
+If lookup gets stuck, GHC rewrites family-free arguments with the
+available family-free nominal equalities. It tries that head again
+with the same domain check. A representational `Coercible a Bool`
+constraint still leaves `Shape a Char` stuck.
+
+The equality can also occur between GADT fields. An ordinary client
+uses it to open the later package. The earlier field and the unused
+package payload can stay unevaluated. Moving the package field before
+the equality leaves its `Choice a` domain unsatisfied.
+
+```haskell
+data Staged a where
+    Staged :: Proxy a -> (a ~ Bool) => Shape a Char -> Staged a
+
+readStaged :: Staged a -> Bool
+readStaged (Staged _ pkg) = case pkg of Pair tag _ -> tag
+```
+
+[Provider](../../../testsuite/tests/dependent/should_run/NativeConstrainedSumProvider.hs)
+and [ordinary client](../../../testsuite/tests/dependent/should_run/NativeConstrainedSumClient.hs).
+
+## Construct a retained pair in an ordinary argument
+
+An ordinary client with `ImpredicativeTypes` can construct a package at a
+known result type, including an imported open family that reduces to a
+sum. For example, `consume (Pair True payload)` uses the argument type
+of `consume` to select the erased parameters of `Pair`. GHC checks
+`payload` against the written witness and keeps an ignored field lazy.
+This Quick Look path follows unconstrained family heads. A stuck
+family leaves the constructor application unresolved.
 
 ## Partition at the original length
 
