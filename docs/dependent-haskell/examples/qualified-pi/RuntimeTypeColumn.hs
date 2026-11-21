@@ -1,7 +1,7 @@
 {-# LANGUAGE ExperimentalDependentTypes, GADTs #-}
 
 -- | Read a bounded element from a column with a runtime type witness.
-module RuntimeTypeColumn (Column(..), lookupColumn) where
+module RuntimeTypeColumn (Column(..), lookupColumn, lookupColumnInferred) where
 
 import Data.Kind (Type)
 import ParameterizedIndexLibrary (indexGeneric, mkFinGeneric)
@@ -17,3 +17,7 @@ lookupColumn wanted (Column actual values) offset =
     case eqTypeRep wanted actual of
         Just HRefl -> fmap (indexGeneric values) (mkFinGeneric values offset)
         Nothing -> Nothing
+
+-- | Use the requested result type to choose the column's element type.
+lookupColumnInferred :: foreach (a :: Type). Column -> Int -> Maybe a
+lookupColumnInferred = lookupColumn a

@@ -293,6 +293,9 @@ representation with its values. On a successful `eqTypeRep` comparison,
 checks the signed offset against those values. A type mismatch leaves
 both the offset and the values unevaluated. A negative offset at the
 correct type leaves the values unevaluated.
+The same example uses an invisible binder in `lookupColumnInferred`.
+The expected `Maybe Char` supplies the requested type. A column of Bool
+still leaves the offset and its values unevaluated.
 
 The ordinary reflection API implements the same equality and demand
 semantics with the following types.

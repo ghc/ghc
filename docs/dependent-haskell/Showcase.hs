@@ -889,6 +889,9 @@ genericSafeIndexing = do
         ( Column.lookupColumn (type Char) chars position
         , Column.lookupColumn (type Char) unused (error "forced offset")
         , Column.lookupColumn (type Bool) unused (-1) )
+    observe "infer the column element type from the result"
+        ( Column.lookupColumnInferred chars position :: Maybe Char
+        , Column.lookupColumnInferred unused (error "forced offset") :: Maybe Char )
     observe "check a signed position in a packaged vector" $
         case ListVectorClient.fromList values of
             Sigma.Pair _ cells -> FinitePositionClient.lookupVecViaView cells position
