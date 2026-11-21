@@ -1537,7 +1537,7 @@ reportClosedShapeError owner err = case err of
             _:_:_ -> ". The field type depends on multiple hidden indices " ++
                      render (parens (pprWithCommas ppr indices)) ++
                      ". Its constructors must determine one index. " ++
-                     "Earlier fields must determine the other indices."
+                     "A field of the enclosing constructor must determine each remaining index."
             _ -> " at the hidden index. The field's constructors must determine that index."
       failWithTc (TcRnClosedTypeEval owner
         ("Cannot reify field " ++ show position ++ " of " ++ constructor ++ explanation))
@@ -1604,14 +1604,15 @@ closedCallValueShape rdr_env kind = do
                 codecs <- case fields of
                   Left (static, ground) -> ClosedStaticFields static <$> traverse (shape next) ground
                   Right (indices, arguments) -> do
-                    let field known (position, ty) = do
-                          let err = UnsupportedClosedPayload con position (field_indices indices ty)
-                          codec <- witness_shape err next indices known ty
-                          let known' = case codec of
-                                AtWitnessIndex (ClosedOpenShape index _ _ _) -> extendVarSet known index
-                                AtGroundType _ -> known
-                          return (known', codec)
-                    (_, fields) <- mapAccumLM field emptyVarSet (zip [1..] arguments)
+                    let numbered = zip [1..] arguments
+                        used ty = field_indices indices ty
+                        unsupported pos ty = UnsupportedClosedPayload con pos (used ty)
+                    fields <- forM numbered $ \(pos, ty) ->
+                      witness_shape (unsupported pos ty) next indices ty
+                    let recovered = mkVarSet [v | AtWitnessIndex (ClosedOpenShape v _ _ _) <- fields]
+                    forM_ numbered $ \(pos, ty) ->
+                      unless (all (`elemVarSet` recovered) (used ty)) $
+                        Trans.lift (Left (unsupported pos ty))
                     return (ClosedWitnessedFields indices fields)
                 return (ClosedConstructor (Just (closedConstructorTag con)) con codecs)
               State.modify' ((here, ClosedData tc args alternatives) :)
@@ -1623,14 +1624,14 @@ closedCallValueShape rdr_env kind = do
 
     field_indices indices ty = filter (`elemVarSet` tyCoVarsOfType ty) indices
 
-    witness_shape unsupported active indices known ty
+    witness_shape unsupported active indices ty
       | closedGroundField ty = AtGroundType <$> shape active ty
       | [(index, plan)] <- [(v, plan) | v <- field_indices indices ty,
-                                        Just plan <- [closedOpenAlternatives known v ty]] =
-          AtWitnessIndex <$> open_shape unsupported active indices known index ty plan
+                                        Just plan <- [closedOpenAlternatives (mkVarSet indices) v ty]] =
+          AtWitnessIndex <$> open_shape unsupported active indices index ty plan
       | otherwise = Trans.lift (Left unsupported)
 
-    open_shape unsupported active indices known index field (tc, args, alternatives) = do
+    open_shape unsupported active indices index field (tc, args, alternatives) = do
       let constructors = [con | (con, _, _) <- alternatives]
       unless (all (isJust . closedImportedGRE rdr_env) constructors) $
         Trans.lift (Left (InaccessibleClosedData tc False))
@@ -1641,7 +1642,7 @@ closedCallValueShape rdr_env kind = do
         let payload ty = do
               unless (closedGroundField ty || proper_subterm ty field) $
                 Trans.lift (Left unsupported)
-              witness_shape unsupported active indices (extendVarSet known index) ty
+              witness_shape unsupported active indices ty
         codecs <- traverse (traverse payload) fields
         return (ClosedOpenAlternative con result_index codecs)
       return (ClosedOpenShape index tc args plans)
@@ -1710,7 +1711,7 @@ closedOpenRepresentation con =
 -- See Note [Closed results with an existential witness].
 closedOpenAlternatives :: TyVarSet -> TyVar -> Type
                        -> Maybe (TyCon, [Type], [(DataCon, ClosedOpenIndex, [Maybe Type])])
-closedOpenAlternatives known index field = do
+closedOpenAlternatives indices index field = do
   (tc, args) <- splitTyConApp_maybe field
   guard (isVanillaAlgTyCon tc && isBoxedDataTyCon tc && isLiftedAlgTyCon tc &&
          null (tyConStupidTheta tc) && lengthIs args (tyConArity tc))
@@ -1722,7 +1723,7 @@ closedOpenAlternatives known index field = do
   return (tc, args, alternatives)
   where
     fixed_argument arg =
-      tyCoVarsOfType arg `subVarSet` extendVarSet known index && isTyFamFree arg && isTauTy arg
+      tyCoVarsOfType arg `subVarSet` indices && isTyFamFree arg && isTauTy arg
 
     check position args con = do
       (universals, locals, [equation], [], fields, result) <- pure (dataConFullSig con)
@@ -1763,7 +1764,7 @@ closedOpenAlternatives known index field = do
              and (zipWith tcEqType rep (expected_evidence ++ field_types)))
       return (con, result_index, typed_fields)
 
--- | Substitute the structural index and any indices fixed by earlier fields.
+-- | Substitute the structural index and the fixed arguments from the enclosing constructor.
 closedOpenArgs :: Subst -> ClosedOpenShape -> Type -> [Type]
 closedOpenArgs actuals (ClosedOpenShape index _ args _) val =
   atStructuralIndex index val (substTy actuals) args
@@ -2265,14 +2266,15 @@ decodeClosedCallResult (ClosedCodec shape nodes) rendered = case shape of
             guard (typeKind value `tcEqType` kind)
             return (value, rest)
           ClosedWitnessedFields templates codecs -> do
-            let field (AtGroundType shape) input = Trans.lift (decodeFields shape input)
+            let field (AtGroundType shape) input = do
+                  (value, rest) <- Trans.lift (decodeFields shape input)
+                  return (const (Just value), rest)
                 field (AtWitnessIndex shape@(ClosedOpenShape template _ _ _)) input = State.StateT $ \known -> do
                   (index, build, rest) <- decodeOpen known shape (lookupVarEnv known template) input
-                  let complete = extendVarEnv known template index
-                  value <- build complete
-                  return ((value, rest), complete)
-            ((values, rest), known) <- State.runStateT (decodeArguments field codecs encoded) emptyVarEnv
+                  return ((build, rest), extendVarEnv known template index)
+            ((builders, rest), known) <- State.runStateT (decodeArguments field codecs encoded) emptyVarEnv
             indices <- traverse (lookupVarEnv known) templates
+            values <- traverse ($ known) builders
             value <- packConstructor kind kinds con indices values
             return (value, rest)
 
@@ -2394,10 +2396,12 @@ at that predecessor. Other fields can use the ordinary ground codec.
 
 For Vec rows (Vec cols a), the outer vector's constructors determine
 rows. The element type retains cols at each recursive step. It needs
-an earlier witness for cols. Check the constructors to find the
-structural index and validate every other index against an earlier
-field. If an earlier field determined rows too, the two counts must
-agree. For Vec n (Vec n a), only the outer vector's structural argument
+a field that determines cols, even if there are no rows. Preflight
+checks that each hidden index is structural in some field of the
+enclosing constructor. Read the tags in field order. After all fields
+supply their indices, check each field at the complete assignment and
+build its promoted value. A label vector can therefore follow the cells.
+If two fields determine rows, their counts must agree. For Vec n (Vec n a), only the outer vector's structural argument
 changes when the worker recurses. Every row still has the original n in
 its type. Decode the constructor tags to obtain the side length, then
 build the promoted values under that assignment. Check the length of
@@ -2406,7 +2410,7 @@ n = Z without inspecting a row.
 
 A nonrecursive indexed field must be a proper subterm of the surrounding type. This
 keeps codec planning finite. An empty outer vector has no row from
-which to recover its column index. Read the column labels first.
+which to recover its column index. The column labels can supply it.
 
 The enclosing Core case binds the existentials with dataConRepInstPat.
 Pair them with their declaration binders and check their kinds and fields.

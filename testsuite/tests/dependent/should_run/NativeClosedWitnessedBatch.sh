@@ -375,7 +375,7 @@ HS
         ClassEvidence.hs >NestedField.hs
     reject NestedField 'Cannot reify field 2 of'
     grep -Eq 'multiple hidden indices \((cols, rows|rows, cols)\)' reject.log
-    grep -Fq 'Earlier fields must determine the other indices.' reject.log
+    grep -Fq 'A field of the enclosing constructor must determine each remaining index.' reject.log
     if grep -Fq 'unsupported nested field was evaluated' reject.log; then cat reject.log >&2; exit 1; fi
 
     sed -e 's/module ClassEvidence/module UnsupportedField/' -e 's/W.withEvidence/W.badField/' \
