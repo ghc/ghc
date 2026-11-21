@@ -5,6 +5,7 @@ module WitnessSchema
     , ProjectionPair, projectionPair, projectionLazy
     , Payload(..), RankedBuilder, buildAt, configured, withWitness, observeBuilder, ranked
     , Flag(..), FlaggedBuilder, observeFlagged
+    , InputAt, RankedInput, observeRankedInput
     , PolyId, PolyMaybe, GuardedBuilder, consumeAt, observeGuarded, never, different
     , TwoCallbacks, TwoWitnessBuilder, fromLeft, fromRight, observeTwo
     , ConfinedTwoWitnessBuilder, conflictingLeft, fromCaptured
@@ -16,6 +17,12 @@ import Data.Proxy
 
 type PolyId = forall a. a -> a
 type PolyMaybe = forall a. a -> Maybe a
+
+type InputAt t = forall r. (t -> r) -> Maybe r
+type RankedInput = exists (t :: Type). InputAt t -> Int
+
+observeRankedInput :: RankedInput -> Int
+observeRankedInput f = f (\_ -> Nothing)
 data Payload t = Payload t (t -> (Int,Bool))
 type Hidden = exists (t :: Type). Payload t
 callback :: Payload PolyId
