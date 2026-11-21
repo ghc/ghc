@@ -3,6 +3,7 @@ module GHC.Core.Dependent (
     hasNativeDependentProgram,
     supportsNativeGentle,
     supportsNativeRuleBinds,
+    supportsNativeUserUnfolding,
     supportsScopedDictionaryCore,
     hasRetainedRuleHead, supportsLocalUserRule, supportsErasedUserRule,
     supportsImportedErasedRule, supportsImportedUserRule,
@@ -94,6 +95,11 @@ supportsNativeGentle binds =
 supportsNativeRuleBinds :: CoreProgram -> Bool
 supportsNativeRuleBinds binds =
     not (runScanFor CheckUserRules AllMetadata (foldMap scanBind binds))
+
+-- | Check the expression forms in a retained unfolding without forcing IdInfo.
+supportsNativeUserUnfolding :: CoreExpr -> Bool
+supportsNativeUserUnfolding expr =
+    not (runScanFor CheckUserRules NoMetadata (scanExpr expr))
 
 -- | Admit the scoped dictionary codec and the retained binders it needs.
 -- Other retained proofs and computations still require separate validation.

@@ -470,8 +470,9 @@ makeCorePair dflags pragma_name gbl_id is_default_method rhs
   , not (hasNativeDependentExprRhs (Type (idType gbl_id)))
   , unf@CoreUnfolding { uf_tmpl = tmpl } <- realIdUnfolding (fst pair)
   , hasNativeDependentUnfolding tmpl
-  -- See Note [Local retained package unfoldings] in GHC.Core.Tidy.
-  = if (isInternalName pragma_name || not (hasExistentialExpr tmpl))
+  -- See Note [Written retained unfolding pragmas].
+  = if (isInternalName pragma_name || pragma_name == idName gbl_id
+        || not (hasExistentialExpr tmpl))
        && supportsNativeRuleBinds [NonRec (fst pair) tmpl]
     then pure (setIdUnfolding (fst pair) unf{uf_src = RetainedUserSrc}, snd pair)
     else putSrcSpanDs (nameSrcSpan pragma_name) $
@@ -529,8 +530,10 @@ GHC.Iface.Tidy.
 A local binding uses the same tag. The retained optimizer sees the
 stable template when it scans the binding. The tag stays attached if
 the binding floats without abstraction or occurs inside an exported template.
-Use the source name that owns the pragma to check the local package case.
-Desugaring can transfer a top-level pragma to an internal worker.
+Permit package operations in a local template or the template of the
+top-level binding that owns the pragma. Desugaring can transfer a top-level
+pragma to an internal worker. The worker needs a separate export check.
+See Note [Erased package unfoldings] in GHC.IfaceToCore.
 Compulsory default-method unfoldings still use their separate check.
 An ordinary binding without an unfolding request needs no native scan here.
 -}
