@@ -783,7 +783,8 @@ cvtRetainedGadtArgs args result = do
   (fields, binders) <- prefix args
   body <- suffix binders
   let prefix_fields = PrefixConGADT noExtField fields
-      supported_interior = isJust (HsDecls.splitGadtInterior prefix_fields body)
+      supported_interior = not (null fields) &&
+                           isJust (HsDecls.splitGadtInterior prefix_fields body)
   when (not supported_interior &&
         (any explicit_group binders ||
          (null binders && isNothing (HsDecls.splitGadtTerminal prefix_fields body)))) $

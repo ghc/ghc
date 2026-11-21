@@ -5486,7 +5486,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
              }
        ; mapM buildOneDataCon names }
   where
-    prefix_group (PrefixConGADT _ fields) = [ConValueArgs (length fields)]
+    prefix_group (PrefixConGADT _ fields@(_ : _)) = [ConValueArgs (length fields)]
     prefix_group _ = []
 
     source_group (Right _) = ConValueArgs 1

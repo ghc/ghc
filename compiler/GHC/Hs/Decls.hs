@@ -1038,16 +1038,24 @@ splitGadtTerminal (PrefixConGADT _ (_ : _)) ty
 splitGadtTerminal _ _ = Nothing
 
 -- | Split a prefix constructor's remaining telescope into source groups.
--- The parser has already separated the fields before its first late group.
+-- The parser separates the fields before the first ordered group.
 splitGadtInterior :: forall pass. IsPass pass
                   => HsConDeclGADTDetails (GhcPass pass) -> LHsType (GhcPass pass)
                   -> Maybe ([Either (LHsGadtTelescope (GhcPass pass)) (HsConDeclField (GhcPass pass))],
                             LHsType (GhcPass pass))
-splitGadtInterior (PrefixConGADT _ (_ : _)) ty
+splitGadtInterior (PrefixConGADT _ fields) ty
   | Just (groups@(Left _ : _), result) <- go ty
   , any isRight groups
+  , not (null fields) || context_before_binders groups
   = Just (groups, result)
   where
+    context_before_binders (Left (L _ HsGadtContext{}) : groups) =
+      any is_forall (takeWhile (not . isRight) groups)
+    context_before_binders _ = False
+
+    is_forall (Left (L _ HsGadtForAll{})) = True
+    is_forall _ = False
+
     go ty = case ignoreParens ty of
       L loc HsForAllTy { hst_tele = tele, hst_body = body }
         | HsForAllVis { hsf_vis_bndrs = _ : _ } <- tele
