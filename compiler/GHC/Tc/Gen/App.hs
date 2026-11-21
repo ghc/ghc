@@ -75,7 +75,7 @@ import GHC.Builtin.WiredIn.Types ( multiplicityTy, runtimeRepTy, nilDataCon, con
 import GHC.Builtin.PrimOps( tagToEnumKey )
 import GHC.Builtin.KnownKeys
 
-import GHC.Driver.DynFlags ( DynFlags(reductionDepth), HasDynFlags(getDynFlags) )
+import GHC.Driver.DynFlags ( GeneralFlag(Opt_DeferTypeErrors), DynFlags(reductionDepth), HasDynFlags(getDynFlags) )
 import GHC.Types.TyThing ( TyThing(AnId, AConLike, ATyCon) )
 import GHC.Types.Basic ( TypeOrKind(TypeLevel), IntWithInf, intGtLimit )
 import GHC.Types.TypeEnv ( lookupTypeEnv )
@@ -667,6 +667,7 @@ tcOrdinaryAppWithPrefix checked_prefix rn_expr rn_head@(rn_fun, fun_lspan) tc_fu
        ; native_app <- tcRetainedAppCapability fun_sigma0 exp_res_ty rn_args
        -- See Note [Known native variables with ImpredicativeTypes].
        ; head_ql <- if any isExplicitRetainedArg rn_args
+                        || (native_app && hasScopedDictionaryPrefix fun_sigma0)
                     then return NoQL
                     else tcRetainedKnownHeadQL native_app wanted_ql rn_args exp_res_ty tc_fun0 fun_sigma0
        ; tcRetainedAppEvidence native_app $
@@ -1452,7 +1453,7 @@ tcRetainedKnownValuePlan :: (LHsExpr GhcRn -> TcM (Maybe Type))
                         -> [LHsExpr GhcRn] -> TcM RetainedInstPlan
 tcRetainedKnownValuePlan declared expected sigma values
   | (tvs, theta, tau) <- tcRetainedInstTelescope sigma
-  , not (null tvs), isRetainedValueType tau
+  , not (null tvs), isRetainedValueType (withoutScopedDictionaries tau)
   , not (null values)
   = case coreFullView tau of
       DepFunTy DepFunInvisible binder body ->
@@ -1934,6 +1935,19 @@ malformed type graphs. See Note [Computing deep free variables] in
 GHC.Core.TyCo.FVs.
 -}
 
+-- | Check for a dependent dictionary before the first written value argument.
+hasScopedDictionaryPrefix :: TcSigmaType -> Bool
+hasScopedDictionaryPrefix sigma
+  | (_, _, rho) <- tcRetainedInstTelescope sigma
+  , DepDictTy{} <- coreFullView rho = True
+  | otherwise = False
+
+-- | Read past the private evidence prefix for declaration matching only.
+withoutScopedDictionaries :: Type -> Type
+withoutScopedDictionaries ty
+  | DepDictTy _ body <- coreFullView ty = withoutScopedDictionaries body
+  | otherwise = ty
+
 -- | Collect declared domains for the written value-argument prefix.
 -- Mark visible retained domains with True. Skip dependent argument domains.
 -- Keep the set of crossed retained binders with the result.
@@ -1944,6 +1958,9 @@ retainedDeclaredDomains supplied = go supplied emptyVarSet
     go 0 bound result = result_view bound result
     go remaining bound ty
       | Just ty' <- coreView ty = go remaining bound ty'
+    go remaining bound (DepDictTy dict body)
+      = let (domains, result, masked) = go remaining (extendVarSet bound dict) body
+        in (domains, result, DepDictTy dict masked)
     go _ _ ty@(DepFunTy DepFunInvisible _ _) = ([], Nothing, ty)
     go remaining bound (DepFunTy DepFunVisible binder body)
       = let domain = independent bound True (varType binder)
@@ -3087,6 +3104,16 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
       , not (no_tvs && no_theta)
       = do { selected <- case plan of
                 Just (_ : _) -> return plan
+                _ | not prefix_only, not no_tvs
+                  , DepDictTy{} <- coreFullView body2
+                  -- See Note [Applying a scoped dictionary].
+                  -> do { sigma <- liftZonkM (zonkTcType fun_ty)
+                        ; choice <- tcRetainedKnownArgPlan (tcRetainedDeclaredArgType pure)
+                                                            Nothing tc_fun sigma args
+                        ; case choice of
+                            Just _ -> return choice
+                            Nothing -> failWithTc $ TcRnRetainedQuantificationError
+                                                     (RetainedSolverType fun_ty) }
                 _ | NoQL <- do_ql, not prefix_only, pos > 1, not no_tvs
                   , DepFunTy DepFunVisible _ _ <- coreFullView body2
                   , arg@EValArg{} : _ <- args
@@ -3159,8 +3186,25 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
            ; let wrap = mkWpEvApps [EvExpr operand]
            ; go plan fun_orig pos (addArgWrap wrap acc) (applyTypeToArgs fun_ty [operand]) args }
 
-    -- Source binders can introduce scoped evidence in the private prototype.
-    -- Applying such a function from source needs a separate evidence path.
+    -- See Note [Applying a scoped dictionary].
+    go1 plan fun_orig pos acc fun_ty args
+      | DepDictTy binder _ <- coreFullView fun_ty
+      , not (null args), inst_fun args Inferred
+      = do { givens <- getLexicalGivens
+           ; dict <- case filter (\d -> isNativeClassDictionaryId d
+                                    && varType d `tcEqType` varType binder) givens of
+               [dict] -> return dict
+               [] | noFreeVarsOfType (varType binder) ->
+                 do { defer <- goptM Opt_DeferTypeErrors
+                    ; when defer $
+                        failWithTc $ TcRnRetainedQuantificationError (RetainedSolverType fun_ty)
+                    ; ev <- newWanted fun_orig Nothing (varType binder)
+                    ; emitSimple (mkNonCanonical ev)
+                    ; return (ctEvEvId ev) }
+               _ -> failWithTc $ TcRnRetainedQuantificationError (RetainedSolverType fun_ty)
+           ; let evidence = Core.Var dict
+                 wrap = mkWpEvApps [EvExpr evidence]
+           ; go plan fun_orig pos (addArgWrap wrap acc) (applyTypeToArgs fun_ty [evidence]) args }
     go1 _ _ _ _ fun_ty _
       | DepDictTy{} <- coreFullView fun_ty
       = failWithTc $ TcRnRetainedQuantificationError (RetainedSolverType fun_ty)
@@ -3192,6 +3236,11 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
         (EValArg { ea_arg = arg, ea_loc_span = ctxt } : rest_args)
       | DepFunTy DepFunVisible binder _ <- coreFullView fun_ty
       = do { (core_arg, runtime_arg) <- tcRetainedOperand binder arg
+           ; case core_arg of
+               Core.Var index | isNativeOpaqueValueId index -> pure ()
+               _ | hasScopedDictionaryPrefix fun_sigma ->
+                     failWithTc $ TcRnRetainedQuantificationError RetainedCallIndex
+                 | otherwise -> pure ()
            ; body_ty <- retainedAppResult fun_ty binder core_arg
            ; arg_co <- retainedVariableCast core_arg runtime_arg
            ; let arg' = ERetainedArg DepFunVisible ctxt (Scaled ManyTy (varType binder)) runtime_arg body_ty
@@ -3470,6 +3519,31 @@ uses only if its proof is used. Reject unsupported wrappers and expressions
 without a diagnostic.
 Finally, retainedArgIndex checks the saturated canonical tree and its domains.
 This operation emits no constraints, usage obligations or method checks.
+-}
+
+{- Note [Applying a scoped dictionary]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Use declared value domains to fix erased parameters before choosing any
+dictionary. Use the declaration path also with ImpredicativeTypes.
+Quick Look cannot assign a type with this private evidence prefix.
+The declaration pass reads through the evidence prefix. It keeps the
+dictionaries bound and cannot infer an argument from a selector
+application in the result. A dictionary in an expected result must
+match the identity and predicate of an actual lexical Given.
+
+At the call, prefer the unique lexical Given with the exact predicate.
+A Wanted for the same predicate can produce a fresh let-bound alias.
+That alias would change the index and could escape its binder.
+
+The Core index currently represents a selector on a variable operand.
+Reject a constructor or other non-variable before substituting it.
+
+A closed predicate with no direct Given can use an ordinary Wanted. Its
+fresh evidence ID belongs to the existing evidence bindings. An ordinary
+result can consume the indexed call while the ID is in scope. The
+retained-index escape checks still apply if the ID occurs in the result.
+Disallow deferred type errors on this path. The source prototype cannot
+assert that an unsolved predicate supplies a class dictionary.
 -}
 
 -- | Resolve the index at the binder's checked scalar or function domain.
@@ -6127,6 +6201,14 @@ tcRetainedInstScope tys
                  && eqType (varType occurrence) (varType binding)
                  && isManyTy (idMult occurrence) && isManyTy (idMult binding)
              valid_runtime_id v
+               | isNativeClassDictionaryId v
+               = do { scoped <- getLexicalGivens
+                    ; occurrence <- liftZonkM (zonkId v)
+                    ; actuals <- liftZonkM (mapM zonkId (filter (== v) scoped))
+                    ; return $ case actuals of
+                        [actual] -> isNativeClassDictionaryId actual
+                                 && varType occurrence `eqType` varType actual
+                        _ -> False }
                | not (isNonCoVarId v) = return True
                | otherwise
                = do { occurrence <- liftZonkM (zonkId v)

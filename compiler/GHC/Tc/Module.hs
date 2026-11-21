@@ -1902,7 +1902,7 @@ tcTopSrcDeclsThen requests group finish = do
     defer <- goptM Opt_DeferTypeErrors
     holes <- goptM Opt_DeferTypedHoles
     not_in_scope <- goptM Opt_DeferOutOfScopeVariables
-    when (defer || holes || not_in_scope) $
+    when (not (null demands) && (defer || holes || not_in_scope)) $
       rejectLocalOpen demands "Disable deferred errors before observing a local definition."
     env <- getGblEnv
     let checked = mkNameSet
