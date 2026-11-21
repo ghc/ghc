@@ -642,7 +642,7 @@ rnIfaceDecl = \case
     name        <- rnIfaceNeverExported name0
     tycon       <- rnIfaceTyCon tycon0
     ax_branches <- mapM rnIfaceAxBranch ax_branches0
-    deps        <- traverse rnSourceProofRule deps0
+    deps        <- traverse (\(index, rules) -> (index,) <$> traverse rnSourceProofRule rules) deps0
     return $
       IfaceAxiom  -- See Note [Prefer explicit record construction]
         { ifName       = name

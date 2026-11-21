@@ -252,7 +252,7 @@ data IfaceDecl
                  ifTyCon      :: IfaceTyCon,     -- LHS TyCon
                  ifRole       :: Role,           -- Role of axiom
                  ifAxBranches :: [IfaceAxBranch], -- Branches
-                 ifAxSourceProofRules :: [IfaceSourceProofRule],
+                 ifAxSourceProofRules :: [(BranchIndex, [IfaceSourceProofRule])],
                  ifAxSourceSpans :: [SrcSpan]    -- See Note [Source table locations in interfaces] in GHC.Iface.Binary
     }
 
@@ -1631,10 +1631,11 @@ pprIfaceDecl ss (IfaceId { ifName = var, ifType = ty,
          , ppShowIface ss (ppr info)
          , ppShowIface ss (ppUnless (null deps) (text "SourceProof" <+> ppr deps)) ]
 
-pprIfaceDecl _ (IfaceAxiom { ifName = name, ifTyCon = tycon
-                           , ifAxBranches = branches })
+pprIfaceDecl ss (IfaceAxiom { ifName = name, ifTyCon = tycon
+                            , ifAxBranches = branches, ifAxSourceProofRules = deps })
   = hang (text "axiom" <+> ppr name <+> dcolon)
-       2 (vcat $ unzipWith (pprAxBranch (ppr tycon)) $ zip [0..] branches)
+       2 (vcat (unzipWith (pprAxBranch (ppr tycon)) (zip [0..] branches)) $$
+          ppShowIface ss (ppUnless (null deps) (text "SourceProofBranches" <+> ppr deps)))
 
 pprCType :: Maybe (CType (GhcPass p)) -> SDoc
 pprCType Nothing      = Outputable.empty
@@ -2627,13 +2628,23 @@ instance Binary IfaceDecl where
         put_ bh a9
         put_ bh a10
 
-    put_ bh (IfaceAxiom a1 a2 a3 a4 deps _) = do
-        putSourceProofTag bh deps SourceProofRuleAxiomEvidence 6 10 14
+    put_ bh (IfaceAxiom a1 a2 a3 branches deps _) = do
+        -- Keep the old encodings for unmarked and nullary axioms. For
+        -- other equations, an old reader cannot check the selected branch.
+        put_deps <- case (branches, deps) of
+            (_, []) -> putByte bh 6 >> pure (pure ())
+            ([IfaceAxBranch { ifaxbLHS = IA_Nil }], [(0, rules)]) -> do
+                putSourceProofTag bh rules SourceProofRuleAxiomEvidence 6 10 14
+                pure (putSourceProofRules bh rules)
+            _ -> do
+                requireIfaceEvidenceVersion bh SourceProofRuleBranchesEvidence
+                putByte bh 15
+                pure (put_ bh deps)
         putIfaceTopBndr bh a1
         put_ bh a2
         put_ bh a3
-        put_ bh a4
-        putSourceProofRules bh deps
+        put_ bh branches
+        put_deps
 
     put_ bh (IfacePatSyn a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11) = do
         putByte bh 7
@@ -2718,8 +2729,9 @@ instance Binary IfaceDecl where
                             ifUnary     = a9
                         }})
             6 -> get_axiom (pure [])
-            10 -> get_axiom (getLegacySourceProofRules bh)
-            14 -> get_axiom (get bh)
+            10 -> get_axiom (legacy_axiom_rules <$> getLegacySourceProofRules bh)
+            14 -> get_axiom (legacy_axiom_rules <$> get bh)
+            15 -> get_axiom (get bh)
             7 -> do a1 <- getIfaceTopBndr bh
                     a2 <- get bh
                     a3 <- get bh
@@ -2752,6 +2764,7 @@ instance Binary IfaceDecl where
           -- See Note [Lazy deserialization of IfaceId]
           deps <- get_rules
           return (IfaceId name ty details idinfo deps)
+        legacy_axiom_rules rules = [(0, rules)]
         get_axiom get_rules = do
           a1 <- getIfaceTopBndr bh
           a2 <- get bh

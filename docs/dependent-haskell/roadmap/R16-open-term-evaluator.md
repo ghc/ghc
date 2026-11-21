@@ -2074,7 +2074,26 @@ The new axiom fingerprint invalidates a dependent module with the same normalize
 family result. The same writer uses the established interface
 encoding for an ordinary literal equation.
 
-The axiom check currently covers an immediate nominal proof from a
-single nullary equation. The next acceptance check is a closed
-family with arguments, where one selected branch uses a checked
-method and a different branch can be used with the rule enabled.
+A closed family with arguments records dependencies by axiom branch.
+For example, `Image 'True` can use the checked method call while
+`Image 'False` returns the same type from a literal. A conflicting
+`fmap` rule prevents an ordinary client from proving the first
+equation with `Refl`. The literal equation, reflexivity at
+`Image 'True`, and a type-only use still pass. Disabling rewrite rules
+allows both equations.
+
+The nominal equality solver reads the index from the axiom in the
+reduction proof. The proof can also include the checked branch when
+another family reduces its argument. The solver records dependencies
+at the original proof site when the rewritten equality is reflexive.
+A checked method synonym also records its dependency when the
+reduction uses an axiom from its expanded private family. For example,
+a proof about `MappedEither f (Image 'True)` can use both the mapping
+axiom and the checked branch of `Image`. A literal receiver branch
+adds no dependency of its own.
+
+The interface adds the `source-proof-rule-branches` requirement for
+indexed dependencies. It keeps the old encoding for unmarked axioms
+and marked nullary axioms. A reader without this feature rejects the
+indexed interface before reading its declarations. Rebuild an older
+unmarked provider to recover the branch dependencies.

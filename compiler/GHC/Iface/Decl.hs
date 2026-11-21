@@ -95,7 +95,7 @@ coAxiomToIfaceDecl ax@(CoAxiom { co_ax_tc = tycon, co_ax_branches = branches
               , ifAxBranches = map (coAxBranchToIfaceBranch tycon
                                      (map coAxBranchLHS branch_list))
                                    branch_list
-              , ifAxSourceProofRules = toIfaceSourceProofRules (co_ax_source_proof_rules ax)
+              , ifAxSourceProofRules = map (fmap toIfaceSourceProofRules) (co_ax_source_proof_rules ax)
               , ifAxSourceSpans = case sourceTableTermOcc (getOccName tycon) of
                   Nothing -> []
                   Just _  -> map coAxBranchSpan branch_list }

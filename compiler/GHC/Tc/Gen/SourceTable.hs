@@ -7,7 +7,8 @@ module GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourc
                               OptionalSourceUses, optionalSourceUses, registerOptionalSourceUses,
                               checkOptionalSourceUses, checkSourceMethodUses,
                               withSourceProofSignature,
-                              recordSourceProofAliasUse, sourceProofRulesFor, captureSourceMethodProof, closedSourceProofArgs,
+                              recordSourceProofAliasUse, sourceProofRulesFor, takeSourceProofRulesFor,
+                              captureSourceMethodProof, closedSourceProofArgs,
                               checkAndInstallSourceProofs) where
 
 import GHC.Prelude
@@ -83,7 +84,7 @@ import GHC.Types.Name (Name, OccName, isExternalName, mkSourceTableOcc, mkSource
                        isVarOcc, mkTyVarOcc, mkVarOcc, nameModule_maybe, nameOccName, nameSrcSpan, occNameString, setOccNameSpace, sourceTableTermOcc, stableNameCmp, nameStableString, tvName, SourceProofRule, SourceProofArgs, SourceProofArg(..))
 import GHC.Core.Opt.Pipeline (pairObservationOcc, pairObservationType, scalarRecipeTableOcc)
 import GHC.Types.Name.Reader (gre_imp, is_decl, is_isboot, lookupGRE_Name)
-import GHC.Types.Name.Env (extendNameEnv_C, lookupNameEnv, mkNameEnv, plusNameEnv_C, isEmptyNameEnv)
+import GHC.Types.Name.Env (delFromNameEnv, extendNameEnv_C, lookupNameEnv, mkNameEnv, plusNameEnv_C, isEmptyNameEnv)
 import GHC.Types.Name.Set (NameSet, emptyNameSet, elemNameSet, extendNameSet, extendNameSetList, filterNameSet,
                            intersectsNameSet,
                            intersectNameSet, isEmptyNameSet, minusNameSet, mkNameSet, nameSetElemsStable,
@@ -654,6 +655,17 @@ sourceProofRulesFor name = do
     env <- getGblEnv
     defs <- sourceProofDefinitions <$> readTcRef (tcg_source_rule_types env)
     pure (stableSourceProofRules (fromMaybe [] (lookupNameEnv defs name)))
+
+-- | Finish a family equation before collecting dependencies for another
+-- equation under the same axiom name.
+takeSourceProofRulesFor :: Name -> TcM [SourceProofRule]
+takeSourceProofRulesFor name = do
+    rules <- sourceProofRulesFor name
+    unless (null rules) $ do
+      env <- getGblEnv
+      updTcRef (tcg_source_rule_types env) $ \state ->
+        state { sourceProofDefinitions = delFromNameEnv (sourceProofDefinitions state) name }
+    pure rules
 
 -- | Verify imported proofs and committed synonym reductions in this consumer and retain the dependencies of
 -- its exports, including forwards through a private local group.
