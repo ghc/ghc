@@ -2226,9 +2226,9 @@ runProgramChecks libdir = do
                 GHC.setTargets [target]
                 action
     let sourceWith declarations = retainedProgramSource ++ unlines declarations
-        inlineSource = sourceWith ["{-# INLINE entry #-}"]
-    forM_ [(optimization, source) | optimization <- [[], ["-O2"]],
-                                     source <- [retainedProgramSource, inlineSource]] $ \(optimization, source) -> do
+        sources = retainedProgramSource :
+            [sourceWith ["{-# " ++ pragma ++ " entry #-}"] | pragma <- ["INLINE", "INLINABLE"]]
+    forM_ [(optimization, source) | optimization <- [[], ["-O2"]], source <- sources] $ \(optimization, source) -> do
         withProgram optimization source $ do
             loaded <- GHC.load GHC.LoadAllTargets
             unless (GHC.succeeded loaded) (fail "FAIL: native source program did not compile or link")
@@ -2281,9 +2281,6 @@ runProgramChecks libdir = do
                 | otherwise -> fail ("FAIL: program rejection " ++ label ++ "; wrong phase: " ++ message)
             Left exception -> fail ("FAIL: program rejection " ++ label ++ "; wrong exception: " ++ displayException exception)
             Right () -> fail ("FAIL: native program accepted " ++ label)
-    withProgram [] (sourceWith ["{-# INLINABLE entry #-}"]) $ do
-        result <- GHC.handleSourceError (pure . Left) (Right <$> checkProgram)
-        checkSourceRejection "INLINABLE entry" 92256 "The INLINABLE unfolding of" result
     writeFile sourcePath retainedProgramSource
     putStrLn "program rejection checks: ok"
 
