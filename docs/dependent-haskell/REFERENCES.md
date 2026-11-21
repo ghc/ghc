@@ -1775,6 +1775,24 @@ all equalities. Expected checking can also supply an ordinary function arrow
 after the written arguments. This follows expected-type instantiation; the
 candidate itself supplies no equality proof.
 
+In `fmap ((.) sum toList) (checkedZipWith xs ys f)`, `fmap` obtains the
+callback's input `Vec Int (sourceLength xs)` from the zip. The result of
+the partial application of `(.)` determines its input and result type
+parameters. Its intermediate type stays open. If the result is an
+undetermined ordinary type parameter, defer the prefix so that `fmap`
+can pass the known input to normal argument checking. This route uses
+NoQL, an unrestricted callback, and a prefix without written type
+arguments. Its operands must have named polymorphic signatures with no
+native anchor of their own. Argument checking infers `[Int]` as the
+intermediate type and `Int` as the result. The zip client uses this
+prefix in an unsigned local binding.
+
+See [A Quick Look at Impredicativity, Figure 4](https://www.microsoft.com/en-us/research/wp-content/uploads/2020/01/quick-look-icfp20.pdf#page=8)
+for IALL, and Notes [Partially applied callbacks] and
+[Partial ordinary applications at a native result type] in
+`GHC.Tc.Gen.App` for native argument selection. Normal subsumption still
+rejects a result that claims an unrelated length.
+
 GHC already gives wired-in dollar applications special Quick Look handling
 in `GHC.Tc.Gen.App`. Its source signature in
 `libraries/ghc-internal/src/GHC/Internal/Base.hs` quantifies over both runtime
