@@ -72,7 +72,7 @@ data PendingStuff
   | TcPending                     -- Typechecking the inside of a typed bracket
       (TcRef [PendingTcSplice])   --   Accumulate pending splices here
       (TcRef WantedConstraints)   --     and type constraints here
-      [EvVar]                    -- Native Givens from outside the bracket.
+      [EvVar]                    -- Lexical Givens from outside the bracket.
                                   -- Restore these when checking nested splices.
       QuoteWrapper                -- A type variable and evidence variable
                                   -- for the overall monad of
