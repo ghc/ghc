@@ -14,10 +14,10 @@ for opt in -O0 -O1 -O2; do
     "${ghc[@]}" "$opt" -Werror=incomplete-patterns -c ParameterizedIndexLibrary.hs
     cd ../proof
     cp "$src/"{FinitePosition,ListCursor,NativeIndexedFinGate,NativeLinearIndexColumns}.hs ../indices/*.hi .
-    "${ghc[@]}" "$opt" -Werror=incomplete-patterns -c FinitePosition.hs ListCursor.hs NativeIndexedFinGate.hs
+    "${ghc[@]}" "$opt" -Werror=incomplete-patterns -c FinitePosition.hs NativeIndexedFinGate.hs
     lint=()
     if [[ $opt == -O0 ]]; then lint=(-dlinear-core-lint); fi
-    "${ghc[@]}" "$opt" "${lint[@]}" -Werror=incomplete-patterns -c NativeLinearIndexColumns.hs
+    "${ghc[@]}" "$opt" "${lint[@]}" -Werror=incomplete-patterns -c ListCursor.hs NativeLinearIndexColumns.hs
     cd ../client
     cp "$src/"{FinitePositionClient,CursorClient}.hs ../proof/*.hi .
     "${ghc[@]}" "$opt" -Werror=incomplete-patterns -c FinitePositionClient.hs CursorClient.hs
@@ -27,7 +27,7 @@ module Main where
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Data.IORef (newIORef, readIORef)
 import Data.Maybe (isJust)
-import CursorClient (observeCursors, observeIndexedCallback)
+import CursorClient (observeAligned, observeCursors, observeIndexedCallback)
 import NativeLinearIndexColumns (choose)
 import FinitePositionClient (lookupVecViaView, observeConstructedViews, observeEmptyIndex, observeFinitePosition, observeListIndices)
 import NativeIndexedFinGate (Gate(..), Ticket(..), grant)
@@ -38,6 +38,8 @@ main :: IO ()
 main = do
     observeFinitePosition >>= print
     observeListIndices >>= print
+    aligned <- observeAligned
+    if aligned == [Just ('b', 20), Nothing, Nothing] then pure () else fail (show aligned)
     callbacks <- observeIndexedCallback
     if callbacks == (Just "cc", Nothing, True) then pure () else fail (show callbacks)
     word <- newIORef "xz" >>= readIORef
@@ -48,7 +50,7 @@ main = do
                 fallback = choose word pos False '!'
             if (selected, fallback) == ('z', '!') then pure () else fail "wrong branch"
     (ordinary, linear) <- observeCursors
-    let expectedCursors = [Just 'c', Nothing, Nothing, Just 'b', Just 'x']
+    let expectedCursors = [Just 'c', Nothing, Nothing, Just 'b', Just 'x', Just 'y']
     if ordinary == expectedCursors && linear == expectedCursors then pure ()
         else fail (show (ordinary, linear))
     empty <- observeEmptyIndex
@@ -114,6 +116,32 @@ for line in 9 12 15 18; do
     grep -Eq "^MissingRows.hs:$line:[0-9]+: error: .GHC-83605." missing.log
 done
 test "$(grep -c 'Missing equation for the retained constructor .*Shut' missing.log)" -eq 4
+cat >ScopedLength.hs <<'HS'
+{-# LANGUAGE CPP, EmptyCase, ExperimentalDependentTypes, GADTs, LinearTypes, ScopedTypeVariables #-}
+module ScopedLength where
+import PackedVecLibrary (sourceLength)
+import ParameterizedIndexLibrary (Fin(..))
+#ifdef UNRELATED
+lookupAt :: forall n m a. foreach (xs :: [a]) -> (m ~ sourceLength xs) => Fin n %1 -> a
+#else
+lookupAt :: forall n m a. foreach (xs :: [a]) -> (m ~ sourceLength xs, n ~ m) => Fin n %1 -> a
+#endif
+#ifndef OMIT
+lookupAt [] i = case i of {}
+#endif
+lookupAt (x : _) FZ = x
+lookupAt (_ : xs) (FS i) = lookupAt xs i
+HS
+for clause in explicit omitted; do
+    flags=()
+    if [[ $clause == omitted ]]; then flags=(-DOMIT); fi
+    "${ghc[@]}" -O0 -fforce-recomp -dlinear-core-lint -Werror=incomplete-patterns "${flags[@]}" -c ScopedLength.hs
+done
+if "${ghc[@]}" -O0 -fforce-recomp -DUNRELATED -DOMIT -fdefer-type-errors -fdiagnostics-color=never -c ScopedLength.hs >unrelated.log 2>&1; then
+    echo 'Used an unrelated list length to omit a retained equation'
+    exit 1
+fi
+grep -Fq 'ScopedLength.hs:13:1: error: [GHC-83605]' unrelated.log
 cat >MissingSuccessor.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, ScopedTypeVariables #-}
 module MissingSuccessor where

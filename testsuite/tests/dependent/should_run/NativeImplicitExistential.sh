@@ -184,6 +184,22 @@ for diagnostic in '[GHC-83865]' '[GHC-46956]' 'would escape its scope'; do
         exit 1
     }
 done
+if "$ghc" "${flags[@]}" -DCONDITIONAL_CONFLICT -c WitnessGuardedReject.hs >conditional-conflict.log 2>&1; then
+    echo "The conditional accepted two different witnesses." >&2
+    exit 1
+fi
+line=$(grep -nF 'else (different b :: Payload PolyMaybe)' WitnessGuardedReject.hs | cut -d: -f1)
+grep -Fq "WitnessGuardedReject.hs:$line:28: error: [GHC-83865]" conditional-conflict.log
+grep -Fq 'Actual: Payload PolyMaybe' conditional-conflict.log
+grep -Fq 'Expected: Payload (forall a. a -> a)' conditional-conflict.log
+if "$ghc" "${flags[@]}" -DCONDITIONAL_ESCAPE -c WitnessGuardedReject.hs >conditional-escape.log 2>&1; then
+    echo "The conditional let a witness escape its scope." >&2
+    exit 1
+fi
+line=$(grep -nF 'if flag then value else value' WitnessGuardedReject.hs | cut -d: -f1)
+grep -Fq "WitnessGuardedReject.hs:$line:18: error: [GHC-46956]" conditional-escape.log
+grep -Fq 'would escape its scope' conditional-escape.log
+grep -Fq 'CapturedMono :: forall t. Payload t -> CapturedMono' conditional-escape.log
 if "$ghc" "${flags[@]}" -c WitnessJointReject.hs >joint-reject.log 2>&1; then
     echo "The joint witness check accepted a conflicting or local witness." >&2
     exit 1

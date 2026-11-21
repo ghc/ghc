@@ -7051,8 +7051,16 @@ Agda's indexed coverage example defines lookup by inspecting a list and a
 bounded position. The empty list gives a position of type `Fin zero`. Agda
 can omit that absurd clause when the written clauses determine the split.
 Serokell uses the two cons equations in its opening example.
-[Agda 2.8.0, coverage checking](https://agda.readthedocs.io/en/v2.8.0/language/coverage-checking.html#coverage-checking-of-indexed-datatypes)
+[Agda 2.8.0, coverage checking](https://agda.readthedocs.io/en/v2.8.0/language/coverage-checking.html#matching-on-indexed-datatypes)
 and [Serokell roadmap](https://ghc.serokell.io/dh#dependent-haskell).
+
+A declared equality can connect the list length to a separate position index.
+The fork uses GHC's Given solver to check that the chosen constructor makes
+the inspected position empty. Agda uses the same index conflict in its
+vector lookup and length-indexed zip examples. The Given solver and the
+checked cast for a written empty case are GHC implementation choices.
+[Agda indexed coverage](https://agda.readthedocs.io/en/v2.8.0/language/coverage-checking.html#matching-on-indexed-datatypes)
+and [fork example](roadmap/R03-dependent-products.md#use-one-position-on-two-lists-of-equal-length).
 
 The fork elaborates the missing equation to `indexGeneric [] i = case i of {}`.
 This gives the same demand on the position as a written Haskell empty case.

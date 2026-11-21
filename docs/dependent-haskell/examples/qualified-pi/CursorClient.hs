@@ -1,10 +1,10 @@
 {-# LANGUAGE BangPatterns, LinearTypes, MonoLocalBinds, NoExperimentalDependentTypes #-}
 
 -- | Open a checked list selection in an ordinary module.
-module CursorClient (observeCursors, observeIndexedCallback) where
+module CursorClient (observeCursors, observeIndexedCallback, observeAligned) where
 
 import Data.IORef (newIORef, readIORef)
-import ListCursor (Selection, cursor, prepare, withIndex)
+import ListCursor (Selection, cursor, lookupAligned, prepare, withIndex)
 import ParameterizedIndexLibrary (indexGeneric, mkFinGeneric)
 
 -- | Pass the stored position once to its reader.
@@ -19,7 +19,8 @@ observeCursors = do
     let ordinary ys i = fmap (indexGeneric ys) (mkFinGeneric ys i)
         packed ys i = fmap (\c -> readSelection (prepare c)) (cursor ys i)
         positions f = [f xs n, f xs 4, f (error "forced list") (-1),
-                       f (cycle "ab") 3, f ('x' : error "forced suffix") 0]
+                       f (cycle "ab") 3, f ('x' : error "forced suffix") 0,
+                       f (error "forced skipped element" : 'y' : error "forced suffix") 1]
     pure (positions ordinary, positions packed)
 
 -- | Check a runtime position before calling a linear continuation.
@@ -32,3 +33,12 @@ observeIndexedCallback = do
             Nothing -> Nothing
             Just pos -> Just (withIndex ys pos (\c -> [c, c]))
     pure (checked xs n, checked bottom (-1), withIndex bottom (error "forced position") `seq` True)
+
+-- | Reuse a checked position after comparing the lengths of two runtime lists.
+observeAligned :: IO [Maybe (Char, Int)]
+observeAligned = do
+    xs <- newIORef "abc" >>= readIORef
+    ys <- newIORef [10, 20, 30] >>= readIORef
+    k <- newIORef 1 >>= readIORef
+    pure [lookupAligned xs ys k, lookupAligned xs (drop 1 ys) k,
+          lookupAligned (error "forced first list") (error "forced second list") (-1)]

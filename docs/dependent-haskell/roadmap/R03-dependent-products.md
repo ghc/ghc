@@ -489,3 +489,18 @@ retained indices still use the separate dependent-pattern rules.
 [Source function](../examples/qualified-pi/ListCursor.hs),
 [ordinary caller](../examples/qualified-pi/CursorClient.hs)
 and [strict pattern control](../../../testsuite/tests/dependent/should_run/NativeLinearIndexColumns.hs).
+
+### Use one position on two lists of equal length
+
+`indexAtLength` takes a list, a position of type `Fin n`, and a constraint
+`n ~ sourceLength xs`. The two cons clauses cover this function. In the
+empty branch the constraint gives `n ~ Z`. The same equality justifies
+a written empty case on the position. An independent equality about a
+different index leaves the empty-list equation missing (GHC-83605).
+
+`lookupAligned` checks an offset against the first list, then compares the
+lengths of both lists. A successful comparison supplies the equality for
+the second lookup. Equal lengths require traversing both finite spines.
+A negative offset returns before inspecting either list.
+[Library](../examples/qualified-pi/ListCursor.hs) and
+[ordinary client](../examples/qualified-pi/CursorClient.hs).

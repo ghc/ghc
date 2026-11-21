@@ -139,8 +139,9 @@ pair a list's computed length with its vector: (2,[11,22])
 generic checked Int position: Just 22
 index a list by its ordinary source length: [Just 'b',Nothing,Nothing,Just 'x',Just 'x']
 empty-list index forces its position: True
-read checked list positions through ordinary and linear callers: ([Just 'c',Nothing,Nothing,Just 'b',Just 'x'],[Just 'c',Nothing,Nothing,Just 'b',Just 'x'])
+read checked list positions through ordinary and linear callers: ([Just 'c',Nothing,Nothing,Just 'b',Just 'x',Just 'y'],[Just 'c',Nothing,Nothing,Just 'b',Just 'x',Just 'y'])
 read a checked position with a linear callback: (Just "cc",Nothing,True)
+use one bounded position on equal-length lists: [Just ('b',20),Nothing,Nothing]
 check a signed position in a packaged vector: Just 22
 generic negative position ignores list: Nothing
 generic checked function position: Just 42
@@ -286,6 +287,7 @@ apply the second projection to the first in an ordinary module: (7,True)
 project twice from the same package producer call: [(8,True),(11,False)]
 infer a polymorphic lambda witness and call its builder at Int: (11,True)
 infer a guarded callback and skip an unused input: ((7,True),(11,False))
+infer one callback type for both arms of a conditional producer: ((7,True),(11,False))
 infer callback witnesses from a type argument and separate equations: ((7,True),((11,False),(13,False)))
 choose each branch's callback witness by type application: ((7,True),(17,False),17)
 read an integer through an erased package: 7
