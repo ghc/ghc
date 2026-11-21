@@ -504,3 +504,19 @@ reports GHC-92256 at the binding.
 [ordinary client](../examples/qualified-pi/FinitePositionClient.hs),
 [INLINE regression](../../../testsuite/tests/dependent/should_run/NativeOrdinaryInline.sh),
 and [INLINABLE regression](../../../testsuite/tests/dependent/should_run/NativeOrdinaryInlinable.sh).
+
+## Higher-rank wrappers around ordinary and retained arrows
+
+A local helper can accept a named retained consumer with matching
+higher-rank arguments. With `DeepSubsumption`, an ordinary arrow can also
+return a wrapper that supplies a dictionary lambda for the retained suffix.
+Check the instantiated domain first. Then solve the complete retained
+function equality and use its coercion for the suffix. With
+`DeepSubsumption`, a visible retained arrow with the same domain on both
+sides can also introduce a dictionary immediately below its binder. The
+wrapper applies the worker to the bound runtime value and uses that same
+value in its result type. The implicit and explicit wrappers preserve lazy
+runtime indices. Independent indices still require equality evidence.
+[Alternating binder regression](../../../testsuite/tests/dependent/should_run/NativeAlternatingBinders.sh),
+[proposal #511](https://ghc-proposals.readthedocs.io/en/latest/proposals/0511-deep-subsumption.html),
+and [discussion of dictionary arguments and evaluation](https://github.com/ghc-proposals/ghc-proposals/pull/287#issuecomment-543733379).

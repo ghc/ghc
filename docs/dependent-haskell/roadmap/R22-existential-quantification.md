@@ -347,10 +347,36 @@ advertises `linear-unpack` so earlier readers reject it at the header.
 An opening confined to an object file leaves the header's requirements
 unchanged.
 
+An ordinary client can write `forwardLinear @p package` as the RHS of
+that strict binding under `forall (p :: Multiplicity)`. The wrapper has
+type `forall (p :: Multiplicity) a. a %p -> a`. One forwarding argument
+determines the erased package type for checking the full call.
+The caller can also omit `@p` when normal usage determines it. A
+written `@Many` cannot consume an input at a rigid `p`. The forwarding
+probe covers leading specified multiplicity arguments.
+
+The same rule accepts `OpenPayload a = exists b. (b, b %1 -> a)` through
+an ordinary wrapper that calls a higher-rank identity function. The free
+`a` must be rigid and free in the selected operand's full declared type.
+That includes a caller's scoped `a` and a witness introduced by an
+enclosing package pattern. A producer's quantified `a` still needs an
+instantiation. A different result variable or an opened witness cannot escape
+the let. An explicit tilde can leave the forwarded package unevaluated.
+An explicit bang forces it before the body. This lexical rule follows
+one forwarding operand.
+
+An ordinary client can also pass the opened result to a retained reader.
+`DeepSubsumption` adapts the reader's dictionary below its retained arrow.
+The source-hidden test reads both `Bool` and `Char` results and can ignore
+a bottom retained argument or a lazy package.
+[Showcase formatter](../examples/erased-existentials/RetainedPackageFormatClient.hs),
+[Retained reader client](../../../testsuite/tests/dependent/should_run/implicit-existential-source/LexicalRetainedClient.hs).
+
 This path accepts one unsigned nonrecursive boxed tuple binding with
 variable or wildcard fields and at most one outer bang or tilde. The
-unguarded RHS must be a name or ordinary application whose declaration
-exposes the dot package. The usual binding rules still apply to
+unguarded RHS must be a named value or ordinary application. The
+declaration or one forwarded argument must expose the dot package.
+The usual binding rules still apply to
 recursive groups, signed bindings, and patterns that bring their own
 evidence.
 [Ordinary client](../examples/erased-existentials/RankedPackageClient.hs),

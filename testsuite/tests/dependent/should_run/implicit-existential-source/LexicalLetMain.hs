@@ -1,8 +1,9 @@
-{-# LANGUAGE NoExperimentalDependentTypes #-}
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeApplications #-}
 module Main where
 
 import Control.Exception (ErrorCall(..), evaluate, try)
 import Data.IORef
+import GHC.Types (Multiplicity(..))
 import LexicalBangLet
 import LexicalStrictLet
 import LexicalLetProvider
@@ -50,3 +51,9 @@ main = do
   print (demand, readBangField, readStrictField,
          readPayload (repackStrict (producePayload second)))
   print (readLinear (linearPayload first), readLinearStrict (linearPayload second))
+  print (readForwarded @One (linearPayload first), readForwarded @Many (linearPayload second),
+         readForwardedInferred (linearPayload first))
+  openDemand <- observeDemand (forceOpen @Int (error "bottom package"))
+  print (readOpen @One (makeOpenPayload first (13 :: Int) 17),
+         readOpen @Many (makeOpenPayload second 'a' 'q'), readOuter (makeOuterPayload first),
+         ignoreOpen @Int (error "bottom package"), openDemand)

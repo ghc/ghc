@@ -1293,13 +1293,16 @@ tcLexicalExistsLet original (L bind_loc (HsValBinds ann (XValBindsLR (HsVBG grou
   , GRHSs { grhssGRHSs = L rhs_loc (GRHS rhs_ann [] rhs) NE.:| []
           , grhssLocalBinds = L _ EmptyLocalBinds{} } <- grhss
   = runMaybeT $ do
-      schema <- MaybeT (tcDeclaredOperandResult rhs)
+      (schema, check_schema) <- MaybeT (tcLexicalPackageOperand rhs)
       case coreFullView schema of
         ExistsTy ImplicitExists _ _ -> guard (matchesImplicitPayloadPat schema pat)
         _ -> mzero
       liftMaybeT $ do
         mult <- newMultiplicityVar
-        (checked, actual) <- tcScalingUsage mult $ tcInferRhoFRR FRRPatBind rhs
+        (checked, actual) <- tcScalingUsage mult $
+          if check_schema
+            then (, schema) <$> tcCheckMonoExpr rhs schema
+            else tcInferRhoFRR FRRPatBind rhs
         result_ty <- expTypeToType expected
         opened <- tcOpenImplicitPackageAt mult (getLocA rhs) actual checked result_ty $ \payload -> do
           let name = getName payload
@@ -1309,7 +1312,7 @@ tcLexicalExistsLet original (L bind_loc (HsValBinds ann (XValBindsLR (HsVBG grou
                 , pat_rhs = grhss { grhssGRHSs = L rhs_loc (GRHS rhs_ann [] replacement) NE.:| [] } }
               scope = HsValBinds ann (XValBindsLR (HsVBG [(NonRecursive, [L pat_bind_loc binding'])] []))
           (usage, (decls, body')) <- tcCollectingUsage $
-            tcExtendIdEnv [payload] $
+            tcExtendGeneratedIdEnv payload $
               tcLocalBinds scope (tcMonoLExpr body (mkCheckExpType result_ty))
           let (payload_use, body_usage) = popUE usage payload
               rhs_mult = case payload_use of
@@ -1343,7 +1346,8 @@ around the original pattern binding and its body. Replace the original
 RHS with the shared payload Id. Then use tcLocalBinds to infer the pattern
 binding and check its usage. Include the payload Id in the binding's
 free variables, since it carries the local witness. Keep the result type
-outside the opening.
+outside the opening. Keep the generated Id out of relevant bindings in
+error messages so the report shows the user's fields and package.
 
 The opening is lazy for every pattern. Keep the source pattern so ordinary
 desugaring determines whether the binding forces the tuple before its body.

@@ -405,7 +405,7 @@ for opt in 0 2; do
     "$ghc" "${let_flags[@]}" -c "$src/LexicalLetProvider.hs" -outputdir .
     cd ../client
     cp ../provider/LexicalLetProvider.hi "$src/"{LexicalLetMain,LexicalLetReject,LexicalBangLet,LexicalStrictLet}.hs \
-        "$src/"{LexicalStrictLetReject,LexicalLinearLet,LexicalLinearLetReject}.hs .
+        "$src/"{LexicalStrictLetReject,LexicalLinearLet,LexicalLinearLetReject,LexicalOpenReject}.hs .
     linear_lint=()
     if [[ $opt == 0 ]]; then linear_lint=(-dlinear-core-lint); fi
     "$ghc" "${let_flags[@]}" "${linear_lint[@]}" -c LexicalLinearLet.hs LexicalStrictLet.hs
@@ -414,7 +414,8 @@ for opt in 0 2; do
         ../provider/LexicalLetProvider.o -o run
     ./run >lexical-let.out
     printf '%s\n' '((1,1),(98,98),77)' "(True,(True,98),(True,'x'))" \
-        '(["True","bottom package","bottom package","True"],77,77,98)' '(5,9)' |
+        '(["True","bottom package","bottom package","True"],77,77,98)' '(5,9)' '(5,9,5)' \
+        "(13,'q',120,True,\"bottom package\")" |
         diff -u - lexical-let.out
     if "$ghc" "${let_flags[@]}" -c LexicalLetReject.hs >lexical-let-reject.log 2>&1; then
         echo "LexicalLetReject unexpectedly compiled." >&2
@@ -452,6 +453,73 @@ for opt in 0 2; do
         grep -Eq "^LexicalLinearLetReject.hs:$line:$column: error: \[GHC-18872\]" linear-let-reject.log ||
             { cat linear-let-reject.log >&2; exit 1; }
     done
+    for rejection in 'badMultiplicity:package:25897' 'badSibling:():83865' 'badKind:Bool:83865'; do
+        IFS=: read -r reader operand code <<< "$rejection"
+        field=$(grep -n "^$reader package =" LexicalLinearLetReject.hs)
+        line=${field%%:*}
+        prefix=${field#*:}
+        prefix=${prefix%%"$operand"*}
+        column=$((${#prefix} + 1))
+        grep -Eq "^LexicalLinearLetReject.hs:$line:$column: error: \[GHC-$code\]" linear-let-reject.log ||
+            { cat linear-let-reject.log >&2; exit 1; }
+    done
+    if "$ghc" "${let_flags[@]}" -c LexicalOpenReject.hs >open-let-reject.log 2>&1; then
+        echo "LexicalOpenReject unexpectedly compiled." >&2
+        exit 1
+    fi
+    for rejection in wrongResult:2:6 escapeWitness:2:6 escapeOuter:3:9; do
+        IFS=: read -r reader offset column <<< "$rejection"
+        line=$(grep -n "^$reader .* =$" LexicalOpenReject.hs | cut -d: -f1)
+        grep -Eq "^LexicalOpenReject.hs:$((line + offset)):$column: error: \[GHC-25897\]" open-let-reject.log ||
+            { cat open-let-reject.log >&2; exit 1; }
+    done
+    field=$(grep -nF '(freshOpenPayload True)' LexicalOpenReject.hs)
+    line=${field%%:*}
+    prefix=${field#*:}
+    prefix=${prefix%%freshOpenPayload True*}
+    column=$((${#prefix} + 1))
+    grep -Eq "^LexicalOpenReject.hs:$line:$column: error: \[GHC-83865\]" open-let-reject.log ||
+        { cat open-let-reject.log >&2; exit 1; }
+    grep -Eq "Couldn't match expected type .b. with actual type .a." open-let-reject.log
+    grep -Fq 'In the expression: value' open-let-reject.log
+    grep -Fq 'the type OuterPayload' open-let-reject.log
+    grep -Fq 'with actual type: OpenPayload' open-let-reject.log
+    grep -Fq 'In the expression: reader value' open-let-reject.log
+    if grep -Fq 'unpacked_' open-let-reject.log; then
+        cat open-let-reject.log >&2
+        exit 1
+    fi
+done
+
+# Use the result of an opened package through a deep dictionary adapter.
+for opt in 0 2; do
+    mkdir -p "$out/lexical-retained-$opt/"{provider,client}
+    cd "$out/lexical-retained-$opt/provider"
+    retained_flags=("${flags[@]}" "-O$opt")
+    "$ghc" "${retained_flags[@]}" -c "$src/LexicalRetainedReader.hs" -outputdir .
+    cp LexicalRetainedReader.hi "$out/lexical-let-$opt/provider/LexicalLetProvider.hi" \
+        "$src/"{LexicalRetainedClient,LexicalOrdinaryShallow}.hs ../client/
+    cd ../client
+    "$ghc" "${retained_flags[@]}" -c LexicalOrdinaryShallow.hs
+    "$ghc" "${retained_flags[@]}" -DDEEP -ddump-ds -fwrite-ide-info \
+        -c LexicalRetainedClient.hs >retained.log
+    test -s LexicalRetainedClient.hie
+    grep -Eq 'unpack \(LexicalLetProvider.relayLinear' retained.log
+    grep -Fq 'LexicalRetainedReader.$p1Display' retained.log
+    "$ghc" "${retained_flags[@]}" LexicalRetainedClient.o LexicalOrdinaryShallow.o \
+        ../provider/LexicalRetainedReader.o "$out/lexical-let-$opt/provider/LexicalLetProvider.o" -o run
+    ./run >retained.out
+    diff -u <(printf '%s\n' "(\"True\",\"'q'\",\"True\",(\"True\",\"'q'\"))") retained.out
+    if "$ghc" "${retained_flags[@]}" -fforce-recomp -c LexicalRetainedClient.hs >shallow.log 2>&1; then
+        echo "The retained dictionary adapter unexpectedly passed shallow subsumption." >&2
+        exit 1
+    fi
+    for line in $(grep -n 'in apply worker$' LexicalRetainedClient.hs | cut -d: -f1); do
+        grep -Eq "^LexicalRetainedClient.hs:$line:17: error: \[GHC-83865\]" shallow.log ||
+            { cat shallow.log >&2; exit 1; }
+    done
+    grep -Fq 'Expected: RetainedReader' shallow.log
+    grep -Fq 'In the expression: apply worker' shallow.log
 done
 
 # Only an opening serialized in the interface needs the linear reader.

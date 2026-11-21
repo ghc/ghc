@@ -13,7 +13,7 @@ module GHC.Tc.Gen.App
        ( tcApp, tcRuleAppPrefix, RuleAppPrefix(..)
        , tcExprPrag
        , matchPolytypeExistsWitness
-       , tcImplicitOperand, tcDeclaredOperandResult
+       , tcImplicitOperand, tcLexicalPackageOperand
        , tcRetainedInferableArg, tcRetainedArg, tcOptionalLetOperand ) where
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcCheckMonoExpr, tcCheckPolyExpr, tcPolyExpr, tcInferRho )
@@ -538,7 +538,7 @@ tcFindMixedBarArgument sigma args
   , Just template <- barPackageSignature domain
   , all (\binder -> isInjectiveInType binder template) binders
   , [EValArg{ea_arg = operand}] <- filter (not . parens) args
-  = do { declared <- tcMixedOperandResult operand
+  = do { declared <- tcPackageOperandResult False operand
        ; return $ case declared of
            Just (declared_ty, check_schema)
              | schema@(ExistsTy ImplicitExists _ inner) <- coreFullView declared_ty
@@ -579,6 +579,12 @@ call. Its ordinary checker checks every operand and all uses at that
 instantiation. Open only the checked result. The alternatives can
 hide different witnesses. The selector determines which value is
 returned and how much of each operand it evaluates.
+
+A lexical tuple binding can use the schema from one forwarding slot as
+its expected RHS type. See Note [Scope of a forwarded package schema].
+Allow leading type arguments for specified multiplicity binders. These
+arguments leave the forwarded type parameter for ordinary inference.
+The original RHS still checks the written type arguments and usage.
 
 An independent higher-rank callback does not obscure the result
 parameter. For relay :: (forall x. x -> x) -> a -> a, the second
@@ -954,37 +960,54 @@ implicitSpineResult n ty
 tcDeclaredOperandResult :: LHsExpr GhcRn -> TcM (Maybe TcType)
 tcDeclaredOperandResult operand =
   fmap (>>= \(ident, args) -> implicitSpineResult (length args) (varType ident))
-       (tcDeclaredOperandSpine operand)
+       (tcDeclaredOperandSpine False operand)
+
+-- | Read a lexical package operand's declared type. A forwarded result
+-- supplies an expected type for checking the original operand.
+tcLexicalPackageOperand :: LHsExpr GhcRn -> TcM (Maybe (TcType, Bool))
+tcLexicalPackageOperand = tcPackageOperandResult True
 
 -- | Read a package result through directly forwarded argument types.
--- The flag asks the caller to check the whole operand at the common schema.
+-- The result flag asks the caller to check the whole operand at the schema.
 -- See Note [Implicit opening for an explicit package argument].
-tcMixedOperandResult :: LHsExpr GhcRn -> TcM (Maybe (TcType, Bool))
-tcMixedOperandResult operand = runMaybeT $ do
-  (ident, args) <- MaybeT (tcDeclaredOperandSpine operand)
-  let sigma = varType ident
-      arity = length args
-  result <- MaybeT (pure (implicitSpineResult arity sigma))
-  case result of
-    TyVarTy v
-      | isEmptyNameEnv (idConcreteTvs ident)
-      , (tvs, _, body) <- tcRetainedInstTelescope sigma
-      , v `elem` tvs
-      , (matches, domains, final) <- splitFunTys body
-      , domains `equalLength` args
-      , getTyVar_maybe (coreFullView final) == Just v
-      , all isTauTy matches, all (ordinary_domain v) domains
-      , first : rest <- [arg | (Scaled _ domain, arg) <- zip domains args
-                             , getTyVar_maybe (coreFullView domain) == Just v]
-      -> do { selected@(schema, _) <- MaybeT (tcMixedOperandResult first)
-            ; case rest of
-                [] -> pure selected
-                _ -> do { guard (closed_dot_schema schema)
-                        ; alternatives <- traverse (MaybeT . tcMixedOperandResult) rest
-                        ; guard (all (agrees_with schema . fst) alternatives)
-                        ; pure (schema, True) } }
-    _ -> pure (result, False)
+tcPackageOperandResult :: Bool -> LHsExpr GhcRn -> TcM (Maybe (TcType, Bool))
+tcPackageOperandResult lexical = go False
   where
+    go forwarded operand = runMaybeT $ do
+      (ident, args) <- MaybeT (tcDeclaredOperandSpine lexical operand)
+      let sigma = varType ident
+          arity = length args
+      result <- MaybeT (pure (implicitSpineResult arity sigma))
+      case result of
+        TyVarTy v
+          | isEmptyNameEnv (idConcreteTvs ident)
+          , (tvs, _, body) <- tcRetainedInstTelescope sigma
+          , v `elem` tvs
+          , (matches, domains, final) <- splitFunTys body
+          , domains `equalLength` args
+          , getTyVar_maybe (coreFullView final) == Just v
+          , all isTauTy matches, all (ordinary_domain v) domains
+          , first : rest <- [arg | (Scaled _ domain, arg) <- zip domains args
+                                 , getTyVar_maybe (coreFullView domain) == Just v]
+          -> do { selected@(schema, _) <- MaybeT (go lexical first)
+                ; case rest of
+                    [] | lexical -> pure (schema, True)
+                    [] -> pure selected
+                    _ -> do { guard (not lexical && closed_dot_schema schema)
+                            ; alternatives <- traverse (MaybeT . go False) rest
+                            ; guard (all (agrees_with schema . fst) alternatives)
+                            ; pure (schema, True) } }
+        _ -> do { when forwarded $ guard (scoped_dot_schema sigma result)
+                ; pure (result, False) }
+
+    scoped_dot_schema sigma ty
+      | schema@(ExistsTy ImplicitExists _ _) <- coreFullView ty
+      = all rigid (tyCoVarsOfTypeList schema)
+      | otherwise = False
+      where
+        scope = tyCoVarsOfType sigma
+        rigid v = isTcTyVar v && isSkolemTyVar v && v `elemVarSet` scope
+
     closed_dot_schema ty
       | schema@(ExistsTy ImplicitExists _ _) <- coreFullView ty
       = noFreeVarsOfType schema
@@ -1002,18 +1025,48 @@ tcMixedOperandResult operand = runMaybeT $ do
         && not (hasNativeDependentExpr (Core.Type domain))
       | otherwise = False
 
--- | Read the head and written ordinary arguments without elaboration.
-tcDeclaredOperandSpine :: LHsExpr GhcRn -> TcM (Maybe (Id, [LHsExpr GhcRn]))
-tcDeclaredOperandSpine = go []
+{- Note [Scope of a forwarded package schema]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A lexical tuple binding checks a forwarding call at the selected package
+schema before opening it. The schema can mention a rigid type variable from
+the caller, or a witness opened by an enclosing binding. Use the complete
+declaration of the selected operand as the scope check. A variable already
+free in that declaration stays in scope when the probe removes its arrows.
+An operand's quantified variables belong to its own telescope. Compare
+variables by identity and include the free variables of their kinds.
+See Note [Computing deep free variables] in GHC.Core.TyCo.FVs.
+
+Apply this check at the leaf of a single forwarding chain. A direct RHS
+keeps ordinary instantiation, and multiple forwarding operands keep their
+existing rule. Ordinary checking of the full call still checks its sibling
+arguments, evidence, and usage at the selected schema. The opening keeps
+the complete let result outside the new witness scope.
+-}
+
+-- | Read a named head and its ordinary arguments without elaboration.
+-- In a lexical package binding, allow leading specified multiplicity arguments.
+tcDeclaredOperandSpine :: Bool -> LHsExpr GhcRn -> TcM (Maybe (Id, [LHsExpr GhcRn]))
+tcDeclaredOperandSpine lexical = go []
   where
     go args (L _ (HsApp _ fun arg)) = go (arg : args) fun
     go args (L _ (HsPar _ fun)) = go args fun
-    go args (L _ (HsVar _ lname))
-      | let name = unLocWithUserRdr lname
+    go args expr
+      | (written, L _ (HsVar _ lname)) <- leading_types 0 expr
+      , written == 0 || lexical
+      , let name = unLocWithUserRdr lname
       , not (isDataOcc (nameOccName name))
-      = do { ident <- tcLookupIdMaybe name
-           ; return ((, args) <$> ident) }
+      = runMaybeT $ do
+          ident <- MaybeT (tcLookupIdMaybe name)
+          let (_, binders, _) = tcSplitForAllTyVarsReqTVBindersN 0 (varType ident)
+              specified = take written [binderVar b | (_, b) <- binders
+                                                    , isSpecifiedForAllTyFlag (binderFlag b)]
+          guard (length specified == written && all (isMultiplicityTy . tyVarKind) specified)
+          pure (ident, args)
     go _ _ = return Nothing
+
+    leading_types n (L _ (HsPar _ fun)) = leading_types n fun
+    leading_types n (L _ (HsAppType _ fun _)) = leading_types (n + 1) fun
+    leading_types n expr = (n, expr)
 
 -- | Recognize a written dot type without checking the expression or signature.
 -- See Note [Projected implicit existential operands].

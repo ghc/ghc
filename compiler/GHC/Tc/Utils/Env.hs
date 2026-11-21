@@ -38,7 +38,7 @@ module GHC.Tc.Utils.Env(
         tcExtendKindEnv, tcExtendKindEnvList,
         tcExtendTyVarEnv, tcExtendNameTyVarEnv,
         tcExtendLetEnv, tcExtendSigIds, tcExtendRecIds,
-        tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2,
+        tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2, tcExtendGeneratedIdEnv,
         tcExtendBinderStack, tcExtendLocalTypeEnv,
         isTypeClosedLetBndr,
 
@@ -914,7 +914,15 @@ tcExtendIdEnv2 :: [(Name,TcId)] -> TcM a -> TcM a
 tcExtendIdEnv2 names_w_ids thing_inside
   = tcExtendBinderStack [ TcIdBndr mono_id NotTopLevel
                         | (_,mono_id) <- names_w_ids ] $
-    tc_extend_local_env NotTopLevel
+    tc_extend_id_env names_w_ids thing_inside
+
+-- | Add a generated binder to lookup and staging. Keep it out of diagnostics.
+tcExtendGeneratedIdEnv :: TcId -> TcM a -> TcM a
+tcExtendGeneratedIdEnv id = tc_extend_id_env [(idName id, id)]
+
+tc_extend_id_env :: [(Name, TcId)] -> TcM a -> TcM a
+tc_extend_id_env names_w_ids thing_inside
+  = tc_extend_local_env NotTopLevel
             [ (name, ATcId { tct_id = id
                            , tct_info    = NotLetBound })
             | (name,id) <- names_w_ids]
