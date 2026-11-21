@@ -2269,15 +2269,18 @@ A fold can recurse directly or use a local worker with the callback and
 seed in its scope. The installed list binding uses the local worker.
 Accept only an exact invocation of that worker on the list; the final
 Core may add an eta binder. The same check runs before and after Core
-optimization. Rules that can replace the fold call remain a separate
-obligation. In particular the type of a build producer does not justify
-fold/build when the producer can use seq.
+optimization. In GHCi, read through debugger breakpoints on the empty
+result, the callback application, and the recursive call. The executable
+Core keeps these ticks. Rules that can replace the fold call remain a
+separate obligation. In particular the type of a build producer does
+not justify fold/build when the producer can use seq.
 -}
 
 -- | Check both defining equations against the actual binding.
 directListFold :: Id -> Core.CoreExpr -> Maybe (ConstructorCaseType, [ConstructorCaseRow])
-directListFold owner rhs = do
-  let rhs_type = exprType rhs
+directListFold owner original = do
+  let rhs = stripTicksE isSourceBreakpoint original
+      rhs_type = exprType rhs
   guard (rhs_type `eqType` varType owner)
   ConstructorCaseType telescope tc [element] domains position result <- listFoldType rhs_type
   ConstructorCaseType declared _ _ _ _ _ <- listFoldType (varType owner)
