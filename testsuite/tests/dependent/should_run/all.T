@@ -246,6 +246,11 @@ test('NativeListBoundary',
                   '../../../../docs/dependent-haskell/examples/packed-vector/OrdinaryVecClient.hs']),
      multimod_compile_and_run,
      ['NativeListBoundary', '-fomit-interface-pragmas -fno-write-if-simplified-core'])
+test('NativeRetainedTypeWitness',
+     [only_ways(['normal']),
+      extra_files(['NativeRetainedTypeWitnessLib.hs', 'NativeRetainedTypeWitness.hs'])],
+     run_command, ['bash NativeRetainedTypeWitness.sh "{compiler}" "{libdir}" '
+                   + config.ghc_th_way_flags])
 test('NativeClosedSum',
      [req_interp, req_rts_linker, only_ways(['normal']), extra_files(['NativeClosedSumLib.hs'])],
      multimod_compile_and_run,
