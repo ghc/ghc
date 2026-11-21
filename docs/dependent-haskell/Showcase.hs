@@ -119,6 +119,7 @@ import qualified OpenMapProof
 import qualified OpenMapWorker
 import qualified InstalledNotProof
 import qualified OrderingPayload
+import qualified ConcreteGuardedListProof
 import qualified PreludeDropWhileRuntime
 import qualified PreludeFilterAppendProof
 import qualified PreludeFilterCutoff
@@ -1353,6 +1354,8 @@ main = do
     prefixInput <- newIORef (False : True : error "prefix and suffix forced the rejected tail") >>= readIORef
     putStrLn ("recover a list from its checked prefix and suffix: "
               ++ PreludeDropWhileRuntime.showPrefixAndSuffix prefixInput)
+    putStrLn ("prove guarded list equations at two concrete element types: "
+              ++ ConcreteGuardedListProof.showConcreteGuardedLists)
     pivot <- newIORef True >>= readIORef
     let unused = error "comparison forced an unused payload"
     observe "select a payload with a checked runtime comparison"
