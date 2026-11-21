@@ -616,10 +616,6 @@ complete match sets because App skips applications with a U head.
 
 TYPE and FUN have matchable kinds. Their representations can construct
 the matchable result directly. A TrApp needs the runtime check.
-Keep that check in a separate call. Inlining the check can replace the
-matchable result's equality with an equality over an application whose
-head still has unknown matchability. The consumer's LRCo requires the
-matchable result.
 -}
 
 data MatchableApp (a :: k) where
@@ -640,7 +636,6 @@ matchableApp f x
   , Just HRefl <- eqTypeRep match trMatchable
   = Just (MatchableApp f x)
   | otherwise = Nothing
-{-# NOINLINE matchableApp #-}
 
 data AppOrCon (a :: k) where
     IsApp :: forall {ma :: Matchability} k k'
