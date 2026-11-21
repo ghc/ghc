@@ -319,6 +319,21 @@ is the fork's conservative rule for checking GHC contexts.
 [Paper, section 4.2](https://jgbm.github.io/pubs/morris-icfp2017-families-extended.pdf#page=9)
 and [source test](../../../testsuite/tests/dependent/should_run/NativeConstrainedFamilyClient.hs).
 
+A library can give its context a name. For example, `PrintableCursor c e`
+stands for `(Cursor c e, Show (Remaining c))`. An ordinary client can use
+the synonym as the context of `showAdvance`. Its cursor dictionary
+supplies the domain of `Remaining c`. A nested constraint tuple works
+the same way. This follows GHC's existing rule for constraint synonyms.
+[GHC User’s Guide on ConstraintKinds](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/constraint_kind.html)
+and [ordinary client](../examples/open-evaluation/ConstrainedElementsClient.hs).
+
+A type such as `Proxy (PrintableCursor c e)` mentions the constraint
+without supplying a dictionary. It requires a separate domain for the
+family occurrence. A synonym can also ignore a written argument. The
+checker preserves the domain checks for an ignored argument when it
+looks for component dictionaries.
+[Stripped-interface test](../../../testsuite/tests/dependent/should_run/NativeConstrainedFamilyClient.hs).
+
 ### Family domains under a retained binder
 
 ```haskell

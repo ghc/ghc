@@ -108,8 +108,9 @@ import qualified InterpretedKind
 import qualified InterpretedKindUseSite
 import qualified NestedFunctionClient
 import qualified InvisibleFamily
-import ConstrainedElementsClient (advanceCursor, showRemainder, splitCollection, partialElement, aliasedReflection, annotatedElement, constrainedElements, explicitElements, formatField, renderField, renderKnownFields, retainedMaybeDomain)
+import ConstrainedElementsClient (advanceCursor, showAdvance, showRemainder, splitCollection, partialElement, aliasedReflection, annotatedElement, constrainedElements, explicitElements, formatField, renderField, renderKnownFields, retainedMaybeDomain)
 import ConstrainedElementsQuickLook (showReflection)
+import OpenArrowKindClient (openKindRows)
 import StoredReflectionClient (readStoredReflection)
 import IndexedMapClient (mappedCells)
 import LaterMatchabilityClient (annotatedMap, appliedCallback, boxedCallbacks, computedDictionary, flippedCallbacks, forwardedMap,
@@ -991,11 +992,14 @@ main = do
         (splitCollection [enabled, disabled], splitCollection (Just 'x'), splitCollection (Nothing :: Maybe Char))
     observe "show the rest of a collection"
         (showRemainder [enabled, disabled], showRemainder (Just 'x'), showRemainder ([] :: [Bool]))
+    observe "print a cursor through its constraint synonym"
+        (showAdvance id [enabled, disabled], showAdvance id [disabled], showAdvance (== 'x') (Just 'x'))
     observe "advance a cursor using its superclass family equation"
         (advanceCursor id [enabled, disabled], advanceCursor id [disabled, enabled],
          advanceCursor (== 'x') (Just 'x'))
     boxedFlag <- newIORef (Just True) >>= readIORef
     boxedLetter <- newIORef (Just 'x') >>= readIORef
+    observe "use both equations of an open arrow kind" (openKindRows disabled)
     observe "use a stored retained callback at Bool and Char" (readStoredReflection boxedFlag boxedLetter)
     putStrLn "Dependent Haskell: completed source features"
     booleans
