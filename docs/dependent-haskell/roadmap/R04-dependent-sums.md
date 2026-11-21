@@ -420,6 +420,20 @@ If lookup gets stuck, GHC rewrites family-free arguments with the
 available family-free nominal equalities. It tries that head again
 with the same domain check. A representational `Coercible a Bool`
 constraint still leaves `Shape a Char` stuck.
+
+The equality can also occur between GADT fields. An ordinary client
+uses it to open the later package. The earlier field and the unused
+package payload can stay unevaluated. Moving the package field before
+the equality leaves its `Choice a` domain unsatisfied.
+
+```haskell
+data Staged a where
+    Staged :: Proxy a -> (a ~ Bool) => Shape a Char -> Staged a
+
+readStaged :: Staged a -> Bool
+readStaged (Staged _ pkg) = case pkg of Pair tag _ -> tag
+```
+
 [Provider](../../../testsuite/tests/dependent/should_run/NativeConstrainedSumProvider.hs)
 and [ordinary client](../../../testsuite/tests/dependent/should_run/NativeConstrainedSumClient.hs).
 
@@ -430,7 +444,8 @@ known result type, including an imported open family that reduces to a
 sum. For example, `consume (Pair True payload)` uses the argument type
 of `consume` to select the erased parameters of `Pair`. GHC checks
 `payload` against the written witness and keeps an ignored field lazy.
-A stuck family leaves the constructor application unresolved.
+This Quick Look path follows unconstrained family heads. A stuck
+family leaves the constructor application unresolved.
 
 ## Partition at the original length
 

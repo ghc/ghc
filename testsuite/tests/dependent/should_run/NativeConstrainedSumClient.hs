@@ -10,7 +10,7 @@ import Data.Proxy (Proxy (..))
 import Data.Type.Equality ((:~:) (Refl))
 import GHC.Sigma (Sigma (Pair), first)
 import NativeAssociatedSumProvider (DefaultSum (Defaulted), Tagged (..))
-import NativeConstrainedSumProvider (Choice (Shape), Permit (Permit), make)
+import NativeConstrainedSumProvider (Choice (Shape), Permit (Permit), Staged (Staged), make)
 
 instance DefaultSum Char
 
@@ -56,6 +56,9 @@ badRepresentation :: (Choice a, Coercible a Bool) => Proxy a -> Shape a Char -> 
 badRepresentation _ pkg = case pkg of Pair tag _ -> tag
 #endif
 
+readStaged :: Staged a -> Bool
+readStaged (Staged _ pkg) = case pkg of Pair tag _ -> tag
+
 main :: IO ()
 main = do
     outer <- try (evaluate (readPair (error "outer pair"))) :: IO (Either ErrorCall Bool)
@@ -63,7 +66,9 @@ main = do
         Left _ -> do
             let pkg = Pair False (error "unused default payload") :: Defaulted Char
                 shaped = Pair True (error "unused shaped payload") :: Shape Bool Char
+                staged = Staged (error "unused earlier field" :: Proxy Bool)
+                                (Pair True (error "unused later payload"))
             print (readFirst pkg, readPair pkg, readPayload (Pair True (Yes 'x')),
                    readGiven Permit (Proxy :: Proxy Bool), readKnown shaped,
-                   readRefined shaped, readProof Refl shaped)
+                   readRefined shaped, readProof Refl shaped, readStaged staged)
         Right _ -> fail "package pattern left the outer constructor unevaluated"

@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, FlexibleInstances, GADTs, TypeFamilies, UndecidableInstances #-}
 
-module NativeConstrainedSumProvider (Choice (Shape), Permit (Permit), make) where
+module NativeConstrainedSumProvider (Choice (Shape), Permit (Permit), Staged (Staged), make) where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy)
@@ -40,6 +40,13 @@ newtype Wrapped = Wrapped Private
 
 class Choice (a :: Type) where
     type Shape a (b :: Type)
+
+data Staged a where
+#ifdef EARLY_DOMAIN
+    Staged :: Shape a Char -> (a ~ Bool) => Proxy a -> Staged a
+#else
+    Staged :: Proxy a -> (a ~ Bool) => Shape a Char -> Staged a
+#endif
 
 instance Choice Bool where
     type Shape Bool Char = Private

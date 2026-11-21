@@ -13,10 +13,10 @@ provider=NativeConstrainedSumProvider
 client=NativeConstrainedSumClient
 
 reject() {
-    local span=$1 message=$2
+    local location=$1 message=$2
     shift 2
     if "$@" > reject.log 2>&1 ||
-       ! grep -Fq "$client.hs:$span" reject.log ||
+       ! grep -Fq "$location" reject.log ||
        ! grep -Fq "$message" reject.log; then
         cat reject.log >&2
         exit 1
@@ -35,6 +35,8 @@ for opt in O0 O2; do
         fi
         "${ghc[@]}" "-$opt" -c "$classes.hs"
         "${ghc[@]}" "-$opt" "${flags[@]}" -c "$default.hs"
+        reject "$provider.hs:46:5-63: error: [GHC-39999]" 'Choice a' \
+            "${ghc[@]}" "-$opt" "${flags[@]}" -DEARLY_DOMAIN -c "$provider.hs"
         "${ghc[@]}" "-$opt" "${flags[@]}" -c "$provider.hs"
         cp "$classes.hi" "$default.hi" "$provider.hi" "$src/$client.hs" ../client/
 
@@ -44,13 +46,13 @@ for opt in O0 O2; do
             "../provider/$provider.o" -o run
         ./run
 
-        reject '32:48-51: error: [GHC-39999]' 'Allowed Int' \
+        reject "$client.hs:32:48-51: error: [GHC-39999]" 'Allowed Int' \
             "${ghc[@]}" "-$opt" -fforce-recomp -fdefer-type-errors -DMISSING_DOMAIN -c "$client.hs"
-        reject '37:28-31: error: [GHC-83605]' 'In the pattern: Pair tag _' \
+        reject "$client.hs:37:28-31: error: [GHC-83605]" 'In the pattern: Pair tag _' \
             "${ghc[@]}" "-$opt" -fforce-recomp -DSTUCK_FAMILY -c "$client.hs"
-        reject '42:30-33: error: [GHC-83605]' 'In the pattern: Pair tag _' \
+        reject "$client.hs:42:30-33: error: [GHC-83605]" 'In the pattern: Pair tag _' \
             "${ghc[@]}" "-$opt" -fforce-recomp -DNEWTYPE_HEAD -c "$client.hs"
-        reject '56:39-42: error: [GHC-83605]' 'In the pattern: Pair tag _' \
+        reject "$client.hs:56:39-42: error: [GHC-83605]" 'In the pattern: Pair tag _' \
             "${ghc[@]}" "-$opt" -fforce-recomp -DREPRESENTATIONAL_ONLY -c "$client.hs"
     done
 done
