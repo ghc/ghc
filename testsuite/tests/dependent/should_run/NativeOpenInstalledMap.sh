@@ -33,6 +33,40 @@ if "${ghc[@]}" -O0 -fenable-rewrite-rules -fforce-recomp -c PreludeMapProof.hs >
     exit 1
 fi
 
+# A downstream rule can invalidate a proof obtained from an erased equation.
+(
+    mkdir "$out"/{rule-proof-provider,rule-proof-client}
+    cd "$out/rule-proof-provider"
+    cp "$src/NativeRuleProofProvider.hs" .
+    "${ghc[@]}" -O2 -fno-enable-rewrite-rules -fomit-interface-pragmas \
+        -fno-write-if-simplified-core -c NativeRuleProofProvider.hs
+
+    cd "$out/rule-proof-client"
+    cp ../rule-proof-provider/NativeRuleProofProvider.hi "$src/NativeRuleProofClient.hs" .
+    provider=../rule-proof-provider/NativeRuleProofProvider.o
+    for form in FAMILY ALIAS IMPORTED_PROOF; do
+        expression='observation = Refl'
+        if [[ $form == IMPORTED_PROOF ]]; then expression='print imageProof'; fi
+        line=$(awk -v expression="$expression" 'index($0, expression) {print NR}' NativeRuleProofClient.hs)
+        if "${ghc[@]}" -O2 -fenable-rewrite-rules -fforce-recomp "-D$form" \
+            -c NativeRuleProofClient.hs >proof-rule.log 2>&1 ||
+           ! grep -Fq "NativeRuleProofClient.hs:$line:" proof-rule.log ||
+           ! grep -Fq '[GHC-83605]' proof-rule.log; then
+            echo "Expected a checked rule diagnostic for $form" >&2
+            cat proof-rule.log >&2
+            exit 1
+        fi
+
+        "${ghc[@]}" -O2 -fno-enable-rewrite-rules -fforce-recomp "-D$form" -c NativeRuleProofClient.hs
+        "${ghc[@]}" NativeRuleProofClient.o "$provider" -o rule-proof-client
+        diff -u <(printf 'Refl\nJust False\n') <(./rule-proof-client)
+    done
+
+    "${ghc[@]}" -O2 -fenable-rewrite-rules -fforce-recomp -DOTHER -c NativeRuleProofClient.hs
+    "${ghc[@]}" NativeRuleProofClient.o "$provider" -o rule-proof-client
+    diff -u <(printf '42\nNothing\n') <(./rule-proof-client)
+)
+
 # An ordinary client uses the installed map and size equations with a recursive proof.
 mkdir "$out"/{length-source,length-client}
 cd "$out/length-source"

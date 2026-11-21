@@ -74,8 +74,12 @@ test('NativeOpenInstalledMap',
                    open_eval_dir + 'PreludeMapLengthSize.hs', open_eval_dir + 'PreludeMapLengthSource.hs',
                    open_eval_dir + 'PreludeMapLengthProof.hs',
                    'NativeOpenInstalledMapProducer.hs', 'NativeOpenFilterGivenControls.hs',
-                   'NativeRetainedSourceOperand.hs'])],
+                   'NativeRetainedSourceOperand.hs',
+                   'NativeRuleProofProvider.hs', 'NativeRuleProofClient.hs'])],
      run_command, ['bash NativeOpenInstalledMap.sh "{compiler}" "{libdir}"'])
+test('NativeClosedMethodApartness',
+     [req_interp, req_rts_linker, only_ways(['normal'])],
+     run_command, ['bash NativeClosedMethodApartness.sh "{compiler}" "{libdir}"'])
 test('NativeOpenFilterCutoff',
      [only_ways(['normal']),
       extra_files([open_eval_dir + f for f in ['PreludeMapLengthSize.hs', 'PreludeMapLengthSource.hs',

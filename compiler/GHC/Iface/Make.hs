@@ -202,19 +202,19 @@ updateDecl decls m_stg_infos m_cmm_infos
                                 m_cmm_infos
     tag_sigs = fromMaybe mempty m_stg_infos
 
-    update_decl (IfaceId nm ty details infos)
+    update_decl decl@(IfaceId { ifName = nm, ifIdInfo = infos })
       | let not_caffy = elemNameSet nm non_cafs
       , let mb_lf_info = lookupNameEnv lf_infos nm
       , let sig = lookupNameEnv tag_sigs nm
       , warnPprTrace (isNothing mb_lf_info) "updateDecl" (text "Name without LFInfo:" <+> ppr nm) True
         -- Only allocate a new IfaceId if we're going to update the infos
       , isJust mb_lf_info || not_caffy || isJust sig
-      = IfaceId nm ty details $
+      = decl { ifIdInfo =
           (if not_caffy then (HsNoCafRefs :) else id) $
           (if isJust sig then (HsTagSig (fromJust sig):) else id) $
           (case mb_lf_info of
              Nothing -> infos -- LFInfos not available when building .cmm files
-             Just lf_info -> HsLFInfo (toIfaceLFInfo nm lf_info) : infos)
+             Just lf_info -> HsLFInfo (toIfaceLFInfo nm lf_info) : infos) }
 
     update_decl decl
       = decl

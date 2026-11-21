@@ -36,6 +36,7 @@ import {-# SOURCE #-} GHC.Tc.Gen.App (RuleAppPrefix(..), tcRuleAppPrefix)
 import {-# SOURCE #-} GHC.Tc.Gen.Expr  ( tcInferRho, tcCheckMonoExpr )
 
 import GHC.Tc.Errors.Types
+import GHC.Tc.Gen.SourceTable (withSourceProofSignature)
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Solver( reportUnsolvedEqualities, pushLevelAndSolveEqualitiesX
                     , emitResidualConstraints )
@@ -236,7 +237,7 @@ tcUserTypeSig loc hs_sig_ty mb_name
          let allow_function = case mb_name of
                Just _ -> True
                Nothing -> False
-       ; sigma_ty <- tcHsSigWcType allow_function ctxt_no_rrc hs_sig_ty
+       ; sigma_ty <- withSourceProofSignature mb_name $ tcHsSigWcType allow_function ctxt_no_rrc hs_sig_ty
        ; traceTc "tcuser" (ppr sigma_ty)
        ; return $ TcCompleteSig $
          CSig { sig_bndr  = mkLocalId name ManyTy sigma_ty

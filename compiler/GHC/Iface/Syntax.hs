@@ -14,7 +14,7 @@ module GHC.Iface.Syntax (
         IfaceConDecl(..), IfaceConDecls(..), IfaceEqSpec,
         IfaceExpr(..), IfaceIndexedConShape(..), IfaceAlt(..), IfaceLetBndr(..), IfaceBinding,
         IfaceBindingX(..), IfaceMaybeRhs(..), IfaceConAlt(..),
-        IfaceIdInfo, IfaceIdDetails(..), IfaceUnfolding(..), IfGuidance(..),
+        IfaceIdInfo, IfaceIdDetails(..), IfaceSourceProofRule, IfaceUnfolding(..), IfGuidance(..),
         IfaceInfoItem(..), IfaceRule(..), IfaceRuleKind(..), ifRuleAuto, hasIfacePackageExpr, isLexicalPackageRule, IfaceAnnotation(..), IfaceAnnTarget,
         IfaceWarnings(..), IfaceWarningTxt(..), IfaceStringLiteral(..),
         IfaceDefault(..), IfaceClsInst(..), IfaceFamInst(..), IfaceTickish(..),
@@ -112,6 +112,7 @@ import Control.Monad
 import Control.DeepSeq
 import Data.Maybe (isJust, isNothing, mapMaybe)
 import Data.Proxy
+import Data.Word (Word8)
 import qualified Data.Set as Set
 
 infixl 3 &&&
@@ -201,7 +202,8 @@ data IfaceDecl
   = IfaceId { ifName      :: IfaceTopBndr,
               ifType      :: IfaceType,
               ifIdDetails :: IfaceIdDetails,
-              ifIdInfo    :: IfaceIdInfo
+              ifIdInfo    :: IfaceIdInfo,
+              ifIdSourceProofRules :: [IfaceSourceProofRule]
               }
 
   | IfaceData { ifName       :: IfaceTopBndr,   -- Type constructor
@@ -224,7 +226,8 @@ data IfaceDecl
                    ifRoles   :: [Role],            -- Roles
                    ifBinders :: [IfaceTyConBinder],
                    ifResKind :: IfaceKind,         -- Kind of the *result*
-                   ifSynRhs  :: IfaceType }
+                   ifSynRhs  :: IfaceType,
+                   ifSynSourceProofRules :: [IfaceSourceProofRule] }
 
   | IfaceFamily  { ifName    :: IfaceTopBndr,      -- Type constructor
                    ifKind    :: IfaceType,
@@ -249,6 +252,7 @@ data IfaceDecl
                  ifTyCon      :: IfaceTyCon,     -- LHS TyCon
                  ifRole       :: Role,           -- Role of axiom
                  ifAxBranches :: [IfaceAxBranch], -- Branches
+                 ifAxSourceProofRules :: [IfaceSourceProofRule],
                  ifAxSourceSpans :: [SrcSpan]    -- See Note [Source table locations in interfaces] in GHC.Iface.Binary
     }
 
@@ -633,6 +637,18 @@ data IfaceIdDetails
     , ifRecSelIdFieldLabel :: FieldLabel }
   | IfDFunId
   | IfSourceDFunId [(IfExtName, IfExtName)] (Maybe (IfExtName, IfExtName, IfExtName))
+  -- Rule heads can name private bindings. Their defining module and
+  -- occurrence identify a RULE without requiring an Id declaration.
+  | IfSourceProofId [IfaceSourceProofHead] -- Legacy private interface encoding.
+
+-- | A source proof identifies a rule head by its module and occurrence.
+type IfaceSourceProofRule = (IfaceSourceProofHead, [SourceProofArg IfaceRuleName])
+
+-- | The rule head with its nominal argument marker and mapper check.
+type IfaceSourceProofHead = (IfaceRuleName, Maybe IfaceRuleName, Bool)
+
+-- | The stable identity of a head or argument constructor.
+type IfaceRuleName = (Module, OccName)
 
 -- | Iface type for LambdaFormInfo. Fields not relevant for imported Ids are
 -- omitted in this type.
@@ -1477,10 +1493,12 @@ pprIfaceDecl ss decl@(IfaceSynonym { ifName    = tc
                                    , ifKind = kind
                                    , ifBinders = binders
                                    , ifSynRhs  = poly_ty
+                                   , ifSynSourceProofRules = deps
                                    })
   = vcat [ pprStandaloneKindSig name_doc kind
          , hang (text "type" <+> decl_head <+> equals)
            2 (sep [ pprIfaceForAllWithMatchability tvs, pprIfaceContextArr theta, ppr_tau ])
+         , ppUnless (null deps) (text "SourceProof" <+> ppr deps)
          ]
   where
     (tvs, theta, tau) = splitIfaceSigmaTy poly_ty
@@ -1605,11 +1623,13 @@ pprIfaceDecl _ (IfacePatSyn { ifName = name,
             && not (null prov_ctxt && isEmpty sdocCtx ex_msg)
 
 pprIfaceDecl ss (IfaceId { ifName = var, ifType = ty,
-                              ifIdDetails = details, ifIdInfo = info })
+                              ifIdDetails = details, ifIdInfo = info
+                            , ifIdSourceProofRules = deps })
   = vcat [ hang (pprPrefixIfDeclBndr (ss_how_much ss) (occName var) <+> dcolon)
               2 (pprIfaceSigmaType (ss_forall ss) ty)
          , ppShowIface ss (ppr details)
-         , ppShowIface ss (ppr info) ]
+         , ppShowIface ss (ppr info)
+         , ppShowIface ss (ppUnless (null deps) (text "SourceProof" <+> ppr deps)) ]
 
 pprIfaceDecl _ (IfaceAxiom { ifName = name, ifTyCon = tycon
                            , ifAxBranches = branches })
@@ -2091,6 +2111,7 @@ instance Outputable IfaceIdDetails where
             NominalSourceTable -> "SourceTable"
             ExecutableSourceTable -> "ExecutableSourceTable"
             FinalCoreSourceTable -> "FinalCoreSourceTable"
+  ppr (IfSourceProofId deps) = text "SourceProof" <+> ppr deps
   ppr (IfWorkerLikeId dmd) = text "StrWork" <> parens (ppr dmd)
   ppr (IfRecSelId tc _c b _fl) = text "RecSel" <+> ppr tc
                             <+> if b
@@ -2220,6 +2241,7 @@ freeNamesIfIdDetails (IfRecSelId tc first_con _ fl) =
   unitFN (flSelector fl)
 freeNamesIfIdDetails IfVanillaId         = emptyNameSet
 freeNamesIfIdDetails (IfSourceTableId table _) = unitFN table
+freeNamesIfIdDetails (IfSourceProofId _) = emptyNameSet
 freeNamesIfIdDetails (IfWorkerLikeId {}) = emptyNameSet
 freeNamesIfIdDetails IfDFunId            = emptyNameSet
 freeNamesIfIdDetails (IfSourceDFunId methods literal) =
@@ -2532,10 +2554,11 @@ details.
 -}
 
 instance Binary IfaceDecl where
-    put_ bh (IfaceId name ty details idinfo) = do
-        putByte bh 0
+    put_ bh (IfaceId name ty details idinfo deps) = do
+        putSourceProofTag bh deps SourceProofRuleInfoEvidence 0 11 12
         putIfaceTopBndr bh name
         lazyPut bh (ty, details, idinfo)
+        putSourceProofRules bh deps
         -- See Note [Lazy deserialization of IfaceId]
 
     put_ bh (IfaceData a1 a10 a2 a11 a3 a4 a5 a6 a7 a8 a9) = do
@@ -2552,14 +2575,15 @@ instance Binary IfaceDecl where
         put_ bh a10
         put_ bh a11
 
-    put_ bh (IfaceSynonym a1 a6 a2 a3 a4 a5) = do
-        putByte bh 3
+    put_ bh (IfaceSynonym a1 a6 a2 a3 a4 a5 deps) = do
+        putSourceProofTag bh deps SourceProofRuleAliasEvidence 3 9 13
         putIfaceTopBndr bh a1
         put_ bh a2
         put_ bh a3
         put_ bh a4
         put_ bh a5
         put_ bh a6
+        putSourceProofRules bh deps
 
     put_ bh (IfaceFamily a1 a7 a2 a3 a8 a4 a5 a6) = do
         putByte bh 4
@@ -2598,12 +2622,13 @@ instance Binary IfaceDecl where
         put_ bh a9
         put_ bh a10
 
-    put_ bh (IfaceAxiom a1 a2 a3 a4 _) = do
-        putByte bh 6
+    put_ bh (IfaceAxiom a1 a2 a3 a4 deps _) = do
+        putSourceProofTag bh deps SourceProofRuleAxiomEvidence 6 10 14
         putIfaceTopBndr bh a1
         put_ bh a2
         put_ bh a3
         put_ bh a4
+        putSourceProofRules bh deps
 
     put_ bh (IfacePatSyn a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11) = do
         putByte bh 7
@@ -2636,10 +2661,9 @@ instance Binary IfaceDecl where
     get bh = do
         h <- getByte bh
         case h of
-            0 -> do name <- get bh
-                    ~(ty, details, idinfo) <- lazyGet bh
-                    -- See Note [Lazy deserialization of IfaceId]
-                    return (IfaceId name ty details idinfo)
+            0 -> get_id (pure [])
+            11 -> get_id (getLegacySourceProofRules bh)
+            12 -> get_id (get bh)
             1 -> error "Binary.get(TyClDecl): ForeignType"
             2 -> do a1  <- getIfaceTopBndr bh
                     a2  <- get bh
@@ -2653,13 +2677,9 @@ instance Binary IfaceDecl where
                     a10 <- get bh
                     a11 <- get bh
                     return (IfaceData a1 a10 a2 a11 a3 a4 a5 a6 a7 a8 a9)
-            3 -> do a1 <- getIfaceTopBndr bh
-                    a2 <- get bh
-                    a3 <- get bh
-                    a4 <- get bh
-                    a5 <- get bh
-                    a6 <- get bh
-                    return (IfaceSynonym a1 a6 a2 a3 a4 a5)
+            3 -> get_synonym (pure [])
+            9 -> get_synonym (getLegacySourceProofRules bh)
+            13 -> get_synonym (get bh)
             4 -> do a1 <- getIfaceTopBndr bh
                     a2 <- get bh
                     a3 <- get bh
@@ -2692,11 +2712,9 @@ instance Binary IfaceDecl where
                             ifMinDef    = a8,
                             ifUnary     = a9
                         }})
-            6 -> do a1 <- getIfaceTopBndr bh
-                    a2 <- get bh
-                    a3 <- get bh
-                    a4 <- get bh
-                    return (IfaceAxiom a1 a2 a3 a4 [])
+            6 -> get_axiom (pure [])
+            10 -> get_axiom (getLegacySourceProofRules bh)
+            14 -> get_axiom (get bh)
             7 -> do a1 <- getIfaceTopBndr bh
                     a2 <- get bh
                     a3 <- get bh
@@ -2722,6 +2740,50 @@ instance Binary IfaceDecl where
                         ifFDs     = a4,
                         ifBody = IfAbstractClass })
             _ -> panic (unwords ["Unknown IfaceDecl tag:", show h])
+      where
+        get_id get_rules = do
+          name <- get bh
+          ~(ty, details, idinfo) <- lazyGet bh
+          -- See Note [Lazy deserialization of IfaceId]
+          deps <- get_rules
+          return (IfaceId name ty details idinfo deps)
+        get_axiom get_rules = do
+          a1 <- getIfaceTopBndr bh
+          a2 <- get bh
+          a3 <- get bh
+          a4 <- get bh
+          deps <- get_rules
+          return (IfaceAxiom a1 a2 a3 a4 deps [])
+        get_synonym get_rules = do
+          a1 <- getIfaceTopBndr bh
+          a2 <- get bh
+          a3 <- get bh
+          a4 <- get bh
+          a5 <- get bh
+          a6 <- get bh
+          deps <- get_rules
+          return (IfaceSynonym a1 a6 a2 a3 a4 a5 deps)
+
+-- | Keep the existing encoding when a declaration has no checked arguments.
+putSourceProofTag :: WriteBinHandle -> [IfaceSourceProofRule] -> IfaceEvidence
+                  -> Word8 -> Word8 -> Word8 -> IO ()
+putSourceProofTag bh deps old_feature unmarked coarse shaped
+  | null deps = putByte bh unmarked
+  | any (not . null . snd) deps = do
+      requireIfaceEvidenceVersion bh SourceProofRuleArgumentsEvidence
+      putByte bh shaped
+  | otherwise = requireIfaceEvidenceVersion bh old_feature >> putByte bh coarse
+
+-- | Write the rule dependencies in the encoding selected by the tag.
+putSourceProofRules :: WriteBinHandle -> [IfaceSourceProofRule] -> IO ()
+putSourceProofRules bh deps
+  | null deps = pure ()
+  | any (not . null . snd) deps = put_ bh deps
+  | otherwise = put_ bh (map fst deps)
+
+-- | An older marked dependency carries no checked argument shape.
+getLegacySourceProofRules :: ReadBinHandle -> IO [IfaceSourceProofRule]
+getLegacySourceProofRules bh = map (, []) <$> get bh
 
 instance Binary IfaceBooleanFormula where
     put_ bh = \case
@@ -3166,6 +3228,8 @@ instance Binary IfaceIdDetails where
     put_ bh (IfSourceDFunId methods Nothing) = putByte bh 5 >> put_ bh methods
     put_ bh (IfSourceDFunId methods (Just literal)) =
       putByte bh 6 >> put_ bh methods >> put_ bh literal
+    put_ bh (IfSourceProofId deps) =
+      requireIfaceEvidenceVersion bh SourceProofRuleEvidence >> putByte bh 9 >> put_ bh deps
     get bh = do
         h <- getByte bh
         case h of
@@ -3183,6 +3247,7 @@ instance Binary IfaceIdDetails where
             6 -> IfSourceDFunId <$> get bh <*> (Just <$> get bh)
             7 -> flip IfSourceTableId ExecutableSourceTable <$> get bh
             8 -> flip IfSourceTableId FinalCoreSourceTable <$> get bh
+            9 -> IfSourceProofId <$> get bh
             _ -> panic "Binary IfaceIdDetails: unknown tag"
 
 instance Binary IfaceInfoItem where
@@ -3622,15 +3687,15 @@ instance NFData ImpIfaceList where
 
 instance NFData IfaceDecl where
   rnf = \case
-    IfaceId f1 f2 f3 f4 ->
-      rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4
+    IfaceId f1 f2 f3 f4 deps ->
+      rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf deps
 
     IfaceData f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 ->
       rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq`
       rnf f6 `seq` rnf f7 `seq` rnf f8 `seq` rnf f9 `seq` rnf f10 `seq` rnf f11
 
-    IfaceSynonym f1 f2 f3 f4 f5 f6 ->
-      rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq` rnf f6
+    IfaceSynonym f1 f2 f3 f4 f5 f6 deps ->
+      rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq` rnf f6 `seq` rnf deps
 
     IfaceFamily f1 f2 f3 f4 f5 f6 f7 f8 ->
       rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq` rnf f6
@@ -3639,11 +3704,11 @@ instance NFData IfaceDecl where
     IfaceClass f1 f2 f3 f4 f5 f6 ->
       rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq` rnf f6
 
-    IfaceAxiom nm tycon role ax spans ->
+    IfaceAxiom nm tycon role ax deps spans ->
       rnf nm `seq`
       rnf tycon `seq`
       rnf role `seq`
-      rnf ax `seq` rnf spans
+      rnf ax `seq` rnf deps `seq` rnf spans
 
     IfacePatSyn f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 ->
       rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq` rnf f6 `seq`
@@ -3701,6 +3766,7 @@ instance NFData IfaceIdDetails where
     IfVanillaId -> ()
     IfSourceTableId table origin -> rnf table `seq` origin `seq` ()
     IfWorkerLikeId dmds -> rnf dmds `seq` ()
+    IfSourceProofId deps -> rnf deps
     IfRecSelId (Left tycon) b c d -> rnf tycon `seq` rnf b `seq` rnf c `seq` rnf d
     IfRecSelId (Right decl) b c d -> rnf decl `seq` rnf b `seq` rnf c `seq` rnf d
     IfDFunId -> ()

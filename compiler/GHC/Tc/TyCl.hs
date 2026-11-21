@@ -54,6 +54,7 @@ import GHC.Tc.TyCl.Class
 import {-# SOURCE #-} GHC.Tc.TyCl.Instance( tcInstDecls1 )
 import {-# SOURCE #-} GHC.Tc.Module( checkBootDeclM )
 import GHC.Tc.Deriv (DerivInfo(..))
+import GHC.Tc.Gen.SourceTable (withSourceProofSignature, sourceProofRulesFor)
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Instance.Class( AssocInstInfo(..) )
 import GHC.Tc.Utils.TcMType
@@ -2632,7 +2633,7 @@ kcLTyClDecl collect_metadata (L loc decl)
                      let vars = mkTyVarTys indices
                      updTcRef ref ((name, vars) :)
                      pure vars
-               _ <- tcCheckSynonymMetadata choose callback_arrow rhs (tyConResKind tycon)
+               _ <- tcCheckSynonymMetadata Nothing choose callback_arrow rhs (tyConResKind tycon)
                Just . (tc_name,) . reverse <$> readTcRef ref
            _ -> kcTyClDecl decl tycon >> pure Nothing
        ; traceTc "kcTyClDecl done }" (ppr tc_name)
@@ -4012,23 +4013,29 @@ tcFamDecl1 case_axioms parent (FamilyDecl { fdInfo = fam_info
                                    False {- this doesn't matter here -}
                                    ClosedTypeFamilyFlavour
 
-       ; (branches, axiom_validity_infos) <-
-           unzip <$> mapAndReportM (tcTyFamInstEqn tc_fam_tc NotAssociated) eqns
+       ; co_ax_name <- newFamInstAxiomName tc_lname []
+       ; let check_equation = tcTyFamInstEqn tc_fam_tc NotAssociated
+       ; (branches, axiom_validity_infos, proof_rules) <- case (tc_bndrs, eqns) of
+           ([], [eqn]) -> do
+             (branch, info) <- withSourceProofSignature (Just co_ax_name) (check_equation eqn)
+             deps <- sourceProofRulesFor co_ax_name
+             return ([branch], [info], deps)
+           _ -> do
+             (branches, infos) <- unzip <$> mapAndReportM check_equation eqns
+             return (branches, infos, [])
          -- Do not attempt to drop equations dominated by earlier
          -- ones here; in the case of mutual recursion with a data
          -- type, we get a knot-tying failure.  Instead we check
          -- for this afterwards, in GHC.Tc.Validity.checkValidCoAxiom
          -- Example: tc265
 
-         -- Create a CoAxiom, with the correct src location.
-       ; co_ax_name <- newFamInstAxiomName tc_lname []
-
        ; let mb_co_ax
               | any hasCasePattern axiom_validity_infos
               , Just ax <- lookupNameEnv case_axioms tc_name
               = Just ax
               | null eqns = Nothing   -- mkBranchedCoAxiom fails on empty list
-              | otherwise = Just (mkBranchedCoAxiom Nominal co_ax_name fam_tc branches)
+              | otherwise = Just ((mkBranchedCoAxiom Nominal co_ax_name fam_tc branches)
+                                  { co_ax_source_proof_rules = proof_rules })
 
              fam_tc = mkFamilyTyCon tc_name kind tc_bndrs 0 res_kind (resultVariableName sig)
                       (ClosedTypeFamilyTyCon closed) parent inj'
@@ -4095,7 +4102,8 @@ tcTySynRhs metadata roles_info tc_name hs_ty
   = bindTyClTyVars tc_name $ \ kind tc_bndrs _nb_eta res_kind ->
     do { env <- getLclEnv
        ; traceTc "tc-syn" (ppr tc_name $$ ppr (getLclEnvRdrEnv env))
-       ; rhs_ty <- pushLevelAndSolveKindArrows skol_info tc_bndrs $
+       ; rhs_ty <- withSourceProofSignature (Just tc_name) $
+                   pushLevelAndSolveKindArrows skol_info tc_bndrs $
                    case metadata of
                      Just plan -> do
                        ref <- newTcRef plan
@@ -4105,14 +4113,14 @@ tcTySynRhs metadata roles_info tc_name hs_ty
                                (owner, tys) : next | owner == name, equalLength tys callbacks ->
                                  writeTcRef ref next >> pure tys
                                _ -> pprPanic "synonym metadata sites changed" (ppr name)
-                       ty <- tcCheckSynonymMetadata choose Nothing hs_ty res_kind
+                       ty <- tcCheckSynonymMetadata (Just tc_name) choose Nothing hs_ty res_kind
                        rest <- readTcRef ref
                        unless (null rest) $ pprPanic "unused synonym metadata sites" (ppr tc_name)
                        pure ty
                      Nothing -> case tc_bndrs of
                        b : _ | inferredMatchabilityIndex b ->
                          tcCheckMatchabilitySynRhs (mkTyVarTy (binderVar b)) hs_ty res_kind
-                       _ -> tcCheckLHsTypeInContext hs_ty (TheKind res_kind)
+                       _ -> tcCheckSynonymRhs tc_name hs_ty res_kind
 
          -- See Note [Error on unconstrained meta-variables] in GHC.Tc.Utils.TcMType
          -- Example: (typecheck/should_fail/T17567)
@@ -4129,7 +4137,9 @@ tcTySynRhs metadata roles_info tc_name hs_ty
            do { rhs_ty <- zonkTcTypeToTypeX rhs_ty
               ; return (kind, bndrs, rhs_ty) }
        ; let roles = roles_info tc_name
-       ; return (buildSynTyCon tc_name kind bndrs res_kind roles rhs_ty) }
+             syn = buildSynTyCon tc_name kind bndrs res_kind roles rhs_ty
+       ; deps <- sourceProofRulesFor tc_name
+       ; return (setSynTyConSourceProofRules syn deps) }
   where
     skol_info = TyConSkol TypeSynonymFlavour tc_name
 

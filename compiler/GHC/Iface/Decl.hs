@@ -32,6 +32,7 @@ import GHC.Core.Multiplicity
 import GHC.Core.TyCo.Tidy
 
 import GHC.Types.Id
+import GHC.Types.Id.Info (sourceProofRuleInfo)
 import GHC.Types.Var.Env
 import GHC.Types.Var
 import GHC.Types.Name
@@ -70,7 +71,8 @@ idToIfaceDecl id
   = IfaceId { ifName      = getName id,
               ifType      = toIfaceType (idType id),
               ifIdDetails = toIfaceIdDetails (getName id) (idDetails id),
-              ifIdInfo    = toIfaceIdInfo (idInfo id) }
+              ifIdInfo    = toIfaceIdInfo (idInfo id),
+              ifIdSourceProofRules = toIfaceSourceProofRules (sourceProofRuleInfo (idInfo id)) }
 
 --------------------------
 dataConToIfaceDecl :: DataCon -> IfaceDecl
@@ -78,7 +80,8 @@ dataConToIfaceDecl dataCon
   = IfaceId { ifName      = getName dataCon,
               ifType      = toIfaceType (dataConWrapperType dataCon),
               ifIdDetails = IfVanillaId,
-              ifIdInfo    = [] }
+              ifIdInfo    = [],
+              ifIdSourceProofRules = [] }
 
 --------------------------
 coAxiomToIfaceDecl :: CoAxiom br -> IfaceDecl
@@ -92,6 +95,7 @@ coAxiomToIfaceDecl ax@(CoAxiom { co_ax_tc = tycon, co_ax_branches = branches
               , ifAxBranches = map (coAxBranchToIfaceBranch tycon
                                      (map coAxBranchLHS branch_list))
                                    branch_list
+              , ifAxSourceProofRules = toIfaceSourceProofRules (co_ax_source_proof_rules ax)
               , ifAxSourceSpans = case sourceTableTermOcc (getOccName tycon) of
                   Nothing -> []
                   Just _  -> map coAxBranchSpan branch_list }
@@ -137,6 +141,7 @@ tyConToIfaceDecl env tycon
                      ifKind    = if_kind,
                      ifRoles   = tyConRoles tycon,
                      ifSynRhs  = if_syn_type syn_rhs,
+                     ifSynSourceProofRules = toIfaceSourceProofRules (synTyConSourceProofRules tycon),
                      ifBinders = if_binders,
                      ifResKind = if_res_kind
                    })

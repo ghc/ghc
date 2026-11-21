@@ -32,6 +32,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Instantiate ( freshenCoVarBndrsX )
 import GHC.Tc.Instance.Family ( tcUnwrapNewtype_maybe )
 import qualified GHC.Tc.Utils.Monad    as TcM
+import GHC.Tc.Zonk.TcType ( unpackCoercionHole_maybe )
 
 import GHC.Core.Type
 import GHC.Core.Predicate
@@ -44,6 +45,7 @@ import GHC.Core.TyCo.Rep   -- cleverly decomposes types, good for completeness c
 import GHC.Core.TyCo.FVs ( tyCoVarsOfMCo, almostDevoidCoVarOfCo, mkUnivCoDeps, univCoDepsHoles )
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Coercion
+import GHC.Core.Coercion.Axiom ( CoAxiomRule(BranchedAxiom), coAxiomName, co_ax_source_proof_rules, sourceProofAxiomRules )
 import GHC.Core.Reduction
 import GHC.Core.FamInstEnv ( FamInstEnvs )
 import GHC.Core
@@ -477,8 +479,29 @@ can_eq_nc _ces _rdr_env _envs ev eq_rel ty1@(TyConApp tc1 []) _ps_ty1 (TyConApp 
 
 -- (EQNC1) Expand synonyms first; see Note [Type synonyms and canonicalization]
 can_eq_nc ces rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
-  | Just ty1' <- coreView ty1 = can_eq_nc ces rdr_env envs ev eq_rel ty1' ps_ty1 ty2  ps_ty2
-  | Just ty2' <- coreView ty2 = can_eq_nc ces rdr_env envs ev eq_rel ty1  ps_ty1 ty2' ps_ty2
+  | Just ty1' <- coreView ty1
+  = expand_proof_synonym ty1 $ can_eq_nc ces rdr_env envs ev eq_rel ty1' ps_ty1 ty2 ps_ty2
+  | Just ty2' <- coreView ty2
+  = expand_proof_synonym ty2 $ can_eq_nc ces rdr_env envs ev eq_rel ty1 ps_ty1 ty2' ps_ty2
+  where
+    -- A Given can rewrite a deferred Wanted to an equality whose proof
+    -- uses a checked source synonym. Record that use only if this expansion
+    -- fills the Wanted's hole with a reflexive coercion. Follow the source
+    -- location in the Wanted, which survives the Given rewrite.
+    expand_proof_synonym (TyConApp tc []) solve
+      | NomEq <- eq_rel
+      , deps@(_ : _) <- synTyConSourceProofRules tc
+      , CtWanted (WantedCt { ctev_dest = HoleDest hole }) <- ev
+      = do { result <- solve
+           ; filled <- wrapTcS (TcM.liftZonkM (unpackCoercionHole_maybe hole))
+           ; case filled of
+               Just (CPH { cph_co = co }) | isReflCo co ->
+                 wrapTcS $ TcM.setCtLocM (ctEvLoc ev) $ do
+                   loc <- TcM.getSrcSpanM
+                   TcM.recordSourceProofUse loc (tyConName tc) deps
+               _ -> pure ()
+           ; pure result }
+    expand_proof_synonym _ solve = solve
 
 -- An imported synonym and a filled metavariable can now name the same
 -- source application. Reflexivity does not need the family's equation.
@@ -694,20 +717,30 @@ can_eq_nc ces rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
         (rhs@(TyConApp family args), TyVarTy tv) -> try_index IsSwapped tv family args rhs
         _ -> rewrite_both
     try_index swapped tv family args rhs
+      | mightPossiblyUnify ev eq_rel tv
+      -- Instantiating Refl can give two copies of alpha ~ F. Keep
+      -- the mark-bearing nullary family as alpha's value. A proof
+      -- that needs only F ~ F then uses no family equation.
+      , null args
+      , Just ax <- closedFamilyTyConCoAxiom_maybe family
+      , _ : _ <- co_ax_source_proof_rules ax
+      = unify_index swapped tv rhs
       | mightPossiblyUnify ev eq_rel tv, saturatedSourceHead family args = do
           owner <- wrapTcS (sourceTableOwner family)
           case owner of
             Nothing -> rewrite_both
-            Just _ -> do
-              unfilled <- isUnfilledMetaTyVar tv
-              given_lvl <- getInnermostGivenEqLevel
-              rhs' <- zonkTcType rhs
-              kind <- zonkTcType (varType tv)
-              if unfilled && kind `eqType` typeKind rhs'
-                 && simpleUnifyCheck UC_Solver given_lvl tv rhs' == SUC_CanUnify
-                then canEqCanLHSFinish ev NomEq swapped (TyVarLHS tv) rhs'
-                else rewrite_both
+            Just _ -> unify_index swapped tv rhs
       | otherwise = rewrite_both
+
+    unify_index swapped tv rhs = do
+      unfilled <- isUnfilledMetaTyVar tv
+      given_lvl <- getInnermostGivenEqLevel
+      rhs' <- zonkTcType rhs
+      kind <- zonkTcType (varType tv)
+      if unfilled && kind `eqType` typeKind rhs'
+         && simpleUnifyCheck UC_Solver given_lvl tv rhs' == SUC_CanUnify
+        then canEqCanLHSFinish ev NomEq swapped (TyVarLHS tv) rhs'
+        else rewrite_both
 
     rewrite_both
       = do { (redn1@(Reduction _ xi1), rewriters1) <- rewrite_if_unrewritten (ces_rwL ces) ps_ty1
@@ -725,7 +758,26 @@ can_eq_nc ces rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
                             , ces_rwL = True
                             , ces_rwR = True
                             }
-           ; can_eq_nc ces' rdr_env envs new_ev eq_rel xi1 xi1 xi2 xi2 }
+           ; let solve = can_eq_nc ces' rdr_env envs new_ev eq_rel xi1 xi1 xi2 xi2
+           ; case (eq_rel, new_ev) of
+               (NomEq, CtWanted (WantedCt { ctev_dest = HoleDest hole }))
+                 -> record_axiom_use hole redn1 (record_axiom_use hole redn2 solve)
+               _ -> solve }
+
+    -- Keep the genuine family axiom in the reduction. The reduced type
+    -- alone cannot distinguish a checked source method from a literal.
+    record_axiom_use hole (Reduction (AxiomCo ax@(BranchedAxiom axiom 0) []) _) solve
+      | deps@(_ : _) <- sourceProofAxiomRules ax
+      = do { result <- solve
+           ; filled <- wrapTcS (TcM.liftZonkM (unpackCoercionHole_maybe hole))
+           ; case filled of
+               Just (CPH { cph_co = co }) | isReflCo co ->
+                 wrapTcS $ TcM.setCtLocM (ctEvLoc ev) $ do
+                   loc <- TcM.getSrcSpanM
+                   TcM.recordSourceProofUse loc (coAxiomName axiom) deps
+               _ -> pure ()
+           ; pure result }
+    record_axiom_use _ _ solve = solve
 
     rewrite_if_unrewritten :: Bool -> TcType -> TcS (Reduction, CoHoleSet)
     rewrite_if_unrewritten already_rewritten ps_ty

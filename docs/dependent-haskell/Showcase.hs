@@ -1765,6 +1765,8 @@ main = do
     observe "prove the append law through the Prelude.foldr list instance"
         PreludeFoldrProof.example
     putStrLn ("prove the two equations of a Maybe mapping method: " ++ MappingProof.example)
+    -- These proofs use the installed Functor Maybe equations. An importing
+    -- module checks their rule dependencies when it uses the exported proof.
     putStrLn ("prove that Prelude.fmap leaves Nothing unchanged: " ++ PreludeMappingProof.example)
     putStrLn ("map an open Just field once and twice with Prelude.fmap: " ++ PreludeMappingProof.presentExample)
     putStrLn ("prove that folding a mapped list composes the step: " ++ PreludeFoldrProof.showFoldMap)

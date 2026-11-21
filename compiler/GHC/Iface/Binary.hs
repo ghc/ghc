@@ -360,7 +360,10 @@ evidenceSuffix requirements
     || needs InferredOrderedGadtBindersEvidence
     || needs ExtendedOrderedGadtTelescopeEvidence || needs ScopedLambdaEvidence
     || needs RetainedConstructorContextEvidence
-    || needs HomeRuleInterfaceEvidence || needs PartialSynonymEvidence = feature_set
+    || needs HomeRuleInterfaceEvidence || needs PartialSynonymEvidence
+    || needs SourceProofRuleEvidence || needs SourceProofRuleAliasEvidence
+    || needs SourceProofRuleAxiomEvidence || needs SourceProofRuleInfoEvidence
+    || needs SourceProofRuleArgumentsEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -408,6 +411,11 @@ legacyEvidenceSuffix ExtendedOrderedGadtTelescopeEvidence = featureSetPrefix ++ 
 legacyEvidenceSuffix ScopedLambdaEvidence = featureSetPrefix ++ "scoped-lambda"
 legacyEvidenceSuffix RetainedConstructorContextEvidence = featureSetPrefix ++ "retained-constructor-context"
 legacyEvidenceSuffix HomeRuleInterfaceEvidence = featureSetPrefix ++ "home-rule-interfaces"
+legacyEvidenceSuffix SourceProofRuleEvidence = featureSetPrefix ++ "source-proof-rules"
+legacyEvidenceSuffix SourceProofRuleAliasEvidence = featureSetPrefix ++ "source-proof-rule-aliases"
+legacyEvidenceSuffix SourceProofRuleAxiomEvidence = featureSetPrefix ++ "source-proof-rule-axioms"
+legacyEvidenceSuffix SourceProofRuleInfoEvidence = featureSetPrefix ++ "source-proof-id-rules"
+legacyEvidenceSuffix SourceProofRuleArgumentsEvidence = featureSetPrefix ++ "source-proof-rule-arguments"
 legacyEvidenceSuffix GeneralIndexedConstructorOperandEvidence = featureSetPrefix ++ "general-indexed-constructor-operand"
 legacyEvidenceSuffix DepFunCoEvidence           = "-retained-depfunco-v1"
 legacyEvidenceSuffix ConstructorCaseEvidence   = "-retained-constructor-case-v1"
@@ -463,7 +471,12 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("scoped-lambda", ScopedLambdaEvidence)
                       , ("retained-constructor-context", RetainedConstructorContextEvidence)
                       , ("home-rule-interfaces", HomeRuleInterfaceEvidence)
-                      , ("partial-synonym-v2", PartialSynonymEvidence) ]
+                      , ("partial-synonym-v2", PartialSynonymEvidence)
+                      , ("source-proof-rules", SourceProofRuleEvidence)
+                      , ("source-proof-rule-aliases", SourceProofRuleAliasEvidence)
+                      , ("source-proof-rule-axioms", SourceProofRuleAxiomEvidence)
+                      , ("source-proof-id-rules", SourceProofRuleInfoEvidence)
+                      , ("source-proof-rule-arguments", SourceProofRuleArgumentsEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion

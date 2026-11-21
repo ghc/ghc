@@ -59,6 +59,7 @@ import GHC.Core.Type
 import GHC.Builtin.WiredIn.Types ( unmatchableDataConTy )
 
 import GHC.Types.Id
+import GHC.Types.Id.Info (sourceProofRuleInfo)
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
@@ -705,7 +706,11 @@ tc_infer_id (L loc (WithUserRdr rdr id_name))
                -> do { check_local_id id
                      ; return_id id }
 
-             AGlobal (AnId id) -> return_id id
+             AGlobal (AnId id)
+               | deps@(_ : _) <- sourceProofRuleInfo (idInfo id)
+               -> do { recordSourceProofUse (locA loc) (idName id) deps
+                     ; return_id id }
+               | otherwise -> return_id id
                -- A global cannot possibly be ill-staged
                -- nor does it need the 'lifting' treatment
                -- Hence no checkTh stuff here

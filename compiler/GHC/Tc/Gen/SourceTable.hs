@@ -5,7 +5,10 @@ module GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourc
                               visibleSourceMethodRules, hasSourceMethodRule, hasSourceMethodRuleAt,
                               sourceBinarySelector, sourceMapSelector, lookupSourceBinaryMethod, lookupSourceContainerMethod, lookupSourceGroundDFun, publishListFoldMethods, sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers, isSourceFilterGuard,
                               OptionalSourceUses, optionalSourceUses, registerOptionalSourceUses,
-                              checkOptionalSourceUses, checkSourceMethodUses) where
+                              checkOptionalSourceUses, checkSourceMethodUses,
+                              withSourceProofSignature,
+                              recordSourceProofAliasUse, sourceProofRulesFor, captureSourceMethodProof, closedSourceProofArgs,
+                              checkAndInstallSourceProofs) where
 
 import GHC.Prelude
 
@@ -17,7 +20,7 @@ import GHC.Core (CoreRule(..), isAutoRule, ruleActivation)
 import qualified GHC.Core as Core
 import GHC.Core.CharCase (certOwner, certRows, certify)
 import GHC.Core.OpenWhnf (openDataConFieldTypes)
-import GHC.Core.Predicate (classMethodInstTy, getClassPredTys_maybe, mkClassPred)
+import GHC.Core.Predicate (classMethodInstTy, getClassPredTys_maybe, isPredTy, mkClassPred)
 import GHC.Core.Rules (RuleEnv(..), emptyRuleBase, emptyRuleEnv, extendRuleBaseList, getRules)
 import GHC.Core.Coercion (abstractNativeIndices, coercionLKind, coercionRKind, coercionRole, mkNomReflCo, mkSymCo, mkTyConAppCo)
 import GHC.Core.Coercion.Axiom (ClosedTyFam(..), CoAxBranch, coAxiomBranches, coAxiomRole,
@@ -58,26 +61,28 @@ import GHC.Tc.Instance.Family (tcGetFamInstEnvs)
 import GHC.Tc.TyCl.Build (newImplicitBinder)
 import GHC.Tc.Types.ErrCtxt (HsCtxt(ExprCtxt))
 import GHC.Tc.Types.Evidence (HsWrapper(..), TcEvBinds(..), EvBindsState(..), isEmptyEvBindsMap)
-import GHC.Tc.Types (TcGblEnv(..), tcVisibleOrphanMods)
+import GHC.Tc.Types (TcGblEnv(..), SourceRuleUses(..), tcVisibleOrphanMods)
 import GHC.Tc.Utils.Instantiate (freshenTyVarBndrs)
 import GHC.Tc.Utils.Env (tcLookupGlobal, tcLookupId, tcLookupIdMaybe, tcGetInstEnvs)
 import GHC.Tc.Utils.Monad (TcM, addErr, failWithTc, getEps, getGblEnv, getGlobalRdrEnv, getTcEvBindsMap, getTcEvBindsState,
-                           checkNoErrs, getTopEnv, goptM, keepAlive, liftZonkM, newSysName, readTcRef, recordHomeRuleDependencies, setSrcSpanA, updTcRef, xoptM)
+                           checkNoErrs, getTopEnv, goptM, keepAlive, liftZonkM, newSysName, readTcRef, writeTcRef, newTcRef, setGblEnv,
+                           recordHomeRuleDependencies, setSrcSpan, setSrcSpanA, updTcRef, xoptM)
 import GHC.Tc.Utils.TcType (isTyFamFree)
 import GHC.Tc.Zonk.TcType (zonkTcType, zonkTcTypes)
-import GHC.Types.Avail (availNames)
+import GHC.Types.Avail (availNames, availsToNameSet)
 import GHC.Types.Basic (Origin(..), LeftOrRight(..), SourceTableOrigin(..), pickLR)
 import GHC.Types.Error (errorsFound)
-import GHC.Types.Id.Info (IdDetails(DFunId, SourceTableId, VanillaId), SourceDFun(..))
-import GHC.Types.Id (globaliseId, idName, isClassOpId_maybe, isDataConId_maybe, isDataConWorkId_maybe, idUnfolding, mkVanillaGlobal, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe,
+import GHC.Types.Id.Info (IdDetails(DFunId, SourceTableId, VanillaId), SourceDFun(..), setSourceProofRuleInfo)
+import GHC.Types.Id (globaliseId, idInfo, idName, setIdInfo, isClassOpId_maybe, isDataConId_maybe, isDataConWorkId_maybe, idUnfolding, mkVanillaGlobal, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe,
                      setSourceMethodIds, sourceMethodAliases, sourceMethodTarget_maybe)
 import GHC.Types.InlinePragma (isNeverActive)
 import GHC.Types.Name (Name, OccName, isExternalName, mkSourceTableOcc, mkSourceFstOcc, mkSourceSndOcc, mkInstTyCoOcc, mkTcOcc,
-                       isVarOcc, mkTyVarOcc, mkVarOcc, nameModule_maybe, nameOccName, nameSrcSpan, occNameString, setOccNameSpace, sourceTableTermOcc, stableNameCmp, tvName)
+                       isVarOcc, mkTyVarOcc, mkVarOcc, nameModule_maybe, nameOccName, nameSrcSpan, occNameString, setOccNameSpace, sourceTableTermOcc, stableNameCmp, nameStableString, tvName, SourceProofRule, SourceProofArgs, SourceProofArg(..))
 import GHC.Core.Opt.Pipeline (pairObservationOcc, pairObservationType, scalarRecipeTableOcc)
 import GHC.Types.Name.Reader (gre_imp, is_decl, is_isboot, lookupGRE_Name)
-import GHC.Types.Name.Env (extendNameEnv_C, lookupNameEnv, mkNameEnv)
+import GHC.Types.Name.Env (extendNameEnv_C, lookupNameEnv, mkNameEnv, plusNameEnv_C, isEmptyNameEnv)
 import GHC.Types.Name.Set (NameSet, emptyNameSet, elemNameSet, extendNameSet, extendNameSetList, filterNameSet,
+                           intersectsNameSet,
                            intersectNameSet, isEmptyNameSet, minusNameSet, mkNameSet, nameSetElemsStable,
                            unionNameSet, unionNameSets, unitNameSet)
 import GHC.Types.SrcLoc
@@ -93,14 +98,14 @@ import GHC.Unit.Module.Env (lookupInstalledModuleEnv, moduleSetElts)
 import GHC.Unit.Module.ModDetails (md_rules)
 import GHC.Unit.Module.ModIface (mi_hash_fn)
 import GHC.Unit.Types (GenWithIsBoot(..), isInteractiveModule, moduleName, moduleUnitId)
-import GHC.Types.TypeEnv (lookupTypeEnv)
+import GHC.Types.TypeEnv (lookupTypeEnv, extendTypeEnvWithIds, typeEnvIds)
 import GHC.Types.TyThing (TyThing(..))
 import GHC.Types.Unique.FM (plusUFM_C)
 import GHC.Types.Unique.Set (mkUniqSet, nonDetEltsUniqSet, sizeUniqSet)
 import GHC.Types.Var (Id, CoVar, idDetails, VarBndr(..), isId, isCoVar, mkTyVar, setIdDetails, varName)
 import GHC.Types.Var.Set (elemVarSet)
 import GHC.Utils.Misc (lengthAtLeast, lengthIs)
-import GHC.Utils.Monad (allM, anyM)
+import GHC.Utils.Monad (allM, anyM, whenM)
 import GHC.Utils.Outputable (text)
 import GHC.Utils.Panic (panic)
 
@@ -110,7 +115,8 @@ import Control.Applicative ((<|>))
 import Data.Functor.Identity (Identity(..))
 import Data.List (find, findIndex, nubBy, partition, sortBy, stripPrefix)
 import Data.List.NonEmpty (NonEmpty(..))
-import Data.Maybe (catMaybes, fromMaybe, isJust, isNothing, mapMaybe)
+import Data.Maybe (catMaybes, fromMaybe, isJust, isNothing, listToMaybe, mapMaybe)
+import Data.Semigroup ((<>))
 
 -- | Read the current defining Id without registering use of its equations.
 -- A local occurrence can still carry the Id from before equation checking.
@@ -376,14 +382,93 @@ hasSourceMethodRule rules = hasSourceMethodRuleAt rules Nothing
 -- | Skip rules whose first rough-match type constructor differs from the
 -- actual type constructor. For example, eqString cannot rewrite (==) @Integer.
 hasSourceMethodRuleAt :: RuleEnv -> Maybe Name -> Id -> Bool
-hasSourceMethodRuleAt rules first fun = any user_rule (getRules rules (globaliseId fun))
+hasSourceMethodRuleAt rules first = hasSourceMethodRuleAtArgs rules first []
+
+-- | An imported rule can also be apart at a checked value argument.
+hasSourceMethodRuleAtArgs :: RuleEnv -> Maybe Name -> SourceProofArgs -> Id -> Bool
+hasSourceMethodRuleAtArgs rules first checked fun = any user_rule (getRules rules (globaliseId fun))
   where
     user_rule BuiltinRule{} = False
     user_rule Rule{ru_rough = Just other : _, ru_args = Core.Type ty : _}
       | Just actual <- first, actual /= other
       , Just (tc, _) <- tcSplitTyConApp_maybe ty
       , tyConName tc == other, isGenerativeTyCon tc Nominal = False
+    user_rule Rule{ru_args = args}
+      | not (null checked)
+      , dictionary : values <- filter (not . Core.isTypeArg) args
+      , not (Core.isTyCoArg dictionary), isPredTy (exprType dictionary)
+      , not (any Core.isTyCoArg values)
+      , sourceProofArgsApart checked (closedSourceProofArgs (map Just values))
+      = False
     user_rule rule = not (isAutoRule rule || isNeverActive (ruleActivation rule))
+
+-- | Retain only syntactic constructor applications at checked value positions.
+closedSourceProofArgs :: [Maybe Core.CoreExpr] -> SourceProofArgs
+closedSourceProofArgs args = case map (maybe SourceProofUnknown (constructorArg view)) args of
+    shapes | all (== SourceProofUnknown) shapes -> []
+           | otherwise -> shapes
+  where
+    view e
+      | (Core.Var fun, args) <- Core.collectArgs e
+      , Just con <- isDataConWorkId_maybe fun
+      , let fields = dropWhile Core.isTypeArg args
+      , not (any Core.isTyCoArg fields)
+      = Just (con, fields)
+      | otherwise = Nothing
+
+-- | Keep only saturated ordinary data constructors.
+-- See Note [No RULES on datacons] in GHC.HsToCore.Binds.
+constructorArg :: (e -> Maybe (DataCon, [e])) -> e -> SourceProofArg Name
+constructorArg view = go
+  where
+    go expr
+      | Just (con, fields) <- view expr
+      , let tc = dataConTyCon con
+      , isVanillaDataCon con, isVanillaAlgTyCon tc, isBoxedDataTyCon tc
+      , isNothing (dataConWrapId_maybe con)
+      , lengthIs fields (dataConSourceArity con)
+      = SourceProofCon (dataConName con) (map go fields)
+      | otherwise = SourceProofUnknown
+
+-- | Prove that the application and rule differ at the same saturated path.
+sourceProofArgsApart :: SourceProofArgs -> SourceProofArgs -> Bool
+sourceProofArgsApart checked rule =
+    lengthIs rule (length checked) && or (zipWith apart checked rule)
+  where
+    apart (SourceProofCon a as) (SourceProofCon b bs)
+      | lengthIs bs (length as) = a /= b || or (zipWith apart as bs)
+    apart _ _ = False
+
+-- | Read a local rule before desugaring. Only application wrappers
+-- preserve the value positions used by the constructor check.
+localSourceRuleApart :: Name -> SourceProofArgs -> LRuleDecl GhcTc -> Bool
+localSourceRuleApart owner checked (L _ HsRule{rd_lhs = lhs})
+  | not (null checked)
+  , (HsVar _ (L _ id), args) <- applications True (unLoc lhs) []
+  , idName id == owner
+  = sourceProofArgsApart checked (map (constructorArg view) args)
+  | otherwise = False
+  where
+    view expr
+      | (XExpr (ConLikeTc (RealDataCon con)), fields) <- applications False expr []
+      = Just (con, fields)
+      | otherwise = Nothing
+
+    applications allow_evidence expr args = case expr of
+      HsApp _ fun arg -> applications allow_evidence (unLoc fun) (unLoc arg : args)
+      HsAppType _ fun _ -> applications allow_evidence (unLoc fun) args
+      HsPar _ e -> applications allow_evidence (unLoc e) args
+      XExpr (WrapExpr wrap e)
+        | transparent allow_evidence wrap -> applications allow_evidence e args
+      _ -> (expr, args)
+
+    transparent _ WpHole = True
+    transparent _ WpTyApp{} = True
+    transparent allow WpEvApp{} = allow
+    transparent allow WpLet{} = allow
+    transparent allow (WpCompose a b) = transparent allow a && transparent allow b
+    transparent allow (WpSubType wrap) = transparent allow wrap
+    transparent _ _ = False
 
 -- | Check that every visible rule of a certified mapper preserves its two list equations.
 -- See Note [Checked list traversal rules].
@@ -486,8 +571,160 @@ Recheck after processing declarations and splices.
 
 -- | Check the selected method at the occurrence, and record its semantic dependencies.
 recordSourceMethodUse :: Id -> Id -> Id -> TcM ()
-recordSourceMethodUse dfun selector target =
+recordSourceMethodUse dfun selector target = do
     recordSourceUses (sourceMethodOps dfun selector target)
+    captureSourceMethodProof dfun selector target ([], [])
+
+-- | Record the observed method in the current named proof declaration.
+-- The caller applies its own checks before publishing the result.
+captureSourceMethodProof :: Id -> Id -> Id -> (SourceProofArgs, [Id]) -> TcM ()
+captureSourceMethodProof dfun selector target (checked, leaves) = do
+    env <- getGblEnv
+    let ops = sourceMethodOps dfun selector target
+    updTcRef (tcg_source_rule_types env) $ \state ->
+      case sourceProofSignature state of
+        Just owner ->
+          state { sourceProofDefinitions =
+                    extendNameEnv_C (++) (sourceProofDefinitions state) owner
+                      ([ (idName v, first, finalCoreMapperOwner v, if v == selector then checked else [])
+                       | (v, first) <- ops ] ++ [(idName v, Nothing, False, []) | v <- leaves]) }
+        Nothing -> state
+
+{- Note [Imported source method proofs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Readback can erase the selected method from a proof's signature. Record
+its rule dependencies while checking the source signature. An ordinary
+consumer may use the resulting proof without enabling the extension.
+Check rules at that occurrence, after all declaration groups have finished.
+
+The checking flag is the consumer's Opt_EnableRewriteRules. If rules are
+off, the consumer still records the dependencies of an exported forwarder.
+Re-exporting the imported binding preserves its original Name and metadata.
+The defining module checked its own rules when it produced the proof.
+For new rules, use the stable rule-head identity in RuleEnv. A head can
+identify a private method worker with no interface declaration.
+
+This check uses the existing first-type-constructor test and
+checkedMapperRules whitelist. Use the same rule policy as for checked
+source method calls. For a direct closed selector application, checked
+constructor arguments can rule out a match. See Note [Closed rule argument
+shapes] in GHC.Tc.Gen.Splice. Keep other uses of the same method in the
+dependency list even if one use has checked arguments.
+
+This metadata covers methods checked in complete top-level signatures.
+It does not recover the provenance of proofs from earlier interfaces.
+-}
+
+-- | Collect method dependencies while checking a complete source signature.
+withSourceProofSignature :: Maybe Name -> TcM a -> TcM a
+withSourceProofSignature (Just owner) action
+  | isExternalName owner = do
+      enabled <- xoptM LangExt.ExperimentalDependentTypes
+      if not enabled then action else do
+        env <- getGblEnv
+        let proof_ref = tcg_source_rule_types env
+        before <- readTcRef proof_ref
+        local <- newTcRef (before { sourceProofSignature = Just owner })
+        result <- setGblEnv (env { tcg_source_rule_types = local }) action
+        after <- readTcRef local
+        writeTcRef proof_ref (after { sourceProofSignature = sourceProofSignature before })
+        pure result
+withSourceProofSignature _ action = action
+
+-- | Carry the referenced synonym's rule dependencies into a named signature
+-- or another synonym before kind checking can discard the reference.
+recordSourceProofAliasUse :: Maybe Name -> TyCon -> TcM ()
+recordSourceProofAliasUse owner tc
+  | deps@(_ : _) <- synTyConSourceProofRules tc = do
+      env <- getGblEnv
+      updTcRef (tcg_source_rule_types env) $ \state ->
+        case owner <|> sourceProofSignature state of
+          Just name | isExternalName name ->
+            state { sourceProofDefinitions =
+                      extendNameEnv_C (++) (sourceProofDefinitions state) name deps }
+          _ -> state
+  | otherwise = pure ()
+
+-- | Get the checked rule dependencies for a finished source declaration.
+sourceProofRulesFor :: Name -> TcM [SourceProofRule]
+sourceProofRulesFor name = do
+    env <- getGblEnv
+    defs <- sourceProofDefinitions <$> readTcRef (tcg_source_rule_types env)
+    pure (stableSourceProofRules (fromMaybe [] (lookupNameEnv defs name)))
+
+-- | Verify imported proofs and committed synonym reductions in this consumer and retain the dependencies of
+-- its exports, including forwards through a private local group.
+checkAndInstallSourceProofs :: TcGblEnv -> TcM TcGblEnv
+checkAndInstallSourceProofs env = do
+    state <- readTcRef (tcg_source_rule_types env)
+    let occurrences = sourceProofOccurrences state
+        imported = mkNameEnv [(name, ops) | (name, _, ops) <- occurrences]
+        -- A Wanted can be solved after checking the binding. Its source
+        -- span still belongs to the checked RHS. Attach the observed
+        -- dependency to the exact singleton signature binding. A type
+        -- reference elsewhere in the module is not evidence of a use.
+        rhs_proofs = mkNameEnv
+          [ (idName owner, deps)
+          | not (null occurrences)
+          , L loc (XHsBindsLR (AbsBinds { abs_sig = True
+                                       , abs_exports = [ABE { abe_poly = owner }] }))
+              <- tcg_binds env
+          , let deps = concat [ops | (_, site, ops) <- occurrences
+                                   , site `isSubspanOf` locA loc]
+          , not (null deps) ]
+        definitions = plusNameEnv_C (++) rhs_proofs $
+                      plusNameEnv_C (++) (sourceProofDefinitions state) imported
+    unless (null occurrences) $ whenM (goptM Opt_EnableRewriteRules) $ do
+      visible <- visibleSourceMethodRules env
+      conflicts <- forM (reverse occurrences) $ \(_, loc, ops) -> do
+        conflict <- listToMaybe <$> filterM (changed visible) ops
+        forM_ conflict $ \(owner, _, _, _) ->
+          setSrcSpan loc (addErr (TcRnRetainedQuantificationError (RetainedFinalCoreRulesEnabled owner)))
+        pure conflict
+      when (all isNothing conflicts) $ recordCommittedHomeRules env
+    if isEmptyNameEnv definitions then pure env else do
+      let -- DefUses also contains group-independent uses, such as RULES and
+          -- export lists. They cannot make a different exported binding a proof.
+          bindings = fromOL (tcg_dus env)
+          exports = availsToNameSet (tcg_exports env)
+          uses_of v = foldr add_uses (unitNameSet (idName v)) bindings
+          add_uses (Just defs, uses) needed
+            | defs `intersectsNameSet` needed = uses `unionNameSet` needed
+          add_uses _ needed = needed
+          proof_id v
+            | idName v `elemNameSet` exports
+            , let deps = concatMap (\name -> fromMaybe [] (lookupNameEnv definitions name))
+                                   (nameSetElemsStable (uses_of v))
+            , not (null deps) =
+                Just (setIdInfo v (setSourceProofRuleInfo (idInfo v) (stableSourceProofRules deps)))
+            | otherwise = Nothing
+          types = tcg_type_env env
+      pure env { tcg_type_env = extendTypeEnvWithIds types (mapMaybe proof_id (typeEnvIds types)) }
+  where
+    changed visible (owner, arg, mapper, checked) = do
+      let relevant = filter (not . localSourceRuleApart owner checked) (tcg_rules env)
+      local <- sourceRuleOwnersAtTc arg relevant
+      if owner `elemNameSet` local then pure True else
+        if mapper then do
+          -- Use the same whitelist as source formation. Only this mode
+          -- requires the checked worker declaration.
+          worker <- tcLookupIdMaybe owner
+          pure (maybe True (\v -> not (finalCoreMapperOwner v && checkedMapperRules visible v)) worker)
+        else
+          -- A newly imported rule is in the rule environment. Its head
+          -- can be found even when the defining Id is private.
+          pure (hasSourceMethodRuleAtArgs visible arg checked (mkVanillaGlobal owner liftedTypeKind))
+
+-- | Preserve stable interface fingerprints when a rule head occurs twice.
+stableSourceProofRules :: [SourceProofRule] -> [SourceProofRule]
+stableSourceProofRules = nubBy (==) . sortBy (\(a, b, c, args) (d, e, f, other) ->
+    stableNameCmp a d <> cmpArg b e <> compare c f <> compare (stableArgs args) (stableArgs other))
+  where
+    cmpArg Nothing Nothing = EQ
+    cmpArg Nothing _ = LT
+    cmpArg _ Nothing = GT
+    cmpArg (Just a) (Just b) = stableNameCmp a b
+    stableArgs = map (fmap nameStableString)
 
 {- Note [Select the dictionary for a promoted method]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -855,7 +1092,8 @@ publishSourceUses ops = do
         combine a b | isEmptyNameSet a || isEmptyNameSet b = emptyNameSet
                     | otherwise = unionNameSet a b
     updTcRef (tcg_source_table_uses env) (`extendNameSetList` map (idName . fst) ops)
-    updTcRef (tcg_source_rule_types env) (\uses -> foldl' add uses ops)
+    updTcRef (tcg_source_rule_types env) $ \state ->
+      state { sourceRuleTypes = foldl' add (sourceRuleTypes state) ops }
 
 -- | Check rules declared or imported after an earlier retained application.
 -- Report a local rule at its declaration, including one added by a splice.
@@ -883,7 +1121,7 @@ checkSourceMethodUsesWithPending env = do
       mkNameSet <$> filterM (fmap (maybe True (not . uses_final_core)) . tcLookupIdMaybe)
         (nameSetElemsStable uses)
     unless (isEmptyNameSet checked_uses) $ do
-      types <- readTcRef (tcg_source_rule_types env)
+      types <- sourceRuleTypes <$> readTcRef (tcg_source_rule_types env)
       let arguments name | Just ts <- lookupNameEnv types name, not (isEmptyNameSet ts)
                          = map Just (nameSetElemsStable ts)
                          | otherwise = [Nothing]
@@ -904,14 +1142,18 @@ checkSourceMethodUsesWithPending env = do
                       | otherwise = any (\arg -> hasSourceMethodRuleAt visible arg v) (arguments name)
           when changed (report name)
           pure (uses_final_core v && not changed)
-        -- A private rule can change the full interface hash while its ABI
-        -- stays the same. Record the rule environment of committed proofs.
-        let here = tcg_mod env
-        when (or uses_checked_rules && not (isInteractiveModule here || isHsBootOrSig (tcg_src env))) $ do
-          hsc <- getTopEnv
-          deps <- liftIO $ hugRuleInterfacesBelow hsc (homeUnitId (hsc_home_unit hsc))
-                     (GWIB (moduleName here) NotBoot)
-          recordHomeRuleDependencies deps
+        when (or uses_checked_rules) $ recordCommittedHomeRules env
+
+-- | Retain the home rule environment of an accepted proof.
+-- A private rule can change the full interface hash without changing its ABI.
+recordCommittedHomeRules :: TcGblEnv -> TcM ()
+recordCommittedHomeRules env = do
+    let here = tcg_mod env
+    unless (isInteractiveModule here || isHsBootOrSig (tcg_src env)) $ do
+      hsc <- getTopEnv
+      deps <- liftIO $ hugRuleInterfacesBelow hsc (homeUnitId (hsc_home_unit hsc))
+                 (GWIB (moduleName here) NotBoot)
+      recordHomeRuleDependencies deps
 
 -- | Find source functions that a user rule can rewrite.
 sourceRuleOwners :: [LRuleDecl GhcTc] -> NameSet

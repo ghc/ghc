@@ -320,6 +320,7 @@ mkWiredInNewTyCon tc_name dc_name nt_co_uniq bndrs roles nt_fld_ty =
                     , co_ax_name     = nt_co_name
                     , co_ax_tc       = tc
                     , co_ax_role     = Representational
+                    , co_ax_source_proof_rules = []
                     , co_ax_implicit = True
                     , co_ax_branches = unbranched branch }
     branch = CoAxBranch { cab_loc     = getSrcSpan nt_co_name

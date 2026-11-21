@@ -23,7 +23,7 @@ module GHC.Tc.Types(
 
         -- The environment types
         Env(..),
-        TcGblEnv(..), TcLclEnv(..), modifyLclCtxt, TcLclCtxt(..),
+        TcGblEnv(..), SourceRuleUses(..), emptySourceRuleUses, TcLclEnv(..), modifyLclCtxt, TcLclCtxt(..),
         setLclEnvTcLevel, getLclEnvTcLevel,
         setLclEnvLoc, getLclEnvLoc, lclEnvInGeneratedCode,
         IfGblEnv(..), IfLclEnv(..),
@@ -527,6 +527,18 @@ data FrontendResult
 --        since that will actually say the specific interface you
 --        want to track (and recompile if it changes)
 
+-- | Rewrite dependencies from checked source applications and imported proofs.
+data SourceRuleUses = SourceRuleUses
+  { sourceRuleTypes :: NameEnv NameSet
+  , sourceProofSignature :: Maybe Name
+  , sourceProofDefinitions :: NameEnv [SourceProofRule]
+  , sourceProofOccurrences :: [(Name, SrcSpan, [SourceProofRule])]
+  }
+
+-- | No checked source applications or imported proof occurrences.
+emptySourceRuleUses :: SourceRuleUses
+emptySourceRuleUses = SourceRuleUses emptyNameEnv Nothing emptyNameEnv []
+
 -- | 'TcGblEnv' describes the top-level of the module at the
 -- point at which the typechecker is finished work.
 -- It is this structure that is handed on to the desugarer
@@ -643,7 +655,7 @@ data TcGblEnv
         tcg_evaluated_term_uses :: TcRef NameSet,
           -- ^ Imported definitions used in type evaluation, including instance dictionaries.
 
-        tcg_source_rule_types :: TcRef (NameEnv NameSet),
+        tcg_source_rule_types :: TcRef SourceRuleUses,
           -- ^ Known first type arguments to retained rule heads. An empty
           -- set requires checking all rules for the head.
 

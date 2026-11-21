@@ -34,7 +34,7 @@ module GHC.CoreToIface
     , toIfaceBang
     , toIfaceSrcBang
     , toIfaceLetBndr
-    , toIfaceIdDetails
+    , toIfaceIdDetails, toIfaceSourceProofRules
     , toIfaceIdInfo
     , toIfUnfolding
     , toIfaceTickish
@@ -550,6 +550,15 @@ toIfaceTopBndr id
                         (toIfaceIdInfo (idInfo id)) (toIfaceIdDetails name (idDetails id))
   where
     name = getName id
+
+-- | Write rule identities without requiring private worker declarations.
+toIfaceSourceProofRules :: [SourceProofRule] -> [IfaceSourceProofRule]
+toIfaceSourceProofRules deps =
+  [ ((symbol owner, fmap symbol first, mapper), map (fmap symbol) args)
+  | (owner, first, mapper, args) <- deps ]
+  where
+    symbol n = (nameModule n, nameOccName n)
+
 
 toIfaceIdDetails :: Name   -- ^ for trace/panic messages only
                  -> IdDetails -> IfaceIdDetails

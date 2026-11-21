@@ -3265,6 +3265,25 @@ uType_defer (UE { u_loc = loc, u_defer = ref
        ; return co }
 
 
+{- Note [Checked source synonym reductions in the eager unifier]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A source synonym can carry the dependencies of a method that reduced
+to its RHS. An ordinary expression such as
+
+  (Refl :: Image :~: 'Just 'False)
+
+uses that observation when the eager unifier expands Image to solve
+the nominal equality of the indices. No imported proof Id occurs.
+
+Record the dependence when expansion produces a reflexive coercion.
+Deferred constraints keep their original spelling for the solver.
+The existing identical nullary-synonym test needs no expansion, so
+Refl at Image :~: Image and a mere Proxy Image do not use the method.
+
+At module finalization, check the recorded use against the same rule
+environment as an imported proof. This includes later RULES pragmas.
+-}
+
 --------------
 uType env@(UE { u_role = role }) orig_ty1 orig_ty2
   | Phantom <- role
@@ -3283,6 +3302,18 @@ uType env@(UE { u_role = role }) orig_ty1 orig_ty2
             else traceTc "u_tys yields coercion:" (ppr co)
        ; return co }
   where
+    -- See Note [Checked source synonym reductions in the eager unifier].
+    expand_proof_synonym :: TcType -> TcM CoercionN -> TcM CoercionN
+    expand_proof_synonym (TyConApp tc _) solve
+      | Nominal <- role
+      , deps@(_ : _) <- synTyConSourceProofRules tc = do
+          co <- solve
+          when (isReflCo co) $ do
+            loc <- getSrcSpanM
+            recordSourceProofUse loc (tyConName tc) deps
+          pure co
+    expand_proof_synonym _ solve = solve
+
     go :: TcType -> TcType -> TcM CoercionN
         -- The arguments to 'go' are always semantically identical
         -- to orig_ty{1,2} except for looking through type synonyms
@@ -3331,8 +3362,8 @@ uType env@(UE { u_role = role }) orig_ty1 orig_ty2
         -- we'll end up saying "can't match Foo with Bool"
         -- rather than "can't match "Int with Bool".  See #4535.
     go ty1 ty2
-      | Just ty1' <- coreView ty1 = go ty1' ty2
-      | Just ty2' <- coreView ty2 = go ty1  ty2'
+      | Just ty1' <- coreView ty1 = expand_proof_synonym ty1 (go ty1' ty2)
+      | Just ty2' <- coreView ty2 = expand_proof_synonym ty2 (go ty1 ty2')
 
     -- See Note [Rigid retained indices]
     go ty1@(TermVarTy v1) (TermVarTy v2)

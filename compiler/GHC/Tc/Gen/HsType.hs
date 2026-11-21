@@ -40,7 +40,7 @@ module GHC.Tc.Gen.HsType (
         bindTyClTyVars, bindTyClTyVarsAndZonk,
         tcFamTyPats, tcInferredMatchabilityFamPats, matchabilityArrow, tcCheckMatchabilityArrow,
         inferredMatchabilityIndex, familyKindUsesMatchability, tcCheckMatchabilitySynRhs,
-        synonymCallbackIndex, tcCheckSynonymMetadata,
+        synonymCallbackIndex, tcCheckSynonymMetadata, tcCheckSynonymRhs,
         maybeEtaExpandAlgTyCon, tcbVisibilities,
         etaExpandAlgTyCon,
 
@@ -103,7 +103,7 @@ import GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourc
                               sourceCaseKindUse, sourceTableReferenceUse, indexedProjectionSource, isSourceConstructorCase, monomorphicEnumCaseArity, sourceCaseVisibleArity, sourceTableOwner, sourcePairBuilderField,
                               lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource,
                               lookupSourceBinaryMethod, sourceMapSelector, lookupSourceContainerMethod,
-                              lookupSourceGroundDFun, recordSourceMethodUse)
+                              lookupSourceGroundDFun, recordSourceMethodUse, recordSourceProofAliasUse)
 import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcPrepareClosedApplication, tcPrepareClosedFunctionValue, tcPrepareClosedResult, tcPrepareClosedObservation, tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand, tcHasClosedCallExecutable)
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Instance.Family (tcGetFamInstEnvs)
@@ -603,8 +603,11 @@ tcRetainedAmbientIndices invalid_reason hs_ty
 tcCheckRetainedSigType :: Bool -> SkolemInfo -> LHsType GhcRn -> TcKind -> TcM TcType
 tcCheckRetainedSigType allow_function skol_info hs_ty kind
   = do { indices <- tcRetainedAmbientIndices RetainedLocalSignatureIndex hs_ty
+       ; let proof_owner = case getSkolemInfo skol_info of
+               SigTypeSkol (FunSigCtxt name _) | isExternalName name -> Just name
+               _ -> Nothing
        ; tcCheckRetainedType allow_function (Just skol_info)
-           (typeLevelMode { mode_indices = indices }) hs_ty kind }
+           (typeLevelMode { mode_indices = indices, mode_source_proof_owner = proof_owner }) hs_ty kind }
 
 -- | Check a retained type without changing the caller's index environment.
 -- See Note [Retained Pi type arguments].
@@ -1737,6 +1740,7 @@ data TcTyMode
              , mode_pending_calls :: Maybe (NameEnv TcTyVar, PendingSigCalls, TcRef [TcPendingTypeCall])
                -- See Note [Pending calls in partial signatures] in GHC.Tc.Solver.
              , mode_synonym_metadata :: Maybe (Name -> [Bool] -> TcM [Type], Maybe (TcM Matchability))
+             , mode_source_proof_owner :: Maybe Name
              , mode_complete_type_arg :: Maybe Bool }
                -- Nothing outside a visible type argument. Just records
                -- completeness of the whole argument, not the current child.
@@ -1773,6 +1777,7 @@ mkMode tyki = TcTyMode { mode_tyki = tyki, mode_holes = Nothing
                       , mode_dictionaries = []
                       , mode_pending_calls = Nothing
                       , mode_synonym_metadata = Nothing
+                      , mode_source_proof_owner = Nothing
                       , mode_complete_type_arg = Nothing }
 
 typeLevelMode, kindLevelMode :: TcTyMode
@@ -1792,6 +1797,7 @@ mkHoleMode tyki hm
                           , mode_dictionaries = []
                           , mode_pending_calls = Nothing
                           , mode_synonym_metadata = Nothing
+                      , mode_source_proof_owner = Nothing
                           , mode_complete_type_arg = Nothing }) }
 
 instance Outputable HoleMode where
@@ -2602,12 +2608,19 @@ synonymCallbackIndex _ _ = False
 
 -- | Check a synonym RHS with controlled instantiation of metadata.
 -- The flag for each index records whether it occurs on a callback arrow.
-tcCheckSynonymMetadata :: (Name -> [Bool] -> TcM [Type]) -> Maybe (TcM Matchability)
+tcCheckSynonymMetadata :: Maybe Name -> (Name -> [Bool] -> TcM [Type]) -> Maybe (TcM Matchability)
                        -> LHsType GhcRn -> TcKind -> TcM TcType
-tcCheckSynonymMetadata get_indices callback_arrow rhs kind =
+tcCheckSynonymMetadata owner get_indices callback_arrow rhs kind =
   addTypeCtxt rhs $
     tc_check_lhs_type
-      (typeLevelMode {mode_synonym_metadata = Just (get_indices, callback_arrow)}) rhs kind
+      (typeLevelMode { mode_synonym_metadata = Just (get_indices, callback_arrow)
+                     , mode_source_proof_owner = owner }) rhs kind
+
+-- | Check an ordinary synonym RHS and retain references to checked aliases.
+tcCheckSynonymRhs :: Name -> LHsType GhcRn -> TcKind -> TcM TcType
+tcCheckSynonymRhs owner rhs kind =
+  addTypeCtxt rhs $
+    tc_check_lhs_type (typeLevelMode { mode_source_proof_owner = Just owner }) rhs kind
 
 hasInferredMatchability :: TyCon -> Bool
 hasInferredMatchability tc
@@ -3447,7 +3460,8 @@ tcPlanClosedCall mode ordinary_call hint fun arg = do
                                (SourceClosedOperand literal_kind)
       argument <- tcClosedTypeCallArgument mode name domain arg
       return (domain, result_kind, return argument)
-  apply <- tcPrepareClosedApplication fun [domain] result_kind
+  let rigid = isNothing (nestedClosedCall arg) && closedConstructorSyntax False arg
+  apply <- tcPrepareClosedApplication fun [domain] result_kind [rigid]
   return (result_kind, OrdinaryClosedCall loc name (operand >>= apply . (:[])))
 
 -- | An ordinary application tree before producer dictionaries are selected.
@@ -3736,7 +3750,9 @@ tcPlanClosedTree mode ordinary hint root arguments = do
           "The checked argument does not represent a supported closed value.")
     prepare (ClosedApplication loc fun _ _ inputs result children) = setSrcSpan loc $ do
       let owner = getName fun
-      apply <- tcPrepareClosedApplication fun inputs result
+      let rigid (ClosedLiteral _ syntax _) = closedConstructorSyntax False syntax
+          rigid _ = False
+      apply <- tcPrepareClosedApplication fun inputs result (map rigid children)
       operands <- mapM (fmap (closedCallRuntimeOperand owner) . prepare) children
       return (OrdinaryClosedCall loc owner (sequence operands >>= apply))
     prepare (ClosedFamilyApplication loc owner table kinds [input] result [child]) =
@@ -3767,7 +3783,7 @@ tcPlanClosedTree mode ordinary hint root arguments = do
       permitted <- lift (canObservePairSource fun)
       guard (available && permitted)
       lift $ setSrcSpan loc $ do
-        apply <- tcPrepareClosedApplication fun domains input
+        apply <- tcPrepareClosedApplication fun domains input []
         operands <- mapM (fmap (closedCallRuntimeOperand owner) . prepare) args
         select <- closedPairProjectionExpression side input left right result
         reify <- tcPrepareClosedResult owner input
@@ -4252,18 +4268,24 @@ checkCompleteClosedCall mode name =
 -- | Admit only syntax that cannot run an ordinary call during kind checking.
 -- The value decoder checks the actual DataCon identity.
 closedConstructorLiteral :: LHsType GhcRn -> Bool
-closedConstructorLiteral arg = case unLoc (ignoreParens arg) of
-  HsExplicitListTy _ _ elements -> all closedConstructorLiteral elements
-  HsExplicitTupleTy _ _ fields -> lengthIs fields 2 && all closedConstructorLiteral fields
-  HsTyLit _ HsNatural{} -> True
-  HsTyLit _ HsChar{} -> True
+closedConstructorLiteral = closedConstructorSyntax True
+
+-- | A rule dependency uses only the written constructor syntax.
+-- Literal elaboration, aliases and evaluated subexpressions are excluded.
+closedConstructorSyntax :: Bool -> LHsType GhcRn -> Bool
+closedConstructorSyntax allow_literals arg = case unLoc (ignoreParens arg) of
+  HsExplicitListTy _ _ elements -> all constructor elements
+  HsExplicitTupleTy _ _ fields -> lengthIs fields 2 && all constructor fields
+  HsTyLit _ HsNatural{} -> allow_literals
+  HsTyLit _ HsChar{} -> allow_literals
   syntax -> case splitHsAppTys syntax of
     (L _ (HsTyVar _ _ (L _ (WithUserRdr _ con))), args)
       | isDataConName con -> all closed_argument args
     _ -> False
   where
+    constructor = closedConstructorSyntax allow_literals
     closed_argument HsArgPar{} = True
-    closed_argument (HsValArg _ operand) = closedConstructorLiteral operand
+    closed_argument (HsValArg _ operand) = constructor operand
     closed_argument _ = False
 
 -- | A bare imported nullary synonym can name a constructor operand.
@@ -5317,7 +5339,7 @@ tcTyVar mode name
   = if isNativeOpaqueValueId index
     then pure (TermVarTy index, varType index)
     else failWithTc $ TcRnRetainedQuantificationError RetainedCallIndex
-tcTyVar _ name         -- Could be a tyvar, a tycon, or a datacon
+tcTyVar mode name      -- Could be a tyvar, a tycon, or a datacon
   = do { traceTc "lk1" (ppr name)
        ; pack <- isExistsPackName name
        ; when pack $ failWithTc (TcRnExistsPack ExistsPackInvalidContext)
@@ -5331,6 +5353,7 @@ tcTyVar _ name         -- Could be a tyvar, a tycon, or a datacon
            AGlobal (ATyCon tc)
              | Just rhs <- synTyConRhs_maybe tc
              -> do { sourceTableTypeUses rhs
+                   ; recordSourceProofAliasUse (mode_source_proof_owner mode) tc
                    ; return (mkTyConTy tc, tyConKind tc) }
              | isJust (sourceTableTermOcc (nameOccName (tyConName tc)))
              -> do { sourceTableTypeUses (mkTyConTy tc)
@@ -6978,6 +7001,7 @@ bindExplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_ki
                          , mode_dictionaries = []
                          , mode_pending_calls = Nothing
                          , mode_synonym_metadata = if family_metadata then familyKindMetadata else Nothing
+                         , mode_source_proof_owner = Nothing
                          , mode_complete_type_arg = Nothing }
                  -- Inherit the HoleInfo from the context
 
