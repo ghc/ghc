@@ -19,7 +19,7 @@ module GHC.Core.Lint (
     WarnsAndErrs,
 
     lintCoreBindings, lintUnfolding,
-    lintPassResult, lintExpr, lintRule,
+    lintPassResult, lintExpr, lintRule, lintScopedDictionaryType,
     lintAxioms,
     lintTcCoercion, lintCoercion_InScope,
 
@@ -50,7 +50,7 @@ import GHC.Core.Lint.SubstTypeLets( substTypeLets )
 import GHC.Core.Ppr
 import GHC.Core.Coercion
 import GHC.Core.Type as Type
-import GHC.Core.Predicate( isCoVarType, mkNomEqPred )
+import GHC.Core.Predicate( getClassPredTys_maybe, isCoVarType, mkNomEqPred )
 import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Core.TyCo.Rep   -- checks validity of types/coercions
@@ -504,6 +504,19 @@ lintExpr cfg expr
     (_warns, errs) = initL cfg linter
     linter = addLoc TopLevelBindings $
              lintCoreExpr expr
+
+-- | Check the scope of experimental dictionary indices in a standalone type.
+-- This entry point is only for an in-memory scope experiment. It does not
+-- authorise ordinary Core or interface types with these evidence binders.
+lintScopedDictionaryType :: LintConfig -> Type -> Maybe (Bag SDoc)
+lintScopedDictionaryType cfg ty
+  | isEmptyBag errs = Nothing
+  | otherwise       = Just errs
+  where
+    (_, errs) = initL cfg $
+      addLoc TopLevelBindings $
+        LintM $ \env lint_errs ->
+          unLintM (lintValueType ty) (env { le_scoped_dictionaries = True }) lint_errs
 
 {-
 ************************************************************************
@@ -2196,6 +2209,18 @@ lintNativeIndexFunction f
            Just domains -> return domains
            Nothing -> failWithL (text "Unsupported opaque runtime call head:" <+> ppr f) }
 
+-- The prototype uses an invisible retained node for an evidence binder only
+-- in the standalone validator. Its domain identifies a class predicate.
+-- Keep this representation out of normal Core Lint and interface writing.
+isScopedDictionary :: Id -> Bool
+isScopedDictionary v
+  = isLocalId v && not (isCoVar v) && not (isJoinId v) && isManyTy (idMult v)
+    && isJust (getClassPredTys_maybe (varType v))
+
+lintScopedDictionaryMode :: LintM Bool
+lintScopedDictionaryMode = LintM $ \env errs ->
+  fromBoxedLResult (Just (le_scoped_dictionaries env), errs)
+
 lintType :: Type -> LintM ()
 -- See Note [Linting types and coercions]
 --
@@ -2210,8 +2235,10 @@ lintType (TyVarTy tv)
 
 lintType (TermVarTy v)
   = do { in_scope <- getInScope
-       ; lintL (isNativeOpaqueValueId v
-                 && maybe False (\b -> isNativeOpaqueValueId b && varType b `eqType` varType v)
+       ; allow_dicts <- lintScopedDictionaryMode
+       ; let eligible b = isNativeOpaqueValueId b || (allow_dicts && isScopedDictionary b)
+       ; lintL (eligible v
+                 && maybe False (\b -> eligible b && varType b `eqType` varType v)
                                 (lookupInScope in_scope v))
            (text "Invalid runtime index:" <+> ppr v <+> dcolon <+> ppr (varType v))
        ; lintVarOcc v }
@@ -2234,7 +2261,8 @@ lintType (ExistsTy _ b body)
                 (text "Existential payload must have kind Type:" <+> ppr body) } }
 
 lintType (DepFunTy vis b body)
-  = do { lintL (isNativeOpaqueValueId b)
+  = do { allow_dicts <- lintScopedDictionaryMode
+       ; lintL (isNativeOpaqueValueId b || (allow_dicts && vis == DepFunInvisible && isScopedDictionary b))
            (text "Invalid retained runtime binder:" <+> ppr b <+> dcolon <+> ppr (varType b))
        ; lintL (vis == DepFunInvisible || b `elemVarSet` tyCoVarsOfType body)
            (text "Vacuous visible retained dependent binder:" <+> ppr b)
@@ -3414,7 +3442,8 @@ type LintLevel = Int
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
 data LintEnv
-  = LE { le_flags    :: LintFlags       -- Linting the result of this pass
+  = LE { le_scoped_dictionaries :: Bool
+       , le_flags    :: LintFlags       -- Linting the result of this pass
        , le_loc      :: [LintLocInfo]   -- Locations
        , le_level    :: LintLevel
        , le_in_scope :: InScopeSet
@@ -3783,7 +3812,8 @@ initL cfg m
   where
     vars = l_vars cfg
     init_level = 0
-    env = LE { le_flags    = l_flags cfg
+    env = LE { le_scoped_dictionaries = False
+             , le_flags    = l_flags cfg
              , le_level    = init_level
              , le_vars     = mkVarEnv [ (v,(v, init_level)) | v <- vars ]
              , le_in_scope = mkInScopeSetList vars
