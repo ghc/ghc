@@ -157,9 +157,11 @@ For example, a domain of Proxy x after some (x :: A) must refer to
 the witness header, even when it shadows a synonym parameter x.
 See Note [Provisional kinds of sum payloads] in GHC.Tc.TyCl.
 
-A type family equation can return a sum. Give each equation its own
-payload family. Take its captures from the equation binders. An implicit
-equation binds the variables in its left-hand side, as in rnFamEqn.
+A closed type family equation can use a type lambda anywhere that a
+synonym body can use one. Give each equation its own lifted families.
+A type family equation can also return a sum. In both cases, take
+captures from the equation binders. An implicit equation binds the
+variables in its left-hand side, as in rnFamEqn.
 Keep the binders that a capture's written kind needs. Keep the entire
 scope when the result contains a splice. The free-variable traversal
 cannot see the variables in the result of a splice. The original equation
@@ -177,8 +179,13 @@ mention another variable outside the family equation. For a splice, pass
 only enclosing variables written in the family pattern. The splice's
 source does not show which variables its result uses. A class default has
 only the scope of its own equation.
+
+An unused capture gets a wildcard in the generated equation. The
+family still receives the capture because other arguments can depend
+on it. Keep named patterns for written lambda binders so the renamer
+can diagnose unused binders at the source.
 -}
--- | Lift type lambdas from synonyms and sums from type family equations.
+-- | Lift type lambdas and sum payloads from declaration right-hand sides.
 -- See Note [Lifting type lambdas].
 liftTypeLambdas :: RdrName -> HsGroup GhcPs
                 -> RnM (HsGroup GhcPs, [(OccName, OccName)], OccEnv (OccName, Bool))
@@ -221,7 +228,7 @@ liftTypeLambdas sigma group = do
       | sumResult rhs = do
           occ <- chooseUniqueOccTc (mkInstTyTcOcc ("$sum:" ++ occNameString (rdrNameOcc (unLoc owner))))
           let instance_owner = L (getLoc owner) (mkRdrUnqual occ)
-              (_, (L _ eqn', lifted)) = liftEquation inherited instance_owner (0 :: Int) (L loc eqn)
+              (_, (L _ eqn', lifted)) = liftEquation False inherited instance_owner (0 :: Int) (L loc eqn)
           return (L loc inst{tfid_inst = decl{tfid_eqn = eqn'}}, lifted)
     liftTypeInst _ inst = return (inst, [])
 
@@ -231,11 +238,11 @@ liftTypeLambdas sigma group = do
       = let (kind_occs, _) = hsQTyVarKindOccs captures (extractHsTyRdrTyVarsKindVars rhs)
             kinds = nubN kind_occs
             implicit = [(liftedTypeVarBinder k, k) | k <- kinds]
-            (rhs', families, _) = liftRhs Nothing owner (implicit ++ scoped) rhs (0 :: Int)
+            (rhs', families, _) = liftRhs True Nothing owner (implicit ++ scoped) rhs (0 :: Int)
         in return (L loc syn{tcdRhs = rhs'}, families)
     liftDecl (L loc decl@FamDecl{tcdFam = family@FamilyDecl
                   { fdLName = owner, fdInfo = ClosedTypeFamily ann (Just rows) }}) =
-      let (_, results) = mapAccumL (liftEquation [] owner) (0 :: Int) rows
+      let (_, results) = mapAccumL (liftEquation True [] owner) (0 :: Int) rows
           (rows', lifted) = unzip results
           family' = family{fdInfo = ClosedTypeFamily ann (Just rows')}
       in return (L loc decl{tcdFam = family'}, concat lifted)
@@ -244,15 +251,17 @@ liftTypeLambdas sigma group = do
       return (L loc cls{tcdDecls = nested'}, lifted)
     liftDecl decl = return (decl, [])
 
-    liftEquation inherited owner salt (L loc eqn@FamEqn{feqn_rhs = rhs})
-      | sumResult rhs =
+    liftEquation closed inherited owner salt row@(L loc eqn@FamEqn{feqn_rhs = rhs})
+      | closed || has_sum =
           let captures = equationCaptures inherited eqn
               free = Set.fromList (map unLoc (extractHsTyRdrTyVars rhs))
               used | spliceFree rhs = fst (foldr selectCapture ([], free) captures)
                    | otherwise = captures
-              (rhs', families, next) = liftRhs Nothing owner used rhs salt
+              (rhs', families, next) = liftRhs has_sum Nothing owner used rhs salt
           in (next, (L loc eqn{feqn_rhs = rhs'}, families))
-    liftEquation _ _ salt row = (salt, (row, []))
+      | otherwise = (salt, (row, []))
+      where
+        has_sum = sumResult rhs
 
     sumResult (L _ (HsParTy _ body)) = sumResult body
     sumResult (L _ (HsKindSig _ body _)) = sumResult body
@@ -280,7 +289,7 @@ liftTypeLambdas sigma group = do
           in (c : used, Set.union kinds (Set.delete (unLoc v) free))
       | otherwise = (used, free)
 
-    liftRhs scoped owner captures (L loc (HsKindSig ann body kind)) salt
+    liftRhs _ scoped owner captures (L loc (HsKindSig ann body kind)) salt
       | L _ HsForAllTy{} <- stripParens kind
       , closedSpliceFreeKind kind
       , Just capture_kinds <- traverse (closedCaptureKind . fst) captures
@@ -291,19 +300,19 @@ liftTypeLambdas sigma group = do
                 liftLambdaRhs scoped Nothing owner captures lam_loc vars rhs salt
                   (Just (foldr nlHsFunTy kind capture_kinds))
         in (L loc (HsKindSig ann body' kind), families, next)
-    liftRhs scoped owner captures (L loc (HsKindSig ann body kind)) salt =
-      let (body', families, next) = liftRhs scoped owner captures body salt
+    liftRhs lift_sum scoped owner captures (L loc (HsKindSig ann body kind)) salt =
+      let (body', families, next) = liftRhs lift_sum scoped owner captures body salt
       in (L loc (HsKindSig ann body' kind), families, next)
-    liftRhs scoped owner captures (L loc (XHsType (HsTypeLambda _ vars body))) salt =
+    liftRhs _ scoped owner captures (L loc (XHsType (HsTypeLambda _ vars body))) salt =
       liftLambdaRhs scoped Nothing owner captures loc vars body salt Nothing
-    liftRhs scoped owner captures (L loc (XHsType (HsTypeSome _ binder domain body))) salt =
+    liftRhs True scoped owner captures (L loc (XHsType (HsTypeSome _ binder domain body))) salt =
       let signature = sumPayloadKind captures domain
           (schema, families, next) = liftLambdaRhs scoped (Just domain) owner captures loc [binder] body salt signature
           sigma_ty = typeName (L (l2l loc) sigma)
           app f arg = L loc (HsAppTy noExtField f arg)
       in (app (app sigma_ty domain) schema, families, next)
-    liftRhs scoped owner captures ty salt =
-      liftTypeChildren (liftRhs scoped owner captures) ty salt
+    liftRhs lift_sum scoped owner captures ty salt =
+      liftTypeChildren (liftRhs lift_sum scoped owner captures) ty salt
 
     -- A standalone kind signature quantifies the invisible prefix before
     -- checking any equation. If the first row could fix that prefix, GADT
@@ -403,7 +412,7 @@ liftTypeLambdas sigma group = do
           equation_captures = zipWith (hideCapture binders salt) [0..] captures
           equation_scope = equation_captures ++ locals
           (body', families, next) =
-            liftRhs scoped owner equation_scope result (salt + 1)
+            liftRhs True scoped owner equation_scope result (salt + 1)
           (applied, lifted) = liftLambda scoped is_sum owner loc captures equation_scope body' salt signature
       in (applied, lifted : families, next)
     liftLambda scoped is_sum owner loc captures equation_scope body salt signature =
@@ -419,7 +428,16 @@ liftTypeLambdas sigma group = do
             , Just branches <- traverse classifyBranch alts
             = map (caseEquation owner name selected equation_scope case_kw scrut) branches
             | otherwise
-            = [equation loc name (map (typeName . snd) equation_scope) body]
+            = [equation loc name (capture_pats ++ binder_pats) body]
+          (capture_names, binder_names) = splitAt (length captures) (map snd equation_scope)
+          capture_pats = map capturePat capture_names
+          binder_pats = map typeName binder_names
+          free = Set.fromList (map unLoc (extractHsTyRdrTyVars body))
+          splice_free = spliceFree body
+          capturePat v
+            | splice_free, not (unLoc v `Set.member` free)
+            = L (l2l (getLoc v)) (HsWildCardTy (HoleVar (noLocA unnamedHoleRdrName)))
+            | otherwise = typeName v
           family = L loc (FamDecl noExtField
                    (FamilyDecl noAnn (ClosedTypeFamily noAnn (Just equations)) TopLevel
                        name (HsQTvs noExtField (map fst equation_scope)) Prefix

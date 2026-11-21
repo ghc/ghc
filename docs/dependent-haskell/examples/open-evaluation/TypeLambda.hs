@@ -1,10 +1,10 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, Modifiers, PolyKinds, StandaloneKindSignatures,
-             TypeApplications, TypeFamilies, TypeOperators #-}
+             TypeApplications, TypeFamilies, TypeOperators, UndecidableInstances #-}
 -- | Apply a type lambda to a list of type constructors.
 module TypeLambda
-  ( L, Captured, Shadowed, WithError, Mixed, Held, CaseShadow, Rebuild
+  ( L, Captured, Shadowed, WithError, Prefixes, Mixed, Held, CaseShadow, Rebuild
   , IndexedTag(..), IndexedCase, IndexedCaseInferred
-  , roadmap, partial, mixed, indexedFields
+  , roadmap, partial, prefixes, mixed, indexedFields
   ) where
 
 import Data.Kind (Type)
@@ -15,7 +15,7 @@ import GHC.Matchability (U)
 -- | Apply a type function to each list element.
 type Map :: (a %U -> b) -> [a] -> [b]
 type family Map f xs where
-  Map f '[] = '[]
+  Map _ '[] = '[]
   Map f (x ': xs) = f x ': Map f xs
 
 -- | Apply each type constructor to Int.
@@ -30,6 +30,17 @@ type Captured (a :: Type) = Map (\b -> Either a b) '[Bool, Char]
 
 -- | Keep the outer kind of a while the lambda binds its own q.
 type Shadowed (q :: Type) (a :: q) = Map (\q -> Either q (Proxy a)) '[Char]
+
+-- | Select a wrapper and capture the error type from the matching row.
+type Prefixes :: Maybe Type -> [Type] -> [Type]
+type family Prefixes prefix xs where
+  Prefixes ('Just e) xs = Map (\a -> Either e a) xs
+  Prefixes 'Nothing xs = Map (\e -> Maybe e) xs
+
+-- | Check both callbacks with the same list.
+prefixes :: ( Prefixes ('Just String) '[Int] :~: '[Either String Int]
+            , Prefixes 'Nothing '[Int] :~: '[Maybe Int] )
+prefixes = (Refl, Refl)
 
 -- | Check the full result of the roadmap example.
 roadmap :: L :~: '[Maybe Int, Either String Int, IO Int]

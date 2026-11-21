@@ -26,10 +26,11 @@ cover a captured variable, a shadowed binder, a rejected matchable
 arrow, and the module's implicit export list.
 
 A lambda can bind one or more ordinary type variables. An enclosing
-synonym can infer its parameter kinds. The renamer accepts lambdas at the
-root of the synonym body or under application, parentheses, and kind
-ascription. Other positions report GHC-27185. With the extension
-disabled, the diagnostic is GHC-27184 at the lambda.
+synonym can infer its parameter kinds. The renamer accepts lambdas in
+supported positions in a synonym body or a closed type family equation.
+These include the right-hand-side root, applications, parentheses, kind
+ascriptions, and list and tuple elements. Other positions report GHC-27185.
+With the extension disabled, the diagnostic is GHC-27184 at the lambda.
 
 Adjacent lambdas share one family telescope. A lambda nested in an
 application gets its own family and captures the enclosing equation's
@@ -67,6 +68,29 @@ The pre-lambda M173 compiler rejects the backslash in the provider.
 With the M174 provider interface, it compiles and runs an ordinary
 client that proves both `L` and `Shadowed Bool 'True`. M173 already
 supports the unsaturated families used in this interface.
+
+## Capturing a closed family pattern
+
+```haskell
+type Prefixes :: Maybe Type -> [Type] -> [Type]
+type family Prefixes prefix xs where
+  Prefixes ('Just e) xs = Map (\a -> Either e a) xs
+  Prefixes 'Nothing xs = Map (\e -> Maybe e) xs
+```
+
+The first callback captures `e` from its equation's constructor pattern.
+The second equation has its own scope. Its lambda binds a fresh `e`.
+`Map` receives an unmatchable callback and applies it to each element.
+Normal type family termination checks still apply. This use of `Map`
+requires `UndecidableInstances`. Writing this callback directly in the
+right-hand side of an open or associated instance still reports GHC-27185.
+
+The [provider](../examples/open-evaluation/TypeLambda.hs) and
+[interface client](../../../testsuite/tests/dependent/should_run/NativeTypeLambda.sh)
+check the two equations. The client runs with the provider source
+absent and constructs fields whose types depend on the mapped list.
+The scope test rejects a reference to another equation's pattern binder at
+the written occurrence.
 
 ## Matching a lambda argument
 
@@ -106,8 +130,9 @@ lambda does not in general determine its arguments from its result.
 ## Prior art
 
 Agda uses ordinary lambda syntax and accepts unannotated binders when
-checking an anonymous function. The surface spelling above comes from
-Serokell. [Agda lambda abstraction](https://agda.readthedocs.io/en/v2.8.0.2/language/lambda-abstraction.html).
+checking an anonymous function. Its pattern lambdas translate to fresh
+definitions. The surface spelling above comes from Serokell.
+[Agda lambda abstraction](https://agda.readthedocs.io/en/v2.8.0.2/language/lambda-abstraction.html).
 
 Eisenberg and Stolarek lift a lambda to a fresh family and pass its local
 variables as parameters. Their implementation in `singletons` uses
@@ -115,3 +140,10 @@ defunctionalization for partial application. The fork can pass the family
 itself at an unmatchable arrow. [Promoting Functions to Type Families in
 Haskell, §4.6](https://richarde.dev/papers/2014/promotion/promotion.pdf)
 and [GHC proposal 242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html).
+The [proposal 242 review](https://github.com/ghc-proposals/ghc-proposals/pull/242)
+discusses matchability as a way to retain first-order unification for
+higher-order operations. The
+[proposal 378 review](https://github.com/ghc-proposals/ghc-proposals/pull/378)
+discusses using ordinary lexical scope and familiar function syntax
+across term and type positions. Proposal 378 is a design sketch. This
+placement is part of the fork's experimental syntax.
