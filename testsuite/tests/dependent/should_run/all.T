@@ -134,6 +134,20 @@ test('NativeOpenIndexedAppendGhci',
       extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/' + f
                    for f in ['PackedVecLibrary.hs', 'OpenVectorAppend.hs', 'OrdinaryOpenVectorAppend.hs']])],
      run_command, ['bash NativeOpenIndexedAppendGhci.sh "{compiler}" "{libdir}" ' + config.ghc_th_way_flags])
+test('NativeOpenListFoldr',
+     [only_ways(['normal']),
+      extra_files([open_eval_dir + f for f in ['ListFoldrSource.hs', 'ListFoldrProof.hs', 'PreludeFoldrProof.hs',
+                                               'PreludeAppendLengthSource.hs', 'PreludeMapLengthSize.hs',
+                                               'PreludeMapLengthSource.hs', 'PreludeMapLengthProof.hs']]
+                  + ['NativeOpenListFoldrProducer.hs', 'NativeOpenListFoldrConcrete.hs'])],
+     run_command, ['bash NativeOpenListFoldr.sh "{compiler}" "{libdir}"'])
+test('NativeOpenListFoldrGhci',
+     [req_interp, req_rts_linker, only_ways(['normal']),
+      extra_files([open_eval_dir + f for f in ['ListFoldrSource.hs', 'ListFoldrProof.hs', 'PreludeFoldrProof.hs',
+                                               'PreludeAppendLengthSource.hs', 'PreludeMapLengthSize.hs',
+                                               'PreludeMapLengthSource.hs', 'PreludeMapLengthProof.hs']]
+                  + ['NativeOpenListFoldrProducer.hs', 'NativeOpenListFoldrConcrete.hs'])],
+     run_command, ['bash NativeOpenListFoldrGhci.sh "{compiler}" "{libdir}"'])
 test('NativeOpenInstalledPair',
      [req_interp, req_rts_linker, only_ways(['normal']),
       extra_files([open_eval_dir + 'PreludePairExport.hs',

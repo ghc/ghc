@@ -475,9 +475,13 @@ and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vecto
    the field selects the result type using the function in scope.
    Template Haskell still needs a representation for the retained field binder.
    [Retained scrutinees and scope](roadmap/R19-type-level-cases.md#compute-a-retained-scrutinee).
-5. **R16.** The checked list worker supports the length theorem for
-   `Prelude.reverse`. The next task is structural recursion with an
-   arbitrary step function and seed, starting with a list right fold.
+5. **R12 and R16.** An ordinary client can prove that `Prelude.reverse`
+   preserves length. A proof using `Prelude.foldr` establishes the append
+   law for an arbitrary step and seed. It uses the method selected by the
+   installed list dictionary. A code-generating producer can record that
+   choice even when its interface omits optimizer pragmas. The next
+   example to check is `fmap` on `Maybe`.
+   [Public fold proof](examples/open-evaluation/PreludeFoldrProof.hs).
    [Append and map proofs](roadmap/R16-open-term-evaluator.md#prove-that-map-distributes-over-append).
 
 6. **R21.** A retained field's worker can use a saturated local synonym

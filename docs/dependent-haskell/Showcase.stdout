@@ -397,6 +397,9 @@ use Prelude.not on a known head with an unknown tail: Refl
 map Prelude.not and Prelude.id over a known head and an unknown tail: (Refl,Refl,Refl)
 prove map preserves length and leaves the callback lazy: (Refl,Succ (Succ Zero))
 prove that append adds the list lengths: (Refl,Succ (Succ (Succ Zero)),Succ (Succ (Succ Zero)),True)
+prove the list fold law for append: (Refl,True)
+prove the append law through the Prelude.foldr list instance: Refl
+prove that folding a mapped list composes the step: (Refl,(True,True),(True,True))
 prove that reverse preserves list length: (Refl,Succ (Succ Zero))
 prove that map distributes over append: (Refl,[False,True,False],[False,True,False],(True,True))
 prove that two maps compose on a finite list: (Refl,[4,5],[4,5],(True,True),(True,True))
