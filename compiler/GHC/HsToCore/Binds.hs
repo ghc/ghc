@@ -518,12 +518,12 @@ Moving a returned lambda outside a case can change what a partial call
 evaluates. The unfolding builder uses native SimpleOpt and preserves
 dependencies in the template.
 
-Only a retained signature selects the retained pipeline in a client.
-Native SimpleOpt can remove all retained Core from the template, for
-example by deleting an unused retained local binding. Permit a written
-pragma at an ordinary signature when the resulting template contains
-only ordinary Core. Keep the check on residual retained Core in
-Note [Retained Core across module boundaries] in GHC.Iface.Tidy.
+Native SimpleOpt can remove all retained Core from a template. When
+retained Core remains in a checked template at an ordinary signature,
+mark its unfolding source. Clients use the tag to select the retained
+pipeline before reading the template. The module interface checks these
+exports. See Note [Retained Core across module boundaries] in
+GHC.Iface.Tidy.
 Compulsory default-method unfoldings still use their separate check.
 An ordinary binding without an unfolding request needs no native scan here.
 -}
