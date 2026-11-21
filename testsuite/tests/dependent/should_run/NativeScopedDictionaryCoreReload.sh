@@ -47,7 +47,18 @@ MAIN
 
 check_old_reader() {
     if [[ -n ${SCOPED_CORE_PREVIOUS_GHC:-} ]]; then
-        head -c 192 Provider.hi > header.hi
+        # Stop at the version field so the old reader cannot inspect the payload.
+        python3 - "$1" <<'HEADER'
+from pathlib import Path
+import sys
+
+description = Path(sys.argv[1]).read_bytes().splitlines()
+version, = (line.split()[1] for line in description
+            if line.split()[:1] == [b"got"] and b"experimental-scoped-dictionary-core-v3" in line)
+interface = Path("Provider.hi").read_bytes()
+end = interface.index(version) + len(version)
+Path("header.hi").write_bytes(interface[:end])
+HEADER
         for iface in Provider.hi header.hi; do
             if "$SCOPED_CORE_PREVIOUS_GHC" "-B${SCOPED_CORE_PREVIOUS_LIBDIR:-$libdir}" \
                 --show-iface "$iface" > previous.log 2>&1; then
@@ -69,7 +80,7 @@ for opt in -O0 -O2; do
     "${ghc[@]}" --show-iface Provider.hi > iface
     grep -Fq 'experimental-scoped-dictionary+experimental-scoped-dictionary-core-v3' iface
     grep -Fq 'extra decls:' iface
-    check_old_reader
+    check_old_reader iface
     cd ../client
     cp ../provider/Provider.hi "$out/"{CompileTime,Main}.hs .
     test ! -e Provider.hs && test ! -e Provider.o && test ! -e Provider.gbc
@@ -79,7 +90,7 @@ for opt in -O0 -O2; do
     test "$(./run)" = "$expected"
 done
 
-# Read both a retained character operand and a scoped dictionary application.
+# Reload characters, a Natural, a family operand, and a dictionary application together.
 mkdir -p "$out/unicode"/{producer,client}
 cd "$out/unicode/producer"
 cat >Characters.hs <<'HS'
@@ -127,7 +138,7 @@ HS
 "${ghc[@]}" -O2 -DSCOPED_DICTIONARY_EXPORT -fwrite-if-simplified-core -c Provider.hs
 "${ghc[@]}" --show-iface Provider.hi >show
 grep -Eq '^ *got .*retained-char-operand\+retained-natural-operand\+experimental-scoped-dictionary\+experimental-scoped-dictionary-core-v3\+retained-data-family-constructor-operand$' show
-check_old_reader
+check_old_reader show
 cd ../client
 cp ../producer/Provider.hi ../producer/Characters.*o ../producer/Characters.*hi .
 cat >Main.hs <<'HS'
@@ -209,7 +220,7 @@ sed -n -e '1p' -e '/^class Choose/,/^forward ::/{ /^forward ::/!p; }' \
 "${ghc[@]}" -fwrite-if-simplified-core -c Provider.hs
 "${ghc[@]}" --show-iface Provider.hi > iface
 grep -Fq 'experimental-scoped-dictionary+experimental-scoped-dictionary-core-v3' iface
-check_old_reader
+check_old_reader iface
 
 # An unrelated erased-package term still needs its own whole-Core support.
 mkdir "$out/mixed"
