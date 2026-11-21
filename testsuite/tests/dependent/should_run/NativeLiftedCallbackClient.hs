@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes, TupleSections #-}
 module Main where
 
 import Control.Exception (ErrorCall(..), evaluate, try)
@@ -17,6 +17,14 @@ observeInferred f x = case decide f x of
   IsTrue -> True
   IsFalse -> False
 
+tupleClient :: (Bool -> Bool) -> Bool -> IO ()
+tupleClient f x = do
+  print (decide f x, ())
+  print ((decide f x,) ())
+
+tupleLazy :: (Bool -> Bool) -> Bool -> Bool
+tupleLazy f x = snd (decide f x, True)
+
 forceFailure :: String -> Bool -> IO Bool
 forceFailure message value = do
   result <- try (evaluate value)
@@ -32,3 +40,5 @@ main = do
   print (observe (const True) (error "unused argument" :: Flag))
   print =<< forceFailure "used argument" (observe (\flag -> flag `seq` True) (error "used argument" :: Flag))
   print =<< forceFailure "used callback" (observe (error "used callback" :: Flag -> Bool) (Flag truth))
+  tupleClient not truth
+  print (tupleLazy (error "unused predicate") truth)

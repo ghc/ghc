@@ -897,10 +897,7 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
                             , ExistsTy ImplicitExists _ _ <- coreFullView expected
                -> return True
              Infer _ | Boxed <- boxity
-               -> do { enabled <- xoptM LangExt.ExperimentalDependentTypes
-                     ; if enabled
-                       then snd <$> tcRetainedInferableArg (noLocA expr)
-                       else return False }
+               -> snd <$> tcRetainedInferableArg (noLocA expr)
              _ -> return False
        ; if as_application
          then do { checkTupSize (length tup_args)
@@ -929,9 +926,7 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
   = -- The tup_args are a mixture of Present and Missing (for tuple sections).
     do { known_tys <- case (boxity, res_ty) of
              (Boxed, Check expected)
-               -> do { enabled <- xoptM LangExt.ExperimentalDependentTypes
-                     ; if not enabled then return Nothing else
-                  do { expected <- liftZonkM (zonkTcType expected)
+               -> do { expected <- liftZonkM (zonkTcType expected)
                      ; let known
                              | hasNativeDependentExpr (Core.Type expected)
                              , Right (_mas, missing, result) <- tcSplitFunTysN
@@ -940,7 +935,7 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
                              , tc == tupleTyCon Boxed (length tup_args)
                              = Just (map scaledMult missing, tys)
                              | otherwise = Nothing
-                     ; return known } }
+                     ; return known }
              _ -> return Nothing
        ; (tup_args1, arg_tys) <- case known_tys of
              Just (mults, tys)
@@ -2129,10 +2124,7 @@ tcInferTupArgs boxity args
   tc_infer_tup_arg i (Present x lexpr@(L l expr))
     = do { (expr', arg_ty) <- case boxity of
              Unboxed -> runInferRhoFRR (FRRUnboxedTuple i) (tcPolyExpr expr)
-             Boxed   -> do { enabled <- xoptM LangExt.ExperimentalDependentTypes
-                           ; (inferable, anchor) <- if enabled
-                               then tcRetainedInferableArg lexpr
-                               else return (False, False)
+             Boxed   -> do { (inferable, anchor) <- tcRetainedInferableArg lexpr
                            ; if inferable && anchor
                              then do { (expr', arg_ty) <- tcInferRhoFRR (FRRUnboxedTuple i) lexpr
                                      ; _ <- setSrcSpanA l $ addExprCtxt expr $
@@ -2155,9 +2147,12 @@ If xs :: Vec Int n, inferring (42, xs) must retain that exact second field
 type. The ordinary tuple path first allocates component meta-variables.
 Those variables cannot contain a runtime Id such as n.
 
-Under ExperimentalDependentTypes, expand a complete boxed tuple to its
-ordinary data constructor when the result is an InferResult and a field
-has a native anchor. Use tcRetainedInferableArg to classify the fields
+Expand a complete boxed tuple to its ordinary data constructor when the
+result is an InferResult and a field has a native anchor. An ordinary
+client can import that anchor. Both `(f x, y)` and `(,) (f x) y` must
+use the imported type in the same scope.
+See Note [Imported native application contracts] in GHC.Tc.Gen.App.
+Use tcRetainedInferableArg to classify the fields
 without checking them or running splices. The application checker infers
 and caches native fields, chooses their types immutably, and checks the
 other fields normally. It retains scope, kind, usage and subsumption checks.

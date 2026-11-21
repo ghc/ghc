@@ -8,7 +8,7 @@ trap 'rm -rf -- "$work"' EXIT
 ghc=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint -fdiagnostics-color=never)
 provider=NativeLiftedCallbackProvider
 client=NativeLiftedCallbackClient
-expected=$'(False,False,True)\nTrue\nTrue\nTrue'
+expected=$'(False,False,True)\nTrue\nTrue\nTrue\n(IsFalse,())\n(IsFalse,())\nTrue'
 
 for opt in O0 O2; do
     flags=("-$opt")
@@ -50,5 +50,18 @@ if "${ghc[@]}" -c WrongEndpoint.hs >reject.log 2>&1 ||
    ! grep -Eq 'Actual: Decision \(g[0-9]* x[0-9]*\)' reject.log ||
    ! grep -Eq 'Actual: Decision \(f[0-9]* y[0-9]*\)' reject.log; then
     cat reject.log >&2
+    exit 1
+fi
+
+cat >WrongTuple.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes #-}
+module WrongTuple where
+import NativeLiftedCallbackProvider (Decision, decide)
+wrong :: forall (chosen :: Bool). (Bool -> Bool) -> Bool -> (Decision chosen, ())
+wrong f x = (decide f x, ())
+HS
+if "${ghc[@]}" -ferror-spans -c WrongTuple.hs >tuple.log 2>&1 ||
+   ! grep -Fq 'WrongTuple.hs:5:14-23: error: [GHC-25897]' tuple.log; then
+    cat tuple.log >&2
     exit 1
 fi

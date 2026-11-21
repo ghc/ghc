@@ -2506,6 +2506,14 @@ wrapper; projection must not discard a domain/result cast or a forall/context.
 existing four combinations of One/Many hole multiplicities. Pinned source
 files, Git blob checks and decisions are in the M27 prior-art artifacts.
 
+A client can import a retained function through its ordinary Haskell
+interface. In that client, `(f x, ())` can have the same indexed field
+as `(,) (f x) ()`. Tuple syntax uses the declared field type that the
+prefix application already uses. A section keeps the same field inside
+its generated lambda. An expected tuple still checks each field against
+the type supplied by its caller. [Ordinary callback client](../../testsuite/tests/dependent/should_run/NativeLiftedCallbackClient.hs)
+and [scope and demand checks](../../testsuite/tests/dependent/should_run/NativeLiftedCallback.sh).
+
 The M28 baseline isolated a different application-spine boundary. A named
 `fst pair` projection and later application compiled; the direct flattened
 application rejected in both M27 stages. M28 now verifies the direct form.
