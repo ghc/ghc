@@ -624,6 +624,11 @@ test('NativePromotedClassBoundary',
      [req_host_target_ghc, only_ways(['normal']), extra_files(['promoted-class'])],
      run_command, ['bash NativePromotedClassBoundary.sh "{compiler}" "{libdir}"'])
 
+test('NativeScopedStoredDictionary',
+     [req_host_target_ghc, req_interp, only_ways(['normal']),
+      extra_files(['promoted-class/stored-dictionary'])],
+     run_command, ['bash NativeScopedStoredDictionary.sh "{compiler}" "{libdir}"'])
+
 test('NativeScopedDictionaryWire',
      [req_host_target_ghc, req_interp, req_rts_linker, only_ways(['normal']),
       extra_files(['promoted-class'])],

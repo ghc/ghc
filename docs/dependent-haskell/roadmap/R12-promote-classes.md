@@ -246,6 +246,25 @@ remain outside this check.
 [Mixed provider](../../../testsuite/tests/dependent/should_run/promoted-class/ScopedFamilyMethodProvider.hs)
 and [wire runner](../../../testsuite/tests/dependent/should_run/NativeScopedDictionaryWire.sh).
 
+## A Given from a retained data family match
+
+`foldCell :: foreach (c :: Cell [Bool]) -> At c` matches the retained
+value with `Stored x`. The pattern introduces the actual `Pick Bool`
+dictionary. The branch can call the imported selector `observe x`
+under this Given and return `At c`. The selector's index stays inside the
+branch.
+
+The source-hidden client passes two cells with payload `True` and
+observes `(True,False)`. One cell stores the provider's general
+dictionary. The other stores the client's more specific dictionary.
+The checker fixes the case multiplicity before entering the constructor
+implication because the dependent result names an unrestricted
+scrutinee. A linear field still fails. The checker compares the
+instantiated predicates of the lexical Givens before applying a scoped
+selector. A branch with two matching dictionaries fails even under
+`-fdefer-type-errors`.
+[Stored dictionary test](../../../testsuite/tests/dependent/should_run/NativeScopedStoredDictionary.sh).
+
 ### Ambiguity in a method-indexed signature
 
 In `inspectPayload :: forall c a. Collects c => foreach (x :: c)
