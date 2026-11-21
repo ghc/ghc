@@ -5370,15 +5370,18 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
        ; let L _ name :| _ = names
        ; let is_context (L _ HsGadtContext{}) = True
              is_context _ = False
+             is_required (L _ (HsGadtForAll _ HsForAllVis{})) = True
+             is_required _ = False
              (terminal, terminal_order, remaining, hs_result)
                = case HsDecls.splitGadtInterior hs_args hs_res_ty of
                    Just (groups, result) -> ([g | Left g <- groups], 0, groups, result)
                    Nothing -> case HsDecls.splitGadtTerminal hs_args hs_res_ty of
                      Nothing -> ([], 0, [], hs_res_ty)
                      Just (groups, count, result)
-                       -- The historical terminal layout has a single context
-                       -- position. Keep both positions in the ordered layout.
-                       | any is_context inner_bndrs, any is_context groups
+                       -- The historical layout stores one context position.
+                       -- For a required group it stores the context first.
+                       | any is_context groups
+                       , any is_context inner_bndrs || any is_required groups
                        -> (groups, 0, map Left groups, result)
                        | otherwise -> (groups, count, [], result)
              ordered = not (null remaining)

@@ -1100,6 +1100,7 @@ main = do
     observe "compare a payload using a dictionary supplied between fields" LabelledValueClient.storedChecks
     observe "use a leading context in a field pattern and a later equality in the branch" LabelledValueClient.rankedPairs
     observe "supply a required type between constructor fields" LabelledValueClient.typedNotes
+    observe "read the dictionary supplied after a constructor field and its required type" LabelledValueClient.typeTags
     observe "duplicate the unrestricted field of a quoted constructor" (QuotedColumn.readQuoted 17)
     observe "recover consecutive GADT constraints" (describePair (PrintablePair False True))
     observe "form an associated family type from its class evidence" constrainedElements
@@ -1536,6 +1537,8 @@ main = do
     observe "retain the kind of a matched Nothing"
         (Refl :: TypeLambda.Rebuild ('Nothing :: Maybe Ordering) :~: Proxy ('Nothing :: Maybe Ordering))
     observe "name and reuse a type-level intermediate result" TypeLet.roadmap
+    observe "splice a type let that shadows its outer binder"
+        (Right (Just True) :: $([t| let a = Bool in let a = Maybe a in Either a a |]))
     let row = VCons 'x' (VCons 'y' VNil)
     observe "select a vector header with a runtime flag and a computed width"
         (TypeLet.frameValues enabled 2 ':' row,

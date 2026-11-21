@@ -139,7 +139,9 @@ test('CurriedGadtContexts', extra_files(['CurriedGadtContextsProvider.hs']),
      multimod_compile_and_run, ['CurriedGadtContexts', '-dcore-lint -dstg-lint'])
 test('TerminalGadtForAll', extra_files(['TerminalGadtForAllProvider.hs']),
      multimod_compile_and_run, ['TerminalGadtForAll', '-dcore-lint -dstg-lint'])
-test('TerminalGadtContext', extra_files(['TerminalGadtContextProvider.hs']),
+test('TerminalGadtContext',
+     extra_files(['TerminalGadtContextProvider.hs',
+                  '../../../docs/dependent-haskell/examples/open-evaluation/LabelledValue.hs']),
      makefile_test, [])
 test('TerminalGadtContextScope', normal, compile_fail, [''])
 test('TerminalGadtTh',
