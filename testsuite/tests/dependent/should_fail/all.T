@@ -85,6 +85,11 @@ test('NativeListBoundaryPartial',
      extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs']),
      multimod_compile_fail,
      ['NativeListBoundaryPartial', '-v0 -fomit-interface-pragmas -fno-write-if-simplified-core'])
+test('NativeListIndexDiagnostics',
+     extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs',
+                  '../../../../docs/dependent-haskell/examples/qualified-pi/ParameterizedIndexLibrary.hs']),
+     multimod_compile_fail,
+     ['NativeListIndexDiagnostics', '-v0 -fwrite-source-equations'])
 test('NativeSourceFieldCoverage', normal, compile_fail, [''])
 test('NativeSourceLengthRecursion', normal, compile_fail, [''])
 test('NativeSourcePlusRecursion', normal, compile_fail, [''])

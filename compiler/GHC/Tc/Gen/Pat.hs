@@ -1630,8 +1630,8 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
                                      check_fields subst' (refinements ++ [(index, mkCoVarCo cv)])
                                        (position + 1) args pats
                              ; let L loc checked = pat'
-                                   field_pat = AsPat noExtField (noLocA index)
-                                                 (L loc (add_proof cv ev_binds checked))
+                                   field_pat = AsPat noExtField (L (noAnnSrcSpan generatedSrcSpan) index)
+                                                (L loc (add_proof cv ev_binds checked))
                              ; return (L loc field_pat : pats', res) } } }
     check_fields _ _ _ _ _ = bad_pattern
 

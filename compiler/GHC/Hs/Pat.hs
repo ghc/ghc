@@ -398,6 +398,16 @@ pprParendPat :: forall p. OutputableBndrId p
              => PprPrec
              -> Pat (GhcPass p)
              -> SDoc
+-- Retained constructor checks bind the whole argument with a generated alias.
+-- Keep that alias in elaboration dumps. Use the written pattern in diagnostics.
+pprParendPat p (AsPat _ (L l name) pat)
+  | GhcTc <- ghcPass @p
+  , isGeneratedSrcSpan (locA l)
+  = sdocOption sdocPrintTypecheckerElaboration $ \print_tc_elab ->
+      if print_tc_elab then ppr_alias else pprParendLPat p pat
+  | otherwise = ppr_alias
+  where
+    ppr_alias = hcat [pprPrefixOcc name, char '@', pprParendLPat appPrec pat]
 pprParendPat p pat = sdocOption sdocPrintTypecheckerElaboration $ \ print_tc_elab ->
     if need_parens print_tc_elab pat
     then parens (pprPat pat)
@@ -420,8 +430,7 @@ pprPat (VarPat _ lvar)          = pprPatBndr (unLoc lvar)
 pprPat (WildPat _)              = char '_'
 pprPat (LazyPat _ pat)          = char '~' <> pprParendLPat appPrec pat
 pprPat (BangPat _ pat)          = char '!' <> pprParendLPat appPrec pat
-pprPat (AsPat _ name pat)       = hcat [pprPrefixOcc (unLoc name), char '@',
-                                        pprParendLPat appPrec pat]
+pprPat pat@AsPat{}              = pprParendPat topPrec pat
 pprPat (ViewPat _ expr pat)     = hcat [pprLExpr expr, text " -> ", ppr pat]
 pprPat (ParPat _ pat)           = parens (ppr pat)
 pprPat (LitPat _ s)             = ppr s
