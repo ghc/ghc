@@ -16,19 +16,22 @@ type family H (a :: Bool) (b :: Bool) where
   H 'False 'False = Char
 
 -- | Name the result of G and pass it to H twice.
-type F a = let b = G a in H b b
+type F a =
+  let flag = G a
+      result = H flag flag
+  in result
 
 -- | Both uses of b refer to the local definition.
 type Shadow (b :: Bool) = let b = 'True in H b b
 
--- | Retain the same unknown Boolean in both fields.
-type Reuse (a :: Bool) = let b = a in '(b,b)
+-- | Use the first b in both fields and return the second b.
+type Reuse (a :: Bool) = let { b = a; b = '(b,b) } in b
 
 -- | The RHS refers to the outer b.
 type Outer (b :: Bool) = let b = b in H b b
 
--- | A nested definition can refer to the enclosing local name.
-type Nested (a :: Bool) = let b = a in let c = b in '(b,c)
+-- | The first binding in the group uses b from the enclosing let.
+type Nested (a :: Bool) = let b = a in let { c = b; b = 'True } in '(c,b)
 
 -- | Match the outer flag and use the selected type on both sides of Either.
 type CaseResult (flag :: Bool) =
@@ -36,7 +39,9 @@ type CaseResult (flag :: Bool) =
 
 -- | A row with one additional value when the header flag is set.
 type Frame (n :: Nat) (b :: Bool) a =
-  let width = 1 + n in case b of { True -> Vec a width; False -> Vec a n }
+  let width = 1 + n
+      withHeader = Vec a width
+  in case b of { True -> withHeader; False -> Vec a n }
 
 -- | Forward the runtime flag to both the producer and the consumer.
 frameValues :: forall a. foreach (b :: Bool) -> foreach (n :: Nat) -> a -> Vec a n -> [a]

@@ -43,10 +43,60 @@ result. For example, `ScopedRow Char '[Bool]` gives
 `'[(Maybe Char, Either Char Bool)]`. Its first callback captures `Char`
 before an inner let binds the same name to `Maybe Char`. Its second
 callback uses both types. An ordinary interface-only client constructs
-a value of the resulting row type. Binding groups, local patterns and
-general cases remain open.
+a value of the resulting row type. Local patterns and general cases remain open.
 [Scoped row](../examples/open-evaluation/TypeLambda.hs)
 and [client](../../../testsuite/tests/dependent/should_run/NativeTypeLambda.sh).
+
+## Ordered binding groups
+
+The fork's design takes a nonempty group of simple bindings under
+`ExperimentalDependentTypes`. Braces with semicolons and layout have the
+same meaning. These two definitions give the same result.
+
+```haskell
+type Braced a = let { b = a; b = Maybe b } in b
+
+type Layout a =
+  let b = a
+      b = Maybe b
+  in b
+```
+
+Each right-hand side sees the enclosing scope and the preceding bindings.
+The most recent binding of a name is visible in subsequent right-hand
+sides and the body. Thus `Maybe b` uses the first `b`, and the body uses
+the second. In `let { b = a; a = Bool } in b`,
+the first right-hand side uses an enclosing `a` if one is in scope.
+Without that binding, the reference is out of scope. Each right-hand side
+must kind-check, including unused bindings and bindings later shadowed.
+
+Agda's manual specifies scope from earlier definitions to later ones. Its
+compiler handles each simple binding without a signature separately and
+hides only the new binder while resolving its right-hand side. For
+repeated names, that exposes the preceding binding.
+[Agda manual](https://agda.readthedocs.io/en/v2.8.0/language/let-and-where.html#let-expressions),
+[Agda declaration processing](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Syntax/Concrete/Definitions.hs#L319-L341),
+[Agda let scoping](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Syntax/Translation/ConcreteToAbstract.hs#L1609-L1625),
+[Agda scope operations](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Syntax/Scope/Monad.hs#L519-L529)
+and [Agda association-list operations](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Utils/AssocList.hs#L46-L64).
+
+Haskell 2010 term `let` makes the group mutually recursive. Every
+declaration is in scope in every right-hand side. The open term-level
+`RecursiveLet` proposal (#401) discusses sequential shadowing as an
+alternative. [Haskell 2010 §3.12](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-440003.12)
+and [RecursiveLet discussion](https://github.com/ghc-proposals/ghc-proposals/pull/401#issuecomment-791233011).
+
+The `ExtendedLet` draft (#523) spells grouped type `let` without a `type`
+keyword and forbids recursive synonyms. Its scope clause names the body.
+The fork specifies the scope of the right-hand sides and repeated binders
+using the Agda rule. In review, Simon Peyton Jones questioned the benefit
+relative to the added complexity. Adam Gundry suggested considering
+`let` in types separately from local type synonym declarations. Richard
+Eisenberg closed the draft without acceptance.
+[ExtendedLet draft](https://github.com/goldfirere/ghc-proposals/blob/f7861dfa72f9a92dee36486940dea6b2ba9b38bd/proposals/0000-extended-let.rst#L109-L136),
+[Peyton Jones's review](https://github.com/ghc-proposals/ghc-proposals/pull/523#issuecomment-1346449731),
+[Gundry's suggestion](https://github.com/ghc-proposals/ghc-proposals/pull/523#issuecomment-1350590569)
+and [Eisenberg's decision](https://github.com/ghc-proposals/ghc-proposals/pull/523#issuecomment-1372209793).
 
 ## Type quotations and splices
 
@@ -65,8 +115,9 @@ An ordinary client can import a value with that type and observe
 `Right (Just True)`. Reification of a checked type can expand the
 abbreviation. The TH constructor and `letT` smart constructor are
 specific to this fork. Serokell gives the type-level let example.
-Proposal #378 describes how a term-level let-bound name can appear in a
-type. Eisenberg's review explains the aim of sharing term and type
+The accepted design sketch in proposal #378 describes a separate use of
+`let`. A term-level let-bound name can appear in a type as an opaque
+variable. Eisenberg's review explains the aim of sharing term and type
 syntax. [Term variables in types](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#term-variables-in-types)
 and [review discussion](https://github.com/ghc-proposals/ghc-proposals/pull/378#discussion_r524560765).
 [Quotation and splice test](../../../testsuite/tests/dependent/should_run/NativeTypeLetQuote.hs).

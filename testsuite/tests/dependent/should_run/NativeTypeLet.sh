@@ -33,7 +33,7 @@ outer = Refl
 reuse :: Reuse 'True :~: '( 'True, 'True)
 reuse = Refl
 
-nested :: Nested 'False :~: '( 'False, 'False)
+nested :: Nested 'False :~: '( 'False, 'True)
 nested = Refl
 
 yes :: CaseResult 'True :~: Either Bool Bool
@@ -80,6 +80,13 @@ type Bad = let b = b in Maybe b
 HS
 reject Recursive 3:20 76037 'Not in scope: type variable'
 
+cat >Forward.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes #-}
+module Forward where
+type Bad = let { a = b; b = Bool } in Maybe a
+HS
+reject Forward 3:22 76037 'Not in scope: type variable'
+
 cat >Disabled.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes #-}
 module Disabled where
@@ -88,12 +95,27 @@ HS
 reject Disabled 3:12 29822 'requires -XExperimentalDependentTypes.'
 grep -Eq '^[[:space:]]*\|[[:space:]]*\^\^\^$' error.log
 
+cat >DisabledGroup.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module DisabledGroup where
+type Bad = let { a = Bool; b = Maybe a } in b
+HS
+reject DisabledGroup 3:12 29822 'requires -XExperimentalDependentTypes.'
+grep -Eq '^[[:space:]]*\|[[:space:]]*\^\^\^$' error.log
+
 cat >UnusedInvalid.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}
 module UnusedInvalid where
 type Bad (a :: Bool) = let b = Maybe a in Int
 HS
 reject UnusedInvalid 3:38 83865 'Expected a type'
+
+cat >UnusedGroup.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}
+module UnusedGroup where
+type Bad (a :: Bool) = let { b = a; ignored = Maybe b } in Int
+HS
+reject UnusedGroup 3:53 83865 'Expected a type'
 
 # The infix operator can be a captured type variable.
 cd "$out/provider"
