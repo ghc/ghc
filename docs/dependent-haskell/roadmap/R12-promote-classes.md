@@ -21,7 +21,11 @@ checks the dictionary field and the worker's final constructor cases.
 The exported synonym names the worker's checked family. The two equations
 preserve `Left x` and return `Right (f x)` for `Right x`. The baseline
 reported GHC-70565 at the open callback in `Prelude.fmap f x`.
-[Either proof](../examples/open-evaluation/PreludeFmapEitherProof.hs).
+The Showcase's ordinary client displays both proofs with `Left 'x'` and
+`Right False`. The fixture compiles that client with only the stripped
+provider interface.
+[Either proof](../examples/open-evaluation/PreludeFmapEitherProof.hs)
+and [ordinary client](../examples/open-evaluation/OrdinaryEitherMapping.hs).
 
 The `Result e` test uses an independent `Translate` class. An ordinary
 client reads the existing proof from a stripped interface. A client with
