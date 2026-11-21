@@ -72,6 +72,13 @@ that equality. Passing the same list twice supplies it by reflexivity
 and allows the first result cell to be read without inspecting the tail.
 [Source and coverage](roadmap/R03-dependent-products.md#zip-two-lists-at-a-common-length).
 
+An ordinary client can filter two vectors independently, pass them to
+a higher-rank callback, and infer the package returned by the callback.
+It can read the first result from either vector while the other input is
+undefined. The second filter can change the two lengths independently.
+[Two-vector example](examples/erased-existentials/RankedPackageClient.hs)
+and [inference and escape checks](roadmap/R22-existential-quantification.md).
+
 A type synonym can use a `case` to choose the argument type of an
 ordinary arrow. For example, one branch can take a pair and another
 a `Char`. An ordinary client sees the selected argument type through

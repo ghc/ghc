@@ -335,10 +335,12 @@ input lazy.
 An Agda record can bind two erased length fields and give each vector
 field its own length index. Matching the record brings each field into
 scope. In GHC the declared dot package supplies that relationship before
-ordinary application checking. The probe handles leading callback
-quantifiers and directly opened payload arguments. A quantifier after a
-supplied value argument still needs a result annotation. A consumer with
-a fixed package result works without `ImpredicativeTypes`.
+ordinary application checking. The callback can quantify its lengths before and after a supplied
+value argument. A length that remains free in the proposed result
+prevents this inference. A consumer with a fixed package result works
+without `ImpredicativeTypes`. The Showcase uses this inference on an
+ordinary client that keeps `[7]` on the left and `[2,4]` on the right.
+[Showcase client](../examples/erased-existentials/RankedPackageClient.hs).
 [Source-hidden local producer](../../../testsuite/tests/dependent/should_run/implicit-existential-source/QuickLookForward.hs),
 [Agda record telescopes](https://agda.readthedocs.io/en/v2.8.0/language/record-types.html),
 and [Agda erased record fields](https://agda.readthedocs.io/en/v2.8.0/language/runtime-irrelevance.html#syntax).

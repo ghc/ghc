@@ -35,8 +35,8 @@ refilterBoth xs ys =
     let rows = withBoth (producer id) (filterVec odd xs) (filterVec even ys)
     in rowCells rows
   where
-    producer :: forall n m. (forall k. Vec k a -> Vec k a)
-             -> Vec n a -> Vec m a -> PackedPair a
+    producer :: forall n. (forall k. Vec k a -> Vec k a)
+             -> forall m. Vec n a -> Vec m a -> PackedPair a
     producer transform left right =
         packPair (filterVec (> 3) (transform left)) (filterVec (< 10) (transform right))
 

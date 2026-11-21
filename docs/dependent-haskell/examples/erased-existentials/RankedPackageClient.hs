@@ -1,14 +1,14 @@
-{-# LANGUAGE BangPatterns, LinearTypes, MonoLocalBinds, ImpredicativeTypes, LambdaCase, NoExperimentalDependentTypes, RequiredTypeArguments #-}
+{-# LANGUAGE BangPatterns, LinearTypes, MonoLocalBinds, ImpredicativeTypes, LambdaCase, NoExperimentalDependentTypes, RequiredTypeArguments, ScopedTypeVariables #-}
 module RankedPackageClient
     ( runGuarded, runConditional, runProjections, projectAt, runDeclaredWitnesses, runExplicitBranches
     , runMixedPackage, runProducedPackage, runForwardedPackage, runLabelledPackage
-    , runSelectedPackage, runLocalPattern, readCount, refilter
+    , runSelectedPackage, runLocalPattern, readCount, refilter, refilterRows
     ) where
 
 import Data.Bool (bool)
 import Data.Proxy (Proxy(..))
 import qualified ErasedPackage
-import ImplicitVector (Filtered, filterVec, withVector)
+import ImplicitVector (Filtered, HiddenRows, filterVec, packRows, rowLists, withVector)
 import PackedVecLibrary (Vec)
 import RankedPackage
     ( Callback(..), CallbackPair, GuardedBuilder, Hidden, PolyId, PolyMaybe
@@ -123,3 +123,16 @@ refilter first second xs =
 -- | Open the hidden state and pass it once to the stored reader.
 readCount :: ErasedPackage.EncodedCount %1 -> Int
 readCount encoded = let !(state, reader) = encoded in reader state
+
+-- | Apply a final filter to each independently selected row.
+refilterRows :: forall a n m. (a -> Bool) -> (a -> Bool) -> (a -> Bool)
+             -> Vec a n -> Vec a m -> ([a], [a])
+refilterRows leftTest rightTest keep left right =
+    let rows = withRows (select keep) (filterVec leftTest left) (filterVec rightTest right)
+    in rowLists rows
+  where
+    select :: (a -> Bool) -> forall i j. Vec a i -> Vec a j -> HiddenRows a
+    select p xs ys = packRows (filterVec p xs) (filterVec p ys)
+
+    withRows :: (forall i j. Vec a i -> Vec a j -> r) -> Vec a l -> Vec a k -> r
+    withRows use xs ys = use xs ys

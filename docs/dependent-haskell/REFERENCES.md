@@ -3412,6 +3412,17 @@ package and leaves equality between package types to subsumption.
 [A Quick Look at Impredicativity, Figure 5](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf)
 and [An Existential Crisis Resolved, §8](https://richarde.dev/papers/2021/exists/exists.pdf#page=21).
 
+For a producer of two filtered vectors, the fork matches both input
+domains with one substitution. Each input length has its own scope.
+Agda records can give each vector a separate erased length field.
+Quick Look instantiates invisible binders as each value argument
+exposes them. The fork reads the same binders from the declared
+callback to identify its result package. It then checks the original
+application under that expected type.
+[Agda 2.8.0, erased record fields](https://agda.readthedocs.io/en/v2.8.0/language/runtime-irrelevance.html#syntax),
+[Quick Look, application rules](https://www.microsoft.com/en-us/research/wp-content/uploads/2020/01/quick-look-icfp20.pdf#page=8),
+and [R22 inference](roadmap/R22-existential-quantification.md).
+
 Figure 10 extends package introduction when the witness can itself be a
 polytype. Given a payload of type `Callback (forall a. a -> a)`, the fork
 can infer the hidden type from that application. It allocates the witness

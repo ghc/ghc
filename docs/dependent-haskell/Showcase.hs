@@ -1111,6 +1111,10 @@ main = do
             (VCons (3 :: Int) (VCons 7 (error "unused refilter tail")))))
         , ImplicitVector.cells (RankedPackageClient.refilter odd (> 3)
             (VCons (2 :: Int) (VCons 7 (VCons 9 VNil)))) )
+    observe "refilter two vectors and infer both hidden result lengths" $
+        RankedPackageClient.refilterRows odd even (< 10)
+            (VCons (7 :: Int) (VCons 11 VNil))
+            (VCons 2 (VCons 4 (VCons 10 VNil)))
     observe "project a stored vector from a strict record field"
         (StoredVector.cells (StoredVector.singleton 'h'))
     observe "read a retained length through a newtype record selector" $
