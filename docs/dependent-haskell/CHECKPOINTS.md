@@ -28,6 +28,24 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `afcdaf34da`, the paired split needs no visible type applications.
+After `cutRemainder` returns `Pair suffix Refl`, GHC checks each
+`splitAtValue cut input` against its field type. It recovers the suffix
+from the lengths of the returned vectors. A separate test hides an index
+under a noninjective family. GHC reports GHC-83865 at the call when
+the caller omits that index.
+[Paired split](examples/packed-vector/CertifiedSplit.hs) and
+[ambiguity control](../../testsuite/tests/dependent/should_fail/NativeRetainedSumInference.hs).
+
+The same Stage 2 compiler matched all 383 Showcase lines at stripped
+`-O0`, default `-O1` and `-O2`, and in source-loaded GHCi.
+The Core API executable matched its 37-line golden and passed the
+interface evidence checks. All 26 focused regressions passed across
+the suite and a rerun. The first run caught an obsolete expected span
+in the paired split test. GHC now selects the inner application itself.
+The negative still checks the displayed types and the location of each
+exchanged argument.
+
 At `6b2c1a6029`, a source-hidden caller can split two different vectors
 at one runtime cut. Each proof reconstructs its own vector. Exchanging
 the fields produces GHC-83865 at each wrong argument and prints the two

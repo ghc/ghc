@@ -34,13 +34,17 @@ branch matches the vector and uses the recursive equality directly.
 [ordinary caller](examples/packed-vector/CertifiedSplitClient.hs).
 
 One bounds check can also split two different vectors. Each proof names
-its original input. Inspecting the first proof leaves the second vector
+its original input. Both calls are written as `splitAtValue cut xs` or
+`splitAtValue cut ys`. The expected types of the pieces determine the
+common suffix. Inspecting the first proof leaves the second vector
 unevaluated. Exchanging the proofs reports the two written `SplitAtValue`
 types at the exchanged arguments.
 
 The Showcase includes ordinary clients of the `INLINE` and `INLINABLE`
 finite zero views. It also includes finite-list proofs for the installed
-Prelude definitions of `map`, `(.)`, `filter`, and `(++)`. The source-hidden
+Prelude definitions of `map`, `(.)`, `filter`, `takeWhile`, and `(++)`.
+The 383-line Showcase passes at three native optimization levels and
+in source-loaded GHCi. The source-hidden
 split regression passes at `-O0`, `-O1`, and `-O2`. Removing the induction
 premise fails at the final `Refl`. A normal two-stage Hadrian build also
 passed on the 378-line paired-split revision.
@@ -81,8 +85,8 @@ and checks the exact output elements. An ordinary client can also use
 `appendEmptyAt xs` to prove that appending an empty vector preserves
 its runtime input. The proof does not inspect `xs`. The recursive
 equation also applies to a runtime head, left tail, and right vector.
-Reconstructing an arbitrary input after splitting still needs a proof
-that identifies the vector matched in the successor branch.
+The successor branch of `splitAtValue` uses this equation and the
+recursive proof to reconstruct an arbitrary input after splitting.
 [Split and prior art](REFERENCES.md#split-a-vector-at-a-retained-length) and
 [contents proof](../../testsuite/tests/dependent/should_run/NativeClosedIndexedVec.hs).
 
