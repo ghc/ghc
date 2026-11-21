@@ -1895,6 +1895,8 @@ type.
 -- See Note [Declared retained-domain choices].
 tcRetainedDeclaredArgType :: (Type -> TcM Type) -> LHsExpr GhcRn -> TcM (Maybe Type)
 tcRetainedDeclaredArgType view (L _ (HsPar _ arg)) = tcRetainedDeclaredArgType view arg
+tcRetainedDeclaredArgType view (L _ (XExpr (ExpandedThingRn (HSE _ arg))))
+  = tcRetainedDeclaredArgType view arg
 tcRetainedDeclaredArgType view (L _ (ExplicitList _ fields))
   = fmap (fmap mkListTy) (tcRetainedListElementType (tcRetainedDeclaredArgType view) fields)
 tcRetainedDeclaredArgType _ (L _ (HsLit _ HsChar{})) = return (Just charTy)
