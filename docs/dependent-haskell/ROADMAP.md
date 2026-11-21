@@ -33,11 +33,12 @@ branch matches the vector and uses the recursive equality directly.
 [Split theorem](examples/packed-vector/CertifiedSplit.hs) and
 [ordinary caller](examples/packed-vector/CertifiedSplitClient.hs).
 
-The 375-line Showcase runs in native code and source-loaded GHCi.
-The source-hidden proof regression passes at `-O0`, `-O1`, and `-O2`.
-Removing the induction premise fails at the final `Refl`. The certified split
-checks without `UndecidableInstances`. The 371-line checkpoint also
-passed both stages of a normal Hadrian build.
+The 376-line Showcase includes a finite-list proof of map composition.
+The source-hidden split regression passes at `-O0`, `-O1`, and `-O2`.
+Removing the induction premise fails at the final `Refl`. The certified
+split checks without `UndecidableInstances`. Both stages of a normal
+Hadrian build passed on the 373-line checkpoint with the direct split,
+signed lookup, and an ordinary `INLINE` wrapper.
 [Verification scope](CHECKPOINTS.md#family-and-package-checkpoints).
 
 A retained function can name an entire indexed vector as its argument.

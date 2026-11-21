@@ -28,6 +28,29 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `89aa40ec56`, the 376-line Showcase includes a split written as
+two equations, an ordinary `INLINE` wrapper, and finite map composition.
+The split's recursive call supplies the equality that its cons branch
+needs. Removing that premise fails at the written `Refl`. A separate
+ordinary client compiled against a hidden producer reproduced a Core
+panic on the previous compiler. Reinstating the vanilla constructor
+case in `mapNativeIndex` let the same packed-vector client compile and
+run all 562 output lines. Its producer interface was identical in both
+runs. The complete `NativeDependentCoreRun` executable matched its
+37-line golden, including module recompilation. The interpreter-enabled
+Stage 2 compiler matched all 376 Showcase lines at native `-O0`, `-O1`,
+`-O2`, and in source-loaded GHCi. All 19 focused regressions passed.
+The map proof at this revision uses a one-equation family for the
+composed callback.
+[Split](examples/packed-vector/CertifiedSplit.hs),
+[map proof](examples/open-evaluation/PreludeMapCompositionProof.hs),
+and [packed-vector client](examples/packed-vector/Main.hs).
+
+Both stages of a normal Hadrian build passed at `49b6526f52`.
+All 373 Showcase lines matched at native `-O0`, `-O1`, `-O2`, and
+in source-loaded GHCi. The same compiler passed the direct split, signed
+position, and ordinary `INLINE` regressions.
+
 At `f2cbaced47`, an ordinary client can pass the result of a declared
 producer directly to a polymorphic reader. The lazy reader can ignore
 the producer's input. A retained rewrite rule also accepts an explicit
