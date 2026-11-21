@@ -204,6 +204,18 @@ syntactically allowed. Some further various observations about this grammar:
   ``(Eq a, Show a) => a -> Packed``. A record GADT constructor accepts a
   single context.
 
+  With :extension:`RequiredTypeArguments`, an ordinary prefix constructor
+  can put a required forall after its last field. For example: ::
+
+    data G a b where
+      After :: forall a. Int -> forall b -> G a b
+
+  Pass the integer first, then the required type, as in
+  ``After @Char 37 (type Bool)``. A pattern uses the same order, as in
+  ``After n (type b)``. This form applies to lifted data constructors whose
+  result is the parent applied to distinct type variables and whose
+  signature has an empty context.
+
   A higher-rank field has its own quantifiers or constraints inside
   parentheses. For example, ``MkS :: Int -> (forall a. a -> a) -> S``
   has a polymorphic second field.
