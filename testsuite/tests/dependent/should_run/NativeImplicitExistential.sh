@@ -57,10 +57,20 @@ mv -- Vector.hs Filter.hs LetFilter.hs BarProvider.hs RetainedDot.hs Builder.hs 
 cd ../client
 cp ../provider/{Vector,Filter,LetFilter,BarProvider,RetainedDot,Builder,Functions,NestedSignature,Nested,ForwardProducer,ForwardSchemas,WitnessSchema}.hi .
 cp "$src/"{Main,AuditMain,Opening,Identity,RetainedClient,LinearDot,LambdaMain,CallHeadMain,WitnessMain,CaseMain,NestedMain,StrictMatch,ForwardMain}.hs .
-"$ghc" "${flags[@]}" -c Main.hs Identity.hs Opening.hs LinearDot.hs
+"$ghc" "${flags[@]}" -c Main.hs Identity.hs LinearDot.hs
+"$ghc" "${flags[@]}" -XImpredicativeTypes -XNoDeepSubsumption -ddump-ds -c Opening.hs >ranked-input.log
+grep -A2 '^Opening.viaFixedInput$' ranked-input.log |
+    grep -Eq 'pack (WitnessSchema.PolyId|\(forall a\. .*a -> a\))'
+if "$ghc" "${flags[@]}" -XImpredicativeTypes -XNoDeepSubsumption -DCHECK_INPUT_ESCAPE \
+    -c Opening.hs >ranked-escape.log 2>&1; then
+    echo "The callback's local type escaped into the package witness." >&2
+    exit 1
+fi
+line=$(grep -n '^inputEscape =' Opening.hs | cut -d: -f1)
+grep -Fq "Opening.hs:$line:15: error: [GHC-83865]" ranked-escape.log
 "$ghc" "${flags[@]}" -c AuditMain.hs -main-is AuditMain
 "$ghc" "${flags[@]}" Main.o ../provider/{Vector,Filter}.o -o run
-"$ghc" "${flags[@]}" AuditMain.o Identity.o Opening.o ../provider/{Vector,Filter,LetFilter}.o -o audit -main-is AuditMain
+"$ghc" "${flags[@]}" AuditMain.o Identity.o Opening.o ../provider/{Vector,Filter,LetFilter,WitnessSchema}.o -o audit -main-is AuditMain
 "$ghc" "${flags[@]}" -c RetainedClient.hs -main-is RetainedClient
 "$ghc" "${flags[@]}" RetainedClient.o ../provider/RetainedDot.o -o retained -main-is RetainedClient
 "$ghc" "${flags[@]}" -c LambdaMain.hs -main-is LambdaMain
