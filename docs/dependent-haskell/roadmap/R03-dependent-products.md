@@ -529,3 +529,18 @@ then leaves the tail of `xs` unevaluated. A cons equation that returns
 equation reports GHC-83605 with the two constructors.
 [Producer](../examples/qualified-pi/AlignedList.hs) and
 [ordinary caller](../examples/qualified-pi/CursorClient.hs).
+
+An ordinary caller can also write both list spines. The declared types
+of the elements determine the two element types. The equations for
+`sourceLength` reduce at compile time.
+
+```haskell
+zipTwoPairs :: a -> a -> b -> b -> [(a, b)]
+zipTwoPairs x y u v = toList (zipWithExact [x, y] [u, v] (,))
+```
+
+Changing the second list to `[u]` reports GHC-18872 at `zipWithExact`.
+With `[x, u]` as the first list, GHC-25897 points to the element `u`.
+With `OverloadedLists`, GHC checks the selected `fromListN` implementation
+as a function call. The ordinary list constructors do not justify equations
+for an arbitrary `IsList` instance.

@@ -55,6 +55,10 @@ rank-2 callback and infer the hidden length of the second filter.
 [Two positions](examples/qualified-pi/ListCursor.hs) and
 [ordinary filter client](examples/erased-existentials/RankedPackageClient.hs).
 
+An ordinary caller can write `zipWithExact [x, y] [u, v] (,)`. GHC
+checks both lengths at compile time and infers both element types.
+[Written list example](roadmap/R03-dependent-products.md#zip-two-lists-at-a-common-length).
+
 A producer can zip two ordinary lists into a vector whose length is
 the length of the first input. Its signature requires equal input
 lengths. For two independent inputs, a runtime comparison supplies

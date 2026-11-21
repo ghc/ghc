@@ -7149,3 +7149,11 @@ pattern. A pattern synonym or a newtype does not supply that
 constructor fact.
 [Lower Your Guards](https://pp.ipd.kit.edu/uploads/publikationen/graf20lyg.pdf)
 and [checker implementation](../../compiler/GHC/HsToCore/Pmc/Solver.hs).
+
+Agda infers hidden arguments from explicit arguments in a function
+application. Its vector `zipWith` leaves the input element types and
+length implicit. In the fork, the declarations of fields in written
+list constructors supply the ordinary element types. GHC checks the
+original fields and the equality of the two lengths at the call.
+[Agda 2.8.0, implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html)
+and [Agda standard library 2.3, vector operations](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html).

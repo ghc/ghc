@@ -858,6 +858,8 @@ genericSafeIndexing = do
     observe "use one bounded position on equal-length lists" =<< CursorClient.observeAligned
     observe "consume two independently bounded list positions" =<< CursorClient.observeBoth
     observe "zip ordinary lists at their proven common length" =<< CursorClient.observeZip
+    observe "zip two list literals at their statically known length" $
+        CursorClient.zipTwoPairs 'a' 'b' (10 :: Int) 20
     observe "check a signed position in a packaged vector" $
         case ListVectorClient.fromList values of
             Sigma.Pair _ cells -> FinitePositionClient.lookupVecViaView cells position

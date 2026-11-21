@@ -145,6 +145,7 @@ read a checked position with a linear callback: (Just "cc",Nothing,True)
 use one bounded position on equal-length lists: [Just ('b',20),Nothing,Nothing]
 consume two independently bounded list positions: [Just ('b',10),Just ('b',20),Nothing]
 zip ordinary lists at their proven common length: (Just [('a',10),('b',20)],Nothing,Just 30,[('x','x')])
+zip two list literals at their statically known length: [('a',10),('b',20)]
 check a signed position in a packaged vector: Just 22
 generic negative position ignores list: Nothing
 generic checked function position: Just 42
