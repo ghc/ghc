@@ -105,7 +105,7 @@ import qualified InterpretedKind
 import qualified InterpretedKindUseSite
 import qualified NestedFunctionClient
 import qualified InvisibleFamily
-import ConstrainedElementsClient (annotatedElement, constrainedElements, explicitElements, renderField)
+import ConstrainedElementsClient (annotatedElement, constrainedElements, explicitElements, formatField, renderField, renderKnownFields)
 import IndexedMapClient (mappedCells)
 import LaterMatchabilityClient (annotatedMap, appliedCallback, boxedCallbacks, flippedCallbacks, forwardedMap,
                                 laterMatchability, nestedCallback, rankedMap)
@@ -960,6 +960,8 @@ main = do
     writeIORef fieldFlag False
     disabled <- readIORef fieldFlag
     observe "render a field with evidence for its runtime flag" (renderField enabled, renderField disabled)
+    observe "format a field with a polymorphic consumer" (formatField enabled, formatField disabled)
+    observe "choose a field domain with a required type argument" renderKnownFields
     putStrLn "Dependent Haskell: completed source features"
     booleans
     finiteDomains

@@ -234,11 +234,35 @@ provides the dictionary, the element and its renderer. The client calls
 A predicate for flag `a` cannot justify an element for flag `b`. A
 predicate to the right of an arrow cannot justify a family application
 in its argument. Both signatures report GHC-39999, including with deferred
-term errors. A higher-rank callback with its own family constraint still
-requires a separate formation check.
+term errors.
+
+A callback can also bring its own domain. The ordinary client supplies
+a formatter to `withField`. The callback accepts any `c :: Type` with a
+`Collects c` instance. It receives that field's element and renderer.
+Its local `Collects c` checks the family applications inside the callback.
+Leaving it out fails at the signature. Moving a use outside the callback
+requires independent evidence there.
+
 [Provider](../examples/open-evaluation/ConstrainedElements.hs),
 [ordinary client](../examples/open-evaluation/ConstrainedElementsClient.hs)
 and [scope regression](../../../testsuite/tests/dependent/should_run/NativeRetainedFamilyDomain.hs).
+
+### Required type arguments
+
+An ordinary module can write this signature with `RequiredTypeArguments`.
+
+```haskell
+renderKnown :: forall (c :: Type) -> Collects c => (Elem c -> String) -> Elem c -> String
+renderKnown (type _) render value = render value
+```
+
+The application `renderKnown (type [Bool]) show True` returns `"True"`.
+The class predicate supplies the family domain in the function signature.
+GHC checks the class instance at the call. The type argument is erased.
+The same scope rule works with multiple required binders, including
+`forall k -> forall (c :: k) -> Collects c => Proxy (Elem c)`.
+[Ordinary implementation](../examples/open-evaluation/ConstrainedElementsClient.hs)
+and [visible forall proposal](https://ghc-proposals.readthedocs.io/en/latest/proposals/0281-visible-forall.html).
 
 ### Associated newtype representation
 

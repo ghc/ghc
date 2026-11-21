@@ -28,6 +28,23 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `189b97bf90`, an ordinary module writes a family domain below a
+required type argument. The same `renderKnown` works at `[Bool]` and
+`FieldKey 'True`. A missing domain still fails at the signature. The
+Stage 2 compiler matched 404 Showcase rows at stripped `-O0`, default
+`-O1`, default `-O2` and in GHCi. Seven focused registered tests passed.
+The scope test also checked a required kind followed by a type of that kind.
+[R24 examples](roadmap/R24-constrained-type-families.md#required-type-arguments).
+
+At `455a53f43e`, a polymorphic callback can use its class constraint
+to form an associated family. The ordinary client formats a field read
+at a runtime flag. All 403 Showcase rows matched at stripped `-O0`,
+default `-O1`, default `-O2` and in GHCi. Five focused registered tests
+passed. At `e577ab4962`, two registered formation tests also checked
+that a missing premise names the callback type that can bind it.
+[Provider](examples/open-evaluation/ConstrainedElements.hs)
+and [diagnostic checks](../../testsuite/tests/dependent/should_run/NativeRetainedFamilyDomain.sh).
+
 At `00b4822dd4`, a family domain can use the preceding retained
 argument. A dictionary from a GADT pattern justifies the element type
 for that same flag. The combined Stage 2 compiler passed the 402-row

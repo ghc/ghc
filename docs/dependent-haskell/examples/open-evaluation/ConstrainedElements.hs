@@ -1,5 +1,8 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, FlexibleContexts, FlexibleInstances, GADTs, TypeFamilies #-}
-module ConstrainedElements (Allowed, Collects(..), FieldKey, Field(..), field, applyField) where
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, FlexibleContexts, FlexibleInstances, GADTs, RankNTypes, ScopedTypeVariables, TypeApplications, TypeFamilies #-}
+module ConstrainedElements (Allowed, Collects(..), FieldKey, Field(..), field, applyField, withField) where
+
+import Data.Kind (Type)
+import Data.Proxy (Proxy(..))
 
 class Allowed a
 instance Allowed Bool
@@ -30,3 +33,8 @@ field True = Just (Field 'x' (: []))
 applyField :: foreach (tag :: Bool) -> Collects (FieldKey tag)
            => (Elem (FieldKey tag) -> String) -> Elem (FieldKey tag) -> String
 applyField _ render value = render value
+
+-- | Open a field and pass its renderer and element to a polymorphic consumer.
+withField :: (forall (c :: Type). Collects c => Proxy c -> (Elem c -> String) -> Elem c -> r)
+          -> foreach (tag :: Bool) -> Field tag -> r
+withField visit tag (Field value render) = visit (Proxy @(FieldKey tag)) render value
