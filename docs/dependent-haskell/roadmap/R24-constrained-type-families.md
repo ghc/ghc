@@ -381,10 +381,12 @@ An ordinary provider allows both `type S = Elem [Int]` and an equation
 `F () = Elem [Int]`. A separately compiled term can use either wrapper
 to prove equality with `Int`, even though there is no `Allowed Int`
 instance. With a marked provider, GHC rejects both right-hand sides
-before the wrappers can be exported. Switching an existing provider to marked mode
-also rechecks the wrappers. The check still rejects a right-hand side
-when the evidence is available, for example for `Elem [Bool]`. The
-current experiment checks evidence in term and constructor signatures.
+before the wrappers can be exported. Switching an existing provider to marked
+mode also rechecks the wrappers. A type synonym for `Elem [Bool]` passes.
+A type family equation with the same right-hand side reports GHC-90647.
+The same error occurs in an associated default and in an explicit associated
+equation even when the owning class has `Collects c` as a superclass.
+These equations still need a rule for checking their right-hand sides.
 
 Draft #177 §3.3 gives a forwarding equation `S a = T a` with a
 standalone kind signature `forall a -> C a => Type`. Both stock GHC
