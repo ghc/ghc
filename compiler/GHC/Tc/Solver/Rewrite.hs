@@ -9,7 +9,7 @@
   -- beneficial SpecConstr to fire in the rest of the module.
 
 module GHC.Tc.Solver.Rewrite(
-   rewrite, rewriteForErrors, rewriteArgsNom,
+   rewrite, rewriteForErrors, rewriteArgsNom, rewriteWithSourceProofs,
    rewriteType, rewriteFamilyAxioms, rewriteTyConAppArgsNom
  ) where
 
@@ -34,10 +34,11 @@ import GHC.Core.TyCo.FVs( tyCoVarsOfTypes, tyCoVarsOfCo
                         , unionUnivCoDeps
                         )
 import GHC.Core.Coercion
-import GHC.Core.Coercion.Axiom ( CoAxiomRule(BranchedAxiom), coAxiomTyCon, sourceProofAxiomRules )
+import GHC.Core.Coercion.Axiom ( CoAxiomRule(BranchedAxiom), coAxiomName, coAxiomTyCon
+                               , co_ax_source_proof_rules, sourceProofAxiomRules )
 import GHC.Core.Lint( lintTcCoercion )
 import GHC.Core.Reduction
-import GHC.Types.Name ( nameOccName, sourceTableTermOcc )
+import GHC.Types.Name ( Name, SourceProofRule, nameOccName, sourceTableTermOcc )
 import GHC.Types.Unique.FM
 import GHC.Types.Var
 import GHC.Types.Var.Set
@@ -122,12 +123,14 @@ runRewrite loc flav eq_rel thing_inside
        ; source_lets <- getSourceLetScope
        ; used_cos_ref  <- newTcRef emptyUnivCoDeps
        ; rewriters_ref <- newTcRef emptyCoHoleSet
+       ; source_proof_ref <- newTcRef False
        ; let fmode = RE { re_loc       = resetCtLocDepth loc
                             -- Start reducing from zero
                         , re_flavour   = flav
                         , re_eq_rel    = eq_rel
                         , re_rewriters = rewriters_ref
                         , re_used_cos  = used_cos_ref
+                        , re_source_proof_family = source_proof_ref
                         , re_native_lifting = emptyLiftingContext emptyInScopeSet
                         , re_source_lets = source_lets
                         , re_native_binders = native_binders
@@ -302,6 +305,19 @@ rewrite :: CtEvidence -> TcType
 rewrite ev ty
   = do { traceTcS "rewrite {" (ppr ty)
        ; result@(redn, _) <- runRewriteCtEv ev (rewrite_one ty)
+       ; traceTcS "rewrite }" (ppr $ reductionReducedType redn)
+       ; return result }
+
+-- | Rewrite a nominal Wanted and return checked branch dependencies.
+-- See Note [Committing checked source family branches].
+rewriteWithSourceProofs :: CtEvidence -> TcType
+                        -> TcS ((Reduction, [(Name, [SourceProofRule])]), CoHoleSet)
+rewriteWithSourceProofs ev ty
+  = do { traceTcS "rewrite {" (ppr ty)
+       ; result@((redn, _), _) <- runRewriteCtEv ev $ do
+           redn <- rewrite_one ty
+           axioms <- reductionSourceAxioms redn
+           return (redn, sourceProofUses ty axioms)
        ; traceTcS "rewrite }" (ppr $ reductionReducedType redn)
        ; return result }
 
@@ -1212,22 +1228,15 @@ rewriteExactFamApp tc tys =
            return redn
          FamAppReduced redn worth_caching _ ->
            do { -- Zap the reduction (when -fzap-coercions is on).
-              ; zapped_redn <- case () of
-                   _ | null tys, AxiomCo ax [] <- reductionCoercion redn
-                     , _ : _ <- sourceProofAxiomRules ax -> return redn
-                   -- An imported synonym can carry the rule dependencies of
-                   -- a checked method. Let the equality solver see the axiom
-                   -- that reduced the synonym's private source family.
-                   _ | Just _ <- sourceTableTermOcc (nameOccName (tyConName tc))
-                     , AxiomCo (BranchedAxiom ax _) _ <- reductionCoercion redn
-                     , coAxiomTyCon ax == tc -> return redn
-                   _ -> zapRedn deps fam_ty redn
+              ; source_proof <- not . null <$> reductionSourceAxioms redn
+              ; zapped_redn <- if source_proof then return redn else zapRedn deps fam_ty redn
 
                 -- See Note [The family application cache]
               ; eq_rel <- getEqRel
               ; source_lets <- getRewriteEnvField re_source_lets
               ; when (  isEmptyVarEnv source_lets
                      && worth_caching                 -- (FAC_WorthCaching)
+                     && not source_proof
                      && eq_rel == NomEq               -- (FAC_Role)
                      && not (univCoDepsHasHoles deps) -- (FAC_Holes)
                      ) $
@@ -1237,6 +1246,78 @@ rewriteExactFamApp tc tys =
 
               ; return zapped_redn
               }}
+
+-- | Inspect the coercion only after a relevant family reduced.
+-- See Note [Committing checked source family branches].
+reductionSourceAxioms :: Reduction -> RewriteM [CoAxiomRule]
+reductionSourceAxioms redn = mkRewriteM $ \env _ -> do
+    marked_family <- readTcRef (re_source_proof_family env)
+    return $ if marked_family then sourceProofAxioms (reductionCoercion redn) else []
+
+-- | Collect selected branches and private source-family axioms in a reduction.
+sourceProofAxioms :: Coercion -> [CoAxiomRule]
+sourceProofAxioms co = go co []
+  where
+    go (AxiomCo rule args) rest =
+      let arg_uses = foldr go rest args
+      in case rule of
+           BranchedAxiom axiom _
+             | isMethodSourceFamily (coAxiomTyCon axiom)
+               || not (null (sourceProofAxiomRules rule)) -> rule : arg_uses
+           _ -> arg_uses
+    go (TyConAppCo _ _ args) rest = foldr go rest args
+    go (AppCo fun arg) rest = go fun (go arg rest)
+    go (TransCo first second) rest = go first (go second rest)
+    go (SymCo inner) rest = go inner rest
+    go _ rest = rest
+
+-- | The private family that implements a checked source method.
+isMethodSourceFamily :: TyCon -> Bool
+isMethodSourceFamily = isJust . sourceTableTermOcc . nameOccName . tyConName
+
+-- | Attribute uses to the selected axiom and to any checked synonym
+-- whose expanded family actually reduced.
+sourceProofUses :: TcType -> [CoAxiomRule] -> [(Name, [SourceProofRule])]
+sourceProofUses _ [] = []
+sourceProofUses ty axioms =
+    [ (coAxiomName axiom, deps)
+    | rule@(BranchedAxiom axiom _) <- axioms
+    , deps@(_ : _) <- [sourceProofAxiomRules rule] ] ++ synonym_uses
+  where
+    synonym_uses
+      | TyConApp synonym _ <- ty
+      , deps@(_ : _) <- synTyConSourceProofRules synonym
+      , TyConApp family args <- coreFullView ty
+      , lengthIs args (tyConArity family), isMethodSourceFamily family
+      , any (matches family) axioms
+      = [(tyConName synonym, deps)]
+      | otherwise = []
+
+    matches family (BranchedAxiom axiom _) = coAxiomTyCon axiom == family
+    matches _ _ = False
+
+{- Note [Committing checked source family branches]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Reading back a checked method call can give the same type as a literal.
+Keep the selected family axiom in the coercion. Its branch index tells
+us which equation supplied the result. If a reduction first rewrites a
+family argument, that argument's proof is part of the reduction too.
+
+A checked synonym such as Mapped f x can expand to a private source
+family. Its dependencies apply only if a selected axiom belongs to
+that family. This also covers a reduction that rewrites x before
+selecting an equation. Naming the synonym or proving reflexivity
+can succeed without using the equation.
+
+A successful reduction of a relevant family sets a flag for the
+current rewrite. This lets ordinary rewrites leave coercions lazy.
+Preserve selected axioms through zapping and keep these reductions
+out of the cache. A cache hit would otherwise hide their selection.
+
+Rewriting can be speculative. The nominal equality solver records
+dependencies at the original Wanted when the rewritten equality
+is solved by reflexivity.
+-}
 
 -- | Reduce an exactly-saturated type family application.
 --
@@ -2081,6 +2162,10 @@ try_to_reduce tc tys tc_rewriters = mkRewriteM $ \env path ->
 
            finish origin redn = do
              { traceTcS "Eager T.F. reduction success" (vcat [ppr tc, ppr tys, ppr redn])
+             ; case closedFamilyTyConCoAxiom_maybe tc of
+                 Just ax | isMethodSourceFamily tc || not (null (co_ax_source_proof_rules ax)) ->
+                   writeTcRef (re_source_proof_family env) True
+                 _ -> return ()
              ; return $! origin $! case eq_rel of
                  NomEq  -> redn
                  ReprEq -> mkSubRedn redn }

@@ -374,6 +374,11 @@ data RewriteEnv
           --
           -- See Note [Computing coercion dependencies] in GHC.Tc.Solver.Rewrite.
 
+       , re_source_proof_family :: !(TcRef Bool)
+          -- ^ A checked branch or private source family may contribute
+          -- to this rewrite. See Note [Committing checked source family branches]
+          -- in GHC.Tc.Solver.Rewrite.
+
        , re_native_lifting :: !LiftingContext
           -- ^ Source runtime binder relations in the common rewriting prefix.
           -- See Note [Lifting runtime binder domains] in GHC.Core.Coercion.
