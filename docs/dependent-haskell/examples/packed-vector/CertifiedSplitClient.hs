@@ -11,13 +11,13 @@ import qualified PackedVecLibrary as P
 
 -- | Read both pieces and their append after opening the equality.
 atTwo :: P.Vec Bool ('P.S ('P.S ('P.S 'P.Z))) -> ([Bool], [Bool], [Bool])
-atTwo v = case splitAtValue @Bool @('P.S 'P.Z) (P.S (P.S P.Z)) v of
+atTwo v = case splitAtValue @Bool @('P.S 'P.Z) 2 v of
     Pair left (Pair right Refl) -> (P.toList left, P.toList right, P.toList (P.appendVec left right))
 
 -- | Split at a length obtained at runtime.
 atRuntime :: P.Nat -> ([Bool], [Bool])
 atRuntime cut =
-    let input = P.replicateNative (P.plus cut (P.S P.Z)) True
+    let input = P.replicateNative (cut + 1) True
     in case splitAtValue @Bool @('P.S 'P.Z) cut input of
         Pair left (Pair right Refl) -> (P.toList left, P.toList right)
 
