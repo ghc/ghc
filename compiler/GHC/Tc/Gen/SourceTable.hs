@@ -73,9 +73,9 @@ import GHC.Types.Avail (availNames, availsToNameSet)
 import GHC.Types.Basic (Origin(..), LeftOrRight(..), SourceTableOrigin(..), pickLR)
 import GHC.Types.Error (errorsFound)
 import GHC.Types.Id.Info (IdDetails(DFunId, SourceTableId, VanillaId), SourceDFun(..), setSourceProofRuleInfo)
-import GHC.Types.Id (globaliseId, idInfo, idName, setIdInfo, isClassOpId_maybe, isDataConId_maybe, isDataConWorkId_maybe, idUnfolding, mkVanillaGlobal, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe,
+import GHC.Types.Id (globaliseId, idInfo, idName, setIdInfo, idInlinePragma, isClassOpId_maybe, isDataConId_maybe, isDataConWorkId_maybe, idUnfolding, mkVanillaGlobal, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe,
                      setSourceMethodIds, sourceMethodAliases, sourceMethodTarget_maybe)
-import GHC.Types.InlinePragma (isNeverActive)
+import GHC.Types.InlinePragma (isNeverActive, isOpaquePragma)
 import GHC.Types.Name (Name, OccName, isExternalName, mkSourceTableOcc, mkSourceFstOcc, mkSourceSndOcc, mkInstTyCoOcc, mkTcOcc,
                        isVarOcc, mkTyVarOcc, mkVarOcc, nameModule_maybe, nameOccName, nameSrcSpan, occNameString, setOccNameSpace, sourceTableTermOcc, stableNameCmp, nameStableString, tvName, SourceProofRule, SourceProofArgs, SourceProofArg(..))
 import GHC.Core.Opt.Pipeline (pairObservationOcc, pairObservationType, scalarRecipeTableOcc)
@@ -674,7 +674,8 @@ checkAndInstallSourceProofs env = do
           , not (null deps) ]
         definitions = plusNameEnv_C (++) rhs_proofs $
                       plusNameEnv_C (++) (sourceProofDefinitions state) imported
-    unless (null occurrences) $ whenM (goptM Opt_EnableRewriteRules) $ do
+    rewriting <- goptM Opt_EnableRewriteRules
+    when (rewriting && not (null occurrences)) $ do
       visible <- visibleSourceMethodRules env
       conflicts <- forM (reverse occurrences) $ \(_, loc, ops) -> do
         conflict <- listToMaybe <$> filterM (changed visible) ops
@@ -692,6 +693,10 @@ checkAndInstallSourceProofs env = do
             | defs `intersectsNameSet` needed = uses `unionNameSet` needed
           add_uses _ needed = needed
           proof_id v
+            | not rewriting
+            , isOpaquePragma (idInlinePragma v)
+            , idName v `elemNameSet` sourceProofClosedResults state
+            = Nothing
             | idName v `elemNameSet` exports
             , let deps = concatMap (\name -> fromMaybe [] (lookupNameEnv definitions name))
                                    (nameSetElemsStable (uses_of v))
@@ -714,6 +719,21 @@ checkAndInstallSourceProofs env = do
           -- A newly imported rule is in the rule environment. Its head
           -- can be found even when the defining Id is private.
           pure (hasSourceMethodRuleAtArgs visible arg checked (mkVanillaGlobal owner liftedTypeKind))
+
+{- Note [Opaque source proof observations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A rules-off provider can use evidence to compute a closed observation
+without exporting the evidence used by its implementation. A client's
+rules cannot enter an OPAQUE body by inlining or specialisation. Its
+written result must expose only built-in data with no evidence fields
+or manifest reflexivity. The grammar admits Bool, Char, Int, String,
+and lists of those types, as well as reflexive equalities on literal
+Bool constructors. The complete signature cannot bind type variables or
+include constraints. Check the renamed signature before a synonym or
+family can reduce to one of those types. Other results keep
+the dependencies. For example, a user-defined data constructor can
+return the evidence used by its implementation as a field.
+-}
 
 -- | Preserve stable interface fingerprints when a rule head occurs twice.
 stableSourceProofRules :: [SourceProofRule] -> [SourceProofRule]

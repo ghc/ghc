@@ -39,6 +39,7 @@ foldMap k f z (Cons xs) = case foldMap k f z xs of
     Refl -> Refl
 
 -- | Apply the law to a one-element left list. Both folds return its head.
+{-# OPAQUE example #-}
 example :: 'True :~: 'True
 example = foldAppend (Proxy @HeadStep) (Proxy @'False)
                      (Cons Empty :: Spine '[ 'True]) (Proxy @'[ 'False])
@@ -54,6 +55,7 @@ foldComposed :: (b -> c -> c) -> (a -> b) -> c -> [a] -> c
 foldComposed k f z xs = P.foldr (k P.. f) z xs
 
 -- | Observe the proof and the first result from both folds.
+{-# OPAQUE showFoldMap #-}
 showFoldMap :: P.String
 showFoldMap =
     P.show ( foldMap Proxy Proxy Proxy (Cons Empty :: Spine '[ 'False])
