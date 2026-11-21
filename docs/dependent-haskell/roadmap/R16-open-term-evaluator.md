@@ -1289,6 +1289,28 @@ rejected head stays undefined.
 [regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledDropWhile.sh),
 and [Agda's prefix and suffix law](../REFERENCES.md#ending-a-list-prefix-at-a-decision).
 
+### Return the matched tail from an ordinary producer
+
+An ordinary module can opt into source equations with
+`-fwrite-source-equations`. This example drops at most one head.
+
+```haskell
+dropOneIf :: (a -> Bool) -> [a] -> [a]
+dropOneIf _ [] = []
+dropOneIf p input@(x : xs)
+    | p x = xs
+    | otherwise = input
+```
+
+The accepting equation returns the original tail. The rejecting equation
+keeps the original cons and leaves both fields lazy. The accepted output
+can expose the next element without forcing the removed head when the
+predicate ignores it. Returning `seq x xs` instead needs the head and
+withdraws both equations. The guard still requires its exact term owner
+when neither branch recurses. An ordinary `Refl` proof uses an alias and
+the producer's stripped interface at `-O0` and `-O2`.
+[Separate compilation regression](../../../testsuite/tests/dependent/should_run/NativeOpenUserGuardedTail.sh).
+
 ### Use an ordinary identity as an open callback
 
 `Prelude.filter Prelude.id` keeps a `True` head and skips a `False`

@@ -95,6 +95,8 @@ test('NativeOpenInstalledDropWhile',
                    'PreludeFilterRuntime.hs', 'PreludeFilterAppendProof.hs', 'PreludeTakeWhile.hs',
                    'PreludeDropWhileSource.hs', 'PreludeDropWhileProof.hs']])],
      run_command, ['bash NativeOpenInstalledDropWhile.sh "{compiler}" "{libdir}"'])
+test('NativeOpenUserGuardedTail', [only_ways(['normal'])],
+     run_command, ['bash NativeOpenUserGuardedTail.sh "{compiler}" "{libdir}"'])
 
 test('NativeOpenInstalledAppend',
      [only_ways(['normal']),
