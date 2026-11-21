@@ -477,19 +477,9 @@ checkConstrainedSignature ctxt ty
   = failWithTc $ TcRnConstrainedFamilyUnsupported fam $
       text "This occurrence comes from a type synonym definition."
   | checks_domain ctxt
-  = do { let (bndrs, theta, rho) = tcSplitSigmaTy ty
-       ; traverse_ (checkNoConstrainedFamilyApps . varType . snd) bndrs
-       ; traverse_ checkNoConstrainedFamilyApps theta
-       ; checkNested rho
-       ; givens <- getLexicalGivens
+  = do { givens <- getLexicalGivens
        ; (_, wanted) <- captureConstraints $
-           checkConstraints (SigSkol ctxt ty []) [] givens $
-             tcSkolemise Shallow ctxt ty $ \sk_rho ->
-               forM_ (constrainedFamilyApps sk_rho) $ \case
-                 WrittenFamily fam args -> emit_domain fam args
-                 FamilyInSynonym fam ->
-                   failWithTc $ TcRnConstrainedFamilyUnsupported fam $
-                     text "This occurrence comes from a type synonym definition."
+           checkConstraints (SigSkol ctxt ty []) [] givens (check_telescope ty)
        ; (unsolved, _) <- runTcS (solveWanteds wanted)
        ; reportAllUnsolved unsolved }
   | otherwise
@@ -501,6 +491,30 @@ checkConstrainedSignature ctxt ty
     checks_domain TypeAppCtxt = True
     checks_domain ConArgCtxt{} = True
     checks_domain _ = False
+
+    -- See Note [Family domains beneath retained binders].
+    check_telescope sig
+      = do { let (bndrs, theta, _) = tcSplitSigmaTy sig
+           ; traverse_ (checkNoConstrainedFamilyApps . varType . snd) bndrs
+           ; traverse_ checkNoConstrainedFamilyApps theta
+           ; void $ tcSkolemise Shallow ctxt sig check_body }
+
+    check_body (DepFunTy _ index body)
+      = do { check_part (varType index)
+           ; tcExtendIdEnv [index] (check_telescope body) }
+    check_body (FunTy af ma mult arg result)
+      | not (isInvisibleFunArg af)
+      = do { mapM_ check_part [ma, mult, arg]
+           ; if isSigmaTy result then check_telescope result else check_body result }
+    check_body body = check_part body
+
+    check_part part
+      = do { checkNested part
+           ; forM_ (constrainedFamilyApps part) $ \case
+               WrittenFamily fam args -> emit_domain fam args
+               FamilyInSynonym fam ->
+                 failWithTc $ TcRnConstrainedFamilyUnsupported fam $
+                   text "This occurrence comes from a type synonym definition." }
 
     checkNested rho
       | isSigmaTy rho = checkNoConstrainedFamilyApps rho
@@ -571,6 +585,20 @@ constrainedFamilyApps ty = State.evalState (go False ty) emptyUniqSet
     go _ _ = pure []
 
     descend in_rhs = fmap concat . traverse (go in_rhs)
+
+{- Note [Family domains beneath retained binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In foreach (flag :: Bool) -> Values (At flag) => Proxy (Item (At flag)),
+the last application of Item needs Values (At flag). Bring the actual
+runtime index into scope before skolemising the rest of the telescope.
+The context on that suffix supplies the domain for its result. Check the
+index's own type before entering its scope. A constraint beneath a binder
+cannot justify an application in an earlier argument.
+
+The nested checks share the signature's formation check, including its
+treatment of unsolved premises under deferred type errors. See
+Note [Constrained associated family formation].
+-}
 
 {- Note [Constrained associated family formation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
