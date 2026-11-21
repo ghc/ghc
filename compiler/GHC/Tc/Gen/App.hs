@@ -3443,7 +3443,7 @@ retainedVariableCast :: Core.CoreExpr -> LHsExpr GhcRn -> TcM (Maybe CoercionN)
 retainedVariableCast (Core.Cast (Core.Var index) (SubCo co)) arg
   | HsVar _ name <- unLoc (stripParensLHsExpr arg)
   , unLocWithUserRdr name == getName index
-  = do { givens <- tcl_native_givens . tcl_lcl_ctxt <$> getLclEnv
+  = do { givens <- getNativeGivens
        ; return (if anyFreeVarsOfCo (`elem` givens) co then Just co else Nothing) }
 retainedVariableCast _ _ = return Nothing
 
