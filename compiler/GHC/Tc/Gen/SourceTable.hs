@@ -295,7 +295,7 @@ sourceTableFamilyUseAt table first
         -- See Note [Legacy private source leaves].
         absent <- importedSourceOwnerAbsent table
         case sourceTableCallees table of
-          Just [] | absent -> do
+          Just [] | absent, not (isSourceFilterGuard table) -> do
             env <- getGblEnv
             updTcRef (tcg_source_table_uses env) (`extendNameSet` tyConName table)
           _ -> failWithTc (TcRnRetainedQuantificationError
@@ -340,8 +340,8 @@ has no declaration for the term and the closed axiom has no distinct source
 family in its RHS. Record the table Name for recompilation.
 
 A present term without SourceTableId is not a legacy omission. Reject it.
-Retained calls and composed helper edges always require the exact owner.
-Do not use this exception when resolving their dependencies.
+Retained calls, composed helper edges and generated list guards require
+the exact owner. Do not use this exception for those equations.
 -}
 
 -- | Load the rules visible to the module, including rules from home boot cycles.
@@ -2183,11 +2183,11 @@ reverseWrapperWorker table = do
 {- Note [Checked guarded list equations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The cons branch must test the original callback on the original head.
-Each result returns [], the original cons, a call on the original tail,
-or the original head with that same call as its lazy tail. The empty
-branch skips the callback. The cons alternative establishes that the
-input variable and case binder refer to the same cons. The equation for
-returning either variable uses the original head and tail of that cons.
+Each result returns [], the original cons, the original tail, a call on
+that tail, or the original head with that call as its lazy tail. The
+empty branch skips the callback. The cons alternative establishes that
+the input variable and case binder refer to the same cons. The equation
+for returning either variable uses the original head and tail of that cons.
 
 Check the exact body before and after optimization. The result of each
 Boolean branch must agree. The simple optimizer removes the desugarer's
@@ -2203,14 +2203,14 @@ callback and a strict subpattern of the list. Both families share the same
 ordinary owner, including when the solver first sees the guard family
 through an imported type. Drop both families if the final Core check fails.
 
-The guard occurrence starts with the source-family prefix. An older
-reader treats it as belonging to a different, absent owner. The guard
-calls the list family, so it cannot use the allowance for a legacy
-private leaf. See Note [Legacy private source leaves].
+The guard name identifies its original term owner. A guard with no
+recursive branch can have no source family in its result. It still needs
+its owner and cannot use the allowance for a legacy private leaf.
+See Note [Legacy private source leaves].
 -}
 
 -- | The checked result of a guarded list branch.
-data GuardedListResult = GuardNil | GuardInput | GuardRecur | GuardConsRecur
+data GuardedListResult = GuardNil | GuardInput | GuardTail | GuardRecur | GuardConsRecur
 
 -- | Check the predicate case and the result of each alternative.
 directGuardedList :: (Core.CoreExpr -> Core.CoreExpr) -> Id -> Core.CoreExpr
@@ -2258,11 +2258,11 @@ directGuardedList prepare owner original = do
           kinds <- traverse (\case Core.Type ty -> Just ty; _ -> Nothing) kind_args'
           [Core.Var callback, Core.Var tail_arg] <- pure value_args
           guard (f == owner && eqTypes kinds kind_args && callback == p && tail_arg == xs)
-        same_input (Core.Var v) = v == list_binder || v == ls
-        same_input _ = False
+        branch (Core.Var v)
+          | v == list_binder || v == ls = Just GuardInput
+          | v == xs = Just GuardTail
         branch value =
           (GuardNil <$ returned nilDataCon 0 value) <|>
-          (GuardInput <$ guard (same_input value)) <|>
           (GuardRecur <$ recurse value) <|>
           (do [Core.Var head_value, tail_value] <- returned consDataCon 2 value
               guard (head_value == x)
@@ -2345,6 +2345,7 @@ guardedListBranchResult :: TyCon -> [Type] -> Type -> Type -> Type -> GuardedLis
 guardedListBranchResult spine params predicate hd tl branch = case branch of
     GuardNil -> mkTyConApp (promoteDataCon nilDataCon) [element]
     GuardInput -> cons tl
+    GuardTail -> tl
     GuardRecur -> recur
     GuardConsRecur -> cons recur
   where
