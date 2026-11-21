@@ -72,3 +72,57 @@ family's equations and the ordinary method.
 [#177 review](https://github.com/ghc-proposals/ghc-proposals/pull/177#issuecomment-549766671),
 [Constrained Type Families §4.2](https://arxiv.org/pdf/1706.09715#page=8),
 and [Promoting Functions to Type Families in Haskell §4.8](https://richarde.dev/papers/2014/promotion/promotion.pdf#page=6).
+
+## Scope of the selected dictionary
+
+The next source control has two distinct class predicates in reverse
+operand order.
+
+```haskell
+chooseTaggedBoth :: forall a b. (Choose b, Choose a)
+                 => foreach (x :: a) -> foreach (y :: b)
+                 -> (Tagged (choose x), Tagged (choose y))
+chooseTaggedBoth x y = (tagBool (choose x), tagBool (choose y))
+```
+
+With distinct rigid `a` and `b`, each operand fixes the selector's type
+argument. Ordinary desugaring takes the evidence parameters in context
+order, `db :: Choose b` and then `da :: Choose a`. It emits
+`choose @a da x` and `choose @b db y`. A control that removes `Choose b`
+fails at the second call. The test compiles the term-only program and
+checks that both dictionary fields produce their expected results. The
+indexed signature currently reports GHC-70566 at both occurrences.
+[Source controls](../../../testsuite/tests/dependent/should_run/promoted-class/ChooseEvidence.hs).
+
+For this first slice, require a unique direct Given of the instantiated
+predicate in the enclosing explicit, complete signature. The evidence
+binder scopes over the rest of that signature and its term body. Preserve
+this binder through abstraction and instantiate it with the evidence that
+the caller supplies. The result index can be a neutral application of the
+selector to the instantiated type, that dictionary and the retained
+operand. Type equality may compare two such applications by congruence of
+their checked parts. It must preserve evidence identity and cannot use
+inverse inference, a proof from the class predicate alone, or a fresh
+global instance choice. This slice leaves superclass projections and
+arbitrary evidence expressions to a later check.
+
+`getLexicalGivens` can see the term implication's evidence parameters.
+Binding a predicate as an existing invisible retained argument does not
+give the desired representation. Core Lint requires its binder type to
+have kind `Type`; a dictionary predicate has kind `Constraint`. The
+application checker also resolves invisible retained values through its
+own path. The representation needs an evidence binder with the original
+constraint application behavior and a checked neutral selector use at a
+domain that mentions a type variable. Check scope and evidence
+substitution in Core and on interface readback before allowing reduction.
+[Term implications](../../../compiler/GHC/Tc/Utils/Unify.hs#L523) and
+[retained binder lint](../../../compiler/GHC/Core/Lint.hs#L2236).
+
+Agda's instance arguments supply a precedent for a scoped record
+argument and an implicit field projection. Its `elem` example also shows
+the equivalent explicit application of the local `Eq A` argument. R12
+uses GHC's Given selection and keeps its existing source constraint
+syntax. The `@@` notation in #383 illustrates the dictionary argument
+and is not proposed source syntax here.
+[Agda 2.8 instance arguments](https://agda.readthedocs.io/en/v2.8.0/language/instance-arguments.html#usage)
+and [#383 sketch](https://github.com/ghc-proposals/ghc-proposals/issues/383#issuecomment-739058810).

@@ -6,7 +6,7 @@ trap 'rm -rf -- "$out"' EXIT
 ghc=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint -fdiagnostics-color=never)
 
 for opt in -O0 -O2; do
-    mkdir -p "$out/$opt/"{target,provider,client}
+    mkdir -p "$out/$opt/"{target,provider,client,evidence}
     cd "$out/$opt/target"
     cp "$src/ChooseTarget.hs" .
     if "${ghc[@]}" "$opt" -c ChooseTarget.hs > failure 2>&1; then
@@ -25,4 +25,25 @@ for opt in -O0 -O2; do
     "${ghc[@]}" "$opt" Main.o ../provider/ChooseControl.o -o probe
     test "$(./probe yes)" = True
     test "$(./probe no)" = False
+
+    cd ../evidence
+    cp "$src/ChooseEvidence.hs" "$src/EvidenceMain.hs" .
+    if "${ghc[@]}" "$opt" -DMISSING_GIVEN -c ChooseEvidence.hs > missing 2>&1; then
+        echo "Accepted the call without Choose b at $opt"
+        exit 1
+    fi
+    grep -Eq '^ChooseEvidence.hs:[0-9]+:[0-9]+: error: \[GHC-39999\]' missing
+    grep -Fq 'add (Choose b) to the context' missing
+
+    if "${ghc[@]}" "$opt" -DPROMOTED -c ChooseEvidence.hs > promoted 2>&1; then
+        echo "Accepted the two abstract promoted methods at $opt"
+        exit 1
+    fi
+    test "$(grep -cF 'error: [GHC-70566]' promoted)" = 2
+
+    "${ghc[@]}" "$opt" -c ChooseEvidence.hs
+    "${ghc[@]}" "$opt" -c EvidenceMain.hs
+    "${ghc[@]}" "$opt" EvidenceMain.o ChooseEvidence.o -o evidence
+    test "$(./evidence yes)" = '(True,False)'
+    test "$(./evidence no)" = '(False,True)'
 done
