@@ -1496,11 +1496,6 @@ tcRetainedKnownValuePlan declared expected sigma values
     match_result_fields tvs subst formal actual
       | Just tv <- getTyVar_maybe formal, tv `elem` tvs
       = matchRetainedAppType tvs subst formal actual
-      | FunTy { ft_af = af, ft_ma = ma, ft_mult = m } <- coreFullView formal
-      , FunTy { ft_af = af', ft_ma = ma', ft_mult = m' } <- coreFullView actual
-      , isVisibleFunArg af, af == af', eqType ma ma'
-      , isManyTy m' || isOneTy m'
-      = match_result_fields tvs subst m m'
       | Just (tc, templates) <- splitTyConApp_maybe formal
       , Just (tc', fields) <- splitTyConApp_maybe actual
       , tc == tc', templates `equalLength` fields
@@ -5267,7 +5262,7 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
                         do { ty <- liftZonkM (zonkTcType (actual_type entry))
                            ; loc <- getCtLocM (lexprCtOrigin arg) (Just TypeLevel)
                            ; view <- reductionReducedType <$> tcRewriteFamilyAxioms loc ty
-                           ; return (loc, (domain_at pos, view)) }
+                           ; return (loc, (domain_at pos, callback_view (domain_at pos) view)) }
                    match_indices = tcMatchRetainedIndexArgs (bind_outer tvs)
              ; initial_cache <- infer_args needed_tvs inferable domains 1 args
              ; initial_args <- mapM matching_arg initial_cache
@@ -5364,6 +5359,17 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
       = subst
       | otherwise = Subst.emptySubst
 
+    -- See Note [Matching a callback with an inferred multiplicity].
+    callback_view FunTy{ft_af = expected_af, ft_ma = expected_ma, ft_mult = expected_mult} actual
+      | isVisibleFunArg expected_af
+      , isOneTy expected_mult || isManyTy expected_mult
+      , fun@FunTy{ft_af = af, ft_ma = ma, ft_mult = mult} <- coreFullView actual
+      , af == expected_af, eqType ma expected_ma
+      , Just tv <- getTyVar_maybe mult, isMetaTyVar tv
+      , hasNativeDependentExpr (Core.Type actual)
+      = fun { ft_mult = expected_mult }
+    callback_view _ actual = actual
+
     actual_type (_, ty, _) = ty
 
     -- See Note [Partially applied callbacks].
@@ -5392,6 +5398,18 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
     infer_args tvs inferable domains pos (_ : args)
       = infer_args tvs inferable domains pos args
 tcRetainedArgInstCached _ _ _ _ _ fun sigma = return (fun, sigma, [], Nothing)
+
+{- Note [Matching a callback with an inferred multiplicity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In fmap (indexGeneric xs) (mkFinGeneric xs n), the partial lookup can
+have type Fin (sourceLength xs) %p -> a with a fresh multiplicity p.
+The declared callback argument of fmap uses Many. Match the domain and
+result to choose fmap's erased arguments before its input metavariable
+would have to hold sourceLength xs. Use the expected concrete arrow
+multiplicity only in that comparison. Keep the cached callback at its
+actual type. tcValArgsWithCache then checks its multiplicity and emits
+the ordinary subsumption wrapper. Rigid multiplicities are never guessed.
+-}
 
 -- | Match cached index arguments and keep both views used for selection.
 -- See Note [Matching a computed nonempty length].
