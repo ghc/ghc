@@ -12,6 +12,10 @@ g=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint
 cd "$out/provider"
 cp "$src"/{TypeLambda,NativeTypeLambdaScope}.hs .
 "${g[@]}" -Werror=unused-type-patterns -fomit-interface-pragmas -c TypeLambda.hs
+sed -e 's/^module TypeLambda$/module OpenTypeLambda/' \
+    -e 's/^type family Map f xs where$/type family Map f xs/' \
+    -e 's/^  Map /type instance Map /' TypeLambda.hs >OpenTypeLambda.hs
+"${g[@]}" -Werror=unused-type-patterns -fomit-interface-pragmas -c OpenTypeLambda.hs
 "${g[@]}" --show-iface TypeLambda.hi >provider.iface
 if sed -n '/^exports:/,/^defaults:/p' provider.iface | grep -E '[$](lambda|signature-lambda):'; then exit 1; fi
 "${g[@]}" -fomit-interface-pragmas -c NativeTypeLambdaScope.hs
@@ -34,11 +38,14 @@ if "${g[@]}" -c Termination.hs >termination.log 2>&1 ||
     cat termination.log >&2
     exit 1
 fi
-cp TypeLambda.hi NativeTypeLambdaScope.hi RepeatedProvider.hi "$out/client/"
+cp TypeLambda.hi OpenTypeLambda.hi NativeTypeLambdaScope.hi RepeatedProvider.hi "$out/client/"
 cd "$out/client"
 test ! -e TypeLambda.hs
 cp "$src/TypeLambdaClient.hs" .
 "${g[@]}" -fomit-interface-pragmas -c TypeLambdaClient.hs
+sed -e 's/module TypeLambdaClient/module OpenTypeLambdaClient/' \
+    -e 's/import TypeLambda /import OpenTypeLambda /' TypeLambdaClient.hs >OpenTypeLambdaClient.hs
+"${g[@]}" -fomit-interface-pragmas -c OpenTypeLambdaClient.hs
 
 cat >RepeatedClient.hs <<'HS'
 {-# LANGUAGE DataKinds, GADTs, Modifiers, NoExperimentalDependentTypes #-}

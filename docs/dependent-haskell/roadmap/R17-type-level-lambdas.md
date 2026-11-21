@@ -66,7 +66,8 @@ name. For example, `forwardErrors` passes its arguments to `withErrors`
 while its result still has the unknown index `xs` in
 `Fields (Map (\field -> Either e field) xs)`. GHC compares the generated
 closures and their checked equations. It then carries that nominal
-equality through the common `Map` application. The proof preserves
+equality through the common `Map` application. The same rule applies
+when `Map` is an open family. The proof preserves
 capture bindings and the order of the type case branches. A different
 body or a different opaque callback cannot supply that proof.
 [Forwarding client](../examples/open-evaluation/TypeLambdaClient.hs)
