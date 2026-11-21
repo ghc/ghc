@@ -4096,10 +4096,13 @@ tcScopedClassOperand result_ty call
        ; if not enabled then return Nothing else do
        { selector <- tcLookupIdMaybe (unLocWithUserRdr method_name)
        ; actual <- tcLookupLcl_maybe (unLocWithUserRdr operand_name)
-       ; givens <- getLexicalGivens
+       ; index_id <- case actual of
+           Just ATcId{tct_id = index} -> Just <$> liftZonkM (zonkId index)
+           _ -> return Nothing
+       ; givens <- liftZonkM . mapM zonkId =<< getLexicalGivens
        ; return $ do
            sel <- selector
-           ATcId{tct_id = index} <- actual
+           index <- index_id
            guard (isNativeOpaqueValueId index)
            let inst = varType index
            (predicate, domain, result) <- Core.nativeClassSelectorTys sel inst
@@ -4121,6 +4124,8 @@ An ordinary Wanted can solve to the right Given but produce a fresh
 dictionary let binder. Keeping that alias in the result would allow a
 let-bound index to escape. Do not make this alias equal to the Given.
 Only a unique lexical Given of the selector's exact predicate qualifies.
+Read the operand's instantiated type and multiplicity before matching a
+constructor field. Use the original operand and evidence Ids.
 This path does not look for superclasses or global instances.
 -}
 
