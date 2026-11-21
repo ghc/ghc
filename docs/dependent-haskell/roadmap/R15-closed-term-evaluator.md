@@ -713,6 +713,16 @@ call, with the field number, constructor and both index names.
 [Table definition](../examples/closed-evaluation/WitnessedBatch.hs)
 and [Agda comparison](../REFERENCES.md#recursively-read-back-witnessed-constructors).
 
+An ordinary function can also compute both totals from a rectangular table.
+Its cells have type `Vec rows (Vec cols Natural)`. The Haskell constructor
+checks every row against the column labels. For the rows `[1,2,3]` and
+`[4,5,6]`, the separate dependent client proves the complete result of
+`totals (sample 4)`. The row totals are `[6,15]` and the column totals are
+`[5,7,9]`. The interpreter runs the ordinary table calculation and returns
+its margins. The nested cell vector is an intermediate value.
+[Ordinary calculation](../examples/closed-evaluation/RectangularTable.hs)
+and [proof and ragged-row diagnostic](../../../testsuite/tests/dependent/should_run/NativeClosedWitnessedBatch.sh).
+
 ## M136. Composing ordinary calls before observation
 
 `LazyParcel` exports an abstract datatype and ordinary functions.

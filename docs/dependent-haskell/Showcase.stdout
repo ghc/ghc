@@ -358,6 +358,7 @@ read independent length witnesses in a recursive batch: (Refl,[1,2],1)
 select values with a mask at the same stored length: (Refl,[5],1)
 look up a column at a shared length carried by the vectors: (Refl,Just 5,Nothing)
 read row and column totals at independent hidden lengths: (Refl,(Just 8,Just 4),(Nothing,Just 0))
+sum a rectangular table by row and by column: (Refl,(Just 15,Just 9))
 read one field of a private parcel without forcing the other: (Refl,7)
 construct a result from two symbolic fields: Refl
 use a derived instance beside a dependent type: "Second"
