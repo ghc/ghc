@@ -65,3 +65,6 @@ for opt in -O1 -O2; do
         diff -u baseline.stdout optimized.stdout
     )
 done
+
+"${g[@]}" -O0 NativeRetainedCastHRefl.hs -o run-hrefl
+diff -u <(printf '(41,42,43,44)\n') <(./run-hrefl)

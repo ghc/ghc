@@ -755,6 +755,11 @@ binders inherit the same restrictions. Ordinary rewriting keeps its existing
 evidence paths without the additional dependency scans. The scope checks are
 inlined.
 
+A retained index occurrence starts with a homogeneous reduction at the
+left domain. When an earlier argument changes that domain, simplifyArgsWorker
+applies the domain coercion. A heterogeneous reduction here would apply the
+same coercion twice.
+
 This rule supplies congruence for normalization. It does not enable retained
 meta-variable assignment, inferred retained bindings, or structural unification.
 Agda's context extension and conversion motivate the scoped rule. Haskell keeps
@@ -829,7 +834,8 @@ rewrite_one ty@(TermVarTy v)
              ; let rhs_env = env { re_source_lets = delVarEnv (re_source_lets env) v
                                  , re_fam_axioms_only = True }
              ; withRewriteEnv (const rhs_env) (bumpReductionDepthRM ty (rewrite_reduction redn)) }
-           _ -> return $! coercionRedn (liftCoSubstNative (re_native_lifting env) role v) }
+           _ -> return $! mkReflRedn role
+                  (coercionLKind (liftCoSubstNative (re_native_lifting env) role v)) }
   | otherwise
   = liftTcS $ failTcS $ TcRnRetainedQuantificationError (RetainedSolverType ty)
 rewrite_one ty@(DepFunTy vis b body)
