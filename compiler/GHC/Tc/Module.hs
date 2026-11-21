@@ -84,7 +84,7 @@ import GHC.Data.OrdList (fromOL)
 import GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceCaseTables, sourceRuleOwners, sourceRuleOwnersAt, visibleSourceMethodRules,
                                hasSourceMethodRule, hasSourceMethodRuleAt, sourceLiteralWorkers, checkSourceMethodUses,
                                checkOptionalSourceUses,
-                               sourceTableDependencies)
+                               sourceMapSelector, sourceTableDependencies)
 import GHC.Tc.Gen.Foreign
 import GHC.Tc.TyCl.Instance
 import GHC.Tc.TyCl.Utils ( addTyConsToGblEnv )
@@ -713,14 +713,14 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
                 | otherwise = filter (\(owner, _) -> not (idName owner `elemNameSet` case_owners)) tables
           with_fields <- if null fields then getGblEnv else fst <$> addTyConsToGblEnv fields
           env <- setGblEnv with_fields (installSourceTables (new_tables ++ cases))
-          if tables_enabled then installSourceMethods env else pure env }
+          installSourceMethods (\sel -> tables_enabled || sourceMapSelector sel) env }
 
 -- | Publish only checked method aliases that user rules cannot replace.
 -- See Note [Certifying a source method alias] in GHC.Tc.TyCl.Instance.
-installSourceMethods :: TcGblEnv -> TcM TcGblEnv
-installSourceMethods env
+installSourceMethods :: (Id -> Bool) -> TcGblEnv -> TcM TcGblEnv
+installSourceMethods wanted env
   | null (tcg_insts env) = pure env
-  | otherwise = case checkedSourceMethods env of
+  | otherwise = case checkedSourceMethods wanted env of
       [] -> pure env
       methods -> setGblEnv env $ do
         let literals = [() | (_, fields) <- methods, (_, _, SourceLiteralMethod{}) <- fields]

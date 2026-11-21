@@ -172,7 +172,7 @@ import GHC.Types.Var.Env       ( mkEmptyTidyEnv )
 import GHC.Types.Var.Set
 
 import GHC.Utils.Fingerprint ( Fingerprint )
-import GHC.Tc.Gen.SourceTable (finalCoreMappers, verifyFinalCoreMapper, failedFinalListTables, finalCoreSourceFamilies, sourceTableCallees, publishListFoldMethods)
+import GHC.Tc.Gen.SourceTable (finalCoreMappers, verifyFinalCoreMapper, failedFinalListTables, finalCoreSourceFamilies, sourceTableCallees, publishContainerMethods)
 import GHC.Utils.Panic
 import GHC.Utils.Error
 import GHC.Utils.Outputable
@@ -891,7 +891,7 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
           plugins <- liftIO $ readIORef (tcg_th_coreplugins tc_result)
           optimized <- hscSimplify' plugins desugared_guts
           let checked = keepValidatedSourceMappers desugared_guts optimized
-              simplified_guts = checked { mg_binds = publishListFoldMethods (mg_module checked) (mg_binds checked) }
+              simplified_guts = checked { mg_binds = publishContainerMethods (mg_module checked) (mg_binds checked) }
 
           (cg_guts, details) <-
               liftIO $ hscTidy hsc_env simplified_guts

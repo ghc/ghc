@@ -1349,8 +1349,8 @@ data CheckedSourceMethod
 -- | Find ground dictionaries whose checked method fields have known equations.
 -- Each result records the class selector, the instance method and its equations.
 -- See Note [Certifying a source method alias].
-checkedSourceMethods :: TcGblEnv -> [(DFunId, [(Id, Id, CheckedSourceMethod)])]
-checkedSourceMethods env = mapMaybe dictionary binds
+checkedSourceMethods :: (Id -> Bool) -> TcGblEnv -> [(DFunId, [(Id, Id, CheckedSourceMethod)])]
+checkedSourceMethods wanted env = mapMaybe dictionary binds
   where
     binds = map unLoc (tcg_binds env)
     instances = mkVarSet (map instanceDFunId (tcg_insts env))
@@ -1367,13 +1367,13 @@ checkedSourceMethods env = mapMaybe dictionary binds
       guard (con == tyConSingleDataCon (classTyCon cls) && con_ty `eqType` inst_ty
              && selectors `equalLength` fields && all lazy_id fields)
       let methods = [(sel, meth, body) | (sel, meth) <- zip selectors fields
-                    , sel `elem` classMethods cls
+                    , sel `elem` classMethods cls, wanted sel
                     , InstMethId owner <- [idDetails meth], owner == idName dfun
                     , idType meth `eqType` classMethodInstTy sel [inst_ty]
-                    , Just (evs, match) <- [lookupVarEnv bodies meth]
-                    , Just body <- [case checked_alias meth match of
+                    , Just (tvs, evs, match) <- [lookupVarEnv bodies meth]
+                    , Just body <- [case checked_alias meth tvs match of
                         Just target -> Just (SourceMethodAlias target)
-                        Nothing -> checkedSourceLiteral dfun sel inst_ty top_evidence evs match]]
+                        Nothing -> guard (null tvs) >> checkedSourceLiteral dfun sel inst_ty top_evidence evs match]]
       guard (not (null methods))
       pure (dfun, methods)
 
@@ -1384,26 +1384,38 @@ checkedSourceMethods env = mapMaybe dictionary binds
       Just (con, ty, fields)
     dictionary_args _ _ = Nothing
 
-    checked_alias meth match = do
+    checked_alias meth tvs match = do
       Match{m_pats = L _ [], m_grhss = GRHSs _ (L _ (GRHS _ [] rhs) :| [])
                                                  (L _ EmptyLocalBinds{})} <- pure match
-      HsVar _ (L _ value) <- pure (unLoc (stripParensLHsExpr rhs))
+      let (apps, head_expr) = case unLoc (stripParensLHsExpr rhs) of
+            XExpr (WrapExpr wrap expr) -> (wrap, expr)
+            expr                       -> (WpHole, expr)
+      HsVar _ (L _ value) <- pure head_expr
+      applied <- type_args apps []
+      guard (applied == tvs)
       guard (isExternalName (idName value) && idType meth `eqType` idType value)
       target <- if nameIsLocalOrFrom (tcg_semantic_mod env) (idName value)
                 then case lookupTypeEnv (tcg_type_env env) (idName value) of
                        Just (AnId actual) | actual == value -> Just actual
                        _ -> Nothing
                 else Just value
-      guard (isJust (sourceTableId_maybe target) && isTauTy (idType target))
+      guard (isJust (sourceTableId_maybe target))
       pure target
+
+    -- In w1[w2[e]], applications in w2 are closest to the worker.
+    type_args (WpCompose w1 w2) acc = type_args w1 acc >>= type_args w2
+    type_args (WpTyApp ty) acc = (:acc) <$> getTyVar_maybe ty
+    type_args WpHole acc = Just acc
+    type_args _ _ = Nothing
 
     method_body binding = do
       (meth, local, outer_evs, inner) <- abstraction is_method binding
-      (_, mono, inner_evs, FunBind{fun_id = L _ bound, fun_ext = (WpHole, []),
+      (_, mono, inner_evs, FunBind{fun_id = L _ bound, fun_ext = (wrapper, []),
                            fun_matches = MG{mg_ext = MatchGroupTc{mg_origin = FromSource},
                                             mg_alts = L _ [L _ match]}}) <- abstraction (== local) inner
-      guard (mono == bound)
-      pure (meth, (inner_evs ++ outer_evs, match))
+      let (tvs, rest) = collectHsWrapBinders wrapper
+      guard (mono == bound && all isTyVar tvs && isIdHsWrapper rest)
+      pure (meth, (tvs, inner_evs ++ outer_evs, match))
 
     is_method v = case idDetails v of { InstMethId{} -> True; _ -> False }
 
@@ -1522,6 +1534,11 @@ It makes no claim about negative inputs or any FromNatural type instance.
 For an instance such as Num Nat, tcInstDecl2 applies the dictionary constructor
 to its superclass fields and methods in classAllSelIds order. Match that checked
 application and use its actual field Id to find the instance method binding.
+A polymorphic alias can bind type variables around the method and apply the
+worker to those same variables. Match them in order. A cast, a dictionary
+argument, or a change of type arguments gives no alias. This check also
+works when the compiler only typechecks the producer.
+
 Check the parent DFun in InstMethId. Generated method names can share a spelling.
 buildClass gives dictionary fields HsLazy. Check that each runtime field is
 lifted so that selecting one method cannot force another field.
