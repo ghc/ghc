@@ -20,6 +20,8 @@ module GHC.Core.Lint (
 
     lintCoreBindings, lintUnfolding,
     lintPassResult, lintExpr, lintRule, lintScopedDictionaryType,
+    ScopedSelectorApp, checkScopedSelectorApp, eqScopedSelectorApp,
+    substScopedSelectorApp, scopedSelectorResultKind,
     lintAxioms,
     lintTcCoercion, lintCoercion_InScope,
 
@@ -45,6 +47,7 @@ import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Utils
 import GHC.Core.Stats ( coreBindsStats )
+import GHC.Core.Class (classMethods)
 import GHC.Core.DataCon
 import GHC.Core.Lint.SubstTypeLets( substTypeLets )
 import GHC.Core.Ppr
@@ -54,7 +57,8 @@ import GHC.Core.Predicate( getClassPredTys_maybe, isCoVarType, mkNomEqPred )
 import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Core.TyCo.Rep   -- checks validity of types/coercions
-import GHC.Core.TyCo.Compare ( eqType, eqTypes, eqTypeIgnoringMultiplicity )
+import GHC.Core.TyCo.Compare ( eqType, eqTypeX, eqTypes, eqTypeIgnoringMultiplicity )
+import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.TyCo.Subst
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr
@@ -517,6 +521,75 @@ lintScopedDictionaryType cfg ty
       addLoc TopLevelBindings $
         LintM $ \env lint_errs ->
           unLintM (lintValueType ty) (env { le_scoped_dictionaries = True }) lint_errs
+
+-- | An experimental neutral selector application held outside the Type AST.
+-- See Note [Scoped selector application prototype].
+data ScopedSelectorApp = ScopedSelectorApp Id Type Id Id Type
+
+-- | Check a direct class selector with one type argument and one value operand.
+checkScopedSelectorApp :: LintConfig -> Id -> Type -> Id -> Id -> Maybe ScopedSelectorApp
+checkScopedSelectorApp cfg selector inst dictionary operand
+  = do cls <- isClassOpId_maybe selector
+       guard (isGlobalId selector
+               && any (\method -> method == selector && varType method `eqType` varType selector)
+                      (classMethods cls))
+       (_, Bndr tv (Invisible _), after_forall) <- splitForAllForAllTyBinder_maybe (varType selector)
+       guard (isTyVar tv && tyVarKind tv `eqType` typeKind inst)
+       (FTF_C_T, _, dict_mult, predicate, method) <- splitFunTy_maybe after_forall
+       (FTF_T_T, matchability, mult, domain, result) <- splitFunTy_maybe method
+       guard (isManyTy dict_mult && isManyTy mult && matchability `eqType` unmatchableDataConTy)
+       (dict_class, [parameter]) <- getClassPredTys_maybe predicate
+       guard (dict_class == cls && parameter `eqType` mkTyVarTy tv)
+       let instantiate = substTyWith [tv] [inst]
+           scope = mkInScopeSetList (l_vars cfg)
+           checked_occ eligible var = do
+             actual <- lookupInScope scope var
+             guard (eligible var && eligible actual && varType actual `eqType` varType var)
+             return actual
+       dict <- checked_occ isScopedDictionary dictionary
+       arg <- checked_occ isNativeOpaqueValueId operand
+       guard (varType dict `eqType` instantiate predicate && varType arg `eqType` instantiate domain)
+       let appl = mkApps (Var selector) [Type inst, Var dict, Var arg]
+       guard (isNothing (lintExpr cfg appl))
+       return (ScopedSelectorApp selector inst dict arg (instantiate result))
+
+-- | Compare two neutral selector applications under a binder renaming.
+eqScopedSelectorApp :: RnEnv2 -> ScopedSelectorApp -> ScopedSelectorApp -> Bool
+eqScopedSelectorApp env (ScopedSelectorApp f a d x _) (ScopedSelectorApp g b e y _)
+  = f == g && eqTypeX env a b && rnOccL env d == rnOccR env e && rnOccL env x == rnOccR env y
+
+-- | Substitute scoped variables and recheck the application and its kind.
+substScopedSelectorApp :: LintConfig -> CoreSubst.Subst -> ScopedSelectorApp -> Maybe ScopedSelectorApp
+substScopedSelectorApp cfg subst (ScopedSelectorApp selector inst dictionary operand _)
+  = do dict <- replace dictionary
+       arg <- replace operand
+       checkScopedSelectorApp cfg selector (CoreSubst.substTy subst inst) dict arg
+  where
+    replace var = case CoreSubst.lookupIdSubst_maybe subst var of
+      Just (Var replacement) -> Just replacement
+      Just _ -> Nothing
+      Nothing -> lookupInScope (CoreSubst.substInScopeSet subst) var
+
+-- | Return the result kind of a checked neutral selector application.
+scopedSelectorResultKind :: ScopedSelectorApp -> Type
+scopedSelectorResultKind (ScopedSelectorApp _ _ _ _ kind) = kind
+
+{- Note [Scoped selector application prototype]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The kind-index checker needs a neutral term with the actual dictionary
+argument. Associating the selector with its class predicate would equate
+different dictionary bindings of the same type. Use the ordinary Core
+selector application to check the instantiation and argument types. Record
+the dictionary and operand as scoped Ids. Equality compares them under
+the same renaming as the type argument. Substitution must preserve a
+variable occurrence at both positions and recheck the resulting scope.
+
+This standalone form is for testing scope and congruence. It does not
+extend Type, accept a dictionary expression, evaluate a selector, or
+enter the interface writer. A production form needs a corresponding
+dependent evidence binder and application in Type before it can occur in
+a user's signature.
+-}
 
 {-
 ************************************************************************
