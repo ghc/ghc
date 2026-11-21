@@ -1584,6 +1584,7 @@ eqFD env (as1,bs1) (as2,bs2) =
 compatFamFlav :: FamTyConFlav -> FamTyConFlav -> BootErrsM BootTyConMismatch
 compatFamFlav (DataFamilyTyCon {}) (DataFamilyTyCon {}) = checkSuccess
 compatFamFlav OpenTypeFamilyTyCon OpenTypeFamilyTyCon = checkSuccess
+compatFamFlav ConstrainedTypeFamilyTyCon ConstrainedTypeFamilyTyCon = checkSuccess
 compatFamFlav flav1@(ClosedTypeFamilyTyCon ctf1) flav2@(ClosedTypeFamilyTyCon ctf2) =
   case (ctf1, ctf2) of
     (CTF_Abstract, CTF_Abstract) -> checkSuccess -- This case only happens for hsig merging

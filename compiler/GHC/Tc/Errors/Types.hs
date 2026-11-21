@@ -4603,6 +4603,9 @@ data TcRnMessage where
 
   -- | Invalid use of the built-in explicit existential constructor.
   TcRnExistsPack :: !ExistsPackProblem -> TcRnMessage
+
+  -- | A constrained associated family occurs outside the supported subset.
+  TcRnConstrainedFamilyUnsupported :: !TyCon -> !SDoc -> TcRnMessage
   deriving Generic
 
 ----

@@ -517,6 +517,10 @@ tcATDefault loc inst_subst defined_ats (ATI fam_tc defs)
        ; return [fam_inst] }
 
    -- No defaults ==> generate a warning
+  | isConstrainedFamilyTyCon fam_tc
+  = failWithTc $ TcRnConstrainedFamilyUnsupported fam_tc $
+      text "This instance must provide an associated type equation or default."
+
   | otherwise  -- defs = Nothing
   = do { warnMissingAT (tyConName fam_tc)
        ; return [] }

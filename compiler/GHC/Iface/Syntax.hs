@@ -311,6 +311,9 @@ data IfaceFamTyConFlav
   -- | Closed type family
   | IfaceClosedTypeFamilyTyCon IfaceClosedTyFamTyCon
 
+  -- | Open associated family with the parent class as its domain.
+  | IfaceConstrainedTypeFamilyTyCon
+
 data IfaceClosedTyFamTyCon
   = IfaceClosedTyFamTyCon (Maybe (IfExtName, [IfaceAxBranch]))
     -- ^ Name of associated axiom and branches for pretty printing purposes,
@@ -1525,6 +1528,7 @@ pprIfaceDecl ss decl@(IfaceFamily { ifName = tycon
 
     pp_rhs IfaceDataFamilyTyCon
       = ppShowIface ss (text "data")
+    pp_rhs IfaceConstrainedTypeFamilyTyCon = text "constrained open"
     pp_rhs IfaceOpenTypeFamilyTyCon
       = ppShowIface ss (text "open")
     pp_rhs (IfaceClosedTypeFamilyTyCon ctf)
@@ -2187,6 +2191,7 @@ freeNamesIfIdDetails (IfSourceDFunId methods literal) =
 -- All other changes are handled via the version info on the tycon
 freeNamesIfFamFlav :: IfaceFamTyConFlav -> NameSet
 freeNamesIfFamFlav IfaceOpenTypeFamilyTyCon            = emptyNameSet
+freeNamesIfFamFlav IfaceConstrainedTypeFamilyTyCon     = emptyNameSet
 freeNamesIfFamFlav IfaceDataFamilyTyCon                = emptyNameSet
 freeNamesIfFamFlav (IfaceClosedTypeFamilyTyCon ctf) =
   case ctf of
@@ -2713,6 +2718,7 @@ represent a small proportion of all declarations.
 instance Binary IfaceFamTyConFlav where
     put_ bh IfaceDataFamilyTyCon             = putByte bh 0
     put_ bh IfaceOpenTypeFamilyTyCon         = putByte bh 1
+    put_ bh IfaceConstrainedTypeFamilyTyCon  = putByte bh 5
     put_ bh (IfaceClosedTypeFamilyTyCon ctf) =
       case ctf of
         IfaceClosedTyFamTyCon mb      -> putByte bh 2 >> put_ bh mb
@@ -2732,6 +2738,7 @@ instance Binary IfaceFamTyConFlav where
                     3 -> return $ IfaceClosedTypeFamilyTyCon IfaceAbstractClosedTyFamTyCon
                     4 -> IfaceClosedTypeFamilyTyCon <$>
                            (IfaceScopedClosedTyFamTyCon <$> get bh <*> get bh <*> get bh)
+                    5 -> return IfaceConstrainedTypeFamilyTyCon
                     _ -> pprPanic "Binary.get(IfaceFamTyConFlav): Invalid tag"
                                   (ppr (fromIntegral h :: Int)) }
 
@@ -3568,6 +3575,7 @@ instance NFData IfaceFamTyConFlav where
   rnf = \case
     IfaceDataFamilyTyCon -> ()
     IfaceOpenTypeFamilyTyCon -> ()
+    IfaceConstrainedTypeFamilyTyCon -> ()
     IfaceClosedTypeFamilyTyCon f1 -> rnf f1
 
 instance NFData IfaceClosedTyFamTyCon where

@@ -18,7 +18,7 @@ module GHC.Tc.Utils.Monad(
   discardResult,
   getTopEnv, updTopEnv, updTopEnvIO, getGblEnv, updGblEnv,
   setGblEnv, getLclEnv, updLclEnv, updLclCtxt, setLclEnv, restoreLclEnv,
-  tcExtendNativeGivens, tcWithSourceLetView,
+  tcExtendLexicalGivens, getLexicalGivens, getNativeGivens, tcWithSourceLetView,
   updTopFlags,
   getEnvs, setEnvs, updEnvs, restoreEnvs,
   xoptM, doptM, goptM, woptM,
@@ -496,7 +496,7 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 tcl_arrow_ctxt = NoArrowCtxt,
                 tcl_env        = emptyNameEnv,
                 tcl_bndrs      = [],
-                tcl_native_givens = [],
+                tcl_lexical_givens = [],
                 tcl_source_let_views = emptyVarEnv,
                 tcl_tclvl      = topTcLevel
                 },
@@ -607,31 +607,39 @@ tcWithSourceLetView :: Id -> TcType -> TcM a -> TcM a
 tcWithSourceLetView value rhs = updLclCtxt $ \ctxt ->
     ctxt { tcl_source_let_views = extendVarEnv (tcl_source_let_views ctxt) value rhs }
 
--- | Record actual native-dependent Given parameters, including CoVars,
--- in their lexical evidence scope.
-tcExtendNativeGivens :: [EvVar] -> TcM a -> TcM a
-tcExtendNativeGivens givens thing_inside
-  = case filter (hasNativeDependentExpr . Core.Type . varType) givens of
-      [] -> thing_inside
-      native_givens -> updLclCtxt (\ctxt -> ctxt
-        { tcl_native_givens = native_givens ++ tcl_native_givens ctxt }) thing_inside
+-- | Record Given evidence parameters in their lexical scope.
+-- See Note [Lexical Givens].
+tcExtendLexicalGivens :: [EvVar] -> TcM a -> TcM a
+tcExtendLexicalGivens [] thing_inside = thing_inside
+tcExtendLexicalGivens givens thing_inside =
+  updLclCtxt (\ctxt -> ctxt
+    { tcl_lexical_givens = givens ++ tcl_lexical_givens ctxt }) thing_inside
 
-{- Note [Lexical native Givens]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- | Get the evidence parameters of the enclosing implications.
+getLexicalGivens :: TcM [EvVar]
+getLexicalGivens = tcl_lexical_givens . tcl_lcl_ctxt <$> getLclEnv
+
+-- | Get the lexical evidence parameters with native-dependent predicates.
+getNativeGivens :: TcM [EvVar]
+getNativeGivens =
+  filter (hasNativeDependentExpr . Core.Type . varType) <$> getLexicalGivens
+
+{- Note [Lexical Givens]
+~~~~~~~~~~~~~~~~~~~~~~~
 A retained source case must transport lexical evidence whose predicate depends
-on its runtime index. Record the actual evidence parameters while checking the
-body of their implication. The implication itself is built after that body.
-Neither the source name environment nor the pending Wanteds contains all these
-parameters. This list is not a solver inert set. TcS still checks constraints
-and derives superclass evidence from the recorded dictionaries.
+on its runtime index. A constrained family in a local signature can use the
+evidence of an enclosing implication to prove its domain. Record the actual
+evidence parameters while checking the implication body. We build the
+implication after checking that body.
 
-Keep only evidence parameters with native-dependent predicates. Include equality
-CoVars as well as dictionary Ids. Mutable metavariables cannot be filled
-with native syntax, so this filter cannot hide a later native instantiation.
-Nested scopes retain enclosing parameters. Static forms clear the list because
-StaticFormSkol excludes enclosing Givens from constraint solving. Arrow scope
-escape restores the enclosing list with the original constraint accumulator.
-Nested typed splices restore the list saved at entry to their bracket.
+The source name environment and the pending Wanteds do not contain all these
+parameters. Use TcS to derive superclass evidence and solve constraints.
+Retained source cases select native-dependent predicates, including equality
+CoVars. Mutable metavariables cannot be filled with native syntax.
+
+Static forms clear the list because StaticFormSkol excludes enclosing Givens.
+Arrow scope escape restores the enclosing list with the original constraint
+accumulator. Nested typed splices restore the list saved at bracket entry.
 -}
 
 setLclEnv :: lcl' -> TcRnIf gbl lcl' a -> TcRnIf gbl lcl a
@@ -1029,7 +1037,7 @@ newArrowScope :: TcM a -> TcM a
 newArrowScope
   = updLclEnv $ \env ->
       modifyLclCtxt (\ctx -> ctx { tcl_arrow_ctxt = ArrowCtxt (getLclEnvRdrEnv env)
-                                                  (tcl_lie env) (tcl_native_givens ctx)
+                                                  (tcl_lie env) (tcl_lexical_givens ctx)
                                                   (tcl_source_let_views ctx) }) env
 
 -- Return to the stored environment (from the enclosing proc)
@@ -1041,7 +1049,7 @@ escapeArrowScope
       ArrowCtxt rdr_env lie givens views -> env
         { tcl_lcl_ctxt = (tcl_lcl_ctxt env) { tcl_arrow_ctxt = NoArrowCtxt
                                           , tcl_rdr = rdr_env
-                                          , tcl_native_givens = givens
+                                          , tcl_lexical_givens = givens
                                           , tcl_source_let_views = views }
         , tcl_lie = lie }
 
