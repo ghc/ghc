@@ -58,7 +58,8 @@ EOF
         fi
         case "$setting" in
             GIVEN) grep -Fq 'GHC-83605' failure && grep -Fq 'Functor Maybe' failure || exit 1 ;;
-            OTHER_HEAD|OTHER_INPUT|CANCEL) grep -Fq "Couldn't match" failure || exit 1 ;;
+            OTHER_HEAD|OTHER_INPUT) grep -Fq "Couldn't match" failure || exit 1 ;;
+            CANCEL) grep -Fq 'GHC-25897' failure && grep -Fq 'Could not deduce' failure || exit 1 ;;
             CHANGED_RULE) grep -Fq 'rewrite rule' failure || exit 1 ;;
         esac
     done
