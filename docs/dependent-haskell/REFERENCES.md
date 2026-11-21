@@ -1739,6 +1739,12 @@ only their stated evaluation observations.
 
 ## Runtime equality and aligned zip: next source probe
 
+The two-line input example compares lengths after both I/O actions.
+Matching on `Just Refl` supplies the shared length for `zipWithExact`.
+Agda's `Vec.zipWith` uses one index for its two arguments and result.
+[PairInputLines](examples/qualified-pi/PairInputLines.hs)
+and [Agda standard library, Data.Vec.Base](https://agda.github.io/agda-stdlib/v2.4/Data.Vec.Base.html).
+
 Status: both compiler stages pass all 136 source observations with Core and
 STG Lint. The bootstrap and registered runtime fixtures pass 27 package/bound
 rejections. All five focused registered regressions pass.

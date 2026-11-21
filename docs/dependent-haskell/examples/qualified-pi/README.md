@@ -375,3 +375,30 @@ through seventeen source modules in both stages. The API fixture's stdout stays
 1/37. See [M69's validation record](../../PLAN.md#m69-generic-safe-list-indexing)
 for the separate source, runtime and diagnostic evidence. R03, R05 and R23 stay
 open. The final exact-HEAD main rebuild and publication are separate gates.
+
+## Pair two input lines
+
+[PairInputLines.hs](PairInputLines.hs) pairs corresponding characters from
+the first two lines of standard input. An empty line has length zero.
+A missing line or different input lengths produces an error on standard
+error and a nonzero exit status.
+
+Build it from the repository root with the fork's compiler.
+
+```sh
+examples=docs/dependent-haskell/examples
+work=$(mktemp -d)
+_build/stage1/bin/ghc --make -i"$examples/qualified-pi" -i"$examples/packed-vector" \
+  -outputdir "$work" "$examples/qualified-pi/PairInputLines.hs" -o "$work/pair-inputs"
+printf 'ab\nXY\n' | "$work/pair-inputs"
+```
+
+The result is `[('a','X'),('b','Y')]`. The ordinary client calls
+`checkedZipWith`, which proves that both finite lists have the same
+length before it pairs any elements. Agda's `Data.Vec.Base.zip` takes
+two vectors at one shared length. Its `fromList` gives each input
+vector the length of its list, so independently read lists still
+need a length comparison before they can share the index.
+Agda's list `zip` instead stops at the shorter list.
+[Agda vectors](https://agda.github.io/agda-stdlib/v2.4/Data.Vec.Base.html)
+and [Agda lists](https://agda.github.io/agda-stdlib/v2.4/Data.List.Base.html).
