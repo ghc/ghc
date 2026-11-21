@@ -141,13 +141,14 @@ reject '[GHC-83605]' -O1 -fno-ignore-interface-pragmas WithRule.hs
 
 # A downstream rule can change an equation already used in the provider.
 cat >Replay.hs <<'HS'
-{-# LANGUAGE CPP, DataKinds, NoExperimentalDependentTypes, ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications, TypeFamilies, TypeOperators #-}
+{-# LANGUAGE CPP, DataKinds, Modifiers, NoExperimentalDependentTypes #-}
+{-# LANGUAGE ScopedTypeVariables, TypeOperators #-}
 {-# OPTIONS_GHC -Wno-inline-rule-shadowing -Wno-orphans #-}
 module Main where
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
-import PreludeFmapEitherProof (MappedEither, fmapRight)
+import GHC.Exts (U)
+import PreludeFmapEitherProof (MappedEither, example)
 
 #ifdef MATCH
 {-# RULES "r12/either" [~1] forall f (x :: Either Bool a). fmap f x = Left False #-}
@@ -155,31 +156,45 @@ import PreludeFmapEitherProof (MappedEither, fmapRight)
 {-# RULES "r12/maybe" [~1] forall f. fmap f (Just True) = Nothing #-}
 #endif
 
-type family Flip (x :: Bool) :: Bool where
-    Flip 'True = 'False
-    Flip 'False = 'True
+#ifdef NOREDUCE
+nameOnly :: forall a b (f :: a %U -> b) (x :: Either Bool a). Proxy f -> Proxy x -> Proxy (MappedEither f x)
+nameOnly _ _ = Proxy
 
-#ifndef EXPORTED_PROOF
-proof :: MappedEither Flip ('Right 'True :: Either Bool Bool) :~: 'Right 'False
-proof = Refl
+same :: forall a b (f :: a %U -> b) (x :: Either Bool a). Proxy f -> Proxy x
+     -> MappedEither f x :~: MappedEither f x
+same _ _ = Refl
+#elif !defined(EXPORTED_PROOF)
+proof :: forall a b (f :: a %U -> b) (x :: a). Proxy f -> Proxy x
+      -> MappedEither f ('Right x :: Either Bool a) :~: ('Right (f x) :: Either Bool b)
+proof _ _ = Refl
 #endif
 
 main :: IO ()
 main = do
 #ifdef EXPORTED_PROOF
-    print (fmapRight @Bool (Proxy @Flip) (Proxy @'True))
-#else
-    print proof
+    print example
 #endif
+#ifdef MATCH
+    print (fmap not (Right True :: Either Bool Bool))
+#else
     print (fmap not (Just True) :: Maybe Bool)
+#endif
 HS
 for form in ALIAS EXPORTED_PROOF; do
     reject '[GHC-83605]' -O2 -fenable-rewrite-rules -DMATCH "-D$form" Replay.hs
     "${ghc[@]}" -O2 -fenable-rewrite-rules -ddump-rule-firings "-D$form" -c Replay.hs >replay.log
     grep -Fq 'Rule fired: r12/maybe' replay.log
     "${ghc[@]}" Replay.o ../producer/PreludeFmapEitherProof.o -o replay
-    diff -u <(printf 'Refl\nNothing\n') <(./replay)
+    if [[ $form == EXPORTED_PROOF ]]; then
+        diff -u <(printf '(Refl,Refl)\nNothing\n') <(./replay)
+    else
+        diff -u <(printf 'Nothing\n') <(./replay)
+    fi
 done
+"${ghc[@]}" -O2 -fenable-rewrite-rules -ddump-rule-firings -DMATCH -DNOREDUCE -c Replay.hs >replay.log
+grep -Fq 'Rule fired: r12/either' replay.log
+"${ghc[@]}" Replay.o ../producer/PreludeFmapEitherProof.o -o replay
+[[ $(./replay) == 'Left False' ]]
 
 cp "$src/NativeOpenEitherFmapProducer.hs" .
 "${ghc[@]}" -O0 -fomit-interface-pragmas -c NativeOpenEitherFmapProducer.hs
