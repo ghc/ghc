@@ -126,6 +126,7 @@ import GHC.Types.Id.Info
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply (getUniquesM)
 import GHC.Types.Var.Set
+import GHC.Types.Var.Env (emptyVarEnv, extendVarEnv, lookupVarEnv, mkVarEnv)
 import GHC.Types.Meta
 import GHC.Types.Basic hiding( SuccessFlag(..) )
 import GHC.Types.Error
@@ -1432,10 +1433,10 @@ lookupCodecNode kind nodes = snd <$> find (tcEqType kind . fst) nodes
 data ClosedConstructor
   = ClosedConstructor (Maybe String) DataCon ClosedConstructorFields
 
--- | Field codecs use static indices or recover one index from constructor fields.
+-- | Field codecs use static indices or recover indices from constructor fields.
 data ClosedConstructorFields
   = ClosedStaticFields ClosedConstructorPlan [ClosedCallShape]
-  | ClosedWitnessedFields TyVar [ClosedWitnessField]
+  | ClosedWitnessedFields [TyVar] [ClosedWitnessField]
 
 -- | An indexed field determines the shared index from its constructors.
 data ClosedWitnessField
@@ -1465,7 +1466,7 @@ data ClosedShapeError
   | InaccessibleClosedOperand TyCon
   | NonDecreasingClosedShape Kind Kind
   | UnrecoverableClosedIndex
-  | UnsupportedClosedPayload DataCon Int
+  | UnsupportedClosedPayload DataCon Int [TyVar]
 
 -- | Classify a checked result and record the constructors inspected by its codec.
 -- See Note [Constructor visibility in closed calls].
@@ -1522,14 +1523,19 @@ reportClosedShapeError owner err = case err of
   UnrecoverableClosedIndex ->
     failWithTc (TcRnClosedTypeEval owner
       "Cannot recover a constructor-local type argument from the checked result type.")
-  UnsupportedClosedPayload con position -> do
+  UnsupportedClosedPayload con position indices -> do
       flags <- getDynFlags
       ctx <- getNamePprCtx
       units <- hsc_units <$> getTopEnv
-      let constructor = showSDocForUser flags units ctx (quotes (ppr con))
+      let render = showSDocForUser flags units ctx
+          constructor = render (quotes (ppr con))
+          explanation = case indices of
+            _:_:_ -> ". The field type depends on multiple hidden indices " ++
+                     render (parens (pprWithCommas ppr indices)) ++
+                     ". Each indexed field must determine one index."
+            _ -> " at the hidden index. The field's constructors must determine that index."
       failWithTc (TcRnClosedTypeEval owner
-        ("Cannot reify field " ++ show position ++ " of " ++ constructor ++
-         " at the hidden index. The field's constructors must determine that index."))
+        ("Cannot reify field " ++ show position ++ " of " ++ constructor ++ explanation))
   NonDecreasingClosedShape previous current -> do
       flags <- getDynFlags
       ctx <- getNamePprCtx
@@ -1592,12 +1598,15 @@ closedCallValueShape rdr_env kind = do
               alternatives <- forM (zip possible plans) $ \(con, fields) -> do
                 codecs <- case fields of
                   Left (static, ground) -> ClosedStaticFields static <$> traverse (shape next) ground
-                  Right (index, arguments) -> do
+                  Right (indices, arguments) -> do
                     let field position ty
                           | closedGroundField ty = AtGroundType <$> shape next ty
-                          | otherwise = AtWitnessIndex <$>
-                              open_shape (UnsupportedClosedPayload con position) next index ty
-                    ClosedWitnessedFields index <$> zipWithM field [1..] arguments
+                          | [index] <- used = AtWitnessIndex <$> open_shape unsupported next index ty
+                          | otherwise = Trans.lift (Left unsupported)
+                          where
+                            used = filter (`elemVarSet` tyCoVarsOfType ty) indices
+                            unsupported = UnsupportedClosedPayload con position used
+                    ClosedWitnessedFields indices <$> zipWithM field [1..] arguments
                 return (ClosedConstructor (Just (closedConstructorTag con)) con codecs)
               State.modify' ((here, ClosedData tc args alternatives) :)
               return (ClosedRef here)
@@ -1659,20 +1668,21 @@ closedCallValueShape rdr_env kind = do
       | otherwise = False
 
 -- | Check the field representation before planning a runtime witness.
-closedWitnessedFields :: Kind -> [Type] -> DataCon -> Maybe (TyVar, [Type])
+closedWitnessedFields :: Kind -> [Type] -> DataCon -> Maybe ([TyVar], [Type])
 closedWitnessedFields here args con = do
-  (universals, [index], [], [], fields, result) <- pure (dataConFullSig con)
-  guard (isTyVar index && closedGroundField (tyVarKind index))
+  (universals, indices, [], [], fields, result) <- pure (dataConFullSig con)
+  guard (not (null indices) && all (\v -> isTyVar v && closedGroundField (tyVarKind v)) indices)
+  let variables = universals ++ indices
   guard (closedOpenRepresentation con && equalLength universals args &&
-         equalLength (universals ++ [index]) (dataConUserTyVars con) &&
-         all (`elem` (universals ++ [index])) (dataConUserTyVars con))
+         equalLength variables (dataConUserTyVars con) &&
+         all (`elem` variables) (dataConUserTyVars con))
   let instantiate = substTyWith universals args
       rep = map (instantiate . scaledThing) (dataConRepArgTys con)
       source = map (instantiate . scaledThing) fields
   guard (instantiate result `tcEqType` here &&
          equalLength rep source && and (zipWith tcEqType rep source))
-  guard (any (elemVarSet index . tyCoVarsOfType) source)
-  return (index, source)
+  guard (mkVarSet indices `subVarSet` tyCoVarsOfTypes source)
+  return (indices, source)
 
 -- | Check that worker values have the source fields' boxed representation.
 closedOpenRepresentation :: DataCon -> Bool
@@ -2121,13 +2131,16 @@ closedCallRenderer name (ClosedCodec shape nodes) = do
                                 return checked
                 renderers <- mapM (renderFields refs quote) codecs
                 return (foldr (.) id (zipWith ($) renderers values))
-              ClosedWitnessedFields template codecs
-                | [index] <- existentials, isTyVar index
-                , tyVarKind index `tcEqType` tyVarKind template
-                , let idx = mkTyVarTy index
+              ClosedWitnessedFields templates codecs
+                | equalLength templates existentials, all isTyVar existentials
+                , let pairs = zip templates existentials
+                , all (\(t, v) -> tyVarKind t `tcEqType` tyVarKind v) pairs
                 , equalLength codecs binders -> do
-                    let render_field (AtWitnessIndex field) value
-                          | varType value `tcEqType` closedOpenType field idx = do
+                    let actuals = mkVarEnv pairs
+                        render_field (AtWitnessIndex field@(ClosedOpenShape template _ _ _)) value
+                          | Just actual <- lookupVarEnv actuals template
+                          , let idx = mkTyVarTy actual
+                          , varType value `tcEqType` closedOpenType field idx = do
                               render <- renderOpen refs quote field
                               return (render idx (Core.Var value))
                         render_field (AtGroundType field) value
@@ -2225,17 +2238,17 @@ decodeClosedCallResult (ClosedCodec shape nodes) rendered = case shape of
             let value = mkTyConApp (promoteDataCon con) (source_args ++ values)
             guard (typeKind value `tcEqType` kind)
             return (value, rest)
-          ClosedWitnessedFields _ codecs -> do
+          ClosedWitnessedFields templates codecs -> do
             let field (AtGroundType shape) input = Trans.lift (decodeFields shape input)
-                field (AtWitnessIndex shape) input = State.StateT $ \expected -> do
-                  (index, value, rest) <- decodeOpen shape expected input
-                  return ((value, rest), Just index)
-            ((values, rest), Just index) <- State.runStateT (decodeArguments field codecs encoded) Nothing
-            value <- packConstructor kind kinds con [index] values
+                field (AtWitnessIndex shape@(ClosedOpenShape template _ _ _)) input = State.StateT $ \known -> do
+                  (index, value, rest) <- decodeOpen shape (lookupVarEnv known template) input
+                  return ((value, rest), extendVarEnv known template index)
+            ((values, rest), known) <- State.runStateT (decodeArguments field codecs encoded) emptyVarEnv
+            indices <- traverse (lookupVarEnv known) templates
+            value <- packConstructor kind kinds con indices values
             return (value, rest)
 
-    -- After the first indexed field, each constructor must agree with
-    -- the index already read from the preceding field.
+    -- A later use of the same existential must agree with its first value.
     decodeOpen shape@(ClosedOpenShape _ _ _ alternatives) expected input = do
       (ClosedOpenAlternative con result_index fields, payload) <- listToMaybe
         [(alt, rest) | alt@(ClosedOpenAlternative ctor _ _) <- alternatives
@@ -2329,12 +2342,12 @@ decodeClosedCallResult (ClosedCodec shape nodes) rendered = case shape of
 
 {- Note [Closed results with an existential witness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A constructor can bind one erased index shared by several fields. For
-example, a row can contain a tag, a vector of values and a Boolean vector
-at the same length. Read the fields in source order. The first vector's
-constructors determine the length. Check each subsequent indexed field
-at that length. A singleton works by the same rule. A closed field uses
-its ordinary codec. A recursive package can choose its own index.
+A constructor can bind erased indices shared by several fields. A table
+can bind independent lengths for the row and column labels. Read its
+fields in source order. Use each existential binder as the key for its
+recovered index. Check later uses at that index, even when another field
+intervenes. A singleton works by the same rule. A closed field uses its
+ordinary codec. A recursive package can choose its own indices.
 
 Preflight checks the independent recursive schema of each indexed field.
 A base constructor fixes its index to a nullary promoted constructor.
@@ -2342,13 +2355,13 @@ A recursive constructor refines its index to an injective promoted
 application of its case-bound predecessor. It has one recursive field
 at that predecessor. Other fields use the ordinary ground codec.
 
-The enclosing Core case binds the existential with
-dataConRepInstPat. Check its kind and every indexed field using that binder.
+The enclosing Core case binds the existentials with dataConRepInstPat.
+Pair them with their declaration binders and check their kinds and fields.
 Each indexed field has a polymorphic Core worker. Each
 recursive case checks its actual nominal equality against the planned
 index pattern. The case evidence supplies no data to the wire. The host
-decoder recovers the index from the first indexed field and builds the
-promoted constructor after checking every field. The preflight plan
+decoder recovers each index on first use. It supplies the indices to
+packConstructor in declaration order after checking every field. The preflight plan
 determines the constructor tags and visibility checks.
 -}
 
