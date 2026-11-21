@@ -653,7 +653,10 @@ data MaskedRow a where
 The evaluator reads the witness and checks each vector at that index.
 It reads the intervening character at its own type. A complete result
 with the wrong mask length fails at the source call. An outer observation
-of just the width can leave the other three fields undefined. The
+of just the width can leave the other three fields undefined.
+`selectedValues` consumes the two vectors together. The shared index
+excludes unequal spines. Applying the mask `[False, True]` to the values
+`[4, 5]` returns `[5]`. The
 evaluator supports one erased constructor index with a recoverable witness
 in the first field. Each indexed payload must support the checked
 constructor cases described above. [Source and projections](../examples/closed-evaluation/WitnessedBatch.hs).

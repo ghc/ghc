@@ -2,7 +2,7 @@
 
 module WitnessedBatch
     ( Batch(..), build, partial, partialTail, firstWidth
-    , MaskedRow(..), maskedRow, partialRow, rowWidth
+    , MaskedRow(..), maskedRow, partialRow, rowWidth, selectedValues
     ) where
 
 import ExistentialVec (SN(..))
@@ -40,7 +40,8 @@ data MaskedRow a where
 
 -- | Make a marked row with one selected value.
 maskedRow :: Natural -> MaskedRow Natural
-maskedRow n = MaskedRow (SS SZ) (VCons n VNil) 'x' (VCons True VNil)
+maskedRow n = MaskedRow (SS (SS SZ)) (VCons n (VCons (n + 1) VNil))
+                        'x' (VCons False (VCons True VNil))
 
 -- | Supply the length alone.
 partialRow :: Natural -> MaskedRow Natural
@@ -49,6 +50,16 @@ partialRow _ = MaskedRow (SS SZ) (error "unused values") (error "unused label") 
 -- | Read the width without inspecting the other fields.
 rowWidth :: MaskedRow a -> Natural
 rowWidth (MaskedRow size _ _ _) = width size
+
+-- | Return the values selected by the mask in their original order.
+selectedValues :: MaskedRow a -> [a]
+selectedValues (MaskedRow _ values _ mask) = select values mask
+  where
+    select :: Vec n a -> Vec n Bool -> [a]
+    select VNil VNil = []
+    select (VCons x xs) (VCons keep rest)
+        | keep = x : select xs rest
+        | otherwise = select xs rest
 
 -- | Count the successors of a length witness.
 width :: SN n -> Natural

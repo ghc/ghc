@@ -78,8 +78,9 @@ evenBatch = Refl
 oddBatch :: B.build 3 :~: 'B.Chunk ('E.SS ('E.SS 'E.SZ)) ('V.VCons 3 ('V.VCons 4 'V.VNil)) 'B.End
 oddBatch = Refl
 
-mask :: B.maskedRow 4 :~: 'B.MaskedRow ('E.SS 'E.SZ) ('V.VCons 4 'V.VNil)
-                                       'x' ('V.VCons 'True 'V.VNil)
+mask :: B.maskedRow 4 :~: 'B.MaskedRow ('E.SS ('E.SS 'E.SZ))
+                            ('V.VCons 4 ('V.VCons 5 'V.VNil))
+                            'x' ('V.VCons 'False ('V.VCons 'True 'V.VNil))
 mask = Refl
 HS
     cat >Demand.hs <<'HS'
@@ -97,17 +98,39 @@ HS
     cat >Main.hs <<'HS'
 module Main where
 import qualified Demand
+import qualified ExistentialVec as E
+import qualified IndexedVec as V
 import Proof (evenBatch, oddBatch, mask)
 import qualified WitnessedBatch as B
 
+skipped :: [Int]
+skipped = B.selectedValues (B.MaskedRow (E.SS E.SZ) (V.VCons (error "unused value") V.VNil)
+                            (error "unused label") (V.VCons False V.VNil))
+
 main :: IO ()
 main = print (evenBatch, oddBatch, mask, Demand.firstWidth, Demand.rowWidth,
-              B.firstWidth (B.build 4), B.firstWidth (B.build 3), B.firstWidth (B.partial 9))
+              B.firstWidth (B.build 4), B.firstWidth (B.build 3), B.firstWidth (B.partial 9),
+              B.selectedValues (B.maskedRow 4), skipped)
 HS
     "${ghc[@]}" "$opt" -c Proof.hs Demand.hs
     "${ghc[@]}" "$opt" -c Main.hs
     "${ghc[@]}" ./*.o -o run
-    test "$(./run)" = '(Refl,Refl,Refl,Refl,Refl,1,2,1)'
+    test "$(./run)" = '(Refl,Refl,Refl,Refl,Refl,1,2,1,[5],[])'
+
+    cat >WrongLength.hs <<'HS'
+module WrongLength where
+import ExistentialVec (SN(..))
+import IndexedVec (Vec(..))
+import WitnessedBatch (MaskedRow(..))
+bad :: MaskedRow Int
+bad = MaskedRow (SS SZ) (VCons 4 VNil) 'x' VNil
+HS
+    if "${ghc[@]}" "$opt" -c WrongLength.hs >length.log 2>&1 ||
+       ! grep -Eq 'WrongLength.hs:6:[0-9]+: error: \[GHC-83865\]' length.log ||
+       ! grep -Fq 'fourth argument' length.log; then
+        cat length.log >&2
+        exit 1
+    fi
 
     reject() {
         local module=$1 expected=$2
