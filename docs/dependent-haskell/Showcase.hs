@@ -147,6 +147,7 @@ import qualified PreludeFoldrProof
 import qualified PreludeFilterLengthProof
 import qualified PreludeFilterProof
 import qualified IndexedPrefix
+import qualified IndexedPrefixClient
 import qualified PreludeFilterRuntime
 import qualified PreludeMapAppendProof
 import qualified PreludeMapCompositionProof
@@ -1696,6 +1697,7 @@ main = do
     observe "read the head of a list indexed by its contents"
         (take 1 (prefix flag unusedTail), take 1 (prefix (not flag) unusedTail),
          not (null (prefix (error "forced indexed list head") unusedTail)))
+    IndexedPrefixClient.matchIndex >>= observe "match the stored list equality with an unevaluated head and tail"
     runtimeList <- newIORef [False, True, False]
     xs <- readIORef runtimeList
     putStrLn ("prove the filter bound from a runtime list: "

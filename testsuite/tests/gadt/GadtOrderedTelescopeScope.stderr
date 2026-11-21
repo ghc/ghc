@@ -29,3 +29,19 @@ GadtOrderedTelescopeScope.hs:17:19: error: [GHC-25897]
     • Relevant bindings include
         badField :: Fenced a -> Int
           (bound at GadtOrderedTelescopeScope.hs:17:1)
+
+GadtOrderedTelescopeScope.hs:20:61: error: [GHC-39999]
+    • Could not deduce ‘Eq a’ arising from a use of ‘==’
+      from the context: Show a
+        bound by a pattern with constructor:
+                   RequiredFieldCheck :: Int
+                                         -> forall a ->
+                                            Show a => a -> Eq a => a -> RequiredFieldCheck,
+                 in an equation for ‘wrongRequiredEarly’
+        at GadtOrderedTelescopeScope.hs:20:40
+      Possible fix:
+        add (Eq a) to the context of
+          the data constructor ‘RequiredFieldCheck’
+    • In the expression: x == x
+      In the expression: \ x -> x == x
+      In the pattern: (\ x -> x == x) -> result

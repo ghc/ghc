@@ -1,6 +1,7 @@
 (True,False,(True,'c'),("NaN",False,"'q'"),41,0,(EQ,"59!"))
 ((True,False),(False,True),(1,2,True,3,4))
 (True,False)
+(("True",True),("1.0",False))
 (False,False,True,False)
 ((EQ,True),1,41,"59")
 (False,True,False)
