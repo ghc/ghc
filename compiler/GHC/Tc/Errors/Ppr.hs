@@ -3835,6 +3835,9 @@ pprRetainedQuantificationError reason = case reason of
     text "A function-valued retained argument must be an already-bound unrestricted local function variable of its declared domain."
   RetainedCallIndex ->
     text "An opaque call index requires an already-bound unrestricted local function and one argument of its declared domain."
+  RetainedSelectorReceiver ->
+    vcat [ text "A class method in the remaining type uses this argument as its receiver."
+         , text "Bind the argument to a local variable and pass that variable." ]
   RetainedCallInstrumentation ->
     text "Opaque call refinement does not support coverage, profiling or source-note instrumentation yet."
   RetainedIndexLambdaStrict ->

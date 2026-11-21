@@ -5436,6 +5436,7 @@ data RetainedQuantificationError
   | RetainedUncoveredConstructors Name [Name]
   | RetainedMissingEquation Name
   | RetainedTypeOperandContext (Maybe Type)
+  | RetainedSelectorReceiver
 
 -- | An error in the implementation of an abstract datatype using
 -- a type synonym.

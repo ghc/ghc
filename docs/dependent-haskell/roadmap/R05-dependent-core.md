@@ -501,11 +501,17 @@ an exported unfolding is checked in its enclosing interface scope.
 In the defining module, a local ordinary-typed template can construct or
 open an erased package. `inlinePacked` inlines a local `INLINE` helper
 that captures an offset and a flag. The false case leaves the offset and
-payload unevaluated. `INLINABLE` retains the checked template before Tidy.
-The size model still gives a template with a package operation no inlining
-guidance. Tidy drops package-bearing local templates before it exports
-metadata. A top-level ordinary signature with an explicit package-bearing
-template still reports GHC-92256 at the binding.
+payload unevaluated. Tidy drops package-bearing local templates before it
+exports metadata.
+
+An ordinary-signature top-level binding with its own `INLINE` or `INLINABLE`
+pragma can export a checked `Pack` or `Unpack` template. The reader checks
+types and scope before it uses the template. An older reader that knows
+both interface tags discards the template and uses the object code.
+The inliner counts the payload of `Pack`. It counts the lazy binding of
+`Unpack` when the package expression needs one. A top-level pragma that
+desugaring transfers to an internal recursive worker still reports
+GHC-92256 at the source binding.
 [Simplified wrapper](../examples/qualified-pi/IndexBetaClient.hs),
 [finite view producer](../examples/qualified-pi/FinitePosition.hs),
 [ordinary client](../examples/qualified-pi/FinitePositionClient.hs),

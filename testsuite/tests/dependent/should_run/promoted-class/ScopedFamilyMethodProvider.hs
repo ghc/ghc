@@ -1,5 +1,8 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, FunctionalDependencies, ScopedTypeVariables, TypeFamilies #-}
-module ScopedFamilyMethodProvider (Collects(..), TaggedEntry(..), inspectEntry, inspectPayload, Encode(..), encodeEntry) where
+module ScopedFamilyMethodProvider (Collects(..), TaggedEntry(..), inspectEntry, inspectPayload, measuredEntry, Encode(..), encodeEntry) where
+
+import Data.Proxy (Proxy(..))
+import Numeric.Natural (Natural)
 
 class Collects c where
     type Element c
@@ -31,3 +34,8 @@ instance Collects Bool where
     type Element Bool = Char
     compareOrigin True = GT
     compareOrigin False = LT
+
+-- | Return the selector index and an independent length index.
+measuredEntry :: forall c. Collects c => foreach (x :: c) -> foreach (n :: Natural)
+              -> (TaggedEntry Natural (compareOrigin x), Proxy n)
+measuredEntry x n = (inspectPayload x n, Proxy)
