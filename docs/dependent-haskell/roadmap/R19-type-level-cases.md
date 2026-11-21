@@ -266,9 +266,16 @@ A quotation or `lookupTypeName` can also refer to an outer erased `forall`
 binder by its exact name. Its kind must be written as a resolved type name
 or promoted constructor. A name from `mkName` supplies only its spelling.
 Use a named family for other enclosing type binders. Cases inside quoted type
-lambdas and spliced references to enclosing retained indices still produce a source
-diagnostic. Reification describes the checked signature and its family
-applications.
+lambdas still produce a source diagnostic. Reification describes the
+checked signature and its family applications.
+
+A nested type splice can also use an enclosing retained variable by its
+exact `IndexVarT` name. A direct quotation and `lookupValueName` both
+identify the original runtime binder. The case lifter can copy a closed
+domain written with type constructors, such as `Bool` or `Maybe Bool`.
+A free fresh name and an erased variable cannot serve as this index.
+Using the binder's name does not make its runtime value available in the
+compile-time splice.
 [External-interpreter fixture](../../../testsuite/tests/dependent/should_run/NativeTypeCaseRetainedThRaw.hs),
 [Template Haskell declaration groups](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/template_haskell.html#declaration-groups),
 [proposal #378 scoping review](https://github.com/ghc-proposals/ghc-proposals/pull/378#discussion_r524560765),

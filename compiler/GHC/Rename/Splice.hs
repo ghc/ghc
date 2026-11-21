@@ -58,6 +58,7 @@ import {-# SOURCE #-} GHC.Tc.Gen.Splice
     , runMetaE
     , runMetaP
     , runMetaT
+    , runMetaTWithIndices
     , tcTopSpliceExpr
     )
 
@@ -663,13 +664,14 @@ References:
 
 ----------------------
 rnSpliceType :: HsUntypedSplice GhcPs -> RnM (HsType GhcRn, FreeNames)
-rnSpliceType = rnSpliceTypeWith (\ty -> rnLHsType (SpliceTypeCtx ty) ty)
+rnSpliceType = rnSpliceTypeWith [] (\ty -> rnLHsType (SpliceTypeCtx ty) ty)
 
 -- | Rename a type splice with a continuation that checks its parsed result.
 -- Run the splice and retain its finalizers through the ordinary pipeline.
-rnSpliceTypeWith :: (LHsType GhcPs -> RnM (LHsType GhcRn, FreeNames))
+rnSpliceTypeWith :: [Name]
+                 -> (LHsType GhcPs -> RnM (LHsType GhcRn, FreeNames))
                  -> HsUntypedSplice GhcPs -> RnM (HsType GhcRn, FreeNames)
-rnSpliceTypeWith rename_result splice
+rnSpliceTypeWith indices rename_result splice
   = rnUntypedSpliceGen run_type_splice pend_type_splice splice
   where
     pend_type_splice
@@ -680,7 +682,7 @@ rnSpliceTypeWith rename_result splice
     run_type_splice rn_splice
       = do { traceRn "rnSpliceType: untyped type splice" empty
            ; (hs_ty2, mod_finalizers) <-
-                runRnSplice UntypedTypeSplice runMetaT ppr rn_splice
+                runRnSplice UntypedTypeSplice (runMetaTWithIndices indices) ppr rn_splice
            ; (hs_ty3, fvs) <- checkNoErrs $ rename_result hs_ty2
                  -- checkNoErrs: see Note [Renamer errors]
 

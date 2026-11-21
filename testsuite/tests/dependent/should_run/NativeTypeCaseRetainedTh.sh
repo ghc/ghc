@@ -30,7 +30,8 @@ import NativeTypeCaseRetainedTh (fromQuote, fromReify)
 import NativeTypeCaseRetainedThRaw
   (chooseInline, chooseDirect, renderDirect, observeInline, caseData,
    chooseQuoted, renderQuoted, QuotedPick, chooseNested, SpliceFlag(..),
-   nestedCases, chooseNestedRetained, outerCapturedQuote, outerCapturedExact)
+   nestedCases, chooseNestedRetained, outerCapturedQuote, outerCapturedExact,
+   retainedCapturedExact, retainedCapturedQuote)
 
 main :: IO ()
 main = do
@@ -61,6 +62,9 @@ main = do
     print (outerCapturedQuote SpliceOn :: Proxy 'True, outerCapturedQuote SpliceOff :: Int)
     print (outerCapturedExact SpliceOn (Proxy @'False) :: Proxy 'True,
            outerCapturedExact SpliceOff (Proxy @'True) :: Int)
+    print (retainedCapturedExact True (error "inner index forced") :: Int,
+           retainedCapturedExact False True :: Char)
+    print (retainedCapturedQuote (Just True) :: Proxy 'True, retainedCapturedQuote Nothing :: Int)
 
 observe :: Bool -> String
 observe b = render b (quoted b)
@@ -106,13 +110,17 @@ cat >NativeTypeCaseRetainedThWrongNested.hs <<'HS'
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}
 module NativeTypeCaseRetainedThWrongNested where
 import Data.Proxy (Proxy)
-import NativeTypeCaseRetainedThRaw (chooseNested, outerCapturedQuote, SpliceFlag(SpliceOn))
+import NativeTypeCaseRetainedThRaw
+  (chooseNested, outerCapturedQuote, retainedCapturedQuote, SpliceFlag(SpliceOn))
 
 wrong :: Proxy 'False
 wrong = chooseNested () SpliceOn
 
 wrongOuter :: Proxy 'False
 wrongOuter = outerCapturedQuote SpliceOn
+
+wrongRetained :: Proxy 'False
+wrongRetained = retainedCapturedQuote (Just True)
 HS
 cat >NativeTypeCaseRetainedThCaptureNested.hs <<'HS'
 {-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, TemplateHaskell #-}
@@ -133,6 +141,33 @@ capture :: forall (b :: Bool). Proxy b ->
     , TypeCaseAlt (PromotedT 'False) (ConT ''Char) ]))
 #endif
 capture = undefined
+HS
+cat >NativeTypeCaseRetainedThIndexScope.hs <<'HS'
+{-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, TemplateHaskell #-}
+module NativeTypeCaseRetainedThIndexScope where
+import Data.Proxy
+import Language.Haskell.TH
+import Language.Haskell.TH.Syntax (getQ, putQ)
+
+#if defined(ESCAPED_INDEX)
+keep :: foreach (flag :: Bool) ->
+  $(do Just n <- lookupValueName "flag"; putQ n; [t| Int |])
+keep _ = 1
+
+$(pure [])
+
+bad :: $(do Just n <- getQ; pure (IndexVarT n))
+#elif defined(ERASED_INDEX)
+bad :: forall (flag :: Bool). $(do Just n <- lookupTypeName "flag"; pure (IndexVarT n))
+#elif defined(FRESH_INDEX)
+bad :: foreach (flag :: Bool) -> $(do n <- newName "flag"; pure (IndexVarT n))
+#elif defined(WRONG_INDEX_AST)
+bad :: foreach (flag :: Bool) ->
+  $(do Just n <- lookupValueName "flag"; pure (AppT (ConT ''Proxy) (VarT n)))
+#else
+bad :: foreach (flag :: Bool) -> $(if flag then [t| Int |] else [t| Int |])
+#endif
+bad = undefined
 HS
 cat >NativeTypeCaseRetainedThSeparate.hs <<'HS'
 {-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, TemplateHaskell #-}
@@ -185,7 +220,7 @@ for opt in -O0 -O2; do
     "${ghc[@]}" NativeTypeCaseRetainedThClient.o NativeTypeCaseRetainedTh.o \
         NativeTypeCaseRetainedThProvider.o NativeTypeCaseRetainedThRaw.o NativeRetainedTH.o -o run
     ./run > actual
-    printf "(11,'x',11,'x',11,'x')\n(\"11\",\"x\")\n(\"13\",\"q\")\n(\"19\",\"c\")\n(\"23\",\"d\",Refl)\n(13,'q')\n(19,'c')\nTrue\n(Proxy,29)\n(31,'n',True)\n(43,'s')\n(Proxy,47)\n(Proxy,53)\n" | diff -u - actual
+    printf "(11,'x',11,'x',11,'x')\n(\"11\",\"x\")\n(\"13\",\"q\")\n(\"19\",\"c\")\n(\"23\",\"d\",Refl)\n(13,'q')\n(19,'c')\nTrue\n(Proxy,29)\n(31,'n',True)\n(43,'s')\n(Proxy,47)\n(Proxy,53)\n(59,'s')\n(Proxy,61)\n" | diff -u - actual
     status=0
     "${ghc[@]}" -c NativeTypeCaseRetainedThWrongBranch.hs > wrong-branch.log 2>&1 || status=$?
     if [[ $status != 1 ]] || ! grep -Fq "Couldn't match type" wrong-branch.log ||
@@ -197,7 +232,8 @@ for opt in -O0 -O2; do
     "${ghc[@]}" -c NativeTypeCaseRetainedThWrongNested.hs > wrong-nested.log 2>&1 || status=$?
     if [[ $status != 1 ]] || ! grep -Fq "Couldn't match type" wrong-nested.log ||
        ! grep -Fq 'chooseNested () SpliceOn' wrong-nested.log ||
-       ! grep -Fq 'outerCapturedQuote SpliceOn' wrong-nested.log; then
+       ! grep -Fq 'outerCapturedQuote SpliceOn' wrong-nested.log ||
+       ! grep -Fq 'retainedCapturedQuote (Just True)' wrong-nested.log; then
         cat wrong-nested.log >&2
         exit 1
     fi
@@ -223,6 +259,20 @@ for control in SPELLED_CAPTURE FRESH_CAPTURE REBIND_CAPTURE; do
     if [[ $status != 1 ]] || ! grep -Fq 'GHC-97233' capture-nested.log ||
        ! grep -Fq 'In the untyped splice' capture-nested.log; then
         cat capture-nested.log >&2
+        exit 1
+    fi
+done
+for control in ESCAPED_INDEX ERASED_INDEX FRESH_INDEX WRONG_INDEX_AST STAGE_INDEX; do
+    status=0
+    diagnostic='Malformed type IndexVarT'
+    case "$control" in
+        WRONG_INDEX_AST) diagnostic='Malformed type VarT' ;;
+        STAGE_INDEX) diagnostic='is used at level -1 but it is bound at level 0' ;;
+    esac
+    "${base[@]}" "-D$control" -c NativeTypeCaseRetainedThIndexScope.hs > index-scope.log 2>&1 || status=$?
+    if [[ $status != 1 ]] || ! grep -Fq "$diagnostic" index-scope.log ||
+       ! grep -Fq 'In the untyped splice' index-scope.log; then
+        cat index-scope.log >&2
         exit 1
     fi
 done

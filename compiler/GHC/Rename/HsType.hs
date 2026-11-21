@@ -294,7 +294,7 @@ rnHsSigWcType = rnHsSigWcTypeWithSplice (\_ _ -> rnSpliceType)
 -- | Whether a splice supplies the entire signature or a type within it.
 data SignatureSpliceSite
   = CompleteSignatureSplice
-  | NestedSignatureSplice (HsOuterSigTyVarBndrs GhcRn)
+  | NestedSignatureSplice (HsOuterSigTyVarBndrs GhcRn) [LHsTyVarBndr () GhcRn]
 
 -- | Rename a type splice and return its free names.
 type RenameTypeSplice = HsUntypedSplice GhcPs -> RnM (HsType GhcRn, FreeNames)
@@ -316,7 +316,8 @@ rnHsSigWcTypeWithSplice rename_splice doc (HsWC { hswc_body =
              Just loc -> setSrcSpan loc $
                failWithTc $ TcRnRetainedQuantificationError RetainedPartialSignature
        ; bindHsOuterTyVarBndrs doc Nothing imp_tv_nms outer_bndrs $ \outer_bndrs' ->
-    do { let nested_splice = rename_splice (NestedSignatureSplice outer_bndrs') doc
+    do { let nested_splice retained =
+               rename_splice (NestedSignatureSplice outer_bndrs' retained) doc
              env = (mkTyKiEnv doc TypeLevel RnTypeBody){rtke_splice = nested_splice}
        ; (wcs, body_ty', fvs) <-
            if | hsHasForEachTy (unLoc body_ty)
@@ -365,7 +366,7 @@ rnRetainedSigTypeWith env (L loc (HsFunTy x mult arg res))
 rnRetainedSigTypeWith env (L loc (HsForEachTy x bndrs body))
   = setSrcSpanA loc $
     do { ((bndrs', body'), fvs) <-
-           rnRetainedTelescope env (rnRetainedSigTypeWith env) bndrs body
+           rnRetainedTelescope env rnRetainedSigTypeWith bndrs body
        ; pure (L loc (HsForEachTy x bndrs' body'), fvs) }
 rnRetainedSigTypeWith env ty = rnLHsTyKi env ty
 
@@ -373,7 +374,7 @@ rnRetainedSigTypeWith env ty = rnLHsTyKi env ty
 -- Scope each fresh runtime Name over subsequent binders and the body only.
 -- See Note [Retained Pi type formation] below.
 rnRetainedTelescope :: RnTyKiEnv
-                    -> (LHsType GhcPs -> RnM (LHsType GhcRn, FreeNames))
+                    -> (RnTyKiEnv -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeNames))
                     -> [LHsTyVarBndr () GhcPs] -> LHsType GhcPs
                     -> RnM (([LHsTyVarBndr () GhcRn], LHsType GhcRn), FreeNames)
 rnRetainedTelescope env rn_body bndrs body
@@ -388,12 +389,12 @@ rnRetainedTelescope env rn_body bndrs body
        ; when (null bndrs) $
            failWithTc $ TcRnRetainedQuantificationError RetainedBinderCount
        ; checkDupRdrNames (mapMaybe hsLTyVarLocName bndrs)
-       ; bind_bndrs bndrs }
+       ; bind_bndrs env bndrs }
   where
-    bind_bndrs []
-      = do { (body', fvs) <- rn_body body
+    bind_bndrs env []
+      = do { (body', fvs) <- rn_body env body
            ; pure (([], body'), fvs) }
-    bind_bndrs (L lb bndr : rest)
+    bind_bndrs env (L lb bndr : rest)
       = setSrcSpanA lb $
         case bndr of
           HsTvb xb () (HsBndrVar _ (L lv rdr)) (HsBndrKind _ domain)
@@ -401,12 +402,13 @@ rnRetainedTelescope env rn_body bndrs body
             do { (domain', domain_fvs) <- rnLHsTyKi env domain
                ; name <- newLocalBndrRn (L lv term_rdr)
                ; let occ = setOccNameSpace tvName (rdrNameOcc rdr)
+                     bndr' = L lb (HsTvb xb () (HsBndrVar noExtField (L lv name))
+                                              (HsBndrKind noExtField domain'))
+                     env' = env{rtke_splice = rtke_splice env . (bndr' :)}
                ; ((rest', body'), body_fvs) <- bindLocalNamesFV [name] $
                    do { rdr_env <- getLocalRdrEnv
                       ; setLocalRdrEnv (extendLocalRdrEnvWithAlias rdr_env occ name) $
-                          bind_bndrs rest }
-               ; let bndr' = L lb (HsTvb xb () (HsBndrVar noExtField (L lv name))
-                                              (HsBndrKind noExtField domain'))
+                          bind_bndrs env' rest }
                ; pure ((bndr' : rest', body'), domain_fvs `plusFN` body_fvs) }
           HsTvb _ _ HsBndrWildCard{} _ ->
             failWithTc $ TcRnRetainedQuantificationError RetainedBinderNeedsName
@@ -503,11 +505,12 @@ rnWcBodyType = rnWcBodyTyKi TypeLevel
 
 rnWcBodyTyKi :: TypeOrKind -> HsDocContext -> [LocatedN RdrName] -> LHsType GhcPs
          -> RnM ([Name], LHsType GhcRn, FreeNames)
-rnWcBodyTyKi = rnWcBodyTyKiWithSplice rnSpliceType
+rnWcBodyTyKi = rnWcBodyTyKiWithSplice (const rnSpliceType)
 
 -- | Rename a type with wildcards using the caller's splice continuation.
 rnWcBodyTyKiWithSplice
-  :: RenameTypeSplice -> TypeOrKind -> HsDocContext -> [LocatedN RdrName] -> LHsType GhcPs
+  :: ([LHsTyVarBndr () GhcRn] -> RenameTypeSplice)
+  -> TypeOrKind -> HsDocContext -> [LocatedN RdrName] -> LHsType GhcPs
   -> RnM ([Name], LHsType GhcRn, FreeNames)
 rnWcBodyTyKiWithSplice rename_splice level ctxt nwc_rdrs hs_ty
   = do { experimental <- xoptM LangExt.ExperimentalDependentTypes
@@ -738,7 +741,7 @@ data RnTyKiEnv
          , rtke_level :: TypeOrKind  -- Am I renaming a type or a kind?
          , rtke_what  :: RnTyKiWhat  -- And within that what am I renaming?
          , rtke_nwcs  :: NameSet     -- These are the in-scope named wildcards
-         , rtke_splice :: RenameTypeSplice
+         , rtke_splice :: [LHsTyVarBndr () GhcRn] -> RenameTypeSplice
     }
 
 data RnTyKiWhat = RnTypeBody
@@ -761,7 +764,7 @@ mkTyKiEnv :: HsDocContext -> TypeOrKind -> RnTyKiWhat -> RnTyKiEnv
 mkTyKiEnv cxt level what
  = RTKE { rtke_level = level, rtke_nwcs = emptyNameSet
         , rtke_what = what, rtke_ctxt = cxt
-        , rtke_splice = rnSpliceType }
+        , rtke_splice = const rnSpliceType }
 
 isRnKindLevel :: RnTyKiEnv -> Bool
 isRnKindLevel (RTKE { rtke_level = KindLevel }) = True
@@ -914,7 +917,7 @@ rnHsTyKi env (XHsType (HsTypeExists (_, sep_tok) binder body))
 
 rnHsTyKi env (HsForEachTy x bndrs body)
   = do { ((bndrs', body'), fvs) <-
-           rnRetainedTelescope env (rnLHsTyKi env) bndrs body
+           rnRetainedTelescope env rnLHsTyKi bndrs body
        ; pure (HsForEachTy x bndrs' body', fvs) }
 
 rnHsTyKi env ty@(HsForAllTy { hst_tele = tele, hst_body = tau })
@@ -1009,7 +1012,7 @@ rnHsTyKi _ (HsStarTy x)
 
 rnHsTyKi env (HsSpliceTy _ sp)
   | isRnKindLevel env = rnSpliceType sp
-  | otherwise = rtke_splice env sp
+  | otherwise = rtke_splice env [] sp
 
 rnHsTyKi env (HsDocTy x ty haddock_doc)
   = do { (ty', fvs) <- rnLHsTyKi env ty

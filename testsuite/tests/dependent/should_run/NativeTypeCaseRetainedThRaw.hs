@@ -1,8 +1,9 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, LambdaCase, TemplateHaskell #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, LambdaCase, TemplateHaskell, TypeApplications #-}
 module NativeTypeCaseRetainedThRaw
   (chooseInline, chooseDirect, renderDirect, observeInline, caseData
   , chooseQuoted, renderQuoted, QuotedPick, chooseNested, SpliceFlag(..)
-  , nestedCases, chooseNestedRetained, outerCapturedQuote, outerCapturedExact) where
+  , nestedCases, chooseNestedRetained, outerCapturedQuote, outerCapturedExact
+  , retainedCapturedExact, retainedCapturedQuote) where
 
 import Data.Proxy (Proxy(..))
 import Language.Haskell.TH
@@ -136,3 +137,19 @@ outerCapturedExact :: forall (d :: SpliceDomain). SpliceFlag d ->
       (AppT (AppT ArrowT arg) result)))
 outerCapturedExact SpliceOn _ = Proxy
 outerCapturedExact SpliceOff _ = 53
+
+retainedCapturedExact :: foreach (flag :: Bool) ->
+  $(do
+    Just outer <- lookupValueName "flag"
+    inner <- newName "flag"
+    pure (ForEachT BndrReq inner (ConT ''Bool) (CaseT (IndexVarT outer)
+      [ TypeCaseAlt (PromotedT 'True) (ConT ''Int)
+      , TypeCaseAlt (PromotedT 'False) (ConT ''Char)
+      ])))
+retainedCapturedExact True = \_ -> 59
+retainedCapturedExact False = \_ -> 's'
+
+retainedCapturedQuote :: foreach (m :: Maybe Bool) ->
+  $([t| case m of { Just m -> Proxy m; Nothing -> Int } |])
+retainedCapturedQuote (Just m) = Proxy @m
+retainedCapturedQuote Nothing = 61

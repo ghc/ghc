@@ -1641,15 +1641,15 @@ rnSplicedSignatureCases
   -> SignatureSpliceSite -> HsDocContext -> HsUntypedSplice GhcPs
   -> RnM (HsType GhcRn, FreeNames)
 rnSplicedSignatureCases sigma named_wildcards fix_env generated splice_cases site doc =
-  rnSpliceTypeWith $ \raw -> do
+  rnSpliceTypeWith indices $ \raw -> do
     local <- getLocalRdrEnv
     case doc of
       TypeSigCtx names@(_:_)
         | contains_case raw
-        , Just outer <- splice_scope local raw
+        , Just (outer, retained) <- splice_scope local raw
         -> do
         let rename ty = rnLHsType (SpliceTypeCtx raw) ty
-            sig = HsSig noExtField outer raw
+            sig = HsSig noExtField outer (wrap_retained retained raw)
             wc = HsWC noExtField (L (getLoc raw) sig)
             input_sig = noLocA (TypeSig noAnn [] names wc)
             input = emptyRdrGroup{hs_valds = ValBinds noExtField [VbSig input_sig]}
@@ -1661,7 +1661,8 @@ rnSplicedSignatureCases sigma named_wildcards fix_env generated splice_cases sit
         let (updated, anchors, aliases, uses, _, helpers) =
               liftDeclarationTypes heads (map (fmap nameRdrName) earlier) suffix True named_wildcards input
         case (anchors, hs_valds updated) of
-          (_:_, ValBinds _ [VbSig (L _ (TypeSig _ _ _ HsWC{hswc_body = L _ HsSig{sig_body = ty}}))]) -> do
+          (_:_, ValBinds _ [VbSig (L _ (TypeSig _ _ _ HsWC{hswc_body = L _ HsSig{sig_body = ty}}))])
+            | Just result <- unwrap_retained retained ty -> do
             let (cases, case_names) = liftTypeCases emptyRdrGroup{hs_tyclds = anchors}
                 (late, lambdas, scopes) = liftTypeLambdas sigma cases
                 hidden = aliases ++ case_names ++ [(fam, Just owner) | (fam, owner) <- lambdas]
@@ -1682,10 +1683,22 @@ rnSplicedSignatureCases sigma named_wildcards fix_env generated splice_cases sit
                 NestedSignatureSplice{} ->
                   updTcRef splice_cases (first (+ 1))
               updTcRef generated (types :)
-              rename ty
+              rename result
           _ -> rename raw
       _ -> rnLHsType (SpliceTypeCtx raw) raw
   where
+    indices = case site of
+      CompleteSignatureSplice -> []
+      NestedSignatureSplice _ retained -> mapMaybe hsLTyVarName retained
+
+    wrap_retained [] ty = ty
+    wrap_retained binders ty =
+      L (getLoc ty) (HsForEachTy (noEpTok, Left noEpUniTok) binders ty)
+
+    unwrap_retained [] ty = Just ty
+    unwrap_retained _ (L _ HsForEachTy{hst_body = body}) = Just body
+    unwrap_retained _ _ = Nothing
+
     contains_case :: Data a => a -> Bool
     contains_case node
       | Just (L _ (XHsType HsTypeCase{})) <- cast node :: Maybe (LHsType GhcPs)
@@ -1693,15 +1706,16 @@ rnSplicedSignatureCases sigma named_wildcards fix_env generated splice_cases sit
       | otherwise = or (gmapQ contains_case node)
 
     splice_scope local raw = case site of
-      CompleteSignatureSplice -> Just mkHsOuterImplicit
-      NestedSignatureSplice outer -> do
+      CompleteSignatureSplice -> Just (mkHsOuterImplicit, [])
+      NestedSignatureSplice outer retained -> do
         let binders = case outer of
               HsOuterImplicit{} -> []
-              HsOuterExplicit{hso_bndrs = bound} -> mapMaybe closedSpliceCapture bound
-            available = mapMaybe hsLTyVarName binders
+              HsOuterExplicit{hso_bndrs = bound} -> mapMaybe (closedSpliceCapture namedSpliceType) bound
+            copied = mapMaybe (closedSpliceCapture retainedSpliceDomain) retained
+            available = mapMaybe hsLTyVarName binders ++ mapMaybe hsLTyVarName copied
         guard (all ((`elem` available) . unLoc) (extractHsTyRdrTyVars raw))
         guard (not (uses_other_local local available raw))
-        pure (mkHsOuterExplicit noAnn binders)
+        pure (mkHsOuterExplicit noAnn binders, copied)
 
     uses_other_local :: Data a => LocalRdrEnv -> [RdrName] -> a -> Bool
     uses_other_local local available node
@@ -1717,20 +1731,35 @@ rnSplicedSignatureCases sigma named_wildcards fix_env generated splice_cases sit
          maybe False (`elemLocalRdrEnv` local) (demoteRdrNameTv rdr))
       | otherwise = or (gmapQ (uses_other_local local available) node)
 
--- | Copy an exact binder whose kind is a named type or promoted constructor.
--- The copied kind uses the original resolved name.
-closedSpliceCapture :: LHsTyVarBndr flag GhcRn -> Maybe (LHsTyVarBndr flag GhcPs)
-closedSpliceCapture (L loc HsTvb{tvb_flag = flag, tvb_var = HsBndrVar _ name,
-                                tvb_kind = HsBndrKind _ kind})
-  | L kind_loc (HsTyVar _ promoted con) <- ignoreParens kind
+-- | Copy an exact binder and its supported domain to the helper scope.
+closedSpliceCapture :: (LHsType GhcRn -> Maybe (LHsType GhcPs))
+                    -> LHsTyVarBndr flag GhcRn -> Maybe (LHsTyVarBndr flag GhcPs)
+closedSpliceCapture copy_type (L loc HsTvb{tvb_flag = flag, tvb_var = HsBndrVar _ name,
+                                          tvb_kind = HsBndrKind _ kind}) = do
+  exact_kind <- copy_type kind
+  pure (L loc (HsTvb noAnn flag (HsBndrVar noExtField (fmap nameRdrName name))
+                     (HsBndrKind noExtField exact_kind)))
+closedSpliceCapture _ _ = Nothing
+
+-- | Retain the original Name of a type or promoted data constructor.
+namedSpliceType :: LHsType GhcRn -> Maybe (LHsType GhcPs)
+namedSpliceType ty
+  | L loc (HsTyVar _ promoted con) <- ignoreParens ty
   , let resolved = getName (unLoc con)
         occ = nameOccName resolved
   , isExternalName resolved
   , isTcOcc occ || isDataOcc occ
-  = let exact_kind = L kind_loc (HsTyVar noAnn promoted (nameRdrName resolved <$ con))
-    in Just (L loc (HsTvb noAnn flag (HsBndrVar noExtField (fmap nameRdrName name))
-                         (HsBndrKind noExtField exact_kind)))
-closedSpliceCapture _ = Nothing
+  = Just (L loc (HsTyVar noAnn promoted (nameRdrName resolved <$ con)))
+  | otherwise = Nothing
+
+-- | Copy a closed constructor application in a retained capture's domain.
+retainedSpliceDomain :: LHsType GhcRn -> Maybe (LHsType GhcPs)
+retainedSpliceDomain ty = case ignoreParens ty of
+  L loc (HsAppTy _ fun arg) -> do
+    fun' <- retainedSpliceDomain fun
+    arg' <- retainedSpliceDomain arg
+    pure (L loc (HsAppTy noExtField fun' arg'))
+  ty -> namedSpliceType ty
 
 {- Note [Lifting cases from signature splices]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1743,12 +1772,14 @@ declarations to the owning group for kind checking and interface writing.
 
 The splice runs once, in signature order. The regular splice path carries
 its free names and module finalizers. A nested type splice can refer to an
-enclosing signature binder by its exact name. Copy this binder only when
-its kind is a single resolved type or promoted constructor. The copied
-kind then needs no local bindings. A name supplied only by spelling does
-not identify a binder for this lifting pass. Give each nested splice a
-distinct helper suffix so it does not collide with a written case or
-another splice in the signature.
+enclosing signature binder by its exact name. For an erased binder, copy
+a single resolved type or promoted constructor. For a retained binder,
+also copy a closed constructor application. The copied domain needs no
+local bindings. Present these retained binders to the ordinary lifting
+pass as an enclosing telescope. Remove that synthetic telescope from the
+result so the helper application refers to the original runtime binders.
+Give each nested splice a distinct helper suffix so it does not collide
+with a written case or another splice in the signature.
 The new private declarations use the same capture and ordered case checks
 as in Note [Lifting types from signatures and fields].
 

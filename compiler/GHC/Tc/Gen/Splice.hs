@@ -25,7 +25,7 @@ module GHC.Tc.Gen.Splice(
      tcTypedSplice, tcTypedBracket, tcUntypedBracket,
      runAnnotation, getUntypedSpliceBody,
 
-     runMetaE, runMetaP, runMetaT, runMetaD, runQinTcM,
+     runMetaE, runMetaP, runMetaT, runMetaTWithIndices, runMetaD, runQinTcM,
      tcTopSpliceExpr, lookupThName_maybe,
      defaultRunMeta, runMeta', runRemoteModFinalizers,
      finishTH, runTopSplice, tcRunClosedCall, tcPrepareClosedApplication, tcPrepareClosedFunctionValue,
@@ -1229,24 +1229,29 @@ runQResult show_th f runQ expr_span hval
 runMeta :: (MetaHook TcM -> LHsExpr GhcTc -> TcM hs_syn)
         -> LHsExpr GhcTc
         -> TcM hs_syn
-runMeta unwrap e = do
+runMeta = runMetaWithIndices []
+
+-- | Keep the plugin hook request and provide exact indices to the default runner.
+runMetaWithIndices :: [Name] -> (MetaHook TcM -> LHsExpr GhcTc -> TcM hs_syn)
+                   -> LHsExpr GhcTc -> TcM hs_syn
+runMetaWithIndices indices unwrap e = do
     env <- getGblEnv
     checkOptionalSourceUses env
     hooks <- getHooks
     case runMetaHook hooks of
-        Nothing -> unwrap defaultRunMeta e
+        Nothing -> unwrap (defaultRunMeta indices) e
         Just h  -> unwrap h e
 
-defaultRunMeta :: MetaHook TcM
-defaultRunMeta (MetaE r)
+defaultRunMeta :: [Name] -> MetaHook TcM
+defaultRunMeta _ (MetaE r)
   = fmap r . runMeta' True ppr (runQResult TH.pprint convertToHsExpr runTHExp)
-defaultRunMeta (MetaP r)
+defaultRunMeta _ (MetaP r)
   = fmap r . runMeta' True ppr (runQResult TH.pprint convertToPat runTHPat)
-defaultRunMeta (MetaT r)
-  = fmap r . runMeta' True ppr (runQResult TH.pprint convertToHsType runTHType)
-defaultRunMeta (MetaD r)
+defaultRunMeta indices (MetaT r)
+  = fmap r . runMeta' True ppr (runQResult TH.pprint (convertToHsTypeWithIndices indices) runTHType)
+defaultRunMeta _ (MetaD r)
   = fmap r . runMeta' True ppr (runQResult TH.pprint convertToHsDecls runTHDec)
-defaultRunMeta (MetaAW r)
+defaultRunMeta _ (MetaAW r)
   = fmap r . runMeta' False (const empty) (const $ fmap Right . convertAnnotationWrapper)
     -- We turn off showing the code in meta-level exceptions because doing so exposes
     -- the toAnnotationWrapper function that we slap around the user's code
@@ -1267,6 +1272,10 @@ runMetaP = runMeta metaRequestP
 runMetaT :: LHsExpr GhcTc          -- Of type (Q Type)
          -> TcM (LHsType GhcPs)
 runMetaT = runMeta metaRequestT
+
+-- | Run a type splice with the scope of a retained signature.
+runMetaTWithIndices :: [Name] -> LHsExpr GhcTc -> TcM (LHsType GhcPs)
+runMetaTWithIndices indices = runMetaWithIndices indices metaRequestT
 
 runMetaD :: LHsExpr GhcTc          -- Of type Q [Dec]
          -> TcM [LHsDecl GhcPs]
