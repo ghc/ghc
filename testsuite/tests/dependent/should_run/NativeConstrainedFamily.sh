@@ -36,11 +36,11 @@ import NativeConstrainedFamilyProvider (Allowed, Collects(..), Key, KeyElement)
 instance {-# OVERLAPPING #-} Allowed a => Collects (Key [a]) where
     type Elem (Key [a]) = Bool
 #ifdef MISSING
-value :: KeyElement [Int]
+value :: (KeyElement [Bool], KeyElement [Int])
 #else
-value :: KeyElement [Bool]
+value :: (KeyElement [Bool], KeyElement [Bool])
 #endif
-value = True
+value = (True, True)
 HS
         "${ghc[@]}" -c AliasUse.hs
         if [[ $reader == ordinary ]]; then

@@ -250,7 +250,10 @@ type Reflection a = Allowed a => foreach (x :: Maybe a) -> Echo x :~: x
 ```
 
 An ordinary module can use `forall a. Reflection a` as a callback type.
-It also imports `MaybeBoolEcho`, a synonym for the partial family at the
+The ordinary caller uses `\ @a -> reflectMaybe @a` to instantiate the
+proof at the callback's element type. Passing `reflectMaybe` directly
+currently reports GHC-83865 when comparing the retained binder domains.
+The client also imports `MaybeBoolEcho`, a synonym for the partial family at the
 kind `Maybe Bool %U -> Maybe Bool`, and proves the result at `'Nothing`.
 
 The reader substitutes its arguments into the family's domain predicate.
