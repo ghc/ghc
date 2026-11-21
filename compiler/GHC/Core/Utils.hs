@@ -78,7 +78,7 @@ import GHC.Core.Ppr
 import GHC.Core.FVs( exprFreeVars, bindFreeVars )
 import GHC.Core.DataCon
 import GHC.Core.Type as Type
-import GHC.Core.TyCo.Rep ( Type(DepFunTy) )
+import GHC.Core.TyCo.Rep ( Type(DepDictTy, DepFunTy) )
 import GHC.Core.Predicate( isEqPred )
 import GHC.Core.Predicate( isUnaryClass )
 import GHC.Core.FamInstEnv
@@ -256,6 +256,9 @@ applyTypeToArgs op_ty args
     go op_ty []                   = op_ty
     go op_ty (Type ty : args)     = go_ty_args op_ty [ty] args
     go op_ty (Coercion co : args) = go_ty_args op_ty [mkCoercionTy co] args
+    go op_ty (_ : _)
+      | DepDictTy{} <- coreFullView op_ty
+      = panic "applyTypeToArgs: experimental dependent dictionary application"
     go op_ty (arg : args)
       | DepFunTy _ b res_ty <- coreFullView op_ty
       , isNativeOpaqueValueId b

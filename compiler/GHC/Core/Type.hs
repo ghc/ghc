@@ -1842,6 +1842,8 @@ fun_kind_arg_flags = go emptySubst
 isTauTy :: Type -> Bool
 isTauTy ty | Just ty' <- coreView ty = isTauTy ty'
 isTauTy (TyVarTy _)       = True
+isTauTy (ClassAppTy _ inst dict operand kind) = all isTauTy [inst, dict, operand, kind]
+isTauTy DepDictTy{} = False
 isTauTy (TermAppTy _ arg) = isTauTy arg
 isTauTy (TermVarTy _)     = True
 isTauTy ty@(ExistsTy _ binder body)
@@ -1878,6 +1880,8 @@ isAtomicTy :: Type -> Bool
 -- Used when deciding how to lay out type error messages; see the
 -- call in GHC.Tc.Errors
 isAtomicTy (TyVarTy {})    = True
+isAtomicTy ClassAppTy{} = False
+isAtomicTy DepDictTy{} = False
 isAtomicTy (TermAppTy {})  = False
 isAtomicTy (TermVarTy {})  = True
 isAtomicTy (LitTy {})      = True
@@ -1973,6 +1977,8 @@ See proposal #242 and the R23 card in docs/dependent-haskell/roadmap.
 isFamFreeTy :: Type -> Bool
 isFamFreeTy ty | Just ty' <- coreView ty = isFamFreeTy ty'
 isFamFreeTy (TyVarTy _)       = True
+isFamFreeTy (ClassAppTy _ inst dict operand kind) = all isFamFreeTy [inst, dict, operand, kind]
+isFamFreeTy (DepDictTy b ty) = isFamFreeTy (varType b) && isFamFreeTy ty
 isFamFreeTy (TermAppTy _ arg) = isFamFreeTy arg
 isFamFreeTy (TermVarTy _)     = True
 isFamFreeTy (ExistsTy _ b ty) = isFamFreeTy (varType b) && isFamFreeTy ty
@@ -2804,6 +2810,8 @@ typeKind (TermAppTy f _)        = case nativeIndexFunctionTys_maybe f of
 typeKind (TermVarTy v)          = varType v
 typeKind (ExistsTy {})           = liftedTypeKind
 typeKind (DepFunTy {})          = liftedTypeKind
+typeKind (DepDictTy {})         = liftedTypeKind
+typeKind (ClassAppTy _ _ _ _ kind) = kind
 typeKind (CastTy _ty co)        = coercionRKind co
 typeKind (CoercionTy co)        = coercionType co
 
@@ -2992,6 +3000,8 @@ isConcreteTypeWith :: TyVarSet -> Type -> Bool
 isConcreteTypeWith conc_tvs = go
   where
     go (TyVarTy tv)        = isConcreteTyVar tv || tv `elemVarSet` conc_tvs
+    go (ClassAppTy {})     = False
+    go (DepDictTy {})      = False
     go (TermAppTy {})      = False
     go (TermVarTy _)       = False
     go (DepFunTy {})       = False

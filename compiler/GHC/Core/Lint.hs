@@ -529,6 +529,12 @@ data ScopedSelectorApp = ScopedSelectorApp Id Type Id Id Type
 -- | Check a direct class selector with one type argument and one value operand.
 checkScopedSelectorApp :: LintConfig -> Id -> Type -> Id -> Id -> Maybe ScopedSelectorApp
 checkScopedSelectorApp cfg selector inst dictionary operand
+  = do checked <- checkScopedSelectorShape (mkInScopeSetList (l_vars cfg)) selector inst dictionary operand
+       guard (isNothing (lintExpr cfg (scopedSelectorExpr checked)))
+       return checked
+
+checkScopedSelectorShape :: InScopeSet -> Id -> Type -> Id -> Id -> Maybe ScopedSelectorApp
+checkScopedSelectorShape scope selector inst dictionary operand
   = do cls <- isClassOpId_maybe selector
        guard (isGlobalId selector
                && any (\method -> method == selector && varType method `eqType` varType selector)
@@ -541,7 +547,6 @@ checkScopedSelectorApp cfg selector inst dictionary operand
        (dict_class, [parameter]) <- getClassPredTys_maybe predicate
        guard (dict_class == cls && parameter `eqType` mkTyVarTy tv)
        let instantiate = substTyWith [tv] [inst]
-           scope = mkInScopeSetList (l_vars cfg)
            checked_occ eligible var = do
              actual <- lookupInScope scope var
              guard (eligible var && eligible actual && varType actual `eqType` varType var)
@@ -549,9 +554,11 @@ checkScopedSelectorApp cfg selector inst dictionary operand
        dict <- checked_occ isScopedDictionary dictionary
        arg <- checked_occ isNativeOpaqueValueId operand
        guard (varType dict `eqType` instantiate predicate && varType arg `eqType` instantiate domain)
-       let appl = mkApps (Var selector) [Type inst, Var dict, Var arg]
-       guard (isNothing (lintExpr cfg appl))
        return (ScopedSelectorApp selector inst dict arg (instantiate result))
+
+scopedSelectorExpr :: ScopedSelectorApp -> CoreExpr
+scopedSelectorExpr (ScopedSelectorApp selector inst dict arg _) =
+  mkApps (Var selector) [Type inst, Var dict, Var arg]
 
 -- | Compare two neutral selector applications under a binder renaming.
 eqScopedSelectorApp :: RnEnv2 -> ScopedSelectorApp -> ScopedSelectorApp -> Bool
@@ -584,11 +591,9 @@ the dictionary and operand as scoped Ids. Equality compares them under
 the same renaming as the type argument. Substitution must preserve a
 variable occurrence at both positions and recheck the resulting scope.
 
-This standalone form is for testing scope and congruence. It does not
-extend Type, accept a dictionary expression, evaluate a selector, or
-enter the interface writer. A production form needs a corresponding
-dependent evidence binder and application in Type before it can occur in
-a user's signature.
+The standalone validator checks ClassAppTy with this same shape test.
+These private forms do not accept dictionary expressions, evaluate the
+selector, or enter the interface writer.
 -}
 
 {-
@@ -2282,9 +2287,8 @@ lintNativeIndexFunction f
            Just domains -> return domains
            Nothing -> failWithL (text "Unsupported opaque runtime call head:" <+> ppr f) }
 
--- The prototype uses an invisible retained node for an evidence binder only
--- in the standalone validator. Its domain identifies a class predicate.
--- Keep this representation out of normal Core Lint and interface writing.
+-- A private evidence binder must name an unrestricted dictionary of
+-- a class predicate, with the ordinary lexical scope rules.
 isScopedDictionary :: Id -> Bool
 isScopedDictionary v
   = isLocalId v && not (isCoVar v) && not (isJoinId v) && isManyTy (idMult v)
@@ -2333,9 +2337,31 @@ lintType (ExistsTy _ b body)
             ; lintL (typeKind body `eqType` liftedTypeKind)
                 (text "Existential payload must have kind Type:" <+> ppr body) } }
 
-lintType (DepFunTy vis b body)
+lintType (DepDictTy b body)
   = do { allow_dicts <- lintScopedDictionaryMode
-       ; lintL (isNativeOpaqueValueId b || (allow_dicts && vis == DepFunInvisible && isScopedDictionary b))
+       ; lintL allow_dicts (text "Experimental dependent dictionary binder")
+       ; lintL (isScopedDictionary b) (text "Invalid scoped dictionary binder:" <+> ppr b)
+       ; lintBinder LambdaBind b $
+         do { lintType body
+            ; lintL (typeKind body `eqType` liftedTypeKind)
+                (text "Dependent dictionary result must have kind Type") } }
+
+lintType (ClassAppTy selector inst (TermVarTy dict) (TermVarTy arg) kind)
+  = do { allow_dicts <- lintScopedDictionaryMode
+       ; lintL allow_dicts (text "Experimental class selector application")
+       ; scope <- getInScope
+       ; case checkScopedSelectorShape scope selector inst dict arg of
+           Just checked
+             -> do { _ <- lintCoreExpr (scopedSelectorExpr checked)
+                   ; lintType kind
+                   ; lintL (kind `eqType` scopedSelectorResultKind checked)
+                       (text "Wrong result kind of class selector application") }
+           _ -> failWithL (text "Invalid scoped class selector application") }
+
+lintType ClassAppTy{} = failWithL (text "Class selector application requires scoped variables")
+
+lintType (DepFunTy vis b body)
+  = do { lintL (isNativeOpaqueValueId b)
            (text "Invalid retained runtime binder:" <+> ppr b <+> dcolon <+> ppr (varType b))
        ; lintL (vis == DepFunInvisible || b `elemVarSet` tyCoVarsOfType body)
            (text "Vacuous visible retained dependent binder:" <+> ppr b)

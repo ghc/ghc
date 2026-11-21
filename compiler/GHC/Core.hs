@@ -37,7 +37,7 @@ module GHC.Core (
         exprToNativeIndex, normaliseNativeIndexExpr, mapNativeIndex,
         nativeSourceCallIndex, nativeComputedIndex, retainedArgIndex, nativeDeferredArgIndex,
         exprToNativeCaseIndex, isNativeCaseValueIndex, isNativeIndexedCaseScrutinee,
-        nativeIndexFunctionVar_maybe, nativeIndexArgKinds, nativeIndexedConArgs,
+        termVar_maybe, nativeIndexFunctionVar_maybe, nativeIndexArgKinds, nativeIndexedConArgs,
         nativeIndexedConApp_maybe, splitNativeIndexedConApp, isNativeConstructedGadtIndex,
         containsIndexedConOperand, containsGeneralIndexedConOperand,
         isNativeIndexAlt, isNativeIndexDataAlt, isNativeIndexAliasAlt, isNativeIndexAliasBinder,
@@ -2763,6 +2763,11 @@ Core-to-STG can name this lifted argument after erasing its index.
 
 -- | Recognize a checked local function head without inspecting its unfolding.
 -- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
+-- | Recognize an exact Core variable occurrence without looking through wrappers.
+termVar_maybe :: CoreExpr -> Maybe Id
+termVar_maybe (Var v) = Just v
+termVar_maybe _ = Nothing
+
 nativeIndexFunctionVar_maybe :: CoreExpr -> Maybe Id
 nativeIndexFunctionVar_maybe (Var f)
   | isNativeIndexFunctionId f = Just f

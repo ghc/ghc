@@ -2,6 +2,7 @@
 
 module Main (main) where
 
+import Control.Exception (SomeException, displayException, evaluate, try)
 import Control.Monad (unless, when)
 import Control.Monad.IO.Class (liftIO)
 import Data.List (isInfixOf)
@@ -15,12 +16,14 @@ import GHC.Core.Lint
     , lintScopedDictionaryType, scopedSelectorResultKind, substScopedSelectorApp
     )
 import qualified GHC.Core.Subst as Subst
-import GHC.Core.TyCo.Compare (eqType, eqVarBndrs)
+import GHC.Core.TyCo.Compare (eqType, eqTypeX, eqVarBndrs, nonDetCmpType)
 import GHC.Core.TyCo.FVs (tyCoVarsOfType)
-import GHC.Core.TyCo.Rep (Type (DepFunTy, TermVarTy))
+import GHC.Core.TyCo.Rep (Type (ClassAppTy, DepDictTy, DepFunTy, TermVarTy))
 import GHC.Core.TyCo.Tidy (tidyTopType)
 import GHC.Core.TyCon (FamTyConFlav (OpenTypeFamilyTyCon), Injectivity (NotInjective), mkAnonTyConBinder, mkFamilyTyCon, mkNamedTyConBinder, mkTyConKindWithMatchability)
-import GHC.Core.Type (pattern ManyTy, mkForAllTys, mkTyConApp, mkTyVarTy)
+import GHC.Core.Type (pattern ManyTy, mkForAllTys, mkTyConApp, mkTyVarTy, typeKind)
+import GHC.Core.Utils (applyTypeToArgs)
+import GHC.CoreToIface (toIfaceType)
 import GHC.Data.FastString (fsLit)
 import GHC.Driver.Config.Core.Lint (initLintConfig)
 import GHC.Types.Id (mkSysLocal, setIdType)
@@ -28,21 +31,27 @@ import GHC.Types.Name (mkSystemName)
 import GHC.Types.Name.Occurrence (mkTcOcc, mkTyVarOcc)
 import GHC.Types.TyThing (TyThing (ATyCon, AnId))
 import GHC.Types.Unique (mkUniqueGrimilyWithTag)
-import GHC.Types.Var (DepFunTyFlag (DepFunInvisible), ForAllTyFlag (Invisible), Specificity (SpecifiedSpec), VarBndr (Bndr), mkTyVar, varType)
+import GHC.Types.Var (DepFunTyFlag (DepFunVisible), ForAllTyFlag (Invisible), Specificity (SpecifiedSpec), VarBndr (Bndr), mkTyVar, varType)
 import GHC.Types.Var.Env (emptyInScopeSet, mkInScopeSetList, mkRnEnv2)
-import GHC.Types.Var.Set (isEmptyVarSet)
+import GHC.Types.Var.Set (elemVarSet, isEmptyVarSet)
 import GHC.Utils.Outputable (ppr, showSDocUnsafe)
 import System.Environment (getArgs)
+import System.IO (BufferMode (LineBuffering), hSetBuffering, stdout)
 
 -- | Test prototypes in memory only.
 main :: IO ()
 main = do
+    hSetBuffering stdout LineBuffering
     [libdir] <- getArgs
     runGhc (Just libdir) $ do
         flags <- getSessionDynFlags
         _ <- setSessionDynFlags flags
         prelude <- parseImportDecl "import Prelude"
-        setContext [IIDecl prelude]
+        proxyImport <- parseImportDecl "import Data.Proxy"
+        setContext [IIDecl prelude, IIDecl proxyImport]
+        proxyNames <- parseName "Proxy"
+        proxies <- traverse lookupName proxyNames
+        [proxy] <- pure [tc | Just (ATyCon tc) <- NE.toList proxies]
         eqName <- NE.head <$> parseName "Eq"
         Just (ATyCon eq) <- lookupName eqName
         enumName <- NE.head <$> parseName "Enum"
@@ -71,7 +80,7 @@ main = do
                 (mkTyConKindWithMatchability unmatchableDataConTy familyBinders liftedTypeKind)
                 familyBinders 2 liftedTypeKind Nothing OpenTypeFamilyTyCon Nothing NotInjective
             observe d = mkTyConApp result [varType d, TermVarTy d]
-            bind = DepFunTy DepFunInvisible
+            bind = DepDictTy
             close = mkForAllTys
                 [(unmatchableDataConTy, Bndr a (Invisible SpecifiedSpec)),
                  (unmatchableDataConTy, Bndr b (Invisible SpecifiedSpec))]
@@ -95,8 +104,8 @@ main = do
             let tidied = tidyTopType both
             pass cfg "tidied evidence type" tidied
             unless (eqType both tidied) (fail "tidy changed evidence scope")
-            reject cfg "escaped reference" "Invalid runtime index" escaped
-            reject cfg "forged predicate" "Invalid runtime index" mislabeled
+            reject cfg "escaped reference" escaped
+            reject cfg "forged predicate" mislabeled
             let carrier = mkSysLocal (fsLit "carrier") (unique 9) ManyTy both
             case lintExpr cfg (Lam carrier (Var carrier)) of
                 Just _ -> putStrLn "normal Lint rejected prototype nodes"
@@ -162,12 +171,80 @@ main = do
                 ]) (fail "substitution accepted computed evidence or changed an argument type")
             putStrLn "selector substitution preserves variable evidence and rechecks its kind"
 
+            let selectorAt selector t evidence value resultKind =
+                    ClassAppTy selector t (TermVarTy evidence) (TermVarTy value) resultKind
+                selectA = selectorAt suc (mkTyVarTy a) ea x (mkTyVarTy a)
+                selectB = selectorAt suc (mkTyVarTy b) eb y (mkTyVarTy b)
+                showIndex = selectorAt showMethod (mkTyVarTy a) showA x stringTy
+                resultUnder index = mkTyConApp proxy [typeKind index, index]
+                qualified evidence value index =
+                    DepDictTy evidence (DepFunTy DepFunVisible value (resultUnder index))
+                sigma = close (qualified ea x selectA)
+                alpha = mkForAllTys
+                    [(unmatchableDataConTy, Bndr b (Invisible SpecifiedSpec)),
+                     (unmatchableDataConTy, Bndr a (Invisible SpecifiedSpec))]
+                    (qualified eb y selectB)
+                stringResult = close (qualified showA x showIndex)
+                differentEvidence = close (DepDictTy ea (qualified ea2 x selectA))
+                otherEvidence = close (DepDictTy ea (qualified ea2 x
+                    (selectorAt suc (mkTyVarTy a) ea2 x (mkTyVarTy a))))
+                wrongResult = selectorAt suc (mkTyVarTy a) ea x boolTy
+                wrongDict = selectorAt suc (mkTyVarTy a) eb x (mkTyVarTy a)
+                wrongValue = selectorAt suc (mkTyVarTy a) ea y (mkTyVarTy a)
+            pass cfg "typed dependent selector signature" sigma
+            pass cfg "typed selector signature with fixed result kind" stringResult
+            pass cfg "first of two exact Givens" differentEvidence
+            pass cfg "second of two exact Givens" otherEvidence
+            unless (isEmptyVarSet (tyCoVarsOfType sigma)) (fail "typed signature leaked a binder")
+            unless (eqType (typeKind sigma) liftedTypeKind) (fail "dependent signature has wrong kind")
+            unless (eqType sigma (tidyTopType sigma)) (fail "tidying changed the typed signature")
+            unless (eqType
+                (Subst.substTy
+                    (Subst.extendTvSubst (Subst.mkEmptySubst (mkInScopeSetList [b, ea, x]))
+                        a (mkTyVarTy b))
+                    (qualified ea x selectA))
+                (qualified eb y selectB)) (fail "type substitution captured a source binder")
+            unless (eqType sigma alpha && nonDetCmpType sigma alpha == EQ
+                    && eqTypeX renamed selectA selectB) (fail "typed selector alpha-renaming failed")
+            when (eqType differentEvidence otherEvidence) (fail "typed signature erased Given identity")
+            reject cfgAB "typed selector rejects wrong dictionary" (resultUnder wrongDict)
+            reject cfgAB "typed selector rejects wrong operand" (resultUnder wrongValue)
+            reject cfgAB "typed selector rejects forged result kind" (resultUnder wrongResult)
+            reject (initLintConfig flags [a, x]) "typed selector rejects an escaped dictionary"
+                (resultUnder selectA)
+            let typedCarrier = valueId 20 "typedCarrier" sigma
+            when (isNothing (lintExpr cfg (Lam typedCarrier (Var typedCarrier)))) $
+                fail "normal Lint accepted the typed selector signature"
+            rejectsPhase "typed substitution of computed evidence"
+                "unsupported experimental dictionary substitution"
+                (case Subst.substTy computed selectA of
+                    ClassAppTy _ _ dictionary _ _ -> dictionary
+                    _ -> error "substitution lost the selector application")
+            let free = tyCoVarsOfType selectA
+            unless (all (`elemVarSet` free) [a, ea, x]) (fail "selector missed a free variable")
+            rejectsPhase "interface write of a dictionary type"
+                "experimental dependent dictionary binder" (toIfaceType (qualified ea x selectA))
+            rejectsPhase "interface write of a selector application"
+                "experimental class selector application" (toIfaceType selectA)
+            rejectsPhase "runtime application of a dependent dictionary"
+                "experimental dependent dictionary application"
+                (applyTypeToArgs (qualified ea x selectA) [Var ea])
+
 pass :: LintConfig -> String -> Type -> IO ()
 pass cfg label ty = case lintScopedDictionaryType cfg ty of
     Nothing -> putStrLn (label ++ ": accepted")
     Just err -> fail (label ++ ": " ++ showSDocUnsafe (ppr err))
 
-reject :: LintConfig -> String -> String -> Type -> IO ()
-reject cfg label diagnostic ty = case lintScopedDictionaryType cfg ty of
-    Just err | diagnostic `isInfixOf` showSDocUnsafe (ppr err) -> putStrLn (label ++ ": rejected")
-    other -> fail (label ++ ": " ++ showSDocUnsafe (ppr other))
+reject :: LintConfig -> String -> Type -> IO ()
+reject cfg label ty = case lintScopedDictionaryType cfg ty of
+    Just _ -> putStrLn (label ++ ": rejected")
+    Nothing -> fail (label ++ ": accepted")
+
+rejectsPhase :: String -> String -> a -> IO ()
+rejectsPhase label diagnostic result = do
+    checked <- try (evaluate result)
+    case checked of
+        Left err | diagnostic `isInfixOf` displayException (err :: SomeException) ->
+            putStrLn (label ++ ": rejected")
+        Left err -> fail (label ++ ": " ++ displayException err)
+        Right _ -> fail (label ++ ": accepted")
