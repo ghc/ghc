@@ -3422,7 +3422,8 @@ isNativeIndexAliasBinder expr binder = isNativeIndexId binder
   || (isNativeOpaqueValueId binder &&
       maybe False boxed_index (exprToNativeCaseIndex expr))
   where
-    boxed_index index = isNativeConstructedGadtIndex index || isJust (isCharLitTy index)
+    boxed_index index = isNativeConstructedGadtIndex index
+      || isJust (isCharLitTy index) || isJust (isNumLitTy index)
 
 -- | Convert a Boolean argument through the restricted frontend index language.
 exprToBoolIndex :: CoreExpr -> Maybe Type

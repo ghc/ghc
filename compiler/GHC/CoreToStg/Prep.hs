@@ -1277,7 +1277,8 @@ prepareNativeCaseScrutinee ty (App (Var fun) arg)
 prepareNativeCaseScrutinee ty scrut
   | Just (con, tys, build, fields) <- nativeConFields_maybe scrut
   , any (not . exprIsTrivial) fields
-  , Just _ <- exprToNativeCaseIndex scrut
+  , Just index <- exprToNativeCaseIndex scrut
+  , Nothing <- isNumLitTy index
   = Just (nameNativeConFields ty con tys build fields)
   | otherwise = Nothing
 
