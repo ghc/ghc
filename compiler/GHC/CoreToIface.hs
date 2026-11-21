@@ -55,11 +55,11 @@ import GHC.StgToCmm.Types
 
 import GHC.Core
 import GHC.Core.TyCon hiding ( pprPromotionQuote )
-import GHC.Core.Coercion (ordinaryAppProjection_maybe)
+import GHC.Core.Coercion (mkDepFunCoWithVis, mkRepReflCo, ordinaryAppProjection_maybe)
 import GHC.Core.Coercion.Axiom
 import GHC.Core.DataCon
 import GHC.Core.Type
-import GHC.Core.Utils (applyTypeToArgs, exprType)
+import GHC.Core.Utils (applyTypeToArgs, exprType, isVacuousRetainedBinder)
 import GHC.Core.Multiplicity
 import GHC.Core.PatSyn
 import GHC.Core.TyCo.Rep
@@ -796,8 +796,32 @@ toIfaceApp (Var v) as
 
 toIfaceApp e as = mkIfaceApps (exprType e) (toIfaceExpr e) as
 
+{- Note [Vacuous retained applications in interfaces]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A vacuous invisible binder accepts an ordinary argument, such as the call
+that supplies a TypeRep value. Older readers require a supported index at
+an invisible retained application. On export, cast a vacuous function to
+its visible form before applying an argument that has no index. The visible
+form is an ordinary Many arrow with the same domain and result.
+
+This uses the existing representational visibility coercion. It preserves
+runtime demand and the checked domain. Older readers can load and inline
+the result without a new wire feature. A genuinely dependent application
+still uses the retained index encoding. See Note [Retained function
+visibility] in GHC.Core.TyCo.Rep.
+-}
+
 mkIfaceApps :: Type -> IfaceExpr -> [CoreExpr] -> IfaceExpr
 mkIfaceApps _ iface [] = iface
+-- See Note [Vacuous retained applications in interfaces].
+mkIfaceApps ty iface (arg : rest)
+  | not (isTyCoArg arg)
+  , DepFunTy DepFunInvisible b body <- coreFullView ty
+  , isVacuousRetainedBinder b body
+  , Nothing <- retainedArgIndex arg
+  = let co = mkDepFunCoWithVis DepFunInvisible DepFunVisible b MRefl (mkRepReflCo body)
+        apply = IfaceApp (IfaceCast iface (toIfaceCoercion co)) (toIfaceExpr arg)
+    in mkIfaceApps body apply rest
 mkIfaceApps ty iface (arg : rest)
   = mkIfaceApps result (IfaceApp iface encoded) rest
   where

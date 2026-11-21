@@ -1587,7 +1587,7 @@ lintValApp :: CoreExpr -> Type -> Type -> UsageEnv -> UsageEnv
 lintValApp arg fun_ty arg_ty fun_ue arg_ue
   | DepFunTy _ b res_ty <- coreFullView fun_ty
   = do { ensureEqTys (varType b) arg_ty (mkAppMsg (varType b) arg_ty arg)
-       ; lintRetainedArgument b arg
+       ; lintRetainedArgument b res_ty arg
        ; in_scope <- getInScope
        ; let subst = Subst in_scope (unitVarEnv b arg) emptyVarEnv emptyVarEnv
        ; return (substTy subst res_ty, addUE fun_ue (scaleUE ManyTy arg_ue)) }
@@ -1603,8 +1603,11 @@ lintValApp arg fun_ty arg_ty fun_ue arg_ue
 
 -- | Check the scalar or variable-only function operand of a retained binder.
 -- See Note [Function-valued retained binders] in GHC.Core.Type.
-lintRetainedArgument :: Id -> CoreExpr -> LintM ()
-lintRetainedArgument b arg
+lintRetainedArgument :: Id -> Type -> CoreExpr -> LintM ()
+lintRetainedArgument b body arg
+  -- See Note [Vacuous retained applications] in GHC.Core.Utils.
+  | isVacuousRetainedBinder b body
+  = return ()
   | isNativeIndexFunctionId b, Var f <- arg
   = do { _ <- lintNativeIndexFunction f
        ; ensureEqTys (varType b) (varType f) unsupported }
@@ -2500,7 +2503,7 @@ lintApp msg lint_forall_arg lint_arrow_arg runtime_arg !orig_fun_ty all_args acc
                        ; ensureEqTys (varType b') arg_ty
                            (text "Retained runtime argument has the wrong type:" <+> ppr arg)
                        ; let arg_expr = to_core arg
-                       ; lintRetainedArgument b' arg_expr
+                       ; lintRetainedArgument b' body_ty arg_expr
                        ; let Subst in_scope ids tvs cvs = subst
                              subst' = Subst in_scope (extendVarEnv ids b arg_expr) tvs cvs
                        ; go subst' body_ty acc' args }

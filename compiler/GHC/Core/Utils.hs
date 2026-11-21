@@ -43,7 +43,7 @@ module GHC.Core.Utils (
 
         -- * Manipulating data constructors and types
         exprToType,
-        applyTypeToArgs,
+        applyTypeToArgs, isVacuousRetainedBinder,
         dataConRepInstPat, dataConRepFSInstPat,
         isEmptyTy, normSplitTyConApp_maybe,
 
@@ -262,6 +262,11 @@ applyTypeToArgs op_ty args
       , retained_arg b arg
       = let in_scope = mkInScopeSet (tyCoVarsOfType res_ty `unionVarSet` exprFreeVars arg)
         in go (substTy (Subst in_scope (unitVarEnv b arg) emptyVarEnv emptyVarEnv) res_ty) args
+    -- See Note [Vacuous retained applications].
+    go op_ty (_ : args)
+      | DepFunTy _ b res_ty <- coreFullView op_ty
+      , isVacuousRetainedBinder b res_ty
+      = go res_ty args
     go op_ty (_ : args)           | Just (_, _, _, _, res_ty) <- splitFunTy_maybe op_ty
                                   = go res_ty args
     go _ args = pprPanic "applyTypeToArgs" (panic_msg args)
@@ -307,6 +312,26 @@ mkPiMCo ma v (MCo co) = MCo (mkPiCo Representational ma v co)
              Casts
 *                                                                      *
 ********************************************************************* -}
+
+-- | Whether an opaque retained application needs no index substitution.
+-- See Note [Vacuous retained applications].
+isVacuousRetainedBinder :: Id -> Type -> Bool
+isVacuousRetainedBinder binder body =
+    isNativeOpaqueValueId binder && not (binder `elemVarSet` tyCoVarsOfType body)
+
+{- Note [Vacuous retained applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An invisible retained binder takes a runtime argument even when its value
+does not occur in the result type. For example, the elaboration of
+`foreach (a :: Type). a -> a` takes a witness of type `TypeRep a`.
+The value of the witness is absent from the result `a -> a`.
+
+When the result does not mention the value, application needs no
+conversion of the argument to a type index. The argument can be any
+expression of the domain type. Core Lint checks the expression, its
+domain and its usage before returning the result type. A dependent
+result still requires a checked index for substitution.
+-}
 
 -- | Wrap the given expression in the coercion safely, dropping
 -- identity coercions and coalescing nested coercions
