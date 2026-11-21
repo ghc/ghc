@@ -13,7 +13,7 @@ cd "$out/provider"
 cp "$src"/{TypeLambda,NativeTypeLambdaScope}.hs .
 "${g[@]}" -Werror=unused-type-patterns -fomit-interface-pragmas -c TypeLambda.hs
 "${g[@]}" --show-iface TypeLambda.hi >provider.iface
-if sed -n '/^exports:/,/^defaults:/p' provider.iface | grep -F '$lambda:'; then exit 1; fi
+if sed -n '/^exports:/,/^defaults:/p' provider.iface | grep -E '[$](lambda|signature-lambda):'; then exit 1; fi
 "${g[@]}" -fomit-interface-pragmas -c NativeTypeLambdaScope.hs
 sed 's/, UndecidableInstances//; s/module TypeLambda/module Termination/' TypeLambda.hs >Termination.hs
 if "${g[@]}" -c Termination.hs >termination.log 2>&1 ||
@@ -99,11 +99,8 @@ cat >RowsMain.hs <<'HS'
 module Main where
 import Data.Type.Equality ((:~:)(Refl))
 import Ordinary (capturedRow, independentRow, scopedRow)
-import TypeLambda (Prefixes, ScopedRow)
-
-data Fields xs where
-  End :: Fields '[]
-  Field :: a -> Fields xs -> Fields (a ': xs)
+import Data.Proxy (Proxy(..))
+import TypeLambda (Fields(..), Prefixes, ScopedRow, withErrors)
 
 withError :: Fields (Prefixes ('Just Ordering) '[Char, Bool])
 withError = case capturedRow of Refl -> Field (Left GT) (Field (Right True) End)
@@ -118,10 +115,13 @@ main = case (capturedRow, independentRow, withError, withoutError) of
     let row :: Fields (ScopedRow Char '[Bool])
         row = case scopedRow of Refl -> Field (Just 'x', Right True) End
     case row of Field value End -> print value
+    let input = Field 'x' (Field (error "unused field" :: Bool) End)
+    case withErrors (Proxy :: Proxy String) input of
+      Field x (Field _ End) -> print x
 HS
 "${g[@]}" -c RowsMain.hs
-"${g[@]}" RowsMain.o Ordinary.o -o rows
-printf '%s\n' "(Left GT,Right True,Just 'a',Just True)" "(Just 'x',Right True)" >rows.expected
+"${g[@]}" RowsMain.o Ordinary.o ../provider/TypeLambda.o -o rows
+printf '%s\n' "(Left GT,Right True,Just 'a',Just True)" "(Just 'x',Right True)" "Right 'x'" >rows.expected
 ./rows >rows.actual
 cmp rows.expected rows.actual
 
@@ -331,13 +331,14 @@ fi
 cat >Signature.hs <<'HS'
 {-# LANGUAGE ExperimentalDependentTypes #-}
 module Signature where
-import Data.Proxy (Proxy)
-witness :: Proxy (\x -> x)
-witness = undefined
+import Data.Proxy (Proxy(..))
+outer = witness where
+  witness :: Proxy (\x -> x)
+  witness = Proxy
 HS
 if "${g[@]}" -c Signature.hs >context.log 2>&1 ||
-   ! grep -Eq '^Signature[.]hs:4:19: error: \[GHC-27185\]' context.log ||
-   ! grep -Fq 'top-level synonym' context.log; then
+   ! grep -Eq '^Signature[.]hs:5:21: error: \[GHC-27185\]' context.log ||
+   ! grep -Fq 'top-level value signature' context.log; then
     cat context.log >&2
     exit 1
 fi

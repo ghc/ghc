@@ -1541,6 +1541,10 @@ main = do
     observe "map a callback that captures a closed family pattern" TypeLambda.prefixes
     observe "capture a type before and after a local let"
         (Refl :: TypeLambda.ScopedRow Char '[Bool] :~: '[(Maybe Char, Either Char Bool)])
+    let fields = TypeLambda.Field 'x' (TypeLambda.Field True TypeLambda.End)
+    case TypeLambda.withErrors (Proxy @String) fields of
+        TypeLambda.Field x (TypeLambda.Field y TypeLambda.End) ->
+            observe "give every field in a row the same error type" (x, y)
     observe "map a type lambda with a constructor case" TypeLambda.mixed
     observe "read fields from two indexed type case branches" TypeLambda.indexedFields
     observe "retain the kind of a matched Nothing"

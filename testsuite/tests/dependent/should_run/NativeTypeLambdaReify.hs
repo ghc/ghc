@@ -2,13 +2,13 @@
 module NativeTypeLambdaReify where
 
 import qualified Data.Kind as K
-import Data.Proxy (Proxy)
+import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Exts (U)
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax (addModFinalizer, mkNameG_tc)
 import System.Directory (doesFileExist, removeFile)
-import TypeLambda (L)
+import TypeLambda (L, withErrors)
 
 $(do info <- reify ''L
      case info of
@@ -17,6 +17,16 @@ $(do info <- reify ''L
 
 checked :: RoundTrip :~: '[Maybe Int, Either String Int, IO Int]
 checked = Refl
+
+-- The local signature and the imported signature each contain a private name.
+local :: Proxy (\a -> Maybe a)
+local = Proxy
+
+$(do let copy original label = do
+           ty <- reifyType original
+           let name = mkName label
+           pure [SigD name ty, ValD (VarP name) (NormalB (VarE original)) []]
+     concat <$> sequence [copy 'local "copyLocal", copy 'withErrors "copyImported"])
 
 -- This marker lives in the private testsuite directory. If the renamer
 -- copies the written kind splice into the lifted family, its second

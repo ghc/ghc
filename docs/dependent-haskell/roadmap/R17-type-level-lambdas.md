@@ -83,6 +83,33 @@ With the M174 provider interface, it compiles and runs an ordinary
 client that proves both `L` and `Shadowed Bool 'True`. M173 already
 supports the unsaturated families used in this interface.
 
+## Mapping a row in a value signature
+
+A top-level value signature can give a type family a lambda directly.
+
+```haskell
+withErrors :: Proxy e -> Fields xs -> Fields (Map (\a -> Either e a) xs)
+```
+
+The lambda binds `a` and captures `e` from the signature. The recursive
+call uses the same family as the outer call. A client with the compiled
+interface can map a row of unrelated types. Reading the first result
+does not force the second field. Template Haskell can reify the type of
+a local or imported value and splice the signature into another declaration.
+[Source](../examples/open-evaluation/TypeLambda.hs) and
+[ordinary client](../../../testsuite/tests/dependent/should_run/NativeTypeLambda.sh).
+
+Two different signatures still generate separate families for their
+lambdas. At an unknown `xs`, forwarding `withErrors` at a second
+signature that repeats its lambda reports GHC-83865. The diagnostic
+names both signatures and shows their captures. A named family lets
+both signatures refer to the same callback. The fork has a checked
+alpha-equivalence rule for retained sum payloads. Extending that rule
+to ordinary type lambdas requires Core evidence that an interface
+reader can recheck. Agda compares lambdas up to renaming their binders.
+[Retained sum equality](R04-dependent-sums.md#payload-families-for-the-some-binder)
+and [Agda function equality](https://agda.readthedocs.io/en/v2.8.0.2/language/lambda-abstraction.html).
+
 ## Capturing a closed family pattern
 
 ```haskell
