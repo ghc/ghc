@@ -259,8 +259,10 @@ The source-hidden client passes two cells with payload `True` and
 observes `(True,False)`. One cell stores the provider's general
 dictionary. The other stores the client's more specific dictionary.
 The checker fixes the case multiplicity before entering the constructor
-implication because the dependent result names an unrestricted
-scrutinee. A linear field still fails. The checker compares the
+implication when the scrutinee is an unrestricted local data family
+value. An inner case with an ordinary `Bool` result can pass the field
+directly to the retained selector. A linear field or scrutinee still
+fails. The checker compares the
 instantiated predicates of the lexical Givens before applying a scoped
 selector. A branch with two matching dictionaries fails even under
 `-fdefer-type-errors`.

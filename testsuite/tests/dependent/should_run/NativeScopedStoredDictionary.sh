@@ -5,7 +5,7 @@ out=$(mktemp -d)
 trap 'rm -rf -- "$out"' EXIT
 ghc=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint -fdiagnostics-color=never)
 stripped=(-fomit-interface-pragmas -fno-write-if-simplified-core)
-expected='((True,False),(True,False))'
+expected='((True,False),(True,False),(True,False))'
 
 for opt in -O0 -O2; do
     mkdir -p "$out/$opt/"{provider,client}
@@ -34,6 +34,11 @@ for opt in -O0 -O2; do
         exit 1
     fi
     grep -Fq 'This argument has multiplicity: One' linear
+    if "${ghc[@]}" "$opt" -DLINEAR_CASE -fno-code -c FoldCell.hs > linear-case 2>&1; then
+        echo "Accepted an unrestricted scoped selector operand from a linear case"
+        exit 1
+    fi
+    grep -Fq '[GHC-83605]' linear-case
 
     cd ../client
     cp "$src/Main.hs" .

@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, LinearTypes, RoleAnnotations #-}
-module FoldCell (At(..), foldCell, foldDirect) where
+module FoldCell (At(..), foldCell, foldDirect, foldValue) where
 
 import Selector (Tagged(..), observe, tag)
 import StoredEvidence (Cell(Stored), Pick(pick))
@@ -17,6 +17,11 @@ foldDirect c = case c of
     Stored x -> case tag (pick x) of
         Tagged b -> At b
 
+foldValue :: foreach (c :: Cell [Bool]) -> At c
+foldValue c = At @c (case c of
+    Stored x -> case observe x of
+        Tagged b -> b)
+
 #ifdef COMPETING_DICTIONARY
 competing :: foreach (first :: Cell [Bool]) -> foreach (second :: Cell [Bool]) -> At first
 competing first second = case first of
@@ -33,4 +38,11 @@ competing first second = case first of
 linearField :: Cell [Bool] %1 -> Bool
 linearField (Stored x) = case observe x of
     Tagged b -> b
+#endif
+
+#ifdef LINEAR_CASE
+linearCase :: Cell [Bool] %1 -> Bool
+linearCase c = case c of
+    Stored x -> case observe x of
+        Tagged b -> b
 #endif
