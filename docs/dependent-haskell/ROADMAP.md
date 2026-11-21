@@ -45,8 +45,9 @@ The Showcase includes ordinary clients of the `INLINE` and `INLINABLE`
 finite zero views. It also includes finite-list proofs for the installed
 Prelude definitions of `map`, `(.)`, `filter`, `takeWhile`, `dropWhile`,
 and `(++)`. One proof recovers the original finite list by appending its
-prefix and suffix. The 387-line Showcase passes at three native optimization levels and
-in source-loaded GHCi. The source-hidden
+prefix and suffix. Another ordinary client opens an erased package in a
+local tuple binding. It can use both fields while the witness stays local.
+The source-hidden
 split regression passes at `-O0`, `-O1`, and `-O2`. Removing the induction
 premise fails at the final `Refl`. A normal two-stage Hadrian build also
 passed on the 378-line paired-split revision.

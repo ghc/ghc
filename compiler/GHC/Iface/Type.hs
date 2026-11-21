@@ -1845,8 +1845,10 @@ pprDefaultUserForAll bndrs ordinary annotated
     sdocOption sdocPrintExplicitKinds $ \print_kinds ->
     sdocOption sdocPrintExplicitMatchabilities $ \explicit ->
     sdocOption sdocModifiers $ \modifiers ->
-      let implicit_ma (ma, _) = ma == ifaceUnmatchable
-                             || (not modifiers && not print_kinds && ma == ifaceMatchable)
+      let implicit_ma (ma, bndr) =
+            ma == ifaceUnmatchable
+            || (ma == ifaceMatchable && not modifiers &&
+                (not print_kinds || isInvisibleForAllTyFlag (ifaceForAllTyFlag (binderFlag bndr))))
       in if userStyle style && not debug && not explicit
             && all implicit_ma bndrs
          then ordinary else annotated
@@ -1856,11 +1858,11 @@ pprDefaultUserForAll bndrs ordinary annotated
 Without Modifiers, user output omits fixed M and U on forall binders
 as it does on ordinary arrows. For example, an ill-scoped data telescope
 still shows its required binders without exposing their internal matchability.
-Keep symbolic indices visible. With Modifiers or explicit kinds, show a
-fixed M binder. A telescope of default U binders uses ordinary syntax
-even with explicit kinds. For example, a skolem escape diagnostic needs
-kind applications to show the escaping variable. The explicit matchability
-flag and debug output show all annotations.
+Keep symbolic indices visible. With Modifiers, show a fixed M binder.
+Explicit kinds still show fixed M on visible binders in a telescope.
+A skolem escape diagnostic prints kind applications to show the escaping
+variable. This does not need to show fixed matchability on invisible
+binders. The explicit matchability flag and debug output show all annotations.
 See Note [Ordinary arrow matchability in user output].
 -}
 

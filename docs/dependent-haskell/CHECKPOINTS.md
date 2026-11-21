@@ -28,6 +28,27 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `f17c3f41b8`, an ordinary client can use
+`let (value, use) = package in use value` when the package hides the
+type of `value`. The original let binding shares the producer.
+Returning the hidden value or passing it to a consumer from a
+different package fails at the written field. A separate check uses
+guarded list equations at `Bool` and at a user-defined element type.
+The GHCi Showcase loads the concrete list producer as object code.
+A bytecode-only producer currently omits those equations.
+[Lexical package checks](../../testsuite/tests/dependent/should_run/implicit-existential-source/LexicalLetMain.hs)
+and [concrete list proof](roadmap/R16-open-term-evaluator.md).
+
+A source wildcard in a retained pattern no longer prints an internal
+binder in the relevant bindings. A named `_first` is still reported.
+Given `Width p ~ Width q`, a retained constructor that requires
+`Proxy p` rejects `Proxy q` with GHC-25897. A genuine recursive
+family axiom still reaches the reduction-depth limit. In one matched
+allocation run, changing only the rewriter object measured −2.38% on
+`T9872a`, +0.24% on `T9872d`, and +0.10% on `T24984`.
+[Retained diagnostic](../../testsuite/tests/dependent/should_fail/NativeFamilyIndexEvidence.stderr)
+and [ordinary regression](../../testsuite/tests/typecheck/should_fail/WantedFamilyRewriteCycle.hs).
+
 At `7128a29dc8`, one runtime cut splits both Boolean flags and characters.
 The proofs track the original contents of each vector. Using the same
 element type for both inputs still rejects exchanged proofs at each
