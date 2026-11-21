@@ -395,7 +395,9 @@ An outer erased binder can occur in the head's argument domain. Apply the
 source substitution to the head's type before checking it against the
 target Id. The target Id is already in scope at the new type. See Note
 [Substituting runtime Id metadata] in GHC.Core.TyCo.Subst. Keep the result,
-matchability and multiplicities closed.
+matchability and multiplicities closed. Only the argument domain may
+account for free variables in the raw function type. A synonym cannot
+hide free metadata outside the checked argument domain.
 
 TermVarTy can also record an eligible function value stored in a closed
 algebraic index. Applying this index through the smart makers produces the
