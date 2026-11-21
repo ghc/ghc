@@ -335,10 +335,15 @@ compare `typeRepKind rep` with `typeRep @Type` and match `HRefl` before using
 checked continuation. A required erased `forall a ->` still needs a
 `Typeable a` constraint to construct the representation of an abstract `a`.
 
-An imported type operand such as `(type Bool)` would need interface
-information that identifies the source binder. That call form also needs
-a rule for types that GHC cannot reflect. Runtime type patterns need their
-own syntax and evidence scope. Agda's hierarchy distinguishes a
+An opted-in caller can write `preserve (type Bool) True`. This fork
+checks the operand against the expected `TypeRep` type, including when
+that type comes from an ordinary imported function. A concrete operand
+obtains its dictionary through GHC's `Typeable` solver. An abstract
+`(type a)` needs evidence for `Typeable a` at the call site. The same
+spelling at a required `forall` binder stays erased. An expression
+with no expected witness type cannot request reflection this way.
+Runtime type patterns still need a syntax and an evidence scope.
+Agda's hierarchy distinguishes a
 universe's level from the datatypes of codes that programs can inspect.
 [Agda universe levels](https://agda.readthedocs.io/en/v2.8.0/language/universe-levels.html)
 and [Agda type codes](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html#forward-declaration).
@@ -351,10 +356,8 @@ and [Agda type codes](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recu
   representation in compiled code and GHCi.
 - [ ] Preserve source telescope information for implicit construction of
   the runtime representation across modules.
-- [ ] For a concrete type operand, construct the representation from
-  GHC's existing `Typeable` evidence. For an abstract operand, track
-  where the caller obtains the evidence. An existential input must
-  also establish that its witness has kind `Type`.
+- [x] Construct concrete and abstract type operands when the caller
+  expects `TypeRep`. Reject an abstract type with no `Typeable` evidence.
 - [ ] Check a runtime type test only inside the branch that receives
   nominal equality evidence. Specifying source patterns for this test
   remains a separate design decision.

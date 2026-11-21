@@ -1181,11 +1181,48 @@ tcExpr (HsStatic free_names expr) res_ty
                Just (APromotionErr {}) -> return ()
                Just (AGlobal {})       -> return () }
 
-tcExpr (HsEmbTy _ _)      _ = failWith (TcRnIllegalTypeExpr TypeKeywordSyntax)
+-- See Note [Reflecting a checked type operand].
+tcExpr expr@(HsEmbTy _ written) expected
+  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+       ; unless enabled $ failWith (TcRnIllegalTypeExpr TypeKeywordSyntax)
+       ; case expected of
+           Check ty
+             | Just (tc, [kind, _]) <- splitTyConApp_maybe ty ->
+               do { selector <- tcLookupKnownOccId typeRepIdOcc
+                  ; let (_, _, rep) = tcSplitSigmaTy (idType selector)
+                  ; case splitTyConApp_maybe rep of
+                      Just (rep_tc, _) | tc == rep_tc ->
+                        do { arg <- tcHsTypeApp written kind
+                           ; let args = [kind, arg]
+                                 (theta, actual) = tcSplitPhiTy (piResultTys (idType selector) args)
+                           ; wrap <- instCall (exprCtOrigin expr) args theta
+                           ; let call = mkHsWrap wrap (mkHsVar (noLocA selector))
+                           ; result <- tcWrapResultMono expr call actual expected
+                           ; return (XExpr (ExpandedThingTc (HSE (ExprCtxt expr) (noLocA result)))) }
+                      _ -> wrong_context (Just ty) }
+             | otherwise -> wrong_context (Just ty)
+           Infer {} -> wrong_context Nothing }
+  where
+    wrong_context = failWith . TcRnRetainedQuantificationError . RetainedTypeOperandContext
 tcExpr (HsQual _ _ _)     _ = failWith (TcRnIllegalTypeExpr ContextArrowSyntax)
 tcExpr (HsForAll _ _ _)   _ = failWith (TcRnIllegalTypeExpr ForallTelescopeSyntax)
 tcExpr (HsFunArr _ _ _ _) _ = failWith (TcRnIllegalTypeExpr FunctionArrowSyntax)
 tcExpr (HsStar _)         _ = failWith (TcRnIllegalTypeExpr StarKindSyntax)
+
+{- Note [Reflecting a checked type operand]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In an expression checked against TypeRep t, ExperimentalDependentTypes
+allows (type t) to supply the runtime witness. Check the written type at
+the expected kind and instantiate the same selector as typeRep. This
+requires Typeable t, including when t is an abstract type variable.
+Identify TypeRep from the selector's result so that aliases work and a
+locally declared type with the same name keeps its ordinary meaning.
+
+The caller can learn the expected witness type from an imported signature.
+See Note [Explicit retained Type witnesses] in GHC.Tc.Gen.HsType.
+A required forall argument takes a separate path in GHC.Tc.Gen.App.
+It remains erased and requires no Typeable dictionary.
+-}
 
 {-
 ************************************************************************

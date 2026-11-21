@@ -7020,6 +7020,16 @@ and [Peyton Jones, Weirich, Eisenberg and Vytiniotis (2016)](https://www.microso
 [Agda universe levels](https://agda.readthedocs.io/en/v2.8.0/language/universe-levels.html)
 and [Agda type codes](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html#forward-declaration).
 
+Proposal #281 establishes the `type` herald in a required argument.
+Proposal #378 discusses carrying an explicit type representation across
+phases. The fork reuses the herald at an expected `TypeRep t` to request
+ordinary `Typeable t` evidence. This contextual rule is a local design
+choice. Agda's universe example uses explicit codes and an interpretation
+function. Haskell's open-world reflection supplies the codes used here.
+[Required type arguments](https://ghc-proposals.readthedocs.io/en/latest/proposals/0281-visible-forall.html),
+[phase distinction in proposal #378](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#phase-distinction)
+and [Agda type codes](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html#forward-declaration).
+
 ### Recursive append at runtime vector arguments
 
 Agda's vector append returns the left head and appends the left tail to

@@ -1,11 +1,10 @@
-{-# LANGUAGE ExperimentalDependentTypes #-}
-{-# LANGUAGE RequiredTypeArguments #-}
+{-# LANGUAGE ExperimentalDependentTypes, RequiredTypeArguments, ScopedTypeVariables #-}
 module NativeRetainedTypeWitnessSynthesis where
 
-import Data.Kind (Type)
+import Type.Reflection (TypeRep, Typeable)
 
-preserve :: foreach (a :: Type) -> a -> a
+preserve :: TypeRep a -> a -> a
 preserve _ x = x
 
-wrong :: Bool
-wrong = preserve (type Bool) True
+missing :: forall a. a -> a
+missing = preserve (type a)

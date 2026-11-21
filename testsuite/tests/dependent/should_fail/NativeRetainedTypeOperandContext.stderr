@@ -1,0 +1,11 @@
+NativeRetainedTypeOperandContext.hs:7:10: error: [GHC-83605]
+    • A runtime type operand requires an expected type of the form ‘Type.Reflection.TypeRep t’.
+      The expected type here is ‘TypeRep Bool’.
+    • In the expression: type Bool
+      In an equation for ‘wrong’: wrong = (type Bool)
+
+NativeRetainedTypeOperandContext.hs:9:12: error: [GHC-83605]
+    • A runtime type operand requires an expected type of the form ‘Type.Reflection.TypeRep t’.
+      Give the expression a type signature or pass it to a function that expects a type representation.
+    • In the expression: type Bool
+      In an equation for ‘unknown’: unknown = (type Bool)
