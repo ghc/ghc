@@ -74,7 +74,7 @@ module GHC.Hs.Decls (
   ConDecl(..), LConDecl,
   HsConDeclH98Details, HsConDeclGADTDetails(..),
   AnnConDeclGADT(..),
-  hsConDeclTheta,
+  hsConDeclTheta, splitGadtTerminalForAll,
   getConNames, getRecConArgs_maybe,
   -- ** Document comments
   DocDecl(..), LDocDecl, docDeclDoc,
@@ -995,6 +995,24 @@ pprConDeclTelescope teles body = foldr step (body <> closes) teles
       | HsForAllInvis{hsf_invis_bndrs = [], hsf_matchability = Nothing} <- tele
       = forAllLit <> dot <+> rest
       | otherwise = pprHsForAllTelescope tele <+> rest
+
+-- | Recognize a required group between a nonempty prefix of fields and the
+-- result. Keep the group in the parsed result to preserve its source order.
+splitGadtTerminalForAll :: HsConDeclGADTDetails (GhcPass pass) -> LHsType (GhcPass pass)
+                        -> Maybe (LHsGadtTelescope (GhcPass pass), Int, LHsType (GhcPass pass))
+splitGadtTerminalForAll (PrefixConGADT _ (_ : _)) ty
+  | L loc HsForAllTy { hst_tele = tele@HsForAllVis { hsf_vis_bndrs = binders }
+                    , hst_body = result } <- ignoreParens ty
+  , not (null binders)
+  , plain_result (unLoc (ignoreParens result))
+  = Just (L loc (HsGadtForAll noExtField tele), length binders, result)
+  where
+    plain_result HsForAllTy{} = False
+    plain_result HsForEachTy{} = False
+    plain_result HsFunTy{} = False
+    plain_result HsQualTy{} = False
+    plain_result _ = True
+splitGadtTerminalForAll _ _ = Nothing
 
 {- Note [Constructor telescope contexts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

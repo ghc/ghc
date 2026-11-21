@@ -342,7 +342,7 @@ evidenceSuffix requirements
     || needs IndexedConstructorExistentialCaseEvidence || needs GeneralIndexedConstructorOperandEvidence
     || needs RetainedUserUnfoldingEvidence || needs LinearUnpackEvidence
     || needs RetainedCharOperandEvidence || needs MatchableProjectionEvidence
-    || needs RetainedNaturalOperandEvidence = feature_set
+    || needs RetainedNaturalOperandEvidence || needs TerminalGadtForAllEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -372,6 +372,7 @@ legacyEvidenceSuffix LinearUnpackEvidence = featureSetPrefix ++ "linear-unpack"
 legacyEvidenceSuffix RetainedCharOperandEvidence = featureSetPrefix ++ "retained-char-operand"
 legacyEvidenceSuffix MatchableProjectionEvidence = featureSetPrefix ++ "matchable-projection"
 legacyEvidenceSuffix RetainedNaturalOperandEvidence = featureSetPrefix ++ "retained-natural-operand"
+legacyEvidenceSuffix TerminalGadtForAllEvidence = featureSetPrefix ++ "terminal-gadt-forall"
 legacyEvidenceSuffix GeneralIndexedConstructorOperandEvidence = featureSetPrefix ++ "general-indexed-constructor-operand"
 legacyEvidenceSuffix DepFunCoEvidence           = "-retained-depfunco-v1"
 legacyEvidenceSuffix ConstructorCaseEvidence   = "-retained-constructor-case-v1"
@@ -409,7 +410,8 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("linear-unpack", LinearUnpackEvidence)
                       , ("retained-char-operand", RetainedCharOperandEvidence)
                       , ("matchable-projection", MatchableProjectionEvidence)
-                      , ("retained-natural-operand", RetainedNaturalOperandEvidence) ]
+                      , ("retained-natural-operand", RetainedNaturalOperandEvidence)
+                      , ("terminal-gadt-forall", TerminalGadtForAllEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion

@@ -33,6 +33,7 @@ import GHC.Driver.DynFlags
 import GHC.Driver.Config.HsToCore
 
 import GHC.Hs
+import qualified GHC.Hs.Decls as HsDecls
 import GHC.Hs.Type (HsTypeGhcRnExt(HsTypeCaseAliasRn))
 
 import GHC.Tc.Types.BasicTypes (TcTyThing(ATcCaseLet))
@@ -2795,7 +2796,11 @@ kcConDecl _ new_or_data _tc_res_kind
     kcRuntimeGadtConBndrs outer_bndrs inner_bndrs $
     do { traceTc "kcConDecl:GADT {" (ppr names $$ ppr res_ty)
        ; con_res_kind <- newOpenTypeKind
-       ; _ <- tcCheckLHsTypeInContext res_ty (TheKind con_res_kind)
+       ; case HsDecls.splitGadtTerminalForAll args res_ty of
+           Nothing -> discardResult $ tcCheckLHsTypeInContext res_ty (TheKind con_res_kind)
+           Just (tele, _, result) ->
+             kcRuntimeConTelescope [tele] $
+             discardResult $ tcCheckLHsTypeInContext result (TheKind con_res_kind)
 
        ; let arg_exp_kind = getArgExpKind new_or_data con_res_kind
              -- getArgExpKind: for newtypes, check that the argument kind
@@ -5338,7 +5343,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _ tag_map
        ; dflags <- getDynFlags
        ; let build_one (L loc con_name) = setSrcSpanA loc $
                do { rep_nm <- newTyConRepName con_name
-                  ; buildDataConWithRetainedArgs retained fam_envs
+                  ; buildDataConWithTelescope 0 retained fam_envs
                       (SrcBangOpts (initBangOpts dflags)) con_name False rep_nm
                       bangs
                       [] univ_tvs ex_tvs user_bndrs eq_preds [] arg_tys' res_ty' rep_tycon tag_map }
@@ -5355,11 +5360,18 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
   = addErrCtxt (DataConDefCtxt names) $
     do { traceTc "tcConDecl 1 gadt" (ppr names)
        ; let L _ name :| _ = names
+       ; let (terminal, late_count, hs_result)
+               = case HsDecls.splitGadtTerminalForAll hs_args hs_res_ty of
+                   Nothing -> ([], 0, hs_res_ty)
+                   Just (group, count, result) -> ([group], count, result)
+       ; when (late_count /= 0 && new_or_data == NewType) $
+           setSrcSpanA (getLoc hs_res_ty) $
+           failWithTc (TcRnNestedForallsContexts NFC_GadtConSig)
        ; skol_info <- mkSkolemInfo (DataConSkol name)
        ; (tclvl, wanted, (tvbs, ctxt, (arg_tys, res_ty, field_lbls, stricts)))
            <- pushLevelAndSolveKindArrowsX "tcConDecl:GADT" $
-              tcGadtConTyVarBndrs skol_info outer_bndrs inner_bndrs $
-              do { (res_ty, res_kind) <- tcInferLHsTypeKind hs_res_ty
+              tcGadtConTyVarBndrs skol_info outer_bndrs (inner_bndrs ++ terminal) $
+              do { (res_ty, res_kind) <- tcInferLHsTypeKind hs_result
                          -- See Note [GADT return kinds]
 
                  -- For data instances (only), ensure that the return type,
@@ -5422,7 +5434,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
              ; rep_nm   <- newTyConRepName name
 
              ; let bang_opts = SrcBangOpts (initBangOpts dflags)
-             ; buildDataCon fam_envs bang_opts name is_infix
+             ; buildDataConWithTelescope late_count [] fam_envs bang_opts name is_infix
                             rep_nm stricts field_lbls
                             univ_tvs ex_tvs tvbndrs' eq_preds
                             ctxt' arg_tys' res_ty' rep_tycon tag_map
@@ -6431,6 +6443,18 @@ checkValidDataCon dflags existential_ok tc con
             --    type family Star where Star = Type
             --    newtype T :: Type where MkT :: Int -> (T :: Star)
 
+        ; when (dataConLateTyVarCount con /= 0) $
+            do { let (early, late) = dataConUserTyVarGroups con
+                     prefix_types = map (varType . binderVar) early ++
+                       concatMap (\(Scaled mult ty) -> [mult, ty]) arg_tys
+                     late_vars = mkVarSet (binderVars late)
+               ; checkTc (isVanillaDataCon con
+                          && null (dataConStupidTheta con)
+                          && not (isDataFamInstTyCon tc)
+                          && not (isTypeDataCon con)
+                          && isLiftedTypeKind (tyConResKind tc)
+                          && disjointVarSet late_vars (tyCoVarsOfTypes prefix_types))
+                         (TcRnNestedForallsContexts NFC_GadtConSig) }
         ; traceTc "checkValidDataCon 2" $ ppr (dataConWrapperType con)
 
           -- Check that the result type is a *monotype*

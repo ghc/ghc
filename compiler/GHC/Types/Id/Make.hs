@@ -803,8 +803,9 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
                         -- See Note [Compulsory newtype unfolding], which applies to
                         -- every constructor without a binding ('dataConHasNoBinding')
                       | otherwise  = mkDataConUnfolding wrap_rhs
-             wrap_rhs = mkCoreTyLams wrap_tvbs $
+             wrap_rhs = mkCoreTyLams early_tvbs $
                         mkCoreLams wrap_args $
+                        mkCoreTyLams late_tvbs $
                         wrapFamInstBody tycon res_ty_args non_wrap_arg_ty $
                         wrap_body
 
@@ -817,7 +818,7 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
     (univ_tvs, ex_tvs, eq_spec, theta, orig_arg_tys, _orig_res_ty)
                  = dataConFullSig data_con
     stupid_theta = dataConStupidTheta data_con
-    wrap_tvbs    = dataConUserTyVarBinders data_con
+    (early_tvbs, late_tvbs) = dataConUserTyVarGroups data_con
     res_ty_args  = dataConResRepTyArgs data_con
 
     tycon        = dataConTyCon data_con       -- The representation TyCon (not family)

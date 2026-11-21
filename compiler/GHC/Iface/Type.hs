@@ -2987,6 +2987,7 @@ data IfaceEvidence
   | RetainedUserUnfoldingEvidence | LinearUnpackEvidence | RetainedCharOperandEvidence
   | MatchableProjectionEvidence
   | RetainedNaturalOperandEvidence
+  | TerminalGadtForAllEvidence
   deriving (Bounded, Enum, Eq, Ord)
 
 -- | Requirements of an interface payload. See Note [Versioning retained evidence]

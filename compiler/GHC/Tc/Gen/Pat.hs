@@ -19,7 +19,7 @@ module GHC.Tc.Gen.Pat
    , bindRetainedConFields, isRetainedVarPat
    , tcRetainedCon, retainedConPat, retainedConIndex, bindRetainedWildcard
    , addDataConStupidTheta
-   , zipPatsBndrs
+   , zipPatsBndrs, zipConPatsBndrs
    )
 where
 
@@ -1333,7 +1333,7 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
                                    , text "arg_tys:" <+> ppr arg_tys_scaled
                                    , text "arg_pats" <+> ppr arg_pats ])
 
-        ; (univ_ty_args, ex_ty_args, val_arg_pats) <- splitConTyArgs con_like arg_pats
+        ; (univ_ty_args, ex_ty_args, val_arg_pats, late_ty_args) <- splitConTyArgs con_like arg_pats
 
         ; traceTc "tcConPat" (vcat [ text "univ_ty_args:" <+> ppr univ_ty_args
                                    , text "ex_ty_args:"   <+> ppr ex_ty_args
@@ -1345,7 +1345,9 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
                     (val_arg_pats', res) <-
                                         tcConTyArgs tenv penv univ_ty_args $
                                         tcConValArgs con_like arg_tys_scaled
-                                                     penv val_arg_pats (thing_inside Nothing)
+                                                     penv val_arg_pats $
+                                        tcConTyArgs tenv penv late_ty_args $
+                                        thing_inside Nothing
                   ; let res_pat = ConPat { pat_con = header
                                          , pat_args = val_arg_pats'
                                          , pat_con_ext = ConPatTc
@@ -1386,7 +1388,8 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
                 tcConTyArgs tenv penv univ_ty_args                       $
                 checkConstraints (getSkolemInfo skol_info) ex_tvs' given $
                 tcConTyArgs tenv penv ex_ty_args                         $
-                tcConValArgs con_like field_tys penv val_arg_pats $ do
+                tcConValArgs con_like field_tys penv val_arg_pats $
+                tcConTyArgs tenv penv late_ty_args $ do
                   proof <- case indexed_fields of
                     Just (scrut, eq, names) -> do
                       fields <- traverse tcLookupId names
@@ -1733,7 +1736,7 @@ tcPatSynPat (L con_span con_name) pat_syn pat_ty penv arg_pats thing_inside
 
         ; checkManyPattern PatternSynonymReason nlWildPatName pat_ty
 
-        ; (univ_ty_args, ex_ty_args, val_arg_pats) <- splitConTyArgs con_like arg_pats
+        ; (univ_ty_args, ex_ty_args, val_arg_pats, _) <- splitConTyArgs con_like arg_pats
 
         ; wrap <- tcSubTypePat_GenSigCtxt penv (scaledThing pat_ty) ty'
 
@@ -2203,7 +2206,8 @@ check_con_pat_arity con_like no_of_vis_args =
 splitConTyArgs :: ConLike -> HsConPatDetails GhcRn
                -> TcM ( [(HsTyPat GhcRn, TyVar)]    -- Universals
                       , [(HsTyPat GhcRn, TyVar)]    -- Existentials
-                      , HsConPatDetails GhcRn )     -- Value arguments
+                      , HsConPatDetails GhcRn      -- Value arguments
+                      , [(HsTyPat GhcRn, TyVar)] )  -- Final required arguments
 -- See Note [Type applications in patterns] (W4)
 -- This function is monadic only to emit error messages
 splitConTyArgs con_like (PrefixCon _ arg_pats) = do
@@ -2214,20 +2218,21 @@ splitConTyArgs con_like (InfixCon _ arg1 arg2) = do
   massert (isVisArgLPat arg1 && isVisArgLPat arg2)
   check_con_pat_arity con_like 2
   split_con_ty_args Infix con_like [arg1, arg2]
-splitConTyArgs _ p@(RecCon {}) = return ([], [], p) -- No type args in RecCon
+splitConTyArgs _ p@(RecCon {}) = return ([], [], p, []) -- No type args in RecCon
 
 split_con_ty_args :: LexicalFixity        -- How to wrap value arguments
                   -> ConLike              -- Data constructor or pattern synonym
                   -> [LPat GhcRn]         -- Argument patterns
                   -> TcM ( [(HsTyPat GhcRn, TyVar)]   -- Universals
                          , [(HsTyPat GhcRn, TyVar)]   -- Existentials
-                         , HsConPatDetails GhcRn )    -- Value arguments
+                         , HsConPatDetails GhcRn      -- Value arguments
+                         , [(HsTyPat GhcRn, TyVar)] )  -- Final required arguments
 split_con_ty_args fixity con_like arg_pats = do
-  (bndr_ty_arg_prs, value_args) <- zipPatsBndrs arg_pats (conLikeUserTyVarBinders con_like)
+  (bndr_ty_arg_prs, value_args, late_ty_args) <- zipConPatsBndrs con_like arg_pats
   return $ if null ex_tvs  -- Short cut common case
-           then (bndr_ty_arg_prs, [], mk_details fixity value_args)
+           then (bndr_ty_arg_prs, [], mk_details fixity value_args, late_ty_args)
            else let (ex_prs, univ_prs) = partition is_existential bndr_ty_arg_prs
-                in (univ_prs, ex_prs, mk_details fixity value_args)
+                in (univ_prs, ex_prs, mk_details fixity value_args, late_ty_args)
   where
     ex_tvs = conLikeExTyCoVars con_like
     is_existential (_, tv) = tv `elem` ex_tvs
@@ -2239,7 +2244,30 @@ split_con_ty_args fixity con_like arg_pats = do
       -- InfixCon becomes PrefixCon if there are fewer than 2 value arguments.
       -- Test case: T25127_infix
 
--- | Line the arguments of a 'ConPat' up against the 'TyVarBinder's of its
+-- | Match source patterns in constructor argument order. Check the final
+-- required arguments after the value patterns bring their Givens into scope.
+-- See Note [Terminal constructor type arguments] in GHC.Core.DataCon.
+zipConPatsBndrs :: ConLike -> [LPat GhcRn]
+                -> TcM ([(HsTyPat GhcRn, TyVar)], [LPat GhcRn], [(HsTyPat GhcRn, TyVar)])
+zipConPatsBndrs con_like pats
+  | RealDataCon con <- con_like
+  , (early, late@(_ : _)) <- dataConUserTyVarGroups con
+  = do { (early_pairs, remaining) <- zipPatsBndrs pats early
+       ; let (value_pats, late_pats) = span_value_pats (dataConSourceArity con) remaining
+       ; (late_pairs, extra_pats) <- zipPatsBndrs late_pats late
+       ; return (early_pairs, value_pats ++ extra_pats, late_pairs) }
+  | otherwise
+  = do { (pairs, value_pats) <- zipPatsBndrs pats (conLikeUserTyVarBinders con_like)
+       ; return (pairs, value_pats, []) }
+  where
+    -- An invalid invisible pattern does not occupy a value field.
+    span_value_pats 0 ps = ([], ps)
+    span_value_pats n (p : ps) =
+      let (args, rest) = span_value_pats (if isVisArgLPat p then n - 1 else n) ps
+      in (p : args, rest)
+    span_value_pats _ [] = ([], [])
+
+-- | Line leading or terminal type patterns up against the 'TyVarBinder's of its
 -- 'ConLike', returning the type arguments with the binders they instantiate,
 -- and the remaining value arguments.
 --
