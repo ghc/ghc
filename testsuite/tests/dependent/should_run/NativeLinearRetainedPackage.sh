@@ -37,5 +37,5 @@ for opt in 0 2; do
     ./run
     reject "${name}Reject" '6:[0-9]+: error: \[GHC-18872\]' '8:[0-9]+: error: \[GHC-18872\]'
     reject "${name}OverlapReject" '9:[0-9]+: error: \[GHC-47619\]'
-    reject "${name}EvidenceReject" '6:[0-9]+: error: \[GHC-05617\]'
+    reject "${name}EvidenceReject" '6:[0-9]+: error: \[GHC-05617\]' '10:[0-9]+: error: \[GHC-83865\]'
 done

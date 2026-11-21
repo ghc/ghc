@@ -62,3 +62,27 @@ at _ = At
 
 next :: Nat -> Bool -> Int -> a -> OwnedStep a
 next n b i a = Step (S n) b (at n i) a
+
+data Packet a where
+    IndexFirst :: foreach (n :: Nat) -> foreach (b :: Bool) -> Payload n -> Flag b -> a %1 -> Packet a
+    FlagFirst :: foreach (n :: Nat) -> foreach (b :: Bool) -> Flag b -> Payload n -> a %1 -> Packet a
+
+inspect :: Packet a %1 -> ((Int, Bool), a)
+inspect (IndexFirst Z _ () _ a) = ((0, False), a)
+inspect (IndexFirst (S left) True payload () a) = ((readAt left payload, True), a)
+inspect (IndexFirst (S right) False payload flag a) = ((1 + readAt right payload, flag), a)
+inspect (FlagFirst (S right) False flag payload a) = ((1 + readAt right payload, flag), a)
+inspect (FlagFirst Z _ _ () a) = ((0, False), a)
+inspect (FlagFirst (S left) True () payload a) = ((readAt left payload, True), a)
+
+packetTrue :: Nat -> Int -> () -> a -> Packet a
+packetTrue n i flag a = IndexFirst (S n) True (at n i) flag a
+
+packetFalse :: Nat -> Bool -> Int -> a -> Packet a
+packetFalse n flag i a = FlagFirst (S n) False flag (at n i) a
+
+packetZero :: Bool -> a -> Packet a
+packetZero b a = FlagFirst Z b (error "unused flag payload") () a
+
+packetUnknown :: Bool -> a -> Packet a
+packetUnknown b a = IndexFirst (S Z) b (at Z 0) (error "unused flag payload") a

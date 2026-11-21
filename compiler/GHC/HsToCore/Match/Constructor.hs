@@ -53,7 +53,7 @@ import Control.Monad(liftM, join)
 import Data.Data ( Data, cast, gmapT )
 import Data.Foldable ( find )
 import Data.Function ( on )
-import Data.List ( groupBy, sort, sortOn )
+import Data.List ( sort )
 import Data.Maybe ( fromMaybe, isJust, isNothing )
 import Data.Typeable ( Typeable )
 import Data.List.NonEmpty (NonEmpty(..))
@@ -154,25 +154,37 @@ matchConFamily (var :| vars) ty groups@(group1 :| other_groups)
     -- See Note [Sharing linear package fields].
     linear_retained_group rows
       | not (isManyTy (matchIdMult var))
-      , Just patterns@((dc, _, _, _) :| _) <- traverse first_index_pattern rows
-      = let family = dataConTyCon dc
-            tag (con, _, _, _) = dataConTag con
-            by_tag = groupBy ((==) `on` tag) (sortOn tag (NE.toList patterns))
-        in all (\(con, _, _, _) -> dataConTyCon con == family) patterns
-             && [tag first | first : _ <- by_tag] == sort (map dataConTag (tyConDataCons family))
-             && all shareable_indices by_tag
+      , Just patterns <- traverse (index_pattern 0) rows
+      , Just by_tag <- complete_index_groups patterns
+      = all shareable_indices by_tag
       | otherwise = False
 
-    shareable_indices [_] = True
-    shareable_indices (first : later) =
-      let rows = first :| later
-      in all (\(_, _, _, row) -> all bare_index (drop 1 (retained_pats row))) rows
-           && isJust (indexPatternSubsts (fmap (\(_, whole, pat, _) -> ([whole], pat)) rows))
-    shareable_indices [] = False
+    complete_index_groups patterns@((dc, _, _, _) :| _)
+      | let family = dataConTyCon dc
+            tag (con, _, _, _) = dataConTag con
+            by_tag = NE.groupBy1 ((==) `on` tag) (NE.sortWith tag patterns)
+      , all (\(con, _, _, _) -> dataConTyCon con == family) patterns
+      , map (tag . NE.head) (NE.toList by_tag) == sort (map dataConTag (tyConDataCons family))
+      = Just by_tag
+      | otherwise = Nothing
 
-    first_index_pattern row
-      | ConPat {pat_con = L _ (RealDataCon con), pat_args = PrefixCon _ (L _ pat : _)} <- firstPat row
-      , Just _ : _ <- dataConRepArgBinders con
+    shareable_indices (_ :| []) = True
+    shareable_indices rows =
+      isJust (indexPatternSubsts (fmap (\(_, whole, pat, _) -> ([whole], pat)) rows))
+        && (all (all bare_index . drop 1 . retained_pats) source_rows
+              || complete_second_split source_rows)
+      where
+        source_rows = fmap (\(_, _, _, row) -> row) rows
+
+    complete_second_split rows
+      | Just patterns <- traverse (index_pattern 1) rows
+      , Just by_tag <- complete_index_groups patterns
+      = all (null . NE.tail) by_tag
+      | otherwise = False
+
+    index_pattern pos row
+      | ConPat {pat_con = L _ (RealDataCon con), pat_args = PrefixCon _ pats} <- firstPat row
+      , (Just _, L _ pat) : _ <- drop pos (zip (dataConRepArgBinders con) pats)
       , AsPat _ (L _ whole) inner <- pat
       , matcher@ConPat{pat_con = L _ (RealDataCon index_con)} <- strip_index_parens (unLoc inner)
       = Just (index_con, whole, matcher, row)
@@ -529,8 +541,10 @@ or capture a linear field in a failure continuation. Use one outer case if
 the first retained field covers all constructors in its family. The ordinary
 matcher can split this first column before it tests the other fields. A repeated
 constructor in this split must satisfy Note [Sharing retained index constructor fields].
-Its later retained patterns must be variables. Ordinary pattern grouping can
-then match the remaining columns with the usual failure continuations.
+Its later retained patterns can be variables. The next constructor argument
+can instead be a retained field with one row for each constructor in its
+family. The matcher then splits that column before it tests the remaining
+fields. Each alternative binds its own proof for that column.
 Report a source error when a linear package would require separate cases.
 
 Use the first row's runtime field Ids in the outer case. Replace the retained

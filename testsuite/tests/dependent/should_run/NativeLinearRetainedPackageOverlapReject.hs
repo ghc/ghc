@@ -2,10 +2,11 @@
 module NativeLinearRetainedPackageOverlapReject where
 import NativeLinearRetainedPackageProvider (Nat(..))
 
-data Pair a where
-    Pair :: foreach (n :: Nat) -> foreach (b :: Bool) -> a %1 -> Pair a
+data Packet a where
+    Packet :: foreach (n :: Nat) -> foreach (b :: Bool) -> Bool -> a %1 -> Packet a
 
-takePair :: Pair a %1 -> a
-takePair (Pair (S _) True a) = a
-takePair (Pair (S _) False a) = a
-takePair (Pair Z _ a) = a
+consume :: Packet a %1 -> a
+consume (Packet (S _) True True a) = a
+consume (Packet (S _) True False a) = a
+consume (Packet (S _) False _ a) = a
+consume (Packet Z _ _ a) = a
