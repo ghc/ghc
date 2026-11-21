@@ -5,6 +5,7 @@
 - [x] Accept a terminal required group when an earlier context supplies a dictionary or equality.
 - [x] Quote, reify, and splice a declaration with a terminal required group. Preserve its field bangs and multiplicities.
 - [x] Apply a constructor with a specified type argument and its context after a field. Match its field before introducing the dictionary.
+- [x] Match an existential field followed directly by a constructor context.
 - [ ] Support the remaining orders of fields, contexts, and quantifiers in prefix constructors.
 
 The [Showcase](../Showcase.hs) defines a constructor with fields of
@@ -44,3 +45,7 @@ dictionary when it matches the constructor. A point-free binding can
 keep the complete constructor type. The registered
 [client](../../../testsuite/tests/gadt/GadtTrailingContext.hs) supplies
 a custom `Eq` instance and tests when a strict field is forced.
+
+The Showcase also defines `EqSample :: a -> Eq a => EqSample`. A
+consumer compares the hidden value with itself. It observes the usual
+`Bool` and `Double` equality rules, including the result for NaN.

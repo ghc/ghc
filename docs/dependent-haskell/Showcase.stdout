@@ -4,6 +4,7 @@ pass a refined data family constructor from an ordinary client: (Refl,True)
 use earlier field evidence in a later constructor type pattern: 37
 use a stored equality in a later constructor type pattern: 41
 use the dictionary supplied after a constructor field: ((29,True),(31,False))
+compare a hidden field with the dictionary supplied after it: (True,False)
 duplicate the unrestricted field of a quoted constructor: (17,17)
 recover consecutive GADT constraints: (False,"True")
 form an associated family type from its class evidence: (Refl,Refl,True)
@@ -14,6 +15,7 @@ read the stored dictionary with ordinary and dependent matches: ((True,False),(T
 read a scoped method through a Haskell 2010 client: ((True,False),(False,True))
 infer a payload constraint beside a scoped method: (True,"'q'")
 pass a literal length beside a scoped method receiver: (True,5)
+project the length of a method-indexed pair with snd and id: 5
 discard the payload of a locally indexed choice: False
 compare zero under two caller dictionaries: [(LT,LT),(EQ,LT),(GT,LT)]
 render a field with evidence for its runtime flag: (Just "x",Nothing)

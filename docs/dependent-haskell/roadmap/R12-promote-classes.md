@@ -233,9 +233,14 @@ that path. A function-valued selector result can occur in a signature.
 Passing the selected function to a retained-function binder gives
 GHC-83605. That application requires a local function variable.
 
+An ordinary client can pass a result containing a scoped selector to
+`snd` or `id` when its inferred monotype has no type family and the
+dictionary and receiver stay in scope. The [Showcase client](../examples/open-evaluation/OrdinaryScopedChoice.hs)
+reads a length this way. The corresponding test accepts `Proxy 5`
+and rejects `Proxy 6` at the ordinary projection.
+
 The direct case works without solving an equality for an unknown result
-index. Passing the call to a polymorphic accessor requires that equality
-and reports GHC-83605. Access through a pattern synonym and refining GADT
+index. An accessor that requires solving such an equality still reports GHC-83605. Access through a pattern synonym and refining GADT
 patterns in the Haskell 2010 reader also remain unsupported.
 [Scoped application checking](../../../compiler/GHC/Tc/Gen/App.hs)
 and [selector shape and result kind](../../../compiler/GHC/Core.hs).

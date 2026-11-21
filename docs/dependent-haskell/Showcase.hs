@@ -1037,6 +1037,14 @@ data Labelled a where
 compareLabel :: Labelled a -> a -> a -> (Int, Bool)
 compareLabel (Labelled n) x y = (n, x == y)
 
+-- | Hide the field type and supply its dictionary after the field.
+data EqSample where
+    EqSample :: a -> Eq a => EqSample
+
+-- | Compare the hidden value with itself using its stored instance.
+equalToSelf :: EqSample -> Bool
+equalToSelf (EqSample x) = x == x
+
 -- | Hide the field type and retain both dictionaries for its consumer.
 data PrintablePair where
     PrintablePair :: forall a. Eq a => (Show a => a -> a -> PrintablePair)
@@ -1058,6 +1066,8 @@ main = do
     observe "use the dictionary supplied after a constructor field"
         (compareLabel (Labelled 29 @String) "yes" "yes",
          compareLabel (Labelled 31 @Int) 1 3)
+    observe "compare a hidden field with the dictionary supplied after it"
+        (equalToSelf (EqSample True), equalToSelf (EqSample (0 / 0 :: Double)))
     observe "duplicate the unrestricted field of a quoted constructor" (QuotedColumn.readQuoted 17)
     observe "recover consecutive GADT constraints" (describePair (PrintablePair False True))
     observe "form an associated family type from its class evidence" constrainedElements
@@ -1077,6 +1087,8 @@ main = do
         (OrdinaryScopedChoice.readDescription enabled 'q')
     observe "pass a literal length beside a scoped method receiver"
         (OrdinaryScopedChoice.readAtFive enabled)
+    observe "project the length of a method-indexed pair with snd and id"
+        (OrdinaryScopedChoice.projectFive enabled)
     observe "discard the payload of a locally indexed choice" $
         let localFlag = False
         in case Choice.describeChoice localFlag (error "unused payload" :: Char) of

@@ -1,5 +1,5 @@
 {-# LANGUAGE Haskell2010 #-}
-module OrdinaryScopedChoice (readChoice, readDescription, readAtFive) where
+module OrdinaryScopedChoice (readChoice, readDescription, readAtFive, projectFive) where
 
 import Numeric.Natural (Natural)
 import RetainedNaturals (readNatural)
@@ -20,3 +20,7 @@ readDescription x payload = case describeChoice x payload of
 readAtFive :: Choose a => a -> (Bool, Natural)
 readAtFive x = case tagAt x 5 of
     (Tagged chosen, reading) -> (chosen, readNatural reading)
+
+-- | Read the length through ordinary pair projection.
+projectFive :: Choose a => a -> Natural
+projectFive x = readNatural (snd (id (tagAt x 5)))
