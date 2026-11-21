@@ -268,7 +268,7 @@ recursive equations, including when compiling without object code.
 The same source function runs at runtime. Separate ordinary proof
 modules use its interface to reason about installed `map` and `filter`.
 [Size definition](examples/open-evaluation/PreludeMapLengthSize.hs)
-and [ordinary module boundary](BOUNDARY-EVIDENCE.md).
+and [ordinary proof module](examples/open-evaluation/PreludeMapLengthProof.hs).
 
 An ordinary caller can package a list's computed length with the vector
 indexed by that length. A separate proof module uses the checked
@@ -558,7 +558,6 @@ library should make that subset useful with ordinary Haskell libraries. These lo
 | --- | --- | --- |
 | Module interoperability | R03 and R05 | Check an indexed API from a module without dependent syntax. Preserve imported types and infer relationships where supported. Use an explicit adapter when a caller cannot express the contract. |
 | Small dependent-base | R03 and R04 | Start with the existing Nat, Vec, Fin, equality and package operations. The example library provides list conversion, package elimination and the [exact-length adapter](PLAN.md#m95-check-ordinary-list-inputs-at-an-indexed-boundary). Package and module names remain provisional. |
-| Optional checks at the dependent boundary | Local interoperability work, using R15 and R16 | An installed plugin finds a field position for one input. A separate native build checks its membership proof and exports a retained function to an ordinary caller. A position for a different input fails during replay. [Run the example](BOUNDARY-EVIDENCE.md#replay-a-candidate-from-an-installed-plugin). |
 | Conservative totality checking | Local assurance work related to R05 | Specify the property for lazy Haskell. Start with coverage and structural recursion. Keep checked results, trusted assumptions and unknown status distinct across imports. |
 | Observational equality | R05 research | Compare explicit equality and transport with OTT. Keep checker conversion, contextual equivalence and inverse application distinct. No new equality rule is selected. |
 
@@ -573,9 +572,8 @@ Specify the required inputs as well as the result. A checked function on total
 inputs does not certify a result obtained from an unchecked lazy argument.
 
 Use linear-base as the library and adapter reference. Use Idris and Agda as
-references for conservative totality checks and imported assumptions. Their
-current guarantees do not transfer to this fork. See the new boundary and
-observational-equality entries in [REFERENCES.md](REFERENCES.md).
+references for conservative totality checks and imported assumptions.
+[Design references](REFERENCES.md).
 
 The first candidate is an advisory report for covered first-order functions
 with direct structural recursion. Use the zonked source AST and the existing

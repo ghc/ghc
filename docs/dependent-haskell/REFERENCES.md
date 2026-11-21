@@ -4591,10 +4591,9 @@ bottom body. See [Haskell 2010, section 6.2](https://www.haskell.org/onlinerepor
 Schmidt-Schauß, Sabel and Machkasova define contextual equivalence by
 convergence in every context of a specified calculus. Their language
 includes lazy evaluation and `seq`. This makes precise what a client
-would need to replace one function everywhere. The boundary example
-instead gives an equality for each named Boolean observation.
-[Paper and reading record](papers/README.md#contextual-equivalence-in-a-call-by-need-calculus-lmcs-2015),
-[Definition 2.2, page 6](https://lmcs.episciences.org/930/pdf#page=6) and [the fork's two checked observations](BOUNDARY-EVIDENCE.md#what-does-an-observation-establish).
+would need to replace one function everywhere.
+[Paper and reading record](papers/README.md#contextual-equivalence-in-a-call-by-need-calculus-lmcs-2015)
+and [Definition 2.2, page 6](https://lmcs.episciences.org/930/pdf#page=6).
 
 The [paper ledger](papers/README.md) now records four selectively read PDFs:
 Altenkirch, McBride and Swierstra (2007); Pujet and Tabareau (2022);
@@ -5886,13 +5885,12 @@ of closed calls with executable operands and later rewrite rules.
 [GHC's tuple definitions](../../libraries/ghc-internal/src/GHC/Internal/Data/Tuple.hs)
 and [GHC's link dependency planner](../../compiler/GHC/Linker/Deps.hs).
 
-### Running checkers at the dependent boundary
+### Decision procedures and indexed evidence
 
-The [boundary experiment](BOUNDARY-EVIDENCE.md) uses an explicit witness
-for a concrete obligation. Agda's decidability library connects the
-result of a decision with its proof. The fork can use existing GHC
-plugins to return ordinary Core evidence. Thoralf gives the contrasting
-case in which an SMT translation is part of the trusted reasoning.
+Agda's decidability library connects the result of a decision with its
+proof. GHC's typechecker plugin interface accepts Core evidence for
+solved constraints. Thoralf's trusted reasoning includes its translation
+to SMT.
 [Agda's decision and witness operations](https://agda.github.io/agda-stdlib/v2.3/Relation.Nullary.Decidable.Core.html),
 [GHC's plugin evidence contract](../users_guide/extending_ghc.rst#typechecker-plugins)
 and [Thoralf implementation and paper](#thoralf-and-ghc-plugin-interfaces).
@@ -6424,8 +6422,7 @@ evaluation and equality evidence in the presence of nontermination.
 This distinction also applies to the probe. The type checker can verify
 which tagged result a particular executable returned. A new equality
 between arbitrary applications would need its own justification.
-[A Specification for Dependent Types in Haskell](https://doi.org/10.1145/3110275)
-and [the boundary example](BOUNDARY-EVIDENCE.md#what-does-an-observation-establish).
+[A Specification for Dependent Types in Haskell](https://doi.org/10.1145/3110275).
 
 Agda's list `replicate` recurses on the predecessor and passes the
 element unchanged. M162 checks the same relationship between the two
@@ -6688,7 +6685,7 @@ of `checked`. Matching its `Refl` then transports the head from the
 hidden index. The caller's GHC rewrite rules apply to its ordinary
 runtime code. [Agda implicit arguments](https://agda.readthedocs.io/en/stable/language/implicit-arguments.html),
 [rewriting with an equality](https://agda.readthedocs.io/en/stable/language/with-abstraction.html#rewrite)
-and [Haskell client](examples/boundary-evidence/UseMapWitness.hs).
+and [Haskell client](examples/open-evaluation/UseMapWitness.hs).
 
 Agda inserts trailing implicit arguments when the expected type requires
 them. R23 uses an expected kind to distinguish two uses of a Haskell

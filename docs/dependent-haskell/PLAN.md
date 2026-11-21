@@ -8418,8 +8418,7 @@ and [source examples](roadmap/R16-open-term-evaluator.md#composing-a-projection-
 
 The two compiled Showcases and GHCi produced the same 197 lines. Both
 interpreter paths passed the interface-only package test. The ordinary
-consumer rejected a local `fst` rule at its inferred composition. The
-self-hosted compiler also passed the ordinary splice and plugin examples.
+consumer rejected a local `fst` rule at its inferred composition.
 The normal-way dependent directory passed 199 of 235 cases, including
 the Core Lint test. Each of the 36 failures had the same diagnostics as
 at M122. The full GHC testsuite was not run.
@@ -8488,8 +8487,7 @@ at M123. The full GHC testsuite was not run.
 
 Both compiler stages built. The compiled Showcase and GHCi produced
 the same 201 lines. Both interpreter modes passed the recursive datatype,
-visibility and enumeration recompilation checks. The boundary splice
-and solver plugin passed their positive and negative checks. The normal-way
+visibility and enumeration recompilation checks. The normal-way
 dependent directory passed 207 of 243 cases. Each of the 36 remaining
 failures produced the same diagnostics as at M125. Six of seven ordinary
 Template Haskell controls passed. `TH_reifyDecl1` also compiled, but its
@@ -8565,9 +8563,9 @@ M127. The full GHC testsuite was not run.
 Both compiler stages built. Each ran the native Showcase with Core and
 STG lint. GHCi produced the same 205 lines. Both interpreters checked
 the vector, its two independently indexed fields, and the three rejection
-cases. The boundary plugin and splice checks also passed. The normal-way
-dependent directory passed 216 of 252 exercised cases. All 36 failures
-matched the M129 diagnostics individually. The full GHC testsuite was not run.
+cases. The normal-way dependent directory passed 216 of 252 exercised
+cases. All 36 failures matched the M129 diagnostics individually. The
+full GHC testsuite was not run.
 
 ## M132: consume a written existential package
 
@@ -8620,9 +8618,9 @@ agreed on all 209 output lines. The internal and external interpreters
 checked the positive vector and fare proofs, constructor visibility,
 and malformed payload controls with Core and STG lint. Changing only
 the producer object made GHC reject the old second cell in an unchanged
-client. The open constructor, mixed dependency, boundary plugin and
-splice regressions passed. The normal-way dependent directory passed
-221 of 257 exercised cases. All 36 failures matched M131 individually.
+client. The open constructor and mixed dependency regressions passed.
+The normal-way dependent directory passed 221 of 257 exercised cases.
+All 36 failures matched M131 individually.
 The full GHC testsuite was not run.
 
 ## M136: preserve demand in nested ordinary calls
@@ -8771,9 +8769,7 @@ cases and passed 237. All 35 failures matched M142 individually. The
 two new diagnostic tests passed. Native execution in both stages and
 GHCi agreed on all 218 Showcase lines. The ordinary-polykinds comparison
 accepted the same 115 of 124 programs on M142 and the candidate.
-The boundary harness also checked the plugin, splice, external candidate
-and the two Boolean observations. The full GHC testsuite was outside
-this verification run.
+The full GHC testsuite was outside this verification run.
 
 ## M145: infer a computed operand through a checked case
 
@@ -8817,11 +8813,7 @@ The bootstrap and self-hosted compilers built. Both native Showcase
 runs and GHCi agreed on all 223 output lines. The normal-way dependent
 directory passed 237 of 272 cases. All 35 failures matched M144
 individually. M144 and M147 compiled the same 115 of 124 ordinary
-polykinds programs. The
-[boundary harness](examples/boundary-evidence/check.sh) also verified that
-changing only the external field position invalidates the witness and that
-a partial Boolean input distinguishes the two functions. This run covered
-a subset of the GHC testsuite.
+polykinds programs. This run covered a subset of the GHC testsuite.
 
 The next three source cases come from the active cards. An interface-only
 projection can demand an unused field when it reads back an ordinary
@@ -8864,8 +8856,8 @@ Both compiler stages built. Both native executables and GHCi produced
 the same 226 Showcase lines. The normal-way dependent directory passed
 237 of 272 cases. Each of the 35 failures had the same output as at
 M147. M147 and M150 accepted the same 115 of 124 ordinary polykinds
-sources. The boundary evidence harness also passed. The verification
-covered the dependent directory and selected ordinary programs.
+sources. The verification covered the dependent directory and selected
+ordinary programs.
 
 The M147 compiler forced the unused pair field in the nested R15 example.
 M149 left it unevaluated through an interface-only projection. The direct
@@ -8930,8 +8922,7 @@ matching rule still prevents the proof. The strict-field rejection
 still explains which constructor inputs the evaluator supports.
 
 M150 and this compiler accepted the same 115 of 124 ordinary
-polykinds programs. The boundary plugin and splice checks passed,
-including invalidation after a producer or candidate file changed.
+polykinds programs.
 
 ## M155: follow private helpers through a constructor result
 
@@ -8948,7 +8939,7 @@ Both compiler stages built at `14dddd7b14`. Native execution and GHCi
 agreed on all 230 Showcase lines. The dependent directory passed 239
 of 274 exercised cases. The remaining 35 failures matched M154
 individually. Both compilers accepted the same 115 of 124 ordinary
-polykinds programs. The boundary plugin and splice checks passed.
+polykinds programs.
 
 [Three private helpers](roadmap/R16-open-term-evaluator.md#m155-reachable-helper-chains).
 
@@ -8983,8 +8974,7 @@ The bootstrap and self-hosted compilers built. Both native runs and GHCi
 agreed on all 232 Showcase lines. The normal-way dependent directory
 passed 240 of 275 exercised cases. The 35 failures matched M155
 individually. Both versions accepted the same 115 of 124 ordinary
-polykinds sources. The interface upgrades and the boundary plugin and
-splice checks passed.
+polykinds sources. The interface upgrades passed.
 
 Two source examples show what still blocks the next cards. For R16,
 an ordinary recursive `erase (More _ xs) = More True (erase xs)` in a
@@ -9017,8 +9007,7 @@ retains its selector unfolding in bytecode mode. A build that omitted
 the unfolding reported GHC-70566 at the family equation. The normal-way
 dependent directory passed 240 of 275 cases. The remaining 35 failures
 matched M158 individually. Both compilers accepted the same 115 of
-124 ordinary polykinds programs. The boundary checks and the interface
-upgrade from M158 passed.
+124 ordinary polykinds programs. The interface upgrade from M158 passed.
 
 ## M161 experiment: return the readback decision with the executable result
 
@@ -9046,8 +9035,7 @@ Both compiler stages built at `7a77369c05`. Native execution at both
 stages and self-hosted GHCi agreed on 234 Showcase lines. The normal
 dependent directory passed 240 of 275 exercised cases. All 35 failures
 matched M160 individually. Both compilers accepted the same 115 of
-124 ordinary polykinds programs. The interface upgrades and the boundary
-plugin and splice checks passed.
+124 ordinary polykinds programs. The interface upgrades passed.
 
 The next R21 examples omit the explicit `forall` and then omit the
 signature for the same local `keep`. Both report GHC-70566 at the
@@ -9077,9 +9065,9 @@ Both compiler stages built. Native execution at both stages and
 self-hosted GHCi agreed on all 235 Showcase lines. The normal dependent
 test directory passed 242 of 277 exercised cases. The 35 failures
 matched M163 individually. The compilers accepted the same 115 of 124
-ordinary polykinds programs. The interface upgrades and boundary checks
-passed. Replacing only the callback object kept the installed interface
-byte-identical and caused the unchanged proof to fail.
+ordinary polykinds programs. The interface upgrades passed. Replacing
+only the callback object kept the installed interface byte-identical
+and caused the unchanged proof to fail.
 
 ## M166. Pass an unapplied type family
 
@@ -9125,7 +9113,7 @@ self-hosted GHCi agreed on all 240 Showcase lines. The normal dependent director
 Both compilers accepted the same 115 of 124 ordinary polykinds programs.
 The previous compiler's rule-free mapper acquired its equation on
 recompilation. An unchanged unrelated module and the subsequent warm
-build were reused. The boundary plugin and splice checks passed.
+build were reused.
 
 The `Heads` example uses both a mapper and a polymorphic callback
 defined in ordinary modules. The consumer proves the first result from
@@ -9194,13 +9182,13 @@ The bootstrap compiler checked the installed `Prelude.map Prelude.not`
 on both an empty list and a list with an unknown tail. A separate
 optimized client consumed an exported witness and changed the runtime
 mapping with its own rule. The executable printed `(False,True)`.
-[Witness and caller examples](BOUNDARY-EVIDENCE.md).
+[Typed map witness regression](examples/open-evaluation/check-map-witness.sh).
 
 Both compiler stages built. Native execution at both stages and self-hosted
 GHCi agreed on 245 Showcase lines. The dependent directory passed 247 of
 282 normal-way cases. The same 35 cases failed with the same diagnostics
 as at M172. Both compilers accepted the same 115 of 124 ordinary polykinds
-sources. The boundary examples passed against the self-hosted compiler.
+sources.
 
 ## M174. Pass an anonymous type function to Map
 
@@ -9252,7 +9240,7 @@ the compiled interfaces. Check a direct result, a witness in a `Maybe`
 and a witness in a list. Verify that the caller's rule fires on an
 ordinary runtime call. Reject a fresh `Refl`, a discarded equality,
 a reassignment to a rigid index and an attempt to invert an ordinary
-type family. [Boundary example](examples/boundary-evidence/UseMapWitness.hs).
+type family. [Ordinary witness client](examples/open-evaluation/UseMapWitness.hs).
 
 ## R18. Bind a local type in source
 
