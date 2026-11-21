@@ -6106,6 +6106,13 @@ constructor binders to associate labels with totals.
 [Agda vectors](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html)
 and [Haskell table margins](roadmap/R15-closed-term-evaluator.md#read-independent-row-and-column-counts).
 
+The same pair can store a matrix of type `Vec (Vec A cols) rows`. Each
+cons of the outer vector changes its row index. Every inner vector
+keeps the same column index. The Haskell evaluator recovers that
+column index from the labels, including when the matrix has no rows.
+[Agda vectors](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html)
+and [stored cells](roadmap/R15-closed-term-evaluator.md#read-the-stored-cells-of-a-rectangular-table).
+
 Agda's `Data.Vec.Base` supplies length-preserving `map` and `zipWith`.
 The Haskell table maps a sum over rows and folds elementwise addition
 over the columns. Both inputs to each addition have the same column

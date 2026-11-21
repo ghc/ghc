@@ -707,21 +707,34 @@ only the producer object added a second row and preserved the module ABI.
 GHC then rechecked the proof and reported the extra label at `Refl`
 with GHC-83865.
 
-Each indexed field can use one hidden index. A nested field such as
-`Vec rows (Vec cols a)` needs both. GHC reports GHC-70565 at the producer
-call, with the field number, constructor and both index names.
-[Table definition](../examples/closed-evaluation/WitnessedBatch.hs)
-and [Agda comparison](../REFERENCES.md#recursively-read-back-witnessed-constructors).
+### Read the stored cells of a rectangular table
 
-An ordinary function can also compute both totals from a rectangular table.
-Its cells have type `Vec rows (Vec cols Natural)`. The Haskell constructor
-checks every row against the column labels. For the rows `[1,2,3]` and
-`[4,5,6]`, the separate dependent client proves the complete result of
-`totals (sample 4)`. The row totals are `[6,15]` and the column totals are
-`[5,7,9]`. The interpreter runs the ordinary table calculation and returns
-its margins. The nested cell vector is an intermediate value.
-[Ordinary calculation](../examples/closed-evaluation/RectangularTable.hs)
-and [proof and ragged-row diagnostic](../../../testsuite/tests/dependent/should_run/NativeClosedWitnessedBatch.sh).
+```haskell
+data Table a where
+    Table :: Vec rows Char -> Vec cols Char -> Vec rows (Vec cols a) -> Table a
+```
+
+The labels determine both lengths before the evaluator reads the cells.
+The outer vector must contain one row for each row label. Every inner
+vector must contain one cell for each column label. A table with no rows
+still has a column count from its labels. A table with no columns can
+contain a vector of empty rows.
+
+The separate dependent client proves the full value of `sample 4` with
+`Refl`. It has the rows `[1,2,3]` and `[4,5,6]`. The client can also prove
+the result of `totals (sample 4)`, whose row totals are `[6,15]` and column
+totals are `[5,7,9]`. GHC reads the producer's interface and runs its
+object code.
+
+A field that uses several hidden indices must follow fields that establish
+all of them. GHC reports GHC-70565 at the producer call if an index is
+missing. It names the constructor, field number and indices before
+running the producer. An inconsistent row or column count returned by the
+interpreter also gives GHC-70565 at the call. In ordinary term code a
+ragged row gives GHC-83865 at the incorrect constructor field.
+[Ordinary table](../examples/closed-evaluation/RectangularTable.hs),
+[source-hidden regression](../../../testsuite/tests/dependent/should_run/NativeClosedWitnessedBatch.sh)
+and [Agda comparison](../REFERENCES.md#recursively-read-back-witnessed-constructors).
 
 ## M136. Composing ordinary calls before observation
 

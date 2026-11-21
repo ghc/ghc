@@ -1442,6 +1442,15 @@ main = do
             ('IndexedVec.VCons 6 ('IndexedVec.VCons 15 'IndexedVec.VNil))
             ('IndexedVec.VCons 5 ('IndexedVec.VCons 7 ('IndexedVec.VCons 9 'IndexedVec.VNil)))
         , Table.selectedTotals (Table.sample 4) )
+    observe "read back the stored cells at both table dimensions"
+        (Refl :: Table.sample 4 :~: 'Table.Table
+            ('IndexedVec.VCons 'r' ('IndexedVec.VCons 's' 'IndexedVec.VNil))
+            ('IndexedVec.VCons 'x' ('IndexedVec.VCons 'y' ('IndexedVec.VCons 'z' 'IndexedVec.VNil)))
+            ('IndexedVec.VCons
+                ('IndexedVec.VCons 1 ('IndexedVec.VCons 2 ('IndexedVec.VCons 3 'IndexedVec.VNil)))
+                ('IndexedVec.VCons
+                    ('IndexedVec.VCons 4 ('IndexedVec.VCons 5 ('IndexedVec.VCons 6 'IndexedVec.VNil)))
+                    'IndexedVec.VNil)))
     observe "read one field of a private parcel without forcing the other"
         (Refl :: LazyParcel.first (LazyParcel.make 7) :~: 7, LazyParcel.first (LazyParcel.make 7))
     observe "construct a result from two symbolic fields"
