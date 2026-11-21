@@ -10,6 +10,7 @@
 - [x] Place a specified forall between two prefix fields, including existential binders.
 - [x] Repeat the specified forall and field groups.
 - [x] Interleave specified forall groups, contexts, and fields in a lifted prefix constructor.
+- [x] Preserve both a leading and a terminal constructor context.
 - [ ] Support the remaining orders of fields, contexts, and quantifiers in prefix constructors.
 
 The [Showcase](../Showcase.hs) defines a constructor with fields of
@@ -108,3 +109,10 @@ uses a context before a later forall and checks a constructor with
 several context boundaries. Earlier field patterns can supply evidence
 for a later context. A field pattern cannot use evidence from a
 context that follows it.
+
+The T12087 constructor `MkF2 :: Ord a => a -> Eq a => F2 a`
+keeps the two contexts on either side of its field. The same ordered
+telescope lets a view pattern use an early `Ord a` dictionary.
+A terminal equality is available in the branch after the field
+has matched. The source-hidden client and Template Haskell tests
+exercise both context positions.

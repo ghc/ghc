@@ -31,3 +31,12 @@ data F4 a where
 
 data F5 a where
   MkF5 :: Int -> Int -> forall a. a -> Int -> Int -> forall b. b -> F5 a
+
+data F2 a where
+  MkF2 :: Ord a => a -> Eq a => F2 a
+
+data Fenced a where
+  Fenced :: Ord a => (a, a) -> (a ~ Int) => Fenced a
+
+data Late a b where
+  Late :: Show a => !a -> forall b. Eq b => Late a b

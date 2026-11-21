@@ -3,3 +3,19 @@ GadtOrderedTelescopeScope.hs:8:21: error: [GHC-14964]
       An invisible type pattern must be checked against a forall.
     • In the pattern: Mixed n @a x @b
       In an equation for ‘wrong’: wrong (Mixed n @a x @b) = x == x
+
+GadtOrderedTelescopeScope.hs:14:19: error: [GHC-25897]
+    • Couldn't match type ‘a’ with ‘Int’
+      Expected: (a, a)
+        Actual: (Int, Int)
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          badField :: forall a. Fenced a -> Int
+        at GadtOrderedTelescopeScope.hs:13:1-27
+    • When checking that the pattern signature: (Int, Int)
+        fits the type of its context: (a, a)
+      In the pattern: x :: (Int, Int)
+      In the pattern: Fenced (x :: (Int, Int))
+    • Relevant bindings include
+        badField :: Fenced a -> Int
+          (bound at GadtOrderedTelescopeScope.hs:14:1)

@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, TypeAbstractions #-}
+{-# LANGUAGE GADTs, ScopedTypeVariables, TypeAbstractions #-}
 module GadtOrderedTelescopeScope where
 
 data Mixed a where
@@ -6,3 +6,9 @@ data Mixed a where
 
 wrong :: Mixed a -> Bool
 wrong (Mixed n @a x @b) = x == x
+
+data Fenced a where
+  Fenced :: Ord a => (a, a) -> (a ~ Int) => Fenced a
+
+badField :: Fenced a -> Int
+badField (Fenced (x :: (Int, Int))) = fst x

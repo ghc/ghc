@@ -1,5 +1,5 @@
 {-# LANGUAGE GADTs, Haskell2010, ImpredicativeTypes, NoExperimentalDependentTypes #-}
-{-# LANGUAGE ExplicitNamespaces, RequiredTypeArguments, ScopedTypeVariables, TypeAbstractions, TypeApplications #-}
+{-# LANGUAGE ExplicitNamespaces, RequiredTypeArguments, ScopedTypeVariables, TypeAbstractions, TypeApplications, ViewPatterns #-}
 module Main where
 
 import Control.Exception
@@ -31,6 +31,22 @@ readF4 (MkF4 x y) = (x == x, y == y)
 readF5 :: F5 a -> (Int, Int, a, Int, Int)
 readF5 (MkF5 i j @a x k l @b _) = (i, j, x, k, l)
 
+readF2 :: F2 a -> (Ordering, Bool)
+readF2 (MkF2 x) = (compare x x, x == x)
+
+keepF2 :: F2 a -> Bool
+keepF2 (MkF2 _) = True
+
+less :: Ord a => (a, a) -> Bool
+less (x, y) = x < y
+
+readFence :: Fenced a -> Int
+readFence (Fenced (less -> True)) = 1
+readFence (Fenced (x, _)) = x
+
+readLate :: Late a b -> String
+readLate (Late x @b) = show x
+
 throws :: a -> IO Bool
 throws x = either (const True) (const False) <$> try @SomeException (evaluate x)
 
@@ -51,3 +67,10 @@ main = do
   sat <- throws (Mixed bad @Bool True)
   lazy <- throws (Mixed 5 @Bool (error "lazy suffix"))
   print (partial, typed, sat, lazy)
+  print (readF2 (MkF2 @Bool True), readFence (Fenced (2, 3)),
+         readFence (Fenced (41, 5)), readLate (Late @Int 59 @Bool))
+  let bottom = error "strict field" :: Int
+  partialLate <- throws (seq @(forall b. Eq b => Late Int b) (Late @Int bottom) True)
+  saturatedLate <- throws (Late @Int bottom @Bool)
+  lazyF2 <- throws (keepF2 (MkF2 @Bool (error "unused lazy field")))
+  print (partialLate, saturatedLate, lazyF2)

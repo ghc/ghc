@@ -30,6 +30,35 @@ equalRebuilt (Rebuilt _ @a x) = x == x
 equalQuoted :: Quoted a -> Bool
 equalQuoted (Quoted _ @a x) = x == x
 
+$(do
+    let local = TH.mkName "RebuiltF2"
+    info <- TH.reify ''F2
+    case info of
+      TH.TyConI (TH.DataD [] _ vars kind
+        [TH.ForallMatchC ma (TH.ForallC tvs [ord@(TH.AppT (TH.ConT cls1) (TH.VarT early))]
+          (TH.RetainedGadtC [_]
+            [field@(TH.GadtValueArg _ _ (TH.VarT fieldName))]
+            (TH.ForallT [] [eq@(TH.AppT (TH.ConT cls2) (TH.VarT late))]
+              (TH.AppT (TH.ConT parent) (TH.VarT result)))))] [])
+        | cls1 == ''Ord, cls2 == ''Eq, parent == ''F2,
+          all (== early) [fieldName,late,result] ->
+            pure [TH.DataD [] local vars kind
+                [TH.ForallMatchC ma (TH.ForallC tvs [ord]
+                    (TH.RetainedGadtC [local] [field] (TH.ForallT [] [eq]
+                       (TH.AppT (TH.ConT local) (TH.VarT result)))))] []]
+      _ -> fail (show info))
+
+$([d| data QuotedF2 a where
+        QuotedF2 :: Ord a => a -> Eq a => QuotedF2 a
+   |])
+
+alias :: $(TH.reifyType 'MkF2)
+alias = MkF2
+
 main :: IO ()
-main = print (equalRebuilt (Rebuilt 1 @Bool True),
+main = do
+  print (equalRebuilt (Rebuilt 1 @Bool True),
               equalQuoted (Quoted 2 @Double (0/0)))
+  print (case alias @Int 7 of MkF2 x -> x == x,
+         case RebuiltF2 @Bool False of RebuiltF2 x -> compare x x,
+         case QuotedF2 @Char 't' of QuotedF2 x -> x /= x)
