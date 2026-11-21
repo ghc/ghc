@@ -537,3 +537,15 @@ the field whose type depends on it. For example, its type can be
 `b` after the join consumes its arguments cannot leave this scope.
 The simplifier preserves the index when changing the join's result type.
 [Source-hidden regression](../../../testsuite/tests/dependent/should_run/NativeRetainedJoin.hs).
+
+### Lower an equality argument after naming two constructors
+
+A worker for `zipWithExact` can take a primitive equality between two
+list lengths. CorePrep binds a name for each non-atomic list argument.
+The call then requires equality of the lengths of those two names.
+CorePrep lifts the alias proofs through the predicate and casts the
+coercion to that type. The same transport already applies to ordinary
+value arguments. A separately compiled ordinary client checks this path
+at `-O2` with Core and STG Lint.
+[Source example](R03-dependent-products.md#zip-two-lists-at-a-common-length)
+and [CorePrep](../../../compiler/GHC/CoreToStg/Prep.hs).
