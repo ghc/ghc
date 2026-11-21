@@ -7194,3 +7194,15 @@ list constructors supply the ordinary element types. GHC checks the
 original fields and the equality of the two lengths at the call.
 [Agda 2.8.0, implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html)
 and [Agda standard library 2.3, vector operations](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html).
+
+
+### Matchability evidence in a substituted projection
+
+Proposal #242 permits decomposition of `f a ~ g b` when the kinds of
+both heads say they are matchable. Kiss, Field, Eisenbach and Peyton Jones give the
+projection rules and prove substitution preserves coercion derivations.
+The fork uses the existing checked built-in rule mechanism to keep a
+cast on a head after substituting for a quantified variable. An
+unrelated or unknown matchability supplies no cancellation proof.
+[Proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html)
+and [Higher-Order Type-Level Programming in Haskell, sections 4 and 5](https://simon.peytonjones.org/assets/pdfs/higher-order-type.pdf).

@@ -274,6 +274,10 @@ test('NativeUnsaturatedFamily',
       extra_files(['NativeUnsaturatedProvider.hs', 'NativeUnsaturatedClient.hs',
                    'NativeUnsaturatedInverse.hs', 'NativeUnsaturatedEta.hs'])],
      run_command, ['bash NativeUnsaturatedFamily.sh "{compiler}" "{libdir}"'])
+test('NativeMatchableProjection',
+     [only_ways(['normal']),
+      extra_files(['NativeMatchableProjection.sh', 'NativeMatchableProjectionLib.hs'])],
+     run_command, ['bash NativeMatchableProjection.sh "{compiler}" "{libdir}"'])
 test('NativeLaterMatchability',
      [only_ways(['normal']),
       extra_files([open_eval_dir + f for f in ['AnchorReceiver.hs', 'LaterMatchability.hs',
