@@ -59,15 +59,24 @@ cp ../provider/{Vector,Filter,LetFilter,BarProvider,RetainedDot,Builder,Function
 cp "$src/"{Main,AuditMain,Opening,Identity,RetainedClient,LinearDot,LambdaMain,CallHeadMain,WitnessMain,CaseMain,NestedMain,StrictMatch,ForwardMain}.hs .
 "$ghc" "${flags[@]}" -c Main.hs Identity.hs LinearDot.hs
 "$ghc" "${flags[@]}" -XImpredicativeTypes -XNoDeepSubsumption -ddump-ds -c Opening.hs >ranked-input.log
-grep -A2 '^Opening.viaFixedInput$' ranked-input.log |
-    grep -Eq 'pack (WitnessSchema.PolyId|\(forall a\. .*a -> a\))'
+for proof in viaFixedInput viaForwardedInput; do
+    grep -A4 "^Opening\.$proof\$" ranked-input.log |
+        grep -Eq 'pack (WitnessSchema.PolyId|\(forall a\. .*a -> a\))'
+done
 if "$ghc" "${flags[@]}" -XImpredicativeTypes -XNoDeepSubsumption -DCHECK_INPUT_ESCAPE \
     -c Opening.hs >ranked-escape.log 2>&1; then
     echo "The callback's local type escaped into the package witness." >&2
     exit 1
 fi
-line=$(grep -n '^inputEscape =' Opening.hs | cut -d: -f1)
+line=$(grep -n '^inputEscape = body$' Opening.hs | cut -d: -f1)
 grep -Fq "Opening.hs:$line:15: error: [GHC-83865]" ranked-escape.log
+if "$ghc" "${flags[@]}" -XImpredicativeTypes -XNoDeepSubsumption -DCHECK_FORWARD_ESCAPE \
+    -c Opening.hs >ranked-forward-escape.log 2>&1; then
+    echo "The forwarding lambda let the callback's local type escape." >&2
+    exit 1
+fi
+line=$(grep -n '^inputEscape = \\receive' Opening.hs | cut -d: -f1)
+grep -Fq "Opening.hs:$line:32: error: [GHC-91028]" ranked-forward-escape.log
 "$ghc" "${flags[@]}" -c AuditMain.hs -main-is AuditMain
 "$ghc" "${flags[@]}" Main.o ../provider/{Vector,Filter}.o -o run
 "$ghc" "${flags[@]}" AuditMain.o Identity.o Opening.o ../provider/{Vector,Filter,LetFilter,WitnessSchema}.o -o audit -main-is AuditMain

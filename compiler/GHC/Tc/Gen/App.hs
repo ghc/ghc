@@ -12,7 +12,7 @@
 module GHC.Tc.Gen.App
        ( tcApp, tcRuleAppPrefix, RuleAppPrefix(..)
        , tcExprPrag
-       , matchPolytypeExistsWitness, tcPreviewQuickLookResult
+       , matchPolytypeExistsWitness, matchExactPolytypeWitness, tcPreviewQuickLookResult
        , tcImplicitOperand, tcLexicalPackageOperand
        , tcRetainedInferableArg, tcRetainedArg, tcOptionalLetOperand ) where
 

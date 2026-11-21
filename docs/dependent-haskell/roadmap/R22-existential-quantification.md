@@ -759,6 +759,12 @@ erased existential witness.
 [Quick Look, §5.2](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf#page=12)
 and [interface-only regression](../../../testsuite/tests/dependent/should_run/implicit-existential-source/Opening.hs).
 
+An ordinary module can also write `\receive -> produce receive` at this
+package type. The closed declared arrow of `produce` fixes the witness.
+The checker matches the complete arrow before it checks the lambda.
+A local binding of `produce` can supply the same declaration. The
+inference rule covers one unguarded forwarding parameter.
+
 An ordinary client with `ImpredicativeTypes` can name a witness in each
 branch. In an expected `exists t. Callback t`, `Callback @PolyId` and
 `Callback @PolyMaybe` fix the types of their callback arguments.

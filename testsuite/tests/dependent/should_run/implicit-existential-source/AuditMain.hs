@@ -23,4 +23,4 @@ main = do
            observeUnused (error "identity forced the package"))
     print (take 1 (toList (letFilter odd (Cons (7 :: Int) (error "let forced the tail")))))
     print (unbundle (p, q), take 1 (fst (unbundle (lazy, error "unused second package"))))
-    print (W.observeRankedInput viaFixedInput)
+    print (W.observeRankedInput viaFixedInput, W.observeRankedInput viaForwardedInput)

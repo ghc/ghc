@@ -412,12 +412,11 @@ tcLambdaExpr x lam_variant matches pat_tys expected
 tcDeclaredLambdaWitness :: TyVar -> Type -> MatchGroup GhcRn (LHsExpr GhcRn)
                         -> TcM (Maybe Type)
 tcDeclaredLambdaWitness binder body matches
-  = do { let results = lambdaResultArms body matches
-       ; declared <- firstJustsM (declaredLambdaResults False results match_witness)
-       ; case declared of
-           Just _ -> return declared
-           Nothing -> firstJustsM (map quick_look results) }
+  = firstJustsM (declaredLambdaResults False results match_witness ++
+                 (tcDeclaredLambdaInput binder body matches : map quick_look results))
   where
+    results = lambdaResultArms body matches
+
     match_witness formal consumed actual =
       do { guard (not (any (`elemVarSet` tyCoVarsOfType actual) consumed))
          ; matchPolytypeExistsWitness binder formal actual }
@@ -426,6 +425,38 @@ tcDeclaredLambdaWitness binder body matches
       do { formal <- liftZonkM (zonkTcType formal)
          ; actual <- tcPreviewQuickLookResult rhs
          ; return (actual >>= match_witness formal []) }
+
+-- | Use the closed declaration of a function that receives the lambda's only
+-- argument. See Note [Implicit existential lambda payloads].
+tcDeclaredLambdaInput :: TyVar -> Type -> MatchGroup GhcRn (LHsExpr GhcRn)
+                      -> TcM (Maybe Type)
+tcDeclaredLambdaInput binder formal matches
+  | Just (input, _) <- splitVisibleFunTy_maybe formal
+  , ForAllTy{} <- coreFullView input
+  , [L _ Match { m_pats = L _ [L _ (VarPat _ (L _ param))], m_grhss = grhss }]
+      <- unLoc (mg_alts matches)
+  , Just rhs <- unguardedRhs grhss
+  , HsApp _ fun arg <- unLoc (stripParensLHsExpr rhs)
+  , HsVar _ arg_name <- unLoc (stripParensLHsExpr arg)
+  , unLocWithUserRdr arg_name == param
+  , HsVar _ fun_name <- unLoc (stripParensLHsExpr fun)
+  , let name = unLocWithUserRdr fun_name
+  , name /= param
+  = do { subsumption <- getDeepSubsumptionFlag
+       ; case subsumption of
+           Deep{} -> return Nothing
+           Shallow -> do
+             { ident <- tcLookupIdMaybe name
+             ; actual <- traverse (liftZonkM . zonkTcType . varType) ident
+             ; formal' <- liftZonkM (zonkTcType formal)
+             ; return $ do
+                 ty <- actual
+                 guard (noFreeVarsOfType ty)
+                 witness <- matchExactPolytypeWitness binder formal' ty
+                 case coreFullView witness of
+                   ForAllTy{} -> Just witness
+                   _          -> Nothing } }
+tcDeclaredLambdaInput _ _ _ = return Nothing
 
 -- | Select closed witnesses for consecutive dot binders from independent result fields.
 -- See Note [Implicit existential lambda payloads].
@@ -597,6 +628,13 @@ for every lookup. Case patterns and their Givens enter scope during normal
 checking, after the witness is selected. Every result checks with the same
 witness. Exact invariant matching chooses a type without filling any
 Quick Look variables. Runtime indices use their existing checks.
+
+An unguarded forwarding lambda (\receive -> produce receive) can use
+the closed declared type of produce. Its forall input can determine a
+polytype witness. Use the same immutable match as for a named payload.
+Check the entire arrow under shallow subsumption. The witness cannot
+refer to a binder local to the input. The probe uses no constraints
+from the lambda body. The usual checker still checks the lambda.
 
 The head can have a leading visible type application prefix. For example,
   \b -> configured @Bool id b
