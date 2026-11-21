@@ -36,7 +36,7 @@ import GHC.Core.TyCo.FVs (tyConsOfTypes)
 import GHC.Core.TyCo.Rep (Coercion, Type(TyConApp, TermVarTy, CastTy))
 import GHC.Core.TyCon
 import GHC.Core.Type
-import GHC.Core.Utils (exprType, stripTicksTopE)
+import GHC.Core.Utils (exprType, stripTicksE, stripTicksTopE)
 import GHC.Data.Graph.Directed (Node(..), SCC(..), stronglyConnCompFromEdgedVerticesUniq)
 import GHC.Data.FastString (fsLit)
 import GHC.Data.Bag (isEmptyBag)
@@ -80,7 +80,7 @@ import GHC.Types.Name.Set (NameSet, emptyNameSet, elemNameSet, extendNameSet, ex
                            intersectNameSet, isEmptyNameSet, minusNameSet, mkNameSet, nameSetElemsStable,
                            unionNameSet, unionNameSets, unitNameSet)
 import GHC.Types.SrcLoc
-import GHC.Types.Tickish (GenTickish(Breakpoint))
+import GHC.Types.Tickish (CoreTickish, GenTickish(Breakpoint))
 import GHC.Types.SourceFile (hscSourceToIsBoot, isHsBootOrSig)
 import GHC.Unit.External (eps_rule_base)
 import GHC.Unit.Home (homeUnitId)
@@ -1939,13 +1939,14 @@ checkIndexedRecursion owner parameters slot core_types carried alts (IndexedRecu
     [Core.Var tail_arg, Core.Var carried_arg] <- pure terms
     guard (self == owner && eqTypes actual expected && tail_arg == tl && carried_arg == carried)
 
--- | Ignore debugger breakpoints when checking the indexed equations.
--- A breakpoint does not evaluate its captured variables. The verifier
--- reads through these ticks and leaves the original executable Core intact.
+-- | Read through debugger breakpoints on an indexed result.
 stripIndexedBreakpoints :: Core.CoreExpr -> Core.CoreExpr
-stripIndexedBreakpoints = stripTicksTopE $ \case
-    Breakpoint{} -> True
-    _ -> False
+stripIndexedBreakpoints = stripTicksTopE isSourceBreakpoint
+
+-- | A debugger breakpoint does not evaluate its captured variables.
+isSourceBreakpoint :: CoreTickish -> Bool
+isSourceBreakpoint Breakpoint{} = True
+isSourceBreakpoint _ = False
 
 -- | Check the index of the recursive result and compute the promoted
 -- constructor arguments, using the same untouched parameters as the input.
@@ -2227,6 +2228,12 @@ It does not apply user rewrite rules.
 The optimizer can replace the empty constructor with the binder of the
 list case. The empty alternative already establishes its constructor.
 
+GHCi places debugger breakpoints on the predicate call, the constructor
+head and the branch results. Read through these ticks in the verifier.
+The checks compare the same cases and results as an object-code build.
+The executable Core keeps its breakpoints. No-code builds still lack
+the final Core check and cannot publish these equations.
+
 The list family tests the spine first. Its cons equation calls a private
 family whose first argument is the predicate result. An unknown result
 cannot select either branch. The recursive application uses the original
@@ -2253,7 +2260,7 @@ directGuardedList prepare owner original = do
            declared_pred `eqType` mkVisFunTyManyU declared_el boolTy &&
            not (hasNativeDependentExprRhs original) &&
            exprType original `eqType` varType owner)
-    let rhs = prepare original
+    let rhs = stripTicksE isSourceBreakpoint (prepare original)
     ConstructorCaseType telescope _ elements domains _ result <- guarded_signature (exprType rhs)
     [element] <- pure elements
     [pred_ty, input] <- pure domains
