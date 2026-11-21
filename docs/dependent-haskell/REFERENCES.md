@@ -6627,6 +6627,14 @@ unrestricted fusion rule outside conversion.
 [Fusion and definedness reading](papers/README.md#short-cut-fusion-and-definedness)
 and [ordinary GHC counterexample](examples/open-evaluation/check-map-fusion.sh).
 
+## Right fold after map
+
+The Agda standard library proves `foldr-map` by induction on the input
+list. The Haskell proof uses the same induction on a finite spine. It
+combines the step and mapper with Prelude's `(.)`.
+[Agda's `Data.List.Properties`](https://agda.github.io/agda-stdlib/v2.4/Data.List.Properties.html)
+and [Haskell proof](examples/open-evaluation/PreludeFoldrProof.hs).
+
 ## Coverage of nested existential patterns
 
 Graf, Peyton Jones and Scott separate evaluation from constructor matching
