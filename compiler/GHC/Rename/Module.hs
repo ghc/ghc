@@ -1117,6 +1117,9 @@ telescope. Use the nearest alias for each written name. A restored
 alias can shadow a capture that another alias needs, so save that
 capture under a fresh name before restoring the aliases.
 An inferred kind parameter must be determined by a checked capture.
+For an infix RHS, a backticked operator can itself be a bound type
+variable. Keep the parsed application so the renamer still resolves
+the operator's fixity in the original scope.
 See Note [Checked RHSs for cases in type lets] in GHC.Tc.TyCl.
 
 Both sides of a function arrow have the arrow's lexical scope.
@@ -1319,6 +1322,7 @@ liftTypeCases group =
       | isTvOcc (rdrNameOcc (unLoc n)) = Just [unLoc n]
       | otherwise = Just []
     lexicalNames (L _ (HsAppTy _ f x)) = (++) <$> lexicalNames f <*> lexicalNames x
+    lexicalNames (L _ (HsOpTy _ left op right)) = concat <$> traverse lexicalNames [left, op, right]
     lexicalNames (L _ (HsParTy _ ty)) = lexicalNames ty
     lexicalNames (L _ (HsExplicitListTy _ _ tys)) = concat <$> traverse lexicalNames tys
     lexicalNames (L _ (HsExplicitTupleTy _ _ tys)) = concat <$> traverse lexicalNames tys
