@@ -16,7 +16,7 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (ExceptT, runExceptT, throwE, withExceptT)
 import Control.Monad.Trans.State.Strict (StateT, evalStateT, get, mapStateT, put)
 import GHC.Builtin.WiredIn.Types
-  (charDataCon, mkPromotedPairTy, pairTyCon, tupleDataCon, unboxedUnitDataCon, unboxedUnitTy)
+  (charDataCon, mkPromotedPairTy, pairTyCon, tupleDataCon, unboxedUnitDataCon, unboxedUnitTy, unmatchableDataConTy)
 import GHC.Core.Coercion (coercionLKind, coercionRKind)
 import GHC.Core.FamInstEnv (emptyFamInstEnvs, reduceTyFamApp_maybe)
 import GHC.Core.Coercion.Axiom (Role(Nominal))
@@ -33,7 +33,9 @@ import GHC.Core.Subst (extendTvSubst, mkEmptySubst, substExpr)
 import GHC.Core.TyCo.Compare (eqType)
 import GHC.Core.TyCon (closedFamilyTyConCoAxiom_maybe, isBoxedDataTyCon)
 import GHC.Core.TyCo.Rep (scaledThing)
-import GHC.Core.Type (Kind, Type, splitFunTy_maybe, isLiftedTypeKind, mkTyConApp, splitTyConApp_maybe, substTyWith, tyCoVarsOfType, typeKind)
+import GHC.Core.Type
+  ( FunTyFlag(FTF_T_T), Kind, Type, isLiftedTypeKind, isManyTy, mkAppTy, mkTyConApp
+  , repGetTyVar_maybe, splitFunTy_maybe, splitTyConApp_maybe, substTyWith, tyCoVarsOfType, typeKind )
 import GHC.Core.Utils (exprType, findAlt)
 import GHC.Types.Basic (Boxity(Boxed), IntWithInf, intGtLimit)
 import GHC.Types.Id (isDataConWorkId_maybe)
@@ -132,6 +134,11 @@ openReadbackM local_families limit obtain local origin visible expected expr =
       case whnf of
         Neutral (Rigid v)
           | Just ty <- origin v, typeKind ty `eqType` kind -> pure (ty, used)
+        Neutral app@Applied{} -> do
+          (ty, used') <- readApplication used app
+          if typeKind ty `eqType` kind
+            then pure (ty, used')
+            else lift (throwE (ReadbackOpaque whnf))
         BoxedPair first@(Suspension _ x) second@(Suspension _ y)
           | Just (con, [ka, kb]) <- splitTyConApp_maybe kind, con == pairTyCon
           , exprType x `eqType` ka, exprType y `eqType` kb -> do
@@ -151,9 +158,45 @@ openReadbackM local_families limit obtain local origin visible expected expr =
                   then pure (result, used')
                   else lift (throwE (ReadbackOpaque whnf))
         _ -> lift (throwE (ReadbackOpaque whnf))
+    -- See Note [Readback of a rigid callback application].
+    readApplication used neutral = case neutral of
+      Rigid v
+        | Just f <- origin v, Just _ <- repGetTyVar_maybe f
+        , varType v `eqType` typeKind f -> pure (f, used)
+      Applied head_neutral field@(Suspension _ operand) -> do
+        (f, used') <- readApplication used head_neutral
+        case splitFunTy_maybe (typeKind f) of
+          Just (FTF_T_T, ma, mult, domain, _)
+            | ma `eqType` unmatchableDataConTy, isManyTy mult
+            , exprType operand `eqType` domain -> do
+                (arg, used'') <- readback used' domain field
+                pure (mkAppTy f arg, used'')
+          _ -> opaque
+      _ -> opaque
+      where
+        opaque = lift (throwE (ReadbackOpaque (Neutral neutral)))
+
     readField (rev_tys, used) (kind, field) = do
       (ty, used') <- readback used kind field
       pure (ty : rev_tys, used')
+
+{- Note [Readback of a rigid callback application]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When a source signature quantifies (f :: a %U -> b), the open evaluator
+uses a fresh term Id to stand for f. The origin map relates that Id to
+the original type variable. If a compiled worker returns Just (f x),
+the application has a rigid head. Recover that variable and check each
+argument at the domain of its arrow. The result is the ordinary type
+application f x. Its head stays unmatchable. This also handles a curried
+callback or an argument that is itself a neutral application.
+
+Reading a constructor field to build a source type uses the same
+reduction budget and constructor visibility checks as the rest of the
+observation. It adds no evaluation to the runtime program. A term binder
+has no type-variable origin. In particular, this path cannot construct
+a TermAppTy for a lazy runtime call. A case blocked on the result of f
+cannot choose a branch.
+-}
 
 -- | Reduce at most one closed family at each function argument or result.
 -- See Note [Local open family conversion].

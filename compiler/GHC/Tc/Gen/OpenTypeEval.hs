@@ -452,7 +452,7 @@ openTypeFailureReason GroundTypeCase =
 openTypeFailureReason (HiddenConstructor name) =
   (Nothing, "A result constructor of " ++ getOccString name ++ " is not in scope through an ordinary import.")
 openTypeFailureReason UnexpectedNeutral =
-  (Nothing, "Reduction did not produce a supplied rigid argument or a finite constructor value built from supported fields.")
+  (Nothing, "Reduction did not produce a supplied rigid variable, an application of a supplied type-level callback, or a finite constructor value with supported fields.")
 
 {- Note [Open source calls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
