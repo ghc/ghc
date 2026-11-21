@@ -178,7 +178,26 @@ for opt in -O0 -O2; do
     "${ghc[@]}" "$opt" -c ScopedFamilyMethodClient.hs
     "${ghc[@]}" ScopedFamilyMethodClient.o ../provider/ScopedFamilyMethodProvider.o -o run
     ./run > actual
-    printf '%s\n' "((GT,True),(LT,'x'))" "((GT,'q'),LT)" '("True","False")' "(GT,'q')" LT | cmp - actual
+    printf '%s\n' "((GT,True),(LT,'x'))" "((GT,'q'),LT)" '("True","False")' "(GT,'q')" LT '((GT,5),(LT,5))' | cmp - actual
+
+    cat > Length.hs <<'HS'
+{-# LANGUAGE DataKinds #-}
+module Length where
+import Data.Proxy
+import ScopedFamilyMethodProvider
+wrong :: Collects c => c -> Proxy 6
+wrong x = snd (measuredEntry x 5)
+HS
+    if "${ghc[@]}" "$opt" -c Length.hs > length.log 2>&1; then exit 1; fi
+    grep -Fq '[GHC-83865]' length.log
+    cat > Receiver.hs <<'HS'
+module Receiver where
+import ScopedFamilyMethodProvider
+direct = measuredEntry True 5
+HS
+    if "${ghc[@]}" "$opt" -fno-code -fdiagnostics-show-caret -c Receiver.hs > receiver.log 2>&1; then exit 1; fi
+    grep -Fq 'Receiver.hs:3:24: error: [GHC-83605]' receiver.log
+    grep -Fq 'Bind the argument to a local variable' receiver.log
 
     cat > Ambiguous.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, ScopedTypeVariables #-}

@@ -297,3 +297,14 @@ a retained index. Reifying the elaborated signature reports GHC-75721.
 The current Template Haskell type representation has no binder for the
 selected dictionary.
 [Reification check](../../../testsuite/tests/dependent/should_run/NativeScopedDictionaryCoreReload.sh).
+
+
+### A separate length argument
+
+In `tagAt x 5`, the method `choose x` uses the identity of `x`.
+The length has its own index. An ordinary client can supply it as a
+literal. A client that expects length `6` gets a type mismatch. An
+application that supplies a literal as the method receiver gets a source
+diagnostic at that argument.
+[Provider](../examples/open-evaluation/ScopedClassMethod.hs)
+and [ordinary client](../examples/open-evaluation/OrdinaryScopedChoice.hs).

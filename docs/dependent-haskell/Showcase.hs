@@ -1058,6 +1058,8 @@ main = do
         (ScopedClassMethodClient.ordinaryChoices enabled, ScopedClassMethodClient.ordinaryChoices disabled)
     observe "infer a payload constraint beside a scoped method"
         (OrdinaryScopedChoice.readDescription enabled 'q')
+    observe "pass a literal length beside a scoped method receiver"
+        (OrdinaryScopedChoice.readAtFive enabled)
     observe "discard the payload of a locally indexed choice" $
         let localFlag = False
         in case Choice.describeChoice localFlag (error "unused payload" :: Char) of
