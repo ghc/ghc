@@ -1,5 +1,5 @@
 {-# LANGUAGE GADTs #-}
-module LabelledValue (LabelledValue(..), LabelledPair(..), StoredCheck(..)) where
+module LabelledValue (LabelledValue(..), LabelledPair(..), StoredCheck(..), RankedPair(..)) where
 
 -- | Store a number before choosing the type of the second field.
 data LabelledValue a where
@@ -12,3 +12,7 @@ data LabelledPair a b where
 -- | Supply the equality dictionary after the label and before the payload.
 data StoredCheck a where
     StoredCheck :: !Int -> forall a. Eq a => a -> StoredCheck a
+
+-- | Provide ordering before the field and the equality after it.
+data RankedPair a where
+    RankedPair :: Ord a => (a, a) -> (a ~ Int) => RankedPair a

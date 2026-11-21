@@ -1,8 +1,8 @@
 {-# LANGUAGE GADTs, Haskell2010, NoExperimentalDependentTypes #-}
-{-# LANGUAGE ScopedTypeVariables, TypeAbstractions, TypeApplications #-}
-module LabelledValueClient (labelledValues, labelledPair, storedChecks) where
+{-# LANGUAGE ScopedTypeVariables, TypeAbstractions, TypeApplications, ViewPatterns #-}
+module LabelledValueClient (labelledValues, labelledPair, storedChecks, rankedPairs) where
 
-import LabelledValue (LabelledValue(..), LabelledPair(..), StoredCheck(..))
+import LabelledValue (LabelledValue(..), LabelledPair(..), StoredCheck(..), RankedPair(..))
 
 readLabelledValue :: LabelledValue a -> (Int, a)
 readLabelledValue (LabelledValue n @field (value :: field)) = (n, value)
@@ -28,3 +28,15 @@ storedChecks :: ((Int, Bool), (Int, Bool))
 storedChecks =
     (comparePayload (StoredCheck 67 @Bool True) True,
      comparePayload (StoredCheck 71 @Char 'a') 'b')
+
+ascending :: Ord a => (a, a) -> Bool
+ascending (x, y) = x < y
+
+readRankedPair :: RankedPair a -> Int
+readRankedPair (RankedPair (ascending -> True)) = 1
+readRankedPair (RankedPair (x, _)) = x
+
+-- | Use the stored ordering in the field pattern and the equality in the branch.
+rankedPairs :: (Int, Int)
+rankedPairs = (readRankedPair (RankedPair (2, 3)),
+               readRankedPair (RankedPair (73, 5)))
