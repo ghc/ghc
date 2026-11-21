@@ -79,7 +79,7 @@ import qualified Data.List.NonEmpty as NE
 import GHC.Data.List.SetOps ( getNth )
 
 import Data.List( partition )
-import Data.Maybe (maybeToList)
+import Data.Maybe (fromMaybe, maybeToList)
 import Control.Monad.Trans.Writer.CPS
 import Control.Monad.Trans.Class
 
@@ -1323,7 +1323,6 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
               con_like       = RealDataCon data_con
               trailing_context = dataConHasTrailingContext data_con
               interior_context = dataConInteriorContext data_con
-              interior_forall = dataConInteriorForAll data_con
 
         ; traceTc "tcConPat" (vcat [ text "con_name:" <+> ppr con_name
                                    , text "univ_tvs:" <+> pprTyVars univ_tvs
@@ -1344,14 +1343,23 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
 
         ; let check_fields :: [Scaled TcSigmaType] -> TcM r -> TcM (HsConPatDetails GhcTc, r)
               check_fields tys action
-                | Just (n, _) <- interior_forall
-                = do { (pats, ((), result)) <-
-                         tcConInteriorArgs con_like n tys penv val_arg_pats
-                           (fmap ((),) . tcConTyArgs tenv penv late_ty_args) action
-                     ; return (pats, result) }
+                | Just _ <- dataConInteriorForAll data_con
+                , PrefixCon _ ps <- val_arg_pats
+                = do { (checked, result) <- check_groups 1 tys ps late_ty_args
+                     ; return (PrefixCon noExtField checked, result) }
                 | otherwise
                 = tcConValArgs con_like tys penv val_arg_pats $
-                    tcConTyArgs tenv penv late_ty_args action
+                    tcConTyArgs tenv penv (concatMap snd late_ty_args) action
+                where
+                  check_groups start ts ps [] = tcConPrefixArgs con_like penv start ts ps action
+                  check_groups start ts ps ((n, type_pats) : gs) = do
+                    let (before_tys, after_tys) = splitAt n ts
+                        (before_pats, after_pats) = splitAt n ps
+                    (before, (after, result)) <-
+                      tcConPrefixArgs con_like penv start before_tys before_pats $
+                      tcConTyArgs tenv penv type_pats $
+                      check_groups (start + n) after_tys after_pats gs
+                    return (before ++ after, result)
 
         ; if null ex_tvs && null eq_spec && null theta
           then do { -- The common case; no class bindings etc
@@ -1420,7 +1428,7 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
                            checkConstraints skol ex_tvs' [] $
                            tcConTyArgs tenv penv ex_ty_args $
                            tcConValArgs con_like field_tys penv val_arg_pats $
-                           tcConTyArgs tenv penv late_ty_args $
+                           tcConTyArgs tenv penv (concatMap snd late_ty_args) $
                            checkConstraints skol [] given check_body
                        ; return (mkWpLet early_binds, late_binds, pats, result) }
                   Nothing ->
@@ -2222,7 +2230,7 @@ tcConPrefixArgs con_like penv start tys pats thing_inside = do
   assert (length pats == length tys) $
     tcMultiple (tcConArg con_like) penv (zip3 [start..] pats tys) thing_inside
 
--- | Enter the interior telescope group after checking the first field patterns.
+-- | Enter the interior context after checking the first field patterns.
 tcConInteriorArgs :: ConLike -> Int -> [Scaled TcSigmaType] -> PatEnv
                   -> HsConPatDetails GhcRn
                   -> (TcM ([LPat GhcTc], a) -> TcM (b, ([LPat GhcTc], a)))
@@ -2251,7 +2259,7 @@ splitConTyArgs :: ConLike -> HsConPatDetails GhcRn
                -> TcM ( [(HsTyPat GhcRn, TyVar)]    -- Universals
                       , [(HsTyPat GhcRn, TyVar)]    -- Existentials
                       , HsConPatDetails GhcRn      -- Value arguments
-                      , [(HsTyPat GhcRn, TyVar)] )  -- Final required arguments
+                      , [(Int, [(HsTyPat GhcRn, TyVar)])] ) -- Later type groups
 -- See Note [Type applications in patterns] (W4)
 -- This function is monadic only to emit error messages
 splitConTyArgs con_like (PrefixCon _ arg_pats) = do
@@ -2270,7 +2278,7 @@ split_con_ty_args :: LexicalFixity        -- How to wrap value arguments
                   -> TcM ( [(HsTyPat GhcRn, TyVar)]   -- Universals
                          , [(HsTyPat GhcRn, TyVar)]   -- Existentials
                          , HsConPatDetails GhcRn      -- Value arguments
-                         , [(HsTyPat GhcRn, TyVar)] )  -- Final required arguments
+                         , [(Int, [(HsTyPat GhcRn, TyVar)])] ) -- Later type groups
 split_con_ty_args fixity con_like arg_pats = do
   (bndr_ty_arg_prs, value_args, late_ty_args) <- zipConPatsBndrs con_like arg_pats
   return $ if null ex_tvs  -- Short cut common case
@@ -2288,23 +2296,30 @@ split_con_ty_args fixity con_like arg_pats = do
       -- InfixCon becomes PrefixCon if there are fewer than 2 value arguments.
       -- Test case: T25127_infix
 
--- | Match source patterns in constructor argument order. Check the final
--- required arguments after the value patterns bring their Givens into scope.
+-- | Match source patterns in constructor argument order. Each later type
+-- group follows its recorded number of fields since the preceding group.
 -- See Note [Terminal constructor type arguments] in GHC.Core.DataCon.
 zipConPatsBndrs :: ConLike -> [LPat GhcRn]
-                -> TcM ([(HsTyPat GhcRn, TyVar)], [LPat GhcRn], [(HsTyPat GhcRn, TyVar)])
+                -> TcM ([(HsTyPat GhcRn, TyVar)], [LPat GhcRn], [(Int, [(HsTyPat GhcRn, TyVar)])])
 zipConPatsBndrs con_like pats
   | RealDataCon con <- con_like
   , (early, late@(_ : _)) <- dataConUserTyVarGroups con
   = do { (early_pairs, remaining) <- zipPatsBndrs pats early
-       ; let prefix = maybe (dataConSourceArity con) fst (dataConInteriorForAll con)
-             (value_pats, late_pats) = span_value_pats prefix remaining
-       ; (late_pairs, extra_pats) <- zipPatsBndrs late_pats late
-       ; return (early_pairs, value_pats ++ extra_pats, late_pairs) }
+       ; let groups = fromMaybe [(dataConSourceArity con, length late)] (dataConInteriorForAll con)
+       ; (value_pats, later_pairs) <- zip_groups remaining late groups
+       ; return (early_pairs, value_pats, later_pairs) }
   | otherwise
   = do { (pairs, value_pats) <- zipPatsBndrs pats (conLikeUserTyVarBinders con_like)
        ; return (pairs, value_pats, []) }
   where
+    zip_groups ps _ [] = return (ps, [])
+    zip_groups ps bndrs ((n, m) : groups) = do
+      let (value_pats, ty_pats) = span_value_pats n ps
+          (this_group, other_binders) = splitAt m bndrs
+      (pairs, remaining) <- zipPatsBndrs ty_pats this_group
+      (values, later) <- zip_groups remaining other_binders groups
+      return (value_pats ++ values, (n, pairs) : later)
+
     -- An invalid invisible pattern does not occupy a value field.
     span_value_pats 0 ps = ([], ps)
     span_value_pats n (p : ps) =

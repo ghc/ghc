@@ -188,9 +188,15 @@ conInteriorContext :: ConSourceOrder -> Maybe Int
 conInteriorContext (OrderedConArgs [ConTypeArgs _, ConValueArgs n, ConContextArgs _, ConValueArgs _]) = Just n
 conInteriorContext _ = Nothing
 
--- | The number of fields before an interior forall and the group's size.
-conInteriorForAll :: ConSourceOrder -> Maybe (Int, Int)
-conInteriorForAll (OrderedConArgs [ConTypeArgs _, ConValueArgs n, ConTypeArgs late, ConValueArgs _]) = Just (n, late)
+-- | For each interior forall, the preceding field count and binder count.
+conInteriorForAll :: ConSourceOrder -> Maybe [(Int, Int)]
+conInteriorForAll (OrderedConArgs (ConTypeArgs _ : ConValueArgs n : ConTypeArgs m : rest))
+  = ((n, m) :) <$> go rest
+  where
+    go [ConValueArgs 1] = Just []
+    go (ConValueArgs fields : ConTypeArgs binders : gs) =
+      ((fields, binders) :) <$> go gs
+    go _ = Nothing
 conInteriorForAll _ = Nothing
 
 -- | Consume the three arrays according to a checked source order.

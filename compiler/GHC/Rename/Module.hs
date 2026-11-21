@@ -4579,7 +4579,7 @@ rnConDecl (ConDeclGADT { con_names   = names
                , not has_leading_context || null (gadtTelescopeContexts groups)
                = result
                | not has_leading_context
-               , Just (_, _, result) <- HsDecls.splitGadtInterior new_args new_res_ty
+               , Just (_, result) <- HsDecls.splitGadtInterior new_args new_res_ty
                = result
                | otherwise = new_res_ty
        ; addNoNestedForallsContextsErr ctxt NFC_GadtConSig con_result

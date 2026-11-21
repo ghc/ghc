@@ -1029,25 +1029,35 @@ splitGadtTerminal (PrefixConGADT _ (_ : _)) ty
       _ -> True
 splitGadtTerminal _ _ = Nothing
 
--- | Recognize one field, one telescope group and one further field.
+-- | Recognize one interior context or successive specified forall groups.
+-- Each group follows a field and precedes an ordinary field.
 splitGadtInterior :: HsConDeclGADTDetails (GhcPass pass) -> LHsType (GhcPass pass)
-                         -> Maybe (LHsGadtTelescope (GhcPass pass),
-                                   HsConDeclField (GhcPass pass), LHsType (GhcPass pass))
+                  -> Maybe ([(LHsGadtTelescope (GhcPass pass), HsConDeclField (GhcPass pass))],
+                            LHsType (GhcPass pass))
 splitGadtInterior (PrefixConGADT _ [_]) ty
-  | Just (group, body) <- middle (ignoreParens ty)
-  , L _ (HsFunTy _ arr arg result) <- ignoreParens body
+  | L _ HsQualTy { hst_ctxt = ctxt, hst_body = body } <- ignoreParens ty
+  , not (null (hsConDeclTheta (Just ctxt)))
+  , Just (field, result) <- field_after body
   , plain_result result
-  = Just (group, CDF noAnn NoSrcUnpack NoSrcStrict arr arg Nothing, result)
+  = Just ([(mkHsGadtContext ctxt, field)], result)
+  | otherwise = go ty
   where
-    middle (L _ HsQualTy { hst_ctxt = ctxt, hst_body = body })
-      | not (null (hsConDeclTheta (Just ctxt)))
-      = Just (mkHsGadtContext ctxt, body)
-    middle (L loc HsForAllTy { hst_tele = tele, hst_body = body })
-      | HsForAllInvis { hsf_invis_bndrs = binders } <- tele
+    go ty
+      | L loc HsForAllTy { hst_tele = tele, hst_body = body } <- ignoreParens ty
+      , HsForAllInvis { hsf_invis_bndrs = binders } <- tele
       , not (null binders)
       , all ((== SpecifiedSpec) . hsTyVarBndrFlag . unLoc) binders
-      = Just (L loc (HsGadtForAll noExtField tele), body)
-    middle _ = Nothing
+      , Just (field, rest) <- field_after body
+      = let group = (L loc (HsGadtForAll noExtField tele), field)
+        in if plain_result rest then Just ([group], rest)
+           else do { (gs, result) <- go rest; return (group : gs, result) }
+      | otherwise = Nothing
+
+    field_after ty = case unLoc (ignoreParens ty) of
+      HsFunTy _ arr arg result ->
+        Just (CDF noAnn NoSrcUnpack NoSrcStrict arr arg Nothing, result)
+      _ -> Nothing
+
     plain_result result = case unLoc (ignoreParens result) of
       HsForAllTy{} -> False
       HsForEachTy{} -> False

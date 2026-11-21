@@ -34,6 +34,7 @@ module GHC.Core.DataCon (
         dataConUserTyVars, dataConUserTyVarBinders,
         dataConTerminalOrder, dataConLateTyVarCount, dataConUserTyVarGroups, dataConHasTrailingContext,
         dataConSourceOrder, dataConInteriorContext, dataConContextFieldCount, dataConInteriorForAll,
+        orderedConForAllScope,
         dataConTheta,
         dataConStupidTheta,
         dataConOtherTheta,
@@ -1505,14 +1506,28 @@ dataConContextFieldCount con
   | dataConHasTrailingContext con = Just (dataConSourceArity con)
   | otherwise = dataConInteriorContext con
 
--- | The number of value fields before an interior forall and its binder count.
-dataConInteriorForAll :: DataCon -> Maybe (Int, Int)
+-- | The field and binder counts for the interior forall groups.
+dataConInteriorForAll :: DataCon -> Maybe [(Int, Int)]
 dataConInteriorForAll = conInteriorForAll . dataConSourceOrder
+
+-- | Check each argument against the binders still to come.
+-- See Note [Interior constructor telescopes].
+orderedConForAllScope :: [ConSourceGroup] -> [TyVarBinder] -> [Scaled Type] -> Bool
+orderedConForAllScope groups binders fields =
+  snd (foldConSourceGroups add_binders (const id) check_fields
+         groups binders [] fields (emptyVarSet, True))
+  where
+    add_binders bs (late, valid) =
+      (extendVarSetList late (binderVars bs),
+       valid && disjointVarSet late (tyCoVarsOfTypes (map (varType . binderVar) bs)))
+    check_fields fs (late, valid) =
+      (late, valid && disjointVarSet late
+        (tyCoVarsOfTypes (concatMap (\(Scaled m ty) -> [m, ty]) fs)))
 
 -- | Number of type arguments after the initial value fields.
 dataConLateTyVarCount :: DataCon -> Int
 dataConLateTyVarCount con = case dataConInteriorForAll con of
-  Just (_, n) -> n
+  Just groups -> sum (map snd groups)
   Nothing -> max 0 (dataConTerminalOrder con)
 
 -- | Does the context follow the fields and any late type binders?
@@ -1818,11 +1833,12 @@ See Note [Algebraic runtime index domains] in GHC.Core.Type.
 
 {- Note [Interior constructor telescopes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A prefix GADT constructor can have a context or specified forall
-between two fields.
+A prefix GADT constructor can have a context or one or more specified
+forall groups between fields.
 
   Two  :: forall a. Tag a -> (a ~ Int) => Tag a -> Two a
   Pack :: Int -> forall a. a -> Pack
+  Parcel :: Int -> forall a. a -> forall a. a -> Parcel
 
 Store the source order in groups of type binders, fields and predicates.
 Each group consumes its entries from the existing DataCon arrays. The
@@ -1837,8 +1853,10 @@ constructor evidence] in GHC.HsToCore.Match.Constructor.
 The kind or type of an earlier argument must be independent of a later
 type binder. For an interior forall, pattern checking allocates the
 existential skolems in the constructor case. A written type pattern
-introduces its source binders after the first field pattern. Any Givens
-from that field are available when checking the type pattern. See
+introduces its source binders after the preceding field patterns. Their
+Givens are available at that type pattern. The two binders in Parcel
+have different Names. The scope check walks the same groups from right
+to left to find the binders that are unavailable at each argument. See
 GHC.Tc.Gen.Pat.tcDataConPatWithIndex.
 
 Ordinary and terminal forms still use LegacyConOrder. Their interface

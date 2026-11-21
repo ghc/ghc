@@ -97,8 +97,8 @@ import GHC.Utils.Fingerprint
 import GHC.Utils.Binary
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Misc( dropList, equalLength, filterByList, notNull, unzipWith,
-                       zipWithEqual )
+import GHC.Utils.Misc( dropList, equalLength, filterByList, lengthExceeds, lengthIs,
+                       notNull, unzipWith, zipWithEqual )
 
 import GHC.Data.FastString
 import GHC.Data.BooleanFormula (pprBooleanFormula, isTrue)
@@ -109,7 +109,7 @@ import Language.Haskell.Syntax.Text
 
 import Control.Monad
 import Control.DeepSeq
-import Data.Maybe (isJust)
+import Data.Maybe (isJust, mapMaybe)
 import Data.Proxy
 import qualified Data.Set as Set
 
@@ -2831,8 +2831,11 @@ instance Binary IfaceConDecls where
       | any ordered orders = do
           when (any (isJust . conInteriorContext) orders) $
             requireIfaceEvidenceVersion bh InteriorGadtContextEvidence
-          when (any (isJust . conInteriorForAll) orders) $
+          let forall_groups = mapMaybe conInteriorForAll orders
+          when (any (\gs -> gs `lengthIs` 1) forall_groups) $
             requireIfaceEvidenceVersion bh InteriorGadtForAllEvidence
+          when (any (\gs -> gs `lengthExceeds` 1) forall_groups) $
+            requireIfaceEvidenceVersion bh RepeatedInteriorGadtForAllEvidence
           record_legacy
           putByte bh 5
           put_ bh cs

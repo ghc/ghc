@@ -3647,17 +3647,23 @@ reifyDataCon isGadtDataCon tys dc
          else pure []
 
        ; main_con <-
-           if | Just (n, _) <- interior_forall
-              , (prefix, [Scaled mult ty]) <- splitAt n g_arg_tys -> do
+           if | Just ((n, _) : _) <- interior_forall
+              , OrderedConArgs (_ : _ : remaining) <- dataConSourceOrder dc
+              , (prefix, suffix) <- splitAt n g_arg_tys -> do
                   { (args, result) <- reifyRetainedGadtArgs (replicate n Nothing)
                       (take n dcdBangs) prefix g_res_ty
                   ; ma <- reifyType unmatchableDataConTy
-                  ; tvs <- reifyTyVarBndrs [Bndr (binderVar tv) SpecifiedSpec | tv <- late_tvs]
-                  ; domain <- reifyType ty
-                  ; multiplicity <- reifyType mult
-                  -- Use the field arrow syntax accepted by cvtRetainedGadtArgs.
-                  ; let field = TH.AppT (TH.AppT (TH.AppT TH.MulArrowT multiplicity) domain) result
-                  ; pure (TH.RetainedGadtC [name] args (TH.ForallMatchT ma (TH.ForallT tvs [] field))) }
+                  ; let reify_group bs rest = do
+                          tvs <- reifyTyVarBndrs [Bndr (binderVar tv) SpecifiedSpec | tv <- bs]
+                          TH.ForallMatchT ma . TH.ForallT tvs [] <$> rest
+                        -- Use the field arrow syntax accepted by cvtRetainedGadtArgs.
+                        reify_field (Scaled mult ty) rest = do
+                          multiplicity <- reifyType mult
+                          domain <- reifyType ty
+                          TH.AppT (TH.AppT (TH.AppT TH.MulArrowT multiplicity) domain) <$> rest
+                  ; body <- foldConSourceGroups reify_group (const id) (flip (foldr reify_field))
+                      remaining late_tvs [] suffix (pure result)
+                  ; pure (TH.RetainedGadtC [name] args body) }
               | not (null ordered_args) -> do
                   { (args, result) <- reifyRetainedGadtArgs ordered_args dcdBangs g_arg_tys g_res_ty
                   ; result' <- case late_tvs of

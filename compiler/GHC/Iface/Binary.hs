@@ -354,7 +354,8 @@ evidenceSuffix requirements
     || needs ExperimentalScopedDictionaryCoreEvidence || needs RetainedDataFamilyConOperandEvidence
     || needs TerminalGadtForAllEvidence || needs TerminalGadtContextEvidence
     || needs TerminalGadtTrailingContextEvidence || needs TerminalGadtContextOnlyEvidence
-    || needs InteriorGadtContextEvidence || needs InteriorGadtForAllEvidence = feature_set
+    || needs InteriorGadtContextEvidence || needs InteriorGadtForAllEvidence
+    || needs RepeatedInteriorGadtForAllEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -393,6 +394,7 @@ legacyEvidenceSuffix TerminalGadtTrailingContextEvidence = featureSetPrefix ++ "
 legacyEvidenceSuffix TerminalGadtContextOnlyEvidence = featureSetPrefix ++ "terminal-gadt-context-only"
 legacyEvidenceSuffix InteriorGadtContextEvidence = featureSetPrefix ++ "interior-gadt-context"
 legacyEvidenceSuffix InteriorGadtForAllEvidence = featureSetPrefix ++ "interior-gadt-forall"
+legacyEvidenceSuffix RepeatedInteriorGadtForAllEvidence = featureSetPrefix ++ "repeated-interior-gadt-forall"
 legacyEvidenceSuffix GeneralIndexedConstructorOperandEvidence = featureSetPrefix ++ "general-indexed-constructor-operand"
 legacyEvidenceSuffix DepFunCoEvidence           = "-retained-depfunco-v1"
 legacyEvidenceSuffix ConstructorCaseEvidence   = "-retained-constructor-case-v1"
@@ -439,7 +441,8 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("terminal-gadt-trailing-context", TerminalGadtTrailingContextEvidence)
                       , ("terminal-gadt-context-only", TerminalGadtContextOnlyEvidence)
                       , ("interior-gadt-context", InteriorGadtContextEvidence)
-                      , ("interior-gadt-forall", InteriorGadtForAllEvidence) ]
+                      , ("interior-gadt-forall", InteriorGadtForAllEvidence)
+                      , ("repeated-interior-gadt-forall", RepeatedInteriorGadtForAllEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion

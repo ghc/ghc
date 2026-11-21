@@ -2798,10 +2798,13 @@ kcConDecl _ new_or_data _tc_res_kind
        ; con_res_kind <- newOpenTypeKind
        ; case HsDecls.splitGadtTerminal args res_ty of
            Nothing
-             | Just (group, field, result) <- HsDecls.splitGadtInterior args res_ty ->
-               kcRuntimeConTelescope [group] $
-               do { discardResult $ tcCheckLHsTypeInContext result (TheKind con_res_kind)
-                  ; discardResult $ tcConArg (getArgExpKind new_or_data con_res_kind) IsPrefixConGADT field }
+             | Just (groups, result) <- HsDecls.splitGadtInterior args res_ty ->
+               let check_group (group, field) rest =
+                     kcRuntimeConTelescope [group] $
+                     do { discardResult $ tcConArg (getArgExpKind new_or_data con_res_kind) IsPrefixConGADT field
+                        ; rest }
+               in foldr check_group
+                    (discardResult $ tcCheckLHsTypeInContext result (TheKind con_res_kind)) groups
              | otherwise -> discardResult $ tcCheckLHsTypeInContext res_ty (TheKind con_res_kind)
            Just (nodes, _, result) ->
              kcRuntimeConTelescope nodes $
@@ -5365,20 +5368,21 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
   = addErrCtxt (DataConDefCtxt names) $
     do { traceTc "tcConDecl 1 gadt" (ppr names)
        ; let L _ name :| _ = names
-       ; let (terminal, terminal_order, final_field, hs_result)
+       ; let (terminal, terminal_order, interior_fields, hs_result)
                = case HsDecls.splitGadtInterior hs_args hs_res_ty of
-                   Just (group, field, result) -> ([group], 0, Just field, result)
+                   Just (groups, result) -> (map fst groups, 0, map snd groups, result)
                    Nothing -> case HsDecls.splitGadtTerminal hs_args hs_res_ty of
-                     Nothing -> ([], 0, Nothing, hs_res_ty)
-                     Just (groups, count, result) -> (groups, count, Nothing, result)
+                     Nothing -> ([], 0, [], hs_res_ty)
+                     Just (groups, count, result) -> (groups, count, [], result)
+             interior = not (null interior_fields)
        ; let is_context (L _ HsGadtContext{}) = True
              is_context _ = False
-             fields = case (hs_args, final_field) of
-               (PrefixConGADT ann prefix, Just field) -> PrefixConGADT ann (prefix ++ [field])
+             fields = case hs_args of
+               PrefixConGADT ann prefix -> PrefixConGADT ann (prefix ++ interior_fields)
                _ -> hs_args
-       ; when ((terminal_order /= 0 || isJust final_field) &&
+       ; when ((terminal_order /= 0 || interior) &&
                (new_or_data == NewType ||
-                ((isJust final_field || any is_context terminal) && any is_context inner_bndrs))) $
+                ((interior || any is_context terminal) && any is_context inner_bndrs))) $
            setSrcSpanA (getLoc hs_res_ty) $
            failWithTc (TcRnNestedForallsContexts NFC_GadtConSig)
        ; skol_info <- mkSkolemInfo (DataConSkol name)
@@ -5449,13 +5453,14 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
 
              ; let bang_opts = SrcBangOpts (initBangOpts dflags)
              ; let order
-                     | isJust final_field
-                     , [L _ (HsGadtForAll _ HsForAllInvis { hsf_invis_bndrs = late })] <- terminal
-                     = OrderedConArgs [ConTypeArgs (length tvbndrs' - length late), ConValueArgs 1,
-                                       ConTypeArgs (length late), ConValueArgs 1]
-                     | isJust final_field
-                     = OrderedConArgs [ConTypeArgs (length tvbndrs'), ConValueArgs 1,
-                                       ConContextArgs (length ctxt'), ConValueArgs 1]
+                     | interior =
+                         let late_sizes = [ length late | L _ (HsGadtForAll _
+                                               HsForAllInvis { hsf_invis_bndrs = late }) <- terminal ]
+                             initial = [ConTypeArgs (length tvbndrs' - sum late_sizes), ConValueArgs 1]
+                             suffix
+                               | null late_sizes = [ConContextArgs (length ctxt'), ConValueArgs 1]
+                               | otherwise = concatMap (\n -> [ConTypeArgs n, ConValueArgs 1]) late_sizes
+                         in OrderedConArgs (initial ++ suffix)
                      | otherwise = LegacyConOrder terminal_order
              ; buildDataConWithTelescope order [] fam_envs bang_opts name is_infix
                             rep_nm stricts field_lbls
@@ -6471,12 +6476,13 @@ checkValidDataCon dflags existential_ok tc con
             do { let (early, late) = dataConUserTyVarGroups con
                      (_, ex_tvs, eq_spec, theta, _, _) = dataConFullSig con
                      prefix_theta = if dataConHasTrailingContext con then [] else theta
-                     prefix_fields = case dataConInteriorForAll con of
-                       Just (n, _) -> take n arg_tys
-                       Nothing -> arg_tys
                      prefix_types = map (varType . binderVar) early ++ prefix_theta ++
-                       concatMap (\(Scaled mult ty) -> [mult, ty]) prefix_fields
-                     late_vars = mkVarSet (binderVars late)
+                       concatMap (\(Scaled mult ty) -> [mult, ty]) arg_tys
+                     scope_ok
+                       | OrderedConArgs groups <- dataConSourceOrder con
+                       , isJust (dataConInteriorForAll con)
+                       = orderedConForAllScope groups (early ++ late) arg_tys
+                       | otherwise = disjointVarSet (mkVarSet (binderVars late)) (tyCoVarsOfTypes prefix_types)
                ; checkTc ((null ex_tvs ||
                             ((dataConTerminalOrder con == gadtTrailingContextOnly ||
                               isJust (dataConInteriorForAll con)) && all isTyVar ex_tvs))
@@ -6485,7 +6491,7 @@ checkValidDataCon dflags existential_ok tc con
                           && not (isDataFamInstTyCon tc)
                           && not (isTypeDataCon con)
                           && isLiftedTypeKind (tyConResKind tc)
-                          && disjointVarSet late_vars (tyCoVarsOfTypes prefix_types))
+                          && scope_ok)
                          (TcRnNestedForallsContexts NFC_GadtConSig) }
         ; traceTc "checkValidDataCon 2" $ ppr (dataConWrapperType con)
 

@@ -1264,7 +1264,7 @@ tcIfaceDataCons tycon_name tycon if_cons
                 context_only = terminal_order == gadtTrailingContextOnly
                 interior_forall = conInteriorForAll source_order
                 late_count = max 0 terminal_order
-                ordered_late_count = maybe late_count snd interior_forall
+                ordered_late_count = maybe late_count (sum . map snd) interior_forall
                 admissible_order
                   | context_only = not (null ctxt) && ordinary_data && all type_binder ex_bndrs
                   | otherwise = late_count > 0 && late_count <= length user_bndrs && null ex_bndrs
@@ -1275,13 +1275,14 @@ tcIfaceDataCons tycon_name tycon if_cons
                       Nothing ->
                         groups == [ConTypeArgs (length user_bndrs), ConValueArgs 1,
                                    ConContextArgs (length ctxt), ConValueArgs 1] &&
-                        not (null ctxt) && null ex_bndrs
-                      Just (_, n) ->
-                        n > 0 && n <= length user_bndrs &&
-                        groups == [ConTypeArgs (length user_bndrs - n), ConValueArgs 1,
-                                   ConTypeArgs n, ConValueArgs 1] &&
+                        not (null ctxt) && null ex_bndrs && length args == 2
+                      Just type_groups ->
+                        all (\(fields, binders) -> fields == 1 && binders > 0) type_groups &&
+                        ordered_late_count <= length user_bndrs &&
+                        take 1 groups == [ConTypeArgs (length user_bndrs - ordered_late_count)] &&
+                        length args == length type_groups + 1 &&
                         null ctxt && all type_binder ex_bndrs
-                in unless (valid_group && length args == 2 && ordinary_data &&
+                in unless (valid_group && ordinary_data &&
                            has_wrapper && null arg_binders && null spec && null lbl_names) $
                      failIfM (text "Invalid interior constructor group in interface:" <+> ppr dc_name)
           ; when (terminal_order /= 0) $
@@ -1344,8 +1345,11 @@ tcIfaceDataCons tycon_name tycon if_cons
                     if null arg_binders
                     then do { arg_tys <- forkM (mk_doc dc_name <+> text "arg_tys") $
                                   do { tys <- mapM (\(w, ty) -> mkScaled <$> tcIfaceType w <*> tcIfaceType ty) args
-                                     ; let prefix = maybe tys (\(n, _) -> take n tys) interior_forall
-                                     ; check_prefix_scope (concatMap (\(Scaled mult ty) -> [mult, ty]) prefix)
+                                     ; case source_order of
+                                         OrderedConArgs groups | isJust interior_forall ->
+                                           unless (orderedConForAllScope groups user_tvs tys) $
+                                             failIfM (text "Invalid interior constructor binder scope:" <+> ppr dc_name)
+                                         _ -> check_prefix_scope (concatMap (\(Scaled mult ty) -> [mult, ty]) tys)
                                      ; return tys }
                             ; return ([], arg_tys) }
                     else tc_retained_args dc_name emptyVarSet arg_binders args
