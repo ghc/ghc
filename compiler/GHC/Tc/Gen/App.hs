@@ -2339,7 +2339,7 @@ isGroundRetainedCallType ty
   | FunTy flag ma mult arg res <- coreFullView ty
   , isVisibleFunArg flag
   = isTauTy ma && isTauTy mult
-    && (isRetainedValueType arg || isRankedRetainedCallback arg)
+    && (isRetainedValueType arg || isRankedRetainedArgument arg)
     && isGroundRetainedCallType res
   | otherwise
   = isRetainedValueType ty || isRankedRetainedContainer ty
@@ -2368,6 +2368,10 @@ isRetainedCallbackRho ty
   | DepFunTy{} <- coreFullView ty = isRetainedValueType ty
   | otherwise                    = False
 
+-- | Recognize a declared retained callback or a container for it.
+isRankedRetainedArgument :: Type -> Bool
+isRankedRetainedArgument ty = isRankedRetainedCallback ty || isRankedRetainedContainer ty
+
 -- | Defer a nested call with a fixed ordinary result and a ranked retained input.
 -- See Note [Quick Look and ordinary argument checking].
 isGroundRankedRetainedCall :: Int -> Type -> Bool
@@ -2380,7 +2384,7 @@ isGroundRankedRetainedCall arity ty
   where
     has_ranked_input n ty
       | n > 0, Just (arg, res) <- splitVisibleFunTy_maybe ty
-      = isRankedRetainedCallback arg || has_ranked_input (n-1) res
+      = isRankedRetainedArgument arg || has_ranked_input (n-1) res
       | otherwise = False
 
 {- Note [Known native variables with ImpredicativeTypes]
@@ -2411,11 +2415,10 @@ skolemises it. When that operand is a bare name with a retained telescope,
 instantiate it predicatively against the resulting retained type. Check its
 scope and keep the complete subsumption check and dictionary obligations.
 
-The call-telescope check permits a retained polytype at a declared argument.
-It still checks the result and all other domains with isRetainedValueType.
-For example, Just reflect at Maybe (forall a. Reflection a) still needs
-Quick Look to instantiate the constructor's type parameter. The native
-Quick Look guard continues to reject that instantiation.
+The call-telescope check permits a retained polytype or its algebraic
+container at a declared argument. For example, consume can supply
+Maybe Callback to its operand Just reflect. The constructor then uses
+the expected result to choose Callback. See Note [Ground retained applications].
 See docs/dependent-haskell/REFERENCES.md#qualified-retained-function-types.
 -}
 

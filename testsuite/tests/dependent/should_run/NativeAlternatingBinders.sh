@@ -411,6 +411,18 @@ bad = Just @Callback reflect
 #else
 bad = Just reflect
 #endif
+#elif FORM == 9
+consume _ _ = True
+bad = consume (Just reflect) Nothing
+#elif FORM == 10
+consume :: forall a. Maybe a -> Maybe Bool -> Bool
+consume _ _ = True
+bad = consume (Just reflect) Nothing
+#elif FORM == 11
+type Callback = forall a. Reflect a
+consume :: Maybe Callback -> Maybe Bool -> Bool
+consume _ _ = True
+bad = consume (Just reflect) Nothing
 #endif
 HS
 
@@ -444,8 +456,9 @@ HS
 
 cat >StoredCallback.hs <<'HS'
 {-# LANGUAGE CPP, ImpredicativeTypes, NoDeepSubsumption, NoExperimentalDependentTypes #-}
-{-# LANGUAGE RankNTypes, TypeApplications #-}
-module StoredCallback (Callback, boxed, empty, bottomBox) where
+{-# LANGUAGE GADTs, RankNTypes, TypeApplications #-}
+module StoredCallback (Callback, boxed, empty, bottomBox, consume, ignoreField) where
+import Data.Type.Equality ((:~:)(Refl))
 import RankDomainProvider (Reflect, bottomReflect, reflect)
 
 type Callback = forall a. Show a => Reflect a
@@ -460,6 +473,15 @@ boxed = Just reflect
 empty = Nothing
 bottomBox = Just bottomReflect
 #endif
+
+consume :: Maybe Callback -> Maybe Bool -> Maybe Char -> (Bool, Bool)
+consume Nothing _ _ = (False, False)
+consume (Just f) b c = (case f @Bool b of Refl -> True,
+                       case f @Char c of Refl -> True)
+
+ignoreField :: Maybe Callback -> Bool
+ignoreField Nothing = False
+ignoreField (Just _) = True
 HS
 
 cat >StoredReader.hs <<'HS'
@@ -502,6 +524,30 @@ main = do
 #endif
 HS
 
+cat >ContextualClient.hs <<'HS'
+{-# LANGUAGE ImpredicativeTypes, NoDeepSubsumption #-}
+{-# LANGUAGE NoExperimentalDependentTypes, RankNTypes #-}
+module Main where
+
+import Data.IORef (newIORef, readIORef)
+import RankDomainProvider (bottomReflect, reflect)
+import StoredCallback (Callback, consume, ignoreField)
+
+partial = consume (Just reflect) Nothing
+
+throughRanked :: Callback -> Maybe Bool -> Maybe Char -> (Bool, Bool)
+throughRanked f b c = consume (Just f) b c
+
+main :: IO ()
+main = do
+    b <- newIORef (error "Bool index forced") >>= readIORef
+    c <- newIORef (error "Char index forced") >>= readIORef
+    print (partial c)
+    putStrLn (show (consume (Just reflect) b c))
+    putStrLn (show (throughRanked reflect b c))
+    print (ignoreField (Just bottomReflect))
+HS
+
 cat >OrdinaryImpred.hs <<'HS'
 module Main where
 ids :: [forall a. a -> a]
@@ -531,7 +577,7 @@ for opt in O0 O2; do
     cp {RankDomainClient,RankDomainReject,RankDomainScope,OrdinaryImpred}.hs "$out/domain-$opt/client/"
     cp StoredCallback.hs "$out/domain-$opt/provider/"
     mkdir -p "$out/domain-$opt/reader"
-    cp StoredReader.hs "$out/domain-$opt/reader/"
+    cp {StoredReader,ContextualClient}.hs "$out/domain-$opt/reader/"
     (
         cd "$out/domain-$opt/provider"
         flags=("-$opt")
@@ -553,9 +599,11 @@ for opt in O0 O2; do
                 reject_rank_domain "$diagnostic" "-$opt" "-X$mode" "-DFORM=$form" -c RankDomainReject.hs
             done
         done
-        reject_rank_domain 'Quick Look inference does not support this retained type yet:' \
-            "-$opt" -XImpredicativeTypes -DFORM=6 -c RankDomainReject.hs
-        for form in 7 8; do
+        for form in 6 9 10; do
+            reject_rank_domain 'Quick Look inference does not support this retained type yet:' \
+                "-$opt" -XImpredicativeTypes "-DFORM=$form" -c RankDomainReject.hs
+        done
+        for form in 7 8 11; do
             reject_rank_domain 'No instance for ‘Show a’' \
                 "-$opt" -XImpredicativeTypes "-DFORM=$form" -c RankDomainReject.hs
         done
@@ -578,5 +626,8 @@ for opt in O0 O2; do
             "${ghc[@]}" "-$opt" StoredReader.o ../provider/{StoredCallback,RankDomainProvider}.o -o stored
             printf '%s\n' '((True,True),True,True)' 'stored callback bottom: forced' | cmp - <(./stored)
         done
+        "${ghc[@]}" "-$opt" -c ContextualClient.hs
+        "${ghc[@]}" "-$opt" ContextualClient.o ../provider/{StoredCallback,RankDomainProvider}.o -o contextual
+        printf '%s\n' '(True,True)' '(True,True)' '(True,True)' True | cmp - <(./contextual)
     )
 done

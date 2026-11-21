@@ -524,7 +524,9 @@ An ordinary algebraic constructor can store the whole retained polytype.
 With `type Callback = forall a. Reflection a`, both
 `Just @Callback reflectMaybe` and `Just reflectMaybe :: Maybe Callback`
 use the known type argument. The second form obtains it from the expected
-result. The compiler checks each field, including its class constraints.
+result. A call such as `consume (Just reflectMaybe) Nothing` also works if
+the declared first argument of `consume` gives `Just` that expected result.
+The compiler checks each field, including its class constraints.
 A separately compiled reader can match the constructor and instantiate the
 stored callback. The field stays lazy. The unannotated `Just reflectMaybe`
 still reports GHC-83605 when the result type gives no choice.
