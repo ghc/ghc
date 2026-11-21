@@ -5241,7 +5241,7 @@ tcTyVar _ name         -- Could be a tyvar, a tycon, or a datacon
                        failWithTc $ TcRnRetainedQuantificationError RetainedPackagePromotion
                    ; when (isDataFamInstTyCon (dataConTyCon dc)) $
                        do { enabled <- xoptM LangExt.ExperimentalDependentTypes
-                          ; unless (enabled && simpleDataFamilyPromotion dc) $
+                          ; unless (enabled && canPromoteDataFamilyCon dc) $
                               promotionErr name FamDataConPE }
                    ; let (_, _, _, theta, _, _) = dataConFullSig dc
                    ; traceTc "tcTyVar" (ppr dc <+> ppr theta)
@@ -5257,16 +5257,18 @@ tcTyVar _ name         -- Could be a tyvar, a tycon, or a datacon
 
            _  -> wrongThingErr WrongThingType thing name }
 
--- | Admit finished lifted constructors that need no evidence binders.
+-- | Admit finished lifted constructors with no stored context or existentials.
 -- See Note [Promoting a simple data family instance constructor].
-simpleDataFamilyPromotion :: DataCon -> Bool
-simpleDataFamilyPromotion dc =
-  isVanillaDataCon dc
+canPromoteDataFamilyCon :: DataCon -> Bool
+canPromoteDataFamilyCon dc =
+  null exs && null theta
   && null (dataConStupidTheta dc)
   && null (dataConRepArgBinders dc)
   && not (isNewTyCon (dataConTyCon dc))
   && isLiftedTypeKind (typeKind (dataConOrigResTy dc))
-  && all (isLiftedTypeKind . typeKind . scaledThing) (dataConOrigArgTys dc)
+  && all (isLiftedTypeKind . typeKind . scaledThing) fields
+  where
+    (_, exs, _, theta, fields, _) = dataConFullSig dc
 
 {- Note [Promoting a simple data family instance constructor]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -5276,9 +5278,11 @@ axiom to return the public family application.
 
 The promoted constructor already uses dataConOrigResTy as its result
 kind. For a data family constructor this is the public family
-application. No representation coercion enters the promoted type.
-Use the existing promoted DataCon and its Name. Do not expose the
-representation TyCon.
+application. An equality refinement in EqSpec already appears in this
+result kind, as it does for an ordinary promoted GADT constructor.
+See Note [Promoted data constructors] in GHC.Core.TyCon.
+Use the existing promoted DataCon and its Name. Its kind contains
+neither the representation TyCon nor the representation coercion.
 
 Discussion #456 distinguishes this case from constructors whose
 promotion needs to bind evidence. Keep that case and constructors of
