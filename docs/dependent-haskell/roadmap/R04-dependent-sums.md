@@ -423,6 +423,15 @@ constraint still leaves `Shape a Char` stuck.
 [Provider](../../../testsuite/tests/dependent/should_run/NativeConstrainedSumProvider.hs)
 and [ordinary client](../../../testsuite/tests/dependent/should_run/NativeConstrainedSumClient.hs).
 
+## Construct a retained pair in an ordinary argument
+
+An ordinary client with `ImpredicativeTypes` can construct a package at a
+known result type, including an imported open family that reduces to a
+sum. For example, `consume (Pair True payload)` uses the argument type
+of `consume` to select the erased parameters of `Pair`. GHC checks
+`payload` against the written witness and keeps an ignored field lazy.
+A stuck family leaves the constructor application unresolved.
+
 ## Partition at the original length
 
 The [vector partition](../examples/packed-vector/ConservedPartition.hs) returns
