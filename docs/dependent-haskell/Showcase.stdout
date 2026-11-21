@@ -141,6 +141,7 @@ index a list by its ordinary source length: [Just 'b',Nothing,Nothing,Just 'x',J
 empty-list index forces its position: True
 read checked list positions through ordinary and linear callers: ([Just 'c',Nothing,Nothing,Just 'b',Just 'x',Just 'y'],[Just 'c',Nothing,Nothing,Just 'b',Just 'x',Just 'y'])
 read a checked position with a linear callback: (Just "cc",Nothing,True)
+use one bounded position on equal-length lists: [Just ('b',20),Nothing,Nothing]
 check a signed position in a packaged vector: Just 22
 generic negative position ignores list: Nothing
 generic checked function position: Just 42

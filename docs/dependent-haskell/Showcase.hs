@@ -855,6 +855,7 @@ genericSafeIndexing = do
     observe "empty-list index forces its position" =<< FinitePositionClient.observeEmptyIndex
     observe "read checked list positions through ordinary and linear callers" =<< CursorClient.observeCursors
     observe "read a checked position with a linear callback" =<< CursorClient.observeIndexedCallback
+    observe "use one bounded position on equal-length lists" =<< CursorClient.observeAligned
     observe "check a signed position in a packaged vector" $
         case ListVectorClient.fromList values of
             Sigma.Pair _ cells -> FinitePositionClient.lookupVecViaView cells position

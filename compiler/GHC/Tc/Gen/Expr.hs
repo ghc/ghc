@@ -42,7 +42,7 @@ import GHC.Tc.Gen.Bind        ( tcLocalBinds, tcNonRecLets )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Arrow
 import GHC.Tc.Gen.Match( tcBody, tcLambdaMatches, tcCaseMatches, tcIndexedCaseMatches, tcRetainedCase
-                       , tcRetainedCallCase
+                       , tcRetainedCallCase, tcEmptyRetainedScrutinee
                        , tcOpenImplicitPackage, tcOpenImplicitPackageAt
                        , implicitPayloadType, matchesImplicitPayloadPat
                        , tcGRHSNE, tcDoStmts )
@@ -963,7 +963,10 @@ tcExpr expr@(HsCase ctxt scrut matches) res_ty
               --     case id        of {..}
               --     case (\v -> v) of {..}
               -- This design choice is discussed in #17790
-              (scrut', scrut_ty) <- tcScalingUsage mult $ tcInferRhoFRR FRRCase source
+              (operand, operand_ty) <- tcScalingUsage mult $ tcInferRhoFRR FRRCase source
+            ; (scrut', scrut_ty) <- if null (unLoc (mg_alts matches))
+                                     then tcEmptyRetainedScrutinee operand operand_ty
+                                     else pure (operand, operand_ty)
             ; dependent <- xoptM LangExt.ExperimentalDependentTypes
             ; special <- case unLoc (stripParensLHsExpr scrut') of
                 _ | ExistsTy ImplicitExists _ _ <- coreFullView scrut_ty

@@ -2,10 +2,11 @@
 {-# LANGUAGE TypeApplications, UndecidableInstances #-}
 
 -- | Store an ordinary list with a position checked against that list.
-module ListCursor (Cursor, Selection, cursor, prepare, withIndex) where
+module ListCursor (Cursor, Selection, cursor, prepare, withIndex, lookupAligned) where
 
+import Data.Type.Equality ((:~:)(Refl))
 import GHC.Sigma (Sigma(Pair))
-import PackedVecLibrary (sourceLength)
+import PackedVecLibrary (sameNat, sourceLength)
 import ParameterizedIndexLibrary (Fin(..), indexGeneric, mkFinGeneric)
 
 -- | The position is bounded by the list in the same pair.
@@ -34,3 +35,16 @@ prepare c = (c, readCursor @a)
 withIndex :: forall a b. foreach (xs :: [a]) -> Fin (sourceLength xs) %1 -> (a -> b) %1 -> b
 withIndex (x : _) FZ visit = visit x
 withIndex (_ : rest) (FS i) visit = withIndex rest i visit
+
+-- | Read a position whose declared bound equals the length of this list.
+indexAtLength :: forall n a. foreach (xs :: [a]) -> (n ~ sourceLength xs) => Fin n %1 -> a
+indexAtLength (x : _) FZ = x
+indexAtLength (_ : rest) (FS i) = indexAtLength rest i
+
+-- | Select from two finite lists at the same position if their lengths agree.
+lookupAligned :: forall a b. foreach (xs :: [a]) -> foreach (ys :: [b]) -> Int -> Maybe (a, b)
+lookupAligned xs ys k = case mkFinGeneric xs k of
+    Nothing -> Nothing
+    Just i -> case sameNat (sourceLength xs) (sourceLength ys) of
+        Nothing -> Nothing
+        Just Refl -> Just (indexAtLength xs i, indexAtLength ys i)
