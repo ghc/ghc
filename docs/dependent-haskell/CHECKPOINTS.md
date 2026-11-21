@@ -28,6 +28,15 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `f2cbaced47`, an ordinary client can pass the result of a declared
+producer directly to a polymorphic reader. The lazy reader can ignore
+the producer's input. A retained rewrite rule also accepts an explicit
+type argument after an ordinary value argument. The self-hosted
+compiler matched all 373 Showcase lines at stripped `-O0`, default
+`-O2`, and in source-loaded GHCi. All eight focused tests passed.
+[Package client](../../testsuite/tests/dependent/should_run/implicit-existential-source/MixedPackageMain.hs)
+and [rewrite rule client](examples/qualified-pi/VisibleRuleClient.hs).
+
 At `a5bba656b8`, an ordinary client can pass `(2 :: Nat)` to a
 retained length parameter. A second client passes a named erased package
 directly to a polymorphic reader. Its argument type determines which
