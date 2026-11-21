@@ -1279,6 +1279,16 @@ tcIfaceDataCons tycon_name tycon if_cons
                             <+> ppr dc_name
                             $$ text "Universal and user binder kinds disagree:" <+> ppr tv) }
 
+        ; let (early, late) = splitAt (length user_tvs - late_count) user_tvs
+              late_vars = mkVarSet (binderVars late)
+              check_prefix_scope tys = when (late_count /= 0) $
+                unless (disjointVarSet late_vars (tyCoVarsOfTypes tys)) $
+                  failIfM (text "Invalid terminal constructor binder scope:" <+> ppr dc_name)
+        ; when (late_count /= 0) $
+            unless (all isVisibleForAllTyBinder late &&
+                    late_vars `subVarSet` mkVarSet univ_tvs) $
+              failIfM (text "Invalid terminal constructor binder scope:" <+> ppr dc_name)
+
         -- Read the context and argument types, but lazily for two reasons
         -- (a) to avoid looking tugging on a recursive use of
         --     the type itself, which is knot-tied
@@ -1287,6 +1297,9 @@ tcIfaceDataCons tycon_name tycon if_cons
         ; ~(eq_spec, theta, retained_binders, arg_tys, stricts) <- forkM (mk_doc dc_name) $
              do { eq_spec <- tcIfaceEqSpec spec
                 ; theta   <- tcIfaceCtxt ctxt
+                -- Check scope in the same lazy computation that reads
+                -- types, since an argument can refer to this TyCon.
+                ; check_prefix_scope (map (varType . binderVar) early)
                 -- This fixes #13710.  The enclosing lazy thunk gets
                 -- forced when typechecking record wildcard pattern
                 -- matching (it's not completely clear why this
@@ -1295,8 +1308,10 @@ tcIfaceDataCons tycon_name tycon if_cons
                 -- See also Note [Tying the knot]
                 ; ~(retained_binders, arg_tys) <-
                     if null arg_binders
-                    then do { arg_tys <- forkM (mk_doc dc_name <+> text "arg_tys")
-                                        $ mapM (\(w, ty) -> mkScaled <$> tcIfaceType w <*> tcIfaceType ty) args
+                    then do { arg_tys <- forkM (mk_doc dc_name <+> text "arg_tys") $
+                                  do { tys <- mapM (\(w, ty) -> mkScaled <$> tcIfaceType w <*> tcIfaceType ty) args
+                                     ; check_prefix_scope (concatMap (\(Scaled mult ty) -> [mult, ty]) tys)
+                                     ; return tys }
                             ; return ([], arg_tys) }
                     else tc_retained_args dc_name emptyVarSet arg_binders args
                 ; stricts <- mapM tc_strict if_stricts
@@ -1311,15 +1326,6 @@ tcIfaceDataCons tycon_name tycon if_cons
 
         ; prom_rep_name <- newTyConRepName dc_name
 
-        ; when (late_count /= 0) $
-            do { let (early, late) = splitAt (length user_tvs - late_count) user_tvs
-                     late_vars = mkVarSet (binderVars late)
-                     prefix_types = map (varType . binderVar) early ++
-                       concatMap (\(Scaled mult ty) -> [mult, ty]) arg_tys
-               ; unless (all isVisibleForAllTyBinder late &&
-                         late_vars `subVarSet` mkVarSet univ_tvs &&
-                         disjointVarSet late_vars (tyCoVarsOfTypes prefix_types)) $
-                   failIfM (text "Invalid terminal constructor binder scope:" <+> ppr dc_name) }
         ; let bang_opts = FixedBangOpts stricts
             -- Pass the HsImplBangs (i.e. final decisions) to buildDataCon;
             -- it'll use these to guide the construction of a worker.
