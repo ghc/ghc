@@ -187,3 +187,11 @@ test('GadtLateFieldTh',
      [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal']),
       extra_files(['GadtLateFieldProvider.hs', 'TerminalGadtTh.sh'])],
      run_command, ['bash TerminalGadtTh.sh "{compiler}" "{libdir}" GadtLateFieldTh GadtLateFieldProvider'])
+test('GadtLeadingRequiredContext', normal, compile_and_run, ['-dcore-lint -dstg-lint'])
+test('GadtLeadingRequiredTh',
+     [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal']),
+      extra_files(['GadtLeadingRequiredThProvider.hs', 'TerminalGadtTh.sh'])],
+     run_command, ['bash TerminalGadtTh.sh "{compiler}" "{libdir}" GadtLeadingRequiredTh GadtLeadingRequiredThProvider'])
+test('GadtExtendedOrderedWire',
+     [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal'])],
+     run_command, ['bash GadtExtendedOrderedWire.sh "{compiler}" "{libdir}"'])

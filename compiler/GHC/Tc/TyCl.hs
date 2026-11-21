@@ -5486,7 +5486,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
              }
        ; mapM buildOneDataCon names }
   where
-    prefix_group (PrefixConGADT _ fields) = [ConValueArgs (length fields)]
+    prefix_group (PrefixConGADT _ fields@(_ : _)) = [ConValueArgs (length fields)]
     prefix_group _ = []
 
     source_group (Right _) = ConValueArgs 1
@@ -6520,8 +6520,7 @@ checkValidDataCon dflags existential_ok tc con
                        = orderedConArgsHaveScope groups (early ++ late) theta arg_tys
                        | otherwise = disjointVarSet (mkVarSet (binderVars late)) (tyCoVarsOfTypes prefix_types)
                ; checkTc ((null ex_tvs ||
-                            ((dataConTerminalOrder con == gadtTrailingContextOnly ||
-                              (is_ordered && isNothing (dataConInteriorContext con))) &&
+                            ((dataConTerminalOrder con == gadtTrailingContextOnly || is_ordered) &&
                              all isTyVar ex_tvs))
                           && null eq_spec
                           && null (dataConStupidTheta con)

@@ -2826,6 +2826,17 @@ ifaceHasTrailingContext :: [IfaceForAllBndr] -> Bool
 ifaceHasTrailingContext (binder : _) = isSpecifiedForAllTyFlag (ifaceForAllTyFlag (binderFlag binder))
 ifaceHasTrailingContext [] = False
 
+{- Note [Versioning extended ordered constructor telescopes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Earlier readers reject a binder group after a leading context and before
+the first value field. They also reject existential binders in the
+interior-context format. When reification triggers either failure during
+external Template Haskell, the reader can block on the interpreter.
+Mark these orders in the header so an earlier reader rejects them before
+starting a splice. The new reader still accepts unmarked interfaces
+written by earlier compilers with support for these orders.
+-}
+
 instance Binary IfaceConDecls where
     put_ bh IfAbstractTyCon  = putByte bh 0
     put_ bh (IfDataTyCon False cs)
@@ -2841,6 +2852,8 @@ instance Binary IfaceConDecls where
             requireIfaceEvidenceVersion bh OrderedGadtTelescopeEvidence
           when (any has_inferred_late_binder cs) $
             requireIfaceEvidenceVersion bh InferredOrderedGadtBindersEvidence
+          when (any has_extended_order cs) $
+            requireIfaceEvidenceVersion bh ExtendedOrderedGadtTelescopeEvidence
           record_legacy
           putByte bh 5
           put_ bh cs
@@ -2863,6 +2876,14 @@ instance Binary IfaceConDecls where
           = any (isInferredForAllTyFlag . ifaceForAllTyFlag . binderFlag)
                 (drop early (ifConUserTvBinders con))
           | otherwise = False
+        -- See Note [Versioning extended ordered constructor telescopes].
+        has_extended_order con = case ifConSourceOrder con of
+          OrderedConArgs (ConTypeArgs _ : ConContextArgs _ : rest) ->
+            type_before_field rest
+          order -> isJust (conInteriorContext order) && not (null (ifConExTCvs con))
+        type_before_field (ConTypeArgs{} : _) = True
+        type_before_field (ConContextArgs{} : rest) = type_before_field rest
+        type_before_field _ = False
         record_legacy = do
           when (any (> 0) late) $
             requireIfaceEvidenceVersion bh TerminalGadtForAllEvidence

@@ -18,9 +18,11 @@
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeAbstractions #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -- | Runnable examples of the completed Dependent Haskell source features.
 -- In GHCi, load PackedVecLibrary with the options in the adjacent README.
@@ -1086,6 +1088,18 @@ data PrintablePair where
 describePair :: PrintablePair -> (Bool, String)
 describePair (PrintablePair a b) = (a == b, show b)
 
+$([d|
+    data QuotedComparison where
+        QuotedComparison :: forall a -> Eq a => forall {b} c. Show c
+                         => a -> !(b, c) -> QuotedComparison
+    |])
+
+-- | Use each dictionary in the field pattern after its context.
+describeQuotedComparison :: QuotedComparison -> (Bool, String)
+describeQuotedComparison
+    (QuotedComparison (type a) @c ((\x -> x == x) -> equal) ((\(_, x) -> show x) -> shown)) =
+    (equal, shown)
+
 main :: IO ()
 main = do
     observe "select the second field of a promoted data family pair" secondFlag
@@ -1111,6 +1125,8 @@ main = do
     observe "read the dictionary supplied after a constructor field and its required type" LabelledValueClient.typeTags
     observe "duplicate the unrestricted field of a quoted constructor" (QuotedColumn.readQuoted 17)
     observe "recover consecutive GADT constraints" (describePair (PrintablePair False True))
+    observe "use two ordered dictionaries in a quoted constructor"
+        (describeQuotedComparison (QuotedComparison (type Int) @Bool 41 ('x', True)))
     observe "form an associated family type from its class evidence" constrainedElements
     observe "form an expression annotation with the matched dictionary" annotatedElement
     observe "pass an associated type as a specified and a required argument" explicitElements

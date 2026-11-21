@@ -1279,17 +1279,18 @@ tcIfaceDataCons tycon_name tycon if_cons
                         initial + ordered_late_count == length user_bndrs &&
                         sum [n | ConContextArgs n <- rest] == length ctxt &&
                         sum [n | ConValueArgs n <- rest] == length args &&
-                        any non_field (drop 1 (dropWhile non_field rest))
+                        (any non_field (drop 1 (dropWhile non_field rest)) ||
+                         leading_context_order rest)
                       _ -> False
                     positive (ConTypeArgs n) = n > 0
                     positive (ConContextArgs n) = n > 0
                     positive (ConValueArgs n) = n > 0
                     non_field ConValueArgs{} = False
                     non_field _ = True
-                    admissible_binders
-                      | Just _ <- conInteriorContext source_order = null ex_bndrs
-                      | otherwise = all type_binder ex_bndrs
-                in unless (valid_group && admissible_binders && ordinary_data &&
+                    leading_context_order (ConContextArgs{} : _) =
+                      not (null args) && any ((== 0) . fst) ordered_type_groups
+                    leading_context_order _ = False
+                in unless (valid_group && all type_binder ex_bndrs && ordinary_data &&
                            has_wrapper && null arg_binders && null spec && null lbl_names) $
                      failIfM (text "Invalid interior constructor group in interface:" <+> ppr dc_name)
           ; when (terminal_order /= 0) $

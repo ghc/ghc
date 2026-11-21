@@ -1100,12 +1100,22 @@ splitLHsGadtTy (L _ sig_ty)
       then (outer_bndrs, [], sigma_ty)
       else let prefix = inner_bndrs ++ maybe [] (pure . mkHsGadtContext) mb_ctxt
            in case split_contexts rho_ty of
+                (_, body)
+                  | Just _ <- mb_ctxt
+                  , any required_group inner_bndrs
+                  , HsForAllTy{} <- unLoc (ignoreParens body)
+                  -- The context precedes another binder group. Keep the
+                  -- rest in the ordered GADT suffix, before its first field.
+                  -> (outer_bndrs, inner_bndrs, phi_ty)
                 (contexts, body)
                   | not (null contexts)
                   , not (is_gadt_rec_ty (ignoreParens body))
                   -> (outer_bndrs, prefix ++ contexts, body)
                 _ -> (outer_bndrs, prefix, rho_ty)
   where
+    required_group (L _ (HsGadtForAll _ HsForAllVis{})) = True
+    required_group _ = False
+
     split_outer_bndrs :: HsSigType GhcPs -> (HsOuterSigTyVarBndrs GhcPs, LHsType GhcPs)
     split_outer_bndrs (HsSig{sig_bndrs = outer_bndrs, sig_body = body_ty}) =
       (outer_bndrs, body_ty)

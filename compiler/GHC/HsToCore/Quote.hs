@@ -895,14 +895,17 @@ repC (L l (ConDeclGADT { con_names  = cons
       HsOuterImplicit{} ->
         -- See Note [Don't quantify implicit type variables in quotes].
         addSimpleTyVarBinds FreshNamesOnly (hsOuterTyVarNames outer_bndrs) $
-          repConTelescope (locA l) teles con
+          con teles
       HsOuterExplicit { hso_matchability = ma, hso_bndrs = tvs } ->
-        repConTelescope (locA l)
-          (noLocA (HsGadtForAll noExtField
-            ((mkHsForAllInvisTele noAnn tvs) { hsf_matchability = ma })) : teles)
-          con
+        con (noLocA (HsGadtForAll noExtField
+          ((mkHsForAllInvisTele noAnn tvs) { hsf_matchability = ma })) : teles)
   where
-    con = repGadtDataCons cons args res_ty
+    con nodes
+      | PrefixConGADT _ [] <- args
+      , Just (groups, result) <- HsDecls.splitGadtInterior args res_ty
+      = do names <- mapM lookupLOcc cons
+           repOrderedGadt (nonEmptyCoreList' names) result [] (map Left nodes ++ groups)
+      | otherwise = repConTelescope (locA l) nodes (repGadtDataCons cons args res_ty)
 
 -- | Quote constructor prefix nodes in order. Combine only an adjacent
 -- forall and context. See Note [Constructor telescope contexts] in GHC.Hs.Decls.
@@ -3139,13 +3142,13 @@ repGadtDataCons cons details res_ty
            PrefixConGADT _ ps
              | Just (groups, result) <- HsDecls.splitGadtInterior details res_ty
              , any annotated_field groups -> do
-               prefix <- mapM rep_field ps
-               ordered (nonEmptyCoreList' cons') result (reverse prefix) groups
+               prefix <- mapM repGadtField ps
+               repOrderedGadt (nonEmptyCoreList' cons') result (reverse prefix) groups
            PrefixConGADT _ ps
              | hsHasForEachTy (unLoc res_ty)
              || isJust (HsDecls.splitGadtTerminal details res_ty)
              || isJust (HsDecls.splitGadtInterior details res_ty) -> do
-               prefix <- mapM rep_field ps
+               prefix <- mapM repGadtField ps
                repRetainedGadt (nonEmptyCoreList' cons') prefix res_ty
            PrefixConGADT _ ps -> do
              arg_tys <- repPrefixConArgs IsPrefixConGADT ps
@@ -3161,38 +3164,49 @@ repGadtDataCons cons details res_ty
       cdf_unpack /= NoSrcUnpack || cdf_bang /= NoSrcStrict
     annotated_field (Left _) = False
 
-    rep_field (CDF { cdf_unpack, cdf_bang, cdf_multiplicity, cdf_type }) =
-      repGadtValueArg cdf_unpack cdf_bang cdf_multiplicity cdf_type
-
-    ordered :: Core [TH.Name] -> LHsType GhcRn -> [Core (M TH.RetainedGadtArg)]
-            -> [Either (LHsGadtTelescope GhcRn) (HsConDeclField GhcRn)]
-            -> MetaM (Core (M TH.Con))
-    ordered names result args [] = do
+-- | Quote an ordered constructor telescope with explicit argument groups.
+repOrderedGadt :: Core [TH.Name] -> LHsType GhcRn -> [Core (M TH.RetainedGadtArg)]
+               -> [Either (LHsGadtTelescope GhcRn) (HsConDeclField GhcRn)]
+               -> MetaM (Core (M TH.Con))
+repOrderedGadt names result = go
+  where
+    go args [] = do
       args' <- coreListM retainedGadtArgTyConOcc (reverse args)
       result' <- repLTy TypeLevel result
       rep2 retainedGadtCOcc [unC names, unC args', unC result']
-    ordered names result args (Right field : rest) = do
-      arg <- rep_field field
-      ordered names result (arg : args) rest
-    ordered names result args (Left (L _ group) : rest) = case group of
-      HsGadtContext ctxt -> do
-        ctxt' <- repContext (unLoc ctxt)
-        arg <- rep2 gadtContextArgsOcc [unC ctxt']
-        ordered names result (arg : args) rest
-      HsGadtForAll _ tele -> do
-        ma <- repForallMatchability (Just TypeLevel) (hsf_matchability tele)
-        case ma of
-          Nothing -> panic "repGadtDataCons: missing matchability"
-          Just ma' -> case tele of
-            HsForAllInvis { hsf_invis_bndrs = tvs } ->
-              addHsTyVarBinds @Specificity @TH.Specificity FreshNamesOnly tvs $ \bndrs -> do
-                arg <- rep2 gadtInvisibleArgsOcc [unC ma', unC bndrs]
-                ordered names result (arg : args) rest
-            HsForAllVis { hsf_vis_bndrs = tvs } ->
-              addHsTyVarBinds @() @() FreshNamesOnly tvs $ \bndrs -> do
-                arg <- rep2 gadtRequiredArgsOcc [unC ma', unC bndrs]
-                ordered names result (arg : args) rest
-      HsGadtPar{} -> ordered names result args rest
+    go args (Right field : rest) = do
+      arg <- repGadtField field
+      go (arg : args) rest
+    go args (Left (L _ group) : rest) = case group of
+      HsGadtContext ctxt
+        | not (null (HsDecls.hsConDeclTheta (Just ctxt))) -> do
+            ctxt' <- repContext (unLoc ctxt)
+            arg <- rep2 gadtContextArgsOcc [unC ctxt']
+            go (arg : args) rest
+      HsGadtForAll _ tele -> case tele of
+        HsForAllInvis { hsf_invis_bndrs = tvs@(_ : _) } -> do
+          ma <- matchability tele
+          addHsTyVarBinds @Specificity @TH.Specificity FreshNamesOnly tvs $ \bndrs -> do
+            arg <- rep2 gadtInvisibleArgsOcc [unC ma, unC bndrs]
+            go (arg : args) rest
+        HsForAllVis { hsf_vis_bndrs = tvs@(_ : _) } -> do
+          ma <- matchability tele
+          addHsTyVarBinds @() @() FreshNamesOnly tvs $ \bndrs -> do
+            arg <- rep2 gadtRequiredArgsOcc [unC ma, unC bndrs]
+            go (arg : args) rest
+        _ -> go args rest
+      _ -> go args rest
+
+    matchability tele = do
+      ma <- repForallMatchability (Just TypeLevel) (hsf_matchability tele)
+      case ma of
+        Nothing -> panic "repOrderedGadt: missing matchability"
+        Just ma' -> pure ma'
+
+-- | Quote the source annotations on one ordered constructor field.
+repGadtField :: HsConDeclField GhcRn -> MetaM (Core (M TH.RetainedGadtArg))
+repGadtField (CDF { cdf_unpack, cdf_bang, cdf_multiplicity, cdf_type }) =
+  repGadtValueArg cdf_unpack cdf_bang cdf_multiplicity cdf_type
 
 -- | Quote the constructor suffix with its retained names or terminal foralls.
 -- See Note [Terminal constructor foralls in TH] in GHC.ThToHs.
