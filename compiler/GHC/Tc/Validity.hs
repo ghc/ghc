@@ -20,8 +20,8 @@ import GHC.Data.FastString
 import GHC.Data.Maybe
 
 -- friends:
-import GHC.Tc.Utils.Unify    ( tcSubTypeAmbiguity )
-import GHC.Tc.Solver         ( simplifyAmbiguityCheck )
+import GHC.Tc.Utils.Unify    ( tcSubTypeAmbiguity, unifyTypeAndEmit )
+import GHC.Tc.Solver         ( simplifyAmbiguityCheck, pushLevelAndSolveEqualities )
 import GHC.Tc.Instance.Class ( matchGlobalInst, ClsInstResult(..), AssocInstInfo(..) )
 import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Instance.Family
@@ -422,7 +422,8 @@ checkValidType ctxt ty
        ; let ve = ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
                              , ve_rank = rank, ve_expand = expand
                              , ve_indices = emptyVarSet, ve_imported_synonym = False
-                             , ve_partial_family_hint = True }
+                             , ve_partial_family_hint = True
+                             , ve_instance_pat = Nothing }
 
        -- Check the internal validity of the type itself
        -- Fail if bad things happen, else we misleading
@@ -444,16 +445,17 @@ checkValidType ctxt ty
 
 checkValidMonoType :: Type -> TcM ()
 -- Assumes argument is fully zonked
-checkValidMonoType = check_valid_mono_type True
+checkValidMonoType = check_valid_mono_type Nothing
 
-check_valid_mono_type :: Bool -> Type -> TcM ()
-check_valid_mono_type partial_family_hint ty
+check_valid_mono_type :: Maybe SkolemInfoAnon -> Type -> TcM ()
+check_valid_mono_type instance_pat ty
   = do { env <- liftZonkM $ tcInitOpenTidyEnv (tyCoVarsOfTypeList ty)
        ; expand <- initialExpandMode
        ; let ve = ValidityEnv{ ve_tidy_env = env, ve_ctxt = SigmaCtxt
                              , ve_rank = MustBeMonoType, ve_expand = expand
                              , ve_indices = emptyVarSet, ve_imported_synonym = False
-                             , ve_partial_family_hint = partial_family_hint }
+                             , ve_partial_family_hint = isNothing instance_pat || isTyFamFree ty
+                             , ve_instance_pat = instance_pat }
        ; check_type ve ty }
 
 checkTySynRhs :: UserTypeCtxt -> TcType -> TcM ()
@@ -748,7 +750,8 @@ data ValidityEnv = ValidityEnv
   , ve_expand   :: ExpandMode
   , ve_indices  :: VarSet
   , ve_imported_synonym :: Bool
-  , ve_partial_family_hint :: Bool }
+  , ve_partial_family_hint :: Bool
+  , ve_instance_pat :: Maybe SkolemInfoAnon }  -- When checking a matching pattern
 
 instance Outputable ValidityEnv where
   ppr (ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
@@ -795,7 +798,11 @@ check_type _ (TyVarTy _)
 
 check_type ve (AppTy ty1 ty2)
   = do  { check_type ve ty1
-        ; check_arg_type False ve ty2 }
+        ; check_arg_type False ve ty2
+        ; case (ve_instance_pat ve, ve_expand ve) of
+            (_, NoExpand) -> pure ()
+            (Just skol_info, _) -> checkPatternMatchability skol_info ty1
+            _ -> pure () }
 
 check_type ve ty@(TyConApp tc tys)
   | isTypeSynonymTyCon tc || isTypeFamilyTyCon tc
@@ -1476,6 +1483,7 @@ check_pred_ty indices env dflags ctxt expand pred
                     , ve_expand   = expand
                     , ve_indices  = indices
                     , ve_imported_synonym = False
+                    , ve_instance_pat = Nothing
                     , ve_partial_family_hint = case classifyPredType pred of
                         -- The head of a quantified constraint follows the
                         -- same rules as the head of an instance declaration.
@@ -2833,6 +2841,7 @@ checkFamPatBinders fam_tc qtvs non_user_tvs pats rhs
 -- Specifically:
 --    * All monotypes
 --    * No type-family applications
+--    * Matchable application heads
 checkValidTypePats :: TyCon -> [Type] -> TcM ()
 checkValidTypePats tc pat_ty_args
   = do { -- Check that each of pat_ty_args is a monotype.
@@ -2842,7 +2851,7 @@ checkValidTypePats tc pat_ty_args
          --
          -- Suppress the opt-in hint when the expanded pattern still
          -- contains a family application. The extension cannot make it legal.
-         traverse_ (\ty -> check_valid_mono_type (isTyFamFree ty) ty) pat_ty_args
+         traverse_ (check_valid_mono_type (Just skol_info)) pat_ty_args
 
        -- Ensure that no type family applications occur a type pattern
        ; case tcTyConAppTyFamInstsAndVis tc pat_ty_args of
@@ -2853,6 +2862,35 @@ checkValidTypePats tc pat_ty_args
                   tf_is_invis_arg tf_tc tf_args }
   where
     inst_ty = mkTyConApp tc pat_ty_args
+    skol_info
+      | isClassTyCon tc = InstSkol IsClsInst pSizeZero
+      | otherwise       = FamInstSkol
+
+-- | Check the consumed kind binder of an application in an instance pattern.
+-- See Note [Matchability of instance patterns].
+checkPatternMatchability :: SkolemInfoAnon -> Type -> TcM ()
+checkPatternMatchability skol_info head_ty
+  | Just (ma, _, _) <- splitPiTy_maybe (typeKind head_ty)
+  , not (ma `eqType` matchableDataConTy)
+  = pushLevelAndSolveEqualities skol_info [] $
+      void $ unifyTypeAndEmit KindLevel (origin ma) ma matchableDataConTy
+  | otherwise = pure ()
+  where
+    origin ma = TypeEqOrigin { uo_actual = ma, uo_expected = matchableDataConTy
+                             , uo_thing = Nothing, uo_invisible = Nothing }
+
+{- Note [Matchability of instance patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An application such as f x is a matchable pattern only when the
+consumed binder is matchable. A family's binder check can succeed
+if f and x are also bound in other, injective positions. That does
+not make f x a valid pattern. Check the application after synonym
+expansion so a synonym can discard an unused argument. Check the
+matchability of just the consumed binder by nominal equality. Neither the
+instance context nor later instance selection can supply it.
+
+See proposal #242, Application in pattern position.
+-}
 
 -------------------------
 checkConsistentFamInst :: AssocInstInfo

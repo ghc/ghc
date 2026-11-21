@@ -18,6 +18,52 @@ if "${ghc[@]}" -c NativeUnsaturatedInverse.hs >inverse.log 2>&1 ||
     exit 1
 fi
 
+cat >PatternMatchability.hs <<'HS'
+{-# LANGUAGE DataKinds, ExplicitForAll, FlexibleInstances, Modifiers, PolyKinds, TypeFamilies, TypeOperators #-}
+module PatternMatchability where
+
+import Data.Kind (Type)
+import Data.Type.Equality ((:~:)(Refl))
+import GHC.Matchability (M, Matchability, U)
+
+type family UnApp a where
+  UnApp (f x) = x
+
+matchable :: UnApp (Maybe Bool) :~: Bool
+matchable = Refl
+
+type family Flip (m :: Matchability) where
+  Flip U = M
+  Flip M = U
+
+class C t
+instance forall (f :: Type %(Flip U) -> Type) x. C (f x)
+HS
+"${ghc[@]}" -c PatternMatchability.hs
+
+cat >UnmatchablePattern.hs <<'HS'
+{-# LANGUAGE ExplicitForAll, FlexibleInstances, Modifiers, PolyKinds, TypeFamilies #-}
+module UnmatchablePattern where
+
+import Data.Kind (Type)
+import Data.Proxy (Proxy)
+import GHC.Matchability (U)
+
+class C t
+instance forall (f :: Type %U -> Type) x. C (f x)
+
+type family UnApp p q r where
+  forall (f :: Type %U -> Type) x. UnApp (Proxy f) (Proxy x) (f x) = x
+HS
+for flag in -XExperimentalDependentTypes -XNoExperimentalDependentTypes; do
+    if "${ghc[@]}" "$flag" -c UnmatchablePattern.hs >pattern.log 2>&1 ||
+       [[ $(grep -Fc '[GHC-83865]' pattern.log) != 2 ]] ||
+       ! grep -Fq 'Unmatchable' pattern.log || ! grep -Fq 'Matchable' pattern.log; then
+        cat pattern.log >&2
+        exit 1
+    fi
+done
+
 (
     cd producer
     cp "$src/NativeUnsaturatedProvider.hs" .
