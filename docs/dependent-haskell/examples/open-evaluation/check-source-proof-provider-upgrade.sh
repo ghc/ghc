@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 export LC_ALL=C.UTF-8
+version_change=false
+if [[ ${1-} == --different-interface-versions ]]; then
+    version_change=true
+    shift
+fi
 if (( $# != 4 )); then
-    echo "Usage: $0 OLD_GHC OLD_LIB NEW_GHC NEW_LIB" >&2
+    echo "Usage: $0 [--different-interface-versions] OLD_GHC OLD_LIB NEW_GHC NEW_LIB" >&2
     exit 2
 fi
 old=$(realpath "$1")
@@ -49,7 +54,16 @@ compile_proof() {
 
 for form in ALIAS FAMILY; do
     build_provider "$old" "$old_lib" "$form"
-    compile_proof -fenable-rewrite-rules
+    if "$version_change"; then
+        if compile_proof -fenable-rewrite-rules > old-interface.log 2>&1 ||
+           ! grep -Fq 'Origin.hi' old-interface.log ||
+           ! grep -Fq 'mismatched interface file versions' old-interface.log; then
+            cat old-interface.log >&2
+            exit 1
+        fi
+    else
+        compile_proof -fenable-rewrite-rules
+    fi
     build_provider "$new" "$new_lib" "$form"
     if compile_proof -fenable-rewrite-rules > rejected.log 2>&1 ||
        ! grep -Fq 'Proof.hs:10:9: error: [GHC-83605]' rejected.log; then

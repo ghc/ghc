@@ -2060,8 +2060,17 @@ normalized axiom and provider ABI for the promoted and literal
 RHSs. A new compiler reads those existing interfaces in warm home
 builds and in installed packages. Rebuild the checked provider to
 write the dependency and protect future proof uses.
-[Old provider rebuild control](../examples/open-evaluation/check-source-proof-provider-upgrade.sh). The new axiom
-fingerprint invalidates a dependent module with the same normalized
+[Old provider rebuild control](../examples/open-evaluation/check-source-proof-provider-upgrade.sh).
+
+The combined R11/R16 compiler also changes the global interface version
+from v69 to v79. Run the same control with
+`--different-interface-versions` when the old provider uses v69.
+The v79 reader rejects the old interface at the import. After rebuilding
+the provider, the client rejects the conflicting rule at `Refl` for
+both a type synonym and a closed family. It accepts both proofs when
+rewrite rules are disabled.
+
+The new axiom fingerprint invalidates a dependent module with the same normalized
 family result. The same writer uses the established interface
 encoding for an ordinary literal equation.
 
