@@ -129,6 +129,7 @@ import GHC.Core.Unify ( BindFlag(..), tcMatchTy, tcMatchTyX, tcMatchTyX_BM )
 import GHC.Builtin( allNameStrings )
 import GHC.Builtin.Modules (gHC_INTERNAL_TYPENATS)
 import GHC.Builtin.KnownKeys
+import GHC.Builtin.KnownOccs (typeRepIdOcc)
 import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.WiredIn.Prim
 
@@ -520,7 +521,7 @@ tc_lhs_sig_type retained_sig skol_info full_hs_ty@(L loc (HsSig { sig_bndrs = hs
                             , sm_sig_kind_arrows = True }
                     ; stuff <- tcOuterTKBndrsX binder_mode skol_info hs_outer_bndrs $
                                (case retained_sig of
-                                  Just allow_function -> tcCheckRetainedSigType allow_function
+                                  Just allow_function -> tcCheckRetainedSigType allow_function skol_info
                                   Nothing -> tcCheckLHsType) hs_ty exp_kind
                     ; return (exp_kind, outer_ma, stuff) }
 
@@ -590,16 +591,16 @@ tcRetainedAmbientIndices invalid_reason hs_ty
 
 -- | Check retained telescopes in function positions of a complete signature.
 -- See Note [Higher-order retained signatures].
-tcCheckRetainedSigType :: Bool -> LHsType GhcRn -> TcKind -> TcM TcType
-tcCheckRetainedSigType allow_function hs_ty kind
+tcCheckRetainedSigType :: Bool -> SkolemInfo -> LHsType GhcRn -> TcKind -> TcM TcType
+tcCheckRetainedSigType allow_function skol_info hs_ty kind
   = do { indices <- tcRetainedAmbientIndices RetainedLocalSignatureIndex hs_ty
-       ; tcCheckRetainedType allow_function
+       ; tcCheckRetainedType allow_function (Just skol_info)
            (typeLevelMode { mode_indices = indices }) hs_ty kind }
 
 -- | Check a retained type without changing the caller's index environment.
 -- See Note [Retained Pi type arguments].
-tcCheckRetainedType :: Bool -> TcTyMode -> LHsType GhcRn -> TcKind -> TcM TcType
-tcCheckRetainedType allow_function = go
+tcCheckRetainedType :: Bool -> Maybe SkolemInfo -> TcTyMode -> LHsType GhcRn -> TcKind -> TcM TcType
+tcCheckRetainedType allow_function witness_skol = go
   where
     go :: TcTyMode -> LHsType GhcRn -> TcKind -> TcM TcType
     go mode (L _ (HsParTy _ body)) kind = go mode body kind
@@ -642,17 +643,34 @@ tcCheckRetainedType allow_function = go
           = setSrcSpanA lb $
             case bndr of
               HsTvb _ () (HsBndrVar _ (L _ name)) (HsBndrKind _ domain) ->
-                do { domain_ty <- tcRetainedBinderDomain isNativeRetainedBinderType mode domain
-                   ; when (not allow_function && isFunTy domain_ty) $
-                       failWithTc $ TcRnRetainedQuantificationError $
-                         if mode_complete_type_arg mode == Just False
-                         then RetainedPartialTypeArgument
-                         else RetainedFunctionSignature
-                   ; let index = mkLocalId name ManyTy domain_ty
-                         mode' = mode { mode_indices = extendNameEnv (mode_indices mode) name index }
-                   ; body_ty <- check_bndrs mode' rest
-                   ; return (mkDepFunTyWithVis (hsForEachVisibility ann) index body_ty) }
+                do { domain_ty <- tcRetainedBinderDomain valid_domain mode domain
+                   ; case witness_skol of
+                       Just skol | visible, isLiftedTypeKind domain_ty ->
+                         -- See Note [Explicit retained Type witnesses].
+                         do { tv_name <- newSysName (mkTyVarOccFS (occNameFS (nameOccName name)))
+                            ; tv <- newSkolemTyVar skol tv_name liftedTypeKind
+                            ; selector <- tcLookupKnownOccId typeRepIdOcc
+                            ; let (_, rep_ty) = tcSplitPhiTy $
+                                    piResultTys (varType selector) [liftedTypeKind, mkTyVarTy tv]
+                            ; body_ty <- tcExtendNameTyVarEnv [(name, tv)] $
+                                           check_bndrs mode rest
+                            ; return $ mkInfForAllTy unmatchableDataConTy tv $
+                                       tcMkVisFunTy unmatchableDataConTy ManyTy rep_ty body_ty }
+                       _ ->
+                         do { when (not allow_function && isFunTy domain_ty) $
+                                failWithTc $ TcRnRetainedQuantificationError $
+                                  if mode_complete_type_arg mode == Just False
+                                  then RetainedPartialTypeArgument
+                                  else RetainedFunctionSignature
+                            ; let index = mkLocalId name ManyTy domain_ty
+                                  mode' = mode { mode_indices = extendNameEnv (mode_indices mode) name index }
+                            ; body_ty <- check_bndrs mode' rest
+                            ; return (mkDepFunTyWithVis (hsForEachVisibility ann) index body_ty) } }
               _ -> failWithTc $ TcRnRetainedQuantificationError RetainedBinderCount
+
+        visible = hsForEachVisibility ann == DepFunVisible
+        valid_domain ty = isNativeRetainedBinderType ty
+                       || (visible && isJust witness_skol && isLiftedTypeKind ty)
     go mode body kind = tc_check_lhs_type mode body kind
 
 {- Note [Local runtime indices in signatures]
@@ -741,7 +759,7 @@ tcRetainedBinderDomain valid_domain mode domain
 
 {- Note [Source retained signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A source retained argument denotes one runtime Id. The renamer gives that
+A native value index denotes one runtime Id. The renamer gives that
 Id a VarName and binds a type-variable occurrence as an alias of the same
 Name. It does not make a TyVar or change the Name's namespace. An ordinary
 inner forall can shadow the alias through its normal type-variable key.
@@ -779,6 +797,27 @@ Agda.TypeChecking.Rules.Term.checkTelescope'. This scope rule does not
 evaluate a runtime argument.
 The runtime Id follows the native representation described in
 Note [Restricted retained dependent types] in GHC.Core.TyCo.Rep.
+-}
+
+{- Note [Explicit retained Type witnesses]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In a complete value signature, translate a visible `foreach (a :: Type)`
+to `forall {a :: Type}. TypeRep a ->` at the same position. Bind the source
+Name to a real type variable for the rest of the telescope. The function
+equation matches an ordinary value of type `TypeRep a`. A pattern type
+signature can name the erased parameter in that equation.
+
+Use the result type of the canonical `typeRep#` selector to obtain
+`TypeRep a` at kind Type. This does not generate a Typeable constraint
+or call the selector. The caller supplies the lifted witness explicitly.
+The ordinary arrow gives the witness the same demand semantics as an
+explicit TypeRep argument. The interface stores the inferred forall and
+ordinary arrow, so a client can read and use them with the extension off.
+The interface does not record the original foreach spelling.
+
+Keep invisible Type binders, constructor telescopes, and retained Type
+binders in general type arguments outside this translation. See the phase
+distinction in GHC proposal #378.
 -}
 
 {- Note [Exported function-valued retained signatures]
@@ -1905,7 +1944,7 @@ tcHsType mode ty@HsForEachTy{} exp_kind
   | TypeLevel <- mode_tyki mode
   = do { experimental <- xoptM LangExt.ExperimentalDependentTypes
        ; unless experimental $ failWithTc TcRnRetainedQuantificationNotImplemented
-       ; ty' <- tcCheckRetainedType (mode_complete_type_arg mode == Just True)
+       ; ty' <- tcCheckRetainedType (mode_complete_type_arg mode == Just True) Nothing
                                     mode (noLocA ty) liftedTypeKind
        ; checkExpKind mode ty ty' liftedTypeKind exp_kind }
   | otherwise

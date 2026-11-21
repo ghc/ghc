@@ -190,7 +190,8 @@ M58 and M59 expose those rules through source checking.
 - [ ] Extend omission beyond the measured domains and application forms.
       Keep retention independent of visibility and inference.
 - [ ] Specify runtime `Type` operands and their universe representation.
-      Existing `TypeRep` and required erased `forall` leave a bridge to define.
+      Visible binders in value signatures accept explicit `TypeRep` operands.
+      Type operands that request evidence remain open.
 - [x] Finish [M68 ordinary callers](../PLAN.md#m68-ordinary-callers-of-retained-apis).
       Imported retained contracts must preserve inference and evidence scope
       without requiring dependent source syntax. Keep the application change
@@ -261,10 +262,32 @@ runtime representation back across the phase boundary.
 [Design sketch, §1.4.9](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#phase-distinction)
 and [review discussion](https://github.com/ghc-proposals/ghc-proposals/pull/378#issuecomment-765416198).
 
-The 354-line compiler rejects `preserve :: foreach (a :: Type) -> a -> a`
-with GHC-83605 at `(a :: Type)`. The existing algebraic binder
-implementation cannot supply a type representation for this argument.
-There is a working reference implementation with the following types.
+A visible binder in a complete value signature gives the caller an
+ordinary `TypeRep` argument. For example:
+
+```haskell
+preserve :: foreach (a :: Type) -> a -> a
+preserve _ x = x
+
+preserve (typeRep @Bool) True
+```
+
+The signature checker binds the source `a` to an erased type variable and
+uses the canonical `TypeRep a` as the operand type. The function equation
+can bind a value witness and name the erased parameter separately with
+`(rep :: TypeRep witness)`. Use `eqTypeRep` and `HRefl` for a runtime
+comparison. A failed comparison can leave the payload unevaluated.
+
+The [source-hidden regression](../../../testsuite/tests/dependent/should_run/NativeRetainedTypeWitness.sh)
+compiles a Safe provider and a Safe ordinary client at `-O0` and `-O2`.
+The client supplies a witness for its own type. It checks agreement
+between two witnesses and gets its payload back with a bottom witness.
+The interface stores the elaborated type
+`forall {a}. TypeRep a -> a -> a`. The original `foreach` spelling is
+absent from the interface. GHCi displays the elaborated type.
+
+The ordinary reflection API implements the same equality and demand
+semantics with the following types.
 
 ```haskell
 data Request where
@@ -290,12 +313,36 @@ supports types declared in other modules.
 [Agda universe example](https://agda.readthedocs.io/en/stable/language/mutual-recursion.html#interleaved-mutual-blocks)
 and [reflection paper, §§5.2–5.6](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/08/dynamic.pdf#page=6).
 
-- [ ] Give the source binder an erased type variable and a value whose
-  representation is `TypeRep a`. Preserve the source telescope in
-  interfaces. Check a provider and a source-hidden ordinary caller.
-- [ ] Use the type variable in erased positions. Pass the value in
+An ordinary caller can pass `TypeRep a` to a checked lookup that returns
+`Maybe a`. After `eqTypeRep` yields `HRefl`, the provider can use
+`mkFinGeneric` and `indexGeneric` on an existential list at that type.
+Public Stage 2 at `96fddcca11` checked the provider with the dependent
+extension disabled and the native indexing provider available through
+interfaces. The ordinary caller defined its own element type. At `-O0`
+and `-O2`, a type mismatch left the payload and offset lazy.
+
+`SomeTypeRep` can hide a kind other than `Type`. For lifted value types,
+compare `typeRepKind rep` with `typeRep @Type` and match `HRefl` before using
+`withTypeable`. This makes a `Typeable a` constraint available to a
+checked continuation. A required erased `forall a ->` still needs a
+`Typeable a` constraint to construct the representation of an abstract `a`.
+
+An imported type operand such as `(type Bool)` would need interface
+information that identifies the source binder. That call form also needs
+a rule for types that GHC cannot reflect. Runtime type patterns need their
+own syntax and evidence scope. Agda's hierarchy distinguishes a
+universe's level from the datatypes of codes that programs can inspect.
+[Agda universe levels](https://agda.readthedocs.io/en/v2.8.0/language/universe-levels.html)
+and [Agda type codes](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html#forward-declaration).
+
+- [x] Give a visible source binder an erased type variable and a value
+  whose representation is `TypeRep a`. Check a provider and a source-hidden
+  ordinary caller. Keep the ordinary type and arrow in the interface.
+- [x] Use the type variable in erased positions. Pass the value in
   retained positions. Check that `preserve` ignores a bottom
   representation in compiled code and GHCi.
+- [ ] Preserve source telescope information for implicit construction of
+  the runtime representation across modules.
 - [ ] For a concrete type operand, construct the representation from
   GHC's existing `Typeable` evidence. For an abstract operand, track
   where the caller obtains the evidence. An existential input must

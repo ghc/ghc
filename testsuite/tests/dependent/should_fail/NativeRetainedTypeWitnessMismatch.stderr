@@ -1,0 +1,8 @@
+NativeRetainedTypeWitnessMismatch.hs:13:32: error: [GHC-83865]
+    • Couldn't match type ‘Int’ with ‘Bool’
+      Expected: TypeRep Bool
+        Actual: TypeRep Int
+    • In the second argument of ‘agree’, namely ‘(typeRep @Int)’
+      In the expression: agree (typeRep @Bool) (typeRep @Int) True
+      In an equation for ‘wrong’:
+          wrong = agree (typeRep @Bool) (typeRep @Int) True

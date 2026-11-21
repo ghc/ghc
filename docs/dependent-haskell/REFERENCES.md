@@ -6949,10 +6949,18 @@ and [Haskell proof](examples/packed-vector/OpenVectorAppend.hs).
 
 Proposal #378 considers a type representation for a retained `Type`
 operand. The reflection paper supplies a typed representation and the
-evidence from equality testing. The source examples and acceptance
-checks for this bridge are on the [R03 card](roadmap/R03-dependent-products.md#runtime-type-operands).
+evidence from equality testing in an open world. Eisenberg and Weirich's
+singleton encoding keeps both the erased index and its runtime witness.
+Agda's coded universe example separates codes and their interpretation,
+within an explicit hierarchy of sorts. The visible binder implementation
+uses an erased parameter and an explicit, lifted `TypeRep` operand.
+The [R03 card](roadmap/R03-dependent-products.md#runtime-type-operands)
+records the interface contract and the remaining source decisions.
 [Proposal and review](https://github.com/ghc-proposals/ghc-proposals/pull/378)
-and [Peyton Jones, Weirich, Eisenberg and Vytiniotis (2016)](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/08/dynamic.pdf).
+and [Peyton Jones, Weirich, Eisenberg and Vytiniotis (2016)](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/08/dynamic.pdf),
+[Eisenberg and Weirich (2012)](https://richarde.dev/papers/2012/singletons/paper.pdf),
+[Agda universe levels](https://agda.readthedocs.io/en/v2.8.0/language/universe-levels.html)
+and [Agda type codes](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html#forward-declaration).
 
 ### Recursive append at runtime vector arguments
 
