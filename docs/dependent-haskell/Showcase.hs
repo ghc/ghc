@@ -830,6 +830,7 @@ forallMatchability = do
             _ -> False
 
 -- | Keep a boxed value opaque inside a structural list.
+-- Enable -Wpun-bindings to report the shared type and constructor name.
 data GenericOpaque = GenericOpaque Int deriving (Eq, Show)
 
 -- | Keep a newtype value opaque inside a structural list.

@@ -684,6 +684,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnCompatUnqualifiedImport"                   = Outdated 82347
   GhcDiagnosticCode "TcRnRedundantSourceImport"                     = 54478
   GhcDiagnosticCode "TcRnDuplicateDecls"                            = 29916
+  GhcDiagnosticCode "TcRnPunBinding"                                = 59431
   GhcDiagnosticCode "TcRnPackageImportsDisabled"                    = 10032
   GhcDiagnosticCode "TcRnConstrainedFamilyUnsupported"             = 90647
   GhcDiagnosticCode "TcRnIllegalDataCon"                            = 78448
