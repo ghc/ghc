@@ -3019,7 +3019,9 @@ tcUnfoldingRhs source toplvl name declared_ty expr
         when native $
           failIfM (text "Unsupported compulsory retained unfolding:" <+> ppr name)
       RetainedUserSrc ->
-        unless (isTopLevel toplvl && not (hasNativeDependentExprRhs (Type declared_ty))
+        -- Local stable templates use the same tag. Lint them in their
+        -- enclosing interface scope below.
+        unless (not (hasNativeDependentExprRhs (Type declared_ty))
                 && not (hasExistentialExpr core_expr')) $
           failIfM (text "Invalid retained user unfolding:" <+> ppr name)
       _ -> pure ()

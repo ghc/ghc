@@ -377,6 +377,12 @@ simplLazyBind keep_index top_lvl is_rec (bndr,unf_se) (bndr1,env) (rhs,rhs_se)
                      {-#SCC "simplLazyBind-simple-floating" #-}
                      return (body_floats2, body2)
 
+                else if sm_core_mode (seMode env) == RetainedCore
+                        && any (isRetainedUserUnfolding . realIdUnfolding)
+                             (bindersOfBinds (letFloatBinds (sfLetFloats body_floats2))) then
+                     -- See Note [Floating retained user unfoldings] in GHC.Core.Opt.SetLevels.
+                     return (emptyFloats env, wrapFloats body_floats2 body2)
+
                 else -- Non-empty floats, and non-empty tyvars: do type-abstraction first
                      {-#SCC "simplLazyBind-type-abstraction-first" #-}
                      do { (poly_binds, body3) <- abstractFloats (seUnfoldingOpts env) top_lvl

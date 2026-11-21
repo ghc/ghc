@@ -330,6 +330,10 @@ runtime usage. Keep other source lets until backend lowering, except for
 the checked variable aliases described below.
 Do not create new rules or Core unfoldings. mkUnfolding would run occurrence
 analysis again. Do not create join points from pre-existing occurrence metadata.
+Keep an existing checked retained user unfolding when cloning a local binder.
+Apply the same substitution to the stable template as to the binding's scope.
+This preserves the unfolding for the later retained simplifier and does not
+create a new one from the RHS.
 
 When a beta redex uses its binder in an annotation, substitute a checked
 index. An opaque binder at Vec a n can occur in its result type even though
@@ -1368,7 +1372,10 @@ subst_opt_id_bndr env@(SOE { soe_subst = subst, soe_inl = inl }) old_id
 ----------------------
 add_info :: SimpleOptEnv -> InVar -> TopLevelFlag -> OutExpr -> OutVar -> OutVar
 add_info env old_bndr top_level new_rhs new_bndr
- | soe_native env = new_bndr  -- See Note [Restricted dependent simplification]
+ | soe_native env  -- See Note [Restricted dependent simplification]
+ = if isNonCoVarId old_bndr && isRetainedUserUnfolding old_unfolding
+   then setIdUnfolding new_bndr (substUnfolding subst old_unfolding)
+   else new_bndr
  | isTyVar old_bndr = new_bndr
  | otherwise        = lazySetIdInfo new_bndr new_info
  where

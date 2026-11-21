@@ -31,10 +31,8 @@ instance Diagnostic DsMessage where
            text "Retained package matches require prefix patterns with bare variable retained fields and unrestricted multiplicity."
     DsRetainedInlinePragma binding pragma
       -> mkSimpleDecorated $
-           vcat [ text "The" <+> inlinePragmaName pragma <+> text "unfolding of"
-                    <+> quotes (ppr binding) <+> text "still contains retained Core."
-                , text "An importer can select the ordinary optimizer from this binding's type."
-                ]
+           text "The" <+> inlinePragmaName pragma <+> text "unfolding of"
+             <+> quotes (ppr binding) <+> text "contains unsupported retained Core."
     DsEmptyEnumeration
       -> mkSimpleDecorated $ text "Enumeration is empty"
     DsIdentitiesFound conv_fn type_of_conv

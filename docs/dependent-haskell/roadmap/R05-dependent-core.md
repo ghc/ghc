@@ -493,7 +493,12 @@ worker/wrapper preserve the tag. The retained specializer can use
 marked imports. An ordinary wrapper compiled with ignored interface
 pragmas can introduce a marked call after pipeline selection. The
 ordinary optimizer leaves that call intact. A residual local template
-still reports GHC-92256 at the binding.
+can use the same checked tag. Restricted SimpleOpt substitutes its lexical
+captures into the stable template. Both float passes keep a marked binding
+in scope when moving it would require abstraction. A local template inside
+an exported unfolding is checked in its enclosing interface scope.
+An unsupported template, such as one with an erased package operation,
+reports GHC-92256 at the binding.
 [Simplified wrapper](../examples/qualified-pi/IndexBetaClient.hs),
 [finite view producer](../examples/qualified-pi/FinitePosition.hs),
 [ordinary client](../examples/qualified-pi/FinitePositionClient.hs),
