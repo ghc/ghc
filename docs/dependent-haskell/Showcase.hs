@@ -1369,6 +1369,7 @@ main = do
     putStrLn ("prove the list fold law for append: " ++ ListFoldrProof.showListFoldAppend)
     observe "prove the append law through the Prelude.foldr list instance"
         PreludeFoldrProof.example
+    putStrLn ("prove that folding a mapped list composes the step: " ++ PreludeFoldrProof.showFoldMap)
     putStrLn ("prove that reverse preserves list length: "
               ++ PreludeReverseLengthProof.showPreludeReverseLength)
     putStrLn ("prove that map distributes over append: "

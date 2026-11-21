@@ -1743,3 +1743,13 @@ pragmas are available. The proof disables rewrite rules for the list worker.
 [Proof using `Prelude.foldr`](../examples/open-evaluation/PreludeFoldrProof.hs),
 [class promotion roadmap](https://ghc.serokell.io/dh#promote-classes), and
 [GHC's lexical scoping principle](https://github.com/ghc-proposals/ghc-proposals/blob/master/principles.rst#221lexical-scoping-principle-lsp).
+
+### Fold a mapped list
+
+Induction on a finite list spine proves that `foldr k z (map f xs)` equals
+`foldr (k . f) z xs`. The step, mapper, and seed can stay abstract. The
+proof uses the installed `foldr`, `map`, and `(.)` with rewrite rules
+disabled. In the runtime example, both folds skip an undefined seed and
+tail. A step that ignores its head also skips the mapper and input head.
+[Source proof](../examples/open-evaluation/PreludeFoldrProof.hs) and
+[Agda's list law](../REFERENCES.md#right-fold-after-map).
