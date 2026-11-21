@@ -39,6 +39,31 @@ HS
     grep -Fq '[GHC-83865]' empty.log
     grep -Fq 'headVec empty' empty.log
 
+    cat > PeanoEvidence.hs <<'HS'
+{-# LANGUAGE DataKinds, FlexibleContexts, NoExperimentalDependentTypes, TypeApplications #-}
+module PeanoEvidence where
+import GHC.TypeNats.Experimental (FromNatural)
+import PackedVecLibrary (Nat, Vec, replicateNative)
+
+ordinary :: Nat
+ordinary = fromInteger @Nat 2
+
+ordinaryGiven :: Num Nat => Nat
+ordinaryGiven = fromInteger @Nat 2
+
+bare :: Vec Char (FromNatural Nat 2)
+bare = replicateNative 2 'p'
+
+explicit :: Vec Char (FromNatural Nat 2)
+explicit = replicateNative (fromInteger @Nat 2) 'p'
+HS
+    "$ghc" "${flags[@]}" -c PeanoEvidence.hs
+    sed 's/ :: Vec Char/ :: Num Nat => Vec Char/' PeanoEvidence.hs > PeanoGiven.hs
+    if "$ghc" "${flags[@]}" -c PeanoGiven.hs > given.log 2>&1; then exit 1; fi
+    test "$(grep -Fc 'This call needs a known' given.log)" = 2
+    grep -Fq "replicateNative 2 'p'" given.log
+    grep -Fq "replicateNative (fromInteger @Nat 2) 'p'" given.log
+
     # The imported type operator returns its first index. Num.(+) does not.
     cat > TypePlus.hs <<'HS'
 {-# LANGUAGE ExplicitNamespaces, TypeOperators #-}
