@@ -2,7 +2,7 @@
 module RankedPackageClient
     ( runGuarded, runConditional, runProjections, projectAt, runDeclaredWitnesses, runExplicitBranches
     , runMixedPackage, runProducedPackage, runForwardedPackage, runLabelledPackage
-    , runSelectedPackage, runLocalPattern, readCount, refilter, refilterRows, refilterNumericZip
+    , runSelectedPackage, firstSelected, runLocalPattern, readCount, refilter, refilterRows, refilterNumericZip
     ) where
 
 import AlignedList (zipWithExact)
@@ -10,7 +10,7 @@ import Data.Bool (bool)
 import Data.Proxy (Proxy(..))
 import qualified ErasedPackage
 import ImplicitVector (Filtered, HiddenRows, cells, filterVec, packRows, rowLists, withVector)
-import PackedVecLibrary (Nat(..), Vec(..))
+import PackedVecLibrary (Nat(..), Vec(..), toList)
 import RankedPackage
     ( Callback(..), CallbackPair, GuardedBuilder, Hidden, PolyId, PolyMaybe
     , TwoWitnessBuilder, atTwoTypes, consumeIdentity, fromLeft, fromRight
@@ -153,3 +153,7 @@ refilterNumericZip keep x y u v =
     increment :: Vec Int n -> Vec Int n
     increment VNil = VNil
     increment (VCons value rest) = VCons (value + 1) (increment rest)
+
+-- | Open the selected vector and leave the other operand unevaluated.
+firstSelected :: Bool -> Filtered a -> Filtered a -> [a]
+firstSelected flag left right = take 1 (toList (if flag then id left else right))

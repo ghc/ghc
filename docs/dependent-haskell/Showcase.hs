@@ -1250,6 +1250,11 @@ main = do
     observe "read the selected erased package and leave the other lazy"
         (RankedPackageClient.runSelectedPackage chooseLeft,
          RankedPackageClient.runSelectedPackage chooseRight)
+    let evens = ImplicitVector.filterVec even (VCons (4 :: Int) VNil)
+        odds = ImplicitVector.filterVec odd (VCons (5 :: Int) VNil)
+    observe "open the vector chosen by a runtime conditional"
+        (RankedPackageClient.firstSelected chooseLeft evens (error "unused right vector"),
+         RankedPackageClient.firstSelected chooseRight (error "unused left vector") odds)
     observe "consume a hidden Boolean or integer once"
         (RankedPackageClient.readCount (ErasedPackage.encodeCount (Left True)),
          RankedPackageClient.readCount (ErasedPackage.encodeCount (Right 17)))
