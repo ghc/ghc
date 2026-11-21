@@ -56,6 +56,11 @@ test('plugins04',
 test('plugins05', [extra_files(['HomePackagePlugin.hs'])],
      multimod_compile_and_run, ['plugins05', '-package ghc ' + config.plugin_way_flags ])
 
+test('DeferredHeterogeneous',
+     [extra_files(['DeferredHeterogeneousPlugin.hs'])],
+     multimod_compile,
+     ['DeferredHeterogeneous', '-v0 -package ghc -dcore-lint ' + config.plugin_way_flags])
+
 test('plugins06',
      [extra_files(['LinkerTicklingPlugin.hs']),
       unless(have_dynamic(), skip)],
