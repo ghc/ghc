@@ -64,6 +64,7 @@ import qualified RetainedPackageFormat
 import qualified RetainedPackageFormatClient
 import qualified StoredVector
 import qualified ExistentialVec as E
+import qualified WitnessedBatch as Batch
 import Data.IORef (modifyIORef', newIORef, readIORef, writeIORef)
 import Data.Functor.Const (Const(..))
 import Data.Kind (Type)
@@ -1243,6 +1244,14 @@ main = do
         ( Refl :: E.someVec 4 :~: 'E.SomeVec ('E.SS ('E.SS 'E.SZ))
                       ('IndexedVec.VCons 4 ('IndexedVec.VCons 5 'IndexedVec.VNil))
         , E.readSomeVec (E.someVec 4) )
+    observe "read independent length witnesses in a recursive batch"
+        ( Refl :: Batch.build 4 :~: 'Batch.Chunk ('E.SS 'E.SZ) ('IndexedVec.VCons 4 'IndexedVec.VNil)
+                    ('Batch.Chunk ('E.SS ('E.SS 'E.SZ))
+                        ('IndexedVec.VCons 5 ('IndexedVec.VCons 6 'IndexedVec.VNil)) 'Batch.End)
+        , case Batch.build 4 of
+            batch@(Batch.Chunk _ _ rest) -> [Batch.firstWidth batch, Batch.firstWidth rest]
+            Batch.End -> []
+        , Batch.firstWidth (Batch.partial 9) )
     observe "read one field of a private parcel without forcing the other"
         (Refl :: LazyParcel.first (LazyParcel.make 7) :~: 7, LazyParcel.first (LazyParcel.make 7))
     observe "construct a result from two symbolic fields"
