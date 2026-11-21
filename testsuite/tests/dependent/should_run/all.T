@@ -420,7 +420,8 @@ test('NativeRetainedMatchability',
 test('NativeNestedPackagePat',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['NativeGadtRetainedSumProvider.hs', 'NativeNestedPackagePatProvider.hs',
-                   'NativeNestedPackagePatClient.hs', 'NativeNestedPackagePatBad.hs'])],
+                   'NativeNestedPackagePatClient.hs', 'NativeNestedPackagePatBad.hs',
+                   '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs'])],
      run_command, ['bash NativeNestedPackagePat.sh "{compiler}" "{libdir}"'])
 
 test('NativeRetainedIndexHpc',

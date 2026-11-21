@@ -20,8 +20,8 @@ for opt in -O0 -O2; do
     work="$out/$opt"
     mkdir -p "$work"/{provider,client,hidden}
     cd "$work/provider"
-    cp "$src/"{"$base","$provider"}.hs .
-    "${ghc[@]}" "${flags[@]}" -c "$base.hs" "$provider.hs"
+    cp "$src/"{"$base","$provider",PackedVecLibrary}.hs .
+    "${ghc[@]}" "${flags[@]}" -c PackedVecLibrary.hs "$base.hs" "$provider.hs"
     mv ./*.hs ../hidden/
     cd ../client
     cp ../provider/*.hi "$src/"{"$client","$bad"}.hs .
@@ -39,7 +39,7 @@ for opt in -O0 -O2; do
         exit 1
     fi
     "${ghc[@]}" "${flags[@]}" -fhpc -package template-haskell \
-        "$client.o" "../provider/$base.o" "../provider/$provider.o" -o run
+        "$client.o" "../provider/$base.o" "../provider/$provider.o" ../provider/PackedVecLibrary.o -o run
     ./run
     test -s run.tix
 

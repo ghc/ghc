@@ -33,7 +33,7 @@ import NativeLinearIndexColumns (choose)
 import FinitePositionClient (lookupVecViaView, observeConstructedViews, observeEmptyIndex, observeFinitePosition, observeListIndices)
 import NativeIndexedFinGate (Gate(..), Ticket(..), grant)
 import NativeRetainedAsPattern (lookupBoth)
-import PackedVecLibrary (Nat(..), Vec(..), toList)
+import PackedVecLibrary (Nat(..), Vec(..), appendNative, replicateNative, takeVec, toList)
 import ParameterizedIndexLibrary (indexVec, lookupVecChecked, mkFinGeneric, mkFinVec)
 
 written = toList (zipWithExact [1,2] [10,20] (+)) :: [Int]
@@ -108,6 +108,15 @@ main = do
     case (lookupVecViaView absent minBound, lookupVecViaView (VNil :: Vec Int 'Z) 0,
           lookupVecViaView prefix 1, isJust (lookupVecViaView selectedBottom 1)) of
         (Nothing, Nothing, Just 29, True) -> pure ()
+        actual -> fail (show actual)
+    case (lookupVecChecked absent minBound, lookupVecChecked (VNil :: Vec Int 'Z) 0,
+          lookupVecChecked prefix 1, isJust (lookupVecChecked selectedBottom 1)) of
+        (Nothing, Nothing, Just 29, True) -> pure ()
+        actual -> fail (show actual)
+    cut <- newIORef (S (S Z)) >>= readIORef
+    let joined = appendNative @Int cut (S Z) (replicateNative cut 7) (VCons 9 VNil)
+    case lookupVecChecked (takeVec @('S 'Z) cut joined) 1 of
+        Just 7 -> pure ()
         actual -> fail (show actual)
 HS
     "${ghc[@]}" "$opt" -c Main.hs

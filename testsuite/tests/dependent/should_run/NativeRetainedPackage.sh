@@ -465,6 +465,8 @@ if "${g[@]}" -Werror=inaccessible-code -c Impossible.hs >impossible.log 2>&1 ||
     cat impossible.log >&2
     exit 1
 fi
+# Allow desugaring and Core Lint to run on the same source.
+"${g[@]}" -Wno-inaccessible-code -Wno-overlapping-patterns -c Impossible.hs
 
 cat >ListVectorMain.hs <<'HS'
 {-# LANGUAGE DataKinds, ExplicitNamespaces, GADTs, NoExperimentalDependentTypes, RequiredTypeArguments, ScopedTypeVariables, TypeApplications #-}
