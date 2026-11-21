@@ -53,5 +53,6 @@ The second branch leaves the unused header unevaluated.
 
 The let RHS keeps its infix syntax for normal fixity resolution. A
 backticked type variable can supply the operator, so the helper
-captures the operator as well as variables from its two operands.
+captures the operator as well as variables from its two operands. A function
+RHS can also mention a multiplicity parameter in its arrow.
 [GHC's infix type syntax](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/infix_tycons.html).

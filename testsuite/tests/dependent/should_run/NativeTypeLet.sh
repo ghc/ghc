@@ -98,20 +98,24 @@ reject UnusedInvalid 3:38 83865 'Expected a type'
 # The infix operator can be a captured type variable.
 cd "$out/provider"
 cat > Operator.hs <<'HS'
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeFamilies, TypeOperators #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, LinearTypes, StarIsType, TypeFamilies, TypeOperators #-}
+{-# OPTIONS_GHC -Wno-star-is-type #-}
 module Operator where
-import Data.Kind (Type)
-type Result (f :: Type -> Type -> Type) a b flag =
+import GHC.Exts (Multiplicity)
+type Result (f :: * -> * -> *) a b flag =
     let field = a `f` b in case flag of { True -> Maybe field; False -> [field] }
+type Handler (m :: Multiplicity) a b flag =
+    let callback = a %m -> b in case flag of { True -> Maybe callback; False -> [callback] }
 HS
 "${g[@]}" -fomit-interface-pragmas -c Operator.hs
 cp Operator.hi "$out/client/"
 cd "$out/client"
 cat > Main.hs <<'HS'
-{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
+{-# LANGUAGE DataKinds, LinearTypes, NoExperimentalDependentTypes, TypeOperators #-}
 module Main where
 import Data.Type.Equality ((:~:)(Refl))
-import Operator (Result)
+import GHC.Exts (Multiplicity(..))
+import Operator (Handler, Result)
 import PackedVecLibrary (Vec(..))
 import TypeLet (Frame, frameValues)
 
@@ -123,6 +127,10 @@ captured :: Result Either Char Bool 'True :~: Maybe (Either Char Bool)
 captured = Refl
 second :: Result (,) Char Bool 'False :~: [(Char, Bool)]
 second = Refl
+linear :: Handler 'One Char Bool 'True :~: Maybe (Char %1 -> Bool)
+linear = Refl
+many :: Handler 'Many Char Bool 'False :~: [Char -> Bool]
+many = Refl
 
 main :: IO ()
 main = do
