@@ -3,7 +3,7 @@ module NativeNestedCase
   ( Pick, Pair(..), LeftFirst, IgnoreLeft, Uniform, SameFallback
   , Indexed(..), IndexedPick, TypeHead, UniformTypeHead, Wrapped, WrappedBool
   , PickFlipped, DiscardConstant, CaptureFlipped, WrittenFirst
-  , AliasFirst, MixedAlias, ArrowResult
+  , AliasFirst, MixedAlias, ArrowDomain, ArrowResult
   , CaseFlag(..), ForallResult, ForallRepResult, forallResult
   , FamilyGate(..), FamilyGatePick, WrittenGatePick, HiddenGatePick, ApartGatePick
   , DependentFieldGate(..), DependentFieldPick
@@ -239,6 +239,14 @@ type ArrowResult (tag :: k) (d :: Maybe (Maybe Bool)) =
     Just (Just field) -> (Proxy tag, Proxy field)
     Just _ -> (Proxy tag, Proxy 'False)
     Nothing -> ())
+
+-- | Select the input type and keep the captured tag in the matching rows.
+type ArrowDomain (tag :: k) (d :: Maybe (Maybe Bool)) =
+  (case d of
+    Just (Just True) -> (Proxy tag, Int)
+    Just (Just bit) -> (Proxy tag, Proxy bit)
+    Just Nothing -> Proxy tag
+    Nothing -> Char) -> Int
 
 data CaseFlag (d :: Maybe Bool) where
   CaseOn :: CaseFlag ('Just 'True)

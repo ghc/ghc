@@ -204,6 +204,12 @@ arrowResult ::
   N.ArrowResult 'LT ('Just ('Just 'True)) :~: (() -> (Proxy 'LT, Proxy 'True))
 arrowResult = Refl
 
+arrowDomain ::
+  ( N.ArrowDomain 'LT ('Just ('Just 'True)) :~: ((Proxy 'LT, Int) -> Int)
+  , N.ArrowDomain 'GT ('Just ('Just 'False)) :~: ((Proxy 'GT, Proxy 'False) -> Int)
+  , N.ArrowDomain 'EQ 'Nothing :~: (Char -> Int) )
+arrowDomain = (Refl, Refl, Refl)
+
 forallResult :: N.ForallResult
 forallResult tag N.CaseOn = (tag, 1)
 forallResult tag N.CaseOff = (tag, 0)

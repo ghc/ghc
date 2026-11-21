@@ -83,3 +83,7 @@ blockedBranch _ _ = Refl
 blockedNestedLet :: Proxy a -> Proxy bit ->
   NestedLetCase a ('Just bit) :~: Proxy '(Maybe a, Either (Maybe a) (Maybe a))
 blockedNestedLet _ _ = Refl
+
+blockedArrowDomain :: Proxy bit ->
+  N.ArrowDomain 'LT ('Just ('Just bit)) :~: ((Proxy 'LT, Proxy bit) -> Int)
+blockedArrowDomain _ = Refl

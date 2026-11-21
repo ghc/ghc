@@ -53,6 +53,8 @@ cp NativeCase.hi NativeNestedCase.hi OpenMapWorker.hi NativeTypeCaseFallback.hi 
    grep -Eq 'the type case in .*RefinedBranchPick' bad.log &&
    grep -Fq 'NativeTypeCaseRigid.hs:85:24: error: [GHC-83865]' bad.log &&
    grep -Eq 'the type case in .*NestedLetCase' bad.log &&
+   grep -Fq 'NativeTypeCaseRigid.hs:89:24: error: [GHC-83865]' bad.log &&
+   grep -Eq 'the type case in .*ArrowDomain' bad.log &&
    ! grep -Eq '\$(case(-node)?|lambda):' bad.log &&
    reject NativeTypeCaseLetWrong 8:9 'GHC-83865')
 "${g[@]}" -fomit-interface-pragmas -c NativeTypeCaseHeadProvider.hs
@@ -76,6 +78,8 @@ grep -Fq "In the type case in" bad.log
 grep -Fq "BadArrow" bad.log
 grep -Fq 'NativeTypeCaseBranchKind.hs:14:12: error: [GHC-83865]' bad.log
 grep -Fq "BadForall" bad.log
+grep -Fq 'NativeTypeCaseBranchKind.hs:18:12: error: [GHC-83865]' bad.log
+grep -Eq 'the type case in .*BadArrowDomain' bad.log
 reject NativeTypeCaseForallResult 4:60 '[GHC-97233]'
 reject NativeTypeCaseSignatureDistinct 9:26 '[GHC-83865]'
 grep -Fq 'NativeTypeCaseSignatureDistinct.hs:15:25: error: [GHC-83865]' bad.log
@@ -272,7 +276,7 @@ cp NativeTypeCaseRetainedField.hi interfaces/
 (
     cd interfaces
     cat >NativeTypeCaseRetainedFieldClient.hs <<'HS'
-{-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
+{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}
 module Main where
 import Control.Exception (ErrorCall(..), evaluate, try)
 import Control.Monad (forM_)
@@ -314,6 +318,12 @@ readStored :: StoredField -> Int
 readStored (StoredField True n) = n
 readStored (StoredField False n) = n
 
+ignoreOn :: Field.ArrowDomain 'LT ('Just ('Just 'True))
+ignoreOn _ = 17
+
+ignoreOff :: Field.ArrowDomain 'GT ('Just ('Just 'False))
+ignoreOff _ = 29
+
 main :: IO ()
 main = do
   input <- newIORef False
@@ -323,13 +333,14 @@ main = do
     print (pick value selected, closed value constant, negated value)
   print (readStored stored)
   print (guarded True False selected, cachedResult True selected)
+  print (ignoreOn (error "unused on"), ignoreOff (error "unused off"))
   result <- try (evaluate (pick (error "strict scrutinee") selected)) :: IO (Either ErrorCall String)
   print (either (\(ErrorCall message) -> message == "strict scrutinee") (const False) result)
 HS
     "${g[@]}" -c NativeTypeCaseRetainedFieldClient.hs
     "${g[@]}" NativeTypeCaseRetainedFieldClient.o ../NativeTypeCaseRetainedField.o ../NativeNestedCase.o -o run-retained-field
     ./run-retained-field >retained-field.out
-    printf '("x",23,"41")\n("11",11,"t")\n23\n("fallthrough","same")\nTrue\n' | diff -u - retained-field.out
+    printf '("x",23,"41")\n("11",11,"t")\n23\n("fallthrough","same")\n(17,29)\nTrue\n' | diff -u - retained-field.out
 
     cat >BadRetainedField.hs <<'HS'
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}

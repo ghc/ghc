@@ -12,3 +12,7 @@ type BadArrow a = () -> (case a of
 type BadForall = forall (b :: Bool). () -> (case b of
   True -> Int
   False -> 'False)
+
+type BadArrowDomain a = (case a of
+  True -> Int
+  False -> 'False) -> ()

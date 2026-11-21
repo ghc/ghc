@@ -1058,8 +1058,8 @@ capture under a fresh name before restoring the aliases.
 An inferred kind parameter must be determined by a checked capture.
 See Note [Checked RHSs for cases in type lets] in GHC.Tc.TyCl.
 
-The result of an ordinary arrow has the same lexical scope as the
-arrow. Use the enclosing captures when lifting a case in the result.
+Both sides of an ordinary arrow have the arrow's lexical scope.
+Lift each side with the same captures and preserve the arrow itself.
 
 Keep an invisible forall in place and copy its binders, in order, to
 the family header. The application uses the original variables inside
@@ -1153,8 +1153,9 @@ liftTypeCases group =
       in (letTy loc ann v rhs' body, cases, next)
     liftRhs owner independent captures aliases
       (L loc (HsFunTy ann arrow@(HsModifiedFunArr _ [] HsStandardArr{}) domain result)) salt =
-      let (result', cases, next) = liftRhs owner independent captures aliases result salt
-      in (L loc (HsFunTy ann arrow domain result'), cases, next)
+      let (domain', domain_cases, next) = liftRhs owner independent captures aliases domain salt
+          (result', result_cases, end) = liftRhs owner independent captures aliases result next
+      in (L loc (HsFunTy ann arrow domain' result'), domain_cases ++ result_cases, end)
     liftRhs owner independent captures aliases
       (L loc quantified@HsForAllTy
         { hst_tele = HsForAllInvis { hsf_matchability = Nothing, hsf_invis_bndrs = binders }

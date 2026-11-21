@@ -212,7 +212,8 @@ tests `not b`. Its ordinary client reads `b` at runtime and gets a
 character at `True` and an integer at `False`. An unqualified call uses
 the function in scope in the declaration group. A rule that can change
 that function blocks the proof. At an unknown index, the case still
-waits for a matching row. Function-arrow domains remain outside this rule.
+waits for a matching row. The same check applies to a case in the
+domain of an ordinary arrow in the field.
 [Field source](../examples/open-evaluation/NativeNestedCase.hs).
 
 Template Haskell reports GHC-75721 at a splice that reifies a retained
@@ -297,17 +298,21 @@ older installed provider to publish its shared family. A client build
 cannot rebuild the installed package.
 [Two-compiler upgrade check](../examples/open-evaluation/check-retained-case-upgrade.sh).
 
-## A case as an arrow result
+## A case in an ordinary function arrow
 
-A top-level synonym can select the result of an ordinary arrow.
+A top-level synonym can select the input or result type of an ordinary
+arrow.
 
 ```haskell
+type Input b = (case b of { True -> Int; False -> Char }) -> ()
 type Result b = () -> (case b of { True -> Int; False -> Char })
 ```
 
-The result shares the arrow's lexical scope. The private family takes
+Both sides share the arrow's lexical scope. The private family takes
 the same captures as a case at the root of the synonym. An ordinary
-client can use `Result 'True` as `() -> Int` through a stripped interface.
+client can use `Input 'True` as `Int -> ()` and `Result 'True` as
+`() -> Int` through a stripped interface. Choosing a domain type adds
+no runtime demand on the argument.
 Template Haskell reification preserves the arrow and the exact name of
 the lowered case family. [Serokell roadmap](https://ghc.serokell.io/dh#type-level-case-expressions),
 [promotion paper, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf),
