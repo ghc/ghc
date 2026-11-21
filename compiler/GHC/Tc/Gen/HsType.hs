@@ -2165,6 +2165,8 @@ tcHsType mode src@(XHsType (HsTypeExistsRn flag binder body)) exp_kind
              checkExpKind mode src (ExistsTy flag tv body') liftedTypeKind exp_kind
            _ -> panic "tcHsType: existential binder count" }
 
+tcHsType mode (XHsType (HsGadtFieldRn field)) exp_kind =
+  tcLHsType mode (cdf_type field) exp_kind
 tcHsType _ (XHsType HsTypeCaseAliasRn{}) _ = failWithTc TcRnTypeCaseContext
 tcHsType _ (XHsType HsTypeCaseRn{}) _ = failWithTc TcRnTypeCaseContext
 

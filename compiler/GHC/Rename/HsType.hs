@@ -9,7 +9,7 @@
 
 module GHC.Rename.HsType (
         -- Type related stuff
-        rnHsType, rnLHsType, rnLHsTypes, rnContext, rnMaybeContext,
+        rnHsType, rnLHsType, rnLHsTypes, rnLHsGadtSuffix, rnContext, rnMaybeContext,
         rnModifier, rnModifierWith,
         rnModifierContext, rnModifiersContext, rnModifiersContextAndWarn,
         rnLHsKind, rnLHsTypeArgs,
@@ -746,6 +746,7 @@ data RnTyKiEnv
     }
 
 data RnTyKiWhat = RnTypeBody
+                | RnGadtSuffix      -- The right spine of an ordered GADT signature
                 | RnTopConstraint   -- Top-level context of HsSigWcTypes
                 | RnConstraint      -- All other constraints
 
@@ -758,6 +759,7 @@ instance Outputable RnTyKiEnv where
 
 instance Outputable RnTyKiWhat where
   ppr RnTypeBody      = text "RnTypeBody"
+  ppr RnGadtSuffix    = text "RnGadtSuffix"
   ppr RnTopConstraint = text "RnTopConstraint"
   ppr RnConstraint    = text "RnConstraint"
 
@@ -840,6 +842,10 @@ rnModifiersAndWarn env = rnModifiersWith (rnModifierAndWarn env)
 rnLHsType  :: HsDocContext -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeNames)
 rnLHsType ctxt ty = rnLHsTyKi (mkTyKiEnv ctxt TypeLevel RnTypeBody) ty
 
+-- | Rename the fields and groups after the first group of an ordered GADT.
+rnLHsGadtSuffix :: HsDocContext -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeNames)
+rnLHsGadtSuffix ctxt = rnLHsTyKi (mkTyKiEnv ctxt TypeLevel RnGadtSuffix)
+
 rnLHsTypes :: HsDocContext -> [LHsType GhcPs] -> RnM ([LHsType GhcRn], FreeNames)
 rnLHsTypes doc tys = mapFvRn (rnLHsType doc) tys
 
@@ -904,8 +910,16 @@ rnMaybeContext doc (Just theta)
 rnLHsTyKi  :: RnTyKiEnv -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeNames)
 rnLHsTyKi env (L loc ty)
   = setSrcSpanA loc $
-    do { (ty', fvs) <- rnHsTyKi env ty
+    do { (ty', fvs) <- rnHsTyKi env' ty
        ; return (L loc ty', fvs) }
+  where
+    env' | RnGadtSuffix <- rtke_what env = case ty of
+             HsForAllTy{} -> env
+             HsQualTy{}   -> env
+             HsFunTy{}    -> env
+             HsParTy{}    -> env
+             _            -> env { rtke_what = RnTypeBody }
+         | otherwise = env
 
 rnHsTyKi :: RnTyKiEnv -> HsType GhcPs -> RnM (HsType GhcRn, FreeNames)
 
@@ -955,11 +969,34 @@ rnHsTyKi env (HsParTy _ ty)
        ; return (HsParTy noAnn ty', fvs) }
 
 rnHsTyKi env (HsFunTy u mult ty1 ty2)
-  = do { (ty1', fvs1) <- rnLHsTyKi env ty1
+  -- See Note [Late GADT field annotations].
+  | RnGadtSuffix <- rtke_what env
+  , field <- mkConDeclField mult ty1
+  , cdf_bang field /= NoSrcStrict || cdf_unpack field /= NoSrcUnpack
+  = do { (field', fvs1) <- rnHsConDeclFieldTyKi (env { rtke_what = RnTypeBody }) field
        ; (ty2', fvs2) <- rnLHsTyKi env ty2
-       ; (mult', w_fvs) <- rnHsModifiedFunArrWith (rnModifier env) mult
+       ; let ty1' = L (getLoc ty1) (XHsType (HsGadtFieldRn field'))
+       ; return (HsFunTy u (cdf_multiplicity field') ty1' ty2', fvs1 `plusFN` fvs2) }
+  | otherwise
+  = do { (ty1', fvs1) <- rnLHsTyKi field_env ty1
+       ; (ty2', fvs2) <- rnLHsTyKi env ty2
+       ; (mult', w_fvs) <- rnHsModifiedFunArrWith (rnModifier field_env) mult
        ; return (HsFunTy u mult' ty1' ty2'
                 , plusFNs [fvs1, fvs2, w_fvs]) }
+  where
+    field_env | RnGadtSuffix <- rtke_what env = env { rtke_what = RnTypeBody }
+              | otherwise = env
+
+{- Note [Late GADT field annotations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The parser stores the signature after the first late group as a type.
+An arrow on that suffix spine represents a field. Rename its annotated
+domain as a constructor field and keep it in HsGadtFieldRn.
+splitGadtInterior then recovers the fields in order.
+
+Stop treating arrows as fields inside a field type, a predicate, or the
+constructor result. A bang there is subject to the ordinary type rules.
+-}
 
 rnHsTyKi env listTy@(HsListTy x ty)
   = do { when (isRnKindLevel env) $
@@ -1354,6 +1391,7 @@ checkAnonWildCard env
            | otherwise
            = case rtke_what env of
                RnTypeBody      -> Nothing
+               RnGadtSuffix    -> Nothing
                RnTopConstraint -> Just WildcardNotLastInConstraint
                RnConstraint    -> Just WildcardNotLastInConstraint
 
@@ -1369,6 +1407,7 @@ checkNamedWildCard env name
            | otherwise
            = case rtke_what env of
                RnTypeBody      -> Nothing   -- Allowed
+               RnGadtSuffix    -> Nothing
                RnTopConstraint -> Nothing   -- Allowed; e.g.
                   -- f :: (Eq _a) => _a -> Int
                   -- g :: (_a, _b) => T _a _b -> Int
@@ -2753,6 +2792,7 @@ extract_lty (L _ ty) acc
       HsQualTy { hst_ctxt = ctxt, hst_body = ty }
                                   -> extract_lctxt ctxt $
                                      extract_lty ty acc
+      XHsType (HsBangTy _ _ ty)    -> extract_lty ty acc
       XHsType (HsTypeExists _ binder body) ->
         extract_hs_tv_bndrs [binder] acc (extract_lty body [])
       XHsType (HsTypeCaseAlias _ (_, _, alias) body) ->

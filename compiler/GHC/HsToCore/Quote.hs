@@ -3137,6 +3137,11 @@ repGadtDataCons cons details res_ty
     = do cons' <- mapM lookupLOcc cons -- See Note [Binders and occurrences]
          case details of
            PrefixConGADT _ ps
+             | Just (groups, result) <- HsDecls.splitGadtInterior details res_ty
+             , any annotated_field groups -> do
+               prefix <- mapM rep_field ps
+               ordered (nonEmptyCoreList' cons') result (reverse prefix) groups
+           PrefixConGADT _ ps
              | hsHasForEachTy (unLoc res_ty)
              || isJust (HsDecls.splitGadtTerminal details res_ty)
              || isJust (HsDecls.splitGadtInterior details res_ty) -> do
@@ -3152,8 +3157,42 @@ repGadtDataCons cons details res_ty
              rep2 recGadtCOcc [unC (nonEmptyCoreList' cons'), unC arg_vtys,
                                 unC res_ty']
   where
+    annotated_field (Right CDF { cdf_unpack, cdf_bang }) =
+      cdf_unpack /= NoSrcUnpack || cdf_bang /= NoSrcStrict
+    annotated_field (Left _) = False
+
     rep_field (CDF { cdf_unpack, cdf_bang, cdf_multiplicity, cdf_type }) =
       repGadtValueArg cdf_unpack cdf_bang cdf_multiplicity cdf_type
+
+    ordered :: Core [TH.Name] -> LHsType GhcRn -> [Core (M TH.RetainedGadtArg)]
+            -> [Either (LHsGadtTelescope GhcRn) (HsConDeclField GhcRn)]
+            -> MetaM (Core (M TH.Con))
+    ordered names result args [] = do
+      args' <- coreListM retainedGadtArgTyConOcc (reverse args)
+      result' <- repLTy TypeLevel result
+      rep2 retainedGadtCOcc [unC names, unC args', unC result']
+    ordered names result args (Right field : rest) = do
+      arg <- rep_field field
+      ordered names result (arg : args) rest
+    ordered names result args (Left (L _ group) : rest) = case group of
+      HsGadtContext ctxt -> do
+        ctxt' <- repContext (unLoc ctxt)
+        arg <- rep2 gadtContextArgsOcc [unC ctxt']
+        ordered names result (arg : args) rest
+      HsGadtForAll _ tele -> do
+        ma <- repForallMatchability (Just TypeLevel) (hsf_matchability tele)
+        case ma of
+          Nothing -> panic "repGadtDataCons: missing matchability"
+          Just ma' -> case tele of
+            HsForAllInvis { hsf_invis_bndrs = tvs } ->
+              addHsTyVarBinds @Specificity @TH.Specificity FreshNamesOnly tvs $ \bndrs -> do
+                arg <- rep2 gadtInvisibleArgsOcc [unC ma', unC bndrs]
+                ordered names result (arg : args) rest
+            HsForAllVis { hsf_vis_bndrs = tvs } ->
+              addHsTyVarBinds @() @() FreshNamesOnly tvs $ \bndrs -> do
+                arg <- rep2 gadtRequiredArgsOcc [unC ma', unC bndrs]
+                ordered names result (arg : args) rest
+      HsGadtPar{} -> ordered names result args rest
 
 -- | Quote the constructor suffix with its retained names or terminal foralls.
 -- See Note [Terminal constructor foralls in TH] in GHC.ThToHs.

@@ -538,6 +538,8 @@ type HsCoreTy = Type
 -- | Renamed type extensions that need kind checking.
 data HsTypeGhcRnExt
   = HsCoreTyRn HsCoreTy
+  | HsGadtFieldRn (HsConDeclField GhcRn)
+    -- See Note [Late GADT field annotations] in GHC.Rename.HsType.
   | HsTypeExistsRn !ExistsTyFlag (LHsTyVarBndr Specificity GhcRn) (LHsType GhcRn)
   | HsTypeLetRn (LocatedN Name) (LHsType GhcRn) (LHsType GhcRn)
   | HsTypeCaseAliasRn (Name, Int, Maybe (LocatedN Name)) (LHsType GhcRn)
@@ -1714,6 +1716,7 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
         <+> text "in" <+> ppr_mono_lty body
   GhcRn -> case t of
     HsCoreTyRn ty -> ppr ty
+    HsGadtFieldRn field -> pprHsConDeclFieldNoMult field
     HsTypeCaseAliasRn _ body -> ppr_mono_lty body
     HsTypeCaseRn scrutinee rows ->
       text "case" <+> ppr_mono_lty scrutinee <+> text "of"
@@ -1801,6 +1804,7 @@ hsTypeNeedsParens p = go_hs_ty
         HsTypeCase{} -> p >= topPrec
       GhcRn -> case t of
         HsCoreTyRn ty -> go_core_ty ty
+        HsGadtFieldRn{} -> False
         HsTypeCaseAliasRn{} -> p >= topPrec
         HsTypeCaseRn{} -> p >= topPrec
         HsTypeExistsRn{} -> p >= funPrec

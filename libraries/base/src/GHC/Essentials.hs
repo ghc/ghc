@@ -240,6 +240,7 @@ module GHC.Essentials
     , Guard, normalGE, patGE
     , normalC, recC, infixC, forallC, forallMatchC, gadtC, recGadtC
     , retainedGadtC, gadtValueArg, gadtIndexArg
+    , gadtInvisibleArgs, gadtRequiredArgs, gadtContextArgs
     , TH.bang, TH.bangType, TH.varBangType
     , TH.unidir, TH.implBidir, TH.explBidir
     , TH.prefixPatSyn, TH.recordPatSyn, TH.infixPatSyn
