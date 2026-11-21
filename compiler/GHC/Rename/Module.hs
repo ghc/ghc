@@ -19,7 +19,7 @@ module GHC.Rename.Module (
 import GHC.Prelude hiding ( head )
 
 import {-# SOURCE #-} GHC.Rename.Expr( rnLExpr )
-import {-# SOURCE #-} GHC.Rename.Splice ( rnSpliceDecl, rnTopSpliceDecls )
+import {-# SOURCE #-} GHC.Rename.Splice ( rnSpliceDecl, rnTopSpliceDecls, rnSpliceTypeWith )
 
 import GHC.Hs
 import GHC.Hs.Type (mkHsImplicitSigType, HsTypeGhcPsExt(HsTypeCase, HsTypeCaseAlias, HsTypeLet, HsTypeSome), HsTypeCaseAlt(..))
@@ -79,11 +79,11 @@ import qualified GHC.LanguageExtensions as LangExt
 import Language.Haskell.Syntax.Specificity (Specificity(SpecifiedSpec))
 
 import Control.Monad
-import Data.Bifunctor ( first )
+import Data.Bifunctor ( first, second )
 import Data.Foldable ( toList, for_ )
 import Data.List ( elemIndex, find, mapAccumL, nub, partition, unzip4 )
 import Data.List.NonEmpty ( NonEmpty(..), head, nonEmpty )
-import Data.Data (Data, cast, gmapQ)
+import Data.Data (Data, cast, gmapQ, gmapT)
 import Data.Maybe (catMaybes,  isJust, isNothing, fromMaybe, mapMaybe, maybeToList )
 import qualified Data.Set as Set ( delete, difference, disjoint, empty, fromList, member, null, toList, union )
 
@@ -521,13 +521,16 @@ data LiftedTypeSite
 
 -- | Rewrite the declarations and return their new private synonyms separately.
 -- See Note [Lifting types from signatures and fields].
-liftDeclarationTypes :: [(RdrName, Maybe (GlobalRdrElt, Name))] -> Bool -> HsGroup GhcPs
+liftDeclarationTypes :: [(RdrName, Maybe (GlobalRdrElt, Name))]
+                     -> [(RetainedCaseKey, RdrName)] -> (Int -> String)
+                     -> Bool -> Bool -> HsGroup GhcPs
                      -> (HsGroup GhcPs, [TyClGroup GhcPs], LiftedDecls,
-                         [(LocatedN RdrName, GlobalRdrElt)], [LocatedN RdrName])
-liftDeclarationTypes source_heads named_wildcards group
+                         [(LocatedN RdrName, GlobalRdrElt)], [LocatedN RdrName],
+                         [(RetainedCaseKey, OccName)])
+liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcards group
   | not (null synonyms)
-  = (group{hs_valds = values, hs_tyclds = type_groups}, [anchors], names, concat uses, missing)
-  | otherwise = (group, [], [], [], [])
+  = (group{hs_valds = values, hs_tyclds = type_groups}, [anchors], names, concat uses, missing, helpers)
+  | otherwise = (group, [], [], [], [], [])
   where
     (values, signature_types) = case hs_valds group of
       ValBinds ann binds ->
@@ -536,7 +539,8 @@ liftDeclarationTypes source_heads named_wildcards group
         in (ValBinds ann binds', concat types)
       binds -> (binds, [])
     (type_groups, groups_sums) = unzip (map liftGroup (hs_tyclds group))
-    (_, shared) = mapAccumL shareRetainedCase [] signature_types
+    (seen, shared) = mapAccumL shareRetainedCase earlier signature_types
+    helpers = [(key, rdrNameOcc name) | (key, name) <- seen, isUnqual name]
     (shared_types, uses) = unzip shared
     field_types = concat groups_sums
     (synonyms, names) = unzip (shared_types ++ [entry | (entry, _, _) <- field_types])
@@ -545,10 +549,10 @@ liftDeclarationTypes source_heads named_wildcards group
 
     shareRetainedCase seen (entry@(L loc alias@SynDecl{}, names@(occ, _)), Just (key, captures, heads), _)
       | Just first <- lookup key seen
-      = let rhs = applyAnchor loc first captures
+      = let rhs = applyCaseAlias loc first captures
         in (seen, ((L loc alias{tcdRhs = rhs}, names), heads))
       | otherwise
-      = ((key, occ) : seen, (entry, []))
+      = ((key, mkRdrUnqual occ) : seen, (entry, []))
     shareRetainedCase seen (entry, _, _) = (seen, (entry, []))
 
     liftGroup decls =
@@ -651,7 +655,7 @@ liftDeclarationTypes source_heads named_wildcards group
           pure (catMaybes copied ++ locals, saved)
       where
         hidden_names = Set.fromList (map (unLoc . snd) hidden)
-        (required, _) = foldr select ([], Set.fromList (map (unLoc . snd) outer)) scope
+        (required, _) = foldr (select []) ([], Set.fromList (map (unLoc . snd) outer)) scope
         needed = [v | (_, v) <- required, unLoc v `Set.member` hidden_names]
         occupied = Set.fromList (map (unLoc . snd) (scope ++ locals))
         fresh = [L (l2l loc) name
@@ -751,7 +755,8 @@ liftDeclarationTypes source_heads named_wildcards group
     liftedAnchor SignatureTypeSite _ ty@(L _ (XHsType HsTypeSome{}))
       | copyable ty = Just ("$signature-sum:", Nothing)
     liftedAnchor site scope (L _ (XHsType (HsTypeCase _ _ scrutinee alts)))
-      | caseScrutinee site scope scrutinee
+      | lift_cases
+      , caseScrutinee site scope scrutinee
       , copyable scrutinee
       , all copyableAlt alts
       = if fieldSite site
@@ -829,21 +834,33 @@ liftDeclarationTypes source_heads named_wildcards group
 
     liftBody site owner scope whole@(L loc _) (salt, seen)
       | Just (prefix, key) <- liftedAnchor site scope whole
-      , let free = Set.fromList (map unLoc (extractHsTyRdrTyVars whole))
+      , let exact_retained = filter (isJust . rdrNameExactName_maybe) (retainedNames site)
+            free = caseCaptures exact_retained whole
             (heads, unbound) = retainedHeadUses site scope whole
             written = Set.fromList (map (unLoc . fst) heads ++ map unLoc unbound)
-            (used, missing) = foldr select ([], free `Set.difference` written) scope
+            (used, missing) = foldr (select exact_retained) ([], free `Set.difference` written) scope
       , Set.null missing
       , all (copyableCapture site whole) used
       = case key >>= (`lookup` seen) of
           Just occ -> (applyAnchor loc occ used, [], (salt + 1, seen))
           Nothing ->
             let occ = mkTcOcc (prefix ++ occNameString (rdrNameOcc (unLoc owner))
-                                 ++ ":" ++ show (salt :: Int))
+                                 ++ ":" ++ helper_suffix salt)
                 name = L (l2l loc) (mkRdrUnqual occ)
-                alias = L loc (SynDecl noAnn name (mkHsQTvs (map fst used)) Prefix whole)
+                -- The signature applies the helper to the original binders.
+                -- Bind fresh type variables in the copy of a quoted case.
+                copied = [ (rdr, mkRdrUnqual (mkTyVarOcc ("$quoted-case-capture:" ++ show i)))
+                         | (i, (_, v)) <- zip [0 :: Int ..] used
+                         , let rdr = unLoc v
+                         , isJust (rdrNameExactName_maybe rdr) ]
+                header = map (renameCaptures copied . fst) used
+                rhs = renameCaptures copied whole
+                alias = L loc (SynDecl noAnn name (mkHsQTvs header) Prefix rhs)
                 seen' = maybe seen (\k -> (k, occ) : seen) key
-                shared = sharedRetainedCaseKey site scope used whole key heads
+                shared = do
+                  (share_key, captures, call_uses) <- sharedRetainedCaseKey site scope used whole key heads
+                  -- A shared alias also applies the family to its private formals.
+                  pure (share_key, renameCaptures copied captures, call_uses)
             in (applyAnchor loc occ used, [((alias, (occ, Nothing)), shared, unbound)], (salt + 1, seen'))
     liftBody site owner scope (L loc quantified) (salt, seen)
       | Just (inner, locals, body) <- innerScope site quantified
@@ -872,17 +889,39 @@ liftDeclarationTypes source_heads named_wildcards group
       in (L loc (HsKindSig ann body' kind), aliases, next)
     liftBody site owner scope ty state = liftTypeChildren (liftBody site owner scope) ty state
 
-    applyAnchor loc occ = foldl' (\f (_, v) -> L loc (HsAppTy noExtField f (typeName v)))
-                                 (typeName (L (l2l loc) (mkRdrUnqual occ)))
+    applyAnchor loc occ = applyCaseAlias loc (mkRdrUnqual occ)
+    applyCaseAlias loc name = foldl' (\f (_, v) -> L loc (HsAppTy noExtField f (typeName v)))
+                                    (typeName (L (l2l loc) name))
 
-    select pair@(binder, name) (captures, used)
+    select exact_retained pair@(binder, name) (captures, used)
       | unLoc name `Set.member` used
-      = (pair : captures, Set.delete (unLoc name) used `Set.union` kindNames binder)
+      = (pair : captures, Set.delete (unLoc name) used `Set.union` kindNamesWith exact_retained binder)
       | otherwise = (captures, used)
 
-    kindNames (L _ HsTvb{tvb_kind = HsBndrKind _ kind}) =
-      Set.fromList (map unLoc (extractHsTyRdrTyVars kind))
-    kindNames _ = Set.empty
+    kindNames binder = kindNamesWith [] binder
+
+    kindNamesWith exact_retained (L _ HsTvb{tvb_kind = HsBndrKind _ kind}) =
+      caseCaptures exact_retained kind
+    kindNamesWith _ _ = Set.empty
+
+    -- TH IndexVarT supplies an exact term Name. The ordinary type-variable
+    -- extractor omits that namespace. Recover only names in this telescope.
+    caseCaptures exact_retained ty =
+      Set.fromList (map unLoc (extractHsTyRdrTyVars ty) ++ exactUses ty)
+      where
+        exactUses :: Data a => a -> [RdrName]
+        exactUses node
+          | null exact_retained = []
+          | Just rdr <- cast node = [rdr | rdr `elem` exact_retained]
+          | otherwise = concat (gmapQ exactUses node)
+
+    renameCaptures :: Data a => [(RdrName, RdrName)] -> a -> a
+    renameCaptures [] node = node
+    renameCaptures copied node
+      | Just rdr <- cast node
+      , Just replacement <- lookup rdr copied
+      = fromMaybe node (cast replacement)
+      | otherwise = gmapT (renameCaptures copied) node
 
     copyable :: Data a => a -> Bool
     copyable node = case cast node :: Maybe (LHsType GhcPs) of
@@ -1017,6 +1056,23 @@ caseCallHeads node = here ++ concat (gmapQ caseCallHeads node)
 -- | The scrutinee followed by the pattern and result in each source row.
 type SignatureCaseKey = (SignatureCasePart, [(SignatureCasePart, SignatureCasePart)])
 
+-- | Compare capture domains, the scrutinee and the ordered rows.
+type RetainedCaseKey = ([SignatureCasePart], SignatureCasePart,
+                        [(SignatureCasePart, SignatureCasePart)])
+
+-- | Only reuse a retained capture case across splice expansions when its
+-- names have fixed identities. See Note [Lifting cases from signature splices].
+stableSplicedCase :: RetainedCaseKey -> Bool
+stableSplicedCase (domains, CasePartCapture _, rows) =
+  all stable domains && all (\(pat, rhs) -> stable pat && stable rhs) rows
+  where
+    stable (CasePartName _ name) =
+      isJust (isOrig_maybe name) || maybe False isExternalName (rdrNameExactName_maybe name)
+    stable (CasePartApp fun arg) = stable fun && stable arg
+    stable CasePartWildcard = True
+    stable _ = False
+stableSplicedCase _ = False
+
 -- | Compare spellings and branch order, ignoring source locations and parentheses.
 signatureCaseKey :: LHsType GhcPs -> [LocatedA HsTypeCaseAlt] -> Maybe SignatureCaseKey
 signatureCaseKey scrutinee alts = (,) <$> signatureCasePart scrutinee <*> traverse alternative alts
@@ -1041,6 +1097,10 @@ See Note [Publishing ordered type cases] in GHC.Tc.TyCl. Keep lexical captures a
 additional arguments. Hide a captured argument's name in any branch
 where a pattern binds that spelling. Put the family and its owning
 synonym in the same kind-checking SCC.
+
+An untyped declaration quote keeps the case in its source signature,
+synonym or field. The quote emits CaseT with its local names. Lift the
+case when the declarations enter the splice's checking group.
 
 For a case in a let body, put the RHS in one private type synonym.
 The original let and the branch rows use that checked synonym at the
@@ -1356,20 +1416,24 @@ rnSrcDecls :: HsGroup GhcPs -> RnM (TcGblEnv, HsGroup GhcRn)
 rnSrcDecls group = do
   enabled <- xoptM LangExt.ExperimentalDependentTypes
   named_wildcards <- xoptM LangExt.NamedWildCards
+  level <- getThLevel
   dflags <- getDynFlags
-  let sigma_mod = mkModule (RealUnit (Definite (baseUnitId dflags))) (mkModuleName "GHC.Sigma")
+  let lift_cases = case level of
+        UntypedBrack{} -> False
+        _ -> enabled
+      sigma_mod = mkModule (RealUnit (Definite (baseUnitId dflags))) (mkModuleName "GHC.Sigma")
       sigma = mkOrig sigma_mod (mkTcOcc "Sigma")
-      (with_cases, case_names) = if enabled then liftTypeCases group else (group, [])
+      (with_cases, case_names) = if lift_cases then liftTypeCases group else (group, [])
       (expanded, lambda_names, scopes) =
         if enabled then liftTypeLambdas sigma with_cases else (group, [], emptyOccEnv)
-  rnSrcDeclsWithLambdas sigma named_wildcards
+  rnSrcDeclsWithLambdas sigma named_wildcards lift_cases
                         (case_names ++ [(fam, Just owner) | (fam, owner) <- lambda_names])
                         scopes expanded
 
 -- | Rename the declarations and record the kind-inference edges of private families.
-rnSrcDeclsWithLambdas :: RdrName -> Bool -> LiftedDecls -> OccEnv (OccName, Bool) -> HsGroup GhcPs
+rnSrcDeclsWithLambdas :: RdrName -> Bool -> Bool -> LiftedDecls -> OccEnv (OccName, Bool) -> HsGroup GhcPs
                       -> RnM (TcGblEnv, HsGroup GhcRn)
-rnSrcDeclsWithLambdas sigma named_wildcards early_hidden early_scopes group@(HsGroup { hs_valds   = val_decls,
+rnSrcDeclsWithLambdas sigma named_wildcards lift_cases early_hidden early_scopes group@(HsGroup { hs_valds   = val_decls,
                             hs_splcds  = splice_decls,
                             hs_tyclds  = tycl_decls,
                             hs_derivds = deriv_decls,
@@ -1439,9 +1503,9 @@ rnSrcDeclsWithLambdas sigma named_wildcards early_hidden early_scopes group@(HsG
    --  See Note [Resolving retained case heads].
    (sig_types, updated_types, sigs, hidden, scopes) <-
      if dependent && not is_boot
-     then do { heads <- retainedSourceHeads sigs' tycl_decls
+     then do { heads <- if lift_cases then retainedSourceHeads sigs' tycl_decls else pure []
              ; let input = emptyRdrGroup{hs_valds = val_decls, hs_tyclds = tycl_decls}
-                   (updated, anchors, aliases, uses, unbound) = liftDeclarationTypes heads named_wildcards input
+                   (updated, anchors, aliases, uses, unbound, _) = liftDeclarationTypes heads [] show lift_cases named_wildcards input
                    (cases, case_names) = liftTypeCases emptyRdrGroup{hs_tyclds = anchors}
                    (late, lambdas, late_scopes) = liftTypeLambdas sigma cases
                    late_hidden = aliases ++ case_names ++ [(fam, Just owner) | (fam, owner) <- lambdas]
@@ -1471,18 +1535,27 @@ rnSrcDeclsWithLambdas sigma named_wildcards early_hidden early_scopes group@(HsG
    -- means we'll only report a declaration as unused if it isn't
    -- mentioned at all.  Ah well.
    traceRn "Start rnTyClDecls" (ppr tycl_decls) ;
-   (rn_tycl_decls, src_fvs1) <- rnTyClDecls hidden scopes (sig_types ++ updated_types) ;
+   (rn_source_types, source_type_fvs) <- rnTyClDecls hidden scopes (sig_types ++ updated_types) ;
 
    -- (F) Rename Value declarations right-hand sides
    traceRn "Start rnmono" empty ;
    let { val_bndr_set = mkNameSet id_bndrs `unionNameSet` mkNameSet pat_syn_bndrs } ;
    let { new_lhs = makeRnValBinds noExtField binds' sigs } ;
-   (rn_val_decls@(XValBindsLR (HsVBG rn_binds sigs')), bind_dus) <- if is_boot
-    -- For an hs-boot, use tc_bndrs (which collects how we're renamed
-    -- signatures), since val_bndr_set is empty (there are no x = ...
-    -- bindings in an hs-boot.)
-    then rnTopBindsBoot tc_bndrs new_lhs
-    else rnValBindsRHS (TopSigCtxt val_bndr_set) new_lhs ;
+   ((rn_val_decls@(XValBindsLR (HsVBG rn_binds sigs')), bind_dus), rn_splice_types) <-
+     if lift_cases && not is_boot
+     then do { splice_types <- newTcRef []
+             ; splice_cases <- newTcRef (0, [])
+             ; let rename_splice = rnSplicedSignatureCases sigma named_wildcards local_fix_env splice_types splice_cases
+             ; binds <- rnValBindsRHSWith (rnHsSigWcTypeWithSplice rename_splice)
+                          (TopSigCtxt val_bndr_set) new_lhs
+             ; types <- reverse <$> readTcRef splice_types
+             ; pure (binds, types) }
+     else (, []) <$> if is_boot
+       -- The signatures bind the boot names. There are no value bindings.
+       then rnTopBindsBoot tc_bndrs new_lhs
+       else rnValBindsRHS (TopSigCtxt val_bndr_set) new_lhs ;
+   let { rn_tycl_decls = rn_source_types ++ concatMap fst rn_splice_types
+       ; src_fvs1 = plusFNs (source_type_fvs : map snd rn_splice_types) } ;
    traceRn "finish rnmono" (ppr rn_val_decls) ;
 
    -- (G) Rename Fixity and deprecations
@@ -1559,6 +1632,165 @@ rnSrcDeclsWithLambdas sigma named_wildcards early_hidden early_scopes group@(HsG
    traceRn "finish Dus" (ppr src_dus ) ;
    return (final_tcg_env, rn_group)
                     }}}}}
+
+-- | Lift cases from the parsed result of a top-level signature splice.
+-- See Note [Lifting cases from signature splices].
+rnSplicedSignatureCases
+  :: RdrName -> Bool -> MiniFixityEnv -> TcRef [([TyClGroup GhcRn], FreeNames)]
+  -> TcRef (Int, [(RetainedCaseKey, Name)])
+  -> SignatureSpliceSite -> HsDocContext -> HsUntypedSplice GhcPs
+  -> RnM (HsType GhcRn, FreeNames)
+rnSplicedSignatureCases sigma named_wildcards fix_env generated splice_cases site doc =
+  rnSpliceTypeWith indices $ \raw -> do
+    local <- getLocalRdrEnv
+    case doc of
+      TypeSigCtx names@(_:_)
+        | contains_case raw
+        , Just (outer, retained) <- splice_scope local raw
+        -> do
+        let rename ty = rnLHsType (SpliceTypeCtx raw) ty
+            sig = HsSig noExtField outer (wrap_retained retained raw)
+            wc = HsWC noExtField (L (getLoc raw) sig)
+            input_sig = noLocA (TypeSig noAnn [] names wc)
+            input = emptyRdrGroup{hs_valds = ValBinds noExtField [VbSig input_sig]}
+        heads <- retainedSourceHeads [input_sig] []
+        (ordinal, complete_helpers) <- readTcRef splice_cases
+        let (earlier, suffix) = case site of
+              CompleteSignatureSplice -> (complete_helpers, show)
+              NestedSignatureSplice{} -> ([], \salt -> "splice" ++ show ordinal ++ "-" ++ show salt)
+        let (updated, anchors, aliases, uses, _, helpers) =
+              liftDeclarationTypes heads (map (fmap nameRdrName) earlier) suffix True named_wildcards input
+        case (anchors, hs_valds updated) of
+          (_:_, ValBinds _ [VbSig (L _ (TypeSig _ _ _ HsWC{hswc_body = L _ HsSig{sig_body = ty}}))])
+            | Just result <- unwrap_retained retained ty -> do
+            let (cases, case_names) = liftTypeCases emptyRdrGroup{hs_tyclds = anchors}
+                (late, lambdas, scopes) = liftTypeLambdas sigma cases
+                hidden = aliases ++ case_names ++ [(fam, Just owner) | (fam, owner) <- lambdas]
+                declarations = hs_tyclds late
+            forM_ uses $ \(loc, gre) -> setSrcSpanA (getLoc loc) (addUsedGRE AllDeprecationWarnings gre)
+            (envs@(global, local), _) <- getLocalNonValBinders fix_env emptyRdrGroup{hs_tyclds = declarations}
+            let rdr_env = foldl' extendGlobalRdrEnv (tcg_rdr_env global)
+                            [mkExactGRE name Vanilla | (_, name) <- earlier]
+            types <- restoreEnvs (global{tcg_rdr_env = rdr_env}, local) $
+              rnTyClDecls hidden scopes declarations
+            restoreEnvs envs $ do
+              case site of
+                CompleteSignatureSplice -> do
+                  new_helpers <- forM (filter (stableSplicedCase . fst) helpers) $ \(key, occ) -> do
+                    name <- getName <$> lookupTopBndrRn WL_Anything (mkRdrUnqual occ)
+                    pure (key, name)
+                  updTcRef splice_cases (second (new_helpers ++))
+                NestedSignatureSplice{} ->
+                  updTcRef splice_cases (first (+ 1))
+              updTcRef generated (types :)
+              rename result
+          _ -> rename raw
+      _ -> rnLHsType (SpliceTypeCtx raw) raw
+  where
+    indices = case site of
+      CompleteSignatureSplice -> []
+      NestedSignatureSplice _ retained -> mapMaybe hsLTyVarName retained
+
+    wrap_retained [] ty = ty
+    wrap_retained binders ty =
+      L (getLoc ty) (HsForEachTy (noEpTok, Left noEpUniTok) binders ty)
+
+    unwrap_retained [] ty = Just ty
+    unwrap_retained _ (L _ HsForEachTy{hst_body = body}) = Just body
+    unwrap_retained _ _ = Nothing
+
+    contains_case :: Data a => a -> Bool
+    contains_case node
+      | Just (L _ (XHsType HsTypeCase{})) <- cast node :: Maybe (LHsType GhcPs)
+      = True
+      | otherwise = or (gmapQ contains_case node)
+
+    splice_scope local raw = case site of
+      CompleteSignatureSplice -> Just (mkHsOuterImplicit, [])
+      NestedSignatureSplice outer retained -> do
+        let binders = case outer of
+              HsOuterImplicit{} -> []
+              HsOuterExplicit{hso_bndrs = bound} -> mapMaybe (closedSpliceCapture namedSpliceType) bound
+            copied = mapMaybe (closedSpliceCapture retainedSpliceDomain) retained
+            available = mapMaybe hsLTyVarName binders ++ mapMaybe hsLTyVarName copied
+        guard (all ((`elem` available) . unLoc) (extractHsTyRdrTyVars raw))
+        guard (not (uses_other_local local available raw))
+        pure (mkHsOuterExplicit noAnn binders, copied)
+
+    uses_other_local :: Data a => LocalRdrEnv -> [RdrName] -> a -> Bool
+    uses_other_local local available node
+      | Just (HsBndrVar _ name) <- cast node :: Maybe (HsBndrVar GhcPs)
+      , unLoc name `elem` available
+      = True
+      | Just (HsTypeCaseAlt pat _ _) <- cast node :: Maybe HsTypeCaseAlt
+      , any ((`elem` available) . unLoc) (extractHsTyRdrTyVars pat)
+      = True
+      | Just rdr <- cast node :: Maybe RdrName
+      = rdr `notElem` available &&
+        (elemLocalRdrEnv rdr local ||
+         maybe False (`elemLocalRdrEnv` local) (demoteRdrNameTv rdr))
+      | otherwise = or (gmapQ (uses_other_local local available) node)
+
+-- | Copy an exact binder and its supported domain to the helper scope.
+closedSpliceCapture :: (LHsType GhcRn -> Maybe (LHsType GhcPs))
+                    -> LHsTyVarBndr flag GhcRn -> Maybe (LHsTyVarBndr flag GhcPs)
+closedSpliceCapture copy_type (L loc HsTvb{tvb_flag = flag, tvb_var = HsBndrVar _ name,
+                                          tvb_kind = HsBndrKind _ kind}) = do
+  exact_kind <- copy_type kind
+  pure (L loc (HsTvb noAnn flag (HsBndrVar noExtField (fmap nameRdrName name))
+                     (HsBndrKind noExtField exact_kind)))
+closedSpliceCapture _ _ = Nothing
+
+-- | Retain the original Name of a type or promoted data constructor.
+namedSpliceType :: LHsType GhcRn -> Maybe (LHsType GhcPs)
+namedSpliceType ty
+  | L loc (HsTyVar _ promoted con) <- ignoreParens ty
+  , let resolved = getName (unLoc con)
+        occ = nameOccName resolved
+  , isExternalName resolved
+  , isTcOcc occ || isDataOcc occ
+  = Just (L loc (HsTyVar noAnn promoted (nameRdrName resolved <$ con)))
+  | otherwise = Nothing
+
+-- | Copy a closed constructor application in a retained capture's domain.
+retainedSpliceDomain :: LHsType GhcRn -> Maybe (LHsType GhcPs)
+retainedSpliceDomain ty = case ignoreParens ty of
+  L loc (HsAppTy _ fun arg) -> do
+    fun' <- retainedSpliceDomain fun
+    arg' <- retainedSpliceDomain arg
+    pure (L loc (HsAppTy noExtField fun' arg'))
+  ty -> namedSpliceType ty
+
+{- Note [Lifting cases from signature splices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A splice at the root of a value signature can return a type case. The
+initial declaration lifting pass has only the source splice. Run the splice
+in the ordinary signature renamer. Use its parsed result to construct the
+same private declarations as for a written signature. Register the names
+only while renaming these declarations and the result. Add the renamed
+declarations to the owning group for kind checking and interface writing.
+
+The splice runs once, in signature order. The regular splice path carries
+its free names and module finalizers. A nested type splice can refer to an
+enclosing signature binder by its exact name. For an erased binder, copy
+a single resolved type or promoted constructor. For a retained binder,
+also copy a closed constructor application. The copied domain needs no
+local bindings. Present these retained binders to the ordinary lifting
+pass as an enclosing telescope. Remove that synthetic telescope from the
+result so the helper application refers to the original runtime binders.
+Give each nested splice a distinct helper suffix so it does not collide
+with a written case or another splice in the signature.
+The new private declarations use the same capture and ordered case checks
+as in Note [Lifting types from signatures and fields].
+
+Two signature splices in the same declaration group can reuse one private
+helper for the same case on a retained capture. Compare the formal capture's
+position, the closed capture domains and every row in order. Require original
+or exact external names in the domains and rows. A splice can construct an
+unqualified name whose interpretation depends on the scope at its expansion.
+Only the generated alias refers to the earlier helper's exact name. Register
+it again for that renaming pass. End reuse at the declaration group boundary.
+-}
 
 {- Note [Resolving retained case heads]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

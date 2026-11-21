@@ -541,6 +541,8 @@ data HsTypeGhcRnExt
   | HsTypeExistsRn !ExistsTyFlag (LHsTyVarBndr Specificity GhcRn) (LHsType GhcRn)
   | HsTypeLetRn (LocatedN Name) (LHsType GhcRn) (LHsType GhcRn)
   | HsTypeCaseAliasRn (Name, Int, Maybe (LocatedN Name)) (LHsType GhcRn)
+  | HsTypeCaseRn (LHsType GhcRn) [([Name], LHsType GhcRn, LHsType GhcRn)]
+    -- Quoted case. Each row carries its pattern binders, pattern and result.
 
 -- Extension of HsType during parsing.
 -- see Note [Trees That Grow] in Language.Haskell.Syntax.Extension
@@ -1697,6 +1699,10 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
   GhcRn -> case t of
     HsCoreTyRn ty -> ppr ty
     HsTypeCaseAliasRn _ body -> ppr_mono_lty body
+    HsTypeCaseRn scrutinee rows ->
+      text "case" <+> ppr_mono_lty scrutinee <+> text "of"
+        <+> braces (sep (punctuate semi [ppr_mono_lty pat <+> arrow <+> ppr_mono_lty rhs
+                                       | (_, pat, rhs) <- rows]))
     HsTypeExistsRn flag b body -> pprExistsTy flag (ppr b) (ppr_mono_lty body)
     HsTypeLetRn v rhs body ->
       text "let" <+> ppr v <+> equals <+> ppr_mono_lty rhs
@@ -1780,6 +1786,7 @@ hsTypeNeedsParens p = go_hs_ty
       GhcRn -> case t of
         HsCoreTyRn ty -> go_core_ty ty
         HsTypeCaseAliasRn{} -> p >= topPrec
+        HsTypeCaseRn{} -> p >= topPrec
         HsTypeExistsRn{} -> p >= funPrec
         HsTypeLetRn{} -> p >= topPrec
 

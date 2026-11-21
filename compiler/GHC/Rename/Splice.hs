@@ -6,7 +6,7 @@ module GHC.Rename.Splice (
         -- Typed splices
         rnTypedSplice,
         -- Untyped splices
-        rnSpliceType, rnUntypedSpliceExpr, rnSplicePat, rnSpliceTyPat, rnSpliceDecl,
+        rnSpliceType, rnSpliceTypeWith, rnUntypedSpliceExpr, rnSplicePat, rnSpliceTyPat, rnSpliceDecl,
 
         -- Brackets
         rnTypedBracket, rnUntypedBracket,
@@ -58,6 +58,7 @@ import {-# SOURCE #-} GHC.Tc.Gen.Splice
     , runMetaE
     , runMetaP
     , runMetaT
+    , runMetaTWithIndices
     , tcTopSpliceExpr
     )
 
@@ -663,7 +664,14 @@ References:
 
 ----------------------
 rnSpliceType :: HsUntypedSplice GhcPs -> RnM (HsType GhcRn, FreeNames)
-rnSpliceType splice
+rnSpliceType = rnSpliceTypeWith [] (\ty -> rnLHsType (SpliceTypeCtx ty) ty)
+
+-- | Rename a type splice with a continuation that checks its parsed result.
+-- Run the splice and retain its finalizers through the ordinary pipeline.
+rnSpliceTypeWith :: [Name]
+                 -> (LHsType GhcPs -> RnM (LHsType GhcRn, FreeNames))
+                 -> HsUntypedSplice GhcPs -> RnM (HsType GhcRn, FreeNames)
+rnSpliceTypeWith indices rename_result splice
   = rnUntypedSpliceGen run_type_splice pend_type_splice splice
   where
     pend_type_splice
@@ -674,10 +682,9 @@ rnSpliceType splice
     run_type_splice rn_splice
       = do { traceRn "rnSpliceType: untyped type splice" empty
            ; (hs_ty2, mod_finalizers) <-
-                runRnSplice UntypedTypeSplice runMetaT ppr rn_splice
-           ; (hs_ty3, fvs) <- do { let doc = SpliceTypeCtx hs_ty2
-                                 ; checkNoErrs $ rnLHsType doc hs_ty2 }
-                                         -- checkNoErrs: see Note [Renamer errors]
+                runRnSplice UntypedTypeSplice (runMetaTWithIndices indices) ppr rn_splice
+           ; (hs_ty3, fvs) <- checkNoErrs $ rename_result hs_ty2
+                 -- checkNoErrs: see Note [Renamer errors]
 
              -- See Note [Delaying modFinalizers in untyped splices].
            ; return ( HsSpliceTy (HsUntypedSpliceTop (ThModFinalizers mod_finalizers)

@@ -491,8 +491,10 @@ and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vecto
 4. **R19.** A branch on an ordinary Boolean can pass that same value to
    a retained field. Matching on an expression such as `not b` in
    the field selects the result type using the function in scope.
-   Template Haskell still needs a representation for the retained field binder.
-   [Retained scrutinees and scope](roadmap/R19-type-level-cases.md#compute-a-retained-scrutinee).
+   Template Haskell can quote and reify the retained binder in a signature
+   or a prefix GADT constructor. Quoting a raw type-level case remains open.
+   [Retained scrutinees](roadmap/R19-type-level-cases.md#compute-a-retained-scrutinee)
+   and [constructor quotations](roadmap/R19-type-level-cases.md#quote-and-reify-retained-gadt-constructors).
 5. **R12 and R16.** An ordinary client can prove that `Prelude.reverse`
    preserves length. A proof using `Prelude.foldr` establishes the append
    law for an arbitrary step and seed. It uses the method selected by the
