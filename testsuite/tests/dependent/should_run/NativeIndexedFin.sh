@@ -14,10 +14,10 @@ for opt in -O0 -O1 -O2; do
     "${ghc[@]}" "$opt" -Werror=incomplete-patterns -c ParameterizedIndexLibrary.hs
     cd ../proof
     cp "$src/"{FinitePosition,ListCursor,NativeIndexedFinGate,NativeLinearIndexColumns}.hs ../indices/*.hi .
-    "${ghc[@]}" "$opt" -Werror=incomplete-patterns -c FinitePosition.hs ListCursor.hs NativeIndexedFinGate.hs
+    "${ghc[@]}" "$opt" -Werror=incomplete-patterns -c FinitePosition.hs NativeIndexedFinGate.hs
     lint=()
     if [[ $opt == -O0 ]]; then lint=(-dlinear-core-lint); fi
-    "${ghc[@]}" "$opt" "${lint[@]}" -Werror=incomplete-patterns -c NativeLinearIndexColumns.hs
+    "${ghc[@]}" "$opt" "${lint[@]}" -Werror=incomplete-patterns -c ListCursor.hs NativeLinearIndexColumns.hs
     cd ../client
     cp "$src/"{FinitePositionClient,CursorClient}.hs ../proof/*.hi .
     "${ghc[@]}" "$opt" -Werror=incomplete-patterns -c FinitePositionClient.hs CursorClient.hs
@@ -48,7 +48,7 @@ main = do
                 fallback = choose word pos False '!'
             if (selected, fallback) == ('z', '!') then pure () else fail "wrong branch"
     (ordinary, linear) <- observeCursors
-    let expectedCursors = [Just 'c', Nothing, Nothing, Just 'b', Just 'x']
+    let expectedCursors = [Just 'c', Nothing, Nothing, Just 'b', Just 'x', Just 'y']
     if ordinary == expectedCursors && linear == expectedCursors then pure ()
         else fail (show (ordinary, linear))
     empty <- observeEmptyIndex

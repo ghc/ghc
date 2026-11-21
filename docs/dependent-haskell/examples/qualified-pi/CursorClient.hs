@@ -19,7 +19,8 @@ observeCursors = do
     let ordinary ys i = fmap (indexGeneric ys) (mkFinGeneric ys i)
         packed ys i = fmap (\c -> readSelection (prepare c)) (cursor ys i)
         positions f = [f xs n, f xs 4, f (error "forced list") (-1),
-                       f (cycle "ab") 3, f ('x' : error "forced suffix") 0]
+                       f (cycle "ab") 3, f ('x' : error "forced suffix") 0,
+                       f (error "forced skipped element" : 'y' : error "forced suffix") 1]
     pure (positions ordinary, positions packed)
 
 -- | Check a runtime position before calling a linear continuation.

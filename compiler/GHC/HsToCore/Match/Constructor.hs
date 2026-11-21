@@ -29,7 +29,7 @@ import GHC.Core.TyCon ( isNewTyCon, newTyConCo, tyConDataCons )
 import GHC.Core.FVs ( exprFreeVars )
 import qualified GHC.Core.Subst as Subst
 import GHC.Core.TyCo.Subst ( deepSubstCo, deepSubstTy )
-import GHC.Tc.Types.Evidence ( isEmptyTcEvBinds, isIdHsWrapper )
+import GHC.Tc.Types.Evidence ( EvBind(..), TcEvBinds(EvBinds), isEmptyTcEvBinds, isIdHsWrapper )
 import GHC.Tc.Utils.TcType
 import GHC.Core.Multiplicity
 import GHC.HsToCore.Monad
@@ -613,10 +613,16 @@ renamePattern subst thing
   | Just ty <- cast thing = put (deepSubstTy subst ty)
   | Just co <- cast thing = put (deepSubstCo subst co)
   | Just e <- cast thing = put (renameCore subst e)
+  -- The Data instances for TcEvBinds and EvBind are opaque. In a zonked
+  -- pattern, the evidence binder's type can name an earlier runtime field.
+  | Just (EvBinds binds) <- cast thing = put (EvBinds (fmap rename_bind binds))
   | otherwise = gmapT (renamePattern subst) thing
   where
     put :: Typeable b => b -> a
     put updated = fromMaybe thing (cast updated)
+
+    rename_bind bind = bind { eb_lhs = renameRowVar subst (eb_lhs bind)
+                            , eb_rhs = renamePattern subst (eb_rhs bind) }
 
 -- | Keep each variable's identity, except for a retained field being shared.
 renameRowVar :: Subst.Subst -> Var -> Var
