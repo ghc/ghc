@@ -6568,8 +6568,13 @@ the short circuit of the captured `(&&)`. The `Prelude.dropWhile`
 equations also let the ordinary proof reconstruct the input with
 `Prelude.(++)`. A false decision ends the proof even when later decisions
 are undefined.
+Agda's `span-defn` relates `span` to the pair of prefix and suffix
+functions. The Haskell proof projects the checked pair with installed
+`fst` and `snd`. Its separate runtime observation checks that `span`
+can return the first accepted head before inspecting the recursive pair.
 [Agda list definitions](https://agda.github.io/agda-stdlib/v2.4/Data.List.Base.html#330),
 [Agda prefix and suffix law](https://agda.github.io/agda-stdlib/v2.4/Data.List.Properties.html#1575),
+[Agda span identity](https://agda.github.io/agda-stdlib/v2.4/Data.List.Properties.html#1581),
 and [R16 prefix and suffix](roadmap/R16-open-term-evaluator.md#recover-the-input-from-its-prefix-and-suffix).
 
 ### Nominal domains for concrete list callbacks

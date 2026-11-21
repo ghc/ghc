@@ -1289,6 +1289,32 @@ rejected head stays undefined.
 [regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledDropWhile.sh),
 and [Agda's prefix and suffix law](../REFERENCES.md#ending-a-list-prefix-at-a-decision).
 
+### Project and rejoin a guarded split
+
+The ordinary proof can put the checked prefix and suffix in a promoted
+pair. The installed `fst`, `snd`, and `(++)` equations project and
+rejoin it. The same prefix induction proves that the result is the
+original list. The proof can use the provider's stripped interface.
+The closed evaluator also checks `Prelude.span Prelude.not` on the
+literal list `[False, True, False]`. The same projection and append
+equations check that its two lists reconstruct the literal input.
+
+The nominal equation for an open `Prelude.span` call is still missing.
+An open tail also blocks `fst (span not (False : xs))`.
+The accepting branch of `span` returns the pair and the first prefix cons
+before matching the recursive pair. The selectors for the recursive fields
+remain inside the result fields. A strict recursive case forces the
+undefined suffix before it returns the first cons. The initial list
+case and predicate must still finish before `span` returns the pair.
+For example, matching the result of `span p undefined` forces the list.
+A pair built directly from the two list calls exposes its constructor
+before either call runs.
+The optimizer can use a recursive worker with an unboxed pair result.
+A source equation must preserve those demand checks in both forms.
+[Proof](../examples/open-evaluation/PreludeDropWhileProof.hs),
+[regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledDropWhile.sh),
+and [Agda's `span-defn`](../REFERENCES.md#ending-a-list-prefix-at-a-decision).
+
 ### Return the matched tail from an ordinary producer
 
 An ordinary module can opt into source equations with
