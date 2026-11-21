@@ -26,7 +26,10 @@ for mode in WRONG_TAG LATE_GIVEN CALLBACK_ESCAPE CALLBACK_MISSING MISSING; do
             ;;
         LATE_GIVEN) grep -Fq "Collects (FieldKey 'False)" failure ;;
         CALLBACK_ESCAPE) grep -Fq 'Collects a' failure ;;
-        CALLBACK_MISSING) grep -Fq 'Collects c' failure ;;
+        CALLBACK_MISSING)
+            grep -Fq 'Collects c' failure
+            grep -A1 'a type expected by the context:' failure | grep -Fq 'Proxy c -> Elem c -> Elem c'
+            ;;
         MISSING) grep -Fq 'Collects (FieldKey tag)' failure ;;
     esac
 done
