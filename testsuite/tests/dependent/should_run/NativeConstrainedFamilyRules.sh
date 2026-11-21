@@ -13,6 +13,19 @@ cp "$src"/{PackedVecLibrary,ParameterizedIndexLibrary,FinitePosition}.hs "$src/$
 "${ghc[@]}" --show-iface "$provider.hi" > provider.iface
 grep -Eq 'constrained-families-v1.*retained-user-unfolding.*linear-unpack' provider.iface
 
+if [[ $# -ge 3 ]]; then
+    old=("$3" "-B${4:-$2}")
+    printf 'module Plain where\nvalue :: Bool\nvalue = True\n' > Plain.hs
+    "${ghc[@]}" -c Plain.hs
+    "${old[@]}" --show-iface Plain.hi > old-plain.log
+    if "${old[@]}" --show-iface "$provider.hi" > old-provider.log 2>&1; then
+        echo 'Previous reader accepted the constrained family header'
+        exit 1
+    fi
+    grep -Fq 'mismatched interface file versions' old-provider.log
+    grep -Fq 'constrained-families-v1' old-provider.log
+fi
+
 cp ./*.hi client/
 cd client
 cp "$src/NativeConstrainedFamilyRulesClient.hs" Main.hs
