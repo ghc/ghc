@@ -293,6 +293,12 @@ test('NativeUnsaturatedFamily',
       extra_files(['NativeUnsaturatedProvider.hs', 'NativeUnsaturatedClient.hs',
                    'NativeUnsaturatedInverse.hs', 'NativeUnsaturatedEta.hs'])],
      run_command, ['bash NativeUnsaturatedFamily.sh "{compiler}" "{libdir}"'])
+test('NativeMatchableProjection',
+     [only_ways(['normal']),
+      extra_files([open_eval_dir + f for f in ['MatchableEquality.hs', 'MatchableView.hs']]
+                  + ['../../../../docs/dependent-haskell/examples/qualified-pi/RetainedCharacters.hs',
+                     'NativeMatchableKindProjection.hs', 'NativeNestedMatchableProjection.hs'])],
+     run_command, ['bash NativeMatchableProjection.sh "{compiler}" "{libdir}"'])
 test('NativeLaterMatchability',
      [only_ways(['normal']),
       extra_files([open_eval_dir + f for f in ['AnchorReceiver.hs', 'LaterMatchability.hs',

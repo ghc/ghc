@@ -32,7 +32,7 @@ module GHC.Core.Coercion (
         mkAxInstLHS, mkUnbranchedAxInstLHS,
         mkPiCo, mkPiCos, mkCoCast,
         mkSymCo, mkTransCo,
-        mkSelCo, mkSelCoResRole, getNthFun, selectFromType, mkLRCo,
+        mkSelCo, mkSelCoResRole, getNthFun, selectFromType, mkLRCo, matchableAppProjectionRule, ordinaryAppProjection_maybe,
         mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo,
         mkFunCo, mkFunCo2, mkFunCoNoFTF, mkFunResCo,
         mkNakedFunCo,
@@ -1004,8 +1004,85 @@ mkLRCo :: LeftOrRight -> Coercion -> Coercion
 mkLRCo lr co
   | Just (ty, eq) <- isReflCo_maybe co
   = mkReflCo eq (pickLR lr (splitAppTy ty))
+  | Pair lhs rhs <- coercionKind co
+  , Just (f, x) <- splitAppTy_maybe lhs
+  , Just (g, y) <- splitAppTy_maybe rhs
+  , not (fixed_head f && fixed_head g)
+  , isMatchableFunTy (typeKind f), isMatchableFunTy (typeKind g)
+  = AxiomCo (snd (matchableAppProjectionRule lr))
+            (co : map mkNomReflCo [f, x, g, y])
   | otherwise
   = LRCo lr co
+  where
+    fixed_head ty = case splitTyConApp_maybe ty of
+      Just (tc, _) -> isGenerativeTyCon tc Nominal
+      Nothing -> False
+
+-- | Check inverse application at two matchable heads after substitution.
+-- See Note [Matchability in application projection evidence].
+matchableAppProjectionRule :: LeftOrRight -> (FastString, CoAxiomRule)
+matchableAppProjectionRule lr = (name, BuiltInRule name Nominal (replicate 5 Nominal) proves)
+  where
+    name = matchableProjectionName lr
+    proves [Pair lhs rhs, Pair f _, Pair x _, Pair _ g, Pair _ y] =
+      Pair <$> projectMatchableApp lr lhs f x <*> projectMatchableApp lr rhs g y
+    proves _ = Nothing
+
+-- | Check the head and argument saved for one side of the application.
+projectMatchableApp :: LeftOrRight -> Type -> Type -> Type -> Maybe Type
+projectMatchableApp lr app fun arg
+  | Just (_, binder, _) <- splitPiTy_maybe fun_kind
+  , isMatchableFunTy fun_kind
+  , piTyBinderType binder `eqType` typeKind arg
+  , mkAppTy fun arg `eqType` app
+  = Just (pickLR lr (fun, arg))
+  | otherwise = Nothing
+  where
+    fun_kind = typeKind fun
+
+-- | Recover an ordinary projection when the equality alone proves its head kinds.
+-- See Note [Matchability in application projection evidence].
+ordinaryAppProjection_maybe :: CoAxiomRule -> [Coercion] -> Maybe (LeftOrRight, Coercion)
+ordinaryAppProjection_maybe (BuiltInRule name Nominal _ _) [co, cf, cx, cg, cy]
+  | Just lr <- matchableProjectionDirection name
+  , Pair lhs rhs <- coercionKind co
+  , Just (f, x) <- splitAppTy_maybe lhs
+  , Just (g, y) <- splitAppTy_maybe rhs
+  , isMatchableFunTy (typeKind f), isMatchableFunTy (typeKind g)
+  , same f (coercionLKind cf), same x (coercionLKind cx)
+  , same g (coercionRKind cg), same y (coercionRKind cy)
+  = Just (lr, co)
+  where
+    same a b = typeKind a `eqType` typeKind b && a `eqType` b
+ordinaryAppProjection_maybe _ _ = Nothing
+
+{- Note [Matchability in application projection evidence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose a GADT match gives m ~ M for f :: Type %m -> Type. A call can
+use f cast to a matchable kind. Inlining that call substitutes the cast
+for a universally quantified matchable head. Application pushes the cast
+through the argument and result. If only matchability changes, the type
+of the equality premise can then show f x with its original kind.
+
+Retain the original heads and arguments as nominal premises when a head
+can be substituted. Each head must still be matchable after substitution.
+Check the kind of its argument and reconstruct its side of the original
+equality before projecting either component. The head premise retains the
+scoped proof m ~ M even when application has erased that cast.
+
+When the plain equality still supplies both matchable heads and the
+same arguments, write the ordinary LRCo interface form. Read that form
+through mkLRCo so later substitution can retain its original heads.
+A projection that needs the scoped proof must keep the checked rule in
+the interface. Its header records that requirement.
+
+The four component premises record the type at each endpoint. Read the
+requested component directly in coercion_lr_kind. Rechecking the parent
+projection there repeatedly traverses the same proof. Core Lint checks
+every premise and both applications. The interface reader also checks
+the full rule before it admits stored evidence.
+See Note [coercionKind performance].
+-}
 
 -- | Instantiates a 'Coercion'.
 -- Works for both tyvar and covar
@@ -2536,6 +2613,9 @@ coercion_lr_kind which orig_co
     go_ax axr@(BuiltInFamRew  bif) cos  = check_bif_res axr (bifrw_proves  bif (map coercionKind cos))
     go_ax axr@(BuiltInFamInj bif) [co]  = check_bif_res axr (bifinj_proves bif (coercionKind co))
     go_ax axr@(BuiltInFamInj {})  _     = crash axr
+    go_ax (BuiltInRule name Nominal _ _) [_, cf, cx, cg, cy]
+      | Just lr <- matchableProjectionDirection name
+      = go (pickLR lr (pickLR which ((cf, cx), (cg, cy))))
     go_ax axr@(BuiltInRule _ _ _ proves) cos =
       check_bif_res axr (proves (map coercionKind cos))
     go_ax     (UnbranchedAxiom ax) cos  = go_branch ax (coAxiomSingleBranch ax) cos

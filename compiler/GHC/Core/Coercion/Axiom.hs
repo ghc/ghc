@@ -25,7 +25,7 @@ module GHC.Core.Coercion.Axiom (
        existsCoRuleName,
 
        CoAxiomRule(.., BuiltInEqRule), BuiltInFamRewrite(..), BuiltInFamInjectivity(..), TypeEqn,
-       scopedSigmaClosureName,
+       scopedSigmaClosureName, matchableProjectionName, matchableProjectionDirection,
        coAxiomRuleArgRoles, coAxiomRuleRole,
        coAxiomRuleBranch_maybe, isNewtypeAxiomRule_maybe,
        ClosedTyFam(..), closedTyFamCoAxiom_maybe, BuiltinClosedTyFam(..),
@@ -654,6 +654,18 @@ pattern BuiltInEqRule name proves = BuiltInRule name Nominal [Nominal, Nominal] 
 -- | The stable interface key for the scoped retained-sum proof rule.
 scopedSigmaClosureName :: FastString
 scopedSigmaClosureName = fsLit "ScopedSigmaClosure"
+
+-- | Interface key for a nominal application projection with explicit heads.
+matchableProjectionName :: LeftOrRight -> FastString
+matchableProjectionName CLeft  = fsLit "MatchableAppLeft"
+matchableProjectionName CRight = fsLit "MatchableAppRight"
+
+-- | Decode the component selected by this built-in rule.
+matchableProjectionDirection :: FastString -> Maybe LeftOrRight
+matchableProjectionDirection name
+  | name == matchableProjectionName CLeft  = Just CLeft
+  | name == matchableProjectionName CRight = Just CRight
+  | otherwise                              = Nothing
 
 instance Eq CoAxiomRule where
   (BuiltInFamRew  bif1)  == (BuiltInFamRew  bif2)  = bifrw_name  bif1 == bifrw_name bif2

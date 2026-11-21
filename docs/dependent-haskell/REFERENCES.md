@@ -7246,3 +7246,19 @@ use ordinary list constructors and the existing character index.
 [GHC User's Guide, unboxed types and primitive operations](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/primitives.html#unboxed-types),
 [Agda built-in strings](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#strings),
 and [ordinary character client](examples/qualified-pi/RetainedCharacterClient.hs).
+
+### Matchability evidence in a substituted projection
+
+Proposal #242 permits decomposition of `f a ~ g b` when the kinds of
+both heads say they are matchable. Kiss, Field, Eisenbach and Peyton Jones give the
+projection rules and prove substitution preserves coercion derivations.
+The fork uses the existing checked built-in rule mechanism to keep a
+cast on a head after substituting for a quantified variable. An
+unrelated or unknown matchability supplies no cancellation proof.
+Agda makes a related distinction. Its pattern unifier can use an
+`INJECTIVE` declaration such as the one for `Fin` in its manual. Its
+`INJECTIVE_FOR_INFERENCE` pragma guides inference. The fork requires
+the nominal evidence in Core even after type inference has finished.
+[Agda injectivity pragmas](https://agda.readthedocs.io/en/v2.8.0/language/pragmas.html#the-injective-pragma),
+[Proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html)
+and [Higher-Order Type-Level Programming in Haskell, sections 4 and 5](https://simon.peytonjones.org/assets/pdfs/higher-order-type.pdf).

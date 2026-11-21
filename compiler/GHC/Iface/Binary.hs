@@ -330,7 +330,7 @@ evidenceSuffix requirements
     || needs IndexedConstructorOperandEvidence
     || needs IndexedConstructorExistentialCaseEvidence || needs GeneralIndexedConstructorOperandEvidence
     || needs RetainedUserUnfoldingEvidence || needs LinearUnpackEvidence
-    || needs RetainedCharOperandEvidence = feature_set
+    || needs RetainedCharOperandEvidence || needs MatchableProjectionEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -358,6 +358,7 @@ legacyEvidenceSuffix IndexedConstructorExistentialCaseEvidence = featureSetPrefi
 legacyEvidenceSuffix RetainedUserUnfoldingEvidence = featureSetPrefix ++ "retained-user-unfolding"
 legacyEvidenceSuffix LinearUnpackEvidence = featureSetPrefix ++ "linear-unpack"
 legacyEvidenceSuffix RetainedCharOperandEvidence = featureSetPrefix ++ "retained-char-operand"
+legacyEvidenceSuffix MatchableProjectionEvidence = featureSetPrefix ++ "matchable-projection"
 legacyEvidenceSuffix GeneralIndexedConstructorOperandEvidence = featureSetPrefix ++ "general-indexed-constructor-operand"
 legacyEvidenceSuffix DepFunCoEvidence           = "-retained-depfunco-v1"
 legacyEvidenceSuffix ConstructorCaseEvidence   = "-retained-constructor-case-v1"
@@ -393,7 +394,8 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("general-indexed-constructor-operand", GeneralIndexedConstructorOperandEvidence)
                       , ("retained-user-unfolding", RetainedUserUnfoldingEvidence)
                       , ("linear-unpack", LinearUnpackEvidence)
-                      , ("retained-char-operand", RetainedCharOperandEvidence) ]
+                      , ("retained-char-operand", RetainedCharOperandEvidence)
+                      , ("matchable-projection", MatchableProjectionEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion
