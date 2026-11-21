@@ -1532,6 +1532,8 @@ main = do
     observe "apply a type lambda to Maybe, Either String and IO" TypeLambda.roadmap
     observe "partially apply a two-argument type lambda" TypeLambda.partial
     observe "map a callback that captures a closed family pattern" TypeLambda.prefixes
+    observe "capture a type before and after a local let"
+        (Refl :: TypeLambda.ScopedRow Char '[Bool] :~: '[(Maybe Char, Either Char Bool)])
     observe "map a type lambda with a constructor case" TypeLambda.mixed
     observe "read fields from two indexed type case branches" TypeLambda.indexedFields
     observe "retain the kind of a matched Nothing"

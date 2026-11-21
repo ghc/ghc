@@ -37,8 +37,16 @@ describes the cases that can use a let-bound value in their branches. [Agda let 
 and [Eisenberg and Stolarek on case lifting, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf).
 
 The source form supports one variable per binding and nested lets.
-Binding groups, local patterns, and combining lets with general
-type-level lambdas and cases remain open.
+A synonym or closed family equation can bind a type lambda on the RHS
+and pass it to another family. A lambda in the body can capture the let
+result. For example, `ScopedRow Char '[Bool]` gives
+`'[(Maybe Char, Either Char Bool)]`. Its first callback captures `Char`
+before an inner let binds the same name to `Maybe Char`. Its second
+callback uses both types. An ordinary interface-only client constructs
+a value of the resulting row type. Binding groups, local patterns and
+general cases remain open.
+[Scoped row](../examples/open-evaluation/TypeLambda.hs)
+and [client](../../../testsuite/tests/dependent/should_run/NativeTypeLambda.sh).
 
 ## Type quotations and splices
 

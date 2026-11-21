@@ -31,7 +31,7 @@ module Ordinary where
 import Data.Kind (Type)
 import Data.Type.Equality ((:~:)(Refl))
 import NativeTypeLambdaScope
-import TypeLambda (L, Captured, Shadowed, WithError, Prefixes, Mixed, Held, CaseShadow, Rebuild,
+import TypeLambda (L, Captured, Shadowed, WithError, Prefixes, ScopedRow, Mixed, Held, CaseShadow, Rebuild,
                    IndexedTag(..), IndexedCase, IndexedCaseInferred)
 import Data.Proxy (Proxy)
 result :: L :~: '[Maybe Int, Either String Int, IO Int]
@@ -46,6 +46,10 @@ capturedRow :: Prefixes ('Just Ordering) '[Char, Bool] :~: '[Either Ordering Cha
 capturedRow = Refl
 independentRow :: Prefixes 'Nothing '[Char, Bool] :~: '[Maybe Char, Maybe Bool]
 independentRow = Refl
+scopedRow :: ScopedRow Char '[Bool] :~: '[(Maybe Char, Either Char Bool)]
+scopedRow = Refl
+scopedKind :: LetKind Ordering 'GT :~: (Maybe Ordering, Proxy 'GT, Char)
+scopedKind = Refl
 nested :: Levels Bool 'True :~:
     ((Proxy 'True, Bool), (Proxy 'True, Int, Ordering))
 nested = Refl
@@ -94,8 +98,8 @@ cat >RowsMain.hs <<'HS'
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, TypeOperators #-}
 module Main where
 import Data.Type.Equality ((:~:)(Refl))
-import Ordinary (capturedRow, independentRow)
-import TypeLambda (Prefixes)
+import Ordinary (capturedRow, independentRow, scopedRow)
+import TypeLambda (Prefixes, ScopedRow)
 
 data Fields xs where
   End :: Fields '[]
@@ -109,12 +113,26 @@ withoutError = case independentRow of Refl -> Field (Just 'a') (Field (Just True
 
 main :: IO ()
 main = case (capturedRow, independentRow, withError, withoutError) of
-  (Refl, Refl, Field a (Field b End), Field c (Field d End)) ->
+  (Refl, Refl, Field a (Field b End), Field c (Field d End)) -> do
     print (a, b, c, d)
+    let row :: Fields (ScopedRow Char '[Bool])
+        row = case scopedRow of Refl -> Field (Just 'x', Right True) End
+    case row of Field value End -> print value
 HS
 "${g[@]}" -c RowsMain.hs
 "${g[@]}" RowsMain.o Ordinary.o -o rows
-test "$(./rows)" = "(Left GT,Right True,Just 'a',Just True)"
+printf '%s\n' "(Left GT,Right True,Just 'a',Just True)" "(Just 'x',Right True)" >rows.expected
+./rows >rows.actual
+cmp rows.expected rows.actual
+
+cat >LaterLet.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes #-}
+module LaterLet where
+type Bad e = let wrap = \a -> Either later a in let later = Maybe e in wrap Char
+HS
+if "${g[@]}" -c LaterLet.hs >later.log 2>&1; then exit 1; fi
+grep -Fq 'GHC-76037' later.log
+grep -Fq "Not in scope: type variable 'later'" later.log
 
 cat >RowScope.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeFamilies #-}
