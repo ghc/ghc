@@ -267,7 +267,8 @@ test('NativeListBoundary',
      ['NativeListBoundary', '-fomit-interface-pragmas -fno-write-if-simplified-core'])
 test('NativeRetainedTypeWitness',
      [only_ways(['normal']),
-      extra_files(['NativeRetainedTypeWitnessLib.hs', 'NativeRetainedTypeWitness.hs'])],
+      extra_files(['NativeRetainedTypeWitnessLib.hs', 'NativeRetainedTypeWitness.hs',
+                   'NativeRetainedTypeOperand.hs'])],
      run_command, ['bash NativeRetainedTypeWitness.sh "{compiler}" "{libdir}" '
                    + config.ghc_th_way_flags])
 test('NativeClosedSum',

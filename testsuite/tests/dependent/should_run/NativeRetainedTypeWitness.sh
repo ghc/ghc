@@ -28,6 +28,10 @@ for opt in -O0 -O2; do
         "${ghc[@]}" "$opt" -i -i../lib -c "$client.hs"
         "${ghc[@]}" "$client.o" "../lib/$provider.o" -o "$client"
         "./$client" > result
+        cp "$src/NativeRetainedTypeOperand.hs" .
+        "${ghc[@]}" "$opt" -i -i../lib -fwrite-ide-info -c NativeRetainedTypeOperand.hs
+        "${ghc[@]}" NativeRetainedTypeOperand.o "../lib/$provider.o" -o operand
+        ./operand >> result
     )
 done
 cmp ./-O0/client/result ./-O2/client/result
