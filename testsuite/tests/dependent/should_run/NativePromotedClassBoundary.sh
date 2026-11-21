@@ -41,9 +41,9 @@ done
 
 mkdir -p "$out/specialise"/{provider,client}
 cd "$out/specialise/provider"
-cp "$src/../"{PackedVecLibrary,ImplicitVector,ScopedClassMethod}.hs .
+cp "$src/../"{PackedVecLibrary,ImplicitVector,RetainedNaturals,ScopedClassMethod}.hs .
 "${ghc[@]}" -O2 -fomit-interface-pragmas -fno-write-if-simplified-core \
-    -c PackedVecLibrary.hs ImplicitVector.hs ScopedClassMethod.hs
+    -c PackedVecLibrary.hs ImplicitVector.hs RetainedNaturals.hs ScopedClassMethod.hs
 cd ../client
 cp ../provider/*.hi "$src/ScopedSpecialise.hs" .
 for opt in -O1 -O2; do
