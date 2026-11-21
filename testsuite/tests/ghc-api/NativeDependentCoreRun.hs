@@ -4223,7 +4223,7 @@ runPackageSourceRejectChecks = do
         , ("SumPartial", 83865, "Sum m", ["TypeFamilies"], equalityImports, sums ++ ["bad :: foreach (m :: Nat) -> (m :~: m) -> Sum Z m", "bad m = Sum m"])
         , ("LinearClause", 18872, "multiplicity", ["LinearTypes"], [], linearPackage ++ ["bad :: PackedVec a %1 -> (PackedVec a, PackedVec a)", "bad (PackVec n xs) = (PackVec n xs, PackVec n xs)"])
         , ("LinearCase", 18872, "multiplicity", ["LinearTypes"], [], linearPackage ++ ["bad :: PackedVec a %1 -> ()", "bad p = case p of PackVec _ xs -> ()"])
-        , ("RigidMultiplicity", 25897, "is a rigid type variable", ["LinearTypes"], ["import GHC.Types (Multiplicity)"], package ++ ["bad :: forall (p :: Multiplicity) a. PackedVec a %p -> PackedVec a", "bad (PackVec n xs) = PackVec n xs"])
+        , ("RigidMultiplicity", 25897, "is a rigid type variable", ["LinearTypes"], ["import GHC.Types (Multiplicity)"], linearPackage ++ ["bad :: forall (p :: Multiplicity) a. PackedVec a %p -> (PackedVec a, PackedVec a)", "bad (PackVec n xs) = (PackVec n xs, PackVec n xs)"])
         , ("FilterWrongLength", 5617, "PackVec m (VCons x ys)", [], [], package ++ ["filterVec :: forall a n. (a -> Bool) -> Vec a n -> PackedVec a", "filterVec predicate VNil = PackVec Z VNil", "filterVec predicate (VCons x xs) =", "  if predicate x", "    then case filterVec predicate xs of", "      PackVec m ys -> PackVec m (VCons x ys)", "    else filterVec predicate xs"])
         , ("BoundedVectorLength", 5617, "VCons x ys", [], [], bounded "PackBounded len (VCons x ys) (weakenRight proof)" dropBound)
         , ("BoundedProofLength", 5617, "weakenRight proof", [], [], bounded "PackBounded (S len) (VCons x ys) (weakenRight proof)" dropBound)
