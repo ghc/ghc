@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}
 {-# LANGUAGE PolyKinds, TypeApplications, TypeFamilies, TypeOperators #-}
-module Main where
+module OpenArrowKindClient (openKindRows, main) where
 import OpenArrowKind (OpenKind)
 import Data.IORef (newIORef, readIORef)
 import Data.Type.Equality ((:~:)(Refl))
@@ -24,8 +24,12 @@ recover = Refl
 ordinary :: Interpret 'True Bool
 ordinary = Just True
 
+-- | Use the matchable row for the value and the other row for its function.
+openKindRows :: Bool -> (Maybe Bool, Bool)
+openKindRows flag = case recover @Maybe @Bool @Bool of Refl -> (ordinary, negateFlag flag)
+
 -- | Evaluate both rows with an ordinary client.
 main :: IO ()
 main = do
   flag <- newIORef False >>= readIORef
-  print (case recover @Maybe @Bool @Bool of Refl -> ordinary, negateFlag flag)
+  print (openKindRows flag)

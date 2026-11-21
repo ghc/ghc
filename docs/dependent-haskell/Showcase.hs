@@ -110,6 +110,7 @@ import qualified NestedFunctionClient
 import qualified InvisibleFamily
 import ConstrainedElementsClient (advanceCursor, showAdvance, showRemainder, splitCollection, partialElement, aliasedReflection, annotatedElement, constrainedElements, explicitElements, formatField, renderField, renderKnownFields, retainedMaybeDomain)
 import ConstrainedElementsQuickLook (showReflection)
+import OpenArrowKindClient (openKindRows)
 import StoredReflectionClient (readStoredReflection)
 import IndexedMapClient (mappedCells)
 import LaterMatchabilityClient (annotatedMap, appliedCallback, boxedCallbacks, computedDictionary, flippedCallbacks, forwardedMap,
@@ -994,6 +995,7 @@ main = do
          advanceCursor (== 'x') (Just 'x'))
     boxedFlag <- newIORef (Just True) >>= readIORef
     boxedLetter <- newIORef (Just 'x') >>= readIORef
+    observe "use both equations of an open arrow kind" (openKindRows disabled)
     observe "use a stored retained callback at Bool and Char" (readStoredReflection boxedFlag boxedLetter)
     putStrLn "Dependent Haskell: completed source features"
     booleans

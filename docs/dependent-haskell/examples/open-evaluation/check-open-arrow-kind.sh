@@ -81,7 +81,7 @@ import $second ()
 HS
         }
         cp "$root/fixtures/"{OpenArrowKindClient,TrailingWriter}.hs .
-        "${ghc[@]}" "${flags[@]}" -c OpenArrowKindClient.hs
+        "${ghc[@]}" "${flags[@]}" -main-is OpenArrowKindClient -c OpenArrowKindClient.hs
         "${ghc[@]}" "-$opt" OpenArrowKindClient.o \
             ../OpenArrowKind/OpenArrowKind.o ../OpenArrowKindMatchable/OpenArrowKindMatchable.o \
             ../OpenArrowKindUnmatchable/OpenArrowKindUnmatchable.o -o run
