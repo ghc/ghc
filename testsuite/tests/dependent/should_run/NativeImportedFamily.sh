@@ -90,6 +90,20 @@ sed -e '/^type instance Payload Word/,$d' -e 's/, directObserved//' \
     ../producer/FamilySignature.hs >SignatureFieldCycle.hs
 expect_cycle SignatureFieldCycle
 
+# The standalone kind signature depends on the equation scheduled after keep.
+cat >SignatureKindCycle.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes, StandaloneKindSignatures, TypeFamilies #-}
+module SignatureKindCycle where
+import Data.Kind (Type)
+import ImportedFamilyProvider (Payload)
+type instance Payload Int = SignatureKindCycle.keep Bool
+keep :: forall a. Input a -> a
+keep x = x
+type Input :: Payload Int -> Type
+type family Input a where Input _ = Bool
+HS
+expect_cycle SignatureKindCycle
+
 # A typed adapter still observes demand and records the RULE owner.
 cat >StrictDirect.hs <<'HS'
 {-# LANGUAGE ExperimentalDependentTypes, TypeFamilies #-}

@@ -1,6 +1,7 @@
-{-# LANGUAGE ExperimentalDependentTypes, TypeFamilies #-}
+{-# LANGUAGE ExperimentalDependentTypes, StandaloneKindSignatures, TypeFamilies #-}
 -- | Use a signed local function in an imported family equation.
 module FamilySignature (observed, directObserved) where
+import Data.Kind (Type)
 import ImportedFamilyProvider (Payload)
 
 type instance Payload Float = FamilySignature.keep Bool
@@ -30,5 +31,6 @@ directObserved = True
 direct :: forall a. DirectInput a -> a
 direct x = x
 
+type DirectInput :: Type -> Type
 type family DirectInput a where
   DirectInput a = a

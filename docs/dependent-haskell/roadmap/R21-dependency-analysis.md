@@ -400,5 +400,16 @@ An ordinary client reads `True :: Payload Word` from the resulting
 interface. A constructor field that refers back to the imported family
 still creates a cycle. Forcing the symbolic argument and enabling a
 matching term rewrite rule each block the proof.
+
+The closed family can have a standalone kind signature such as
+`type DirectInput :: Type -> Type`. Move the signature with its
+renamed type group and check its references before moving it.
+The earlier scheduler rejected this forward dependency with
+GHC-70566. A signature that instead mentions the postponed
+`Payload Int` equation still rejects, as does recursion through
+two signed function bodies. The signature sets the kind and leaves
+the body's value dependencies in place.
+[Proposal #54](https://ghc-proposals.readthedocs.io/en/latest/proposals/0054-kind-signatures.html)
+and [its review discussion on polymorphic recursion](https://github.com/ghc-proposals/ghc-proposals/pull/54#issuecomment-308906690).
 [Checked declarations](../examples/open-evaluation/FamilySignature.hs)
 and [interface, cycle, demand and rule checks](../../../testsuite/tests/dependent/should_run/NativeImportedFamily.sh).
