@@ -325,8 +325,9 @@ and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vecto
 1. **R05.** A rule can match a retained head from another module.
    The same checked type application supplies the domains of `m`
    and `x` in `keepReading @Bool m x`. An ordinary value can precede
-   the type argument. R03 must admit an erased binder inside a retained
-   binder before a rule can use that order in a source signature.
+   the type argument. A retained prefix can also precede a specified
+   erased binder and a second retained argument, as in
+   `keepTagged tag @Bool m x`.
    [Rule and interface support](roadmap/R05-dependent-core.md).
 2. **R23 and R24.** A recursive family can forward a constructor
    or a partial family across stripped interfaces. When a signature

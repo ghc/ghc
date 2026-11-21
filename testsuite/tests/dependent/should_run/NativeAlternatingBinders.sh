@@ -21,7 +21,10 @@ for opt in O0 O2; do
     mv "$provider.hs" ../
     cp "$provider.hi" "$src/$client.hs" ../client/
     cd ../client
-    "${ghc[@]}" "-$opt" -XNoExperimentalDependentTypes -c "$client.hs"
+    "${ghc[@]}" "-$opt" -XNoExperimentalDependentTypes -ddump-rule-firings -c "$client.hs" >firings
+    if [[ $opt == O2 ]]; then
+        grep -Fq "Rule fired: keepCons/Bool ($provider)" firings || { cat firings; exit 1; }
+    fi
     "${ghc[@]}" "-$opt" "$client.o" "../provider/$provider.o" -o run
     ./run
 done
@@ -64,3 +67,27 @@ if "${ghc[@]}" -XNoExperimentalDependentTypes -c MissingShow.hs >reject.log 2>&1
     exit 1
 fi
 grep -Fq 'No instance for ‘Show NoShow’' reject.log || { cat reject.log >&2; exit 1; }
+
+cat >WrongCons.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, ScopedTypeVariables, TypeAbstractions, TypeOperators #-}
+module WrongCons where
+import Data.Type.Equality ((:~:))
+import NativeAlternatingBindersProvider
+
+wrongProof :: foreach (phase :: Phase) -> forall a.
+              foreach (xs :: [Maybe a]) -> foreach (ys :: [Maybe a]) ->
+              ('Nothing ': ys) :~: ('Nothing ': ys) ->
+              ConsReading phase ('Nothing ': xs) -> ConsReading phase ('Nothing ': xs)
+wrongProof phase @a xs ys p x = keepCons phase @a xs p x
+
+wrongPhase :: foreach (phase :: Phase) -> foreach (other :: Phase) -> forall a.
+              foreach (xs :: [Maybe a]) -> ('Nothing ': xs) :~: ('Nothing ': xs) ->
+              ConsReading phase ('Nothing ': xs) -> ConsReading phase ('Nothing ': xs)
+wrongPhase phase other @a xs p x = keepCons other @a xs p x
+HS
+if "${ghc[@]}" -c WrongCons.hs >reject.log 2>&1 ||
+   ! grep -Fq "Couldn't match type ‘ys’ with ‘xs’" reject.log ||
+   ! grep -Fq "Couldn't match type ‘other’ with ‘phase’" reject.log; then
+    cat reject.log >&2
+    exit 1
+fi

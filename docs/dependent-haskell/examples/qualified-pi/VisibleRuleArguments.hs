@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, PolyKinds, ScopedTypeVariables, TypeAbstractions #-}
-module VisibleRuleArguments (Reading(..), keepReading, keepAfter) where
+module VisibleRuleArguments (Reading(..), keepReading, keepAfter, TaggedReading(..), keepTagged) where
 
 import Data.Kind (Type)
 
@@ -19,3 +19,14 @@ keepAfter :: Bool -> forall (a :: Type). foreach (m :: Maybe a) -> Reading m -> 
 keepAfter _ @a = keepReading @a
 
 {-# RULES "keepAfter/Bool" forall ignored m x. keepAfter ignored @Bool m x = x #-}
+
+-- | A payload indexed by values on both sides of an erased type binder.
+data TaggedReading (tag :: Bool) (m :: Maybe a) = TaggedReading Int
+
+-- | Keep both runtime indices while selecting the element type between them.
+{-# NOINLINE keepTagged #-}
+keepTagged :: foreach (tag :: Bool) -> forall (a :: Type).
+              foreach (m :: Maybe a) -> TaggedReading tag m -> TaggedReading tag m
+keepTagged _ _ x = x
+
+{-# RULES "keepTagged/Bool" forall tag m x. keepTagged tag @Bool m x = x #-}

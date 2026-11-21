@@ -264,6 +264,8 @@ booleans = do
     ignoredFirst <- newIORef (error "forced first rule argument") >>= readIORef
     observe "match a type argument after a lazy value argument"
         (VisibleRuleClient.readAfter ignoredFirst readingIndex 43)
+    observe "select an erased type between two lazy runtime indices"
+        (VisibleRuleClient.readTagged ignoredFirst lazyIndex 47)
     observe "apply a rule declared outside the retained function's module"
         (Rule.readChoice (Rule.keep True (ImportedRetainedRules.tagged 23)))
     observe "choose True has result Int" (choose True)

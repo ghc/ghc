@@ -1,10 +1,12 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, PolyKinds, ScopedTypeVariables #-}
-{-# LANGUAGE TypeAbstractions, TypeFamilies #-}
+{-# LANGUAGE GADTs, TypeAbstractions, TypeFamilies, TypeOperators #-}
 module NativeAlternatingBindersProvider
   ( Reading(..), Marker(..), keepAfter, keepExplicit, keepImplicit
-  , forwardKind, sameSpelling, twice, plainFirst, showAfter ) where
+  , forwardKind, sameSpelling, twice, plainFirst, showAfter
+  , Phase(..), ConsReading(..), keepCons ) where
 import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
+import Data.Type.Equality ((:~:)(Refl))
 
 data Reading (b :: Bool) (m :: Maybe a) = Reading Int
 
@@ -49,3 +51,15 @@ plainFirst _ _ x = x
 showAfter :: foreach (b :: Bool) -> forall (a :: Type). Show a =>
              foreach (m :: Maybe a) -> a -> Reading b m -> (String, Int)
 showAfter _ _ value (Reading n) = (show value, n)
+
+data Phase = Start | Finish
+data ConsReading (phase :: Phase) (xs :: [Maybe a]) = ConsReading Int
+
+{-# NOINLINE keepCons #-}
+keepCons :: foreach (phase :: Phase) -> forall a. foreach (xs :: [Maybe a]) ->
+            ('Nothing ': xs) :~: ('Nothing ': xs) ->
+            ConsReading phase ('Nothing ': xs) -> ConsReading phase ('Nothing ': xs)
+keepCons _ _ proof x = case proof of Refl -> x
+
+{-# RULES "keepCons/Bool" forall phase xs proof x.
+    keepCons phase @Bool xs proof x = case proof of Refl -> x #-}

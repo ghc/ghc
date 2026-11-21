@@ -208,6 +208,14 @@ declaration-based omitted operand. The
 [research references](../REFERENCES.md#invisible-retained-binders-next-candidate)
 record the choice of delimiter, representation and telescope-order checks.
 
+A retained argument can precede an erased `forall` and another retained
+argument. In `keepTagged tag @Bool m x`, the type of `x` uses both
+`tag` and `m`. The ordinary interface-only client reads bottom for both
+indices and returns 47. At `-O2`, the imported R05 rule fires.
+[Provider](../examples/qualified-pi/VisibleRuleArguments.hs),
+[ordinary client](../examples/qualified-pi/VisibleRuleClient.hs) and
+[checks](../examples/qualified-pi/check-visible-rule-arguments.sh).
+
 ## Completion boundary
 
 Keep R03 open until the supported domain judgment is stable under substitution

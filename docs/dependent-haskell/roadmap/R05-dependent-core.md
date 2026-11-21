@@ -218,6 +218,11 @@ In `keepAfter ignored @Bool m x`, the rule checks `ignored` at `Bool`
 and infers `x :: Reading m`. The caller can pass an undefined value
 for `ignored`. A test puts a value between two visible type arguments
 and uses a noninjective family for the payload type.
+In `keepTagged tag @Bool m x`, both `tag` and `m` are retained.
+The checked prefix gives the types of the later index and payload.
+The list-indexed regression also checks an equality proof after the
+list argument. The optimized rule forces the proof and leaves the
+two indices lazy.
 An ordinary caller can write `keepReading @_ m x` when the type of
 `m` determines the wildcard. The call remains lazy in `m`.
 [Source rule](../examples/qualified-pi/VisibleRuleArguments.hs),

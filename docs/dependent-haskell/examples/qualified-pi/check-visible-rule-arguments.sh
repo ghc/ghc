@@ -19,7 +19,7 @@ main = do
     m <- newIORef (Just True) >>= readIORef
     bottom <- newIORef (error "forced reading index" :: Maybe Bool) >>= readIORef
     ignored <- newIORef (error "forced first argument") >>= readIORef
-    print (readAt m 37, readAt bottom 19, readAfter ignored m 43)
+    print (readAt m 37, readAt bottom 19, readAfter ignored m 43, readTagged ignored bottom 47)
 HS
 
 for opt in 0 2; do
@@ -29,12 +29,13 @@ for opt in 0 2; do
     cd "$out/client"
     "$ghc" "${flags[@]}" -O"$opt" -ddump-rule-firings -c VisibleRuleClient.hs >firings
     if [[ $opt == 2 ]]; then
+        grep -Fq 'Rule fired: keepTagged/Bool (VisibleRuleArguments)' firings || { cat firings; exit 1; }
         grep -Fq 'Rule fired: keepAfter/Bool (VisibleRuleArguments)' firings || { cat firings; exit 1; }
         grep -Fq 'Rule fired: keepReading/Bool (VisibleRuleArguments)' firings || { cat firings; exit 1; }
     fi
     "$ghc" "${flags[@]}" -O"$opt" -c Main.hs
     "$ghc" "-B$lib" Main.o VisibleRuleClient.o ../provider/VisibleRuleArguments.o -o observe
-    [[ $(./observe) == '(37,19,43)' ]]
+    [[ $(./observe) == '(37,19,43,47)' ]]
 done
 
 cd "$out/provider"

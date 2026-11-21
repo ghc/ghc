@@ -1,7 +1,9 @@
-{-# LANGUAGE TypeApplications, DataKinds #-}
+{-# LANGUAGE TypeApplications, DataKinds, GADTs #-}
 module Main where
+import Control.Exception (ErrorCall, evaluate, try)
 import Data.IORef
 import Data.Proxy
+import Data.Type.Equality ((:~:)(Refl))
 import NativeAlternatingBindersProvider
 
 data ShowMarker = ShowMarker
@@ -32,3 +34,10 @@ main = do
   print (case plainFirst () @Bool m (Reading 34) of Reading n -> n)
   showIndex <- newIORef (error "unused Show index" :: Maybe ShowMarker) >>= readIORef
   print (showAfter badB showIndex (error "unused Show argument") (Reading 51))
+  phase <- newIORef (error "unused phase") >>= readIORef
+  xs <- newIORef (error "unused list" :: [Maybe Bool]) >>= readIORef
+  print (case keepCons phase @Bool xs Refl (ConsReading 57) of ConsReading n -> n)
+  print (case keepCons phase xs Refl (ConsReading 61) of ConsReading n -> n)
+  proof <- try (evaluate $ case keepCons phase @Bool xs (error "demanded proof") (ConsReading 63) of
+                  ConsReading n -> n) :: IO (Either ErrorCall Int)
+  print (either ((== "demanded proof") . takeWhile (/= '\n') . show) (const False) proof)
