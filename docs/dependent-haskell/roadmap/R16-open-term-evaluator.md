@@ -1839,3 +1839,5 @@ interfaces. The upgrade check also applies to `-fno-code -fwrite-interface`.
 A separate Core experiment observed both outer constructors from the
 installed `Prelude.fmap`.
 [Core observations and readback](R05-dependent-core.md#open-observation-of-the-installed-maybe-method).
+
+[Source upgrade regression](../examples/open-evaluation/check-mapping-upgrade.sh).
