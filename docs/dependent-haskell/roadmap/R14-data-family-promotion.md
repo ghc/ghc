@@ -19,8 +19,7 @@ direction and leaves the general design open.
 and [GHC issue #15245](https://gitlab.haskell.org/ghc/ghc/-/issues/15245).
 
 The experiment admits a checked, lifted data instance
-constructor with no context, existential, index refinement, or retained
-binder. Its fields are lifted. The module that names the constructor in
+constructor with no stored context, existential, or retained binder. Its fields are lifted. The module that names the constructor in
 a type enables `ExperimentalDependentTypes` and uses the normal
 `DataKinds` syntax. The data instance can come from an ordinary module.
 
@@ -43,9 +42,9 @@ and [test runner](../../../testsuite/tests/dependent/should_run/NativeDataFamily
 The promoted constructor uses the original DataCon name and its public
 result kind. The runtime wrapper still uses the existing representational
 axiom between the family and its representation type. That axiom supplies
-no nominal equality between those types. Constructors with constraints,
-index refinements, or a newtype representation still give GHC-64578 in
-this slice. A type declaration that needs a constructor from an unchecked
+no nominal equality between those types. Constructors with a stored
+context, existential binder, or newtype representation still give
+GHC-64578 in this slice. A type declaration that needs a constructor from an unchecked
 same-group data instance also gives GHC-64578.
 [Promotion check](../../../compiler/GHC/Tc/Gen/HsType.hs)
 and [instance placeholders](../../../compiler/GHC/Tc/Utils/Env.hs).
@@ -102,9 +101,31 @@ an ordinary source-hidden client, an undemanded field, and rejection of
 wrong fields and strict constructors.
 [Constructor operand test](../../../testsuite/tests/dependent/should_run/NativeDataFamilyConstructorOperands.sh).
 
+## Result refinements
+
+```haskell
+data family C a
+data instance C (a, b) where
+    Refines :: C (Int, b)
+```
+
+The promoted constructor has result kind `C (Int, b)`. GHC uses the
+source telescope of the GADT constructor, so the refined parameter
+appears directly in the result kind. A separately compiled closed type
+family can match `'Refines` and prove its result with `Refl`. Using
+`'Refines` at kind `C (Char, Bool)` fails.
+
+An ordinary client can also pass `Refines` to an imported
+`foreach (t :: C (Int, Bool))` function. The worker receives the
+refined type argument and an exact nominal reflexive proof. The
+wrapper still applies the separate representational instance axiom.
+The interface reader checks the same operand shape for an optimized
+unfolding.
+[Promotion and retained-operand tests](../../../testsuite/tests/dependent/should_run/data-family-promotion).
+
 ## Next acceptance check
 
-Test a constructor with a context or a result refinement after specifying
-how its promoted telescope carries the required evidence. Discussion #456
-identifies the coercion binder question for constrained constructors.
+Specify how a promoted family constructor with a stored context can
+bind and expose its evidence in a type. Discussion #456 identifies the
+coercion binder question for constrained constructors.
 [Discussion #456](https://github.com/ghc-proposals/ghc-proposals/discussions/456).

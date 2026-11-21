@@ -31,10 +31,11 @@ for opt in -O0 -O2; do
     cp {TupleProvider,TuplePromotion}.hi ../client/
     refuse 64578 "${ghc[@]}" "$opt" "$ordinary" -fno-code -c TuplePromotion.hs
     refuse 83865 "${ghc[@]}" "$opt" "$experimental" -DWRONG_KIND -fno-code -c TuplePromotion.hs
+    refuse 83865 "${ghc[@]}" "$opt" "$experimental" -DWRONG_REFINEMENT -fno-code -c TuplePromotion.hs
     refuse 83865 "${ghc[@]}" "$opt" "$experimental" -DWRONG_PROOF -fno-code -c TuplePromotion.hs
     refuse 18872 "${ghc[@]}" "$opt" "$experimental" -DWRONG_COERCION -fno-code -c TuplePromotion.hs
     refuse 64578 "${ghc[@]}" "$opt" "$experimental" -DUNSUPPORTED_CONSTRUCTORS -fno-code -c TuplePromotion.hs
-    test "$(grep -Fc '[GHC-64578]' diagnostic)" = 3
+    test "$(grep -Fc '[GHC-64578]' diagnostic)" = 2
 
     cd ../client
     cp "$src/Main.hs" .

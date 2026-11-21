@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP, DataKinds, GADTs, StandaloneKindSignatures, TypeApplications, TypeFamilies, TypeOperators #-}
-module TuplePromotion (Selected, proof, pairIndex, reflected) where
+module TuplePromotion (Selected, Refined, proof, refinementProof, pairIndex, reflected) where
 
 import Data.Type.Equality ((:~:)(Refl))
 import Type.Reflection (typeRep)
@@ -18,6 +18,14 @@ type Selected = Inspect ('Tup2 'True 'True)
 proof :: Selected :~: 'True
 proof = Refl
 
+type family HasRefinement (x :: C (Int, Bool)) :: Bool where
+    HasRefinement 'Refines = 'True
+
+type Refined = HasRefinement ('Refines :: C (Int, Bool))
+
+refinementProof :: Refined :~: 'True
+refinementProof = Refl
+
 pairIndex :: At ('Tup2 'True 'False :: Tuple Bool Bool)
 pairIndex = At
 
@@ -35,6 +43,11 @@ wrongKind :: At ('Tup2 'True 'False :: Tuple Int Bool)
 wrongKind = At
 #endif
 
+#ifdef WRONG_REFINEMENT
+wrongRefinement :: At ('Refines :: C (Char, Bool))
+wrongRefinement = At
+#endif
+
 #ifdef WRONG_PROOF
 wrongProof :: 'Tup2 'True 'False :~: ('Tup2 'True 'True :: Tuple Bool Bool)
 wrongProof = Refl
@@ -48,9 +61,6 @@ wrongCoercion = Coercion
 #ifdef UNSUPPORTED_CONSTRUCTORS
 context :: At ('MkC 'True)
 context = At
-
-refinement :: At 'Refines
-refinement = At
 
 newtypeCon :: At ('MkN 'True)
 newtypeCon = At

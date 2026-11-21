@@ -4,7 +4,7 @@ src=$(cd "$(dirname "$0")/data-family-promotion" && pwd)
 out=$(mktemp -d)
 trap 'rm -rf -- "$out"' EXIT
 ghc=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint -fdiagnostics-color=never)
-expected='((True,False),(0,True),(False,True),True)'
+expected='((True,False),(0,True),(False,True),True,True)'
 feature=retained-data-family-constructor-operand
 
 for opt in -O0 -O2; do
@@ -42,6 +42,11 @@ for opt in -O0 -O2; do
                 exit 1
             fi
             grep -Fq '[GHC-83605]' strict
+            if "${ghc[@]}" "$opt" -DWRONG_REFINEMENT -fno-code -c RetainedConstructor.hs > refinement 2>&1; then
+                echo "Accepted a constructor with a different data family refinement"
+                exit 1
+            fi
+            grep -Fq '[GHC-83605]' refinement
         fi
 
         cd ../client

@@ -1,6 +1,7 @@
-{-# LANGUAGE CPP, DataKinds, TypeFamilies, ExperimentalDependentTypes #-}
-module RetainedConstructor (emitted, lazy, withNatural) where
+{-# LANGUAGE CPP, DataKinds, TypeFamilies, GADTs, TypeOperators, ExperimentalDependentTypes #-}
+module RetainedConstructor (emitted, lazy, withNatural, withRefinement) where
 
+import Data.Type.Equality ((:~:)(Refl))
 import Numeric.Natural (Natural)
 import RetainedTuple (keep, observe)
 import TupleProvider
@@ -20,6 +21,13 @@ observeNatural t = (At, fields t)
 withNatural :: () -> (At ('Tup2 0 'True), (Natural, Bool))
 withNatural () = observeNatural (Tup2 0 True)
 
+observeRefined :: foreach (t :: C (Int, Bool)) -> (t :~: t, Bool)
+observeRefined t = (Refl, case t of Refines -> True; MkC _ -> False)
+
+{-# INLINE withRefinement #-}
+withRefinement :: () -> ('Refines :~: ('Refines :: C (Int, Bool)), Bool)
+withRefinement () = observeRefined Refines
+
 #ifdef WRONG_INDEX
 wrong :: At ('Tup2 'True 'False)
 wrong = keep (Tup2 False True)
@@ -33,4 +41,11 @@ keepStrict :: foreach (t :: StrictTuple Bool) -> At t
 keepStrict _ = At
 
 strict = keepStrict (StrictTuple True)
+#endif
+
+#ifdef WRONG_REFINEMENT
+keepOther :: foreach (t :: C (Char, Bool)) -> At t
+keepOther _ = At
+
+wrongRefinement = keepOther Refines
 #endif

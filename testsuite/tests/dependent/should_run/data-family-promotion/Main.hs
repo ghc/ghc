@@ -8,8 +8,11 @@ import TuplePromotion
 proofAfterImport :: Selected :~: 'True
 proofAfterImport = Refl
 
+refinementAfterImport :: Refined :~: 'True
+refinementAfterImport = Refl
+
 main :: IO ()
-main = case (proof, proofAfterImport, pairIndex) of
-    (Refl, Refl, At) -> do
+main = case (proof, proofAfterImport, refinementProof, refinementAfterImport, pairIndex) of
+    (Refl, Refl, Refl, Refl, At) -> do
         print (fields (Tup2 True False))
         putStrLn reflected
