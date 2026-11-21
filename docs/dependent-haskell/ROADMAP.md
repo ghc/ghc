@@ -9,8 +9,8 @@ records every edge. The R numbers are local labels for those cards.
 
 ## Where this fork stands
 
-At `da6124e9a1`, **23 of 50 cards (46%) are complete** on the upstream
-checklist. The fork adds a tested part of **18 of the 27 open cards**.
+At `711b6e0e56`, **23 of 50 cards (46%) are complete** on the upstream
+checklist. The fork adds a tested part of **19 of the 27 open cards**.
 This count includes a card when the fork demonstrates a behavior in
 source Haskell or in compiled Core. Each card counts once, regardless
 of the number of Showcase examples. The cards differ in scope and some
@@ -21,6 +21,14 @@ depend on others, so this count cannot estimate the remaining work time.
 | Dependent binders, Core and equality | R03, R04, R05, R11, R22 |
 | Promotion and evaluation | R07, R12, R13, R14, R15, R16, R17, R18, R19 |
 | Declaration dependencies, families and GADTs | R21, R23, R24, R41 |
+| Namespace warnings | R36 |
+
+Proposal #765 adds pun warnings. The fork now implements the top-level
+part of `-Wpun-bindings`. With this flag, `data T = T` reports both
+declaration locations. A type and a constructor in different declarations
+of the same group can also trigger the warning. Local binding groups
+and `-Wpun-uses` remain open. [Accepted proposal and review](REFERENCES.md#namespace-pun-warnings)
+and [GHC regression](../../testsuite/tests/rename/should_compile/ToplevelPunBindings.hs).
 
 A separately compiled producer can return a rectangular table whose
 type hides its dimensions. The client can prove every stored cell at

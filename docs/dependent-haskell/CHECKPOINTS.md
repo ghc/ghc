@@ -55,6 +55,17 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At compiler revision `711b6e0e56`, `-Wpun-bindings` and
+`-Werror=pun-bindings` identify type and term definitions with the
+same spelling in one top-level declaration group. The diagnostic is
+GHC-59431. Default flags and `-Wall` accept the same declarations.
+A plain provider produced byte-identical objects and interfaces at
+`-O0` and `-O2`. Both compilers could read and link the other's
+output. All 500 Showcase outputs matched at native `-O0`, native
+`-O2` and in source GHCi. All 17 selected registered tests and the
+linked GHC API checks passed.
+[Source fixture and warning sites](../../testsuite/tests/rename/should_compile/ToplevelPunBindings.hs).
+
 At compiler revision `da6124e9a1`, a closed call reads the stored
 `Vec rows (Vec cols a)` from an ordinary table producer. Row and
 column labels establish the dimensions before the evaluator checks
