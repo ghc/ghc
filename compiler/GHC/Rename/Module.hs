@@ -1644,9 +1644,12 @@ rnSplicedSignatureCases sigma named_wildcards fix_env generated splice_cases sit
   rnSpliceTypeWith $ \raw -> do
     local <- getLocalRdrEnv
     case doc of
-      TypeSigCtx names@(_:_) | contains_case raw, independent local raw -> do
+      TypeSigCtx names@(_:_)
+        | contains_case raw
+        , Just outer <- splice_scope local raw
+        -> do
         let rename ty = rnLHsType (SpliceTypeCtx raw) ty
-            sig = HsSig noExtField (HsOuterImplicit noExtField) raw
+            sig = HsSig noExtField outer raw
             wc = HsWC noExtField (L (getLoc raw) sig)
             input_sig = noLocA (TypeSig noAnn [] names wc)
             input = emptyRdrGroup{hs_valds = ValBinds noExtField [VbSig input_sig]}
@@ -1654,7 +1657,7 @@ rnSplicedSignatureCases sigma named_wildcards fix_env generated splice_cases sit
         (ordinal, complete_helpers) <- readTcRef splice_cases
         let (earlier, suffix) = case site of
               CompleteSignatureSplice -> (complete_helpers, show)
-              NestedSignatureSplice -> ([], \salt -> "splice" ++ show ordinal ++ "-" ++ show salt)
+              NestedSignatureSplice{} -> ([], \salt -> "splice" ++ show ordinal ++ "-" ++ show salt)
         let (updated, anchors, aliases, uses, _, helpers) =
               liftDeclarationTypes heads (map (fmap nameRdrName) earlier) suffix True named_wildcards input
         case (anchors, hs_valds updated) of
@@ -1676,7 +1679,7 @@ rnSplicedSignatureCases sigma named_wildcards fix_env generated splice_cases sit
                     name <- getName <$> lookupTopBndrRn WL_Anything (mkRdrUnqual occ)
                     pure (key, name)
                   updTcRef splice_cases (second (new_helpers ++))
-                NestedSignatureSplice ->
+                NestedSignatureSplice{} ->
                   updTcRef splice_cases (first (+ 1))
               updTcRef generated (types :)
               rename ty
@@ -1689,17 +1692,45 @@ rnSplicedSignatureCases sigma named_wildcards fix_env generated splice_cases sit
       = True
       | otherwise = or (gmapQ contains_case node)
 
-    independent local raw = case site of
-      CompleteSignatureSplice -> True
-      NestedSignatureSplice ->
-        null (extractHsTyRdrTyVars raw) && not (uses_local local raw)
+    splice_scope local raw = case site of
+      CompleteSignatureSplice -> Just mkHsOuterImplicit
+      NestedSignatureSplice outer -> do
+        let binders = case outer of
+              HsOuterImplicit{} -> []
+              HsOuterExplicit{hso_bndrs = bound} -> mapMaybe closedSpliceCapture bound
+            available = mapMaybe hsLTyVarName binders
+        guard (all ((`elem` available) . unLoc) (extractHsTyRdrTyVars raw))
+        guard (not (uses_other_local local available raw))
+        pure (mkHsOuterExplicit noAnn binders)
 
-    uses_local :: Data a => LocalRdrEnv -> a -> Bool
-    uses_local local node
+    uses_other_local :: Data a => LocalRdrEnv -> [RdrName] -> a -> Bool
+    uses_other_local local available node
+      | Just (HsBndrVar _ name) <- cast node :: Maybe (HsBndrVar GhcPs)
+      , unLoc name `elem` available
+      = True
+      | Just (HsTypeCaseAlt pat _ _) <- cast node :: Maybe HsTypeCaseAlt
+      , any ((`elem` available) . unLoc) (extractHsTyRdrTyVars pat)
+      = True
       | Just rdr <- cast node :: Maybe RdrName
-      = elemLocalRdrEnv rdr local ||
-        maybe False (`elemLocalRdrEnv` local) (demoteRdrNameTv rdr)
-      | otherwise = or (gmapQ (uses_local local) node)
+      = rdr `notElem` available &&
+        (elemLocalRdrEnv rdr local ||
+         maybe False (`elemLocalRdrEnv` local) (demoteRdrNameTv rdr))
+      | otherwise = or (gmapQ (uses_other_local local available) node)
+
+-- | Copy an exact binder whose kind is a named type or promoted constructor.
+-- The copied kind uses the original resolved name.
+closedSpliceCapture :: LHsTyVarBndr flag GhcRn -> Maybe (LHsTyVarBndr flag GhcPs)
+closedSpliceCapture (L loc HsTvb{tvb_flag = flag, tvb_var = HsBndrVar _ name,
+                                tvb_kind = HsBndrKind _ kind})
+  | L kind_loc (HsTyVar _ promoted con) <- ignoreParens kind
+  , let resolved = getName (unLoc con)
+        occ = nameOccName resolved
+  , isExternalName resolved
+  , isTcOcc occ || isDataOcc occ
+  = let exact_kind = L kind_loc (HsTyVar noAnn promoted (nameRdrName resolved <$ con))
+    in Just (L loc (HsTvb noAnn flag (HsBndrVar noExtField (fmap nameRdrName name))
+                         (HsBndrKind noExtField exact_kind)))
+closedSpliceCapture _ = Nothing
 
 {- Note [Lifting cases from signature splices]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1711,11 +1742,13 @@ only while renaming these declarations and the result. Add the renamed
 declarations to the owning group for kind checking and interface writing.
 
 The splice runs once, in signature order. The regular splice path carries
-its free names and module finalizers. In a nested type splice, lift only a
-fragment whose binders are all declared within the fragment. The lifting
-pass cannot copy enclosing signature binders because their parsed domains
-are unavailable. Give each nested splice a distinct helper suffix so it
-does not collide with a written case or another splice in the signature.
+its free names and module finalizers. A nested type splice can refer to an
+enclosing signature binder by its exact name. Copy this binder only when
+its kind is a single resolved type or promoted constructor. The copied
+kind then needs no local bindings. A name supplied only by spelling does
+not identify a binder for this lifting pass. Give each nested splice a
+distinct helper suffix so it does not collide with a written case or
+another splice in the signature.
 The new private declarations use the same capture and ordered case checks
 as in Note [Lifting types from signatures and fields].
 

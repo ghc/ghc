@@ -262,8 +262,11 @@ A type splice inside a value signature can supply a case when the fragment
 declares its own local binders. An erased binder inside the splice can index
 the case. A variable bound by one row can shadow that binder. Separate
 fragments and written cases in the same signature keep distinct helpers.
-Use a named family when the fragment needs a binder from the enclosing
-signature. Cases inside quoted type lambdas still produce a source
+A quotation or `lookupTypeName` can also refer to an outer erased `forall`
+binder by its exact name. Its kind must be written as a resolved type name
+or promoted constructor. A name from `mkName` supplies only its spelling.
+Use a named family for other enclosing type binders. Cases inside quoted type
+lambdas and spliced references to enclosing retained indices still produce a source
 diagnostic. Reification describes the checked signature and its family
 applications.
 [External-interpreter fixture](../../../testsuite/tests/dependent/should_run/NativeTypeCaseRetainedThRaw.hs),

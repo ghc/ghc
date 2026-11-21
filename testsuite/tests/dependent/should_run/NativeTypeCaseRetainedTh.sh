@@ -30,7 +30,7 @@ import NativeTypeCaseRetainedTh (fromQuote, fromReify)
 import NativeTypeCaseRetainedThRaw
   (chooseInline, chooseDirect, renderDirect, observeInline, caseData,
    chooseQuoted, renderQuoted, QuotedPick, chooseNested, SpliceFlag(..),
-   nestedCases, chooseNestedRetained)
+   nestedCases, chooseNestedRetained, outerCapturedQuote, outerCapturedExact)
 
 main :: IO ()
 main = do
@@ -58,6 +58,9 @@ main = do
     print (nestedCases ())
     print (chooseNestedRetained (error "outer index forced") True :: Int,
            chooseNestedRetained True False :: Char)
+    print (outerCapturedQuote SpliceOn :: Proxy 'True, outerCapturedQuote SpliceOff :: Int)
+    print (outerCapturedExact SpliceOn (Proxy @'False) :: Proxy 'True,
+           outerCapturedExact SpliceOff (Proxy @'True) :: Int)
 
 observe :: Bool -> String
 observe b = render b (quoted b)
@@ -103,21 +106,32 @@ cat >NativeTypeCaseRetainedThWrongNested.hs <<'HS'
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}
 module NativeTypeCaseRetainedThWrongNested where
 import Data.Proxy (Proxy)
-import NativeTypeCaseRetainedThRaw (chooseNested, SpliceFlag(SpliceOn))
+import NativeTypeCaseRetainedThRaw (chooseNested, outerCapturedQuote, SpliceFlag(SpliceOn))
 
 wrong :: Proxy 'False
 wrong = chooseNested () SpliceOn
+
+wrongOuter :: Proxy 'False
+wrongOuter = outerCapturedQuote SpliceOn
 HS
 cat >NativeTypeCaseRetainedThCaptureNested.hs <<'HS'
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, TemplateHaskell #-}
+{-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, TemplateHaskell #-}
 module NativeTypeCaseRetainedThCaptureNested where
 import Data.Proxy (Proxy)
 import Language.Haskell.TH
 
 capture :: forall (b :: Bool). Proxy b ->
+#if defined(FRESH_CAPTURE)
+  $(do b <- newName "b"
+       pure (CaseT (VarT b) [TypeCaseAlt WildCardT (ConT ''Int)]))
+#elif defined(REBIND_CAPTURE)
+  $(do Just b <- lookupTypeName "b"
+       pure (CaseT (VarT b) [TypeCaseAlt (VarT b) (ConT ''Int)]))
+#else
   $(pure (CaseT (VarT (mkName "b"))
     [ TypeCaseAlt (PromotedT 'True) (ConT ''Int)
     , TypeCaseAlt (PromotedT 'False) (ConT ''Char) ]))
+#endif
 capture = undefined
 HS
 cat >NativeTypeCaseRetainedThSeparate.hs <<'HS'
@@ -171,7 +185,7 @@ for opt in -O0 -O2; do
     "${ghc[@]}" NativeTypeCaseRetainedThClient.o NativeTypeCaseRetainedTh.o \
         NativeTypeCaseRetainedThProvider.o NativeTypeCaseRetainedThRaw.o NativeRetainedTH.o -o run
     ./run > actual
-    printf "(11,'x',11,'x',11,'x')\n(\"11\",\"x\")\n(\"13\",\"q\")\n(\"19\",\"c\")\n(\"23\",\"d\",Refl)\n(13,'q')\n(19,'c')\nTrue\n(Proxy,29)\n(31,'n',True)\n(43,'s')\n" | diff -u - actual
+    printf "(11,'x',11,'x',11,'x')\n(\"11\",\"x\")\n(\"13\",\"q\")\n(\"19\",\"c\")\n(\"23\",\"d\",Refl)\n(13,'q')\n(19,'c')\nTrue\n(Proxy,29)\n(31,'n',True)\n(43,'s')\n(Proxy,47)\n(Proxy,53)\n" | diff -u - actual
     status=0
     "${ghc[@]}" -c NativeTypeCaseRetainedThWrongBranch.hs > wrong-branch.log 2>&1 || status=$?
     if [[ $status != 1 ]] || ! grep -Fq "Couldn't match type" wrong-branch.log ||
@@ -182,7 +196,8 @@ for opt in -O0 -O2; do
     status=0
     "${ghc[@]}" -c NativeTypeCaseRetainedThWrongNested.hs > wrong-nested.log 2>&1 || status=$?
     if [[ $status != 1 ]] || ! grep -Fq "Couldn't match type" wrong-nested.log ||
-       ! grep -Fq 'chooseNested () SpliceOn' wrong-nested.log; then
+       ! grep -Fq 'chooseNested () SpliceOn' wrong-nested.log ||
+       ! grep -Fq 'outerCapturedQuote SpliceOn' wrong-nested.log; then
         cat wrong-nested.log >&2
         exit 1
     fi
@@ -202,13 +217,15 @@ if [[ $status != 1 ]] || ! grep -Eq 'Not in scope: .*field' escape.log; then
     cat escape.log >&2
     exit 1
 fi
-status=0
-"${base[@]}" -c NativeTypeCaseRetainedThCaptureNested.hs > capture-nested.log 2>&1 || status=$?
-if [[ $status != 1 ]] || ! grep -Fq 'GHC-97233' capture-nested.log ||
-   ! grep -Fq 'In the untyped splice' capture-nested.log; then
-    cat capture-nested.log >&2
-    exit 1
-fi
+for control in SPELLED_CAPTURE FRESH_CAPTURE REBIND_CAPTURE; do
+    status=0
+    "${base[@]}" "-D$control" -c NativeTypeCaseRetainedThCaptureNested.hs > capture-nested.log 2>&1 || status=$?
+    if [[ $status != 1 ]] || ! grep -Fq 'GHC-97233' capture-nested.log ||
+       ! grep -Fq 'In the untyped splice' capture-nested.log; then
+        cat capture-nested.log >&2
+        exit 1
+    fi
+done
 for control in DIFFERENT_GROUP REORDERED_ROWS DIFFERENT_ARMS DIFFERENT_CAPTURE; do
     status=0
     "${base[@]}" "-D$control" -c NativeTypeCaseRetainedThSeparate.hs > separate.log 2>&1 || status=$?

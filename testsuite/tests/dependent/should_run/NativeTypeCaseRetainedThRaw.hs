@@ -2,7 +2,7 @@
 module NativeTypeCaseRetainedThRaw
   (chooseInline, chooseDirect, renderDirect, observeInline, caseData
   , chooseQuoted, renderQuoted, QuotedPick, chooseNested, SpliceFlag(..)
-  , nestedCases, chooseNestedRetained) where
+  , nestedCases, chooseNestedRetained, outerCapturedQuote, outerCapturedExact) where
 
 import Data.Proxy (Proxy(..))
 import Language.Haskell.TH
@@ -114,3 +114,25 @@ chooseNestedRetained :: foreach (b :: Bool) -> $([t| foreach (b :: Bool) ->
 chooseNestedRetained _ = \case
   True -> 43
   False -> 's'
+
+type SpliceDomain = Maybe Bool
+
+outerCapturedQuote :: forall (d :: SpliceDomain). SpliceFlag d ->
+  $([t| case d of { Just d -> Proxy d; Nothing -> Int } |])
+outerCapturedQuote SpliceOn = Proxy
+outerCapturedQuote SpliceOff = 47
+
+outerCapturedExact :: forall (d :: SpliceDomain). SpliceFlag d ->
+  $(do
+    Just outer <- lookupTypeName "d"
+    shadow <- newName "d"
+    row <- newName "d"
+    let arg = AppT (ConT ''Proxy) (VarT shadow)
+        result = CaseT (VarT outer)
+          [ TypeCaseAlt (AppT (PromotedT 'Just) (VarT row)) (AppT (ConT ''Proxy) (VarT row))
+          , TypeCaseAlt (PromotedT 'Nothing) (ConT ''Int)
+          ]
+    pure (ForallT [KindedTV shadow SpecifiedSpec (ConT ''Bool)] []
+      (AppT (AppT ArrowT arg) result)))
+outerCapturedExact SpliceOn _ = Proxy
+outerCapturedExact SpliceOff _ = 53

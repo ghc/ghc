@@ -292,7 +292,9 @@ rnHsSigWcType :: HsDocContext
 rnHsSigWcType = rnHsSigWcTypeWithSplice (\_ _ -> rnSpliceType)
 
 -- | Whether a splice supplies the entire signature or a type within it.
-data SignatureSpliceSite = CompleteSignatureSplice | NestedSignatureSplice
+data SignatureSpliceSite
+  = CompleteSignatureSplice
+  | NestedSignatureSplice (HsOuterSigTyVarBndrs GhcRn)
 
 -- | Rename a type splice and return its free names.
 type RenameTypeSplice = HsUntypedSplice GhcPs -> RnM (HsType GhcRn, FreeNames)
@@ -313,10 +315,10 @@ rnHsSigWcTypeWithSplice rename_splice doc (HsWC { hswc_body =
              Nothing -> pure ()
              Just loc -> setSrcSpan loc $
                failWithTc $ TcRnRetainedQuantificationError RetainedPartialSignature
-       ; let nested_splice = rename_splice NestedSignatureSplice doc
-             env = (mkTyKiEnv doc TypeLevel RnTypeBody){rtke_splice = nested_splice}
        ; bindHsOuterTyVarBndrs doc Nothing imp_tv_nms outer_bndrs $ \outer_bndrs' ->
-    do { (wcs, body_ty', fvs) <-
+    do { let nested_splice = rename_splice (NestedSignatureSplice outer_bndrs') doc
+             env = (mkTyKiEnv doc TypeLevel RnTypeBody){rtke_splice = nested_splice}
+       ; (wcs, body_ty', fvs) <-
            if | hsHasForEachTy (unLoc body_ty)
               -> do { case doc of
                        TypeSigCtx{} -> pure ()
