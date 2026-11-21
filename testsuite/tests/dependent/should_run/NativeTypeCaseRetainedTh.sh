@@ -26,7 +26,7 @@ import Data.Proxy (Proxy(..))
 import Data.IORef (newIORef, readIORef, writeIORef)
 import NativeRetainedTH (quoted, render)
 import NativeTypeCaseRetainedTh (fromQuote, fromReify)
-import NativeTypeCaseRetainedThRaw (chooseInline, chooseDirect, caseData)
+import NativeTypeCaseRetainedThRaw (chooseInline, chooseDirect, observeInline, caseData)
 
 main :: IO ()
 main = do
@@ -35,9 +35,12 @@ main = do
            fromReify (Proxy @Int) True, fromReify (Proxy @Int) False)
     flag <- newIORef True
     first <- observe <$> readIORef flag
+    firstInline <- observeInline <$> readIORef flag
     writeIORef flag False
     second <- observe <$> readIORef flag
+    secondInline <- observeInline <$> readIORef flag
     print (first, second)
+    print (firstInline, secondInline)
     print (chooseInline True :: Int, chooseInline False :: Char)
     print (chooseDirect True () :: Int, chooseDirect False () :: Char)
     print caseData
@@ -73,6 +76,21 @@ import NativeTypeCaseRetainedThRaw (chooseInline)
 wrong :: Int
 wrong = chooseInline False
 HS
+cat >NativeTypeCaseRetainedThSeparate.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, TemplateHaskell #-}
+module NativeTypeCaseRetainedThSeparate where
+
+choose :: $([t| foreach (b :: Bool) -> case b of { True -> Int; False -> Char } |])
+choose True = 13
+choose False = 'q'
+
+render :: $([t| foreach (b :: Bool) -> (case b of { True -> Int; False -> Char }) -> String |])
+render True i = show i
+render False c = [c]
+
+separate :: foreach (b :: Bool) -> String
+separate b = render b (choose b)
+HS
 
 "${base[@]}" -package ghci -package template-haskell -package binary -package bytestring \
     NativeTypeCaseRetainedThWire.hs -o wire
@@ -92,7 +110,7 @@ for opt in -O0 -O2; do
     "${ghc[@]}" NativeTypeCaseRetainedThClient.o NativeTypeCaseRetainedTh.o \
         NativeTypeCaseRetainedThProvider.o NativeTypeCaseRetainedThRaw.o NativeRetainedTH.o -o run
     ./run > actual
-    printf "(11,'x',11,'x',11,'x')\n(\"11\",\"x\")\n(13,'q')\n(19,'c')\nTrue\n" | diff -u - actual
+    printf "(11,'x',11,'x',11,'x')\n(\"11\",\"x\")\n(\"13\",\"q\")\n(13,'q')\n(19,'c')\nTrue\n" | diff -u - actual
     status=0
     "${ghc[@]}" -c NativeTypeCaseRetainedThWrongBranch.hs > wrong-branch.log 2>&1 || status=$?
     if [[ $status != 1 ]] || ! grep -Fq "Couldn't match type" wrong-branch.log ||
@@ -114,5 +132,12 @@ status=0
 "${base[@]}" -c NativeTypeCaseRetainedThEscape.hs > escape.log 2>&1 || status=$?
 if [[ $status != 1 ]] || ! grep -Eq 'Not in scope: .*field' escape.log; then
     cat escape.log >&2
+    exit 1
+fi
+status=0
+"${base[@]}" -c NativeTypeCaseRetainedThSeparate.hs > separate.log 2>&1 || status=$?
+if [[ $status != 1 ]] || ! grep -Fq 'GHC-83865' separate.log ||
+   ! grep -Fq 'render b (choose b)' separate.log; then
+    cat separate.log >&2
     exit 1
 fi

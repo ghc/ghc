@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, TemplateHaskell #-}
-module NativeTypeCaseRetainedThRaw (chooseInline, chooseDirect, caseData) where
+module NativeTypeCaseRetainedThRaw (chooseInline, chooseDirect, observeInline, caseData) where
 
 import Data.Proxy (Proxy)
 import Language.Haskell.TH
@@ -7,6 +7,7 @@ import Language.Haskell.TH.Syntax (addModFinalizer, dataToExpQ, dataToPatQ)
 
 $(do
   ty <- [t| foreach (b :: Bool) -> case b of { True -> Int; False -> Char } |]
+  rendered <- [t| foreach (b :: Bool) -> (case b of { True -> Int; False -> Char }) -> String |]
   scoped <- [t| foreach (b :: Maybe Bool) ->
                  case b of { Just b -> Proxy b; _ -> Proxy False } |]
   case (ty, scoped) of
@@ -22,11 +23,17 @@ $(do
       | b == bUse, t == 'True, f == 'False, i == ''Int, c == ''Char
       , outer == outerUse, outer /= inner, inner == innerUse
       , just == 'Just, proxy == ''Proxy
-      -> pure [SigD (mkName "chooseInline") ty]
+      -> pure [SigD (mkName "chooseInline") ty, SigD (mkName "renderInline") rendered]
     _ -> fail (show (ty, scoped)))
 
 chooseInline True = 13
 chooseInline False = 'q'
+
+renderInline True i = show i
+renderInline False c = [c]
+
+observeInline :: foreach (b :: Bool) -> String
+observeInline b = renderInline b (chooseInline b)
 
 before :: $(runIO (appendFile "case-effects" "before\n") >> [t| Int |])
 before = 19

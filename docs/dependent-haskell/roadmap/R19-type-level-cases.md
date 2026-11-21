@@ -242,12 +242,14 @@ the retained binder and its result case. It checks an `Int` result at
 `True` and a `Char` result at `False`.
 [Quoted signature](../examples/open-evaluation/NativeRetainedTH.hs).
 
-A declaration splice or a splice that supplies a complete top-level value
-signature can return the quoted type. The existing case checker then lifts
-the rows and preserves ordered reduction. This runs the splice and its
-module finalizer once in the ordinary order. Nested type splices and raw
-cases lifted inside declaration quotes retain their existing diagnostics.
-Reification describes the checked signature and its family applications.
+A declaration splice can use the quoted type in `SigD`. The declarations
+it returns can share a case helper within one group. A type splice can
+supply the complete top-level value signature. Each separate type splice
+has its own case helper. The checker lifts the rows and preserves ordered
+reduction in both forms. Each splice and its module finalizer run once in
+the ordinary order. Nested type splices and raw cases lifted inside
+declaration quotes produce a source diagnostic. Reification describes the
+checked signature and its family applications.
 [External-interpreter fixture](../../../testsuite/tests/dependent/should_run/NativeTypeCaseRetainedThRaw.hs),
 [proposal #378 scoping review](https://github.com/ghc-proposals/ghc-proposals/pull/378#discussion_r524560765),
 and [Eisenberg and Stolarek, §4.7](https://richarde.dev/papers/2014/promotion/promotion.pdf).

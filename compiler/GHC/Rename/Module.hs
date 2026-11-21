@@ -852,7 +852,10 @@ liftDeclarationTypes source_heads named_wildcards group
                 rhs = renameCaptures copied whole
                 alias = L loc (SynDecl noAnn name (mkHsQTvs header) Prefix rhs)
                 seen' = maybe seen (\k -> (k, occ) : seen) key
-                shared = sharedRetainedCaseKey site scope used whole key heads
+                shared = do
+                  (share_key, captures, call_uses) <- sharedRetainedCaseKey site scope used whole key heads
+                  -- A shared alias also applies the family to its private formals.
+                  pure (share_key, renameCaptures copied captures, call_uses)
             in (applyAnchor loc occ used, [((alias, (occ, Nothing)), shared, unbound)], (salt + 1, seen'))
     liftBody site owner scope (L loc quantified) (salt, seen)
       | Just (inner, locals, body) <- innerScope site quantified
