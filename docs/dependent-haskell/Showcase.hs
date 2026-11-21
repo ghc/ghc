@@ -126,6 +126,7 @@ import qualified PreludeFilterLengthProof
 import qualified PreludeFilterProof
 import qualified PreludeFilterRuntime
 import qualified PreludeMapAppendProof
+import qualified PreludeMapCompositionProof
 import qualified PreludeMapLengthProof
 import qualified PreludeReverseLengthProof
 import qualified PreludeMapLengthSize as Size
@@ -1298,6 +1299,8 @@ main = do
               ++ PreludeReverseLengthProof.showPreludeReverseLength)
     putStrLn ("prove that map distributes over append: "
               ++ PreludeMapAppendProof.showPreludeMapAppend)
+    putStrLn ("prove that two maps compose on a finite list: "
+              ++ PreludeMapCompositionProof.showPreludeMapComposition)
     putStrLn ("filter with Prelude.not and Prelude.id without forcing the kept tail: "
               ++ PreludeFilterProof.showPreludeFilterProofs)
     putStrLn ("prove filter never increases length: "

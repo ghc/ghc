@@ -6806,3 +6806,14 @@ follows GHC's ordinary simplification path.
 [GHC roles](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/roles.html),
 [coercion operations](../../compiler/GHC/Core/Coercion.hs)
 and [optimization checkpoint](CHECKPOINTS.md#family-and-package-checkpoints).
+
+### Compose two maps over a finite list
+
+Agda's `map-∘` proves pointwise equality by induction on the list.
+The Haskell proof uses the installed Prelude map equations and an
+explicit finite spine. Its type-level `Compose f g x` applies `g` and
+then `f`. The runtime control calls ordinary `map (f . g)`.
+Instantiating the type-level callback with the installed `(.)` itself
+remains open.
+[Agda stdlib v2.3 list properties](https://agda.github.io/agda-stdlib/v2.3/Data.List.Properties.html)
+and [Haskell map composition proof](examples/open-evaluation/PreludeMapCompositionProof.hs).
