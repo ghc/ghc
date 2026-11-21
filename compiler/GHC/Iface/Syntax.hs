@@ -2263,6 +2263,10 @@ freeNamesIfType (IfaceTermAppTy _ arg) = freeNamesIfType arg
 freeNamesIfType (IfaceFreeTermAppTy _ arg) = freeNamesIfType arg
 freeNamesIfType (IfaceDepFunTy _vis (w, _, arg) res)
   = freeNamesIfType w &&& freeNamesIfType arg &&& freeNamesIfType res
+freeNamesIfType (IfaceDepDictTy (w, _, pred_ty) res)
+  = freeNamesIfType w &&& freeNamesIfType pred_ty &&& freeNamesIfType res
+freeNamesIfType (IfaceClassAppTy method inst dict arg)
+  = unitNameSet method &&& freeNamesIfType inst &&& freeNamesIfType dict &&& freeNamesIfType arg
 freeNamesIfType (IfaceTyVar _)        = emptyNameSet
 freeNamesIfType (IfaceAppTy s t)      = freeNamesIfType s &&& freeNamesIfAppArgs t
 freeNamesIfType (IfaceTyConApp tc ts) = freeNamesIfTc tc &&& freeNamesIfAppArgs ts

@@ -1,5 +1,10 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, ScopedTypeVariables #-}
-module Provider (Choose(..), observe, observeBoth, observeGround, ignorePayload) where
+{-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, ScopedTypeVariables #-}
+module Provider
+    ( Choose(..), observe, observeBoth, observeGround, ignorePayload
+#ifdef SCOPED_DICTIONARY_EXPORT
+    , Tagged(..), chooseTagged, chooseTaggedBoth
+#endif
+    ) where
 
 class Choose a where
     choose :: a -> Bool

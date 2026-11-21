@@ -206,8 +206,12 @@ toIfaceTypeX fr (TyVarTy tv)   -- See Note [Free TyVars and CoVars in IfaceType]
 toIfaceTypeX fr (TermVarTy var)
   | var `elemVarSet` fr = IfaceFreeTermVar var
   | otherwise = IfaceTermVar (mkIfLclName (occNameFS (getOccName var)))
-toIfaceTypeX _ DepDictTy{} = panic "toIfaceTypeX: experimental dependent dictionary binder"
-toIfaceTypeX _ ClassAppTy{} = panic "toIfaceTypeX: experimental class selector application"
+toIfaceTypeX fr (DepDictTy var body)
+  = IfaceDepDictTy (toIfaceIdBndrX fr var)
+                   (toIfaceTypeX (fr `delVarSet` var) body)
+toIfaceTypeX fr (ClassAppTy method inst dict arg _)
+  = IfaceClassAppTy (idName method) (toIfaceTypeX fr inst)
+                   (toIfaceTypeX fr dict) (toIfaceTypeX fr arg)
 toIfaceTypeX fr (TermAppTy fun arg)
   -- See Note [Opaque call indices in interfaces] in GHC.Iface.Type.
   | fun `elemVarSet` fr = IfaceFreeTermAppTy fun arg'

@@ -105,7 +105,7 @@ import qualified GHC.ByteCode.Serialize as ByteCode
 
 import GHC.Core
 import GHC.Core.Dependent ( hasExistentialExpr, hasNativeDependentExpr, rejectNativeDependentExpr
-                          , hasScopedDictionaryProgram, hasScopedDictionaryType
+                          , hasScopedDictionaryProgram
                           , supportsNativeGentle, supportsNativeRuleBinds, supportsLocalUserRule )
 import GHC.Core.Lint ( endScopedDictionaryPassIO )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
@@ -1514,14 +1514,8 @@ hscSimplify' plugins ds_result = do
               env = hscUpdateFlags (`gopt_set` Opt_DoCoreLinting) hsc_env_with_plugins
               finish = endScopedDictionaryPassIO (hsc_logger env)
                 . initEndPassConfig (hsc_dflags env) (interactiveInScope (hsc_IC env)) alwaysQualify
-          unless (backendWritesFiles (backend (hsc_dflags env))) $
-            throwGhcExceptionIO (Sorry "Private dependent dictionaries require an object backend.")
           unless (null rules && all (null . idCoreRules . fst) (flattenBinds binds)) $
             throwGhcExceptionIO (Sorry "Private dependent dictionaries do not support Core rules.")
-          forM_ [b | (b, _) <- flattenBinds binds, isExportedId b,
-                       hasScopedDictionaryType (idType b)] $ \b ->
-            throwGhcExceptionIO $ PprProgramError
-              "Cannot export a private dependent dictionary type." (ppr b)
           finish CoreDesugar binds rules
           let simplified = simpleOptNativeProgram binds
           finish CoreDesugarOpt simplified rules
@@ -1585,10 +1579,10 @@ A dependent dictionary application keeps its evidence argument in scope.
 The retained simplifier preserves the binder, and SimpleOpt substitutes
 only a matching evidence variable into a private selector type.
 
-A module can export ordinary wrappers for these bindings. An exported
-type cannot contain a private dictionary form. Omit interface pragmas
-for the module so an ordinary wrapper does not expose a private type
-through its unfolding. Keep the private codec refusal in CoreToIface.
+An exported signature can contain a scoped dictionary binder and selector.
+Omit interface pragmas for the module. The experimental interface stores
+signatures and does not store expressions that apply these binders.
+See Note [Scoped class selectors in interfaces] in GHC.Iface.Type.
 -}
 
 {- Note [Retained Core in the Gentle simplifier]

@@ -797,7 +797,8 @@ hscGenerateByteCode hsc_env cgguts location = do
 
     -- See Note [Compiling native dependent modules] in GHC.Driver.Main.Passes.
     native <- checkNativeDependentModule hsc_env core_binds [] tycons
-    let dflags = nativeCodeGenFlags native (hsc_dflags hsc_env)
+    let scoped = native && hasScopedDictionaryProgram core_binds
+        dflags = nativeCodeGenFlags native (hsc_dflags hsc_env)
         platform = targetPlatform dflags
 
     -------------------
@@ -813,8 +814,9 @@ hscGenerateByteCode hsc_env cgguts location = do
     unless native $
       rejectNativeDependentProgram "unchecked implicit-binding output" binds_to_prep []
     cp_cfg <- initCorePrepConfigFor native hsc_env
+    let prepare = if scoped then corePrepScopedDictionaryPgm else corePrepPgm
     prepd_binds <- {-# SCC "CorePrep" #-}
-                   corePrepPgm (hsc_logger hsc_env) cp_cfg cp_pgm_cfg
+                   prepare (hsc_logger hsc_env) cp_cfg cp_pgm_cfg
                                this_mod binds_to_prep
 
     -- The stg cg info only provides a runtime benfit, but is not requires so we just

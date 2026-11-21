@@ -218,8 +218,20 @@ data IfaceType
           -- In an experiment, removing IfaceTupleTy resulted in a 0.75% regression
           -- in interface file size (in GHC's boot libraries).
           -- See !3987.
+  | IfaceDepDictTy IfaceIdBndr IfaceType
+  | IfaceClassAppTy Name IfaceType IfaceType IfaceType
+      -- See Note [Scoped class selectors in interfaces].
   deriving (Eq, Ord)
   -- See Note [Ord instance of IfaceType]
+
+{- Note [Scoped class selectors in interfaces]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An IfaceDepDictTy binds its Id only in the result type, like IfaceDepFunTy.
+An IfaceClassAppTy stores a global class method, its type argument and two
+lexical references. The reader derives the result kind from the method and
+checks the types of both references. The method is part of the declaration's
+ABI dependencies. Free references can occur in diagnostic types only.
+-}
 
 {- Note [Forall interface metadata]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -869,6 +881,8 @@ ifTypeIsVarFree ty = go ty
     go (IfaceFreeTermAppTy {}) = False
     go (IfaceExistsTy {})      = False
     go (IfaceDepFunTy {})      = False
+    go (IfaceDepDictTy {})     = False
+    go (IfaceClassAppTy {})    = False
     go (IfaceAppTy fun args)   = go fun && go_args args
     go (IfaceFunTy _ ma w arg res) = go ma && go w && go arg && go res
     go (IfaceForAllTy {})      = False
@@ -897,6 +911,8 @@ visibleTypeVarOccurencies = go
     go (IfaceFreeTermAppTy _ arg) = go arg
     go (IfaceExistsTy _ (_, arg) res) = go arg <> go res
     go (IfaceDepFunTy _vis (w, _, arg) res) = go w <> go arg <> go res
+    go (IfaceDepDictTy (w, _, arg) res) = go w <> go arg <> go res
+    go (IfaceClassAppTy _ _ dict arg) = go dict <> go arg
     go (IfaceAppTy fun args)    = go fun <> go_args args
     go (IfaceFunTy _ ma w arg res) = go ma <> go w <> go arg <> go res
     go (IfaceForAllTy ma bndr ty) = go ma <> go (ifaceBndrType $ binderVar bndr) <> go ty
@@ -956,6 +972,8 @@ substIfaceType env ty
         body_env
           | name' == name = without_binder
           | otherwise = extendFsEnv without_binder (ifLclNameFS name) (IfaceTyVar name')
+    go (IfaceClassAppTy method inst dict arg) = IfaceClassAppTy method (go inst) dict arg
+    go (IfaceDepDictTy {})   = pprPanic "substIfaceType: scoped dictionary binder" (ppr ty)
     go (IfaceDepFunTy {})    = pprPanic "substIfaceType: native dependent Core not implemented" (ppr ty)
     go (IfaceTyVar tv)        = substIfaceTyVar env tv
     go (IfaceAppTy  t ts)     = IfaceAppTy  (go t) (substIfaceAppArgs env ts)
@@ -1008,6 +1026,8 @@ ifaceLocalNames = go
       IfaceFreeTermAppTy _ arg -> go arg
       IfaceExistsTy _ (var, arg) body -> names [one var, go arg, go body]
       IfaceDepFunTy _ (w, var, arg) body -> names [one var, go w, go arg, go body]
+      IfaceDepDictTy (w, var, pred_ty) body -> names [one var, go w, go pred_ty, go body]
+      IfaceClassAppTy _ inst dict arg -> names [go inst, go dict, go arg]
       IfaceAppTy fun args -> go fun `union` go_args args
       IfaceFunTy _ ma w arg res -> names (map go [ma, w, arg, res])
       IfaceForAllTy ma (Bndr b _) body -> names [go ma, bndr b, go body]
@@ -1444,6 +1464,13 @@ ppr_ty ctxt_prec (IfaceFreeTermAppTy fun arg)
 ppr_ty ctxt_prec (IfaceExistsTy flag (var, arg) res)
   = maybeParen ctxt_prec funPrec $
       pprExistsTy flag (parens (ppr var <+> dcolon <+> ppr_ty_nested arg)) (ppr_ty_nested res)
+ppr_ty ctxt_prec (IfaceDepDictTy (_, var, pred_ty) res)
+  = maybeParen ctxt_prec funPrec $
+    sep [parens (ppr var <+> dcolon <+> ppr_ty_nested pred_ty) <+> darrow, ppr_ty_nested res]
+ppr_ty ctxt_prec (IfaceClassAppTy method inst dict arg)
+  = maybeParen ctxt_prec appPrec $
+    ppr method <+> (char '@' <> ppr_ty appPrec inst)
+               <+> ppr_ty appPrec dict <+> ppr_ty appPrec arg
 ppr_ty ctxt_prec (IfaceDepFunTy vis (_, var, arg) res)
   = maybeParen ctxt_prec funPrec $
     case vis of
@@ -1632,6 +1659,11 @@ defaultIfaceTyVarsOfKind def_rep def_mult ty = go emptyFsEnv True ty
 
     go subs rank1 (IfaceDepFunTy vis (w, var, arg) res)
       = IfaceDepFunTy vis (go subs False w, var, go subs False arg) (go subs rank1 res)
+
+    go subs rank1 (IfaceDepDictTy (w, var, pred_ty) res)
+      = IfaceDepDictTy (go subs False w, var, go subs False pred_ty) (go subs rank1 res)
+    go subs rank1 (IfaceClassAppTy method inst dict arg)
+      = IfaceClassAppTy method (go subs rank1 inst) dict arg
 
     go _ _ ty@(IfaceTermVar {}) = ty
     go _ _ ty@(IfaceFreeTermVar {}) = ty
@@ -2877,6 +2909,14 @@ putIfaceType bh (IfaceExistsTy flag bndr body)
        ; put_ bh bndr; put_ bh body }
 putIfaceType bh (IfaceDepFunTy vis bndr body)
   = do { putByte bh 10; put_ bh vis; put_ bh bndr; put_ bh body }
+putIfaceType bh (IfaceDepDictTy bndr body)
+  = do { requireIfaceEvidenceVersion bh ExperimentalScopedDictionaryEvidence
+       ; putByte bh 15; put_ bh bndr; put_ bh body }
+putIfaceType bh (IfaceClassAppTy method inst dict@IfaceTermVar{} arg@IfaceTermVar{})
+  = do { requireIfaceEvidenceVersion bh ExperimentalScopedDictionaryEvidence
+       ; putByte bh 16; put_ bh method; put_ bh inst; put_ bh dict; put_ bh arg }
+putIfaceType _ ty@IfaceClassAppTy{}
+  = pprPanic "Cannot serialise an unscoped class selector" (ppr ty)
 putIfaceType bh (IfaceTermVar var)
   = do { putByte bh 11; put_ bh var }
 
@@ -2950,6 +2990,8 @@ getIfaceType bh = do
               12 -> IfaceTermAppTy <$> get bh <*> get bh
               13 -> IfaceExistsTy ExplicitExists <$> get bh <*> get bh
               14 -> IfaceExistsTy ImplicitExists <$> get bh <*> get bh
+              15 -> IfaceDepDictTy <$> get bh <*> get bh
+              16 -> IfaceClassAppTy <$> get bh <*> get bh <*> get bh <*> get bh
               _  -> ioError (userError ("getIfaceType: invalid type tag " ++ show h))
 
 instance Binary IfLclName where
@@ -2985,6 +3027,7 @@ data IfaceEvidence
   | IndexedConstructorOperandEvidence
   | IndexedConstructorExistentialCaseEvidence | GeneralIndexedConstructorOperandEvidence
   | RetainedUserUnfoldingEvidence | LinearUnpackEvidence
+  | ExperimentalScopedDictionaryEvidence
   deriving (Bounded, Enum, Eq, Ord)
 
 -- | Requirements of an interface payload. See Note [Versioning retained evidence]
@@ -3201,6 +3244,8 @@ instance NFData IfaceType where
     IfaceFreeTyVar f1 -> f1 `seq` ()
     IfaceExistsTy _ bndr res -> rnf bndr `seq` rnf res
     IfaceDepFunTy vis bndr res -> vis `seq` rnf bndr `seq` rnf res
+    IfaceDepDictTy bndr res -> rnf bndr `seq` rnf res
+    IfaceClassAppTy method inst dict arg -> rnf method `seq` rnf inst `seq` rnf dict `seq` rnf arg
     IfaceTermVar var -> rnf var
     IfaceFreeTermVar var -> var `seq` ()
     IfaceTermAppTy fun arg -> rnf fun `seq` rnf arg
