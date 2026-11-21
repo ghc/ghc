@@ -636,7 +636,8 @@ can inspect just the first width. The proof of
 `B.firstWidth (B.partial 9) :~: 1` then leaves the vector and remaining
 chunks undefined. The source-hidden regression uses stripped producer
 interfaces. It checks the full even and odd results, the partial-width
-proof, and a full read that forces an undefined tail.
+proof, and a full read that forces an undefined tail. The Showcase
+prints the complete proof, the two widths, and the partial observation.
 [Ordinary batch](../examples/closed-evaluation/WitnessedBatch.hs),
 [separate-module check](../../../testsuite/tests/dependent/should_run/NativeClosedWitnessedBatch.sh),
 and [Idris dependent pairs](../REFERENCES.md#recursively-read-back-witnessed-constructors).
