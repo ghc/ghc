@@ -273,8 +273,8 @@ size :: Pack True Char -> Bool
 size (Pair tag _) = tag
 ```
 
-GHC follows closed-family equations at the head of the type and composes
-their nominal coercions. For example, `Outer select a = Pack select a`
+GHC follows family equations at the head of the type and composes their
+nominal coercions. For example, `Outer select a = Pack select a`
 can expose the package through `Pack`. The final equation can return a
 sum directly or name a synonym for it. The pattern demands the outer
 pair and leaves an ignored payload lazy. A lazy tuple pattern inside an
@@ -282,9 +282,26 @@ ordinary payload field keeps that field lazy. A lazy pattern around the
 whole package still fails. So does a match on a stuck family or through
 a newtype wrapper.
 
+An imported open family instance can also expose the pair. The test
+provider declares `type instance OpenPackage Bool = Outer True Char`.
+Its separately compiled ordinary client checks the pattern below. The
+match demands the package and leaves the ignored payload lazy.
+
+```haskell
+sizeOpen :: OpenPackage Bool -> Bool
+sizeOpen (Pair tag _) = tag
+```
+
+The pattern checker uses the solver's nominal family rule and follows
+only heads. `OpenPackage Char` has no matching instance. Its `Pair` pattern
+fails at the constructor. Constrained families still need their separate
+premise checks.
+[GHC's open-family compatibility rules](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_families.html#compatibility-and-apartness-of-type-family-equations).
+
 Each step uses the solver's reduction-depth counter. A recursive
-`Loop a = Loop [a]` reaches the configured limit and reports GHC-40404
-at the written `Pair` pattern.
+family such as `Loop a = Loop [a]` reaches the configured limit and
+reports GHC-40404 at the written `Pair` pattern. The test checks the
+same limit for an open instance.
 
 GHC rejects a payload for a different tag at the written payload. An equation that
 uses a binder from another equation fails at that variable's occurrence.
@@ -311,6 +328,9 @@ Agda can write a function returning a type whose result uses `Σ A B`,
 with `B` chosen from the function's arguments. The standard library
 provides the same construction with the syntax `Σ[ x ∈ A ] B`.
 [Agda's `Data.Product.Base`](https://agda.github.io/agda-stdlib/v2.4/Data.Product.Base.html#37).
+Its `uncurry` matches the pair to pass the witness and its dependent
+field to a function.
+[Agda's dependent pair elimination](https://agda.github.io/agda-stdlib/v2.4/Data.Product.Base.html#126).
 
 ## Partition at the original length
 
