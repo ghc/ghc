@@ -12,7 +12,7 @@ module GHC.Rename.Utils (
         checkDupNames, checkDupAndShadowedNames, dupNamesErr,
         checkTupSize, checkCTupSize,
         addFvRn, mapFvRn, mapMaybeFvRn,
-        warnUnusedMatches, warnUnusedTypePatterns,
+        warnUnusedMatches, warnUnusedTypePatterns, warnPunBindings,
         warnUnusedTopBinds, warnUnusedLocalBinds,
         DeprecationWarnings(..), warnIfDeprecated,
         checkUnusedRecordWildcard,
@@ -61,7 +61,8 @@ import GHC.Utils.Misc
 import GHC.Unit.Module.ModIface
 import GHC.Utils.Panic
 import GHC.Types.Basic
-import GHC.Data.List.SetOps ( removeDupsOn )
+import GHC.Data.FastString ( lexicalCompareFS )
+import GHC.Data.List.SetOps ( equivClasses, removeDupsOn )
 import GHC.Data.Maybe ( whenIsJust )
 import GHC.Driver.DynFlags
 import GHC.Data.Bag ( mapBagM, headMaybe )
@@ -73,7 +74,8 @@ import qualified GHC.LanguageExtensions as LangExt
 import Language.Haskell.Syntax.Text
 
 import qualified Data.List.NonEmpty as NE
-import Data.Foldable (for_)
+import Data.Foldable (for_, toList)
+import Data.List (partition, sortBy)
 import Data.Maybe
 
 
@@ -161,6 +163,38 @@ checkDupAndShadowedNames envs names
     filtered_names = filterOut isSystemName names
                 -- See Note [Binders in Template Haskell] in "GHC.ThToHs"
     get_loc_occ name = (nameSrcSpan name, nameOccName name)
+
+-- | Report type and term binders with the same spelling in one scope.
+-- See Note [Pun binding warnings].
+warnPunBindings :: [Name] -> RnM ()
+warnPunBindings binders = whenWOptM Opt_WarnPunBindings $
+  forM_ (equivClasses compareSpelling names) $ \same_spelling ->
+    case partition (not . isValOcc . nameOccName) (sortBy byLocation (toList same_spelling)) of
+      (type_name : _, term_name : _) ->
+        let (first_name, second_name)
+              | byLocation type_name term_name == GT = (term_name, type_name)
+              | otherwise = (type_name, term_name)
+        in addDiagnosticAt (nameSrcSpan second_name) (TcRnPunBinding second_name first_name)
+      _ -> pure ()
+  where
+    names = filter (isGoodSrcSpan . nameSrcSpan) binders
+    spelling = occNameFS . nameOccName
+    compareSpelling a b = lexicalCompareFS (spelling a) (spelling b)
+    byLocation a b = leftmost_smallest (nameSrcSpan a) (nameSrcSpan b)
+
+{- Note [Pun binding warnings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Proposal #765 diagnoses same-spelled type and term binders that would
+conflict in a single namespace. Check each group of simultaneous
+binders separately. A binder can shadow a name in an enclosing scope.
+
+For example, `id (type a) a = a` binds both names in one group.
+In `f @a = \(a :: a) -> a`, the annotation uses the outer type variable.
+The lambda binds the term variable in a separate group. Only explicitly
+bound variables in type patterns take part in this check. A type variable
+introduced implicitly by an annotation cannot shadow an in-scope name
+in the proposed single namespace.
+-}
 
 -------------------------------------
 checkShadowedOccs :: (GlobalRdrEnv, LocalRdrEnv)
