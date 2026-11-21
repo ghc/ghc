@@ -53,7 +53,8 @@ import GHC.Core.Class ( Class, classTyVars )
 import GHC.Core.ConLike ( ConLike(..) )
 import GHC.Core.DataCon ( DataCon, dataConConcreteTyVars, dataConFullSig, dataConName, isNewDataCon, dataConOrigArgTys, dataConOrigResTy, dataConRepArgBinders, dataConTyCon, dataConUserTyVars, dataConWorkId, dataConWrapId )
 import qualified GHC.Core as Core
-import GHC.Core.Dependent ( hasNativeDependentExpr, isScopedSelectorReceiver, supportsQuickLookType )
+import GHC.Core.Dependent ( hasNativeDependentExpr, hasScopedDictionaryType
+                          , isScopedSelectorReceiver, supportsQuickLookType )
 import GHC.Core.FamInstEnv (FamInstEnvs, reduceTyFamApp_maybe)
 import GHC.Core.Make ( mkCharExpr, mkNaturalExpr )
 import GHC.Core.Reduction ( Reduction(..) )
@@ -6052,7 +6053,10 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
                      in addArgCtxt (pos + fromMaybe 0 after_vta) rn_head arg $
                         do { ty <- liftZonkM (zonkTcType (actual_type entry))
                            ; loc <- getCtLocM (lexprCtOrigin arg) (Just TypeLevel)
-                           ; view <- reductionReducedType <$> tcRewriteFamilyAxioms loc ty
+                           ; view <- if not native_worker && not index_route
+                                        && hasScopedDictionaryType ty && isTauTy ty && isFamFreeTy ty
+                                     then return ty
+                                     else reductionReducedType <$> tcRewriteFamilyAxioms loc ty
                            ; return (loc, (domain_at pos, callback_view (domain_at pos) view)) }
                    match_indices = tcMatchRetainedIndexArgs (bind_outer tvs)
              ; initial_cache <- infer_args needed_tvs inferable domains 1 args
@@ -6350,6 +6354,13 @@ argument list and VTA offset as infer_args. The depth diagnostic must identify
 that argument. See Note [Bounded frontend family views] in GHC.Tc.Solver.
 Use the same normalized views for initial matching, extra matching and the
 final exact-domain check. This does not unwrap newtypes or invert families.
+
+For a family-free tau type with a scoped selector, keep the zonked type.
+For example, the first field of the pair passed to snd can contain
+compareOrigin @c dict x. The family rewriter cannot rewrite that selector.
+Match it as part of the original type. The complete choices still pass
+tcRetainedInstScope, which checks the receiver and the exact lexical Given.
+This path does not provide a coercion for a different selector application.
 
 Keep the original expression, inferred type and usage in each cache entry.
 tcValArgsWithCache checks that original type against the selected domain with
