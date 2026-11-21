@@ -1138,7 +1138,10 @@ lookupOccRnConstr :: RdrName -> RnM Name
 lookupOccRnConstr rdr_name
   = do { mb_gre <- lookupOccRn_maybe rdr_name
        ; case mb_gre of
-           Just gre  -> return $ greName gre
+           Just gre  -> do
+             loc <- getSrcSpanM
+             warnGlobalPunUse (L (noAnnSrcSpan loc) rdr_name) gre
+             return (greName gre)
            Nothing   -> do
             { mb_ty_gre <- lookup_promoted rdr_name
             ; case mb_ty_gre of
