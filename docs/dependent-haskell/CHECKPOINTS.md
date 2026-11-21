@@ -27,6 +27,9 @@ test drivers and uses the existing expiry rule for old native test programs.
 It also removes a testsuite's `tmp/ghctest-*` directory when the test names
 and timestamps match a successful summary and JUnit report. It keeps both
 reports and checks for live, queued and linked users before removal.
+The timer can also remove the compiled `ghc-config` helper in a completed
+test run. It checks the reports, the helper's source and the Makefile rule.
+The next run rebuilds the helper from that source.
 For other products, keep the completion log outside `_build`. After the last
 consumer finishes, record the source revision and build command.
 
