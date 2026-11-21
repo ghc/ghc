@@ -1,7 +1,8 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, ScopedTypeVariables #-}
-module ScopedClassMethodClient (twoDictionaries) where
+module ScopedClassMethodClient (twoDictionaries, ordinaryChoices) where
 
 import ScopedClassMethod
+import OrdinaryScopedChoice (readChoice)
 
 instance Choose Bool where
     choose x = x
@@ -22,3 +23,7 @@ twoDictionaries x =
     let inverted = Inverted x
     in case selectBoth x inverted of
         (Tagged lhs, Tagged rhs) -> (lhs, rhs)
+
+-- | Apply the Haskell 2010 reader to two distinct instances.
+ordinaryChoices :: Bool -> (Bool, Bool)
+ordinaryChoices x = (readChoice x, readChoice (Inverted x))

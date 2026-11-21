@@ -979,6 +979,8 @@ main = do
     disabled <- readIORef fieldFlag
     observe "use two caller dictionaries in imported dependent results"
         (ScopedClassMethodClient.twoDictionaries enabled, ScopedClassMethodClient.twoDictionaries disabled)
+    observe "read a scoped method through a Haskell 2010 client"
+        (ScopedClassMethodClient.ordinaryChoices enabled, ScopedClassMethodClient.ordinaryChoices disabled)
     observe "render a field with evidence for its runtime flag" (renderField enabled, renderField disabled)
     observe "format a field with a polymorphic consumer" (formatField enabled, formatField disabled)
     observe "choose a field domain with a required type argument" renderKnownFields

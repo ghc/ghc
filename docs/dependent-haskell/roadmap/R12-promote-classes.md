@@ -179,3 +179,10 @@ Core. Whole-module replay checks the admitted forms and runs scoped
 Core Lint. It uses an empty interactive context. The codec leaves
 unfolding pragmas suppressed and keeps the serialization gate for
 other retained proofs and erased package expressions.
+
+An ordinary Haskell 2010 module can call an imported `chooseTagged`
+under `Choose a` and match its result. Its own signature exposes only
+`Choose a => a -> Bool`. The driver selects scoped Core Lint and
+CorePrep from the checked bindings. The same compiled reader uses
+distinct dictionaries at two call sites.
+[Ordinary reader](../examples/open-evaluation/OrdinaryScopedChoice.hs).

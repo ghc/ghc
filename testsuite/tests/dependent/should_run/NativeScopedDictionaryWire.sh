@@ -78,9 +78,9 @@ MISSING
         grep -Fq 'error: [GHC-83605]' wrong
 
         cp "$src/ScopedDictionaryClient.hs" Main.hs
-        "${ghc[@]}" "$opt" -c Main.hs
+        "${ghc[@]}" "$opt" -DDIRECT_IMPORT -c Main.hs
         "${ghc[@]}" "$opt" Main.o ../provider/Provider.o -o ordinary-client
-        diff -u <(printf 'True\n'; expected true) <(./ordinary-client true)
+        diff -u <(printf '(True,False)\nTrue\n'; expected true) <(./ordinary-client true)
 
         cd ../ordinary
         cp ../provider/Provider.hs .

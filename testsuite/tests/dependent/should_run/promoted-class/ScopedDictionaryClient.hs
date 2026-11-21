@@ -1,4 +1,4 @@
-{-# LANGUAGE NoExperimentalDependentTypes #-}
+{-# LANGUAGE CPP, Haskell2010, NoExperimentalDependentTypes #-}
 module Main (main) where
 import Provider
 import System.Environment (getArgs)
@@ -17,8 +17,17 @@ main :: IO ()
 main = do
     args <- getArgs
     let input = args == ["true"]
+#ifdef DIRECT_IMPORT
+    print (readChoice (Normal input), readChoice (Invert input))
+#endif
     print (observe (Normal input))
     print (observeBoth (Normal input) (Invert input))
     print (observeGround input)
     print (observe (error "the ignored operand was forced" :: Ignore))
     print (ignorePayload Unobserved)
+
+#ifdef DIRECT_IMPORT
+readChoice :: Choose a => a -> Bool
+readChoice x = case chooseTagged x of
+    Tagged b -> b
+#endif
