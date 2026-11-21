@@ -28,6 +28,21 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `3c90ebc198`, an ordinary client uses a case to select the input
+of a multiplicity-polymorphic arrow. A linear call consumes its argument
+once. An unrestricted call returns the first field of a pair and leaves
+the second field unevaluated. The Showcase prints `(7,(19,'q'),29)`.
+[Provider and linearity checks](../../testsuite/tests/dependent/should_run/NativeTypeCase.sh).
+
+This revision also enforces matchability on variable-headed applications
+in instance heads and family patterns. A written unmatchable arrow gives
+GHC-83865 under either setting of the dependent extension, including
+with deferred term errors. The combined Stage 2 compiler matched all
+398 Showcase observations in native `-O0`, native `-O2`, and source-loaded
+GHCi. Nine registered tests passed in the normal way.
+[Instance pattern regression](../../testsuite/tests/dependent/should_run/NativeUnsaturatedFamily.sh)
+and [proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#application-in-pattern-position).
+
 At `2df3d0020e`, a local `INLINE` function can replicate a captured
 element at two runtime lengths. An ordinary module opens an erased
 package with a strict tuple pattern and passes its hidden state to its

@@ -28,7 +28,14 @@ position. [Equations and coverage](roadmap/R03-dependent-products.md#omit-an-imp
 A type synonym can use a `case` to choose the argument type of an
 ordinary arrow. For example, one branch can take a pair and another
 a `Char`. An ordinary client sees the selected argument type through
-the provider's interface. [R19 example and limits](roadmap/R19-type-level-cases.md).
+the provider's interface. A case in the domain also works under a
+multiplicity annotation. One identity can be called at `One` and
+`Many`. The ordinary linearity checks still apply to each call.
+[R19 example and limits](roadmap/R19-type-level-cases.md).
+
+An application pattern `f x` in a type family equation or class instance
+requires a matchable `f`. GHC checks the declared arrow modifier, even
+when another pattern determines `f` and `x`. [R23 pattern checks](roadmap/R23-unsaturated-type-families.md).
 
 An opted-in provider can pass the type family `Map` itself to a GADT.
 The GADT uses it once with the matchable constructor `Maybe` and once
