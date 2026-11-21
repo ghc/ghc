@@ -1,5 +1,5 @@
 module GHC.Driver.Config.Core.Lint.Interactive
-  ( lintInteractiveExpr
+  ( lintInteractiveExpr, lintInteractiveExprAfterPrep
   ) where
 
 import GHC.Prelude
@@ -20,13 +20,22 @@ import GHC.Utils.Outputable as Outputable
 lintInteractiveExpr :: SDoc -- ^ The source of the linted expression
                     -> HscEnv
                     -> CoreExpr -> IO ()
-lintInteractiveExpr what hsc_env expr
+lintInteractiveExpr = lintInteractiveExprWith False
+
+-- | Check an interactive expression after CorePrep lowered its literals.
+lintInteractiveExprAfterPrep :: SDoc -> HscEnv -> CoreExpr -> IO ()
+lintInteractiveExprAfterPrep = lintInteractiveExprWith True
+
+lintInteractiveExprWith :: Bool -> SDoc -> HscEnv -> CoreExpr -> IO ()
+lintInteractiveExprWith after_prep what hsc_env expr
   | not (gopt Opt_DoCoreLinting dflags)
   = return ()
-  | Just err <- lintExpr (initLintConfig dflags $ interactiveInScope $ hsc_IC hsc_env) expr
+  | Just err <- lintExpr config expr
   = displayLintResults logger what (pprCoreExpr expr) (emptyBag, err)
   | otherwise
   = return ()
   where
     dflags = hsc_dflags hsc_env
     logger = hsc_logger hsc_env
+    initial = initLintConfig dflags (interactiveInScope (hsc_IC hsc_env))
+    config = initial { l_flags = (l_flags initial) { lf_after_core_prep = after_prep } }

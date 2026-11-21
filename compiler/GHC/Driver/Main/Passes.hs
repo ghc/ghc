@@ -58,7 +58,7 @@ import GHC.Driver.Messager
 import GHC.Driver.Errors.Types
 import GHC.Driver.Config.Core.Opt.Simplify ( initSimplifyExprOpts )
 import GHC.Driver.Config.Core.Lint ( endPassHscEnvIO )
-import GHC.Driver.Config.Core.Lint.Interactive ( lintInteractiveExpr )
+import GHC.Driver.Config.Core.Lint.Interactive ( lintInteractiveExpr, lintInteractiveExprAfterPrep )
 import GHC.Driver.Config.CoreToStg
 import GHC.Driver.Config.CoreToStg.Prep
 import GHC.Driver.Config.Parser   (initParserOpts)
@@ -1780,7 +1780,7 @@ compileCoreExpr hsc_env srcspan optional ds_expr = do
    tidy_expr
 
   {- Lint if necessary -}
-  lintInteractiveExpr (text "hscCompileCoreExpr") lint_env prepd_expr
+  lintInteractiveExprAfterPrep (text "hscCompileCoreExpr") lint_env prepd_expr
   let this_loc = OsPathModLocation
           { ml_hs_file_ospath   = Nothing,
             ml_hi_file_ospath   = panic "hscCompileCoreExpr':ml_hi_file_ospath",

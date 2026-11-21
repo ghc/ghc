@@ -1663,12 +1663,17 @@ lintCaseExpr scrut case_bndr alt_ty alts
            lintL (any is_default alts || covers_domain scrut_ty)
              (text "Native index proof alternatives must be exhaustive:" <+> ppr e)
 
-       ; when (any isNativeIndexAliasAlt alts) $
-           do { in_scope <- getInScope
-              ; lintL (isNativeIndexAliasBinder scrut case_bndr
-                        && not (case_bndr `elemInScopeSet` in_scope))
-                  (text "Native index alias case requires a fresh unrestricted local index binder:"
-                   <+> ppr case_bndr) }
+       ; scrut_index <- if any isNativeIndexAliasAlt alts
+           then do { after_prep <- lf_after_core_prep <$> getLintFlags
+                   ; let alias_scrut | after_prep = prepared_alias_scrut
+                                     | otherwise  = scrut
+                   ; in_scope <- getInScope
+                   ; lintL (isNativeIndexAliasBinder alias_scrut case_bndr
+                             && not (case_bndr `elemInScopeSet` in_scope))
+                       (text "Native index alias case requires a fresh unrestricted local index binder:"
+                        <+> ppr case_bndr)
+                   ; return (exprToNativeCaseIndex alias_scrut) }
+           else return (exprToNativeCaseIndex scrut)
 
        -- Lint the case-binder. Must do this after linting the scrutinee
        -- because the case-binder isn't in scope in the scrutineex
@@ -1682,10 +1687,20 @@ lintCaseExpr scrut case_bndr alt_ty alts
          -- See GHC.Core Note [Case expression invariants] item (7)
 
        ; -- Check the alternatives
-       ; alt_ues <- mapM (lintCoreAlt (exprToNativeCaseIndex scrut) case_bndr scrut_ty scrut_mult alt_ty) alts
+       ; alt_ues <- mapM (lintCoreAlt scrut_index case_bndr scrut_ty scrut_mult alt_ty) alts
        ; let case_ue = (scaleUE scrut_mult scrut_ue) `addUE` supUEs alt_ues
        ; return (alt_ty, case_ue) } }
   where
+    -- See Note [Large Natural literals in prepared Core] in GHC.CoreToStg.Prep.
+    prepared_alias_scrut
+      | App (Var worker) (Var _) <- scrut
+      , Just original@(App (Var original_worker) _) <-
+          maybeUnfoldingTemplate (idUnfolding case_bndr)
+      , worker == original_worker
+      , isBoxedBigNaturalLiteral original
+      = original
+      | otherwise = scrut
+
     legacy_constructor_proof (Alt (DataAlt con) args _) = isNativeIndexDataAlt con args
     legacy_constructor_proof _ = False
     is_default (Alt DEFAULT _ _) = True
@@ -3447,6 +3462,8 @@ data LintFlags
        , lf_allow_weak_joins   :: Bool -- ^ See Note [Linting join points with casts or ticks]
        , lf_allow_beta_joins   :: Bool -- ^ See Note [Join points and beta-redexes]
        , lf_allow_dead_occs    :: Bool -- ^ See Note [Dead occurrences]
+       , lf_after_core_prep    :: Bool
+           -- ^ See Note [Large Natural literals in prepared Core] in GHC.CoreToStg.Prep.
        , lf_tc_coercion        :: Bool
            -- ^ Are we linting a coercion which may contain unfilled
            -- metavariables and coercion holes?

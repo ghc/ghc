@@ -40,6 +40,7 @@ module GHC.Core (
         nativeIndexFunctionVar_maybe, nativeIndexArgKinds, nativeIndexedConArgs,
         nativeIndexedConApp_maybe, splitNativeIndexedConApp, isNativeConstructedGadtIndex,
         containsIndexedConOperand, containsGeneralIndexedConOperand, containsRetainedCharLiteral,
+        isBoxedBigNaturalLiteral,
         isNativeIndexAlt, isNativeIndexDataAlt, isNativeIndexAliasAlt, isNativeIndexAliasBinder,
         isNativeIndexedDataAlt, splitNativeIndexedDataAlt, isNativeIndexedGadtCon,
         nativeIndexedCon_maybe,
@@ -3088,6 +3089,12 @@ boxedNaturalLiteral_maybe (App (Var worker) (Lit (LitNumber tag n)))
       _ -> False
   = Just n
 boxedNaturalLiteral_maybe _ = Nothing
+
+-- | Test for the boxed Natural form that CorePrep must lower to bytes.
+isBoxedBigNaturalLiteral :: CoreExpr -> Bool
+isBoxedBigNaturalLiteral expr@(App _ (Lit (LitNumber LitNumBigNat _)))
+  = isJust (boxedNaturalLiteral_maybe expr)
+isBoxedBigNaturalLiteral _ = False
 
 {- Note [Boxed natural literal indices]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

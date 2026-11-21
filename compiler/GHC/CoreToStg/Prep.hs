@@ -32,7 +32,7 @@ import GHC.Builtin.WiredIn.Ids ( realWorldPrimId )
 
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity
-import GHC.Core.Lint    ( EndPassConfig(..), LintPassResultConfig(..)
+import GHC.Core.Lint    ( EndPassConfig(..), LintPassResultConfig(..), LintFlags(..)
                         , endPassIO, lintPassResult )
 import GHC.Core hiding( FloatBind(..) )
 import GHC.Core.FVs (exprFreeVars)
@@ -40,6 +40,7 @@ import GHC.Core.Dependent
 import GHC.Core.Subst
 import GHC.Core.Make
 import GHC.Core.Type
+import GHC.Core.Unfold.Make (mkCoreUnfolding)
 import GHC.Core.TyCo.Rep ( Type(..), Coercion(SubCo) )
 import GHC.Core.TyCo.Compare ( eqType )
 import GHC.Core.TyCo.Subst ( isEmptyTypeSubst )
@@ -267,7 +268,9 @@ corePrepPgm logger cp_cfg pgm_cfg
             lintPassResult logger
               (checked_lint_cfg { lpr_passPpr = text "before native CorePrep" })
               binds
-            return (end_pass_cfg { ep_lintPassResult = Just checked_lint_cfg })
+            let lint_flags = (lpr_makeLintFlags checked_lint_cfg) { lf_after_core_prep = True }
+            return (end_pass_cfg { ep_lintPassResult =
+                      Just (checked_lint_cfg { lpr_makeLintFlags = lint_flags }) })
       else return end_pass_cfg
     let initialCorePrepEnv = mkInitialCorePrepEnv cp_cfg
 
@@ -967,7 +970,14 @@ cpeBodyF env (Case scrut bndr ty alts)
   | otherwise
   = do { (floats, scrut') <- cpeBodyF env scrut
        ; (env', bndr2) <- cpCloneBndr env bndr
-       ; let bndr3 = bndr2 `setIdUnfolding` evaldUnfolding
+       ; let bndr3 = bndr2 `setIdUnfolding` unfolding
+             unfolding
+               | any isNativeIndexAliasAlt alts
+               , isBoxedBigNaturalLiteral scrut
+               -- See Note [Large Natural literals in prepared Core].
+               = mkCoreUnfolding VanillaSrc False scrut
+                   (Just (UnfoldingCache True True False False)) UnfNever
+               | otherwise = evaldUnfolding
        ; let alts'
                | cp_catchNonexhaustiveCases $ cpe_config env
                  -- Suppose the alternatives do not cover all the data constructors of the type.
@@ -993,6 +1003,21 @@ cpeBodyF env (Case scrut bndr ty alts)
        = do { (env2, bs') <- cpCloneBndrs env bs
             ; rhs' <- cpeBody env2 rhs
             ; return (Alt con bs' rhs') }
+
+{- Note [Large Natural literals in prepared Core]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+CorePrep checks the proof for an alias of NB applied to a BigNat# literal
+before lowering the BigNat# to a byte array. The prepared scrutinee is NB
+applied to the variable bound by that lowering. Its syntax no longer
+contains the original literal.
+
+Retain the original closed value as a non-inlining unfolding on the
+evaluated alias binder. Output Lint checks the original literal and the
+exact alias proof against this unfolding when it sees the prepared NB form.
+Input Lint and interface decoding use the scrutinee itself. They cannot
+use a binder's unfolding as evidence. CoreToStg erases the proof and uses
+the prepared scrutinee for the runtime value.
+-}
 
 {- Note [mkTick breaks ANF]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
