@@ -170,6 +170,7 @@ import qualified QualifiedPiLibrary as Qualified
 import qualified ReadNatural
 import qualified Type.Reflection as Reflection
 import qualified UnicodeExport
+import qualified RetainedCharacterClient
 
 {- Note [Maintaining the Dependent Haskell showcase]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1032,6 +1033,8 @@ main = do
         [CharacterExport.p3 (Proxy @'x'), CharacterExport.p3 (Proxy @'!')]
     observe "Unicode code points from an exported Data.Char.toUpper equality"
         (map fromEnum [UnicodeExport.p3 (Proxy @'é'), UnicodeExport.p3 (Proxy @'\x1e943')])
+    observe "written character indices and a lazy later element"
+        (RetainedCharacterClient.observeCharacters (error "forced the later character"))
     observe "greatest common divisor checked in a type"
         (TypeNats.natVal (Proxy @(Prelude.gcd 18 24)))
     observe "first and second fields proved through an imported pair equality"
