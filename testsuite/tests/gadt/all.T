@@ -177,3 +177,5 @@ test('GadtOrderedTelescopeTh',
      run_command, ['bash TerminalGadtTh.sh "{compiler}" "{libdir}" GadtOrderedTelescopeTh GadtOrderedTelescopeProvider'])
 test('GadtOrderedTelescopeScope', extra_files(['GadtOrderedTelescopeProvider.hs']),
      multimod_compile_fail, ['GadtOrderedTelescopeScope', '-v0'])
+test('GadtInferredTelescopeWire', [req_host_target_ghc, only_ways(['normal'])],
+     run_command, ['bash GadtInferredTelescopeWire.sh "{compiler}" "{libdir}"'])
