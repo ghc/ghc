@@ -3583,7 +3583,7 @@ tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
                do { ctxt <- tcHsContext hs_ctxt
                   ; fds  <- mapM (addLocM tc_fundep) fundeps
                   ; sig_stuff <- tcClassSigs class_name sigs meths
-                  ; at_stuff  <- tcClassATs class_name clas ats at_defs
+                  ; at_stuff  <- tcClassATs class_name (binderVars tc_bndrs) clas ats at_defs
                   ; return (ctxt, fds, sig_stuff, at_stuff) }
 
        -- See Note [Error on unconstrained meta-variables] in GHC.Tc.Utils.TcMType
@@ -3666,11 +3666,12 @@ families.
 -}
 
 tcClassATs :: Name                    -- The class name (not knot-tied)
+           -> [TyVar]                 -- The class binders (not knot-tied)
            -> Class                   -- The class parent of this associated type
            -> [LFamilyDecl GhcRn]     -- Associated types.
            -> [LTyFamDefltDecl GhcRn] -- Associated type defaults.
            -> TcM [ClassATItem]
-tcClassATs class_name cls ats at_defs
+tcClassATs class_name class_tvs cls ats at_defs
   = do {  -- Complain about associated type defaults for non associated-types
          sequence_ [ failWithTc $ TcRnIllegalInstance
                                 $ IllegalFamilyInstance $ InvalidAssoc
@@ -3695,6 +3696,14 @@ tcClassATs class_name cls ats at_defs
                         emptyNameEnv at_defs
 
     tc_at at = do { (fam_tc, val_infos) <- addLocM (tcFamDecl1 emptyNameEnv (Just cls)) at
+                  ; let fam_tvs = tyConTyVars fam_tc
+                  ; when (isConstrainedFamilyTyCon fam_tc) $
+                      setSrcSpanA (getLoc at) $
+                      checkTc (length fam_tvs == length class_tvs &&
+                               all (`elemVarSet` mkVarSet fam_tvs) class_tvs &&
+                               isLiftedTypeKind (tyConResKind fam_tc)) $
+                        TcRnConstrainedFamilyUnsupported fam_tc $
+                          text "The family must have the same binders as its class and result kind Type."
                   ; mapM_ (checkTyFamEqnValidityInfo fam_tc) val_infos
                   ; let at_defs = lookupNameEnv at_defs_map (at_fam_name at)
                                   `orElse` []
@@ -3920,9 +3929,16 @@ tcFamDecl1 case_axioms parent (FamilyDecl { fdInfo = fam_info
   ; checkFamFlag tc_name
   ; inj' <- tcInjectivity tc_bndrs inj
   ; checkResultSigFlag tc_name sig  -- check after injectivity for better errors
-  ; let tycon = mkFamilyTyCon tc_name kind tc_bndrs 0 res_kind
-                               (resultVariableName sig) OpenTypeFamilyTyCon
-                               parent inj'
+  ; enabled <- xoptM LangExt.ExperimentalDependentTypes
+  ; is_boot <- tcIsHsBootOrSig
+  ; let flav
+          | enabled, Just _ <- parent = ConstrainedTypeFamilyTyCon
+          | otherwise = OpenTypeFamilyTyCon
+        tycon = mkFamilyTyCon tc_name kind tc_bndrs 0 res_kind
+                               (resultVariableName sig) flav parent inj'
+  ; when (is_boot && isConstrainedFamilyTyCon tycon) $
+      failWithTc $ TcRnConstrainedFamilyUnsupported tycon $
+        text "Constrained associated families in hs-boot files and signatures are unsupported."
   ; return (tycon, []) }
 
   | ClosedTypeFamily (_, scope) mb_eqns <- fam_info
@@ -6207,7 +6223,8 @@ checkValidTyCon tc
                         ; checkTc hsBoot $ TcRnAbstractClosedTyFamDecl }
                    ; _ -> return () }
                ; DataFamilyTyCon {}  -> return ()
-               ; OpenTypeFamilyTyCon -> return () }
+               ; OpenTypeFamilyTyCon -> return ()
+               ; ConstrainedTypeFamilyTyCon -> return () }
 
              | otherwise -> do
                { -- Check the context on the data decl

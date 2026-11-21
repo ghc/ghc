@@ -2056,7 +2056,11 @@ genFamInsts spec@(DS { ds_tvs = tyvars, ds_mechanism = mechanism
       DerivSpecVia{dsm_via_ty = via_ty}
         -> gen_newtype_or_via via_ty
   where
-    gen_newtype_or_via ty = gen_Newtype_fam_insts loc clas tyvars inst_tys ty
+    gen_newtype_or_via ty = do
+      forM_ (filter isConstrainedFamilyTyCon (classATs clas)) $ \fam_tc ->
+        failWithTc $ TcRnConstrainedFamilyUnsupported fam_tc $
+          text "Newtype deriving and DerivingVia cannot provide this family's equation."
+      gen_Newtype_fam_insts loc clas tyvars inst_tys ty
 
 -- Set the SrcSpan and error context for an action that uses a DerivSpec.
 set_spec_span_and_ctxt :: DerivSpec theta -> TcM a -> TcM a
