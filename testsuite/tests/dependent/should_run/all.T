@@ -97,6 +97,11 @@ test('NativeOpenInstalledDropWhile',
      run_command, ['bash NativeOpenInstalledDropWhile.sh "{compiler}" "{libdir}"'])
 test('NativeOpenUserGuardedTail', [only_ways(['normal'])],
      run_command, ['bash NativeOpenUserGuardedTail.sh "{compiler}" "{libdir}"'])
+test('NativeOpenConcreteGuardedList',
+     [only_ways(['normal']),
+      extra_files([open_eval_dir + f for f in ['ConcreteGuardedList.hs',
+                   'ConcreteGuardedListSource.hs', 'ConcreteGuardedListProof.hs']])],
+     run_command, ['bash NativeOpenConcreteGuardedList.sh "{compiler}" "{libdir}"'])
 
 test('NativeOpenInstalledAppend',
      [only_ways(['normal']),

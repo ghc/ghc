@@ -6485,6 +6485,18 @@ are undefined.
 [Agda prefix and suffix law](https://agda.github.io/agda-stdlib/v2.4/Data.List.Properties.html#1575),
 and [R16 prefix and suffix](roadmap/R16-open-term-evaluator.md#recover-the-input-from-its-prefix-and-suffix).
 
+### Nominal domains for concrete list callbacks
+
+GHC's role rules distinguish nominal equality from equality of runtime
+representations. A checked list equation accepts a callback on the exact
+element type. A newtype callback can share the element representation
+and still fail ordinary kind checking. Agda's list prefix and suffix
+definitions also keep one element type in both the predicate and the
+list.
+[GHC's role rules](../users_guide/exts/roles.rst#nominal-representational-and-phantom),
+[Agda's list definitions](https://agda.github.io/agda-stdlib/v2.4/Data.List.Base.html#330),
+and [R16 concrete element types](roadmap/R16-open-term-evaluator.md#check-guarded-lists-at-concrete-element-types).
+
 ### Checked runtime decisions for filter
 
 Agda's `length-filter` takes a `Decidable P` argument. It branches on

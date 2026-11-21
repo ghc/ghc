@@ -1311,6 +1311,26 @@ when neither branch recurses. An ordinary `Refl` proof uses an alias and
 the producer's stripped interface at `-O0` and `-O2`.
 [Separate compilation regression](../../../testsuite/tests/dependent/should_run/NativeOpenUserGuardedTail.sh).
 
+### Check guarded lists at concrete element types
+
+The ordinary producer exports a function on `[Bool]` and one on a list
+of its own `Signal` datatype. Each callback has the exact element type
+as its domain. The two signatures use closed, lifted element types and
+the same input and output list type. GHC checks the actual guard and
+branch results in Core before it publishes nominal equations. The
+private guard reads its value operands without a kind parameter.
+
+An ordinary client proves removal of `False` and preservation of an
+`Entry` with a rigid tail. The Showcase exposes one output element for
+each function and leaves the later tail unforced. A callback on a
+newtype of `Bool` fails the kind check. A Boolean branch that forces the
+removed head loses both equations. The producer withholds the list
+equations in a no-code build.
+[Producer](../examples/open-evaluation/ConcreteGuardedList.hs),
+[ordinary proofs](../examples/open-evaluation/ConcreteGuardedListProof.hs),
+[regression](../../../testsuite/tests/dependent/should_run/NativeOpenConcreteGuardedList.sh),
+and [nominal roles](../REFERENCES.md#nominal-domains-for-concrete-list-callbacks).
+
 ### Use an ordinary identity as an open callback
 
 `Prelude.filter Prelude.id` keeps a `True` head and skips a `False`
