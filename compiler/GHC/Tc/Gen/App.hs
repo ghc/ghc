@@ -89,11 +89,13 @@ import GHC.Unit.Types ( isInteractiveModule )
 import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
+import GHC.Types.SourceText ( SourceText(NoSourceText) )
 import GHC.Types.Var.Env  ( VarEnv, emptyTidyEnv, mkInScopeSet, delVarEnv, lookupVarEnv )
 
 import GHC.Data.Maybe
 import GHC.Data.Bag ( unitBag )
 import GHC.Data.FastString
+import Language.Haskell.Syntax.Text ( unpackHText )
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
@@ -1788,6 +1790,7 @@ tcRetainedDeclaredArgType view (L _ (HsPar _ arg)) = tcRetainedDeclaredArgType v
 tcRetainedDeclaredArgType view (L _ (ExplicitList _ fields))
   = fmap (fmap mkListTy) (tcRetainedListElementType (tcRetainedDeclaredArgType view) fields)
 tcRetainedDeclaredArgType _ (L _ (HsLit _ HsChar{})) = return (Just charTy)
+tcRetainedDeclaredArgType _ (L _ (HsLit _ HsString{})) = return (Just (mkListTy charTy))
 tcRetainedDeclaredArgType view_type (L loc (HsVar _ lname))
   | not (isDataOcc (nameOccName (unLocWithUserRdr lname)))
   = setSrcSpan (locA loc) $
@@ -3968,6 +3971,12 @@ tcRetainedArg domain arg
           HsLit _ (HsChar _ c)
             | charTy `tcEqType` expected
             -> return (mkCharExpr c, original)
+          HsLit _ (HsString _ string)
+            | mkListTy charTy `tcEqType` expected
+            -> do { -- See Note [Quoted strings in retained operands].
+                    let chars = map (nlHsLit . HsChar NoSourceText) (unpackHText string)
+                  ; (core, expanded) <- resolve env expected (L loc (ExplicitList noExtField chars))
+                  ; return (core, L loc (mkExpandedLExpr expr expanded)) }
           HsOverLit _ (OverLit OverLitRn{ol_from_fun = L _ from} (HsIntegral lit))
             | let n = il_value lit, n >= 0
             -> do { (core, generated) <- tcRetainedNumeral expected from n
@@ -4309,6 +4318,22 @@ a casted variable, report the actual and expected types at that operand's
 existing span. Do not solve constraints, check the operand again, or discard
 a successful conversion. The message describes the required cast, rather
 than asserting that no nominal equality can hold in the current context.
+-}
+
+{- Note [Quoted strings in retained operands]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A plain quoted string at [Char] has the same index as its written list
+of characters. Decode the parsed HText with its existing modified UTF-8
+decoder. This preserves embedded NUL and each Unicode code point.
+
+Check and desugar the expansion through the retained list path. It keeps
+the original literal for source diagnostics and the list constructors
+for Core index recovery. The constructor fields stay lazy. Ordinary
+string expressions still use GHC.Core.Make.mkStringExprFSWith.
+
+With OverloadedStrings the renamer produces HsOverLit, even when the
+expected type is [Char]. A fromString instance or a rebindable fromString
+can change the value or demand. Only a plain HsString uses this expansion.
 -}
 
 {- Note [Retained argument application]
