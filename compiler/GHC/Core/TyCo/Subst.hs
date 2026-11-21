@@ -62,14 +62,14 @@ import {-# SOURCE #-} GHC.Core.Coercion ( mkCoercionType, coVarTypesRole, mkTyCo
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprTyVar )
 import {-# SOURCE #-} GHC.Core.Ppr ( ) -- instance Outputable CoreExpr
 import {-# SOURCE #-} GHC.Core ( CoreExpr, retainedArgIndex, normaliseNativeIndexExpr,
-                                nativeComputedIndex, varToCoreExpr, nativeIndexFunctionVar_maybe )
+                                nativeComputedIndex, varToCoreExpr, termVar_maybe, nativeIndexFunctionVar_maybe )
 import {-# SOURCE #-} GHC.Core.Subst ( substExpr )
 import {-# SOURCE #-} GHC.Core.Type( isCoercionTy, isNativeIndexFunctionId
-                                 , nativeIndexFunctionTys_maybe, typeKind )
+                                 , nativeIndexFunctionTys_maybe, typeKind, coreFullView )
 
 import GHC.Core.TyCo.Make
 import {-# SOURCE #-} GHC.Core.TyCo.Compare ( eqType )
-import GHC.Core.TyCon( TyCon )
+import GHC.Core.TyCon( TyCon, tyConClass_maybe )
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
 
@@ -895,6 +895,15 @@ substNativeIndexFunction (Subst in_scope ids _ _) f
 -- See Note [Substituting runtime Id metadata].
 substNativeIndexUsing :: (Subst -> Type -> Type) -> Subst -> Id -> Type
 substNativeIndexUsing subst_ty subst@(Subst in_scope ids _ _) v
+  | TyConApp tc _ <- coreFullView (varType v)
+  , Just _ <- tyConClass_maybe tc
+  = TermVarTy $!
+      case lookupVarEnv ids v of
+        Just range
+          | Just target <- termVar_maybe range
+          , varType target `eqType` subst_ty subst (varType v) -> target
+        Nothing -> lookupInScope in_scope v `orElse` v
+        _ -> pprPanic "substTy: unsupported experimental dictionary substitution" (ppr v)
   | isNativeIndexFunctionId v
   = TermVarTy (substNativeIndexFunction subst v)
     -- Keep the same Var-only ranges as a native call head.

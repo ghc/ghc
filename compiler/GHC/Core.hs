@@ -37,7 +37,8 @@ module GHC.Core (
         exprToNativeIndex, normaliseNativeIndexExpr, mapNativeIndex,
         nativeSourceCallIndex, nativeComputedIndex, retainedArgIndex, nativeDeferredArgIndex,
         exprToNativeCaseIndex, isNativeCaseValueIndex, isNativeIndexedCaseScrutinee,
-        nativeIndexFunctionVar_maybe, nativeIndexArgKinds, nativeIndexedConArgs,
+        termVar_maybe, nativeIndexFunctionVar_maybe, nativeIndexArgKinds,
+        nativeClassSelectorTys, nativeClassSelectorIndex, nativeIndexedConArgs,
         nativeIndexedConApp_maybe, splitNativeIndexedConApp, isNativeConstructedGadtIndex,
         containsIndexedConOperand, containsGeneralIndexedConOperand,
         isNativeIndexAlt, isNativeIndexDataAlt, isNativeIndexAliasAlt, isNativeIndexAliasBinder,
@@ -112,11 +113,14 @@ import GHC.Platform
 
 import GHC.Core.Type
 import GHC.Core.TyCo.Compare ( eqType )
-import GHC.Core.TyCo.Rep ( Type(TermVarTy, TermAppTy, TyConApp, CastTy), Coercion(SubCo), Scaled(..) )
+import GHC.Core.TyCo.Rep ( Type(TermVarTy, TermAppTy, ClassAppTy, TyConApp, CastTy), Coercion(SubCo), Scaled(..) )
 import qualified GHC.Core.TyCo.Subst as TyCoSubst
 import GHC.Builtin.KnownKeys ( boolTyConKey )
+import {-# SOURCE #-} GHC.Builtin.WiredIn.Types (unmatchableDataConTy)
 import GHC.Core.Coercion
 import GHC.Core.Rules.Config ( RuleOpts )
+import GHC.Core.Class (classMethods)
+import GHC.Core.Predicate (getClassPredTys_maybe)
 import GHC.Core.DataCon
 import GHC.Core.TyCon ( isPromotedDataCon_maybe, isVanillaAlgTyCon, isBoxedDataTyCon,
                         tyConTyVars, tyConResKind, tyConKind )
@@ -2681,7 +2685,8 @@ nativeDeferredArgIndex :: CoreExpr -> Maybe Type
 nativeDeferredArgIndex e
   | containsIndexedOperand (isJust . nativeIndexedOperandSignature_maybe) e
   = snd <$> computedIndexExpr e
-  | otherwise = nativeComputedIndex e
+  | Just index <- nativeComputedIndex e = Just index
+  | otherwise = nativeClassSelectorIndex e
 
 -- | Reuse structural constructor checks without enabling beta or cast conversion.
 computedIndexExpr :: CoreExpr -> Maybe (CoreExpr, Type)
@@ -2726,7 +2731,33 @@ computedIndexExpr = nativeIndexExprWith False extra
 retainedArgIndex :: CoreExpr -> Maybe Type
 retainedArgIndex expr = case exprToNativeIndex expr of
   Just index -> Just index
-  Nothing -> nativeComputedIndex expr
+  Nothing -> case nativeComputedIndex expr of
+    Just index -> Just index
+    Nothing -> nativeClassSelectorIndex expr
+
+-- | Get the instantiated predicate, domain and result of a unary selector.
+nativeClassSelectorTys :: Id -> Type -> Maybe (Type, Type, Type)
+nativeClassSelectorTys selector inst = do
+  (_, Bndr tv (Invisible _), body) <- splitForAllForAllTyBinder_maybe (varType selector)
+  guard (isTyVar tv && tyVarKind tv `eqType` typeKind inst)
+  (FTF_C_T, _, dict_mult, predicate, method) <- splitFunTy_maybe body
+  (FTF_T_T, ma, mult, domain, result) <- splitFunTy_maybe method
+  guard (isManyTy dict_mult && isManyTy mult && ma `eqType` unmatchableDataConTy)
+  (dict_class, [parameter]) <- getClassPredTys_maybe predicate
+  guard (isGlobalId selector && parameter `eqType` mkTyVarTy tv
+         && any (\m -> m == selector && varType m `eqType` varType selector) (classMethods dict_class))
+  let instantiate = TyCoSubst.substTyWith [tv] [inst]
+  return (instantiate predicate, instantiate domain, instantiate result)
+
+-- | Recover an opaque application to an explicit local Given and operand.
+nativeClassSelectorIndex :: CoreExpr -> Maybe Type
+nativeClassSelectorIndex expr
+  | (Var selector, [Type inst, Var dict, Var arg]) <- collectArgs expr
+  , isNativeClassDictionaryId dict, isNativeOpaqueValueId arg
+  , Just (predicate, domain, result) <- nativeClassSelectorTys selector inst
+  , varType dict `eqType` predicate, varType arg `eqType` domain
+  = Just (ClassAppTy selector inst (TermVarTy dict) (TermVarTy arg) result)
+  | otherwise = Nothing
 
 {- Note [Source calls in retained arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2763,6 +2794,11 @@ Core-to-STG can name this lifted argument after erasing its index.
 
 -- | Recognize a checked local function head without inspecting its unfolding.
 -- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
+-- | Recognize an exact Core variable occurrence without looking through wrappers.
+termVar_maybe :: CoreExpr -> Maybe Id
+termVar_maybe (Var v) = Just v
+termVar_maybe _ = Nothing
+
 nativeIndexFunctionVar_maybe :: CoreExpr -> Maybe Id
 nativeIndexFunctionVar_maybe (Var f)
   | isNativeIndexFunctionId f = Just f

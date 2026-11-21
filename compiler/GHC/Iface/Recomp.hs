@@ -900,6 +900,9 @@ couldExportRetainedSignatureCase owner exports = any candidate
         containsRetained (IfaceDepFunTy _ (_, _, domain) body) =
           any localCase (nameSetElemsStable (freeNamesIfDecl (decl { ifType = body, ifIdInfo = [] })))
             || containsRetained domain
+        containsRetained (IfaceDepDictTy (_, _, pred_ty) body) =
+          containsRetained pred_ty || containsRetained body
+        containsRetained (IfaceClassAppTy _ inst _ _) = containsRetained inst
         containsRetained (IfaceForAllTy _ _ body) = containsRetained body
         containsRetained (IfaceFunTy _ _ _ arg body) = containsRetained arg || containsRetained body
         containsRetained (IfaceAppTy head_ty args) =

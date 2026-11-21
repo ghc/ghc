@@ -787,6 +787,13 @@ rewrite_one ty
   | Just ty' <- rewriterView ty  -- See Note [Rewriting synonyms]
   = rewrite_one ty'
 
+-- A dictionary index has no checked rewrite or congruence rule. Only
+-- reflexivity in the equality checker can discharge an obligation on it.
+rewrite_one ty@ClassAppTy{}
+  = liftTcS $ failTcS $ TcRnRetainedQuantificationError (RetainedSolverType ty)
+rewrite_one ty@DepDictTy{}
+  = liftTcS $ failTcS $ TcRnRetainedQuantificationError (RetainedSolverType ty)
+
 -- Nominal argument evidence gives forward congruence under the same head.
 -- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
 rewrite_one ty@(TermAppTy f arg)
