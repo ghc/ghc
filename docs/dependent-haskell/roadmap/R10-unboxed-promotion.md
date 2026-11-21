@@ -91,13 +91,32 @@ sameRep :: forall (a :: TYPE 'IntRep). RawEq a -> AtRep a -> AtRep Int#
 sameRep RawInt x = x
 ```
 
-At `-O0` with Core and STG Lint, the fork’s binder audit reports one
-mixed-kind binder for `general`, namely `(a :: TYPE r) ~# (Int# :: TYPE
-'IntRep)`. It reports zero for `sameRep`. The general R11 worker must lift
-`r ~# 'IntRep` through `TYPE` before binding the homogeneous index proof.
-`RawInt` refines the representation to `IntRep`. Use `general` to test
-transport under `TYPE`. Use the family patterns above to test kind
-formation and binding.
+At `-O0` and `-O2` with Core and STG Lint, the fork’s binder audit reports
+one mixed-kind binder for `general`, namely
+`(a :: TYPE r) ~# (Int# :: TYPE 'IntRep)`. It reports zero for `sameRep`.
+The fork’s private v77 worker trial removed this binder. It lifted
+`r ~# 'IntRep` through `TYPE` and bound the transported index proof next.
+That worker telescope requires a matched compiler and rebuilt interfaces.
+The public worker layout still has the mixed binder. The family patterns
+above also need kind formation and binding for the `Int#` field.
+
+### Given equality projections
+
+A same-kind Given such as `Premise a ~ Premise b` can relate indices
+`a :: k1` and `b :: k2`, where `Premise` is a nominal, kind-polymorphic
+constructor. When the solver projects the equality of the indices, it
+binds the nominal kind proof first. It then binds the equality of `a`
+and `b` transported to `k1`. Function argument projections use the same
+rule when the argument types have different runtime representations.
+The second proof keeps the role of the original selector. The input
+coercion can still contain heterogeneous expressions.
+
+At `-O0` and `-O2` the separate-provider check found zero mixed binders
+in four nominal and representational projection cases. The old solver
+found four. The provider interfaces were byte-identical. The change uses
+the existing coercion syntax and does not change the constructor worker
+or the boxed-equality layout.
+[Solver](../../../compiler/GHC/Tc/Solver/Equality.hs).
 
 ### Deferred heterogeneous equalities
 
