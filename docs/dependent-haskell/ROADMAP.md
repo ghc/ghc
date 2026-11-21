@@ -38,11 +38,11 @@ its original input. Inspecting the first proof leaves the second vector
 unevaluated. Exchanging the proofs reports the two written `SplitAtValue`
 types at the exchanged arguments.
 
-The 378-line Showcase includes finite-list proofs for the installed
+The 380-line Showcase includes finite-list proofs for the installed
 Prelude definitions of `map`, `(.)`, `filter`, and `(++)`. The source-hidden
 split regression passes at `-O0`, `-O1`, and `-O2`. Removing the induction
-premise fails at the final `Refl`. Both stages of a normal Hadrian build
-passed at the preceding 376-line checkpoint.
+premise fails at the final `Refl`. A normal two-stage Hadrian build also
+passed on the 378-line paired-split revision.
 [Verification scope](CHECKPOINTS.md#family-and-package-checkpoints).
 
 A retained function can name an entire indexed vector as its argument.
