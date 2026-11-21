@@ -424,3 +424,25 @@ the prefix it needs. A type checker can also use a statically constructed
 `Fin` when its bound matches the list.
 [Ordinary caller](../examples/qualified-pi/FinitePositionClient.hs)
 and [Agda and Serokell examples](../REFERENCES.md#index-an-ordinary-list-at-its-source-length).
+
+### Omit an impossible list-index equation
+
+The generic list index needs only the two cons equations.
+
+```haskell
+indexGeneric :: forall (a :: Type). foreach (xs :: [a]) -> Fin (sourceLength xs) -> a
+indexGeneric (value : _) FZ = value
+indexGeneric (_ : rest) (FS smaller) = indexGeneric rest smaller
+```
+
+At `[]`, the checked equation for `sourceLength` gives `Fin 'Z`.
+Neither `FZ` nor `FS` can construct that type. The written constructor
+patterns on the position tell GHC which argument to inspect in the
+omitted equation. A wildcard or a lazy pattern alone supplies no split.
+An inhabited or unresolved argument still needs a written equation.
+Omitting the successor equation still produces the ordinary incomplete
+pattern diagnostic. The empty-list function waits for its position.
+A bottom position raises its own exception.
+[Implementation](../examples/qualified-pi/ParameterizedIndexLibrary.hs),
+[ordinary caller](../examples/qualified-pi/FinitePositionClient.hs)
+and [Agda and Haskell precedents](../REFERENCES.md#omit-an-impossible-list-index-equation).

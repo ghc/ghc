@@ -6997,3 +6997,20 @@ local list operand. Multiplicity and lexical scope are checked afterward.
 [Serokell roadmap](https://ghc.serokell.io/dh#dependent-haskell),
 [Agda standard library 2.3, Data.List.Base](https://agda.github.io/agda-stdlib/v2.3/Data.List.Base.html),
 and [implementation](examples/qualified-pi/ParameterizedIndexLibrary.hs).
+
+### Omit an impossible list-index equation
+
+Agda's indexed coverage example defines lookup by inspecting a list and a
+bounded position. The empty list gives a position of type `Fin zero`. Agda
+can omit that absurd clause when the written clauses determine the split.
+Serokell uses the two cons equations in its opening example.
+[Agda 2.8.0, coverage checking](https://agda.readthedocs.io/en/v2.8.0/language/coverage-checking.html#coverage-checking-of-indexed-datatypes)
+and [Serokell roadmap](https://ghc.serokell.io/dh#dependent-haskell).
+
+The fork elaborates the missing equation to `indexGeneric [] i = case i of {}`.
+This gives the same demand on the position as a written Haskell empty case.
+Partial application returns the function. Applying it to an undefined
+position raises the exception from that position. See Note [Omitted
+impossible retained equations] in `GHC.Tc.Gen.Match`.
+[GHC user guide, empty case alternatives](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/empty_case.html)
+and [runtime and rejection checks](../../testsuite/tests/dependent/should_run/NativeIndexedFin.sh).

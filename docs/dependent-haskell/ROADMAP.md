@@ -20,6 +20,11 @@ fails at compile time. A finite position can select from a cyclic list.
 [Implementation](examples/qualified-pi/ParameterizedIndexLibrary.hs)
 and [ordinary caller](examples/qualified-pi/FinitePositionClient.hs).
 
+The bounded list index now has the two cons equations in Serokell's
+example. The empty list gives a position of type `Fin 'Z`. GHC checks
+that this type has no constructor and inserts an empty case on the
+position. [Equations and coverage](roadmap/R03-dependent-products.md#omit-an-impossible-list-index-equation).
+
 An opted-in provider can pass the type family `Map` itself to a GADT.
 The GADT uses it once with the matchable constructor `Maybe` and once
 with an unmatchable type family. An ordinary client uses both results
