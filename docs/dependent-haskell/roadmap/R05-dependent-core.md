@@ -516,9 +516,19 @@ template when the source binding is a direct alias. The simplifier uses
 the existing indirection pass to move the worker RHS, pragma and unfolding
 to the exported binding. An interface can carry a template for a strong
 loop breaker. The reader restores its loop-breaker flag and leaves its call
-intact. In the inferred polymorphic case, the exported binding selects the
-worker from a tuple under type or dictionary abstractions. That path still
-reports GHC-92256 for a package-bearing worker template at the source binding.
+intact.
+
+In an inferred polymorphic group the exported function selects its worker
+from a shared tuple. For a written `INLINE` or `INLINABLE` pragma, GHC
+closes the package-bearing worker's unfolding over the group's type
+variables, dictionaries, evidence bindings and recursive functions. This
+lets a separate client inline the definition. Its local recursion still
+has a loop breaker. The unspecialized function uses the original shared
+tuple. The [job example](../examples/qualified-pi/RecursiveJobs.hs)
+uses the same producer at `Integer`, `Double` and `Int`. A constant cost
+leaves an undefined job payload unevaluated. GHC's inliner uses occurrence
+analysis to select loop breakers in recursive groups. [Peyton Jones and
+Marlow, §3.3](https://www.microsoft.com/en-us/research/publication/secrets-of-the-glasgow-haskell-compiler-inliner/).
 [Simplified wrapper](../examples/qualified-pi/IndexBetaClient.hs),
 [finite view producer](../examples/qualified-pi/FinitePosition.hs),
 [ordinary client](../examples/qualified-pi/FinitePositionClient.hs),

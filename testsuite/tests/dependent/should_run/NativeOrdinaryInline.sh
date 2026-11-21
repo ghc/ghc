@@ -451,31 +451,33 @@ for opt in -O1 -O2; do
     done
 done
 
-cat >TopRecursive.hs <<'HS'
-{-# LANGUAGE ExperimentalDependentTypes #-}
-module TopRecursive (entry) where
-
-import Data.Kind (Type)
-
-type Hidden = exists (a :: Type). Maybe a
-
-{-# NOINLINE consume #-}
-consume :: Hidden -> Int
-consume _ = 42
-
-{-# INLINABLE top #-}
-top n = if n == 0 then consume (Just n :: Hidden) else peer (n - 1)
-peer n = top n
-
-entry :: Int -> Int
-entry = top
+# A polymorphic recursive group must close its exported template over the
+# type variables and dictionaries that the caller chooses.
+mkdir -p jobs/provider jobs/client
+cp "$src/RecursiveJobs.hs" jobs/provider/
+cat >jobs/client/Main.hs <<'HS'
+{-# LANGUAGE Haskell2010, NoExperimentalDependentTypes #-}
+module Main where
+import RecursiveJobs (totalJobs)
+main :: IO ()
+main = print (totalJobs length ["ghc", "core"] :: Integer,
+              totalJobs fromEnum ['A', 'B'] :: Double,
+              totalJobs (const 3) [error "unused payload"] :: Int)
 HS
-if "${ghc[@]}" -O1 -fdiagnostics-color=never -fforce-recomp -c TopRecursive.hs > residual.log 2>&1; then
-    echo 'Accepted a package template for an internal worker of a top-level recursive group'
-    exit 1
-fi
-grep -qFx 'TopRecursive.hs:13:1: error: [GHC-92256]' residual.log
-grep -q 'The INLINABLE unfolding of .*top.* contains unsupported retained Core.' residual.log
+(
+    cd jobs/provider
+    "${ghc[@]}" -O2 -c RecursiveJobs.hs
+    "${ghc[@]}" --show-iface RecursiveJobs.hi > provider.iface
+    grep -F 'Unfolding: Core: StableRetainedUser' provider.iface >/dev/null
+    cp RecursiveJobs.hi ../client/
+)
+(
+    cd jobs/client
+    "${ghc[@]}" -O2 -ddump-inlinings -c Main.hs > client.core
+    grep -Fx 'Inlining done: RecursiveJobs.totalJobs' client.core >/dev/null
+    "${ghc[@]}" Main.o ../provider/RecursiveJobs.o -o run
+    printf '%s\n' '(7,131.0,3)' | cmp - <(./run)
+)
 
 cp "$src"/{FinitePosition,ParameterizedIndexLibrary,PackedVecLibrary}.hs .
 cat >FinConstruction.hs <<'HS'

@@ -86,6 +86,7 @@ import GHC.Matchability (M, U, Matchability(..))
 import qualified GHC.TypeNats as TypeNats
 import GHC.TypeLits (charVal)
 import qualified IndexBetaClient as IndexBeta
+import qualified RecursiveJobs
 import qualified IndexedMark
 import qualified IndexedVec
 import qualified CertifiedSplitClient
@@ -412,6 +413,10 @@ vectors = do
     observe "equality evidence beneath a retained Pi" (toList (transported n))
     observe "immediate index beta reduction" (toList (IndexBeta.betaSuccessor n 5))
     observe "inline an ordinary function that calls a retained helper" (IndexBeta.inlineIncrement 41)
+    observe "sum separately typed job costs through a recursive package"
+        (RecursiveJobs.totalJobs length ["ghc", "core"] :: Integer,
+         RecursiveJobs.totalJobs fromEnum ['A','B'] :: Double,
+         RecursiveJobs.totalJobs (const 3) [error "unused payload"] :: Int)
     observe "replicate a captured element at two runtime lengths"
         (IndexBeta.replicateTwice 7 (S Z) (S (S Z)))
     observe "inline a local package helper with captured values"
