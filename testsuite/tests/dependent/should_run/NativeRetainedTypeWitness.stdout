@@ -4,3 +4,6 @@ Just False
 Nothing
 True
 True
+(True,Just True)
+Nothing
+((),Maybe)

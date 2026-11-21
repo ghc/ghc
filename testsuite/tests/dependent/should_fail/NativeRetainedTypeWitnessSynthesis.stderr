@@ -1,7 +1,6 @@
-NativeRetainedTypeWitnessSynthesis.hs:11:19: error: [GHC-35499]
-    • Illegal keyword ‘type’
-      Type syntax may only be used in a required type argument,
-      i.e. to instantiate a visible forall.
-    • In the first argument of ‘preserve’, namely ‘(type Bool)’
-      In the expression: preserve (type Bool) True
-      In an equation for ‘wrong’: wrong = preserve (type Bool) True
+NativeRetainedTypeWitnessSynthesis.hs:10:21: error: [GHC-39999]
+    • No instance for ‘Typeable a’
+        arising from the type operand ‘type a’
+    • In the first argument of ‘preserve’, namely ‘(type a)’
+      In the expression: preserve (type a)
+      In an equation for ‘missing’: missing = preserve (type a)
