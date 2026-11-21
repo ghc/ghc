@@ -45,6 +45,26 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At compiler revision `e59256cf58`, a prefix GADT accepts one specified
+`forall` between two value fields. An ordinary client of a stripped
+interface chooses `@Bool` or `@Char` after the first field and observes
+`((53,True),(59,'q'))`. The 474 Showcase rows match at native O0, O1
+and O2, and in source-loaded GHCi. The GHC testsuite passed 56 distinct
+registered cases. The GHC API run matched all 37 output rows. Four
+older constructor layouts retain the same interface bytes. An older
+reader diagnoses the new field order when it opens the interface.
+[Constructor example](examples/open-evaluation/LabelledValueClient.hs)
+and [scope and quotation](roadmap/R41-nested-quantification-in-gadts.md).
+
+A second check at the same revision consumes both equalities that GHC
+projects from a matchable application. Each of two compilers reads the
+other compiler's interface. At O0 and O2 the program returns
+`(47,53)`. At O2 both readers inline the producer's definition. The
+Core audit finds zero mixed-kind evidence binders in this program,
+down from two at `1a08e7d43d`. The installed `HRefl` worker still
+has one such binder. [Core regression](../../testsuite/tests/plugins/HomogeneousSelectorGivens.hs).
+
+
 At `892ba587fb`, an ordinary module passed a runtime Boolean to both
 `frameRow` and `frameToList`. With two cells it obtained `":xy"` or
 `"xy"`. The header-free branch ignored an undefined header. Separate
