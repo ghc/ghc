@@ -3770,7 +3770,9 @@ improveSeq fam_envs (saf,env) scrut case_bndr case_bndr1 [Alt DEFAULT _ _]
   -- The cast changes the scrutinee type. Preserve the case multiplicity.
   = do { case_bndr2 <- newId (fsLit "nt") (idMult case_bndr1) ty2
         ; let rhs  = DoneEx (Var case_bndr2 `Cast` mkSymCo co) NotJoinPoint
-              env2 = extendIdSubst env case_bndr rhs
+              -- Retained alternatives skip addDefaultUnfoldings. The
+              -- replacement binder must already be in scope in either path.
+              env2 = extendIdSubst (addNewInScopeIds env [case_bndr2]) case_bndr rhs
         ; return (env2, scrut `Cast` co, case_bndr2) }
 
 improveSeq _ (_,env) scrut _ case_bndr1 _
