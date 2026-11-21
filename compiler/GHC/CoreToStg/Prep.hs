@@ -280,7 +280,7 @@ corePrepPgmWith scoped logger cp_cfg pgm_cfg this_mod binds =
               binds
             return (end_pass_cfg { ep_lintPassResult = Just checked_lint_cfg })
       else return end_pass_cfg
-    let initialCorePrepEnv = mkInitialCorePrepEnv cp_cfg
+    let initialCorePrepEnv = mkInitialCorePrepEnv scoped cp_cfg
 
     us <- mkSplitUniqSupply StgTag
     let
@@ -296,6 +296,9 @@ corePrepPgmWith scoped logger cp_cfg pgm_cfg this_mod binds =
 {- Note [CorePrep for retained dependent programs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The native program path preserves retained algebraic types until CoreToStg.
+A scoped selector requires a variable receiver until CoreToStg erases
+the index. Preserve a local binding for a constructor such as True
+when inlining its RHS would change a variable index to a constructor.
 The caller must disable speculation and optional arity analysis. It must
 also supply the CorePrep Lint configuration, including its weak-join rules.
 CorePrep checks the input and output even without -dcore-lint. These checks
@@ -321,7 +324,7 @@ corePrepExpr logger config expr = do
       else rejectNativeDependentExpr "CorePrep" expr
     withTiming logger (text "CorePrep [expr]") (\e -> e `seq` ()) $ do
       us <- mkSplitUniqSupply StgTag
-      let initialCorePrepEnv = mkInitialCorePrepEnv config
+      let initialCorePrepEnv = mkInitialCorePrepEnv False config
       let new_expr = initUs_ us (cpeBody initialCorePrepEnv expr)
       putDumpFileMaybe logger Opt_D_dump_prep "CorePrep" FormatCore (ppr new_expr)
       return new_expr
@@ -682,7 +685,11 @@ cpeBind top_lvl env (NonRec bndr rhs)
           Var fun -> isNativeIndexFunctionId fun
                   && idType fun `eqType` idType bndr
           _ -> False
-      | isNativeOpaqueValueId bndr = isJust (exprToNativeIndex rhs)
+      | isNativeOpaqueValueId bndr
+      = case exprToNativeIndex rhs of
+          Just TermVarTy{} -> True
+          Just _ -> not (cpe_scoped_dicts env)
+          Nothing -> False
       | otherwise = True
 
 cpeBind top_lvl env (Rec pairs)
@@ -3156,6 +3163,7 @@ data CorePrepEnv
         -- the case where a function we think should bottom
         -- unexpectedly returns.
 
+        , cpe_scoped_dicts :: Bool -- ^ A selector must retain its receiver variable.
         , cpe_subst :: Subst  -- ^ See Note [CorePrepEnv: cpe_subst]
 
         , cpe_rec_ids :: UnVarSet -- Faster OutIdSet; See Note [Speculative evaluation]
@@ -3163,9 +3171,10 @@ data CorePrepEnv
         , cpe_context :: [OccName] -- ^ See Note [Binder context]
     }
 
-mkInitialCorePrepEnv :: CorePrepConfig -> CorePrepEnv
-mkInitialCorePrepEnv cfg = CPE
-      { cpe_config        = cfg
+mkInitialCorePrepEnv :: Bool -> CorePrepConfig -> CorePrepEnv
+mkInitialCorePrepEnv scoped cfg = CPE
+      { cpe_scoped_dicts  = scoped
+      , cpe_config        = cfg
       , cpe_subst         = emptySubst
       , cpe_rec_ids       = emptyUnVarSet
       , cpe_context       = []
