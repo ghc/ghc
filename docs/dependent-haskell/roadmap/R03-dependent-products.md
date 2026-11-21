@@ -682,3 +682,24 @@ constructor with a retained result index. An ordinary chain of calls
 to `choose :: Maybe a -> Maybe a` takes the existing inference path.
 The compiler allocation test `QuickLookOrdinaryChain` checks 480 calls
 around `Just id` with an impredicative result.
+
+## A runtime predicate on an erased argument type
+
+`decideBy` returns evidence for the result of a supplied predicate.
+The element type can be a parameter of the caller.
+
+```haskell
+decideBy :: forall a. foreach (f :: a -> Bool)
+         -> foreach (x :: a) -> BooleanResult (f x)
+```
+
+A filter uses this decision at each element of a finite list. Its length
+bound refers to the same predicate and list that ran. An ordinary client
+can capture a runtime cutoff in a predicate on pairs, then return the
+selected rows and the bound. An empty list does not evaluate the predicate.
+The result index distinguishes a call on a different element and a call
+to a different predicate. The retained callback still needs a closed
+structural result and an unrestricted visible arrow.
+[Filter and proof](../examples/open-evaluation/PreludeFilterRuntime.hs),
+[source-hidden client](../../../testsuite/tests/dependent/should_run/NativeLiftedCallbackClient.hs)
+and [Agda and GHC precedents](../REFERENCES.md#evidence-for-a-retained-predicate-on-a-lifted-input).
