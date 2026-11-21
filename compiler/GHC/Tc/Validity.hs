@@ -501,7 +501,18 @@ checkConstrainedSignature ctxt ty
     -- See Note [Family domains beneath retained binders].
     check_telescope origin whole = go whole
       where
-        go sig = withFamilyDomainScope origin whole 0 sig check_body
+        go sig = do
+          let (_, theta, _) = familyDomainPrefix 0 sig
+          unless (all (null . constrainedFamilyApps) theta) $ do
+            uses <- familyDomainObligations (qualifierPrefix sig)
+            mapM_ (emitFamilyDomain origin whole) uses
+          withFamilyDomainScope origin whole 0 sig check_body
+
+        -- Check only the written prefix here. The body has its own scope.
+        qualifierPrefix (ForAllTy ma b rest) = ForAllTy ma b (qualifierPrefix rest)
+        qualifierPrefix (FunTy af ma mult pred_ty rest)
+          | isInvisibleFunArg af = FunTy af ma mult pred_ty (qualifierPrefix rest)
+        qualifierPrefix _ = unitTy
 
         check_body (DepFunTy _ index body)
           = do { check_part (varType index)
@@ -555,7 +566,6 @@ withFamilyDomainScope origin whole n sig inside = case familyDomainPrefix n sig 
     (subst, skolems) <- tcInstSkolTyVarsX info (mkEmptySubst in_scope) tvs
     let sig_skol = SigSkol origin whole (zip (map tyVarName tvs) skolems)
     traverse_ checkNoConstrainedFamilyApps (map fst bndrs ++ map varType tvs)
-    traverse_ checkNoConstrainedFamilyApps theta
     given <- newEvVars (substTheta subst theta)
     void $ checkConstraints sig_skol skolems given (inside (substTy subst body))
 
@@ -721,11 +731,15 @@ familyDomainObligations ty = State.evalStateT (go ty) emptyUFM
       kinds <- forbidden [ma, binderType b]
       uses <- go body
       pure (kinds ++ map (mapSigma (ForAllTy ma b)) uses)
-    go (FunTy af ma mult arg res)
+    go ty@(FunTy af ma mult arg res)
       | isInvisibleFunArg af = do
-          preds <- forbidden [ma, mult, arg]
-          uses <- go res
-          pure $ preds ++ map (mapSigma (tcMkDFunPhiTy [arg])) uses
+          let (arrow_tys, theta, body) = qualifiers ty
+              plain = filter (null . constrainedFamilyApps) theta
+          kinds <- forbidden arrow_tys
+          predicates <- concat <$> traverse go theta
+          uses <- go body
+          pure $ kinds ++ map (mapSigma (tcMkDFunPhiTy plain)) predicates
+                       ++ map (mapSigma (tcMkDFunPhiTy theta)) uses
       | otherwise = do
           kinds <- forbidden [ma, mult]
           domain <- go arg
@@ -740,6 +754,13 @@ familyDomainObligations ty = State.evalStateT (go ty) emptyUFM
     go (TermAppTy _ arg) = go arg
     go (CastTy t _) = go t
     go _ = pure []
+
+    -- Preserve the written predicates and their unexpanded arguments.
+    qualifiers (FunTy af ma mult arg rest)
+      | isInvisibleFunArg af =
+          let (kinds, theta, body) = qualifiers rest
+          in (ma : mult : kinds, arg : theta, body)
+    qualifiers body = ([], [], body)
 
     -- See Note [Retained indices in domain predicates].
     close_retained v uses
@@ -799,6 +820,15 @@ For example, type Q a = Allowed a => Proxy (Elem [a]) -> () gives the
 obligation Allowed a => Collects [a]. Substitute for a in the whole type
 when a client uses Q. A premise in Q cannot discharge a separate
 obligation in a written argument to Q.
+
+In (Collects c, Show (Elem c)) => body, Collects c establishes the
+domain of Elem c inside the other predicate. Check the predicates that
+mention marked families using the family-free premises of the same
+context. Their order does not matter. Thus a predicate cannot establish
+the domain of one of its own arguments by projecting a superclass.
+A later forall starts a separate context. Its premises cannot establish
+the domain of an earlier predicate. All checked premises are available
+in the body.
 
 Traverse the argument and result of a function separately. In
 (forall a. Allowed a => Proxy a -> Elem [a]) -> Elem [Int], the Given

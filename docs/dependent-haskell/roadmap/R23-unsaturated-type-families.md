@@ -489,6 +489,16 @@ programs. Both now compile unchanged.
 [Default signatures](../../../testsuite/tests/dependent/should_compile/T14720.hs)
 and [visible type arguments](../../../testsuite/tests/dependent/should_compile/T15346.hs).
 
+A closed nullary family whose only equation returns a bare arrow can
+also infer a result selector. With `type family K where K = Type -> Type`,
+a later module can use `K` as the kind of `Maybe` in a family equation
+and as the type of an ordinary function. The first use selects M. The
+second selects U. An explicit U on the equation still rejects
+`Maybe`. When upgrading, GHC rechecks a home provider whose old interface
+contains a nullary closed U arrow. The rebuilt family's ABI invalidates
+its clients through the usual dependency checks.
+[Stripped-interface and noninjectivity checks](../../../testsuite/tests/dependent/should_run/NativeClosedMatchability.sh).
+
 The optional code can also return an unsaturated family. Keep the
 interpreter's arrow bare and give the same code a second equation.
 The expected kind of `Maybe` selects M at its equation, and the

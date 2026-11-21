@@ -559,7 +559,7 @@ checkFlagHash :: HscEnv -> ModIface -> IfaceSelfRecomp
               -> IfG (RecompileRequired, IfG RecompileRequired)
 checkFlagHash hsc_env iface self_recomp = do
     let logger   = hsc_logger hsc_env
-    let FingerprintWithValue file_fp old_flags = mi_sr_flag_hash self_recomp
+    let FingerprintWithValue raw_file_fp old_flags = mi_sr_flag_hash self_recomp
     let (base_fp, new_flags) = fingerprintDynFlags hsc_env (mi_module iface) putNameLiterally
         sum_fp = computeFingerprint putNameLiterally (base_fp, "sum-projections-v1" :: String)
         projection_fp = computeFingerprint putNameLiterally (base_fp, "constructor-case-trees-v1" :: String)
@@ -616,6 +616,21 @@ checkFlagHash hsc_env iface self_recomp = do
         append_fps = [append_fp, stamp_rules append_fp]
         reverse_fps = [reverse_fp, stamp_rules reverse_fp]
         source_provider = checkedSourceProvider (mi_module iface)
+        -- See Note [Recompiling nullary closed arrow families].
+        nullary_candidate = mi_hsc_src iface == HsSrcFile &&
+                           couldInferNullaryClosedMatchability (map snd (mi_decls iface))
+        list_fps = [reverse_fp, fold_fp, fold_method_fp, monomorphic_fold_fp]
+        nullary_base_fps = new_fp : list_fps
+                        ++ [stamp fp | Just (stamp, _) <- [source_provider], fp <- list_fps]
+                        ++ [guardedPrefixFingerprint reverse_fp
+                            | mi_module iface == guardedListModule]
+        with_retained fps = fps ++ map retainedSignatureCaseFingerprint fps
+        (checked_nullary, file_fp)
+          | nullary_candidate
+          , Just fp <- find ((== raw_file_fp) . nullaryClosedMatchabilityFingerprint)
+              (with_retained nullary_base_fps ++ with_retained (map stamp_rules nullary_base_fps))
+          = (True, fp)
+          | otherwise = (False, raw_file_fp)
         read_provider_stamp fingerprint fp =
           (,fp) <$> find (\stamp -> stamp (fingerprint fp) == file_fp)
             [id, stamp_rules, retainedSignatureCaseFingerprint,
@@ -864,6 +879,10 @@ checkFlagHash hsc_env iface self_recomp = do
                                             (mi_exports iface) (map snd (mi_decls iface)) =
               liftIO $ recheck "Compiler now shares retained signature type cases"
           | otherwise = pure UpToDate
+        check_nullary_family
+          | nullary_candidate, not checked_nullary =
+              liftIO $ recheck "Compiler now infers matchability for nullary family results"
+          | otherwise = pure UpToDate
     pure (flags, check_identity `recompThen` check_guarded_filter
                                      `recompThen` check_append
                                      `recompThen` check_reverse
@@ -875,7 +894,26 @@ checkFlagHash hsc_env iface self_recomp = do
                                      `recompThen` check_forwarded_result
                                      `recompThen` check_scoped_case
                                      `recompThen` check_binary_enum
-                                     `recompThen` check_retained_signature)
+                                     `recompThen` check_retained_signature
+                                     `recompThen` check_nullary_family)
+
+{- Note [Recompiling nullary closed arrow families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A nullary closed family with a bare-arrow equation can gain an inferred
+result selector. Older interfaces store the arrow as unmatchable and
+keep no record of whether the source wrote that matchability explicitly.
+Recheck a home provider with this shape once. If its arity changes, its
+ABI invalidates source clients through the usual dependency checks.
+
+An explicit U arrow keeps the same interface declaration. Stamp that
+provider so a warm build can reuse it. Apply the stamp after all other
+flag hash stamps and remove it before classifying older generations.
+-}
+
+-- | Mark a provider checked for an inferred selector on a nullary result.
+nullaryClosedMatchabilityFingerprint :: Fingerprint -> Fingerprint
+nullaryClosedMatchabilityFingerprint fp =
+    computeFingerprint putNameLiterally (fp, "nullary-closed-matchability-v1" :: String)
 
 {- Note [Recompiling retained signature case providers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1485,6 +1523,23 @@ couldInferClosedMatchability = any candidate . mi_decls
 
     has_arrow IfaceAxBranch{ifaxbRHS = IfaceFunTy FTF_T_T _ _ _ _} = True
     has_arrow _ = False
+
+-- | Select the old checked shape of a closed nullary bare-arrow equation.
+-- See Note [Recompiling nullary closed arrow families].
+couldInferNullaryClosedMatchability :: [IfaceDecl] -> Bool
+couldInferNullaryClosedMatchability = any candidate
+  where
+    candidate IfaceFamily{ ifBinders = [], ifFamInj = NotInjective
+                         , ifResKind = kind, ifFamFlav = flavor }
+      | isIfaceLiftedTypeKind kind
+      , Just (_, [equation]) <- ifaceClosedFamilyAxiom_maybe flavor
+      = unmatchable_arrow (ifaxbRHS equation)
+    candidate _ = False
+
+    unmatchable_arrow (IfaceFunTy FTF_T_T (IfaceTyConApp name IA_Nil) _ _ _) =
+      ifaceTyConName name == unmatchableDataConName
+    unmatchable_arrow (IfaceCastTy ty _) = unmatchable_arrow ty
+    unmatchable_arrow _ = False
 
 exportedCaseDatatypes :: ModIface -> [[IfaceConDecl]]
 exportedCaseDatatypes iface =
@@ -2586,14 +2641,19 @@ addFingerprints hsc_env iface0 = do
   --   - the things which can affect whether a module is recompiled
   --   - the module level annotations,
   --   - deps (home and external packages, dependent files)
-  let iface
+  let stamp_retained = couldExportRetainedSignatureCase (mi_semantic_module iface0)
+                        (mi_exports iface0) (mi_decls iface0)
+      stamp_nullary = couldInferNullaryClosedMatchability (mi_decls iface0)
+      iface
         | mi_hsc_src iface0 == HsSrcFile
         , Just info <- mi_self_recomp_info iface0
         , FingerprintWithValue fp flags <- mi_sr_flag_hash info
-        , couldExportRetainedSignatureCase (mi_semantic_module iface0)
-                                          (mi_exports iface0) (mi_decls iface0) =
-            set_mi_self_recomp (Just info
-              { mi_sr_flag_hash = FingerprintWithValue (retainedSignatureCaseFingerprint fp) flags }) iface0
+        , stamp_retained || stamp_nullary =
+            let retained_fp = if stamp_retained then retainedSignatureCaseFingerprint fp else fp
+                final_fp = if stamp_nullary then nullaryClosedMatchabilityFingerprint retained_fp
+                                          else retained_fp
+            in set_mi_self_recomp (Just info
+              { mi_sr_flag_hash = FingerprintWithValue final_fp flags }) iface0
         | otherwise = iface0
       base_hash = computeFingerprint putNameLiterally
                         (mi_abi_mod_hash abiHashes,
