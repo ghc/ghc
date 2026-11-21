@@ -61,6 +61,44 @@ rejects it in the parser. Support for that literal is a separate part of
 R07. [Kind checking](../../../compiler/GHC/Tc/Gen/HsType.hs),
 [Core binder checking](../../../compiler/GHC/Core/Lint.hs).
 
+### The primitive field and the family axiom
+
+On the public compiler at `7836668a00`, the named binder and wildcard
+still give GHC-18872. The annotated binder gives GHC-83865.
+`ExperimentalDependentTypes` gives the same diagnostic in each case.
+The original issue reports that GHC 8.3 accepted the wildcard.
+[GHC #14180 report](https://gitlab.haskell.org/api/v4/projects/ghc%2Fghc/issues/14180).
+
+`'I#` expects an index of kind `Int#`. A term literal `3#` has that type.
+The type literal `3` has kind `Natural`. Core Lint rejects its use as an
+`'I#` argument. Native index readback rejects the raw literal, the boxed
+expression `I# 3#`, and a scoped `Int#` term variable. A raw variable
+inserted directly as a runtime index also fails Core Lint.
+[Core type literals](../../../compiler/GHC/Core/TyCo/Rep.hs),
+[Core index readback](../../../compiler/GHC/Core.hs).
+
+A Core API probe builds the family axiom directly. With a symbolic `x`
+of kind `Int#` in the constructor field, the reducer returns `'()` for
+`MatchInt ('I# x)` and leaves `MatchInt i` stuck at an unknown `i :: Int`.
+Core Lint rejects the axiom binder `x :: Int# :: TYPE 'IntRep`. The
+control axiom for `'Just x`, with `x :: Char`, passes Lint and reduces
+with a concrete character literal. A source test with `3#` would need
+both a type-level `Int#` literal and a rule for binding its kind inside
+the axiom. The ordinary `forall` rule requires the binder's kind to
+have kind `Type`.
+[Core kinding rules](../../../compiler/GHC/Core/Type.hs),
+[Core axiom checking](../../../compiler/GHC/Core/Lint.hs).
+
+Eisenberg's thesis separates the sorts selected by `TYPE` and leaves
+levity polymorphism out of the formal calculus in section 5.13.4.
+Agda gives `Word64` its own primitive type of sort `Set` and provides
+conversions to and from `Nat`. Idris 2 can compile a Peano natural as an
+`Integer` while keeping its constructor patterns in source. These
+examples separate the representation choice from the type of an index.
+[Eisenberg, §5.13.4](https://arxiv.org/pdf/1610.07978#page=153),
+[Agda machine words](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#machine-words),
+[Idris 2 natural numbers](https://idris2.readthedocs.io/en/latest/reference/builtins.html#natural-numbers).
+
 Accepted proposal #265 allows boxed unlifted datatypes. Accepted #547
 excludes written constructor contexts from promotion. Its review preserves
 the promotion of GADTs with indexed result types.

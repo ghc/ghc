@@ -21,13 +21,15 @@ for opt in -O0 -O2; do
 {-# LANGUAGE DataKinds, GADTs, KindSignatures #-}
 module WrongWitness
     ( buildWrong, wrongMask, wrongColumns, BadField(..), badField
-    , wrongRows, wrongCols, Nested(..), nested
+    , wrongRows, wrongCols, wrongCellRows, wrongCellCols, Nested(..), nested
+    , noRows, noCols
     , EvidenceBatch(..), withEvidence, TaggedBatch(..), withEquality
     ) where
 import Data.Proxy (Proxy)
 import ExistentialVec (SN(..))
 import IndexedVec (N(..), Vec(..))
 import Numeric.Natural (Natural)
+import RectangularTable (Table(..), sample)
 import Unsafe.Coerce (unsafeCoerce)
 import WitnessedBatch (Batch(..), MaskedRow(..), KeyedRow(..), TableMargins(..), tableMargins)
 
@@ -46,6 +48,18 @@ wrongRows n = case tableMargins n of
     TableMargins r c _ ys -> TableMargins r c (unsafeCoerce ys) ys
 wrongCols n = case tableMargins n of
     TableMargins r c xs _ -> TableMargins r c xs (unsafeCoerce xs)
+
+wrongCellRows, wrongCellCols :: Natural -> Table Natural
+wrongCellRows n = case sample n of
+    Table rows cols _ -> Table rows cols (unsafeCoerce (VNil :: Vec 'Z (Vec 'Z Natural)))
+wrongCellCols n = case sample n of
+    Table rows cols (VCons row (VCons _ rest)) ->
+        Table rows cols (VCons row (VCons (unsafeCoerce (VNil :: Vec 'Z Natural)) rest))
+    table -> table
+
+noRows, noCols :: Char -> Table Natural
+noRows col = Table VNil (VCons col VNil) VNil
+noCols row = Table (VCons row VNil) VNil (VCons VNil VNil)
 
 data Nested a where
     Nested :: Vec cols Char -> Vec rows (Vec cols a) -> Nested a
@@ -76,16 +90,18 @@ HS
     cd "../client"
     cp ../producer/*.{hi,o} .
     test ! -e WitnessedBatch.hs
+    test ! -e RectangularTable.hs
     if [[ -f ../producer/WitnessedBatch.dyn_o ]]; then cp ../producer/*.{dyn_hi,dyn_o} .; fi
     cat >Proof.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, PolyKinds, TypeOperators #-}
-module Proof (evenBatch, oddBatch, mask, empty, row, margins, totals) where
+module Proof (evenBatch, oddBatch, mask, empty, row, margins, table, emptyRows, emptyCols, totals) where
 
 import Data.Type.Equality ((:~:)(Refl))
 import qualified ExistentialVec as E
 import qualified IndexedVec as V
 import qualified WitnessedBatch as B
 import qualified RectangularTable as T
+import qualified WrongWitness as W
 
 evenBatch :: B.build 4 :~: 'B.Chunk ('E.SS 'E.SZ) ('V.VCons 4 'V.VNil)
                             ('B.Chunk ('E.SS ('E.SS 'E.SZ))
@@ -113,6 +129,17 @@ margins = Refl
 
 type Two x y = 'V.VCons x ('V.VCons y 'V.VNil)
 type Three x y z = 'V.VCons x (Two y z)
+
+table :: T.sample 4 :~: 'T.Table (Two 'r' 's') (Three 'x' 'y' 'z')
+                                (Two (Three 1 2 3) (Three 4 5 6))
+table = Refl
+
+emptyRows :: W.noRows 'z' :~: 'T.Table 'V.VNil ('V.VCons 'z' 'V.VNil) 'V.VNil
+emptyRows = Refl
+
+emptyCols :: W.noCols 's' :~: 'T.Table ('V.VCons 's' 'V.VNil) 'V.VNil ('V.VCons 'V.VNil 'V.VNil)
+emptyCols = Refl
+
 totals :: T.totals (T.sample 4) :~: 'B.TableMargins (Two 'r' 's') (Three 'x' 'y' 'z')
                                                    (Two 6 15) (Three 5 7 9)
 totals = Refl
@@ -134,7 +161,7 @@ module Main where
 import qualified Demand
 import qualified ExistentialVec as E
 import qualified IndexedVec as V
-import Proof (evenBatch, oddBatch, mask, row, empty, margins, totals)
+import Proof (evenBatch, oddBatch, mask, row, empty, margins, table, emptyRows, emptyCols, totals)
 import qualified RectangularTable as T
 import qualified WitnessedBatch as B
 
@@ -157,12 +184,13 @@ main = do
     print (margins, B.lookupTotals 'r' 'y' (B.tableMargins 4), snd (B.lookupTotals 'r' 'x' partial))
     let noRows = T.Table V.VNil (V.VCons 'z' V.VNil) V.VNil
         noCols = T.Table (V.VCons 's' V.VNil) V.VNil (V.VCons V.VNil V.VNil)
-    print (totals, T.selectedTotals (T.sample 7), T.selectedTotals noRows, T.selectedTotals noCols)
+    print (table, emptyRows, emptyCols, totals,
+           T.selectedTotals (T.sample 7), T.selectedTotals noRows, T.selectedTotals noCols)
 HS
     "${ghc[@]}" "$opt" -c Proof.hs Demand.hs
     "${ghc[@]}" "$opt" -c Main.hs
     "${ghc[@]}" ./*.o -o run
-    test "$(./run)" = $'(Refl,Refl,Refl,Refl,Refl,1,2,1,[5],[])\n(Refl,Refl,Just 5,Just 8)\n(Refl,(Just 8,Just 4),Just 7)\n(Refl,(Just 18,Just 9),(Nothing,Just 0),(Just 0,Nothing))'
+    test "$(./run)" = $'(Refl,Refl,Refl,Refl,Refl,1,2,1,[5],[])\n(Refl,Refl,Just 5,Just 8)\n(Refl,(Just 8,Just 4),Just 7)\n(Refl,Refl,Refl,Refl,(Just 18,Just 9),(Nothing,Just 0),(Just 0,Nothing))'
 
     cat >WrongLength.hs <<'HS'
 module WrongLength where
@@ -285,10 +313,21 @@ HS
         reject BadColumns 'The value returned by the interpreter does not match the checked result type.'
     done
 
+    for function in wrongCellRows wrongCellCols; do
+        sed -e 's/module BadWitness/module BadCells/' -e "s/Wrong.buildWrong/Wrong.$function/" \
+            -e '/^import qualified WrongWitness/i import RectangularTable (Table(..))' \
+            BadWitness.hs >BadCells.hs
+        reject BadCells 'The value returned by the interpreter does not match the checked result type.'
+    done
+
+    sed -e 's/module BadCells/module HiddenTable/' -e '/^import RectangularTable/d' BadCells.hs >HiddenTable.hs
+    reject HiddenTable 'Cannot inspect the constructors of RectangularTable.Table.'
+
     sed -e 's/module ClassEvidence/module NestedField/' -e 's/W.withEvidence/W.nested/' \
         ClassEvidence.hs >NestedField.hs
     reject NestedField 'Cannot reify field 2 of'
     grep -Eq 'multiple hidden indices \((cols, rows|rows, cols)\)' reject.log
+    grep -Fq 'determining its indices from earlier fields' reject.log
     if grep -Fq 'unsupported nested field was evaluated' reject.log; then cat reject.log >&2; exit 1; fi
 
     sed -e 's/module ClassEvidence/module UnsupportedField/' -e 's/W.withEvidence/W.badField/' \

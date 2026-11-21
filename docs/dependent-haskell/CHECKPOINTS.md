@@ -55,6 +55,26 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At compiler revision `6a32ffff94`, `lookupColumnWhen` takes a visible
+retained Boolean and an invisible runtime type witness. An ordinary
+client read a matching element and skipped a column with an undefined
+witness. Reading one field of a two-witness result left the other
+witness unevaluated. These checks passed at `-O0` and `-O2` with
+only the provider interfaces and objects available.
+[Column example](examples/qualified-pi/RuntimeTypeColumn.hs).
+
+A type synonym or type-level let can have an unparenthesized lambda
+on its right-hand side. Exact printing preserves parentheses, comments
+and the ASCII or Unicode arrow. The ASCII pretty-printer tests also
+round-trip. The extension diagnostic points at the backslash.
+[Lambda tests](../../testsuite/tests/dependent/should_run/NativeTypeLambda.sh)
+and [printer fixtures](../../testsuite/tests/printer/RetainedPrint.hs).
+
+All 498 Showcase outputs matched at native `-O0`, native `-O2` and
+in source GHCi. All 15 selected registered tests passed. The linked
+GHC API checks matched 37 dependent-program and 18 open-evaluation
+outputs. The constructor and coercion checks also passed.
+
 At compiler revision `8c4942f617`, a type-level `let` can bind a
 callback that captures an outer type. An inner `let` can shadow that
 type name. Applying the callback still uses the outer type. In an

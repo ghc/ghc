@@ -9,7 +9,7 @@ records every edge. The R numbers are local labels for those cards.
 
 ## Where this fork stands
 
-At `8c4942f617`, **23 of 50 cards (46%) are complete** on the upstream
+At `6a32ffff94`, **23 of 50 cards (46%) are complete** on the upstream
 checklist. The fork adds a tested part of **18 of the 27 open cards**.
 This count includes a card when the fork demonstrates a behavior in
 source Haskell or in compiled Core. Each card counts once, regardless
@@ -21,6 +21,15 @@ depend on others, so this count cannot estimate the remaining work time.
 | Dependent binders, Core and equality | R03, R04, R05, R11, R22 |
 | Promotion and evaluation | R07, R12, R13, R14, R15, R16, R17, R18, R19 |
 | Declaration dependencies, families and GADTs | R21, R23, R24, R41 |
+
+A typed column reader can accept a visible Boolean followed by an
+invisible type witness. The skip branch returns `Nothing` even when
+both the witness and the column are undefined. A type-level let can
+now use the ordinary lambda spelling `let wrap = \a -> Either e a`.
+Both examples are part of the 498-output Showcase.
+[Column reader](examples/qualified-pi/RuntimeTypeColumn.hs),
+[type-level lambda](roadmap/R17-type-level-lambdas.md) and
+[verification](CHECKPOINTS.md#family-and-package-checkpoints).
 
 A type-level `let` can name a callback and pass it to `Map` after
 an inner `let` shadows a captured type name. An ordinary client with

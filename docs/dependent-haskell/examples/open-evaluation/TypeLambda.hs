@@ -3,7 +3,7 @@
 -- | Apply a type lambda to a list of type constructors.
 module TypeLambda
   ( L, Captured, Shadowed, WithError, Prefixes, ScopedRow, Mixed, Held, CaseShadow, Rebuild
-  , IndexedTag(..), IndexedCase, IndexedCaseInferred
+  , Fields(..), Map, withErrors, IndexedTag(..), IndexedCase, IndexedCaseInferred
   , roadmap, partial, prefixes, mixed, indexedFields
   ) where
 
@@ -17,6 +17,16 @@ type Map :: (a %U -> b) -> [a] -> [b]
 type family Map f xs where
   Map _ '[] = '[]
   Map f (x ': xs) = f x ': Map f xs
+
+-- | A heterogeneous row indexed by the types of its fields.
+data Fields (xs :: [Type]) where
+  End :: Fields '[]
+  Field :: a -> Fields xs -> Fields (a ': xs)
+
+-- | Give each field the same error type.
+withErrors :: Proxy e -> Fields xs -> Fields (Map (\a -> Either e a) xs)
+withErrors _ End = End
+withErrors p (Field x xs) = Field (Right x) (withErrors p xs)
 
 -- | Apply each type constructor to Int.
 type L = Map (\f -> f Int) [Maybe, Either String, IO]

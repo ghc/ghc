@@ -1443,6 +1443,15 @@ main = do
             ('IndexedVec.VCons 6 ('IndexedVec.VCons 15 'IndexedVec.VNil))
             ('IndexedVec.VCons 5 ('IndexedVec.VCons 7 ('IndexedVec.VCons 9 'IndexedVec.VNil)))
         , Table.selectedTotals (Table.sample 4) )
+    observe "read back the stored cells at both table dimensions"
+        (Refl :: Table.sample 4 :~: 'Table.Table
+            ('IndexedVec.VCons 'r' ('IndexedVec.VCons 's' 'IndexedVec.VNil))
+            ('IndexedVec.VCons 'x' ('IndexedVec.VCons 'y' ('IndexedVec.VCons 'z' 'IndexedVec.VNil)))
+            ('IndexedVec.VCons
+                ('IndexedVec.VCons 1 ('IndexedVec.VCons 2 ('IndexedVec.VCons 3 'IndexedVec.VNil)))
+                ('IndexedVec.VCons
+                    ('IndexedVec.VCons 4 ('IndexedVec.VCons 5 ('IndexedVec.VCons 6 'IndexedVec.VNil)))
+                    'IndexedVec.VNil)))
     observe "read one field of a private parcel without forcing the other"
         (Refl :: LazyParcel.first (LazyParcel.make 7) :~: 7, LazyParcel.first (LazyParcel.make 7))
     observe "construct a result from two symbolic fields"
@@ -1542,6 +1551,10 @@ main = do
     observe "map a callback that captures a closed family pattern" TypeLambda.prefixes
     observe "capture a type before and after a local let"
         (Refl :: TypeLambda.ScopedRow Char '[Bool] :~: '[(Maybe Char, Either Char Bool)])
+    let fields = TypeLambda.Field 'x' (TypeLambda.Field True TypeLambda.End)
+    case TypeLambda.withErrors (Proxy @String) fields of
+        TypeLambda.Field x (TypeLambda.Field y TypeLambda.End) ->
+            observe "give every field in a row the same error type" (x, y)
     observe "map a type lambda with a constructor case" TypeLambda.mixed
     observe "read fields from two indexed type case branches" TypeLambda.indexedFields
     observe "retain the kind of a matched Nothing"
