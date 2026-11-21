@@ -3321,6 +3321,13 @@ for the producer's usage. The strict pattern uses the inferred multiplicity
 when matching the payload.
 [GHC Proposal 111, let and where bindings](https://ghc-proposals.readthedocs.io/en/latest/proposals/0111-linear-types.html#let-and-where-bindings).
 
+For a lexical binding, a polymorphic wrapper can forward one closed
+package schema through its result parameter. A leading visible argument
+can select a declared multiplicity binder. GHC skips inferred binders
+when counting visible type arguments. The probe uses that ordering
+and the ordinary call checker checks the argument and its usage.
+[GHC User's Guide, inferred and specified type variables](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_applications.html#inferred-vs-specified-type-variables).
+
 Agda checks the clauses of an indexed function against its telescope.
 GHC keeps its ordinary match group for equations on a packaged argument.
 It opens the hidden indices before checking the payload patterns in that

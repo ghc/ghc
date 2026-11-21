@@ -414,7 +414,7 @@ for opt in 0 2; do
         ../provider/LexicalLetProvider.o -o run
     ./run >lexical-let.out
     printf '%s\n' '((1,1),(98,98),77)' "(True,(True,98),(True,'x'))" \
-        '(["True","bottom package","bottom package","True"],77,77,98)' '(5,9)' |
+        '(["True","bottom package","bottom package","True"],77,77,98)' '(5,9)' '(5,9,5)' |
         diff -u - lexical-let.out
     if "$ghc" "${let_flags[@]}" -c LexicalLetReject.hs >lexical-let-reject.log 2>&1; then
         echo "LexicalLetReject unexpectedly compiled." >&2
@@ -450,6 +450,16 @@ for opt in 0 2; do
         prefix=${prefix%%package in*}
         column=$((${#prefix} + 1))
         grep -Eq "^LexicalLinearLetReject.hs:$line:$column: error: \[GHC-18872\]" linear-let-reject.log ||
+            { cat linear-let-reject.log >&2; exit 1; }
+    done
+    for rejection in 'badMultiplicity:package:25897' 'badSibling:():83865' 'badKind:Bool:83865'; do
+        IFS=: read -r reader operand code <<< "$rejection"
+        field=$(grep -n "^$reader package =" LexicalLinearLetReject.hs)
+        line=${field%%:*}
+        prefix=${field#*:}
+        prefix=${prefix%%"$operand"*}
+        column=$((${#prefix} + 1))
+        grep -Eq "^LexicalLinearLetReject.hs:$line:$column: error: \[GHC-$code\]" linear-let-reject.log ||
             { cat linear-let-reject.log >&2; exit 1; }
     done
 done

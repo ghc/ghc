@@ -347,10 +347,20 @@ advertises `linear-unpack` so earlier readers reject it at the header.
 An opening confined to an object file leaves the header's requirements
 unchanged.
 
+An ordinary client can write `forwardLinear @p package` as the RHS of
+that strict binding under `forall (p :: Multiplicity)`. The wrapper has
+type `forall (p :: Multiplicity) a. a %p -> a`. One forwarding argument
+supplies the closed erased package type for checking the full call.
+The caller can also omit `@p` when normal usage determines it. A
+written `@Many` cannot consume an input at a rigid `p`. The forwarding
+probe covers leading specified multiplicity arguments. An open schema
+or several forwarding operands need a separate lexical rule.
+
 This path accepts one unsigned nonrecursive boxed tuple binding with
 variable or wildcard fields and at most one outer bang or tilde. The
-unguarded RHS must be a name or ordinary application whose declaration
-exposes the dot package. The usual binding rules still apply to
+unguarded RHS must be a named value or ordinary application. The
+declaration or one forwarded argument must expose the dot package.
+The usual binding rules still apply to
 recursive groups, signed bindings, and patterns that bring their own
 evidence.
 [Ordinary client](../examples/erased-existentials/RankedPackageClient.hs),
