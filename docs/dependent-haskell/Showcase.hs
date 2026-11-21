@@ -1098,6 +1098,7 @@ main = do
     observe "compare a payload using a dictionary supplied between fields" LabelledValueClient.storedChecks
     observe "use a leading context in a field pattern and a later equality in the branch" LabelledValueClient.rankedPairs
     observe "supply a required type between constructor fields" LabelledValueClient.typedNotes
+    observe "read the dictionary supplied after a constructor field and its required type" LabelledValueClient.typeTags
     observe "duplicate the unrestricted field of a quoted constructor" (QuotedColumn.readQuoted 17)
     observe "recover consecutive GADT constraints" (describePair (PrintablePair False True))
     observe "form an associated family type from its class evidence" constrainedElements

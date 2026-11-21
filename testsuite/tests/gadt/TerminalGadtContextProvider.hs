@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleContexts, GADTs, KindSignatures, RequiredTypeArguments #-}
-module TerminalGadtContextProvider (G(..), Observe(..), Recursive(..), TypeTag(..), IndexedTag(..)) where
+module TerminalGadtContextProvider (G(..), Observe(..), Recursive(..), IndexedTag(..)) where
 
 import Data.Kind (Type)
 import Type.Reflection (Typeable)
@@ -13,9 +13,6 @@ class Observe a where
 
 data Recursive a b where
   Recur :: forall a. Observe (Recursive a Bool) => a -> forall b -> Recursive a b
-
-data TypeTag where
-  TypeTag :: !Int -> forall (a :: Type) -> Typeable a => TypeTag
 
 data IndexedTag a where
   IndexedTag :: Int -> forall (a :: Type) -> Typeable a => IndexedTag a

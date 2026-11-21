@@ -1,6 +1,9 @@
-{-# LANGUAGE GADTs, RequiredTypeArguments #-}
+{-# LANGUAGE GADTs, KindSignatures, RequiredTypeArguments #-}
 module LabelledValue
-    (LabelledValue(..), LabelledPair(..), StoredCheck(..), RankedPair(..), TypedNote(..)) where
+    (LabelledValue(..), LabelledPair(..), StoredCheck(..), RankedPair(..), TypedNote(..), TypeTag(..)) where
+
+import Data.Kind (Type)
+import Type.Reflection (Typeable)
 
 -- | Store a number before choosing the type of the second field.
 data LabelledValue a where
@@ -21,3 +24,7 @@ data RankedPair a where
 -- | Supply the payload type after the number and before the payload.
 data TypedNote a where
     TypedNote :: Int -> forall a -> a -> TypedNote a
+
+-- | Store the dictionary for a type supplied after the number.
+data TypeTag where
+    TypeTag :: !Int -> forall (a :: Type) -> Typeable a => TypeTag

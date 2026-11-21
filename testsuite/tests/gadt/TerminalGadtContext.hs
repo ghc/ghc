@@ -2,7 +2,8 @@
 {-# LANGUAGE NoRequiredTypeArguments, TypeApplications #-}
 module Main where
 
-import TerminalGadtContextProvider (G(..), Observe(..), Recursive(..), TypeTag(..), IndexedTag(..))
+import LabelledValue (TypeTag(..))
+import TerminalGadtContextProvider (G(..), Observe(..), Recursive(..), IndexedTag(..))
 import Type.Reflection (typeRep)
 
 data Token = Token Bool deriving Eq
