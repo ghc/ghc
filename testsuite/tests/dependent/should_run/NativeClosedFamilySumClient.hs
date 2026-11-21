@@ -5,7 +5,7 @@ module Main (main) where
 import Control.Exception (ErrorCall, evaluate, try)
 import Data.Proxy (Proxy (..))
 import GHC.Sigma (Sigma (Pair), first)
-import NativeClosedFamilySumChain (Loop, Outer)
+import NativeClosedFamilySumChain (Loop, OpenLoop, OpenPackage, Outer)
 import NativeClosedFamilySumProvider (KindCapture, Pack, PackViaAlias, Tagged (..))
 
 closed :: Pack False Int
@@ -54,12 +54,31 @@ loopPackage :: Loop Char -> Bool
 loopPackage (Pair tag _) = tag
 #endif
 
+sizeOpen :: OpenPackage Bool -> Bool
+sizeOpen (Pair tag _) = tag
+
+#ifdef BAD_OPEN_PATTERN
+stuckOpen :: OpenPackage Char -> Bool
+stuckOpen (Pair tag _) = tag
+
+wrappedOpen :: OpenPackage Int -> Bool
+wrappedOpen (Pair tag _) = tag
+#endif
+
+#ifdef BAD_OPEN_RECURSION
+loopOpen :: OpenLoop Char -> Bool
+loopOpen (Pair tag _) = tag
+#endif
+
 main :: IO ()
 main = do
     outer <- try (evaluate (sizeOuter (error "outer package"))) :: IO (Either ErrorCall Bool)
-    case outer of
-        Left _ -> print (first closed, size captured, size lazyPayload, first kindCapture,
-                         sizeViaAlias (Pair False (error "alias payload")),
-                         sizeKind (Pair True (error "lazy tuple payload")),
-                         sizeOuter (Pair False (error "chained payload")))
-        Right _ -> fail "package pattern left the outer constructor unevaluated"
+    open <- try (evaluate (sizeOpen (error "open package"))) :: IO (Either ErrorCall Bool)
+    case (outer, open) of
+        (Left _, Left _) ->
+            print (first closed, size captured, size lazyPayload, first kindCapture,
+                   sizeViaAlias (Pair False (error "alias payload")),
+                   sizeKind (Pair True (error "lazy tuple payload")),
+                   sizeOuter (Pair False (error "chained payload")),
+                   sizeOpen (Pair True (error "open payload")))
+        _ -> fail "package pattern left the outer constructor unevaluated"

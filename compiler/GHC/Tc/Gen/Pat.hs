@@ -1587,7 +1587,7 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
     match_family_result :: TyCon -> TcType -> TcM (Maybe (TcCoercionN, [TcType]))
     match_family_result parent ty
       | Just (family, _) <- tcSplitTyConApp_maybe ty
-      , Just _ <- closedTypeFamily_maybe family
+      , reducible_family family
       = do { loc <- getCtLocM (OccurrenceOf (tyConName family)) (Just TypeLevel)
            ; ty <- liftZonkM (zonkTcType ty)
            ; runTcSEqualities (go loc ty) }
@@ -1596,7 +1596,7 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
         go loc ty = case tcSplitTyConApp_maybe ty of
           Just (tc, args)
             | tc == parent -> return (Just (mkNomReflCo ty, args))
-            | Just _ <- closedTypeFamily_maybe tc ->
+            | reducible_family tc ->
                 do { reduction <- matchFam tc args
                    ; case reduction of
                        Nothing -> return Nothing
@@ -1604,6 +1604,8 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
                          do { loc <- bumpReductionDepth loc ty
                             ; fmap (first (mkTransCo co)) <$> go loc rhs } }
           _ -> return Nothing
+
+        reducible_family tc = isTypeFamilyTyCon tc && not (isConstrainedFamilyTyCon tc)
 
     check_fields _ _ _ [] []
       = do { res <- thing_inside; return ([], res) }
@@ -1714,11 +1716,16 @@ Match compilation keeps each equation's actual source field Ids in a separate
 case, including when its family has other constructors.
 See Note [Retained package equation scope] in GHC.HsToCore.Match.Constructor.
 
-A closed type family can return the package. Reduce only the head of the
-expected type. Compose the nominal coercions and use the result when its
-head is the selected constructor's parent. Put that cast on the scrutinee
-so the fields bind at their checked types. This also handles the private
-family of a nested sum. Leave the fields and newtype representations alone.
+A type family can return the package. Reduce only the head of the expected
+type. matchFam uses the ordinary nominal solver rule and its instance
+environment, including imported open family instances. The rule for
+constrained families needs separate premise checking. Leave those families
+outside this path.
+
+Compose the nominal coercions and use the result when its head is the
+selected constructor's parent. Put that cast on the scrutinee so the fields
+bind at their checked types. This also handles the private family of a nested
+sum. Leave the fields and newtype representations alone.
 Use the solver's reduction-depth counter for each step. A recursive family
 can keep reducing without reaching a constructor. Create the location at
 the pattern constructor so the depth error points to that constructor.

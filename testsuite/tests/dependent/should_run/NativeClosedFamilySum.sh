@@ -41,6 +41,12 @@ for opt in O0 O2; do
     reject "$client.hs:54:14-17: error: [GHC-40404]" \
         "${ghc[@]}" "-$opt" -DBAD_RECURSION -freduction-depth=8 -c "$client.hs"
     grep -Fq 'Reduction stack overflow; size = 9' reject.log
+    reject "$client.hs:62:12-15: error: [GHC-83605]" \
+        "${ghc[@]}" "-$opt" -DBAD_OPEN_PATTERN -c "$client.hs"
+    grep -Fq "$client.hs:65:14-17: error: [GHC-83605]" reject.log
+    reject "$client.hs:70:11-14: error: [GHC-40404]" \
+        "${ghc[@]}" "-$opt" -DBAD_OPEN_RECURSION -freduction-depth=8 -c "$client.hs"
+    grep -Fq 'Reduction stack overflow; size = 9' reject.log
     "${ghc[@]}" "-$opt" -c "$client.hs"
     "${ghc[@]}" "$client.o" "../provider/$provider.o" "../provider/$chain.o" -o run
     ./run
