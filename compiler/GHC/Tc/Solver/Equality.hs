@@ -12,7 +12,7 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.Tc.Solver.Solve( solveSimpleWanteds )
 
 import GHC.Builtin.CoercionRules
-  ( proveBoxedPairProjection, proveScopedSigmaClosure )
+  ( proveBoxedPairProjection, proveScopedSigmaClosure, proveScopedLambdaClosure )
 import GHC.Tc.Gen.SourceTable ( sourceTableFamilyAppUse, sourceTableOwner )
 import GHC.Tc.Errors.Types ( RetainedQuantificationError(..), TcRnMessage(..) )
 
@@ -746,6 +746,13 @@ can_eq_nc ces _ _ ev eq_rel lhs _ rhs _
   = do { setEqIfWanted ev (CPH (downgradeRole (eqRelRole eq_rel) Nominal co) emptyCoHoleSet)
        ; stopWith ev "Checked scoped sum codomain" }
 
+-- See Note [Congruence for generated type lambdas].
+can_eq_nc ces _ _ ev eq_rel lhs _ rhs _
+  | bothRewritten ces, isWanted ev
+  , Just co <- proveLambdaCongruence lhs rhs
+  = do { setEqIfWanted ev (CPH (downgradeRole (eqRelRole eq_rel) Nominal co) emptyCoHoleSet)
+       ; stopWith ev "Checked scoped type lambda" }
+
 -- Try a certified strict pair composition before choosing a canonical LHS.
 -- See Note [Strict boxed pair composition] in GHC.Builtin.CoercionRules.
 can_eq_nc ces _ _ ev NomEq lhs _ rhs _
@@ -810,6 +817,34 @@ can_eq_nc _ _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
     call_domain f ty = case nativeIndexFunctionTys_maybe f of
       Just (_, result) -> typeKind ty `eqType` result
       Nothing -> False
+
+{- Note [Congruence for generated type lambdas]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A wanted can compare Map f xs and Map g xs with xs still unknown.
+Map is not injective. Decomposing the wanted would assume an equality
+of its arguments. Instead, check the generated f and g independently
+using their checked lexical closures. Build nominal congruence only
+when every argument already has a proof. This does not select a family
+equation or add new wanteds. Written family heads retain their names.
+See Note [Scoped retained sum codomains] in GHC.Core.TyCo.Compare.
+-}
+
+-- | Prove a generated closure equality, including under a closed family.
+proveLambdaCongruence :: Type -> Type -> Maybe CoercionN
+proveLambdaCongruence lhs rhs
+  | Just co <- proveScopedLambdaClosure lhs rhs = Just co
+  | Just (tc, as) <- splitTyConApp_maybe lhs
+  , Just (tc', bs) <- splitTyConApp_maybe rhs
+  , tc == tc', isJust (closedFamilyTyConCoAxiom_maybe tc)
+  , lengthIs as (tyConArity tc), equalLength as bs
+  , typeKind lhs `eqType` typeKind rhs
+  , not (lhs `eqType` rhs)
+  = mkTyConAppCo Nominal tc <$> zipWithM prove_argument as bs
+  | otherwise = Nothing
+  where
+    prove_argument a b
+      | a `eqType` b = Just (mkNomReflCo a)
+      | otherwise = proveLambdaCongruence a b
 
 {- Note [Inferring a source index without reduction]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -3,7 +3,7 @@ module GHC.Builtin.CoercionRules
   ( builtInCoAxiomRules
   , boxedPairCompositionRule, matchBoxedPairComposition
   , boxedPairReconstructionRule
-  , proveBoxedPairProjection, proveScopedSigmaClosure
+  , proveBoxedPairProjection, proveScopedSigmaClosure, proveScopedLambdaClosure
   ) where
 
 import GHC.Prelude
@@ -13,7 +13,7 @@ import GHC.Builtin.WiredIn.Types (promotedTupleDataCon, tupleTyCon)
 import GHC.Core.Coercion (existsCoRule, matchableAppProjectionRule, mkNomReflCo, mkSymCo)
 import GHC.Core.Coercion.Axiom
 import GHC.Core.TyCo.Rep (Coercion(AxiomCo))
-import GHC.Core.TyCo.Compare (eqType, eqTypes, eqScopedSigmaClosures)
+import GHC.Core.TyCo.Compare (eqType, eqTypes, eqScopedSigmaClosures, eqScopedLambdaClosures)
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Data.FastString
@@ -35,15 +35,20 @@ builtInCoAxiomRules =
       , existsCoRule ExplicitExists Nominal, existsCoRule ExplicitExists Representational
       , existsCoRule ImplicitExists Nominal, existsCoRule ImplicitExists Representational
       , matchableAppProjectionRule CLeft, matchableAppProjectionRule CRight
-      , (scopedSigmaClosureName, scopedSigmaClosureRule) ]
+      , (scopedSigmaClosureName, scopedSigmaClosureRule)
+      , (scopedLambdaClosureName, scopedLambdaClosureRule) ]
 
-scopedSigmaClosureRule :: CoAxiomRule
-scopedSigmaClosureRule = BuiltInEqRule scopedSigmaClosureName proves
+scopedSigmaClosureRule, scopedLambdaClosureRule :: CoAxiomRule
+scopedSigmaClosureRule = scopedClosureRule scopedSigmaClosureName eqScopedSigmaClosures
+scopedLambdaClosureRule = scopedClosureRule scopedLambdaClosureName eqScopedLambdaClosures
+
+scopedClosureRule :: FastString -> (Type -> Type -> Bool) -> CoAxiomRule
+scopedClosureRule name equal = BuiltInEqRule name proves
   where
     -- Compare the two left endpoints. Lifting may change each right endpoint.
     -- The second nominal premise connects the result to the rewritten RHS.
     proves [Pair lhs _, Pair rhs result]
-      | eqScopedSigmaClosures lhs rhs = Just (Pair lhs result)
+      | equal lhs rhs = Just (Pair lhs result)
     proves _ = Nothing
 
 -- | Produce nominal evidence for equal scoped retained-sum codomains.
@@ -51,6 +56,13 @@ proveScopedSigmaClosure :: Type -> Type -> Maybe Coercion
 proveScopedSigmaClosure lhs rhs
   | eqScopedSigmaClosures lhs rhs
   = Just (AxiomCo scopedSigmaClosureRule [mkNomReflCo lhs, mkNomReflCo rhs])
+  | otherwise = Nothing
+
+-- | Produce nominal evidence for alpha-equivalent generated type lambdas.
+proveScopedLambdaClosure :: Type -> Type -> Maybe Coercion
+proveScopedLambdaClosure lhs rhs
+  | eqScopedLambdaClosures lhs rhs
+  = Just (AxiomCo scopedLambdaClosureRule [mkNomReflCo lhs, mkNomReflCo rhs])
   | otherwise = Nothing
 
 {- Note [Strict boxed pair composition]

@@ -25,7 +25,7 @@ module GHC.Core.Coercion.Axiom (
        existsCoRuleName,
 
        CoAxiomRule(.., BuiltInEqRule), BuiltInFamRewrite(..), BuiltInFamInjectivity(..), TypeEqn,
-       scopedSigmaClosureName, matchableProjectionName, matchableProjectionDirection,
+       scopedSigmaClosureName, scopedLambdaClosureName, matchableProjectionName, matchableProjectionDirection,
        coAxiomRuleArgRoles, coAxiomRuleRole,
        coAxiomRuleBranch_maybe, isNewtypeAxiomRule_maybe,
        ClosedTyFam(..), closedTyFamCoAxiom_maybe, BuiltinClosedTyFam(..),
@@ -654,6 +654,10 @@ pattern BuiltInEqRule name proves = BuiltInRule name Nominal [Nominal, Nominal] 
 -- | The stable interface key for the scoped retained-sum proof rule.
 scopedSigmaClosureName :: FastString
 scopedSigmaClosureName = fsLit "ScopedSigmaClosure"
+
+-- | The stable interface key for the scoped type-lambda proof rule.
+scopedLambdaClosureName :: FastString
+scopedLambdaClosureName = fsLit "ScopedLambdaClosure"
 
 -- | Interface key for a nominal application projection with explicit heads.
 matchableProjectionName :: LeftOrRight -> FastString

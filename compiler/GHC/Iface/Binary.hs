@@ -356,7 +356,7 @@ evidenceSuffix requirements
     || needs TerminalGadtTrailingContextEvidence || needs TerminalGadtContextOnlyEvidence
     || needs InteriorGadtContextEvidence || needs InteriorGadtForAllEvidence
     || needs RepeatedInteriorGadtForAllEvidence || needs OrderedGadtTelescopeEvidence
-    || needs InferredOrderedGadtBindersEvidence = feature_set
+    || needs InferredOrderedGadtBindersEvidence || needs ScopedLambdaEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -398,6 +398,7 @@ legacyEvidenceSuffix InteriorGadtForAllEvidence = featureSetPrefix ++ "interior-
 legacyEvidenceSuffix RepeatedInteriorGadtForAllEvidence = featureSetPrefix ++ "repeated-interior-gadt-forall"
 legacyEvidenceSuffix OrderedGadtTelescopeEvidence = featureSetPrefix ++ "ordered-gadt-telescope"
 legacyEvidenceSuffix InferredOrderedGadtBindersEvidence = featureSetPrefix ++ "inferred-ordered-gadt-binders"
+legacyEvidenceSuffix ScopedLambdaEvidence = featureSetPrefix ++ "scoped-lambda"
 legacyEvidenceSuffix GeneralIndexedConstructorOperandEvidence = featureSetPrefix ++ "general-indexed-constructor-operand"
 legacyEvidenceSuffix DepFunCoEvidence           = "-retained-depfunco-v1"
 legacyEvidenceSuffix ConstructorCaseEvidence   = "-retained-constructor-case-v1"
@@ -447,7 +448,8 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("interior-gadt-forall", InteriorGadtForAllEvidence)
                       , ("repeated-interior-gadt-forall", RepeatedInteriorGadtForAllEvidence)
                       , ("ordered-gadt-telescope", OrderedGadtTelescopeEvidence)
-                      , ("inferred-ordered-gadt-binders", InferredOrderedGadtBindersEvidence) ]
+                      , ("inferred-ordered-gadt-binders", InferredOrderedGadtBindersEvidence)
+                      , ("scoped-lambda", ScopedLambdaEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion

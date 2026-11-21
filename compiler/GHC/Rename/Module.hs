@@ -415,8 +415,8 @@ liftTypeLambdas sigma group = do
       let owner_occ = rdrNameOcc (unLoc owner)
           is_sum = isJust domain
           scoped
-            | is_sum, Nothing <- outer_scope = Just (lambdaOcc owner_occ salt True)
-            | otherwise = outer_scope
+            | Just scope@(_, sum_scope) <- outer_scope, sum_scope || not is_sum = scope
+            | otherwise = (lambdaOcc owner_occ salt is_sum, is_sum)
           (binders, result) = collectLambdas salt vars body
           -- Keep source spellings in a malformed list so the normal family
           -- binder check diagnoses a duplicate at the written binder.
@@ -432,12 +432,12 @@ liftTypeLambdas sigma group = do
           equation_captures = zipWith (hideCapture binders salt) [0..] captures
           equation_scope = equation_captures ++ locals
           (body', families, next) =
-            liftRhs True scoped owner equation_scope result (salt + 1)
+            liftRhs True (Just scoped) owner equation_scope result (salt + 1)
           (applied, lifted) = liftLambda scoped is_sum owner loc captures equation_scope body' salt signature
       in (applied, lifted : families, next)
-    liftLambda scoped is_sum owner loc captures equation_scope body salt signature =
+    liftLambda (root, sum_scope) is_sum owner loc captures equation_scope body salt signature =
       let owner_occ = rdrNameOcc (unLoc owner)
-          occ = lambdaOcc owner_occ salt (isJust scoped)
+          occ = lambdaOcc owner_occ salt sum_scope
           name = L (getLoc owner) (mkRdrUnqual occ)
           equations
             | L _ (XHsType (HsTypeCase (case_kw, _) _ scrutinee alts)) <- stripParens body
@@ -466,8 +466,7 @@ liftTypeLambdas sigma group = do
                            (typeName name) captures
           sig kind = L loc (StandaloneKindSig noAnn name
                        (L (getLoc kind) (mkHsImplicitSigType kind)))
-          scope_entry = fmap (\root -> (occ, (root, is_sum))) scoped
-      in (applied, (family, (occ, owner_occ), sig <$> signature, scope_entry))
+      in (applied, (family, (occ, owner_occ), sig <$> signature, Just (occ, (root, is_sum))))
 
     lambdaOcc owner salt scoped =
       mkTcOcc ("$lambda:" ++ occNameString owner ++ ":" ++ show salt

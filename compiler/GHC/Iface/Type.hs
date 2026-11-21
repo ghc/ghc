@@ -3048,6 +3048,7 @@ data IfaceEvidence
   | RepeatedInteriorGadtForAllEvidence
   | OrderedGadtTelescopeEvidence
   | InferredOrderedGadtBindersEvidence
+  | ScopedLambdaEvidence
   deriving (Bounded, Enum, Eq, Ord)
 
 -- | Requirements of an interface payload. See Note [Versioning retained evidence]
@@ -3236,6 +3237,8 @@ instance Binary IfaceAxiomRule where
       requireIfaceEvidenceVersion bh MatchableProjectionEvidence
     when (ifLclNameFS n == scopedSigmaClosureName) $
       requireIfaceEvidenceVersion bh ScopedSigmaEvidence
+    when (ifLclNameFS n == scopedLambdaClosureName) $
+      requireIfaceEvidenceVersion bh ScopedLambdaEvidence
     putByte bh 0
     put_ bh n
   put_ bh (IfaceAR_U n)   = putByte bh 1 >> put_ bh n
