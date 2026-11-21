@@ -3656,9 +3656,13 @@ reifyDataCon isGadtDataCon tys dc
                   { (args, result) <- reifyRetainedGadtArgs (replicate n Nothing)
                       (take n dcdBangs) prefix g_res_ty
                   ; ma <- reifyType unmatchableDataConTy
-                  ; let reify_group bs rest = do
-                          tvs <- reifyTyVarBndrs [Bndr (binderVar tv) SpecifiedSpec | tv <- bs]
-                          TH.ForallMatchT ma . TH.ForallT tvs [] <$> rest
+                  ; let reify_group bs rest
+                          | all isVisibleForAllTyBinder bs = do
+                              tvs <- reifyTyVarBndrs [Bndr (binderVar tv) () | tv <- bs]
+                              TH.ForallMatchT ma . TH.ForallVisT tvs <$> rest
+                          | otherwise = do
+                              tvs <- reifyTyVarBndrs [Bndr (binderVar tv) SpecifiedSpec | tv <- bs]
+                              TH.ForallMatchT ma . TH.ForallT tvs [] <$> rest
                         reify_context ps rest = do
                           ctxt <- reifyCxt ps
                           TH.ForallT [] ctxt <$> rest

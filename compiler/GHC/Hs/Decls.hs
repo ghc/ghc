@@ -1043,6 +1043,8 @@ splitGadtInterior (PrefixConGADT _ (_ : _)) ty
   where
     go ty = case ignoreParens ty of
       L loc HsForAllTy { hst_tele = tele, hst_body = body }
+        | HsForAllVis { hsf_vis_bndrs = _ : _ } <- tele
+        -> next (Left (L loc (HsGadtForAll noExtField tele))) body
         | HsForAllInvis { hsf_invis_bndrs = binders } <- tele
         , not (null binders)
         , all ((== SpecifiedSpec) . hsTyVarBndrFlag . unLoc) binders

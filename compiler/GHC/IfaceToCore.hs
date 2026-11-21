@@ -1263,9 +1263,10 @@ tcIfaceDataCons tycon_name tycon if_cons
      = do { let terminal_order = legacyConOrder source_order
                 context_only = terminal_order == gadtTrailingContextOnly
                 late_count = max 0 terminal_order
-                ordered_late_count = case source_order of
-                  OrderedConArgs groups -> sum (map snd (orderedConTypeGroups groups))
-                  LegacyConOrder _ -> late_count
+                ordered_type_groups = case source_order of
+                  OrderedConArgs groups -> orderedConTypeGroups groups
+                  LegacyConOrder _ -> []
+                ordered_late_count = late_count + sum (map snd ordered_type_groups)
                 admissible_order
                   | context_only = not (null ctxt) && ordinary_data && all type_binder ex_bndrs
                   | otherwise = late_count > 0 && late_count <= length user_bndrs && null ex_bndrs
@@ -1322,7 +1323,7 @@ tcIfaceDataCons tycon_name tycon if_cons
                   failIfM (text "Invalid terminal constructor binder scope:" <+> ppr dc_name)
         ; case source_order of
             OrderedConArgs _ ->
-              unless (all (isSpecifiedForAllTyFlag . binderFlag) late &&
+              unless (valid_type_groups late ordered_type_groups &&
                       late_vars `subVarSet` mkVarSet (univ_tvs ++ ex_tvs)) $
                 failIfM (text "Invalid interior constructor binder scope:" <+> ppr dc_name)
             LegacyConOrder _ -> pure ()
@@ -1398,6 +1399,15 @@ tcIfaceDataCons tycon_name tycon if_cons
 
     type_binder (IfaceTvBndr _) = True
     type_binder _              = False
+
+    -- Each written forall has one visibility. The existing user binder flags
+    -- store it, so the group encoding stays the same.
+    valid_type_groups bs [] = null bs
+    valid_type_groups bs ((_, n) : rest) =
+      let (here, later) = splitAt n bs
+      in (all isVisibleForAllTyBinder here ||
+          all (isSpecifiedForAllTyFlag . binderFlag) here) &&
+         valid_type_groups later rest
 
     -- Check only interface syntax here. The parent TyCon is still knot-tied.
     check_retained_shape name wrapper binders args univs users exs spec ctxt fields bangs src_bangs
