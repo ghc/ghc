@@ -116,6 +116,34 @@ for line in 9 12 15 18; do
     grep -Eq "^MissingRows.hs:$line:[0-9]+: error: .GHC-83605." missing.log
 done
 test "$(grep -c 'Missing equation for the retained constructor .*Shut' missing.log)" -eq 4
+cat >IndependentLengths.hs <<'HS'
+{-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, LinearTypes, ScopedTypeVariables #-}
+module IndependentLengths where
+import Data.Proxy (Proxy)
+import PackedVecLibrary (sourceLength)
+import ParameterizedIndexLibrary (Fin)
+
+data Positions a b where
+    Positions :: foreach (xs :: [a]) -> Fin (sourceLength xs) %1
+              -> foreach (ys :: [b]) -> Fin (sourceLength ys) %1 -> Positions a b
+
+ordinary :: Proxy (xs :: [a]) -> Proxy (ys :: [b])
+         -> Proxy (sourceLength xs) -> Proxy (sourceLength ys)
+         -> (Proxy (sourceLength xs), Proxy (sourceLength ys))
+ordinary _ _ p q = (p, q)
+#ifdef BAD_INDEX
+data Wrong where
+    Wrong :: Proxy (sourceLength True) -> Wrong
+#endif
+HS
+for opt in -O0 -O2; do
+    "${ghc[@]}" "$opt" -fforce-recomp -c IndependentLengths.hs
+done
+if "${ghc[@]}" -O0 -fforce-recomp -DBAD_INDEX -fdiagnostics-color=never -c IndependentLengths.hs >wrong-length.log 2>&1; then
+    echo 'Generalized a certified source function over a wrong argument kind'
+    exit 1
+fi
+grep -Eq '^IndependentLengths.hs:17:[0-9]+: error: .GHC-25897.' wrong-length.log
 cat >ScopedLength.hs <<'HS'
 {-# LANGUAGE CPP, EmptyCase, ExperimentalDependentTypes, GADTs, LinearTypes, ScopedTypeVariables #-}
 module ScopedLength where
