@@ -448,6 +448,8 @@ insolubleFunDep is_top ev
 tryDictFunDepsTop :: DictCt -> SolverStage ()
 tryDictFunDepsTop dict_ct@(DictCt { di_ev = ev, di_cls = cls, di_tys = xis })
   = Stage $
+    do { mode <- getTcSMode
+       ; if tcsmGivenOnly mode then continueWith () else
     do { inst_envs <- getInstEnvs
 
        ; traceTcS "tryDictFunDepsTop {" (ppr dict_ct)
@@ -458,7 +460,7 @@ tryDictFunDepsTop dict_ct@(DictCt { di_ev = ev, di_cls = cls, di_tys = xis })
 
        ; if | unif_happened -> startAgainWith (CDictCan dict_ct)
             | insoluble     -> insolubleFunDep True ev
-            | otherwise     -> continueWith () }
+            | otherwise     -> continueWith () } }
 
 {- Note [No Given/Given fundeps]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

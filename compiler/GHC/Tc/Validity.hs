@@ -25,7 +25,7 @@ import GHC.Data.Maybe
 import GHC.Tc.Utils.Unify    ( checkConstraints, tcSubTypeAmbiguity, unifyTypeAndEmit )
 import GHC.Tc.Utils.Instantiate ( tcInstSkolTyVarsX )
 import GHC.Tc.Solver         ( simplifyAmbiguityCheck, pushLevelAndSolveEqualities )
-import GHC.Tc.Solver.Monad   ( runTcS )
+import GHC.Tc.Solver.Monad   ( runTcS, setTcSMode, TcSMode(..), vanillaTcSMode )
 import GHC.Tc.Solver.Solve   ( solveWanteds )
 import GHC.Tc.Instance.Class ( matchGlobalInst, ClsInstResult(..), AssocInstInfo(..) )
 import GHC.Tc.Instance.FunDeps
@@ -458,10 +458,11 @@ checkValidType ctxt ty
 
 checkValidMonoType :: Type -> TcM ()
 -- Assumes argument is fully zonked
-checkValidMonoType = check_valid_mono_type Nothing
+checkValidMonoType = check_valid_mono_type checkNoConstrainedFamilyApps Nothing
 
-check_valid_mono_type :: Maybe (SkolemInfoAnon, CoercionN -> TcM ()) -> Type -> TcM ()
-check_valid_mono_type instance_pat ty
+check_valid_mono_type :: (Type -> TcM ()) -> Maybe (SkolemInfoAnon, CoercionN -> TcM ())
+                      -> Type -> TcM ()
+check_valid_mono_type check_domains instance_pat ty
   = do { env <- liftZonkM $ tcInitOpenTidyEnv (tyCoVarsOfTypeList ty)
        ; expand <- initialExpandMode
        ; let ve = ValidityEnv{ ve_tidy_env = env, ve_ctxt = SigmaCtxt
@@ -470,7 +471,7 @@ check_valid_mono_type instance_pat ty
                              , ve_partial_family_hint = isNothing instance_pat || isTyFamFree ty
                              , ve_instance_pat = instance_pat }
        ; check_type ve ty
-       ; checkNoConstrainedFamilyApps ty }
+       ; check_domains ty }
 
 -- | Check each family domain in the signature's own context.
 -- See Note [Constrained associated family formation].
@@ -500,7 +501,7 @@ checkConstrainedSignature ctxt ty
     -- See Note [Family domains beneath retained binders].
     check_telescope origin whole = go whole
       where
-        go sig = with_scope origin whole 0 sig check_body
+        go sig = withFamilyDomainScope origin whole 0 sig check_body
 
         check_body (DepFunTy _ index body)
           = do { check_part (varType index)
@@ -515,16 +516,7 @@ checkConstrainedSignature ctxt ty
     check_part part = do
       checkNested part
       uses <- familyDomainObligations part
-      forM_ uses $ \case
-        UnsupportedFamily fam reason -> failWithTc (TcRnConstrainedFamilyUnsupported fam reason)
-        ScopedFamily fam n sigma -> with_scope ctxt ty n sigma $ \domain -> do
-          pred_ty <- if n == 0 then pure domain else do
-            let (hidden, predicate) = splitForAllTyVars domain
-                scope = mkEmptySubst (mkInScopeSet (tyCoVarsOfType domain))
-            (subst, _) <- newMetaTyVarsX scope (map snd hidden)
-            pure (substTy subst predicate)
-          ev <- newWanted (OccurrenceOf (tyConName fam)) (Just TypeLevel) pred_ty
-          emitSimple (mkNonCanonical ev)
+      mapM_ (emitFamilyDomain ctxt ty) uses
 
     checkNested rho@(ForAllTy _ (Bndr _ vis) _)
       | isInvisibleForAllTyFlag vis = checkNoConstrainedFamilyApps rho
@@ -538,18 +530,34 @@ checkConstrainedSignature ctxt ty
     checkNested ty@ExistsTy{} = checkNoConstrainedFamilyApps ty
     checkNested _ = pure ()
 
-    with_scope origin whole n sig inside = case familyDomainPrefix n sig of
-      ([], [], body) -> inside body
-      (bndrs, theta, body) -> mdo
-        info <- mkSkolemInfo sig_skol
-        let tvs = map snd bndrs
-            in_scope = mkInScopeSet (tyCoVarsOfType sig)
-        (subst, skolems) <- tcInstSkolTyVarsX info (mkEmptySubst in_scope) tvs
-        let sig_skol = SigSkol origin whole (zip (map tyVarName tvs) skolems)
-        traverse_ checkNoConstrainedFamilyApps (map fst bndrs ++ map varType tvs)
-        traverse_ checkNoConstrainedFamilyApps theta
-        given <- newEvVars (substTheta subst theta)
-        void $ checkConstraints sig_skol skolems given (inside (substTy subst body))
+-- | Emit one domain Wanted inside the binders of the written family use.
+emitFamilyDomain :: UserTypeCtxt -> Type -> ConstrainedFamilyUse -> TcM ()
+emitFamilyDomain _ _ (UnsupportedFamily fam reason) =
+  failWithTc (TcRnConstrainedFamilyUnsupported fam reason)
+emitFamilyDomain ctxt ty (ScopedFamily fam n sigma) =
+  withFamilyDomainScope ctxt ty n sigma $ \domain -> do
+    pred_ty <- if n == 0 then pure domain else do
+      let (hidden, predicate) = splitForAllTyVars domain
+          scope = mkEmptySubst (mkInScopeSet (tyCoVarsOfType domain))
+      (subst, _) <- newMetaTyVarsX scope (map snd hidden)
+      pure (substTy subst predicate)
+    ev <- newWanted (OccurrenceOf (tyConName fam)) (Just TypeLevel) pred_ty
+    emitSimple (mkNonCanonical ev)
+
+-- | Open the lexical binders and premises of a family use.
+withFamilyDomainScope :: UserTypeCtxt -> Type -> Int -> Type -> (Type -> TcM ()) -> TcM ()
+withFamilyDomainScope origin whole n sig inside = case familyDomainPrefix n sig of
+  ([], [], body) -> inside body
+  (bndrs, theta, body) -> mdo
+    info <- mkSkolemInfo sig_skol
+    let tvs = map snd bndrs
+        in_scope = mkInScopeSet (tyCoVarsOfType sig)
+    (subst, skolems) <- tcInstSkolTyVarsX info (mkEmptySubst in_scope) tvs
+    let sig_skol = SigSkol origin whole (zip (map tyVarName tvs) skolems)
+    traverse_ checkNoConstrainedFamilyApps (map fst bndrs ++ map varType tvs)
+    traverse_ checkNoConstrainedFamilyApps theta
+    given <- newEvVars (substTheta subst theta)
+    void $ checkConstraints sig_skol skolems given (inside (substTy subst body))
 
 -- | Separate the lexical binders from the owner's inferred parameters.
 -- See Note [Associated family domain arguments].
@@ -2994,13 +3002,56 @@ checkValidTyFamEqn fam_tc typats rhs
          --             type instance F Int              = forall a. a->a
          --             type instance F Int              = Int#
          -- See #9357
-       ; checkValidMonoType rhs
+       ; check_valid_mono_type (checkEquationFamilyDomains fam_tc typats) Nothing rhs
 
          -- We have a decidable instance unless otherwise permitted
        ; undecidable_ok <- xoptM LangExt.UndecidableInstances
        ; traceTc "checkVTFE" (ppr fam_tc $$ ppr rhs $$ ppr (tcTyFamInsts rhs))
        ; unless undecidable_ok $
          mapM_ addErrTc (checkFamInstRhs fam_tc typats (tcTyFamInsts rhs)) }
+
+-- | Check the family domains in an equation under its owning class.
+-- See Note [Class evidence in associated family equations].
+checkEquationFamilyDomains :: TyCon -> [Type] -> Type -> TcM ()
+checkEquationFamilyDomains family pats rhs
+  | null (constrainedFamilyApps rhs) = pure ()
+  | not (isConstrainedFamilyTyCon family) = checkNoConstrainedFamilyApps rhs
+  | otherwise = do
+      (_, owner_sigma) <- either (failWithTc . TcRnConstrainedFamilyUnsupported family)
+                                pure (associatedFamilyDomain family pats)
+      info <- mkSkolemInfo FamInstSkol
+      let (owner_vars, predicate) = splitForAllTyVars owner_sigma
+          scope = mkEmptySubst (mkInScopeSet (tyCoVarsOfTypes (owner_sigma : rhs : pats)))
+      (subst, skolems) <- tcInstSkolTyVarsX info scope (map snd owner_vars)
+      owner <- newEvVars [substTy subst predicate]
+      uses <- familyDomainObligations rhs
+      (_, wanted) <- captureConstraints $
+        checkConstraints FamInstSkol skolems owner $
+          mapM_ (emitFamilyDomain (TySynCtxt (tyConName family)) rhs) uses
+      (unsolved, _) <- runTcS $ setTcSMode (vanillaTcSMode { tcsmGivenOnly = True }) $
+                        solveWanteds wanted
+      reportAllUnsolved unsolved
+
+{- Note [Class evidence in associated family equations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For class Collects c => View c, the default Viewed c = Elem c can use
+Collects c. Every use of the marked Viewed c requires View c and every
+View c dictionary provides Collects c. The same rule applies to an
+explicit associated type instance after substitution of its patterns.
+
+Use the owner and its superclasses to check the right-hand side. An
+overlappable instance available to the equation writer can be specialized
+by an importer. The owner would not guarantee the new instance context.
+An ordinary family also has no domain in its interface.
+
+An omitted owner parameter is rigid when opening the equation owner.
+Only the inferred parameters of a right-hand-side domain get fresh
+metavariables. The ordinary solver can project superclasses, rewrite
+by a nominal equality and apply a quantified dictionary. Run this
+implication with tcsmGivenOnly so its evidence is available whenever
+the owner is. Use the same scoped templates as signature formation:
+an ignored synonym argument still requires its own domain.
+-}
 
 -- | Checks that an associated type family default:
 --
@@ -3294,7 +3345,7 @@ checkValidTypePats record tc pat_ty_args
          --
          -- Suppress the opt-in hint when the expanded pattern still
          -- contains a family application. The extension cannot make it legal.
-         traverse_ (check_valid_mono_type (Just (skol_info, record))) pat_ty_args
+         traverse_ (check_valid_mono_type checkNoConstrainedFamilyApps (Just (skol_info, record))) pat_ty_args
 
        -- Ensure that no type family applications occur a type pattern
        ; case tcTyConAppTyFamInstsAndVis tc pat_ty_args of

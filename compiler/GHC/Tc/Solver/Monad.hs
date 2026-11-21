@@ -1023,6 +1023,8 @@ data TcSMode
                    -- ^ Abort early on insoluble constraints
             , tcsmSkipOverlappable :: Bool
                    -- ^ Do not select an OVERLAPPABLE instance
+            , tcsmGivenOnly        :: Bool
+                   -- ^ Restrict evidence to the local implication.
             , tcsmFullySolveQCIs   :: Bool
                    -- ^ Fully solve quantified constraints
             }
@@ -1031,14 +1033,15 @@ vanillaTcSMode :: TcSMode
 vanillaTcSMode = TcSMode { tcsmResumable        = False
                          , tcsmEarlyAbort       = False
                          , tcsmSkipOverlappable = False
+                         , tcsmGivenOnly        = False
                          , tcsmFullySolveQCIs   = False }
 
 instance Outputable TcSMode where
   ppr (TcSMode { tcsmResumable = pm, tcsmEarlyAbort = ea
-               , tcsmSkipOverlappable = so, tcsmFullySolveQCIs = fs })
+               , tcsmSkipOverlappable = so, tcsmGivenOnly = go, tcsmFullySolveQCIs = fs })
     = text "TcSMode" <> (braces $ cat $ punctuate comma $ catMaybes $
                          [ pp_one pm "Resumable", pp_one ea "EarlyAbort"
-                         , pp_one so "SkipOverlappable", pp_one fs "FullySolveQCIs" ])
+                         , pp_one so "SkipOverlappable", pp_one go "GivenOnly", pp_one fs "FullySolveQCIs" ])
       -- We get something like TcSMode{EarlyAbort,FullySolveQCIs},
       -- mentioning just the flags that are on
     where
@@ -1059,6 +1062,10 @@ The constraint solver can operate in different modes:
 
 * `tcsmSkipOverlappable`: don't use OVERLAPPABLE instances.  Used by the
   short-cut solver.  See Note [Shortcut solving] in GHC.Tc.Solver.Dict
+
+* `tcsmGivenOnly`: check a class implication without selecting or improving
+  from global class instances or running external evidence providers.
+  See Note [Class evidence in associated family equations] in GHC.Tc.Validity.
 
 * `tcsmFullSolveQCIs`: fully solve quantified constraints, or leave them alone.
   Used (only) for SPECIALISE pragmas;
@@ -2137,7 +2144,8 @@ matchGlobalInst :: DynFlags -> Class -> [Type] -> CtLoc -> TcS TcM.ClsInstResult
 matchGlobalInst dflags cls tys loc
   = do { mode <- getTcSMode
        ; let skip_overlappable = tcsmSkipOverlappable mode
-       ; wrapTcS $ TcM.matchGlobalInst dflags skip_overlappable cls tys (Just loc) }
+       ; if tcsmGivenOnly mode then return TcM.NoInstance else
+         wrapTcS $ TcM.matchGlobalInst dflags skip_overlappable cls tys (Just loc) }
 
 tcInstSkolTyVarsX :: SkolemInfo -> Subst -> [TyVar] -> TcS (Subst, [TcTyVar])
 tcInstSkolTyVarsX skol_info subst tvs = wrapTcS $ TcM.tcInstSkolTyVarsX skol_info subst tvs

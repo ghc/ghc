@@ -197,7 +197,9 @@ withoutExternalEvidence :: a -> RewriteM a -> RewriteM a
 withoutExternalEvidence fallback thing_inside
   = mkRewriteM $ \env path ->
     if not (re_fam_axioms_only env) && isEmptyVarSet (re_native_binders env)
-    then runRewriteM thing_inside env path
+    then do { mode <- getTcSMode
+            ; if tcsmGivenOnly mode then return fallback
+              else runRewriteM thing_inside env path }
     else return fallback
 {-# INLINE withoutExternalEvidence #-}
 

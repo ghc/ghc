@@ -2096,8 +2096,9 @@ data TcPluginProgress = TcPluginProgress
 
 getTcPluginSolvers :: TcS [TcPluginSolver]
 getTcPluginSolvers
-  = do { native_binders <- getNativeBinderScope
-       ; if not (isEmptyVarSet native_binders) then return [] else
+  = do { mode <- getTcSMode
+       ; native_binders <- getNativeBinderScope
+       ; if tcsmGivenOnly mode || not (isEmptyVarSet native_binders) then return [] else
     -- See Note [Native runtime binder scopes] in GHC.Tc.Solver.Monad.
     do { tcg_env <- TcS.getGblEnv
        ; plugins <- TcS.readTcRef (tcg_plugins tcg_env)
