@@ -49,6 +49,16 @@ allocation run, changing only the rewriter object measured −2.38% on
 [Retained diagnostic](../../testsuite/tests/dependent/should_fail/NativeFamilyIndexEvidence.stderr)
 and [ordinary regression](../../testsuite/tests/typecheck/should_fail/WantedFamilyRewriteCycle.hs).
 
+The 389-line Showcase matched stripped native `-O0`, default `-O1`
+and `-O2`, and GHCi. All 33 focused tests passed, including the
+three new concrete-list and matchability checks. The Core API run
+matched 37 lines. After merging the ordinary skolem printer from
+`b11b85c2b7`, all four Showcase modes and 11 diagnostic and package
+regressions passed again. A separate normal two-stage build at
+`d177823714` matched 383 lines in the same modes. Its source-hidden
+split, finite lookup, ordinary `INLINE`, and ordinary `INLINABLE`
+tests passed with the corrected split diagnostic span.
+
 At `7128a29dc8`, one runtime cut splits both Boolean flags and characters.
 The proofs track the original contents of each vector. Using the same
 element type for both inputs still rejects exchanged proofs at each
