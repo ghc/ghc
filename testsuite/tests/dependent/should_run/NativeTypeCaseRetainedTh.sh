@@ -26,7 +26,7 @@ import Data.Proxy (Proxy(..))
 import Data.IORef (newIORef, readIORef, writeIORef)
 import NativeRetainedTH (quoted, render)
 import NativeTypeCaseRetainedTh (fromQuote, fromReify)
-import NativeTypeCaseRetainedThRaw (chooseInline, chooseDirect, observeInline, caseData)
+import NativeTypeCaseRetainedThRaw (chooseInline, chooseDirect, renderDirect, observeInline, caseData)
 
 main :: IO ()
 main = do
@@ -36,17 +36,23 @@ main = do
     flag <- newIORef True
     first <- observe <$> readIORef flag
     firstInline <- observeInline <$> readIORef flag
+    firstDirect <- observeDirect <$> readIORef flag
     writeIORef flag False
     second <- observe <$> readIORef flag
     secondInline <- observeInline <$> readIORef flag
+    secondDirect <- observeDirect <$> readIORef flag
     print (first, second)
     print (firstInline, secondInline)
+    print (firstDirect, secondDirect)
     print (chooseInline True :: Int, chooseInline False :: Char)
     print (chooseDirect True () :: Int, chooseDirect False () :: Char)
     print caseData
 
 observe :: Bool -> String
 observe b = render b (quoted b)
+
+observeDirect :: Bool -> String
+observeDirect b = renderDirect b (chooseDirect b ())
 HS
 cat >NativeTypeCaseRetainedThWrong.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, TemplateHaskell #-}
@@ -77,19 +83,34 @@ wrong :: Int
 wrong = chooseInline False
 HS
 cat >NativeTypeCaseRetainedThSeparate.hs <<'HS'
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, TemplateHaskell #-}
+{-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, TemplateHaskell #-}
 module NativeTypeCaseRetainedThSeparate where
 
 choose :: $([t| foreach (b :: Bool) -> case b of { True -> Int; False -> Char } |])
 choose True = 13
 choose False = 'q'
 
-render :: $([t| foreach (b :: Bool) -> (case b of { True -> Int; False -> Char }) -> String |])
-render True i = show i
-render False c = [c]
+#if defined(DIFFERENT_GROUP)
+$(pure [])
+#endif
 
+#if defined(REORDERED_ROWS)
+render :: $([t| foreach (b :: Bool) -> (case b of { False -> Char; True -> Int }) -> String |])
+#elif defined(DIFFERENT_ARMS)
+render :: $([t| foreach (b :: Bool) -> (case b of { True -> Int; False -> Bool }) -> String |])
+#else
+render :: $([t| foreach (b :: Bool) -> (case b of { True -> Int; False -> Char }) -> String |])
+#endif
+render True i = show i
+render False c = show c
+
+#if defined(DIFFERENT_CAPTURE)
+separate :: foreach (b :: Bool) -> foreach (c :: Bool) -> String
+separate b c = render c (choose b)
+#else
 separate :: foreach (b :: Bool) -> String
 separate b = render b (choose b)
+#endif
 HS
 
 "${base[@]}" -package ghci -package template-haskell -package binary -package bytestring \
@@ -104,13 +125,13 @@ for opt in -O0 -O2; do
     "${ghc[@]}" -c NativeTypeCaseRetainedTh.hs
     : > case-effects
     "${ghc[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core -c NativeTypeCaseRetainedThRaw.hs
-    printf 'after\ncase\nbefore\nfinalizer\n' | diff -u - case-effects
+    printf 'after\nrender\ncase\nbefore\nfinalizer\n' | diff -u - case-effects
     mv NativeTypeCaseRetainedThRaw.hs raw.source
     "${ghc[@]}" -c NativeTypeCaseRetainedThClient.hs
     "${ghc[@]}" NativeTypeCaseRetainedThClient.o NativeTypeCaseRetainedTh.o \
         NativeTypeCaseRetainedThProvider.o NativeTypeCaseRetainedThRaw.o NativeRetainedTH.o -o run
     ./run > actual
-    printf "(11,'x',11,'x',11,'x')\n(\"11\",\"x\")\n(\"13\",\"q\")\n(13,'q')\n(19,'c')\nTrue\n" | diff -u - actual
+    printf "(11,'x',11,'x',11,'x')\n(\"11\",\"x\")\n(\"13\",\"q\")\n(\"19\",\"c\")\n(13,'q')\n(19,'c')\nTrue\n" | diff -u - actual
     status=0
     "${ghc[@]}" -c NativeTypeCaseRetainedThWrongBranch.hs > wrong-branch.log 2>&1 || status=$?
     if [[ $status != 1 ]] || ! grep -Fq "Couldn't match type" wrong-branch.log ||
@@ -134,10 +155,12 @@ if [[ $status != 1 ]] || ! grep -Eq 'Not in scope: .*field' escape.log; then
     cat escape.log >&2
     exit 1
 fi
-status=0
-"${base[@]}" -c NativeTypeCaseRetainedThSeparate.hs > separate.log 2>&1 || status=$?
-if [[ $status != 1 ]] || ! grep -Fq 'GHC-83865' separate.log ||
-   ! grep -Fq 'render b (choose b)' separate.log; then
-    cat separate.log >&2
-    exit 1
-fi
+for control in DIFFERENT_GROUP REORDERED_ROWS DIFFERENT_ARMS DIFFERENT_CAPTURE; do
+    status=0
+    "${base[@]}" "-D$control" -c NativeTypeCaseRetainedThSeparate.hs > separate.log 2>&1 || status=$?
+    if [[ $status != 1 ]] || ! grep -Fq 'GHC-83865' separate.log ||
+       ! grep -Eq 'render [bc] \(choose b\)' separate.log; then
+        cat separate.log >&2
+        exit 1
+    fi
+done

@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, TemplateHaskell #-}
-module NativeTypeCaseRetainedThRaw (chooseInline, chooseDirect, observeInline, caseData) where
+module NativeTypeCaseRetainedThRaw
+  (chooseInline, chooseDirect, renderDirect, observeInline, caseData) where
 
 import Data.Proxy (Proxy)
 import Language.Haskell.TH
@@ -44,6 +45,12 @@ chooseDirect :: $(do
   [t| foreach (b :: Bool) -> () -> case b of { True -> Int; False -> Char } |])
 chooseDirect True () = before
 chooseDirect False () = after
+
+renderDirect :: $(do
+  runIO (appendFile "case-effects" "render\n")
+  [t| foreach (flag :: Bool) -> (case flag of { True -> Int; False -> Char }) -> String |])
+renderDirect True i = show i
+renderDirect False c = [c]
 
 after :: $(runIO (appendFile "case-effects" "after\n") >> [t| Char |])
 after = 'c'
