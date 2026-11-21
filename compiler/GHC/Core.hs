@@ -40,6 +40,7 @@ module GHC.Core (
         termVar_maybe, nativeIndexFunctionVar_maybe, nativeIndexArgKinds,
         nativeClassSelectorTys, nativeClassSelectorIndex, nativeIndexedConArgs,
         nativeIndexedConApp_maybe, splitNativeIndexedConApp, isNativeConstructedGadtIndex,
+        nativeFamilyConHead_maybe,
         containsIndexedConOperand, containsGeneralIndexedConOperand, containsRetainedCharLiteral,
         containsRetainedNaturalLiteral, isBoxedBigNaturalLiteral,
         isNativeIndexAlt, isNativeIndexDataAlt, isNativeIndexAliasAlt, isNativeIndexAliasBinder,
@@ -114,17 +115,19 @@ import GHC.Platform
 
 import GHC.Core.Type
 import GHC.Core.TyCo.Compare ( eqType )
-import GHC.Core.TyCo.Rep ( Type(TermVarTy, TermAppTy, ClassAppTy, TyConApp, CastTy), Coercion(SubCo), Scaled(..) )
+import GHC.Core.TyCo.Rep ( Type(TermVarTy, TermAppTy, ClassAppTy, TyConApp, CastTy), Coercion(SubCo, SymCo, AppCo, AxiomCo), Scaled(..) )
 import qualified GHC.Core.TyCo.Subst as TyCoSubst
 import GHC.Builtin.KnownKeys ( boolTyConKey, charDataConKey, naturalNSDataConKey, naturalNBDataConKey )
 import {-# SOURCE #-} GHC.Builtin.WiredIn.Types (unmatchableDataConTy)
 import GHC.Core.Coercion
+import GHC.Core.Coercion.Axiom (CoAxiomRule(UnbranchedAxiom), coAxiomArity)
 import GHC.Core.Rules.Config ( RuleOpts )
 import GHC.Core.Class (classMethods)
 import GHC.Core.Predicate (getClassPredTys_maybe)
 import GHC.Core.DataCon
-import GHC.Core.TyCon ( isPromotedDataCon_maybe, isVanillaAlgTyCon, isBoxedDataTyCon,
-                        tyConTyVars, tyConResKind, tyConKind, tyConSingleDataCon_maybe )
+import GHC.Core.TyCon ( isPromotedDataCon_maybe, isVanillaAlgTyCon,
+                        tyConTyVars, tyConResKind, tyConKind, tyConSingleDataCon_maybe,
+                        isBoxedDataTyCon, isTypeDataTyCon, tyConDataFamCoercion_maybe )
 import GHC.Unit.Module
 
 import GHC.Types.InlinePragma
@@ -2684,7 +2687,8 @@ nativeComputedIndex expr
 -- See Note [Naming computed retained arguments at erasure] in GHC.CoreToStg.Prep.
 nativeDeferredArgIndex :: CoreExpr -> Maybe Type
 nativeDeferredArgIndex e
-  | containsIndexedOperand (isJust . nativeIndexedOperandSignature_maybe) e
+  | containsIndexedOperand (\con -> isJust (nativeIndexedOperandSignature_maybe con)
+                                 || isJust (tyConDataFamCoercion_maybe (dataConTyCon con))) e
   = snd <$> computedIndexExpr e
   | Just index <- nativeComputedIndex e = Just index
   | otherwise = nativeClassSelectorIndex e
@@ -2884,6 +2888,10 @@ nativeIndexExprWith allow_conversions extra = go emptyVarEnv
                          then Just body_result
                          else Nothing }
              else Nothing }
+      | Just (con, tys, build, fields) <- splitNativeFamilyConApp expr
+      = do { (fields', indices) <- unzip <$> traverse (go env) fields
+           ; index <- nativeFamilyPromotedCon_maybe con tys indices
+           ; return (build fields', index) }
       | Just (con, tys, fields) <- splitNativeIndexedConApp expr
       , (builder, args) <- collectArgs expr
       = do { (fields', indices) <- unzip <$> traverse (go env) fields
@@ -3093,6 +3101,12 @@ mapNativeIndexWithNatural mk_natural subst expr
            ; return (Cast expr (SubCo delta)) }
     from_index (TyConApp tc args)
       | Just con <- isPromotedDataCon_maybe tc
+      , let (tys, fields) = splitAt (length (dataConUserTyVars con)) args
+      , Just (worker_tys, _, _, cast) <- nativeFamilyConArgs con tys
+      , Just _ <- nativeFamilyPromotedCon_maybe con tys fields
+      = do { values <- traverse from_index fields
+           ; pure (Cast (mkConApp con (map Type worker_tys ++ values)) cast) }
+      | Just con <- isPromotedDataCon_maybe tc
       , let (params, fields) = splitAt (length (dataConUserTyVars con)) args
       , Just (prefix, _) <- nativeIndexedConArgs con params
       , Just _ <- nativeIndexedPromotedCon_maybe con params fields
@@ -3106,6 +3120,98 @@ mapNativeIndexWithNatural mk_natural subst expr
       = do { values <- traverse from_index fields
            ; return (mkConApp con (map Type tys ++ values)) }
     from_index _ = Nothing
+
+-- | Read the public wrapper of an ordinary lazy data family constructor.
+nativeFamilyConHead_maybe :: DataCon -> [Type] -> Maybe CoreExpr
+nativeFamilyConHead_maybe con tys = do
+  (_, _, _, _) <- nativeFamilyConArgs con tys
+  wrapper <- dataConWrapId_maybe con
+  return (mkTyApps (Var wrapper) tys)
+
+-- | Return the worker's instantiation and the instance's runtime cast.
+-- See Note [Retained data family constructor operands].
+nativeFamilyConArgs :: DataCon -> [Type] -> Maybe ([Type], [Type], Type, CoercionR)
+nativeFamilyConArgs con tys = do
+  axiom <- tyConDataFamCoercion_maybe rep
+  guard (isBoxedDataTyCon rep && not (isTypeDataTyCon rep))
+  guard (isVanillaDataCon con && null (dataConStupidTheta con))
+  guard (null (dataConRepArgBinders con) && not (any isBanged (dataConImplBangs con)))
+  guard (tys `equalLength` user_tvs &&
+         and [typeKind ty `eqType` inst (tyVarKind tv) | (tv, ty) <- zip user_tvs tys])
+  let worker_tys = map inst (dataConResRepTyArgs con)
+      fields = [inst field | Scaled _ field <- dataConOrigArgTys con]
+      result = inst (dataConOrigResTy con)
+  guard (dataConRepArity con == length fields && length worker_tys >= coAxiomArity axiom 0)
+  let cast = mkSymCo (mkUnbranchedAxInstCo Representational axiom worker_tys [])
+  guard (all isNativeOpaqueValueType fields &&
+         sameNativeIndexDomain (coercionLKind cast) (mkTyConApp rep worker_tys) &&
+         sameNativeIndexDomain (coercionRKind cast) result)
+  return (worker_tys, fields, result, cast)
+  where
+    rep = dataConTyCon con
+    user_tvs = dataConUserTyVars con
+    inst = substTyWith user_tvs tys
+
+-- | Recover the promoted constructor at its original public family kind.
+nativeFamilyPromotedCon_maybe :: DataCon -> [Type] -> [Type] -> Maybe Type
+nativeFamilyPromotedCon_maybe con tys fields = do
+  (_, domains, result, _) <- nativeFamilyConArgs con tys
+  guard (fields `equalLength` domains && and (zipWith sameNativeIndexDomain (map typeKind fields) domains))
+  let index = mkTyConApp (promoteDataCon con) (tys ++ fields)
+  guard (sameNativeIndexDomain (typeKind index) result)
+  return index
+
+-- | Accept the exact wrapper or its worker cast by the same family axiom.
+splitNativeFamilyConApp :: CoreExpr
+                        -> Maybe (DataCon, [Type], [CoreExpr] -> CoreExpr, [CoreExpr])
+splitNativeFamilyConApp (Cast expr cast) = do
+  (Var worker, args) <- Just (collectArgs expr)
+  con <- isDataConWorkId_maybe worker
+  let univs = dataConUnivTyVars con
+      (type_args, fields) = splitAt (length univs) args
+  worker_tys <- traverse family_type_arg type_args
+  guard (worker_tys `equalLength` univs)
+  tys <- traverse (`lookup` zip univs worker_tys) (dataConUserTyVars con)
+  (expected_tys, domains, _, expected_cast) <- nativeFamilyConArgs con tys
+  guard (worker_tys `equalLength` expected_tys && and (zipWith eqType worker_tys expected_tys) &&
+         fields `equalLength` domains)
+  guard (coercionRole cast == Representational &&
+         coercionLKind cast `eqType` coercionLKind expected_cast &&
+         coercionRKind cast `eqType` coercionRKind expected_cast)
+  axiom <- tyConDataFamCoercion_maybe (dataConTyCon con)
+  guard (uses_axiom (UnbranchedAxiom axiom) cast)
+  return (con, tys, \xs -> Cast (mkApps (Var worker) (type_args ++ xs)) cast, fields)
+  where
+    uses_axiom ax (AxiomCo actual cos) = actual == ax && all isReflCo cos
+    uses_axiom ax (AppCo co arg) = uses_axiom ax co && isReflCo arg
+    uses_axiom ax (SymCo co) = uses_axiom ax co
+    uses_axiom _ _ = False
+splitNativeFamilyConApp expr = do
+  (Var wrapper, args) <- Just (collectArgs expr)
+  con <- isDataConWrapId_maybe wrapper
+  let (type_args, fields) = splitAt (length (dataConUserTyVars con)) args
+  tys <- traverse family_type_arg type_args
+  (_, domains, _, _) <- nativeFamilyConArgs con tys
+  guard (fields `equalLength` domains)
+  return (con, tys, mkApps (mkApps (Var wrapper) type_args), fields)
+
+family_type_arg :: CoreExpr -> Maybe Type
+family_type_arg (Type ty) = Just ty
+family_type_arg _ = Nothing
+
+{- Note [Retained data family constructor operands]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The wrapper constructs a value in the representation type, then applies
+the data family instance axiom at representational role. The promoted
+constructor has the original public result kind. Recognize the exact
+wrapper or its worker with that same runtime cast. Check both endpoints,
+the axiom identity and its reflexive arguments. Recover the promoted
+constructor directly at its public kind. Never put the representational
+coercion in a type cast or derive nominal equality from it.
+
+Only a simple lazy constructor can use this path. Compose the operand
+inside the normal retained-argument thunk until STG erases the index.
+-}
 
 -- | Recognise the ordinary boxed representation of a character literal.
 boxedCharLiteral_maybe :: CoreExpr -> Maybe Char

@@ -4412,8 +4412,11 @@ tcRetainedArg domain arg
           subst <- tcMatchTyX_BM bind Subst.emptySubst (dataConOrigResTy dc) domain
           tys <- traverse (Subst.lookupTyVar subst) tvs
           guard (substTyWith tvs tys (dataConOrigResTy dc) `eqType` domain)
-          (prefix, _) <- Core.nativeIndexedConArgs dc tys
-          return (Core.mkApps (Core.Var (dataConWorkId dc)) prefix)
+          case Core.nativeFamilyConHead_maybe dc tys of
+            Just app -> return app
+            Nothing -> do
+              (prefix, _) <- Core.nativeIndexedConArgs dc tys
+              return (Core.mkApps (Core.Var (dataConWorkId dc)) prefix)
 
     resolve_app :: NameEnv Id -> Type -> LHsExpr GhcRn -> LHsExpr GhcRn
                 -> TcM (Core.CoreExpr, LHsExpr GhcRn, LHsExpr GhcRn)

@@ -713,6 +713,7 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
 -- See Note [Naming computed retained arguments at erasure] in GHC.CoreToStg.Prep.
 nameComputedOperands :: CoreExpr -> CtsM CoreExpr
 nameComputedOperands (Tick tick body) = Tick tick <$> nameComputedOperands body
+nameComputedOperands (Cast body co) = (`Cast` co) <$> nameComputedOperands body
 nameComputedOperands call = do
     let (fun, args) = collectArgs call
     (rev_binds, atoms) <- mapAccumLM name_operand [] args
