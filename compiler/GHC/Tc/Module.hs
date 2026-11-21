@@ -1964,10 +1964,15 @@ tcIndependentFamilyProducers demands group@HsGroup
                 , not (hasSplice (decls, signatures)) ->
                     Right (unionNameSets (group_ext tg : externalDeclUses signatures : fv_sets))
               _ -> Left "a type declaration dependency"
-        early_decl_uses decl =
-          case closed_family_uses decl of
-            Just refs -> Just refs
-            Nothing -> independentDataDecl decl
+        early_decl_uses decl
+          | Just refs <- closed_family_uses decl = Just refs
+          | L _ SynDecl{tcdTyVars = tvs, tcdRhs = rhs} <- decl
+          , Just params <- traverse ordinary_parameter (hsQTvExplicit tvs) =
+              independentTypeRefs (mkNameSet params) rhs
+          | otherwise = independentDataDecl decl
+        ordinary_parameter (L _ b@HsTvb{tvb_flag = HsBndrRequired{}, tvb_kind = HsBndrNoKind{}}) =
+          hsTyVarName b
+        ordinary_parameter _ = Nothing
         type_prerequisites constructors signature_types =
           either (const Nothing) Just $
             closeLocalNames early_type_dependencies emptyNameSet
@@ -2010,10 +2015,11 @@ tcIndependentFamilyProducers demands group@HsGroup
             (tcg_ev_binds early_env `unionBags` evs) (tcg_binds early_env)
           workers <- traverse independentImport (nameSetElemsStable constructors)
           let allowed = unionNameSets [names, imported, mkNameSet (catMaybes workers)]
-              families = mkNameSet [tcdName decl | tg <- early_groups, L _ decl <- group_tyclds tg,
-                                                   isFamilyDecl decl]
+              planned_types = mkNameSet
+                [tcdName decl | tg <- early_groups, L _ decl <- group_tyclds tg,
+                               isFamilyDecl decl || isSynDecl decl]
           unless (all isJust workers && isEmptyBag evs &&
-                    all (independentCore families allowed . snd)
+                    all (independentCore planned_types allowed . snd)
                         (nonDetNameEnvElts definitions)) $
             rejectLocalOpen selected "The checked producer requires evidence outside the independent fragment."
           addTopEvBinds evs $ withLocalOpenDefinitions checked $
@@ -2089,7 +2095,7 @@ independentClosure this_mod constructors binds sigs roots = do
       { sig_bndrs = outer, sig_body = body }))]
       | Just params <- signature_binders outer
       , let bound = mkNameSet params
-      , Just refs <- signature_type bound body = Just (bound, refs)
+      , Just refs <- independentTypeRefs bound body = Just (bound, refs)
     independent_signature _ = Nothing
     signature_binders HsOuterImplicit{hso_ximplicit = quantified} = Just quantified
     signature_binders HsOuterExplicit{hso_matchability = Nothing, hso_bndrs = quantified} =
@@ -2097,14 +2103,6 @@ independentClosure this_mod constructors binds sigs roots = do
     signature_binders _ = Nothing
     bare_binder (L _ b@HsTvb {tvb_kind = HsBndrNoKind _}) = hsTyVarName b
     bare_binder _ = Nothing
-    signature_type params ty = case unLoc (ignoreParens ty) of
-      HsFunTy _ (HsModifiedFunArr _ [] HsStandardArr{}) input result ->
-        unionNameSet <$> signature_type params input <*> signature_type params result
-      HsAppTy _ fun arg -> unionNameSet <$> signature_type params fun <*> signature_type params arg
-      HsTyVar _ NotPromoted (L _ (WithUserRdr _ n))
-        | n `elemNameSet` params -> Just emptyNameSet
-        | isTyConName n, isExternalName n -> Just (unitNameSet n)
-      _ -> Nothing
     arrow_type params ty = case unLoc (ignoreParens ty) of
       HsFunTy _ (HsModifiedFunArr _ [] HsStandardArr{}) input result ->
         arrow_type params input && arrow_type params result
@@ -2133,6 +2131,19 @@ independentClosure this_mod constructors binds sigs roots = do
       _ -> Nothing
       where
         recur = expr_refs tyvars locals
+
+-- | Read dependencies in an ordinary producer signature or synonym RHS.
+independentTypeRefs :: NameSet -> LHsType GhcRn -> Maybe NameSet
+independentTypeRefs params ty = case unLoc (ignoreParens ty) of
+  HsFunTy _ (HsModifiedFunArr _ [] HsStandardArr{}) input result ->
+    unionNameSet <$> recur input <*> recur result
+  HsAppTy _ fun arg -> unionNameSet <$> recur fun <*> recur arg
+  HsTyVar _ NotPromoted (L _ (WithUserRdr _ n))
+    | n `elemNameSet` params -> Just emptyNameSet
+    | isTyConName n, isExternalName n -> Just (unitNameSet n)
+  _ -> Nothing
+  where
+    recur = independentTypeRefs params
 
 -- | Verify an imported occurrence and return the name found in checked Core.
 independentImport :: Name -> TcM (Maybe Name)
@@ -2163,9 +2174,9 @@ independentDataFields con parameters
 
 -- | Recheck pre-optimisation Core emitted by the source fragment.
 independentCore :: NameSet -> NameSet -> CoreExpr -> Bool
-independentCore families producers = go emptyNameSet emptyNameSet
+independentCore planned_types producers = go emptyNameSet emptyNameSet
   where
-    valid_type = independentTypeWith families
+    valid_type = independentTypeWith planned_types
 
     go tyvars locals expression
       | (Core.Var worker, args) <- Core.collectArgs expression
@@ -2199,7 +2210,7 @@ independentCore families producers = go emptyNameSet emptyNameSet
     go tyvars locals (Core.Let (Core.Rec [(v, rhs)]) body) =
       independent_let tyvars locals v rhs body
     go tyvars locals (Core.Cast body co)
-      | not (isEmptyNameSet families)
+      | not (isEmptyNameSet planned_types)
       , let lhs = coercionLKind co
             rhs = coercionRKind co
             normalize = reductionReducedType . normaliseType
@@ -2228,7 +2239,7 @@ independentType :: NameSet -> Type -> Bool
 independentType = independentTypeWith emptyNameSet
 
 independentTypeWith :: NameSet -> NameSet -> Type -> Bool
-independentTypeWith families = check
+independentTypeWith planned_types = check
   where
     check tyvars (TyVarTy var) = getName var `elemNameSet` tyvars
     check tyvars FunTy{ft_af = FTF_T_T, ft_ma = ma, ft_mult = mult,
@@ -2239,9 +2250,13 @@ independentTypeWith families = check
       independentConstant unmatchableDataConTy ma && isTyVar var &&
       independentConstant liftedTypeKind (varType var) &&
       check (extendNameSet tyvars (getName var)) body
-    check tyvars (TyConApp tc args)
+    check tyvars ty@(TyConApp tc args)
+      | tyConName tc `elemNameSet` planned_types
+      , Just expanded <- coreView ty =
+          check tyvars expanded
       | lengthIs args (tyConArity tc)
-      , independentDataKind tc || tyConName tc `elemNameSet` families =
+      , independentDataKind tc ||
+        (isTypeFamilyTyCon tc && tyConName tc `elemNameSet` planned_types) =
           all (check tyvars) args
     check _ ty = independentConstant liftedTypeKind ty
 
@@ -2300,6 +2315,11 @@ closure. Check the family's declaration, its standalone kind signature
 and their external references. Keep the signature with its group.
 The wired-in Type synonym in the signature has no declaration dependency.
 A recursive family or a cycle through another family blocks the split.
+A local synonym with ordinary binders and a checked RHS can also
+belong to the closure. Follow every dependency in it before moving
+the group, including arguments that synonym expansion could erase.
+The ordinary type checker still checks arity and synonym cycles.
+Expand only the planned synonyms when validating the solved Core.
 An imported open family in the transitive closure blocks the split,
 even when it occurs only in a field of an unused constructor.
 
