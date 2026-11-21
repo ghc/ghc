@@ -28,6 +28,26 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `cd293f731f`, all 416 Showcase outputs matched in stripped native
+code at `-O0`, source-loaded GHCi, and native code at `-O1` and `-O2`.
+Fourteen registered tests, the 37-row native Core test and the evidence
+API checks passed.
+
+The reviewed matrix checker accepts `zipWithExact` on ordinary lists.
+A runtime length comparison lets independent inputs use the typed zip.
+For the same input twice, the ordinary caller gets its first pair with
+an undefined tail. A missing cons/cons clause reports GHC-83605. A
+cons clause that returns `VNil` reports GHC-83865 at `VNil` and lists
+the source binders. The input dictionary has no written binder.
+
+The ordinary GHC pattern-match suite ran on the public cursor compiler
+with these five checker modules. It recorded 159 expected passes and
+six expected failures, with no unexpected results. The 37-row native
+Core API regression, evidence API checks and four registered dependent
+tests passed on the same compiler.
+[Checked zip](examples/qualified-pi/AlignedList.hs) and
+[coverage and demand](roadmap/R03-dependent-products.md#zip-two-lists-at-a-common-length).
+
 The join-point integration at `418cd6f6bb` also passed all 414 rows in
 the same four modes. Fourteen registered tests passed on that revision.
 The recorded join fixture runs inside `NativeTypeCase`. The 37-row Core
