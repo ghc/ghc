@@ -2534,10 +2534,12 @@ familyKindUsesMatchability tc b =
 
 -- | Does the index annotate a curried arrow in a synonym parameter's kind?
 synonymCallbackIndex :: TyVar -> Kind -> Bool
-synonymCallbackIndex tv domain
-  | Just (arrow, _, result) <- tcSplitFunTy_maybe domain =
-      getTyVar_maybe arrow == Just tv || synonymCallbackIndex tv result
-  | otherwise = False
+synonymCallbackIndex tv (FunTy { ft_af = af, ft_ma = arrow, ft_res = result })
+  | isVisibleFunArg af =
+      case arrow of
+        TyVarTy index | index == tv -> True
+        _ -> synonymCallbackIndex tv result
+synonymCallbackIndex _ _ = False
 
 -- | Check a synonym RHS with controlled instantiation of metadata.
 -- The flag for each index records whether it occurs on a callback arrow.

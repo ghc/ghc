@@ -19,6 +19,7 @@ module GHC.Iface.Binary (
         getIfaceWithExtFields,
         putIfaceWithExtFields,
         sourceTableLocations,
+        couldInferLiberalSynonymMatchability,
         getWithUserData,
         putWithUserData,
 
@@ -35,6 +36,7 @@ import GHC.Prelude
 
 import GHC.Builtin   ( knownKeyOccMap, wiredInNamesMap )
 import GHC.Builtin.KnownKeys (matchabilityTyConKey)
+import GHC.Builtin.WiredIn.Types (matchableDataConName)
 import GHC.Builtin.Uniques( knownUniqueTupleName )
 
 import GHC.Utils.Panic
@@ -42,7 +44,9 @@ import GHC.Utils.Binary as Binary
 import GHC.Utils.Misc (split)
 import GHC.Utils.Outputable
 
+import GHC.Types.Avail (availNames)
 import GHC.Types.Name
+import GHC.Types.Name.Set (elemNameSet, mkNameSet)
 import GHC.Types.Unique
 import GHC.Types.SrcLoc
 import GHC.Types.Name.Cache
@@ -55,13 +59,13 @@ import GHC.Platform.Profile
 import GHC.Platform
 import GHC.Settings.Constants
 import GHC.Iface.Ext.Fields (readFieldWith, writeFieldWith, deleteField)
-import GHC.Iface.Syntax (IfaceDecl(..), IfaceFamTyConFlav(..), IfaceClassBody(..), IfaceAT(..), IfaceIdDetails(..))
+import GHC.Iface.Syntax (IfaceDecl(..), IfaceExport, IfaceFamTyConFlav(..), IfaceClassBody(..), IfaceAT(..), IfaceIdDetails(..))
 import GHC.Types.Basic (SourceTableOrigin(ExecutableSourceTable, FinalCoreSourceTable))
 import GHC.Iface.Type (IfaceType(..), IfaceBndr(..), IfaceAppArgs(..), IfaceTyCon(..), IfaceTyConBinder,
                        getIfaceType, putIfaceType, ifaceTypeSharedByte,
                        IfaceEvidence(..), IfaceEvidenceVersion)
-import GHC.Core.TyCon (isInferredTyConBinder)
-import GHC.Types.Var (VarBndr(..))
+import GHC.Core.TyCon (isInferredTyConBinder, isVisibleTyConBinder)
+import GHC.Types.Var (VarBndr(..), isVisibleFunArg)
 
 import GHC.Data.FastMutInt
 import GHC.Data.Maybe( orElse )
@@ -189,7 +193,9 @@ readBinIfaceHeaderVersion profile checkHiWay traceBinIFace hi_path = do
 
     pure (evidence, bh)
   where
-    parse_version actual base = stripPrefix base actual >>= parseEvidenceSuffix
+    parse_version actual base = do
+      suffix <- stripPrefix base actual
+      parseEvidenceSuffix (stripPrefix liberalSynonymCallbackSuffix suffix `orElse` suffix)
 
 -- | Read an interface file.
 --
@@ -299,12 +305,17 @@ writeBinIface profile traceBinIface compressionLevel hi_path mod_iface = do
           put_ h (profileBuildTag profile)
 
     -- Select the existing version first. The writer records extra features.
-    let version | any (hasConstrainedFamily . snd) (mi_decls mod_iface) = constrainedFamilyIfaceVersion
-                | any (hasOpenMatchabilityScheme . snd) (mi_decls mod_iface) = openMatchabilityIfaceVersion
-                | any hasMatchabilityScheme (mi_decls mod_iface) = matchabilitySchemeIfaceVersion
-                | any hasFinalCore (mi_decls mod_iface) = finalCoreIfaceVersion
-                | any hasEnumCallback (mi_decls mod_iface) = enumCallbackIfaceVersion
-                | otherwise = show hiVersion
+    let base_version
+          | any (hasConstrainedFamily . snd) (mi_decls mod_iface) = constrainedFamilyIfaceVersion
+          | any (hasOpenMatchabilityScheme . snd) (mi_decls mod_iface) = openMatchabilityIfaceVersion
+          | any hasMatchabilityScheme (mi_decls mod_iface) = matchabilitySchemeIfaceVersion
+          | any hasFinalCore (mi_decls mod_iface) = finalCoreIfaceVersion
+          | any hasEnumCallback (mi_decls mod_iface) = enumCallbackIfaceVersion
+          | otherwise = show hiVersion
+        version
+          | hasLiberalSynonymCallback (mi_exports mod_iface) (map snd (mi_decls mod_iface)) =
+              base_version ++ liberalSynonymCallbackSuffix
+          | otherwise = base_version
     writeHeader bh version
     payload <- tellBinWriter bh
     evidence <- putIfaceWithExtFields traceBinIface compressionLevel bh mod_iface
@@ -524,6 +535,48 @@ matchabilityBinder :: IfaceTyConBinder -> Bool
 matchabilityBinder b@(Bndr (IfaceTvBndr (_, IfaceTyConApp tc IA_Nil)) _) =
   isInferredTyConBinder b && ifaceTyConName tc `hasKnownKey` matchabilityTyConKey
 matchabilityBinder _ = False
+
+-- | Announce a synonym binder scheme that needs callback kind inference.
+-- The suffix is independent of existing schemes and retained evidence.
+liberalSynonymCallbackSuffix :: String
+liberalSynonymCallbackSuffix = "-liberal-synonym-callback-v1"
+
+-- | Find a checked callback selector in an exported synonym kind.
+hasLiberalSynonymCallback :: [IfaceExport] -> [IfaceDecl] -> Bool
+hasLiberalSynonymCallback = exportedSynonymCallback instantiated
+  where
+    instantiated binders (IfaceTyVar name) =
+      any (selects name) (filter matchabilityBinder binders)
+    instantiated _ _ = False
+
+    selects name (Bndr (IfaceTvBndr (index, _)) _) = index == name
+    selects _ _ = False
+
+-- | Find a fixed M callback that a prior producer can have defaulted.
+couldInferLiberalSynonymMatchability :: [IfaceExport] -> [IfaceDecl] -> Bool
+couldInferLiberalSynonymMatchability = exportedSynonymCallback fixed
+  where
+    fixed _ (IfaceTyConApp tc IA_Nil) = ifaceTyConName tc == matchableDataConName
+    fixed _ _ = False
+
+-- | Inspect direct curried callback arrows in the checked parameter kinds.
+-- See Note [Callback arrows in inferred synonym kinds] in GHC.Tc.TyCl.
+exportedSynonymCallback :: ([IfaceTyConBinder] -> IfaceType -> Bool)
+                        -> [IfaceExport] -> [IfaceDecl] -> Bool
+exportedSynonymCallback accepts exports = any is_candidate
+  where
+    exported = mkNameSet (concatMap availNames exports)
+    is_candidate IfaceSynonym{ifName = name, ifBinders = binders}
+      | name `elemNameSet` exported = any (parameter binders) binders
+    is_candidate _ = False
+
+    parameter binders b@(Bndr (IfaceTvBndr (_, kind)) _)
+      | isVisibleTyConBinder b = callback binders kind
+    parameter _ _ = False
+
+    callback binders (IfaceFunTy flag arrow _ _ result)
+      | isVisibleFunArg flag = accepts binders arrow || callback binders result
+    callback _ _ = False
 
 hasFinalCore :: (a, IfaceDecl) -> Bool
 hasFinalCore (_, IfaceId{ifIdDetails = IfSourceTableId _ FinalCoreSourceTable}) = True

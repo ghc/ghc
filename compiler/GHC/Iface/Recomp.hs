@@ -34,7 +34,8 @@ import GHC.Driver.Plugins
 
 
 import GHC.Iface.Syntax
-import GHC.Iface.Binary (sourceTableLocations)
+import GHC.Iface.Binary (sourceTableLocations, couldInferLiberalSynonymMatchability)
+import GHC.Iface.Ext.Fields (getExtensibleFields, writeField)
 import GHC.Iface.Recomp.Binary
 import GHC.Iface.Recomp.Types
 import GHC.Iface.Load
@@ -883,6 +884,12 @@ checkFlagHash hsc_env iface self_recomp = do
           | nullary_candidate, not checked_nullary =
               liftIO $ recheck "Compiler now infers matchability for nullary family results"
           | otherwise = pure UpToDate
+        check_liberal_synonym
+          | xopt LangExt.LiberalTypeSynonyms dflags
+          , not (Map.member liberalSynonymCallbackField (getExtensibleFields (mi_ext_fields iface)))
+          , couldInferLiberalSynonymMatchability (mi_exports iface) (map snd (mi_decls iface)) =
+              liftIO $ recheck "Compiler now infers matchability for liberal synonym callbacks"
+          | otherwise = pure UpToDate
     pure (flags, check_identity `recompThen` check_guarded_filter
                                      `recompThen` check_append
                                      `recompThen` check_reverse
@@ -895,7 +902,26 @@ checkFlagHash hsc_env iface self_recomp = do
                                      `recompThen` check_scoped_case
                                      `recompThen` check_binary_enum
                                      `recompThen` check_retained_signature
-                                     `recompThen` check_nullary_family)
+                                     `recompThen` check_nullary_family
+                                     `recompThen` check_liberal_synonym)
+
+{- Note [Recompiling liberal synonym callbacks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An older interface records M both when a callback arrow was inferred
+and when it was written. Recheck only home modules that enable
+LiberalTypeSynonyms and export a synonym with an M callback. Also
+check boot interfaces so both declarations keep the same kind. A kind
+that gains an index changes the ABI, so usage checks invalidate clients.
+
+A written M may leave the declaration unchanged. Record this check
+in a separate extensible field. Include its name in the interface hash
+so GHC writes the field even if the ABI and flags are unchanged. The
+field does not alter the flag generation or need to load rules.
+-}
+
+-- | Record that a potential old synonym provider was checked once.
+liberalSynonymCallbackField :: String
+liberalSynonymCallbackField = "liberal-synonym-callback-v1"
 
 {- Note [Recompiling nullary closed arrow families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2644,6 +2670,8 @@ addFingerprints hsc_env iface0 = do
   let stamp_retained = couldExportRetainedSignatureCase (mi_semantic_module iface0)
                         (mi_exports iface0) (mi_decls iface0)
       stamp_nullary = couldInferNullaryClosedMatchability (mi_decls iface0)
+      stamp_liberal = xopt LangExt.LiberalTypeSynonyms (hsc_dflags hsc_env)
+                   && couldInferLiberalSynonymMatchability (mi_exports iface0) (mi_decls iface0)
       iface
         | mi_hsc_src iface0 == HsSrcFile
         , Just info <- mi_self_recomp_info iface0
@@ -2659,11 +2687,19 @@ addFingerprints hsc_env iface0 = do
                         (mi_abi_mod_hash abiHashes,
                          mi_self_recomp_info iface,
                          mi_deps iface0)
+      checked_hash | stamp_liberal =
+                       computeFingerprint putNameLiterally (base_hash, liberalSynonymCallbackField)
+                   | otherwise = base_hash
       !iface_hash = case sourceTableLocations sorted_decls of
-        []   -> base_hash
-        locs -> computeFingerprint putNameLiterally (base_hash, locs)
+        []   -> checked_hash
+        locs -> computeFingerprint putNameLiterally (checked_hash, locs)
 
-  let final_iface = completePartialModIface iface iface_hash
+  checked_iface <- if stamp_liberal
+                   then do fields <- writeField liberalSynonymCallbackField () (mi_ext_fields iface)
+                           pure (set_mi_ext_fields fields iface)
+                   else pure iface
+
+  let final_iface = completePartialModIface checked_iface iface_hash
                      sorted_decls sorted_extra_decls abiHashes caches
    --
   return final_iface
