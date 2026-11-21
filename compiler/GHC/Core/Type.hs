@@ -2596,7 +2596,7 @@ nativeIndexDataConTyArgs domain con
   = Just args
   | otherwise = Nothing
 
--- | Return the independently closed argument and result domains of a native head.
+-- | Return the lifted argument and closed result domains of a native head.
 -- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
 nativeIndexFunctionTys_maybe :: Id -> Maybe (Type, Type)
 nativeIndexFunctionTys_maybe f
@@ -2606,16 +2606,15 @@ nativeIndexFunctionTys_maybe f
   = nativeIndexFunctionTypeTys_maybe (varType f)
   | otherwise = Nothing
 
--- | Check the closed ordinary function type shared by heads and retained binders.
+-- | Check the ordinary function type shared by heads and retained binders.
 -- See Note [Function-valued retained binders].
 nativeIndexFunctionTypeTys_maybe :: Type -> Maybe (Type, Type)
 nativeIndexFunctionTypeTys_maybe ty
-  | noFreeVarsOfType ty
-  , FunTy { ft_af = af, ft_ma = ma, ft_mult = mult, ft_arg = arg, ft_res = res }
+  | FunTy { ft_af = af, ft_ma = ma, ft_mult = mult, ft_arg = arg, ft_res = res }
       <- coreFullView ty
   , af == FTF_T_T, eqType ma unmatchableDataConTy, isManyTy mult
-  , noFreeVarsOfType mult
-  , isNativeClosedIndexType arg, isNativeClosedIndexType res
+  , noFreeVarsOfType ma, noFreeVarsOfType mult, noFreeVarsOfType res
+  , isNativeOpaqueValueType arg, isNativeClosedIndexType res
   = Just (arg, res)
   | otherwise = Nothing
 
@@ -2693,8 +2692,8 @@ List a stays opaque when a becomes Int, IO Int or Vec Int n. The list tail
 still has the structural domain List a. Derive that distinction from the
 original constructor telescope. See Note [Algebraic runtime index domains].
 
-Opaque identity does not grant native call permission. Keep the independently
-closed function policy in nativeIndexFunctionTypeTys_maybe. A nominal value
+Opaque identity does not grant native call permission. Check the arrow and
+result in nativeIndexFunctionTypeTys_maybe. A nominal value
 conversion can change an opaque domain. If either endpoint has an eligible
 native function type, require the same complete type at both endpoints.
 Other function values can remain opaque fields. The conversion predicate
@@ -2809,16 +2808,14 @@ with a closed ordinary U/Many arrow. Keep all other algebraic-domain checks.
 The function remains a runtime Id. Its TermVarTy records identity without
 evaluating the function or comparing its behavior.
 
-Function arguments and results keep the old closed function-free algebraic
-policy. nativeIndexType False checks every instantiated field structurally.
-It requires closed monotype parameters and disables opaque parameter fields.
-Thus List Int can be a structural root without becoming a native function
-endpoint. Do not call the broader public
-predicate from nativeIndexFunctionTypeTys_maybe: a domain such as
+Function results keep the closed function-free algebraic policy.
+nativeIndexType False checks every instantiated field structurally. It
+requires closed monotype parameters and disables opaque parameter fields.
+Do not use the broader predicate for results. A datatype such as
 
-  data Loop = Loop (Loop -> Bool)
+  data Loop = Loop (Bool -> Loop)
 
-would then restart eligibility checking through its function argument.
+would then restart eligibility checking through its function result.
 The function-free endpoint check rejects Loop without this recursive restart.
 This restriction is separate from regular algebraic recursion.
 
@@ -2834,9 +2831,10 @@ and forward evidence.
 A source foreach root can bind an opaque algebraic or abstract value,
 or an eligible opaque call head. Core retained value binders use the
 opaque Id judgment. See Note [Opaque runtime index values].
-The function head has a closed ordinary visible Many arrow A -> B. Both A and
-B are independently supported scalar domains. The Id is local, unrestricted,
-and not a join point. Keep the head policy separate from structural schemas.
+The function head has an ordinary visible Many arrow A -> B. A has kind
+Type and can mention an outer erased binder. B is a closed structural index
+domain. The Id is local, unrestricted, and not a join point. Keep the head
+policy separate from structural schemas.
 
 A bound function can occur in the head slot of TermAppTy or TermAppCo, or as
 a TermVarTy stored in an algebraic index. Application of that TermVarTy uses
