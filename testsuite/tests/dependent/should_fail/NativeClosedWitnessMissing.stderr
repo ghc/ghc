@@ -1,5 +1,5 @@
 NativeClosedWitnessMissing.hs:8:15: error: [GHC-70565]
     • Cannot evaluate ‘P.noWitness’ in a type.
-        Cannot recover the package index from its first field. Each witness constructor must have no fields or carry only its predecessor witness.
+        Cannot reify field 2 of ‘P.HiddenWidth’ at the hidden index. The field's constructors must determine that index.
     • In the first argument of ‘Proxy’, namely ‘(P.noWitness 4)’
       In the type signature: bad :: Proxy (P.noWitness 4)

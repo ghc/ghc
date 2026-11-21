@@ -20,17 +20,31 @@ for opt in -O0 -O2; do
     cat >WrongWitness.hs <<'HS'
 {-# LANGUAGE DataKinds, GADTs, KindSignatures #-}
 module WrongWitness
-    ( buildWrong, EvidenceBatch(..), withEvidence, TaggedBatch(..), withEquality
+    ( buildWrong, wrongMask, wrongColumns, BadField(..), badField
+    , EvidenceBatch(..), withEvidence, TaggedBatch(..), withEquality
     ) where
+import Data.Proxy (Proxy)
 import ExistentialVec (SN(..))
-import IndexedVec (Vec(..))
+import IndexedVec (N(..), Vec(..))
 import Numeric.Natural (Natural)
 import Unsafe.Coerce (unsafeCoerce)
-import WitnessedBatch (Batch(..))
+import WitnessedBatch (Batch(..), MaskedRow(..), KeyedRow(..))
 
 buildWrong :: Natural -> Batch Natural
 buildWrong n = Chunk (SS SZ) (VCons n VNil)
                      (Chunk (SS SZ) (unsafeCoerce (VCons n (VCons n VNil))) End)
+
+wrongMask :: Natural -> MaskedRow Natural
+wrongMask n = MaskedRow (SS SZ) (VCons n VNil) 'x' (unsafeCoerce (VNil :: Vec 'Z Bool))
+
+wrongColumns :: Natural -> KeyedRow Natural
+wrongColumns n = KeyedRow 'r' (VCons 'x' VNil) (unsafeCoerce (VCons n (VCons n VNil)))
+
+data BadField a where
+    BadField :: SN n -> Vec n a -> Char -> Proxy n -> BadField a
+
+badField :: Natural -> BadField Natural
+badField _ = error "unsupported field was evaluated"
 
 data EvidenceBatch a where
     EvidenceEnd :: EvidenceBatch a
@@ -52,7 +66,7 @@ HS
     if [[ -f ../producer/WitnessedBatch.dyn_o ]]; then cp ../producer/*.{dyn_hi,dyn_o} .; fi
     cat >Proof.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
-module Proof (evenBatch, oddBatch) where
+module Proof (evenBatch, oddBatch, mask, empty, row) where
 
 import Data.Type.Equality ((:~:)(Refl))
 import qualified ExistentialVec as E
@@ -66,30 +80,72 @@ evenBatch = Refl
 
 oddBatch :: B.build 3 :~: 'B.Chunk ('E.SS ('E.SS 'E.SZ)) ('V.VCons 3 ('V.VCons 4 'V.VNil)) 'B.End
 oddBatch = Refl
+
+mask :: B.maskedRow 4 :~: 'B.MaskedRow ('E.SS ('E.SS 'E.SZ))
+                            ('V.VCons 4 ('V.VCons 5 'V.VNil))
+                            'x' ('V.VCons 'False ('V.VCons 'True 'V.VNil))
+mask = Refl
+
+empty :: B.keyedRow 0 :~: 'B.KeyedRow 'e' 'V.VNil 'V.VNil
+empty = Refl
+
+row :: B.keyedRow 4 :~: 'B.KeyedRow 'r' ('V.VCons 'x' ('V.VCons 'y' 'V.VNil))
+                                        ('V.VCons 4 ('V.VCons 5 'V.VNil))
+row = Refl
 HS
     cat >Demand.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeOperators #-}
-module Demand (firstWidth) where
+module Demand (firstWidth, rowWidth) where
 import Data.Type.Equality ((:~:)(Refl))
-import qualified WitnessedBatch as B (firstWidth, partial)
+import qualified WitnessedBatch as B (firstWidth, partial, rowWidth, partialRow)
 
 firstWidth :: B.firstWidth (B.partial 9) :~: 1
 firstWidth = Refl
+
+rowWidth :: B.rowWidth (B.partialRow 9) :~: 1
+rowWidth = Refl
 HS
     cat >Main.hs <<'HS'
 module Main where
 import qualified Demand
-import Proof (evenBatch, oddBatch)
+import qualified ExistentialVec as E
+import qualified IndexedVec as V
+import Proof (evenBatch, oddBatch, mask, row, empty)
 import qualified WitnessedBatch as B
 
+skipped :: [Int]
+skipped = B.selectedValues (B.MaskedRow (E.SS E.SZ) (V.VCons (error "unused value") V.VNil)
+                            (error "unused label") (V.VCons False V.VNil))
+
 main :: IO ()
-main = print (evenBatch, oddBatch, Demand.firstWidth,
-              B.firstWidth (B.build 4), B.firstWidth (B.build 3), B.firstWidth (B.partial 9))
+main = do
+    print (evenBatch, oddBatch, mask, Demand.firstWidth, Demand.rowWidth,
+           B.firstWidth (B.build 4), B.firstWidth (B.build 3), B.firstWidth (B.partial 9),
+           B.selectedValues (B.maskedRow 4), skipped)
+    let short :: B.KeyedRow Int
+        short = B.KeyedRow (error "unused tag") (V.VCons 'x' V.VNil)
+                           (V.VCons 8 (error "unused tail"))
+    print (row, empty, B.lookupColumn 'y' (B.keyedRow 4), B.lookupColumn 'x' short)
 HS
     "${ghc[@]}" "$opt" -c Proof.hs Demand.hs
     "${ghc[@]}" "$opt" -c Main.hs
     "${ghc[@]}" ./*.o -o run
-    test "$(./run)" = '(Refl,Refl,Refl,1,2,1)'
+    test "$(./run)" = $'(Refl,Refl,Refl,Refl,Refl,1,2,1,[5],[])\n(Refl,Refl,Just 5,Just 8)'
+
+    cat >WrongLength.hs <<'HS'
+module WrongLength where
+import ExistentialVec (SN(..))
+import IndexedVec (Vec(..))
+import WitnessedBatch (MaskedRow(..))
+bad :: MaskedRow Int
+bad = MaskedRow (SS SZ) (VCons 4 VNil) 'x' VNil
+HS
+    if "${ghc[@]}" "$opt" -c WrongLength.hs >length.log 2>&1 ||
+       ! grep -Eq 'WrongLength.hs:6:[0-9]+: error: \[GHC-83865\]' length.log ||
+       ! grep -Fq 'fourth argument' length.log; then
+        cat length.log >&2
+        exit 1
+    fi
 
     reject() {
         local module=$1 expected=$2
@@ -158,4 +214,18 @@ HS
         -e '/^import qualified WitnessedBatch as B$/a import qualified WrongWitness as Wrong' \
         DemandTail.hs >BadWitness.hs
     reject BadWitness 'The value returned by the interpreter does not match the checked result type.'
+
+    sed -e 's/module BadWitness/module BadMask/' -e 's/Wrong.buildWrong/Wrong.wrongMask/' \
+        BadWitness.hs >BadMask.hs
+    reject BadMask 'The value returned by the interpreter does not match the checked result type.'
+
+    sed -e 's/module BadWitness/module BadColumns/' -e 's/Wrong.buildWrong/Wrong.wrongColumns/' \
+        BadWitness.hs >BadColumns.hs
+    reject BadColumns 'The value returned by the interpreter does not match the checked result type.'
+
+    sed -e 's/module ClassEvidence/module UnsupportedField/' -e 's/W.withEvidence/W.badField/' \
+        ClassEvidence.hs >UnsupportedField.hs
+    reject UnsupportedField 'Cannot reify field 4 of'
+    grep -Fq 'BadField' reject.log
+    if grep -Fq 'unsupported field was evaluated' reject.log; then cat reject.log >&2; exit 1; fi
 done

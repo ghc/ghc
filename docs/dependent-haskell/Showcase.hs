@@ -1319,6 +1319,19 @@ main = do
             batch@(Batch.Chunk _ _ rest) -> [Batch.firstWidth batch, Batch.firstWidth rest]
             Batch.End -> []
         , Batch.firstWidth (Batch.partial 9) )
+    observe "select values with a mask at the same stored length"
+        ( Refl :: Batch.maskedRow 4 :~:
+            'Batch.MaskedRow ('E.SS ('E.SS 'E.SZ))
+                ('IndexedVec.VCons 4 ('IndexedVec.VCons 5 'IndexedVec.VNil))
+                'x' ('IndexedVec.VCons 'False ('IndexedVec.VCons 'True 'IndexedVec.VNil))
+        , Batch.selectedValues (Batch.maskedRow 4)
+        , Batch.rowWidth (Batch.partialRow 9) )
+    observe "look up a column at a shared length carried by the vectors"
+        ( Refl :: Batch.keyedRow 4 :~: 'Batch.KeyedRow 'r'
+            ('IndexedVec.VCons 'x' ('IndexedVec.VCons 'y' 'IndexedVec.VNil))
+            ('IndexedVec.VCons 4 ('IndexedVec.VCons 5 'IndexedVec.VNil))
+        , Batch.lookupColumn 'y' (Batch.keyedRow 4)
+        , Batch.lookupColumn 'y' (Batch.keyedRow 0) )
     observe "read one field of a private parcel without forcing the other"
         (Refl :: LazyParcel.first (LazyParcel.make 7) :~: 7, LazyParcel.first (LazyParcel.make 7))
     observe "construct a result from two symbolic fields"

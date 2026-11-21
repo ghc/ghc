@@ -6071,6 +6071,15 @@ and [GHC's declaration scheduler](../../compiler/GHC/Tc/Module.hs).
 
 ### Recursively read back witnessed constructors
 
+Agda's `length-toList` proves the relationship between a vector's index
+and the length of its list representation by induction on the vector.
+The empty case gives `refl`. The cons case applies `cong suc` to the
+recursive proof. R15 uses the constructor equalities of the Haskell GADT
+to recover an existential index from a finite value. Other indexed fields
+must give the same index. An ordinary lookup only evaluates the constructors
+it visits. [Agda vector properties](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Properties.html)
+and [shared vector length](roadmap/R15-closed-term-evaluator.md#recover-a-hidden-length-from-the-vector).
+
 The Idris 2 tutorial's vector filter returns a dependent pair. Its
 recursive branch opens the result of the recursive call before building
 a new pair whose length follows the selected branch. The Haskell batch
@@ -6081,6 +6090,14 @@ an ordinary consumer stop after reading the first witness.
 [Idris dependent pairs and vector filter](https://idris2.readthedocs.io/en/latest/tutorial/typesfuns.html#dependent-pairs),
 [ordinary batch](examples/closed-evaluation/WitnessedBatch.hs),
 and [R15 result check](roadmap/R15-closed-term-evaluator.md#read-back-a-recursive-result-with-witnessed-indices).
+
+Agda can express a row with a length, values, a label and a mask as
+`Σ[ n ∈ ℕ ] (Vec A n × Char × Vec Bool n)`. Both vectors use the
+index bound by the pair. The intervening label has a closed type.
+The fork checks the same relationship when it reads an ordinary Haskell
+constructor back from the interpreter.
+[Agda dependent pairs and products](https://agda.github.io/agda-stdlib/v2.4/Data.Product.Base.html)
+and [Agda vectors](https://agda.github.io/agda-stdlib/v2.4/Data.Vec.Base.html).
 
 ### Observing a composition and returning an open constructor
 
