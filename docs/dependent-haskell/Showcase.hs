@@ -1457,6 +1457,8 @@ main = do
     observe "recover a table's row count from its cells"
         (Refl :: Table.withoutRowLabels (Table.sample 4) :~: 'Table.ColumnTable
             (Vec3 'x' 'y' 'z') (Vec2 (Vec3 1 2 3) (Vec3 4 5 6)))
+    observe "recover one side length for every row of a square"
+        (Refl :: Table.square 1 :~: 'Table.Square (Vec2 (Vec2 1 2) (Vec2 3 4)))
     observe "read one field of a private parcel without forcing the other"
         (Refl :: LazyParcel.first (LazyParcel.make 7) :~: 7, LazyParcel.first (LazyParcel.make 7))
     observe "construct a result from two symbolic fields"

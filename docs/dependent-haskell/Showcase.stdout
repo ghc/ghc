@@ -374,6 +374,7 @@ read row and column totals at independent hidden lengths: (Refl,(Just 8,Just 4),
 sum a rectangular table by row and by column: (Refl,(Just 15,Just 9))
 read back the stored cells at both table dimensions: Refl
 recover a table's row count from its cells: Refl
+recover one side length for every row of a square: Refl
 read one field of a private parcel without forcing the other: (Refl,7)
 construct a result from two symbolic fields: Refl
 use a derived instance beside a dependent type: "Second"

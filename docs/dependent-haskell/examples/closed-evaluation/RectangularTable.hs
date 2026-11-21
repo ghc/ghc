@@ -1,5 +1,5 @@
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
-module RectangularTable (Table(..), ColumnTable(..), withoutRowLabels, totals, sample, selectedTotals) where
+module RectangularTable (Table(..), ColumnTable(..), Square(..), withoutRowLabels, square, totals, sample, selectedTotals) where
 
 import IndexedVec (Vec(..))
 import Numeric.Natural (Natural)
@@ -16,6 +16,16 @@ data ColumnTable a where
 -- | Discard the row labels. The outer vector still determines the row count.
 withoutRowLabels :: Table a -> ColumnTable a
 withoutRowLabels (Table _ cols cells) = ColumnTable cols cells
+
+-- | The number of rows also gives the width of every row.
+data Square a where
+    Square :: Vec n (Vec n a) -> Square a
+
+-- | Return an empty square at zero and a two-by-two square otherwise.
+square :: Natural -> Square Natural
+square 0 = Square VNil
+square n = Square (VCons (VCons n (VCons 2 VNil))
+                  (VCons (VCons 3 (VCons 4 VNil)) VNil))
 
 -- | Sum each row and column with its original labels.
 totals :: Table Natural -> TableMargins Natural
