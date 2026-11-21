@@ -1808,3 +1808,27 @@ disabled. In the runtime example, both folds skip an undefined seed and
 tail. A step that ignores its head also skips the mapper and input head.
 [Source proof](../examples/open-evaluation/PreludeFoldrProof.hs) and
 [Agda's list law](../REFERENCES.md#right-fold-after-map).
+
+
+## Select a mapping worker from a ground dictionary
+
+An ordinary producer can define `mapLike = mapMaybeValue` in a
+`MapLike Maybe` instance. Its reader can prove both constructor
+equations with `Refl`. In the `Just` case both the callback and the
+payload are type variables. The runtime example returns `Just False`.
+The `Nothing` case leaves the callback unevaluated.
+[Producer](../examples/open-evaluation/MappingWorker.hs)
+and [proofs](../examples/open-evaluation/MappingProof.hs).
+
+The instance must select a named worker with checked equations.
+A local `MapLike Maybe` constraint leaves the method choice open.
+GHC reports GHC-83605 at the call. The installed `Functor Maybe`
+instance defines `fmap` with two equations in the instance body.
+Checking this body remains open. Agda's Maybe mapper has the same
+two constructor equations. GHC must also identify the selected
+dictionary. In the #383 discussion Eisenberg recommends sharing
+the representation of terms and types in Core. That makes evaluating
+the actual method body a question for R05 as well as R16.
+[Agda Maybe](https://github.com/agda/agda-stdlib/blob/v2.4/src/Data/Maybe/Base.agda),
+[installed instance](../../../libraries/ghc-internal/src/GHC/Internal/Base.hs),
+and [Eisenberg's review](https://github.com/ghc-proposals/ghc-proposals/issues/383#issuecomment-746676314).

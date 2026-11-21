@@ -531,7 +531,9 @@ and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vecto
    law for an arbitrary step and seed. It uses the method selected by the
    installed list dictionary. A code-generating producer can record that
    choice even when its interface omits optimizer pragmas. The next
-   example to check is `fmap` on `Maybe`.
+   example to check is the instance body of `Prelude.fmap` on `Maybe`.
+   A mapping method that selects a named worker now supports proofs of
+   both constructor equations. [Maybe proof](examples/open-evaluation/MappingProof.hs).
    [Public fold proof](examples/open-evaluation/PreludeFoldrProof.hs).
    [Append and map proofs](roadmap/R16-open-term-evaluator.md#prove-that-map-distributes-over-append).
 

@@ -3,7 +3,7 @@ module GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourc
                               sourceTableCallees, sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
                               sourceTableFamilyAppUse, sourceTableReferenceUse, sourceCaseKindUse, sourceCaseVisibleArity, isSourceConstructorCase, sourceTableOwner, monomorphicEnumCaseArity, groundFirstHead,
                               visibleSourceMethodRules, hasSourceMethodRule, hasSourceMethodRuleAt,
-                              sourceBinarySelector, sourceMapSelector, lookupSourceBinaryMethod, lookupSourceContainerMethod, publishContainerMethods, sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers, isSourceFilterGuard,
+                              sourceBinarySelector, sourceMapSelector, lookupSourceBinaryMethod, lookupSourceContainerMethod, publishListFoldMethods, sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers, isSourceFilterGuard,
                               OptionalSourceUses, optionalSourceUses, registerOptionalSourceUses,
                               checkOptionalSourceUses, checkSourceMethodUses) where
 
@@ -500,6 +500,11 @@ For a binary selector of type a -> a -> a, a retained argument fixes a.
 Use the binder's type to look up the dictionary. Check the original
 operands, including any written kind annotations, against the worker's table.
 
+For a method of type (a -> b) -> h a -> h b, the kind of the receiver
+fixes h. Check that the receiver and result use the class parameter
+before using it to find an instance. The selected worker determines
+what happens to each constructor.
+
 First find the method field of the visible instance dictionary. Check
 its specialized type and its equations. Then ask the ordinary
 solver which dictionary the source call uses. GHC.Tc.Gen.HsType supplies
@@ -621,13 +626,11 @@ dictionarySlots cls domain con (Core.Type applied : fields)
   = Just (zip selectors fields)
 dictionarySlots _ _ _ _ = Nothing
 
-{- Note [Mandatory container method evidence]
+{- Note [Mandatory list fold method evidence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Record just the selector and implementation Names from the final dictionary
-constructor. A fold requires a checked list fold at the specialized
-method type. A mapping method uses the equations of its actual field.
-Match the class parameter in both the receiver and result to determine
-the instance. A matching method type alone supplies no equations. Read a local field's current binder after final source-table
+constructor. The actual field must be a checked fold at the specialized
+method type. Read a local field's current binder after final source-table
 validation. A Core occurrence can still carry the pre-validation IdDetails.
 Keep older mandatory evidence for other methods.
 
@@ -637,10 +640,10 @@ It records only the exact method choice and does not supply any equations
 by itself. The client still checks its scoped dictionary and visible rules.
 -}
 
--- | Publish checked fold and mapping aliases from ground dictionaries.
--- See Note [Mandatory container method evidence].
-publishContainerMethods :: Module -> [Core.CoreBind] -> [Core.CoreBind]
-publishContainerMethods mod binds = map publishBind binds
+-- | Publish exact list fold aliases from the final dictionary bindings.
+-- See Note [Mandatory list fold method evidence].
+publishListFoldMethods :: Module -> [Core.CoreBind] -> [Core.CoreBind]
+publishListFoldMethods mod binds = map publishBind binds
   where
     locals = mkNameEnv [(idName v, v) | (v, _) <- Core.flattenBinds binds]
     publishBind (Core.NonRec v rhs) = Core.NonRec (publish v rhs) rhs
@@ -648,18 +651,17 @@ publishContainerMethods mod binds = map publishBind binds
     publish v rhs = fromMaybe v $ do
       DFunId terminating _ <- pure (idDetails v)
       (cls, [domain]) <- getClassPredTys_maybe (varType v)
-      guard (noFreeVarsOfType domain && isTyFamFree domain)
+      guard (domain `eqType` mkTyConTy listTyCon)
       (Core.Var worker, fields) <- pure (Core.collectArgs rhs)
       con <- isDataConWorkId_maybe worker
       slots <- dictionarySlots cls domain con fields
       let methods =
             [ (selector, target)
             | (selector, Core.Var field) <- slots, selector `elem` classMethods cls
-            , Just target <- [current field], isExternalName (idName target)
+            , listFoldSelector cls selector
+            , Just target <- [current field]
             , varType target `eqType` classMethodInstTy selector [domain]
-            , Just table <- [sourceTableId_maybe target]
-            , sourceMapSelector selector || (domain `eqType` mkTyConTy listTyCon &&
-                listFoldSelector cls selector && isListFoldTable table) ]
+            , Just table <- [sourceTableId_maybe target], isListFoldTable table ]
       guard (not (null methods))
       DFunId _ (Just checked) <- pure (idDetails (setSourceMethodIds v methods))
       let selected = map fst (sdf_methods checked)
