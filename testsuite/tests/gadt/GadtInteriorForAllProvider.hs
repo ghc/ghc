@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs, RequiredTypeArguments #-}
 module GadtInteriorForAllProvider where
 
 data Box a where
@@ -16,3 +16,12 @@ data Later b a where
 
 data Shadow where
   Shadow :: forall a. a -> forall a. a -> Shadow
+
+data Required a where
+  Required :: !Int -> forall a -> a -> Required a
+
+data RequiredPack where
+  RequiredPack :: Int -> forall a -> a -> RequiredPack
+
+data RequiredLater b a where
+  RequiredLater :: forall b. First b -> forall a -> a -> RequiredLater b a

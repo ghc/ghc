@@ -3,3 +3,26 @@ GadtInteriorForAllScope.hs:8:12: error: [GHC-14964]
       An invisible type pattern must be checked against a forall.
     • In the pattern: Box @Int _ _
       In an equation for ‘wrong’: wrong (Box @Int _ _) = True
+
+GadtInteriorForAllScope.hs:17:18: error: [GHC-70206]
+    • Illegal type pattern.
+      A type pattern must be checked against a visible forall.
+    • In the pattern: type b
+      In the pattern: Required (type b) n x
+      In an equation for ‘early’: early (Required (type b) n x) = (n, x)
+
+GadtInteriorForAllScope.hs:20:37: error: [GHC-25897]
+    • Couldn't match expected type ‘a’ with actual type ‘a1’
+      ‘a1’ is a rigid type variable bound by
+        a pattern with constructor: Pack :: Int -> forall a -> a -> Pack,
+        in an equation for ‘escape’
+        at GadtInteriorForAllScope.hs:20:9-32
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          escape :: forall a. Pack -> a
+        at GadtInteriorForAllScope.hs:19:1-19
+    • In the expression: x
+      In an equation for ‘escape’: escape (Pack _ (type b) (x :: b)) = x
+    • Relevant bindings include
+        x :: a1 (bound at GadtInteriorForAllScope.hs:20:26)
+        escape :: Pack -> a (bound at GadtInteriorForAllScope.hs:20:1)
