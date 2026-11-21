@@ -457,8 +457,11 @@ tcOrdinaryApp rn_expr rn_fun rn_args exp_res_ty
        ; let rn_head = (rn_fun, fun_lspan)
        ; (tc_fun0, fun_sigma0) <- tcInferAppHead rn_head
        ; let check_call fun sigma args expected =
-               tcOpenImplicitArgs rn_expr sigma args expected $
-                 tcOrdinaryApp' rn_expr rn_head fun sigma
+               do { let check = tcOrdinaryApp' rn_expr rn_head
+                  ; mixed <- tcOpenMixedBarArgument fun sigma args expected check
+                  ; case mixed of
+                      Just opened -> return opened
+                      Nothing -> tcOpenImplicitArgs rn_expr sigma args expected (check fun sigma) }
              -- See Note [Type arguments before an implicit package head].
              (type_prefix, payload_args)
                | let (prefix, rest) = span prefix_arg rn_args
@@ -487,6 +490,76 @@ tcOrdinaryApp rn_expr rn_fun rn_args exp_res_ty
     ordinary_arg EValArg{} = True
     ordinary_arg EWrap{} = True
     ordinary_arg _ = False
+
+-- | Open a dot operand for a unary consumer of its explicit package.
+-- See Note [Implicit opening for an explicit package argument].
+tcOpenMixedBarArgument
+  :: HsExpr GhcTc -> TcSigmaType -> [HsExprArg 'TcpRn] -> ExpRhoType
+  -> (HsExpr GhcTc -> TcSigmaType -> [HsExprArg 'TcpRn] -> ExpRhoType -> TcM (HsExpr GhcTc))
+  -> TcM (Maybe (HsExpr GhcTc))
+tcOpenMixedBarArgument fun sigma args expected check_app
+  | hasNoConcreteTyVars fun
+  = do { candidate <- tcFindMixedBarArgument sigma args
+       ; case candidate of
+           Just (binder, rho, domain, operand)
+             -> do { (checked, actual) <- tcScalingUsage ManyTy $ tcInferRho operand
+                   ; schema <- liftZonkM (zonkTcType actual)
+                   ; result <- expTypeToType expected
+                   ; opened <- tcOpenImplicitPackage (getLocA operand) schema checked result $ \payload ->
+                         let ref = mkExpandedLExpr (unLoc operand) (nlHsVar (getName payload))
+                             replace arg@EValArg{} = arg { ea_arg = L (getLoc operand) ref }
+                             replace arg = arg
+                             check fun' ty = tcExtendIdEnv [payload] $
+                               check_app fun' ty (map replace args) (mkCheckExpType result)
+                         in case matchBarPackageWitness binder domain (varType payload) of
+                              Just (witness, _) ->
+                                check (mkHsWrap (mkWpTyApps [witness]) fun)
+                                      (substTyWith [binder] [witness] rho)
+                              Nothing -> check fun sigma
+                   ; return (Just opened) }
+           Nothing -> return Nothing }
+  | otherwise = return Nothing
+
+-- | Read the declaration of a unary mixed package call without elaborating it.
+-- See Note [Implicit opening for an explicit package argument].
+tcFindMixedBarArgument :: TcSigmaType -> [HsExprArg 'TcpRn]
+                       -> TcM (Maybe (TyVar, TcSigmaType, TcType, LHsExpr GhcRn))
+tcFindMixedBarArgument sigma args
+  | ForAllTy _ (Bndr binder vis) rho <- coreFullView sigma
+  , isTyVar binder, isInvisibleForAllTyFlag vis
+  , FunTy { ft_af = af, ft_mult = mult, ft_arg = domain } <- coreFullView rho
+  , isVisibleFunArg af, isManyTy mult
+  , Just template <- barPackageSignature domain
+  , isInjectiveInType binder template
+  , [EValArg{ea_arg = operand}] <- filter (not . parens) args
+  , HsVar _ name <- unLoc (stripParensLHsExpr operand)
+  = do { ident <- tcLookupIdMaybe (unLocWithUserRdr name)
+       ; return $ case coreFullView . varType <$> ident of
+           Just (ExistsTy ImplicitExists _ inner)
+             | Just _ <- matchBarPackageWitness binder domain (implicitPayloadType inner)
+             -> Just (binder, rho, domain, operand)
+           _ -> Nothing }
+  | otherwise = return Nothing
+  where
+    parens (EWrap EPar{}) = True
+    parens _ = False
+
+{- Note [Implicit opening for an explicit package argument]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For inspectInner p, the formal domain is exists b | (a, b) under
+forall a. If p hides a in a dot package, its opened bar type can determine
+the erased type application. Determine this before creating inference
+variables: ordinary unification treats the bar type as opaque.
+
+Require an injective occurrence of the parameter in the bar binder's kind
+or body. The scoped comparison selects a type, then checks the complete bar
+type at that choice. Recompute the choice from the actual opened payload
+so it refers to the fresh skolem. Keep the result type outside its scope.
+Continue checking the source application under this opening. Only the dot
+binder opens here; the callee still controls the explicit unpacking.
+Use the same read-only preflight to defer Quick Look when it would skip
+the opening. See Note [Quick Look and implicit existential arguments].
+-}
 
 tcOrdinaryApp' :: HsExpr GhcRn -> (HsExpr GhcRn, SrcSpan) -> HsExpr GhcTc
                -> TcSigmaType -> [HsExprArg 'TcpRn] -> ExpRhoType -> TcM (HsExpr GhcTc)
@@ -2248,8 +2321,14 @@ implicitResult _ _ _ expected = return (expected, id)
 matchMixedExistsResult :: Type -> Type -> Maybe (Type, Type)
 matchMixedExistsResult schema actual
   | ExistsTy ImplicitExists outer formal <- coreFullView schema
-  , Just template <- bar_signature formal
-  , Just target <- bar_signature actual
+  = matchBarPackageWitness outer formal actual
+  | otherwise = Nothing
+
+-- | Match one free template variable across an explicit existential.
+matchBarPackageWitness :: TyVar -> Type -> Type -> Maybe (Type, Type)
+matchBarPackageWitness outer formal actual
+  | Just template <- barPackageSignature formal
+  , Just target <- barPackageSignature actual
   , all supportsQuickLookType [formal, actual]
   , all noQuickLookVars [formal, actual]
   = do { let bind_outer tv _ | tv == outer = BindMe
@@ -2263,11 +2342,13 @@ matchMixedExistsResult schema actual
        ; guard (eqType (typeKind witness) (tyVarKind outer) && eqType inner actual)
        ; return (witness, inner) }
   | otherwise = Nothing
-  where
-    bar_signature ty
-      | ExistsTy ExplicitExists binder body <- coreFullView ty
-      = Just (mkTyCoForAllTy unmatchableDataConTy binder (Invisible SpecifiedSpec) body)
-      | otherwise = Nothing
+
+-- | Compare the binder kind and body without changing the original mode.
+barPackageSignature :: Type -> Maybe Type
+barPackageSignature ty
+  | ExistsTy ExplicitExists binder body <- coreFullView ty
+  = Just (mkTyCoForAllTy unmatchableDataConTy binder (Invisible SpecifiedSpec) body)
+  | otherwise = Nothing
 
 -- | Select a higher-rank witness from equal invariant result types.
 -- See Note [Implicit existential lambda payloads] in GHC.Tc.Gen.Expr.
@@ -6818,7 +6899,12 @@ tcQuickLookNeedsImplicitArgs (HsVar _ lname) args
   , any isHsValArg args, all plain args
   = do { ident <- tcLookupIdMaybe name
        ; case ident of
-           Just var -> any isRight <$> tcImplicitAppArgs (varType var) args
+           Just var -> do
+             { let sigma = varType var
+             ; mixed <- if isEmptyNameEnv (idConcreteTvs var)
+                        then tcFindMixedBarArgument sigma args
+                        else return Nothing
+             ; if isJust mixed then return True else any isRight <$> tcImplicitAppArgs sigma args }
            Nothing -> return False }
   where
     plain EValArg{} = True

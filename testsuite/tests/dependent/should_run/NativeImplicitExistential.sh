@@ -350,16 +350,23 @@ for opt in 0 2; do
     "$ghc" "${mixed_flags[@]}" -c MixedPackageMain.hs
     "$ghc" "${mixed_flags[@]}" MixedPackageMain.o ../provider/MixedPackageProvider.o -o run
     ./run >mixed.out
-    printf '(11,11,13,True)\n("ignored","ignored")\nTrue\n' | diff -u - mixed.out
+    printf '(11,11,13,True)\n("ignored","ignored")\nTrue\n(13,21,(17,True),True)\nTrue\n' |
+        diff -u - mixed.out
     if "$ghc" "${mixed_flags[@]}" -c MixedPackageReject.hs >mixed-reject.log 2>&1; then
         echo "MixedPackageReject unexpectedly compiled." >&2
         exit 1
     fi
-    for rejection in wrongWitness:83865 wrongMode:27432 crossed:83865; do
-        line=$(grep -n "^${rejection%:*} =" MixedPackageReject.hs | cut -d: -f1)
+    for rejection in wrongWitness:83865 wrongMode:27432 crossed:83865 stale:83865 \
+                     escapeCall:25897 captureRank:83865 onlyFamily:83865 linearCall:18872; do
+        line=$(grep -n "^${rejection%:*}.* =" MixedPackageReject.hs | cut -d: -f1)
         grep -Eq "^MixedPackageReject.hs:$line:[0-9]+: error: \[GHC-${rejection#*:}\]" mixed-reject.log ||
             { cat mixed-reject.log >&2; exit 1; }
     done
+    line=$(grep -n '^stale p =' MixedPackageReject.hs | cut -d: -f1)
+    if [[ $(grep -Ec "^MixedPackageReject.hs:$line:[0-9]+: error:" mixed-reject.log) != 1 ]]; then
+        cat mixed-reject.log >&2
+        exit 1
+    fi
     for pattern in 'Pack _ (x, _, _) -> x' '(_, y :: witness, _) -> y'; do
         line=$(grep -nF "$pattern" MixedPackageReject.hs | cut -d: -f1)
         grep -Eq "^MixedPackageReject.hs:$line:[0-9]+: error: \[GHC-25897\]" mixed-reject.log ||

@@ -396,8 +396,17 @@ schema. In `case p of Pack (type b) payload -> ...`, the case opens the
 dot package before checking the explicit pattern. The pattern binds the
 bar witness. The ordinary payload pattern determines demand.
 
-A call that expects a polymorphic bar package still requires the package
-at its declared type. Use the explicit case to open a mixed package.
+A separately compiled ordinary module can call
+`inspectInner p` with `inspectInner :: forall a. Inner a -> Int` and
+`p :: Mixed`. The type of the opened bar package fixes `a` before
+checking the call. The parameter must occur injectively in the bar
+binder kind or body. The result type stays outside the dot witness's
+scope. The consumer can open the inner package with its explicit Pack
+pattern, or ignore its payload and leave the argument lazy.
+
+The argument in this call must be a named value of the declared mixed
+type. For a package-producing expression, bind its result at `Mixed`
+before passing the name to the consumer.
 
 A local binding can store the whole nested package. For example,
 `let rows = partitionPair p xs in roundTrip rows` keeps both lengths

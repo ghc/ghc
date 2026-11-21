@@ -336,9 +336,10 @@ and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vecto
    [later argument](roadmap/R23-unsaturated-type-families.md#choosing-a-prefixs-matchability-from-a-later-argument)
    and [singletons migration](roadmap/R23-unsaturated-type-families.md#arrow-patterns-in-family-equations).
 3. **R22 and R04.** An ordinary module can put an explicit existential
-   package inside an implicit one and open both in a pattern. Check direct
-   application of a polymorphic consumer whose parameter is inside the
-   explicit package. The list-to-vector producer carries a computed witness.
+   package inside an implicit one and open both in a pattern. A direct call
+   can infer a polymorphic consumer's parameter from a named mixed
+   package. Extend that call to an argument that produces the package.
+   The list-to-vector producer carries a computed witness.
    [Retained list pairs](roadmap/R04-dependent-sums.md),
    [Guarded witness](roadmap/R22-existential-quantification.md#inferring-a-higher-rank-witness)
    and [nested patterns](roadmap/R22-existential-quantification.md#constructor-cases-on-the-payload).
