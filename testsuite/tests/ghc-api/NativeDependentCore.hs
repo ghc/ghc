@@ -438,7 +438,7 @@ runRetainedFieldChecks dflags = do
                 [Scaled ManyTy natTy, Scaled ManyTy natTy]
                 vacuousTy
         rejectsMetadata label binders args result =
-            rejectsWith label "mkDataConWithRetainedArgs: invalid telescope" $
+            rejectsWith label "mkDataConWithTelescope: invalid retained telescope" $
                 evaluate (dataConWrapperType (build binders args result))
     case nestedFields of
         [field, dependent] -> case idType dependent of
@@ -553,7 +553,7 @@ runRetainedFieldChecks dflags = do
                 Nothing -> fail ("FAIL: " ++ label ++ " retained domain validation did not terminate")
                 Just (Left exception) ->
                     check (label ++ " retained domain is rejected") $
-                        "mkDataConWithRetainedArgs: invalid telescope" `isInfixOf` displayException exception
+                        "mkDataConWithTelescope: invalid retained telescope" `isInfixOf` displayException exception
                 Just (Right _) -> fail ("FAIL: " ++ label ++ " retained domain was accepted")
     rejectsWith "retained constructor cannot be promoted" "promoteDataCon: retained field telescope" $
         evaluate (promoteDataCon constructor)
