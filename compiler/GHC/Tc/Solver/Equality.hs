@@ -2120,7 +2120,7 @@ canDecomposableTyConAppOK ev eq_rel tc (ty1,tys1) (ty2,tys2)
                    -- setVarType: satisfy Note [mkSelCo precondition] in Coercion.hs
                    -- Remember: ty1/ty2 may be more fully zonked than evar
                    --           See the call to canonicaliseEquality in solveEquality.
-             -> emitNewGivens loc
+             -> emitSelectorGivens loc
                        [ (r, mkSelCo (SelTyCon i r) ev_co)
                        | (r, ty1, ty2, i) <- zip4 tc_roles tys1 tys2 [0..]
                        , r /= Phantom
@@ -2163,6 +2163,47 @@ canDecomposableTyConAppOK ev eq_rel tc (ty1,tys1) (ty2,tys2)
           mb_role_expln = tyConAppRoleExplanation role tc (arg_no, arg_role)
       in adjustCtLocTyConBinder mb_bndr mb_role_expln loc
 
+-- | Bind the non-reflexive projections of a Given.
+-- See Note [Homogeneous selector Givens].
+emitSelectorGivens :: CtLoc -> [(Role, TcCoercion)] -> TcS ()
+emitSelectorGivens loc selectors
+  = do { traceTcS "emitSelectorGivens" (ppr selectors)
+       ; givens <- sequence
+           [ bind_selector role co lhs rhs
+           | (role, co) <- selectors
+           , let Pair lhs rhs = coercionKind co
+           , not (lhs `tcEqType` rhs) ]
+       ; emitWorkNC (map CtGiven givens) }
+  where
+    bind_selector role co lhs rhs
+      | let k1 = typeKind lhs
+            k2 = typeKind rhs
+      , not (k1 `tcEqType` k2)
+      = do { kind_ev <- newGivenEv (mkKindEqLoc lhs rhs loc)
+                            (mkNomEqPred k2 k1, evCoercion (mkSymCo (mkKindCo co)))
+           ; emitWorkNC [CtGiven kind_ev]
+           ; let kind_co = givenCtEvCoercion kind_ev
+           ; newGivenEv loc (mkEqPredRole role lhs (mkCastTy rhs kind_co),
+                    evCoercion (co `mkTransCo` mkGReflRightCo role rhs kind_co)) }
+      | otherwise
+      = newGivenEv loc (mkEqPredRole role lhs rhs, evCoercion co)
+
+{- Note [Homogeneous selector Givens]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A same-kind Given such as T @k a ~# T @l b can have a projection whose
+endpoints have different kinds. Function argument projections can also
+have different runtime representations. The selector expression proves
+the heterogeneous equality. Keep it as a coercion expression.
+
+First bind a nominal proof h :: l ~# k from Sym (Kind selector).
+Bind the index equality a ~# (b |> h) next, using the selector followed by
+the cast on b. Both binders have same-kind endpoints. Use the selector's
+role for the index equality, including a representational projection.
+This performs the transport from canEqCanLHSHetero before binding the
+selected evidence. The constructor or function representation stays the
+same.
+-}
+
 canDecomposableFunTy :: CtEvidence -> EqRel -> FunTyFlag
                      -> (Type,Type,Type,Type,Type) -- (fun_ty,matchability,multiplicity,arg,res)
                      -> (Type,Type,Type,Type,Type) -- (fun_ty,matchability,multiplicity,arg,res)
@@ -2191,7 +2232,7 @@ canDecomposableFunTy ev eq_rel af f1@(ty1,ma1,m1,a1,r1) f2@(ty2,ma2,m2,a2,r2)
                    -- setVarType: satisfy Note [mkSelCo precondition] in Coercion.hs
                    -- Remember: ty1/ty2 may be more fully zonked than evar
                    --           See the call to canonicaliseEquality in solveEquality.
-             -> emitNewGivens loc
+             -> emitSelectorGivens loc
                        [ (funRole role fs, mkSelCo (SelFun fs) ev_co)
                        | fs <- [SelMatch, SelMult, SelArg, SelRes] ]
 

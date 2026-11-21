@@ -1092,8 +1092,9 @@ main = do
     disabled <- readIORef fieldFlag
     observe "use two caller dictionaries in imported dependent results"
         (ScopedClassMethodClient.twoDictionaries enabled, ScopedClassMethodClient.twoDictionaries disabled)
-    observe "read the stored dictionary with ordinary and dependent matches"
-        StoredDictionaryClient.storedDecisions
+    cellDemand <- StoredDictionaryClient.bindingDemand
+    observe "read stored dictionaries and check strict and lazy cell binding"
+        (StoredDictionaryClient.storedDecisions, cellDemand)
     observe "read a scoped method through a Haskell 2010 client"
         (ScopedClassMethodClient.ordinaryChoices enabled, ScopedClassMethodClient.ordinaryChoices disabled)
     observe "infer a payload constraint beside a scoped method"

@@ -7,15 +7,15 @@ plugin :: Plugin
 plugin =
     defaultPlugin
         { installCoreToDos = \_ passes ->
-            pure (CoreDoPluginPass "Check deferred coercion binders" check : passes)
+            pure (CoreDoPluginPass "Check homogeneous coercion binders" check : passes)
         }
 
 check :: ModGuts -> CoreM ModGuts
 check guts =
     case filter isCoVar (concatMap binders (mg_binds guts)) of
-        [] -> error "Expected deferred coercion binders"
+        [] -> error "Expected coercion binders"
         covars
-            | any mixedKind covars -> error "Mixed-kind binder for deferred coercion"
+            | any mixedKind covars -> error "Mixed-kind coercion binder"
             | otherwise -> pure guts
   where
     mixedKind cv =

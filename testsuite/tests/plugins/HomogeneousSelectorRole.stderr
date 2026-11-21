@@ -1,0 +1,28 @@
+HomogeneousSelectorRole.hs:14:9: error: [GHC-25897]
+    • Could not deduce ‘a ~ b’
+      from the context: Coercible (Premise a) (Premise b)
+        bound by the type signature for:
+                   bad :: forall k l (a :: k) (b :: l).
+                          Coercible (Premise a) (Premise b) =>
+                          Result a -> Result b
+        at HomogeneousSelectorRole.hs:(12,1)-(13,64)
+      Expected: Result b
+        Actual: Result a
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          bad :: forall k l (a :: k) (b :: l).
+                 Coercible (Premise a) (Premise b) =>
+                 Result a -> Result b
+        at HomogeneousSelectorRole.hs:(12,1)-(13,64)
+      ‘b’ is a rigid type variable bound by
+        the type signature for:
+          bad :: forall k l (a :: k) (b :: l).
+                 Coercible (Premise a) (Premise b) =>
+                 Result a -> Result b
+        at HomogeneousSelectorRole.hs:(12,1)-(13,64)
+    • In the expression: x
+      In an equation for ‘bad’: bad x = x
+    • Relevant bindings include
+        x :: Result a (bound at HomogeneousSelectorRole.hs:14:5)
+        bad :: Result a -> Result b
+          (bound at HomogeneousSelectorRole.hs:14:1)

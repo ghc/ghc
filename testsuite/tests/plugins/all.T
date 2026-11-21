@@ -61,6 +61,13 @@ test('DeferredHeterogeneous',
      multimod_compile,
      ['DeferredHeterogeneous', '-v0 -package ghc -dcore-lint ' + config.plugin_way_flags])
 
+test('HomogeneousSelectorGivens',
+     [only_ways(['normal']),
+      extra_files(['DeferredHeterogeneousPlugin.hs', 'HomogeneousSelectorGivensProvider.hs'])],
+     multimod_compile_and_run,
+     ['HomogeneousSelectorGivens', '-v0 -package ghc -dcore-lint -dstg-lint ' + config.plugin_way_flags])
+test('HomogeneousSelectorRole', normal, compile_fail, [''])
+
 test('plugins06',
      [extra_files(['LinkerTicklingPlugin.hs']),
       unless(have_dynamic(), skip)],

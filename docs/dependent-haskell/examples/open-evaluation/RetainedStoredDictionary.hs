@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, RoleAnnotations #-}
-module RetainedStoredDictionary (Result(..), inspectStored) where
+module RetainedStoredDictionary (Result(..), inspectStored, ignoreStored) where
 
 import StoredDictionary (Cell(Stored), Pick(pick))
 
@@ -17,3 +17,7 @@ data Result (cell :: Cell [Bool]) = Result Bool
 inspectStored :: foreach (cell :: Cell [Bool]) -> Result cell
 inspectStored cell = Result @cell (case cell of
     Stored x -> case tag (pick x) of Tagged b -> b)
+
+-- | Keep the cell's index without evaluating the cell.
+ignoreStored :: foreach (cell :: Cell [Bool]) -> Result cell
+ignoreStored cell = Result @cell True
