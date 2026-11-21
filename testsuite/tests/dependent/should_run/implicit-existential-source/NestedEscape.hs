@@ -64,3 +64,13 @@ distinctEquations (Product yes _) (Product other _) = sameLength yes other
   where
     sameLength :: Vec n a -> Vec n a -> Bool
     sameLength _ _ = True
+
+wrongRepack :: PackedPair a -> PackedPair a
+wrongRepack p = let result = case p of (xs, ys) -> sameLength xs ys in result
+  where
+    sameLength :: Vec n a -> Vec n a -> (Vec n a, Vec n a)
+    sameLength xs ys = (xs, ys)
+
+unpackedLet, unpackedCase :: PackedPair a -> Vec n a
+unpackedLet p = let result = case p of (xs, _) -> xs in result
+unpackedCase p = case (case p of (_, ys) -> ys) of result -> result

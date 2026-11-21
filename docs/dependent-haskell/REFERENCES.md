@@ -3312,6 +3312,12 @@ of witnesses. Elab-IExist opens a package while checking an application.
 The fork substitutes each witness into the next binder's kind. A case
 whose pattern names the payload's data constructor uses the same lexical
 scope. This case context extends the application rule in the paper.
+An expected package can also pass through a single forwarding let or
+variable case. GHC checks the local RHS or scrutinee at the expected
+package type, so Elab-Gen still chooses the witnesses within their scope.
+This rule needs no type-level `Witness` projection. The draft discusses
+the corresponding local scope problem under
+[Alternatives](https://github.com/goldfirere/ghc-proposals/blob/72de21d16aa0b6e1a85cd4ecc66c7dc729ee0d87/proposals/0473-existentials.rst#alternatives).
 Agda's dependent pair supplies the binder-order comparison. Its second
 field can mention the first. Idris's `Exists` supplies the erased-witness
 comparison. [Paper, figure 8](https://richarde.dev/papers/2021/exists/exists.pdf#page=18),

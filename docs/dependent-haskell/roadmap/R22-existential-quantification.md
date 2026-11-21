@@ -230,8 +230,17 @@ annotation can also identify the dot package. The resulting witness remains
 local to the fold, and the fold can return its first result with an
 exceptional input tail.
 
-The draft's general opaque witness projections, scope
-repacking across lambda, let or case, and `@Pack` remain open.
+`RankedPackageClient.swapRowsLet` checks an unsigned local binding at the
+known output package type when the body returns that binding directly.
+`swapRowsCase` uses the same type flow through one variable alternative.
+The package introduction stays inside the inner alternative, where both
+input lengths are in scope. Swapping the vector fields also swaps the
+chosen witnesses. Reading the first cell leaves the other field and
+the first cell's tail unevaluated. The ordinary binding and match retain
+their own demand and multiplicity checks.
+
+The draft's general opaque witness projections, repacking when the result
+package must be inferred through a scope, and `@Pack` remain open.
 [Proposal #473](https://github.com/ghc-proposals/ghc-proposals/pull/473)
 and [the inference rules](https://richarde.dev/papers/2021/exists/exists.pdf).
 
