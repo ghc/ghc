@@ -59,6 +59,15 @@ Rebuild the pinned revision when that comparison is needed again.
 [Append upgrade test](examples/open-evaluation/check-append-upgrade.sh)
 and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
+At consolidation, identify the compiler and package database used by the
+next work. Check their library paths and the inputs of running and queued
+jobs. Retire superseded Hadrian stages and loose compiler outputs together.
+Two finished experiments can still point at each other's files through a
+linker response file, package configuration or symlink. Record their
+source revisions and rebuild commands, then remove both sets of outputs
+after the last live user finishes. The 200 GB threshold is a backup for
+this cleanup.
+
 ## Shared R11 and R16 rebuild
 
 The v69 comparison compiler at `ae563bb342` matched all 517 Showcase
