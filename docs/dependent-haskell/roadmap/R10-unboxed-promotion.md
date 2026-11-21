@@ -134,6 +134,14 @@ hole. Demanding invalid evidence raises the original deferred error.
 The [Core regression](../../../testsuite/tests/plugins/DeferredHeterogeneous.hs)
 checks the kinds of the generated binders.
 
+Core Lint checks a constructor whose second equality argument uses its
+first. Given a nominal proof `ck :: k1 ~# k2`, the next proof can compare
+`a |> ck` and `b` at kind `k2`. Constructor application and pattern
+matching both substitute the first proof before checking the second.
+The [Core test](../../../testsuite/tests/plugins/CoercionForallPlugin.hs)
+checks both directions and rejects arguments with the wrong kind,
+role or scope. The installed constructor worker still has its old type.
+
 A pattern match on `HRefl` can still bind a mixed-kind coercion.
 GADT constructor workers, boxed source constraints, and primitive Core
 coercions have separate representations. The review of proposal #547
