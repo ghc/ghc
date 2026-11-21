@@ -1,7 +1,7 @@
-{-# LANGUAGE GADTs, ScopedTypeVariables, TypeAbstractions, ViewPatterns #-}
+{-# LANGUAGE ExplicitNamespaces, GADTs, ScopedTypeVariables, TypeAbstractions, ViewPatterns #-}
 module GadtOrderedTelescopeScope where
 
-import GadtOrderedTelescopeProvider (FieldCheck(..), Mixed(..))
+import GadtOrderedTelescopeProvider (FieldCheck(..), Mixed(..), RequiredFieldCheck(..))
 
 wrong :: Mixed a -> Bool
 wrong (Mixed n @a x @b) = x == x
@@ -15,3 +15,6 @@ data Fenced a where
 
 badField :: Fenced a -> Int
 badField (Fenced (x :: (Int, Int))) = fst x
+
+wrongRequiredEarly :: RequiredFieldCheck -> Bool
+wrongRequiredEarly (RequiredFieldCheck _ (type a) ((\x -> x == x) -> result) _) = result

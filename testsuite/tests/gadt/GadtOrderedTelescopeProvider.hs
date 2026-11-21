@@ -8,6 +8,10 @@ data Mixed a where
 data FieldCheck a where
   FieldCheck :: forall a. a -> Eq a => a -> FieldCheck a
 
+-- | Keep the required type in scope on both sides of the equality context.
+data RequiredFieldCheck where
+  RequiredFieldCheck :: Int -> forall a -> Show a => a -> Eq a => a -> RequiredFieldCheck
+
 data Reversed a b where
   Reversed :: forall a. Int -> Eq a => forall b. (a,b) -> Reversed a b
 
