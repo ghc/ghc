@@ -681,7 +681,7 @@ even though its result kind is `Type %U -> Type`. Its equation can
 reduce immediately. `Foo` still needs its argument, and pointwise
 agreement does not give equality between two unapplied families.
 [Proposal #242 on arity](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#arity-of-type-families)
-and [the author's review reply of June 19, 2019](https://github.com/ghc-proposals/ghc-proposals/pull/242).
+and [the author's explanation of fixed-arity axioms](https://github.com/ghc-proposals/ghc-proposals/pull/242#issuecomment-503360362).
 
 ```haskell
 type family Foo (a :: Type) :: Type where

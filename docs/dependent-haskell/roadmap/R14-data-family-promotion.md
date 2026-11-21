@@ -144,12 +144,65 @@ between a constructor's explicit context and an ordinary result
 refinement.
 [Proposal #547, examples](https://ghc-proposals.readthedocs.io/en/latest/proposals/0547-no-kind-equalities.html#examples).
 
-The private R12 prototype can refer to a dictionary already in scope
-for a retained function. Promoting `Stored` also needs a kind
-application that records the evidence stored by this constructor.
-A promoted match needs to bring that evidence into scope for
-`pick x`, as the runtime pattern `Stored x` already does. Two
-modules can select different instances when constructing `Stored True`,
-so the field alone cannot determine this evidence.
-[Discussion #456](https://github.com/ghc-proposals/ghc-proposals/discussions/456)
-and [#383 dictionary sketch](https://github.com/ghc-proposals/ghc-proposals/issues/383#issuecomment-739058810).
+### Package the exact cell
+
+An ordinary construction can pass a named cell to a retained binder.
+For example, let `Result c` be a nominally indexed wrapper for the
+Boolean chosen by `inspectStored :: foreach (c :: Cell [Bool]) -> Result c`.
+The inspector matches `Stored x` and uses the dictionary brought into
+scope by that match. A dependent pair can keep the cell and its result
+together:
+
+```haskell
+type family Payload (cell :: Cell [Bool]) :: Type where
+    Payload cell = Result cell
+
+type Package = Sigma (Cell [Bool]) Payload
+
+seal :: Cell [Bool] -> Package
+seal cell = Pair @(Cell [Bool]) @Payload cell (inspectStored cell)
+
+readPackage :: Package -> Bool
+readPackage (Pair _ (Result result)) = result
+```
+
+At `204567ceb4`, a source-hidden ordinary client packages two cells
+whose fields are both `True`. A polymorphic producer selects a general
+`Pick` dictionary that returns `True`. A second cell uses the client's
+`Pick Bool` instance, which returns `False` for that field. At O0 and
+O2, the client observes `(True,False)` after unpacking. It also checks
+that the first dictionary can ignore its field and that unpacking
+without inspecting the contents leaves the cell unevaluated.
+
+In the published compiler, the inspector can bind `selected = pick x`
+and supply the local `selected` to a retained call. At the stored-pattern
+checkpoint `7112441e40`, the same package works when the inspector
+supplies `pick x` directly. Both compilers reject using the result
+indexed by a second cell where the result for the first cell is
+required (GHC-83865). Both also reject a direct retained call
+`inspectStored (Stored True)` (GHC-83605). The ordinary argument to
+`seal` can still be `Stored True`.
+
+### Evidence in a promoted constructor
+
+A promoted `Stored` that can feed a dependent selector needs to
+retain the dictionary chosen at construction. The family instance
+cast can still connect its runtime worker and public result at
+representational role. That cast supplies no class evidence.
+[Discussion #456](https://github.com/ghc-proposals/ghc-proposals/discussions/456).
+
+The current R12 Core forms bind an exact dictionary in a function
+result and record it in a neutral selector application. Equality
+compares the dictionary occurrences under binder renaming. These
+forms supply neither a dictionary slot on a promoted constructor
+application nor a type-level match that binds the stored dictionary.
+Using only a predicate or erasing evidence from constructor equality
+would identify the two cells before an observation that distinguishes
+them. An opaque cell index avoids that identification by keeping
+the complete value and its evidence. A distinct promoted constructor
+form would need evidence-preserving construction, scoped elimination,
+and an interface representation for both. The ordinary DataKinds
+rule continues to reject a constructor with a written class context.
+[Core forms](../../../compiler/GHC/Core/TyCo/Rep.hs),
+[#383 dictionary sketch](https://github.com/ghc-proposals/ghc-proposals/issues/383#issuecomment-739058810)
+and [proposal #547](https://ghc-proposals.readthedocs.io/en/latest/proposals/0547-no-kind-equalities.html#proposed-change-specification).
