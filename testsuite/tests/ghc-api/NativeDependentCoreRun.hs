@@ -2225,8 +2225,11 @@ runProgramChecks libdir = do
                 target <- GHC.guessTarget sourcePath Nothing Nothing
                 GHC.setTargets [target]
                 action
-    forM_ [[], ["-O2"]] $ \optimization -> do
-        withProgram optimization retainedProgramSource $ do
+    let sourceWith declarations = retainedProgramSource ++ unlines declarations
+        inlineSource = sourceWith ["{-# INLINE entry #-}"]
+    forM_ [(optimization, source) | optimization <- [[], ["-O2"]],
+                                     source <- [retainedProgramSource, inlineSource]] $ \(optimization, source) -> do
+        withProgram optimization source $ do
             loaded <- GHC.load GHC.LoadAllTargets
             unless (GHC.succeeded loaded) (fail "FAIL: native source program did not compile or link")
         objectExists <- doesFileExist (replaceExtension sourcePath "o")
@@ -2243,8 +2246,7 @@ runProgramChecks libdir = do
     putStrLn "program keep indexed bottom (fully applied): 42"
     putStrLn "program indexed payload control bottom (dictionary WHNF): forced"
     putStrLn "program choose bottom: raised native-bottom-bool"
-    let sourceWith declarations = retainedProgramSource ++ unlines declarations
-        classBody = drop 1 $ dropWhile (/= "entry =") $ lines $ retainedChooseSource "NativeDefault" "driveBoth run"
+    let classBody = drop 1 $ dropWhile (/= "entry =") $ lines $ retainedChooseSource "NativeDefault" "driveBoth run"
         classSource =
             sourceWith $
                 [ "class NativeDefault a where"
@@ -2279,10 +2281,9 @@ runProgramChecks libdir = do
                 | otherwise -> fail ("FAIL: program rejection " ++ label ++ "; wrong phase: " ++ message)
             Left exception -> fail ("FAIL: program rejection " ++ label ++ "; wrong exception: " ++ displayException exception)
             Right () -> fail ("FAIL: native program accepted " ++ label)
-    forM_ ["INLINE", "INLINABLE"] $ \pragma ->
-        withProgram [] (sourceWith ["{-# " ++ pragma ++ " entry #-}"]) $ do
-            result <- GHC.handleSourceError (pure . Left) (Right <$> checkProgram)
-            checkSourceRejection (pragma ++ " entry") 92256 ("The " ++ pragma ++ " unfolding of") result
+    withProgram [] (sourceWith ["{-# INLINABLE entry #-}"]) $ do
+        result <- GHC.handleSourceError (pure . Left) (Right <$> checkProgram)
+        checkSourceRejection "INLINABLE entry" 92256 "The INLINABLE unfolding of" result
     writeFile sourcePath retainedProgramSource
     putStrLn "program rejection checks: ok"
 
