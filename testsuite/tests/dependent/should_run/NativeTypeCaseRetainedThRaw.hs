@@ -4,7 +4,7 @@ module NativeTypeCaseRetainedThRaw
 
 import Data.Proxy (Proxy)
 import Language.Haskell.TH
-import Language.Haskell.TH.Syntax (addModFinalizer, dataToExpQ, dataToPatQ)
+import Language.Haskell.TH.Syntax (addModFinalizer, dataToExpQ, dataToPatQ, lift, liftTyped)
 
 $(do
   ty <- [t| foreach (b :: Bool) -> case b of { True -> Int; False -> Char } |]
@@ -58,5 +58,8 @@ after = 'c'
 caseData :: Bool
 caseData =
   case $(dataToExpQ (const Nothing) (CaseT StarT [TypeCaseAlt WildCardT ConstraintT])) of
-    $(dataToPatQ (const Nothing) (CaseT StarT [TypeCaseAlt WildCardT ConstraintT])) -> True
+    $(dataToPatQ (const Nothing) (CaseT StarT [TypeCaseAlt WildCardT ConstraintT])) -> lifted == CaseT StarT [expected, TypeCaseAlt StarT WildCardT]
     _ -> False
+  where
+    lifted = $(lift (CaseT StarT [TypeCaseAlt WildCardT ConstraintT, TypeCaseAlt StarT WildCardT]))
+    expected = $$(liftTyped (TypeCaseAlt WildCardT ConstraintT))
