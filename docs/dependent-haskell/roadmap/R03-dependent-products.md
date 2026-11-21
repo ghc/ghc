@@ -373,7 +373,9 @@ An ordinary caller can split two vectors at one runtime cut. A successful
 bounds check identifies the common length with the sum of the two piece
 lengths. The expected result determines all five erased arguments of
 `SplitBothAtWidth`: the element type, cut, suffix, and the two original
-vectors. The constructor call needs no type applications. Each reconstruction proof belongs to its
+vectors. The field type also fixes the suffix through the vector domain
+of the inner sum. Neither the constructor nor the two calls to
+`splitAtValue` needs a written type application. Each reconstruction proof belongs to its
 own input. The caller can open the first proof while the second vector is
 undefined. An excessive cut returns `Nothing`.
 

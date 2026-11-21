@@ -1,0 +1,8 @@
+NativeRetainedSumInference.hs:26:21: error: [GHC-83865]
+    • Couldn't match expected type: Opaque n1 b
+                  with actual type: Opaque n0 b
+      Note: GHC cannot infer the captured indices of this retained sum from its payload type.
+      The type variable ‘n0’ is ambiguous
+    • In the expression: opaque b
+      In an equation for ‘forwardOpaque’: forwardOpaque n b = opaque b
+

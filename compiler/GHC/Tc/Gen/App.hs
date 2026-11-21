@@ -69,7 +69,7 @@ import GHC.Core.Unify ( tcMatchTyX_BM, tcMatchRetainedTyX_BM, BindFlag(..), Bind
 import GHC.Core.Type
 import GHC.Core.UsageEnv ( UsageEnv, singleUsageUE, zeroUE )
 import GHC.Core.Coercion
-import GHC.Core.Coercion.Axiom (coAxiomBranches, coAxBranchLHS, coAxBranchRHS, fromBranches)
+import GHC.Core.Coercion.Axiom (coAxiomBranches, coAxBranchLHS, coAxBranchRHS, coAxBranchCoVars, fromBranches)
 
 import GHC.Builtin.WiredIn.Types ( multiplicityTy, runtimeRepTy, nilDataCon, consDataCon, mkListTy, unmatchableDataConTy )
 import GHC.Builtin.PrimOps( tagToEnumKey )
@@ -1448,6 +1448,7 @@ tcRetainedKnownValuePlan declared expected sigma values
               subst pairs
       | otherwise = Just subst
 
+    -- See Note [Inferring the suffix of a checked split].
     result_fields tc templates fields
       | isAlgTyCon tc, isGenerativeTyCon tc Nominal
       , length templates == tyConArity tc
@@ -1456,6 +1457,7 @@ tcRetainedKnownValuePlan declared expected sigma values
       , length templates + 1 == tyConArity tc
       , Just axiom <- closedFamilyTyConCoAxiom_maybe tc
       , [branch] <- fromBranches (coAxiomBranches axiom)
+      , null (coAxBranchCoVars branch)
       , Just parameters <- traverse getTyVar_maybe (coAxBranchLHS branch)
       , length parameters == tyConArity tc
       , length parameters == sizeVarSet (mkVarSet parameters)
@@ -1909,6 +1911,26 @@ example, dropVec returns Vec a m and its input contains Add n m.
 Only the erased parameters receive type arguments. Keep the declared
 retained telescope. The argument checker still checks the input at
 Add n m, and result subsumption checks the actual first vector length.
+-}
+
+{- Note [Inferring the suffix of a checked split]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The expected result of SplitBothAtWidth determines both input vectors.
+Select those constructor arguments before checking the two fields. If
+we infer a field first and cache its type, its splitAtValue call loses
+the expected SplitAtValue a cut suffix input. A result match that emits
+kind equalities is suitable here because the caller commits to it. The
+speculative Quick Look prefix still uses tcRetainedResultInst.
+
+SplitAtValue returns a sum whose payload is another sum. The domain of
+the inner sum is Vec a suffix. This fixes suffix even though the input
+width Add cut suffix does not. For two applications of the same checked
+payload family, inspect its single covering equation. Match only the
+captured parameters that occur injectively in the right-hand side.
+Use the ordinary nominal injective variable analysis and treat user type
+families as opaque. A capture under an unannotated family Hide is still
+ambiguous. This selects type applications; final subsumption and the
+ordinary field checks must still succeed.
 -}
 
 {- Note [Declared retained-domain choices]
@@ -2913,10 +2935,7 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
      | isJust plan
      = go1 plan fun_orig pos acc fun_ty args
      | otherwise
-     = do { matched <- tcRetainedResultInst do_ql expected_rho args tc_fun fun_ty
-          ; matched <- case matched of
-              Just _ -> return matched
-              Nothing -> tcRetainedResultIndexCast do_ql expected_rho args tc_fun fun_ty
+     = do { matched <- tcRetainedResultInstWithCasts do_ql expected_rho args tc_fun fun_ty
           ; case matched of
               Just (inst_tys, body)
                 -> go plan fun_orig pos (addArgWrap (mkWpTyApps inst_tys) acc) body args
@@ -4019,10 +4038,7 @@ tcRetainedExpectedInst :: QLFlag -> ExpRhoType -> [HsExprArg 'TcpRn]
                        -> HsExpr GhcTc -> TcSigmaType
                        -> TcM (HsExpr GhcTc, TcSigmaType)
 tcRetainedExpectedInst do_ql expected args fun sigma
-  = do { matched <- tcRetainedResultInst do_ql expected_rho args fun sigma
-       ; matched <- case matched of
-           Just _ -> return matched
-           Nothing -> tcRetainedResultIndexCast do_ql expected_rho args fun sigma
+  = do { matched <- tcRetainedResultInstWithCasts do_ql expected_rho args fun sigma
        ; case matched of
            Just (_, body)
              | XExpr (ConLikeTc (RealDataCon _)) <- fun
@@ -4111,6 +4127,17 @@ tcRetainedResultInst do_ql expected args fun sigma
            Just _ -> return matched
            Nothing -> tcRetainedResultCandidate do_ql expected args fun sigma }
 
+-- | Choose result arguments at a site that commits to the application.
+-- See Note [Inferring the suffix of a checked split].
+tcRetainedResultInstWithCasts :: QLFlag -> Maybe TcRhoType -> [HsExprArg 'TcpRn]
+                              -> HsExpr GhcTc -> TcSigmaType
+                              -> TcM (Maybe ([Type], TcSigmaType))
+tcRetainedResultInstWithCasts do_ql expected args fun sigma
+  = do { matched <- tcRetainedResultInst do_ql expected args fun sigma
+       ; case matched of
+           Just _ -> return matched
+           Nothing -> tcRetainedResultIndexCast do_ql expected args fun sigma }
+
 -- | Instantiate erased constructor binders from exact retained result indices.
 -- See Note [Transporting retained result indices].
 tcRetainedResultIndexCast :: QLFlag -> Maybe TcRhoType -> [HsExprArg 'TcpRn]
@@ -4180,9 +4207,9 @@ argument from its position without decomposing it. Find every choice
 before emitting any evidence. Check the indices in binder order. An
 earlier transport can occur in a later kind. Use ordinary nominal kind
 checking, as for a written type application, and cast each scoped index.
-This produces an immutable application. Emit the kind equalities in IALL
-when the caller commits to this application. The enclosing implication
-must solve them. The application checker still checks all field arguments
+This produces an immutable application. Emit the kind equalities when
+the caller commits to this application. The enclosing implication must
+solve them. The application checker still checks all field arguments
 and the entire result.
 For a generated sum payload, read the result arguments after the checked
 family reduction in matchSumPayload. That reduction goes from the family

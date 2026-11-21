@@ -62,15 +62,15 @@ if "${ghc[@]}" -O0 -fforce-recomp -c OtherVector.hs >other.log 2>&1 ||
 fi
 
 # Each proof must identify the vector in its own result position.
-sed 's/(splitAtValue @a @suffix cut xs) (splitAtValue @a @suffix cut ys)/(splitAtValue @a @suffix cut ys) (splitAtValue @a @suffix cut xs)/' \
+sed 's/(splitAtValue cut xs) (splitAtValue cut ys)/(splitAtValue cut ys) (splitAtValue cut xs)/' \
     CertifiedSplit.hs >SwappedVectors.hs
 if "${ghc[@]}" -O0 -ferror-spans -fforce-recomp -c SwappedVectors.hs >swapped.log 2>&1; then
     echo 'Accepted exchanged reconstruction proofs'
     exit 1
 fi
 for input in xs ys; do
-    span=$(awk -v expr="(splitAtValue @a @suffix cut $input)" '
-        /cut ys\) \(splitAtValue @a @suffix cut xs/ {
+    span=$(awk -v expr="(splitAtValue cut $input)" '
+        /cut ys\) \(splitAtValue cut xs/ {
             col = index($0, expr); print NR ":" col "-" col + length(expr) - 1
         }' SwappedVectors.hs)
     grep -Fq "SwappedVectors.hs:$span: error: [GHC-83865]" swapped.log

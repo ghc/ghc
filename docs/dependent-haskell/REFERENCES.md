@@ -6894,3 +6894,16 @@ it. A separate GADT equality justifies transporting their kinds. Equality of len
 [Agda 2.8 implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html),
 [GHC GADT constructors](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/gadt.html),
 and [paired vector split](examples/packed-vector/CertifiedSplit.hs).
+
+### Infer a split width from the returned pieces
+
+Agda's standard library defines `∃₂` as two nested dependent pairs.
+Agda inserts the implicit arguments that the expected type determines.
+In the Haskell split, the inner pair binds a vector of length `suffix`.
+GHC checks each field at its expected type. It can then infer `suffix`
+from that vector domain. The implementation uses GHC's nominal
+injective-variable analysis on the generated payload equation. It leaves
+an index beneath an ordinary noninjective type family ambiguous.
+[Agda's nested pairs](https://agda.github.io/agda-stdlib/v2.3/Data.Product.Base.html),
+[implicit argument insertion](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html),
+and [GHC's injective variable analysis](../../compiler/GHC/Core/TyCo/FVs.hs).
