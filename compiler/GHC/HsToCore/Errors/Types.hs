@@ -212,7 +212,6 @@ data ThRejectionReason
   | ThUnclassifiedArrowModifier (LHsModifier GhcRn)
   | ThUnexpectedModifier [LHsModifier GhcRn]
   | ThUnexpectedModifierExpr [LHsModifierOf (LocatedA (HsExpr GhcRn)) GhcRn]
-  | ThTypeLet
   | ThTypeCase
 
 -- | Why is a @SPECIALISE@ pragmas useless?

@@ -404,6 +404,11 @@ test('NativeRetainedIndexHpc',
       extra_files(['NativeRetainedIndexHpcProvider.hs', 'NativeRetainedIndexHpcClient.hs'])],
      run_command, ['bash NativeRetainedIndexHpc.sh "{compiler}" "{libdir}" "{hpc}"'])
 
+test('NativeTypeLetQuote',
+     [req_th, req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal']),
+      extra_files(['NativeTypeLetQuote.sh', 'NativeTypeLetQuote.hs'])],
+     run_command, ['bash NativeTypeLetQuote.sh "{compiler}" "{libdir}"'])
+
 test('NativeTypeLet',
      [only_ways(['normal']), extra_files([open_eval_dir + 'TypeLet.hs',
                                        '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs'])],
