@@ -1,9 +1,9 @@
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 {-# LANGUAGE DataKinds, ExplicitNamespaces, FlexibleContexts, RequiredTypeArguments, TypeApplications #-}
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes, PartialTypeSignatures, QuantifiedConstraints, RankNTypes, ScopedTypeVariables, TypeFamilies, TypeOperators #-}
-module ConstrainedElementsClient (advanceCursor, showAdvance, showRemainder, splitCollection, constrainedElements, annotatedElement, explicitElements, renderField, formatField, renderKnownFields, retainedMaybeDomain, aliasedReflection, runReflection, partialElement) where
+module ConstrainedElementsClient (advanceCursor, showAdvance, showRemainder, splitCollection, constrainedElements, annotatedElement, explicitElements, renderField, formatField, renderKnownFields, retainedMaybeDomain, aliasedReflection, runReflection, partialElement, ViewsAfter) where
 
-import ConstrainedElements (Cursor(..), PrintableCursor, Collection(..), Allowed, Collects(..), FieldKey, Field(..), applyField, field, withField, Reflection, reflectMaybe, MaybeBoolEcho, AtNothing)
+import ConstrainedElements (Cursor(..), PrintableCursor, Collection(..), Allowed, Collects(..), FieldKey, Field(..), applyField, field, withField, Reflection, reflectMaybe, MaybeBoolEcho, AtNothing, ViewsFor)
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
@@ -95,6 +95,9 @@ partialElement = forward (Proxy @[]) (Proxy @Bool)
     forward :: forall f a. (Allowed a, forall x. Allowed x => Collects (f x))
             => Proxy f -> Proxy a -> Elem (f a) -> _
     forward _ _ value = id @(Elem (f a)) value
+
+-- | Select the views after an abstract constructor chooses the field type.
+type ViewsAfter f a = ViewsFor (f a)
 
 -- | The collection determines the element type required by Rest.
 splitCollection :: Collection c e => c -> Maybe (e, Rest c)
