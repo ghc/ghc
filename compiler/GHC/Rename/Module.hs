@@ -156,28 +156,44 @@ For example, a domain of Proxy x after some (x :: A) must refer to
 the witness header, even when it shadows a synonym parameter x.
 See Note [Provisional kinds of sum payloads] in GHC.Tc.TyCl.
 
-A closed type family equation can return a sum. Give each row its own
+A type family equation can return a sum. Give each equation its own
 payload family. Take its captures from the equation binders. An implicit
 equation binds the variables in its left-hand side, as in rnFamEqn.
 Keep the binders that a capture's written kind needs. Keep the entire
 scope when the result contains a splice. The free-variable traversal
 cannot see the variables in the result of a splice. The original equation
 still goes through the ordinary scope, kind, and termination checks.
+For a top-level type instance, allocate a stable occurrence before lifting
+the payload. The same open family can have multiple instances, including
+instances in separate declaration groups. The payload helper belongs to
+the instance module even if that module imports the family.
 -}
--- | Lift type lambdas from synonyms and sums from closed family equations.
+-- | Lift type lambdas from synonyms and sums from type family equations.
 -- See Note [Lifting type lambdas].
 liftTypeLambdas :: RdrName -> HsGroup GhcPs
-                -> (HsGroup GhcPs, [(OccName, OccName)], OccEnv (OccName, Bool))
-liftTypeLambdas sigma group =
-  let (groups, hidden, scopes) = unzip3 (map liftGroup (hs_tyclds group))
-  in (group { hs_tyclds = groups }, concat hidden, mkOccEnv (concat scopes))
+                -> RnM (HsGroup GhcPs, [(OccName, OccName)], OccEnv (OccName, Bool))
+liftTypeLambdas sigma group = do
+  (groups, hidden, scopes) <- unzip3 <$> traverse liftGroup (hs_tyclds group)
+  return (group { hs_tyclds = groups }, concat hidden, mkOccEnv (concat scopes))
   where
-    liftGroup decls =
+    liftGroup decls = do
+      (instances, lifted_insts) <- unzip <$> traverse liftInst (group_instds decls)
       let (defs, lifted) = unzip (map liftDecl (group_tyclds decls))
-          (families, hidden, signatures, scopes) = unzip4 (concat lifted)
-      in (decls { group_tyclds = defs ++ families
-                , group_kisigs = group_kisigs decls ++ catMaybes signatures }
-         , hidden, catMaybes scopes)
+          (families, hidden, signatures, scopes) = unzip4 (concat lifted ++ concat lifted_insts)
+      return (decls { group_tyclds = defs ++ families
+                    , group_kisigs = group_kisigs decls ++ catMaybes signatures
+                    , group_instds = instances }
+             , hidden, catMaybes scopes)
+
+    liftInst (L loc inst@TyFamInstD
+                    { tfid_inst = decl@TyFamInstDecl
+                    { tfid_eqn = eqn@FamEqn{feqn_tycon = owner, feqn_rhs = rhs} } })
+      | sumResult rhs = do
+          occ <- chooseUniqueOccTc (mkInstTyTcOcc ("$sum:" ++ occNameString (rdrNameOcc (unLoc owner))))
+          let instance_owner = L (getLoc owner) (mkRdrUnqual occ)
+              (_, (L _ eqn', lifted)) = liftEquation instance_owner (0 :: Int) (L loc eqn)
+          return (L loc inst{tfid_inst = decl{tfid_eqn = eqn'}}, lifted)
+    liftInst inst = return (inst, [])
 
     liftDecl (L loc syn@SynDecl{tcdLName = owner, tcdRhs = rhs,
                                 tcdTyVars = HsQTvs{hsq_explicit = captures}})
@@ -1468,8 +1484,8 @@ rnSrcDecls group = do
       sigma_mod = mkModule (RealUnit (Definite (baseUnitId dflags))) (mkModuleName "GHC.Sigma")
       sigma = mkOrig sigma_mod (mkTcOcc "Sigma")
       (with_cases, case_names) = if lift_cases then liftTypeCases group else (group, [])
-      (expanded, lambda_names, scopes) =
-        if enabled then liftTypeLambdas sigma with_cases else (group, [], emptyOccEnv)
+  (expanded, lambda_names, scopes) <-
+    if enabled then liftTypeLambdas sigma with_cases else return (group, [], emptyOccEnv)
   rnSrcDeclsWithLambdas sigma named_wildcards lift_cases
                         (case_names ++ [(fam, Just owner) | (fam, owner) <- lambda_names])
                         scopes expanded
@@ -1551,8 +1567,8 @@ rnSrcDeclsWithLambdas sigma named_wildcards lift_cases early_hidden early_scopes
              ; let input = emptyRdrGroup{hs_valds = val_decls, hs_tyclds = tycl_decls}
                    (updated, anchors, aliases, uses, unbound, _) = liftDeclarationTypes heads [] show lift_cases named_wildcards input
                    (cases, case_names) = liftTypeCases emptyRdrGroup{hs_tyclds = anchors}
-                   (late, lambdas, late_scopes) = liftTypeLambdas sigma cases
-                   late_hidden = aliases ++ case_names ++ [(fam, Just owner) | (fam, owner) <- lambdas]
+             ; (late, lambdas, late_scopes) <- liftTypeLambdas sigma cases
+             ; let late_hidden = aliases ++ case_names ++ [(fam, Just owner) | (fam, owner) <- lambdas]
              ; forM_ unbound $ \v ->
                  forM_ (demoteRdrNameTv (unLoc v)) $ \term ->
                    setSrcSpanA (getLoc v) (void (reportUnboundName WL_Anything term))
@@ -1708,8 +1724,8 @@ rnSplicedSignatureCases sigma named_wildcards fix_env generated splice_cases sit
           (_:_, ValBinds _ [VbSig (L _ (TypeSig _ _ _ HsWC{hswc_body = L _ HsSig{sig_body = ty}}))])
             | Just result <- unwrap_retained retained ty -> do
             let (cases, case_names) = liftTypeCases emptyRdrGroup{hs_tyclds = anchors}
-                (late, lambdas, scopes) = liftTypeLambdas sigma cases
-                hidden = aliases ++ case_names ++ [(fam, Just owner) | (fam, owner) <- lambdas]
+            (late, lambdas, scopes) <- liftTypeLambdas sigma cases
+            let hidden = aliases ++ case_names ++ [(fam, Just owner) | (fam, owner) <- lambdas]
                 declarations = hs_tyclds late
             forM_ uses $ \(loc, gre) -> setSrcSpanA (getLoc loc) (addUsedGRE AllDeprecationWarnings gre)
             (envs@(global, local), _) <- getLocalNonValBinders fix_env emptyRdrGroup{hs_tyclds = declarations}

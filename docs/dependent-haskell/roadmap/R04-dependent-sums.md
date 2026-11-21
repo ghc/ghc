@@ -332,6 +332,28 @@ Its `uncurry` matches the pair to pass the witness and its dependent
 field to a function.
 [Agda's dependent pair elimination](https://agda.github.io/agda-stdlib/v2.4/Data.Product.Base.html#126).
 
+## Return a dependent sum from an open type instance
+
+A top-level type instance can write the sum directly, including for a
+family imported from another module.
+
+```haskell
+type instance Provider.DirectOpen [a] = some (tag :: Bool) | Tagged tag a
+```
+
+Here `a` comes from the instance pattern. The witness `tag` scopes over
+`Tagged tag a`. Its domain must already be in scope. The ordinary
+instance checks still apply, including compatibility and termination.
+Keep the usual `data instance` syntax for data families.
+
+Each equation has a private payload family in the instance module.
+An ordinary client sees the instance through its interface and can
+construct or match the result. Two instances of one family keep separate
+payload families. The regression also captures a variable whose kind
+depends on an explicit `forall` binder.
+[Instance provider](../../../testsuite/tests/dependent/should_run/NativeClosedFamilySumChain.hs)
+and [ordinary client](../../../testsuite/tests/dependent/should_run/NativeClosedFamilySumClient.hs).
+
 ## Partition at the original length
 
 The [vector partition](../examples/packed-vector/ConservedPartition.hs) returns

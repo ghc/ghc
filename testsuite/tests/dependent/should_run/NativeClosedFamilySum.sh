@@ -27,9 +27,18 @@ for opt in O0 O2; do
     cp "$src/$provider.hs" "$src/$chain.hs" .
     reject "$provider.hs:15:51-56: error: [GHC-76037]" \
         "${ghc[@]}" "-$opt" -DBAD_SCOPE -c "$provider.hs"
-    "${ghc[@]}" "-$opt" -c "$provider.hs" "$chain.hs"
+    "${ghc[@]}" "-$opt" -c "$provider.hs"
+    reject "$chain.hs:32:74-80: error: [GHC-76037]" \
+        "${ghc[@]}" "-$opt" -DBAD_OPEN_CAPTURE -c "$chain.hs"
+    reject "$chain.hs:36:61-63: error: [GHC-76037]" \
+        "${ghc[@]}" "-$opt" -DBAD_OPEN_BINDER -c "$chain.hs"
+    reject "$chain.hs:41:1-66: error: [GHC-52347]" \
+        "${ghc[@]}" "-$opt" -DBAD_DATA_CATEGORY -c "$chain.hs"
+    "${ghc[@]}" "-$opt" -c "$chain.hs"
     "${ghc[@]}" --show-iface "$provider.hi" > iface.txt
     test "$(grep -Fc 'sum codomain of $lambda:Pack:' iface.txt)" = 2
+    "${ghc[@]}" --show-iface "$chain.hi" > open-iface.txt
+    test "$(grep -Fc 'sum codomain of $lambda:R:$sum:DirectOpen' open-iface.txt)" = 2
     cp "$provider.hi" "$chain.hi" "$src/$client.hs" ../client/
 
     cd ../client
