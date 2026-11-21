@@ -271,6 +271,9 @@ booleans = do
         (VisibleRuleClient.readTagged ignoredFirst lazyIndex 47)
     observe "pass a required type between lazy runtime indices"
         (VisibleRuleClient.readRequired ignoredFirst lazyIndex 53)
+    lazyCharIndex <- newIORef (error "forced second reading index" :: Maybe Char) >>= readIORef
+    observe "infer a rule binder between two required types"
+        (VisibleRuleClient.readTwoRequired ignoredFirst lazyIndex lazyCharIndex 61)
     observe "apply a rule declared outside the retained function's module"
         (Rule.readChoice (Rule.keep True (ImportedRetainedRules.tagged 23)))
     observe "choose True has result Int" (choose True)
