@@ -3,6 +3,8 @@ module GHC.Tc.Gen.OpenTypeEval
   , openTypeFailureReason
   , observeOpenType
   , instantiateOpenTypeFunction
+  , instantiateOpenMethod
+  , readOpenMethodWorker
   ) where
 
 import GHC.Prelude
@@ -14,25 +16,30 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (runExceptT, throwE)
 import GHC.Builtin.WiredIn.Types (liftedTypeKind, manyDataConTy, mkBoxedTupleTy,
                                   promotedTupleDataCon, tupleTyCon, unmatchableDataConTy)
+import GHC.Core.Class (classAllSelIds)
 import GHC.Core (CoreExpr, Expr(..))
 import GHC.Core.Coercion (mkSubCo)
 import GHC.Core.Reduction (Reduction(..))
 import GHC.Core.DataCon (DataCon, dataConName, dataConTyCon, dataConWorkId)
 import GHC.Core.TyCon (isBoxedDataTyCon, isPromotedDataCon_maybe, isTupleTyCon, tyConName)
 import GHC.Core.Make (mkCoreBoxedTuple)
+import GHC.Core.Predicate (classMethodInstTy, getClassPredTys_maybe)
 import GHC.Core.Type (Kind, Type, FunTyFlag(FTF_T_T), getTyVar_maybe, isLiftedTypeKind, isManyTy,
                       mkTyConApp, mkTyVarTy, mkVisFunTyManyU, splitForAllForAllTyBinders,
-                      splitFunTy_maybe, splitTyConApp_maybe, typeKind)
+                      splitAppTysNoView, splitFunTy_maybe, splitTyConApp_maybe, typeKind)
 import GHC.Core.Utils (exprType, mkCast)
+import GHC.Core.TyCo.Subst (lookupTyVar, substTy)
+import GHC.Core.Unify (tcMatchTys)
 import GHC.Data.FastString (fsLit)
 import GHC.Data.Maybe (MaybeErr(..))
 import GHC.Driver.DynFlags (HasDynFlags(getDynFlags), ghcMode, isOneShot, reductionDepth)
 import GHC.Driver.Env (HscEnv, hsc_HUG, hsc_all_home_unit_ids, hsc_dflags)
 import GHC.Iface.Load (findAndReadIface)
-import GHC.Iface.Syntax (IfaceDecl(..), IfaceInfoItem(..), IfaceUnfolding(..))
+import GHC.Iface.Syntax (IfaceDecl(..), IfaceExpr(..), IfaceInfoItem(..), IfaceUnfolding(..))
 import GHC.IfaceToCore (tcIfaceExpr)
 import GHC.Rename.Env (DeprecationWarnings(NoDeprecationWarnings), addUsedGREs)
 import GHC.Tc.Gen.SourceTable (groundFirstHead)
+import GHC.Tc.Types (IfL)
 import GHC.Tc.Utils.Monad (TcM, getGblEnv, getTopEnv, initIfaceLcl, initIfaceTcRn,
                            liftIO, newTcRef, newUnique, readTcRef, tcg_imports,
                            tcg_rdr_env, tcg_semantic_mod, tcg_local_open_defs, tcg_local_open_owners, updTcRef)
@@ -70,7 +77,7 @@ data OpenTypeFailure
 
 -- | A checked source argument and its lazy constructor fields.
 data OpenArgument
-  = OpenRigid TyVar
+  = OpenRigid TyVar [OpenArgument]
   | OpenGroundType Type
   | OpenPair TyVar TyVar
   | OpenConstructor DataCon [Type] [OpenArgument]
@@ -158,7 +165,9 @@ observeOpenType local_call instantiated result_kind operands
       | otherwise = False
 
     checkedOperand ty
-      | Just skolem <- getTyVar_maybe ty, rigid skolem = Just (OpenRigid skolem)
+      | (head_ty, args) <- splitAppTysNoView ty
+      , Just skolem <- getTyVar_maybe head_ty, rigid skolem
+      = OpenRigid skolem <$> checkArgs (tyVarKind skolem) args
       | Just (tuple, [ka, kb, a, b]) <- splitTyConApp_maybe ty
       , tuple == promotedTupleDataCon Boxed 2
       , all (`tcEqType` liftedTypeKind) [ka, kb]
@@ -181,11 +190,22 @@ observeOpenType local_call instantiated result_kind operands
       = Just (OpenGroundType ty)
       | otherwise = Nothing
 
+    -- Reflect the same unmatchable applications that readback can produce.
+    -- See Note [Readback of a rigid callback application] in GHC.Core.OpenWhnf.
+    checkArgs _ [] = Just []
+    checkArgs kind (arg : rest) = do
+      (FTF_T_T, ma, mult, domain, result) <- splitFunTy_maybe kind
+      guard (ma `tcEqType` unmatchableDataConTy && isManyTy mult && typeKind arg `tcEqType` domain)
+      (:) <$> checkedOperand arg <*> checkArgs result rest
+
     buildArgument (state, args) operand = do
       (state', arg) <- buildOperand state operand
       pure (state', arg : args)
 
-    buildOperand state (OpenRigid skolem) = symbolFor state skolem
+    buildOperand state (OpenRigid skolem args) = do
+      (state', head_expr) <- symbolFor state skolem
+      (final, revArgs) <- foldM buildArgument (state', []) args
+      pure (final, foldl App head_expr (reverse revArgs))
     -- See Note [Ground type operands of local calls].
     buildOperand (symbols, origins) (OpenGroundType ty) = do
       symbol <- freshSymbol liftedTypeKind
@@ -253,9 +273,6 @@ instantiateOpenTypeFunction local_families function
   | otherwise = Nothing
   where
     (binders, body) = splitForAllForAllTyBinders (idType function)
-    liftedUniversal (_, Bndr v (Invisible _)) =
-      isTyVar v && tyVarKind v `tcEqType` liftedTypeKind
-    liftedUniversal _ = False
     bound ty = any (\(_, Bndr v _) -> ty `tcEqType` mkTyVarTy v) binders
     domainKind ty
       | bound ty = Just liftedTypeKind
@@ -283,15 +300,94 @@ instantiateOpenTypeFunction local_families function
       = Just ([], mkTyConApp con (map (const liftedTypeKind) parameters))
       | otherwise = Nothing
 
+-- | Instantiate a selected binary method using the kinds of both operands.
+instantiateOpenMethod :: Id -> Kind -> Kind -> Maybe (CoreExpr, Kind)
+instantiateOpenMethod worker left right = do
+    let (binders, body) = splitForAllForAllTyBinders (idType worker)
+    guard (all liftedUniversal binders)
+    (FTF_T_T, _, _, callback, rest) <- splitFunTy_maybe body
+    (FTF_T_T, _, _, receiver, result) <- splitFunTy_maybe rest
+    subst <- tcMatchTys [callback, receiver] [left, right]
+    args <- traverse (\(_, Bndr v _) -> lookupTyVar subst v) binders
+    guard (all (isLiftedTypeKind . typeKind) args)
+    let method = foldl App (Var worker) (map Type args)
+        result_kind = substTy subst result
+    guard (exprType method `tcEqType` mkVisFunTyManyU left (mkVisFunTyManyU right result_kind))
+    pure (method, result_kind)
+
+-- | An ordinary erased parameter of lifted kind.
+liftedUniversal :: (Type, VarBndr TyVar ForAllTyFlag) -> Bool
+liftedUniversal (_, Bndr v (Invisible _)) =
+    isTyVar v && tyVarKind v `tcEqType` liftedTypeKind
+liftedUniversal _ = False
+
+{- Note [Observing an imported method worker]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The kind of a mapping operand determines the class parameter. It does
+not determine the dictionary. The caller uses the solver with the
+signature and lexical Givens. It must select the exact imported DFun.
+
+Read the DFun from its full interface, which keeps the unfolding even
+when the reader ignores interface pragmas. The unfolding stores the
+constructor arguments in class selector order. Accept a dictionary
+with no binders, and use the selector's slot only when it names an
+imported worker of the specialized method type.
+
+The caller records the selector, dictionary, and worker for rule checks
+and recompilation. The observer reads the worker body on demand and
+records any further calls it follows. A method can return a constructor
+without inspecting its callback. A rigid callback with a type-variable origin
+can also occur in a returned field. The next call can use that field as
+a symbolic input. A case that needs its value remains stuck.
+-}
+
+-- | Read the direct method field of the imported ground dictionary.
+-- See Note [Observing an imported method worker].
+readOpenMethodWorker :: Id -> Id -> TcM (Either OpenTypeFailure Id)
+readOpenMethodWorker dfun selector = do
+    info <- readOpenIdInfo dfun
+    case info of
+      Left failure -> unavailable failure
+      Right (mod, items)
+        | Just (cls, [domain]) <- getClassPredTys_maybe (idType dfun)
+        , let selectors = classAllSelIds cls
+        , [parameter : fields] <- [ops | HsUnfold _ (IfDFunUnfold [] ops) <- items]
+        , length selectors == length fields
+        , Just field@IfaceExt{} <- lookup selector (zip selectors fields)
+        -> do
+          args <- readOpenIfaceExpr mod (traverse tcIfaceExpr [parameter, field])
+          case args of
+            [Type actual, Var worker]
+              | actual `tcEqType` domain, isGlobalId worker
+              , idType worker `tcEqType` classMethodInstTy selector [domain] ->
+                  pure (Right worker)
+            _ -> unavailable WrongTemplateType
+      _ -> unavailable MissingTemplate
+  where
+    unavailable = pure . Left . UnavailableDefinition (idName dfun)
+
 -- | Read the checked expression for one demanded ordinary import.
 -- Use a full interface because EPS may discard the optimizer's IdInfo.
 -- The caller records the Id Name when it consumes the returned definition.
 readOpenDefinition :: Id -> TcM (Either DefinitionFailure CoreExpr)
 readOpenDefinition identifier = do
+  info <- readOpenIdInfo identifier
+  case info of
+    Left failure -> pure (Left failure)
+    Right (mod, items)
+      | [template] <- [template | HsUnfold _ (IfCoreUnfold _ _ _ template) <- items] -> do
+          body <- readOpenIfaceExpr mod (tcIfaceExpr template)
+          pure $ if tcEqType (exprType body) (idType identifier)
+            then Right body
+            else Left WrongTemplateType
+      | otherwise -> pure (Left MissingTemplate)
+
+-- | Read an imported declaration with its optimizer information.
+readOpenIdInfo :: Id -> TcM (Either DefinitionFailure (Module, [IfaceInfoItem]))
+readOpenIdInfo identifier = do
   hscEnv <- getTopEnv
   tcgEnv <- getGblEnv
   let requested = idName identifier
-      reason = text "open term definition"
   case nameModule_maybe requested of
     Just mod
       | mod == tcg_semantic_mod tcgEnv, Just _ <- isClassOpId_maybe identifier
@@ -307,17 +403,11 @@ readOpenDefinition identifier = do
             Right iface
               | isHsBootOrSig (mi_hsc_src iface) -> pure (Left UnavailableModule)
               | otherwise ->
-                  case [ template
+                  case [ info
                        | (_, IfaceId { ifName = name, ifIdInfo = info }) <- mi_decls iface
                        , name == requested
-                       , HsUnfold _ (IfCoreUnfold _ _ _ template) <- info
                        ] of
-                    [template] -> do
-                      body <- initIfaceTcRn $
-                        initIfaceLcl (mi_semantic_module iface) reason NotBoot (tcIfaceExpr template)
-                      pure $ if tcEqType (exprType body) (idType identifier)
-                        then Right body
-                        else Left WrongTemplateType
+                    [info] -> pure (Right (mi_semantic_module iface, info))
                     _ -> pure (Left MissingTemplate)
     _ -> pure (Left UnavailableModule)
   where
@@ -325,6 +415,11 @@ readOpenDefinition identifier = do
       case lookupInstalledModuleEnv (imp_boot_mods (tcg_imports env)) installed of
         Just dep -> gwib_isBoot dep == IsBoot
         Nothing -> False
+
+-- | Read an expression in the module that supplied its interface.
+readOpenIfaceExpr :: Module -> IfL a -> TcM a
+readOpenIfaceExpr mod readExpr = initIfaceTcRn $
+    initIfaceLcl mod (text "open term definition") NotBoot readExpr
 
 -- | Read a complete interface without repopulating the external package table.
 -- The compilation manager already has complete interfaces for its loaded
@@ -371,7 +466,7 @@ openTypeFailureReason GroundTypeCase =
 openTypeFailureReason (HiddenConstructor name) =
   (Nothing, "A result constructor of " ++ getOccString name ++ " is not in scope through an ordinary import.")
 openTypeFailureReason UnexpectedNeutral =
-  (Nothing, "Reduction did not produce a supplied rigid argument or a finite constructor value built from supported fields.")
+  (Nothing, "Reduction did not produce a supplied rigid variable, an application of a supplied type-level callback, or a finite constructor value with supported fields.")
 
 {- Note [Open source calls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~

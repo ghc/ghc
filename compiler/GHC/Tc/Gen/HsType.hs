@@ -95,11 +95,14 @@ import GHC.Tc.Types.Constraint
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity
-import GHC.Tc.Gen.OpenTypeEval (instantiateOpenTypeFunction, observeOpenType, openTypeFailureReason)
+import GHC.Tc.Gen.OpenTypeEval (OpenTypeFailure(InvalidInput), instantiateOpenMethod,
+                               instantiateOpenTypeFunction, observeOpenType,
+                               openTypeFailureReason, readOpenMethodWorker)
 import GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourceTableFamilyUse, sourceTableTypeUses,
                               sourceCaseKindUse, sourceTableReferenceUse, indexedProjectionSource, isSourceConstructorCase, monomorphicEnumCaseArity, sourceCaseVisibleArity, sourceTableOwner, sourcePairBuilderField,
                               lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource,
-                              lookupSourceBinaryMethod, sourceMapSelector, lookupSourceContainerMethod, recordSourceMethodUse)
+                              lookupSourceBinaryMethod, sourceMapSelector, lookupSourceContainerMethod,
+                              lookupSourceGroundDFun, recordSourceMethodUse)
 import {-# SOURCE #-} GHC.Tc.Gen.Splice (tcPrepareClosedApplication, tcPrepareClosedFunctionValue, tcPrepareClosedResult, tcPrepareClosedObservation, tcCheckClosedCallContext, tcPreflightClosedCall, tcDecodeClosedCallOperand, tcHasClosedCallExecutable)
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Instance.Family (tcGetFamInstEnvs)
@@ -137,7 +140,7 @@ import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.WiredIn.Prim
 
 import GHC.Types.Error
-import GHC.Types.Id ( isClassOpId_maybe, mkLocalId, mkSysLocalM, sourceTableId_maybe, sourceTableKeepsExecutable )
+import GHC.Types.Id ( idName, isClassOpId_maybe, mkLocalId, mkSysLocalM, sourceTableId_maybe, sourceTableKeepsExecutable )
 import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Set (NameSet, mkNameSet, unionNameSet, emptyNameSet, elemNameSet, extendNameSet)
@@ -2950,11 +2953,7 @@ tc_app_ty_other mode rn_ty exp_kind
                          , ordinary_call || (isQual rdr && ready_partial_call && length args == 1)
                          -> do { selected <- if ordinary_call then checkedClassMethod fun args else pure Nothing
                                ; case selected of
-                                   Just (dfun, target, table) -> do
-                                     recordSourceMethodUse dfun fun target
-                                     checkSourceMethodSelection mode dfun name
-                                     (ty, kind) <- tcInferTyApps mode hs_fun_ty (mkTyConTy table) hs_args
-                                     checkExpKind mode rn_ty ty kind exp_kind
+                                   Just check -> check
                                    Nothing -> do
                                      hint <- closedCallResultHint ordinary_call exp_kind
                                      (result_kind, plan) <- tcPlanOrdinaryCall mode ordinary_call hint fun args
@@ -2996,19 +2995,56 @@ tc_app_ty_other mode rn_ty exp_kind
           (_, kind) <- tc_infer_lhs_type mode receiver
           actual <- liftZonkM (zonkTcType kind)
           case splitTyConApp_maybe actual of
-            Just (tc, [_]) | tc == listTyCon -> lookupSourceContainerMethod fun (mkTyConTy tc)
+            Just (tc, [_]) | tc == listTyCon ->
+              fmap (checkTableMethod fun) <$> lookupSourceContainerMethod fun (mkTyConTy tc)
             _ -> pure Nothing
     checkedClassMethod fun args@[left, right]
-      | sourceMapSelector fun, any isOpenTypeOperand args = do
-          (_, kind) <- tc_infer_lhs_type mode right
+      | sourceMapSelector fun, any isOpenTypeOperand args
+      , Just cls <- isClassOpId_maybe fun = do
+          (receiver, kind) <- tc_infer_lhs_type mode right
           actual <- liftZonkM (zonkTcType kind)
           case splitAppTy_maybe actual of
-            Just (domain, _) -> lookupSourceContainerMethod fun domain
+            Just (domain, _) -> do
+              table <- lookupSourceContainerMethod fun domain
+              case table of
+                Just checked -> pure (Just (checkTableMethod fun checked))
+                Nothing | isOpenTypeOperand left
+                        , isOpenTypeOperand right || promotedReceiver receiver ->
+                  fmap (checkOpenMethod fun left receiver) <$> lookupSourceGroundDFun cls domain
+                Nothing -> pure Nothing
             Nothing -> pure Nothing
       | Just _ <- isClassOpId_maybe fun
       , Just domain <- retainedDomain left <|> retainedDomain right
-      = liftZonkM (zonkTcType domain) >>= lookupSourceBinaryMethod fun
+      = do actual <- liftZonkM (zonkTcType domain)
+           fmap (checkTableMethod fun) <$> lookupSourceBinaryMethod fun actual
     checkedClassMethod _ _ = pure Nothing
+
+    checkTableMethod fun (dfun, target, table) = do
+      recordSourceMethodUse dfun fun target
+      checkSourceMethodSelection mode dfun (idName fun)
+      (ty, kind) <- tcInferTyApps mode hs_fun_ty (mkTyConTy table) hs_args
+      checkExpKind mode rn_ty ty kind exp_kind
+
+    -- See Note [Observing an imported method worker] in GHC.Tc.Gen.OpenTypeEval.
+    checkOpenMethod fun left receiver dfun = do
+      let name = idName fun
+      local <- tcOpenTypeContext mode name
+      checkSourceMethodSelection mode dfun name
+      worker <- readOpenMethodWorker dfun fun >>= either (reportOpenTypeFailure name) pure
+      recordSourceMethodUse dfun fun worker
+      (callback, _) <- tc_infer_lhs_type mode left
+      checked_callback <- liftZonkM (zonkTcType callback)
+      checked_receiver <- liftZonkM (zonkTcType receiver)
+      case instantiateOpenMethod worker (typeKind checked_callback) (typeKind checked_receiver) of
+        Nothing -> reportOpenTypeFailure name InvalidInput
+        Just (method, result_kind) -> do
+          result <- tcObserveOpenTypeCall local name method result_kind [checked_callback, checked_receiver]
+          checkExpKind mode rn_ty result result_kind exp_kind
+
+    -- An inner checked call can return a constructor as its source type.
+    promotedReceiver ty = case splitTyConApp_maybe ty of
+      Just (tc, _) -> isJust (isPromotedDataCon_maybe tc)
+      Nothing      -> False
 
     -- A retained operand fixes the class parameter for a method of
     -- type a -> a -> a. Check both original operands against its table.
@@ -3114,6 +3150,20 @@ tc_app_ty_with_head mode rn_ty exp_kind fun_ty
 -- See Note [Open source calls] in GHC.Tc.Gen.OpenTypeEval.
 tcOpenTypeCall :: TcTyMode -> Name -> Core.CoreExpr -> Kind -> [(LHsType GhcRn, Kind)] -> TcM Type
 tcOpenTypeCall mode name instantiated result_kind args = do
+  local <- tcOpenTypeContext mode name
+  operands <- mapM (checkOperand local) args
+  tcObserveOpenTypeCall local name instantiated result_kind operands
+  where
+    checkOperand local (arg, kind) = setSrcSpanA (getLoc arg) $ do
+      let check = tc_check_lhs_type mode arg kind
+      -- Report an insoluble kind equality before observing a local operand.
+      -- A cast with an unsolved kind equality is not an opaque Type.
+      checked <- if local then solveEqualities "tcOpenTypeCall operand" check else check
+      liftZonkM (zonkTcType checked)
+
+-- | Check the staging restrictions and tell whether the call is local.
+tcOpenTypeContext :: TcTyMode -> Name -> TcM Bool
+tcOpenTypeContext mode name = do
   when (mode_complete_type_arg mode == Just False) $
     reject "A visible type argument containing an open call must be complete. Replace its wildcards with types."
   level <- getThLevel
@@ -3123,12 +3173,18 @@ tcOpenTypeCall mode name instantiated result_kind args = do
     Comp | not bootOrSig && not explicitLevels -> pure ()
     _ -> reject "This call requires an ordinary module outside quotes and splices, without ExplicitLevelImports."
   env <- getGblEnv
-  let local = nameIsLocalOrFrom (tcg_semantic_mod env) name
-  operands <- mapM (checkOperand local) args
+  pure (nameIsLocalOrFrom (tcg_semantic_mod env) name)
+  where
+    reject :: String -> TcM a
+    reject = failWithTc . TcRnOpenTypeEval name Nothing
+
+-- | Observe checked operands and record every definition used for readback.
+tcObserveOpenTypeCall :: Bool -> Name -> Core.CoreExpr -> Kind -> [Type] -> TcM Type
+tcObserveOpenTypeCall local name instantiated result_kind operands = do
+  env <- getGblEnv
   outcome <- observeOpenType local instantiated result_kind operands
   case outcome of
-    Left reason -> let (definition, message) = openTypeFailureReason reason
-                   in failWithTc (TcRnOpenTypeEval name definition message)
+    Left reason -> reportOpenTypeFailure name reason
     Right (result, used, constructors) -> do
       let locals = tcg_local_open_defs env
           lookup_owner n = case lookupNameEnv locals n of
@@ -3138,16 +3194,12 @@ tcOpenTypeCall mode name instantiated result_kind args = do
       recordUnfoldedSourceUses dependencies
       updTcRef (tcg_evaluated_term_uses env) (\seen -> seen `unionNameSet` constructors `unionNameSet` mkNameSet (map fst used))
       pure result
-  where
-    checkOperand local (arg, kind) = setSrcSpanA (getLoc arg) $ do
-      let check = tc_check_lhs_type mode arg kind
-      -- Report an insoluble kind equality before observing a local operand.
-      -- A cast with an unsolved kind equality is not an opaque Type.
-      checked <- if local then solveEqualities "tcOpenTypeCall operand" check else check
-      liftZonkM (zonkTcType checked)
 
-    reject :: String -> TcM a
-    reject = failWithTc . TcRnOpenTypeEval name Nothing
+-- | Report an unavailable observation at the source call.
+reportOpenTypeFailure :: Name -> OpenTypeFailure -> TcM a
+reportOpenTypeFailure name reason =
+  let (definition, message) = openTypeFailureReason reason
+  in failWithTc (TcRnOpenTypeEval name definition message)
 
 -- | Admit a rigid variable or a promoted constructor with symbolic fields.
 isOpenTypeOperand :: LHsType GhcRn -> Bool
