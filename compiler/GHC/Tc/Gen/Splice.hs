@@ -25,7 +25,7 @@ module GHC.Tc.Gen.Splice(
      tcTypedSplice, tcTypedBracket, tcUntypedBracket,
      runAnnotation, getUntypedSpliceBody,
 
-     runMetaE, runMetaP, runMetaT, runMetaD, runQinTcM,
+     runMetaE, runMetaP, runMetaT, runMetaTWithIndices, runMetaD, runQinTcM,
      tcTopSpliceExpr, lookupThName_maybe,
      defaultRunMeta, runMeta', runRemoteModFinalizers,
      finishTH, runTopSplice, tcRunClosedCall, tcPrepareClosedApplication, tcPrepareClosedFunctionValue,
@@ -1229,24 +1229,29 @@ runQResult show_th f runQ expr_span hval
 runMeta :: (MetaHook TcM -> LHsExpr GhcTc -> TcM hs_syn)
         -> LHsExpr GhcTc
         -> TcM hs_syn
-runMeta unwrap e = do
+runMeta = runMetaWithIndices []
+
+-- | Keep the plugin hook request and provide exact indices to the default runner.
+runMetaWithIndices :: [Name] -> (MetaHook TcM -> LHsExpr GhcTc -> TcM hs_syn)
+                   -> LHsExpr GhcTc -> TcM hs_syn
+runMetaWithIndices indices unwrap e = do
     env <- getGblEnv
     checkOptionalSourceUses env
     hooks <- getHooks
     case runMetaHook hooks of
-        Nothing -> unwrap defaultRunMeta e
+        Nothing -> unwrap (defaultRunMeta indices) e
         Just h  -> unwrap h e
 
-defaultRunMeta :: MetaHook TcM
-defaultRunMeta (MetaE r)
+defaultRunMeta :: [Name] -> MetaHook TcM
+defaultRunMeta _ (MetaE r)
   = fmap r . runMeta' True ppr (runQResult TH.pprint convertToHsExpr runTHExp)
-defaultRunMeta (MetaP r)
+defaultRunMeta _ (MetaP r)
   = fmap r . runMeta' True ppr (runQResult TH.pprint convertToPat runTHPat)
-defaultRunMeta (MetaT r)
-  = fmap r . runMeta' True ppr (runQResult TH.pprint convertToHsType runTHType)
-defaultRunMeta (MetaD r)
+defaultRunMeta indices (MetaT r)
+  = fmap r . runMeta' True ppr (runQResult TH.pprint (convertToHsTypeWithIndices indices) runTHType)
+defaultRunMeta _ (MetaD r)
   = fmap r . runMeta' True ppr (runQResult TH.pprint convertToHsDecls runTHDec)
-defaultRunMeta (MetaAW r)
+defaultRunMeta _ (MetaAW r)
   = fmap r . runMeta' False (const empty) (const $ fmap Right . convertAnnotationWrapper)
     -- We turn off showing the code in meta-level exceptions because doing so exposes
     -- the toAnnotationWrapper function that we slap around the user's code
@@ -1267,6 +1272,10 @@ runMetaP = runMeta metaRequestP
 runMetaT :: LHsExpr GhcTc          -- Of type (Q Type)
          -> TcM (LHsType GhcPs)
 runMetaT = runMeta metaRequestT
+
+-- | Run a type splice with the scope of a retained signature.
+runMetaTWithIndices :: [Name] -> LHsExpr GhcTc -> TcM (LHsType GhcPs)
+runMetaTWithIndices indices = runMetaWithIndices indices metaRequestT
 
 runMetaD :: LHsExpr GhcTc          -- Of type Q [Dec]
          -> TcM [LHsDecl GhcPs]
@@ -2935,6 +2944,9 @@ lookupThInstName th_type = do
 
     inst_cls_name (TH.ForallT _ _ _)         = inst_cls_name_err
     inst_cls_name (TH.ForallVisT _ _)        = inst_cls_name_err
+    inst_cls_name TH.ForEachT{}               = inst_cls_name_err
+    inst_cls_name TH.IndexVarT{}              = inst_cls_name_err
+    inst_cls_name TH.CaseT{}                  = inst_cls_name_err
     inst_cls_name (TH.ForallMatchT _ _)      = inst_cls_name_err
     inst_cls_name (TH.AppKindT _ _)          = inst_cls_name_err
     inst_cls_name (TH.TupleT _)              = inst_cls_name_err
@@ -3555,6 +3567,7 @@ reifyDataCon isGadtDataCon tys dc
              (srcUnpks, srcStricts)
                  = mapAndUnzip reifySourceBang (dataConSrcBangs dc)
              dcdBangs  = zipWith TH.Bang srcUnpks srcStricts
+             retained  = dataConRepArgBinders dc
              fields    = dataConFieldLabels dc
              name      = reifyName dc
              -- Universal tvs present in eq_spec need to be filtered out, as
@@ -3570,10 +3583,16 @@ reifyDataCon isGadtDataCon tys dc
              g_arg_tys = substTys tvb_subst (map scaledThing g_arg_tys')
              g_res_ty  = substTy  tvb_subst g_res_ty'
 
-       ; r_arg_tys <- reifyTypes (if isGadtDataCon then g_arg_tys else arg_tys)
+       ; r_arg_tys <- if null retained
+         then reifyTypes (if isGadtDataCon then g_arg_tys else arg_tys)
+         else pure []
 
        ; main_con <-
-           if | not (null fields) && not isGadtDataCon ->
+           if | not (null retained) -> do
+                  { (args, result) <- reifyRetainedGadtArgs retained dcdBangs
+                                      (map (substScaledTy tvb_subst) g_arg_tys') g_res_ty
+                  ; pure (TH.RetainedGadtC [name] args result) }
+              | not (null fields) && not isGadtDataCon ->
                   return $ TH.RecC name (zip3 (map reifyFieldLabel fields)
                                          dcdBangs r_arg_tys)
               | not (null fields) -> do
@@ -3610,7 +3629,7 @@ reifyDataCon isGadtDataCon tys dc
                          ; let con = TH.ForallC ex_tvs'' cxt main_con
                          ; return $ if null ex_tvs'' then con
                                     else TH.ForallMatchC ma con }
-       ; assert (r_arg_tys `equalLength` dcdBangs)
+       ; assert (not (null retained) || r_arg_tys `equalLength` dcdBangs)
          ret_con }
   where
     mk_specified tv = Bndr tv Specified
@@ -3627,6 +3646,27 @@ reifyDataCon isGadtDataCon tys dc
           (subst', tvs') = substTyVarBndrs subst tvs
           tv_bndrs'      = map (\(tv,fl) -> Bndr tv fl) (zip tvs' flags)
       in (subst', tv_bndrs')
+
+-- | Reify the actual field binders. The wrapper type can omit a vacuous
+-- retained binder even when the constructor's field metadata retains it.
+reifyRetainedGadtArgs :: [Maybe Id] -> [TH.Bang] -> [Scaled Type] -> Type
+                     -> TcM ([TH.RetainedGadtArg], TH.Type)
+reifyRetainedGadtArgs binders bangs fields result =
+  assert (binders `equalLength` bangs && binders `equalLength` fields) $
+    go emptyNameSet (zip3 binders bangs fields)
+  where
+    go scope [] = ([],) <$> reifyTypeInScope scope result
+    go scope ((binder, bang, Scaled mult ty) : rest) = do
+      field_ty <- reifyTypeInScope scope ty
+      (arg, rest_scope) <- case binder of
+        Nothing -> do
+          mult' <- reifyTypeInScope scope mult
+          pure (TH.GadtValueArg bang mult' field_ty, scope)
+        Just index ->
+          pure (TH.GadtIndexArg (reifyName index) field_ty,
+                extendNameSet scope (getName index))
+      (args, result') <- go rest_scope rest
+      pure (arg : args, result')
 
 mkDataConI :: DataCon -> TcM TH.Info
 mkDataConI dc
@@ -3925,33 +3965,44 @@ reifyFamilyInstance is_poly_tvs (FamInst { fi_flavor = flavor
 ------------------------------
 reifyType :: TyCoRep.Type -> TcM TH.Type
 -- Monadic only because of failure
-reifyType ty                | tcIsLiftedTypeKind ty = return TH.StarT
+reifyType = reifyTypeInScope emptyNameSet
+
+-- | Keep the scope of retained term binders while reifying their result types.
+reifyTypeInScope :: NameSet -> TyCoRep.Type -> TcM TH.Type
+reifyTypeInScope _ ty      | tcIsLiftedTypeKind ty = return TH.StarT
   -- Make sure to use tcIsLiftedTypeKind here, since we don't want to confuse it
   -- with Constraint (#14869).
-reifyType ty@(TermAppTy {}) = pprPanic "reifyType: unsupported runtime call index" (ppr ty)
-reifyType ty@(TermVarTy {}) = noTH RetainedRuntimeIndex ty
--- ForallVisT represents an erased type argument. It cannot bind a runtime
--- argument in a function type or scope that argument over the result type.
-reifyType ty@(DepFunTy {}) = noTH RetainedFunctionType ty
-reifyType ty@ExistsTy{}     = noTH FirstClassExistential ty
-reifyType (ForAllTy ma (Bndr tv argf) body)
+reifyTypeInScope _ ty@TermAppTy{} = noTH RetainedRuntimeIndex ty
+reifyTypeInScope scope ty@(TermVarTy v)
+  | getName v `elemNameSet` scope = pure (TH.IndexVarT (reifyName v))
+  | otherwise                    = noTH RetainedRuntimeIndex ty
+reifyTypeInScope scope (DepFunTy vis v body)
+  = do { domain' <- reifyTypeInScope scope (idType v)
+       ; body' <- reifyTypeInScope (extendNameSet scope (getName v)) body
+       ; pure (TH.ForEachT visibility (reifyName v) domain' body') }
+  where
+    visibility = case vis of
+      DepFunVisible   -> TH.BndrReq
+      DepFunInvisible -> TH.BndrInvis
+reifyTypeInScope _ ty@ExistsTy{} = noTH FirstClassExistential ty
+reifyTypeInScope scope (ForAllTy ma (Bndr tv argf) body)
   -- See Note [Reifying forall matchability].
-  = do { ma' <- reifyType ma
-       ; body' <- reifyType body
+  = do { ma' <- reifyTypeInScope scope ma
+       ; body' <- reifyTypeInScope scope body
        ; group <- case argf of
-           Required -> do { tvs <- reifyTyVarBndrs [Bndr tv ()]
+           Required -> do { tvs <- reifyTyVarBndrsWith (reifyTypeInScope scope) [Bndr tv ()]
                           ; pure (TH.ForallVisT tvs body') }
            Invisible spec -> do
-             { tvs <- reifyTyVarBndrs [Bndr tv spec]
+             { tvs <- reifyTyVarBndrsWith (reifyTypeInScope scope) [Bndr tv spec]
              ; pure (TH.ForallT tvs [] body') }
        ; pure (TH.ForallMatchT ma' group) }
-reifyType (LitTy t)         = do { r <- reifyTyLit t; return (TH.LitT r) }
-reifyType (TyVarTy tv)      = return (TH.VarT (reifyName tv))
-reifyType (TyConApp tc tys) = reify_tc_app tc tys   -- Do not expand type synonyms here
-reifyType ty@(AppTy {})     = do
+reifyTypeInScope _ (LitTy t)         = do { r <- reifyTyLit t; return (TH.LitT r) }
+reifyTypeInScope _ (TyVarTy tv)      = return (TH.VarT (reifyName tv))
+reifyTypeInScope scope (TyConApp tc tys) = reify_tc_app scope tc tys   -- Do not expand type synonyms here
+reifyTypeInScope scope ty@AppTy{}     = do
   let (ty_head, ty_args) = splitAppTys ty
-  ty_head' <- reifyType ty_head
-  ty_args' <- reifyTypes (filter_out_invisible_args ty_head ty_args)
+  ty_head' <- reifyTypeInScope scope ty_head
+  ty_args' <- mapM (reifyTypeInScope scope) (filter_out_invisible_args ty_head ty_args)
   pure $ mkThAppTs ty_head' ty_args'
   where
     -- Make sure to filter out any invisible arguments. For instance, if you
@@ -3966,28 +4017,28 @@ reifyType ty@(AppTy {})     = do
       filterByList (map isVisibleForAllTyFlag $ appTyForAllTyFlags ty_head ty_args)
                    ty_args
 -- Explicit metadata preserves arrows in both type and kind quotation contexts.
-reifyType (FunTy { ft_af = FTF_T_T, ft_ma = ma, ft_mult = mult, ft_arg = arg, ft_res = res })
-  = do { [ma',mult',arg',res'] <- reifyTypes [ma,mult,arg,res]
+reifyTypeInScope scope (FunTy { ft_af = FTF_T_T, ft_ma = ma, ft_mult = mult, ft_arg = arg, ft_res = res })
+  = do { [ma',mult',arg',res'] <- mapM (reifyTypeInScope scope) [ma,mult,arg,res]
        ; let fun = TH.AppKindT (TH.ConT (reifyName (funTyFlagTyCon FTF_T_T))) ma'
        ; return (mkThAppTs fun [mult',arg',res']) }
-reifyType ty@(FunTy { ft_af = af, ft_mult = ManyTy, ft_arg = t1, ft_res = t2 })
-  | isInvisibleFunArg af = reify_context ty  -- Types like ((?x::Int) => Char -> Char)
-  | otherwise            = do { [r1,r2] <- reifyTypes [t1,t2]
+reifyTypeInScope scope ty@(FunTy { ft_af = af, ft_mult = ManyTy, ft_arg = t1, ft_res = t2 })
+  | isInvisibleFunArg af = reify_context scope ty  -- Types like ((?x::Int) => Char -> Char)
+  | otherwise            = do { [r1,r2] <- mapM (reifyTypeInScope scope) [t1,t2]
                               ; return (TH.ArrowT `TH.AppT` r1 `TH.AppT` r2) }
-reifyType ty@(FunTy { ft_af = af, ft_mult = tm, ft_arg = t1, ft_res = t2 })
+reifyTypeInScope scope ty@(FunTy { ft_af = af, ft_mult = tm, ft_arg = t1, ft_res = t2 })
   | isInvisibleFunArg af = noTH LinearInvisibleArgument ty
-  | otherwise            = do { [rm,r1,r2] <- reifyTypes [tm,t1,t2]
+  | otherwise            = do { [rm,r1,r2] <- mapM (reifyTypeInScope scope) [tm,t1,t2]
                               ; return (TH.MulArrowT `TH.AppT` rm `TH.AppT` r1 `TH.AppT` r2) }
-reifyType (CastTy t _)      = reifyType t -- Casts are ignored in TH
-reifyType ty@(CoercionTy {})= noTH CoercionsInTypes ty
+reifyTypeInScope scope (CastTy t _) = reifyTypeInScope scope t -- Casts are ignored in TH
+reifyTypeInScope _ ty@CoercionTy{} = noTH CoercionsInTypes ty
 
 -- | Reify predicate arrows without introducing a quantified group.
-reify_context :: TyCoRep.Type -> TcM TH.Type
+reify_context :: NameSet -> TyCoRep.Type -> TcM TH.Type
 -- The argument is a predicate FunTy. Context-only nodes have no metadata.
-reify_context ty
+reify_context scope ty
   = do let (cxt, tau) = tcSplitPhiTy ty
-       cxt' <- reifyCxt cxt
-       tau' <- reifyType tau
+       cxt' <- mapM (reifyTypeInScope scope) cxt
+       tau' <- reifyTypeInScope scope tau
        pure $ TH.ForallT [] cxt' tau'
 
 {- Note [Reifying forall matchability]
@@ -4091,28 +4142,33 @@ reifyTyVars = reifyTyVarBndrs . map mk_bndr
 
 reifyTyVarBndrs :: ReifyFlag flag flag'
                 => [VarBndr TyVar flag] -> TcM [TH.TyVarBndr flag']
-reifyTyVarBndrs = mapM reify_tvbndr
+reifyTyVarBndrs = reifyTyVarBndrsWith reifyKind
+
+-- | Reify binder kinds in the caller's scope.
+reifyTyVarBndrsWith :: ReifyFlag flag flag'
+                   => (Kind -> TcM TH.Kind) -> [VarBndr TyVar flag] -> TcM [TH.TyVarBndr flag']
+reifyTyVarBndrsWith reify_kind = mapM reify_tvbndr
   where
     -- even if the kind is *, we need to include a kind annotation,
     -- in case a poly-kind would be inferred without the annotation.
     -- See #8953 or test th/T8953
     reify_tvbndr (Bndr tv fl) = TH.KindedTV (reifyName tv)
                                             (reifyFlag fl)
-                                            <$> reifyKind (tyVarKind tv)
+                                            <$> reify_kind (tyVarKind tv)
 
 reifyTyVarsToMaybe :: [TyVar] -> TcM (Maybe [TH.TyVarBndr ()])
 reifyTyVarsToMaybe []  = pure Nothing
 reifyTyVarsToMaybe tys = Just <$> reifyTyVars tys
 
-reify_tc_app :: TyCon -> [Type.Type] -> TcM TH.Type
-reify_tc_app tc tys
+reify_tc_app :: NameSet -> TyCon -> [Type.Type] -> TcM TH.Type
+reify_tc_app scope tc tys
   | tc `hasKey` fUNTyConKey
   , ma : _ <- tys
-  = do { ma' <- reifyType ma
-       ; tys' <- reifyTypes (filterOutInvisibleTypes tc tys)
+  = do { ma' <- reifyTypeInScope scope ma
+       ; tys' <- mapM (reifyTypeInScope scope) (filterOutInvisibleTypes tc tys)
        ; maybe_sig_t (mkThAppTs (TH.AppKindT (TH.ConT (reifyName tc)) ma') tys') }
   | otherwise
-  = do { tys' <- reifyTypes (filterOutInvisibleTypes tc tys)
+  = do { tys' <- mapM (reifyTypeInScope scope) (filterOutInvisibleTypes tc tys)
        ; maybe_sig_t (mkThAppTs r_tc tys') }
   where
     arity       = tyConArity tc
@@ -4145,7 +4201,7 @@ reify_tc_app tc tys
                 -- injective positions in the kind of the tycon.
           tc (length tys)
       = do { let full_kind = typeKind (mkTyConApp tc tys)
-           ; th_full_kind <- reifyKind full_kind
+           ; th_full_kind <- reifyTypeInScope scope full_kind
            ; return (TH.SigT th_type th_full_kind) }
       | otherwise
       = return th_type

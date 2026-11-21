@@ -606,6 +606,9 @@ tcCheckRetainedType allow_function witness_skol = go
   where
     go :: TcTyMode -> LHsType GhcRn -> TcKind -> TcM TcType
     go mode (L _ (HsParTy _ body)) kind = go mode body kind
+    go mode (L _ (HsSpliceTy (HsUntypedSpliceTop finalizers body) _)) kind =
+      do { addModFinalizersWithLclEnv finalizers
+         ; go mode body kind }
     go mode (L loc (HsForAllTy { hst_tele = tele@HsForAllInvis{}, hst_body = body })) kind
       | not (isEmptyNameEnv (mode_indices mode)) || hsHasForEachTy (unLoc body)
       = setSrcSpanA loc $
@@ -2131,6 +2134,7 @@ tcHsType mode src@(XHsType (HsTypeExistsRn flag binder body)) exp_kind
            _ -> panic "tcHsType: existential binder count" }
 
 tcHsType _ (XHsType HsTypeCaseAliasRn{}) _ = failWithTc TcRnTypeCaseContext
+tcHsType _ (XHsType HsTypeCaseRn{}) _ = failWithTc TcRnTypeCaseContext
 
 -- See Note [Typechecking type lets].
 tcHsType mode (XHsType (HsTypeLetRn (L _ binder) rhs body)) exp_kind = do

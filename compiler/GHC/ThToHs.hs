@@ -18,7 +18,7 @@ module GHC.ThToHs
    ( convertToHsExpr
    , convertToPat
    , convertToHsDecls
-   , convertToHsType
+   , convertToHsType, convertToHsTypeWithIndices
    , thRdrNameGuesses
    )
 where
@@ -54,7 +54,7 @@ import qualified GHC.Data.EnumSet as EnumSet
 import qualified GHC.LanguageExtensions as LangExt
 
 import qualified Data.ByteString as BS
-import Control.Monad( unless )
+import Control.Monad( forM, unless, when )
 import Data.Bifunctor (first)
 import Data.Foldable (for_)
 import Data.List (isPrefixOf)
@@ -92,15 +92,31 @@ convertToPat exts origin loc p
   = initCvt exts origin loc $ wrapMsg (ConvPat p) $ cvtPat p
 
 convertToHsType :: EnumSet LangExt.Extension -> Origin -> SrcSpan -> TH.Type -> Either RunSpliceFailReason (LHsType GhcPs)
-convertToHsType exts origin loc t
-  = initCvt exts origin loc $ wrapMsg (ConvType t) $ cvtType t
+convertToHsType = convertToHsTypeWithIndices []
+
+-- | Convert a type splice in the scope of these exact retained binders.
+convertToHsTypeWithIndices
+  :: [Name.Name] -> EnumSet LangExt.Extension -> Origin -> SrcSpan -> TH.Type
+  -> Either RunSpliceFailReason (LHsType GhcPs)
+convertToHsTypeWithIndices names exts origin loc t
+  = initCvtWithIndices (concatMap aliases names) exts origin loc $
+      wrapMsg (ConvType t) (cvtType t)
+  where
+    -- A quotation uses NameL. lookupValueName uses NameU for the same binder.
+    -- Resolve both to the original runtime Name.
+    aliases name =
+      let occ = OccName.occNameString (Name.nameOccName name)
+          key = toInteger (getKey (getUnique name))
+          rdr = nameRdrName name
+      in [(TH.mkNameL occ key, rdr), (TH.mkNameU occ key, rdr)]
 
 -------------------------------------------------------------------
 
 -- Reader context for CvtM
 data CvtCtx =
   CvtCtx { cvt_origin :: !Origin
-         , cvt_listTuplePuns :: !Bool }
+         , cvt_listTuplePuns :: !Bool
+         , cvt_retained_indices :: [(TH.Name, RdrName)] }
 
 -- State of CvtM
 type CvtSt = SrcSpan
@@ -138,9 +154,15 @@ mapCvtMError :: (err1 -> err2) -> CvtM' err1 a -> CvtM' err2 a
 mapCvtMError f m = CvtM $ \origin loc -> first f $ unCvtM m origin loc
 
 initCvt :: EnumSet LangExt.Extension -> Origin -> SrcSpan -> CvtM' err a -> Either err a
-initCvt exts origin loc m = fmap fst (unCvtM m ctx loc)
+initCvt = initCvtWithIndices []
+
+-- | Seed conversion with exact runtime names that the renamer already bound.
+initCvtWithIndices :: [(TH.Name, RdrName)] -> EnumSet LangExt.Extension
+                   -> Origin -> SrcSpan -> CvtM' err a -> Either err a
+initCvtWithIndices names exts origin loc m = fmap fst (unCvtM m ctx loc)
   where ctx = CvtCtx { cvt_origin = origin
-                     , cvt_listTuplePuns = listTuplePuns }
+                     , cvt_listTuplePuns = listTuplePuns
+                     , cvt_retained_indices = names }
         listTuplePuns = EnumSet.member LangExt.ListTuplePuns exts
 
 force :: a -> CvtM ()
@@ -154,6 +176,16 @@ getOrigin = CvtM (\ctx s -> Right (cvt_origin ctx,s))
 
 getListTuplePuns :: CvtM Bool
 getListTuplePuns = CvtM (\ctx s -> Right (cvt_listTuplePuns ctx,s))
+
+-- | Find a runtime binder in the splice or the enclosing retained telescope.
+lookupRetainedIndex :: TH.Name -> CvtM (Maybe RdrName)
+lookupRetainedIndex nm = CvtM $ \ctx loc ->
+  Right (lookup nm (cvt_retained_indices ctx), loc)
+
+-- | Add the binder to the scope of the result of a retained function type.
+withRetainedIndex :: TH.Name -> RdrName -> CvtM a -> CvtM a
+withRetainedIndex nm rdr action = CvtM $ \ctx ->
+  unCvtM action ctx { cvt_retained_indices = (nm, rdr) : cvt_retained_indices ctx }
 
 getL :: CvtM SrcSpan
 getL = CvtM (\_ loc -> Right (loc,loc))
@@ -542,7 +574,9 @@ cvtDataDefnCons ::
 cvtDataDefnCons type_data ksig constrs
   = do  { let isGadtCon (GadtC    _ _ _) = True
               isGadtCon (RecGadtC _ _ _) = True
+              isGadtCon RetainedGadtC{}  = True
               isGadtCon (ForallC  _ _ c) = isGadtCon c
+              isGadtCon (ForallMatchC _ c) = isGadtCon c
               isGadtCon _                = False
               isGadtDecl  = all isGadtCon constrs
               isH98Decl   = all (not . isGadtCon) constrs
@@ -732,6 +766,49 @@ cvtConstr parent_con do_con_name (RecGadtC c varstrtys ty) = case nonEmpty c of
         ; rec_flds <- mapM (cvt_id_arg parent_con) varstrtys
         ; lrec_flds <- returnLA rec_flds
         ; mk_gadt_decl c' (RecConGADT noAnn lrec_flds) ty' }
+
+cvtConstr _ do_con_name (RetainedGadtC names args result) = case nonEmpty names of
+  Nothing -> failWith GadtNoCons
+  Just names -> do
+    names' <- mapM do_con_name names
+    (prefix, suffix) <- cvtRetainedGadtArgs args result
+    mk_gadt_decl names' (PrefixConGADT noExtField prefix) suffix
+
+-- | The source AST stores the prefix fields before the first retained binder
+-- separately. Use the retained function type syntax for the suffix.
+cvtRetainedGadtArgs :: [TH.RetainedGadtArg] -> TH.Type
+                    -> CvtM ([HsConDeclField GhcPs], LHsType GhcPs)
+cvtRetainedGadtArgs args result = prefix args
+  where
+    prefix (GadtValueArg bang mult ty : rest) = do
+      field <- cvt_arg (bang, ty)
+      mult' <- cvtGadtArgMult mult
+      (fields, body) <- prefix rest
+      pure (field { cdf_multiplicity = mult' } : fields, body)
+    prefix binders@(GadtIndexArg{} : _) = ([],) <$> suffix binders
+    prefix [] = failWith (MalformedType TypeLevel result)
+
+    suffix [] = cvtType result
+    suffix (GadtIndexArg name domain : rest) =
+      cvtRetainedBinder TH.BndrReq name domain (suffix rest)
+    suffix (GadtValueArg (Bang unpack strict) mult ty : rest) = do
+      arg <- cvtType ty
+      let bang = HsSrcBang NoSourceText (cvtSrcUnpackedness unpack) (cvtSrcStrictness strict)
+      arg' <- case (unpack, strict) of
+        (NoSourceUnpackedness, NoSourceStrictness) -> pure arg
+        _ -> returnLA $ XHsType (HsBangTy (noAnn, noAnn, noAnn) bang arg)
+      mult' <- cvtGadtArgMult mult
+      body <- suffix rest
+      returnLA (HsFunTy noExtField mult' arg' body)
+
+-- | Constructor arrows can default to One. Keep a Many annotation explicit.
+cvtGadtArgMult :: TH.Type -> CvtM (HsModifiedFunArr GhcPs)
+cvtGadtArgMult mult = do
+  ty <- cvtType mult
+  pure $ case hsTypeToArrow ty of
+    HsModifiedFunArr x [] arr@HsStandardArr{} ->
+      HsModifiedFunArr x [noLocA (HsModifier noAnn ty)] arr
+    arrow -> arrow
 
 mk_gadt_decl :: NonEmpty (LocatedN RdrName) -> HsConDeclGADTDetails GhcPs -> LHsType GhcPs
              -> CvtM (LConDecl GhcPs)
@@ -1760,8 +1837,18 @@ cvtTypeKind typeOrKind ty
              -> do { list_tc <- returnLA $ getRdrName listTyCon
                    ; mk_apps (HsTyVar noAnn NotPromoted list_tc) tys' }
 
-           VarT nm -> do { nm' <- tNameN nm
+           VarT nm -> do { retained <- lookupRetainedIndex nm
+                         ; unless (isNothing retained) $
+                             failWith (MalformedType typeOrKind ty)
+                         ; nm' <- tNameN nm
                          ; mk_apps (HsTyVar noAnn NotPromoted nm') tys' }
+           IndexVarT nm -> do
+             retained <- lookupRetainedIndex nm
+             case retained of
+               Nothing -> failWith (MalformedType typeOrKind ty)
+               Just rdr -> do
+                 name <- returnLA rdr
+                 mk_apps (HsTyVar noAnn NotPromoted name) tys'
            ConT nm -> do { nm' <- cvtNameWith True OccName.tcClsName nm
                          ; let prom = name_promotedness nm'
                          ; lnm' <- returnLA nm'
@@ -1798,6 +1885,18 @@ cvtTypeKind typeOrKind ty
                    ; let loc' = noAnnSrcSpan loc
                    ; let tele = mkHsForAllVisTele noAnn tvs'
                    ; pure $ mkHsForAllTy loc' tele ty' }
+
+           ForEachT vis nm domain ty
+             | null tys'
+             -> cvtRetainedBinder vis nm domain (cvtType ty)
+
+           CaseT scrutinee rows -> do
+             scrutinee' <- cvtTypeKind typeOrKind scrutinee
+             rows' <- forM rows $ \(TypeCaseAlt pat rhs) -> do
+               pat' <- cvtTypeKind typeOrKind pat
+               rhs' <- cvtTypeKind typeOrKind rhs
+               returnLA (HsTypeCaseAlt pat' noEpUniTok rhs')
+             mk_apps (XHsType (HsTypeCase (noEpTok, noEpTok) Nothing scrutinee' rows')) tys'
 
            SigT ty ki
              -> do { ty' <- cvtType ty
@@ -1906,6 +2005,20 @@ cvtTypeKind typeOrKind ty
 
            _ -> failWith (MalformedType typeOrKind ty)
     }
+
+-- | The runtime name scopes over the continuation after its domain.
+cvtRetainedBinder :: TH.BndrVis -> TH.Name -> TH.Type -> CvtM (LHsType GhcPs)
+                  -> CvtM (LHsType GhcPs)
+cvtRetainedBinder vis nm domain body = do
+  nm' <- vNameN nm
+  domain' <- cvtType domain
+  body' <- withRetainedIndex nm (unLoc nm') body
+  binder <- returnLA $
+    HsTvb noAnn () (HsBndrVar noExtField nm') (HsBndrKind noExtField domain')
+  let delimiter = case vis of
+        TH.BndrReq   -> Left noEpUniTok
+        TH.BndrInvis -> Right noEpTok
+  returnLA (HsForEachTy (noEpTok, delimiter) [binder] body')
 
 hsTypeToArrow :: LHsType GhcPs -> HsModifiedFunArr GhcPs
 hsTypeToArrow (L l w) = HsModifiedFunArr noExtField mods arr

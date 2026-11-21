@@ -37,7 +37,7 @@ import GHC.HsToCore.Binds
 import qualified GHC.Boot.TH.Syntax as TH
 
 import GHC.Hs
-import GHC.Hs.Type (HsTypeGhcRnExt(HsTypeLetRn, HsTypeCaseAliasRn))
+import GHC.Hs.Type (HsTypeGhcRnExt(HsTypeLetRn, HsTypeCaseAliasRn, HsTypeCaseRn))
 import GHC.Hs.Decls.Overlap ( OverlapMode(..) )
 
 import GHC.Tc.Utils.TcType
@@ -941,11 +941,16 @@ repSrcStrictness NoSrcStrict = rep2 noSourceStrictnessOcc []
 
 repConDeclField :: HsConDeclField GhcRn -> MetaM (Core (M TH.BangType))
 repConDeclField (CDF { cdf_unpack, cdf_bang, cdf_type }) = do
-  MkC u <- repSrcUnpackedness cdf_unpack
-  MkC s <- repSrcStrictness cdf_bang
-  MkC b <- rep2 bangName [u, s]
+  MkC b <- repSourceBang cdf_unpack cdf_bang
   MkC t <- repLTy TypeLevel cdf_type
   rep2 bangTypeName [b, t]
+
+-- | Quote a field's source strictness and unpacking.
+repSourceBang :: SrcUnpackedness -> SrcStrictness -> MetaM (Core (M TH.Bang))
+repSourceBang unpack strict = do
+  MkC u <- repSrcUnpackedness unpack
+  MkC s <- repSrcStrictness strict
+  rep2 bangName [u, s]
 
 -------------------------------------------------------
 --                      Deriving clauses
@@ -1488,6 +1493,16 @@ repLTy tyki = repLTyAt (Just tyki)
 -- | Quote a type with a selected default, or defer declaration-kind omissions.
 -- See Note [Quoting forall matchability].
 repLTyAt :: Maybe TypeOrKind -> LHsType GhcRn -> MetaM (Core (M TH.Type))
+repLTyAt tyki (L _ (XHsType (HsTypeCaseRn scrutinee rows))) = do
+  MkC scrutinee' <- repLTyAt tyki scrutinee
+  MkC rows' <- repListM typeCaseAltTyConOcc rep_row rows
+  rep2 caseTName [scrutinee', rows']
+  where
+    rep_row :: ([Name], LHsType GhcRn, LHsType GhcRn) -> MetaM (Core (M TH.TypeCaseAlt))
+    rep_row (names, pat, rhs) = addSimpleTyVarBinds FreshNamesOnly names $ do
+      MkC pat' <- repLTyAt tyki pat
+      MkC rhs' <- repLTyAt tyki rhs
+      rep2 typeCaseAltName [pat', rhs']
 repLTyAt _ (L loc (XHsType HsTypeCaseAliasRn{})) =
   notHandledL (locA loc) ThTypeCase
 repLTyAt _ (L loc (XHsType HsTypeLetRn{})) =
@@ -1509,6 +1524,8 @@ repTy tyki (HsForAllTy { hst_tele = tele, hst_body = body }) = do
       addHsTyVarBinds FreshNamesOnly tvs $ \bndrs ->
       do body1 <- repLTyAt tyki body
          repTForallVis bndrs body1 >>= repForallMatch forallMatchTName (not (null tvs)) ma
+repTy tyki (HsForEachTy { hst_xforeach = ann, hst_bndrs = bndrs, hst_body = body }) =
+  repRetainedTelescope tyki (hsForEachVisibility ann) bndrs body
 repTy tyki (HsQualTy { hst_ctxt = ctxt, hst_body = body }) = do
   bndrs <- coreListM tyVarBndrSpecTyConOcc []
   ctxt1 <- repContextAt (independentForallContext tyki) (unLoc ctxt)
@@ -1521,6 +1538,9 @@ repTy _ (HsTyVar _ _ (L _ (WithUserRdr _ n)))
   | n `hasKey` unrestrictedFunTyConKey = repArrowTyCon
   | n `hasKey` fUNTyConKey             = repMulArrowTyCon
   | n `hasKey` eqTyConKey              = repTequality
+  | isVarName n && not (isExternalName n) = do
+      MkC index <- lookupOcc n
+      rep2 indexVarTName [index]
   | isVarNameSpace     ns = do tv1 <- lookupOcc n
                                repTvar tv1
   | isDataConNameSpace ns = do dc1 <- lookupOcc n
@@ -1615,6 +1635,33 @@ repTy tyki (HsIParamTy _ n t) = do
                              repTImplicitParam n' t'
 
 repTy _ ty                      = notHandled (ThExoticFormOfType ty)
+
+-- | The domain of each retained binder can use earlier binders only.
+repRetainedTelescope :: Maybe TypeOrKind -> DepFunTyFlag
+                     -> [LHsTyVarBndr () GhcRn] -> LHsType GhcRn
+                     -> MetaM (Core (M TH.Type))
+repRetainedTelescope tyki _ [] body = repLTyAt tyki body
+repRetainedTelescope tyki vis
+    (L _ (HsTvb _ () (HsBndrVar _ (L _ name)) (HsBndrKind _ domain)) : rest) body =
+  repRetainedBinder name domain $ \(MkC name') (MkC domain') -> do
+    MkC vis' <- rep2_nw vis_name [] :: MetaM (Core TH.BndrVis)
+    MkC body' <- repRetainedTelescope tyki vis rest body
+    rep2 forEachTName [vis', name', domain', body']
+  where
+    vis_name = case vis of
+      DepFunVisible   -> bndrReqName
+      DepFunInvisible -> bndrInvisName
+repRetainedTelescope _ _ _ _ = panic "repRetainedTelescope: invalid retained binder"
+
+-- | Allocate a fresh term name after quoting its domain.
+repRetainedBinder :: Name -> LHsType GhcRn
+                  -> (Core TH.Name -> Core (M TH.Type) -> MetaM (Core (M a)))
+                  -> MetaM (Core (M a))
+repRetainedBinder name domain inside = do
+  domain' <- repLTy TypeLevel domain
+  addSimpleTyVarBinds FreshNamesOnly [name] $ do
+    name' <- lookupOcc name
+    inside name' domain'
 
 repTyLit :: HsLit GhcRn -> MetaM (Core (M TH.TyLit))
 repTyLit (HsNatural _ i) = do
@@ -3084,6 +3131,9 @@ repGadtDataCons :: NonEmpty (LocatedN Name)
 repGadtDataCons cons details res_ty
     = do cons' <- mapM lookupLOcc cons -- See Note [Binders and occurrences]
          case details of
+           PrefixConGADT _ ps | hsHasForEachTy (unLoc res_ty) -> do
+             prefix <- mapM rep_field ps
+             repRetainedGadt (nonEmptyCoreList' cons') prefix res_ty
            PrefixConGADT _ ps -> do
              arg_tys <- repPrefixConArgs IsPrefixConGADT ps
              res_ty' <- repLTy TypeLevel res_ty
@@ -3093,6 +3143,56 @@ repGadtDataCons cons details res_ty
              res_ty'  <- repLTy TypeLevel res_ty
              rep2 recGadtCOcc [unC (nonEmptyCoreList' cons'), unC arg_vtys,
                                 unC res_ty']
+  where
+    rep_field (CDF { cdf_unpack, cdf_bang, cdf_multiplicity, cdf_type }) =
+      repGadtValueArg cdf_unpack cdf_bang cdf_multiplicity cdf_type
+
+-- | Quote the constructor suffix with retained names in scope.
+repRetainedGadt :: Core [TH.Name] -> [Core (M TH.RetainedGadtArg)]
+                -> LHsType GhcRn -> MetaM (Core (M TH.Con))
+repRetainedGadt names prefix = go (reverse prefix)
+  where
+    go args (L _ (HsParTy _ ty)) = go args ty
+    go args (L _ (HsForEachTy ann bndrs body))
+      | DepFunVisible <- hsForEachVisibility ann =
+          bind args bndrs body
+    go _ (L loc ty@HsForEachTy{}) = notHandledL (locA loc) (ThExoticFormOfType ty)
+    go args (L _ (HsFunTy _ mult ty body)) = do
+      arg <- repGadtValueArg NoSrcUnpack NoSrcStrict mult ty
+      go (arg : args) body
+    go args result = do
+      args' <- coreListM retainedGadtArgTyConOcc (reverse args)
+      result' <- repLTy TypeLevel result
+      rep2 retainedGadtCOcc [unC names, unC args', unC result']
+
+    bind args [] body = go args body
+    bind args (L _ (HsTvb _ () (HsBndrVar _ (L _ name)) (HsBndrKind _ domain)) : rest) body =
+      repRetainedBinder name domain $ \(MkC n) (MkC d) -> do
+        arg <- rep2 gadtIndexArgOcc [n, d]
+        bind (arg : args) rest body
+    bind _ _ _ = panic "repRetainedGadt: invalid retained binder"
+
+-- | Use the GADT arrow default in scope at the quotation site.
+repGadtValueArg :: SrcUnpackedness -> SrcStrictness -> HsModifiedFunArr GhcRn
+                -> LHsType GhcRn -> MetaM (Core (M TH.RetainedGadtArg))
+repGadtValueArg unpack strict (HsModifiedFunArr _ mods arr) ty = do
+  bang <- repSourceBang unpack strict
+  mult <- case (arr, mods) of
+    (HsStandardArr _, []) -> do
+      linear <- lift $ unannotatedMultIsLinear IsPrefixConGADT
+      promoted_mult (if linear then oneDataConName else manyDataConName)
+    (HsLinearArr _, []) -> promoted_mult oneDataConName
+    (HsStandardArr _, [mod@(L _ (HsModifier _ ann))]) -> do
+      modifiers <- lift $ xoptM LangExt.Modifiers
+      if modifiers
+        then quoteArrowModifier mod >>= either (repLTy KindLevel)
+               (const (notHandled $ ThUnexpectedModifier mods))
+        else repLTy KindLevel ann
+    _ -> notHandled $ ThUnexpectedModifier mods
+  field <- repLTy TypeLevel ty
+  rep2 gadtValueArgOcc [unC bang, unC mult, unC field]
+  where
+    promoted_mult name = lookupOcc name >>= repPromotedDataCon
 
 -- TH currently only supports linear constructors.
 -- We also accept the (->) arrow when -XLinearTypes is off, because this
