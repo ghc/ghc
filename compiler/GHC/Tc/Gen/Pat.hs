@@ -1321,6 +1321,7 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
         ; let pat_mult       = scaledMult pat_ty_scaled
               arg_tys_scaled = map (scaleScaled pat_mult) (substScaledTys tenv arg_tys)
               con_like       = RealDataCon data_con
+              trailing_context = dataConHasTrailingContext data_con
 
         ; traceTc "tcConPat" (vcat [ text "con_name:" <+> ppr con_name
                                    , text "univ_tvs:" <+> pprTyVars univ_tvs
@@ -1371,6 +1372,7 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
         ; given <- newEvVars theta'
         ; let indexed_fields
                 | Just scrut <- index, [eq] <- given
+                , not trailing_context
                 , isIdHsWrapper wrap, isNativeIndexedGadtCon data_con
                 , PrefixCon _ fields <- val_arg_pats
                 , Just names <- traverse index_field_name fields
@@ -1383,23 +1385,29 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
         ; when (case indexed_fields of Just (_, _, _ : _) -> True; _ -> False) $
             tcSubMult (pe_orig penv) ManyTy pat_mult
         -- See Note [Native indexed branch evidence] in GHC.Core.
+        ; let check_body = do
+                proof <- case indexed_fields of
+                  Just (scrut, eq, names) -> do
+                    fields <- traverse tcLookupId names
+                    actual <- traverse zonk_field fields
+                    case nativeIndexedCon_maybe (varType scrut) data_con (ex_tvs' ++ eq : actual) of
+                      Just con -> Just <$> newEvVar (mkNomEqPred (TermVarTy scrut) con)
+                      Nothing -> return Nothing
+                  Nothing -> return Nothing
+                result <- thing_inside proof
+                return (proof, result)
         ; (ev_binds, (arg_pats', (extra_proof, res)))
-             <- -- See Note [Type applications in patterns] (W4)
-                tcConTyArgs tenv penv univ_ty_args                       $
-                checkConstraints (getSkolemInfo skol_info) ex_tvs' given $
-                tcConTyArgs tenv penv ex_ty_args                         $
-                tcConValArgs con_like field_tys penv val_arg_pats $
-                tcConTyArgs tenv penv late_ty_args $ do
-                  proof <- case indexed_fields of
-                    Just (scrut, eq, names) -> do
-                      fields <- traverse tcLookupId names
-                      actual <- traverse zonk_field fields
-                      case nativeIndexedCon_maybe (varType scrut) data_con (ex_tvs' ++ eq : actual) of
-                        Just con -> Just <$> newEvVar (mkNomEqPred (TermVarTy scrut) con)
-                        Nothing -> return Nothing
-                    Nothing -> return Nothing
-                  result <- thing_inside proof
-                  return (proof, result)
+             <- tcConTyArgs tenv penv univ_ty_args $
+                if trailing_context
+                then do { (arg_pats', (ev_binds, result)) <-
+                            tcConValArgs con_like field_tys penv val_arg_pats $
+                            tcConTyArgs tenv penv late_ty_args $
+                            checkConstraints (getSkolemInfo skol_info) ex_tvs' given check_body
+                        ; return (ev_binds, (arg_pats', result)) }
+                else checkConstraints (getSkolemInfo skol_info) ex_tvs' given $
+                     tcConTyArgs tenv penv ex_ty_args $
+                     tcConValArgs con_like field_tys penv val_arg_pats $
+                     tcConTyArgs tenv penv late_ty_args check_body
 
         ; let res_pat = ConPat
                 { pat_con   = header

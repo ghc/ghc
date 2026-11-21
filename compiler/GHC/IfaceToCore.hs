@@ -1281,11 +1281,12 @@ tcIfaceDataCons tycon_name tycon if_cons
 
         ; let (early, late) = splitAt (length user_tvs - late_count) user_tvs
               late_vars = mkVarSet (binderVars late)
+              trailing_context = late_count /= 0 && all (isSpecifiedForAllTyFlag . binderFlag) late
               check_prefix_scope tys = when (late_count /= 0) $
                 unless (disjointVarSet late_vars (tyCoVarsOfTypes tys)) $
                   failIfM (text "Invalid terminal constructor binder scope:" <+> ppr dc_name)
         ; when (late_count /= 0) $
-            unless (all isVisibleForAllTyBinder late &&
+            unless ((all isVisibleForAllTyBinder late || (trailing_context && not (null ctxt))) &&
                     late_vars `subVarSet` mkVarSet univ_tvs) $
               failIfM (text "Invalid terminal constructor binder scope:" <+> ppr dc_name)
 
@@ -1299,7 +1300,8 @@ tcIfaceDataCons tycon_name tycon if_cons
                 ; theta   <- tcIfaceCtxt ctxt
                 -- A predicate or field can refer to this TyCon. Check its
                 -- scope in the same lazy computation that reads the type.
-                ; check_prefix_scope (map (varType . binderVar) early ++ theta)
+                ; let prefix_theta = if trailing_context then [] else theta
+                ; check_prefix_scope (map (varType . binderVar) early ++ prefix_theta)
                 -- This fixes #13710.  The enclosing lazy thunk gets
                 -- forced when typechecking record wildcard pattern
                 -- matching (it's not completely clear why this

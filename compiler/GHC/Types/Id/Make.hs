@@ -773,11 +773,13 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
                | otherwise        = LFReEntrant TopLevel (countFunRepArgs wrap_arity wrap_ty) True ArgUnknown
                                                       -- LFInfo stores post-unarisation arity
 
-             wrap_arg_dmds =
-               replicate (length stupid_theta + length theta) topDmd
-                 ++ map mk_dmd arg_ibangs
-               -- Don't forget the dictionary arguments when building
-               -- the strictness signature (#14290, #26748).
+             wrap_arg_dmds
+               | trailing_context = field_dmds ++ dict_dmds
+               | otherwise = dict_dmds ++ field_dmds
+               where
+                 field_dmds = map mk_dmd arg_ibangs
+                 dict_dmds = replicate (length stupid_theta + length theta) topDmd
+               -- Keep dictionary demands in wrapper order (#14290, #26748).
 
              mk_dmd str | isBanged str = evalDmd
                         | otherwise    = topDmd
@@ -804,10 +806,12 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
                         -- every constructor without a binding ('dataConHasNoBinding')
                       | otherwise  = mkDataConUnfolding wrap_rhs
              wrap_rhs = mkCoreTyLams early_tvbs $
-                        mkCoreLams wrap_args $
-                        mkCoreTyLams late_tvbs $
-                        wrapFamInstBody tycon res_ty_args non_wrap_arg_ty $
-                        wrap_body
+                        wrap_lams (wrapFamInstBody tycon res_ty_args non_wrap_arg_ty wrap_body)
+             wrap_lams body
+               | trailing_context
+               , (dict_args, field_args) <- splitAt (length theta) wrap_args
+               = mkCoreLams field_args (mkCoreTyLams late_tvbs (mkCoreLams dict_args body))
+               | otherwise = mkCoreLams wrap_args (mkCoreTyLams late_tvbs body)
 
        ; return (DCR { dcr_wrap_id = wrap_id
                      , dcr_boxer   = mk_boxer boxers
@@ -819,6 +823,7 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
                  = dataConFullSig data_con
     stupid_theta = dataConStupidTheta data_con
     (early_tvbs, late_tvbs) = dataConUserTyVarGroups data_con
+    trailing_context = dataConHasTrailingContext data_con
     res_ty_args  = dataConResRepTyArgs data_con
 
     tycon        = dataConTyCon data_con       -- The representation TyCon (not family)
