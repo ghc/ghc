@@ -1,6 +1,8 @@
-{-# LANGUAGE Haskell2010, NoExperimentalDependentTypes, MultiParamTypeClasses, TypeFamilies #-}
+{-# LANGUAGE DataKinds, Haskell2010, NoExperimentalDependentTypes, MultiParamTypeClasses, TypeFamilies #-}
 module Main where
 
+import Data.Proxy (Proxy)
+import GHC.TypeLits (natVal)
 import Numeric.Natural (Natural)
 import ScopedFamilyMethodProvider
 
@@ -32,6 +34,9 @@ measureFive :: Collects c => c -> (Ordering, Natural)
 measureFive x = case measuredEntry x 5 of
     (TaggedEntry order n, _) -> (order, n)
 
+projectFive :: Collects c => c -> Proxy 5
+projectFive x = snd (id (measuredEntry x 5))
+
 main :: IO ()
 main = do
     print (readEntry (2 :: Int) True, readEntry (error "unforced" :: AlwaysBelow) 'x')
@@ -44,3 +49,4 @@ main = do
     print (case inspectPayload high 'q' of TaggedEntry order value -> (order, value))
     print (case inspectPayload low unused of TaggedEntry order _ -> order)
     print (measureFive True, measureFive False)
+    print (natVal (projectFive True))
