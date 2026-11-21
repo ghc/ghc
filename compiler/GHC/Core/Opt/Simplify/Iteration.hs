@@ -3775,6 +3775,10 @@ improveSeq :: (FamInstEnv, FamInstEnv)
 improveSeq fam_envs (saf,env) scrut case_bndr case_bndr1 [Alt DEFAULT _ _]
   | SAF_In <- saf  -- improveSeq extends the substitution; not allowed for SAF_Out
   , Just (Reduction co ty2) <- topNormaliseType_maybe fam_envs (idType case_bndr1)
+  -- See Note [Retained case binders in improveSeq].
+  , not (sm_core_mode (seMode env) == RetainedCore
+         && isNativeOpaqueValueId case_bndr1
+         && not (isDeadBinder case_bndr))
   -- The cast changes the scrutinee type. Preserve the case multiplicity.
   = do { case_bndr2 <- newId (fsLit "nt") (idMult case_bndr1) ty2
         ; let rhs  = DoneEx (Var case_bndr2 `Cast` mkSymCo co) NotJoinPoint
@@ -3785,6 +3789,19 @@ improveSeq fam_envs (saf,env) scrut case_bndr case_bndr1 [Alt DEFAULT _ _]
 
 improveSeq _ (_,env) scrut _ case_bndr1 _
   = return (env, scrut, case_bndr1)
+
+{- Note [Retained case binders in improveSeq]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An ordinary strict binding can name a value at a data family application.
+Its RHS is evaluated by a DEFAULT case. The case body can use the
+binder as a retained operand at the public family type.
+
+Normalising the scrutinee would substitute a variable of the
+representation type with a representational cast for the original
+binder. That cast does not supply a nominal index at the public type.
+Keep the original strict case and its binder when retained Core can use
+the binder's identity. A dead binder needs no replacement.
+-}
 
 
 ------------------------------------
