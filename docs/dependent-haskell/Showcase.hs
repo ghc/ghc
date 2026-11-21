@@ -63,6 +63,7 @@ import qualified RetainedPackageFormatClient
 import qualified StoredVector
 import qualified ExistentialVec as E
 import qualified WitnessedBatch as Batch
+import qualified RectangularTable as Table
 import Data.IORef (modifyIORef', newIORef, readIORef, writeIORef)
 import Data.Functor.Const (Const(..))
 import Data.Kind (Type)
@@ -1396,6 +1397,13 @@ main = do
             ('IndexedVec.VCons 4 ('IndexedVec.VCons 4 'IndexedVec.VNil))
         , Batch.lookupTotals 'r' 'y' (Batch.tableMargins 4)
         , Batch.lookupTotals 'r' 'x' (Batch.tableMargins 0) )
+    observe "sum a rectangular table by row and by column"
+        ( Refl :: Table.totals (Table.sample 4) :~: 'Batch.TableMargins
+            ('IndexedVec.VCons 'r' ('IndexedVec.VCons 's' 'IndexedVec.VNil))
+            ('IndexedVec.VCons 'x' ('IndexedVec.VCons 'y' ('IndexedVec.VCons 'z' 'IndexedVec.VNil)))
+            ('IndexedVec.VCons 6 ('IndexedVec.VCons 15 'IndexedVec.VNil))
+            ('IndexedVec.VCons 5 ('IndexedVec.VCons 7 ('IndexedVec.VCons 9 'IndexedVec.VNil)))
+        , Table.selectedTotals (Table.sample 4) )
     observe "read one field of a private parcel without forcing the other"
         (Refl :: LazyParcel.first (LazyParcel.make 7) :~: 7, LazyParcel.first (LazyParcel.make 7))
     observe "construct a result from two symbolic fields"
