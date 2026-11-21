@@ -95,7 +95,7 @@ line=$(grep -n '^wrong xs = (' TupleLengthReject.hs | cut -d: -f1)
 grep -Fq "TupleLengthReject.hs:$line:31: error: [GHC-25897]" tuple-length.log
 grep -Fq "at TupleLengthReject.hs:$line:13-28" tuple-length.log
 grep -Fq "at TupleLengthReject.hs:$line:31-47" tuple-length.log
-grep -Fq 'In the expression: filterVec even xs' tuple-length.log
+grep -Fq 'In the expression: (filterVec odd xs, filterVec even xs)' tuple-length.log
 if grep -Fq 'unpacked_' tuple-length.log; then
     cat tuple-length.log >&2
     exit 1
