@@ -47,8 +47,8 @@ HS
 if "${ghc[@]}" -c WrongEndpoint.hs >reject.log 2>&1 ||
    ! grep -Eq '^WrongEndpoint\.hs:9:.*\[GHC-83865\]' reject.log ||
    ! grep -Eq '^WrongEndpoint\.hs:13:.*\[GHC-83865\]' reject.log ||
-   ! grep -Fq 'Actual: Decision (g x)' reject.log ||
-   ! grep -Fq 'Actual: Decision (f y)' reject.log; then
+   ! grep -Eq 'Actual: Decision \(g[0-9]* x[0-9]*\)' reject.log ||
+   ! grep -Eq 'Actual: Decision \(f[0-9]* y[0-9]*\)' reject.log; then
     cat reject.log >&2
     exit 1
 fi
