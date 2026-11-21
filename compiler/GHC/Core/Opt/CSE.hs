@@ -18,7 +18,7 @@ import GHC.Core.Utils   ( exprType, mkAltExpr
                         , exprIsTickedString
                         , stripTicksE, stripTicksT, mkTicks )
 import GHC.Core.FVs     ( exprFreeVars )
-import GHC.Core.Type    ( coreFullView, tyConAppArgs, isNativeOpaqueValueId
+import GHC.Core.Type    ( coreFullView, tyConAppArgs, isNativeOpaqueValueId, isNativeClassDictionaryId
                         , isNativeIndexFunctionId )
 import GHC.Core
 import GHC.Utils.Outputable
@@ -807,6 +807,9 @@ with such a selector, keep a local variable if its replacement denotes
 a constructor index. For example, replacing x by True in ordering x
 would discard the variable required by the selector. Apply the forward
 substitution to a scoped dictionary argument, as for a retained operand.
+The evidence must also be a local dictionary variable. For a concrete
+instance imported from another module, keep the local binding that
+refers to its global dictionary.
 
 The same constraint applies to a nested case on the same call:
 
@@ -979,12 +982,14 @@ lookupSubst (CS { cs_subst = sub}) x = lookupIdSubst sub x
 extendCSSubst :: CSEnv -> Id  -> CoreExpr -> CSEnv
 extendCSSubst cse x rhs
   | RetainedCore <- cs_mode cse
-  , isId x, isNativeOpaqueValueId x
-  , not preserves_index
+  , isId x, not preserves_index
   = cse  -- See Note [CSE for retained operands and case evidence]
   | otherwise = cse { cs_subst = extendSubst (cs_subst cse) x rhs }
   where
     preserves_index
+      | cs_scoped_dicts cse, isNativeClassDictionaryId x
+      = maybe False isNativeClassDictionaryId (termVar_maybe rhs)
+      | not (isNativeOpaqueValueId x) = True
       | isNativeIndexFunctionId x = isJust (nativeIndexFunctionVar_maybe rhs)
       | cs_scoped_dicts cse = case retainedArgIndex rhs of
           Just TermVarTy{} -> True

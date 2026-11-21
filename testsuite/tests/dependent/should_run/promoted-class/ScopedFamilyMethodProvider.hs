@@ -26,3 +26,8 @@ class Encode a b | a -> b where
 encodeEntry :: forall c a b. (Collects c, Encode a b, Show b)
             => foreach (x :: c) -> a -> TaggedEntry String (compareOrigin x)
 encodeEntry x payload = tagEntry @String (compareOrigin x) (show (encode payload))
+
+instance Collects Bool where
+    type Element Bool = Char
+    compareOrigin True = GT
+    compareOrigin False = LT

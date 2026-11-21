@@ -7,11 +7,6 @@ instance Collects Int where
     type Element Int = Bool
     compareOrigin x = compare x 0
 
-instance Collects Bool where
-    type Element Bool = Char
-    compareOrigin True = GT
-    compareOrigin False = LT
-
 data AlwaysBelow = AlwaysBelow
 instance Collects AlwaysBelow where
     type Element AlwaysBelow = Char

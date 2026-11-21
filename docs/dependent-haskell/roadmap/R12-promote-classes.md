@@ -265,7 +265,8 @@ requires a local binding for that receiver.
 The client can bind `let high = True` and call `inspectPayload high 'q'`.
 Common subexpression elimination and CorePrep keep a variable for
 the receiver until CoreToStg erases the selector index. A client can
-discard the payload without forcing it.
+discard the payload without forcing it. The Boolean instance comes from the
+provider. CSE keeps the local binding for its imported dictionary.
 [Ambiguity check](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/ambiguous_types.html)
 and [client](../../../testsuite/tests/dependent/should_run/promoted-class/ScopedFamilyMethodClient.hs).
 
