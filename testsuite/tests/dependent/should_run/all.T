@@ -279,6 +279,10 @@ test('NativeListBoundary',
                   '../../../../docs/dependent-haskell/examples/packed-vector/OrdinaryVecClient.hs']),
      multimod_compile_and_run,
      ['NativeListBoundary', '-fomit-interface-pragmas -fno-write-if-simplified-core'])
+test('NativeKnownPair',
+     [extra_files(['NativeKnownPairProvider.hs', 'NativeKnownPairClient.hs'])],
+     run_command, ['bash NativeKnownPair.sh "{compiler}" "{libdir}"'])
+
 test('NativeRetainedTypeWitness',
      [only_ways(['normal']),
       extra_files(['NativeRetainedTypeWitnessLib.hs', 'NativeRetainedTypeWitness.hs',

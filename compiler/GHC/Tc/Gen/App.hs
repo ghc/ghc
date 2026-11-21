@@ -30,6 +30,7 @@ import GHC.Tc.Errors.Types
 import GHC.Tc.Errors.Ppr
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Solver ( tcRewriteFamilyAxioms )
+import GHC.Tc.Solver.Monad ( bumpReductionDepth, runTcSEqualities )
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Utils.Env ( isExistsPackName, tcLookupIdMaybe, tcLookupConLike
@@ -782,14 +783,18 @@ tcOrdinaryAppScoped :: [Name] -> [HsExprArg 'TcpInst] -> HsExpr GhcRn -> (HsExpr
                     -> ExpRhoType -> TcM (HsExpr GhcTc)
 tcOrdinaryAppScoped fields checked_prefix rn_expr rn_head@(rn_fun, fun_lspan) tc_fun0 fun_sigma0 rn_args written_res_ty
   -- See Note [Constructors in a nested dependent sum] in GHC.Tc.Utils.Unify.
-  = do { let exp_res_ty = case (tc_fun0, written_res_ty) of
-               (XExpr (ConLikeTc (RealDataCon dc)), Check ty)
-                 | not (null (dataConRepArgBinders dc))
-                 , let tc = dataConTyCon dc
-                 , Just (_, params) <- matchSumPayload tc ty
-                 -> mkCheckExpType (mkTyConApp tc params)
-               _ -> written_res_ty
-       ; wanted_ql <- wantQuickLook rn_fun
+  = do { wanted_ql <- wantQuickLook rn_fun
+       ; exp_res_ty <- case (tc_fun0, written_res_ty) of
+           (XExpr (ConLikeTc (RealDataCon dc)), Check ty)
+             | not (null (dataConRepArgBinders dc))
+             , let tc = dataConTyCon dc
+             , Just (_, params) <- matchSumPayload tc ty
+             -> return (mkCheckExpType (mkTyConApp tc params))
+           (_, Check ty) | DoQL <- wanted_ql
+             -> do { result <- setSrcSpan fun_lspan $
+                              tcKnownRetainedConstructorResult rn_args tc_fun0 fun_sigma0 ty
+                   ; return (maybe written_res_ty mkCheckExpType result) }
+           _ -> return written_res_ty
        ; traceTc "tcApp {" $
            vcat [ text "rn_fun:" <+> ppr rn_fun
                 , text "fun_lspan:" <+> ppr fun_lspan
@@ -8024,6 +8029,68 @@ tcQuickLookNeedsOrdinaryArgs (HsVar _ lname) args
     plain _ = False
 tcQuickLookNeedsOrdinaryArgs _ _ = return False
 
+-- | Select a constructor result from a complete expected type.
+-- See Note [Retained constructors with a known Quick Look result].
+tcKnownRetainedConstructorResult :: [HsExprArg 'TcpRn] -> HsExpr GhcTc
+                                 -> TcSigmaType -> TcRhoType -> TcM (Maybe TcRhoType)
+tcKnownRetainedConstructorResult args fun@(XExpr (ConLikeTc (RealDataCon dc))) sigma expected
+  | let fields = dataConRepArgBinders dc
+  , any isJust fields
+  , length fields == count isHsValArg args
+  , all plain args
+  = runMaybeT $ do
+      expected <- liftMaybeT (liftZonkM (zonkTcType expected))
+      guard (not (anyFreeVarsOfType (\v -> isTcTyVar v && isMetaTyVar v) expected))
+      result <- MaybeT (resolve (dataConTyCon dc) expected)
+      _ <- MaybeT (tcRetainedWorkerResultMatch NoQL (Just result) args fun sigma)
+      pure result
+  where
+    plain EValArg{} = True
+    plain (EWrap EPar{}) = True
+    plain _ = False
+
+    resolve parent ty
+      | Just (tc, _) <- tcSplitTyConApp_maybe ty
+      , tc == parent
+      = return (Just ty)
+      | Just (family, _) <- tcSplitTyConApp_maybe ty
+      , can_reduce family
+      = do { envs <- tcGetFamInstEnvs
+           ; loc <- getCtLocM (OccurrenceOf (tyConName family)) (Just TypeLevel)
+           ; tryTcDiscardingErrs (return Nothing) $
+               runTcSEqualities (follow envs loc ty) }
+      | otherwise = return Nothing
+      where
+        follow envs loc ty
+          = case tcSplitTyConApp_maybe ty of
+              Just (tc, _) | tc == parent -> return (Just ty)
+              Just (tc, tys)
+                | can_reduce tc
+                , Just (Reduction _ rhs) <- reduceTyFamApp_maybe envs Nominal tc tys
+                -> do { loc <- bumpReductionDepth loc ty
+                      ; follow envs loc rhs }
+              _ -> return Nothing
+
+    can_reduce tc = isTypeFamilyTyCon tc && not (isConstrainedFamilyTyCon tc)
+tcKnownRetainedConstructorResult _ _ _ _ = return Nothing
+
+{- Note [Retained constructors with a known Quick Look result]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A fully applied retained constructor can get its erased parameters from a
+known expected result, as in consume (Pair True payload). A type family in
+the expected type can hide the constructor's parent. Follow nominal family
+equations at the head only. The preview does not record an axiom use. Final
+subsumption still checks the original result and records any evidence use.
+
+Quick Look on the argument would instantiate the constructor without this
+expected result. If the existing worker matcher finds every erased
+parameter, leave the entire application to ordinary argument checking.
+It checks the retained operand and each field against the constructor
+telescope. No part of this preview assigns a metavariable or inspects a
+written operand. Restrict it to plain value applications so the final
+check does not repeat a source expansion.
+-}
+
 quickLookArg1 :: Int
               -> HsExprLoc
               -> (HsExpr GhcRn, SrcSpan)
@@ -8060,7 +8127,13 @@ quickLookArg1 pos app_lspan rn_head larg@(L _ arg) sc_arg_ty@(Scaled _ orig_arg_
               , text "args:" <+> ppr rn_args
               , text "level:" <+> ppr lvl ]
 
+       ; known_result <- case mb_fun_ty of
+           Just (fun, sigma) -> fmap isJust $ setSrcSpan fun_lspan_arg $
+             tcKnownRetainedConstructorResult rn_args fun sigma orig_arg_rho
+           Nothing -> return False
+
        ; case mb_fun_ty of {
+           _ | known_result -> skipQuickLook app_lspan larg sc_arg_ty ;
            Nothing -> skipQuickLook app_lspan larg sc_arg_ty ;    -- fun is too complicated
            Just (tc_fun_arg_head, fun_sigma_arg_head) ->
 

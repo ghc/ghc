@@ -252,6 +252,13 @@ family can leave the application stuck.
 [Serokell’s R04 card](https://ghc.serokell.io/dh#dependent-sums)
 and [type-lambda elaboration](R17-type-level-lambdas.md#source-and-evidence).
 
+An ordinary client with `ImpredicativeTypes` can construct a package at a
+known result type, including an imported open family that reduces to a
+sum. For example, `consume (Pair True payload)` uses the argument type
+of `consume` to select the erased parameters of `Pair`. GHC checks
+`payload` against the written witness and keeps an ignored field lazy.
+A stuck family leaves the constructor application unresolved.
+
 ## Partition at the original length
 
 The [vector partition](../examples/packed-vector/ConservedPartition.hs) returns
