@@ -782,7 +782,12 @@ cvtRetainedGadtArgs :: [TH.RetainedGadtArg] -> TH.Type
 cvtRetainedGadtArgs args result = do
   (fields, binders) <- prefix args
   body <- suffix binders
-  when (null binders && isNothing (HsDecls.splitGadtTerminal (PrefixConGADT noExtField fields) body)) $
+  let prefix_fields = PrefixConGADT noExtField fields
+      supported_interior = case HsDecls.splitGadtInterior prefix_fields body of
+        Just (L _ HsGadtForAll{}, _, _) -> True
+        _ -> False
+  when (null binders &&
+        isNothing (HsDecls.splitGadtTerminal prefix_fields body) && not supported_interior) $
     failWith (MalformedType TypeLevel result)
   pure (fields, body)
   where
@@ -808,7 +813,9 @@ cvtRetainedGadtArgs args result = do
 
 {- Note [Terminal constructor foralls in TH]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For a prefix constructor with a terminal forall or context, use RetainedGadtC.
+For a prefix constructor with a late forall or context, use RetainedGadtC.
+An interior specified forall scopes over one plain final field. Its Type
+suffix preserves that field's type and multiplicity.
 Each GadtValueArg represents a retained value field and carries its source
 bang and multiplicity. GadtC carries only the bang and field type. The
 result Type contains a ForallVisT for a required group or a ForallT with

@@ -154,3 +154,10 @@ test('GadtTrailingFieldScope', normal, compile_fail, [''])
 test('GadtInteriorContext', extra_files(['GadtInteriorContextProvider.hs']),
      makefile_test, [])
 test('GadtInteriorContextScope', normal, compile_fail, [''])
+test('GadtInteriorForAll', extra_files(['GadtInteriorForAllProvider.hs']),
+     makefile_test, [])
+test('GadtInteriorForAllScope', normal, compile_fail, [''])
+test('GadtInteriorForAllTh',
+     [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal']),
+      extra_files(['GadtInteriorForAllProvider.hs', 'TerminalGadtTh.sh'])],
+     run_command, ['bash TerminalGadtTh.sh "{compiler}" "{libdir}" GadtInteriorForAllTh GadtInteriorForAllProvider'])

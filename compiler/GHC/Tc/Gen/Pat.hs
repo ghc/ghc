@@ -1323,6 +1323,7 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
               con_like       = RealDataCon data_con
               trailing_context = dataConHasTrailingContext data_con
               interior_context = dataConInteriorContext data_con
+              interior_forall = dataConInteriorForAll data_con
 
         ; traceTc "tcConPat" (vcat [ text "con_name:" <+> ppr con_name
                                    , text "univ_tvs:" <+> pprTyVars univ_tvs
@@ -1341,15 +1342,23 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
                                    , text "ex_ty_args:"   <+> ppr ex_ty_args
                                    , text "val_arg_pats:" <+> ppr val_arg_pats ])
 
+        ; let check_fields :: [Scaled TcSigmaType] -> TcM r -> TcM (HsConPatDetails GhcTc, r)
+              check_fields tys action
+                | Just (n, _) <- interior_forall
+                = do { (pats, ((), result)) <-
+                         tcConInteriorArgs con_like n tys penv val_arg_pats
+                           (fmap ((),) . tcConTyArgs tenv penv late_ty_args) action
+                     ; return (pats, result) }
+                | otherwise
+                = tcConValArgs con_like tys penv val_arg_pats $
+                    tcConTyArgs tenv penv late_ty_args action
+
         ; if null ex_tvs && null eq_spec && null theta
           then do { -- The common case; no class bindings etc
                     -- (see Note [Arrows and patterns])
                     (val_arg_pats', res) <-
                                         tcConTyArgs tenv penv univ_ty_args $
-                                        tcConValArgs con_like arg_tys_scaled
-                                                     penv val_arg_pats $
-                                        tcConTyArgs tenv penv late_ty_args $
-                                        thing_inside Nothing
+                                        check_fields arg_tys_scaled (thing_inside Nothing)
                   ; let res_pat = ConPat { pat_con = header
                                          , pat_args = val_arg_pats'
                                          , pat_con_ext = ConPatTc
@@ -1418,8 +1427,7 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
                     do { (binds, (pats, result)) <-
                            checkConstraints skol ex_tvs' given $
                            tcConTyArgs tenv penv ex_ty_args $
-                           tcConValArgs con_like field_tys penv val_arg_pats $
-                           tcConTyArgs tenv penv late_ty_args check_body
+                           check_fields field_tys check_body
                        ; return (idHsWrapper, binds, pats, result) }
 
         ; let res_pat = ConPat
@@ -2214,12 +2222,12 @@ tcConPrefixArgs con_like penv start tys pats thing_inside = do
   assert (length pats == length tys) $
     tcMultiple (tcConArg con_like) penv (zip3 [start..] pats tys) thing_inside
 
--- | Check the interior context between its two field patterns.
+-- | Enter the interior telescope group after checking the first field patterns.
 tcConInteriorArgs :: ConLike -> Int -> [Scaled TcSigmaType] -> PatEnv
                   -> HsConPatDetails GhcRn
-                  -> (forall r. TcM r -> TcM (TcEvBinds, r))
-                  -> TcM a -> TcM (HsConPatDetails GhcTc, (TcEvBinds, a))
-tcConInteriorArgs con_like n tys penv args with_givens thing_inside = do
+                  -> (TcM ([LPat GhcTc], a) -> TcM (b, ([LPat GhcTc], a)))
+                  -> TcM a -> TcM (HsConPatDetails GhcTc, (b, a))
+tcConInteriorArgs con_like n tys penv args enter_group thing_inside = do
   let pats = case args of
         PrefixCon _ ps -> ps
         InfixCon _ p q -> [p, q]
@@ -2228,7 +2236,7 @@ tcConInteriorArgs con_like n tys penv args with_givens thing_inside = do
       (before_tys, after_tys) = splitAt n tys
   (before', (binds, (after', res))) <-
     tcConPrefixArgs con_like penv 1 before_tys before $
-      with_givens $
+      enter_group $
         tcConPrefixArgs con_like penv (n+1) after_tys after thing_inside
   return (PrefixCon noExtField (before' ++ after'), (binds, res))
 
@@ -2289,7 +2297,8 @@ zipConPatsBndrs con_like pats
   | RealDataCon con <- con_like
   , (early, late@(_ : _)) <- dataConUserTyVarGroups con
   = do { (early_pairs, remaining) <- zipPatsBndrs pats early
-       ; let (value_pats, late_pats) = span_value_pats (dataConSourceArity con) remaining
+       ; let prefix = maybe (dataConSourceArity con) fst (dataConInteriorForAll con)
+             (value_pats, late_pats) = span_value_pats prefix remaining
        ; (late_pairs, extra_pats) <- zipPatsBndrs late_pats late
        ; return (early_pairs, value_pats ++ extra_pats, late_pairs) }
   | otherwise

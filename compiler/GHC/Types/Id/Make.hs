@@ -807,17 +807,22 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
                         -- See Note [Compulsory newtype unfolding], which applies to
                         -- every constructor without a binding ('dataConHasNoBinding')
                       | otherwise  = mkDataConUnfolding wrap_rhs
-             wrap_rhs = mkCoreTyLams early_tvbs $
-                        wrap_lams (wrapFamInstBody tycon res_ty_args non_wrap_arg_ty wrap_body)
+             wrap_rhs = wrap_lams (wrapFamInstBody tycon res_ty_args non_wrap_arg_ty wrap_body)
              wrap_lams body
+               | OrderedConArgs groups <- dataConSourceOrder data_con
+               , (dict_args, field_args) <- splitAt (length theta) wrap_args
+               = foldConSourceGroups mkCoreTyLams mkCoreLams mkCoreLams
+                   groups (early_tvbs ++ late_tvbs) dict_args field_args body
                | Just n <- dataConContextFieldCount data_con
                , (dict_args, field_args) <- splitAt (length theta) wrap_args
                , (prefix, suffix) <- splitAt n field_args
-               = mkCoreLams prefix $
+               = mkCoreTyLams early_tvbs $
+                 mkCoreLams prefix $
                  mkCoreTyLams late_tvbs $
                  mkCoreLams dict_args $
                  mkCoreLams suffix body
-               | otherwise = mkCoreLams wrap_args (mkCoreTyLams late_tvbs body)
+               | otherwise = mkCoreTyLams early_tvbs $
+                 mkCoreLams wrap_args (mkCoreTyLams late_tvbs body)
 
        ; return (DCR { dcr_wrap_id = wrap_id
                      , dcr_boxer   = mk_boxer boxers

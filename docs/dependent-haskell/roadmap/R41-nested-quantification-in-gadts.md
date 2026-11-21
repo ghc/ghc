@@ -7,6 +7,7 @@
 - [x] Apply a constructor with a specified type argument and its context after a field. Match its field before introducing the dictionary.
 - [x] Match an existential field followed directly by a constructor context.
 - [x] Match a second field under a context placed between two prefix fields.
+- [x] Place a specified forall between two prefix fields, including existential binders.
 - [ ] Support the remaining orders of fields, contexts, and quantifiers in prefix constructors.
 
 The [Showcase](../Showcase.hs) defines a constructor with fields of
@@ -66,3 +67,22 @@ the source order over the existing type binders, predicates, and
 fields. The worker still takes evidence before its representation fields.
 Template Haskell can reify the wrapper type. Whole-declaration quotation
 and reification report an unsupported form.
+
+A specified forall can also appear between two fields of a lifted
+prefix constructor with no constructor context. For example,
+`Box :: !Int -> forall a. a -> Box a` determines `a` from the
+result. `Pack :: !Int -> forall a. a -> Pack` hides `a`
+existentially. The [client](../../../testsuite/tests/gadt/GadtInteriorForAll.hs)
+uses both forms. It supplies the type argument after the first value
+and tests partial application of the strict prefix. In a pattern,
+`Pack n @a x` introduces `a` for the rest of the pattern and
+the branch. Evidence from the first field is available when GHC
+checks the type pattern. The
+[scope test](../../../testsuite/tests/gadt/GadtInteriorForAllScope.hs)
+checks that the binder cannot scope over the first field.
+
+Template Haskell preserves this constructor type through `reifyType`.
+A declaration quote or reification uses `RetainedGadtC` for the
+prefix and stores the specified forall and final field in its
+`Type` suffix. This keeps the prefix bang and the final field's
+multiplicity when the declaration is spliced.

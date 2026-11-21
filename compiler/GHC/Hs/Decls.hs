@@ -74,7 +74,7 @@ module GHC.Hs.Decls (
   ConDecl(..), LConDecl,
   HsConDeclH98Details, HsConDeclGADTDetails(..),
   AnnConDeclGADT(..),
-  hsConDeclTheta, splitGadtTerminal, splitGadtInteriorContext,
+  hsConDeclTheta, splitGadtTerminal, splitGadtInterior,
   getConNames, getRecConArgs_maybe,
   -- ** Document comments
   DocDecl(..), LDocDecl, docDeclDoc,
@@ -1029,24 +1029,32 @@ splitGadtTerminal (PrefixConGADT _ (_ : _)) ty
       _ -> True
 splitGadtTerminal _ _ = Nothing
 
--- | Recognize one field, one context and one further field.
-splitGadtInteriorContext :: HsConDeclGADTDetails (GhcPass pass) -> LHsType (GhcPass pass)
+-- | Recognize one field, one telescope group and one further field.
+splitGadtInterior :: HsConDeclGADTDetails (GhcPass pass) -> LHsType (GhcPass pass)
                          -> Maybe (LHsGadtTelescope (GhcPass pass),
                                    HsConDeclField (GhcPass pass), LHsType (GhcPass pass))
-splitGadtInteriorContext (PrefixConGADT _ [_]) ty
-  | L _ HsQualTy { hst_ctxt = ctxt, hst_body = body } <- ignoreParens ty
-  , not (null (hsConDeclTheta (Just ctxt)))
+splitGadtInterior (PrefixConGADT _ [_]) ty
+  | Just (group, body) <- middle (ignoreParens ty)
   , L _ (HsFunTy _ arr arg result) <- ignoreParens body
   , plain_result result
-  = Just (mkHsGadtContext ctxt, CDF noAnn NoSrcUnpack NoSrcStrict arr arg Nothing, result)
+  = Just (group, CDF noAnn NoSrcUnpack NoSrcStrict arr arg Nothing, result)
   where
+    middle (L _ HsQualTy { hst_ctxt = ctxt, hst_body = body })
+      | not (null (hsConDeclTheta (Just ctxt)))
+      = Just (mkHsGadtContext ctxt, body)
+    middle (L loc HsForAllTy { hst_tele = tele, hst_body = body })
+      | HsForAllInvis { hsf_invis_bndrs = binders } <- tele
+      , not (null binders)
+      , all ((== SpecifiedSpec) . hsTyVarBndrFlag . unLoc) binders
+      = Just (L loc (HsGadtForAll noExtField tele), body)
+    middle _ = Nothing
     plain_result result = case unLoc (ignoreParens result) of
       HsForAllTy{} -> False
       HsForEachTy{} -> False
       HsFunTy{} -> False
       HsQualTy{} -> False
       _ -> True
-splitGadtInteriorContext _ _ = Nothing
+splitGadtInterior _ _ = Nothing
 
 {- Note [Constructor telescope contexts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

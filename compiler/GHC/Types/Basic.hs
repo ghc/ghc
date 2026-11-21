@@ -23,7 +23,8 @@ module GHC.Types.Basic (
 
         ConTag, ConTagZ, fIRST_TAG,
         gadtTrailingContextOnly,
-        ConSourceOrder(..), ConSourceGroup(..), legacyConOrder, conInteriorContext,
+        ConSourceOrder(..), ConSourceGroup(..), legacyConOrder, conInteriorContext, conInteriorForAll,
+        foldConSourceGroups,
 
         Arity, VisArity, RepArity, JoinArity, FullArgCount,
         JoinPointHood(..), isJoinPoint,
@@ -186,6 +187,24 @@ legacyConOrder OrderedConArgs{} = 0
 conInteriorContext :: ConSourceOrder -> Maybe Int
 conInteriorContext (OrderedConArgs [ConTypeArgs _, ConValueArgs n, ConContextArgs _, ConValueArgs _]) = Just n
 conInteriorContext _ = Nothing
+
+-- | The number of fields before an interior forall and the group's size.
+conInteriorForAll :: ConSourceOrder -> Maybe (Int, Int)
+conInteriorForAll (OrderedConArgs [ConTypeArgs _, ConValueArgs n, ConTypeArgs late, ConValueArgs _]) = Just (n, late)
+conInteriorForAll _ = Nothing
+
+-- | Consume the three arrays according to a checked source order.
+foldConSourceGroups :: ([ty] -> r -> r) -> ([ev] -> r -> r) -> ([field] -> r -> r)
+                    -> [ConSourceGroup] -> [ty] -> [ev] -> [field] -> r -> r
+foldConSourceGroups types context fields = go
+  where
+    go [] _ _ _ result = result
+    go (ConTypeArgs n : rest) ts es fs result =
+      let (group, ts') = splitAt n ts in types group (go rest ts' es fs result)
+    go (ConContextArgs n : rest) ts es fs result =
+      let (group, es') = splitAt n es in context group (go rest ts es' fs result)
+    go (ConValueArgs n : rest) ts es fs result =
+      let (group, fs') = splitAt n fs in fields group (go rest ts es fs' result)
 
 {-
 ************************************************************************

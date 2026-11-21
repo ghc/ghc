@@ -3133,10 +3133,11 @@ repGadtDataCons cons details res_ty
     = do cons' <- mapM lookupLOcc cons -- See Note [Binders and occurrences]
          case details of
            PrefixConGADT _ ps
-             | Just _ <- HsDecls.splitGadtInteriorContext details res_ty
+             | Just (L _ HsGadtContext{}, _, _) <- HsDecls.splitGadtInterior details res_ty
              -> notHandledL (locA (getLoc res_ty)) (ThExoticFormOfType (unLoc res_ty))
              | hsHasForEachTy (unLoc res_ty)
-             || isJust (HsDecls.splitGadtTerminal details res_ty) -> do
+             || isJust (HsDecls.splitGadtTerminal details res_ty)
+             || isJust (HsDecls.splitGadtInterior details res_ty) -> do
                prefix <- mapM rep_field ps
                repRetainedGadt (nonEmptyCoreList' cons') prefix res_ty
            PrefixConGADT _ ps -> do

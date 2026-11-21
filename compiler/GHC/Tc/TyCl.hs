@@ -2798,8 +2798,8 @@ kcConDecl _ new_or_data _tc_res_kind
        ; con_res_kind <- newOpenTypeKind
        ; case HsDecls.splitGadtTerminal args res_ty of
            Nothing
-             | Just (context, field, result) <- HsDecls.splitGadtInteriorContext args res_ty ->
-               kcRuntimeConTelescope [context] $
+             | Just (group, field, result) <- HsDecls.splitGadtInterior args res_ty ->
+               kcRuntimeConTelescope [group] $
                do { discardResult $ tcCheckLHsTypeInContext result (TheKind con_res_kind)
                   ; discardResult $ tcConArg (getArgExpKind new_or_data con_res_kind) IsPrefixConGADT field }
              | otherwise -> discardResult $ tcCheckLHsTypeInContext res_ty (TheKind con_res_kind)
@@ -5366,8 +5366,8 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
     do { traceTc "tcConDecl 1 gadt" (ppr names)
        ; let L _ name :| _ = names
        ; let (terminal, terminal_order, final_field, hs_result)
-               = case HsDecls.splitGadtInteriorContext hs_args hs_res_ty of
-                   Just (context, field, result) -> ([context], 0, Just field, result)
+               = case HsDecls.splitGadtInterior hs_args hs_res_ty of
+                   Just (group, field, result) -> ([group], 0, Just field, result)
                    Nothing -> case HsDecls.splitGadtTerminal hs_args hs_res_ty of
                      Nothing -> ([], 0, Nothing, hs_res_ty)
                      Just (groups, count, result) -> (groups, count, Nothing, result)
@@ -5378,7 +5378,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
                _ -> hs_args
        ; when ((terminal_order /= 0 || isJust final_field) &&
                (new_or_data == NewType ||
-                (any is_context terminal && any is_context inner_bndrs))) $
+                ((isJust final_field || any is_context terminal) && any is_context inner_bndrs))) $
            setSrcSpanA (getLoc hs_res_ty) $
            failWithTc (TcRnNestedForallsContexts NFC_GadtConSig)
        ; skol_info <- mkSkolemInfo (DataConSkol name)
@@ -5449,9 +5449,13 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
 
              ; let bang_opts = SrcBangOpts (initBangOpts dflags)
              ; let order
-                     | isJust final_field =
-                         OrderedConArgs [ConTypeArgs (length tvbndrs'), ConValueArgs 1,
-                                         ConContextArgs (length ctxt'), ConValueArgs 1]
+                     | isJust final_field
+                     , [L _ (HsGadtForAll _ HsForAllInvis { hsf_invis_bndrs = late })] <- terminal
+                     = OrderedConArgs [ConTypeArgs (length tvbndrs' - length late), ConValueArgs 1,
+                                       ConTypeArgs (length late), ConValueArgs 1]
+                     | isJust final_field
+                     = OrderedConArgs [ConTypeArgs (length tvbndrs'), ConValueArgs 1,
+                                       ConContextArgs (length ctxt'), ConValueArgs 1]
                      | otherwise = LegacyConOrder terminal_order
              ; buildDataConWithTelescope order [] fam_envs bang_opts name is_infix
                             rep_nm stricts field_lbls
@@ -6462,16 +6466,20 @@ checkValidDataCon dflags existential_ok tc con
             --    type family Star where Star = Type
             --    newtype T :: Type where MkT :: Int -> (T :: Star)
 
-        ; when (dataConTerminalOrder con /= 0 || isJust (dataConInteriorContext con)) $
+        ; when (dataConTerminalOrder con /= 0 ||
+                isJust (dataConInteriorContext con) || isJust (dataConInteriorForAll con)) $
             do { let (early, late) = dataConUserTyVarGroups con
                      (_, ex_tvs, eq_spec, theta, _, _) = dataConFullSig con
                      prefix_theta = if dataConHasTrailingContext con then [] else theta
+                     prefix_fields = case dataConInteriorForAll con of
+                       Just (n, _) -> take n arg_tys
+                       Nothing -> arg_tys
                      prefix_types = map (varType . binderVar) early ++ prefix_theta ++
-                       concatMap (\(Scaled mult ty) -> [mult, ty]) arg_tys
+                       concatMap (\(Scaled mult ty) -> [mult, ty]) prefix_fields
                      late_vars = mkVarSet (binderVars late)
                ; checkTc ((null ex_tvs ||
-                            (dataConTerminalOrder con == gadtTrailingContextOnly &&
-                             all isTyVar ex_tvs))
+                            ((dataConTerminalOrder con == gadtTrailingContextOnly ||
+                              isJust (dataConInteriorForAll con)) && all isTyVar ex_tvs))
                           && null eq_spec
                           && null (dataConStupidTheta con)
                           && not (isDataFamInstTyCon tc)

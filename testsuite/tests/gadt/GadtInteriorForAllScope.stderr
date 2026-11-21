@@ -1,0 +1,5 @@
+GadtInteriorForAllScope.hs:8:12: error: [GHC-14964]
+    • Illegal invisible type pattern: @Int
+      An invisible type pattern must be checked against a forall.
+    • In the pattern: Box @Int _ _
+      In an equation for ‘wrong’: wrong (Box @Int _ _) = True

@@ -3637,8 +3637,9 @@ reifyDataCon isGadtDataCon tys dc
                | otherwise = (g_theta, [])
              g_arg_tys = map (substScaledTy tvb_subst) g_arg_tys'
              g_res_ty  = substTy tvb_subst g_res_ty'
+             interior_forall = dataConInteriorForAll dc
              ordered_args
-               | dataConTerminalOrder dc == 0 = retained
+               | dataConTerminalOrder dc == 0, isNothing interior_forall = retained
                | otherwise = map (const Nothing) g_arg_tys
 
        ; r_arg_tys <- if null ordered_args
@@ -3646,7 +3647,18 @@ reifyDataCon isGadtDataCon tys dc
          else pure []
 
        ; main_con <-
-           if | not (null ordered_args) -> do
+           if | Just (n, _) <- interior_forall
+              , (prefix, [Scaled mult ty]) <- splitAt n g_arg_tys -> do
+                  { (args, result) <- reifyRetainedGadtArgs (replicate n Nothing)
+                      (take n dcdBangs) prefix g_res_ty
+                  ; ma <- reifyType unmatchableDataConTy
+                  ; tvs <- reifyTyVarBndrs [Bndr (binderVar tv) SpecifiedSpec | tv <- late_tvs]
+                  ; domain <- reifyType ty
+                  ; multiplicity <- reifyType mult
+                  -- Use the field arrow syntax accepted by cvtRetainedGadtArgs.
+                  ; let field = TH.AppT (TH.AppT (TH.AppT TH.MulArrowT multiplicity) domain) result
+                  ; pure (TH.RetainedGadtC [name] args (TH.ForallMatchT ma (TH.ForallT tvs [] field))) }
+              | not (null ordered_args) -> do
                   { (args, result) <- reifyRetainedGadtArgs ordered_args dcdBangs g_arg_tys g_res_ty
                   ; result' <- case late_tvs of
                       [] -> do { ctxt <- reifyCxt late_theta

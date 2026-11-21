@@ -33,7 +33,7 @@ module GHC.Core.DataCon (
         dataConConcreteTyVars,
         dataConUserTyVars, dataConUserTyVarBinders,
         dataConTerminalOrder, dataConLateTyVarCount, dataConUserTyVarGroups, dataConHasTrailingContext,
-        dataConSourceOrder, dataConInteriorContext, dataConContextFieldCount,
+        dataConSourceOrder, dataConInteriorContext, dataConContextFieldCount, dataConInteriorForAll,
         dataConTheta,
         dataConStupidTheta,
         dataConOtherTheta,
@@ -1311,7 +1311,11 @@ mkDataConWithTelescope source_order arg_binders name declared_infix prom_info
     (early_prom_bndrs, late_prom_bndrs)
       | late_tyvar_count <= 0 = (prom_tv_bndrs, [])
       | otherwise = splitAt (length prom_tv_bndrs - late_tyvar_count) prom_tv_bndrs
-    prom_bndrs       = early_prom_bndrs ++ prom_arg_bndrs ++ late_prom_bndrs
+    prom_bndrs
+      | OrderedConArgs groups <- source_order
+      , Just _ <- conInteriorForAll source_order
+      = foldConSourceGroups (++) (const id) (++) groups prom_tv_bndrs theta prom_arg_bndrs []
+      | otherwise = early_prom_bndrs ++ prom_arg_bndrs ++ late_prom_bndrs
     prom_res_kind    = orig_res_ty
     promoted
       | null arg_binders
@@ -1329,6 +1333,10 @@ mkDataConWithTelescope source_order arg_binders name declared_infix prom_info
       = pprPanic "promoteDataCon: retained field telescope" (ppr name)
 
     roles field_role
+      | OrderedConArgs groups <- source_order
+      , Just _ <- conInteriorForAll source_order
+      = foldConSourceGroups (\ts -> (replicate (length ts) Nominal ++)) (const id)
+          (\fs -> (replicate (length fs) field_role ++)) groups prom_tv_bndrs theta prom_arg_bndrs []
       | late_tyvar_count > 0
       = map (const Nominal) early_prom_bndrs
         ++ map (const field_role) prom_arg_bndrs
@@ -1479,7 +1487,7 @@ dataConUserTyVarBinders :: DataCon -> [TyVarBinder]
 dataConUserTyVarBinders = dcUserTyVarBinders
 
 -- | Source order attached to the constructor's existing argument arrays.
--- See Note [Interior constructor contexts].
+-- See Note [Interior constructor telescopes].
 dataConSourceOrder :: DataCon -> ConSourceOrder
 dataConSourceOrder = dcSourceOrder
 
@@ -1497,19 +1505,26 @@ dataConContextFieldCount con
   | dataConHasTrailingContext con = Just (dataConSourceArity con)
   | otherwise = dataConInteriorContext con
 
--- | Number of type arguments after the value fields.
+-- | The number of value fields before an interior forall and its binder count.
+dataConInteriorForAll :: DataCon -> Maybe (Int, Int)
+dataConInteriorForAll = conInteriorForAll . dataConSourceOrder
+
+-- | Number of type arguments after the initial value fields.
 dataConLateTyVarCount :: DataCon -> Int
-dataConLateTyVarCount = max 0 . dataConTerminalOrder
+dataConLateTyVarCount con = case dataConInteriorForAll con of
+  Just (_, n) -> n
+  Nothing -> max 0 (dataConTerminalOrder con)
 
 -- | Does the context follow the fields and any late type binders?
 -- See Note [Terminal constructor type arguments].
 dataConHasTrailingContext :: DataCon -> Bool
 dataConHasTrailingContext con
   | dataConTerminalOrder con == gadtTrailingContextOnly = True
-  | (_, Bndr _ vis : _) <- dataConUserTyVarGroups con = isSpecifiedForAllTyFlag vis
+  | dataConTerminalOrder con > 0
+  , (_, Bndr _ vis : _) <- dataConUserTyVarGroups con = isSpecifiedForAllTyFlag vis
   | otherwise = False
 
--- | The type binders before and after the value fields.
+-- | The type binders before and after the initial value fields.
 dataConUserTyVarGroups :: DataCon -> ([TyVarBinder], [TyVarBinder])
 dataConUserTyVarGroups con
   | late == 0 = (binders, [])
@@ -1765,13 +1780,10 @@ dataConWrapperTypeUnchecked con@(MkData { dcOtherTheta = theta, dcOrigArgTys = a
                                  dcOrigArgBinders = arg_binders,
                                  dcOrigResTy = res_ty,
                                  dcStupidTheta = stupid_theta })
-  | Just n <- dataConInteriorContext con
-  , (prefix, suffix) <- splitAt n arg_tys
-  = mkForAllTys [(unmatchableDataConTy, bndr) | bndr <- early] $
-    mkInvisFunTys stupid_theta $
-    mkRetainedArgTys [] prefix $
-    mkInvisFunTys theta $
-    mkRetainedArgTys [] suffix res_ty
+  | OrderedConArgs groups <- dataConSourceOrder con
+  = mkInvisFunTys stupid_theta $
+    foldConSourceGroups bind_types mkInvisFunTys (mkRetainedArgTys [])
+      groups (dataConUserTyVarBinders con) theta arg_tys res_ty
   | otherwise
   = mkForAllTys [(unmatchableDataConTy, bndr) | bndr <- early] $
     mkInvisFunTys (stupid_theta ++ early_theta) $
@@ -1780,6 +1792,7 @@ dataConWrapperTypeUnchecked con@(MkData { dcOtherTheta = theta, dcOrigArgTys = a
     mkInvisFunTys late_theta res_ty
   where
     (early, late) = dataConUserTyVarGroups con
+    bind_types bs = mkForAllTys [(unmatchableDataConTy, b) | b <- bs]
     (early_theta, late_theta)
       | dataConHasTrailingContext con = ([], theta)
       | otherwise = (theta, [])
@@ -1803,11 +1816,13 @@ Its term wrapper disqualifies it from structural native index domains.
 See Note [Algebraic runtime index domains] in GHC.Core.Type.
 -}
 
-{- Note [Interior constructor contexts]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A prefix GADT constructor can have a context between two fields.
+{- Note [Interior constructor telescopes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A prefix GADT constructor can have a context or specified forall
+between two fields.
 
-  Two :: forall a. Tag a -> (a ~ Int) => Tag a -> Two a
+  Two  :: forall a. Tag a -> (a ~ Int) => Tag a -> Two a
+  Pack :: Int -> forall a. a -> Pack
 
 Store the source order in groups of type binders, fields and predicates.
 Each group consumes its entries from the existing DataCon arrays. The
@@ -1819,8 +1834,15 @@ field pattern. The second pattern can use it. Zonking and desugaring
 bind the resulting evidence at the same boundary. See Note [Trailing
 constructor evidence] in GHC.HsToCore.Match.Constructor.
 
+The kind or type of an earlier argument must be independent of a later
+type binder. For an interior forall, pattern checking allocates the
+existential skolems in the constructor case. A written type pattern
+introduces its source binders after the first field pattern. Any Givens
+from that field are available when checking the type pattern. See
+GHC.Tc.Gen.Pat.tcDataConPatWithIndex.
+
 Ordinary and terminal forms still use LegacyConOrder. Their interface
-tags and payloads are the same. An interface with an interior context
+tags and payloads are the same. An interface with an interior group
 stores the full group order for that constructor and checks it against
 its decoded arrays. See GHC.IfaceToCore.tcIfaceDataCons.
 -}
