@@ -28,6 +28,20 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `d35002f260`, `Recipe Map` retains the inferred matchability argument
+of `Map`. A client reads the stripped provider interface, constructs a
+recipe, and obtains `(Just True,[False])`. A shorter receiver specializes
+the omitted matchability. A receiver with the same number of binders
+but an incompatible kind fails with GHC-83865. An explicit family
+equation binder can use the mapper at both matchabilities.
+
+The Stage 2 compiler with the public bytecode and package changes
+matched all 391 Showcase lines at stripped `-O0`, default `-O2`, and
+in GHCi. The source-hidden recipe and ordinary list-index checks cover
+the new family argument and the existing runtime index.
+[Source and negative checks](../../testsuite/tests/dependent/should_run/NativeLaterMatchability.sh)
+and [list-index checks](../../testsuite/tests/dependent/should_run/NativeIndexedFin.sh).
+
 At `706677658b`, source-loaded GHCi checks the guarded list proof with
 bytecode for the producer. The debugger's breakpoint ticks remain in
 executable Core. Adding strictness to the skipped head prevents the

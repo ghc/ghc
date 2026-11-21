@@ -20,6 +20,13 @@ fails at compile time. A finite position can select from a cyclic list.
 [Implementation](examples/qualified-pi/ParameterizedIndexLibrary.hs)
 and [ordinary caller](examples/qualified-pi/FinitePositionClient.hs).
 
+An opted-in provider can pass the type family `Map` itself to a GADT.
+The GADT uses it once with the matchable constructor `Maybe` and once
+with an unmatchable type family. An ordinary client uses both results
+through the provider's interface. An explicit equation binder can also
+carry the polymorphic kind into the right-hand side of a type family.
+[R23 examples and limits](roadmap/R23-unsaturated-type-families.md#passing-a-polymorphic-mapper-at-its-full-kind).
+
 An ordinary module can check a signed offset once against a vector.
 On success, `mkFinVec` returns a position of type `Fin n`. The caller
 can use that position on any vector of length `n`. A negative offset
