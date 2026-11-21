@@ -355,7 +355,8 @@ evidenceSuffix requirements
     || needs TerminalGadtForAllEvidence || needs TerminalGadtContextEvidence
     || needs TerminalGadtTrailingContextEvidence || needs TerminalGadtContextOnlyEvidence
     || needs InteriorGadtContextEvidence || needs InteriorGadtForAllEvidence
-    || needs RepeatedInteriorGadtForAllEvidence || needs OrderedGadtTelescopeEvidence = feature_set
+    || needs RepeatedInteriorGadtForAllEvidence || needs OrderedGadtTelescopeEvidence
+    || needs InferredOrderedGadtBindersEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -396,6 +397,7 @@ legacyEvidenceSuffix InteriorGadtContextEvidence = featureSetPrefix ++ "interior
 legacyEvidenceSuffix InteriorGadtForAllEvidence = featureSetPrefix ++ "interior-gadt-forall"
 legacyEvidenceSuffix RepeatedInteriorGadtForAllEvidence = featureSetPrefix ++ "repeated-interior-gadt-forall"
 legacyEvidenceSuffix OrderedGadtTelescopeEvidence = featureSetPrefix ++ "ordered-gadt-telescope"
+legacyEvidenceSuffix InferredOrderedGadtBindersEvidence = featureSetPrefix ++ "inferred-ordered-gadt-binders"
 legacyEvidenceSuffix GeneralIndexedConstructorOperandEvidence = featureSetPrefix ++ "general-indexed-constructor-operand"
 legacyEvidenceSuffix DepFunCoEvidence           = "-retained-depfunco-v1"
 legacyEvidenceSuffix ConstructorCaseEvidence   = "-retained-constructor-case-v1"
@@ -444,7 +446,8 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("interior-gadt-context", InteriorGadtContextEvidence)
                       , ("interior-gadt-forall", InteriorGadtForAllEvidence)
                       , ("repeated-interior-gadt-forall", RepeatedInteriorGadtForAllEvidence)
-                      , ("ordered-gadt-telescope", OrderedGadtTelescopeEvidence) ]
+                      , ("ordered-gadt-telescope", OrderedGadtTelescopeEvidence)
+                      , ("inferred-ordered-gadt-binders", InferredOrderedGadtBindersEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion
@@ -517,6 +520,13 @@ specialization rules, constructor case evidence and dependent function
 coercions. It predates index aliases and erased existentials. An interface
 that also uses either feature needs a distinct header in both declaration
 orders. Each historical reader must reject the mixed payload early.
+
+An ordered GADT constructor can put an inferred binder after a field.
+The existing binder flag carries its specificity. Older readers only
+accept specified binders in a late invisible group. Record the new
+requirement for that group so those readers reject the interface header.
+Inferred binders before the first field use the existing format.
+See Note [Terminal constructor type arguments] in GHC.Core.DataCon.
 
 A compulsory retained default includes the older index alias, rule and
 coercion forms. Erased existentials and scoped sums have independent

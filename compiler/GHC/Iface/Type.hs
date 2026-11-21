@@ -3039,6 +3039,7 @@ data IfaceEvidence
   | InteriorGadtForAllEvidence
   | RepeatedInteriorGadtForAllEvidence
   | OrderedGadtTelescopeEvidence
+  | InferredOrderedGadtBindersEvidence
   deriving (Bounded, Enum, Eq, Ord)
 
 -- | Requirements of an interface payload. See Note [Versioning retained evidence]

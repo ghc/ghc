@@ -78,7 +78,8 @@ import GHC.Types.InlinePragma
 import GHC.Types.Tickish
 import GHC.Types.SrcLoc
 import GHC.Types.SourceText
-import GHC.Types.Var( VarBndr(..), binderVar, binderFlag, isSpecifiedForAllTyFlag, visArgTypeLike )
+import GHC.Types.Var( VarBndr(..), binderVar, binderFlag, isInferredForAllTyFlag,
+                      isSpecifiedForAllTyFlag, visArgTypeLike )
 
 import GHC.Unit.Module
 import GHC.Unit.Module.Warnings
@@ -2838,6 +2839,8 @@ instance Binary IfaceConDecls where
             requireIfaceEvidenceVersion bh RepeatedInteriorGadtForAllEvidence
           when (any wider_order orders) $
             requireIfaceEvidenceVersion bh OrderedGadtTelescopeEvidence
+          when (any has_inferred_late_binder cs) $
+            requireIfaceEvidenceVersion bh InferredOrderedGadtBindersEvidence
           record_legacy
           putByte bh 5
           put_ bh cs
@@ -2855,6 +2858,11 @@ instance Binary IfaceConDecls where
         ordered _ = False
         wider_order order =
           ordered order && isNothing (conInteriorContext order) && isNothing (conInteriorForAll order)
+        has_inferred_late_binder con
+          | OrderedConArgs (ConTypeArgs early : _) <- ifConSourceOrder con
+          = any (isInferredForAllTyFlag . ifaceForAllTyFlag . binderFlag)
+                (drop early (ifConUserTvBinders con))
+          | otherwise = False
         record_legacy = do
           when (any (> 0) late) $
             requireIfaceEvidenceVersion bh TerminalGadtForAllEvidence
