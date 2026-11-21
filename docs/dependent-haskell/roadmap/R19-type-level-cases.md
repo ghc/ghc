@@ -242,6 +242,12 @@ the retained binder and its result case. It checks an `Int` result at
 `True` and a `Char` result at `False`.
 [Quoted signature](../examples/open-evaluation/NativeRetainedTH.hs).
 
+The Showcase composes `renderCase b (quotedCase b ())` before inspecting
+`b`. The functions have independently spliced signatures. An ordinary
+client reads `b` from an IORef and obtains `("19","q")` across its two
+calls. The stripped provider interface suffices at both `-O0` and `-O2`.
+[Provider](../examples/open-evaluation/NativeRetainedTH.hs).
+
 A declaration splice can use the quoted type in `SigD`. The declarations
 it returns can share a case helper within one group. A type splice can
 supply the complete top-level value signature. Separate signature splices

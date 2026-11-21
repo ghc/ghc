@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, TemplateHaskell #-}
 -- | Select a result type with a retained signature from a quote.
-module NativeRetainedTH (Select, quoted, quotedCase, render) where
+module NativeRetainedTH (Select, quoted, quotedCase, render, renderCase) where
 
 -- | Select a type from a Boolean index.
 type Select (b :: Bool) = case b of { True -> Int; False -> Char }
@@ -19,3 +19,9 @@ quotedCase False () = 'q'
 render :: foreach (b :: Bool) -> Select b -> String
 render True n = show n
 render False c = [c]
+
+-- | Accept the case result from an independently spliced signature.
+renderCase :: $([t| foreach (flag :: Bool) ->
+                    (case flag of { True -> Int; False -> Char }) -> String |])
+renderCase True i = show i
+renderCase False c = [c]

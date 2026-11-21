@@ -1315,6 +1315,8 @@ main = do
                 False -> show (choose b :: Int)
         quotedResult :: Bool -> String
         quotedResult b = NativeRetainedTH.render b (NativeRetainedTH.quoted b)
+        splicedResult :: Bool -> String
+        splicedResult b = NativeRetainedTH.renderCase b (NativeRetainedTH.quotedCase b ())
         storedResult :: Bool -> String
         storedResult b =
             NativeRetainedConTH.renderStored
@@ -1323,17 +1325,20 @@ main = do
     firstField <- fieldResult <$> readIORef fieldFlag
     firstNegated <- negatedResult <$> readIORef fieldFlag
     firstQuoted <- quotedResult <$> readIORef fieldFlag
+    firstSpliced <- splicedResult <$> readIORef fieldFlag
     firstStored <- storedResult <$> readIORef fieldFlag
     writeIORef fieldFlag False
     secondField <- fieldResult <$> readIORef fieldFlag
     secondNegated <- negatedResult <$> readIORef fieldFlag
     secondQuoted <- quotedResult <$> readIORef fieldFlag
+    secondSpliced <- splicedResult <$> readIORef fieldFlag
     secondStored <- storedResult <$> readIORef fieldFlag
     observe "pass a refined runtime Boolean to a retained field" (firstField, secondField)
     observe "choose a field result by negating its runtime index" (firstNegated, secondNegated)
     observe "choose a result with a quoted retained signature" (firstQuoted, secondQuoted)
     observe "splice a result type selected by a retained Boolean"
         (NativeRetainedTH.quotedCase True (), NativeRetainedTH.quotedCase False ())
+    observe "compose two signature splices at a runtime Boolean" (firstSpliced, secondSpliced)
     observe "store a runtime index in a quoted constructor" (firstStored, secondStored)
     let aliasResult :: Bool -> String
         aliasResult b = case LocalAliasField.aliasField of
