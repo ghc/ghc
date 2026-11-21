@@ -25,6 +25,19 @@ if "${g[@]}" -c Termination.hs >termination.log 2>&1 ||
 fi
 cp TypeLambda.hi NativeTypeLambdaScope.hi "$out/client/"
 cd "$out/client"
+test ! -e TypeLambda.hs
+cp "$src/TypeLambdaClient.hs" .
+"${g[@]}" -fomit-interface-pragmas -c TypeLambdaClient.hs
+
+sed -e 's/module TypeLambdaClient/module ChangedLambda/' \
+    -e 's/Either e field/Either field e/' TypeLambdaClient.hs >ChangedLambda.hs
+if "${g[@]}" -c ChangedLambda.hs >changed.log 2>&1 ||
+   ! grep -Fq 'error: [GHC-83865]' changed.log ||
+   ! grep -Fq 'withErrors p fields' changed.log; then
+    cat changed.log >&2
+    exit 1
+fi
+
 cat >Ordinary.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeApplications, TypeOperators #-}
 module Ordinary where
@@ -100,7 +113,8 @@ module Main where
 import Data.Type.Equality ((:~:)(Refl))
 import Ordinary (capturedRow, independentRow, scopedRow)
 import Data.Proxy (Proxy(..))
-import TypeLambda (Fields(..), Prefixes, ScopedRow, withErrors)
+import TypeLambda (Fields(..), Prefixes, ScopedRow)
+import TypeLambdaClient (forwardErrors)
 
 withError :: Fields (Prefixes ('Just Ordering) '[Char, Bool])
 withError = case capturedRow of Refl -> Field (Left GT) (Field (Right True) End)
@@ -116,11 +130,11 @@ main = case (capturedRow, independentRow, withError, withoutError) of
         row = case scopedRow of Refl -> Field (Just 'x', Right True) End
     case row of Field value End -> print value
     let input = Field 'x' (Field (error "unused field" :: Bool) End)
-    case withErrors (Proxy :: Proxy String) input of
+    case forwardErrors (Proxy :: Proxy String) input of
       Field x (Field _ End) -> print x
 HS
 "${g[@]}" -c RowsMain.hs
-"${g[@]}" RowsMain.o Ordinary.o ../provider/TypeLambda.o -o rows
+"${g[@]}" RowsMain.o Ordinary.o TypeLambdaClient.o ../provider/TypeLambda.o -o rows
 printf '%s\n' "(Left GT,Right True,Just 'a',Just True)" "(Just 'x',Right True)" "Right 'x'" >rows.expected
 ./rows >rows.actual
 cmp rows.expected rows.actual

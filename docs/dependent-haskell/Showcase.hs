@@ -121,6 +121,7 @@ import qualified MatchableView as View
 import LaterMatchabilityClient (annotatedMap, appliedCallback, boxedCallbacks, computedDictionary, flippedCallbacks, forwardedMap,
                                 laterMatchability, nestedCallback, rankedMap)
 import qualified TypeLambda
+import qualified TypeLambdaClient
 import qualified TypeLet
 import qualified NativeCase
 import qualified NativeNestedCase
@@ -1542,7 +1543,7 @@ main = do
     observe "capture a type before and after a local let"
         (Refl :: TypeLambda.ScopedRow Char '[Bool] :~: '[(Maybe Char, Either Char Bool)])
     let fields = TypeLambda.Field 'x' (TypeLambda.Field True TypeLambda.End)
-    case TypeLambda.withErrors (Proxy @String) fields of
+    case TypeLambdaClient.forwardErrors (Proxy @String) fields of
         TypeLambda.Field x (TypeLambda.Field y TypeLambda.End) ->
             observe "give every field in a row the same error type" (x, y)
     observe "map a type lambda with a constructor case" TypeLambda.mixed
