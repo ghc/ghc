@@ -144,6 +144,7 @@ import qualified ListFoldrProof
 import qualified PreludeFoldrProof
 import qualified PreludeFilterLengthProof
 import qualified PreludeFilterProof
+import qualified IndexedPrefix
 import qualified PreludeFilterRuntime
 import qualified PreludeMapAppendProof
 import qualified PreludeMapCompositionProof
@@ -1669,6 +1670,12 @@ main = do
               ++ PreludeFilterLengthProof.showPreludeFilterLength)
     putStrLn ("prove that filter distributes over append: "
               ++ PreludeFilterAppendProof.showPreludeFilterAppend)
+    flag <- newIORef True >>= readIORef
+    let prefix bit rest = IndexedPrefix.elements (IndexedPrefix.negatedCons bit rest)
+        unusedTail = error "forced indexed list tail"
+    observe "read the head of a list indexed by its contents"
+        (take 1 (prefix flag unusedTail), take 1 (prefix (not flag) unusedTail),
+         not (null (prefix (error "forced indexed list head") unusedTail)))
     runtimeList <- newIORef [False, True, False]
     xs <- readIORef runtimeList
     putStrLn ("prove the filter bound from a runtime list: "
