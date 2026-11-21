@@ -972,8 +972,13 @@ cpeBodyF env (Case scrut bndr ty alts)
        ; (env', bndr2) <- cpCloneBndr env bndr
        ; let bndr3 = bndr2 `setIdUnfolding` unfolding
              unfolding
-               | any isNativeIndexAliasAlt alts
+               | [Alt DEFAULT [proof] _] <- alts
+               , isCoVar proof
                , isBoxedBigNaturalLiteral scrut
+               , Just index <- exprToNativeCaseIndex scrut
+               , Just n <- isNumLitTy index
+               , n > platformMaxWord (cp_platform (cpe_config env))
+               , varType proof `eqType` mkNomEqPred (TermVarTy bndr) index
                -- See Note [Large Natural literals in prepared Core].
                = mkCoreUnfolding VanillaSrc False scrut
                    (Just (UnfoldingCache True True False False)) UnfNever
@@ -1006,10 +1011,11 @@ cpeBodyF env (Case scrut bndr ty alts)
 
 {- Note [Large Natural literals in prepared Core]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-CorePrep checks the proof for an alias of NB applied to a BigNat# literal
-before lowering the BigNat# to a byte array. The prepared scrutinee is NB
-applied to the variable bound by that lowering. Its syntax no longer
-contains the original literal.
+Check the original NB alias against its boxed literal. This uses the target
+Word range and the exact equality in the DEFAULT alternative. CorePrep
+lowers the BigNat# to a byte array. The prepared scrutinee is NB applied
+to the variable bound by that lowering. Its syntax no longer contains the
+original literal.
 
 Retain the original closed value as a non-inlining unfolding on the
 evaluated alias binder. Output Lint checks the original literal and the
