@@ -164,3 +164,54 @@ printf ':main true\n:main false\n:main force\n:quit\n' |
     "${ghc[@]}" --interactive -ignore-dot-ghci -fbyte-code "$export_flag" Main.hs > interactive.out 2> interactive.err
 diff -u <(expected true; expected false) interactive.out
 grep -Fq 'the method was forced' interactive.err
+
+# An exported method and a marked family share the same direct Given.
+for opt in -O0 -O2; do
+    mkdir -p "$out/scoped-family/$opt/"{provider,client}
+    cd "$out/scoped-family/$opt/provider"
+    cp "$src/ScopedFamilyMethodProvider.hs" .
+    "${ghc[@]}" "$opt" -fomit-interface-pragmas -fno-write-if-simplified-core -c ScopedFamilyMethodProvider.hs
+    "${ghc[@]}" --show-iface ScopedFamilyMethodProvider.hi > iface
+    grep -Fq 'constrained-families-v1-retained-features-v1-experimental-scoped-dictionary' iface
+    cp ScopedFamilyMethodProvider.hi "$src/ScopedFamilyMethodClient.hs" ../client/
+    cd ../client
+    "${ghc[@]}" "$opt" -c ScopedFamilyMethodClient.hs
+    "${ghc[@]}" ScopedFamilyMethodClient.o ../provider/ScopedFamilyMethodProvider.o -o run
+    test "$(./run)" = "((GT,True),(LT,'x'))"
+
+    cat > MissingOwner.hs <<'HS'
+{-# LANGUAGE Haskell2010, NoExperimentalDependentTypes, TypeFamilies #-}
+module MissingOwner where
+import Data.Proxy
+import ScopedFamilyMethodProvider
+missing :: Proxy (Element Double)
+missing = Proxy
+HS
+    if "${ghc[@]}" "$opt" -c MissingOwner.hs > missing-owner.log 2>&1; then exit 1; fi
+    grep -Fq '[GHC-39999]' missing-owner.log
+
+    cat > WrongOwner.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, ScopedTypeVariables, TypeFamilies #-}
+module WrongOwner where
+import ScopedFamilyMethodProvider
+class OtherClass c where
+    otherCompare :: c -> Ordering
+wrongOwner :: forall c. OtherClass c
+           => foreach (x :: c) -> Element c -> TaggedEntry (Element c) (otherCompare x)
+wrongOwner _ _ = error "missing owner"
+HS
+    if "${ghc[@]}" "$opt" -c WrongOwner.hs > wrong-owner.log 2>&1; then exit 1; fi
+    grep -Fq '[GHC-39999]' wrong-owner.log
+    grep -Fq 'Collects c' wrong-owner.log
+
+    cat > CrossedIndex.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, ScopedTypeVariables, TypeFamilies #-}
+module CrossedIndex where
+import ScopedFamilyMethodProvider
+crossed :: forall c. Collects c
+        => foreach (x :: c) -> foreach (y :: c) -> Element c -> TaggedEntry (Element c) (compareOrigin x)
+crossed x y payload = inspectEntry y payload
+HS
+    if "${ghc[@]}" "$opt" -c CrossedIndex.hs > crossed-index.log 2>&1; then exit 1; fi
+    grep -Fq '[GHC-83605]' crossed-index.log
+done

@@ -232,3 +232,17 @@ and reports GHC-83605. Access through a pattern synonym and refining GADT
 patterns in the Haskell 2010 reader also remain unsupported.
 [Scoped application checking](../../../compiler/GHC/Tc/Gen/App.hs)
 and [selector shape and result kind](../../../compiler/GHC/Core.hs).
+
+## A constrained family under the method's Given
+
+One library exports the marked family `Element` and a scoped selector in
+the same signature. Its `Collects c` dictionary supplies the formation
+premise for the input and output types `Element c`. The result index uses
+that same dictionary for `compareOrigin x`. An ordinary client can
+supply distinct dictionaries and obtain `((GT,True),(LT,'x'))` from the
+stripped interface. Missing or unrelated class evidence and a crossed
+runtime index each fail. The formation check opens a leading dictionary
+binder. Nested dictionary or selector types that need family formation
+remain outside this check.
+[Mixed provider](../../../testsuite/tests/dependent/should_run/promoted-class/ScopedFamilyMethodProvider.hs)
+and [wire runner](../../../testsuite/tests/dependent/should_run/NativeScopedDictionaryWire.sh).
