@@ -85,7 +85,7 @@ import GHC.Types.Basic  ( TypeOrKind(..) )
 import GHC.Builtin( mkUnboundName, isUnboundName )
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.KnownOccs
-import GHC.Builtin.WiredIn.Types( oneDataConName )
+import GHC.Builtin.WiredIn.Types( listTyConName, oneDataConName )
 
 import GHC.Unit.Module ( getModule )
 
@@ -978,7 +978,11 @@ rnHsTyKi env (HsKindSig x ty k)
 -- Unboxed tuples are allowed to have poly-typed arguments.  These
 -- sometimes crop up as a result of CPR worker-wrappering dictionaries.
 rnHsTyKi env tupleTy@(HsTupleTy x tup_con tys)
-  = do { when (isRnKindLevel env) $
+  = do { case x of
+           AnnParens (EpTok (EpaSpan (RealSrcSpan _ _))) _ ->
+             addDiagnostic (TcRnPunnedTypeSyntax (ppr tupleTy))
+           _ -> pure ()
+       ; when (isRnKindLevel env) $
            checkDataKinds env tupleTy
        ; (tys', fvs) <- mapFvRn (rnLHsTyKi env) tys
        ; return (HsTupleTy x tup_con tys', fvs) }
@@ -1286,8 +1290,17 @@ rnHsTyVar lookup_occ env tv ip (L loc rdr_name)
            -- Any type variable at the kind level is illegal without the use
            -- of PolyKinds (see #14710)
        ; gre <- lookup_occ rdr_name
-       ; unless (isPromoted ip) $
+       ; unless (isPromoted ip) $ do
            warnGlobalPunUse (L loc rdr_name) gre
+           -- The parser records the punctuation only for written syntax.
+           -- A type constructed by Template Haskell has no such tokens.
+           let name = greName gre
+           case anns loc of
+             NameAnnOnly (NameSquare _ _) _ | name == listTyConName ->
+               addDiagnosticAt (locA loc) (TcRnPunnedTypeSyntax (text "[]"))
+             NameAnnCommas (NameParens _ _) _ _ | isTupleTyConName name ->
+               addDiagnosticAt (locA loc) (TcRnPunnedTypeSyntax (ppr rdr_name))
+             _ -> pure ()
        ; checkNamedWildCard env (greName gre)
        ; this_mod <- getModule
        ; explicit_level_imports <- xoptM LangExt.ExplicitLevelImports
