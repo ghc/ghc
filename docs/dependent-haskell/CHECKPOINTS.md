@@ -48,6 +48,26 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+Compiler `61785e1925` accepts a required type argument after a value
+field in a prefix GADT constructor. An ordinary client supplies
+`TypedNote 79 (type Bool) True`. Pattern matching binds the type at
+the same position. The client also uses the Quick Look package reader
+and the retained family results from R04. For R24, a newtype-derived
+associated equation can use a representation constraint supplied by
+the owning class's superclass. A constraint available only in the
+deriving context still fails the domain check.
+
+All 488 Showcase rows matched at native O0, native O2 and in
+source-loaded GHCi. All 47 selected registered tests passed. The
+separate indexed-list diagnostic from `fd52c23d14` also passed.
+All 37 GHC API results matched. This Stage 2 compiler used a rebuild
+of 77 compiler modules and three boot modules against matching
+libraries. A clean two-stage build that also includes quoted type lets
+is queued at `cfdb42ce78`.
+[Required type arguments](roadmap/R41-nested-quantification-in-gadts.md),
+[derived equations](roadmap/R24-constrained-type-families.md),
+and [package readers](roadmap/R22-existential-quantification.md).
+
 At revision `e5f162cbec`, an ordinary client passes a three-way `case`
 directly to a vector reader. Only the selected vector is evaluated.
 With `ImpredicativeTypes`, the client can also write `toList (id xs)`
