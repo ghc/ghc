@@ -32,8 +32,11 @@ import GHC.Hs.Syn.Type
 import GHC.Rename.Utils
 import GHC.Tc.Errors.Types
 import GHC.Tc.Gen.Sig( TcPragEnv, lookupPragEnv, addInlinePrags )
+import GHC.Tc.Solver.Monad (bumpReductionDepthTcM, matchFamTcM)
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Instantiate
+import GHC.Tc.Validity (checkConstrainedSignature)
+import GHC.Types.Basic (TypeOrKind(TypeLevel))
 import GHC.Types.FieldLabel
 import GHC.Types.Id
 import GHC.Types.Var
@@ -45,7 +48,7 @@ import qualified GHC.Core.Subst as CoreSubst
 import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_kind )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
-import GHC.Tc.Zonk.TcType (zonkTcType)
+import GHC.Tc.Zonk.TcType (zonkTcType, zonkTcTypes)
 import GHC.Core.TyCo.Ppr ( pprTyVars )
 import GHC.Core.TyCo.Rep ( Type(ExistsTy, TermVarTy) )
 import GHC.Tc.Utils.TcType
@@ -58,6 +61,7 @@ import GHC.Tc.Types.Origin
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Coercion
+import GHC.Core.Reduction (Reduction(..))
 import GHC.Core.Predicate ( isEvId, mkNomEqPred )
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
@@ -70,7 +74,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import qualified GHC.LanguageExtensions as LangExt
-import Control.Arrow  ( second )
+import Control.Arrow  ( first, second )
 import Control.Monad
 import GHC.Data.FastString
 import GHC.Data.Pair ( pSnd )
@@ -1562,8 +1566,8 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
        ; check_con_pat_arity con_like (length pats)
        ; let tc = dataConTyCon con
        ; expected <- readExpType_maybe (scaledThing pat_ty_scaled)
-       -- See Note [Constructors in a nested dependent sum] in GHC.Tc.Utils.Unify.
-       ; (wrap, ctxt_res_tys) <- case expected >>= matchSumPayload tc of
+       ; family_result <- maybe (pure Nothing) (match_family_result tc) expected
+       ; (wrap, ctxt_res_tys) <- case family_result of
            Just (co, tys) -> return (mkWpCastN co, tys)
            Nothing -> do { matched@(wrap, _) <- matchExpectedConTy penv tc pat_ty_scaled
                          ; unless (isIdHsWrapper wrap) bad_pattern
@@ -1582,6 +1586,32 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
   where
     bad_pattern :: TcM a
     bad_pattern = failWithTc (TcRnRetainedQuantificationError RetainedPackagePattern)
+
+    -- See Note [Checking retained package patterns].
+    match_family_result :: TyCon -> TcType -> TcM (Maybe (TcCoercionN, [TcType]))
+    match_family_result parent ty
+      | Just (family, _) <- tcSplitTyConApp_maybe ty
+      , isTypeFamilyTyCon family
+      = do { loc <- getCtLocM (OccurrenceOf (tyConName family)) (Just TypeLevel)
+           ; ty <- liftZonkM (zonkTcType ty)
+           ; go loc ty }
+      | otherwise = return Nothing
+      where
+        go loc ty = case tcSplitTyConApp_maybe ty of
+          Just (tc, args)
+            | tc == parent -> return (Just (mkNomReflCo ty, args))
+            | isTypeFamilyTyCon tc ->
+                do { args <- if isConstrainedFamilyTyCon tc && args `lengthAtLeast` tyConArity tc
+                             then do { checkNoErrs $ checkConstrainedSignature TypeAppCtxt ty
+                                     ; liftZonkM (zonkTcTypes args) }
+                             else return args
+                   ; reduction <- matchFamTcM tc args
+                   ; case reduction of
+                       Nothing -> return Nothing
+                       Just (Reduction co rhs) ->
+                         do { loc <- bumpReductionDepthTcM loc ty
+                            ; fmap (first (mkTransCo co)) <$> go loc rhs } }
+          _ -> return Nothing
 
     check_fields _ _ _ [] []
       = do { res <- thing_inside; return ([], res) }
@@ -1691,6 +1721,28 @@ context, and require an identity result wrapper for the ordinary constructor mat
 Match compilation keeps each equation's actual source field Ids in a separate
 case, including when its family has other constructors.
 See Note [Retained package equation scope] in GHC.HsToCore.Match.Constructor.
+
+A type family can return the package. Reduce only the head of the expected
+type. Before each step through a saturated constrained family, check the
+domain in the pattern's lexical scope. See Note [Constrained associated
+family formation] in GHC.Tc.Validity. The match can infer the scrutinee's
+type from an expression without a written signature at the use site.
+The nominal axiom does not carry the domain dictionary. Check the
+domain even when the family itself matches an equation.
+
+The separate check uses the existing lexical Givens and instance
+environment. A missing domain is an error, including when the caller
+defers term errors. No domain dictionary enters the pattern wrapper.
+matchFamTcM then uses the ordinary nominal solver rule and its instance
+environment, including imported open family instances.
+
+Compose the nominal coercions and use the result when its head is the
+selected constructor's parent. Put that cast on the scrutinee so the fields
+bind at their checked types. This also handles the private family of a nested
+sum. Leave the fields and newtype representations alone.
+Use the solver's reduction-depth counter for each step. A recursive family
+can keep reducing without reaching a constructor. Create the location at
+the pattern constructor so the depth error points to that constructor.
 
 Scale each field by the multiplicity of the case. A retained field is declared
 at Many, so its pattern Id still has multiplicity Many in a linear case.

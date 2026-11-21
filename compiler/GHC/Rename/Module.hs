@@ -156,20 +156,74 @@ Restore those names with type lets if the header has private names.
 For example, a domain of Proxy x after some (x :: A) must refer to
 the witness header, even when it shadows a synonym parameter x.
 See Note [Provisional kinds of sum payloads] in GHC.Tc.TyCl.
+
+A type family equation can return a sum. Give each equation its own
+payload family. Take its captures from the equation binders. An implicit
+equation binds the variables in its left-hand side, as in rnFamEqn.
+Keep the binders that a capture's written kind needs. Keep the entire
+scope when the result contains a splice. The free-variable traversal
+cannot see the variables in the result of a splice. The original equation
+still goes through the ordinary scope, kind, and termination checks.
+For a top-level type instance, allocate a stable occurrence before lifting
+the payload. The same open family can have multiple instances, including
+instances in separate declaration groups. The payload helper belongs to
+the instance module even if that module imports the family.
+
+In an associated instance, an explicit equation forall can use variables
+from the enclosing instance head. Keep those captures as arguments to the
+helper. rnFamEqn still checks that these variables occur on the left-hand
+side. Copy only their names. An annotation on the instance head can
+mention another variable outside the family equation. For a splice, pass
+only enclosing variables written in the family pattern. The splice's
+source does not show which variables its result uses. A class default has
+only the scope of its own equation.
 -}
--- | Lift type lambdas from synonym right-hand sides. See Note [Lifting type lambdas].
+-- | Lift type lambdas from synonyms and sums from type family equations.
+-- See Note [Lifting type lambdas].
 liftTypeLambdas :: RdrName -> HsGroup GhcPs
-                -> (HsGroup GhcPs, [(OccName, OccName)], OccEnv (OccName, Bool))
-liftTypeLambdas sigma group =
-  let (groups, hidden, scopes) = unzip3 (map liftGroup (hs_tyclds group))
-  in (group { hs_tyclds = groups }, concat hidden, mkOccEnv (concat scopes))
+                -> RnM (HsGroup GhcPs, [(OccName, OccName)], OccEnv (OccName, Bool))
+liftTypeLambdas sigma group = do
+  (groups, hidden, scopes) <- unzip3 <$> traverse liftGroup (hs_tyclds group)
+  return (group { hs_tyclds = groups }, concat hidden, mkOccEnv (concat scopes))
   where
-    liftGroup decls =
-      let (defs, lifted) = unzip (map liftDecl (group_tyclds decls))
-          (families, hidden, signatures, scopes) = unzip4 (concat lifted)
-      in (decls { group_tyclds = defs ++ families
-                , group_kisigs = group_kisigs decls ++ catMaybes signatures }
-         , hidden, catMaybes scopes)
+    liftGroup decls = do
+      (instances, lifted_insts) <- unzip <$> traverse liftInst (group_instds decls)
+      (defs, lifted) <- unzip <$> traverse liftDecl (group_tyclds decls)
+      let (families, hidden, signatures, scopes) = unzip4 (concat lifted ++ concat lifted_insts)
+      return (decls { group_tyclds = defs ++ families
+                    , group_kisigs = group_kisigs decls ++ catMaybes signatures
+                    , group_instds = instances }
+             , hidden, catMaybes scopes)
+
+    liftInst (L loc inst@ClsInstD
+                  { cid_inst = decl@ClsInstDecl{cid_poly_ty = header, cid_decls = nested} }) = do
+      (nested', lifted) <- liftNested (instanceVars header) nested
+      return (L loc inst{cid_inst = decl{cid_decls = nested'}}, lifted)
+    liftInst inst = liftTypeInst [] inst
+
+    liftNested inherited nested = do
+      (nested', lifted) <- unzip <$> traverse liftDeclInst nested
+      return (nested', concat lifted)
+      where
+        liftDeclInst (L loc (InstD ext inst)) = do
+          (L _ inst', lifted) <- liftTypeInst inherited (L loc inst)
+          return (L loc (InstD ext inst'), lifted)
+        liftDeclInst decl = return (decl, [])
+
+    instanceVars (L _ HsSig{sig_bndrs = outer, sig_body = body}) =
+      case outer of
+        HsOuterImplicit{} -> nubN (extractHsTyRdrTyVars body)
+        HsOuterExplicit{hso_bndrs = binders} -> mapMaybe hsLTyVarLocName binders
+
+    liftTypeInst inherited (L loc inst@TyFamInstD
+                                { tfid_inst = decl@TyFamInstDecl
+                                { tfid_eqn = eqn@FamEqn{feqn_tycon = owner, feqn_rhs = rhs} } })
+      | sumResult rhs = do
+          occ <- chooseUniqueOccTc (mkInstTyTcOcc ("$sum:" ++ occNameString (rdrNameOcc (unLoc owner))))
+          let instance_owner = L (getLoc owner) (mkRdrUnqual occ)
+              (_, (L _ eqn', lifted)) = liftEquation inherited instance_owner (0 :: Int) (L loc eqn)
+          return (L loc inst{tfid_inst = decl{tfid_eqn = eqn'}}, lifted)
+    liftTypeInst _ inst = return (inst, [])
 
     liftDecl (L loc syn@SynDecl{tcdLName = owner, tcdRhs = rhs,
                                 tcdTyVars = HsQTvs{hsq_explicit = captures}})
@@ -178,8 +232,53 @@ liftTypeLambdas sigma group =
             kinds = nubN kind_occs
             implicit = [(liftedTypeVarBinder k, k) | k <- kinds]
             (rhs', families, _) = liftRhs Nothing owner (implicit ++ scoped) rhs (0 :: Int)
-        in (L loc syn{tcdRhs = rhs'}, families)
-    liftDecl decl = (decl, [])
+        in return (L loc syn{tcdRhs = rhs'}, families)
+    liftDecl (L loc decl@FamDecl{tcdFam = family@FamilyDecl
+                  { fdLName = owner, fdInfo = ClosedTypeFamily ann (Just rows) }}) =
+      let (_, results) = mapAccumL (liftEquation [] owner) (0 :: Int) rows
+          (rows', lifted) = unzip results
+          family' = family{fdInfo = ClosedTypeFamily ann (Just rows')}
+      in return (L loc decl{tcdFam = family'}, concat lifted)
+    liftDecl (L loc cls@ClassDecl{tcdDecls = nested}) = do
+      (nested', lifted) <- liftNested [] nested
+      return (L loc cls{tcdDecls = nested'}, lifted)
+    liftDecl decl = return (decl, [])
+
+    liftEquation inherited owner salt (L loc eqn@FamEqn{feqn_rhs = rhs})
+      | sumResult rhs =
+          let captures = equationCaptures inherited eqn
+              free = Set.fromList (map unLoc (extractHsTyRdrTyVars rhs))
+              used | spliceFree rhs = fst (foldr selectCapture ([], free) captures)
+                   | otherwise = captures
+              (rhs', families, next) = liftRhs Nothing owner used rhs salt
+          in (next, (L loc eqn{feqn_rhs = rhs'}, families))
+    liftEquation _ _ salt row = (salt, (row, []))
+
+    sumResult (L _ (HsParTy _ body)) = sumResult body
+    sumResult (L _ (HsKindSig _ body _)) = sumResult body
+    sumResult (L _ (XHsType HsTypeSome{})) = True
+    sumResult _ = False
+
+    equationCaptures inherited FamEqn{feqn_bndrs = outer, feqn_pats = pats, feqn_rhs = rhs} =
+      [(liftedTypeVarBinder v, v) | v <- inherited
+                                , not (any (sameBinder v . snd) local)
+                                , without_splice || any (sameBinder v) lhs] ++ local
+      where
+        without_splice = spliceFree rhs
+        lhs = nubN (extractHsTyArgRdrKiTyVars pats)
+        local = case outer of
+          HsOuterImplicit{} -> [(liftedTypeVarBinder v, v) | v <- lhs]
+          HsOuterExplicit{hso_bndrs = binders} ->
+            mapMaybe (capture . fmap (setHsTyVarBndrFlag (HsBndrRequired noExtField))) binders
+
+    selectCapture c@(binder, v) (used, free)
+      | Set.member (unLoc v) free =
+          let kinds = case unLoc binder of
+                HsTvb{tvb_kind = HsBndrKind _ kind} ->
+                  Set.fromList (map unLoc (extractHsTyRdrTyVars kind))
+                _ -> Set.empty
+          in (c : used, Set.union kinds (Set.delete (unLoc v) free))
+      | otherwise = (used, free)
 
     liftRhs scoped owner captures (L loc (HsKindSig ann body kind)) salt
       | L _ HsForAllTy{} <- stripParens kind
@@ -1425,8 +1524,8 @@ rnSrcDecls group = do
       sigma_mod = mkModule (RealUnit (Definite (baseUnitId dflags))) (mkModuleName "GHC.Sigma")
       sigma = mkOrig sigma_mod (mkTcOcc "Sigma")
       (with_cases, case_names) = if lift_cases then liftTypeCases group else (group, [])
-      (expanded, lambda_names, scopes) =
-        if enabled then liftTypeLambdas sigma with_cases else (group, [], emptyOccEnv)
+  (expanded, lambda_names, scopes) <-
+    if enabled then liftTypeLambdas sigma with_cases else return (group, [], emptyOccEnv)
   rnSrcDeclsWithLambdas sigma named_wildcards lift_cases
                         (case_names ++ [(fam, Just owner) | (fam, owner) <- lambda_names])
                         scopes expanded
@@ -1508,8 +1607,8 @@ rnSrcDeclsWithLambdas sigma named_wildcards lift_cases early_hidden early_scopes
              ; let input = emptyRdrGroup{hs_valds = val_decls, hs_tyclds = tycl_decls}
                    (updated, anchors, aliases, uses, unbound, _) = liftDeclarationTypes heads [] show lift_cases named_wildcards input
                    (cases, case_names) = liftTypeCases emptyRdrGroup{hs_tyclds = anchors}
-                   (late, lambdas, late_scopes) = liftTypeLambdas sigma cases
-                   late_hidden = aliases ++ case_names ++ [(fam, Just owner) | (fam, owner) <- lambdas]
+             ; (late, lambdas, late_scopes) <- liftTypeLambdas sigma cases
+             ; let late_hidden = aliases ++ case_names ++ [(fam, Just owner) | (fam, owner) <- lambdas]
              ; forM_ unbound $ \v ->
                  forM_ (demoteRdrNameTv (unLoc v)) $ \term ->
                    setSrcSpanA (getLoc v) (void (reportUnboundName WL_Anything term))
@@ -1665,8 +1764,8 @@ rnSplicedSignatureCases sigma named_wildcards fix_env generated splice_cases sit
           (_:_, ValBinds _ [VbSig (L _ (TypeSig _ _ _ HsWC{hswc_body = L _ HsSig{sig_body = ty}}))])
             | Just result <- unwrap_retained retained ty -> do
             let (cases, case_names) = liftTypeCases emptyRdrGroup{hs_tyclds = anchors}
-                (late, lambdas, scopes) = liftTypeLambdas sigma cases
-                hidden = aliases ++ case_names ++ [(fam, Just owner) | (fam, owner) <- lambdas]
+            (late, lambdas, scopes) <- liftTypeLambdas sigma cases
+            let hidden = aliases ++ case_names ++ [(fam, Just owner) | (fam, owner) <- lambdas]
                 declarations = hs_tyclds late
             forM_ uses $ \(loc, gre) -> setSrcSpanA (getLoc loc) (addUsedGRE AllDeprecationWarnings gre)
             (envs@(global, local), _) <- getLocalNonValBinders fix_env emptyRdrGroup{hs_tyclds = declarations}

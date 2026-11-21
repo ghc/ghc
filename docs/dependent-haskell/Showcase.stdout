@@ -158,6 +158,7 @@ generic partial worker WHNF: True
 ordinary module runtime replicate: [7,7]
 ordinary module generic round-trip: [11,22]
 pair a list's computed length with its vector: (2,[11,22])
+read a closed family's retained length without its payload: 2
 generic checked Int position: Just 22
 index a list by its ordinary source length: [Just 'b',Nothing,Nothing,Just 'x',Just 'x']
 empty-list index forces its position: True
