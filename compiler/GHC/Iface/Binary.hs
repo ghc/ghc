@@ -53,6 +53,7 @@ import GHC.Types.Name.Cache
 import GHC.Types.Unique.FM
 
 import GHC.Unit
+import GHC.Unit.Module.Deps (Usage(UsageHomeModuleInterface))
 import GHC.Unit.Module.ModIface
 
 import GHC.Platform.Profile
@@ -358,7 +359,8 @@ evidenceSuffix requirements
     || needs RepeatedInteriorGadtForAllEvidence || needs OrderedGadtTelescopeEvidence
     || needs InferredOrderedGadtBindersEvidence
     || needs ExtendedOrderedGadtTelescopeEvidence || needs ScopedLambdaEvidence
-    || needs RetainedConstructorContextEvidence = feature_set
+    || needs RetainedConstructorContextEvidence
+    || needs HomeRuleInterfaceEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -404,6 +406,7 @@ legacyEvidenceSuffix InferredOrderedGadtBindersEvidence = featureSetPrefix ++ "i
 legacyEvidenceSuffix ExtendedOrderedGadtTelescopeEvidence = featureSetPrefix ++ "extended-ordered-gadt-telescope"
 legacyEvidenceSuffix ScopedLambdaEvidence = featureSetPrefix ++ "scoped-lambda"
 legacyEvidenceSuffix RetainedConstructorContextEvidence = featureSetPrefix ++ "retained-constructor-context"
+legacyEvidenceSuffix HomeRuleInterfaceEvidence = featureSetPrefix ++ "home-rule-interfaces"
 legacyEvidenceSuffix GeneralIndexedConstructorOperandEvidence = featureSetPrefix ++ "general-indexed-constructor-operand"
 legacyEvidenceSuffix DepFunCoEvidence           = "-retained-depfunco-v1"
 legacyEvidenceSuffix ConstructorCaseEvidence   = "-retained-constructor-case-v1"
@@ -457,7 +460,8 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("inferred-ordered-gadt-binders", InferredOrderedGadtBindersEvidence)
                       , ("extended-ordered-gadt-telescope", ExtendedOrderedGadtTelescopeEvidence)
                       , ("scoped-lambda", ScopedLambdaEvidence)
-                      , ("retained-constructor-context", RetainedConstructorContextEvidence) ]
+                      , ("retained-constructor-context", RetainedConstructorContextEvidence)
+                      , ("home-rule-interfaces", HomeRuleInterfaceEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion
@@ -671,7 +675,13 @@ putIfaceWithExtFields traceBinIface compressionLevel bh mod_iface =
         []   -> pure (deleteField sourceTableField fields)
         locs -> writeFieldWith sourceTableField
                     (\h -> putWithUserData QuietBinIFace NormalCompression h locs) fields
-      found <- newIORef Set.empty
+      let home_rule_interface_usage UsageHomeModuleInterface{} = True
+          home_rule_interface_usage _ = False
+          usage_version = withSelfRecomp mod_iface Set.empty $ \info ->
+            if any home_rule_interface_usage (mi_sr_usages info)
+              then Set.singleton HomeRuleInterfaceEvidence
+              else Set.empty
+      found <- newIORef usage_version
       let notify _ required = modifyIORef' found (Set.insert required)
           feature_bh = addWriterToUserData (mkWriter notify) bh
       forwardPutRel_ feature_bh (\_ -> put_ feature_bh fields') $

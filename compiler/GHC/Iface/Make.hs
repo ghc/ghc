@@ -273,6 +273,7 @@ mkRecompUsageInfo hsc_env tc_result = do
     else do
      tables <- readIORef (tcg_source_table_uses tc_result)
      evaluated_terms <- readIORef (tcg_evaluated_term_uses tc_result)
+     home_rule_deps <- readIORef (tcg_home_rule_dependencies tc_result)
      let used_names = mkUsedNames tc_result `unionNameSet` tables `unionNameSet` evaluated_terms
      dep_files <- (readIORef (tcg_dependent_files tc_result))
      dep_dirs  <- (readIORef (tcg_dependent_dirs tc_result))
@@ -300,7 +301,7 @@ mkRecompUsageInfo hsc_env tc_result = do
           (tcg_merged tc_result)
           needed_links
           needed_pkgs
-     return (Just usages)
+     return (Just (addHomeRuleUsageInfo home_rule_deps usages))
 
 mkIface_ :: HscEnv -> Module -> CoreProgram -> HscSource
          -> Dependencies -> GlobalRdrEnv -> [ImportUserSpec]

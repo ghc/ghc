@@ -396,7 +396,7 @@ data Usage
         -- This changes when anything about the interface (and hence the
         -- module) has changed.
 
-        -- UsageHomeModuleInterface is *only* used for recompilation
+        -- UsageHomeModuleBytecode is *only* used for recompilation
         -- checking when using TemplateHaskell in the interpreter (where
         -- some modules are loaded as BCOs).
 
@@ -405,6 +405,12 @@ data Usage
   | UsageMergedRequirement {
         usg_mod :: Module,
         usg_mod_hash :: Fingerprint
+  }
+  -- | Complete home interface inspected when checking source rule evidence.
+  | UsageHomeModuleInterface {
+        usg_mod :: Module,
+        usg_iface_hash :: Fingerprint
+            -- ^ Fingerprint of the inspected interface (mi_iface_hash).
   }
     deriving( Eq )
         -- The export list field is (Just v) if we depend on the export list:
@@ -427,6 +433,7 @@ instance NFData Usage where
   rnf (UsageDirectory dir hash label) = rnf dir `seq` rnf hash `seq` rnf label `seq` ()
   rnf (UsageMergedRequirement mod hash) = rnf mod `seq` rnf hash `seq` ()
   rnf (UsageHomeModuleBytecode mod uid hash) = rnf mod `seq` rnf uid `seq` rnf hash `seq` ()
+  rnf (UsageHomeModuleInterface mod hash) = rnf mod `seq` rnf hash `seq` ()
 
 instance Binary Usage where
     put_ bh usg@UsagePackageModule{} = do
@@ -467,6 +474,11 @@ instance Binary Usage where
         put_ bh (usg_dir_hash usg)
         put_ bh (usg_dir_label usg)
 
+    put_ bh (UsageHomeModuleInterface mod hash) = do
+        putByte bh 6
+        put_ bh mod
+        put_ bh hash
+
     get bh = do
         h <- getByte bh
         case h of
@@ -503,6 +515,7 @@ instance Binary Usage where
             hash  <- get bh
             label <- get bh
             return UsageDirectory { usg_dir_path = dp, usg_dir_hash = hash, usg_dir_label = label }
+          6 -> UsageHomeModuleInterface <$> get bh <*> get bh
 
           i -> error ("Binary.get(Usage): " ++ show i)
 
@@ -534,6 +547,10 @@ stableUsageCmp
     usage2@UsageMergedRequirement {}
     = (compare `on` usg_mod) usage1 usage2
 stableUsageCmp
+    usage1@UsageHomeModuleInterface {}
+    usage2@UsageHomeModuleInterface {}
+    = (compare `on` usg_mod) usage1 usage2
+stableUsageCmp
     usage1
     usage2
     = (compare `on` constructorIndex) usage1 usage2
@@ -546,6 +563,7 @@ stableUsageCmp
     constructorIndex UsageDirectory          {} = 3
     constructorIndex UsageHomeModuleBytecode {} = 4
     constructorIndex UsageMergedRequirement  {} = 5
+    constructorIndex UsageHomeModuleInterface {} = 6
 
 -- | Records the imports that we depend on from a home module,
 -- for recompilation checking.

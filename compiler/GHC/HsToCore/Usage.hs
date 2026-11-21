@@ -1,6 +1,6 @@
 module GHC.HsToCore.Usage (
     -- * Dependency/fingerprinting code (used by GHC.Iface.Make)
-    mkUsageInfo, mkUsedNames,
+    mkUsageInfo, mkUsedNames, addHomeRuleUsageInfo,
 
     UsageConfig(..),
     ) where
@@ -65,6 +65,16 @@ its dep_orphs. This was the cause of #14128.
 
 mkUsedNames :: TcGblEnv -> NameSet
 mkUsedNames TcGblEnv{ tcg_dus = dus } = allUses dus
+
+-- | Add the exact home interfaces inspected by accepted source proofs.
+-- An ordinary usage tracks the ABI and the declarations used by the client.
+-- A proof can also depend on the absence of an applicable source rule. Its
+-- dependency must select the full interface inspected by the rule check.
+addHomeRuleUsageInfo :: Map Module Fingerprint -> [Usage] -> [Usage]
+addHomeRuleUsageInfo checked usages
+  | Map.null checked = usages
+  | otherwise = sortBy stableUsageCmp
+      ([UsageHomeModuleInterface mod hash | (mod, hash) <- Map.toList checked] ++ usages)
 
 data UsageConfig = UsageConfig
   { uc_safe_implicit_imps_req :: !Bool -- ^ Are all implicit imports required to be safe for this Safe Haskell mode?

@@ -64,6 +64,7 @@ module GHC.Tc.Utils.Monad(
   getFixityEnv, extendFixityEnv,
   getDeclaredDefaultTys,
   addDependentFiles, addDependentDirectories,
+  recordHomeRuleDependencies,
 
   -- * Error management
   getSrcSpanM, getRealSrcSpanM, setSrcSpan, setSrcSpanA, addLocM,
@@ -193,6 +194,8 @@ import GHC.Unit
 import GHC.Unit.Env
 import GHC.Unit.External
 import GHC.Unit.Module.Warnings
+import GHC.Unit.Module.ModIface (ModIface, mi_hsc_src, mi_module, mi_iface_hash)
+import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.Home.PackageTable
 
 import qualified GHC.Core as Core
@@ -356,6 +359,7 @@ initTcGblEnv hsc_env hsc_src keep_rn_syntax mod loc =
      ; source_table_uses    <- newIORef emptyNameSet
      ; evaluated_term_uses  <- newIORef emptyNameSet
      ; source_rule_types    <- newIORef emptyNameEnv
+     ; home_rule_dependencies <- newIORef Map.empty
      ; optional_source_uses <- newIORef []
      ; th_var               <- newIORef False
      ; infer_var            <- newIORef True
@@ -433,6 +437,7 @@ initTcGblEnv hsc_env hsc_src keep_rn_syntax mod loc =
           , tcg_local_open_owners   = emptyNameEnv
           , tcg_evaluated_term_uses  = evaluated_term_uses
           , tcg_source_rule_types    = source_rule_types
+          , tcg_home_rule_dependencies = home_rule_dependencies
           , tcg_optional_source_uses = optional_source_uses
           , tcg_dus                = emptyDUs
 
@@ -1325,6 +1330,24 @@ addDependentDirectories ds = do
   ref <- fmap tcg_dependent_dirs getGblEnv
   dep_dirs <- readTcRef ref
   writeTcRef ref (ds ++ dep_dirs)
+
+-- | Record the exact home interfaces inspected by an accepted source proof.
+-- Pass only source ancestors of the module in the current build. A usage
+-- does not add a build dependency. Call this after committing to the proof.
+recordHomeRuleDependencies :: [ModIface] -> TcM ()
+recordHomeRuleDependencies ifaces = do
+  env <- getGblEnv
+  unit_env <- hsc_unit_env <$> getTopEnv
+  let home_units = HUG.allUnits (ue_home_unit_graph unit_env)
+      checked = Map.fromList
+        [ (mod, mi_iface_hash iface)
+        | iface <- ifaces
+        , mi_hsc_src iface == HsSrcFile
+        , let mod = mi_module iface
+        , mod /= tcg_mod env
+        , toUnitId (moduleUnit mod) `Set.member` home_units
+        ]
+  updTcRef (tcg_home_rule_dependencies env) (`Map.union` checked)
 
 {-
 ************************************************************************

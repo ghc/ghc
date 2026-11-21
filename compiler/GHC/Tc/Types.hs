@@ -647,6 +647,9 @@ data TcGblEnv
           -- ^ Known first type arguments to retained rule heads. An empty
           -- set requires checking all rules for the head.
 
+        tcg_home_rule_dependencies :: TcRef (Map Module Fingerprint),
+          -- ^ Complete home interfaces inspected by accepted source proofs.
+
         tcg_optional_source_uses :: TcRef [(TcEvBinds, CoVar, [Id], [(Id, Maybe Name)], [Name])],
           -- ^ Deferred source dependencies: evidence, proof, term owners,
           -- rule heads with known type arguments, and table Names.
