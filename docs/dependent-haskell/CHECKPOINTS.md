@@ -28,6 +28,20 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `d1db028e3c`, the ordinary two-vector client inferred its result
+package. Its output was `([7],[2,4])`. Reading the first cell on
+either side left the other input and the selected tail unevaluated.
+Removing a required `Show a` constraint reported GHC-39999 at the
+producer argument. Identifying different hidden lengths still failed.
+
+All 421 Showcase outputs matched in stripped native code at `-O0`,
+source-loaded GHCi, and native code at `-O1` and `-O2`. Eighteen
+registered tests passed. The erased-existential test also passed with
+the added missing-constraint control. The ordinary impredicative suite
+recorded 21 expected passes and one expected failure.
+[Two-vector client](examples/erased-existentials/RankedPackageClient.hs)
+and [R22 inference](roadmap/R22-existential-quantification.md).
+
 The combined compiler at `0869c02fcf` passed all 420 Showcase outputs
 in stripped native code at `-O0`, source-loaded GHCi and native code
 at `-O1` and `-O2`. Eighteen registered tests, the 37-row Core test
