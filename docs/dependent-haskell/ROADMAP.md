@@ -24,8 +24,8 @@ depend on others, so this count cannot estimate the remaining work time.
 | Namespace warnings | R36 |
 
 The 519-output Showcase proves that filtering a finite list with a
-runtime predicate cannot increase its length. The predicate can close over
-a cutoff read from `IO`. An erased package can infer its witness from
+runtime predicate cannot increase its length. The predicate computes a
+cutoff from rows read from an `IORef`. An erased package can infer its witness from
 a declared rank-n callback. A consumer can reverse the proof that a
 vector with an unknown length is empty. [Filter bound](examples/open-evaluation/PreludeFilterRuntime.hs),
 [erased callback](examples/erased-existentials/RankedPackageClient.hs)
@@ -41,7 +41,7 @@ record how each behavior was introduced.
 | [R15 closed evaluator](roadmap/R15-closed-term-evaluator.md#read-independent-row-and-column-counts) | A client proves the labels and all cells of a compiled rectangular table with two hidden dimensions. Both dimensions of a square can share one hidden index. | Extend readback beyond the checked matrix and container shapes. |
 | [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The installed `filter not` handles a known Boolean head and an unknown tail. A separate ordinary client proves length preservation for the installed `map` by induction over a finite spine. | General open evaluation across arbitrary ordinary definitions. |
 | [R19 type-level cases](roadmap/R19-type-level-cases.md) | Retained signatures can match a runtime index or an application of a checked function. Two qualified imports of the same checked function can share a case in one declaration group. The upgrade test rebuilds an affected home provider once. | Separately compiled modules still need a shared result type at an unknown index. Older installed providers need rebuilding to export a shared result. |
-| [R22 erased existentials](roadmap/R22-existential-quantification.md) | A constructor pattern can open a hidden vector length inside a tuple. A typed consumer can fix the higher-rank witness of a guarded callback. | Extend inference to callbacks without a result declaration that determines the witness. |
+| [R22 erased existentials](roadmap/R22-existential-quantification.md) | A constructor pattern can open a hidden vector length inside a tuple. A producer's declared argument type can fix a witness beneath a callback's `forall`. | Infer a witness when the callback has no declared type that determines it. |
 | [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | An unsigned closed family can infer a callback that accepts constructors and partially applied families. A later GADT argument can fix a receiver's matchability. The original `KindEqualities2` checks across its declaration splice. | Extend higher-order inference beyond the tested closed-family cases and check compatibility of existing unannotated programs. |
 
 The published evaluator work covers closed calls such as `Prelude.sum` and

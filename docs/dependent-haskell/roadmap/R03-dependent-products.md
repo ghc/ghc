@@ -693,13 +693,14 @@ decideBy :: forall a. foreach (f :: a -> Bool)
          -> foreach (x :: a) -> BooleanResult (f x)
 ```
 
-A filter uses this decision at each element of a finite list. Its length
-bound refers to the same predicate and list that ran. An ordinary client
-can capture a runtime cutoff in a predicate on pairs, then return the
-selected rows and the bound. An empty list does not evaluate the predicate.
+A filter uses this decision at each element of a finite list.
+`filterBoundBy` returns a length bound indexed by that predicate and list.
+An ordinary client can pass a predicate on pairs that captures a runtime
+cutoff. It receives the selected rows and a string showing the bound.
+An empty list does not evaluate the predicate.
 The result index distinguishes a call on a different element and a call
 to a different predicate. The retained callback still needs a closed
 structural result and an unrestricted visible arrow.
 [Filter and proof](../examples/open-evaluation/PreludeFilterRuntime.hs),
-[source-hidden client](../../../testsuite/tests/dependent/should_run/NativeLiftedCallbackClient.hs)
+[source-hidden decision client](../../../testsuite/tests/dependent/should_run/NativeLiftedCallbackClient.hs)
 and [Agda and GHC precedents](../REFERENCES.md#evidence-for-a-retained-predicate-on-a-lifted-input).
