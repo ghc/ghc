@@ -3313,6 +3313,14 @@ demand choice.
 [Agda dependent pairs](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#the-s-type),
 and [GHC bang-pattern desugaring](https://github.com/ghc/ghc/blob/master/compiler/GHC/HsToCore/Utils.hs#L910).
 
+GHC infers the RHS multiplicity of a local pattern binding. A lazy tuple
+binding requires `Many`, and a monomorphic strict tuple binding can consume
+its RHS linearly. The erased opening uses the same multiplicity for the
+producer and the payload Id. Core Lint follows the payload alias to account
+for the producer's usage. The strict pattern uses the inferred multiplicity
+when matching the payload.
+[GHC Proposal 111, let and where bindings](https://ghc-proposals.readthedocs.io/en/latest/proposals/0111-linear-types.html#let-and-where-bindings).
+
 Agda checks the clauses of an indexed function against its telescope.
 GHC keeps its ordinary match group for equations on a packaged argument.
 It opens the hidden indices before checking the payload patterns in that

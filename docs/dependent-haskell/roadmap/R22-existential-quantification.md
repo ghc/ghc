@@ -322,19 +322,26 @@ the binding lazy. An explicit `!(value, reader)` or the `Strict` default
 forces the package to a tuple before evaluating the body. This force
 leaves the fields lazy. Demand leaves the witness scope unchanged.
 A caller can return the fields in another erased package with a closed
-result type. This opening consumes the package at `Many`. A linear
-strict binding needs a package opening that can bind a linear payload.
+result type.
 
-The ordinary strict binding below accepts its input at `%1`:
+Strict tuple bindings can consume an erased package at `%1`. This follows
+the same usage rules as the ordinary tuple control:
 ```haskell
+type LinearPayload = exists a. (a, a %1 -> Int)
+
 readPlain :: (Bool, Bool %1 -> Int) %1 -> Int
 readPlain pair = let !(value, reader) = pair in reader value
+
+readLinear :: LinearPayload %1 -> Int
+readLinear package = let !(value, reader) = package in reader value
 ```
-With `LinearPayload = exists a. (a, a %1 -> Int)`, the same definition
-at `LinearPayload %1 -> Int` reports GHC-18872 on the package input.
-Both controls use `LinearTypes`, `MonoLocalBinds`, and `BangPatterns`.
-The Core `Unpack` binder is currently unrestricted. Accepting the linear
-source call without changing this invariant fails linear Core Lint.
+Both use `LinearTypes`, `MonoLocalBinds`, and `BangPatterns`. The original
+opening fixed the payload Id at `Many`. That accepted `readPlain` and
+rejected `readLinear` with GHC-18872. The opening now gives its payload Id
+the tuple pattern's inferred multiplicity. Core Lint tracks usage through
+the alias, and the ordinary case generated for the pattern forces the tuple.
+The source-hidden regression also reads a package at `%1` with `Strict`,
+and checks GHC-18872 for a lazy linear binding and a duplicated use.
 
 This path accepts one unsigned nonrecursive boxed tuple binding with
 variable or wildcard fields and at most one outer bang or tilde. The
