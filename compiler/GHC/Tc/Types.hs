@@ -142,6 +142,7 @@ import GHC.Tc.Errors.Types
 
 import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.Coercion (LiftingContext)
+import GHC.Core.Coercion.Axiom (CoAxiomRule)
 import GHC.Core (CoreExpr)
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep ( UnivCoDeps )
@@ -373,6 +374,14 @@ data RewriteEnv
           -- in the family application cache.
           --
           -- See Note [Computing coercion dependencies] in GHC.Tc.Solver.Rewrite.
+
+       , re_source_proof_family :: !(TcRef Bool)
+          -- ^ A checked branch or private source family may contribute
+          -- to this rewrite. See Note [Committing checked source family branches]
+          -- in GHC.Tc.Solver.Rewrite.
+
+       , re_source_proof_synonyms :: !(Maybe (TcRef [(CoAxiomRule, TcCoercion, Name, [SourceProofRule])]))
+          -- ^ Selected private family axioms and their enclosing synonyms.
 
        , re_native_lifting :: !LiftingContext
           -- ^ Source runtime binder relations in the common rewriting prefix.

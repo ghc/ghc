@@ -161,6 +161,16 @@ test('NativeOpenListFoldrGhci',
 test('NativeHomeRuleRecomp',
      [only_ways(['normal'])],
      run_command, ['bash NativeHomeRuleRecomp.sh "{compiler}" "{libdir}"'])
+test('NativeOpenEitherFmap',
+     [only_ways(['normal']),
+      extra_files([open_eval_dir + 'PreludeFmapEitherProof.hs',
+                   open_eval_dir + 'OrdinaryEitherMapping.hs',
+                   open_eval_dir + 'CheckedEitherInput.hs',
+                   'NativeOpenEitherFmapProducer.hs'])],
+     run_command, ['bash NativeOpenEitherFmap.sh "{compiler}" "{libdir}"'])
+test('NativeOpenEitherFmapDownstream',
+     [only_ways(['normal']), extra_files(['either-fmap-overlap-source'])],
+     run_command, ['bash NativeOpenEitherFmapDownstream.sh "{compiler}" "{libdir}"'])
 test('NativeOpenInstalledPair',
      [req_interp, req_rts_linker, only_ways(['normal']),
       extra_files([open_eval_dir + 'PreludePairExport.hs',

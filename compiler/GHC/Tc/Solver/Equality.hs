@@ -46,14 +46,14 @@ import GHC.Core.TyCo.Rep   -- cleverly decomposes types, good for completeness c
 import GHC.Core.TyCo.FVs ( tyCoVarsOfMCo, almostDevoidCoVarOfCo, mkUnivCoDeps, univCoDepsHoles )
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Coercion
-import GHC.Core.Coercion.Axiom ( CoAxiomRule(BranchedAxiom), coAxiomName, co_ax_source_proof_rules, sourceProofAxiomRules )
+import GHC.Core.Coercion.Axiom ( co_ax_source_proof_rules )
 import GHC.Core.Reduction
 import GHC.Core.FamInstEnv ( FamInstEnvs )
 import GHC.Core
 
 import GHC.Types.Var
 import GHC.Types.Basic
-import GHC.Types.Name (nameOccName, sourceTableTermOcc)
+import GHC.Types.Name (Name, SourceProofRule, nameOccName, sourceTableTermOcc)
 import GHC.Types.Name.Reader
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
@@ -504,10 +504,10 @@ can_eq_nc ces rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
            ; pure result }
     expand_proof_synonym _ solve = solve
 
--- An imported synonym and a filled metavariable can now name the same
--- source application. Reflexivity does not need the family's equation.
+-- A filled metavariable can name the same source application.
+-- Reflexivity does not need that application's family equation.
 can_eq_nc _ _ _ ev NomEq lhs@(TyConApp tc args) _ rhs@(TyConApp tc' _) _
-  | tc == tc', saturatedSourceHead tc args
+  | tc == tc', saturatedSourceHead tc args || saturatedProofFamily tc args
   , lhs `tcEqType` rhs = canEqReflexive ev NomEq lhs
 
 -- See Note [Reflexivity after retained normalization].
@@ -722,11 +722,9 @@ can_eq_nc ces rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
     try_index swapped tv family args rhs
       | mightPossiblyUnify ev eq_rel tv
       -- Instantiating Refl can give two copies of alpha ~ F. Keep
-      -- the mark-bearing nullary family as alpha's value. A proof
-      -- that needs only F ~ F then uses no family equation.
-      , null args
-      , Just ax <- closedFamilyTyConCoAxiom_maybe family
-      , _ : _ <- co_ax_source_proof_rules ax
+      -- the mark-bearing family application as alpha's value. A
+      -- reflexive proof then uses no family equation.
+      , saturatedProofFamily family args
       = unify_index swapped tv rhs
       | mightPossiblyUnify ev eq_rel tv, saturatedSourceHead family args = do
           owner <- wrapTcS (sourceTableOwner family)
@@ -746,8 +744,8 @@ can_eq_nc ces rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
         else rewrite_both
 
     rewrite_both
-      = do { (redn1@(Reduction _ xi1), rewriters1) <- rewrite_if_unrewritten (ces_rwL ces) ps_ty1
-           ; (redn2@(Reduction _ xi2), rewriters2) <- rewrite_if_unrewritten (ces_rwR ces) ps_ty2
+      = do { ((redn1@(Reduction _ xi1), deps1), rewriters1) <- rewrite_if_unrewritten (ces_rwL ces) ps_ty1
+           ; ((redn2@(Reduction _ xi2), deps2), rewriters2) <- rewrite_if_unrewritten (ces_rwR ces) ps_ty2
            ; new_ev <- rewriteEqEvidence ev NotSwapped redn1 redn2
                                          (rewriters1 S.<> rewriters2)
            ; traceTcS "can_eq_nc: go round again" (ppr new_ev $$ ppr xi1 $$ ppr xi2)
@@ -764,30 +762,33 @@ can_eq_nc ces rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
            ; let solve = can_eq_nc ces' rdr_env envs new_ev eq_rel xi1 xi1 xi2 xi2
            ; case (eq_rel, new_ev) of
                (NomEq, CtWanted (WantedCt { ctev_dest = HoleDest hole }))
-                 -> record_axiom_use hole redn1 (record_axiom_use hole redn2 solve)
+                 -> record_reduction_uses hole (deps1 ++ deps2) solve
                _ -> solve }
 
-    -- Keep the genuine family axiom in the reduction. The reduced type
-    -- alone cannot distinguish a checked source method from a literal.
-    record_axiom_use hole (Reduction (AxiomCo ax@(BranchedAxiom axiom 0) []) _) solve
-      | deps@(_ : _) <- sourceProofAxiomRules ax
+    -- See Note [Committing checked source family branches]
+    -- in GHC.Tc.Solver.Rewrite.
+    record_reduction_uses hole uses@(_ : _) solve
       = do { result <- solve
            ; filled <- wrapTcS (TcM.liftZonkM (unpackCoercionHole_maybe hole))
            ; case filled of
-               Just (CPH { cph_co = co }) | isReflCo co ->
+               Just (CPH { cph_co = proof }) | isReflCo proof ->
                  wrapTcS $ TcM.setCtLocM (ctEvLoc ev) $ do
                    loc <- TcM.getSrcSpanM
-                   TcM.recordSourceProofUse loc (coAxiomName axiom) deps
+                   mapM_ (uncurry (TcM.recordSourceProofUse loc)) uses
                _ -> pure ()
            ; pure result }
-    record_axiom_use _ _ solve = solve
+    record_reduction_uses _ _ solve = solve
 
-    rewrite_if_unrewritten :: Bool -> TcType -> TcS (Reduction, CoHoleSet)
+    rewrite_if_unrewritten :: Bool -> TcType
+                           -> TcS ((Reduction, [(Name, [SourceProofRule])]), CoHoleSet)
     rewrite_if_unrewritten already_rewritten ps_ty
       | already_rewritten
-      = return (mkReflRedn (eqRelRole eq_rel) ps_ty, emptyCoHoleSet)
+      = return ((mkReflRedn (eqRelRole eq_rel) ps_ty, []), emptyCoHoleSet)
+      | NomEq <- eq_rel, isWanted ev
+      = rewriteWithSourceProofs ev ps_ty
       | otherwise
-      = rewrite ev ps_ty
+      = do { (redn, rewriters) <- rewrite ev ps_ty
+           ; return ((redn, []), rewriters) }
 
 ----------------------------
 -- Look for a canonical LHS.
@@ -3105,6 +3106,13 @@ saturatedSourceHead :: TyCon -> [Type] -> Bool
 saturatedSourceHead tc args =
   isTypeFamilyTyCon tc && length args == tyConArity tc
     && isJust (sourceTableTermOcc (nameOccName (tyConName tc)))
+
+-- | Recognize a complete application of a family with checked branches.
+saturatedProofFamily :: TyCon -> [Type] -> Bool
+saturatedProofFamily tc args
+  | Just ax <- closedFamilyTyConCoAxiom_maybe tc
+  = not (null (co_ax_source_proof_rules ax)) && lengthIs args (tyConArity tc)
+  | otherwise = False
 
 -- | Solve a reflexive equality constraint
 canEqReflexive :: CtEvidence    -- ty ~ ty

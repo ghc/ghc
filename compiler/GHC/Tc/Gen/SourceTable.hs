@@ -3,17 +3,18 @@ module GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourc
                               sourceTableCallees, sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
                               sourceTableFamilyAppUse, sourceTableReferenceUse, sourceCaseKindUse, sourceCaseVisibleArity, isSourceConstructorCase, sourceTableOwner, monomorphicEnumCaseArity, groundFirstHead,
                               visibleSourceMethodRules, hasSourceMethodRule, hasSourceMethodRuleAt,
-                              sourceBinarySelector, sourceMapSelector, lookupSourceBinaryMethod, lookupSourceContainerMethod, lookupSourceGroundDFun, publishListFoldMethods, sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers, isSourceFilterGuard,
+                              sourceBinarySelector, sourceMapSelector, lookupSourceBinaryMethod, lookupSourceContainerMethod, lookupSourceGroundDFun, lookupSourceCheckedMapMethod, publishListFoldMethods, keepCheckedMapWorkers, publishCheckedMapMethods, sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers, isSourceFilterGuard,
                               OptionalSourceUses, optionalSourceUses, registerOptionalSourceUses,
                               checkOptionalSourceUses, checkSourceMethodUses,
                               withSourceProofSignature,
-                              recordSourceProofAliasUse, sourceProofRulesFor, captureSourceMethodProof, closedSourceProofArgs,
+                              recordSourceProofAliasUse, sourceProofRulesFor, takeSourceProofRulesFor,
+                              captureSourceMethodProof, closedSourceProofArgs,
                               checkAndInstallSourceProofs) where
 
 import GHC.Prelude
 
 import GHC.Builtin.KnownOccs (eqClassOpOcc, minusClassOpOcc)
-import GHC.Core.Class (Class, classAllSelIds, classMethods, classTyCon, classTyVars)
+import GHC.Core.Class (Class, classAllSelIds, classMethods, className, classTyCon, classTyVars)
 import GHC.Builtin.Modules (gHC_CLASSES, gHC_INTERNAL_BASE, gHC_INTERNAL_NUM_INTEGER, gHC_TYPES, mkGhcInternalModule)
 import GHC.Builtin.WiredIn.Types (nilDataCon, consDataCon, boolTy, falseDataCon, trueDataCon, charTy, charTyCon, typeSymbolKind, stringTy, integerTy, integerTyConName, listTyCon, mkListTy, mkTupleTy, promotedTupleDataCon, tupleDataCon, tupleTyCon, unmatchableDataConTy)
 import GHC.Core (CoreRule(..), isAutoRule, ruleActivation)
@@ -31,7 +32,9 @@ import GHC.Core.DataCon
 import GHC.Core.Dependent (hasNativeDependentExprRhs)
 import GHC.Core.FVs (exprSomeFreeVarsList)
 import GHC.Core.FamInstEnv (FamInstEnvs, mkBranchedCoAxiom, mkCoAxBranch, reduceTyFamApp_maybe)
-import GHC.Core.InstEnv (instanceDFunId, lookupUniqueInstEnv)
+import GHC.Core.InstEnv (ClsInst(is_tcs), classInstances, instanceCantMatch, instanceDFunId,
+                         isIncoherent, lookupUniqueInstEnv, roughMatchTcs)
+import GHC.Core.RoughMap (RoughMatchTc(RM_KnownTc))
 import GHC.Core.Multiplicity (scaledThing)
 import GHC.Core.Reduction (reductionCoercion, reductionReducedType)
 import GHC.Core.SimpleOpt (simpleOptExpr)
@@ -74,13 +77,14 @@ import GHC.Types.Basic (Origin(..), LeftOrRight(..), SourceTableOrigin(..), pick
 import GHC.Types.Error (errorsFound)
 import GHC.Types.Id.Info (IdDetails(DFunId, SourceTableId, VanillaId), SourceDFun(..), setSourceProofRuleInfo)
 import GHC.Types.Id (globaliseId, idInfo, idName, setIdInfo, idInlinePragma, isClassOpId_maybe, isDataConId_maybe, isDataConWorkId_maybe, idUnfolding, mkVanillaGlobal, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe,
-                     setSourceMethodIds, sourceMethodAliases, sourceMethodTarget_maybe)
+                     setIdExported, setSourceMethodIds, sourceMethodAliases, sourceMethodTarget_maybe,
+                     sourceMethodDFunClass)
 import GHC.Types.InlinePragma (isNeverActive, isOpaquePragma)
 import GHC.Types.Name (Name, OccName, isExternalName, mkSourceTableOcc, mkSourceFstOcc, mkSourceSndOcc, mkInstTyCoOcc, mkTcOcc,
                        isVarOcc, mkTyVarOcc, mkVarOcc, nameModule_maybe, nameOccName, nameSrcSpan, occNameString, setOccNameSpace, sourceTableTermOcc, stableNameCmp, nameStableString, tvName, SourceProofRule, SourceProofArgs, SourceProofArg(..))
 import GHC.Core.Opt.Pipeline (pairObservationOcc, pairObservationType, scalarRecipeTableOcc)
 import GHC.Types.Name.Reader (gre_imp, is_decl, is_isboot, lookupGRE_Name)
-import GHC.Types.Name.Env (extendNameEnv_C, lookupNameEnv, mkNameEnv, plusNameEnv_C, isEmptyNameEnv)
+import GHC.Types.Name.Env (delFromNameEnv, extendNameEnv_C, lookupNameEnv, mkNameEnv, plusNameEnv_C, isEmptyNameEnv)
 import GHC.Types.Name.Set (NameSet, emptyNameSet, elemNameSet, extendNameSet, extendNameSetList, filterNameSet,
                            intersectsNameSet,
                            intersectNameSet, isEmptyNameSet, minusNameSet, mkNameSet, nameSetElemsStable,
@@ -104,7 +108,7 @@ import GHC.Types.Unique.FM (plusUFM_C)
 import GHC.Types.Unique.Set (mkUniqSet, nonDetEltsUniqSet, sizeUniqSet)
 import GHC.Types.Var (Id, CoVar, idDetails, VarBndr(..), isId, isCoVar, mkTyVar, setIdDetails, varName)
 import GHC.Types.Var.Set (elemVarSet)
-import GHC.Utils.Misc (lengthAtLeast, lengthIs)
+import GHC.Utils.Misc (equalLength, lengthAtLeast, lengthIs)
 import GHC.Utils.Monad (allM, anyM, whenM)
 import GHC.Utils.Outputable (text)
 import GHC.Utils.Panic (panic)
@@ -113,7 +117,7 @@ import Control.Monad (filterM, foldM, forM, forM_, guard, unless, void, when, zi
 import Control.Monad.IO.Class (liftIO)
 import Control.Applicative ((<|>))
 import Data.Functor.Identity (Identity(..))
-import Data.List (find, findIndex, nubBy, partition, sortBy, stripPrefix)
+import Data.List (find, findIndex, nubBy, partition, sortBy, stripPrefix, unsnoc)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (catMaybes, fromMaybe, isJust, isNothing, listToMaybe, mapMaybe)
 import Data.Semigroup ((<>))
@@ -652,6 +656,17 @@ sourceProofRulesFor name = do
     defs <- sourceProofDefinitions <$> readTcRef (tcg_source_rule_types env)
     pure (stableSourceProofRules (fromMaybe [] (lookupNameEnv defs name)))
 
+-- | Finish a family equation before collecting dependencies for another
+-- equation under the same axiom name.
+takeSourceProofRulesFor :: Name -> TcM [SourceProofRule]
+takeSourceProofRulesFor name = do
+    rules <- sourceProofRulesFor name
+    unless (null rules) $ do
+      env <- getGblEnv
+      updTcRef (tcg_source_rule_types env) $ \state ->
+        state { sourceProofDefinitions = delFromNameEnv (sourceProofDefinitions state) name }
+    pure rules
+
 -- | Verify imported proofs and committed synonym reductions in this consumer and retain the dependencies of
 -- its exports, including forwards through a private local group.
 checkAndInstallSourceProofs :: TcGblEnv -> TcM TcGblEnv
@@ -827,6 +842,54 @@ lookupSourceContainerMethod selector domain
         _ -> pure Nothing
   | otherwise = pure Nothing
 
+-- | Find the checked worker used by a mapping dictionary, including one with
+-- erased parameters. See Note [Erased arguments in a checked source dictionary].
+lookupSourceCheckedMapMethod :: Class -> Id -> Type -> TcM (Maybe (Id, Type, Id, TyCon))
+lookupSourceCheckedMapMethod cls selector domain
+  | isTyFamFree domain
+  , Just (head_tc, _) <- tcSplitTyConApp_maybe domain
+  , isGenerativeTyCon head_tc Nominal = do
+      insts <- tcGetInstEnvs
+      env <- getGblEnv
+      case lookupUniqueInstEnv insts cls [domain] of
+        Right (inst, args)
+          | noFreeVarsOfType domain ||
+            (not (isIncoherent inst) && all (apart inst) (classInstances insts cls))
+          , let name = idName (instanceDFunId inst)
+          , nameModule_maybe name /= Just (tcg_semantic_mod env) -> do
+              candidate <- tcLookupIdMaybe name
+              case candidate of
+                Just dfun
+                  | let predicate = mkClassPred cls [domain]
+                  , Just applied <- erasedMethodType (varType dfun) args
+                  , applied `eqType` predicate
+                  , Just target <- sourceMethodTarget_maybe dfun selector -> do
+                      worker <- tcLookupIdMaybe target
+                      pure $ do
+                        method <- worker
+                        method_ty <- erasedMethodType (varType method) args
+                        guard (method_ty `eqType` classMethodInstTy selector [domain])
+                        table <- sourceTableId_maybe method
+                        sig <- constructorCaseType (tyConKind table)
+                        guard (checkedMapCase sig && sourceCaseVisibleArity table == Just 2)
+                        pure (dfun, predicate, method, table)
+                _ -> pure Nothing
+        _ -> pure Nothing
+  | otherwise = pure Nothing
+  where
+    rough = RM_KnownTc (className cls) : roughMatchTcs [domain]
+    apart chosen other = instanceDFunId other == instanceDFunId chosen ||
+                         instanceCantMatch (is_tcs other) rough
+
+-- | Instantiate a prefix of ordinary erased type parameters.
+erasedMethodType :: Type -> [Type] -> Maybe Type
+erasedMethodType ty args = do
+    let (binders, _) = splitForAllForAllTyBinders ty
+        prefix = take (length args) binders
+    guard (equalLength prefix args)
+    _ <- traverse ordinaryCaseBinder prefix
+    pure (piResultTys ty args)
+
 -- | Find a complete, imported dictionary with no instance context.
 lookupSourceGroundDFun :: Class -> Type -> TcM (Maybe Id)
 lookupSourceGroundDFun cls domain
@@ -883,6 +946,119 @@ dictionarySlots cls domain con (Core.Type applied : fields)
   = Just (zip selectors fields)
 dictionarySlots _ _ _ _ = Nothing
 
+{- Note [Erased arguments in a checked source dictionary]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A context-free dictionary for Functor (Either e) applies its method to e
+before supplying the method's operands. Check that its final Core field
+passes every erased parameter to the worker in order. Check the worker's
+constructor rows and its specialized type.
+
+Ordinary matching at a rigid receiver can leave instances that might
+apply after substitution. It can discard incoherent candidates. At a
+receiver with free variables, require every other visible instance to be
+apart. The solver then checks the actual evidence at the occurrence.
+
+The resulting family names the checked worker. An ordinary client can
+use that family even when it introduces an overlapping instance. A new
+selector application in that client still uses its own dictionary. Record
+the selected dictionary, method and selector as rule dependencies.
+-}
+
+-- | Check a callback case on a two-constructor sum with a fixed field type.
+checkedMapCase :: ConstructorCaseType -> Bool
+checkedMapCase (ConstructorCaseType _ tc params [callback, _] 1 result)
+  | Just (prefix, input) <- unsnoc params
+  , lengthIs prefix 1
+  , Just (from, to) <- caseArrow callback
+  , input `eqType` from, result `eqType` mkTyConApp tc (prefix ++ [to])
+  , Just [first, second] <- traverse (\dc -> openDataConFieldTypes dc params)
+                                    (tyConDataCons tc)
+  = (eqTypes first prefix && eqTypes second [input]) ||
+    (eqTypes second prefix && eqTypes first [input])
+checkedMapCase _ = False
+
+-- | Keep the checked workers until Tidy gives their binders external names.
+keepCheckedMapWorkers :: TcGblEnv -> [Core.CoreBind] -> [Core.CoreBind]
+keepCheckedMapWorkers env binds
+  | isEmptyNameSet targets = binds
+  | otherwise = map keep binds
+  where
+    targets = mkNameSet [idName owner | (_, fields) <- checkedMapWorkers env binds
+                       , (_, (owner, _, _)) <- fields]
+    exported v | idName v `elemNameSet` targets = setIdExported v
+               | otherwise = v
+    keep (Core.NonRec v rhs) = Core.NonRec (exported v) rhs
+    keep (Core.Rec pairs) = Core.Rec [(exported v, rhs) | (v, rhs) <- pairs]
+
+-- | Publish mandatory aliases and nominal equations for the same final workers.
+publishCheckedMapMethods :: TcGblEnv -> [Core.CoreBind] -> Maybe (TcM ([Id], [TyCon]))
+publishCheckedMapMethods env binds
+  | null candidates = Nothing
+  | otherwise = Just $ do
+      let owners = nubBy (\(a, _, _) (b, _, _) -> a == b)
+                     [entry | (_, fields) <- candidates, (_, entry) <- fields]
+      tables <- forM owners $ \(owner, sig, rows) -> do
+        table <- publishConstructorCase owner sig rows
+        let worker = setIdDetails owner (SourceTableId (idName owner) table NominalSourceTable)
+        pure (worker, table)
+      let checked = mkNameEnv [(idName owner, owner) | (owner, _) <- tables]
+          publish (dfun, fields) = addSourceMethods dfun
+            [(selector, target) | (selector, (owner, _, _)) <- fields
+            , Just target <- [lookupNameEnv checked (idName owner)]]
+      pure (map fst tables ++ map publish candidates, map snd tables)
+  where
+    candidates = [(dfun, external) | (dfun, fields) <- checkedMapWorkers env binds
+                 , let external = filter (\(_, (owner, _, _)) -> isExternalName (idName owner)) fields
+                 , not (null external)]
+
+-- | Read a complete DFun constructor and certify its actual mapping fields.
+checkedMapWorkers :: TcGblEnv -> [Core.CoreBind]
+                  -> [(Id, [(Id, (Id, ConstructorCaseType, [ConstructorCaseRow]))])]
+checkedMapWorkers env binds = mapMaybe selected bindings
+  where
+    bindings = Core.flattenBinds binds
+    owners = mkNameEnv [(idName v, (v, rhs)) | (v, rhs) <- bindings]
+    exported = mkNameSet (concatMap availNames (tcg_exports env))
+    visible tc = all available (tyConName tc : map dataConName (tyConDataCons tc))
+    available name
+      | nameModule_maybe name == Just (tcg_semantic_mod env) = name `elemNameSet` exported
+      | Just gre <- lookupGRE_Name (tcg_rdr_env env) name =
+          any ((== NotBoot) . is_isboot . is_decl) (gre_imp gre)
+      | otherwise = False
+    selected (dfun, rhs) = do
+      DFunId{} <- pure (idDetails dfun)
+      cls <- sourceMethodDFunClass (varType dfun)
+      let (binders, body) = Core.collectBinders rhs
+      guard (all isTyVar binders && exprType rhs `eqType` varType dfun)
+      (_, [domain]) <- getClassPredTys_maybe (exprType body)
+      (Core.Var constructor, fields) <- pure (Core.collectArgs body)
+      con <- isDataConWorkId_maybe constructor
+      slots <- dictionarySlots cls domain con fields
+      let methods = mapMaybe (checkSlot domain binders) slots
+      (dfun, methods) <$ guard (not (null methods))
+
+    checkSlot domain binders (selector, field) = do
+      guard (sourceMapSelector selector)
+      (Core.Var worker, args) <- pure (Core.collectArgs field)
+      types <- traverse (\case Core.Type ty -> Just ty; _ -> Nothing) args
+      guard (eqTypes types (mkTyVarTys binders))
+      (owner, rhs) <- lookupNameEnv owners (idName worker)
+      guard (not (idName owner `elemNameSet` exported) &&
+             isNothing (sourceTableId_maybe owner) &&
+             exprType field `eqType` classMethodInstTy selector [domain])
+      (sig, rows) <- checkedConstructorCase visible (const Nothing) owner rhs
+      guard (checkedMapCase sig)
+      pure (selector, (owner, sig, rows))
+
+addSourceMethods :: Id -> [(Id, Id)] -> Id
+addSourceMethods dfun methods =
+  case idDetails (setSourceMethodIds dfun methods) of
+    DFunId terminating (Just checked) ->
+      let selected = map fst (sdf_methods checked)
+          aliases = sdf_methods checked ++ filter ((`notElem` selected) . fst) (sourceMethodAliases dfun)
+      in setIdDetails dfun (DFunId terminating (Just checked { sdf_methods = aliases }))
+    _ -> dfun
+
 {- Note [Mandatory list fold method evidence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Record just the selector and implementation Names from the final dictionary
@@ -906,7 +1082,7 @@ publishListFoldMethods mod binds = map publishBind binds
     publishBind (Core.NonRec v rhs) = Core.NonRec (publish v rhs) rhs
     publishBind (Core.Rec pairs) = Core.Rec [(publish v rhs, rhs) | (v, rhs) <- pairs]
     publish v rhs = fromMaybe v $ do
-      DFunId terminating _ <- pure (idDetails v)
+      DFunId{} <- pure (idDetails v)
       (cls, [domain]) <- getClassPredTys_maybe (varType v)
       guard (domain `eqType` mkTyConTy listTyCon)
       (Core.Var worker, fields) <- pure (Core.collectArgs rhs)
@@ -920,23 +1096,20 @@ publishListFoldMethods mod binds = map publishBind binds
             , varType target `eqType` classMethodInstTy selector [domain]
             , Just table <- [sourceTableId_maybe target], isListFoldTable table ]
       guard (not (null methods))
-      DFunId _ (Just checked) <- pure (idDetails (setSourceMethodIds v methods))
-      let selected = map fst (sdf_methods checked)
-          aliases = sdf_methods checked ++ filter ((`notElem` selected) . fst) (sourceMethodAliases v)
-      pure (setIdDetails v (DFunId terminating (Just checked { sdf_methods = aliases })))
+      pure (addSourceMethods v methods)
 
     current field
       | nameModule_maybe (idName field) == Just mod = lookupNameEnv locals (idName field)
       | otherwise = Just field
 
--- | The selector's first type argument is fixed by this ground dictionary.
--- Its monomorphic target and the dictionary itself can have any active rule.
+-- | The dictionary fixes the nominal head of the selector's first argument.
+-- The worker and the dictionary itself can have any active rule.
 sourceMethodOps :: Id -> Id -> Id -> [(Id, Maybe Name)]
 sourceMethodOps dfun selector target =
     [(selector, first), (dfun, Nothing), (target, Nothing)]
   where
     first = do
-      (_, [domain]) <- getClassPredTys_maybe (varType dfun)
+      (_, [domain]) <- getClassPredTys_maybe (snd (splitForAllForAllTyBinders (varType dfun)))
       (tc, _) <- tcSplitTyConApp_maybe domain
       guard (isGenerativeTyCon tc Nominal)
       return (tyConName tc)
@@ -1920,11 +2093,11 @@ sourceCaseVisibleArity table
     projectionBranch telescope tc visible root branch = do
       (patterns, vars) <- branchPatterns telescope branch
       guard (lengthIs patterns visible)
-      (_, root_pat, carried) <- splitCaseOperand root patterns
+      (before, root_pat, after) <- splitCaseOperand root patterns
       (root_con, _) <- constructorPattern root_pat
       guard (dataConTyCon root_con == tc)
       leaves <- concat <$> traverse patternLeaves patterns
-      guard (eqTypes leaves vars && resultPattern carried vars False (coAxBranchRHS branch))
+      guard (eqTypes leaves vars && resultPattern (before ++ after) vars False (coAxBranchRHS branch))
       pure root_con
 
     patternLeaves ty

@@ -54,7 +54,7 @@ import GHC.Tc.TyCl.Class
 import {-# SOURCE #-} GHC.Tc.TyCl.Instance( tcInstDecls1 )
 import {-# SOURCE #-} GHC.Tc.Module( checkBootDeclM )
 import GHC.Tc.Deriv (DerivInfo(..))
-import GHC.Tc.Gen.SourceTable (withSourceProofSignature, sourceProofRulesFor)
+import GHC.Tc.Gen.SourceTable (withSourceProofSignature, sourceProofRulesFor, takeSourceProofRulesFor)
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Instance.Class( AssocInstInfo(..) )
 import GHC.Tc.Utils.TcMType
@@ -4015,14 +4015,17 @@ tcFamDecl1 case_axioms parent (FamilyDecl { fdInfo = fam_info
 
        ; co_ax_name <- newFamInstAxiomName tc_lname []
        ; let check_equation = tcTyFamInstEqn tc_fam_tc NotAssociated
-       ; (branches, axiom_validity_infos, proof_rules) <- case (tc_bndrs, eqns) of
-           ([], [eqn]) -> do
-             (branch, info) <- withSourceProofSignature (Just co_ax_name) (check_equation eqn)
-             deps <- sourceProofRulesFor co_ax_name
-             return ([branch], [info], deps)
-           _ -> do
-             (branches, infos) <- unzip <$> mapAndReportM check_equation eqns
-             return (branches, infos, [])
+       ; track_proofs <- xoptM LangExt.ExperimentalDependentTypes
+       ; checked <- mapAndReportM (\eqn ->
+           if track_proofs
+           then do result <- withSourceProofSignature (Just co_ax_name) (check_equation eqn)
+                   deps <- takeSourceProofRulesFor co_ax_name
+                   return (result, deps)
+           else (, []) <$> check_equation eqn) eqns
+       ; let (results, deps_by_branch) = unzip checked
+             (branches, axiom_validity_infos) = unzip results
+             -- Use the same order as mkBranchedCoAxiom and chooseBranch.
+             proof_rules = [(index, deps) | (index, deps@(_ : _)) <- zip [0..] deps_by_branch]
          -- Do not attempt to drop equations dominated by earlier
          -- ones here; in the case of mutual recursion with a data
          -- type, we get a knot-tying failure.  Instead we check

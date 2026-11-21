@@ -964,7 +964,7 @@ tc_iface_decl _ _ (IfaceAxiom { ifName = tc_name, ifTyCon = tc
        -- See #13803
        ; tc_branches <- forkM (text "Axiom branches" <+> ppr tc_name)
                       $ tc_ax_branches spans branches
-       ; rules <- tcIfaceSourceProofRules deps
+       ; rules <- traverse (traverse tcIfaceSourceProofRules) deps
        ; let axiom = (mkBranchedCoAxiom role tc_name tc_tycon tc_branches)
                       { co_ax_source_proof_rules = rules }
        ; return (ACoAxiom axiom) }

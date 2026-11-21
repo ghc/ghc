@@ -363,7 +363,8 @@ evidenceSuffix requirements
     || needs HomeRuleInterfaceEvidence || needs PartialSynonymEvidence
     || needs SourceProofRuleEvidence || needs SourceProofRuleAliasEvidence
     || needs SourceProofRuleAxiomEvidence || needs SourceProofRuleInfoEvidence
-    || needs SourceProofRuleArgumentsEvidence = feature_set
+    || needs SourceProofRuleArgumentsEvidence || needs PolymorphicSourceMethodEvidence
+    || needs SourceProofRuleBranchesEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -416,6 +417,8 @@ legacyEvidenceSuffix SourceProofRuleAliasEvidence = featureSetPrefix ++ "source-
 legacyEvidenceSuffix SourceProofRuleAxiomEvidence = featureSetPrefix ++ "source-proof-rule-axioms"
 legacyEvidenceSuffix SourceProofRuleInfoEvidence = featureSetPrefix ++ "source-proof-id-rules"
 legacyEvidenceSuffix SourceProofRuleArgumentsEvidence = featureSetPrefix ++ "source-proof-rule-arguments"
+legacyEvidenceSuffix PolymorphicSourceMethodEvidence = featureSetPrefix ++ "polymorphic-source-method"
+legacyEvidenceSuffix SourceProofRuleBranchesEvidence = featureSetPrefix ++ "source-proof-rule-branches"
 legacyEvidenceSuffix GeneralIndexedConstructorOperandEvidence = featureSetPrefix ++ "general-indexed-constructor-operand"
 legacyEvidenceSuffix DepFunCoEvidence           = "-retained-depfunco-v1"
 legacyEvidenceSuffix ConstructorCaseEvidence   = "-retained-constructor-case-v1"
@@ -476,7 +479,9 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("source-proof-rule-aliases", SourceProofRuleAliasEvidence)
                       , ("source-proof-rule-axioms", SourceProofRuleAxiomEvidence)
                       , ("source-proof-id-rules", SourceProofRuleInfoEvidence)
-                      , ("source-proof-rule-arguments", SourceProofRuleArgumentsEvidence) ]
+                      , ("source-proof-rule-arguments", SourceProofRuleArgumentsEvidence)
+                      , ("polymorphic-source-method", PolymorphicSourceMethodEvidence)
+                      , ("source-proof-rule-branches", SourceProofRuleBranchesEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion
