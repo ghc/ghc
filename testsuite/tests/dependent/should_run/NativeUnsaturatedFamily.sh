@@ -18,11 +18,14 @@ if "${ghc[@]}" -c NativeUnsaturatedInverse.hs >inverse.log 2>&1 ||
     exit 1
 fi
 
-cat >PatternMatchability.hs <<'HS'
-{-# LANGUAGE DataKinds, ExplicitForAll, FlexibleInstances, Modifiers, PolyKinds, TypeFamilies, TypeOperators #-}
+cat >producer/PatternMatchability.hs <<'HS'
+{-# LANGUAGE DataKinds, ExplicitForAll, FlexibleInstances, Modifiers, MultiParamTypeClasses #-}
+{-# LANGUAGE NoExperimentalDependentTypes, PolyKinds, TypeApplications, TypeFamilies #-}
+{-# LANGUAGE TypeOperators, UndecidableInstances #-}
 module PatternMatchability where
 
 import Data.Kind (Type)
+import Data.Proxy (Proxy(Proxy))
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Matchability (M, Matchability, U)
 
@@ -36,30 +39,90 @@ type family Flip (m :: Matchability) where
   Flip U = M
   Flip M = U
 
-class C t
-instance forall (f :: Type %(Flip U) -> Type) x. C (f x)
+type family Initial (flag :: Bool) :: Matchability where
+  Initial flag = U
+
+data Box (flag :: Bool) (f :: Type %(Flip (Initial flag)) -> Type)
+
+class C (flag :: Bool) box t where
+  tag :: Proxy flag -> Proxy box -> Proxy t -> Bool
+
+instance forall flag (f :: Type %(Flip (Initial flag)) -> Type) x.
+         C flag (Box flag f) (f x) where
+  tag _ _ _ = True
+
+local :: Bool
+local = tag (Proxy @'True) (Proxy @(Box 'True Maybe)) (Proxy @(Maybe Bool))
+
+type family Loop (flag :: Bool) :: Matchability where
+  Loop flag = Loop flag
+
+class Unused t
+instance forall (unused :: Type %(Loop 'True) -> Type). Unused Int
 HS
-"${ghc[@]}" -c PatternMatchability.hs
+
+cat >client/PatternClient.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeApplications #-}
+module Main where
+
+import Data.Proxy (Proxy(Proxy))
+import PatternMatchability (Box, local, tag)
+
+main :: IO ()
+main = print (local, tag (Proxy @'False) (Proxy @(Box 'False Maybe)) (Proxy @(Maybe Bool)))
+HS
+for opt in -O0 -O2; do
+    (cd producer && "${ghc[@]}" "$opt" "${stripped[@]}" -fforce-recomp -freduction-depth=8 -c PatternMatchability.hs)
+    cp producer/PatternMatchability.hi client/
+    (
+        cd client
+        "${ghc[@]}" "$opt" -fforce-recomp -c PatternClient.hs
+        "${ghc[@]}" "$opt" PatternClient.o ../producer/PatternMatchability.o -o matchable-pattern
+        test "$(./matchable-pattern)" = '(True,True)'
+    )
+done
 
 cat >UnmatchablePattern.hs <<'HS'
-{-# LANGUAGE ExplicitForAll, FlexibleInstances, Modifiers, PolyKinds, TypeFamilies #-}
+{-# LANGUAGE DataKinds, ExplicitForAll, FlexibleInstances, Modifiers, PolyKinds, TypeFamilies #-}
 module UnmatchablePattern where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy)
-import GHC.Matchability (U)
+import GHC.Matchability (M, Matchability, U)
 
 class C t
 instance forall (f :: Type %U -> Type) x. C (f x)
 
+type family ToU (m :: Matchability) where
+  ToU M = U
+
+class Computed t
+instance forall (f :: Type %(ToU M) -> Type) x. Computed (f x)
+
 type family UnApp p q r where
   forall (f :: Type %U -> Type) x. UnApp (Proxy f) (Proxy x) (f x) = x
+HS
+cat >RigidPattern.hs <<'HS'
+{-# LANGUAGE ExplicitForAll, FlexibleInstances, Modifiers, PolyKinds, TypeFamilies #-}
+module RigidPattern where
+
+import Data.Kind (Type)
+import GHC.Matchability (M, Matchability)
+
+class C t
+instance forall (m :: Matchability) (f :: Type %m -> Type) x. (m ~ M) => C (f x)
 HS
 for flag in -XExperimentalDependentTypes -XNoExperimentalDependentTypes; do
     for defer in -fno-defer-type-errors -fdefer-type-errors; do
         if "${ghc[@]}" "$flag" "$defer" -c UnmatchablePattern.hs >pattern.log 2>&1 ||
-           [[ $(grep -Fc 'error: [GHC-83865]' pattern.log) != 2 ]] ||
-           ! grep -Fq 'Unmatchable' pattern.log || ! grep -Fq 'Matchable' pattern.log; then
+           [[ $(grep -Fc 'error: [GHC-83865]' pattern.log) != 3 ]] ||
+           ! grep -Fq 'Unmatchable' pattern.log || ! grep -Fq 'Matchable' pattern.log ||
+           [[ -e UnmatchablePattern.hi ]]; then
+            cat pattern.log >&2
+            exit 1
+        fi
+        if "${ghc[@]}" "$flag" "$defer" -c RigidPattern.hs >pattern.log 2>&1 ||
+           ! grep -Fq 'error: [GHC-25897]' pattern.log || [[ -e RigidPattern.hi ]]; then
             cat pattern.log >&2
             exit 1
         fi

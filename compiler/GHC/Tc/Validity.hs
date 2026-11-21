@@ -54,6 +54,7 @@ import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Core.TyCon.Set (emptyTyConSet, elemTyConSet, extendTyConSet)
 import GHC.Core.Predicate
+import GHC.Core.Reduction ( Reduction(..), mkReflRedn, mkReduction, mkFunRedn, mkForAllRedn )
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr
@@ -77,7 +78,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Var     ( Id, ExistsTyFlag(ImplicitExists), VarBndr(..)
                         , isInvisibleFunArg, isVisibleFunArg, mkTyVar, tyVarName
-                        , isId, isCoVar, varType )
+                        , isId, isCoVar, varType, setVarType )
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing ( TyThing(..) )
@@ -455,7 +456,7 @@ checkValidMonoType :: Type -> TcM ()
 -- Assumes argument is fully zonked
 checkValidMonoType = check_valid_mono_type Nothing
 
-check_valid_mono_type :: Maybe SkolemInfoAnon -> Type -> TcM ()
+check_valid_mono_type :: Maybe (SkolemInfoAnon, CoercionN -> TcM ()) -> Type -> TcM ()
 check_valid_mono_type instance_pat ty
   = do { env <- liftZonkM $ tcInitOpenTidyEnv (tyCoVarsOfTypeList ty)
        ; expand <- initialExpandMode
@@ -960,7 +961,7 @@ data ValidityEnv = ValidityEnv
   , ve_indices  :: VarSet
   , ve_imported_synonym :: Bool
   , ve_partial_family_hint :: Bool
-  , ve_instance_pat :: Maybe SkolemInfoAnon }  -- When checking a matching pattern
+  , ve_instance_pat :: Maybe (SkolemInfoAnon, CoercionN -> TcM ()) }  -- When checking a matching pattern
 
 instance Outputable ValidityEnv where
   ppr (ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
@@ -1010,7 +1011,7 @@ check_type ve (AppTy ty1 ty2)
         ; check_arg_type False ve ty2
         ; case (ve_instance_pat ve, ve_expand ve) of
             (_, NoExpand) -> pure ()
-            (Just skol_info, _) -> checkPatternMatchability skol_info ty1
+            (Just (skol_info, record), _) -> checkPatternMatchability skol_info record ty1
             _ -> pure () }
 
 check_type ve ty@(TyConApp tc tys)
@@ -1953,11 +1954,14 @@ We can also have instances for functions: @instance Foo (a -> b) ...@.
 -}
 
 checkValidInstHead :: UserTypeCtxt -> Class -> [Type] -> TcM ()
-checkValidInstHead ctxt clas cls_args
+checkValidInstHead = checkValidInstHeadWith (const (pure ()))
+
+checkValidInstHeadWith :: (CoercionN -> TcM ()) -> UserTypeCtxt -> Class -> [Type] -> TcM ()
+checkValidInstHeadWith record ctxt clas cls_args
   = do { dflags   <- getDynFlags
        ; hsc_src  <- tcHscSource
        ; check_special_inst_head dflags hsc_src ctxt clas cls_args
-       ; checkValidTypePats (classTyCon clas) cls_args
+       ; checkValidTypePats record (classTyCon clas) cls_args
        }
 
 {-
@@ -2512,16 +2516,23 @@ if we find a constraint tuple.
 -}
 
 
-checkValidInstance :: UserTypeCtxt -> LHsSigType GhcRn -> Type -> TcM ()
+checkValidInstance :: UserTypeCtxt -> LHsSigType GhcRn -> Type -> TcM Type
 checkValidInstance ctxt hs_type ty = case tau of
   -- See Note [Instances and constraint synonyms]
   TyConApp tc inst_tys
     | Just clas <- tyConClass_maybe tc
     -> do
-        { setSrcSpanA head_loc $
-          checkValidInstHead ctxt clas inst_tys
+        { proofs <- newTcRef []
+        ; setSrcSpanA head_loc $
+          checkValidInstHeadWith (\co -> updTcRef proofs (co :)) ctxt clas inst_tys
 
-        ; traceTc "checkValidInstance {" (ppr ty)
+        ; cos <- readTcRef proofs
+        ; ty' <- if null cos
+                 then return ty
+                 else do { cos' <- liftZonkM $ traverse zonkCo cos
+                         ; return $ normaliseInstBinderKinds (tyCoVarsOfTypes inst_tys) cos' ty }
+
+        ; traceTc "checkValidInstance {" (ppr ty')
 
         ; env0 <- liftZonkM $ tcInitTidyEnv
         ; expand <- initialExpandMode
@@ -2539,7 +2550,7 @@ checkValidInstance ctxt hs_type ty = case tau of
         --   in the constraint than in the head
         ; undecidable_ok <- xoptM LangExt.UndecidableInstances
         ; if undecidable_ok
-          then checkAmbiguity ctxt ty
+          then checkAmbiguity ctxt ty'
           else checkInstTermination theta tau
 
         ; traceTc "cvi 2" (ppr ty)
@@ -2551,7 +2562,8 @@ checkValidInstance ctxt hs_type ty = case tau of
               -> addErrTc $ mk_err
                           $ IllegalInstanceFailsCoverageCondition clas coverageInstErr
 
-        ; traceTc "End checkValidInstance }" empty }
+        ; traceTc "End checkValidInstance }" empty
+        ; return ty' }
     | otherwise
     -> failWithTc $ mk_err $ IllegalInstanceHead
                            $ InstHeadNonClassHead
@@ -2746,7 +2758,7 @@ checkValidTyFamEqn :: TyCon    -- ^ of the type family
                    -> Type     -- ^ Rhs
                    -> TcM ()
 checkValidTyFamEqn fam_tc typats rhs
-  = do { checkValidTypePats fam_tc typats
+  = do { checkValidTypePats (const (pure ())) fam_tc typats
 
          -- Check for oversaturated visible kind arguments in a type family
          -- equation.
@@ -3055,8 +3067,8 @@ checkFamPatBinders fam_tc qtvs non_user_tvs pats rhs
 --    * All monotypes
 --    * No type-family applications
 --    * Matchable application heads
-checkValidTypePats :: TyCon -> [Type] -> TcM ()
-checkValidTypePats tc pat_ty_args
+checkValidTypePats :: (CoercionN -> TcM ()) -> TyCon -> [Type] -> TcM ()
+checkValidTypePats record tc pat_ty_args
   = do { -- Check that each of pat_ty_args is a monotype.
          -- One could imagine generalising to allow
          --      instance C (forall a. a->a)
@@ -3064,7 +3076,7 @@ checkValidTypePats tc pat_ty_args
          --
          -- Suppress the opt-in hint when the expanded pattern still
          -- contains a family application. The extension cannot make it legal.
-         traverse_ (check_valid_mono_type (Just skol_info)) pat_ty_args
+         traverse_ (check_valid_mono_type (Just (skol_info, record))) pat_ty_args
 
        -- Ensure that no type family applications occur a type pattern
        ; case tcTyConAppTyFamInstsAndVis tc pat_ty_args of
@@ -3081,16 +3093,65 @@ checkValidTypePats tc pat_ty_args
 
 -- | Check the consumed kind binder of an application in an instance pattern.
 -- See Note [Matchability of instance patterns].
-checkPatternMatchability :: SkolemInfoAnon -> Type -> TcM ()
-checkPatternMatchability skol_info head_ty
+checkPatternMatchability :: SkolemInfoAnon -> (CoercionN -> TcM ()) -> Type -> TcM ()
+checkPatternMatchability skol_info record head_ty
   | Just (ma, _, _) <- splitPiTy_maybe (typeKind head_ty)
   , not (ma `eqType` matchableDataConTy)
-  = pushLevelAndSolveEqualities skol_info [] $
-      void $ unifyTypeAndEmit KindLevel (origin ma) ma matchableDataConTy
+  = do { co <- pushLevelAndSolveEqualities skol_info [] $
+                 unifyTypeAndEmit KindLevel (origin ma) ma matchableDataConTy
+       ; record co }
   | otherwise = pure ()
   where
     origin ma = TypeEqOrigin { uo_actual = ma, uo_expected = matchableDataConTy
                              , uo_thing = Nothing, uo_invisible = Nothing }
+
+-- | Record the selectors proved by instance-head validation on the dictionary
+-- binders. See Note [Computed matchability in instance binders].
+normaliseInstBinderKinds :: TyCoVarSet -> [CoercionN] -> Type -> Type
+normaliseInstBinderKinds head_vars proofs ty =
+    rebind (mkEmptySubst (mkInScopeSet (tyCoVarsOfType ty))) ty
+  where
+    rebind subst (ForAllTy ma (Bndr tv vis) body)
+      = mkTyCoForAllTy (substTy subst ma) tv' vis (rebind subst' body)
+      where
+        (subst', tv')
+          | isTyVar tv, tv `elemVarSet` head_vars
+          , Reduction co kind <- normalise_kind (varType tv)
+          , not (isReflCo co)
+          = let tv' = setVarType tv (substTy subst kind)
+                old = mkCastTy (mkTyVarTy tv') (mkSymCo (substCo subst co))
+            in (extendTvSubstAndInScope subst tv old, tv')
+          | otherwise
+          = substVarBndr subst tv
+    rebind subst body = substTy subst body
+
+    normalise_kind kind
+      | FunTy flag ma mult arg res <- coreFullView kind
+      = mkFunRedn Nominal flag (selector ma) (refl mult) (refl arg) (normalise_kind res)
+      | ForAllTy ma (Bndr tv vis) res <- coreFullView kind
+      = mkForAllRedn vis tv (selector ma) (refl (varType tv)) (normalise_kind res)
+      | otherwise = refl kind
+
+    selector ma = case find (eqType ma . coercionLKind) proofs of
+      Just co -> mkReduction co matchableDataConTy
+      Nothing -> refl ma
+
+    refl = mkReflRedn Nominal
+
+{- Note [Computed matchability in instance binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Instance-head validity can prove that Flip U is M. Instance lookup uses
+the pure matcher, which cannot reduce Flip U to see that f x is matchable.
+Keep the proof that validation used and rewrite the corresponding
+selector in f's dictionary binder. A substitution casts occurrences
+that still need the old kind. For f x the application constructor pushes
+the cast through the application and exposes the M arrow to the matcher.
+
+Use only the nominal equalities checked in the head. A selector in an
+unused quantified kind can diverge. The left endpoint of the equality
+must agree with the selector in the uninstantiated kind. A proof that
+Pick Bool is M is insufficient to rewrite Pick a under forall a.
+-}
 
 {- Note [Matchability of instance patterns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
