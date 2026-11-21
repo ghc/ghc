@@ -1119,7 +1119,9 @@ capture under a fresh name before restoring the aliases.
 An inferred kind parameter must be determined by a checked capture.
 For an infix RHS, a backticked operator can itself be a bound type
 variable. Keep the parsed application so the renamer still resolves
-the operator's fixity in the original scope.
+the operator's fixity in the original scope. A captured operator can have a
+function kind. Include variables from arrow modifiers when collecting
+the captures of that kind or of a function RHS.
 See Note [Checked RHSs for cases in type lets] in GHC.Tc.TyCl.
 
 Both sides of a function arrow have the arrow's lexical scope.
@@ -1323,6 +1325,9 @@ liftTypeCases group =
       | otherwise = Just []
     lexicalNames (L _ (HsAppTy _ f x)) = (++) <$> lexicalNames f <*> lexicalNames x
     lexicalNames (L _ (HsOpTy _ left op right)) = concat <$> traverse lexicalNames [left, op, right]
+    lexicalNames (L _ (HsFunTy _ (HsModifiedFunArr _ mods _) domain result)) =
+      concat <$> traverse lexicalNames (domain : [ty | L _ (HsModifier _ ty) <- mods] ++ [result])
+    lexicalNames (L _ HsStarTy{}) = Just []
     lexicalNames (L _ (HsParTy _ ty)) = lexicalNames ty
     lexicalNames (L _ (HsExplicitListTy _ _ tys)) = concat <$> traverse lexicalNames tys
     lexicalNames (L _ (HsExplicitTupleTy _ _ tys)) = concat <$> traverse lexicalNames tys
