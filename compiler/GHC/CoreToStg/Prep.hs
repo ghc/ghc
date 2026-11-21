@@ -1476,6 +1476,11 @@ liftNativeIndexTransport :: Platform -> String -> [(Id, CoercionN)] -> Type -> U
 liftNativeIndexTransport platform context transport ty
   | all (isReflCo . snd) relevant
   = return (mkReflCo Nominal left_ty)
+  -- Lift each argument at nominal role. A sibling index can contain an
+  -- opaque selector with its original dictionary and receiver. The
+  -- reflexive case above keeps that whole index when it has no marker.
+  | TyConApp tc args <- ty
+  = mkTyConAppCo Nominal tc <$> mapM (liftNativeIndexTransport platform context transport) args
   | otherwise
   = do { bindings <- foldM template [] relevant
        ; let templates = map snd bindings
