@@ -39,7 +39,8 @@ reject NativeRetainedCastDomainReject GHC-83865 'DomainToken Char'
 sed '/^bad ::/,$d; s/^module NativeRetainedCastDomainReject where/module OrdinaryRoleWitness where/' \
     NativeRetainedCastDomainReject.hs >OrdinaryRoleWitness.hs
 "${g[@]}" -O0 "${flags[@]}" -c OrdinaryRoleWitness.hs
-reject NativeRetainedCastDomainWorker GHC-05617 'In the second argument of' -DWRONG_BRANCH_LENGTH
+reject NativeRetainedCastDomainWorker GHC-25897 'In the second argument of' -DWRONG_BRANCH_LENGTH
+grep -Fq "Expected: Vec Bool (S m)" reject.log
 swapped=$(awk '/S k -> [(]observeVector .* ys, observeVector .* xs[)]/ { print NR }' NativeRetainedCastDomainWorker.hs)
 reject NativeRetainedCastDomainWorker GHC-05617 "NativeRetainedCastDomainWorker.hs:$swapped:13:" -DWRONG_BRANCH_VECTOR
 "${g[@]}" -O0 "${flags[@]}" -c NativeRetainedCastDomainWorker.hs

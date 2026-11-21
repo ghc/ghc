@@ -1,4 +1,4 @@
-NativeRetainedSecondGuard.hs:15:3: error: [GHC-62161] [-Wincomplete-patterns, Werror=incomplete-patterns]
+NativeRetainedSecondGuard.hs:15:3: error: [GHC-62161] [-Wincomplete-patterns (in -Wextra), Werror=incomplete-patterns]
     Pattern match(es) are non-exhaustive
     In a multi-way if alternative:
         Guards do not cover entire pattern space
