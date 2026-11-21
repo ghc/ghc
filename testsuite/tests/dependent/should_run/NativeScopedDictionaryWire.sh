@@ -177,7 +177,20 @@ for opt in -O0 -O2; do
     cd ../client
     "${ghc[@]}" "$opt" -c ScopedFamilyMethodClient.hs
     "${ghc[@]}" ScopedFamilyMethodClient.o ../provider/ScopedFamilyMethodProvider.o -o run
-    test "$(./run)" = "((GT,True),(LT,'x'))"
+    ./run > actual
+    printf '%s\n' "((GT,True),(LT,'x'))" "((GT,'q'),LT)" | cmp - actual
+
+    cat > Ambiguous.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, ScopedTypeVariables #-}
+module Ambiguous where
+import ScopedFamilyMethodProvider
+missingPayload :: forall c a. (Collects c, Show a) =>
+                  foreach (x :: c) -> TaggedEntry Int (compareOrigin x)
+missingPayload x = inspectPayload x (5 :: Int)
+HS
+    if "${ghc[@]}" "$opt" -c Ambiguous.hs > ambiguous.log 2>&1; then exit 1; fi
+    grep -Fq 'is ambiguous' ambiguous.log
+    "${ghc[@]}" "$opt" -XAllowAmbiguousTypes -c Ambiguous.hs
 
     cat > MissingOwner.hs <<'HS'
 {-# LANGUAGE Haskell2010, NoExperimentalDependentTypes, TypeFamilies #-}

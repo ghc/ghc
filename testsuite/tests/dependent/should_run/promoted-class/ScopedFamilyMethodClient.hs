@@ -16,5 +16,11 @@ readEntry :: Collects c => c -> Element c -> (Ordering, Element c)
 readEntry x payload = case inspectEntry x payload of
     TaggedEntry order item -> (order, item)
 
+readPayload :: Collects c => c -> a -> (Ordering, a)
+readPayload x payload = case inspectPayload x payload of
+    TaggedEntry order item -> (order, item)
+
 main :: IO ()
-main = print (readEntry (2 :: Int) True, readEntry (error "unforced" :: AlwaysBelow) 'x')
+main = do
+    print (readEntry (2 :: Int) True, readEntry (error "unforced" :: AlwaysBelow) 'x')
+    print (readPayload (2 :: Int) 'q', fst (readPayload AlwaysBelow (error "unforced payload" :: Char)))

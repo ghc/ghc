@@ -246,3 +246,18 @@ binder. Nested dictionary or selector types that need family formation
 remain outside this check.
 [Mixed provider](../../../testsuite/tests/dependent/should_run/promoted-class/ScopedFamilyMethodProvider.hs)
 and [wire runner](../../../testsuite/tests/dependent/should_run/NativeScopedDictionaryWire.sh).
+
+### Ambiguity in a method-indexed signature
+
+In `inspectPayload :: forall c a. Collects c => foreach (x :: c)
+-> a -> TaggedEntry a (compareOrigin x)`, the receiver determines
+`c`. The ordinary payload determines `a`. GHC compares the retained
+receiver domains before it opens the instantiated dictionary with the
+matching Given. It then runs the usual ambiguity check on the body.
+A redundant constraint on a fresh type parameter can still produce an
+ambiguity error, and `AllowAmbiguousTypes` defers it to the use site.
+The ordinary test client passes a local receiver. Applying the imported
+function directly to a constructor at the method-indexed position still
+requires a local binding for that receiver.
+[Ambiguity check](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/ambiguous_types.html)
+and [client](../../../testsuite/tests/dependent/should_run/promoted-class/ScopedFamilyMethodClient.hs).

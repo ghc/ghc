@@ -624,9 +624,9 @@ the dictionary and operand as scoped Ids. Equality compares them under
 the same renaming as the type argument. Substitution must preserve a
 variable occurrence at both positions and recheck the resulting scope.
 
-The standalone validator checks ClassAppTy with this same shape test.
-These private forms do not accept dictionary expressions, evaluate the
-selector, or enter the interface writer.
+Core Lint and the scoped interface reader check ClassAppTy against the
+same selector shape. The index remains opaque during typechecking.
+A runtime call can evaluate the method through its dictionary.
 -}
 
 {-

@@ -269,10 +269,11 @@ selector application to a type, a local dictionary and a local operand.
 The final field is the instantiated result kind. Core Lint recomputes
 it from the selector and validates the metadata of both occurrences.
 
-These nodes are private Core syntax. Only the standalone Lint checker
-accepts them. Core expression typing supports a variable dictionary
-argument. CorePrep and interface serialization refuse these forms. Do not use DepFunInvisible for the dictionary binder:
-it describes a retained value with different source application rules.
+A dictionary application passes ordinary evidence at runtime. The scoped
+interface format records the selector and the names of its two local
+arguments. CorePrep erases the type dependency. See Note [Scoped selector
+application prototype] in GHC.Core.Lint. DepFunInvisible describes a
+retained value with different source application rules.
 -}
 
 {- Note [Lifted erased existentials]
