@@ -1261,6 +1261,14 @@ main = do
             (VCons (6 :: Int) (error "unused left tail")) (error "unused right input")
         , RankedPackageClient.firstSelectedFilter chooseRight odd
             (error "unused left input") (VCons (7 :: Int) (error "unused right tail")) )
+    let unusedVector = error "unused case alternative"
+        order = compare chooseRight chooseLeft
+    observe "open one of three vectors selected by a case"
+        ( RankedPackageClient.firstByOrdering order evens unusedVector unusedVector
+        , RankedPackageClient.firstByOrdering EQ unusedVector odds unusedVector
+        , RankedPackageClient.firstByOrdering GT unusedVector unusedVector evens )
+    observe "read a vector forwarded through id"
+        (RankedPackageClient.firstForwarded odds)
     observe "consume a hidden Boolean or integer once"
         (RankedPackageClient.readCount (ErasedPackage.encodeCount (Left True)),
          RankedPackageClient.readCount (ErasedPackage.encodeCount (Right 17)))

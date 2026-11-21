@@ -2,7 +2,7 @@
 module RankedPackageClient
     ( runGuarded, runConditional, runProjections, projectAt, runDeclaredWitnesses, runExplicitBranches
     , runMixedPackage, runProducedPackage, runForwardedPackage, runLabelledPackage
-    , runSelectedPackage, firstSelected, firstSelectedFilter, runLocalPattern, readCount, refilter, refilterRows, refilterNumericZip
+    , runSelectedPackage, firstSelected, firstSelectedFilter, firstByOrdering, firstForwarded, runLocalPattern, readCount, refilter, refilterRows, refilterNumericZip
     ) where
 
 import AlignedList (zipWithExact)
@@ -162,3 +162,15 @@ firstSelected flag left right = take 1 (toList (if flag then id left else right)
 firstSelectedFilter :: Bool -> (a -> Bool) -> Vec a n -> Vec a m -> [a]
 firstSelectedFilter flag keep left right =
     take 1 (toList (if flag then filterVec keep left else filterVec keep right))
+
+-- | Read one element from the package selected by the ordering.
+firstByOrdering :: Ordering -> Filtered a -> Filtered a -> Filtered a -> [a]
+firstByOrdering order below same above =
+    take 1 (toList (case order of
+        LT -> below
+        EQ -> id same
+        GT -> above))
+
+-- | Forward a package through a polymorphic call before reading its vector.
+firstForwarded :: Filtered a -> [a]
+firstForwarded xs = take 1 (toList (id xs))

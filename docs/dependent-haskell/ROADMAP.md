@@ -520,7 +520,8 @@ and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vecto
    a retained field. Matching on an expression such as `not b` in
    the field selects the result type using the function in scope.
    Template Haskell can quote and reify the retained binder in a signature
-   or a prefix GADT constructor. Quoting a raw type-level case remains open.
+   or a prefix GADT constructor. A type quotation preserves a case on an
+   enclosing retained binder as `CaseT`.
    [Retained scrutinees](roadmap/R19-type-level-cases.md#compute-a-retained-scrutinee)
    and [constructor quotations](roadmap/R19-type-level-cases.md#quote-and-reify-retained-gadt-constructors).
 5. **R12 and R16.** An ordinary client can prove that `Prelude.reverse`
