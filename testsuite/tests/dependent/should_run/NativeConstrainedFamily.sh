@@ -19,6 +19,7 @@ for reader in marked ordinary; do
     (
         cd "$reader"
         "${ghc[@]}" -c NativeConstrainedFamilyClient.hs
+        "${ghc[@]}" -fforce-recomp -fdefer-type-errors -c NativeConstrainedFamilyClient.hs
         cat >MissingField.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes, TypeFamilies #-}
 module MissingField where
@@ -42,13 +43,26 @@ import NativeConstrainedFamilyProvider (Collects(..))
 missing :: Elem [Int] :~: Int
 missing = Refl
 HS
-        if [[ $reader == ordinary ]]; then
-            "${ghc[@]}" -c MissingGround.hs
-        elif "${ghc[@]}" -c MissingGround.hs >missing.log 2>&1 ||
-             ! grep -Fq '[GHC-39999]' missing.log ||
-             ! grep -Fq 'Allowed Int' missing.log; then
-            cat missing.log
-            exit 1
+        for defer in -fno-defer-type-errors -fdefer-type-errors; do
+            if [[ $reader == ordinary ]]; then
+                "${ghc[@]}" "$defer" -c MissingGround.hs
+            elif "${ghc[@]}" "$defer" -c MissingGround.hs >missing.log 2>&1 ||
+                 ! grep -Fq 'MissingGround.hs:5:12: error: [GHC-39999]' missing.log ||
+                 ! grep -Fq 'Allowed Int' missing.log; then
+                cat missing.log
+                exit 1
+            fi
+        done
+        if [[ $reader == marked ]]; then
+            cat >DeferredTerm.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes, TypeFamilies #-}
+module DeferredTerm where
+import NativeConstrainedFamilyProvider (Collects(..))
+deferred :: Elem [Bool]
+deferred = 'x'
+HS
+            "${ghc[@]}" -fdefer-type-errors -c DeferredTerm.hs >deferred-term.log 2>&1
+            grep -Fq '[-Wdeferred-type-errors]' deferred-term.log
         fi
     )
 done

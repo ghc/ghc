@@ -23,12 +23,15 @@ import GHC.Data.Maybe
 import GHC.Tc.Utils.Unify    ( checkConstraints, tcSubTypeAmbiguity, tcSkolemise
                               , DeepSubsumptionFlag(Shallow) )
 import GHC.Tc.Solver         ( simplifyAmbiguityCheck )
+import GHC.Tc.Solver.Monad   ( runTcS )
+import GHC.Tc.Solver.Solve   ( solveWanteds )
 import GHC.Tc.Instance.Class ( matchGlobalInst, ClsInstResult(..), AssocInstInfo(..) )
 import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Instance.Family
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.ErrCtxt
 import GHC.Tc.Types.Rank
+import GHC.Tc.Errors ( reportAllUnsolved )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Constraint ( userTypeError_maybe, mkNonCanonical )
 import GHC.Tc.Utils.TcMType (newWanted)
@@ -485,7 +488,8 @@ checkConstrainedSignature ctxt ty
                  FamilyInSynonym fam ->
                    failWithTc $ TcRnConstrainedFamilyUnsupported fam $
                      text "This occurrence comes from a type synonym definition."
-       ; simplifyAmbiguityCheck ty wanted }
+       ; (unsolved, _) <- runTcS (solveWanteds wanted)
+       ; reportAllUnsolved unsolved }
   | otherwise
   = checkNoConstrainedFamilyApps ty
   where
@@ -577,6 +581,11 @@ predicate from the declared and enclosing Givens and the instance
 environment. Check formation separately from inference so that inference
 cannot add a missing predicate to the signature. This source check
 does not put a dictionary into the family's Core kind.
+
+Report a missing domain even under -fdefer-type-errors. The check
+discards the dictionary, so a deferred error has no runtime use site.
+For example, a family axiom can let an out-of-domain equality reduce
+to Refl. A client of that module could then use Refl without an error.
 
 For a constructor, check its wrapper type after the newtype validity
 check. The wrapper contains the Givens for its fields, including the

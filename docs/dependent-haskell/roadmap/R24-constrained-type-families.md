@@ -254,11 +254,11 @@ assumptions about totality under *Effects and Interactions*.
 ### Deferred errors at a module boundary
 
 An ordinary signature `missing :: Elem [Int] :~: Int` fails with GHC-39999
-when `Allowed Int` is absent. It also fails with `AllowAmbiguousTypes`.
-With `-fdefer-type-errors`, GHC reports the missing instance as a warning.
-The existing family axiom reduces the equality, so `missing = Refl` runs.
-A second module compiled with normal flags can read that interface and
-evaluate `case missing of Refl -> True`. The producer's successful
-compilation with deferred errors gives the consumer no evidence that
-the producer discharged the domain obligation.
-[GHC deferred type errors](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/defer_type_errors.html).
+at the signature when `Allowed Int` is absent, including under
+`AllowAmbiguousTypes` or `-fdefer-type-errors`. Formation discards the
+dictionary. If GHC deferred the error, the family axiom could still
+reduce the equality, and a downstream module could evaluate `missing`
+as `Refl`. A type error in a term with a well-formed signature still
+defers normally.
+[GHC deferred type errors](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/defer_type_errors.html)
+and [stripped-interface check](../../../testsuite/tests/dependent/should_run/NativeConstrainedFamily.sh).
