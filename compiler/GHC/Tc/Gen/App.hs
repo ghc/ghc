@@ -69,6 +69,7 @@ import GHC.Core.Unify ( tcMatchTyX_BM, tcMatchRetainedTyX_BM, BindFlag(..), Bind
 import GHC.Core.Type
 import GHC.Core.UsageEnv ( UsageEnv, singleUsageUE, zeroUE )
 import GHC.Core.Coercion
+import GHC.Core.Coercion.Axiom (coAxiomBranches, coAxBranchLHS, coAxBranchRHS, fromBranches)
 
 import GHC.Builtin.WiredIn.Types ( multiplicityTy, runtimeRepTy, nilDataCon, consDataCon, mkListTy, unmatchableDataConTy )
 import GHC.Builtin.PrimOps( tagToEnumKey )
@@ -80,7 +81,7 @@ import GHC.Types.Basic ( TypeOrKind(TypeLevel), IntWithInf, intGtLimit )
 import GHC.Types.TypeEnv ( lookupTypeEnv )
 import GHC.Types.Var
 import GHC.Types.Id ( mkLocalId, isClassOpId_maybe, isDFunId, sourceTableId_maybe, sourceMethodTarget_maybe, sourceLiteralCons_maybe )
-import GHC.Types.Var.Set ( IdSet, elemVarSet, emptyVarSet, extendVarSet, isEmptyVarSet )
+import GHC.Types.Var.Set ( IdSet, elemVarSet, emptyVarSet, extendVarSet, isEmptyVarSet, mkVarSet, sizeVarSet )
 import GHC.Types.Var.FV
 import GHC.Types.Name
 import GHC.Unit.Types ( isInteractiveModule )
@@ -1441,13 +1442,28 @@ tcRetainedKnownValuePlan declared expected sigma values
       | Just tv <- getTyVar_maybe formal, tv `elem` tvs
       = matchRetainedAppType tvs subst formal actual
       | Just (tc, templates) <- splitTyConApp_maybe formal
-      , isAlgTyCon tc, isGenerativeTyCon tc Nominal
-      , length templates == tyConArity tc
       , Just (tc', fields) <- splitTyConApp_maybe actual
       , tc == tc', templates `equalLength` fields
+      , Just pairs <- result_fields tc templates fields
       = foldM (\s (template, field) -> match_result_fields tvs s template field)
-              subst (zip templates fields)
+              subst pairs
       | otherwise = Just subst
+
+    result_fields tc templates fields
+      | isAlgTyCon tc, isGenerativeTyCon tc Nominal
+      , length templates == tyConArity tc
+      = Just (zip templates fields)
+      | Just (_, True) <- closedFamilyScope_maybe tc
+      , length templates + 1 == tyConArity tc
+      , Just axiom <- closedFamilyTyConCoAxiom_maybe tc
+      , [branch] <- fromBranches (coAxiomBranches axiom)
+      , Just parameters <- traverse getTyVar_maybe (coAxBranchLHS branch)
+      , length parameters == tyConArity tc
+      , length parameters == sizeVarSet (mkVarSet parameters)
+      = let determined = injectiveVarsOfType False (coAxBranchRHS branch)
+        in Just [(template, field) | (parameter, template, field) <- zip3 parameters templates fields
+                                   , parameter `elemVarSet` determined]
+      | otherwise = Nothing
 
     declared_arg tvs (Just (retained, formal), arg)
       | any (`elemVarSet` tyCoVarsOfType formal) tvs
