@@ -86,8 +86,9 @@ In a class body, `type T :: a` already declares a nullary family with
 result kind `a`. Using the same spelling for a standalone signature
 would make that line ambiguous. The earlier PR #227 considered moving
 the signature outside the class. The committee left associated families
-out of standalone kind signatures. The existing family header can still
-give its result kind.
+out of standalone kind signatures. GHC 9.14.1 and this fork accept
+the nullary family header above. Both report GHC-29916 for an additional
+signature inside the class and GHC-44432 for one outside it.
 [Associated types in #54](https://ghc-proposals.readthedocs.io/en/latest/proposals/0054-kind-signatures.html#associated-types),
 [placement discussion in #227](https://github.com/ghc-proposals/ghc-proposals/pull/227#issuecomment-497878018)
 and [accepted amendment #259](https://github.com/ghc-proposals/ghc-proposals/pull/259).
