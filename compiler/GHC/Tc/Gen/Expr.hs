@@ -468,10 +468,18 @@ declaredLambdaResults skip_invisible body (MG { mg_alts = L _ matches }) select 
                              , m_grhss = GRHSs _ rhss (L _ EmptyLocalBinds{}) }))
       | all isVisArgLPat pats
       , Just formal <- result_after (length pats) body
-      = map (rhs_result formal) (NE.toList rhss)
+      = foldr (rhs_results formal) [] rhss
     match_results _ = []
 
-    rhs_result formal (L _ (GRHS _ _ rhs))
+    rhs_results formal (L _ (GRHS _ _ rhs)) = result_arms rhs
+      where
+        result_arms expr rest
+          | HsIf _ _ yes no <- unLoc (stripParensLHsExpr expr)
+          = result_arms yes (result_arms no rest)
+          | otherwise
+          = rhs_result formal expr : rest
+
+    rhs_result formal rhs
       | Just (name, ntypes, args) <- application 0 [] rhs
       = do { mb_id <- if isExternalName name
                      then tcLookupIdMaybe name
@@ -555,9 +563,13 @@ fixes the choice before the lambda patterns enter scope. Read the head's
 declared type and follow its written ordinary application arrows. The
 ordinary check instantiates types, checks operands and records usage.
 For a guarded or multi-equation lambda, read the first matching result
-declaration in source order. Check every guard and result with the same
-witness. The selected declaration supplies no local evidence. A head bound
-by a pattern or guard is unavailable at this point. Exact invariant matching
+declaration in source order. An ordinary if adds its two result arms
+in that order. It introduces no binders, so both arms can use the same
+declaration lookup. The predicate and the result arms still go through
+the ordinary expression check. Rebindable if is already an expanded
+application at this stage. The selected declaration supplies no local
+evidence. A head bound by a pattern or guard is unavailable at this
+point. Every result checks with the same witness. Exact invariant matching
 chooses a type without filling any Quick Look variables. Runtime indices
 use their existing checks.
 
