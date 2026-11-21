@@ -115,7 +115,8 @@ cp "$src/"{QuickLookForward,QuickLookRuntime}.hs .
     -o quick-look -main-is QuickLookForward
 ./quick-look
 cp "$src/RankedFilterReject.hs" .
-for rejection in ESCAPE_LENGTH LATE_BINDER LATE_CONSTRAINT BAD_PREDICATE SHARED_CALLBACK SHARED_INPUTS SHARED_RESULT ESCAPING_SECOND; do
+for rejection in ESCAPE_LENGTH LATE_BINDER LATE_CONSTRAINT BAD_PREDICATE SHARED_CALLBACK SHARED_INPUTS SHARED_RESULT \
+                 ESCAPING_SECOND CONDITIONAL_ELEMENT; do
     if "$ghc" "${flags[@]}" "-D$rejection" -c RankedFilterReject.hs > ranked-filter.log 2>&1; then
         echo "Accepted the ranked filter control $rejection." >&2
         exit 1
@@ -129,6 +130,7 @@ for rejection in ESCAPE_LENGTH LATE_BINDER LATE_CONSTRAINT BAD_PREDICATE SHARED_
         SHARED_INPUTS) operand='withBoth producer'; column=55; code=25897; detail='third argument.*filterVec even ys' ;;
         SHARED_RESULT) operand='in commonLength result'; column=21; code=25897; detail='first argument.*commonLength.*result' ;;
         ESCAPING_SECOND) operand='withBoth producer'; column=27; code=91028; detail='Restricted m Int' ;;
+        CONDITIONAL_ELEMENT) operand='else filterVec (const True) ys'; column=23; code=83865; detail='Actual: Hidden Bool' ;;
     esac
     line=$(grep -nF "$operand" RankedFilterReject.hs | tail -1 | cut -d: -f1)
     grep -Fq "RankedFilterReject.hs:$line:$column: error: [GHC-$code]" ranked-filter.log

@@ -1,5 +1,15 @@
-GadtOrderedTelescopeScope.hs:8:21: error: [GHC-14964]
+GadtOrderedTelescopeScope.hs:7:21: error: [GHC-14964]
     • Illegal invisible type pattern: @b
       An invisible type pattern must be checked against a forall.
     • In the pattern: Mixed n @a x @b
       In an equation for ‘wrong’: wrong (Mixed n @a x @b) = x == x
+
+GadtOrderedTelescopeScope.hs:11:34: error: [GHC-39999]
+    • No instance for ‘Eq a’ arising from a use of ‘==’
+      Possible fix:
+        add (Eq a) to the context of
+          the type signature for:
+            wrongEarly :: forall a. FieldCheck a -> Bool
+    • In the expression: x == x
+      In the expression: \ x -> x == x
+      In the pattern: (\ x -> x == x) -> result

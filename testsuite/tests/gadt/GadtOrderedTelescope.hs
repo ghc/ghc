@@ -1,5 +1,6 @@
 {-# LANGUAGE GADTs, Haskell2010, ImpredicativeTypes, NoExperimentalDependentTypes #-}
 {-# LANGUAGE ExplicitNamespaces, RequiredTypeArguments, ScopedTypeVariables, TypeAbstractions, TypeApplications #-}
+{-# LANGUAGE ViewPatterns #-}
 module Main where
 
 import Control.Exception
@@ -7,6 +8,10 @@ import GadtOrderedTelescopeProvider
 
 equalMixed :: Mixed a -> Bool
 equalMixed (Mixed _ @a (x :: a)) = x == x
+
+-- | Use equality when matching the field after the context.
+readFieldCheck :: FieldCheck a -> Bool
+readFieldCheck (FieldCheck _ ((\x -> x == x) -> result)) = result
 
 equalPair :: Reversed a b -> (Bool, b)
 equalPair (Reversed @a _ @b ((a :: a), (b :: b))) = (a == a, b)
@@ -45,6 +50,8 @@ main = do
   print (readF3 (MkF3 @Bool True @Double (0/0)),
          readF4 (MkF4 @Double @Bool (0/0) True),
          readF5 (MkF5 1 2 @Bool True 3 4 @Char 'x'))
+  print ( readFieldCheck (FieldCheck (error "unused earlier field") True)
+        , readFieldCheck (FieldCheck (error "unused earlier field") (0/0 :: Double)) )
   let bad = error "strict prefix" :: Int
   partial <- throws (seq @(forall a. Eq a => a -> Mixed a) (Mixed bad) True)
   typed <- throws (Mixed bad @Bool)

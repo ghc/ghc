@@ -4,6 +4,10 @@ module GadtOrderedTelescopeProvider where
 data Mixed a where
   Mixed :: !Int -> forall a. Eq a => a -> Mixed a
 
+-- | Supply equality between two fields of the same type.
+data FieldCheck a where
+  FieldCheck :: forall a. a -> Eq a => a -> FieldCheck a
+
 data Reversed a b where
   Reversed :: forall a. Int -> Eq a => forall b. (a,b) -> Reversed a b
 

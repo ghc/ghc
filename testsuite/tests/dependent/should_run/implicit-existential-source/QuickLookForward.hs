@@ -4,6 +4,7 @@ module QuickLookForward where
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Control.Monad (unless)
 import Data.Bool (bool)
+import Data.IORef (newIORef, readIORef)
 import Data.Proxy (Proxy(..))
 import Filter (Hidden, filterVec, fromList, partitionVec, toList)
 import ForwardSchemas
@@ -39,6 +40,11 @@ firstSelected flag left right =
 firstFromList :: Bool -> [a] -> [a] -> [a]
 firstFromList flag left right =
     take 1 (listCells (if flag then fromList left else fromList right))
+
+-- | Read the first element that passes the selected filter.
+firstFromFilter :: Bool -> (a -> Bool) -> Vec n a -> Vec m a -> [a]
+firstFromFilter flag keep left right =
+    take 1 (listCells (if flag then filterVec keep left else filterVec keep right))
 
 type family Forwarded (tag :: Bool) a where
     Forwarded 'True a = a
@@ -102,6 +108,16 @@ main = do
     unless (firstFromList True (7 : error "unused list tail") (error "unused right list") == [7 :: Int]
          && firstFromList False (error "unused left list") ('a' : error "unused list tail") == "a") $
         fail "inferring a conditional changed list demand"
+    chooseLeft <- newIORef True >>= readIORef
+    let input = Cons 1 (Cons (2 :: Int) (error "unused filter tail"))
+    unless (firstFromFilter chooseLeft even input unused == [2]
+         && firstFromFilter (not chooseLeft) even unused input == [2]
+         && null (firstFromFilter chooseLeft (error "unused predicate") Nil input)) $
+        fail "opening a conditional changed filter demand"
+    selected <- try (evaluate (firstFromFilter chooseLeft (\_ -> error "selected predicate") input unused))
+    case selected of
+        Left ex | takeWhile (/= '\n') (displayException (ex :: ErrorCall)) == "selected predicate" -> pure ()
+        _ -> fail "the selected filter did not raise its original exception"
     unless (forwardConditional Proxy (error "unused flag") unused unused) $
         fail "forwarding at a family domain forced a package"
     let filteredCells input = toList (refilter input)

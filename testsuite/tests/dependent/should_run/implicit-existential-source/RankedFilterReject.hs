@@ -60,6 +60,12 @@ reject xs ys =
     commonLength :: (Vec n Int, Vec n Int) -> ()
     commonLength _ = ()
 #endif
+#elif defined(CONDITIONAL_ELEMENT)
+badConditional :: Bool -> Vec n Int -> Vec m Bool -> [Int]
+badConditional flag xs ys =
+    consumeVector (foldr (:) [])
+        (if flag then filterVec (const True) xs
+                 else filterVec (const True) ys)
 #else
 badPredicate :: Vec n Int -> [Int]
 badPredicate xs =
