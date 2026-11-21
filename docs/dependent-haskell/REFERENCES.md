@@ -6830,10 +6830,13 @@ and [optimization checkpoint](CHECKPOINTS.md#family-and-package-checkpoints).
 ### Compose two maps over a finite list
 
 Agda's `map-∘` proves pointwise equality by induction on the list.
-The Haskell proof uses the installed Prelude map equations and an
-explicit finite spine. Its type-level `Compose f g x` applies `g` and
-then `f`. The runtime control calls ordinary `map (f . g)`.
-Instantiating the type-level callback with the installed `(.)` itself
-remains open.
+The Haskell proof uses an explicit finite spine and the installed
+definitions of Prelude's `map` and `(.)`. The compiler checks that the
+Core for composition returns `f (g x)` before and after optimization.
+Forcing `g x` before calling `f` changes Haskell's behavior when `f`
+ignores its argument. Such a definition cannot supply this equation.
+The [HERMIT proof](https://doi.org/10.1145/2804302.2804303) also treats
+a bottom spine. The finite-spine witness here covers the empty and cons
+cases.
 [Agda stdlib v2.3 list properties](https://agda.github.io/agda-stdlib/v2.3/Data.List.Properties.html)
 and [Haskell map composition proof](examples/open-evaluation/PreludeMapCompositionProof.hs).
