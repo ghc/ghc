@@ -7408,3 +7408,18 @@ Natural operand adds the `retained-natural-operand` requirement.
 [discussion of negative literals](https://github.com/ghc-proposals/ghc-proposals/pull/364#discussion_r488890272),
 [Agda literal overloading](https://agda.readthedocs.io/en/stable/language/literal-overloading.html#natural-numbers),
 and [ordinary Natural client](examples/qualified-pi/RetainedNaturalClient.hs).
+
+### Mapping methods under an open callback (R05, R12, R16)
+
+Agda's standard library defines `Data.Maybe.Base.map` using the
+`maybe` eliminator. Its `nothing` and `just` clauses determine both
+results with the callback still open. For an overloaded Haskell method,
+GHC must also establish which instance supplies the implementation.
+In #383 Ericson sketches an explicit dictionary argument. Eisenberg
+asks how much of a term-to-type translation would survive a move to
+dependent Core and supports extending the surface language in stages.
+[Agda eliminator](https://github.com/agda/agda-stdlib/blob/v2.4/src/Data/Maybe/Base.agda#L51-L55),
+[Agda map](https://github.com/agda/agda-stdlib/blob/v2.4/src/Data/Maybe/Base.agda#L78-L81),
+[dictionary design](https://github.com/ghc-proposals/ghc-proposals/issues/383#issuecomment-739058810),
+[Core review](https://github.com/ghc-proposals/ghc-proposals/issues/383#issuecomment-746676314),
+and [surface-language follow-up](https://github.com/ghc-proposals/ghc-proposals/issues/383#issuecomment-749166999).
