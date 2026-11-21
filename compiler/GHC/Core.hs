@@ -39,7 +39,7 @@ module GHC.Core (
         exprToNativeCaseIndex, isNativeCaseValueIndex, isNativeIndexedCaseScrutinee,
         nativeIndexFunctionVar_maybe, nativeIndexArgKinds, nativeIndexedConArgs,
         nativeIndexedConApp_maybe, splitNativeIndexedConApp, isNativeConstructedGadtIndex,
-        containsIndexedConOperand, containsGeneralIndexedConOperand,
+        containsIndexedConOperand, containsGeneralIndexedConOperand, containsRetainedCharLiteral,
         isNativeIndexAlt, isNativeIndexDataAlt, isNativeIndexAliasAlt, isNativeIndexAliasBinder,
         isNativeIndexedDataAlt, splitNativeIndexedDataAlt, isNativeIndexedGadtCon,
         nativeIndexedCon_maybe,
@@ -2816,9 +2816,7 @@ nativeIndexExprWith allow_conversions extra = go emptyVarEnv
     go :: IdEnv (CoreExpr, Type) -> CoreExpr -> Maybe (CoreExpr, Type)
     go env expr
       -- See Note [Boxed character literal indices].
-      | App (Var worker) (Lit (LitChar c)) <- expr
-      , Just con <- isDataConWorkId_maybe worker
-      , con `hasKey` charDataConKey
+      | Just c <- boxedCharLiteral_maybe expr
       = Just (expr, mkCharLitTy c)
       | Var v <- expr, isNativeOpaqueValueId v
       = case lookupVarEnv env v of
@@ -3061,6 +3059,23 @@ mapNativeIndex subst expr
       = do { values <- traverse from_index fields
            ; return (mkConApp con (map Type tys ++ values)) }
     from_index _ = Nothing
+
+-- | Recognise the ordinary boxed representation of a character literal.
+boxedCharLiteral_maybe :: CoreExpr -> Maybe Char
+boxedCharLiteral_maybe (App (Var worker) (Lit (LitChar c)))
+  | Just con <- isDataConWorkId_maybe worker
+  , con `hasKey` charDataConKey = Just c
+boxedCharLiteral_maybe _ = Nothing
+
+-- | Detect a boxed character literal in the runtime part of a retained operand.
+containsRetainedCharLiteral :: CoreExpr -> Bool
+containsRetainedCharLiteral expr
+  | Just _ <- boxedCharLiteral_maybe expr = True
+containsRetainedCharLiteral (App fun arg) = containsRetainedCharLiteral fun || containsRetainedCharLiteral arg
+containsRetainedCharLiteral (Lam _ body)  = containsRetainedCharLiteral body
+containsRetainedCharLiteral (Tick _ body) = containsRetainedCharLiteral body
+containsRetainedCharLiteral (Cast body _) = containsRetainedCharLiteral body
+containsRetainedCharLiteral _             = False
 
 {- Note [Boxed character literal indices]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
