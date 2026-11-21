@@ -150,6 +150,15 @@ variable. Quotation and reification preserve both binder flags.
 [interface client](../../../testsuite/tests/gadt/GadtOrderedTelescope.hs),
 and [TH test](../../../testsuite/tests/gadt/GadtOrderedTelescopeTh.hs).
 
+An interface with an inferred binder in a group after a field carries
+the `inferred-ordered-gadt-binders` feature in its version header.
+Older readers reject the header before reading the constructor. At
+O0 and O2, ordinary and specified-only controls retained byte-identical
+interfaces at all three tested compression levels. The new reader also
+accepts the earlier, unmarked inferred group. Rebuilding the provider
+writes the new header. The marker leaves the payload encoding unchanged.
+[Writer and reader test](../../../testsuite/tests/gadt/GadtInferredTelescopeWire.sh).
+
 Proposal #402 permits a strictness annotation on a prefix field in any
 position. The compiler currently reports GHC-18932 for
 `Late :: Int -> forall a -> !a -> Late`, including when the first
