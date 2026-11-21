@@ -43,3 +43,12 @@ inlineIncrement n =
     let increment :: foreach (i :: Int) -> Int
         increment i = i + 1
     in increment n
+
+-- | Replicate one captured element at two runtime lengths.
+{-# NOINLINE replicateTwice #-}
+replicateTwice :: Int -> Nat -> Nat -> ([Int], [Int])
+replicateTwice value left right =
+    let {-# INLINE cells #-}
+        cells :: Nat -> [Int]
+        cells n = toList (replicateNative @Int n value)
+    in (cells left, cells right)

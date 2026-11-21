@@ -1,9 +1,9 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, LinearTypes #-}
 {-# LANGUAGE RequiredTypeArguments, ScopedTypeVariables #-}
 
 -- | Observe payloads whose type witness is erased.
 module ErasedPackage
-  ( observation, MixedNumber, packNumber, readMixedNumber, readNumber
+  ( observation, EncodedCount, encodeCount, MixedNumber, packNumber, readMixedNumber, readNumber
   , readLabelledNumber, Filtered, filterVec, cells, filterObservation
   ) where
 
@@ -74,3 +74,15 @@ filterObservation =
   ( take 1 (cells (filterVec odd (VCons 7 (error "unseen input tail"))))
   , cells (filterVec odd (VCons 2 (VCons 7 (VCons 9 VNil))))
   )
+
+-- | A state and a reader that consumes that state once.
+type EncodedCount = exists a. (a, a %1 -> Int)
+
+-- | Store a Boolean flag or an integer with its own reader.
+encodeCount :: Either Bool Int -> EncodedCount
+encodeCount (Left flag) = (flag, fromFlag)
+  where
+    fromFlag :: Bool %1 -> Int
+    fromFlag False = 0
+    fromFlag True = 1
+encodeCount (Right count) = (count, \n -> n)

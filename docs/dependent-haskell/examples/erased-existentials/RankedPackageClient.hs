@@ -1,8 +1,8 @@
-{-# LANGUAGE ImpredicativeTypes, LambdaCase, NoExperimentalDependentTypes, RequiredTypeArguments #-}
+{-# LANGUAGE BangPatterns, LinearTypes, MonoLocalBinds, ImpredicativeTypes, LambdaCase, NoExperimentalDependentTypes, RequiredTypeArguments #-}
 module RankedPackageClient
     ( runGuarded, runProjections, projectAt, runDeclaredWitnesses, runExplicitBranches
     , runMixedPackage, runProducedPackage, runForwardedPackage, runLabelledPackage
-    , runSelectedPackage, runLocalPattern
+    , runSelectedPackage, runLocalPattern, readCount
     ) where
 
 import Data.Bool (bool)
@@ -102,3 +102,7 @@ runLocalPattern flag = let (value, reader) = pairFor flag in reader value
 -- | Hide the first witness after packing the second.
 hide :: Int -> ErasedPackage.MixedNumber
 hide value = ErasedPackage.packNumber value
+
+-- | Open the hidden state and pass it once to the stored reader.
+readCount :: ErasedPackage.EncodedCount %1 -> Int
+readCount encoded = let !(state, reader) = encoded in reader state

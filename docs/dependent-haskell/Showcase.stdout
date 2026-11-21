@@ -34,6 +34,7 @@ linear equality witness beneath a retained binder: 42
 equality evidence beneath a retained Pi: [7,7,7]
 immediate index beta reduction: [5,5,5,5]
 inline an ordinary function that calls a retained helper: 42
+replicate a captured element at two runtime lengths: ([7],[7,7])
 explicit erased choices and qualified Pi: [7,7,7]
 known arguments select erased choices: [7,7,7]
 generic consumer of a native function: 42
@@ -253,6 +254,7 @@ open erased packages and leave an unused payload lazy: (True,False,True)
 pass named, computed and forwarded erased packages to a polymorphic reader: (17,23,29)
 read a forwarded erased package and keep its label: ("count",31)
 read the selected erased package and leave the other lazy: (("count",37),("count",41))
+consume a hidden Boolean or integer once: (1,17)
 read dependent fields from a local package pattern: ((8,True),(11,False))
 filter a vector without forcing the tail to learn the result length: ([7],[7,9])
 infer the hidden lengths of a lazy filter and a retained vector: ([7],[],[9])
