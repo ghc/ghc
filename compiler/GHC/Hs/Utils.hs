@@ -1241,6 +1241,7 @@ collectPatsBinders flag pats = foldr (collect_lpat flag) [] pats
 -- CollNoDictBinders   |  no      |    no     |    yes    |  any  |
 -- CollWithDictBinders |  yes     |    no     |    yes    | GhcTc |
 -- CollVarTyVarBinders |  no      |    yes    |    yes    | GhcRn |
+-- CollExplicitBinders | no      |  explicit |    yes    | GhcRn |
 --
 -- See Note [Dictionary binders in ConPatOut]
 data CollectFlag p where
@@ -1250,6 +1251,8 @@ data CollectFlag p where
     CollWithDictBinders :: CollectFlag GhcTc
     -- | Collect variable and type variable binders, but no evidence binders
     CollVarTyVarBinders :: CollectFlag GhcRn
+    -- | Collect term variables and explicit type variables in type patterns
+    CollExplicitBinders :: CollectFlag GhcRn
 
 
 collect_lpat :: forall p. CollectPass p
@@ -1284,9 +1287,8 @@ collect_pat flag pat bndrs = case pat of
   NPat {}               -> bndrs
   NPlusKPat _ n _ _ _ _ -> unXRec @p n : bndrs
   SigPat _ pat sig      -> case flag of
-    CollNoDictBinders   -> collect_lpat flag pat bndrs
-    CollWithDictBinders -> collect_lpat flag pat bndrs
     CollVarTyVarBinders -> collect_lpat flag pat bndrs ++ collectPatSigBndrs sig
+    _                   -> collect_lpat flag pat bndrs
   XPat ext              -> collectXXPat @p flag ext bndrs
   SplicePat ext _       -> collectXSplicePat @p flag ext bndrs
   EmbTyPat _ tp         -> collect_ty_pat_bndrs flag tp bndrs
@@ -1295,11 +1297,10 @@ collect_pat flag pat bndrs = case pat of
 
   -- See Note [Dictionary binders in ConPatOut]
   ConPat {pat_args=ps}  -> case flag of
-    CollNoDictBinders   -> foldr (collect_lpat flag) bndrs (hsConPatArgs ps)
     CollWithDictBinders -> foldr (collect_lpat flag) bndrs (hsConPatArgs ps)
                            ++ collectEvBinders (cpt_binds (pat_con_ext pat))
                            ++ concatMap (collectEvBinders . snd) (cpt_ordered_binds (pat_con_ext pat))
-    CollVarTyVarBinders -> foldr (collect_lpat flag) bndrs (hsConPatArgs ps)
+    _                   -> foldr (collect_lpat flag) bndrs (hsConPatArgs ps)
 
 collectEvBinders :: TcEvBinds -> [Id]
 collectEvBinders (EvBinds bs)   = foldr add_ev_bndr [] bs
@@ -1309,6 +1310,7 @@ collect_ty_pat_bndrs :: CollectFlag p -> HsTyPat (NoGhcTc p) -> [IdP p] -> [IdP 
 collect_ty_pat_bndrs CollNoDictBinders _ bndrs = bndrs
 collect_ty_pat_bndrs CollWithDictBinders _ bndrs = bndrs
 collect_ty_pat_bndrs CollVarTyVarBinders tp bndrs = collectTyPatBndrs tp ++ bndrs
+collect_ty_pat_bndrs CollExplicitBinders (HsTP (HsTPRn _ _ exp_tvs) _) bndrs = exp_tvs ++ bndrs
 
 collectTyPatBndrs :: HsTyPat GhcRn -> [Name]
 collectTyPatBndrs (HsTP (HsTPRn nwcs imp_tvs exp_tvs) _) = nwcs ++ imp_tvs ++ exp_tvs

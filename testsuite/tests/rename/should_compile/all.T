@@ -258,3 +258,4 @@ test('T25901_sub_f', normal, compile, ['-Wdodgy-exports -Wno-duplicate-exports']
 test('T25901_sub_g', [extra_files(['T25901_sub_g_helper.hs'])], multimod_compile, ['T25901_sub_g', '-v0 -Wdodgy-imports'])
 
 test('ToplevelPunBindings', normal, compile, ['-Wpun-bindings'])
+test('LocalPunBindings', normal, compile, ['-Wpun-bindings -Wname-shadowing'])
