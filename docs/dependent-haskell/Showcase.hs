@@ -109,6 +109,7 @@ import qualified NestedFunctionClient
 import qualified InvisibleFamily
 import ConstrainedElementsClient (advanceCursor, splitCollection, partialElement, aliasedReflection, annotatedElement, constrainedElements, explicitElements, formatField, renderField, renderKnownFields, retainedMaybeDomain)
 import ConstrainedElementsQuickLook (showReflection)
+import StoredReflectionClient (readStoredReflection)
 import IndexedMapClient (mappedCells)
 import LaterMatchabilityClient (annotatedMap, appliedCallback, boxedCallbacks, computedDictionary, flippedCallbacks, forwardedMap,
                                 laterMatchability, nestedCallback, rankedMap)
@@ -978,6 +979,9 @@ main = do
     observe "advance a cursor using its superclass family equation"
         (advanceCursor id [enabled, disabled], advanceCursor id [disabled, enabled],
          advanceCursor (== 'x') (Just 'x'))
+    boxedFlag <- newIORef (Just True) >>= readIORef
+    boxedLetter <- newIORef (Just 'x') >>= readIORef
+    observe "use a stored retained callback at Bool and Char" (readStoredReflection boxedFlag boxedLetter)
     putStrLn "Dependent Haskell: completed source features"
     booleans
     finiteDomains

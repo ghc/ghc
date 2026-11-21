@@ -528,6 +528,8 @@ result. The compiler checks each field, including its class constraints.
 A separately compiled reader can match the constructor and instantiate the
 stored callback. The field stays lazy. The unannotated `Just reflectMaybe`
 still reports GHC-83605 when the result type gives no choice.
+[Writer](../examples/open-evaluation/StoredReflection.hs) and
+[ordinary reader](../examples/open-evaluation/StoredReflectionClient.hs).
 
 With `DeepSubsumption`, an ordinary arrow can also
 return a wrapper that supplies a dictionary lambda for the retained suffix.
