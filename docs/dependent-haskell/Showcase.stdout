@@ -361,6 +361,7 @@ store the result of Maybe and an imported open family: (Just True,[False])
 use one polymorphic map with Maybe and a type family: (Just True,[False])
 apply a callback with matchability computed in its declared kind: (Just False,[True])
 select a dictionary with computed matchability: True
+recover the element and its map from a matchable application: ('q',Just True,Just False)
 interpret a kind code as an ordinary type constructor: Just True
 interpret two applications of the optional type constructor: Just (Just True)
 choose an interpreted arrow from its expected kind: (Just 3,Right 3)

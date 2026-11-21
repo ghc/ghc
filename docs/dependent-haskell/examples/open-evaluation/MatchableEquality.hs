@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, GADTs, Modifiers, NoExperimentalDependentTypes, PolyKinds, TypeOperators #-}
-module NativeMatchableProjectionLib (project) where
+module MatchableEquality (project) where
 
 import Data.Kind (Type)
 import Data.Type.Equality ((:~:)(Refl))

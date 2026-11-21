@@ -111,6 +111,7 @@ import qualified InvisibleFamily
 import ConstrainedElementsClient (splitCollection, partialElement, aliasedReflection, annotatedElement, constrainedElements, explicitElements, formatField, renderField, renderKnownFields, retainedMaybeDomain)
 import ConstrainedElementsQuickLook (showReflection)
 import IndexedMapClient (mappedCells)
+import qualified MatchableView as View
 import LaterMatchabilityClient (annotatedMap, appliedCallback, boxedCallbacks, computedDictionary, flippedCallbacks, forwardedMap,
                                 laterMatchability, nestedCallback, rankedMap)
 import qualified TypeLambda
@@ -1285,6 +1286,10 @@ main = do
     observe "use one polymorphic map with Maybe and a type family" rankedMap
     observe "apply a callback with matchability computed in its declared kind" flippedCallbacks
     observe "select a dictionary with computed matchability" computedDictionary
+    let applied = View.Applied @M @Maybe Proxy View.KnownM 'q' (fmap odd)
+        (element, run) = View.viewResult applied
+    observe "recover the element and its map from a matchable application"
+        (element, run (Just 3), View.betaResult applied (Just 4))
     observe "interpret a kind code as an ordinary type constructor" InterpretedKind.optionalFlag
     observe "interpret two applications of the optional type constructor" InterpretedKind.nestedOptional
     observe "choose an interpreted arrow from its expected kind"

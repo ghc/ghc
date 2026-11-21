@@ -1,15 +1,17 @@
 {-# LANGUAGE DataKinds, GADTs, Modifiers, NoExperimentalDependentTypes, PolyKinds, ScopedTypeVariables, TypeApplications #-}
-module NativeMatchableProjection (Applied(..), Known(..), viewResult, betaResult) where
+module MatchableView (Applied(..), Known(..), viewResult, betaResult) where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy)
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Matchability (M, Matchability)
-import NativeMatchableProjectionLib (project)
+import MatchableEquality (project)
 
+-- | Supply the matchability needed to decompose an application.
 data Known (m :: Matchability) where
     KnownM :: Known M
 
+-- | Store the argument and an operation on applications of the same head.
 data Applied t where
     Applied :: forall (m :: Matchability) (f :: Type %m -> Type) x.
                Proxy f -> Known m -> x -> (f Int -> f Bool) -> Applied (f x)
