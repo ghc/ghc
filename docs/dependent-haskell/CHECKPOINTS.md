@@ -28,6 +28,21 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `5af708d0cc`, the ordinary client checks the class domain of a
+fully applied associated family from an imported interface. The same
+interface supplies a retained unfolding and a rewrite rule for linear
+existential packages. The compiler inlines the unfolding and fires
+the rule twice. Changing `Elem [Bool]` to `Elem [Int]` reports the
+missing `Allowed Int` even with deferred term errors. The previous
+reader accepts an ordinary interface and rejects the new family header.
+
+The combined Stage 2 compiler matched all 401 Showcase observations at
+stripped `-O0`, default `-O1`, default `-O2` and in GHCi. Nine selected
+registered tests passed. The 399-observation predecessor also completed
+a normal two-stage Hadrian build.
+[Domain checks](../../testsuite/tests/dependent/should_run/NativeConstrainedFamily.sh)
+and [mixed interface regression](../../testsuite/tests/dependent/should_run/NativeConstrainedFamilyRules.sh).
+
 At `3c90ebc198`, an ordinary client uses a case to select the input
 of a multiplicity-polymorphic arrow. A linear call consumes its argument
 once. An unrestricted call returns the first field of a pair and leaves

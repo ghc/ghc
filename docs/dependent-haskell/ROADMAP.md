@@ -37,6 +37,15 @@ An application pattern `f x` in a type family equation or class instance
 requires a matchable `f`. GHC checks the declared arrow modifier, even
 when another pattern determines `f` and `x`. [R23 pattern checks](roadmap/R23-unsaturated-type-families.md).
 
+An opted-in library can declare an associated type whose use requires
+the parent class. An ordinary client can prove `Elem [Bool] :~: Bool`
+when `Allowed Bool` supplies the instance. Writing `Elem [Int] :~: Int`
+in the same client reports the missing `Allowed Int` at compile time,
+even though the family equation could reduce to `Int`. A GADT pattern
+can also supply the class dictionary locally.
+[Ordinary client](examples/open-evaluation/ConstrainedElementsClient.hs)
+and [R24 scope](roadmap/R24-constrained-type-families.md).
+
 An opted-in provider can pass the type family `Map` itself to a GADT.
 The GADT uses it once with the matchable constructor `Maybe` and once
 with an unmatchable type family. An ordinary client uses both results
@@ -398,8 +407,8 @@ and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vecto
    error there and suggests the extension. In a complete signature,
    the body can determine a nested callback arrow's matchability. An
    unconstrained callback arrow still takes its ordinary default.
-   For R24, check a separate
-   client's obligation when it forms an associated family application.
+   R24 checks the parent class when a separate client writes a fully applied
+   associated family in a signature, constructor field, or visible type argument.
    [Domain example](roadmap/R24-constrained-type-families.md),
    [inferred callback arrows](roadmap/R23-unsaturated-type-families.md#inferring-a-callback-arrow-in-a-closed-family),
    [later argument](roadmap/R23-unsaturated-type-families.md#choosing-a-prefixs-matchability-from-a-later-argument)
@@ -562,7 +571,7 @@ still require substantial research.
 - [ ] **R21 [Dependency analysis](https://ghc.serokell.io/dh#dependency-analysis)** — Accepted. Needs/includes: no outgoing graph edge. M126 schedules an independent local producer for open evaluation. M128 extends scheduling to a chain of acyclic value bindings. M131 also schedules mutually recursive value groups, with or without complete signatures. M134 schedules local datatypes and synonyms with their ordinary value prerequisites. M138 admits deriving and default declarations with ready prerequisites. M147 installs ordinary class instance heads and associated type equations before local producers, then checks the methods. M150 also schedules associated data and standalone family instances. M152 schedules a local producer before the equations of a fresh local family. M156 checks independent local functions used by an imported family equation. M160 accepts imported functions with independent polymorphic signatures in those local producers. M163 admits saturated ordinary data constructors and checks their field types. M164 also infers an unsigned producer. [Scope and remaining dependencies](roadmap/R21-dependency-analysis.md).
 - [ ] **R22 [Existential quantification](https://ghc.serokell.io/dh#existential-quantification)** — Unmarked. Needs/includes: no outgoing graph edge. The first acceptance check opens an erased package from another module. An implicitly packed vector filter must also return its first cell without forcing the tail. [Source examples and Core checks](roadmap/R22-existential-quantification.md).
 - [ ] **R23 [Unsaturated type families](https://ghc.serokell.io/dh#unsaturated-type-families)** — Accepted. Needs/includes: R25. M141 restores omitted-arrow inference for a dependent argument. M166 passes a partial user family through an interface at a known unmatchable arrow. General inference and ordinary-program compatibility remain open. [Checks and remaining work](roadmap/R23-unsaturated-type-families.md#m166-passing-an-unsaturated-family-to-an-unmatchable-binder).
-- [ ] **R24 [Constrained type families](https://ghc.serokell.io/dh#constrained-type-families)** — Unmarked. Needs/includes: no outgoing graph edge. [Source boundary and first check](roadmap/R24-constrained-type-families.md).
+- [ ] **R24 [Constrained type families](https://ghc.serokell.io/dh#constrained-type-families)** — Unmarked. Needs/includes: no outgoing graph edge. The fork checks fully applied associated families across module interfaces. Partial applications, qualified family kinds and general Core evidence remain open. [Checked scope and open questions](roadmap/R24-constrained-type-families.md).
 - [x] **R25 [Modifiers syntax](https://ghc.serokell.io/dh#modifiers-syntax)** — Completed. Needs/includes: no outgoing graph edge.
 - [x] **R26 [Standalone kind signatures](https://ghc.serokell.io/dh#standalone-kind-signatures)** — Completed. Needs/includes: no outgoing graph edge.
 - [ ] **R27 [Deprecate CUSKs](https://ghc.serokell.io/dh#deprecate-cusks)** — Accepted. Needs/includes: R26, R29.
