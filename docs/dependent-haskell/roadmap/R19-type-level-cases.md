@@ -298,23 +298,30 @@ older installed provider to publish its shared family. A client build
 cannot rebuild the installed package.
 [Two-compiler upgrade check](../examples/open-evaluation/check-retained-case-upgrade.sh).
 
-## A case in an ordinary function arrow
+## A case in a function arrow
 
-A top-level synonym can select the input or result type of an ordinary
-arrow.
+A top-level synonym can select the input or result type of a function
+arrow, including a linear or multiplicity-polymorphic arrow.
 
 ```haskell
 type Input b = (case b of { True -> Int; False -> Char }) -> ()
 type Result b = () -> (case b of { True -> Int; False -> Char })
+type LinearInput b = (case b of { True -> Int; False -> Char }) %1 -> Int
+type PolyInput b = forall (p :: Multiplicity).
+  (case b of { True -> Proxy p; False -> Char }) %p -> Proxy p
 ```
 
 Both sides share the arrow's lexical scope. The private family takes
-the same captures as a case at the root of the synonym. An ordinary
-client can use `Input 'True` as `Int -> ()` and `Result 'True` as
+the same captures as a case at the root of the synonym. The original
+arrow retains its multiplicity, and `p` in the case and in `%p` refers
+to the same binder. An ordinary client can use `Input 'True` as
+`Int -> ()` and `Result 'True` as
 `() -> Int` through a stripped interface. Choosing a domain type adds
 no runtime demand on the argument.
 Template Haskell reification preserves the arrow and the exact name of
 the lowered case family. [Serokell roadmap](https://ghc.serokell.io/dh#type-level-case-expressions),
+[LinearTypes proposal #111](https://ghc-proposals.readthedocs.io/en/latest/proposals/0111-linear-types.html),
+[Modifiers review #370](https://github.com/ghc-proposals/ghc-proposals/pull/370),
 [promotion paper, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf),
 [Agda pattern lambdas](https://agda.readthedocs.io/en/v2.8.0/language/with-abstraction.html#pattern-lambdas),
 and [interface test](../../../testsuite/tests/dependent/should_run/NativeTypeCase.sh).

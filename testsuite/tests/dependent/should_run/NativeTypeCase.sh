@@ -276,11 +276,13 @@ cp NativeTypeCaseRetainedField.hi interfaces/
 (
     cd interfaces
     cat >NativeTypeCaseRetainedFieldClient.hs <<'HS'
-{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}
+{-# LANGUAGE DataKinds, GADTs, LinearTypes, NoExperimentalDependentTypes, TypeApplications #-}
 module Main where
 import Control.Exception (ErrorCall(..), evaluate, try)
 import Control.Monad (forM_)
 import Data.IORef
+import Data.Proxy (Proxy(..))
+import GHC.Types (Multiplicity(Many, One))
 import NativeTypeCaseRetainedField
 import qualified NativeNestedCase as Field
 
@@ -324,6 +326,15 @@ ignoreOn _ = 17
 ignoreOff :: Field.ArrowDomain 'GT ('Just ('Just 'False))
 ignoreOff _ = 29
 
+linearInput :: Field.LinearArrowDomain 'True
+linearInput x = x
+
+polyInput :: Field.MultiplicityArrowDomain 'True
+polyInput x = x
+
+useOne :: Proxy 'One %1 -> Proxy 'One
+useOne x = polyInput @'One x
+
 main :: IO ()
 main = do
   input <- newIORef False
@@ -334,13 +345,34 @@ main = do
   print (readStored stored)
   print (guarded True False selected, cachedResult True selected)
   print (ignoreOn (error "unused on"), ignoreOff (error "unused off"))
+  print (linearInput 31, useOne Proxy, polyInput @'Many Proxy)
   result <- try (evaluate (pick (error "strict scrutinee") selected)) :: IO (Either ErrorCall String)
   print (either (\(ErrorCall message) -> message == "strict scrutinee") (const False) result)
 HS
     "${g[@]}" -c NativeTypeCaseRetainedFieldClient.hs
     "${g[@]}" NativeTypeCaseRetainedFieldClient.o ../NativeTypeCaseRetainedField.o ../NativeNestedCase.o -o run-retained-field
     ./run-retained-field >retained-field.out
-    printf '("x",23,"41")\n("11",11,"t")\n23\n("fallthrough","same")\n(17,29)\nTrue\n' | diff -u - retained-field.out
+    printf '("x",23,"41")\n("11",11,"t")\n23\n("fallthrough","same")\n(17,29)\n(31,Proxy,Proxy)\nTrue\n' | diff -u - retained-field.out
+
+    cat >BadArrowUse.hs <<'HS'
+{-# LANGUAGE DataKinds, LinearTypes, NoExperimentalDependentTypes #-}
+module BadArrowUse where
+import Data.Proxy (Proxy(..))
+import qualified NativeNestedCase as Field
+
+dropInput :: Field.LinearArrowDomain 'True
+dropInput _ = 0
+
+duplicateInput :: Field.LinearArrowDomain 'True
+duplicateInput x = x + x
+
+dropPolyInput :: Field.MultiplicityArrowDomain 'True
+dropPolyInput _ = Proxy
+HS
+    reject BadArrowUse 7:11 '[GHC-18872]'
+    grep -Fq 'BadArrowUse.hs:10:16: error: [GHC-18872]' bad.log
+    grep -Fq 'BadArrowUse.hs:13:15: error: [GHC-25897]' bad.log
+    grep -Fq 'rigid type variable bound by' bad.log
 
     cat >BadRetainedField.hs <<'HS'
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
