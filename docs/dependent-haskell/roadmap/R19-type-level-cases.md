@@ -281,6 +281,13 @@ compile-time splice.
 [proposal #378 scoping review](https://github.com/ghc-proposals/ghc-proposals/pull/378#discussion_r524560765),
 and [Eisenberg and Stolarek, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf).
 
+A compiler plugin can forward a type splice to `defaultRunMeta`. GHC
+provides the retained binders in scope at the splice site. The hook uses
+the same call for an ordinary type splice. An installed plugin can
+typecheck the retained signature with `-fno-code`. The native backend
+still rejects modules that contain dependent Core and use `-fplugin`.
+[Forwarding plugin test](../../../testsuite/tests/plugins/HooksRetainedSplice.hs).
+
 ### Quote and reify retained GADT constructors
 
 `RetainedGadtC` carries the ordered fields and result of a prefix constructor.

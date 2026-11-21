@@ -246,16 +246,13 @@ test('test-hole-plugin',
       req_th
       ],
      compile, ['-fdefer-typed-holes'])
-test('test-hooks-plugin',
-     [extra_files(['hooks-plugin/']),
-      pre_cmd('$MAKE -s --no-print-directory -C hooks-plugin package.hooks-plugin TOP={top}'),
-      # The following doesn't seem to work, even though it
-      # seems identical to the previous test...?
-      # extra_hc_opts('-package-db hooks-plugin/pkg.hooks-plugin/local.package.conf '+ config.plugin_way_flags),
-      req_th
-      ],
-     compile_and_run,
-     ['-package-db hooks-plugin/pkg.hooks-plugin/local.package.conf '+ config.plugin_way_flags])
+hooks_plugin = [extra_files(['hooks-plugin/']),
+                pre_cmd('$MAKE -s --no-print-directory -C hooks-plugin package.hooks-plugin TOP={top}'),
+                req_th]
+hooks_plugin_flags = '-package-db hooks-plugin/pkg.hooks-plugin/local.package.conf ' + config.plugin_way_flags
+
+test('test-hooks-plugin', hooks_plugin, compile_and_run, [hooks_plugin_flags])
+test('HooksRetainedSplice', hooks_plugin, compile, [hooks_plugin_flags + ' -fno-code'])
 
 test('plugins-ghci', [extra_files(['HomePackagePlugin.hs']), only_ways(['ghci'])], compile_and_run, ['-package ghc'])
 
