@@ -69,7 +69,7 @@ if "${ghc[@]}" -O0 -ferror-spans -fforce-recomp -c SwappedVectors.hs >swapped.lo
     exit 1
 fi
 for input in xs ys; do
-    span=$(awk -v expr="splitAtValue @a @suffix cut $input" '
+    span=$(awk -v expr="(splitAtValue @a @suffix cut $input)" '
         /cut ys\) \(splitAtValue @a @suffix cut xs/ {
             col = index($0, expr); print NR ":" col "-" col + length(expr) - 1
         }' SwappedVectors.hs)
