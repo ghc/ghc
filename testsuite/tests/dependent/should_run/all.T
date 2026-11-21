@@ -235,6 +235,10 @@ test('NativeClosedIndexedVec',
                    '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs'])],
      multimod_compile_and_run,
      ['NativeClosedIndexedVec', '-dcore-lint -dstg-lint ' + config.ghc_th_way_flags])
+test('NativeClosedWitnessedBatch',
+     [req_interp, req_rts_linker, only_ways(['normal']),
+      extra_files([closed_eval_dir + f for f in ['WitnessedBatch.hs', 'IndexedVec.hs', 'ExistentialVec.hs']])],
+     run_command, ['bash NativeClosedWitnessedBatch.sh "{compiler}" "{libdir}" ' + config.ghc_th_way_flags])
 test('NativeClosedCompoundLists',
      [req_interp, req_rts_linker, only_ways(['normal']), extra_files(['NativeClosedCompoundListsLib.hs'])],
      multimod_compile_and_run,
