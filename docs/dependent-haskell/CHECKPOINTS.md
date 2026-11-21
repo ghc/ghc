@@ -28,6 +28,16 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `a5bba656b8`, an ordinary client can pass `(2 :: Nat)` to a
+retained length parameter. A second client passes a named erased package
+directly to a polymorphic reader. Its argument type determines which
+witness to open. The self-hosted compiler matched 372 Showcase lines
+at stripped `-O0`, default `-O2`, and in source-loaded GHCi. All eight
+focused tests passed, including rejection of a different vector at the
+same length in the checked split.
+[Literal client](../../testsuite/tests/dependent/should_compile/NativeLiteralClient.hs)
+and [mixed-package reader](examples/erased-existentials/ErasedPackage.hs).
+
 At `68207d8a32`, the Stage 2 compiler combined R23 callback
 matchability, written GADT constructor operands and checked-split
 inference. The 371-line Showcase matched at stripped `-O0`, default
