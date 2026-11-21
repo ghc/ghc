@@ -788,43 +788,54 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
     spine_result _ _ = Nothing
 
     package_result result
-      | ExistsTy ImplicitExists binder body <- coreFullView result
-      , isTauTy (varType binder), isTauTy body
+      | ExistsTy ImplicitExists _ _ <- coreFullView result
       , isFamFreeTy result
-      , not (hasNativeDependentExpr (Core.Type (varType binder)))
-      , not (hasNativeDependentExpr (Core.Type body))
+      , ordinary_package result
       = Just result
       | otherwise = Nothing
+
+    ordinary_package ty
+      | ExistsTy ImplicitExists binder body <- coreFullView ty
+      = ordinary_type (varType binder) && ordinary_package body
+      | otherwise = ordinary_type ty
+
+    ordinary_type ty = isTauTy ty && not (hasNativeDependentExpr (Core.Type ty))
 
     -- See Note [Inferring an erased package from a higher-rank callback].
     ranked_result marked = runMaybeT $ do
       guard =<< liftMaybeT (xoptM LangExt.ImpredicativeTypes)
-      [Left EValArg{ea_arg = callback}, Right (_, _, _, Nothing)] <-
+      Left EValArg{ea_arg = callback} : opened <-
         pure [arg | arg <- marked, is_value arg]
+      guard (not (null opened) && all directly_opened opened)
       let (mas, domains, result) = splitFunTys head_body
-      [Scaled cb_use cb, Scaled payload_use payload] <- pure domains
+      Scaled cb_use cb : payloads <- pure domains
+      guard (opened `equalLength` payloads)
       TyVarTy result_var <- pure (coreFullView result)
       guard (result_var `elem` map snd head_binders)
       let (cb_binders, cb_body) = tcSplitForAllInvisTyVars cb
       guard (not (null cb_binders))
-      (cb_match, Scaled cb_mult formal, cb_result) <- MaybeT (pure (tcSplitFunTy_maybe cb_body))
-      guard (eqType cb_result result)
-      let other = [cb_use, payload_use, payload, cb_match, cb_mult, formal]
-                    ++ mas ++ head_theta ++ map fst cb_binders
+      let (cb_matches, formals, cb_result) = tcSplitFunTys cb_body
+      guard (formals `equalLength` payloads && eqType cb_result result)
+      let other = cb_use : mas ++ head_theta ++ cb_matches ++ map fst cb_binders
+                    ++ concatMap (\(Scaled mult ty) -> [mult, ty]) (payloads ++ formals)
                     ++ map (varType . snd) (head_binders ++ cb_binders)
       guard (not (result_var `elemVarSet` tyCoVarsOfTypes other))
       (ident, operands) <- MaybeT (tcDeclaredOperandSpine False callback)
       let (provided, _, declared) = tcRetainedInstTelescope (varType ident)
       residual <- MaybeT . pure $ foldM (\ty _ -> snd <$> splitVisibleFunTy_maybe ty) declared operands
-      (actual, callback_result) <- MaybeT (pure (splitVisibleFunTy_maybe residual))
-      guard (all isFamFreeTy [formal, actual])
-      guard (all supportsQuickLookType [formal, actual])
-      guard (all noQuickLookVars [formal, actual, callback_result])
-      let scope = mkInScopeSet (tyCoVarsOfTypes [formal, actual, callback_result])
+      let (_, actuals, callback_result) = tcSplitFunTys residual
+          inputs = map scaledThing (formals ++ actuals)
+          pairs = zip (map scaledThing actuals) (map scaledThing formals)
+      guard (actuals `equalLength` formals)
+      guard (all isFamFreeTy inputs && all supportsQuickLookType inputs)
+      guard (all noQuickLookVars (callback_result : inputs))
+      let scope = mkInScopeSet (tyCoVarsOfTypes (callback_result : inputs))
           bind_provided tv _ | tv `elem` provided = BindMe
                              | otherwise = DontBindMe
-      subst <- MaybeT . pure $ tcMatchTyX_BM bind_provided (Subst.mkEmptySubst scope) actual formal
-      guard (eqType (Subst.substTy subst actual) formal)
+      subst <- MaybeT . pure $
+        foldM (\subst (actual, formal) -> tcMatchTyX_BM bind_provided subst actual formal)
+              (Subst.mkEmptySubst scope) pairs
+      guard (all (\(actual, formal) -> eqType (Subst.substTy subst actual) formal) pairs)
       let template = Subst.substTy subst callback_result
           free = tyCoVarsOfType template
       guard (all (not . (`elemVarSet` free)) (provided ++ map snd cb_binders))
@@ -833,6 +844,8 @@ tcOpenImplicitArgs rn_expr fun_ty args expected check_app
         is_value (Left EValArg{}) = True
         is_value Right{} = True
         is_value _ = False
+        directly_opened (Right (_, _, _, Nothing)) = True
+        directly_opened _ = False
 
     open result_ty opened rev_args [] = do
       let args = reverse rev_args
@@ -1285,9 +1298,11 @@ An ordinary inference slot cannot contain the dot result of filterVec.
 Quick Look skips the callback because its expected type starts with forall.
 See Note [Quick Look at value arguments].
 
-When the consumer has a ranked callback and one directly opened operand,
-match the declared input type of the callback to the consumer's callback
-domain. Use a type match without unification. Require the result parameter
+When the consumer has a ranked callback followed by directly opened
+operands, match the callback's declared input types against the expected
+callback domains. Use one substitution for the whole spine. A declared
+callback that uses one length for two inputs cannot match distinct rigid
+lengths. Require the result parameter
 to occur only as the callback result and the complete application result.
 This avoids choosing a package for a parameter that another argument or
 constraint can select. Use the substituted result only when it declares a
@@ -1301,7 +1316,10 @@ The callback length j does not occur in the package.
 Freshen the consumer's result parameters outside the opening. Check the
 original callback at that result through the ordinary argument checker.
 This still checks its supplied arguments, constraints, and multiplicity.
-The producer thunk stays lazy.
+For a result with consecutive dot binders, check each binder kind and
+the final payload. An inner body can refer to a witness bound by an
+earlier dot. Keep the whole result type over these witnesses. The
+producer thunk stays lazy.
 -}
 
 {- Note [Projected implicit existential operands]
