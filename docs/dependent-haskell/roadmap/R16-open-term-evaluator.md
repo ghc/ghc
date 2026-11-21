@@ -1299,19 +1299,28 @@ The closed evaluator also checks `Prelude.span Prelude.not` on the
 literal list `[False, True, False]`. The same projection and append
 equations check that its two lists reconstruct the literal input.
 
-The nominal equation for an open `Prelude.span` call is still missing.
-An open tail also blocks `fst (span not (False : xs))`.
-The accepting branch of `span` returns the pair and the first prefix cons
-before matching the recursive pair. The selectors for the recursive fields
-remain inside the result fields. A strict recursive case forces the
-undefined suffix before it returns the first cons. The initial list
-case and predicate must still finish before `span` returns the pair.
+The checked equations for installed `Prelude.span` use the original
+predicate and matched tail. The proof of the accepted prefix exposes the
+original head with an unknown tail. The accepted suffix equals the second
+projection of the recursive split. The rejected suffix is the original
+cons. An ordinary client proves that appending the two projections
+reconstructs the input. The proof inspects each decision up to the first
+rejection and leaves the remaining decisions lazy.
+
+The accepting branch returns the pair and the first prefix cons before
+matching the recursive pair. The selectors for the recursive fields remain
+inside the result fields. A strict recursive case forces the undefined
+suffix before it returns the first cons. The initial list case and
+predicate must finish before `span` returns the pair.
 For example, matching the result of `span p undefined` forces the list.
 A pair built directly from the two list calls exposes its constructor
 before either call runs.
-The optimizer can use a recursive worker with an unboxed pair result.
-A source equation must preserve those demand checks in both forms.
-[Proof](../examples/open-evaluation/PreludeDropWhileProof.hs),
+The checker verifies the ordinary body and the optimized wrapper and
+worker with their unboxed pair result. It uses the existing checked
+`fst` and `snd` tables in the accepted branch. A strict recursive
+body publishes no equation. A proof with an unknown Boolean decision
+cannot select the branch.
+[Proof](../examples/open-evaluation/PreludeSpanProof.hs),
 [regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledDropWhile.sh),
 and [Agda's `span-defn`](../REFERENCES.md#ending-a-list-prefix-at-a-decision).
 

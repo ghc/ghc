@@ -10,29 +10,22 @@ trap 'rm -rf -- "$out"' EXIT
 mkdir "$out"/{provider,client,shapes}
 cd "$out/provider"
 stripped=(-fomit-interface-pragmas -fno-write-if-simplified-core)
-files=(Prelude{MapLength{Size,Source},AppendLengthSource,Filter{Source,LengthProof,Runtime,AppendProof},TakeWhile,DropWhileSource}.hs)
+files=(Prelude{MapLength{Size,Source},AppendLengthSource,Filter{Source,LengthProof,Runtime,AppendProof},TakeWhile,DropWhileSource,SpanSource}.hs)
+files+=(NativeOpenSpanShapes.hs)
 for file in "${files[@]}"; do cp "$src/$file" .; done
-cat >SpanShapes.hs <<'HS'
-{-# OPTIONS_GHC -fwrite-source-equations #-}
-module SpanShapes (lazySpan, strictSpan) where
-
-lazySpan :: (a -> Bool) -> [a] -> ([a], [a])
-lazySpan _ [] = ([], [])
-lazySpan p input@(x : rest)
-    | p x = let (ys, zs) = lazySpan p rest in (x : ys, zs)
-    | otherwise = ([], input)
-
-strictSpan :: (a -> Bool) -> [a] -> ([a], [a])
-strictSpan _ [] = ([], [])
-strictSpan p input@(x : rest)
-    | p x = case strictSpan p rest of (ys, zs) -> (x : ys, zs)
-    | otherwise = ([], input)
-HS
-files+=(SpanShapes.hs)
+sed -e 's/PreludeSpanSource/SpanShapeSource/' \
+    -e '/^import GHC.Exts/a import NativeOpenSpanShapes (lazySpan)' \
+    -e 's/= span p xs$/= lazySpan p xs/' PreludeSpanSource.hs >SpanShapeSource.hs
+files+=(SpanShapeSource.hs)
 "${ghc[@]}" -O2 "${stripped[@]}" -c "${files[@]}"
+"${ghc[@]}" --show-iface NativeOpenSpanShapes.hi >SpanShapes.iface
+grep -Fxq '  FinalCoreSourceTable T:lazySpan' SpanShapes.iface
+if grep -Fq 'T:strictSpan' SpanShapes.iface; then exit 1; fi
 
 cd "$out/client"
-cp ../provider/*.hi "$src/PreludeDropWhileProof.hs" .
+cp ../provider/*.hi "$src"/Prelude{DropWhileProof,SpanProof}.hs .
+sed -e 's/PreludeSpanProof/SpanShapeProof/' -e 's/PreludeSpanSource/SpanShapeSource/' \
+    PreludeSpanProof.hs >SpanShapeProof.hs
 cat >ClosedSpan.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
@@ -60,10 +53,11 @@ import PreludeDropWhileProof (rejoinPair)
 import PreludeFilterAppendProof (FilterDecisions(..))
 import PreludeFilterRuntime (BooleanResult(..))
 import PreludeFilterSource (Negation)
-import qualified SpanShapes
+import PreludeSpanProof (rejoinSpan)
+import qualified NativeOpenSpanShapes as SpanShapes
 
 passed :: Bool
-passed = case rejoinPair decisions of Refl -> True
+passed = case (rejoinPair decisions, rejoinSpan decisions) of (Refl, Refl) -> True
   where
     decisions :: FilterDecisions Negation '[ 'False, 'True, 'False]
     decisions = Decide IsTrue (Decide IsFalse (error "proof inspected after rejection"))
@@ -103,8 +97,9 @@ main = do
     raised _ _ = False
 HS
 for level in -O0 -O2; do
-    "${ghc[@]}" "$level" -fforce-recomp -c PreludeDropWhileProof.hs ClosedSpan.hs Main.hs
-    "${ghc[@]}" Main.o PreludeDropWhileProof.o ../provider/*.o -o run
+    "${ghc[@]}" "$level" -fforce-recomp -c PreludeDropWhileProof.hs PreludeSpanProof.hs \
+        SpanShapeProof.hs ClosedSpan.hs Main.hs
+    "${ghc[@]}" Main.o PreludeDropWhileProof.o PreludeSpanProof.o ../provider/*.o -o run
     ./run >actual
     cat >expected <<'OUT'
 (True,[False],[True],True,True,True,True)
@@ -113,37 +108,31 @@ OUT
     cmp expected actual
 done
 
-cat >OpenSpan.hs <<'HS'
-{-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, Modifiers #-}
-module OpenSpan where
+cat >StrictSpanSource.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes, Modifiers #-}
+module StrictSpanSource where
 import GHC.Exts (U)
-#ifdef LAZY
-import SpanShapes (lazySpan)
-#elif defined(STRICT)
-import SpanShapes (strictSpan)
-#endif
+import NativeOpenSpanShapes (strictSpan)
 
-#ifdef PREFIX
-type Split xs = fst (span not ('False ': xs))
-#else
 type Split :: (a %U -> Bool) -> [a] -> ([a], [a])
-#ifdef LAZY
-type Split p xs = lazySpan p xs
-#elif defined(STRICT)
 type Split p xs = strictSpan p xs
-#else
-type Split p xs = span p xs
-#endif
-#endif
 HS
-for variant in STOCK LAZY STRICT PREFIX; do
-    if "${ghc[@]}" -O0 "-D$variant" -c OpenSpan.hs >open-span.log 2>&1 ||
-       ! grep -Eq '^OpenSpan.hs:[0-9]+:[0-9]+: error: \[GHC-70565\]' open-span.log ||
-       ! grep -Fq 'type synonym declaration for ‘Split’' open-span.log; then
-        cat open-span.log >&2
-        exit 1
-    fi
-done
+if "${ghc[@]}" -O0 -c StrictSpanSource.hs >strict-span.log 2>&1 ||
+   ! grep -Eq '^StrictSpanSource.hs:[0-9]+:[0-9]+: error: \[GHC-70565\]' strict-span.log ||
+   ! grep -Fq 'type synonym declaration for ‘Split’' strict-span.log; then
+    cat strict-span.log >&2
+    exit 1
+fi
+
+sed 's/(Decide IsFalse _)/(Decide _ _)/' PreludeSpanProof.hs >WrongSpanDecision.hs
+line=$(awk '/^rejoinSpan \(Decide _ _\)/ { print NR }' WrongSpanDecision.hs)
+if "${ghc[@]}" -O0 -c WrongSpanDecision.hs >wrong-span-decision.log 2>&1 ||
+   ! grep -Fq "WrongSpanDecision.hs:$line:" wrong-span-decision.log ||
+   ! grep -Fq '[GHC-05617]' wrong-span-decision.log ||
+   ! grep -Fq '#guard:span (p x)' wrong-span-decision.log; then
+    cat wrong-span-decision.log >&2
+    exit 1
+fi
 
 sed 's/(Decide IsFalse _)/(Decide _ _)/' PreludeDropWhileProof.hs >WrongDecision.hs
 line=$(awk '/^prefixAndSuffix \(Decide _ _\)/ { print NR }' WrongDecision.hs)
