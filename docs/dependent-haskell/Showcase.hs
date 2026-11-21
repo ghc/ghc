@@ -1045,6 +1045,17 @@ data EqSample where
 equalToSelf :: EqSample -> Bool
 equalToSelf (EqSample x) = x == x
 
+-- | Put the equality between two fields of the same indexed type.
+data CountField a where
+    CountField :: forall a -> a -> CountField a
+
+data InteriorCount a where
+    InteriorCount :: forall a. CountField a -> (a ~ Int) => CountField a -> InteriorCount a
+
+-- | The stored equality is available at the second field pattern.
+readInteriorCount :: InteriorCount a -> Int
+readInteriorCount (InteriorCount _ (CountField (type Int) n)) = n
+
 -- | Hide the field type and retain both dictionaries for its consumer.
 data PrintablePair where
     PrintablePair :: forall a. Eq a => (Show a => a -> a -> PrintablePair)
@@ -1068,6 +1079,8 @@ main = do
          compareLabel (Labelled 31 @Int) 1 3)
     observe "compare a hidden field with the dictionary supplied after it"
         (equalToSelf (EqSample True), equalToSelf (EqSample (0 / 0 :: Double)))
+    observe "use an equality between two constructor fields"
+        (readInteriorCount (InteriorCount @Int (error "unused first field") (CountField (type Int) 47)))
     observe "duplicate the unrestricted field of a quoted constructor" (QuotedColumn.readQuoted 17)
     observe "recover consecutive GADT constraints" (describePair (PrintablePair False True))
     observe "form an associated family type from its class evidence" constrainedElements
