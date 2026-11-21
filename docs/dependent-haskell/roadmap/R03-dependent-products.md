@@ -261,9 +261,9 @@ runtime representation back across the phase boundary.
 [Design sketch, §1.4.9](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#phase-distinction)
 and [review discussion](https://github.com/ghc-proposals/ghc-proposals/pull/378#issuecomment-765416198).
 
-The 354-line compiler rejects `preserve :: foreach (a :: Type) -> a -> a`
-with GHC-83605 at `(a :: Type)`. The existing algebraic binder
-implementation cannot supply a type representation for this argument.
+The compiler reports GHC-83605 at `(a :: Type)` in
+`preserve :: foreach (a :: Type) -> a -> a`. The source binder needs a
+calling convention for its runtime representation.
 There is a working reference implementation with the following types.
 
 ```haskell
@@ -289,6 +289,30 @@ and an interpretation function. Haskell's indexed `TypeRep` also
 supports types declared in other modules.
 [Agda universe example](https://agda.readthedocs.io/en/stable/language/mutual-recursion.html#interleaved-mutual-blocks)
 and [reflection paper, §§5.2–5.6](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/08/dynamic.pdf#page=6).
+
+An ordinary caller can pass `TypeRep a` to a checked lookup that returns
+`Maybe a`. After `eqTypeRep` yields `HRefl`, the provider can use
+`mkFinGeneric` and `indexGeneric` on an existential list at that type.
+Public Stage 2 at `96fddcca11` checked the provider with the dependent
+extension disabled and the native indexing provider available through
+interfaces. The ordinary caller defined its own element type. At `-O0`
+and `-O2`, a type mismatch left the payload and offset lazy.
+
+`SomeTypeRep` can hide a kind other than `Type`. For lifted value types,
+compare `typeRepKind rep` with `typeRep @Type` and match `HRefl` before using
+`withTypeable`. This makes a `Typeable a` constraint available to a
+checked continuation. A required erased `forall a ->` still needs a
+`Typeable a` constraint to construct the representation of an abstract `a`.
+
+A native binder can elaborate an explicit witness to an erased type and
+a `TypeRep` argument. The witness type then determines the erased type at
+each call. Specify how interfaces record this source telescope before
+allowing the caller to write a type operand that requests compiler-supplied
+`Typeable` evidence. That call form also needs a rule for types that GHC
+cannot reflect. Keep runtime type patterns as a separate choice. Agda's
+hierarchy distinguishes a universe's level from the datatypes of codes that
+programs can inspect. [Agda universe levels](https://agda.readthedocs.io/en/v2.8.0/language/universe-levels.html)
+and [Agda type codes](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html#forward-declaration).
 
 - [ ] Give the source binder an erased type variable and a value whose
   representation is `TypeRep a`. Preserve the source telescope in
