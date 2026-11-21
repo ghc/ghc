@@ -323,8 +323,10 @@ and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vecto
    The expected vector domains of the returned pieces also determine the
    suffix. The paired implementation needs no visible type application.
    An index that appears only under a noninjective type family remains
-   ambiguous. A Given equality between open family applications can still
-   expose a solver rewrite cycle.
+   ambiguous. If a local Given equates two applications of an open
+   family, GHC can use it without equating the arguments. A retained
+   constructor that requires the arguments to agree reports the mismatch
+   at that constructor's field.
    [Checked input inference](roadmap/R03-dependent-products.md)
    and [independent inputs](../../testsuite/tests/dependent/should_fail/NativeIrredIndexEvidence.hs).
 2. **R05.** Extend checked retained templates to local bindings.

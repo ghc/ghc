@@ -320,6 +320,20 @@ keeps diagnostics finite when another index equality remains unsolved.
 [Checked constructor](../examples/packed-vector/CertifiedSplit.hs)
 and [negative regression](../../../testsuite/tests/dependent/should_fail/NativeIrredIndexEvidence.hs).
 
+A constructor can hide the argument of an open family. For example,
+`Hide :: Proxy p -> Hidden (Width p)` records `p` in its field.
+When the caller knows `Width p ~ Width q`, a `Proxy q` still cannot
+replace the required `Proxy p`. GHC now reports GHC-25897 at the field.
+Previously a Wanted for `q ~ p` rewrote the argument of `Width`, and the
+Given sent the solver back to the same family application. The same cycle
+occurred under `Maybe` in ordinary Haskell.
+
+The solver tracks where it used a local family equality on the current
+rewrite path. A sibling occurrence can still use the same equality.
+Recursive family axioms retain their ordinary reduction-depth diagnostic.
+[Retained constructor](../../../testsuite/tests/dependent/should_fail/NativeFamilyIndexEvidence.hs)
+and [ordinary equalities](../../../testsuite/tests/typecheck/should_fail/WantedFamilyRewriteCycle.hs).
+
 ## Retain a bounded position and its actual predecessor
 
 The two constructors of `Fin n` have different telescopes. `FZ` has no

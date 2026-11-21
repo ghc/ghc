@@ -6948,3 +6948,17 @@ relationship between its inputs. Each returned equality also identifies
 the contents of its own vector.
 [Agda standard library 2.3, Data.Vec.Base](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html)
 and [Haskell split](examples/packed-vector/CertifiedSplit.hs).
+
+### A family result does not identify its argument
+
+GHC checks a family's declared injectivity before using a result equality
+to infer its arguments. Agda also treats injectivity as a separate property
+in pattern unification. The fork follows GHC's rule for the open family
+`Width`. Given `Width p ~ Width q`, it reports the missing `q ~ p` when
+a retained constructor needs that stronger equality. The rewriter's
+implementation follows GHC's rules for which constraints can rewrite
+each other. See Note [Mixed-flavour family rewrite cycles] in
+`GHC.Tc.Solver.Rewrite` and Note [inert_eqs: the inert equalities] in
+`GHC.Tc.Solver.InertSet`.
+[GHC's injective families](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_families.html#injective-type-families)
+and [Agda 2.8.0 on injectivity](https://agda.readthedocs.io/en/v2.8.0/language/pragmas.html#the-injective-pragma).
