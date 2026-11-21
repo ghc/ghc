@@ -105,6 +105,48 @@ the promotion of GADTs with indexed result types.
 [#265](https://ghc-proposals.readthedocs.io/en/latest/proposals/0265-unlifted-datatypes.html),
 [#547 review](https://github.com/ghc-proposals/ghc-proposals/pull/547#discussion_r1012596259).
 
+## Private `Int#` prototype
+
+With `ExperimentalDependentTypes`, the prototype accepts the issue's
+`MatchInt ('I# x) = '()`. The same rule accepts `'I# _` and
+`'I# (x :: Int#)`. Each spelling reduces at `'I# 3#`. The axiom binds
+the raw variable only in the immediate `'I#` field of a closed family
+pattern. Its right-hand side cannot refer to that variable.
+
+```haskell
+import Data.Type.Equality ((:~:)(Refl))
+
+known :: MatchInt ('I# 3#) :~: '()
+known = Refl
+
+-- This separate declaration fails. Use AllowAmbiguousTypes for the check.
+unknown :: forall (i :: Int). MatchInt i :~: '()
+unknown = Refl
+```
+
+A client with the extension disabled imported a provider alias for
+`'I# 3#` and proved the same equality using only the provider interface.
+An older compiler rejected that interface at its version check. An
+ordinary interface from the prototype remained readable by the older
+compiler. The binder alone also sets the new interface marker.
+
+The type-level literal uses the term parser's signed `Int#` token and
+the term literal's wrapping operation on the target platform. On the
+64-bit target, `18446744073709551613#` equals `(-3#)`, and
+`4294967293#` stays distinct from `(-3#)`. The signed source probe
+enabled `NegativeLiterals`. Core Lint checks that the stored literal
+fits the target range.
+[Primitive lexer](../../../compiler/GHC/Parser/Lexer.x),
+[Term literal elaboration](../../../compiler/GHC/HsToCore/Match/Literal.hs),
+[Target-width wrapping](../../../compiler/GHC/Types/Literal.hs).
+
+The ordinary `forall` and raw runtime-value readback checks still
+reject the controls above. The same Core API probe now checks the axiom
+with a concrete `Int#` index and leaves the unknown `Int` application
+stuck. The experiment covers only the primitive constructor in #14180.
+R10 still includes other raw fields, unboxed constructors, and the
+general promotion rules.
+
 ## R11 acceptance check
 
 `RawInt` is a small case of the kind-indexed GADT described in the GHC
