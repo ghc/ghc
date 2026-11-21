@@ -351,7 +351,7 @@ evidenceSuffix requirements
     || needs RetainedCharOperandEvidence || needs MatchableProjectionEvidence
     || needs RetainedNaturalOperandEvidence
     || needs ExperimentalScopedDictionaryEvidence
-    || needs ExperimentalScopedDictionaryCoreEvidence = feature_set
+    || needs ExperimentalScopedDictionaryCoreEvidence || needs RetainedDataFamilyConOperandEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -383,6 +383,7 @@ legacyEvidenceSuffix MatchableProjectionEvidence = featureSetPrefix ++ "matchabl
 legacyEvidenceSuffix RetainedNaturalOperandEvidence = featureSetPrefix ++ "retained-natural-operand"
 legacyEvidenceSuffix ExperimentalScopedDictionaryEvidence = featureSetPrefix ++ "experimental-scoped-dictionary"
 legacyEvidenceSuffix ExperimentalScopedDictionaryCoreEvidence = featureSetPrefix ++ "experimental-scoped-dictionary-core-v3"
+legacyEvidenceSuffix RetainedDataFamilyConOperandEvidence = featureSetPrefix ++ "retained-data-family-constructor-operand"
 legacyEvidenceSuffix GeneralIndexedConstructorOperandEvidence = featureSetPrefix ++ "general-indexed-constructor-operand"
 legacyEvidenceSuffix DepFunCoEvidence           = "-retained-depfunco-v1"
 legacyEvidenceSuffix ConstructorCaseEvidence   = "-retained-constructor-case-v1"
@@ -422,7 +423,8 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("matchable-projection", MatchableProjectionEvidence)
                       , ("retained-natural-operand", RetainedNaturalOperandEvidence)
                       , ("experimental-scoped-dictionary", ExperimentalScopedDictionaryEvidence)
-                      , ("experimental-scoped-dictionary-core-v3", ExperimentalScopedDictionaryCoreEvidence) ]
+                      , ("experimental-scoped-dictionary-core-v3", ExperimentalScopedDictionaryCoreEvidence)
+                      , ("retained-data-family-constructor-operand", RetainedDataFamilyConOperandEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion

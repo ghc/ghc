@@ -2560,10 +2560,12 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
     -- Resolve each constructor once, before inspecting its representation arity.
     let scrut_index = exprToNativeCaseIndex scrut'
         constructed = maybe False isNativeConstructedGadtIndex scrut_index
+        is_indexed IfaceDataFamilyCon = False
+        is_indexed _ = True
         indexed_data_alt valid_shape name names = do
           dc <- tcIfaceDataCon name
           unless (isNativeIndexedDataAlt dc names && hasNoDups (case_bndr : names)
-                  && (not constructed || isJust tagged_operand) && valid_shape dc) $
+                  && (not constructed || any is_indexed tagged_operand) && valid_shape dc) $
             failIfM (text "Invalid indexed constructor proof in interface alternative:"
                      <+> ppr dc <+> ppr names)
           return (DataAlt dc)
@@ -2684,13 +2686,13 @@ tcIfaceRetainedApp fun arg
   = do { f <- tcIfaceExpr fun
        ; (_, shape, a) <- tcIfaceRetainedOperand arg
        ; case coreFullView (exprType f) of
-           DepFunTy _ binder _ | maybe True (`matchesIndexedConShape` a) shape
+           DepFunTy _ binder _ | all (`matchesIndexedConShape` a) shape
              , Just index <- retainedArgIndex a
              , typeKind index `eqType` varType binder -> return (App f a)
            _ -> failIfM (text "Invalid tagged operand in retained interface application.") }
 
 -- | Read optional capability tags in their writer order.
-tcIfaceRetainedOperand :: IfaceExpr -> IfL (Bool, Maybe IfaceIndexedConShape, CoreExpr)
+tcIfaceRetainedOperand :: IfaceExpr -> IfL (Bool, [IfaceIndexedConShape], CoreExpr)
 tcIfaceRetainedOperand expr
   = do { let (tagged_natural, char_operand) = case expr of
                IfaceRetainedNaturalArg operand -> (True, operand)
@@ -2698,15 +2700,18 @@ tcIfaceRetainedOperand expr
        ; let (tagged_char, rest) = case char_operand of
                IfaceRetainedCharArg operand -> (True, operand)
                _ -> (False, char_operand)
-       ; let (shape, operand) = case rest of
-               IfaceIndexedConArg con subexpr -> (Just con, subexpr)
-               _ -> (Nothing, rest)
+       ; let (shape, operand) = shape_tags rest
        ; result <- tcIfaceExpr operand
        ; when (tagged_char && not (containsRetainedCharLiteral result)) $
            failIfM (text "Missing boxed character literal in tagged interface operand:" <+> ppr result)
        ; when (tagged_natural && not (containsRetainedNaturalLiteral result)) $
            failIfM (text "Missing boxed natural literal in tagged interface operand:" <+> ppr result)
        ; return (tagged_char || tagged_natural, shape, result) }
+  where
+    shape_tags (IfaceIndexedConArg con subexpr) =
+      let (shapes, operand) = shape_tags subexpr
+      in (con : shapes, operand)
+    shape_tags operand = ([], operand)
 
 -------------------------
 tcIfaceTickish :: IfaceTickish -> IfL CoreTickish
@@ -2796,6 +2801,7 @@ matchesIndexedConShape :: IfaceIndexedConShape -> CoreExpr -> Bool
 matchesIndexedConShape IfaceSimpleIndexedCon e =
   containsIndexedConOperand e && not (containsGeneralIndexedConOperand e)
 matchesIndexedConShape IfaceGeneralIndexedCon e = containsGeneralIndexedConOperand e
+matchesIndexedConShape IfaceDataFamilyCon e = containsRetainedDataFamilyConOperand e
 
 {- Note [Native index alias evidence in interfaces]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

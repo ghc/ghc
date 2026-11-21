@@ -856,9 +856,12 @@ toIfaceRetainedOperand arg
       | containsRetainedCharLiteral arg = IfaceRetainedCharArg encoded_operand
       | otherwise                       = encoded_operand
     encoded_operand
-      | containsGeneralIndexedConOperand arg = IfaceIndexedConArg IfaceGeneralIndexedCon encoded
-      | containsIndexedConOperand arg        = IfaceIndexedConArg IfaceSimpleIndexedCon encoded
-      | otherwise                            = encoded
+      | containsGeneralIndexedConOperand arg = IfaceIndexedConArg IfaceGeneralIndexedCon encoded_family
+      | containsIndexedConOperand arg        = IfaceIndexedConArg IfaceSimpleIndexedCon encoded_family
+      | otherwise                            = encoded_family
+    encoded_family
+      | containsRetainedDataFamilyConOperand arg = IfaceIndexedConArg IfaceDataFamilyCon encoded
+      | otherwise                               = encoded
     encoded = toIfaceExpr arg
 
 {- Note [Retained scalar operands in interfaces]

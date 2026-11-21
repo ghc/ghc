@@ -3030,6 +3030,7 @@ data IfaceEvidence
   | MatchableProjectionEvidence
   | RetainedNaturalOperandEvidence
   | ExperimentalScopedDictionaryEvidence | ExperimentalScopedDictionaryCoreEvidence
+  | RetainedDataFamilyConOperandEvidence
   deriving (Bounded, Enum, Eq, Ord)
 
 -- | Requirements of an interface payload. See Note [Versioning retained evidence]

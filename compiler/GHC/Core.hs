@@ -42,6 +42,7 @@ module GHC.Core (
         nativeIndexedConApp_maybe, splitNativeIndexedConApp, isNativeConstructedGadtIndex,
         nativeFamilyConHead_maybe,
         containsIndexedConOperand, containsGeneralIndexedConOperand, containsRetainedCharLiteral,
+        containsRetainedDataFamilyConOperand,
         containsRetainedNaturalLiteral, isBoxedBigNaturalLiteral,
         isNativeIndexAlt, isNativeIndexDataAlt, isNativeIndexAliasAlt, isNativeIndexAliasBinder,
         isNativeIndexedDataAlt, splitNativeIndexedDataAlt, isNativeIndexedGadtCon,
@@ -2688,7 +2689,7 @@ nativeComputedIndex expr
 nativeDeferredArgIndex :: CoreExpr -> Maybe Type
 nativeDeferredArgIndex e
   | containsIndexedOperand (\con -> isJust (nativeIndexedOperandSignature_maybe con)
-                                 || isJust (tyConDataFamCoercion_maybe (dataConTyCon con))) e
+                                 || isNativeDataFamilyCon con) e
   = snd <$> computedIndexExpr e
   | Just index <- nativeComputedIndex e = Just index
   | otherwise = nativeClassSelectorIndex e
@@ -3381,6 +3382,14 @@ containsGeneralIndexedConOperand = containsIndexedOperand general
   where
     general con = isJust (nativeIndexedOperandSignature_maybe con) &&
                   not (isJust (nativeIndexedOperandSpec_maybe con))
+
+-- | Detect data family constructors in a retained operand for interface encoding.
+containsRetainedDataFamilyConOperand :: CoreExpr -> Bool
+containsRetainedDataFamilyConOperand = containsIndexedOperand isNativeDataFamilyCon
+
+-- | Test the origin of a constructor before checking its operand shape.
+isNativeDataFamilyCon :: DataCon -> Bool
+isNativeDataFamilyCon = isJust . tyConDataFamCoercion_maybe . dataConTyCon
 
 -- | Find a constructor head in the runtime part of an operand tree.
 containsIndexedOperand :: (DataCon -> Bool) -> CoreExpr -> Bool

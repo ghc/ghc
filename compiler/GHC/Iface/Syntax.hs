@@ -837,7 +837,7 @@ data IfaceExpr
   | IfaceDictApp IfaceExpr IfLclName
 
 -- | The constructor shapes that a reader can use as retained operands.
-data IfaceIndexedConShape = IfaceSimpleIndexedCon | IfaceGeneralIndexedCon
+data IfaceIndexedConShape = IfaceSimpleIndexedCon | IfaceGeneralIndexedCon | IfaceDataFamilyCon
 
 
 data IfaceTickish
@@ -3157,6 +3157,9 @@ instance Binary IfaceExpr where
           IfaceGeneralIndexedCon -> do
             requireIfaceEvidenceVersion bh GeneralIndexedConstructorOperandEvidence
             putByte bh 18
+          IfaceDataFamilyCon -> do
+            requireIfaceEvidenceVersion bh RetainedDataFamilyConOperandEvidence
+            putByte bh 22
         put_ bh arg
     put_ bh (IfaceRetainedCharArg arg) = do
         requireIfaceEvidenceVersion bh RetainedCharOperandEvidence
@@ -3280,6 +3283,7 @@ instance Binary IfaceExpr where
             19 -> IfaceRetainedCharArg <$> get bh
             20 -> IfaceRetainedNaturalArg <$> get bh
             21 -> IfaceDictApp <$> get bh <*> get bh
+            22 -> IfaceIndexedConArg IfaceDataFamilyCon <$> get bh
             _ -> ioError (userError ("get IfaceExpr: invalid expression tag " ++ show h))
 
 instance Binary IfaceTickish where
