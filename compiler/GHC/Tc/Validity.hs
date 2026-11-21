@@ -452,31 +452,9 @@ checkValidType ctxt ty
        -- Check for ambiguous types.  See Note [When to call checkAmbiguity]
        -- NB: this will happen even for monotypes, but that should be cheap;
        --     and there may be nested foralls for the subtype test to examine
-       ; if hasScopedDictionary ty
-         then unless (scopedDictionaryArgumentsDetermined ty) $
-                failWithTc $ TcRnRetainedQuantificationError RetainedCallIndex
-         else checkAmbiguity ctxt ty
+       ; checkAmbiguity ctxt ty
 
        ; traceTc "checkValidType done" (ppr ty <+> text "::" <+> ppr (typeKind ty)) }
-
--- The prototype accepts a complete leading qualified telescope only when
--- each erased parameter is determined by a visible retained argument.
-hasScopedDictionary :: Type -> Bool
-hasScopedDictionary (ForAllTy _ _ ty) = hasScopedDictionary ty
-hasScopedDictionary (FunTy af _ _ _ ty) | isInvisibleFunArg af = hasScopedDictionary ty
-hasScopedDictionary DepDictTy{} = True
-hasScopedDictionary _ = False
-
-scopedDictionaryArgumentsDetermined :: Type -> Bool
-scopedDictionaryArgumentsDetermined ty =
-    all (\(_, tv) -> isTyVar tv && any ((== Just tv) . getTyVar_maybe) domains) parameters
-  where
-    (parameters, rho) = splitForAllTyCoVars ty
-    domains = arguments rho
-    arguments (DepDictTy _ body) = arguments body
-    arguments (FunTy af _ _ _ body) | isInvisibleFunArg af = arguments body
-    arguments (DepFunTy DepFunVisible v body) = varType v : arguments body
-    arguments _ = []
 
 checkValidMonoType :: Type -> TcM ()
 -- Assumes argument is fully zonked
