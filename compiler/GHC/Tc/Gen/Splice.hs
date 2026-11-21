@@ -1229,29 +1229,36 @@ runQResult show_th f runQ expr_span hval
 runMeta :: (MetaHook TcM -> LHsExpr GhcTc -> TcM hs_syn)
         -> LHsExpr GhcTc
         -> TcM hs_syn
-runMeta = runMetaWithIndices []
-
--- | Keep the plugin hook request and provide exact indices to the default runner.
-runMetaWithIndices :: [Name] -> (MetaHook TcM -> LHsExpr GhcTc -> TcM hs_syn)
-                   -> LHsExpr GhcTc -> TcM hs_syn
-runMetaWithIndices indices unwrap e = do
+runMeta unwrap e = do
     env <- getGblEnv
     checkOptionalSourceUses env
     hooks <- getHooks
     case runMetaHook hooks of
-        Nothing -> unwrap (defaultRunMeta indices) e
+        Nothing -> unwrap defaultRunMeta e
         Just h  -> unwrap h e
 
-defaultRunMeta :: [Name] -> MetaHook TcM
-defaultRunMeta _ (MetaE r)
+{- Note [Retained indices in meta hooks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A nested type splice can refer to a retained binder by its exact Name.
+The renamer records the eligible names for this splice. A runMetaHook
+plugin can inspect the request and delegate it to defaultRunMeta. Put
+the names in the local context for the duration of the hook so both
+paths convert the result with the same binders. Each type splice sets
+its own scope.
+-}
+
+defaultRunMeta :: MetaHook TcM
+defaultRunMeta (MetaE r)
   = fmap r . runMeta' True ppr (runQResult TH.pprint convertToHsExpr runTHExp)
-defaultRunMeta _ (MetaP r)
+defaultRunMeta (MetaP r)
   = fmap r . runMeta' True ppr (runQResult TH.pprint convertToPat runTHPat)
-defaultRunMeta indices (MetaT r)
-  = fmap r . runMeta' True ppr (runQResult TH.pprint (convertToHsTypeWithIndices indices) runTHType)
-defaultRunMeta _ (MetaD r)
+defaultRunMeta (MetaT r)
+  = \e -> do
+      indices <- tcl_th_retained_indices . tcl_lcl_ctxt <$> getLclEnv
+      r <$> runMeta' True ppr (runQResult TH.pprint (convertToHsTypeWithIndices indices) runTHType) e
+defaultRunMeta (MetaD r)
   = fmap r . runMeta' True ppr (runQResult TH.pprint convertToHsDecls runTHDec)
-defaultRunMeta _ (MetaAW r)
+defaultRunMeta (MetaAW r)
   = fmap r . runMeta' False (const empty) (const $ fmap Right . convertAnnotationWrapper)
     -- We turn off showing the code in meta-level exceptions because doing so exposes
     -- the toAnnotationWrapper function that we slap around the user's code
@@ -1275,7 +1282,8 @@ runMetaT = runMeta metaRequestT
 
 -- | Run a type splice with the scope of a retained signature.
 runMetaTWithIndices :: [Name] -> LHsExpr GhcTc -> TcM (LHsType GhcPs)
-runMetaTWithIndices indices = runMetaWithIndices indices metaRequestT
+runMetaTWithIndices indices expr =
+  updLclCtxt (\ctxt -> ctxt { tcl_th_retained_indices = indices }) (runMetaT expr)
 
 runMetaD :: LHsExpr GhcTc          -- Of type Q [Dec]
          -> TcM [LHsDecl GhcPs]

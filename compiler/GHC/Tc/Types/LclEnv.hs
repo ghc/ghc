@@ -40,6 +40,7 @@ import GHC.Tc.Errors.Types ( TcRnMessage )
 
 import GHC.Core.UsageEnv ( UsageEnv )
 
+import GHC.Types.Name ( Name )
 import GHC.Types.Name.Reader ( LocalRdrEnv )
 import GHC.Types.Name.Env ( NameEnv )
 import GHC.Types.SrcLoc ( RealSrcSpan )
@@ -122,6 +123,8 @@ data TcLclCtxt
 
 
         tcl_th_ctxt    :: ThLevel,         -- Template Haskell context
+        tcl_th_retained_indices :: [Name], -- See Note [Retained indices in meta hooks]
+                                           -- in GHC.Tc.Gen.Splice.
         tcl_th_bndrs   :: ThBindEnv,       -- and binder info
             -- The ThBindEnv records the TH binding level of in-scope Names
             -- defined in this module (not imported)
