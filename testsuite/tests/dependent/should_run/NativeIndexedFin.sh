@@ -55,6 +55,31 @@ HS
     ./run
 done
 cd "$out/client"
+cat >InvalidListIndex.hs <<'HS'
+{-# LANGUAGE DataKinds, LinearTypes, NoExperimentalDependentTypes, ScopedTypeVariables, TypeApplications #-}
+module InvalidListIndex where
+import ParameterizedIndexLibrary (Fin(FZ), indexGeneric, mkFinGeneric)
+
+empty :: Char
+empty = indexGeneric @Char [] FZ
+
+linear :: [Char] %1 -> Bool
+linear xs = case mkFinGeneric xs 0 of
+    Just _ -> True
+    Nothing -> False
+
+rigid :: forall a. a -> Bool
+rigid xs = case mkFinGeneric @Char xs 0 of
+    Just _ -> True
+    Nothing -> False
+HS
+if "${ghc[@]}" -O0 -fdiagnostics-color=never -c InvalidListIndex.hs >invalid.log 2>&1; then
+    echo 'Accepted an invalid source-length index'
+    exit 1
+fi
+grep -Fq 'InvalidListIndex.hs:6:31: error: [GHC-83865]' invalid.log
+grep -Fq 'InvalidListIndex.hs:9:31: error: [GHC-83605]' invalid.log
+grep -Fq 'InvalidListIndex.hs:14:36: error: [GHC-25897]' invalid.log
 cat >DifferentPredecessor.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, ScopedTypeVariables, TypeApplications, TypeOperators #-}
 module DifferentPredecessor where
