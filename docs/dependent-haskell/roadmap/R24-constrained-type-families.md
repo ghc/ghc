@@ -87,10 +87,13 @@ infers the result wildcard. GHC checks a partial expression signature
 the same way. A context wildcard cannot supply a missing premise.
 If the inferred result still contains the family, GHC checks the domain
 again under the final signature. At this point its context is fixed.
+An ordinary constrained call can contribute its class to that context.
+A dictionary obtained by matching a GADT constructor stays in that branch.
+GHC reports GHC-39999 if the caller would need it to form the inferred result.
 The formation check discards the proof it builds. GHC still infers and
 abstracts the actual dictionary for the function in the usual way.
 [GHC User’s Guide on partial signatures](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/partial_type_signatures.html#extra-constraints-wildcard).
-[Client](../../../testsuite/tests/dependent/should_run/NativeConstrainedFamilyClient.hs).
+[Partial signature and scope controls](../../../testsuite/tests/dependent/should_run/NativePartialFamilyScope.hs).
 
 The same discussion asks whether coverage
 and termination should be separate requirements. The authors disagreed
@@ -121,16 +124,6 @@ signature inside the class and GHC-44432 for one outside it.
 [Associated types in #54](https://ghc-proposals.readthedocs.io/en/latest/proposals/0054-kind-signatures.html#associated-types),
 [placement discussion in #227](https://github.com/ghc-proposals/ghc-proposals/pull/227#issuecomment-497878018)
 and [accepted amendment #259](https://github.com/ghc-proposals/ghc-proposals/pull/259).
-
-The discussion that led to #177 asks how a client can establish a
-domain from a GADT constructor or a quantified constraint. Looking up
-a top-level instance alone misses both cases. The local GADT example
-below exercises the first. The same discussion asks whether coverage
-and termination should be separate requirements. The authors disagreed
-about the consequences for closed family reduction.
-[GADT evidence](https://github.com/ghc-proposals/ghc-proposals/pull/154#issuecomment-408569969),
-[termination](https://github.com/ghc-proposals/ghc-proposals/pull/154#issuecomment-409628107)
-and [the reply](https://github.com/ghc-proposals/ghc-proposals/pull/154#issuecomment-409688377).
 
 The accepted proposal #547 disallows `=>` in family result kind
 annotations and standalone kind signatures. Class constraints were

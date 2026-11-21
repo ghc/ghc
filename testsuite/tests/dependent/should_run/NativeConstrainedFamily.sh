@@ -31,11 +31,18 @@ for reader in marked ordinary; do
         fi
         scoped=(-fforce-recomp -Wno-partial-type-signatures -c NativePartialFamilyScope.hs)
         "${ghc[@]}" "${scoped[@]}"
-        for site in MISSING_BINDING MISSING_ANNOTATION CONTEXT_WILDCARD SIBLING STATIC; do
+        for site in MISSING_BINDING MISSING_ANNOTATION CONTEXT_WILDCARD SIBLING STATIC SPLICE_ESCAPE OTHER_INDEX INFERRED_ESCAPE; do
+            predicate='Collects c'
+            case "$site" in
+                MISSING_*) predicate='Allowed a' ;;
+                OTHER_INDEX) predicate='Collects other' ;;
+                SPLICE_ESCAPE) predicate='Collects Int' ;;
+            esac
             if [[ $reader == ordinary ]]; then
                 "${ghc[@]}" "${scoped[@]}" "-D$site"
             elif "${ghc[@]}" "${scoped[@]}" "-D$site" -fdefer-type-errors >scope.log 2>&1 ||
-                 ! grep -Eq '^NativePartialFamilyScope.hs:[0-9]+:[0-9]+: error: \[GHC-39999\]' scope.log; then
+                 ! grep -Eq '^NativePartialFamilyScope.hs:[0-9]+:[0-9]+: error: \[GHC-39999\]' scope.log ||
+                 ! grep -Fq "$predicate" scope.log; then
                 cat scope.log
                 exit 1
             fi
