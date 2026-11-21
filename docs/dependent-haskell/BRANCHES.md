@@ -25,6 +25,18 @@ evaluator reports GHC-68947 at `zipLength xs ys`.
 
 ## Branch and source inventory
 
+Use `dependent-haskell` for active development. Build a pinned revision in
+a detached checkout when the compiler or its libraries need a separate
+build. R11 and R16 share one compiler and package database for the combined
+rebuild. Check an old native provider, a rebuilt provider and client, and
+the reverse interface import before publishing a changed worker ABI.
+
+At the end of an experiment, integrate its verified source or keep its
+exact tip under `refs/archive/dependent-haskell/` in the primary local
+repository. Record any distinct test, limitation, or design choice that
+remains. Save staged and unstaged source before detaching a dirty checkout.
+Retire the topic branch after verifying the recovery ref.
+
 The reference point for the inventory is `02f4f731f4`. The main
 repository had 319 local branches, 148 registered worktrees, and
 three stashes. Of the local branches, 118 pointed into the published

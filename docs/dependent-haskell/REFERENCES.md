@@ -7520,6 +7520,21 @@ still checks the payload at its own source location.
 [Agda indexed constructors](https://agda.readthedocs.io/en/v2.8.0/language/data-types.html#indexed-datatypes)
 and [indexed reading](examples/open-evaluation/DirectIndexedList.hs).
 
+### Opaque observations of an imported proof
+
+Agda checks the type of an opaque definition without unfolding its
+opaque implementation. This lets a client check the exported statement
+with the information available outside the defining block. GHC proposal
+#415 gives a separate guarantee about compiled calls. An explicit
+`OPAQUE` pragma prevents inlining, specialization, and worker/wrapper
+transformation of that binding. The R16 experiment tests whether a
+client can use an opaque compiled observation when its written type
+already fixes the result. A type synonym or family in the statement can
+still carry a dependency on an imported method.
+[Agda 2.8 opaque definitions](https://agda.readthedocs.io/en/v2.8.0/language/opaque-definitions.html#overview),
+[GHC proposal #415](https://ghc-proposals.readthedocs.io/en/latest/proposals/0415-opaque-pragma.html)
+and [the GHC user's guide](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/pragmas.html#opaque-pragma).
+
 ## Class instances for existential packages
 
 GHC checks the number of occurrences of free variables and the size of
