@@ -1322,6 +1322,7 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
               arg_tys_scaled = map (scaleScaled pat_mult) (substScaledTys tenv arg_tys)
               con_like       = RealDataCon data_con
               trailing_context = dataConHasTrailingContext data_con
+              interior_context = dataConInteriorContext data_con
 
         ; traceTc "tcConPat" (vcat [ text "con_name:" <+> ppr con_name
                                    , text "univ_tvs:" <+> pprTyVars univ_tvs
@@ -1372,7 +1373,7 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
         ; given <- newEvVars theta'
         ; let indexed_fields
                 | Just scrut <- index, [eq] <- given
-                , not trailing_context
+                , not trailing_context, Nothing <- interior_context
                 , isIdHsWrapper wrap, isNativeIndexedGadtCon data_con
                 , PrefixCon _ fields <- val_arg_pats
                 , Just names <- traverse index_field_name fields
@@ -1399,20 +1400,27 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
         ; let skol = getSkolemInfo skol_info
         ; (early_wrap, ev_binds, arg_pats', (extra_proof, res))
              <- tcConTyArgs tenv penv univ_ty_args $
-                if trailing_context
-                then do { (early_binds, (pats, (late_binds, result))) <-
-                            checkConstraints skol ex_tvs' [] $
-                            tcConTyArgs tenv penv ex_ty_args $
-                            tcConValArgs con_like field_tys penv val_arg_pats $
-                            tcConTyArgs tenv penv late_ty_args $
-                            checkConstraints skol [] given check_body
-                        ; return (mkWpLet early_binds, late_binds, pats, result) }
-                else do { (binds, (pats, result)) <-
-                             checkConstraints skol ex_tvs' given $
-                             tcConTyArgs tenv penv ex_ty_args $
-                             tcConValArgs con_like field_tys penv val_arg_pats $
-                             tcConTyArgs tenv penv late_ty_args check_body
-                        ; return (idHsWrapper, binds, pats, result) }
+                case interior_context of
+                  Just prefix_len -> do
+                    { (pats, (binds, result)) <-
+                        tcConInteriorArgs con_like prefix_len field_tys penv val_arg_pats
+                          (checkConstraints skol [] given) check_body
+                    ; return (idHsWrapper, binds, pats, result) }
+                  Nothing | trailing_context ->
+                    do { (early_binds, (pats, (late_binds, result))) <-
+                           checkConstraints skol ex_tvs' [] $
+                           tcConTyArgs tenv penv ex_ty_args $
+                           tcConValArgs con_like field_tys penv val_arg_pats $
+                           tcConTyArgs tenv penv late_ty_args $
+                           checkConstraints skol [] given check_body
+                       ; return (mkWpLet early_binds, late_binds, pats, result) }
+                  Nothing ->
+                    do { (binds, (pats, result)) <-
+                           checkConstraints skol ex_tvs' given $
+                           tcConTyArgs tenv penv ex_ty_args $
+                           tcConValArgs con_like field_tys penv val_arg_pats $
+                           tcConTyArgs tenv penv late_ty_args check_body
+                       ; return (idHsWrapper, binds, pats, result) }
 
         ; let res_pat = ConPat
                 { pat_con   = header
@@ -2117,27 +2125,11 @@ tcConValArgs con_like arg_tys penv con_args thing_inside = case con_args of
   PrefixCon x arg_pats -> do
         -- NB: Type arguments already dealt with by splitConTyArgs, tcConTyArgs.
         -- See Note [Type applications in patterns]
-        { report_invis_arg_pats arg_pats
-        ; let pats_w_tys = assert (length arg_pats == length arg_tys)
-                         $ zip3 [1..] arg_pats arg_tys
-
-        ; (arg_pats', res) <- tcMultiple (tcConArg con_like) penv pats_w_tys thing_inside
+        { (arg_pats', res) <- tcConPrefixArgs con_like penv 1 arg_tys arg_pats thing_inside
 
         -- Return only /value/ patterns, all /type/ patterns are discarded.
         -- This is also what tcMatchPats does, and Note [tcMatchPats] explains why.
         ; return (PrefixCon x arg_pats', res) }
-      where
-        -- Report @-patterns as errors. The valid ones have been dealt with
-        -- outside tcConValArgs. At this point we are expecting patterns for
-        -- value arguments only.
-        report_invis_arg_pats :: [LPat GhcRn] -> TcM ()
-        report_invis_arg_pats ps = do
-          let bad_ps = [L loc tp | L loc (InvisPat _ tp) <- ps]
-          forM_ bad_ps $ \(L loc tp) ->
-            setSrcSpanA loc $
-            addErrTc (TcRnIllegalInvisibleTypePattern tp InvisPatNoForall)
-          unless (null bad_ps) failM
-
   InfixCon x p1 p2 -> do
         { let [arg_ty1,arg_ty2] = arg_tys       -- This can't fail after splitConTyArgs
         ; ([p1',p2'], res) <- tcMultiple (tcConArg con_like) penv
@@ -2208,6 +2200,37 @@ tcConValArgs con_like arg_tys penv con_args thing_inside = case con_args of
 
       con_field_labels :: [Maybe FieldLabel]
       con_field_labels = (map Just (conLikeFieldLabels con_like)) ++ repeat Nothing
+
+-- | Check consecutive value patterns at their original argument positions.
+tcConPrefixArgs :: ConLike -> PatEnv -> Int -> [Scaled TcSigmaType] -> [LPat GhcRn]
+                -> TcM a -> TcM ([LPat GhcTc], a)
+tcConPrefixArgs con_like penv start tys pats thing_inside = do
+  -- Valid type patterns were handled by tcConTyArgs.
+  let bad_ps = [L loc tp | L loc (InvisPat _ tp) <- pats]
+  forM_ bad_ps $ \(L loc tp) ->
+    setSrcSpanA loc $
+    addErrTc (TcRnIllegalInvisibleTypePattern tp InvisPatNoForall)
+  unless (null bad_ps) failM
+  assert (length pats == length tys) $
+    tcMultiple (tcConArg con_like) penv (zip3 [start..] pats tys) thing_inside
+
+-- | Check the interior context between its two field patterns.
+tcConInteriorArgs :: ConLike -> Int -> [Scaled TcSigmaType] -> PatEnv
+                  -> HsConPatDetails GhcRn
+                  -> (forall r. TcM r -> TcM (TcEvBinds, r))
+                  -> TcM a -> TcM (HsConPatDetails GhcTc, (TcEvBinds, a))
+tcConInteriorArgs con_like n tys penv args with_givens thing_inside = do
+  let pats = case args of
+        PrefixCon _ ps -> ps
+        InfixCon _ p q -> [p, q]
+        _ -> panic "tcConInteriorArgs: record arguments"
+      (before, after) = splitAt n pats
+      (before_tys, after_tys) = splitAt n tys
+  (before', (binds, (after', res))) <-
+    tcConPrefixArgs con_like penv 1 before_tys before $
+      with_givens $
+        tcConPrefixArgs con_like penv (n+1) after_tys after thing_inside
+  return (PrefixCon noExtField (before' ++ after'), (binds, res))
 
 check_con_pat_arity :: ConLike -> Int -> TcM ()
 check_con_pat_arity con_like no_of_vis_args =

@@ -4566,7 +4566,10 @@ rnConDecl (ConDeclGADT { con_names   = names
          -- The prefix fields have already been renamed in their own scope.
        ; let con_result = case HsDecls.splitGadtTerminal new_args new_res_ty of
                             Just (_, _, result) -> result
-                            Nothing             -> new_res_ty
+                            Nothing
+                              | Just (_, _, result) <- HsDecls.splitGadtInteriorContext new_args new_res_ty
+                              -> result
+                              | otherwise -> new_res_ty
        ; addNoNestedForallsContextsErr ctxt NFC_GadtConSig con_result
 
         ; let all_fvs = fvs2 `plusFN` fvs3 `plusFN` mods_fvs

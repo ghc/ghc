@@ -74,7 +74,7 @@ module GHC.Hs.Decls (
   ConDecl(..), LConDecl,
   HsConDeclH98Details, HsConDeclGADTDetails(..),
   AnnConDeclGADT(..),
-  hsConDeclTheta, splitGadtTerminal,
+  hsConDeclTheta, splitGadtTerminal, splitGadtInteriorContext,
   getConNames, getRecConArgs_maybe,
   -- ** Document comments
   DocDecl(..), LDocDecl, docDeclDoc,
@@ -1028,6 +1028,25 @@ splitGadtTerminal (PrefixConGADT _ (_ : _)) ty
       HsQualTy{} -> False
       _ -> True
 splitGadtTerminal _ _ = Nothing
+
+-- | Recognize one field, one context and one further field.
+splitGadtInteriorContext :: HsConDeclGADTDetails (GhcPass pass) -> LHsType (GhcPass pass)
+                         -> Maybe (LHsGadtTelescope (GhcPass pass),
+                                   HsConDeclField (GhcPass pass), LHsType (GhcPass pass))
+splitGadtInteriorContext (PrefixConGADT _ [_]) ty
+  | L _ HsQualTy { hst_ctxt = ctxt, hst_body = body } <- ignoreParens ty
+  , not (null (hsConDeclTheta (Just ctxt)))
+  , L _ (HsFunTy _ arr arg result) <- ignoreParens body
+  , plain_result result
+  = Just (mkHsGadtContext ctxt, CDF noAnn NoSrcUnpack NoSrcStrict arr arg Nothing, result)
+  where
+    plain_result result = case unLoc (ignoreParens result) of
+      HsForAllTy{} -> False
+      HsForEachTy{} -> False
+      HsFunTy{} -> False
+      HsQualTy{} -> False
+      _ -> True
+splitGadtInteriorContext _ _ = Nothing
 
 {- Note [Constructor telescope contexts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

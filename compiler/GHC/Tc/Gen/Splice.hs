@@ -3602,6 +3602,9 @@ reifyTyCon tc
 
 reifyDataCon :: Bool -> [Type] -> DataCon -> TcM TH.Con
 reifyDataCon isGadtDataCon tys dc
+  | Just _ <- dataConInteriorContext dc
+  = noTH InteriorConstructorContext (dataConWrapperType dc)
+  | otherwise
   = do { let -- used for H98 data constructors
              (ex_tvs, theta, arg_tys)
                  = dataConInstSig dc tys

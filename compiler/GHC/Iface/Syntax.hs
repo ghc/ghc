@@ -109,6 +109,7 @@ import Language.Haskell.Syntax.Text
 
 import Control.Monad
 import Control.DeepSeq
+import Data.Maybe (isJust)
 import Data.Proxy
 import qualified Data.Set as Set
 
@@ -403,7 +404,7 @@ data IfaceConDecl
           -- or 1-1 corresp with arg tys
           -- See Note [Bangs on imported data constructors] in GHC.Types.Id.Make
         ifConSrcStricts :: [IfaceSrcBang], -- empty meaning no src stricts
-        ifConLateTyVarCount :: !Int } -- Late binder count or context-only marker
+        ifConSourceOrder :: !ConSourceOrder }
 
 type IfaceEqSpec = [(IfLclName,IfaceType)]
 
@@ -1711,10 +1712,13 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
                  ifConEqSpec = eq_spec, ifConCtxt = ctxt, ifConArgTys = arg_tys,
                  ifConArgBinders = arg_binders,
                  ifConStricts = stricts, ifConFields = fields,
-                 ifConLateTyVarCount = late_count })
-  | gadt_style || late_count /= 0 = pp_prefix_con <+> dcolon <+> ppr_gadt_ty
+                 ifConSourceOrder = source_order })
+  | gadt_style || late_count /= 0 || isJust interior = pp_prefix_con <+> dcolon <+> ppr_gadt_ty
   | otherwise  = ppr_ex_quant pp_h98_con
   where
+    late_count = legacyConOrder source_order
+    interior = conInteriorContext source_order
+
     pp_h98_con
       | not (null fields) = pp_prefix_con <+> pp_field_args
       | is_infix
@@ -1740,6 +1744,7 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
       | late_count <= 0 = (user_tvbs, [])
       | otherwise = splitAt (length user_tvbs - late_count) user_tvbs
     (early_ctxt, late_ctxt)
+      | isJust interior = ([], [])
       | late_count == gadtTrailingContextOnly || ifaceHasTrailingContext late = ([], ctxt)
       | otherwise = (ctxt, [])
     pp_gadt_res_ty = pprIfaceForAllPart (map (ifaceUnmatchable,) late) late_ctxt
@@ -1748,7 +1753,12 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
 
         -- A bit gruesome this, but we can't form the full con_tau, and ppr it,
         -- because we don't have a Name for the tycon, only an OccName
-    pp_tau | not (null arg_binders)
+    pp_tau | Just n <- interior
+           , (prefix, suffix) <- splitAt n (zip pp_args (map (ppr_arr . fst) arg_tys))
+           = fsep ([ty <+> arr | (ty, arr) <- prefix] ++
+                   [pprIfaceContextArr ctxt] ++
+                   [ty <+> arr | (ty, arr) <- suffix] ++ [pp_gadt_res_ty])
+           | not (null arg_binders)
            = pp_retained_args arg_binders arg_tys
            | null fields
            = case pp_args ++ [pp_gadt_res_ty] of
@@ -2816,7 +2826,24 @@ ifaceHasTrailingContext [] = False
 instance Binary IfaceConDecls where
     put_ bh IfAbstractTyCon  = putByte bh 0
     put_ bh (IfDataTyCon False cs)
+      | any ordered orders = do
+          requireIfaceEvidenceVersion bh InteriorGadtContextEvidence
+          record_legacy
+          putByte bh 5
+          put_ bh cs
+          put_ bh orders
       | any (/= 0) late = do
+          record_legacy
+          putByte bh 4
+          put_ bh cs
+          put_ bh late
+      | otherwise = putByte bh 1 >> put_ bh cs
+      where
+        orders = map ifConSourceOrder cs
+        late = map legacyConOrder orders
+        ordered OrderedConArgs{} = True
+        ordered _ = False
+        record_legacy = do
           when (any (> 0) late) $
             requireIfaceEvidenceVersion bh TerminalGadtForAllEvidence
           when (gadtTrailingContextOnly `elem` late) $
@@ -2825,19 +2852,13 @@ instance Binary IfaceConDecls where
             requireIfaceEvidenceVersion bh TerminalGadtTrailingContextEvidence
           when (any has_leading_context cs) $
             requireIfaceEvidenceVersion bh TerminalGadtContextEvidence
-          putByte bh 4
-          put_ bh cs
-          put_ bh late
-      | otherwise = putByte bh 1 >> put_ bh cs
-      where
-        late = map ifConLateTyVarCount cs
         has_trailing_context con =
-          ifConLateTyVarCount con > 0 &&
-          let binders = ifConUserTvBinders con
-          in ifaceHasTrailingContext (drop (length binders - ifConLateTyVarCount con) binders)
+          let count = legacyConOrder (ifConSourceOrder con)
+              binders = ifConUserTvBinders con
+          in count > 0 && ifaceHasTrailingContext (drop (length binders - count) binders)
         has_leading_context con =
-          ifConLateTyVarCount con > 0 && not (null (ifConCtxt con)) &&
-          not (has_trailing_context con)
+          legacyConOrder (ifConSourceOrder con) > 0 &&
+          not (null (ifConCtxt con)) && not (has_trailing_context con)
     put_ bh (IfDataTyCon True cs) = putByte bh 2 >> put_ bh cs
     put_ bh (IfNewTyCon c)   = putByte bh 3 >> put_ bh c
     get bh = do
@@ -2853,11 +2874,41 @@ instance Binary IfaceConDecls where
                 if cons `equalLength` late
                    && all (\n -> n >= 0 || n == gadtTrailingContextOnly) late
                    && any (/= 0) late
-                  then return (IfDataTyCon False (zipWith set_count cons late))
+                  then return (IfDataTyCon False (zipWith set_order cons (map LegacyConOrder late)))
                   else fail "Invalid terminal constructor foralls in interface"
+            5 -> do
+                cons <- get bh
+                orders <- get bh
+                if cons `equalLength` orders && any ordered orders
+                  then return (IfDataTyCon False (zipWith set_order cons orders))
+                  else fail "Invalid constructor order in interface"
             _ -> error "Binary(IfaceConDecls).get: Invalid IfaceConDecls"
       where
-        set_count con count = con { ifConLateTyVarCount = count }
+        set_order con order = con { ifConSourceOrder = order }
+        ordered OrderedConArgs{} = True
+        ordered _ = False
+
+instance Binary ConSourceOrder where
+    put_ bh (LegacyConOrder n) = putByte bh 0 >> put_ bh n
+    put_ bh (OrderedConArgs xs) = putByte bh 1 >> put_ bh xs
+    get bh = do
+      tag <- getByte bh
+      case tag of
+        0 -> LegacyConOrder <$> get bh
+        1 -> OrderedConArgs <$> get bh
+        _ -> fail "Invalid constructor order tag"
+
+instance Binary ConSourceGroup where
+    put_ bh (ConTypeArgs n) = putByte bh 0 >> put_ bh n
+    put_ bh (ConContextArgs n) = putByte bh 1 >> put_ bh n
+    put_ bh (ConValueArgs n) = putByte bh 2 >> put_ bh n
+    get bh = do
+      tag <- getByte bh
+      case tag of
+        0 -> ConTypeArgs <$> get bh
+        1 -> ConContextArgs <$> get bh
+        2 -> ConValueArgs <$> get bh
+        _ -> fail "Invalid constructor argument group tag"
 
 instance Binary IfaceConDecl where
     put_ bh (IfCon a1 a2 a3 a12 a4 a5 a6 a7 a8 a13 a9 a10 a11 _) = do
@@ -2890,7 +2941,7 @@ instance Binary IfaceConDecl where
         a10 <- get bh
         a11 <- get bh
         a12 <- get bh
-        return (IfCon a1 a2 a3 a12 a4 a5 a6 a7 a8 a13 a9 a10 a11 0)
+        return (IfCon a1 a2 a3 a12 a4 a5 a6 a7 a8 a13 a9 a10 a11 (LegacyConOrder 0))
 
 instance Binary IfaceBang where
     put_ bh IfNoBang        = putByte bh 0

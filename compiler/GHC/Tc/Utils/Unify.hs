@@ -89,7 +89,7 @@ import GHC.Tc.Utils.TcMType qualified as TcM
 import GHC.Tc.Solver.InertSet
 
 import GHC.Core.ConLike (ConLike(..))
-import GHC.Core.DataCon (dataConHasTrailingContext)
+import GHC.Core.DataCon (dataConContextFieldCount)
 import GHC.Core.FamInstEnv ( reduceScopedSumPayload_maybe, reduceTyFamApp_maybe )
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr )
@@ -2564,7 +2564,7 @@ tc_sub_type_deep fun_pos@(tc_fun, pos) ds_depth unify inst_orig ctxt ty_actual t
     go1 ty_a ty_e
       | TopSub <- ds_depth
       , Just (XExpr (ConLikeTc (RealDataCon con))) <- tc_fun
-      , dataConHasTrailingContext con
+      , Just _ <- dataConContextFieldCount con
       , isSigmaTy ty_a, isSigmaTy ty_e
       = do { actual <- liftZonkM $ zonkTcType ty_a
            ; expected <- liftZonkM $ zonkTcType ty_e

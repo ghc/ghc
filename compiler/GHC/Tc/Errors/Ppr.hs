@@ -8111,6 +8111,7 @@ pprTHReifyError = \case
            CoercionsInTypes        -> (False, text "coercions in types")
            DataConVisibleForall    -> (False, text "visible forall in the type of a data constructor")
            FirstClassExistential   -> (False, text "first-class existential type")
+           InteriorConstructorContext -> (False, text "constructor with an interior context")
 
 pprTypedTHError :: TypedTHError -> DecoratedSDoc
 pprTypedTHError = \case
