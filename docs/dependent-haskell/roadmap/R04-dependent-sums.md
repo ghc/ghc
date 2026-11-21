@@ -273,12 +273,18 @@ size :: Pack True Char -> Bool
 size (Pair tag _) = tag
 ```
 
-GHC uses one nominal family reduction to expose the package constructor.
-The equation can return a sum directly or name a synonym for it. The
-pattern demands the outer pair and leaves an ignored payload lazy. A
-lazy tuple pattern inside an ordinary payload field keeps that field lazy.
-A lazy pattern around the whole package still fails. So does a match on
-a stuck family or through a newtype wrapper.
+GHC follows closed-family equations at the head of the type and composes
+their nominal coercions. For example, `Outer select a = Pack select a`
+can expose the package through `Pack`. The final equation can return a
+sum directly or name a synonym for it. The pattern demands the outer
+pair and leaves an ignored payload lazy. A lazy tuple pattern inside an
+ordinary payload field keeps that field lazy. A lazy pattern around the
+whole package still fails. So does a match on a stuck family or through
+a newtype wrapper.
+
+Each step uses the solver's reduction-depth counter. A recursive
+`Loop a = Loop [a]` reaches the configured limit and reports GHC-40404
+at the written `Pair` pattern.
 
 GHC rejects a payload for a different tag at the written payload. An equation that
 uses a binder from another equation fails at that variable's occurrence.
