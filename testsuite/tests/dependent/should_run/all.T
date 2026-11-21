@@ -395,7 +395,7 @@ test('NativeTypeCaseReify',
 test('NativeTypeCaseRetainedTh',
      [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal']),
       extra_files([open_eval_dir + 'NativeRetainedTH.hs',
-                   'NativeTypeCaseRetainedThWire.hs'])],
+                   'NativeTypeCaseRetainedThWire.hs', 'NativeTypeCaseRetainedThRaw.hs'])],
      run_command, ['bash NativeTypeCaseRetainedTh.sh "{compiler}" "{libdir}"'])
 test('NativeTypeCaseRetainedConTh',
      [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal']),

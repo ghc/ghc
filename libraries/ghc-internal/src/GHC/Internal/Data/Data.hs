@@ -1395,6 +1395,7 @@ deriving instance Data TH.Stmt
 deriving instance Data TH.TyLit
 deriving instance Data TH.TySynEqn
 deriving instance Data TH.Type
+deriving instance Data TH.TypeCaseAlt
 deriving instance Data TH.TypeFamilyHead
 deriving instance Data flag => Data (TH.TyVarBndr flag)
 

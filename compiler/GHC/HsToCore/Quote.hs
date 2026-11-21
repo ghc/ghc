@@ -37,7 +37,7 @@ import GHC.HsToCore.Binds
 import qualified GHC.Boot.TH.Syntax as TH
 
 import GHC.Hs
-import GHC.Hs.Type (HsTypeGhcRnExt(HsTypeLetRn, HsTypeCaseAliasRn))
+import GHC.Hs.Type (HsTypeGhcRnExt(HsTypeLetRn, HsTypeCaseAliasRn, HsTypeCaseRn))
 import GHC.Hs.Decls.Overlap ( OverlapMode(..) )
 
 import GHC.Tc.Utils.TcType
@@ -1493,6 +1493,16 @@ repLTy tyki = repLTyAt (Just tyki)
 -- | Quote a type with a selected default, or defer declaration-kind omissions.
 -- See Note [Quoting forall matchability].
 repLTyAt :: Maybe TypeOrKind -> LHsType GhcRn -> MetaM (Core (M TH.Type))
+repLTyAt tyki (L _ (XHsType (HsTypeCaseRn scrutinee rows))) = do
+  MkC scrutinee' <- repLTyAt tyki scrutinee
+  MkC rows' <- repListM typeCaseAltTyConOcc rep_row rows
+  rep2 caseTName [scrutinee', rows']
+  where
+    rep_row :: ([Name], LHsType GhcRn, LHsType GhcRn) -> MetaM (Core (M TH.TypeCaseAlt))
+    rep_row (names, pat, rhs) = addSimpleTyVarBinds FreshNamesOnly names $ do
+      MkC pat' <- repLTyAt tyki pat
+      MkC rhs' <- repLTyAt tyki rhs
+      rep2 typeCaseAltName [pat', rhs']
 repLTyAt _ (L loc (XHsType HsTypeCaseAliasRn{})) =
   notHandledL (locA loc) ThTypeCase
 repLTyAt _ (L loc (XHsType HsTypeLetRn{})) =

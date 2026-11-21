@@ -54,7 +54,7 @@ import qualified GHC.Data.EnumSet as EnumSet
 import qualified GHC.LanguageExtensions as LangExt
 
 import qualified Data.ByteString as BS
-import Control.Monad( unless, when )
+import Control.Monad( forM, unless, when )
 import Data.Bifunctor (first)
 import Data.Foldable (for_)
 import Data.List (isPrefixOf)
@@ -1867,6 +1867,14 @@ cvtTypeKind typeOrKind ty
            ForEachT vis nm domain ty
              | null tys'
              -> cvtRetainedBinder vis nm domain (cvtType ty)
+
+           CaseT scrutinee rows -> do
+             scrutinee' <- cvtTypeKind typeOrKind scrutinee
+             rows' <- forM rows $ \(TypeCaseAlt pat rhs) -> do
+               pat' <- cvtTypeKind typeOrKind pat
+               rhs' <- cvtTypeKind typeOrKind rhs
+               returnLA (HsTypeCaseAlt pat' noEpUniTok rhs')
+             mk_apps (XHsType (HsTypeCase (noEpTok, noEpTok) Nothing scrutinee' rows')) tys'
 
            SigT ty ki
              -> do { ty' <- cvtType ty

@@ -920,6 +920,11 @@ pprType p (ForEachT vis name domain body) =
       BndrReq   -> binder <+> text "->"
       BndrInvis -> binder <> char '.'
 pprType _ (IndexVarT name) = pprName' Applied name
+pprType p (CaseT scrutinee rows) =
+  parensIf (p >= funPrec) $
+    text "case" <+> pprType noPrec scrutinee <+> text "of"
+      <+> braces (sep (punctuate semi [pprType noPrec pat <+> text "->" <+> pprType noPrec rhs
+                                     | TypeCaseAlt pat rhs <- rows]))
 pprType p (ForallMatchT ma (ForallT tvars ctxt ty)) | not (null tvars) =
   parensIf (p >= funPrec) $
     sep [pprForallMatch ForallInvis (Just ma) tvars ctxt, pprType qualPrec ty]

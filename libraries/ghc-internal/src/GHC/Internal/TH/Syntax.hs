@@ -1449,7 +1449,14 @@ data Type = ForallT [TyVarBndr Specificity] Cxt Type -- ^ @forall \<vars\>. \<ct
             -- 'BndrReq' uses @foreach (x :: t) -> r@. 'BndrInvis' uses
             -- @foreach (x :: t). r@.
           | IndexVarT Name                 -- ^ A retained term variable used in a type.
+          | CaseT Type [TypeCaseAlt]       -- ^ @case t of { p -> r; ... }@
       deriving( Show, Eq, Ord, Generic )
+
+-- | A row in an ordered type case. Type variable occurrences in the
+-- pattern bind over the result of this row. A pattern uses the same type
+-- syntax as the arguments of a 'TySynEqn'.
+data TypeCaseAlt = TypeCaseAlt Type Type
+  deriving( Show, Eq, Ord, Generic )
 
 {- Note [Forall matchability wrappers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

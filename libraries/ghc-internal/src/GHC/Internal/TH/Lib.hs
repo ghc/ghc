@@ -807,6 +807,14 @@ forEachT vis name domain body = ForEachT vis name <$> domain <*> body
 indexVarT :: Quote m => Name -> m Type
 indexVarT = pure . IndexVarT
 
+-- | Construct an ordered type case.
+caseT :: Quote m => m Type -> [m TypeCaseAlt] -> m Type
+caseT scrutinee rows = CaseT <$> scrutinee <*> sequenceA rows
+
+-- | Construct one pattern and result of an ordered type case.
+typeCaseAlt :: Quote m => m Type -> m Type -> m TypeCaseAlt
+typeCaseAlt pat rhs = TypeCaseAlt <$> pat <*> rhs
+
 -- | Set the matchability of an immediate, nonempty type forall group.
 -- See Note [Forall matchability wrappers] in GHC.Internal.TH.Syntax.
 forallMatchT :: Quote m => m Type -> m Type -> m Type

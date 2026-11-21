@@ -20,8 +20,9 @@ main = do
   unless (tags == [0 .. 28]) (fail (show tags))
   let ix = IndexVarT v
       new = [ForEachT BndrReq v (ConT (mkName "Bool")) ix, ix,
-             ForEachT BndrInvis v (ConT (mkName "Bool")) ix]
-  unless (map (Bytes.head . encode) new == [29, 30, 29])
-    (fail "Unexpected retained-constructor Binary tags")
+             ForEachT BndrInvis v (ConT (mkName "Bool")) ix,
+             CaseT ix [TypeCaseAlt t (ConT v), TypeCaseAlt WildCardT t]]
+  unless (map (Bytes.head . encode) new == [29, 30, 29, 31])
+    (fail "Unexpected retained-type Binary tags")
   unless (map (decode . encode) (old ++ new) == old ++ new)
     (fail "Template Haskell Binary round-trip changed a type")

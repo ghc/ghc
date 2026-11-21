@@ -83,7 +83,7 @@ import Data.Bifunctor ( first )
 import Data.Foldable ( toList, for_ )
 import Data.List ( elemIndex, find, mapAccumL, nub, partition, unzip4 )
 import Data.List.NonEmpty ( NonEmpty(..), head, nonEmpty )
-import Data.Data (Data, cast, gmapQ)
+import Data.Data (Data, cast, gmapQ, gmapT)
 import Data.Maybe (catMaybes,  isJust, isNothing, fromMaybe, mapMaybe, maybeToList )
 import qualified Data.Set as Set ( delete, difference, disjoint, empty, fromList, member, null, toList, union )
 
@@ -651,7 +651,7 @@ liftDeclarationTypes source_heads named_wildcards group
           pure (catMaybes copied ++ locals, saved)
       where
         hidden_names = Set.fromList (map (unLoc . snd) hidden)
-        (required, _) = foldr select ([], Set.fromList (map (unLoc . snd) outer)) scope
+        (required, _) = foldr (select []) ([], Set.fromList (map (unLoc . snd) outer)) scope
         needed = [v | (_, v) <- required, unLoc v `Set.member` hidden_names]
         occupied = Set.fromList (map (unLoc . snd) (scope ++ locals))
         fresh = [L (l2l loc) name
@@ -829,10 +829,11 @@ liftDeclarationTypes source_heads named_wildcards group
 
     liftBody site owner scope whole@(L loc _) (salt, seen)
       | Just (prefix, key) <- liftedAnchor site scope whole
-      , let free = Set.fromList (map unLoc (extractHsTyRdrTyVars whole))
+      , let exact_retained = filter (isJust . rdrNameExactName_maybe) (retainedNames site)
+            free = caseCaptures exact_retained whole
             (heads, unbound) = retainedHeadUses site scope whole
             written = Set.fromList (map (unLoc . fst) heads ++ map unLoc unbound)
-            (used, missing) = foldr select ([], free `Set.difference` written) scope
+            (used, missing) = foldr (select exact_retained) ([], free `Set.difference` written) scope
       , Set.null missing
       , all (copyableCapture site whole) used
       = case key >>= (`lookup` seen) of
@@ -841,7 +842,15 @@ liftDeclarationTypes source_heads named_wildcards group
             let occ = mkTcOcc (prefix ++ occNameString (rdrNameOcc (unLoc owner))
                                  ++ ":" ++ show (salt :: Int))
                 name = L (l2l loc) (mkRdrUnqual occ)
-                alias = L loc (SynDecl noAnn name (mkHsQTvs (map fst used)) Prefix whole)
+                -- The signature applies the helper to the original binders.
+                -- Bind fresh type variables in the copy of a quoted case.
+                copied = [ (rdr, mkRdrUnqual (mkTyVarOcc ("$quoted-case-capture:" ++ show i)))
+                         | (i, (_, v)) <- zip [0 :: Int ..] used
+                         , let rdr = unLoc v
+                         , isJust (rdrNameExactName_maybe rdr) ]
+                header = map (renameCaptures copied . fst) used
+                rhs = renameCaptures copied whole
+                alias = L loc (SynDecl noAnn name (mkHsQTvs header) Prefix rhs)
                 seen' = maybe seen (\k -> (k, occ) : seen) key
                 shared = sharedRetainedCaseKey site scope used whole key heads
             in (applyAnchor loc occ used, [((alias, (occ, Nothing)), shared, unbound)], (salt + 1, seen'))
@@ -875,14 +884,35 @@ liftDeclarationTypes source_heads named_wildcards group
     applyAnchor loc occ = foldl' (\f (_, v) -> L loc (HsAppTy noExtField f (typeName v)))
                                  (typeName (L (l2l loc) (mkRdrUnqual occ)))
 
-    select pair@(binder, name) (captures, used)
+    select exact_retained pair@(binder, name) (captures, used)
       | unLoc name `Set.member` used
-      = (pair : captures, Set.delete (unLoc name) used `Set.union` kindNames binder)
+      = (pair : captures, Set.delete (unLoc name) used `Set.union` kindNamesWith exact_retained binder)
       | otherwise = (captures, used)
 
-    kindNames (L _ HsTvb{tvb_kind = HsBndrKind _ kind}) =
-      Set.fromList (map unLoc (extractHsTyRdrTyVars kind))
-    kindNames _ = Set.empty
+    kindNames binder = kindNamesWith [] binder
+
+    kindNamesWith exact_retained (L _ HsTvb{tvb_kind = HsBndrKind _ kind}) =
+      caseCaptures exact_retained kind
+    kindNamesWith _ _ = Set.empty
+
+    -- TH IndexVarT supplies an exact term Name. The ordinary type-variable
+    -- extractor omits that namespace. Recover only names in this telescope.
+    caseCaptures exact_retained ty =
+      Set.fromList (map unLoc (extractHsTyRdrTyVars ty) ++ exactUses ty)
+      where
+        exactUses :: Data a => a -> [RdrName]
+        exactUses node
+          | null exact_retained = []
+          | Just rdr <- cast node = [rdr | rdr `elem` exact_retained]
+          | otherwise = concat (gmapQ exactUses node)
+
+    renameCaptures :: Data a => [(RdrName, RdrName)] -> a -> a
+    renameCaptures [] node = node
+    renameCaptures copied node
+      | Just rdr <- cast node
+      , Just replacement <- lookup rdr copied
+      = fromMaybe node (cast replacement)
+      | otherwise = gmapT (renameCaptures copied) node
 
     copyable :: Data a => a -> Bool
     copyable node = case cast node :: Maybe (LHsType GhcPs) of

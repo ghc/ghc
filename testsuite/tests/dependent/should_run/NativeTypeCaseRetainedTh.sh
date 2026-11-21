@@ -6,7 +6,7 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 base=("$1" "-B$2" -v0 -package-env - -i -i. -fexternal-interpreter -dcore-lint -dstg-lint)
 cd "$work"
-cp "$area"/NativeRetainedTH.hs "$area"/NativeTypeCaseRetainedTh{,Wire}.hs .
+cp "$area"/NativeRetainedTH.hs "$area"/NativeTypeCaseRetainedTh{,Raw,Wire}.hs .
 cat >NativeTypeCaseRetainedThProvider.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}
 module NativeTypeCaseRetainedThProvider where
@@ -26,6 +26,7 @@ import Data.Proxy (Proxy(..))
 import Data.IORef (newIORef, readIORef, writeIORef)
 import NativeRetainedTH (quoted, render)
 import NativeTypeCaseRetainedTh (fromQuote, fromReify)
+import NativeTypeCaseRetainedThRaw (chooseInline)
 
 main :: IO ()
 main = do
@@ -37,6 +38,7 @@ main = do
     writeIORef flag False
     second <- observe <$> readIORef flag
     print (first, second)
+    print (chooseInline True :: Int, chooseInline False :: Char)
 
 observe :: Bool -> String
 observe b = render b (quoted b)
@@ -51,6 +53,24 @@ wrong :: $(do b <- newName "b"
               pure (ForEachT BndrReq b (ConT ''Bool) (AppT (ConT ''Select) (VarT b))))
 wrong = undefined
 HS
+cat >NativeTypeCaseRetainedThEscape.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, TemplateHaskell #-}
+module NativeTypeCaseRetainedThEscape where
+import Data.Proxy (Proxy)
+import Language.Haskell.TH (Q, Type)
+
+escape :: Q Type
+escape = [t| foreach (b :: Maybe Bool) ->
+             case b of { Just field -> Proxy field; Nothing -> Proxy field } |]
+HS
+cat >NativeTypeCaseRetainedThWrongBranch.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module NativeTypeCaseRetainedThWrongBranch where
+import NativeTypeCaseRetainedThRaw (chooseInline)
+
+wrong :: Int
+wrong = chooseInline False
+HS
 
 "${base[@]}" -package ghci -package template-haskell -package binary -package bytestring \
     NativeTypeCaseRetainedThWire.hs -o wire
@@ -62,11 +82,21 @@ for opt in -O0 -O2; do
     "${ghc[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core -c NativeTypeCaseRetainedThProvider.hs
     mv NativeTypeCaseRetainedThProvider.hs provider.source
     "${ghc[@]}" -c NativeTypeCaseRetainedTh.hs
+    "${ghc[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core -c NativeTypeCaseRetainedThRaw.hs
+    mv NativeTypeCaseRetainedThRaw.hs raw.source
     "${ghc[@]}" -c NativeTypeCaseRetainedThClient.hs
     "${ghc[@]}" NativeTypeCaseRetainedThClient.o NativeTypeCaseRetainedTh.o \
-        NativeTypeCaseRetainedThProvider.o NativeRetainedTH.o -o run
+        NativeTypeCaseRetainedThProvider.o NativeTypeCaseRetainedThRaw.o NativeRetainedTH.o -o run
     ./run > actual
-    printf "(11,'x',11,'x',11,'x')\n(\"11\",\"x\")\n" | diff -u - actual
+    printf "(11,'x',11,'x',11,'x')\n(\"11\",\"x\")\n(13,'q')\n" | diff -u - actual
+    status=0
+    "${ghc[@]}" -c NativeTypeCaseRetainedThWrongBranch.hs > wrong-branch.log 2>&1 || status=$?
+    if [[ $status != 1 ]] || ! grep -Fq "Couldn't match type" wrong-branch.log ||
+       ! grep -Fq 'chooseInline False' wrong-branch.log; then
+        cat wrong-branch.log >&2
+        exit 1
+    fi
+    mv raw.source NativeTypeCaseRetainedThRaw.hs
     mv provider.source NativeTypeCaseRetainedThProvider.hs
 done
 
@@ -74,5 +104,11 @@ status=0
 "${base[@]}" -c NativeTypeCaseRetainedThWrong.hs > wrong.log 2>&1 || status=$?
 if [[ $status != 1 ]] || ! grep -Fq 'Malformed type VarT' wrong.log; then
     cat wrong.log >&2
+    exit 1
+fi
+status=0
+"${base[@]}" -c NativeTypeCaseRetainedThEscape.hs > escape.log 2>&1 || status=$?
+if [[ $status != 1 ]] || ! grep -Eq 'Not in scope: .*field' escape.log; then
+    cat escape.log >&2
     exit 1
 fi

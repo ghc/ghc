@@ -88,7 +88,7 @@ module Language.Haskell.TH(
     -- ** Patterns
         Pat(..), FieldExp, FieldPat,
     -- ** Types
-        Type(..), TyVarBndr(..), TyLit(..), Kind, Cxt, Pred, Syntax.Role(..),
+        Type(..), TypeCaseAlt(..), TyVarBndr(..), TyLit(..), Kind, Cxt, Pred, Syntax.Role(..),
         Syntax.Specificity(..),
         Syntax.BndrVis(..),
         FamilyResultSig(..), Syntax.InjectivityAnn(..), PatSynType, BangType, VarBangType,

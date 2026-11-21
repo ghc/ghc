@@ -2090,6 +2090,7 @@ tcHsType mode src@(XHsType (HsTypeExistsRn flag binder body)) exp_kind
            _ -> panic "tcHsType: existential binder count" }
 
 tcHsType _ (XHsType HsTypeCaseAliasRn{}) _ = failWithTc TcRnTypeCaseContext
+tcHsType _ (XHsType HsTypeCaseRn{}) _ = failWithTc TcRnTypeCaseContext
 
 -- See Note [Typechecking type lets].
 tcHsType mode (XHsType (HsTypeLetRn (L _ binder) rhs body)) exp_kind = do

@@ -21,6 +21,7 @@ module Language.Haskell.TH.Syntax (
     Con (..),
     RetainedGadtArg (..),
     Type (..),
+    TypeCaseAlt (..),
     Dec (..),
     BangType,
     VarBangType,

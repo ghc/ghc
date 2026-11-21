@@ -1047,15 +1047,30 @@ rnHsTyKi env (XHsType (HsTypeLet (let_kw, _, _) binder rhs body)) = do
   return (XHsType (HsTypeLetRn (fmap (const name) binder) rhs' body'),
           rhs_fvs `plusFN` body_fvs)
 
-rnHsTyKi _ (XHsType (HsTypeCase (case_kw, _) _ _ alts)) = do
+rnHsTyKi env (XHsType (HsTypeCase (case_kw, _) _ scrutinee alts)) = do
   enabled <- xoptM LangExt.ExperimentalDependentTypes
-  if not enabled
-    then setSrcSpan (getEpTokenSrcSpan case_kw) $ failWithTc TcRnTypeCaseDisabled
-    else case [ pat | L _ (HsTypeCaseAlt pat _ _) <- alts
-                    , isNothing (classifyTypeCasePattern pat) ] of
-      pat : _ -> setSrcSpanA (getLoc pat) $
+  let case_span = getEpTokenSrcSpan case_kw
+  unless enabled $ setSrcSpan case_span $ failWithTc TcRnTypeCaseDisabled
+  rows <- forM alts $ \(L _ (HsTypeCaseAlt pat _ rhs)) ->
+    case classifyTypeCasePattern pat of
+      Just (pattern', _) -> pure (pattern', rhs)
+      Nothing -> setSrcSpanA (getLoc pat) $
         failWithTc (TcRnTypeCasePattern Nothing)
-      [] -> setSrcSpan (getEpTokenSrcSpan case_kw) $ failWithTc TcRnTypeCaseContext
+  case rtke_ctxt env of
+    TypBrCtx{} -> do
+      -- A type quote records source syntax. Its eventual declaration splice
+      -- supplies the context that checks and lifts the case.
+      (scrutinee', scrutinee_fvs) <- rnLHsTyKi env scrutinee
+      (rows', rows_fvs) <- mapFvRn rn_row rows
+      pure (XHsType (HsTypeCaseRn scrutinee' rows'), scrutinee_fvs `plusFN` rows_fvs)
+    _ -> setSrcSpan case_span $ failWithTc TcRnTypeCaseContext
+  where
+    rn_row (pat, rhs) = do
+      names <- mapM newLocalBndrRn (extractHsTyRdrTyVars pat)
+      bindLocalNamesFV names $ do
+        (pat', pat_fvs) <- rnLHsTyKi env pat
+        (rhs', rhs_fvs) <- rnLHsTyKi env rhs
+        pure ((names, pat', rhs'), pat_fvs `plusFN` rhs_fvs)
 
 rnHsTyKi env ty@(XHsType (HsRecTy {})) = do
   -- Record types (which only show up temporarily in constructor

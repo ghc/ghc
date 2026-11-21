@@ -17,7 +17,7 @@ quoteClassOcc :: KnownOcc
 quoteClassOcc = mkTcOcc "Quote"
 
 qTyConOcc, nameTyConOcc, fieldExpTyConOcc, patTyConOcc, fieldPatTyConOcc,
-  expTyConOcc, decTyConOcc, typeTyConOcc, matchTyConOcc, funDepTyConOcc,
+  expTyConOcc, decTyConOcc, typeTyConOcc, matchTyConOcc, typeCaseAltTyConOcc, funDepTyConOcc,
   codeTyConOcc, injAnnTyConOcc, overlapTyConOcc, decsTyConOcc, modNameTyConOcc,
   quasiQuoterTyConOcc :: KnownOcc
 qTyConOcc             = mkTcOcc "Q"
@@ -30,6 +30,7 @@ decTyConOcc           = mkTcOcc "Dec"
 decsTyConOcc          = mkTcOcc "Decs"
 typeTyConOcc          = mkTcOcc "Type"
 matchTyConOcc         = mkTcOcc "Match"
+typeCaseAltTyConOcc   = mkTcOcc "TypeCaseAlt"
 funDepTyConOcc        = mkTcOcc "FunDep"
 codeTyConOcc          = mkTcOcc "Code"
 injAnnTyConOcc        = mkTcOcc "InjectivityAnn"
@@ -286,12 +287,14 @@ forallTName, forallVisTName, forallMatchTName, forEachTName, indexVarTName,
     unboxedTupleTName, unboxedSumTName, arrowTName, mulArrowTName, listTName,
     appTName, appKindTName, sigTName, equalityTName, litTName, promotedTName,
     promotedTupleTName, promotedNilTName, promotedConsTName,
-    wildCardTName, implicitParamTName :: KnownOcc
+    wildCardTName, implicitParamTName, caseTName, typeCaseAltName :: KnownOcc
 forallTName         = mkVarOcc "forallT"
 forallVisTName      = mkVarOcc "forallVisT"
 forallMatchTName    = mkVarOcc "forallMatchT"
 forEachTName        = mkVarOcc "forEachT"
 indexVarTName       = mkVarOcc "indexVarT"
+caseTName           = mkVarOcc "caseT"
+typeCaseAltName     = mkVarOcc "typeCaseAlt"
 varTName            = mkVarOcc "varT"
 conTName            = mkVarOcc "conT"
 tupleTName          = mkVarOcc "tupleT"

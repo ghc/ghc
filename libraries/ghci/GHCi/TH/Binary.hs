@@ -23,6 +23,7 @@ instance Binary TH.NameSpace
 instance Binary TH.Module
 instance Binary TH.Info
 instance Binary TH.Type
+instance Binary TH.TypeCaseAlt
 instance Binary TH.TyLit
 instance Binary TH.Specificity
 instance Binary TH.BndrVis
