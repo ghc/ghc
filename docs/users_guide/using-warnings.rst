@@ -2498,6 +2498,23 @@ of ``-W(no-)*``.
 
     :ghc-flag:`-Weverything` enables this warning.
 
+.. ghc-flag:: -Wpun-uses
+    :shortdesc: warn about uses that rely on separate type and term namespaces
+    :type: dynamic
+    :reverse: -Wno-pun-uses
+    :default: off
+
+    Warn about uses of a global name when a name from the other namespace
+    would conflict with it in a single namespace. A qualifier can avoid
+    the conflict if it selects only one of the competing names.
+
+    Also warn about implicit type-variable uses that would capture a
+    term name, and about ``[]`` as a type constructor and boxed tuple
+    type syntax. For implicit type-variable uses, this warning takes
+    precedence over :ghc-flag:`-Wterm-variable-capture`.
+
+    :ghc-flag:`-Weverything` enables this warning.
+
 .. ghc-flag:: -Wterm-variable-capture
     :shortdesc: warn when an implicitly quantified type variable captures a term's name
     :type: dynamic
