@@ -2428,6 +2428,12 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             liftedArg = setIdType callN inputTy
             liftedCalls = mkForAllTy unmatchableDataConTy (Bndr erasedInput Specified) $
                 mkDepFunTy liftedHead (mkDepFunTy liftedArg (indexed (TermAppTy liftedHead (TermVarTy liftedArg))))
+            shadowErasedInput = mkVisFunTyManyU inputTy liftedCalls
+            Reduction shadowCo shadowResult = normaliseType emptyFamInstEnvs Nominal shadowErasedInput
+        checkType dflags "normalization preserves the lifted call's erased scope" shadowErasedInput shadowResult
+        checkType dflags "normalization retains the source endpoint" shadowErasedInput (coercionLKind shadowCo)
+        checkType dflags "normalization retains the target endpoint" shadowErasedInput (coercionRKind shadowCo)
+        lintAccepts dflags "normalized lifted call across a shadowed erased binder" [erasedInput] (Coercion shadowCo)
         forM_ [NormalCompression, SafeExtraCompression, MaximumCompression] $ \compression -> do
             wire <- roundtrip compression openCalls
             restored <- restore [callF, callN] wire
