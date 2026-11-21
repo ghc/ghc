@@ -1956,11 +1956,13 @@ tcIndependentFamilyProducers demands group@HsGroup
           | otherwise = case lookupNameEnv data_groups name of
               Just tg
                 | Just fv_sets <- traverse early_decl_uses (group_tyclds tg)
-                , null (group_kisigs tg), null (group_instds tg)
+                , null (group_instds tg)
                 , let decls = group_tyclds tg
+                      signatures = group_kisigs tg
                 , isSingleton decls || all (not . isFamilyDecl . unLoc) decls
-                , not (hasSplice decls) ->
-                    Right (unionNameSets (group_ext tg : fv_sets))
+                , null (localUses value_names signatures)
+                , not (hasSplice (decls, signatures)) ->
+                    Right (unionNameSets (group_ext tg : externalDeclUses signatures : fv_sets))
               _ -> Left "a type declaration dependency"
         early_decl_uses decl =
           case closed_family_uses decl of
@@ -1972,6 +1974,7 @@ tcIndependentFamilyProducers demands group@HsGroup
               (nameSetElemsStable signature_types ++
                mapMaybe (lookupNameEnv constructor_owners) (nameSetElemsStable constructors))
         check_data_import name
+          | name `hasKey` liftedTypeKindTyConKey = pure True
           | isTyConName name = do
               thing <- tcLookupGlobal name
               pure $ case thing of
@@ -2293,7 +2296,9 @@ then receives the remaining type groups and all instances, methods,
 defaults and deriving declarations.
 A signed producer can name a closed type family in an input or result.
 Use those resolved names as additional roots of the same type SCC
-closure. Check the family's declaration and its external references.
+closure. Check the family's declaration, its standalone kind signature
+and their external references. Keep the signature with its group.
+The wired-in Type synonym in the signature has no declaration dependency.
 A recursive family or a cycle through another family blocks the split.
 An imported open family in the transitive closure blocks the split,
 even when it occurs only in a field of an unused constructor.
