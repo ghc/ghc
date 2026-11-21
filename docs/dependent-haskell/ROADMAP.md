@@ -71,6 +71,7 @@ The branch audit found a recompilation error in R05/R16. Adding an active
 rewrite rule in a transitive home module can leave a warm proof accepted
 when a clean build rejects it. The recovery test must exercise both object
 code and `-fno-code`, including a second build with no further edits.
+[Recovered branches and remaining checks](BRANCHES.md).
 
 Two changes need separate decisions before integration.
 
