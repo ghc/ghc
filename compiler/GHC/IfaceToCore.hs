@@ -2477,7 +2477,10 @@ tcIfaceExpr (IfaceUnpack witness@(name, _) value package body)
              do { valid <- evaluateIfaceValidation (ppr name) (varType witness' `eqType` varType a)
                 ; unless valid $
                     failIfM (text "Existential Unpack witness kind differs from its package:" <+> ppr name)
-                ; unless (isManyTy (idMult value')
+                ; let mult = idMult value'
+                ; unless (isNonCoVarId value'
+                          && isMultiplicityTy (typeKind mult)
+                          && not (witness' `elemVarSet` tyCoVarsOfType mult)
                           && substTyWith [a] [mkTyVarTy witness'] payload_ty `eqType` varType value') $
                     failIfM (text "Invalid existential payload binder in interface.")
                 ; body' <- tcIfaceExpr body

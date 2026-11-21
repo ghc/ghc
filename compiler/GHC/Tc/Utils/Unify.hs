@@ -13,7 +13,7 @@ module GHC.Tc.Utils.Unify (
   tcWrapResult, tcWrapResultO, tcWrapResultMono,
   tcSubType, tcSubTypeSigma, tcSubTypePat, tcSubTypeApp, tcSubTypeHoleFit,
   addSubTypeCtxt,
-  tcSubTypeAmbiguity, tcSubMult,
+  tcSubTypeAmbiguity, tcSubMult, tcEqMult,
   checkConstraints, checkTvConstraints, checkSourceLetConstraints,
   buildImplicationFor, buildTvImplication, emitResidualTvConstraint,
 
@@ -2077,6 +2077,7 @@ tcSubMult origin w_actual w_expected =
     Submult -> return ()
     Unknown -> tcEqMult origin w_actual w_expected
 
+-- | Check multiplicity equality without using a non-reflexive coercion.
 tcEqMult :: CtOrigin -> Mult -> Mult -> TcM ()
 tcEqMult origin w_actual w_expected = do
   {

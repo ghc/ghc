@@ -901,10 +901,13 @@ lintCoreExpr (Unpack witness payload package body)
            ExistsTy _ a payload_ty ->
              do { lintL (isTyVar witness && varType witness `eqType` varType a) $
                     text "Invalid Unpack witness:" <+> ppr witness
-                ; lintTyCoBndr witness $
-             do { lintL (isNonCoVarId payload && isManyTy (idMult payload) && not (isJoinId payload)) $
+                ; lintL (isNonCoVarId payload && not (isJoinId payload)) $
                     text "Invalid Unpack payload binder:" <+> ppr payload
-                ; lintBinder LetBind payload $
+                ; lintType (idMult payload)
+                ; lintL (isMultiplicityTy (typeKind (idMult payload))) $
+                    text "Invalid Unpack payload multiplicity:" <+> ppr (idMult payload)
+                ; lintTyCoBndr witness $
+                  lintBinder LetBind payload $
              do { lintL (substTyWith [a] [mkTyVarTy witness] payload_ty `eqType` varType payload) $
                     text "Unpack payload binder does not match the existential:" <+> ppr payload
                 ; addAliasUE payload usage $
@@ -912,7 +915,7 @@ lintCoreExpr (Unpack witness payload package body)
                 ; let result_fvs = tyCoVarsOfType result
                 ; lintL (not (witness `elemVarSet` result_fvs || payload `elemVarSet` result_fvs)) $
                     text "Unpack binder escapes its scope:" <+> ppr result
-                ; return (result, body_usage) } } } }
+                ; return (result, body_usage) } } }
            _ -> failWithL (text "Unpack requires an existential package:" <+> ppr package_ty) }
 
 lintCoreExpr (Cast expr co)

@@ -21,6 +21,7 @@ module GHC.Tc.Gen.Match
    , tcLambdaMatches
    , tcMatches
    , tcOpenImplicitPackage
+   , tcOpenImplicitPackageAt
    , implicitPayloadType
    , matchesImplicitPayloadPat
    , tcGRHSNE
@@ -276,7 +277,12 @@ their FunRhs context for coverage checks and match failures.
 -- | Open checked dot binders with the result type outside every scope.
 tcOpenImplicitPackage :: SrcSpan -> TcType -> LHsExpr GhcTc -> TcRhoType
                       -> (Id -> TcM (HsExpr GhcTc)) -> TcM (HsExpr GhcTc)
-tcOpenImplicitPackage loc schema checked result_ty check_body = open schema checked
+tcOpenImplicitPackage = tcOpenImplicitPackageAt ManyTy
+
+-- | Open checked dot binders with the multiplicity of the payload pattern.
+tcOpenImplicitPackageAt :: Mult -> SrcSpan -> TcType -> LHsExpr GhcTc -> TcRhoType
+                        -> (Id -> TcM (HsExpr GhcTc)) -> TcM (HsExpr GhcTc)
+tcOpenImplicitPackageAt mult loc schema checked result_ty check_body = open schema checked
   where
     open schema checked =
       case coreFullView schema of
@@ -287,7 +293,7 @@ tcOpenImplicitPackage loc schema checked result_ty check_body = open schema chec
              ; let name = mkSystemNameAt uniq (getOccName binder) loc
              ; witness <- pushTcLevelM_ $ newSkolemTyVar skol name (tyVarKind binder)
              ; let body_ty = substTyWith [binder] [mkTyVarTy witness] payload_ty
-             ; payload <- newSysLocalId (fsLit "unpacked") ManyTy body_ty
+             ; payload <- newSysLocalId (fsLit "unpacked") mult body_ty
              ; (ev_binds, body) <- setSrcSpan loc $
                  checkConstraints origin [witness] [] $
                    case coreFullView body_ty of

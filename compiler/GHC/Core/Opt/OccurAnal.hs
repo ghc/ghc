@@ -2774,6 +2774,7 @@ occAnal env (Unpack witness payload package body)
         let WUD usage body' = occAnal body_env body
             !payload' = tagLamBinder usage payload
             static = occTypeUses env (varType witness)
+                     `unionVarSet` occTypeUses env (idMult payload)
                      `unionVarSet` occTypeUses body_env (varType payload)
         in WUD (addManyOccs usage static) (payload', body')
 
