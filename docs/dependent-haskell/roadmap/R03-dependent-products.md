@@ -369,8 +369,15 @@ An exported unfolding can use the existing representational visibility cast
 when its result type does not refer to the runtime argument. The direct call
 `map selected` works with shallow and deep subsumption. Quick Look still
 rejects `map $ selected` and the direct call with `ImpredicativeTypes`.
-A flat equation cannot yet name a runtime TypeRep witness whose invisible
-binder follows a visible retained binder.
+
+A single flat equation can name the invisible runtime TypeRep witness
+after a nonforcing visible retained prefix. The witness enters scope
+before the remaining patterns, guards, and local bindings. The column
+example uses `foreach enabled -> foreach a.` to check a request indexed
+by `enabled` and return `Maybe a`. A skipped request leaves both the
+explicit type representation and the column unevaluated.
+[Column choice](../examples/qualified-pi/RuntimeTypeColumn.hs) and
+[Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html).
 
 - [x] Give a visible source binder an erased type variable and a value
   whose representation is `TypeRep a`. Check a provider and a source-hidden

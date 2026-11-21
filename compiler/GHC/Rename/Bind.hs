@@ -64,7 +64,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc as SrcLoc
-import GHC.Types.Basic         ( RecFlag(..), TypeOrKind(..) )
+import GHC.Types.Basic         ( RecFlag(..), TypeOrKind(..), VisArity )
 import GHC.Types.Var           ( DepFunTyFlag(..) )
 
 import GHC.Types.CompleteMatch
@@ -495,7 +495,7 @@ rnBindLHS name_maker _ (PatSynBind x psb@PSB{ psb_id = rdrname })
 
 rnBindLHS _ _ b = pprPanic "rnBindHS" (ppr b)
 
-rnLBind :: (Name -> ([Name], [Name]))  -- Scoped type and runtime names
+rnLBind :: (Name -> ([Name], [(VisArity, [Name])]))  -- Scoped type and runtime names
         -> LHsBindLR GhcRn GhcPs
         -> RnM (LHsBind GhcRn, [Name], Uses)
 rnLBind sig_fn (L loc bind)
@@ -504,7 +504,7 @@ rnLBind sig_fn (L loc bind)
        ; return (L loc bind', bndrs, dus) }
 
 -- assumes the left-hands-side vars are in scope
-rnBind :: (Name -> ([Name], [Name]))  -- Scoped type and runtime names
+rnBind :: (Name -> ([Name], [(VisArity, [Name])]))  -- Scoped type and runtime names
        -> HsBindLR GhcRn GhcPs
        -> RnM (HsBind GhcRn, [Name], Uses)
 rnBind _ bind@(PatBind { pat_lhs = pat
@@ -538,12 +538,13 @@ rnBind sig_fn bind@(FunBind { fun_id = name
                             , fun_matches = matches })
        -- invariant: no free vars here when it's a FunBind
   = do  { let plain_name = unLoc name
-              (ty_names, runtime_names) = sig_fn plain_name
+              (ty_names, runtime_scopes) = sig_fn plain_name
+              (leading, interior) = span ((== 0) . fst) runtime_scopes
 
         ; (matches', rhs_fvs) <- bindSigTyVarsFV ty_names $
-                                  bindLocalNamesFV runtime_names $
-                                    rnMatchGroup (mkPrefixFunRhs name noAnn)
-                                                 rnLExpr matches
+                                  bindLocalNamesFV (concatMap snd leading) $
+                                    rnMatchGroupWithScopes interior
+                                        (mkPrefixFunRhs name noAnn) rnLExpr matches
         ; let is_infix = isInfixFunBind bind
         ; when is_infix $ checkPrecMatch plain_name matches'
 
@@ -690,7 +691,7 @@ depAnalBinds binds_w_dus
 
 -- | Find erased and invisible retained names that scope over a definition.
 -- See Note [Invisible retained definitions].
-mkScopedSigBndrs :: [LSig GhcRn] -> (Name -> ([Name], [Name]))
+mkScopedSigBndrs :: [LSig GhcRn] -> Name -> ([Name], [(VisArity, [Name])])
 mkScopedSigBndrs sigs = \n -> lookupNameEnv env n `orElse` ([], [])
   where
     env = mkHsSigEnv get_scoped sigs
@@ -705,12 +706,14 @@ mkScopedSigBndrs sigs = \n -> lookupNameEnv env n `orElse` ([], [])
 
     after_context ty
       | L _ (HsQualTy _ _ body) <- ignoreParens ty = after_context body
-      | otherwise = invisible_prefix ty
+      | otherwise = retained_scopes 0 ty
 
-    invisible_prefix ty
+    retained_scopes pos ty
       | L _ (HsForEachTy ann bndrs body) <- ignoreParens ty
       , hsForEachVisibility ann == DepFunInvisible
-      = mapMaybe hsLTyVarName bndrs ++ invisible_prefix body
+      = (pos, mapMaybe hsLTyVarName bndrs) : retained_scopes pos body
+      | L _ (HsForEachTy _ bndrs body) <- ignoreParens ty
+      = retained_scopes (pos + length bndrs) body
       | otherwise = []
 
 {- Note [Invisible retained definitions]
@@ -724,6 +727,13 @@ Use the prefix after the outer context because complete-signature checking
 skolemises that context before checking value patterns. GHC.Tc.Gen.Match
 adds runtime patterns for this prefix once it has the checked domains.
 The renamed equations keep their written pattern list.
+
+A contiguous retained telescope can also put an invisible binder after
+visible retained binders. Count the preceding visible binders. Add the
+invisible names to the renamer's scope at that position when the equation
+has a later visible pattern. This keeps the preceding patterns outside
+the scope of the invisible names. See Note [Erased suffixes in retained
+matches] in GHC.Tc.Gen.Match.
 -}
 
 -- Process the fixity declarations, making a FastString -> (Located Fixity) map
@@ -1460,10 +1470,18 @@ rnMatchGroup :: (Outputable (body GhcPs), AnnoBody body) => HsMatchContextRn
              -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeNames))
              -> MatchGroup GhcPs (LocatedA (body GhcPs))
              -> RnM (MatchGroup GhcRn (LocatedA (body GhcRn)), FreeNames)
-rnMatchGroup ctxt rnBody (MG { mg_alts = L lm ms, mg_ext = (origin, mann) })
+rnMatchGroup = rnMatchGroupWithScopes []
+
+-- | Rename a match group with implicit runtime names from its signature.
+rnMatchGroupWithScopes :: (Outputable (body GhcPs), AnnoBody body)
+                       => [(VisArity, [Name])] -> HsMatchContextRn
+                       -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeNames))
+                       -> MatchGroup GhcPs (LocatedA (body GhcPs))
+                       -> RnM (MatchGroup GhcRn (LocatedA (body GhcRn)), FreeNames)
+rnMatchGroupWithScopes scopes ctxt rnBody (MG { mg_alts = L lm ms, mg_ext = (origin, mann) })
          -- see Note [Empty MatchGroups]
   = do { when (null ms) $ checkEmptyCase ctxt
-       ; (new_ms, ms_fvs) <- mapFvRn (rnMatch ctxt rnBody) ms
+       ; (new_ms, ms_fvs) <- mapFvRn (rnMatch scopes ctxt rnBody) ms
        ; return (mkMatchGroup origin mann (L lm new_ms), ms_fvs) }
 
 -- Check the validity of a MatchGroup with an empty list of alternatives.
@@ -1496,19 +1514,19 @@ checkEmptyCase ctxt
         _ -> False
 
 rnMatch :: AnnoBody body
-        => HsMatchContextRn
+        => [(VisArity, [Name])] -> HsMatchContextRn
         -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeNames))
         -> LMatch GhcPs (LocatedA (body GhcPs))
         -> RnM (LMatch GhcRn (LocatedA (body GhcRn)), FreeNames)
-rnMatch ctxt rnBody = wrapLocFstMA (rnMatch' ctxt rnBody)
+rnMatch scopes ctxt rnBody = wrapLocFstMA (rnMatch' scopes ctxt rnBody)
 
 rnMatch' :: (AnnoBody body)
-         => HsMatchContextRn
+         => [(VisArity, [Name])] -> HsMatchContextRn
          -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeNames))
          -> Match GhcPs (LocatedA (body GhcPs))
          -> RnM (Match GhcRn (LocatedA (body GhcRn)), FreeNames)
-rnMatch' ctxt rnBody (Match { m_ctxt = mf, m_pats = L l pats, m_grhss = grhss })
-  = rnPats ctxt pats $ \ pats' -> do
+rnMatch' scopes ctxt rnBody (Match { m_ctxt = mf, m_pats = L l pats, m_grhss = grhss })
+  = rnPats ctxt scopes pats $ \ pats' -> do
         { (grhss', grhss_fvs) <- rnGRHSs ctxt rnBody grhss
         ; let mf' = case (ctxt, mf) of
                       (FunRhs { mc_fun = L _ funid }, FunRhs { mc_fun = L lf _ })

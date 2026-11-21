@@ -923,6 +923,11 @@ genericSafeIndexing = do
     observe "infer the column element type from the result"
         ( Column.lookupColumnInferred chars position :: Maybe Char
         , Column.lookupColumnInferred unused (error "forced offset") :: Maybe Char )
+    let ignoredType = error "forced skipped type witness" :: Reflection.TypeRep Char
+    observe "skip a typed column request without forcing its witness"
+        ( Column.lookupColumnWhen True (Column.ReadColumn position) chars :: Maybe Char
+        , Column.lookupColumnWhen False @{ignoredType} Column.SkipColumn
+            (error "forced skipped column") :: Maybe Char )
     observe "check a signed position in a packaged vector" $
         case ListVectorClient.fromList values of
             Sigma.Pair _ cells -> FinitePositionClient.lookupVecViaView cells position
