@@ -1338,17 +1338,17 @@ tcRuleBndrs skol_info mb_lhs (RuleBndrs { rb_tyvs = mb_tv_bndrs, rb_tmvs = tm_bn
     check_with domain = go_tms domain emptyNameEnv tm_bndrs (const (thing_inside Nothing))
 
     check_prefix lhs fun prefix args
-      | any unsigned later
-      = do { early_domain <- case [arg | Right arg <- prefix] of
-                          [] -> return no_domain
-                          vals -> ruleBinderDomain fun vals
-           ; (first, (last_bndrs, result)) <-
-               go_tms early_domain emptyNameEnv earlier $ \scope ->
-               do { (sigma, finish) <- tcRuleAppPrefix lhs
-                  ; domain <- ruleBinderDomain (setVarType fun sigma) args
-                  ; go_tms domain scope later (const (thing_inside (Just finish))) }
-           ; return (first ++ last_bndrs, result) }
-      | otherwise = check_with no_domain
+      = do { early_domain <- case [arg | Right arg <- prefix, not (has_type_herald arg)] of
+                               [] -> return no_domain
+                               vals -> ruleBinderDomain fun vals
+           ; if any unsigned later
+             then do { (first, (last_bndrs, result)) <-
+                         go_tms early_domain emptyNameEnv earlier $ \scope ->
+                         do { (sigma, finish) <- tcRuleAppPrefix lhs
+                            ; domain <- ruleBinderDomain (setVarType fun sigma) args
+                            ; go_tms domain scope later (const (thing_inside (Just finish))) }
+                     ; return (first ++ last_bndrs, result) }
+             else check_with early_domain }
       where
         names = unionNameSets (map rulePrefixNames prefix)
         (suffix, rest) = span (all (\n -> not (n `elemNameSet` names)) . binder_names . unLoc)
@@ -1389,24 +1389,26 @@ tcRuleBndrs skol_info mb_lhs (RuleBndrs { rb_tyvs = mb_tv_bndrs, rb_tmvs = tm_bn
                               go_tms domain (extendNameEnv scope name bndr_id) rule_bndrs thing_inside
             ; return (map snd tv_prs ++ bndr_id : bndrs, res) }
 
--- | Split the RULE at its last visible type argument. The prefix keeps
--- source order so earlier value operands can bind indices for later ones.
+-- | Split the RULE at its last written type operand.
+-- See Note [Dependent RULE binder domains].
 ruleAppSpine :: LHsExpr GhcRn
              -> Maybe (Name, [Either (LHsWcType GhcRn) (LHsExpr GhcRn)], [LHsExpr GhcRn])
-ruleAppSpine = values []
+ruleAppSpine = go []
   where
-    values args e = case unLoc (stripParensLHsExpr e) of
-      HsApp _ f x      -> values (x : args) f
-      OpApp _ x f y    -> values (x : y : args) f
-      HsAppType _ f ty -> prefix args [Left ty] f
-      HsVar _ (L _ f)  -> Just (getName f, [], args)
+    go args e = case unLoc (stripParensLHsExpr e) of
+      HsApp _ f x      -> go (Right x : args) f
+      OpApp _ x f y    -> go (Right x : Right y : args) f
+      HsAppType _ f ty -> go (Left ty : args) f
+      HsVar _ (L _ f)  -> let (suffix, prefix) = break is_type_operand (reverse args)
+                         in Just (getName f, reverse prefix, [arg | Right arg <- reverse suffix])
       _                -> Nothing
-    prefix args leading e = case unLoc (stripParensLHsExpr e) of
-      HsAppType _ f ty -> prefix args (Left ty : leading) f
-      HsApp _ f x      -> prefix args (Right x : leading) f
-      OpApp _ x f y    -> prefix args (Right x : Right y : leading) f
-      HsVar _ (L _ f)  -> Just (getName f, leading, args)
-      _                -> Nothing
+
+    is_type_operand = either (const True) has_type_herald
+
+has_type_herald :: LHsExpr GhcRn -> Bool
+has_type_herald arg = case unLoc (stripParensLHsExpr arg) of
+  HsEmbTy{} -> True
+  _ -> False
 
 -- | Names needed before checking a RULE application prefix. The caller
 -- intersects these with the names introduced by this RULE.
@@ -1481,6 +1483,13 @@ all preceding arguments when checking m and x. Their error positions
 include the earlier value arguments. A different occurrence of the same
 binder must also check at its inferred type. A type family in the domain
 can stay stuck throughout. No inverse family equation is needed.
+
+A required argument written as (type Bool) marks a prefix boundary as well.
+The herald changes the argument's syntax. The usual ITVDQ check reads the
+function type and decides whether the binder is required. The prepass does
+not elaborate the type. It uses the same checked prefix for the rule and
+checks a splice in the argument once. A required operand without a herald
+does not mark a prefix boundary.
 -}
 
 

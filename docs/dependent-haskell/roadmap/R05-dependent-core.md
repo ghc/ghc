@@ -222,7 +222,10 @@ In `keepTagged tag @Bool m x`, both `tag` and `m` are retained.
 The checked prefix gives the types of the later index and payload.
 The list-indexed regression also checks an equality proof after the
 list argument. The optimized rule forces the proof and leaves the
-two indices lazy.
+two indices lazy. A rule can also use a required type operand written
+with the `type` herald. In `keepRequired tag (type Bool) m x`, the
+ordinary required-argument check supplies the types of `m` and `x`.
+Without the herald, the later rule binders still need signatures.
 An ordinary caller can write `keepReading @_ m x` when the type of
 `m` determines the wildcard. The call remains lazy in `m`.
 [Source rule](../examples/qualified-pi/VisibleRuleArguments.hs),

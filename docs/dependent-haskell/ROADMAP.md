@@ -334,8 +334,8 @@ and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vecto
    the type argument. A retained prefix can also precede a specified
    erased binder and a second retained argument, as in
    `keepTagged tag @Bool m x`. The corresponding required binder
-   takes `(type Bool)`. Its rewrite rule can give explicit signatures
-   for the later runtime arguments.
+   takes `(type Bool)`. A rewrite rule can infer the types of the later
+   runtime arguments from that prefix.
    [Rule and interface support](roadmap/R05-dependent-core.md).
 2. **R23 and R24.** A recursive family can forward a constructor
    or a partial family across stripped interfaces. When a signature

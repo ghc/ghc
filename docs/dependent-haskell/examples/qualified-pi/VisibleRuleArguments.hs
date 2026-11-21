@@ -38,5 +38,5 @@ keepRequired :: foreach (tag :: Bool) -> forall (a :: Type) ->
                 foreach (m :: Maybe a) -> TaggedReading tag m -> TaggedReading tag m
 keepRequired tag (type a) m x = keepTagged tag @a m x
 
-{-# RULES "keepRequired/Bool" forall tag (m :: Maybe Bool) (x :: TaggedReading tag m).
+{-# RULES "keepRequired/Bool" forall tag m x.
     keepRequired tag (type Bool) m x = x #-}

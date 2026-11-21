@@ -54,6 +54,19 @@ Its type signature is legal. A separate two-stage Hadrian build passed
 on the preceding 378-line paired-split revision, including all four
 Showcase modes and the source-hidden split and finite-position tests.
 
+At `b5faf22c3e`, the rule for `keepRequired tag (type Bool) m x`
+infers the types of `m` and `x`. A client compiled from the producer's
+interface fires the rule at `-O2` and leaves both indices lazy. A type
+splice in the prefix runs once. The signed rule and an ordinary control
+produce identical interface and object files before and after the change.
+Six focused regressions passed, and 378 Showcase lines matched at stripped
+`-O0`, default `-O2` and in source-loaded GHCi. The full Core API test
+checks both endpoints of the branch equality for the scoped call `f b`.
+The same interface bytes are rejected when the reader gives `f` a linear
+arrow.
+[Source rule](examples/qualified-pi/VisibleRuleArguments.hs) and
+[interface proof](../../testsuite/tests/ghc-api/NativeDependentCore.hs).
+
 At `cd14d1268d`, an ordinary reader gets 17, 23 and 29 from a named
 erased package, a producer call, and the same call forwarded through
 `id`. A required erased type can also follow a retained argument.
