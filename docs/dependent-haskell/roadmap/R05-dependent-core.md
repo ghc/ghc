@@ -598,3 +598,14 @@ value arguments. A separately compiled ordinary client checks this path
 at `-O2` with Core and STG Lint.
 [Source example](R03-dependent-products.md#zip-two-lists-at-a-common-length)
 and [CorePrep](../../../compiler/GHC/CoreToStg/Prep.hs).
+
+### Observe a selected method body
+
+The open evaluator follows the ordinary compiled Core of a method chosen
+by a ground dictionary. For the installed `Functor Maybe` instance the
+dictionary field of `fmap` selects `$fApplicativeMaybe_$sliftM`. The
+observer returns `Nothing` on an empty input with an abstract callback.
+A local `Functor Maybe` Given leaves the method implementation unknown.
+Readback of a lazy field that applies the abstract callback remains open.
+[Source proof and limits](R16-open-term-evaluator.md#select-a-mapping-worker-from-a-ground-dictionary)
+and [Eisenberg's Core representation discussion](https://github.com/ghc-proposals/ghc-proposals/pull/383#issuecomment-746676314).

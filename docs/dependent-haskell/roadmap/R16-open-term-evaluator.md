@@ -1822,13 +1822,24 @@ and [proofs](../examples/open-evaluation/MappingProof.hs).
 
 The instance must select a named worker with checked equations.
 A local `MapLike Maybe` constraint leaves the method choice open.
-GHC reports GHC-83605 at the call. The installed `Functor Maybe`
-instance defines `fmap` with two equations in the instance body.
-Checking this body remains open. Agda's Maybe mapper has the same
-two constructor equations. GHC must also identify the selected
-dictionary. In the #383 discussion Eisenberg recommends sharing
-the representation of terms and types in Core. That makes evaluating
-the actual method body a question for R05 as well as R16.
-[Agda Maybe](https://github.com/agda/agda-stdlib/blob/v2.4/src/Data/Maybe/Base.agda),
+GHC reports GHC-83605 at the call.
+[Agda Maybe](https://github.com/agda/agda-stdlib/blob/v2.4/src/Data/Maybe/Base.agda)
+has the same two constructor equations.
+
+A mapping call can also use an ordinary imported dictionary with no
+instance context. The solver must select that dictionary with the
+lexical and written Givens in scope. GHC reads the method field from
+its full interface. If the field names a worker of the specialized
+method type, the Core observer can follow the worker's unfolding.
+An applicable rule on the selector, dictionary, or worker blocks the
+proof. The reader also detects a missing unfolding.
+
+For `Prelude.fmap` with the installed `Functor Maybe` instance, the
+observer reads back `Nothing` without evaluating the callback. The
+proof uses an abstract callback. The runtime example passes a divergent
+callback. On `Just x`, readback reaches the application of the rigid
+callback to `x` and stops.
+[Source proof](../examples/open-evaluation/PreludeMappingProof.hs),
+[source-hidden regression](../../../testsuite/tests/dependent/should_run/NativePromotedClassBoundary.sh),
 [installed instance](../../../libraries/ghc-internal/src/GHC/Internal/Base.hs),
-and [Eisenberg's review](https://github.com/ghc-proposals/ghc-proposals/issues/383#issuecomment-746676314).
+and [R05](R05-dependent-core.md#observe-a-selected-method-body).
