@@ -537,7 +537,7 @@ The table gives the completion criteria for each area.
 
 | Roadmap area | Remaining local work | Main obligations before completion |
 | --- | --- | --- |
-| R03: dependent products | General domains, broader invisible argument inference, and runtime type operands | A visible `foreach (a :: Type)` in a complete value signature accepts an explicit `TypeRep a`. The interface records the erased type parameter and witness arrow. Source type operands, hidden witnesses and type patterns remain open. |
+| R03: dependent products | General domains, broader invisible argument inference, and runtime type operands | An opted-in caller can pass `(type Bool)` to a visible `foreach (a :: Type)` binder through its interface. An abstract operand needs `Typeable a`. Hidden witnesses and runtime type patterns remain open. |
 | R04 and R22: sums and existentials | First-class erased `exists` and retained `some` | Specify formation, introduction, elimination, scope and representation. Existing retained ADT fields provide a storage baseline. |
 | R05: dependent Core | Typed conversion, proof operations, transformations, unfoldings and normal optimization | Reconcile the native forms with the calculi. Preserve roles, scope, demand, sharing and ordinary GHC behavior. |
 | R15 and R16: closed and open evaluation | Computation in types over closed inputs and rigid variables | Specify staging, divergence, stuck terms and diagnostics. Reuse ordinary term definitions without parallel handwritten families. |

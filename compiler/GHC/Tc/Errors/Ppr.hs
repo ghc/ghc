@@ -3755,7 +3755,7 @@ pprRetainedQuantificationError reason = case reason of
     vcat [text "A retained constructor matrix requires an unguarded equation for each possible constructor pair."
          ,text "A final equation with bare variables or wildcards in both index columns can cover the remaining pairs."]
   RetainedTypeOperandContext expected ->
-    vcat [text "A type operand in this expression requires an expected type of the form" <+> quotes (text "TypeRep t") <> dot,
+    vcat [text "A runtime type operand requires an expected type of the form" <+> quotes (text "Type.Reflection.TypeRep t") <> dot,
           case expected of
             Just ty -> text "The expected type here is" <+> quotes (ppr ty) <> dot
             Nothing -> text "Give the expression a type signature or pass it to a function that expects a type representation."]
