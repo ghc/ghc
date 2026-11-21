@@ -1466,7 +1466,7 @@ data ClosedShapeError
   | NonDecreasingClosedShape Kind Kind
   | UnrecoverableClosedIndex
   | UnsupportedClosedWitness
-  | UnsupportedClosedPayload
+  | UnsupportedClosedPayload DataCon Int
 
 -- | Classify a checked result and record the constructors inspected by its codec.
 -- See Note [Constructor visibility in closed calls].
@@ -1526,9 +1526,14 @@ reportClosedShapeError owner err = case err of
   UnsupportedClosedWitness ->
     failWithTc (TcRnClosedTypeEval owner
       "Cannot recover the package index from its first field. Each witness constructor must have no fields or carry only its predecessor witness.")
-  UnsupportedClosedPayload ->
-    failWithTc (TcRnClosedTypeEval owner
-      "Cannot reify a constructor field at the index given by its first field.")
+  UnsupportedClosedPayload con position -> do
+      flags <- getDynFlags
+      ctx <- getNamePprCtx
+      units <- hsc_units <$> getTopEnv
+      let constructor = showSDocForUser flags units ctx (quotes (ppr con))
+      failWithTc (TcRnClosedTypeEval owner
+        ("Cannot reify field " ++ show position ++ " of " ++ constructor ++
+         " at the index given by its first field."))
   NonDecreasingClosedShape previous current -> do
       flags <- getDynFlags
       ctx <- getNamePprCtx
@@ -1592,11 +1597,12 @@ closedCallValueShape rdr_env kind = do
                 codecs <- case fields of
                   Left (static, ground) -> ClosedStaticFields static <$> traverse (shape next) ground
                   Right (index, witness, rest) -> do
-                    let field ty
+                    let field position ty
                           | closedGroundField ty = AtGroundType <$> shape next ty
-                          | otherwise = AtWitnessIndex <$> open_shape False next index ty
-                    ClosedWitnessedFields <$> open_shape True next index witness
-                                         <*> traverse field rest
+                          | otherwise = AtWitnessIndex <$>
+                              open_shape (UnsupportedClosedPayload con position) next index ty
+                    ClosedWitnessedFields <$> open_shape UnsupportedClosedWitness next index witness
+                                         <*> zipWithM field [2..] rest
                 return (ClosedConstructor (Just (closedConstructorTag con)) con codecs)
               State.modify' ((here, ClosedData tc args alternatives) :)
               return (ClosedRef here)
@@ -1605,12 +1611,13 @@ closedCallValueShape rdr_env kind = do
         -> Trans.lift (Left (InaccessibleClosedData tc False))
       _ -> Trans.lift (Left UnsupportedClosedShape)
 
-    open_shape witness active index field = do
+    open_shape unsupported active index field = do
       (tc, args, alternatives) <- Trans.lift $
-        maybe (Left (if witness then UnsupportedClosedWitness else UnsupportedClosedPayload))
-              Right (closedOpenAlternatives index field)
-      when (witness && or [any isJust fields | (_, _, fields) <- alternatives]) $
-        Trans.lift (Left UnsupportedClosedWitness)
+        maybe (Left unsupported) Right (closedOpenAlternatives index field)
+      case unsupported of
+        UnsupportedClosedWitness | or [any isJust fields | (_, _, fields) <- alternatives]
+          -> Trans.lift (Left unsupported)
+        _ -> pure ()
       let constructors = [con | (con, _, _) <- alternatives]
       unless (all (isJust . closedImportedGRE rdr_env) constructors) $
         Trans.lift (Left (InaccessibleClosedData tc False))
