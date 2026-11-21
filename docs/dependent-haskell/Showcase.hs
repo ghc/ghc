@@ -51,6 +51,7 @@ import qualified Data.Either
 import DefaultVector (DefaultElement(..))
 import qualified ErasedPackage
 import FamilyTuple (Tuple(Tup2))
+import qualified RetainedFamilyTuple
 import qualified ForgetWitness
 import qualified ImplicitVector
 import qualified PartitionChoices
@@ -1005,6 +1006,10 @@ type family SecondFlag (t :: Tuple Bool Bool) :: Bool where
 secondFlag :: SecondFlag ('Tup2 'True 'False) :~: 'False
 secondFlag = Refl
 
+-- | Check that the imported call returns a proof for the written pair.
+retainedPair :: ('Tup2 'True 'False :~: 'Tup2 'True 'False, (Bool, Bool))
+retainedPair = RetainedFamilyTuple.readPair (Tup2 True False)
+
 -- | Hide the field type and retain both dictionaries for its consumer.
 data PrintablePair where
     PrintablePair :: forall a. Eq a => (Show a => a -> a -> PrintablePair)
@@ -1016,6 +1021,7 @@ describePair (PrintablePair a b) = (a == b, show b)
 main :: IO ()
 main = do
     observe "select the second field of a promoted data family pair" secondFlag
+    observe "retain a data family pair and read its fields" retainedPair
     observe "recover consecutive GADT constraints" (describePair (PrintablePair False True))
     observe "form an associated family type from its class evidence" constrainedElements
     observe "form an expression annotation with the matched dictionary" annotatedElement

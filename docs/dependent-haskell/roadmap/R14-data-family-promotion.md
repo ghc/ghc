@@ -88,7 +88,9 @@ at the public kind `Tuple Bool Bool`. The check accepts the constructor
 wrapper or its worker with the matching data family instance axiom. It
 checks both endpoints at representational role and uses the public
 constructor directly as the type index. It keeps the original runtime
-cast and preserves lazy fields.
+cast and preserves lazy fields. The [Showcase](../Showcase.hs) names
+the exact retained pair in the result type of a call to
+[`readPair`](../examples/open-evaluation/RetainedFamilyTuple.hs).
 
 An optimized unfolding that contains a retained data family constructor
 operand uses the `retained-data-family-constructor-operand` interface
