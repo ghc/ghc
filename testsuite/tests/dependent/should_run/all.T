@@ -452,6 +452,12 @@ test('NativeCertifiedSplit',
       extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/' + f
                    for f in ['PackedVecLibrary.hs', 'CertifiedSplit.hs', 'CertifiedSplitClient.hs']])],
      run_command, ['bash NativeCertifiedSplit.sh "{compiler}" "{libdir}"'])
+
+test('NativeLinearRetainedPackage',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['NativeLinearRetainedPackage' + suffix for suffix in
+                   ['Provider.hs', 'Client.hs', 'Reject.hs', 'OverlapReject.hs']])],
+     run_command, ['bash NativeLinearRetainedPackage.sh "{compiler}" "{libdir}"'])
 test('NativeNamedSplit',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/NamedSplitClient.hs',

@@ -29,6 +29,10 @@ instance Diagnostic DsMessage where
     DsRetainedPackagePatterns
       -> mkSimpleDecorated $
            text "Retained package matches require prefix patterns with bare variable retained fields and unrestricted multiplicity."
+    DsLinearRetainedPackageRows
+      -> mkSimpleDecorated $
+           vcat [ text "These equations require separate matches of a linear retained package."
+                , text "Match each retained constructor once, then match the remaining fields inside that branch." ]
     DsRetainedInlinePragma binding pragma
       -> mkSimpleDecorated $
            text "The" <+> inlinePragmaName pragma <+> text "unfolding of"
@@ -268,6 +272,7 @@ instance Diagnostic DsMessage where
   diagnosticReason = \case
     DsUnknownMessage m          -> diagnosticReason m
     DsRetainedPackagePatterns   -> ErrorWithoutFlag
+    DsLinearRetainedPackageRows -> ErrorWithoutFlag
     DsRetainedInlinePragma{}    -> ErrorWithoutFlag
     DsEmptyEnumeration          -> WarningWithFlag Opt_WarnEmptyEnumerations
     DsIdentitiesFound{}         -> WarningWithFlag Opt_WarnIdentities
@@ -299,6 +304,7 @@ instance Diagnostic DsMessage where
   diagnosticHints = \case
     DsUnknownMessage m          -> diagnosticHints m
     DsRetainedPackagePatterns   -> noHints
+    DsLinearRetainedPackageRows -> noHints
     DsRetainedInlinePragma{}    -> noHints
     DsEmptyEnumeration          -> noHints
     DsIdentitiesFound{}         -> noHints

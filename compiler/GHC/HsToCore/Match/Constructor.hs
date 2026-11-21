@@ -22,7 +22,8 @@ import GHC.Hs
 import GHC.HsToCore.Binds
 import GHC.Core.ConLike
 import GHC.Core.Coercion ( MCoercion(..), coercionLKind, mkUnbranchedAxInstCo )
-import GHC.Core.DataCon ( DataCon, dataConRepType, dataConTyCon, dataConTag, dataConRepArgBinders )
+import GHC.Core.DataCon ( DataCon, dataConRepType, dataConTyCon, dataConTag
+                       , dataConRepArgBinders, isNullaryRepDataCon )
 import GHC.Core.Type ( coreFullView, isManyTy, isNativeIndexType, mkTyConApp, piResultTys )
 import GHC.Core.TyCon ( isNewTyCon, newTyConCo, tyConDataCons )
 import GHC.Core.FVs ( exprFreeVars )
@@ -32,7 +33,7 @@ import GHC.Tc.Types.Evidence ( isEmptyTcEvBinds, isIdHsWrapper )
 import GHC.Tc.Utils.TcType
 import GHC.Core.Multiplicity
 import GHC.HsToCore.Monad
-import GHC.HsToCore.Errors.Types (DsMessage(DsRetainedPackagePatterns))
+import GHC.HsToCore.Errors.Types (DsMessage(DsRetainedPackagePatterns, DsLinearRetainedPackageRows))
 import GHC.HsToCore.Utils
 import GHC.Core ( CoreExpr, Expr(Var), isNativeIndexedGadtCon )
 import GHC.Core.TyCo.Rep ( Type(DepFunTy, FunTy, ft_mult) )
@@ -40,7 +41,7 @@ import GHC.Core.Utils ( applyTypeToArgs )
 import GHC.Core.Make ( mkCoreLets )
 import GHC.Utils.Misc
 import GHC.Types.Id
-import GHC.Types.Var ( Var, isCoVar, isTyVar, updateVarType )
+import GHC.Types.Var ( Var, isCoVar, isTyVar, updateVarType, varType )
 import GHC.Types.Var.Env ( mkInScopeSetList )
 import GHC.Types.Var.Set ( mapVarSet, nonDetStrictFoldVarSet )
 import GHC.Types.Name.Env
@@ -50,7 +51,8 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import Control.Monad(liftM, join)
 import Data.Data ( Data, cast, gmapT )
-import Data.List ( sort )
+import Data.Foldable ( find )
+import Data.List ( group, sort )
 import Data.Maybe ( fromMaybe )
 import Data.Typeable ( Typeable )
 import Data.List.NonEmpty (NonEmpty(..))
@@ -124,9 +126,12 @@ matchConFamily (var :| vars) ty groups@(group1 :| other_groups)
 
   -- See Note [Retained package equation scope].
   -- See Note [Retained constructor equation scope].
-  | any needs_separate_rows groups
-  = do { results <- mapM match_retained_row (join groups)
-       ; return (foldr1 combineMatchResults results) }
+  | Just rows <- find needs_separate_rows groups
+  = if isManyTy (matchIdMult var)
+    then do { results <- mapM match_retained_row (join groups)
+            ; return (foldr1 combineMatchResults results) }
+    else putSrcSpanDsA (getLoc (eqn_pat (NE.head rows))) $
+           failWithDs DsLinearRetainedPackageRows
 
   | otherwise
   = do let mult = matchIdMult var
@@ -142,7 +147,7 @@ matchConFamily (var :| vars) ty groups@(group1 :| other_groups)
 
     needs_separate_rows group@(first :| rest) =
       not (null rest)
-        && (any has_native_proof group
+        && ((any has_native_proof group && not (equal_nullary_proofs group))
           || (has_retained_fields first && not (linear_retained_group group)))
 
     -- See Note [Sharing linear package fields].
@@ -150,8 +155,13 @@ matchConFamily (var :| vars) ty groups@(group1 :| other_groups)
       | not (isManyTy (matchIdMult var))
       , Just (dc :| dcs) <- traverse first_index_constructor rows
       = let family = dataConTyCon dc
+            by_tag = group (sort (map dataConTag (dc : dcs)))
+            repeats = [tag | tag : _ : _ <- by_tag]
         in all ((== family) . dataConTyCon) dcs
-             && sort (map dataConTag (dc : dcs)) == sort (map dataConTag (tyConDataCons family))
+             && map head by_tag == sort (map dataConTag (tyConDataCons family))
+             && and [isNullaryRepDataCon con && all bare_index (drop 1 (retained_pats row))
+                    | (con, row) <- zip (dc : dcs) (NE.toList rows)
+                    , dataConTag con `elem` repeats]
       | otherwise = False
 
     first_index_constructor row
@@ -164,6 +174,27 @@ matchConFamily (var :| vars) ty groups@(group1 :| other_groups)
     index_constructor (ParPat _ pat) = index_constructor (unLoc pat)
     index_constructor ConPat{pat_con = L _ (RealDataCon con)} = Just con
     index_constructor _ = Nothing
+
+    retained_pats row
+      | ConPat {pat_con = L _ (RealDataCon con), pat_args = PrefixCon _ pats} <- firstPat row
+      = [pat | (Just _, L _ pat) <- zip (dataConRepArgBinders con) pats]
+      | otherwise = []
+
+    bare_index VarPat{} = True
+    bare_index _ = False
+
+    equal_nullary_proofs rows
+      | Just (proof :| proofs) <- traverse nullary_proof rows
+      = all (eqType proof) proofs
+      | otherwise = False
+
+    nullary_proof row
+      | ConPat { pat_con = L _ (RealDataCon con)
+               , pat_con_ext = ConPatTc { cpt_tvs = [], cpt_dicts = [cv] } }
+          <- firstPat row
+      , isNullaryRepDataCon con, isCoVar cv
+      = Just (varType cv)
+      | otherwise = Nothing
 
     -- Compile one equation with its own runtime index binders.
     match_retained_row :: EquationInfoNE -> DsM (MatchResult CoreExpr)
@@ -320,9 +351,10 @@ fields k1 and k2 and proofs n ~# 'S k1 and n ~# 'S k2. Ordinary constructor
 grouping shares the first row's fields and introduces evidence aliases. Those
 aliases do not substitute the runtime Ids in later proof types or RHS types.
 
-Use the separate-row strategy from Note [Retained package equation scope] when
-a group with several rows carries a virtual proof. Compile each row
-with its own fields and proof. Keep source order within each constructor group.
+If the constructor has no fields, rows with equal proof types can use the
+usual evidence aliases. Otherwise use the separate-row strategy from
+Note [Retained package equation scope]. Compile each row with its own fields
+and proof. Keep source order within each constructor group.
 Different constructors do not overlap. Each case uses the existing DEFAULT
 failure path for other constructors. A failed later column or guard tries the
 next row. An infallible row discards later rows for the same constructor.
@@ -489,9 +521,12 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Testing the same linear package in separate cases can use its scrutinee twice
 or capture a linear field in a failure continuation. Use one outer case if
-the first retained field has one row for each constructor in its family. The
-ordinary matcher can split this first column before it tests the other fields.
-Each constructor alternative can reach only its own source row.
+the first retained field covers all constructors in its family. The ordinary
+matcher can split this first column before it tests the other fields. A repeated
+constructor in this split must have no fields, and its later retained patterns
+must be variables. Its virtual proofs then have the same type. Ordinary pattern
+grouping can match the remaining columns with the usual failure continuations.
+Report a source error when a linear package would require separate cases.
 
 Use the first row's runtime field Ids in the outer case. Replace the retained
 field Ids of each later row before matching the inner columns. The substitution
