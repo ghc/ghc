@@ -676,12 +676,42 @@ row and the complete two-column row both admit a `Refl` proof.
 `lookupColumn 'y' (keyedRow 4)` returns `Just 5`. Finding the first
 key leaves the rest of the values unevaluated.
 
-The evaluator supports one erased constructor index. Each indexed field
-must have the checked constructor cases described above. A `Proxy n`
+Each indexed field must have the checked constructor cases described above. A `Proxy n`
 field leaves its index unknown. GHC reports GHC-70565 at the written call
 and names the field and its constructor before executing the producer.
 [Ordinary row](../examples/closed-evaluation/WitnessedBatch.hs) and
 [separate-module checks](../../../testsuite/tests/dependent/should_run/NativeClosedWitnessedBatch.sh).
+
+### Read independent row and column counts
+
+```haskell
+data TableMargins a where
+    TableMargins :: forall cols rows a. Vec rows Char -> Vec cols Char
+                 -> Vec rows a -> Vec cols a -> TableMargins a
+```
+
+The row labels determine `rows`. The column labels determine `cols`.
+The evaluator checks each vector of totals against its own labels.
+The order in the `forall` can differ from the order in which the
+fields reveal these lengths. A table can have zero rows and one column.
+With one row and two columns, `lookupTotals 'r' 'y' (tableMargins 4)`
+returns `(Just 8, Just 4)`. Reading only the column total leaves the row
+labels and row totals unevaluated.
+
+An ordinary caller that supplies the column totals in the row-total
+position gets GHC-25897 at that argument. GHC reports the two rigid
+lengths `cols` and `rows`.
+
+In a separate recompilation check, GHC reused the unchanged proof. Replacing
+only the producer object added a second row and preserved the module ABI.
+GHC then rechecked the proof and reported the extra label at `Refl`
+with GHC-83865.
+
+Each indexed field can use one hidden index. A nested field such as
+`Vec rows (Vec cols a)` needs both. GHC reports GHC-70565 at the producer
+call, with the field number, constructor and both index names.
+[Table definition](../examples/closed-evaluation/WitnessedBatch.hs)
+and [Agda comparison](../REFERENCES.md#recursively-read-back-witnessed-constructors).
 
 ## M136. Composing ordinary calls before observation
 

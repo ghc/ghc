@@ -6089,6 +6089,15 @@ must give the same index. An ordinary lookup only evaluates the constructors
 it visits. [Agda vector properties](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Properties.html)
 and [shared vector length](roadmap/R15-closed-term-evaluator.md#recover-a-hidden-length-from-the-vector).
 
+In Agda the table margins can be described by two nested dependent pairs,
+`Σ[ rows ∈ ℕ ] Σ[ cols ∈ ℕ ] (Vec Char rows × Vec Char cols × Vec A rows × Vec A cols)`.
+Each vector mentions its own binder. The Haskell GADT erases both lengths.
+R15 therefore reconstructs each length from its own fields and uses the
+constructor binders to associate labels with totals.
+[Agda dependent products](https://agda.github.io/agda-stdlib/v2.3/Data.Product.Base.html),
+[Agda vectors](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html)
+and [Haskell table margins](roadmap/R15-closed-term-evaluator.md#read-independent-row-and-column-counts).
+
 The Idris 2 tutorial's vector filter returns a dependent pair. Its
 recursive branch opens the result of the recursive call before building
 a new pair whose length follows the selected branch. The Haskell batch

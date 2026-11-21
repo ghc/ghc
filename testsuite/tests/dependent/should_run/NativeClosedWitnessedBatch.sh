@@ -21,6 +21,7 @@ for opt in -O0 -O2; do
 {-# LANGUAGE DataKinds, GADTs, KindSignatures #-}
 module WrongWitness
     ( buildWrong, wrongMask, wrongColumns, BadField(..), badField
+    , wrongRows, wrongCols, Nested(..), nested
     , EvidenceBatch(..), withEvidence, TaggedBatch(..), withEquality
     ) where
 import Data.Proxy (Proxy)
@@ -28,7 +29,7 @@ import ExistentialVec (SN(..))
 import IndexedVec (N(..), Vec(..))
 import Numeric.Natural (Natural)
 import Unsafe.Coerce (unsafeCoerce)
-import WitnessedBatch (Batch(..), MaskedRow(..), KeyedRow(..))
+import WitnessedBatch (Batch(..), MaskedRow(..), KeyedRow(..), TableMargins(..), tableMargins)
 
 buildWrong :: Natural -> Batch Natural
 buildWrong n = Chunk (SS SZ) (VCons n VNil)
@@ -39,6 +40,18 @@ wrongMask n = MaskedRow (SS SZ) (VCons n VNil) 'x' (unsafeCoerce (VNil :: Vec 'Z
 
 wrongColumns :: Natural -> KeyedRow Natural
 wrongColumns n = KeyedRow 'r' (VCons 'x' VNil) (unsafeCoerce (VCons n (VCons n VNil)))
+
+wrongRows, wrongCols :: Natural -> TableMargins Natural
+wrongRows n = case tableMargins n of
+    TableMargins r c _ ys -> TableMargins r c (unsafeCoerce ys) ys
+wrongCols n = case tableMargins n of
+    TableMargins r c xs _ -> TableMargins r c xs (unsafeCoerce xs)
+
+data Nested a where
+    Nested :: Vec cols Char -> Vec rows (Vec cols a) -> Nested a
+
+nested :: Natural -> Nested Natural
+nested _ = error "unsupported nested field was evaluated"
 
 data BadField a where
     BadField :: SN n -> Vec n a -> Char -> Proxy n -> BadField a
@@ -66,7 +79,7 @@ HS
     if [[ -f ../producer/WitnessedBatch.dyn_o ]]; then cp ../producer/*.{dyn_hi,dyn_o} .; fi
     cat >Proof.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
-module Proof (evenBatch, oddBatch, mask, empty, row) where
+module Proof (evenBatch, oddBatch, mask, empty, row, margins) where
 
 import Data.Type.Equality ((:~:)(Refl))
 import qualified ExistentialVec as E
@@ -92,6 +105,10 @@ empty = Refl
 row :: B.keyedRow 4 :~: 'B.KeyedRow 'r' ('V.VCons 'x' ('V.VCons 'y' 'V.VNil))
                                         ('V.VCons 4 ('V.VCons 5 'V.VNil))
 row = Refl
+
+margins :: B.tableMargins 0 :~: 'B.TableMargins 'V.VNil ('V.VCons 'x' 'V.VNil)
+                                                'V.VNil ('V.VCons 0 'V.VNil)
+margins = Refl
 HS
     cat >Demand.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeOperators #-}
@@ -110,7 +127,7 @@ module Main where
 import qualified Demand
 import qualified ExistentialVec as E
 import qualified IndexedVec as V
-import Proof (evenBatch, oddBatch, mask, row, empty)
+import Proof (evenBatch, oddBatch, mask, row, empty, margins)
 import qualified WitnessedBatch as B
 
 skipped :: [Int]
@@ -126,11 +143,15 @@ main = do
         short = B.KeyedRow (error "unused tag") (V.VCons 'x' V.VNil)
                            (V.VCons 8 (error "unused tail"))
     print (row, empty, B.lookupColumn 'y' (B.keyedRow 4), B.lookupColumn 'x' short)
+    let partial :: B.TableMargins Int
+        partial = B.TableMargins (error "unused row labels") (V.VCons 'x' V.VNil)
+                                 (error "unused row totals") (V.VCons 7 V.VNil)
+    print (margins, B.lookupTotals 'r' 'y' (B.tableMargins 4), snd (B.lookupTotals 'r' 'x' partial))
 HS
     "${ghc[@]}" "$opt" -c Proof.hs Demand.hs
     "${ghc[@]}" "$opt" -c Main.hs
     "${ghc[@]}" ./*.o -o run
-    test "$(./run)" = $'(Refl,Refl,Refl,Refl,Refl,1,2,1,[5],[])\n(Refl,Refl,Just 5,Just 8)'
+    test "$(./run)" = $'(Refl,Refl,Refl,Refl,Refl,1,2,1,[5],[])\n(Refl,Refl,Just 5,Just 8)\n(Refl,(Just 8,Just 4),Just 7)'
 
     cat >WrongLength.hs <<'HS'
 module WrongLength where
@@ -144,6 +165,20 @@ HS
        ! grep -Eq 'WrongLength.hs:6:[0-9]+: error: \[GHC-83865\]' length.log ||
        ! grep -Fq 'fourth argument' length.log; then
         cat length.log >&2
+        exit 1
+    fi
+
+    cat >SwapMargins.hs <<'HS'
+module SwapMargins where
+import WitnessedBatch (TableMargins(..))
+swapped :: TableMargins a -> TableMargins a
+swapped (TableMargins rowKeys colKeys rowTotals colTotals) =
+    TableMargins rowKeys colKeys colTotals rowTotals
+HS
+    if "${ghc[@]}" "$opt" -c SwapMargins.hs >swap.log 2>&1 ||
+       ! grep -Fq 'SwapMargins.hs:5:34: error: [GHC-25897]' swap.log ||
+       ! grep -Fq 'third argument' swap.log; then
+        cat swap.log >&2
         exit 1
     fi
 
@@ -219,9 +254,17 @@ HS
         BadWitness.hs >BadMask.hs
     reject BadMask 'The value returned by the interpreter does not match the checked result type.'
 
-    sed -e 's/module BadWitness/module BadColumns/' -e 's/Wrong.buildWrong/Wrong.wrongColumns/' \
-        BadWitness.hs >BadColumns.hs
-    reject BadColumns 'The value returned by the interpreter does not match the checked result type.'
+    for function in wrongColumns wrongRows wrongCols; do
+        sed -e 's/module BadWitness/module BadColumns/' -e "s/Wrong.buildWrong/Wrong.$function/" \
+            BadWitness.hs >BadColumns.hs
+        reject BadColumns 'The value returned by the interpreter does not match the checked result type.'
+    done
+
+    sed -e 's/module ClassEvidence/module NestedField/' -e 's/W.withEvidence/W.nested/' \
+        ClassEvidence.hs >NestedField.hs
+    reject NestedField 'Cannot reify field 2 of'
+    grep -Eq 'multiple hidden indices \((cols, rows|rows, cols)\)' reject.log
+    if grep -Fq 'unsupported nested field was evaluated' reject.log; then cat reject.log >&2; exit 1; fi
 
     sed -e 's/module ClassEvidence/module UnsupportedField/' -e 's/W.withEvidence/W.badField/' \
         ClassEvidence.hs >UnsupportedField.hs

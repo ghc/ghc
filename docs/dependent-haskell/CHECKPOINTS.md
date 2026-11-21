@@ -28,6 +28,16 @@ and [reverse upgrade test](examples/open-evaluation/check-reverse-upgrade.sh).
 
 ## Family and package checkpoints
 
+At `020023a416`, an ordinary keyed row used the key vector to determine
+the length of the value vector. A dependent client checked the whole row
+through stripped interfaces. At `9aeba5a435`, an ordinary caller also used
+a scoped class method in a vector filter at `-O1` and `-O2`. GHC still
+specialised the independent equality count in the same module. Each
+component compiler passed 16 registered tests and all 463 Showcase rows
+at native `-O0`, `-O1`, `-O2` and in GHCi.
+[Keyed rows](roadmap/R15-closed-term-evaluator.md#recover-a-hidden-length-from-the-vector)
+and [ordinary class client](../../testsuite/tests/dependent/should_run/promoted-class/ScopedSpecialise.hs).
+
 The native Core API driver linked directly to the archive at
 `8a431a16cc` and matched all 37 expected lines with empty standard error.
 The runtime type operand change at `e029a412f3` passed the three registered

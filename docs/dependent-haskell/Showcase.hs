@@ -1332,6 +1332,14 @@ main = do
             ('IndexedVec.VCons 4 ('IndexedVec.VCons 5 'IndexedVec.VNil))
         , Batch.lookupColumn 'y' (Batch.keyedRow 4)
         , Batch.lookupColumn 'y' (Batch.keyedRow 0) )
+    observe "read row and column totals at independent hidden lengths"
+        ( Refl :: Batch.tableMargins 4 :~: 'Batch.TableMargins
+            ('IndexedVec.VCons 'r' 'IndexedVec.VNil)
+            ('IndexedVec.VCons 'x' ('IndexedVec.VCons 'y' 'IndexedVec.VNil))
+            ('IndexedVec.VCons 8 'IndexedVec.VNil)
+            ('IndexedVec.VCons 4 ('IndexedVec.VCons 4 'IndexedVec.VNil))
+        , Batch.lookupTotals 'r' 'y' (Batch.tableMargins 4)
+        , Batch.lookupTotals 'r' 'x' (Batch.tableMargins 0) )
     observe "read one field of a private parcel without forcing the other"
         (Refl :: LazyParcel.first (LazyParcel.make 7) :~: 7, LazyParcel.first (LazyParcel.make 7))
     observe "construct a result from two symbolic fields"

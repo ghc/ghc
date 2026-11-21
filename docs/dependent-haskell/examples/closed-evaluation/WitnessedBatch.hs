@@ -1,9 +1,10 @@
-{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}
+{-# LANGUAGE DataKinds, ExplicitForAll, GADTs, NoExperimentalDependentTypes #-}
 
 module WitnessedBatch
     ( Batch(..), build, partial, partialTail, firstWidth
     , MaskedRow(..), maskedRow, partialRow, rowWidth, selectedValues
     , KeyedRow(..), keyedRow, lookupColumn
+    , TableMargins(..), tableMargins, lookupTotals
     ) where
 
 import ExistentialVec (SN(..))
@@ -74,13 +75,30 @@ keyedRow n = KeyedRow 'r' (VCons 'x' (VCons 'y' VNil))
 
 -- | Read the value at the first matching key.
 lookupColumn :: Char -> KeyedRow a -> Maybe a
-lookupColumn key (KeyedRow _ keys values) = go keys values
-  where
-    go :: Vec n Char -> Vec n b -> Maybe b
-    go VNil VNil = Nothing
-    go (VCons k ks) (VCons x xs)
-        | key == k  = Just x
-        | otherwise = go ks xs
+lookupColumn key (KeyedRow _ keys values) = lookupKey key keys values
+
+-- | Row and column labels each index their own totals.
+data TableMargins a where
+    TableMargins :: forall cols rows a. Vec rows Char -> Vec cols Char
+                 -> Vec rows a -> Vec cols a -> TableMargins a
+
+-- | Use one row and two columns for a positive input.
+tableMargins :: Natural -> TableMargins Natural
+tableMargins 0 = TableMargins VNil (VCons 'x' VNil) VNil (VCons 0 VNil)
+tableMargins n = TableMargins (VCons 'r' VNil) (VCons 'x' (VCons 'y' VNil))
+                              (VCons (n + n) VNil) (VCons n (VCons n VNil))
+
+-- | Look up a row total and a column total independently.
+lookupTotals :: Char -> Char -> TableMargins a -> (Maybe a, Maybe a)
+lookupTotals r c (TableMargins rows cols rowTotals colTotals) =
+    (lookupKey r rows rowTotals, lookupKey c cols colTotals)
+
+-- | Look up a key in two vectors of equal length.
+lookupKey :: Char -> Vec n Char -> Vec n a -> Maybe a
+lookupKey _ VNil VNil = Nothing
+lookupKey key (VCons k ks) (VCons x xs)
+    | key == k  = Just x
+    | otherwise = lookupKey key ks xs
 
 -- | Count the successors of a length witness.
 width :: SN n -> Natural
