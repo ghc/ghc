@@ -470,7 +470,9 @@ makeCorePair dflags gbl_id is_default_method rhs
   , not (hasNativeDependentExprRhs (Type (idType gbl_id)))
   , unf@CoreUnfolding { uf_tmpl = tmpl } <- realIdUnfolding (fst pair)
   , hasNativeDependentUnfolding tmpl
-  = if not (hasExistentialExpr tmpl) && supportsNativeRuleBinds [NonRec (fst pair) tmpl]
+  -- See Note [Local retained package unfoldings] in GHC.Core.Tidy.
+  = if (isInternalName (idName gbl_id) || not (hasExistentialExpr tmpl))
+       && supportsNativeRuleBinds [NonRec (fst pair) tmpl]
     then pure (setIdUnfolding (fst pair) unf{uf_src = RetainedUserSrc}, snd pair)
     else putSrcSpanDs (nameSrcSpan (idName gbl_id)) $
            failWithDs (DsRetainedInlinePragma (idName gbl_id) inline_spec)

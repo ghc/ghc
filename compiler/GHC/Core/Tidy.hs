@@ -15,6 +15,7 @@ module GHC.Core.Tidy (
 import GHC.Prelude
 
 import GHC.Core
+import GHC.Core.Dependent (hasExistentialExpr)
 import GHC.Core.Type
 import GHC.Core.TyCo.Tidy
 import GHC.Core.Seq ( seqUnfolding )
@@ -384,6 +385,9 @@ tidyNestedUnfolding tidy_env df@(DFunUnfolding { df_bndrs = bndrs, df_args = arg
 
 tidyNestedUnfolding tidy_env
     unf@(CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src, uf_cache = cache })
+  -- See Note [Local retained package unfoldings].
+  | RetainedUserSrc <- src, hasExistentialExpr unf_rhs
+  = noUnfolding
   | isStableSource src
   = seqIt $ unf { uf_tmpl = tidyExpr tidy_env unf_rhs }    -- Preserves OccInfo
             -- This seqIt avoids a space leak: otherwise the uf_cache
@@ -397,6 +401,21 @@ tidyNestedUnfolding tidy_env
 
   where
     seqIt unf = seqUnfolding unf `seq` unf
+
+{- Note [Local retained package unfoldings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The retained simplifier handles Pack and Unpack. An ordinary-typed local
+INLINE or INLINABLE binding can use these expressions in its checked
+template during optimization of the defining module.
+
+An exported unfolding can contain a local binding whose template still
+contains a package operation after simplification removes it from the RHS.
+Discard that local template during Tidy, before creating the interface or
+the in-memory ModDetails for another module. GHC.Iface.Tidy still withholds
+top-level templates that contain package operations in their expression.
+This keeps the existing interface reader contract. See Note [Erased package
+unfoldings] in GHC.IfaceToCore.
+-}
 
 {-
 Note [Tidy IdInfo]
