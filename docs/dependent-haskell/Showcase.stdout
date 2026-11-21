@@ -467,6 +467,7 @@ prove the list fold law for append: (Refl,True)
 prove the append law through the Prelude.foldr list instance: Refl
 prove the two equations of a Maybe mapping method: (Refl,Refl,Nothing,Just False)
 prove that Prelude.fmap leaves Nothing unchanged: (Refl,Nothing)
+map an open Just field once and twice with Prelude.fmap: (Refl,Refl,Just False,Just True,True)
 prove that folding a mapped list composes the step: (Refl,(True,True),(True,True))
 prove that reverse preserves list length: (Refl,Succ (Succ Zero))
 prove that map distributes over append: (Refl,[False,True,False],[False,True,False],(True,True))

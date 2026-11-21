@@ -1675,6 +1675,7 @@ main = do
         PreludeFoldrProof.example
     putStrLn ("prove the two equations of a Maybe mapping method: " ++ MappingProof.example)
     putStrLn ("prove that Prelude.fmap leaves Nothing unchanged: " ++ PreludeMappingProof.example)
+    putStrLn ("map an open Just field once and twice with Prelude.fmap: " ++ PreludeMappingProof.presentExample)
     putStrLn ("prove that folding a mapped list composes the step: " ++ PreludeFoldrProof.showFoldMap)
     putStrLn ("prove that reverse preserves list length: "
               ++ PreludeReverseLengthProof.showPreludeReverseLength)

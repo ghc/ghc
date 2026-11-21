@@ -7,7 +7,7 @@ import Data.Proxy (Proxy)
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Exts (U)
 import Prelude
-#ifdef ALTERNATE
+#if defined(ALTERNATE) || defined(STRICT_FIELD)
 import DirectMappingProvider (Alternate(..))
 #endif
 
@@ -15,9 +15,23 @@ import DirectMappingProvider (Alternate(..))
 {-# RULES "map-bool-nothing" forall f. Prelude.fmap @Maybe f (Nothing @Bool) = Just (f True) #-}
 #endif
 
-#ifdef PRESENT
+#if defined(OTHER_HEAD) || defined(OTHER_INPUT)
+control :: forall a b (f :: a %U -> b) (g :: a %U -> b) (x :: a) (y :: a).
+           Proxy f -> Proxy g -> Proxy x -> Proxy y -> Prelude.fmap f ('Just x) :~:
+#ifdef OTHER_HEAD
+           'Just (g x)
+#else
+           'Just (f y)
+#endif
+control _ _ _ _ = Refl
+#elif defined(CANCEL)
+control :: forall a b (f :: a %U -> b) (x :: a) (y :: a). Proxy f
+        -> Prelude.fmap f ('Just x) :~: Prelude.fmap f ('Just y)
+        -> x :~: y
+control _ Refl = Refl
+#elif defined(STRICT_FIELD)
 control :: forall a b (f :: a %U -> b) (x :: a). Proxy f -> Proxy x
-        -> Prelude.fmap f ('Just x) :~: 'Just (f x)
+        -> strictMap f ('Just x) :~: 'Just (f x)
 control _ _ = Refl
 #else
 control :: forall a b (f :: a %U -> b) (x :: a).
