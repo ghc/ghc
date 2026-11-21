@@ -70,5 +70,6 @@ main = do
             print (observe input)
             print (observeBoth input (Inverted input))
             print (observeGround input)
+            print (observe True)
             print (observe (error "the ignored operand was forced" :: Ignored))
             print (ignorePayload Unobserved)

@@ -13,7 +13,7 @@ module GHC.Core.Dependent (
     isRetainedVanillaDefaultMethod,
     rejectNativeDependentProgram,
     rejectNativeDependentExpr,
-    hasScopedDictionaryProgram, hasScopedDictionaryType, rejectScopedDictionaryProgram, rejectScopedDictionaryExpr,
+    hasScopedDictionaryProgram, hasScopedDictionaryExpr, hasScopedDictionaryType, rejectScopedDictionaryProgram, rejectScopedDictionaryExpr,
 ) where
 
 import GHC.Prelude
@@ -266,6 +266,10 @@ rejectNativeDependentExpr context expr =
 hasScopedDictionaryProgram :: CoreProgram -> Bool
 hasScopedDictionaryProgram binds =
     runScanFor DetectScopedDictionaries AllMetadata (foldMap scanBind binds)
+
+-- | Detect a private dictionary form in an expression and its annotations.
+hasScopedDictionaryExpr :: CoreExpr -> Bool
+hasScopedDictionaryExpr = runScanFor DetectScopedDictionaries AllMetadata . scanExpr
 
 -- | Detect a private dictionary form in an interface-visible type.
 hasScopedDictionaryType :: Type -> Bool

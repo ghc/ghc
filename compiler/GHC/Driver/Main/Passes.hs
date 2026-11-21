@@ -1525,7 +1525,10 @@ hscSimplify' plugins ds_result = do
           finish CoreDesugar binds rules
           let simplified = simpleOptNativeProgram binds
           finish CoreDesugarOpt simplified rules
-          return (ds_result { mg_binds = simplified })
+          let result = ds_result { mg_binds = simplified }
+          case nativeOptLevel (hsc_dflags env) of
+            Just _ -> core2coreRetained env result
+            Nothing -> return result
       else if native
         then do
           let lint_env = hscUpdateFlags (`gopt_set` Opt_DoCoreLinting) hsc_env_with_plugins
@@ -1575,10 +1578,12 @@ hscSimplify' plugins ds_result = do
 
 {- Note [Private dictionary programs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The full simplifier and worker/wrapper can replace an evidence variable
-that occurs in a private selector type. Use retained SimpleOpt and
-scoped lint at both optimization levels. Pass the requested level to the
-native backend.
+Use retained SimpleOpt at every optimization level. Run the retained
+Core pipeline at the requested optimization level when it is enabled.
+Check private dictionary forms with scoped lint throughout the pipeline.
+A dependent dictionary application keeps its evidence argument in scope.
+The retained simplifier preserves the binder, and SimpleOpt substitutes
+only a matching evidence variable into a private selector type.
 
 A module can export ordinary wrappers for these bindings. An exported
 type cannot contain a private dictionary form. Omit interface pragmas
