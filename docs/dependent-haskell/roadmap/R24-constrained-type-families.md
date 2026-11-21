@@ -265,7 +265,6 @@ A marked family in a written argument must have a domain even if its
 enclosing synonym ignores that argument. For
 `type Ignore a = forall b. Show b => b -> String`, a signature using
 `Ignore (Elem [Int])` reports GHC-39999 for `Allowed Int`.
-Generated newtype or via equations still need separate formation rules.
 [Source checks](../../../testsuite/tests/dependent/should_run/NativeRetainedFamilyDomain.hs).
 
 ### Domains in type synonyms
@@ -453,6 +452,22 @@ dictionary. To recover that constraint later, the class must provide it.
 The source controls distinguish a representational coercion, a sibling
 parameter, and an argument hidden by a type synonym.
 [Equation controls](../../../testsuite/tests/dependent/should_run/NativeFamilyEquationScope.hs).
+
+Newtype deriving and `DerivingVia` check the generated equation with the
+same rule. In the Showcase, `Buffered a` derives `BufferSource (Buffered a)`.
+The generated equation `BufferElement (Buffered a) = BufferElement [a]`
+requires `BufferSource [a]`. The owning instance supplies that constraint
+through its `BackingDomain (Buffered a)` superclass. An ordinary module
+derives the instance. The Showcase uses it to read a populated and an
+empty buffer.
+
+A separate test covers both strategies with and without the superclass
+proof. The marked family rejects the forwarding equation if the
+representation constraint is available only from the explicit or
+inferred deriving context. The same deriving declarations compile
+for an ordinary provider.
+[Buffer example](../examples/open-evaluation/ConstrainedElementsClient.hs)
+and [derived-equation controls](../../../testsuite/tests/dependent/should_run/NativeDerivedFamilyScope.hs).
 
 An instance selected by the writer can acquire a more specific alternative
 in a later module. The equation proof therefore uses local evidence. A

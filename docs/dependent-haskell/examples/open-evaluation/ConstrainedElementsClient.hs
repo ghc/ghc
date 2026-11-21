@@ -1,9 +1,9 @@
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
-{-# LANGUAGE DataKinds, ExplicitNamespaces, FlexibleContexts, RequiredTypeArguments, TypeApplications #-}
-{-# LANGUAGE GADTs, NoExperimentalDependentTypes, PartialTypeSignatures, QuantifiedConstraints, RankNTypes, ScopedTypeVariables, TypeFamilies, TypeOperators #-}
-module ConstrainedElementsClient (advanceCursor, showAdvance, showRemainder, splitCollection, constrainedElements, annotatedElement, explicitElements, renderField, formatField, renderKnownFields, retainedMaybeDomain, aliasedReflection, runReflection, partialElement, ViewsAfter) where
+{-# LANGUAGE DataKinds, DerivingStrategies, ExplicitNamespaces, FlexibleContexts, RequiredTypeArguments, TypeApplications #-}
+{-# LANGUAGE GADTs, GeneralizedNewtypeDeriving, NoExperimentalDependentTypes, PartialTypeSignatures, QuantifiedConstraints, RankNTypes, ScopedTypeVariables, StandaloneDeriving, TypeFamilies, TypeOperators, UndecidableInstances #-}
+module ConstrainedElementsClient (advanceCursor, showAdvance, showRemainder, splitCollection, Buffered(..), firstBuffered, constrainedElements, annotatedElement, explicitElements, renderField, formatField, renderKnownFields, retainedMaybeDomain, aliasedReflection, runReflection, partialElement, ViewsAfter) where
 
-import ConstrainedElements (Cursor(..), PrintableCursor, Collection(..), Allowed, Collects(..), FieldKey, Field(..), applyField, field, withField, Reflection, reflectMaybe, MaybeBoolEcho, AtNothing, ViewsFor)
+import ConstrainedElements (Cursor(..), PrintableCursor, Collection(..), Allowed, Collects(..), BufferSource(..), BackingDomain, FieldKey, Field(..), applyField, field, withField, Reflection, reflectMaybe, MaybeBoolEcho, AtNothing, ViewsFor)
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
@@ -102,6 +102,12 @@ type ViewsAfter f a = ViewsFor (f a)
 -- | The collection determines the element type required by Rest.
 splitCollection :: Collection c e => c -> Maybe (e, Rest c)
 splitCollection = uncons
+
+-- | A buffer backed by a list.
+newtype Buffered a = Buffered [a]
+
+type instance BackingDomain (Buffered a) = BufferSource [a]
+deriving newtype instance Allowed a => BufferSource (Buffered a)
 
 -- | Render the rest of a collection after its first element.
 showRemainder :: (Collection c e, Show (Rest c)) => c -> Maybe String

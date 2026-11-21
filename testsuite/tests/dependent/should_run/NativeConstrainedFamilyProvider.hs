@@ -1,5 +1,7 @@
-{-# LANGUAGE ConstraintKinds, FlexibleContexts, FlexibleInstances, FunctionalDependencies, MultiParamTypeClasses, TypeFamilies #-}
-module NativeConstrainedFamilyProvider (Collects(..), Display, Allowed, Defaulted(..), Pair(..), Key, KeyElement, Output(..), Projected, Chain(..), Fixed(..)) where
+{-# LANGUAGE ConstraintKinds, FlexibleContexts, FlexibleInstances, FunctionalDependencies, MultiParamTypeClasses, TypeFamilies, UndecidableSuperClasses #-}
+module NativeConstrainedFamilyProvider (Collects(..), Display, Allowed, Defaulted(..), Pair(..), Key, KeyElement, Output(..), Projected, Chain(..), Fixed(..), ListBacking, ListSource(..)) where
+
+import Data.Kind (Constraint)
 
 class Allowed a
 instance Allowed Bool
@@ -55,3 +57,17 @@ class (e ~ Maybe a) => Fixed a e where
 
 instance Fixed Bool (Maybe Bool) where
     type FromFixed Bool = Char
+
+-- | Constraints supplied by a collection to its users.
+type family ListBacking c :: Constraint
+type instance ListBacking [a] = ()
+
+-- | Select the element type and read the first element.
+class ListBacking c => ListSource c where
+    type SourceItem c
+    first :: c -> Maybe (SourceItem c)
+
+instance Allowed a => ListSource [a] where
+    type SourceItem [a] = a
+    first [] = Nothing
+    first (x:_) = Just x

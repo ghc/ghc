@@ -31,6 +31,7 @@ render a retained callback with ImpredicativeTypes enabled: ["Just True","Nothin
 forward a runtime element with a quantified partial signature: (True,False)
 render a raw view through an ordinary wrapper around a partial family: "[True,False]"
 split collections whose types determine their elements: (Just (True,[False]),Just ('x',()),Nothing)
+read the derived element type of a list-backed buffer: (Just True,Nothing)
 show the rest of a collection: (Just "[False]",Just "()",Nothing)
 print a cursor through its constraint synonym: (Just "[False]",Nothing,Just "()")
 advance a cursor using its superclass family equation: (Just [False],Nothing,Just ())

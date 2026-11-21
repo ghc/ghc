@@ -15,7 +15,7 @@ for reader in marked ordinary; do
         mode=-XNoExperimentalDependentTypes
     fi
     (cd provider && "${ghc[@]}" -fforce-recomp "$mode" -c NativeConstrainedFamilyProvider.hs)
-    cp provider/NativeConstrainedFamilyProvider.hi "$src/"{NativeConstrainedFamilyClient,NativePartialFamilyScope,NativeImprovedFamilyScope,NativeFamilyEquationScope}.hs "$reader/"
+    cp provider/NativeConstrainedFamilyProvider.{hi,o} "$src/"{NativeConstrainedFamilyClient,NativePartialFamilyScope,NativeImprovedFamilyScope,NativeFamilyEquationScope}.hs "$reader/"
     (
         cd "$reader"
         "${ghc[@]}" -c NativeConstrainedFamilyClient.hs
@@ -204,6 +204,58 @@ deferred = 'x'
 HS
             "${ghc[@]}" -fdefer-type-errors -c DeferredTerm.hs >deferred-term.log 2>&1
             grep -Fq '[-Wdeferred-type-errors]' deferred-term.log
+        fi
+    )
+done
+
+# The domain proof for a generated equation comes from the owning class.
+for reader in marked ordinary; do
+    (
+        cd "$reader"
+        cp "$src/NativeDerivedFamilyScope.hs" .
+        for strategy in NEWTYPE_ONLY VIA_ONLY INFERRED_CONTEXT; do
+            derive=(-fforce-recomp "-D$strategy" -DNO_PROJECTION -fdefer-type-errors -c NativeDerivedFamilyScope.hs)
+            if [[ $reader == ordinary ]]; then
+                "${ghc[@]}" "${derive[@]}"
+            elif "${ghc[@]}" "${derive[@]}" >derive.log 2>&1 ||
+                 ! grep -Eq '^NativeDerivedFamilyScope.hs:[0-9]+:[0-9]+: error: \[GHC-90647\]' derive.log ||
+                 ! grep -Fq 'The equation requires ‘ListSource [a]’' derive.log; then
+                cat derive.log
+                exit 1
+            fi
+        done
+
+        "${ghc[@]}" -O2 -fforce-recomp -c NativeDerivedFamilyScope.hs
+        mkdir derived-client
+        cp NativeConstrainedFamilyProvider.hi NativeDerivedFamilyScope.hi derived-client/
+        cd derived-client
+        cat >Main.hs <<'HS'
+{-# LANGUAGE CPP, NoExperimentalDependentTypes, TypeFamilies, TypeOperators #-}
+module Main where
+import Data.Type.Equality ((:~:)(Refl))
+import NativeConstrainedFamilyProvider (ListSource(..))
+import NativeDerivedFamilyScope (Wrapped(..), ViaList(..))
+
+#ifdef BAD_DOMAIN
+proof :: SourceItem (ViaList Int) :~: Int
+#else
+proof :: SourceItem (ViaList Bool) :~: Bool
+#endif
+proof = Refl
+
+main :: IO ()
+main = print (first (Wrapped [True]), first (ViaList [False]))
+HS
+        "${ghc[@]}" -O2 -c Main.hs
+        "${ghc[@]}" Main.o ../NativeDerivedFamilyScope.o ../NativeConstrainedFamilyProvider.o -o run
+        [[ $(./run) == '(Just True,Just False)' ]]
+        if [[ $reader == ordinary ]]; then
+            "${ghc[@]}" -fforce-recomp -DBAD_DOMAIN -c Main.hs
+        elif "${ghc[@]}" -fforce-recomp -DBAD_DOMAIN -fdefer-type-errors -c Main.hs >domain.log 2>&1 ||
+             ! grep -Fq '[GHC-39999]' domain.log ||
+             ! grep -Fq 'Allowed Int' domain.log; then
+            cat domain.log
+            exit 1
         fi
     )
 done
