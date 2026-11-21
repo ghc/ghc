@@ -2939,7 +2939,7 @@ tc_app_ty mode rn_ty exp_kind
     -- A retained operand fixes the class parameter for a method of
     -- type a -> a -> a. Check both original operands against its table.
     retainedDomain arg
-      | L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ name))) <- ignoreParens arg
+      | L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ name))) <- indexed_operand arg
       , Just index <- lookupNameEnv (mode_indices mode) name
       , isNativeOpaqueValueId index
       = Just (varType index)
@@ -2994,7 +2994,7 @@ sourceMethodContext :: TcTyMode -> [PredType] -> TcTyMode
 sourceMethodContext mode theta = mode { mode_source_givens = theta ++ mode_source_givens mode }
 
 -- | Require the ordinary solver to select the exact compiled dictionary.
--- See Note [Select the dictionary for a promoted list fold] in GHC.Tc.Gen.SourceTable.
+-- See Note [Select the dictionary for a promoted method] in GHC.Tc.Gen.SourceTable.
 checkSourceMethodSelection :: TcTyMode -> Id -> Name -> TcM ()
 checkSourceMethodSelection mode dfun selector = do
   lexical <- getLexicalGivens

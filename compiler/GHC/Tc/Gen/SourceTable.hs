@@ -489,15 +489,19 @@ recordSourceMethodUse :: Id -> Id -> Id -> TcM ()
 recordSourceMethodUse dfun selector target =
     recordSourceUses (sourceMethodOps dfun selector target)
 
-{- Note [Select the dictionary for a promoted list fold]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Select the dictionary for a promoted method]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 An occurrence of Prelude.foldr names a class selector. A list operand
 fixes its instance head to Foldable []. A local Given can still supply
 the dictionary, for example after a match on Dict (Foldable []).
 Only the dictionary that selects the checked worker justifies its equations.
 
+For a binary selector of type a -> a -> a, a retained argument fixes a.
+Use the binder's type to look up the dictionary. Check the original
+operands, including any written kind annotations, against the worker's table.
+
 First find the method field of the visible instance dictionary. Check
-its specialized type and its list fold equations. Then ask the ordinary
+its specialized type and its equations. Then ask the ordinary
 solver which dictionary the source call uses. GHC.Tc.Gen.HsType supplies
 both lexical Givens and the constraints written in the signature. It
 disables the constant dictionary shortcut for this check because the
@@ -517,6 +521,7 @@ sourceBinarySelector selector = do
     pure cls
 
 -- | Resolve a saturated homogeneous selector to its certified source worker.
+-- See Note [Select the dictionary for a promoted method].
 lookupSourceBinaryMethod :: Id -> Type -> TcM (Maybe (Id, Id, TyCon))
 lookupSourceBinaryMethod selector domain
   | Just cls <- sourceBinarySelector selector
@@ -534,7 +539,7 @@ lookupSourceBinaryMethod selector domain
   | otherwise = pure Nothing
 
 -- | Find a visible ground dictionary whose exact method is a checked list fold.
--- See Note [Select the dictionary for a promoted list fold].
+-- See Note [Select the dictionary for a promoted method].
 lookupSourceListFoldMethod :: Id -> Type -> TcM (Maybe (Id, Id, TyCon))
 lookupSourceListFoldMethod selector domain
   | Just cls <- isClassOpId_maybe selector
