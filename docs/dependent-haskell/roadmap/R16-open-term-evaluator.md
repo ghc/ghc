@@ -1837,8 +1837,21 @@ proof. The reader also detects a missing unfolding.
 For `Prelude.fmap` with the installed `Functor Maybe` instance, the
 observer reads back `Nothing` without evaluating the callback. The
 proof uses an abstract callback. The runtime example passes a divergent
-callback. On `Just x`, readback reaches the application of the rigid
-callback to `x` and stops.
+callback. On `Just x`, readback produces `Just (f x)` with
+`f :: a %U -> b` and `x :: a` still abstract. A second call can
+consume this value. For example, GHC accepts this result with `Refl`.
+
+```haskell
+mapTwice :: forall a b c (f :: a %U -> b) (g :: b %U -> c) (x :: a).
+            Proxy f -> Proxy g -> Proxy x
+         -> Prelude.fmap g (Prelude.fmap f ('Just x)) :~: 'Just (g (f x))
+```
+
+The constructor fields are lazy at runtime. A different callback
+or a different payload gives a type error. An equality between two
+mapped results gives no equality between their input elements.
+A method that forces the callback result with `seq` rejects this
+proof at the source call.
 [Source proof](../examples/open-evaluation/PreludeMappingProof.hs),
 [source-hidden regression](../../../testsuite/tests/dependent/should_run/NativePromotedClassBoundary.sh),
 [installed instance](../../../libraries/ghc-internal/src/GHC/Internal/Base.hs),

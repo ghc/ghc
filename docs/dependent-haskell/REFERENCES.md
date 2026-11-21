@@ -7423,3 +7423,14 @@ dependent Core and supports extending the surface language in stages.
 [dictionary design](https://github.com/ghc-proposals/ghc-proposals/issues/383#issuecomment-739058810),
 [Core review](https://github.com/ghc-proposals/ghc-proposals/issues/383#issuecomment-746676314),
 and [surface-language follow-up](https://github.com/ghc-proposals/ghc-proposals/issues/383#issuecomment-749166999).
+
+For an erased variable applied to an argument, Agda records the variable
+and its eliminations. The GHC observer recovers a checked source type
+variable and its applications. Proposal #242 supplies the difference
+between matchable and unmatchable application in GHC. Its review
+discusses how to choose the arrow when inference has insufficient
+information. The proof uses an explicit unmatchable arrow.
+[Agda internal terms](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Syntax/Internal.hs#L221-L227),
+[proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html),
+[review questions](https://github.com/ghc-proposals/ghc-proposals/pull/242#issuecomment-502487934),
+and [author's reply](https://github.com/ghc-proposals/ghc-proposals/pull/242#issuecomment-503360362).

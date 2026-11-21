@@ -615,10 +615,11 @@ An identity callback returned `x`. A missing worker unfolding or an
 unknown local dictionary stopped the observation. The experiment
 checked 12 Core assertions and the runtime demand at O0 and O2.
 
-Readback is the remaining step for a source equality. Core can index
-a strict case scrutinee by an application `f x`. Supporting the
-`Just` equation requires preserving the laziness of the constructor
-field. Eisenberg's review of #383 distinguishes the Core representation
+That experiment stopped at the lazy `Just` field. A source signature
+can bind `f :: a %U -> b` as a type variable. When the Core worker
+applies the corresponding symbolic callback, readback can return that
+same type variable applied to its checked operand. A callback supplied
+only as a runtime binder still has a different representation. Eisenberg's review of #383 distinguishes the Core representation
 from an incremental extension of the surface language.
 [Open evaluator](../../../compiler/GHC/Core/OpenWhnf.hs),
 [review](https://github.com/ghc-proposals/ghc-proposals/issues/383#issuecomment-746676314),
@@ -632,6 +633,9 @@ by a ground dictionary. For the installed `Functor Maybe` instance the
 dictionary field of `fmap` selects `$fApplicativeMaybe_$sliftM`. The
 observer returns `Nothing` on an empty input with an abstract callback.
 A local `Functor Maybe` Given leaves the method implementation unknown.
-Readback of a lazy field that applies the abstract callback remains open.
+On a present input the observer reads back `Just (f x)`. It keeps both
+the head and argument identities. The runtime program retains the lazy
+field. A method that uses `seq` on the callback result cannot expose
+that constructor while the callback is unknown.
 [Source proof and limits](R16-open-term-evaluator.md#select-a-mapping-worker-from-a-ground-dictionary)
-and [Eisenberg's Core representation discussion](https://github.com/ghc-proposals/ghc-proposals/pull/383#issuecomment-746676314).
+and [Eisenberg's Core representation discussion](https://github.com/ghc-proposals/ghc-proposals/issues/383#issuecomment-746676314).

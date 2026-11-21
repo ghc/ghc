@@ -530,10 +530,12 @@ and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vecto
    preserves length. A proof using `Prelude.foldr` establishes the append
    law for an arbitrary step and seed. It uses the method selected by the
    installed list dictionary. A code-generating producer can record that
-   choice even when its interface omits optimizer pragmas. The next
-   example to check is the instance body of `Prelude.fmap` on `Maybe`.
-   A mapping method that selects a named worker now supports proofs of
-   both constructor equations. [Maybe proof](examples/open-evaluation/MappingProof.hs).
+   choice even when its interface omits optimizer pragmas. The installed
+   `Functor Maybe` dictionary supplies both `Prelude.fmap` equations.
+   A second call can consume the first call's result with both callbacks
+   still abstract. A local dictionary leaves the method choice open.
+   [Installed method proof](examples/open-evaluation/PreludeMappingProof.hs)
+   and [named worker proof](examples/open-evaluation/MappingProof.hs).
    [Public fold proof](examples/open-evaluation/PreludeFoldrProof.hs).
    [Append and map proofs](roadmap/R16-open-term-evaluator.md#prove-that-map-distributes-over-append).
 
