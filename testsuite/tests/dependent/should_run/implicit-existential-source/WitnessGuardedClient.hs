@@ -47,6 +47,14 @@ viaGuardedAnnotated =
                 | otherwise -> buildAt b
     ) :: Bool -> Bool -> Payload PolyId
 
+viaArguments :: GuardedBuilder
+viaArguments = \cases
+    True b -> id (Payload id (id (prepare b)))
+    False _ -> Payload id atTwoTypes
+  where
+    prepare :: Bool -> PolyId -> (Int, Bool)
+    prepare b f = (f (if b then 11 else 9), f b)
+
 viaJoint :: TwoWitnessBuilder
 viaJoint = \cases
     False b | never -> error "unreachable joint guard"
@@ -76,6 +84,8 @@ main = do
         guarded = results viaGuarded
     unless (guarded == results viaGuardedAnnotated) $
         fail "the annotation changed the guarded results"
+    unless (guarded == results viaArguments) $
+        fail "the argument-derived witness changed the guarded results"
     unless (observeConditional True (error "unselected condition") == (7, True)
          && observeConditional False True == (9, False)) $
         fail "the conditional forced an unselected arm"

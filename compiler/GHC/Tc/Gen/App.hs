@@ -12,7 +12,7 @@
 module GHC.Tc.Gen.App
        ( tcApp, tcRuleAppPrefix, RuleAppPrefix(..)
        , tcExprPrag
-       , matchPolytypeExistsWitness
+       , matchPolytypeExistsWitness, tcPreviewQuickLookResult
        , tcImplicitOperand, tcLexicalPackageOperand
        , tcRetainedInferableArg, tcRetainedArg, tcOptionalLetOperand ) where
 
@@ -643,7 +643,7 @@ tcRuleAppPrefix (L loc expr) = context $
      ; (checked_fun, sigma) <- tcInferAppHead head_ctxt
      ; let check prefix residual remaining = case break looks_like_type_arg remaining of
              (values, ty_arg : rest) -> CheckRulePrefix $ context $
-               do { (checked, sigma') <- tcInstFunWithPrefix True prefix Nothing Nothing Nothing
+               do { (checked, sigma') <- tcInstFunWithPrefix quickLookArg True prefix Nothing Nothing Nothing
                                           NoQL False head_ctxt checked_fun residual (values ++ [ty_arg])
                   ; return (sigma', check checked sigma' rest) }
              _ -> FinishRuleApp $ context $
@@ -854,7 +854,7 @@ tcOrdinaryAppScoped fields checked_prefix rn_expr rn_head@(rn_fun, fun_lspan) tc
                   -> Just <$> newTcRef Nothing
                 _ -> return Nothing
             ; let instantiate =
-                    tcInstFunWithPrefix False (checked_prefix ++ prefix) vta_cache expected_rho inst_plan
+                    tcInstFunWithPrefix quickLookArg False (checked_prefix ++ prefix) vta_cache expected_rho inst_plan
                       do_ql inst_final rn_head tc_fun fun_sigma remaining_args
             ; ((inst_args, app_res_rho), emit_wanteds) <- case do_ql of
                 NoQL -> (, return ()) <$> instantiate
@@ -1731,7 +1731,7 @@ tcRetainedGroundApp True DoQL exp_ty rn_head fun sigma args
   = do { let (leading, rest) = span prefix_arg args
        ; (prefix, residual, remaining) <-
            if any type_arg leading
-           then do { (checked, ty) <- tcInstFunWithPrefix True [] Nothing Nothing
+           then do { (checked, ty) <- tcInstFunWithPrefix quickLookArg True [] Nothing Nothing
                                        Nothing DoQL False rn_head fun sigma leading
                    ; return (checked, ty, rest) }
            else return ([], sigma, args)
@@ -3502,19 +3502,19 @@ tcInstFunWithExpectedCache :: Maybe (TcRef (Maybe RetainedArgCache))
                           -> (HsExpr GhcRn, SrcSpan) -> HsExpr GhcTc
                           -> TcSigmaType -> [HsExprArg 'TcpRn]
                           -> TcM ([HsExprArg 'TcpInst], TcSigmaType)
-tcInstFunWithExpectedCache = tcInstFunWithPrefix False []
+tcInstFunWithExpectedCache = tcInstFunWithPrefix quickLookArg False []
 
 -- | Resume instantiation after a checked prefix, or check that prefix only.
 -- A prefix-only call stops before instantiating the result. Retained RULEs
 -- may include value operands before a written type argument.
 -- See Note [Ground retained applications].
-tcInstFunWithPrefix :: Bool -> [HsExprArg 'TcpInst]
+tcInstFunWithPrefix :: QuickLookArg -> Bool -> [HsExprArg 'TcpInst]
                     -> Maybe (TcRef (Maybe RetainedArgCache))
                     -> Maybe TcRhoType -> RetainedInstPlan -> QLFlag -> Bool
                     -> (HsExpr GhcRn, SrcSpan) -> HsExpr GhcTc
                     -> TcSigmaType -> [HsExprArg 'TcpRn]
                     -> TcM ([HsExprArg 'TcpInst], TcSigmaType)
-tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql inst_final
+tcInstFunWithPrefix look_arg prefix_only prefix vta_cache expected_rho inst_plan do_ql inst_final
                     rn_head@(_, fun_lspan) tc_fun fun_sigma rn_args
   = do { lvl <- getTcLevel
        ; traceTc "tcInstFun" (vcat [ text "tc_fun" <+> ppr tc_fun
@@ -3916,7 +3916,7 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
                  seedClassReceiver DoQL rn_head ((arg_pos, arg, scaledThing arg_ty) : domains)
                _ -> return False
            ; arg_ty <- if selected then liftZonkM (zonkScaledTcType arg_ty) else return arg_ty
-           ; arg' <- quickLookArg do_ql arg_pos ctxt rn_head arg arg_ty
+           ; arg' <- look_arg do_ql arg_pos ctxt rn_head arg arg_ty
            ; let acc' = arg' : addArgWrap (mkWpCastN fun_co) acc
            ; go plan fun_orig (pos+1) acc' res_ty rest_args }
 
@@ -8067,12 +8067,15 @@ This turned out to be more subtle than I expected.  Wrinkles:
 
 -}
 
-quickLookArg :: QLFlag -> Int
-             -> HsExprLoc -- ^ location span of the whole application
-             -> (HsExpr GhcRn, SrcSpan) -- ^ Head of the application chain and its source span
-             -> LHsExpr GhcRn          -- ^ Argument
-             -> Scaled TcSigmaTypeFRR  -- ^ Type expected by the function
-             -> TcM (HsExprArg 'TcpInst)
+-- | Take a quick look at a value argument during application instantiation.
+type QuickLookArg = QLFlag -> Int
+                 -> HsExprLoc -- ^ Location span of the whole application
+                 -> (HsExpr GhcRn, SrcSpan) -- ^ Head and source span
+                 -> LHsExpr GhcRn          -- ^ Argument
+                 -> Scaled TcSigmaTypeFRR  -- ^ Type expected by the function
+                 -> TcM (HsExprArg 'TcpInst)
+
+quickLookArg :: QuickLookArg
 -- See Note [Quick Look at value arguments]
 quickLookArg NoQL _ app_lspan _ larg orig_arg_ty
   = skipQuickLook app_lspan larg orig_arg_ty
@@ -8083,6 +8086,82 @@ quickLookArg DoQL pos app_lspan fun_and_lspan larg orig_arg_ty
        ; if not is_rho
          then skipQuickLook app_lspan larg orig_arg_ty
          else quickLookArg1 pos app_lspan fun_and_lspan larg orig_arg_ty }
+
+-- | Find a lambda result type before the patterns bring new binders into scope.
+-- See Note [Quick Look before lambda patterns].
+tcPreviewQuickLookResult :: LHsExpr GhcRn -> TcM (Maybe TcRhoType)
+tcPreviewQuickLookResult rhs =
+  discardErrs $ discardConstraints $ tryTcDiscardingErrs (return Nothing) $
+    runMaybeT $ do
+      result <- preview rhs >>= liftMaybeT . liftZonkM . zonkTcType
+      guard (fixed result)
+      return result
+  where
+    preview :: LHsExpr GhcRn -> MaybeT TcM TcRhoType
+    preview expr = do
+      guard (plain_spine expr)
+      (rn_fun, args) <- liftMaybeT (splitHsApps (unLoc expr))
+      (tc_fun, declared) <- preview_head rn_fun
+      sigma <- liftMaybeT (liftZonkM (zonkTcType declared))
+      guard (fixed sigma)
+      loc <- liftMaybeT (getFunSrcSpan args)
+      snd <$> liftMaybeT
+        (tcInstFunWithPrefix preview_arg False [] Nothing Nothing Nothing
+          DoQL True (rn_fun, loc) tc_fun sigma args)
+
+    preview_head :: HsExpr GhcRn -> MaybeT TcM (HsExpr GhcTc, TcSigmaType)
+    preview_head (HsVar _ (L loc (WithUserRdr _ name))) = do
+      thing <- if isExternalName name
+               then liftMaybeT (tcLookup name)
+               else MaybeT (tcLookupLcl_maybe name)
+      let from_id ident = (mkHsVar (L loc ident), varType ident)
+      case thing of
+        ATcId{tct_id = ident} -> return (from_id ident)
+        AGlobal (AnId ident) -> return (from_id ident)
+        AGlobal (AConLike (RealDataCon dc)) ->
+          return (XExpr (ConLikeTc (RealDataCon dc)), varType (dataConWrapId dc))
+        _ -> mzero
+    preview_head _ = mzero
+
+    preview_arg :: QuickLookArg
+    preview_arg _ _ loc _ arg scaled = do
+      let expected = scaledThing scaled
+      is_rho <- qlArgHasRhoType expected
+      when is_rho $ void $ runMaybeT $ do
+        actual <- preview arg
+        influences <- liftMaybeT (quickLookInfluencesCall expected actual)
+        when influences (liftMaybeT (qlUnify actual expected))
+      skipQuickLook loc arg scaled
+
+    plain_spine :: LHsExpr GhcRn -> Bool
+    plain_spine expr = case unLoc (stripParensLHsExpr expr) of
+      HsVar{} -> True
+      HsApp _ fun _ -> plain_spine fun
+      _ -> False
+
+    fixed :: TcType -> Bool
+    fixed ty = supportsQuickLookType ty && not (hasCoercionHole ty)
+               && not (anyFreeVarsOfType isMetaTyVar ty)
+
+{- Note [Quick Look before lambda patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider checking a lambda against `exists t. Bool -> Callback t`.
+For `\flag -> id (prepare flag)`, the declaration of id cannot fix t.
+Quick Look at its arguments can find the result `Callback PolyId`.
+The result supplies t by invariant matching, as in Figure 10 of
+"An Existential Crisis Resolved".
+
+Run the ordinary application instantiator with the same rho, guardedness
+and free instantiation variable checks as Quick Look. Read only plain
+named application spines. A pattern or guard name has no declaration at
+this point, so it supplies no Quick Look information. Leave complex
+expressions and explicit type arguments to the ordinary checker.
+
+Require head and result types without free metavariables or coercion holes.
+Read head types without checking their uses. Discard the preview's
+constraints and diagnostics. Then check the original lambda once, with
+all its patterns, guards and operands in scope.
+-}
 
 qlArgHasRhoType :: TcType -> TcM Bool
 -- `qlArgHasRhoType` checks that the expected argument type in rule
@@ -8120,6 +8199,13 @@ qlArgHasRhoType ty
 
       | otherwise
       = return True
+
+-- | Check premises (A) and (B) of APP-QL using the original argument type.
+-- See Note [Quick Look at value arguments] and Note [The fiv test in quickLookArg].
+quickLookInfluencesCall :: TcRhoType -> TcRhoType -> TcM Bool
+quickLookInfluencesCall expected actual
+  | isGuardedTy expected = return True
+  | otherwise = not <$> anyFreeKappa actual
 
 isGuardedTy :: TcType -> Bool
 isGuardedTy ty
@@ -8312,11 +8398,7 @@ quickLookArg1 pos app_lspan rn_head larg@(L _ arg) sc_arg_ty@(Scaled _ orig_arg_
        --         unzonked orig_arg_rho, so that we deliberately do not exploit
        --         guardedness that emerges a result of QL on earlier args
        --     In contrast, we must do the `anyFreeKappa` test /after/ tcInstFun; see (QLA3).
-       ; arg_influences_enclosing_call
-            <- if isGuardedTy orig_arg_rho
-               then return True
-               else not <$> anyFreeKappa app_res_rho  -- (B)
-                    -- For (B) see Note [The fiv test in quickLookArg]
+       ; arg_influences_enclosing_call <- quickLookInfluencesCall orig_arg_rho app_res_rho
 
        -- Step 4: do quick-look unification if either (A) or (B) hold
        -- This is part of APP-lightning-bolt (Fig 5 in the paper)
