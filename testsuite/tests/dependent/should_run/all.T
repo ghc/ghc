@@ -607,6 +607,10 @@ test('NativeConstrainedFamilyRules',
                      for f in ['ParameterizedIndexLibrary.hs', 'FinitePosition.hs']])],
      run_command, ['bash NativeConstrainedFamilyRules.sh "{compiler}" "{libdir}"'])
 
+test('NativeDataFamilyPromotion',
+     [req_host_target_ghc, only_ways(['normal']), extra_files(['data-family-promotion'])],
+     run_command, ['bash NativeDataFamilyPromotion.sh "{compiler}" "{libdir}"'])
+
 test('NativePromotedClassBoundary',
      [req_host_target_ghc, only_ways(['normal']), extra_files(['promoted-class'])],
      run_command, ['bash NativePromotedClassBoundary.sh "{compiler}" "{libdir}"'])

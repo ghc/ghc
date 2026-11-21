@@ -1,3 +1,4 @@
+select the second field of a promoted data family pair: Refl
 recover consecutive GADT constraints: (False,"True")
 form an associated family type from its class evidence: (Refl,Refl,True)
 form an expression annotation with the matched dictionary: True

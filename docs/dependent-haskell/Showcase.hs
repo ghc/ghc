@@ -50,6 +50,7 @@ import qualified Data.Char
 import qualified Data.Either
 import DefaultVector (DefaultElement(..))
 import qualified ErasedPackage
+import FamilyTuple (Tuple(Tup2))
 import qualified ForgetWitness
 import qualified ImplicitVector
 import qualified PartitionChoices
@@ -992,6 +993,14 @@ constructorFieldCases =
 type PairCaseArrow (b :: Bool) = forall (p :: Multiplicity).
     (case b of { True -> (Int, Char); False -> Bool }) %p -> (Int, Char)
 
+-- | Select the second field of a promoted data family constructor.
+type family SecondFlag (t :: Tuple Bool Bool) :: Bool where
+    SecondFlag ('Tup2 left right) = right
+
+-- | Check the second field of a particular pair at compile time.
+secondFlag :: SecondFlag ('Tup2 'True 'False) :~: 'False
+secondFlag = Refl
+
 -- | Hide the field type and retain both dictionaries for its consumer.
 data PrintablePair where
     PrintablePair :: forall a. Eq a => (Show a => a -> a -> PrintablePair)
@@ -1002,6 +1011,7 @@ describePair (PrintablePair a b) = (a == b, show b)
 
 main :: IO ()
 main = do
+    observe "select the second field of a promoted data family pair" secondFlag
     observe "recover consecutive GADT constraints" (describePair (PrintablePair False True))
     observe "form an associated family type from its class evidence" constrainedElements
     observe "form an expression annotation with the matched dictionary" annotatedElement
