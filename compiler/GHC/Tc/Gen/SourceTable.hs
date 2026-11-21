@@ -984,7 +984,9 @@ sourceCaseTables binds = do
       generates_code = backendGeneratesCode (backend dflags)
       list_case_position owner
         | generates_code
-        , Just (ConstructorCaseType _ tc _ _ position _) <- constructorCaseType (varType owner)
+        , let ty = varType owner
+        , Just (ConstructorCaseType _ tc _ _ position _) <-
+            constructorCaseType ty <|> monomorphicGuardedListCaseType ty
         , tc == listTyCon = Just position
         | otherwise = Nothing
       indexed_candidate owner
@@ -1011,8 +1013,8 @@ sourceCaseTables binds = do
       candidates = [(bind, owner) | (bind, owner) <- owners
                     , eligible owner ||
                       (is_exported owner && (identity_candidate owner ||
-                       composition_candidate owner || binary_list_candidate owner ||
-                       reverse_wrapper_candidate owner || indexed_candidate owner))]
+                       composition_candidate owner || final_candidate owner ||
+                       reverse_wrapper_candidate owner))]
   if isHsBootOrSig (tcg_src env) || null candidates
     then pure ([], [])
     else do
@@ -1443,7 +1445,7 @@ sourceCaseVisibleArity table
           case traverse (caseBranchConstructor telescope) branches of
             Just [con] | con == tupleDataCon Boxed 2 -> Just 1
             _ -> Nothing
-        Nothing -> case constructorCaseType kind of
+        Nothing -> case constructorCaseType kind <|> monomorphicGuardedListCaseType kind of
           Just (ConstructorCaseType telescope tc _ domains position _)
             | isNothing (monomorphicEnumCaseArity kind)
             , let visible = length domains
@@ -1470,8 +1472,10 @@ sourceCaseVisibleArity table
 
     resultPattern carried vars under_constructor ty
       | any (eqType ty) vars = True
-      | Just (helper, [_, predicate_result, p, x, xs]) <- splitTyConApp_maybe ty
+      | Just (helper, args) <- splitTyConApp_maybe ty
       , isFilterGuardFor table helper
+      , lengthIs args (tyConArity helper)
+      , [predicate_result, p, x, xs] <- drop (helperInvisibleArity helper) args
       , any (eqType p) carried
       , Just (domain, result) <- caseArrow (typeKind p) =
           domain `eqType` typeKind x && result `eqType` boolTy &&
@@ -1587,6 +1591,33 @@ constructorCaseType tau = do
       | ma `eqType` unmatchableDataConTy
       , isTyVar v = Just binder
     ordinaryBinder _ = Nothing
+
+-- | Check the exact closed signature of a guarded list.
+-- See Note [Monomorphic guarded list equations].
+monomorphicGuardedListCaseType :: Type -> Maybe ConstructorCaseType
+monomorphicGuardedListCaseType ty = do
+    (predicate, rest) <- caseArrow ty
+    (input, result) <- caseArrow rest
+    (root, [element]) <- caseDatatype input
+    guard (root == listTyCon && noFreeVarsOfType element && caseKind [] element &&
+           predicate `eqType` mkVisFunTyManyU element boolTy && result `eqType` input)
+    pure (ConstructorCaseType [] root [element] [predicate, input] 1 result)
+
+{- Note [Monomorphic guarded list equations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The general constructor-case signature tracks type parameters of the
+scrutinized datatype. A guarded list can instead have a fixed element
+type. Check that it is a closed, lifted datatype and require the exact
+callback type for that element. The checker still inspects the same Core
+fields and publishes a nominal axiom. Representational equality cannot
+substitute a different callback domain.
+
+Use this signature when checking a guarded result before and after
+optimization, and when reading its equations. Other constructor cases
+use the general signature. The private guard has no invisible kind
+parameter for a concrete list. Read its value operands after the actual
+invisible binders.
+-}
 
 {- Note [Retained field kinds in source equations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2217,13 +2248,13 @@ directGuardedList :: (Core.CoreExpr -> Core.CoreExpr) -> Id -> Core.CoreExpr
                   -> Maybe (ConstructorCaseType, (GuardedListResult, GuardedListResult))
 directGuardedList prepare owner original = do
     ConstructorCaseType declared tc [declared_el] [declared_pred, declared_input] 1 declared_result <-
-      constructorCaseType (varType owner)
+      guarded_signature (varType owner)
     guard (tc == listTyCon && declared_input `eqType` declared_result &&
            declared_pred `eqType` mkVisFunTyManyU declared_el boolTy &&
            not (hasNativeDependentExprRhs original) &&
            exprType original `eqType` varType owner)
     let rhs = prepare original
-    ConstructorCaseType telescope _ elements domains _ result <- constructorCaseType (exprType rhs)
+    ConstructorCaseType telescope _ elements domains _ result <- guarded_signature (exprType rhs)
     [element] <- pure elements
     [pred_ty, input] <- pure domains
     let (binders, body) = Core.collectBinders rhs
@@ -2271,6 +2302,8 @@ directGuardedList prepare owner original = do
     on_true <- branch accepted
     let kept_binders = zipWith (\(Bndr v _) (Bndr _ vis) -> Bndr v vis) telescope declared
     pure (ConstructorCaseType kept_binders tc elements domains 1 result, (on_false, on_true))
+  where
+    guarded_signature ty = constructorCaseType ty <|> monomorphicGuardedListCaseType ty
 
 -- | The auxiliary family shares the filter's source-equation owner.
 filterGuardOcc :: OccName -> OccName
