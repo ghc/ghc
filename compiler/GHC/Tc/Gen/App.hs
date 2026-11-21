@@ -53,7 +53,7 @@ import GHC.Tc.Zonk.TcType
 
 import GHC.Core.Class ( Class, classTyVars )
 import GHC.Core.ConLike ( ConLike(..) )
-import GHC.Core.DataCon ( DataCon, dataConConcreteTyVars, dataConFullSig, dataConName, isNewDataCon, dataConOrigArgTys, dataConOrigResTy, dataConRepArgBinders, dataConTyCon, dataConUserTyVars, dataConWorkId, dataConWrapId )
+import GHC.Core.DataCon ( DataCon, dataConConcreteTyVars, dataConFullSig, dataConName, isNewDataCon, dataConOrigArgTys, dataConOrigResTy, dataConHasRetainedResult, dataConRepArgBinders, dataConTyCon, dataConUserTyVars, dataConWorkId, dataConWrapId )
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr, hasScopedDictionaryType
                           , isScopedSelectorReceiver, supportsQuickLookType )
@@ -1962,7 +1962,24 @@ tcRetainedKnownValuePlan _ _ _ _ = return Nothing
 -- See Note [Nested immutable retained applications].
 tcRetainedQuickLookArgType :: LHsExpr GhcRn -> TcM (Maybe Type)
 tcRetainedQuickLookArgType arg
-  | (L _ (HsVar _ lname), values@(_:_)) <- split_named [] arg
+  | L _ (HsVar _ con_name) <- head_expr
+  , [field] <- args
+  , isDataOcc (nameOccName (unLocWithUserRdr con_name))
+  , HsVar _ field_name <- unLoc (stripParensLHsExpr field)
+  = runMaybeT $ do
+      RealDataCon dc <- liftMaybeT (tcLookupConLike (unLoc con_name))
+      guard (dataConHasRetainedResult dc)
+      ATcId { tct_id = local } <- MaybeT (tcLookupLcl_maybe (unLocWithUserRdr field_name))
+      actual <- liftMaybeT (liftZonkM (zonkId local))
+      let sigma = idType (dataConWrapId dc)
+      DepFunTy DepFunVisible binder _ <- pure (coreFullView sigma)
+      guard (isNativeOpaqueValueId actual && varType actual `eqType` varType binder)
+      let result = applyTypeToArgs sigma [Core.Var actual]
+      guard (isAlgTyConApp result && noQuickLookVars result)
+      guard =<< liftMaybeT (tcRetainedInstScope [result])
+      return result
+  | L _ (HsVar _ lname) <- head_expr
+  , values@(_ : _) <- args
   , let name = unLocWithUserRdr lname
   , not (isDataOcc (nameOccName name))
   , all bare_operand values
@@ -1982,6 +1999,7 @@ tcRetainedQuickLookArgType arg
       return ty
   | otherwise = declared arg
   where
+    (head_expr, args) = split_named [] arg
     declared = tcRetainedDeclaredArgType tcRetainedDeclaredTypeView
 
     split_named values (L _ (HsPar _ inner)) = split_named values inner
@@ -2014,6 +2032,15 @@ checker still checks the inner and outer applications, including their
 argument types, lexical scopes, and usage. No term is evaluated or
 checked during the read, and no Quick Look variable acquires a native
 type.
+
+A constructor can return its own field as an index. In
+`rebuild (IndexedList xs)`, the outer function must instantiate its erased
+index with the caller's xs. Its signature alone cannot supply this index.
+The constructor's result equality enables the same argument inference as
+a named value with a retained type. With Quick Look, read the constructor
+wrapper's codomain at the scoped field Id before instantiating rebuild.
+The regular argument check records usage and checks the field type.
+See Note [Retained constructor result equality] in GHC.Core.DataCon.
 -}
 
 -- | Read a monomorphic declaration for immutable retained argument matching.
@@ -5775,7 +5802,7 @@ tcRetainedInferableArg (L _ expr)
       HsVar _ lname
         | isDataOcc (nameOccName (unLocWithUserRdr lname))
         -> do { con <- tcLookupConLike (unLoc lname)
-              ; return (case con of RealDataCon _ -> (True, False)
+              ; return (case con of RealDataCon dc -> (True, dataConHasRetainedResult dc)
                                     _ -> (False, False)) }
         | otherwise
         -> do { mb_id <- tcLookupIdMaybe (unLocWithUserRdr lname)

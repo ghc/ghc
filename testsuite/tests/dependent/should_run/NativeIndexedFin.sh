@@ -257,10 +257,10 @@ main :: IO ()
 main = do
     xs <- newIORef (error "forced retained list" :: [Bool]) >>= readIORef
     tag <- newIORef (error "forced retained ordering" :: Ordering) >>= readIORef
-    let listLazy = case CheckedList xs of
-            indexed@(CheckedList _) -> case roundList indexed of CheckedList _ -> True
-        tagLazy = case Dynamic tag of
-            indexed -> dynamic (roundTag indexed)
+    let listLazy = case roundList (CheckedList xs) of CheckedList _ -> True
+        tagLazy = case roundTag (Dynamic tag) of
+            Dynamic _ -> True
+            Fixed -> False
     if listLazy && tagLazy && not (dynamic (roundTag Fixed))
         then pure ()
         else fail "retained constructor result changed its runtime witness"
@@ -272,11 +272,30 @@ for opt in -O0 -O2; do
             -fno-write-if-simplified-core -c CheckedList.hs
         cp CheckedList.hi ../client/
         cd ../client
-        "${ghc[@]}" "$opt" -fforce-recomp -Werror=incomplete-patterns -c ResultClient.hs
-        "${ghc[@]}" "$opt" ResultClient.o ../provider/CheckedList.o -o result-client
-        ./result-client
+        for inference in -XNoImpredicativeTypes -XImpredicativeTypes; do
+            "${ghc[@]}" "$opt" "$inference" -fforce-recomp -Werror=incomplete-patterns -c ResultClient.hs
+            "${ghc[@]}" "$opt" ResultClient.o ../provider/CheckedList.o -o result-client
+            ./result-client
+        done
     )
 done
+(
+    cd "$tmp/result/client"
+    cat >IndependentFields.hs <<'HS'
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
+module IndependentFields where
+import CheckedList
+same :: CheckedList xs -> CheckedList xs -> ()
+same _ _ = ()
+bad :: [Bool] -> [Bool] -> ()
+bad xs ys = same (CheckedList xs) (CheckedList ys)
+HS
+    if "${ghc[@]}" -fdiagnostics-color=never -fno-code -c IndependentFields.hs >different.log 2>&1; then
+        echo 'Equated two independent runtime list indices'
+        exit 1
+    fi
+    grep -Eq '^IndependentFields.hs:7:[0-9]+: error: .GHC-83865.' different.log
+)
 cat >ScopedLength.hs <<'HS'
 {-# LANGUAGE CPP, EmptyCase, ExperimentalDependentTypes, GADTs, LinearTypes, ScopedTypeVariables #-}
 module ScopedLength where

@@ -8,8 +8,7 @@ import DirectIndexedList (IndexedList(IndexedList))
 firstCell :: IO [Bool]
 firstCell = do
     xs <- newIORef (True : error "forced direct indexed list tail") >>= readIORef
-    let indexed = IndexedList xs
-    pure $ case rebuild indexed of
+    pure $ case rebuild (IndexedList xs) of
         IndexedList ys -> take 1 ys
   where
     rebuild :: IndexedList xs -> IndexedList xs

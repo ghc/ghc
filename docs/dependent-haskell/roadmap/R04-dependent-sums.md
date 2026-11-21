@@ -210,6 +210,9 @@ constructor pattern introduces the nominal index equality after the
 field binder. Code generation erases the equality.
 An ordinary client can rebuild the constructor at its original index and
 read the first cell of a runtime list with an unevaluated tail.
+In `rebuild (IndexedList xs)`, the nested constructor supplies the
+outer call's index. This also works with `ImpredicativeTypes`.
+[Inference and prior art](../REFERENCES.md#nested-constructors-with-a-runtime-result-index).
 GHC reports compound results and results that depend on one of several
 fields at the written result type.
 [Direct constructor](../examples/open-evaluation/DirectIndexedList.hs),
