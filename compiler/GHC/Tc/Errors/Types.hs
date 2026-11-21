@@ -4040,6 +4040,15 @@ data TcRnMessage where
                  -> !Name -- ^ The other binding
                  -> TcRnMessage
 
+  -- | An occurrence has a conflicting name in a unified namespace.
+  TcRnPunUse :: !RdrName
+             -> !GlobalRdrElt -- ^ The name resolved by the renamer
+             -> !(NE.NonEmpty GlobalRdrElt) -- ^ Candidates in the other namespace
+             -> TcRnMessage
+
+  -- | Type syntax whose interpretation depends on ListTuplePuns.
+  TcRnPunnedTypeSyntax :: !SDoc -> TcRnMessage
+
   {-| TcRnPackageImportsDisabled is an error indicating that an import uses
     a package qualifier while the extension PackageImports was disabled.
 

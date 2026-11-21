@@ -542,6 +542,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
                let avail = availFromGRE gre
                    name = greName gre
 
+               warn_punned_export l gre
                checkThLocalNameNoLift $ ieLWrappedUserRdrName l gre
                occs' <- check_occs occs ie [gre]
                (export_warn_spans', dont_warn_export', warn_txt_rn)
@@ -591,6 +592,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
                     occs' <- check_occs occs ie [gre]
                     return (Just avail, occs', exp_dflts)
 
+               warn_punned_export l gre
                checkThLocalNameNoLift (ieLWrappedUserRdrName l gre)
                (export_warn_spans', dont_warn_export', warn_txt_rn)
                  <- process_warning export_warn_spans
@@ -791,6 +793,10 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
     -- In an export item M.T(A,B,C), we want to treat the uses of
     -- A,B,C as if they were M.A, M.B, M.C
     -- Happily pickGREs does just the right thing
+    warn_punned_export :: LIEWrappedName GhcPs -> GlobalRdrElt -> RnM ()
+    warn_punned_export (L _ (IEName _ rdr)) = warnGlobalPunUse rdr
+    warn_punned_export _ = const (pure ())
+
     addUsedKids :: RdrName -> [GlobalRdrElt] -> RnM ()
     addUsedKids parent_rdr kid_gres
       = addUsedGREs ExportDeprecationWarnings (pickGREs parent_rdr kid_gres)

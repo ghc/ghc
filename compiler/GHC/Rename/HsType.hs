@@ -1286,6 +1286,8 @@ rnHsTyVar lookup_occ env tv ip (L loc rdr_name)
            -- Any type variable at the kind level is illegal without the use
            -- of PolyKinds (see #14710)
        ; gre <- lookup_occ rdr_name
+       ; unless (isPromoted ip) $
+           warnGlobalPunUse (L loc rdr_name) gre
        ; checkNamedWildCard env (greName gre)
        ; this_mod <- getModule
        ; explicit_level_imports <- xoptM LangExt.ExplicitLevelImports
@@ -1319,6 +1321,8 @@ rnHsTyOp env overall_ty tyop
                  = any (isOpenTypeOperandWith isRdrTyVar (isDataOcc . rdrNameOcc)) [left, right]
                  | otherwise = False
        ; opgre <- lookupTypeAppHeadRn open_operands op
+       ; unless (isPromoted prom) $
+           warnGlobalPunUse (L loc op) opgre
        ; checkNamedWildCard env (greName opgre)
        ; let opName = greName opgre
        ; unlessXOptM LangExt.TypeOperators $

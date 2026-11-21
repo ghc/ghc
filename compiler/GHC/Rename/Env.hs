@@ -21,7 +21,7 @@ module GHC.Rename.Env (
         lookupGlobalOccRn_maybe,
         rnLookupKnownOccName,
 
-        lookupExprOccRn,
+        lookupExprOccRn, warnGlobalPunUse,
         lookupRecFieldOcc,
         lookupRecUpdFields,
         getFieldUpdLbl,
@@ -107,7 +107,7 @@ import GHC.Types.GREInfo
 import GHC.Types.Basic  ( TupleSort(..), tupleSortBoxity )
 
 import GHC.Utils.Outputable as Outputable
-import GHC.Utils.Lexeme (isLexVarId, isLexVarSym)
+import GHC.Utils.Lexeme (isLexVar, isLexVarId, isLexVarSym)
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 
@@ -1662,6 +1662,59 @@ lookupExprOccRn rdr_name
                         -- type constructor or type variable, if
                         -- we failed to look up the name at the term level.
            p         -> return p }
+
+-- | Warn about a global occurrence that relies on separate namespaces.
+-- See Note [Global pun use warnings].
+warnGlobalPunUse :: LocatedN RdrName -> GlobalRdrElt -> RnM ()
+warnGlobalPunUse (L loc rdr) selected
+  | isUnqual rdr || isQual rdr
+  , let name = greName selected
+  , isExternalName name
+  , isTyConName name || isValName name
+  = whenWOptM Opt_WarnPunUses $
+    unlessXOptM LangExt.ExplicitLevelImports $ do
+      (global_env, local_env) <- getRdrEnvs
+      let globals r = lookupGRE global_env (LookupRdrName r (RelevantGREsFOS WantNormal))
+      case globals same_ns of
+        [chosen]
+          | greName chosen == name
+          , isNothing (lookupLocalRdrEnv local_env local_other_ns)
+          , other : rest <- filter (visible_with chosen) (globals other_ns)
+          -> addDiagnosticAt (locA loc) (TcRnPunUse rdr chosen (other NE.:| rest))
+        _ -> pure ()
+  | otherwise = pure ()
+  where
+    term_ns = setRdrNameSpace rdr $
+      if isLexVar (occNameFS (rdrNameOcc rdr)) then varName else dataName
+    type_ns = setRdrNameSpace rdr tcClsName
+    selected_term = isValName (greName selected)
+    (same_ns, other_ns)
+      | selected_term = (term_ns, type_ns)
+      | otherwise = (type_ns, term_ns)
+    local_other_ns
+      | selected_term = setRdrNameSpace rdr tvName
+      | otherwise = term_ns
+    visible_with chosen other =
+      isQual rdr || not (isLocalGRE chosen) || isLocalGRE other
+
+{- Note [Global pun use warnings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Proposal #765 checks the name that the renamer resolves at each occurrence.
+If a use relies on selecting one of two namespaces, report the real
+selection and the names that conflict with it. Use lookupGRE on the
+original qualifier. The additional lookup does not mark an import as
+used, emit deprecations, or make another name available to the renamer.
+
+For unqualified names a definition in this module takes precedence over
+imports. A selection in the imported scope still needs a warning if a
+local top-level definition in the other namespace would shadow it.
+Qualified paths use the qualifier to select their candidates.
+
+A term binder and a type binder can be introduced in separate local
+scopes. Their presence alone does not determine which is visible in a
+unified namespace. This check uses global selections only and leaves
+local alternatives and ExplicitLevelImports to their scope checks.
+-}
 
 lookupGlobalOccRn_maybe :: WhichGREs GREInfo -> RdrName -> RnM (Maybe GlobalRdrElt)
 -- Looks up a RdrName occurrence in the top-level
