@@ -492,14 +492,18 @@ declaredLambdaResults skip_invisible body (MG { mg_alts = L _ matches }) select 
                      else fmap local_id (tcLookupLcl_maybe name)
            ; declared <- traverse (liftZonkM . zonkTcType . varType) mb_id
            ; formal' <- liftZonkM (zonkTcType formal)
-           ; case declared >>= type_prefix ntypes of
+           ; selected <- case declared >>= type_prefix ntypes of
                Just (consumed, residual) ->
                  let (skipped, result) = if skip_invisible
                                          then tcSplitForAllInvisTyVars residual
                                          else ([], residual)
                  in fmap (>>= uncurry (select formal'))
                          (result_from (map snd skipped ++ consumed) args result)
-               Nothing -> return Nothing }
+               Nothing -> return Nothing
+           ; case selected of
+               Just _ -> return selected
+               Nothing -> do { actual <- tcPreviewQuickLookResult rhs
+                             ; return (actual >>= select formal' []) } }
     rhs_result _ _ = return Nothing
 
     application ntypes args expr = case unLoc (stripParensLHsExpr expr) of
@@ -593,6 +597,11 @@ result type to be independent of those binders, including in its kinds.
 The ordinary application checker instantiates the binders and checks each
 written operand at its original location.
 See Note [Visible type application and abstraction] in GHC.Tc.Gen.App.
+
+If the declaration does not fix the witness, Quick Look can use the
+call's arguments to find a result type. This covers
+`\b -> id (prepare b)` with the same declaration for prepare.
+See Note [Quick Look before lambda patterns] in GHC.Tc.Gen.App.
 
 An explicitly marked required argument, such as (type PolyId), can
 also fix the result type. Read only a closed, saturated type synonym
