@@ -1293,13 +1293,16 @@ tcLexicalExistsLet original (L bind_loc (HsValBinds ann (XValBindsLR (HsVBG grou
   , GRHSs { grhssGRHSs = L rhs_loc (GRHS rhs_ann [] rhs) NE.:| []
           , grhssLocalBinds = L _ EmptyLocalBinds{} } <- grhss
   = runMaybeT $ do
-      schema <- MaybeT (tcDeclaredOperandResult rhs)
+      (schema, check_schema) <- MaybeT (tcLexicalPackageOperand rhs)
       case coreFullView schema of
         ExistsTy ImplicitExists _ _ -> guard (matchesImplicitPayloadPat schema pat)
         _ -> mzero
       liftMaybeT $ do
         mult <- newMultiplicityVar
-        (checked, actual) <- tcScalingUsage mult $ tcInferRhoFRR FRRPatBind rhs
+        (checked, actual) <- tcScalingUsage mult $
+          if check_schema
+            then (, schema) <$> tcCheckMonoExpr rhs schema
+            else tcInferRhoFRR FRRPatBind rhs
         result_ty <- expTypeToType expected
         opened <- tcOpenImplicitPackageAt mult (getLocA rhs) actual checked result_ty $ \payload -> do
           let name = getName payload
