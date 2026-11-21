@@ -1,0 +1,100 @@
+# R10. Promote unboxed types
+
+Serokell links R10 to GHC #14180 and lists homogeneous equality as a
+prerequisite. The issue asks whether a type-family pattern can bind the
+`Int#` field of the promoted `I#` constructor. The datatype, the constructor
+head, and a type-level field value exercise different checks.
+[Serokell R10](https://ghc.serokell.io/dh#promote-unboxed-types),
+[GHC #14180](https://gitlab.haskell.org/ghc/ghc/-/work_items/14180).
+
+## Source boundary
+
+Use `ghc -XGHC2024 -XMagicHash -fforce-recomp -fno-code`. Put each
+rejected declaration in a separate module. Enable `TypeFamilies`
+for the family patterns and `UnliftedDatatypes` for `Token`.
+
+```haskell
+import Data.Proxy (Proxy (Proxy))
+import GHC.Exts (Int#, RuntimeRep (IntRep), TYPE)
+
+type PrimType = Int#
+data AtIntRep (a :: TYPE 'IntRep) = AtIntRep
+raw :: AtIntRep Int#
+raw = AtIntRep
+
+data Packet = Empty | Packed Int#
+packet :: Proxy ('Empty :: Packet)
+packet = Proxy
+type PackedHead = 'Packed
+```
+
+The published compiler at `89aa40ec5689` and stock GHC 9.14.1 accept all
+of these declarations. They also accept `type RawHead = 'Raw` after
+`newtype Raw :: TYPE 'IntRep where Raw :: Int# -> Raw` with
+`UnliftedNewtypes`. The `Int#` type and a kind of the form `TYPE 'IntRep`
+are available. The promoted constructor head has no supplied field value.
+
+The issue's family is a separate module.
+
+```haskell
+import GHC.Exts (Int (I#))
+
+type family MatchInt (i :: Int) :: () where
+    MatchInt ('I# x) = '()
+```
+
+| Separate probe | Fork | Stock 9.14.1 |
+| --- | --- | --- |
+| `data RawIndex (i :: Int#) = RawIndex` | GHC-83865 | GHC-83865 |
+| `type PromotedToken = 'Token`, with `data Token :: UnliftedType where Token :: Token` | GHC-18872 | GHC-18872 |
+| `MatchInt ('I# x) = '()` in a closed family over `Int` | GHC-18872 | GHC-18872 |
+| `MatchInt ('I# _) = '()` | GHC-18872 | GHC-18872 |
+| `MatchInt ('I# (x :: Int#)) = '()` | GHC-83865 | GHC-83865 |
+| `type Three = 'Packed 3#` | GHC-51819 | GHC-58481 |
+
+The kind signature checker requires the written kind to have kind `Type`.
+The family pattern binder and wildcard also introduce a kind variable of
+kind `Type`. Core Lint checks the same invariant for a type-variable binder.
+A local change to the wildcard would have to account for that invariant.
+The fork parses `3#` in a type and rejects it in `tc_hs_lit_ty`. Stock
+rejects it in the parser. Support for that literal is a separate part of
+R07. [Kind checking](../../../compiler/GHC/Tc/Gen/HsType.hs),
+[Core binder checking](../../../compiler/GHC/Core/Lint.hs).
+
+Accepted proposal #265 allows boxed unlifted datatypes. Accepted #547
+excludes written constructor contexts from promotion. Its review preserves
+the promotion of GADTs with indexed result types.
+[#265](https://ghc-proposals.readthedocs.io/en/latest/proposals/0265-unlifted-datatypes.html),
+[#547 review](https://github.com/ghc-proposals/ghc-proposals/pull/547#discussion_r1012596259).
+
+## R11 acceptance check
+
+`RawInt` is a small case of the kind-indexed GADT described in the GHC
+homogeneous-equality design. The source already compiles on both compilers.
+[GHC phase 2a](https://gitlab.haskell.org/ghc/ghc/-/wikis/dependent-haskell/phase2#phase-2a-homogeneous-equality).
+
+```haskell
+import Data.Kind (Type)
+import GHC.Exts (Int#, RuntimeRep (IntRep), TYPE)
+
+type RawEq :: forall r. TYPE r -> Type
+data RawEq a where
+    RawInt :: RawEq Int#
+
+type role AtRep nominal
+data AtRep (a :: TYPE r) = AtRep
+
+general :: forall r (a :: TYPE r). RawEq a -> AtRep a -> AtRep Int#
+general RawInt x = x
+
+sameRep :: forall (a :: TYPE 'IntRep). RawEq a -> AtRep a -> AtRep Int#
+sameRep RawInt x = x
+```
+
+At `-O0` with Core and STG Lint, the fork’s binder audit reports one
+mixed-kind binder for `general`, namely `(a :: TYPE r) ~# (Int# :: TYPE
+'IntRep)`. It reports zero for `sameRep`. The general R11 worker must lift
+`r ~# 'IntRep` through `TYPE` before binding the homogeneous index proof.
+`RawInt` refines the representation to `IntRep`. Use `general` to test
+transport under `TYPE`. Use the family patterns above to test kind
+formation and binding.
