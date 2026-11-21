@@ -422,6 +422,19 @@ can remain ambiguous. An opaque family result stays opaque.
 An `if` whose branches return `Mixed` can infer that type on its own.
 Bind the conditional at `Mixed` before passing it to the consumer.
 
+An ignored conditional can need its expected type. For example,
+`ignoreInner (if flag then id (error "left") else error "right")`
+returns `True` for either flag. The consumer supplies the explicit
+package type when GHC checks the branches. If a `case` first binds the
+conditional to a variable and passes that variable to `ignoreInner`,
+GHC reports GHC-91028. The result variable cannot take the package
+polytype at that later point. Two unsigned `Pack` branches also need
+their expected schema. Inference on the conditional alone gives
+GHC-27432. A general rule for opening computed operands must preserve
+these calls that use an expected type.
+[Implicit elimination in #473](https://github.com/ghc-proposals/ghc-proposals/pull/473)
+and [Quick Look review](https://github.com/ghc-proposals/ghc-proposals/pull/274#issuecomment-529816378).
+
 A local binding can store the whole nested package. For example,
 `let rows = partitionPair p xs in roundTrip rows` keeps both lengths
 hidden. Check free variables on the whole type. The inner package alone
