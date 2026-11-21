@@ -6104,6 +6104,14 @@ constructor binders to associate labels with totals.
 [Agda vectors](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html)
 and [Haskell table margins](roadmap/R15-closed-term-evaluator.md#read-independent-row-and-column-counts).
 
+Agda's `Data.Vec.Base` supplies length-preserving `map` and `zipWith`.
+The Haskell table maps a sum over rows and folds elementwise addition
+over the columns. Both inputs to each addition have the same column
+index. Mapping zero over the column labels supplies one zero per column
+even for a table with no rows.
+[Agda vector operations](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html)
+and [Haskell calculation](examples/closed-evaluation/RectangularTable.hs).
+
 The Idris 2 tutorial's vector filter returns a dependent pair. Its
 recursive branch opens the result of the recursive call before building
 a new pair whose length follows the selected branch. The Haskell batch

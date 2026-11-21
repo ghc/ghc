@@ -16,7 +16,7 @@ fi
 for opt in -O0 -O2; do
     mkdir -p "$out/${opt#-}"/{producer,client}
     cd "$out/${opt#-}/producer"
-    cp "$src"/{ExistentialVec,IndexedVec,WitnessedBatch}.hs .
+    cp "$src"/{ExistentialVec,IndexedVec,WitnessedBatch,RectangularTable}.hs .
     cat >WrongWitness.hs <<'HS'
 {-# LANGUAGE DataKinds, GADTs, KindSignatures #-}
 module WrongWitness
@@ -72,19 +72,20 @@ data TaggedBatch (marked :: Bool) a where
 withEquality :: Natural -> TaggedBatch 'True Natural
 withEquality _ = error "equality-constrained constructor was evaluated"
 HS
-    "${ghc[@]}" "$opt" "${producer_flags[@]}" -c IndexedVec.hs ExistentialVec.hs WitnessedBatch.hs WrongWitness.hs
+    "${ghc[@]}" "$opt" "${producer_flags[@]}" -c IndexedVec.hs ExistentialVec.hs WitnessedBatch.hs RectangularTable.hs WrongWitness.hs
     cd "../client"
     cp ../producer/*.{hi,o} .
     test ! -e WitnessedBatch.hs
     if [[ -f ../producer/WitnessedBatch.dyn_o ]]; then cp ../producer/*.{dyn_hi,dyn_o} .; fi
     cat >Proof.hs <<'HS'
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
-module Proof (evenBatch, oddBatch, mask, empty, row, margins) where
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, PolyKinds, TypeOperators #-}
+module Proof (evenBatch, oddBatch, mask, empty, row, margins, totals) where
 
 import Data.Type.Equality ((:~:)(Refl))
 import qualified ExistentialVec as E
 import qualified IndexedVec as V
 import qualified WitnessedBatch as B
+import qualified RectangularTable as T
 
 evenBatch :: B.build 4 :~: 'B.Chunk ('E.SS 'E.SZ) ('V.VCons 4 'V.VNil)
                             ('B.Chunk ('E.SS ('E.SS 'E.SZ))
@@ -109,6 +110,12 @@ row = Refl
 margins :: B.tableMargins 0 :~: 'B.TableMargins 'V.VNil ('V.VCons 'x' 'V.VNil)
                                                 'V.VNil ('V.VCons 0 'V.VNil)
 margins = Refl
+
+type Two x y = 'V.VCons x ('V.VCons y 'V.VNil)
+type Three x y z = 'V.VCons x (Two y z)
+totals :: T.totals (T.sample 4) :~: 'B.TableMargins (Two 'r' 's') (Three 'x' 'y' 'z')
+                                                   (Two 6 15) (Three 5 7 9)
+totals = Refl
 HS
     cat >Demand.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeOperators #-}
@@ -127,7 +134,8 @@ module Main where
 import qualified Demand
 import qualified ExistentialVec as E
 import qualified IndexedVec as V
-import Proof (evenBatch, oddBatch, mask, row, empty, margins)
+import Proof (evenBatch, oddBatch, mask, row, empty, margins, totals)
+import qualified RectangularTable as T
 import qualified WitnessedBatch as B
 
 skipped :: [Int]
@@ -147,11 +155,14 @@ main = do
         partial = B.TableMargins (error "unused row labels") (V.VCons 'x' V.VNil)
                                  (error "unused row totals") (V.VCons 7 V.VNil)
     print (margins, B.lookupTotals 'r' 'y' (B.tableMargins 4), snd (B.lookupTotals 'r' 'x' partial))
+    let noRows = T.Table V.VNil (V.VCons 'z' V.VNil) V.VNil
+        noCols = T.Table (V.VCons 's' V.VNil) V.VNil (V.VCons V.VNil V.VNil)
+    print (totals, T.selectedTotals (T.sample 7), T.selectedTotals noRows, T.selectedTotals noCols)
 HS
     "${ghc[@]}" "$opt" -c Proof.hs Demand.hs
     "${ghc[@]}" "$opt" -c Main.hs
     "${ghc[@]}" ./*.o -o run
-    test "$(./run)" = $'(Refl,Refl,Refl,Refl,Refl,1,2,1,[5],[])\n(Refl,Refl,Just 5,Just 8)\n(Refl,(Just 8,Just 4),Just 7)'
+    test "$(./run)" = $'(Refl,Refl,Refl,Refl,Refl,1,2,1,[5],[])\n(Refl,Refl,Just 5,Just 8)\n(Refl,(Just 8,Just 4),Just 7)\n(Refl,(Just 18,Just 9),(Nothing,Just 0),(Just 0,Nothing))'
 
     cat >WrongLength.hs <<'HS'
 module WrongLength where
@@ -179,6 +190,20 @@ HS
        ! grep -Fq 'SwapMargins.hs:5:34: error: [GHC-25897]' swap.log ||
        ! grep -Fq 'third argument' swap.log; then
         cat swap.log >&2
+        exit 1
+    fi
+
+    cat >Ragged.hs <<'HS'
+module Ragged where
+import IndexedVec (Vec(..))
+import RectangularTable (Table(..))
+bad :: Table Int
+bad = Table (VCons 'r' VNil) (VCons 'x' (VCons 'y' VNil))
+            (VCons (VCons 1 VNil) VNil)
+HS
+    if "${ghc[@]}" "$opt" -c Ragged.hs >ragged.log 2>&1 ||
+       ! grep -Fq 'Ragged.hs:6:29: error: [GHC-83865]' ragged.log; then
+        cat ragged.log >&2
         exit 1
     fi
 
