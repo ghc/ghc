@@ -26,4 +26,3 @@ NativeFamilyIndexEvidence.hs:18:37: error: [GHC-25897]
         y :: Proxy q (bound at NativeFamilyIndexEvidence.hs:18:9)
         wrong :: foreach (x :: Proxy p) -> Proxy q -> Proxy (Hide x)
           (bound at NativeFamilyIndexEvidence.hs:18:1)
-
