@@ -826,26 +826,30 @@ of its arguments. Check the lexical closures of f and g independently.
 Build nominal congruence only when every argument already has a proof.
 Use the same family head on both sides, whether the family is open or
 closed. Ordinary matching and apartness still select its equations.
+Compare the arguments before testing reflexivity of a family application.
+This visits the arguments of nested family applications once. Use
+reflexivity for an argument whose types already agree. Leave a wholly
+reflexive wanted to the ordinary solver.
 See Note [Scoped retained sum codomains] in GHC.Core.TyCo.Compare.
 -}
 
 -- | Prove a generated closure equality, including under a type family.
 proveLambdaCongruence :: Type -> Type -> Maybe CoercionN
-proveLambdaCongruence lhs rhs
-  | Just co <- proveScopedLambdaClosure lhs rhs = Just co
-  | Just (tc, as) <- splitTyConApp_maybe lhs
-  , Just (tc', bs) <- splitTyConApp_maybe rhs
-  , tc == tc'
-  , isOpenTypeFamilyTyCon tc || isJust (closedFamilyTyConCoAxiom_maybe tc)
-  , lengthIs as (tyConArity tc), equalLength as bs
-  , typeKind lhs `eqType` typeKind rhs
-  , not (lhs `eqType` rhs)
-  = mkTyConAppCo Nominal tc <$> zipWithM prove_argument as bs
-  | otherwise = Nothing
+proveLambdaCongruence = prove False
   where
-    prove_argument a b
-      | a `eqType` b = Just (mkNomReflCo a)
-      | otherwise = proveLambdaCongruence a b
+    prove allow_refl lhs rhs
+      | Just co <- proveScopedLambdaClosure lhs rhs = Just co
+      | Just (tc, as) <- splitTyConApp_maybe lhs
+      , Just (tc', bs) <- splitTyConApp_maybe rhs
+      , tc == tc'
+      , isOpenTypeFamilyTyCon tc || isJust (closedFamilyTyConCoAxiom_maybe tc)
+      , lengthIs as (tyConArity tc), equalLength as bs
+      = do cos <- zipWithM (prove True) as bs
+           if all isReflCo cos
+             then mkNomReflCo lhs <$ guard allow_refl
+             else mkTyConAppCo Nominal tc cos <$ guard (typeKind lhs `eqType` typeKind rhs)
+      | allow_refl, lhs `eqType` rhs = Just (mkNomReflCo lhs)
+      | otherwise = Nothing
 
 {- Note [Inferring a source index without reduction]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
