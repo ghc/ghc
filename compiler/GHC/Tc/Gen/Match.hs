@@ -1230,6 +1230,10 @@ The outer pattern keeps the source span of the wildcard. The internal
 binder has no source occurrence. The renamer has already resolved the
 RHS and its quotations. Ordinary variable-pattern desugaring preserves
 the argument's demand, including the module's Strict setting.
+
+A source wildcard has no name that the user can refer to. Keep its
+generated Id out of the relevant bindings in an error message. A named
+pattern such as `_first` is a source binding and can still be reported.
 -}
 
 -- | Check an erased suffix as an expression inside its runtime prefix.

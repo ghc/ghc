@@ -24,7 +24,6 @@ NativeFamilyIndexEvidence.hs:18:37: error: [GHC-25897]
       In an equation for ‘wrong’: wrong _ y = retain @(Width p) (Hide y)
     • Relevant bindings include
         y :: Proxy q (bound at NativeFamilyIndexEvidence.hs:18:9)
-        __aAk :: Proxy p (bound at <no location info>)
         wrong :: foreach (x :: Proxy p) -> Proxy q -> Proxy (Hide x)
           (bound at NativeFamilyIndexEvidence.hs:18:1)
 

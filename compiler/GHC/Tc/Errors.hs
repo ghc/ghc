@@ -2982,6 +2982,9 @@ relevant_bindings want_filtering lcl_env lcl_name_env ct_tvs
       where
         discard_it = go dflags n_left tvs_seen rels tc_bndrs
         go2 id_name top_lvl
+          | isSystemName id_name, isUnderscore (nameOccName id_name)
+          = discard_it  -- See Note [Wildcard retained binders] in GHC.Tc.Gen.Match.
+          | otherwise
           = do { let tidy_ty = case lookupNameEnv lcl_name_env id_name of
                                   Just tty -> tty
                                   Nothing -> pprPanic "relevant_bindings" (ppr id_name)
