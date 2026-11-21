@@ -1004,10 +1004,12 @@ retainedPair = RetainedFamilyTuple.readPair (Tup2 True False)
 -- | Store a column value before the required type argument.
 data ColumnSample a b where
     ColumnSample :: forall a. (a :~: Int) -> a -> forall b -> ColumnSample a b
+    GivenCount :: forall a. (a ~ Int) => a -> forall b -> ColumnSample a b
 
 -- | Matching Refl establishes that the last type pattern is Int.
 columnCount :: ColumnSample a a -> Int
 columnCount (ColumnSample Refl n (type Int)) = n
+columnCount (GivenCount n (type Int)) = n
 
 -- | Hide the field type and retain both dictionaries for its consumer.
 data PrintablePair where
@@ -1023,6 +1025,8 @@ main = do
     observe "retain a data family pair and read its fields" retainedPair
     observe "use earlier field evidence in a later constructor type pattern"
         (columnCount (ColumnSample @Int Refl 37 (type Int)))
+    observe "use a stored equality in a later constructor type pattern"
+        (columnCount (GivenCount @Int 41 (type Int)))
     observe "recover consecutive GADT constraints" (describePair (PrintablePair False True))
     observe "form an associated family type from its class evidence" constrainedElements
     observe "form an expression annotation with the matched dictionary" annotatedElement

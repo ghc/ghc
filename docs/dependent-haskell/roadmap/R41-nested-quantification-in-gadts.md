@@ -2,14 +2,15 @@
 
 - [x] Accept consecutive constructor contexts before the first field.
 - [x] Accept a terminal group of required universal type arguments after prefix fields in a lifted constructor with distinct result parameters and no constructor context or existentials.
-- [ ] Accept a terminal required group when an earlier context supplies a dictionary or equality.
+- [x] Accept a terminal required group when an earlier context supplies a dictionary or equality.
 - [ ] Support the remaining orders of fields, contexts, and quantifiers in prefix constructors.
 
 The [Showcase](../Showcase.hs) defines a constructor with fields of
 types `a :~: Int` and `a`, followed by `forall b ->`. The function
 `columnCount` matches a `ColumnSample a a`. Matching the first field
 against `Refl` establishes `a ~ Int`. GHC can then check the last
-pattern, `(type Int)`, and return the middle field as an `Int`.
+pattern, `(type Int)`, and return the middle field as an `Int`. The constructor `GivenCount`
+supplies the same equality from its context.
 
 Proposal #402 specifies free order for prefix constructor signatures.
 Its grammar includes both forms of `forall`. The required form uses
