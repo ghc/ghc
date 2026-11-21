@@ -13,11 +13,11 @@ for opt in -O0 -O1 -O2; do
     "${ghc[@]}" "$opt" -fwrite-source-equations -c PackedVecLibrary.hs
     "${ghc[@]}" "$opt" -Werror=incomplete-patterns -c ParameterizedIndexLibrary.hs
     cd ../proof
-    cp "$src/"{FinitePosition,ListCursor,AlignedList,NativeIndexedFinGate,NativeLinearIndexColumns}.hs ../indices/*.hi .
+    cp "$src/"{FinitePosition,ListCursor,AlignedList,NativeIndexedFinGate,NativeLinearIndexColumns,NativeRetainedAsPattern}.hs ../indices/*.hi .
     "${ghc[@]}" "$opt" -Werror=incomplete-patterns -c FinitePosition.hs AlignedList.hs NativeIndexedFinGate.hs
     lint=()
     if [[ $opt == -O0 ]]; then lint=(-dlinear-core-lint); fi
-    "${ghc[@]}" "$opt" "${lint[@]}" -Werror=incomplete-patterns -c ListCursor.hs NativeLinearIndexColumns.hs
+    "${ghc[@]}" "$opt" "${lint[@]}" -Werror=incomplete-patterns -c ListCursor.hs NativeLinearIndexColumns.hs NativeRetainedAsPattern.hs
     cd ../client
     cp "$src/"{FinitePositionClient,CursorClient}.hs ../proof/*.hi .
     "${ghc[@]}" "$opt" -Werror=incomplete-patterns -c FinitePositionClient.hs CursorClient.hs
@@ -32,6 +32,7 @@ import CursorClient (observeBoth, observeZip, observeAligned, observeCursors, ob
 import NativeLinearIndexColumns (choose)
 import FinitePositionClient (lookupVecViaView, observeConstructedViews, observeEmptyIndex, observeFinitePosition, observeListIndices)
 import NativeIndexedFinGate (Gate(..), Ticket(..), grant)
+import NativeRetainedAsPattern (lookupBoth)
 import PackedVecLibrary (Nat(..), Vec(..), toList)
 import ParameterizedIndexLibrary (indexVec, lookupVecChecked, mkFinGeneric, mkFinVec)
 
@@ -77,6 +78,12 @@ main = do
     let expectedCursors = [Just 'c', Nothing, Nothing, Just 'b', Just 'x', Just 'y']
     if ordinary == expectedCursors && linear == expectedCursors then pure ()
         else fail (show (ordinary, linear))
+    left <- newIORef (error "skipped element" : 'L' : error "left tail") >>= readIORef
+    right <- newIORef (13 : error "right tail") >>= readIORef
+    let firstOnly = fmap fst (lookupBoth ('R' : error "left tail") 0
+                             (error "unused selection" : right) 0)
+    if lookupBoth left 1 right 0 == Just ('L', 13 :: Int) && firstOnly == Just 'R'
+        then pure () else fail "wrong value or demand under a retained as-pattern"
     empty <- observeEmptyIndex
     gate <- newIORef (Shut (error "gate field")) >>= readIORef
     denied <- try (evaluate (grant gate (error "ticket"))) :: IO (Either ErrorCall Bool)
@@ -124,6 +131,12 @@ fi
 grep -Eq '^EscapingComposedResult.hs:7:[0-9]+: error: .GHC-25897.' compose-escape.log
 grep -Fq 'PackedVecLibrary.sourceLength left' compose-escape.log
 grep -Fq 'is a rigid type variable bound by' compose-escape.log
+cp "$src/NativeRetainedAsPattern.hs" .
+if "${ghc[@]}" -O0 -fforce-recomp -DWRONG_BOUND -fdiagnostics-color=never -c NativeRetainedAsPattern.hs >wrong-bound.log 2>&1; then
+    echo 'Accepted a position for the other as-binder'
+    exit 1
+fi
+grep -Eq '^NativeRetainedAsPattern.hs:25:[0-9]+: error: .GHC-05617.' wrong-bound.log
 cat >MissingRows.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeFamilies #-}
 module MissingRows where
