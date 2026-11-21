@@ -59,6 +59,8 @@ import OrphanPackageRules ()
 import qualified LexicalPackageRules
 import qualified RankedPackage
 import qualified RankedPackageClient
+import qualified RetainedPackageFormat
+import qualified RetainedPackageFormatClient
 import qualified StoredVector
 import qualified ExistentialVec as E
 import Data.IORef (modifyIORef', newIORef, readIORef, writeIORef)
@@ -1057,6 +1059,12 @@ main = do
     observe "read dependent fields from a local package pattern"
         (RankedPackageClient.runLocalPattern chooseLeft,
          RankedPackageClient.runLocalPattern chooseRight)
+    let formatterTag = error "unused formatter tag"
+    observe "use a Show superclass to format a reopened package"
+        ( RetainedPackageFormatClient.formatPackage formatterTag
+            (RetainedPackageFormat.chooseValue chooseLeft True False)
+        , RetainedPackageFormatClient.formatPackage formatterTag
+            (RetainedPackageFormat.chooseValue chooseRight 'x' 'q') )
     observe "filter a vector without forcing the tail to learn the result length"
         ErasedPackage.filterObservation
     observe "infer the hidden lengths of a lazy filter and a retained vector"

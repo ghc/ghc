@@ -369,6 +369,7 @@ An ordinary client can also pass the opened result to a retained reader.
 `DeepSubsumption` adapts the reader's dictionary below its retained arrow.
 The source-hidden test reads both `Bool` and `Char` results and can ignore
 a bottom retained argument or a lazy package.
+[Showcase formatter](../examples/erased-existentials/RetainedPackageFormatClient.hs),
 [Retained reader client](../../../testsuite/tests/dependent/should_run/implicit-existential-source/LexicalRetainedClient.hs).
 
 This path accepts one unsigned nonrecursive boxed tuple binding with
