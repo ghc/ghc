@@ -126,7 +126,7 @@ import GHC.Types.Id.Info
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply (getUniquesM)
 import GHC.Types.Var.Set
-import GHC.Types.Var.Env (emptyVarEnv, extendVarEnv, lookupVarEnv, mkVarEnv)
+import GHC.Types.Var.Env (emptyInScopeSet, emptyVarEnv, extendVarEnv, lookupVarEnv)
 import GHC.Types.Meta
 import GHC.Types.Basic hiding( SuccessFlag(..) )
 import GHC.Types.Error
@@ -1416,7 +1416,7 @@ closedConstructorArgumentsMatch fields values =
 data ClosedOpenShape = ClosedOpenShape TyVar TyCon [Type] [ClosedOpenAlternative]
 
 -- | Nothing denotes the one recursive field at the case-bound predecessor.
-data ClosedOpenAlternative = ClosedOpenAlternative DataCon ClosedOpenIndex [Maybe ClosedCallShape]
+data ClosedOpenAlternative = ClosedOpenAlternative DataCon ClosedOpenIndex [Maybe ClosedWitnessField]
 
 -- | The promoted constructor that fixes the index or extends a predecessor.
 data ClosedOpenIndex
@@ -1438,7 +1438,7 @@ data ClosedConstructorFields
   = ClosedStaticFields ClosedConstructorPlan [ClosedCallShape]
   | ClosedWitnessedFields [TyVar] [ClosedWitnessField]
 
--- | An indexed field determines the shared index from its constructors.
+-- | An indexed field determines one index from its constructors.
 data ClosedWitnessField
   = AtWitnessIndex ClosedOpenShape
   | AtGroundType ClosedCallShape
@@ -1481,12 +1481,16 @@ tcClosedCallValueShape owner kind = do
             concatMap witness_dependencies alternatives
           dependencies _ = []
           witness_dependencies (ClosedConstructor _ _ (ClosedWitnessedFields _ fields)) =
-            concatMap open_dependencies [s | AtWitnessIndex s <- fields]
+            concatMap witness_field_dependencies fields
           witness_dependencies _ = []
+          witness_field_dependencies (AtWitnessIndex field) = open_dependencies field
+          witness_field_dependencies (AtGroundType _) = []
           open_dependencies (ClosedOpenShape _ tc _ alternatives) =
             (tc, [con | ClosedOpenAlternative con _ _ <- alternatives]) :
             [(dataConTyCon con, [con]) | ClosedOpenAlternative _ index _ <- alternatives
-                                     , let con = closedIndexCon index]
+                                     , let con = closedIndexCon index] ++
+            concatMap witness_field_dependencies
+              [field | ClosedOpenAlternative _ _ fields <- alternatives, Just field <- fields]
           used = [name | (tc, constructors) <- datatypes
                        , name <- tyConName tc : map dataConName constructors]
       addUsedGREs NoDeprecationWarnings
@@ -1532,7 +1536,8 @@ reportClosedShapeError owner err = case err of
           explanation = case indices of
             _:_:_ -> ". The field type depends on multiple hidden indices " ++
                      render (parens (pprWithCommas ppr indices)) ++
-                     ". Each indexed field must determine one index."
+                     ". Read such a field after determining its indices from earlier fields. " ++
+                     "Its constructors must determine one of those indices."
             _ -> " at the hidden index. The field's constructors must determine that index."
       failWithTc (TcRnClosedTypeEval owner
         ("Cannot reify field " ++ show position ++ " of " ++ constructor ++ explanation))
@@ -1599,14 +1604,15 @@ closedCallValueShape rdr_env kind = do
                 codecs <- case fields of
                   Left (static, ground) -> ClosedStaticFields static <$> traverse (shape next) ground
                   Right (indices, arguments) -> do
-                    let field position ty
-                          | closedGroundField ty = AtGroundType <$> shape next ty
-                          | [index] <- used = AtWitnessIndex <$> open_shape unsupported next index ty
-                          | otherwise = Trans.lift (Left unsupported)
-                          where
-                            used = filter (`elemVarSet` tyCoVarsOfType ty) indices
-                            unsupported = UnsupportedClosedPayload con position used
-                    ClosedWitnessedFields indices <$> zipWithM field [1..] arguments
+                    let field known (position, ty) = do
+                          let err = UnsupportedClosedPayload con position (field_indices indices ty)
+                          codec <- witness_shape err next indices known ty
+                          let known' = case codec of
+                                AtWitnessIndex (ClosedOpenShape index _ _ _) -> extendVarSet known index
+                                AtGroundType _ -> known
+                          return (known', codec)
+                    (_, fields) <- mapAccumLM field emptyVarSet (zip [1..] arguments)
+                    return (ClosedWitnessedFields indices fields)
                 return (ClosedConstructor (Just (closedConstructorTag con)) con codecs)
               State.modify' ((here, ClosedData tc args alternatives) :)
               return (ClosedRef here)
@@ -1615,9 +1621,25 @@ closedCallValueShape rdr_env kind = do
         -> Trans.lift (Left (InaccessibleClosedData tc False))
       _ -> Trans.lift (Left UnsupportedClosedShape)
 
-    open_shape unsupported active index field = do
+    field_indices indices ty = filter (`elemVarSet` tyCoVarsOfType ty) indices
+
+    witness_shape unsupported active indices known ty
+      | closedGroundField ty = AtGroundType <$> shape active ty
+      | Just index <- structural_index =
+          AtWitnessIndex <$> open_shape unsupported active indices known index ty
+      | otherwise = Trans.lift (Left unsupported)
+      where
+        structural_index = case field_indices indices ty of
+          [index] -> Just index
+          used | all (`elemVarSet` known) used
+               , Just (_, args) <- splitTyConApp_maybe ty
+               , [index] <- filter (\v -> any (tcEqType (mkTyVarTy v)) args) used
+               -> Just index
+          _ -> Nothing
+
+    open_shape unsupported active indices known index field = do
       (tc, args, alternatives) <- Trans.lift $
-        maybe (Left unsupported) Right (closedOpenAlternatives index field)
+        maybe (Left unsupported) Right (closedOpenAlternatives known index field)
       let constructors = [con | (con, _, _) <- alternatives]
       unless (all (isJust . closedImportedGRE rdr_env) constructors) $
         Trans.lift (Left (InaccessibleClosedData tc False))
@@ -1625,7 +1647,11 @@ closedCallValueShape rdr_env kind = do
         let index_con = closedIndexCon result_index
         unless (isJust (closedImportedGRE rdr_env index_con)) $
           Trans.lift (Left (InaccessibleClosedData (dataConTyCon index_con) False))
-        codecs <- traverse (traverse (shape active)) fields
+        let payload ty = do
+              unless (closedGroundField ty || proper_subterm ty field) $
+                Trans.lift (Left unsupported)
+              witness_shape unsupported active indices known ty
+        codecs <- traverse (traverse payload) fields
         return (ClosedOpenAlternative con result_index codecs)
       return (ClosedOpenShape index tc args plans)
 
@@ -1690,19 +1716,23 @@ closedOpenRepresentation con =
   null (dataConRepArgBinders con) && not (any isUnpacked (dataConImplBangs con))
 
 -- | Validate the open datatype before generating its polymorphic encoder.
-closedOpenAlternatives :: TyVar -> Type
+-- See Note [Closed results with an existential witness].
+closedOpenAlternatives :: TyVarSet -> TyVar -> Type
                        -> Maybe (TyCon, [Type], [(DataCon, ClosedOpenIndex, [Maybe Type])])
-closedOpenAlternatives index field = do
+closedOpenAlternatives known index field = do
   (tc, args) <- splitTyConApp_maybe field
   guard (isVanillaAlgTyCon tc && isBoxedDataTyCon tc && isLiftedAlgTyCon tc &&
          null (tyConStupidTheta tc) && lengthIs args (tyConArity tc))
   let positions = [i | (i, arg) <- zip [0 :: Int ..] args, arg `tcEqType` mkTyVarTy index]
   [position] <- pure positions
-  guard (all (\arg -> arg `tcEqType` mkTyVarTy index || closedGroundType arg) args)
+  guard (all fixed_argument [arg | (i, arg) <- zip [0 ..] args, i /= position])
   guard (not (null (tyConDataCons tc)))
   alternatives <- traverse (check position args) (tyConDataCons tc)
   return (tc, args, alternatives)
   where
+    fixed_argument arg =
+      tyCoVarsOfType arg `subVarSet` delVarSet known index && isTyFamFree arg && isTauTy arg
+
     check position args con = do
       (universals, locals, [equation], [], fields, result) <- pure (dataConFullSig con)
       let (refined, rhs) = eqSpecPair equation
@@ -1734,7 +1764,6 @@ closedOpenAlternatives index field = do
       let typed_fields = [if maybe False (tcEqType arg) recursive_type then Nothing else Just arg
                          | arg <- field_types]
       guard (maybe True (const (lengthIs (filter isNothing typed_fields) 1)) recursive_type &&
-             all (maybe True closedGroundField) typed_fields &&
              result_type `tcEqType` substTyWith [index] [constructor_index] (mkTyConApp tc args) &&
              here_index `tcEqType` mkTyVarTy index &&
              dataConRepArity con == length rep &&
@@ -1742,14 +1771,14 @@ closedOpenAlternatives index field = do
              and (zipWith tcEqType rep (expected_evidence ++ field_types)))
       return (con, result_index, typed_fields)
 
--- | Instantiate an open codec at one nominal index.
-closedOpenArgs :: ClosedOpenShape -> Type -> [Type]
-closedOpenArgs (ClosedOpenShape index _ args _) val =
-  substTys (zipTvSubst [index] [val]) args
+-- | Substitute the structural index and any indices fixed by earlier fields.
+closedOpenArgs :: Subst -> ClosedOpenShape -> Type -> [Type]
+closedOpenArgs actuals (ClosedOpenShape index _ args _) val =
+  substTys (extendTvSubstAndInScope actuals index val) args
 
 -- | Get the type consumed by a polymorphic renderer at this index.
-closedOpenType :: ClosedOpenShape -> Type -> Type
-closedOpenType shape@(ClosedOpenShape _ tc _ _) val = mkTyConApp tc (closedOpenArgs shape val)
+closedOpenType :: Subst -> ClosedOpenShape -> Type -> Type
+closedOpenType actuals shape@(ClosedOpenShape _ tc _ _) val = mkTyConApp tc (closedOpenArgs actuals shape val)
 
 -- | A terminated tag distinguishes each constructor on the wire.
 closedConstructorTag :: DataCon -> String
@@ -2046,11 +2075,22 @@ closedCallRenderer name (ClosedCodec shape nodes) = do
         foldr (\c rest -> mkConsExpr charTy (mkCharExpr c) rest) suffix (closedConstructorTag con)
       unexpected_rep :: TcM a
       unexpected_rep = failWithTc (TcRnClosedTypeEval name "Unexpected indexed constructor representation.")
-      renderOpen refs quote shape@(ClosedOpenShape template _ _ alternatives) = do
+      renderWitnessField refs quote actuals field value = case field of
+        AtWitnessIndex indexed@(ClosedOpenShape template _ _ _)
+          | let idx = substTy actuals (mkTyVarTy template)
+          , varType value `tcEqType` closedOpenType actuals indexed idx -> do
+              render <- renderOpen refs quote actuals indexed
+              return (render idx (Core.Var value))
+        AtGroundType ground
+          | varType value `tcEqType` closedShapeKind ground -> do
+              render <- renderFields refs quote ground
+              return (render (Core.Var value))
+        _ -> unexpected_rep
+      renderOpen refs quote actuals shape@(ClosedOpenShape template _ _ alternatives) = do
         unique <- newUnique
         let index = mkTyVar (mkSysTvName unique (fsLit "closed_index")) (tyVarKind template)
             index_ty = mkTyVarTy index
-            kind = closedOpenType shape index_ty
+            kind = closedOpenType actuals shape index_ty
         loop <- mkSysLocalM (fsLit "closed_indexed") ManyTy
                   (mkLamType index (mkVisFunTyManyU kind show_s))
         current <- mkSysLocalM (fsLit "closed_indexed_value") ManyTy kind
@@ -2058,7 +2098,7 @@ closedCallRenderer name (ClosedCodec shape nodes) = do
         binder <- mkSysLocalM (fsLit "closed_indexed_arm") ManyTy kind
         alts <- forM alternatives $ \(ClosedOpenAlternative con result_index fields) -> do
           uniques <- getUniquesM
-          let (locals, binders) = dataConRepInstPat uniques ManyTy con (closedOpenArgs shape index_ty)
+          let (locals, binders) = dataConRepInstPat uniques ManyTy con (closedOpenArgs actuals shape index_ty)
           case binders of
             evidence : values | isCoVar evidence, equalLength fields values -> do
               (target, previous) <- case (result_index, locals) of
@@ -2073,10 +2113,8 @@ closedCallRenderer name (ClosedCodec shape nodes) = do
                       coercionLKind proof `tcEqType` index_ty &&
                       coercionRKind proof `tcEqType` target) unexpected_rep
               renderers <- forM (zip fields values) $ \(field, var) -> case field of
-                Just field_shape | varType var `tcEqType` closedShapeKind field_shape -> do
-                  render <- renderFields refs quote field_shape
-                  return (render (Core.Var var))
-                Nothing | Just child <- previous, varType var `tcEqType` closedOpenType shape child ->
+                Just field_shape -> renderWitnessField refs quote actuals field_shape var
+                Nothing | Just child <- previous, varType var `tcEqType` closedOpenType actuals shape child ->
                   return (\rest -> mkCoreApps (Core.Var loop) [Core.Type child, Core.Var var, rest])
                 _ -> unexpected_rep
               let encoded = foldr ($) (Core.Var suffix) renderers
@@ -2133,22 +2171,10 @@ closedCallRenderer name (ClosedCodec shape nodes) = do
                 return (foldr (.) id (zipWith ($) renderers values))
               ClosedWitnessedFields templates codecs
                 | equalLength templates existentials, all isTyVar existentials
-                , let pairs = zip templates existentials
-                , all (\(t, v) -> tyVarKind t `tcEqType` tyVarKind v) pairs
+                , and (zipWith (\t v -> tyVarKind t `tcEqType` tyVarKind v) templates existentials)
                 , equalLength codecs binders -> do
-                    let actuals = mkVarEnv pairs
-                        render_field (AtWitnessIndex field@(ClosedOpenShape template _ _ _)) value
-                          | Just actual <- lookupVarEnv actuals template
-                          , let idx = mkTyVarTy actual
-                          , varType value `tcEqType` closedOpenType field idx = do
-                              render <- renderOpen refs quote field
-                              return (render idx (Core.Var value))
-                        render_field (AtGroundType field) value
-                          | varType value `tcEqType` closedShapeKind field = do
-                              render <- renderFields refs quote field
-                              return (render (Core.Var value))
-                        render_field _ _ = unexpected_rep
-                    renderers <- zipWithM render_field codecs binders
+                    let actuals = zipTvSubst templates (map mkTyVarTy existentials)
+                    renderers <- zipWithM (renderWitnessField refs quote actuals) codecs binders
                     return (foldr (.) id renderers)
                 | otherwise -> unexpected_rep
             let alt suffix =
@@ -2241,7 +2267,7 @@ decodeClosedCallResult (ClosedCodec shape nodes) rendered = case shape of
           ClosedWitnessedFields templates codecs -> do
             let field (AtGroundType shape) input = Trans.lift (decodeFields shape input)
                 field (AtWitnessIndex shape@(ClosedOpenShape template _ _ _)) input = State.StateT $ \known -> do
-                  (index, value, rest) <- decodeOpen shape (lookupVarEnv known template) input
+                  (index, value, rest) <- decodeOpen known shape (lookupVarEnv known template) input
                   return ((value, rest), extendVarEnv known template index)
             ((values, rest), known) <- State.runStateT (decodeArguments field codecs encoded) emptyVarEnv
             indices <- traverse (lookupVarEnv known) templates
@@ -2249,7 +2275,7 @@ decodeClosedCallResult (ClosedCodec shape nodes) rendered = case shape of
             return (value, rest)
 
     -- A later use of the same existential must agree with its first value.
-    decodeOpen shape@(ClosedOpenShape _ _ _ alternatives) expected input = do
+    decodeOpen known shape@(ClosedOpenShape _ result_tc _ alternatives) expected input = do
       (ClosedOpenAlternative con result_index fields, payload) <- listToMaybe
         [(alt, rest) | alt@(ClosedOpenAlternative ctor _ _) <- alternatives
                      , Just rest <- [stripPrefix (closedConstructorTag ctor) input]]
@@ -2262,26 +2288,31 @@ decodeClosedCallResult (ClosedCodec shape nodes) rendered = case shape of
           (tc, [child]) <- splitTyConApp_maybe index
           guard (tc == promoteDataCon successor)
           return (Just child)
-      (children, values, rest) <- decodeOpenFields shape expected_child fields payload
+      (children, values, rest) <- decodeOpenFields known shape expected_child fields payload
       index <- case (result_index, children) of
         (ClosedFixedIndex fixed, []) -> return (mkTyConTy (promoteDataCon fixed))
         (ClosedSuccessor successor, [child]) -> return (mkTyConApp (promoteDataCon successor) [child])
         _ -> Nothing
-      let kind = closedOpenType shape index
-          args = closedOpenArgs shape index
+      let actuals = mkTvSubst emptyInScopeSet known
+          args = closedOpenArgs actuals shape index
+          kind = mkTyConApp result_tc args
       value <- packConstructor kind args con children values
       return (index, value, rest)
 
-    decodeOpenFields _ _ [] input = Just ([], [], input)
-    decodeOpenFields shape expected (field : fields) input = do
+    decodeOpenFields _ _ _ [] input = Just ([], [], input)
+    decodeOpenFields known shape expected (field : fields) input = do
       (indices, value, after_field) <- case field of
-        Just field_shape -> do
+        Just (AtGroundType field_shape) -> do
           (value, rest) <- decodeFields field_shape input
           return ([], value, rest)
+        Just (AtWitnessIndex nested@(ClosedOpenShape template _ _ _)) -> do
+          index <- lookupVarEnv known template
+          (_, value, rest) <- decodeOpen known nested (Just index) input
+          return ([], value, rest)
         Nothing -> do
-          (index, value, rest) <- decodeOpen shape expected input
+          (index, value, rest) <- decodeOpen known shape expected input
           return ([index], value, rest)
-      (other_indices, values, rest) <- decodeOpenFields shape expected fields after_field
+      (other_indices, values, rest) <- decodeOpenFields known shape expected fields after_field
       return (indices ++ other_indices, value : values, rest)
 
     packConstructor kind kinds con indices values = do
@@ -2349,20 +2380,29 @@ recovered index. Check later uses at that index, even when another field
 intervenes. A singleton works by the same rule. A closed field uses its
 ordinary codec. A recursive package can choose its own indices.
 
-Preflight checks the independent recursive schema of each indexed field.
+Preflight checks the recursive schema of each indexed field.
 A base constructor fixes its index to a nullary promoted constructor.
 A recursive constructor refines its index to an injective promoted
 application of its case-bound predecessor. It has one recursive field
-at that predecessor. Other fields use the ordinary ground codec.
+at that predecessor. Other fields can use the ordinary ground codec.
+
+A table can store its cells at Vec rows (Vec cols a) after fields that
+establish rows and cols. The outer vector changes its row index. Its
+element type retains the established column index. A nonrecursive
+indexed field must be a proper subterm of the surrounding type. This
+keeps codec planning finite. An empty outer vector has no row from
+which to recover its column index. Read the column labels first.
 
 The enclosing Core case binds the existentials with dataConRepInstPat.
 Pair them with their declaration binders and check their kinds and fields.
-Each indexed field has a polymorphic Core worker. Each
-recursive case checks its actual nominal equality against the planned
+Each indexed field has a polymorphic Core worker. The worker abstracts
+its structural index and keeps the other case-bound indices in scope.
+Each recursive case checks its nominal equality against the planned
 index pattern. The case evidence supplies no data to the wire. The host
-decoder recovers each index on first use. It supplies the indices to
-packConstructor in declaration order after checking every field. The preflight plan
-determines the constructor tags and visibility checks.
+decoder recovers each index on first use and checks each nested row at
+its established length. It supplies the indices to packConstructor in
+declaration order. Preflight determines the constructor tags and
+visibility checks, including those for nested fields.
 -}
 
 {- Note [Recovering constructor-local indices in closed calls]
