@@ -4762,7 +4762,7 @@ runSourceRejectChecks = do
         , ("missing domain annotation", 83605, "explicit domain type", [], local [] "foreach b -> Int -> Int" identity "42")
         , ("anonymous retained binder", 83605, "requires a variable name", [], local [] "foreach (_ :: Bool) -> Int -> Int" identity "42")
         , ("partial retained signature", 83605, "complete type signature", ["PartialTypeSignatures", "NamedWildCards"], local [] "foreach (b :: Bool) -> _a -> _a" identity "42")
-        , ("inner erased forall", 83605, "within the scope of a retained binder", ["RankNTypes"], local [] "foreach (b :: Bool) -> forall a. a -> Select b" ["keep b x = x"] "42")
+        , ("result mismatch under an inner erased forall", 25897, "In the expression: x", ["RankNTypes"], local [] "foreach (b :: Bool) -> forall a. a -> Select b" ["keep b x = x"] "42")
         , ("strict retained pattern", 83605, "bare variable pattern", ["BangPatterns"], local [] selection ["keep !_ x = x"] "42")
         , ("multiple variable equations", 83605, "one unguarded clause for each constructor", [], local [] selection (identity ++ identity) "42")
         , ("uncertified producer expression", 83605, "No checked source equations are available for", [],
