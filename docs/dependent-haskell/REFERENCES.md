@@ -6888,8 +6888,9 @@ another. Its `subst` example omits both endpoints while using an equality
 to transport a value. The GHC User’s Guide gives an ordinary GADT pair
 constructor whose result contains both component types. The fork combines
 these ideas for two retained vector values. The expected constructor
-result names each value. A separate GADT equality justifies transporting
-its kind. Equality of lengths alone never identifies the two vectors.
+result names each value and supplies the ordinary element type. The
+binder order places the element type before the vector values that use
+it. A separate GADT equality justifies transporting their kinds. Equality of lengths alone never identifies the two vectors.
 [Agda 2.8 implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html),
 [GHC GADT constructors](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/gadt.html),
 and [paired vector split](examples/packed-vector/CertifiedSplit.hs).

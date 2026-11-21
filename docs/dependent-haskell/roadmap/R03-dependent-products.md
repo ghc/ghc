@@ -370,8 +370,9 @@ and [cross-module checks](../../../testsuite/tests/dependent/should_run/NativeIn
 
 An ordinary caller can split two vectors at one runtime cut. A successful
 bounds check identifies the common length with the sum of the two piece
-lengths. The expected result of `SplitBothAtWidth @a @cut @suffix`
-identifies each original vector. Each reconstruction proof belongs to its
+lengths. The expected result determines all five erased arguments of
+`SplitBothAtWidth`: the element type, cut, suffix, and the two original
+vectors. The constructor call needs no type applications. Each reconstruction proof belongs to its
 own input. The caller can open the first proof while the second vector is
 undefined. An excessive cut returns `Nothing`.
 
