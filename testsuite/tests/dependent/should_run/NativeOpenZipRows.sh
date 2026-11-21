@@ -7,7 +7,7 @@ strip=(-fomit-interface-pragmas -fno-write-if-simplified-core)
 src=$PWD
 out=$(mktemp -d)
 trap 'rm -rf -- "$out"' EXIT
-mkdir "$out"/{provider,reader,rule,nocode,nocode-reader}
+mkdir "$out"/{provider,reader,rule,nocode,nocode-reader,counting}
 
 reject() {
     local expected=$1
@@ -175,5 +175,14 @@ cp ../provider/PackedVecLibrary.hi "$src/ZipLengthSource.hs" .
 "${ghc[@]}" --show-iface ZipLengthSource.hi >nocode.iface
 if grep -Fq 'FinalCoreSourceTable T:zipLength' nocode.iface; then
     echo 'A no-code producer exported a provisional table.' >&2
+    exit 1
+fi
+
+cd "$out/counting"
+cp ../provider/PackedVecLibrary.hi "$src/ZipLengthSource.hs" .
+"${ghc[@]}" "${strip[@]}" -fhpc -hpcdir . -c ZipLengthSource.hs
+"${ghc[@]}" --show-iface ZipLengthSource.hi >counting.iface
+if grep -Fq 'FinalCoreSourceTable T:zipLength' counting.iface; then
+    echo 'Coverage ticks qualified as debugger breakpoints.' >&2
     exit 1
 fi

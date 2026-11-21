@@ -2399,6 +2399,9 @@ checks the constructors and operands after alpha-renaming. Drop the
 table if optimization changes a pattern or result, even if the new
 body also passes the structural check. Check the exact owner for
 visible rules at an imported use.
+
+Ignore debugger breakpoints in both checks. Keep coverage ticks because
+they record evaluation.
 -}
 
 {- Note [Nullary indexed source projections]
@@ -3456,7 +3459,8 @@ checkedFinalListTable bindings table = isJust $ do
 checkedTwoListCase :: (TyCon -> Bool) -> Id -> Core.CoreExpr
                    -> Maybe (ConstructorCaseType, [ConstructorCaseRow])
 checkedTwoListCase public owner rhs = do
-    (signature, rows) <- checkedConstructorCase public (const Nothing) owner rhs
+    (signature, rows) <- checkedConstructorCase public (const Nothing) owner
+                           (stripTicksE isSourceBreakpoint rhs)
     guard (isTwoListCase signature)
     pure (signature, rows)
 
