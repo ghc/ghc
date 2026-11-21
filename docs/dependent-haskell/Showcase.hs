@@ -1026,8 +1026,11 @@ main = do
         (Refl :: LocalOpen.LazyFirst Char Bool :~: Char, LocalOpen.lazyFirst 'x' 'y')
     observe "open erased packages and leave an unused payload lazy"
         ErasedPackage.observation
-    observe "pass an erased package directly to a polymorphic reader"
-        (RankedPackageClient.runMixedPackage 17, RankedPackageClient.runProducedPackage 23)
+    observe "pass named, computed and forwarded erased packages to a polymorphic reader"
+        ( RankedPackageClient.runMixedPackage 17
+        , RankedPackageClient.runProducedPackage 23
+        , RankedPackageClient.runForwardedPackage 29
+        )
     observe "filter a vector without forcing the tail to learn the result length"
         ErasedPackage.filterObservation
     observe "infer the hidden lengths of a lazy filter and a retained vector"

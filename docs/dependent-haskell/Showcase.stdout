@@ -244,7 +244,7 @@ read the fields of a result indexed by True: Refl
 read the head of an ordinary length-indexed vector: Refl
 ignore a recursive helper in a type and at runtime: (Refl,'x')
 open erased packages and leave an unused payload lazy: (True,False,True)
-pass an erased package directly to a polymorphic reader: (17,23)
+pass named, computed and forwarded erased packages to a polymorphic reader: (17,23,29)
 filter a vector without forcing the tail to learn the result length: ([7],[7,9])
 infer the hidden lengths of a lazy filter and a retained vector: ([7],[],[9])
 project a stored vector from a strict record field: "h"

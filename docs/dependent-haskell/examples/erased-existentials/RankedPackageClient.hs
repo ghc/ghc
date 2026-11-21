@@ -1,7 +1,7 @@
 {-# LANGUAGE ImpredicativeTypes, LambdaCase, NoExperimentalDependentTypes, RequiredTypeArguments #-}
 module RankedPackageClient
     ( runGuarded, runProjections, projectAt, runDeclaredWitnesses, runExplicitBranches
-    , runMixedPackage, runProducedPackage
+    , runMixedPackage, runProducedPackage, runForwardedPackage
     ) where
 
 import Data.Proxy (Proxy(..))
@@ -72,6 +72,10 @@ runMixedPackage n = ErasedPackage.readMixedNumber (hide n)
 -- | Pass the produced outer package directly to its polymorphic reader.
 runProducedPackage :: Int -> Int
 runProducedPackage n = ErasedPackage.readNumber (hide n)
+
+-- | Pass the producer's result through a polymorphic function.
+runForwardedPackage :: Int -> Int
+runForwardedPackage n = ErasedPackage.readNumber (id (hide n))
 
 -- | Hide the first witness after packing the second.
 hide :: Int -> ErasedPackage.MixedNumber
