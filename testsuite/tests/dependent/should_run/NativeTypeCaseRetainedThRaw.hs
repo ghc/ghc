@@ -60,10 +60,12 @@ after = 'c'
 
 caseData :: Bool
 caseData =
-  case $(dataToExpQ (const Nothing) (CaseT StarT [TypeCaseAlt WildCardT ConstraintT])) of
-    $(dataToPatQ (const Nothing) (CaseT StarT [TypeCaseAlt WildCardT ConstraintT])) -> lifted == CaseT StarT [expected, TypeCaseAlt StarT WildCardT]
-    _ -> False
+    matches $(dataToExpQ (const Nothing) (CaseT StarT [TypeCaseAlt WildCardT ConstraintT]))
+    && not (matches ConstraintT)
+    && lifted == CaseT StarT [expected, TypeCaseAlt StarT WildCardT]
   where
+    matches $(dataToPatQ (const Nothing) (CaseT StarT [TypeCaseAlt WildCardT ConstraintT])) = True
+    matches _ = False
     lifted = $(lift (CaseT StarT [TypeCaseAlt WildCardT ConstraintT, TypeCaseAlt StarT WildCardT]))
     expected = $$(liftTyped (TypeCaseAlt WildCardT ConstraintT))
 
