@@ -1336,6 +1336,16 @@ the next cons before demanding the remaining left tail or right list.
 [regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh),
 and [prior art](../REFERENCES.md#distributing-filter-over-append).
 
+`packFilterAppend` builds those decisions for `Prelude.not` from a
+runtime list. `negationResult x` checks the installed predicate at the
+current head `x`. The type checker rejects a decision about a different
+head. An ordinary client matches the equality on lists read at runtime
+using stripped producer interfaces at `-O0` and `-O2`. Forcing the proof
+requires a finite left spine and defined left heads. It can leave the
+right list undefined. The outer package can leave both inputs undefined.
+[Runtime producer](../examples/open-evaluation/PreludeFilterAppendRuntime.hs)
+and [regression](../../../testsuite/tests/dependent/should_run/NativeOpenInstalledMap.sh).
+
 ### Supply a runtime filter decider
 
 `runtimeFilterBoundWith` takes an erased required type argument `(type p)`

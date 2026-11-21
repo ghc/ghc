@@ -625,13 +625,16 @@ if "${proof[@]}" >changed.log 2>&1 ||
 fi
 
 # The same predicate decision applies before and after appending to the tail.
-mkdir "$out"/{filter-append-provider,filter-append-client}
+stripped=(-fomit-interface-pragmas -fno-write-if-simplified-core)
+mkdir "$out"/{filter-append-provider,filter-append-client,filter-append-observer}
 cd "$out/filter-append-provider"
 cp ../length-source/PreludeMapLength{Size,Source}.hi ../filter/PreludeFilterSource.hi .
-"${filter[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core -odir . -hidir . -c \
+"${filter[@]}" "${stripped[@]}" -odir . -hidir . -c \
     "$src/PreludeFilterLengthProof.hs" "$src/PreludeFilterRuntime.hs" "$src/PreludeAppendLengthSource.hs"
 cd "$out/filter-append-client"
-cp ../filter-append-provider/*.hi "$src/PreludeFilterAppendProof.hs" .
+cp ../filter-append-provider/*.hi "$src"/PreludeFilterAppend{Proof,Runtime}.hs .
+filter_append_sources=(../filter-append-provider/*.o ../filter/PreludeFilterSource.o
+                       ../length-source/PreludeMapLength{Size,Source}.o)
 cat >Main.hs <<'HS'
 module Main where
 import PreludeFilterAppendProof (showPreludeFilterAppend)
@@ -639,9 +642,8 @@ main :: IO ()
 main = putStrLn showPreludeFilterAppend
 HS
 for level in -O0 -O2; do
-    "${filter[@]}" "$level" -fforce-recomp -c PreludeFilterAppendProof.hs Main.hs
-    "${ghc[@]}" Main.o PreludeFilterAppendProof.o ../filter-append-provider/*.o \
-        ../filter/PreludeFilterSource.o ../length-source/PreludeMapLength{Size,Source}.o -o filter-append-run
+    "${filter[@]}" "$level" "${stripped[@]}" -fforce-recomp -c PreludeFilterAppendProof.hs Main.hs
+    "${ghc[@]}" Main.o PreludeFilterAppendProof.o "${filter_append_sources[@]}" -o filter-append-run
     [[ $(./filter-append-run) == '(Refl,[1,3],[1,3],(True,True))' ]]
 done
 
@@ -656,3 +658,51 @@ if "${filter[@]}" -c WithoutDecision.hs >without-decision.log 2>&1 ||
     cat without-decision.log >&2
     exit 1
 fi
+
+# Check that each runtime decision belongs to the head in this proof step.
+"${filter[@]}" -O2 "${stripped[@]}" -c PreludeFilterAppendRuntime.hs
+sed 's/negationResult x/negationResult False/' PreludeFilterAppendRuntime.hs >WrongHead.hs
+line=$(awk '/^decisionsForNot .*negationResult False/ { print NR }' WrongHead.hs)
+if "${filter[@]}" -c WrongHead.hs >wrong-head.log 2>&1 ||
+   ! grep -Fq "WrongHead.hs:$line:" wrong-head.log ||
+   ! grep -Fq '[GHC-05617]' wrong-head.log ||
+   ! grep -Fq 'not x ~ True' wrong-head.log; then
+    cat wrong-head.log >&2
+    exit 1
+fi
+
+cd "$out/filter-append-observer"
+cp ../filter-append-client/{PreludeFilterAppendProof,PreludeFilterAppendRuntime}.hi ../filter-append-provider/*.hi .
+cat >ObserveFilterAppend.hs <<'HS'
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
+module Main where
+
+import Data.IORef (newIORef, readIORef)
+import Data.Type.Equality ((:~:)(Refl))
+import PreludeFilterAppendRuntime (RuntimeFilterAppend(..), packFilterAppend)
+
+observe :: RuntimeFilterAppend -> ([Bool], [Bool])
+observe (RuntimeFilterAppend xs ys Refl) =
+    (filter not (xs ++ ys), filter not xs ++ filter not ys)
+
+proofOnly :: RuntimeFilterAppend -> Bool
+proofOnly (RuntimeFilterAppend _ _ Refl) = True
+
+packageOnly :: RuntimeFilterAppend -> Bool
+packageOnly (RuntimeFilterAppend _ _ _) = True
+
+main :: IO ()
+main = do
+    xs <- newIORef [True, False] >>= readIORef
+    ys <- newIORef [False, True] >>= readIORef
+    print ( observe (packFilterAppend xs ys)
+          , proofOnly (packFilterAppend [] undefined)
+          , proofOnly (packFilterAppend xs undefined)
+          , packageOnly (packFilterAppend undefined undefined) )
+HS
+for level in -O0 -O2; do
+    "${filter[@]}" "$level" -fforce-recomp -c ObserveFilterAppend.hs
+    "${ghc[@]}" ObserveFilterAppend.o ../filter-append-client/PreludeFilterAppend{Proof,Runtime}.o \
+        "${filter_append_sources[@]}" -o filter-append-observer
+    [[ $(./filter-append-observer) == '(([False,False],[False,False]),True,True,True)' ]]
+done
