@@ -3727,7 +3727,7 @@ runNatContextSourceChecks = do
         ,
             ( "NativeSourceLambdaMissingConstructor"
             , 83605
-            , "one unguarded clause for each constructor"
+            , "Missing equation for the retained constructor"
             , []
             ,
                 [ "badLambda :: foreach (n :: Nat) -> Vec Int n -> String"
@@ -4652,7 +4652,7 @@ runNatSourceRejectChecks = do
         ,
             ( "NativeSourceNatCoverage"
             , 83605
-            , "one unguarded clause for each constructor"
+            , "Missing equation for the retained constructor"
             , "      replicateNative Z x = VNil"
             , []
             )
@@ -4762,7 +4762,7 @@ runSourceRejectChecks = do
         , ("partial retained signature", 83605, "complete type signature", ["PartialTypeSignatures", "NamedWildCards"], local [] "foreach (b :: Bool) -> _a -> _a" identity "42")
         , ("result mismatch under an inner erased forall", 25897, "In the expression: x", ["RankNTypes"], local [] "foreach (b :: Bool) -> forall a. a -> Select b" ["keep b x = x"] "42")
         , ("strict retained pattern", 83605, "bare variable pattern", ["BangPatterns"], local [] selection ["keep !_ x = x"] "42")
-        , ("multiple variable equations", 83605, "one unguarded clause for each constructor", [], local [] selection (identity ++ identity) "42")
+        , ("multiple variable equations", 83605, "requires unguarded equations", [], local [] selection (identity ++ identity) "42")
         , ("uncertified producer expression", 83605, "No checked source equations are available for", [],
            ["partial :: Bool -> Bool", "partial flag = if flag then False else error \"undefined index\""]
            ++ local [] selection identity "keep (partial False) (42 :: Int)")
@@ -4788,9 +4788,9 @@ runSourceRejectChecks = do
         , ("False payload at an unknown index", 83865, "Select", [], local [] "foreach (b :: Bool) -> Select b" ["keep b = False"] "42")
         , ("numeric payload at an unknown index", 83865, "Select", [], local [] "foreach (b :: Bool) -> Select b" ["keep b = 42"] "42")
         , ("swapped constructor results", 83865, "Int", [], local [] chooser ["keep True = False", "keep False = 42"] "42")
-        , ("missing constructor equation", 83605, "one unguarded clause for each constructor", [], local [] chooser ["keep True = 42"] "42")
-        , ("duplicate constructor equation", 83605, "one unguarded clause for each constructor", [], local [] chooser ["keep True = 42", "keep True = 43"] "42")
-        , ("guarded constructor equation", 83605, "one unguarded clause for each constructor", [], local [] chooser ["keep True | True = 42", "keep False = False"] "42")
+        , ("missing constructor equation", 83605, "Missing equation for the retained constructor", [], local [] chooser ["keep True = 42"] "42")
+        , ("duplicate constructor equation", 83605, "requires unguarded equations", [], local [] chooser ["keep True = 42", "keep True = 43"] "42")
+        , ("guarded constructor equation", 83605, "requires unguarded equations", [], local [] chooser ["keep True | True = 42", "keep False = False"] "42")
         , ("wrong later constructor argument", 83865, "False", [], local [] selection ["keep True False = 42", "keep False x = x"] "42")
         , ("linear constructor argument", 83605, "unrestricted multiplicities", ["LinearTypes"], local [] "foreach (b :: Bool) -> Select b %1 -> Select b" ["keep True x = x", "keep False x = x"] "42")
         ,
