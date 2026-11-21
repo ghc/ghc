@@ -1044,6 +1044,8 @@ main = do
         (map fromEnum [UnicodeExport.p3 (Proxy @'é'), UnicodeExport.p3 (Proxy @'\x1e943')])
     observe "written character indices and a lazy later element"
         (RetainedCharacterClient.observeCharacters (error "forced the later character"))
+    observe "quoted retained string with an embedded NUL"
+        (RetainedCharacterClient.observeQuoted (error "forced the later string"))
     observe "greatest common divisor checked in a type"
         (TypeNats.natVal (Proxy @(Prelude.gcd 18 24)))
     observe "first and second fields proved through an imported pair equality"

@@ -35,7 +35,7 @@ import Checked (flipChar, withProof)
 import Data.IORef (newIORef, readIORef)
 import Data.Proxy (Proxy(..))
 import GHC.TypeLits (charVal)
-import RetainedCharacterClient (observeCharacters)
+import RetainedCharacterClient (observeCharacters, observeQuoted)
 import RetainedCharacters
 
 ascii :: RememberedChar 'a'
@@ -45,7 +45,14 @@ escaped :: RememberedChar '\x1f642'
 escaped = remember '🙂'
 
 empty :: RememberedList Char '[]
-empty = rememberList []
+empty = rememberList ""
+
+word :: RememberedList Char '[ 'a', 'b', 'c' ]
+word = rememberList "abc"
+
+quoted, written :: RememberedList Char '[ 'λ', '\0', '🙂' ]
+quoted = rememberList "λ\0🙂"
+written = rememberList ['λ', '\0', '🙂']
 
 computed :: RememberedChar 'X'
 computed = remember (flipChar 'λ')
@@ -59,6 +66,11 @@ main = do
                   rememberedChar computed, withProof 'λ' count)
     if actual == expected then pure ()
     else fail "retained character literals changed value or demand"
+    if rememberedList word == "abc" &&
+       rememberedList quoted == rememberedList written &&
+       observeQuoted (error "forced the later string") == [955, 0, 128578]
+    then pure ()
+    else fail "quoted retained strings changed value or demand"
 HS
     "${ghc[@]}" "-$opt" -c RetainedCharacterClient.hs Main.hs
     "${ghc[@]}" "-$opt" Main.o RetainedCharacterClient.o ../provider/{Checked,RetainedCharacters}.o -o observe
@@ -72,6 +84,9 @@ import RetainedCharacters
 #ifdef RAW_CHAR
 unsupported :: Char# -> Char
 unsupported raw = rememberedChar (remember (C# raw))
+#elif defined(WRONG_WORD)
+wrong :: RememberedList Char '[ 'λ', '🙂' ]
+wrong = rememberList "λ\0🙂"
 #else
 wrong :: RememberedChar 'x'
 wrong = remember 'λ'
@@ -81,7 +96,7 @@ HS
         echo "Accepted a different retained character index" >&2
         exit 1
     fi
-    grep -Eq '^Reject.hs:10:[0-9]+: error: .GHC-83865.' wrong.log
+    grep -Eq '^Reject.hs:13:[0-9]+: error: .GHC-83865.' wrong.log
     grep -Fq "Expected: RememberedChar 'x'" wrong.log
     grep -Fq "Actual: RememberedChar '\955'" wrong.log
     if "${ghc[@]}" "-$opt" -DRAW_CHAR -c Reject.hs >raw.log 2>&1; then
@@ -89,7 +104,33 @@ HS
         exit 1
     fi
     grep -Eq '^Reject.hs:7:[0-9]+: error: .GHC-83605.' raw.log
+    if "${ghc[@]}" "-$opt" -DWRONG_WORD -c Reject.hs >word.log 2>&1; then
+        echo "Accepted a different retained string index" >&2
+        exit 1
+    fi
+    grep -Eq '^Reject.hs:10:[0-9]+: error: .GHC-83865.' word.log
 done
+
+cat >Rebound.hs <<'HS'
+{-# LANGUAGE CPP, DataKinds, NoExperimentalDependentTypes, RebindableSyntax #-}
+#ifdef OVERLOADED
+{-# LANGUAGE OverloadedStrings #-}
+#endif
+module Rebound where
+import Prelude
+import RetainedCharacters
+fromString :: String -> String
+fromString _ = ['x']
+
+word :: RememberedList Char '[ 'λ', '🙂' ]
+word = rememberList "λ🙂"
+HS
+"${ghc[@]}" -O0 -c Rebound.hs
+if "${ghc[@]}" -O0 -fforce-recomp -DOVERLOADED -c Rebound.hs >overloaded.log 2>&1; then
+    echo "Treated a rebound fromString as a plain retained string" >&2
+    exit 1
+fi
+grep -Eq '^Rebound.hs:12:[0-9]+: error: .GHC-83605.' overloaded.log
 
 # Keep the provider's source out of both reader directories.
 mkdir -p "$out/wire"/{provider,client,stripped}
@@ -97,11 +138,15 @@ cd "$out/wire/provider"
 cp "$src/RetainedCharacters.hs" .
 cat >Exported.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes #-}
-module Exported (value) where
-import RetainedCharacters (remember, rememberedChar)
+module Exported (value, word) where
+import RetainedCharacters (remember, rememberedChar, rememberList, rememberedList)
 {-# INLINE value #-}
 value :: () -> Char
 value _ = rememberedChar (remember 'λ')
+
+{-# INLINE word #-}
+word :: () -> String
+word _ = rememberedList (rememberList "λ\0🙂")
 HS
 cat >Plain.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes #-}
@@ -131,16 +176,18 @@ cd ../client
 cat >Client.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes #-}
 module Main where
-import Exported (value)
+import Exported (value, word)
 import Plain (plain)
 main :: IO ()
 main =
-    if map fromEnum (value () : plain ()) == [955, 955, 128578]
+    if map fromEnum (value () : plain ()) == [955, 955, 128578] &&
+       map fromEnum (word ()) == [955, 0, 128578]
     then pure ()
     else fail "the imported character literal changed value"
 HS
 "${ghc[@]}" -O2 -ddump-inlinings -c Client.hs >inlinings.log
 grep -Fq 'Inlining done: Exported.value' inlinings.log
+grep -Fq 'Inlining done: Exported.word' inlinings.log
 "${ghc[@]}" Client.o ../provider/{Exported,Plain,RetainedCharacters}.o -o run
 ./run
 

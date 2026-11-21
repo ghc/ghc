@@ -253,6 +253,7 @@ odd applied directly to the literal 5: Refl
 an exported character equality at a mapped and a default input: "X!"
 Unicode code points from an exported Data.Char.toUpper equality: [201,125217]
 written character indices and a lazy later element: (955,[955,128578],[955])
+quoted retained string with an embedded NUL: [955,0,128578]
 greatest common divisor checked in a type: 6
 first and second fields proved through an imported pair equality: (Refl,Refl)
 first and second projections from a pair of unknown types: (False,42)

@@ -7220,3 +7220,19 @@ their existing format.
 [GHC proposal #387](https://ghc-proposals.readthedocs.io/en/latest/proposals/0387-char-kind.html),
 [Agda built-in characters](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#characters),
 and [ordinary character client](examples/qualified-pi/RetainedCharacterClient.hs).
+
+### Quoted strings in retained operands
+
+GHC usually lowers an ordinary string to `unpackCString#` or
+`unpackCStringUtf8#`. The second function handles Unicode and embedded
+NUL through Modified UTF-8. A plain retained `"λ🙂"` uses the same lazy
+list and DataKinds index as `['λ','🙂']`. The expansion reads the
+parsed code points before desugaring. It leaves overloaded `fromString`
+calls outside this rule.
+
+Agda provides `primStringToList` to convert its built-in `String` to
+`List Char`. Haskell's `String` is already `[Char]`, so the fork can
+use ordinary list constructors and the existing character index.
+[GHC User's Guide, unboxed types and primitive operations](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/primitives.html#unboxed-types),
+[Agda built-in strings](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#strings),
+and [ordinary character client](examples/qualified-pi/RetainedCharacterClient.hs).

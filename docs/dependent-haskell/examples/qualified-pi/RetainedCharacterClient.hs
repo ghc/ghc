@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes #-}
-module RetainedCharacterClient (observeCharacters) where
+module RetainedCharacterClient (observeCharacters, observeQuoted) where
 
 import RetainedCharacters
 
@@ -10,3 +10,8 @@ observeCharacters later =
     , map fromEnum (rememberedList (rememberList ['λ', '🙂']))
     , map fromEnum (take 1 (rememberedList (rememberList ['λ', later])))
     )
+
+-- | Read the first string, including its NUL, without forcing the later string.
+observeQuoted :: String -> [Int]
+observeQuoted later =
+    map fromEnum (concat (take 1 (rememberedList (rememberList ["λ\0🙂", later]))))
