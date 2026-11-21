@@ -118,6 +118,12 @@ the existing coercion syntax and does not change the constructor worker
 or the boxed-equality layout.
 [Solver](../../../compiler/GHC/Tc/Solver/Equality.hs).
 
+The same transport applies to both projections of a nominal equality
+`f a ~ g b` with matchable heads. The head and argument can each have
+endpoints at different kinds. The separate-provider check reduces these
+two mixed binders to zero at `-O0` and `-O2`. Representational application
+equality still cannot justify the nominal argument proof.
+
 ### Deferred heterogeneous equalities
 
 With `-fdefer-type-errors`, a call can require evidence for
