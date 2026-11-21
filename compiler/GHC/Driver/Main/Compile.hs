@@ -44,6 +44,7 @@ import GHC.Driver.Plugins
 import GHC.Driver.Session
 import GHC.Driver.Backend
 import GHC.Driver.Env
+import qualified GHC.LanguageExtensions as LangExt
 import GHC.Driver.ByteCode
 import GHC.Driver.Env.KnotVars
 import GHC.Driver.Errors.Types
@@ -75,7 +76,7 @@ import GHC.Iface.Load   ( writeIface, flagsToIfCompression )
 import qualified GHC.ByteCode.Serialize as ByteCode
 
 import GHC.Core
-import GHC.Core.Dependent ( rejectNativeDependentProgram )
+import GHC.Core.Dependent ( hasScopedDictionaryProgram, rejectNativeDependentProgram )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.TyCon
 import GHC.Core.LateCC
@@ -554,7 +555,7 @@ hscGenScopedDictionaryHardCode = hscGenHardCodeWith True
 hscGenHardCodeWith
     :: Bool -> HscEnv -> CgGuts -> ModLocation -> FilePath
     -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)], Maybe StgCgInfos, Maybe CmmCgInfos)
-hscGenHardCodeWith scoped hsc_env cgguts mod_loc output_filename = do
+hscGenHardCodeWith private_api hsc_env cgguts mod_loc output_filename = do
         let CgGuts{ cg_module   = this_mod,
                     cg_binds    = core_binds,
                     cg_ccs      = local_ccs
@@ -564,6 +565,8 @@ hscGenHardCodeWith scoped hsc_env cgguts mod_loc output_filename = do
         -- See Note [Compiling native dependent modules] in GHC.Driver.Main.Passes.
         native <- checkNativeDependentModule hsc_env core_binds [] (cg_tycons cgguts)
         let dflags = nativeCodeGenFlags native (hsc_dflags hsc_env)
+            scoped = native && (private_api || xopt LangExt.ExperimentalDependentTypes dflags)
+                            && hasScopedDictionaryProgram core_binds
         when (native && not (backendWritesFiles (backend dflags))) $
           throwGhcExceptionIO (Sorry "Native dependent Core requires an object backend at hscGenHardCode.")
 

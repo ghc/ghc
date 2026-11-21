@@ -51,6 +51,7 @@ import GHC.Driver.Main.Hsc
 
 import GHC.Driver.Plugins
 import GHC.Driver.Session
+import qualified GHC.LanguageExtensions as LangExt
 import GHC.Driver.Backend
 import GHC.Driver.Env
 import GHC.Driver.Errors
@@ -104,7 +105,7 @@ import qualified GHC.ByteCode.Serialize as ByteCode
 
 import GHC.Core
 import GHC.Core.Dependent ( hasExistentialExpr, hasNativeDependentExpr, rejectNativeDependentExpr
-                          , hasScopedDictionaryProgram
+                          , hasScopedDictionaryProgram, hasScopedDictionaryType
                           , supportsNativeGentle, supportsNativeRuleBinds, supportsLocalUserRule )
 import GHC.Core.Lint ( endScopedDictionaryPassIO )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
@@ -1505,7 +1506,27 @@ hscSimplify' plugins ds_result = do
                       hsc_env
     liftIO $ do
       native <- checkNativeDependentModule hsc_env_with_plugins (mg_binds ds_result) (mg_rules ds_result) (mg_tcs ds_result)
-      if native
+      -- See Note [Private dictionary programs].
+      if native && hasScopedDictionaryProgram (mg_binds ds_result)
+        then do
+          let binds = mg_binds ds_result
+              rules = mg_rules ds_result
+              env = hscUpdateFlags (`gopt_set` Opt_DoCoreLinting) hsc_env_with_plugins
+              finish = endScopedDictionaryPassIO (hsc_logger env)
+                . initEndPassConfig (hsc_dflags env) (interactiveInScope (hsc_IC env)) alwaysQualify
+          unless (backendWritesFiles (backend (hsc_dflags env))) $
+            throwGhcExceptionIO (Sorry "Private dependent dictionaries require an object backend.")
+          unless (null rules && all (null . idCoreRules . fst) (flattenBinds binds)) $
+            throwGhcExceptionIO (Sorry "Private dependent dictionaries do not support Core rules.")
+          forM_ [b | (b, _) <- flattenBinds binds, isExportedId b,
+                       hasScopedDictionaryType (idType b)] $ \b ->
+            throwGhcExceptionIO $ PprProgramError
+              "Cannot export a private dependent dictionary type." (ppr b)
+          finish CoreDesugar binds rules
+          let simplified = simpleOptNativeProgram binds
+          finish CoreDesugarOpt simplified rules
+          return (ds_result { mg_binds = simplified })
+      else if native
         then do
           let lint_env = hscUpdateFlags (`gopt_set` Opt_DoCoreLinting) hsc_env_with_plugins
               name_ppr_ctx = alwaysQualify
@@ -1551,6 +1572,19 @@ hscSimplify' plugins ds_result = do
               return (optimized { mg_binds = final })
             Nothing -> return result
         else {-# SCC "Core2Core" #-} core2core hsc_env_with_plugins ds_result
+
+{- Note [Private dictionary programs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The full simplifier and worker/wrapper can replace an evidence variable
+that occurs in a private selector type. Use retained SimpleOpt and
+scoped lint at both optimization levels. Pass the requested level to the
+native backend.
+
+A module can export ordinary wrappers for these bindings. An exported
+type cannot contain a private dictionary form. Omit interface pragmas
+for the module so an ordinary wrapper does not expose a private type
+through its unfolding. Keep the private codec refusal in CoreToIface.
+-}
 
 {- Note [Retained Core in the Gentle simplifier]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1647,21 +1681,26 @@ hscTidyScopedDictionary :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
 hscTidyScopedDictionary = hscTidyWith True
 
 hscTidyWith :: Bool -> HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
-hscTidyWith scoped hsc_env guts = do
+hscTidyWith private_api hsc_env guts = do
   native <- checkNativeDependentModule hsc_env (mg_binds guts) (mg_rules guts) (mg_tcs guts)
-  let logger   = hsc_logger hsc_env
+  let scoped = native && (private_api || xopt LangExt.ExperimentalDependentTypes (hsc_dflags hsc_env))
+                       && hasScopedDictionaryProgram (mg_binds guts)
+      logger   = hsc_logger hsc_env
   let this_mod = mg_module guts
   let lint_env | native = hscUpdateFlags (`gopt_set` Opt_DoCoreLinting) hsc_env
                | otherwise = hsc_env
       end_pass ppr_ctx pass
-        | scoped && hasScopedDictionaryProgram (mg_binds guts) = endScopedDictionaryPassIO logger $
+        | scoped = endScopedDictionaryPassIO logger $
             initEndPassConfig (hsc_dflags lint_env) (interactiveInScope (hsc_IC lint_env)) ppr_ctx pass
         | otherwise = endPassHscEnvIO lint_env ppr_ctx pass
 
   when native $
     end_pass alwaysQualify CoreDesugarOpt (mg_binds guts) (mg_rules guts)
 
-  opts <- initTidyOpts native hsc_env guts
+  -- See Note [Private dictionary programs].
+  let tidy_env | scoped = hscUpdateFlags (`gopt_set` Opt_OmitInterfacePragmas) hsc_env
+               | otherwise = hsc_env
+  opts <- initTidyOpts native tidy_env guts
   (cgguts, details) <- withTiming logger
     (text "CoreTidy"<+>brackets (ppr this_mod))
     (const ())

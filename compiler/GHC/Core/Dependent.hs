@@ -13,7 +13,7 @@ module GHC.Core.Dependent (
     isRetainedVanillaDefaultMethod,
     rejectNativeDependentProgram,
     rejectNativeDependentExpr,
-    hasScopedDictionaryProgram, rejectScopedDictionaryProgram, rejectScopedDictionaryExpr,
+    hasScopedDictionaryProgram, hasScopedDictionaryType, rejectScopedDictionaryProgram, rejectScopedDictionaryExpr,
 ) where
 
 import GHC.Prelude
@@ -267,6 +267,11 @@ hasScopedDictionaryProgram :: CoreProgram -> Bool
 hasScopedDictionaryProgram binds =
     runScanFor DetectScopedDictionaries AllMetadata (foldMap scanBind binds)
 
+-- | Detect a private dictionary form in an interface-visible type.
+hasScopedDictionaryType :: Type -> Bool
+hasScopedDictionaryType =
+    runScanFor DetectScopedDictionaries NoMetadata . scanType
+
 -- | Keep experimental dictionary types out of ordinary CorePrep.
 rejectScopedDictionaryProgram :: CoreProgram -> IO ()
 rejectScopedDictionaryProgram binds =
@@ -299,6 +304,14 @@ gentleForm scan = NativeScan $ do
         CheckUserRules -> runNativeScan scan
         DetectScopedDictionaries -> runNativeScan scan
         _           -> pure True
+
+-- | Exclude shape diagnostics from the scan for actual dictionary forms.
+unsupportedShape :: Bool -> NativeScan
+unsupportedShape invalid = NativeScan $ do
+    purpose <- gets scanPurpose
+    pure $ case purpose of
+      DetectScopedDictionaries -> False
+      _ -> invalid
 
 -- | Detect an erased form and check its children at each supported use.
 erasedForm :: NativeScan -> NativeScan
@@ -442,7 +455,7 @@ scanType DepDictTy{} = NativeScan (pure True)
 scanType ClassAppTy{} = NativeScan (pure True)
 scanType (TyVarTy tv) = scanVarKind tv
 scanType (TermVarTy v) =
-    gentleForm (NativeScan (pure (not (isNativeOpaqueValueId v))) <> scanVarKind v)
+    gentleForm (unsupportedShape (not (isNativeOpaqueValueId v)) <> scanVarKind v)
 scanType (TermAppTy f arg) = gentleForm (scanCallHead f <> scanType arg)
 -- The type binder itself is safe for Quick Look. Check its kind and payload.
 scanType (ExistsTy _ binder body) = erasedForm (scanType (varType binder) <> scanType body)
@@ -461,11 +474,11 @@ scanType (CoercionTy co) = scanCo co
 -- | Apply the retained binder checks, including Note [Abstract witness domains]
 -- in GHC.Core.Type.
 scanRetainedIndex :: Var -> NativeScan
-scanRetainedIndex v = NativeScan (pure (not (isNativeRetainedBinder v)))
+scanRetainedIndex v = unsupportedShape (not (isNativeRetainedBinder v))
 
 -- | Check the head and its annotation without examining the function body.
 scanCallHead :: Id -> NativeScan
-scanCallHead f = NativeScan (pure (not (isNativeIndexFunctionId f))) <> scanVarKind f
+scanCallHead f = unsupportedShape (not (isNativeIndexFunctionId f)) <> scanVarKind f
 
 {- Note [Nominal domains in retained Gentle]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -484,10 +497,10 @@ scanCo (DepFunCo _ _ b domain body) =
   where
     scanDomain MRefl = mempty
     scanDomain (MCo delta) =
-        NativeScan (pure (not (coercionRole delta == Nominal
+        unsupportedShape (not (coercionRole delta == Nominal
                             && coercionLKind delta `eqType` varType b
                             && isNativeIndexDomainConversion (varType b) target
-                            && (isNativeIndexType target || isNativeIndexFunctionId b))))
+                            && (isNativeIndexType target || isNativeIndexFunctionId b)))
           <> scanCo delta
       where
         target = coercionRKind delta
