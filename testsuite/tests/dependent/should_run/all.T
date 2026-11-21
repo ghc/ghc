@@ -363,7 +363,8 @@ test('NativeGadtRetainedSum',
 
 test('NativeClosedFamilySum',
      [req_host_target_ghc, only_ways(['normal']),
-      extra_files(['NativeClosedFamilySumProvider.hs', 'NativeClosedFamilySumClient.hs'])],
+      extra_files(['NativeClosedFamilySumProvider.hs', 'NativeClosedFamilySumChain.hs',
+                   'NativeClosedFamilySumClient.hs'])],
      run_command, ['bash NativeClosedFamilySum.sh "{compiler}" "{libdir}"'])
 
 test('NativeAlternatingBinders',

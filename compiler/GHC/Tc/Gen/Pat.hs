@@ -32,8 +32,10 @@ import GHC.Hs.Syn.Type
 import GHC.Rename.Utils
 import GHC.Tc.Errors.Types
 import GHC.Tc.Gen.Sig( TcPragEnv, lookupPragEnv, addInlinePrags )
+import GHC.Tc.Solver.Monad (bumpReductionDepth, matchFam, runTcSEqualities)
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Instantiate
+import GHC.Types.Basic (TypeOrKind(TypeLevel))
 import GHC.Types.FieldLabel
 import GHC.Types.Id
 import GHC.Types.Var
@@ -58,7 +60,6 @@ import GHC.Tc.Types.Origin
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Coercion
-import GHC.Core.FamInstEnv (emptyFamInstEnvs, reduceTyFamApp_maybe)
 import GHC.Core.Reduction (Reduction(..))
 import GHC.Core.Predicate ( isEvId, mkNomEqPred )
 import GHC.Core.DataCon
@@ -72,7 +73,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import qualified GHC.LanguageExtensions as LangExt
-import Control.Arrow  ( second )
+import Control.Arrow  ( first, second )
 import Control.Monad
 import GHC.Data.FastString
 import GHC.Data.Pair ( pSnd )
@@ -1585,15 +1586,24 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
     -- See Note [Checking retained package patterns].
     match_family_result :: TyCon -> TcType -> TcM (Maybe (TcCoercionN, [TcType]))
     match_family_result parent ty
-      | Just (family, args) <- tcSplitTyConApp_maybe ty
+      | Just (family, _) <- tcSplitTyConApp_maybe ty
       , Just _ <- closedTypeFamily_maybe family
-      = do { args <- liftZonkM (mapM zonkTcType args)
-           ; return $ do
-               Reduction co result <- reduceTyFamApp_maybe emptyFamInstEnvs Nominal family args
-               (tc, params) <- tcSplitTyConApp_maybe result
-               guard (tc == parent)
-               return (co, params) }
+      = do { loc <- getCtLocM (OccurrenceOf (tyConName family)) (Just TypeLevel)
+           ; ty <- liftZonkM (zonkTcType ty)
+           ; runTcSEqualities (go loc ty) }
       | otherwise = return Nothing
+      where
+        go loc ty = case tcSplitTyConApp_maybe ty of
+          Just (tc, args)
+            | tc == parent -> return (Just (mkNomReflCo ty, args))
+            | Just _ <- closedTypeFamily_maybe tc ->
+                do { reduction <- matchFam tc args
+                   ; case reduction of
+                       Nothing -> return Nothing
+                       Just (Reduction co rhs) ->
+                         do { loc <- bumpReductionDepth loc ty
+                            ; fmap (first (mkTransCo co)) <$> go loc rhs } }
+          _ -> return Nothing
 
     check_fields _ _ _ [] []
       = do { res <- thing_inside; return ([], res) }
@@ -1704,12 +1714,14 @@ Match compilation keeps each equation's actual source field Ids in a separate
 case, including when its family has other constructors.
 See Note [Retained package equation scope] in GHC.HsToCore.Match.Constructor.
 
-A closed type family can return the package. Try one nominal reduction of
-the expected type. Use the constructor arguments only if the result has
-the selected constructor's parent as its head. Put the reduction on the
-scrutinee so the fields bind at their checked types. This also handles
-the private family of a nested sum. Leave reductions inside the fields
-to ordinary type checking.
+A closed type family can return the package. Reduce only the head of the
+expected type. Compose the nominal coercions and use the result when its
+head is the selected constructor's parent. Put that cast on the scrutinee
+so the fields bind at their checked types. This also handles the private
+family of a nested sum. Leave the fields and newtype representations alone.
+Use the solver's reduction-depth counter for each step. A recursive family
+can keep reducing without reaching a constructor. Create the location at
+the pattern constructor so the depth error points to that constructor.
 
 Scale each field by the multiplicity of the case. A retained field is declared
 at Many, so its pattern Id still has multiplicity Many in a linear case.
