@@ -2081,11 +2081,11 @@ sourceCaseVisibleArity table
     projectionBranch telescope tc visible root branch = do
       (patterns, vars) <- branchPatterns telescope branch
       guard (lengthIs patterns visible)
-      (_, root_pat, carried) <- splitCaseOperand root patterns
+      (before, root_pat, after) <- splitCaseOperand root patterns
       (root_con, _) <- constructorPattern root_pat
       guard (dataConTyCon root_con == tc)
       leaves <- concat <$> traverse patternLeaves patterns
-      guard (eqTypes leaves vars && resultPattern carried vars False (coAxBranchRHS branch))
+      guard (eqTypes leaves vars && resultPattern (before ++ after) vars False (coAxBranchRHS branch))
       pure root_con
 
     patternLeaves ty
