@@ -1143,7 +1143,6 @@ lintJoinBndrType :: Type -- Type of the body
 lintJoinBndrType body_ty bndr
   | JoinPoint arity <- idJoinPointHood bndr
   , let bndr_ty = idType bndr
-  , (mas, bndrs, res) <- splitPiTys bndr_ty
   = do let
           ty_msg =
             hang (text "Join point returns different type than body")
@@ -1153,20 +1152,18 @@ lintJoinBndrType body_ty bndr
           arity_msg =
             hang (text "Join point is not saturated")
               2 (vcat [ text "Join bndr:" <+> ppr bndr <+> dcolon <+> ppr (idType bndr)
-                      , text "Join arity:" <+> ppr arity
-                      , text "Arguments:" <+> ppr bndrs ])
+                      , text "Join arity:" <+> ppr arity ])
 
        mb_join_info <- lookupJoinId bndr
        case mb_join_info of
          Nothing ->
           pprPanic "lintJoinBndrType: valid join marked bad" (ppr bndr)
-         Just (_, occ_info) -> do
-           checkL (length bndrs >= arity) arity_msg
-
-           -- See Note [Linting join points with casts or ticks] for why
-           -- we skip this check if there is an intervening cast.
-           unless (occ_info == JoinOccUnderCast) $
-             ensureEqTys body_ty (mkPiTys (drop arity (zip mas bndrs)) res) ty_msg
+         Just (_, occ_info) -> case joinPointResultType arity bndr_ty of
+           Nothing -> addErrL arity_msg
+           Just result ->
+             -- See Note [Linting join points with casts or ticks].
+             unless (occ_info == JoinOccUnderCast) $
+               ensureEqTys body_ty result ty_msg
   | otherwise
   = return ()
 

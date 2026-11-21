@@ -122,7 +122,7 @@ module GHC.Core.Type (
         isPiTy, isTauTy, isFamFreeTy, isUnsaturatedUserFamily,
         isAtomicTy,
 
-        isValidJoinPointType,
+        isValidJoinPointType, joinPointResultType,
         tyConAppNeedsKindSig,
 
         -- * Space-saving construction
@@ -2219,12 +2219,16 @@ isPrimitiveType ty = case splitTyConApp_maybe ty of
 -- See Note [Retained arguments of join points].
 -- TODO: See Note [Excess polymorphism and join points]
 isValidJoinPointType :: JoinArity -> Type -> Bool
-isValidJoinPointType arity ty
-  = valid_under emptyVarSet arity ty
+isValidJoinPointType arity ty = isJust (joinPointResultType arity ty)
+
+-- | Return the type shared by all jumps after consuming the join arguments.
+-- See Note [Retained arguments of join points].
+joinPointResultType :: JoinArity -> Type -> Maybe Type
+joinPointResultType arity ty = valid_under emptyVarSet arity ty
   where
     valid_under tvs arity ty
       | arity == 0
-      = tvs `disjointVarSet` tyCoVarsOfType ty
+      = if tvs `disjointVarSet` tyCoVarsOfType ty then Just ty else Nothing
       | Just (_, t, ty') <- splitForAllTyCoVar_maybe ty
       = valid_under (tvs `extendVarSet` t) (arity-1) ty'
       | DepFunTy _ index body <- coreFullView ty
@@ -2234,7 +2238,7 @@ isValidJoinPointType arity ty
         -- See Note [Ordinary arrow metadata and eta] in GHC.Core.Opt.Arity.
       = valid_under tvs (arity-1) res_ty
       | otherwise
-      = False
+      = Nothing
 
 {- Note [Retained arguments of join points]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
