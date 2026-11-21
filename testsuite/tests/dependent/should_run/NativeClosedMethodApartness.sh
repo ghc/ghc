@@ -120,7 +120,12 @@ type Input = 'Just 'True
 opaqueNot :: Bool -> Bool
 opaqueNot = not
 HS
-(cd provider && "${ghc[@]}" -O2 -fomit-interface-pragmas -fno-write-if-simplified-core -c Operand.hs)
+operand_flags=(-fomit-interface-pragmas -fno-write-if-simplified-core)
+if [[ " $* " != *" -dynamic "* ]] &&
+   "${ghc[@]}" --info | grep -F '("Support dynamic-too","YES")' >/dev/null; then
+    operand_flags+=(-dynamic-too)
+fi
+(cd provider && "${ghc[@]}" -O2 "${operand_flags[@]}" -c Operand.hs)
 
 mkdir coarse
 (
