@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, LinearTypes, TemplateHaskell #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, LambdaCase, LinearTypes, TemplateHaskell #-}
 module NativeTypeCaseRetainedConTh where
 
 import qualified NativeTypeCaseRetainedConThProvider as P
@@ -48,3 +48,16 @@ $([d|
     QuotedVacuous :: forall a. foreach (b :: Bool) -> a %1 -> Quoted a
     QuotedPlain :: a %1 -> Quoted a
   |])
+
+$([d|
+  data CurriedPacked where
+    CurriedPacked :: forall a. Eq a => (Show a => a %1 -> a %1 ->
+      (foreach (flag :: Bool) ->
+       $([t| case flag of { True -> Int; False -> Char } |])) %1 ->
+      CurriedPacked)
+  |])
+
+curriedSample :: CurriedPacked
+curriedSample = CurriedPacked False True (\case
+  True -> 19
+  False -> 'q')

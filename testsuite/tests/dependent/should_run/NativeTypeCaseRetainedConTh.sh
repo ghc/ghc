@@ -47,12 +47,14 @@ for opt in -O0 -O2; do
     ghc=("${base[@]}" "$opt" -fforce-recomp)
     "${ghc[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core -c NativeTypeCaseRetainedConThProvider.hs
     mv NativeTypeCaseRetainedConThProvider.hs provider.source
-    "${ghc[@]}" -c NativeTypeCaseRetainedConTh.hs
+    "${ghc[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core -c NativeTypeCaseRetainedConTh.hs
+    mv NativeTypeCaseRetainedConTh.hs quoted.source
     "${ghc[@]}" -c NativeTypeCaseRetainedConThClient.hs
     "${ghc[@]}" NativeTypeCaseRetainedConThClient.o NativeTypeCaseRetainedConTh.o \
         NativeTypeCaseRetainedConThProvider.o -o run
     ./run >actual
-    printf "(11,'x',27)\n(11,'x',27)\n29\n" | diff -u - actual
+    printf "(11,'x',27)\n(11,'x',27)\n29\n(False,\"True\",19,'q')\n" | diff -u - actual
+    mv quoted.source NativeTypeCaseRetainedConTh.hs
     mv provider.source NativeTypeCaseRetainedConThProvider.hs
 done
 

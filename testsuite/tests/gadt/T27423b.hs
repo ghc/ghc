@@ -19,3 +19,6 @@ data T3 where
 -- earlier than we need to
 data T4 a where
   MkT4 :: Show a => (forall b. a -> b -> T4 a)
+
+data T5 where
+  MkT5 :: forall a. Eq a => (Show b => a -> T5)
