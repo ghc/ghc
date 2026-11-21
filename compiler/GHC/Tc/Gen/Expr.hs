@@ -41,7 +41,7 @@ import GHC.Tc.Gen.SourceTable (sourceTableOccurrence, optionalSourceUses, regist
 import GHC.Tc.Gen.Bind        ( tcLocalBinds, tcNonRecLets )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Arrow
-import GHC.Tc.Gen.Match( tcBody, tcLambdaMatches, tcCaseMatches, tcIndexedCaseMatches, tcRetainedCase
+import GHC.Tc.Gen.Match( tcBody, tcScopedRuntimeBody, tcLambdaMatches, tcCaseMatches, tcIndexedCaseMatches, tcRetainedCase
                        , tcRetainedCallCase, tcEmptyRetainedScrutinee
                        , tcOpenImplicitPackage, tcOpenImplicitPackageAt
                        , implicitPayloadType, matchesImplicitPayloadPat
@@ -943,7 +943,8 @@ tcExpr original@(HsLet x local_binds@(L loc binds) body) res_ty
                    _ -> return Nothing
              ; case expansion of
                  Just expr -> return expr
-                 Nothing -> do { (binds', body') <- tcLocalBinds binds (tcMonoLExpr body res_ty)
+                 Nothing -> do { let names = collectLocalBinders CollNoDictBinders binds
+                               ; (binds', body') <- tcLocalBinds binds (tcScopedRuntimeBody names body res_ty)
                                ; return (HsLet x (L loc binds') body') } } }
 
 tcExpr expr@(HsCase ctxt scrut matches) res_ty

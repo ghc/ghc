@@ -33,6 +33,7 @@ module GHC.Tc.Gen.Match
    , tcStmtsAndThen
    , tcDoStmts
    , tcBody
+   , tcScopedRuntimeBody
    , tcDoStmt
    , tcGuardStmt
    , checkArgCounts
@@ -50,7 +51,7 @@ import GHC.Rename.Utils ( bindLocalNames, wrapGenSpan' )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
-import GHC.Tc.Solver ( tcCheckGivens, tcNormalise )
+import GHC.Tc.Solver ( tcCheckGivens, tcNormalise, tcRewriteFamilyAxioms )
 import GHC.Tc.Solver.InertSet ( emptyInertSet )
 import GHC.Tc.Solver.Monad ( runTcSEqualities )
 import GHC.Tc.Solver.Rewrite ( rewriteFamilyAxioms )
@@ -113,7 +114,7 @@ import GHC.Types.Id
 import GHC.Types.Var ( binderFlag, EvVar, DepFunTyFlag(..), ExistsTyFlag(ImplicitExists), FunTyFlag, VarBndr(Bndr), varType, tyVarKind, isId, isCoVar, isTyVar, isVisibleFunArg )
 import GHC.Types.Var.Env ( mkInScopeSetList, unitVarEnv )
 import GHC.Types.SrcLoc
-import GHC.Types.Basic( VisArity, RecFlag(NonRecursive), Origin(Generated), GenReason(OtherExpansion), DoPmc(SkipPmc) )
+import GHC.Types.Basic( VisArity, RecFlag(NonRecursive), TypeOrKind(TypeLevel), Origin(Generated), GenReason(OtherExpansion), DoPmc(SkipPmc) )
 import GHC.Data.Bag ( listToBag, unionBags )
 import GHC.Data.FastString ( fsLit )
 import GHC.Data.Pair ( pSnd )
@@ -2411,13 +2412,57 @@ tcLambdaMatches e lam_variant matches invis_pat_tys res_ty
                  Check ty | hasRetainedFunTy ty
                    -> tcRetainedMatches herald GenSigCtxt ctxt arity invis_pat_tys ty matches
                  _ -> matchExpectedFunTys herald GenSigCtxt arity res_ty $ \ pat_tys rhs_ty ->
-                        tcMatches ctxt tcBody (invis_pat_tys ++ pat_tys) rhs_ty matches
+                        tcMatches ctxt check_body (invis_pat_tys ++ pat_tys) rhs_ty matches
 
         ; return (wrapper, r) }
   where
+    check_body
+      | LamSingle <- lam_variant
+      , [L _ Match { m_pats = L _ pats
+                   , m_grhss = GRHSs { grhssGRHSs = L _ (GRHS _ [] _) :| [] } }]
+          <- unLoc (mg_alts matches)
+      = tcScopedRuntimeBody (collectPatsBinders CollNoDictBinders pats)
+      | otherwise = tcBody
+
     ctxt   = LamAlt lam_variant
     herald = ExpectedFunTyLam lam_variant e
              -- See Note [Herald for matchExpectedFunTys] in GHC.Tc.Utils.Unify
+
+-- | Infer a result within the value scopes that may occur in its type.
+-- See Note [Closing an inferred runtime index scope].
+tcScopedRuntimeBody :: [Name] -> LHsExpr GhcRn -> ExpRhoType -> TcM (LHsExpr GhcTc)
+tcScopedRuntimeBody bound body@(L loc expr) expected
+  | not (null bound)
+  , Infer ir <- expected
+  = do { local <- newInferExpType (ir_inst ir)
+       ; checked <- tcBody body local
+       ; actual <- readExpType local >>= liftZonkM . zonkTcType
+       ; let local_indices ty = filter mentions_local (tyCoVarsOfTypeList ty)
+             mentions_local var = isId var && not (isCoVar var) && getName var `elem` bound
+       ; case local_indices actual of
+           [] -> fmap (L loc) (tcWrapResultMono expr (unLoc checked) actual expected)
+           _ -> setSrcSpanA loc $
+             do { origin <- getCtLocM (exprCtOrigin expr) (Just TypeLevel)
+                ; Reduction co reduced <- tcRewriteFamilyAxioms origin actual
+                ; case local_indices reduced of
+                    index : _ -> failWithTc $ TcRnRetainedQuantificationError (RetainedIndexOutOfScope index)
+                    [] -> L loc <$> tcWrapResultMono expr (mkHsWrapCo co (unLoc checked)) reduced expected } }
+  | otherwise = tcBody body expected
+
+{- Note [Closing an inferred runtime index scope]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An inferred result can contain a local runtime variable even when callers
+only need the length of a list containing that variable. Reduce the result
+with the checked family axioms while the local variable is still in scope.
+Insert the nominal result cast inside the scope. For example, a result
+Vec Int (sourceLength '[element]) can leave a let scope as Vec Int (S Z).
+A result that still refers to element cannot leave.
+
+Use an inner inference result so the outer hole sees only the closed type.
+The conversion does not equate distinct field values or look at a binding's
+RHS. A checked outer type already sends its evidence to the scoped body.
+Keep the usual checking rule in that case.
+-}
 
 {-
 @tcCaseMatches@ doesn't do the argument-count check because the
