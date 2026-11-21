@@ -7480,3 +7480,12 @@ same index fails at the arguments.
 [Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html),
 [GHC proposal #274](https://ghc-proposals.readthedocs.io/en/latest/proposals/0274-quick-look-impredicativity.html),
 and [ordinary client](examples/open-evaluation/DirectIndexedListClient.hs).
+
+Agda can infer a constructor's index from its arguments. An ordinary
+GHC payload arrow binds no index. In the fork, checking a saturated
+constructor can therefore skip that arrow while finding the retained
+field. An unsigned local variable receives the field's declared domain
+through GHC's ordinary retained-argument checker. The full application
+still checks the payload at its own source location.
+[Agda indexed constructors](https://agda.readthedocs.io/en/v2.8.0/language/data-types.html#indexed-datatypes)
+and [indexed reading](examples/open-evaluation/DirectIndexedList.hs).

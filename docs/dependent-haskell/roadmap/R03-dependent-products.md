@@ -663,3 +663,16 @@ arguments, so the proof must hold for all those types.
 [Haskell 2010 Report, let expressions](https://haskell.foundation/haskell-2010-revised-report/expressions.html#let-expressions),
 [GHC proposal #378, dependent application](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#dependent-application-and-the-static-subset),
 and [Agda's length-indexed zip](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html).
+
+### Infer the index of a rebuilt reading
+
+An ordinary client can write `adjust (+ 1) (Reading calibrated n)`.
+The constructor fixes the index of the result, so `adjust` preserves the
+same calibration flag. A local function can also project a field from
+the rebuilt value without writing its index or a type signature. Both
+forms work with `ImpredicativeTypes`. A wrong payload gets a type error
+at the payload. A linear flag gets the retained-index multiplicity
+diagnostic at the flag.
+[Ordinary client](../examples/open-evaluation/DirectIndexedListClient.hs),
+[constructor](../examples/open-evaluation/DirectIndexedList.hs),
+and [inference references](../REFERENCES.md#nested-constructors-with-a-runtime-result-index).

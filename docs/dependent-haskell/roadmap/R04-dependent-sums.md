@@ -214,6 +214,12 @@ read the first cell of a runtime list with an unevaluated tail.
 In `rebuild (IndexedList xs)`, the nested constructor supplies the
 outer call's index. This also works with `ImpredicativeTypes`.
 [Inference and prior art](../REFERENCES.md#nested-constructors-with-a-runtime-result-index).
+In the Showcase, `adjust :: (Int -> Int) -> Reading b -> Reading b`
+changes a measurement and keeps the calibration index. An ordinary
+client writes `adjust (+ 1) (Reading flag n)`. The local helper can
+infer the types of both arguments. Reading the flag leaves an undefined
+measurement unevaluated. Reading the adjusted measurement leaves an
+undefined flag unevaluated.
 [Direct constructor](../examples/open-evaluation/DirectIndexedList.hs),
 [ordinary client](../examples/open-evaluation/DirectIndexedListClient.hs),
 and [source-hidden check](../../../testsuite/tests/dependent/should_run/NativeIndexedFin.sh).
