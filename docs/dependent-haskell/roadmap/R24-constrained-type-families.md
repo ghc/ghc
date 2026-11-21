@@ -377,16 +377,38 @@ data instances would need a separate representation decision.
 
 ### Associated applications in type declaration bodies
 
-An ordinary provider allows both `type S = Elem [Int]` and an equation
-`F () = Elem [Int]`. A separately compiled term can use either wrapper
-to prove equality with `Int`, even though there is no `Allowed Int`
-instance. With a marked provider, GHC rejects both right-hand sides
-before the wrappers can be exported. Switching an existing provider to marked
-mode also rechecks the wrappers. A type synonym for `Elem [Bool]` passes.
-A type family equation with the same right-hand side reports GHC-90647.
-The same error occurs in an associated default and in an explicit associated
-equation even when the owning class has `Collects c` as a superclass.
-These equations still need a rule for checking their right-hand sides.
+A marked associated family can forward another associated family through
+its superclass. For example, `Cursor c e` has superclass `Collection c e`.
+Its default equation `Remaining c = Rest c` uses that dictionary. The
+list instance uses the default. The `Maybe` instance writes the forwarding
+equation explicitly. An ordinary reader runs both through stripped interfaces.
+[Provider](../examples/open-evaluation/ConstrainedElements.hs) and
+[ordinary client](../examples/open-evaluation/ConstrainedElementsClient.hs).
+
+The solver checks the right-hand side using the owner of the left-hand side.
+It can project a transitive superclass, rewrite with a nominal equality,
+or apply a quantified superclass when its premises are available. A
+constraint in an instance declaration can be used to construct its
+dictionary. To recover that constraint later, the class must provide it.
+The source controls distinguish a representational coercion, a sibling
+parameter, and an argument hidden by a type synonym.
+[Equation controls](../../../testsuite/tests/dependent/should_run/NativeFamilyEquationScope.hs).
+
+The boundary-evidence plugin can provide `Locate 8 '[7, 8]` in a value
+signature. Suppose a family owner supplies
+`forall n. Locate n '[7, 8] => Marker n` and its equation needs `Marker 8`.
+The equation must also obtain `Locate 8 '[7, 8]` from its context.
+Adding that premise to the owner makes the equation valid in readers
+that use ordinary type checking.
+[Membership plugin](../examples/boundary-evidence/LocatePlugin.hs).
+
+An instance selected by the writer can acquire a more specific alternative
+in a later module. The equation proof therefore uses local evidence. A
+top-level family with a ground equation such as `F () = Elem [Bool]` still
+reports GHC-90647 for a marked `Elem`. A type synonym for `Elem [Bool]`
+has an interface rule for checking its domain and compiles. The same
+synonym with `Int` reports the missing `Allowed Int`. An ordinary
+unmarked provider retains the usual type-family behavior.
 
 Draft #177 §3.3 gives a forwarding equation `S a = T a` with a
 standalone kind signature `forall a -> C a => Type`. Both stock GHC
