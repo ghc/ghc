@@ -367,6 +367,12 @@ test('NativeClosedFamilySum',
                    'NativeClosedFamilySumClient.hs'])],
      run_command, ['bash NativeClosedFamilySum.sh "{compiler}" "{libdir}"'])
 
+test('NativeAssociatedSum',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['NativeAssociatedSumClass.hs', 'NativeAssociatedSumProvider.hs',
+                   'NativeAssociatedSumClient.hs'])],
+     run_command, ['bash NativeAssociatedSum.sh "{compiler}" "{libdir}"'])
+
 test('NativeAlternatingBinders',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['NativeAlternatingBindersProvider.hs', 'NativeAlternatingBindersClient.hs'])],

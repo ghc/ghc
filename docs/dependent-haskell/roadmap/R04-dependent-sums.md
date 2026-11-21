@@ -354,6 +354,36 @@ depends on an explicit `forall` binder.
 [Instance provider](../../../testsuite/tests/dependent/should_run/NativeClosedFamilySumChain.hs)
 and [ordinary client](../../../testsuite/tests/dependent/should_run/NativeClosedFamilySumClient.hs).
 
+## Return a dependent sum from an associated equation
+
+An associated type instance can use the enclosing instance variable
+`a` alongside the equation's own `b`.
+
+```haskell
+instance forall a. Build [a] where
+    type forall b. Result [a] b = some (tag :: Bool) | Tagged tag (a, b)
+```
+
+Both variables occur on the family left-hand side. GHC still rejects
+an instance-head variable that the family pattern omits. The test also
+captures an equation variable whose kind depends on another binder.
+[GHC's scope rules for associated instances](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_families.html#scoping-of-class-parameters).
+
+A default has its own scope. In a class with `type Defaulted a`, the
+default `type Defaulted b = some (tag :: Bool) | Tagged tag b` captures
+`b` from its pattern. GHC checks the default before it instantiates it
+in another module. The default still requires distinct variable
+patterns.
+[GHC's associated default rules](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_families.html#associated-type-synonym-defaults).
+
+The ordinary client matches `Pair` on the result of an ordinary
+associated instance. The class declaration lives in a module that uses
+ordinary `TypeFamilies`. This fork marks the family declared under
+`ExperimentalDependentTypes` as constrained. The client uses `first`
+with the existing domain check for that default.
+[Instance and default provider](../../../testsuite/tests/dependent/should_run/NativeAssociatedSumProvider.hs)
+and [interface-only client](../../../testsuite/tests/dependent/should_run/NativeAssociatedSumClient.hs).
+
 ## Partition at the original length
 
 The [vector partition](../examples/packed-vector/ConservedPartition.hs) returns

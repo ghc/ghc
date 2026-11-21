@@ -167,6 +167,15 @@ For a top-level type instance, allocate a stable occurrence before lifting
 the payload. The same open family can have multiple instances, including
 instances in separate declaration groups. The payload helper belongs to
 the instance module even if that module imports the family.
+
+In an associated instance, an explicit equation forall can use variables
+from the enclosing instance head. Keep those captures as arguments to the
+helper. rnFamEqn still checks that these variables occur on the left-hand
+side. Copy only their names. An annotation on the instance head can
+mention another variable outside the family equation. For a splice, pass
+only enclosing variables written in the family pattern. The splice's
+source does not show which variables its result uses. A class default has
+only the scope of its own equation.
 -}
 -- | Lift type lambdas from synonyms and sums from type family equations.
 -- See Note [Lifting type lambdas].
@@ -178,22 +187,42 @@ liftTypeLambdas sigma group = do
   where
     liftGroup decls = do
       (instances, lifted_insts) <- unzip <$> traverse liftInst (group_instds decls)
-      let (defs, lifted) = unzip (map liftDecl (group_tyclds decls))
-          (families, hidden, signatures, scopes) = unzip4 (concat lifted ++ concat lifted_insts)
+      (defs, lifted) <- unzip <$> traverse liftDecl (group_tyclds decls)
+      let (families, hidden, signatures, scopes) = unzip4 (concat lifted ++ concat lifted_insts)
       return (decls { group_tyclds = defs ++ families
                     , group_kisigs = group_kisigs decls ++ catMaybes signatures
                     , group_instds = instances }
              , hidden, catMaybes scopes)
 
-    liftInst (L loc inst@TyFamInstD
-                    { tfid_inst = decl@TyFamInstDecl
-                    { tfid_eqn = eqn@FamEqn{feqn_tycon = owner, feqn_rhs = rhs} } })
+    liftInst (L loc inst@ClsInstD
+                  { cid_inst = decl@ClsInstDecl{cid_poly_ty = header, cid_decls = nested} }) = do
+      (nested', lifted) <- liftNested (instanceVars header) nested
+      return (L loc inst{cid_inst = decl{cid_decls = nested'}}, lifted)
+    liftInst inst = liftTypeInst [] inst
+
+    liftNested inherited nested = do
+      (nested', lifted) <- unzip <$> traverse liftDeclInst nested
+      return (nested', concat lifted)
+      where
+        liftDeclInst (L loc (InstD ext inst)) = do
+          (L _ inst', lifted) <- liftTypeInst inherited (L loc inst)
+          return (L loc (InstD ext inst'), lifted)
+        liftDeclInst decl = return (decl, [])
+
+    instanceVars (L _ HsSig{sig_bndrs = outer, sig_body = body}) =
+      case outer of
+        HsOuterImplicit{} -> nubN (extractHsTyRdrTyVars body)
+        HsOuterExplicit{hso_bndrs = binders} -> mapMaybe hsLTyVarLocName binders
+
+    liftTypeInst inherited (L loc inst@TyFamInstD
+                                { tfid_inst = decl@TyFamInstDecl
+                                { tfid_eqn = eqn@FamEqn{feqn_tycon = owner, feqn_rhs = rhs} } })
       | sumResult rhs = do
           occ <- chooseUniqueOccTc (mkInstTyTcOcc ("$sum:" ++ occNameString (rdrNameOcc (unLoc owner))))
           let instance_owner = L (getLoc owner) (mkRdrUnqual occ)
-              (_, (L _ eqn', lifted)) = liftEquation instance_owner (0 :: Int) (L loc eqn)
+              (_, (L _ eqn', lifted)) = liftEquation inherited instance_owner (0 :: Int) (L loc eqn)
           return (L loc inst{tfid_inst = decl{tfid_eqn = eqn'}}, lifted)
-    liftInst inst = return (inst, [])
+    liftTypeInst _ inst = return (inst, [])
 
     liftDecl (L loc syn@SynDecl{tcdLName = owner, tcdRhs = rhs,
                                 tcdTyVars = HsQTvs{hsq_explicit = captures}})
@@ -202,34 +231,44 @@ liftTypeLambdas sigma group = do
             kinds = nubN kind_occs
             implicit = [(liftedTypeVarBinder k, k) | k <- kinds]
             (rhs', families, _) = liftRhs Nothing owner (implicit ++ scoped) rhs (0 :: Int)
-        in (L loc syn{tcdRhs = rhs'}, families)
+        in return (L loc syn{tcdRhs = rhs'}, families)
     liftDecl (L loc decl@FamDecl{tcdFam = family@FamilyDecl
                   { fdLName = owner, fdInfo = ClosedTypeFamily ann (Just rows) }}) =
-      let (_, results) = mapAccumL (liftEquation owner) (0 :: Int) rows
+      let (_, results) = mapAccumL (liftEquation [] owner) (0 :: Int) rows
           (rows', lifted) = unzip results
           family' = family{fdInfo = ClosedTypeFamily ann (Just rows')}
-      in (L loc decl{tcdFam = family'}, concat lifted)
-    liftDecl decl = (decl, [])
+      in return (L loc decl{tcdFam = family'}, concat lifted)
+    liftDecl (L loc cls@ClassDecl{tcdDecls = nested}) = do
+      (nested', lifted) <- liftNested [] nested
+      return (L loc cls{tcdDecls = nested'}, lifted)
+    liftDecl decl = return (decl, [])
 
-    liftEquation owner salt (L loc eqn@FamEqn{feqn_rhs = rhs})
+    liftEquation inherited owner salt (L loc eqn@FamEqn{feqn_rhs = rhs})
       | sumResult rhs =
-          let captures = equationCaptures eqn
+          let captures = equationCaptures inherited eqn
               free = Set.fromList (map unLoc (extractHsTyRdrTyVars rhs))
               used | spliceFree rhs = fst (foldr selectCapture ([], free) captures)
                    | otherwise = captures
               (rhs', families, next) = liftRhs Nothing owner used rhs salt
           in (next, (L loc eqn{feqn_rhs = rhs'}, families))
-    liftEquation _ salt row = (salt, (row, []))
+    liftEquation _ _ salt row = (salt, (row, []))
 
     sumResult (L _ (HsParTy _ body)) = sumResult body
     sumResult (L _ (HsKindSig _ body _)) = sumResult body
     sumResult (L _ (XHsType HsTypeSome{})) = True
     sumResult _ = False
 
-    equationCaptures FamEqn{feqn_bndrs = HsOuterImplicit{}, feqn_pats = pats} =
-      [(liftedTypeVarBinder v, v) | v <- nubN (extractHsTyArgRdrKiTyVars pats)]
-    equationCaptures FamEqn{feqn_bndrs = HsOuterExplicit{hso_bndrs = binders}} =
-      mapMaybe (capture . fmap (setHsTyVarBndrFlag (HsBndrRequired noExtField))) binders
+    equationCaptures inherited FamEqn{feqn_bndrs = outer, feqn_pats = pats, feqn_rhs = rhs} =
+      [(liftedTypeVarBinder v, v) | v <- inherited
+                                , not (any (sameBinder v . snd) local)
+                                , without_splice || any (sameBinder v) lhs] ++ local
+      where
+        without_splice = spliceFree rhs
+        lhs = nubN (extractHsTyArgRdrKiTyVars pats)
+        local = case outer of
+          HsOuterImplicit{} -> [(liftedTypeVarBinder v, v) | v <- lhs]
+          HsOuterExplicit{hso_bndrs = binders} ->
+            mapMaybe (capture . fmap (setHsTyVarBndrFlag (HsBndrRequired noExtField))) binders
 
     selectCapture c@(binder, v) (used, free)
       | Set.member (unLoc v) free =
