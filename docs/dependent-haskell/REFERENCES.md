@@ -7033,3 +7033,23 @@ position raises the exception from that position. See Note [Omitted
 impossible retained equations] in `GHC.Tc.Gen.Match`.
 [GHC user guide, empty case alternatives](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/empty_case.html)
 and [runtime and rejection checks](../../testsuite/tests/dependent/should_run/NativeIndexedFin.sh).
+
+### Consume a list position in a linear function
+
+Agda's list lookup uses a position of type `Fin (length xs)`. Its
+successor branch passes the predecessor to the recursive lookup. The
+fork uses that same recursion. The Haskell type also records how the
+caller consumes the position. In a linear call the two cons equations
+share one case on the position. This preserves Haskell's demand on each
+list cell and avoids a second use of the position on pattern failure.
+[Agda standard library 2.3, Data.List.Base](https://agda.github.io/agda-stdlib/v2.3/Data.List.Base.html)
+and [Agda 2.8.0, indexed coverage](https://agda.readthedocs.io/en/v2.8.0/language/coverage-checking.html).
+
+GHC proposal 111 specifies the usage of constructor fields in a
+linear pattern. The fork uses the declared multiplicity of each field
+when opening a retained pair. A retained witness has multiplicity
+`Many`. The position in `Cursor` follows the payload field of
+`GHC.Sigma.Pair`. An ordinary module can open the erased state and
+reader with a strict tuple binding.
+[GHC proposal 111, constructors and pattern matching](https://ghc-proposals.readthedocs.io/en/latest/proposals/0111-linear-types.html#constructors-pattern-matching)
+and [source-hidden client](examples/qualified-pi/CursorClient.hs).

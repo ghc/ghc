@@ -22,8 +22,8 @@ import GHC.Hs
 import GHC.HsToCore.Binds
 import GHC.Core.ConLike
 import GHC.Core.Coercion ( MCoercion(..), coercionLKind, mkUnbranchedAxInstCo )
-import GHC.Core.DataCon ( dataConTyCon, dataConRepArgBinders )
-import GHC.Core.Type ( isNativeIndexType, isManyTy, mkTyConApp )
+import GHC.Core.DataCon ( dataConRepType, dataConTyCon, dataConRepArgBinders )
+import GHC.Core.Type ( coreFullView, isNativeIndexType, mkTyConApp, piResultTys )
 import GHC.Core.TyCon ( isNewTyCon, newTyConCo )
 import GHC.Tc.Types.Evidence ( isEmptyTcEvBinds, isIdHsWrapper )
 import GHC.Tc.Utils.TcType
@@ -31,7 +31,9 @@ import GHC.Core.Multiplicity
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Errors.Types (DsMessage(DsRetainedPackagePatterns))
 import GHC.HsToCore.Utils
-import GHC.Core ( CoreExpr, isNativeIndexedGadtCon )
+import GHC.Core ( CoreExpr, Expr(Var), isNativeIndexedGadtCon )
+import GHC.Core.TyCo.Rep ( Type(DepFunTy, FunTy, ft_mult) )
+import GHC.Core.Utils ( applyTypeToArgs )
 import GHC.Core.Make ( mkCoreLets )
 import GHC.Utils.Misc
 import GHC.Types.Id
@@ -267,6 +269,10 @@ use the usual match compiler. No typed-AST or runtime-index alias is required.
 Re-casing the shared scrutinee does not repeat its evaluation. The fields stay
 lazy until their patterns or RHS demand them. This can generate more cases
 than field sharing. Ordinary constructor families retain their current path.
+Instantiate the constructor telescope with each selected pattern Id before
+selecting the next field. This preserves dependencies on the actual Ids.
+For a linear case, multiply each ordinary field's declared multiplicity by
+the case multiplicity. The retained index field stays unrestricted.
 Agda supplies the constructor-telescope and clause-discrimination precedent.
 Separate cases preserve Haskell's field demand and source clause order.
 See docs/dependent-haskell/REFERENCES.md#source-package-patterns.
@@ -302,10 +308,10 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
   = do  { retained_vars <- case con1 of
             RealDataCon con | not (null (dataConRepArgBinders con)) ->
               putSrcSpanDsA (getLoc (eqn_pat eqn1)) $
-                do { unless (null eqns && isManyTy mult) package_error
+                do { unless (null eqns) package_error
                    ; case args1 of
                        PrefixCon _ pats ->
-                         Just <$> mapM (selectMatchVar mult . unLoc) pats
+                         Just <$> retained_fields (piResultTys (dataConRepType con) arg_tys) pats
                        _ -> package_error }
             _ -> return Nothing
         ; let inst_tys = assert (all tcIsTcTyVar ex_tvs) $
@@ -388,6 +394,18 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
       , isCoVar eq, isCoVar cv, isNativeIndexedGadtCon con
       = Just (eq, cv)
       | otherwise = Nothing
+
+    -- See Note [Retained package equation scope].
+    retained_fields _ [] = return []
+    retained_fields ty (L _ pat : pats)
+      = case coreFullView ty of
+          DepFunTy{} -> select ManyTy
+          FunTy { ft_mult = w } -> select (mkMultMul mult w)
+          _ -> package_error
+      where
+        select w = do { field <- selectMatchVar w pat
+                      ; fields <- retained_fields (applyTypeToArgs ty [Var field]) pats
+                      ; return (field : fields) }
 
     select_indexed_field (L _ (ParPat _ pat)) = select_indexed_field pat
     select_indexed_field (L _ (SigPat _ pat _)) = select_indexed_field pat
