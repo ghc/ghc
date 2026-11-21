@@ -1306,6 +1306,10 @@ projection of the recursive split. The rejected suffix is the original
 cons. An ordinary client proves that appending the two projections
 reconstructs the input. The proof inspects each decision up to the first
 rejection and leaves the remaining decisions lazy.
+The Showcase prints both accepted projection equalities and the
+reassembly proof. It observes the first element of each result and the
+first two elements after append, with an undefined tail after the rejected
+head.
 
 The accepting branch returns the pair and the first prefix cons before
 matching the recursive pair. The selectors for the recursive fields remain
