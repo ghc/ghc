@@ -327,9 +327,9 @@ HS
         reject BadColumns 'The value returned by the interpreter does not match the checked result type.'
     done
 
-    for function in wrongCellRows wrongCellCols wrongUnlabelled; do
+    for function in wrongUnlabelled wrongCellRows wrongCellCols; do
         sed -e 's/module BadWitness/module BadCells/' -e "s/Wrong.buildWrong/Wrong.$function/" \
-            -e '/^import qualified WrongWitness/i import RectangularTable (Table(..))' \
+            -e '/^import qualified WrongWitness/i import RectangularTable (Table(..), ColumnTable(..))' \
             BadWitness.hs >BadCells.hs
         reject BadCells 'The value returned by the interpreter does not match the checked result type.'
     done
