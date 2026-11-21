@@ -519,6 +519,7 @@ retained callback by ordinary subsumption. A nested call with a fixed ordinary
 result can use the same check. Quick Look still rejects instantiating a type
 variable with the retained polytype, as in
 `Just reflectMaybe :: Maybe (forall a. Reflection a)`.
+[Showcase client](../examples/open-evaluation/ConstrainedElementsQuickLook.hs).
 [Quick Look argument checking](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf#page=12).
 
 With `DeepSubsumption`, an ordinary arrow can also

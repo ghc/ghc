@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 {-# LANGUAGE DataKinds, ExplicitNamespaces, RequiredTypeArguments, TypeApplications #-}
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes, PartialTypeSignatures, QuantifiedConstraints, RankNTypes, ScopedTypeVariables, TypeFamilies, TypeOperators #-}
-module ConstrainedElementsClient (splitCollection, constrainedElements, annotatedElement, explicitElements, renderField, formatField, renderKnownFields, retainedMaybeDomain, aliasedReflection, partialElement) where
+module ConstrainedElementsClient (splitCollection, constrainedElements, annotatedElement, explicitElements, renderField, formatField, renderKnownFields, retainedMaybeDomain, aliasedReflection, runReflection, partialElement) where
 
 import ConstrainedElements (Collection(..), Allowed, Collects(..), FieldKey, Field(..), applyField, field, withField, Reflection, reflectMaybe, MaybeBoolEcho, AtNothing)
 import Data.IORef (newIORef, readIORef, writeIORef)
@@ -82,10 +82,11 @@ retainedMaybeDomain = do
 
 -- | Use the partial family and the qualified proof through their imported aliases.
 aliasedReflection :: (Maybe Bool, AtNothing MaybeBoolEcho :~: 'Nothing)
-aliasedReflection = (run reflectMaybe (Just True), Refl)
-  where
-    run :: (forall a. Reflection a) -> Maybe Bool -> Maybe Bool
-    run proof x = case proof @Bool x of Refl -> x
+aliasedReflection = (runReflection reflectMaybe (Just True), Refl)
+
+-- | Use the supplied polymorphic proof at the runtime input.
+runReflection :: (forall a. Reflection a) -> Maybe Bool -> Maybe Bool
+runReflection proof x = case proof @Bool x of Refl -> x
 
 -- | Forward a runtime element using the premises of a partial signature.
 partialElement :: Bool -> Bool
