@@ -333,7 +333,7 @@ dsAbsBinds dflags tyvars dicts exports
                              , core_wrap (Var lcl_id)) } }
        ; main_prs <- mapM mk_main exports
        ; let direct_workers = mkVarSet [worker | (_, Var worker) <- main_prs]
-       ; bind_prs' <- mapM (mk_aux_bind direct_workers) bind_prs
+       ; bind_prs' <- mapM (mk_aux_bind (`elemVarSet` direct_workers)) bind_prs
        ; let
              -- When there's a single source binding, we wrap the evidence binding in a
              -- separate let-rec (DSB1) inside the first desugared binding (DSB2).
@@ -345,10 +345,14 @@ dsAbsBinds dflags tyvars dicts exports
     -- The general case
     -- See Note [Desugaring AbsBinds]
   | otherwise
-  = do { aux_prs <- mapM (mk_aux_bind emptyVarSet) bind_prs
+  = do { aux_prs <- mapM (mk_aux_bind (const True)) bind_prs
        ; let aux_binds = Rec aux_prs
                 -- Monomorphic recursion possible, hence Rec
 
+             package_workers = mkVarSet
+               [ worker | (worker, _) <- aux_prs
+                        , CoreUnfolding { uf_src = RetainedUserSrc, uf_tmpl = tmpl } <- [realIdUnfolding worker]
+                        , hasExistentialExpr tmpl ]
              new_force_vars = get_new_force_vars force_vars
              locals       = map abe_mono exports
              all_locals   = locals ++ new_force_vars
@@ -378,12 +382,13 @@ dsAbsBinds dflags tyvars dicts exports
                      ; let rhs = core_wrap $ mkLams tyvars $ mkLams dicts sel_body
                            rhs_for_spec = Let (NonRec poly_tup_id poly_tup_rhs) rhs
                      ; (spec_binds, rules) <- dsSpecs rhs_for_spec spec_prags
-                     ; let global' = (global `setInlinePragma` defaultInlinePragma)
-                                             `addIdSpecialisations` rules
-                           -- Kill the INLINE pragma because it applies to
-                           -- the user written (local) function.  The global
-                           -- Id is just the selector.  Hmm.
-                     ; return (fromOL spec_binds ++ [(global', rhs)]) } }
+                     ; selector <- if local `elemVarSet` package_workers
+                           then do
+                             let template = core_wrap $ mkLams tyvars $ mkLams dicts $
+                                            mkCoreLets ds_ev_binds $ mkLet aux_binds (Var local)
+                             fst <$> makeCorePair dflags False (idName global) global False template
+                           else pure (global `setInlinePragma` defaultInlinePragma)
+                     ; return (fromOL spec_binds ++ [(addIdSpecialisations selector rules, rhs)]) } }
 
        ; export_binds_s <- mapM mk_bind (exports ++ extra_exports)
 
@@ -391,11 +396,11 @@ dsAbsBinds dflags tyvars dicts exports
                 , (poly_tup_id, poly_tup_rhs) :
                    concat export_binds_s) }
   where
-    mk_aux_bind :: VarSet -> (Id,CoreExpr) -> DsM (Id,CoreExpr)
-    mk_aux_bind direct_workers (lcl_id, rhs) =
+    mk_aux_bind :: (Id -> Bool) -> (Id,CoreExpr) -> DsM (Id,CoreExpr)
+    mk_aux_bind allow_package (lcl_id, rhs) =
       let lcl_w_inline = lookupVarEnv inline_env lcl_id `orElse` lcl_id
           pragma_name = idName (lookupVarEnv global_env lcl_id `orElse` lcl_id)
-      in makeCorePair dflags (lcl_id `elemVarSet` direct_workers) pragma_name lcl_w_inline False rhs
+      in makeCorePair dflags (allow_package lcl_id) pragma_name lcl_w_inline False rhs
 
     inline_env :: IdEnv Id -- Maps a monomorphic local Id to one with
                            -- the inline pragma from the source
@@ -448,7 +453,7 @@ dsAbsBinds dflags tyvars dicts exports
 ------------------------
 makeCorePair :: DynFlags -> Bool -> Name -> Id -> Bool -> CoreExpr
              -> DsM (Id, CoreExpr)
-makeCorePair dflags direct_worker pragma_name gbl_id is_default_method rhs
+makeCorePair dflags allow_worker_package pragma_name gbl_id is_default_method rhs
   | is_default_method
   , native_rhs
   , isRetainedVanillaDefaultMethod (idName gbl_id) (idType gbl_id)
@@ -472,7 +477,7 @@ makeCorePair dflags direct_worker pragma_name gbl_id is_default_method rhs
   , unf@CoreUnfolding { uf_tmpl = tmpl } <- realIdUnfolding (fst pair)
   , hasNativeDependentUnfolding tmpl
   -- See Note [Written retained unfolding pragmas].
-  = if (direct_worker || isInternalName pragma_name || pragma_name == idName gbl_id
+  = if (allow_worker_package || isInternalName pragma_name || pragma_name == idName gbl_id
         || not (hasExistentialExpr tmpl))
        && supportsNativeRuleBinds [NonRec (fst pair) tmpl]
     then pure (setIdUnfolding (fst pair) unf{uf_src = RetainedUserSrc}, snd pair)
@@ -536,8 +541,16 @@ top-level binding that owns the pragma. In the monomorphic AbsBinds path
 also accept a worker whose wrapper is a direct alias. The simplifier can
 move the unfolding and pragma to the exported Id with the worker RHS.
 See Note [Transferring IdInfo] in GHC.Core.Opt.Simplify. Occurrence analysis
-still chooses loop breakers for the recursive group. A selector out of a
-polymorphic tuple has no such transfer path.
+still chooses loop breakers for the recursive group.
+
+In the general AbsBinds case the workers are local to the tuple function.
+Its type and dictionary lambdas bind the variables in the worker template.
+Use the local unfolding policy for those workers. Leave the pragma on the
+worker that owns the definition. For its export, close the selected worker
+over those same binders and evidence bindings. This gives the client a
+stable unfolding with all of the group's free variables in scope.
+The runtime selector still calls the shared tuple function.
+See Note [Desugaring AbsBinds].
 See Note [Erased package unfoldings] in GHC.IfaceToCore.
 Compulsory default-method unfoldings still use their separate check.
 An ordinary binding without an unfolding request needs no native scan here.

@@ -1120,7 +1120,7 @@ lintCoreExpr e@(App _ _)
              -- TODO: Look through ticks?
 
        ; runrw_pr <- lintApp (text "runRW# expression")
-                               lintTyArg lint_rw_cont
+                               lintCoreForAllArg lint_rw_cont
                                (Just id)
                                (idType fun) [ty_arg1,ty_arg2,cont_arg] zeroUE
        ; lintCoreArgs runrw_pr rest }
@@ -1153,7 +1153,7 @@ lintCoreExpr (Lam var expr)
 lintCoreExpr (Case scrut var alt_ty alts)
   = lintCaseExpr scrut var alt_ty alts
 
--- This case can't happen; linting types in expressions gets routed through lintTyArg
+-- This case can't happen; linting types in expressions gets routed through lintCoreForAllArg
 lintCoreExpr (Type ty)
   = failWithL (text "Type found as expression" <+> ppr ty)
 
@@ -1611,19 +1611,43 @@ subtype of the required type, as one would expect.
 -- e.g. f :: Int -> Bool -> Int would return `Int` as result type.
 lintCoreArgs  :: (Type, UsageEnv) -> [CoreExpr] -> LintM (Type, UsageEnv)
 lintCoreArgs (fun_ty, fun_ue) args
-  = lintApp (text "expression") lintTyArg lintValArg (Just id) fun_ty args fun_ue
+  = lintApp (text "expression") lintCoreForAllArg lintValArg (Just id) fun_ty args fun_ue
 
-lintTyArg :: CoreExpr -> LintM Type
-
--- Type argument
-lintTyArg (Type arg_ty)
+lintCoreForAllArg :: TyCoVar -> CoreExpr -> LintM Type
+lintCoreForAllArg tv (Type arg_ty)
+  | isTyVar tv
   = do { checkL (not (isCoercionTy arg_ty))
                 (text "Unnecessary coercion-to-type injection:"
                   <+> ppr arg_ty)
        ; lintType arg_ty
        ; return arg_ty }
-lintTyArg arg
-  = failWithL (hang (text "Expected type argument but found") 2 (ppr arg))
+lintCoreForAllArg cv (Coercion co)
+  | isCoVar cv
+  = do { lintCoercion co
+       ; let (_, _, role) = coVarTypesRole cv
+       ; lintRole co role (coercionRole co)
+       ; return (mkCoercionTy co) }
+    -- See Note [Linting coercion forall arguments].
+lintCoreForAllArg binder arg =
+  failWithL (hang (text "Expected" <+> sort <+> text "argument but found") 2 (ppr arg))
+  where
+    sort | isCoVar binder = text "coercion"
+         | otherwise      = text "type"
+
+{- Note [Linting coercion forall arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A named coercion argument can appear in the type of a later argument.
+For example, a constructor can take ck :: k1 ~# k2, then a proof of
+(a |> ck) ~# b. A Core application passes a Coercion expression for
+ck. Check its scope and role before injecting it into the substitution.
+lintApp checks its type against the instantiated binder type.
+
+A DataAlt binds proofs in the same order. lintBinders checks scope and
+lintAltBinders checks each proof type against the constructor telescope.
+Substitute the matched CoVar before checking the remaining binders.
+A non-dependent coercion argument that uses a FunTy keeps the existing
+value application rule.
+-}
 
 lintValArg  :: CoreExpr -> Mult -> UsageEnv -> LintM (Type, UsageEnv)
 lintValArg arg mult fun_ue
@@ -1658,6 +1682,13 @@ lintAltBinders rhs_ue case_bndr scrut_ty con_ty ((var_w, bndr):bndrs)
   | isTyVar bndr
   = do { con_ty' <- lintTyApp con_ty (mkTyVarTy bndr)
        ; lintAltBinders rhs_ue case_bndr scrut_ty con_ty'  bndrs }
+  | isCoVar bndr
+  , Just (_, cv, body_ty) <- splitForAllCoVar_maybe con_ty
+  = do { ensureEqTys (varType cv) (varType bndr) (mkBadPatMsg con_ty scrut_ty)
+       ; in_scope <- getInScope
+       ; let subst = extendCvSubst (mkEmptySubst in_scope) cv (mkCoVarCo bndr)
+       ; lintAltBinders rhs_ue case_bndr scrut_ty (substTy subst body_ty) bndrs }
+    -- See Note [Linting coercion forall arguments].
   | otherwise
   = do { (con_ty', _) <- lintValApp (Var bndr) con_ty (idType bndr) zeroUE zeroUE
          -- We can pass zeroUE to lintValApp because we ignore its usage
@@ -2590,7 +2621,7 @@ lint_co_app co = lint_tyco_app (text "coercion" <+> quotes (ppr co))
 lint_tyco_app :: SDoc -> Kind -> [Type] -> LintM ()
 lint_tyco_app msg fun_kind arg_tys
     -- See Note [Avoiding compiler perf traps when constructing error messages.]
-  = do { _ <- lintApp msg (\ty     -> do { lintType ty; return ty })
+  = do { _ <- lintApp msg (\_ ty   -> do { lintType ty; return ty })
                           (\ty _ _ -> do { lintType ty; return (typeKind ty,()) })
                           Nothing
                           fun_kind arg_tys ()
@@ -2599,7 +2630,7 @@ lint_tyco_app msg fun_kind arg_tys
 ----------------
 lintApp :: forall a acc. Outputable a =>
              SDoc
-          -> (a -> LintM Type)                        -- Lint the thing and return its value
+          -> (TyCoVar -> a -> LintM Type)             -- Lint the forall argument for substitution
           -> (a -> Mult -> acc -> LintM (Kind, acc))  -- Lint the thing and return its type
           -> Maybe (a -> CoreExpr)                  -- Runtime arguments only
           -> Type
@@ -2638,7 +2669,7 @@ lintApp msg lint_forall_arg lint_arrow_arg runtime_arg !orig_fun_ty all_args acc
                  = return (substTy subst fun_ty, acc)
 
                go subst (ForAllTy _ma (Bndr tv _vis) body_ty) acc (arg:args)
-                 = do { arg' <- lint_forall_arg arg
+                 = do { arg' <- lint_forall_arg tv arg
                       ; let tv_kind = substTy subst (varType tv)
                             karg'   = typeKind arg'
                             subst'  = extendTCvSubst subst tv arg'

@@ -71,6 +71,7 @@ linear equality witness beneath a retained binder: 42
 equality evidence beneath a retained Pi: [7,7,7]
 immediate index beta reduction: [5,5,5,5]
 inline an ordinary function that calls a retained helper: 42
+sum separately typed job costs through a recursive package: (7,131.0,3)
 replicate a captured element at two runtime lengths: ([7],[7,7])
 inline a local package helper with captured values: (18,1)
 apply an exported package helper to a captured function: (17,3)

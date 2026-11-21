@@ -66,6 +66,9 @@ test('HomogeneousSelectorGivens',
       extra_files(['DeferredHeterogeneousPlugin.hs', 'HomogeneousSelectorGivensProvider.hs'])],
      multimod_compile_and_run,
      ['HomogeneousSelectorGivens', '-v0 -package ghc -dcore-lint -dstg-lint ' + config.plugin_way_flags])
+test('CoercionForall',
+     [only_ways(['normal']), extra_files(['CoercionForallPlugin.hs'])],
+     multimod_compile, ['CoercionForall', '-v0 -package ghc -dcore-lint ' + config.plugin_way_flags])
 test('HomogeneousSelectorRole', normal, compile_fail, [''])
 
 test('plugins06',
