@@ -6931,3 +6931,10 @@ an index beneath an ordinary noninjective type family ambiguous.
 [Agda's nested pairs](https://agda.github.io/agda-stdlib/v2.3/Data.Product.Base.html),
 [implicit argument insertion](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html),
 and [GHC's injective variable analysis](../../compiler/GHC/Core/TyCo/FVs.hs).
+
+Agda's `Data.Vec.Base.zipWith` gives its two inputs independent element
+types and shares their length index. The checked split uses the same
+relationship between its inputs. Each returned equality also identifies
+the contents of its own vector.
+[Agda standard library 2.3, Data.Vec.Base](https://agda.github.io/agda-stdlib/v2.3/Data.Vec.Base.html)
+and [Haskell split](examples/packed-vector/CertifiedSplit.hs).

@@ -1578,6 +1578,7 @@ sourceAddition = do
     checkedContents <- CertifiedSplitClient.checkedObservation
     observe "check a runtime cut and prove the original contents" checkedContents
     observe "split two independent vectors at one checked cut" =<< CertifiedSplitClient.pairedObservation
+    observe "split flags and characters at the same checked cut" =<< CertifiedSplitClient.mixedObservation
     finitePosition <- FinitePositionClient.observeFinitePosition
     observe "recover the checked predecessor of a finite position" finitePosition
     observe "pass zero and a written successor to a retained function"

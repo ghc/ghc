@@ -27,6 +27,7 @@ main = do
     checkedObservation >>= print
     print checkBounds
     pairedObservation >>= print
+    mixedObservation >>= print
 HS
     "${ghc[@]}" "$opt" -c Main.hs
     "${ghc[@]}" Main.o CertifiedSplitClient.o ../proof/CertifiedSplit.o ../provider/PackedVecLibrary.o -o run
@@ -52,17 +53,21 @@ fi
 # vector has the identity named by the expected split type.
 sed -e 's/foreach (v :: P.Vec a total) -> Maybe/foreach (v :: P.Vec a total) -> foreach (other :: P.Vec a total) -> Maybe/' \
     -e 's/^checkedSplitAtValue cut total v =/checkedSplitAtValue cut total v other =/' \
-    -e 's/splitAtValue @a @suffix cut v)))/splitAtValue @a @suffix cut other)))/' \
+    -e 's/splitAtValue cut v)))/splitAtValue cut other)))/' \
     CertifiedSplit.hs >OtherVector.hs
 if "${ghc[@]}" -O0 -fforce-recomp -c OtherVector.hs >other.log 2>&1 ||
    ! grep -Eq '^OtherVector.hs:.*error: \[GHC-83865\]' other.log ||
-   ! grep -Fq 'splitAtValue @a @suffix cut other' other.log; then
+   ! grep -Fq 'splitAtValue cut other' other.log; then
     cat other.log >&2
     exit 1
 fi
 
 # Each proof must identify the vector in its own result position.
-sed 's/(splitAtValue cut xs) (splitAtValue cut ys)/(splitAtValue cut ys) (splitAtValue cut xs)/' \
+# Give both vectors the same element type to isolate their value indices.
+sed -e '/^checkedSplitBoth ::/,$s/forall a b\./forall a./' \
+    -e '/^checkedSplitBoth ::/,$s/ys :: P.Vec b total/ys :: P.Vec a total/' \
+    -e '/^checkedSplitBoth ::/,$s/CheckedSplitBoth a b cut/CheckedSplitBoth a a cut/' \
+    -e 's/(splitAtValue cut xs) (splitAtValue cut ys)/(splitAtValue cut ys) (splitAtValue cut xs)/' \
     CertifiedSplit.hs >SwappedVectors.hs
 if "${ghc[@]}" -O0 -ferror-spans -fforce-recomp -c SwappedVectors.hs >swapped.log 2>&1; then
     echo 'Accepted exchanged reconstruction proofs'
@@ -89,7 +94,7 @@ if "${ghc[@]}" -O0 -fforce-recomp -c NoLengthProof.hs >width.log 2>&1; then
     exit 1
 fi
 grep -Eq '^NoLengthProof.hs:.*error: \[GHC-83865\]' width.log
-grep -Fq 'SplitBothAtWidth a cut suffix total xs ys' width.log
+grep -Fq 'SplitBothAtWidth a b cut suffix total xs ys' width.log
 if grep -Fq '$lambda:' width.log; then
     cat width.log >&2
     exit 1

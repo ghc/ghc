@@ -167,6 +167,7 @@ split a vector with a proof of its original contents: (([True,False],[True],[Tru
 split proof demand (zero ignores input, one ignores fields, one demands the cell): (True,True,True)
 check a runtime cut and prove the original contents: [Just (1,[True],[False],[True,False]),Nothing]
 split two independent vectors at one checked cut: (Just (([True],[False]),([False],[True])),Just [True],Nothing)
+split flags and characters at the same checked cut: Just (([False],[True]),("a","b"))
 recover the checked predecessor of a finite position: ((Nothing,Just 1),(True,False,True,True))
 pass zero and a written successor to a retained function: (Just 1,True)
 open finite zero views with INLINE and INLINABLE: (True,True)

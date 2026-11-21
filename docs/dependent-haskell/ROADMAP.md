@@ -34,7 +34,8 @@ branch matches the vector and uses the recursive equality directly.
 [ordinary caller](examples/packed-vector/CertifiedSplitClient.hs).
 
 One bounds check can also split two different vectors. Each proof names
-its original input. Both calls are written as `splitAtValue cut xs` or
+its original input. The vectors can contain different element types.
+Both calls are written as `splitAtValue cut xs` or
 `splitAtValue cut ys`. The expected types of the pieces determine the
 common suffix. Inspecting the first proof leaves the second vector
 unevaluated. Exchanging the proofs reports the two written `SplitAtValue`
@@ -317,7 +318,7 @@ reconstruction proof for an arbitrary cut within the vector.
 and [append equations](roadmap/R16-open-term-evaluator.md#prove-that-empty-vector-append-preserves-its-right-operand).
 
 1. **R03 and R05.** The expected constructor result can now identify
-   two original vectors and their element type after one bounds check.
+   two original vectors and both element types after one bounds check.
    The expected vector domains of the returned pieces also determine the
    suffix. The paired implementation needs no visible type application.
    An index that appears only under a noninjective type family remains

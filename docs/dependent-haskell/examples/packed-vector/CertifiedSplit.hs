@@ -41,23 +41,24 @@ checkedSplitAtValue :: forall a. foreach (cut :: P.Nat) -> foreach (total :: P.N
 checkedSplitAtValue cut total v = case P.cutRemainder cut total of
     Nothing -> Nothing
     Just (Pair suffix Refl) ->
-        Just (Pair suffix (SplitAtWidth @a @cut @suffix (splitAtValue @a @suffix cut v)))
+        Just (Pair suffix (SplitAtWidth (splitAtValue cut v)))
 
 -- | Store the reconstruction proof for each of two vectors at the same width.
-type SplitBothAtWidth :: forall a -> P.Nat -> P.Nat -> forall total -> P.Vec a total -> P.Vec a total -> Type
-data SplitBothAtWidth a cut suffix total xs ys where
-    SplitBothAtWidth :: forall a cut suffix (xs :: P.Vec a (P.Add cut suffix)) (ys :: P.Vec a (P.Add cut suffix)).
-        SplitAtValue a cut suffix xs -> SplitAtValue a cut suffix ys ->
-        SplitBothAtWidth a cut suffix (P.Add cut suffix) xs ys
+type SplitBothAtWidth :: forall a -> forall b -> P.Nat -> P.Nat -> forall total -> P.Vec a total -> P.Vec b total -> Type
+data SplitBothAtWidth a b cut suffix total xs ys where
+    SplitBothAtWidth :: forall a b cut suffix
+        (xs :: P.Vec a (P.Add cut suffix)) (ys :: P.Vec b (P.Add cut suffix)).
+        SplitAtValue a cut suffix xs -> SplitAtValue b cut suffix ys ->
+        SplitBothAtWidth a b cut suffix (P.Add cut suffix) xs ys
 
 -- | Retain the common suffix length selected by the bounds check.
-type CheckedSplitBoth a (cut :: P.Nat) (total :: P.Nat) (xs :: P.Vec a total) (ys :: P.Vec a total) =
-    some (suffix :: P.Nat) | SplitBothAtWidth a cut suffix total xs ys
+type CheckedSplitBoth a b (cut :: P.Nat) (total :: P.Nat) (xs :: P.Vec a total) (ys :: P.Vec b total) =
+    some (suffix :: P.Nat) | SplitBothAtWidth a b cut suffix total xs ys
 
--- | Check one cut and split each input at that cut.
-checkedSplitBoth :: forall a. foreach (cut :: P.Nat) -> foreach (total :: P.Nat)
-                 -> foreach (xs :: P.Vec a total) -> foreach (ys :: P.Vec a total)
-                 -> Maybe (CheckedSplitBoth a cut total xs ys)
+-- | Split vectors of independent element types at the same checked cut.
+checkedSplitBoth :: forall a b. foreach (cut :: P.Nat) -> foreach (total :: P.Nat)
+                 -> foreach (xs :: P.Vec a total) -> foreach (ys :: P.Vec b total)
+                 -> Maybe (CheckedSplitBoth a b cut total xs ys)
 checkedSplitBoth cut total xs ys = case P.cutRemainder cut total of
     Nothing -> Nothing
     Just (Pair suffix Refl) ->

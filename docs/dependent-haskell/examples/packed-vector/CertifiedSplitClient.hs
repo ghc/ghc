@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, TypeApplications #-}
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
-module CertifiedSplitClient (splitObservation, checkDemand, checkedObservation, checkBounds, pairedObservation) where
+module CertifiedSplitClient (splitObservation, checkDemand, checkedObservation, checkBounds, pairedObservation, mixedObservation) where
 
 import CertifiedSplit (SplitAtWidth(..), SplitBothAtWidth(..), checkedSplitBoth, checkedSplitAtValue, splitAtValue)
 import Control.Exception (ErrorCall, displayException, evaluate, try)
@@ -80,7 +80,7 @@ checkBounds = [bound P.Z P.Z, bound one two, bound two two, bound (P.S two) two,
     two = P.S one
 
 -- | Read two vectors of the same length and inspect each reconstruction proof.
-pairedContents :: P.Nat -> P.Nat -> [Bool] -> [Bool] -> Maybe (([Bool], [Bool]), ([Bool], [Bool]))
+pairedContents :: P.Nat -> P.Nat -> [a] -> [b] -> Maybe (([a], [a]), ([b], [b]))
 pairedContents cut total first second = do
     xs <- P.fromListExact total first
     ys <- P.fromListExact total second
@@ -95,7 +95,7 @@ firstPrefix cut total =
     let xs = P.replicateNative total True
         missing :: a -> a
         missing _ = error "forced second vector"
-        ys = missing xs
+        ys = missing (P.replicateNative total 'x')
     in case checkedSplitBoth cut total xs ys of
         Just (Pair _ (SplitBothAtWidth (Pair prefix (Pair _ Refl)) _)) -> Just (P.toList prefix)
         Nothing -> Nothing
@@ -107,3 +107,10 @@ pairedObservation = do
     total <- newIORef (P.S (P.S P.Z)) >>= readIORef
     pure (pairedContents cut total [True,False] [False,True],
           firstPrefix cut total, firstPrefix (P.S total) total)
+
+-- | Split flags and characters with a single cut read from IO.
+mixedObservation :: IO (Maybe (([Bool], [Bool]), (String, String)))
+mixedObservation = do
+    cut <- newIORef (P.S P.Z) >>= readIORef
+    let total = P.S (P.S P.Z)
+    pure (pairedContents cut total [False,True] "ab")

@@ -371,13 +371,17 @@ and [cross-module checks](../../../testsuite/tests/dependent/should_run/NativeIn
 
 An ordinary caller can split two vectors at one runtime cut. A successful
 bounds check identifies the common length with the sum of the two piece
-lengths. The expected result determines all five erased arguments of
-`SplitBothAtWidth`: the element type, cut, suffix, and the two original
-vectors. The field type also fixes the suffix through the vector domain
-of the inner sum. Neither the constructor nor the two calls to
-`splitAtValue` needs a written type application. Each reconstruction proof belongs to its
-own input. The caller can open the first proof while the second vector is
-undefined. An excessive cut returns `Nothing`.
+lengths. The expected result determines the two element types, the cut,
+the suffix, and the two original vectors. Each field fixes the suffix
+through the vector domain of its inner sum. The constructor and both
+calls to `splitAtValue` need no written type application. The single-vector
+bounds check uses the same inference rule.
+
+An ordinary caller splits Boolean flags and characters at one cut. Each
+reconstruction proof identifies its own input. For two Boolean vectors,
+exchanging the proofs still fails at the written arguments. The caller
+can open the first proof while the second vector is undefined.
+An excessive cut returns `Nothing`.
 
 GHC selects an omitted index only when it occupies a unique direct position
 in the result of the same data constructor type. It collects all choices
