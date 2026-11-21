@@ -30,14 +30,30 @@ cat >Main.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes #-}
 module Main where
 
-import LaterMatchabilityClient (rankedMap)
+import LaterMatchabilityClient (flippedCallbacks, rankedMap)
 
 main :: IO ()
-main = print rankedMap
+main = print (rankedMap, flippedCallbacks)
 HS
 "${ghc[@]}" -c Main.hs
 "${ghc[@]}" Main.o LaterMatchabilityClient.o ../provider/{AnchorReceiver,LaterMatchability}.o -o ranked-map
-test "$(./ranked-map)" = '(Just True,[False])'
+test "$(./ranked-map)" = '((Just True,[False]),(Just False,[True]))'
+
+cat >ComputedMismatch.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, KindSignatures, TypeApplications, TypeFamilies #-}
+module ComputedMismatch where
+
+import GHC.Matchability (M, Matchability)
+import LaterMatchability (ApplyFlipped)
+
+type Wrong = ApplyFlipped @M Maybe Bool
+type Rigid (m :: Matchability) = ApplyFlipped @m Maybe Bool
+HS
+if "${ghc[@]}" -c ComputedMismatch.hs >computed-mismatch.log 2>&1 ||
+   [[ $(grep -Fc '[GHC-83865]' computed-mismatch.log) != 2 ]]; then
+    cat computed-mismatch.log >&2
+    exit 1
+fi
 
 cat >RankMismatch.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, KindSignatures, Modifiers, TypeFamilies #-}

@@ -54,7 +54,7 @@ module GHC.Tc.Gen.HsType (
         tcHsLiftedType,   tcHsOpenType,
         tcHsLiftedTypeNC, tcHsOpenTypeNC,
         tcInferLHsType, tcInferLHsTypeKind, tcInferLHsTypeUnsaturated,
-        tcCheckLHsTypeInContext, tcCheckInferredFamilyRhs, tcCheckDatatypeField, tcCheckLHsType,
+        tcCheckLHsTypeInContext, tcCheckFamilyRhs, tcCheckInferredFamilyRhs, tcCheckDatatypeField, tcCheckLHsType,
         tcHsContext, tcLHsPredType,
 
         kindGeneralizeAll,
@@ -1486,6 +1486,16 @@ tcCheckInferredFamilyRhs rhs kind = do
   addTypeCtxt rhs $
     tc_check_lhs_type (typeLevelMode {mode_callback_arrow = arrows}) rhs kind
 
+-- | Check a family equation without generalising a new arrow modifier.
+-- See Note [Callback kinds in checked family equations].
+tcCheckFamilyRhs :: LHsType GhcRn -> TcKind -> TcM TcType
+tcCheckFamilyRhs rhs kind = do
+  experimental <- xoptM LangExt.ExperimentalDependentTypes
+  if experimental
+     then addTypeCtxt rhs $
+          tc_check_lhs_type (typeLevelMode {mode_callback_arrow = CheckFamilyRhsArrows}) rhs kind
+     else tcCheckLHsTypeInContext rhs (TheKind kind)
+
 {- Note [Inferred closed family callback arrows]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In an unsigned closed family, an application such as f x can determine
@@ -1500,6 +1510,18 @@ a forwarding or recursive equation can specialise its axiom to U even
 when the family kind is polymorphic. An explicit signature or a LHS
 pattern keeps its separate checking mode. When generalisation is disabled
 an unsigned family retains the default M kind for its callback.
+-}
+
+{- Note [Callback kinds in checked family equations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider a declared callback kind Type %(Flip m) -> Type. Checking
+the equation's LHS emits a wanted for the kind of the callback.
+If Flip m has to reduce, the callback may still have an unknown kind
+when the RHS applies it. Use an arrow with an owned matchability
+metavariable. The solver can read Flip m from the LHS wanted before
+defaulting the arrow to M. See Note [Owning omitted arrows in
+kind-valued arguments] in GHC.Tc.Solver. This mode does not generalise
+the arrow or infer a higher-rank kind.
 -}
 
 tcInferLHsType :: LHsType GhcRn -> TcM TcType
@@ -1637,6 +1659,7 @@ data TcTyMode
 data CallbackArrowMode
   = OrdinaryArrowChecking
   | DefaultUnsignedFamilyArrows
+  | CheckFamilyRhsArrows
   | InferUnsignedFamilyArrows
   | InferDatatypeArrows NameSet
 
@@ -4534,6 +4557,11 @@ tcInferTyApps_nosat index_level expected_kind mode orig_hs_ty fun orig_hs_args
     missing_arrow
       | infer_family_arrows =
           Just (newFlexiTyVarTy matchabilityTy)
+      | CheckFamilyRhsArrows <- mode_callback_arrow mode =
+          Just $ do { owner <- tcl_kind_arrow_defaults <$> getLclEnv
+                    ; case owner of
+                        Just (defaults, _) -> fresh_kind_arrow KindLevel defaults
+                        Nothing -> pure matchableDataConTy }
       | InferDatatypeArrows parameters <- mode_callback_arrow mode
       , L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ name))) <- ignoreParens orig_hs_ty
       , name `elemNameSet` parameters =

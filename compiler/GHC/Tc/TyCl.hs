@@ -4902,7 +4902,7 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
                              , b : _ <- tyConBinders fam_tc
                              , inferredMatchabilityIndex b
                              -> tcCheckInferredFamilyRhs rhs rhs_kind
-                             | otherwise -> tcCheckLHsTypeInContext rhs (TheKind rhs_kind)
+                             | otherwise -> tcCheckFamilyRhs rhs rhs_kind
                      ; return (lhs_ty, rhs_ty) }
 
        ; outer_bndrs <- scopedSortOuter outer_bndrs

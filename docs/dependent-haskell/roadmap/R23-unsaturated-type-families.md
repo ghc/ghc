@@ -816,6 +816,18 @@ parameter with a declared rank uses that kind directly.
 [proposal #242, other quantifiers](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#other-quantifiers)
 and [proposal review](https://github.com/ghc-proposals/ghc-proposals/pull/242).
 
+### Checking a callback with a computed matchability
+
+`ApplyFlipped` takes a callback with kind `Type %(Flip m) -> Type`.
+Its equation `ApplyFlipped @m f a = f a` leaves `m` rigid. The
+kind checker solves the callback's matchability from the declared
+kind before using the usual M fallback. An ordinary client reads
+the M result for `Maybe` and the U result for `KnownListCallback`
+from the provider interface. Applying `Maybe` at a selector fixed
+to U or an arbitrary selector still fails.
+[Proposal #242, computed matchabilities](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#matchability-polymorphism)
+and [interface and rejection checks](../../../testsuite/tests/dependent/should_run/NativeLaterMatchability.sh).
+
 ### Inferring a callback arrow from a datatype field
 
 In `data FamilyBox f = FamilyBox (f Bool)`, the field fixes the domain

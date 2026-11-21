@@ -2,14 +2,14 @@
 {-# LANGUAGE ExplicitForAll, Modifiers, TypeApplications #-}
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
 module LaterMatchabilityClient
-  (laterMatchability, forwardedMap, annotatedMap, nestedCallback, appliedCallback, boxedCallbacks, rankedMap) where
+  (laterMatchability, forwardedMap, annotatedMap, nestedCallback, appliedCallback, boxedCallbacks, rankedMap, flippedCallbacks) where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy(Proxy))
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Matchability (U)
 import LaterMatchability (AtBool, CallbackResult(CallbackResult), ForwardMap,
-                           FamilyBox(FamilyBox), ForwardBox, KnownListCallback, ListBox,
+                           FamilyBox(FamilyBox), FlippedMatch, FlippedUnmatch, ForwardBox, KnownListCallback, ListBox,
                            ListCallback, ListRecipe, MatchResult, Recipe(Recipe), UnmatchResult)
 
 laterMatchability :: (MatchResult, UnmatchResult)
@@ -56,3 +56,7 @@ rankedMap :: (Maybe Bool, [Bool])
 rankedMap =
   case (Recipe (Just True) [False] :: ListRecipe) of
     Recipe matchable unmatchable -> (matchable, unmatchable)
+
+-- | Use both results of the declared callback kind.
+flippedCallbacks :: (FlippedMatch, FlippedUnmatch)
+flippedCallbacks = (Just False, [True])

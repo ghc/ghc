@@ -1,6 +1,6 @@
 {-# LANGUAGE KindSignatures, Modifiers, PolyKinds, StandaloneKindSignatures, TypeFamilies, TypeOperators #-}
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}
-{-# LANGUAGE GADTs, RankNTypes, TypeApplications #-}
+{-# LANGUAGE GADTs, RankNTypes, TypeAbstractions, TypeApplications #-}
 module LaterMatchability where
 
 import AnchorReceiver
@@ -34,6 +34,18 @@ data Recipe mapper where
             Recipe mapper
 
 type ListRecipe = Recipe Map
+
+type family Flip (m :: Matchability) :: Matchability where
+  Flip M = U
+  Flip U = M
+
+-- | Apply a callback whose matchability is computed from a named selector.
+type ApplyFlipped :: forall m. (Type %(Flip m) -> Type) -> Type -> Type
+type family ApplyFlipped @m f a where
+  ApplyFlipped @m f a = f a
+
+type FlippedMatch = ApplyFlipped @U Maybe Bool
+type FlippedUnmatch = ApplyFlipped @M KnownListCallback Bool
 
 type family ForwardMap f xs where
   ForwardMap _ '[] = '[]

@@ -334,6 +334,7 @@ infer the inner arrow of a higher-order family callback: [True]
 infer an unsigned synonym kind from a bare callback use: [True]
 store the result of Maybe and an imported open family: (Just True,[False])
 use one polymorphic map with Maybe and a type family: (Just True,[False])
+apply a callback with matchability computed in its declared kind: (Just False,[True])
 interpret a kind code as an ordinary type constructor: Just True
 interpret two applications of the optional type constructor: Just (Just True)
 choose an interpreted arrow from its expected kind: (Just 3,Right 3)
