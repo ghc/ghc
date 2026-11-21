@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 export LC_ALL=C.UTF-8
+version_change=false
+if [[ ${1-} == --different-interface-versions ]]; then
+    version_change=true
+    shift
+fi
 if (( $# != 4 )); then
-    echo "Usage: $0 OLD_GHC OLD_LIB NEW_GHC NEW_LIB" >&2
+    echo "Usage: $0 [--different-interface-versions] OLD_GHC OLD_LIB NEW_GHC NEW_LIB" >&2
     exit 2
 fi
 old=$(realpath "$1")
@@ -11,6 +16,10 @@ new=$(realpath "$3")
 new_lib=$(realpath "$4")
 flags=(-O2 -v1 -package-env - -dcore-lint -dstg-lint -fdiagnostics-color=never)
 reason='Compiler now tracks home rule dependencies for final Core equations'
+if "$version_change"; then
+    flags+=(-v2 -ddump-hi-diffs)
+    reason='mismatched interface file versions'
+fi
 work=$(mktemp -d)
 trap 'rm -rf -- "$work"' EXIT
 cd "$work"
@@ -125,7 +134,7 @@ HS
             exit 1
         fi
         check "$reason" upgrade.log
-        check '[GHC-83605]' upgrade.log
+        check 'RuleProof.hs:18:13: error: [GHC-83605]' upgrade.log
         printf 'Old %s home proof rechecked and rejected.\n' "$mode"
     )
 done
@@ -138,9 +147,18 @@ cp ./*.hs ordinary/
     build "$old" "$old_lib" old.log -fno-enable-rewrite-rules RuleProof.hs SafeConsumer.hs
     sha256sum ./*.{hi,o} > warm.sha
     build "$new" "$new_lib" upgrade.log -fno-enable-rewrite-rules RuleProof.hs SafeConsumer.hs
-    no_compile upgrade.log
+    if "$version_change"; then
+        check "$reason" upgrade.log
+        check 'Compiling RuleProof' upgrade.log
+        sha256sum ./*.{hi,o} > warm.sha
+        build "$new" "$new_lib" warm.log -fno-enable-rewrite-rules RuleProof.hs SafeConsumer.hs
+        no_compile warm.log
+        printf '%s\n' 'Rules-off modules rebuilt for the new interface version and reused.'
+    else
+        no_compile upgrade.log
+        printf '%s\n' 'Rules-off interfaces and objects reused.'
+    fi
     sha256sum --quiet -c warm.sha
-    printf '%s\n' 'Rules-off interfaces and objects reused.'
 )
 (
     cd ordinary
