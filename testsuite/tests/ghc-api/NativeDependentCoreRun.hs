@@ -17,7 +17,7 @@ import GHC.Core.FVs (exprFreeVars)
 import GHC.Core.FamInstEnv (mkBranchedCoAxiom, mkCoAxBranch)
 import GHC.Core.Lint (lintExpr)
 import GHC.Core.Make (mkCoreConApps, mkIntExpr)
-import GHC.Core.Opt.Arity (etaExpand)
+import GHC.Core.Opt.Arity (etaExpand, etaExpandToJoinPoint)
 import GHC.Core.Predicate (mkNomEqPred)
 import GHC.Core.SimpleOpt (simpleOptNativeExpr)
 import qualified GHC.Core.Subst as CoreSubst
@@ -6190,9 +6190,23 @@ runDepFunVisibilityChecks environment flags bindings = do
             | otherwise -> fail ("FAIL: hidden retained demand raised another exception: " ++ displayException exception)
         Right actualResult -> fail ("FAIL: hidden retained demand returned " ++ show actualResult)
 
+-- | Check which arguments a join must consume and how eta expansion renames them.
+checkRetainedJoin :: IO ()
+checkRetainedJoin = do
+    let index = local 1 "index" boolTy
+        joinTy = mkDepFunTy index (indexed (TermVarTy index))
+        fun = local 2 "function" joinTy
+        rhs = Let (NonRec (local 3 "other" boolTy) (Var index)) (Var fun)
+    unless ([isValidJoinPointType n joinTy | n <- [0..3]] == [True, False, True, False]) $
+        fail "A retained join must consume the field that mentions its index."
+    case fst (etaExpandToJoinPoint 2 rhs) of
+        [i, field] | i /= index, i `elemVarSet` tyCoVarsOfType (varType field) -> pure ()
+        _ -> fail "The second eta binder lost its runtime index."
+
 -- | Check runtime results and distinguish both keep laziness observations.
 runChecks :: GHC.Ghc ()
 runChecks = do
+    liftIO checkRetainedJoin
     (bindings, tycons) <- loadHelpers
     flags <- GHC.getSessionDynFlags
     environment <- GHC.getSession
