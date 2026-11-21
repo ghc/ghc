@@ -170,6 +170,8 @@ For a top-level type instance, allocate a stable occurrence before lifting
 the payload. The same open family can have multiple instances, including
 instances in separate declaration groups. The payload helper belongs to
 the instance module even if that module imports the family.
+Check whether the equation would generate a helper before allocating
+its owner. An ordinary equation must not consume a unique occurrence.
 Use a separate occurrence for a lambda in an open family instance.
 Its lexical captures come from that equation. The renamed instance
 still goes through the usual type family validity and overlap checks.
@@ -234,12 +236,13 @@ liftTypeLambdas sigma group = do
     liftTypeInst inherited (L loc inst@TyFamInstD
                                 { tfid_inst = decl@TyFamInstDecl
                                 { tfid_eqn = eqn@FamEqn{feqn_tycon = owner, feqn_rhs = rhs} } })
-      | let has_sum = sumResult rhs
-      , has_sum || containsLambda rhs = do
-          let prefix = if has_sum then "$sum:" else "$callback:"
+      | let liftFor name = liftEquation inherited name (0 :: Int) (L loc eqn)
+            (_, (_, candidates)) = liftFor owner
+      , not (null candidates) = do
+          let prefix = if sumResult rhs then "$sum:" else "$callback:"
           occ <- chooseUniqueOccTc (mkInstTyTcOcc (prefix ++ occNameString (rdrNameOcc (unLoc owner))))
           let instance_owner = L (getLoc owner) (mkRdrUnqual occ)
-              (_, (L _ eqn', lifted)) = liftEquation inherited instance_owner (0 :: Int) (L loc eqn)
+              (_, (L _ eqn', lifted)) = liftFor instance_owner
           return (L loc inst{tfid_inst = decl{tfid_eqn = eqn'}}, lifted)
     liftTypeInst _ inst = return (inst, [])
 
@@ -269,12 +272,6 @@ liftTypeLambdas sigma group = do
                | otherwise = captures
           (rhs', families, next) = liftRhs (sumResult rhs) Nothing owner used rhs salt
       in (next, (L loc eqn{feqn_rhs = rhs'}, families))
-
-    containsLambda :: Data a => a -> Bool
-    containsLambda node = case cast node :: Maybe (LHsType GhcPs) of
-      Just (L _ (XHsType HsTypeLambda{})) -> True
-      Just (L _ HsSpliceTy{}) -> False
-      _ -> or (gmapQ containsLambda node)
 
     sumResult (L _ (HsParTy _ body)) = sumResult body
     sumResult (L _ (HsKindSig _ body _)) = sumResult body
