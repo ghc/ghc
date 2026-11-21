@@ -45,7 +45,8 @@ quotation reports an error at the let.
 
 `Frame n b a` binds `width = 1 + n` before matching the flag `b`.
 The header branch returns a `Vec a width`. The other branch returns a
-`Vec a n`. The producer and consumer use the same runtime flag. An
+`Vec a n`. An ordinary client passes the same runtime flag to `frameRow` and
+`frameToList`. An
 ordinary client obtains `":xy"` or `"xy"` from the same two cells.
 The second branch leaves the unused header unevaluated.
 [Source](../examples/open-evaluation/TypeLet.hs) and

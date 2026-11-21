@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, ExplicitNamespaces, GADTs #-}
 {-# LANGUAGE ScopedTypeVariables, TypeApplications, TypeFamilies, TypeOperators, UndecidableInstances #-}
 -- | Bind an intermediate result in a type synonym.
-module TypeLet (F, Shadow, Reuse, Outer, Nested, CaseResult, Frame, frameValues, roadmap) where
+module TypeLet (F, Shadow, Reuse, Outer, Nested, CaseResult, Frame, frameRow, frameToList, frameValues, roadmap) where
 import Data.Type.Equality ((:~:)(Refl))
 import PackedVecLibrary (Nat, Vec(..), toList, type (+))
 
@@ -40,17 +40,17 @@ type Frame (n :: Nat) (b :: Bool) a =
 
 -- | Forward the runtime flag to both the producer and the consumer.
 frameValues :: forall a. foreach (b :: Bool) -> foreach (n :: Nat) -> a -> Vec a n -> [a]
-frameValues flag n h row = values @a flag n (header @a flag n h row)
+frameValues flag n h row = frameToList @a flag n (frameRow @a flag n h row)
 
 -- | Prepend the header when the flag selects the longer vector.
-header :: forall a. foreach (b :: Bool) -> foreach (n :: Nat) -> a -> Vec a n -> Frame n b a
-header True  _ h row = VCons h row
-header False _ _ row = row
+frameRow :: forall a. foreach (b :: Bool) -> foreach (n :: Nat) -> a -> Vec a n -> Frame n b a
+frameRow True  _ h row = VCons h row
+frameRow False _ _ row = row
 
 -- | Read the vector at the length selected by the flag.
-values :: forall a. foreach (b :: Bool) -> foreach (n :: Nat) -> Frame n b a -> [a]
-values True  _ row = toList row
-values False _ row = toList row
+frameToList :: forall a. foreach (b :: Bool) -> foreach (n :: Nat) -> Frame n b a -> [a]
+frameToList True  _ row = toList row
+frameToList False _ row = toList row
 
 -- | Check the result of substituting G Bool in both positions.
 roadmap :: F Bool :~: Ordering

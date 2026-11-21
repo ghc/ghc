@@ -113,14 +113,14 @@ HS
 cp Operator.hi "$out/client/"
 cd "$out/client"
 cat > Main.hs <<'HS'
-{-# LANGUAGE DataKinds, LinearTypes, NoExperimentalDependentTypes, TypeOperators #-}
+{-# LANGUAGE DataKinds, LinearTypes, NoExperimentalDependentTypes, TypeApplications, TypeOperators #-}
 module Main where
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Exts (Multiplicity(..))
 import Operator (Handler, Prefix, Result)
 import Data.Proxy (Proxy)
 import PackedVecLibrary (Nat(..), Vec(..))
-import TypeLet (Frame, frameValues)
+import TypeLet (Frame, frameRow, frameToList)
 
 longer :: Proxy n -> Frame n 'True Char :~: Vec Char ('S n)
 longer _ = Refl
@@ -140,7 +140,8 @@ many = Refl
 main :: IO ()
 main = do
     let row = VCons 'x' (VCons 'y' VNil)
-        render flag = frameValues flag 2 (if flag then ':' else error "unused header") row
+        render flag = frameToList @Char flag 2
+            (frameRow flag 2 (if flag then ':' else error "unused header") row)
     print (render True, render False)
 HS
 for opt in -O0 -O2; do
