@@ -1,12 +1,11 @@
 {-# LANGUAGE ExperimentalDependentTypes, GADTs, LinearTypes #-}
 module NativeLinearRetainedPackageOverlapReject where
+import NativeLinearRetainedPackageProvider (Nat(..))
 
-data Nat = Z | S Nat
+data Pair a where
+    Pair :: foreach (n :: Nat) -> foreach (b :: Bool) -> a %1 -> Pair a
 
-data OwnedStep a where
-    Step :: foreach (n :: Nat) -> Bool -> a %1 -> OwnedStep a
-
-takeStep :: OwnedStep a %1 -> a
-takeStep (Step (S _) True a) = a
-takeStep (Step (S _) False a) = a
-takeStep (Step Z _ a) = a
+takePair :: Pair a %1 -> a
+takePair (Pair (S _) True a) = a
+takePair (Pair (S _) False a) = a
+takePair (Pair Z _ a) = a

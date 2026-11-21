@@ -23,7 +23,7 @@ import GHC.HsToCore.Binds
 import GHC.Core.ConLike
 import GHC.Core.Coercion ( MCoercion(..), coercionLKind, mkUnbranchedAxInstCo )
 import GHC.Core.DataCon ( DataCon, dataConRepType, dataConTyCon, dataConTag
-                       , dataConRepArgBinders, isNullaryRepDataCon )
+                       , dataConRepArgBinders, dataConRepArity )
 import GHC.Core.Type ( coreFullView, isManyTy, isNativeIndexType, mkTyConApp, piResultTys )
 import GHC.Core.TyCon ( isNewTyCon, newTyConCo, tyConDataCons )
 import GHC.Core.FVs ( exprFreeVars )
@@ -52,8 +52,9 @@ import GHC.Utils.Panic
 import Control.Monad(liftM, join)
 import Data.Data ( Data, cast, gmapT )
 import Data.Foldable ( find )
-import Data.List ( group, sort )
-import Data.Maybe ( fromMaybe )
+import Data.Function ( on )
+import Data.List ( groupBy, sort, sortOn )
+import Data.Maybe ( fromMaybe, isJust, isNothing )
 import Data.Typeable ( Typeable )
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
@@ -140,40 +141,45 @@ matchConFamily (var :| vars) ty groups@(group1 :| other_groups)
            -- multiplicity of the pattern. We extract that multiplicity, so that
            -- 'matchOneconLike' knows the context multiplicity, in case it needs
            -- to come up with new variables.
-       alts <- mapM (fmap toRealAlt . matchOneConLike vars ty mult) groups
+       alts <- mapM (fmap toRealAlt . matchOneConLike vars ty mult . share_native_rows) groups
        return (mkDataConCase var ty alts)
   where
     ConPat { pat_con = L _ con1 } = firstPat (NE.head group1)
 
     needs_separate_rows group@(first :| rest) =
       not (null rest)
-        && ((any has_native_proof group && not (equal_nullary_proofs group))
+        && ((any has_native_proof group && isNothing (native_row_substs group))
           || (has_retained_fields first && not (linear_retained_group group)))
 
     -- See Note [Sharing linear package fields].
     linear_retained_group rows
       | not (isManyTy (matchIdMult var))
-      , Just (dc :| dcs) <- traverse first_index_constructor rows
+      , Just patterns@((dc, _, _, _) :| _) <- traverse first_index_pattern rows
       = let family = dataConTyCon dc
-            by_tag = group (sort (map dataConTag (dc : dcs)))
-            repeats = [tag | tag : _ : _ <- by_tag]
-        in all ((== family) . dataConTyCon) dcs
-             && map head by_tag == sort (map dataConTag (tyConDataCons family))
-             && and [isNullaryRepDataCon con && all bare_index (drop 1 (retained_pats row))
-                    | (con, row) <- zip (dc : dcs) (NE.toList rows)
-                    , dataConTag con `elem` repeats]
+            tag (con, _, _, _) = dataConTag con
+            by_tag = groupBy ((==) `on` tag) (sortOn tag (NE.toList patterns))
+        in all (\(con, _, _, _) -> dataConTyCon con == family) patterns
+             && [tag first | first : _ <- by_tag] == sort (map dataConTag (tyConDataCons family))
+             && all shareable_indices by_tag
       | otherwise = False
 
-    first_index_constructor row
+    shareable_indices [_] = True
+    shareable_indices (first : later) =
+      let rows = first :| later
+      in all (\(_, _, _, row) -> all bare_index (drop 1 (retained_pats row))) rows
+           && isJust (indexPatternSubsts (fmap (\(_, whole, pat, _) -> ([whole], pat)) rows))
+    shareable_indices [] = False
+
+    first_index_pattern row
       | ConPat {pat_con = L _ (RealDataCon con), pat_args = PrefixCon _ (L _ pat : _)} <- firstPat row
       , Just _ : _ <- dataConRepArgBinders con
-      , AsPat _ _ inner <- pat
-      = index_constructor (unLoc inner)
+      , AsPat _ (L _ whole) inner <- pat
+      , matcher@ConPat{pat_con = L _ (RealDataCon index_con)} <- strip_index_parens (unLoc inner)
+      = Just (index_con, whole, matcher, row)
       | otherwise = Nothing
 
-    index_constructor (ParPat _ pat) = index_constructor (unLoc pat)
-    index_constructor ConPat{pat_con = L _ (RealDataCon con)} = Just con
-    index_constructor _ = Nothing
+    strip_index_parens (ParPat _ pat) = strip_index_parens (unLoc pat)
+    strip_index_parens pat = pat
 
     retained_pats row
       | ConPat {pat_con = L _ (RealDataCon con), pat_args = PrefixCon _ pats} <- firstPat row
@@ -183,18 +189,16 @@ matchConFamily (var :| vars) ty groups@(group1 :| other_groups)
     bare_index VarPat{} = True
     bare_index _ = False
 
-    equal_nullary_proofs rows
-      | Just (proof :| proofs) <- traverse nullary_proof rows
-      = all (eqType proof) proofs
-      | otherwise = False
+    share_native_rows rows@(first :| rest)
+      | not (null rest), Just substs <- native_row_substs rows
+      = first :| zipWithEqual rename_if_needed substs rest
+      | otherwise = rows
 
-    nullary_proof row
-      | ConPat { pat_con = L _ (RealDataCon con)
-               , pat_con_ext = ConPatTc { cpt_tvs = [], cpt_dicts = [cv] } }
-          <- firstPat row
-      , isNullaryRepDataCon con, isCoVar cv
-      = Just (varType cv)
-      | otherwise = Nothing
+    rename_if_needed subst row
+      | Subst.isEmptySubst subst = row
+      | otherwise = renameEquation subst row
+
+    native_row_substs = indexPatternSubsts . fmap (\row -> ([], firstPat row))
 
     -- Compile one equation with its own runtime index binders.
     match_retained_row :: EquationInfoNE -> DsM (MatchResult CoreExpr)
@@ -351,10 +355,11 @@ fields k1 and k2 and proofs n ~# 'S k1 and n ~# 'S k2. Ordinary constructor
 grouping shares the first row's fields and introduces evidence aliases. Those
 aliases do not substitute the runtime Ids in later proof types or RHS types.
 
-If the constructor has no fields, rows with equal proof types can use the
-usual evidence aliases. Otherwise use the separate-row strategy from
-Note [Retained package equation scope]. Compile each row with its own fields
-and proof. Keep source order within each constructor group.
+Rows can use the usual evidence aliases when their field and proof types
+agree after substitution. See Note [Sharing retained index constructor fields].
+Otherwise use the separate-row strategy from Note [Retained package equation scope].
+Compile each row with its own fields and proof. Keep source order within each
+constructor group.
 Different constructors do not overlap. Each case uses the existing DEFAULT
 failure path for other constructors. A failed later column or guard tries the
 next row. An infallible row discards later rows for the same constructor.
@@ -523,9 +528,9 @@ Testing the same linear package in separate cases can use its scrutinee twice
 or capture a linear field in a failure continuation. Use one outer case if
 the first retained field covers all constructors in its family. The ordinary
 matcher can split this first column before it tests the other fields. A repeated
-constructor in this split must have no fields, and its later retained patterns
-must be variables. Its virtual proofs then have the same type. Ordinary pattern
-grouping can match the remaining columns with the usual failure continuations.
+constructor in this split must satisfy Note [Sharing retained index constructor fields].
+Its later retained patterns must be variables. Ordinary pattern grouping can
+then match the remaining columns with the usual failure continuations.
 Report a source error when a linear package would require separate cases.
 
 Use the first row's runtime field Ids in the outer case. Replace the retained
@@ -545,6 +550,56 @@ shareRowFields con shared row
        ; let subst = Subst.mkOpenSubst (mkInScopeSetList shared) pairs
        ; return (renameEquation subst row) }
   | otherwise = pprPanic "shareRowFields: expected a prefix constructor" (ppr row)
+
+{- Note [Sharing retained index constructor fields]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For example, two S rows have proofs n ~# 'S k1 and n ~# 'S k2. The case binds
+one runtime predecessor. Check that replacing k2 with k1 makes the checked
+field and proof types agree. Substitute in the typed row with the same map.
+The usual evidence aliases can then use the first proof for both rows. Keep
+both rows' evidence bindings in the constructor alternative. Source field
+patterns are bare variables, so sharing a binder does not force that field.
+
+The outer package split checks this condition before it can share any fields.
+Include its whole-index Id in the substitution for this check. The inner split
+uses the same condition after it has bound the shared whole-index Id.
+Only admit a prefix constructor with one virtual proof and no other evidence,
+existentials, wrappers or retained field telescope of its own.
+-}
+
+-- | Check the predicate and field types after renaming each later row's fields.
+indexPatternSubsts :: NonEmpty ([Id], Pat GhcTc) -> Maybe [Subst.Subst]
+indexPatternSubsts patterns = do
+  first :| later <- traverse fields_and_proof patterns
+  traverse (align first) later
+  where
+    fields_and_proof (outer, ConPat
+        { pat_con = L _ (RealDataCon con), pat_args = PrefixCon _ pats
+        , pat_con_ext = ConPatTc { cpt_tvs = [], cpt_dicts = [cv]
+                                , cpt_arg_tys = tys, cpt_wrap = wrapper } })
+      | isCoVar cv, isIdHsWrapper wrapper, null (dataConRepArgBinders con)
+      , length pats == dataConRepArity con
+      , isNativeIndexType (mkTyConApp (dataConTyCon con) tys)
+      = do fields <- traverse bare_field pats
+           return (con, outer ++ fields, varType cv)
+    fields_and_proof _ = Nothing
+
+    bare_field (L _ (VarPat _ (L _ v))) = Just v
+    bare_field _ = Nothing
+
+    align (first_con, fields, proof) (row_con, row_fields, row_proof)
+      | first_con == row_con, fields `equalLength` row_fields
+      , let pairs = zip row_fields fields
+            subst = Subst.mkOpenSubst (mkInScopeSetList fields)
+                       [(old, Var new) | (old, new) <- pairs, old /= new]
+      , all (same_field subst) pairs
+      , eqType (deepSubstTy subst row_proof) proof
+      = Just subst
+      | otherwise = Nothing
+
+    same_field subst (old, new) =
+      eqType (deepSubstTy subst (idType old)) (idType new)
+      && eqType (deepSubstTy subst (idMult old)) (idMult new)
 
 -- | Substitute types and evidence before compiling later pattern columns.
 renameEquation :: Subst.Subst -> EquationInfo -> EquationInfo

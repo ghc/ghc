@@ -30,11 +30,12 @@ for opt in 0 2; do
     cd "$work/provider"
     cp "$src/$provider.hs" .
     "${ghc[@]}" -c "$provider.hs"
-    cp "$provider.hi" "$src/""$client.hs" "$src/""$name"{Reject,OverlapReject}.hs ../client/
+    cp "$provider.hi" "$src/$client.hs" "$src/$name"{Reject,OverlapReject,EvidenceReject}.hs ../client/
     cd ../client
     "${ghc[@]}" -c "$client.hs"
     "${ghc[@]}" "$client.o" "../provider/$provider.o" -o run
     ./run
     reject "${name}Reject" '6:[0-9]+: error: \[GHC-18872\]' '8:[0-9]+: error: \[GHC-18872\]'
-    reject "${name}OverlapReject" '10:[0-9]+: error: \[GHC-47619\]'
+    reject "${name}OverlapReject" '9:[0-9]+: error: \[GHC-47619\]'
+    reject "${name}EvidenceReject" '6:[0-9]+: error: \[GHC-05617\]'
 done

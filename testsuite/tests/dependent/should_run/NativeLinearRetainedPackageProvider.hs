@@ -38,3 +38,27 @@ takeTwo (Two True d () flag a) = (readFlag d flag, a)
 readFlag :: foreach (b :: Bool) -> Flag b -> Bool
 readFlag True () = True
 readFlag False b = b
+
+data Nat = Z | S Nat
+data At (n :: Nat) = At Int
+
+type family Payload (n :: Nat) where
+    Payload 'Z = ()
+    Payload ('S n) = At n
+
+data OwnedStep a where
+    Step :: foreach (n :: Nat) -> Bool -> Payload n -> a %1 -> OwnedStep a
+
+readAt :: foreach (n :: Nat) -> At n -> Int
+readAt _ (At i) = i
+
+takeStep :: OwnedStep a %1 -> (Int, a)
+takeStep (Step Z _ () a) = (0, a)
+takeStep (Step (S left) True payload a) = (readAt left payload, a)
+takeStep (Step (S right) False payload a) = (1 + readAt right payload, a)
+
+at :: foreach (n :: Nat) -> Int -> At n
+at _ = At
+
+next :: Nat -> Bool -> Int -> a -> OwnedStep a
+next n b i a = Step (S n) b (at n i) a
