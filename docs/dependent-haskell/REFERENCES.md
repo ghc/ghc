@@ -1709,6 +1709,15 @@ the public index. The Haskell client can use both equalities in later
 argument patterns and in its result. The match compiler scopes their
 combined evidence after all the constructor fields.
 
+Agda checks an absurd pattern by testing each constructor's result index
+for a conflict. In the manual, `Even 1` conflicts with both constructors
+of `Even`. GHC checks whether a nominal equality rules out a constructor
+of the stored witness. A Haskell witness can be bottom. The coverage
+checker can report an inaccessible right-hand side while preserving the
+demand of the pattern that precedes it.
+[Agda's absurd patterns](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#absurd-patterns)
+and [the Haskell 2010 Report, §3.17.2](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html).
+
 ## Source vector uncons
 
 Decision: inspect the stored runtime length before repackaging a vector tail.

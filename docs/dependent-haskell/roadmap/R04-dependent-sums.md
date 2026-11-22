@@ -250,9 +250,10 @@ payload. A later argument of type `Vec b n` can use the same refinement.
 [Ordinary client](../../../testsuite/tests/dependent/should_run/NativeGadtRetainedSumClient.hs)
 and [Agda pattern precedent](../REFERENCES.md#refine-the-public-index-of-a-stored-witness).
 
-The coverage checker still reports a missing successor clause for a
-single zero clause at `SomeVec a 'Z`. It reports the same missing clause
-at `SomeVec a n`, where a successor can occur.
+A single zero clause is exhaustive at `SomeVec a 'Z`. At `SomeVec a n`,
+GHC warns about a missing successor clause. An explicit successor clause
+at the known zero index has an inaccessible right-hand side. Its pattern
+can still force the stored witness.
 
 An explicit equality can also describe the exact stored value.
 For example, the constructor

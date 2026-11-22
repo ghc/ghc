@@ -64,7 +64,7 @@ import GHC.Core.Dependent   (hasNativeDependentExprRhs)
 import GHC.Core.FVs         (exprFreeVars)
 import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.Map.Expr
-import GHC.Core.Predicate (isEqClassPred, typeDeterminesValue, mkNomEqPred)
+import GHC.Core.Predicate (getEqPredTys_maybe, isEqClassPred, typeDeterminesValue, mkNomEqPred)
 import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.SimpleOpt (simpleOptExpr, exprIsConApp_maybe)
 import GHC.Core.Utils     (exprType, dataConRepInstPat)
@@ -84,6 +84,8 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Subst (elemSubst)
 import GHC.Core.Type
 import GHC.Tc.Solver   (tcNormalise, tcCheckGivens, tcCheckWanteds)
+import GHC.Tc.Solver.InertSet (InertSet(inert_cans), InertCans(inert_irreds))
+import GHC.Tc.Types.Constraint (irredCtPred)
 import GHC.Core.Unify    (tcMatchTy)
 import GHC.Core.Coercion
 import GHC.Core.Reduction
@@ -812,6 +814,9 @@ hasRequiredTheta _                 = False
 addConCt :: Nabla -> Id -> PmAltCon -> [TyVar] -> [Id] -> MaybeT DsM Nabla
 addConCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts=env } } x alt tvs args = do
   let vi@VI{ vi_pos = pos, vi_neg = neg, vi_bot = bot } = lookupVarInfo ts x
+  case alt of
+    PmAltConLike (RealDataCon con) -> guard (retainedIndexCanMatch nabla x con)
+    _ -> pure ()
   -- First try to refute with a negative fact
   guard (not (elemPmAltConSet alt neg))
   -- Then see if any of the other solutions (remember: each of them is an
@@ -840,6 +845,43 @@ addConCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts=env } } x alt tvs args =
             IsNotBot -> addNotBotCt (nabla_with MaybeBot) y
         _ -> assert (isPmAltConMatchStrict alt )
              pure (nabla_with IsNotBot) -- strict match ==> not ⊥
+
+-- | Test the constructor head against the nominal Givens for this witness.
+-- See Note [Coverage of retained constructor results].
+retainedIndexCanMatch :: Nabla -> Id -> DataCon -> Bool
+retainedIndexCanMatch MkNabla{nabla_ty_st = TySt _ inert} x con
+  | not (isEmptyBag irreds)
+  , isNativeIndexId x
+  , Just _ <- nativeIndexDataConTyArgs (idType x) con
+  = all compatible irreds
+  | otherwise = True
+  where
+    irreds = inert_irreds (inert_cans inert)
+    compatible irred
+      | Just (Nominal, lhs, rhs) <- getEqPredTys_maybe (irredCtPred irred)
+      = matches lhs rhs && matches rhs lhs
+      | otherwise = True
+    matches (TermVarTy index) rhs
+      | index == x
+      , Just (tc, _) <- splitTyConApp_maybe rhs
+      , Just other <- isPromotedDataCon_maybe tc
+      , dataConTyCon con == dataConTyCon other
+      = con == other
+    matches _ _ = True
+
+{- Note [Coverage of retained constructor results]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A match on DirectVec at index Z supplies Z ~# n, where n is the stored
+witness. The type oracle keeps this as an irreducible Given. When the
+term oracle tries S for that witness, the two constructor heads disagree.
+Check this in the term oracle and in the fast path for trivially inhabited
+constructors.
+
+Apply the check to a constructor alternative. The witness can still be
+bottom before the program matches it. The branch that tries S can force
+the witness, even if its right-hand side is inaccessible. Keep the
+ordinary divergence and demand checks.
+-}
 
 equateTys :: [Type] -> [Type] -> [PhiCt]
 equateTys ts us =
@@ -1541,6 +1583,7 @@ instCompleteSet fuel nabla x cs
       -- Recall that dc can't be in vi_neg, because then it would be
       -- deleted from the residual COMPLETE set.
       | isDataConTriviallyInhabited dc
+      , retainedIndexCanMatch nabla x dc
       = pure nabla
     go nabla (con:cons) = do
       let x = vi_id vi
@@ -1631,20 +1674,23 @@ instCon fuel nabla@MkNabla{nabla_ty_st = ty_st} x con = {-# SCC "instCon" #-} Ma
       let gammas = substTheta sigma_ex (eqSpecPreds eq_spec ++ thetas)
       -- (4) Instantiate fresh term variables as arguments to the constructor
       let field_tys' = substTys sigma_ex $ map scaledThing field_tys
-      arg_ids <- case con of
+      (provided, arg_ids) <- case con of
         RealDataCon dc | not (null (dataConRepArgBinders dc)) -> do
           -- See Note [Retained package fields in PMC].
           uniqs <- getUniquesM
           let inst_tys = map (substTyVar sigma_univ) (dataConUnivTyVars dc)
               (_, fields) = dataConRepInstPat uniqs ManyTy dc inst_tys
-          pure (drop (length thetas) fields)
-        _ -> mapM mkPmId field_tys'
+          if dataConHasRetainedResult dc
+            then let (values, evidence) = splitAt (dataConSourceArity dc) fields
+                 in pure (map varType evidence, values)
+            else pure (gammas, drop (length thetas) fields)
+        _ -> (gammas,) <$> mapM mkPmId field_tys'
       tracePm (hdr "(cts)") $ vcat
         [ ppr x <+> dcolon <+> ppr match_ty
         , text "In WHNF:" <+> ppr (isSourceTypeInWHNF match_ty) <+> ppr norm_match_ty
         , ppr con <+> dcolon <+> text "... ->" <+> ppr _con_res_ty
         , ppr (map (\tv -> ppr tv <+> char '↦' <+> ppr (substTyVar sigma_univ tv)) _univ_tvs)
-        , ppr gammas
+        , ppr provided
         , ppr (map (\x -> ppr x <+> dcolon <+> ppr (idType x)) arg_ids)
         ]
       -- (5) Finally add the new constructor constraint
@@ -1652,7 +1698,7 @@ instCon fuel nabla@MkNabla{nabla_ty_st = ty_st} x con = {-# SCC "instCon" #-} Ma
         -- Case (2) of Note [Strict fields and variables of unlifted type]
         let alt = PmAltConLike con
         let branching_factor = length $ filterUnliftedFields alt arg_ids
-        let ct = PhiConCt x alt ex_tvs gammas arg_ids
+        let ct = PhiConCt x alt ex_tvs provided arg_ids
         nabla1 <- traceWhenFailPm (hdr "(ct unsatisfiable) }") (ppr ct) $
                   addPhiTmCt nabla ct
         -- See Note [Fuel for the inhabitation test]
@@ -1665,7 +1711,7 @@ instCon fuel nabla@MkNabla{nabla_ty_st = ty_st} x con = {-# SCC "instCon" #-} Ma
           , text "In WHNF:" <+> ppr (isSourceTypeInWHNF match_ty) <+> ppr norm_match_ty
           , ppr con <+> dcolon <+> text "... ->" <+> ppr _con_res_ty
           , ppr (map (\tv -> ppr tv <+> char '↦' <+> ppr (substTyVar sigma_univ tv)) _univ_tvs)
-          , ppr gammas
+          , ppr provided
           , ppr (map (\x -> ppr x <+> dcolon <+> ppr (idType x)) arg_ids)
           , ppr branching_factor
           , ppr new_fuel
@@ -1685,6 +1731,10 @@ type substitution leaves the declaration's retained field templates free in
 later field types. Use dataConRepInstPat to freshen fields from left to right
 and substitute each retained Id into the remaining types. Drop the prefix
 of dictionaries after using their predicates in the type oracle.
+
+For a retained result, read the equality predicate from the last fresh
+binder. Its type mentions the fresh witness. The term oracle receives only
+the value fields as arguments.
 
 The observed source-pattern path instead uses its checked field Ids. See
 Note [Checking retained package patterns] in GHC.Tc.Gen.Pat. Both paths keep

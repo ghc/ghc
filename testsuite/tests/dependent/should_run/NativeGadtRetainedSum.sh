@@ -127,15 +127,14 @@ unknownZero (DirectVec Z _) = True
 
 knownUnreachable :: DirectVec a 'Z -> Bool
 knownUnreachable (DirectVec (S _) _) = False
-knownUnreachable (DirectVec Z _) = True
+knownUnreachable (DirectVec _ _) = True
 HS
         "${ghc[@]}" "${flags[@]}" -ferror-spans -Wincomplete-patterns -Woverlapping-patterns \
             -c DirectIndexCoverage.hs >coverage.log 2>&1
-        for span in 6:1-32 9:1-48 12:1-34; do
-            grep -Fq "DirectIndexCoverage.hs:$span: warning: [GHC-62161]" coverage.log ||
-                { cat coverage.log >&2; exit 1; }
-        done
-        test "$(grep -c 'warning:' coverage.log)" -eq 3 || { cat coverage.log >&2; exit 1; }
+        grep -Fq 'DirectIndexCoverage.hs:12:1-34: warning: [GHC-62161]' coverage.log &&
+            grep -Fq 'not matched: DirectVec (S _) _' coverage.log &&
+            grep -Fq 'DirectIndexCoverage.hs:15:1-44: warning: [GHC-94210]' coverage.log &&
+            test "$(grep -c 'warning:' coverage.log)" -eq 2 || { cat coverage.log >&2; exit 1; }
     fi
 
     cat >BadScope.hs <<'HS'
