@@ -3146,7 +3146,7 @@ repGadtDataCons cons details res_ty
          case details of
            PrefixConGADT _ ps
              | Just (groups, result) <- HsDecls.splitGadtInterior details res_ty
-             , any annotated_field groups -> do
+             , any needs_group groups -> do
                prefix <- mapM repGadtField ps
                repOrderedGadt (nonEmptyCoreList' cons') result (reverse prefix) groups
            PrefixConGADT _ ps
@@ -3165,9 +3165,9 @@ repGadtDataCons cons details res_ty
              rep2 recGadtCOcc [unC (nonEmptyCoreList' cons'), unC arg_vtys,
                                 unC res_ty']
   where
-    annotated_field (Right CDF { cdf_unpack, cdf_bang }) =
+    needs_group (Right CDF { cdf_unpack, cdf_bang }) =
       cdf_unpack /= NoSrcUnpack || cdf_bang /= NoSrcStrict
-    annotated_field (Left _) = False
+    needs_group (Left (L _ group)) = HsDecls.isEmptyGadtGroup group
 
 -- | Quote an ordered constructor telescope with explicit argument groups.
 repOrderedGadt :: Core [TH.Name] -> LHsType GhcRn -> [Core (M TH.RetainedGadtArg)]

@@ -783,19 +783,29 @@ cvtRetainedGadtArgs :: Bool -> [TH.RetainedGadtArg] -> TH.Type
 cvtRetainedGadtArgs type_data args result = do
   (fields, binders) <- prefix args
   body <- suffix binders
-  let prefix_fields = PrefixConGADT noExtField fields
-      (telescope, interior)
+  let (telescope, extra_fields, interior)
         -- Recover the same ordered suffix that the parser produces.
         | null fields
         , (_, leading, remaining) <- splitLHsGadtTy (noLocA (mkHsImplicitSigType body))
-        = (leading, remaining)
-        | otherwise = ([], body)
+        , (_, _, leading_fields, tail_ty) <- splitHsFunType remaining
+        = (leading, leading_fields, tail_ty)
+        | otherwise = ([], [], body)
+      all_fields = fields ++ extra_fields
+      prefix_fields = PrefixConGADT noExtField all_fields
       supported_interior = isJust (HsDecls.splitGadtInterior prefix_fields interior)
-  when (not supported_interior &&
+      -- A quote omits groups with no binders or predicates. The result
+      -- can be the ordinary field prefix with no ordered suffix.
+      ordinary_result = case unLoc (ignoreParens interior) of
+        HsForAllTy{} -> False
+        HsForEachTy{} -> False
+        HsFunTy{} -> False
+        HsQualTy{} -> False
+        _ -> True
+  when (not supported_interior && not ordinary_result &&
         (any explicit_group binders ||
-         (null binders && isNothing (HsDecls.splitGadtTerminal prefix_fields body)))) $
+         (null binders && isNothing (HsDecls.splitGadtTerminal prefix_fields interior)))) $
     failWith (MalformedType TypeLevel result)
-  pure (telescope, fields, interior)
+  pure (telescope, all_fields, interior)
   where
     explicit_group GadtInvisibleArgs{} = True
     explicit_group GadtRequiredArgs{} = True

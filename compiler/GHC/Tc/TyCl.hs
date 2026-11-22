@@ -5527,13 +5527,23 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
                        , any is_context inner_bndrs || any is_required groups
                        -> (groups, 0, map Left groups, result)
                        | otherwise -> (groups, count, [], result)
-             ordered = not (null remaining)
+             suffix = map source_group
+                        [group | group <- remaining, not (empty_source_group group)]
+             -- See Note [Empty groups in prefix constructor signatures].
+             ordered = case hs_args of
+               PrefixConGADT _ [] ->
+                 let (leading, after_first_field) = break is_field suffix
+                 in any is_type_group (dropWhile (not . is_context_group) leading) ||
+                    any (not . is_field) after_first_field
+               _ -> any (not . is_field) suffix
              is_forall (L _ HsGadtForAll{}) = True
              is_forall _ = False
              fields = case hs_args of
                PrefixConGADT ann prefix -> PrefixConGADT ann (prefix ++ [f | Right f <- remaining])
                _ -> hs_args
-       ; when (ordered && any is_forall (dropWhile (not . is_context) inner_bndrs)) $
+             semantic_prefix = [g | g@(L _ group) <- inner_bndrs
+                                  , not (HsDecls.isEmptyGadtGroup group)]
+       ; when (ordered && any is_forall (dropWhile (not . is_context) semantic_prefix)) $
            setSrcSpanA (getLoc hs_res_ty) $
            failWithTc (TcRnNestedForallsContexts NFC_GadtConSig)
        ; skol_info <- mkSkolemInfo (DataConSkol name)
@@ -5611,14 +5621,13 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
                      -- in GHC.Tc.Gen.Pat.
                      | ordered || (terminal_order /= 0 &&
                                    (new_or_data == NewType || not (null eq_preds))) =
-                         let suffix = map source_group $
-                               if ordered then remaining else map Left terminal
-                             late_count = sum [n | ConTypeArgs n <- suffix]
+                         let encoded_suffix = if ordered then suffix else map (source_group . Left) terminal
+                             late_count = sum [n | ConTypeArgs n <- encoded_suffix]
                              leading_context = sum [length (hsConDeclTheta (Just ctxt))
                                                     | L _ (HsGadtContext ctxt) <- inner_bndrs]
                              initial = ConTypeArgs (length tvbndrs' - late_count) :
                                [ConContextArgs leading_context | leading_context /= 0]
-                         in OrderedConArgs (initial ++ prefix_group hs_args ++ suffix)
+                         in OrderedConArgs (initial ++ prefix_group hs_args ++ encoded_suffix)
                      | otherwise = LegacyConOrder terminal_order
              ; buildDataConWithTelescope order [] fam_envs bang_opts name is_infix
                             rep_nm stricts field_lbls
@@ -5630,6 +5639,18 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
              }
        ; mapM buildOneDataCon names }
   where
+    empty_source_group (Left (L _ group)) = HsDecls.isEmptyGadtGroup group
+    empty_source_group _ = False
+
+    is_field ConValueArgs{} = True
+    is_field _ = False
+
+    is_context_group ConContextArgs{} = True
+    is_context_group _ = False
+
+    is_type_group ConTypeArgs{} = True
+    is_type_group _ = False
+
     prefix_group (PrefixConGADT _ fields@(_ : _)) = [ConValueArgs (length fields)]
     prefix_group _ = []
 
@@ -5641,6 +5662,15 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
     source_group (Left (L _ (HsGadtForAll _ HsForAllVis { hsf_vis_bndrs = bs }))) =
       ConTypeArgs (length bs)
     source_group _ = panic "tcConDecl: invalid interior telescope group"
+
+{- Note [Empty groups in prefix constructor signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A nested forall can bind no variables, and a context can have no
+predicates. Keep those groups in the source telescope. They consume no
+arguments, so the quoted and compiled constructor omit them. If only
+fields remain after omitting empty groups, use the ordinary worker. A real group after a field, or a real binder after
+a leading context, still needs the ordered constructor layout.
+-}
 
 -- | Check the syntax admitted for a retained constructor field telescope.
 checkRetainedConShape :: NewOrData -> [LHsGadtTelescope GhcRn]

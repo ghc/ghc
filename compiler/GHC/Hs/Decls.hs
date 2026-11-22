@@ -74,7 +74,7 @@ module GHC.Hs.Decls (
   ConDecl(..), LConDecl,
   HsConDeclH98Details, HsConDeclGADTDetails(..),
   AnnConDeclGADT(..),
-  hsConDeclTheta, splitGadtTerminal, splitGadtInterior,
+  hsConDeclTheta, splitGadtTerminal, splitGadtInterior, isEmptyGadtGroup,
   getConNames, getRecConArgs_maybe,
   -- ** Document comments
   DocDecl(..), LDocDecl, docDeclDoc,
@@ -1059,18 +1059,17 @@ splitGadtInterior args@(PrefixConGADT _ fields) ty
 
     go ty = case ignoreParens ty of
       L loc HsForAllTy { hst_tele = tele, hst_body = body }
-        | HsForAllVis { hsf_vis_bndrs = _ : _ } <- tele
-        -> next (Left (L loc (HsGadtForAll noExtField tele))) body
-        | HsForAllInvis { hsf_invis_bndrs = _ : _ } <- tele
-        -> next (Left (L loc (HsGadtForAll noExtField tele))) body
-      L _ HsQualTy { hst_ctxt = ctxt, hst_body = body }
-        | not (null (hsConDeclTheta (Just ctxt)))
-        -> next (Left (mkHsGadtContext ctxt)) body
+        | let group = HsGadtForAll noExtField tele
+        , case tele of
+            HsForAllVis { hsf_vis_bndrs = bs } -> not (null bs) || isEmptyGadtGroup group
+            HsForAllInvis { hsf_invis_bndrs = bs } -> not (null bs) || isEmptyGadtGroup group
+        -> next (Left (L loc group)) body
+      L _ HsQualTy { hst_ctxt = ctxt, hst_body = body } ->
+        next (Left (mkHsGadtContext ctxt)) body
       L _ (HsFunTy _ arr arg result) ->
         next (Right (gadt_field arr arg)) result
       L _ HsForAllTy{} -> Nothing
       L _ HsForEachTy{} -> Nothing
-      L _ HsQualTy{} -> Nothing
       result -> Just ([], result)
 
     gadt_field :: HsModifiedFunArr (GhcPass pass) -> LHsType (GhcPass pass)
@@ -1083,6 +1082,16 @@ splitGadtInterior args@(PrefixConGADT _ fields) ty
       (rest, result) <- go ty
       return (group : rest, result)
 splitGadtInterior _ _ = Nothing
+
+-- | A source group that adds no binders or evidence to the constructor.
+-- Keep the syntax for source tools. Constructor metadata omits the group.
+isEmptyGadtGroup :: HsGadtTelescope (GhcPass pass) -> Bool
+isEmptyGadtGroup (HsGadtContext ctxt) = null (hsConDeclTheta (Just ctxt))
+isEmptyGadtGroup (HsGadtForAll _ HsForAllInvis
+  { hsf_invis_bndrs = [], hsf_matchability = Nothing }) = True
+isEmptyGadtGroup (HsGadtForAll _ HsForAllVis
+  { hsf_vis_bndrs = [], hsf_matchability = Nothing }) = True
+isEmptyGadtGroup _ = False
 
 {- Note [Constructor telescope contexts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
