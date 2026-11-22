@@ -3756,7 +3756,8 @@ Agda checks whether a proposed solution refers to the metavariable it
 would solve. In this fork the Core unifier must also follow the type and
 multiplicity of a retained identifier. For `f :: a -> Bool` and
 `x :: a`, the result kind of `f x` is `Bool`, but an assignment for
-`a` containing that index would refer back to `a`.
+`a` containing that index would refer back to `a`. The unifier follows
+earlier type-variable and type-family substitutions in the same traversal.
 [Agda 2.8.0 occurs check](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/MetaVars/Occurs.hs#L510-L523)
 and [GHC unifier](../../compiler/GHC/Core/Unify.hs).
 
@@ -5736,16 +5737,6 @@ equality cannot supply an equality between the arguments.
 [Agda 2.8.0 terms and eliminations](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Syntax/Internal.hs#L221-L252),
 [GHC proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#matchability)
 and [Core checks](../../testsuite/tests/ghc-api/NativeDependentCore.hs).
-
-Agda checks the proposed solution of a metavariable for a reference to
-that same metavariable. GHC's immutable Core unifier follows both its
-type-variable and type-family substitutions during the occurs check.
-A retained Haskell variable carries its type, so a reference can also
-occur in the type of the function or of an operand. For example, with
-`f :: a -> Bool` and `x :: a`, a type containing the index `f x` can
-depend on `a` even though the index has kind `Bool`.
-[Agda 2.8.0 occurs check](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/MetaVars/Occurs.hs#L510-L523)
-and [GHC's occurs check and Note](../../compiler/GHC/Core/Unify.hs).
 
 ### Upgrading checked method interfaces
 
