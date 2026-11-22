@@ -86,6 +86,13 @@ flaggedTrue (Flagged False) = Nothing
 blockPayloads :: Blocked a ('Block width mark depth) -> (Vec a width, Vec a depth)
 blockPayloads (Blocked _ _ _ xs ys) = (xs, ys)
 
+-- | Infer the predecessor when passing the first payload to a helper.
+blockFirst :: Blocked a ('Block ('S width) mark depth) -> a
+blockFirst (Blocked _ _ _ xs _) = first xs
+  where
+    first :: Vec b ('S n) -> b
+    first (VCons x _) = x
+
 -- | Read only the mark.
 blockMark :: Blocked a shape -> Bool
 blockMark (Blocked mark _ _ _ _) = mark
@@ -203,9 +210,11 @@ main = do
     case flaggedTrue (Flagged True) of
         Just Refl -> pure ()
         Nothing -> fail "the stored flag determines the unary shape"
-    let (wide, deep) = blockPayloads (Blocked True Z (S Z) one VNil)
+    let block = Blocked True Z (S Z) one VNil
+        (wide, deep) = blockPayloads block
     require (cells wide == [True] && null (cells deep))
         "the promoted shape determines the payloads in index order"
+    require (blockFirst block) "a helper infers its predecessor from the public shape"
     require (blockMark (Blocked True unused unused (error "width cells") (error "depth cells")))
         "reading the block mark leaves dimensions and payloads unevaluated"
     require (cells (markedCells (MarkedRows True (S Z) one)) == [True])

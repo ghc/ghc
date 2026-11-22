@@ -8,9 +8,12 @@ module GHC.Tc.Solver.Irred(
 
 import GHC.Prelude
 
+import qualified GHC.Core as Core
 import GHC.Core.Coercion
+import GHC.Core.Dependent ( hasNativeDependentExpr )
 import GHC.Core.Map.Type ( emptyTypeMap, extendTypeMap, lookupTypeMap )
 import GHC.Core.Predicate
+import GHC.Core.TyCon ( TyCon, TyConBndrVis(..), isPromotedDataCon, tyConBinders )
 import GHC.Core.Type
 import GHC.Core.TyCo.Compare ( tcEqType )
 import GHC.Core.TyCo.FVs ( mkUnivCoDeps, univCoDepsHoles )
@@ -20,8 +23,11 @@ import GHC.Tc.Solver.InertSet
 import GHC.Tc.Solver.Dict( matchLocalInst, chooseInstance )
 import GHC.Tc.Solver.Monad
 import GHC.Tc.Types.Evidence
+import GHC.Tc.Utils.TcType ( isMetaTyVar )
 
 import GHC.Types.Basic( SwapFlag(..) )
+import GHC.Types.Var ( Id, VarBndr(..) )
+import GHC.Types.Var.Set ( isEmptyVarSet )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -93,11 +99,72 @@ try_inert_irreds inerts irred_w@(IrredCt { ir_ev = ev_w, ir_reason = reason })
        ; setWantedEq dest (CPH co holes)
        ; stopWith ev_w "Solved by transported index Given" }
 
+  -- See Note [Using a promoted head from a retained index Given].
+  | CtWanted (WantedCt { ctev_dest = dest }) <- ev_w
+  , EqPred NomEq lhs rhs <- classifyPredType (ctEvPred ev_w)
+  , Just (swap, index, tc, meta, expected) <-
+      promoted_wanted NotSwapped lhs rhs <|> promoted_wanted IsSwapped rhs lhs
+  = do { binders <- getNativeBinderScope
+       ; unfilled <- isUnfilledMetaTyVar meta
+       ; case if isEmptyVarSet binders && unfilled
+              then findPromotedIndexGiven (inert_irreds inerts) index tc
+              else Nothing of
+           Nothing -> continueWith ()
+           Just (known, known_co) ->
+             do { (child, hole) <- newWantedEq (ctEvLoc ev_w) (ctEvRewriters ev_w)
+                                              Nominal known expected
+                ; emitChildEqs ev_w (unitBag (mkNonCanonical (CtWanted child)))
+                ; let co = maybeSymCo swap (known_co `mkTransCo` mkHoleCo hole)
+                ; setWantedEq dest (CPH co (unitCoHoleSet hole))
+                ; stopWith ev_w "Used promoted head from retained index Given" } }
+
   | otherwise
   = continueWith ()
 
   where
     ct_w = CIrredCan irred_w
+    promoted_wanted swap (TermVarTy index) ty@(TyConApp tc [TyVarTy meta])
+      | isNativeIndexId index
+      , isPromotedDataCon tc
+      , [Bndr _ AnonTCB] <- tyConBinders tc
+      , isMetaTyVar meta
+      = Just (swap, index, tc, meta, ty)
+    promoted_wanted _ _ _ = Nothing
+
+-- | Find the nominal Given that fixes an argument of this promoted head.
+-- See Note [Using a promoted head from a retained index Given].
+findPromotedIndexGiven :: InertIrreds -> Id -> TyCon -> Maybe (Type, Coercion)
+findPromotedIndexGiven irreds index head_tc =
+    foldIrreds (\irred rest -> match irred <|> rest) irreds Nothing
+  where
+    match irred
+      | ev@CtGiven {} <- irredCtEvidence irred
+      , EqPred NomEq lhs rhs <- classifyPredType (ctEvPred ev)
+      = let co = ctEvCoercion ev
+        in orient lhs rhs co <|> orient rhs lhs (mkSymCo co)
+      | otherwise = Nothing
+
+    orient (TermVarTy witness) ty@(TyConApp tc [arg]) co
+      | witness == index, tc == head_tc
+      , not (hasNativeDependentExpr (Core.Type arg))
+      = Just (ty, co)
+    orient _ _ _ = Nothing
+
+{- Note [Using a promoted head from a retained index Given]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Matching a Volume at a known successor can put S layers ~# field in
+scope. Passing its stack to firstLayer asks for field ~# S alpha.
+Exact irred matching works if the call supplies @layers. For a fresh
+erased alpha, compose the nominal Given with a Wanted S layers ~# S
+alpha. Ordinary decomposition and unification check the predecessor.
+
+Look for the same retained Id and a saturated unary promoted head.
+The argument from the Given must contain no retained syntax. Keep the
+metavariable level checks in the ordinary solver. The child has promoted
+heads at both endpoints and cannot repeat this rule. The proof uses the
+in-scope Given and the child hole. A private runtime-binder comparison
+keeps its existing read-only scope.
+-}
 
 -- | Is this the type of an occurrence of a rigid runtime index?
 isOpaqueTermIndex :: Type -> Bool
