@@ -148,6 +148,36 @@ source revisions and rebuild commands, then remove both sets of outputs
 after the last live user finishes. The 200 GB threshold is a backup for
 this cleanup.
 
+## Equality continuations and structural kind inference
+
+The original GHC test `T13822` returns `Maybe` at a kind computed by
+an injective closed type family. The unannotated family can now infer
+the matchability of its result arrow. An older home provider rebuilds
+once and exposes its new kind to dependent clients. A subsequent
+build reuses its interface. An older installed provider needs rebuilding.
+Clean two-stage job `712` checked both the ordinary program and the
+retained caller at `9f33902199`. [Source and compatibility conditions](roadmap/R23-unsaturated-type-families.md).
+
+The type checker also accepts `gcastWith proof Refl` under a retained
+binder. It can use the supplied argument and the expected result type
+to instantiate the equality eliminator before checking its continuation.
+The continuation still receives only its declared equality. A proof
+about a second, independent list fails at `Refl` with GHC-05617.
+[Maintained source test](../../testsuite/tests/dependent/should_run/NativeRetainedFamilyGiven.hs)
+and [type inference and Agda references](REFERENCES.md#checking-a-retained-equality-continuation).
+
+Job `733` built both combined compiler stages at `a395eea233`.
+Job `738` checked fixtures at `f73e659381`. All four native Showcase
+runs and stage 2 GHCi matched 546 lines. HaskLib's unpacked source
+distribution, interface-only clients, nominal equality controls and
+provider-upgrade tests passed. Of 40 registered normal-way tests,
+39 passed. The upstream test `T15874` failed at its data-family
+constructor. Job `750` reproduced the same GHC-45219 diagnostic with
+the preceding normal compiler, the R23-only development compiler and
+the combined normal compiler. The return-kind synonym fixes its
+invisible forall to U while the data family requires M.
+[Original unannotated source](../../testsuite/tests/polykinds/T15874.hs).
+
 ## Optimized zippers and scoped callback equalities
 
 HaskLib commit `6765da7957` composes the two list proofs with base's

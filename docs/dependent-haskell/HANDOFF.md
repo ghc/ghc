@@ -25,8 +25,9 @@ Updated 22 November 2026. The development branch is
 | `2d6368dd57` and `3ecc8d6fc9` | Both stages matched 546 native outputs at `-O0` and `-O2`. Stage 2 GHCi and all 31 selected normal tests passed. Installed clients used `zip` and `zipWith` proofs at ordinary `-O2`. A scoped equality with a runtime callback result rewrote the argument of `minSize`. |
 | `6765da7957` | HaskLib exports `trans`, `congSucc` and `congFirst`. A single-import client uses them to prove the append-singleton and zip-after-map laws. Job `692` passed the final package and demand checks with the normal `2d6368dd57` compiler at both optimization levels. |
 | `1011998c82` | The Showcase calls the direct and composed proofs on the same lists from IO. It prints `([False],Refl,Refl)`. Job `704` matched all 546 lines at native `-O0`, native `-O2` with stripped and ordinary interfaces, and GHCi. |
+| `a395eea233` and `f73e659381` | Both stages built and matched 546 native Showcase lines at `-O0` and `-O2`. Stage 2 GHCi, installed HaskLib and the selective-upgrade checks passed. The official normal-way selection passed 39 of 40 tests. Unchanged `T15874` failed with the same GHC-45219 as on the preceding released compiler. |
 
-[HaskLib pipeline and parametricity](CHECKPOINTS.md#compose-installed-list-proofs), [Ordinary minimum](CHECKPOINTS.md#an-ordinary-minimum-in-the-zip-length-proof)
+[Equality continuations and kind inference](CHECKPOINTS.md#equality-continuations-and-structural-kind-inference), [HaskLib pipeline and parametricity](CHECKPOINTS.md#compose-installed-list-proofs), [Ordinary minimum](CHECKPOINTS.md#an-ordinary-minimum-in-the-zip-length-proof)
 and [previous release](CHECKPOINTS.md#direct-zip-proof-and-retained-callback-rules).
 
 ## Current R16 result
@@ -71,8 +72,6 @@ Private candidates are recoverable under
 
 | Ref | Current evidence |
 | --- | --- |
-| `r23-structural-kind-rebuild` (`9f33902199`) | The original `T13822` compiles. An earlier home provider rebuilds once to export its inferred result kind. The warm build reuses its interface. A separately installed old provider still needs a rebuild. The cases that depend on a written matchability remain distinct. Clean two-stage job `712` uses `_build/on-demand/r23-injective-kind-normal-20261122`. |
-| `r03-r11-equality-continuation` (`90b0103fd0`) | In a private compiler, `gcastWith` can infer the retained equality endpoints from a supplied proof and the result type from the caller. The continuation receives the original equality. A wrong-list proof still fails at `Refl`. Jobs `721` and `722` check the accepted types, errors and evaluation order against the explicitly typed program. Check normal-build status before using this compiler. |
 | `r19-eight-constructor-selector` (`568979c39e`) | Separate providers agree on a case over an unknown enum with up to eight nullary constructors. The wider recursive alternative in `r19-selector-depth-comparison` (`732d9c5bb8`) exceeds the default reduction depth for the last of 1,610 constructors. |
 
 ## Resume after a restart
@@ -95,12 +94,11 @@ Private candidates are recoverable under
 
 ## Build and verify
 
-The latest 546-line qualification area is
-`_build/on-demand/r16-zip-family-next-qualification-20261122`. Its
-`source` link points to the configured compiler checkout. The normal
-incremental build is recorded in
-`_build/on-demand/r16-zip-fusion-inverse-20261122/next-normal-intake`.
-Check the driver's `--info` revision against `2d6368dd57` before replay.
+The current 546-line qualification area is
+`_build/on-demand/r23-r03-normal-20261122`. Its `source` link points to
+the configured checkout from the R23 clean build. Its `build.sh`
+records the incremental build. Check that the driver's `--info`
+revision is `a395eea233` before replay.
 On this host the bootstrap tools are GHC 9.14.1, Cabal 3.18.1.0, Happy 2.1.7
 and Alex 3.5.4.0. A fresh checkout needs the Git submodules at their recorded
 revisions. This build used five workers per job.
@@ -114,7 +112,7 @@ self-hosted stage 2 compiler in `_build/stage1/bin/ghc`. Both use the
 target libraries in `_build/stage1/lib`. For example, from the main checkout:
 
 ```sh
-stable="$PWD/_build/on-demand/r16-zip-family-next-qualification-20261122/source/_build/stage1"
+stable="$PWD/_build/on-demand/r23-r03-normal-20261122/source/_build/stage1"
 queue="$PWD/docs/dependent-haskell/tools/ghc-build-job"
 check="$PWD/docs/dependent-haskell/check-showcase.sh"
 "$queue" showcase-stage2-ghci bash "$check" "$stable/bin/ghc" "$stable/lib" --ghci
