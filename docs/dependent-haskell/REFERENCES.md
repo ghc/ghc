@@ -5900,6 +5900,16 @@ handwritten minimum family. The new proof uses the checked equations
 of the Haskell function and the same induction on the lists. [Direct list proof](examples/open-evaluation/PreludeZipRuntime.hs)
 and [ordinary structural count](examples/open-evaluation/PreludeMapLengthSize.hs).
 
+Agda's `length-zipWith` quantifies over the combining function. Its
+proof never applies that function. The Haskell proof accepts a runtime
+`f :: a -> b -> c` and uses the same induction. It can return `Refl`
+even when applying or evaluating `f` would diverge. GHC proposal #302
+supplies the two-argument `\cases` used to match the list spines after
+binding `f`.
+[Agda's proof](https://agda.github.io/agda-stdlib/v2.3/Data.List.Properties.html#length-zipWith),
+[GHC proposal #302](https://ghc-proposals.readthedocs.io/en/latest/proposals/0302-cases.html)
+and [runtime callback proof](examples/open-evaluation/PreludeZipRuntime.hs).
+
 A proposed length for zipping two ordinary lists tests the first spine,
 then tests the second spine only if the first has a cell. Agda's `max`
 example shows why a source equation need not reduce when its first

@@ -1916,6 +1916,14 @@ main = do
         , PreludeZipRuntime.lengthZip zipLeft zipRight
         , PreludeZipWithLengthProof.shorterRight
         )
+    zipCallback <- newIORef (&&) >>= readIORef
+    let unusedCallback :: Bool -> Bool -> Bool
+        unusedCallback = error "lengthZipWith forced its callback"
+    observe "zipWith a runtime callback and prove the result length"
+        ( zipWith zipCallback zipLeft zipRight
+        , PreludeZipRuntime.lengthZipWith zipCallback zipLeft zipRight
+        , PreludeZipRuntime.lengthZipWith unusedCallback zipLeft zipRight
+        )
     observe "use the Prelude.zipWith cons equation with both tails unevaluated"
         PreludeZipWithProof.firstPair
     observe "compose two checked traversals without forcing the inner callback"

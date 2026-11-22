@@ -156,7 +156,8 @@ test('NativeOpenPreludeZipWith',
                                                'PreludeMapLengthSource.hs', 'PreludeMapLengthProof.hs',
                                                'PreludeZipSource.hs', 'PreludeZipProof.hs', 'PreludeZipRuntime.hs',
                                                'ZipMinimum.hs']]
-                  + ['NativeOpenZipDemandControls.hs', 'NativeOpenZipWrongMinimum.hs'])],
+                  + ['NativeOpenZipDemandControls.hs', 'NativeOpenZipWrongMinimum.hs',
+                     'NativeZipWithRuntimeClient.hs'])],
      run_command, ['bash NativeOpenPreludeZipWith.sh "{compiler}" "{libdir}"'])
 test('NativeOpenMinimum',
      [req_interp, req_rts_linker, only_ways(['normal']),

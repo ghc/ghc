@@ -30,6 +30,10 @@ pair_proof="$src/PreludeZipProof.hs"
 for opt in -O0 -O2; do
     "${ghc[@]}" "$opt" -fno-enable-rewrite-rules -fforce-recomp -c \
         "$proof" "$length_proof" "$pair_proof" "$src/PreludeZipRuntime.hs" "$src/ZipMinimum.hs" -outputdir .
+    "${ghc[@]}" "$opt" -fforce-recomp -c "$src/NativeZipWithRuntimeClient.hs" -outputdir .
+    "${ghc[@]}" Main.o PreludeZipRuntime.o ../provider/PreludeMapLengthSize.o -o client
+    ./client >client.stdout
+    grep -Fxq '(True,True)' client.stdout
 done
 
 reject() {

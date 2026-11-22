@@ -1837,6 +1837,14 @@ from IO, runs the installed zipper, and calls the proof on those same lists.
 An extension-off proof uses `Spine xs` to refine an erased list index by
 pattern matching.
 
+`lengthZipWith` takes a runtime callback and both runtime lists. Its
+result is `size (zipWith f xs ys) :~: minSize (size xs) (size ys)`.
+The Showcase reads all three inputs from IO. It runs the proof a
+second time with an undefined callback. The proof inspects the list
+spines and leaves the callback and elements unevaluated.
+[Runtime proofs](../examples/open-evaluation/PreludeZipRuntime.hs) and
+[ordinary interface client](../../../testsuite/tests/dependent/should_run/NativeZipWithRuntimeClient.hs).
+
 [ZipMinimum.hs](../examples/open-evaluation/ZipMinimum.hs) contains the
 datatype, both ordinary functions and the proof in one module. Checking
 the proof in that module uses the three typed pattern clauses of
