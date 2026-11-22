@@ -8,45 +8,42 @@ and its [expected output](Showcase.stdout) are the executable examples.
 
 ## Current checkpoint
 
-Verified 22 November 2026, 14:24 CET. The development branch is
-`dependent-haskell`. To find its latest commit, use the fork command below.
+Verified 22 November 2026, 15:06 CET. The development branch is
+`dependent-haskell`. Use the fork command below to find its latest commit.
 
-| Revision | Result |
+| Revision | Verified result |
 | --- | --- |
-| `3a4e5c237a` | Both normal compiler stages built. Both report this compiler revision. An isolated Core API test reproduced the callback cast failure on `70ded7e706` and passed with the changed optimizer. |
-| `54d1d5c54a` | Both stages matched the 542-line Showcase at `-O0` and `-O2`. Stage 2 GHCi matched it too. The native runs checked HIE files and clients that could read only provider interfaces. |
-| `89d450a893` | All 29 selected normal-way registered tests passed across two runs. Job `397` passed 28. After three diagnostic assertions were corrected in the remaining test, job `409` passed it on the same compiler. |
+| `5fe06625c3` | Clean two-stage build. Both stages matched the 543-line Showcase at `-O0` and `-O2`. Stage 2 GHCi and all 29 selected registered tests passed. The 542 and 543 compilers read each other's imported rule interfaces. |
+| `c88606fe92` | Same compiler with the proof over the two runtime lists. Both stages passed the updated zipper tests and Showcase. The proof uses `size (zip xs ys) :~: Minimum (size xs) (size ys)`. |
 
-An ordinary client proves that `Prelude.zip` and `Prelude.zipWith` return
-the shorter input length. The proof module checks the equations with
-rewrite rules disabled. The optimized Showcase imports concrete witnesses.
-The Core optimizer retains the callback and its nominal evidence when it
-substitutes a cast argument into a dependent result proof.
-[Checkpoint and test selection](CHECKPOINTS.md#ordered-zippers-and-nominal-callback-casts).
+[Qualification record](CHECKPOINTS.md#direct-zip-proof-and-retained-callback-rules).
 
-## Work in progress
+## Current priority
 
-- **R05.** The local candidate at `56dd0a2099` lets a rewrite rule fire when it
-  matches a nominally cast callback. Its isolated compiler passed the
-  rule tests and the 543-line Showcase. The normal two-stage build uses
-  the integrated candidate at `5fe06625c3` in Pueue job `416`.
-  A separate rule-free program on the 542-line compiler exposes a Core Lint
-  failure at `-O1` and `-O2`. Full laziness floats a binding for an unused
-  polymorphic callback that is still needed in a type. The program passes
-  at `-O0` and with the provider's optimization pragmas omitted. In job
-  `414`, a private compiler preserved the callback binding and passed Core
-  and STG Lint on the reproducer at all three optimization levels. The
-  ordinary optimization and run-time demand controls are still in progress.
-- **R19.** Two independent signatures can share a named case result at an
-  unknown index. Two separately written anonymous cases can still disagree.
-  The next experiment checks whether exhaustive cases for a nullary
-  enumeration can share one ordinary closed type family across interfaces.
-  [Evidence and alternatives](roadmap/R19-type-level-cases.md#separate-providers-at-an-unknown-index).
+**R16 open evaluation.** Replace the handwritten `Minimum` family with
+an ordinary recursive Haskell function, `minSize :: Size -> Size -> Size`.
+The theorem is `size (zip xs ys) :~: minSize (size xs) (size ys)`.
+The three induction clauses stay the same. Compiler `5fe06625c3`
+reports GHC-70565 at the inner `size xs` when checking the right side.
+The private compiler in job `460` accepted that source at both `-O0` and
+`-O2`. Verification of final Core, incorrect equations, ordinary
+interfaces and the combined normal compiler must precede publication.
 
-The normal build from job `383` remains a live input to both experiments.
-Its two compiler hashes are in `final-3a4e5c237a/compilers.sha256` under
-the build area below. The `fixture-54d1d5c54a` and `fixture-89d450a893`
-directories hold the test reports. [Git recovery](BRANCHES.md#22-november-restart).
+The reference compiler is under
+`_build/on-demand/r05-normal-543-20261122/source`. The R16 compiler
+experiment is under `_build/on-demand/r16-recursive-minimum-20261122`.
+The independent controls under `_build/on-demand/r16-minsize-20261122/acceptance`
+cover 81 finite pairs, partial spines, demand and a changed definition.
+[Open evaluator card](roadmap/R16-open-term-evaluator.md#prove-an-equation-for-preludezipwith).
+
+Other local candidates are recoverable from Git. Each name is relative
+to `refs/archive/dependent-haskell/2026-11-22/`.
+
+| Ref | Evidence and remaining work |
+| --- | --- |
+| `r05-absent-float` (`c5b4c8a5ea`) | Full laziness preserves an absent callback's lexical identity. The private compiler passed the 544-line Showcase, demand controls and the unrelated-binding control. A normal build remains open. |
+| `r04-strict-witness` (`e71f7098f1`) | Bang patterns on stored witnesses passed source-hidden tests with Core and STG Lint. A normal build remains open. |
+| `r19-enum-experiment` (`edee3f0ed5`) | Cross-module enum cases shared a generic selector, but wide cases exceeded the default reduction budget. The measured owner-ordinal alternative requires owner participation. |
 
 ## Resume after a restart
 
@@ -69,14 +66,14 @@ directories hold the test reports. [Git recovery](BRANCHES.md#22-november-restar
 ## Build and verify
 
 The current normal checkout is
-`_build/on-demand/live-recovery/normal-70ded7e706/source`. Its sibling
+`_build/on-demand/r05-normal-543-20261122/source`. Its sibling
 `build.sh` records the commands and writes logs in the parent directory.
 On this host the bootstrap tools are GHC 9.14.1, Cabal 3.18.1.0, Happy 2.1.7
 and Alex 3.5.4.0. A fresh checkout needs the Git submodules at their recorded
-revisions. This build used four workers. The shared queue now allows five per job.
+revisions. This build used five workers per job.
 The normal build runs `./boot`, `./configure`, builds Hadrian
 from `hadrian/cabal.project`, and runs Hadrian with
-`-j4 --flavour=quick --docs=none`. Reuse the configured checkout and Hadrian
+`-j5 --flavour=quick --docs=none`. Reuse the configured checkout and Hadrian
 binary if a build stops partway. Keep each compiler with its own libraries.
 
 Hadrian puts the stage 1 compiler in `_build/stage0/bin/ghc` and the
@@ -84,7 +81,7 @@ self-hosted stage 2 compiler in `_build/stage1/bin/ghc`. Both use the
 target libraries in `_build/stage1/lib`. For example, from the main checkout:
 
 ```sh
-area="$PWD/_build/on-demand/live-recovery/normal-70ded7e706"
+area="$PWD/_build/on-demand/r05-normal-543-20261122"
 queue="$PWD/docs/dependent-haskell/tools/ghc-build-job"
 check="$PWD/docs/dependent-haskell/check-showcase.sh"
 lib="$area/source/_build/stage1/lib"

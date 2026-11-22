@@ -148,6 +148,27 @@ source revisions and rebuild commands, then remove both sets of outputs
 after the last live user finishes. The 200 GB threshold is a backup for
 this cleanup.
 
+## Direct zip proof and retained callback rules
+
+Both normal compiler stages at `5fe06625c3` matched the 543-line
+Showcase at `-O0` and default `-O2`. Stage 2 GHCi and all 29 selected
+normal-way tests passed in job `445`. The 542 and 543 compilers wrote
+byte-identical optimized interfaces for the three tested rule providers.
+Both read the other's interfaces and fired the imported-head and uncast
+callback rules. The 543 reader also fired the callback rule through
+a nominal cast. Both returned `(19,23,1,0)`.
+[Rule tests](examples/qualified-pi/check-retained-rules.sh).
+
+The integrated tree at `c88606fe92` has the same compiler. Its
+Showcase reads two lists from IO and proves the length law on them.
+Both stages passed the updated zipper regression, both native
+optimization levels and the interface-only clients. Stage 2 GHCi passed
+in job `457`. The proof uses ordinary `size` and `Prelude.zip`. At
+this checkpoint `Minimum` is a closed family. The complete example
+also compiles together in one Haskell module at both optimization levels.
+[Direct proof](examples/open-evaluation/PreludeZipRuntime.hs) and
+[Agda reference](REFERENCES.md#the-length-of-zip-and-demand-in-a-case-tree).
+
 ## Ordered zippers and nominal callback casts
 
 Both compilers reported revision `3a4e5c237a`. Both matched the 542 lines
