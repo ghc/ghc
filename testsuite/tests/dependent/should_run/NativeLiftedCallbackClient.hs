@@ -43,11 +43,14 @@ main = do
   print =<< forceFailure "used callback" (observe (error "used callback" :: Flag -> Bool) (Flag truth))
   tupleClient not truth
   print (tupleLazy (error "unused predicate") truth)
-  let cmp = flip compare
+  let cmp :: Bool -> Bool -> Ordering
+      cmp = flip compare
       observed :: CompareAt.Witness o -> Ordering
       observed CompareAt.Less = LT
       observed CompareAt.Equal = EQ
       observed CompareAt.Greater = GT
       order x y = observed (CompareAt.decideCompare cmp x y)
   print (order (not truth) truth, order truth (not truth), order truth truth)
-  print (CompareAt.keepCompare (error "unused comparator") (error "unused first argument") (error "unused second argument"))
+  let lazyProof :: (Bool -> Bool -> Ordering) -> Bool -> Bool -> IO ()
+      lazyProof f x y = print (CompareAt.keepCompare f x y)
+  lazyProof (error "unused comparator") (error "unused first argument") (error "unused second argument")

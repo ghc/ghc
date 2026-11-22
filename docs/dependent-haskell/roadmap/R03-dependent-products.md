@@ -26,12 +26,14 @@ or unlifted endpoint still fails at the callback binder.
 and [kind inference references](../REFERENCES.md#inferring-the-endpoint-kinds-of-a-retained-callback).
 
 With explicit `(a :: Type) (b :: Type)`, a separately compiled client
-has run the proof at `-O0` with function and `IO` results. Forcing the
+ran the proof at `-O0` and `-O2` with function and `IO` results. Forcing the
 proof left the counter at zero. Executing the returned action advanced
 it to one. The earlier mapping compiler that required a closed structural
-result rejected the new interface at the callback binder.
-The unannotated signature, the revised cast reader, and
-the combined Showcase still need qualification with the normal compiler.
+result rejected the new interface at the callback binder. The reader
+rejected an argument at the wrong result kind in both interface encodings.
+It also rejected a cast whose left kind disagreed with the callback result.
+The full Core API test passed with these checks. The combined signature
+inference and normal compiler qualification are pending.
 [Source and demand checks](../../../testsuite/tests/dependent/should_run/NativeOpenTheseFmap.sh)
 and [interface checks](../../../testsuite/tests/ghc-api/NativeDependentCore.hs).
 
@@ -755,12 +757,18 @@ decideCompare cmp x y = case cmp x y of
 The Core experiment represents the prefix `cmp x` as a retained call and
 applies that result to `y` with the existing `AppTy`. The second arrow
 is unmatchable. Equal arguments give equal results. Equal results give
-no evidence about either argument. The checks cover Core Lint, forward
-congruence and attempted projections from a result equality.
+no evidence about either argument. Core Lint accepted forward congruence
+before and after coercion optimization and rejected projections from a
+result equality. A rewrite rule matched the whole index and an identical
+call. It could neither recover an operand nor substitute a different
+comparator with the same spelling.
 
-Source checking, reconstruction of the strict case from its runtime
-scrutinee, and a separately compiled client must all agree about the
-two operands. The published compiler supports the one-argument witness.
+The earlier callback compiler reports GHC-83605 at `cmp x y` in the
+signature. The prototype at `32b2689180` checks both operands in source
+and in the interface. Its strict case uses the lexical comparator and
+the ordered operands. The source-hidden client, older reader, and
+raw interface tests are queued. The published compiler supports the
+one-argument witness.
 [Existing ordering witness](../examples/open-evaluation/RuntimeOrdering.hs),
 [two-argument source fixture](../../../testsuite/tests/dependent/should_run/curried-callback/CompareAt.hs),
 [inverse-equality control](../../../testsuite/tests/dependent/should_run/curried-callback/NoInverse.hs)
