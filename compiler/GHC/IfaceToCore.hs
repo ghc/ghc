@@ -2253,13 +2253,12 @@ tcIfaceType = go
     go (IfaceCastTy ty co)
       = do { ty' <- go ty
            ; co' <- tcIfaceCo co
-           ; case ty' of
-               TermVarTy f | isNativeIndexFunctionId f ->
+           ; case cast_function_head ty' of
+               Just f | isNativeIndexFunctionId f ->
                  do { valid <- evaluateIfaceNativeDomain (ppr f) $
                         coercionRole co' == Nominal
-                        && coercionLKind co' `eqType` varType f
-                        && coercionRKind co' `eqType` varType f
-                        && isJust (nativeIndexFunctionTypeTys_maybe (coercionRKind co'))
+                        && coercionLKind co' `eqType` typeKind ty'
+                        && isJust (nativeIndexCastCo_maybe (SubCo co'))
                     ; unless valid $
                         failIfM (text "A retained function-value cast changes its fixed domain:"
                                  <+> ppr f)
@@ -2268,6 +2267,11 @@ tcIfaceType = go
                  do { when (call_operand False ty) (check_call_result_cast ty' co')
                     ; return (CastTy ty' co') } }
     go (IfaceCoercionTy co)  = CoercionTy <$> tcIfaceCo co
+
+    -- Check each cast on a lexical callback, including nested wire casts.
+    cast_function_head (TermVarTy f) = Just f
+    cast_function_head (CastTy ty _) = cast_function_head ty
+    cast_function_head _ = Nothing
 
     -- A raw ordinary application can expose a native function-value head.
     -- Check its argument before the smart maker forms TermAppTy.

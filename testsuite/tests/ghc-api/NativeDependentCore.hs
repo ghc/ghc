@@ -2791,10 +2791,32 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                 rejectsIface "curried interface requires an unrestricted unmatchable arrow" "A retained call result cannot be applied"
                     [curriedHead tailArrow, callN, callM] (applyWire cmpWire (take 2 args))
             rejectsIface "ordinary wire application cannot invent its head" "Iface id out of scope" [callN] (rawCall argumentWire)
-            let changedDomain = proof 9112 (varType callF) (mkVisFunTyManyU boolTy (mkTyConApp maybeTyCon [boolTy]))
+            let maybeBool = mkTyConApp maybeTyCon [boolTy]
+                changedDomain = proof 9112 (varType callF) (mkVisFunTyManyU maybeBool boolTy)
                 functionCast co = IfaceCastTy (IfaceTermVar callName) (toIfaceCoercion co)
+                resultTransport = mkCoVar (mkSystemName (unique 9115) (mkVarOcc "result_transport"))
+                    (mkNomEqPred (varType callF) (mkVisFunTyManyU boolTy maybeBool))
+                fromCallback = mkCoVarCo resultTransport
+                castHead = mkCastTy (TermVarTy callF) fromCallback
+                castScope = [callF, callN, callM, callCv, resultTransport]
+                castCallAt arg = mkAppTy castHead (TermVarTy arg)
             castRestored <- restore [callF] =<< roundtrip compression (functionCast (mkNomReflCo (varType callF)))
             checkType dflags "reflexive function-value cast preserves identity" (TermVarTy callF) castRestored
+            let restoreCast wire = restore castScope =<< roundtrip compression wire
+            wholeCast <- restoreCast (toIfaceType castHead)
+            singleCall <- restoreCast (applyWire (toIfaceType castHead) [argumentWire])
+            checkType dflags "whole callback interface preserves nominal result transport" castHead wholeCast
+            checkType dflags "callback interface applies a nominally cast head" (castCallAt callN) singleCall
+            let appliedCo = mkAppCo (mkNomReflCo castHead) (mkCoVarCo callCv)
+            restoredApp <- restoreCast (toIfaceType (CoercionTy appliedCo))
+            case restoredApp of
+                CoercionTy restoredCo -> do
+                    lintAccepts dflags "interface callback congruence keeps nominal evidence" castScope (Coercion restoredCo)
+                    checkType dflags "interface callback congruence left endpoint" (castCallAt callN) (coercionLKind restoredCo)
+                    checkType dflags "interface callback congruence right endpoint" (castCallAt callM) (coercionRKind restoredCo)
+                    check "interface callback congruence keeps both proofs" $
+                        all (`elemVarSet` tyCoVarsOfCo restoredCo) [callCv, resultTransport]
+                _ -> fail "FAIL: interface callback congruence lost its evidence"
             rejectsIface "function-value cast cannot change its fixed domain" "A retained function-value cast changes its fixed domain" [callF, changedDomain] $
                 functionCast (mkCoVarCo changedDomain)
             rejectsIface "function-value cast requires nominal evidence" "A retained function-value cast changes its fixed domain" [callF] $
