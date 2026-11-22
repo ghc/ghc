@@ -148,6 +148,31 @@ source revisions and rebuild commands, then remove both sets of outputs
 after the last live user finishes. The 200 GB threshold is a backup for
 this cleanup.
 
+## Compose type-level cases on an unknown `Maybe`
+
+Normal compiler `4e169241d2` and merge `098ca0ae97` have the same
+compiler, tests and 549-line Showcase. The provider chooses `Char`
+for `Nothing` and `Int` for `Just _`. An independent consumer writes
+the rows in the opposite order. An ordinary module composes the two
+at an unknown index. The Showcase reads `Nothing` and then
+`Just bottomB` from an IORef and prints `("n","73")`.
+
+Job 904 built both stages. Job 927 checked four registered tests,
+native `-O0` and `-O2`, and GHCi. The source-hidden client rejected a
+different index or changed result. An older reader could still use
+the new providers at known indices. It rejected an interface that
+stored the new coercion. The new compiler replayed that proof under
+Core Lint after substituting `Just False`.
+
+The same compiler restored the ordinary term-capture diagnostic when
+dependent types are off. Job 928 passed all ten original tests from
+`T23740a` through `T23740j`. The separate unchanged upstream suite
+matched the previous compiler on all 158 registrations, including
+all 15 failure reports.
+[Provider](examples/open-evaluation/NativeCase.hs),
+[consumer](examples/open-evaluation/NativeRetainedTH.hs)
+and [registered test](../../testsuite/tests/dependent/should_run/NativeTypeCaseRetainedTh.sh).
+
 ## A named measurement and an inferred vector length
 
 The compiler at `4f2fc1146f` and merge `229cecd250` have identical

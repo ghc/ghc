@@ -28,6 +28,7 @@ Updated 22 November 2026. The development branch is
 | `a395eea233` and `f73e659381` | Both stages built and matched 546 native Showcase lines at `-O0` and `-O2`. Stage 2 GHCi, installed HaskLib and the selective-upgrade checks passed. The official normal-way selection passed 39 of 40 tests. Unchanged `T15874` failed with the same GHC-45219 as on the preceding released compiler. |
 | `d41294266d` and `a7088dd69f` | R19 composes type-level cases across two modules at a runtime enum index. The compiler sources match the normal two-stage build at `4e0c9b393a`. Job `828` passed `NativeDependentCoreRun` and the 547-line Showcase at stage 2 in native `-O0`, native `-O2` and GHCi. |
 | `4f2fc1146f` and `229cecd250` | A client passes `HaskLib.size` as a retained callback. A scoped equality lets `safeHead` infer the tail index of a vector of length one. The installed-package clients and 548-line Showcase passed. Of 41 registered regressions, only the known `T15874` failed. |
+| `4e169241d2` and `098ca0ae97` | Independent modules compose type-level cases on an unknown `Maybe Bool`. The `Just` field stays lazy. Both stages built, the 549-line Showcase passed, and all ten original term-capture diagnostic tests passed. The 158 upstream test outcomes match the previous release. |
 
 [Equality continuations and kind inference](CHECKPOINTS.md#equality-continuations-and-structural-kind-inference), [HaskLib pipeline and parametricity](CHECKPOINTS.md#compose-installed-list-proofs), [Ordinary minimum](CHECKPOINTS.md#an-ordinary-minimum-in-the-zip-length-proof)
 and [previous release](CHECKPOINTS.md#direct-zip-proof-and-retained-callback-rules).
@@ -114,7 +115,7 @@ were removed after qualification of `4f2fc1146f`. Each experiment
 directory retains its Git source bundle, recipe and test results.
 Rebuild the old compiler only if an experiment needs to run it.
 
-For the current compiler, use `r03-r19-r36-normal-4f2fc1146f-20261122`.
+The previous 548-line compiler is in `r03-r19-r36-normal-4f2fc1146f-20261122`.
 Job 855 rebuilt both stages there. Jobs 864, 865, 868 and 871 checked
 the Showcase, selected tests, installed HaskLib and upstream compatibility.
 The build reuses the physical checkout under
@@ -151,11 +152,13 @@ source-hidden client composes two cases on `Maybe Bool` at an unknown
 index. Job 893 checked the unused `Just` field, a changed row, a
 different index, old readers and reuse after rebuilding. The 549-line
 Showcase also passed in the private compiler in job 902. Job 904
-built both stages for R19 and R13 at `4e169241d2` in
-`r19-ignored-fields-next-20261122/normal`. Job 927 checks the four
-maintained cases, interface compatibility and the 549-line Showcase.
-Job 928 follows it with the ten unchanged diagnostic tests and 158
-upstream dependent tests.
+built both stages for R19 and R13 at `4e169241d2`. Use the current
+compiler in `r19-ignored-fields-next-20261122/normal/source/_build/stage1`.
+Job 927 passed the four maintained cases, interface compatibility and
+the 549-line Showcase at native `-O0`, native `-O2` and in GHCi.
+Job 928 passed the ten unchanged diagnostic tests. Of 158 upstream
+dependent test registrations, 143 passed. All 15 failure outputs
+matched the previous release.
 
 **R41 nested GADT quantifiers.** Compiler `9884c35ff0` reads
 fieldless ordered constructors and preserves all 24 one-field orders.
@@ -167,7 +170,7 @@ Job 909 found a further failure for result indices such as `T a a`.
 The private repair at `b13259766e` introduces the result equalities
 at pattern entry and brings written constraints into scope at their
 declared positions. Jobs 925 and 926 passed. The next aggregate
-source is `2b64ffc406`. Job 931 rebuilds both stages in
+source is `2b64ffc406`. Job 932 rebuilds both stages in
 `r41-r36-aggregate-normal-20261122`. It includes the final warning
 changes, the result-equality repair and the 549-line Showcase.
 [R41 ordering tests](roadmap/R41-nested-quantification-in-gadts.md#which-prefix-orders-work)
