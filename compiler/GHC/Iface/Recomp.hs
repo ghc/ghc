@@ -908,6 +908,14 @@ checkFlagHash hsc_env iface self_recomp = do
                                             (mi_exports iface) (map snd (mi_decls iface)) =
               liftIO $ recheck "Compiler now shares retained signature type cases"
           | otherwise = pure UpToDate
+        check_ignored_case_fields
+          | mi_hsc_src iface == HsSrcFile
+          , not (Map.member ignoredCaseFields (getExtensibleFields (mi_ext_fields iface)))
+          , couldHaveIgnoredCaseFields (mi_semantic_module iface) (map snd (mi_decls iface))
+          , couldExportRetainedSignatureCase (mi_semantic_module iface)
+                                            (mi_exports iface) (map snd (mi_decls iface)) =
+              liftIO $ recheck "Compiler now checks retained signature cases with ignored fields"
+          | otherwise = pure UpToDate
         check_nullary_family
           | nullary_candidate, not checked_nullary =
               liftIO $ recheck "Compiler now infers matchability for nullary family results"
@@ -961,6 +969,7 @@ checkFlagHash hsc_env iface self_recomp = do
                                      `recompThen` check_scoped_case
                                      `recompThen` check_binary_enum
                                      `recompThen` check_retained_signature
+                                     `recompThen` check_ignored_case_fields
                                      `recompThen` check_nullary_family
                                      `recompThen` check_injective_kind
                                      `recompThen` check_liberal_synonym
@@ -1080,6 +1089,10 @@ liberalSynonymCallbackField = "liberal-synonym-callback-v1"
 -- | Record that the compiler attributed generated cases to their signatures.
 enumCaseClosureField :: String
 enumCaseClosureField = "enum-case-closure-v1"
+
+-- | Record that a potential source case with ignored fields was checked.
+ignoredCaseFields :: String
+ignoredCaseFields = "ignored-case-fields-v1"
 
 {- Note [Recompiling source proof family branches]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1256,6 +1269,29 @@ couldExportRetainedSignatureCase owner exports = any candidate
     localCase name = nameModule_maybe name == Just owner &&
       any (`isPrefixOf` occNameString (nameOccName name))
           ["$signature-case:", "$case:$signature-case:"]
+
+-- | Find a potential flat case whose family has constructor field variables.
+-- The proof check is in GHC.Builtin.CoercionRules.
+couldHaveIgnoredCaseFields :: Module -> [IfaceDecl] -> Bool
+couldHaveIgnoredCaseFields owner = any field_case
+  where
+    field_case IfaceFamily{ifName = name, ifFamFlav = flavour}
+      | nameModule_maybe name == Just owner
+      , "$case:$signature-case:" `isPrefixOf` occNameString (nameOccName name)
+      , Just (_, rows) <- ifaceClosedFamilyAxiom_maybe flavour
+      , Just has_fields <- traverse flat_fields rows
+      = or has_fields
+    field_case _ = False
+
+    flat_fields branch
+      | Just (_, IfaceTyConApp _ args) <- snocView (appArgsIfaceTypes (ifaxbLHS branch))
+      , let fields = appArgsIfaceTypes (stripInvisArgs (PrintExplicitKinds False) args)
+      , all is_field_var fields
+      = Just (not (null fields))
+      | otherwise = Nothing
+
+    is_field_var IfaceTyVar{} = True
+    is_field_var _ = False
 
 -- | Mark providers compiled with the scope traversal in GHC.Iface.Tidy.
 -- See Note [Private helpers in erased package rules] in GHC.Iface.Tidy.
@@ -3063,6 +3099,8 @@ addFingerprints hsc_env iface0 = do
   --   - deps (home and external packages, dependent files)
   let stamp_retained = couldExportRetainedSignatureCase (mi_semantic_module iface0)
                         (mi_exports iface0) (mi_decls iface0)
+      stamp_ignored_case_fields = mi_hsc_src iface0 == HsSrcFile && stamp_retained &&
+          couldHaveIgnoredCaseFields (mi_semantic_module iface0) (mi_decls iface0)
       stamp_nullary = couldInferNullaryClosedMatchability (mi_decls iface0)
       stamp_injective_kind = mi_hsc_src iface0 == HsSrcFile &&
                              couldInferInjectiveKindResult (mi_decls iface0)
@@ -3092,6 +3130,7 @@ addFingerprints hsc_env iface0 = do
       checked_fields = [liberalSynonymCallbackField | stamp_liberal]
                     ++ [injectiveKindResultField | stamp_injective_kind]
                     ++ [enumCaseClosureField | mi_hsc_src iface0 == HsSrcFile, stamp_retained]
+                    ++ [ignoredCaseFields | stamp_ignored_case_fields]
                     ++ [mappingField | stamp_mapping]
                     ++ [appliedMappingField | stamp_applied_mapping]
                     ++ [homeRuleClosuresField | stamp_home_rules]
