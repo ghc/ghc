@@ -61,11 +61,12 @@ another import as used.
 and [explicit controls](../../../testsuite/tests/rename/should_compile/DisambiguatedPunUses.hs).
 
 The parser records which written syntax relies on `ListTuplePuns`.
-The warning covers `[]` used as a type constructor and boxed tuple
-types such as `(a, b)`, including the unit type. List types such as
-`[a]`, term list and tuple syntax, explicit promotion, and named
-type constructors such as `List` and `Tuple2` follow their existing
-paths without this syntax warning.
+The warning covers written list types such as `[a]`, the type
+constructor spelling `[]`, and boxed tuple types such as `(a, b)`.
+Proposal #765 section 1.3.4 includes `[a]`. Its executable appendix
+omits a duplicate example because it treats `[a]` as `[] a`. Term
+list and tuple syntax, promoted lists, and named type constructors
+such as `List` and `Tuple2` remain quiet.
 
 When implicit quantification creates a type variable with the
 spelling of a term already in scope, `-Wpun-uses` reports each use

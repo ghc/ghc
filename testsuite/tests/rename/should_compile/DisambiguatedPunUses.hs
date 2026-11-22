@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, ExplicitNamespaces, NoListTuplePuns, PolyKinds #-}
 
-module DisambiguatedPunUses (type Ty.T, data Con.T, typ, term, listSyntax, tupleSyntax, promoted) where
+module DisambiguatedPunUses (type Ty.T, data Con.T, typ, term, listSyntax, tupleSyntax, promoted, promotedList) where
 
 import Data.List (List)
 import Data.Tuple.Experimental (Tuple2)
@@ -23,3 +23,6 @@ listSyntax = []
 
 tupleSyntax :: Tuple2 Int Bool
 tupleSyntax = (1, True)
+
+promotedList :: Witness [Bool]
+promotedList = WitnessValue

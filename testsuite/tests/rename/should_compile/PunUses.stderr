@@ -46,3 +46,6 @@ PunUses.hs:27:26: warning: [GHC-79036] [-Wpun-uses]
 
 PunUses.hs:30:15: warning: [GHC-79036] [-Wpun-uses]
     The type syntax ‘[]’ depends on ListTuplePuns.
+
+PunUses.hs:30:23: warning: [GHC-79036] [-Wpun-uses]
+    The type syntax ‘[a]’ depends on ListTuplePuns.

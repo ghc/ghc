@@ -2509,9 +2509,10 @@ of ``-W(no-)*``.
     the conflict if it selects only one of the competing names.
 
     Also warn about implicit type-variable uses that would capture a
-    term name, and about ``[]`` as a type constructor and boxed tuple
-    type syntax. For implicit type-variable uses, this warning takes
-    precedence over :ghc-flag:`-Wterm-variable-capture`.
+    term name, and about list and boxed tuple type syntax that depends on
+    :extension:`ListTuplePuns`. This includes the list type ``[a]`` and the
+    list type constructor ``[]``. For implicit type-variable uses, this
+    warning takes precedence over :ghc-flag:`-Wterm-variable-capture`.
 
     :ghc-flag:`-Weverything` enables this warning.
 
