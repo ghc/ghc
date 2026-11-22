@@ -28,12 +28,41 @@ depend on others, so this count cannot estimate the remaining work time.
 | Declaration dependencies, families and GADTs | R21, R23, R24, R41 |
 | Namespace warnings | R36 |
 
+### Release readiness
+
+As of 2026-11-22, we can recommend **0 of the 20 partially implemented
+cards** for release as a complete upstream feature. The coverage count
+increases with the first working example on a new card. Further work
+on that card can remove restrictions without changing the count.
+For example, the published fork can prove the length of `zipWith` on
+runtime lists. R16 still needs evaluation of ordinary definitions
+outside the checked recursion patterns.
+[Remaining work by area](#remaining-work-by-roadmap-area).
+
+R36 is the clearest candidate for the first complete card. Five of its
+eight checklist entries are checked. The remaining entries cover
+implicit type binders, uses shadowed across lexical scopes, and staged
+imports or remaining syntax. For R41, accepted proposal #402 permits
+orders of fields, constraints and quantifiers in
+prefix GADT constructors that the fork still rejects.
+[R36 checklist](roadmap/R36-pun-warnings.md)
+and [R41 checklist](roadmap/R41-nested-quantification-in-gadts.md).
+
 Seven open cards have no separate tested implementation counted here.
-R01 Dependent Haskell, R02 dependent retained
-quantifiers, R06 universal promotion and R20 language cleanup collect prerequisites. The other
-three are R27 deprecating CUSKs, R34 syntactic unification and R35 namespace
-management. The [checklist](#upstream-checklist-and-complete-dependency-index)
-lists their dependencies.
+
+| Card | What still holds it open |
+| --- | --- |
+| R01 Dependent Haskell | This is the overall goal. It depends on retained quantifiers (R02), universal promotion (R06) and language cleanup (R20). |
+| R02 Dependent retained quantifiers | Complete both dependent products (R03) and sums (R04). The fork still restricts which runtime arguments can appear in results and which hidden indices it can infer. |
+| R06 Universal promotion | Promotion of literals, unboxed types, classes, functions and data families is partial (R07, R10, R12–R14). An ordinary definition can still fall outside the evaluator. |
+| R20 Clean up the language | Complete mixed declaration ordering, erased existentials, unsaturated families, constrained families, CUSK deprecation and namespace management. |
+| R27 Deprecate CUSKs | Standalone kind signatures already exist. Serokell identifies an impact assessment and a transition warning for code relying on complete user-supplied kind signatures. |
+| R34 Syntactic unification | Type syntax already works in some expressions. Patterns, the term and type grammars, and the frontend representations still need general unification. |
+| R35 Namespace management | Imports and explicit type syntax already provide disambiguation. R36 pun warnings is the last open subtask listed upstream. |
+
+The [Serokell roadmap](https://ghc.serokell.io/dh) records the status of
+the upstream work. The [dependency checklist](#upstream-checklist-and-complete-dependency-index)
+maps its names to the local card numbers.
 
 The Showcase reads two lists from IO and proves
 `size (zip xs ys) :~: minSize (size xs) (size ys)` on those lists.
