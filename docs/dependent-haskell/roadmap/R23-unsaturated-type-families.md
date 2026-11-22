@@ -9,14 +9,30 @@ General kind inference and compatibility with existing unannotated programs
 remain open.
 Use the [work queue](../ROADMAP.md#current-work-queue) for priorities.
 
-One outstanding compatibility test is `T13822`. Its family `IK` returns
-`IK a -> IK b`. A later equation returns `Maybe` at that kind. The fork
-infers an unmatchable result arrow and reports GHC-83865 at `Maybe`.
-Writing `IK a %M -> IK b` lets the test compile. Both the published
-`c24ffa9ca0` compiler and the `8d756d44da` family-improvement repair
-reject the original source with the same diagnostic. The compatibility
-target is the original program without an annotation.
+The ordinary GHC test `T13822` uses the closed injective family `IK`
+to interpret kinds. Its constructor case returns `IK a -> IK b`.
+An older compiler fixed that arrow to U and reported GHC-83865 when a
+later equation returned `Maybe` at that kind. The compiler now infers
+a matchability index for `IK`, so the unchanged equation can select M.
 [Original GHC regression](../../../testsuite/tests/typecheck/should_compile/T13822.hs).
+
+This inference rule applies to a closed injective family with one
+visible argument. Its results must be `Type` or bare arrows whose
+operands are `Type` or recursive calls on pattern variables. The result
+shape distinguishes `Type` from an arrow for either matchability.
+The injectivity checker verifies the written annotation. A family
+with `Bool -> Bool` and `Bool %M -> Bool` in different equations keeps
+its fixed, distinct results. A written arrow matchability or standalone
+kind signature still governs the family.
+[Mixed-arrow regression](../../../testsuite/tests/dependent/should_run/NativeOpenMatchability.sh).
+
+On upgrade, GHC rechecks a home provider whose checked interface
+contains the old structural result with a fixed U arrow. The new `IK`
+kind invalidates its clients through their existing dependency hashes.
+A written `Unmatchable` arrow can have the same interface encoding. A
+stamp allows that provider to stay warm after the one recheck. An
+installed provider keeps its interface and needs a rebuild to export
+the new kind.
 
 ## Matchability on a source arrow
 
