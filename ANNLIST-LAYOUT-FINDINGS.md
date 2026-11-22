@@ -369,6 +369,7 @@ This also fixes an existing oddity: in the `[]` case, the old code combined a
 ---
 
 ## F6. MultiWayIf under `-XAlternativeLayoutRule` *(unverified)*
+- AlternativeLayoutRule is deprecated, skip
 
 ### Finding
 
