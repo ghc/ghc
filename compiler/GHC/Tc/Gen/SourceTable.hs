@@ -44,7 +44,7 @@ import GHC.Core.TyCo.FVs (tyConsOfTypes)
 import GHC.Core.TyCo.Rep (Coercion, Type(TyConApp, TermVarTy, CastTy))
 import GHC.Core.TyCon
 import GHC.Core.Type
-import GHC.Core.Utils (dataConRepInstPat, exprType, mergeAlts, stripTicksE, stripTicksTopE)
+import GHC.Core.Utils (dataConRepInstPat, exprType, findAlt, mergeAlts, stripTicksE, stripTicksTopE)
 import GHC.Data.Graph.Directed (Node(..), SCC(..), stronglyConnCompFromEdgedVerticesUniq)
 import GHC.Data.FastString (fsLit)
 import GHC.Data.Bag (isEmptyBag)
@@ -78,7 +78,7 @@ import GHC.Types.Basic (Origin(..), LeftOrRight(..), SourceTableOrigin(..), Unfo
                         isMarkedCbv, pickLR)
 import GHC.Types.Error (errorsFound)
 import GHC.Types.Id.Info (IdDetails(DFunId, SourceTableId, VanillaId), SourceDFun(..), setSourceProofRuleInfo)
-import GHC.Types.Id (globaliseId, idCbvMarks_maybe, idCoreRules, idInfo, idName, setIdInfo, idInlinePragma, isClassOpId_maybe, isDataConId_maybe, isDataConWorkId_maybe, idUnfolding, realIdUnfolding, mkVanillaGlobal, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe,
+import GHC.Types.Id (globaliseId, idCbvMarks_maybe, idCoreRules, idInfo, idName, setIdInfo, idInlinePragma, isClassOpId_maybe, isDataConId_maybe, isDataConWorkId_maybe, isJoinId, idUnfolding, realIdUnfolding, mkVanillaGlobal, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe,
                      setIdExported, setSourceMethodIds, sourceMethodAliases, sourceMethodTarget_maybe,
                      sourceMethodDFunClass)
 import GHC.Types.InlinePragma (isNeverActive, isOpaquePragma)
@@ -485,7 +485,7 @@ checkedMapperRules env owner = case activeMapperRules env owner of
            , isTwoListCaseTable table
            -> isJust (checkedImportedSpecConstr env owner table rule)
     rules | Just table <- sourceTableId_maybe owner
-          , isListFoldTable table || isReverseWorkerTable table ||
+          , isListFoldTable table || isListZipWithTable table || isReverseWorkerTable table ||
             isJust (reverseWrapperWorker table) ||
             isTwoListCaseTable table -> null rules
     [] -> False
@@ -1710,6 +1710,7 @@ sourceCaseTables binds = do
       final_candidate owner = isJust (list_case_position owner) || indexed_candidate owner
       binary_list_candidate owner = list_case_position owner == Just 0
       fold_candidate owner = generates_code && isJust (listFoldType (varType owner))
+      zip_candidate owner = generates_code && isJust (listZipWithType (varType owner))
       reverse_wrapper_candidate owner =
         generates_code && isJust (listReverseWrapperType (varType owner))
       identity_candidate owner = generates_code && isIdentitySourceType (varType owner)
@@ -1728,7 +1729,8 @@ sourceCaseTables binds = do
                     , eligible owner ||
                       (is_exported owner && (identity_candidate owner ||
                        composition_candidate owner || final_candidate owner ||
-                       reverse_wrapper_candidate owner || fold_candidate owner))]
+                       reverse_wrapper_candidate owner || fold_candidate owner ||
+                       zip_candidate owner))]
   if isHsBootOrSig (tcg_src env) || null candidates
     then pure ([], [])
     else do
@@ -1739,7 +1741,7 @@ sourceCaseTables binds = do
         let ruled_owner = changed owner
             check_final = isJust (list_case_position owner)
         if ruled_owner && not (final_candidate owner || identity_candidate owner || fold_candidate owner ||
-                              reverse_wrapper_candidate owner) then pure Nothing else do
+                              zip_candidate owner || reverse_wrapper_candidate owner) then pure Nothing else do
           rhs <- bindingCore bind owner
           pure $ do
             body <- rhs
@@ -1763,7 +1765,8 @@ sourceCaseTables binds = do
                       (guard (binary_list_candidate owner) *>
                         (directListAppend owner body <|> directListReverseWorker owner (prepare body) <|>
                          checkedTwoListCase public owner (prepare body))) <|>
-                      (guard (fold_candidate owner) *> directListFold owner (prepare body)) -> do
+                      (guard (fold_candidate owner) *> directListFold owner (prepare body)) <|>
+                      (guard (zip_candidate owner) *> directListZipWith owner (prepare body)) -> do
             table <- publishConstructorCase owner signature rows
             pure (Just (finalOwner owner table, table), [])
           Nothing | indexed_candidate owner
@@ -2895,6 +2898,137 @@ listFoldType ty = do
     _ -> Nothing
   pure (ConstructorCaseType binders tc [element] [callback, seed, list] 2 result)
 
+-- | Check the lifted signature of a list zipper with a curried callback.
+listZipWithType :: Type -> Maybe ConstructorCaseType
+listZipWithType ty = do
+    let (telescope, body) = splitForAllForAllTyBinders ty
+    binders <- traverse ordinaryCaseBinder telescope
+    guard (all (isLiftedTypeKind . varType . binderVar) binders)
+    [a, b, c] <- pure (mkTyVarTys (binderVars binders))
+    (callback, rest) <- caseArrow body
+    (left, rest') <- caseArrow rest
+    (right, result) <- caseArrow rest'
+    guard (callback `eqType` mkVisFunTyManyU a (mkVisFunTyManyU b c) &&
+           eqTypes [left, right, result] (map mkListTy [a, b, c]))
+    pure (ConstructorCaseType binders listTyCon [a, b, c] [callback, left, right] 1 result)
+
+-- | Identify a nominal family backed by a checked zipper.
+isListZipWithTable :: TyCon -> Bool
+isListZipWithTable table = isJust $ do
+    _ <- sourceTableTermOcc (nameOccName (tyConName table))
+    axiom <- closedFamilyTyConCoAxiom_maybe table
+    guard (coAxiomRole axiom == Nominal)
+    listZipWithType (tyConKind table)
+
+{- Note [Checked list zippers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Check the left list first. The left nil branch leaves the right list
+and the callback alone. Only the left cons branch checks the right
+list. The two-cons branch constructs a lazy cons with the original
+head application and recursive call on both original tails.
+
+The recursion can use the owner directly or a single local worker with
+the callback in scope. In the local form, check that the owner applies
+the worker to its exact list operands, allowing eta reduction. The
+recursive call must use that exact worker and both original tails.
+Recheck the rows against the axiom after optimization. Require no
+active rules when using the table, as for a right list fold.
+
+The desugarer can put a pattern-failure join around the cases and
+test an operand again in a default alternative. Select the reachable
+alternative for each list constructor with findAlt. Check both nil
+results and the cons result independently. A repeated test can only
+inspect an operand already forced on that path. Thus no checked path
+can reach the failure join, and the left nil path never tests the right.
+-}
+
+-- | Read the three ordered equations of a checked list zipper.
+directListZipWith :: Id -> Core.CoreExpr -> Maybe (ConstructorCaseType, [ConstructorCaseRow])
+directListZipWith owner original = do
+    let rhs = stripTicksE isSourceBreakpoint original
+        rhs_type = exprType rhs
+    guard (rhs_type `eqType` varType owner)
+    ConstructorCaseType telescope root [a, b, c] domains position result <- listZipWithType rhs_type
+    ConstructorCaseType declared _ _ _ _ _ <- listZipWithType (varType owner)
+    let (bindings, body) = Core.collectBinders rhs
+        (parameters, operands) = splitAt (length telescope) bindings
+        types = mkTyVarTys parameters
+    guard (parameters == binderVars telescope)
+    callback : supplied <- pure operands
+    ([left, right], cases, selfCall) <- case (supplied, body) of
+      (_, Core.Let (Core.Rec [(worker, worker_rhs)]) invoke)
+        | exactCall worker [] supplied invoke ->
+            let (inputs, branches) = Core.collectBinders worker_rhs
+            in pure (inputs, branches, \xs ys -> exactCall worker [] [xs, ys])
+      ([_, _], _) ->
+        pure (supplied, body, \xs ys -> exactCall owner types [callback, xs, ys])
+      _ -> Nothing
+    guard (all isId [callback, left, right] &&
+           eqTypes (map varType [callback, left, right]) domains)
+    let outer = case cases of
+          Core.Let (Core.NonRec j _) rest | isJoinId j -> rest
+          _ -> cases
+        left_nil = (left, a, nilDataCon)
+        left_cons = (left, a, consDataCon)
+        right_nil = (right, b, nilDataCon)
+        right_cons = (right, b, consDataCon)
+    (left_nil_fields, left_empty) <- listAlt result left_nil outer
+    (_, empty) <- followCases result [(left_nil, left_nil_fields)] left_empty
+    guard (nilResult c empty)
+    (left_fields, inner) <- listAlt result left_cons outer
+    (right_nil_fields, right_empty) <- listAlt result right_nil inner
+    (_, empty') <- followCases result [(left_cons, left_fields), (right_nil, right_nil_fields)] right_empty
+    guard (nilResult c empty')
+    (right_fields, rest) <- listAlt result right_cons inner
+    ([(_, [x, xs]), (_, [y, ys])], nonempty) <-
+      followCases result [(left_cons, left_fields), (right_cons, right_fields)] rest
+    (Core.Var cons, [Core.Type element, hd, tl]) <- pure (Core.collectArgs nonempty)
+    guard (cons == dataConWorkId consDataCon && element `eqType` c &&
+           exactCall callback [] [x, y] hd && selfCall xs ys tl)
+    let binders = zipWith (\v (Bndr _ vis) -> Bndr v vis) parameters declared
+        nil element_kind = CaseConstructor nilDataCon [element_kind] []
+        cell element_kind h t = CaseConstructor consDataCon [element_kind] [CaseField h, CaseField t]
+        row left_pat right_pat = ConstructorCaseRow [CaseField callback, left_pat, right_pat]
+        head_value = CaseApply callback [CaseField x, CaseField y]
+        tail_value = CaseSelf types [CaseField callback, CaseField xs, CaseField ys]
+    pure (ConstructorCaseType binders root [a, b, c] domains position result,
+           [ row (nil a) (CaseField right) (nil c)
+           , row (cell a x xs) (nil b) (nil c)
+           , row (cell a x xs) (cell b y ys) (CaseConstructor consDataCon [c] [head_value, tail_value]) ])
+  where
+    exactCall fun kinds operands expression =
+      case Core.collectArgs expression of
+        (Core.Var callee, arguments)
+          | (types, values) <- span Core.isTypeArg arguments ->
+              callee == fun && eqTypes (map Core.exprToType types) kinds &&
+              mapM operand values == Just operands
+        _ -> False
+    operand (Core.Var v) = Just v
+    operand _ = Nothing
+
+    nilResult output expression =
+      case Core.collectArgs expression of
+        (Core.Var nil_worker, [Core.Type nil_kind]) ->
+          nil_worker == dataConWorkId nilDataCon && nil_kind `eqType` output
+        _ -> False
+
+    listAlt result (scrutinee, input, con) expression = do
+      Core.Case (Core.Var actual) _ case_result alts <- pure expression
+      guard (actual == scrutinee && case_result `eqType` result)
+      Core.Alt alt fields rest <- findAlt (Core.DataAlt con) alts
+      guard (all isId fields && eqTypes (map varType fields)
+               (if alt == Core.DataAlt consDataCon then [input, mkListTy input] else []))
+      pure (fields, rest)
+
+    followCases result known expression
+      | Core.Case (Core.Var scrutinee) _ _ _ <- expression = do
+          (earlier, (fact, fields) : later) <- pure $
+              break (\((v, _, _), _) -> v == scrutinee) known
+          (new_fields, rest) <- listAlt result fact expression
+          let selected = if null new_fields then fields else new_fields
+          followCases result (earlier ++ (fact, selected) : later) rest
+      | otherwise = pure (known, expression)
+
 -- | Recognize the compiler-generated nominal family for a right list fold.
 isListFoldTable :: TyCon -> Bool
 isListFoldTable table = isJust $ do
@@ -3486,7 +3620,8 @@ verifyFinalCoreMapper binds original =
       -> isJust (checkedCompositionSource owner expression)
       | varType owner `eqType` varType original
       , Just table <- sourceTableId_maybe original
-      , isListFoldTable table || isReverseWorkerTable table || isJust (reverseWrapperWorker table)
+      , isListFoldTable table || isListZipWithTable table ||
+          isReverseWorkerTable table || isJust (reverseWrapperWorker table)
                        || isTwoListCaseTable table
       -> checkedFinalListTable bindings table
       | varType owner `eqType` varType original
@@ -3527,7 +3662,8 @@ verifyFinalCoreMapper binds original =
 failedFinalListTables :: [Core.CoreBind] -> [TyCon] -> [TyCon]
 failedFinalListTables binds tables =
     [table | table <- tables
-           , isListFoldTable table || isReverseWorkerTable table || isJust (reverseWrapperWorker table)
+           , isListFoldTable table || isListZipWithTable table ||
+             isReverseWorkerTable table || isJust (reverseWrapperWorker table)
                             || isTwoListCaseTable table
            , not (checkedFinalListTable bindings table)]
   where
@@ -3545,6 +3681,10 @@ checkedFinalListTable bindings table = isJust $ do
         worker_rhs <- lookup callee bindings
         directListReverseWorker callee worker_rhs
       Nothing | isListFoldTable table -> directListFold owner rhs
+              | isListZipWithTable table -> do
+                  (signature, rows) <- directListZipWith owner rhs
+                  guard (matchesConstructorCase table signature rows)
+                  pure (signature, rows)
               | isTwoListCaseTable table -> do
                   let check specialized = do
                         (signature, rows) <- checkedTwoListCaseWith specialized (const True) owner rhs
