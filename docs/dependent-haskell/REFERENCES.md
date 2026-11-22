@@ -3458,6 +3458,15 @@ The witness cannot leave the complete let expression.
 [GHC User's Guide, existential restrictions](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/existential_quantification.html#restrictions)
 and [paper, figure 9](https://richarde.dev/papers/2021/exists/exists.pdf#page=19).
 
+Agda can infer implicit arguments from the surrounding type and from the
+types of supplied values. R22 uses both sources when an ordinary client
+constructs `exists shape. Tile a shape`. The expected payload supplies
+the element type `a`. The constructor's actual result supplies the
+hidden shape. Two independent dimensions must still agree if the package
+requires the same witness in both positions.
+[Agda 2.8 implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html)
+and [R22 source inference](roadmap/R22-existential-quantification.md).
+
 Agda allows a local record pattern to bind fields through projections.
 For its dependent pair, the second field's type mentions the first.
 Agda inlines local bindings during type checking. GHC retains the
@@ -7850,6 +7859,13 @@ homogeneous equality with a cast. The solver keeps that equality in
 scope. It uses the kind proof to reject incompatible vector lengths or
 to reconstruct a proof with the original endpoints.
 [Source example and diagnostics](roadmap/R11-homogeneous-equality.md#an-equality-with-the-empty-vector).
+
+Agda's `trans` composes two proofs that share an endpoint. In Core,
+the R11 solver must also check the endpoint's kind after recovering a
+nominal proof from each matched GADT. It searches the finite set of
+proofs in scope. A cycle supplies no evidence for an unrelated endpoint.
+[Agda standard library 2.4, propositional equality](https://agda.github.io/agda-stdlib/v2.4/Relation.Binary.PropositionalEquality.Core.html)
+and [R11 chained proof checks](roadmap/R11-homogeneous-equality.md).
 
 ## Transport an ordinary GADT index with a quantified kind
 

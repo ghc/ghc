@@ -110,6 +110,25 @@ substitution. [Compiler qualification](CHECKPOINTS.md#four-roadmap-cards-and-the
 | [R13 function promotion](PLAN.md#constructor-specialization) | A recursive function can consume either list when the other list stays the same or also gets shorter. | Specialization at `-O2` must preserve the checked equations and which inputs each branch forces. |
 | [R18 type-level lets](roadmap/R18-type-level-lets.md) | An ordered type-level `let` can give a local binding its own kind signature. | Scope, diagnostics, exact printing and Template Haskell must agree with the source. |
 
+The next compiler checkpoint has 532 expected Showcase lines. It adds
+a curried runtime comparator, mapping instances selected by the receiver
+type, rectangular and square indices, a successor-indexed payload, a
+quantified GADT equality, and tuple patterns in type-level lets. Its
+matched compiler and library qualification is pending.
+
+The following checks extend the same cards. An ordinary caller can
+recover the dimensions and cells of a `Tile`. The partial application
+`f pivot` can appear inside `Prelude.fmap` in a type when both arguments
+and the result of `f` have abstract lifted types. Other component checks
+compose scoped index equalities across several matches and infer an
+erased shape from a runtime tile constructor. Nested tuple patterns in
+type-level lets await matched source and quotation tests.
+[Tile](examples/packed-vector/IndexedMatrixClient.hs),
+[mapping proof](examples/open-evaluation/TheseMapping.hs),
+[equality](roadmap/R11-homogeneous-equality.md),
+[existential construction](roadmap/R22-existential-quantification.md)
+and [let patterns](roadmap/R18-type-level-lets.md).
+
 For the remaining work on each card, use the table below. The
 [previous queue](CHECKPOINTS.md#vector-split-and-package-checkpoints)
 records the earlier source and interface checks.
