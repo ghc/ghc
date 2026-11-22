@@ -360,6 +360,7 @@ evidenceSuffix requirements
     || needs RepeatedInteriorGadtForAllEvidence || needs OrderedGadtTelescopeEvidence
     || needs InferredOrderedGadtBindersEvidence
     || needs ExtendedOrderedGadtTelescopeEvidence || needs FieldlessOrderedGadtTelescopeEvidence
+    || needs RefinedOrderedGadtTelescopeEvidence
     || needs ScopedLambdaEvidence
     || needs RetainedConstructorContextEvidence
     || needs HomeRuleInterfaceEvidence || needs PartialSynonymEvidence
@@ -414,6 +415,7 @@ legacyEvidenceSuffix OrderedGadtTelescopeEvidence = featureSetPrefix ++ "ordered
 legacyEvidenceSuffix InferredOrderedGadtBindersEvidence = featureSetPrefix ++ "inferred-ordered-gadt-binders"
 legacyEvidenceSuffix ExtendedOrderedGadtTelescopeEvidence = featureSetPrefix ++ "extended-ordered-gadt-telescope"
 legacyEvidenceSuffix FieldlessOrderedGadtTelescopeEvidence = featureSetPrefix ++ "fieldless-ordered-gadt-telescope"
+legacyEvidenceSuffix RefinedOrderedGadtTelescopeEvidence = featureSetPrefix ++ "refined-ordered-gadt-telescope"
 legacyEvidenceSuffix ScopedLambdaEvidence = featureSetPrefix ++ "scoped-lambda"
 legacyEvidenceSuffix RetainedConstructorContextEvidence = featureSetPrefix ++ "retained-constructor-context"
 legacyEvidenceSuffix HomeRuleInterfaceEvidence = featureSetPrefix ++ "home-rule-interfaces"
@@ -478,6 +480,7 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("inferred-ordered-gadt-binders", InferredOrderedGadtBindersEvidence)
                       , ("extended-ordered-gadt-telescope", ExtendedOrderedGadtTelescopeEvidence)
                       , ("fieldless-ordered-gadt-telescope", FieldlessOrderedGadtTelescopeEvidence)
+                      , ("refined-ordered-gadt-telescope", RefinedOrderedGadtTelescopeEvidence)
                       , ("scoped-lambda", ScopedLambdaEvidence)
                       , ("retained-constructor-context", RetainedConstructorContextEvidence)
                       , ("home-rule-interfaces", HomeRuleInterfaceEvidence)

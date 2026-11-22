@@ -5545,8 +5545,14 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
 
              ; let bang_opts = SrcBangOpts (initBangOpts dflags)
              ; let order
-                     | ordered =
-                         let suffix = map source_group remaining
+                     -- Refined terminal constructors need the same separation
+                     -- of result equalities and written contexts as other
+                     -- ordered constructors.
+                     -- See Note [Result equalities of ordered constructors]
+                     -- in GHC.Tc.Gen.Pat.
+                     | ordered || (terminal_order /= 0 && not (null eq_preds)) =
+                         let suffix = map source_group $
+                               if ordered then remaining else map Left terminal
                              late_count = sum [n | ConTypeArgs n <- suffix]
                              leading_context = sum [length (hsConDeclTheta (Just ctxt))
                                                     | L _ (HsGadtContext ctxt) <- inner_bndrs]
@@ -6607,7 +6613,7 @@ checkValidDataCon dflags existential_ok tc con
                ; checkTc ((null ex_tvs ||
                             ((dataConTerminalOrder con == gadtTrailingContextOnly || is_ordered) &&
                              all isTyVar ex_tvs))
-                          && null eq_spec
+                          && (is_ordered || null eq_spec)
                           && null (dataConStupidTheta con)
                           && not (isDataFamInstTyCon tc)
                           && not (isTypeDataCon con)

@@ -2939,6 +2939,11 @@ A context can also precede a type argument when the constructor has
 no fields. The payload counts type arguments, contexts, and fields
 separately. Older readers require a field in this layout.
 Mark the fieldless order in the header to reject it before a splice.
+
+An ordered constructor can refine its result parameters. Store its
+result equalities in the ordinary EqSpec list. The source order
+counts only the written contexts. Older readers reject EqSpec in
+an ordered constructor, so mark this use before external TH.
 -}
 
 instance Binary IfaceConDecls where
@@ -2960,6 +2965,8 @@ instance Binary IfaceConDecls where
             requireIfaceEvidenceVersion bh ExtendedOrderedGadtTelescopeEvidence
           when (any (\con -> ordered (ifConSourceOrder con) && null (ifConArgTys con)) cs) $
             requireIfaceEvidenceVersion bh FieldlessOrderedGadtTelescopeEvidence
+          when (any (\con -> ordered (ifConSourceOrder con) && not (null (ifConEqSpec con))) cs) $
+            requireIfaceEvidenceVersion bh RefinedOrderedGadtTelescopeEvidence
           record_legacy
           putByte bh 5
           put_ bh cs

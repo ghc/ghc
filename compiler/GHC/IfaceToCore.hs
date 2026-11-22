@@ -1304,7 +1304,7 @@ tcIfaceDataCons tycon_name tycon if_cons
                       any ((== 0) . fst) ordered_type_groups
                     leading_context_order _ = False
                 in unless (valid_group && all type_binder ex_bndrs && ordinary_data &&
-                           has_wrapper && null arg_binders && null spec && null lbl_names) $
+                           has_wrapper && null arg_binders && null lbl_names) $
                      failIfM (text "Invalid interior constructor group in interface:" <+> ppr dc_name)
           ; when (terminal_order /= 0) $
               unless (admissible_order && has_wrapper && not (null args) &&
