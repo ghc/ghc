@@ -736,3 +736,30 @@ type of `decide`. Selecting `snd (decide f x, True)` leaves the predicate
 unevaluated. If a signature specifies the first field's index, GHC checks
 the result of `decide` against it.
 [Tuple inference and desugaring](../REFERENCES.md#native-tuple-sections-and-application-spines).
+
+## Two arguments to a runtime callback
+
+The next source target extends `decideOrdering` to a comparator that
+takes both inputs at the call site.
+
+```haskell
+decideCompare :: foreach (cmp :: Bool -> Bool -> Ordering)
+              -> foreach (x :: Bool) -> foreach (y :: Bool)
+              -> Witness (cmp x y)
+decideCompare cmp x y = case cmp x y of
+    LT -> Less
+    EQ -> Equal
+    GT -> Greater
+```
+
+The Core experiment represents the prefix `cmp x` as a retained call and
+applies that result to `y` with the existing `AppTy`. The second arrow
+is unmatchable. Equal arguments give equal results. Equal results give
+no evidence about either argument. The checks cover Core Lint, forward
+congruence and attempted projections from a result equality.
+
+Source checking, reconstruction of the strict case from its runtime
+scrutinee, and a separately compiled client must all agree about the
+two operands. The published compiler supports the one-argument witness.
+[Existing ordering witness](../examples/open-evaluation/RuntimeOrdering.hs)
+and [application and equality precedents](../REFERENCES.md#applying-a-retained-callback-to-two-arguments).

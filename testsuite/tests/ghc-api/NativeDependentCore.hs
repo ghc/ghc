@@ -114,6 +114,7 @@ main = do
             runOccurrenceChecks dflags
             runAliasChecks dflags
             runOpaqueCallChecks dflags
+            runCurriedCallCoreChecks dflags
             runFunctionBinderChecks dflags
             runFunctionFieldChecks dflags
             runArrowMatchabilityChecks dflags
@@ -133,6 +134,42 @@ main = do
             runIfaceChecks libdir
             putStrLn "native-core-api-ok"
         _ -> fail "Usage: NativeDependentCore GHC_LIBDIR"
+
+-- | Check ordinary unmatchable Core application after the first retained operand.
+runCurriedCallCoreChecks :: DynFlags -> IO ()
+runCurriedCallCoreChecks dflags = do
+    let order = mkTyConTy orderingTyCon
+        step = mkVisFunTyManyU boolTy order
+        cmp = local 11500 "cmp" (mkVisFunTyManyU boolTy step)
+        x = local 11501 "x" boolTy
+        y = local 11502 "y" boolTy
+        z = local 11503 "z" boolTy
+        apply a b = mkAppTys (TermVarTy cmp) [TermVarTy a, TermVarTy b]
+        partial = TermAppTy cmp (TermVarTy x)
+        result = apply x y
+        xy = proof 11504 (TermVarTy x) (TermVarTy y)
+        yz = proof 11505 (TermVarTy y) (TermVarTy z)
+        forward = mkAppCo (mkTermAppCo cmp (mkCoVarCo xy)) (mkCoVarCo yz)
+        whole = proof 11506 result (apply x z)
+        scope = [cmp, x, y, z, xy, yz, whole]
+    check "the comparator is a retained call head" (isNativeIndexFunctionId cmp)
+    checkType dflags "the prefix has the second argument's arrow" step (typeKind partial)
+    check "the second application uses ordinary AppTy" $ case result of
+        AppTy (TermAppTy f (TermVarTy a)) (TermVarTy b) -> (f, a, b) == (cmp, x, y)
+        _ -> False
+    checkType dflags "the full call has the declared result kind" order (typeKind result)
+    lintAccepts dflags "well-kinded curried call" scope (Coercion (mkNomReflCo result))
+    lintAccepts dflags "forward congruence in both arguments" scope (Coercion forward)
+    checkType dflags "left endpoint of curried congruence" result (coercionLKind forward)
+    checkType dflags "right endpoint of curried congruence" (apply y z) (coercionRKind forward)
+    forM_ [apply x z, apply z y] $ \other ->
+        check "different inputs to an unknown comparator remain possibly equal" $
+            case tcUnifyTysFG alwaysBindFam alwaysBindTv [result] [other] of
+                MaybeApart{} -> True
+                _ -> False
+    forM_ [CLeft, CRight] $ \side ->
+        lintRejects dflags "call-result equality cannot be projected" scope
+            (Coercion (LRCo side (mkCoVarCo whole)))
 
 -- | Create a stable test unique without a global unique supply.
 unique :: Int -> Unique

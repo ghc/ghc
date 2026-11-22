@@ -5679,6 +5679,19 @@ before it checks an application such as `f x` in the result type.
 [Provider](../../testsuite/tests/dependent/should_run/NativeLiftedCallbackProvider.hs)
 and [kind and demand checks](../../testsuite/tests/dependent/should_run/NativeLiftedCallback.sh).
 
+### Applying a retained callback to two arguments
+
+Agda represents a neutral variable with its eliminations in application
+order. This keeps `cmp x y` attached to the original variable when its
+definition is unknown. In GHC proposal #242, a matchable function is
+both generative and injective. An arbitrary runtime comparator has
+neither guarantee. The R03 experiment uses the existing unmatchable
+arrow for the second application. Its Core test checks that a result
+equality cannot supply an equality between the arguments.
+[Agda 2.8.0 terms and eliminations](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Syntax/Internal.hs#L221-L252),
+[GHC proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#matchability)
+and [Core checks](../../testsuite/tests/ghc-api/NativeDependentCore.hs).
+
 ### Upgrading checked method interfaces
 
 Agda checks the interface version before decoding a module. It also
