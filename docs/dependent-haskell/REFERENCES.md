@@ -5868,6 +5868,14 @@ the equality proof would keep searching for the end of the zip.
 [Agda standard library 2.3, list properties](https://agda.github.io/agda-stdlib/v2.3/Data.List.Properties.html)
 and [Haskell proof](examples/packed-vector/ZipRows.hs).
 
+The fork also checks that induction directly on two ordinary lists. A
+`foreach` binder lets the clauses refine each input as they match its
+constructors. The structural count is the ordinary function `size`. Its
+three minimum equations remain a closed family in this version. The
+ordinary `minSize` definition for the same Peano type still rejects on
+two open inputs. [Direct list proof](examples/open-evaluation/PreludeZipRuntime.hs)
+and [ordinary structural count](examples/open-evaluation/PreludeMapLengthSize.hs).
+
 A proposed length for zipping two ordinary lists tests the first spine,
 then tests the second spine only if the first has a cell. Agda's `max`
 example shows why a source equation need not reduce when its first

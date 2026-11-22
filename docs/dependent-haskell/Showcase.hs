@@ -159,6 +159,7 @@ import qualified RowProof
 import qualified OrdinaryFamilyBranches
 import qualified PreludeFoldrProof
 import qualified PreludeZipProof
+import qualified PreludeZipRuntime
 import qualified PreludeZipWithLengthProof
 import qualified PreludeZipWithProof
 import qualified PreludeFilterLengthProof
@@ -1903,10 +1904,12 @@ main = do
                              (error "forced second argument"))
     observe "use a checked cons rule without forcing the callback, head or tail"
         (ConsRuleMapProof.negateHead (Proxy @'[]), ConsRuleMapProof.lazySpine)
+    zipLeft <- newIORef [True, False] >>= readIORef
+    zipRight <- newIORef [False] >>= readIORef
     observe "zip two lists and prove the pair and minimum-length laws"
-        ( zip [True, False] [False]
+        ( zip zipLeft zipRight
         , PreludeZipProof.firstPair
-        , PreludeZipProof.shorterRight
+        , PreludeZipRuntime.lengthZip zipLeft zipRight
         , PreludeZipWithLengthProof.shorterRight
         )
     observe "use the Prelude.zipWith cons equation with both tails unevaluated"

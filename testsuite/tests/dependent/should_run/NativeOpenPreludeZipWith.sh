@@ -27,7 +27,7 @@ length_proof="$src/PreludeZipWithLengthProof.hs"
 pair_proof="$src/PreludeZipProof.hs"
 for opt in -O0 -O2; do
     "${ghc[@]}" "$opt" -fno-enable-rewrite-rules -fforce-recomp -c \
-        "$proof" "$length_proof" "$pair_proof" -outputdir .
+        "$proof" "$length_proof" "$pair_proof" "$src/PreludeZipRuntime.hs" -outputdir .
 done
 
 reject() {

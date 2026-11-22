@@ -1828,9 +1828,24 @@ The existing constructor checker verifies the lazy pair in its cons
 equation. An independent induction on the two list spines proves the
 minimum-length law directly for `Prelude.zip`. The Showcase runs `zip`
 on unequal lists and prints the pair-cons proof and the two length proofs.
-The proof module specializes its witnesses at concrete inputs. Their
-exported types contain only the resulting list or length. The optimized
-Showcase can print them with its usual rewrite rules enabled.
+An extension-enabled proof takes the two runtime lists directly with
+`foreach`. Matching `[]` and `(:)` refines the lists in its result
+type. Its result type calls the ordinary `size` and `Prelude.zip`
+functions directly. The optimized Showcase reads two lists from IO, runs the installed
+zipper, and calls the proof on those same lists. An extension-off proof
+uses `Spine xs` to refine an erased list index by pattern matching.
+
+`Count` names the ordinary structural function `size`, which counts in
+unbounded successors. `Minimum` compares two such counts. The installed
+`Prelude.length` returns a bounded `Int`. Its result can overflow.
+The two formulations also differ on partial inputs. For example,
+`length (zip [] undefined)` returns zero, but `min 0 (length undefined)`
+forces the second length. The compiler currently accepts selected
+closed list lengths. At an unknown list or an unknown `Int`, it rejects
+the corresponding open `Prelude.length` or `Prelude.min` application
+with GHC-70565. [Runtime-list proof](../examples/open-evaluation/PreludeZipRuntime.hs)
+and [closed length examples](R15-closed-term-evaluator.md).
+
 Both functions must recur on the original tails. A function that checks
 the right spine first or forces a head before returning a cons does not
 get these equations. See the
