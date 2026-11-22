@@ -1651,7 +1651,7 @@ normalise_type ty
            ; env <- getEnv
            ; let callback ctx domain
                    -- See Note [Closed retained domains].
-                   | noFreeVarsOfType domain = mkReflRedn Nominal domain
+                   | Just ty <- retainedReflDomain_maybe ctx domain = mkReflRedn Nominal ty
                    | otherwise = runNormM (normalise_type domain) env ctx Nominal
                  (lc', v', domain) = liftCoSubstNativeBndrUsing reductionCoercion callback lc v
            ; Reduction body_co _ <- withLC lc' $ normalise_type body
@@ -1796,6 +1796,15 @@ closed families. For unequal domains, the retained equality solver still uses
 bounded rewriteFamilyAxioms on the standalone domains. Keep that reduction
 and its depth error. See Note [Solving retained function equalities] in
 GHC.Tc.Solver.Equality.
+
+A retained callback occurrence carries the type of its lexical head. If
+the enclosing lifting context gives the same callback type at both
+endpoints, keep that type. For example, when checking ambiguity in
+`foreach (f :: Bool -> F tag) -> ...`, a Wanted may rewrite `F tag0` to
+`F tag`. Using it to rewrite the binder would require a cast between
+two different function types at each occurrence of f. The existing
+call representation requires the head to keep its complete type.
+The family equality remains available to the ordinary solver.
 
 An open domain can depend on an outer type variable or an earlier runtime Id.
 Keep its nominal normalisation and transport. Body arguments still use the

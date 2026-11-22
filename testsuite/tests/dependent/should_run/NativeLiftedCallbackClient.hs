@@ -1,7 +1,9 @@
-{-# LANGUAGE GADTs, NoExperimentalDependentTypes, TupleSections #-}
+{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, TupleSections #-}
 module Main where
 
 import Control.Exception (ErrorCall(..), evaluate, try)
+import Data.Proxy (Proxy(..))
+import qualified FamilyCallback
 import qualified CompareAt
 import NativeLiftedCallbackProvider (Decision(..), decide)
 import System.Environment (getArgs)
@@ -33,6 +35,10 @@ forceFailure message value = do
     Left (ErrorCall actual) -> actual == message
     Right _ -> False
 
+-- | Pass an opaque callback with the same family-indexed type as the provider.
+keepFamily :: (Bool -> FamilyCallback.Result 'True) -> Bool -> IO ()
+keepFamily f x = print (FamilyCallback.law @'True (Proxy @'True) f x)
+
 main :: IO ()
 main = do
   [input] <- getArgs
@@ -54,3 +60,4 @@ main = do
   let lazyProof :: (Bool -> Bool -> Ordering) -> Bool -> Bool -> IO ()
       lazyProof f x y = print (CompareAt.keepCompare f x y)
   lazyProof (error "unused comparator") (error "unused first argument") (error "unused second argument")
+  keepFamily (error "forced family callback") (error "forced callback argument")

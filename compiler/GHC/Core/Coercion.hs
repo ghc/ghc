@@ -106,7 +106,7 @@ module GHC.Core.Coercion (
 
         LiftCoEnv, NativeLiftEnv, LiftingContext(..), liftEnvSubstLeft, liftEnvSubstRight,
         extendLiftingContextNative, liftCoSubstNative, liftCoSubstNativeBndrUsing,
-        prepareNativeLiftingContext,
+        prepareNativeLiftingContext, retainedReflDomain_maybe,
         abstractNativeIndices,
         substRightCo, substLeftCo, swapLiftCoEnv, lcSubstLeft, lcSubstRight,
 
@@ -2153,6 +2153,18 @@ liftCoSubstNative lc@(LC _ _ native) role source
   where
     left = substTy (lcSubstLeft lc) (TermVarTy source)
     right = substTy (lcSubstRight lc) (TermVarTy source)
+
+-- | Keep a closed domain or a fixed callback type in its enclosing scope.
+-- See Note [Closed retained domains] in GHC.Core.FamInstEnv.
+retainedReflDomain_maybe :: LiftingContext -> Type -> Maybe Type
+retainedReflDomain_maybe lc ty
+  | noFreeVarsOfType ty = Just ty
+  | Just {} <- nativeIndexFunctionTypeTys_maybe ty
+  , left `eqType` right = Just left
+  | otherwise = Nothing
+  where
+    left  = substTy (lcSubstLeft lc) ty
+    right = substTy (lcSubstRight lc) ty
 
 -- | Lift a runtime domain before introducing its binder.
 liftCoSubstNativeBndrUsing :: (a -> CoercionN)

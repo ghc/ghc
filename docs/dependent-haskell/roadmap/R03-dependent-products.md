@@ -47,6 +47,15 @@ representation-polymorphic second domain.
 [Mapping proof](../examples/open-evaluation/TheseMapping.hs)
 and [source checks](../../../testsuite/tests/dependent/should_run/NativeLiftedCallback.sh).
 
+For a callback `f :: Bool -> Result tag`, a noninjective family cannot
+determine `tag`. The ambiguity check reports GHC-83865 at the signature
+when no other argument determines it. Supplying `Proxy tag` determines
+the tag. A client can then obtain `Refl` without forcing the callback
+or its argument. The consumer currently needs the declared callback
+domain. Writing its reduced function type in the consumer still fails
+at the retained argument.
+[Family callback control](../../../testsuite/tests/dependent/should_run/curried-callback/FamilyCallback.hs).
+
 A type synonym can name a dependent function over a lifted parameter.
 The ordinary caller can use `Consumer a p r` in a signature and supply a
 witness and its indexed payload. The Showcase instantiates the witness

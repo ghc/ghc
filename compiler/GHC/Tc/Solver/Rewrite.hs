@@ -877,10 +877,9 @@ rewrite_one ty@(DepFunTy vis b body)
   | isNativeOpaqueValueId b
   , isLiftedTypeKind (typeKind body)
   = do { lc <- getRewriteEnvField re_native_lifting
-       ; domain <- if noFreeVarsOfType (varType b)
-                   -- See Note [Closed retained domains] in GHC.Core.FamInstEnv.
-                   then return (mkReflRedn Nominal (varType b))
-                   else setEqRel NomEq $ rewrite_one (varType b)
+       ; domain <- case retainedReflDomain_maybe lc (varType b) of
+             Just ty -> return (mkReflRedn Nominal ty)
+             Nothing -> setEqRel NomEq $ rewrite_one (varType b)
        ; let (lc', b', _) = liftCoSubstNativeBndrUsing reductionCoercion
                               (\_ _ -> domain) lc b
        ; Reduction body_co _ <- withNativeLifting lc' b' $ rewrite_one body

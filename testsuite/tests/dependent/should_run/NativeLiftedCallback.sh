@@ -9,7 +9,7 @@ ghc=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint -fdiagnostics-
 provider=NativeLiftedCallbackProvider
 client=NativeLiftedCallbackClient
 expected=$'(False,False,True)\nTrue\nTrue\nTrue\n(IsFalse,())\n(IsFalse,())\nTrue'
-expected+=$'\n(GT,LT,EQ)\nRefl'
+expected+=$'\n(GT,LT,EQ)\nRefl\nRefl'
 
 for opt in O0 O2; do
     flags=("-$opt")
@@ -23,13 +23,23 @@ for opt in O0 O2; do
     mv "$provider.hs" ../
     "${ghc[@]}" "${flags[@]}" -c "$src/RuntimeOrdering.hs" -outputdir .
     "${ghc[@]}" "${flags[@]}" -c "$src/CompareAt.hs" -outputdir .
-    cp "$provider.hi" RuntimeOrdering.hi CompareAt.hi "$src/$client.hs" ../client/
+    "${ghc[@]}" "${flags[@]}" -c "$src/curried-callback/FamilyCallback.hs" -outputdir .
+    cp "$provider.hi" RuntimeOrdering.hi CompareAt.hi FamilyCallback.hi "$src/$client.hs" ../client/
     cd ../client
     "${ghc[@]}" "-$opt" -c "$client.hs"
-    "${ghc[@]}" "$client.o" "../provider/$provider.o" ../provider/{CompareAt,RuntimeOrdering}.o -o run
+    "${ghc[@]}" "$client.o" "../provider/$provider.o" ../provider/{CompareAt,RuntimeOrdering,FamilyCallback}.o -o run
     actual=$(./run True)
     [[ $actual == "$expected" ]] || { printf '%s\n' "$actual"; exit 1; }
 done
+
+for zap in -fzap-coercions -fno-zap-coercions; do
+    if "${ghc[@]}" "$zap" -DAMBIGUOUS -fno-code -fforce-recomp -c \
+        "$src/curried-callback/FamilyCallback.hs" >ambiguity.log 2>&1; then exit 1; fi
+    grep -Fq '[GHC-83865]' ambiguity.log
+    grep -Fq 'non-injective type family' ambiguity.log
+    grep -Fq 'In the ambiguity check for' ambiguity.log
+done
+"${ghc[@]}" -DAMBIGUOUS -XAllowAmbiguousTypes -fforce-recomp -fno-code -c "$src/curried-callback/FamilyCallback.hs"
 
 for probe in NoInverse WrongOrder; do
     if "${ghc[@]}" -ferror-spans -fno-code -c "$src/curried-callback/$probe.hs" >"$probe.log" 2>&1 ||
