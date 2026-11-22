@@ -3752,6 +3752,14 @@ This comparison establishes no evaluator or combined preservation theorem.
 
 ## Opaque native calls: representation, substitution and nominal congruence
 
+Agda checks whether a proposed solution refers to the metavariable it
+would solve. In this fork the Core unifier must also follow the type and
+multiplicity of a retained identifier. For `f :: a -> Bool` and
+`x :: a`, the result kind of `f x` is `Bool`, but an assignment for
+`a` containing that index would refer back to `a`.
+[Agda 2.8.0 occurs check](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/MetaVars/Occurs.hs#L510-L523)
+and [GHC unifier](../../compiler/GHC/Core/Unify.hs).
+
 Agda v2.8.0 supplies the operational precedent for a neutral head with eliminations:
 [`Internal.hs`221–252](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Syntax/Internal.hs#L221-L252).
 Its scoped substitution applies a variable's stored replacement and eliminations:

@@ -83,6 +83,22 @@ source revisions and rebuild commands, then remove both sets of outputs
 after the last live user finishes. The 200 GB threshold is a backup for
 this cleanup.
 
+## Four roadmap cards and the Core occurs check
+
+The normal compiler at `bb45f2d668` integrates indexed vector patterns
+(R04), a derived mapping method (R12), recursion on either list (R13),
+and local kind signatures in type-level lets (R18). Both compiler stages
+matched all 525 Showcase lines at `-O0` and `-O2`. The self-hosted GHCi
+run also matched.
+
+The previous normal compiler at `63cd0fb120` classified two recursive
+substitutions as unifiable. One referred to the type variable through a
+retained callback and its operand. The other reached it through an earlier
+substitution. After the repair, the direct and indirect cases report
+`MARInfinite`, and an independent substitution remains unifiable.
+[Core controls](../../testsuite/tests/ghc-api/NativeDependentCore.hs)
+and [unifier](../../compiler/GHC/Core/Unify.hs).
+
 ## R11 retained vector equality
 
 At `48bb9fa5bd`, both normal Hadrian stages produced the 519 expected

@@ -23,18 +23,16 @@ depend on others, so this count cannot estimate the remaining work time.
 | Declaration dependencies, families and GADTs | R21, R23, R24, R41 |
 | Namespace warnings | R36 |
 
-The 522-output Showcase includes a proof that zipping two runtime lists
-returns exactly as many pairs as the length of the shorter list.
-An ordinary client prints the pairs and the proof in the same tuple.
-The filtering example bounds the result of a predicate that captures a
-runtime cutoff. The mapping example proves both equations for
-`Prelude.fmap` on `Either`. An erased package can infer its witness
-through a lambda that forwards a declared rank-n callback.
-[Zip proof](examples/packed-vector/ZipRows.hs),
-[ordinary zip client](examples/packed-vector/OrdinaryZipRows.hs),
-[filter bound](examples/open-evaluation/PreludeFilterRuntime.hs),
-[Either equations](examples/open-evaluation/PreludeFmapEitherProof.hs)
-and [erased callback](examples/erased-existentials/RankedPackageClient.hs).
+The 525-output Showcase proves that zipping two runtime lists returns
+as many pairs as the shorter list. A second recursive function counts
+records when a header is present. It returns zero for an empty header
+without inspecting the records. An ordinary client can also match a
+vector's stored length, or map a runtime predicate over `These` and
+obtain a proof that its label survives.
+[List proofs](examples/packed-vector/ZipRows.hs),
+[ordinary list client](examples/packed-vector/OrdinaryZipRows.hs),
+[vector client](examples/packed-vector/DirectIndexedVectorClient.hs)
+and [mapping proof](examples/open-evaluation/TheseMapping.hs).
 
 Earlier [Showcase milestones and examples](CHECKPOINTS.md#showcase-history-through-502-outputs)
 record how each behavior was introduced.
@@ -100,11 +98,12 @@ installed provider needs its source rebuilt to recover omitted evidence.
 [Open evaluation](roadmap/R16-open-term-evaluator.md) and
 [upgrade checks](CHECKPOINTS.md#shared-r11-and-r16-rebuild).
 
-Four changes share one normal compiler build. The card totals above
-count the published results. Each change extends a card that is already
-partially implemented.
+Four changes share the normal compiler at `bb45f2d668`. Each extends
+a card already counted as partially implemented. Its Core unifier also
+checks the types of retained variables before accepting a recursive
+substitution. [Compiler qualification](CHECKPOINTS.md#four-roadmap-cards-and-the-core-occurs-check).
 
-| Card | Behavior under test | Regression to catch |
+| Card | Behavior | Regression checks |
 | --- | --- | --- |
 | [R04 dependent sums](roadmap/R04-dependent-sums.md) | An ordinary caller matches the length stored in an indexed vector. | A known zero length should make the zero branch exhaustive. At an unknown length, omitting the successor branch should still warn. |
 | [R12 class promotion](roadmap/R12-promote-classes.md) | A client proves that derived `fmap` applies a runtime predicate and preserves the other field of `These`. | An instance that discards the field must reject the original proof. A warm build must recover the same checked equations as a clean build. |
