@@ -122,4 +122,8 @@ data T where { ; C1 :: T ;; C2 :: T }
 data U where
   C3 :: U ;; C4 :: U
 
+-- Closed type family leading semis
+
+type family F a where { ; F Int = Bool ; F a = Char }
+
 -- eof

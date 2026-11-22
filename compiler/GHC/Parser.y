@@ -1530,29 +1530,29 @@ where_type_family :: { Located ((EpToken "where",  EpToken ".."),FamilyInfo GhcP
                     , ClosedTypeFamily (fst $ fst $ unLoc $2) (snd $ unLoc $2)) }
 
 ty_fam_inst_eqn_list :: { Located ((AnnList, EpToken ".."),Maybe (LocatedA [LTyFamInstEqn GhcPs])) }
-        :     '{' ty_fam_inst_eqns '}'     { sLL $1 $> ((AnnList (EpExplicitBraces (epTok $1) (epTok $3)) [], noAnn)
-                                                ,Just (sLLa $1 $> (reverse $ unLoc $2))) }
-        | vocurly ty_fam_inst_eqns close   { let (L loc _) = $2 in
-                                             L loc ((pal $ AnnList (epVirtualBraces (glR $1) $2) [], noAnn),Just (sL1a $2 (reverse $ unLoc $2))) }
+        :     '{' ty_fam_inst_eqns '}'     { sLL $1 $> ((AnnList (EpExplicitBraces (epTok $1) (epTok $3)) (fst $ unLoc $2), noAnn)
+                                                ,Just (sLLa $1 $> (reverse $ snd $ unLoc $2))) }
+        | vocurly ty_fam_inst_eqns close   { let (L loc (semis, eqns)) = $2 in
+                                             L loc ((pal $ AnnList (epVirtualBraces (glR $1) $2) semis, noAnn),Just (sL1a $2 (reverse eqns))) }
         |     '{' '..' '}'                 { sLL $1 $> ((AnnList (EpExplicitBraces (epTok $1) (epTok $3)) [], epTok $2), Nothing) }
         | vocurly '..' close               { let (L loc _) = $2 in
                                              L loc ((AnnList (EpVirtualBraces (glR $1)) [], epTok $2),Nothing) }
 
-ty_fam_inst_eqns :: { Located [LTyFamInstEqn GhcPs] }
+ty_fam_inst_eqns :: { Located ([EpToken ";"], [LTyFamInstEqn GhcPs]) }
         : ty_fam_inst_eqns ';' ty_fam_inst_eqn
                                       {% let (L loc eqn) = $3 in
                                          case unLoc $1 of
-                                           [] -> return (sLL $1 $> (L loc eqn : unLoc $1))
-                                           (h:t) -> do
+                                           (semis, []) -> return (sLL $1 $> (semis ++ [mzEpTok $2], (L loc eqn : (snd $ unLoc $1))))
+                                           (semis, h:t) -> do
                                              h' <- addTrailingSemiA h (epTok $2)
-                                             return (sLL $1 $> ($3 : h' : t)) }
+                                             return (sLL $1 $> (semis, $3 : h' : t)) }
         | ty_fam_inst_eqns ';'        {% case unLoc $1 of
-                                           [] -> return (sLZ $1 $> (unLoc $1))
-                                           (h:t) -> do
+                                           (semis, []) -> return (sLZ $1 $> (unLoc $1))
+                                           (semis, h:t) -> do
                                              h' <- addTrailingSemiA h (epTok $2)
-                                             return (sLZ $1 $>  (h':t)) }
-        | ty_fam_inst_eqn             { sLL $1 $> [$1] }
-        | {- empty -}                 { noLoc [] }
+                                             return (sLZ $1 $>  (semis, h':t)) }
+        | ty_fam_inst_eqn             { sLL $1 $> ([], [$1]) }
+        | {- empty -}                 { noLoc ([], []) }
 
 ty_fam_inst_eqn :: { LTyFamInstEqn GhcPs }
         : 'forall' tv_bndrs '.' type '=' ktype
