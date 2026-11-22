@@ -2015,10 +2015,15 @@ tcRetainedKnownValuePlan declared expected sigma values
       , tc == tc', isAlgTyCon tc, templates `equalLength` actuals
       , Just fields <- result_fields tc templates actuals
       = foldM (\s (template, actual) -> match_result_fields tvs s template actual)
-              Subst.emptySubst
-              [(template, actual) | (template, actual) <- fields
-                                  , not (anyFreeVarsOfType (== witness) actual)]
+              Subst.emptySubst (mapMaybe independent fields)
       | otherwise = Nothing
+      where
+        independent entry@(template, actual)
+          | not (mentions_witness actual) = Just entry
+          | let expanded = expandTypeSynonyms actual
+          , not (mentions_witness expanded) = Just (template, expanded)
+          | otherwise = Nothing
+        mentions_witness = anyFreeVarsOfType (== witness)
 
     match_result_fields tvs subst formal actual
       | Just tv <- getTyVar_maybe formal, tv `elem` tvs
@@ -2608,11 +2613,12 @@ example, dropVec returns Vec a m and its input contains Add n m.
 An expected dot package can also supply independent erased parameters.
 For Tile rows columns xs checked against exists shape. Tile a shape,
 take the element type a from the expected payload. Skip arguments that
-mention the hidden witness. The ordinary result would otherwise still
-have a fresh element metavariable when implicitResult tries to match
-the payload. It cannot use an ordinary metavariable for the retained
-shape. First choose the element type, then let implicitResult check the
-actual result and choose the shape it contains.
+still mention the hidden witness after expanding type synonyms. Use the
+expanded type when a synonym discards the witness. The ordinary result
+would otherwise have a fresh element metavariable when implicitResult
+tries to match the payload. It cannot use an ordinary metavariable for
+the retained shape. First choose the element type, then let
+implicitResult check the actual result and choose the shape it contains.
 
 Only the erased parameters receive type arguments. Keep the declared
 retained telescope. The argument checker still checks the input at

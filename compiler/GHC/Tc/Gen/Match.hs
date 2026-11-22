@@ -76,7 +76,7 @@ import GHC.Core ( Expr(Var, App, Type), exprToNativeIndex )
 import GHC.Core.TyCo.Rep ( Type(DepFunTy, ExistsTy, ForAllTy, FunTy, ft_af, TermVarTy, TyConApp) )
 import GHC.Core.Subst ( extendIdSubstWithClone )
 import qualified GHC.Core.TyCo.Subst as Subst
-import GHC.Core.Type ( coreFullView, isManyTy, splitTyConApp_maybe
+import GHC.Core.Type ( coreFullView, expandTypeSynonyms, isManyTy, splitTyConApp_maybe
                      , anyFreeVarsOfType, typeKind, isNativeIndexFunctionId, isNativeOpaqueValueId
                      , isInvisibleForAllTyFlag, isNativeIndexId, nativeIndexDataConTyArgs
                      , splitFunTy_maybe, nativeCallSpine_maybe, substTyWith )
@@ -287,6 +287,7 @@ tcOpenImplicitPackage :: SrcSpan -> TcType -> LHsExpr GhcTc -> TcRhoType
 tcOpenImplicitPackage = tcOpenImplicitPackageAt ManyTy
 
 -- | Open checked dot binders with the multiplicity of the payload pattern.
+-- See Note [Type synonyms in implicit existential openings].
 tcOpenImplicitPackageAt :: Mult -> SrcSpan -> TcType -> LHsExpr GhcTc -> TcRhoType
                         -> (Id -> TcM (HsExpr GhcTc)) -> TcM (HsExpr GhcTc)
 tcOpenImplicitPackageAt mult loc schema checked result_ty check_body = open schema checked
@@ -299,7 +300,8 @@ tcOpenImplicitPackageAt mult loc schema checked result_ty check_body = open sche
              ; uniq <- newUnique
              ; let name = mkSystemNameAt uniq (getOccName binder) loc
              ; witness <- pushTcLevelM_ $ newSkolemTyVar skol name (tyVarKind binder)
-             ; let body_ty = substTyWith [binder] [mkTyVarTy witness] payload_ty
+             ; let body_ty = substTyWith [binder] [mkTyVarTy witness]
+                                         (expandTypeSynonyms payload_ty)
              ; payload <- newSysLocalId (fsLit "unpacked") mult body_ty
              ; (ev_binds, body) <- setSrcSpan loc $
                  checkConstraints origin [witness] [] $
@@ -309,6 +311,17 @@ tcOpenImplicitPackageAt mult loc schema checked result_ty check_body = open sche
              ; return (XExpr (NativeExistsUnpack witness payload result_ty checked
                                  (mkHsDictLet ev_binds (noLocA body)))) }
         _ -> failWithTc (TcRnExistsPack (ExistsPackInvalidSchema schema))
+
+{- Note [Type synonyms in implicit existential openings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The result type of Unpack is outside the witness's scope. Suppose a
+package contains Tile (Constant shape) shape, where Constant is a synonym
+for Bool. A reader can infer Constant shape as its result element type.
+The synonym is equal to Bool, but its argument still refers to shape in
+Core. Expand synonyms in the payload before checking the reader. This
+keeps discarded arguments out of the inferred result. Any genuine use of
+the witness stays in scope for checking the reader.
+-}
 
 {- Note [Invisible retained definition patterns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

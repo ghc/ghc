@@ -18,6 +18,9 @@ data Choice a (b :: Bool) where
 
 type HiddenChoice a = exists (b :: Bool). Choice a b
 
+type IgnoreFlag (b :: Bool) = Char
+type HiddenConstant = exists (b :: Bool). Choice (Maybe (IgnoreFlag b)) b
+
 forget :: RetainedFlag -> Hidden
 forget (RuntimeFlag _ payload) = payload
 
