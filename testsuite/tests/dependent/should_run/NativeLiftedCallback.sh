@@ -65,3 +65,24 @@ if "${ghc[@]}" -ferror-spans -c WrongTuple.hs >tuple.log 2>&1 ||
     cat tuple.log >&2
     exit 1
 fi
+
+cat >RigidInput.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, MagicHash #-}
+module RigidInput where
+import GHC.Exts (TYPE, RuntimeRep(IntRep))
+
+rigid :: forall (r :: RuntimeRep) (a :: TYPE r). foreach (p :: a -> Bool) -> Bool
+rigid _ = False
+
+unlifted :: forall (a :: TYPE IntRep). foreach (p :: a -> Bool) -> Bool
+unlifted _ = False
+HS
+if "${ghc[@]}" -ferror-spans -c RigidInput.hs >kind.log 2>&1 ||
+   ! grep -Eq '^RigidInput\.hs:5:.*error: \[GHC-83605\]' kind.log ||
+   ! grep -Eq '^RigidInput\.hs:8:.*error: \[GHC-83605\]' kind.log ||
+   ! grep -Fq 'A retained callback requires an input of kind' kind.log ||
+   ! grep -Fq 'TYPE r' kind.log ||
+   ! grep -Fq 'IntRep' kind.log; then
+    cat kind.log >&2
+    exit 1
+fi
