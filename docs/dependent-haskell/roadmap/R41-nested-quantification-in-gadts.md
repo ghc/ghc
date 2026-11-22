@@ -245,7 +245,7 @@ the expected results are `(True,False)`.
 Jobs 866 and 869 tested each order separately at `-O0` with Core and
 STG Lint. On `365f7403ce`, the same eleven orders fail with either field multiplicity.
 Eight report GHC-71492 for a nested group. Three report GHC-51580 for
-a required binder. For example, the private compiler still rejects
+a required binder. For example, that revision rejects
 the first `forall` after the field in this signature.
 
 ```haskell
@@ -261,8 +261,13 @@ The 96 construction and pattern checks above used a relinked compiler.
 Job 879 found a separate interface failure with no value fields.
 The same compiler accepted `K :: forall a. Eq a => forall b. T a b`
 in a provider. Its interface reader then rejected the ordered group
-when a Template Haskell client reified the constructor. This form
-requires separate writer, reader and diagnostic checks.
+when a Template Haskell client reified the constructor. The repair at
+`7df3cd2a79` marks that encoding in the interface header. A new reader
+can reify and splice the fieldless constructor. An old reader reports
+the unsupported encoding before starting the splice interpreter. Job
+890 also found four existing constructor interfaces byte-identical at
+both optimization levels. Job 901 passed twelve registered GADT tests
+with the relinked compiler. The two-stage build uses `9884c35ff0`.
 
 The repair at `365f7403ce` also preserves the earlier `Box` example through
 quotation, interface-only reification and splicing at `-O0` and `-O2`.

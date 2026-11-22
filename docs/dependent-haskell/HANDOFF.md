@@ -122,38 +122,57 @@ The build reuses the physical checkout under
 revision against the `compiler.source` file in the newer directory.
 [Results and test counts](CHECKPOINTS.md#a-named-measurement-and-an-inferred-vector-length).
 
-Job 838 independently built the R36 warning candidate `e3d6d94481`.
-The full rename run found one expected-output change in a selected
-warning test. The other 16 unexpected results reproduced on the
-preceding compiler in job 872. Job 873 matched the 547-line R19
-Showcase used for that comparison. Job 876 rebuilt
-`r36-pun-normal-20261122/source` at `a20088cba1` with corrections
-for GADT scopes, quoted declarations, record selectors and the
-warning golden. Job 881 checks the accepted warning examples and
-the full rename run on that build.
+**R36 pun warnings.** Job 881 qualified the independent normal
+compiler at `a20088cba1`. All 15 warning controls passed. The rename
+suite recorded 479 expected passes, three expected failures and the
+same 16 unexpected failures as the preceding compiler. Job 887 builds
+the cumulative source `575e35e0d6` on the released callback compiler.
+The splice-scope check in job 889 then exposed a missing binding warning across declaration
+groups. The repaired cumulative source is `0a19ed1190` in
+`r36-combined-top-groups-20261122/source`. Check the treatment of
+implicit pattern binders against the accepted warning rule before
+closing the card.
 
-Two of the inherited differences also reproduce when the dependent
-extension is explicitly disabled. In job 875, `T23740a` and
-`T23740h` both produced GHC-68947 on the R19 compiler. Stock GHC
-9.14.1 and the checked-in goldens report GHC-45510. Both compilers
-reject both programs. This diagnostic difference predates R36.
+**R13 ordinary typechecking.** With only `RequiredTypeArguments`
+enabled, a name in a type can resolve to a term. The released compiler
+reports missing source equations in several of these cases. The repair
+`faad9b1e9a` sends the captured name through the ordinary checker
+when dependent types are off. Job 899 passed all ten original
+`T23740a`–`T23740j` tests. Compiled clients used an imported proof
+and HaskLib at both optimization levels. Four direct function calls in
+types still checked with the extension enabled. This repair shares the
+R19 two-stage build below.
 
-R41's private compiler at `dc7c0472b6` passes all 24 tested orders of
-a field, a context and two binders at both multiplicities and both
-optimization levels. The preceding repair at `365f7403ce` passed
-13 orders. In job 879 the compiler wrote a constructor with no value
-fields, then rejected its interface during Template Haskell reification.
-Resume from `r41-ordered-prefix-general-20261122` and check this case
-before integrating the repair.
+**R19 cases on constructors with fields.** At `96efc76a77`, a
+source-hidden client composes two cases on `Maybe Bool` at an unknown
+index. Job 893 checked the unused `Just` field, a changed row, a
+different index, old readers and reuse after rebuilding. The 549-line
+Showcase also passed in the private compiler in job 902. Job 904
+builds the combined R19 and R13 source `4e169241d2` in
+`r19-ignored-fields-next-20261122/normal`. After its focused test
+run frees Hadrian, run `r13-r19-normal-compatibility-20261122/check.sh`
+with the shared build queue. This checks the ten unchanged diagnostic
+tests and the 158 upstream dependent tests.
 
-R19's next case uses a `Maybe Bool` scrutinee. Its `Just` branch
-ignores the field. Job 874 reproduced the failure to compose at an
-unknown index. In job 880 a private relinked compiler ran the
-interface-only client at `-O0` and `-O2`. A bottom-valued `Just`
-field stayed lazy. A changed row and a different index still failed.
-Check the stored proof, older readers and a normal build before release.
+**R41 nested GADT quantifiers.** Private compiler `7df3cd2a79`
+reads fieldless ordered constructors and rejects unsupported interfaces
+before running an external splice. It retains the 24 one-field orders.
+Jobs 890 and 901 checked the interface cases and twelve registered
+tests. Job 903 builds the combined source `9884c35ff0` in
+`r41-r36-normal-20261122`. Check nonuniform result indices,
+unboxed fields and the upstream record diagnostic before closing R41.
 [R41 ordering tests](roadmap/R41-nested-quantification-in-gadts.md#which-prefix-orders-work)
 and [R19 scope](roadmap/R19-type-level-cases.md).
+
+**R27 CUSK migration study.** The comparison source `aea0428256` in
+`r27-cusk-impact-20261122/source` applies the three compiler lines
+from [GHC MR !1602](https://gitlab.haskell.org/ghc/ghc/-/merge_requests/1602).
+Job 905 compares legacy and standalone signatures on stock and fork
+GHC. Job 907 relinks the proposed change. Job 911 depends on both
+and compares the upstream polykinds and standalone-kind-signature
+tests on the two compilers. Record provider kinds and client results
+before interpreting these runs as migration evidence.
+[R27 scope](roadmap/R27-deprecate-cusks.md).
 
 The [release-readiness assessment](ROADMAP.md#release-readiness) identifies
 R36 as the next full-card target.
