@@ -113,7 +113,7 @@ workflow:
     # cause a duplicate pipeline for merge requests coming from the master
     # branch of a fork.
     - if: $CI_PROJECT_ID == "1" && $CI_COMMIT_BRANCH == "master"
-    - if: $CI_PROJECT_ID == "1" && $CI_COMMIT_BRANCH =~ /ghc-[0-9]+\.[0-9]+/
+    - if: $CI_PROJECT_ID == "1" && $CI_COMMIT_BRANCH =~ /^ghc-[0-9]+\.[0-9]+$/
     - if: '$CI_PIPELINE_SOURCE == "web"'
 
 # which versions of GHC to allow bootstrap with
@@ -193,7 +193,7 @@ workflow:
   - if: '$CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/'
   - if: '$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/'
   - if: '$CI_COMMIT_BRANCH == "master"'
-  - if: '$CI_COMMIT_BRANCH =~ /ghc-[0-9]+\.[0-9]+/'
+  - if: '$CI_COMMIT_BRANCH =~ /^ghc-[0-9]+\.[0-9]+$/'
 
 ############################################################
 # Runner Tags
