@@ -2,6 +2,7 @@
 module Main where
 
 import Control.Exception (ErrorCall(..), evaluate, try)
+import qualified CompareAt
 import NativeLiftedCallbackProvider (Decision(..), decide)
 import System.Environment (getArgs)
 
@@ -42,3 +43,11 @@ main = do
   print =<< forceFailure "used callback" (observe (error "used callback" :: Flag -> Bool) (Flag truth))
   tupleClient not truth
   print (tupleLazy (error "unused predicate") truth)
+  let cmp = flip compare
+      observed :: CompareAt.Witness o -> Ordering
+      observed CompareAt.Less = LT
+      observed CompareAt.Equal = EQ
+      observed CompareAt.Greater = GT
+      order x y = observed (CompareAt.decideCompare cmp x y)
+  print (order (not truth) truth, order truth (not truth), order truth truth)
+  print (CompareAt.keepCompare (error "unused comparator") (error "unused first argument") (error "unused second argument"))

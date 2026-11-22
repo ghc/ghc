@@ -9,6 +9,7 @@ ghc=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint -fdiagnostics-
 provider=NativeLiftedCallbackProvider
 client=NativeLiftedCallbackClient
 expected=$'(False,False,True)\nTrue\nTrue\nTrue\n(IsFalse,())\n(IsFalse,())\nTrue'
+expected+=$'\n(GT,LT,EQ)\nRefl'
 
 for opt in O0 O2; do
     flags=("-$opt")
@@ -20,12 +21,22 @@ for opt in O0 O2; do
     cp "$src/$provider.hs" .
     "${ghc[@]}" "${flags[@]}" -c "$provider.hs"
     mv "$provider.hs" ../
-    cp "$provider.hi" "$src/$client.hs" ../client/
+    "${ghc[@]}" "${flags[@]}" -c "$src/RuntimeOrdering.hs" -outputdir .
+    "${ghc[@]}" "${flags[@]}" -c "$src/curried-callback/CompareAt.hs" -outputdir .
+    cp "$provider.hi" RuntimeOrdering.hi CompareAt.hi "$src/$client.hs" ../client/
     cd ../client
     "${ghc[@]}" "-$opt" -c "$client.hs"
-    "${ghc[@]}" "$client.o" "../provider/$provider.o" -o run
+    "${ghc[@]}" "$client.o" "../provider/$provider.o" ../provider/{CompareAt,RuntimeOrdering}.o -o run
     actual=$(./run True)
     [[ $actual == "$expected" ]] || { printf '%s\n' "$actual"; exit 1; }
+done
+
+for probe in NoInverse WrongOrder; do
+    if "${ghc[@]}" -ferror-spans -fno-code -c "$src/curried-callback/$probe.hs" >"$probe.log" 2>&1 ||
+       ! grep -Fq 'In the expression: Refl' "$probe.log"; then
+        cat "$probe.log" >&2
+        exit 1
+    fi
 done
 
 cat > WrongEndpoint.hs <<'HS'

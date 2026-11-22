@@ -761,5 +761,7 @@ congruence and attempted projections from a result equality.
 Source checking, reconstruction of the strict case from its runtime
 scrutinee, and a separately compiled client must all agree about the
 two operands. The published compiler supports the one-argument witness.
-[Existing ordering witness](../examples/open-evaluation/RuntimeOrdering.hs)
+[Existing ordering witness](../examples/open-evaluation/RuntimeOrdering.hs),
+[two-argument source fixture](../../../testsuite/tests/dependent/should_run/curried-callback/CompareAt.hs),
+[inverse-equality control](../../../testsuite/tests/dependent/should_run/curried-callback/NoInverse.hs)
 and [application and equality precedents](../REFERENCES.md#applying-a-retained-callback-to-two-arguments).
