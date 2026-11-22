@@ -5715,7 +5715,8 @@ and [GHC alternative refinement](../../compiler/GHC/Core/Utils.hs).
 Agda's conversion checker constructs `UnequalTerms` with the two terms
 and the type at which it compares them. This is the diagnostic precedent
 for a failed mapping proof. Given a receiver whose constructor is unknown,
-the relevant comparison is the application `fmap p r` against `'Empty`.
+the source control names `Prelude.fmap` so implicit quantification cannot
+bind `fmap`. GHC compares the selected method application with `'Empty`.
 [Agda 2.8.0 conversion](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L514-L531)
 and [the Haskell control](../../testsuite/tests/dependent/should_run/concrete-mapping/UnknownRow.hs).
 

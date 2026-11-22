@@ -24,10 +24,10 @@ both _ _ _ _ = Refl
 
 -- | The same Boolean-label dictionary returns Empty at a known Empty.
 empty :: foreach (p :: Int -> Bool)
-      -> fmap p ('Empty :: Row Bool Bool Int) :~: ('Empty :: Row Bool Bool Bool)
+      -> Prelude.fmap p ('Empty :: Row Bool Bool Int) :~: ('Empty :: Row Bool Bool Bool)
 empty _ = Refl
 
 -- | An unknown receiver still forms a well-kinded mapping application.
 unknown :: foreach (p :: Int -> Bool) -> foreach (r :: Row Bool Bool Int)
-        -> fmap p r :~: fmap p r
+        -> Prelude.fmap p r :~: Prelude.fmap p r
 unknown _ _ = Refl

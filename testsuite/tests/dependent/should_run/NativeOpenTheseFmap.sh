@@ -22,12 +22,15 @@ for opt in -O0 -O2; do
     cp ../provider/{These,Row}.hi .
     "${ghc[@]}" "$opt" -fomit-interface-pragmas -fno-write-if-simplified-core -c "$src/TheseMapping.hs" -outputdir .
     "${ghc[@]}" "$opt" -c "$src/RowProof.hs" -outputdir .
+    "${ghc[@]}" --show-iface RowProof.hi >row-proof.iface
+    sed -n '/^  unknown ::/,/^  \[\]$/p' row-proof.iface | grep -Fq 'Row.T:$cfmap p r'
     sed -e 's/module RowProof where/module WrongInstance where/' \
         -e 's/:: Row Int Bool a/:: Row Bool Bool a/' "$src/RowProof.hs" >WrongInstance.hs
     if "${ghc[@]}" "$opt" -fno-code -c WrongInstance.hs >wrong-instance 2>&1; then exit 1; fi
     grep -Fq 'WrongInstance.hs:11:16-19: error: [GHC-83865]' wrong-instance || { cat wrong-instance >&2; exit 1; }
     if "${ghc[@]}" "$opt" -fno-code -c "$src/concrete-mapping/UnknownRow.hs" >unknown-row 2>&1; then exit 1; fi
-    grep -Fq 'UnknownRow.hs:10:19-22: error:' unknown-row
+    grep -Fq 'UnknownRow.hs:10:19-22: error: [GHC-83865]' unknown-row
+    grep -Fq 'with: Empty' unknown-row
     grep -Fq 'In the expression: Refl' unknown-row
     (
         mkdir -p "$stage"/{uniform,uniform-client}
@@ -38,7 +41,8 @@ for opt in -O0 -O2; do
         cp ../uniform/Row.hi .
         "${ghc[@]}" "$opt" -c "$src/concrete-mapping/UniformRows.hs" -outputdir .
         if "${ghc[@]}" "$opt" -fno-code -c "$src/concrete-mapping/UnknownRow.hs" >unknown-row 2>&1; then exit 1; fi
-        grep -Fq 'UnknownRow.hs:10:19-22: error:' unknown-row
+        grep -Fq 'UnknownRow.hs:10:19-22: error: [GHC-83865]' unknown-row
+        grep -Fq 'with: Empty' unknown-row
         grep -Fq 'In the expression: Refl' unknown-row
         "${ghc[@]}" "$opt" -c "$src/concrete-mapping/UniformClient.hs" -o Main.o
         "${ghc[@]}" Main.o ../uniform/Row.o -o uniform
@@ -189,7 +193,7 @@ module Label where
 import Data.Type.Equality ((:~:)(Refl))
 import Row
 claim :: foreach (n :: Int) -> foreach (f :: Bool -> Bool) -> foreach (x :: Bool)
-      -> fmap f ('Both n 'True x) :~: 'Both n 'True (f x)
+      -> Prelude.fmap f ('Both n 'True x) :~: 'Both n 'True (f x)
 claim _ _ _ = Refl
 HS
 cp "$out/O2/provider/Row.hi" .

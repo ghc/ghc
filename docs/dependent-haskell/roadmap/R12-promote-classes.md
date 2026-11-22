@@ -110,11 +110,12 @@ build kept identical interface bytes. Normal qualification remains open.
 [separately compiled proofs](../examples/open-evaluation/RowProof.hs)
 and [warm upgrade check](../examples/open-evaluation/check-applied-mapping-upgrade.sh).
 
-At an unknown receiver `r`, GHC rejects the proof
-`fmap p r :~: ('Empty :: Row Bool Bool Bool)` at the written `Refl`.
-The current diagnostic (GHC-18872) leads with the kinds of `fmap` and
-`Empty`. The proof asks whether the two *applied results* are equal.
-The diagnostic should identify those results and their common kind.
+At an unknown receiver `r`, the source proof names `Prelude.fmap`.
+GHC reports GHC-83865 at the written `Refl`. It compares the selected
+instance application `Row.$cfmap p r` with `Empty`. An unqualified
+`fmap` in this implicitly quantified signature binds a fresh type
+variable. That spelling tests a different type. The positive control
+checks the compiled interface for the selected instance method.
 [Unknown receiver](../../../testsuite/tests/dependent/should_run/concrete-mapping/UnknownRow.hs).
 
 If the equation uses `p` to map the field but claims the result is
