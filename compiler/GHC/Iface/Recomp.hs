@@ -867,6 +867,15 @@ checkFlagHash hsc_env iface self_recomp = do
                 then liftIO $ recheck "Compiler now checks lazy guarded list pairs"
                 else pure UpToDate
           | otherwise = pure UpToDate
+        check_structural_case
+          | checkStructuralCases dflags iface
+          , not (Map.member structuralCasesField (getExtensibleFields (mi_ext_fields iface)))
+          = do
+              candidate <- couldExportSourceSignature (isOneShot (ghcMode dflags)) iface StructuralCase
+              if candidate
+                then liftIO $ recheck "Compiler now checks cases on two structural size operands"
+                else pure UpToDate
+          | otherwise = pure UpToDate
         check_family_uses
           | old_fp `elem` (staged_fp : class_generations) = pure UpToDate
           | otherwise = do
@@ -938,6 +947,7 @@ checkFlagHash hsc_env iface self_recomp = do
                                      `recompThen` check_fold_method
                                      `recompThen` check_monomorphic_fold
                                      `recompThen` check_guarded_pair
+                                     `recompThen` check_structural_case
                                      `recompThen` check_source_provider
                                      `recompThen` check_family_uses
                                      `recompThen` check_forwarded_result
@@ -1108,6 +1118,29 @@ the recompiled module no longer uses a final Core proof.
 -- | Extensible field for interfaces reviewed for home rule dependencies.
 homeRuleClosuresField :: String
 homeRuleClosuresField = "home-rule-closures-reviewed-v1"
+
+{- Note [Recompiling structural size providers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An older home interface can omit the equations of a function that inspects
+two structural sizes. Its source can still pass the new final Core check.
+Recheck a source module when it exports a function with a possible signature
+and no certificate. Inspect the exact datatype through any saturated
+synonyms. The interface need not contain the worker body.
+
+Only the final Core check can prove the equations. Record the check even
+when the body fails. A build that cannot generate code does not check the
+final Core body. Rebuild installed modules from source to supply new
+equations.
+-}
+
+-- | Extensible field for interfaces reviewed for structural size equations.
+structuralCasesField :: String
+structuralCasesField = "structural-size-cases-reviewed-v1"
+
+-- | Check ordinary source modules that generate code.
+checkStructuralCases :: DynFlags -> ModIface_ phase -> Bool
+checkStructuralCases dflags iface =
+    mi_hsc_src iface == HsSrcFile && backendGeneratesCode (backend dflags)
 
 -- | Check source modules that enable rewrite rules.
 checkRuleClosures :: DynFlags -> ModIface_ phase -> Bool
@@ -1880,18 +1913,24 @@ data SourceIfaceType = SourceIfaceType IfaceType [(IfLclName, Either Int SourceI
 -- | The signature shapes used to find producers with missing source equations.
 data SourceSignature
   = GuardedListFilter | GuardedListPair | PolymorphicIdentity | ListAppend
-  | ListFold | ListFoldMethod | MonomorphicListFold
+  | ListFold | ListFoldMethod | MonomorphicListFold | StructuralCase
 
 -- | Check whether an interface signature could supply the requested equation.
 -- See Note [Looking through type synonyms for checked source signatures].
 couldExportSourceSignature :: Bool -> ModIface -> SourceSignature -> IfG Bool
 couldExportSourceSignature one_shot iface signature =
-    evalStateT (anyM candidate (mi_decls iface))
-      (mkModuleEnv [(mi_semantic_module iface, decl_index iface)])
+    couldExportSourceDecls one_shot iface (map snd (mi_decls iface)) signature
+
+-- | Classify declarations from either a saved or a newly built interface.
+couldExportSourceDecls :: Bool -> ModIface_ phase -> [IfaceDecl] -> SourceSignature -> IfG Bool
+couldExportSourceDecls one_shot iface declarations signature =
+    evalStateT (anyM candidate declarations)
+      (mkModuleEnv [(this_mod, decl_index declarations)])
   where
+    this_mod = mi_semantic_module iface
     exports = mkNameSet (concatMap availNames (mi_exports iface))
     boot_deps = mkModDeps (dep_boot_mods (mi_deps iface))
-    candidate (_, IfaceId{ifName = n, ifType = ty, ifIdDetails = details})
+    candidate IfaceId{ifName = n, ifType = ty, ifIdDetails = details}
       | ListFoldMethod <- signature = check (fold_dictionary details)
       | n `elemNameSet` exports = case signature of
           GuardedListFilter -> check (filter_type (fmap pure . list_element) 0)
@@ -1910,6 +1949,9 @@ couldExportSourceSignature one_shot iface signature =
           MonomorphicListFold
             | IfSourceTableId{} <- details -> pure False
             | otherwise -> check monomorphic_fold_arrows
+          StructuralCase
+            | IfSourceTableId{} <- details -> pure False
+            | otherwise -> check structural_case_arrows
       where
         check shape = isJust <$> runMaybeT (shape (SourceIfaceType ty []))
     candidate _ = pure False
@@ -1995,6 +2037,37 @@ couldExportSourceSignature one_shot iface signature =
     nullary_name expected (IfaceTyConApp tc IA_Nil) = ifaceTyConName tc == expected
     nullary_name _ _ = False
 
+    structural_case_arrows ty = do
+      (left, rest) <- ordinary_arrow ty
+      (right, result) <- ordinary_arrow rest
+      root <- structural_head left
+      right_root <- structural_head right
+      result_root <- structural_head result
+      guard (right_root == root && result_root == root)
+      Just IfaceData{ifBinders = [], ifCtxt = [], ifParent = IfNoParent,
+                     ifResKind = kind, ifCons = IfDataTyCon False [first, second]}
+        <- lift (declaration root)
+      guard (isIfaceLiftedTypeKind kind)
+      guard (nameModule_maybe root /= Just this_mod ||
+             all (`elemNameSet` exports) [root, ifConName first, ifConName second])
+      fields <- traverse structural_fields [first, second]
+      [child] <- pure (concat fields)
+      child_root <- structural_head (SourceIfaceType child [])
+      guard (child_root == root)
+
+    structural_head ty = do
+      Just (SourceIfaceType (IfaceTyConApp tc IA_Nil) _) <- lift (view ty)
+      let name = ifaceTyConName tc
+      name <$ guard (not (isWiredInName name))
+
+    structural_fields IfCon{ifConWrapper = False, ifConExTCvs = [], ifConCtxt = [],
+                            ifConEqSpec = [], ifConArgBinders = [],
+                            ifConStricts = bangs, ifConArgTys = fields}
+      | all lazy_field bangs = pure (map snd fields)
+    structural_fields _ = mzero
+    lazy_field IfNoBang = True
+    lazy_field _ = False
+
     filter_type result_elements depth ty = lift (view ty) >>= \case
       Nothing -> pure ()
       Just (SourceIfaceType (IfaceForAllTy _ (Bndr binder _) body) args) ->
@@ -2078,7 +2151,7 @@ couldExportSourceSignature one_shot iface signature =
           Nothing -> do
             provider <- lift $ readRecompProviderWithBoot (text "Checking source equation type")
                                 (provider_boot owner) owner
-            let decls = maybe emptyNameEnv decl_index provider
+            let decls = maybe emptyNameEnv (decl_index . map snd . mi_decls) provider
             modify' (\env -> extendModuleEnv env owner decls)
             pure decls
         pure (lookupNameEnv decls name)
@@ -2089,7 +2162,7 @@ couldExportSourceSignature one_shot iface signature =
       = gwib_isBoot dep
       | otherwise = NotBoot
 
-    decl_index provider = mkNameEnv (concatMap (named_declaration . snd) (mi_decls provider))
+    decl_index = mkNameEnv . concatMap named_declaration
     named_declaration decl@IfaceClass{ifBody = IfConcreteClass{ifATs = ats}} =
       (ifName decl, decl) : [(ifName family, family) | IfaceAT family _ <- ats]
     named_declaration decl = [(ifName decl, decl)]
@@ -2889,6 +2962,12 @@ addFingerprints hsc_env iface0 = do
     Just info | checkRuleClosures (hsc_dflags hsc_env) iface0 ->
       initIfaceLoad hsc_env (usesFinalCoreSourceTable (mi_sr_usages info))
     _ -> pure False
+  stamp_structural_cases <-
+    if checkStructuralCases (hsc_dflags hsc_env) iface0
+      then initIfaceLoad hsc_env $
+        couldExportSourceDecls (isOneShot (ghcMode (hsc_dflags hsc_env)))
+          iface0 (map snd decls_w_hashes) StructuralCase
+      else pure False
 
    -- put the declarations in a canonical order, sorted by OccName
   let sorted_decls :: [(Fingerprint, IfaceDecl)]
@@ -2945,6 +3024,7 @@ addFingerprints hsc_env iface0 = do
                     ++ [mappingField | stamp_mapping]
                     ++ [appliedMappingField | stamp_applied_mapping]
                     ++ [homeRuleClosuresField | stamp_home_rules]
+                    ++ [structuralCasesField | stamp_structural_cases]
                     ++ [sourceProofBranchesField | stamp_source_proof_branches]
       checked_hash = foldl' (\fp field -> computeFingerprint putNameLiterally (fp, field))
                             base_hash checked_fields
