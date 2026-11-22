@@ -481,10 +481,11 @@ instance Diagnostic TcRnMessage where
           kind
         pragma extensions = case extensions of
           [] -> empty
-          _ -> hang (text "Enable the required extensions") 2 $
-            text "{-# LANGUAGE" <+>
-              hsep (punctuate comma (map (text . extensionName) extensions)) <+>
-              text "#-}"
+          _ -> hang (text "Enable the required extensions") 2
+              (text "{-# LANGUAGE" <+>
+                hsep (punctuate comma (map (text . extensionName) extensions)) <+> text "#-}") $$
+            ppWhen (LangExt.StandaloneKindSignatures `elem` extensions)
+              (text "Enabling StandaloneKindSignatures disables CUSKs for the whole module.")
 
     TcRnPolymorphicBinderMissingSig n ty
       -> mkSimpleDecorated $

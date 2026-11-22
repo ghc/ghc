@@ -252,6 +252,6 @@ test('T25661', normal, compile_fail, [''])
 test('T13882', normal, compile, [''])
 test('CuskWarning', normal, compile, ['-Wcusks -fno-diagnostics-show-caret'])
 test('CuskWarningDefault', [extra_files(['CuskWarning.hs'])], multimod_compile,
-     ['CuskWarningDefault', '-Wcompat'])
+     ['CuskWarningDefault', '-v0 -Wcompat'])
 test('CuskWarningStandalone', normal, compile, ['-Wcusks'])
 test('CuskWarningNoTypeImport', normal, compile, ['-Wcusks -fno-diagnostics-show-caret'])
