@@ -427,6 +427,7 @@ apply Maybe and a type family through a computed arrow kind: (Just 7,[7])
 pass a family before giving its required kind argument: (3,LT)
 map cells with a class method over a family prefix and Maybe: ([Just True,Nothing],[Just True,Nothing])
 infer the matchability of a family prefix from a later argument: (Just True,True)
+infer the arrows in a promoted Endo callback: (True,Refl)
 forward an inferred partial-family callback and an ordinary constructor: (Refl,Refl)
 infer both bare kind arrows in a list family proof: Refl
 infer the inner arrow of a higher-order family callback: [True]

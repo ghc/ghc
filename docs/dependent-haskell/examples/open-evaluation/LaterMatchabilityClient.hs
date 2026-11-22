@@ -1,15 +1,16 @@
 {-# LANGUAGE DataKinds, KindSignatures, TypeOperators #-}
 {-# LANGUAGE ExplicitForAll, Modifiers, TypeApplications #-}
-{-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes, TypeFamilies #-}
 module LaterMatchabilityClient
   ( laterMatchability, forwardedMap, annotatedMap, nestedCallback, appliedCallback
-  , boxedCallbacks, rankedMap, flippedCallbacks, computedDictionary
+  , boxedCallbacks, rankedMap, flippedCallbacks, computedDictionary, inferredEndo
   ) where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy(Proxy))
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Matchability (U)
+import PromotedEndo (Endo(Endo), Eval, Exp, UnEndo)
 import LaterMatchability (AtBool, CallbackResult(CallbackResult), ForwardMap,
                            computedTag, FamilyBox(FamilyBox), FlippedMatch, FlippedUnmatch, ForwardBox, KnownListCallback, ListBox,
                            ListCallback, ListRecipe, MatchResult, Recipe(Recipe), UnmatchResult)
@@ -66,3 +67,14 @@ flippedCallbacks = (Just False, [True])
 -- | Select a dictionary with a computed matchable application pattern.
 computedDictionary :: Bool
 computedDictionary = computedTag (Proxy @'True) (Proxy @(Maybe Bool))
+
+-- | A matchable expression that evaluates to its Boolean argument.
+data Echo :: Bool -> Exp Bool
+type instance Eval (Echo x) = x
+
+-- | Use the same constructor at ordinary and promoted callback types.
+inferredEndo :: (Bool, Eval (UnEndo ('Endo Echo) 'True) :~: 'True)
+inferredEndo = (callable, Refl)
+  where
+    callable = case (Endo (\_ _ -> undefined) :: Endo Bool) of
+      Endo f -> f `seq` True
