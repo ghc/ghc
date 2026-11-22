@@ -30,6 +30,16 @@ signed :: $(do
     _ -> fail (show ty))
 signed = Proxy :: Proxy 'True
 
+pair :: $(do
+  ty <- [t| let (rows, cols) = '(2, 3) in Proxy '(rows, cols) |]
+  case ty of
+    LetT saved _ (LetT rows (AppT (ConT first) (VarT left))
+      (LetT cols (AppT (ConT second) (VarT right)) _))
+      | saved == left, saved == right, rows /= cols
+      , nameBase first == "PairFirst", nameBase second == "PairSecond" -> pure ty
+    _ -> fail (show ty))
+pair = Proxy :: Proxy '(2, 3)
+
 -- A let can return a type constructor. The final argument applies to its result.
 applied :: $(do
   f <- newName "f"
@@ -39,4 +49,4 @@ applied = Just 'q'
 $([d| type QuotedPair a = let a = Maybe a in (a, a) |])
 
 result :: (Either (Maybe Bool) (Maybe Bool), Maybe Char, QuotedPair Int)
-result = signed `seq` (quoted, applied, (Just 3, Nothing))
+result = pair `seq` signed `seq` (quoted, applied, (Just 3, Nothing))

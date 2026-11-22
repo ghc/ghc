@@ -40,11 +40,42 @@ HS
 test "$(grep -c 'tag :: tag' Pretty.hs)" = 2
 "${g[@]}" -fforce-recomp -fno-code -c Pretty.hs
 cp TypeLet.hi PackedVecLibrary.hi SignatureLet.hi SignedLets.hi "$out/client/"
+cat >PairBindings.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, ExplicitNamespaces, KindSignatures, TypeOperators #-}
+module PairBindings (Count, AliasCount, Held, Rebuild, ShadowCount) where
+
+import GHC.TypeNats (Nat, type (+))
+
+type Count (dimensions :: (Nat, Nat)) =
+  let (rows, cols) = dimensions
+  in rows + cols
+
+type Dimensions = '(2, 3)
+type Alias = Dimensions
+type AliasCount = let { (rows, _) = Alias; cols = 3 } in rows + cols
+
+type Held (dimensions :: (Nat, Nat)) = let { (_, _) = dimensions } in Bool
+type Rebuild (dimensions :: (Nat, Nat)) = let { (rows, cols) = dimensions } in '(rows, cols)
+
+type ShadowCount (rows :: Nat) =
+  let dimensions = '(rows, 3)
+      (rows, cols) = dimensions
+  in rows + cols
+HS
+"${g[@]}" -fomit-interface-pragmas -ddump-parsed -c PairBindings.hs >pair-parsed.txt
+{
+  head -n 1 PairBindings.hs
+  sed -n '/^module /,$p' pair-parsed.txt
+} >PrettyPair.hs
+"${g[@]}" -fforce-recomp -fno-code -c PrettyPair.hs
+cp PairBindings.hi "$out/client/"
 cd "$out/client"
 cat >OrdinaryLet.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
 module OrdinaryLet where
 import Data.Type.Equality ((:~:)(Refl))
+import Data.Proxy (Proxy)
+import PairBindings (AliasCount, Count, Held, ShadowCount)
 import qualified SignatureLet
 import SignedLets (Braced, Layout)
 import TypeLet
@@ -75,6 +106,18 @@ braced = Refl
 
 layout :: Layout 'False :~: 'False
 layout = Refl
+
+knownPair :: Count '(2, 3) :~: 5
+knownPair = Refl
+
+aliasPair :: AliasCount :~: 5
+aliasPair = Refl
+
+heldPair :: Proxy dimensions -> Held dimensions :~: Bool
+heldPair _ = Refl
+
+shadowPair :: ShadowCount 2 :~: 5
+shadowPair = Refl
 
 yes :: CaseResult 'True :~: Either Bool Bool
 yes = Refl
@@ -177,6 +220,32 @@ module SignedForward where
 type Bad = let { width :: later; width = 'True; later = Bool } in width
 HS
 reject SignedForward 3:27 76037 'Not in scope: type variable'
+
+cat >PairDuplicate.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes #-}
+module PairDuplicate where
+type Bad = let (x, x) = '(Bool, Char) in x
+HS
+reject PairDuplicate 3:20 50547 'twice'
+
+cat >IgnoredNonPair.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes #-}
+module IgnoredNonPair where
+type Bad = let (_, _) = Bool in Int
+HS
+reject IgnoredNonPair 3:25 83865 'Expected kind'
+
+cat >PairEta.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
+module PairEta where
+import Data.Proxy (Proxy)
+import Data.Type.Equality ((:~:)(Refl))
+import PairBindings (Rebuild)
+
+bad :: Proxy dimensions -> Rebuild dimensions :~: dimensions
+bad _ = Refl
+HS
+reject PairEta 8:9 83865 'Refl'
 
 # The infix operator can be a captured type variable.
 cd "$out/provider"

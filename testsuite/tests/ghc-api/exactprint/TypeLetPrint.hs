@@ -21,3 +21,11 @@ type SignedLayout a =
 type SignedBraced a =
   let { result ∷ Bool {- separator -}; {- binding -} result = G a; {- close -} }
   in H result result
+
+type PairLayout dimensions =
+  let (rows {- left field -}, cols) = dimensions
+  in H rows cols
+
+type PairBraced dimensions =
+  let { (rows, _) {- equation -} = dimensions; cols = G rows }
+  in H rows cols

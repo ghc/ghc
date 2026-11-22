@@ -43,7 +43,7 @@ result. For example, `ScopedRow Char '[Bool]` gives
 `'[(Maybe Char, Either Char Bool)]`. Its first callback captures `Char`
 before an inner let binds the same name to `Maybe Char`. Its second
 callback uses both types. An ordinary interface-only client constructs
-a value of the resulting row type. Local patterns and general cases remain open.
+a value of the resulting row type. General local patterns and cases remain open.
 [Scoped row](../examples/open-evaluation/TypeLambda.hs)
 and [client](../../../testsuite/tests/dependent/should_run/NativeTypeLambda.sh).
 
@@ -124,6 +124,29 @@ fork design. [Agda](https://agda.readthedocs.io/en/v2.8.0/language/let-and-where
 [Haskell 2010 §3.12](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-440003.12),
 [Haskell 2010 §4.4](https://www.haskell.org/onlinereport/haskell2010/haskellch4.html#x10-780004.4),
 and [ExtendedLet](https://github.com/ghc-proposals/ghc-proposals/pull/523/files).
+
+## A boxed pair binding
+
+```haskell
+type Count (dimensions :: (Nat, Nat)) =
+  let (rows, cols) = dimensions
+  in rows + cols
+```
+
+A two-field boxed pair pattern uses distinct names or wildcards. The
+right-hand side sees the enclosing scope and the preceding bindings.
+GHC checks it at a pair kind before extending the scope with the named
+fields. An unused field need not reduce. A known promoted constructor
+selects its fields, so `Count '(2, 3)` reduces to `5`. At an unknown pair,
+the projections stay in the type. Rebuilding an unknown pair from its
+projections gives no equality proof with the original pair.
+
+The fork uses closed families for the projections. Agda also translates
+local record patterns to projections and separately gives its records an
+eta rule. The fork's pair bindings use the existing type-family equality
+rules. [Agda record lets](https://agda.readthedocs.io/en/v2.8.0/language/let-and-where.html#let-binding-record-patterns),
+[Agda eta](https://agda.readthedocs.io/en/v2.8.0/language/record-types.html#eta-expansion),
+and [interface and scope checks](../../../testsuite/tests/dependent/should_run/NativeTypeLet.sh).
 
 ## Type quotations and splices
 
