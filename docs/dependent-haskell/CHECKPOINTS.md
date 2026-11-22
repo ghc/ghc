@@ -6,6 +6,13 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Local build capacity
+
+This workspace has two slots for GHC builds and compiler verification.
+Count a Hadrian build, a private compiler link, or a separate test job
+as one slot across all worktrees. A queued test starts when a slot is
+free. Source review and editing can continue while both slots are in use.
+
 ## Clean up after each experiment
 
 Use Git to recover finished experiments. Before cleanup, commit the source
