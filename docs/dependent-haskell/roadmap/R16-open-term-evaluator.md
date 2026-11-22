@@ -1815,6 +1815,14 @@ the first result with undefined tails. See the [alias](../examples/open-evaluati
 [ordinary proof](../examples/open-evaluation/PreludeZipWithProof.hs), and
 [Agda list equations](https://agda.github.io/agda-stdlib/v2.3/Data.List.Base.html#zipWith).
 
+The ordinary client can also prove that the result length is the
+minimum of the two input lengths. It reuses the checked size function
+and applies induction to the two list spines. The successor case
+uses the result for both tails. A right nil alone leaves the length
+stuck when the left spine is abstract. See the
+[ordinary length proof](../examples/open-evaluation/PreludeZipWithLengthProof.hs)
+and [Agda's length proof](https://agda.github.io/agda-stdlib/v2.3/Data.List.Properties.html#length-zipWith).
+
 ### Fold a mapped list
 
 Induction on a finite list spine proves that `foldr k z (map f xs)` equals

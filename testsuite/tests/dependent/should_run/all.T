@@ -151,7 +151,9 @@ test('NativeOpenZipRows',
      run_command, ['bash NativeOpenZipRows.sh "{compiler}" "{libdir}"'])
 test('NativeOpenPreludeZipWith',
      [only_ways(['normal']),
-      extra_files([open_eval_dir + f for f in ['PreludeZipWithSource.hs', 'PreludeZipWithProof.hs']])],
+      extra_files([open_eval_dir + f for f in ['PreludeZipWithSource.hs', 'PreludeZipWithProof.hs',
+                                               'PreludeZipWithLengthProof.hs', 'PreludeMapLengthSize.hs',
+                                               'PreludeMapLengthSource.hs', 'PreludeMapLengthProof.hs']])],
      run_command, ['bash NativeOpenPreludeZipWith.sh "{compiler}" "{libdir}"'])
 test('NativeOpenListFoldr',
      [only_ways(['normal']),
