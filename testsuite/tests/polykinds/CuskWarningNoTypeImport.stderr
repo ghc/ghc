@@ -1,0 +1,9 @@
+CuskWarningNoTypeImport.hs:5:1: warning: [GHC-57439] [-Wcusks]
+    This declaration uses a complete user-supplied kind signature (CUSK).
+    The current kind is forall k. k -> Type
+    Use a standalone kind signature with the appropriate source syntax and names.
+
+CuskWarningNoTypeImport.hs:7:1: warning: [GHC-57439] [-Wcusks]
+    This declaration uses a complete user-supplied kind signature (CUSK).
+    The current kind is forall a. a
+    Use a standalone kind signature with the appropriate source syntax and names.

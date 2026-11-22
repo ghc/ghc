@@ -5,6 +5,7 @@ module Main where
 import Control.Exception (SomeException, evaluate, try)
 import Data.Proxy
 import Data.Type.Equality
+import GHC.Exts (Levity(..))
 import GadtRefinedOrderedProvider
 import qualified Language.Haskell.TH as TH
 
@@ -56,3 +57,6 @@ main = do
          fromFamily (End True (type Char)))
   forced <- try @SomeException (evaluate (observesBox (StrictBox @Bool (error "strict field") (type Char) Proxy)))
   print (case forced of Left _ -> True; Right _ -> False)
+  let lifted = case LevityBox @Lifted True (type Char) of LevityBox x (type _) -> x
+      unlifted = case LevityBox @Unlifted (73 :: Int) (type Bool) of LevityBox x (type _) -> x
+  print (lifted, unlifted)

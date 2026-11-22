@@ -464,6 +464,29 @@ instance Diagnostic TcRnMessage where
                 | otherwise
                 = text "Top-level type constructor with no standalone kind signature:"
 
+    TcRnCusk tc mbExtensions ->
+      mkSimpleDecorated $
+        text "This declaration uses a complete user-supplied kind signature (CUSK)." $$
+        getPprDebug (\debug -> details (if debug then Nothing else mbExtensions))
+      where
+        details = \case
+          Just extensions ->
+            hang (text "To state this kind explicitly, write") 2 signature $$ pragma extensions
+          Nothing ->
+            hang (text "The current kind is") 2 kind $$
+            text "Use a standalone kind signature with the appropriate source syntax and names."
+        kind = updSDocContext (\ctx -> ctx { sdocPrintExplicitForalls = True })
+                 (pprKind (tyConKind tc))
+        signature = text "type" <+> pprPrefixName (tyConName tc) <+> dcolon <+>
+          kind
+        pragma extensions = case extensions of
+          [] -> empty
+          _ -> hang (text "Enable the required extensions") 2
+              (text "{-# LANGUAGE" <+>
+                hsep (punctuate comma (map (text . extensionName) extensions)) <+> text "#-}") $$
+            ppWhen (LangExt.StandaloneKindSignatures `elem` extensions)
+              (text "Enabling StandaloneKindSignatures disables CUSKs for the whole module.")
+
     TcRnPolymorphicBinderMissingSig n ty
       -> mkSimpleDecorated $
            sep [ text "Polymorphic local binding with no type signature:"
@@ -2319,6 +2342,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnMissingSignature what exported
       -> WarningWithFlags $ missingSignatureWarningFlags what exported
+    TcRnCusk{}
+      -> WarningWithFlag Opt_WarnCusks
     TcRnPolymorphicBinderMissingSig{}
       -> WarningWithFlag Opt_WarnMissingLocalSignatures
     TcRnOverloadedSig{}
@@ -3030,6 +3055,8 @@ instance Diagnostic TcRnMessage where
     TcRnPartialTypeSigBadQuantifier{}
       -> noHints
     TcRnMissingSignature {}
+      -> noHints
+    TcRnCusk{}
       -> noHints
     TcRnPolymorphicBinderMissingSig{}
       -> noHints

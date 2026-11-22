@@ -9,7 +9,8 @@ module NativeCase
   , AscribedCaseKind, SignedCaseRhs
   , CaseRhsAliasKind, CaseBodyAliasKind
   , caseIdentity, nestedCaseIdentity, retainedPick, renderRetainedPick, retainedKeep
-  , retainedMaybePick, retainedDoubleNot, renderRetainedDoubleNot, retainedPermission
+  , retainedMaybePick, retainedMaybeField, retainedDoubleNot, renderRetainedDoubleNot
+  , retainedPermission
   ) where
 
 import Data.Kind (Type)
@@ -93,6 +94,12 @@ retainedMaybePick :: foreach (m :: Maybe Bool) ->
   (case m of { Nothing -> Char; Just _ -> Int })
 retainedMaybePick Nothing = 'n'
 retainedMaybePick (Just _) = 73
+
+-- | Return a proxy indexed by the field of Just.
+retainedMaybeField :: foreach (m :: Maybe Bool) ->
+  (case m of { Nothing -> Proxy 'False; Just field -> Proxy field })
+retainedMaybeField Nothing = Proxy
+retainedMaybeField (Just field) = Proxy @field
 
 -- | Select the result after two checked Boolean negations.
 retainedDoubleNot :: foreach (b :: Bool)

@@ -67,8 +67,8 @@ import GHC.Tc.Types.ErrCtxt( ReportRedundantConstraints(..) )
 
 import GHC.Builtin.WiredIn.Types ( oneDataConTy, unitTy, makeRecoveryTyCon
                                , boolTy, promotedTrueDataCon, promotedFalseDataCon
-                               , manyDataConTy, unmatchableDataConTy, matchabilityTy
-                               , liftedTypeKindTyConName )
+                               , manyDataConTy, matchableDataConTy, unmatchableDataConTy, matchabilityTy
+                               , liftedTypeKindTyConName, listTyConName, tYPETyConName )
 
 import GHC.Rename.Env( lookupConstructorFields )
 
@@ -95,7 +95,7 @@ import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Name
-import GHC.Types.Name.Reader (WithUserRdr(..))
+import GHC.Types.Name.Reader (WithUserRdr(..), lookupGRE_Name)
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
@@ -1420,11 +1420,70 @@ kcTyClGroup open_indices kisig_env decls
                                    | (tc, Just plan) <- zip generalized_tcs plans]
         ; poly_tcs <- traverse (inferOpenMatchability open_indices kisig_env)
                     (checked_tcs ++ generalized_tcs)
+        ; whenWOptM Opt_WarnCusks $ do
+            dflags <- getDynFlags
+            rdr_env <- getGlobalRdrEnv
+            name_ctx <- getNamePprCtx
+            let cusk_decls = mkNameEnv [(get_name decl, unLoc decl) | (decl, CUSK) <- kinded_decls]
+                missing_extensions = filter (not . (`xopt` dflags))
+                  [LangExt.StandaloneKindSignatures, LangExt.ExplicitForAll]
+                in_scope name =
+                  isExternalName name && isJust (lookupGRE_Name rdr_env name) &&
+                  case queryQualifyName name_ctx (nameModule name) Nothing (nameOccName name) of
+                    NameUnqual -> True
+                    NameQual _ -> True
+                    _ -> False
+            forM_ poly_tcs $ \tc -> do
+              let name = tyConName tc
+              case lookupNameEnv cusk_decls name of
+                Just decl | any isNamedTyConBinder (tyConBinders tc) ->
+                  addDiagnosticAt (getSrcSpan name) (TcRnCusk tc
+                    (if cuskCanSuggest decl tc && sourceCuskKind dflags in_scope (tyConKind tc)
+                     then Just missing_extensions else Nothing))
+                _ -> pure ()
         ; traceTc "---- kcTyClGroup end ---- }" (ppr_tc_kinds poly_tcs)
         ; return (poly_tcs, kindless_names, metadata) }
   where
     ppr_tc_kinds tcs = vcat (map pp_tc tcs)
     pp_tc tc = ppr (tyConName tc) <+> dcolon <+> ppr (tyConKind tc)
+
+-- | Limit edits to declarations whose explicit kind can describe their arity.
+-- For example, adding @type F :: forall k. k@ to @type family F :: k@
+-- can change how many arguments the family must consume.
+cuskCanSuggest :: TyClDecl GhcRn -> TyCon -> Bool
+cuskCanSuggest DataDecl{} _ = True
+cuskCanSuggest FamDecl{tcdFam = FamilyDecl{fdInfo = ClosedTypeFamily{}}} tc =
+  any isVisibleTyConBinder (tyConBinders tc)
+cuskCanSuggest _ _ = False
+
+-- | Check the source forms supported by the CUSK warning's suggested edit.
+-- The warning prints the current kind for forms outside this subset.
+sourceCuskKind :: DynFlags -> (Name -> Bool) -> Kind -> Bool
+sourceCuskKind dflags in_scope kind =
+    not (any (`gopt` dflags) [Opt_PrintExplicitKinds, Opt_PrintExplicitMatchabilities,
+                            Opt_PrintExplicitRuntimeReps, Opt_PrintExpandedSynonyms]) &&
+    go kind
+  where
+    enabled ext = xopt ext dflags
+    ordinary ma = eqType ma unmatchableDataConTy ||
+      (not (enabled LangExt.Modifiers) && eqType ma matchableDataConTy)
+
+    go (TyVarTy _) = True
+    go (AppTy fun arg) = go fun && go arg
+    go (ForAllTy ma (Bndr tv _) body) =
+      isTyVar tv && ordinary ma && go (tyVarKind tv) && go body
+    go (FunTy af ma mult arg res) =
+      isFUNArg af && ordinary ma && isManyTy mult && go arg && go res
+    go ty@(TyConApp tc args)
+      | name == liftedTypeKindTyConName ||
+        (name == tYPETyConName && isLiftedTypeKind ty)
+      = enabled LangExt.StarIsType || in_scope liftedTypeKindTyConName
+      | name == listTyConName, enabled LangExt.ListTuplePuns = all go args
+      | otherwise = isTyConName name && in_scope name &&
+          (not (isSymOcc (nameOccName name)) || enabled LangExt.TypeOperators) &&
+          all isVisibleTyConBinder (take (length args) (tyConBinders tc)) && all go args
+      where name = tyConName tc
+    go _ = False
 
 {- Note [Checked RHSs for cases in type lets]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -5472,9 +5531,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
              fields = case hs_args of
                PrefixConGADT ann prefix -> PrefixConGADT ann (prefix ++ [f | Right f <- remaining])
                _ -> hs_args
-       ; when ((terminal_order /= 0 || ordered) &&
-               (new_or_data == NewType ||
-                (ordered && any is_forall (dropWhile (not . is_context) inner_bndrs)))) $
+       ; when (ordered && any is_forall (dropWhile (not . is_context) inner_bndrs)) $
            setSrcSpanA (getLoc hs_res_ty) $
            failWithTc (TcRnNestedForallsContexts NFC_GadtConSig)
        ; skol_info <- mkSkolemInfo (DataConSkol name)
@@ -5550,7 +5607,8 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
                      -- ordered constructors.
                      -- See Note [Result equalities of ordered constructors]
                      -- in GHC.Tc.Gen.Pat.
-                     | ordered || (terminal_order /= 0 && not (null eq_preds)) =
+                     | ordered || (terminal_order /= 0 &&
+                                   (new_or_data == NewType || not (null eq_preds))) =
                          let suffix = map source_group $
                                if ordered then remaining else map Left terminal
                              late_count = sum [n | ConTypeArgs n <- suffix]
@@ -6604,6 +6662,9 @@ checkValidDataCon dflags existential_ok tc con
             do { let (early, late) = dataConUserTyVarGroups con
                      (_, ex_tvs, eq_spec, theta, _, _) = dataConFullSig con
                      res_kind = tyConResKind tc
+                     valid_res_kind
+                       | isNewTyCon tc = isFixedRuntimeRepKind res_kind
+                       | otherwise = maybe False isBoxedRuntimeRep (kindRep_maybe res_kind)
                      prefix_theta = if dataConHasTrailingContext con then [] else theta
                      prefix_types = map (varType . binderVar) early ++ prefix_theta ++
                        concatMap (\(Scaled mult ty) -> [mult, ty]) arg_tys
@@ -6617,7 +6678,7 @@ checkValidDataCon dflags existential_ok tc con
                           && (is_ordered || null eq_spec)
                           && null (dataConStupidTheta con)
                           && not (isTypeDataCon con)
-                          && (isLiftedTypeKind res_kind || res_kind `eqType` unliftedTypeKind)
+                          && valid_res_kind
                           && scope_ok)
                          (TcRnNestedForallsContexts NFC_GadtConSig) }
         ; traceTc "checkValidDataCon 2" $ ppr (dataConWrapperType con)

@@ -57,6 +57,7 @@ keep ignores bottom index and payload: 42
 inline retained type case: ("7","'f'",42)
 compose retained type cases from separate modules: ("7","f")
 compose retained type cases with an ignored field: ("n","73")
+compose retained type cases with a field-dependent result: ("nothing","just")
 three-constructor runtime domain: "'G'"
 empty-domain elimination demands its scrutinee: showcase-empty-domain
 IORef length and dependent vector: (3,[7,7,7])

@@ -365,6 +365,11 @@ booleans = do
     writeIORef maybeCell (Just bottomB)
     present <- renderIndependentMaybe <$> readIORef maybeCell
     observe "compose retained type cases with an ignored field" (absent, present)
+    writeIORef maybeCell Nothing
+    fieldAbsent <- renderIndependentField <$> readIORef maybeCell
+    writeIORef maybeCell (Just bottomB)
+    fieldPresent <- renderIndependentField <$> readIORef maybeCell
+    observe "compose retained type cases with a field-dependent result" (fieldAbsent, fieldPresent)
   where
     renderIndependent :: Bool -> String
     renderIndependent flag = NativeRetainedTH.renderCase flag (NativeCase.retainedPick flag)
@@ -372,6 +377,10 @@ booleans = do
     renderIndependentMaybe :: Maybe Bool -> String
     renderIndependentMaybe m =
         NativeRetainedTH.renderMaybeCase m (NativeCase.retainedMaybePick m)
+
+    renderIndependentField :: Maybe Bool -> String
+    renderIndependentField m =
+        NativeRetainedTH.renderMaybeField m (NativeCase.retainedMaybeField m)
 
     -- Return a result at the selected Boolean type.
     choose :: foreach (b :: Bool) -> Select b

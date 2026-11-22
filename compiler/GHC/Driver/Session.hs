@@ -2442,6 +2442,7 @@ wWarningFlagsDeps = [minBound..maxBound] >>= \x -> case x of
   Opt_WarnImplicitFieldStrictness -> warnSpec x
   Opt_WarnPunBindings -> warnSpec x
   Opt_WarnPunUses -> warnSpec x
+  Opt_WarnCusks -> warnSpec x
 
 warningGroupsDeps :: [(Deprecation, FlagSpec WarningGroup)]
 warningGroupsDeps = map mk warningGroups

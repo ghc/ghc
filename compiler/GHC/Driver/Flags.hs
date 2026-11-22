@@ -1154,6 +1154,7 @@ data WarningFlag =
    --search codebase for Opt_WarnRedundantCanonicalMethods for cleanup
    | Opt_WarnPunBindings
    | Opt_WarnPunUses
+   | Opt_WarnCusks                                  -- ^ @since 10.2
    deriving (Eq, Ord, Show, Enum, Bounded)
 
 -- | Return the names of a WarningFlag
@@ -1282,6 +1283,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnDefaultedCallStack                      -> "defaulted-callstack" :| []
   Opt_WarnPunBindings                             -> "pun-bindings" :| []
   Opt_WarnPunUses                                 -> "pun-uses" :| []
+  Opt_WarnCusks                                   -> "cusks" :| []
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options

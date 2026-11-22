@@ -26,7 +26,7 @@ module GHC.Core.Coercion.Axiom (
 
        CoAxiomRule(.., BuiltInEqRule), BuiltInFamRewrite(..), BuiltInFamInjectivity(..), TypeEqn,
        scopedSigmaClosureName, scopedLambdaClosureName,
-       scopedEnumCaseName, scopedConstructorCaseName,
+       scopedEnumCaseName, scopedConstructorCaseName, scopedCaseResultName,
        matchableProjectionName, matchableProjectionDirection,
        coAxiomRuleArgRoles, coAxiomRuleRole,
        coAxiomRuleBranch_maybe, sourceProofAxiomRules, isNewtypeAxiomRule_maybe,
@@ -675,6 +675,10 @@ scopedEnumCaseName = fsLit "ScopedEnumCase"
 -- | The interface name of the equality for complete cases with ignored fields.
 scopedConstructorCaseName :: FastString
 scopedConstructorCaseName = fsLit "ScopedConstructorCase"
+
+-- | The interface key for complete cases with scoped branch results.
+scopedCaseResultName :: FastString
+scopedCaseResultName = fsLit "ScopedCaseResult"
 
 -- | Interface key for a nominal application projection with explicit heads.
 matchableProjectionName :: LeftOrRight -> FastString

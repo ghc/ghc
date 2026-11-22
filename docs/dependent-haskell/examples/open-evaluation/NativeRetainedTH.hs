@@ -1,6 +1,9 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, TemplateHaskell #-}
 -- | Select a result type with a retained signature from a quote.
-module NativeRetainedTH (Select, quoted, quotedCase, render, renderCase, renderMaybeCase) where
+module NativeRetainedTH
+  (Select, quoted, quotedCase, render, renderCase, renderMaybeCase, renderMaybeField) where
+
+import Data.Proxy (Proxy(..))
 
 -- | Select a type from a Boolean index.
 type Select (b :: Bool) = case b of { True -> Int; False -> Char }
@@ -31,3 +34,9 @@ renderMaybeCase :: foreach (m :: Maybe Bool) ->
   (case m of { Just _ -> Int; Nothing -> Char }) -> String
 renderMaybeCase (Just _) = show
 renderMaybeCase Nothing = (:[])
+
+-- | Accept the proxy at the field selected by the same Maybe.
+renderMaybeField :: foreach (m :: Maybe Bool) ->
+  (case m of { Just field -> Proxy field; Nothing -> Proxy 'False }) -> String
+renderMaybeField Nothing Proxy = "nothing"
+renderMaybeField (Just _) Proxy = "just"

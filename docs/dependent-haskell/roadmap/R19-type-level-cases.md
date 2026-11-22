@@ -437,12 +437,33 @@ An ordinary client can apply `renderMaybe m (chooseMaybe m)` to the
 same unknown `m`. The client reads `Nothing` and `Just (error ...)`
 from IO. Selecting the `Just` row leaves its field lazy. GHC checks
 that every field is a distinct variable with its declared kind and
-that each result is a bare algebraic type constructor. Nested field
-patterns and results that use a field still require a shared family or
-an explicit proof. A home build refreshes old retained providers that
-may use this form. The interface version changes only for a stored
-proof that uses ignored fields.
+that each result is a bare algebraic type constructor. A home build
+refreshes retained providers made before the ignored-field check.
+The interface version changes only for a stored proof that uses
+ignored fields.
 [Maintained client and mismatch controls](../../../testsuite/tests/dependent/should_run/NativeTypeCaseRetainedTh.sh).
+
+A branch result can use a field. Two separately compiled signatures
+can return or accept `Proxy field` in the `Just field` branch. The
+ordinary client passes the same unknown `Maybe Bool` to both. All
+alternatives still form a complete split over one ordinary datatype.
+For each constructor, the rule checks nominal equality of the
+results under the row's captures and fields. It pairs captures in
+application order and fields in constructor order. Swapping fields
+or captures produces a different result. Nested patterns still use
+their ordered reduction rules.
+[Provider](../examples/open-evaluation/NativeCase.hs),
+[consumer](../examples/open-evaluation/NativeRetainedTH.hs),
+and [source-hidden regression](../../../testsuite/tests/dependent/should_run/NativeTypeCaseScopedResult.sh).
+
+Agda gives each pattern lambda a fresh name. Separate functions with
+matching clauses therefore do not acquire conversion through the
+pattern-lambda translation. The GHC rule adds a checked nominal
+equality for this restricted split. It uses the ordinary stored case
+axioms, so an existing provider can supply the proof to a new client.
+Only a serialized proof that uses scoped branch results requires the
+new interface marker.
+[Agda's pattern-lambda translation](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html#internal-representation-of-pattern-lambdas).
 
 The same test works with a user-defined `Mode = Cold | Hot | Standby`
 and a single closed family `ByMode` in `Mode`'s module. At `-O0` and

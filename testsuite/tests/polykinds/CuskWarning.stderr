@@ -1,0 +1,23 @@
+CuskWarning.hs:7:1: warning: [GHC-57439] [-Wcusks]
+    This declaration uses a complete user-supplied kind signature (CUSK).
+    To state this kind explicitly, write
+      type TyEq :: forall k l. k -> l -> Bool
+    Enable the required extensions
+      {-# LANGUAGE StandaloneKindSignatures, ExplicitForAll #-}
+    Enabling StandaloneKindSignatures disables CUSKs for the whole module.
+
+CuskWarning.hs:11:1: warning: [GHC-57439] [-Wcusks]
+    This declaration uses a complete user-supplied kind signature (CUSK).
+    To state this kind explicitly, write
+      type Visible :: forall k -> k -> Type
+    Enable the required extensions
+      {-# LANGUAGE StandaloneKindSignatures, ExplicitForAll #-}
+    Enabling StandaloneKindSignatures disables CUSKs for the whole module.
+
+CuskWarning.hs:14:1: warning: [GHC-57439] [-Wcusks]
+    This declaration uses a complete user-supplied kind signature (CUSK).
+    To state this kind explicitly, write
+      type Nonrecursive :: forall k. k -> Type
+    Enable the required extensions
+      {-# LANGUAGE StandaloneKindSignatures, ExplicitForAll #-}
+    Enabling StandaloneKindSignatures disables CUSKs for the whole module.

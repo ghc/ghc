@@ -482,6 +482,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnPartialTypeSigTyVarMismatch"               = 88793
   GhcDiagnosticCode "TcRnPartialTypeSigBadQuantifier"               = 94185
   GhcDiagnosticCode "TcRnMissingSignature"                          = 38417
+  GhcDiagnosticCode "TcRnCusk"                                      = 57439
   GhcDiagnosticCode "TcRnPolymorphicBinderMissingSig"               = 64414
   GhcDiagnosticCode "TcRnOverloadedSig"                             = 16675
   GhcDiagnosticCode "TcRnTupleConstraintInst"                       = 69012

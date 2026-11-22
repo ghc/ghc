@@ -1434,6 +1434,26 @@ of ``-W(no-)*``.
     It is useful to catch accidentally polykinded types, or to make that polymorphism explicit,
     without requiring a kind signature for every type.
 
+.. ghc-flag:: -Wcusks
+    :shortdesc: warn when GHC uses a complete user-supplied kind signature with a quantified kind parameter
+    :type: dynamic
+    :reverse: -Wno-cusks
+    :category:
+
+    :since: 10.2
+    :default: off
+
+    Warn when GHC uses a :ref:`complete user-supplied kind signature
+    <complete-kind-signatures>` with a quantified kind parameter. For
+    supported source forms, GHC suggests a :ref:`standalone kind signature
+    <standalone-kind-signatures>` and required language pragmas. For other
+    forms, the warning shows the current kind. A declaration can trigger this warning even
+    when GHC can infer its kind with :extension:`CUSKs` disabled.
+
+    Enabling :extension:`StandaloneKindSignatures` disables :extension:`CUSKs`
+    for the whole module. You may need to add several kind signatures when
+    you enable the extension.
+
 .. ghc-flag:: -Wmissing-exported-pattern-synonym-signatures
     :shortdesc: warn about pattern synonyms without signatures, only if they
         are exported

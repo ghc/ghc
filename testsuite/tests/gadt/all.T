@@ -207,3 +207,7 @@ test('GadtRefinedOrdered',
       extra_files(['GadtRefinedOrderedProvider.hs', 'GadtRefinedOrderedScope.hs',
                    'GadtRefinedOrderedWrongFamily.hs'])],
      run_command, ['bash GadtRefinedOrdered.sh "{compiler}" "{libdir}"'])
+test('GadtOrderedNewtype',
+     [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal']),
+      extra_files(['GadtOrderedNewtypeProvider.hs', 'TerminalGadtTh.sh'])],
+     run_command, ['bash TerminalGadtTh.sh "{compiler}" "{libdir}" GadtOrderedNewtype GadtOrderedNewtypeProvider'])
