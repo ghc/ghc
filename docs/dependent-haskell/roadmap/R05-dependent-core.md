@@ -302,6 +302,30 @@ For a negative input the result depends on the callback's Boolean.
 [ordinary client](../examples/qualified-pi/CallbackRulesClient.hs)
 and [rule-firing and demand checks](../examples/qualified-pi/check-retained-rules.sh).
 
+### Keep absent polymorphic callbacks in lexical scope
+
+An independent float-out failure remains open. Use the provider from
+the callback example with `makeChoice _ _ = Choice`,
+`readKept _ _ (Choice value) = value`, and no user rule. Keep both
+`NOINLINE` pragmas. Compile the provider at `-O2` and give an ordinary
+client just its interface:
+
+```haskell
+check :: (a ~ Bool, r ~ Bool) => (a -> r) -> Bool -> Int -> Int
+check f x value = readKept f x (makeChoice f x value)
+```
+
+On `3a4e5c237a`, the client passes at `-O0` with Core and STG Lint.
+It fails at `-O1` and `-O2` with `Unsupported retained runtime argument`.
+Worker/wrapper supplies a local absence thunk for the callback.
+Float-out abstracts the thunk over the callback's type parameters.
+The retained argument becomes a type application under a nominal cast.
+The matcher update reproduces the same failure. Compiling the provider with
+omitted interface pragmas lets both compilers accept the client at all
+three optimization levels. Preserve the local callback binding until
+erasure so that its retained index can still name it.
+[Callback provider](../examples/qualified-pi/CallbackRules.hs).
+
 ### Standard `-O2` object code
 
 Liberate-case traverses a package and places the opened witness and value
