@@ -754,6 +754,7 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
                      ; let explicit_args = dropList stupid_theta args
                      ; body <- case explicit_args of
                          [field] | new_tycon, not omit_newtype_arg
+                                 , not (isFixedRuntimeRepKind (tyConResKind tycon))
                                  , null theta, null eq_spec, null source_exs
                            -> return (wrapNewTypeBody tycon res_ty_args (Var field))
                          _ -> mk_rep_app (explicit_args `zip` dropList eq_tys unboxers)

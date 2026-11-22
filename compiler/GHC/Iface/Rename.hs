@@ -743,7 +743,7 @@ rnIfaceTyConParent IfNoParent = pure IfNoParent
 rnIfaceConDecls :: Rename IfaceConDecls
 rnIfaceConDecls (IfDataTyCon type_data ds)
     = IfDataTyCon type_data <$> mapM rnIfaceConDecl ds
-rnIfaceConDecls (IfNewTyCon d) = IfNewTyCon <$> rnIfaceConDecl d
+rnIfaceConDecls (IfNewTyCon rep_poly d) = IfNewTyCon rep_poly <$> rnIfaceConDecl d
 rnIfaceConDecls IfAbstractTyCon = pure IfAbstractTyCon
 
 rnIfaceConDecl :: Rename IfaceConDecl

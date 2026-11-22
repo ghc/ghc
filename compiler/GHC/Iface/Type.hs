@@ -3108,6 +3108,7 @@ data IfaceEvidence
   | ScopedCaseResultEvidence
   | OrderedNewtypeTelescopeEvidence
   | ScopedOrderedCaseEvidence
+  | OrderedRepPolyNewtypeEvidence
   deriving (Bounded, Enum, Eq, Ord)
 
 -- | Requirements of an interface payload. See Note [Versioning retained evidence]
