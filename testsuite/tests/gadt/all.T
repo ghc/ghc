@@ -219,3 +219,4 @@ test('GadtEmptyGroups',
      [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal']),
       extra_files(['GadtEmptyGroupsProvider.hs', 'TerminalGadtTh.sh'])],
      run_command, ['bash TerminalGadtTh.sh "{compiler}" "{libdir}" GadtEmptyGroups GadtEmptyGroupsProvider'])
+test('GadtEmptyRequiredOff', req_th, compile_fail, [''])

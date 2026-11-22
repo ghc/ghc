@@ -1,0 +1,5 @@
+GadtEmptyRequiredOff.hs:8:35: error: [GHC-51580]
+    • Illegal visible, dependent quantification in the type of a term
+    • In the definition of data constructor ‘Quoted’
+    • In the Template Haskell quotation:
+        [d| data Quoted where Quoted :: Bool -> Quoted |]
