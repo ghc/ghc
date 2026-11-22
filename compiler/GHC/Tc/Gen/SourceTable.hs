@@ -880,7 +880,7 @@ lookupSourceCheckedMapMethod cls selector domain
                         guard (method_ty `eqType` classMethodInstTy selector [domain])
                         table <- sourceTableId_maybe method
                         sig <- constructorCaseType (tyConKind table)
-                        guard (checkedMapCase sig && sourceCaseVisibleArity table == Just 2)
+                        guard (isJust (checkedMapPrefix sig) && sourceCaseVisibleArity table == Just 2)
                         pure (dfun, predicate, method, table)
                 _ -> pure Nothing
         _ -> pure Nothing
@@ -983,14 +983,35 @@ checker. Such an Id can supply the callback or a constructor field.
 Treat it as an open operand when selecting the checked method.
 -}
 
--- | Check the mapping signature for a receiver with fixed type parameters.
-checkedMapCase :: ConstructorCaseType -> Bool
-checkedMapCase (ConstructorCaseType _ tc params [callback, _] 1 result)
+-- | Return the receiver parameters preserved by the checked mapping signature.
+checkedMapPrefix :: ConstructorCaseType -> Maybe [Type]
+checkedMapPrefix (ConstructorCaseType _ tc params [callback, _] 1 result)
   | Just (prefix, input) <- unsnoc params
   , not (null prefix)
   , Just (from, to) <- caseArrow callback
-  = input `eqType` from && result `eqType` mkTyConApp tc (prefix ++ [to])
-checkedMapCase _ = False
+  , input `eqType` from, result `eqType` mkTyConApp tc (prefix ++ [to])
+  = Just prefix
+checkedMapPrefix _ = Nothing
+
+-- | Closed types carried unchanged by a mapping method.
+-- See Note [Closed parameters in a checked mapping instance].
+fixedMapTypes :: ConstructorCaseType -> [Type]
+fixedMapTypes = filter (caseKind []) . fromMaybe [] . checkedMapPrefix
+
+{- Note [Closed parameters in a checked mapping instance]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For Functor (Row Int Bool), the worker takes a Row Int Bool a and returns
+a Row Int Bool b. It can copy an Int field without using its constructor.
+Keep the closed prefix types when checking the fields and publishing the
+equations. Treat them as opaque at those occurrences. The checker for a
+case on a field still requires the actual constructor to be available.
+The same check applies when a result builds a constructor.
+
+The kind telescope still quantifies the callback's input and output.
+Record only types from the fixed prefix of the same datatype on both
+sides of the mapping signature.
+See Note [Erased arguments in a checked source dictionary].
+-}
 
 -- | Keep the checked workers until Tidy gives their binders external names.
 keepCheckedMapWorkers :: TcGblEnv -> [Core.CoreBind] -> [Core.CoreBind]
@@ -1062,7 +1083,7 @@ checkedMapWorkers env binds = mapMaybe selected bindings
              isNothing (sourceTableId_maybe owner) &&
              exprType field `eqType` classMethodInstTy selector [domain])
       (sig, rows) <- checkedConstructorCase visible (const Nothing) owner rhs
-      guard (checkedMapCase sig)
+      guard (isJust (checkedMapPrefix sig))
       pure (selector, (owner, sig, rows))
 
 addSourceMethods :: Id -> [(Id, Id)] -> Id
@@ -2239,24 +2260,25 @@ constructorCaseType tau = do
       (Nothing, Nothing) -> Just (first, [], [first], 0, rest)
       _ -> Nothing
     (tc, args) <- caseDatatype domain
-    let binder_kinds = map (varType . binderVar) binders
+    let signature = ConstructorCaseType binders tc args domains position result
+        binder_kinds = map (varType . binderVar) binders
     guard (all isLiftedTypeKind binder_kinds ||
            (isRetainedCaseRoot domain tc && noFreeVarsOfType (mkForAllTys telescope liftedTypeKind)))
     let two_lists = twoListDomains domains
     if two_lists && null binders
       then guard (all (caseKind kinds) args)
       else do
-        parameters <- catMaybes <$> traverse domainParameter args
+        parameters <- catMaybes <$> traverse (domainParameter (fixedMapTypes signature)) args
         guard ((isJust (monomorphicEnumCaseArity tau) || not (null parameters)) &&
                sizeUniqSet (mkUniqSet parameters) == length parameters)
     guard (tyCoVarsOfTypes domains == mkUniqSet quantified &&
            caseKind kinds result && all (caseKind kinds) carried &&
            (tc /= listTyCon || position == 1 || two_lists) &&
            tc /= tupleTyCon Boxed 2)
-    pure (ConstructorCaseType binders tc args domains position result)
+    pure signature
   where
-    domainParameter ty
-      | ty `eqType` liftedTypeKind = Just Nothing
+    domainParameter fixed ty
+      | ty `eqType` liftedTypeKind || any (eqType ty) fixed = Just Nothing
       | otherwise = Just <$> getTyVar_maybe ty
 
 -- | A type variable quantified by an ordinary inferred or specified forall.
@@ -3671,7 +3693,7 @@ checkedConstructorCaseWith specialized visible helper owner rhs = do
     guard (parameters == [v | Bndr v _ <- telescope])
     guard (all isId terms && eqTypes (map varType terms) domains)
     (_, scrutinee, _) <- splitCaseOperand position terms
-    let kinds = [mkTyVarTy v | Bndr v _ <- telescope] ++
+    let kinds = [mkTyVarTy v | Bndr v _ <- telescope] ++ fixedMapTypes signature ++
                 [element | isTwoListCase signature
                          , operand <- domains
                          , Just (_, [element]) <- [caseDatatype operand]]
