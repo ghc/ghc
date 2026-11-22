@@ -110,11 +110,14 @@ substitution. [Compiler qualification](CHECKPOINTS.md#four-roadmap-cards-and-the
 | [R13 function promotion](PLAN.md#constructor-specialization) | A recursive function can consume either list when the other list stays the same or also gets shorter. | Specialization at `-O2` must preserve the checked equations and which inputs each branch forces. |
 | [R18 type-level lets](roadmap/R18-type-level-lets.md) | An ordered type-level `let` can give a local binding its own kind signature. | Scope, diagnostics, exact printing and Template Haskell must agree with the source. |
 
-The next compiler checkpoint has 532 expected Showcase lines. It adds
+The 532-line integration added
 a curried runtime comparator, mapping instances selected by the receiver
 type, rectangular and square indices, a successor-indexed payload, a
-quantified GADT equality, and tuple patterns in type-level lets. Its
-matched compiler and library qualification is pending.
+quantified GADT equality, and tuple patterns in type-level lets. A clean
+bootstrap exposed a missing dependency on the primitive tuple module.
+The ambiguity check for a noninjective callback result could also panic.
+The 534-line candidate includes both repairs. Its matched compiler and
+library qualification is pending.
 
 The following checks extend the same cards. An ordinary caller can
 recover the dimensions and cells of a `Tile`. The partial application
