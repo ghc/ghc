@@ -182,11 +182,16 @@ and [source signature and controls](roadmap/R19-type-level-cases.md#a-case-in-a-
 Eisenberg and Stolarek lower each case to a fresh closed family. R19
 keeps that lowering and records the owner of a flat signature case.
 For two applications with the same rigid index, a checked nominal
-coercion compares every exact constructor and its result. Distinct
-nullary constructors make the row order irrelevant in this fragment.
-Known inputs still use the ordinary closed-family equations.
+coercion compares every exact constructor and its result. A row can
+bind fields without inspecting them when its result is a closed type
+constructor. Each row tests a different outer constructor, so row
+order does not change the result. Known inputs still use the ordinary
+closed-family equations. Agda gives pattern lambdas fresh names even
+when the branches agree. R19 checks the complete constructor split
+after lowering.
 [Eisenberg and Stolarek, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf#page=5),
 [closed-family apartness](../users_guide/exts/type_families.rst#compatibility-and-apartness-of-type-family-equations),
+[Agda pattern lambdas](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html#internal-representation-of-pattern-lambdas),
 and [R19 provider and client checks](roadmap/R19-type-level-cases.md#separate-providers-at-an-unknown-index).
 
 An ordinary shared selector that discards eight rows per equation

@@ -415,13 +415,34 @@ gives both providers the same result type.
 The two signatures keep their separate closed families and concrete
 reduction equations. The solver can prove that the two applications
 agree at the same rigid index. It compares the complete sets of exact
-nullary constructor keys and their bare algebraic results of kind
-`Type`. This proof still leaves the selected result unknown. Changing
+constructor keys and their bare algebraic results of kind `Type`. This proof still leaves the selected result unknown. Changing
 one row, omitting a constructor, or using different indices prevents
 that proof. Core Lint checks the same conditions after substitution.
 [Example of an exported case result](../examples/open-evaluation/NativeRetainedTH.hs),
 [Eisenberg and Stolarek, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf),
 and [Agda's fresh pattern-lambda helpers](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html#internal-representation-of-pattern-lambdas).
+
+A split can also ignore the fields of an ordinary constructor. Two
+separate `Maybe Bool` signatures can use these rows in either order.
+
+```haskell
+chooseMaybe :: foreach (m :: Maybe Bool) ->
+  (case m of { Nothing -> Char; Just _ -> Int })
+
+renderMaybe :: foreach (m :: Maybe Bool) ->
+  (case m of { Just _ -> Int; Nothing -> Char }) -> String
+```
+
+An ordinary client can apply `renderMaybe m (chooseMaybe m)` to the
+same unknown `m`. The client reads `Nothing` and `Just (error ...)`
+from IO. Selecting the `Just` row leaves its field lazy. GHC checks
+that every field is a distinct variable with its declared kind and
+that each result is a bare algebraic type constructor. Nested field
+patterns and results that use a field still require a shared family or
+an explicit proof. A home build refreshes old retained providers that
+may use this form. The interface version changes only for a stored
+proof that uses ignored fields.
+[Maintained client and mismatch controls](../../../testsuite/tests/dependent/should_run/NativeTypeCaseRetainedTh.sh).
 
 The same test works with a user-defined `Mode = Cold | Hot | Standby`
 and a single closed family `ByMode` in `Mode`'s module. At `-O0` and
