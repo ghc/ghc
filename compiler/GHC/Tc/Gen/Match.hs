@@ -346,9 +346,21 @@ tcRetainedMatches :: ExpectedFunTyCtxt -> UserTypeCtxt -> HsMatchContextRn
                   -> MatchGroup GhcRn (LHsExpr GhcRn)
                   -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))
 tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
+  | DepFunTy DepFunVisible callback _ <- coreFullView ty
+  , isNativeIndexFunctionId callback
+  , [first_source, second_source] <- constructor_columns
+  = do { (wrap, (pat_tys, plan, rhs_ty)) <- tcRetainedConArgs herald ctxt arity ty
+       ; let visible = filter (isRetainedSourceArg . snd) (zip [0..] plan)
+       ; case (drop first_source visible, drop second_source visible) of
+           ((i, RetainedConIndex first) : _, (j, RetainedConIndex second) : _)
+             | isNativeIndexId first, isNativeIndexId second
+             -> do { checked <- tcRetainedMatrixMatches (i, first) (j, second)
+                                 invis_pat_tys pat_tys plan rhs_ty matches
+                   ; return (wrap, checked) }
+           _ -> function_pattern_error }
   | has_function_binder ty
   , not (one_variable_equation matches)
-  = failWithTc $ TcRnRetainedQuantificationError RetainedFunctionPatterns
+  = function_pattern_error
   | otherwise
   = case unLoc (mg_alts matches) of
       [L loc match@(Match { m_pats = L pat_loc pats })]
@@ -368,8 +380,14 @@ tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
         | otherwise -> failWithTc $
             TcRnRetainedQuantificationError RetainedConstructorCoverage
   where
-    -- Function binders have no constructor-pattern rule. Keep the existing
-    -- scalar constructor path unchanged.
+    function_pattern_error = failWithTc $ TcRnRetainedQuantificationError RetainedFunctionPatterns
+
+    constructor_columns =
+      [ column
+      | (column, pats) <- zip [0..] (transpose visible_rows)
+      , any constructor_pat pats ]
+    visible_rows = map (filter isVisArgLPat . hsLMatchPats) (unLoc (mg_alts matches))
+
     -- See Note [Function-valued retained binders] in GHC.Core.Type.
     has_function_binder :: Type -> Bool
     has_function_binder ty = case coreFullView ty of
@@ -1387,6 +1405,11 @@ data RetainedConArg
   | RetainedConDict EvVar
   | RetainedConIndex Id
 
+-- | Test whether the argument occupies a written column.
+isRetainedSourceArg :: RetainedConArg -> Bool
+isRetainedSourceArg RetainedConDict{} = False
+isRetainedSourceArg _ = True
+
 -- | Collect shared binders in telescope order without counting evidence as values.
 tcRetainedConArgs :: ExpectedFunTyCtxt -> UserTypeCtxt -> Int -> Type
                   -> TcM (HsWrapper, ([ExpPatType], [RetainedConArg], ExpRhoType))
@@ -1469,8 +1492,8 @@ docs/dependent-haskell/REFERENCES.md#agda-provenance.
 -}
 
 -- | Names shared by the visible runtime index columns of constructor equations.
-retainedColumnNames :: Id -> [RetainedConArg] -> [Maybe Name]
-retainedColumnNames first plan = Just (idName first) : foldr column [] plan
+retainedColumnNames :: [RetainedConArg] -> [Maybe Name]
+retainedColumnNames = foldr column []
   where
     column (RetainedConIndex index) rest = Just (idName index) : rest
     column RetainedConValue rest = Nothing : rest
@@ -1478,20 +1501,13 @@ retainedColumnNames first plan = Just (idName first) : foldr column [] plan
 
 -- | Bind implicit dictionaries in their original argument positions.
 insertRetainedDictionaries :: [RetainedConArg] -> [LPat GhcRn] -> [LPat GhcRn]
-insertRetainedDictionaries ds = before_index
-  where
-    before_index (pat : pats)
-      | isVisArgLPat pat = pat : insert ds pats
-      | otherwise = pat : before_index pats
-    before_index [] = panic "insertRetainedDictionaries: missing source index"
-
-    insert [] pats = pats
-    insert (RetainedConDict dict : rest) pats
-      = noLocA (VarPat noExtField (noLocA (idName dict))) : insert rest pats
-    insert ds@(_ : rest) (pat : pats)
-      | isVisArgLPat pat = pat : insert rest pats
-      | otherwise = pat : insert ds pats
-    insert _ [] = panic "insertRetainedDictionaries: missing source argument"
+insertRetainedDictionaries [] pats = pats
+insertRetainedDictionaries (RetainedConDict dict : rest) pats
+  = noLocA (VarPat noExtField (noLocA (idName dict))) : insertRetainedDictionaries rest pats
+insertRetainedDictionaries plan@(_ : rest) (pat : pats)
+  | isVisArgLPat pat = pat : insertRetainedDictionaries rest pats
+  | otherwise = pat : insertRetainedDictionaries plan pats
+insertRetainedDictionaries _ [] = panic "insertRetainedDictionaries: missing source argument"
 
 -- | Check one equation with its constructor proofs and transported dictionaries.
 withRetainedRowGivens :: SkolemInfoAnon -> [EvVar] -> [RetainedConArg] -> [TcCoercionN]
@@ -1526,14 +1542,12 @@ retainedMatrixColumn plan (MG { mg_alts = L _ rows })
   = case [(column, shared)
          | L _ (Match { m_pats = L _ pats }) <- rows
          , ((column, RetainedConIndex shared), pat) <-
-             zip (filter source_argument (zip [0..] plan))
+             zip (filter (isRetainedSourceArg . snd) (zip [0..] plan))
                  (drop 1 (filter isVisArgLPat pats))
          , constructor_pattern pat] of
       first : _ -> Just first
       [] -> Nothing
   where
-    source_argument (_, RetainedConDict _) = False
-    source_argument _ = True
     constructor_pattern :: LPat GhcRn -> Bool
     constructor_pattern (L _ (ParPat _ pat)) = constructor_pattern pat
     constructor_pattern pat | ConPat{} <- unLoc (retainedConPat pat) = True
@@ -1541,11 +1555,11 @@ retainedMatrixColumn plan (MG { mg_alts = L _ rows })
 
 -- | Check a two-index matrix in left-to-right order.
 -- See Note [Retained constructor matrices].
-tcRetainedMatrixMatches :: Id -> (Int, Id) -> [ExpPatType] -> [ExpPatType]
+tcRetainedMatrixMatches :: (Int, Id) -> (Int, Id) -> [ExpPatType] -> [ExpPatType]
                        -> [RetainedConArg] -> ExpRhoType
                        -> MatchGroup GhcRn (LHsExpr GhcRn)
                        -> TcM (MatchGroup GhcTc (LHsExpr GhcTc))
-tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
+tcRetainedMatrixMatches (first_column, first_index) (second_column, second_index) invis_pat_tys
                        pat_tys plan rhs_ty
                        (MG { mg_alts = L loc matches, mg_ext = (origin, _) })
   = setSrcSpanA loc $
@@ -1562,13 +1576,12 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
            (zip rows matches)
        ; tcEmitBindingUsage (supUEs usages)
        ; return (MG { mg_alts = L loc checked
-                    , mg_ext = MatchGroupTc (Scaled ManyTy (varType first_index) : arg_tys)
-                                result_ty origin }) }
+                    , mg_ext = MatchGroupTc arg_tys result_ty origin }) }
   where
     dictionaries = [d | RetainedConDict d <- plan]
-    source_column = length [() | arg <- take second_column plan, written arg]
-    written RetainedConDict{} = False
-    written _ = True
+    first_source = source_column first_column
+    second_source = source_column second_column
+    source_column column = length (filter isRetainedSourceArg (take column plan))
 
     -- An omitted constructor pair must contradict a declared equality.
     check_missing (one, two)
@@ -1611,11 +1624,11 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
     argument_error = failWithTc (TcRnRetainedQuantificationError RetainedConstructorArguments)
 
     row_patterns (Match { m_pats = L _ pats })
-      = case filter isVisArgLPat pats of
-          first : later -> case drop source_column later of
-            second : _ -> return (first, second)
-            _ -> pattern_error
+      = case (drop first_source visible, drop second_source visible) of
+          (first : _, second : _) -> return (first, second)
           _ -> pattern_error
+      where
+        visible = filter isVisArgLPat pats
 
     constructors position (L match_loc match@(Match
       { m_grhss = GRHSs { grhssGRHSs = L _ (GRHS _ [] _) :| [] } }))
@@ -1663,15 +1676,7 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
 
     check_row row arg_tys result_ty (L match_loc match@(Match { m_pats = L _ pats }))
       = setSrcSpanA match_loc $
-        do { later_names <- check_later 0 plan (drop 1 (filter isVisArgLPat pats))
-           ; names <- case row of
-               Just _ -> return later_names
-               Nothing -> do { (first, _) <- row_patterns match
-                             ; case unLoc first of
-                                 VarPat _ (L _ name) ->
-                                   return ((name, idName first_index) : later_names)
-                                 WildPat{} -> return later_names
-                                 _ -> pattern_error }
+        do { names <- check_columns 0 plan (filter isVisArgLPat pats)
            ; when (isNothing row || not (null names)) $
                case retainedMatchQuotation match of
                  Nothing -> return ()
@@ -1696,22 +1701,22 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
                                    mkCheckExpFunPatTy (Scaled mult (case argument of
                                      RetainedConValue -> pSnd (coercionKind co)
                                      _ -> ty))) plan arg_tys arg_cos
-                 first_arg = mkCheckExpFunPatTy (Scaled ManyTy (varType first_index))
                  renamed@(Match { m_pats = L renamed_loc renamed_pats })
                    = renameRetainedMatch names match
                  constructor_columns = case row of
                    Just ((_, first_fields), second) ->
-                     (0, first_fields) : [(source_column+1, fields) | (_, fields) <- maybeToList second]
+                     (first_source, first_fields) :
+                       [(second_source, fields) | (_, fields) <- maybeToList second]
                    Nothing -> []
                  prepared = renamed { m_pats = L renamed_loc
                    (insertRetainedDictionaries plan $ retainedConPats constructor_columns $
-                    bindRetainedWildcards (retainedColumnNames first_index plan) renamed_pats) }
+                    bindRetainedWildcards (retainedColumnNames plan) renamed_pats) }
                  check = do
                    clause <- if length matches == 1
                      then prepareUnguardedWhere (mkCheckExpType (pSnd (coercionKind result_co)))
                             (L match_loc prepared)
                      else return (L match_loc prepared)
-                   tcMatchWithSource tcBody (invis_pat_tys ++ first_arg : refined_args)
+                   tcMatchWithSource tcBody (invis_pat_tys ++ refined_args)
                      (mkCheckExpType (pSnd (coercionKind result_co))) match clause
            ; (ev_binds, L checked_loc checked) <- case (row, cvs) of
                (Nothing, Nothing)
@@ -1728,15 +1733,12 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
                        (L pat_loc (addRetainedConProof cv binds pat)))
                  second_cv = cvs >>= snd
                  first_binds = if isJust second_cv then emptyTcEvBinds else ev_binds
-                 wrap_later column argument co (Scaled _ ty) pat@(L pat_loc inner)
+                 wrap_column (column, argument) co (Scaled _ ty) pat@(L pat_loc inner)
+                   | column == first_column = wrap_index first_index (fst <$> cvs) first_binds pat
                    | column == second_column = wrap_index second_index second_cv ev_binds pat
                    | RetainedConValue <- argument = L pat_loc (XPat (CoPat (mkWpCastN co) inner ty))
                    | otherwise = pat
-                 checked_pats' = case checked_pats of
-                   first : rest -> wrap_index first_index (fst <$> cvs) first_binds first :
-                     zipWith4 (\(column, argument) co ty pat -> wrap_later column argument co ty pat)
-                       (zip [0..] plan) arg_cos arg_tys rest
-                   [] -> panic "tcRetainedMatrixMatches: missing first pattern"
+                 checked_pats' = zipWith4 wrap_column (zip [0..] plan) arg_cos arg_tys checked_pats
                  cast_rhs (L rhs_loc (GRHS x guards rhs))
                    = L rhs_loc (GRHS x guards (mkLHsWrapCo (mkSymCo result_co) rhs))
                  fallback_binds = isNothing cvs && not (null dictionaries)
@@ -1757,22 +1759,23 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
     constructor_proof index (con, fields) =
       newEvVar (mkNomEqPred (TermVarTy index) (retainedConIndex (varType index) con fields))
 
-    check_later _ [] [] = return []
-    check_later column (RetainedConDict _ : args) pats = check_later (column+1) args pats
-    check_later column (argument : args) (pat@(L pat_loc inner) : pats)
+    check_columns _ [] [] = return []
+    check_columns column (RetainedConDict _ : args) pats = check_columns (column+1) args pats
+    check_columns column (argument : args) (pat@(L pat_loc inner) : pats)
       | RetainedConIndex shared <- argument
       = setSrcSpanA pat_loc $
         case inner of
           VarPat _ (L _ name) ->
-            do { names <- check_later (column+1) args pats
+            do { names <- check_columns (column+1) args pats
                ; return ((name, idName shared) : names) }
-          WildPat{} -> check_later (column+1) args pats
-          _ | column == second_column -> check_later (column+1) args pats
+          WildPat{} -> check_columns (column+1) args pats
+          _ | column == first_column || column == second_column
+            -> check_columns (column+1) args pats
             | otherwise -> failWithTc (TcRnRetainedQuantificationError RetainedVariablePattern)
       | otherwise
       = do { unless (isRetainedVarPat pat) (setSrcSpanA pat_loc argument_error)
-           ; check_later (column+1) args pats }
-    check_later _ _ _ = argument_error
+           ; check_columns (column+1) args pats }
+    check_columns _ _ _ = argument_error
 
 {- Note [Retained constructor matrices]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1794,6 +1797,14 @@ index at the incoming type. Use only the first constructor proof. The
 second VarPat binds the shared index without a case. A variable fallback
 uses the original dictionaries and keeps its evidence outside its local
 definitions and RHS.
+
+When the telescope starts with a retained callback, select the two written
+constructor columns. Each column must have a structural retained binder.
+Use a bare variable or wildcard in the other columns. Collect callbacks
+with the rest of the telescope and rename each row's callback Names to
+the shared Ids. Keep all source patterns in order. The ordinary matcher
+uses the original arity and applies Strict to the original positions.
+Use the same coverage check as for a matrix without a callback prefix.
 
 For an omitted pair, instantiate each constructor with fresh fields.
 Specialise the declared nominal equalities to that pair. Check them with
@@ -1858,9 +1869,10 @@ tcRetainedConMatches :: Id -> [ExpPatType] -> [ExpPatType] -> [RetainedConArg] -
                     -> TcM (MatchGroup GhcTc (LHsExpr GhcTc))
 tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
                     group@(MG { mg_alts = L loc matches, mg_ext = (origin, _) })
-  | Just second <- matrix_column
+  | Just (second_column, second) <- matrix_column
   , not split_final
-  = tcRetainedMatrixMatches index second invis_pat_tys pat_tys argument_plan rhs_ty group
+  = tcRetainedMatrixMatches (0, index) (second_column + 1, second) invis_pat_tys
+      (mkCheckExpFunPatTy (Scaled ManyTy (varType index)) : pat_tys) all_arguments rhs_ty group
   | otherwise
   = setSrcSpanA loc $
     do { constructors <- mapM constructor matches
@@ -1868,7 +1880,7 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
              domain_cons = case splitTyConApp_maybe (coreFullView (varType index)) of
                Just (tc, _) -> tyConDataCons tc
                _ -> []
-             columns = retainedColumnNames index argument_plan
+             columns = retainedColumnNames all_arguments
              has_value_pattern (L _ (Match { m_pats = L _ pats })) =
                or [not (isRetainedVarPat pat) | (Nothing, pat) <- zip columns (filter isVisArgLPat pats)]
        -- See Note [Ordinary patterns after a retained constructor].
@@ -1892,6 +1904,7 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
                          , mg_ext = MatchGroupTc (Scaled ManyTy (varType index) : arg_tys) result_ty origin }) }
   where
     matrix_column = retainedMatrixColumn argument_plan group
+    all_arguments = RetainedConIndex index : argument_plan
 
     -- See Note [Split the final retained column inside its first branch].
     split_final
@@ -2128,8 +2141,8 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
                  refined_args = map mkCheckExpFunPatTy refined_domains
                  index_arg = mkCheckExpFunPatTy (Scaled ManyTy (varType index))
                  renamed = renameRetainedMatch names match
-                 prepare = insertRetainedDictionaries argument_plan . retainedConPats [(0, fields)]
-                         . bindRetainedWildcards (retainedColumnNames index argument_plan)
+                 prepare = insertRetainedDictionaries all_arguments . retainedConPats [(0, fields)]
+                         . bindRetainedWildcards (retainedColumnNames all_arguments)
                  match' = renamed { m_pats = fmap prepare (m_pats renamed)
                                   , m_ctxt = case operands of
                                       Just (_ : _ : _, _) -> LamAlt LamSingle

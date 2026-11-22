@@ -3839,7 +3839,8 @@ pprRetainedQuantificationError reason = case reason of
   RetainedVariablePattern ->
     text "The retained argument currently requires a bare variable pattern or a wildcard."
   RetainedFunctionPatterns ->
-    text "Function-valued retained binders currently require one equation with bare variable patterns or wildcards in retained columns."
+    vcat [ text "Function-valued retained binders require bare variable patterns or wildcards."
+         , text "Use a single equation, or a leading retained function column followed by two retained constructor columns." ]
   RetainedContextPattern ->
     text "A strict prefix pattern before a retained context is not supported when later value patterns remain."
   RetainedResultWrapper ->
