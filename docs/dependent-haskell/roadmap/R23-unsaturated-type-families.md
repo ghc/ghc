@@ -386,6 +386,50 @@ remains visible in the unchanged directory replay.
 [Stock test](../../../testsuite/tests/dependent/should_compile/LopezJuan.hs)
 and [reproduction script](../examples/open-evaluation/check-singletons-arrows.sh).
 
+### Released first-class-families migration
+
+The original `first-class-families-0.8.2.0` Haskell2010 build reports
+GHC-83865 at `data Pure :: a -> Exp a`. The synonym RHS
+`type Exp a = a -> Type` defaults to U. The datatype consumes that
+arrow as an argument and requires M. Change the synonym's RHS to
+`a %M -> Type`. Writing `%U` reproduces the same 42 declaration
+errors. Also mark the callback field arrows in `Endo`, `Is_` and
+`Else_` as M. These fields default to U in the declarations, but
+their promoted uses take matchable constructors such as `Pure` and
+`TyEq 0`. Omitting any of the three field annotations restores its
+kind errors.
+[Package release](https://hackage-content.haskell.org/package/first-class-families-0.8.2.0),
+[proposal #242 on synonym RHSs](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#rhs-of-type-synonyms)
+and [promotion](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#promotion).
+
+A separate edit removes `type` from the `:<>:` and `:$$:` data
+constructor exports under `ErrorMessage`. The stock compiler at
+9.14.1 still accepts this spelling in exports. Source inspection
+shows that upstream revision `19ff36f2ae` already enforces the
+namespace via commit `5618645b58` and its `T12488a` regression.
+The fork reports GHC-11592 for the original spelling and accepts
+both bare and explicit `data` exports.
+[Upstream export fix](https://gitlab.haskell.org/ghc/ghc/-/commit/5618645b5860bf65546108e578a7ebfd82c6316f)
+and [proposal #581 on compatibility](https://ghc-proposals.readthedocs.io/en/latest/proposals/0581-namespace-specified-imports.html#backwards-compatibility).
+
+With those two edits, the released fork at `4f2fc1146f` builds all
+17 modules with the original Cabal settings. The upstream package
+test passes. A client using only the compiled library declares its
+own `Exp` symbol, checks equalities with `Eval`, `Case` and promoted
+`UnEndo`, and prints `True`. On the MR !1602 compiler at
+`aea0428256`, the same sources reach the independent CUSK error in
+`TyEqImpl`. [R27 release comparison](R27-deprecate-cusks.md).
+
+The promoted migration restricts runtime uses of `Endo`.
+`Endo (\_ _ -> undefined) :: Endo Bool` compiles against the
+original package on stock GHC. The migrated package rejects that
+lambda with GHC-83865. A standalone `Endo` with two
+matchability parameters accepts the same runtime term. The fork
+defaults the two omitted arguments of promoted `'Endo Echo` to U
+before it checks `Echo`. An explicit `'Endo @M @M Echo` works.
+The polymorphic declaration alone therefore leaves a promoted
+client migration.
+
 ### Arrow patterns in family equations
 
 In the staged `T12088sg2` example, the constructor `TyCon1` needs the
