@@ -150,8 +150,24 @@ this cleanup.
 
 ## Ordered zippers and nominal callback casts
 
-The compiler and the tests share revision `3a4e5c237a`. The ordinary
-zipper proofs use the equations exported by the installed
+Both compilers reported revision `3a4e5c237a`. Both matched the 542 lines
+of the `54d1d5c54a` Showcase at `-O0` and default `-O2`, with Core and
+STG Lint, HIE files and interface-only clients. Self-hosted GHCi matched
+the same output. Both stages found the `zip` and `zipWith` checked equations
+and fusion rules in the static and dynamic installed interfaces. Both
+stages passed the zipper proofs and their demand and active-rule controls.
+
+Job `397` passed 28 of the 29 selected registered tests. The remaining
+test still expected the old pattern diagnostic for a variable in a
+constructor matrix. The checker accepts a final variable row and names the missing constructor
+pair when the rows are incomplete. The fixture at `89d450a893` checks
+the missing pair `(Z, S)` and the current restrictions on each column.
+It retains the three rejected programs, error code and source-span check.
+Job `409` passed that test on the same compiler. These runs cover the
+selected normal way. The earlier v80/v79 compatibility run is recorded
+under [erased calibration status](#erased-calibration-status).
+
+The ordinary zipper proofs use the equations exported by the installed
 `GHC.Internal.List`. The client can prove the cons equation and both
 empty-list equations, then prove the length law by induction. With an
 unknown left spine and an empty right list, reduction stays stuck.
