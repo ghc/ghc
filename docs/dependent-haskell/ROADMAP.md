@@ -60,7 +60,7 @@ Seven open cards have no separate tested implementation counted here.
 | R02 Dependent retained quantifiers | Complete both dependent products (R03) and sums (R04). The fork still restricts which runtime arguments can appear in results and which hidden indices it can infer. |
 | R06 Universal promotion | Promotion of literals, unboxed types, classes, functions and data families is partial (R07, R10, R12–R14). An ordinary definition can still fall outside the evaluator. |
 | R20 Clean up the language | Complete mixed declaration ordering, erased existentials, unsaturated families, constrained families, CUSK deprecation and namespace management. |
-| R27 Deprecate CUSKs | Standalone kind signatures already exist. Serokell identifies an impact assessment and a transition warning for code relying on complete user-supplied kind signatures. |
+| [R27 Deprecate CUSKs](roadmap/R27-deprecate-cusks.md) | Standalone kind signatures already exist. The open GHC migration patch changes the Haskell98 and Haskell2010 defaults. Measure the impact on importing clients and check how a transition warning could identify affected declarations. |
 | R34 Syntactic unification | Type syntax already works in some expressions. Patterns, the term and type grammars, and the frontend representations still need general unification. |
 | R35 Namespace management | Imports and explicit type syntax already provide disambiguation. R36 pun warnings is the last open subtask listed upstream. |
 
