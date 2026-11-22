@@ -202,11 +202,12 @@ written binder kind refers to a name hidden by this shadowing.
 Lifting stops at shadowing on the constructor's own argument spine.
 
 The constructor result has the enclosing telescope scope. A witness
-bound inside a field cannot escape into that result. A constructor can
-use each retained field directly as a result index. More than one result
+bound inside a field cannot escape into that result. Every retained field
+occurs in a result argument. The argument uses the field directly or under
+one unary promoted constructor of the same index type. More than one
 parameter can use the same field. The other result arguments must be
-distinct, unchanged erased parameters. A
-retained field is lazy and has a supported closed structural domain such
+distinct, unchanged erased parameters. A retained field is lazy and has
+a supported closed structural domain such
 as `[Bool]`, `Ordering`, or `Nat`. A variable or wildcard leaves the
 field unevaluated. The constructor pattern introduces the nominal index
 equalities after the field binders. Code generation erases the equalities.
@@ -229,9 +230,8 @@ An ordinary field can refer to the retained field that determines the
 result index. `SomeVec` stores a vector at that length and leaves its
 element type polymorphic. An ordinary client opens a runtime vector
 package and reads the first element at two element types. Both vector
-tails stay unevaluated. GHC reports compound indices, omitted retained
-fields, and specialized erased arguments at the written result
-type.
+tails stay unevaluated. GHC reports unsupported result arguments and
+omitted retained fields at the written result type.
 [Direct constructor](../examples/packed-vector/DirectIndexedVector.hs),
 [ordinary client](../examples/packed-vector/DirectIndexedVectorClient.hs),
 and [source-hidden check](../../../testsuite/tests/dependent/should_run/NativeGadtRetainedSum.sh).
@@ -259,6 +259,24 @@ A single zero clause is exhaustive at `SomeVec a 'Z`. At `SomeVec a n`,
 GHC warns about a missing successor clause. An explicit successor clause
 at the known zero index has an inaccessible right-hand side. Its pattern
 can still force the stored witness.
+
+A constructor can store a vector and give its successor length as the
+result index.
+
+```haskell
+data SuccVec a (size :: Nat) where
+    SuccVec :: foreach (n :: Nat) -> Vec a n -> SuccVec a ('S n)
+
+predecessor :: SuccVec a ('S n) -> Vec a n
+predecessor (SuccVec _ xs) = xs
+```
+
+`predecessor` uses the nominal equality of the two successor indices.
+It can return the payload without evaluating the stored predecessor.
+At `SuccVec a ('S 'Z)`, a zero predecessor pattern is exhaustive.
+At an unknown result index it needs a successor predecessor pattern too.
+[Source-hidden check](../../../testsuite/tests/dependent/should_run/NativeGadtRetainedSum.sh)
+and [Agda successor indices](../REFERENCES.md#put-a-stored-witness-under-a-promoted-constructor).
 
 A rectangular matrix stores the row and column lengths independently.
 Both lengths index the payload and the result.

@@ -1745,6 +1745,20 @@ scrutinee. An explicit square pattern still demands the scrutinee.
 GHC reports that its right-hand side is inaccessible.
 [Agda absurd patterns](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#absurd-patterns).
 
+#### Put a stored witness under a promoted constructor
+
+Agda's vector constructor takes a tail at `n` and returns a vector at
+`suc n`. Its length argument is implicit in the manual. The same rule
+permits an explicit length argument `(n : Nat)` in the telescope.
+[Agda indexed datatypes](https://agda.readthedocs.io/en/v2.8.0/language/data-types.html#indexed-datatypes).
+
+The Haskell `SuccVec` stores the predecessor. Its result equality is
+`size ~# 'S n`. The ordinary nominal equality solver can use the
+injectivity of `'S` to relate the payload to the caller's predecessor.
+Neither the equality nor the constructor pattern's wildcard evaluates
+the stored `n`. See Note [Retained constructor result equality] in
+GHC.Core.DataCon.
+
 ## Source vector uncons
 
 Decision: inspect the stored runtime length before repackaging a vector tail.

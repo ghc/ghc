@@ -42,6 +42,19 @@ zeroIndex :: DirectVec a n -> Maybe (n :~: 'Z)
 zeroIndex (DirectVec Z _) = Just Refl
 zeroIndex (DirectVec (S _) _) = Nothing
 
+-- | Recover the predecessor payload at the index of the caller.
+succPayload :: SuccVec a ('S n) -> Vec a n
+succPayload (SuccVec _ xs) = xs
+
+-- | Match the outer box and leave both fields unevaluated.
+hasSuccVec :: SuccVec a size -> Bool
+hasSuccVec (SuccVec _ _) = True
+
+-- | Inspect the predecessor at an unknown public index.
+zeroPredecessor :: SuccVec a size -> Bool
+zeroPredecessor (SuccVec Z _) = True
+zeroPredecessor (SuccVec (S _) _) = False
+
 -- | Read both dimensions independently.
 matrixShape :: Matrix a rows columns -> (Int, Int)
 matrixShape (Matrix rows columns _) = (lengthValue rows, lengthValue columns)
@@ -128,6 +141,12 @@ main = do
     require ((case atLength of DirectAtLength _ (AtLength value) -> value) == 37)
         "a direct result leaves the length unevaluated"
     throws "direct vector" (case rebuildDirect vector of DirectVec _ xs -> cells xs)
+    let lazySucc = SuccVec unused (error "successor payload")
+    require (cells (succPayload (SuccVec (S Z) one)) == [True])
+        "the successor result determines the payload index"
+    require (hasSuccVec lazySucc) "wildcards leave both successor fields unevaluated"
+    throws "direct length" (zeroPredecessor lazySucc)
+    throws "successor payload" (cells (succPayload lazySucc))
     throws "direct length" (case atLength of DirectAtLength len _ -> lengthValue len)
     let rectangle = VCons (VCons True (VCons False VNil)) VNil
         matrix = Matrix (S Z) (S (S Z)) rectangle

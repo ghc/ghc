@@ -3897,8 +3897,8 @@ pprRetainedQuantificationError reason = case reason of
          , text "Its erased quantifiers must name exactly the datatype parameters."
          , text "A context may contain only homogeneous (~) constraints and requires datatype parameter order." ]
   RetainedConstructorResult ty ->
-    vcat [ text "Each retained field must appear as a direct result argument."
-         , text "Each field must have a closed structural index type."
+    vcat [ text "Each retained field must appear directly or under one unary promoted constructor in a result argument."
+         , text "Each field and its result argument must have the same closed structural index type."
          , text "Other result arguments must be unchanged erased parameters."
          , text "The result type is" <+> quotes (ppr ty) <> dot
          , text "For other results, use an ordinary datatype parameter in the result type."

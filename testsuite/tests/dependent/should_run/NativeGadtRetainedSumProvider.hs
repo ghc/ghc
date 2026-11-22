@@ -114,6 +114,9 @@ pack n xs = Pair n xs
 data DirectVec a (n :: Nat) where
     DirectVec :: foreach (n :: Nat) -> Vec a n -> DirectVec a n
 
+data SuccVec a (size :: Nat) where
+    SuccVec :: foreach (n :: Nat) -> Vec a n -> SuccVec a ('S n)
+
 -- | Store a rectangular matrix and both of its dimensions.
 data Matrix a (rows :: Nat) (columns :: Nat) where
     Matrix :: foreach (rows :: Nat) (columns :: Nat)

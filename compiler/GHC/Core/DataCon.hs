@@ -37,6 +37,7 @@ module GHC.Core.DataCon (
         dataConSourceOrder, dataConInteriorContext, dataConContextFieldCount, dataConInteriorForAll,
         orderedConArgsHaveScope,
         dataConTheta, dataConHasRetainedResult, validRetainedResultEqSpec,
+        retainedResultField_maybe,
         dataConStupidTheta,
         dataConOtherTheta, validRetainedConTheta,
         dataConInstArgTys, dataConOrigArgTys, dataConOrigResTy,
@@ -2079,6 +2080,14 @@ dataConHasRetainedResult :: DataCon -> Bool
 dataConHasRetainedResult con
   = not (null (dcOrigArgBinders con)) && not (null (dcEqSpec con))
 
+-- | Find the retained field in a supported result argument.
+-- See Note [Retained constructor result equality].
+retainedResultField_maybe :: Type -> Maybe Id
+retainedResultField_maybe (TermVarTy field) = Just field
+retainedResultField_maybe (TyConApp tc [TermVarTy field])
+  | isPromotedDataCon tc = Just field
+retainedResultField_maybe _ = Nothing
+
 -- | Check that the result uses all retained fields and each refined universal once.
 -- See Note [Retained constructor result equality].
 validRetainedResultEqSpec :: [TyVar] -> [Id] -> [EqSpec] -> Bool
@@ -2088,7 +2097,9 @@ validRetainedResultEqSpec univs fields eq_spec
     && sizeVarSet (mkVarSet (map snd pairs)) == length fields
     && all valid_pair pairs
   where
-    pairs = [(tv, field) | EqSpec tv (TermVarTy field) <- eq_spec]
+    pairs = [(tv, field) | EqSpec tv result <- eq_spec
+                         , Just field <- [retainedResultField_maybe result]
+                         , varType field `eqType` typeKind result]
     universal_set = mkVarSet univs
     field_set = mkVarSet fields
     valid_pair (tv, field) =
@@ -2118,11 +2129,13 @@ would be out of scope there. Keep the same order when copying alternative
 binders in GHC.Core.Utils and when checking them in GHC.Core.Lint. An
 interface decodes the proof's type in the scope of the decoded field.
 
-Each retained field has a closed structural index type and occurs as a
-direct result argument. The other arguments are unchanged universal
-variables. There are no contexts or existentials. The wrapper binds the
-unchanged variables. An ordinary field type can refer to earlier retained
-fields. Its multiplicity must be independent of the retained fields.
+Each retained field has a closed structural index type. It occurs as a
+result argument or under one unary promoted constructor of the same
+index type. For example, the EqSpec can record i ~# 'S n. The other
+arguments are unchanged universal variables. There are no contexts or
+existentials. The wrapper binds the unchanged variables. An ordinary
+field type can refer to earlier retained fields. Its multiplicity must
+be independent of the retained fields.
 
 The EqSpecs follow the result argument order. The fields follow the
 constructor telescope. For example, the telescope can bind columns before

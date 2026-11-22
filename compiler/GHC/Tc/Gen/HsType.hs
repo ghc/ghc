@@ -763,11 +763,11 @@ tcCheckRetainedConType validate_domain allow_result tc_field_mult
       = setSrcSpanA loc $
         do { res_ty <- tc_check_lhs_type mode body liftedTypeKind
            ; when (anyFreeVarsOfType isId res_ty
-                   && not (allow && direct_result mode res_ty)) $
+                   && not (allow && retained_result mode res_ty)) $
                failWithTc $ TcRnRetainedQuantificationError (RetainedConstructorResult res_ty)
            ; return ([], res_ty) }
 
-    direct_result mode ty
+    retained_result mode ty
       | Just (_, args) <- tcSplitTyConApp_maybe ty
       , Just fields <- traverse result_field (filter (isNothing . getTyVar_maybe) args)
       , let binders = nonDetNameEnvElts (mode_indices mode)
@@ -776,10 +776,12 @@ tcCheckRetainedConType validate_domain allow_result tc_field_mult
         && field_set `subVarSet` mkVarSet binders
       | otherwise = False
 
-    result_field (TermVarTy field)
-      | not validate_domain || isNativeClosedIndexType (varType field)
+    result_field ty
+      | Just field <- retainedResultField_maybe ty
+      , not validate_domain ||
+          (isNativeClosedIndexType (varType field) && typeKind ty `tcEqType` varType field)
       = Just field
-    result_field _ = Nothing
+      | otherwise = Nothing
 
     bind_indices allow mode [] body = go allow mode body
     bind_indices allow mode (L loc bndr : rest) body

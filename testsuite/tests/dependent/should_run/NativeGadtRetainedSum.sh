@@ -159,6 +159,15 @@ disjointSquare x = case x of {}
 
 disjointSquareMatch :: SquareMatrix a 'Z ('S 'Z) -> ()
 disjointSquareMatch (Square _ _) = ()
+
+impossibleSuccessor :: SuccVec a 'Z -> ()
+impossibleSuccessor x = case x of {}
+
+knownPredecessor :: SuccVec a ('S 'Z) -> Bool
+knownPredecessor (SuccVec Z _) = True
+
+unknownPredecessor :: SuccVec a n -> Bool
+unknownPredecessor (SuccVec Z _) = True
 HS
         "${ghc[@]}" "${flags[@]}" -ferror-spans -Wincomplete-patterns -Woverlapping-patterns \
             -c DirectIndexCoverage.hs >coverage.log 2>&1
@@ -166,7 +175,9 @@ HS
             grep -Fq 'not matched: DirectVec (S _) _' coverage.log &&
             grep -Fq 'DirectIndexCoverage.hs:15:1-44: warning: [GHC-94210]' coverage.log &&
             grep -Fq 'DirectIndexCoverage.hs:32:1-37: warning: [GHC-94210]' coverage.log &&
-            test "$(grep -c 'warning:' coverage.log)" -eq 3 || { cat coverage.log >&2; exit 1; }
+            grep -Fq 'DirectIndexCoverage.hs:41:1-39: warning: [GHC-62161]' coverage.log &&
+            grep -Fq 'not matched: SuccVec (S _) _' coverage.log &&
+            test "$(grep -c 'warning:' coverage.log)" -eq 4 || { cat coverage.log >&2; exit 1; }
     fi
 
     cat >BadScope.hs <<'HS'
