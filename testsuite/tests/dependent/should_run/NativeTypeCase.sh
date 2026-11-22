@@ -71,6 +71,8 @@ reject NativeTypeCaseInvalid 6:3 'Not in scope: data constructor'
 reject NativeTypeCaseEscape 6:14 'Not in scope: type variable'
 reject NativeTypeCaseTupleKindEscape 9:14 'Not in scope: type variable'
 grep -Fq 'missing' bad.log
+reject NativeTypeCaseTupleKindRhsEscape 7:41 'Not in scope: type variable'
+grep -Fq 'ghost' bad.log
 reject NativeTypeCaseBadPattern 5:3 'Expected a constructor pattern, a variable, or a wildcard'
 grep -Fq '[GHC-55789]' bad.log
 reject NativeTypeCaseDisabled 4:12 'GHC-98931'

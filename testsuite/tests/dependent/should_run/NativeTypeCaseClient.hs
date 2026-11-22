@@ -114,6 +114,12 @@ nestedTupleKind ::
   , NestedTupleKindLet '( '( 'False, 2), 3) :~: Ordering )
 nestedTupleKind = (Refl, Refl)
 
+polyNestedTupleKind ::
+  ( PolyNestedTupleKindLet Ordering '( '( 'True, 'EQ), 3) :~: Int
+  , PolyNestedTupleKindLet Ordering '( '( 'False, 'EQ), 3) :~: Ordering
+  , PolyNestedTupleKindLet Bool '( '( 'False, 'True), 4) :~: Bool )
+polyNestedTupleKind = (Refl, Refl, Refl)
+
 nested :: ( N.Pick ('Just ('Just 'True)) :~: Proxy 'True
           , N.Pick ('Just 'Nothing) :~: Int
           , N.SameFallback ('Just 'Nothing) :~: Int )

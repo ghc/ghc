@@ -5,7 +5,7 @@ module NativeCase
   , PayloadKind, Fixed, Captured, Retain, PatternShadow, ScrutineeShadow, NestedScope
   , Paired, InferredCapture, ContextKind, SeparateKinds
   , NestedLetCase, NestedLetShadow, NestedLetKind
-  , TupleKindLet, AliasTupleKindLet, NestedTupleKindLet
+  , TupleKindLet, AliasTupleKindLet, NestedTupleKindLet, PolyNestedTupleKindLet
   , caseIdentity, nestedCaseIdentity, retainedPick, renderRetainedPick, retainedKeep
   , retainedDoubleNot, renderRetainedDoubleNot, retainedPermission
   ) where
@@ -216,3 +216,10 @@ type NestedTupleKindLet (dims :: ((Bool, Nat), Nat)) =
   in case flag of
     'True -> Int
     'False -> Ordering
+
+-- | Capture the nested projection and its enclosing kind variable.
+type PolyNestedTupleKindLet (k :: Type) (dims :: ((Bool, k), Nat)) =
+  let ((flag, _), _) = dims
+  in case flag of
+    'True -> Int
+    'False -> k
