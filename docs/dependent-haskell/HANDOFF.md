@@ -109,6 +109,11 @@ below are under `_build/on-demand/`.
 | 798, 809, 816, 817 | `r03-named-safehead-normal-20261122` | Both stages built at `a43a310c08` and matched all 547 lines of fixture `cde69193d8` at `-O0` and `-O2`. Stage 2 GHCi and the installed HaskLib clients passed. The registered normal suite passed 39 of 41. The Core Lint repair in `4f2fc1146f` restores the stored-function test. |
 | 802, 815 | `r19-closure-normal-20261122` | Both stages built at `4e0c9b393a`. Four registered tests passed. A stripped-interface client used the two case results at an unknown index. Changing a row rebuilt the consumer and rejected its old proof. |
 
+The generated compiler trees for `0eb0718f35` and `a43a310c08`
+were removed after qualification of `4f2fc1146f`. Each experiment
+directory retains its Git source bundle, recipe and test results.
+Rebuild the old compiler only if an experiment needs to run it.
+
 For the current compiler, use `r03-r19-r36-normal-4f2fc1146f-20261122`.
 Job 855 rebuilt both stages there. Jobs 864, 865, 868 and 871 checked
 the Showcase, selected tests, installed HaskLib and upstream compatibility.
@@ -121,11 +126,11 @@ Job 838 independently built the R36 warning candidate `e3d6d94481`.
 The full rename run found one expected-output change in a selected
 warning test. The other 16 unexpected results reproduced on the
 preceding compiler in job 872. Job 873 matched the 547-line R19
-Showcase used for that comparison. Job 876 recompiles
+Showcase used for that comparison. Job 876 rebuilt
 `r36-pun-normal-20261122/source` at `a20088cba1` with corrections
 for GADT scopes, quoted declarations, record selectors and the
-warning golden. Recheck the accepted warning examples and the full
-rename run on that build.
+warning golden. Job 881 checks the accepted warning examples and
+the full rename run on that build.
 
 Two of the inherited differences also reproduce when the dependent
 extension is explicitly disabled. In job 875, `T23740a` and
@@ -133,13 +138,20 @@ extension is explicitly disabled. In job 875, `T23740a` and
 9.14.1 and the checked-in goldens report GHC-45510. Both compilers
 reject both programs. This diagnostic difference predates R36.
 
-R41's private parser and Template Haskell repair is at `365f7403ce`
-in `r41-ordered-prefix-repair-20261122`. Its source and interface
-checks passed, including quotation and splicing. Eleven of 24 tested
-prefix orders still fail. R19's next case uses a `Maybe Bool`
-scrutinee. Its `Just` branch ignores the field. Job 874 reproduced the
-failure to compose at an unknown index and checked that a known
-`Just` leaves its field lazy.
+R41's private compiler at `dc7c0472b6` passes all 24 tested orders of
+a field, a context and two binders at both multiplicities and both
+optimization levels. The preceding repair at `365f7403ce` passed
+13 orders. In job 879 the compiler wrote a constructor with no value
+fields, then rejected its interface during Template Haskell reification.
+Resume from `r41-ordered-prefix-general-20261122` and check this case
+before integrating the repair.
+
+R19's next case uses a `Maybe Bool` scrutinee. Its `Just` branch
+ignores the field. Job 874 reproduced the failure to compose at an
+unknown index. In job 880 a private relinked compiler ran the
+interface-only client at `-O0` and `-O2`. A bottom-valued `Just`
+field stayed lazy. A changed row and a different index still failed.
+Check the stored proof, older readers and a normal build before release.
 [R41 ordering tests](roadmap/R41-nested-quantification-in-gadts.md#which-prefix-orders-work)
 and [R19 scope](roadmap/R19-type-level-cases.md).
 

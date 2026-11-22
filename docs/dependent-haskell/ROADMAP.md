@@ -46,8 +46,9 @@ implicit type binders, uses shadowed across lexical scopes, and staged
 imports or remaining syntax. For R41, accepted proposal #402 permits
 free order for fields, constraints and quantifiers in prefix GADT
 constructors. In a test of 24 orders, the published R19 compiler
-accepted eight. A private repair accepts thirteen. The eleven remaining
-rejections persist with both a linear and an unrestricted field.
+accepted eight. The latest private repair accepts all 24 with a
+linear or unrestricted field. Its release still requires a normal build
+and tests for the other constructor forms.
 [R36 checklist](roadmap/R36-pun-warnings.md)
 and [R41 checklist](roadmap/R41-nested-quantification-in-gadts.md).
 
@@ -117,7 +118,7 @@ continue to follow Serokell's published status.
 | [R23 Unsaturated families](roadmap/R23-unsaturated-type-families.md) | The unmodified `T13822` interpreter compiles. Its kind can select a matchable arrow when an equation returns `Maybe`. | Complete higher-order inference and settle compatibility of existing unannotated programs. The unmodified `T15874` still fails on the released compiler. |
 | [R24 Constrained families](roadmap/R24-constrained-type-families.md) | An associated family such as `Elem c` can require the owning dictionary. A source-hidden client rejects a missing premise before reduction. | Settle the general representation of domain evidence, including partial applications, and how the source formation rule corresponds to Core. |
 | [R36 Pun warnings](roadmap/R36-pun-warnings.md) | Five of the eight local checklist entries cover same-scope bindings, global uses, selected syntax and implicit capture. | Finish implicit binding puns, shadowed uses and stage-specific or remaining syntax. Compare diagnostic spans and quiet controls against proposal #765. |
-| [R41 Nested GADT quantifiers](roadmap/R41-nested-quantification-in-gadts.md) | Prefix constructors can interleave several groups of fields, contexts and quantifiers. The tested orders survive an interface and Template Haskell. | Accept all valid orders. The [24-order comparison](roadmap/R41-nested-quantification-in-gadts.md#which-prefix-orders-work) gives a reproducible set of outstanding cases. |
+| [R41 Nested GADT quantifiers](roadmap/R41-nested-quantification-in-gadts.md) | Prefix constructors can interleave several groups of fields, contexts and quantifiers. The tested orders survive an interface and Template Haskell. | Qualify the private [24-order repair](roadmap/R41-nested-quantification-in-gadts.md#which-prefix-orders-work) in a normal build. Check other forms, including repeated and empty field groups and their interface encodings. |
 
 The published evaluator work covers closed calls such as `Prelude.sum` and
 open equations such as mapping `Prelude.not` over a list with a known head

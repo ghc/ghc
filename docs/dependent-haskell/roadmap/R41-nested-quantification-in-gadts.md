@@ -239,9 +239,11 @@ the expected results are `(True,False)`.
 | Published R19 compiler, `4e0c9b393a` | `a %1 ->` | 8/24 |
 | Private parser and Template Haskell repair, `365f7403ce` | `a %1 ->` | 13/24 |
 | Same repair | `a ->` | 13/24 |
+| Private ordered-suffix repair, `dc7c0472b6` | `a %1 ->` | 24/24 at both `-O0` and `-O2` |
+| Same repair | `a ->` | 24/24 at both `-O0` and `-O2` |
 
 Jobs 866 and 869 tested each order separately at `-O0` with Core and
-STG Lint. The same eleven orders fail with either field multiplicity.
+STG Lint. On `365f7403ce`, the same eleven orders fail with either field multiplicity.
 Eight report GHC-71492 for a nested group. Three report GHC-51580 for
 a required binder. For example, the private compiler still rejects
 the first `forall` after the field in this signature.
@@ -251,7 +253,18 @@ data T a b c where
     K :: forall a. Eq a => a -> forall b -> forall c. T a b c
 ```
 
-The private repair also preserves the earlier `Box` example through
+The missed orders put a quantifier or constraint after the last field.
+The ordered constructor checker had required another field in the suffix.
+The repair at `dc7c0472b6` lets the ordered suffix end with these groups.
+It preserves the existing path for terminal groups that already worked.
+The 96 construction and pattern checks above used a relinked compiler.
+Job 879 found a separate interface failure with no value fields.
+The same compiler accepted `K :: forall a. Eq a => forall b. T a b`
+in a provider. Its interface reader then rejected the ordered group
+when a Template Haskell client reified the constructor. This form
+requires separate writer, reader and diagnostic checks.
+
+The repair at `365f7403ce` also preserves the earlier `Box` example through
 quotation, interface-only reification and splicing at `-O0` and `-O2`.
 The 24-order test covers one field and one occurrence of each binder
 form. Repeated groups and additional fields have separate scope and
