@@ -907,6 +907,10 @@ checkFlagHash hsc_env iface self_recomp = do
           , not (Map.member mappingField (getExtensibleFields (mi_ext_fields iface)))
           , couldSupplyMapping (mi_exports iface) (map snd (mi_decls iface)) =
               liftIO $ recheck "Compiler now checks mapping workers and their instance aliases"
+          | mi_hsc_src iface == HsSrcFile
+          , not (Map.member polymorphicMappingField (getExtensibleFields (mi_ext_fields iface)))
+          , couldSupplyPolymorphicMapping (map snd (mi_decls iface)) =
+              liftIO $ recheck "Compiler now checks mapping methods with erased instance parameters"
           | otherwise = pure UpToDate
         check_liberal_synonym
           | xopt LangExt.LiberalTypeSynonyms dflags
@@ -972,6 +976,13 @@ and wired-in types give us their arity. For a type from another module,
 allow for an unsaturated datatype or a synonym. A callback's arrow can
 also be behind a synonym. Mark these candidates after checking them, even
 when the source does not define an eligible equation.
+
+The first review covered ground dictionaries. A later compiler can also
+check a dictionary such as forall e. Functor (Either e). The ground
+review marker can already occur in its module. Record a separate review
+for quantified, context-free dictionaries with a possible mapping receiver.
+This lets an incremental library build recover the same checked methods
+as a clean build. A failed method check also records the review.
 -}
 
 -- | Identify modules that need a one-time check for mapping evidence.
@@ -979,20 +990,13 @@ couldSupplyMapping :: [IfaceExport] -> [IfaceDecl] -> Bool
 couldSupplyMapping exports decls = any candidate decls
   where
     exported = mkNameSet (concatMap availNames exports)
-    local_data = mkNameEnv [(n, length bs) | IfaceData{ifName = n, ifBinders = bs} <- decls]
-    arity n
-      | Just (ATyCon tc) <- wiredInNameTyThing_maybe n = Just (tyConArity tc)
-      | otherwise = lookupNameEnv local_data n
+    arity = mappingTyConArity decls
 
     candidate IfaceId{ifIdDetails = details, ifName = n, ifType = ty} = case details of
-      IfDFunId -> dictionary ty
-      IfSourceDFunId{} -> dictionary ty
+      IfDFunId -> possibleMappingDictionary arity ty
+      IfSourceDFunId{} -> possibleMappingDictionary arity ty
       _ -> n `elemNameSet` exported && callback ty
     candidate _ = False
-
-    dictionary (IfaceTyConApp _ (IA_Arg (IfaceTyConApp tc args) _ IA_Nil)) =
-      maybe True (> length (appArgsIfaceTypes args)) (arity (ifaceTyConName tc))
-    dictionary _ = False
 
     callback (IfaceForAllTy _ _ body) = callback body
     callback (IfaceFunTy FTF_T_T _ _ f rest) = arrow f && arrow rest
@@ -1004,9 +1008,41 @@ couldSupplyMapping exports decls = any candidate decls
     opaque IfaceAppTy{} = True
     opaque _ = False
 
+-- | Find context-free instances that the ground dictionary review missed.
+couldSupplyPolymorphicMapping :: [IfaceDecl] -> Bool
+couldSupplyPolymorphicMapping decls = any candidate decls
+  where
+    arity = mappingTyConArity decls
+    candidate IfaceId{ifIdDetails = IfDFunId, ifType = ty} = quantified ty
+    candidate IfaceId{ifIdDetails = IfSourceDFunId{}, ifType = ty} = quantified ty
+    candidate _ = False
+
+    quantified (IfaceForAllTy _ (Bndr IfaceTvBndr{} (IfaceForAllTyFlag (Invisible _))) body) =
+      quantified body || possibleMappingDictionary arity body
+    quantified _ = False
+
+-- | Look up arity when the interface supplies the datatype or GHC knows it.
+mappingTyConArity :: [IfaceDecl] -> Name -> Maybe Int
+mappingTyConArity decls = arity
+  where
+    local_data = mkNameEnv [(n, length bs) | IfaceData{ifName = n, ifBinders = bs} <- decls]
+    arity n
+      | Just (ATyCon tc) <- wiredInNameTyThing_maybe n = Just (tyConArity tc)
+      | otherwise = lookupNameEnv local_data n
+
+-- | A mapping class takes one receiver that can take another type argument.
+possibleMappingDictionary :: (Name -> Maybe Int) -> IfaceType -> Bool
+possibleMappingDictionary arity (IfaceTyConApp _ (IA_Arg (IfaceTyConApp tc args) _ IA_Nil)) =
+    maybe True (> length (appArgsIfaceTypes args)) (arity (ifaceTyConName tc))
+possibleMappingDictionary _ _ = False
+
 -- | Mark interfaces checked for both the method alias and its worker.
 mappingField :: String
 mappingField = "checked-container-mapping-v1"
+
+-- | Mark the review of mapping dictionaries with erased type parameters.
+polymorphicMappingField :: String
+polymorphicMappingField = "checked-polymorphic-container-mapping-v1"
 
 -- | Record that a potential old synonym provider was checked once.
 liberalSynonymCallbackField :: String
@@ -2877,6 +2913,8 @@ addFingerprints hsc_env iface0 = do
       stamp_nullary = couldInferNullaryClosedMatchability (mi_decls iface0)
       stamp_mapping = mi_hsc_src iface0 == HsSrcFile &&
                       couldSupplyMapping (mi_exports iface0) (mi_decls iface0)
+      stamp_poly_mapping = mi_hsc_src iface0 == HsSrcFile &&
+                           couldSupplyPolymorphicMapping (mi_decls iface0)
       stamp_liberal = xopt LangExt.LiberalTypeSynonyms (hsc_dflags hsc_env)
                    && couldInferLiberalSynonymMatchability (mi_exports iface0) (mi_decls iface0)
       stamp_source_proof_branches = couldHaveUncheckedSourceProofBranches (hsc_dflags hsc_env)
@@ -2898,6 +2936,7 @@ addFingerprints hsc_env iface0 = do
                          mi_deps iface0)
       checked_fields = [liberalSynonymCallbackField | stamp_liberal]
                     ++ [mappingField | stamp_mapping]
+                    ++ [polymorphicMappingField | stamp_poly_mapping]
                     ++ [homeRuleClosuresField | stamp_home_rules]
                     ++ [sourceProofBranchesField | stamp_source_proof_branches]
       checked_hash = foldl' (\fp field -> computeFingerprint putNameLiterally (fp, field))

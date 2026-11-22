@@ -5570,6 +5570,25 @@ check also includes free runtime variables in types and coercions.
 [Haskell 2010 pattern matching, section 3.17.2](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html),
 and [Haskell evaluation provenance](#haskell-evaluation-provenance).
 
+### Upgrading checked method interfaces
+
+Agda checks the interface version before decoding a module. It also
+checks the source hash and the hashes of imported modules before reuse.
+The fork uses GHC's recompilation checker to review a home provider
+when a new compiler can derive evidence that an earlier compiler omitted.
+The first mapping review covered ground instances. A second review
+checks dictionaries with erased type parameters. Both use declarations
+from the old interface to select modules for recompilation.
+[Agda interface versions](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Serialise.hs),
+[Agda import checks](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Interaction/Imports.hs#L840-L891)
+and [GHC upgrade regression](examples/open-evaluation/check-polymorphic-method-upgrade.sh).
+
+An old stripped package can contain exactly the same bytes for a
+computed family equation and for its literal result. Without provider
+source, those bytes cannot identify the original method. The R16
+upgrade instructions describe how to rebuild a local Cabal dependency.
+[Method proofs in family equations](roadmap/R16-open-term-evaluator.md#a-proof-whose-method-is-reduced-in-a-type-synonym).
+
 ### The length of zip and demand in a case tree
 
 Agda's `length-zipWith` proves that the length of a zip is the minimum

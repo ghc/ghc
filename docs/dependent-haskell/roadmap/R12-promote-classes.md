@@ -50,6 +50,15 @@ code. Promotion needs the rebuilt provider. An old reader reports GHC-47808
 when it imports the new marked interface.
 [Interface upgrade check](../examples/open-evaluation/check-polymorphic-method-upgrade.sh).
 
+When the provider source is available, a warm build checks eligible
+quantified instances once. The older mapping marker covered ground
+instances. An old `GHC.Internal.Data.Either` interface can carry that
+marker while its `Functor (Either e)` dictionary lacks the checked
+`fmap` method. The new review includes instances with erased parameters
+even in ordinary Haskell modules. The next build with the same inputs
+reuses the interface.
+[Recompilation precedent](../REFERENCES.md#upgrading-checked-method-interfaces).
+
 ## A method in a retained result type
 
 ```haskell

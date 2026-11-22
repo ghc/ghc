@@ -26,7 +26,8 @@ value = translate (const undefined) (Failed "left" :: Result String Bool)
 HS
 
 cd old
-"${old[@]}" "${flags[@]}" -c "$src/ResultFunctor.hs" -ohi ResultFunctor.hi -o ResultFunctor.o
+cp "$src/ResultFunctor.hs" .
+"${old[@]}" "${flags[@]}" -c ResultFunctor.hs
 "${old[@]}" --show-iface ResultFunctor.hi >old.iface
 if grep -Eq 'DFunId SourceMethods \[\((ResultFunctor\.)?translate,' old.iface; then
     echo 'Expected a provider from before polymorphic method certificates.' >&2
@@ -62,3 +63,36 @@ cd ../reader
 cp ../new/ResultFunctor.hi .
 "${new[@]}" "${flags[@]}" -fignore-interface-pragmas -c "$src/UniversalResultProof.hs" \
     -ohi UniversalResultProof.hi -o UniversalResultProof.o
+
+# Reuse the old build directory, as Hadrian does when rebuilding libraries.
+cd ../old
+"${new[@]}" "${flags[@]}" -v1 --make -no-link ResultFunctor.hs >warm.log 2>&1
+grep -Fq 'Compiler now checks mapping methods with erased instance parameters' warm.log
+"${new[@]}" --show-iface ResultFunctor.hi >reviewed.iface
+grep -Eq 'DFunId SourceMethods \[\((ResultFunctor\.)?translate,' reviewed.iface
+cp ResultFunctor.hi reviewed.hi
+"${new[@]}" "${flags[@]}" --make -no-link ResultFunctor.hs
+cmp reviewed.hi ResultFunctor.hi
+cp ResultFunctor.hi ../reader/
+cd ../reader
+"${new[@]}" "${flags[@]}" -fignore-interface-pragmas -fforce-recomp -fno-code \
+    -c "$src/UniversalResultProof.hs"
+
+# A saturated receiver and a dictionary with a value premise stay on the old path.
+mkdir "$out/unaffected"
+cd "$out/unaffected"
+cat >Plain.hs <<'HS'
+module Plain where
+data Box a = Box a
+class Present t where present :: t -> Bool
+instance Present (Box a) where present _ = True
+
+data Tagged e a = Tag e | Value a
+instance Eq e => Functor (Tagged e) where
+    fmap _ (Tag e) = Tag e
+    fmap f (Value x) = Value (f x)
+HS
+"${old[@]}" "${flags[@]}" --make -no-link Plain.hs
+cp Plain.hi old.hi
+"${new[@]}" "${flags[@]}" --make -no-link Plain.hs
+cmp old.hi Plain.hi
