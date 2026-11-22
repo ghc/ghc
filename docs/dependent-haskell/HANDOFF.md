@@ -125,13 +125,16 @@ revision against the `compiler.source` file in the newer directory.
 **R36 pun warnings.** Job 881 qualified the independent normal
 compiler at `a20088cba1`. All 15 warning controls passed. The rename
 suite recorded 479 expected passes, three expected failures and the
-same 16 unexpected failures as the preceding compiler. Job 887 builds
-the cumulative source `575e35e0d6` on the released callback compiler.
+same 16 unexpected failures as the preceding compiler. Jobs 887 and
+912 verified those controls and the 548-line Showcase on cumulative
+source `575e35e0d6`.
 The splice-scope check in job 889 then exposed a missing binding warning across declaration
-groups. The repaired cumulative source is `0a19ed1190` in
-`r36-combined-top-groups-20261122/source`. Check the treatment of
-implicit pattern binders against the accepted warning rule before
-closing the card.
+groups. Job 913 also distinguished a fresh implicit type binder from
+an annotation that would reuse an earlier term binder. The corrected
+cumulative source is `58bcf66601`. The verified 575e comparator is in
+`r36-combined-top-groups-20261122/preserved-575e`. Job 923 starts
+the corrected warm rebuild. Confirm the full corrected rename run
+before closing the card.
 
 **R13 ordinary typechecking.** With only `RequiredTypeArguments`
 enabled, a name in a type can resolve to a term. The released compiler
@@ -148,31 +151,50 @@ source-hidden client composes two cases on `Maybe Bool` at an unknown
 index. Job 893 checked the unused `Just` field, a changed row, a
 different index, old readers and reuse after rebuilding. The 549-line
 Showcase also passed in the private compiler in job 902. Job 904
-builds the combined R19 and R13 source `4e169241d2` in
-`r19-ignored-fields-next-20261122/normal`. After its focused test
-run frees Hadrian, run `r13-r19-normal-compatibility-20261122/check.sh`
-with the shared build queue. This checks the ten unchanged diagnostic
-tests and the 158 upstream dependent tests.
+built both stages for R19 and R13 at `4e169241d2` in
+`r19-ignored-fields-next-20261122/normal`. Job 927 checks the four
+maintained cases, interface compatibility and the 549-line Showcase.
+Job 928 follows it with the ten unchanged diagnostic tests and 158
+upstream dependent tests.
 
-**R41 nested GADT quantifiers.** Private compiler `7df3cd2a79`
-reads fieldless ordered constructors and rejects unsupported interfaces
-before running an external splice. It retains the 24 one-field orders.
-Jobs 890 and 901 checked the interface cases and twelve registered
-tests. Job 903 builds the combined source `9884c35ff0` in
-`r41-r36-normal-20261122`. Check nonuniform result indices,
-unboxed fields and the upstream record diagnostic before closing R41.
+**R41 nested GADT quantifiers.** Compiler `9884c35ff0` reads
+fieldless ordered constructors and preserves all 24 one-field orders.
+Job 903 built both normal stages. Job 924 passed 33 registered GADT
+tests and the 548-line Showcase. Its verified installation is preserved
+before the next build reuses the physical checkout.
+
+Job 909 found a further failure for result indices such as `T a a`.
+The private repair at `b13259766e` introduces the result equalities
+at pattern entry and brings written constraints into scope at their
+declared positions. Jobs 925 and 926 passed. The next aggregate
+source is `2b64ffc406`. Job 931 rebuilds both stages in
+`r41-r36-aggregate-normal-20261122`. It includes the final warning
+changes, the result-equality repair and the 549-line Showcase.
 [R41 ordering tests](roadmap/R41-nested-quantification-in-gadts.md#which-prefix-orders-work)
 and [R19 scope](roadmap/R19-type-level-cases.md).
 
 **R27 CUSK migration study.** The comparison source `aea0428256` in
 `r27-cusk-impact-20261122/source` applies the three compiler lines
 from [GHC MR !1602](https://gitlab.haskell.org/ghc/ghc/-/merge_requests/1602).
-Job 905 compares legacy and standalone signatures on stock and fork
-GHC. Job 907 relinks the proposed change. Job 911 depends on both
-and compares the upstream polykinds and standalone-kind-signature
-tests on the two compilers. Record provider kinds and client results
-before interpreting these runs as migration evidence.
+Jobs 905 and 911 compared four legacy declarations on stock and fork
+GHC. In the 317-registration comparison, the proposed defaults added
+one expected-output mismatch for an explicit deprecation warning.
+The 19 pre-existing failures had the same diagnostics. Job 914
+supplies Make's companion tools for the definitive comparison.
+Jobs 919 and 922 built `binary` and `deepseq` with their original
+Haskell2010 package settings. Both clients ran on both compilers
+and linked the expected archives. The full comparison also exposed
+an earlier fork failure in the positive upstream test `T19092`.
+Stock GHC 9.14.1 accepts the same source. Job 918 records the
+Core Lint diagnostic for the incorrect coercion.
 [R27 scope](roadmap/R27-deprecate-cusks.md).
+
+The main checkout has local Git recovery refs for these source
+revisions under `refs/archive/dependent-haskell/2026-11-22/`:
+`r36-module-and-pattern-scopes`, `r41-ordered-prefix-normal`,
+`r19-r13-ignored-fields-normal`, `r27-upstream-migration-comparator`
+and `r36-r41-r19-r13-549-normal`.
+The compiler sources remain available there after generated builds expire.
 
 The [release-readiness assessment](ROADMAP.md#release-readiness) identifies
 R36 as the next full-card target.

@@ -275,3 +275,34 @@ The 24-order test covers one field and one occurrence of each binder
 form. Repeated groups and additional fields have separate scope and
 demand tests above.
 [Prefix and record grammar](https://ghc-proposals.readthedocs.io/en/latest/proposals/0402-gadt-syntax.html#grammar-specification).
+
+### GADT result refinements
+
+An indexed constructor can return the same type in two parameters.
+Its consumer learns `x ~ y` when it matches a value of type `T x y`.
+The following declaration also puts a required binder after its
+first field. It is within the scope of proposal #402.
+
+```haskell
+data T x y where
+    K :: forall a. Eq a => !a -> forall (b :: Type) -> Proxy b -> T a a
+```
+
+Job 909 compared three results on private compiler `7df3cd2a79`:
+`T a a`, `T [a] a` and `T Int Bool`. In the last case, the
+payload type `a` is existential. Each of the three ordered signatures
+failed with GHC-71492 at the constructor. Each ordinary control with
+both invisible binders before the fields compiled at `-O0` and `-O2`.
+The clients used only the provider interface. They proved the result
+equalities with `Refl` and used `Eq a` to distinguish a finite
+`Double` from NaN. The earlier 24-order test has distinct result
+parameters and does not exercise these equalities.
+
+The repair at `b13259766e` introduces the result equalities when the
+pattern selects the constructor. The written constraints still enter
+scope at their declared positions. In job 925 the three refined
+results compiled and ran through stripped interfaces at `-O0` and
+`-O2`. A field pattern placed before the written `Eq` constraint
+still failed with GHC-39999. Job 926 passed three registered GADT
+tests with that relinked compiler. The aggregate compiler must
+also pass them in a normal build.
