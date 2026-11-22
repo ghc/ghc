@@ -154,9 +154,15 @@ test('NativeOpenPreludeZipWith',
       extra_files([open_eval_dir + f for f in ['PreludeZipWithSource.hs', 'PreludeZipWithProof.hs',
                                                'PreludeZipWithLengthProof.hs', 'PreludeMapLengthSize.hs',
                                                'PreludeMapLengthSource.hs', 'PreludeMapLengthProof.hs',
-                                               'PreludeZipSource.hs', 'PreludeZipProof.hs', 'PreludeZipRuntime.hs']]
+                                               'PreludeZipSource.hs', 'PreludeZipProof.hs', 'PreludeZipRuntime.hs',
+                                               'ZipMinimum.hs']]
                   + ['NativeOpenZipDemandControls.hs', 'NativeOpenZipWrongMinimum.hs'])],
      run_command, ['bash NativeOpenPreludeZipWith.sh "{compiler}" "{libdir}"'])
+test('NativeOpenMinimum',
+     [req_interp, req_rts_linker, only_ways(['normal']),
+      extra_files(['NativeLocalMinSizeRule.hs'] + [open_eval_dir + f for f in
+                   ['PreludeMapLengthSize.hs', 'PreludeZipRuntime.hs', 'ZipMinimum.hs']])],
+     run_command, ['bash NativeOpenMinimum.sh "{compiler}" "{libdir}" ' + config.ghc_th_way_flags])
 test('NativeOpenListFoldr',
      [only_ways(['normal']),
       extra_files([open_eval_dir + f for f in ['ListFoldrSource.hs', 'ListFoldrProof.hs', 'PreludeFoldrProof.hs',

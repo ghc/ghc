@@ -1832,15 +1832,37 @@ An extension-enabled proof takes the two runtime lists directly with
 `foreach`. Matching `[]` and `(:)` refines the lists in its result
 type. The result type is
 `size (zip xs ys) :~: minSize (size xs) (size ys)`. All three functions
-are ordinary Haskell definitions. The optimized Showcase reads two lists from IO, runs the installed
-zipper, and calls the proof on those same lists. An extension-off proof
-uses `Spine xs` to refine an erased list index by pattern matching.
+are ordinary Haskell definitions. The optimized Showcase reads two lists
+from IO, runs the installed zipper, and calls the proof on those same lists.
+An extension-off proof uses `Spine xs` to refine an erased list index by
+pattern matching.
+
+[ZipMinimum.hs](../examples/open-evaluation/ZipMinimum.hs) contains the
+datatype, both ordinary functions and the proof in one module. Checking
+the proof in that module uses the three typed pattern clauses of
+`minSize`. GHC preserves their left-to-right demand. The module disables
+rewrite rules so that the installed zipper's fusion rules cannot change
+the computation used in the proof.
+
+The proof can import `minSize` from an ordinary library module. GHC
+checks the clauses against final Core and records the three equations in
+the provider's interface.
+Adding an extra `Succ` to the recursive result changes the exported
+equation. GHC then rejects the recursive `Refl` in the unchanged proof.
+When generating code after a compiler upgrade, `--make` rebuilds an
+affected home module once.
+Rebuild an installed library from source to obtain the new equations.
+[Definition](../examples/open-evaluation/PreludeMapLengthSize.hs) and
+[two-compiler upgrade check](../examples/open-evaluation/check-minimum-upgrade.sh).
 
 `Count` names the ordinary structural function `size`, which counts in
 unbounded successors. `Minimum` in the extension-off examples is a
-synonym for the same `minSize` that the direct proof uses. Matching two
-successors exposes a successor of the recursive call on their fields,
-so the proof for the tails discharges the inductive step. The installed
+synonym for the same `minSize` that the direct proof uses. When the proof
+matches two list cells, `minSize` sees two successors. Both sides of the
+goal now start with `Succ`. Matching `Refl` from the tails proves their
+arguments equal. The empty-left proof leaves the right list unevaluated.
+Forcing the proof on two infinite lists diverges, although `zip` can
+produce a prefix. The installed
 `Prelude.length` returns a bounded `Int`. Its result can overflow.
 The two formulations also differ on partial inputs. For example,
 `length (zip [] undefined)` returns zero, but `min 0 (length undefined)`

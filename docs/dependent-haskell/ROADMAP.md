@@ -33,12 +33,14 @@ three are R27 deprecating CUSKs, R34 syntactic unification and R35 namespace
 management. The [checklist](#upstream-checklist-and-complete-dependency-index)
 lists their dependencies.
 
-The Showcase now includes proofs about two functions from the installed
-Prelude. An ordinary client proves that the length of `zip xs ys` and of
-`zipWith f xs ys` is the minimum of the two input lengths. The callback
-can stay abstract. A separate example passes a constructed `Just` to a
+The Showcase reads two lists from IO and proves
+`size (zip xs ys) :~: minSize (size xs) (size ys)` on those lists.
+Both `size` and `minSize` are ordinary recursive Haskell functions.
+The same minimum describes the length of `zipWith f xs ys` for an unknown
+callback `f`. A separate example passes a constructed `Just` to a
 retained comparison and leaves an unused field unevaluated.
-[Pair and length proofs](examples/open-evaluation/PreludeZipProof.hs),
+[Runtime-list proof](examples/open-evaluation/PreludeZipRuntime.hs),
+[ordinary definitions](examples/open-evaluation/PreludeMapLengthSize.hs),
 [callback length proof](examples/open-evaluation/PreludeZipWithLengthProof.hs),
 [comparison](examples/open-evaluation/CompareOptional.hs) and
 [verification status](HANDOFF.md#current-checkpoint).
