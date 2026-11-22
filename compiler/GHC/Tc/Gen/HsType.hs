@@ -1988,7 +1988,10 @@ tcInferTypeLetRhs mode source
         Just (ATcCaseLet params rhs kind Nothing)
           | equalLength params captures -> do
               actuals <- check [] [] params captures
-              instantiate params actuals rhs kind
+              -- Solved metas can refer to this helper's lexical captures.
+              -- Expose those references before substituting the actuals.
+              (rhs', kind') <- liftZonkM $ (,) <$> zonkTcType rhs <*> zonkTcType kind
+              instantiate params actuals rhs' kind'
         Just (ATcCaseLet params rhs kind (Just tc)) -> do
           (applied, _) <- tcInferTyApps mode source (mkTyConTy tc) args
           case splitTyConAppNoView_maybe applied of
