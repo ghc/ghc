@@ -442,8 +442,9 @@ A case branch can use a let-bound type or kind. For example,
 `let k = PayloadKind a in case b of { False -> Maybe k; True -> [k] }`
 checks with `a` still unknown. The branches and the original let refer
 to one private synonym. The synonym takes the RHS's lexical captures,
-including any variables named in their kinds. A case nested in the
-scrutinee inherits the surrounding bindings. A branch pattern or
+including any variables named in their kinds. This includes a parameter
+`dims` with a written kind such as `((Bool, Nat), Nat)`. A case nested in
+the scrutinee inherits the surrounding bindings. A branch pattern or
 inner let can shadow a name in its own scope. The ordinary
 interface-only client verifies both kinds of shadowing.
 [Provider](../examples/open-evaluation/NativeCase.hs)
