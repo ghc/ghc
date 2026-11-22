@@ -2,6 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables, TemplateHaskell, TypeAbstractions, TypeFamilies, TypeOperators #-}
 module Main where
 
+import Control.Exception (SomeException, evaluate, try)
 import Data.Proxy
 import Data.Type.Equality
 import GadtRefinedOrderedProvider
@@ -32,6 +33,14 @@ family = Family
 familyProof :: Family Char x y -> (x :~: [y], Bool)
 familyProof (Family value (type _) _) = (Refl, value == value)
 
+observesBox :: Box x y -> Bool
+{-# NOINLINE observesBox #-}
+observesBox (LazyBox _ (type _) _) = True
+observesBox (StrictBox _ (type _) _) = True
+
+fromFamily :: UnliftedFamily Int b -> Bool
+fromFamily (End value (type _)) = value
+
 main :: IO ()
 main = do
   let s x = same @Double x (type Bool) Proxy
@@ -43,3 +52,7 @@ main = do
          useResultEquality (TrailingContext @Double Proxy))
   let example value = family @Double value (type Bool) Proxy
   print (familyProof (example 3), familyProof (example (0 / 0)))
+  print (observesBox (LazyBox @Bool (error "lazy field") (type Char) Proxy),
+         fromFamily (End True (type Char)))
+  forced <- try @SomeException (evaluate (observesBox (StrictBox @Bool (error "strict field") (type Char) Proxy)))
+  print (case forced of Left _ -> True; Right _ -> False)

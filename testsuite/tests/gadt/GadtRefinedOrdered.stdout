@@ -1,6 +1,10 @@
 ((True,False,Left Refl),(True,False,Right (Left Refl)),(True,False,Right (Right (Refl,Refl))))
 (True,True)
 ((Refl,True),(Refl,False))
+(True,True)
+True
 ((True,False,Left Refl),(True,False,Right (Left Refl)),(True,False,Right (Right (Refl,Refl))))
 (True,True)
 ((Refl,True),(Refl,False))
+(True,True)
+True
