@@ -1721,11 +1721,11 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
                     ; return (wrap_pat pat' : pats', res) }
                Just template ->
                  do { let as_pat = retained_field_as_pat pat
-                    ; name <- case unLoc pat of
-                        VarPat _ (L _ name) -> return name
-                        WildPat{} -> newSysName (mkVarOcc "_")
-                        _ | Just (L _ name, _) <- as_pat -> return name
-                        _ -> newSysName (mkVarOcc "retained_field")
+                    ; mb_field <- bind_retained_field id pat
+                    ; name <- case mb_field of
+                        Just (name, _) -> return name
+                        Nothing | Just (L _ name, _) <- as_pat -> return name
+                        Nothing -> newSysName (mkVarOcc "retained_field")
                     -- Keep the incoming field identity and domain.
                     -- See Note [Refining later retained domains] in GHC.Tc.Gen.Match.
                     ; let index = mkLocalId name ManyTy (scaledThing original_ty)
@@ -1733,13 +1733,13 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
                             (extendSubstInScope subst index) template (Var index)
                     -- See Note [Abstract witness domains] in GHC.Core.Type.
                     ; unless (isManyTy (scaledMult original_ty) && isNativeOpaqueValueId index) bad_pattern
-                    ; case bindRetainedWildcard name pat of
-                        field@(L _ VarPat{}) ->
+                    ; case mb_field of
+                        Just (_, field) ->
                           do { (pat', (pats', res)) <- tcConArg (RealDataCon con) penv
                                   (position, field, original_ty) $
                                   check_fields subst' refinements (position + 1) args pats
                              ; return (pat' : pats', res) }
-                        _ ->
+                        Nothing ->
                           do { unless (isNativeIndexId index) $
                                  failWithTc $ TcRnRetainedQuantificationError RetainedVariablePattern
                              ; let inner_pat = maybe pat snd as_pat
@@ -1769,6 +1769,19 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
                              ; return (L loc indexed_pat : pats', res) } } }
     check_fields _ _ _ _ _ = bad_pattern
 
+    bind_retained_field :: (LPat GhcRn -> LPat GhcRn) -> LPat GhcRn
+                        -> TcM (Maybe (Name, LPat GhcRn))
+    bind_retained_field wrap (L loc (ParPat x inner)) =
+      bind_retained_field (wrap . L loc . ParPat x) inner
+    bind_retained_field wrap (L loc (BangPat x inner)) =
+      bind_retained_field (wrap . L loc . BangPat x) inner
+    bind_retained_field wrap pat@(L _ (VarPat _ (L _ name))) =
+      return (Just (name, wrap pat))
+    bind_retained_field wrap pat@(L _ WildPat{}) =
+      do { name <- newSysName (mkVarOcc "_")
+         ; return (Just (name, wrap (bindRetainedWildcard name pat))) }
+    bind_retained_field _ _ = return Nothing
+
     retained_field_as_pat (L _ (ParPat _ pat)) = retained_field_as_pat pat
     retained_field_as_pat (L _ (AsPat _ alias pat)) = Just (alias, pat)
     retained_field_as_pat _ = Nothing
@@ -1797,14 +1810,19 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
 {- Note [Checking retained package patterns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A retained constructor field binds a runtime Id in the later field types.
-Instantiate these types from left to right. Use the bare source variable's
+Instantiate these types from left to right. Use the source variable's
 Name for the retained Id. tcPatBndr uses that same Name, type, and multiplicity
 when it checks the field. Extend the substitution and its in-scope set before
 checking later fields and the RHS. Do not put this Id among the erased skolems.
 
 Retained fields accept variables, wildcards, or closed constructor patterns
-whose fields are variables or wildcards. A constructor pattern uses the source
-as-binder as the whole-field Id when present. Otherwise generate an outer
+whose fields are variables or wildcards. Parentheses and bangs around a
+variable or wildcard keep the same retained Id. Keep the BangPat so the
+ordinary matcher evaluates the witness and the coverage checker tracks its
+demand. The variable path uses only the constructor's existing evidence.
+
+A constructor pattern uses the source as-binder as the whole-field Id when
+present. Otherwise generate an outer
 as-pattern with a fresh Id. Its inner ConPat carries the nominal whole-index
 equality. Keep the actual source subfield Ids. Transport each
 later field type under that equality with tcRetainedCoercion, then retain
@@ -1828,11 +1846,12 @@ decomposition remains a scalar operation; it supplies no function equality.
 
 Check ordinary fields with
 tcConArg. Nested GADT evidence then scopes over the later fields and the RHS.
-Keep prefix patterns in a strict constructor match. The fields themselves
-stay lazy. Reject lazy package and let patterns. A retained telescope belongs
-to its selected constructor; other constructors do not change its field
-scope. matchExpectedConTy checks the parent and instantiates its universal
-arguments. Keep the checks for no existentials or context, and require an
+Keep prefix patterns in a strict constructor match. A field stays lazy
+unless its pattern demands it. Reject lazy package and let patterns.
+A retained telescope belongs to its selected constructor. Other constructors
+do not change its field scope. matchExpectedConTy checks the parent and
+instantiates its universal arguments. Keep the checks for no existentials or
+context, and require an
 identity result wrapper for the ordinary constructor match. Check a retained
 result's EqSpec after the source field Id enters scope. See Note [Retained
 constructor result equality] in GHC.Core.DataCon. An index constructor pattern

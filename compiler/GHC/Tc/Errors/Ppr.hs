@@ -3913,7 +3913,8 @@ pprRetainedQuantificationError reason = case reason of
          , text "Promotion requires one witness followed by a field whose final type argument is that witness." ]
   RetainedPackagePattern ->
     vcat [ text "A retained package pattern requires prefix constructor syntax and unrestricted multiplicity."
-         , text "Retained fields require bare variables, wildcards, or constructor patterns for their index domain. Constructor fields must be variables or wildcards."
+         , text "Retained fields require variables, wildcards, or constructor patterns for their index domain."
+         , text "A retained variable or wildcard can be parenthesized or have a bang. Fields of an index constructor must be bare variables or wildcards."
          , text "Lazy patterns and pattern bindings are not supported yet." ]
 
 pprTcRnBadlyLevelled :: LevelCheckReason -> Set.Set ThLevelIndex -> ThLevelIndex -> Maybe ErrorItem -> DecoratedSDoc

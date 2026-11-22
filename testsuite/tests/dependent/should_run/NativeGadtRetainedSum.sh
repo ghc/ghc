@@ -94,6 +94,20 @@ HS
         grep -Eq "$expected" reject.log || { cat reject.log >&2; exit 1; }
     done
 
+    cat >CrossedWitness.hs <<'HS'
+{-# LANGUAGE BangPatterns, GADTs, NoExperimentalDependentTypes #-}
+module CrossedWitness where
+import NativeGadtRetainedSumProvider
+crossed :: DirectVec a n -> DirectVec a m -> Vec a m
+crossed (DirectVec !size xs) right = case right of
+    DirectVec !size _ -> xs
+HS
+    if "${ghc[@]}" "${flags[@]}" -ferror-spans -c CrossedWitness.hs >reject.log 2>&1; then
+        echo 'Accepted the payload of a different retained witness' >&2
+        exit 1
+    fi
+    grep -Eq 'CrossedWitness.hs:6:26-27: error: \[GHC-05617\]' reject.log || { cat reject.log >&2; exit 1; }
+
     cat >WrongDirectIndex.hs <<'HS'
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}
 module WrongDirectIndex where

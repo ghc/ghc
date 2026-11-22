@@ -386,7 +386,10 @@ matchOneConLike scrut vars ty (eqn1 :| eqns)   -- All eqns for a single construc
                      ; let field v = (mkMatchId v) { matchInLinearPackage = linear_package }
                            linear_package = matchInLinearPackage scrut
                                          || (isJust retained_vars && not (isManyTy mult))
-                     ; match_result <- match (map field group_arg_vars ++ vars) ty (NE.toList eqns')
+                           match_fields = match (map field group_arg_vars ++ vars) ty (NE.toList eqns')
+                     ; match_result <- case retained_vars of
+                         Just fields -> withRuntimeIndexTypes (map idType (fields ++ dicts1)) match_fields
+                         Nothing -> match_fields
                      ; return $ foldr1 (.) wraps <$> match_result
                      }
 

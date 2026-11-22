@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, EmptyCase, GADTs, NoExperimentalDependentTypes #-}
+{-# LANGUAGE BangPatterns, DataKinds, EmptyCase, GADTs, NoExperimentalDependentTypes #-}
 module Main (main) where
 
 import Control.Exception (ErrorCall, displayException, evaluate, try)
@@ -31,6 +31,27 @@ openDirect (Pair n xs) =
 firstDirect :: DirectVec a n -> Maybe a
 firstDirect (DirectVec Z _) = Nothing
 firstDirect (DirectVec (S _) (VCons x _)) = Just x
+
+strictDirectCells :: DirectVec a n -> Vec a n
+strictDirectCells (DirectVec !n xs) = xs
+
+strictDirectLength :: DirectVec a n -> Bool
+strictDirectLength (DirectVec !_ _) = True
+
+strictNamedLength :: DirectVec a n -> Bool
+strictNamedLength (DirectVec !n _) = True
+
+strictPackedLength :: Packed Bool -> Bool
+strictPackedLength (Pair !_ _) = True
+
+strictOuterLength :: Nested a -> Bool
+strictOuterLength (Nested (Pair !_ (_, Pair _ _))) = True
+
+captureDirect :: DirectVec a n -> DirectVec b m -> (DirectVec a n, DirectVec b m)
+captureDirect (DirectVec !(n) xs) right =
+    let left = DirectVec n xs
+    in case right of
+        DirectVec (!n) ys -> (left, DirectVec n ys)
 
 -- | Use the public index to check a later argument at the same length.
 firstAtIndex :: DirectVec a n -> Vec b n -> Maybe b
@@ -164,6 +185,19 @@ main = do
     let emptyDirect = DirectVec Z (error "zero payload")
     require (firstDirect emptyDirect == (Nothing :: Maybe Bool))
         "the zero branch leaves the payload unevaluated"
+    require (strictDirectLength emptyDirect && strictPackedLength (pack Z (error "packed payload")))
+        "bang patterns force the zero witness and leave each payload unevaluated"
+    let undefinedLength = DirectVec unused (error "direct payload")
+    require (case undefinedLength of DirectVec _ _ -> True)
+        "an unbanged witness stays unevaluated"
+    throws "direct length" (strictDirectLength undefinedLength)
+    throws "direct length" (strictNamedLength undefinedLength)
+    throws "direct length" (strictPackedLength (pack unused (error "packed payload")))
+    require (strictOuterLength innerWitnessBottom) "the independent inner witness stays unevaluated"
+    let (left, right) = captureDirect (DirectVec Z (VNil :: Vec Bool 'Z))
+                                     (DirectVec (S Z) (VCons 'r' VNil))
+    require (null (cells (strictDirectCells left)) && cells (strictDirectCells right) == "r")
+        "parenthesized bangs keep the types of separately captured lengths"
     require (firstAtIndex emptyDirect (error "later zero vector") == (Nothing :: Maybe Char))
         "the zero branch leaves the later vector unevaluated"
     case zeroIndex emptyDirect of

@@ -285,10 +285,12 @@ For example, both arguments in the body f p can depend on n.
 
 Collect the free runtime Ids of the argument and result types once per match
 group. Include the types of pattern-bound variables and constructor evidence.
-Keep the accumulated set in scope for nested matches. A strict let group
-also includes the types of its bindings and result. A forcing case uses
-an unused binder for these indices so that references still name the outer
-Id. Ordinary matches have no such index. This check does not traverse
+Keep the accumulated set in scope for nested matches. When a retained
+constructor binds fields, include their instantiated types. A wildcard field
+can lack a source binder and still need its type in a later cast.
+A strict let group also includes the types of its bindings and result.
+A forcing case uses an unused binder for these indices so that references
+still name the outer Id. Ordinary matches have no such index. This check does not traverse
 nested Core bodies at each strict binder.
 
 Linear variables still need the shadowing case binder. See Wrinkle 1 in
