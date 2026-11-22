@@ -365,7 +365,7 @@ evidenceSuffix requirements
     || needs SourceProofRuleEvidence || needs SourceProofRuleAliasEvidence
     || needs SourceProofRuleAxiomEvidence || needs SourceProofRuleInfoEvidence
     || needs SourceProofRuleArgumentsEvidence || needs PolymorphicSourceMethodEvidence
-    || needs SourceProofRuleBranchesEvidence = feature_set
+    || needs SourceProofRuleBranchesEvidence || needs ScopedEnumCaseEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -382,6 +382,7 @@ evidenceSuffix requirements
 legacyEvidenceSuffix :: IfaceEvidence -> String
 legacyEvidenceSuffix ExperimentalIntPrimIndexEvidence = featureSetPrefix ++ "experimental-int-prim-index"
 legacyEvidenceSuffix ExperimentalWordPrimIndexEvidence = featureSetPrefix ++ "experimental-word-prim-index"
+legacyEvidenceSuffix ScopedEnumCaseEvidence = featureSetPrefix ++ "scoped-enum-case-v1"
 legacyEvidenceSuffix PartialSynonymEvidence = featureSetPrefix ++ "partial-synonym-v2"
 legacyEvidenceSuffix ErasedUserRuleEvidence = featureSetPrefix ++ "user-rule"
 legacyEvidenceSuffix LexicalPackageRuleEvidence = featureSetPrefix ++ "lexical-rule"
@@ -484,7 +485,8 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("source-proof-id-rules", SourceProofRuleInfoEvidence)
                       , ("source-proof-rule-arguments", SourceProofRuleArgumentsEvidence)
                       , ("polymorphic-source-method", PolymorphicSourceMethodEvidence)
-                      , ("source-proof-rule-branches", SourceProofRuleBranchesEvidence) ]
+                      , ("source-proof-rule-branches", SourceProofRuleBranchesEvidence)
+                      , ("scoped-enum-case-v1", ScopedEnumCaseEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion

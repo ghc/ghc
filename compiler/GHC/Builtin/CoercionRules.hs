@@ -4,6 +4,7 @@ module GHC.Builtin.CoercionRules
   , boxedPairCompositionRule, matchBoxedPairComposition
   , boxedPairReconstructionRule
   , proveBoxedPairProjection, proveScopedSigmaClosure, proveScopedLambdaClosure
+  , proveScopedEnumCase
   ) where
 
 import GHC.Prelude
@@ -12,19 +13,25 @@ import GHC.Builtin.WiredIn.TypeLits (typeNatCoAxiomRules)
 import GHC.Builtin.WiredIn.Types (promotedTupleDataCon, tupleTyCon)
 import GHC.Core.Coercion (existsCoRule, matchableAppProjectionRule, mkNomReflCo, mkSymCo)
 import GHC.Core.Coercion.Axiom
-import GHC.Core.TyCo.Rep (Coercion(AxiomCo))
+import GHC.Core.DataCon (dataConName, dataConTyCon)
+import GHC.Core.TyCo.FVs (tyCoVarsOfType)
+import GHC.Core.TyCo.Rep (Coercion(AxiomCo), Type(TyVarTy))
 import GHC.Core.TyCo.Compare (eqType, eqTypes, eqScopedSigmaClosures, eqScopedLambdaClosures)
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Data.FastString
 import GHC.Data.Pair
 import GHC.Types.Basic (Boxity(Boxed), LeftOrRight(..))
-import GHC.Types.Var (ExistsTyFlag(..))
-import GHC.Types.Name (nameOccName)
-import GHC.Types.Name.Occurrence (sourceTableTermOcc)
+import GHC.Types.Var (ExistsTyFlag(..), binderVar, tyVarKind)
+import GHC.Types.Var.Set
+import GHC.Types.Name (nameModule_maybe, nameOccName, stableNameCmp)
+import GHC.Types.Name.Occurrence (occNameString, sourceTableTermOcc)
 import GHC.Types.Unique.FM (UniqFM, addToUFM)
 
+import GHC.Utils.Misc (equalLength, lengthIs, snocView)
+
 import Control.Monad (guard)
+import Data.List (isPrefixOf, sortBy)
 
 -- | Resolve the stable names written to the interface by CoreToIface.
 builtInCoAxiomRules :: UniqFM FastString CoAxiomRule
@@ -36,11 +43,15 @@ builtInCoAxiomRules =
       , existsCoRule ImplicitExists Nominal, existsCoRule ImplicitExists Representational
       , matchableAppProjectionRule CLeft, matchableAppProjectionRule CRight
       , (scopedSigmaClosureName, scopedSigmaClosureRule)
-      , (scopedLambdaClosureName, scopedLambdaClosureRule) ]
+      , (scopedLambdaClosureName, scopedLambdaClosureRule)
+      , (scopedEnumCaseName, scopedEnumCaseRule) ]
 
 scopedSigmaClosureRule, scopedLambdaClosureRule :: CoAxiomRule
 scopedSigmaClosureRule = scopedClosureRule scopedSigmaClosureName eqScopedSigmaClosures
 scopedLambdaClosureRule = scopedClosureRule scopedLambdaClosureName eqScopedLambdaClosures
+
+scopedEnumCaseRule :: CoAxiomRule
+scopedEnumCaseRule = scopedClosureRule scopedEnumCaseName eqScopedEnumCases
 
 scopedClosureRule :: FastString -> (Type -> Type -> Bool) -> CoAxiomRule
 scopedClosureRule name equal = BuiltInEqRule name proves
@@ -64,6 +75,98 @@ proveScopedLambdaClosure lhs rhs
   | eqScopedLambdaClosures lhs rhs
   = Just (AxiomCo scopedLambdaClosureRule [mkNomReflCo lhs, mkNomReflCo rhs])
   | otherwise = Nothing
+
+-- | Produce nominal evidence for equal retained enumeration cases.
+proveScopedEnumCase :: Type -> Type -> Maybe Coercion
+proveScopedEnumCase lhs rhs
+  | eqScopedEnumCases lhs rhs
+  = Just (AxiomCo scopedEnumCaseRule [mkNomReflCo lhs, mkNomReflCo rhs])
+  | otherwise = Nothing
+
+-- | Check a nominal equality of two complete retained enumeration cases.
+-- See Note [Equality of retained enumeration cases].
+eqScopedEnumCases :: Type -> Type -> Bool
+eqScopedEnumCases lhs rhs
+  | Just (tc1, as1) <- splitTyConApp_maybe lhs
+  , Just (tc2, as2) <- splitTyConApp_maybe rhs
+  , tc1 /= tc2
+  , is_signature_case tc1, is_signature_case tc2
+  , as1 `lengthIs` tyConArity tc1, as2 `lengthIs` tyConArity tc2
+  , tyConKind tc1 `eqType` tyConKind tc2
+  , as1 `eqTypes` as2
+  , Just rows1 <- checked_rows tc1
+  , Just rows2 <- checked_rows tc2
+  = rows1 == rows2
+  | otherwise = False
+  where
+    is_signature_case tc
+      | Just (owner, False) <- closedFamilyScope_maybe tc
+      , Just owner_module <- nameModule_maybe owner
+      , Just owner_module == nameModule_maybe (tyConName tc)
+      , let occurrence = occNameString (nameOccName owner)
+      = "$signature-case:" `isPrefixOf` occurrence
+        && ("$case:" ++ occurrence ++ ":") `isPrefixOf` occNameString (nameOccName (tyConName tc))
+      | otherwise = False
+
+    checked_rows tc = do
+      guard (isLiftedTypeKind (tyConResKind tc))
+      NotInjective <- pure (tyConInjectivityInfo tc)
+      let kinds = map (tyVarKind . binderVar) (tyConBinders tc)
+      guard (all (isEmptyVarSet . tyCoVarsOfType) kinds)
+      (captures, scrutinee_kind) <- snocView kinds
+      (enum, []) <- splitTyConAppNoView_maybe scrutinee_kind
+      guard (isEnumerationTyCon enum)
+      constructors <- tyConDataCons_maybe enum
+      ax <- closedFamilyTyConCoAxiom_maybe tc
+      guard (coAxiomTyCon ax == tc && coAxiomRole ax == Nominal)
+      guard (null (co_ax_source_proof_rules ax))
+      let branches = fromBranches (coAxiomBranches ax)
+      guard (equalLength branches constructors)
+      rows <- traverse (checked_row enum captures) branches
+      let sorted_rows = sortBy (compare_names (dataConName . fst)) rows
+      guard (map fst sorted_rows == sortBy (compare_names dataConName) constructors)
+      pure sorted_rows
+
+    checked_row enum captures branch = do
+      guard (null (cab_cvs branch) && null (cab_eta_tvs branch))
+      guard (equalLength (cab_roles branch) (cab_tvs branch) && all (== Nominal) (cab_roles branch))
+      (parameters, pattern_ty) <- snocView (cab_lhs branch)
+      vars <- traverse plain_var parameters
+      guard (equalLength vars (cab_tvs branch) && equalLength vars captures)
+      let bound = mkVarSet (cab_tvs branch)
+      guard (sizeVarSet bound == length vars && all (`elemVarSet` bound) vars)
+      guard (sizeVarSet (mkVarSet vars) == length vars)
+      guard (map tyVarKind vars `eqTypes` captures)
+      (pattern_tc, []) <- splitTyConAppNoView_maybe pattern_ty
+      con <- isPromotedDataCon_maybe pattern_tc
+      guard (dataConTyCon con == enum)
+      (result, []) <- splitTyConAppNoView_maybe (cab_rhs branch)
+      guard (isAlgTyCon result && isLiftedTypeKind (tyConKind result))
+      pure (con, result)
+
+    plain_var (TyVarTy var) = Just var
+    plain_var _ = Nothing
+    compare_names get_name a b = stableNameCmp (get_name a) (get_name b)
+
+{- Note [Equality of retained enumeration cases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The checker records the signature-case owner from the renamed source
+rows. Each family retains its ordinary reduction axioms. The additional
+nominal rule can compare two such families with the same scrutinee when
+ordinary rewriting leaves their applications stuck.
+
+Read the immutable axioms on demand. Require one exhaustive split over
+the same unindexed enumeration. Each row has only unrelated capture
+variables and one exact constructor pattern. Check that each result is
+a bare algebraic type constructor. Distinct exact constructors
+establish disjointness. Do not force the pairwise overlap caches.
+Compare all results by constructor identity.
+
+Recheck this shape when reading the coercion. A substitution can make
+the scrutinee known to both families. The same row then reduces on both
+sides, so the proof remains valid. Other closed families and ordered
+cases continue to use their nominal identities.
+-}
 
 {- Note [Strict boxed pair composition]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

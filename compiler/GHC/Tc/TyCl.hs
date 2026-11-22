@@ -4089,6 +4089,10 @@ tcFamDecl1 case_axioms parent (FamilyDecl { fdInfo = fam_info
              closed
                | Just (owner, is_sum) <- scope, Just ax <- mb_co_ax
                = CTF_Scoped owner is_sum ax
+               | Just ax <- mb_co_ax
+               , Nothing <- lookupNameEnv case_axioms tc_name
+               , Just owner <- flatSignatureCaseOwner axiom_validity_infos
+               = CTF_Scoped owner False ax
                | otherwise = CTF mb_co_ax
 
          -- We check for instance validity later, when doing validity
@@ -4415,6 +4419,19 @@ typeCasePattern tc source_args rhs checked_args
 hasCasePattern :: TyFamEqnValidityInfo -> Bool
 hasCasePattern VI{vi_case_pattern = Just _} = True
 hasCasePattern _ = False
+
+-- | Keep the owner of an elaborated signature case with flat constructor rows.
+-- See Note [Equality of retained enumeration cases] in GHC.Builtin.CoercionRules.
+flatSignatureCaseOwner :: [TyFamEqnValidityInfo] -> Maybe Name
+flatSignatureCaseOwner infos = do
+  ((owner, column) : rest) <- traverse flat infos
+  guard ("$signature-case:" `List.isPrefixOf` occNameString (nameOccName owner))
+  guard (all (== (owner, column)) rest)
+  pure owner
+  where
+    flat VI{vi_case_pattern = Just (owner, column, CasePatternConstructor _ _ [], _)} =
+      Just (owner, column)
+    flat _ = Nothing
 
 hasOrderedPattern :: TyFamEqnValidityInfo -> Bool
 hasOrderedPattern VI{vi_case_pattern = Just (_, _, CasePatternField, _)} = True

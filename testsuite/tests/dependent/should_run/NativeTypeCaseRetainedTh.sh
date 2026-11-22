@@ -276,7 +276,11 @@ for control in ESCAPED_INDEX ERASED_INDEX FRESH_INDEX WRONG_INDEX_AST STAGE_INDE
         exit 1
     fi
 done
-for control in DIFFERENT_GROUP REORDERED_ROWS DIFFERENT_ARMS DIFFERENT_CAPTURE; do
+for control in DIFFERENT_GROUP REORDERED_ROWS; do
+    "${base[@]}" "-D$control" -fforce-recomp -fomit-interface-pragmas \
+        -fno-write-if-simplified-core -c NativeTypeCaseRetainedThSeparate.hs
+done
+for control in DIFFERENT_ARMS DIFFERENT_CAPTURE; do
     status=0
     "${base[@]}" "-D$control" -c NativeTypeCaseRetainedThSeparate.hs > separate.log 2>&1 || status=$?
     if [[ $status != 1 ]] || ! grep -Fq 'GHC-83865' separate.log ||
@@ -284,4 +288,49 @@ for control in DIFFERENT_GROUP REORDERED_ROWS DIFFERENT_ARMS DIFFERENT_CAPTURE; 
         cat separate.log >&2
         exit 1
     fi
+done
+
+mkdir providers
+cat >providers/ChooseAcross.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes #-}
+module ChooseAcross (choose) where
+choose :: foreach (b :: Bool) -> (case b of { True -> Int; False -> Char })
+choose True = 19
+choose False = 'q'
+HS
+cat >providers/RenderAcross.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes #-}
+module RenderAcross (render) where
+render :: foreach (b :: Bool) -> (case b of { False -> Char; True -> Int }) -> String
+render True = show
+render False = (:[])
+HS
+cat >Across.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module Main where
+import ChooseAcross (choose)
+import Data.IORef (newIORef, readIORef, writeIORef)
+import RenderAcross (render)
+
+atRuntime :: Bool -> String
+atRuntime b = render b (choose b)
+
+main :: IO ()
+main = do
+    ref <- newIORef False
+    first <- atRuntime <$> readIORef ref
+    writeIORef ref True
+    second <- atRuntime <$> readIORef ref
+    if (first, second) == ("q", "19") then pure () else fail "unexpected selected row"
+HS
+for opt in -O0 -O2; do
+    ghc=("${base[@]}" "$opt" -fforce-recomp)
+    cp providers/*.hs .
+    for module in ChooseAcross RenderAcross; do
+        "${ghc[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core -c "$module.hs"
+        mv "$module.hs" "$module.source"
+    done
+    "${ghc[@]}" -c Across.hs
+    "${ghc[@]}" Across.o ChooseAcross.o RenderAcross.o -o across
+    ./across
 done

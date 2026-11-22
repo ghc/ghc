@@ -12,7 +12,8 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.Tc.Solver.Solve( solveSimpleWanteds )
 
 import GHC.Builtin.CoercionRules
-  ( proveBoxedPairProjection, proveScopedSigmaClosure, proveScopedLambdaClosure )
+  ( proveBoxedPairProjection, proveScopedSigmaClosure, proveScopedLambdaClosure
+  , proveScopedEnumCase )
 import GHC.Builtin.WiredIn.Types ( heqClass )
 import GHC.Tc.Gen.SourceTable ( sourceTableFamilyAppUse, sourceTableOwner )
 import GHC.Tc.Errors.Types ( RetainedQuantificationError(..), TcRnMessage(..) )
@@ -794,6 +795,13 @@ can_eq_nc ces rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
 -- Look for a canonical LHS.
 -- Only rewritten types end up below here.
 ----------------------------
+
+-- See Note [Equality of retained enumeration cases] in GHC.Builtin.CoercionRules.
+can_eq_nc ces _ _ ev eq_rel lhs _ rhs _
+  | bothRewritten ces, isWanted ev
+  , Just co <- proveScopedEnumCase lhs rhs
+  = do { setEqIfWanted ev (CPH (downgradeRole (eqRelRole eq_rel) Nominal co) emptyCoHoleSet)
+       ; stopWith ev "Checked retained enumeration case" }
 
 -- See Note [Scoped retained sum codomains] in GHC.Core.TyCo.Compare.
 can_eq_nc ces _ _ ev eq_rel lhs _ rhs _

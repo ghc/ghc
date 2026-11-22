@@ -902,6 +902,7 @@ checkFlagHash hsc_env iface self_recomp = do
           | otherwise = pure UpToDate
         check_retained_signature
           | not shared_retained_cases
+            || not (Map.member enumCaseClosureField (getExtensibleFields (mi_ext_fields iface)))
           , mi_hsc_src iface == HsSrcFile
           , couldExportRetainedSignatureCase (mi_semantic_module iface)
                                             (mi_exports iface) (map snd (mi_decls iface)) =
@@ -1075,6 +1076,10 @@ injectiveKindResultField = "injective-kind-result-v1"
 -- | Record that a potential old synonym provider was checked once.
 liberalSynonymCallbackField :: String
 liberalSynonymCallbackField = "liberal-synonym-callback-v1"
+
+-- | Record that the compiler attributed generated cases to their signatures.
+enumCaseClosureField :: String
+enumCaseClosureField = "enum-case-closure-v1"
 
 {- Note [Recompiling source proof family branches]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3086,6 +3091,7 @@ addFingerprints hsc_env iface0 = do
                          mi_deps iface0)
       checked_fields = [liberalSynonymCallbackField | stamp_liberal]
                     ++ [injectiveKindResultField | stamp_injective_kind]
+                    ++ [enumCaseClosureField | mi_hsc_src iface0 == HsSrcFile, stamp_retained]
                     ++ [mappingField | stamp_mapping]
                     ++ [appliedMappingField | stamp_applied_mapping]
                     ++ [homeRuleClosuresField | stamp_home_rules]

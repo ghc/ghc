@@ -402,14 +402,23 @@ render :: foreach (b :: Bool) ->
   (case b of { True -> Int; False -> Char }) -> String
 ```
 
-An ordinary client with only the stripped interfaces can compose
-these functions at `True` and `False`. Its definition
-`atRuntime b = render b (choose b ())` fails with GHC-83865 at the
-second argument of `render`. The two interfaces name different
-private families. The diagnostic shows identical case text and
-names the two source signatures. If both providers use a single
-exported `Select b`, the client can pass a Boolean from an IORef
-to `atRuntime`. A named `Data.Type.Bool.If b Int Char` works too.
+An ordinary client with only the stripped interfaces can define
+`atRuntime b = render b (choose b ())` and pass it a Boolean from an
+IORef. This also works if the providers write the rows in opposite
+orders. An older provider interface without the signature owner still
+supports calls at `True` and `False`. A home build reviews exported
+signature cases once. Rebuild an older installed provider to record
+its owner. A shared `Select b` or `Data.Type.Bool.If b Int Char` also
+gives both providers the same result type.
+[Source-hidden client](../../../testsuite/tests/dependent/should_run/NativeTypeCaseRetainedTh.sh).
+
+The two signatures keep their separate closed families and concrete
+reduction equations. The solver can prove that the two applications
+agree at the same rigid index. It compares the complete sets of exact
+nullary constructor keys and their bare algebraic results of kind
+`Type`. This proof still leaves the selected result unknown. Changing
+one row, omitting a constructor, or using different indices prevents
+that proof. Core Lint checks the same conditions after substitution.
 [Example of an exported case result](../examples/open-evaluation/NativeRetainedTH.hs),
 [Eisenberg and Stolarek, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf),
 and [Agda's fresh pattern-lambda helpers](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html#internal-representation-of-pattern-lambdas).
@@ -472,10 +481,9 @@ selection.
   Constructor fields and indexed branches also need scopes for their
   binders and their equality evidence.
 
-Automatic sharing would need an interface upgrade check for affected
-home providers. A client with only an older installed provider's
-private family cannot recover the shared result from that interface
-under the current rules.
+The checked equality above uses the existing scoped-family metadata
+and one Coercion rule. The selector and first-class case representations
+remain alternatives for broader forms of case conversion.
 
 ## A case in a function arrow
 
