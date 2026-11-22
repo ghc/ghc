@@ -9,6 +9,7 @@ module GHC.Tc.Solver.Irred(
 import GHC.Prelude
 
 import GHC.Core.Coercion
+import GHC.Core.Map.Type ( emptyTypeMap, extendTypeMap, lookupTypeMap )
 import GHC.Core.Predicate
 import GHC.Core.Type
 import GHC.Core.TyCo.Compare ( tcEqType )
@@ -26,9 +27,10 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import GHC.Data.Bag
+import GHC.Data.TrieMap ( alterTM )
 
 import Control.Applicative ( (<|>) )
-import Data.Maybe ( listToMaybe )
+import Data.Maybe ( fromMaybe, isJust, listToMaybe )
 import Data.Void( Void )
 
 
@@ -85,7 +87,7 @@ try_inert_irreds inerts irred_w@(IrredCt { ir_ev = ev_w, ir_reason = reason })
   | CtWanted (WantedCt { ctev_dest = dest }) <- ev_w
   , EqPred NomEq lhs rhs <- classifyPredType (ctEvPred ev_w)
   , isOpaqueTermIndex lhs || isOpaqueTermIndex rhs
-  , Just co <- findCastedIndexProof (inert_irreds inerts) lhs rhs
+  , Just co <- findRetainedIndexProof (inert_irreds inerts) lhs rhs
   = do { let holes = foldr (flip addRewriter) emptyCoHoleSet
                           (univCoDepsHoles (mkUnivCoDeps [co]))
        ; setWantedEq dest (CPH co holes)
@@ -104,8 +106,8 @@ isOpaqueTermIndex _ = False
 
 -- | Recover a nominal index equality from scoped homogeneous Givens.
 -- See Note [Using casted index Givens].
-findCastedIndexProof :: InertIrreds -> Type -> Type -> Maybe Coercion
-findCastedIndexProof irreds lhs rhs = direct <|> chained
+findRetainedIndexProof :: InertIrreds -> Type -> Type -> Maybe Coercion
+findRetainedIndexProof irreds lhs rhs = direct <|> chained
   where
     direct
       | typeKind lhs `tcEqType` typeKind rhs = Nothing
@@ -115,15 +117,30 @@ findCastedIndexProof irreds lhs rhs = direct <|> chained
           , left `sameEndpoint` lhs
           , right `sameEndpoint` rhs ]
 
-    chained = listToMaybe
-      [ mkTransCo from_lhs to_rhs
-      | (left, middle, from_lhs) <- edges
-      , left `sameEndpoint` lhs
-      , isOpaqueTermIndex middle
-      , (middle', to_rhs) <- right_edges
-      , middle `sameEndpoint` middle' ]
+    chained
+      | isOpaqueTermIndex lhs = findPath lhs rhs
+      | otherwise = mkSymCo <$> findPath rhs lhs
 
-    right_edges = [ (middle, co) | (middle, right, co) <- edges, right `sameEndpoint` rhs ]
+    findPath start target = go emptyTypeMap [(start, [])]
+      where
+        go _ [] = Nothing
+        go seen ((current, path) : pending)
+          | sameEndpoint current target
+          , co:rest <- path
+          = Just (foldl' (flip mkTransCo) co rest)
+          | not (isOpaqueTermIndex current) || isJust (lookupTypeMap seen current)
+          = go seen pending
+          | otherwise
+          = go (extendTypeMap seen current ()) (foldr push pending next)
+          where
+            next = fromMaybe [] (lookupTypeMap graph current)
+            push (endpoint, co) todo = (endpoint, co:path) : todo
+
+    graph = foldl' addArc emptyTypeMap edges
+
+    addArc arcs (from, to, co)
+      | isOpaqueTermIndex from = alterTM from (Just . ((to, co):) . fromMaybe []) arcs
+      | otherwise = arcs
 
     sameEndpoint left right = left `tcEqType` right && typeKind left `tcEqType` typeKind right
 
@@ -132,14 +149,25 @@ findCastedIndexProof irreds lhs rhs = direct <|> chained
     addEdges irred rest
       | ev@CtGiven {} <- irredCtEvidence irred
       , EqPred NomEq left right <- classifyPredType (ctEvPred ev)
-      = let co = ctEvCoercion ev
-        in addEdge left right co (addEdge right left (mkSymCo co) rest)
+      = givenEdges left right (ctEvCoercion ev) rest
       | otherwise = rest
 
-    addEdge (CastTy ty kind_co) other co rest =
-      let uncast_co = mkGReflRightCo Nominal ty kind_co `mkTransCo` co
-      in (ty, other, uncast_co) : (other, ty, mkSymCo uncast_co) : rest
-    addEdge _ _ _ rest = rest
+    givenEdges left@(CastTy {}) right co rest =
+      uncastEdge left right co (uncastEdge right left (mkSymCo co) rest)
+    givenEdges left right@(CastTy {}) co rest =
+      uncastEdge right left (mkSymCo co) rest
+    givenEdges left right co rest
+      | isOpaqueTermIndex left || isOpaqueTermIndex right
+      , typeKind left `tcEqType` typeKind right
+      = bothDirections left right co rest
+      | otherwise = rest
+
+    uncastEdge (CastTy ty kind_co) other co rest =
+      bothDirections ty other (mkGReflRightCo Nominal ty kind_co `mkTransCo` co) rest
+    uncastEdge _ _ _ rest = rest
+
+    bothDirections left right co rest =
+      (left, right, co) : (right, left, mkSymCo co) : rest
 
 {- Note [Using casted index Givens]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -153,9 +181,19 @@ the Wanted proof.
 
 A retained package can carry xs :~~: 'VNil and ys :~~: xs. Matching both
 proofs supplies two Givens. The Wanted ys :~~: 'VNil can use their
-composition. Undo the kind cast in each proof, match the shared opaque
-index and its kind, and compose the resulting coercion expressions.
-The two Givens stay homogeneous in their original scopes.
+composition. Undo a kind cast if the Given has one. Follow the available
+nominal proofs through opaque retained indices and compose the path to
+the Wanted endpoint. The Givens stay homogeneous in their original scopes.
+
+Canonical type-variable rewriting uses the terminating substitution in
+the inert equalities. An opaque retained index cannot be a substitution
+key. Here the direct lookup remains the fast path. If it fails, index
+the scoped nominal Givens by their retained endpoints. Use TypeMap for
+both adjacency and visited endpoints. The keys include the retained Id
+and its kind. A path can follow each endpoint at most once. Each visit
+adds its outgoing proofs to the work list once. A proof with a
+non-retained endpoint can finish the path. It cannot extend the search.
+Compose only the successful path. This creates no new constraints.
 
 See Note [Opaque runtime index equalities] in GHC.Tc.Solver.Equality.
 -}
