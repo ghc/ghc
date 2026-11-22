@@ -5598,6 +5598,16 @@ the runtime calling convention, field demand and the scope of `f` after
 substitution. [Agda 2.8 function types](https://agda.readthedocs.io/en/v2.8.0/language/function-types.html)
 and [Agda standard library 2.4, Data.These.Base](https://agda.github.io/agda-stdlib/v2.4/Data.These.Base.html).
 
+Agda's `subst` transports a value along an equality. The input must
+belong to the family at the equality's left endpoint. GHC Core has a
+corresponding rule for kind casts. The coercion must be nominal and its
+left endpoint must equal the kind of the type being cast. The interface
+reader applies this rule to a retained callback result before using the
+right endpoint as its new kind.
+[Agda standard library 2.4, propositional equality](https://agda.github.io/agda-stdlib/v2.4/Relation.Binary.PropositionalEquality.Core.html),
+[GHC 9.14.1 cast check](https://github.com/ghc/ghc/blob/ghc-9.14.1-release/compiler/GHC/Core/Lint.hs#L1843-L1847)
+and [nominal role check](https://github.com/ghc/ghc/blob/ghc-9.14.1-release/compiler/GHC/Core/Lint.hs#L2125-L2135).
+
 For promotion the fork reads each equation from the selected instance's
 final Core worker. This applies to derived and hand-written instances.
 A constructor can hold both a fixed field and a field used by the

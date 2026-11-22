@@ -713,8 +713,9 @@ An ordinary client can pass a predicate on pairs that captures a runtime
 cutoff. It receives the selected rows and a string showing the bound.
 An empty list does not evaluate the predicate.
 The result index distinguishes a call on a different element and a call
-to a different predicate. The retained callback still needs a closed
-structural result and an unrestricted visible arrow.
+to a different predicate. The filter needs a Boolean result to decide
+whether to keep the head. A mapping callback can return an abstract
+lifted type. Both callbacks use ordinary unrestricted arrows.
 [Filter and proof](../examples/open-evaluation/PreludeFilterRuntime.hs),
 [source-hidden decision client](../../../testsuite/tests/dependent/should_run/NativeLiftedCallbackClient.hs)
 and [Agda and GHC precedents](../REFERENCES.md#evidence-for-a-retained-predicate-on-a-lifted-input).
