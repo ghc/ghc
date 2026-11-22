@@ -211,3 +211,7 @@ test('GadtOrderedNewtype',
      [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal']),
       extra_files(['GadtOrderedNewtypeProvider.hs', 'TerminalGadtTh.sh'])],
      run_command, ['bash TerminalGadtTh.sh "{compiler}" "{libdir}" GadtOrderedNewtype GadtOrderedNewtypeProvider'])
+test('GadtOrderedTypeData',
+     [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal']),
+      extra_files(['GadtOrderedTypeDataProvider.hs', 'TerminalGadtTh.sh'])],
+     run_command, ['bash TerminalGadtTh.sh "{compiler}" "{libdir}" GadtOrderedTypeData GadtOrderedTypeDataProvider'])

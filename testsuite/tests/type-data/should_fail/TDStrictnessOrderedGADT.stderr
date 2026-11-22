@@ -1,0 +1,2 @@
+TDStrictnessOrderedGADT.hs:5:6: error: [GHC-67297]
+    Strictness, unpackedness or multiplicity annotations are not allowed in type data declarations.
