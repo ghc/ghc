@@ -203,10 +203,12 @@ Lifting stops at shadowing on the constructor's own argument spine.
 
 The constructor result has the enclosing telescope scope. A witness
 bound inside a field cannot escape into that result. Every retained field
-occurs in a result argument. The argument uses the field directly or under
-one unary promoted constructor of the same index type. More than one
-parameter can use the same field. The other result arguments must be
-distinct, unchanged erased parameters. A retained field is lazy and has
+occurs in a result argument. The argument uses the field directly or
+as an argument of one promoted constructor. A unary constructor
+preserves the index type. A binary constructor can build a new closed
+structural index. More than one parameter can use the same field. The
+other result arguments must be distinct, unchanged erased parameters.
+A retained field is lazy and has
 a supported closed structural domain such
 as `[Bool]`, `Ordering`, or `Nat`. A variable or wildcard leaves the
 field unevaluated. The constructor pattern introduces the nominal index
@@ -298,6 +300,26 @@ evaluating the other length or the cells. At zero rows and a successor
 column count, the matching patterns are exhaustive.
 [Source-hidden check](../../../testsuite/tests/dependent/should_run/NativeGadtRetainedSum.sh)
 and [Agda indexed datatypes](../REFERENCES.md#store-two-direct-result-indices).
+
+A tile can combine both lengths into one public shape index.
+
+```haskell
+data Shape = Rectangle Nat Nat
+
+data Tile a (shape :: Shape) where
+    Tile :: foreach (rows :: Nat) (columns :: Nat)
+         -> Vec (Vec a columns) rows -> Tile a ('Rectangle rows columns)
+
+tileCells :: Tile a ('Rectangle rows columns) -> Vec (Vec a columns) rows
+tileCells (Tile _ _ xs) = xs
+```
+
+An ordinary client recovers both dimensions through the nominal shape
+equality. A wildcard match leaves the dimensions and the cells unevaluated.
+Reading one dimension leaves the other unevaluated. Swapping the two
+dimensions in the payload type fails at `xs`.
+[Source-hidden check](../../../testsuite/tests/dependent/should_run/NativeGadtRetainedSum.sh)
+and [indexed shape precedent](../REFERENCES.md#combine-two-stored-fields-in-one-index).
 
 A square stores one side length. Both result parameters use this length.
 

@@ -65,6 +65,18 @@ matrixCells :: Matrix a rows columns -> Vec (Vec a columns) rows
 matrixCells (Matrix _ _ xs) = xs
 matrixCells (MatrixByColumns _ _ xs) = xs
 
+-- | Recover the payload at both components of the public shape.
+tileCells :: Tile a ('Rectangle rows columns) -> Vec (Vec a columns) rows
+tileCells (Tile _ _ xs) = xs
+
+-- | Read the dimensions independently.
+tileDimensions :: Tile a shape -> (Int, Int)
+tileDimensions (Tile rows columns _) = (lengthValue rows, lengthValue columns)
+
+-- | Match the constructor and leave its dimensions and cells unevaluated.
+hasTile :: Tile a shape -> Bool
+hasTile (Tile _ _ _) = True
+
 -- | Use both result equalities to prove the dimensions agree.
 squareDimensions :: SquareMatrix a rows columns -> rows :~: columns
 squareDimensions (Square _ _) = Refl
@@ -163,6 +175,18 @@ main = do
     throws "direct length" (fst (matrixShape badRow))
     throws "direct length" (snd (matrixShape badColumn))
     throws "matrix payload" (cells (matrixCells badRow))
+    let tile = Tile (S Z) (S (S Z)) (VCons (VCons True (VCons False VNil)) VNil)
+        tileRowBottom = Tile unused (S (S Z)) (error "tile cells")
+        tileColumnBottom = Tile (S Z) unused (error "tile cells")
+    require (tileDimensions tile == (1, 2) && map cells (cells (tileCells tile)) == [[True, False]])
+        "the public shape determines both matrix dimensions"
+    require (fst (tileDimensions tileColumnBottom) == 1 && snd (tileDimensions tileRowBottom) == 2)
+        "reading one dimension leaves the other and the cells unevaluated"
+    require (hasTile (Tile unused unused (error "tile cells")))
+        "a wildcard tile match leaves all fields unevaluated"
+    throws "direct length" (fst (tileDimensions tileRowBottom))
+    throws "direct length" (snd (tileDimensions tileColumnBottom))
+    throws "tile cells" (cells (tileCells tileRowBottom))
     require (cells (markedCells (MarkedRows True (S Z) one)) == [True])
         "different retained kinds follow the result parameter order"
     case squareDimensions (Square unused (error "square payload")) of

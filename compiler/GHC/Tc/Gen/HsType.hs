@@ -769,18 +769,18 @@ tcCheckRetainedConType validate_domain allow_result tc_field_mult
 
     retained_result mode ty
       | Just (_, args) <- tcSplitTyConApp_maybe ty
-      , Just fields <- traverse result_field (filter (isNothing . getTyVar_maybe) args)
+      , Just fields <- traverse result_fields (filter (isNothing . getTyVar_maybe) args)
       , let binders = nonDetNameEnvElts (mode_indices mode)
-            field_set = mkVarSet fields
+            field_set = mkVarSet (concat fields)
       = sizeVarSet field_set == length binders
         && field_set `subVarSet` mkVarSet binders
       | otherwise = False
 
-    result_field ty
-      | Just field <- retainedResultField_maybe ty
+    result_fields ty
+      | Just fields <- retainedResultFields_maybe ty
       , not validate_domain ||
-          (isNativeClosedIndexType (varType field) && typeKind ty `tcEqType` varType field)
-      = Just field
+          (all (isNativeClosedIndexType . varType) fields && validRetainedResultKind ty fields)
+      = Just fields
       | otherwise = Nothing
 
     bind_indices allow mode [] body = go allow mode body

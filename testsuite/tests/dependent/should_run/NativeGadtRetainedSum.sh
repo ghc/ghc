@@ -110,6 +110,22 @@ HS
     grep -Fq 'WrongDirectIndex.hs:6:34-37: error: [GHC-05617]' reject.log ||
         { cat reject.log >&2; exit 1; }
 
+    cat >WrongTile.hs <<'HS'
+{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}
+module WrongTile where
+
+import NativeGadtRetainedSumProvider
+
+wrong :: Tile a ('Rectangle 'Z ('S 'Z)) -> Vec (Vec a 'Z) ('S 'Z)
+wrong (Tile _ _ xs) = xs
+HS
+    if "${ghc[@]}" "${flags[@]}" -ferror-spans -c WrongTile.hs >reject.log 2>&1; then
+        echo "Accepted a tile payload with its dimensions swapped" >&2
+        exit 1
+    fi
+    grep -Fq 'WrongTile.hs:7:23-24: error: [GHC-05617]' reject.log ||
+        { cat reject.log >&2; exit 1; }
+
     cat >RepeatedMatrix.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
 module RepeatedMatrix where
@@ -168,6 +184,12 @@ knownPredecessor (SuccVec Z _) = True
 
 unknownPredecessor :: SuccVec a n -> Bool
 unknownPredecessor (SuccVec Z _) = True
+
+knownTile :: Tile a ('Rectangle 'Z ('S 'Z)) -> Bool
+knownTile (Tile Z (S _) _) = True
+
+unknownTile :: Tile a shape -> Bool
+unknownTile (Tile Z _ _) = True
 HS
         "${ghc[@]}" "${flags[@]}" -ferror-spans -Wincomplete-patterns -Woverlapping-patterns \
             -c DirectIndexCoverage.hs >coverage.log 2>&1
@@ -177,7 +199,9 @@ HS
             grep -Fq 'DirectIndexCoverage.hs:32:1-37: warning: [GHC-94210]' coverage.log &&
             grep -Fq 'DirectIndexCoverage.hs:41:1-39: warning: [GHC-62161]' coverage.log &&
             grep -Fq 'not matched: SuccVec (S _) _' coverage.log &&
-            test "$(grep -c 'warning:' coverage.log)" -eq 4 || { cat coverage.log >&2; exit 1; }
+            grep -Fq 'DirectIndexCoverage.hs:47:1-31: warning: [GHC-62161]' coverage.log &&
+            grep -Fq 'not matched: Tile (S _) _ _' coverage.log &&
+            test "$(grep -c 'warning:' coverage.log)" -eq 5 || { cat coverage.log >&2; exit 1; }
     fi
 
     cat >BadScope.hs <<'HS'

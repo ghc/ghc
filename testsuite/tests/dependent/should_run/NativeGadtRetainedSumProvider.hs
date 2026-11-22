@@ -124,6 +124,12 @@ data Matrix a (rows :: Nat) (columns :: Nat) where
     MatrixByColumns :: foreach (columns :: Nat) (rows :: Nat)
                     -> Vec (Vec a columns) rows -> Matrix a rows columns
 
+data Shape = Rectangle Nat Nat
+
+data Tile a (shape :: Shape) where
+    Tile :: foreach (rows :: Nat) (columns :: Nat)
+         -> Vec (Vec a columns) rows -> Tile a ('Rectangle rows columns)
+
 -- | Store one dimension for both axes of a square matrix.
 data SquareMatrix a (rows :: Nat) (columns :: Nat) where
     Square :: foreach (side :: Nat) -> Vec (Vec a side) side -> SquareMatrix a side side

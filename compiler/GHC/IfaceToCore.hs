@@ -1467,13 +1467,19 @@ tcIfaceDataCons tycon_name tycon if_cons
           | otherwise
           = not wrapper && null spec && matching_users univ_names
           where
-            pairs = [(lhs, field) | (lhs, rhs) <- spec
-                                  , Just field <- [result_field rhs]]
-            (result_names, result_fields) = unzip pairs
-        result_field (IfaceTermVar field) = Just field
-        result_field (IfaceTyConApp tc (IA_Arg (IfaceTermVar field) _ IA_Nil))
-          | ifaceTyConIsPromoted (ifaceTyConInfo tc) == IsPromoted = Just field
-        result_field _ = Nothing
+            pairs = [(lhs, retained) | (lhs, rhs) <- spec
+                                     , Just retained <- [fields_in_result rhs]]
+            result_names = map fst pairs
+            result_fields = concatMap snd pairs
+        fields_in_result (IfaceTermVar field) = Just [field]
+        fields_in_result (IfaceTyConApp tc args)
+          | ifaceTyConIsPromoted (ifaceTyConInfo tc) == IsPromoted
+          = case args of
+              IA_Arg (IfaceTermVar field) _ IA_Nil -> Just [field]
+              IA_Arg (IfaceTermVar first) _ (IA_Arg (IfaceTermVar second) _ IA_Nil) ->
+                Just [first, second]
+              _ -> Nothing
+        fields_in_result _ = Nothing
         matching_users expected = expected `equalLength` user_names && all (`elem` expected) user_names
         lazy_bang IfNoBang = True
         lazy_bang _        = False

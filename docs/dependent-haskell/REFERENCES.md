@@ -1759,6 +1759,23 @@ Neither the equality nor the constructor pattern's wildcard evaluates
 the stored `n`. See Note [Retained constructor result equality] in
 GHC.Core.DataCon.
 
+#### Combine two stored fields in one index
+
+Agda's indexed constructor rule permits a result argument built from
+more than one field. A `Tile` family can have one `Shape` index. Its
+constructor can take `(r c : Nat)` and `Vec (Vec A c) r`, then return
+`Tile A (rectangle r c)`. Matching `tile` unifies the shape and its
+components in the same constructor pattern.
+[Indexed datatypes](https://agda.readthedocs.io/en/v2.8.0/language/data-types.html#indexed-datatypes)
+and [Agda constructor patterns](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#dot-patterns).
+
+The Haskell worker keeps one nominal equality for the `Tile` result.
+GHC can decompose the equality between two `'Rectangle` applications
+into the equalities for the stored row and column fields. It adds the
+proof after both fields and erases it before code generation.
+See Note [Decomposing TyConApp equalities] in
+[GHC.Tc.Solver.Equality](../../compiler/GHC/Tc/Solver/Equality.hs).
+
 ## Source vector uncons
 
 Decision: inspect the stored runtime length before repackaging a vector tail.
