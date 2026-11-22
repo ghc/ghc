@@ -626,7 +626,7 @@ splitHsTypeLet (first :| binds) body = case unLoc first of
       first_field = mkOrig projection_module (mkTcOcc "PairFirst")
       second_field = mkOrig projection_module (mkTcOcc "PairSecond")
       named = [(field, selector) | (Right field, selector) <- [(left, first_field), (right, second_field)]]
-      fields | null named = [(pair, first_field)]
+      fields | null named = [(L name_loc (mkRdrUnqual (mkTyVarOcc "_")), first_field)]
              | otherwise = named
       tyvar :: LocatedN RdrName -> LHsType GhcPs
       tyvar name = L loc (HsTyVar noAnn NotPromoted name)
@@ -665,7 +665,8 @@ use the same scope and checks as a written RHS kind ascription.
 For a pair pattern, bind the RHS to one private name before binding its
 fields. The internal closed families select fields only when they see the
 promoted pair constructor. An unknown pair can remain in the type. With
-two wildcards, a private projection still checks that the RHS has a pair kind.
+two wildcards, keep a private projection. It checks that the RHS has a pair
+kind when Template Haskell splices the ordinary LetT binders.
 -}
 
 -- | A parsed constructor alternative in a type case.

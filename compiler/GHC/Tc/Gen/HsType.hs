@@ -83,7 +83,7 @@ import Control.Monad.Trans.Maybe (MaybeT(..))
 
 import GHC.Prelude hiding ( head, init, last, tail )
 
-import GHC.Hs.Type (HsTypeGhcRnExt(..))
+import GHC.Hs.Type (HsTypeGhcRnExt(..), typeLetPairOcc)
 import GHC.Hs
 import GHC.Rename.Utils
 import GHC.Tc.Errors.Types
@@ -2229,7 +2229,17 @@ tcHsType _ (XHsType HsTypeCaseRn{}) _ = failWithTc TcRnTypeCaseContext
 -- See Note [Typechecking type lets].
 tcHsType mode (XHsType (HsTypeLetRn (L _ binder) rhs body)) exp_kind = do
   (rhs_ty, rhs_kind) <- tcInferTypeLetRhs mode rhs
-  updLclCtxt (tcExtendLocalTypeEnv [(binder, ATcTypeLet binder rhs_ty rhs_kind)]) $
+  (checked_rhs, checked_kind) <-
+    if nameOccName binder == typeLetPairOcc
+      then do
+        first_kind <- newMetaKindVar
+        second_kind <- newMetaKindVar
+        let pair_kind = mkTyConApp (tupleTyCon Boxed 2) [first_kind, second_kind]
+        rhs' <- setSrcSpanA (getLoc rhs) $
+          checkExpKind mode (unLoc rhs) rhs_ty rhs_kind (Check pair_kind)
+        pure (rhs', pair_kind)
+      else pure (rhs_ty, rhs_kind)
+  updLclCtxt (tcExtendLocalTypeEnv [(binder, ATcTypeLet binder checked_rhs checked_kind)]) $
     tcLHsType mode body exp_kind
 
 {- Note [Typechecking type lets]
@@ -2239,6 +2249,10 @@ when the body does not use the name. Every use shares the checked Type and its k
 metavariables. The binder can shadow an outer type name. The renamer
 gives each binder its own Name and keeps the new name out of its RHS.
 Read the Type at each occurrence. The let itself never enters Core.
+
+Check the kind of a pair pattern's scrutinee before binding its fields.
+Use the source RHS and span in the kind error. The RHS inference above
+still instantiates the checked captures of any lifted type case.
 -}
 
 -- See Note [Typechecking HsCoreTys]

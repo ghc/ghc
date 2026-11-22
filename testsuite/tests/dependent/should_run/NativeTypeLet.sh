@@ -235,7 +235,8 @@ cat >IgnoredNonPair.hs <<'HS'
 module IgnoredNonPair where
 type Bad = let (_, _) = Bool in Int
 HS
-reject IgnoredNonPair 3:25 83865 'Expected kind'
+reject IgnoredNonPair 3:25 83865 "but \`Bool' has kind"
+grep -Eq '^[[:space:]]*\|[[:space:]]*\^{4}$' error.log
 
 cat >PairEta.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}

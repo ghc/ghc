@@ -24,6 +24,11 @@ module BadRhs where
 import Language.Haskell.TH
 type Bad = $(do b <- newName "b"; letT b (appT (conT ''Int) (conT ''Bool)) (conT ''Int))
 HS
+cat >QuotedNonPair.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes, TemplateHaskell #-}
+module QuotedNonPair where
+type Bad = $([t| let (_, _) = Bool in Int |])
+HS
 ghc=("$1" "-B$2" -v0 -package-env - -dcore-lint -dstg-lint)
 for opt in -O0 -O2; do
     for mode in -fno-external-interpreter -fexternal-interpreter; do
@@ -40,8 +45,9 @@ for opt in -O0 -O2; do
         )
     done
 done
-for source in Disabled BadRhs; do
+for source in Disabled BadRhs QuotedNonPair; do
     if "${ghc[@]}" -fexternal-interpreter -fno-code "$source.hs" > "$source.log" 2>&1; then exit 1; fi
 done
 grep -q 'GHC-29822' Disabled.log
 grep -q "Expected kind" BadRhs.log
+grep -q 'GHC-83865' QuotedNonPair.log
