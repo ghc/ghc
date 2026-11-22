@@ -6,6 +6,35 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Nested case decisions and representation-polymorphic newtypes
+
+Job 1087 built both stages of `00115859a5` from clean sources. Merge
+`f42ebe4659` contains the tested compiler, tests and Showcase. Job 1101
+matched all 552 outputs at native `-O0`, native `-O2` and in GHCi.
+All 40 selected normal-way registrations passed.
+
+A provider takes a runtime `Maybe Bool` and returns a `Char`, `Int`
+or `Bool`. An independently compiled consumer writes the same nested
+type-level case in a different clause order. For three values read
+from IO the ordinary client printed `["n","42","False"]`. Cases that
+inspect different fields first still reject at an unknown index.
+[Provider](examples/open-evaluation/NativeCase.hs),
+[consumer](examples/open-evaluation/NativeRetainedTH.hs)
+and [registered controls](../../testsuite/tests/dependent/should_run/NativeTypeCaseOrderedScope.sh).
+
+One interface contained the ordered case proof and a representation-
+polymorphic ordered newtype. Each earlier component reader loaded
+its own control and rejected the combined interface. The normal
+client printed `(True,42)`. The new compiler also passed the
+higher-rank alias checks and three separate `first-class-families`
+package builds. See `r19-r41-next-20261122/qualification` for
+outputs, linker maps and hashes.
+
+A cleanup of the earlier 547 compiler removed 14,242 intermediate
+files and freed 2,326,372,352 allocated bytes. Job 1126 checked the
+installed compiler hashes and used both stages to build and run a
+native program.
+
 ## Field-dependent case results, ordered newtypes and CUSK migrations
 
 Jobs 1035 and 1041 built and tested `fd19c8fe5f`. Merge `6272edb866`

@@ -356,3 +356,25 @@ newtype interface bytes match the previous compiler at `-O0` and `-O2`.
 The next scope includes open field representations and `type data`.
 [Constructor definitions](../../../testsuite/tests/gadt/GadtOrderedNewtypeProvider.hs)
 and [reader and reification test](../../../testsuite/tests/gadt/GadtOrderedNewtype.hs).
+
+### A newtype with an unknown field representation
+
+Normal compiler `00115859a5` accepts a field with representation
+`r` when a later quantifier follows it. The ordered constructor
+casts its argument directly. A client can instantiate `r` to
+`IntRep`, including when a family computes the field representation.
+An ordinary source binder still needs a fixed runtime representation.
+Job 1101 exercised construction, matching, family instances and
+Template Haskell at both native optimization levels. An older
+compiler can read the new fixed-representation interfaces, and it
+rejects a marked representation-polymorphic interface before starting
+the external interpreter.
+
+A bare alias of an ordered constructor also typechecks when its
+expected type quantifies after the field. The tests compare both
+shallow and deep subsumption with ordinary higher-rank functions.
+The remaining prefix grammar checks include ordered `type data` and
+empty contexts or quantifiers after a field.
+[Provider](../../../testsuite/tests/gadt/GadtOrderedNewtypeProvider.hs),
+[client](../../../testsuite/tests/gadt/GadtOrderedNewtype.hs)
+and [newtype representation](../REFERENCES.md#newtype-casts-and-ordered-fields).

@@ -11,35 +11,26 @@ and its [expected output](Showcase.stdout) are the executable examples.
 Updated 22 November 2026. The development branch is
 `dependent-haskell`. Use the fork command below to find its latest commit.
 
-The published compiler in `6272edb866` matches the tested sources at
-`fd19c8fe5f`. Jobs 1035 and 1041 passed. The 551 Showcase outputs
-matched at native `-O0`, native `-O2` and in GHCi. All 36 selected
-registrations passed. Read `physical-source.path`, `compiler.source`,
-`compilers.sha256` and `qualification/qualification.pass` under
-`_build/on-demand/r19-r23-r27-r41-integration-20261122`. The compiler
-is installed in `r23-injective-kind-normal-20261122/source/_build`.
-Use the new hash manifest when an old receipt names the same directory.
-The previous released compiler at `5833e38cbd` is installed in
-`r36-combined-release-20261122/source/_build`.
+The published compiler at `f42ebe4659` matches normal build
+`00115859a5`. Jobs 1087 and 1101 passed both build stages and all 12
+qualification checks. The 552 Showcase outputs matched at native
+`-O0`, native `-O2` and in GHCi. All 40 selected registrations passed.
+The build, stage hashes and `qualification/qualification.pass` are in
+`_build/on-demand/r19-r41-next-20261122`. Its `source/_build/stage1`
+holds the Stage 2 installation. For the previous 551 compiler use
+`r19-r23-r27-r41-integration-20261122/physical-source.path` and the
+hashes in that experiment directory.
 
-The next combined build adds nested case decisions, higher-rank
-constructor aliases and representation-polymorphic newtypes. Its inputs
-are in `_build/on-demand/r19-r41-next-20261122`. Job 1087 builds
-`00115859a5` from a clean checkout with pinned local submodules.
-Job 1101 waits for that build, then checks the 552-line Showcase, 40
-registered tests, package clients and an interface with both new features.
+| Next check | Source and verification |
+| --- | --- |
+| Tree induction and ordered `type data` | Job 1110 builds `c5b5acbffc` in `r41-type-data-554-normal-20261122` using a private copy of the 552 tree. Job 1115 checks the 554-line Showcase, installed HaskLib and the combined interface. Jobs 1100 and 1107 had already passed the source-distribution and downstream tree clients on the compiler component. |
+| Legacy CUSK defaults | Job 1112 builds GHC and its boot libraries from clean sources at `c27193021b` in `r27-legacy-transition-normal-20261122`. Job 1121 checks the corrected diagnostic across 34 inputs, compares three packages, and links clients across old and new interfaces. This is a private edition change. |
+| Declaration groups and diagnostics | The R21 candidate at `87fcbcef7d` checks the tree proof with both workers in the same group and the tree datatype imported. The R16 experiment at `r16-nested-call-diagnostic-20261122` checks which function an unavailable closed argument should blame. |
 
-The next R13/R16 source is `d70ffb8d20`, stored under the local ref
-`refs/archive/dependent-haskell/2026-11-22/r16-hasklib-tree-553`.
-Job 1100 installed HaskLib from its source distribution and exercised
-the two-child induction proof at `-O0` and `-O2`. Job 1107 restated
-the theorem in an independent client. Both used the source-checker
-component on the normal `5833e38cbd` installation. The complete
-`d70ffb8d20` compiler and 553-line Showcase still require a normal
-build. Use `_build/on-demand/r16-hasklib-tree-next-20261122` for its
-inputs and package receipts. R27 is testing the effect of removing
-implicit CUSKs from the two legacy editions. The current language
-defaults still apply on this branch.
+The local archive refs `r19-r41-normal-552`, `r16-hasklib-tree-553`
+and `r27-legacy-transition-normal` are under
+`refs/archive/dependent-haskell/2026-11-22/`. The `normal-sources/`
+refs preserve original private compiler and test revisions.
 
 | Revision | Verified result |
 | --- | --- |
@@ -62,6 +53,7 @@ defaults still apply on this branch.
 | `2b64ffc406` and `930910d25b` | Both normal stages built. The 549-line Showcase, 23 focused regressions and interface upgrade checks passed. The full renamer run restored eight upstream goldens. R36 passed all 16 pun-warning regressions. R35 passed 25 namespace registrations, including the source-hidden regression in `e0fa805055`. |
 | `5833e38cbd` and `ad644c290f` | The same polymorphic `Endo` supports an ordinary lambda and a promoted callback with omitted matchability. Lifted data family instances and fixed boxed unlifted data constructors accept ordered arguments. All 30 selected registrations and all three 550-line Showcase modes passed. |
 | `fd19c8fe5f` and `6272edb866` | Both stages built. A field can index the result of a type-level case across modules. Boxed data with unknown levity and fixed-representation newtypes accept ordered constructor arguments. The opt-in CUSK warning passed its package checks. All 36 selected registrations and all three 551-line Showcase runs passed. |
+| `00115859a5` and `f42ebe4659` | Nested cases compose across modules at unknown indices when their decisions agree. Representation-polymorphic ordered newtypes and bare higher-rank constructor aliases work. All 40 registrations and all three 552-line Showcase runs passed. |
 
 [Equality continuations and kind inference](CHECKPOINTS.md#equality-continuations-and-structural-kind-inference), [HaskLib pipeline and parametricity](CHECKPOINTS.md#compose-installed-list-proofs), [Ordinary minimum](CHECKPOINTS.md#an-ordinary-minimum-in-the-zip-length-proof)
 and [previous release](CHECKPOINTS.md#direct-zip-proof-and-retained-callback-rules).

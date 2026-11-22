@@ -46,9 +46,11 @@ Two cards meet their documented scope on the normal compiler at
 
 R41 remains partial. Its normal compiler accepts all 24 tested orders
 of a prefix GADT constructor with both field multiplicities. Boxed datatypes can also quantify over levity.
-An ordered newtype can put a required or invisible quantifier after
-a field with a fixed representation. Open field representations and
-ordered `type data` constructors remain open on this compiler. R23 now supports both the ordinary
+Ordered newtypes now accept a representation-polymorphic field. Clients
+can construct and match them at a fixed representation, including one
+specified by a type family. Ordered `type data` constructors and empty
+quantifier groups after a field remain open on the published compiler.
+R23 now supports both the ordinary
 and promoted uses of a polymorphic `Endo` in real library clients.
 A bare higher-order use in `FoldrDefault_` still needs explicit
 matchability arguments.
@@ -120,7 +122,7 @@ continue to follow Serokell's published status.
 | [R23 Unsaturated families](roadmap/R23-unsaturated-type-families.md) | A supplied promoted callback can determine its arrow matchabilities. The real `first-class-families` package supports the plain lambda and `'Endo Echo` in separate clients. | Complete higher-order inference and settle compatibility of existing unannotated programs. The unmodified `T15874` still fails on the released compiler. |
 | [R24 Constrained families](roadmap/R24-constrained-type-families.md) | An associated family such as `Elem c` can require the owning dictionary. A source-hidden client rejects a missing premise before reduction. | Settle the general representation of domain evidence, including partial applications, and how the source formation rule corresponds to Core. |
 | [R27 Deprecate CUSKs](roadmap/R27-deprecate-cusks.md) | The opt-in `-Wcusks` warning supplies checked edits or explains a kind. Fourteen standalone signatures preserved all 215 printed kinds in a three-package migration on the fork. | Verify the legacy edition transition, including advice for an explicit opt-out after an opt-in. |
-| [R41 Nested GADT quantifiers](roadmap/R41-nested-quantification-in-gadts.md) | Prefix constructors can interleave several groups of fields, contexts and quantifiers. Boxed data supports unknown levity. Ordered newtypes support a fixed field representation, including `Int#`. | Check representation-polymorphic newtypes and ordered `type data` constructors under the [prefix grammar](roadmap/R41-nested-quantification-in-gadts.md#which-prefix-orders-work). |
+| [R41 Nested GADT quantifiers](roadmap/R41-nested-quantification-in-gadts.md) | Prefix constructors can interleave several groups of fields, contexts and quantifiers. Boxed data supports unknown levity. An ordered newtype constructor erases to a cast even with a representation-polymorphic field. | Qualify ordered `type data` constructors and empty groups after a field under the [prefix grammar](roadmap/R41-nested-quantification-in-gadts.md#which-prefix-orders-work). |
 
 The published evaluator work covers closed calls such as `Prelude.sum` and
 open equations such as mapping `Prelude.not` over a list with a known head

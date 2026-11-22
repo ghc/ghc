@@ -8248,3 +8248,15 @@ cases written in separate modules. Agda gives pattern lambdas fresh
 names. The additional equality for matching trees is a fork decision.
 [Agda case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees)
 and [pattern-lambda translation](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html#internal-representation-of-pattern-lambdas).
+
+### Newtype casts and ordered fields
+
+Proposal #98 permits a newtype to abstract over its field's
+representation. Construction and pattern matching use casts. Proposal
+#402 permits a quantifier after a field in a prefix constructor. The
+fork combines these rules and retains the representation check on
+ordinary source binders. Its interface records whether a reader needs
+the extended constructor representation.
+[GHC proposal #98, proposed change](https://ghc-proposals.readthedocs.io/en/latest/proposals/0098-unlifted-newtypes.html#proposed-change-specification),
+[GHC proposal #402, prefix grammar](https://ghc-proposals.readthedocs.io/en/latest/proposals/0402-gadt-syntax.html#grammar-specification)
+and [R41 implementation](roadmap/R41-nested-quantification-in-gadts.md#a-newtype-with-an-unknown-field-representation).
