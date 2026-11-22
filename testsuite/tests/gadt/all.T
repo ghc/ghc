@@ -202,3 +202,7 @@ test('GadtOrderedUnboxed',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['GadtOrderedUnboxedProvider.hs', 'GadtOrderedUnboxedScope.hs'])],
      run_command, ['bash GadtOrderedUnboxed.sh "{compiler}" "{libdir}"'])
+test('GadtRefinedOrdered',
+     [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal']),
+      extra_files(['GadtRefinedOrderedProvider.hs', 'GadtRefinedOrderedScope.hs'])],
+     run_command, ['bash GadtRefinedOrdered.sh "{compiler}" "{libdir}"'])
