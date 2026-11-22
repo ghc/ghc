@@ -5712,6 +5712,13 @@ cannot select a constructor equation.
 [Agda case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees)
 and [GHC alternative refinement](../../compiler/GHC/Core/Utils.hs).
 
+Agda's conversion checker constructs `UnequalTerms` with the two terms
+and the type at which it compares them. This is the diagnostic precedent
+for a failed mapping proof. Given a receiver whose constructor is unknown,
+the relevant comparison is the application `fmap p r` against `'Empty`.
+[Agda 2.8.0 conversion](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L514-L531)
+and [the Haskell control](../../testsuite/tests/dependent/should_run/concrete-mapping/UnknownRow.hs).
+
 Agda's printer looks up an abstract qualified name in the current scope.
 It checks that a local binder does not hide the chosen name. GHC's
 `mkQualName` also checks the reader environment to select a qualifier.

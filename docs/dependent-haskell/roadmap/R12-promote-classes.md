@@ -110,6 +110,13 @@ build kept identical interface bytes. Normal qualification remains open.
 [separately compiled proofs](../examples/open-evaluation/RowProof.hs)
 and [warm upgrade check](../examples/open-evaluation/check-applied-mapping-upgrade.sh).
 
+At an unknown receiver `r`, GHC rejects the proof
+`fmap p r :~: ('Empty :: Row Bool Bool Bool)` at the written `Refl`.
+The current diagnostic (GHC-18872) leads with the kinds of `fmap` and
+`Empty`. The proof asks whether the two *applied results* are equal.
+The diagnostic should identify those results and their common kind.
+[Unknown receiver](../../../testsuite/tests/dependent/should_run/concrete-mapping/UnknownRow.hs).
+
 If the equation uses `p` to map the field but claims the result is
 `q x`, GHC reports GHC-83865 at `Refl`. The detailed expected type can
 still display the instance worker as `These.$cfmap`. To display a selector
