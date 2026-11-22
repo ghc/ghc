@@ -7752,6 +7752,28 @@ prints the rows and the proof in one tuple. The test also prints
 `([],Refl)` with an empty first list and an undefined second list.
 [Case-tree and demand references](REFERENCES.md#the-length-of-zip-and-demand-in-a-case-tree).
 
+### Constructor specialization
+
+An ordinary `countRight` that keeps its matched first cons can use
+`{-# NOINLINE countRight #-}` at standard `-O2`. This keeps the exact
+self-call in final Core. A no-code reader can use the complete interface
+with rewrite rules enabled. A matching user rule still blocks the proof.
+
+For the unannotated case, first check one private specialized worker
+whose call pattern fixes one operand to a known lazy cons. Match its
+typed arguments to the original operand positions. Compare the worker's
+remaining case tree and equations with the original rows under that
+specialization. Verify every recursive edge under the same mapping.
+Keep the wrapper's original inspection order and check that the worker
+leaves the captured head and tail lazy.
+
+Then check each exported specialization rule against the verified worker
+and its argument mapping. A consumer may use the equation with rewriting
+enabled once it has checked the active rules against that evidence.
+Keep the existing rejection for unchecked workers and rules. Use the
+captured bottom tail, changed nil result, and real conflicting rule as
+negative controls.
+
 ## M99: evaluate an imported closed call
 
 R15 owns this increment. Use a separately compiled ordinary function

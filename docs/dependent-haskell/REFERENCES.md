@@ -5617,6 +5617,19 @@ total size decreases in every recursive call. The checked Core case
 tree determines demand independently of that decrease.
 [Agda 2.8.0 structural recursion](https://agda.readthedocs.io/en/v2.8.0/language/termination-checking.html#structural-recursion).
 
+SpecConstr specializes a recursive call for a known constructor shape.
+The observed right-decreasing worker takes the first cons fields and
+the remaining second spine. It inspects that spine, returns `Z` for nil,
+and recurses on the tail for cons. Its wrapper has already inspected
+the first spine. The left-decreasing worker has the corresponding
+second-cons specialization. Standard `-O2` exports both rewrite rules.
+The existing two-list check requires the same final owner and rejects
+an active rule at proof use. The `NOINLINE` probe keeps both original
+calls, and the `OPAQUE` probe also keeps both.
+[Call-pattern specialisation for Haskell programs](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/07/spec-constr.pdf),
+[GHC SpecConstr, Note [Good arguments] and Note [SpecConstr: rule activation]](../../compiler/GHC/Core/Opt/SpecConstr.hs),
+and [GHC proposal 415](https://ghc-proposals.readthedocs.io/en/latest/proposals/0415-opaque-pragma.html).
+
 ## Executing closed calls and reducing open calls
 
 The 2026-11-18 review returned to Serokell's examples. A closed call to
