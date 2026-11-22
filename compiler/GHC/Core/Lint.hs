@@ -1772,15 +1772,17 @@ lintRetainedArgument b body arg
        ; ensureEqTys (varType b) (typeKind index) unsupported
        ; case index of
            TermVarTy{} -> return ()
-           _ -> lintL (not (isScopedSelectorReceiver b body)) unsupported }
+           _ -> do { lintL (not (isScopedSelectorReceiver b body)) unsupported
+                   ; lint_source_owners arg } }
   | not (isNativeIndexFunctionId b), isNativeOpaqueValueId b
   = do { lintL (isJust (retainedArgIndex arg)) unsupported
        ; lint_source_owners arg }
   | otherwise = failWithL unsupported
   where
     lint_source_owners (Tick HpcTick{} body) = lint_source_owners body
+    lint_source_owners (Cast body _) = lint_source_owners body
     lint_source_owners expr = case collectArgs expr of
-      (Var fun, args@(_ : _)) -> do
+      (Var fun, args) -> do
         case sourceTableId_maybe fun of
           Just fam -> do
             env <- getInVarEnv

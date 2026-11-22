@@ -3969,7 +3969,7 @@ tcInstFunWithPrefix look_arg prefix_only prefix vta_cache expected_rho inst_plan
                addArgCtxt (pos + count written_prefix_arg acc) rn_head arg $
                if isVacuousRetainedBinder binder body
                then return (arg, body, Nothing)
-               else do { (operand, runtime_arg) <- tcRetainedOperand binder arg
+               else do { (operand, runtime_arg) <- tcRetainedOperand binder body arg
                        ; res <- retainedAppResult fun_ty binder operand
                        ; co <- retainedVariableCast operand runtime_arg
                        ; return (runtime_arg, res, co) }
@@ -4056,13 +4056,7 @@ tcInstFunWithPrefix look_arg prefix_only prefix vta_cache expected_rho inst_plan
     go1 plan fun_orig pos acc fun_ty
         (EValArg { ea_arg = arg, ea_loc_span = ctxt } : rest_args)
       | DepFunTy DepFunVisible binder body <- coreFullView fun_ty
-      = do { (core_arg, runtime_arg) <- tcRetainedOperand binder arg
-           ; case core_arg of
-               Core.Var index | isNativeOpaqueValueId index -> pure ()
-               _ | isScopedSelectorReceiver binder body ->
-                     setSrcSpanA (getLoc arg) $
-                       failWithTc $ TcRnRetainedQuantificationError RetainedSelectorReceiver
-                 | otherwise -> pure ()
+      = do { (core_arg, runtime_arg) <- tcRetainedOperand binder body arg
            ; body_ty <- retainedAppResult fun_ty binder core_arg
            ; arg_co <- retainedVariableCast core_arg runtime_arg
            ; let arg' = ERetainedArg DepFunVisible ctxt (Scaled ManyTy (varType binder)) runtime_arg body_ty
@@ -4381,10 +4375,16 @@ before asking the ordinary solver for a ground instance.
 -}
 
 -- | Resolve the index at the binder's checked scalar or function domain.
-tcRetainedOperand :: Id -> LHsExpr GhcRn -> TcM (Core.CoreExpr, LHsExpr GhcRn)
-tcRetainedOperand binder arg
-  | isNativeIndexFunctionId binder = (,arg) <$> tcRetainedFunctionArg domain arg
-  | otherwise = tcRetainedArg domain arg
+tcRetainedOperand :: Id -> Type -> LHsExpr GhcRn -> TcM (Core.CoreExpr, LHsExpr GhcRn)
+tcRetainedOperand binder body arg = do
+  result@(core_arg, _) <- if isNativeIndexFunctionId binder
+    then (,arg) <$> tcRetainedFunctionArg domain arg
+    else tcRetainedArg domain arg
+  case core_arg of
+    Core.Var index | isNativeOpaqueValueId index -> return result
+    _ | isScopedSelectorReceiver binder body -> setSrcSpanA (getLoc arg) $
+          failWithTc (TcRnRetainedQuantificationError RetainedSelectorReceiver)
+      | otherwise -> return result
   where
     domain = varType binder
 
@@ -4636,19 +4636,61 @@ a second dictionary. M81's source-call check verifies saturation and
 operand kinds and preserves the lazy call through erasure.
 -}
 
--- | Resolve one already-bound local function at the retained domain.
--- See Note [Checking a cast retained callback].
+-- | Resolve a lexical callback or an exact function with checked equations.
+-- See Notes [Checking a cast retained callback] and [Named retained callbacks].
 tcRetainedFunctionArg :: Type -> LHsExpr GhcRn -> TcM Core.CoreExpr
 tcRetainedFunctionArg domain arg = setSrcSpanA (getLoc arg) $
-  case unLoc (stripParensLHsExpr arg) of
-    HsVar _ lname -> do
-      thing <- tcLookupLcl_maybe (unLocWithUserRdr lname)
-      case thing of
-        Just (ATcId { tct_id = actual }) -> liftZonkM (zonkId actual) >>= tcRetainedFunctionVar domain
-        _ -> unsupported
+  case retainedSourceHead arg of
+    Just (name, written)
+      | isExternalName name -> do
+          mb_owner <- tcLookupIdMaybe name >>= maybe (pure Nothing) tcLookupSourceTableId
+          case mb_owner of
+            Just owner -> instantiate_named owner written
+            Nothing -> failWithTc (TcRnRetainedQuantificationError (RetainedUncheckedSourceCall name))
+      | null written -> do
+          thing <- tcLookupLcl_maybe name
+          case thing of
+            Just (ATcId { tct_id = actual }) -> liftZonkM (zonkId actual) >>= tcRetainedFunctionVar domain
+            _ -> unsupported
     _ -> unsupported
   where
+    unsupported :: TcM a
     unsupported = failWithTc $ TcRnRetainedQuantificationError RetainedFunctionArgument
+
+    instantiate_named owner written = do
+      expected <- liftZonkM (zonkTcType domain)
+      owner <- liftZonkM (zonkId owner)
+      (core, sigma) <- foldM (applyRetainedSourceType unsupported owner)
+                             (Core.Var owner, varType owner) written
+      let (binders, body) = tcSplitForAllInvisTyVars sigma
+      choices <- chooseRetainedSourceTypes unsupported owner sigma (map snd binders) body expected
+      let arg = Core.mkTyApps core choices
+      case Core.nativeIndexFunctionArgIndex arg of
+        Just index | typeKind index `tcEqType` expected -> return arg
+        _ -> unsupported
+
+{- Note [Named retained callbacks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained callback can use a named function with checked source equations.
+Resolve the certificate through the written occurrence's defining Id.
+Record that use and its dependencies with tcLookupSourceTableId. This
+checks the same rewrite rules as a saturated source call.
+
+A unary source family takes the same erased arguments as its term owner.
+Leave its value binder unsaturated at a function-valued retained argument.
+Substituting the index for the callback saturates that family wherever the
+callback was applied to a value. The U arrow prevents using the application
+as evidence for the identity of either input. The ordinary argument check
+keeps the original function occurrence and its selected type arguments.
+A lexical variable still has its own index, even when its right-hand side
+names a certified function. A lambda has no certificate at this admission.
+
+The simplifier can substitute another lexical callback and preserve a strict
+case on an opaque call. It cannot substitute a source family into that case
+evidence. The latter needs a checked ordinary retained application which
+records the source equations and the active rule policy. Keep the lexical
+judgment for beta exposure, rule matching and strict case transport.
+-}
 
 -- | Check the nominal equality for the actual lexical callback.
 tcRetainedFunctionVar :: TcType -> Id -> TcM Core.CoreExpr
@@ -4876,7 +4918,7 @@ tcRetainedArg domain arg
            ; return (Core.App (Core.Lam binder core_body) core_arg,
                      L loc (HsLam x LamSingle matches'), arg') }
     resolve_app env expected fun arg
-      = do { (core_fun, fun') <- case source_head fun of
+      = do { (core_fun, fun') <- case retainedSourceHead fun of
                Just (n, written) -> do
                      certified <- if isExternalName n
                        then tcLookupIdMaybe n >>= maybe (pure Nothing) tcLookupSourceTableId
@@ -4891,61 +4933,21 @@ tcRetainedArg domain arg
            ; return (app, fun', arg') }
 
     -- See Note [Erased arguments of certified source operands].
-    source_head :: LHsExpr GhcRn -> Maybe (Name, [LHsWcType GhcRn])
-    source_head = go []
-      where
-        go written (L _ (HsPar _ fun)) = go written fun
-        go written (L _ (HsAppType _ fun ty)) = go (ty : written) fun
-        go written (L _ (HsVar _ name))
-          | let n = unLocWithUserRdr name
-          , not (isDataOcc (nameOccName n)) = Just (n, written)
-        go _ _ = Nothing
-
-    -- See Note [Erased arguments of certified source operands].
     instantiate_source :: Id -> [LHsWcType GhcRn] -> LHsExpr GhcRn -> TcM Core.CoreExpr
     instantiate_source owner written arg = do
       owner <- liftZonkM (zonkId owner)
-      (core, sigma) <- foldM (apply_written owner) (Core.Var owner, varType owner) written
+      (core, sigma) <- foldM (applyRetainedSourceType unsupported owner)
+                             (Core.Var owner, varType owner) written
       let (binders, body) = tcSplitForAllInvisTyVars sigma
-          tvs = map snd binders
-      if null tvs
+      if null binders
         then return core
         else do
           actual <- tcRetainedDeclaredArgType pure arg
-          case actual of
-            Just actual
-              | isEmptyNameEnv (idConcreteTvs owner)
-              , Just (_, _, _, formal, _) <- splitFunTy_maybe body
-              , Just subst <- matchRetainedAppType tvs Subst.emptySubst formal actual
-              , Just choices <- traverse (Subst.lookupTyVar subst) tvs
-              , not (any (`elemVarSet` tyCoVarsOfTypes choices) tvs)
-              , and (zipWith (\tv ty ->
-                       eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty))
-                     tvs choices)
-              , eqType (Subst.substTy subst formal) actual
-              , all noQuickLookVars (sigma : actual : choices)
-              -> do { valid <- tcRetainedInstScope (sigma : actual : choices)
-                    ; if valid
-                      then return (Core.mkTyApps core choices)
-                      else unsupported }
+          case (splitFunTy_maybe body, actual) of
+            (Just (_, _, _, formal, _), Just actual) ->
+              Core.mkTyApps core <$>
+                chooseRetainedSourceTypes unsupported owner sigma (map snd binders) formal actual
             _ -> unsupported
-
-    -- Check written types without inferring an earlier erased argument.
-    apply_written :: Id -> (Core.CoreExpr, TcSigmaType) -> LHsWcType GhcRn
-                  -> TcM (Core.CoreExpr, TcSigmaType)
-    apply_written owner (core, sigma) ty
-      | Just (_, binder, _) <- tcSplitForAllTyVarBinder_maybe sigma
-      , isSpecifiedForAllTyFlag (binderFlag binder)
-      = do { (choice, body) <- tcVTA (idConcreteTvs owner) sigma ty
-           ; choice <- liftZonkM (zonkTcType choice)
-           ; body <- liftZonkM (zonkTcType body)
-           ; valid <- tcRetainedInstScope [choice, body]
-           ; if valid && all noQuickLookVars [choice, body]
-                      && not (any (\v -> isTcTyVar v && isMetaTyVar v)
-                                  (tyCoVarsOfTypesList [choice, body]))
-             then return (Core.App core (Core.Type choice), body)
-             else unsupported }
-      | otherwise = unsupported
 
     -- Resolve the witness before checking the dependent payload. The next
     -- application reads its domain from the type of this partial Core call.
@@ -4978,6 +4980,56 @@ tcRetainedArg domain arg
 
     unsupported :: TcM a
     unsupported = failWithTc (TcRnRetainedQuantificationError RetainedIndexExpression)
+
+-- | Split a written source head into its name and visible type arguments.
+-- See Note [Erased arguments of certified source operands].
+retainedSourceHead :: LHsExpr GhcRn -> Maybe (Name, [LHsWcType GhcRn])
+retainedSourceHead = go []
+  where
+    go written (L _ (HsPar _ fun)) = go written fun
+    go written (L _ (HsAppType _ fun ty)) = go (ty : written) fun
+    go written (L _ (HsVar _ name))
+      | let n = unLocWithUserRdr name
+      , not (isDataOcc (nameOccName n)) = Just (n, written)
+    go _ _ = Nothing
+
+-- | Check a written type without inferring an earlier erased argument.
+-- See Note [Erased arguments of certified source operands].
+applyRetainedSourceType :: TcM (Core.CoreExpr, TcSigmaType) -> Id
+                        -> (Core.CoreExpr, TcSigmaType) -> LHsWcType GhcRn
+                        -> TcM (Core.CoreExpr, TcSigmaType)
+applyRetainedSourceType unsupported owner (core, sigma) ty
+  | Just (_, binder, _) <- tcSplitForAllTyVarBinder_maybe sigma
+  , isSpecifiedForAllTyFlag (binderFlag binder)
+  = do { (choice, body) <- tcVTA (idConcreteTvs owner) sigma ty
+       ; choice <- liftZonkM (zonkTcType choice)
+       ; body <- liftZonkM (zonkTcType body)
+       ; valid <- tcRetainedInstScope [choice, body]
+       ; if valid && all noQuickLookVars [choice, body]
+                  && not (any (\v -> isTcTyVar v && isMetaTyVar v)
+                              (tyCoVarsOfTypesList [choice, body]))
+         then return (Core.App core (Core.Type choice), body)
+         else unsupported }
+  | otherwise = unsupported
+
+-- | Determine erased type arguments from a known type.
+-- See Note [Erased arguments of certified source operands].
+chooseRetainedSourceTypes :: TcM [Type] -> Id -> Type -> [TyVar]
+                          -> Type -> Type -> TcM [Type]
+chooseRetainedSourceTypes unsupported owner sigma tvs formal actual
+  | null tvs, eqType formal actual
+  = return []
+  | isEmptyNameEnv (idConcreteTvs owner)
+  , Just subst <- matchRetainedAppType tvs Subst.emptySubst formal actual
+  , Just choices <- traverse (Subst.lookupTyVar subst) tvs
+  , not (any (`elemVarSet` tyCoVarsOfTypes choices) tvs)
+  , and (zipWith (\tv ty -> eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty))
+                 tvs choices)
+  , eqType (Subst.substTy subst formal) actual
+  , all noQuickLookVars (sigma : actual : choices)
+  = do { valid <- tcRetainedInstScope (sigma : actual : choices)
+       ; if valid then return choices else unsupported }
+  | otherwise = unsupported
 
 {- Note [Inferred domains of written retained constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
