@@ -1424,7 +1424,7 @@ kcTyClGroup open_indices kisig_env decls
             dflags <- getDynFlags
             rdr_env <- getGlobalRdrEnv
             name_ctx <- getNamePprCtx
-            let cusk_names = mkNameSet [get_name decl | (decl, CUSK) <- kinded_decls]
+            let cusk_decls = mkNameEnv [(get_name decl, unLoc decl) | (decl, CUSK) <- kinded_decls]
                 missing_extensions = filter (not . (`xopt` dflags))
                   [LangExt.StandaloneKindSignatures, LangExt.ExplicitForAll]
                 in_scope name =
@@ -1435,15 +1435,26 @@ kcTyClGroup open_indices kisig_env decls
                     _ -> False
             forM_ poly_tcs $ \tc -> do
               let name = tyConName tc
-              when (name `elemNameSet` cusk_names && any isNamedTyConBinder (tyConBinders tc)) $
-                addDiagnosticAt (getSrcSpan name) (TcRnCusk tc
-                  (if sourceCuskKind dflags in_scope (tyConKind tc)
-                   then Just missing_extensions else Nothing))
+              case lookupNameEnv cusk_decls name of
+                Just decl | any isNamedTyConBinder (tyConBinders tc) ->
+                  addDiagnosticAt (getSrcSpan name) (TcRnCusk tc
+                    (if cuskCanSuggest decl tc && sourceCuskKind dflags in_scope (tyConKind tc)
+                     then Just missing_extensions else Nothing))
+                _ -> pure ()
         ; traceTc "---- kcTyClGroup end ---- }" (ppr_tc_kinds poly_tcs)
         ; return (poly_tcs, kindless_names, metadata) }
   where
     ppr_tc_kinds tcs = vcat (map pp_tc tcs)
     pp_tc tc = ppr (tyConName tc) <+> dcolon <+> ppr (tyConKind tc)
+
+-- | Limit edits to declarations whose explicit kind can describe their arity.
+-- For example, adding @type F :: forall k. k@ to @type family F :: k@
+-- can change how many arguments the family must consume.
+cuskCanSuggest :: TyClDecl GhcRn -> TyCon -> Bool
+cuskCanSuggest DataDecl{} _ = True
+cuskCanSuggest FamDecl{tcdFam = FamilyDecl{fdInfo = ClosedTypeFamily{}}} tc =
+  any isVisibleTyConBinder (tyConBinders tc)
+cuskCanSuggest _ _ = False
 
 -- | Check the source forms supported by the CUSK warning's suggested edit.
 -- The warning prints the current kind for forms outside this subset.
