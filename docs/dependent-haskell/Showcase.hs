@@ -161,6 +161,7 @@ import qualified OrdinaryFamilyBranches
 import qualified PreludeFoldrProof
 import qualified PreludeZipProof
 import qualified HaskLib
+import qualified Client as HaskLibClient
 import qualified PreludeZipWithLengthProof
 import qualified PreludeZipWithProof
 import qualified PreludeFilterLengthProof
@@ -1925,9 +1926,10 @@ main = do
         , HaskLib.lengthZipWith unusedCallback zipLeft zipRight
         )
     beforeZip <- newIORef not >>= readIORef
-    observe "prove the result length after map and zipWith"
+    observe "prove map and zipWith length directly and with trans and congFirst"
         ( zipWith zipCallback (map beforeZip zipLeft) zipRight
         , HaskLib.lengthZipMap beforeZip zipCallback zipLeft zipRight
+        , HaskLibClient.zipMapLaw beforeZip zipCallback zipLeft zipRight
         )
     observe "use the Prelude.zipWith cons equation with both tails unevaluated"
         PreludeZipWithProof.firstPair

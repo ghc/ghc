@@ -538,7 +538,7 @@ read a payload with an absent polymorphic callback: 37
 use a checked cons rule without forcing the callback, head or tail: (Refl,True)
 zip two lists and prove their result length with an ordinary minimum: ([(True,False)],Refl,Refl,Refl)
 zipWith a runtime callback and prove the result length: ([False],Refl,Refl)
-prove the result length after map and zipWith: ([False],Refl)
+prove map and zipWith length directly and with trans and congFirst: ([False],Refl,Refl)
 use the Prelude.zipWith cons equation with both tails unevaluated: [(True,False)]
 compose two checked traversals without forcing the inner callback: (Refl,True)
 collect row heads with an ordinary polymorphic callback: Refl

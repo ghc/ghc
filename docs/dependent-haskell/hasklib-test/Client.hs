@@ -1,7 +1,7 @@
-{-# LANGUAGE ExperimentalDependentTypes #-}
+{-# LANGUAGE GHC2024, ExperimentalDependentTypes #-}
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
 
-module Client (zipLaw, lengthAppendSingleton, checkAppendSingleton, checkReverse, checkZipMap) where
+module Client (zipLaw, lengthAppendSingleton, checkAppendSingleton, checkReverse, zipMapLaw, checkZipMap) where
 
 import qualified HaskLib as H
 
