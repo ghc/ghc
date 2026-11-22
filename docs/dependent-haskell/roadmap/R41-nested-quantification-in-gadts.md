@@ -222,3 +222,38 @@ constructed a value, and used its `Eq a` dictionary in a view pattern
 on the first field. It distinguished an ordinary `Double` from NaN.
 [Proposal #402 grammar](https://ghc-proposals.readthedocs.io/en/latest/proposals/0402-gadt-syntax.html#grammar-specification)
 and [parser decomposition](../../../compiler/GHC/Hs/Type.hs).
+
+### Which prefix orders work?
+
+Fix the outer binder at `forall a.` and the result at `T a b c`.
+Between them, put one constraint (`Eq a =>`), one field (`a %1 ->`),
+one invisible binder (`forall c.`) and one required binder
+(`forall b ->`). All 24 orders keep each variable in scope. Proposal
+#402 permits all 24. Each client constructs a value from the stripped
+provider interface. It then matches the constructor and uses its
+dictionary to compare the field with itself. On inputs `3` and NaN,
+the expected results are `(True,False)`.
+
+| Compiler | Field | Orders that compile and run |
+| --- | --- | ---: |
+| Published R19 compiler, `4e0c9b393a` | `a %1 ->` | 8/24 |
+| Private parser and Template Haskell repair, `365f7403ce` | `a %1 ->` | 13/24 |
+| Same repair | `a ->` | 13/24 |
+
+Jobs 866 and 869 tested each order separately at `-O0` with Core and
+STG Lint. The same eleven orders fail with either field multiplicity.
+Eight report GHC-71492 for a nested group. Three report GHC-51580 for
+a required binder. For example, the private compiler still rejects
+the first `forall` after the field in this signature.
+
+```haskell
+data T a b c where
+    K :: forall a. Eq a => a -> forall b -> forall c. T a b c
+```
+
+The private repair also preserves the earlier `Box` example through
+quotation, interface-only reification and splicing at `-O0` and `-O2`.
+The 24-order test covers one field and one occurrence of each binder
+form. Repeated groups and additional fields have separate scope and
+demand tests above.
+[Prefix and record grammar](https://ghc-proposals.readthedocs.io/en/latest/proposals/0402-gadt-syntax.html#grammar-specification).
