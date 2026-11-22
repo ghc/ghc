@@ -3066,6 +3066,11 @@ checkTypeEqNoUnification ev eq_rel lhs rhs =
       , hasNativeDependentExpr (Type rhs)
       = wanted_flags { tefTyVar_allowNativeGivenRhs = True
                      , tef_fam_app = TEFA_Recurse }
+      | TyFamLHS {} <- lhs, NomEq <- eq_rel
+      , hasNativeDependentExpr (Type rhs)
+      -- See Note [Family Givens with rigid runtime indices] in GHC.Tc.Utils.Unify.
+      = wanted_flags { tefTyFam_allowRetainedIds = True
+                     , tef_fam_app = TEFA_Recurse }
       | otherwise
       = wanted_flags { tef_fam_app = mkTEFA_Break ev eq_rel BreakGiven }
         -- TEFA_Break used for: [G] a ~ Maybe (F a)

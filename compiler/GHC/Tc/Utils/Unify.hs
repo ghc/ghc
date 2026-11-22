@@ -4239,6 +4239,23 @@ docs/dependent-haskell/REFERENCES.md#agda-provenance.
 The caller uses the nominal proof for argument and inverse result casts.
 -}
 
+{- Note [Family Givens with rigid runtime indices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Matching Refl on a list-length proof gives an equality between two
+family applications, size (map f xs) ~ size xs. The same equality must
+rewrite an argument of another type family, for example minSize. An
+irreducible Given can solve the exact equality, but ordinary family
+rewriting cannot use it under minSize.
+
+For an existing nominal Given with a family application on the left,
+accept a rigid runtime Id on the right. Check the type of that Id with
+the same occurs check before keeping the occurrence. Recurse through
+family applications without introducing cycle breakers on this path.
+The resulting canonical equality retains the original scoped evidence.
+Wanted constraints and private runtime-binder comparisons keep their
+usual scope checks. See Note [Rigid retained indices].
+-}
+
 {- Note [Rigid retained indices]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Runtime indices are rigid local Ids. Equal occurrences of the same Id need
@@ -4510,6 +4527,9 @@ data TyEqFlags m a
        -- (soluble or insoluble)
     , tefTyFam_tyCon :: TyCon
     , tefTyFam_args  :: [Type]
+    , tefTyFam_allowRetainedIds :: Bool
+        -- ^ Check the types of rigid runtime Ids in a nominal Given.
+        -- See Note [Family Givens with rigid runtime indices].
     , tef_fam_app :: TyEqFamApp m a
         -- ^ How to deal with type family applications
     }
@@ -4681,6 +4701,7 @@ notUnifying_TEFTask occ_prob = \case
     TEFTyFam
       { tefTyFam_tyCon = tc
       , tefTyFam_args  = tys
+      , tefTyFam_allowRetainedIds = False
       , tefTyFam_occursCheck = occ_prob
       , tef_fam_app = TEFA_Recurse
       }
@@ -4821,10 +4842,11 @@ famAppBreaker (BreakWanted ev lhs_tv) fam_app   -- Wanteds
 
 instance Outputable (TyEqFlags m a) where
   ppr = \case
-    TEFTyFam occ tc tys fam_app ->
+    TEFTyFam occ tc tys retained fam_app ->
       text "TEFTyFam" <> braces (
         hcat [ ppr occ
              , ppr (mkTyConApp tc tys)
+             , text "RetainedIds:" <+> ppr retained
              , ppr fam_app ] )
     TEFTyVar occ lc conc native fam_app ->
       text "TEFTyVar" <> braces (hcat (punctuate comma fields))
@@ -5012,6 +5034,10 @@ check_ty_eq_rhs flags ty
         | native_given
         , isNativeRetainedBinder v
         -> return $ okCheckRefl ty
+        | TEFTyFam { tefTyFam_allowRetainedIds = True } <- flags
+        , isNativeRetainedBinder v
+        -> do { checked <- check_ty_eq_rhs flags (varType v)
+              ; return (mkReflRedn Nominal ty <$ checked) }
         | otherwise
         -> return $ PuFail (cteProblem cteSkolemEscape)
       DepFunTy vis index body
