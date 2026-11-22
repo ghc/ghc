@@ -196,3 +196,29 @@ group after a leading context and before the first value field. The
 the interface before it starts an external Template Haskell splice.
 The existing payload encodings stay the same.
 [Writer and reader test](../../../testsuite/tests/gadt/GadtExtendedOrderedWire.sh).
+
+## A context before an invisible binder and the first field
+
+Proposal #402 permits this prefix constructor with ordinary GADT syntax.
+The published compiler at `eda3895806` rejects the signature with
+GHC-71492 at the suffix starting with `forall b.`.
+
+```haskell
+data Box a where
+    K :: forall a. Eq a => forall b. a -> forall c. b -> c -> Box a
+```
+
+Moving `b` into the outer `forall` makes the constructor compile.
+Moving it beside `c` after the first field also works. Changing only
+the outer binder to `forall a ->` works with `RequiredTypeArguments`.
+These controls isolate the order of the binder and constraint.
+
+With the invisible outer binder, the parser separates `Eq a` from
+the following quantifier. With the required outer binder, it keeps
+them together. The former suffix then fails the renamer's check.
+Job 849 compared six source orders at `-O0` and `-O2`.
+For each accepted order, a client imported the stripped interface,
+constructed a value, and used its `Eq a` dictionary in a view pattern
+on the first field. It distinguished an ordinary `Double` from NaN.
+[Proposal #402 grammar](https://ghc-proposals.readthedocs.io/en/latest/proposals/0402-gadt-syntax.html#grammar-specification)
+and [parser decomposition](../../../compiler/GHC/Hs/Type.hs).
