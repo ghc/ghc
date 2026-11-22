@@ -103,9 +103,24 @@ below are under `_build/on-demand/`.
 
 | Job | Directory | What to verify |
 | --- | --- | --- |
-| 783, 806 | `r03-named-measured-zip-normal-20261122` | Job 783 completed the clean two-stage build of named callbacks at `0eb0718f35`. Job 806 checks the normal binaries with `HaskLib.size` and existing lexical callbacks. |
-| 798 | `r03-named-safehead-normal-20261122` | Combined compiler at `a43a310c08`. Fixture `cde69193d8` uses `HaskLib.withEquality` and calls `safeHead` without type arguments. It also includes the named-callback example. Expect 547 output lines. |
-| 802 | `r19-closure-normal-20261122` | Two-stage build of `4e0c9b393a`. This fixes the import cycle found by job 797. Check independently compiled type-level cases, the stored coercion and the changed-row rejection. |
+| 783, 806 | `r03-named-measured-zip-normal-20261122` | Both stages built at `0eb0718f35`. The dedicated named-callback, lexical-callback and rewrite-rule tests passed, as did the source-hidden HaskLib clients. |
+| 798, 809, 816, 817 | `r03-named-safehead-normal-20261122` | Both stages built at `a43a310c08` and matched all 547 lines of fixture `cde69193d8` at `-O0` and `-O2`. Stage 2 GHCi and the installed HaskLib clients passed. The registered normal suite passed 39 of 41. See the release blocker below. |
+| 802, 815 | `r19-closure-normal-20261122` | Both stages built at `4e0c9b393a`. Four registered tests passed. A stripped-interface client used the two case results at an unknown index. Changing a row rebuilt the consumer and rejected its old proof. |
+
+The R03/R11 release is held at `a43a310c08`. In
+`NativeDependentCoreRun`, Core Lint checks the source equations of
+`flipNative` when the function is stored in a constructor field. The
+test binds a plain function and stores an occurrence that carries a
+certificate. The field index uses the function's identity. Lint must reject a
+mismatched certificate when an index actually uses its equations.
+`T15874` is the inherited failure in this selection.
+[Core API test](../../testsuite/tests/ghc-api/NativeDependentCoreRun.hs)
+and [the separate 158-registration compatibility comparison](CHECKPOINTS.md#compatibility-of-the-named-callback-and-successor-inference-changes).
+
+The cumulative source `91fd7365bf` adds R19 and the first R36 warning
+fixes. Its clean build uses `r03-r19-r36-normal-91fd7365bf-20261122`.
+It contains the same R03 change. Qualify the corrected Lint behavior
+before publishing those compiler changes.
 
 The [release-readiness assessment](ROADMAP.md#release-readiness) identifies
 R36 as the next full-card target.

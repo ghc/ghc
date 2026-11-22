@@ -148,6 +148,30 @@ source revisions and rebuild commands, then remove both sets of outputs
 after the last live user finishes. The 200 GB threshold is a backup for
 this cleanup.
 
+## Compatibility of the named callback and successor inference changes
+
+The preceding normal compiler at `a395eea233` and the combined normal
+compiler at `a43a310c08` ran the same 158 upstream test registrations.
+The sources, driver registrations and expected files came from the
+`dependent/should_compile`, `should_fail` and `should_run` directories
+at upstream commit `19ff36f2aede`. Each compiler ran 157 registrations
+in the normal way and `T14729kind` in GHCi. Both passed 143 of 158.
+All 15 failures had the same actual diagnostic or output difference
+on the two compilers.
+
+| Upstream expectation | Tests that still fail it |
+| --- | --- |
+| The program compiles | `GADTSingletons`, `LopezJuan`, `Rae31`, `RaeBlogPost`, `RaeJobTalk`, `T12088sg2`, `T12088sg3`, `T12442`, `T13910`, `T13938` |
+| Rejection has the recorded diagnostic | `RAE_T32a`, `T13135`, `T14066d` |
+| Compiled type declarations print as recorded | `T15743`, `T15743e` |
+
+For example, `T13938` rejects the unannotated kind synonym `~>`
+at a declaration that requires a matchable arrow. `T15743` compiles
+and prints different names for quantified kind variables. The selected
+release regression `T15874` lives in the separate polykinds directory.
+[Upstream dependent tests](https://github.com/ghc/ghc/tree/19ff36f2aede0ca2e554016ff22c71e73aa9803b/testsuite/tests/dependent)
+and [R23 compatibility](roadmap/R23-unsaturated-type-families.md).
+
 ## Equality continuations and structural kind inference
 
 The original GHC test `T13822` returns `Maybe` at a kind computed by
