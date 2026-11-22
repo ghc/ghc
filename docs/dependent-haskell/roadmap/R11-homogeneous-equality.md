@@ -9,6 +9,19 @@ Source `~`, `~~`, `:~:`, and `:~~:` keep their current meanings.
 [GHC phase 2a](https://gitlab.haskell.org/ghc/ghc/-/wikis/dependent-haskell/phase2#phase-2a-homogeneous-equality),
 [open GHC issue #17368](https://gitlab.haskell.org/ghc/ghc/-/work_items/17368).
 
+## Rewrite a size in a downstream proof
+
+Matching `Refl` on `lengthMap pre xs` lets the client replace
+`size (map pre xs)` with `size xs` under `minSize`. The solver uses the
+nominal equality from this branch. A retained result variable alone
+gives it no information about which equation of a closed family applies.
+The negative controls use another list, leave the branch, or supply only
+representational evidence. The closed-family control checks that
+`Closed b :~: b` cannot establish `b :~: 'True` for an unknown `b`.
+[HaskLib proof](../hasklib-test/Client.hs),
+[solver controls](../../../testsuite/tests/dependent/should_run/NativeRetainedFamilyGiven.hs)
+and [equality elimination in Agda](../REFERENCES.md#reusing-an-equality-under-a-size-function).
+
 ## An equality with the empty vector
 
 An ordinary `HRefl` pattern can refine the length of a retained vector.

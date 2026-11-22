@@ -5929,6 +5929,27 @@ whose equations the fork has checked.
 [Agda list properties](https://agda.github.io/agda-stdlib/v2.4/Data.List.Properties.html#length-reverse)
 and [HaskLib implementation](hasklib/HaskLib/List.hs).
 
+### Filter naturality in the presence of seq
+
+Johann and Voigtländer's Theorem 1 treats every function
+`r :: forall a. (a -> Bool) -> [a] -> [a]` in their calculus.
+For a strict, total `h` and a predicate `p` defined at function weak
+head normal form, they derive
+`r p (map h xs) = map h (r (p . h) xs)`. Requiring only strictness
+of `h` gives an approximation in one direction. For example, take
+`r p _ = seq p []`, `h = id` and `p = undefined`. The left side
+forces `p`. The right side passes a lambda to `r` and returns `[]`.
+[Johann and Voigtländer, §7, Theorem 1](https://www.orchid.inf.tu-dresden.de/gdp/reports/p76-voigtlaender.pdf).
+
+The example changes element type from `Bool` to `Ordering`.
+It states both sides for one erased polymorphic function `r`.
+The signature checks, but a bare `Refl` at this abstract head gets
+GHC-83865. For the actual `filter`, induction on the list establishes
+the equation using the compiled definitions. A retained rank-N
+callback is a separate open compiler feature.
+[Statement and checked proof](examples/open-evaluation/ParametricFilter.hs)
+and [positive, negative and runtime controls](examples/open-evaluation/check-parametric-filter.sh).
+
 ### Reusing an equality under a size function
 
 Agda's `cong` takes an equality between arguments and produces an

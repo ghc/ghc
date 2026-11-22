@@ -148,6 +148,35 @@ source revisions and rebuild commands, then remove both sets of outputs
 after the last live user finishes. The 200 GB threshold is a backup for
 this cleanup.
 
+## Compose installed list proofs
+
+HaskLib's `lengthZipMap` proves the shorter-length law for
+`zipWith combine (map pre xs) ys` by induction on the two lists.
+A consumer can prove the same equation with `lengthZipWith` and
+`lengthMap`. Matching the second proof rewrites an argument to
+`minSize`. Omitting either equality leaves the final `Refl` unsolved.
+Both callbacks and list elements can be undefined. The proofs differ
+in their demand on the left spine when the right list ends first.
+Job `652` checked this difference at `-O0` and `-O2` using the installed
+package with the normal self-hosted compiler. [Worked example](README.md#reuse-a-proof-with-hasklib).
+
+Job `589` built both stages from a clean checkout at `3fceb0b35d`.
+This compiler panicked when checking a closed-family equality at a
+retained result variable. Job `633` rebuilt both stages at `8d756d44da`
+after the solver stopped inferring a family equation from such a result.
+Job `643` checked both stages against fixture `193e3f35d0`. Four native
+runs and stage 2 GHCi matched the 546-line Showcase. Stage 2 passed
+all 31 selected normal-way tests. The package suite, source-hidden
+clients at both optimization levels and compiler-upgrade checks passed.
+The source at `999f0ed489` has the same Git tree as the tested fixture.
+[Closed-family regression](../../testsuite/tests/dependent/should_run/NativeRetainedFamilyGiven.hs).
+
+Job `653` checked the standalone filter example against the normal
+self-hosted compiler. It accepts the concrete proof and rejects a bare
+`Refl` for the general law. The example includes a runtime `seq`
+counterexample at both optimization levels.
+[Statement and hypotheses](REFERENCES.md#filter-naturality-in-the-presence-of-seq).
+
 ## Runtime callbacks and HaskLib
 
 Job `515` built compiler `c24ffa9ca0` from a clean checkout. Job `551`

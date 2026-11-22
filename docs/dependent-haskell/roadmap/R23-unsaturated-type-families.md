@@ -9,6 +9,15 @@ General kind inference and compatibility with existing unannotated programs
 remain open.
 Use the [work queue](../ROADMAP.md#current-work-queue) for priorities.
 
+One outstanding compatibility test is `T13822`. Its family `IK` returns
+`IK a -> IK b`. A later equation returns `Maybe` at that kind. The fork
+infers an unmatchable result arrow and reports GHC-83865 at `Maybe`.
+Writing `IK a %M -> IK b` lets the test compile. Both the published
+`c24ffa9ca0` compiler and the `8d756d44da` family-improvement repair
+reject the original source with the same diagnostic. The compatibility
+target is the original program without an annotation.
+[Original GHC regression](../../../testsuite/tests/typecheck/should_compile/T13822.hs).
+
 ## Matchability on a source arrow
 
 Import `U` from `GHC.Matchability` and enable `Modifiers` to write the

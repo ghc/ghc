@@ -40,6 +40,7 @@ for just the list API.
 | `lengthAppend xs ys` | `plus (size xs) (size ys)` |
 | `lengthZip xs ys` | `minSize (size xs) (size ys)` |
 | `lengthZipWith f xs ys` | `minSize (size xs) (size ys)` |
+| `lengthZipMap pre combine xs ys` | `minSize (size xs) (size ys)` for `zipWith combine (map pre xs) ys` |
 
 `HaskLib.Size` exports `plusZero` and `plusSucc`. The
 [append-singleton client](hasklib-test/Client.hs) imports both lemmas
@@ -70,6 +71,39 @@ HaskLib imports that worker from `ghc-internal`. Clients can use
 `lengthReverse` with only `base` and `hasklib` in their dependencies.
 [Package](hasklib.cabal), [list API](hasklib/HaskLib/List.hs) and
 [proof methods](REFERENCES.md#parametricity-and-the-list-length-laws).
+
+A client can also prove the pipeline law using two imports. Each
+`Refl` makes one equality available in its branch.
+
+```haskell
+zipMapLaw :: forall a b c d. foreach (pre :: a -> b) -> foreach (combine :: b -> c -> d)
+          -> foreach (xs :: [a]) -> foreach (ys :: [c])
+          -> size (zipWith combine (map pre xs) ys) :~: minSize (size xs) (size ys)
+zipMapLaw pre combine xs ys =
+    case lengthZipWith combine (map pre xs) ys of
+        Refl -> case lengthMap pre xs of Refl -> Refl
+```
+
+The second proof traverses the left list. For example, if the left list
+is `True : undefined` and the right list is empty, forcing
+`lengthZipMap` returns `Refl`. Forcing `zipMapLaw` reaches the undefined
+tail. Both proofs typecheck. Their types describe the equality each
+establishes when it returns. [Client source](hasklib-test/Client.hs)
+and [direct proof](examples/open-evaluation/PreludeZipRuntime.hs).
+
+### What polymorphism can prove
+
+A function with `zipWith`'s type can return `[]` for every input.
+HaskLib therefore proves the length law from the equations for the
+installed function. Parametricity instead relates different element
+types. For a function `r` with `filter`'s polymorphic type, one such
+law relates filtering before and after a change of element type.
+The standalone example states this law for an abstract function,
+checks an induction for Prelude's `filter`, and shows how `seq` can
+distinguish the two sides when a hypothesis is missing.
+[Example](examples/open-evaluation/ParametricFilter.hs),
+[run the controls](examples/open-evaluation/check-parametric-filter.sh)
+and [the theorem and its hypotheses](REFERENCES.md#filter-naturality-in-the-presence-of-seq).
 
 ## Run the showcase
 

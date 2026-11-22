@@ -41,6 +41,10 @@ Both `size` and `minSize` are ordinary recursive Haskell functions.
 The same minimum describes the length of `zipWith f xs ys` for an unknown
 callback `f`. A separate example passes a constructed `Just` to a
 retained comparison and leaves an unused field unevaluated.
+HaskLib also proves the length of `zipWith combine (map pre xs) ys`.
+A downstream client can derive that equation from two imported lemmas.
+The [filter example](examples/open-evaluation/ParametricFilter.hs) shows
+which proof steps still require the function's definition.
 [Runtime-list proof](examples/open-evaluation/PreludeZipRuntime.hs),
 [ordinary definitions](examples/open-evaluation/PreludeMapLengthSize.hs),
 [callback length proof](examples/open-evaluation/PreludeZipWithLengthProof.hs),
