@@ -268,6 +268,23 @@ type Bad = let (_, _) = Bool in Int
 HS
 reject IgnoredNonPair 3:25 83865 "but \`Bool' has kind"
 grep -Eq '^[[:space:]]*\|[[:space:]]*\^{4}$' error.log
+grep -Fq "In the type \`let (_, _) = Bool in Int'" error.log
+
+cat >BadPairRhs.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}
+module BadPairRhs where
+type Bad = let (value, _) = '(Maybe 'True, 'False) in value
+HS
+reject BadPairRhs 3:37 83865 "In the first argument of \`Maybe', namely 'True"
+grep -Fq "In the type \`let (value, _) =" error.log
+
+cat >BadPairOperand.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}
+module BadPairOperand where
+type Bad = let (flag, _) = '( 'True, 'False) in Maybe flag
+HS
+reject BadPairOperand 3:55 83865 "In the first argument of \`Maybe', namely \`flag'"
+grep -Fq "In the type \`let (flag, _) =" error.log
 
 cat >NestedWrongKind.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, KindSignatures #-}
@@ -281,6 +298,7 @@ HS
 reject NestedWrongKind 6:8 83865 'Expected kind'
 grep -Fq "has kind \`Bool'" error.log
 grep -Eq '^[[:space:]]*\|[[:space:]]*\^{6}$' error.log
+grep -Fq "In the type \`let ((_, _), height) = dims in height'" error.log
 
 cat >PairEta.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
