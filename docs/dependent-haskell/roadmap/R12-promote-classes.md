@@ -97,8 +97,11 @@ compiles as ordinary Haskell. Its interface omits the checked method.
 The next change treats a concrete prefix such as `Int Bool` as part of
 the instance head. A worker can copy a field at one of those types.
 Inspecting or constructing a value still checks the constructor.
-The source checks compare two instances with different results for the
-same `Flagged` constructor. Normal compiler qualification is pending.
+The prototype exports a checked method for `Row Int Bool` at `-O0`
+and `-O2`. In the second instance GHC combines the `Empty` and
+`Flagged` branches into one Core `DEFAULT` alternative. The checker
+does not yet export that method. The two-instance source control and
+normal compiler qualification remain open.
 [Instance equations](../../../testsuite/tests/dependent/should_run/concrete-mapping/Row.hs),
 [separately compiled proofs](../../../testsuite/tests/dependent/should_run/concrete-mapping/RowProof.hs)
 and [warm upgrade check](../examples/open-evaluation/check-applied-mapping-upgrade.sh).

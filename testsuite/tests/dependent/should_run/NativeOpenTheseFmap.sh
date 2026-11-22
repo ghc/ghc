@@ -82,6 +82,11 @@ printProof p label x = print (mapBoth p label x)
 forceProof :: (a -> b) -> Char -> a -> IO ()
 forceProof f label x = evaluate (mapBoth f label x) >> pure ()
 
+rowProofs :: (Int -> Bool) -> Int -> Bool -> Int -> IO ()
+rowProofs p label flag x = do
+    print (fmap p (Flagged False 11 :: Row Bool Bool Int), RowProof.discarded p flag x)
+    print (RowProof.both p label flag x)
+
 main :: IO ()
 main = do
     putStrLn (report (> (4 :: Int)) 'w' 5)
@@ -104,9 +109,7 @@ main = do
     case fmap odd row of
         Both _ _ x -> print x
         _ -> fail "fmap discarded the row"
-    print (fmap odd (Flagged False 11 :: Row Bool Bool Int),
-           RowProof.discarded odd (error "flag") (error "element" :: Int))
-    print (RowProof.both odd (error "first field") (error "second field") (error "element" :: Int))
+    rowProofs odd (error "first field") (error "second field") (error "element")
 HS
     "${ghc[@]}" "$opt" -c Main.hs
     "${ghc[@]}" Main.o OrdinaryTheseMapping.o ../proof/{TheseMapping,RowProof}.o ../provider/{These,Row}.o -o run
