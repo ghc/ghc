@@ -33,9 +33,8 @@ lengthReverseOnto :: forall a. foreach (xs :: [a]) -> foreach (acc :: [a])
                   -> size (List.reverseOnto xs acc) :~: plus (size xs) (size acc)
 lengthReverseOnto [] _ = Refl
 lengthReverseOnto (x : xs) acc =
-    case lengthReverseOnto xs (x : acc) of
-        Refl -> case plusSucc (size xs) (size acc) of
-            Refl -> Refl
+    trans (lengthReverseOnto xs (x : acc))
+          (plusSucc (size xs) (size acc))
 
 -- | Reversing a list preserves its finite length.
 lengthReverse :: forall a. foreach (xs :: [a]) -> size (reverse xs) :~: size xs
