@@ -2491,6 +2491,11 @@ of ``-W(no-)*``.
         id :: forall a -> a -> a
         id (type a) a = a
 
+    An implicit binding in a pattern annotation depends on the names in
+    scope when GHC reads the annotation. If a preceding term binder would
+    supply the name in a single namespace, :ghc-flag:`-Wpun-uses` reports
+    the affected type references.
+
     An enclosing scope can contain another binder with the same name.
     For example, ``f @a = \(a :: a) -> a`` puts the term binder in the
     lambda and uses the outer type variable in its annotation. This

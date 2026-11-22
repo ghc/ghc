@@ -37,7 +37,13 @@ distinguishes this group from a nested scope. With
 group inside the lambda. Its annotation refers to the outer type
 variable. It produces no binding warning. In contrast,
 `freshAnnotation (d :: d) = d` introduces both a term variable and a
-fresh implicit type variable in one match. It reports `GHC-59431`.
+fresh implicit type variable in one match. It reports `GHC-59431`
+when no earlier name with that spelling is visible. In
+`earlier q (value :: q) = (value :: q)`, the earlier term binder
+would already supply the name in a unified scope. The two written
+type uses report `GHC-41293`. Appendix A leaves the conditional
+binding check per variable open. The renamer checks each implicit
+type binder against the term scope at its introducing annotation.
 
 The old diagnostics still apply. In
 `ordinaryShadow a = let f a = a in f a`, the inner value binder shadows

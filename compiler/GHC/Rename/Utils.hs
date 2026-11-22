@@ -139,8 +139,18 @@ groupPunBinders names = updLclCtxt $ \ lcl_env ->
 
 -- | Track later uses of type variables introduced by a pattern signature.
 recordImplicitPunBinders :: [Name] -> RnM a -> RnM a
-recordImplicitPunBinders names = updLclCtxt $ \ lcl_env ->
-  lcl_env { tcl_rdr = extendImplicitPunScope (tcl_rdr lcl_env) names }
+recordImplicitPunBinders [] thing_inside = thing_inside
+recordImplicitPunBinders names thing_inside = do
+  global_env <- getGlobalRdrEnv
+  let update lcl_env =
+        let local_env = tcl_rdr lcl_env
+            captures name =
+              let occ = setOccNameSpace varName (nameOccName name)
+              in isJust (lookupLocalRdrOcc local_env occ)
+                 || not (null (lookupGRE global_env
+                           (LookupRdrName (mkRdrUnqual occ) (RelevantGREsFOS WantNormal))))
+        in lcl_env { tcl_rdr = extendImplicitPunScope local_env captures names }
+  updLclCtxt update thing_inside
 
 delLocalNames :: [Name] -> RnM a -> RnM a
 delLocalNames names
@@ -191,7 +201,9 @@ checkDupAndShadowedNames envs names
 -- | Report type and term binders with the same spelling in one scope.
 -- See Note [Pun binding warnings].
 warnPunBindings :: [Name] -> RnM ()
-warnPunBindings = warnPunBindingsAgainst Nothing
+warnPunBindings binders = whenWOptM Opt_WarnPunBindings $ do
+  env <- getLocalRdrEnv
+  warnPunBindingsAgainst Nothing (filter (not . localImplicitPunCapture env) binders)
 
 -- | Check a binding group and any earlier batches in the same module scope.
 warnPunBindingsAgainst :: Maybe GlobalRdrEnv -> [Name] -> RnM ()
@@ -238,9 +250,14 @@ distinguishes imported names from local definitions.
 
 For example, `id (type a) a = a` binds both names in one group.
 In `f @a = \(a :: a) -> a`, the annotation uses the outer type variable.
-The lambda binds the term variable in a separate group. Include fresh
-implicit type variables in the match's check. An implicit binder cannot
-shadow an in-scope name in the proposed single namespace.
+The lambda binds the term variable in a separate group. When a pattern
+signature introduces a fresh type variable, check whether a term with
+that name is already in scope. Appendix A leaves this conditional step
+per variable. In `f q (_ :: q)`, the signature would refer to the term
+in a unified namespace, so it introduces no conflicting binding.
+In `f (d :: d)` with no earlier `d`, the signature introduces the type
+variable before the term binder. Both belong to the same match.
+The type-use warning checks the resolved occurrence independently.
 -}
 
 -------------------------------------

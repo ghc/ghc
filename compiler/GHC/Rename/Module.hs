@@ -4191,8 +4191,9 @@ rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = cond
                 | h98_style = thing
                 | otherwise = do
                     -- Start tracking again for the constructors' own binders.
-                    warn_puns <- woptM Opt_WarnPunUses
-                    let rdr_env | warn_puns = trackPunScopes emptyLocalRdrEnv
+                    warn_uses <- woptM Opt_WarnPunUses
+                    warn_bindings <- woptM Opt_WarnPunBindings
+                    let rdr_env | warn_uses || warn_bindings = trackPunScopes emptyLocalRdrEnv
                                 | otherwise = emptyLocalRdrEnv
                     setLocalRdrEnv rdr_env thing
         ; (condecls', con_fvs) <- zap_lcl_env $ rnConDecls condecls
