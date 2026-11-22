@@ -274,6 +274,9 @@ instance Diagnostic PsMessage where
            text "The signature for" <+> quotes (ppr sig)
            <+> text "must immediately precede its binding."
            $$ text "The next binding is for" <+> quotes (ppr binder) <> dot
+    PsErrTypeLetDuplicatePairField field
+      -> mkSimpleDecorated $
+           text "The pair pattern in this type let binds" <+> quotes (ppr field) <+> text "twice."
     PsErrIllegalExplicitNamespace kw
       -> mkSimpleDecorated $
            text "Illegal keyword" <+> quotes kw_doc
@@ -643,6 +646,7 @@ instance Diagnostic PsMessage where
     PsErrDeclSpliceNotAtTopLevel{}                -> ErrorWithoutFlag
     PsErrMultipleNamesInStandaloneKindSignature{} -> ErrorWithoutFlag
     PsErrTypeLetSignatureMismatch{}               -> ErrorWithoutFlag
+    PsErrTypeLetDuplicatePairField{}              -> ErrorWithoutFlag
     PsErrIllegalExplicitNamespace{}               -> ErrorWithoutFlag
     PsErrUnsupportedExplicitNamespace{}           -> ErrorWithoutFlag
     PsErrPlainWildcardImport{}                    -> ErrorWithoutFlag
@@ -791,6 +795,7 @@ instance Diagnostic PsMessage where
     PsErrDeclSpliceNotAtTopLevel{}                -> noHints
     PsErrMultipleNamesInStandaloneKindSignature{} -> noHints
     PsErrTypeLetSignatureMismatch{}               -> noHints
+    PsErrTypeLetDuplicatePairField{}              -> noHints
     PsErrIllegalExplicitNamespace{}               -> [suggestExtension LangExt.ExplicitNamespaces]
     PsErrUnsupportedExplicitNamespace{}           -> noHints
     PsErrPlainWildcardImport{}                    -> [SuggestRemoveImportList]

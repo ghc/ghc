@@ -113,9 +113,10 @@ import GHC.Base ( Multiplicity(..) )
 import GHC.Types.Fixity ( LexicalFixity(..) )
 import GHC.Types.SourceText
 import GHC.Types.Name
-import GHC.Types.Name.Reader ( RdrName, WithUserRdr(..) )
+import GHC.Types.Name.Reader ( RdrName, WithUserRdr(..), mkOrig, mkRdrUnqual )
 import GHC.Types.Var ( DepFunTyFlag(..), ExistsTyFlag(..), VarBndr, visArgTypeLike, pprExistsTy )
 import GHC.Core.TyCo.Rep ( Type(..) )
+import GHC.Builtin.Modules ( mkGhcInternalModule )
 import GHC.Builtin.WiredIn.Types( mkTupleStr )
 import GHC.Core.Ppr ( pprOccWithTick)
 import GHC.Core.Type
@@ -590,9 +591,14 @@ data HsTypeGhcPsExt
                (LocatedN RdrName) (LHsType GhcPs) (LHsType GhcPs)
 
 -- | One abbreviation in a source type let.
-data HsTypeLetBind = HsTypeLetBind
-  (Maybe (LocatedN RdrName, TokDcolon, LHsKind GhcPs, EpToken ";"))
-  (LocatedN RdrName) (EpToken "=") (LHsType GhcPs)
+data HsTypeLetBind
+  = HsTypeLetBind
+      (Maybe (LocatedN RdrName, TokDcolon, LHsKind GhcPs, EpToken ";"))
+      (LocatedN RdrName) (EpToken "=") (LHsType GhcPs)
+  | HsTypeLetPairBind (EpToken "(", EpToken ",", EpToken ")")
+      (Either (EpToken "_") (LocatedN RdrName))
+      (Either (EpToken "_") (LocatedN RdrName))
+      (EpToken "=") (LHsType GhcPs)
 
 -- | Construct one binding during renaming or TH conversion.
 mkHsSingleTypeLet :: (EpToken "let", EpToken "in") -> LocatedN RdrName
@@ -603,13 +609,31 @@ mkHsSingleTypeLet ann name rhs body =
 -- | Expose the first binding and its scope. See Note [Ordered type let bindings].
 splitHsTypeLet :: NonEmpty (LocatedA HsTypeLetBind) -> LHsType GhcPs
                -> (LocatedN RdrName, LHsType GhcPs, LHsType GhcPs)
-splitHsTypeLet (L _ (HsTypeLetBind signature name _ rhs) :| binds) body =
-  (name, ascribed_rhs, case binds of
-    [] -> body
-    b : bs -> L (noAnnSrcSpan (getLocA b `combineSrcSpans` getLocA body))
-                (XHsType (HsTypeLet noAnn Nothing (b :| bs) body)))
+splitHsTypeLet (first :| binds) body = case unLoc first of
+  HsTypeLetBind signature name _ rhs ->
+    (name, ascribe signature rhs, rest)
+  HsTypeLetPairBind _ left right _ rhs ->
+    (pair, rhs, foldr bindField rest fields)
+    where
+      loc = getLoc rhs
+      name_loc = l2l loc
+      pair = L name_loc (mkRdrUnqual (mkTyVarOcc "$type-let-pair"))
+      projection_module = mkGhcInternalModule (fsLit "GHC.Internal.TupleProjection")
+      first_field = mkOrig projection_module (mkTcOcc "PairFirst")
+      second_field = mkOrig projection_module (mkTcOcc "PairSecond")
+      named = [(field, selector) | (Right field, selector) <- [(left, first_field), (right, second_field)]]
+      fields | null named = [(pair, first_field)]
+             | otherwise = named
+      tyvar name = L loc (HsTyVar noAnn NotPromoted name)
+      bindField (field, selector) result =
+        let projected = L loc (HsAppTy noAnn (tyvar (L name_loc selector)) (tyvar pair))
+        in L loc (XHsType (mkHsSingleTypeLet noAnn field projected result))
   where
-    ascribed_rhs = case signature of
+    rest = case binds of
+      [] -> body
+      b : bs -> L (noAnnSrcSpan (getLocA b `combineSrcSpans` getLocA body))
+                  (XHsType (HsTypeLet noAnn Nothing (b :| bs) body))
+    ascribe signature rhs = case signature of
       Nothing -> rhs
       Just (_, colon, kind, _) -> L (getLoc rhs) (HsKindSig colon rhs kind)
 
@@ -632,6 +656,11 @@ so kind checking and Template Haskell use their existing single-binder rules.
 The parser keeps an adjacent signature with its binding. When splitting the
 group, put the signature on the RHS as an HsKindSig. The kind and RHS then
 use the same scope and checks as a written RHS kind ascription.
+
+For a pair pattern, bind the RHS to one private name before binding its
+fields. The internal closed families select fields only when they see the
+promoted pair constructor. An unknown pair can remain in the type. With
+two wildcards, a private projection still checks that the RHS has a pair kind.
 -}
 
 -- | A parsed constructor alternative in a type case.
@@ -1773,6 +1802,9 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
       let binding (L _ (HsTypeLetBind signature v _ rhs)) =
             [ppr sig <+> dcolon <+> ppr_mono_lty kind | (sig, _, kind, _) <- maybeToList signature]
               ++ [ppr v <+> equals <+> ppr_typelet_rhs rhs]
+          binding (L _ (HsTypeLetPairBind _ left right _ rhs)) =
+            [parens (pprWithCommas (either (const (char '_')) ppr) [left, right])
+              <+> equals <+> ppr_typelet_rhs rhs]
           bindings = concatMap binding (NE.toList binds)
           group = case brackets of
             Nothing -> vcat bindings

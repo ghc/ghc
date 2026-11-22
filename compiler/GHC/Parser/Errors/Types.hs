@@ -413,6 +413,9 @@ data PsMessage
    -- | A type let signature names a different binding from the next equation.
    | PsErrTypeLetSignatureMismatch !RdrName !RdrName
 
+   -- | A type let pair pattern binds the same name twice.
+   | PsErrTypeLetDuplicatePairField !RdrName
+
    -- | Illegal import bundle form
    | PsErrIllegalImportBundleForm
 

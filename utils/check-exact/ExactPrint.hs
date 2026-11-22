@@ -4352,6 +4352,16 @@ instance ExactPrint HsTypeLetBind where
     where
       signature (name, colon, kind, semi) =
         (,,,) <$> markAnnotated name <*> markEpUniToken colon <*> markAnnotated kind <*> markEpToken semi
+  exact (HsTypeLetPairBind (open, comma, close) left right eq rhs) = do
+    open' <- markEpToken open
+    left' <- field left
+    comma' <- markEpToken comma
+    right' <- field right
+    close' <- markEpToken close
+    HsTypeLetPairBind (open', comma', close') left' right' <$> markEpToken eq <*> markAnnotated rhs
+    where
+      field (Left wildcard) = Left <$> markEpToken wildcard
+      field (Right name) = Right <$> markAnnotated name
 
 instance ExactPrint (LocatedN RdrName) where
   getAnnotationEntry (L sann _) = fromAnn sann

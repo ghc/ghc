@@ -2411,6 +2411,18 @@ typelet_bind :: { LocatedA HsTypeLetBind }
                                                      PsErrTypeLetSignatureMismatch (unLoc $1) (unLoc $5)
                                                ; amsA' (sLL $1 $> (HsTypeLetBind
                                                    (Just ($1, epUniTok $2, $3, mzEpTok $4)) $5 (epTok $6) $7)) } }
+        | '(' typelet_pair_field ',' typelet_pair_field ')' '=' ctype
+                                         {% do { case ($2, $4) of
+                                                   (Right first, Right second) | unLoc first == unLoc second ->
+                                                     addError $ mkPlainErrorMsgEnvelope (locA (getLoc second)) $
+                                                       PsErrTypeLetDuplicatePairField (unLoc second)
+                                                   _ -> pure ()
+                                               ; amsA' (sLL $1 $> (HsTypeLetPairBind
+                                                   (epTok $1, epTok $3, epTok $5) $2 $4 (epTok $6) $7)) } }
+
+typelet_pair_field :: { Either (EpToken "_") (LocatedN RdrName) }
+        : tyvar                          { Right $1 }
+        | '_'                            { Left (epTok $1) }
 
 typecase_alts :: { Located [LocatedA HsTypeCaseAlt] }
         : typecase_alt                   { sL1 $1 [$1] }

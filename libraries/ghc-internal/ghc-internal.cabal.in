@@ -371,6 +371,7 @@ Library
         GHC.Internal.Unicode.Char.UnicodeData.SimpleTitleCaseMapping
         GHC.Internal.Unicode.Char.UnicodeData.SimpleUpperCaseMapping
         GHC.Internal.System.Environment.ExecutablePath
+        GHC.Internal.TupleProjection
 
 
     ----------------------------------------
