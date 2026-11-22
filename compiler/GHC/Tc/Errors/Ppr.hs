@@ -59,7 +59,7 @@ import GHC.Core.ConLike
 import GHC.Core.FamInstEnv ( FamInst(..), famInstAxiom, pprFamInst )
 import GHC.Core.InstEnv
 import qualified GHC.Core.TyCo.Compare as TypeCompare
-import GHC.Core.TyCo.Rep (Type(..))
+import GHC.Core.TyCo.Rep (Type(..), scaledThing)
 import GHC.Core.TyCo.Ppr (pprWithInvisibleBitsWhen, pprSourceTyCon,
                           pprTyVars, pprWithTYPE, pprTyVar, pprTidiedType, pprForAllWithMatchability)
 import GHC.Core.PatSyn ( patSynName, pprPatSynType, PatSyn )
