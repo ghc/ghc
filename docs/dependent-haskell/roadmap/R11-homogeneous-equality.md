@@ -29,7 +29,7 @@ of the same length. GHC reports GHC-83865 at the attempted `HRefl`.
 [Source and diagnostic checks](../../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh)
 and [equality representation](../REFERENCES.md#transport-a-retained-vector-index).
 
-### Two equalities in one retained package
+### Compose equalities in one retained package
 
 The imported package retains vectors `xs :: Vec Bool n` and
 `ys :: Vec Bool m`. The payload carries proofs `xs :~~: 'VNil` and
@@ -57,6 +57,15 @@ client now compiles from the provider interface at `-O0` and `-O2`
 with Core and STG Lint. Omitting either match still fails. Returning
 `Carrier zs` for an independent vector of length zero gives
 GHC-83865 at the RHS `payload`.
+
+The registered client also transports payloads along two and three
+links from the same package. It includes an already homogeneous
+`:~:` proof and an attached cycle. Ordinary type variables use the
+inert substitution. For retained indices, the solver indexes the
+scoped nominal Givens by endpoint and kind. It visits each reachable
+retained endpoint once. It builds the composite coercion only when
+it reaches the requested endpoint. The search uses the current
+inert Givens and creates no new constraints.
 [Retained package harness](../../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh),
 [solver evidence](../../../compiler/GHC/Tc/Solver/Irred.hs),
 [Cockx and Devriese, §3.1, Example 14](https://jesper.cx/files/proof-relevant-unification.pdf#page=13),
