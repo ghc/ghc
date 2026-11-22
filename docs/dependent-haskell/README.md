@@ -83,10 +83,10 @@ of `plusZero`. [Append-singleton proof](hasklib-test/Client.hs).
 The body can return an ordinary value.
 In the Showcase, `sameNat count (S Z)` returns a witness when the
 runtime count is one. Inside that branch, the vector has the length
-that `safeHead @Char @'Z` requires. The tail length is explicitly zero.
+that `safeHead` requires. The checker infers the zero-length tail from that equality.
 
 ```haskell
-Just proof -> withEquality proof (Just (safeHead @Char @'Z (replicateNative count 'x')))
+Just proof -> withEquality proof (Just (safeHead (replicateNative count 'x')))
 ```
 
 The branch returns `Just 'x'`. [Value-returning example](Showcase.hs).
@@ -130,6 +130,23 @@ is `True : undefined` and the right list is empty, forcing
 tail. Both proofs typecheck. Their types describe the equality each
 establishes when it returns. [Client source](hasklib-test/Client.hs)
 and [direct proof](examples/open-evaluation/PreludeZipMapRuntime.hs).
+
+### Pass a named measurement
+
+The Showcase passes the ordinary `HaskLib.size` function to a retained
+callback. Its premise says the measurement of the input list equals
+`HaskLib.size xs`. Passing `size` makes these the same expression, so
+`Refl` supplies the premise. The provider uses `lengthReverse` and
+returns the measured size.
+
+```haskell
+case measureReverseLength HaskLib.size xs Refl of
+    (n, Refl) -> n
+```
+
+The Showcase reads the list at runtime. It counts two cells and leaves
+the elements unevaluated. [Runnable definition](Showcase.hs)
+and [checked callback rules](roadmap/R03-dependent-products.md#pass-a-named-function-with-checked-equations).
 
 ### What polymorphism can prove
 

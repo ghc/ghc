@@ -6005,6 +6005,20 @@ ask for additional qualified operations such as `join` and `<*>`.
 [GHC proposal #216](https://ghc-proposals.readthedocs.io/en/latest/proposals/0216-qualified-do.html)
 and [QualifiedDo desugaring](../users_guide/exts/qualified_do.rst).
 
+### A named function as a retained callback
+
+In Agda, applying a dependent function substitutes the argument in its
+result type. For `measureReverseLength HaskLib.size xs Refl`, the fork
+uses that rule with the name of an ordinary Haskell function. Its
+checked equations identify the type family for `size`. Leaving the
+value argument unsupplied gives the callback its type-level identity.
+The runtime call still uses the Haskell function. Two different
+functions of the same type can therefore require different proofs.
+[Agda function application](https://agda.readthedocs.io/en/v2.8.0/language/function-types.html),
+[GHC dependent application design](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#dependent-application-and-the-static-subset),
+[proposal #242 on family arity](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#arity-of-type-families)
+and [named callback checks](../../testsuite/tests/dependent/should_run/NativeNamedCallback.sh).
+
 ### Checking a retained equality continuation
 
 Agda's `subst` transports a value between instances of a predicate by
@@ -6044,6 +6058,20 @@ evidence. See `Note [Checking a nominal equality continuation]` and
 [GHC proposal #274, Quick Look](https://ghc-proposals.readthedocs.io/en/latest/proposals/0274-quick-look-impredicativity.html),
 [GHC proposal #287, Simplify subsumption](https://ghc-proposals.readthedocs.io/en/latest/proposals/0287-simplify-subsumption.html)
 and [GHC proposal #511, Deep Subsumption](https://ghc-proposals.readthedocs.io/en/latest/proposals/0511-deep-subsumption.html).
+
+A call inside the continuation can use the constructor named by a
+direct nominal Given. In `oneCellHead`, the predicate `count ~ S Z`
+lets `safeHead` select `Z` as the tail index of the original vector.
+The checker reads the predicate in either orientation. Multiple boxed
+Givens for the same index must agree before they supply a constructor.
+The argument keeps its original checked type. Ordinary subsumption
+uses the existing evidence to check the selected domain. This
+implements constructor refinement in argument selection and leaves
+open arithmetic and noninjective families subject to their usual
+matching rules. See `Note [Nominal Givens in retained argument selection]`
+in [`GHC.Tc.Gen.App`](../../compiler/GHC/Tc/Gen/App.hs), the
+[Showcase source](Showcase.hs) and the
+[registered test](../../testsuite/tests/dependent/should_run/NativeRetainedTailGiven.hs).
 
 ### The length of zip and demand in a case tree
 

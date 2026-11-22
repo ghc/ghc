@@ -505,6 +505,7 @@ map the same constructor with two instance dictionaries: (Flagged True True,Empt
 prove the checked and literal Either family branches: (Refl,Refl)
 prove that folding a mapped list composes the step: (Refl,(True,True),(True,True))
 prove that reverse preserves list length: (Refl,Succ (Succ Zero))
+pass size as a callback and check the reversed list length: Succ (Succ Zero)
 prove that map distributes over append: (Refl,[False,True,False],[False,True,False],(True,True))
 prove that two maps compose on a finite list: (Refl,[4,5],[4,5],(True,True),(True,True))
 filter with Prelude.not and Prelude.id without forcing the kept tail: ((Refl,Refl,True),(Refl,Refl,True))

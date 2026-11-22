@@ -287,6 +287,14 @@ bottomValue = error
 observe :: (Show a) => String -> a -> IO ()
 observe label value = putStrLn (label ++ ": " ++ show value)
 
+-- | Return the measurement and certify that reversal preserves it.
+measureReverseLength :: forall a. foreach (measure :: [a] -> HaskLib.Size)
+                     -> foreach (xs :: [a])
+                     -> measure xs :~: HaskLib.size xs
+                     -> (HaskLib.Size, HaskLib.size (reverse xs) :~: measure xs)
+measureReverseLength measure xs agrees =
+    case agrees of Refl -> (measure xs, HaskLib.lengthReverse xs)
+
 -- | Check that the demanded value raises its original error.
 expectError :: String -> String -> IO a -> IO ()
 expectError label marker action = do
@@ -1815,6 +1823,9 @@ main = do
     reverseInput <- newIORef [error "forced reverse element", False] >>= readIORef
     observe "prove that reverse preserves list length"
         (HaskLib.lengthReverse reverseInput, HaskLib.size (reverse reverseInput))
+    observe "pass size as a callback and check the reversed list length"
+        (case measureReverseLength HaskLib.size reverseInput Refl of
+             (n, Refl) -> n)
     putStrLn ("prove that map distributes over append: "
               ++ PreludeMapAppendProof.showPreludeMapAppend)
     putStrLn ("prove that two maps compose on a finite list: "
@@ -2120,7 +2131,7 @@ oneCellHead extent =
         count = 1 + extent
     in case sameNat count (S Z) of
          Just proof ->
-             HaskLib.withEquality proof (Just (safeHead @Char @'Z (replicateNative count 'x')))
+             HaskLib.withEquality proof (Just (safeHead (replicateNative count 'x')))
          Nothing -> Nothing
 
 -- | Return equality with the empty constructor after inspecting the vector.
