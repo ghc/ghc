@@ -323,6 +323,15 @@ dimensions in the payload type fails at `xs`.
 [source-hidden check](../../../testsuite/tests/dependent/should_run/NativeGadtRetainedSum.sh)
 and [indexed shape precedent](../REFERENCES.md#combine-two-stored-fields-in-one-index).
 
+A provider can declare `HiddenTile a = exists (shape :: Shape). Tile a shape`.
+An ordinary client can return `Tile rows columns xs` at that package type
+when both dimensions come from runtime inputs. Its expected result fixes
+the element type. The actual tile fixes the hidden shape. An ordinary
+reader can open the package and match `Tile Z _ _` to return an empty
+result with the columns and cells unevaluated.
+[Implicit package inference](R22-existential-quantification.md#an-implicit-package-in-an-application)
+and [Agda dependent pairs](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#the-s-type).
+
 A square stores one side length. Both result parameters use this length.
 
 ```haskell

@@ -188,6 +188,13 @@ also supply the witness for an implicit package in that field's scope.
 The same application rule checks a linear operand once. Using that
 operand in two linear arguments is a multiplicity error.
 
+An expected dot package can supply an independent erased argument of a
+retained application. With `exists shape. Tile a shape`, the application
+selects `a` from the expected payload. The actual runtime dimensions
+determine the hidden `shape`. The ordinary result check still checks the
+complete payload. See Note [Erased arguments in a dependent result] in
+GHC.Tc.Gen.App and the [shape-indexed tile](R04-dependent-sums.md#sums-in-constructor-fields).
+
 The separator survives in checked types and interfaces. Core uses the
 same Pack and Unpack operations for each mode. This is a GHC adaptation
 of the draft. It preserves bar-only interface bytes and gives dot

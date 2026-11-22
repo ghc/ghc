@@ -1958,9 +1958,14 @@ tcRetainedKnownValuePlan declared expected sigma values
                     , Just rho <- expected
                     , not (null pairs) || not (isEmptyVarSet bound)
                     = fromMaybe Subst.emptySubst $
-                        if null pairs || anyFreeVarsOfType (`elemVarSet` bound) result_ty
-                        then match_result_fields tvs Subst.emptySubst result_ty rho
-                        else matchRetainedAppType tvs Subst.emptySubst result_ty rho
+                        case coreFullView rho of
+                          ExistsTy ImplicitExists witness payload
+                            | not (isEmptyVarSet bound)
+                            -> match_packed_result_fields tvs witness result_ty payload
+                          _ | null pairs || anyFreeVarsOfType (`elemVarSet` bound) result_ty
+                            -> match_result_fields tvs Subst.emptySubst result_ty rho
+                            | otherwise
+                            -> matchRetainedAppType tvs Subst.emptySubst result_ty rho
                     | otherwise = Subst.emptySubst
                match subst = foldM (\s (formal, actual) ->
                                       matchRetainedAppType tvs s formal actual)
@@ -2004,6 +2009,17 @@ tcRetainedKnownValuePlan declared expected sigma values
              _ -> return Nothing }
 
     -- See Note [Erased arguments in a dependent result].
+    match_packed_result_fields tvs witness formal payload
+      | Just (tc, templates) <- splitTyConApp_maybe formal
+      , Just (tc', actuals) <- splitTyConApp_maybe payload
+      , tc == tc', isAlgTyCon tc, templates `equalLength` actuals
+      , Just fields <- result_fields tc templates actuals
+      = foldM (\s (template, actual) -> match_result_fields tvs s template actual)
+              Subst.emptySubst
+              [(template, actual) | (template, actual) <- fields
+                                  , not (anyFreeVarsOfType (== witness) actual)]
+      | otherwise = Nothing
+
     match_result_fields tvs subst formal actual
       | Just tv <- getTyVar_maybe formal, tv `elem` tvs
       = matchRetainedAppType tvs subst formal actual
@@ -2588,6 +2604,15 @@ type constructors. A type family result gives no such projection.
 The source arguments can supply the remaining erased choices as usual.
 The same rule applies when only the result supplies information. For
 example, dropVec returns Vec a m and its input contains Add n m.
+
+An expected dot package can also supply independent erased parameters.
+For Tile rows columns xs checked against exists shape. Tile a shape,
+take the element type a from the expected payload. Skip arguments that
+mention the hidden witness. The ordinary result would otherwise still
+have a fresh element metavariable when implicitResult tries to match
+the payload. It cannot use an ordinary metavariable for the retained
+shape. First choose the element type, then let implicitResult check the
+actual result and choose the shape it contains.
 
 Only the erased parameters receive type arguments. Keep the declared
 retained telescope. The argument checker still checks the input at

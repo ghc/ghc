@@ -11,6 +11,13 @@ data RetainedFlag where
 
 type Hidden = exists (b :: Bool). Flag b
 
+data Value a (b :: Bool) = Value a
+
+data Choice a (b :: Bool) where
+    Choice :: foreach (b :: Bool) -> Value a b -> Choice a b
+
+type HiddenChoice a = exists (b :: Bool). Choice a b
+
 forget :: RetainedFlag -> Hidden
 forget (RuntimeFlag _ payload) = payload
 
