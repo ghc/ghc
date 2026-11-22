@@ -16,3 +16,6 @@ type BadForall = forall (b :: Bool). () -> (case b of
 type BadArrowDomain a = (case a of
   True -> Int
   False -> 'False) -> ()
+
+type BadAscription (b :: Bool) =
+  (case b of { 'True -> 'Just 'False; 'False -> 'Nothing }) :: Maybe Ordering

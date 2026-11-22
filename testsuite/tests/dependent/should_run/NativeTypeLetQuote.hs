@@ -64,5 +64,15 @@ applied = Just 'q'
 
 $([d| type QuotedPair a = let a = Maybe a in (a, a) |])
 
+$([d| type QuotedCase (b :: Bool) =
+        let result :: Maybe Bool
+            result = case b of
+              'True -> 'Nothing
+              'False -> 'Nothing
+        in Proxy result |])
+
+quotedCase :: QuotedCase 'True
+quotedCase = Proxy :: Proxy ('Nothing :: Maybe Bool)
+
 result :: (Either (Maybe Bool) (Maybe Bool), Maybe Char, QuotedPair Int)
-result = nestedPair `seq` pair `seq` signed `seq` (quoted, applied, (Just 3, Nothing))
+result = quotedCase `seq` nestedPair `seq` pair `seq` signed `seq` (quoted, applied, (Just 3, Nothing))

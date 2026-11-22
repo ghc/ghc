@@ -436,6 +436,15 @@ ordinary rules for recursive kinds.
 [Quantified example](../examples/open-evaluation/NativeNestedCase.hs)
 and [Agda function types](https://agda.readthedocs.io/en/v2.8.0/language/function-types.html).
 
+An ordinary type synonym can ascribe a result kind to a case. In
+`(case input of { Just k -> 'Nothing; Nothing -> 'Nothing }) :: Maybe k`,
+both branches use the enclosing result kind. The branch pattern's
+`k` is local to that branch. A kind signature on the first let binding
+can also check a case in that binding's RHS. Both forms supply the
+written kind to the private case family.
+[Haskell 2010 expression signatures, §3.16](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html)
+and [Agda's pattern lambda result type](https://agda.readthedocs.io/en/v2.8.0/language/with-abstraction.html#pattern-lambdas).
+
 ## A case in a let body
 
 A case branch can use a let-bound type or kind. For example,

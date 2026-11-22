@@ -6,6 +6,7 @@ module NativeCase
   , Paired, InferredCapture, ContextKind, SeparateKinds
   , NestedLetCase, NestedLetShadow, NestedLetKind
   , TupleKindLet, AliasTupleKindLet, NestedTupleKindLet, PolyNestedTupleKindLet
+  , AscribedCaseKind, SignedCaseRhs
   , caseIdentity, nestedCaseIdentity, retainedPick, renderRetainedPick, retainedKeep
   , retainedDoubleNot, renderRetainedDoubleNot, retainedPermission
   ) where
@@ -223,3 +224,17 @@ type PolyNestedTupleKindLet (k :: Type) (dims :: ((Bool, k), Nat)) =
   in case flag of
     'True -> Int
     'False -> k
+
+-- | Use the enclosing kind even when a branch binds the same name.
+type AscribedCaseKind (k :: Type) (input :: Maybe Bool) =
+  (case input of
+    'Just k -> 'Nothing
+    'Nothing -> 'Nothing) :: Maybe k
+
+-- | Check both branches of a case RHS at the local binding's kind.
+type SignedCaseRhs (b :: Bool) =
+  let result :: Maybe Bool
+      result = case b of
+        'True -> 'Nothing
+        'False -> 'Nothing
+  in Proxy result

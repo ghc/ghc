@@ -120,6 +120,16 @@ polyNestedTupleKind ::
   , PolyNestedTupleKindLet Bool '( '( 'False, 'True), 4) :~: Bool )
 polyNestedTupleKind = (Refl, Refl, Refl)
 
+ascribedCaseKind ::
+  ( AscribedCaseKind Ordering ('Just 'True) :~: ('Nothing :: Maybe Ordering)
+  , AscribedCaseKind Bool 'Nothing :~: ('Nothing :: Maybe Bool) )
+ascribedCaseKind = (Refl, Refl)
+
+signedCaseRhs ::
+  ( SignedCaseRhs 'True :~: Proxy ('Nothing :: Maybe Bool)
+  , SignedCaseRhs 'False :~: Proxy ('Nothing :: Maybe Bool) )
+signedCaseRhs = (Refl, Refl)
+
 nested :: ( N.Pick ('Just ('Just 'True)) :~: Proxy 'True
           , N.Pick ('Just 'Nothing) :~: Int
           , N.SameFallback ('Just 'Nothing) :~: Int )

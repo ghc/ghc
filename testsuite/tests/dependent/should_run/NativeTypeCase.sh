@@ -84,6 +84,8 @@ grep -Fq 'NativeTypeCaseBranchKind.hs:14:12: error: [GHC-83865]' bad.log
 grep -Fq "BadForall" bad.log
 grep -Fq 'NativeTypeCaseBranchKind.hs:18:12: error: [GHC-83865]' bad.log
 grep -Eq 'the type case in .*BadArrowDomain' bad.log
+grep -Fq 'NativeTypeCaseBranchKind.hs:21:25: error: [GHC-83865]' bad.log
+grep -Eq 'the type case in .*BadAscription' bad.log
 reject NativeTypeCaseForallResult 4:60 '[GHC-97233]'
 reject NativeTypeCaseSignatureDistinct 9:26 '[GHC-83865]'
 grep -Fq 'NativeTypeCaseSignatureDistinct.hs:15:25: error: [GHC-83865]' bad.log
