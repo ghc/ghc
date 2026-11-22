@@ -1,8 +1,20 @@
 {-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, TypeFamilies, TypeOperators #-}
 module NativeRetainedFamilyGiven where
 
-import Data.Type.Coercion (Coercion(..))
 import Data.Type.Equality ((:~:)(Refl))
+
+#if defined(CLOSED_GIVEN) || defined(CLOSED_WRONG)
+type family Closed (b :: Bool) :: Bool where
+    Closed 'False = 'False
+
+#ifdef CLOSED_WRONG
+check :: foreach (b :: Bool) -> Closed b :~: b -> 'Just (Closed b) :~: 'Just 'True
+#else
+check :: foreach (b :: Bool) -> Closed b :~: b -> 'Just (Closed b) :~: 'Just b
+#endif
+check _ Refl = Refl
+#else
+import Data.Type.Coercion (Coercion(..))
 
 data Size = Zero | Succ Size
 type family F (xs :: [Bool]) :: Size
@@ -27,4 +39,5 @@ check xs proof = case proof of Refl -> Refl
 #else
 check :: foreach (xs :: [Bool]) -> F xs :~: G xs -> W (F xs) :~: W (G xs)
 check xs proof = case proof of Refl -> Refl
+#endif
 #endif
