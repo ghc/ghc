@@ -1039,13 +1039,14 @@ splitGadtTerminal _ _ = Nothing
 
 -- | Split a prefix constructor's remaining telescope into source groups.
 -- The parser separates the fields before the first ordered group.
+-- See Note [Constructor telescope contexts].
 splitGadtInterior :: forall pass. IsPass pass
                   => HsConDeclGADTDetails (GhcPass pass) -> LHsType (GhcPass pass)
                   -> Maybe ([Either (LHsGadtTelescope (GhcPass pass)) (HsConDeclField (GhcPass pass))],
                             LHsType (GhcPass pass))
-splitGadtInterior (PrefixConGADT _ fields) ty
-  | Just (groups@(Left _ : _), result) <- go ty
-  , any isRight groups
+splitGadtInterior args@(PrefixConGADT _ fields) ty
+  | Nothing <- splitGadtTerminal args ty
+  , Just (groups@(Left _ : _), result) <- go ty
   , not (null fields) || context_before_binders groups
   = Just (groups, result)
   where
@@ -1102,6 +1103,9 @@ contexts after the foralls. This is the curried-context part of proposal
 #402 and issue #27424. Record source signatures allow one context.
 A forall or context after a field needs an ordered DataCon telescope.
 TH prefixes can contain contexts before later forall groups.
+The ordered suffix can end with several quantifier or context groups.
+Keep the forms recognized by splitGadtTerminal on their existing
+representation so their interface encoding stays the same.
 After renaming and kind checking, the Core constructor type can combine the
 contexts. The resolved Names retain their scopes.
 
