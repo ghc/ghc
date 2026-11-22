@@ -369,6 +369,7 @@ data IfaceTyLit
   | IfaceStrTyLit LexicalFastString
   | IfaceCharTyLit Char
   | IfaceIntPrimTyLit Integer
+  | IfaceWordPrimTyLit Integer
   deriving (Eq, Ord)
 
 type IfaceTyConBinder    = VarBndr IfaceBndr TyConBndrVis
@@ -2588,6 +2589,7 @@ pprIfaceTyLit (IfaceNumTyLit n) = integer n
 pprIfaceTyLit (IfaceStrTyLit n) = text (show n)
 pprIfaceTyLit (IfaceCharTyLit c) = text (show c)
 pprIfaceTyLit (IfaceIntPrimTyLit n) = integer n <> char '#'
+pprIfaceTyLit (IfaceWordPrimTyLit n) = integer n <> text "##"
 
 pprIfaceCoercion, pprParendIfaceCoercion :: IfaceCoercion -> SDoc
 pprIfaceCoercion = ppr_co topPrec
@@ -2803,6 +2805,10 @@ instance Binary IfaceTyLit where
     requireIfaceEvidenceVersion bh ExperimentalIntPrimIndexEvidence
     putByte bh 4
     put_ bh n
+  put_ bh (IfaceWordPrimTyLit n) = do
+    requireIfaceEvidenceVersion bh ExperimentalWordPrimIndexEvidence
+    putByte bh 5
+    put_ bh n
 
   get bh =
     do tag <- getByte bh
@@ -2814,6 +2820,7 @@ instance Binary IfaceTyLit where
          3 -> do { n <- get bh
                  ; return (IfaceCharTyLit n) }
          4 -> IfaceIntPrimTyLit <$> get bh
+         5 -> IfaceWordPrimTyLit <$> get bh
          _ -> panic ("get IfaceTyLit " ++ show tag)
 
 instance Binary IfaceAppArgs where
@@ -3093,6 +3100,7 @@ data IfaceEvidence
   | SourceProofRuleArgumentsEvidence
   | PolymorphicSourceMethodEvidence
   | SourceProofRuleBranchesEvidence
+  | ExperimentalWordPrimIndexEvidence
   deriving (Bounded, Enum, Eq, Ord)
 
 -- | Requirements of an interface payload. See Note [Versioning retained evidence]
@@ -3333,6 +3341,7 @@ instance NFData IfaceTyLit where
   rnf = \case
     IfaceNumTyLit f1 -> rnf f1
     IfaceIntPrimTyLit f1 -> rnf f1
+    IfaceWordPrimTyLit f1 -> rnf f1
     IfaceStrTyLit f1 -> rnf f1
     IfaceCharTyLit f1 -> rnf f1
 

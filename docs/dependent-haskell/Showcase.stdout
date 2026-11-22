@@ -288,6 +288,7 @@ installed Prelude.length converted to a Nat index: 3
 ordinary identity applied to a type variable: 42
 uppercase character and digit proof from Data.Char: ('X',Refl)
 match the Int# field in a closed type family: Refl
+match zero and the target maximum in a Word# family: (False,'M')
 Prelude.const selects the first type variable: 'x'
 Prelude.sum in a type: 10
 title case after the pattern determines the character: 'A'
@@ -516,6 +517,7 @@ match the stored length of directly indexed vectors: (Nothing,Just True)
 read a payload at the predecessor of its public index: [True]
 read a rectangle's rows and compare a square's dimensions: (1,True)
 pack and open tiles with runtime dimensions: [((1,Just 2),[[True,True]]),((0,Nothing),[])]
+read the top layer of a two-layer volume: [[True,False]]
 adjust a reading while preserving its calibration index: (True,37)
 prove the filter bound from a runtime list: (BothSucc (RightSucc (BothSucc ZeroBound)),Succ (Succ Zero),Succ (Succ (Succ Zero)))
 prove the filter bound with a runtime decider: (BothSucc (BothSucc (BothSucc ZeroBound)),Succ (Succ (Succ Zero)),Succ (Succ (Succ Zero)))
@@ -527,6 +529,7 @@ prove both projections and rejoin an ordinary span: (Refl,Refl,Refl,[False],[Tru
 prove guarded list equations at two concrete element types: (Refl,Refl,[True],[Entry])
 select a payload with a checked runtime comparison: ["LT:17","EQ:True","GT:'G'"]
 witness a runtime comparator at both of its arguments: [GT,LT,EQ]
+apply the comparison selected by a type family: [GT,LT]
 use a checked cons rule without forcing the callback, head or tail: (Refl,True)
 compose two checked traversals without forcing the inner callback: (Refl,True)
 collect row heads with an ordinary polymorphic callback: Refl

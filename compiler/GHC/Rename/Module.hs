@@ -1485,6 +1485,7 @@ liftTypeCases group =
     lexicalNames (L _ HsStarTy{}) = Just []
     lexicalNames (L _ (HsParTy _ ty)) = lexicalNames ty
     lexicalNames (L _ (HsExplicitListTy _ _ tys)) = concat <$> traverse lexicalNames tys
+    lexicalNames (L _ (HsTupleTy _ HsBoxedOrConstraintTuple tys)) = concat <$> traverse lexicalNames tys
     lexicalNames (L _ (HsExplicitTupleTy _ _ tys)) = concat <$> traverse lexicalNames tys
     lexicalNames (L _ (HsKindSig _ ty kind)) = (++) <$> lexicalNames ty <*> lexicalNames kind
     lexicalNames (L _ HsTyLit{}) = Just []

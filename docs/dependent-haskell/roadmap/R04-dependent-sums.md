@@ -204,10 +204,11 @@ Lifting stops at shadowing on the constructor's own argument spine.
 The constructor result has the enclosing telescope scope. A witness
 bound inside a field cannot escape into that result. Every retained field
 occurs in a result argument. The argument uses the field directly or
-as an argument of one promoted constructor. A unary constructor
-preserves the index type. A binary constructor can build a new closed
-structural index. More than one parameter can use the same field. The
-other result arguments must be distinct, unchanged erased parameters.
+fills a field of one promoted constructor. The application supplies
+every field in the promoted constructor's telescope. Each argument
+matches its field kind, and the result has its own closed structural
+kind. A retained field may occur more than once. The other result
+arguments must be distinct, unchanged erased parameters.
 A retained field is lazy and has
 a supported closed structural domain such
 as `[Bool]`, `Ordering`, or `Nat`. A variable or wildcard leaves the
@@ -322,6 +323,14 @@ dimensions in the payload type fails at `xs`.
 [ordinary client](../examples/packed-vector/IndexedMatrixClient.hs),
 [source-hidden check](../../../testsuite/tests/dependent/should_run/NativeGadtRetainedSum.sh)
 and [indexed shape precedent](../REFERENCES.md#combine-two-stored-fields-in-one-index).
+
+The same example defines a volume whose public shape holds its layer,
+row, and column counts. The client reads the first rectangular layer
+at a successor layer count and leaves the second layer unevaluated.
+The direct-field rule requires a stored field for each argument of the
+promoted application. A constructor such as `'Just` carries an erased type
+argument even when source syntax omits it. A constructor can store the
+complete `Maybe Bool` shape directly instead.
 
 A provider can declare `HiddenTile a = exists (shape :: Shape). Tile a shape`.
 An ordinary client can return `Tile rows columns xs` at that package type

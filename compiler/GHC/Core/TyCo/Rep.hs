@@ -425,7 +425,8 @@ data TyLit
   = NumTyLit Integer
   | StrTyLit FastString
   | CharTyLit Char
-  | IntPrimTyLit Integer -- ^ A signed machine integer of kind @Int#@.
+  | IntPrimTyLit Integer  -- ^ A signed machine integer of kind @Int#@.
+  | WordPrimTyLit Integer -- ^ An unsigned machine integer of kind @Word#@.
   deriving (Eq, Data.Data)
 
 -- Non-determinism arises due to uniqCompareFS
@@ -442,6 +443,7 @@ cmpTyLitWith _ (NumTyLit  x) (NumTyLit  y) = compare x y
 cmpTyLitWith w (StrTyLit  x) (StrTyLit  y) = compare (w x) (w y)
 cmpTyLitWith _ (CharTyLit x) (CharTyLit y) = compare x y
 cmpTyLitWith _ (IntPrimTyLit x) (IntPrimTyLit y) = compare x y
+cmpTyLitWith _ (WordPrimTyLit x) (WordPrimTyLit y) = compare x y
 cmpTyLitWith _ a b = compare (tag a) (tag b)
   where
     tag :: TyLit -> Int
@@ -449,6 +451,7 @@ cmpTyLitWith _ a b = compare (tag a) (tag b)
     tag StrTyLit{}  = 1
     tag CharTyLit{} = 2
     tag IntPrimTyLit{} = 3
+    tag WordPrimTyLit{} = 4
 
 instance Outputable TyLit where
    ppr = pprTyLit

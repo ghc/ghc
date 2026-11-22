@@ -5,12 +5,14 @@ module NativeCase
   , PayloadKind, Fixed, Captured, Retain, PatternShadow, ScrutineeShadow, NestedScope
   , Paired, InferredCapture, ContextKind, SeparateKinds
   , NestedLetCase, NestedLetShadow, NestedLetKind
+  , TupleKindLet, AliasTupleKindLet, NestedTupleKindLet
   , caseIdentity, nestedCaseIdentity, retainedPick, renderRetainedPick, retainedKeep
   , retainedDoubleNot, renderRetainedDoubleNot, retainedPermission
   ) where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
+import GHC.TypeNats (Nat)
 import qualified OpenMapWorker as Open
 import Prelude
 import qualified Prelude as P
@@ -191,3 +193,26 @@ type NestedLetKind (b :: Bool) =
   case b of
     'True  -> BoolUse inner
     'False -> BoolUse outer
+
+-- | Select a type after a let binds a field of a parameter with a tuple kind.
+type TupleKindLet (dims :: (Bool, Nat)) =
+  let (flag, _) = dims
+  in case flag of
+    'True -> Int
+    'False -> Bool
+
+type Dimensions = (Bool, Nat)
+
+-- | Use a named kind for the same selection.
+type AliasTupleKindLet (dims :: Dimensions) =
+  let (flag, _) = dims
+  in case flag of
+    'True -> Int
+    'False -> Bool
+
+-- | Capture a parameter with a nested tuple kind.
+type NestedTupleKindLet (dims :: ((Bool, Nat), Nat)) =
+  let ((flag, _), _) = dims
+  in case flag of
+    'True -> Int
+    'False -> Ordering

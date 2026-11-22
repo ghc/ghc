@@ -1219,9 +1219,9 @@ instance Diagnostic TcRnMessage where
                      TermVariablePE -> text "term variables cannot be promoted"
                      TypeVariablePE -> text "type variables bound in a kind signature cannot be used in the type"
           same_rec_group_msg = text "it is defined and used in the same recursive group"
-    TcRnEscapingIntPrimFamilyBinder binders
+    TcRnEscapingPrimFamilyBinder binders
       -> mkSimpleDecorated $
-           hang (text "An Int# binder may occur only in the promoted I# field of a closed family pattern:")
+           hang (text "A primitive field binder may occur only in its promoted constructor field in a closed family pattern:")
                 2 (pprWithCommas ppr binders)
     TcRnUnpromotableLit lit
       -> mkSimpleDecorated $
@@ -2555,7 +2555,7 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnUnpromotableThing{}
       -> ErrorWithoutFlag
-    TcRnEscapingIntPrimFamilyBinder{}
+    TcRnEscapingPrimFamilyBinder{}
       -> ErrorWithoutFlag
     TcRnUnpromotableLit{}
       -> ErrorWithoutFlag
@@ -3284,7 +3284,7 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnUnpromotableThing{}
       -> noHints
-    TcRnEscapingIntPrimFamilyBinder{}
+    TcRnEscapingPrimFamilyBinder{}
       -> noHints
     TcRnUnpromotableLit{}
       -> noHints
@@ -3898,8 +3898,8 @@ pprRetainedQuantificationError reason = case reason of
          , text "A context may contain only homogeneous (~) constraints and requires datatype parameter order." ]
   RetainedConstructorResult ty ->
     vcat [ text "Each retained field must appear directly or under one promoted constructor in a result argument."
-         , text "A promoted constructor can take one or two retained fields."
-         , text "The fields and result must have closed structural index types. A unary constructor preserves the field's index type."
+         , text "Each argument of the promoted constructor must be a retained field."
+         , text "The fields and result must have closed structural index types."
          , text "Other result arguments must be unchanged erased parameters."
          , text "The result type is" <+> quotes (ppr ty) <> dot
          , text "For other results, use an ordinary datatype parameter in the result type."

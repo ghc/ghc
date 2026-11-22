@@ -28,7 +28,7 @@ module GHC.Tc.Gen.HsType (
             bindExplicitTKBndrs_Q_Tv, bindExplicitTKBndrs_Q_Skol,
 
         bindOuterFamEqnTKBndrs_Q_Tv, bindOuterFamEqnTKBndrs,
-        intPrimFamilyPatKinds,
+        primFamilyPatKinds,
         tcOuterTKBndrs, scopedSortOuter, outerTyVars, outerTyVarBndrs,
         tcGadtConTyVarBndrs, tcConDeclTelescope, tcCheckRetainedConType,
         bindOuterSigTKBndrs_Tv,
@@ -142,7 +142,7 @@ import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.WiredIn.Prim
 
 import GHC.Types.Error
-import GHC.Types.Literal (litValue, mkLitIntWrap)
+import GHC.Types.Literal (litValue, mkLitIntWrap, mkLitWordWrap)
 import GHC.Types.Id ( idName, isClassOpId_maybe, mkLocalId, mkSysLocalM, sourceTableId_maybe, sourceTableKeepsExecutable )
 import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
@@ -1504,8 +1504,8 @@ tcFamTyPatsX prefix fam_tc hs_pats
   = do { traceTc "tcFamTyPats {" $
          vcat [ ppr fam_tc, text "arity:" <+> ppr fam_arity ]
 
-       ; raw_int_fields <- intPrimFamilyPatEnabled fam_tc
-       ; mode <- mkHoleMode TypeLevel (HM_FamPat raw_int_fields)
+       ; raw_fields <- primFamilyPatEnabled fam_tc
+       ; mode <- mkHoleMode TypeLevel (HM_FamPat raw_fields)
                  -- HM_FamPat: See Note [Wildcards in family instances] in
                  -- GHC.Rename.Module
        ; let fun_ty = mkTyConApp fam_tc prefix
@@ -2296,15 +2296,20 @@ tc_hs_lit_ty mode rn_ty (HsString _ s) exp_kind
 tc_hs_lit_ty mode rn_ty (HsChar _ c) exp_kind
   = do checkWiredInTyCon charTyCon
        checkExpKind mode rn_ty (mkCharLitTy c) charTy exp_kind
-tc_hs_lit_ty mode rn_ty lit@(HsIntPrim _ n) exp_kind
+tc_hs_lit_ty mode rn_ty lit exp_kind
+  | Just (mk_prim_lit, kind) <- prim_lit lit
   = do { native <- xoptM LangExt.ExperimentalDependentTypes
        ; if native
            then do { platform <- targetPlatform <$> getDynFlags
-                   ; let ty = LitTy (IntPrimTyLit (litValue (mkLitIntWrap platform n)))
-                   ; checkExpKind mode rn_ty ty intPrimTy exp_kind }
+                   ; checkExpKind mode rn_ty (LitTy (mk_prim_lit platform)) kind exp_kind }
            else failWithTc (TcRnUnpromotableLit lit) }
-tc_hs_lit_ty _mode _ lit _
-  = failWithTc $ TcRnUnpromotableLit lit
+  | otherwise = failWithTc (TcRnUnpromotableLit lit)
+  where
+    prim_lit (HsIntPrim _ n) =
+      Just (\platform -> IntPrimTyLit (litValue (mkLitIntWrap platform n)), intPrimTy)
+    prim_lit (HsWordPrim _ n) =
+      Just (\platform -> WordPrimTyLit (litValue (mkLitWordWrap platform n)), wordPrimTy)
+    prim_lit _ = Nothing
 
 -- | Elaborate a literal at a known result kind. See Note [Registered type numerals].
 tcConvertedNumeral :: TcTyMode -> ExpKind -> Type -> TcM (Maybe Type)
@@ -2962,13 +2967,21 @@ tc_app_ty_other mode rn_ty exp_kind
     apply checked HsArgPar{} = return checked
     apply _ (HsTypeArg _ arg) = setSrcSpanA (getLoc arg) invalid_call
     apply (fun, kind) (HsValArg _ arg) = setSrcSpanA (getLoc arg) $
-      do { kind' <- inferRetainedCallbackKinds arg kind
-         ; case nativeIndexFunctionTypeTys_maybe kind' of
+      -- See Note [Source opaque call indices].
+      do { (fun', kind') <- case tcSplitTyConApp_maybe kind of
+               Just (tc, _) | isTypeFamilyTyCon tc -> do
+                 co <- matchExpectedFunKind (TypeThing fun)
+                         (Just (pure unmatchableDataConTy)) 1 kind
+                 exposed <- liftZonkM (zonkTcType (mkCastTy fun co))
+                 return (exposed, typeKind exposed)
+               _ -> return (fun, kind)
+         ; arrow <- inferRetainedCallbackKinds arg kind'
+         ; case nativeIndexFunctionTypeTys_maybe arrow of
              Just (domain, result) -> do { ty <- tc_check_lhs_type mode arg domain
-                                         ; return (mkAppTy fun ty, result) }
-             Nothing | FunTy { ft_mult = mult } <- coreFullView kind'
+                                         ; return (mkAppTy fun' ty, result) }
+             Nothing | FunTy { ft_mult = mult } <- coreFullView arrow
                      -> failWithTc $ TcRnRetainedQuantificationError $
-                          if isManyTy mult then RetainedUnsupportedDomain kind'
+                          if isManyTy mult then RetainedUnsupportedDomain arrow
                                            else RetainedIndexMultiplicity mult
                      | otherwise -> invalid_call }
     invalid_call :: TcM a
@@ -4509,6 +4522,13 @@ applications use AppTy. Ignore parentheses. Reject visible type arguments and
 applications past the last eligible arrow. Erased type variables keep their
 ordinary application path and lookup precedence.
 
+For f :: Bool -> Result 'True, the kind of f x can reduce to a function
+type. At the next argument of f x y, use matchExpectedFunKind to obtain
+the nominal coercion from Result 'True to the arrow. Cast the checked
+prefix f x before applying it to y. The argument supplies the source
+span if the family stays stuck or reduces to a non-function.
+See Note [Applying a type at a family-defined arrow kind] in GHC.Tc.Utils.Unify.
+
 This rule checks a type. It does not admit f n as a retained runtime argument
 or evaluate the call. Strict source cases use the separate checked call
 refinement path. Validity checks the actual lexical binding and argument kind.
@@ -4869,9 +4889,9 @@ tcInferTyApps_nosat index_level expected_kind mode orig_hs_ty fun orig_hs_args
 
     check_kind_value (TyConApp tc []) _ _ _ arg expected
       | Just (level, HM_FamPat True) <- mode_holes mode
-      , tc `hasKey` intDataConKey
-      , expected `tcEqType` intPrimTy
-      = check_int_prim_field level arg expected
+      , Just field_kind <- primFamilyPatFieldKind (tyConName tc)
+      , expected `tcEqType` field_kind
+      = check_prim_field level arg field_kind
 
     -- A visible argument is used as a kind when it supplies the whole kind
     -- of the next visible argument. Keep this limited to the checked telescope.
@@ -4894,16 +4914,16 @@ tcInferTyApps_nosat index_level expected_kind mode orig_hs_ty fun orig_hs_args
                Just (defaults, _) -> check_arrows defaults arg expected }
       | otherwise = tc_check_lhs_type mode arg expected
 
-    -- This slot supplies the kind for a wildcard or an exact Int# annotation.
-    -- See Note [Int# family pattern binders] in GHC.Core.Type.
-    check_int_prim_field level arg expected = case unLoc (ignoreParens arg) of
+    -- This slot supplies the kind for a wildcard or an exact annotation.
+    -- See Note [Primitive family pattern binders] in GHC.Core.Type.
+    check_prim_field level arg field_kind = case unLoc (ignoreParens arg) of
       HsWildCardTy{} -> do
         name <- newMetaTyVarName (fsLit "_")
         details <- newTauTvDetailsAtLevel level
-        return (mkTyVarTy (mkTcTyVar name intPrimTy details))
+        return (mkTyVarTy (mkTcTyVar name field_kind details))
       HsKindSig _ field sig
-        | isIntPrimKindAnnotation sig -> check_int_prim_field level field expected
-      _ -> tc_check_lhs_type mode arg expected
+        | isPrimKindAnnotation field_kind sig -> check_prim_field level field field_kind
+      _ -> tc_check_lhs_type mode arg field_kind
 
     is_par HsArgPar{} = True
     is_par _ = False
@@ -6835,38 +6855,40 @@ bindOuterSigTKBndrs_Tv_M mode
                                  , sm_holes = mode_holes mode })
 
 -- | Give an implicit field binder the kind of the wired-in constructor field.
--- See Note [Int# family pattern binders] in GHC.Core.Type.
-intPrimFamilyPatKinds :: TyCon -> HsFamEqnPats GhcRn -> TcM (NameEnv Kind)
-intPrimFamilyPatKinds fam pats
-  = do { enabled <- intPrimFamilyPatEnabled fam
+-- See Note [Primitive family pattern binders] in GHC.Core.Type.
+primFamilyPatKinds :: TyCon -> HsFamEqnPats GhcRn -> TcM (NameEnv Kind)
+primFamilyPatKinds fam pats
+  = do { enabled <- primFamilyPatEnabled fam
        ; return $ if enabled
-           then mkNameEnv [(name, intPrimTy) | HsValArg _ pat <- pats, Just name <- [int_field pat]]
+           then mkNameEnv [binder | HsValArg _ pat <- pats, Just binder <- [prim_field pat]]
            else emptyNameEnv }
   where
-    int_field pat
+    prim_field pat
       | (L _ (HsTyVar _ IsPromoted (L _ (WithUserRdr _ con))), [HsValArg _ arg])
           <- splitHsAppTys (unLoc (ignoreParens pat))
-      , con == intDataConName
-      = field_name arg
+      , Just field_kind <- primFamilyPatFieldKind con
+      , Just name <- field_name field_kind arg
+      = Just (name, field_kind)
       | otherwise = Nothing
 
-    field_name arg = case unLoc (ignoreParens arg) of
+    field_name field_kind arg = case unLoc (ignoreParens arg) of
       HsTyVar _ NotPromoted (L _ (WithUserRdr _ name))
         | isTyVarName name -> Just name
       HsKindSig _ field sig
-        | isIntPrimKindAnnotation sig -> field_name field
+        | isPrimKindAnnotation field_kind sig -> field_name field_kind field
       _ -> Nothing
 
 -- | Enable the raw binder judgment only in an opted-in closed family equation.
-intPrimFamilyPatEnabled :: TyCon -> TcM Bool
-intPrimFamilyPatEnabled fam
+primFamilyPatEnabled :: TyCon -> TcM Bool
+primFamilyPatEnabled fam
   | ClosedTypeFamilyFlavour <- tyConFlavour fam = xoptM LangExt.ExperimentalDependentTypes
   | otherwise = return False
 
--- | Recognize a written reference to the wired-in Int# kind.
-isIntPrimKindAnnotation :: LHsKind GhcRn -> Bool
-isIntPrimKindAnnotation sig = case unLoc (ignoreParens sig) of
-  HsTyVar _ NotPromoted (L _ (WithUserRdr _ name)) -> name == intPrimTyConName
+-- | Recognize a written reference to the constructor's primitive field kind.
+isPrimKindAnnotation :: Kind -> LHsKind GhcRn -> Bool
+isPrimKindAnnotation kind sig = case unLoc (ignoreParens sig) of
+  HsTyVar _ NotPromoted (L _ (WithUserRdr _ name))
+    -> Just name == (tyConName <$> tyConAppTyCon_maybe kind)
   _ -> False
 
 bindOuterFamEqnTKBndrs_Q_Tv :: NameEnv Kind -> HsOuterFamEqnTyVarBndrs GhcRn

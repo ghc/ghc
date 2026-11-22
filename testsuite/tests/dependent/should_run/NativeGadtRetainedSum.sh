@@ -141,6 +141,21 @@ HS
     grep -Fq 'RepeatedMatrix.hs:6:51-76: error: [GHC-83605]' reject.log ||
         { cat reject.log >&2; exit 1; }
 
+    cat >RepeatedBlock.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
+module RepeatedBlock where
+import NativeGadtRetainedSumProvider (BlockShape(..), Nat, Vec)
+data RepeatedBlock a (shape :: BlockShape) where
+    RepeatedBlock :: foreach (mark :: Bool) (depth :: Nat) (width :: Nat)
+                  -> Vec a width -> Vec a depth -> RepeatedBlock a ('Block width mark width)
+HS
+    if "${ghc[@]}" "${flags[@]}" -ferror-spans -c RepeatedBlock.hs >reject.log 2>&1; then
+        echo "Accepted a repeated argument that omits a retained field" >&2
+        exit 1
+    fi
+    grep -Fq 'RepeatedBlock.hs:6:52-92: error: [GHC-83605]' reject.log || \
+        { cat reject.log >&2; exit 1; }
+
     if [[ $mode == O0 ]]; then
         cat >DirectIndexCoverage.hs <<'HS'
 {-# LANGUAGE DataKinds, EmptyCase, GADTs, NoExperimentalDependentTypes #-}
@@ -190,6 +205,22 @@ knownTile (Tile Z (S _) _) = True
 
 unknownTile :: Tile a shape -> Bool
 unknownTile (Tile Z _ _) = True
+
+knownNested :: DirectVec a ('S n) -> a
+knownNested (DirectVec _ (VCons x _)) = x
+
+knownDifferentFields :: Blocked a ('Block ('S n) mark 'Z) -> a
+knownDifferentFields (Blocked _ _ _ (VCons x _) VNil) = x
+
+unknownNested :: Blocked a ('Block n mark depth) -> a
+unknownNested (Blocked _ _ _ (VCons x _) _) = x
+
+knownNestedBool :: Blocked Bool ('Block ('S n) mark depth) -> Bool
+knownNestedBool (Blocked _ _ _ (VCons True _) _) = True
+
+knownNestedInaccessible :: Blocked a ('Block 'Z mark depth) -> Bool
+knownNestedInaccessible (Blocked _ _ _ (VCons _ _) _) = False
+knownNestedInaccessible (Blocked _ _ _ _ _) = True
 HS
         "${ghc[@]}" "${flags[@]}" -ferror-spans -Wincomplete-patterns -Woverlapping-patterns \
             -c DirectIndexCoverage.hs >coverage.log 2>&1
@@ -201,7 +232,12 @@ HS
             grep -Fq 'not matched: SuccVec (S _) _' coverage.log &&
             grep -Fq 'DirectIndexCoverage.hs:47:1-31: warning: [GHC-62161]' coverage.log &&
             grep -Fq 'not matched: Tile (S _) _ _' coverage.log &&
-            test "$(grep -c 'warning:' coverage.log)" -eq 5 || { cat coverage.log >&2; exit 1; }
+            grep -Fq 'DirectIndexCoverage.hs:56:1-47: warning: [GHC-62161]' coverage.log &&
+            grep -Fq 'Blocked _ _ _ VNil _' coverage.log &&
+            grep -Fq 'DirectIndexCoverage.hs:59:1-55: warning: [GHC-62161]' coverage.log &&
+            grep -Fq 'Blocked _ _ _ (VCons False _) _' coverage.log &&
+            grep -Fq 'DirectIndexCoverage.hs:62:1-61: warning: [GHC-94210]' coverage.log &&
+            test "$(grep -c 'warning:' coverage.log)" -eq 8 || { cat coverage.log >&2; exit 1; }
     fi
 
     cat >BadScope.hs <<'HS'

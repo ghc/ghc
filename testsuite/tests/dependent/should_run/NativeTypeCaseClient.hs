@@ -103,6 +103,17 @@ nestedLetShadow _ = (Refl, Refl)
 nestedLetKind :: (NestedLetKind 'True :~: Bool, NestedLetKind 'False :~: Bool)
 nestedLetKind = (Refl, Refl)
 
+tupleKind :: (TupleKindLet '( 'True, 3) :~: Int, TupleKindLet '( 'False, 3) :~: Bool)
+tupleKind = (Refl, Refl)
+
+aliasTupleKind :: AliasTupleKindLet '( 'False, 3) :~: Bool
+aliasTupleKind = Refl
+
+nestedTupleKind ::
+  ( NestedTupleKindLet '( '( 'True, 2), 3) :~: Int
+  , NestedTupleKindLet '( '( 'False, 2), 3) :~: Ordering )
+nestedTupleKind = (Refl, Refl)
+
 nested :: ( N.Pick ('Just ('Just 'True)) :~: Proxy 'True
           , N.Pick ('Just 'Nothing) :~: Int
           , N.SameFallback ('Just 'Nothing) :~: Int )

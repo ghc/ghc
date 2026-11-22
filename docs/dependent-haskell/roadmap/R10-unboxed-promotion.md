@@ -159,8 +159,9 @@ disabled. It prints `18446744073709551615` and checks that the term
 family control also passes with stripped provider interfaces.
 Both controls run at `-O0` and `-O2` with Core and STG Lint.
 
-The following separate probes use `ExperimentalDependentTypes`.
-They have the same outcome at both optimization levels.
+Before the unsigned extension, the following probes used
+`ExperimentalDependentTypes`. They had the same outcome at both
+optimization levels.
 
 | Declaration or equation | Diagnostic location |
 | --- | --- |
@@ -172,19 +173,25 @@ They have the same outcome at both optimization levels.
 | `type WrongSigned = 'W# 3#` | GHC-83865 at the `Int#` literal |
 | `forall (w :: Word#). ()` | GHC-83865 at `Word#` |
 
-The current typechecker admits signed `Int#` literals and scopes
-raw `Int#` family binders under `'I#`. The unsigned candidate needs
-a `Word#` field judgment and an unsigned literal of that kind.
-The target word size defines its range. A separate client should be
-able to prove that `IsFullWidth FullWidth` is `'True` from the provider
-interface. The word one below the maximum should choose a fallback
-branch. An unknown `w :: Word` should leave the family application
-stuck. The existing term wrapping control also gives an expected
-result for a word literal one above the maximum.
+The unsigned extension applies the same closed equation rule to
+the immediate `'W#` field. A raw `Word#` binder cannot occur in the
+right-hand side. The type literal uses `mkLitWordWrap` at the
+target word size. Its kind is `Word#`. A signed `Int#` literal
+still fails in the unsigned field, and the reverse check fails too.
 
-The existing interface feature marker covers `Int#` literals and
-`Int#` family binders. The unsigned source probes fail before a provider
-interface can contain either form of `Word#` evidence.
+The [unsigned interface check](../examples/open-evaluation/check-word-prim-family.sh)
+uses a separate client with the extension disabled. It proves that
+the maximum chooses the literal equation, the word one below it
+chooses the fallback, and the word one above it is equal to zero.
+The named, wildcard, and annotated equation forms all reduce.
+An unknown `w :: Word` leaves the family application stuck.
+
+The interface writes unsigned literals with a separate tag. A
+literal or a `Word#` axiom binder requires the
+`experimental-word-prim-index` feature marker. An older reader
+rejects either unsigned provider at the import with GHC-47808.
+Providers with signed evidence keep the signed marker. An
+ordinary provider can still be read by the older compiler.
 [GHC User's Guide, MagicHash](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/magic_hash.html),
 [term literal elaboration](../../../compiler/GHC/HsToCore/Match/Literal.hs),
 [target word bounds](../../../compiler/GHC/Platform.hs),

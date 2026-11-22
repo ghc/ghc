@@ -1474,12 +1474,11 @@ tcIfaceDataCons tycon_name tycon if_cons
         fields_in_result (IfaceTermVar field) = Just [field]
         fields_in_result (IfaceTyConApp tc args)
           | ifaceTyConIsPromoted (ifaceTyConInfo tc) == IsPromoted
-          = case args of
-              IA_Arg (IfaceTermVar field) _ IA_Nil -> Just [field]
-              IA_Arg (IfaceTermVar first) _ (IA_Arg (IfaceTermVar second) _ IA_Nil) ->
-                Just [first, second]
-              _ -> Nothing
+          , fields@(_:_) <- appArgsIfaceTypes args
+          = traverse field_arg fields
         fields_in_result _ = Nothing
+        field_arg (IfaceTermVar field) = Just field
+        field_arg _                   = Nothing
         matching_users expected = expected `equalLength` user_names && all (`elem` expected) user_names
         lazy_bang IfNoBang = True
         lazy_bang _        = False
@@ -2511,6 +2510,7 @@ tcIfaceCtxt sts = mapM tcIfaceType sts
 tcIfaceTyLit :: IfaceTyLit -> IfL TyLit
 tcIfaceTyLit (IfaceNumTyLit n) = return (NumTyLit n)
 tcIfaceTyLit (IfaceIntPrimTyLit n) = return (IntPrimTyLit n)
+tcIfaceTyLit (IfaceWordPrimTyLit n) = return (WordPrimTyLit n)
 tcIfaceTyLit (IfaceStrTyLit n) = return (StrTyLit (getLexicalFastString n))
 tcIfaceTyLit (IfaceCharTyLit n) = return (CharTyLit n)
 

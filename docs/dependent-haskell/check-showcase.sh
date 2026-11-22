@@ -44,11 +44,12 @@ for module in Main PackedVecLibrary ClosedTableLibrary ErasedPackage ForgetWitne
 done
 
 mkdir "$out/indexed-client"
-cp "$out/native"/{DirectIndexedVector,IndexedMatrix,PackedVecLibrary}.hi "$out/indexed-client/"
-cp "$examples/packed-vector"/{DirectIndexedVectorClient,IndexedMatrixClient}.hs "$out/indexed-client/"
+cp "$out/native"/{DirectIndexedVector,IndexedMatrix,PackedVecLibrary,PrimitiveWordFields}.hi "$out/indexed-client/"
+cp "$examples/packed-vector"/{DirectIndexedVectorClient,IndexedMatrixClient}.hs \
+    "$examples/open-evaluation/PrimitiveWordFieldsClient.hs" "$out/indexed-client/"
 (
     cd "$out/indexed-client"
-    for module in DirectIndexedVectorClient IndexedMatrixClient; do
+    for module in DirectIndexedVectorClient IndexedMatrixClient PrimitiveWordFieldsClient; do
         "${ghc[@]}" "$native_opt" "${native_interfaces[@]}" -i -i. -dcore-lint -dstg-lint -c "$module.hs"
     done
 )

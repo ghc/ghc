@@ -130,6 +130,21 @@ data Tile a (shape :: Shape) where
     Tile :: foreach (rows :: Nat) (columns :: Nat)
          -> Vec (Vec a columns) rows -> Tile a ('Rectangle rows columns)
 
+-- | A unary shape with a different kind from its field.
+data FlagShape = Flag Bool
+
+-- | Store the flag at the public unary shape.
+data Flagged (shape :: FlagShape) where
+    Flagged :: foreach (flag :: Bool) -> Flagged ('Flag flag)
+
+-- | A shape with two dimensions and a mark.
+data BlockShape = Block Nat Bool Nat
+
+-- | Store the fields in a different order from the shape.
+data Blocked a (shape :: BlockShape) where
+    Blocked :: foreach (mark :: Bool) (depth :: Nat) (width :: Nat)
+            -> Vec a width -> Vec a depth -> Blocked a ('Block width mark depth)
+
 -- | Store one dimension for both axes of a square matrix.
 data SquareMatrix a (rows :: Nat) (columns :: Nat) where
     Square :: foreach (side :: Nat) -> Vec (Vec a side) side -> SquareMatrix a side side

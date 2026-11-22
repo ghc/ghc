@@ -1,6 +1,9 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
 
-module IndexedMatrix (Matrix(Rectangle, Square), TileShape(Rectangular), Tile(Tile), HiddenTile) where
+module IndexedMatrix
+    ( Matrix(Rectangle, Square), TileShape(Rectangular), Tile(Tile), HiddenTile
+    , VolumeShape(Cuboid), Volume(Volume)
+    ) where
 
 import PackedVecLibrary (Nat, Vec)
 
@@ -21,3 +24,11 @@ data Tile a (shape :: TileShape) where
 
 -- | Hide the public shape of a runtime tile.
 type HiddenTile a = exists (shape :: TileShape). Tile a shape
+
+-- | Combine the layer, row, and column lengths of a volume.
+data VolumeShape = Cuboid Nat Nat Nat
+
+-- | Store a stack of equal rectangular layers.
+data Volume a (shape :: VolumeShape) where
+    Volume :: foreach (layers :: Nat) (rows :: Nat) (columns :: Nat)
+           -> Vec (Vec (Vec a columns) rows) layers -> Volume a ('Cuboid layers rows columns)

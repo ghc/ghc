@@ -55,6 +55,7 @@ import qualified RetainedFamilyTuple
 import qualified ForgetWitness
 import qualified ImplicitVector
 import qualified PartitionChoices
+import qualified PrimitiveWordFieldsClient
 import qualified ErasedStream
 import qualified StreamFold
 import qualified StreamPreview
@@ -1227,6 +1228,7 @@ main = do
     observe "ordinary identity applied to a type variable" (openIdentity @Int)
     observe "uppercase character and digit proof from Data.Char" checkedCharacters
     observe "match the Int# field in a closed type family" machineIntProof
+    observe "match zero and the target maximum in a Word# family" PrimitiveWordFieldsClient.wordFieldResults
     observe "Prelude.const selects the first type variable" (openLeft 'x' (undefined :: Bool))
     observe "Prelude.sum in a type" (TypeNats.natVal (Proxy @(Prelude.sum '[2, 3, 5])))
     observe "title case after the pattern determines the character"
@@ -1824,6 +1826,7 @@ main = do
     observe "read a payload at the predecessor of its public index" DirectIndexedVectorClient.successorPayload
     IndexedMatrixClient.observeDimensions >>= observe "read a rectangle's rows and compare a square's dimensions"
     IndexedMatrixClient.observeTile >>= observe "pack and open tiles with runtime dimensions"
+    observe "read the top layer of a two-layer volume" IndexedMatrixClient.observeTopLayer
     observe "adjust a reading while preserving its calibration index"
         (DirectIndexedListClient.readingFields enabled 36)
     runtimeList <- newIORef [False, True, False]
@@ -1875,6 +1878,12 @@ main = do
         [ observeComparison (flip compare) (not pivot) pivot
         , observeComparison (flip compare) pivot (not pivot)
         , observeComparison (flip compare) pivot pivot ]
+    let familyComparison :: (Bool -> CompareAt.Result 'True) -> Bool -> Bool -> Ordering
+        familyComparison cmp x y = case CompareAt.keepFamilyCompare cmp x y of
+            Refl -> cmp x y
+    observe "apply the comparison selected by a type family"
+        [ familyComparison (flip compare) (not pivot) pivot
+        , familyComparison (flip compare) pivot (not pivot) ]
     observe "use a checked cons rule without forcing the callback, head or tail"
         (ConsRuleMapProof.negateHead (Proxy @'[]), ConsRuleMapProof.lazySpine)
     observe "compose two checked traversals without forcing the inner callback"

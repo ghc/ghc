@@ -56,6 +56,14 @@ domain. Writing its reduced function type in the consumer still fails
 at the retained argument.
 [Family callback control](../../../testsuite/tests/dependent/should_run/curried-callback/FamilyCallback.hs).
 
+When `Result 'True` reduces to `Bool -> Ordering`, the provider can
+write `f x y` in a result type. An ordinary client can force the
+equality proof while leaving all three arguments unevaluated. A second
+argument to `f x` gives GHC-83865 at that argument when the family
+returns `Bool` or its result is unknown.
+[Example](../examples/open-evaluation/CompareAt.hs)
+and [source checks](../../../testsuite/tests/dependent/should_run/NativeLiftedCallback.sh).
+
 A type synonym can name a dependent function over a lifted parameter.
 The ordinary caller can use `Consumer a p r` in a signature and supply a
 witness and its indexed payload. The Showcase instantiates the witness

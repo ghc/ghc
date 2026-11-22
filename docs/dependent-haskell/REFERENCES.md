@@ -1776,6 +1776,14 @@ proof after both fields and erases it before code generation.
 See Note [Decomposing TyConApp equalities] in
 [GHC.Tc.Solver.Equality](../../compiler/GHC/Tc/Solver/Equality.hs).
 
+The same Agda rule applies to a shape constructor
+`block : Nat → Bool → Nat → BlockShape`. Each index argument has the
+type declared at its position in the telescope. The constructor can
+return this shape from runtime fields bound in a different order.
+GHC checks the promoted constructor's actual field kinds and uses
+the same nominal equality for the whole shape.
+[Agda telescopes](https://agda.readthedocs.io/en/v2.8.0/language/telescopes.html).
+
 ## Source vector uncons
 
 Decision: inspect the stored runtime length before repackaging a vector tail.
@@ -5794,6 +5802,16 @@ for an unknown endpoint when a retained call uses that arrow. A written
 rigid representation remains in scope when the program returns `f p`.
 [Agda 2.8.0 function types](https://agda.readthedocs.io/en/v2.8.0/language/function-types.html)
 and [GHC 9.14.1 representation inference](https://downloads.haskell.org/ghc/9.14.1/docs/users_guide/exts/representation_polymorphism.html#inference-and-defaulting).
+
+When the intermediate result is a type family, the next application
+needs evidence that its result is a function. In the fork, a family
+equation supplies the nominal coercion for the prefix `f x`. The
+second application retains that coercion in Core. Agda also checks
+each argument against the function type of the prefix. The explicit
+coercion comes from GHC's treatment of family-defined arrow kinds.
+[Agda function types](https://agda.readthedocs.io/en/v2.8.0/language/function-types.html),
+[GHC kind matching](../../compiler/GHC/Tc/Utils/Unify.hs)
+and [comparison example](examples/open-evaluation/CompareAt.hs).
 
 ### Upgrading checked method interfaces
 
