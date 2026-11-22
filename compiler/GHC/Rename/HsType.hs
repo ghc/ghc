@@ -940,6 +940,14 @@ rnHsTyKi env (HsForEachTy x bndrs body)
 
 rnHsTyKi env ty@(HsForAllTy { hst_tele = tele, hst_body = tau })
   = do { checkPolyKinds env (HsType ty)
+       ; case (rtke_what env, tele) of
+           (RnGadtSuffix, HsForAllVis{hsf_vis_bndrs = []}) ->
+             -- The empty group disappears before the type checker can check
+             -- RequiredTypeArguments. Check the new suffix syntax here.
+             unlessXOptM LangExt.RequiredTypeArguments $
+               addErr $ TcRnWithHsDocContext (rtke_ctxt env) $
+                 TcRnVDQInTermType Nothing
+           _ -> pure ()
        ; bindHsForAllTelescope (rtke_ctxt env) tele $ \ tele' ->
     do { (tau',  fvs) <- rnLHsTyKi env tau
        ; return ( HsForAllTy { hst_xforall = noExtField
