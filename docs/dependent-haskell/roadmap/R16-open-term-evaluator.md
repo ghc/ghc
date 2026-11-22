@@ -2285,3 +2285,18 @@ of type `Bool -> Char`. Supplying a top-level callback that lacks
 checked source equations directly in the retained application still
 reports GHC-83605. The combined source at `d70ffb8d20` awaits its
 normal build.
+
+### Report which call needs the closed argument
+
+A stripped `Certified` interface can supply equations for `each`
+while another provider supplies no equations for `measure`. A client
+can use `each f xs` with unknown `f` and `xs`. Evaluating
+`measure (each f xs)` through the closed evaluator requires a closed
+value for its argument. The 552 compiler reports GHC-68947 against
+`each`, although the mapper has checked equations.
+
+The private correction at `e0e63bec5d` reports GHC-70565 against
+`measure` and highlights the entire argument `(each f xs)`. It changes
+the diagnostic for the failed evaluation. Job 1151 passed the updated
+`NativeOpenMap` shell regression, including its positive source-hidden
+mapper, callback, rewrite-rule and recompilation controls.

@@ -268,3 +268,24 @@ can disable syntax that the module uses. Keep both controls when
 revising the advice. The published declaration warning is independent
 of this driver change.
 [Upstream driver change](https://github.com/ghc/ghc/commit/c8c660f678bd77fb9d0a855753a165c5a5d1f8e1).
+
+### Does GHC itself build with the proposed defaults?
+
+Private revision `c27193021b` contains separate commits for the flag
+diagnostic and for the Haskell98 and Haskell2010 defaults. Job 1112
+built both compiler stages and their boot libraries from a clean tree.
+Job 1121 checked the resulting Stage 2 installation against the released
+`fd19c8fe5f` compiler, each using its own boot libraries.
+
+| Check | Result |
+| --- | --- |
+| Diagnostic text, ordering and locations | All 34 inputs matched the corrected component diagnostic and exit status. Both the command-line and pragma forms retained GHC-53692. |
+| Recompile an importing program | Both compilers consumed both the legacy provider and the migrated provider from stripped interfaces. All four clients linked the expected object and printed `54`. |
+| Real packages | The annotation-only first package failed with GHC-17370 under the proposed default. Adding `-XCUSKs` or applying 14 standalone kind signatures across the three libraries restored the builds. The five unchanged clients ran in each restored configuration using only compiled library interfaces. |
+| Interface comparison | Across all 23 interfaces the export lists and all 215 printed kinds matched the released build. These include 163 local exports. |
+| Registered regressions | All five selected normal-way tests passed, including the updated `T20916` golden. |
+
+The proposal calls for disabling implicit CUSKs before removing the
+explicit switch later. This experiment keeps the explicit opt-in. The
+public fork retains its language defaults while the change is under
+review. [Proposal #54, steps 3 and 4](https://ghc-proposals.readthedocs.io/en/latest/proposals/0054-kind-signatures.html#proposed-change-specification).

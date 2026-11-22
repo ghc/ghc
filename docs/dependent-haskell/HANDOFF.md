@@ -24,8 +24,8 @@ hashes in that experiment directory.
 | Next check | Source and verification |
 | --- | --- |
 | Tree induction and ordered `type data` | Job 1110 builds `c5b5acbffc` in `r41-type-data-554-normal-20261122` using a private copy of the 552 tree. Job 1115 checks the 554-line Showcase, installed HaskLib and the combined interface. Jobs 1100 and 1107 had already passed the source-distribution and downstream tree clients on the compiler component. |
-| Legacy CUSK defaults | Job 1112 builds GHC and its boot libraries from clean sources at `c27193021b` in `r27-legacy-transition-normal-20261122`. Job 1121 checks the corrected diagnostic across 34 inputs, compares three packages, and links clients across old and new interfaces. This is a private edition change. |
-| Declaration groups and diagnostics | The R21 candidate at `87fcbcef7d` checks the tree proof with both workers in the same group and the tree datatype imported. The R16 experiment at `r16-nested-call-diagnostic-20261122` checks which function an unavailable closed argument should blame. |
+| Legacy CUSK defaults | Job 1112 built GHC and its boot libraries from clean sources at `c27193021b` in `r27-legacy-transition-normal-20261122`. Job 1121 passed the 34 diagnostic inputs, three-package comparisons, cross-version interface links and five registered tests. The fork-wide edition decision is pending. |
+| Declaration groups and diagnostics | The R21 candidate at `87fcbcef7d` checks the tree proof with both workers in the same group and the tree datatype imported. The R16 diagnostic at `e0e63bec5d` names the enclosing call and highlights its full argument. Job 1151 passed the source-hidden mapper regression. |
 
 The local archive refs `r19-r41-normal-552`, `r16-hasklib-tree-553`
 and `r27-legacy-transition-normal` are under
