@@ -519,6 +519,7 @@ read a rectangle's rows and compare a square's dimensions: (1,True)
 pack and open tiles with runtime dimensions: [((1,Just 2),[[True,True]]),((0,Nothing),[])]
 read the top layer of a two-layer volume: [[True,False]]
 adjust a reading while preserving its calibration index: (True,37)
+read calibrated samples from erased packages: [Just 37,Nothing,Nothing]
 prove the filter bound from a runtime list: (BothSucc (RightSucc (BothSucc ZeroBound)),Succ (Succ Zero),Succ (Succ (Succ Zero)))
 prove the filter bound with a runtime decider: (BothSucc (BothSucc (BothSucc ZeroBound)),Succ (Succ (Succ Zero)),Succ (Succ (Succ Zero)))
 prove the filter bound for rows at a runtime cutoff: (BothSucc (BothSucc (RightSucc ZeroBound)),[Zero,Succ Zero],Succ (Succ (Succ Zero)))

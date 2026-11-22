@@ -197,6 +197,12 @@ from an independent argument. Type families remain opaque during this
 selection. See Note [Erased arguments in a dependent result] in
 GHC.Tc.Gen.App and the [shape-indexed tile](R04-dependent-sums.md#sums-in-constructor-fields).
 
+The calibration example packs a sample at `exists status. Sample a status`.
+Its runtime flag determines the hidden index `'Just calibrated`.
+An ordinary reader opens the package and skips an uncalibrated sample
+without evaluating its value.
+[Showcase client](../examples/open-evaluation/DirectIndexedListClient.hs).
+
 The separator survives in checked types and interfaces. Core uses the
 same Pack and Unpack operations for each mode. This is a GHC adaptation
 of the draft. It preserves bar-only interface bytes and gives dot

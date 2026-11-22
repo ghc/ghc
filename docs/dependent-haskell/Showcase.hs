@@ -1829,6 +1829,8 @@ main = do
     observe "read the top layer of a two-layer volume" IndexedMatrixClient.observeTopLayer
     observe "adjust a reading while preserving its calibration index"
         (DirectIndexedListClient.readingFields enabled 36)
+    observe "read calibrated samples from erased packages"
+        (DirectIndexedListClient.acceptedSamples flag)
     runtimeList <- newIORef [False, True, False]
     xs <- readIORef runtimeList
     putStrLn ("prove the filter bound from a runtime list: "

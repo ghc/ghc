@@ -1,8 +1,8 @@
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
-module DirectIndexedListClient (firstCell, readingFields) where
+module DirectIndexedListClient (firstCell, readingFields, acceptedSamples) where
 
 import Data.IORef (newIORef, readIORef)
-import DirectIndexedList (IndexedList(IndexedList), Reading(Reading))
+import DirectIndexedList (IndexedList(IndexedList), Reading(Reading), Sample(..), SomeSample)
 
 -- | Read the first cell after rebuilding the list at its original index.
 firstCell :: IO [Bool]
@@ -26,3 +26,19 @@ readingFields calibrated value =
   where
     fields flag n = case adjust (+ 1) (Reading flag n) of
         Reading stored result -> (stored, result)
+
+-- | Read only samples recorded with calibration.
+acceptedSamples :: Bool -> [Maybe Int]
+acceptedSamples calibrated =
+    [ accept (record calibrated 37)
+    , accept (record False (error "forced uncalibrated sample"))
+    , accept (MissingSample :: SomeSample Int)
+    ]
+  where
+    record :: Bool -> a -> SomeSample a
+    record flag value = Sample flag value
+
+    accept :: Sample a status -> Maybe a
+    accept MissingSample = Nothing
+    accept (Sample False _) = Nothing
+    accept (Sample True value) = Just value
