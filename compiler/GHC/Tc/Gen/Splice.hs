@@ -3788,10 +3788,23 @@ reifyDataCon isGadtDataCon tys dc
                | otherwise = (g_theta, [])
              g_arg_tys = map (substScaledTy tvb_subst) g_arg_tys'
              g_res_ty  = substTy tvb_subst g_res_ty'
-             leading_order
+             explicit_order
                | OrderedConArgs groups@(_ : ConContextArgs{} : rest) <- dataConSourceOrder dc
                , any is_type_group (takeWhile (not . is_field) rest)
                = Just groups
+               -- ForallC can only represent invisible binders. A leading
+               -- required binder still needs explicit TH groups when the
+               -- constructor uses the ordinary runtime layout.
+               | isGadtDataCon, null fields, null retained
+               , any isVisibleForAllTyBinder early_tvs
+               = Just $ case dataConSourceOrder dc of
+                   OrderedConArgs groups -> groups
+                   LegacyConOrder _ ->
+                     ConTypeArgs (length early_tvs) :
+                     [ConContextArgs (length early_theta) | not (null early_theta)] ++
+                     [ConValueArgs (length g_arg_tys) | not (null g_arg_tys)] ++
+                     [ConTypeArgs (length late_tvs) | not (null late_tvs)] ++
+                     [ConContextArgs (length late_theta) | not (null late_theta)]
                | otherwise = Nothing
              is_type_group ConTypeArgs{} = True
              is_type_group _ = False
@@ -3811,7 +3824,7 @@ reifyDataCon isGadtDataCon tys dc
          else pure []
 
        ; main_con <-
-           if | Just groups <- leading_order -> do
+           if | Just groups <- explicit_order -> do
                   { ma <- reifyType unmatchableDataConTy
                   ; ordered <- reifyOrderedArgs ma groups g_user_tvs g_theta
                                                 (zip dcdBangs g_arg_tys)
@@ -3881,7 +3894,7 @@ reifyDataCon isGadtDataCon tys dc
                                | otherwise     = assert (all isTyVar ex_tvs)
                                                  -- no covars for haskell syntax
                                                  (map mk_specified ex_tvs, theta)
-             ret_con | isJust leading_order       = return main_con
+             ret_con | isJust explicit_order       = return main_con
                      | null ex_tvs' && null theta' = return main_con
                      | otherwise                   = do
                          { cxt <- reifyCxt theta'

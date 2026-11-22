@@ -43,11 +43,31 @@ $( do
        else fail (show [trailing, between, ordered, canonical])
  )
 
+$( do
+     info <- TH.reify ''EmptyGroups
+     let hasLeadingRequired
+           ( TH.RetainedGadtC
+               [constructor]
+               [ TH.GadtInvisibleArgs _ [_, _]
+                 , TH.GadtRequiredArgs _ [_]
+                 , TH.GadtContextArgs [_]
+                 , TH.GadtValueArg{}
+                 , TH.GadtValueArg{}
+                 ]
+               _
+             ) = constructor == 'LeadingRequired
+         hasLeadingRequired _ = False
+     case info of
+       TH.TyConI (TH.DataD _ _ _ _ constructors _) | any hasLeadingRequired constructors -> pure []
+       _ -> fail (show info)
+ )
+
 inspect :: EmptyGroups -> Bool
 inspect (Trailing x) = x
 inspect (Between x y) = x /= y
 inspect (Constrained x) = x == x
 inspect (Ordered x (type _) _) = x == x
+inspect (LeadingRequired (type _) x _) = x == x
 inspect (Canonical (type _) x _) = x == x
 
 inspectQuote :: Quoted -> Bool
@@ -72,6 +92,7 @@ main =
         , inspect (Between True False)
         , inspect (Constrained False)
         , inspect (Ordered (1 :: Int) (type Bool) True)
+        , inspect (LeadingRequired @Int @() (type Bool) 1 Proxy)
         , inspect (Canonical @Int @() (type Bool) 1 Proxy)
         ]
     )
