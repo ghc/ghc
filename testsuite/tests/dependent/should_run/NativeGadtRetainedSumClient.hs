@@ -42,6 +42,20 @@ zeroIndex :: DirectVec a n -> Maybe (n :~: 'Z)
 zeroIndex (DirectVec Z _) = Just Refl
 zeroIndex (DirectVec (S _) _) = Nothing
 
+-- | Read both dimensions independently.
+matrixShape :: Matrix a rows columns -> (Int, Int)
+matrixShape (Matrix rows columns _) = (lengthValue rows, lengthValue columns)
+matrixShape (MatrixByColumns columns rows _) = (lengthValue rows, lengthValue columns)
+
+-- | Check the payload against both public dimensions.
+matrixCells :: Matrix a rows columns -> Vec (Vec a columns) rows
+matrixCells (Matrix _ _ xs) = xs
+matrixCells (MatrixByColumns _ _ xs) = xs
+
+-- | Return the vector from a marked row.
+markedCells :: MarkedRows a rows 'True -> Vec a rows
+markedCells (MarkedRows True _ xs) = xs
+
 phantomPayload :: Phantom -> Bool
 phantomPayload (Pair _ xs) = sameLength xs empty
   where
@@ -100,6 +114,23 @@ main = do
         "a direct result leaves the length unevaluated"
     throws "direct vector" (case rebuildDirect vector of DirectVec _ xs -> cells xs)
     throws "direct length" (case atLength of DirectAtLength len _ -> lengthValue len)
+    let rectangle = VCons (VCons True (VCons False VNil)) VNil
+        matrix = Matrix (S Z) (S (S Z)) rectangle
+        byColumns = MatrixByColumns (S (S Z)) (S Z) rectangle
+        badRow = Matrix unused (S Z) (error "matrix payload")
+        badColumn = MatrixByColumns unused (S Z) (error "matrix payload")
+    require (matrixShape matrix == (1, 2) && matrixShape byColumns == (1, 2))
+        "both constructor orders preserve the public dimensions"
+    require (map cells (cells (matrixCells matrix)) == [[True, False]] &&
+             map cells (cells (matrixCells byColumns)) == [[True, False]])
+        "both result equalities apply to the matrix payload"
+    require (snd (matrixShape badRow) == 1 && fst (matrixShape badColumn) == 1)
+        "reading either dimension leaves the other dimension and the payload unevaluated"
+    throws "direct length" (fst (matrixShape badRow))
+    throws "direct length" (snd (matrixShape badColumn))
+    throws "matrix payload" (cells (matrixCells badRow))
+    require (cells (markedCells (MarkedRows True (S Z) one)) == [True])
+        "different retained kinds follow the result parameter order"
     require (storedLengths value == (1, 2)) "stored lengths"
     require (innerCells value == [False, True]) "inner cells"
     require (paired value == aligned) "shared outer index"

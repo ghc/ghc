@@ -735,7 +735,7 @@ See docs/dependent-haskell/REFERENCES.md#checked-local-payload-signatures.
 -- domain kinds because the datatype constructor knots are not yet available.
 -- Return explicit metadata too: mkDepFunTy can erase a vacuous binder.
 tcCheckRetainedConType :: Bool
-                      -> Bool -- ^ Permit a retained field to determine the result index
+                      -> Bool -- ^ Permit retained fields to determine the result indices
                       -> (HsModifiedFunArr GhcRn -> TcM Mult)
                       -> LHsType GhcRn -> TcM ([Maybe Id], TcType)
 tcCheckRetainedConType validate_domain allow_result tc_field_mult
@@ -769,11 +769,18 @@ tcCheckRetainedConType validate_domain allow_result tc_field_mult
 
     direct_result mode ty
       | Just (_, args) <- tcSplitTyConApp_maybe ty
-      , [TermVarTy field] <- filter (isNothing . getTyVar_maybe) args
-      , [binder] <- nonDetNameEnvElts (mode_indices mode)
-      = field == binder
-        && (not validate_domain || isNativeClosedIndexType (varType field))
+      , Just fields <- traverse result_field (filter (isNothing . getTyVar_maybe) args)
+      , let binders = nonDetNameEnvElts (mode_indices mode)
+            binder_set = mkVarSet binders
+      = fields `equalLength` binders
+        && sizeVarSet (mkVarSet fields) == length fields
+        && all (`elemVarSet` binder_set) fields
       | otherwise = False
+
+    result_field (TermVarTy field)
+      | not validate_domain || isNativeClosedIndexType (varType field)
+      = Just field
+    result_field _ = Nothing
 
     bind_indices allow mode [] body = go allow mode body
     bind_indices allow mode (L loc bndr : rest) body

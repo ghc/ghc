@@ -1381,15 +1381,12 @@ tcIfaceDataCons tycon_name tycon if_cons
                 ; let retained_fields = [field | Just field <- retained_binders]
                 ; eq_spec <- extendIfaceIdEnv retained_fields $ tcIfaceEqSpec spec
                 ; when (not (null arg_binders) && not (null spec)) $
-                    case (retained_fields, eq_spec) of
-                      ([field], [eq]) -> do
-                        { valid <- evaluateIfaceNativeDomain (ppr dc_name)
-                            (isNativeClosedIndexType (varType field)
-                             && varType field `eqType` varType (eqSpecTyVar eq)
-                             && all (not . anyFreeVarsOfType isId . scaledMult) arg_tys)
-                        ; unless valid $
-                            failIfM (text "Invalid retained result field in interface:" <+> ppr dc_name) }
-                      _ -> failIfM (text "Invalid retained result field in interface:" <+> ppr dc_name)
+                    do { valid <- evaluateIfaceNativeDomain (ppr dc_name)
+                           (validRetainedResultEqSpec univ_tvs retained_fields eq_spec
+                            && all (isNativeClosedIndexType . varType) retained_fields
+                            && all (not . anyFreeVarsOfType isId . scaledMult) arg_tys)
+                       ; unless valid $
+                           failIfM (text "Invalid retained result field in interface:" <+> ppr dc_name) }
                 ; stricts <- mapM tc_strict if_stricts
                         -- The IfBang field can mention
                         -- the type itself; hence inside forkM
@@ -1453,19 +1450,25 @@ tcIfaceDataCons tycon_name tycon if_cons
           failIfM (text "Invalid retained constructor fields in interface:" <+> ppr name
                    $$ text "Expected aligned distinct field names and a lazy data constructor"
                    $$ text "without an existential or record field."
-                   $$ text "User type binders must match the universal binders outside the result equality.")
+                   $$ text "User type binders must match the universal binders outside the result equalities.")
       where
         names = [n | Just n <- binders]
         univ_names = map ifaceBndrName univs
         user_names = [ifaceBndrName b | Bndr b _ <- users]
         valid_result
           | wrapper
-          , [field] <- names
-          , [(lhs, IfaceTermVar rhs)] <- spec
-          = lhs `elem` univ_names && rhs == field
-            && matching_users (filter (/= lhs) univ_names)
+          , not (null spec)
+          = pairs `equalLength` spec && pairs `equalLength` names
+            && length result_names == length (nub result_names)
+            && length result_fields == length (nub result_fields)
+            && all (`elem` univ_names) result_names
+            && all (`elem` names) result_fields
+            && matching_users (filter (`notElem` result_names) univ_names)
           | otherwise
           = not wrapper && null spec && matching_users univ_names
+          where
+            pairs = [(lhs, rhs) | (lhs, IfaceTermVar rhs) <- spec]
+            (result_names, result_fields) = unzip pairs
         matching_users expected = expected `equalLength` user_names && all (`elem` expected) user_names
         lazy_bang IfNoBang = True
         lazy_bang _        = False

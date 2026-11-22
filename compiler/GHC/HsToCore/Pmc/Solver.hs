@@ -1732,9 +1732,9 @@ later field types. Use dataConRepInstPat to freshen fields from left to right
 and substitute each retained Id into the remaining types. Drop the prefix
 of dictionaries after using their predicates in the type oracle.
 
-For a retained result, read the equality predicate from the last fresh
-binder. Its type mentions the fresh witness. The term oracle receives only
-the value fields as arguments.
+For a retained result, read the equality predicates from the trailing
+fresh binders. Their types mention the fresh witnesses. Pass the value
+fields as arguments to the term oracle.
 
 The observed source-pattern path instead uses its checked field Ids. See
 Note [Checking retained package patterns] in GHC.Tc.Gen.Pat. Both paths keep

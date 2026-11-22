@@ -110,6 +110,21 @@ HS
     grep -Fq 'WrongDirectIndex.hs:6:34-37: error: [GHC-05617]' reject.log ||
         { cat reject.log >&2; exit 1; }
 
+    cat >RepeatedMatrix.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
+module RepeatedMatrix where
+import NativeGadtRetainedSumProvider (Nat, Vec)
+data RepeatedMatrix a (rows :: Nat) (columns :: Nat) where
+    RepeatedMatrix :: foreach (rows :: Nat) (columns :: Nat)
+                   -> Vec (Vec a columns) rows -> RepeatedMatrix a rows rows
+HS
+    if "${ghc[@]}" "${flags[@]}" -ferror-spans -c RepeatedMatrix.hs >reject.log 2>&1; then
+        echo "Accepted a retained dimension twice in a constructor result" >&2
+        exit 1
+    fi
+    grep -Fq 'RepeatedMatrix.hs:6:51-76: error: [GHC-83605]' reject.log ||
+        { cat reject.log >&2; exit 1; }
+
     if [[ $mode == O0 ]]; then
         cat >DirectIndexCoverage.hs <<'HS'
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}
@@ -128,6 +143,13 @@ unknownZero (DirectVec Z _) = True
 knownUnreachable :: DirectVec a 'Z -> Bool
 knownUnreachable (DirectVec (S _) _) = False
 knownUnreachable (DirectVec _ _) = True
+
+knownMatrix :: Matrix a 'Z ('S columns) -> Bool
+knownMatrix (Matrix Z (S _) _) = True
+knownMatrix (MatrixByColumns (S _) Z _) = True
+
+knownMarked :: MarkedRows a ('S rows) 'True -> a
+knownMarked (MarkedRows True (S _) (VCons x _)) = x
 HS
         "${ghc[@]}" "${flags[@]}" -ferror-spans -Wincomplete-patterns -Woverlapping-patterns \
             -c DirectIndexCoverage.hs >coverage.log 2>&1

@@ -1718,6 +1718,22 @@ demand of the pattern that precedes it.
 [Agda's absurd patterns](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#absurd-patterns)
 and [the Haskell 2010 Report, §3.17.2](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html).
 
+#### Store two direct result indices
+
+An Agda datatype can declare a family with indices `ℕ → ℕ → Set`.
+Its constructor can bind `r` and `c`, take `Vec (Vec A c) r`, and return
+`Matrix A r c`. The indices are arguments of the result type. Their
+association with the fields follows the written constructor type.
+[Agda indexed datatypes](https://agda.readthedocs.io/en/v2.8.0/language/data-types.html#indexed-datatypes)
+and [Agda vectors](https://agda.github.io/agda-stdlib/v2.4/Data.Vec.Base.html).
+
+The Haskell worker adds one nominal equality for each retained result
+index. The result arguments determine which public parameter each equality
+refines. The worker binds the fields in telescope order and the equalities
+after those fields. This preserves both witness identities when the
+constructor takes the columns first. The witnesses and cells remain lazy.
+See Note [Retained constructor result equality] in GHC.Core.DataCon.
+
 ## Source vector uncons
 
 Decision: inspect the stored runtime length before repackaging a vector tail.

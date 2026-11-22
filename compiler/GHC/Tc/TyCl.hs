@@ -5579,7 +5579,7 @@ Kind inference checks domain kinds without inspecting unfinished datatype
 constructor graphs. Final checking validates the fixed native index domain.
 Erased outer quantifiers keep their ordinary GADT scope. The retained Ids
 are fields. An ordinary retained package has no EqSpec. A direct retained
-result gets one from rejigConRes. See Note [Retained constructor result
+result gets one per retained field from rejigConRes. See Note [Retained constructor result
 equality] in GHC.Core.DataCon. Neither form permits existential or context
 binders, records, strict fields, or newtypes.
 Reject StrictData rather than changing its field evaluation rules.
@@ -6491,10 +6491,8 @@ checkValidDataCon dflags existential_ok tc con
                    user_tvs = binderVars (dataConUserTyVarBinders con)
                    (_, _, eq_spec, theta, _, _) = dataConFullSig con
                    retained_fields = [field | Just field <- dataConRepArgBinders con]
-                   valid_eq_spec = case (map eqSpecPair eq_spec, retained_fields) of
-                     ([], _) -> True
-                     ([(lhs, TermVarTy rhs)], [field]) -> lhs `elem` univ_tvs && rhs == field
-                     _ -> False
+                   valid_eq_spec = null eq_spec ||
+                     validRetainedResultEqSpec univ_tvs retained_fields eq_spec
              ; unless (isBoxedDataTyCon tc && isLiftedAlgTyCon tc
                        && isVanillaAlgTyCon tc && not (isTypeDataTyCon tc)
                        && null (dataConExTyCoVars con)

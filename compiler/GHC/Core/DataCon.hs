@@ -36,7 +36,7 @@ module GHC.Core.DataCon (
         dataConTerminalOrder, dataConLateTyVarCount, dataConUserTyVarGroups, dataConHasTrailingContext,
         dataConSourceOrder, dataConInteriorContext, dataConContextFieldCount, dataConInteriorForAll,
         orderedConArgsHaveScope,
-        dataConTheta, dataConHasRetainedResult,
+        dataConTheta, dataConHasRetainedResult, validRetainedResultEqSpec,
         dataConStupidTheta,
         dataConOtherTheta, validRetainedConTheta,
         dataConInstArgTys, dataConOrigArgTys, dataConOrigResTy,
@@ -1387,19 +1387,20 @@ mkDataConWithTelescope source_order arg_binders name declared_infix prom_info
         && valid_result
 
     valid_result
-      | [field] <- [b | Just b <- arg_binders]
-      , [EqSpec t (TermVarTy rhs)] <- eq_spec
-      , Just (parent, args) <- splitTyConApp_maybe orig_res_ty
-      = rhs == field && parent == rep_tycon && t `elem` univ_tvs
-        && varType field `eqType` varType t
-        && valid_universals
-        && eqTypes args [if tv == t then TermVarTy field else mkTyVarTy tv | tv <- univ_tvs]
-        && all (not . anyFreeVarsOfType isId . scaledMult) orig_arg_tys
-        && case rep of { DCR {} -> True; _ -> False }
-      | otherwise
-      = null eq_spec && not (anyFreeVarsOfType isId orig_res_ty)
+      | null eq_spec
+      = not (anyFreeVarsOfType isId orig_res_ty)
         && valid_universals
         && case rep of { NoDataConRep -> True; _ -> False }
+      | Just (parent, args) <- splitTyConApp_maybe orig_res_ty
+      = parent == rep_tycon
+        && validRetainedResultEqSpec univ_tvs [b | Just b <- arg_binders] eq_spec
+        && eqTypes args (substTyCoVars result_subst univ_tvs)
+        && valid_universals
+        && all (not . anyFreeVarsOfType isId . scaledMult) orig_arg_tys
+        && case rep of { DCR {} -> True; _ -> False }
+      | otherwise = False
+      where
+        result_subst = mkTvSubstPrs (map eqSpecPair eq_spec)
 
     valid_universals
       = (null theta || user_tvs == univ_tvs)
@@ -2062,15 +2063,32 @@ its decoded arrays. See GHC.IfaceToCore.tcIfaceDataCons.
 
 -- | Return retained binders for the source fields. An empty list denotes
 -- ordinary fields. Dictionaries precede these fields. A retained result
--- adds its equality after these fields.
+-- adds its equalities after these fields.
 dataConRepArgBinders :: DataCon -> [Maybe Id]
 dataConRepArgBinders = dcOrigArgBinders
 
--- | A constructor whose result index refers to its retained field.
+-- | A constructor whose result indices refer to its retained fields.
 -- See Note [Retained constructor result equality].
 dataConHasRetainedResult :: DataCon -> Bool
 dataConHasRetainedResult con
   = not (null (dcOrigArgBinders con)) && not (null (dcEqSpec con))
+
+-- | Check that the result equalities pair distinct universals with all retained fields.
+-- See Note [Retained constructor result equality].
+validRetainedResultEqSpec :: [TyVar] -> [Id] -> [EqSpec] -> Bool
+validRetainedResultEqSpec univs fields eq_spec
+  = eq_spec `equalLength` fields
+    && pairs `equalLength` eq_spec
+    && sizeVarSet (mkVarSet (map fst pairs)) == length pairs
+    && sizeVarSet (mkVarSet (map snd pairs)) == length pairs
+    && all valid_pair pairs
+  where
+    pairs = [(tv, field) | EqSpec tv (TermVarTy field) <- eq_spec]
+    universal_set = mkVarSet univs
+    field_set = mkVarSet fields
+    valid_pair (tv, field) =
+      tv `elemVarSet` universal_set && field `elemVarSet` field_set
+      && varType tv `eqType` varType field
 
 {- Note [Retained constructor result equality]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2095,13 +2113,16 @@ would be out of scope there. Keep the same order when copying alternative
 binders in GHC.Core.Utils and when checking them in GHC.Core.Lint. An
 interface decodes the proof's type in the scope of the decoded field.
 
-This shape has one retained field at a closed structural index type and
-no contexts or existentials. One result argument is the retained field.
-The others are unchanged universal variables. The wrapper binds exactly
-those variables. An ordinary field type can refer to an earlier retained
-field. Its multiplicity must be independent of the retained field. A
-variable or wildcard can match the retained field. The equality is an
-ordinary nominal Given after the fields are in scope.
+Each retained field has a closed structural index type and occurs once
+as a direct result argument. The other arguments are unchanged universal
+variables. There are no contexts or existentials. The wrapper binds the
+unchanged variables. An ordinary field type can refer to earlier retained
+fields. Its multiplicity must be independent of the retained fields.
+
+The EqSpecs follow the result argument order. The fields follow the
+constructor telescope. For example, the telescope can bind columns before
+rows and return Matrix a rows columns. Validate the association by field Id.
+All result equalities enter scope together after the fields.
 -}
 
 -- | Rebuild a constructor field telescope without erasing runtime binders.

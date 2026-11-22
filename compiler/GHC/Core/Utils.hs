@@ -3018,7 +3018,7 @@ dataConInstPat fss uniqs mult con inst_tys
     retained_binders = case dataConRepArgBinders con of
       [] -> []
       binders -> [Nothing | _ <- dataConOtherTheta con] ++ binders
-                 ++ [Nothing | dataConHasRetainedResult con]
+                 ++ [Nothing | dataConHasRetainedResult con, _ <- dataConTheta con]
       -- See Note [Retained constructor result equality] in GHC.Core.DataCon.
 
     mk_id_var subst uniq fs (Scaled m ty) str

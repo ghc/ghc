@@ -114,6 +114,18 @@ pack n xs = Pair n xs
 data DirectVec a (n :: Nat) where
     DirectVec :: foreach (n :: Nat) -> Vec a n -> DirectVec a n
 
+-- | Store a rectangular matrix and both of its dimensions.
+data Matrix a (rows :: Nat) (columns :: Nat) where
+    Matrix :: foreach (rows :: Nat) (columns :: Nat)
+           -> Vec (Vec a columns) rows -> Matrix a rows columns
+    MatrixByColumns :: foreach (columns :: Nat) (rows :: Nat)
+                    -> Vec (Vec a columns) rows -> Matrix a rows columns
+
+-- | Store a flag and a row length in the opposite order from the result.
+data MarkedRows a (rows :: Nat) (marked :: Bool) where
+    MarkedRows :: foreach (marked :: Bool) (rows :: Nat)
+               -> Vec a rows -> MarkedRows a rows marked
+
 -- | Store a value at any length.
 data AtLength (n :: Nat) = AtLength Int
 

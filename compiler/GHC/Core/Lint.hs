@@ -2076,7 +2076,8 @@ lintCoreAlt scrut_index case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt 
       { in_scope <- getInScope
       ; let expected_binders
               | dataConHasRetainedResult con
-              = map isCoVar args == (replicate (dataConSourceArity con) False ++ [True])
+              = map isCoVar args == (replicate (dataConSourceArity con) False
+                                   ++ map (const True) (dataConTheta con))
               | otherwise = all (not . isCoVar) args
       ; lintL (all (\v -> isLocalId v && not (v `elemInScopeSet` in_scope)) args
                && expected_binders
