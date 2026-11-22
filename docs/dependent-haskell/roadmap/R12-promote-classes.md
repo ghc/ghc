@@ -118,6 +118,15 @@ variable. That spelling tests a different type. The positive control
 checks the compiled interface for the selected instance method.
 [Unknown receiver](../../../testsuite/tests/dependent/should_run/concrete-mapping/UnknownRow.hs).
 
+GHCi inserts debugger breakpoints on constructor results and callback
+applications. The equation checker reads through these ticks in its copy
+of the worker. GHCi keeps the breakpoints when it executes the method.
+Both Row instances supply their equations when GHCi loads the source as
+bytecode. Adding `seq` to the integer label blocks that instance's
+equation. The Boolean-label instance still supplies its equations.
+[Mapping workers](../../../compiler/GHC/Tc/Gen/SourceTable.hs)
+and [instance demand control](../../../testsuite/tests/dependent/should_run/NativeOpenTheseFmap.sh).
+
 If the equation uses `p` to map the field but claims the result is
 `q x`, GHC reports GHC-83865 at `Refl`. The detailed expected type can
 still display the instance worker as `These.$cfmap`. To display a selector
