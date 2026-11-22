@@ -368,7 +368,8 @@ evidenceSuffix requirements
     || needs SourceProofRuleAxiomEvidence || needs SourceProofRuleInfoEvidence
     || needs SourceProofRuleArgumentsEvidence || needs PolymorphicSourceMethodEvidence
     || needs SourceProofRuleBranchesEvidence || needs ScopedEnumCaseEvidence
-    || needs ScopedConstructorCaseEvidence || needs ScopedCaseResultEvidence = feature_set
+    || needs ScopedConstructorCaseEvidence || needs ScopedCaseResultEvidence
+    || needs OrderedNewtypeTelescopeEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -388,6 +389,7 @@ legacyEvidenceSuffix ExperimentalWordPrimIndexEvidence = featureSetPrefix ++ "ex
 legacyEvidenceSuffix ScopedEnumCaseEvidence = featureSetPrefix ++ "scoped-enum-case-v1"
 legacyEvidenceSuffix ScopedConstructorCaseEvidence = featureSetPrefix ++ "scoped-constructor-case-v1"
 legacyEvidenceSuffix ScopedCaseResultEvidence = featureSetPrefix ++ "scoped-case-result-v1"
+legacyEvidenceSuffix OrderedNewtypeTelescopeEvidence = featureSetPrefix ++ "ordered-newtype-telescope"
 legacyEvidenceSuffix PartialSynonymEvidence = featureSetPrefix ++ "partial-synonym-v2"
 legacyEvidenceSuffix ErasedUserRuleEvidence = featureSetPrefix ++ "user-rule"
 legacyEvidenceSuffix LexicalPackageRuleEvidence = featureSetPrefix ++ "lexical-rule"
@@ -497,7 +499,8 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("source-proof-rule-branches", SourceProofRuleBranchesEvidence)
                       , ("scoped-enum-case-v1", ScopedEnumCaseEvidence)
                       , ("scoped-constructor-case-v1", ScopedConstructorCaseEvidence)
-                      , ("scoped-case-result-v1", ScopedCaseResultEvidence) ]
+                      , ("scoped-case-result-v1", ScopedCaseResultEvidence)
+                      , ("ordered-newtype-telescope", OrderedNewtypeTelescopeEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion

@@ -2944,6 +2944,9 @@ An ordered constructor can refine its result parameters. Store its
 result equalities in the ordinary EqSpec list. The source order
 counts only the written contexts. Older readers reject EqSpec in
 an ordered constructor, so mark this use before external TH.
+
+The original newtype tag has no order payload. Give ordered newtypes a
+separate tag and feature marker. Keep the original tag for other newtypes.
 -}
 
 instance Binary IfaceConDecls where
@@ -3014,7 +3017,13 @@ instance Binary IfaceConDecls where
           legacyConOrder (ifConSourceOrder con) > 0 &&
           not (null (ifConCtxt con)) && not (has_trailing_context con)
     put_ bh (IfDataTyCon True cs) = putByte bh 2 >> put_ bh cs
-    put_ bh (IfNewTyCon c)   = putByte bh 3 >> put_ bh c
+    put_ bh (IfNewTyCon c)
+      | order@OrderedConArgs{} <- ifConSourceOrder c = do
+          requireIfaceEvidenceVersion bh OrderedNewtypeTelescopeEvidence
+          putByte bh 6
+          put_ bh c
+          put_ bh order
+      | otherwise = putByte bh 3 >> put_ bh c
     get bh = do
         h <- getByte bh
         case h of
@@ -3036,6 +3045,12 @@ instance Binary IfaceConDecls where
                 if cons `equalLength` orders && any ordered orders
                   then return (IfDataTyCon False (zipWith set_order cons orders))
                   else fail "Invalid constructor order in interface"
+            6 -> do
+                con <- get bh
+                order <- get bh
+                if ordered order
+                  then return (IfNewTyCon (set_order con order))
+                  else fail "Invalid ordered newtype constructor in interface"
             _ -> error "Binary(IfaceConDecls).get: Invalid IfaceConDecls"
       where
         set_order con order = con { ifConSourceOrder = order }

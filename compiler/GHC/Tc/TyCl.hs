@@ -5531,9 +5531,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
              fields = case hs_args of
                PrefixConGADT ann prefix -> PrefixConGADT ann (prefix ++ [f | Right f <- remaining])
                _ -> hs_args
-       ; when ((terminal_order /= 0 || ordered) &&
-               (new_or_data == NewType ||
-                (ordered && any is_forall (dropWhile (not . is_context) inner_bndrs)))) $
+       ; when (ordered && any is_forall (dropWhile (not . is_context) inner_bndrs)) $
            setSrcSpanA (getLoc hs_res_ty) $
            failWithTc (TcRnNestedForallsContexts NFC_GadtConSig)
        ; skol_info <- mkSkolemInfo (DataConSkol name)
@@ -5609,7 +5607,8 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
                      -- ordered constructors.
                      -- See Note [Result equalities of ordered constructors]
                      -- in GHC.Tc.Gen.Pat.
-                     | ordered || (terminal_order /= 0 && not (null eq_preds)) =
+                     | ordered || (terminal_order /= 0 &&
+                                   (new_or_data == NewType || not (null eq_preds))) =
                          let suffix = map source_group $
                                if ordered then remaining else map Left terminal
                              late_count = sum [n | ConTypeArgs n <- suffix]
@@ -6663,6 +6662,9 @@ checkValidDataCon dflags existential_ok tc con
             do { let (early, late) = dataConUserTyVarGroups con
                      (_, ex_tvs, eq_spec, theta, _, _) = dataConFullSig con
                      res_kind = tyConResKind tc
+                     valid_res_kind
+                       | isNewTyCon tc = isFixedRuntimeRepKind res_kind
+                       | otherwise = maybe False isBoxedRuntimeRep (kindRep_maybe res_kind)
                      prefix_theta = if dataConHasTrailingContext con then [] else theta
                      prefix_types = map (varType . binderVar) early ++ prefix_theta ++
                        concatMap (\(Scaled mult ty) -> [mult, ty]) arg_tys
@@ -6676,7 +6678,7 @@ checkValidDataCon dflags existential_ok tc con
                           && (is_ordered || null eq_spec)
                           && null (dataConStupidTheta con)
                           && not (isTypeDataCon con)
-                          && maybe False isBoxedRuntimeRep (kindRep_maybe res_kind)
+                          && valid_res_kind
                           && scope_ok)
                          (TcRnNestedForallsContexts NFC_GadtConSig) }
         ; traceTc "checkValidDataCon 2" $ ppr (dataConWrapperType con)

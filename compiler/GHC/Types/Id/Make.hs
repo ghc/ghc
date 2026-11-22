@@ -864,14 +864,14 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
     orig_bangs   = dataConSrcBangs data_con
 
     wrap_arg_tys
-      | new_tycon
+      | omit_newtype_arg
       -- See Wrinkle [Unlifted newtypes with wrappers]
       -- in Note [Desugaring unlifted newtypes] in GHC.Core.SimpleOpt.
       = map unrestricted stupid_theta
       | otherwise
       = (map unrestricted $ stupid_theta ++ theta) ++ orig_arg_tys
     non_wrap_arg_ty
-      | new_tycon
+      | omit_newtype_arg
       , [arg_ty] <- map unrestricted theta ++ orig_arg_tys
       = Just arg_ty
       | otherwise
@@ -883,6 +883,13 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
              -- wrapper
 
     new_tycon = isNewTyCon tycon
+
+    -- Ordered newtypes need the field lambda before the later type lambdas.
+    -- The result and field have a fixed runtime representation in this case.
+    -- The compulsory unfolding still reduces the construction to a cast.
+    omit_newtype_arg = new_tycon && case dataConSourceOrder data_con of
+      LegacyConOrder _ -> True
+      OrderedConArgs _ -> False
 
     no_binding = dataConHasNoBinding data_con
 
