@@ -59,6 +59,31 @@ even in ordinary Haskell modules. The next build with the same inputs
 reuses the interface.
 [Recompilation precedent](../REFERENCES.md#upgrading-checked-method-interfaces).
 
+## Prove the result of a derived mapping instance
+
+An ordinary module can declare `data These e a = This e | That a | These e a`
+and derive `Functor`. A dependent client can check a property of the
+derived instance for a predicate and two fields supplied at runtime.
+
+```haskell
+mapBoth :: forall (a :: Type). foreach (p :: a -> Bool)
+        -> foreach (label :: Char) -> foreach (x :: a)
+        -> fmap p ('These label x) :~: 'These label (p x)
+mapBoth _ _ _ = Refl
+```
+
+The two-field equation comes from the selected mapping worker. If a
+hand-written instance returns `This label` for that branch, the displayed
+proof fails at `Refl`. A proof of the changed result succeeds. The worker
+checker requires the ordinary lazy representation for its output fields.
+The warm upgrade checks a provider again if an older compiler reviewed it
+under the two-constructor restriction.
+[Derived instance](../examples/open-evaluation/These.hs),
+[proof](../examples/open-evaluation/TheseMapping.hs),
+[ordinary client](../examples/open-evaluation/OrdinaryTheseMapping.hs),
+[warm upgrade test](../examples/open-evaluation/check-applied-mapping-upgrade.sh)
+and [Agda and GHC precedents](../REFERENCES.md#mapping-the-second-field-of-these).
+
 ## A method in a retained result type
 
 ```haskell

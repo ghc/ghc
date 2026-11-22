@@ -67,7 +67,7 @@ cp ../new/ResultFunctor.hi .
 # Reuse the old build directory, as Hadrian does when rebuilding libraries.
 cd ../old
 "${new[@]}" "${flags[@]}" -v1 --make -no-link ResultFunctor.hs >warm.log 2>&1
-grep -Fq 'Compiler now checks mapping methods with erased instance parameters' warm.log
+grep -Fq 'Compiler now checks mapping methods for applied receivers' warm.log
 "${new[@]}" --show-iface ResultFunctor.hi >reviewed.iface
 grep -Eq 'DFunId SourceMethods \[\((ResultFunctor\.)?translate,' reviewed.iface
 cp ResultFunctor.hi reviewed.hi

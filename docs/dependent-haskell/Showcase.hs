@@ -150,6 +150,7 @@ import qualified ListFoldrProof
 import qualified MappingProof
 import qualified PreludeMappingProof
 import qualified OrdinaryEitherMapping
+import qualified OrdinaryTheseMapping
 import qualified OrdinaryFamilyBranches
 import qualified PreludeFoldrProof
 import qualified PreludeFilterLengthProof
@@ -1775,6 +1776,9 @@ main = do
     putStrLn ("prove that Prelude.fmap leaves Nothing unchanged: " ++ PreludeMappingProof.example)
     putStrLn ("map an open Just field once and twice with Prelude.fmap: " ++ PreludeMappingProof.presentExample)
     putStrLn ("prove the two Either equations of Prelude.fmap: " ++ OrdinaryEitherMapping.example)
+    cutoff <- newIORef (4 :: Int) >>= readIORef
+    putStrLn ("map a runtime predicate and prove the label is preserved: "
+              ++ OrdinaryTheseMapping.report (> cutoff) 'w' 5)
     putStrLn ("prove the checked and literal Either family branches: " ++ OrdinaryFamilyBranches.example)
     putStrLn ("prove that folding a mapped list composes the step: " ++ PreludeFoldrProof.showFoldMap)
     putStrLn ("prove that reverse preserves list length: "
