@@ -37,6 +37,7 @@ import qualified BetaCallClient as Beta
 import qualified CharacterExport
 import qualified ClosedLengthProducer as Length
 import qualified ClosedTableLibrary as Table
+import qualified CompareAt
 import qualified ComputedPair as Computed
 import qualified ConstructorCallClient as Constructor
 import Control.Exception (ErrorCall, displayException, evaluate, try)
@@ -1847,6 +1848,15 @@ main = do
         [ OrderingPayload.showComparison (not pivot) pivot (17, unused, unused)
         , OrderingPayload.showComparison pivot pivot (unused, True, unused)
         , OrderingPayload.showComparison pivot (not pivot) (unused, unused, 'G') ]
+    let observeComparison :: (Bool -> Bool -> Ordering) -> Bool -> Bool -> Ordering
+        observeComparison cmp x y = case CompareAt.decideCompare cmp x y of
+            CompareAt.Less -> LT
+            CompareAt.Equal -> EQ
+            CompareAt.Greater -> GT
+    observe "witness a runtime comparator at both of its arguments"
+        [ observeComparison (flip compare) (not pivot) pivot
+        , observeComparison (flip compare) pivot (not pivot)
+        , observeComparison (flip compare) pivot pivot ]
     observe "use a checked cons rule without forcing the callback, head or tail"
         (ConsRuleMapProof.negateHead (Proxy @'[]), ConsRuleMapProof.lazySpine)
     observe "compose two checked traversals without forcing the inner callback"

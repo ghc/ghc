@@ -32,8 +32,9 @@ it to one. The earlier mapping compiler that required a closed structural
 result rejected the new interface at the callback binder. The reader
 rejected an argument at the wrong result kind in both interface encodings.
 It also rejected a cast whose left kind disagreed with the callback result.
-The full Core API test passed with these checks. The combined signature
-inference and normal compiler qualification are pending.
+The full Core API test passed with these checks. The unannotated signature
+also passed the mapping and callback source suites on the same compiler.
+The combined normal compiler build remains open.
 [Source and demand checks](../../../testsuite/tests/dependent/should_run/NativeOpenTheseFmap.sh)
 and [interface checks](../../../testsuite/tests/ghc-api/NativeDependentCore.hs).
 
@@ -741,7 +742,7 @@ the result of `decide` against it.
 
 ## Two arguments to a runtime callback
 
-The next source target extends `decideOrdering` to a comparator that
+The source example extends `decideOrdering` to a comparator that
 takes both inputs at the call site.
 
 ```haskell
@@ -766,10 +767,13 @@ comparator with the same spelling.
 The earlier callback compiler reports GHC-83605 at `cmp x y` in the
 signature. The prototype at `32b2689180` checks both operands in source
 and in the interface. Its strict case uses the lexical comparator and
-the ordered operands. The source-hidden client, older reader, and
-raw interface tests are queued. The published compiler supports the
-one-argument witness.
+the ordered operands. The ordinary client observed `(GT,LT,EQ)` with
+`flip compare` at `-O0` and `-O2`. Its reflexivity proof left the
+comparator and both arguments unevaluated. GHC rejected swapped arguments
+and an attempted inverse at the written `Refl`. The older compiler rejected
+the stripped interface at the new declaration. The Core API checks also
+passed for a three-argument call in two interface encodings.
 [Existing ordering witness](../examples/open-evaluation/RuntimeOrdering.hs),
-[two-argument source fixture](../../../testsuite/tests/dependent/should_run/curried-callback/CompareAt.hs),
+[two-argument source example](../examples/open-evaluation/CompareAt.hs),
 [inverse-equality control](../../../testsuite/tests/dependent/should_run/curried-callback/NoInverse.hs)
 and [application and equality precedents](../REFERENCES.md#applying-a-retained-callback-to-two-arguments).

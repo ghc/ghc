@@ -422,7 +422,7 @@ test('NativeAlternatingBinders',
 test('NativeLiftedCallback',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['NativeLiftedCallbackProvider.hs', 'NativeLiftedCallbackClient.hs',
-                   'curried-callback', open_eval_dir + 'RuntimeOrdering.hs'])],
+                   'curried-callback', open_eval_dir + 'RuntimeOrdering.hs', open_eval_dir + 'CompareAt.hs'])],
      run_command, ['bash NativeLiftedCallback.sh "{compiler}" "{libdir}"'])
 
 test('NativeRetainedMatchability',

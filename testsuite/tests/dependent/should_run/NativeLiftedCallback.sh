@@ -22,7 +22,7 @@ for opt in O0 O2; do
     "${ghc[@]}" "${flags[@]}" -c "$provider.hs"
     mv "$provider.hs" ../
     "${ghc[@]}" "${flags[@]}" -c "$src/RuntimeOrdering.hs" -outputdir .
-    "${ghc[@]}" "${flags[@]}" -c "$src/curried-callback/CompareAt.hs" -outputdir .
+    "${ghc[@]}" "${flags[@]}" -c "$src/CompareAt.hs" -outputdir .
     cp "$provider.hi" RuntimeOrdering.hi CompareAt.hi "$src/$client.hs" ../client/
     cd ../client
     "${ghc[@]}" "-$opt" -c "$client.hs"

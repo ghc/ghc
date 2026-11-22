@@ -519,6 +519,7 @@ recover a list from its checked prefix and suffix: (Refl,[False,True],[False,Tru
 prove both projections and rejoin an ordinary span: (Refl,Refl,Refl,[False],[True],[False,True])
 prove guarded list equations at two concrete element types: (Refl,Refl,[True],[Entry])
 select a payload with a checked runtime comparison: ["LT:17","EQ:True","GT:'G'"]
+witness a runtime comparator at both of its arguments: [GT,LT,EQ]
 use a checked cons rule without forcing the callback, head or tail: (Refl,True)
 compose two checked traversals without forcing the inner callback: (Refl,True)
 collect row heads with an ordinary polymorphic callback: Refl
