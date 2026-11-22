@@ -6679,7 +6679,6 @@ checkValidDataCon dflags existential_ok tc con
                              all isTyVar ex_tvs))
                           && (is_ordered || null eq_spec)
                           && null (dataConStupidTheta con)
-                          && not (isTypeDataCon con)
                           && valid_res_kind
                           && scope_ok)
                          (TcRnNestedForallsContexts NFC_GadtConSig) }

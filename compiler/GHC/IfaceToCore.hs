@@ -78,7 +78,7 @@ import GHC.Core.Dependent
   , isRetainedVanillaDefaultMethod, hasRetainedRuleHead, supportsLocalUserRule
   , supportsErasedUserRule, supportsImportedErasedRule, supportsImportedUserRule
   , supportsNativeUserUnfolding )
-import GHC.Core.Predicate ( mkNomEqPred )
+import GHC.Core.Predicate ( isEqClassPred, mkNomEqPred )
 import GHC.Core.Opt.OccurAnal ( occurAnalyseBndrsAndExpr )
 import GHC.Core.Ppr
 
@@ -1280,8 +1280,10 @@ tcIfaceDataCons tycon_name tycon if_cons
                   OrderedConArgs groups -> orderedConTypeGroups groups
                   LegacyConOrder _ -> []
                 ordered_late_count = late_count + sum (map snd ordered_type_groups)
+                valid_order_wrapper = has_wrapper /= type_data
                 admissible_order
-                  | context_only = not (null ctxt) && ordinary_data && all type_binder ex_bndrs
+                  | context_only = not (null ctxt) && (ordinary_data || type_data) &&
+                                   all type_binder ex_bndrs
                   | otherwise = late_count > 0 && late_count <= length user_bndrs && null ex_bndrs
           ; case source_order of
               LegacyConOrder _ -> pure ()
@@ -1307,11 +1309,13 @@ tcIfaceDataCons tycon_name tycon if_cons
                       IfNewTyCon {} -> args `lengthIs` 1 && null ex_bndrs && null ctxt && null spec
                       _             -> False
                 in unless (valid_group && all type_binder ex_bndrs &&
-                           (ordinary_data || ordered_newtype) &&
-                           has_wrapper && null arg_binders && null lbl_names) $
+                           (ordinary_data || ordered_newtype || type_data) &&
+                           valid_order_wrapper &&
+                           null arg_binders && null lbl_names) $
                      failIfM (text "Invalid interior constructor group in interface:" <+> ppr dc_name)
           ; when (terminal_order /= 0) $
-              unless (admissible_order && has_wrapper && not (null args) &&
+              unless (admissible_order && valid_order_wrapper &&
+                      not (null args) &&
                       null arg_binders && null spec &&
                       null lbl_names) $
                 failIfM (text "Invalid terminal constructor foralls in interface:" <+> ppr dc_name)
@@ -1357,6 +1361,9 @@ tcIfaceDataCons tycon_name tycon if_cons
         --     they are really needed
         ; ~(eq_spec, theta, retained_binders, arg_tys, stricts) <- forkM (mk_doc dc_name) $
              do { theta <- tcIfaceCtxt ctxt
+                ; when (type_data && (terminal_order /= 0 || is_ordered source_order)) $
+                    unless (all isEqClassPred theta) $
+                      failIfM (text "Invalid type data constructor context in interface:" <+> ppr dc_name)
                 ; unless (null arg_binders || validRetainedConTheta theta) $
                     failIfM (text "Invalid retained constructor context in interface:" <+> ppr dc_name)
                 -- A predicate or field can refer to this TyCon. Check its
@@ -1424,6 +1431,13 @@ tcIfaceDataCons tycon_name tycon if_cons
     ordinary_data = case if_cons of
                       IfDataTyCon False _ -> True
                       _                   -> False
+
+    type_data = case if_cons of
+                  IfDataTyCon True _ -> True
+                  _                  -> False
+
+    is_ordered OrderedConArgs{} = True
+    is_ordered LegacyConOrder{} = False
 
     type_binder (IfaceTvBndr _) = True
     type_binder _              = False
