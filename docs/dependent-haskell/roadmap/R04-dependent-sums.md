@@ -291,7 +291,9 @@ An ordinary client can return `rows :~: columns` from `Square _ _`.
 The match needs the outer constructor. It leaves the side length and
 the cells unevaluated. At type `SquareMatrix a 'Z ('S 'Z)`, a case with
 no alternatives still warns about a missing `Square` pattern.
-[Source-hidden check](../../../testsuite/tests/dependent/should_run/NativeGadtRetainedSum.sh).
+[Showcase constructors](../examples/packed-vector/IndexedMatrix.hs),
+[ordinary Showcase client](../examples/packed-vector/IndexedMatrixClient.hs), and
+[source-hidden check](../../../testsuite/tests/dependent/should_run/NativeGadtRetainedSum.sh).
 
 An explicit equality can also describe the exact stored value.
 For example, the constructor

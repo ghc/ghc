@@ -160,6 +160,7 @@ import qualified IndexedPrefix
 import qualified IndexedPrefixClient
 import qualified DirectIndexedListClient
 import qualified DirectIndexedVectorClient
+import qualified IndexedMatrixClient
 import qualified PreludeFilterRuntime
 import qualified PreludeMapAppendProof
 import qualified PreludeMapCompositionProof
@@ -1806,6 +1807,7 @@ main = do
     DirectIndexedListClient.firstCell >>= observe "read the first cell of a directly indexed list"
     DirectIndexedVectorClient.firstCells >>= observe "read the first cells of polymorphic directly indexed vectors"
     observe "match the stored length of directly indexed vectors" DirectIndexedVectorClient.firstCellsByLength
+    IndexedMatrixClient.observeDimensions >>= observe "read a rectangle's rows and compare a square's dimensions"
     observe "adjust a reading while preserving its calibration index"
         (DirectIndexedListClient.readingFields enabled 36)
     runtimeList <- newIORef [False, True, False]

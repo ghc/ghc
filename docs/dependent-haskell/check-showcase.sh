@@ -43,6 +43,14 @@ for module in Main PackedVecLibrary ClosedTableLibrary ErasedPackage ForgetWitne
     test -s "$out/hie/$module.hie"
 done
 
+mkdir "$out/matrix-client"
+cp "$out/native/IndexedMatrix.hi" "$out/native/PackedVecLibrary.hi" "$out/matrix-client/"
+cp "$examples/packed-vector/IndexedMatrixClient.hs" "$out/matrix-client/"
+(
+    cd "$out/matrix-client"
+    "${ghc[@]}" "$native_opt" "${native_interfaces[@]}" -i -i. -dcore-lint -dstg-lint -c IndexedMatrixClient.hs
+)
+
 if "$interactive"; then
     "${ghc[@]}" -O0 "${stripped_interfaces[@]}" "${flags[@]}" --interactive -ignore-dot-ghci -fbyte-code \
         -outputdir "$out/interactive" -hiedir "$out/interactive-hie" \

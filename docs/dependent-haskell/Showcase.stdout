@@ -509,6 +509,7 @@ match the stored list equality with an unevaluated head and tail: True
 read the first cell of a directly indexed list: [True]
 read the first cells of polymorphic directly indexed vectors: ([True],"q")
 match the stored length of directly indexed vectors: (Nothing,Just True)
+read a rectangle's rows and compare a square's dimensions: (1,True)
 adjust a reading while preserving its calibration index: (True,37)
 prove the filter bound from a runtime list: (BothSucc (RightSucc (BothSucc ZeroBound)),Succ (Succ Zero),Succ (Succ (Succ Zero)))
 prove the filter bound with a runtime decider: (BothSucc (BothSucc (BothSucc ZeroBound)),Succ (Succ (Succ Zero)),Succ (Succ (Succ Zero)))
