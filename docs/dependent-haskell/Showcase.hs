@@ -152,6 +152,8 @@ import qualified MappingProof
 import qualified PreludeMappingProof
 import qualified OrdinaryEitherMapping
 import qualified OrdinaryTheseMapping
+import qualified Row
+import qualified RowProof
 import qualified OrdinaryFamilyBranches
 import qualified PreludeFoldrProof
 import qualified PreludeFilterLengthProof
@@ -1786,6 +1788,13 @@ main = do
               ++ OrdinaryTheseMapping.report (> cutoff) 'w' 5)
     putStrLn ("map a runtime-sized string and prove the label is preserved: "
               ++ OrdinaryTheseMapping.report (replicate cutoff) 'w' 'a')
+    let reportInstances :: (Int -> Bool) -> Bool -> Int -> String
+        reportInstances p flag x =
+            show ( fmap p (Row.Flagged flag x :: Row.Row Int Bool Int)
+                 , fmap p (Row.Flagged flag x :: Row.Row Bool Bool Int)
+                 , RowProof.mapped p flag x, RowProof.discarded p flag x )
+    putStrLn ("map the same constructor with two instance dictionaries: "
+              ++ reportInstances (> cutoff) True 5)
     putStrLn ("prove the checked and literal Either family branches: " ++ OrdinaryFamilyBranches.example)
     putStrLn ("prove that folding a mapped list composes the step: " ++ PreludeFoldrProof.showFoldMap)
     putStrLn ("prove that reverse preserves list length: "

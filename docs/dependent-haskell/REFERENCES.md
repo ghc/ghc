@@ -5677,7 +5677,7 @@ uses `Row Int Bool` and `Row Bool Bool`. Their methods return different
 constructors on the same input shape. Each proof needs the equation from
 its own instance.
 [Agda mapping clauses](https://github.com/agda/agda-stdlib/blob/v2.4/src/Data/These/Base.agda#L40-L49)
-and [Haskell instance equations](../../testsuite/tests/dependent/should_run/concrete-mapping/Row.hs).
+and [Haskell instance equations](examples/open-evaluation/Row.hs).
 
 Agda's case tree records which argument needs a constructor before a
 clause can compute. GHC's `refineDefaultAlt` recovers a constructor when

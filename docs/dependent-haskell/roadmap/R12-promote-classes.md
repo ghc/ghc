@@ -106,8 +106,8 @@ returned `Empty`. The wrong-instance proof failed at `Refl`. A strict
 field control rejected an equation that would have hidden its demand.
 A warm rebuild added both methods to an older provider and the next
 build kept identical interface bytes. Normal qualification remains open.
-[Instance equations](../../../testsuite/tests/dependent/should_run/concrete-mapping/Row.hs),
-[separately compiled proofs](../../../testsuite/tests/dependent/should_run/concrete-mapping/RowProof.hs)
+[Instance equations](../examples/open-evaluation/Row.hs),
+[separately compiled proofs](../examples/open-evaluation/RowProof.hs)
 and [warm upgrade check](../examples/open-evaluation/check-applied-mapping-upgrade.sh).
 
 If the equation uses `p` to map the field but claims the result is

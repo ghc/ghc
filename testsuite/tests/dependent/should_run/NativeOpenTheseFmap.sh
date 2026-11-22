@@ -14,16 +14,16 @@ for opt in -O0 -O2; do
     "${ghc[@]}" "$opt" -fomit-interface-pragmas -fno-write-if-simplified-core -c "$src/These.hs" -outputdir .
     "${ghc[@]}" --show-iface These.hi >provider.iface
     grep -Fq 'DFunId SourceMethods [(GHC.Internal.Base.fmap,' provider.iface
-    "${ghc[@]}" "$opt" -fomit-interface-pragmas -fno-write-if-simplified-core -c "$src/concrete-mapping/Row.hs" -outputdir .
+    "${ghc[@]}" "$opt" -fomit-interface-pragmas -fno-write-if-simplified-core -c "$src/Row.hs" -outputdir .
     "${ghc[@]}" --show-iface Row.hi >row.iface
     test "$(grep -c 'DFunId SourceMethods.*GHC.Internal.Base.fmap' row.iface)" = 2
 
     cd "$stage/proof"
     cp ../provider/{These,Row}.hi .
     "${ghc[@]}" "$opt" -fomit-interface-pragmas -fno-write-if-simplified-core -c "$src/TheseMapping.hs" -outputdir .
-    "${ghc[@]}" "$opt" -c "$src/concrete-mapping/RowProof.hs" -outputdir .
+    "${ghc[@]}" "$opt" -c "$src/RowProof.hs" -outputdir .
     sed -e 's/module RowProof where/module WrongInstance where/' \
-        -e 's/:: Row Int Bool a/:: Row Bool Bool a/' "$src/concrete-mapping/RowProof.hs" >WrongInstance.hs
+        -e 's/:: Row Int Bool a/:: Row Bool Bool a/' "$src/RowProof.hs" >WrongInstance.hs
     if "${ghc[@]}" "$opt" -fno-code -c WrongInstance.hs >wrong-instance 2>&1; then exit 1; fi
     grep -Fq 'WrongInstance.hs:11:16-19: error: [GHC-83865]' wrong-instance || { cat wrong-instance >&2; exit 1; }
     if "${ghc[@]}" "$opt" -fno-code -c "$src/concrete-mapping/UnknownRow.hs" >unknown-row 2>&1; then exit 1; fi
@@ -33,7 +33,7 @@ for opt in -O0 -O2; do
         mkdir -p "$stage"/{uniform,uniform-client}
         cd "$stage/uniform"
         "${ghc[@]}" "$opt" -DFORCE_ROW_ONLY -fomit-interface-pragmas -fno-write-if-simplified-core \
-            -c "$src/concrete-mapping/Row.hs" -outputdir .
+            -c "$src/Row.hs" -outputdir .
         cd "$stage/uniform-client"
         cp ../uniform/Row.hi .
         "${ghc[@]}" "$opt" -c "$src/concrete-mapping/UniformRows.hs" -outputdir .
@@ -181,7 +181,7 @@ fi
 mkdir -p "$out/label"/{provider,client}
 cd "$out/label/provider"
 "${ghc[@]}" -O2 -DFORCE_INT_LABEL -fomit-interface-pragmas -fno-write-if-simplified-core \
-    -c "$src/concrete-mapping/Row.hs" -outputdir .
+    -c "$src/Row.hs" -outputdir .
 cd ../client
 cat >Label.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
