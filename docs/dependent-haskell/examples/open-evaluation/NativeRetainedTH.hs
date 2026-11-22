@@ -44,6 +44,5 @@ renderMaybeField (Just _) Proxy = "just"
 -- | Render a nested result from a separately compiled provider.
 renderNestedMaybe :: foreach (m :: Maybe Bool) ->
   (case m of { Just False -> Bool; Nothing -> Char; Just True -> Int }) -> String
-renderNestedMaybe (Just False) b = show b
-renderNestedMaybe Nothing c = [c]
-renderNestedMaybe (Just True) n = show n
+renderNestedMaybe Nothing = (:[])
+renderNestedMaybe (Just b) = case b of { True -> show; False -> show }
