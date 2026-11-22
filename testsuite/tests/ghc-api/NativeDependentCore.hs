@@ -1535,6 +1535,19 @@ runNatChecks dflags = do
             []
             (mkForAllTy unmatchableDataConTy (Bndr erased Specified) (mkDepFunTy n (indexedNat (add zeroTy index))))
             (mkForAllTy unmatchableDataConTy (Bndr erasedNormalized Specified) (mkDepFunTy n (indexedNat (if role == Phantom then add zeroTy index else index))))
+    let familyResult = mkTyConApp forgetFamily [mkTyVarTy left]
+        callback = local 97531 "family_callback" (mkFunctionType unmatchableDataConTy ManyTy boolTy familyResult)
+        call = TermAppTy callback (constructorIndex trueDataCon)
+        callbackBody = mkFunctionType unmatchableDataConTy ManyTy (mkTyConApp eqTyCon [familyResult, call, call]) intTy
+        callbackType = mkDepFunTy callback callbackBody
+        Reduction callbackCo reducedCallback = normaliseType emptyFamInstEnvs Nominal callbackType
+    case reducedCallback of
+        DepFunTy _ binder _ ->
+            checkType dflags "normalization keeps the callback head type" (varType callback) (varType binder)
+        _ -> fail "FAIL: normalization lost the callback binder"
+    checkType dflags "family callback normalization source" callbackType (coercionLKind callbackCo)
+    checkType dflags "family callback normalization target" reducedCallback (coercionRKind callbackCo)
+    lintAccepts dflags "family callback normalization evidence" [left] (Coercion callbackCo)
     let originalShadow = mkFunctionType unmatchableDataConTy ManyTy (indexedNat index) (mkDepFunTy n (indexedNat (add zeroTy index)))
         expectedShadow = mkFunctionType unmatchableDataConTy ManyTy (indexedNat index) (mkDepFunTy n (indexedNat index))
     freshened <- checkNormalization Nominal "retained normalization avoids a free outer Id" [n] originalShadow expectedShadow
