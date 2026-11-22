@@ -145,6 +145,27 @@ on the original sources under both default configurations. The
 successful migration result above is for stock GHC.
 [Published first-class-families source archive](https://hackage-content.haskell.org/package/first-class-families-0.8.2.0.tar.gz).
 
+Two published Haskell2010 packages depend on this library in sequence.
+With `-XNoCUSKs`, each failed when its dependencies first built.
+Job 941 built the complete migrated chain on stock GHC 9.14.1.
+Each client then compiled with the provider source hidden. Each linker
+map identified the archive from the corresponding build.
+
+| Haskell2010 release | Standalone signatures added | Printed kinds compared in the edited modules | Client output before and after |
+| --- | ---: | ---: | --- |
+| `first-class-families-0.8.2.0` | 2 | 16 | `True` |
+| `kind-apply-0.4.0.1` | 10 | 43 | `Just (Right True)` |
+| `kind-generics-0.5.0.0` | 2 | 25 | `(Right True,Just 3)` |
+
+All 84 printed kinds matched across the six modules, including which
+binders callers can specify. The final client also round-tripped an
+`Either Int Bool` through `GenericK`. The ten signatures in
+`kind-apply` suffice to restore its build. The minimum number is open.
+These are dependent packages from one release chain. A prevalence
+estimate would require an independent sample of Haskell2010 packages.
+[kind-apply release source](https://hackage-content.haskell.org/package/kind-apply-0.4.0.1.tar.gz)
+and [kind-generics release source](https://hackage-content.haskell.org/package/kind-generics-0.5.0.0.tar.gz).
+
 The Haskell98 package `tagged-0.9` also uses `PolyKinds`. It built
 unchanged with both fork compilers. A client instantiated tags at
 `Bool` and at `Type -> Type` and printed `(3,'x')` on both.

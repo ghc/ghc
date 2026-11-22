@@ -190,6 +190,12 @@ and linked the expected archives. The full comparison also exposed
 an earlier fork failure in the positive upstream test `T19092`.
 Stock GHC 9.14.1 accepts the same source. Job 918 records the
 Core Lint diagnostic for the incorrect coercion.
+Job 941 compared a three-package Haskell2010 release chain on stock
+GHC 9.14.1. Adding 14 standalone signatures restored all three builds
+with `-XNoCUSKs`. The 84 printed kinds in the six edited modules and
+all three clients agreed with the original builds. The fork rejects
+the unchanged first dependency at `Pure` under both configurations.
+The next comparison checks which migration targets a warning identifies.
 [R27 scope](roadmap/R27-deprecate-cusks.md).
 
 The main checkout has local Git recovery refs for these source
