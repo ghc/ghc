@@ -8,6 +8,7 @@ src=$PWD
 out=$(mktemp -d)
 trap 'rm -rf -- "$out"' EXIT
 mkdir "$out"/{provider,reader,rule,nocode,nocode-reader,counting}
+mkdir "$out"/{specialized-provider,specialized-reader}
 
 reject() {
     local expected=$1
@@ -21,7 +22,7 @@ reject() {
 cd "$out/provider"
 cp "$src/"{PackedVecLibrary,ZipLengthSource}.hs .
 "${ghc[@]}" "${strip[@]}" -c PackedVecLibrary.hs
-"${ghc[@]}" "${strip[@]}" -O2 -c ZipLengthSource.hs
+"${ghc[@]}" -O2 "${strip[@]}" -c ZipLengthSource.hs
 "${ghc[@]}" --show-iface ZipLengthSource.hi >provider.iface
 grep -Fq 'FinalCoreSourceTable T:zipLength' provider.iface
 
@@ -187,7 +188,8 @@ main = do
     print (either (isPrefixOf "second spine" . displayException) (const False) second)
     print (minimumHolds "" badSecond, minimumHolds [badChar] [badBool],
            minimumHolds infinite [True, False])
-    print (natToInt (countRight "" badSecond), natToInt (countRight leftTail [True, False]),
+    print (natToInt (countRight "" badSecond),
+           natToInt (countRight (badChar : error "first tail") [True, False]),
            natToInt (countLeft "ab" rightTail), natToInt (countEither [False, True] [True, False]))
     rightFirst <- try @ErrorCall (evaluate (natToInt (countRight badFirst emptyB)))
     print (either (isPrefixOf "first spine" . displayException) (const False) rightFirst)
@@ -246,6 +248,50 @@ sed 's/WrongDemand/RightDemand/; s/ZipLengthSource/ZipVariants/; s/zipLength/cou
     WrongDemand.hs >RightDemand.hs
 reject '^RightDemand.hs:7:9-12: error: \[GHC-83865\]' RightDemand.hs
 
+# Check the generated worker and its rule in the normal optimization pipeline.
+cd "$out/specialized-provider"
+cp ../provider/{PackedVecLibrary.hi,ZipVariants.hs} .
+"${ghc[@]}" -O2 -ddump-rule-firings -c ZipVariants.hs >specialized.log
+grep -Fq 'Rule fired: SC:countRight0 (ZipVariants)' specialized.log
+"${ghc[@]}" --show-iface ZipVariants.hi >specialized.iface
+grep -Fq '"SC:countRight0"' specialized.iface
+grep -Fq 'FinalCoreSourceTable T:countRight' specialized.iface
+
+cd "$out/specialized-reader"
+cp ../specialized-provider/{PackedVecLibrary,ZipVariants}.hi ../reader/RightDemand.hs .
+cat >Specialized.hs <<'HS'
+{-# LANGUAGE AllowAmbiguousTypes, DataKinds, ExperimentalDependentTypes, GADTs #-}
+module Specialized where
+import Data.Type.Equality ((:~:)(Refl))
+import PackedVecLibrary (Nat(..))
+import ZipVariants (countRight)
+step :: forall (x :: Char) (xs :: [Char]) (y :: Bool) (ys :: [Bool]).
+        countRight (x ': xs) (y ': ys) :~: 'S (countRight (x ': xs) ys)
+step = Refl
+HS
+"${ghc[@]}" -fno-enable-rewrite-rules -c Specialized.hs
+reject '^Specialized.hs:8:8-11: error: \[GHC-83605\]' -fforce-recomp \
+    -fno-ignore-interface-pragmas -fenable-rewrite-rules Specialized.hs
+reject '^RightDemand.hs:7:9-12: error: \[GHC-83865\]' -fno-enable-rewrite-rules RightDemand.hs
+
+cd "$out/specialized-provider"
+"${ghc[@]}" -O2 "${strip[@]}" -fforce-recomp -c ZipVariants.hs
+"${ghc[@]}" --show-iface ZipVariants.hi >stripped.iface
+grep -Fq 'FinalCoreSourceTable T:countRight' stripped.iface
+if grep -Fq '"SC:countRight0"' stripped.iface; then
+    echo 'The stripped interface still exports the specialization rule.' >&2
+    exit 1
+fi
+cd "$out/specialized-reader"
+cp ../specialized-provider/ZipVariants.hi .
+"${ghc[@]}" -fforce-recomp -fno-ignore-interface-pragmas -fenable-rewrite-rules -c Specialized.hs
+"${ghc[@]}" ../reader/{Main,OrdinaryZipRows,ZipRows,LaterFallback}.o \
+    ../provider/{PackedVecLibrary,ZipLengthSource}.o ../specialized-provider/ZipVariants.o -o run
+./run >actual
+diff -u ../reader/actual actual
+
+cd "$out/reader"
+
 { sed -n '1,4p' WrongDemand.hs | sed 's/WrongDemand/Nondecreasing/'
   cat <<'HS'
 import ZipVariants (loopLength)
@@ -278,7 +324,7 @@ cat >>ZipLengthSource.hs <<'HS'
 {-# NOINLINE zipLength #-}
 {-# RULES "change recursive zip" forall xs ys. zipLength xs ys = Z #-}
 HS
-"${ghc[@]}" "${strip[@]}" -O1 -fno-full-laziness -ddump-rule-firings \
+"${ghc[@]}" -O1 "${strip[@]}" -fno-full-laziness -ddump-rule-firings \
     -c ZipLengthSource.hs >rule.log
 grep -Fq 'Rule fired: change recursive zip (ZipLengthSource)' rule.log
 "${ghc[@]}" --show-iface ZipLengthSource.hi >rule.iface
@@ -291,7 +337,7 @@ fi
 cd "$out/provider"
 sed 's/S (zipLength xs ys)/S Z/; s/(_ : xs) (_ : ys)/(_ : _) (_ : _)/' \
     "$src/ZipLengthSource.hs" >ZipLengthSource.hs
-"${ghc[@]}" "${strip[@]}" -O2 -fno-full-laziness -c ZipLengthSource.hs
+"${ghc[@]}" -O2 "${strip[@]}" -fno-full-laziness -c ZipLengthSource.hs
 "${ghc[@]}" --show-iface ZipLengthSource.hi >changed.iface
 grep -Fq 'FinalCoreSourceTable T:zipLength' changed.iface
 cp ZipLengthSource.hi ../reader/

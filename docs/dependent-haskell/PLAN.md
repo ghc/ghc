@@ -7759,20 +7759,20 @@ An ordinary `countRight` that keeps its matched first cons can use
 self-call in final Core. A no-code reader can use the complete interface
 with rewrite rules enabled. A matching user rule still blocks the proof.
 
-For the unannotated case, first check one private specialized worker
-whose call pattern fixes one operand to a known lazy cons. Match its
-typed arguments to the original operand positions. Compare the worker's
-remaining case tree and equations with the original rows under that
-specialization. Verify every recursive edge under the same mapping.
-Keep the wrapper's original inspection order and check that the worker
-leaves the captured head and tail lazy.
+The first unannotated case uses two independently quantified list
+element types. SpecConstr fixes the first list to a cons. The checker
+reads the generated local rule and checks the order and type of each
+captured field. It compares the worker's second-list case and each
+recursive call with the original first-cons equations. The wrapper must
+still check the first list before the second. Tidy must leave both
+captured fields lazy.
 
-Then check each exported specialization rule against the verified worker
-and its argument mapping. A consumer may use the equation with rewriting
-enabled once it has checked the active rules against that evidence.
-Keep the existing rejection for unchecked workers and rules. Use the
-captured bottom tail, changed nil result, and real conflicting rule as
-negative controls.
+A client can check the open equation with rewriting disabled. A stripped
+interface also lets a client check the equation with rewriting enabled.
+An active specialization rule in a full interface still reports
+GHC-83605. To accept that rule, the consumer must validate its exact
+argument mapping and its dependency on the checked worker. The
+specialization to a known second cons also needs its own demand check.
 
 ## M99: evaluate an imported closed call
 
