@@ -104,3 +104,29 @@ instructions from the local archive with this command.
 ```sh
 git show refs/archive/dependent-haskell/source-copy-recovery/markerless-20261121-with-fixtures:README.md
 ```
+
+
+## 22 November restart
+
+After WSL restarted, Git still had each of the ten topic branch tips
+and the HEADs of the 49 missing checkouts in `/tmp`. Each saved index
+matched its HEAD. The integration branch contains the ten topics by
+ancestry or by equivalent patches. Three cherry-picks had different patch
+IDs. Comparing their additions and deletions found the same source changes.
+The scoped dictionary test also moved a blank line.
+
+| Original | Integrated | Change |
+| --- | --- | --- |
+| `a24fddec60` | `134f6abe20` | Unsigned machine fields in closed families |
+| `b3bb592ca0` | `52f0f85832` | Recursive substitutions through scoped dictionary types |
+| `5e2f428185` | `934c3a1be3` | Installed `Prelude.zipWith` cons proof |
+
+Local recovery refs retain the original tips and reflog revisions. The
+stale registrations and ten integrated topic branch names were removed.
+The main repository has one development branch, `dependent-haskell`,
+and the upstream `master`. To inspect the archived paths and revisions:
+
+```sh
+git show refs/archive/dependent-haskell/2026-11-22/restart/ledger:checkouts.tsv
+git show refs/archive/dependent-haskell/2026-11-22/restart/ledger:branches.txt
+```

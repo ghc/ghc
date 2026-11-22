@@ -7,6 +7,9 @@ marker. An edge can identify a prerequisite or a subtask. The
 records every edge. The R numbers are local labels for those cards.
 [Upstream roadmap](https://ghc.serokell.io/dh).
 
+For the active checkout, combined build and next verification step, see
+the [project handoff](HANDOFF.md).
+
 ## Where this fork stands
 
 **23 of 50 cards (46%) are complete** on the upstream

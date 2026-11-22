@@ -18,6 +18,9 @@ The `Just` branch gets a `Vec a 1` and can use `safeHead` directly.
 [Vector library](examples/packed-vector/PackedVecLibrary.hs) and
 [working examples](Showcase.hs).
 
+For the current compiler revision, test results and restart procedure, see
+the [project handoff](HANDOFF.md).
+
 ## Run the showcase
 
 From the repository root, run the checked example with this fork’s compiler
