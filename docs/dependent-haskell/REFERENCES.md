@@ -5976,13 +5976,39 @@ for the corresponding step under `Succ`.
 [base equality operations](../../libraries/ghc-internal/src/GHC/Internal/Data/Type/Equality.hs),
 and [HaskLib client](hasklib-test/Client.hs).
 
-GHC's `QualifiedDo` can sequence ordinary equality witnesses when the
-qualified `(>>)` is `gcastWith`. Compiler `8d756d44da` reports untouchable
-proof endpoints for the retained calls in the HaskLib client. With
-`ApplicativeDo`, even the ordinary equality block asks for qualified
-operations such as `join` and `<*>`.
+GHC's `QualifiedDo` can sequence equality witnesses through an ordinary
+qualified `(>>)` defined as `gcastWith`. The alias uses the same
+continuation check as a direct call. With `ApplicativeDo`, the block can
+ask for additional qualified operations such as `join` and `<*>`.
 [GHC proposal #216](https://ghc-proposals.readthedocs.io/en/latest/proposals/0216-qualified-do.html)
 and [QualifiedDo desugaring](../users_guide/exts/qualified_do.rst).
+
+### Checking a retained equality continuation
+
+Agda's `subst` transports a value between instances of a predicate by
+matching the equality proof with `refl`. Haskell's `gcastWith` matches
+`Refl` and supplies the resulting nominal equality to its continuation.
+The existing `gcastWith` definition determines when it evaluates the
+proof. [Agda built-in equality](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#equality),
+[Agda standard library 2.4, `subst`](https://agda.github.io/agda-stdlib/v2.4/Relation.Binary.PropositionalEquality.Core.html)
+and [base equality operations](../../libraries/ghc-internal/src/GHC/Internal/Data/Type/Equality.hs).
+
+The fork selects complete, scoped type arguments from the first argument
+and the expected result before checking a nominal equality continuation.
+On the earlier compiler, retained indices could reach mutable type
+variables before the continuation received its Given. The existing
+restriction on those assignments still applies. The implementation uses
+the ordinary cached argument path outside Quick Look and checks the
+continuation using ordinary subsumption. The head's signature provides the
+equality. A proof about another list does not supply the required
+evidence. See `Note [Checking a nominal equality continuation]` and
+`Note [Cached retained argument inference]` in
+[`GHC.Tc.Gen.App`](../../compiler/GHC/Tc/Gen/App.hs), and
+`Note [Rigid retained indices]` in
+[`GHC.Tc.Utils.Unify`](../../compiler/GHC/Tc/Utils/Unify.hs).
+[GHC proposal #274, Quick Look](https://ghc-proposals.readthedocs.io/en/latest/proposals/0274-quick-look-impredicativity.html),
+[GHC proposal #287, Simplify subsumption](https://ghc-proposals.readthedocs.io/en/latest/proposals/0287-simplify-subsumption.html)
+and [GHC proposal #511, Deep Subsumption](https://ghc-proposals.readthedocs.io/en/latest/proposals/0511-deep-subsumption.html).
 
 ### The length of zip and demand in a case tree
 

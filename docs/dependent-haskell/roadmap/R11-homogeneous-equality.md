@@ -22,6 +22,18 @@ representational evidence. The closed-family control checks that
 [solver controls](../../../testsuite/tests/dependent/should_run/NativeRetainedFamilyGiven.hs)
 and [equality elimination in Agda](../REFERENCES.md#reusing-an-equality-under-a-size-function).
 
+## Infer the type arguments of an equality eliminator
+
+The registered test supplies a retained proof `F xs :~: G xs` to
+`gcastWith proof Refl`. Its result is `W (F xs) :~: W (G xs)`.
+The compiler selects the erased endpoint types from the proof and
+the result type from the signature. It then checks `Refl` under
+the equality declared by the continuation. The same application
+works through a locally defined eliminator. A result about a
+different list `ys` fails with GHC-05617 at the continuation.
+[Registered test](../../../testsuite/tests/dependent/should_run/NativeRetainedFamilyGiven.hs)
+and [application and equality provenance](../REFERENCES.md#checking-a-retained-equality-continuation).
+
 ## An equality with the empty vector
 
 An ordinary `HRefl` pattern can refine the length of a retained vector.

@@ -170,6 +170,10 @@ cutoff. The proof index keeps that function's identity. [Captured cutoff](R16-op
   native let-list and literal `fmap toList (lookupGeneric [vector] 0)` probes
   reject. The named-list fmap variant is unmeasured.
 
+- Application checking can infer the erased arguments of `gcastWith` from
+  a retained proof and the expected result. The equality scopes over the
+  continuation. See [R11](R11-homogeneous-equality.md#infer-the-type-arguments-of-an-equality-eliminator).
+
 The published M60 checkpoint appends five observations to M59's 79-line prefix
 and passes all 84 with both compilers. Its separate evidence audit passes.
 See [the current evidence](../ROADMAP.md#where-this-fork-stands) and
