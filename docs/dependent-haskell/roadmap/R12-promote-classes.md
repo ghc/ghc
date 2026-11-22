@@ -92,9 +92,14 @@ and [Agda and GHC precedents](../REFERENCES.md#mapping-the-second-field-of-these
 An instance can fix more than one receiver parameter. For
 `data Row e t a = Empty | Failed e | Both e t a`, the checked interface
 records the method for `Functor (Row e t)` and `Functor (Row Type Type)`.
-The same worker under `Functor (Row Int Bool)` compiles as ordinary
-Haskell, but its interface omits the checked method. The constructor-case
-checker currently accepts a type variable or `Type` in each fixed position.
+On the 525-output candidate the same worker under `Functor (Row Int Bool)`
+compiles as ordinary Haskell. Its interface omits the checked method.
+The next change treats a concrete prefix such as `Int Bool` as part of
+the instance head. A worker can copy a field at one of those types.
+Inspecting or constructing a value still checks the constructor.
+The source checks compare two instances with different results for the
+same `Flagged` constructor. Normal compiler qualification is pending.
+[Warm upgrade check](../examples/open-evaluation/check-applied-mapping-upgrade.sh).
 
 If the equation uses `p` to map the field but claims the result is
 `q x`, GHC reports GHC-83865 at `Refl`. The detailed expected type can

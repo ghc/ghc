@@ -11,18 +11,22 @@ out=$(mktemp -d)
 trap 'rm -rf -- "$out"' EXIT
 flags=(-O0 -v0 -package-env - -i -i. -fomit-interface-pragmas -fno-write-if-simplified-core)
 
-for mode in polymorphic ground; do
+for mode in polymorphic ground concrete; do
     mkdir -p "$out/$mode"/{provider,reader}
     cd "$out/$mode/provider"
     if [[ $mode == polymorphic ]]; then
         cp "$src/These.hs" .
     else
-        cat >These.hs <<'HS'
+        case $mode in
+          ground) label=Type ;;
+          concrete) label=Int ;;
+        esac
+        cat >These.hs <<HS
 {-# LANGUAGE FlexibleInstances #-}
 module These where
 import Data.Kind (Type)
 data These e a = This e | That a | These e a
-instance Functor (These Type) where
+instance Functor (These $label) where
     fmap _ (This e) = This e
     fmap f (That x) = That (f x)
     fmap f (These e x) = These e (f x)
@@ -56,5 +60,16 @@ HS
     "${old[@]}" "${flags[@]}" -fno-code -c Ordinary.hs
     if [[ $mode == polymorphic ]]; then
         "${new[@]}" "${flags[@]}" -fexternal-interpreter -c "$src/TheseMapping.hs" -outputdir .
+    elif [[ $mode == concrete ]]; then
+        cat >IntLabel.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
+module IntLabel where
+import Data.Type.Equality ((:~:)(Refl))
+import These
+both :: foreach (n :: Int) -> foreach (x :: Bool)
+     -> foreach (p :: Bool -> Bool) -> fmap p ('These n x) :~: 'These n (p x)
+both _ _ _ = Refl
+HS
+        "${new[@]}" "${flags[@]}" -fexternal-interpreter -c IntLabel.hs
     fi
 done

@@ -1047,8 +1047,9 @@ mappingField :: String
 mappingField = "checked-container-mapping-v1"
 
 -- | Mark the review of mapping workers on applied datatype receivers.
+-- Version 3 includes instances with closed receiver parameters.
 appliedMappingField :: String
-appliedMappingField = "checked-applied-container-mapping-v2"
+appliedMappingField = "checked-applied-container-mapping-v3"
 
 -- | Record that a potential old synonym provider was checked once.
 liberalSynonymCallbackField :: String
