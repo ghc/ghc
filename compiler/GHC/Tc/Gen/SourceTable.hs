@@ -971,19 +971,25 @@ The resulting family names the checked worker. An ordinary client can
 use that family even when it introduces an overlapping instance. A new
 selector application in that client still uses its own dictionary. Record
 the selected dictionary, method and selector as rule dependencies.
+
+Check the receiver and result at the same datatype and fixed parameters.
+For example, fmap on These e a can inspect a constructor that contains
+both an e and an a. The number of constructors does not determine the
+equations. checkedConstructorCase reads each result from the worker and
+checks coverage, field types and callback applications.
+
+At the use site, a foreach binder names a runtime Id in the type
+checker. Such an Id can supply the callback or a constructor field.
+Treat it as an open operand when selecting the checked method.
 -}
 
--- | Check a callback case on a two-constructor sum with a fixed field type.
+-- | Check the mapping signature for a receiver with fixed type parameters.
 checkedMapCase :: ConstructorCaseType -> Bool
 checkedMapCase (ConstructorCaseType _ tc params [callback, _] 1 result)
   | Just (prefix, input) <- unsnoc params
-  , lengthIs prefix 1
+  , not (null prefix)
   , Just (from, to) <- caseArrow callback
-  , input `eqType` from, result `eqType` mkTyConApp tc (prefix ++ [to])
-  , Just [first, second] <- traverse (\dc -> openDataConFieldTypes dc params)
-                                    (tyConDataCons tc)
-  = (eqTypes first prefix && eqTypes second [input]) ||
-    (eqTypes second prefix && eqTypes first [input])
+  = input `eqType` from && result `eqType` mkTyConApp tc (prefix ++ [to])
 checkedMapCase _ = False
 
 -- | Keep the checked workers until Tidy gives their binders external names.

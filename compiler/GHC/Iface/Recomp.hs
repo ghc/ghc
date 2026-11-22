@@ -908,9 +908,9 @@ checkFlagHash hsc_env iface self_recomp = do
           , couldSupplyMapping (mi_exports iface) (map snd (mi_decls iface)) =
               liftIO $ recheck "Compiler now checks mapping workers and their instance aliases"
           | mi_hsc_src iface == HsSrcFile
-          , not (Map.member polymorphicMappingField (getExtensibleFields (mi_ext_fields iface)))
-          , couldSupplyPolymorphicMapping (map snd (mi_decls iface)) =
-              liftIO $ recheck "Compiler now checks mapping methods with erased instance parameters"
+          , not (Map.member appliedMappingField (getExtensibleFields (mi_ext_fields iface)))
+          , couldSupplyAppliedMapping (map snd (mi_decls iface)) =
+              liftIO $ recheck "Compiler now checks mapping methods for applied receivers"
           | otherwise = pure UpToDate
         check_liberal_synonym
           | xopt LangExt.LiberalTypeSynonyms dflags
@@ -983,6 +983,11 @@ review marker can already occur in its module. Record a separate review
 for quantified, context-free dictionaries with a possible mapping receiver.
 This lets an incremental library build recover the same checked methods
 as a clean build. A failed method check also records the review.
+
+The first polymorphic review checked only two single-field constructors.
+Review applied receivers again when the checked worker can handle other
+constructor shapes. A ground instance head can also fix an argument of
+the receiver. An imported synonym can hide those arguments.
 -}
 
 -- | Identify modules that need a one-time check for mapping evidence.
@@ -1008,18 +1013,19 @@ couldSupplyMapping exports decls = any candidate decls
     opaque IfaceAppTy{} = True
     opaque _ = False
 
--- | Find context-free instances that the ground dictionary review missed.
-couldSupplyPolymorphicMapping :: [IfaceDecl] -> Bool
-couldSupplyPolymorphicMapping decls = any candidate decls
+-- | Find context-free instances whose receiver can have fixed arguments.
+couldSupplyAppliedMapping :: [IfaceDecl] -> Bool
+couldSupplyAppliedMapping decls = any candidate decls
   where
     arity = mappingTyConArity decls
-    candidate IfaceId{ifIdDetails = IfDFunId, ifType = ty} = quantified ty
-    candidate IfaceId{ifIdDetails = IfSourceDFunId{}, ifType = ty} = quantified ty
+    candidate IfaceId{ifIdDetails = IfDFunId, ifType = ty} = applied ty
+    candidate IfaceId{ifIdDetails = IfSourceDFunId{}, ifType = ty} = applied ty
     candidate _ = False
 
-    quantified (IfaceForAllTy _ (Bndr IfaceTvBndr{} (IfaceForAllTyFlag (Invisible _))) body) =
-      quantified body || possibleMappingDictionary arity body
-    quantified _ = False
+    applied (IfaceForAllTy _ (Bndr IfaceTvBndr{} (IfaceForAllTyFlag (Invisible _))) body) = applied body
+    applied (IfaceTyConApp _ (IA_Arg (IfaceTyConApp tc IA_Nil) _ IA_Nil)) =
+      isNothing (arity (ifaceTyConName tc))
+    applied ty = possibleMappingDictionary arity ty
 
 -- | Look up arity when the interface supplies the datatype or GHC knows it.
 mappingTyConArity :: [IfaceDecl] -> Name -> Maybe Int
@@ -1040,9 +1046,9 @@ possibleMappingDictionary _ _ = False
 mappingField :: String
 mappingField = "checked-container-mapping-v1"
 
--- | Mark the review of mapping dictionaries with erased type parameters.
-polymorphicMappingField :: String
-polymorphicMappingField = "checked-polymorphic-container-mapping-v1"
+-- | Mark the review of mapping workers on applied datatype receivers.
+appliedMappingField :: String
+appliedMappingField = "checked-applied-container-mapping-v2"
 
 -- | Record that a potential old synonym provider was checked once.
 liberalSynonymCallbackField :: String
@@ -2913,8 +2919,8 @@ addFingerprints hsc_env iface0 = do
       stamp_nullary = couldInferNullaryClosedMatchability (mi_decls iface0)
       stamp_mapping = mi_hsc_src iface0 == HsSrcFile &&
                       couldSupplyMapping (mi_exports iface0) (mi_decls iface0)
-      stamp_poly_mapping = mi_hsc_src iface0 == HsSrcFile &&
-                           couldSupplyPolymorphicMapping (mi_decls iface0)
+      stamp_applied_mapping = mi_hsc_src iface0 == HsSrcFile &&
+                              couldSupplyAppliedMapping (mi_decls iface0)
       stamp_liberal = xopt LangExt.LiberalTypeSynonyms (hsc_dflags hsc_env)
                    && couldInferLiberalSynonymMatchability (mi_exports iface0) (mi_decls iface0)
       stamp_source_proof_branches = couldHaveUncheckedSourceProofBranches (hsc_dflags hsc_env)
@@ -2936,7 +2942,7 @@ addFingerprints hsc_env iface0 = do
                          mi_deps iface0)
       checked_fields = [liberalSynonymCallbackField | stamp_liberal]
                     ++ [mappingField | stamp_mapping]
-                    ++ [polymorphicMappingField | stamp_poly_mapping]
+                    ++ [appliedMappingField | stamp_applied_mapping]
                     ++ [homeRuleClosuresField | stamp_home_rules]
                     ++ [sourceProofBranchesField | stamp_source_proof_branches]
       checked_hash = foldl' (\fp field -> computeFingerprint putNameLiterally (fp, field))
