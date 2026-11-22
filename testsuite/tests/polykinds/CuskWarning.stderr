@@ -21,4 +21,3 @@ CuskWarning.hs:14:1: warning: [GHC-57439] [-Wcusks]
     Enable the required extensions
       {-# LANGUAGE StandaloneKindSignatures, ExplicitForAll #-}
     Enabling StandaloneKindSignatures disables CUSKs for the whole module.
-
