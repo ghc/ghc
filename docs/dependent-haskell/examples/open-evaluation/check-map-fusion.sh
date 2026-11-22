@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 g=("$1" "-B$2" -v0 -package-env - -dcore-lint -dstg-lint)
+examples=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 out=$(mktemp -d)
 trap 'rm -rf -- "$out"' EXIT
 cd "$out"
@@ -91,3 +92,27 @@ done
 grep -Fxq "'z'" fold-0.out
 grep -Fq 'Rule fired: fold/build' fold-1.rules
 grep -Fxq 'demanded combiner' fold-1.out
+
+for mode in O0 O2 O2-no-rules; do
+    opts=(-"${mode:0:2}")
+    if [[ $mode == O2-no-rules ]]; then opts+=(-fno-enable-rewrite-rules); fi
+    "${g[@]}" "${opts[@]}" -fforce-recomp -ddump-rule-rewrites -dverbose-core2core \
+        -outputdir . "$examples/MapFusionDemand.hs" -o map-demand >"$mode.demand.rules" 2>&1
+    ./map-demand >"$mode.demand.out"
+    echo "map demand $mode"
+    cat "$mode.demand.out"
+done
+diff -u <(printf '%s\n' True True True True True) O0.demand.out
+diff -u <(printf '%s\n' 'empty seed' True True True True) O2.demand.out
+cmp O0.demand.out O2-no-rules.demand.out
+
+awk '
+    /^SimplBind:normal / { binding = $2 }
+    /^[[:space:]]*Rule: (map|fold\/build|zipWith|foldr2\/left)$/ { print binding, $2 }
+' O2.demand.rules >demand.firings
+grep -Fxq 'consumeMap map' demand.firings
+test "$(grep -Fxc 'consumeMap fold/build' demand.firings)" -eq 2
+grep -Fxq 'mapEscapes map' demand.firings
+grep -Fxq 'mapEscapes fold/build' demand.firings
+grep -Fxq 'consumeZip zipWith' demand.firings
+grep -Fxq 'consumeZip foldr2/left' demand.firings

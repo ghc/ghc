@@ -1076,6 +1076,29 @@ non-parametric builder can use `seq` to distinguish a constructor from
 a partial combiner. Rule-enabled conversion remains open.
 [Fusion and definedness](../papers/README.md#short-cut-fusion-and-definedness).
 
+A caller can also expose this difference with only the installed rules.
+Let `produce c n = seq n (c True n)` and let `step _ _ = True`.
+Observing `foldr step (error "empty seed") (map not (build produce))`
+returns `True` at `-O0` and at `-O2 -fno-enable-rewrite-rules`.
+At ordinary `-O2`, the `map` rule and two `fold/build` rewrites expose
+the bottom seed to `produce`, and evaluation raises `empty seed`.
+At all three settings, the same fold returns `True` with a direct
+recursive mapper or a producer that skips the `seq`. The mapped list
+also has a cons when it escapes into a separate caller. When `zipWith`
+consumes the mapped left input, the test still returns `True`. The
+`foldr2/left` rule supplies a lambda as its seed.
+[Source](../examples/open-evaluation/MapFusionDemand.hs)
+and [replay](../examples/open-evaluation/check-map-fusion.sh).
+
+Theorem 8.2 of Johann and Voigtländer proves this general fusion identity
+when the seed is defined and the combiner returns a defined result on
+two bottom arguments. In the failing call, `step` meets the combiner
+condition and the seed is bottom. A source table records constructor
+equations for a function. This R16 case still needs a way to check the
+producer and the particular consumer algebra at the fusion site,
+including the rules that introduce them.
+[Johann and Voigtländer, Theorem 8.2](https://janis-voigtlaender.eu/papers/TheImpactOfSeqOnFreeTheoremsBasedProgramTransformations.pdf#page=28).
+
 ### Checking an identity traversal with rules enabled
 
 An ordinary `-O1` client can use a checked equation from an ordinary
