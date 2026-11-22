@@ -12,6 +12,7 @@ strip=(-fno-enable-rewrite-rules -fomit-interface-pragmas -fno-write-if-simplifi
 for module in PreludeMapLengthSize PreludeMapLengthSource PreludeMapLengthProof PreludeZipWithSource PreludeZipSource; do
     "${ghc[@]}" "${strip[@]}" -c "$src/$module.hs" -outputdir .
 done
+
 for opt in -O0 -O2; do
     "${ghc[@]}" "$opt" -fwrite-source-equations -fforce-recomp -c "$src/NativeOpenZipDemandControls.hs" -outputdir .
     "${ghc[@]}" --show-iface NativeOpenZipDemandControls.hi >demand.iface
@@ -87,4 +88,62 @@ for mode in CHANGE_ZIP CHANGE_BUILD; do
     if [[ $mode == CHANGE_BUILD ]]; then
         grep -Eq 'A rewrite rule can change the result of.*build' rejected.log
     fi
+done
+
+# Both folders agree at the list algebra. With an abstract seed, only the
+# lazy folder may reach the rule check for the introduced build helper.
+# Continue with the source-hidden CHANGE_BUILD interface above.
+cat > "$out/ZipFoldProvider.hs" <<'EOF'
+{-# LANGUAGE CPP #-}
+module ZipFoldProvider (zipProbe, foldZip, pairStep) where
+
+{-# NOINLINE [1] zipProbe #-}
+zipProbe :: [a] -> [b] -> [(a, b)]
+zipProbe [] _ = []
+zipProbe (_ : _) [] = []
+zipProbe (x : xs) (y : ys) = (x, y) : zipProbe xs ys
+
+{-# INLINE [0] foldZip #-}
+foldZip :: (a -> b -> r -> r) -> r -> [a] -> [b] -> r
+foldZip k seed xs ys =
+#ifdef FORCE_SEED
+  seed `seq`
+#endif
+  go xs ys
+  where
+    go [] _ = seed
+    go (_ : _) [] = seed
+    go (a : as) (b : bs) = k a b (go as bs)
+
+{-# INLINE [0] pairStep #-}
+pairStep :: ((a, b) -> r -> s) -> a -> b -> r -> s
+pairStep k x y r = k (x, y) r
+EOF
+cat > "$out/ZipFoldRule.hs" <<'EOF'
+module ZipFoldRule () where
+import GHC.Exts (build)
+import ZipFoldProvider
+
+{-# RULES "probe zip fusion" [~1] forall xs ys. zipProbe xs ys =
+    build (\cons nil -> foldZip (pairStep cons) nil xs ys) #-}
+EOF
+
+sed -e '/fno-enable-rewrite-rules/d' \
+    -e '/^module ZipMinimum where/a import ZipFoldProvider (zipProbe)\nimport ZipFoldRule ()\nimport ZipFusionRule ()' \
+    -e 's/size (zip xs ys)/size (zipProbe xs ys)/' "$src/ZipMinimum.hs" > ZipMinimum.hs
+for mode in LAZY_SEED FORCE_SEED; do
+    ( cd "$out/provider"
+      "${ghc[@]}" -O2 -fwrite-source-equations -fforce-recomp "-D$mode" -c "$out/ZipFoldProvider.hs" -outputdir .
+      "${ghc[@]}" --show-iface ZipFoldProvider.hi > fold.iface
+      grep -Fq 'FinalCoreSourceTable T:zipProbe' fold.iface
+      "${ghc[@]}" -O2 -fforce-recomp -c "$out/ZipFoldRule.hs" -outputdir .
+    )
+    cp ../provider/{ZipFoldProvider,ZipFoldRule}.hi .
+    reject '[GHC-83605]' ZipMinimum.hs -O2
+    if [[ $mode == LAZY_SEED ]]; then
+        grep -Eq 'A rewrite rule can change the result of.*build' rejected.log
+    else
+        grep -Eq 'cannot use the checked equation for.*zipProbe' rejected.log
+    fi
+    "${ghc[@]}" -O2 -fno-enable-rewrite-rules -fforce-recomp -c ZipMinimum.hs -outputdir .
 done

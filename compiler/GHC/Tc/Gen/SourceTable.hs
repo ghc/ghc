@@ -585,6 +585,7 @@ zipFusionRuleHelpers owner table Rule{ru_fn = fn, ru_bndrs = binders,
     build_body <- unfolding build
     fold_body <- unfolding fold
     step_body <- unfolding step
+    guard (checkedZipFoldAlgebra fold fold_body && checkedZipPairStep step step_body)
     ([element_var, builder], algebra) <- pure (Core.collectBinders build_body)
     guard (isTyVar element_var && isId builder)
     let e = mkTyVarTy element_var
@@ -618,6 +619,49 @@ zipFusionRuleHelpers owner table Rule{ru_fn = fn, ru_bndrs = binders,
       pure (CoreSubst.substExpr (CoreSubst.mkOpenSubst scope (zip applied args)) rest)
 zipFusionRuleHelpers _ _ _ = Nothing
 
+-- | Check the fold before specializing its abstract continuation and seed.
+-- See Note [List interpretation of zipper fusion].
+checkedZipFoldAlgebra :: Id -> Core.CoreExpr -> Bool
+checkedZipFoldAlgebra folder expression = isJust $ do
+    ([a, b, r, k, seed, left, right], Core.Let (Core.Rec [(go, loop)]) start) <-
+      pure (Core.collectBinders expression)
+    guard (all isTyVar [a, b, r] && all isId [k, seed, left, right] &&
+           exact_call go [left, right] start)
+    let marks = fromMaybe [] (idCbvMarks_maybe folder)
+        extra_marks = take 2 marks ++ drop 3 marks ++ drop 1 (fromMaybe [] (idCbvMarks_maybe go))
+    guard (not (any isMarkedCbv extra_marks))
+    ([xs, ys], outer) <- pure (Core.collectBinders loop)
+    (empty_left, x, xt, inner) <- split_list xs outer
+    (empty_right, y, yt, both) <- split_list ys inner
+    guard (empty_left == seed && empty_right == seed)
+    (Core.Var step, [Core.Var head_left, Core.Var head_right, tail_call]) <-
+      pure (Core.collectArgs both)
+    guard (step == k && [head_left, head_right] == [x, y] && exact_call go [xt, yt] tail_call)
+  where
+    exact_call f values body = case Core.collectArgs body of
+      (Core.Var fun, args) -> fun == f && traverse argument args == Just values
+      _ -> False
+    argument (Core.Var v) = Just v
+    argument _ = Nothing
+    split_list scrutinee body = do
+      Core.Case (Core.Var actual) _ _
+        [Core.Alt (Core.DataAlt nil) [] (Core.Var seed),
+         Core.Alt (Core.DataAlt cons) [head_var, tail_var] rest] <- pure body
+      guard (actual == scrutinee && nil == nilDataCon && cons == consDataCon)
+      pure (seed, head_var, tail_var, rest)
+
+-- | Keep the pair and recursive result as arguments of the abstract continuation.
+checkedZipPairStep :: Id -> Core.CoreExpr -> Bool
+checkedZipPairStep step expression = isJust $ do
+    ([a, b, c, d, k, x, y, r], body) <- pure (Core.collectBinders expression)
+    guard (all isTyVar [a, b, c, d] && all isId [k, x, y, r] &&
+           not (any isMarkedCbv (fromMaybe [] (idCbvMarks_maybe step))))
+    (Core.Var apply, [pair, Core.Var tail_result]) <- pure (Core.collectArgs body)
+    (Core.Var constructor, [Core.Type left, Core.Type right, Core.Var head_left, Core.Var head_right]) <-
+      pure (Core.collectArgs pair)
+    guard (apply == k && tail_result == r && constructor == dataConWorkId (tupleDataCon Boxed 2) &&
+           eqTypes [left, right] (mkTyVarTys [a, b]) && [head_left, head_right] == [x, y])
+
 {- Note [List interpretation of zipper fusion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A zipper can have an optimizer rule whose right-hand side builds a
@@ -627,13 +671,19 @@ from the builder. Compare the ordered cases and the recursive
 operands with the owner's already checked table.
 
 This check establishes the list interpretation of the forward rule.
+Check the fold and step with their original abstract arguments first.
+The fold tests the left spine and, only for a cons, the right spine.
+Each nil result returns the seed. The cons result leaves the heads
+and recursive result in the original continuation's arguments. Check
+call-by-value marks for any extra demand. Substituting [] before this
+check could erase an early test of the seed. An output consumer can
+supply a bottom seed to a continuation that leaves its tail unused.
+
 The simplifier can also rewrite the introduced helpers before
 inlining them. In particular, a rule on build can replace the entire
 zip result. Report this conflict through the same checks as other
-source-rule conflicts. The list seed is already in weak head normal
-form, so this check cannot detect an extra demand on the seed in a
-fused consumer. Admission also needs a check of the generic algebra's
-demand and of the fold's other fusion rules.
+source-rule conflicts. Admission also needs a check of the fold's other
+fusion rules and the use of the helper unfoldings through optimization.
 -}
 
 -- | Check final-Core rules and identify an introduced helper with an active rule.
