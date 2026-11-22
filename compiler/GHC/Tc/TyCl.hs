@@ -6617,7 +6617,7 @@ checkValidDataCon dflags existential_ok tc con
                           && (is_ordered || null eq_spec)
                           && null (dataConStupidTheta con)
                           && not (isTypeDataCon con)
-                          && (isLiftedTypeKind res_kind || res_kind `eqType` unliftedTypeKind)
+                          && maybe False isBoxedRuntimeRep (kindRep_maybe res_kind)
                           && scope_ok)
                          (TcRnNestedForallsContexts NFC_GadtConSig) }
         ; traceTc "checkValidDataCon 2" $ ppr (dataConWrapperType con)
