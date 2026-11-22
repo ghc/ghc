@@ -650,6 +650,8 @@ deriving instance Data (HsType GhcTc)
 
 deriving instance Data HsTypeGhcPsExt
 deriving instance Data HsTypeLetBind
+deriving instance Data HsTypeLetPair
+deriving instance Data HsTypeLetPat
 deriving instance Data HsTypeCaseAlt
 deriving instance Data HsTypeGhcRnExt
 

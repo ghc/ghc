@@ -83,7 +83,7 @@ import Control.Monad.Trans.Maybe (MaybeT(..))
 
 import GHC.Prelude hiding ( head, init, last, tail )
 
-import GHC.Hs.Type (HsTypeGhcRnExt(..), typeLetPairOcc)
+import GHC.Hs.Type (HsTypeGhcRnExt(..), isTypeLetPairOcc)
 import GHC.Hs
 import GHC.Rename.Utils
 import GHC.Tc.Errors.Types
@@ -2237,7 +2237,7 @@ tcHsType _ (XHsType HsTypeCaseRn{}) _ = failWithTc TcRnTypeCaseContext
 tcHsType mode (XHsType (HsTypeLetRn (L _ binder) rhs body)) exp_kind = do
   (rhs_ty, rhs_kind) <- tcInferTypeLetRhs mode rhs
   (checked_rhs, checked_kind) <-
-    if nameOccName binder == typeLetPairOcc
+    if isTypeLetPairOcc (nameOccName binder)
       then do
         first_kind <- newMetaKindVar
         second_kind <- newMetaKindVar

@@ -20,8 +20,9 @@ module GHC.Hs.Type (
         pprHsModifiedFunArr, pprHsModifier, pprLHsModifiers,
 
         HsType(..), HsCoreTy, LHsType, HsKind, LHsKind,
-        HsTypeGhcPsExt(..), HsTypeCaseAlt(..), HsTypeLetBind(..), HsTypeGhcRnExt(..), hsExistsTyFlag,
-        mkHsSingleTypeLet, splitHsTypeLet, typeLetPairOcc,
+        HsTypeGhcPsExt(..), HsTypeCaseAlt(..), HsTypeLetBind(..), HsTypeLetPair(..), HsTypeLetPat(..),
+        HsTypeGhcRnExt(..), hsExistsTyFlag,
+        mkHsSingleTypeLet, splitHsTypeLet, isTypeLetPairOcc,
         HsForAllTelescope(..), EpAnnForallVis, EpAnnForallInvis,
         HsTyVarBndr(..), LHsTyVarBndr, AnnTyVarBndr(..),
         HsBndrKind(..),
@@ -129,6 +130,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Misc (count)
 
 import Data.Maybe
+import Data.List (isPrefixOf)
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import Data.Data (Data)
@@ -595,10 +597,17 @@ data HsTypeLetBind
   = HsTypeLetBind
       (Maybe (LocatedN RdrName, TokDcolon, LHsKind GhcPs, EpToken ";"))
       (LocatedN RdrName) (EpToken "=") (LHsType GhcPs)
-  | HsTypeLetPairBind (EpToken "(", EpToken ",", EpToken ")")
-      (Either (EpToken "_") (LocatedN RdrName))
-      (Either (EpToken "_") (LocatedN RdrName))
-      (EpToken "=") (LHsType GhcPs)
+  | HsTypeLetPairBind HsTypeLetPair (EpToken "=") (LHsType GhcPs)
+
+-- | One boxed pair in a type let pattern.
+data HsTypeLetPair = HsTypeLetPair (EpToken "(", EpToken ",", EpToken ")")
+  HsTypeLetPat HsTypeLetPat
+
+-- | One field in a type let pattern.
+data HsTypeLetPat
+  = HsTypeLetPatVar (LocatedN RdrName)
+  | HsTypeLetPatWild (EpToken "_")
+  | HsTypeLetPatPair (Located HsTypeLetPair)
 
 -- | Construct one binding during renaming or TH conversion.
 mkHsSingleTypeLet :: (EpToken "let", EpToken "in") -> LocatedN RdrName
@@ -606,9 +615,12 @@ mkHsSingleTypeLet :: (EpToken "let", EpToken "in") -> LocatedN RdrName
 mkHsSingleTypeLet ann name rhs body =
   HsTypeLet ann Nothing (noLocA (HsTypeLetBind Nothing name noAnn rhs) :| []) body
 
--- | Private binder for the scrutinee of a type let pair pattern.
-typeLetPairOcc :: OccName
-typeLetPairOcc = mkTyVarOcc "$type-let-pair"
+typeLetPairPrefix :: String
+typeLetPairPrefix = "$type-let-pair:"
+
+-- | Is this a private scrutinee binder for a type let pair?
+isTypeLetPairOcc :: OccName -> Bool
+isTypeLetPairOcc occ = isTvOcc occ && typeLetPairPrefix `isPrefixOf` occNameString occ
 
 -- | Expose the first binding and its scope. See Note [Ordered type let bindings].
 splitHsTypeLet :: NonEmpty (LocatedA HsTypeLetBind) -> LHsType GhcPs
@@ -616,23 +628,45 @@ splitHsTypeLet :: NonEmpty (LocatedA HsTypeLetBind) -> LHsType GhcPs
 splitHsTypeLet (first :| binds) body = case unLoc first of
   HsTypeLetBind signature name _ rhs ->
     (name, ascribe signature rhs, rest)
-  HsTypeLetPairBind _ left right _ rhs ->
-    (pair, rhs, foldr bindField rest fields)
+  HsTypeLetPairBind pair_pat _ rhs ->
+    (pair, rhs, bind_fields rest)
     where
       loc = getLoc rhs
-      name_loc = l2l loc
-      pair = L name_loc (mkRdrUnqual typeLetPairOcc)
+      pair = pairName 0 loc
+      (bind_fields, _) = bindPair pair 1 loc pair_pat
+
       projection_module = mkGhcInternalModule (fsLit "GHC.Internal.TupleProjection")
       first_field = mkOrig projection_module (mkTcOcc "PairFirst")
       second_field = mkOrig projection_module (mkTcOcc "PairSecond")
-      named = [(field, selector) | (Right field, selector) <- [(left, first_field), (right, second_field)]]
-      fields | null named = [(L name_loc (mkRdrUnqual (mkTyVarOcc "_")), first_field)]
-             | otherwise = named
-      tyvar :: LocatedN RdrName -> LHsType GhcPs
-      tyvar name = L loc (HsTyVar noAnn NotPromoted name)
-      bindField (field, selector) result =
-        let projected = L loc (HsAppTy noExtField (tyvar (L name_loc selector)) (tyvar pair))
-        in L loc (XHsType (mkHsSingleTypeLet noAnn field projected result))
+
+      pairName :: Int -> SrcSpanAnnA -> LocatedN RdrName
+      pairName i field_loc =
+        L (l2l field_loc) (mkRdrUnqual (mkTyVarOcc (typeLetPairPrefix ++ show i)))
+
+      bindPair saved i pair_loc (HsTypeLetPair _ left right)
+        | HsTypeLetPatWild{} <- left
+        , HsTypeLetPatWild{} <- right =
+            let discard = L (l2l pair_loc) (mkRdrUnqual (mkTyVarOcc "_"))
+            in (bindProjection pair_loc discard saved first_field, i)
+        | otherwise =
+            let (bind_left, j) = bindField saved i pair_loc first_field left
+                (bind_right, k) = bindField saved j pair_loc second_field right
+            in (bind_left . bind_right, k)
+
+      bindField saved i pair_loc selector field = case field of
+        HsTypeLetPatVar name -> (bindProjection pair_loc name saved selector, i)
+        HsTypeLetPatWild{} -> (id, i)
+        HsTypeLetPatPair (L nested_span nested) ->
+          let field_loc = noAnnSrcSpan nested_span
+              child = pairName i field_loc
+              (bind_children, j) = bindPair child (i + 1) field_loc nested
+          in (bindProjection field_loc child saved selector . bind_children, j)
+
+      bindProjection field_loc name saved selector result =
+        let tyvar :: LocatedN RdrName -> LHsType GhcPs
+            tyvar n = L field_loc (HsTyVar noAnn NotPromoted n)
+            projected = L field_loc (HsAppTy noExtField (tyvar (L (l2l field_loc) selector)) (tyvar saved))
+        in L field_loc (XHsType (mkHsSingleTypeLet noAnn name projected result))
   where
     rest = case binds of
       [] -> body
@@ -663,10 +697,12 @@ group, put the signature on the RHS as an HsKindSig. The kind and RHS then
 use the same scope and checks as a written RHS kind ascription.
 
 For a pair pattern, bind the RHS to one private name before binding its
-fields. The internal closed families select fields only when they see the
-promoted pair constructor. An unknown pair can remain in the type. With
-two wildcards, keep a private projection. It checks that the RHS has a pair
-kind when Template Haskell splices the ordinary LetT binders.
+fields. Give each nested pair a separate name. A later projection from
+the parent must still refer to the parent after binding the nested pair.
+The internal closed families select fields only when they see the promoted
+pair constructor. An unknown pair can remain in the type. With two
+wildcards, keep a private projection. It checks the pair kind when
+Template Haskell splices the ordinary LetT binders.
 -}
 
 -- | A parsed constructor alternative in a type case.
@@ -1808,9 +1844,12 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
       let binding (L _ (HsTypeLetBind signature v _ rhs)) =
             [ppr sig <+> dcolon <+> ppr_mono_lty kind | (sig, _, kind, _) <- maybeToList signature]
               ++ [ppr v <+> equals <+> ppr_typelet_rhs rhs]
-          binding (L _ (HsTypeLetPairBind _ left right _ rhs)) =
-            [parens (pprWithCommas (either (const (char '_')) ppr) [left, right])
-              <+> equals <+> ppr_typelet_rhs rhs]
+          binding (L _ (HsTypeLetPairBind pair_pat _ rhs)) =
+            [pair pair_pat <+> equals <+> ppr_typelet_rhs rhs]
+          pair (HsTypeLetPair _ left right) = parens (pprWithCommas field [left, right])
+          field (HsTypeLetPatVar name) = ppr name
+          field HsTypeLetPatWild{} = char '_'
+          field (HsTypeLetPatPair nested) = pair (unLoc nested)
           bindings = concatMap binding (NE.toList binds)
           group = case brackets of
             Nothing -> vcat bindings

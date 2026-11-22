@@ -38,7 +38,7 @@ import qualified GHC.Boot.TH.Syntax as TH
 
 import GHC.Hs
 import qualified GHC.Hs.Decls as HsDecls
-import GHC.Hs.Type (HsTypeGhcRnExt(HsTypeLetRn, HsTypeCaseAliasRn, HsTypeCaseRn), typeLetPairOcc)
+import GHC.Hs.Type (HsTypeGhcRnExt(HsTypeLetRn, HsTypeCaseAliasRn, HsTypeCaseRn), isTypeLetPairOcc)
 import GHC.Hs.Decls.Overlap ( OverlapMode(..) )
 
 import GHC.Tc.Utils.TcType
@@ -2609,7 +2609,7 @@ wrapGenSyms binds body@(MkC b)
 
     -- A splice checks the spelling of a fresh name. Use a valid spelling
     -- for the private pair binder. Keep the original Name in DsMetaEnv.
-    quoteOcc name | occName name == typeLetPairOcc = mkTyVarOcc "pair"
+    quoteOcc name | isTypeLetPairOcc (occName name) = mkTyVarOcc "pair"
                   | otherwise = occName name
 
 occNameLit :: OccName -> DsM (Core String)

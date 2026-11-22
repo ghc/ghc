@@ -50,7 +50,7 @@ import qualified GHC.Data.Strict as Strict
 import GHC.Hs.Decls.Overlap (OverlapMode(..))
 import GHC.Hs.Type
   ( HsTypeGhcPsExt(HsTypeLambda, HsTypeLet, HsTypeCase, HsTypeCaseAlias, HsTypeCaseHead, HsTypeExists, HsTypeSome)
-  , HsTypeCaseAlt(..), HsTypeLetBind(..)
+  , HsTypeCaseAlt(..), HsTypeLetBind(..), HsTypeLetPair(..), HsTypeLetPat(..)
   )
 import GHC.TypeLits
 import GHC.Types.ForeignCall
@@ -4352,16 +4352,26 @@ instance ExactPrint HsTypeLetBind where
     where
       signature (name, colon, kind, semi) =
         (,,,) <$> markAnnotated name <*> markEpUniToken colon <*> markAnnotated kind <*> markEpToken semi
-  exact (HsTypeLetPairBind (open, comma, close) left right eq rhs) = do
+  exact (HsTypeLetPairBind pair eq rhs) =
+    HsTypeLetPairBind <$> markAnnotated pair <*> markEpToken eq <*> markAnnotated rhs
+
+instance ExactPrint HsTypeLetPair where
+  getAnnotationEntry = const NoEntryVal
+  setAnnotationAnchor pair _ _ _ = pair
+  exact (HsTypeLetPair (open, comma, close) left right) = do
     open' <- markEpToken open
-    left' <- field left
+    left' <- markAnnotated left
     comma' <- markEpToken comma
-    right' <- field right
+    right' <- markAnnotated right
     close' <- markEpToken close
-    HsTypeLetPairBind (open', comma', close') left' right' <$> markEpToken eq <*> markAnnotated rhs
-    where
-      field (Left wildcard) = Left <$> markEpToken wildcard
-      field (Right name) = Right <$> markAnnotated name
+    pure (HsTypeLetPair (open', comma', close') left' right')
+
+instance ExactPrint HsTypeLetPat where
+  getAnnotationEntry = const NoEntryVal
+  setAnnotationAnchor pat _ _ _ = pat
+  exact (HsTypeLetPatVar name) = HsTypeLetPatVar <$> markAnnotated name
+  exact (HsTypeLetPatWild wildcard) = HsTypeLetPatWild <$> markEpToken wildcard
+  exact (HsTypeLetPatPair (L loc pair)) = HsTypeLetPatPair . L loc <$> markAnnotated pair
 
 instance ExactPrint (LocatedN RdrName) where
   getAnnotationEntry (L sann _) = fromAnn sann

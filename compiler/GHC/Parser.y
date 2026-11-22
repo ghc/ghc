@@ -43,7 +43,8 @@ import qualified Data.List.NonEmpty as NE
 import qualified Prelude -- for happy-generated code
 
 import GHC.Hs
-import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLambda, HsTypeLet, HsTypeCase, HsTypeExists, HsTypeSome), HsTypeCaseAlt(..), HsTypeLetBind(..))
+import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLambda, HsTypeLet, HsTypeCase, HsTypeExists, HsTypeSome),
+                    HsTypeCaseAlt(..), HsTypeLetBind(..), HsTypeLetPair(..), HsTypeLetPat(..))
 import GHC.Hs.Decls.Overlap ( OverlapMode(..) )
 
 import GHC.Driver.Backpack.Syntax
@@ -65,7 +66,8 @@ import GHC.Prelude hiding ( head, init, last, tail )
 import qualified GHC.Data.Strict as Strict
 
 import GHC.Types.Name.Reader
-import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName, occNameFS, occNameString, mkVarOccFS )
+import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName, occNameFS, occNameString,
+                                   mkVarOccFS, emptyOccSet, elemOccSet, extendOccSet )
 import GHC.Types.UnresolvedImport ( ImportDeclOrigin(..) )
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
@@ -2411,18 +2413,18 @@ typelet_bind :: { LocatedA HsTypeLetBind }
                                                      PsErrTypeLetSignatureMismatch (unLoc $1) (unLoc $5)
                                                ; amsA' (sLL $1 $> (HsTypeLetBind
                                                    (Just ($1, epUniTok $2, $3, mzEpTok $4)) $5 (epTok $6) $7)) } }
-        | '(' typelet_pair_field ',' typelet_pair_field ')' '=' ctype
-                                         {% do { case ($2, $4) of
-                                                   (Right first, Right second) | unLoc first == unLoc second ->
-                                                     addError $ mkPlainErrorMsgEnvelope (locA (getLoc second)) $
-                                                       PsErrTypeLetDuplicatePairField (unLoc second)
-                                                   _ -> pure ()
+        | typelet_pair '=' ctype          {% do { checkTypeLetPairBinders (unLoc $1)
                                                ; amsA' (sLL $1 $> (HsTypeLetPairBind
-                                                   (epTok $1, epTok $3, epTok $5) $2 $4 (epTok $6) $7)) } }
+                                                   (unLoc $1) (epTok $2) $3)) } }
 
-typelet_pair_field :: { Either (EpToken "_") (LocatedN RdrName) }
-        : tyvar                          { Right $1 }
-        | '_'                            { Left (epTok $1) }
+typelet_pair :: { Located HsTypeLetPair }
+        : '(' typelet_pair_field ',' typelet_pair_field ')'
+                                         { sLL $1 $> (HsTypeLetPair (epTok $1, epTok $3, epTok $5) $2 $4) }
+
+typelet_pair_field :: { HsTypeLetPat }
+        : tyvar                          { HsTypeLetPatVar $1 }
+        | '_'                            { HsTypeLetPatWild (epTok $1) }
+        | typelet_pair                   { HsTypeLetPatPair $1 }
 
 typecase_alts :: { Located [LocatedA HsTypeCaseAlt] }
         : typecase_alt                   { sL1 $1 [$1] }
@@ -4613,6 +4615,20 @@ fileSrcSpan = do
   l <- getRealSrcLoc;
   let loc = mkSrcLoc (srcLocFile l) 1 1;
   return (mkSrcSpan loc loc)
+
+-- | Check the simultaneous binders in one type let pattern.
+checkTypeLetPairBinders :: HsTypeLetPair -> P ()
+checkTypeLetPairBinders (HsTypeLetPair _ left right) = check emptyOccSet [left, right]
+  where
+    check _ [] = pure ()
+    check seen (field : rest) = case field of
+      HsTypeLetPatWild{} -> check seen rest
+      HsTypeLetPatPair (L _ (HsTypeLetPair _ l r)) -> check seen (l : r : rest)
+      HsTypeLetPatVar (L loc name) -> do
+        let occ = rdrNameOcc name
+        when (elemOccSet occ seen) $
+          addError $ mkPlainErrorMsgEnvelope (locA loc) $ PsErrTypeLetDuplicatePairField name
+        check (extendOccSet seen occ) rest
 
 -- Hint about linear types. These can be parsed given either -XLinearTypes or
 -- -XModifiers.
