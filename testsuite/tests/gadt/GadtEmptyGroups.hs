@@ -57,6 +57,9 @@ inspectQuote (QuoteRequired (type _) x _) = x == x
 inspectTerminal :: QuotedAt b -> Bool
 inspectTerminal (QuoteTerminal x (type _)) = x == x
 
+inspectImportedTerminal :: Terminal b -> Bool
+inspectImportedTerminal (Terminal x (type _)) = x == x
+
 main :: IO ()
 main =
   print
@@ -64,6 +67,7 @@ main =
         [ inspectQuote (Quote False True)
         , inspectQuote (QuoteRequired @Int (type Bool) 1 Proxy)
         , inspectTerminal (QuoteTerminal (1 :: Int) (type Bool))
+        , inspectImportedTerminal (Terminal (1 :: Int) (type Bool))
         , inspect (Trailing True)
         , inspect (Between True False)
         , inspect (Constrained False)

@@ -11,3 +11,6 @@ data EmptyGroups where
   Constrained :: forall a. (Eq a) => forall. a -> EmptyGroups
   Ordered :: forall a. a -> () => forall b -> forall. (Eq a) => b -> EmptyGroups
   Canonical :: forall a. () => forall c. (Eq a) => forall b -> a -> Proxy (b, c) -> EmptyGroups
+
+data Terminal b where
+  Terminal :: forall a. (Eq a) => a -> forall b -> Terminal b

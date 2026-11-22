@@ -5614,13 +5614,15 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
 
              ; let bang_opts = SrcBangOpts (initBangOpts dflags)
              ; let order
-                     -- Refined terminal constructors need the same separation
-                     -- of result equalities and written contexts as other
-                     -- ordered constructors.
+                     -- The legacy terminal forall layout is restricted to
+                     -- constructors without existential binders. A terminal
+                     -- context alone already supports existential types.
+                     -- Use the ordered layout for refined results as well.
                      -- See Note [Result equalities of ordered constructors]
                      -- in GHC.Tc.Gen.Pat.
                      | ordered || (terminal_order /= 0 &&
-                                   (new_or_data == NewType || not (null eq_preds))) =
+                                   (new_or_data == NewType || not (null eq_preds) ||
+                                    (terminal_order > 0 && not (null ex_tvs)))) =
                          let encoded_suffix = if ordered then suffix else map (source_group . Left) terminal
                              late_count = sum [n | ConTypeArgs n <- encoded_suffix]
                              leading_context = sum [length (hsConDeclTheta (Just ctxt))
