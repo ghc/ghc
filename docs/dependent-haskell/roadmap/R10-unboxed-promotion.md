@@ -149,6 +149,49 @@ stuck. The experiment covers only the primitive constructor in #14180.
 R10 still includes other raw fields, unboxed constructors, and the
 general promotion rules.
 
+### Unsigned machine words
+
+The 64-bit target accepts `type WordHead = 'W#` and the term
+`W# 18446744073709551615##`. A client imports both from the
+stripped provider interface with `ExperimentalDependentTypes`
+disabled. It prints `18446744073709551615` and checks that the term
+`W# 18446744073709551616##` wraps to zero. The signed `Int#`
+family control also passes with stripped provider interfaces.
+Both controls run at `-O0` and `-O2` with Core and STG Lint.
+
+The following separate probes use `ExperimentalDependentTypes`.
+They have the same outcome at both optimization levels.
+
+| Declaration or equation | Diagnostic location |
+| --- | --- |
+| `MatchWord ('W# x) = '()` | GHC-18872 at `x` |
+| `MatchWord ('W# _) = '()` | GHC-18872 at `_` |
+| `MatchWord ('W# (x :: Word#)) = '()` | GHC-83865 at `Word#` |
+| `type FullWidth = 'W# 18446744073709551615##` | GHC-51819 at the literal |
+| `IsFullWidth ('W# 18446744073709551615##) = 'True` | GHC-51819 at the literal |
+| `type WrongSigned = 'W# 3#` | GHC-83865 at the `Int#` literal |
+| `forall (w :: Word#). ()` | GHC-83865 at `Word#` |
+
+The current typechecker admits signed `Int#` literals and scopes
+raw `Int#` family binders under `'I#`. The unsigned candidate needs
+a `Word#` field judgment and an unsigned literal of that kind.
+The target word size defines its range. A separate client should be
+able to prove that `IsFullWidth FullWidth` is `'True` from the provider
+interface. The word one below the maximum should choose a fallback
+branch. An unknown `w :: Word` should leave the family application
+stuck. The existing term wrapping control also gives an expected
+result for a word literal one above the maximum.
+
+The existing interface feature marker covers `Int#` literals and
+`Int#` family binders. The unsigned source probes fail before a provider
+interface can contain either form of `Word#` evidence.
+[GHC User's Guide, MagicHash](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/magic_hash.html),
+[term literal elaboration](../../../compiler/GHC/HsToCore/Match/Literal.hs),
+[target word bounds](../../../compiler/GHC/Platform.hs),
+[family field checking](../../../compiler/GHC/Tc/Gen/HsType.hs),
+[interface literals](../../../compiler/GHC/Iface/Type.hs),
+[interface axiom branches](../../../compiler/GHC/Iface/Syntax.hs).
+
 ## R11 acceptance check
 
 `RawInt` is a small case of the kind-indexed GADT described in the GHC
