@@ -197,4 +197,8 @@ test('GadtExtendedOrderedWire',
      run_command, ['bash GadtExtendedOrderedWire.sh "{compiler}" "{libdir}"'])
 test('GadtPrefixSourceOrder',
      [req_host_target_ghc, only_ways(['normal'])],
-     run_command, ['python3 GadtPrefixSourceOrder.py "{compiler}" "{libdir}"'])
+     run_command, ['$PYTHON GadtPrefixSourceOrder.py "{compiler}" "{libdir}"'])
+test('GadtOrderedUnboxed',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['GadtOrderedUnboxedProvider.hs', 'GadtOrderedUnboxedScope.hs'])],
+     run_command, ['bash GadtOrderedUnboxed.sh "{compiler}" "{libdir}"'])
