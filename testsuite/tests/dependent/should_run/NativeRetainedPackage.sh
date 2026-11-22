@@ -462,6 +462,86 @@ for opt in O0 O2; do
         exit 1
     fi
 done
+# Compose two retained index proofs in a separately compiled consumer.
+mkdir -p "$out/linked/provider"
+cd "$out/linked/provider"
+cp "$out/provider/PackedVecLibrary.hi" .
+cat >LinkedIndex.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures, RoleAnnotations #-}
+module LinkedIndex (Carrier(..), Linked(..), mkLinked) where
+
+import Data.Type.Equality ((:~~:)(HRefl))
+import GHC.Sigma (Sigma(Pair))
+import PackedVecLibrary (Nat(..), Vec(..))
+
+type role Carrier nominal
+newtype Carrier (xs :: Vec Bool n) = Carrier Int
+
+type Evidence n m =
+    some (xs :: Vec Bool n) | (some (ys :: Vec Bool m) |
+        (xs :~~: ('VNil :: Vec Bool 'Z), ys :~~: xs, Carrier ys))
+
+data Linked n m = Linked (Evidence n m)
+
+evidenceZero :: Int -> Evidence 'Z 'Z
+evidenceZero value = Pair VNil (Pair VNil (HRefl, HRefl, Carrier value))
+
+mkLinked :: Int -> Linked 'Z 'Z
+mkLinked value = Linked (evidenceZero value)
+HS
+for opt in O0 O2; do
+    cd "$out/linked/provider"
+    "${g[@]}" "-$opt" -fforce-recomp -fomit-interface-pragmas -fno-write-if-simplified-core -c LinkedIndex.hs
+    mkdir -p "$out/linked/$opt"
+    cp {PackedVecLibrary,LinkedIndex}.hi "$out/linked/$opt/"
+    cd "$out/linked/$opt"
+    cat >LinkedIndexClient.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures #-}
+module Main (main) where
+
+import Data.Type.Equality ((:~~:)(HRefl))
+import GHC.Sigma (Sigma(Pair))
+import LinkedIndex (Carrier(..), Linked(..), mkLinked)
+import PackedVecLibrary (Nat(..), Vec(..))
+
+unpack :: Linked n m -> Carrier ('VNil :: Vec Bool 'Z)
+unpack (Linked (Pair _xs (Pair _ys (first, second, payload)))) =
+    case first of
+        HRefl -> case second of
+            HRefl -> payload
+
+main :: IO ()
+main = do
+    value <- readLn
+    case unpack (mkLinked value) of
+        Carrier result -> print result
+HS
+    "${g[@]}" "-$opt" -c LinkedIndexClient.hs
+    "${g[@]}" LinkedIndexClient.o ../provider/LinkedIndex.o "$out/provider/PackedVecLibrary.o" -o run
+    test "$(printf '41\n' | ./run)" = 41
+    test "$(printf '43\n' | ./run)" = 43
+    cat >LinkedIndexWrong.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures #-}
+module LinkedIndexWrong (wrong) where
+
+import Data.Type.Equality ((:~~:)(HRefl))
+import GHC.Sigma (Sigma(Pair))
+import LinkedIndex (Carrier, Linked(..))
+import PackedVecLibrary (Nat(..), Vec(..))
+
+wrong :: foreach (zs :: Vec Bool 'Z) -> Linked n m -> Carrier zs
+wrong zs (Linked (Pair _xs (Pair _ys (first, second, payload)))) =
+    case first of
+        HRefl -> case second of
+            HRefl -> payload
+HS
+    if "${g[@]}" "-$opt" -fno-code -ferror-spans -c LinkedIndexWrong.hs >wrong-link.log 2>&1 ||
+       ! grep -Fq 'LinkedIndexWrong.hs:13:22-28: error: [GHC-83865]' wrong-link.log ||
+       ! grep -Fq 'Carrier zs' wrong-link.log; then
+        cat wrong-link.log >&2
+        exit 1
+    fi
+done
 cd "$out/provider"
 cp {StoredVector,ConservedPartition}.hi "$src/ListVectorClient.hs" "$out/projection/"
 cd "$out/projection"

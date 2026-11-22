@@ -29,6 +29,39 @@ of the same length. GHC reports GHC-83865 at the attempted `HRefl`.
 [Source and diagnostic checks](../../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh)
 and [equality representation](../REFERENCES.md#transport-a-retained-vector-index).
 
+### Two equalities in one retained package
+
+The imported package retains vectors `xs :: Vec Bool n` and
+`ys :: Vec Bool m`. The payload carries proofs `xs :~~: 'VNil` and
+`ys :~~: xs`, followed by `Carrier ys`. The `Carrier` index has
+nominal role.
+
+```haskell
+unpack :: Linked n m -> Carrier ('VNil :: Vec Bool 'Z)
+unpack (Linked (Pair _xs (Pair _ys (first, second, payload)))) =
+    case first of
+        HRefl -> case second of
+            HRefl -> payload
+```
+
+The first match relates the kind of `xs` to `Vec Bool 'Z` and
+relates `xs` to `'VNil`. The second relates the kind of `ys` to the
+kind of `xs` and relates their indices. The solver can recover a
+nominal coercion from each scoped homogeneous Given. It composes
+the two expressions when the shared retained index and its kind
+match. This lets the client return the payload at `'VNil`.
+
+The previous solver could recover either equality directly. It
+rejected this transport at the RHS `payload` with GHC-83865. The
+client now compiles from the provider interface at `-O0` and `-O2`
+with Core and STG Lint. Omitting either match still fails. Returning
+`Carrier zs` for an independent vector of length zero gives
+GHC-83865 at the RHS `payload`.
+[Retained package harness](../../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh),
+[solver evidence](../../../compiler/GHC/Tc/Solver/Irred.hs),
+[Cockx and Devriese, §3.1, Example 14](https://jesper.cx/files/proof-relevant-unification.pdf#page=13),
+[Weirich et al., §6.2](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf#page=22).
+
 ## Compatibility example
 
 The roadmap card gives no source example. Its linked GHC design uses this
