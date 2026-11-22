@@ -23,12 +23,14 @@ depend on others, so this count cannot estimate the remaining work time.
 | Declaration dependencies, families and GADTs | R21, R23, R24, R41 |
 | Namespace warnings | R36 |
 
-The 525-output Showcase proves that zipping two runtime lists returns
-as many pairs as the shorter list. A second recursive function counts
-records when a header is present. It returns zero for an empty header
-without inspecting the records. An ordinary client can also match a
-vector's stored length, or map a runtime predicate over `These` and
-obtain a proof that its label survives.
+The 534-output Showcase packs a tile with row and column counts read
+at runtime. An ordinary client recovers both dimensions. For an empty
+tile it returns zero rows without evaluating the columns or cells.
+Another client obtains a witness for a comparison at two runtime
+arguments. The list example proves that zipping two runtime lists
+returns as many pairs as the shorter input.
+[Tile client](examples/packed-vector/IndexedMatrixClient.hs),
+[runtime comparison](examples/open-evaluation/CompareAt.hs),
 [List proofs](examples/packed-vector/ZipRows.hs),
 [ordinary list client](examples/packed-vector/OrdinaryZipRows.hs),
 [vector client](examples/packed-vector/DirectIndexedVectorClient.hs)
@@ -39,7 +41,7 @@ record how each behavior was introduced.
 
 | Card | What works | Remaining gap |
 | --- | --- | --- |
-| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | GADT constructors can store nested retained sums that refer to erased parameters. An ordinary client can construct and match a `Pair` when its expected type reduces to a retained sum. An ordinary client can also use a GADT with one retained result index, ordinary fields that depend on that index, and other unchanged erased parameters. | Broaden dependent product domains and inference. Support compound constructor result indices and multiple retained result indices. |
+| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | A result type can name a runtime comparator applied to both arguments. A constructor can index a rectangle by separate dimensions or a tile by one shape that contains both dimensions. | Broaden callback domains and inference. Check higher-arity shapes and infer hidden indices through nested patterns. |
 | [R05 dependent Core](roadmap/R05-dependent-core.md) | The standard `-O2` pipeline specializes a recursive consumer and keeps retained case proofs scoped. A provider and an interface-only client can match rules that construct or open an erased package. Source rules can have an imported head and a local anchor, or come from a visible orphan module. | Rules for retained functions and general dependent coercions remain open. |
 | [R15 closed evaluator](roadmap/R15-closed-term-evaluator.md#read-independent-row-and-column-counts) | A client proves the labels and all cells of a compiled rectangular table with two hidden dimensions. Both dimensions of a square can share one hidden index. | Extend readback beyond the checked matrix and container shapes. |
 | [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The installed `filter not` handles a known Boolean head and an unknown tail. A separate ordinary client proves length preservation for the installed `map` by induction over a finite spine. | General open evaluation across arbitrary ordinary definitions. |
@@ -116,16 +118,20 @@ type, rectangular and square indices, a successor-indexed payload, a
 quantified GADT equality, and tuple patterns in type-level lets. A clean
 bootstrap exposed a missing dependency on the primitive tuple module.
 The ambiguity check for a noninjective callback result could also panic.
-The 534-line candidate includes both repairs. Its matched compiler and
-library qualification is pending.
+The 534-line compiler includes both repairs. It also reads checked
+mapping equations through GHCi debugger breakpoints.
+Both normal compiler stages matched the native golden at `-O0` and
+`-O2`. Self-hosted GHCi matched it in bytecode. All 27 selected
+registered tests passed.
+[Qualification record](CHECKPOINTS.md#runtime-tiles-and-curried-comparisons).
 
 The following checks extend the same cards. An ordinary caller can
 recover the dimensions and cells of a `Tile`. The partial application
 `f pivot` can appear inside `Prelude.fmap` in a type when both arguments
 and the result of `f` have abstract lifted types. Other component checks
 compose scoped index equalities across several matches and infer an
-erased shape from a runtime tile constructor. Nested tuple patterns in
-type-level lets await matched source and quotation tests.
+erased shape from a runtime tile constructor. Both compiler stages
+check nested tuple patterns in source and in type quotations.
 [Tile](examples/packed-vector/IndexedMatrixClient.hs),
 [mapping proof](examples/open-evaluation/TheseMapping.hs),
 [equality](roadmap/R11-homogeneous-equality.md),
