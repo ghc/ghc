@@ -954,7 +954,9 @@ gadtKindTransport_maybe spec@(_:_:_)
     transport earlier (EqSpec tv rhs_index)
       | lhs_kind `eqType` rhs_kind
       = Just (const (mkNomEqPred lhs_index rhs_index, Nothing))
-      | isTauTy lhs_kind
+      | let (kind_bndrs, kind_body) = splitForAllTyVars lhs_kind
+      , all (\(ma, tv) -> isTauTy ma && isTauTy (tyVarKind tv)) kind_bndrs
+      , isTauTy kind_body
       , allVarSet independent (tyCoVarsOfType lhs_kind)
       , substTyWithInScope in_scope kvs rhses lhs_kind `eqType` rhs_kind
       = Just $ \lc ->
@@ -1062,9 +1064,13 @@ before the source context dictionaries and ordinary fields. The
 wrapper skips the remaining proof fields before applying unboxers to
 the dictionaries and fields. Pattern synonym inference restores the
 proof prefix and retains the source context evidence verbatim.
-The index kind must be a monotype.
-Its free variables must be type variables. Each variable either has
-an earlier proof in scope or has a kind independent of their refinements.
+The index kind can start with foralls that bind type variables.
+Each binder kind, matchability and the remaining body must be a monotype.
+ForAllCo relates the binder kinds with an earlier proof. The lift uses that
+proof at occurrences of the binder in the body. See Note [ForAllCo] in
+GHC.Core.TyCo.Rep.
+The free variables of the index kind must be type variables. Each variable
+must have an earlier proof in scope or a kind independent of those proofs.
 
 Keep the source EqSpecs for the source constructor signature and
 pattern-match oracle. The interface records the worker binders in
