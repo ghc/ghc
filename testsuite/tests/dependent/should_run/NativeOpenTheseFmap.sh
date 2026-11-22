@@ -153,3 +153,39 @@ if grep -q 'DFunId SourceMethods.*fmap' strict.iface; then
     echo 'The mapping worker with a strict result field exported lazy equations.' >&2
     exit 1
 fi
+
+# The equation for an unknown label requires the constructor result even
+# when the label is bottom. Check the same client against both workers.
+mkdir -p "$out/label"/{provider,client}
+cd "$out/label/provider"
+"${ghc[@]}" -O2 -DFORCE_INT_LABEL -fomit-interface-pragmas -fno-write-if-simplified-core \
+    -c "$src/concrete-mapping/Row.hs" -outputdir .
+cd ../client
+cat >Label.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
+module Label where
+import Data.Type.Equality ((:~:)(Refl))
+import Row
+claim :: foreach (n :: Int) -> foreach (f :: Bool -> Bool) -> foreach (x :: Bool)
+      -> fmap f ('Both n 'True x) :~: 'Both n 'True (f x)
+claim _ _ _ = Refl
+HS
+cp "$out/O2/provider/Row.hi" .
+"${ghc[@]}" -O2 -fno-code -c Label.hs
+cp ../provider/Row.hi .
+if "${ghc[@]}" -O2 -fforce-recomp -fno-code -c Label.hs >demand.log 2>&1; then
+    echo 'The proof accepted an equation that discards demand on the label.' >&2
+    exit 1
+fi
+grep -Eq '^Label.hs:[67]:' demand.log && grep -Fq 'fmap' demand.log || { cat demand.log >&2; exit 1; }
+cat >Main.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module Main where
+import Row
+main :: IO ()
+main = fmap not (Both (error "strict integer label") False True :: Row Int Bool Bool) `seq` pure ()
+HS
+"${ghc[@]}" -O2 -c Main.hs
+"${ghc[@]}" Main.o ../provider/Row.o -o demand
+if ./demand >actual 2>&1; then exit 1; fi
+grep -Fq 'strict integer label' actual || { cat actual >&2; exit 1; }
