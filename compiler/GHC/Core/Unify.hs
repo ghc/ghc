@@ -2335,11 +2335,8 @@ uOccursCheck (UMState { um_tv_env = tv_env, um_fam_env = fam_env }) bvs lhs ty
     go :: TyCoVarSet   -- Bound by enclosing foralls; see (OCU1)
        -> Type -> Bool
     go bvs ty | Just ty' <- coreView ty = go bvs ty'
-    go bvs (TermAppTy _ arg) = go bvs arg
-    go _ (TermVarTy {}) = False
-      -- A supported index Id has a closed algebraic domain and Many
-      -- multiplicity. Its type has no type variables or family applications.
-      -- See Note [Apartness of retained runtime indices].
+    go bvs (TermAppTy f arg) = go_id bvs f || go bvs arg
+    go bvs (TermVarTy v) = go_id bvs v
     go bvs (ExistsTy _ v body)
       = go bvs (varType v) ||
         (case lhs of
@@ -2371,6 +2368,9 @@ uOccursCheck (UMState { um_tv_env = tv_env, um_fam_env = fam_env }) bvs lhs ty
     go bvs (CastTy ty  _co) = go bvs ty  -- ToDo: should we worry about `co`?
     go _   (CoercionTy _co) = False      -- ToDo: should we worry about `co`?
 
+    -- See Note [The occurs check in the Core unifier].
+    go_id bvs v = go bvs (varType v) || go bvs (idMult v)
+
     go_tc bvs tc tys
       | isEmptyVarSet bvs   -- Never look up in um_fam_env under a forall (ATF3)
       , isTypeFamilyTyCon tc
@@ -2397,6 +2397,13 @@ The unifier applies both substitutions (um_tv_env and um_fam_env) as it goes,
 so we'll get an infinite loop if we have, for example
     um_tv_env:   a :-> F b      -- (1)
     um_fam_env   F b :-> a      -- (2)
+
+A retained index can refer to a type variable through its runtime Ids.
+For example, let f :: a -> Bool and x :: a. The type of f x is Bool.
+The proposed binding a := ((f x ~ f x) => Int) would still put a in its
+own substitution range, through the types of f and x. Check the type and
+multiplicity of each retained Id with the same substitutions as the
+enclosing type. A fresh b can bind to the same range.
 
 So (uOccursCheck substs lhs ty) returns True iff extending `substs` with `lhs :-> ty`
 could lead to a loop. That is, could there by a type `s` such that
