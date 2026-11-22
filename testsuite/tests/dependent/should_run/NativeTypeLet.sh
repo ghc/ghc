@@ -41,8 +41,8 @@ test "$(grep -c 'tag :: tag' Pretty.hs)" = 2
 "${g[@]}" -fforce-recomp -fno-code -c Pretty.hs
 cp TypeLet.hi PackedVecLibrary.hi SignatureLet.hi SignedLets.hi "$out/client/"
 cat >PairBindings.hs <<'HS'
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, ExplicitNamespaces, KindSignatures, TypeOperators #-}
-module PairBindings (Count, AliasCount, Held, Rebuild, ShadowCount) where
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, ExplicitNamespaces, KindSignatures, TypeFamilies, TypeOperators #-}
+module PairBindings (Count, AliasCount, Held, KnownPrefix, Rebuild, ShadowCount) where
 
 import GHC.TypeNats (Nat, type (+))
 
@@ -53,6 +53,9 @@ type Count (dimensions :: (Nat, Nat)) =
 type Dimensions = '(2, 3)
 type Alias = Dimensions
 type AliasCount = let { (rows, _) = Alias; cols = 3 } in rows + cols
+
+type family OpaqueField (n :: Nat) :: Bool
+type KnownPrefix (n :: Nat) = let { (rows, _) = '(2, OpaqueField n) } in rows
 
 type Held (dimensions :: (Nat, Nat)) = let { (_, _) = dimensions } in Bool
 type Rebuild (dimensions :: (Nat, Nat)) = let { (rows, cols) = dimensions } in '(rows, cols)
@@ -75,7 +78,7 @@ cat >OrdinaryLet.hs <<'HS'
 module OrdinaryLet where
 import Data.Type.Equality ((:~:)(Refl))
 import Data.Proxy (Proxy)
-import PairBindings (AliasCount, Count, Held, ShadowCount)
+import PairBindings (AliasCount, Count, Held, KnownPrefix, ShadowCount)
 import qualified SignatureLet
 import SignedLets (Braced, Layout)
 import TypeLet
@@ -112,6 +115,9 @@ knownPair = Refl
 
 aliasPair :: AliasCount :~: 5
 aliasPair = Refl
+
+opaqueField :: Proxy n -> KnownPrefix n :~: 2
+opaqueField _ = Refl
 
 heldPair :: Proxy dimensions -> Held dimensions :~: Bool
 heldPair _ = Refl

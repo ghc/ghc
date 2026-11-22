@@ -36,7 +36,7 @@ type was selected. The [R19 card](R19-type-level-cases.md#a-case-in-a-let-body)
 describes the cases that can use a let-bound value in their branches. [Agda let scope](https://agda.readthedocs.io/en/v2.8.0/language/let-and-where.html#let-expressions)
 and [Eisenberg and Stolarek on case lifting, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf).
 
-The source form supports one variable per binding and nested lets.
+The source form supports simple variable bindings and nested lets.
 A synonym or closed family equation can bind a type lambda on the RHS
 and pass it to another family. A lambda in the body can capture the let
 result. For example, `ScopedRow Char '[Bool]` gives
@@ -144,8 +144,10 @@ projections gives no equality proof with the original pair.
 The fork uses closed families for the projections. Agda also translates
 local record patterns to projections and separately gives its records an
 eta rule. The fork's pair bindings use the existing type-family equality
-rules. [Agda record lets](https://agda.readthedocs.io/en/v2.8.0/language/let-and-where.html#let-binding-record-patterns),
+rules. The base test `CatPairs` uses the same constructor equations for
+pairs of types. [Agda record lets](https://agda.readthedocs.io/en/v2.8.0/language/let-and-where.html#let-binding-record-patterns),
 [Agda eta](https://agda.readthedocs.io/en/v2.8.0/language/record-types.html#eta-expansion),
+[CatPairs](../../../libraries/base/tests/CatPairs.hs),
 and [interface and scope checks](../../../testsuite/tests/dependent/should_run/NativeTypeLet.sh).
 
 ## Type quotations and splices
@@ -162,6 +164,8 @@ to the second binder.
 
 Splicing the quotation checks the type at the splice site.
 A local kind signature appears as `SigT` on the right-hand side of `LetT`.
+A pair binding appears as a fresh temporary `LetT` followed by a `LetT`
+for each projected field.
 An ordinary client can import a value with that type and observe
 `Right (Just True)`. Reification of a checked type can expand the
 abbreviation. The TH constructor and `letT` smart constructor are
