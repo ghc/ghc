@@ -16,4 +16,4 @@ exec env -u XDG_RUNTIME_DIR pueue add --print-task-id --escape --group ghc --lab
     "CAPPED_LABEL=$label" "CAPPED_MEM=$mem" "HEAVY_PEAKS=$peaks" \
     /usr/bin/systemd-run --user --scope --quiet --slice=ghcbuild.slice \
     --property="MemoryMax=$mem" --property=MemorySwapMax=0 \
-    /usr/bin/taskset --cpu-list 0-11 "$record" "$@"
+    /usr/bin/taskset --cpu-list 0-15 "$record" "$@"

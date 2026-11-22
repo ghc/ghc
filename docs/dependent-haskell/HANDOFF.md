@@ -8,7 +8,7 @@ and its [expected output](Showcase.stdout) are the executable examples.
 
 ## Current checkpoint
 
-Updated 22 November 2026, 13:25 CET.
+Updated 22 November 2026, 13:37 CET.
 
 | Revision | What to recover | Verification |
 | --- | --- | --- |
@@ -18,73 +18,43 @@ Updated 22 November 2026, 13:25 CET.
 
 Pueue job `379` is building `70ded7e706` in the normal checkout below.
 Verify that its label is `normal-70ded7e706` when inspecting the queue.
-The bootstrap completed. The process reported CPUs 0–11, a 16 GiB job cap,
-and no swap. The priority probe froze the slice while a job in another group
+The baseline started with four workers. After WSL exposed 24 CPUs, the
+active build gained affinity to CPUs 0–15. The shared slice reported
+`cpu.max = 1600000 100000`, a 64 GB memory limit and zero swap. The priority probe froze the slice while a job in another group
 ran, then resumed it. The local branch includes the 542-line fixture.
 [Branch recovery ledger](BRANCHES.md#22-november-restart).
 
-The open Core optimizer investigation concerns pushing a dependent function
-cast through an application with a cast callback. It is separate from the
-CorePrep fix in the consolidated compiler. Record its tested commit here
-before including it in a release.
+The final compiler candidate is `3a4e5c237a`. It includes the Core
+optimizer change from `9011965d43` and the 542-line fixture. When a
+retained function cast is applied to a nominally cast lexical callback,
+the optimizer can substitute that callback into the result proof. It checks
+the full binder type and preserves the callback's identity and evidence.
+Pueue job `380` ran the same Core API test before and after the optimizer
+change. The baseline failed at the forward cast. The candidate object
+passed the full fixture, including the reverse cast and the newtype
+control. Job `381` found both zipper equations and their fusion rules
+in the baseline's static and dynamic `GHC.Internal.List` interfaces.
+The combined compiler still needs its two-stage build and tests.
 
-## Resume on the shared WSL host
+The baseline reader has finished. The clean build owns the normal checkout.
+The recovery area's `core/verify.sh` records the focused before/after check.
+The normal area's `incremental.sh` rebuilds the same checkout at the final
+revision. `qualify.sh` records the final tests in
+`final-3a4e5c237a/results/qualification.tsv`. All three commands use the
+shared queue. The user requested a pause after the verified branch is pushed.
 
-Use `/home/tritlo/Code/ghc`. Keep source changes in Git and put current
-builds and receipts under `_build/on-demand/live-recovery/`. The WSL restart
-erased `/tmp`. A Git worktree registration or a saved Pueue task can survive
-after its checkout or process has gone.
+## Resume after a restart
 
-1. Run `git status -sb`, `git worktree list --porcelain`, and
-   `git ls-remote fork refs/heads/dependent-haskell`. Compare the revisions
-   with the table above. Run `env -u XDG_RUNTIME_DIR pueue status` to check
-   the shared daemon. Inspect the specific job and its checkout before
-   retrying it. Keep the queue paused while restoring resource limits.
-2. Set the user bus variables in the shell that controls systemd. If
-   `/run/user/$(id -u)/bus` is missing, start the user manager from a WSL
-   terminal with `sudo systemctl start user@$(id -u).service`.
-
-   ```sh
-   export XDG_RUNTIME_DIR=/run/user/$(id -u)
-   export DBUS_SESSION_BUS_ADDRESS=unix:path=$XDG_RUNTIME_DIR/bus
-   ```
-
-3. If the shared daemon is down, start it on its existing socket.
-   Pueue clients on this host use `env -u XDG_RUNTIME_DIR pueue`.
-   This preserves the queue shared with local-model jobs.
-
-   ```sh
-   systemd-run --user --unit=shared-pueued --property=Restart=on-failure \
-       /usr/bin/env -u XDG_RUNTIME_DIR "$HOME/.nix-profile/bin/pueued"
-   ```
-
-4. Restore the GHC slice and its priority watcher. Run these commands from
-   the repository root. Start the watcher only if its service is inactive.
-   Its state marker lives in the user runtime directory. Inspect any queued
-   GHC commands from the previous boot before starting the group.
-
-   ```sh
-   systemctl --user set-property --runtime ghcbuild.slice \
-       CPUQuota=1200% AllowedCPUs=0-11 MemoryMax=64000000000 MemorySwapMax=0
-   systemctl --user start ghcbuild.slice
-   systemd-run --user --unit=ghc-build-priority --property=Restart=on-failure \
-       --setenv="PATH=$PATH" --setenv="XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR" \
-       --setenv="DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS" \
-       /usr/bin/python3 "$PWD/docs/dependent-haskell/tools/ghc-build-priority.py"
-   systemctl --user show ghcbuild.slice -p CPUQuotaPerSecUSec -p MemoryMax -p MemorySwapMax
-   env -u XDG_RUNTIME_DIR pueue group
-   ```
-
-   The expected values are `12s`, `64000000000` and `0` respectively.
-   The `ghc` group has three slots. Each Hadrian invocation uses at most four
-   workers. Runnable work in another group takes priority. The watcher
-   pauses GHC admissions and freezes the GHC slice until that work finishes.
-   When another job has priority, leave GHC paused. Use
-   `env -u XDG_RUNTIME_DIR pueue start --group ghc` when ready to resume.
-5. Submit the build with [ghc-build-job](tools/ghc-build-job). It runs each
-   job in the shared slice and records peak memory with
-   `~/Code/heavy-management/bin/capped-record`. Inspect the job result and
-   the compiler revision in its receipt.
+1. Check `git status -sb` and `git ls-remote fork refs/heads/dependent-haskell`.
+   Compare both revisions with the checkpoint table. Fetch the fork branch
+   if this checkout predates the release.
+2. Check `env -u XDG_RUNTIME_DIR pueue status` and inspect the named job and
+   its checkout. The WSL restart erased `/tmp` while Git and Pueue retained
+   records for its old paths. Keep active builds under `_build/on-demand/`.
+3. Restore the [shared WSL build queue](CHECKPOINTS.md#restore-the-shared-wsl-build-queue)
+   before submitting work. The group has three slots. All GHC jobs share
+   16 logical CPUs, 64,000,000,000 bytes of memory and zero swap.
+   Higher-priority jobs pause the queue and freeze the GHC slice.
 
 ## Build and verify
 
@@ -93,7 +63,8 @@ The current normal checkout is
 `build.sh` records the commands and writes logs in the parent directory.
 On this host the bootstrap tools are GHC 9.14.1, Cabal 3.18.1.0, Happy 2.1.7
 and Alex 3.5.4.0. A fresh checkout needs the Git submodules at their recorded
-revisions. The normal build runs `./boot`, `./configure`, builds Hadrian
+revisions. This build used four workers. The shared queue now allows five per job.
+The normal build runs `./boot`, `./configure`, builds Hadrian
 from `hadrian/cabal.project`, and runs Hadrian with
 `-j4 --flavour=quick --docs=none`. Reuse the configured checkout and Hadrian
 binary if a build stops partway. Keep each compiler with its own libraries.

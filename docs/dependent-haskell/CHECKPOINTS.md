@@ -10,9 +10,8 @@ increments.
 
 On the shared WSL host, schedule GHC builds and compiler verification
 in the `ghc` group on the usual Pueue daemon. The group has three slots
-across all worktrees. Its jobs share twelve logical CPUs and a memory
-limit of 64,000,000,000 bytes in `ghcbuild.slice`. Use at most four
-Hadrian workers per job. A private compiler link or a separate test
+across all worktrees. Its jobs share sixteen logical CPUs and a memory
+limit of 64,000,000,000 bytes in `ghcbuild.slice`. Use up to five Hadrian workers per job. A private compiler link or a separate test
 job also uses a slot.
 
 Runnable work in other groups has priority. The local priority watcher
@@ -27,6 +26,64 @@ timeouts across a priority pause. The affected tests were
 `NativeIndexedFin` and `NativeImplicitExistential`. Keep the first summary.
 Rerun the timed-out tests on the same compiler and allow for the pause in
 the wall-time limit. Record the rerun separately.
+
+## Restore the shared WSL build queue
+
+Use `/home/tritlo/Code/ghc`. Keep source changes in Git and put current
+builds and receipts under `_build/on-demand/live-recovery/`. The WSL restart
+erased `/tmp`. A Git worktree registration or a saved Pueue task can survive
+after its checkout or process has gone.
+
+1. Run `git status -sb`, `git worktree list --porcelain`, and
+   `git ls-remote fork refs/heads/dependent-haskell`. Compare the revisions
+   with the [handoff](HANDOFF.md). Run `env -u XDG_RUNTIME_DIR pueue status` to check
+   the shared daemon. Inspect the specific job and its checkout before
+   retrying it. Keep the queue paused while restoring resource limits.
+2. Set the user bus variables in the shell that controls systemd. If
+   `/run/user/$(id -u)/bus` is missing, start the user manager from a WSL
+   terminal with `sudo systemctl start user@$(id -u).service`.
+
+   ```sh
+   export XDG_RUNTIME_DIR=/run/user/$(id -u)
+   export DBUS_SESSION_BUS_ADDRESS=unix:path=$XDG_RUNTIME_DIR/bus
+   ```
+
+3. If the shared daemon is down, start it on its existing socket.
+   Pueue clients on this host use `env -u XDG_RUNTIME_DIR pueue`.
+   This preserves the queue shared with local-model jobs.
+
+   ```sh
+   systemd-run --user --unit=shared-pueued --property=Restart=on-failure \
+       /usr/bin/env -u XDG_RUNTIME_DIR "$HOME/.nix-profile/bin/pueued"
+   ```
+
+4. Restore the GHC slice and its priority watcher. Run these commands from
+   the repository root. Start the watcher only if its service is inactive.
+   Its state marker lives in the user runtime directory. Inspect any queued
+   GHC commands from the previous boot before starting the group.
+
+   ```sh
+   systemctl --user set-property ghcbuild.slice \
+       CPUQuota=1600% AllowedCPUs=0-15 MemoryMax=64000000000 MemorySwapMax=0
+   systemctl --user start ghcbuild.slice
+   systemd-run --user --unit=ghc-build-priority --property=Restart=on-failure \
+       --setenv="PATH=$PATH" --setenv="XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR" \
+       --setenv="DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS" \
+       /usr/bin/python3 "$PWD/docs/dependent-haskell/tools/ghc-build-priority.py"
+   systemctl --user show ghcbuild.slice -p CPUQuotaPerSecUSec -p MemoryMax -p MemorySwapMax
+   env -u XDG_RUNTIME_DIR pueue group
+   ```
+
+   The expected values are `16s`, `64000000000` and `0` respectively.
+   The `ghc` group has three slots. Each Hadrian invocation uses at most five
+   workers. Runnable work in another group takes priority. The watcher
+   pauses GHC admissions and freezes the GHC slice until that work finishes.
+   When another job has priority, leave GHC paused. Use
+   `env -u XDG_RUNTIME_DIR pueue start --group ghc` when ready to resume.
+5. Submit the build with [ghc-build-job](tools/ghc-build-job). It runs each
+   job in the shared slice and records peak memory with
+   `~/Code/heavy-management/bin/capped-record`. Inspect the job result and
+   the compiler revision in its receipt.
 
 ## Clean up after each experiment
 
