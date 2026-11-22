@@ -21,6 +21,30 @@ type family F (xs :: [Bool]) :: Size
 type family G (xs :: [Bool]) :: Size
 type family W (n :: Size) :: Size
 
+-- Apply the same type family on both sides of a local equality.
+type family Count (n :: Size) :: Size
+#if defined(CALL_HEAD)
+underCall :: foreach (f :: Size -> Size) -> foreach (g :: Size -> Size) -> foreach (n :: Size)
+          -> Count n :~: f n -> W (Count n) :~: W (g n)
+underCall _ _ _ Refl = Refl
+#elif defined(CALL_ARG)
+underCall :: foreach (f :: Size -> Size) -> foreach (n :: Size) -> foreach (m :: Size)
+          -> Count n :~: f n -> W (Count n) :~: W (f m)
+underCall _ _ _ Refl = Refl
+#elif defined(CALL_ROLE)
+underCall :: foreach (f :: Size -> Size) -> foreach (n :: Size)
+          -> Coercion (Count n) (f n) -> W (Count n) :~: W (f n)
+underCall _ _ Coercion = Refl
+#elif defined(CALL_CYCLE)
+underCall :: foreach (f :: Size -> Size) -> foreach (n :: Size)
+          -> Count n :~: f (Count n) -> W (Count n) :~: W 'Zero
+underCall _ _ Refl = Refl
+#else
+underCall :: foreach (f :: Size -> Size) -> foreach (n :: Size)
+          -> f (f n) :~: Count n -> W (Count n) :~: W (f (f n))
+underCall _ _ Refl = Refl
+#endif
+
 #ifdef OUTSIDE
 check :: foreach (xs :: [Bool]) -> Maybe (F xs :~: G xs) -> W (F xs) :~: W (G xs)
 check xs proof = case proof of
