@@ -39,7 +39,7 @@ pair :: $(do
       , nameBase outer == nameBase saved
       , nameBase first == "PairFirst", nameBase second == "PairSecond" -> pure ty
     _ -> fail (show ty))
-pair = Proxy :: Proxy '('(1, 7), '(2, 3))
+pair = Proxy :: Proxy '( '(1, 7), '(2, 3))
 
 -- A let can return a type constructor. The final argument applies to its result.
 applied :: $(do
