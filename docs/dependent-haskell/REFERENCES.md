@@ -1738,6 +1738,13 @@ constructor takes the columns first. The square has two equalities and
 one retained field. The witnesses and cells remain lazy.
 See Note [Retained constructor result equality] in GHC.Core.DataCon.
 
+An Agda absurd pattern can eliminate a square at unequal indices.
+Unifying both indices with `n` gives a conflict. The Haskell empty
+case at unequal indices is exhaustive and evaluates its lifted
+scrutinee. An explicit square pattern still demands the scrutinee.
+GHC reports that its right-hand side is inaccessible.
+[Agda absurd patterns](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#absurd-patterns).
+
 ## Source vector uncons
 
 Decision: inspect the stored runtime length before repackaging a vector tail.

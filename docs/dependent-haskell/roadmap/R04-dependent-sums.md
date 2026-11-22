@@ -289,8 +289,10 @@ data SquareMatrix a (rows :: Nat) (columns :: Nat) where
 
 An ordinary client can return `rows :~: columns` from `Square _ _`.
 The match needs the outer constructor. It leaves the side length and
-the cells unevaluated. At type `SquareMatrix a 'Z ('S 'Z)`, a case with
-no alternatives still warns about a missing `Square` pattern.
+the cells unevaluated. At type `SquareMatrix a 'Z ('S 'Z)`, an empty
+case is exhaustive and evaluates its scrutinee. An explicit `Square`
+alternative at this type has an inaccessible right-hand side. A length
+pattern on a square with compatible indices evaluates the stored length.
 [Showcase constructors](../examples/packed-vector/IndexedMatrix.hs),
 [ordinary Showcase client](../examples/packed-vector/IndexedMatrixClient.hs), and
 [source-hidden check](../../../testsuite/tests/dependent/should_run/NativeGadtRetainedSum.sh).

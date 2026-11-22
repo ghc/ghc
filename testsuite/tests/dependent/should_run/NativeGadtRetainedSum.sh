@@ -127,7 +127,7 @@ HS
 
     if [[ $mode == O0 ]]; then
         cat >DirectIndexCoverage.hs <<'HS'
-{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}
+{-# LANGUAGE DataKinds, EmptyCase, GADTs, NoExperimentalDependentTypes #-}
 module DirectIndexCoverage where
 import NativeGadtRetainedSumProvider
 
@@ -153,13 +153,20 @@ knownMarked (MarkedRows True (S _) (VCons x _)) = x
 
 knownSquare :: SquareMatrix a 'Z 'Z -> Bool
 knownSquare (Square Z _) = True
+
+disjointSquare :: SquareMatrix a 'Z ('S 'Z) -> ()
+disjointSquare x = case x of {}
+
+disjointSquareMatch :: SquareMatrix a 'Z ('S 'Z) -> ()
+disjointSquareMatch (Square _ _) = ()
 HS
         "${ghc[@]}" "${flags[@]}" -ferror-spans -Wincomplete-patterns -Woverlapping-patterns \
             -c DirectIndexCoverage.hs >coverage.log 2>&1
         grep -Fq 'DirectIndexCoverage.hs:12:1-34: warning: [GHC-62161]' coverage.log &&
             grep -Fq 'not matched: DirectVec (S _) _' coverage.log &&
             grep -Fq 'DirectIndexCoverage.hs:15:1-44: warning: [GHC-94210]' coverage.log &&
-            test "$(grep -c 'warning:' coverage.log)" -eq 2 || { cat coverage.log >&2; exit 1; }
+            grep -Fq 'DirectIndexCoverage.hs:32:1-37: warning: [GHC-94210]' coverage.log &&
+            test "$(grep -c 'warning:' coverage.log)" -eq 3 || { cat coverage.log >&2; exit 1; }
     fi
 
     cat >BadScope.hs <<'HS'

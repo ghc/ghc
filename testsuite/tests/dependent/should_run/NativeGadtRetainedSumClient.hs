@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}
+{-# LANGUAGE DataKinds, EmptyCase, GADTs, NoExperimentalDependentTypes #-}
 module Main (main) where
 
 import Control.Exception (ErrorCall, displayException, evaluate, try)
@@ -55,6 +55,17 @@ matrixCells (MatrixByColumns _ _ xs) = xs
 -- | Use both result equalities to prove the dimensions agree.
 squareDimensions :: SquareMatrix a rows columns -> rows :~: columns
 squareDimensions (Square _ _) = Refl
+
+-- | Eliminate a square whose public dimensions disagree.
+{-# NOINLINE emptySquare #-}
+emptySquare :: SquareMatrix a 'Z ('S 'Z) -> ()
+emptySquare x = case x of {}
+
+-- | Inspect the stored field of a possible square.
+{-# NOINLINE squareIsEmpty #-}
+squareIsEmpty :: SquareMatrix a n n -> Bool
+squareIsEmpty (Square Z _) = True
+squareIsEmpty (Square (S _) _) = False
 
 -- | Return the vector from a marked row.
 markedCells :: MarkedRows a rows 'True -> Vec a rows
@@ -137,6 +148,8 @@ main = do
         "different retained kinds follow the result parameter order"
     case squareDimensions (Square unused (error "square payload")) of
         Refl -> pure ()
+    throws "square scrutinee" (emptySquare (error "square scrutinee"))
+    throws "direct length" (squareIsEmpty (Square unused (error "square payload")))
     require (storedLengths value == (1, 2)) "stored lengths"
     require (innerCells value == [False, True]) "inner cells"
     require (paired value == aligned) "shared outer index"

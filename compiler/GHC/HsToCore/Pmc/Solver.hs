@@ -710,7 +710,7 @@ addPhiTmCt nabla (PhiConCt x con tvs dicts args) = do
   -- PhiConCt correspond to the higher-level φ constraints from the paper with
   -- bindings semantics. It disperses into lower-level δ constraints that the
   -- 'add*Ct' functions correspond to.
-  nabla' <- addTyCts nabla (listToBag dicts)
+  nabla' <- addTyCts nabla (listToBag (addSharedRetainedResultEqs con dicts))
   nabla'' <- addConCt nabla' x con tvs args
   foldlM addNotBotCt nabla'' (filterUnliftedFields con args)
 addPhiTmCt nabla (PhiNotConCt x con)       = addNotConCt nabla x con
@@ -718,6 +718,21 @@ addPhiTmCt nabla (PhiBotCt x)              = addBotCt nabla x
 addPhiTmCt nabla (PhiNotBotCt x)           = addNotBotCt nabla x
 addPhiTmCt nabla (PhiUnpackCt x schema witness payload)
   = addUnpackCt nabla x schema witness payload
+
+-- | Relate result arguments that use the same retained field.
+-- See Note [Coverage of retained constructor results].
+addSharedRetainedResultEqs :: PmAltCon -> [PredType] -> [PredType]
+addSharedRetainedResultEqs (PmAltConLike (RealDataCon con)) dicts@(_:_:_)
+  | dataConHasRetainedResult con
+  = snd (foldl' add_eq (emptyVarEnv, dicts) dicts)
+  where
+    add_eq (seen, equalities) pred_ty
+      | Just (Nominal, ty, TermVarTy field) <- getEqPredTys_maybe pred_ty
+      = case lookupVarEnv seen field of
+          Just other -> (seen, mkNomEqPred other ty : equalities)
+          Nothing -> (extendVarEnv seen field ty, equalities)
+      | otherwise = (seen, equalities)
+addSharedRetainedResultEqs _ dicts = dicts
 
 filterUnliftedFields :: PmAltCon -> [Id] -> [Id]
 filterUnliftedFields con args =
@@ -881,6 +896,15 @@ Apply the check to a constructor alternative. The witness can still be
 bottom before the program matches it. The branch that tries S can force
 the witness, even if its right-hand side is inaccessible. Keep the
 ordinary divergence and demand checks.
+
+A Square constructor provides rows ~# side and columns ~# side. Add
+rows ~# columns to the type oracle when checking the constructor. This
+lets it detect incompatible public indices, even when the equalities
+that mention the stored side are irreducible. Compare the retained Ids
+so that a rectangle's two different fields do not relate its indices.
+Both a written pattern and a speculative constructor use this check.
+An empty case can still force the scrutinee. A length pattern can still
+force the stored side when the constructor is possible.
 -}
 
 equateTys :: [Type] -> [Type] -> [PhiCt]
