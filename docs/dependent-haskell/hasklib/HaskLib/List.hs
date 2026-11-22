@@ -4,7 +4,7 @@
 -- | Length laws for the installed Prelude functions on ordinary lists.
 module HaskLib.List
     ( Size(..), size, plus, minSize
-    , lengthMap, lengthAppend, lengthZip, lengthZipWith, lengthReverse
+    , lengthMap, lengthAppend, lengthZip, lengthZipWith, lengthZipMap, lengthReverse
     ) where
 
 import Data.Type.Equality ((:~:)(Refl), trans)
@@ -13,7 +13,7 @@ import HaskLib.Size (plusSucc, plusZero)
 import Prelude ((++), map, reverse)
 import PreludeAppendLengthSource (plus)
 import PreludeMapLengthSize (Size(..), minSize, size)
-import PreludeZipRuntime (lengthZip, lengthZipWith)
+import PreludeZipRuntime (lengthZip, lengthZipMap, lengthZipWith)
 
 -- | Mapping a function preserves the number of list cells.
 lengthMap :: forall a b. foreach (f :: a -> b) -> foreach (xs :: [a])

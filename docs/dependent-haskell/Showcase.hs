@@ -1927,7 +1927,7 @@ main = do
     beforeZip <- newIORef not >>= readIORef
     observe "prove the result length after map and zipWith"
         ( zipWith zipCallback (map beforeZip zipLeft) zipRight
-        , PreludeZipRuntime.lengthZipMap beforeZip zipCallback zipLeft zipRight
+        , HaskLib.lengthZipMap beforeZip zipCallback zipLeft zipRight
         )
     observe "use the Prelude.zipWith cons equation with both tails unevaluated"
         PreludeZipWithProof.firstPair
