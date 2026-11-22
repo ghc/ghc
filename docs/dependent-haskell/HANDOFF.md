@@ -11,16 +11,21 @@ and its [expected output](Showcase.stdout) are the executable examples.
 Updated 22 November 2026. The development branch is
 `dependent-haskell`. Use the fork command below to find its latest commit.
 
-The R23/R41 candidate at `5833e38cbd` adds promoted callback
-inference and ordered constructors for lifted data family instances
-and boxed unlifted results. Job 988 builds this revision in the
-superseded R36 physical tree under `r36-combined-release-20261122`.
-Dependent job 1006 runs the 550-line Showcase, 30 registrations and
-the source-hidden checks. Read the receipts under
-`_build/on-demand/r23-r41-field-inference-20261122`. The previously
-published `2b64ffc406` compiler is the old reader. The candidate
-source is in the local recovery ref
-`refs/archive/dependent-haskell/2026-11-22/r23-r41-field-inference-550`.
+The published R23/R41 compiler matches `5833e38cbd`. Its normal
+build and qualification are in `r23-r41-field-inference-20261122`.
+The physical compiler is in `r36-combined-release-20261122/source/_build`.
+Jobs 988 and 1006 both passed. Use their recorded compiler hashes
+when resolving the physical path from older receipts.
+
+The next combined source is `fd19c8fe5f`, held by
+`refs/archive/dependent-haskell/2026-11-22/r19-r23-r27-r41-normal-551`.
+Job 1035 builds it in the former R23 compiler tree. Job 1041 depends
+on that build. It checks 551 Showcase outputs, 36 registrations, real
+package clients, and one interface containing both the bound-field
+case proof and an ordered newtype. Read `physical-source.path`,
+`compiler.source`, and `qualification/qualification.pass` under
+`_build/on-demand/r19-r23-r27-r41-integration-20261122`. This pin
+keeps the fixed-representation check on ordered newtypes.
 
 | Revision | Verified result |
 | --- | --- |
@@ -41,6 +46,7 @@ source is in the local recovery ref
 | `4f2fc1146f` and `229cecd250` | A client passes `HaskLib.size` as a retained callback. A scoped equality lets `safeHead` infer the tail index of a vector of length one. The installed-package clients and 548-line Showcase passed. Of 41 registered regressions, only the known `T15874` failed. |
 | `4e169241d2` and `098ca0ae97` | Independent modules compose type-level cases on an unknown `Maybe Bool`. The `Just` field stays lazy. Both stages built, the 549-line Showcase passed, and all ten original term-capture diagnostic tests passed. The 158 upstream test outcomes match the previous release. |
 | `2b64ffc406` and `930910d25b` | Both normal stages built. The 549-line Showcase, 23 focused regressions and interface upgrade checks passed. The full renamer run restored eight upstream goldens. R36 passed all 16 pun-warning regressions. R35 passed 25 namespace registrations, including the source-hidden regression in `e0fa805055`. |
+| `5833e38cbd` and `ad644c290f` | The same polymorphic `Endo` supports an ordinary lambda and a promoted callback with omitted matchability. Lifted data family instances and fixed boxed unlifted data constructors accept ordered arguments. All 30 selected registrations and all three 550-line Showcase modes passed. |
 
 [Equality continuations and kind inference](CHECKPOINTS.md#equality-continuations-and-structural-kind-inference), [HaskLib pipeline and parametricity](CHECKPOINTS.md#compose-installed-list-proofs), [Ordinary minimum](CHECKPOINTS.md#an-ordinary-minimum-in-the-zip-length-proof)
 and [previous release](CHECKPOINTS.md#direct-zip-proof-and-retained-callback-rules).

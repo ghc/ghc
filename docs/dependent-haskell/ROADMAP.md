@@ -45,12 +45,16 @@ Two cards meet their documented scope on the normal compiler at
   both imports. All 25 namespace registrations passed.
 
 R41 remains partial. Its normal compiler accepts all 24 tested orders
-of a prefix GADT constructor with both field multiplicities. Result
-refinements survive separate compilation. Ordered data family instances,
-newtypes and unlifted datatypes still fail with GHC-71492 on the
-published compiler. Their ordinary controls pass. A private repair
-has passed source-hidden clients for lifted data family instances.
-[R41 scope](roadmap/R41-nested-quantification-in-gadts.md).
+of a prefix GADT constructor with both field multiplicities. Lifted
+data family instances and boxed unlifted datatypes with a fixed result
+representation now support ordered fields. Older readers load their
+stripped interfaces. Ordered newtypes and representation-polymorphic
+results still have restrictions. R23 now supports both the ordinary
+and promoted uses of a polymorphic `Endo` in real library clients.
+A bare higher-order use in `FoldrDefault_` still needs explicit
+matchability arguments.
+[R23 package check](roadmap/R23-unsaturated-type-families.md#one-constructor-for-term-and-promoted-callbacks)
+and [R41 scope](roadmap/R41-nested-quantification-in-gadts.md).
 
 Six of the 27 open upstream cards have no separate implementation
 counted on this branch.
@@ -115,9 +119,9 @@ continue to follow Serokell's published status.
 | [R19 Type-level cases](roadmap/R19-type-level-cases.md) | Independent modules can compose exhaustive cases at an unknown runtime index. Their rows may have different orders. A `Just _` branch can ignore its field, even if evaluating that field would fail. | Compare nested patterns and branch results that use a matched field or captured value. The current proof checks flat constructor rows with closed results. |
 | [R21 Declaration dependencies](roadmap/R21-dependency-analysis.md) | Selected mixed type and term declarations can refer forward to a producer. GHC diagnoses a genuine dependency cycle at the source call. | Establish general ordering for mixed groups. Cover declarations that introduce instances or deriving dependencies, while respecting splice boundaries. |
 | [R22 Erased existentials](roadmap/R22-existential-quantification.md) | A pattern can open a hidden length. An argument's declared type can determine a witness beneath a callback's `forall`. | Specify inference for a package repacked across a scope, including the cases where its witness cannot be determined or would escape. |
-| [R23 Unsaturated families](roadmap/R23-unsaturated-type-families.md) | The unmodified `T13822` interpreter compiles. Its kind can select a matchable arrow when an equation returns `Maybe`. | Complete higher-order inference and settle compatibility of existing unannotated programs. The unmodified `T15874` still fails on the released compiler. |
+| [R23 Unsaturated families](roadmap/R23-unsaturated-type-families.md) | A supplied promoted callback can determine its arrow matchabilities. The real `first-class-families` package supports the plain lambda and `'Endo Echo` in separate clients. | Complete higher-order inference and settle compatibility of existing unannotated programs. The unmodified `T15874` still fails on the released compiler. |
 | [R24 Constrained families](roadmap/R24-constrained-type-families.md) | An associated family such as `Elem c` can require the owning dictionary. A source-hidden client rejects a missing premise before reduction. | Settle the general representation of domain evidence, including partial applications, and how the source formation rule corresponds to Core. |
-| [R41 Nested GADT quantifiers](roadmap/R41-nested-quantification-in-gadts.md) | Prefix constructors can interleave several groups of fields, contexts and quantifiers. The tested orders survive an interface and Template Haskell. | Check the [remaining constructor forms](roadmap/R41-nested-quantification-in-gadts.md#which-prefix-orders-work), including newtypes, data family instances, unlifted results and record syntax. |
+| [R41 Nested GADT quantifiers](roadmap/R41-nested-quantification-in-gadts.md) | Prefix constructors can interleave several groups of fields, contexts and quantifiers. The tested orders survive an interface and Template Haskell. | Check newtypes and representation-polymorphic results under the [prefix grammar](roadmap/R41-nested-quantification-in-gadts.md#which-prefix-orders-work). |
 
 The published evaluator work covers closed calls such as `Prelude.sum` and
 open equations such as mapping `Prelude.not` over a list with a known head

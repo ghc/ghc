@@ -329,3 +329,11 @@ Job 966 tested a private repair for lifted data family instances at
 reader at `2b64ffc406` could also load and link that interface.
 A wrong family result still gave GHC-83865. Using the dictionary
 before its position in the constructor still gave GHC-39999.
+
+The published compiler at `5833e38cbd` includes that repair and
+supports ordered fields in datatypes and data family instances with
+a fixed boxed unlifted result. Job 1006 ran source-hidden clients with
+both this compiler and `2b64ffc406` at `-O0` and `-O2`. An ordinary
+levity-polymorphic control compiled. Its ordered counterpart still
+gave GHC-71492. Ordered newtypes are a separate pending change.
+[Maintained constructor regression](../../../testsuite/tests/gadt/GadtRefinedOrderedProvider.hs).

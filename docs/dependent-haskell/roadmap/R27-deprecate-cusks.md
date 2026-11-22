@@ -206,3 +206,15 @@ the first, the module temporarily enabled `CUSKs` after
 In the second, it added both required signatures and left CUSKs off.
 Thus the advice to enable the extension affects the whole module,
 even when the diagnostic points at one declaration.
+
+The private opt-in `-Wcusks` implementation uses GHC-57439. On the
+R23-compatible package, the normal stage 2 compiler gave five
+suggested edits and ten explanations. All five suggested signatures
+together compiled under `-XNoCUSKs`, preserved the corresponding
+interface declarations and passed the source-hidden client. Two of
+the five edits sufficed to restore the build. The warning also reported
+the current kind for a zero-argument open family whose arity could
+change after adding a signature. The default build was quiet.
+The wording reminds the user about the module-wide effect when it
+suggests enabling `StandaloneKindSignatures`. Language editions and
+their defaults are unchanged on the published branch.

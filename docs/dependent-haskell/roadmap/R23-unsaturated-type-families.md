@@ -432,7 +432,7 @@ alone therefore leaves a promoted client migration.
 
 #### One constructor for term and promoted callbacks
 
-The candidate at `e7041d1b2d` checks a supplied callback before
+The published compiler at `5833e38cbd` checks a supplied callback before
 defaulting an omitted matchability argument of a promoted constructor.
 Thus `'Endo Echo` can infer M for both arrows, while the ordinary
 lambda still has U for both arrows. An unconstrained argument still
@@ -467,6 +467,13 @@ The three linker maps identify the migrated archive. Job 996 used
 the identical package source on the previous compiler. It rejected
 the `Endo` construction in the monoid instances with GHC-83865.
 [Published package source](https://hackage-content.haskell.org/package/first-class-families-0.8.2.0.tar.gz).
+
+Normal job 1006 repeated the build, package test, and all three
+source-hidden clients. The focused matrix confirmed the U default
+when no argument selects a matchability and rejected all four
+incompatible choices at both optimization levels.
+[Showcase provider](../examples/open-evaluation/PromotedEndo.hs)
+and [consumer](../examples/open-evaluation/LaterMatchabilityClient.hs).
 
 ### Arrow patterns in family equations
 

@@ -6,6 +6,34 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Promoted callbacks and ordered data family constructors
+
+Normal job 988 built both compiler stages at `5833e38cbd`. The
+compiler in merge `ad644c290f` matches that source. Job 1006 passed
+all 30 named normal-way registrations. The 550 Showcase lines
+matched at native `-O0`, native `-O2` and in stage 2 GHCi.
+
+Two pairs of stripped-interface clients ran at both optimization
+levels. They used ordered constructors in a lifted data family, a
+boxed unlifted datatype and a boxed unlifted data family. The
+previous reader at `2b64ffc406` loaded those interfaces. The tests
+checked strict and lazy fields, a result equality, an out-of-scope
+dictionary and an invalid family result.
+
+The migrated `first-class-families-0.8.2.0` package passed its own
+test and three clients that had access only to the compiled library.
+The promoted client printed `True`, the runtime lambda printed `True`,
+and the documented `FoldrDefault_` equality printed `Refl`. The
+compiler's private matchability test matrix also passed on this
+normal build at `-O0` and `-O2`.
+[R23 migration and remaining annotation](roadmap/R23-unsaturated-type-families.md#one-constructor-for-term-and-promoted-callbacks)
+and [R41 constructor coverage](roadmap/R41-nested-quantification-in-gadts.md#gadt-result-refinements).
+
+The build reused the completed R36 experiment's physical tree. A
+separate cleanup removed 14,242 intermediate files from the earlier
+`2d6368dd57` build. It released 2,325,647,360 allocated bytes.
+Job 1022 compiled and ran a program with both retained compiler stages.
+
 ## Namespace management and ordered GADT results
 
 Job 932 built stages 1 and 2 from `2b64ffc406`. The compiler sources
