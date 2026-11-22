@@ -1824,6 +1824,7 @@ main = do
     observe "read a payload at the predecessor of its public index" DirectIndexedVectorClient.successorPayload
     IndexedMatrixClient.observeDimensions >>= observe "read a rectangle's rows and compare a square's dimensions"
     IndexedMatrixClient.observeTile >>= observe "pack and open tiles with runtime dimensions"
+    observe "read the top layer of a two-layer volume" IndexedMatrixClient.observeTopLayer
     observe "adjust a reading while preserving its calibration index"
         (DirectIndexedListClient.readingFields enabled 36)
     runtimeList <- newIORef [False, True, False]

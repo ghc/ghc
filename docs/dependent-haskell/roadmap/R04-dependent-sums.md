@@ -324,6 +324,14 @@ dimensions in the payload type fails at `xs`.
 [source-hidden check](../../../testsuite/tests/dependent/should_run/NativeGadtRetainedSum.sh)
 and [indexed shape precedent](../REFERENCES.md#combine-two-stored-fields-in-one-index).
 
+The same example defines a volume whose public shape holds its layer,
+row, and column counts. The client reads the first rectangular layer
+at a successor layer count and leaves the second layer unevaluated.
+The direct-field rule requires a stored field for each argument of the
+promoted application. A constructor such as `'Just` carries an erased type
+argument even when source syntax omits it. A constructor can store the
+complete `Maybe Bool` shape directly instead.
+
 A provider can declare `HiddenTile a = exists (shape :: Shape). Tile a shape`.
 An ordinary client can return `Tile rows columns xs` at that package type
 when both dimensions come from runtime inputs. Its expected result fixes

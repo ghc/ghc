@@ -1,11 +1,11 @@
-{-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
+{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}
 
-module IndexedMatrixClient (observeDimensions, observeTile) where
+module IndexedMatrixClient (observeDimensions, observeTile, observeTopLayer) where
 
 import Data.IORef (newIORef, readIORef)
 import Data.Type.Equality ((:~:)(Refl))
-import IndexedMatrix (HiddenTile, Matrix(Rectangle, Square), Tile(Tile))
-import PackedVecLibrary (Nat(S, Z), natToInt, replicateNative, toList)
+import IndexedMatrix (HiddenTile, Matrix(Rectangle, Square), Tile(Tile), Volume(Volume), VolumeShape(Cuboid))
+import PackedVecLibrary (Nat(S, Z), Vec(VCons, VNil), natToInt, replicateNative, toList)
 
 -- | Read the rectangle's rows and prove the square's dimensions equal.
 observeDimensions :: IO (Int, Bool)
@@ -46,3 +46,15 @@ observeTile = do
     readTile (Tile Z _ _) = ((0, Nothing), [])
     readTile (Tile rows columns payload) =
         ((natToInt rows, Just (natToInt columns)), map toList (toList payload))
+
+-- | Read the top layer and leave the second layer unevaluated.
+observeTopLayer :: [[Bool]]
+observeTopLayer = case volumeLayers volume of
+    VCons first _ -> map toList (toList first)
+  where
+    volume = Volume (S (S Z)) (S Z) (S (S Z))
+        (VCons layer (error "forced deeper layers"))
+    layer = VCons (VCons True (VCons False VNil)) VNil
+
+    volumeLayers :: Volume a ('Cuboid layers rows columns) -> Vec (Vec (Vec a columns) rows) layers
+    volumeLayers (Volume _ _ _ stack) = stack
