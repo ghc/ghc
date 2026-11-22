@@ -265,7 +265,8 @@ at the known zero index has an inaccessible right-hand side. Its pattern
 can still force the stored witness.
 
 An ordinary client can use `BangPatterns` to evaluate the stored length
-before it uses the payload. The payload still has the public index `n`.
+before it uses the payload. The test calls its version of `SomeVec`
+`DirectVec`. The payload still has the public index `n`.
 
 ```haskell
 strictDirectCells :: DirectVec a n -> Vec a n
