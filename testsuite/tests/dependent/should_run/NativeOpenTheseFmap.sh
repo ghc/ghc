@@ -26,6 +26,9 @@ for opt in -O0 -O2; do
         -e 's/:: Row Int Bool a/:: Row Bool Bool a/' "$src/concrete-mapping/RowProof.hs" >WrongInstance.hs
     if "${ghc[@]}" "$opt" -fno-code -c WrongInstance.hs >wrong-instance 2>&1; then exit 1; fi
     grep -Fq 'WrongInstance.hs:11:16-19: error: [GHC-83865]' wrong-instance || { cat wrong-instance >&2; exit 1; }
+    if "${ghc[@]}" "$opt" -fno-code -c "$src/concrete-mapping/UnknownRow.hs" >unknown-row 2>&1; then exit 1; fi
+    grep -Fq 'UnknownRow.hs:10:19-22: error:' unknown-row
+    grep -Fq 'In the expression: Refl' unknown-row
     cat >OneField.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, ScopedTypeVariables, TypeOperators #-}
 module OneField where

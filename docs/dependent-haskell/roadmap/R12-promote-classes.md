@@ -97,11 +97,15 @@ compiles as ordinary Haskell. Its interface omits the checked method.
 The next change treats a concrete prefix such as `Int Bool` as part of
 the instance head. A worker can copy a field at one of those types.
 Inspecting or constructing a value still checks the constructor.
-The prototype exports a checked method for `Row Int Bool` at `-O0`
-and `-O2`. In the second instance GHC combines the `Empty` and
-`Flagged` branches into one Core `DEFAULT` alternative. The checker
-does not yet export that method. The two-instance source control and
-normal compiler qualification remain open.
+GHC combines the `Empty` and `Flagged` branches of the Boolean-label
+instance into one Core `DEFAULT` alternative. The prototype recovers a
+separate constructor equation for each. At `-O0` and `-O2`, an ordinary
+client and a proof module imported both instances with no provider source.
+The integer-label instance kept `Flagged`, and the Boolean-label instance
+returned `Empty`. The wrong-instance proof failed at `Refl`. A strict
+field control rejected an equation that would have hidden its demand.
+A warm rebuild added both methods to an older provider and the next
+build kept identical interface bytes. Normal qualification remains open.
 [Instance equations](../../../testsuite/tests/dependent/should_run/concrete-mapping/Row.hs),
 [separately compiled proofs](../../../testsuite/tests/dependent/should_run/concrete-mapping/RowProof.hs)
 and [warm upgrade check](../examples/open-evaluation/check-applied-mapping-upgrade.sh).

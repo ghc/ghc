@@ -5652,6 +5652,16 @@ its own instance.
 [Agda mapping clauses](https://github.com/agda/agda-stdlib/blob/v2.4/src/Data/These/Base.agda#L40-L49)
 and [Haskell instance equations](../../testsuite/tests/dependent/should_run/concrete-mapping/Row.hs).
 
+Agda's case tree records which argument needs a constructor before a
+clause can compute. GHC's `refineDefaultAlt` recovers a constructor when
+it is the only one that can reach a default. In a mapping method several
+constructors can reach the same default. R12 generates one equation for
+each of them and obtains fresh field binders with `dataConRepInstPat`.
+The executable case still inspects the receiver. An unknown receiver
+cannot select a constructor equation.
+[Agda case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees)
+and [GHC alternative refinement](../../compiler/GHC/Core/Utils.hs).
+
 Agda's printer looks up an abstract qualified name in the current scope.
 It checks that a local binder does not hide the chosen name. GHC's
 `mkQualName` also checks the reader environment to select a qualifier.
