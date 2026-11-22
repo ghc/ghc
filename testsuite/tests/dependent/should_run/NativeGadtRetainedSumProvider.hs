@@ -137,6 +137,10 @@ data FlagShape = Flag Bool
 data Flagged (shape :: FlagShape) where
     Flagged :: foreach (flag :: Bool) -> Flagged ('Flag flag)
 
+-- | Index an optional flag by the polymorphic promoted constructor.
+data OptionalFlag (shape :: Maybe Bool) where
+    HasFlag :: foreach (flag :: Bool) -> KindTag flag -> OptionalFlag ('Just flag)
+
 -- | A shape with two dimensions and a mark.
 data BlockShape = Block Nat Bool Nat
 

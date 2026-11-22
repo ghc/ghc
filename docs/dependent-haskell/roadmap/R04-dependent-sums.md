@@ -205,9 +205,10 @@ The constructor result has the enclosing telescope scope. A witness
 bound inside a field cannot escape into that result. Every retained field
 occurs in a result argument. The argument uses the field directly or
 fills a field of one promoted constructor. The application supplies
-every field in the promoted constructor's telescope. Each argument
-matches its field kind, and the result has its own closed structural
-kind. A retained field may occur more than once. The other result
+every visible field in the promoted constructor's telescope. Each
+invisible type argument is closed. The fields match their instantiated
+kinds, and the result has its own closed structural kind. A retained
+field may occur more than once. The other result
 arguments must be distinct, unchanged erased parameters.
 A retained field is lazy and has
 a supported closed structural domain such
@@ -327,10 +328,10 @@ and [indexed shape precedent](../REFERENCES.md#combine-two-stored-fields-in-one-
 The same example defines a volume whose public shape holds its layer,
 row, and column counts. The client reads the first rectangular layer
 at a successor layer count and leaves the second layer unevaluated.
-The direct-field rule requires a stored field for each argument of the
-promoted application. A constructor such as `'Just` carries an erased type
-argument even when source syntax omits it. A constructor can store the
-complete `Maybe Bool` shape directly instead.
+In `'Just @Bool flag`, `Bool` fills an invisible type binder and the
+stored `flag` fills the visible field. GHC inserts the same `Bool`
+argument in `'Just flag` when the field and public `Maybe Bool` kind
+determine it.
 
 A provider can declare `HiddenTile a = exists (shape :: Shape). Tile a shape`.
 An ordinary client can return `Tile rows columns xs` at that package type

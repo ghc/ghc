@@ -82,6 +82,10 @@ flaggedTrue :: Flagged shape -> Maybe (shape :~: 'Flag 'True)
 flaggedTrue (Flagged True) = Just Refl
 flaggedTrue (Flagged False) = Nothing
 
+-- | Recover the payload at the public optional flag.
+optionalPayload :: OptionalFlag ('Just flag) -> KindTag flag
+optionalPayload (HasFlag _ payload) = payload
+
 -- | Recover each payload index from its position in the public shape.
 blockPayloads :: Blocked a ('Block width mark depth) -> (Vec a width, Vec a depth)
 blockPayloads (Blocked _ _ _ xs ys) = (xs, ys)
@@ -210,6 +214,8 @@ main = do
     case flaggedTrue (Flagged True) of
         Just Refl -> pure ()
         Nothing -> fail "the stored flag determines the unary shape"
+    case optionalPayload (HasFlag True KindTag) of
+        KindTag -> pure ()
     let block = Blocked True Z (S Z) one VNil
         (wide, deep) = blockPayloads block
     require (cells wide == [True] && null (cells deep))

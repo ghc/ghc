@@ -1474,11 +1474,14 @@ tcIfaceDataCons tycon_name tycon if_cons
         fields_in_result (IfaceTermVar field) = Just [field]
         fields_in_result (IfaceTyConApp tc args)
           | ifaceTyConIsPromoted (ifaceTyConInfo tc) == IsPromoted
-          , fields@(_:_) <- appArgsIfaceTypes args
-          = traverse field_arg fields
+          , Just fields <- concat <$> traverse field_arg (appArgsIfaceTypesForAllTyFlags args)
+          , not (null fields)
+          = Just fields
         fields_in_result _ = Nothing
-        field_arg (IfaceTermVar field) = Just field
-        field_arg _                   = Nothing
+        field_arg (IfaceTermVar field, Required) = Just [field]
+        field_arg (IfaceTermVar _, _)            = Nothing
+        field_arg (_, Required)                  = Nothing
+        field_arg _                              = Just []
         matching_users expected = expected `equalLength` user_names && all (`elem` expected) user_names
         lazy_bang IfNoBang = True
         lazy_bang _        = False

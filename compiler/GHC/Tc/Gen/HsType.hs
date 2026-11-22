@@ -120,6 +120,7 @@ import GHC.Tc.Utils.Instantiate ( tcInstInvisibleTyBinders, tcInstInvisibleTyBin
 import GHC.Tc.Zonk.TcType
 
 import GHC.Core.Reduction (reductionReducedType)
+import GHC.Core.Coercion (hasCoercionHole)
 import GHC.Core.TyCon
 import GHC.Core.ConLike
 import GHC.Core.DataCon
@@ -763,8 +764,12 @@ tcCheckRetainedConType validate_domain allow_result tc_field_mult
       = setSrcSpanA loc $
         do { res_ty <- tc_check_lhs_type mode body liftedTypeKind
            ; when (anyFreeVarsOfType isId res_ty
-                   && not (allow && retained_result mode res_ty)) $
-               failWithTc $ TcRnRetainedQuantificationError (RetainedConstructorResult res_ty)
+                   && (validate_domain || not (hasCoercionHole res_ty))) $
+               do { checked <- if validate_domain
+                               then liftZonkM $ zonkTcType res_ty
+                               else pure res_ty
+                  ; unless (allow && retained_result mode checked) $
+                      failWithTc $ TcRnRetainedQuantificationError (RetainedConstructorResult checked) }
            ; return ([], res_ty) }
 
     retained_result mode ty
@@ -779,7 +784,7 @@ tcCheckRetainedConType validate_domain allow_result tc_field_mult
     result_fields ty
       | Just fields <- retainedResultFields_maybe ty
       , not validate_domain ||
-          (all (isNativeClosedIndexType . varType) fields && validRetainedResultKind ty fields)
+          (all (isNativeClosedIndexType . varType) fields && validRetainedResultKind ty)
       = Just fields
       | otherwise = Nothing
 

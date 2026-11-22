@@ -2085,26 +2085,38 @@ dataConHasRetainedResult con
 retainedResultFields_maybe :: Type -> Maybe [Id]
 retainedResultFields_maybe (TermVarTy field) = Just [field]
 retainedResultFields_maybe (TyConApp tc args)
-  | isPromotedDataCon tc, not (null args)
-  = traverse field_arg args
+  | isPromotedDataCon tc
+  , Just fields <- concat <$> traverse field_arg args
+  , not (null fields)
+  = Just fields
   where
-    field_arg (TermVarTy field) = Just field
-    field_arg _                = Nothing
+    field_arg (TermVarTy field) = Just [field]
+    field_arg ty
+      | not (anyFreeVarsOfType isId ty) = Just []
+      | otherwise = Nothing
 retainedResultFields_maybe _ = Nothing
 
--- | Check the kind of a result argument with the given retained fields.
+-- | Check each argument against the instantiated promoted telescope.
 -- See Note [Retained constructor result equality].
-validRetainedResultKind :: Type -> [Id] -> Bool
-validRetainedResultKind (TermVarTy _) [_] = True
-validRetainedResultKind (TyConApp tc _) fields
-  = binders `equalLength` fields
-    && and (zipWith matches_field binders fields)
-    && isNativeClosedIndexType (tyConResKind tc)
+validRetainedResultKind :: Type -> Bool
+validRetainedResultKind (TermVarTy _) = True
+validRetainedResultKind (TyConApp tc args)
+  | isPromotedDataCon tc = check_args (tyConKind tc) args
   where
-    binders = tyConBinders tc
-    matches_field (Bndr tv AnonTCB) field = varType tv `eqType` varType field
-    matches_field _                _     = False
-validRetainedResultKind _ _ = False
+    check_args kind [] = isNativeClosedIndexType kind
+    check_args kind (arg : rest)
+      | Just (_, binder, result) <- splitPiTy_maybe kind
+      = case (binder, arg) of
+          (Named (Bndr tv vis), _)
+            | isTyVar tv, isInvisibleForAllTyFlag vis
+            , noFreeVarsOfType arg, isTauTy arg, not (hasCoercionHole arg)
+            , varType tv `eqType` typeKind arg
+            -> check_args (piResultTy kind arg) rest
+          (Anon (Scaled _ domain) FTF_T_T, TermVarTy field)
+            -> domain `eqType` varType field && check_args result rest
+          _ -> False
+      | otherwise = False
+validRetainedResultKind _ = False
 
 -- | Check that the result uses all retained fields and each refined universal once.
 -- See Note [Retained constructor result equality].
@@ -2118,7 +2130,7 @@ validRetainedResultEqSpec univs fields eq_spec
   where
     pairs = [(tv, retained) | EqSpec tv result <- eq_spec
                             , Just retained <- [retainedResultFields_maybe result]
-                            , validRetainedResultKind result retained
+                            , validRetainedResultKind result
                             , varType tv `eqType` typeKind result]
     result_tvs = map fst pairs
     result_fields = mkVarSet (concatMap snd pairs)
@@ -2148,15 +2160,18 @@ binders in GHC.Core.Utils and when checking them in GHC.Core.Lint. An
 interface decodes the proof's type in the scope of the decoded field.
 
 Each retained field has a closed structural index type. It occurs as a
-result argument or as a direct argument of one promoted constructor.
-Each promoted argument must fill a visible field binder and match its
-kind in telescope order. The saturated application must have a closed
-structural result kind. This kind can differ from every field kind.
+result argument or as a direct visible argument of one promoted
+constructor. The application may carry closed erased types for the
+invisible type binders. For example, 'Just @Bool flag determines Bool
+before checking the stored flag against the instantiated field kind.
+The saturated application must have a closed structural result kind.
+This kind can differ from every field kind.
 For Tile, the EqSpec records shape ~# 'Rectangle rows columns.
 GHC's nominal equality solver can recover both dimensions from that
 one equality. Kind inference checks only the shape of the application.
-The full check uses the promoted telescope after the constructor knot
-is available.
+If it has unsolved kind casts, report any kind errors first. The full
+check uses the promoted telescope after the constructor knot is
+available.
 See Note [Decomposing TyConApp equalities] in
 GHC.Tc.Solver.Equality. The other arguments are unchanged universal
 variables. There are no contexts or existentials. The wrapper binds the

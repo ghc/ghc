@@ -3898,7 +3898,7 @@ pprRetainedQuantificationError reason = case reason of
          , text "A context may contain only homogeneous (~) constraints and requires datatype parameter order." ]
   RetainedConstructorResult ty ->
     vcat [ text "Each retained field must appear directly or under one promoted constructor in a result argument."
-         , text "Each argument of the promoted constructor must be a retained field."
+         , text "Visible arguments must be retained fields. Invisible arguments must be closed types."
          , text "The fields and result must have closed structural index types."
          , text "Other result arguments must be unchanged erased parameters."
          , text "The result type is" <+> quotes (ppr ty) <> dot
