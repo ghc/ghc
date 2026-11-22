@@ -2892,13 +2892,14 @@ function field checks both endpoints separately. The head Id is local,
 unrestricted, and not a join point.
 
 A bound function can occur in TermAppTy, TermAppCo, or TermVarTy. Its
-argument is an eligible local Id, possibly cast with nominal evidence to
-change the result type of its arrow. The input type stays fixed. For
-example, a closed family equation can cast Bool -> Bool -> Ordering to
-Bool -> Result 'True. Preserve the actual Id and its complete type.
+argument is an eligible local Id, possibly cast with nominal evidence
+between two eligible arrow types. For example, a closed family equation
+can cast Bool -> Bool -> Ordering to Input 'True -> Bool -> Ordering.
+Preserve the actual Id and its complete type.
 Keep the cast on a whole function occurrence. For a call, mkAppTy uses
-decomposePiCos to move the cast to the call result. TermAppCo uses
-ordinary AppCo over the cast head and keeps the argument proof nominal.
+decomposePiCos to cast the operand from the target arrow's input to the
+actual arrow's input. The residual cast acts on the call result.
+TermAppCo uses AppCo over the cast head and keeps the argument proof nominal.
 Scoped selector receivers still require a bare variable.
 
 DepFunCo keeps eligible call-head domains unchanged. See Note

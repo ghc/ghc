@@ -33,7 +33,7 @@ import GHC.Core.TyCo.FVs (isInjectiveInType, tyCoVarsOfCo, tyCoVarsOfType)
 import GHC.Core.TyCo.Rep (Coercion (..), CoSel (..), ForAllSel (..), FunSel (..), Scaled (..), TyLit (..), Type (..))
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.TyCo.Tidy (tidyTopType)
-import GHC.Core.TyCon (AlgTyConFlav (VanillaAlgTyCon), FamTyConFlav (..), Injectivity (..), PromDataConInfo (NoPromInfo), NativeDomainShape (NativeInvalidDomain), TyCon, mkAlgTyCon, mkAnonTyConBinder, mkNamedTyConBinder, mkDataTyConRhs, mkFamilyTyCon, mkSynonymTyCon, mkTyConKind, mkTyConKindWithMatchability, setTyConNativeDomainShape, tyConDataCons, tyConNativeDomainShape, tyConSingleDataCon)
+import GHC.Core.TyCon (AlgTyConFlav (VanillaAlgTyCon), FamTyConFlav (..), Injectivity (..), PromDataConInfo (NoPromInfo), NativeDomainShape (NativeInvalidDomain), TyCon, mkAlgTyCon, mkAnonTyConBinder, mkNamedTyConBinder, mkDataTyConRhs, mkFamilyTyCon, mkSynonymTyCon, mkTyConKind, mkTyConKindWithMatchability, newTyConCo, setTyConNativeDomainShape, tyConDataCons, tyConNativeDomainShape, tyConSingleDataCon)
 import GHC.Core.Type
 import GHC.Core.Unfold.Make (mkCoreUnfolding)
 import GHC.Core.Unify (BindFlag (..), MaybeApartReason (..), UnifyResultM (..), alwaysBindFam, alwaysBindTv, ruleMatchTyKiX, tcMatchRetainedTyX_BM, tcMatchTy, tcMatchTyKi, tcMatchTyX_BM, tcMatchTys, tcUnifyTysFG)
@@ -119,6 +119,7 @@ main = do
             runRetainedOccursChecks
             runCurriedCallCoreChecks dflags
             runCastCallbackChecks dflags libdir
+            runCastCallbackInputChecks dflags libdir
             runScopedDictionaryOccursChecks libdir
             runFunctionBinderChecks dflags
             runFunctionFieldChecks dflags
@@ -337,6 +338,111 @@ runCastCallbackChecks dflags libdir = do
     prepared <- corePrepExpr (hsc_logger env) nativeConfig rawMixed
     lintAccepts dflags "cast callback after preparing a named constructor argument" [] prepared
     checkType dflags "CorePrep preserves the mixed retained application type" (exprType rawMixed) (exprType prepared)
+
+-- | Transport the first operand of a curried callback through a nominal family equation.
+runCastCallbackInputChecks :: DynFlags -> FilePath -> IO ()
+runCastCallbackInputChecks dflags libdir = do
+    let ordering = mkTyConTy orderingTyCon
+        step = mkVisFunTyManyU boolTy ordering
+        flag = mkTyVar (mkSystemName (unique 11620) (mkTyVarOcc "flag")) boolTy
+        binders = [mkAnonTyConBinder flag]
+        family = mkFamilyTyCon (mkSystemName (unique 11621) (mkTcOcc "CallbackInput"))
+            (mkTyConKindWithMatchability unmatchableDataConTy binders liftedTypeKind)
+            binders 1 liftedTypeKind Nothing (ClosedTypeFamilyTyCon (CTF (Just axiom))) Nothing NotInjective
+        axiom = mkBranchedCoAxiom Nominal (mkSystemName (unique 11622) (mkTcOcc "CallbackInputAx")) family
+            [mkCoAxBranch [] [] [] [constructorIndex trueDataCon] boolTy [] noSrcSpan]
+        input = mkTyConApp family [constructorIndex trueDataCon]
+        inputCo = mkAxInstCo Nominal (BranchedAxiom axiom 0) [] []
+        actual = local 11623 "actual" (mkVisFunTyManyU boolTy step)
+        formal = local 11624 "formal" (mkVisFunTyManyU input step)
+        x = local 11625 "x" input
+        y = local 11626 "y" input
+        p = local 11627 "p" boolTy
+        q = local 11628 "q" boolTy
+        xy = proof 11629 (TermVarTy x) (TermVarTy y)
+        pq = proof 11630 (TermVarTy p) (TermVarTy q)
+        Reduction normalized _ = normaliseType emptyFamInstEnvs Nominal (varType formal)
+        delta = mkSymCo normalized
+        castHead = mkCastTy (TermVarTy actual) delta
+        operand = Cast (Var actual) (mkSubCo delta)
+        occurrence first second = mkAppTy (TermAppTy formal (TermVarTy first)) (TermVarTy second)
+        expected first second = mkAppTy (TermAppTy actual (mkCastTy (TermVarTy first) inputCo)) (TermVarTy second)
+        forward = mkAppCo (mkTermAppCo formal (mkCoVarCo xy)) (mkCoVarCo pq)
+        witness = proof 11631 (occurrence x p) (occurrence x p)
+        correct = mkNomReflCo (expected x p)
+        requiresCorrect = Lam (proof 11632 (expected x p) (expected x p)) (Var (dataConWorkId trueDataCon))
+        answer = Var (dataConWorkId trueDataCon)
+        worker = mkLams [formal, witness] answer
+        scope = [actual, x, y, p, q, xy, pq]
+        subst = indexSubst scope formal operand
+    lintAccepts dflags "callback input uses the family equation at the true operand" scope $
+        Coercion (mkNomReflCo (mkAppTys castHead [TermVarTy x, TermVarTy p]))
+    checkType dflags "application casts the first input in the opposite direction" (expected x p) $
+        mkAppTys castHead [TermVarTy x, TermVarTy p]
+    lintAccepts dflags "a reflexive proof names the selected callback operands" scope (App requiresCorrect (Coercion correct))
+    forM_ [expected y p, expected x q] $ \wrong ->
+        lintRejects dflags "a reflexive proof cannot name a different callback operand" scope $
+            App requiresCorrect (Coercion (mkNomReflCo wrong))
+    lintRejects dflags "the callback cast requires the correct proof direction" scope $
+        App worker (Cast (Var actual) (mkSubCo normalized))
+    lintAccepts dflags "a retained callback accepts nominal input transport" scope (App worker operand)
+    let call = Subst.substTy subst (occurrence x p)
+    checkType dflags "substitution preserves the actual curried call" (expected x p) call
+    case call of
+        AppTy (TermAppTy lexical (CastTy (TermVarTy first) back)) (TermVarTy second) -> do
+            check "the lexical callback and both operands keep their identity" $
+                (lexical, first, second) == (actual, x, p)
+            checkType dflags "the lexical callback keeps its declared type" (varType actual) (varType lexical)
+            checkType dflags "the cast starts at the first operand's type" input (coercionLKind back)
+            checkType dflags "the cast ends at the actual callback's input" boolTy (coercionRKind back)
+        _ -> fail "FAIL: input transport lost the cast or the curried call spine"
+    let converted = Subst.substCo subst forward
+        optimized = optCoercion (OptCoercionOpts True Nothing) Subst.emptySubst converted
+    forM_ [converted, optimized] $ \co -> do
+        lintAccepts dflags "cast input congruence" scope (Coercion co)
+        checkType dflags "cast input congruence left endpoint" (expected x p) (coercionLKind co)
+        checkType dflags "cast input congruence right endpoint" (expected y q) (coercionRKind co)
+        check "cast input congruence keeps the callback and both operand proofs" $
+            all (`elemVarSet` tyCoVarsOfCo co) [actual, xy, pq]
+
+    (env, identity) <- runGhc (Just libdir) $ do
+        flags <- getSessionDynFlags
+        _ <- setSessionDynFlags flags
+        declaration <- parseImportDecl "import Data.Functor.Identity"
+        setContext [IIDecl declaration]
+        name :| names <- parseName "Identity"
+        things <- traverse lookupName (name : names)
+        [identity] <- pure [tc | Just (ATyCon tc) <- things]
+        environment <- getSession
+        pure (environment, identity)
+    let identityBool = mkTyConApp identity [boolTy]
+        unwrap = mkAxInstCo Representational (UnbranchedAxiom (newTyConCo identity)) [boolTy] []
+        representation = mkFunCoNoFTF Representational (mkNomReflCo unmatchableDataConTy)
+            (mkNomReflCo ManyTy) (mkSymCo unwrap) (mkReflCo Representational step)
+        represented = Cast (Var actual) representation
+        wrapped = local 11633 "wrapped" (mkVisFunTyManyU identityBool step)
+        wrappedIndex = TermVarTy wrapped
+        wrappedConstraint = mkTyConApp eqTyCon [varType wrapped, wrappedIndex, wrappedIndex]
+        wrappedWorker = mkLams [wrapped, local 11634 "constraint" wrappedConstraint] answer
+    lintAccepts dflags "a real newtype proof casts an ordinary callback" [actual] represented
+    lintRejects dflags "a newtype proof cannot cast a retained callback input" [actual] (App wrappedWorker represented)
+
+    config <- initCorePrepConfig env
+    let (nat, _, successor) = peanoNat
+        natTy = mkTyConTy nat
+        template = local 11635 "template" natTy
+        n = local 11636 "n" natTy
+        equality = mkTyConApp eqTyCon [natTy, TermVarTy template, TermVarTy template]
+        payload = local 11637 "equality" equality
+        mixedWorker = mkLams [formal, template, witness, payload] answer
+        successorArg = App (Var (dataConWorkId successor)) (Var n)
+        rawMixed = mkLams [actual, x, p, n] (mkApps mixedWorker [operand, successorArg])
+        nativeConfig = config { cp_allowNativeDependent = True, cp_arityOpts = Nothing
+                              , cp_specEval = False, cp_specEvalDFun = False }
+    lintAccepts dflags "input cast before a named constructor argument" [] rawMixed
+    prepared <- corePrepExpr (hsc_logger env) nativeConfig rawMixed
+    lintAccepts dflags "input cast after preparing a named constructor argument" [] prepared
+    checkType dflags "CorePrep preserves the contravariant operand cast" (exprType rawMixed) (exprType prepared)
 
 -- | Follow the types of runtime variables when checking for recursive substitutions.
 runRetainedOccursChecks :: IO ()
@@ -2814,7 +2920,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                     [curriedHead tailArrow, callN, callM] (applyWire cmpWire (take 2 args))
             rejectsIface "ordinary wire application cannot invent its head" "Iface id out of scope" [callN] (rawCall argumentWire)
             let maybeBool = mkTyConApp maybeTyCon [boolTy]
-                changedDomain = proof 9112 (varType callF) (mkVisFunTyManyU maybeBool boolTy)
+                inputTransport = proof 9112 (varType callF) (mkVisFunTyManyU maybeBool boolTy)
                 functionCast co = IfaceCastTy (IfaceTermVar callName) (toIfaceCoercion co)
                 resultTransport = mkCoVar (mkSystemName (unique 9115) (mkVarOcc "result_transport"))
                     (mkNomEqPred (varType callF) (mkVisFunTyManyU boolTy maybeBool))
@@ -2839,9 +2945,40 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                     check "interface callback congruence keeps both proofs" $
                         all (`elemVarSet` tyCoVarsOfCo restoredCo) [callCv, resultTransport]
                 _ -> fail "FAIL: interface callback congruence lost its evidence"
-            rejectsIface "function-value cast cannot change its fixed domain" "A retained function-value cast changes its fixed domain" [callF, changedDomain] $
-                functionCast (mkCoVarCo changedDomain)
-            rejectsIface "function-value cast requires nominal evidence" "A retained function-value cast changes its fixed domain" [callF] $
+            let inputCo = mkCoVarCo inputTransport
+                maybeArgument = local 9116 "maybe_argument" maybeBool
+                inputScope = [callF, maybeArgument, inputTransport]
+                castInput = mkCastTy (TermVarTy callF) inputCo
+                inputCall = mkAppTy castInput (TermVarTy maybeArgument)
+            transportedInput <- restore inputScope =<< roundtrip compression (toIfaceType castInput)
+            checkType dflags "interface preserves a callback input cast" castInput transportedInput
+            inputApplied <- restore inputScope =<< roundtrip compression
+                (applyWire (toIfaceType castInput) [toIfaceType (TermVarTy maybeArgument)])
+            checkType dflags "interface applies a callback at its cast input" inputCall inputApplied
+            lintAccepts dflags "interface callback uses a nominal cast on the actual input" inputScope $
+                Coercion (mkNomReflCo inputApplied)
+            let otherArgument = local 9117 "other_argument" maybeBool
+                operandEquality = mkCoVar (mkSystemName (unique 9118) (mkVarOcc "operand_equality"))
+                    (mkNomEqPred (TermVarTy maybeArgument) (TermVarTy otherArgument))
+                inputCoScope = otherArgument : operandEquality : inputScope
+                inputCongruence = mkAppCo (mkNomReflCo castInput) (mkCoVarCo operandEquality)
+            restoredInputCo <- restore inputCoScope =<< roundtrip compression (toIfaceType (CoercionTy inputCongruence))
+            case restoredInputCo of
+                CoercionTy restoredCo -> do
+                    lintAccepts dflags "interface callback input congruence" inputCoScope (Coercion restoredCo)
+                    checkType dflags "interface input congruence starts at the first operand" inputCall (coercionLKind restoredCo)
+                    checkType dflags "interface input congruence ends at the second operand"
+                        (mkAppTy castInput (TermVarTy otherArgument)) (coercionRKind restoredCo)
+                    check "interface input congruence retains both nominal proofs" $
+                        all (`elemVarSet` tyCoVarsOfCo restoredCo) [inputTransport, operandEquality]
+                _ -> fail "FAIL: interface callback input congruence lost its evidence"
+            rejectsIface "callback application requires the cast input kind"
+                "A retained call result cannot be applied" (callN : inputScope) $
+                    applyWire (toIfaceType castInput) [argumentWire]
+            rejectsIface "function-value cast must start at the scope's function type"
+                "Invalid retained function-value cast in interface" inputScope $
+                    functionCast (mkSymCo inputCo)
+            rejectsIface "function-value cast requires nominal evidence" "Invalid retained function-value cast in interface" [callF] $
                 functionCast (mkReflCo Representational (varType callF))
             functionPiWire <- roundtrip compression (toIfaceType (tidyTopType closedCalls))
             firstFunctionPi <- restore [] functionPiWire

@@ -375,7 +375,7 @@ demand restriction.
 
 Scalar beta reduction substitutes an optimized local variable or exact
 constructor into terms and types together. A retained function head substitutes
-an eligible local callback with checked nominal result transport. See Note
+an eligible local callback with a checked nominal cast. See Note
 [Function-valued retained binders] in GHC.Core.Type. Retain the redex for an
 unsupported producer. A lazy let for a retained argument could let its index
 escape through a partial application's result type.

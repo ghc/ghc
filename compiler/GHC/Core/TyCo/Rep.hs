@@ -390,8 +390,8 @@ at that argument. The unmatchable arrow supplies no inverse projection.
 TermAppCo f co lifts a nominal argument proof through the same checked head.
 Both child endpoints have kind A. Both result endpoints have kind B. There
 is no inverse projection or extensional function equality rule. The head is a
-free occurrence. Substitution can use nominal transport of a lexical callback's
-result. See Note [Function-valued retained binders] in GHC.Core.Type. Runtime
+free occurrence. Substitution can use a nominal cast on a lexical callback.
+See Note [Function-valued retained binders] in GHC.Core.Type. Runtime
 reification is partial and has a narrower grammar than this Type constructor.
 
 An outer erased binder can occur in either endpoint of the head. Apply the

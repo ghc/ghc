@@ -1118,13 +1118,13 @@ nativeIndexCastCo_maybe co
   = Just delta
   | otherwise = Nothing
 
--- | Check value casts and fixed-input callback result casts.
+-- | Check value casts and casts between eligible callback arrows.
 -- See Note [Function-valued retained binders] in GHC.Core.Type.
 nativeIndexCastEndpoints :: Type -> Type -> Bool
 nativeIndexCastEndpoints source target
-  | Just (source_arg, _) <- nativeIndexFunctionTypeTys_maybe source
-  , Just (target_arg, _) <- nativeIndexFunctionTypeTys_maybe target
-  = source_arg `eqType` target_arg
+  | Just _ <- nativeIndexFunctionTypeTys_maybe source
+  , Just _ <- nativeIndexFunctionTypeTys_maybe target
+  = True
   | otherwise = isNativeIndexDomainConversion source target
 
 -- | Rewrite a value cast while retaining its recoverable nominal evidence.
@@ -1167,7 +1167,7 @@ mkWpCastN therefore retains a raw SubCo until final zonking. At that point,
 mapNativeIndexCastCoM recovers the nominal proof before the generic zonker
 can rebuild SubCo with mkSubCo. It zonks the proof at Nominal, then checks
 the endpoints. It retains raw SubCo for an admitted value conversion or a
-callback result cast. See Note [Function-valued retained binders] in
+callback cast. See Note [Function-valued retained binders] in
 GHC.Core.Type. R-only evidence follows the ordinary zonking path.
 
 The domain check must follow zonking. An assigned type metavariable can

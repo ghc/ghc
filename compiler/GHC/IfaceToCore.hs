@@ -2260,7 +2260,7 @@ tcIfaceType = go
                         && coercionLKind co' `eqType` typeKind ty'
                         && isJust (nativeIndexCastCo_maybe (SubCo co'))
                     ; unless valid $
-                        failIfM (text "A retained function-value cast changes its fixed domain:"
+                        failIfM (text "Invalid retained function-value cast in interface:"
                                  <+> ppr f)
                     ; return (mkCastTy ty' co') }
                _ ->

@@ -2810,7 +2810,7 @@ nativeIndexFunctionVar_maybe (Var f)
   | isNativeIndexFunctionId f = Just f
 nativeIndexFunctionVar_maybe _ = Nothing
 
--- | Reify a lexical callback and any checked nominal casts on its result.
+-- | Reify a lexical callback and checked nominal casts between its arrow types.
 -- See Note [Function-valued retained binders] in GHC.Core.Type.
 nativeIndexFunctionArgIndex :: CoreExpr -> Maybe Type
 nativeIndexFunctionArgIndex (Cast body co) = do
