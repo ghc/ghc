@@ -31,14 +31,15 @@ signed :: $(do
 signed = Proxy :: Proxy 'True
 
 pair :: $(do
-  ty <- [t| let (rows, cols) = '(2, 3) in Proxy '(rows, cols) |]
+  ty <- [t| let pair = '(1, 7) in let (rows, cols) = '(2, 3) in Proxy '(pair, '(rows, cols)) |]
   case ty of
-    LetT saved _ (LetT rows (AppT (ConT first) (VarT left))
-      (LetT cols (AppT (ConT second) (VarT right)) _))
-      | saved == left, saved == right, rows /= cols
+    LetT outer _ (LetT saved _ (LetT rows (AppT (ConT first) (VarT left))
+      (LetT cols (AppT (ConT second) (VarT right)) _)))
+      | saved == left, saved == right, rows /= cols, outer /= saved
+      , nameBase outer == nameBase saved
       , nameBase first == "PairFirst", nameBase second == "PairSecond" -> pure ty
     _ -> fail (show ty))
-pair = Proxy :: Proxy '(2, 3)
+pair = Proxy :: Proxy '('(1, 7), '(2, 3))
 
 -- A let can return a type constructor. The final argument applies to its result.
 applied :: $(do

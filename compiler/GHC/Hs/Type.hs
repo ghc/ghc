@@ -21,7 +21,7 @@ module GHC.Hs.Type (
 
         HsType(..), HsCoreTy, LHsType, HsKind, LHsKind,
         HsTypeGhcPsExt(..), HsTypeCaseAlt(..), HsTypeLetBind(..), HsTypeGhcRnExt(..), hsExistsTyFlag,
-        mkHsSingleTypeLet, splitHsTypeLet,
+        mkHsSingleTypeLet, splitHsTypeLet, typeLetPairOcc,
         HsForAllTelescope(..), EpAnnForallVis, EpAnnForallInvis,
         HsTyVarBndr(..), LHsTyVarBndr, AnnTyVarBndr(..),
         HsBndrKind(..),
@@ -606,6 +606,10 @@ mkHsSingleTypeLet :: (EpToken "let", EpToken "in") -> LocatedN RdrName
 mkHsSingleTypeLet ann name rhs body =
   HsTypeLet ann Nothing (noLocA (HsTypeLetBind Nothing name noAnn rhs) :| []) body
 
+-- | Private binder for the scrutinee of a type let pair pattern.
+typeLetPairOcc :: OccName
+typeLetPairOcc = mkTyVarOcc "$type-let-pair"
+
 -- | Expose the first binding and its scope. See Note [Ordered type let bindings].
 splitHsTypeLet :: NonEmpty (LocatedA HsTypeLetBind) -> LHsType GhcPs
                -> (LocatedN RdrName, LHsType GhcPs, LHsType GhcPs)
@@ -617,7 +621,7 @@ splitHsTypeLet (first :| binds) body = case unLoc first of
     where
       loc = getLoc rhs
       name_loc = l2l loc
-      pair = L name_loc (mkRdrUnqual (mkTyVarOcc "$type-let-pair"))
+      pair = L name_loc (mkRdrUnqual typeLetPairOcc)
       projection_module = mkGhcInternalModule (fsLit "GHC.Internal.TupleProjection")
       first_field = mkOrig projection_module (mkTcOcc "PairFirst")
       second_field = mkOrig projection_module (mkTcOcc "PairSecond")

@@ -38,7 +38,7 @@ import qualified GHC.Boot.TH.Syntax as TH
 
 import GHC.Hs
 import qualified GHC.Hs.Decls as HsDecls
-import GHC.Hs.Type (HsTypeGhcRnExt(HsTypeLetRn, HsTypeCaseAliasRn, HsTypeCaseRn))
+import GHC.Hs.Type (HsTypeGhcRnExt(HsTypeLetRn, HsTypeCaseAliasRn, HsTypeCaseRn), typeLetPairOcc)
 import GHC.Hs.Decls.Overlap ( OverlapMode(..) )
 
 import GHC.Tc.Utils.TcType
@@ -2602,10 +2602,15 @@ wrapGenSyms binds body@(MkC b)
     go _ [] = return body
     go var_ty ((name,id) : binds)
       = do { MkC body'  <- go var_ty binds
-           ; lit_str    <- lift $ occNameLit (occName name)
+           ; lit_str    <- lift $ occNameLit (quoteOcc name)
            ; gensym_app <- repGensym lit_str
            ; repBindM var_ty elt_ty
                       gensym_app (MkC (Lam id body')) }
+
+    -- A splice checks the spelling of a fresh name. Use a valid spelling
+    -- for the private pair binder. Keep the original Name in DsMetaEnv.
+    quoteOcc name | occName name == typeLetPairOcc = mkTyVarOcc "pair"
+                  | otherwise = occName name
 
 occNameLit :: OccName -> DsM (Core String)
 occNameLit name = coreStringLit (occNameFS name)
