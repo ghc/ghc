@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, RequiredTypeArguments #-}
+{-# LANGUAGE GADTs, RequiredTypeArguments, TypeFamilies #-}
 module GadtRefinedOrderedProvider where
 
 import Data.Proxy
@@ -13,3 +13,8 @@ data TrailingType x where
 
 data TrailingContext x y where
   TrailingContext :: forall a. Proxy a -> Eq a => TrailingContext a a
+
+-- The wrapper casts to the family result after taking the written arguments.
+data family Family tag x y
+data instance Family Char x y where
+  Family :: forall a. !a -> forall b -> Eq a => Proxy b -> Family Char [a] a

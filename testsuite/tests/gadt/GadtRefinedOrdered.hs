@@ -1,5 +1,5 @@
 {-# LANGUAGE ExplicitNamespaces, GADTs, RankNTypes, RequiredTypeArguments #-}
-{-# LANGUAGE ScopedTypeVariables, TemplateHaskell, TypeAbstractions, TypeOperators #-}
+{-# LANGUAGE ScopedTypeVariables, TemplateHaskell, TypeAbstractions, TypeFamilies, TypeOperators #-}
 module Main where
 
 import Data.Proxy
@@ -26,6 +26,12 @@ withResult (TrailingType _ (type b)) use = use @b Refl
 useResultEquality :: forall x y. TrailingContext x y -> Bool
 useResultEquality (TrailingContext (_ :: Proxy y)) = True
 
+family :: $(TH.reifyType 'Family)
+family = Family
+
+familyProof :: Family Char x y -> (x :~: [y], Bool)
+familyProof (Family value (type _) _) = (Refl, value == value)
+
 main :: IO ()
 main = do
   let s x = same @Double x (type Bool) Proxy
@@ -35,3 +41,5 @@ main = do
   print (observe s, observe l, observe f)
   print (withResult (TrailingType (3 :: Double) (type Char)) (\Refl -> True),
          useResultEquality (TrailingContext @Double Proxy))
+  let example value = family @Double value (type Bool) Proxy
+  print (familyProof (example 3), familyProof (example (0 / 0)))
