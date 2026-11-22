@@ -443,6 +443,26 @@ if "${g[@]}" -ferror-spans -fforce-recomp -DWRONG_VECTOR -c VectorIdentity.hs >w
     cat wrong-vector.log >&2
     exit 1
 fi
+# Lift the kind proof through a forall before binding the index equality.
+for opt in O0 O2; do
+    quantified="$out/quantified-$opt"
+    mkdir -p "$quantified"/{provider,client}
+    cd "$quantified/provider"
+    cp "$src/QuantifiedGadtIndex.hs" .
+    "${g[@]}" "-$opt" -fomit-interface-pragmas -fno-write-if-simplified-core -c QuantifiedGadtIndex.hs
+    cd "$quantified/client"
+    cp ../provider/QuantifiedGadtIndex.hi "$src"/QuantifiedGadtIndex{Client,Wrong}.hs .
+    "${g[@]}" "-$opt" -c QuantifiedGadtIndexClient.hs
+    "${g[@]}" "-$opt" QuantifiedGadtIndexClient.o ../provider/QuantifiedGadtIndex.o -o run
+    test "$(./run)" = '(41,43)'
+    if "${g[@]}" "-$opt" -fno-code -ferror-spans -c QuantifiedGadtIndexWrong.hs >wrong-index.log 2>&1 ||
+       ! grep -Fq 'QuantifiedGadtIndexWrong.hs:11:18: error: [GHC-25897]' wrong-index.log ||
+       ! grep -Fq 'g ~ Slot' wrong-index.log; then
+        cat wrong-index.log >&2
+        exit 1
+    fi
+done
+cd "$out/provider"
 cp {StoredVector,ConservedPartition}.hi "$src/ListVectorClient.hs" "$out/projection/"
 cd "$out/projection"
 "${g[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core -c ListVectorClient.hs

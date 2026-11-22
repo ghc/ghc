@@ -327,9 +327,9 @@ An ordinary GADT can refine a function index whose kind itself depends on
 an earlier index.
 
 ```haskell
-{-# LANGUAGE DataKinds, GADTs, PolyKinds, RankNTypes, RoleAnnotations #-}
+{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, PolyKinds, RankNTypes, RoleAnnotations #-}
 {-# LANGUAGE StandaloneKindSignatures, TypeApplications #-}
-module Pick where
+module QuantifiedGadtIndex where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy)
@@ -364,16 +364,16 @@ a synonym, such as `IndexKind k` below.
 type IndexKind k = forall (a :: k). @M Proxy a %M -> Type
 ```
 
-The independent-index check fails at the final `x` in `Wrong.hs`, line 11,
-column 18. GHC-25897 reports `Could not deduce 'g ~ Slot'`.
+The independent-index check fails at the final `x` in the following file,
+line 11, column 18. GHC-25897 reports `Could not deduce 'g ~ Slot'`.
 
 ```haskell
-{-# LANGUAGE GADTs, PolyKinds, RankNTypes, TypeApplications #-}
-module Wrong where
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes, PolyKinds, RankNTypes, TypeApplications #-}
+module QuantifiedGadtIndexWrong where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy)
-import Pick
+import QuantifiedGadtIndex
 
 bad :: forall k (f :: forall (a :: k). Proxy a -> Type)
                 (g :: forall (a :: k). Proxy a -> Type).
@@ -383,20 +383,21 @@ bad PickBool x = x
 
 The v79 compiler accepted `Pick` at source and printed `41` without
 Core Lint. With Core Lint, desugaring reported the mixed-kind coercion
-binder `f ~# Slot` in the `PickBool` alternative at `Pick.hs:21:20`.
+binder `f ~# Slot` in the `PickBool` alternative on the `transport` equation.
 A relink with the scoped worker passed Core and STG Lint and printed
 `(41,43)` through a separate client at `-O0` and `-O2`. The client
 uses the exported `transport` and performs its own `PickBool` match.
 Both provider interfaces omit interface pragmas. GHC rejects the
 independent index at the same source position with the scoped worker.
+[Maintained source and diagnostic checks](../../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh).
 
 A v79 reader panics in `extendTCvSubst` when the new worker layout has
 a v79 header. It reconstructs the index evidence from the old worker
 rules. The `IndexKind k` alias remains visible in the stripped
 interface, so checking for a `forall` in the written kind would miss
 some constructors that need the new layout. Version 80 uses the common
-worker-layout gate. GHC-47808 points to `import Pick` when a v79 reader
-opens the v80 interface. The diagnostic names the expected and actual
+worker-layout gate. GHC-47808 points to the import declaration when a v79
+reader opens the v80 interface. The diagnostic names the expected and actual
 versions. A v80 provider and client passed both optimization levels
 with a component compiler that could read the installed v79 libraries.
 A normal build must rebuild the compiler and its libraries for v80.

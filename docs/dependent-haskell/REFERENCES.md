@@ -7803,3 +7803,29 @@ homogeneous equality with a cast. The solver keeps that equality in
 scope. It uses the kind proof to reject incompatible vector lengths or
 to reconstruct a proof with the original endpoints.
 [Source example and diagnostics](roadmap/R11-homogeneous-equality.md#an-equality-with-the-empty-vector).
+
+## Transport an ordinary GADT index with a quantified kind
+
+Agda unifies a constructor's result indices with the indices of the
+scrutinee. In `Square`, matching `sq m` fixes the outer `n` to `m * m`.
+The coverage rules for `Vec` use the same index unification to exclude
+incompatible constructors. Cockx and Devriese write the index equations
+as a telescope. Example 14 gives an equation between vectors whose type
+depends on an earlier length equality. Example 42 solves an earlier
+kind equation before the dependent index equation becomes homogeneous.
+[Agda 2.10, Dot patterns](https://agda.readthedocs.io/en/latest/language/function-definitions.html#dot-patterns),
+[Agda 2.10, Matching on indexed datatypes](https://agda.readthedocs.io/en/latest/language/coverage-checking.html#matching-on-indexed-datatypes),
+[Cockx and Devriese, §3.1, Example 14](https://jesper.cx/files/proof-relevant-unification.pdf#page=13),
+[Cockx and Devriese, §4.2, Example 42](https://jesper.cx/files/proof-relevant-unification.pdf#page=22).
+
+Weirich et al. give explicit constructor equality contexts for `Vec`.
+Their `Heq` example sequences kind and index evidence. The annotated
+calculus casts one endpoint before it forms the homogeneous proposition.
+`An-PiCong` transports occurrences of the bound variable in the right
+body when the binder kind changes. R11 uses `ForAllCo` to lift the
+kind proof over a type-variable binder in an ordinary GADT index kind.
+[Weirich et al., §2, `Vec` and `zip`](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf#page=5),
+[Figure 8, `An-PiCong`](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf#page=16),
+[§6.1, proposition formation](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf#page=21),
+[§6.2, `Heq`](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf#page=22),
+[the R11 source example](roadmap/R11-homogeneous-equality.md#an-index-with-a-quantified-kind).
