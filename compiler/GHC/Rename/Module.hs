@@ -4255,11 +4255,20 @@ rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = cond
       where
         unannotated (CDF { cdf_bang = NoSrcStrict
                          , cdf_unpack = NoSrcUnpack
-                         , cdf_multiplicity = HsModifiedFunArr _ [] (HsStandardArr _) })
-          = True
+                         , cdf_multiplicity = HsModifiedFunArr _ [] (HsStandardArr _)
+                         , cdf_type = ty })
+          -- The parsed fields after a telescope still carry their bangs
+          -- in the field type. The prefix parser already split those bangs.
+          = case unLoc ty of
+              XHsType HsBangTy{} -> False
+              _                  -> True
         unannotated _ = False
 
-    con_arg_fields (ConDeclGADT { con_g_args = PrefixConGADT _ args }) = args
+    con_arg_fields (ConDeclGADT { con_g_args = details@(PrefixConGADT _ args)
+                               , con_res_ty = result })
+      = args ++ case HsDecls.splitGadtInterior details result of
+                  Just (groups, _) -> [field | Right field <- groups]
+                  Nothing          -> []
     con_arg_fields (ConDeclH98 { con_args = PrefixCon _ args }) = args
     con_arg_fields (ConDeclH98 { con_args = InfixCon _ arg1 arg2 }) = [arg1, arg2]
     con_arg_fields _ = []
@@ -4301,7 +4310,7 @@ preceded by `type`, with the following restrictions:
      (!, ~, {-# UNPACK #-}, {-# NOUNPACK #-}, %m ->, ⊸), because they
      don't make sense at the type level.
 
-(R4) The types of the constructors contain no constraints.
+(R4) The types of the constructors contain only equality constraints.
 
 (R5) There are no deriving clauses.
 

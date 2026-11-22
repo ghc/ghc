@@ -601,7 +601,7 @@ cvtDataDefnCons type_data ksig constrs
                 case get_cons_names first_datacon of
                   []  -> panic "cvtDataDefnCons: data constructor with no names"
                   c:_ -> c
-        ; mapM (cvtConstr first_datacon_name con_name) constrs }
+        ; mapM (cvtConstr type_data first_datacon_name con_name) constrs }
 
 ----------------
 cvtTySynEqn :: TySynEqn -> CvtM (LTyFamInstEqn GhcPs)
@@ -722,36 +722,37 @@ is_ip_bind decl             = Right decl
 --      Data types
 ---------------------------------------------------
 
-cvtConstr :: TH.Name -- ^ name of first constructor of parent type
+cvtConstr :: Bool    -- ^ Is this a type data declaration?
+          -> TH.Name -- ^ name of first constructor of parent type
           -> (TH.Name -> CvtM (LocatedN RdrName)) -- ^ convert constructor name
           -> TH.Con -> CvtM (LConDecl GhcPs)
 
-cvtConstr _ do_con_name (NormalC c strtys)
+cvtConstr _ _ do_con_name (NormalC c strtys)
   = do  { c'   <- do_con_name c
         ; tys' <- mapM cvt_arg strtys
         ; returnLA $ mkConDeclH98 [] c' [] (PrefixCon noExtField tys') }
 
-cvtConstr parent_con do_con_name (RecC c varstrtys)
+cvtConstr _ parent_con do_con_name (RecC c varstrtys)
   = do  { c'    <- do_con_name c
         ; args' <- mapM (cvt_id_arg parent_con) varstrtys
         ; con_decl <- wrapParLA (mkConDeclH98 [] c' [] . RecCon noAnn) args'
         ; returnLA con_decl }
 
-cvtConstr _ do_con_name (InfixC st1 c st2)
+cvtConstr _ _ do_con_name (InfixC st1 c st2)
   = do  { c'   <- do_con_name c
         ; st1' <- cvt_arg st1
         ; st2' <- cvt_arg st2
         ; returnLA $ mkConDeclH98 [] c' []
                        (InfixCon noExtField st1' st2') }
 
-cvtConstr parent_con do_con_name (ForallC tvs ctxt con)
-  = cvtForallCon parent_con do_con_name Nothing tvs ctxt con
-cvtConstr parent_con do_con_name (ForallMatchC ma (ForallC tvs@(_ : _) ctxt con))
+cvtConstr type_data parent_con do_con_name (ForallC tvs ctxt con)
+  = cvtForallCon type_data parent_con do_con_name Nothing tvs ctxt con
+cvtConstr type_data parent_con do_con_name (ForallMatchC ma (ForallC tvs@(_ : _) ctxt con))
   = do { ma' <- cvtKind ma
-       ; cvtForallCon parent_con do_con_name (Just ma') tvs ctxt con }
-cvtConstr _ _ ForallMatchC{} = failWith (InvalidForallMatchabilityWrapper "ForallMatchC")
+       ; cvtForallCon type_data parent_con do_con_name (Just ma') tvs ctxt con }
+cvtConstr _ _ _ ForallMatchC{} = failWith (InvalidForallMatchabilityWrapper "ForallMatchC")
 
-cvtConstr _ do_con_name (GadtC c strtys ty) = case nonEmpty c of
+cvtConstr _ _ do_con_name (GadtC c strtys ty) = case nonEmpty c of
     Nothing -> failWith GadtNoCons
     Just c -> do
         { c'      <- mapM do_con_name c
@@ -759,7 +760,7 @@ cvtConstr _ do_con_name (GadtC c strtys ty) = case nonEmpty c of
         ; ty'     <- cvtType ty
         ; mk_gadt_decl c' [] (PrefixConGADT noExtField args) ty'}
 
-cvtConstr parent_con do_con_name (RecGadtC c varstrtys ty) = case nonEmpty c of
+cvtConstr _ parent_con do_con_name (RecGadtC c varstrtys ty) = case nonEmpty c of
     Nothing -> failWith RecGadtNoCons
     Just c -> do
         { c'       <- mapM do_con_name c
@@ -768,18 +769,18 @@ cvtConstr parent_con do_con_name (RecGadtC c varstrtys ty) = case nonEmpty c of
         ; lrec_flds <- returnLA rec_flds
         ; mk_gadt_decl c' [] (RecConGADT noAnn lrec_flds) ty' }
 
-cvtConstr _ do_con_name (RetainedGadtC names args result) = case nonEmpty names of
+cvtConstr type_data _ do_con_name (RetainedGadtC names args result) = case nonEmpty names of
   Nothing -> failWith GadtNoCons
   Just names -> do
     names' <- mapM do_con_name names
-    (telescope, fields, suffix) <- cvtRetainedGadtArgs args result
+    (telescope, fields, suffix) <- cvtRetainedGadtArgs type_data args result
     mk_gadt_decl names' telescope (PrefixConGADT noExtField fields) suffix
 
 -- | Convert the prefix value fields and the ordered suffix separately.
 -- See Note [Terminal constructor foralls in TH].
-cvtRetainedGadtArgs :: [TH.RetainedGadtArg] -> TH.Type
+cvtRetainedGadtArgs :: Bool -> [TH.RetainedGadtArg] -> TH.Type
                     -> CvtM ([LHsGadtTelescope GhcPs], [HsConDeclField GhcPs], LHsType GhcPs)
-cvtRetainedGadtArgs args result = do
+cvtRetainedGadtArgs type_data args result = do
   (fields, binders) <- prefix args
   body <- suffix binders
   let prefix_fields = PrefixConGADT noExtField fields
@@ -803,7 +804,7 @@ cvtRetainedGadtArgs args result = do
 
     prefix (GadtValueArg bang mult ty : rest) = do
       field <- cvt_arg (bang, ty)
-      mult' <- cvtGadtArgMult mult
+      mult' <- cvtGadtArgMult type_data mult
       (fields, binders) <- prefix rest
       pure (field { cdf_multiplicity = mult' } : fields, binders)
     prefix binders = pure ([], binders)
@@ -828,7 +829,7 @@ cvtRetainedGadtArgs args result = do
       arg' <- case (unpack, strict) of
         (NoSourceUnpackedness, NoSourceStrictness) -> pure arg
         _ -> returnLA $ XHsType (HsBangTy (noAnn, noAnn, noAnn) bang arg)
-      mult' <- cvtGadtArgMult mult
+      mult' <- cvtGadtArgMult type_data mult
       body <- suffix rest
       returnLA (HsFunTy noExtField mult' arg' body)
     suffix (_ : _) = failWith (MalformedType TypeLevel result)
@@ -859,12 +860,16 @@ Type can contain an interior or terminal telescope.
 -}
 
 -- | Constructor arrows can default to One. Keep a Many annotation explicit.
-cvtGadtArgMult :: TH.Type -> CvtM (HsModifiedFunArr GhcPs)
-cvtGadtArgMult mult = do
+cvtGadtArgMult :: Bool -> TH.Type -> CvtM (HsModifiedFunArr GhcPs)
+cvtGadtArgMult type_data mult = do
   ty <- cvtType mult
   pure $ case hsTypeToArrow ty of
-    HsModifiedFunArr x [] arr@HsStandardArr{} ->
-      HsModifiedFunArr x [noLocA (HsModifier noAnn ty)] arr
+    -- A TypeData field has no multiplicity. TH represents its plain
+    -- arrow as One or Many, depending on the GADT arrow default.
+    HsModifiedFunArr x [] HsLinearArr{}
+      | type_data -> HsModifiedFunArr x [] (HsStandardArr (EpArrow noAnn))
+    HsModifiedFunArr x [] arr@HsStandardArr{}
+      | not type_data -> HsModifiedFunArr x [noLocA (HsModifier noAnn ty)] arr
     arrow -> arrow
 
 mk_gadt_decl :: NonEmpty (LocatedN RdrName) -> [LHsGadtTelescope GhcPs]
@@ -893,13 +898,13 @@ cvtSrcStrictness SourceStrict       = SrcStrict
 
 -- | Retain each constructor forall group and its outer annotation scope.
 -- See Note [Source forall matchability] in GHC.Hs.Type.
-cvtForallCon :: TH.Name -> (TH.Name -> CvtM (LocatedN RdrName))
+cvtForallCon :: Bool -> TH.Name -> (TH.Name -> CvtM (LocatedN RdrName))
              -> Maybe (LHsType GhcPs) -> [TH.TyVarBndr TH.Specificity]
              -> TH.Cxt -> TH.Con -> CvtM (LConDecl GhcPs)
-cvtForallCon parent_con do_con_name ma tvs ctxt con =
+cvtForallCon type_data parent_con do_con_name ma tvs ctxt con =
   do { tvs' <- cvtTvs tvs
      ; ctxt' <- cvtContext funPrec ctxt
-     ; L _ con' <- cvtConstr parent_con do_con_name con
+     ; L _ con' <- cvtConstr type_data parent_con do_con_name con
      ; returnLA $ add_group tvs' ctxt' con' }
   where
     tele tvs = (mkHsForAllInvisTele noAnn tvs) { hsf_matchability = ma }

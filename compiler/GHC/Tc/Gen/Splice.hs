@@ -3823,7 +3823,10 @@ reifyDataCon isGadtDataCon tys dc
                       (take n dcdBangs) prefix g_res_ty
                   ; ma <- reifyType unmatchableDataConTy
                   ; let late_bangs = drop n dcdBangs
-                  ; if any (/= TH.Bang TH.NoSourceUnpackedness TH.NoSourceStrictness) late_bangs
+                  -- Keep the fields explicit so type data splices can
+                  -- recover plain arrows without a multiplicity annotation.
+                  ; if isTypeDataCon dc ||
+                       any (/= TH.Bang TH.NoSourceUnpackedness TH.NoSourceStrictness) late_bangs
                     then do
                       ordered <- reifyOrderedArgs ma remaining late_tvs late_theta
                                                   (zip late_bangs suffix)
