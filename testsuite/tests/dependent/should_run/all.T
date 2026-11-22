@@ -164,6 +164,9 @@ test('NativeOpenMinimum',
       extra_files(['NativeLocalMinSizeRule.hs'] + [open_eval_dir + f for f in
                    ['PreludeMapLengthSize.hs', 'PreludeZipRuntime.hs', 'ZipMinimum.hs']])],
      run_command, ['bash NativeOpenMinimum.sh "{compiler}" "{libdir}" ' + config.ghc_th_way_flags])
+test('NativeRetainedFamilyGiven',
+     [only_ways(['normal']), extra_files(['NativeRetainedFamilyGiven.hs'])],
+     run_command, ['bash NativeRetainedFamilyGiven.sh "{compiler}" "{libdir}"'])
 test('NativeOpenListFoldr',
      [only_ways(['normal']),
       extra_files([open_eval_dir + f for f in ['ListFoldrSource.hs', 'ListFoldrProof.hs', 'PreludeFoldrProof.hs',

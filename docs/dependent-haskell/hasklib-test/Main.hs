@@ -1,6 +1,6 @@
 module Main where
 
-import Client (checkAppendSingleton, checkReverse, zipLaw)
+import Client (checkAppendSingleton, checkReverse, checkZipMap, zipLaw)
 import HaskLib
 
 -- | Use the installed list proofs from an ordinary Haskell function.
@@ -20,5 +20,6 @@ main = do
         && checkAppendSingleton [element, element] element
         && checkReverse []
         && checkReverse [element, element]
+        && checkZipMap (error "forced map callback") (error "forced zip callback") [element] [0]
         then pure ()
         else fail "list proof failed"

@@ -1,7 +1,7 @@
 {-# LANGUAGE ExperimentalDependentTypes #-}
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
 
-module Client (zipLaw, lengthAppendSingleton, checkAppendSingleton, checkReverse) where
+module Client (zipLaw, lengthAppendSingleton, checkAppendSingleton, checkReverse, checkZipMap) where
 
 import qualified HaskLib as H
 import HaskLib.Size (plusSucc, plusZero)
@@ -29,3 +29,16 @@ checkAppendSingleton xs x = case lengthAppendSingleton xs x of
 checkReverse :: [Bool] -> Bool
 checkReverse xs = case H.lengthReverse xs of
     H.Refl -> True
+
+-- | Compose two library proofs. The map proof visits the entire left spine.
+zipMapLaw :: forall a b c d. foreach (pre :: a -> b) -> foreach (combine :: b -> c -> d)
+           -> foreach (xs :: [a]) -> foreach (ys :: [c])
+           -> H.size (zipWith combine (map pre xs) ys) H.:~: H.minSize (H.size xs) (H.size ys)
+zipMapLaw pre combine xs ys =
+    case H.lengthZipWith combine (map pre xs) ys of
+        H.Refl -> case H.lengthMap pre xs of H.Refl -> H.Refl
+
+-- | Instantiate the pipeline with different intermediate and input types.
+checkZipMap :: (Bool -> Char) -> (Char -> Int -> Ordering) -> [Bool] -> [Int] -> Bool
+checkZipMap pre combine xs ys =
+    case zipMapLaw pre combine xs ys of H.Refl -> True

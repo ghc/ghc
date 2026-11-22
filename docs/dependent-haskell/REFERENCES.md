@@ -5929,6 +5929,21 @@ whose equations the fork has checked.
 [Agda list properties](https://agda.github.io/agda-stdlib/v2.4/Data.List.Properties.html#length-reverse)
 and [HaskLib implementation](hasklib/HaskLib/List.hs).
 
+### Reusing an equality under a size function
+
+Agda's `cong` takes an equality between arguments and produces an
+equality between the results of applying one function. Equality
+elimination permits the same substitution when a Haskell client matches
+`Refl`. In the HaskLib pipeline example, `lengthMap pre xs` gives
+`size (map pre xs) :~: size xs`. The client uses that equality in
+the first argument to `minSize`, after matching the zipWith proof.
+Neither step requires the size function to be injective.
+The compiler keeps the Given in its branch and uses its nominal
+coercion during family rewriting. See Note [Family Givens with rigid
+runtime indices] in GHC.Tc.Utils.Unify.
+[Agda equality congruence](https://github.com/agda/agda-stdlib/blob/v2.3/src/Relation/Binary/PropositionalEquality/Core.agda#L54-L55)
+and [HaskLib client](hasklib-test/Client.hs).
+
 ### The length of zip and demand in a case tree
 
 Agda's `length-zipWith` proves that the length of a zip is the minimum
