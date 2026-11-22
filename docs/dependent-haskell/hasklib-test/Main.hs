@@ -1,6 +1,6 @@
 module Main where
 
-import Client (zipLaw)
+import Client (checkAppendSingleton, zipLaw)
 import HaskLib
 
 -- | Use the installed list proofs from an ordinary Haskell function.
@@ -13,6 +13,10 @@ check pre f xs ys = case lengthMap pre xs of
 main :: IO ()
 main = do
     let bad = error "forced zipWith callback"
-    if check not bad [True, False] [False] && check not bad [] (error "forced right list")
+        element = error "forced an append element"
+    if check not bad [True, False] [False]
+        && check not bad [] (error "forced right list")
+        && checkAppendSingleton [] element
+        && checkAppendSingleton [element, element] element
         then pure ()
         else fail "list proof failed"
