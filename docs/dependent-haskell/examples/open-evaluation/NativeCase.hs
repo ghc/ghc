@@ -9,7 +9,7 @@ module NativeCase
   , AscribedCaseKind, SignedCaseRhs
   , CaseRhsAliasKind, CaseBodyAliasKind
   , caseIdentity, nestedCaseIdentity, retainedPick, renderRetainedPick, retainedKeep
-  , retainedDoubleNot, renderRetainedDoubleNot, retainedPermission
+  , retainedMaybePick, retainedDoubleNot, renderRetainedDoubleNot, retainedPermission
   ) where
 
 import Data.Kind (Type)
@@ -87,6 +87,12 @@ render False value = show value
 -- | Return a constant without forcing either argument.
 retainedKeep :: foreach (flag :: Bool) -> (case flag of { True -> Int; False -> Char }) -> Int
 retainedKeep _ _ = 42
+
+-- | Select a result by the outer constructor of a runtime Maybe.
+retainedMaybePick :: foreach (m :: Maybe Bool) ->
+  (case m of { Nothing -> Char; Just _ -> Int })
+retainedMaybePick Nothing = 'n'
+retainedMaybePick (Just _) = 73
 
 -- | Select the result after two checked Boolean negations.
 retainedDoubleNot :: foreach (b :: Bool)

@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, TemplateHaskell #-}
 -- | Select a result type with a retained signature from a quote.
-module NativeRetainedTH (Select, quoted, quotedCase, render, renderCase) where
+module NativeRetainedTH (Select, quoted, quotedCase, render, renderCase, renderMaybeCase) where
 
 -- | Select a type from a Boolean index.
 type Select (b :: Bool) = case b of { True -> Int; False -> Char }
@@ -25,3 +25,9 @@ renderCase :: $([t| foreach (flag :: Bool) ->
                     (case flag of { True -> Int; False -> Char }) -> String |])
 renderCase True i = show i
 renderCase False c = [c]
+
+-- | Render the selected payload without inspecting the Boolean inside Just.
+renderMaybeCase :: foreach (m :: Maybe Bool) ->
+  (case m of { Just _ -> Int; Nothing -> Char }) -> String
+renderMaybeCase (Just _) = show
+renderMaybeCase Nothing = (:[])
