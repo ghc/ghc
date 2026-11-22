@@ -2047,11 +2047,11 @@ Keep the Id precheck and the typed checks after allocation as well.
 Fields permit One or Many. Function arrows and retained binders require Many.
 Function arrows require U matchability. Resolve metadata by wired TyCon
 identity, including nullary aliases.
-An algebraic domain can contain an eligible function leaf. Check each
-endpoint of a structural field with the function-free algebraic policy.
-The function in a call can take an opaque lifted argument. Check its
-result with the function-free policy. Start a separate data visited set for
-each endpoint. An enclosing data back-edge must not certify that endpoint.
+An algebraic domain can contain a function field. Check each endpoint of
+that field with the function-free algebraic policy. Start a separate data
+visited set for each endpoint. An enclosing data back-edge must not certify
+that endpoint. For a lexical call head, both endpoints can be opaque lifted
+types. The argument to the call must have the declared domain as its kind.
 A raw Pi is not scalar. mkDepFunTyWithVis can convert a vacuous visible Pi
 to an ordinary arrow. A hidden Pi remains retained. Keep the domain projection
 conservative for both flags. Check the multiplicity, argument and result

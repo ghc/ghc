@@ -908,8 +908,9 @@ checking pass False. Keep the scalar retained signature walker in those paths.
 Other signature contexts keep their existing checks. Explicit type arguments
 use the separate permission in Note [Retained Pi type arguments].
 
-Check each domain before adding its Id to the telescope. The function must
-satisfy the closed visible Many A -> B policy.
+Check each domain before adding its Id to the telescope. A function has
+a visible Many arrow A -> B. The lifted types A and B can refer to outer
+binders.
 See Note [Function-valued retained binders] in GHC.Core.Type. A bare function
 is a value index at its fixed type. Application keeps the opaque call policy.
 

@@ -310,9 +310,10 @@ lifted argument and result types, and the kind of the index argument.
 The result kind comes from the head that was actually decoded. When a
 call supplies a type argument, check that kind against the application's
 telescope. Replacing a Bool result with a scoped type variable cannot
-make the call a valid argument of Bool kind. Constructor
-fields can refer only to earlier fields. A function-valued IfaceDepFunTy uses
-the same domain check. See Note [Exported function-valued retained signatures]
+make the call a valid argument of Bool kind. Constructor fields can refer
+only to earlier fields. An IfaceDepFunTy binder can hold an opaque lifted
+value. Check its arrow when an IfaceTermAppTy uses it as a call head.
+See Note [Exported function-valued retained signatures]
 in GHC.Tc.Gen.HsType. This encoding adds no runtime call or function equality.
 
 An open diagnostic head must keep its actual Id. CoreToIface selects

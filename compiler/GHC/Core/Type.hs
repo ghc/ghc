@@ -2823,7 +2823,8 @@ The function remains a runtime Id. Its TermVarTy records identity without
 evaluating the function or comparing its behavior.
 
 A structural function field requires independently closed function-free
-argument and result domains. Native calls also require that result policy.
+argument and result domains. A call to a lexical function can have an
+opaque lifted result. See Note [Function-valued retained binders].
 nativeIndexType False checks every instantiated field structurally. It
 requires closed monotype parameters and disables opaque parameter fields.
 Do not use the broader predicate for these checks. A datatype such as
