@@ -1823,6 +1823,14 @@ stuck when the left spine is abstract. See the
 [ordinary length proof](../examples/open-evaluation/PreludeZipWithLengthProof.hs)
 and [Agda's length proof](https://agda.github.io/agda-stdlib/v2.3/Data.List.Properties.html#length-zipWith).
 
+The same checker reads the ordered cases of the installed `Prelude.zip`.
+The existing constructor checker verifies the lazy pair in its cons
+equation. Both functions must recur on the original tails. A function
+that checks the right spine first or forces a head before returning
+a cons does not get these equations. See the
+[ordinary pair proof](../examples/open-evaluation/PreludeZipProof.hs) and
+[regression](../../../testsuite/tests/dependent/should_run/NativeOpenPreludeZipWith.sh).
+
 ### Fold a mapped list
 
 Induction on a finite list spine proves that `foldr k z (map f xs)` equals

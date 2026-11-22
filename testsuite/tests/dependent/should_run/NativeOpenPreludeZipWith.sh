@@ -9,16 +9,25 @@ mkdir "$out"/{provider,client}
 
 cd "$out/provider"
 strip=(-fno-enable-rewrite-rules -fomit-interface-pragmas -fno-write-if-simplified-core)
-for module in PreludeMapLengthSize PreludeMapLengthSource PreludeMapLengthProof PreludeZipWithSource; do
+for module in PreludeMapLengthSize PreludeMapLengthSource PreludeMapLengthProof PreludeZipWithSource PreludeZipSource; do
     "${ghc[@]}" "${strip[@]}" -c "$src/$module.hs" -outputdir .
+done
+for opt in -O0 -O2; do
+    "${ghc[@]}" "$opt" -fforce-recomp -c "$src/NativeOpenZipDemandControls.hs" -outputdir .
+    "${ghc[@]}" --show-iface NativeOpenZipDemandControls.hi >demand.iface
+    if grep -E 'T:(rightFirstPair|strictPair|strictResult)\b' demand.iface; then
+        exit 1
+    fi
 done
 
 cd "$out/client"
 cp ../provider/*.hi .
 proof="$src/PreludeZipWithProof.hs"
 length_proof="$src/PreludeZipWithLengthProof.hs"
+pair_proof="$src/PreludeZipProof.hs"
 for opt in -O0 -O2; do
-    "${ghc[@]}" "$opt" -fno-enable-rewrite-rules -fforce-recomp -c "$proof" "$length_proof" -outputdir .
+    "${ghc[@]}" "$opt" -fno-enable-rewrite-rules -fforce-recomp -c \
+        "$proof" "$length_proof" "$pair_proof" -outputdir .
 done
 
 reject() {
@@ -32,8 +41,10 @@ reject() {
 }
 for mode in UNKNOWN_LEFT DROP_CONS; do
     reject '[GHC-83865]' "$proof" -fno-enable-rewrite-rules "-D$mode"
+    reject '[GHC-83865]' "$pair_proof" -fno-enable-rewrite-rules "-D$mode"
 done
 for mode in UNKNOWN_LEFT_LENGTH DROP_SUCCESSOR; do
     reject '[GHC-83865]' "$length_proof" "-D$mode"
 done
 reject '[GHC-83605]' "$proof" -O1 -fenable-rewrite-rules -DRULES_ON
+reject '[GHC-83605]' "$pair_proof" -O1 -fenable-rewrite-rules
