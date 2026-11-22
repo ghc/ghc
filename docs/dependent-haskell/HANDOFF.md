@@ -29,6 +29,7 @@ Updated 22 November 2026. The development branch is
 | `d41294266d` and `a7088dd69f` | R19 composes type-level cases across two modules at a runtime enum index. The compiler sources match the normal two-stage build at `4e0c9b393a`. Job `828` passed `NativeDependentCoreRun` and the 547-line Showcase at stage 2 in native `-O0`, native `-O2` and GHCi. |
 | `4f2fc1146f` and `229cecd250` | A client passes `HaskLib.size` as a retained callback. A scoped equality lets `safeHead` infer the tail index of a vector of length one. The installed-package clients and 548-line Showcase passed. Of 41 registered regressions, only the known `T15874` failed. |
 | `4e169241d2` and `098ca0ae97` | Independent modules compose type-level cases on an unknown `Maybe Bool`. The `Just` field stays lazy. Both stages built, the 549-line Showcase passed, and all ten original term-capture diagnostic tests passed. The 158 upstream test outcomes match the previous release. |
+| `2b64ffc406` and `930910d25b` | Both normal stages built. The 549-line Showcase, 23 focused regressions and interface upgrade checks passed. The full renamer run restored eight upstream goldens. R36 passed all 16 pun-warning regressions. R35 passed 25 namespace registrations, including the source-hidden regression in `e0fa805055`. |
 
 [Equality continuations and kind inference](CHECKPOINTS.md#equality-continuations-and-structural-kind-inference), [HaskLib pipeline and parametricity](CHECKPOINTS.md#compose-installed-list-proofs), [Ordinary minimum](CHECKPOINTS.md#an-ordinary-minimum-in-the-zip-length-proof)
 and [previous release](CHECKPOINTS.md#direct-zip-proof-and-retained-callback-rules).
@@ -133,9 +134,10 @@ The splice-scope check in job 889 then exposed a missing binding warning across 
 groups. Job 913 also distinguished a fresh implicit type binder from
 an annotation that would reuse an earlier term binder. The corrected
 cumulative source is `58bcf66601`. The verified 575e comparator is in
-`r36-combined-top-groups-20261122/preserved-575e`. Job 923 starts
-the corrected warm rebuild. Confirm the full corrected rename run
-before closing the card.
+`r36-combined-top-groups-20261122/preserved-575e`. Jobs 923 and
+936 qualified the correction. The combined compiler passed the
+complete R36 and R35 acceptance checks.
+[Namespace results](CHECKPOINTS.md#namespace-management-and-ordered-gadt-results).
 
 **R13 ordinary typechecking.** With only `RequiredTypeArguments`
 enabled, a name in a type can resolve to a term. The released compiler
@@ -170,9 +172,13 @@ Job 909 found a further failure for result indices such as `T a a`.
 The private repair at `b13259766e` introduces the result equalities
 at pattern entry and brings written constraints into scope at their
 declared positions. Jobs 925 and 926 passed. The next aggregate
-source is `2b64ffc406`. Job 932 rebuilds both stages in
-`r41-r36-aggregate-normal-20261122`. It includes the final warning
-changes, the result-equality repair and the 549-line Showcase.
+source is `2b64ffc406`. Job 932 built both stages in
+`r41-r36-aggregate-normal-20261122`. The tests in job 951 passed
+their release criteria. Read the final `qualification/qualification.pass`
+and `qualification/rename-comparison-verified.tsv`. The raw job exited
+1 because its report comparator assumed a system temporary directory.
+The final comparison checked the same test results with the correct
+temporary path. R41 still needs the remaining source-grammar checks.
 [R41 ordering tests](roadmap/R41-nested-quantification-in-gadts.md#which-prefix-orders-work)
 and [R19 scope](roadmap/R19-type-level-cases.md).
 
@@ -205,8 +211,10 @@ revisions under `refs/archive/dependent-haskell/2026-11-22/`:
 and `r36-r41-r19-r13-549-normal`.
 The compiler sources remain available there after generated builds expire.
 
-The [release-readiness assessment](ROADMAP.md#release-readiness) identifies
-R36 as the next full-card target.
+The [release-readiness assessment](ROADMAP.md#release-readiness) records
+R35 and R36 as complete on the fork. The active follow-ups are R41
+constructor forms, R23 matchability in package interfaces and an opt-in
+R27 migration diagnostic.
 
 ## Resume after a restart
 

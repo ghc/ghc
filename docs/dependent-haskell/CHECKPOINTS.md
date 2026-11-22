@@ -6,6 +6,33 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Namespace management and ordered GADT results
+
+Job 932 built stages 1 and 2 from `2b64ffc406`. The compiler sources
+in the integration commit `930910d25b` match that revision. The two
+new local completions are R36 and R35. Serokell still marks 23 cards
+complete upstream.
+
+| Check | Result |
+| --- | --- |
+| Showcase | All 549 lines matched at native `-O0`, native `-O2` and in stage 2 GHCi. |
+| GADTs, Core, interfaces and related regressions | All 23 selected normal-way registrations passed. The mixed interface loaded in the new compiler. Two older compilers each reported the incompatible features before decoding. The new client printed `(True,(False,Refl))`. |
+| Full renamer directory | 508 registrations. The 499 executed cases gave 488 expected passes, three expected failures and eight unexpected failures inherited from the baseline. All eight diagnostic bodies matched. Eight original `T23740` goldens recovered. All 16 R36 tests passed. |
+| Namespace management | Job 957 passed all 25 registered normal-way tests on the same compiler. The new regression checked separate compilation, required arguments, distinct Template Haskell annotations and the exact ambiguous-use diagnostic. |
+
+Job 951's last postprocessing step compared unified diffs. It expected
+the test scratch directory under `/tmp`. This run used a temporary
+directory under the build tree. The final check normalized the file
+headers and timestamps and compared every remaining line, including
+the compiler's source positions. Keep the original exit code and the
+verified comparison under `r41-r36-aggregate-normal-20261122/qualification`.
+The older R36 warning build and ten superseded overlays released
+5,308,047,360 allocated bytes. The current compiler and comparison
+manifests remain in the active build tree.
+[R35 controls](roadmap/R35-namespace-management.md),
+[R36 scope](roadmap/R36-pun-warnings.md) and
+[R41 orderings](roadmap/R41-nested-quantification-in-gadts.md#which-prefix-orders-work).
+
 ## Local build capacity
 
 On the shared WSL host, schedule GHC builds and compiler verification

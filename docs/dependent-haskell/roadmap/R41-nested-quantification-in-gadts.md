@@ -304,5 +304,28 @@ scope at their declared positions. In job 925 the three refined
 results compiled and ran through stripped interfaces at `-O0` and
 `-O2`. A field pattern placed before the written `Eq` constraint
 still failed with GHC-39999. Job 926 passed three registered GADT
-tests with that relinked compiler. The aggregate compiler must
-also pass them in a normal build.
+tests with that relinked compiler. Job 951 passed these tests on the
+normal compiler at `2b64ffc406`. The ordinary and linear fields each
+passed all 24 prefix orders. A mixed interface used the fieldless,
+refined-result and scoped-constructor-case encodings together. Both
+older readers diagnosed its incompatible interface. The new reader
+compiled and ran the client at `-O2`.
+[Qualification and scope](../CHECKPOINTS.md#namespace-management-and-ordered-gadt-results).
+
+Two smaller programs still give GHC-71492 at `2b64ffc406`. A data
+family instance declares `K :: forall a. a -> forall b. Eq a => T Char b`.
+An unlifted datatype declares `K :: forall a. a -> forall b. T a b`.
+Moving the quantifiers before the fields makes both controls compile.
+The record tests separately preserve the stock compiler's results for
+both valid examples and all seven rejected forms. Proposal #402
+keeps distinct rules for prefix and record constructors.
+[Proposal grammar](https://ghc-proposals.readthedocs.io/en/latest/proposals/0402-gadt-syntax.html#grammar-specification).
+
+Job 965 confirmed that ordinary newtypes and newtype instances with
+linear fields compile. Their ordered counterparts give GHC-71492.
+Job 966 tested a private repair for lifted data family instances at
+`2b16e9003e`. Its stripped-interface clients passed at `-O0` and
+`-O2`, including a result equality and a late dictionary. The earlier
+reader at `2b64ffc406` could also load and link that interface.
+A wrong family result still gave GHC-83865. Using the dictionary
+before its position in the constructor still gave GHC-39999.

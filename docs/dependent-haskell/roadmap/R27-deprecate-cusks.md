@@ -52,8 +52,10 @@ and [GHC MR !1602](https://gitlab.haskell.org/ghc/ghc/-/merge_requests/1602).
   build. Record their revisions and verify the linked libraries.
 - [x] Extend the impact study to additional releases, including
   a package that relies on an implicit CUSK and a Haskell98 package.
-- [ ] Test the transition warning on explicit and inherited uses.
+- [x] Test the transition warning on explicit and inherited uses.
   Include a declaration with a CUSK whose client needs no migration.
+- [ ] Verify each suggested signature on package sources. Explain
+  kinds with inaccessible names without suggesting invalid source.
 - [ ] Recheck the selected migration on the normal compiler and
   document the effect on callers before changing a language default.
 
@@ -170,3 +172,26 @@ The Haskell98 package `tagged-0.9` also uses `PolyKinds`. It built
 unchanged with both fork compilers. A client instantiated tags at
 `Bool` and at `Type -> Type` and printed `(3,'x')` on both.
 [Published tagged release](https://hackage.haskell.org/package/tagged-0.9).
+
+### Which declarations would a migration warning identify?
+
+Job 942 built the unmodified release chain on stock GHC 9.14.1 with
+each existing missing-signature warning. Neither warning reported any
+of the 14 declarations in the migration. Both warned on `Tagged`,
+which retained its polymorphic kind without a signature. The kind
+checker uses a different path for declarations that already have a
+CUSK. Job 950 checked the warning on the extension flag in MR !1602.
+It reported all 14 explicit switches across seven modules and none
+of the seven modules that inherited the edition default.
+
+An opt-in declaration warning is under test on the fork. After the
+[R23 package migration](R23-unsaturated-type-families.md#released-first-class-families-migration),
+the prototype reported both affected declarations in
+`first-class-families` and 13 additional declarations. Six printed
+kinds contained package-qualified internal matchability names.
+Check that the compiler can suggest valid source, or explain the
+inferred kind without offering an invalid edit. A warning here can
+identify a declaration for inspection. Rebuild with `-XNoCUSKs` and
+check the exported kind and client to establish the impact.
+[GHC's missing-signature diagnostics](../../users_guide/using-warnings.rst)
+and [the upstream flag change](https://github.com/ghc/ghc/commit/c8c660f678bd77fb9d0a855753a165c5a5d1f8e1).

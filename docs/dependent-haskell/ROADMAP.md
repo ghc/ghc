@@ -15,54 +15,54 @@ the checked list laws for reuse by other modules.
 
 ## Where this fork stands
 
-**23 of 50 cards (46%) are complete** on the upstream
-checklist. The fork adds a tested part of **20 of the 27 open cards**.
-This count includes a card when the fork demonstrates a behavior in
-source Haskell or in compiled Core. Each card counts once, regardless
-of the number of Showcase examples. The cards differ in scope and some
-depend on others, so this count cannot estimate the remaining work time.
+Serokell marks **23 of 50 cards complete**. Of its **27 open cards**,
+the fork now completes **2**, partially implements **19** and has **6**
+with no separate implementation on the published branch. Counting the
+inherited 23 gives **25 of 50 complete** on the roadmap. These figures
+count cards. They do not estimate the effort left or certify all inherited
+GHC behavior on the fork.
 
 | Area | Open cards with a tested implementation in the fork |
 | --- | --- |
 | Dependent binders, Core and equality | R03, R04, R05, R11, R22 |
 | Promotion and evaluation | R07, R10, R12, R13, R14, R15, R16, R17, R18, R19 |
 | Declaration dependencies, families and GADTs | R21, R23, R24, R41 |
-| Namespace warnings | R36 |
+| Namespace management and warnings | R35 and R36, both complete on the fork |
 
 ### Release readiness
 
-As of 2026-11-22, we can recommend **0 of the 20 partially implemented
-cards** for release as a complete upstream feature. The coverage count
-increases with the first working example on a new card. Further work
-on that card can remove restrictions without changing the count.
-For example, the published fork can prove the length of `zipWith` on
-runtime lists. R16 still needs evaluation of ordinary definitions
-outside the checked recursion patterns.
-[Remaining work by area](#remaining-work-by-roadmap-area).
+Two cards meet their documented scope on the normal compiler at
+`2b64ffc406`. The upstream review and release decisions are separate.
 
-R36 is the clearest candidate for the first complete card. Five of its
-eight checklist entries are checked. The remaining entries cover
-implicit type binders, uses shadowed across lexical scopes, and staged
-imports or remaining syntax. For R41, accepted proposal #402 permits
-free order for fields, constraints and quantifiers in prefix GADT
-constructors. In a test of 24 orders, the published R19 compiler
-accepted eight. The latest private repair accepts all 24 with a
-linear or unrestricted field. Its release still requires a normal build
-and tests for the other constructor forms.
-[R36 checklist](roadmap/R36-pun-warnings.md)
-and [R41 checklist](roadmap/R41-nested-quantification-in-gadts.md).
+- [x] **[R36 Pun warnings](roadmap/R36-pun-warnings.md).** All eight
+  checklist entries and all 16 registered warning cases passed. These
+  cover independent scopes, conditional type binders, splices, staged
+  imports, syntax and diagnostic precedence.
+- [x] **[R35 Namespace management](roadmap/R35-namespace-management.md).**
+  All four prerequisites have implementations. A client distinguishes a
+  type, its same-spelled constructor and their annotations after a
+  re-export through compiled interfaces. The negative case identifies
+  both imports. All 25 namespace registrations passed.
 
-Seven open cards have no separate tested implementation counted here.
+R41 remains partial. Its normal compiler accepts all 24 tested orders
+of a prefix GADT constructor with both field multiplicities. Result
+refinements survive separate compilation. Ordered data family instances,
+newtypes and unlifted datatypes still fail with GHC-71492 on the
+published compiler. Their ordinary controls pass. A private repair
+has passed source-hidden clients for lifted data family instances.
+[R41 scope](roadmap/R41-nested-quantification-in-gadts.md).
+
+Six of the 27 open upstream cards have no separate implementation
+counted on this branch.
 
 | Card | What still holds it open |
 | --- | --- |
 | R01 Dependent Haskell | This is the overall goal. It depends on retained quantifiers (R02), universal promotion (R06) and language cleanup (R20). |
 | R02 Dependent retained quantifiers | Complete both dependent products (R03) and sums (R04). The fork still restricts which runtime arguments can appear in results and which hidden indices it can infer. |
 | R06 Universal promotion | Promotion of literals, unboxed types, classes, functions and data families is partial (R07, R10, R12–R14). An ordinary definition can still fall outside the evaluator. |
-| R20 Clean up the language | Complete mixed declaration ordering, erased existentials, unsaturated families, constrained families, CUSK deprecation and namespace management. |
-| [R27 Deprecate CUSKs](roadmap/R27-deprecate-cusks.md) | Standalone kind signatures already exist. The open GHC migration patch changes the Haskell98 and Haskell2010 defaults. Measure the impact on importing clients and check how a transition warning could identify affected declarations. |
+| R20 Clean up the language | Complete mixed declaration ordering, erased existentials, unsaturated families, constrained families and CUSK deprecation. |
+| [R27 Deprecate CUSKs](roadmap/R27-deprecate-cusks.md) | A three-package migration preserved 84 kinds. The prototype warning finds both affected declarations in the first package and 13 others. Check the suggested signatures before changing any edition defaults. |
 | R34 Syntactic unification | Type syntax already works in some expressions. Patterns, the term and type grammars, and the frontend representations still need general unification. |
-| R35 Namespace management | Imports and explicit type syntax already provide disambiguation. R36 pun warnings is the last open subtask listed upstream. |
 
 The [Serokell roadmap](https://ghc.serokell.io/dh) records the status of
 the upstream work. The [dependency checklist](#upstream-checklist-and-complete-dependency-index)
@@ -87,7 +87,7 @@ which proof steps still require the function's definition.
 Earlier [Showcase milestones and examples](CHECKPOINTS.md#showcase-history-through-502-outputs)
 record how each behavior was introduced.
 
-### Evidence for the 20 partial cards
+### Evidence for the 19 partial cards
 
 Each row links to the test or card that supports it. The last column
 identifies an outstanding obligation or a test that can expose it.
@@ -117,8 +117,7 @@ continue to follow Serokell's published status.
 | [R22 Erased existentials](roadmap/R22-existential-quantification.md) | A pattern can open a hidden length. An argument's declared type can determine a witness beneath a callback's `forall`. | Specify inference for a package repacked across a scope, including the cases where its witness cannot be determined or would escape. |
 | [R23 Unsaturated families](roadmap/R23-unsaturated-type-families.md) | The unmodified `T13822` interpreter compiles. Its kind can select a matchable arrow when an equation returns `Maybe`. | Complete higher-order inference and settle compatibility of existing unannotated programs. The unmodified `T15874` still fails on the released compiler. |
 | [R24 Constrained families](roadmap/R24-constrained-type-families.md) | An associated family such as `Elem c` can require the owning dictionary. A source-hidden client rejects a missing premise before reduction. | Settle the general representation of domain evidence, including partial applications, and how the source formation rule corresponds to Core. |
-| [R36 Pun warnings](roadmap/R36-pun-warnings.md) | Five of the eight local checklist entries cover same-scope bindings, global uses, selected syntax and implicit capture. | Finish implicit binding puns, shadowed uses and stage-specific or remaining syntax. Compare diagnostic spans and quiet controls against proposal #765. |
-| [R41 Nested GADT quantifiers](roadmap/R41-nested-quantification-in-gadts.md) | Prefix constructors can interleave several groups of fields, contexts and quantifiers. The tested orders survive an interface and Template Haskell. | Qualify the private [24-order repair](roadmap/R41-nested-quantification-in-gadts.md#which-prefix-orders-work) in a normal build. Check other forms, including repeated and empty field groups and their interface encodings. |
+| [R41 Nested GADT quantifiers](roadmap/R41-nested-quantification-in-gadts.md) | Prefix constructors can interleave several groups of fields, contexts and quantifiers. The tested orders survive an interface and Template Haskell. | Check the [remaining constructor forms](roadmap/R41-nested-quantification-in-gadts.md#which-prefix-orders-work), including newtypes, data family instances, unlifted results and record syntax. |
 
 The published evaluator work covers closed calls such as `Prelude.sum` and
 open equations such as mapping `Prelude.not` over a list with a known head
@@ -142,7 +141,7 @@ for all cards that change the same checker or interface format.
 | [R03](roadmap/R03-dependent-products.md), [R04](roadmap/R04-dependent-sums.md), [R41](roadmap/R41-nested-quantification-in-gadts.md) | A constructor supplies a runtime result index to a nested call. A retained package can carry a polymorphic element. A quoted GADT preserves the order of its binders and fields. | Check source-hidden clients, lazy fields, rejected index and payload mismatches, interface markers, and ordinary Quick Look allocation. |
 | [R10](roadmap/R10-unboxed-promotion.md) | A closed family matches a signed machine integer of type `Int#`. | Check target-width conversion and the imported family axiom with both compiler stages. |
 | [R15](roadmap/R15-closed-term-evaluator.md), [R17](roadmap/R17-type-level-lambdas.md) | Rectangular and square matrices retain their shape during readback. A type family recognizes equal lambda closures across an interface. | Check zero-sized and mismatched dimensions, imported closure equality, and the cost of nested family applications. |
-| [R36](roadmap/R36-pun-warnings.md) | The renamer can warn when a type and a term share a name at an unqualified use. | Check qualified and explicitly disambiguated uses, implicit binders, diagnostic locations, and `-Werror=pun-uses`. |
+| [R36](roadmap/R36-pun-warnings.md) | The renamer can warn when a type and a term share a name at an unqualified use. | These controls passed on the normal compiler. See the [cross-module acceptance check](roadmap/R35-namespace-management.md). |
 | [R18](roadmap/R18-type-level-lets.md#ordered-binding-groups) | A group of type-level let bindings uses source order. A later binding can refer to an earlier binding with the same name. Both braced and layout groups work directly in source. | Check free variables in implicitly quantified signatures, an out-of-scope forward reference, an interface-only client, quotations, and exact and ordinary printing. |
 
 The R05/R16 compiler at `fd5a526ea1` checks the full interfaces of home
@@ -352,8 +351,8 @@ still require substantial research.
 - [x] **R32 [Visible type applications](https://ghc.serokell.io/dh#visible-type-applications)** — Completed. Needs/includes: no outgoing graph edge.
 - [x] **R33 [Visible kind applications](https://ghc.serokell.io/dh#visible-kind-applications)** — Completed. Needs/includes: no outgoing graph edge.
 - [ ] **R34 [Syntactic unification](https://ghc.serokell.io/dh#syntactic-unification)** — Accepted. Needs/includes: R44, R45, R46, R47.
-- [ ] **R35 [Namespace management](https://ghc.serokell.io/dh#namespace-management)** — Accepted. Needs/includes: R36, R37, R38, R42.
-- [ ] **R36 [Pun warnings](https://ghc.serokell.io/dh#pun-warnings)** — Accepted. Needs/includes: no outgoing graph edge. [Proposal #765](https://ghc-proposals.readthedocs.io/en/latest/proposals/0765-pun-warnings.html) introduces two warnings. `-Wpun-bindings` checks top-level definitions in one declaration group and explicit type and term binders in one match. `-Wpun-uses` checks global names, implicit capture, and selected list and tuple type syntax. Explicit local use scope and staged imports remain open. [Checklist and source examples](roadmap/R36-pun-warnings.md).
+- [ ] **R35 [Namespace management](https://ghc.serokell.io/dh#namespace-management)** — Accepted. Needs/includes: R36, R37, R38, R42. [Complete on the fork](roadmap/R35-namespace-management.md).
+- [ ] **R36 [Pun warnings](https://ghc.serokell.io/dh#pun-warnings)** — Accepted. Needs/includes: no outgoing graph edge. [Proposal #765](https://ghc-proposals.readthedocs.io/en/latest/proposals/0765-pun-warnings.html) specifies the two opt-in diagnostics. [Complete on the fork](roadmap/R36-pun-warnings.md).
 - [x] **R37 [Namespace-specified imports](https://ghc.serokell.io/dh#namespace-specified-imports)** — Completed. Needs/includes: no outgoing graph edge.
 - [x] **R38 [No list or tuple puns](https://ghc.serokell.io/dh#no-list-or-tuple-puns)** — Completed. Needs/includes: no outgoing graph edge.
 - [x] **R39 [Visible forall](https://ghc.serokell.io/dh#visible-forall)** — Completed. Needs/includes: R34 (loose end), R40, R41 (loose end), R43.
