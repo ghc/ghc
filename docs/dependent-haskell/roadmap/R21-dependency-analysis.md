@@ -422,3 +422,21 @@ omits that argument from its result. Synonym saturation and cycle
 checks still apply.
 [Proposal #425 on arity inference](https://ghc-proposals.readthedocs.io/en/latest/proposals/0425-decl-invis-binders.html#arity-inference)
 and [the review on arity and scoping](https://github.com/ghc-proposals/ghc-proposals/pull/425#issuecomment-973555158).
+
+## A datatype, its workers and their proof in one group
+
+The private source at `60cc9f5d23` declares `Tree`, `Size`, addition,
+`mapTree`, `nodes` and `nodesMap` in one declaration group. The
+datatype dependencies determine when GHC can check the workers.
+The type of `nodesMap` uses their checked equations. No splice or
+separate provider module is needed for this example.
+
+The scheduler retains each existing group of mutually dependent type
+declarations. A regular Haskell98 datatype can move early when its
+single parameter and recursive fields have the verified shape.
+A genuine data/function cycle still rejects. Job 1160 checked the
+example with HaskLib's `withEquality` at both optimization levels.
+The client counted two forks and obtained `Refl` without forcing the
+callback. The 555 compiler includes this source. The separate
+[imported-rule check](R16-open-term-evaluator.md#an-imported-proof-and-a-client-rewrite-rule)
+applies when another module uses the proof.

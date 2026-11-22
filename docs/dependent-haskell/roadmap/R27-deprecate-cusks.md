@@ -299,3 +299,7 @@ After the decision, the 4,320,100,352-byte comparison checkout and 407
 compiled test products were retired. Git retains the exact source under
 `refs/archive/dependent-haskell/2026-11-22/r27-legacy-transition-normal`.
 The experiment directory retains the build recipe, inputs and results.
+The earlier declaration-warning prototype checkout used another
+4,320,931,840 bytes. Its source is under the local recovery ref
+`refs/archive/dependent-haskell/2026-11-22/r27-declaration-warning`.
+The published compiler includes its warning.

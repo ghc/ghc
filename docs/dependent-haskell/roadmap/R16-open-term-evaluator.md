@@ -2328,3 +2328,12 @@ dependencies through an interface and rejecting the proof use when a
 client changes its equations. A dormant rule and an unrelated active
 rule must still permit the proof.
 [GHC rewrite rule semantics](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/rewrite_rules.html#semantics).
+
+Job 1181 reproduced both the list and tree cases on the complete
+554-line compiler. The private solver at `952c7bbd6b` records the
+equations it uses to prove the equality. On rebuilt providers it
+rejects these two proof uses at GHC-83605. Job 1189 found that an
+unchanged home provider compiled before this metadata existed could
+still be reused. An old installed provider also admitted the conflicting
+rule. Rebuilding the provider restored the check. Proofs whose only
+dependency arises in their body need separate verification.

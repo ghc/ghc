@@ -23,7 +23,7 @@ hashes in that experiment directory.
 
 | Next check | Source and verification |
 | --- | --- |
-| Tree induction and ordered `type data` | Job 1110 built `c5b5acbffc` in `r41-type-data-554-normal-20261122` using a private copy of the 552 tree. Job 1115 checks the 554-line Showcase, installed HaskLib and the combined interface. Jobs 1100 and 1107 had already passed the source-distribution and downstream tree clients on the compiler component. |
+| Tree induction and ordered `type data` | Job 1110 built `c5b5acbffc` in `r41-type-data-554-normal-20261122` using a private copy of the 552 tree. Job 1115 passed the 554-line Showcase in three modes, 48 registered tests, the installed HaskLib client and the combined interface. Jobs 1100 and 1107 had already passed the source-distribution and downstream tree clients on the compiler component. |
 | Legacy CUSK defaults | Job 1112 built GHC and its boot libraries from clean sources at `c27193021b` in `r27-legacy-transition-normal-20261122`. Job 1121 passed the 34 diagnostic inputs, three-package comparisons, cross-version interface links and five registered tests. The fork keeps existing Haskell98 and Haskell2010 defaults and the opt-in warning. The transition experiment is complete. Its temporary installation was retired after archiving its source. |
 | Declaration groups and diagnostics | The R21 candidate at `87fcbcef7d` checks the tree proof with both workers in the same group and the tree datatype imported. The R16 diagnostic at `e0e63bec5d` names the enclosing call and highlights its full argument. Job 1151 passed the source-hidden mapper regression. |
 
@@ -33,10 +33,23 @@ the measured fork count. Job 1164 reproduced the same behavior on the
 published list proof. With the conflicting rewrite disabled, job 1171
 obtained matching counts. See the [R16 evidence](roadmap/R16-open-term-evaluator.md#an-imported-proof-and-a-client-rewrite-rule).
 
+Job 1181 reproduced both rewrite counterexamples on the exact 554
+compiler. Keep that checkpoint private. Job 1184 builds `1bef98f413`
+in `r03-r16-r21-r41-consolidated-20261122`. It includes the
+candidate solver fix from `952c7bbd6b` and the 555-line Showcase.
+Job 1187 checks the two active downstream rules, an ordinary caller,
+the same proof with rewrites disabled, 53 registrations and installed
+HaskLib. Inspect each gate separately. A terminal existential in the
+new constructor regression requires a subsequent R41 patch. The
+initial 555 pin also needs the maintained proof regression. Before
+publishing, check source-hidden forwarding and the upgrade path for
+proof providers compiled without dependency metadata.
+
 The local archive refs `r19-r41-normal-552`, `r16-hasklib-tree-553`
 and `r27-legacy-transition-normal` are under
 `refs/archive/dependent-haskell/2026-11-22/`. The `normal-sources/`
-refs preserve original private compiler and test revisions.
+refs preserve original private compiler and test revisions. The 555
+source is under `refs/archive/dependent-haskell/2026-11-23/r03-r16-r21-r41-normal-555`.
 
 | Revision | Verified result |
 | --- | --- |
