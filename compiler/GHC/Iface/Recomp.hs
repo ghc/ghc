@@ -916,6 +916,14 @@ checkFlagHash hsc_env iface self_recomp = do
                                             (mi_exports iface) (map snd (mi_decls iface)) =
               liftIO $ recheck "Compiler now checks retained signature cases with ignored fields"
           | otherwise = pure UpToDate
+        check_ordered_signature_owner
+          | mi_hsc_src iface == HsSrcFile
+          , let owner = mi_semantic_module iface
+                decls = map snd (mi_decls iface)
+          , hasUnscopedSignatureCaseNode owner decls
+          , couldExportRetainedSignatureCase owner (mi_exports iface) decls =
+              liftIO $ recheck "Compiler now records owners for ordered signature cases"
+          | otherwise = pure UpToDate
         check_nullary_family
           | nullary_candidate, not checked_nullary =
               liftIO $ recheck "Compiler now infers matchability for nullary family results"
@@ -970,6 +978,7 @@ checkFlagHash hsc_env iface self_recomp = do
                                      `recompThen` check_binary_enum
                                      `recompThen` check_retained_signature
                                      `recompThen` check_ignored_case_fields
+                                     `recompThen` check_ordered_signature_owner
                                      `recompThen` check_nullary_family
                                      `recompThen` check_injective_kind
                                      `recompThen` check_liberal_synonym
@@ -1292,6 +1301,17 @@ couldHaveIgnoredCaseFields owner = any field_case
 
     is_field_var IfaceTyVar{} = True
     is_field_var _ = False
+
+-- | Recognize an older ordered signature case in a home interface.
+-- See Note [Equality of ordered retained case trees] in GHC.Builtin.CoercionRules.
+hasUnscopedSignatureCaseNode :: Module -> [IfaceDecl] -> Bool
+hasUnscopedSignatureCaseNode owner = any unscoped
+  where
+    unscoped IfaceFamily{ifName = name, ifFamFlav = IfaceClosedTypeFamilyTyCon
+                           (IfaceClosedTyFamTyCon (Just _))}
+      = nameModule_maybe name == Just owner &&
+        "$case-node:$signature-case:" `isPrefixOf` occNameString (nameOccName name)
+    unscoped _ = False
 
 -- | Mark providers compiled with the scope traversal in GHC.Iface.Tidy.
 -- See Note [Private helpers in erased package rules] in GHC.Iface.Tidy.

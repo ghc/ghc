@@ -3107,6 +3107,7 @@ data IfaceEvidence
   | ScopedConstructorCaseEvidence
   | ScopedCaseResultEvidence
   | OrderedNewtypeTelescopeEvidence
+  | ScopedOrderedCaseEvidence
   deriving (Bounded, Enum, Eq, Ord)
 
 -- | Requirements of an interface payload. See Note [Versioning retained evidence]
@@ -3303,6 +3304,8 @@ instance Binary IfaceAxiomRule where
       requireIfaceEvidenceVersion bh ScopedConstructorCaseEvidence
     when (ifLclNameFS n == scopedCaseResultName) $
       requireIfaceEvidenceVersion bh ScopedCaseResultEvidence
+    when (ifLclNameFS n == scopedOrderedCaseName) $
+      requireIfaceEvidenceVersion bh ScopedOrderedCaseEvidence
     putByte bh 0
     put_ bh n
   put_ bh (IfaceAR_U n)   = putByte bh 1 >> put_ bh n
