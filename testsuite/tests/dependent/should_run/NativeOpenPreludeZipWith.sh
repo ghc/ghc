@@ -62,3 +62,29 @@ for mode in UNKNOWN_LEFT_LENGTH DROP_SUCCESSOR; do
 done
 reject '[GHC-83605]' "$proof" -O1 -fenable-rewrite-rules -DRULES_ON
 reject '[GHC-83605]' "$pair_proof" -O1 -fenable-rewrite-rules -DRULES_ON
+
+# Load conflicting rules from a separate interface. The second rule can
+# rewrite an application introduced by the installed zip rule.
+cat > "$out/ZipFusionRule.hs" <<'EOF'
+{-# LANGUAGE CPP, RankNTypes #-}
+module ZipFusionRule () where
+#ifdef CHANGE_BUILD
+import GHC.Exts (build)
+{-# RULES "change build" [~1]
+    forall (g :: forall r. ((Bool, Bool) -> r -> r) -> r -> r).
+      build g = [] #-}
+#else
+{-# RULES "zip" [0] forall xs ys. zip xs ys = [] #-}
+#endif
+EOF
+sed '/^module PreludeZipProof where/a import ZipFusionRule ()' "$pair_proof" > PreludeZipProof.hs
+for mode in CHANGE_ZIP CHANGE_BUILD; do
+    ( cd "$out/provider"
+      "${ghc[@]}" -O2 -fforce-recomp "-D$mode" -c "$out/ZipFusionRule.hs" -outputdir .
+    )
+    cp ../provider/ZipFusionRule.hi .
+    reject '[GHC-83605]' PreludeZipProof.hs -O2 -DRULES_ON
+    if [[ $mode == CHANGE_BUILD ]]; then
+        grep -Eq 'A rewrite rule can change the result of.*build' rejected.log
+    fi
+done

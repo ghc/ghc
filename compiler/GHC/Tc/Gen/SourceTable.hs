@@ -31,14 +31,15 @@ import GHC.Core.Coercion.Axiom (ClosedTyFam(..), CoAxBranch, coAxiomBranches, co
 import GHC.Core.ConLike (ConLike(..))
 import GHC.Core.DataCon
 import GHC.Core.Dependent (hasNativeDependentExprRhs)
-import GHC.Core.FVs (exprSomeFreeVarsList)
+import GHC.Core.FVs (exprSomeFreeVarsList, exprsFreeVars)
 import GHC.Core.FamInstEnv (FamInstEnvs, mkBranchedCoAxiom, mkCoAxBranch, reduceTyFamApp_maybe)
 import GHC.Core.InstEnv (ClsInst(is_tcs), classInstances, instanceCantMatch, instanceDFunId,
                          isIncoherent, lookupUniqueInstEnv, roughMatchTcs)
 import GHC.Core.RoughMap (RoughMatchTc(RM_KnownTc))
 import GHC.Core.Multiplicity (scaledThing)
 import GHC.Core.Reduction (reductionCoercion, reductionReducedType)
-import GHC.Core.SimpleOpt (simpleOptExpr)
+import GHC.Core.SimpleOpt (defaultSimpleOpts, simpleOptExpr)
+import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.Tidy (tidyCbvInfoTop)
 import GHC.Core.TyCo.Compare (eqType, eqTypes)
 import GHC.Core.TyCo.FVs (tyConsOfTypes)
@@ -111,6 +112,7 @@ import GHC.Types.Unique.FM (plusUFM_C)
 import GHC.Types.Unique.Set (mkUniqSet, nonDetEltsUniqSet, sizeUniqSet)
 import GHC.Types.Unique.Supply (UniqSupply, listSplitUniqSupply, splitUniqSupply, uniqsFromSupply)
 import GHC.Types.Var (Id, CoVar, idDetails, idMult, VarBndr(..), isId, isCoVar, mkTyVar, setIdDetails, varName)
+import GHC.Types.Var.Env (mkInScopeSet)
 import GHC.Types.Var.Set (elemVarSet)
 import GHC.Utils.Misc (equalLength, lengthAtLeast, lengthIs)
 import GHC.Utils.Monad (allM, anyM, whenM)
@@ -554,6 +556,101 @@ activeMapperRules :: RuleEnv -> Id -> [CoreRule]
 activeMapperRules env =
     filter (not . isNeverActive . ruleActivation) . getRules env . globaliseId
 
+-- | Compare the list interpretation of a zipper's fusion rule with its table.
+-- See Note [List interpretation of zipper fusion].
+zipFusionRuleHelpers :: Id -> TyCon -> CoreRule -> Maybe [Id]
+zipFusionRuleHelpers owner table Rule{ru_fn = fn, ru_bndrs = binders,
+                                     ru_args = lhs, ru_rhs = rhs} = do
+    [a_var, b_var, xs, ys] <- pure binders
+    [Core.Type a, Core.Type b, Core.Var left, Core.Var right] <- pure lhs
+    guard (fn == idName owner && isTyVar a_var && isTyVar b_var &&
+           getTyVar_maybe a == Just a_var && getTyVar_maybe b == Just b_var &&
+           all isId [xs, ys] && [xs, ys] == [left, right] &&
+           sizeUniqSet (mkUniqSet binders) == 4 &&
+           eqTypes (map varType [xs, ys]) (map mkListTy [a, b]))
+    let pair = mkTupleTy Boxed [a, b]
+        list = mkListTy pair
+    (Core.Var build, [Core.Type element, generator]) <- pure (Core.collectArgs rhs)
+    guard (element `eqType` pair && exprType rhs `eqType` list)
+    ([accumulator, cons, nil], fold_call) <- pure (Core.collectBinders generator)
+    guard (isTyVar accumulator && all isId [cons, nil])
+    let r = mkTyVarTy accumulator
+    (Core.Var fold, [Core.Type x, Core.Type y, Core.Type state,
+                     step_call, Core.Var seed, Core.Var l, Core.Var rgt]) <-
+      pure (Core.collectArgs fold_call)
+    guard (eqTypes [a, b, r] [x, y, state] && [seed, l, rgt] == [nil, xs, ys])
+    (Core.Var step, [Core.Type a', Core.Type b', Core.Type c, Core.Type d, Core.Var k]) <-
+      pure (Core.collectArgs step_call)
+    guard (eqTypes [a, b, r, r] [a', b', c, d] && k == cons)
+    build_body <- unfolding build
+    fold_body <- unfolding fold
+    step_body <- unfolding step
+    ([element_var, builder], algebra) <- pure (Core.collectBinders build_body)
+    guard (isTyVar element_var && isId builder)
+    let e = mkTyVarTy element_var
+    (Core.Var apply, [Core.Type result, cons_arg, nil_arg]) <- pure (Core.collectArgs algebra)
+    guard (apply == builder && result `eqType` mkListTy e &&
+           list_constructor consDataCon e cons_arg && list_constructor nilDataCon e nil_arg)
+    list_step <- instantiate step_body
+      [Core.Type a, Core.Type b, Core.Type list, Core.Type list,
+       Core.mkConApp consDataCon [Core.Type pair]]
+    list_result <- instantiate fold_body
+      [Core.Type a, Core.Type b, Core.Type list, list_step,
+       Core.mkConApp nilDataCon [Core.Type pair], Core.Var xs, Core.Var ys]
+    let expanded = simpleOptExpr defaultSimpleOpts (Core.mkLams binders list_result)
+    (signature, rows) <- checkedListZip (const True) owner expanded
+    guard (matchesConstructorCase table signature rows)
+    pure [build, step]
+  where
+    unfolding v = do
+      Core.CoreUnfolding { Core.uf_tmpl = body } <- pure (realIdUnfolding v)
+      pure body
+    list_constructor con element value = case Core.collectArgs value of
+      (Core.Var worker, [Core.Type ty]) -> worker == dataConWorkId con && ty `eqType` element
+      _ -> False
+    instantiate expression args = do
+      let (parameters, body) = Core.collectBinders expression
+          (applied, remaining) = splitAt (length args) parameters
+          argument v a = not (isCoVar v || Core.isCoArg a) && isTyVar v == Core.isTypeArg a
+          rest = Core.mkLams remaining body
+          scope = mkInScopeSet (exprsFreeVars (rest : args))
+      guard (equalLength applied args && and (zipWith argument applied args))
+      pure (CoreSubst.substExpr (CoreSubst.mkOpenSubst scope (zip applied args)) rest)
+zipFusionRuleHelpers _ _ _ = Nothing
+
+{- Note [List interpretation of zipper fusion]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A zipper can have an optimizer rule whose right-hand side builds a
+list from a two-list fold. Read the actual Core rule and the helper
+unfoldings. Instantiate the generator with the lazy list algebra
+from the builder. Compare the ordered cases and the recursive
+operands with the owner's already checked table.
+
+This check establishes the list interpretation of the forward rule.
+The simplifier can also rewrite the introduced helpers before
+inlining them. In particular, a rule on build can replace the entire
+zip result. Report this conflict through the same checks as other
+source-rule conflicts. The list seed is already in weak head normal
+form, so this check cannot detect an extra demand on the seed in a
+fused consumer. Admission also needs a check of the generic algebra's
+demand and of the fold's other fusion rules.
+-}
+
+-- | Check final-Core rules and identify an introduced helper with an active rule.
+finalCoreRuleConflict :: RuleEnv -> NameSet -> Id -> Maybe RetainedQuantificationError
+finalCoreRuleConflict visible local owner
+  | idName owner `elemNameSet` local = Just fallback
+  | checkedMapperRules visible owner = Nothing
+  | Just table <- sourceTableId_maybe owner
+  , isTwoListCaseTable table
+  , [rule] <- activeMapperRules visible owner
+  , Just helpers <- zipFusionRuleHelpers owner table rule
+  , Just helper <- find changed helpers = Just (RetainedSourceRule (idName helper))
+  | otherwise = Just fallback
+  where
+    changed v = idName v `elemNameSet` local || not (null (activeMapperRules visible v))
+    fallback = RetainedFinalCoreRulesEnabled (idName owner)
+
 {- Note [Checked list traversal rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For the checked list mapper, mapping the identity lambda over an empty
@@ -704,9 +801,9 @@ checkAndInstallSourceProofs env = do
     when (rewriting && not (null occurrences)) $ do
       visible <- visibleSourceMethodRules env
       conflicts <- forM (reverse occurrences) $ \(_, loc, ops) -> do
-        conflict <- listToMaybe <$> filterM (changed visible) ops
-        forM_ conflict $ \(owner, _, _, _) ->
-          setSrcSpan loc (addErr (TcRnRetainedQuantificationError (RetainedFinalCoreRulesEnabled owner)))
+        conflict <- listToMaybe . catMaybes <$> traverse (changed visible) ops
+        forM_ conflict $ \reason ->
+          setSrcSpan loc (addErr (TcRnRetainedQuantificationError reason))
         pure conflict
       when (all isNothing conflicts) $ recordCommittedHomeRules env
     if isEmptyNameEnv definitions then pure env else do
@@ -735,16 +832,21 @@ checkAndInstallSourceProofs env = do
     changed visible (owner, arg, mapper, checked) = do
       let relevant = filter (not . localSourceRuleApart owner checked) (tcg_rules env)
       local <- sourceRuleOwnersAtTc arg relevant
-      if owner `elemNameSet` local then pure True else
+      let conflict = Just (RetainedFinalCoreRulesEnabled owner)
+      if owner `elemNameSet` local then pure conflict else
         if mapper then do
-          -- Use the same whitelist as source formation. Only this mode
+          -- Use the same checks as source formation. Only this mode
           -- requires the checked worker declaration.
           worker <- tcLookupIdMaybe owner
-          pure (maybe True (\v -> not (finalCoreMapperOwner v && checkedMapperRules visible v)) worker)
+          let helper_rules = sourceRuleOwners relevant `minusNameSet` unitNameSet owner
+          pure $ case worker of
+            Just v | finalCoreMapperOwner v -> finalCoreRuleConflict visible helper_rules v
+            _ -> conflict
         else
           -- A newly imported rule is in the rule environment. Its head
           -- can be found even when the defining Id is private.
-          pure (hasSourceMethodRuleAtArgs visible arg checked (mkVanillaGlobal owner liftedTypeKind))
+          pure $ if hasSourceMethodRuleAtArgs visible arg checked (mkVanillaGlobal owner liftedTypeKind)
+                 then conflict else Nothing
 
 {- Note [Opaque source proof observations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1289,22 +1391,25 @@ optionalSourceUsePlan heads methods = do
       pure (owners, [(v, Nothing) | v <- owners] ++ concat checked_methods, map snd checked)
 
 -- | Find a currently visible rewrite that can change one selected operation.
-changedSourceUse :: [(Id, Maybe Name)] -> TcM (Maybe (Id, Maybe Name))
+changedSourceUse :: [(Id, Maybe Name)] -> TcM (Maybe RetainedQuantificationError)
 changedSourceUse ops = do
     env <- getGblEnv
     visible <- visibleSourceMethodRules env
     rewriting <- goptM Opt_EnableRewriteRules
-    let check [] = pure Nothing
-        check (op@(v, arg) : rest)
+    let local_rules = sourceRuleOwners (tcg_rules env)
+        check [] = pure Nothing
+        check ((v, arg) : rest)
           | isNominalStructuralSource v, not rewriting = check rest
-          | finalCoreMapperOwner v = do
-              let local = sourceRuleOwners (tcg_rules env)
-              if rewriting && (idName v `elemNameSet` local || not (checkedMapperRules visible v))
-                then pure (Just op) else check rest
+          | finalCoreMapperOwner v
+          = if rewriting
+            then case finalCoreRuleConflict visible local_rules v of
+                   Just reason -> pure (Just reason)
+                   Nothing -> check rest
+            else check rest
           | otherwise = do
               local <- sourceRuleOwnersAtTc arg (tcg_rules env)
               if idName v `elemNameSet` local || hasSourceMethodRuleAt visible arg v
-                then pure (Just op)
+                then pure (Just (RetainedSourceRule (idName v)))
                 else check rest
     check ops
 
@@ -1347,10 +1452,7 @@ recordSourceUses :: [(Id, Maybe Name)] -> TcM ()
 recordSourceUses ops = do
     changed <- changedSourceUse ops
     case changed of
-      Just (v, _) -> failWithTc (TcRnRetainedQuantificationError
-        (if finalCoreMapperOwner v
-           then RetainedFinalCoreRulesEnabled (idName v)
-           else RetainedSourceRule (idName v)))
+      Just reason -> failWithTc (TcRnRetainedQuantificationError reason)
       Nothing -> publishSourceUses ops
 
 -- | Use the exact dependencies visited by the open evaluator.
@@ -1417,10 +1519,16 @@ checkSourceMethodUsesWithPending env = do
         visible <- visibleSourceMethodRules env
         uses_checked_rules <- forM (nameSetElemsStable imported) $ \name -> do
           v <- tcLookupId name
-          let changed | uses_final_core v = not (checkedMapperRules visible v)
-                      | otherwise = any (\arg -> hasSourceMethodRuleAt visible arg v) (arguments name)
-          when changed (report name)
-          pure (uses_final_core v && not changed)
+          let local_rules = sourceRuleOwners (tcg_rules env) `minusNameSet` unitNameSet name
+              conflict
+                | uses_final_core v = finalCoreRuleConflict visible local_rules v
+                | any (\arg -> hasSourceMethodRuleAt visible arg v) (arguments name) =
+                    Just (RetainedSourceRule name)
+                | otherwise = Nothing
+          forM_ conflict $ \case
+            RetainedFinalCoreRulesEnabled _ -> report name
+            reason -> addErr (TcRnRetainedQuantificationError reason)
+          pure (uses_final_core v && isNothing conflict)
         when (or uses_checked_rules) $ recordCommittedHomeRules env
 
 -- | Retain the home rule environment of an accepted proof.
