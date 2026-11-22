@@ -5605,8 +5605,17 @@ documents the same demand issue for fusion. A type-level reduction
 must preserve that choice of discriminator. The equation for an empty
 second list can require a known cons in the first position. Neither
 coverage nor structural recursion makes all Haskell spines finite.
-[GHC.Internal.List, Note [Fusion for foldrN] and zip](../../libraries/ghc-internal/src/GHC/Internal/List.hs)
-and [Agda 2.8.0 structural recursion](https://agda.readthedocs.io/en/v2.8.0/language/termination-checking.html#primitive-recursion).
+[GHC.Internal.List, Note [Fusion for foldrN] and zip](../../libraries/ghc-internal/src/GHC/Internal/List.hs).
+
+Agda's structural recursion allows descent into a proper subexpression.
+Its lexicographic examples also show that a later operand can supply the
+decrease while an earlier operand stays unchanged. The two-list
+certificate checks each operand against its own original value. Require
+each operand to stay unchanged or decrease, and require a strict
+decrease in at least one position. On finite constructor trees their
+total size decreases in every recursive call. The checked Core case
+tree determines demand independently of that decrease.
+[Agda 2.8.0 structural recursion](https://agda.readthedocs.io/en/v2.8.0/language/termination-checking.html#structural-recursion).
 
 ## Executing closed calls and reducing open calls
 

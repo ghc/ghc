@@ -2400,10 +2400,17 @@ the second. Keep every path in Core alternative order, including the
 path that leaves the second operand untouched. The empty second list
 does not select an equation when the first list is unknown.
 
-In a recursive call, the first list must decrease. A second operand that
-the current path did not inspect must retain its original value. If the
-path inspected the second list, accept only one of its smaller fields
-with the same type. Check each operand against its own pattern.
+For each recursive call, check each operand against its own original
+binder and pattern. Accept the original value or a proper subterm of
+that operand with the same type. At least one operand must decrease.
+The sum of the sizes of the finite constructor trees decreases on each
+call, even when different calls decrease different operands. The
+checked case tree determines demand independently of that decrease.
+
+A case binder names its scrutinee. Keep this alias when checking the
+recursive operands. When a matched operand stays unchanged, use its
+branch pattern as the operand in the type-level equation. This uses
+the original value in Core and the known constructor in the equation.
 
 The final checker matches all equations against the provisional axiom.
 It uses the axiom's variables at the same positions in each path. This
@@ -3520,7 +3527,7 @@ checkedConstructorCase visible helper owner rhs = do
           Just (input, output) -> all (casePublicKind public kinds) [input, output]
           Nothing -> casePublicKind public kinds ty
     guard (all public_domain (result : domains))
-    rows <- checkBody signature kinds result (map CaseField terms) [] (Just scrutinee) body
+    rows <- checkBody signature kinds result terms (map CaseField terms) [] (Just scrutinee) body
     -- The patterns use types from the Core binders. Use the same telescope
     -- for substitution. Keep the owner's declared visibility in the interface.
     ConstructorCaseType declared _ _ _ _ _ <- constructorCaseType (varType owner)
@@ -3533,18 +3540,23 @@ checkedConstructorCase visible helper owner rhs = do
       Just (ConstructorCaseType _ root _ _ _ _) -> root == listTyCon && tc == root
       _ -> False
 
-    checkCase signature parameters result patterns aliases scrutinee
+    checkCase signature parameters result terms patterns aliases scrutinee
               (Core.Case (Core.Var actual) binder case_result alternatives) = do
       guard (resolve aliases actual == scrutinee &&
              varType binder `eqType` varType actual && case_result `eqType` result)
       (tc, args) <- caseDatatype (varType actual)
       guard (public tc && all (casePublicKind public parameters) args)
-      branches <- traverse (checkAlt signature parameters result patterns aliases scrutinee tc args) alternatives
+      let branch_aliases
+            | isTwoListCase signature = (binder, scrutinee) : aliases
+            | otherwise = aliases
+      branches <- traverse (checkAlt signature parameters result terms patterns branch_aliases scrutinee tc args)
+                           alternatives
       guard (completeCase tc (map fst branches))
       pure (concatMap snd branches)
-    checkCase _ _ _ _ _ _ _ = Nothing
+    checkCase _ _ _ _ _ _ _ _ = Nothing
 
-    checkAlt signature parameters result patterns aliases scrutinee tc args (Core.Alt (Core.DataAlt dc) fields body) = do
+    checkAlt signature parameters result terms patterns aliases scrutinee tc args
+             (Core.Alt (Core.DataAlt dc) fields body) = do
       guard (dataConTyCon dc == tc && dataConUserTyVars dc == dataConUnivTyVars dc)
       let domain = mkTyConApp tc args
           kinds = map varType fields
@@ -3565,9 +3577,9 @@ checkedConstructorCase visible helper owner rhs = do
           replace call = (False, call)
           (replaced, patterns') = unzip (map replace patterns)
       guard (or replaced)
-      rows <- checkBody signature parameters result patterns' aliases Nothing body
+      rows <- checkBody signature parameters result terms patterns' aliases Nothing body
       pure (dc, rows)
-    checkAlt _ _ _ _ _ _ _ _ _ = Nothing
+    checkAlt _ _ _ _ _ _ _ _ _ _ = Nothing
 
     publicFieldKind parameters fields kind
       | Just (family, index) <- splitAppTy_maybe kind
@@ -3575,9 +3587,9 @@ checkedConstructorCase visible helper owner rhs = do
       = True
       | otherwise = casePublicKind public (parameters ++ fields) kind
 
-    checkBody signature parameters result patterns aliases first_case body = case body of
+    checkBody signature parameters result terms patterns aliases first_case body = case body of
       Core.Case (Core.Var next) _ _ _ ->
-        checkCase signature parameters result patterns aliases
+        checkCase signature parameters result terms patterns aliases
           (fromMaybe (resolve aliases next) first_case) body
       Core.Let (Core.NonRec binder (Core.Var target)) rest
         | isId binder, binder /= target, not (scoped binder)
@@ -3585,40 +3597,47 @@ checkedConstructorCase visible helper owner rhs = do
         , varType binder `eqType` varType target
         , let selected = resolve aliases target
         , scoped selected ->
-            checkBody signature parameters result patterns ((binder, selected) : aliases) first_case rest
+            checkBody signature parameters result terms patterns ((binder, selected) : aliases) first_case rest
       _ -> do
         guard (isNothing first_case)
         value <- checkCaseResult public (casePublicKind public parameters) helper
                     (\v -> let selected = resolve aliases v
                            in selected <$ guard (scoped selected))
-                    (\expr -> checkedSelfCall signature patterns aliases expr <|>
+                    (\expr -> checkedSelfCall signature terms patterns aliases expr <|>
                               checkedCallback signature patterns aliases expr) result body
         pure [ConstructorCaseRow patterns value]
       where
         scoped v = any (contains v) patterns
 
-    checkedSelfCall signature@(ConstructorCaseType telescope tc args domains position _) patterns aliases expr = do
-      (before, CaseConstructor _ _ children, after) <- splitCaseOperand position patterns
+    checkedSelfCall signature@(ConstructorCaseType telescope tc args _ position _) terms patterns aliases expr = do
       (Core.Var callee, arguments) <- pure (Core.collectArgs expr)
       guard (callee == owner)
       let (kind_args, operands) = splitAt (length telescope) arguments
           expected = [mkTyVarTy v | Bndr v _ <- telescope]
       types <- traverse (\case Core.Type ty -> Just ty; _ -> Nothing) kind_args
       guard (eqTypes types expected)
-      (left, Core.Var operand, right) <- splitCaseOperand position operands
-      let field = resolve aliases operand
-      guard (varType field `eqType` mkTyConApp tc args && any (contains field) children)
-      actual <- traverse (\case Core.Var v -> Just (resolve aliases v); _ -> Nothing) (left ++ right)
-      let carried = before ++ after
-          checkOperand ty (CaseField v) selected = selected == v && varType selected `eqType` ty
-          checkOperand ty (CaseConstructor _ _ fields) selected =
-            isTwoListCase signature && varType selected `eqType` ty &&
-            any (contains selected) fields
-          checkOperand _ _ _ = False
-          carried_types = take position domains ++ drop (position + 1) domains
-          (left_fields, right_fields) = splitAt position actual
-      guard (equalLength actual carried && and (zipWith3 checkOperand carried_types carried actual))
-      pure (CaseSelf types (map CaseField (left_fields ++ field : right_fields)))
+      fields <- traverse (\case Core.Var v -> Just (resolve aliases v); _ -> Nothing) operands
+      guard (equalLength terms fields)
+      next <- if isTwoListCase signature
+        then do
+          checked <- zipWithM recursiveOperand (zip terms patterns) fields
+          guard (any fst checked)
+          pure (map snd checked)
+        else do
+          (before, CaseConstructor _ _ children, after) <- splitCaseOperand position patterns
+          (left, field, right) <- splitCaseOperand position fields
+          guard (varType field `eqType` mkTyConApp tc args && any (contains field) children)
+          original <- traverse (\case CaseField v -> Just v; _ -> Nothing) (before ++ after)
+          guard (left ++ right == original)
+          pure (map CaseField fields)
+      pure (CaseSelf types next)
+
+    recursiveOperand (original, pattern) field
+      | field == original = Just (False, pattern)
+      | CaseConstructor _ _ children <- pattern
+      , varType field `eqType` varType original
+      , any (contains field) children = Just (True, CaseField field)
+      | otherwise = Nothing
 
     checkedCallback (ConstructorCaseType _ _ _ _ 1 _) patterns aliases expr = do
       [CaseField carried, root@CaseConstructor{}] <- pure patterns

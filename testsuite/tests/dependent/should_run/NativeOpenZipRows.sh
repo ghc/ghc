@@ -26,7 +26,9 @@ cp "$src/"{PackedVecLibrary,ZipLengthSource}.hs .
 grep -Fq 'FinalCoreSourceTable T:zipLength' provider.iface
 
 cat >ZipVariants.hs <<'HS'
-module ZipVariants (zipConcrete, loopLength) where
+module ZipVariants
+    (zipConcrete, countRight, countLeft, countEither,
+     loopLength, swapCycle, crossFields, growRight, growBoth) where
 import PackedVecLibrary (Nat(..))
 
 zipConcrete :: [Bool] -> [Char] -> Nat
@@ -34,18 +36,59 @@ zipConcrete [] _ = Z
 zipConcrete (_ : _) [] = Z
 zipConcrete (_ : xs) (_ : ys) = S (zipConcrete xs ys)
 
+countRight :: forall a b. [a] -> [b] -> Nat
+countRight [] _ = Z
+countRight (_ : _) [] = Z
+countRight left@(_ : _) (_ : ys) = S (countRight left ys)
+
+countLeft :: forall a b. [a] -> [b] -> Nat
+countLeft [] _ = Z
+countLeft (_ : _) [] = Z
+countLeft (_ : xs) right@(_ : _) = S (countLeft xs right)
+
+countEither :: [Bool] -> [Bool] -> Nat
+countEither [] _ = Z
+countEither (_ : _) [] = Z
+countEither (_ : xs) right@(False : _) = S (countEither xs right)
+countEither left@(_ : _) (True : ys) = S (countEither left ys)
+
 loopLength :: [Bool] -> [Char] -> Nat
 loopLength [] _ = Z
 loopLength (_ : _) [] = Z
-loopLength left@(_ : _) (_ : ys) = S (loopLength left ys)
+loopLength left@(_ : _) right@(_ : _) = S (loopLength left right)
+
+swapCycle :: [Bool] -> [Bool] -> Nat
+swapCycle [] _ = Z
+swapCycle (_ : _) [] = Z
+swapCycle left@(_ : _) right@(_ : _) = S (swapCycle right left)
+
+crossFields :: [Bool] -> [Bool] -> Nat
+crossFields [] _ = Z
+crossFields (_ : _) [] = Z
+crossFields (_ : xs) (False : ys) = S (crossFields xs ys)
+crossFields (_ : xs) (True : ys) = S (crossFields ys xs)
+
+growRight :: [Bool] -> [Char] -> Nat
+growRight [] _ = Z
+growRight (_ : _) [] = Z
+growRight (_ : xs) (y : ys) = S (growRight xs (y : y : ys))
+
+growBoth :: [Bool] -> [Char] -> Nat
+growBoth [] _ = Z
+growBoth (_ : _) [] = Z
+growBoth (x : xs) (y : ys) = S (growBoth (x : x : xs) (y : y : ys))
 HS
 "${ghc[@]}" "${strip[@]}" -c ZipVariants.hs
 "${ghc[@]}" --show-iface ZipVariants.hi >variants.iface
-grep -Fq 'FinalCoreSourceTable T:zipConcrete' variants.iface
-if grep -Fq 'FinalCoreSourceTable T:loopLength' variants.iface; then
-    echo 'The nondecreasing call exported a table.' >&2
-    exit 1
-fi
+for name in zipConcrete countRight countLeft countEither; do
+    grep -Fq "FinalCoreSourceTable T:$name" variants.iface
+done
+for name in loopLength swapCycle crossFields growRight growBoth; do
+    if grep -Fq "FinalCoreSourceTable T:$name" variants.iface; then
+        echo "Exported an unchecked equation for $name." >&2
+        exit 1
+    fi
+done
 
 cd "$out/reader"
 cp ../provider/{PackedVecLibrary,ZipLengthSource,ZipVariants}.hi "$src/ZipRows.hs" .
@@ -55,7 +98,7 @@ module Laws where
 import Data.Type.Equality ((:~:)(Refl))
 import PackedVecLibrary (Nat(..))
 import ZipLengthSource (zipLength)
-import ZipVariants (zipConcrete)
+import ZipVariants (countEither, countLeft, countRight, zipConcrete)
 
 emptyLeft :: forall (ys :: [Bool]). zipLength ('[] :: [Char]) ys :~: 'Z
 emptyLeft = Refl
@@ -69,6 +112,22 @@ bothCons = Refl
 
 concrete :: forall (ys :: [Char]). zipConcrete '[] ys :~: 'Z
 concrete = Refl
+
+rightStep :: forall (x :: Char) (xs :: [Char]) (y :: Bool) (ys :: [Bool]).
+             countRight (x ': xs) (y ': ys) :~: 'S (countRight (x ': xs) ys)
+rightStep = Refl
+
+leftStep :: forall (x :: Char) (xs :: [Char]) (y :: Bool) (ys :: [Bool]).
+            countLeft (x ': xs) (y ': ys) :~: 'S (countLeft xs (y ': ys))
+leftStep = Refl
+
+changeLeft :: forall (x :: Bool) (xs :: [Bool]) (ys :: [Bool]).
+              countEither (x ': xs) ('False ': ys) :~: 'S (countEither xs ('False ': ys))
+changeLeft = Refl
+
+changeRight :: forall (x :: Bool) (xs :: [Bool]) (ys :: [Bool]).
+               countEither (x ': xs) ('True ': ys) :~: 'S (countEither (x ': xs) ys)
+changeRight = Refl
 HS
 "${ghc[@]}" -fenable-rewrite-rules -c Laws.hs
 "${ghc[@]}" -Werror=incomplete-patterns -Werror=overlapping-patterns -c ZipRows.hs
@@ -99,8 +158,9 @@ import Data.List (isPrefixOf)
 import Data.Type.Equality ((:~:)(Refl))
 import LaterFallback (which, choiceNumber)
 import OrdinaryZipRows (zipReport)
-import PackedVecLibrary (toList)
+import PackedVecLibrary (natToInt, toList)
 import ZipRows (zipMinimum, zipRows)
+import ZipVariants (countEither, countLeft, countRight)
 
 minimumHolds :: [a] -> [b] -> Bool
 minimumHolds xs ys = case zipMinimum xs ys of Refl -> True
@@ -127,11 +187,16 @@ main = do
     print (either (isPrefixOf "second spine" . displayException) (const False) second)
     print (minimumHolds "" badSecond, minimumHolds [badChar] [badBool],
            minimumHolds infinite [True, False])
+    print (natToInt (countRight "" badSecond), natToInt (countRight leftTail [True, False]),
+           natToInt (countLeft "ab" rightTail), natToInt (countEither [False, True] [True, False]))
+    rightFirst <- try @ErrorCall (evaluate (natToInt (countRight badFirst emptyB)))
+    print (either (isPrefixOf "first spine" . displayException) (const False) rightFirst)
     putStrLn (zipReport "abc" [True, False])
     putStrLn (zipReport "" badSecond)
 HS
 "${ghc[@]}" -c Main.hs
-"${ghc[@]}" Main.o OrdinaryZipRows.o ZipRows.o LaterFallback.o ../provider/{PackedVecLibrary,ZipLengthSource}.o -o run
+"${ghc[@]}" Main.o OrdinaryZipRows.o ZipRows.o LaterFallback.o \
+    ../provider/{PackedVecLibrary,ZipLengthSource,ZipVariants}.o -o run
 ./run >actual
 diff -u - actual <<'OUT'
 ([('a',True)],[('a',True)])
@@ -143,6 +208,8 @@ True
 (0,1,2)
 True
 (True,True,True)
+(0,2,2,3)
+True
 ([('a',True),('b',False)],Refl)
 ([],Refl)
 OUT
@@ -175,6 +242,9 @@ wrong :: forall (xs :: [Char]). zipLength xs ('[] :: [Bool]) :~: 'Z
 wrong = Refl
 HS
 reject '^WrongDemand.hs:7:9-12: error: \[GHC-83865\]' WrongDemand.hs
+sed 's/WrongDemand/RightDemand/; s/ZipLengthSource/ZipVariants/; s/zipLength/countRight/g' \
+    WrongDemand.hs >RightDemand.hs
+reject '^RightDemand.hs:7:9-12: error: \[GHC-83865\]' RightDemand.hs
 
 { sed -n '1,4p' WrongDemand.hs | sed 's/WrongDemand/Nondecreasing/'
   cat <<'HS'

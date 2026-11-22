@@ -7718,11 +7718,13 @@ zipRows (x : xs) (y : ys) = VCons (x, y) (zipRows xs ys)
 ```
 
 The source checker verifies coverage at each inspected constructor.
-It requires the first list to decrease in a recursive call. For the
-second recursive operand it uses the unchanged argument or a smaller
-field from that operand's own pattern. It compares every provisional
-equation with the corresponding final Core equation before writing
-the interface.
+For each recursive operand it accepts the unchanged argument or a
+proper subterm from that operand's own pattern. At least one operand
+must decrease on every call. For example, the checker can preserve
+the original first cons while recursing on the second tail. It compares
+each provisional equation with the corresponding final Core equation
+before writing the interface. Constructor specialization can replace
+a self-call with a new worker. Final validation then drops the table.
 
 `zipLength '[] ys` reduces with an unknown `ys`. The empty-second
 equation requires a known first cons. An attempted equality for an
@@ -7736,7 +7738,10 @@ Its first row uses a wildcard to leave the second list uninspected.
 `NativeOpenZipRows` checks the stripped interface, separate client,
 two concrete element kinds, runtime demand, and recompilation after a
 changed equation. It also checks that a rule which changes the final
-result removes the provisional table.
+result removes the provisional table. The recursion controls cover
+each single-operand decrease and a function that decreases different
+operands in different branches. They reject calls that leave both
+operands unchanged, swap positions, or grow an operand.
 
 `zipMinimum` proves that the result index equals
 `Min (sourceLength xs) (sourceLength ys)`. Its first empty-list
