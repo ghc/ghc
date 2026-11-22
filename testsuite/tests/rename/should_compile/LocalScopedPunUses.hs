@@ -27,3 +27,11 @@ termBehindType a = let g :: forall a. a -> Bool; g _ = a `seq` True in g a
 -- A let binding enters scope before its body.
 letShadowsType :: forall a. a -> a
 letShadowsType x = let a = x in (a :: a)
+
+-- An explicit local type binder also shadows a top-level term.
+globalBehindType :: forall a. a -> Integer
+globalBehindType _ = a
+
+-- The implicit type introduced by the pattern cannot shadow the term.
+globalWithImplicit :: t -> Integer
+globalWithImplicit (_ :: a) = a

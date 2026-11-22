@@ -267,3 +267,7 @@ test('StagedPunUses', [extra_files(['PunUseData.hs', 'PunUseType.hs'])],
      multimod_compile, ['StagedPunUses', '-v0 -Wpun-uses'])
 test('ImplicitPunUses', normal, compile, ['-Wpun-uses -Wterm-variable-capture'])
 test('LocalScopedPunUses', normal, compile, ['-Wpun-uses -Wpun-bindings'])
+test('ExportParentAll', [extra_files(['PunUseData.hs', 'PunUseType.hs'])],
+     multimod_compile, ['ExportParentAll', '-v0 -Wpun-uses'])
+test('TypePatternPunUses', [extra_files(['PunUseData.hs', 'PunUseType.hs'])],
+     multimod_compile, ['TypePatternPunUses', '-v0 -Wpun-uses'])

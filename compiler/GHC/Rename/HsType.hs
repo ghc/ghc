@@ -19,7 +19,7 @@ module GHC.Rename.HsType (
         newTyVarNameRn,
         rnHsConDeclRecFields,
         lookupField, mkHsOpTyRn,
-        rnLTyVar, classifyTypeCasePattern,
+        rnLTyVar, classifyTypeCasePattern, warnPunnedTypeSyntax, warnPunnedTyConSyntax,
 
         rnHsConDeclField, rnRetainedSigType, rnHsSigWcTypeWithSplice,
         SignatureSpliceSite(..),
@@ -1002,10 +1002,7 @@ constructor result. A bang there is subject to the ordinary type rules.
 -}
 
 rnHsTyKi env listTy@(HsListTy x ty)
-  = do { case x of
-           (EpTok (EpaSpan (RealSrcSpan _ _)), _) ->
-             addDiagnostic (TcRnPunnedTypeSyntax (ppr listTy))
-           _ -> pure ()
+  = do { warnPunnedTypeSyntax listTy
        ; when (isRnKindLevel env) $
            checkDataKinds env listTy
        ; (ty', fvs) <- rnLHsTyKi env ty
@@ -1022,10 +1019,7 @@ rnHsTyKi env (HsKindSig x ty k)
 -- Unboxed tuples are allowed to have poly-typed arguments.  These
 -- sometimes crop up as a result of CPR worker-wrappering dictionaries.
 rnHsTyKi env tupleTy@(HsTupleTy x tup_con tys)
-  = do { case x of
-           AnnParens (EpTok (EpaSpan (RealSrcSpan _ _))) _ ->
-             addDiagnostic (TcRnPunnedTypeSyntax (ppr tupleTy))
-           _ -> pure ()
+  = do { warnPunnedTypeSyntax tupleTy
        ; when (isRnKindLevel env) $
            checkDataKinds env tupleTy
        ; (tys', fvs) <- mapFvRn (rnLHsTyKi env) tys
@@ -1325,6 +1319,26 @@ rnLHsAppHead env open (L l (HsParTy _ ty)) = do
   return (L l (HsParTy noAnn ty'), fvs)
 rnLHsAppHead env _ ty = rnLHsTyKi env ty
 
+-- | Warn about written list and boxed tuple type syntax.
+warnPunnedTypeSyntax :: HsType GhcPs -> RnM ()
+warnPunnedTypeSyntax ty = case ty of
+  HsListTy (EpTok (EpaSpan (RealSrcSpan _ _)), _) _ -> warn
+  HsTupleTy (AnnParens (EpTok (EpaSpan (RealSrcSpan _ _))) _) _ _ -> warn
+  _ -> pure ()
+  where
+    warn = addDiagnostic (TcRnPunnedTypeSyntax (ppr ty))
+
+-- | Warn about a written list or boxed tuple type constructor.
+warnPunnedTyConSyntax :: LocatedN RdrName -> Name -> RnM ()
+warnPunnedTyConSyntax (L loc rdr) name =
+  -- Template Haskell-generated types do not carry written punctuation.
+  case anns loc of
+    NameAnnOnly (NameSquare _ _) _ | name == listTyConName ->
+      addDiagnosticAt (locA loc) (TcRnPunnedTypeSyntax (text "[]"))
+    NameAnnCommas (NameParens _ _) _ _ | isTupleTyConName name ->
+      addDiagnosticAt (locA loc) (TcRnPunnedTypeSyntax (ppr rdr))
+    _ -> pure ()
+
 rnHsTyVar :: (RdrName -> RnM GlobalRdrElt) -> RnTyKiEnv -> HsType GhcPs
           -> PromotionFlag -> LocatedN RdrName -> RnM (HsType GhcRn, FreeNames)
 rnHsTyVar lookup_occ env tv ip (L loc rdr_name)
@@ -1337,15 +1351,7 @@ rnHsTyVar lookup_occ env tv ip (L loc rdr_name)
        ; gre <- lookup_occ rdr_name
        ; unless (isPromoted ip) $ do
            warnPunUse (L loc rdr_name) gre
-           -- The parser records the punctuation only for written syntax.
-           -- A type constructed by Template Haskell has no such tokens.
-           let name = greName gre
-           case anns loc of
-             NameAnnOnly (NameSquare _ _) _ | name == listTyConName ->
-               addDiagnosticAt (locA loc) (TcRnPunnedTypeSyntax (text "[]"))
-             NameAnnCommas (NameParens _ _) _ _ | isTupleTyConName name ->
-               addDiagnosticAt (locA loc) (TcRnPunnedTypeSyntax (ppr rdr_name))
-             _ -> pure ()
+           warnPunnedTyConSyntax (L loc rdr_name) (greName gre)
        ; checkNamedWildCard env (greName gre)
        ; this_mod <- getModule
        ; explicit_level_imports <- xoptM LangExt.ExplicitLevelImports

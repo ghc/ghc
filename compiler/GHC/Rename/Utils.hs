@@ -207,10 +207,9 @@ binders separately. A binder can shadow a name in an enclosing scope.
 
 For example, `id (type a) a = a` binds both names in one group.
 In `f @a = \(a :: a) -> a`, the annotation uses the outer type variable.
-The lambda binds the term variable in a separate group. Only explicitly
-bound variables in type patterns take part in this check. A type variable
-introduced implicitly by an annotation cannot shadow an in-scope name
-in the proposed single namespace.
+The lambda binds the term variable in a separate group. Include fresh
+implicit type variables in the match's check. An implicit binder cannot
+shadow an in-scope name in the proposed single namespace.
 -}
 
 -------------------------------------

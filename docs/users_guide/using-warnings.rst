@@ -2485,8 +2485,8 @@ of ``-W(no-)*``.
     A local declaration can shadow an imported name without producing this
     warning.
 
-    The warning also applies to explicit type and value binders in one
-    match. For example: ::
+    The warning also applies to type and value binders in one match,
+    including type variables introduced by a pattern annotation. For example: ::
 
         id :: forall a -> a -> a
         id (type a) a = a
@@ -2508,6 +2508,8 @@ of ``-W(no-)*``.
     would conflict with it in a single namespace. A qualifier can avoid
     the conflict if it selects only one of the competing names. The check
     uses name resolution across normal, quote and splice imports.
+    Unmarked names in export lists and constructor type patterns also
+    use this check.
 
     The warning also applies when an explicit local binder in the
     other namespace would replace the chosen binding. For example,

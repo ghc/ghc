@@ -10,6 +10,10 @@ LocalPunBindings.hs:16:20: warning: [GHC-59431] [-Wpun-bindings]
     ‘c’ is declared in both the type and term namespaces.
     Other declaration at LocalPunBindings.hs:16:17
 
-LocalPunBindings.hs:25:26: warning: [GHC-63397] [-Wname-shadowing (in -Wall)]
+LocalPunBindings.hs:25:26: warning: [GHC-63397] [-Wname-shadowing]
     This binding for ‘a’ shadows the existing binding
       bound at LocalPunBindings.hs:25:16
+
+LocalPunBindings.hs:28:18: warning: [GHC-59431] [-Wpun-bindings]
+    ‘d’ is declared in both the type and term namespaces.
+    Other declaration at LocalPunBindings.hs:28:18

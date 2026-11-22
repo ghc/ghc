@@ -1,0 +1,16 @@
+TypePatternPunUses.hs:13:20: warning: [GHC-79036] [-Wpun-uses]
+    The type syntax ‘[b]’ depends on ListTuplePuns.
+
+TypePatternPunUses.hs:16:30: warning: [GHC-79036] [-Wpun-uses]
+    The type syntax ‘[]’ depends on ListTuplePuns.
+
+TypePatternPunUses.hs:19:21: warning: [GHC-79036] [-Wpun-uses]
+    The type syntax ‘(s, t)’ depends on ListTuplePuns.
+
+TypePatternPunUses.hs:22:19: warning: [GHC-41293] [-Wpun-uses]
+    ‘T’ depends on separate type and term namespaces.
+    This use resolves to ‘T’ imported from ‘PunUseType’ at TypePatternPunUses.hs:8:20
+                             (and originally defined at PunUseType.hs:3:1-10)
+    Same-spelled names in the other namespace:
+      ‘T’ imported from ‘PunUseData’ at TypePatternPunUses.hs:6:1-17
+          (and originally defined at PunUseData.hs:3:10)

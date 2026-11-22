@@ -2,12 +2,12 @@
 
 - [x] Report same-spelled type and term definitions in one top-level group.
 - [x] Report same-spelled explicit type and term binders in one match.
-- [ ] Check implicitly introduced type binders for binding puns.
+- [x] Check implicitly introduced type binders for binding puns.
 - [x] Report punned global term, type, and bare export uses.
 - [x] Report the named list and boxed tuple syntax from proposal #765.
 - [x] Report implicit capture at each written type variable use.
 - [x] Report uses shadowed by an explicit binder in another lexical scope.
-- [ ] Check global uses under stage-specific imports and remaining syntax forms.
+- [x] Check global uses under stage-specific imports and remaining syntax forms.
 
 With `-Wpun-bindings`, both equations below report `GHC-59431` at the
 value binder. The diagnostic also points to the type binder.
@@ -29,7 +29,9 @@ names. The [review](https://github.com/ghc-proposals/ghc-proposals/pull/765#disc
 distinguishes this group from a nested scope. With
 `ScopedTypeVariables`, `f @a = \\(a :: a) -> a` has a separate binding
 group inside the lambda. Its annotation refers to the outer type
-variable. It produces no binding warning.
+variable. It produces no binding warning. In contrast,
+`freshAnnotation (d :: d) = d` introduces both a term variable and a
+fresh implicit type variable in one match. It reports `GHC-59431`.
 
 The old diagnostics still apply. In
 `ordinaryShadow a = let f a = a in f a`, the inner value binder shadows
@@ -88,8 +90,13 @@ introduces an explicit type and term binder with the same spelling,
 both names compete in its right-hand side.
 [Lexical regression](../../../testsuite/tests/rename/should_compile/LocalScopedPunUses.hs).
 
-The global-name check still leaves non-bare export items and types
-inside type patterns open.
+An unmarked parent in `T(..)` or `T(X)` still depends on the choice of
+namespace. An explicit `type T(..)` selects the type namespace. Child
+names are resolved within the selected parent. The same list and tuple
+syntax checks apply inside constructor type patterns, as does the check
+for bare punned constructor names used as types.
+[Export regression](../../../testsuite/tests/rename/should_compile/ExportParentAll.hs)
+and [type-pattern regression](../../../testsuite/tests/rename/should_compile/TypePatternPunUses.hs).
 
 Global pun-use checks include normal, quote and splice imports. Proposal
 #682 resolves names before checking their levels, so a conflicting name
@@ -98,3 +105,8 @@ qualifier selecting one namespace disambiguates the use. GHC checks
 the level of the name it actually selected as before.
 [Staged import regression](../../../testsuite/tests/rename/should_compile/StagedPunUses.hs)
 and [proposal #682, name resolution](https://ghc-proposals.readthedocs.io/en/latest/proposals/0682-explicit-level-imports.html#name-resolution-and-ambiguous-variables).
+
+Both warning flags are off by default and included in `-Weverything`.
+When `-Wpun-uses` and `-Wterm-variable-capture` are enabled together,
+each affected occurrence receives the pun-use warning alone. Disabling
+`-Wpun-uses` restores the legacy capture warning.

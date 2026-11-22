@@ -1670,21 +1670,23 @@ lookupExprOccRn rdr_name
 warnPunUse :: LocatedN RdrName -> GlobalRdrElt -> RnM ()
 warnPunUse loc_rdr@(L loc rdr) selected
   | isUnqual rdr
-  , let name = greName selected
-  , not (isExternalName name)
   , isTyVarName name || isValName name
   = whenWOptM Opt_WarnPunUses $ do
       (_, env) <- getRdrEnvs
       let other_ns = if isTyVarName name then varName else tvName
           competing = do
-            selected_rank <- localPunScope env name
             other <- lookupLocalRdrEnv env (setRdrNameSpace rdr other_ns)
             other_rank <- localPunScope env other
-            guard (name /= other && selected_rank <= other_rank)
+            guard (name /= other)
+            guard (isExternalName name || maybe False (<= other_rank) (localPunScope env name))
             pure other
-      forM_ competing $ \ other ->
-        addDiagnosticAt (locA loc) (TcRnPunUse rdr selected (mkLocalVanillaGRE NoParent other NE.:| []))
+      case competing of
+        Just other ->
+          addDiagnosticAt (locA loc) (TcRnPunUse rdr selected (mkLocalVanillaGRE NoParent other NE.:| []))
+        Nothing -> warnGlobalPunUse loc_rdr selected
   | otherwise = warnGlobalPunUse loc_rdr selected
+  where
+    name = greName selected
 
 -- | Warn about a global occurrence that relies on separate namespaces.
 -- See Note [Global pun use warnings].
@@ -1738,9 +1740,9 @@ the hypothetical unified namespace before any staging check. Leave
 the actual selected name and staging diagnostic unchanged.
 
 Explicit local names are ranked in the order they enter the reader
-environment. For a written occurrence of an explicit binder, check
-whether the other namespace has a name in the same group or in a closer
-group. Use the current reader environment to find the other name. A
+environment. A local explicit binder can replace a global binding.
+For a written occurrence of an explicit local binder, check whether
+the other namespace has a name in the same group or in a closer group. Use the current reader environment to find the other name. A
 binder removed from that environment can no longer compete, and a
 retained binder's alias resolves to the same name.
 

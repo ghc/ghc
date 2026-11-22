@@ -621,6 +621,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
                    all_gres = par : all_kids
                    all_names = map greName all_gres
 
+               warn_punned_export l par
                checkThLocalNameNoLift (ieLWrappedUserRdrName l par)
                occs' <- check_occs occs ie all_gres
                (export_warn_spans', dont_warn_export', warn_txt_rn)
@@ -660,6 +661,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
                    all_gres = par : all_kids
                    all_names = map greName all_gres
 
+               warn_punned_export l par
                checkThLocalNameNoLift (ieLWrappedUserRdrName l par)
                occs' <- check_occs occs ie all_gres
                (export_warn_spans', dont_warn_export', warn_txt_rn)
