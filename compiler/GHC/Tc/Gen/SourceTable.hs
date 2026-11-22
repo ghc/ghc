@@ -44,7 +44,7 @@ import GHC.Core.TyCo.FVs (tyConsOfTypes)
 import GHC.Core.TyCo.Rep (Coercion, Type(TyConApp, TermVarTy, CastTy))
 import GHC.Core.TyCon
 import GHC.Core.Type
-import GHC.Core.Utils (exprType, stripTicksE, stripTicksTopE)
+import GHC.Core.Utils (dataConRepInstPat, exprType, mergeAlts, stripTicksE, stripTicksTopE)
 import GHC.Data.Graph.Directed (Node(..), SCC(..), stronglyConnCompFromEdgedVerticesUniq)
 import GHC.Data.FastString (fsLit)
 import GHC.Data.Bag (isEmptyBag)
@@ -108,7 +108,8 @@ import GHC.Types.TypeEnv (lookupTypeEnv, extendTypeEnvWithIds, typeEnvIds)
 import GHC.Types.TyThing (TyThing(..))
 import GHC.Types.Unique.FM (plusUFM_C)
 import GHC.Types.Unique.Set (mkUniqSet, nonDetEltsUniqSet, sizeUniqSet)
-import GHC.Types.Var (Id, CoVar, idDetails, VarBndr(..), isId, isCoVar, mkTyVar, setIdDetails, varName)
+import GHC.Types.Unique.Supply (UniqSupply, listSplitUniqSupply, splitUniqSupply, uniqsFromSupply)
+import GHC.Types.Var (Id, CoVar, idDetails, idMult, VarBndr(..), isId, isCoVar, mkTyVar, setIdDetails, varName)
 import GHC.Types.Var.Set (elemVarSet)
 import GHC.Utils.Misc (equalLength, lengthAtLeast, lengthIs)
 import GHC.Utils.Monad (allM, anyM, whenM)
@@ -1014,12 +1015,12 @@ See Note [Erased arguments in a checked source dictionary].
 -}
 
 -- | Keep the checked workers until Tidy gives their binders external names.
-keepCheckedMapWorkers :: TcGblEnv -> [Core.CoreBind] -> [Core.CoreBind]
-keepCheckedMapWorkers env binds
+keepCheckedMapWorkers :: UniqSupply -> TcGblEnv -> [Core.CoreBind] -> [Core.CoreBind]
+keepCheckedMapWorkers supply env binds
   | isEmptyNameSet targets = binds
   | otherwise = map keep binds
   where
-    targets = mkNameSet [idName owner | (_, fields) <- checkedMapWorkers env binds
+    targets = mkNameSet [idName owner | (_, fields) <- checkedMapWorkers supply env binds
                        , (_, (owner, _, _)) <- fields]
     exported v | idName v `elemNameSet` targets = setIdExported v
                | otherwise = v
@@ -1027,8 +1028,8 @@ keepCheckedMapWorkers env binds
     keep (Core.Rec pairs) = Core.Rec [(exported v, rhs) | (v, rhs) <- pairs]
 
 -- | Publish mandatory aliases and nominal equations for the same final workers.
-publishCheckedMapMethods :: TcGblEnv -> [Core.CoreBind] -> Maybe (TcM ([Id], [TyCon]))
-publishCheckedMapMethods env binds
+publishCheckedMapMethods :: UniqSupply -> TcGblEnv -> [Core.CoreBind] -> Maybe (TcM ([Id], [TyCon]))
+publishCheckedMapMethods supply env binds
   | null candidates = Nothing
   | otherwise = Just $ do
       let owners = nubBy (\(a, _, _) (b, _, _) -> a == b)
@@ -1043,16 +1044,17 @@ publishCheckedMapMethods env binds
             , Just target <- [lookupNameEnv checked (idName owner)]]
       pure (map fst tables ++ map publish candidates, map snd tables)
   where
-    candidates = [(dfun, external) | (dfun, fields) <- checkedMapWorkers env binds
+    candidates = [(dfun, external) | (dfun, fields) <- checkedMapWorkers supply env binds
                  , let external = filter (\(_, (owner, _, _)) -> isExternalName (idName owner)) fields
                  , not (null external)]
 
 -- | Read a complete DFun constructor and certify its actual mapping fields.
-checkedMapWorkers :: TcGblEnv -> [Core.CoreBind]
+checkedMapWorkers :: UniqSupply -> TcGblEnv -> [Core.CoreBind]
                   -> [(Id, [(Id, (Id, ConstructorCaseType, [ConstructorCaseRow]))])]
-checkedMapWorkers env binds = mapMaybe selected bindings
+checkedMapWorkers supply env binds = mapMaybe (uncurry selected) (zip dfuns (listSplitUniqSupply supply))
   where
     bindings = Core.flattenBinds binds
+    dfuns = [binding | binding@(v, _) <- bindings, DFunId{} <- [idDetails v]]
     owners = mkNameEnv [(idName v, (v, rhs)) | (v, rhs) <- bindings]
     exported = mkNameSet (concatMap availNames (tcg_exports env))
     visible tc = all available (tyConName tc : map dataConName (tyConDataCons tc))
@@ -1061,8 +1063,7 @@ checkedMapWorkers env binds = mapMaybe selected bindings
       | Just gre <- lookupGRE_Name (tcg_rdr_env env) name =
           any ((== NotBoot) . is_isboot . is_decl) (gre_imp gre)
       | otherwise = False
-    selected (dfun, rhs) = do
-      DFunId{} <- pure (idDetails dfun)
+    selected (dfun, rhs) dict_supply = do
       cls <- sourceMethodDFunClass (varType dfun)
       let (binders, body) = Core.collectBinders rhs
       guard (all isTyVar binders && exprType rhs `eqType` varType dfun)
@@ -1070,10 +1071,10 @@ checkedMapWorkers env binds = mapMaybe selected bindings
       (Core.Var constructor, fields) <- pure (Core.collectArgs body)
       con <- isDataConWorkId_maybe constructor
       slots <- dictionarySlots cls domain con fields
-      let methods = mapMaybe (checkSlot domain binders) slots
+      let methods = catMaybes (zipWith (checkSlot domain binders) slots (listSplitUniqSupply dict_supply))
       (dfun, methods) <$ guard (not (null methods))
 
-    checkSlot domain binders (selector, field) = do
+    checkSlot domain binders (selector, field) slot_supply = do
       guard (sourceMapSelector selector)
       (Core.Var worker, args) <- pure (Core.collectArgs field)
       types <- traverse (\case Core.Type ty -> Just ty; _ -> Nothing) args
@@ -1082,9 +1083,51 @@ checkedMapWorkers env binds = mapMaybe selected bindings
       guard (not (idName owner `elemNameSet` exported) &&
              isNothing (sourceTableId_maybe owner) &&
              exprType field `eqType` classMethodInstTy selector [domain])
-      (sig, rows) <- checkedConstructorCase visible (const Nothing) owner rhs
+      (sig, rows) <- checkedConstructorCase visible (const Nothing) owner (expandMappingDefaults slot_supply rhs)
       guard (isJust (checkedMapPrefix sig))
       pure (selector, (owner, sig, rows))
+
+-- | Expose the constructors tested by grouped mapping alternatives.
+-- See Note [Default alternatives in mapping equations].
+expandMappingDefaults :: UniqSupply -> Core.CoreExpr -> Core.CoreExpr
+expandMappingDefaults supply (Core.Lam v rhs) = Core.Lam v (expandMappingDefaults supply rhs)
+expandMappingDefaults supply (Core.Let bind@(Core.NonRec _ (Core.Var _)) rhs) =
+    Core.Let bind (expandMappingDefaults supply rhs)
+expandMappingDefaults supply (Core.Case scrut binder result alts) =
+    Core.Case scrut binder result (fromMaybe checked (expand checked))
+  where
+    (pat_supply, rhs_supply) = splitUniqSupply supply
+    checked = zipWith descend (listSplitUniqSupply rhs_supply) alts
+    descend us (Core.Alt con fields body) = Core.Alt con fields (expandMappingDefaults us body)
+    expand (Core.Alt Core.DEFAULT [] body : rest) = do
+      (tc, args) <- caseDatatype (varType binder)
+      let explicit = [dc | Core.Alt (Core.DataAlt dc) _ _ <- rest]
+          missing = filter (`notElem` explicit) (tyConDataCons tc)
+      guard (equalLength explicit rest && not (null missing))
+      let alternative us dc = do
+            _ <- openDataConFieldTypes dc args
+            let (ex, fields) = dataConRepInstPat (uniqsFromSupply us) (idMult binder) dc args
+            guard (null ex)
+            pure (Core.Alt (Core.DataAlt dc) fields body)
+      inferred <- sequence (zipWith alternative (listSplitUniqSupply pat_supply) missing)
+      pure (mergeAlts rest inferred)
+    expand _ = Nothing
+expandMappingDefaults _ expr = expr
+
+{- Note [Default alternatives in mapping equations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC can merge identical mapping branches into a DEFAULT alternative. For
+example, both Empty and Flagged _ _ can map to Empty. A family equation with
+a variable for the entire row would also reduce at an unknown row. The Core
+case must inspect the row first.
+
+For equation checking, expose a DataAlt for each missing lazy constructor.
+Use dataConRepInstPat to bind its fields at their instantiated types. The
+DEFAULT body cannot refer to those fresh binders. The ordinary row checker
+still checks the visibility, constructor patterns, and result of each branch.
+The executable worker keeps its original case. See refineDefaultAlt in
+GHC.Core.Utils for the corresponding single-constructor transformation.
+-}
 
 addSourceMethods :: Id -> [(Id, Id)] -> Id
 addSourceMethods dfun methods =

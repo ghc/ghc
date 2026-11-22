@@ -168,7 +168,7 @@ import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 import GHC.Types.TypeEnv (lookupTypeEnv, plusTypeEnv, typeEnvFromEntities)
 import GHC.Types.TyThing (TyThing(..))
-import GHC.Types.Unique.Supply ( uniqFromTag, UniqueTag(BcoTag) )
+import GHC.Types.Unique.Supply ( mkSplitUniqSupply, splitUniqSupply, uniqFromTag, UniqueTag(BcoTag, HscTag) )
 import GHC.Types.Unique.Set
 import GHC.Types.Var.Env       ( mkEmptyTidyEnv )
 import GHC.Types.Var.Set
@@ -894,14 +894,15 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
       Just desugared_guts | backendGeneratesCode bcknd -> do
           plugins <- liftIO $ readIORef (tcg_th_coreplugins tc_result)
           optimized <- hscSimplify' plugins desugared_guts
+          (before_tidy, after_tidy) <- splitUniqSupply <$> liftIO (mkSplitUniqSupply HscTag)
           let checked = keepValidatedSourceMappers desugared_guts optimized
-              simplified_guts = checked { mg_binds = keepCheckedMapWorkers tc_result $
+              simplified_guts = checked { mg_binds = keepCheckedMapWorkers before_tidy tc_result $
                                               publishListFoldMethods (mg_module checked) (mg_binds checked) }
 
           (cg_guts, original_details) <-
               liftIO $ hscTidy hsc_env simplified_guts
 
-          publication <- case publishCheckedMapMethods tc_result (cg_binds cg_guts) of
+          publication <- case publishCheckedMapMethods after_tidy tc_result (cg_binds cg_guts) of
             Nothing -> pure Nothing
             Just publish -> liftIO $ fmap snd $
               initTc NoTcMPlugins hsc_env hsc_src False (mg_module checked) (tcg_top_loc tc_result) $
