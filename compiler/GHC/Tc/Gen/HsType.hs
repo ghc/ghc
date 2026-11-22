@@ -2966,7 +2966,11 @@ tc_app_ty_other mode rn_ty exp_kind
          ; case nativeIndexFunctionTypeTys_maybe kind' of
              Just (domain, result) -> do { ty <- tc_check_lhs_type mode arg domain
                                          ; return (mkAppTy fun ty, result) }
-             Nothing -> invalid_call }
+             Nothing | FunTy { ft_mult = mult } <- coreFullView kind'
+                     -> failWithTc $ TcRnRetainedQuantificationError $
+                          if isManyTy mult then RetainedUnsupportedDomain kind'
+                                           else RetainedIndexMultiplicity mult
+                     | otherwise -> invalid_call }
     invalid_call :: TcM a
     invalid_call = failWithTc $ TcRnRetainedQuantificationError RetainedCallIndex
     (hs_fun_ty, hs_args) = splitHsAppTys rn_ty

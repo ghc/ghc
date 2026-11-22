@@ -94,10 +94,10 @@ if "${ghc[@]}" -ferror-spans -c WrongTuple.hs >tuple.log 2>&1 ||
 fi
 
 cat >RigidInput.hs <<'HS'
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, MagicHash #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, LinearTypes, MagicHash, TypeOperators #-}
 module RigidInput where
 import GHC.Exts (TYPE, RuntimeRep(IntRep))
-
+import Data.Type.Equality ((:~:)(Refl))
 rigid :: forall (r :: RuntimeRep) (a :: TYPE r). foreach (p :: a -> Bool) -> Bool
 rigid _ = False
 
@@ -106,6 +106,14 @@ unlifted _ = False
 
 rigidResult :: forall (r :: RuntimeRep) (b :: TYPE r). foreach (p :: Bool -> b) -> Bool
 rigidResult _ = False
+
+nestedResult :: forall (r :: RuntimeRep) (b :: TYPE r). foreach (f :: Bool -> Bool -> b)
+             -> foreach (p :: Bool) -> f p p :~: f p p
+nestedResult _ _ = Refl
+
+nestedLinear :: foreach (f :: Bool -> Bool %1 -> Bool)
+             -> foreach (p :: Bool) -> f p p :~: f p p
+nestedLinear _ _ = Refl
 HS
 if "${ghc[@]}" -ferror-spans -c RigidInput.hs >kind.log 2>&1 ||
    ! grep -Eq '^RigidInput\.hs:5:.*error: \[GHC-83605\]' kind.log ||
@@ -114,6 +122,9 @@ if "${ghc[@]}" -ferror-spans -c RigidInput.hs >kind.log 2>&1 ||
    ! grep -Fq 'The input of this retained callback must have kind' kind.log ||
    ! grep -Fq 'The result of this retained callback must have kind' kind.log ||
    ! grep -Fq 'TYPE r' kind.log ||
+   ! grep -Fq 'RigidInput.hs:15:44: error: [GHC-83605]' kind.log ||
+   ! grep -Fq 'RigidInput.hs:19:44: error: [GHC-83605]' kind.log ||
+   ! grep -Fq 'This argument has multiplicity: One' kind.log ||
    ! grep -Fq 'IntRep' kind.log; then
     cat kind.log >&2
     exit 1
