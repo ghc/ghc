@@ -27,3 +27,13 @@ for opt in -O0 -O2; do
     grep -Fq 'error: [GHC-05617]' "$out/closed-wrong.log" ||
         { cat "$out/closed-wrong.log" >&2; exit 1; }
 done
+
+for opt in -O0 -O2; do
+    if "${compile[@]}" "$opt" -DWRONG_CONTINUATION -ferror-spans >"$out/continuation.log" 2>&1; then
+        echo 'Unexpected gcastWith proof for a different list' >&2
+        exit 1
+    fi
+    grep -Fq 'error: [GHC-05617]' "$out/continuation.log"
+    grep -Fq 'from the context: F xs ~ G xs' "$out/continuation.log"
+    grep -Fq 'In the second argument of ‘gcastWith’, namely ‘Refl’' "$out/continuation.log"
+done

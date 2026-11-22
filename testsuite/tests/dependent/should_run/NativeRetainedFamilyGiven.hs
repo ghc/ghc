@@ -1,7 +1,7 @@
-{-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, TypeFamilies, TypeOperators #-}
+{-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, RankNTypes, TypeFamilies, TypeOperators #-}
 module NativeRetainedFamilyGiven where
 
-import Data.Type.Equality ((:~:)(Refl))
+import Data.Type.Equality ((:~:)(Refl), gcastWith)
 
 #if defined(CLOSED_GIVEN) || defined(CLOSED_WRONG)
 type family Closed (b :: Bool) :: Bool where
@@ -63,5 +63,22 @@ check xs proof = case proof of Refl -> Refl
 #else
 check :: foreach (xs :: [Bool]) -> F xs :~: G xs -> W (F xs) :~: W (G xs)
 check xs proof = case proof of Refl -> Refl
+
+-- Infer all of the eliminator's type arguments from its witness and result.
+checkWith :: foreach (xs :: [Bool]) -> F xs :~: G xs -> W (F xs) :~: W (G xs)
+checkWith _ proof = gcastWith proof Refl
+
+-- Check the same continuation through an ordinary, locally defined function.
+eliminate :: (a :~: b) -> ((a ~ b) => r) -> r
+eliminate Refl continuation = continuation
+
+checkWithLocal :: foreach (xs :: [Bool]) -> F xs :~: G xs -> W (F xs) :~: W (G xs)
+checkWithLocal _ proof = eliminate proof Refl
+
+#ifdef WRONG_CONTINUATION
+wrong :: foreach (xs :: [Bool]) -> foreach (ys :: [Bool])
+      -> F xs :~: G xs -> W (F ys) :~: W (G ys)
+wrong _ _ proof = gcastWith proof Refl
+#endif
 #endif
 #endif
