@@ -2300,3 +2300,31 @@ The private correction at `e0e63bec5d` reports GHC-70565 against
 the diagnostic for the failed evaluation. Job 1151 passed the updated
 `NativeOpenMap` shell regression, including its positive source-hidden
 mapper, callback, rewrite-rule and recompilation controls.
+
+### An imported proof and a client rewrite rule
+
+A client imported the HaskLib `lengthMap` proof from stripped interfaces
+produced by the normal 552 compiler at `00115859a5`. A separate module
+supplied this deliberately invalid GHC rule.
+
+```haskell
+{-# RULES "drop mapped head" forall f x xs. map f (x:xs) = map f xs #-}
+```
+
+At `-O2` the rule fired. On a singleton list the client measured
+`Zero` after mapping and `Succ Zero` before mapping. The expression
+`case lengthMap f xs of Refl -> ()` also compiled and returned `()`. Job 1164 checked the ordinary
+program and the proof client separately. Jobs 1161 and 1166 reproduced
+the discrepancy for a binary tree, including the installed HaskLib
+candidate before the same-group scheduling change. In job 1171 the same
+list and tree clients produced `Succ Zero` on both sides with rewrites
+disabled.
+
+GHC trusts the programmer to preserve meaning in a `RULES` pragma. The
+fork additionally checks some uses of source equations against active
+rules. The imported induction proofs above do not carry all the function
+dependencies needed by that check. Coverage requires retaining those
+dependencies through an interface and rejecting the proof use when a
+client changes its equations. A dormant rule and an unrelated active
+rule must still permit the proof.
+[GHC rewrite rule semantics](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/rewrite_rules.html#semantics).

@@ -8,7 +8,7 @@ and its [expected output](Showcase.stdout) are the executable examples.
 
 ## Current checkpoint
 
-Updated 22 November 2026. The development branch is
+Updated 23 November 2026. The development branch is
 `dependent-haskell`. Use the fork command below to find its latest commit.
 
 The published compiler at `f42ebe4659` matches normal build
@@ -23,9 +23,15 @@ hashes in that experiment directory.
 
 | Next check | Source and verification |
 | --- | --- |
-| Tree induction and ordered `type data` | Job 1110 builds `c5b5acbffc` in `r41-type-data-554-normal-20261122` using a private copy of the 552 tree. Job 1115 checks the 554-line Showcase, installed HaskLib and the combined interface. Jobs 1100 and 1107 had already passed the source-distribution and downstream tree clients on the compiler component. |
-| Legacy CUSK defaults | Job 1112 built GHC and its boot libraries from clean sources at `c27193021b` in `r27-legacy-transition-normal-20261122`. Job 1121 passed the 34 diagnostic inputs, three-package comparisons, cross-version interface links and five registered tests. The fork-wide edition decision is pending. |
+| Tree induction and ordered `type data` | Job 1110 built `c5b5acbffc` in `r41-type-data-554-normal-20261122` using a private copy of the 552 tree. Job 1115 checks the 554-line Showcase, installed HaskLib and the combined interface. Jobs 1100 and 1107 had already passed the source-distribution and downstream tree clients on the compiler component. |
+| Legacy CUSK defaults | Job 1112 built GHC and its boot libraries from clean sources at `c27193021b` in `r27-legacy-transition-normal-20261122`. Job 1121 passed the 34 diagnostic inputs, three-package comparisons, cross-version interface links and five registered tests. The fork keeps existing Haskell98 and Haskell2010 defaults and the opt-in warning. The transition experiment is complete. Its temporary installation was retired after archiving its source. |
 | Declaration groups and diagnostics | The R21 candidate at `87fcbcef7d` checks the tree proof with both workers in the same group and the tree datatype imported. The R16 diagnostic at `e0e63bec5d` names the enclosing call and highlights its full argument. Job 1151 passed the source-hidden mapper regression. |
+
+The tree-proof release also needs a cross-module rewrite check. Jobs
+1161 and 1166 accepted an imported tree witness when a client rule changed
+the measured fork count. Job 1164 reproduced the same behavior on the
+published list proof. With the conflicting rewrite disabled, job 1171
+obtained matching counts. See the [R16 evidence](roadmap/R16-open-term-evaluator.md#an-imported-proof-and-a-client-rewrite-rule).
 
 The local archive refs `r19-r41-normal-552`, `r16-hasklib-tree-553`
 and `r27-legacy-transition-normal` are under

@@ -58,8 +58,10 @@ and [GHC MR !1602](https://gitlab.haskell.org/ghc/ghc/-/merge_requests/1602).
   kinds with inaccessible names without suggesting invalid source.
 - [x] Recheck the selected migration on the normal compiler and
   document the effect on callers.
-- [ ] Decide when to change the legacy editions and how to retire the
-  explicit opt-in. Verify the selected transition on the normal compiler.
+- [x] Test the proposed edition transition on a clean normal compiler.
+- [x] Decide the fork policy for existing editions and explicit CUSK flags.
+- [ ] Upstream proposal #54 also calls for disabling and eventually removing
+  CUSKs. The fork defers those changes.
 
 ### Results for four declarations
 
@@ -286,6 +288,14 @@ Job 1121 checked the resulting Stage 2 installation against the released
 | Registered regressions | All five selected normal-way tests passed, including the updated `T20916` golden. |
 
 The proposal calls for disabling implicit CUSKs before removing the
-explicit switch later. This experiment keeps the explicit opt-in. The
-public fork retains its language defaults while the change is under
-review. [Proposal #54, steps 3 and 4](https://ghc-proposals.readthedocs.io/en/latest/proposals/0054-kind-signatures.html#proposed-change-specification).
+explicit switch later. This experiment keeps the explicit opt-in. On 23 November 2026 the fork chose to retain the existing Haskell98
+and Haskell2010 defaults and the opt-in `-Wcusks` declaration warning.
+Explicit `-XCUSKs` and `-XNoCUSKs` retain their current behavior. The
+default flip and the associated flag deprecation remain experimental.
+R27 stays partial against the upstream deprecation plan. [Proposal #54, steps 3 and 4](https://ghc-proposals.readthedocs.io/en/latest/proposals/0054-kind-signatures.html#proposed-change-specification).
+
+
+After the decision, the 4,320,100,352-byte comparison checkout and 407
+compiled test products were retired. Git retains the exact source under
+`refs/archive/dependent-haskell/2026-11-22/r27-legacy-transition-normal`.
+The experiment directory retains the build recipe, inputs and results.

@@ -72,6 +72,11 @@ HaskLib imports that worker from `ghc-internal`. Clients can use
 [Package](hasklib.cabal), [list API](hasklib/HaskLib/List.hs) and
 [proof methods](REFERENCES.md#parametricity-and-the-list-length-laws).
 
+The list laws use the ordinary equations of the functions in their
+statements. On the current fork a client can import a rewrite rule that
+changes `map` and still use an already compiled `lengthMap` witness.
+[R16 example and measured outputs](roadmap/R16-open-term-evaluator.md#an-imported-proof-and-a-client-rewrite-rule).
+
 ### Compose equality proofs
 
 Use `trans` from `HaskLib` to join two proofs with a shared endpoint.
