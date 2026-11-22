@@ -2509,6 +2509,12 @@ of ``-W(no-)*``.
     the conflict if it selects only one of the competing names. The check
     uses name resolution across normal, quote and splice imports.
 
+    The warning also applies when an explicit local binder in the
+    other namespace would replace the chosen binding. For example,
+    with :extension:`ScopedTypeVariables`, in
+    ``f :: forall a. a -> a; f = \a -> (a :: a)``, the type variable in
+    the body annotation warns because of the nearer term binder.
+
     Also warn about implicit type-variable uses that would capture a
     term name, and about list and boxed tuple type syntax that depends on
     :extension:`ListTuplePuns`. This includes the list type ``[a]`` and the

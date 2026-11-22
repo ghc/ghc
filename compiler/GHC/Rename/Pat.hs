@@ -442,8 +442,9 @@ rn_pats_general ctxt rename_pats thing_inside = do
          then checkDupNames bndrs
          else checkDupAndShadowedNames envs_before bndrs
     -- See Note [Pun binding warnings] in GHC.Rename.Utils.
-    warnPunBindings (filterOut isSystemName (collectPatsBinders CollExplicitBinders (toList pats')))
-    thing_inside pats'
+    let explicit_bndrs = filterOut isSystemName (collectPatsBinders CollExplicitBinders (toList pats'))
+    warnPunBindings explicit_bndrs
+    groupPunBinders explicit_bndrs $ thing_inside pats'
 
 -- | Choose the pattern renamer for the current match.
 -- See Note [Invisible binders in functions] in GHC.Hs.Pat.

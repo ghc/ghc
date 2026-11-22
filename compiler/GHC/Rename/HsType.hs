@@ -60,7 +60,7 @@ import GHC.Hs
 
 import GHC.Rename.Env
 import GHC.Rename.Doc
-import GHC.Rename.Utils  ( mapFvRn, bindLocalNamesFV
+import GHC.Rename.Utils  ( mapFvRn, bindLocalNamesFV, bindImplicitLocalNamesFV
                          , typeAppErr, newLocalBndrRn, checkDupRdrNames
                          , checkShadowedRdrNames )
 import GHC.Rename.Fixity ( lookupFieldFixityRn, lookupFixityRn
@@ -703,7 +703,7 @@ rnImplicitTvOccs mb_assoc implicit_vs_with_dups thing_inside
        ; vars <- mapM (newTyVarNameRnImplicit mb_assoc implicit_vs_with_dups . L loc' . unLoc)
                       implicit_vs
 
-       ; bindLocalNamesFV vars $
+       ; bindImplicitLocalNamesFV vars $
          thing_inside vars }
 
 {-
@@ -1336,7 +1336,7 @@ rnHsTyVar lookup_occ env tv ip (L loc rdr_name)
            -- of PolyKinds (see #14710)
        ; gre <- lookup_occ rdr_name
        ; unless (isPromoted ip) $ do
-           warnGlobalPunUse (L loc rdr_name) gre
+           warnPunUse (L loc rdr_name) gre
            -- The parser records the punctuation only for written syntax.
            -- A type constructed by Template Haskell has no such tokens.
            let name = greName gre
@@ -1380,7 +1380,7 @@ rnHsTyOp env overall_ty tyop
                  | otherwise = False
        ; opgre <- lookupTypeAppHeadRn open_operands op
        ; unless (isPromoted prom) $
-           warnGlobalPunUse (L loc op) opgre
+           warnPunUse (L loc op) opgre
        ; checkNamedWildCard env (greName opgre)
        ; let opName = greName opgre
        ; unlessXOptM LangExt.TypeOperators $

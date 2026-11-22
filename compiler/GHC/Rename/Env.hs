@@ -21,7 +21,7 @@ module GHC.Rename.Env (
         lookupGlobalOccRn_maybe,
         rnLookupKnownOccName,
 
-        lookupExprOccRn, warnGlobalPunUse,
+        lookupExprOccRn, warnPunUse, warnGlobalPunUse,
         lookupRecFieldOcc,
         lookupRecUpdFields,
         getFieldUpdLbl,
@@ -1666,6 +1666,26 @@ lookupExprOccRn rdr_name
                         -- we failed to look up the name at the term level.
            p         -> return p }
 
+-- | Warn about a written occurrence that relies on separate namespaces.
+warnPunUse :: LocatedN RdrName -> GlobalRdrElt -> RnM ()
+warnPunUse loc_rdr@(L loc rdr) selected
+  | isUnqual rdr
+  , let name = greName selected
+  , not (isExternalName name)
+  , isTyVarName name || isValName name
+  = whenWOptM Opt_WarnPunUses $ do
+      (_, env) <- getRdrEnvs
+      let other_ns = if isTyVarName name then varName else tvName
+          competing = do
+            selected_rank <- localPunScope env name
+            other <- lookupLocalRdrEnv env (setRdrNameSpace rdr other_ns)
+            other_rank <- localPunScope env other
+            guard (name /= other && selected_rank <= other_rank)
+            pure other
+      forM_ competing $ \ other ->
+        addDiagnosticAt (locA loc) (TcRnPunUse rdr selected (mkLocalVanillaGRE NoParent other NE.:| []))
+  | otherwise = warnGlobalPunUse loc_rdr selected
+
 -- | Warn about a global occurrence that relies on separate namespaces.
 -- See Note [Global pun use warnings].
 warnGlobalPunUse :: LocatedN RdrName -> GlobalRdrElt -> RnM ()
@@ -1717,10 +1737,19 @@ An import at a different level can still make a name ambiguous. Check
 the hypothetical unified namespace before any staging check. Leave
 the actual selected name and staging diagnostic unchanged.
 
-A term binder and a type binder can be introduced in separate local
-scopes. Their presence alone does not determine which is visible in a
-unified namespace. This check uses global selections only and leaves
-local alternatives to their scope checks.
+Explicit local names are ranked in the order they enter the reader
+environment. For a written occurrence of an explicit binder, check
+whether the other namespace has a name in the same group or in a closer
+group. Use the current reader environment to find the other name. A
+binder removed from that environment can no longer compete, and a
+retained binder's alias resolves to the same name.
+
+Pattern renaming brings names into scope from left to right. In
+`\(a :: a) -> a` the annotation is read before the term variable enters
+scope. After the patterns, the RHS sees their explicit binders as one
+group. Implicit quantification has separate capture checks. An implicit
+binder does not take precedence over an explicit local binder in this
+check.
 -}
 
 lookupGlobalOccRn_maybe :: WhichGREs GREInfo -> RdrName -> RnM (Maybe GlobalRdrElt)

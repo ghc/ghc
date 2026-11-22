@@ -30,7 +30,8 @@ module GHC.Rename.Utils (
 
         newLocalBndrRn, newLocalBndrsRn,
 
-        bindLocalNames, bindLocalNamesFV, delLocalNames,
+        bindLocalNames, bindLocalNamesFV, bindImplicitLocalNamesFV,
+        groupPunBinders, delLocalNames,
 
         addNameClashErrRn, mkNameClashErr,
 
@@ -104,12 +105,16 @@ newLocalBndrsRn :: [LocatedN RdrName] -> RnM [Name]
 newLocalBndrsRn = mapM newLocalBndrRn
 
 bindLocalNames :: [Name] -> RnM a -> RnM a
-bindLocalNames names
+bindLocalNames = bindLocalNamesUsing $ \ env names ->
+  extendPunScope (extendLocalRdrEnvList env names) names
+
+bindLocalNamesUsing :: (LocalRdrEnv -> [Name] -> LocalRdrEnv) -> [Name] -> RnM a -> RnM a
+bindLocalNamesUsing extend names
   = updLclCtxt $ \ lcl_env ->
     let th_level  = thLevelIndex (tcl_th_ctxt lcl_env)
         th_bndrs' = extendNameEnvList (tcl_th_bndrs lcl_env)
                     [ (n, (NotTopLevel, th_level)) | n <- names ]
-        rdr_env'  = extendLocalRdrEnvList (tcl_rdr lcl_env) names
+        rdr_env'  = extend (tcl_rdr lcl_env) names
     in lcl_env { tcl_th_bndrs = th_bndrs'
                , tcl_rdr      = rdr_env' }
 
@@ -117,6 +122,18 @@ bindLocalNamesFV :: [Name] -> RnM (a, FreeNames) -> RnM (a, FreeNames)
 bindLocalNamesFV names enclosed_scope
   = do  { (result, fvs) <- bindLocalNames names enclosed_scope
         ; return (result, delFNs names fvs) }
+
+-- | Bring implicit variables into the usual reader environment. These binders
+-- do not shadow names in the hypothetical unified namespace.
+bindImplicitLocalNamesFV :: [Name] -> RnM (a, FreeNames) -> RnM (a, FreeNames)
+bindImplicitLocalNamesFV names enclosed_scope
+  = do (result, fvs) <- bindLocalNamesUsing extendLocalRdrEnvList names enclosed_scope
+       return (result, delFNs names fvs)
+
+-- | Give explicit match binders the same rank after processing the patterns.
+groupPunBinders :: [Name] -> RnM a -> RnM a
+groupPunBinders names = updLclCtxt $ \ lcl_env ->
+  lcl_env { tcl_rdr = extendPunScope (tcl_rdr lcl_env) names }
 
 delLocalNames :: [Name] -> RnM a -> RnM a
 delLocalNames names
