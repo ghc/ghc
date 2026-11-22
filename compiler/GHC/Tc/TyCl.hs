@@ -6603,6 +6603,7 @@ checkValidDataCon dflags existential_ok tc con
         ; when (dataConTerminalOrder con /= 0 || is_ordered) $
             do { let (early, late) = dataConUserTyVarGroups con
                      (_, ex_tvs, eq_spec, theta, _, _) = dataConFullSig con
+                     res_kind = tyConResKind tc
                      prefix_theta = if dataConHasTrailingContext con then [] else theta
                      prefix_types = map (varType . binderVar) early ++ prefix_theta ++
                        concatMap (\(Scaled mult ty) -> [mult, ty]) arg_tys
@@ -6615,9 +6616,8 @@ checkValidDataCon dflags existential_ok tc con
                              all isTyVar ex_tvs))
                           && (is_ordered || null eq_spec)
                           && null (dataConStupidTheta con)
-                          && not (isDataFamInstTyCon tc)
                           && not (isTypeDataCon con)
-                          && isLiftedTypeKind (tyConResKind tc)
+                          && (isLiftedTypeKind res_kind || res_kind `eqType` unliftedTypeKind)
                           && scope_ok)
                          (TcRnNestedForallsContexts NFC_GadtConSig) }
         ; traceTc "checkValidDataCon 2" $ ppr (dataConWrapperType con)

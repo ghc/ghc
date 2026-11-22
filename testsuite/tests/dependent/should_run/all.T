@@ -372,7 +372,7 @@ test('NativeMatchableProjection',
 test('NativeLaterMatchability',
      [only_ways(['normal']),
       extra_files([open_eval_dir + f for f in ['AnchorReceiver.hs', 'LaterMatchability.hs',
-                                              'LaterMatchabilityClient.hs']])],
+                                              'LaterMatchabilityClient.hs', 'PromotedEndo.hs']])],
      run_command, ['bash NativeLaterMatchability.sh "{compiler}" "{libdir}"'])
 test('NativeIndexedClassReceiver',
      [only_ways(['normal']),

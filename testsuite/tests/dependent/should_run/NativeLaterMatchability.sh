@@ -9,9 +9,10 @@ out=$(mktemp -d)
 trap 'rm -rf -- "$out"' EXIT
 cd "$out"
 mkdir provider client
-cp "$src/AnchorReceiver.hs" provider/
+cp "$src/"{AnchorReceiver,PromotedEndo}.hs provider/
+(cd provider && "${ghc[@]}" -c PromotedEndo.hs)
 (cd provider && "${ghc[@]}" -c AnchorReceiver.hs)
-cp provider/AnchorReceiver.hi "$src/LaterMatchability.hs" client/
+cp provider/{AnchorReceiver,PromotedEndo}.hi "$src/LaterMatchability.hs" client/
 cd client
 "${ghc[@]}" -c LaterMatchability.hs
 "${ghc[@]}" -fprint-explicit-kinds -dppr-cols=250 --show-iface LaterMatchability.hi >client.iface
@@ -30,14 +31,14 @@ cat >Main.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes #-}
 module Main where
 
-import LaterMatchabilityClient (flippedCallbacks, rankedMap)
+import LaterMatchabilityClient (flippedCallbacks, inferredEndo, rankedMap)
 
 main :: IO ()
-main = print (rankedMap, flippedCallbacks)
+main = print (rankedMap, flippedCallbacks, inferredEndo)
 HS
 "${ghc[@]}" -c Main.hs
-"${ghc[@]}" Main.o LaterMatchabilityClient.o ../provider/{AnchorReceiver,LaterMatchability}.o -o ranked-map
-test "$(./ranked-map)" = '((Just True,[False]),(Just False,[True]))'
+"${ghc[@]}" Main.o LaterMatchabilityClient.o ../provider/{AnchorReceiver,LaterMatchability,PromotedEndo}.o -o ranked-map
+test "$(./ranked-map)" = '((Just True,[False]),(Just False,[True]),(True,Refl))'
 
 cat >ComputedMismatch.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, KindSignatures, TypeApplications, TypeFamilies #-}

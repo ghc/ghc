@@ -10,6 +10,12 @@ for opt in 0 2; do
         "${ghc[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core \
             -c GadtRefinedOrderedProvider.hs
         cp GadtRefinedOrderedProvider.hi ../reader/
+        cp "$source_dir/GadtRefinedOrderedWrongFamily.hs" .
+        if "${ghc[@]}" -fdiagnostics-color=never -ferror-spans \
+            -c GadtRefinedOrderedWrongFamily.hs > wrong-family.stderr 2>&1; then
+            exit 1
+        fi
+        grep -Fq 'GadtRefinedOrderedWrongFamily.hs:6:3-43: error: [GHC-83865]' wrong-family.stderr
     )
     (
         cd "O$opt/reader"
