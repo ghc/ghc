@@ -9,10 +9,10 @@ import GadtOrderedNewtypeProvider
 import qualified Language.Haskell.TH as TH
 
 construct :: $(TH.reifyType 'N)
-construct value @b = N value @b
+construct = N
 
 afterField :: Bool %1 -> forall b. N Bool b
-afterField value @b = construct @Bool value @b
+afterField = construct @Bool
 
 readN :: N a b %1 -> a
 readN (N v) = v
