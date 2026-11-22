@@ -450,8 +450,7 @@ alternatives still form a complete split over one ordinary datatype.
 For each constructor, the rule checks nominal equality of the
 results under the row's captures and fields. It pairs captures in
 application order and fields in constructor order. Swapping fields
-or captures produces a different result. Nested patterns still use
-their ordered reduction rules.
+or captures produces a different result.
 [Provider](../examples/open-evaluation/NativeCase.hs),
 [consumer](../examples/open-evaluation/NativeRetainedTH.hs),
 and [source-hidden regression](../../../testsuite/tests/dependent/should_run/NativeTypeCaseScopedResult.sh).
@@ -462,8 +461,37 @@ pattern-lambda translation. The GHC rule adds a checked nominal
 equality for this restricted split. It uses the ordinary stored case
 axioms, so an existing provider can supply the proof to a new client.
 Only a serialized proof that uses scoped branch results requires the
-new interface marker.
-[Agda's pattern-lambda translation](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html#internal-representation-of-pattern-lambdas).
+new interface marker. [Agda's pattern-lambda translation](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html#internal-representation-of-pattern-lambdas).
+
+Two separate nested signature cases can also agree. For example, both
+can return `Char` for `Nothing`, `Int` for `Just True`, and `Bool`
+for `Just False`. Reordering these rows leaves the same decisions.
+An ordinary client can pass a runtime `m` from one provider to the
+other. This also works at `Just b` when `b` is rigid. The proof
+leaves the result at `b` unknown.
+
+GHC compares the generated decision families in order. Each test must
+cover all constructors of one ordinary datatype, and the two cases must
+test the same column. GHC pairs row binders by position. It checks the
+arguments to each child and checks leaf results under those binders.
+A missing row, a changed result, or a different test order prevents
+the proof. For example, `Pair _ False` can select a result at
+`Pair b False` with rigid `b` when that row comes first. Putting the
+rows that test the first field before it can leave the case stuck.
+Likewise, a `Just True` row before `Just _` can leave `Just b` stuck
+even when both rows return `Int`.
+
+Agda's case trees also preserve when each argument is tested. Its
+pattern-lambda translation gives each expression a fresh helper. GHC's
+additional equality checks the generated trees while retaining the
+original closed-family equations and their apartness behavior. A shared
+named case synonym still provides a common type when the intended
+interface can share that declaration. An old installed provider needs
+a rebuild to record the owner of its decisions. A home build refreshes
+an affected exported signature once. Only a stored ordered-case proof
+requires a new interface feature. [Agda case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees),
+[closed families and apartness, §3](https://www.seas.upenn.edu/~sweirich/papers/popl14-axioms-extended.pdf),
+and [source-hidden checks](../../../testsuite/tests/dependent/should_run/NativeTypeCaseOrderedScope.sh).
 
 The same test works with a user-defined `Mode = Cold | Hot | Standby`
 and a single closed family `ByMode` in `Mode`'s module. At `-O0` and
@@ -523,9 +551,9 @@ selection.
   Constructor fields and indexed branches also need scopes for their
   binders and their equality evidence.
 
-The checked equality above uses the existing scoped-family metadata
-and one Coercion rule. The selector and first-class case representations
-remain alternatives for broader forms of case conversion.
+The checked equalities above use the existing scoped-family metadata.
+The selector and first-class case representations remain alternatives
+for broader forms of case conversion.
 
 ## A case in a function arrow
 

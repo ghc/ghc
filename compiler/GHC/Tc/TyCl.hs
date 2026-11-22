@@ -4149,8 +4149,8 @@ tcFamDecl1 case_axioms parent (FamilyDecl { fdInfo = fam_info
                | Just (owner, is_sum) <- scope, Just ax <- mb_co_ax
                = CTF_Scoped owner is_sum ax
                | Just ax <- mb_co_ax
-               , Nothing <- lookupNameEnv case_axioms tc_name
-               , Just owner <- flatSignatureCaseOwner axiom_validity_infos
+               , let ordered = isJust (lookupNameEnv case_axioms tc_name)
+               , Just owner <- signatureCaseOwner ordered axiom_validity_infos
                = CTF_Scoped owner False ax
                | otherwise = CTF mb_co_ax
 
@@ -4479,18 +4479,20 @@ hasCasePattern :: TyFamEqnValidityInfo -> Bool
 hasCasePattern VI{vi_case_pattern = Just _} = True
 hasCasePattern _ = False
 
--- | Keep the owner of an elaborated signature case with flat constructor rows.
--- See Note [Equality of retained constructor cases] in GHC.Builtin.CoercionRules.
-flatSignatureCaseOwner :: [TyFamEqnValidityInfo] -> Maybe Name
-flatSignatureCaseOwner infos = do
-  ((owner, column) : rest) <- traverse flat infos
+-- | Keep the owner of an elaborated retained signature case.
+-- See Note [Equality of ordered retained case trees] in GHC.Builtin.CoercionRules.
+signatureCaseOwner :: Bool -> [TyFamEqnValidityInfo] -> Maybe Name
+signatureCaseOwner ordered infos = do
+  ((owner, column) : rest) <- traverse case_owner infos
   guard ("$signature-case:" `List.isPrefixOf` occNameString (nameOccName owner))
   guard (all (== (owner, column)) rest)
   pure owner
   where
-    flat VI{vi_case_pattern = Just (owner, column, pat@CasePatternConstructor{}, _)}
-      | not (nestedTypeCasePattern pat) = Just (owner, column)
-    flat _ = Nothing
+    case_owner VI{vi_case_pattern = Just (owner, column, pat, _)}
+      | ordered = Just (owner, column)
+      | CasePatternConstructor{} <- pat
+      , not (nestedTypeCasePattern pat) = Just (owner, column)
+    case_owner _ = Nothing
 
 hasOrderedPattern :: TyFamEqnValidityInfo -> Bool
 hasOrderedPattern VI{vi_case_pattern = Just (_, _, CasePatternField, _)} = True
@@ -6663,7 +6665,7 @@ checkValidDataCon dflags existential_ok tc con
                      (_, ex_tvs, eq_spec, theta, _, _) = dataConFullSig con
                      res_kind = tyConResKind tc
                      valid_res_kind
-                       | isNewTyCon tc = isFixedRuntimeRepKind res_kind
+                       | isNewTyCon tc = True
                        | otherwise = maybe False isBoxedRuntimeRep (kindRep_maybe res_kind)
                      prefix_theta = if dataConHasTrailingContext con then [] else theta
                      prefix_types = map (varType . binderVar) early ++ prefix_theta ++

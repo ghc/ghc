@@ -373,7 +373,7 @@ data IfaceConDecls
   | IfDataTyCon !Bool [IfaceConDecl] -- Data type decls
         -- The Bool is True for "type data" declarations.
         -- see Note [Type data declarations] in GHC.Rename.Module
-  | IfNewTyCon  IfaceConDecl   -- Newtype decls
+  | IfNewTyCon  !Bool IfaceConDecl  -- Bool marks representation-polymorphic ordered newtypes
 
 -- For IfDataTyCon and IfNewTyCon we store:
 --  * the data constructor(s);
@@ -729,7 +729,7 @@ See [https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/recompilation-
 visibleIfConDecls :: IfaceConDecls -> [IfaceConDecl]
 visibleIfConDecls (IfAbstractTyCon {}) = []
 visibleIfConDecls (IfDataTyCon _ cs)   = cs
-visibleIfConDecls (IfNewTyCon c)       = [c]
+visibleIfConDecls (IfNewTyCon _ c)     = [c]
 
 ifaceDeclImplicitBndrs :: IfaceDecl -> [OccName]
 --  *Excludes* the 'main' name, but *includes* the implicitly-bound names
@@ -747,7 +747,7 @@ ifaceDeclImplicitBndrs :: IfaceDecl -> [OccName]
 ifaceDeclImplicitBndrs (IfaceData {ifName = tc_name, ifCons = cons })
   = case cons of
       IfAbstractTyCon {} -> []
-      IfNewTyCon  cd     -> mkNewTyCoOcc (occName tc_name) : ifaceConDeclImplicitBndrs cd
+      IfNewTyCon  _ cd   -> mkNewTyCoOcc (occName tc_name) : ifaceConDeclImplicitBndrs cd
       IfDataTyCon type_data cds
         | type_data ->
           -- Constructors in "type data" declarations have no implicits.
@@ -2285,7 +2285,7 @@ freeNamesDM _                     = emptyNameSet
 
 freeNamesIfConDecls :: IfaceConDecls -> NameSet
 freeNamesIfConDecls (IfDataTyCon _ cs) = fnList freeNamesIfConDecl cs
-freeNamesIfConDecls (IfNewTyCon    c)  = freeNamesIfConDecl c
+freeNamesIfConDecls (IfNewTyCon  _ c)  = freeNamesIfConDecl c
 freeNamesIfConDecls _                  = emptyNameSet
 
 freeNamesIfConDecl :: IfaceConDecl -> NameSet
@@ -2947,6 +2947,12 @@ an ordered constructor, so mark this use before external TH.
 
 The original newtype tag has no order payload. Give ordered newtypes a
 separate tag and feature marker. Keep the original tag for other newtypes.
+
+Representation-polymorphic ordered newtypes need a wrapper that casts the
+field directly. Older readers can decode the telescope, but the wrapper
+they build can fail at a use with a kind coercion. Mark this form separately
+and preserve the exact encodings for ordinary and fixed-representation
+ordered newtypes. See Note [Desugaring unlifted newtypes] in GHC.Core.SimpleOpt.
 -}
 
 instance Binary IfaceConDecls where
@@ -3017,10 +3023,12 @@ instance Binary IfaceConDecls where
           legacyConOrder (ifConSourceOrder con) > 0 &&
           not (null (ifConCtxt con)) && not (has_trailing_context con)
     put_ bh (IfDataTyCon True cs) = putByte bh 2 >> put_ bh cs
-    put_ bh (IfNewTyCon c)
+    put_ bh (IfNewTyCon rep_poly c)
       | order@OrderedConArgs{} <- ifConSourceOrder c = do
           requireIfaceEvidenceVersion bh OrderedNewtypeTelescopeEvidence
-          putByte bh 6
+          when rep_poly $
+            requireIfaceEvidenceVersion bh OrderedRepPolyNewtypeEvidence
+          putByte bh (if rep_poly then 7 else 6)
           put_ bh c
           put_ bh order
       | otherwise = putByte bh 3 >> put_ bh c
@@ -3030,7 +3038,7 @@ instance Binary IfaceConDecls where
             0 -> return IfAbstractTyCon
             1 -> liftM (IfDataTyCon False) (get bh)
             2 -> liftM (IfDataTyCon True) (get bh)
-            3 -> liftM IfNewTyCon (get bh)
+            3 -> liftM (IfNewTyCon False) (get bh)
             4 -> do
                 cons <- get bh
                 late <- get bh
@@ -3045,14 +3053,16 @@ instance Binary IfaceConDecls where
                 if cons `equalLength` orders && any ordered orders
                   then return (IfDataTyCon False (zipWith set_order cons orders))
                   else fail "Invalid constructor order in interface"
-            6 -> do
-                con <- get bh
-                order <- get bh
-                if ordered order
-                  then return (IfNewTyCon (set_order con order))
-                  else fail "Invalid ordered newtype constructor in interface"
+            6 -> get_ordered_newtype False
+            7 -> get_ordered_newtype True
             _ -> error "Binary(IfaceConDecls).get: Invalid IfaceConDecls"
       where
+        get_ordered_newtype rep_poly = do
+          con <- get bh
+          order <- get bh
+          if ordered order
+            then return (IfNewTyCon rep_poly (set_order con order))
+            else fail "Invalid ordered newtype constructor in interface"
         set_order con order = con { ifConSourceOrder = order }
         ordered OrderedConArgs{} = True
         ordered _ = False
@@ -3794,7 +3804,7 @@ instance NFData IfaceConDecls where
   rnf = \case
     IfAbstractTyCon -> ()
     IfDataTyCon _ f1 -> rnf f1
-    IfNewTyCon f1 -> rnf f1
+    IfNewTyCon _ f1 -> rnf f1
 
 instance NFData IfaceConDecl where
   rnf (IfCon f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 _) =

@@ -369,7 +369,8 @@ evidenceSuffix requirements
     || needs SourceProofRuleArgumentsEvidence || needs PolymorphicSourceMethodEvidence
     || needs SourceProofRuleBranchesEvidence || needs ScopedEnumCaseEvidence
     || needs ScopedConstructorCaseEvidence || needs ScopedCaseResultEvidence
-    || needs OrderedNewtypeTelescopeEvidence = feature_set
+    || needs OrderedNewtypeTelescopeEvidence || needs ScopedOrderedCaseEvidence
+    || needs OrderedRepPolyNewtypeEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -390,6 +391,8 @@ legacyEvidenceSuffix ScopedEnumCaseEvidence = featureSetPrefix ++ "scoped-enum-c
 legacyEvidenceSuffix ScopedConstructorCaseEvidence = featureSetPrefix ++ "scoped-constructor-case-v1"
 legacyEvidenceSuffix ScopedCaseResultEvidence = featureSetPrefix ++ "scoped-case-result-v1"
 legacyEvidenceSuffix OrderedNewtypeTelescopeEvidence = featureSetPrefix ++ "ordered-newtype-telescope"
+legacyEvidenceSuffix ScopedOrderedCaseEvidence = featureSetPrefix ++ "scoped-ordered-case-v1"
+legacyEvidenceSuffix OrderedRepPolyNewtypeEvidence = featureSetPrefix ++ "ordered-rep-poly-newtype"
 legacyEvidenceSuffix PartialSynonymEvidence = featureSetPrefix ++ "partial-synonym-v2"
 legacyEvidenceSuffix ErasedUserRuleEvidence = featureSetPrefix ++ "user-rule"
 legacyEvidenceSuffix LexicalPackageRuleEvidence = featureSetPrefix ++ "lexical-rule"
@@ -500,7 +503,9 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("scoped-enum-case-v1", ScopedEnumCaseEvidence)
                       , ("scoped-constructor-case-v1", ScopedConstructorCaseEvidence)
                       , ("scoped-case-result-v1", ScopedCaseResultEvidence)
-                      , ("ordered-newtype-telescope", OrderedNewtypeTelescopeEvidence) ]
+                      , ("ordered-newtype-telescope", OrderedNewtypeTelescopeEvidence)
+                      , ("scoped-ordered-case-v1", ScopedOrderedCaseEvidence)
+                      , ("ordered-rep-poly-newtype", OrderedRepPolyNewtypeEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion

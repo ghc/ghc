@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, TemplateHaskell #-}
 -- | Select a result type with a retained signature from a quote.
 module NativeRetainedTH
-  (Select, quoted, quotedCase, render, renderCase, renderMaybeCase, renderMaybeField) where
+  (Select, quoted, quotedCase, render, renderCase, renderMaybeCase, renderMaybeField, renderNestedMaybe) where
 
 import Data.Proxy (Proxy(..))
 
@@ -40,3 +40,9 @@ renderMaybeField :: foreach (m :: Maybe Bool) ->
   (case m of { Just field -> Proxy field; Nothing -> Proxy 'False }) -> String
 renderMaybeField Nothing Proxy = "nothing"
 renderMaybeField (Just _) Proxy = "just"
+
+-- | Render a nested result from a separately compiled provider.
+renderNestedMaybe :: foreach (m :: Maybe Bool) ->
+  (case m of { Just False -> Bool; Nothing -> Char; Just True -> Int }) -> String
+renderNestedMaybe Nothing = (:[])
+renderNestedMaybe (Just b) = case b of { True -> show; False -> show }

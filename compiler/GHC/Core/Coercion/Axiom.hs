@@ -26,7 +26,7 @@ module GHC.Core.Coercion.Axiom (
 
        CoAxiomRule(.., BuiltInEqRule), BuiltInFamRewrite(..), BuiltInFamInjectivity(..), TypeEqn,
        scopedSigmaClosureName, scopedLambdaClosureName,
-       scopedEnumCaseName, scopedConstructorCaseName, scopedCaseResultName,
+       scopedEnumCaseName, scopedConstructorCaseName, scopedCaseResultName, scopedOrderedCaseName,
        matchableProjectionName, matchableProjectionDirection,
        coAxiomRuleArgRoles, coAxiomRuleRole,
        coAxiomRuleBranch_maybe, sourceProofAxiomRules, isNewtypeAxiomRule_maybe,
@@ -679,6 +679,10 @@ scopedConstructorCaseName = fsLit "ScopedConstructorCase"
 -- | The interface key for complete cases with scoped branch results.
 scopedCaseResultName :: FastString
 scopedCaseResultName = fsLit "ScopedCaseResult"
+
+-- | The interface key for conversion between checked ordered case trees.
+scopedOrderedCaseName :: FastString
+scopedOrderedCaseName = fsLit "ScopedOrderedCase"
 
 -- | Interface key for a nominal application projection with explicit heads.
 matchableProjectionName :: LeftOrRight -> FastString

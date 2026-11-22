@@ -9,7 +9,7 @@ module NativeCase
   , AscribedCaseKind, SignedCaseRhs
   , CaseRhsAliasKind, CaseBodyAliasKind
   , caseIdentity, nestedCaseIdentity, retainedPick, renderRetainedPick, retainedKeep
-  , retainedMaybePick, retainedMaybeField, retainedDoubleNot, renderRetainedDoubleNot
+  , retainedMaybePick, retainedMaybeField, retainedNestedMaybe, retainedDoubleNot, renderRetainedDoubleNot
   , retainedPermission
   ) where
 
@@ -100,6 +100,12 @@ retainedMaybeField :: foreach (m :: Maybe Bool) ->
   (case m of { Nothing -> Proxy 'False; Just field -> Proxy field })
 retainedMaybeField Nothing = Proxy
 retainedMaybeField (Just field) = Proxy @field
+
+-- | Choose a payload by inspecting both constructors.
+retainedNestedMaybe :: foreach (m :: Maybe Bool) ->
+  (case m of { Nothing -> Char; Just True -> Int; Just False -> Bool })
+retainedNestedMaybe Nothing = 'n'
+retainedNestedMaybe (Just b) = case b of { True -> 42; False -> False }
 
 -- | Select the result after two checked Boolean negations.
 retainedDoubleNot :: foreach (b :: Bool)

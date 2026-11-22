@@ -541,6 +541,10 @@ test('NativeTypeCaseScopedResult',
      [req_host_target_ghc, only_ways(['normal'])],
      run_command, ['bash NativeTypeCaseScopedResult.sh "{compiler}" "{libdir}"'])
 
+test('NativeTypeCaseOrderedScope',
+     [req_host_target_ghc, only_ways(['normal'])],
+     run_command, ['bash NativeTypeCaseOrderedScope.sh "{compiler}" "{libdir}"'])
+
 test('NativeTypeCaseRetainedTh',
      [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal']),
       extra_files([open_eval_dir + 'NativeRetainedTH.hs',

@@ -2557,10 +2557,10 @@ tc_sub_type_deep fun_pos@(tc_fun, pos) ds_depth unify inst_orig ctxt ty_actual t
              Just (witness, res) -> (<.> witness) <$> go res ty_e'
              Nothing -> go1 ty_a' ty_e' }
 
-    -- TopSub leaves the expected terminal context quantified. Match an
-    -- equal sigma before instantiating it. Read the metavariables already
-    -- solved by the preceding fields. Their multiplicity still uses the
-    -- normal constructor subsumption rule.
+    -- TopSub leaves the expected terminal sigma quantified. Compare the
+    -- two sigmas by nominal equality before instantiating either one.
+    -- This can solve an outer kind metavariable that the preceding
+    -- fields do not mention.
     go1 ty_a ty_e
       | TopSub <- ds_depth
       , Just (XExpr (ConLikeTc (RealDataCon con))) <- tc_fun
@@ -2568,11 +2568,7 @@ tc_sub_type_deep fun_pos@(tc_fun, pos) ds_depth unify inst_orig ctxt ty_actual t
           OrderedConArgs _ -> True
           LegacyConOrder _ -> False
       , isSigmaTy ty_a, isSigmaTy ty_e
-      = do { actual <- liftZonkM $ zonkTcType ty_a
-           ; expected <- liftZonkM $ zonkTcType ty_e
-           ; if tcEqType actual expected
-             then just_unify actual expected
-             else instantiate_actual ty_a ty_e }
+      = just_unify ty_a ty_e
 
     -- Instantiate an actual sigma before comparing its result.
     go1 ty_a ty_e

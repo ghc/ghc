@@ -751,8 +751,14 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
                      -- See Note [Retained constructor result equality] in GHC.Core.DataCon.
                      ; return (args, mkCoApps (mkVarApps initial_wrap_app args) refls) }
              else do { args <- mapM (newLocal (fsLit "conrep")) wrap_arg_tys
-                     ; body <- mk_rep_app (dropList stupid_theta args `zip` dropList eq_tys unboxers)
-                                          (mkCoApps initial_wrap_app refls)
+                     ; let explicit_args = dropList stupid_theta args
+                     ; body <- case explicit_args of
+                         [field] | new_tycon, not omit_newtype_arg
+                                 , not (isFixedRuntimeRepKind (tyConResKind tycon))
+                                 , null theta, null eq_spec, null source_exs
+                           -> return (wrapNewTypeBody tycon res_ty_args (Var field))
+                         _ -> mk_rep_app (explicit_args `zip` dropList eq_tys unboxers)
+                                         (mkCoApps initial_wrap_app refls)
                      ; return (args, body) }
            -- Drop the stupid theta arguments, as per
            -- Note [Instantiating stupid theta] in GHC.Core.DataCon.
@@ -884,9 +890,10 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
 
     new_tycon = isNewTyCon tycon
 
-    -- Ordered newtypes need the field lambda before the later type lambdas.
-    -- The result and field have a fixed runtime representation in this case.
-    -- The compulsory unfolding still reduces the construction to a cast.
+    -- Ordered newtypes bind the field before the late type arguments.
+    -- Cast that field directly. A nested worker call would be simplified
+    -- before the caller's cast fixes the field's runtime representation.
+    -- See Note [Desugaring unlifted newtypes] in GHC.Core.SimpleOpt.
     omit_newtype_arg = new_tycon && case dataConSourceOrder data_con of
       LegacyConOrder _ -> True
       OrderedConArgs _ -> False

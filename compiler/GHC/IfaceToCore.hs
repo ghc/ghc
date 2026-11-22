@@ -750,7 +750,7 @@ tc_iface_decl _ _
               ifParent = mb_parent })
   = do { let has_retained = case rdr_cons of
                               IfDataTyCon _ cons -> any (not . null . ifConArgBinders) cons
-                              IfNewTyCon con     -> not (null (ifConArgBinders con))
+                              IfNewTyCon _ con   -> not (null (ifConArgBinders con))
                               _                  -> False
        ; when has_retained $
            unless (null ctxt && case mb_parent of { IfNoParent -> True; _ -> False }) $
@@ -1254,7 +1254,7 @@ tcIfaceDataCons tycon_name tycon if_cons
                        (isFixedRuntimeRepKind $ tyConResKind tycon)
                        type_data
                        data_cons }
-        IfNewTyCon con
+        IfNewTyCon _ con
           -> do  { data_con  <- tc_con_decl con
                  ; mkNewTyConRhs tycon_name tycon data_con }
   where

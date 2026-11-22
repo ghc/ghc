@@ -231,7 +231,12 @@ tyConToIfaceDecl env tycon
 
     ifaceConDecls (DataTyCon { data_cons = cons, is_type_data = type_data })
       = IfDataTyCon type_data (map ifaceConDecl cons)
-    ifaceConDecls (NewTyCon { data_con = con })        = IfNewTyCon        (ifaceConDecl con)
+    ifaceConDecls (NewTyCon { data_con = con })
+      = IfNewTyCon rep_poly (ifaceConDecl con)
+      where
+        rep_poly = case dataConSourceOrder con of
+          OrderedConArgs{} -> not (isFixedRuntimeRepKind (tyConResKind tycon))
+          LegacyConOrder{} -> False
     ifaceConDecls (UnaryClassTyCon { data_con = con})  = IfDataTyCon False [ifaceConDecl con]
     ifaceConDecls (TupleTyCon { data_con = con })      = IfDataTyCon False [ifaceConDecl con]
     ifaceConDecls (SumTyCon { data_cons = cons })      = IfDataTyCon False (map ifaceConDecl cons)
