@@ -14,7 +14,6 @@ import GHC.Builtin.WiredIn.Types (promotedTupleDataCon, tupleTyCon)
 import GHC.Core.Coercion (existsCoRule, matchableAppProjectionRule, mkNomReflCo, mkSymCo)
 import GHC.Core.Coercion.Axiom
 import GHC.Core.DataCon (dataConName, dataConTyCon)
-import GHC.Core.TyCo.FVs (tyCoVarsOfType)
 import GHC.Core.TyCo.Rep (Coercion(AxiomCo), Type(TyVarTy))
 import GHC.Core.TyCo.Compare (eqType, eqTypes, eqScopedSigmaClosures, eqScopedLambdaClosures)
 import GHC.Core.TyCon
@@ -22,7 +21,7 @@ import GHC.Core.Type
 import GHC.Data.FastString
 import GHC.Data.Pair
 import GHC.Types.Basic (Boxity(Boxed), LeftOrRight(..))
-import GHC.Types.Var (ExistsTyFlag(..), binderVar, tyVarKind)
+import GHC.Types.Var (ExistsTyFlag(..))
 import GHC.Types.Var.Set
 import GHC.Types.Name (nameModule_maybe, nameOccName, stableNameCmp)
 import GHC.Types.Name.Occurrence (occNameString, sourceTableTermOcc)
