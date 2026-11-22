@@ -464,19 +464,26 @@ instance Diagnostic TcRnMessage where
                 | otherwise
                 = text "Top-level type constructor with no standalone kind signature:"
 
-    TcRnCusk tc missingExtensions ->
+    TcRnCusk tc mbExtensions ->
       mkSimpleDecorated $
         text "This declaration uses a complete user-supplied kind signature (CUSK)." $$
-        hang (text "To state this kind explicitly, write") 2 signature $$ pragma
+        getPprDebug (\debug -> details (if debug then Nothing else mbExtensions))
       where
+        details = \case
+          Just extensions ->
+            hang (text "To state this kind explicitly, write") 2 signature $$ pragma extensions
+          Nothing ->
+            hang (text "The current kind is") 2 kind $$
+            text "Use a standalone kind signature with the appropriate source syntax and names."
+        kind = updSDocContext (\ctx -> ctx { sdocPrintExplicitForalls = True })
+                 (pprKind (tyConKind tc))
         signature = text "type" <+> pprPrefixName (tyConName tc) <+> dcolon <+>
-          updSDocContext (\ctx -> ctx { sdocPrintExplicitForalls = True })
-            (pprKind (tyConKind tc))
-        pragma = case missingExtensions of
+          kind
+        pragma extensions = case extensions of
           [] -> empty
           _ -> hang (text "Enable the required extensions") 2 $
             text "{-# LANGUAGE" <+>
-              hsep (punctuate comma (map (text . extensionName) missingExtensions)) <+>
+              hsep (punctuate comma (map (text . extensionName) extensions)) <+>
               text "#-}"
 
     TcRnPolymorphicBinderMissingSig n ty

@@ -254,3 +254,4 @@ test('CuskWarning', normal, compile, ['-Wcusks -fno-diagnostics-show-caret'])
 test('CuskWarningDefault', [extra_files(['CuskWarning.hs'])], multimod_compile,
      ['CuskWarningDefault', '-Wcompat'])
 test('CuskWarningStandalone', normal, compile, ['-Wcusks'])
+test('CuskWarningNoTypeImport', normal, compile, ['-Wcusks -fno-diagnostics-show-caret'])

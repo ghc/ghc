@@ -67,8 +67,8 @@ import GHC.Tc.Types.ErrCtxt( ReportRedundantConstraints(..) )
 
 import GHC.Builtin.WiredIn.Types ( oneDataConTy, unitTy, makeRecoveryTyCon
                                , boolTy, promotedTrueDataCon, promotedFalseDataCon
-                               , manyDataConTy, unmatchableDataConTy, matchabilityTy
-                               , liftedTypeKindTyConName )
+                               , manyDataConTy, matchableDataConTy, unmatchableDataConTy, matchabilityTy
+                               , liftedTypeKindTyConName, listTyConName, tYPETyConName )
 
 import GHC.Rename.Env( lookupConstructorFields )
 
@@ -95,7 +95,7 @@ import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Name
-import GHC.Types.Name.Reader (WithUserRdr(..))
+import GHC.Types.Name.Reader (WithUserRdr(..), lookupGRE_Name)
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
@@ -1421,20 +1421,58 @@ kcTyClGroup open_indices kisig_env decls
         ; poly_tcs <- traverse (inferOpenMatchability open_indices kisig_env)
                     (checked_tcs ++ generalized_tcs)
         ; whenWOptM Opt_WarnCusks $ do
-            standalone_kinds <- xoptM LangExt.StandaloneKindSignatures
-            explicit_forall <- xoptM LangExt.ExplicitForAll
+            dflags <- getDynFlags
+            rdr_env <- getGlobalRdrEnv
+            name_ctx <- getNamePprCtx
             let cusk_names = mkNameSet [get_name decl | (decl, CUSK) <- kinded_decls]
-                missing_extensions = [LangExt.StandaloneKindSignatures | not standalone_kinds] ++
-                                     [LangExt.ExplicitForAll | not explicit_forall]
+                missing_extensions = filter (not . (`xopt` dflags))
+                  [LangExt.StandaloneKindSignatures, LangExt.ExplicitForAll]
+                in_scope name =
+                  isExternalName name && isJust (lookupGRE_Name rdr_env name) &&
+                  case queryQualifyName name_ctx (nameModule name) Nothing (nameOccName name) of
+                    NameUnqual -> True
+                    NameQual _ -> True
+                    _ -> False
             forM_ poly_tcs $ \tc -> do
               let name = tyConName tc
               when (name `elemNameSet` cusk_names && any isNamedTyConBinder (tyConBinders tc)) $
-                addDiagnosticAt (getSrcSpan name) (TcRnCusk tc missing_extensions)
+                addDiagnosticAt (getSrcSpan name) (TcRnCusk tc
+                  (if sourceCuskKind dflags in_scope (tyConKind tc)
+                   then Just missing_extensions else Nothing))
         ; traceTc "---- kcTyClGroup end ---- }" (ppr_tc_kinds poly_tcs)
         ; return (poly_tcs, kindless_names, metadata) }
   where
     ppr_tc_kinds tcs = vcat (map pp_tc tcs)
     pp_tc tc = ppr (tyConName tc) <+> dcolon <+> ppr (tyConKind tc)
+
+-- | Check the source forms supported by the CUSK warning's suggested edit.
+-- The warning prints the current kind for forms outside this subset.
+sourceCuskKind :: DynFlags -> (Name -> Bool) -> Kind -> Bool
+sourceCuskKind dflags in_scope kind =
+    not (any (`gopt` dflags) [Opt_PrintExplicitKinds, Opt_PrintExplicitMatchabilities,
+                            Opt_PrintExplicitRuntimeReps, Opt_PrintExpandedSynonyms]) &&
+    go kind
+  where
+    enabled ext = xopt ext dflags
+    ordinary ma = eqType ma unmatchableDataConTy ||
+      (not (enabled LangExt.Modifiers) && eqType ma matchableDataConTy)
+
+    go (TyVarTy _) = True
+    go (AppTy fun arg) = go fun && go arg
+    go (ForAllTy ma (Bndr tv _) body) =
+      isTyVar tv && ordinary ma && go (tyVarKind tv) && go body
+    go (FunTy af ma mult arg res) =
+      isFUNArg af && ordinary ma && isManyTy mult && go arg && go res
+    go ty@(TyConApp tc args)
+      | name == liftedTypeKindTyConName ||
+        (name == tYPETyConName && isLiftedTypeKind ty)
+      = enabled LangExt.StarIsType || in_scope liftedTypeKindTyConName
+      | name == listTyConName, enabled LangExt.ListTuplePuns = all go args
+      | otherwise = isTyConName name && in_scope name &&
+          (not (isSymOcc (nameOccName name)) || enabled LangExt.TypeOperators) &&
+          all isVisibleTyConBinder (take (length args) (tyConBinders tc)) && all go args
+      where name = tyConName tc
+    go _ = False
 
 {- Note [Checked RHSs for cases in type lets]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1444,9 +1444,10 @@ of ``-W(no-)*``.
     :default: off
 
     Warn when GHC uses a :ref:`complete user-supplied kind signature
-    <complete-kind-signatures>` with a quantified kind parameter. GHC
-    prints a :ref:`standalone kind signature <standalone-kind-signatures>`
-    that states the same kind. A declaration can trigger this warning even
+    <complete-kind-signatures>` with a quantified kind parameter. For
+    supported source forms, GHC suggests a :ref:`standalone kind signature
+    <standalone-kind-signatures>` and required language pragmas. For other
+    forms, the warning shows the current kind. A declaration can trigger this warning even
     when GHC can infer its kind with :extension:`CUSKs` disabled.
 
     Enabling :extension:`StandaloneKindSignatures` disables :extension:`CUSKs`
