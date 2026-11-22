@@ -50,7 +50,7 @@ and [GHC MR !1602](https://gitlab.haskell.org/ghc/ghc/-/merge_requests/1602).
   suites with the proposed defaults. Separate pre-existing failures.
 - [x] Compare two Haskell2010 packages and run a client against each
   build. Record their revisions and verify the linked libraries.
-- [ ] Extend the impact study to additional releases, including
+- [x] Extend the impact study to additional releases, including
   a package that relies on an implicit CUSK and a Haskell98 package.
 - [ ] Test the transition warning on explicit and inherited uses.
   Include a declaration with a CUSK whose client needs no migration.
@@ -122,3 +122,30 @@ compiler. These two packages provide controls. The three recursive
 declarations above demonstrate code that does need migration.
 [Binary library](../../../libraries/binary/binary.cabal)
 and [deepseq library](../../../libraries/deepseq/deepseq.cabal).
+
+### A published library that relies on implicit CUSKs
+
+Stock GHC 9.14.1 builds `first-class-families-0.8.2.0` with the
+package's Haskell2010 settings. Adding `-XNoCUSKs` rejects
+`TyEqImpl` in `Fcf.Utils` with GHC-17370. Giving it a standalone
+kind signature exposes a second failure in `Case_`, which recurses
+at another kind. Enabling `StandaloneKindSignatures` and adding the
+following two signatures restores the library build with CUSKs off.
+
+```haskell
+type TyEqImpl :: forall k l. k -> l -> Bool
+type Case_    :: forall j k. [Match j k] -> j -> k
+```
+
+The signatures match the original interface kinds. The same
+interface-only client proved the exported equality and case examples
+on the original and migrated builds. Both runs printed `True`.
+The fork already rejects `Pure` in `Fcf.Combinators` with GHC-83865
+on the original sources under both default configurations. The
+successful migration result above is for stock GHC.
+[Published first-class-families source archive](https://hackage-content.haskell.org/package/first-class-families-0.8.2.0.tar.gz).
+
+The Haskell98 package `tagged-0.9` also uses `PolyKinds`. It built
+unchanged with both fork compilers. A client instantiated tags at
+`Bool` and at `Type -> Type` and printed `(3,'x')` on both.
+[Published tagged release](https://hackage.haskell.org/package/tagged-0.9).
