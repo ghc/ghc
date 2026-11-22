@@ -1672,17 +1672,23 @@ warnPunUse loc_rdr@(L loc rdr) selected
   | isUnqual rdr
   , isTyVarName name || isValName name
   = whenWOptM Opt_WarnPunUses $ do
-      (_, env) <- getRdrEnvs
-      let other_ns = if isTyVarName name then varName else tvName
-          competing = do
-            other <- lookupLocalRdrEnv env (setRdrNameSpace rdr other_ns)
-            other_rank <- localPunScope env other
-            guard (name /= other)
-            guard (isExternalName name || maybe False (<= other_rank) (localPunScope env name))
-            pure other
+      (global_env, local_env) <- getRdrEnvs
+      let other_ns = setRdrNameSpace rdr (if isTyVarName name then varName else tvName)
+          rank = localPunScope local_env name
+          implicit = rank == Just 0
+          competing
+            | Just other <- lookupLocalRdrEnv local_env other_ns
+            , other /= name
+            , implicit || closer (localPunScope local_env other)
+            = Just (mkLocalVanillaGRE NoParent other NE.:| [])
+            | implicit
+            = NE.nonEmpty (lookupGRE global_env (LookupRdrName other_ns SameNameSpace))
+            | otherwise = Nothing
+          closer (Just other_rank) =
+            other_rank > 0 && (isExternalName name || maybe False (<= other_rank) rank)
+          closer Nothing = False
       case competing of
-        Just other ->
-          addDiagnosticAt (locA loc) (TcRnPunUse rdr selected (mkLocalVanillaGRE NoParent other NE.:| []))
+        Just others -> addDiagnosticAt (locA loc) (TcRnPunUse rdr selected others)
         Nothing -> warnGlobalPunUse loc_rdr selected
   | otherwise = warnGlobalPunUse loc_rdr selected
   where
@@ -1742,16 +1748,19 @@ the actual selected name and staging diagnostic unchanged.
 Explicit local names are ranked in the order they enter the reader
 environment. A local explicit binder can replace a global binding.
 For a written occurrence of an explicit local binder, check whether
-the other namespace has a name in the same group or in a closer group. Use the current reader environment to find the other name. A
-binder removed from that environment can no longer compete, and a
-retained binder's alias resolves to the same name.
+the other namespace has a name in the same group or in a closer group.
+Check the current reader environment. A binder removed from that
+environment can no longer compete. A retained binder's alias resolves
+to the same name.
 
 Pattern renaming brings names into scope from left to right. In
 `\(a :: a) -> a` the annotation is read before the term variable enters
 scope. After the patterns, the RHS sees their explicit binders as one
-group. Implicit quantification has separate capture checks. An implicit
-binder does not take precedence over an explicit local binder in this
-check.
+group. The implicit-quantification check reports the occurrences in
+the introducing signature. After renaming a pattern signature, record
+its fresh implicit type variables for later uses. They cannot shadow
+competing term binders. Recording them after the signature prevents
+duplicate warnings on the introducing occurrences.
 -}
 
 lookupGlobalOccRn_maybe :: WhichGREs GREInfo -> RdrName -> RnM (Maybe GlobalRdrElt)

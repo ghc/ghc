@@ -77,7 +77,10 @@ at its written location. It takes precedence over
 1.4. An explicit `forall` can shadow the term name under one
 namespace, so its type references stay quiet. An associated type
 that inherits the class's existing type variable does not introduce
-an implicit binder or trigger this warning.
+an implicit binder or trigger this warning. A later occurrence of a
+type variable introduced in a pattern signature gives the same warning
+if the term binder still takes precedence in a unified namespace.
+[Conditional-scope regression](../../../testsuite/tests/rename/should_compile/ConditionalPunUses.hs).
 [Implicit regression](../../../testsuite/tests/rename/should_compile/ImplicitPunUses.hs)
 and [associated-type control](../../../testsuite/tests/rename/should_compile/T23434.hs).
 

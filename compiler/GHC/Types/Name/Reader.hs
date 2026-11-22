@@ -47,7 +47,7 @@ module GHC.Types.Name.Reader (
         -- * Local mapping of 'RdrName' to 'Name.Name'
         LocalRdrEnv, emptyLocalRdrEnv, extendLocalRdrEnv, extendLocalRdrEnvList,
         extendLocalRdrEnvWithAlias,
-        trackPunScopes, extendPunScope, localPunScope,
+        trackPunScopes, extendPunScope, extendImplicitPunScope, localPunScope,
         lookupLocalRdrEnv, lookupLocalRdrOcc,
         elemLocalRdrEnv, inLocalRdrEnvScope,
         localRdrEnvElts, minusLocalRdrEnv, minusLocalRdrEnvList,
@@ -519,7 +519,14 @@ extendPunScope lre@(LRE { lre_pun_scope = Just (depth, ranks) }) names@(_:_) =
   in lre { lre_pun_scope = Just (next, extendNameEnvList ranks [(n, next) | n <- names]) }
 extendPunScope lre _ = lre
 
--- | Get the binding group's rank for an explicitly introduced name.
+-- | Record a type variable introduced by a pattern signature. It has
+-- lower priority than any competing term binder, including a global one.
+extendImplicitPunScope :: LocalRdrEnv -> [Name] -> LocalRdrEnv
+extendImplicitPunScope lre@(LRE { lre_pun_scope = Just (depth, ranks) }) names@(_:_) =
+  lre { lre_pun_scope = Just (depth, extendNameEnvList ranks [(n, 0) | n <- names]) }
+extendImplicitPunScope lre _ = lre
+
+-- | Get the binding group's rank. Zero marks implicit type variables.
 localPunScope :: LocalRdrEnv -> Name -> Maybe Int
 localPunScope lre name = do
   (_, ranks) <- lre_pun_scope lre

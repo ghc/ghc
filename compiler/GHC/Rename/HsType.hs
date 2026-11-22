@@ -62,7 +62,7 @@ import GHC.Rename.Env
 import GHC.Rename.Doc
 import GHC.Rename.Utils  ( mapFvRn, bindLocalNamesFV, bindImplicitLocalNamesFV
                          , typeAppErr, newLocalBndrRn, checkDupRdrNames
-                         , checkShadowedRdrNames )
+                         , checkShadowedRdrNames, recordImplicitPunBinders )
 import GHC.Rename.Fixity ( lookupFieldFixityRn, lookupFixityRn
                          , lookupTypeFixityRn, lookupTypeFixityWithUsesRn )
 import GHC.Rename.Unbound ( notInScopeErr, WhereLooking(WL_LocalOnly) )
@@ -487,7 +487,7 @@ rnHsPatSigTyKi level scoping ctx sig_ty thing_inside
     do { (nwcs, pat_sig_ty', fvs1) <- rnWcBodyTyKi level ctx nwc_rdrs pat_sig_ty
        ; let sig_names = HsPSRn { hsps_nwcs = nwcs, hsps_imp_tvs = imp_tvs }
              sig_ty'   = HsPS { hsps_ext = sig_names, hsps_body = pat_sig_ty' }
-       ; (res, fvs2) <- thing_inside sig_ty'
+       ; (res, fvs2) <- recordImplicitPunBinders imp_tvs (thing_inside sig_ty')
        ; return (res, fvs1 `plusFN` fvs2) } }
   where
     pat_sig_ty = hsPatSigType sig_ty

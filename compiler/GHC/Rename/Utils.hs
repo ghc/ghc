@@ -31,7 +31,7 @@ module GHC.Rename.Utils (
         newLocalBndrRn, newLocalBndrsRn,
 
         bindLocalNames, bindLocalNamesFV, bindImplicitLocalNamesFV,
-        groupPunBinders, delLocalNames,
+        groupPunBinders, recordImplicitPunBinders, delLocalNames,
 
         addNameClashErrRn, mkNameClashErr,
 
@@ -134,6 +134,11 @@ bindImplicitLocalNamesFV names enclosed_scope
 groupPunBinders :: [Name] -> RnM a -> RnM a
 groupPunBinders names = updLclCtxt $ \ lcl_env ->
   lcl_env { tcl_rdr = extendPunScope (tcl_rdr lcl_env) names }
+
+-- | Track later uses of type variables introduced by a pattern signature.
+recordImplicitPunBinders :: [Name] -> RnM a -> RnM a
+recordImplicitPunBinders names = updLclCtxt $ \ lcl_env ->
+  lcl_env { tcl_rdr = extendImplicitPunScope (tcl_rdr lcl_env) names }
 
 delLocalNames :: [Name] -> RnM a -> RnM a
 delLocalNames names
