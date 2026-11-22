@@ -21,6 +21,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeAbstractions #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeData #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -1138,6 +1139,14 @@ readInteriorCount :: InteriorCount a -> Int
 readInteriorCount (InteriorCount _ (CountField (type Int) n)) = n
 
 -- | Hide the field type and retain both dictionaries for its consumer.
+-- | A type-only key with a required type argument after its Boolean field.
+type data PayloadKey a where
+    ChoosePayload :: Bool -> forall a -> PayloadKey a
+
+-- | Read a value of the type selected by the key.
+keyedPayload :: Proxy (key :: PayloadKey a) -> a -> a
+keyedPayload _ value = value
+
 data PrintablePair where
     PrintablePair :: forall a. Eq a => (Show a => a -> a -> PrintablePair)
 
@@ -1188,6 +1197,8 @@ main = do
     observe "read the dictionary supplied after a constructor field and its required type" LabelledValueClient.typeTags
     observe "duplicate the unrestricted field of a quoted constructor" (QuotedColumn.readQuoted 17)
     observe "recover consecutive GADT constraints" (describePair (PrintablePair False True))
+    observe "choose a type after a field in a type-only constructor"
+        (keyedPayload (Proxy @(ChoosePayload 'True Int)) 47)
     observe "use two ordered dictionaries in a quoted constructor"
         (describeQuotedComparison (QuotedComparison (type Int) @Bool 41 ('x', True)))
     observe "form an associated family type from its class evidence" constrainedElements
