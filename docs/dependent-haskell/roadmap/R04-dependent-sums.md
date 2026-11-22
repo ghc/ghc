@@ -264,6 +264,23 @@ GHC warns about a missing successor clause. An explicit successor clause
 at the known zero index has an inaccessible right-hand side. Its pattern
 can still force the stored witness.
 
+An ordinary client can use `BangPatterns` to evaluate the stored length
+before it uses the payload. The payload still has the public index `n`.
+
+```haskell
+strictDirectCells :: DirectVec a n -> Vec a n
+strictDirectCells (DirectVec !n xs) = xs
+```
+
+`DirectVec !_ _` evaluates just the witness. At a stored `Z` it accepts
+a bottom payload. `Pair !_ _` has the same demand on an existential
+witness. A nested pair can leave its independent witness unevaluated.
+Parenthesized bangs also keep each witness in scope. Two matches with
+the same variable spelling still bind distinct witnesses.
+[Ordinary client](../../../testsuite/tests/dependent/should_run/NativeGadtRetainedSumClient.hs),
+[source-hidden check](../../../testsuite/tests/dependent/should_run/NativeGadtRetainedSum.sh),
+and [pattern precedents](../REFERENCES.md#force-a-stored-witness).
+
 A constructor can store a vector and give its successor length as the
 result index.
 

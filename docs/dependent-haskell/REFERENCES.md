@@ -1632,8 +1632,9 @@ and [author's reply](https://github.com/ghc-proposals/ghc-proposals/pull/274#iss
 ## Source package patterns
 
 Decision: allow ordinary nested patterns in non-retained package fields.
-Retained fields accept bare variables or one closed constructor layer with
-bare variable subfields. Compile package equations in
+Retained fields accept variables and wildcards, with optional bangs and
+parentheses. They also accept one closed constructor layer with bare
+variable or wildcard subfields. Compile package equations in
 source order with a separate case for each equation. Each case keeps that
 equation's actual runtime index Ids. Reuse GHC's `MatchResult` failure
 continuations and checked outer field pattern types. This avoids aliases
@@ -1729,6 +1730,17 @@ checker can report an inaccessible right-hand side while preserving the
 demand of the pattern that precedes it.
 [Agda's absurd patterns](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#absurd-patterns)
 and [the Haskell 2010 Report, §3.17.2](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html).
+
+#### Force a stored witness
+
+Agda's `uncurry` binds both fields of `Σ` and passes them to a dependent
+function. The type of the second field mentions the first binder.
+GHC keeps that binder when a retained field has a bang. Ordinary Haskell
+bang matching evaluates the witness to weak head normal form before it
+matches the remaining fields. The forcing case uses an unused binder if
+later field types or evidence mention the witness.
+[`uncurry`](https://agda.github.io/agda-stdlib/v2.4/Data.Product.Base.html#126)
+and [GHC's `BangPatterns` guide](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/strict.html#bang-patterns).
 
 #### Store two direct result indices
 
