@@ -135,8 +135,9 @@ type DimensionSum (dimensions :: (TypeNats.Nat, TypeNats.Nat)) =
   in rows TypeNats.+ cols
 ```
 
-A two-field boxed pair pattern uses distinct names or wildcards. The
-right-hand side sees the enclosing scope and the preceding bindings.
+A field in a boxed pair pattern can be a name, a wildcard, or another
+boxed pair pattern. Names in one pattern must be distinct. The right-hand
+side sees the enclosing scope and the preceding bindings.
 GHC checks it at a pair kind before extending the scope with the named
 fields. An unused field need not reduce. A known promoted constructor
 selects its fields. The Showcase prints `5` for `DimensionSum '(2, 3)`.
@@ -156,6 +157,12 @@ projections. [Agda record lets](https://agda.readthedocs.io/en/v2.8.0/language/l
 [T14010](../../../testsuite/tests/typecheck/should_compile/T14010.hs),
 and [interface and scope checks](../../../testsuite/tests/dependent/should_run/NativeTypeLet.sh).
 
+In `let ((width, _), height) = dims in …`, selecting `width` takes the
+first field of the first pair. Selecting `height` takes the second field
+of `dims`. Each nested pair must have a pair kind. An unused nested pair
+need not reduce to a constructor. Agda also composes projections for
+nested record patterns. [Agda record pattern translation](https://agda.github.io/agda/src/Agda.TypeChecking.RecordPatterns.html).
+
 ## Type quotations and splices
 
 A type quotation represents `let a = rhs in body` as `LetT a rhs body`.
@@ -171,7 +178,7 @@ to the second binder.
 Splicing the quotation checks the type at the splice site.
 A local kind signature appears as `SigT` on the right-hand side of `LetT`.
 A pair binding appears as a fresh temporary `LetT` followed by a `LetT`
-for each projected field.
+for each projected field. A nested pair has a separate fresh temporary.
 An ordinary client can import a value with that type and observe
 `Right (Just True)`. Reification of a checked type can expand the
 abbreviation. The TH constructor and `letT` smart constructor are

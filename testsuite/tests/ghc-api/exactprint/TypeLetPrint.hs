@@ -29,3 +29,11 @@ type PairLayout dimensions =
 type PairBraced dimensions =
   let { (rows, _) {- equation -} = dimensions; cols = G rows }
   in H rows cols
+
+type NestedPairLayout dimensions =
+  let ((width {- inner field -}, _), height) = dimensions
+  in H width height
+
+type NestedPairBraced dimensions =
+  let { (width, {- next pair -} (_, height)) = dimensions }
+  in H width height

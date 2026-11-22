@@ -42,7 +42,8 @@ test "$(grep -c 'tag :: tag' Pretty.hs)" = 2
 cp TypeLet.hi PackedVecLibrary.hi SignatureLet.hi SignedLets.hi "$out/client/"
 cat >PairBindings.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, ExplicitNamespaces, KindSignatures, TypeFamilies, TypeOperators #-}
-module PairBindings (AliasCount, Held, KnownPrefix, Rebuild, ShadowCount) where
+module PairBindings (AliasCount, Held, KnownPrefix, Rebuild, ShadowCount,
+                     NestedCount, NestedRight, NestedHeight) where
 
 import GHC.TypeNats (Nat, type (+))
 
@@ -60,6 +61,19 @@ type ShadowCount (rows :: Nat) =
   let dimensions = '(rows, 3)
       (rows, cols) = dimensions
   in rows + cols
+
+type NestedCount (width :: Nat) =
+  let ((width, _), height) = '( '(width, 'True), 3)
+  in width + height
+
+type NestedRight (height :: Nat) =
+  let { (width, (_, height)) = '(2, '( 'True, height)) }
+  in width + height
+
+type family OpaquePair (n :: Nat) :: (Nat, Bool)
+type NestedHeight (n :: Nat) =
+  let ((_, _), height) = '(OpaquePair n, 3)
+  in height
 HS
 "${g[@]}" -fomit-interface-pragmas -ddump-parsed -c PairBindings.hs >pair-parsed.txt
 {
@@ -74,7 +88,8 @@ cat >OrdinaryLet.hs <<'HS'
 module OrdinaryLet where
 import Data.Type.Equality ((:~:)(Refl))
 import Data.Proxy (Proxy)
-import PairBindings (AliasCount, Held, KnownPrefix, ShadowCount)
+import PairBindings (AliasCount, Held, KnownPrefix, ShadowCount,
+                     NestedCount, NestedRight, NestedHeight)
 import qualified SignatureLet
 import SignedLets (Braced, Layout)
 import TypeLet
@@ -108,6 +123,15 @@ layout = Refl
 
 knownPair :: DimensionSum '(2, 3) :~: 5
 knownPair = Refl
+
+nestedLeftPair :: NestedCount 7 :~: 10
+nestedLeftPair = Refl
+
+nestedRightPair :: NestedRight 3 :~: 5
+nestedRightPair = Refl
+
+nestedUnusedPair :: Proxy n -> NestedHeight n :~: 3
+nestedUnusedPair _ = Refl
 
 aliasPair :: AliasCount :~: 5
 aliasPair = Refl
@@ -230,6 +254,13 @@ type Bad = let (x, x) = '(Bool, Char) in x
 HS
 reject PairDuplicate 3:20 50547 'twice'
 
+cat >NestedPairDuplicate.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes #-}
+module NestedPairDuplicate where
+type Bad = let ((x, _), x) = '( '(Bool, Char), Int) in x
+HS
+reject NestedPairDuplicate 3:25 50547 'twice'
+
 cat >IgnoredNonPair.hs <<'HS'
 {-# LANGUAGE ExperimentalDependentTypes #-}
 module IgnoredNonPair where
@@ -237,6 +268,19 @@ type Bad = let (_, _) = Bool in Int
 HS
 reject IgnoredNonPair 3:25 83865 "but \`Bool' has kind"
 grep -Eq '^[[:space:]]*\|[[:space:]]*\^{4}$' error.log
+
+cat >NestedWrongKind.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, KindSignatures #-}
+module NestedWrongKind where
+import GHC.TypeNats (Nat)
+
+type Bad (dims :: (Bool, Nat)) =
+  let ((_, _), height) = dims
+  in height
+HS
+reject NestedWrongKind 6:8 83865 'Expected kind'
+grep -Fq "has kind \`Bool'" error.log
+grep -Eq '^[[:space:]]*\|[[:space:]]*\^{6}$' error.log
 
 cat >PairEta.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}

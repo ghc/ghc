@@ -41,6 +41,21 @@ pair :: $(do
     _ -> fail (show ty))
 pair = Proxy :: Proxy '( '(1, 7), '(2, 3))
 
+nestedPair :: $(do
+  ty <- [t| let width = 7 in
+      let ((width, _), height) = '( '(width, 'True), 3)
+      in Proxy '(width, height) |]
+  case ty of
+    LetT outer _ (LetT saved _ (LetT child (AppT (ConT first) (VarT parentUse))
+      (LetT width (AppT (ConT childFirst) (VarT childUse))
+        (LetT _ (AppT (ConT second) (VarT siblingUse)) _))))
+      | saved == parentUse, saved == siblingUse, child == childUse, saved /= child
+      , outer /= width, nameBase outer == nameBase width
+      , nameBase first == "PairFirst", first == childFirst
+      , nameBase second == "PairSecond" -> pure ty
+    _ -> fail (show ty))
+nestedPair = Proxy :: Proxy '(7, 3)
+
 -- A let can return a type constructor. The final argument applies to its result.
 applied :: $(do
   f <- newName "f"
@@ -50,4 +65,4 @@ applied = Just 'q'
 $([d| type QuotedPair a = let a = Maybe a in (a, a) |])
 
 result :: (Either (Maybe Bool) (Maybe Bool), Maybe Char, QuotedPair Int)
-result = pair `seq` signed `seq` (quoted, applied, (Just 3, Nothing))
+result = nestedPair `seq` pair `seq` signed `seq` (quoted, applied, (Just 3, Nothing))
