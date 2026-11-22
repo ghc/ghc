@@ -1295,7 +1295,11 @@ An ordinary case can use a written result kind, including a kind
 signature on a let RHS. Copy that kind to the family so its equations
 check at the written kind. Use the actual declaration dependencies
 so a result kind with a captured variable can generalize before use.
-The kind must refer only to captures in the family header.
+The kind can use earlier let bindings. Restore those aliases using
+the same capture substitution as an ordinary let RHS. The family
+header needs the preceding helpers before it checks the equations.
+Use the actual declaration dependencies for this annotated let chain.
+An unannotated case keeps the shared kind inference of its owner.
 
 A named scrutinee can also depend on an earlier binder of the synonym.
 Generalize the family before checking the synonym when the captures
@@ -1337,20 +1341,19 @@ liftTypeCases group =
       | Just patterns <- traverse checkAlt alts
       , Just scrut_kind <- caseScrutineeKind independent captures scrutinee
       = liftCase owner independent captures aliases loc (scrutinee, scrut_kind) Nothing patterns salt
-    liftRhs owner independent captures [] (L loc (HsKindSig ann body kind)) salt
+    liftRhs owner independent captures aliases (L loc (HsKindSig ann body kind)) salt
       | L case_loc (XHsType (HsTypeCase _ _ scrutinee alts)) <- ignoreParens body
       , Just patterns <- traverse checkAlt alts
       , Just scrut_kind <- caseScrutineeKind independent captures scrutinee
-      , Just mentions <- lexicalNames kind
-      , all (`elem` [unLoc name | (_, name, _) <- captures]) mentions
-      = let (body', cases, next) = liftCase owner independent captures [] case_loc
-                                   (scrutinee, scrut_kind) (Just kind) patterns salt
+      , Just result_kind <- caseResultKind captures aliases kind
+      = let (body', cases, next) = liftCase owner independent captures aliases case_loc
+                                   (scrutinee, scrut_kind) (Just result_kind) patterns salt
         in (L loc (HsKindSig ann body' kind), cases, next)
     liftRhs owner independent captures aliases
       (L loc (XHsType let_ty@(HsTypeLet ann _ _ binds result_ty))) salt
       | not independent
       , let (binder, rhs, body) = splitHsTypeLet binds result_ty
-      , letCaseBody body
+      , Just annotated <- letCaseBody body
       , Just (used, references) <- rhsCaptures captures aliases rhs
       , let owner_occ = rdrNameOcc (unLoc owner)
             occ = mkTcOcc ("$case-let-rhs:" ++ occNameString owner_occ ++ ":" ++ show salt)
@@ -1372,7 +1375,8 @@ liftTypeCases group =
             result'
               | any shadowed captures = letTy loc ann saved (typeName binder) result
               | otherwise = result
-        in (preserveTypeLetSource let_ty result', (helper, (occ, Just owner_occ)) : generated, next)
+            helper_owner = if annotated then Nothing else Just owner_occ
+        in (preserveTypeLetSource let_ty result', (helper, (occ, helper_owner)) : generated, next)
     liftRhs owner False captures aliases (L loc (XHsType let_ty@(HsTypeLet ann _ _ binds result_ty))) salt =
       let (v, rhs, body) = splitHsTypeLet binds result_ty
           (rhs', cases, next) = liftRhs owner False captures aliases rhs salt
@@ -1414,8 +1418,8 @@ liftTypeCases group =
                      Prefix (L (l2l loc) (maybe (NoSig noExtField) (KindSig noExtField) result_kind)) Nothing))
           (scrutinee', nested, next) = liftRhs owner independent captures aliases scrutinee (salt + 1)
           result = applyType loc name ([typeName v | (_, _, v) <- captures] ++ [scrutinee'])
-          separate = independent || (null aliases &&
-                       (isJust result_kind || dependentScrutinee captures scrutinee))
+          separate = independent || isJust result_kind ||
+                     (null aliases && dependentScrutinee captures scrutinee)
       in (result, (fam, (occ, if separate then Nothing else Just owner_occ)) : nested, next)
 
     dependentScrutinee captures scrutinee
@@ -1436,13 +1440,34 @@ liftTypeCases group =
     letTy loc ann v rhs body = L loc (XHsType (mkHsSingleTypeLet ann v rhs body))
     applyType loc name = foldl' (\f x -> L loc (HsAppTy noExtField f x)) (typeName name)
 
-    -- Follow a chain of nonrecursive lets to the ordered case.
-    letCaseBody ty = case unLoc (ignoreParens ty) of
-      XHsType (HsTypeCase _ _ _ alts) -> all (isJust . checkAlt) alts
-      XHsType (HsTypeLet _ _ _ binds result_ty) ->
-        let (_, rhs, body) = splitHsTypeLet binds result_ty
-        in isJust (lexicalNames rhs) && letCaseBody body
-      _ -> False
+    -- Follow an ordered chain to a case. A written result kind needs
+    -- the preceding helpers before checking the family's header.
+    letCaseBody ty
+      | orderedCase ty = Just False
+      | annotatedCase ty = Just True
+      | L _ (XHsType (HsTypeLet _ _ _ binds result_ty)) <- ignoreParens ty
+      = let (_, rhs, body) = splitHsTypeLet binds result_ty
+        in if annotatedCase rhs
+           then Just True
+           else lexicalNames rhs >> letCaseBody body
+      | otherwise = Nothing
+
+    orderedCase ty
+      | L _ (XHsType (HsTypeCase _ _ _ alts)) <- ignoreParens ty
+      = all (isJust . checkAlt) alts
+      | otherwise = False
+
+    annotatedCase ty
+      | L _ (HsKindSig _ body _) <- ignoreParens ty = orderedCase body
+      | otherwise = False
+
+    caseResultKind captures [] kind = do
+      mentions <- lexicalNames kind
+      guard (all (`elem` [unLoc name | (_, name, _) <- captures]) mentions)
+      pure kind
+    caseResultKind captures aliases kind = do
+      (used, references) <- rhsCaptures captures aliases kind
+      pure (restoreRhs noAnn used references kind)
 
     -- Include the captures of every referenced alias, and their kinds.
     rhsCaptures captures aliases rhs = do
