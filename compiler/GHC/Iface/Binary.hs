@@ -359,7 +359,8 @@ evidenceSuffix requirements
     || needs InteriorGadtContextEvidence || needs InteriorGadtForAllEvidence
     || needs RepeatedInteriorGadtForAllEvidence || needs OrderedGadtTelescopeEvidence
     || needs InferredOrderedGadtBindersEvidence
-    || needs ExtendedOrderedGadtTelescopeEvidence || needs ScopedLambdaEvidence
+    || needs ExtendedOrderedGadtTelescopeEvidence || needs FieldlessOrderedGadtTelescopeEvidence
+    || needs ScopedLambdaEvidence
     || needs RetainedConstructorContextEvidence
     || needs HomeRuleInterfaceEvidence || needs PartialSynonymEvidence
     || needs SourceProofRuleEvidence || needs SourceProofRuleAliasEvidence
@@ -412,6 +413,7 @@ legacyEvidenceSuffix RepeatedInteriorGadtForAllEvidence = featureSetPrefix ++ "r
 legacyEvidenceSuffix OrderedGadtTelescopeEvidence = featureSetPrefix ++ "ordered-gadt-telescope"
 legacyEvidenceSuffix InferredOrderedGadtBindersEvidence = featureSetPrefix ++ "inferred-ordered-gadt-binders"
 legacyEvidenceSuffix ExtendedOrderedGadtTelescopeEvidence = featureSetPrefix ++ "extended-ordered-gadt-telescope"
+legacyEvidenceSuffix FieldlessOrderedGadtTelescopeEvidence = featureSetPrefix ++ "fieldless-ordered-gadt-telescope"
 legacyEvidenceSuffix ScopedLambdaEvidence = featureSetPrefix ++ "scoped-lambda"
 legacyEvidenceSuffix RetainedConstructorContextEvidence = featureSetPrefix ++ "retained-constructor-context"
 legacyEvidenceSuffix HomeRuleInterfaceEvidence = featureSetPrefix ++ "home-rule-interfaces"
@@ -475,6 +477,7 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("ordered-gadt-telescope", OrderedGadtTelescopeEvidence)
                       , ("inferred-ordered-gadt-binders", InferredOrderedGadtBindersEvidence)
                       , ("extended-ordered-gadt-telescope", ExtendedOrderedGadtTelescopeEvidence)
+                      , ("fieldless-ordered-gadt-telescope", FieldlessOrderedGadtTelescopeEvidence)
                       , ("scoped-lambda", ScopedLambdaEvidence)
                       , ("retained-constructor-context", RetainedConstructorContextEvidence)
                       , ("home-rule-interfaces", HomeRuleInterfaceEvidence)

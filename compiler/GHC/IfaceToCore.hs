@@ -1301,7 +1301,7 @@ tcIfaceDataCons tycon_name tycon if_cons
                     non_field ConValueArgs{} = False
                     non_field _ = True
                     leading_context_order (ConContextArgs{} : _) =
-                      not (null args) && any ((== 0) . fst) ordered_type_groups
+                      any ((== 0) . fst) ordered_type_groups
                     leading_context_order _ = False
                 in unless (valid_group && all type_binder ex_bndrs && ordinary_data &&
                            has_wrapper && null arg_binders && null spec && null lbl_names) $
