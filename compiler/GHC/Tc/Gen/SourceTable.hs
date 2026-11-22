@@ -80,7 +80,7 @@ import GHC.Types.Basic (Origin(..), LeftOrRight(..), SourceTableOrigin(..), Unfo
                         isMarkedCbv, pickLR)
 import GHC.Types.Error (errorsFound)
 import GHC.Types.Id.Info (IdDetails(DFunId, SourceTableId, VanillaId), SourceDFun(..), setSourceProofRuleInfo)
-import GHC.Types.Id (globaliseId, idCbvMarks_maybe, idCoreRules, idInfo, idName, setIdInfo, idInlineActivation, idInlinePragma, isClassOpId_maybe, isDataConId_maybe, isDataConWorkId_maybe, isJoinId, idUnfolding, realIdUnfolding, mkSysLocalM, mkVanillaGlobal, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe,
+import GHC.Types.Id (globaliseId, idArity, idCbvMarks_maybe, idCoreRules, idInfo, idName, setIdInfo, idInlineActivation, idInlinePragma, isClassOpId_maybe, isDataConId_maybe, isDataConWorkId_maybe, isJoinId, idUnfolding, realIdUnfolding, mkSysLocalM, mkVanillaGlobal, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe,
                      setIdExported, setSourceMethodIds, sourceMethodAliases, sourceMethodTarget_maybe,
                      sourceMethodDFunClass)
 import GHC.Types.InlinePragma (ActivationX(ActiveAfter, ActiveBefore), PhaseNum,
@@ -128,7 +128,7 @@ import Control.Monad.Trans.Maybe (MaybeT(..))
 import Data.Functor.Identity (Identity(..))
 import Data.List (find, findIndex, nubBy, partition, sortBy, stripPrefix, unsnoc)
 import Data.List.NonEmpty (NonEmpty(..))
-import Data.Maybe (catMaybes, fromMaybe, isJust, isNothing, listToMaybe, mapMaybe)
+import Data.Maybe (catMaybes, fromMaybe, isJust, isNothing, listToMaybe, mapMaybe, maybeToList)
 import Data.Semigroup ((<>))
 
 -- | Read the current defining Id without registering use of its equations.
@@ -563,17 +563,19 @@ zipFusionRuleHelpers :: Id -> TyCon -> CoreRule -> Maybe (PhaseNum, Id, Id, Id)
 zipFusionRuleHelpers owner table Rule{ru_fn = fn, ru_bndrs = binders,
                                      ru_act = activation, ru_args = lhs, ru_rhs = rhs} = do
     ActiveBefore phase <- pure activation
-    [a_var, b_var, xs, ys] <- pure binders
-    [Core.Type a, Core.Type b, Core.Var left, Core.Var right] <- pure lhs
-    guard (fn == idName owner && isTyVar a_var && isTyVar b_var &&
-           getTyVar_maybe a == Just a_var && getTyVar_maybe b == Just b_var &&
-           all isId [xs, ys] && [xs, ys] == [left, right] &&
-           sizeUniqSet (mkUniqSet binders) == 4 &&
+    (xs, ys, zipper_args) <- case reverse lhs of
+      Core.Var ys : Core.Var xs : args -> pure (xs, ys, reverse args)
+      _ -> Nothing
+    (a, b, output, callback, parameters) <- zipRuleOperands zipper_args
+    let variables = parameters ++ maybeToList callback ++ [xs, ys]
+        list = mkListTy output
+    guard (fn == idName owner && all isId [xs, ys] &&
+           lengthIs binders (length variables) &&
+           sizeUniqSet (mkUniqSet variables) == length variables &&
+           mkUniqSet binders == mkUniqSet variables &&
            eqTypes (map varType [xs, ys]) (map mkListTy [a, b]))
-    let pair = mkTupleTy Boxed [a, b]
-        list = mkListTy pair
     (Core.Var build, [Core.Type element, generator]) <- pure (Core.collectArgs rhs)
-    guard (element `eqType` pair && exprType rhs `eqType` list)
+    guard (element `eqType` output && exprType rhs `eqType` list)
     ([accumulator, cons, nil], fold_call) <- pure (Core.collectBinders generator)
     guard (isTyVar accumulator && all isId [cons, nil])
     let r = mkTyVarTy accumulator
@@ -581,28 +583,32 @@ zipFusionRuleHelpers owner table Rule{ru_fn = fn, ru_bndrs = binders,
                      step_call, Core.Var seed, Core.Var l, Core.Var rgt]) <-
       pure (Core.collectArgs fold_call)
     guard (eqTypes [a, b, r] [x, y, state] && [seed, l, rgt] == [nil, xs, ys])
-    (Core.Var step, [Core.Type a', Core.Type b', Core.Type c, Core.Type d, Core.Var k]) <-
-      pure (Core.collectArgs step_call)
-    guard (eqTypes [a, b, r, r] [a', b', c, d] && k == cons)
+    (step, Core.Var actual) <- zipStepOperands a b r output callback step_call
+    guard (actual == cons)
     ActiveAfter build_phase <- pure (idInlineActivation build)
     guard (phase == build_phase)
     build_body <- unfolding build
     fold_body <- unfolding fold
     step_body <- unfolding step
-    guard (checkedZipFoldAlgebra fold fold_body && checkedZipPairStep step step_body)
+    guard (checkedZipFoldAlgebra fold fold_body &&
+           case callback of
+             Nothing -> checkedZipPairStep step step_body
+             Just _ -> checkedZipCallbackStep step step_body)
     ([element_var, builder], algebra) <- pure (Core.collectBinders build_body)
     guard (isTyVar element_var && isId builder)
     let e = mkTyVarTy element_var
     (Core.Var apply, [Core.Type result, cons_arg, nil_arg]) <- pure (Core.collectArgs algebra)
     guard (apply == builder && result `eqType` mkListTy e &&
            listRuleConstructor consDataCon e cons_arg && listRuleConstructor nilDataCon e nil_arg)
-    list_step <- instantiate step_body
-      [Core.Type a, Core.Type b, Core.Type list, Core.Type list,
-       Core.mkConApp consDataCon [Core.Type pair]]
+    let cons_value = Core.mkConApp consDataCon [Core.Type output]
+    list_step <- instantiate step_body $
+      case callback of
+        Nothing -> map Core.Type [a, b, list, list] ++ [cons_value]
+        Just f -> map Core.Type [output, list, list, a, b] ++ [cons_value, Core.Var f]
     list_result <- instantiate fold_body
       [Core.Type a, Core.Type b, Core.Type list, list_step,
-       Core.mkConApp nilDataCon [Core.Type pair], Core.Var xs, Core.Var ys]
-    let expanded = simpleOptExpr defaultSimpleOpts (Core.mkLams binders list_result)
+       Core.mkConApp nilDataCon [Core.Type output], Core.Var xs, Core.Var ys]
+    let expanded = simpleOptExpr defaultSimpleOpts (Core.mkLams variables list_result)
     (signature, rows) <- checkedListZip (const True) owner expanded
     guard (matchesConstructorCase table signature rows)
     pure (phase, build, fold, step)
@@ -626,20 +632,44 @@ checkedZipInverse owner fold step phase
     Rule{ru_fn = fn, ru_act = activation, ru_bndrs = binders, ru_args = lhs, ru_rhs = rhs}
   = isJust $ do
     ActiveAfter inverse_phase <- pure activation
-    [a_var, b_var] <- pure binders
     [Core.Type a, Core.Type b, Core.Type r, step_call, nil] <- pure lhs
-    guard (inverse_phase == phase && fn == idName fold &&
-           isTyVar a_var && isTyVar b_var && a_var /= b_var &&
-           getTyVar_maybe a == Just a_var && getTyVar_maybe b == Just b_var)
-    let pair = mkTupleTy Boxed [a, b]
-        list = mkListTy pair
-    (Core.Var step', [Core.Type x, Core.Type y, Core.Type c, Core.Type d, cons]) <-
-      pure (Core.collectArgs step_call)
-    guard (step == step' && eqTypes [a, b, list, list, list] [x, y, r, c, d] &&
-           listRuleConstructor consDataCon pair cons && listRuleConstructor nilDataCon pair nil)
-    (Core.Var zipper, [Core.Type a', Core.Type b']) <- pure (Core.collectArgs rhs)
-    guard (zipper == owner && eqTypes [a, b] [a', b'])
+    (Core.Var zipper, args) <- pure (Core.collectArgs rhs)
+    (a', b', output, callback, parameters) <- zipRuleOperands args
+    let variables = parameters ++ maybeToList callback
+    guard (inverse_phase == phase && fn == idName fold && zipper == owner &&
+           eqTypes [a, b, r] [a', b', mkListTy output] &&
+           lengthIs binders (length variables) &&
+           sizeUniqSet (mkUniqSet variables) == length variables &&
+           mkUniqSet binders == mkUniqSet variables)
+    (step', cons) <- zipStepOperands a b r output callback step_call
+    guard (step == step' &&
+           listRuleConstructor consDataCon output cons && listRuleConstructor nilDataCon output nil)
 checkedZipInverse _ _ _ _ _ = False
+
+-- | Read the type arguments and the optional callback of a zipper application.
+zipRuleOperands :: [Core.CoreExpr] -> Maybe (Type, Type, Type, Maybe Id, [TyVar])
+zipRuleOperands (Core.Type a : Core.Type b : rest) = do
+    parameters <- traverse getTyVar_maybe [a, b]
+    case rest of
+      [] -> pure (a, b, mkTupleTy Boxed [a, b], Nothing, parameters)
+      [Core.Type output, Core.Var callback] -> do
+        result <- getTyVar_maybe output
+        guard (isId callback)
+        pure (a, b, output, Just callback, parameters ++ [result])
+      _ -> Nothing
+zipRuleOperands _ = Nothing
+
+-- | Read the continuation passed to the pair or callback step.
+zipStepOperands :: Type -> Type -> Type -> Type -> Maybe Id -> Core.CoreExpr
+                -> Maybe (Id, Core.CoreExpr)
+zipStepOperands a b r output callback expr =
+  case (callback, Core.collectArgs expr) of
+    (Nothing, (Core.Var step, [Core.Type x, Core.Type y, Core.Type c, Core.Type d, k]))
+      | eqTypes [a, b, r, r] [x, y, c, d] -> Just (step, k)
+    (Just f, (Core.Var step, [Core.Type e, Core.Type c, Core.Type d, Core.Type x,
+                             Core.Type y, k, Core.Var f']))
+      | eqTypes [output, r, r, a, b] [e, c, d, x, y], f' == f -> Just (step, k)
+    _ -> Nothing
 
 listRuleConstructor :: DataCon -> Type -> Core.CoreExpr -> Bool
 listRuleConstructor con element value = case Core.collectArgs value of
@@ -689,6 +719,63 @@ checkedZipPairStep step expression = isJust $ do
     guard (apply == k && tail_result == r && constructor == dataConWorkId (tupleDataCon Boxed 2) &&
            eqTypes [left, right] (mkTyVarTys [a, b]) && [head_left, head_right] == [x, y])
 
+-- | Keep the callback application and tail lazy in the abstract continuation.
+checkedZipCallbackStep :: Id -> Core.CoreExpr -> Bool
+checkedZipCallbackStep step expression = isJust $ do
+    ([a, b, c, d, e, k, f, x, y, r], body) <- pure (Core.collectBinders expression)
+    guard (all isTyVar [a, b, c, d, e] && all isId [k, f, x, y, r] &&
+           not (any isMarkedCbv (fromMaybe [] (idCbvMarks_maybe step))))
+    (Core.Var continuation, [head_result, Core.Var tail_result]) <- pure (Core.collectArgs body)
+    (Core.Var callback, [Core.Var head_left, Core.Var head_right]) <-
+      pure (Core.collectArgs head_result)
+    guard (continuation == k && callback == f && tail_result == r && [head_left, head_right] == [x, y])
+
+-- | Check the rule that fuses a build producer in the fold's left input.
+-- See Note [List interpretation of zipper fusion].
+checkedZipLeftFusion :: Id -> Id -> CoreRule -> Maybe Id
+checkedZipLeftFusion fold build
+    Rule{ru_fn = fn, ru_bndrs = binders, ru_args = lhs, ru_rhs = rhs} = do
+    [Core.Type a, Core.Type b, Core.Type r, Core.Var step, Core.Var seed,
+      producer, Core.Var right] <- pure lhs
+    type_vars <- traverse getTyVar_maybe [a, b, r]
+    (Core.Var builder, [Core.Type element, Core.Var generator]) <- pure (Core.collectArgs producer)
+    let variables = type_vars ++ [step, seed, generator, right]
+    guard (fn == idName fold && builder == build && eqType element a &&
+           all isId [step, seed, generator, right] &&
+           lengthIs binders (length variables) &&
+           sizeUniqSet (mkUniqSet variables) == length variables &&
+           mkUniqSet binders == mkUniqSet variables)
+    (Core.Var g, [Core.Type result, on_cons, Core.Lam ignored (Core.Var on_nil), Core.Var ys]) <-
+      pure (Core.collectArgs rhs)
+    guard (g == generator && isId ignored && eqType (varType ignored) (mkListTy b) &&
+           on_nil == seed && ys == right)
+    (FTF_T_T, _, mult, domain, range) <- splitFunTy_maybe result
+    guard (isManyTy mult && eqTypes [domain, range] [mkListTy b, r])
+    (Core.Var adapt, [Core.Type a', Core.Type b', Core.Type c', Core.Type r',
+                      Core.Var k, Core.Var z]) <- pure (Core.collectArgs on_cons)
+    guard (eqTypes [a, b, r, r] [a', b', c', r'] && k == step && z == seed)
+    Core.CoreUnfolding{Core.uf_tmpl = body} <- pure (realIdUnfolding adapt)
+    guard (checkedZipLeftAdapter adapt body)
+    pure adapt
+checkedZipLeftFusion _ _ _ = Nothing
+
+-- | Verify that the cons adapter is a function before it sees the right input.
+checkedZipLeftAdapter :: Id -> Core.CoreExpr -> Bool
+checkedZipLeftAdapter adapt expression = isJust $ do
+    ([a, b, c, d, k, z, x, recur, right], body) <- pure (Core.collectBinders expression)
+    guard (all isTyVar [a, b, c, d] && all isId [k, z, x, recur, right] &&
+           idArity adapt == 5 &&
+           not (any isMarkedCbv (take 4 (fromMaybe [] (idCbvMarks_maybe adapt)))))
+    Core.Case (Core.Var input) _ _
+      [Core.Alt (Core.DataAlt nil) [] (Core.Var seed),
+       Core.Alt (Core.DataAlt cons) [y, ys] next] <- pure body
+    guard (input == right && nil == nilDataCon && cons == consDataCon && seed == z)
+    (Core.Var continuation, [Core.Var head_left, Core.Var head_right, rest]) <-
+      pure (Core.collectArgs next)
+    (Core.Var f, [Core.Var tail_right]) <- pure (Core.collectArgs rest)
+    guard (continuation == k && head_left == x && head_right == y &&
+           f == recur && tail_right == ys)
+
 {- Note [List interpretation of zipper fusion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A zipper can have an optimizer rule whose right-hand side builds a
@@ -712,8 +799,21 @@ to the same fold and return the same zipper. Its phase starts when the
 builder can inline and the forward rule stops. This avoids a rewrite
 cycle. A rule on the builder can replace the entire zip result. Report
 these conflicts through the same checks as other source-rule conflicts.
-Admission also needs a check of the fold's other fusion rules and the use
-of the helper unfoldings through optimization.
+
+The left-producer rule is an instance of fold/build with a function
+accumulator. The nil algebra returns a lambda. The cons algebra
+applies the adapter to the continuation, the seed, a left element and
+a recursive function. The adapter still awaits a right list, so this
+application is in head normal form even when those four arguments
+diverge. In the adapter, a right nil returns the original seed. A right
+cons passes the original heads and recursive right tail to the original
+continuation. These equations and the two head-normal-form properties
+give the hypotheses of Johann and Voigtlaender, The Impact of seq on
+Free Theorems-Based Program Transformations, Theorem 8.2. The rank-2
+producer can use seq.
+
+Admission still needs a check of the complete rule set of the fold and
+the use of the helper unfoldings through optimization.
 -}
 
 -- | Check final-Core rules and identify an introduced helper with an active rule.
@@ -722,17 +822,17 @@ finalCoreRuleConflict visible local owner
   | idName owner `elemNameSet` local = Just fallback
   | checkedMapperRules visible owner = Nothing
   | Just table <- sourceTableId_maybe owner
-  , isTwoListCaseTable table
+  , isTwoListCaseTable table || isListZipWithTable table
   , [rule] <- activeMapperRules visible owner
   , Just (phase, build, fold, step) <- zipFusionRuleHelpers owner table rule
-  = case find changed [build, step] of
-      _ | any (not . checkedZipInverse owner fold step phase) (inverses fold step)
-          -> Just (RetainedSourceRule (idName fold))
-      Just helper -> Just (RetainedSourceRule (idName helper))
-      Nothing -> Just fallback
+  , let fold_rules = activeMapperRules visible fold
+        adapters = mapMaybe (checkedZipLeftFusion fold build) fold_rules
+  = if idName fold `elemNameSet` local ||
+       any (\r -> usesStep step r && not (checkedZipInverse owner fold step phase r)) fold_rules
+    then Just (RetainedSourceRule (idName fold))
+    else Just (maybe fallback (RetainedSourceRule . idName) (find changed (build : step : adapters)))
   | otherwise = Just fallback
   where
-    inverses fold step = filter (usesStep step) (activeMapperRules visible fold)
     usesStep step Rule{ru_args = _ : _ : _ : arg : _}
       | (Core.Var fun, _) <- Core.collectArgs arg = fun == step
     usesStep _ _ = False
