@@ -107,7 +107,7 @@ is `True : undefined` and the right list is empty, forcing
 `lengthZipMap` returns `Refl`. Forcing `zipMapLaw` reaches the undefined
 tail. Both proofs typecheck. Their types describe the equality each
 establishes when it returns. [Client source](hasklib-test/Client.hs)
-and [direct proof](examples/open-evaluation/PreludeZipRuntime.hs).
+and [direct proof](examples/open-evaluation/PreludeZipMapRuntime.hs).
 
 ### What polymorphism can prove
 

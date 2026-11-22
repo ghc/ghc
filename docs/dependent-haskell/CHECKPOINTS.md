@@ -150,6 +150,16 @@ this cleanup.
 
 ## Optimized zippers and scoped callback equalities
 
+HaskLib commit `6765da7957` composes the two list proofs with base's
+`trans`. The `congFirst` lemma rewrites the first argument of a
+binary size function. The client supplies `minSize` and the fixed
+right size. The same lemma works with `plus`. Job `692` installed the
+consolidated source distribution offline. Clients at `-O0` and
+`-O2` passed with only the public interface. The compiler rejected
+both missing premises and a false conclusion. The demand comparison
+confirmed the original proof order when the lists contain distinct
+unevaluated errors. [Proof and rationale](README.md#compose-equality-proofs).
+
 Job `668` built both normal compiler stages at `2d6368dd57`. Jobs
 `674` and `682` checked fixture `3ecc8d6fc9`. Both stages matched
 all 546 Showcase lines at `-O0` and `-O2`. Stage 2 GHCi, the
