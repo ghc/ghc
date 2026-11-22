@@ -1630,6 +1630,8 @@ main = do
     observe "retain the kind of a matched Nothing"
         (Refl :: TypeLambda.Rebuild ('Nothing :: Maybe Ordering) :~: Proxy ('Nothing :: Maybe Ordering))
     observe "name and reuse a type-level intermediate result" TypeLet.roadmap
+    observe "sum two matrix dimensions with a type let"
+        (TypeNats.natVal (Proxy @(TypeLet.DimensionSum '(2, 3))))
     observe "splice a type let that shadows its outer binder"
         (Right (Just True) :: $([t| let a = Bool in let a = Maybe a in Either a a |]))
     observe "capture an outer type in a let group before shadowing its name"

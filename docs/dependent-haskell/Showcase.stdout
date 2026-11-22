@@ -451,6 +451,7 @@ map a type lambda with a constructor case: Refl
 read fields from two indexed type case branches: (Refl,Refl)
 retain the kind of a matched Nothing: Refl
 name and reuse a type-level intermediate result: Refl
+sum two matrix dimensions with a type let: 5
 splice a type let that shadows its outer binder: Right (Just True)
 capture an outer type in a let group before shadowing its name: Refl
 select a vector header with a runtime flag and a computed width: (":xy","xy")

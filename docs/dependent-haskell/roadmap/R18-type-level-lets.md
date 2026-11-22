@@ -128,26 +128,32 @@ and [ExtendedLet](https://github.com/ghc-proposals/ghc-proposals/pull/523/files)
 ## A boxed pair binding
 
 ```haskell
-type Count (dimensions :: (Nat, Nat)) =
+import qualified GHC.TypeNats as TypeNats
+
+type DimensionSum (dimensions :: (TypeNats.Nat, TypeNats.Nat)) =
   let (rows, cols) = dimensions
-  in rows + cols
+  in rows TypeNats.+ cols
 ```
 
 A two-field boxed pair pattern uses distinct names or wildcards. The
 right-hand side sees the enclosing scope and the preceding bindings.
 GHC checks it at a pair kind before extending the scope with the named
 fields. An unused field need not reduce. A known promoted constructor
-selects its fields, so `Count '(2, 3)` reduces to `5`. At an unknown pair,
-the projections stay in the type. Rebuilding an unknown pair from its
-projections gives no equality proof with the original pair.
+selects its fields. The Showcase prints `5` for `DimensionSum '(2, 3)`.
+An ordinary client proves that equality from the provider interface. At
+an unknown pair, the projections stay in the type. Rebuilding it from its
+projections gives no equality proof with the original pair. [Provider](../examples/open-evaluation/TypeLet.hs)
+and [Showcase](../Showcase.hs).
 
 The fork uses closed families for the projections. Agda also translates
 local record patterns to projections and separately gives its records an
 eta rule. The fork's pair bindings use the existing type-family equality
 rules. The base test `CatPairs` uses the same constructor equations for
-pairs of types. [Agda record lets](https://agda.readthedocs.io/en/v2.8.0/language/let-and-where.html#let-binding-record-patterns),
+pairs of types. Test `T14010` uses poly-kinded closed equations for those
+projections. [Agda record lets](https://agda.readthedocs.io/en/v2.8.0/language/let-and-where.html#let-binding-record-patterns),
 [Agda eta](https://agda.readthedocs.io/en/v2.8.0/language/record-types.html#eta-expansion),
 [CatPairs](../../../libraries/base/tests/CatPairs.hs),
+[T14010](../../../testsuite/tests/typecheck/should_compile/T14010.hs),
 and [interface and scope checks](../../../testsuite/tests/dependent/should_run/NativeTypeLet.sh).
 
 ## Type quotations and splices

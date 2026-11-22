@@ -2,8 +2,9 @@
 {-# LANGUAGE ScopedTypeVariables, TypeApplications, TypeFamilies, TypeOperators, UndecidableInstances #-}
 -- | Bind an intermediate result in a type synonym.
 module TypeLet (F, Shadow, Reuse, Outer, Nested, CaptureBeforeShadow, CaseResult, Frame,
-                frameRow, frameToList, frameValues, roadmap) where
+                DimensionSum, frameRow, frameToList, frameValues, roadmap) where
 import Data.Type.Equality ((:~:)(Refl))
+import qualified GHC.TypeNats as TypeNats
 import PackedVecLibrary (Nat, Vec(..), toList, type (+))
 
 -- | Select a flag for each input type in the example.
@@ -18,6 +19,11 @@ type family H (a :: Bool) (b :: Bool) where
 
 -- | Name the result of G and pass it to H twice.
 type F a = let b = G a in H b b
+
+-- | Add the two dimensions of a promoted pair.
+type DimensionSum (dimensions :: (TypeNats.Nat, TypeNats.Nat)) =
+  let (rows, cols) = dimensions
+  in rows TypeNats.+ cols
 
 -- | Both uses of b refer to the local definition.
 type Shadow (b :: Bool) = let b = 'True in H b b

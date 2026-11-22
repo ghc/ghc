@@ -42,13 +42,9 @@ test "$(grep -c 'tag :: tag' Pretty.hs)" = 2
 cp TypeLet.hi PackedVecLibrary.hi SignatureLet.hi SignedLets.hi "$out/client/"
 cat >PairBindings.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, ExplicitNamespaces, KindSignatures, TypeFamilies, TypeOperators #-}
-module PairBindings (Count, AliasCount, Held, KnownPrefix, Rebuild, ShadowCount) where
+module PairBindings (AliasCount, Held, KnownPrefix, Rebuild, ShadowCount) where
 
 import GHC.TypeNats (Nat, type (+))
-
-type Count (dimensions :: (Nat, Nat)) =
-  let (rows, cols) = dimensions
-  in rows + cols
 
 type Dimensions = '(2, 3)
 type Alias = Dimensions
@@ -78,7 +74,7 @@ cat >OrdinaryLet.hs <<'HS'
 module OrdinaryLet where
 import Data.Type.Equality ((:~:)(Refl))
 import Data.Proxy (Proxy)
-import PairBindings (AliasCount, Count, Held, KnownPrefix, ShadowCount)
+import PairBindings (AliasCount, Held, KnownPrefix, ShadowCount)
 import qualified SignatureLet
 import SignedLets (Braced, Layout)
 import TypeLet
@@ -110,7 +106,7 @@ braced = Refl
 layout :: Layout 'False :~: 'False
 layout = Refl
 
-knownPair :: Count '(2, 3) :~: 5
+knownPair :: DimensionSum '(2, 3) :~: 5
 knownPair = Refl
 
 aliasPair :: AliasCount :~: 5
