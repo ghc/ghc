@@ -2113,8 +2113,15 @@ provider keeps its ABI. A second unchanged build reuses the reviewed
 interface. This migration leaves
 the earlier single nullary equation and synonym formats in place.
 
-An installed interface can omit dependencies without losing its
-normalized equation. To recover those dependencies in a Cabal project,
+An older installed package can expose the same normalized equation
+for `fmap not ('Just 'True)` and the literal `'Just 'False`. With
+`-fno-write-if-self-recomp`, the two source modules produced identical
+interface and object files under the same module and unit name. An
+ordinary client can accept the old equation even when a local rule
+changes the call. Rebuilding the provider restores the dependency and
+GHC reports GHC-83605 at the proof use.
+
+To rebuild the provider in a Cabal project,
 list the provider's source checkout as a local package alongside the
 client. For example, put `packages: ./provider ./client` in
 `cabal.project`. Build both packages in a fresh build directory with
