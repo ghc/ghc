@@ -1420,6 +1420,16 @@ kcTyClGroup open_indices kisig_env decls
                                    | (tc, Just plan) <- zip generalized_tcs plans]
         ; poly_tcs <- traverse (inferOpenMatchability open_indices kisig_env)
                     (checked_tcs ++ generalized_tcs)
+        ; whenWOptM Opt_WarnCusks $ do
+            standalone_kinds <- xoptM LangExt.StandaloneKindSignatures
+            explicit_forall <- xoptM LangExt.ExplicitForAll
+            let cusk_names = mkNameSet [get_name decl | (decl, CUSK) <- kinded_decls]
+                missing_extensions = [LangExt.StandaloneKindSignatures | not standalone_kinds] ++
+                                     [LangExt.ExplicitForAll | not explicit_forall]
+            forM_ poly_tcs $ \tc -> do
+              let name = tyConName tc
+              when (name `elemNameSet` cusk_names && any isNamedTyConBinder (tyConBinders tc)) $
+                addDiagnosticAt (getSrcSpan name) (TcRnCusk tc missing_extensions)
         ; traceTc "---- kcTyClGroup end ---- }" (ppr_tc_kinds poly_tcs)
         ; return (poly_tcs, kindless_names, metadata) }
   where

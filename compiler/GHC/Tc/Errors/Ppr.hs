@@ -464,6 +464,21 @@ instance Diagnostic TcRnMessage where
                 | otherwise
                 = text "Top-level type constructor with no standalone kind signature:"
 
+    TcRnCusk tc missingExtensions ->
+      mkSimpleDecorated $
+        text "This declaration uses a complete user-supplied kind signature (CUSK)." $$
+        hang (text "To state this kind explicitly, write") 2 signature $$ pragma
+      where
+        signature = text "type" <+> pprPrefixName (tyConName tc) <+> dcolon <+>
+          updSDocContext (\ctx -> ctx { sdocPrintExplicitForalls = True })
+            (pprKind (tyConKind tc))
+        pragma = case missingExtensions of
+          [] -> empty
+          _ -> hang (text "Enable the required extensions") 2 $
+            text "{-# LANGUAGE" <+>
+              hsep (punctuate comma (map (text . extensionName) missingExtensions)) <+>
+              text "#-}"
+
     TcRnPolymorphicBinderMissingSig n ty
       -> mkSimpleDecorated $
            sep [ text "Polymorphic local binding with no type signature:"
@@ -2319,6 +2334,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnMissingSignature what exported
       -> WarningWithFlags $ missingSignatureWarningFlags what exported
+    TcRnCusk{}
+      -> WarningWithFlag Opt_WarnCusks
     TcRnPolymorphicBinderMissingSig{}
       -> WarningWithFlag Opt_WarnMissingLocalSignatures
     TcRnOverloadedSig{}
@@ -3030,6 +3047,8 @@ instance Diagnostic TcRnMessage where
     TcRnPartialTypeSigBadQuantifier{}
       -> noHints
     TcRnMissingSignature {}
+      -> noHints
+    TcRnCusk{}
       -> noHints
     TcRnPolymorphicBinderMissingSig{}
       -> noHints

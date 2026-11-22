@@ -1070,6 +1070,9 @@ data TcRnMessage where
                        -> Exported
                        -> TcRnMessage
 
+  -- | A complete user-supplied kind signature supplies a quantified kind.
+  TcRnCusk :: TyCon -> [LangExt.Extension] -> TcRnMessage
+
   {-| TcRnPolymorphicBinderMissingSig is a warning controlled by -Wmissing-local-signatures
       that occurs when a local polymorphic binding lacks a type signature.
 
