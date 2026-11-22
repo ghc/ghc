@@ -22,6 +22,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
 
 import GHC.Core.FamInstEnv
+import GHC.Core.Type( isMatchableFunTy, typeKind )
 import GHC.Core.Coercion
 import GHC.Core.TyCo.Rep( Type(..) )
 import GHC.Core.TyCo.Subst( deepSubstTy, elemSubst, extendTvSubstWithClone )
@@ -667,20 +668,20 @@ mkTopClosedFamEqFDs ax work_args (EqCt { eq_ev = ev, eq_rhs = work_rhs })
   = Stage $ continueWith []
 
 isGenerativeType :: Type -> Bool
--- True <=> This type cannot rewrite to, or be substituted to,
---          a saturated type-family application
+-- True if the outer head rules out a saturated type-family application.
 -- See (CF5) in Note [Exploiting closed type families]
 isGenerativeType ty | Just ty' <- coreView ty = isGenerativeType ty'
 isGenerativeType (TermAppTy {}) = False
-isGenerativeType ty@(TermVarTy {})
-  = pprPanic "isGenerativeType: unsupported runtime index" (ppr ty)
-isGenerativeType ty@(DepFunTy {})
-  = pprPanic "isGenerativeType: unsupported retained function" (ppr ty)
+isGenerativeType (TermVarTy {})  = False
+isGenerativeType (ClassAppTy {}) = False
+isGenerativeType (DepFunTy {})   = False
+isGenerativeType (DepDictTy {})  = False
+isGenerativeType (ExistsTy {})   = False
 isGenerativeType (FunTy {})      = True
 isGenerativeType (CastTy ty _)   = isGenerativeType ty
 isGenerativeType (ForAllTy {})   = True
 isGenerativeType (TyConApp tc _) = isGenerativeTyCon tc Nominal
-isGenerativeType (AppTy {})      = True
+isGenerativeType (AppTy fun _)   = isMatchableFunTy (typeKind fun)
 isGenerativeType (LitTy {})      = True
 isGenerativeType (TyVarTy {})    = False
 isGenerativeType (CoercionTy {}) = False
@@ -1390,6 +1391,14 @@ Key point: equations that are not relevant do not need to be considered for fund
   rhs we must be sure that `rhs` can't turn into `F tys`.  The only way to be
   sure of that is if `rhs` is headed by a generative type constructor. See
   `isGenerativeType`.
+
+  A retained variable can stand for the result of a family application.
+  For example, the induction hypothesis for right identity of addition
+  relates the runtime index m to Plus m Zero. Seeing m does not tell us
+  which equation of Plus produced it. The same applies to an opaque
+  callback or selector result. For an application, check the matchability
+  of the consumed binder before relying on its head. We also skip this
+  optional improvement for retained, dictionary and existential binders.
 
   Otherwise prinicple (FUNDEP-COMPLETENESS) is threatened.
 
