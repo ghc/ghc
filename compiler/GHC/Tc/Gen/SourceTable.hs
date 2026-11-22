@@ -2,7 +2,7 @@
 module GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourceTableTyCons, sourceCaseTables, finalCoreMappers, verifyFinalCoreMapper, failedFinalListTables, finalCoreSourceFamilies, isFinalCoreIdentity, indexedProjectionSource, isFinalCoreReverseWrapper, sourcePairBuilderField, lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
                               sourceTableCallees, sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
                               sourceTableFamilyAppUse, sourceTableReferenceUse, sourceCaseKindUse, sourceCaseVisibleArity, isSourceConstructorCase, sourceTableOwner, monomorphicEnumCaseArity, groundFirstHead,
-                              isFinalStructuralSource,
+                              isFinalStructuralSource, isStructuralSourceTable, isNominalStructuralSource,
                               visibleSourceMethodRules, hasSourceMethodRule, hasSourceMethodRuleAt,
                               sourceBinarySelector, sourceMapSelector, lookupSourceBinaryMethod, lookupSourceContainerMethod, lookupSourceGroundDFun, lookupSourceCheckedMapMethod, publishListFoldMethods, keepCheckedMapWorkers, publishCheckedMapMethods, sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers, isSourceFilterGuard,
                               OptionalSourceUses, optionalSourceUses, registerOptionalSourceUses,
@@ -79,7 +79,7 @@ import GHC.Types.Basic (Origin(..), LeftOrRight(..), SourceTableOrigin(..), Unfo
                         isMarkedCbv, pickLR)
 import GHC.Types.Error (errorsFound)
 import GHC.Types.Id.Info (IdDetails(DFunId, SourceTableId, VanillaId), SourceDFun(..), setSourceProofRuleInfo)
-import GHC.Types.Id (globaliseId, idCbvMarks_maybe, idCoreRules, idInfo, idName, setIdInfo, idInlinePragma, isClassOpId_maybe, isDataConId_maybe, isDataConWorkId_maybe, isJoinId, idUnfolding, realIdUnfolding, mkVanillaGlobal, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe,
+import GHC.Types.Id (globaliseId, idCbvMarks_maybe, idCoreRules, idInfo, idName, setIdInfo, idInlinePragma, isClassOpId_maybe, isDataConId_maybe, isDataConWorkId_maybe, isJoinId, idUnfolding, realIdUnfolding, mkSysLocalM, mkVanillaGlobal, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe,
                      setIdExported, setSourceMethodIds, sourceMethodAliases, sourceMethodTarget_maybe,
                      sourceMethodDFunClass)
 import GHC.Types.InlinePragma (isNeverActive, isOpaquePragma)
@@ -119,7 +119,9 @@ import GHC.Utils.Panic (panic)
 
 import Control.Monad (filterM, foldM, forM, forM_, guard, unless, void, when, zipWithM)
 import Control.Monad.IO.Class (liftIO)
-import Control.Applicative ((<|>))
+import Control.Applicative (empty, (<|>))
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.Maybe (MaybeT(..))
 import Data.Functor.Identity (Identity(..))
 import Data.List (find, findIndex, nubBy, partition, sortBy, stripPrefix, unsnoc)
 import Data.List.NonEmpty (NonEmpty(..))
@@ -1294,6 +1296,7 @@ changedSourceUse ops = do
     rewriting <- goptM Opt_EnableRewriteRules
     let check [] = pure Nothing
         check (op@(v, arg) : rest)
+          | isNominalStructuralSource v, not rewriting = check rest
           | finalCoreMapperOwner v = do
               let local = sourceRuleOwners (tcg_rules env)
               if rewriting && (idName v `elemNameSet` local || not (checkedMapperRules visible v))
@@ -1392,8 +1395,9 @@ checkSourceMethodUsesWithPending env = do
     rewriting <- goptM Opt_EnableRewriteRules
     let uses_final_core v = finalCoreMapperOwner v
           && not (isFinalCoreIdentity v && idName v `elemNameSet` unfolded)
+        needs_rules v = uses_final_core v || isNominalStructuralSource v
     checked_uses <- if rewriting then pure uses else
-      mkNameSet <$> filterM (fmap (maybe True (not . uses_final_core)) . tcLookupIdMaybe)
+      mkNameSet <$> filterM (fmap (maybe True (not . needs_rules)) . tcLookupIdMaybe)
         (nameSetElemsStable uses)
     unless (isEmptyNameSet checked_uses) $ do
       types <- sourceRuleTypes <$> readTcRef (tcg_source_rule_types env)
@@ -1616,10 +1620,13 @@ return an outer successor. Skip binary equations in that case.
 -}
 
 -- | Derive closed families after solving the group's top-level constraints.
-sourceTableTyCons :: LHsBinds GhcTc -> TcM [(Id, TyCon)]
-sourceTableTyCons binds = do
+sourceTableTyCons :: Bool -> LHsBinds GhcTc -> TcM [(Id, TyCon)]
+sourceTableTyCons local binds = do
     strict <- xoptM LangExt.Strict
-    collect strict [] candidates
+    structural <- if local && not strict
+                  then catMaybes <$> traverse (runMaybeT . localStructuralTable . unLoc) binds
+                  else pure []
+    collect strict structural candidates
   where
     candidates = mapMaybe (sourceRows . unLoc) binds
     candidate_names = extendNameSetList emptyNameSet [idName f | (f, _, _, _) <- candidates]
@@ -1707,7 +1714,9 @@ sourceCaseTables binds = do
         = publicCaseType env exported imported (dataConTyCon con)
         | otherwise = False
       structural_candidate owner
-        | generates_code, Just signature <- constructorCaseType (varType owner)
+        | generates_code
+        , isNothing (sourceTableOccurrence env owner >>= sourceTableId_maybe)
+        , Just signature <- constructorCaseType (varType owner)
         = isTwoStructuralCase signature
         | otherwise = False
       final_candidate owner = isJust (list_case_position owner) || indexed_candidate owner ||
@@ -2313,6 +2322,27 @@ isTwoStructuralCaseTable table =
     isJust (sourceTableTermOcc (nameOccName (tyConName table))) &&
     isJust (closedFamilyTyConCoAxiom_maybe table) &&
     maybe False isTwoStructuralCase (constructorCaseType (tyConKind table))
+
+-- | Check that the family scrutinises its second structural operand.
+isStructuralSourceTable :: TyCon -> Bool
+isStructuralSourceTable table
+  | isTwoStructuralCaseTable table
+  , Just axiom <- closedFamilyTyConCoAxiom_maybe table
+  = any matches_second (fromBranches (coAxiomBranches axiom))
+  | otherwise = False
+  where
+    matches_second branch
+      | [_, right] <- coAxBranchLHS branch
+      , Just (constructor, _) <- splitTyConApp_maybe right
+      = isJust (isPromotedDataCon_maybe constructor)
+      | otherwise = False
+
+-- | Identify a source certificate installed before final Core is available.
+isNominalStructuralSource :: Id -> Bool
+isNominalStructuralSource owner
+  | SourceTableId _ table NominalSourceTable <- idDetails owner
+  = isStructuralSourceTable table
+  | otherwise = False
 
 -- | Identify the exact owner of final Core equations on two structural sizes.
 isFinalStructuralSource :: Id -> Bool
@@ -4675,6 +4705,15 @@ data SourceInput = ClosedInput Type [Type] | PolyList TyVar
 -- | Collect the constructors and evidence for a candidate source function.
 sourceRows :: HsBind GhcTc -> Maybe (Id, Maybe TyVar, [TcEvBinds], [SourceRow])
 sourceRows binding = do
+    (fun, mono, body_tv, evidence, matches) <- sourceMatches binding
+    let self v = v == fun || v == mono
+    (row_evidence, rows) <- unzip <$> traverse (sourceRow self) matches
+    pure (fun, body_tv, evidence ++ row_evidence, rows)
+
+-- | Read the original function clauses with the solver evidence in scope.
+sourceMatches :: HsBind GhcTc
+              -> Maybe (Id, Id, Maybe TyVar, [TcEvBinds], [LMatch GhcTc (LHsExpr GhcTc)])
+sourceMatches binding = do
     (fun, mono, body_tv, MG { mg_ext = MatchGroupTc { mg_origin = FromSource },
                mg_alts = L _ matches }, evidence) <- case binding of
       XHsBindsLR (AbsBinds { abs_tvs = [], abs_ev_vars = [], abs_ev_binds = evs
@@ -4689,9 +4728,7 @@ sourceRows binding = do
         (fun, Nothing, matches) <- funBind binding
         pure (fun, fun, Nothing, matches, [])
     guard (isExternalName (varName fun))
-    let self v = v == fun || v == mono
-    (row_evidence, rows) <- unzip <$> traverse (sourceRow self) matches
-    pure (fun, body_tv, evidence ++ row_evidence, rows)
+    pure (fun, mono, body_tv, evidence, matches)
   where
     funBind :: HsBind GhcTc -> Maybe (Id, Maybe TyVar, MatchGroup GhcTc (LHsExpr GhcTc))
     funBind (FunBind { fun_ext = (wrap, []), fun_id = L _ f, fun_matches = mg })
@@ -4700,6 +4737,96 @@ sourceRows binding = do
           WpTyLam tv | isTyVar tv, tcIsLiftedTypeKind (tyVarKind tv) -> Just (f, Just tv, mg)
           _ -> Nothing
     funBind _ = Nothing
+
+-- | Derive local structural equations before checking a dependent signature.
+-- See Note [Local structural case equations].
+localStructuralTable :: HsBind GhcTc -> MaybeT TcM (Id, TyCon)
+localStructuralTable binding = do
+    (fun, mono, Nothing, evidence, matches) <- MaybeT (pure (sourceMatches binding))
+    guard (lengthIs matches 3)
+    guard =<< lift (allM emptyEvidence evidence)
+    ty <- lift (liftZonkM (zonkTcType (varType fun)))
+    signature@(ConstructorCaseType _ root _ _ _ domain) <- MaybeT (pure (constructorCaseType ty))
+    guard (isTwoStructuralCase signature)
+    let self v = v == fun || v == mono
+    rows <- traverse (read_row self root domain) matches
+    guard (complete rows)
+    let owner = setIdType fun ty
+    family <- lift (publishConstructorCase owner signature rows)
+    pure (owner, family)
+  where
+    complete
+      [ ConstructorCaseRow [CaseConstructor z [] [], CaseField _] _
+      , ConstructorCaseRow [CaseConstructor s [] [_], CaseConstructor z' [] []] _
+      , ConstructorCaseRow [CaseConstructor s' [] [_], CaseConstructor s'' [] [_]] _ ]
+      = z == z' && s == s' && s == s''
+    complete _ = False
+
+    read_row self root domain (L _ Match{m_pats = L _ [lhs, rhs], m_grhss = rhss})
+      | GRHSs _ (L _ (GRHS _ [] (L _ body)) :| []) (L _ (EmptyLocalBinds _)) <- rhss
+      = do
+          left <- read_pattern root domain lhs
+          right <- read_pattern root domain rhs
+          let predecessors = case right of
+                CaseConstructor _ [] [CaseField field] -> [field]
+                _ -> []
+          output <- MaybeT (pure (sourceRhs self predecessors body))
+          let visit under_constructor = \case
+                Field v | any (hasCaseField v) [left, right] -> Just (CaseField v)
+                Construct dc args | dataConTyCon dc == root
+                                  , lengthIs args (dataConSourceArity dc) ->
+                    CaseConstructor dc [] <$> traverse (visit True) args
+                Recur [] x | under_constructor
+                           , CaseConstructor _ [] [CaseField x'] <- left
+                           , x == x', [y] <- predecessors ->
+                    Just (CaseSelf [] [CaseField x, CaseField y])
+                _ -> Nothing
+          ConstructorCaseRow [left, right] <$> MaybeT (pure (visit False output))
+    read_row _ _ _ _ = empty
+
+    read_pattern root domain (L _ (ConPat (ConPatTc [] [] [] evidence WpHole [])
+                                   (L _ (RealDataCon dc)) (PrefixCon _ pats))) = do
+      guard (dataConTyCon dc == root)
+      guard =<< lift (emptyEvidence evidence)
+      kinds <- MaybeT (pure (openDataConFieldTypes dc []))
+      guard (equalLength pats kinds)
+      CaseConstructor dc [] <$> zipWithM read_field kinds pats
+    read_pattern root domain (L _ (ParPat _ p)) = read_pattern root domain p
+    read_pattern _ domain p = read_field domain p
+
+    read_field kind (L _ (VarPat _ (L _ v))) = do
+      ty <- lift (liftZonkM (zonkTcType (varType v)))
+      guard (ty `eqType` kind)
+      pure (CaseField (setIdType v ty))
+    read_field kind (L _ WildPat{}) = CaseField <$> lift (mkSysLocalM (fsLit "_") ManyTy kind)
+    read_field kind (L _ (ParPat _ p)) = read_field kind p
+    read_field _ _ = empty
+
+{- Note [Local structural case equations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Local proofs can need a source equation before the compiler has final
+Core for its owner. Check the solved source clauses before publishing a
+nominal table when a local type requires it. A declaration splice can
+publish other source tables for a later group. Keep the structural
+table on its ordinary final-Core path in that case. See
+Note [Checked cases on two structural sizes]. If the source table is already
+installed, keep that authority through final zonking and publication.
+
+Read the left-nullary clause first. Its right pattern is a variable or a
+wildcard. The next two clauses match the left recursive constructor and
+split on the right constructor. These rows are complete and disjoint.
+Each recursive call uses the actual predecessor binder from each column.
+Require a lazy constructor around a recursive call.
+
+Strict adds an implicit bang to a variable pattern. Skip this checker
+under Strict. Read only plain constructor fields, variables, and
+wildcards. Require empty evidence and unguarded right-hand sides.
+Install the table through the existing nominal source rule checks. They
+also check rules when later declarations finish typechecking. The compiler
+can use these equations with rewriting disabled. Use the actual second
+constructor column to identify this rule policy. An earlier nominal table
+can have the same kind and carry its second argument unchanged.
+-}
 
 -- | Check that the rows cover the domain of the solved function type.
 checkedDomains :: Bool -> Maybe TyVar -> Type -> [SourceRow] -> Maybe (SourceInput, [Type], TyCon)

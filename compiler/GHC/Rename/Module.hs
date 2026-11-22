@@ -2101,22 +2101,34 @@ localSourceTableBinders binds sigs =
   mapM (\n -> (n,) <$> lookupOrig (nameModule n) (mkSourceTableOcc (nameOccName n)))
     [ n | L _ FunBind{fun_id = L _ n, fun_matches = MG{mg_alts = L _ rows}} <- binds
         , isExternalName n, nameOccName n `elemOccSet` signed
-        , all (constructor_row n) rows ]
+        , all (constructor_row n False) rows ||
+          (any matches_second rows && all (constructor_row n True) rows) ]
   where
     signed = mkOccSet [ rdrNameOcc n | L _ (TypeSig _ [] [L _ n] _) <- sigs ]
-    constructor_row :: Name -> LMatch GhcPs (LHsExpr GhcPs) -> Bool
-    constructor_row self (L _ Match{m_pats = L _ (pat : rest), m_grhss = rhss})
+    constructor_row :: Name -> Bool -> LMatch GhcPs (LHsExpr GhcPs) -> Bool
+    constructor_row self structural (L _ Match{m_pats = L _ (pat : rest), m_grhss = rhss})
       | Just fields <- constructor_fields (unparen pat)
       , all plain_field fields
-      , Just carried <- carried_binders rest
+      , Just carried <- carried_binders structural rest
       , GRHSs _ (L _ (GRHS _ [] rhs) :| []) (L _ EmptyLocalBinds{}) <- rhss
       = row_result self (collectPatsBinders CollNoDictBinders fields) carried rhs
-    constructor_row _ _ = False
+    constructor_row _ _ _ = False
 
-    carried_binders :: [LPat GhcPs] -> Maybe [RdrName]
-    carried_binders [] = Just []
-    carried_binders [p] | VarPat _ (L _ v) <- unparen p = Just [v]
-    carried_binders _ = Nothing
+    -- The typed checker checks the whole matrix, including the constructor
+    -- identities and the order of both columns. See Note [Local structural
+    -- case equations] in GHC.Tc.Gen.SourceTable.
+    matches_second (L _ Match{m_pats = L _ [_, p]}) =
+      isJust (constructor_fields (unparen p))
+    matches_second _ = False
+
+    carried_binders :: Bool -> [LPat GhcPs] -> Maybe [RdrName]
+    carried_binders False [] = Just []
+    carried_binders _ [p] | VarPat _ (L _ v) <- unparen p = Just [v]
+    carried_binders True [p]
+      | WildPat{} <- unparen p = Just []
+      | Just fields <- constructor_fields (unparen p)
+      , all plain_field fields = Just (collectPatsBinders CollNoDictBinders fields)
+    carried_binders _ _ = Nothing
 
     constructor_fields :: Pat GhcPs -> Maybe [LPat GhcPs]
     constructor_fields ConPat{pat_args = PrefixCon _ fields} = Just fields

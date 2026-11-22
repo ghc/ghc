@@ -81,7 +81,7 @@ import GHC.Core (CoreExpr)
 import qualified GHC.Core as Core
 import GHC.Core.Utils (exprType)
 import GHC.Data.OrdList (fromOL)
-import GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceCaseTables, sourceRuleOwners, sourceRuleOwnersAt, visibleSourceMethodRules,
+import GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceCaseTables, isStructuralSourceTable, isNominalStructuralSource, sourceRuleOwners, sourceRuleOwnersAt, visibleSourceMethodRules,
                                hasSourceMethodRule, hasSourceMethodRuleAt, sourceLiteralWorkers, checkSourceMethodUses,
                                checkOptionalSourceUses, checkAndInstallSourceProofs,
                                sourceMapSelector, sourceTableDependencies)
@@ -645,8 +645,7 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
                                    , tcg_rules     = []
                                    , tcg_fords     = []
                                    , tcg_patsyns   = []
-                                   , tcg_type_env  = tcg_type_env tcg_env
-                                                     `plusTypeEnv` id_env }
+                                   , tcg_type_env  = mergeZonkedTypes (tcg_type_env tcg_env) id_env }
       ; (tcg_env, tcl_env) <- setGblEnv init_tcg_env
                               run_th_modfinalizers
       ; finishTH
@@ -679,9 +678,11 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
       ; (id_env_mf, ev_binds_mf, binds_mf, fords_mf, imp_specs_mf, rules_mf, patsyns_mf)
             <- zonkTcGblEnv tcg_env
 
-      ; let { !final_type_env = tcg_type_env tcg_env
-                                `plusTypeEnv` id_env_mf
+      ; let { !final_type_env = mergeZonkedTypes (tcg_type_env tcg_env) id_env_mf
               -- Add the zonked Ids from the value bindings (they were in tcl_env)
+              -- Keep the origin of tables used before final zonking. The same
+              -- family can already occur in a local signature. A provisional
+              -- final-Core check must not replace or remove it.
               -- Force !final_type_env, lest we retain an old reference
               -- to the previous tcg_env
 
@@ -705,7 +706,7 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
       ; setGblEnv tcg_env' $ do
           let binds = tcg_binds tcg_env'
           tables <- if tables_enabled || write_equations
-                    then sourceTableTyCons binds else pure []
+                    then sourceTableTyCons False binds else pure []
           (cases, fields) <- sourceCaseTables binds
           -- Keep the existing ordinary certificates when both checkers
           -- accept the same owner. Enumeration cases retain executable origin.
@@ -714,7 +715,10 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
                 | tables_enabled = tables
                 | otherwise = filter (\(owner, _) -> not (idName owner `elemNameSet` case_owners)) tables
           with_fields <- if null fields then getGblEnv else fst <$> addTyConsToGblEnv fields
-          env <- setGblEnv with_fields (installSourceTables (new_tables ++ cases))
+          let early_structural = [(fun, table) | fun <- typeEnvIds (tcg_type_env with_fields)
+                                               , isNominalStructuralSource fun
+                                               , Just table <- [sourceTableId_maybe fun]]
+          env <- setGblEnv with_fields (installSourceTables (early_structural ++ new_tables ++ cases))
           installSourceMethods (\sel -> tables_enabled || sourceMapSelector sel) env }
 
 -- | Publish only checked method aliases that user rules cannot replace.
@@ -803,6 +807,7 @@ installSourceTables tables = do
           Nothing -> reject (TcRnNoSourceTable name)
           Just deps | Just bad <- find changed (case origin of
                         FinalCoreSourceTable -> deps
+                        NominalSourceTable | not rewriting, isStructuralSourceTable table -> deps
                         _ -> fun : deps)
             -> reject (TcRnRetainedQuantificationError (RetainedSourceRule (idName bad)))
           Just deps -> do
@@ -816,11 +821,19 @@ installSourceTables tables = do
         if null new_tables then getGblEnv else fst <$> addTyConsToGblEnv new_tables
 
 -- | Check only the bindings in the declaration group that is now in scope.
-sourceTablesFor :: NameSet -> TcGblEnv -> TcM [(Id, TyCon)]
-sourceTablesFor names env = sourceTableTyCons (filter requested (tcg_binds env))
+sourceTablesFor :: Bool -> NameSet -> TcGblEnv -> TcM [(Id, TyCon)]
+sourceTablesFor structural names env = sourceTableTyCons structural (filter requested (tcg_binds env))
   where
     requested bind = any ((`elemNameSet` names) . idName)
                          (collectHsBindBinders CollNoDictBinders (unLoc bind))
+
+-- | Merge the finalised types and retain a source table already attached to
+-- its exact owner. A local signature can already use the table's equations.
+mergeZonkedTypes :: TypeEnv -> TypeEnv -> TypeEnv
+mergeZonkedTypes original zonked = original `plusTypeEnv` mapNameEnv restore zonked
+  where
+    restore (AnId fun) = AnId (restoreSourceTableId original fun)
+    restore thing = thing
 
 zonkTcGblEnv :: TcGblEnv
              -> TcM (TypeEnv, Bag EvBind, LHsBinds GhcTc,
@@ -942,7 +955,7 @@ tc_rn_src_decls ds
                ; enabled <- xoptM LangExt.ExperimentalDependentTypes
                ; let names = mkNameSet (collectHsValBinders CollNoDictBinders (hs_valds rn_decls))
                ; tcg_env <- if enabled
-                            then sourceTablesFor names tcg_env >>= installSourceTables
+                            then sourceTablesFor False names tcg_env >>= installSourceTables
                             else return tcg_env
 
                  -- Rename the splice expression, and get its supporting decls
@@ -2349,7 +2362,7 @@ tcTopSrcTables group = do
         restoreEnvs envs $ do
           evs <- simplifyTop wanteds
           let names = mkNameSet (collectHsValBinders CollNoDictBinders (hs_valds early))
-          tables <- sourceTablesFor names early_env
+          tables <- sourceTablesFor True names early_env
           let found = mkNameSet (map (tyConName . snd) tables)
           for_ needed $ \(term, family) ->
             unless (family `elemNameSet` found) $
@@ -2869,7 +2882,7 @@ tcSourceValueBinds group = do
         restoreEnvs envs $ do
           evs <- simplifyTop wanteds
           let names = mkNameSet (collectHsValBinders CollNoDictBinders (hs_valds first))
-          tables <- sourceTablesFor names first_env
+          tables <- sourceTablesFor False names first_env
           addTopEvBinds evs $ do
             env' <- installSourceTables tables
             setGblEnv env' (check_group rest)
