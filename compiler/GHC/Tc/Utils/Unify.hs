@@ -4248,8 +4248,11 @@ irreducible Given can solve the exact equality, but ordinary family
 rewriting cannot use it under minSize.
 
 For an existing nominal Given with a family application on the left,
-accept a rigid runtime Id on the right. Check the type of that Id with
-the same occurs check before keeping the occurrence. Recurse through
+accept a rigid runtime Id or a checked application of that Id on the
+right. Check the type of the Id with the same occurs check before keeping
+the occurrence. For an application, keep the head fixed and check the
+argument at its declared domain. Use its nominal coercion to rebuild the
+application. Recurse through
 family applications without introducing cycle breakers on this path.
 The resulting canonical equality retains the original scoped evidence.
 Wanted constraints and private runtime-binder comparisons keep their
@@ -5021,22 +5024,20 @@ check_ty_eq_rhs flags ty
   = case ty of
       -- See Note [Rigid retained indices]
       TermAppTy f arg
-        | native_given
+        | native_given || family_given
         , Just (domain, _) <- nativeIndexFunctionTys_maybe f
         , typeKind arg `eqType` domain
-        -> do { arg_res <- check_ty_eq_rhs flags arg
+        -> do { head_res <- check_runtime_id f
+              ; arg_res <- check_ty_eq_rhs flags arg
               ; return ((\(Reduction co arg') ->
                            mkReduction (mkTermAppCo f co) (TermAppTy f arg'))
-                         <$> arg_res) }
+                         <$> (head_res *> arg_res)) }
         | otherwise
         -> return $ PuFail (cteProblem cteSkolemEscape)
       TermVarTy v
-        | native_given
+        | native_given || family_given
         , isNativeRetainedBinder v
-        -> return $ okCheckRefl ty
-        | TEFTyFam { tefTyFam_allowRetainedIds = True } <- flags
-        , isNativeRetainedBinder v
-        -> do { checked <- check_ty_eq_rhs flags (varType v)
+        -> do { checked <- check_runtime_id v
               ; return (mkReflRedn Nominal ty <$ checked) }
         | otherwise
         -> return $ PuFail (cteProblem cteSkolemEscape)
@@ -5090,6 +5091,14 @@ check_ty_eq_rhs flags ty
     native_given = case flags of
       TEFTyVar { tefTyVar_allowNativeGivenRhs = True } -> True
       _ -> False
+
+    family_given = case flags of
+      TEFTyFam { tefTyFam_allowRetainedIds = True } -> True
+      _ -> False
+
+    check_runtime_id v
+      | family_given = check_ty_eq_rhs flags (varType v)
+      | otherwise = return (okCheckRefl (varType v))
 
 -------------------
 checkCo :: Monad m => TyEqFlags m a -> Coercion -> m (PuResult a Coercion)
