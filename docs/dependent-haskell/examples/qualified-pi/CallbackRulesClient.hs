@@ -53,7 +53,16 @@ observation =
     call = check
 #endif
 
+-- | A worker can omit the callback while its type still names the callback.
+{-# NOINLINE readAbsent #-}
+readAbsent :: (a ~ Bool, r ~ Bool) => (a -> r) -> Bool -> Int -> Int
+readAbsent f x value = readKept f x (keepChoice f x value)
+
+-- | Return the payload without forcing the absent callback or its argument.
+absentObservation :: Int
+absentObservation = readAbsent (error "forced callback" :: Bool -> Bool) (error "forced index") 37
+
 -- | Print the results of the demand checks.
 main :: IO ()
-main = print observation
+main = print (observation, absentObservation)
 #endif

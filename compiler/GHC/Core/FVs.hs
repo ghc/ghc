@@ -16,7 +16,8 @@ module GHC.Core.FVs (
         exprFreeIds,      exprsFreeIds,
         exprFreeIdsDSet,  exprsFreeIdsDSet,
         exprFreeIdsList,  exprsFreeIdsList,
-        bindFreeVars, hasFreeVarInCoreAnnotations, exprAnnotationFreeVars, bindsAnnotationFreeVars, bindsAnnotationVars,
+        bindFreeVars, hasFreeVarInCoreAnnotations, exprAnnotationFreeVars,
+        bindsAnnotationFreeVars, bindsAnnotationVars, bindsAnnotationVarsWith,
 
         -- * Selective free variables of expressions
         InterestingVarFun,
@@ -284,7 +285,7 @@ exprFVs (Let (Rec pairs) body)
 hasFreeVarInCoreAnnotations :: Var -> CoreExpr -> Bool
 hasFreeVarInCoreAnnotations target = getAny . expr
   where
-    (expr, _) = coreAnnotationFVs (Any . anyFreeVarsOfType (== target))
+    (expr, _) = coreAnnotationFVs (\_ _ -> mempty) (Any . anyFreeVarsOfType (== target))
                                   (Any . anyFreeVarsOfCo (== target))
                                   (\b uses -> if b == target then mempty else uses)
 
@@ -300,19 +301,24 @@ bindsAnnotationFreeVars = foldMap (snd coreAnnotationVarSets)
 -- | Collect every variable named in annotations, even under its binder.
 -- This protects binder identities in a single traversal of a Core program.
 bindsAnnotationVars :: CoreProgram -> VarSet
-bindsAnnotationVars = foldMap bind
+bindsAnnotationVars = bindsAnnotationVarsWith (\_ _ -> emptyVarSet)
+
+-- | Also collect references in selected application operands.
+bindsAnnotationVarsWith :: (CoreExpr -> CoreExpr -> VarSet) -> CoreProgram -> VarSet
+bindsAnnotationVarsWith app = foldMap bind
   where
-    (_, bind) = coreAnnotationFVs tyCoVarsOfType tyCoVarsOfCo (const id)
+    (_, bind) = coreAnnotationFVs app tyCoVarsOfType tyCoVarsOfCo (const id)
 
 coreAnnotationVarSets :: (CoreExpr -> VarSet, CoreBind -> VarSet)
 coreAnnotationVarSets =
-    coreAnnotationFVs tyCoVarsOfType tyCoVarsOfCo (flip delVarSet)
+    coreAnnotationFVs (\_ _ -> emptyVarSet) tyCoVarsOfType tyCoVarsOfCo (flip delVarSet)
 
 coreAnnotationFVs
     :: Monoid refs
-    => (Type -> refs) -> (Coercion -> refs) -> (Var -> refs -> refs)
+    => (CoreExpr -> CoreExpr -> refs)
+    -> (Type -> refs) -> (Coercion -> refs) -> (Var -> refs -> refs)
     -> (CoreExpr -> refs, CoreBind -> refs)
-coreAnnotationFVs ty co hide = (expr, bind)
+coreAnnotationFVs app ty co hide = (expr, bind)
   where
     annotation b = ty (varType b) <> foldMap ty (varMultMaybe b)
 
@@ -324,7 +330,7 @@ coreAnnotationFVs ty co hide = (expr, bind)
     expr (Var v) = annotation v
     expr Lit{} = mempty
     expr (Tick tick body) = tickAnn tick <> expr body
-    expr (App fun arg) = expr fun <> expr arg
+    expr (App fun arg) = app fun arg <> expr fun <> expr arg
     expr (Lam b body) = under [b] (expr body)
     expr (Cast body c) = expr body <> co c
     expr (Pack schema witness payload) = ty schema <> ty witness <> expr payload

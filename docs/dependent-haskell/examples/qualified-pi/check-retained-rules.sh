@@ -61,8 +61,17 @@ for opt in 0 1 2; do
         fi
         "$ghc" "${flags[@]}" "${options[@]}" -main-is CallbackRulesClient \
             CallbackRulesClient.o ../provider/CallbackRules.o -o observe
-        [[ $(./observe) == '(19,23,1,0)' ]]
+        [[ $(./observe) == '((19,23,1,0),37)' ]]
     done
+done
+
+# Check the absent callback independently of read/callback firing.
+for opt in 1 2; do
+    cd "$out/O$opt/GIVEN"
+    "$ghc" "${flags[@]}" "-O$opt" -DGIVEN -fno-zap-coercions -fno-enable-rewrite-rules \
+        -main-is CallbackRulesClient -c CallbackRulesClient.hs
+    "$ghc" "-B$lib" -main-is CallbackRulesClient CallbackRulesClient.o ../provider/CallbackRules.o -o observe
+    [[ $(./observe) == '((19,23,1,0),37)' ]]
 done
 
 cd "$out/O2/FAMILY"

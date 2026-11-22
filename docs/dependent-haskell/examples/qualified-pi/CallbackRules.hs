@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}
-module CallbackRules (Choice, makeChoice, readKept) where
+module CallbackRules (Choice, makeChoice, keepChoice, readKept) where
 
 -- | Store an integer at the result index of a callback.
 data Choice (b :: Bool) = Choice Int
@@ -9,6 +9,11 @@ data Choice (b :: Bool) = Choice Int
 makeChoice :: foreach (f :: Bool -> Bool) -> foreach (x :: Bool) -> Int -> Choice (f x)
 makeChoice f x value = Choice
     (if value < 0 then if f x then 1 else 0 else value)
+
+-- | Keep a value at the callback index without evaluating either operand.
+{-# NOINLINE keepChoice #-}
+keepChoice :: foreach (f :: Bool -> Bool) -> foreach (x :: Bool) -> Int -> Choice (f x)
+keepChoice _ _ = Choice
 
 -- | Read the payload at any index.
 readChoice :: Choice b -> Int

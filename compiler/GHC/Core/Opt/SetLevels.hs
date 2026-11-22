@@ -98,7 +98,7 @@ import GHC.Core.Make    ( sortQuantVars )
 import GHC.Core.Make.Box ( mkCanonicalCo )
 import GHC.Core.Coercion ( MCoercion(..), MCoercionR, mkSymMCo )
 import GHC.Core.DataCon ( DataCon, dataConTyCon )
-import GHC.Core.TyCo.Rep (Type(DepFunTy))
+import GHC.Core.TyCo.Rep (Type(DepFunTy, DepDictTy))
 import GHC.Core.Type    ( Type, coreFullView, mightBeUnliftedType, typeHasFixedRuntimeRep
                         , mkTyConTy, getRuntimeRep )
 import GHC.Core.Multiplicity     ( pattern ManyTy )
@@ -1358,8 +1358,8 @@ lvlBind env (AnnNonRec bndr rhs)
   || not (wantToFloat env NonRecursive dest_lvl is_join is_top_bindable)
   || hasRuntimeIndexRefs env ty_fvs
   || (floatCoreMode (le_switches env) == RetainedCore
-      && isRetainedUserUnfolding (realIdUnfolding bndr) && not (null abs_vars))
-     -- See Note [Floating retained user unfoldings].
+      && not (null abs_vars) && keepIndexBinder env bndr)
+     -- See Note [Floating index binders].
   = -- No float
     do { rhs' <- lvlRhs env NonRecursive is_bot_lam mb_join_arity rhs
        ; let  bind_lvl        = incMinorLvl (le_ctxt_lvl env)
@@ -1408,7 +1408,7 @@ lvlBind env (AnnRec pairs)
   |  not (wantToFloat env Recursive dest_lvl is_join is_top_bindable)
   || hasRuntimeIndexRefs env ty_fvs
   || (floatCoreMode (le_switches env) == RetainedCore
-      && any (isRetainedUserUnfolding . realIdUnfolding) bndrs && not (null abs_vars))
+      && not (null abs_vars) && any (keepIndexBinder env) bndrs)
   = -- No float
     do { let bind_lvl       = incMinorLvl (le_ctxt_lvl env)
              (env', bndrs') = substAndLvlBndrs Recursive env bind_lvl bndrs
@@ -1710,6 +1710,38 @@ destLevel env fvs fvs_ty is_function is_bot
     as_far_as_poss = maxFvLevel' idsOnly env fvs_ty
                      -- See Note [Floating and kind casts]
 
+-- | Keep the lexical binding if type abstraction would change a runtime index.
+-- See Note [Floating index binders].
+keepIndexBinder :: LevelEnv -> Id -> Bool
+keepIndexBinder env b = isRetainedUserUnfolding (realIdUnfolding b)
+                     || b `elemVarSet` le_index_uses env
+
+-- | Collect the local variables in the retained operand of an application.
+retainedOperandVars :: CoreExpr -> CoreExpr -> VarSet
+retainedOperandVars fun arg
+  | isValArg arg
+  = case coreFullView (exprType fun) of
+      DepFunTy _ b body | not (isVacuousRetainedBinder b body) -> exprFreeIds arg
+      DepDictTy{} -> exprFreeIds arg
+      _ -> emptyVarSet
+  | otherwise = emptyVarSet
+
+{- Note [Floating index binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A callback used as a retained index must keep its lexical identity.
+Worker/wrapper can replace an absent polymorphic callback with a lazy
+local binding. If full laziness abstracts its free type variables, the
+callback becomes an application such as poly_f @a @r. Core cannot use
+that application as the index of the original call.
+
+Collect the local variables in retained operands and in types and
+coercions, including stable unfoldings, before setting levels. Test the
+original binder before it is cloned. The set is needed only in retained
+Core when floating would abstract variables. Floating without abstraction
+can still rename the binder. See Note [Floating retained user unfoldings]
+and Note [Local indices across Core Tidy] in GHC.Iface.Tidy.
+-}
+
 -- | Keep the binding scope of the free runtime indices in a float's type.
 -- See Note [Floating a dependent result].
 hasRuntimeIndexRefs :: LevelEnv -> TyCoVarSet -> Bool
@@ -1790,6 +1822,7 @@ countFreeIds = nonDetStrictFoldUDFM add 0 . getUniqDSet
 
 data LevelEnv
   = LE { le_switches :: FloatOutSwitches
+       , le_index_uses :: VarSet        -- Pre-cloned variables; see Note [Floating index binders].
        , le_ctxt_lvl :: Level           -- The current level
        , le_lvl_env  :: VarEnv Level    -- Domain is *post-cloned* TyVars and Ids
 
@@ -1835,6 +1868,7 @@ The domain of the le_lvl_env is the *post-cloned* Ids
 initialEnv :: FloatOutSwitches -> CoreProgram -> LevelEnv
 initialEnv float_lams binds
   = LE { le_switches  = float_lams
+       , le_index_uses = bindsAnnotationVarsWith retainedOperandVars binds
        , le_ctxt_lvl  = tOP_LEVEL
        , le_lvl_env   = emptyVarEnv
        , le_subst     = mkEmptySubst in_scope_toplvl
