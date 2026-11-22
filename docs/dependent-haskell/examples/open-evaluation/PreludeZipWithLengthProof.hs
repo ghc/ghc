@@ -9,6 +9,14 @@ import PreludeMapLengthProof (Count, Spine(..))
 import PreludeMapLengthSize (Size(..))
 import PreludeZipWithSource (PairHeads, Zipped)
 
+{- Note [Minimum length for ordinary zippers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Both length proofs share Minimum and Spine. Each proof uses the checked
+equations of its own installed zipper. An empty left list returns an
+empty result for any right list. An empty right list needs a left cons
+because both zippers inspect the left list first.
+-}
+
 -- | Compare two sizes, starting with the left size.
 type family Minimum (left :: Size) (right :: Size) :: Size where
     Minimum 'Zero _ = 'Zero

@@ -45,6 +45,7 @@ for mode in UNKNOWN_LEFT DROP_CONS; do
 done
 for mode in UNKNOWN_LEFT_LENGTH DROP_SUCCESSOR; do
     reject '[GHC-83865]' "$length_proof" "-D$mode"
+    reject '[GHC-83865]' "$pair_proof" "-D$mode"
 done
 reject '[GHC-83605]' "$proof" -O1 -fenable-rewrite-rules -DRULES_ON
-reject '[GHC-83605]' "$pair_proof" -O1 -fenable-rewrite-rules
+reject '[GHC-83605]' "$pair_proof" -O1 -fenable-rewrite-rules -DRULES_ON

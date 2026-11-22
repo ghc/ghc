@@ -1825,10 +1825,13 @@ and [Agda's length proof](https://agda.github.io/agda-stdlib/v2.3/Data.List.Prop
 
 The same checker reads the ordered cases of the installed `Prelude.zip`.
 The existing constructor checker verifies the lazy pair in its cons
-equation. Both functions must recur on the original tails. A function
-that checks the right spine first or forces a head before returning
-a cons does not get these equations. See the
-[ordinary pair proof](../examples/open-evaluation/PreludeZipProof.hs) and
+equation. An independent induction on the two list spines proves the
+minimum-length law directly for `Prelude.zip`. The Showcase runs `zip`
+on unequal lists and prints the pair-cons proof and the two length proofs.
+Both functions must recur on the original tails. A function that checks
+the right spine first or forces a head before returning a cons does not
+get these equations. See the
+[ordinary pair and length proofs](../examples/open-evaluation/PreludeZipProof.hs) and
 [regression](../../../testsuite/tests/dependent/should_run/NativeOpenPreludeZipWith.sh).
 
 ### Fold a mapped list
