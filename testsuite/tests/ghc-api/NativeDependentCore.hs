@@ -39,12 +39,14 @@ import GHC.Core.Unfold.Make (mkCoreUnfolding)
 import GHC.Core.Unify (BindFlag (..), MaybeApartReason (..), UnifyResultM (..), alwaysBindFam, alwaysBindTv, ruleMatchTyKiX, tcMatchRetainedTyX_BM, tcMatchTy, tcMatchTyKi, tcMatchTyX_BM, tcMatchTys, tcUnifyTysFG)
 import GHC.Core.Utils (applyTypeToArgs, cheapEqExpr, dataConRepFSInstPat, dataConRepInstPat, exprType)
 import GHC.CoreToIface (toIfaceAlt, toIfaceCoercion, toIfaceCoercionX, toIfaceExpr, toIfaceType, toIfaceTypeX)
+import GHC.CoreToStg.Prep (CorePrepConfig (..), corePrepExpr)
 import GHC.Data.Bag (bagToList)
 import GHC.Data.FastString (fsLit)
 import GHC.Data.IOEnv (IOEnvFailure)
 import GHC.Data.StringBuffer (stringToStringBuffer)
 import qualified GHC.Data.TrieMap as Trie
 import GHC.Driver.Config.Core.Lint (initLintConfig)
+import GHC.Driver.Config.CoreToStg.Prep (initCorePrepConfig)
 import GHC.Driver.Config.Parser (initParserOpts)
 import GHC.Driver.DynFlags (targetProfile)
 import GHC.Driver.Env (HscEnv (..), hscUpdateFlags)
@@ -116,7 +118,7 @@ main = do
             runOpaqueCallChecks dflags
             runRetainedOccursChecks
             runCurriedCallCoreChecks dflags
-            runCastCallbackChecks dflags
+            runCastCallbackChecks dflags libdir
             runScopedDictionaryOccursChecks libdir
             runFunctionBinderChecks dflags
             runFunctionFieldChecks dflags
@@ -228,8 +230,8 @@ runCurriedCallCoreChecks dflags = do
             _ -> False
 
 -- | Substitute a local callback using a closed family result equation.
-runCastCallbackChecks :: DynFlags -> IO ()
-runCastCallbackChecks dflags = do
+runCastCallbackChecks :: DynFlags -> FilePath -> IO ()
+runCastCallbackChecks dflags libdir = do
     let ordering = mkTyConTy orderingTyCon
         step = mkVisFunTyManyU boolTy ordering
         parameter = mkTyVar (mkSystemName (unique 11600) (mkTyVarOcc "flag")) boolTy
@@ -261,11 +263,14 @@ runCastCallbackChecks dflags = do
         whole = mkTyConApp eqTyCon [formalTy, TermVarTy formal, TermVarTy formal]
         partial = mkTyConApp eqTyCon [familyResult, occurrence x, occurrence y]
         applied = mkTyConApp eqTyCon [ordering, rawFull x y, rawFull y z]
-        result = mkVisFunTyManyU whole (mkVisFunTyManyU partial (mkVisFunTyManyU applied whole))
+        result = mkFunTy FTF_C_T unmatchableDataConTy ManyTy whole $
+            mkFunTy FTF_C_T unmatchableDataConTy ManyTy partial $
+            mkFunTy FTF_C_T unmatchableDataConTy ManyTy applied boolTy
         capture = local 11610 "capture" whole
         part = local 11611 "partial" partial
         both = local 11612 "applied" applied
-        worker = Lam formal (Lam capture (Lam part (Lam both (Var capture))))
+        answer = Var (dataConWorkId trueDataCon)
+        worker = mkLams [formal, capture, part, both] answer
         scope = [actual, x, y, z, xy, yz]
         subst = CoreSubst.extendIdSubst (CoreSubst.mkEmptySubst (mkInScopeSet (mkVarSet scope))) formal operand
         proofSubst = CoreSubst.substCo subst (mkTermAppCo formal (mkCoVarCo xy))
@@ -315,6 +320,23 @@ runCastCallbackChecks dflags = do
         Subst.isValidTCvSubst (scopedSubst (missing : scope)) && not (Subst.isValidTCvSubst (scopedSubst scope))
     lintRejects dflags "a runtime cast cannot forge the lexical head's type" scope $
         App worker (Var (setIdType actual formalTy))
+    env <- runGhc (Just libdir) getSession
+    config <- initCorePrepConfig env
+    let (nat, _, successor) = peanoNat
+        natTy = mkTyConTy nat
+        template = local 11615 "template" natTy
+        n = local 11616 "n" natTy
+        equality = mkTyConApp eqTyCon [natTy, TermVarTy template, TermVarTy template]
+        payload = local 11617 "equality" equality
+        mixedWorker = mkLams [formal, template, capture, payload] answer
+        successorArg = App (Var (dataConWorkId successor)) (Var n)
+        rawMixed = mkLams [actual, n] (mkApps mixedWorker [operand, successorArg])
+        nativeConfig = config { cp_allowNativeDependent = True, cp_arityOpts = Nothing
+                              , cp_specEval = False, cp_specEvalDFun = False }
+    lintAccepts dflags "cast callback before a named constructor argument" [] rawMixed
+    prepared <- corePrepExpr (hsc_logger env) nativeConfig rawMixed
+    lintAccepts dflags "cast callback after preparing a named constructor argument" [] prepared
+    checkType dflags "CorePrep preserves the mixed retained application type" (exprType rawMixed) (exprType prepared)
 
 -- | Follow the types of runtime variables when checking for recursive substitutions.
 runRetainedOccursChecks :: IO ()
