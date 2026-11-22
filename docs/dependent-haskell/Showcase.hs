@@ -1881,7 +1881,7 @@ main = do
         [ observeComparison (flip compare) (not pivot) pivot
         , observeComparison (flip compare) pivot (not pivot)
         , observeComparison (flip compare) pivot pivot ]
-    let familyComparison :: (Bool -> Bool -> Ordering) -> Bool -> Bool -> Ordering
+    let familyComparison :: (CompareAt.Result 'False -> Bool -> Ordering) -> Bool -> Bool -> Ordering
         familyComparison cmp x y = case CompareAt.decideFamilyCompare cmp x y of
             CompareAt.Less -> LT
             CompareAt.Equal -> EQ
@@ -1889,7 +1889,7 @@ main = do
     observe "apply the comparison selected by a type family"
         [ familyComparison (flip compare) (not pivot) pivot
         , familyComparison (flip compare) pivot (not pivot) ]
-    let keepComparison :: (Bool -> Bool -> Ordering) -> Bool -> Bool -> String
+    let keepComparison :: (CompareAt.Result 'False -> Bool -> Ordering) -> Bool -> Bool -> String
         keepComparison cmp x y = show (CompareAt.keepFamilyCompare cmp x y)
     putStrLn ("keep a comparison proof without forcing the converted callback: " ++
               keepComparison (error "forced comparator") (error "forced first argument")

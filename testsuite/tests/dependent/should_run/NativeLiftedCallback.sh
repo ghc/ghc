@@ -36,7 +36,7 @@ for probe in WRONG_INPUT WRONG_RESULT ABSTRACT_TAG; do
     if "${ghc[@]}" -ferror-spans "-D$probe" -fforce-recomp -fno-code -c \
         "$src/curried-callback/WrongDomain.hs" >"$probe.log" 2>&1; then exit 1; fi
     case $probe in
-        WRONG_INPUT)  grep -Fq 'WrongDomain.hs:9:38: error: [GHC-83605]' "$probe.log"
+        WRONG_INPUT)  grep -Fq 'WrongDomain.hs:9:38: error: [GHC-83865]' "$probe.log"
                       grep -Fq 'Actual: Bit -> Bool -> Ordering' "$probe.log" ;;
         WRONG_RESULT) grep -Fq 'WrongDomain.hs:12:38: error: [GHC-83865]' "$probe.log" ;;
         ABSTRACT_TAG) grep -Fq 'WrongDomain.hs:15:40: error: [GHC-83865]' "$probe.log" ;;

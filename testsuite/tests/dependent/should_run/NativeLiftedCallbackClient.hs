@@ -45,7 +45,7 @@ readFamily f x y = case CompareAt.decideFamilyCompare f x y of
   CompareAt.Equal -> EQ
   CompareAt.Greater -> GT
 
-readVia :: (Bool -> Bool -> Ordering) -> Bool -> Bool -> Ordering
+readVia :: (CompareAt.Result 'False -> Bool -> Ordering) -> Bool -> Bool -> Ordering
 readVia f x y = case FamilyCallback.decideVia f x y of
   CompareAt.Less -> LT
   CompareAt.Equal -> EQ
@@ -57,14 +57,14 @@ readBack f x y = case CompareAt.decideCompare f x y of
   CompareAt.Equal -> EQ
   CompareAt.Greater -> GT
 
-readScoped :: forall r. (r ~ CompareAt.Result 'True)
-           => Proxy r -> (Bool -> r) -> Bool -> Bool -> Ordering
-readScoped _ f x y = case CompareAt.decideFamilyCompare f x y of
+readScoped :: forall a r. (a ~ Bool, r ~ CompareAt.Result 'True)
+           => Proxy a -> Proxy r -> (a -> r) -> Bool -> Bool -> Ordering
+readScoped _ _ f x y = case CompareAt.decideFamilyCompare f x y of
   CompareAt.Less -> LT
   CompareAt.Equal -> EQ
   CompareAt.Greater -> GT
 
-keepBoth :: (Bool -> Bool -> Ordering) -> Bool -> Bool -> IO ()
+keepBoth :: (CompareAt.Result 'False -> Bool -> Ordering) -> Bool -> Bool -> IO ()
 keepBoth f x y = print (CompareAt.keepFamilyCompare f x y)
 
 main :: IO ()
@@ -91,7 +91,7 @@ main = do
   keepFamily (error "forced family callback") (error "forced callback argument")
   print (readFamily (flip compare) (not truth) truth, readFamily (flip compare) truth (not truth))
   print (readVia compare truth (not truth), readBack compare (not truth) truth,
-         readScoped (Proxy @(Bool -> Ordering)) compare truth truth)
+         readScoped (Proxy @Bool) (Proxy @(Bool -> Ordering)) compare truth truth)
   print (readFamily (\_ _ -> EQ) (error "unused first operand") (error "unused second operand"))
   print =<< forceFailure "forced family callback" (readFamily (error "forced family callback") truth truth == EQ)
   keepBoth (error "forced family callback") (error "forced first operand") (error "forced second operand")

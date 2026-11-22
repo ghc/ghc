@@ -4654,17 +4654,16 @@ tcRetainedFunctionArg domain arg = setSrcSpanA (getLoc arg) $
 tcRetainedFunctionVar :: TcType -> Id -> TcM Core.CoreExpr
 tcRetainedFunctionVar expected actual
   | not (isExternalName (getName actual))
-  , Just (input, _) <- nativeIndexFunctionTys_maybe actual
-  , Just (expected_input, _) <- nativeIndexFunctionTypeTys_maybe expected
+  , isNativeIndexFunctionId actual
+  , isJust (nativeIndexFunctionTypeTys_maybe expected)
   = if actual_ty `tcEqType` expected then pure (Core.Var actual)
-    else if input `tcEqType` expected_input then do
+    else do
       co <- unifyType (Just (NameThing (idName actual))) actual_ty expected
       nominal <- liftZonkM (zonkCo co)
       let range = Core.Cast (Core.Var actual) (SubCo nominal)
       case Core.nativeIndexFunctionArgIndex range of
         Just index | typeKind index `tcEqType` expected -> pure range
         _ -> mismatch
-    else mismatch
   | otherwise = failWithTc $ TcRnRetainedQuantificationError RetainedFunctionArgument
   where
     actual_ty = varType actual
@@ -4674,10 +4673,10 @@ tcRetainedFunctionVar expected actual
 {- Note [Checking a cast retained callback]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 An ordinary caller can declare cmp :: Bool -> Bool -> Ordering while
-the provider expects Bool -> Result 'True. The first argument has the
-same type. The ordinary unifier must prove the nominal equality of the
-arrows. Use its coercion for both the retained index and the value
-argument. Both refer to the actual local Id and preserve its demand.
+the provider expects Bool -> Result 'True. A type family can also
+determine the input type. The ordinary unifier must prove the nominal
+equality of the arrows. Use its coercion for both the retained index
+and the value argument. Both refer to the same local Id.
 -}
 
 -- | Resolve a retained argument at its known domain without checking its value.

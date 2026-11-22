@@ -5830,7 +5830,10 @@ result. GHC's `mkAppTy` already implements this operation with
 `decomposePiCos`. The fork uses the ordinary unifier's evidence in the
 index and the value argument. Substitution retains the lexical callback
 and GHCi or native code evaluates the ordinary call. The source test
-covers both conversion directions and an abstract result with a Given.
+covers conversions at the input and result. Figure 10 of DC uses the
+symmetric input coercion to pass the operand back to the original
+function. The Core API test checks the operand and its proof after
+interface serialization.
 [DC, An-Push](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf),
 [Core application](../../compiler/GHC/Core/TyCo/Make.hs)
 and [ordinary caller](../../testsuite/tests/dependent/should_run/NativeLiftedCallbackClient.hs).

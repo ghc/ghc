@@ -55,7 +55,10 @@ or its argument. A caller can declare `cmp :: Bool -> Bool -> Ordering`
 and supply it where the provider expects `Bool -> Result 'True`.
 The reverse conversion also works. The ordinary type checker proves
 the equality. A local Given can supply it when the result type is abstract.
-The first argument must have the same type in both function arrows.
+A nominal equality can also determine the input type. For example,
+the client can use `Result 'False -> Bool -> Ordering` as the callback
+type. Its first argument reduces to `Bool`. A newtype with the same
+representation as `Bool` produces GHC-83865 at the callback argument.
 [Family callback control](../../../testsuite/tests/dependent/should_run/curried-callback/FamilyCallback.hs).
 
 When `Result 'True` reduces to `Bool -> Ordering`, the provider can
