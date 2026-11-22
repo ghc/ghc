@@ -372,6 +372,11 @@ and substitutes that same argument in co. Symmetry reverses the transport.
 Transitivity composes the checked argument and result conversions. Preserve a
 cast on a function value until application: eta expansion can hide bottom.
 The Arity and CorePrep paths implement this selected An-Push specialization.
+Arity accepts a nominally cast lexical callback at an unchanged binder domain.
+Use the checked callback index and substitute the original operand in the body
+proof. This keeps the lexical Id and the evidence for the callback cast.
+Keep this case out of scoped dictionary proof bodies. A selector can require a
+bare receiver in an intermediate type of the proof.
 Opaque coercion projections, changed multiplicities, native coercion encoding
 and general optimization remain separate gates.
 -}

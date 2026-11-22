@@ -53,6 +53,7 @@ import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Utils
 import GHC.Core.DataCon
+import GHC.Core.Dependent ( hasScopedDictionaryExpr )
 import GHC.Core.TyCon     ( TyCon, tyConArity, isInjectiveTyCon )
 import GHC.Core.TyCon.RecWalk     ( initRecTc, checkRecTc )
 import GHC.Core.Predicate ( isDictTy, isEvId, isCallStackPredTy, isCallStackTy )
@@ -65,7 +66,7 @@ import GHC.Core.Subst    as Core
 import GHC.Core.Type     as Type
 import GHC.Core.Coercion as Type
 import GHC.Core.TyCo.Compare( eqType, eqTypeIgnoringMultiplicity )
-import GHC.Core.TyCo.Rep ( Type(DepFunTy), Coercion(..) )
+import GHC.Core.TyCo.Rep ( Type(DepFunTy, TermVarTy), Coercion(..) )
 
 import GHC.Types.Demand
 import GHC.Types.Cpr( CprSig, mkCprSig, botCpr )
@@ -2986,16 +2987,19 @@ pushCoRetainedArg = go
                    MRefl -> arg
                    MCo _ -> Cast arg (SubCo (if symmetric then delta else mkSymCo delta))
                  replacement = if symmetric then arg else converted
-           ; if valid_argument b replacement then pure () else Nothing
+           ; if valid_argument b body replacement then pure () else Nothing
            ; let scope = mkInScopeSet (exprFreeVars replacement `unionVarSet` tyCoVarsOfCo body)
                  subst = Core.extendIdSubst (Core.mkEmptySubst scope) b replacement
                  proof = Core.substCo subst body
            ; return (converted, MCo (if symmetric then mkSymCo proof else proof)) }
 
-    valid_argument b arg
+    valid_argument b body arg
       | isNativeIndexFunctionId b
-      = case nativeIndexFunctionVar_maybe arg of
-          Just actual -> varType actual `eqType` varType b
+      = case nativeIndexFunctionArgIndex arg of
+          Just index -> typeKind index `eqType` varType b
+                        && case index of
+                             TermVarTy{} -> True
+                             _ -> not (hasScopedDictionaryExpr (Coercion body))
           Nothing -> False
       | isNativeOpaqueValueId b
       = case exprToNativeIndex arg of

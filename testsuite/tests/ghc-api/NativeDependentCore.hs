@@ -414,8 +414,9 @@ runCastCallbackInputChecks dflags libdir = do
         mixSubst = indexSubst scope mixed mixedOperand
         openCall a = TermAppTy mixed (TermVarTy a)
         expose a = mkGReflRightCo Nominal (openCall a) resultCo
-        congruence a b first second = Subst.substCo mixSubst $
+        openCongruence a b first second =
             mkAppCo (mkTransCo (mkSymCo (expose a)) (mkTransCo (mkTermAppCo mixed first) (expose b))) second
+        congruence a b first second = Subst.substCo mixSubst (openCongruence a b first second)
         mixedProof = congruence x y (mkCoVarCo xy) (mkCoVarCo pq)
         mixedOptimized = optCoercion (OptCoercionOpts True Nothing) Subst.emptySubst mixedProof
         requireMixed = Lam (proof 11644 (expected x p) (expected y q)) answer
@@ -429,6 +430,33 @@ runCastCallbackInputChecks dflags libdir = do
         lintAccepts dflags "proof for a different mixed callback result is itself valid" scope (Coercion wrong)
         lintRejects dflags "mixed callback proof must name both selected operands" scope $
             App requireMixed (Coercion wrong)
+
+    let openProof = openCongruence x y (mkCoVarCo xy) (mkCoVarCo pq)
+        payloadCo = mkTyConAppCo Nominal eqTyCon [mkNomReflCo ordering, openProof, openProof]
+        arrowCo = mkFunCoNoFTF Nominal (mkNomReflCo unmatchableDataConTy)
+                    (mkNomReflCo ManyTy) payloadCo (mkNomReflCo boolTy)
+        fixedCo = mkSubCo (mkDepFunCo mixed arrowCo)
+        resultAt a b = mkFunTy FTF_C_T unmatchableDataConTy ManyTy
+            (mkTyConApp eqTyCon [ordering, expected a b, expected a b]) boolTy
+    forM_ [("forward", fixedCo, resultAt x p, resultAt y q),
+           ("reverse", mkSymCo fixedCo, resultAt y q, resultAt x p)] $ \(direction, co, lhs, rhs) -> do
+        let label = "push a mixed callback cast " ++ direction
+            fun = local 11646 "worker" (coercionLKind co)
+            original = App (Cast (Var fun) co) mixedOperand
+        lintAccepts dflags (label ++ " original") (fun : scope) original
+        case pushCoArg co mixedOperand of
+            Just (arg, MCo resultProof) -> do
+                check (label ++ " retains the runtime argument") (cheapEqExpr arg mixedOperand)
+                check (label ++ " keeps the representational role and proof scope") $
+                    coercionRole resultProof == Representational &&
+                    all (`elemVarSet` tyCoVarsOfCo resultProof) [actual, xy, pq] &&
+                    not (mixed `elemVarSet` tyCoVarsOfCo resultProof)
+                checkType dflags (label ++ " left result endpoint") lhs (coercionLKind resultProof)
+                checkType dflags (label ++ " right result endpoint") rhs (coercionRKind resultProof)
+                lintAccepts dflags (label ++ " pushed") (fun : scope) $
+                    Cast (App (Var fun) arg) resultProof
+            _ -> fail ("FAIL: " ++ label ++ " did not push explicit retained congruence")
+
     let callResult = mkAppTy (mkCastTy (openCall x) resultCo) (TermVarTy p)
         keep = mkLams [mixed, proof 11645 callResult callResult] answer
         ignored = simpleOptNativeExpr (App keep mixedOperand)
@@ -457,8 +485,15 @@ runCastCallbackInputChecks dflags libdir = do
         wrappedIndex = TermVarTy wrapped
         wrappedConstraint = mkTyConApp eqTyCon [varType wrapped, wrappedIndex, wrappedIndex]
         wrappedWorker = mkLams [wrapped, local 11634 "constraint" wrappedConstraint] answer
+        wrappedTy = mkFunTy FTF_C_T unmatchableDataConTy ManyTy wrappedConstraint boolTy
+        wrappedCo = mkDepFunCoWithVis DepFunVisible DepFunInvisible wrapped MRefl
+                        (mkReflCo Representational wrappedTy)
     lintAccepts dflags "a real newtype proof casts an ordinary callback" [actual] represented
     lintRejects dflags "a newtype proof cannot cast a retained callback input" [actual] (App wrappedWorker represented)
+    lintAccepts dflags "the retained visibility cast itself is valid" [] (Coercion wrappedCo)
+    case pushCoArg wrappedCo represented of
+        Nothing -> pure ()
+        Just _ -> fail "FAIL: retained cast push accepted representational-only callback evidence"
 
     config <- initCorePrepConfig env
     let (nat, _, successor) = peanoNat
