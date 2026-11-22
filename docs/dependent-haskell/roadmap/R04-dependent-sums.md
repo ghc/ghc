@@ -318,7 +318,9 @@ An ordinary client recovers both dimensions through the nominal shape
 equality. A wildcard match leaves the dimensions and the cells unevaluated.
 Reading one dimension leaves the other unevaluated. Swapping the two
 dimensions in the payload type fails at `xs`.
-[Source-hidden check](../../../testsuite/tests/dependent/should_run/NativeGadtRetainedSum.sh)
+[Showcase constructor](../examples/packed-vector/IndexedMatrix.hs),
+[ordinary client](../examples/packed-vector/IndexedMatrixClient.hs),
+[source-hidden check](../../../testsuite/tests/dependent/should_run/NativeGadtRetainedSum.sh)
 and [indexed shape precedent](../REFERENCES.md#combine-two-stored-fields-in-one-index).
 
 A square stores one side length. Both result parameters use this length.

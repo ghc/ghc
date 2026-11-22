@@ -514,6 +514,7 @@ read the first cells of polymorphic directly indexed vectors: ([True],"q")
 match the stored length of directly indexed vectors: (Nothing,Just True)
 read a payload at the predecessor of its public index: [True]
 read a rectangle's rows and compare a square's dimensions: (1,True)
+read dimensions and cells at a tile's public shape: ((1,2),[[True,False]])
 adjust a reading while preserving its calibration index: (True,37)
 prove the filter bound from a runtime list: (BothSucc (RightSucc (BothSucc ZeroBound)),Succ (Succ Zero),Succ (Succ (Succ Zero)))
 prove the filter bound with a runtime decider: (BothSucc (BothSucc (BothSucc ZeroBound)),Succ (Succ (Succ Zero)),Succ (Succ (Succ Zero)))
