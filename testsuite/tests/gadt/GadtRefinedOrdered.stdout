@@ -1,0 +1,4 @@
+((True,False,Left Refl),(True,False,Right (Left Refl)),(True,False,Right (Right (Refl,Refl))))
+(True,True)
+((True,False,Left Refl),(True,False,Right (Left Refl)),(True,False,Right (Right (Refl,Refl))))
+(True,True)

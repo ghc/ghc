@@ -19,7 +19,7 @@ module GHC.Rename.HsType (
         newTyVarNameRn,
         rnHsConDeclRecFields,
         lookupField, mkHsOpTyRn,
-        rnLTyVar, classifyTypeCasePattern,
+        rnLTyVar, classifyTypeCasePattern, warnPunnedTypeSyntax, warnPunnedTyConSyntax,
 
         rnHsConDeclField, rnRetainedSigType, rnHsSigWcTypeWithSplice,
         SignatureSpliceSite(..),
@@ -60,9 +60,9 @@ import GHC.Hs
 
 import GHC.Rename.Env
 import GHC.Rename.Doc
-import GHC.Rename.Utils  ( mapFvRn, bindLocalNamesFV
+import GHC.Rename.Utils  ( mapFvRn, bindLocalNamesFV, bindImplicitLocalNamesFV
                          , typeAppErr, newLocalBndrRn, checkDupRdrNames
-                         , checkShadowedRdrNames )
+                         , checkShadowedRdrNames, recordImplicitPunBinders )
 import GHC.Rename.Fixity ( lookupFieldFixityRn, lookupFixityRn
                          , lookupTypeFixityRn, lookupTypeFixityWithUsesRn )
 import GHC.Rename.Unbound ( notInScopeErr, WhereLooking(WL_LocalOnly) )
@@ -487,7 +487,7 @@ rnHsPatSigTyKi level scoping ctx sig_ty thing_inside
     do { (nwcs, pat_sig_ty', fvs1) <- rnWcBodyTyKi level ctx nwc_rdrs pat_sig_ty
        ; let sig_names = HsPSRn { hsps_nwcs = nwcs, hsps_imp_tvs = imp_tvs }
              sig_ty'   = HsPS { hsps_ext = sig_names, hsps_body = pat_sig_ty' }
-       ; (res, fvs2) <- thing_inside sig_ty'
+       ; (res, fvs2) <- recordImplicitPunBinders imp_tvs (thing_inside sig_ty')
        ; return (res, fvs1 `plusFN` fvs2) } }
   where
     pat_sig_ty = hsPatSigType sig_ty
@@ -703,7 +703,7 @@ rnImplicitTvOccs mb_assoc implicit_vs_with_dups thing_inside
        ; vars <- mapM (newTyVarNameRnImplicit mb_assoc implicit_vs_with_dups . L loc' . unLoc)
                       implicit_vs
 
-       ; bindLocalNamesFV vars $
+       ; bindImplicitLocalNamesFV vars $
          thing_inside vars }
 
 {-
@@ -1002,10 +1002,7 @@ constructor result. A bang there is subject to the ordinary type rules.
 -}
 
 rnHsTyKi env listTy@(HsListTy x ty)
-  = do { case x of
-           (EpTok (EpaSpan (RealSrcSpan _ _)), _) ->
-             addDiagnostic (TcRnPunnedTypeSyntax (ppr listTy))
-           _ -> pure ()
+  = do { warnPunnedTypeSyntax listTy
        ; when (isRnKindLevel env) $
            checkDataKinds env listTy
        ; (ty', fvs) <- rnLHsTyKi env ty
@@ -1022,10 +1019,7 @@ rnHsTyKi env (HsKindSig x ty k)
 -- Unboxed tuples are allowed to have poly-typed arguments.  These
 -- sometimes crop up as a result of CPR worker-wrappering dictionaries.
 rnHsTyKi env tupleTy@(HsTupleTy x tup_con tys)
-  = do { case x of
-           AnnParens (EpTok (EpaSpan (RealSrcSpan _ _))) _ ->
-             addDiagnostic (TcRnPunnedTypeSyntax (ppr tupleTy))
-           _ -> pure ()
+  = do { warnPunnedTypeSyntax tupleTy
        ; when (isRnKindLevel env) $
            checkDataKinds env tupleTy
        ; (tys', fvs) <- mapFvRn (rnLHsTyKi env) tys
@@ -1325,6 +1319,26 @@ rnLHsAppHead env open (L l (HsParTy _ ty)) = do
   return (L l (HsParTy noAnn ty'), fvs)
 rnLHsAppHead env _ ty = rnLHsTyKi env ty
 
+-- | Warn about written list and boxed tuple type syntax.
+warnPunnedTypeSyntax :: HsType GhcPs -> RnM ()
+warnPunnedTypeSyntax ty = case ty of
+  HsListTy (EpTok (EpaSpan (RealSrcSpan _ _)), _) _ -> warn
+  HsTupleTy (AnnParens (EpTok (EpaSpan (RealSrcSpan _ _))) _) _ _ -> warn
+  _ -> pure ()
+  where
+    warn = addDiagnostic (TcRnPunnedTypeSyntax (ppr ty))
+
+-- | Warn about a written list or boxed tuple type constructor.
+warnPunnedTyConSyntax :: LocatedN RdrName -> Name -> RnM ()
+warnPunnedTyConSyntax (L loc rdr) name =
+  -- Template Haskell-generated types do not carry written punctuation.
+  case anns loc of
+    NameAnnOnly (NameSquare _ _) _ | name == listTyConName ->
+      addDiagnosticAt (locA loc) (TcRnPunnedTypeSyntax (text "[]"))
+    NameAnnCommas (NameParens _ _) _ _ | isTupleTyConName name ->
+      addDiagnosticAt (locA loc) (TcRnPunnedTypeSyntax (ppr rdr))
+    _ -> pure ()
+
 rnHsTyVar :: (RdrName -> RnM GlobalRdrElt) -> RnTyKiEnv -> HsType GhcPs
           -> PromotionFlag -> LocatedN RdrName -> RnM (HsType GhcRn, FreeNames)
 rnHsTyVar lookup_occ env tv ip (L loc rdr_name)
@@ -1336,16 +1350,8 @@ rnHsTyVar lookup_occ env tv ip (L loc rdr_name)
            -- of PolyKinds (see #14710)
        ; gre <- lookup_occ rdr_name
        ; unless (isPromoted ip) $ do
-           warnGlobalPunUse (L loc rdr_name) gre
-           -- The parser records the punctuation only for written syntax.
-           -- A type constructed by Template Haskell has no such tokens.
-           let name = greName gre
-           case anns loc of
-             NameAnnOnly (NameSquare _ _) _ | name == listTyConName ->
-               addDiagnosticAt (locA loc) (TcRnPunnedTypeSyntax (text "[]"))
-             NameAnnCommas (NameParens _ _) _ _ | isTupleTyConName name ->
-               addDiagnosticAt (locA loc) (TcRnPunnedTypeSyntax (ppr rdr_name))
-             _ -> pure ()
+           warnPunUse (L loc rdr_name) gre
+           warnPunnedTyConSyntax (L loc rdr_name) (greName gre)
        ; checkNamedWildCard env (greName gre)
        ; this_mod <- getModule
        ; explicit_level_imports <- xoptM LangExt.ExplicitLevelImports
@@ -1380,7 +1386,7 @@ rnHsTyOp env overall_ty tyop
                  | otherwise = False
        ; opgre <- lookupTypeAppHeadRn open_operands op
        ; unless (isPromoted prom) $
-           warnGlobalPunUse (L loc op) opgre
+           warnPunUse (L loc op) opgre
        ; checkNamedWildCard env (greName opgre)
        ; let opName = greName opgre
        ; unlessXOptM LangExt.TypeOperators $
@@ -1757,25 +1763,28 @@ bindHsOuterTyVarBndrs doc mb_cls implicit_vars outer_bndrs thing_inside =
 -- See Note [Term variable capture and implicit quantification]
 warn_term_var_capture :: FreeKiTyVars -> LocatedN RdrName -> Name -> RnM ()
 warn_term_var_capture occurrences lVar chosen = do
-    gbl_env <- getGlobalRdrEnv
-    local_env <- getLocalRdrEnv
+  pun_uses <- woptM Opt_WarnPunUses
+  legacy_capture <- woptM Opt_WarnTermVariableCapture
+  when (pun_uses || legacy_capture) $ do
+    (gbl_env, local_env) <- getRdrEnvs
     case demoteRdrNameTv $ unLoc lVar of
       Nothing           -> return ()
       Just demoted_name -> do
-        let global_vars = lookupGRE gbl_env (LookupRdrName demoted_name SameNameSpace)
-        let mlocal_var  = lookupLocalRdrEnv local_env demoted_name
-        case mlocal_var of
-          Just name -> warn (Right name) (mkLocalVanillaGRE NoParent name NE.:| [])
-          Nothing   -> for_ (NE.nonEmpty global_vars) $ warn (Left global_vars)
+        -- An in-scope selector function is an alternative for pun warnings.
+        -- Keep the legacy check aligned with RequiredTypeArguments.
+        let which | pun_uses = RelevantGREsFOS WantNormal
+                  | otherwise = SameNameSpace
+            global_vars = lookupGRE gbl_env (LookupRdrName demoted_name which)
+        case lookupLocalRdrEnv local_env demoted_name of
+          Just name -> warn pun_uses (Right name) (mkLocalVanillaGRE NoParent name NE.:| [])
+          Nothing   -> for_ (NE.nonEmpty global_vars) $ warn pun_uses (Left global_vars)
   where
-    warn captured alternatives = do
-      pun_uses <- woptM Opt_WarnPunUses
-      if pun_uses
-        then for_ occurrences $ \(L loc rdr) ->
+    warn pun_uses captured alternatives
+      | pun_uses = for_ occurrences $ \(L loc rdr) ->
           when (rdr == unLoc lVar) $
             addDiagnosticAt (locA loc)
               (TcRnPunUse rdr (mkLocalVanillaGRE NoParent chosen) alternatives)
-        else warnCapturedTerm lVar captured
+      | otherwise = warnCapturedTerm lVar captured
 
 bindHsForAllTelescope :: HsDocContext
                       -> HsForAllTelescope GhcPs

@@ -1,0 +1,74 @@
+ConditionalPunUses.hs:9:8: warning: [GHC-59431] [-Wpun-bindings]
+    ‘x’ is declared in both the type and term namespaces.
+    Other declaration at ConditionalPunUses.hs:9:8
+
+ConditionalPunUses.hs:9:24: warning: [GHC-41293] [-Wpun-uses]
+    ‘x’ depends on separate type and term namespaces.
+    This use resolves to ‘x’ defined at ConditionalPunUses.hs:9:8
+    Same-spelled names in the other namespace:
+      ‘x’ defined at ConditionalPunUses.hs:9:8
+
+ConditionalPunUses.hs:13:21: warning: [GHC-41293] [-Wpun-uses]
+    ‘q’ depends on separate type and term namespaces.
+    This use resolves to ‘q’ defined at ConditionalPunUses.hs:13:12
+    Same-spelled names in the other namespace:
+      ‘q’ defined at ConditionalPunUses.hs:13:9
+
+ConditionalPunUses.hs:13:36: warning: [GHC-41293] [-Wpun-uses]
+    ‘q’ depends on separate type and term namespaces.
+    This use resolves to ‘q’ defined at ConditionalPunUses.hs:13:12
+    Same-spelled names in the other namespace:
+      ‘q’ defined at ConditionalPunUses.hs:13:9
+
+ConditionalPunUses.hs:17:18: warning: [GHC-41293] [-Wpun-uses]
+    ‘a’ depends on separate type and term namespaces.
+    This use resolves to ‘a’ defined at ConditionalPunUses.hs:17:9
+    Same-spelled names in the other namespace:
+      ‘a’ defined at ConditionalPunUses.hs:5:1
+
+ConditionalPunUses.hs:17:33: warning: [GHC-41293] [-Wpun-uses]
+    ‘a’ depends on separate type and term namespaces.
+    This use resolves to ‘a’ defined at ConditionalPunUses.hs:17:9
+    Same-spelled names in the other namespace:
+      ‘a’ defined at ConditionalPunUses.hs:5:1
+
+ConditionalPunUses.hs:25:13: warning: [GHC-59431] [-Wpun-bindings]
+    ‘r’ is declared in both the type and term namespaces.
+    Other declaration at ConditionalPunUses.hs:25:11
+
+ConditionalPunUses.hs:25:18: warning: [GHC-41293] [-Wpun-uses]
+    ‘r’ depends on separate type and term namespaces.
+    This use resolves to ‘r’ defined at ConditionalPunUses.hs:25:13
+    Same-spelled names in the other namespace:
+      ‘r’ defined at ConditionalPunUses.hs:25:11
+
+ConditionalPunUses.hs:25:23: warning: [GHC-41293] [-Wpun-uses]
+    ‘r’ depends on separate type and term namespaces.
+    This use resolves to ‘r’ defined at ConditionalPunUses.hs:25:11
+    Same-spelled names in the other namespace:
+      ‘r’ defined at ConditionalPunUses.hs:25:13
+
+ConditionalPunUses.hs:29:25: warning: [GHC-41293] [-Wpun-uses]
+    ‘q’ depends on separate type and term namespaces.
+    This use resolves to ‘q’ defined at ConditionalPunUses.hs:29:20
+    Same-spelled names in the other namespace:
+      ‘q’ defined at ConditionalPunUses.hs:29:14
+
+ConditionalPunUses.hs:29:37: warning: [GHC-41293] [-Wpun-uses]
+    ‘q’ depends on separate type and term namespaces.
+    This use resolves to ‘q’ defined at ConditionalPunUses.hs:29:20
+    Same-spelled names in the other namespace:
+      ‘q’ defined at ConditionalPunUses.hs:29:20
+
+ConditionalPunUses.hs:33:19: warning: [GHC-41293] [-Wpun-uses]
+    ‘id’ depends on separate type and term namespaces.
+    This use resolves to ‘id’ defined at ConditionalPunUses.hs:33:13
+    Same-spelled names in the other namespace:
+      ‘id’ imported from ‘Prelude’
+           (and originally defined in ‘GHC.Internal.Base’)
+
+ConditionalPunUses.hs:33:32: warning: [GHC-41293] [-Wpun-uses]
+    ‘id’ depends on separate type and term namespaces.
+    This use resolves to ‘id’ defined at ConditionalPunUses.hs:33:13
+    Same-spelled names in the other namespace:
+      ‘id’ defined at ConditionalPunUses.hs:33:13

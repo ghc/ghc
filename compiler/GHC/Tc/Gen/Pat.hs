@@ -1425,11 +1425,13 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
              <- tcConTyArgs tenv penv univ_ty_args $
                 case source_order of
                   OrderedConArgs (_ : groups) -> do
-                    { (binds, (pats, scopes, result)) <-
-                        checkConstraints skol ex_tvs' [] $
+                    { -- See Note [Result equalities of ordered constructors].
+                      let (result_givens, context_givens) = splitAt (length eq_spec) given
+                    ; (binds, (pats, scopes, result)) <-
+                        checkConstraints skol ex_tvs' result_givens $
                         tcConTyArgs tenv penv ex_ty_args $
                         tcOrderedConArgs con_like penv tenv skol groups
-                          field_tys val_arg_pats late_ty_args given check_body
+                          field_tys val_arg_pats late_ty_args context_givens check_body
                     ; return (idHsWrapper, binds, scopes, pats, result) }
                   _ | trailing_context ->
                     do { (early_binds, (pats, (late_binds, result))) <-
@@ -2393,7 +2395,21 @@ tcConPrefixArgs con_like penv start tys pats thing_inside = do
   assert (length pats == length tys) $
     tcMultiple (tcConArg con_like) penv (zip3 [start..] pats tys) thing_inside
 
--- | Match fields and introduce each group of Givens in source order.
+{- Note [Result equalities of ordered constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The constructor alternative binds its existential skolems and the
+equalities from matching its result type. Those Givens are available
+when checking its arguments, as in other GADT patterns.
+
+The worker binds result equalities before the written contexts.
+An ordered constructor records positions only for the written
+contexts. Split off the result equalities before walking those
+positions. A written context still enters scope after the preceding
+fields and type patterns. The names introduced by a written type
+pattern also retain their source scope.
+-}
+
+-- | Match fields and introduce each written context in source order.
 tcOrderedConArgs :: ConLike -> PatEnv -> Subst -> SkolemInfoAnon
                  -> [ConSourceGroup] -> [Scaled TcSigmaType] -> HsConPatDetails GhcRn
                  -> [(Int, [(HsTyPat GhcRn, TyVar)])] -> [EvVar]

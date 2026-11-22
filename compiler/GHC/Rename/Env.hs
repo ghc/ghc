@@ -21,7 +21,7 @@ module GHC.Rename.Env (
         lookupGlobalOccRn_maybe,
         rnLookupKnownOccName,
 
-        lookupExprOccRn, warnGlobalPunUse,
+        lookupExprOccRn, warnPunUse, warnGlobalPunUse,
         lookupRecFieldOcc,
         lookupRecUpdFields,
         getFieldUpdLbl,
@@ -1666,13 +1666,41 @@ lookupExprOccRn rdr_name
                         -- we failed to look up the name at the term level.
            p         -> return p }
 
+-- | Warn about a written occurrence that relies on separate namespaces.
+warnPunUse :: LocatedN RdrName -> GlobalRdrElt -> RnM ()
+warnPunUse loc_rdr@(L loc rdr) selected
+  | isUnqual rdr
+  , isTyVarName name || isValName name
+  = whenWOptM Opt_WarnPunUses $ do
+      (global_env, local_env) <- getRdrEnvs
+      let other_ns = setRdrNameSpace rdr (if isTyVarName name then varName else tvName)
+          rank = localPunScope local_env name
+          implicit = rank == Just 0
+          competing
+            | Just other <- lookupLocalRdrEnv local_env other_ns = do
+                guard (other /= name && (implicit || closer (localPunScope local_env other)))
+                Just (mkLocalVanillaGRE NoParent other NE.:| [])
+            | isTyVarName name =
+                NE.nonEmpty (filter relevant_other (lookupGRE global_env global_other_ns))
+            | otherwise = Nothing
+          global_other_ns = LookupRdrName other_ns (RelevantGREsFOS WantNormal)
+          relevant_other other = implicit || closer (localPunScope local_env (greName other))
+          closer (Just other_rank) =
+            other_rank > 0 && maybe (isExternalName name) (<= other_rank) rank
+          closer Nothing = False
+      case competing of
+        Just others -> addDiagnosticAt (locA loc) (TcRnPunUse rdr selected others)
+        Nothing -> warnGlobalPunUse loc_rdr selected
+  | otherwise = warnGlobalPunUse loc_rdr selected
+  where
+    name = greName selected
+
 -- | Warn about a global occurrence that relies on separate namespaces.
 -- See Note [Global pun use warnings].
 warnGlobalPunUse :: LocatedN RdrName -> GlobalRdrElt -> RnM ()
 warnGlobalPunUse (L loc rdr) selected
   | isUnqual rdr || isQual rdr
   , let name = greName selected
-  , isExternalName name
   , isTyConName name || isValName name
   = whenWOptM Opt_WarnPunUses $ do
       (global_env, local_env) <- getRdrEnvs
@@ -1681,7 +1709,7 @@ warnGlobalPunUse (L loc rdr) selected
         [chosen]
           | greName chosen == name
           , isNothing (lookupLocalRdrEnv local_env local_other_ns)
-          , other : rest <- filter (visible_with chosen) (globals other_ns)
+          , other : rest <- filter (visible_with local_env chosen) (globals other_ns)
           -> addDiagnosticAt (locA loc) (TcRnPunUse rdr chosen (other NE.:| rest))
         _ -> pure ()
   | otherwise = pure ()
@@ -1696,8 +1724,15 @@ warnGlobalPunUse (L loc rdr) selected
     local_other_ns
       | selected_term = setRdrNameSpace rdr tvName
       | otherwise = term_ns
-    visible_with chosen other =
-      isQual rdr || not (isLocalGRE chosen) || isLocalGRE other
+    visible_with env chosen other
+      | isQual rdr = True
+      | otherwise =
+          case compare (scope chosen) (scope other) of
+            LT -> True
+            GT -> False
+            EQ -> not (isLocalGRE chosen) || isLocalGRE other
+      where
+        scope = localPunScope env . greName
 
 {- Note [Global pun use warnings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1712,15 +1747,34 @@ imports. A selection in the imported scope still needs a warning if a
 local top-level definition in the other namespace would shadow it.
 Qualified paths use the qualifier to select their candidates.
 
+Top-level names in a declaration quote have InternalNames in the
+global reader environment. Check exact membership of the selected name
+in that environment. Declarations in an inner quote can shadow declarations
+in an enclosing scope, so rank them as one group when extending the global
+environment. See Note [Top-level Names in Template Haskell decl quotes]
+in GHC.Rename.Names.
+
 Proposal #682 section 3.4 keeps all import levels in name resolution.
 An import at a different level can still make a name ambiguous. Check
 the hypothetical unified namespace before any staging check. Leave
 the actual selected name and staging diagnostic unchanged.
 
-A term binder and a type binder can be introduced in separate local
-scopes. Their presence alone does not determine which is visible in a
-unified namespace. This check uses global selections only and leaves
-local alternatives to their scope checks.
+Explicit local names are ranked in the order they enter the reader
+environment. A local explicit binder can replace a global binding.
+For a written occurrence of an explicit local binder, check whether
+the other namespace has a name in the same group or in a closer group.
+Check the current reader environment. A binder removed from that
+environment can no longer compete. A retained binder's alias resolves
+to the same name.
+
+Pattern renaming brings names into scope from left to right. In
+`\(a :: a) -> a` the annotation is read before the term variable enters
+scope. After the patterns, the RHS sees their explicit binders as one
+group. The implicit-quantification check reports the occurrences in
+the introducing signature. After renaming a pattern signature, record
+its fresh implicit type variables for later uses. They cannot shadow
+competing term binders. Recording them after the signature prevents
+duplicate warnings on the introducing occurrences.
 -}
 
 lookupGlobalOccRn_maybe :: WhichGREs GREInfo -> RdrName -> RnM (Maybe GlobalRdrElt)

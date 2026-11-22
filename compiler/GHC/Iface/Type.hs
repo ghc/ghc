@@ -3102,6 +3102,8 @@ data IfaceEvidence
   | SourceProofRuleBranchesEvidence
   | ExperimentalWordPrimIndexEvidence
   | ScopedEnumCaseEvidence
+  | FieldlessOrderedGadtTelescopeEvidence
+  | RefinedOrderedGadtTelescopeEvidence
   | ScopedConstructorCaseEvidence
   deriving (Bounded, Enum, Eq, Ord)
 

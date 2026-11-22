@@ -1255,10 +1255,8 @@ splitLHsGadtTy (L _ sig_ty)
            in case split_contexts rho_ty of
                 (_, body)
                   | Just _ <- mb_ctxt
-                  , any required_group inner_bndrs
                   , HsForAllTy{} <- unLoc (ignoreParens body)
-                  -- The context precedes another binder group. Keep the
-                  -- rest in the ordered GADT suffix, before its first field.
+                  -- See Note [GADT contexts before nested foralls].
                   -> (outer_bndrs, inner_bndrs, phi_ty)
                 (contexts, body)
                   | not (null contexts)
@@ -1266,9 +1264,6 @@ splitLHsGadtTy (L _ sig_ty)
                   -> (outer_bndrs, prefix ++ contexts, body)
                 _ -> (outer_bndrs, prefix, rho_ty)
   where
-    required_group (L _ (HsGadtForAll _ HsForAllVis{})) = True
-    required_group _ = False
-
     split_outer_bndrs :: HsSigType GhcPs -> (HsOuterSigTyVarBndrs GhcPs, LHsType GhcPs)
     split_outer_bndrs (HsSig{sig_bndrs = outer_bndrs, sig_body = body_ty}) =
       (outer_bndrs, body_ty)
@@ -1296,6 +1291,19 @@ splitLHsGadtTy (L _ sig_ty)
     -- type of form {fld :: ty, ...} -> ResTy
     is_gadt_rec_ty (L _ (HsFunTy _ _ (L _ (XHsType HsRecTy{})) _)) = True
     is_gadt_rec_ty _ = False
+
+{- Note [GADT contexts before nested foralls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In a prefix constructor such as
+
+  K :: forall a. Eq a => forall b. a -> forall c. b -> c -> Box a
+
+the outer forall binds a before the context. Keep the context and the
+remaining quantifiers and fields together in the ordered suffix.
+Otherwise the suffix starts at forall b. with no preceding fields.
+splitGadtInterior in GHC.Hs.Decls then cannot recover the source order.
+The same rule applies to visible and invisible leading binders.
+-}
 
 -- | Split one invisible forall group. Look through outer parentheses.
 -- Keep the complete telescope, including its matchability annotation.

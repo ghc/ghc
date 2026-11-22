@@ -258,6 +258,7 @@ test('T25901_sub_f', normal, compile, ['-Wdodgy-exports -Wno-duplicate-exports']
 test('T25901_sub_g', [extra_files(['T25901_sub_g_helper.hs'])], multimod_compile, ['T25901_sub_g', '-v0 -Wdodgy-imports'])
 
 test('ToplevelPunBindings', normal, compile, ['-Wpun-bindings'])
+test('ToplevelPunSplices', req_th, compile, ['-Wpun-bindings'])
 test('LocalPunBindings', normal, compile, ['-Wpun-bindings -Wname-shadowing'])
 test('PunUses', [extra_files(['PunUseData.hs', 'PunUseType.hs'])],
      multimod_compile, ['PunUses', '-v0 -Wpun-uses'])
@@ -266,3 +267,16 @@ test('DisambiguatedPunUses', [extra_files(['PunUseData.hs', 'PunUseType.hs'])],
 test('StagedPunUses', [extra_files(['PunUseData.hs', 'PunUseType.hs'])],
      multimod_compile, ['StagedPunUses', '-v0 -Wpun-uses'])
 test('ImplicitPunUses', normal, compile, ['-Wpun-uses -Wterm-variable-capture'])
+test('ConditionalPunUses', normal, compile,
+     ['-Wpun-uses -Wterm-variable-capture -Wpun-bindings'])
+test('LocalScopedPunUses', normal, compile, ['-Wpun-uses -Wpun-bindings'])
+test('ExportParentAll', [extra_files(['PunUseData.hs', 'PunUseType.hs'])],
+     multimod_compile, ['ExportParentAll', '-v0 -Wpun-uses'])
+test('TypePatternPunUses', [extra_files(['PunUseData.hs', 'PunUseType.hs'])],
+     multimod_compile, ['TypePatternPunUses', '-v0 -Wpun-uses'])
+test('GadtPunScope', [req_th, extra_files(['PunTypeSplice.hs'])],
+     multimod_compile, ['GadtPunScope', '-v0 -Wpun-uses'])
+test('DeclarationQuote', req_th, compile, ['-Wpun-bindings -Wpun-uses'])
+test('RecordSelectorPunUses', normal, compile, ['-Wpun-uses -Wterm-variable-capture'])
+test('HiddenSelectorPunUses', [extra_files(['SelectorOwner.hs'])],
+     multimod_compile, ['HiddenSelectorPunUses', '-v0 -Werror=pun-uses'])

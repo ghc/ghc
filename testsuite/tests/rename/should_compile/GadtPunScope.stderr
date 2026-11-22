@@ -1,0 +1,13 @@
+GadtPunScope.hs:5:22: warning: [GHC-41293] [-Wpun-uses]
+    ‘a’ depends on separate type and term namespaces.
+    This use resolves to ‘a’ imported from ‘PunTypeSplice’ at GadtPunScope.hs:3:23
+                             (and originally defined at PunTypeSplice.hs:5:1)
+    Same-spelled names in the other namespace:
+      ‘a’ defined at GadtPunScope.hs:5:17
+
+GadtPunScope.hs:9:22: warning: [GHC-41293] [-Wpun-uses]
+    ‘a’ depends on separate type and term namespaces.
+    This use resolves to ‘a’ imported from ‘PunTypeSplice’ at GadtPunScope.hs:3:23
+                             (and originally defined at PunTypeSplice.hs:5:1)
+    Same-spelled names in the other namespace:
+      ‘a’ defined at GadtPunScope.hs:9:17

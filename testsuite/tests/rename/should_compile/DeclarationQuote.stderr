@@ -1,0 +1,39 @@
+DeclarationQuote.hs:8:15: warning: [GHC-59431] [-Wpun-bindings]
+    ‘Both’ is declared in both the type and term namespaces.
+    Other declaration at DeclarationQuote.hs:8:3
+
+DeclarationQuote.hs:9:16: warning: [GHC-41293] [-Wpun-uses]
+    ‘Both’ depends on separate type and term namespaces.
+    This use resolves to ‘Both’ defined at DeclarationQuote.hs:8:3
+    Same-spelled names in the other namespace:
+      ‘Both’ defined at DeclarationQuote.hs:8:15
+
+DeclarationQuote.hs:9:24: warning: [GHC-41293] [-Wpun-uses]
+    ‘Both’ depends on separate type and term namespaces.
+    This use resolves to ‘Both’ defined at DeclarationQuote.hs:8:3
+    Same-spelled names in the other namespace:
+      ‘Both’ defined at DeclarationQuote.hs:8:15
+
+DeclarationQuote.hs:10:13: warning: [GHC-41293] [-Wpun-uses]
+    ‘Both’ depends on separate type and term namespaces.
+    This use resolves to ‘Both’ defined at DeclarationQuote.hs:8:15
+    Same-spelled names in the other namespace:
+      ‘Both’ defined at DeclarationQuote.hs:8:3
+
+DeclarationQuote.hs:10:20: warning: [GHC-41293] [-Wpun-uses]
+    ‘Both’ depends on separate type and term namespaces.
+    This use resolves to ‘Both’ defined at DeclarationQuote.hs:8:15
+    Same-spelled names in the other namespace:
+      ‘Both’ defined at DeclarationQuote.hs:8:3
+
+DeclarationQuote.hs:21:17: warning: [GHC-41293] [-Wpun-uses]
+    ‘T’ depends on separate type and term namespaces.
+    This use resolves to ‘T’ defined at DeclarationQuote.hs:13:14
+    Same-spelled names in the other namespace:
+      ‘T’ defined at DeclarationQuote.hs:17:3
+
+DeclarationQuote.hs:29:13: warning: [GHC-41293] [-Wpun-uses]
+    ‘a’ depends on separate type and term namespaces.
+    This use resolves to ‘a’ defined at DeclarationQuote.hs:27:3
+    Same-spelled names in the other namespace:
+      ‘a’ defined at DeclarationQuote.hs:28:19

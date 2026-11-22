@@ -2479,17 +2479,22 @@ of ``-W(no-)*``.
     :reverse: -Wno-pun-bindings
     :default: off
 
-    Warn about type and term definitions with the same name in one top-level
-    declaration group, such as ``data T = T``. This also applies when the type
-    and term definitions are in separate declarations in that group.
+    Warn about type and term definitions with the same name in a module's
+    top-level scope, such as ``data T = T``. A top-level declaration splice
+    can separate the two declarations. The later declaration still warns.
     A local declaration can shadow an imported name without producing this
     warning.
 
-    The warning also applies to explicit type and value binders in one
-    match. For example: ::
+    The warning also applies to type and value binders in one match,
+    including type variables introduced by a pattern annotation. For example: ::
 
         id :: forall a -> a -> a
         id (type a) a = a
+
+    An implicit binding in a pattern annotation depends on the names in
+    scope when GHC reads the annotation. If a preceding term binder would
+    supply the name in a single namespace, :ghc-flag:`-Wpun-uses` reports
+    the affected type references.
 
     An enclosing scope can contain another binder with the same name.
     For example, ``f @a = \(a :: a) -> a`` puts the term binder in the
@@ -2508,6 +2513,14 @@ of ``-W(no-)*``.
     would conflict with it in a single namespace. A qualifier can avoid
     the conflict if it selects only one of the competing names. The check
     uses name resolution across normal, quote and splice imports.
+    Unmarked names in export lists and constructor type patterns also
+    use this check.
+
+    The warning also applies when an explicit local binder in the
+    other namespace would replace the chosen binding. For example,
+    with :extension:`ScopedTypeVariables`, in
+    ``f :: forall a. a -> a; f = \a -> (a :: a)``, the type variable in
+    the body annotation warns because of the nearer term binder.
 
     Also warn about implicit type-variable uses that would capture a
     term name, and about list and boxed tuple type syntax that depends on

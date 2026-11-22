@@ -1,0 +1,31 @@
+RecordSelectorPunUses.hs:6:23: warning: [GHC-41293] [-Wpun-uses]
+    ‘label’ depends on separate type and term namespaces.
+    This use resolves to ‘label’ defined at RecordSelectorPunUses.hs:6:14
+    Same-spelled names in the other namespace:
+      ‘label’ defined at RecordSelectorPunUses.hs:4:22
+
+RecordSelectorPunUses.hs:6:42: warning: [GHC-41293] [-Wpun-uses]
+    ‘label’ depends on separate type and term namespaces.
+    This use resolves to ‘label’ defined at RecordSelectorPunUses.hs:6:14
+    Same-spelled names in the other namespace:
+      ‘label’ defined at RecordSelectorPunUses.hs:4:22
+
+RecordSelectorPunUses.hs:9:21: warning: [GHC-41293] [-Wpun-uses]
+    ‘label’ depends on separate type and term namespaces.
+    This use resolves to ‘label’ defined at RecordSelectorPunUses.hs:4:22
+    Same-spelled names in the other namespace:
+      ‘label’ defined at RecordSelectorPunUses.hs:8:23
+
+RecordSelectorPunUses.hs:14:24: warning: [GHC-41293] [-Wpun-uses]
+    ‘duplicate’ depends on separate type and term namespaces.
+    This use resolves to ‘duplicate’ defined at RecordSelectorPunUses.hs:14:15
+    Same-spelled names in the other namespace:
+      ‘duplicate’ defined at RecordSelectorPunUses.hs:11:22
+      ‘duplicate’ defined at RecordSelectorPunUses.hs:12:24
+
+RecordSelectorPunUses.hs:14:47: warning: [GHC-41293] [-Wpun-uses]
+    ‘duplicate’ depends on separate type and term namespaces.
+    This use resolves to ‘duplicate’ defined at RecordSelectorPunUses.hs:14:15
+    Same-spelled names in the other namespace:
+      ‘duplicate’ defined at RecordSelectorPunUses.hs:11:22
+      ‘duplicate’ defined at RecordSelectorPunUses.hs:12:24

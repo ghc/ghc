@@ -784,25 +784,18 @@ cvtRetainedGadtArgs args result = do
   body <- suffix binders
   let prefix_fields = PrefixConGADT noExtField fields
       (telescope, interior)
-        | null fields, any required_group (takeWhile forall_group_arg binders)
+        -- Recover the same ordered suffix that the parser produces.
+        | null fields
         , (_, leading, remaining) <- splitLHsGadtTy (noLocA (mkHsImplicitSigType body))
         = (leading, remaining)
         | otherwise = ([], body)
-      supported_interior = (not (null fields) || not (null telescope)) &&
-                           isJust (HsDecls.splitGadtInterior prefix_fields interior)
+      supported_interior = isJust (HsDecls.splitGadtInterior prefix_fields interior)
   when (not supported_interior &&
         (any explicit_group binders ||
          (null binders && isNothing (HsDecls.splitGadtTerminal prefix_fields body)))) $
     failWith (MalformedType TypeLevel result)
   pure (telescope, fields, interior)
   where
-    required_group (GadtRequiredArgs _ (_ : _)) = True
-    required_group _ = False
-
-    forall_group_arg GadtInvisibleArgs{} = True
-    forall_group_arg GadtRequiredArgs{} = True
-    forall_group_arg _ = False
-
     explicit_group GadtInvisibleArgs{} = True
     explicit_group GadtRequiredArgs{} = True
     explicit_group GadtContextArgs{} = True

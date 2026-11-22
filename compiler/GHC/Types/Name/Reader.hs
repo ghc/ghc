@@ -47,6 +47,8 @@ module GHC.Types.Name.Reader (
         -- * Local mapping of 'RdrName' to 'Name.Name'
         LocalRdrEnv, emptyLocalRdrEnv, extendLocalRdrEnv, extendLocalRdrEnvList,
         extendLocalRdrEnvWithAlias,
+        trackPunScopes, extendPunScope, extendImplicitPunScope, localPunScope,
+        localImplicitPunCapture,
         lookupLocalRdrEnv, lookupLocalRdrOcc,
         elemLocalRdrEnv, inLocalRdrEnvScope,
         localRdrEnvElts, minusLocalRdrEnv, minusLocalRdrEnvList,
@@ -476,7 +478,12 @@ The LocalRdrEnv is used to store local bindings (let, where, lambda, case).
 -- | Local Reader Environment
 -- See Note [LocalRdrEnv]
 data LocalRdrEnv = LRE { lre_env      :: OccEnv Name
-                       , lre_in_scope :: NameSet }
+                       , lre_in_scope :: NameSet
+                       , lre_pun_scope :: Maybe (Int, NameEnv PunBinding) }
+
+data PunBinding
+  = ExplicitPunBinding !Int
+  | ImplicitPunBinding !Bool
 
 instance Outputable LocalRdrEnv where
   ppr (LRE {lre_env = env, lre_in_scope = ns})
@@ -491,7 +498,8 @@ instance Outputable LocalRdrEnv where
 
 emptyLocalRdrEnv :: LocalRdrEnv
 emptyLocalRdrEnv = LRE { lre_env = emptyOccEnv
-                       , lre_in_scope = emptyNameSet }
+                       , lre_in_scope = emptyNameSet
+                       , lre_pun_scope = Nothing }
 
 extendLocalRdrEnv :: LocalRdrEnv -> Name -> LocalRdrEnv
 -- See Note [LocalRdrEnv]
@@ -504,6 +512,45 @@ extendLocalRdrEnvList :: LocalRdrEnv -> [Name] -> LocalRdrEnv
 extendLocalRdrEnvList lre@(LRE { lre_env = env, lre_in_scope = ns }) names
   = lre { lre_env = extendOccEnvList env [(nameOccName n, n) | n <- names]
         , lre_in_scope = extendNameSetList ns names }
+
+-- | Enable binding-order tracking for pun warnings.
+trackPunScopes :: LocalRdrEnv -> LocalRdrEnv
+trackPunScopes lre = lre { lre_pun_scope = Just (0, emptyNameEnv) }
+
+-- | Add the names of one explicit binding group to the scope tracker.
+extendPunScope :: LocalRdrEnv -> [Name] -> LocalRdrEnv
+extendPunScope lre@(LRE { lre_pun_scope = Just (depth, ranks) }) names@(_:_) =
+  let next = depth + 1
+  in lre { lre_pun_scope = Just (next, extendNameEnvList ranks [(n, ExplicitPunBinding next) | n <- names]) }
+extendPunScope lre _ = lre
+
+-- | Record that a pattern signature introduces a type variable implicitly.
+-- Remember whether a term binder was already in scope at that point.
+extendImplicitPunScope :: LocalRdrEnv -> (Name -> Bool) -> [Name] -> LocalRdrEnv
+extendImplicitPunScope lre@(LRE { lre_pun_scope = Just (depth, ranks) }) captures names@(_:_) =
+  lre { lre_pun_scope = Just (depth, extendNameEnvList ranks
+                            [(n, ImplicitPunBinding (captures n)) | n <- names]) }
+extendImplicitPunScope lre _ _ = lre
+
+-- | Get the binding group's rank. Zero marks implicit type variables,
+-- which cannot replace a name already in a unified namespace.
+localPunScope :: LocalRdrEnv -> Name -> Maybe Int
+localPunScope lre name = do
+  binding <- lookupPunBinding lre name
+  pure $ case binding of
+    ExplicitPunBinding rank -> rank
+    ImplicitPunBinding _ -> 0
+
+-- | An implicit binding would reuse a term already in a unified namespace.
+localImplicitPunCapture :: LocalRdrEnv -> Name -> Bool
+localImplicitPunCapture lre name = case lookupPunBinding lre name of
+  Just (ImplicitPunBinding captured) -> captured
+  _ -> False
+
+lookupPunBinding :: LocalRdrEnv -> Name -> Maybe PunBinding
+lookupPunBinding lre name = do
+  (_, ranks) <- lre_pun_scope lre
+  lookupNameEnv ranks name
 
 -- | Resolve another occurrence to the same local 'Name'.
 -- Retained quantification uses a type-variable occurrence to refer to a

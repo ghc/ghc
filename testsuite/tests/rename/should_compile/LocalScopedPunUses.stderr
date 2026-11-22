@@ -1,0 +1,45 @@
+LocalScopedPunUses.hs:9:21: warning: [GHC-41293] [-Wpun-uses]
+    ‘a’ depends on separate type and term namespaces.
+    This use resolves to ‘a’ defined at LocalScopedPunUses.hs:8:17
+    Same-spelled names in the other namespace:
+      ‘a’ defined at LocalScopedPunUses.hs:9:10
+
+LocalScopedPunUses.hs:21:14: warning: [GHC-59431] [-Wpun-bindings]
+    ‘p’ is declared in both the type and term namespaces.
+    Other declaration at LocalScopedPunUses.hs:21:12
+
+LocalScopedPunUses.hs:21:19: warning: [GHC-41293] [-Wpun-uses]
+    ‘p’ depends on separate type and term namespaces.
+    This use resolves to ‘p’ defined at LocalScopedPunUses.hs:21:14
+    Same-spelled names in the other namespace:
+      ‘p’ defined at LocalScopedPunUses.hs:21:12
+
+LocalScopedPunUses.hs:21:24: warning: [GHC-41293] [-Wpun-uses]
+    ‘p’ depends on separate type and term namespaces.
+    This use resolves to ‘p’ defined at LocalScopedPunUses.hs:21:12
+    Same-spelled names in the other namespace:
+      ‘p’ defined at LocalScopedPunUses.hs:21:14
+
+LocalScopedPunUses.hs:25:56: warning: [GHC-41293] [-Wpun-uses]
+    ‘a’ depends on separate type and term namespaces.
+    This use resolves to ‘a’ defined at LocalScopedPunUses.hs:25:16
+    Same-spelled names in the other namespace:
+      ‘a’ defined at LocalScopedPunUses.hs:25:36
+
+LocalScopedPunUses.hs:29:39: warning: [GHC-41293] [-Wpun-uses]
+    ‘a’ depends on separate type and term namespaces.
+    This use resolves to ‘a’ defined at LocalScopedPunUses.hs:28:26
+    Same-spelled names in the other namespace:
+      ‘a’ defined at LocalScopedPunUses.hs:29:24
+
+LocalScopedPunUses.hs:33:22: warning: [GHC-41293] [-Wpun-uses]
+    ‘a’ depends on separate type and term namespaces.
+    This use resolves to ‘a’ defined at LocalScopedPunUses.hs:5:1
+    Same-spelled names in the other namespace:
+      ‘a’ defined at LocalScopedPunUses.hs:32:28
+
+LocalScopedPunUses.hs:37:26: warning: [GHC-41293] [-Wpun-uses]
+    ‘a’ depends on separate type and term namespaces.
+    This use resolves to ‘a’ defined at LocalScopedPunUses.hs:37:21
+    Same-spelled names in the other namespace:
+      ‘a’ defined at LocalScopedPunUses.hs:5:1

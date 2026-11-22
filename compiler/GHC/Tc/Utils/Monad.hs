@@ -497,7 +497,10 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 -- tcl_loc should be over-ridden very soon!
                 tcl_in_gen_code = False,
                 tcl_err_ctxt   = [],
-                tcl_rdr        = emptyLocalRdrEnv,
+                tcl_rdr        = if wopt Opt_WarnPunUses (hsc_dflags hsc_env)
+                                    || wopt Opt_WarnPunBindings (hsc_dflags hsc_env)
+                                 then trackPunScopes emptyLocalRdrEnv
+                                 else emptyLocalRdrEnv,
                 tcl_th_ctxt    = topLevel,
                 tcl_th_bndrs   = emptyNameEnv,
                 tcl_th_retained_indices = [],

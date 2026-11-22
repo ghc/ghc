@@ -13,6 +13,7 @@ module GHC.Rename.Utils (
         checkTupSize, checkCTupSize,
         addFvRn, mapFvRn, mapMaybeFvRn,
         warnUnusedMatches, warnUnusedTypePatterns, warnPunBindings,
+        warnPunBindingsAgainst,
         warnUnusedTopBinds, warnUnusedLocalBinds,
         DeprecationWarnings(..), warnIfDeprecated,
         checkUnusedRecordWildcard,
@@ -30,7 +31,8 @@ module GHC.Rename.Utils (
 
         newLocalBndrRn, newLocalBndrsRn,
 
-        bindLocalNames, bindLocalNamesFV, delLocalNames,
+        bindLocalNames, bindLocalNamesFV, bindImplicitLocalNamesFV,
+        groupPunBinders, recordImplicitPunBinders, delLocalNames,
 
         addNameClashErrRn, mkNameClashErr,
 
@@ -56,6 +58,7 @@ import GHC.Types.Name.Env
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.SourceFile
 import GHC.Types.SourceText ( SourceText(..) )
+import GHC.Utils.Lexeme (isLexVar)
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Unit.Module.ModIface
@@ -104,12 +107,16 @@ newLocalBndrsRn :: [LocatedN RdrName] -> RnM [Name]
 newLocalBndrsRn = mapM newLocalBndrRn
 
 bindLocalNames :: [Name] -> RnM a -> RnM a
-bindLocalNames names
+bindLocalNames = bindLocalNamesUsing $ \ env names ->
+  extendPunScope (extendLocalRdrEnvList env names) names
+
+bindLocalNamesUsing :: (LocalRdrEnv -> [Name] -> LocalRdrEnv) -> [Name] -> RnM a -> RnM a
+bindLocalNamesUsing extend names
   = updLclCtxt $ \ lcl_env ->
     let th_level  = thLevelIndex (tcl_th_ctxt lcl_env)
         th_bndrs' = extendNameEnvList (tcl_th_bndrs lcl_env)
                     [ (n, (NotTopLevel, th_level)) | n <- names ]
-        rdr_env'  = extendLocalRdrEnvList (tcl_rdr lcl_env) names
+        rdr_env'  = extend (tcl_rdr lcl_env) names
     in lcl_env { tcl_th_bndrs = th_bndrs'
                , tcl_rdr      = rdr_env' }
 
@@ -117,6 +124,33 @@ bindLocalNamesFV :: [Name] -> RnM (a, FreeNames) -> RnM (a, FreeNames)
 bindLocalNamesFV names enclosed_scope
   = do  { (result, fvs) <- bindLocalNames names enclosed_scope
         ; return (result, delFNs names fvs) }
+
+-- | Bring implicit variables into the usual reader environment. These binders
+-- do not shadow names in the hypothetical unified namespace.
+bindImplicitLocalNamesFV :: [Name] -> RnM (a, FreeNames) -> RnM (a, FreeNames)
+bindImplicitLocalNamesFV names enclosed_scope
+  = do (result, fvs) <- bindLocalNamesUsing extendLocalRdrEnvList names enclosed_scope
+       return (result, delFNs names fvs)
+
+-- | Give explicit match binders the same rank after processing the patterns.
+groupPunBinders :: [Name] -> RnM a -> RnM a
+groupPunBinders names = updLclCtxt $ \ lcl_env ->
+  lcl_env { tcl_rdr = extendPunScope (tcl_rdr lcl_env) names }
+
+-- | Track later uses of type variables introduced by a pattern signature.
+recordImplicitPunBinders :: [Name] -> RnM a -> RnM a
+recordImplicitPunBinders [] thing_inside = thing_inside
+recordImplicitPunBinders names thing_inside = do
+  global_env <- getGlobalRdrEnv
+  let update lcl_env =
+        let local_env = tcl_rdr lcl_env
+            captures name =
+              let occ = setOccNameSpace varName (nameOccName name)
+              in isJust (lookupLocalRdrOcc local_env occ)
+                 || not (null (lookupGRE global_env
+                           (LookupRdrName (mkRdrUnqual occ) (RelevantGREsFOS WantNormal))))
+        in lcl_env { tcl_rdr = extendImplicitPunScope local_env captures names }
+  updLclCtxt update thing_inside
 
 delLocalNames :: [Name] -> RnM a -> RnM a
 delLocalNames names
@@ -167,20 +201,40 @@ checkDupAndShadowedNames envs names
 -- | Report type and term binders with the same spelling in one scope.
 -- See Note [Pun binding warnings].
 warnPunBindings :: [Name] -> RnM ()
-warnPunBindings binders = whenWOptM Opt_WarnPunBindings $
+warnPunBindings binders = whenWOptM Opt_WarnPunBindings $ do
+  env <- getLocalRdrEnv
+  warnPunBindingsAgainst Nothing (filter (not . localImplicitPunCapture env) binders)
+
+-- | Check a binding group and any earlier batches in the same module scope.
+warnPunBindingsAgainst :: Maybe GlobalRdrEnv -> [Name] -> RnM ()
+warnPunBindingsAgainst earlier binders = whenWOptM Opt_WarnPunBindings $
   forM_ (equivClasses compareSpelling names) $ \same_spelling ->
     case partition (not . isValOcc . nameOccName) (sortBy byLocation (toList same_spelling)) of
       (type_name : _, term_name : _) ->
-        let (first_name, second_name)
-              | byLocation type_name term_name == GT = (term_name, type_name)
-              | otherwise = (type_name, term_name)
-        in addDiagnosticAt (nameSrcSpan second_name) (TcRnPunBinding second_name first_name)
-      _ -> pure ()
+        if byLocation type_name term_name == GT
+        then report type_name term_name
+        else report term_name type_name
+      (type_name : _, []) -> warnEarlier type_name (termNamespace type_name)
+      ([], term_name : _) -> warnEarlier term_name tcClsName
+      ([], []) -> pure ()
   where
     names = filter (isGoodSrcSpan . nameSrcSpan) binders
     spelling = occNameFS . nameOccName
     compareSpelling a b = lexicalCompareFS (spelling a) (spelling b)
     byLocation a b = leftmost_smallest (nameSrcSpan a) (nameSrcSpan b)
+
+    report new old = addDiagnosticAt (nameSrcSpan new) (TcRnPunBinding new old)
+
+    termNamespace name
+      | isLexVar (spelling name) = varName
+      | otherwise = dataName
+
+    warnEarlier new namespace = for_ earlier $ \env ->
+      let occ = setOccNameSpace namespace (nameOccName new)
+          earlier_names = map greName
+                        $ filter isLocalGRE
+                        $ lookupGRE env (LookupOccName occ SameNameSpace)
+      in for_ (listToMaybe (sortBy byLocation earlier_names)) (report new)
 
 {- Note [Pun binding warnings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -188,12 +242,22 @@ Proposal #765 diagnoses same-spelled type and term binders that would
 conflict in a single namespace. Check each group of simultaneous
 binders separately. A binder can shadow a name in an enclosing scope.
 
+A top-level splice divides a module into declaration batches for renaming
+and type checking. The module's declarations still share one scope.
+Compare each newly introduced spelling with earlier local definitions.
+Report at the new declaration. The global reader environment still
+distinguishes imported names from local definitions.
+
 For example, `id (type a) a = a` binds both names in one group.
 In `f @a = \(a :: a) -> a`, the annotation uses the outer type variable.
-The lambda binds the term variable in a separate group. Only explicitly
-bound variables in type patterns take part in this check. A type variable
-introduced implicitly by an annotation cannot shadow an in-scope name
-in the proposed single namespace.
+The lambda binds the term variable in a separate group. When a pattern
+signature introduces a fresh type variable, check whether a term with
+that name is already in scope. Appendix A leaves this conditional step
+per variable. In `f q (_ :: q)`, the signature would refer to the term
+in a unified namespace, so it introduces no conflicting binding.
+In `f (d :: d)` with no earlier `d`, the signature introduces the type
+variable before the term binder. Both belong to the same match.
+The type-use warning checks the resolved occurrence independently.
 -}
 
 -------------------------------------

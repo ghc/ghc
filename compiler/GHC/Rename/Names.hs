@@ -714,9 +714,13 @@ extendGlobalRdrEnvRn new_gres new_fixities
               rdr_env1 | want_shadowing = shadowNames False rdr_env new_gres_env
                        | otherwise      = rdr_env
 
-              lcl_env3 = modifyLclCtxt (\lcl_env -> lcl_env { tcl_th_bndrs = extendNameEnvList th_bndrs
-                                                       [ ( n, (TopLevel, th_lvl) )
-                                                       | n <- new_names ] }) lcl_env2
+              lcl_env3 = modifyLclCtxt update_binders lcl_env2
+              update_binders lcl_env = lcl_env
+                { tcl_th_bndrs = extendNameEnvList th_bndrs
+                    [ (n, (TopLevel, th_lvl)) | n <- new_names ]
+                , tcl_rdr = if inBracket
+                            then extendPunScope (tcl_rdr lcl_env) new_names
+                            else tcl_rdr lcl_env }
 
         ; rdr_env2 <- foldlM add_gre rdr_env1 new_gres
 

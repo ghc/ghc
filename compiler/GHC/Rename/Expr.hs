@@ -315,7 +315,7 @@ rnExpr (HsVar _ (L l v))
            Just gre ->
     do { let nm   = greName gre
              info = greInfo gre
-       ; when (isValName nm) $ warnGlobalPunUse (L l v) gre
+       ; when (isValName nm) $ warnPunUse (L l v) gre
        ; if | IAmRecField fld_info <- info
             -- Since GHC 9.4, such occurrences of record fields must be
             -- unambiguous. For ambiguous occurrences, we arbitrarily pick one

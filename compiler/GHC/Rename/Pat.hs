@@ -442,8 +442,9 @@ rn_pats_general ctxt rename_pats thing_inside = do
          then checkDupNames bndrs
          else checkDupAndShadowedNames envs_before bndrs
     -- See Note [Pun binding warnings] in GHC.Rename.Utils.
-    warnPunBindings (filterOut isSystemName (collectPatsBinders CollExplicitBinders (toList pats')))
-    thing_inside pats'
+    let explicit_bndrs = filterOut isSystemName (collectPatsBinders CollExplicitBinders (toList pats'))
+    warnPunBindings (filterOut isSystemName bndrs)
+    groupPunBinders explicit_bndrs $ thing_inside pats'
 
 -- | Choose the pattern renamer for the current match.
 -- See Note [Invisible binders in functions] in GHC.Hs.Pat.
@@ -1321,19 +1322,14 @@ unTPRnRaw ::
   RnM (r, FreeNames)
 unTPRnRaw (MkTPRnM m) doc_ctxt locals = unCpsRn $ runWriterT $ runReaderT m (doc_ctxt, locals)
 
-lookupTypeOccTPRnM :: RdrName -> TPRnM Name
-lookupTypeOccTPRnM rdr_name = liftRnFV $ do
-  gre <- lookupTypeOccRn rdr_name
-  let name = greName gre
-  pure (name, unitFN name)
-
 rn_lty_pat :: LHsType GhcPs -> TPRnM (LHsType GhcRn)
 rn_lty_pat (L l hs_ty) = do
+  liftRn $ setSrcSpanA l $ warnPunnedTypeSyntax hs_ty
   hs_ty' <- rn_ty_pat hs_ty
   pure (L l hs_ty')
 
-rn_ty_pat_var :: LocatedN RdrName -> TPRnM (LocatedN (WithUserRdr Name))
-rn_ty_pat_var lrdr@(L l rdr) = do
+rn_ty_pat_var :: PromotionFlag -> LocatedN RdrName -> TPRnM (LocatedN (WithUserRdr Name))
+rn_ty_pat_var prom lrdr@(L l rdr) = do
   locals <- askLocals
   if isRdrTyVar rdr
     && not (elemOccSet (occName rdr) locals) -- See Note [Locally bound names in type patterns]
@@ -1343,14 +1339,18 @@ rn_ty_pat_var lrdr@(L l rdr) = do
       tellTPB (tpBuilderExplicitTV name)
       pure (L l $ WithUserRdr rdr name)
 
-    else do -- usage
-      name <- lookupTypeOccTPRnM rdr
-      pure (L l $ WithUserRdr rdr name)
+    else liftRnFV $ do
+      gre <- lookupTypeOccRn rdr
+      let name = greName gre
+      unless (isPromoted prom) $ do
+        warnPunUse lrdr gre
+        warnPunnedTyConSyntax lrdr name
+      pure (L l (WithUserRdr rdr name), unitFN name)
 
 rn_tyop_pat :: LHsType GhcPs -> TPRnM (LHsType GhcRn)
 rn_tyop_pat tyop
   | L l (HsTyVar ann prom l_op) <- tyop
-  = do l_op' <- rn_ty_pat_var l_op
+  = do l_op' <- rn_ty_pat_var prom l_op
        let op_name = getName l_op'
        when (isDataConName op_name && not (isPromoted prom)) $
          liftRn $ addDiagnostic (TcRnUntickedPromotedThing $ UntickedConstructor Infix op_name)
@@ -1363,7 +1363,7 @@ rn_tyop_pat tyop
 -- and Note [Implicit and explicit type variable binders]
 rn_ty_pat :: HsType GhcPs -> TPRnM (HsType GhcRn)
 rn_ty_pat tv@(HsTyVar an prom lrdr) = do
-  L l (WithUserRdr _ name) <- rn_ty_pat_var lrdr
+  L l (WithUserRdr _ name) <- rn_ty_pat_var prom lrdr
   when (isDataConName name && not (isKindName name)) $
     -- Any use of a promoted data constructor name (that is not specifically
     -- exempted by isKindName) is illegal without the use of DataKinds.

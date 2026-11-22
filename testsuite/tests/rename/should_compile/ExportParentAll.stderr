@@ -1,0 +1,7 @@
+ExportParentAll.hs:1:25: warning: [GHC-41293] [-Wpun-uses]
+    ‘T’ depends on separate type and term namespaces.
+    This use resolves to ‘T’ imported from ‘PunUseType’ at ExportParentAll.hs:3:1-17
+                             (and originally defined at PunUseType.hs:3:1-10)
+    Same-spelled names in the other namespace:
+      ‘T’ imported from ‘PunUseData’ at ExportParentAll.hs:2:1-17
+          (and originally defined at PunUseData.hs:3:10)
