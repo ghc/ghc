@@ -307,6 +307,8 @@ IfaceTermAppTy stores a local function name and its index argument with tag 12.
 The enclosing telescope writes the function's domain before that name enters
 scope. The importer resolves the actual local Id and checks its Many arrow,
 lifted argument and result types, and the kind of the index argument.
+An IfaceAppTy can supply the remaining arguments of a curried call.
+Check each argument against the next unrestricted value arrow.
 The result kind comes from the head that was actually decoded. When a
 call supplies a type argument, check that kind against the application's
 telescope. Replacing a Bool result with a scoped type variable cannot

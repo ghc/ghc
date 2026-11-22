@@ -70,7 +70,7 @@ import GHC.Core.DataCon
 import GHC.Core.Class(classTyCon)
 import GHC.Core.TyCon
 import GHC.Core.Type
-import GHC.Core.TyCo.Rep (Type(ExistsTy, ForAllTy, TermAppTy, TermVarTy, TyConApp))
+import GHC.Core.TyCo.Rep (Type(ExistsTy, ForAllTy, TermVarTy, TyConApp))
 import GHC.Core.Coercion
 import GHC.Core.Predicate( decomposeIPPred, mkNomEqPred )
 
@@ -1839,15 +1839,20 @@ payload pattern still determines demand.
 -- See Note [Source opaque call refinement] in GHC.Tc.Gen.Match.
 checkedNativeCallIndex :: LHsExpr GhcTc -> Type -> TcM (Maybe Type)
 checkedNativeCallIndex expr result_ty
-  | HsApp _ fun arg <- unLoc (stripParensLHsExpr expr)
-  , HsVar _ (L _ head_id) <- unLoc (stripParensLHsExpr fun)
-  , Just (domain, codomain) <- nativeIndexFunctionTys_maybe head_id
-  = do { core_arg <- checkedNativeCallArgument emptyNameEnv arg
+  | HsApp _ fun _ <- unLoc (stripParensLHsExpr expr)
+  , local_head fun
+  = do { core <- checkedNativeCallArgument emptyNameEnv expr
        ; return $ do
-           arg_index <- core_arg >>= Core.exprToNativeIndex
-           guard (eqType domain (typeKind arg_index) && eqType codomain result_ty)
-           return (TermAppTy head_id arg_index) }
+           index <- core >>= Core.exprToNativeCaseIndex
+           guard (typeKind index `eqType` result_ty)
+           return index }
   | otherwise = return Nothing
+  where
+    local_head :: LHsExpr GhcTc -> Bool
+    local_head fun = case unLoc (stripParensLHsExpr fun) of
+      HsApp _ inner _ -> local_head inner
+      HsVar _ (L _ f) -> isNativeIndexFunctionId f
+      _ -> False
 
 -- | Reconstruct a checked call argument for classification, not execution.
 -- See Note [Checked source call arguments] and Note [Signed source call beta].

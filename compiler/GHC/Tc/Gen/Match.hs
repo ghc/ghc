@@ -1,4 +1,5 @@
 {-# LANGUAGE RecordWildCards  #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeFamilies     #-}
 {-# LANGUAGE MonadComprehensions  #-}
 {-# LANGUAGE PartialTypeSignatures #-}
@@ -72,13 +73,13 @@ import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Core.TyCon
 import GHC.Core ( Expr(Var, App, Type), exprToNativeIndex )
-import GHC.Core.TyCo.Rep ( Type(DepFunTy, ExistsTy, ForAllTy, FunTy, ft_af, TermVarTy, TermAppTy, TyConApp) )
+import GHC.Core.TyCo.Rep ( Type(DepFunTy, ExistsTy, ForAllTy, FunTy, ft_af, TermVarTy, TyConApp) )
 import GHC.Core.Subst ( extendIdSubstWithClone )
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Type ( coreFullView, isManyTy, splitTyConApp_maybe
                      , anyFreeVarsOfType, typeKind, isNativeIndexFunctionId, isNativeOpaqueValueId
                      , isInvisibleForAllTyFlag, isNativeIndexId, nativeIndexDataConTyArgs
-                     , splitFunTy_maybe, substTyWith )
+                     , splitFunTy_maybe, nativeCallSpine_maybe, substTyWith )
 import GHC.Core.Coercion ( CoercionR, MCoercion(MRefl, MCo), Role(Representational), mkCoVarCo, mkCoCast, coercionType, isReflCo
                          , mkSymCo, mkSubCo, coercionKind, coercionLKind
                          , mkFunCo, mkFunResCo, mkHomoForAllCos
@@ -595,7 +596,7 @@ tcRetainedCase _ _ _ _ = return Nothing
 tcRetainedCallCase :: Type -> LHsExpr GhcTc
                    -> MatchGroup GhcRn (LHsExpr GhcRn) -> ExpRhoType
                    -> TcM (Maybe (HsExpr GhcTc))
-tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
+tcRetainedCallCase call_ty@(nativeCallSpine_maybe -> Just (fun, indices, domain)) scrut
                   matches@(MG { mg_alts = L loc alternatives }) (Check result_ty)
   = do { captures <- fmap catMaybes $ mapM capture
                        (nameSetElemsStable (retainedCaseNames matches))
@@ -690,7 +691,6 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
               ; return (Just (XExpr (NativeCaseAlias scrut alias proof result_ty
                                       (noLocA transported)))) } }
   where
-    domain = typeKind call_ty
     call_ids = filter (\v -> isId v && not (isCoVar v)) (tyCoVarsOfTypeList call_ty)
     depends ty
       | retainedCallOccurs call_ty ty = return True
@@ -731,10 +731,10 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
     case_error = failWithTc (TcRnRetainedQuantificationError RetainedCasePatterns)
 
     is_call :: HsType GhcRn -> Bool
-    is_call (HsParTy _ ty) = is_call (unLoc ty)
-    is_call (HsAppTy _ head_ty source_arg)
-      = is_name (idName fun) (unLoc head_ty) && is_index arg_ty (unLoc source_arg)
-    is_call _ = False
+    is_call ty
+      = let (head_ty, args) = split_apps [] ty
+        in is_name (idName fun) head_ty && indices `equalLength` args
+           && and (zipWith is_index indices args)
     is_name :: Name -> HsType GhcRn -> Bool
     is_name name (HsParTy _ ty) = is_name name (unLoc ty)
     is_name name (HsTyVar _ NotPromoted (L _ (WithUserRdr _ actual))) = name == actual

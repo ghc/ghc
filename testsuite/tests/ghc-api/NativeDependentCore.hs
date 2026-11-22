@@ -2583,6 +2583,22 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                 rawCall (toIfaceType intTy)
             rejectsIface "ordinary wire application rejects an extra argument" "A retained call result cannot be applied" [callF, callN] $
                 IfaceAppTy (IfaceTermVar callName) (argument argumentWire (argument argumentWire IA_Nil))
+            let applyWire fun args = IfaceAppTy fun (foldr argument IA_Nil args)
+                curriedHead result = setIdType callF (mkVisFunTyManyU boolTy result)
+                boolArrow = mkVisFunTyManyU boolTy
+                binary = curriedHead (boolArrow boolTy)
+                ternary = curriedHead (boolArrow (boolArrow boolTy))
+                cmpWire = IfaceTermVar callName
+                operands = map TermVarTy [callN, callM, callN]
+                args = map toIfaceType operands
+            forM_ [applyWire cmpWire args, applyWire (rawCall argumentWire) (drop 1 args)] $ \wire -> do
+                result <- restore [ternary, callN, callM] =<< roundtrip compression wire
+                checkType dflags "curried interface applies arguments in order" (mkAppTys (TermVarTy ternary) operands) result
+                rejectsIface "curried interface rejects an extra final argument" "A retained call result cannot be applied"
+                    [binary, callN, callM] wire
+            forM_ [mkFunTy FTF_T_T unmatchableDataConTy OneTy boolTy boolTy, mkVisFunTyManyM boolTy boolTy] $ \tailArrow ->
+                rejectsIface "curried interface requires an unrestricted unmatchable arrow" "A retained call result cannot be applied"
+                    [curriedHead tailArrow, callN, callM] (applyWire cmpWire (take 2 args))
             rejectsIface "ordinary wire application cannot invent its head" "Iface id out of scope" [callN] (rawCall argumentWire)
             let changedDomain = proof 9112 (varType callF) (mkVisFunTyManyU boolTy (mkTyConApp maybeTyCon [boolTy]))
                 functionCast co = IfaceCastTy (IfaceTermVar callName) (toIfaceCoercion co)

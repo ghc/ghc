@@ -2459,6 +2459,10 @@ lintType ty@(AppTy t1 t2)
   | otherwise
   = do { let (fun_ty, arg_tys) = collect t1 [t2]
        ; lintType fun_ty
+       ; case fun_ty of
+           TermAppTy{} -> lintL (isJust (nativeCallSpine_maybe ty))
+             (text "Invalid curried runtime call:" <+> ppr ty)
+           _ -> return ()
        ; let fun_kind = typeKind fun_ty
        ; lint_ty_app ty fun_kind arg_tys }
   where

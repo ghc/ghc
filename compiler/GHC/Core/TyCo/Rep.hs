@@ -383,6 +383,10 @@ function. Its visible unrestricted arrow has lifted argument and result types
 A and B. The argument is a scoped Type of kind A. The call has kind B.
 Do not unfold f or infer argument equality from equality of calls.
 
+For a curried call f x y, use AppTy (TermAppTy f x) y. Check y against
+the domain of the next unrestricted arrow. AppCo lifts forward equality
+at that argument. The unmatchable arrow supplies no inverse projection.
+
 TermAppCo f co lifts a nominal argument proof through the same checked head.
 Both child endpoints have kind A. Both result endpoints have kind B. There
 is no inverse projection or extensional function equality rule. The head is a free

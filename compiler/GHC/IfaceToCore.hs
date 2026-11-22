@@ -2190,7 +2190,7 @@ tcIfaceType = go
     go (IfaceTupleTy s i tks)    = tcIfaceTupleTy s i tks
     go (IfaceAppTy t ts)
       = do { t'  <- go t
-           ; foldlM apply_arg t' (appArgsIfaceTypes ts) }
+           ; foldlM (apply_arg (call_operand True t)) t' (appArgsIfaceTypes ts) }
     go (IfaceTyConApp tc tks)
       = do { tc' <- tcIfaceTyCon tc
            ; let args = appArgsIfaceTypes tks
@@ -2255,7 +2255,7 @@ tcIfaceType = go
 
     -- A raw ordinary application can expose a native function-value head.
     -- Check its argument before the smart maker forms TermAppTy.
-    app fun@(TermVarTy f) arg
+    app _ fun@(TermVarTy f) arg
       = do { domains <- evaluateIfaceNativeDomain (ppr f)
                           (nativeIndexFunctionTys_maybe f)
            ; case domains of
@@ -2263,19 +2263,25 @@ tcIfaceType = go
                  return (mkAppTy fun arg)
                _ -> failIfM (text "Invalid retained function-value application in interface:"
                              <+> ppr f) }
-    app TermAppTy{} _
-      = failIfM (text "A retained call result cannot be applied in an interface.")
-    app fun@(TyConApp tc _) arg
+    app True fun arg
+      = do { arrow <- evaluateIfaceNativeDomain (ppr fun)
+                        (nativeIndexFunctionTypeTys_maybe (typeKind fun))
+           ; case arrow of
+               Just (domain, _) | typeKind arg `eqType` domain ->
+                 return (mkAppTy fun arg)
+               _ -> failIfM (text "A retained call result cannot be applied to this argument in an interface:"
+                             <+> ppr fun <+> ppr arg) }
+    app _ fun@(TyConApp tc _) arg
       | Just con <- isPromotedDataCon_maybe tc
       , not (null (dataConRepArgBinders con))
       = do { check_iface_retained_args (ppr tc) (typeKind fun) [arg]
            ; return (mkAppTy fun arg) }
-    app fun arg = return (mkAppTy fun arg)
+    app _ fun arg = return (mkAppTy fun arg)
 
-    apply_arg fun raw = do { arg <- go raw
-                           ; when (call_operand False raw) $
-                               check_call_arg_kinds (ppr fun) (typeKind fun) [arg]
-                           ; app fun arg }
+    apply_arg retained fun raw = do { arg <- go raw
+                                    ; when (call_operand False raw) $
+                                        check_call_arg_kinds (ppr fun) (typeKind fun) [arg]
+                                    ; app retained fun arg }
 
     -- A call can also be encoded by applying a lexical term variable.
     -- Inspect its serialized head without forcing ordinary decoded types.

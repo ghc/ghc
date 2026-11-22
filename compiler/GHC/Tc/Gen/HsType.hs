@@ -2925,19 +2925,18 @@ tc_app_ty_other mode rn_ty exp_kind
   | L _ (HsTyVar _ _ (L _ (WithUserRdr _ name))) <- hs_fun_ty
   , Just head_id <- lookupNameEnv (mode_indices mode) name
   , isNativeIndexFunctionId head_id
-  = case filterOut is_par hs_args of
-      [] -> checkExpKind mode rn_ty (TermVarTy head_id) (varType head_id) exp_kind
-      [HsValArg _ arg] ->
-        do { (domain, result) <- case nativeIndexFunctionTys_maybe head_id of
-                   Just domains -> return domains
-                   Nothing -> invalid_call
-           ; arg_ty <- tc_check_lhs_type mode arg domain
-           ; checkExpKind mode rn_ty (TermAppTy head_id arg_ty) result exp_kind }
-      _ -> invalid_call
+  = do { (ty, kind) <- foldM apply (TermVarTy head_id, varType head_id) hs_args
+       ; checkExpKind mode rn_ty ty kind exp_kind }
     -- See Note [Source opaque call indices].
   where
-    is_par HsArgPar{} = True
-    is_par _ = False
+    apply :: (TcType, TcKind) -> LHsTypeArg GhcRn -> TcM (TcType, TcKind)
+    apply checked HsArgPar{} = return checked
+    apply _ (HsTypeArg _ arg) = setSrcSpanA (getLoc arg) invalid_call
+    apply (fun, kind) (HsValArg _ arg) = setSrcSpanA (getLoc arg) $
+      case nativeIndexFunctionTypeTys_maybe kind of
+        Just (domain, result) -> do { ty <- tc_check_lhs_type mode arg domain
+                                    ; return (mkAppTy fun ty, result) }
+        Nothing -> invalid_call
     invalid_call :: TcM a
     invalid_call = failWithTc $ TcRnRetainedQuantificationError RetainedCallIndex
     (hs_fun_ty, hs_args) = splitHsAppTys rn_ty
@@ -4469,14 +4468,12 @@ eligible function heads in mode_indices along with scalar indices. Require
 the ordinary Many arrow accepted by nativeIndexFunctionTys_maybe.
 Keep function-head eligibility separate from scalar-index eligibility.
 
-Recognize the registered head before tcInferTyApps. Check its sole value
-argument at the declared domain, then form TermAppTy at the result domain.
-Ignore parentheses. With no arguments, form TermVarTy at the complete fixed
-U function type. Reject kind arguments and more than one value argument.
-Canonical ordinary
-application of that value forms TermAppTy, including after a saturated family
-exposes it. This adds no matchable application or inverse rule. Erased type
-variables keep their ordinary application path and lookup precedence.
+Recognize the registered head before tcInferTyApps. Check each value argument
+at the domain of its own unrestricted arrow. With no arguments, form TermVarTy
+at the full function type. The first application forms TermAppTy. Subsequent
+applications use AppTy. Ignore parentheses. Reject visible type arguments and
+applications past the last eligible arrow. Erased type variables keep their
+ordinary application path and lookup precedence.
 
 This rule checks a type. It does not admit f n as a retained runtime argument
 or evaluate the call. Strict source cases use the separate checked call

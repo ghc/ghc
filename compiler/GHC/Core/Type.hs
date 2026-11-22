@@ -66,7 +66,7 @@ module GHC.Core.Type (
         isNativeIndexId, isNativeIndexType, isNativeClosedIndexType, nativeIndexDataConTyArgs,
         isIntPrimFamilyPatBinder,
         isNativeIndexFunctionId, nativeIndexFunctionTys_maybe,
-        nativeIndexFunctionTypeTys_maybe,
+        nativeIndexFunctionTypeTys_maybe, nativeCallSpine_maybe,
         isNativeOpaqueValueId, isNativeOpaqueValueType, isNativeClassDictionaryId,
         isNativeIndexDomainConversion,
         isNativeRetainedBinder, isNativeRetainedBinderType,
@@ -2623,6 +2623,26 @@ nativeIndexFunctionTypeTys_maybe ty
 -- | Test whether an identifier is an eligible opaque native call head.
 isNativeIndexFunctionId :: Id -> Bool
 isNativeIndexFunctionId = isJust . nativeIndexFunctionTys_maybe
+
+-- | Recover the lexical head, its checked arguments, and the final result kind.
+-- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
+nativeCallSpine_maybe :: Type -> Maybe (Id, [Type], Kind)
+nativeCallSpine_maybe ty = collect ty []
+  where
+    collect (AppTy fun arg) rest = collect fun (arg : rest)
+    collect (TermAppTy f arg) rest
+      | Just (domain, result) <- nativeIndexFunctionTys_maybe f
+      , typeKind arg `eqType` domain
+      = do { kind <- check result rest
+           ; return (f, arg : rest, kind) }
+    collect _ _ = Nothing
+
+    check result [] = Just result
+    check fun (arg : rest)
+      | Just (domain, result) <- nativeIndexFunctionTypeTys_maybe fun
+      , typeKind arg `eqType` domain
+      = check result rest
+      | otherwise = Nothing
 
 -- | Check a function field in a structural index schema.
 -- See Note [Function fields in native index domains].

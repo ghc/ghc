@@ -2814,11 +2814,13 @@ nativeIndexFunctionVar_maybe _ = Nothing
 -- This does not admit a call as a lazy retained application argument.
 -- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
 exprToNativeCaseIndex :: CoreExpr -> Maybe Type
-exprToNativeCaseIndex (App (Var f) arg)
-  | Just (domain, _) <- nativeIndexFunctionTys_maybe f
-  , Just index <- exprToNativeIndex arg
-  , sameNativeIndexDomain domain (typeKind index)
-  = Just (TermAppTy f index)
+exprToNativeCaseIndex expr@App{}
+  | (Var f, args) <- collectArgs expr
+  , isNativeIndexFunctionId f
+  , Just indices <- traverse exprToNativeIndex args
+  , let call = mkAppTys (TermVarTy f) indices
+  , Just {} <- nativeCallSpine_maybe call
+  = Just call
 exprToNativeCaseIndex (Var v)
   | isNativeOpaqueValueId v = Just (TermVarTy v)
 exprToNativeCaseIndex expr

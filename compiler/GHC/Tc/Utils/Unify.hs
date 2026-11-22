@@ -4186,18 +4186,13 @@ retainedCallOccurs call_ty = go
 -- See Note [Source opaque call refinement] in GHC.Tc.Gen.Match.
 tcRetainedCallCoercion :: Type -> CoercionN -> TcType -> TcM CoercionN
 tcRetainedCallCoercion call_ty branch_co original_ty
-  = do { unless (valid_call call_ty
+  = do { unless (isJust (nativeCallSpine_maybe call_ty)
                  && coercionRole branch_co == Nominal
                  && coercionLKind branch_co `eqType` call_ty
                  && typeKind (coercionRKind branch_co) `eqType` typeKind call_ty) $
            pprPanic "tcRetainedCallCoercion: invalid alias proof"
              (ppr call_ty $$ ppr branch_co $$ ppr original_ty)
        ; tcRetainedIndexCoercion call_ty branch_co original_ty }
-  where
-    valid_call (TermAppTy fun arg)
-      | Just (domain, _) <- nativeIndexFunctionTys_maybe fun
-      = typeKind arg `eqType` domain
-    valid_call _ = False
 
 -- | Abstract one checked index, then use ordinary nominal FC lifting.
 tcRetainedIndexCoercion :: Type -> CoercionN -> TcType -> TcM CoercionN
