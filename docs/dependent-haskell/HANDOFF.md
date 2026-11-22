@@ -74,6 +74,11 @@ repeated all nine checks from a client with only the installed package.
 Job `760` checks `oneCellHead` with the same 546-line output at native
 `-O0`, native `-O2` and in GHCi. It uses `gcastWith` to return a
 `Maybe Char` under the equality supplied by the runtime length test.
+HaskLib now exports that operation as `withEquality` at `3f22060189`.
+The installed clients in job `801` used it at kind `Type` and at kind
+`Size`, forced the witness and rejected an unrelated equality.
+Job `804` checked the new spelling in all 546 Showcase outputs at both
+native optimization levels and in GHCi.
 
 The standalone [filter example](examples/open-evaluation/ParametricFilter.hs)
 states a free theorem at two element types. For Prelude's filter, the
@@ -81,12 +86,29 @@ client can import a proof by induction. For an arbitrary erased
 polymorphic function, a bare `Refl` fails at the proof expression.
 [Hypotheses and controls](REFERENCES.md#filter-naturality-in-the-presence-of-seq).
 
-Private candidates are recoverable under
-`refs/archive/dependent-haskell/2026-11-22/`.
+The earlier R19 selector designs are recoverable under
+`refs/archive/dependent-haskell/2026-11-22/`. The current R19
+candidate compares the generated case equations directly. Its private
+compiler passed both known and unknown scrutinees at 1,610 constructors.
+Job 802 checks that implementation in a normal build.
 
 | Ref | Current evidence |
 | --- | --- |
 | `r19-eight-constructor-selector` (`568979c39e`) | Separate providers agree on a case over an unknown enum with up to eight nullary constructors. The wider recursive alternative in `r19-selector-depth-comparison` (`732d9c5bb8`) exceeds the default reduction depth for the last of 1,610 constructors. |
+
+## Compiler builds submitted on 22 November
+
+Check Pueue for each job before resuming it. The experiment directories
+below are under `_build/on-demand/`.
+
+| Job | Directory | What to verify |
+| --- | --- | --- |
+| 783, 806 | `r03-named-measured-zip-normal-20261122` | Job 783 completed the clean two-stage build of named callbacks at `0eb0718f35`. Job 806 checks the normal binaries with `HaskLib.size` and existing lexical callbacks. |
+| 798 | `r03-named-safehead-normal-20261122` | Combined compiler at `a43a310c08`. Fixture `cde69193d8` uses `HaskLib.withEquality` and calls `safeHead` without type arguments. It also includes the named-callback example. Expect 547 output lines. |
+| 802 | `r19-closure-normal-20261122` | Two-stage build of `4e0c9b393a`. This fixes the import cycle found by job 797. Check independently compiled type-level cases, the stored coercion and the changed-row rejection. |
+
+The [release-readiness assessment](ROADMAP.md#release-readiness) identifies
+R36 as the next full-card target.
 
 ## Resume after a restart
 

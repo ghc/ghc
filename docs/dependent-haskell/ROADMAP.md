@@ -2,7 +2,8 @@
 
 Serokell’s roadmap has 50 cards and 67 edges. Its 2026-11-12 snapshot marks
 23 cards complete and seven proposals accepted. Twenty cards have no status
-marker. An edge can identify a prerequisite or a subtask. The
+marker. On 2026-11-22, all 50 live card IDs and status labels still
+matched this snapshot. An edge can identify a prerequisite or a subtask. The
 [dependency index](#upstream-checklist-and-complete-dependency-index)
 records every edge. The R numbers are local labels for those cards.
 [Upstream roadmap](https://ghc.serokell.io/dh).
