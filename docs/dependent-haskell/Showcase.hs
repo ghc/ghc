@@ -350,7 +350,12 @@ booleans = do
         , NativeCase.renderRetainedPick other
         , NativeCase.retainedKeep ignored (error "showcase-inline-payload")
         )
+    observe "compose retained type cases from separate modules"
+        (renderIndependent b, renderIndependent other)
   where
+    renderIndependent :: Bool -> String
+    renderIndependent flag = NativeRetainedTH.renderCase flag (NativeCase.retainedPick flag)
+
     -- Return a result at the selected Boolean type.
     choose :: foreach (b :: Bool) -> Select b
     choose True = 42
