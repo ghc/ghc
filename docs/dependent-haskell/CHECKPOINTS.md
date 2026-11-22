@@ -148,6 +148,36 @@ source revisions and rebuild commands, then remove both sets of outputs
 after the last live user finishes. The 200 GB threshold is a backup for
 this cleanup.
 
+## A named measurement and an inferred vector length
+
+The compiler at `4f2fc1146f` and merge `229cecd250` have identical
+compiler sources, tests and Showcase. A client can pass `HaskLib.size`
+to a proof as a retained callback. The same function measures a list
+read from IO and occurs in the result type. A separately compiled
+client rejects a different measurement at `Refl`. Core Lint checks
+the function's source equations when it uses them to form the index.
+An ordinary constructor field can still store a function by identity.
+
+The Showcase also uses a proof from `sameNat count (S Z)` to call
+`safeHead (replicateNative count 'x')` without explicit type
+arguments. An equality to zero cannot satisfy the call. HaskLib's
+source distribution built offline, and its list laws passed. Clients
+that could only see the installed interfaces passed at `-O0` and
+`-O2`. Jobs 855 and 865 verified the build and package.
+
+Jobs 864 and 871 matched all 548 Showcase outputs in GHCi, native
+`-O0` and native `-O2`. Native `-O2` passed with both stripped and
+ordinary interfaces. Ten R19/R36 registrations passed. In the separate
+41-test selection, 40 passed. The sole failure, `T15874`, produced
+the same diagnostic as the preceding compiler. Both the raw failing
+test and its diagnostic are retained in the job 868 results. The
+unchanged upstream compatibility comparison below also ran on this
+compiler. All 158 outcomes and all 15 failure reports matched the
+preceding comparison.
+[Named callback](roadmap/R03-dependent-products.md#pass-a-named-function-with-checked-equations),
+[scoped successor](roadmap/R11-homogeneous-equality.md#infer-the-checked-successor-tail)
+and [Showcase](Showcase.hs).
+
 ## Compose independent type-level cases
 
 The published R19 compiler compares the equations of two generated

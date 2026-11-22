@@ -27,6 +27,7 @@ Updated 22 November 2026. The development branch is
 | `1011998c82` | The Showcase calls the direct and composed proofs on the same lists from IO. It prints `([False],Refl,Refl)`. Job `704` matched all 546 lines at native `-O0`, native `-O2` with stripped and ordinary interfaces, and GHCi. |
 | `a395eea233` and `f73e659381` | Both stages built and matched 546 native Showcase lines at `-O0` and `-O2`. Stage 2 GHCi, installed HaskLib and the selective-upgrade checks passed. The official normal-way selection passed 39 of 40 tests. Unchanged `T15874` failed with the same GHC-45219 as on the preceding released compiler. |
 | `d41294266d` and `a7088dd69f` | R19 composes type-level cases across two modules at a runtime enum index. The compiler sources match the normal two-stage build at `4e0c9b393a`. Job `828` passed `NativeDependentCoreRun` and the 547-line Showcase at stage 2 in native `-O0`, native `-O2` and GHCi. |
+| `4f2fc1146f` and `229cecd250` | A client passes `HaskLib.size` as a retained callback. A scoped equality lets `safeHead` infer the tail index of a vector of length one. The installed-package clients and 548-line Showcase passed. Of 41 registered regressions, only the known `T15874` failed. |
 
 [Equality continuations and kind inference](CHECKPOINTS.md#equality-continuations-and-structural-kind-inference), [HaskLib pipeline and parametricity](CHECKPOINTS.md#compose-installed-list-proofs), [Ordinary minimum](CHECKPOINTS.md#an-ordinary-minimum-in-the-zip-length-proof)
 and [previous release](CHECKPOINTS.md#direct-zip-proof-and-retained-callback-rules).
@@ -105,34 +106,42 @@ below are under `_build/on-demand/`.
 | Job | Directory | What to verify |
 | --- | --- | --- |
 | 783, 806 | `r03-named-measured-zip-normal-20261122` | Both stages built at `0eb0718f35`. The dedicated named-callback, lexical-callback and rewrite-rule tests passed, as did the source-hidden HaskLib clients. |
-| 798, 809, 816, 817 | `r03-named-safehead-normal-20261122` | Both stages built at `a43a310c08` and matched all 547 lines of fixture `cde69193d8` at `-O0` and `-O2`. Stage 2 GHCi and the installed HaskLib clients passed. The registered normal suite passed 39 of 41. See the release blocker below. |
+| 798, 809, 816, 817 | `r03-named-safehead-normal-20261122` | Both stages built at `a43a310c08` and matched all 547 lines of fixture `cde69193d8` at `-O0` and `-O2`. Stage 2 GHCi and the installed HaskLib clients passed. The registered normal suite passed 39 of 41. The Core Lint repair in `4f2fc1146f` restores the stored-function test. |
 | 802, 815 | `r19-closure-normal-20261122` | Both stages built at `4e0c9b393a`. Four registered tests passed. A stripped-interface client used the two case results at an unknown index. Changing a row rebuilt the consumer and rejected its old proof. |
 
-The R03/R11 release is held at `a43a310c08`. In
-`NativeDependentCoreRun`, Core Lint checks the source equations of
-`flipNative` when the function is stored in a constructor field. The
-test binds a plain function and stores an occurrence that carries a
-certificate. The field index uses the function's identity. Lint must reject a
-mismatched certificate when an index actually uses its equations.
-`T15874` is the inherited failure in this selection.
-[Core API test](../../testsuite/tests/ghc-api/NativeDependentCoreRun.hs)
-and [the separate 158-registration compatibility comparison](CHECKPOINTS.md#compatibility-of-the-named-callback-and-successor-inference-changes).
+For the current compiler, use `r03-r19-r36-normal-4f2fc1146f-20261122`.
+Job 855 rebuilt both stages there. Jobs 864, 865, 868 and 871 checked
+the Showcase, selected tests, installed HaskLib and upstream compatibility.
+The build reuses the physical checkout under
+`r03-r19-r36-normal-91fd7365bf-20261122/source`. Verify its actual
+revision against the `compiler.source` file in the newer directory.
+[Results and test counts](CHECKPOINTS.md#a-named-measurement-and-an-inferred-vector-length).
 
-The cumulative source `91fd7365bf` adds R19 and the first R36 warning
-fixes. Its clean build uses `r03-r19-r36-normal-91fd7365bf-20261122`.
-It contains the same R03 change. The repair at `1e81b08715` and its
-API test at `f753d0b089` passed the two registered tests in a relinked
-compiler. The tests check ordinary storage and reject a named callback
-with a certificate from the wrong binding. The corrected cumulative
-source and its 548-line fixture are at `4f2fc1146f` in
-`r03-r19-r36-repair-source-20261122/source`. Qualify this pin in the
-normal compiler before publishing the callback and successor-inference
-changes.
+Job 838 independently built the R36 warning candidate `e3d6d94481`.
+The full rename run found one expected-output change in a selected
+warning test. The other 16 unexpected results reproduced on the
+preceding compiler in job 872. Job 873 matched the 547-line R19
+Showcase used for that comparison. Job 876 recompiles
+`r36-pun-normal-20261122/source` at `a20088cba1` with corrections
+for GADT scopes, quoted declarations, record selectors and the
+warning golden. Recheck the accepted warning examples and the full
+rename run on that build.
 
-Job 838 independently builds the full R36 warning candidate at
-`e3d6d94481` in `r36-pun-normal-20261122/source`. It uses the released
-R19 compiler sources as its base. Compare its diagnostics and quiet
-controls with proposal #765 before marking the card complete on the fork.
+Two of the inherited differences also reproduce when the dependent
+extension is explicitly disabled. In job 875, `T23740a` and
+`T23740h` both produced GHC-68947 on the R19 compiler. Stock GHC
+9.14.1 and the checked-in goldens report GHC-45510. Both compilers
+reject both programs. This diagnostic difference predates R36.
+
+R41's private parser and Template Haskell repair is at `365f7403ce`
+in `r41-ordered-prefix-repair-20261122`. Its source and interface
+checks passed, including quotation and splicing. Eleven of 24 tested
+prefix orders still fail. R19's next case uses a `Maybe Bool`
+scrutinee. Its `Just` branch ignores the field. Job 874 reproduced the
+failure to compose at an unknown index and checked that a known
+`Just` leaves its field lazy.
+[R41 ordering tests](roadmap/R41-nested-quantification-in-gadts.md#which-prefix-orders-work)
+and [R19 scope](roadmap/R19-type-level-cases.md).
 
 The [release-readiness assessment](ROADMAP.md#release-readiness) identifies
 R36 as the next full-card target.

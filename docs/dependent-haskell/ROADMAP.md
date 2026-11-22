@@ -44,8 +44,10 @@ R36 is the clearest candidate for the first complete card. Five of its
 eight checklist entries are checked. The remaining entries cover
 implicit type binders, uses shadowed across lexical scopes, and staged
 imports or remaining syntax. For R41, accepted proposal #402 permits
-orders of fields, constraints and quantifiers in
-prefix GADT constructors that the fork still rejects.
+free order for fields, constraints and quantifiers in prefix GADT
+constructors. In a test of 24 orders, the published R19 compiler
+accepted eight. A private repair accepts thirteen. The eleven remaining
+rejections persist with both a linear and an unrestricted field.
 [R36 checklist](roadmap/R36-pun-warnings.md)
 and [R41 checklist](roadmap/R41-nested-quantification-in-gadts.md).
 
@@ -96,12 +98,12 @@ continue to follow Serokell's published status.
 
 | Card | What works on the published fork | What still needs evidence or a decision |
 | --- | --- | --- |
-| [R03 Dependent products](roadmap/R03-dependent-products.md) | A retained argument can appear in the result type. A caller can use an indexed function on a vector of runtime length. | Infer omitted indices through helper calls at more domains. Compare inferred and explicitly indexed programs on the same runtime inputs. |
+| [R03 Dependent products](roadmap/R03-dependent-products.md) | An ordinary named function such as `HaskLib.size` can serve as both a runtime callback and the measurement in a result type. A caller can use an indexed function on a vector of runtime length. | Generalize beyond named callbacks with checked equations. Infer omitted indices through helper calls at more domains. |
 | [R04 Dependent sums](roadmap/R04-dependent-sums.md) | A caller can unpack a vector with its runtime length and use that length when matching the vector. | Generalize construction and elimination across dependent fields. Test inference and lazy projection while preserving the relationship between the fields. |
 | [R05 Dependent Core](roadmap/R05-dependent-core.md) | Optimized Core preserves retained indices in curried calls and keeps case evidence scoped. | Generalize dependent coercions, rewrite rules and exported unfoldings. Test a separately compiled optimized client with abstract evidence and a partial input. |
 | [R07 Promote literals](REFERENCES.md#written-retained-natural-literals) | Written characters, strings and nonnegative numerals work at checked domains, including a user Peano type. | Support overloaded literals beyond the checked conversions. Check that type-level reduction uses the instance selected for the term. |
 | [R10 Promote unboxed types](roadmap/R10-unboxed-promotion.md) | An imported family can match the machine-integer field of a promoted constructor. | Establish which other primitive representations support field values and pattern matching. Check target-width behavior and its interaction with homogeneous equality. |
-| [R11 Homogeneous equality](roadmap/R11-homogeneous-equality.md) | Selected GADT workers carry a kind proof and same-kind evidence. A source equality witness can refine the type of the body of `withEquality`. | Account for the remaining coercion binders with endpoints of different kinds. Broader inference for equality continuations is a separate source-level gap. |
+| [R11 Homogeneous equality](roadmap/R11-homogeneous-equality.md) | Selected GADT workers carry a kind proof and same-kind evidence. A runtime proof that a length is one lets `safeHead` infer its tail index inside `withEquality`. | Account for the remaining coercion binders with endpoints of different kinds. Generalize inference beyond the checked nominal equality and constructor forms. |
 | [R12 Promote classes](roadmap/R12-promote-classes.md) | An imported proof can use equations from the dictionary selected for a method, including supported `fmap` instances. | Specify and test general dictionary selection across superclass and recursive evidence, including two contexts that select different evidence. |
 | [R13 Function promotion](roadmap/R16-open-term-evaluator.md) | The ordinary recursive definitions of `size` and `minSize` work in the zip theorem. | Extend beyond recognized recursion and equation shapes. A client must retain the same equations and evaluation order after optimization and separate compilation. |
 | [R14 Data family promotion](roadmap/R14-data-family-promotion.md#next-acceptance-check) | Selected data-family instance constructors can appear in promoted indices. A runtime match can use a stored class dictionary. | Decide how to promote a constructor with an explicit class constraint. Direct promotion of `Stored` in the card's example is a useful boundary. |
@@ -115,7 +117,7 @@ continue to follow Serokell's published status.
 | [R23 Unsaturated families](roadmap/R23-unsaturated-type-families.md) | The unmodified `T13822` interpreter compiles. Its kind can select a matchable arrow when an equation returns `Maybe`. | Complete higher-order inference and settle compatibility of existing unannotated programs. The unmodified `T15874` still fails on the released compiler. |
 | [R24 Constrained families](roadmap/R24-constrained-type-families.md) | An associated family such as `Elem c` can require the owning dictionary. A source-hidden client rejects a missing premise before reduction. | Settle the general representation of domain evidence, including partial applications, and how the source formation rule corresponds to Core. |
 | [R36 Pun warnings](roadmap/R36-pun-warnings.md) | Five of the eight local checklist entries cover same-scope bindings, global uses, selected syntax and implicit capture. | Finish implicit binding puns, shadowed uses and stage-specific or remaining syntax. Compare diagnostic spans and quiet controls against proposal #765. |
-| [R41 Nested GADT quantifiers](roadmap/R41-nested-quantification-in-gadts.md) | Prefix constructors can interleave several groups of fields, contexts and quantifiers. The tested orders survive an interface and Template Haskell. | Preserve a context followed by an invisible binder before the first field. The [matched source examples](roadmap/R41-nested-quantification-in-gadts.md#a-context-before-an-invisible-binder-and-the-first-field) show which orders still reject. |
+| [R41 Nested GADT quantifiers](roadmap/R41-nested-quantification-in-gadts.md) | Prefix constructors can interleave several groups of fields, contexts and quantifiers. The tested orders survive an interface and Template Haskell. | Accept all valid orders. The [24-order comparison](roadmap/R41-nested-quantification-in-gadts.md#which-prefix-orders-work) gives a reproducible set of outstanding cases. |
 
 The published evaluator work covers closed calls such as `Prelude.sum` and
 open equations such as mapping `Prelude.not` over a list with a known head
