@@ -5578,6 +5578,26 @@ check also includes free runtime variables in types and coercions.
 [Haskell 2010 pattern matching, section 3.17.2](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html),
 and [Haskell evaluation provenance](#haskell-evaluation-provenance).
 
+### Mapping the second field of These
+
+Agda calls the three constructors `this`, `that`, and `these`. Its
+`map₂` leaves the first component alone and applies a supplied function
+to the second component wherever it occurs. Haskell's stock
+`DeriveFunctor` also examines how the final type parameter occurs in the
+fields of each constructor. The example derives its ordinary instance
+with this extension.
+[Agda standard library 2.4, Data.These.Base](https://agda.github.io/agda-stdlib/v2.4/Data.These.Base.html)
+and [GHC User's Guide, DeriveFunctor](https://downloads.haskell.org/ghc/9.14.1/docs/users_guide/exts/deriving_extra.html#deriving-functor-instances).
+
+For promotion the fork reads each equation from the selected instance's
+final Core worker. This applies to derived and hand-written instances.
+A constructor can hold both a fixed field and a field used by the
+callback. The proof names `fmap` directly and can refer to a supplied
+runtime predicate. Haskell's field demand and visible rewrite rules
+are checked separately.
+[Runtime proof](examples/open-evaluation/TheseMapping.hs)
+and [instance and demand checks](../../testsuite/tests/dependent/should_run/NativeOpenTheseFmap.sh).
+
 ### Upgrading checked method interfaces
 
 Agda checks the interface version before decoding a module. It also
