@@ -16,7 +16,7 @@ the checked list laws for reuse by other modules.
 ## Where this fork stands
 
 Serokell marks **23 of 50 cards complete**. Of its **27 open cards**,
-the fork now completes **2**, partially implements **19** and has **6**
+the fork now completes **2**, partially implements **20** and has **5**
 with no separate implementation on the published branch. Counting the
 inherited 23 gives **25 of 50 complete** on the roadmap. These figures
 count cards. They do not estimate the effort left or certify all inherited
@@ -27,7 +27,7 @@ GHC behavior on the fork.
 | Dependent binders, Core and equality | R03, R04, R05, R11, R22 |
 | Promotion and evaluation | R07, R10, R12, R13, R14, R15, R16, R17, R18, R19 |
 | Declaration dependencies, families and GADTs | R21, R23, R24, R41 |
-| Namespace management and warnings | R35 and R36, both complete on the fork |
+| Namespace management and warnings | R27, plus R35 and R36, both complete on the fork |
 
 ### Release readiness
 
@@ -45,18 +45,17 @@ Two cards meet their documented scope on the normal compiler at
   both imports. All 25 namespace registrations passed.
 
 R41 remains partial. Its normal compiler accepts all 24 tested orders
-of a prefix GADT constructor with both field multiplicities. Lifted
-data family instances and boxed unlifted datatypes with a fixed result
-representation now support ordered fields. Older readers load their
-stripped interfaces. Ordered newtypes and representation-polymorphic
-results still have restrictions. R23 now supports both the ordinary
+of a prefix GADT constructor with both field multiplicities. Boxed datatypes can also quantify over levity.
+An ordered newtype can put a required or invisible quantifier after
+a field with a fixed representation. Open field representations and
+ordered `type data` constructors remain open on this compiler. R23 now supports both the ordinary
 and promoted uses of a polymorphic `Endo` in real library clients.
 A bare higher-order use in `FoldrDefault_` still needs explicit
 matchability arguments.
 [R23 package check](roadmap/R23-unsaturated-type-families.md#one-constructor-for-term-and-promoted-callbacks)
 and [R41 scope](roadmap/R41-nested-quantification-in-gadts.md).
 
-Six of the 27 open upstream cards have no separate implementation
+Five of the 27 open upstream cards have no separate implementation
 counted on this branch.
 
 | Card | What still holds it open |
@@ -65,7 +64,6 @@ counted on this branch.
 | R02 Dependent retained quantifiers | Complete both dependent products (R03) and sums (R04). The fork still restricts which runtime arguments can appear in results and which hidden indices it can infer. |
 | R06 Universal promotion | Promotion of literals, unboxed types, classes, functions and data families is partial (R07, R10, R12–R14). An ordinary definition can still fall outside the evaluator. |
 | R20 Clean up the language | Complete mixed declaration ordering, erased existentials, unsaturated families, constrained families and CUSK deprecation. |
-| [R27 Deprecate CUSKs](roadmap/R27-deprecate-cusks.md) | A three-package migration preserved 84 kinds. The prototype warning finds both affected declarations in the first package and 13 others. Check the suggested signatures before changing any edition defaults. |
 | R34 Syntactic unification | Type syntax already works in some expressions. Patterns, the term and type grammars, and the frontend representations still need general unification. |
 
 The [Serokell roadmap](https://ghc.serokell.io/dh) records the status of
@@ -91,7 +89,7 @@ which proof steps still require the function's definition.
 Earlier [Showcase milestones and examples](CHECKPOINTS.md#showcase-history-through-502-outputs)
 record how each behavior was introduced.
 
-### Evidence for the 19 partial cards
+### Evidence for the 20 partial cards
 
 Each row links to the test or card that supports it. The last column
 identifies an outstanding obligation or a test that can expose it.
@@ -116,12 +114,13 @@ continue to follow Serokell's published status.
 | [R16 Open evaluator](roadmap/R16-open-term-evaluator.md) | With unknown input lists, a client proves that `map` preserves length and that `zipWith` takes the shorter length. | Evaluate ordinary definitions on unknown inputs beyond the certified equations. Preserve demand and check the effect of visible rewrite rules. |
 | [R17 Type-level lambdas](roadmap/R17-type-level-lambdas.md) | A type-level `Map` accepts an anonymous function. An importing client can use its application and selected equalities between closures. | Settle where a lambda can be written and the conversion rule for an unapplied lambda with captures. Test agreement across module boundaries. |
 | [R18 Type-level lets](roadmap/R18-type-level-lets.md) | The roadmap's `let b = G a in H b b` example works directly. The fork also handles ordered groups, local kind signatures and tuple patterns. | Settle the scope of general local patterns and binding groups. The current ordered, nonrecursive semantics is a fork design choice. |
-| [R19 Type-level cases](roadmap/R19-type-level-cases.md) | Independent modules can compose exhaustive cases at an unknown runtime index. Their rows may have different orders. A `Just _` branch can ignore its field, even if evaluating that field would fail. | Compare nested patterns and branch results that use a matched field or captured value. The current proof checks flat constructor rows with closed results. |
+| [R19 Type-level cases](roadmap/R19-type-level-cases.md) | Independent modules can compose exhaustive cases at an unknown runtime index. Their rows may have different orders. A `Just x` branch can return `Proxy x` without forcing `x`. | Qualify equality for nested cases, including cases that select the same result types but inspect different fields first. |
 | [R21 Declaration dependencies](roadmap/R21-dependency-analysis.md) | Selected mixed type and term declarations can refer forward to a producer. GHC diagnoses a genuine dependency cycle at the source call. | Establish general ordering for mixed groups. Cover declarations that introduce instances or deriving dependencies, while respecting splice boundaries. |
 | [R22 Erased existentials](roadmap/R22-existential-quantification.md) | A pattern can open a hidden length. An argument's declared type can determine a witness beneath a callback's `forall`. | Specify inference for a package repacked across a scope, including the cases where its witness cannot be determined or would escape. |
 | [R23 Unsaturated families](roadmap/R23-unsaturated-type-families.md) | A supplied promoted callback can determine its arrow matchabilities. The real `first-class-families` package supports the plain lambda and `'Endo Echo` in separate clients. | Complete higher-order inference and settle compatibility of existing unannotated programs. The unmodified `T15874` still fails on the released compiler. |
 | [R24 Constrained families](roadmap/R24-constrained-type-families.md) | An associated family such as `Elem c` can require the owning dictionary. A source-hidden client rejects a missing premise before reduction. | Settle the general representation of domain evidence, including partial applications, and how the source formation rule corresponds to Core. |
-| [R41 Nested GADT quantifiers](roadmap/R41-nested-quantification-in-gadts.md) | Prefix constructors can interleave several groups of fields, contexts and quantifiers. The tested orders survive an interface and Template Haskell. | Check newtypes and representation-polymorphic results under the [prefix grammar](roadmap/R41-nested-quantification-in-gadts.md#which-prefix-orders-work). |
+| [R27 Deprecate CUSKs](roadmap/R27-deprecate-cusks.md) | The opt-in `-Wcusks` warning supplies checked edits or explains a kind. Fourteen standalone signatures preserved all 215 printed kinds in a three-package migration on the fork. | Verify the legacy edition transition, including advice for an explicit opt-out after an opt-in. |
+| [R41 Nested GADT quantifiers](roadmap/R41-nested-quantification-in-gadts.md) | Prefix constructors can interleave several groups of fields, contexts and quantifiers. Boxed data supports unknown levity. Ordered newtypes support a fixed field representation, including `Int#`. | Check representation-polymorphic newtypes and ordered `type data` constructors under the [prefix grammar](roadmap/R41-nested-quantification-in-gadts.md#which-prefix-orders-work). |
 
 The published evaluator work covers closed calls such as `Prelude.sum` and
 open equations such as mapping `Prelude.not` over a list with a known head

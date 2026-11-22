@@ -54,10 +54,12 @@ and [GHC MR !1602](https://gitlab.haskell.org/ghc/ghc/-/merge_requests/1602).
   a package that relies on an implicit CUSK and a Haskell98 package.
 - [x] Test the transition warning on explicit and inherited uses.
   Include a declaration with a CUSK whose client needs no migration.
-- [ ] Verify each suggested signature on package sources. Explain
+- [x] Verify each suggested signature on package sources. Explain
   kinds with inaccessible names without suggesting invalid source.
-- [ ] Recheck the selected migration on the normal compiler and
-  document the effect on callers before changing a language default.
+- [x] Recheck the selected migration on the normal compiler and
+  document the effect on callers.
+- [ ] Decide when to change the legacy editions and how to retire the
+  explicit opt-in. Verify the selected transition on the normal compiler.
 
 ### Results for four declarations
 
@@ -173,6 +175,34 @@ unchanged with both fork compilers. A client instantiated tags at
 `Bool` and at `Type -> Type` and printed `(3,'x')` on both.
 [Published tagged release](https://hackage.haskell.org/package/tagged-0.9).
 
+### The release chain on the normal fork
+
+Jobs 1046, 1050 and 1053 repeated the three-package migration on the
+normal Stage 2 fork at `5833e38cbd`. The two sides use identical
+matchability changes and unchanged Haskell2010 Cabal files. The
+baseline inherits CUSKs. The migration adds the same 2, 10 and 2
+standalone kind signatures and builds with `-XNoCUSKs`.
+
+The matchability changes are required even with CUSKs enabled.
+`first-class-families` uses the R23 provider migration, including the
+`Endo` matchability annotations and the namespace correction.
+`kind-apply` adds `%M` to nested arrows in `(:&&:)`, `VZ`, `VS`,
+`(:@:)` and `ForAll`. In the minimal `HeadLoT` case, the unannotated
+promoted `(:&&:)` carries an unmatchable arrow. The family parameter
+requires a matchable arrow. An explicit `%M` passes with either CUSK
+setting. `kind-generics` needs no matchability edit.
+[R23 first-class-families migration](R23-unsaturated-type-families.md#released-first-class-families-migration).
+
+After those prerequisites, disabling CUSKs reproduces the failures in
+each release as its dependencies are migrated. The 2, 10 and 2
+signatures restore the chain. All 215 printed kinds match across its
+23 interfaces, including 163 locally defined exported constructors.
+All five unchanged source-hidden clients pass, including the two
+`Endo` uses and `FoldrDefault_`. The upstream `fcf-test` passes on
+both builds. The comparison measures the CUSK switch on an already
+matchability-compatible provider.
+[Exact package sources, patches and build commands](../examples/r27-package-migration/README.md).
+
 ### Which declarations would a migration warning identify?
 
 Job 942 built the unmodified release chain on stock GHC 9.14.1 with
@@ -184,7 +214,7 @@ CUSK. Job 950 checked the warning on the extension flag in MR !1602.
 It reported all 14 explicit switches across seven modules and none
 of the seven modules that inherited the edition default.
 
-An opt-in declaration warning is under test on the fork. After the
+The fork provides an opt-in declaration warning. After the
 [R23 package migration](R23-unsaturated-type-families.md#released-first-class-families-migration),
 the prototype reported both affected declarations in
 `first-class-families` and 13 additional declarations. Six printed
@@ -207,7 +237,8 @@ In the second, it added both required signatures and left CUSKs off.
 Thus the advice to enable the extension affects the whole module,
 even when the diagnostic points at one declaration.
 
-The private opt-in `-Wcusks` implementation uses GHC-57439. On the
+The opt-in `-Wcusks` warning uses GHC-57439. Job 1041 checked the
+package on the integrated normal compiler at `fd19c8fe5f`. On the
 R23-compatible package, the normal stage 2 compiler gave five
 suggested edits and ten explanations. All five suggested signatures
 together compiled under `-XNoCUSKs`, preserved the corresponding
@@ -218,3 +249,22 @@ change after adding a signature. The default build was quiet.
 The wording reminds the user about the module-wide effect when it
 suggests enabling `StandaloneKindSignatures`. Language editions and
 their defaults are unchanged on the published branch.
+
+### An explicit opt-out during the transition
+
+The private comparator applies the two driver changes from !1602 to
+`fd19c8fe5f`. With Haskell98 or Haskell2010, a module that relied on
+the edition to enable CUSKs must migrate or explicitly opt back in.
+Jobs 1071 and 1073 checked the three-package chain, source-hidden
+clients, edition selection, and the order of the extension flags.
+In the 317-test upstream comparison, only `T20916` gained an extra
+golden mismatch for the flag deprecation.
+
+Job 1079 found that the proposed warning for `-XNoCUSKs` suggests
+an edit that changes behavior. After `-XCUSKs`, `-XNoCUSKs` turns
+CUSKs off. Replacing it with `-XNoStandaloneKindSignatures` leaves
+CUSKs on. If standalone signatures are enabled, the same replacement
+can disable syntax that the module uses. Keep both controls when
+revising the advice. The published declaration warning is independent
+of this driver change.
+[Upstream driver change](https://github.com/ghc/ghc/commit/c8c660f678bd77fb9d0a855753a165c5a5d1f8e1).

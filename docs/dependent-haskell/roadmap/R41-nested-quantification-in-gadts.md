@@ -335,5 +335,24 @@ supports ordered fields in datatypes and data family instances with
 a fixed boxed unlifted result. Job 1006 ran source-hidden clients with
 both this compiler and `2b64ffc406` at `-O0` and `-O2`. An ordinary
 levity-polymorphic control compiled. Its ordered counterpart still
-gave GHC-71492. Ordered newtypes are a separate pending change.
+gave GHC-71492. The next compiler covers fixed-representation newtypes.
 [Maintained constructor regression](../../../testsuite/tests/gadt/GadtRefinedOrderedProvider.hs).
+
+### Boxed results and fixed-representation newtypes
+
+Job 1041 checked a boxed datatype with unknown levity on the normal
+compiler at `fd19c8fe5f`. A separately compiled client constructed
+and matched values at lifted and unlifted kinds. Binding a field whose
+runtime representation is unknown still gave the ordinary GHC diagnostic.
+
+A newtype constructor can put its single field before a specified or
+required quantifier. This works for ordinary newtypes, family instances
+and an `Int#` field. The constructor erases to a cast. Ignoring a lifted
+payload leaves it unevaluated. Forcing the newtype forces its payload.
+The test checks source order through Template Haskell and verifies that
+the provider emits no newtype constructor symbol. The previous reader
+rejects an ordered-newtype interface before decoding it. Ordinary
+newtype interface bytes match the previous compiler at `-O0` and `-O2`.
+The next scope includes open field representations and `type data`.
+[Constructor definitions](../../../testsuite/tests/gadt/GadtOrderedNewtypeProvider.hs)
+and [reader and reification test](../../../testsuite/tests/gadt/GadtOrderedNewtype.hs).

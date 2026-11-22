@@ -2256,3 +2256,21 @@ cabal build all --builddir=dist-r16 \
 
 [Two-compiler warm check](../examples/open-evaluation/check-source-proof-branch-upgrade.sh)
 and [home recompilation check](../../../compiler/GHC/Iface/Recomp.hs).
+
+### Two induction hypotheses for a binary tree
+
+The normal compiler at `5833e38cbd` exports the equations of
+`mapTree f (Fork l r)`. It retains the unknown callback and both
+recursive calls. It omits the equations for `nodes`, whose fork
+clause passes the two recursive results to addition. The importing
+proof then reports GHC-68947 at the inner call to `mapTree`.
+
+A private compiler admits a lazy, vanilla datatype with one lifted
+parameter through the existing source-equation checker. Job 1086
+compiled the worker and proof separately. Its ordinary client ran
+at `-O0` and `-O2` with Core and STG Lint. Counting the nodes after
+mapping an unknown function yields the original count. The fork case
+uses one induction hypothesis for each child. Omitting one hypothesis leaves an unsolved goal at `Refl`. A failing mapping function and a
+bottom leaf payload were both left unevaluated. Evaluating the proof
+over a bottom right subtree raised the expected exception.
+[Agda theorem and provenance](../REFERENCES.md#map-preserves-the-number-of-internal-nodes).

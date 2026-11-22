@@ -6,6 +6,30 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Field-dependent case results, ordered newtypes and CUSK migrations
+
+Jobs 1035 and 1041 built and tested `fd19c8fe5f`. Merge `6272edb866`
+contains the same compiler, examples and tests. The Stage 2 Showcase
+matched all 551 lines at native `-O0`, native `-O2` and in GHCi. All
+36 selected normal-way registrations passed.
+
+Two modules give a retained `Maybe Bool` separate case expressions.
+In the `Just x` branch the first returns `Proxy x` and the second
+accepts it. They compose for input read from IO, even if the field is
+bottom. A mixed interface contained the new case proof and an ordered
+newtype. Both earlier component readers reported the unsupported
+features. The integrated client printed `(42,True,(False,Refl))`.
+[Showcase](Showcase.hs) and [R19 case](roadmap/R19-type-level-cases.md).
+
+The integrated compiler also passed the stripped-interface newtype,
+unknown-levity and Template Haskell checks. In the migrated
+`first-class-families` package, `-Wcusks` issued 15 diagnostics.
+Five contained source edits. Applying all five and disabling CUSKs
+built the package and ran its importing client. The default build
+was quiet. The edition change remains a private experiment.
+[R41 tests](roadmap/R41-nested-quantification-in-gadts.md#boxed-results-and-fixed-representation-newtypes)
+and [R27 package study](roadmap/R27-deprecate-cusks.md#the-release-chain-on-the-normal-fork).
+
 ## Promoted callbacks and ordered data family constructors
 
 Normal job 988 built both compiler stages at `5833e38cbd`. The

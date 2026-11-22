@@ -11,21 +11,25 @@ and its [expected output](Showcase.stdout) are the executable examples.
 Updated 22 November 2026. The development branch is
 `dependent-haskell`. Use the fork command below to find its latest commit.
 
-The published R23/R41 compiler matches `5833e38cbd`. Its normal
-build and qualification are in `r23-r41-field-inference-20261122`.
-The physical compiler is in `r36-combined-release-20261122/source/_build`.
-Jobs 988 and 1006 both passed. Use their recorded compiler hashes
-when resolving the physical path from older receipts.
+The published compiler in `6272edb866` matches the tested sources at
+`fd19c8fe5f`. Jobs 1035 and 1041 passed. The 551 Showcase outputs
+matched at native `-O0`, native `-O2` and in GHCi. All 36 selected
+registrations passed. Read `physical-source.path`, `compiler.source`,
+`compilers.sha256` and `qualification/qualification.pass` under
+`_build/on-demand/r19-r23-r27-r41-integration-20261122`. The compiler
+is installed in `r23-injective-kind-normal-20261122/source/_build`.
+Use the new hash manifest when an old receipt names the same directory.
+The previous released compiler at `5833e38cbd` is installed in
+`r36-combined-release-20261122/source/_build`.
 
-The next combined source is `fd19c8fe5f`, held by
-`refs/archive/dependent-haskell/2026-11-22/r19-r23-r27-r41-normal-551`.
-Job 1035 builds it in the former R23 compiler tree. Job 1041 depends
-on that build. It checks 551 Showcase outputs, 36 registrations, real
-package clients, and one interface containing both the bound-field
-case proof and an ordered newtype. Read `physical-source.path`,
-`compiler.source`, and `qualification/qualification.pass` under
-`_build/on-demand/r19-r23-r27-r41-integration-20261122`. This pin
-keeps the fixed-representation check on ordered newtypes.
+The next combined build adds nested case decisions, higher-rank
+constructor aliases and representation-polymorphic newtypes. Its inputs
+are in `_build/on-demand/r19-r41-next-20261122`. Job 1087 builds
+`00115859a5` from a clean checkout with pinned local submodules.
+R13/R16 is testing
+two-child recursion on trees. R27 is testing the effect of removing
+implicit CUSKs from the two legacy editions. The current language
+defaults still apply on this branch.
 
 | Revision | Verified result |
 | --- | --- |
@@ -47,6 +51,7 @@ keeps the fixed-representation check on ordered newtypes.
 | `4e169241d2` and `098ca0ae97` | Independent modules compose type-level cases on an unknown `Maybe Bool`. The `Just` field stays lazy. Both stages built, the 549-line Showcase passed, and all ten original term-capture diagnostic tests passed. The 158 upstream test outcomes match the previous release. |
 | `2b64ffc406` and `930910d25b` | Both normal stages built. The 549-line Showcase, 23 focused regressions and interface upgrade checks passed. The full renamer run restored eight upstream goldens. R36 passed all 16 pun-warning regressions. R35 passed 25 namespace registrations, including the source-hidden regression in `e0fa805055`. |
 | `5833e38cbd` and `ad644c290f` | The same polymorphic `Endo` supports an ordinary lambda and a promoted callback with omitted matchability. Lifted data family instances and fixed boxed unlifted data constructors accept ordered arguments. All 30 selected registrations and all three 550-line Showcase modes passed. |
+| `fd19c8fe5f` and `6272edb866` | Both stages built. A field can index the result of a type-level case across modules. Boxed data with unknown levity and fixed-representation newtypes accept ordered constructor arguments. The opt-in CUSK warning passed its package checks. All 36 selected registrations and all three 551-line Showcase runs passed. |
 
 [Equality continuations and kind inference](CHECKPOINTS.md#equality-continuations-and-structural-kind-inference), [HaskLib pipeline and parametricity](CHECKPOINTS.md#compose-installed-list-proofs), [Ordinary minimum](CHECKPOINTS.md#an-ordinary-minimum-in-the-zip-length-proof)
 and [previous release](CHECKPOINTS.md#direct-zip-proof-and-retained-callback-rules).
@@ -218,7 +223,9 @@ GHC 9.14.1. Adding 14 standalone signatures restored all three builds
 with `-XNoCUSKs`. The 84 printed kinds in the six edited modules and
 all three clients agreed with the original builds. The fork rejects
 the unchanged first dependency at `Pure` under both configurations.
-The next comparison checks which migration targets a warning identifies.
+On the fork with the matchability changes, all 215 printed kinds in the
+23 interfaces and all five clients agree across the CUSK migration. Job
+1041 verified the warning and its five copyable suggestions on the first package.
 [R27 scope](roadmap/R27-deprecate-cusks.md).
 
 The main checkout has local Git recovery refs for these source
@@ -229,9 +236,8 @@ and `r36-r41-r19-r13-549-normal`.
 The compiler sources remain available there after generated builds expire.
 
 The [release-readiness assessment](ROADMAP.md#release-readiness) records
-R35 and R36 as complete on the fork. The active follow-ups are R41
-constructor forms, R23 matchability in package interfaces and an opt-in
-R27 migration diagnostic.
+R35 and R36 as complete on the fork. R27 has a published declaration warning
+and an open decision on legacy language defaults.
 
 ## Resume after a restart
 

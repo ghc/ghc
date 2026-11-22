@@ -1,0 +1,81 @@
+--- a/first-class-families-0.8.2.0/src/Fcf/Class/Foldable.hs
++++ b/first-class-families-0.8.2.0/src/Fcf/Class/Foldable.hs
+@@ -0,0 +1 @@
++{-# LANGUAGE TypeApplications #-}
+@@ -52,0 +54 @@
++import GHC.Matchability (M)
+@@ -114 +116 @@
+-type FoldrDefault_ f y xs = Eval (UnEndo (Eval (FoldMap (Pure1 'Endo <=< Pure1 f) xs)) y)
++type FoldrDefault_ f y xs = Eval (UnEndo (Eval (FoldMap (Pure1 ('Endo @M @M) <=< Pure1 f) xs)) y)
+--- a/first-class-families-0.8.2.0/src/Fcf/Class/Monoid/Types.hs
++++ b/first-class-families-0.8.2.0/src/Fcf/Class/Monoid/Types.hs
+@@ -2,0 +3,5 @@
++    Modifiers,
++    RankNTypes,
++    StandaloneKindSignatures,
++    TypeAbstractions,
++    TypeApplications,
+@@ -14,0 +20,2 @@
++import Data.Kind (Type)
++import GHC.Matchability (M, Matchability)
+@@ -26 +33,2 @@
+-newtype Endo a = Endo (a -> Exp a)
++type Endo :: forall (m :: Matchability) (n :: Matchability). Type -> Type
++newtype Endo @m @n a = Endo (a %m -> a %n -> Type)
+@@ -29,2 +37,2 @@
+-type family UnEndo (e :: Endo a) :: a -> Exp a where
+-  UnEndo ('Endo f) = f
++type family UnEndo (e :: Endo @M @M a) :: a -> Exp a where
++  UnEndo ('Endo @M @M f) = f
+@@ -36 +44 @@
+-type instance 'Endo f <> 'Endo g = 'Endo (f <=< g)
++type instance 'Endo @M @M f <> 'Endo @M @M g = 'Endo (f <=< g)
+--- a/first-class-families-0.8.2.0/src/Fcf/Core.hs
++++ b/first-class-families-0.8.2.0/src/Fcf/Core.hs
+@@ -2,0 +3 @@
++    Modifiers,
+@@ -15,0 +17 @@
++import GHC.Exts (M)
+@@ -20 +22 @@
+-type Exp a = a -> Type
++type Exp a = a %M -> Type
+--- a/first-class-families-0.8.2.0/src/Fcf/Utils.hs
++++ b/first-class-families-0.8.2.0/src/Fcf/Utils.hs
+@@ -4,0 +5 @@
++    Modifiers,
+@@ -34 +35 @@
+-  , GHC.TypeLits.ErrorMessage(Text, ShowType, type (:<>:), type (:$$:))
++  , GHC.TypeLits.ErrorMessage(Text, ShowType, (:<>:), (:$$:))
+@@ -37,0 +39 @@
++import GHC.Exts (M)
+@@ -93 +95 @@
+-  | Is_ (j -> Exp Bool) k
++  | Is_ (j %M -> Exp Bool) k
+@@ -95 +97 @@
+-  | Else_ (j -> Exp k)
++  | Else_ (j %M -> Exp k)
+--- a/kind-apply-0.4.0.1/src/Data/PolyKinded/Atom.hs
++++ b/kind-apply-0.4.0.1/src/Data/PolyKinded/Atom.hs
+@@ -5,0 +6 @@
++{-# language Modifiers             #-}
+@@ -46 +47 @@
+-  VZ :: TyVar (x -> xs) x
++  VZ :: TyVar (x %M -> xs) x
+@@ -48 +49 @@
+-  VS :: TyVar xs k -> TyVar (x -> xs) k
++  VS :: TyVar xs k -> TyVar (x %M -> xs) k
+@@ -113 +114 @@
+-  (:@:) :: Atom d (k1 -> k2) -> Atom d k1 -> Atom d k2
++  (:@:) :: Atom d (k1 %M -> k2) -> Atom d k1 -> Atom d k2
+@@ -117 +118 @@
+-  ForAll  :: Atom (d1 -> d) Type -> Atom d Type
++  ForAll  :: Atom (d1 %M -> d) Type -> Atom d Type
+--- a/kind-apply-0.4.0.1/src/Data/PolyKinded.hs
++++ b/kind-apply-0.4.0.1/src/Data/PolyKinded.hs
+@@ -5,0 +6 @@
++{-# language Modifiers              #-}
+@@ -24,0 +26 @@
++import           GHC.Matchability (M)
+@@ -36 +38 @@
+-  (:&&:)  :: k -> LoT ks -> LoT (k -> ks)
++  (:&&:)  :: k -> LoT ks -> LoT (k %M -> ks)

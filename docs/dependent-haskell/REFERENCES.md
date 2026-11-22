@@ -8230,3 +8230,21 @@ typed Core. An ordinary callback can still float in the same module.
 [Let-floating: moving bindings to give faster programs](https://www.microsoft.com/en-us/research/publication/let-floating-moving-bindings-to-give-faster-programs/),
 [GHC full laziness](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/using-optimisation.html#ghc-flag-ffull-laziness)
 and [R05 example](roadmap/R05-dependent-core.md#keep-absent-polymorphic-callbacks-in-lexical-scope).
+
+### Map preserves the number of internal nodes
+
+Agda's standard library proves `#nodes-map` by induction on a binary
+tree. At a node, `cong₂` applies the induction hypotheses for both
+children to the same counting expression. The leaf-only map theorem
+`#nodes-mapₗ` specializes the other callback to the identity. R13 and
+R16 use this theorem to test promotion of an ordinary Haskell function
+that passes two recursive results to addition. The Haskell proof can
+inspect both subtrees while leaving their leaf payloads unevaluated.
+[Agda standard library v2.3, Data.Tree.Binary.Properties](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Tree/Binary/Properties.agda#L31-L40).
+
+Agda's treatment of case trees also distinguishes which argument is
+inspected first. The fork uses that distinction when comparing nested
+cases written in separate modules. Agda gives pattern lambdas fresh
+names. The additional equality for matching trees is a fork decision.
+[Agda case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees)
+and [pattern-lambda translation](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html#internal-representation-of-pattern-lambdas).

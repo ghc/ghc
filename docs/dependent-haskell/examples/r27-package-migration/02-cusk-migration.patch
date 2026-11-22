@@ -1,0 +1,54 @@
+--- a/first-class-families-0.8.2.0/src/Fcf/Utils.hs
++++ b/first-class-families-0.8.2.0/src/Fcf/Utils.hs
+@@ -7,0 +8 @@
++    StandaloneKindSignatures,
+@@ -73,0 +75 @@
++type TyEqImpl :: forall k l. k -> l -> Bool
+@@ -122,0 +125 @@
++type Case_ :: forall j k. [Match j k] -> j -> k
+--- a/kind-apply-0.4.0.1/src/Data/PolyKinded/Atom.hs
++++ b/kind-apply-0.4.0.1/src/Data/PolyKinded/Atom.hs
+@@ -8,0 +9 @@
++{-# language StandaloneKindSignatures #-}
+@@ -107,0 +109 @@
++type Atom :: forall r. Type -> TYPE r -> Type
+@@ -140,0 +143 @@
++type InterpretVar :: forall d k. TyVar d k -> LoT d -> k
+@@ -151,0 +155 @@
++type Interpret :: forall d k. Atom d k -> LoT d -> k
+@@ -199,0 +204 @@
++type ContainsTyVar :: forall d k p. TyVar d k -> Atom d p -> Bool
+--- a/kind-apply-0.4.0.1/src/Data/PolyKinded/Functor.hs
++++ b/kind-apply-0.4.0.1/src/Data/PolyKinded/Functor.hs
+@@ -6,0 +7 @@
++{-# language StandaloneKindSignatures #-}
+@@ -14,0 +16 @@
++import           Data.Kind (Type)
+@@ -46,0 +49 @@
++type Mappings :: forall k. Variances -> LoT k -> LoT k -> Type
+--- a/kind-apply-0.4.0.1/src/Data/PolyKinded.hs
++++ b/kind-apply-0.4.0.1/src/Data/PolyKinded.hs
+@@ -9,0 +10 @@
++{-# language StandaloneKindSignatures #-}
+@@ -49,0 +51 @@
++type (:@@:) :: forall k. k -> LoT k -> Type
+@@ -76,0 +79 @@
++type SpineLoT :: forall k. LoT k -> LoT k
+@@ -80,0 +84 @@
++type SLoT :: forall k. LoT k -> Type
+@@ -100,0 +105 @@
++type SplitF' :: forall d k l. d -> k -> LoT l -> LoT k
+@@ -121,0 +127 @@
++type SplitN' :: forall d. Nat -> d -> LoT d -> TyEnv
+--- a/kind-generics-0.5.0.0/src/Generics/Kind/Examples.hs
++++ b/kind-generics-0.5.0.0/src/Generics/Kind/Examples.hs
+@@ -9,0 +10 @@
++{-# language StandaloneKindSignatures #-}
+@@ -170,0 +172 @@
++type T :: forall k. k -> Type
+--- a/kind-generics-0.5.0.0/src/Generics/Kind.hs
++++ b/kind-generics-0.5.0.0/src/Generics/Kind.hs
+@@ -14,0 +15 @@
++{-# language StandaloneKindSignatures  #-}
+@@ -197,0 +199 @@
++type SubstAtom :: forall t k d. Atom (t -> k) d -> t -> Atom k d
