@@ -49,12 +49,11 @@ observeTile = do
 
 -- | Read the top layer and leave the second layer unevaluated.
 observeTopLayer :: [[Bool]]
-observeTopLayer = case volumeLayers volume of
-    VCons first _ -> map toList (toList first)
+observeTopLayer = map toList (toList (topLayer volume))
   where
     volume = Volume (S (S Z)) (S Z) (S (S Z))
         (VCons layer (error "forced deeper layers"))
     layer = VCons (VCons True (VCons False VNil)) VNil
 
-    volumeLayers :: Volume a ('Cuboid layers rows columns) -> Vec (Vec (Vec a columns) rows) layers
-    volumeLayers (Volume _ _ _ stack) = stack
+    topLayer :: Volume a ('Cuboid ('S layers) rows columns) -> Vec (Vec a columns) rows
+    topLayer (Volume _ _ _ (VCons first _)) = first

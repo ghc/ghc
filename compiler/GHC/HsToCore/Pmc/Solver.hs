@@ -679,8 +679,10 @@ tyOracle ty_st@(TySt n inert) cts
     do { evs <- traverse nameTyCt cts
        ; tracePm "tyOracle" (ppr n $$ ppr cts $$ ppr inert)
        ; mb_new_inert <- initTcDsForSolver $ tcCheckGivens inert evs
-         -- return the new inert set and increment the sequence number n
-       ; return (TySt (n+1) <$> mb_new_inert) }
+       ; return $ do
+           new_inert <- mb_new_inert
+           guard (retainedGivensCompatible new_inert)
+           pure (TySt (n+1) new_inert) }
 
 -- | Allocates a fresh 'EvVar' name for 'PredTy's
 nameTyCt :: PredType -> DsM EvVar
@@ -873,16 +875,38 @@ retainedIndexCanMatch MkNabla{nabla_ty_st = TySt _ inert} x con
   where
     irreds = inert_irreds (inert_cans inert)
     compatible irred
-      | Just (Nominal, lhs, rhs) <- getEqPredTys_maybe (irredCtPred irred)
-      = matches lhs rhs && matches rhs lhs
-      | otherwise = True
-    matches (TermVarTy index) rhs
-      | index == x
-      , Just (tc, _) <- splitTyConApp_maybe rhs
-      , Just other <- isPromotedDataCon_maybe tc
-      , dataConTyCon con == dataConTyCon other
+      | Just (index, other) <- retainedGivenHead (irredCtPred irred)
+      , index == x
       = con == other
-    matches _ _ = True
+      | otherwise = True
+
+-- | Check that the Givens assign compatible constructor heads to each retained Id.
+-- See Note [Coverage of retained constructor results].
+retainedGivensCompatible :: InertSet -> Bool
+retainedGivensCompatible inert = isJust (foldlM record emptyVarEnv irreds)
+  where
+    irreds = inert_irreds (inert_cans inert)
+    record heads irred
+      | Just (index, con) <- retainedGivenHead (irredCtPred irred)
+      = case lookupVarEnv heads index of
+          Just other -> heads <$ guard (con == other)
+          Nothing    -> Just (extendVarEnv heads index con)
+      | otherwise = Just heads
+
+-- | Find a nominal equality between a retained Id and a promoted constructor.
+retainedGivenHead :: PredType -> Maybe (Id, DataCon)
+retainedGivenHead pred_ty
+  | Just (Nominal, lhs, rhs) <- getEqPredTys_maybe pred_ty
+  = match lhs rhs <|> match rhs lhs
+  | otherwise = Nothing
+  where
+    match (TermVarTy index) rhs
+      | Just (domain, _) <- splitTyConApp_maybe (idType index)
+      , Just (tc, _) <- splitTyConApp_maybe rhs
+      , Just con <- isPromotedDataCon_maybe tc
+      , dataConTyCon con == domain
+      = Just (index, con)
+    match _ _ = Nothing
 
 {- Note [Coverage of retained constructor results]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -896,6 +920,14 @@ Apply the check to a constructor alternative. The witness can still be
 bottom before the program matches it. The branch that tries S can force
 the witness, even if its right-hand side is inaccessible. Keep the
 ordinary divergence and demand checks.
+
+An outer DirectVec at index S k supplies S k ~# n. A nested VNil would
+also supply n ~# Z. Each Given can remain irreducible on its own. The
+type oracle compares their promoted heads by retained Id after solving
+the ordinary Givens. This refutes VNil. The nested match's divergence
+branch adds only the bottom fact for the vector, so it remains possible.
+The same check applies when the solver decomposes a promoted shape
+such as Cuboid to obtain the equalities for its fields.
 
 A Square constructor provides rows ~# side and columns ~# side. Add
 rows ~# columns to the type oracle when checking the constructor. This
