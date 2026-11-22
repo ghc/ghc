@@ -9,6 +9,8 @@ records every edge. The R numbers are local labels for those cards.
 
 For the active checkout, combined build and next verification step, see
 the [project handoff](HANDOFF.md).
+The [HaskLib package](README.md#reuse-a-proof-with-hasklib) collects
+the checked list laws for reuse by other modules.
 
 ## Where this fork stands
 

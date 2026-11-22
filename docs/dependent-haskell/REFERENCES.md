@@ -5911,6 +5911,14 @@ reusable theorems in an importable library with subject modules.
 [Agda list properties](https://agda.github.io/agda-stdlib/v2.3/Data.List.Properties.html)
 and [Lean mathlib](https://github.com/leanprover-community/mathlib4).
 
+Agda's natural-number properties prove right identity for addition and
+the equation for a successor on the right. `HaskLib.Size` follows the
+same induction on the left operand of its Peano addition. Its client
+uses both lemmas with the append-length theorem to count a list with
+one new element.
+[Agda natural-number properties](https://agda.github.io/agda-stdlib/v2.3/Data.Nat.Properties.html),
+[HaskLib.Size](hasklib/HaskLib/Size.hs) and [client](hasklib-test/Client.hs).
+
 ### The length of zip and demand in a case tree
 
 Agda's `length-zipWith` proves that the length of a zip is the minimum

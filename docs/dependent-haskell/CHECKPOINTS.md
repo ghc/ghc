@@ -148,6 +148,35 @@ source revisions and rebuild commands, then remove both sets of outputs
 after the last live user finishes. The 200 GB threshold is a backup for
 this cleanup.
 
+## Runtime callbacks and HaskLib
+
+Job `515` built compiler `c24ffa9ca0` from a clean checkout. Job `551`
+checked the 545-line Showcase at `f84b71ab53` on both stages at `-O0`
+and `-O2`, and in stage 2 GHCi. All 30 selected normal-way tests passed.
+The R04 checks cover a bang on the stored witness with a lazy payload.
+The R05 checks cover an absent callback at `-O2` and an unrelated
+binding that the optimizer can still float. The zipWith length law
+accepts a callback and both lists from IO.
+[Runtime-list proofs](examples/open-evaluation/PreludeZipRuntime.hs).
+
+HaskLib exposes these proofs through `HaskLib` and `HaskLib.List`.
+Job `566` built and installed the source distribution offline in an
+isolated Cabal store. Its `list-laws` suite passed. A separate dependent
+module named the reexported functions in its signature. An ordinary
+client linked against the installed package at `-O0` and `-O2` and
+used all four laws. For the package and compiler paths, see the
+[handoff](HANDOFF.md) and [library guide](README.md#reuse-a-proof-with-hasklib).
+
+Job `569` ran the Showcase through HaskLib's public API on both normal
+compilers and in GHCi. At `5292956a82`, `HaskLib.Size` exports
+`plusZero` and `plusSucc`. Job `576` installed the updated source
+distribution, ran its package test and ran the downstream append-singleton
+proof at `-O0` and `-O2`. The client uses those two lemmas and
+`lengthAppend` without repeating their induction. Job `577` loaded
+the new public module and matched all 545 lines in stage 2 native
+code and GHCi.
+[Arithmetic lemmas](hasklib/HaskLib/Size.hs) and [consumer proof](hasklib-test/Client.hs).
+
 ## An ordinary minimum in the zip length proof
 
 The [single-file example](examples/open-evaluation/ZipMinimum.hs) uses

@@ -40,6 +40,11 @@ for just the list API.
 | `lengthZip xs ys` | `minSize (size xs) (size ys)` |
 | `lengthZipWith f xs ys` | `minSize (size xs) (size ys)` |
 
+`HaskLib.Size` exports `plusZero` and `plusSucc`. The
+[append-singleton client](hasklib-test/Client.hs) imports both lemmas
+and `lengthAppend` to prove that appending one element adds one cell.
+It reuses the proofs without recursing over its input list.
+
 An ordinary client can use the zip equality with lists read at runtime.
 A dependent client can also name it in its signature.
 

@@ -160,7 +160,7 @@ import qualified RowProof
 import qualified OrdinaryFamilyBranches
 import qualified PreludeFoldrProof
 import qualified PreludeZipProof
-import qualified PreludeZipRuntime
+import qualified HaskLib
 import qualified PreludeZipWithLengthProof
 import qualified PreludeZipWithProof
 import qualified PreludeFilterLengthProof
@@ -1913,7 +1913,7 @@ main = do
     observe "zip two lists and prove their result length with an ordinary minimum"
         ( zip zipLeft zipRight
         , PreludeZipProof.firstPair
-        , PreludeZipRuntime.lengthZip zipLeft zipRight
+        , HaskLib.lengthZip zipLeft zipRight
         , PreludeZipWithLengthProof.shorterRight
         )
     zipCallback <- newIORef (&&) >>= readIORef
@@ -1921,8 +1921,8 @@ main = do
         unusedCallback = error "lengthZipWith forced its callback"
     observe "zipWith a runtime callback and prove the result length"
         ( zipWith zipCallback zipLeft zipRight
-        , PreludeZipRuntime.lengthZipWith zipCallback zipLeft zipRight
-        , PreludeZipRuntime.lengthZipWith unusedCallback zipLeft zipRight
+        , HaskLib.lengthZipWith zipCallback zipLeft zipRight
+        , HaskLib.lengthZipWith unusedCallback zipLeft zipRight
         )
     observe "use the Prelude.zipWith cons equation with both tails unevaluated"
         PreludeZipWithProof.firstPair

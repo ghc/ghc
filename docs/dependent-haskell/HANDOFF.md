@@ -8,7 +8,7 @@ and its [expected output](Showcase.stdout) are the executable examples.
 
 ## Current checkpoint
 
-Updated 22 November 2026, 16:07 CET. The development branch is
+Updated 22 November 2026, 17:06 CET. The development branch is
 `dependent-haskell`. Use the fork command below to find its latest commit.
 
 | Revision | Verified result |
@@ -17,8 +17,11 @@ Updated 22 November 2026, 16:07 CET. The development branch is
 | `c88606fe92` | Same compiler with the proof over the two runtime lists. Both stages passed the updated zipper tests and Showcase. The proof uses `size (zip xs ys) :~: Minimum (size xs) (size ys)`. |
 | `6d442d71b8` | Both normal compiler stages matched 543 native outputs at `-O0` and `-O2`. Stage 2 GHCi matched the same output with breakpoints enabled. An ordinary recursive `minSize` works in the same module as the zip proof or in a library. |
 | `dcaa2a244a` | All 30 selected normal-way tests passed on that compiler, including the single-file proof, imported proof, rule controls and no-code map regression. Both compiler-upgrade checks passed. |
+| `c24ffa9ca0` and `f84b71ab53` | Clean two-stage compiler and separate 545-line fixtures. All four native Showcase runs, stage 2 GHCi, 30 registered normal tests and the upgrade checks passed. The compiler preserves demand on strict stored witnesses and tracks absent callbacks during full laziness. |
+| `a7f42b75db` | HaskLib packages four runtime-list laws. Cabal built and installed its source distribution outside the checkout. Its package test and a separate client passed. |
+| `5292956a82` | HaskLib also exports right-zero and right-successor lemmas for addition. A downstream module combines them with `lengthAppend` to prove the length of a list with one element appended. |
 
-[Ordinary minimum](CHECKPOINTS.md#an-ordinary-minimum-in-the-zip-length-proof)
+[HaskLib](README.md#reuse-a-proof-with-hasklib), [Ordinary minimum](CHECKPOINTS.md#an-ordinary-minimum-in-the-zip-length-proof)
 and [previous release](CHECKPOINTS.md#direct-zip-proof-and-retained-callback-rules).
 
 ## Current R16 result
@@ -43,14 +46,27 @@ The zip proof uses the order in which the installed function inspects
 its lists and disables rewrite rules in the proof module.
 [Open evaluator card](roadmap/R16-open-term-evaluator.md#prove-an-equation-for-preludezipwith).
 
-Other local candidates are recoverable from Git. Each name is relative
-to `refs/archive/dependent-haskell/2026-11-22/`.
+The current compiler and the HaskLib qualification receipts live under
+`_build/on-demand/r04-r05-r16-normal-544-20261122` and
+`_build/on-demand/hasklib-package-20261122/receipts`. The normal build
+area was named before the runtime `zipWith` example brought the golden
+to 545 lines. The R04 strict-witness and R05 absent-callback patches are
+integrated. See the [qualified checkpoint](CHECKPOINTS.md#runtime-callbacks-and-hasklib).
 
-| Ref | Evidence and remaining work |
+The next work concerns ordinary multi-clause callback proofs (R03/R16),
+reusing a scoped equality under type families (R11/R16), and the
+semantics of the installed zipper fusion rules (R16). The published proof
+module still disables rewrite rules. The R19 cross-module enumeration
+experiment remains at `refs/archive/dependent-haskell/2026-11-22/r19-enum-experiment`.
+
+Private candidates are recoverable under
+`refs/archive/dependent-haskell/2026-11-22/`.
+
+| Ref | Current evidence |
 | --- | --- |
-| `r05-absent-float` (`c5b4c8a5ea`) | Full laziness preserves an absent callback's lexical identity. The private compiler passed the 544-line Showcase, demand controls and the unrelated-binding control. A normal build remains open. |
-| `r04-strict-witness` (`e71f7098f1`) | Bang patterns on stored witnesses passed source-hidden tests with Core and STG Lint. A normal build remains open. |
-| `r19-enum-experiment` (`edee3f0ed5`) | Cross-module enum cases shared a generic selector, but wide cases exceeded the default reduction budget. The measured owner-ordinal alternative requires owner participation. |
+| `r03-two-runtime-callbacks` (`13d0694a68`) | Ordinary clauses prove the length of `zipWith combine (map pre xs) ys`. The separate client can infer the callback types. Focused native checks passed. Integration with HaskLib and a normal build remain. |
+| `r16-family-givens` (`f77462070f`) | A private compiler composes the map and zip proofs at both optimization levels. Job `573` rejected an out-of-branch proof, a different list, a representational equality and a cyclic premise. A normal build remains open. |
+| `r16-zip-fold-demand` (`60ed33f602`) | Checking the generic folding algebra distinguishes the installed zipper from a fold that forces its seed. The inverse and other reachable rules still need verification. |
 
 ## Resume after a restart
 
@@ -73,9 +89,8 @@ to `refs/archive/dependent-haskell/2026-11-22/`.
 ## Build and verify
 
 The current normal build area is
-`_build/on-demand/r16-normal-6d442d71b8-20261122`. The scripts
-`build.sh` and `incremental.sh` in `_build/on-demand/r16-normal-20261122`
-record the clean and incremental build commands.
+`_build/on-demand/r04-r05-r16-normal-544-20261122`. Its `build.sh`
+records the clean build commands.
 On this host the bootstrap tools are GHC 9.14.1, Cabal 3.18.1.0, Happy 2.1.7
 and Alex 3.5.4.0. A fresh checkout needs the Git submodules at their recorded
 revisions. This build used five workers per job.
@@ -89,7 +104,7 @@ self-hosted stage 2 compiler in `_build/stage1/bin/ghc`. Both use the
 target libraries in `_build/stage1/lib`. For example, from the main checkout:
 
 ```sh
-area="$PWD/_build/on-demand/r16-normal-6d442d71b8-20261122"
+area="$PWD/_build/on-demand/r04-r05-r16-normal-544-20261122"
 queue="$PWD/docs/dependent-haskell/tools/ghc-build-job"
 check="$PWD/docs/dependent-haskell/check-showcase.sh"
 lib="$area/source/_build/stage1/lib"

@@ -31,7 +31,7 @@ trap 'rm -rf -- "$out"' EXIT
 
 ghc=("$compiler" "-B$libdir" -v0 -package-env - -fexternal-interpreter)
 flags=(-dcore-lint -dstg-lint -fwrite-ide-info -Werror=inaccessible-code
-     -i "-i$examples/packed-vector" "-i$examples/qualified-pi"
+     -i "-i$docs/hasklib" "-i$examples/packed-vector" "-i$examples/qualified-pi"
      "-i$examples/closed-evaluation" "-i$examples/open-evaluation"
      "-i$examples/erased-existentials" "-i$examples/r11-heq-pair")
 
