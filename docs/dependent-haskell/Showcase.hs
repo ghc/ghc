@@ -205,6 +205,7 @@ import qualified DependentPair as Pair
 import qualified DependentProjection as Pair
 import qualified RetainedProjection
 import qualified QualifiedPiLibrary as Qualified
+import qualified QuantifiedGadtIndex as QuantifiedIndex
 import qualified ReadNatural
 import qualified Type.Reflection as Reflection
 import qualified UnicodeExport
@@ -2112,6 +2113,10 @@ sourceAddition = do
                 Nothing -> False
     observe "reverse the proof that a runtime vector is empty"
         (matchesEmpty (drop 2 checkedInput), matchesEmpty checkedInput)
+    pick <- newIORef QuantifiedIndex.PickBool >>= readIORef
+    case QuantifiedIndex.transport pick (QuantifiedIndex.Carrier 41) of
+        QuantifiedIndex.Carrier value ->
+            observe "transport a GADT index with a quantified kind" value
     observe "check a runtime cut against a vector length"
         (ListVectorClient.checkedSplitObservation n checkedInput,
          ListVectorClient.checkedSplitObservation (S m) checkedInput)

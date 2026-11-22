@@ -33,7 +33,7 @@ ghc=("$compiler" "-B$libdir" -v0 -package-env - -fexternal-interpreter)
 flags=(-dcore-lint -dstg-lint -fwrite-ide-info -Werror=inaccessible-code
      -i "-i$examples/packed-vector" "-i$examples/qualified-pi"
      "-i$examples/closed-evaluation" "-i$examples/open-evaluation"
-     "-i$examples/erased-existentials")
+     "-i$examples/erased-existentials" "-i$examples/r11-heq-pair")
 
 "${ghc[@]}" "$native_opt" "${native_interfaces[@]}" "${flags[@]}" --make -outputdir "$out/native" -hiedir "$out/hie" \
     "$docs/Showcase.hs" -o "$out/showcase"

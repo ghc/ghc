@@ -389,7 +389,9 @@ A relink with the scoped worker passed Core and STG Lint and printed
 uses the exported `transport` and performs its own `PickBool` match.
 Both provider interfaces omit interface pragmas. GHC rejects the
 independent index at the same source position with the scoped worker.
-[Maintained source and diagnostic checks](../../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh).
+[Runnable provider](../examples/r11-heq-pair/QuantifiedGadtIndex.hs),
+[Showcase](../Showcase.hs),
+[maintained source and diagnostic checks](../../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh).
 
 A v79 reader panics in `extendTCvSubst` when the new worker layout has
 a v79 header. It reconstructs the index evidence from the old worker
