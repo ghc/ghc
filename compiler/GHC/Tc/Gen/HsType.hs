@@ -797,9 +797,33 @@ tcRetainedBinderDomain :: (Type -> Bool) -> TcTyMode -> LHsType GhcRn -> TcM TcT
 tcRetainedBinderDomain valid_domain mode domain
   = do { domain_ty <- tc_check_lhs_type mode domain liftedTypeKind
        ; domain_ty <- liftZonkM $ zonkTcType domain_ty
+       ; domain_ty <- infer_callback_kinds domain_ty
        ; unless (valid_domain domain_ty) $
            failWithTc $ TcRnRetainedQuantificationError (RetainedUnsupportedDomain domain_ty)
        ; return domain_ty }
+  where
+    -- See Note [Inferring the endpoint kinds of a retained callback].
+    infer_callback_kinds ty
+      | FunTy { ft_arg = arg, ft_res = res } <- coreFullView ty
+      , not (valid_domain ty)
+      , let flexible = filter (maybe False isMetaTyVarTy . getRuntimeRep_maybe) [arg, res]
+      , not (null flexible)
+      = do { forM_ flexible $ \endpoint ->
+               discardResult $ unifyKind (Just (HsTypeRnThing (unLoc domain)))
+                                         (typeKind endpoint) liftedTypeKind
+           ; liftZonkM $ zonkTcType ty }
+      | otherwise = return ty
+
+{- Note [Inferring the endpoint kinds of a retained callback]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In forall a b. foreach (f :: a -> b) -> ..., the ordinary arrow checker
+infers a :: TYPE r1 and b :: TYPE r2. Signature generalisation has not
+yet defaulted the representation variables. To check f x in a later
+type, the source checker needs the callback's argument and result kinds
+now. Unify each flexible representation with the required lifted kind
+and check the complete domain. An explicit representation variable is
+rigid and keeps its declared kind.
+-}
 
 {- Note [Source retained signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

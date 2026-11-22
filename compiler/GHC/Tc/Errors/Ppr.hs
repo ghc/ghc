@@ -3743,6 +3743,13 @@ pprRetainedQuantificationError reason = case reason of
                <+> text "binder in a complete value signature,"
            , text "or use an explicit" <+> quotes (text "TypeRep a") <+> text "parameter from"
                <+> quotes (text "Type.Reflection") <> dot ]
+    | Just (_, arg, res) <- tcSplitFunTy_maybe ty
+    , (position, endpoint) : _ <- filter (not . isLiftedTypeKind . typeKind . snd)
+                                       [(text "input", scaledThing arg), (text "result", res)] ->
+      vcat [ text "The" <+> position <+> text "of this retained callback must have kind"
+               <+> quotes (text "Type") <> dot
+           , quotes (ppr endpoint) <+> text "has kind"
+               <+> quotes (pprWithTYPE (typeKind endpoint)) <> dot ]
     | otherwise ->
       vcat [ if isPiTy ty
              then text "This retained argument has an unsupported function domain."

@@ -119,7 +119,7 @@ HS
 "${ghc[@]}" -O2 -fomit-interface-pragmas -c These.hs
 cp "$src/TheseMapping.hs" .
 if "${ghc[@]}" -O2 -c TheseMapping.hs >rejected 2>&1; then exit 1; fi
-grep -Eq '^TheseMapping.hs:12:17-20: error: \[GHC-83865\]' rejected || { cat rejected >&2; exit 1; }
+grep -Eq '^TheseMapping.hs:11:17-20: error: \[GHC-83865\]' rejected || { cat rejected >&2; exit 1; }
 sed -i "s/:~: 'These label (p x)/:~: 'This label/" TheseMapping.hs
 "${ghc[@]}" -O2 -c TheseMapping.hs
 
