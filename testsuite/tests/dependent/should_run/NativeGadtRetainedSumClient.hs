@@ -77,6 +77,19 @@ tileDimensions (Tile rows columns _) = (lengthValue rows, lengthValue columns)
 hasTile :: Tile a shape -> Bool
 hasTile (Tile _ _ _) = True
 
+-- | Prove the shape when the stored flag is true.
+flaggedTrue :: Flagged shape -> Maybe (shape :~: 'Flag 'True)
+flaggedTrue (Flagged True) = Just Refl
+flaggedTrue (Flagged False) = Nothing
+
+-- | Recover each payload index from its position in the public shape.
+blockPayloads :: Blocked a ('Block width mark depth) -> (Vec a width, Vec a depth)
+blockPayloads (Blocked _ _ _ xs ys) = (xs, ys)
+
+-- | Read only the mark.
+blockMark :: Blocked a shape -> Bool
+blockMark (Blocked mark _ _ _ _) = mark
+
 -- | Use both result equalities to prove the dimensions agree.
 squareDimensions :: SquareMatrix a rows columns -> rows :~: columns
 squareDimensions (Square _ _) = Refl
@@ -187,6 +200,14 @@ main = do
     throws "direct length" (fst (tileDimensions tileRowBottom))
     throws "direct length" (snd (tileDimensions tileColumnBottom))
     throws "tile cells" (cells (tileCells tileRowBottom))
+    case flaggedTrue (Flagged True) of
+        Just Refl -> pure ()
+        Nothing -> fail "the stored flag determines the unary shape"
+    let (wide, deep) = blockPayloads (Blocked True Z (S Z) one VNil)
+    require (cells wide == [True] && null (cells deep))
+        "the promoted shape determines the payloads in index order"
+    require (blockMark (Blocked True unused unused (error "width cells") (error "depth cells")))
+        "reading the block mark leaves dimensions and payloads unevaluated"
     require (cells (markedCells (MarkedRows True (S Z) one)) == [True])
         "different retained kinds follow the result parameter order"
     case squareDimensions (Square unused (error "square payload")) of

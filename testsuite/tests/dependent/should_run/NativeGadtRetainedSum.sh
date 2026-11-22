@@ -141,6 +141,21 @@ HS
     grep -Fq 'RepeatedMatrix.hs:6:51-76: error: [GHC-83605]' reject.log ||
         { cat reject.log >&2; exit 1; }
 
+    cat >RepeatedBlock.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
+module RepeatedBlock where
+import NativeGadtRetainedSumProvider (BlockShape(..), Nat, Vec)
+data RepeatedBlock a (shape :: BlockShape) where
+    RepeatedBlock :: foreach (mark :: Bool) (depth :: Nat) (width :: Nat)
+                  -> Vec a width -> Vec a depth -> RepeatedBlock a ('Block width mark width)
+HS
+    if "${ghc[@]}" "${flags[@]}" -ferror-spans -c RepeatedBlock.hs >reject.log 2>&1; then
+        echo "Accepted a repeated argument that omits a retained field" >&2
+        exit 1
+    fi
+    grep -Fq 'RepeatedBlock.hs:6:52-92: error: [GHC-83605]' reject.log || \
+        { cat reject.log >&2; exit 1; }
+
     if [[ $mode == O0 ]]; then
         cat >DirectIndexCoverage.hs <<'HS'
 {-# LANGUAGE DataKinds, EmptyCase, GADTs, NoExperimentalDependentTypes #-}

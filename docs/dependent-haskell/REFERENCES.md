@@ -1776,6 +1776,14 @@ proof after both fields and erases it before code generation.
 See Note [Decomposing TyConApp equalities] in
 [GHC.Tc.Solver.Equality](../../compiler/GHC/Tc/Solver/Equality.hs).
 
+The same Agda rule applies to a shape constructor
+`block : Nat → Bool → Nat → BlockShape`. Each index argument has the
+type declared at its position in the telescope. The constructor can
+return this shape from runtime fields bound in a different order.
+GHC checks the promoted constructor's actual field kinds and uses
+the same nominal equality for the whole shape.
+[Agda telescopes](https://agda.readthedocs.io/en/v2.8.0/language/telescopes.html).
+
 ## Source vector uncons
 
 Decision: inspect the stored runtime length before repackaging a vector tail.

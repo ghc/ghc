@@ -204,10 +204,11 @@ Lifting stops at shadowing on the constructor's own argument spine.
 The constructor result has the enclosing telescope scope. A witness
 bound inside a field cannot escape into that result. Every retained field
 occurs in a result argument. The argument uses the field directly or
-as an argument of one promoted constructor. A unary constructor
-preserves the index type. A binary constructor can build a new closed
-structural index. More than one parameter can use the same field. The
-other result arguments must be distinct, unchanged erased parameters.
+fills a field of one promoted constructor. The application supplies
+every field in the promoted constructor's telescope. Each argument
+matches its field kind, and the result has its own closed structural
+kind. A retained field may occur more than once. The other result
+arguments must be distinct, unchanged erased parameters.
 A retained field is lazy and has
 a supported closed structural domain such
 as `[Bool]`, `Ordering`, or `Nat`. A variable or wildcard leaves the
