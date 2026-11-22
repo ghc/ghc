@@ -3102,6 +3102,7 @@ data IfaceEvidence
   | SourceProofRuleBranchesEvidence
   | ExperimentalWordPrimIndexEvidence
   | ScopedEnumCaseEvidence
+  | ScopedConstructorCaseEvidence
   deriving (Bounded, Enum, Eq, Ord)
 
 -- | Requirements of an interface payload. See Note [Versioning retained evidence]
@@ -3294,6 +3295,8 @@ instance Binary IfaceAxiomRule where
       requireIfaceEvidenceVersion bh ScopedLambdaEvidence
     when (ifLclNameFS n == scopedEnumCaseName) $
       requireIfaceEvidenceVersion bh ScopedEnumCaseEvidence
+    when (ifLclNameFS n == scopedConstructorCaseName) $
+      requireIfaceEvidenceVersion bh ScopedConstructorCaseEvidence
     putByte bh 0
     put_ bh n
   put_ bh (IfaceAR_U n)   = putByte bh 1 >> put_ bh n

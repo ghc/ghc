@@ -293,27 +293,45 @@ done
 mkdir providers
 cat >providers/ChooseAcross.hs <<'HS'
 {-# LANGUAGE ExperimentalDependentTypes #-}
-module ChooseAcross (choose) where
+module ChooseAcross (choose, chooseMaybe) where
 choose :: foreach (b :: Bool) -> (case b of { True -> Int; False -> Char })
 choose True = 19
 choose False = 'q'
+
+chooseMaybe :: foreach (m :: Maybe Bool) ->
+    (case m of { Nothing -> Char; Just _ -> Int })
+chooseMaybe Nothing = 'n'
+chooseMaybe (Just _) = 73
 HS
 cat >providers/RenderAcross.hs <<'HS'
 {-# LANGUAGE ExperimentalDependentTypes #-}
-module RenderAcross (render) where
+module RenderAcross (render, renderMaybe, renderChanged) where
 render :: foreach (b :: Bool) -> (case b of { False -> Char; True -> Int }) -> String
 render True = show
 render False = (:[])
+
+renderMaybe :: foreach (m :: Maybe Bool) ->
+    (case m of { Just _ -> Int; Nothing -> Char }) -> String
+renderMaybe (Just _) = show
+renderMaybe Nothing = (:[])
+
+renderChanged :: foreach (m :: Maybe Bool) ->
+    (case m of { Just _ -> Bool; Nothing -> Char }) -> String
+renderChanged (Just _) = show
+renderChanged Nothing = (:[])
 HS
 cat >Across.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes #-}
 module Main where
-import ChooseAcross (choose)
+import ChooseAcross (choose, chooseMaybe)
 import Data.IORef (newIORef, readIORef, writeIORef)
-import RenderAcross (render)
+import RenderAcross (render, renderMaybe)
 
 atRuntime :: Bool -> String
 atRuntime b = render b (choose b)
+
+atRuntimeMaybe :: Maybe Bool -> String
+atRuntimeMaybe m = renderMaybe m (chooseMaybe m)
 
 main :: IO ()
 main = do
@@ -321,7 +339,31 @@ main = do
     first <- atRuntime <$> readIORef ref
     writeIORef ref True
     second <- atRuntime <$> readIORef ref
-    if (first, second) == ("q", "19") then pure () else fail "unexpected selected row"
+    maybeRef <- newIORef Nothing
+    absent <- atRuntimeMaybe <$> readIORef maybeRef
+    writeIORef maybeRef (Just (error "forced ignored field"))
+    present <- atRuntimeMaybe <$> readIORef maybeRef
+    if (first, second, absent, present) == ("q", "19", "n", "73")
+        then pure ()
+        else fail "unexpected selected row"
+HS
+cat >WrongIndexAcross.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module WrongIndexAcross where
+import ChooseAcross (chooseMaybe)
+import RenderAcross (renderMaybe)
+
+wrongIndex :: Maybe Bool -> Maybe Bool -> String
+wrongIndex m n = renderMaybe m (chooseMaybe n)
+HS
+cat >WrongRowAcross.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module WrongRowAcross where
+import ChooseAcross (chooseMaybe)
+import RenderAcross (renderChanged)
+
+wrongRow :: Maybe Bool -> String
+wrongRow m = renderChanged m (chooseMaybe m)
 HS
 for opt in -O0 -O2; do
     ghc=("${base[@]}" "$opt" -fforce-recomp)
@@ -333,4 +375,13 @@ for opt in -O0 -O2; do
     "${ghc[@]}" -c Across.hs
     "${ghc[@]}" Across.o ChooseAcross.o RenderAcross.o -o across
     ./across
+    for control in WrongIndexAcross WrongRowAcross; do
+        status=0
+        "${ghc[@]}" -c "$control.hs" > "$control.log" 2>&1 || status=$?
+        if [[ $status != 1 ]] || ! grep -Fq 'GHC-83865' "$control.log" ||
+           ! grep -Fq 'In the second argument of' "$control.log"; then
+            cat "$control.log"
+            exit 1
+        fi
+    done
 done

@@ -182,11 +182,16 @@ and [source signature and controls](roadmap/R19-type-level-cases.md#a-case-in-a-
 Eisenberg and Stolarek lower each case to a fresh closed family. R19
 keeps that lowering and records the owner of a flat signature case.
 For two applications with the same rigid index, a checked nominal
-coercion compares every exact constructor and its result. Distinct
-nullary constructors make the row order irrelevant in this fragment.
-Known inputs still use the ordinary closed-family equations.
+coercion compares every exact constructor and its result. A row can
+bind fields without inspecting them when its result is a closed type
+constructor. Each row tests a different outer constructor, so row
+order does not change the result. Known inputs still use the ordinary
+closed-family equations. Agda gives pattern lambdas fresh names even
+when the branches agree. R19 checks the complete constructor split
+after lowering.
 [Eisenberg and Stolarek, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf#page=5),
 [closed-family apartness](../users_guide/exts/type_families.rst#compatibility-and-apartness-of-type-family-equations),
+[Agda pattern lambdas](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html#internal-representation-of-pattern-lambdas),
 and [R19 provider and client checks](roadmap/R19-type-level-cases.md#separate-providers-at-an-unknown-index).
 
 An ordinary shared selector that discards eight rows per equation
@@ -2437,6 +2442,15 @@ Upstream GHC already selects term-variable capture for RequiredTypeArguments:
 File blob: `01d0688febd8cee4493a176fce13ed80e08fa72f`.
 The full baseline file is copied into `native-local-signature-prior-art`.
 Preserve that flag's existing behavior independently of M23's local extension.
+
+The [RequiredTypeArguments guide](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/required_type_arguments.html)
+uses `a = 42` and `f :: a -> a` to show why the term is in scope.
+When the module disables `ExperimentalDependentTypes`, the ordinary
+typechecker reports GHC-45510 at the captured term. The ten existing
+`T23740a`–`T23740j` registrations cover signatures, instances
+and Template Haskell. A client can still import a type synonym
+whose provider checked a promoted call. This follows the
+[opt-in principle in proposal #378](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#learnability-of-haskell).
 
 
 ## Direct do bind of a saved native action
