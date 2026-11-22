@@ -6,6 +6,7 @@ import Data.Kind (Type)
 data Decision (b :: Bool) where
   IsTrue :: Decision True
   IsFalse :: Decision False
+deriving instance Show (Decision b)
 
 -- | Return a witness for the result of this callback on this argument.
 decide :: forall (a :: Type). foreach (f :: a -> Bool)

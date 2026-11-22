@@ -704,3 +704,10 @@ structural result and an unrestricted visible arrow.
 [Filter and proof](../examples/open-evaluation/PreludeFilterRuntime.hs),
 [source-hidden decision client](../../../testsuite/tests/dependent/should_run/NativeLiftedCallbackClient.hs)
 and [Agda and GHC precedents](../REFERENCES.md#evidence-for-a-retained-predicate-on-a-lifted-input).
+
+An ordinary client can print `(decide f x, ())` or use the tuple section
+`(decide f x,)`. Both obtain the index of the first field from the imported
+type of `decide`. Selecting `snd (decide f x, True)` leaves the predicate
+unevaluated. If a signature specifies the first field's index, GHC checks
+the result of `decide` against it.
+[Tuple inference and desugaring](../REFERENCES.md#native-tuple-sections-and-application-spines).

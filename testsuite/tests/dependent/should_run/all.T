@@ -147,7 +147,7 @@ test('NativeOpenIndexedAppendGhci',
 test('NativeOpenZipRows',
      [only_ways(['normal']),
       extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/' + f
-                   for f in ['PackedVecLibrary.hs', 'ZipLengthSource.hs', 'ZipRows.hs']])],
+                   for f in ['PackedVecLibrary.hs', 'ZipLengthSource.hs', 'ZipRows.hs', 'OrdinaryZipRows.hs']])],
      run_command, ['bash NativeOpenZipRows.sh "{compiler}" "{libdir}"'])
 test('NativeOpenListFoldr',
      [only_ways(['normal']),

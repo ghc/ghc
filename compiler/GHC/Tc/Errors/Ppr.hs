@@ -3788,8 +3788,9 @@ pprRetainedQuantificationError reason = case reason of
     vcat [text "A retained constructor match requires unguarded equations."
          ,text "Repeated constructors need a later ordinary pattern to distinguish the equations."]
   RetainedMatrixCoverage ->
-    vcat [text "A retained constructor matrix requires an unguarded equation for each possible constructor pair."
-         ,text "A final equation with bare variables or wildcards in both index columns can cover the remaining pairs."]
+    vcat [text "The unguarded equations must cover each possible retained constructor pair."
+         ,text "A bare second index pattern covers the remaining pairs for its first constructor."
+         ,text "A final equation with bare variables or wildcards in both index columns covers all remaining pairs."]
   RetainedTypeOperandContext expected ->
     vcat [text "A runtime type operand requires an expected type of the form" <+> quotes (text "Type.Reflection.TypeRep t") <> dot,
           case expected of
@@ -3806,7 +3807,8 @@ pprRetainedQuantificationError reason = case reason of
   RetainedMatrixFallback ->
     text "A retained constructor matrix permits only one final equation with bare variables or wildcards in both selected index columns."
   RetainedMatrixPattern ->
-    vcat [text "A retained constructor matrix requires constructor patterns in both selected index columns, with variables or wildcards as fields."
+    vcat [text "The first index column requires constructor patterns with variables or wildcards as fields."
+         ,text "The second index column also accepts bare variables or wildcards."
          ,text "One final equation can use bare variables or wildcards in both columns."]
   RetainedMissingConstructorPair first second ->
     vcat [ text "Missing equation for the retained constructor pair" <+>

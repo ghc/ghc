@@ -7712,6 +7712,9 @@ zipLength (_ : xs) (_ : ys) = S (zipLength xs ys)
 
 zipRows :: forall a b. foreach (xs :: [a]) -> foreach (ys :: [b])
         -> Vec (a, b) (zipLength xs ys)
+zipRows [] _ = VNil
+zipRows (_ : _) [] = VNil
+zipRows (x : xs) (y : ys) = VCons (x, y) (zipRows xs ys)
 ```
 
 The source checker verifies coverage at each inspected constructor.
@@ -7728,7 +7731,8 @@ rewriting checks the exact source owner for active rules.
 
 The [ordinary provider](examples/packed-vector/ZipLengthSource.hs) and
 [dependent client](examples/packed-vector/ZipRows.hs) supply a Showcase
-row. The client uses nested cases to refine the two indices in order.
+row. The client uses three equations to refine the indices in order.
+Its first row uses a wildcard to leave the second list uninspected.
 `NativeOpenZipRows` checks the stripped interface, separate client,
 two concrete element kinds, runtime demand, and recompilation after a
 changed equation. It also checks that a rule which changes the final
@@ -7737,9 +7741,11 @@ result removes the provisional table.
 `zipMinimum` proves that the result index equals
 `Min (sourceLength xs) (sourceLength ys)`. Its first empty-list
 equation returns `Refl` without inspecting the second list. In the
-two-cons case it uses the proof for the two tails. An ordinary client
-can match the result through a stripped interface. [Case-tree and demand
-references](REFERENCES.md#the-length-of-zip-and-demand-in-a-case-tree).
+two-cons case it infers the element types from the tails passed to the
+recursive call. An [ordinary client](examples/packed-vector/OrdinaryZipRows.hs)
+prints the rows and the proof in one tuple. The test also prints
+`([],Refl)` with an empty first list and an undefined second list.
+[Case-tree and demand references](REFERENCES.md#the-length-of-zip-and-demand-in-a-case-tree).
 
 ## M99: evaluate an imported closed call
 

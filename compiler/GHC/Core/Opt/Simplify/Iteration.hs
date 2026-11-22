@@ -3874,6 +3874,11 @@ alternative. Clone them from left to right so each payload type refers to
 its own witness. Extend the expression, index and coercion substitutions
 before simplifying the RHS. See Note [Linting retained constructor fields]
 in GHC.Core.Lint.
+
+Known-constructor elimination can also copy a binder and remove its
+alternative. It can float the auxiliary let to the top level. That puts
+the binder in scope in the original function, which still binds the same
+Unique in its alternative. Give the copy a fresh Unique before making the let.
 -}
 
 {- Note [Adding evaluatedness info to pattern-bound variables]
@@ -4041,7 +4046,11 @@ simplAltIdBinder :: (SimplAltFlag, SimplEnv) -> Id -> SimplM (SimplEnv, OutId)
 simplAltIdBinder (saf,env) bndr
   = case saf of
       SAF_Out -> return (env, bndr)
-      SAF_In ->  simplNonRecBndr env bndr
+      SAF_In
+        -- See Note [Inlining retained constructor alternatives].
+        | sm_core_mode (seMode env) == RetainedCore
+        , reSimplifying env -> cloneRetainedCaseBinder env bndr
+        | otherwise -> simplNonRecBndr env bndr
 
 simplAltExprF :: HasDebugCallStack
               => (SimplAltFlag, SimplEnv) -> CoreExpr -> SimplCont
