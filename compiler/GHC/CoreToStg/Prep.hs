@@ -1279,10 +1279,7 @@ nameNativeIndexArg result_ty arg
   = case normal of
       Cast inner (SubCo delta)
         -> do { (atom, proof, wrap) <- nameNativeIndexArg result_ty inner
-              ; let left_cast = mkGReflCo Nominal (coercionLKind proof) (MCo delta)
-                    right_cast = mkGReflCo Nominal (coercionRKind proof) (MCo delta)
-                    converted = mkTransCo (mkSymCo left_cast) (mkTransCo proof right_cast)
-              ; return (Cast atom (SubCo delta), converted, wrap) }
+              ; return (Cast atom (SubCo delta), castNativeIndexCo delta proof, wrap) }
       _ -> name_constructor normal index
   | otherwise = nativeIndexTransportError "an unsupported retained argument"
   where
@@ -1309,6 +1306,12 @@ nameNativeIndexArg result_ty arg
                  wrap body = wrap_fields $
                    Case scrut value result_ty [Alt DEFAULT [proof] body]
            ; return (Var value, co, wrap) }
+
+-- | Apply the same nominal kind cast to both endpoints of an index equality.
+castNativeIndexCo :: CoercionN -> CoercionN -> CoercionN
+castNativeIndexCo delta co =
+  mkCoherenceLeftCo Nominal (coercionLKind co) delta $
+    mkCoherenceRightCo Nominal (coercionRKind co) delta co
 
 -- | Split a checked constructor application into its promotion arguments and builder.
 -- See Note [Naming fields of a dependent case scrutinee].
@@ -1351,12 +1354,36 @@ prepareNativeCaseScrutinee ty (App (Var fun) arg)
   = Just $ do { (atom, co, wrap) <- nameNativeIndexArg ty arg
               ; return (App (Var fun) atom, mkTermAppCo fun co, wrap) }
 prepareNativeCaseScrutinee ty scrut
+  | Just (True, prepare) <- prepare_call scrut
+  = Just prepare
   | Just (con, tys, build, fields) <- nativeConFields_maybe scrut
   , any (not . exprIsTrivial) fields
   , Just index <- exprToNativeCaseIndex scrut
   , Nothing <- isNumLitTy index
   = Just (nameNativeConFields ty con tys build fields)
   | otherwise = Nothing
+  where
+    prepare_call (App fun arg)
+      | Just index <- exprToNativeIndex arg
+      , Just (names, prepare) <- prepare_call fun
+      = let name_arg = not (exprIsTrivial arg)
+        in Just (names || name_arg, do
+           (fun', fun_co, wrap_fun) <- prepare
+           (arg', arg_co, wrap_arg) <- if name_arg then nameNativeIndexArg ty arg
+                                      else pure (arg, mkNomReflCo index, id)
+           pure (App fun' arg', mkAppCo fun_co arg_co, wrap_fun . wrap_arg))
+    prepare_call (Cast prefix@App{} co)
+      | coercionRole co == Representational
+      , Just nominal <- setNominalRole_maybe Representational co
+      , coercionRole nominal == Nominal
+      , Just (names, prepare) <- prepare_call prefix
+      = Just (names, do
+           (prefix', proof, wrap) <- prepare
+           pure (Cast prefix' co, castNativeIndexCo nominal proof, wrap))
+    prepare_call head_expr
+      | Just index <- nativeIndexFunctionArgIndex head_expr
+      = Just (False, pure (head_expr, mkNomReflCo index, id))
+      | otherwise = Nothing
 
 -- | Give the alternative its prepared proof and recover the original proof in its RHS.
 transportNativeCaseAlt :: Id -> CoercionN -> CoreAlt -> UniqSM CoreAlt
@@ -1424,6 +1451,12 @@ The argument wrappers evaluate only constructor WHNFs. Their fields stay lazy,
 so a bottom function still takes precedence over a bottom constructor field.
 Normalize supported immediate beta redexes before this step as for retained
 constructor arguments. Do not put a variable result under a strict alias case.
+
+For a curried call, name nontrivial operands across the checked application
+spine. Use AppCo to relate each prepared application to the original one.
+Keep a nominal cast at its original prefix and cast both proof endpoints
+there. This preserves the proof at the fully applied call after CorePrep
+names a constructor at any of its operand positions.
 
 This bridge belongs to an already strict case. Do not admit opaque calls as
 retained arguments through exprToNativeIndex: a strict alias for such a call
