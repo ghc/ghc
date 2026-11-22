@@ -2274,3 +2274,14 @@ uses one induction hypothesis for each child. Omitting one hypothesis leaves an 
 bottom leaf payload were both left unevaluated. Evaluating the proof
 over a bottom right subtree raised the expected exception.
 [Agda theorem and provenance](../REFERENCES.md#map-preserves-the-number-of-internal-nodes).
+
+Job 1100 installed the candidate HaskLib from its Cabal source
+distribution. Its package test passed. A client imported the law from
+`HaskLib` and passed a failing `Bool -> Bool` mapper with a tree read
+from IO. It produced the expected witness at `-O0` and `-O2`.
+In job 1107 a separate module restated the law through the public
+`HaskLib` names. An ordinary client used it with an unknown callback
+of type `Bool -> Char`. Supplying a top-level callback that lacks
+checked source equations directly in the retained application still
+reports GHC-83605. The combined source at `d70ffb8d20` awaits its
+normal build.

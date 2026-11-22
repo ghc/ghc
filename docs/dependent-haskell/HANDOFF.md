@@ -26,8 +26,18 @@ The next combined build adds nested case decisions, higher-rank
 constructor aliases and representation-polymorphic newtypes. Its inputs
 are in `_build/on-demand/r19-r41-next-20261122`. Job 1087 builds
 `00115859a5` from a clean checkout with pinned local submodules.
-R13/R16 is testing
-two-child recursion on trees. R27 is testing the effect of removing
+Job 1101 waits for that build, then checks the 552-line Showcase, 40
+registered tests, package clients and an interface with both new features.
+
+The next R13/R16 source is `d70ffb8d20`, stored under the local ref
+`refs/archive/dependent-haskell/2026-11-22/r16-hasklib-tree-553`.
+Job 1100 installed HaskLib from its source distribution and exercised
+the two-child induction proof at `-O0` and `-O2`. Job 1107 restated
+the theorem in an independent client. Both used the source-checker
+component on the normal `5833e38cbd` installation. The complete
+`d70ffb8d20` compiler and 553-line Showcase still require a normal
+build. Use `_build/on-demand/r16-hasklib-tree-next-20261122` for its
+inputs and package receipts. R27 is testing the effect of removing
 implicit CUSKs from the two legacy editions. The current language
 defaults still apply on this branch.
 
