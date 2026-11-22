@@ -23,7 +23,10 @@ library
     hasklib
     examples/open-evaluation
 
-  build-depends: base >=4.23 && <5
+  build-depends:
+    base >=4.23 && <5,
+    ghc-internal >=10.100 && <10.101,
+
   default-language: GHC2024
 
 test-suite list-laws

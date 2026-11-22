@@ -4,11 +4,13 @@
 -- | Length laws for the installed Prelude functions on ordinary lists.
 module HaskLib.List
     ( Size(..), size, plus, minSize
-    , lengthMap, lengthAppend, lengthZip, lengthZipWith
+    , lengthMap, lengthAppend, lengthZip, lengthZipWith, lengthReverse
     ) where
 
-import Data.Type.Equality ((:~:)(Refl))
-import Prelude ((++), map)
+import Data.Type.Equality ((:~:)(Refl), trans)
+import qualified GHC.Internal.List as List
+import HaskLib.Size (plusSucc, plusZero)
+import Prelude ((++), map, reverse)
 import PreludeAppendLengthSource (plus)
 import PreludeMapLengthSize (Size(..), minSize, size)
 import PreludeZipRuntime (lengthZip, lengthZipWith)
@@ -25,3 +27,16 @@ lengthAppend :: forall a. foreach (xs :: [a]) -> foreach (ys :: [a])
              -> size (xs ++ ys) :~: plus (size xs) (size ys)
 lengthAppend [] _ = Refl
 lengthAppend (_ : xs) ys = case lengthAppend xs ys of Refl -> Refl
+
+-- | Count the result of the reverse worker with any accumulator.
+lengthReverseOnto :: forall a. foreach (xs :: [a]) -> foreach (acc :: [a])
+                  -> size (List.reverseOnto xs acc) :~: plus (size xs) (size acc)
+lengthReverseOnto [] _ = Refl
+lengthReverseOnto (x : xs) acc =
+    case lengthReverseOnto xs (x : acc) of
+        Refl -> case plusSucc (size xs) (size acc) of
+            Refl -> Refl
+
+-- | Reversing a list preserves its finite length.
+lengthReverse :: forall a. foreach (xs :: [a]) -> size (reverse xs) :~: size xs
+lengthReverse xs = trans (lengthReverseOnto xs []) (plusZero (size xs))

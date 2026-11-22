@@ -1,7 +1,7 @@
 {-# LANGUAGE ExperimentalDependentTypes #-}
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
 
-module Client (zipLaw, lengthAppendSingleton, checkAppendSingleton) where
+module Client (zipLaw, lengthAppendSingleton, checkAppendSingleton, checkReverse) where
 
 import qualified HaskLib as H
 import HaskLib.Size (plusSucc, plusZero)
@@ -23,4 +23,9 @@ lengthAppendSingleton xs x =
 -- | Check the proof without inspecting any list elements.
 checkAppendSingleton :: [Bool] -> Bool -> Bool
 checkAppendSingleton xs x = case lengthAppendSingleton xs x of
+    H.Refl -> True
+
+-- | Check a reverse proof from an ordinary caller.
+checkReverse :: [Bool] -> Bool
+checkReverse xs = case H.lengthReverse xs of
     H.Refl -> True
