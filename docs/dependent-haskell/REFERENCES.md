@@ -5795,6 +5795,16 @@ rigid representation remains in scope when the program returns `f p`.
 [Agda 2.8.0 function types](https://agda.readthedocs.io/en/v2.8.0/language/function-types.html)
 and [GHC 9.14.1 representation inference](https://downloads.haskell.org/ghc/9.14.1/docs/users_guide/exts/representation_polymorphism.html#inference-and-defaulting).
 
+When the intermediate result is a type family, the next application
+needs evidence that its result is a function. In the fork, a family
+equation supplies the nominal coercion for the prefix `f x`. The
+second application retains that coercion in Core. Agda also checks
+each argument against the function type of the prefix. The explicit
+coercion comes from GHC's treatment of family-defined arrow kinds.
+[Agda function types](https://agda.readthedocs.io/en/v2.8.0/language/function-types.html),
+[GHC kind matching](../../compiler/GHC/Tc/Utils/Unify.hs)
+and [comparison example](examples/open-evaluation/CompareAt.hs).
+
 ### Upgrading checked method interfaces
 
 Agda checks the interface version before decoding a module. It also

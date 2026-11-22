@@ -9,7 +9,7 @@ ghc=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint -fdiagnostics-
 provider=NativeLiftedCallbackProvider
 client=NativeLiftedCallbackClient
 expected=$'(False,False,True)\nTrue\nTrue\nTrue\n(IsFalse,())\n(IsFalse,())\nTrue'
-expected+=$'\n(GT,LT,EQ)\nRefl\nRefl'
+expected+=$'\n(GT,LT,EQ)\nRefl\nRefl\n(GT,LT)\nRefl'
 
 for opt in O0 O2; do
     flags=("-$opt")
@@ -40,6 +40,14 @@ for zap in -fzap-coercions -fno-zap-coercions; do
     grep -Fq 'In the ambiguity check for' ambiguity.log
 done
 "${ghc[@]}" -DAMBIGUOUS -XAllowAmbiguousTypes -fforce-recomp -fno-code -c "$src/curried-callback/FamilyCallback.hs"
+
+for probe in NONFUNCTION STUCK; do
+    if "${ghc[@]}" -ferror-spans "-D$probe" -fforce-recomp -fno-code -c \
+        "$src/curried-callback/FamilyCallback.hs" >"$probe.log" 2>&1; then exit 1; fi
+    grep -Fq '[GHC-83865]' "$probe.log"
+    grep -Fq 'has kind' "$probe.log"
+    grep -Fq 'f x y' "$probe.log"
+done
 
 for probe in NoInverse WrongOrder; do
     if "${ghc[@]}" -ferror-spans -fno-code -c "$src/curried-callback/$probe.hs" >"$probe.log" 2>&1 ||

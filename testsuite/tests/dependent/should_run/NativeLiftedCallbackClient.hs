@@ -3,6 +3,7 @@ module Main where
 
 import Control.Exception (ErrorCall(..), evaluate, try)
 import Data.Proxy (Proxy(..))
+import Data.Type.Equality ((:~:)(Refl))
 import qualified FamilyCallback
 import qualified CompareAt
 import NativeLiftedCallbackProvider (Decision(..), decide)
@@ -39,6 +40,13 @@ forceFailure message value = do
 keepFamily :: (Bool -> FamilyCallback.Result 'True) -> Bool -> IO ()
 keepFamily f x = print (FamilyCallback.law @'True (Proxy @'True) f x)
 
+readFamily :: (Bool -> CompareAt.Result 'True) -> Bool -> Bool -> Ordering
+readFamily f x y = case CompareAt.keepFamilyCompare f x y of
+  Refl -> f x y
+
+keepBoth :: (Bool -> CompareAt.Result 'True) -> Bool -> Bool -> IO ()
+keepBoth f x y = print (CompareAt.keepFamilyCompare f x y)
+
 main :: IO ()
 main = do
   [input] <- getArgs
@@ -61,3 +69,5 @@ main = do
       lazyProof f x y = print (CompareAt.keepCompare f x y)
   lazyProof (error "unused comparator") (error "unused first argument") (error "unused second argument")
   keepFamily (error "forced family callback") (error "forced callback argument")
+  print (readFamily (flip compare) (not truth) truth, readFamily (flip compare) truth (not truth))
+  keepBoth (error "forced family callback") (error "forced first operand") (error "forced second operand")

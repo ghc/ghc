@@ -2962,13 +2962,21 @@ tc_app_ty_other mode rn_ty exp_kind
     apply checked HsArgPar{} = return checked
     apply _ (HsTypeArg _ arg) = setSrcSpanA (getLoc arg) invalid_call
     apply (fun, kind) (HsValArg _ arg) = setSrcSpanA (getLoc arg) $
-      do { kind' <- inferRetainedCallbackKinds arg kind
-         ; case nativeIndexFunctionTypeTys_maybe kind' of
+      -- See Note [Source opaque call indices].
+      do { (fun', kind') <- case tcSplitTyConApp_maybe kind of
+               Just (tc, _) | isTypeFamilyTyCon tc -> do
+                 co <- matchExpectedFunKind (TypeThing fun)
+                         (Just (pure unmatchableDataConTy)) 1 kind
+                 exposed <- liftZonkM (zonkTcType (mkCastTy fun co))
+                 return (exposed, typeKind exposed)
+               _ -> return (fun, kind)
+         ; arrow <- inferRetainedCallbackKinds arg kind'
+         ; case nativeIndexFunctionTypeTys_maybe arrow of
              Just (domain, result) -> do { ty <- tc_check_lhs_type mode arg domain
-                                         ; return (mkAppTy fun ty, result) }
-             Nothing | FunTy { ft_mult = mult } <- coreFullView kind'
+                                         ; return (mkAppTy fun' ty, result) }
+             Nothing | FunTy { ft_mult = mult } <- coreFullView arrow
                      -> failWithTc $ TcRnRetainedQuantificationError $
-                          if isManyTy mult then RetainedUnsupportedDomain kind'
+                          if isManyTy mult then RetainedUnsupportedDomain arrow
                                            else RetainedIndexMultiplicity mult
                      | otherwise -> invalid_call }
     invalid_call :: TcM a
@@ -4508,6 +4516,13 @@ at the full function type. The first application forms TermAppTy. Subsequent
 applications use AppTy. Ignore parentheses. Reject visible type arguments and
 applications past the last eligible arrow. Erased type variables keep their
 ordinary application path and lookup precedence.
+
+For f :: Bool -> Result 'True, the kind of f x can reduce to a function
+type. At the next argument of f x y, use matchExpectedFunKind to obtain
+the nominal coercion from Result 'True to the arrow. Cast the checked
+prefix f x before applying it to y. The argument supplies the source
+span if the family stays stuck or reduces to a non-function.
+See Note [Applying a type at a family-defined arrow kind] in GHC.Tc.Utils.Unify.
 
 This rule checks a type. It does not admit f n as a retained runtime argument
 or evaluate the call. Strict source cases use the separate checked call
