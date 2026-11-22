@@ -321,6 +321,100 @@ before every CoVar can require same-kind endpoints.
 [Coercion promotion](../../../compiler/GHC/Core/Coercion.hs),
 [!2857 invariant review](https://gitlab.haskell.org/ghc/ghc/-/merge_requests/2857#note_258029).
 
+### An index with a quantified kind
+
+An ordinary GADT can refine a function index whose kind itself depends on
+an earlier index.
+
+```haskell
+{-# LANGUAGE DataKinds, GADTs, PolyKinds, RankNTypes, RoleAnnotations #-}
+{-# LANGUAGE StandaloneKindSignatures, TypeApplications #-}
+module Pick where
+
+import Data.Kind (Type)
+import Data.Proxy (Proxy)
+
+type Slot :: forall (a :: Bool). Proxy a -> Type
+data Slot p = Slot
+
+type Pick :: forall k. (forall (a :: k). Proxy a -> Type) -> Type
+data Pick f where
+  PickBool :: Pick @Bool Slot
+
+type Carrier :: forall k. (forall (a :: k). Proxy a -> Type) -> Type
+type role Carrier nominal
+data Carrier f = Carrier Int
+
+transport :: forall k (f :: forall (a :: k). Proxy a -> Type).
+  Pick @k f -> Carrier @k f -> Carrier @Bool Slot
+transport PickBool x = x
+```
+
+Outside the match, `x` has type `Carrier @k f`. The `PickBool` pattern
+first gives `k ~ Bool`. It then identifies `f` with `Slot` at the
+transported kind, so the branch can return `x` at `Carrier @Bool Slot`.
+The nominal role on `Carrier` requires both equalities. The worker lifts
+the kind proof through the `forall` with `ForAllCo`. It uses the inverse
+of that lifted proof to cast `Slot` to the kind of `f` before binding the
+index equality. The same rule applies when the index kind is written as
+a synonym, such as `IndexKind k` below.
+
+```haskell
+-- With Modifiers and import GHC.Exts (M).
+type IndexKind k = forall (a :: k). @M Proxy a %M -> Type
+```
+
+The independent-index check fails at the final `x` in `Wrong.hs`, line 11,
+column 18. GHC-25897 reports `Could not deduce 'g ~ Slot'`.
+
+```haskell
+{-# LANGUAGE GADTs, PolyKinds, RankNTypes, TypeApplications #-}
+module Wrong where
+
+import Data.Kind (Type)
+import Data.Proxy (Proxy)
+import Pick
+
+bad :: forall k (f :: forall (a :: k). Proxy a -> Type)
+                (g :: forall (a :: k). Proxy a -> Type).
+  Pick @k f -> Carrier @k g -> Carrier @Bool Slot
+bad PickBool x = x
+```
+
+The v79 compiler accepted `Pick` at source and printed `41` without
+Core Lint. With Core Lint, desugaring reported the mixed-kind coercion
+binder `f ~# Slot` in the `PickBool` alternative at `Pick.hs:21:20`.
+A relink with the scoped worker passed Core and STG Lint and printed
+`(41,43)` through a separate client at `-O0` and `-O2`. The client
+uses the exported `transport` and performs its own `PickBool` match.
+Both provider interfaces omit interface pragmas. GHC rejects the
+independent index at the same source position with the scoped worker.
+
+A v79 reader panics in `extendTCvSubst` when the new worker layout has
+a v79 header. It reconstructs the index evidence from the old worker
+rules. The `IndexKind k` alias remains visible in the stripped
+interface, so checking for a `forall` in the written kind would miss
+some constructors that need the new layout. Version 80 uses the common
+worker-layout gate. GHC-47808 points to `import Pick` when a v79 reader
+opens the v80 interface. The diagnostic names the expected and actual
+versions. A v80 provider and client passed both optimization levels
+with a component compiler that could read the installed v79 libraries.
+A normal build must rebuild the compiler and its libraries for v80.
+Rebuild providers and clients together with that compiler.
+[Worker evidence](../../../compiler/GHC/Core/DataCon.hs),
+[interface version](../../../compiler/GHC/Settings/Constants.hs).
+
+Agda's `Square` example shows how a matched constructor refines an outer
+index. The Agda unification model treats the equation types as a telescope.
+Its vector example makes the vector equality depend on the preceding length
+equality. Weirich et al. sequence the kind and index equalities in `Heq`.
+Their `An-PiCong` rule transports the bound variable in the right body
+when its kind changes.
+[Agda manual, Dot patterns](https://agda.readthedocs.io/en/latest/language/function-definitions.html#dot-patterns),
+[Cockx and Devriese, §3.1, Example 14](https://jesper.cx/files/proof-relevant-unification.pdf#page=13),
+[Weirich et al., Figure 8](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf#page=16),
+[Weirich et al., §6.2](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf#page=22).
+
 ### Checked constructor fragment
 
 The Core fragment builds a dictionary worker with the same four parameters
