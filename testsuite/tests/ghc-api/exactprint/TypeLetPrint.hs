@@ -1,4 +1,4 @@
-{-# LANGUAGE ExperimentalDependentTypes #-}
+{-# LANGUAGE ExperimentalDependentTypes, UnicodeSyntax #-}
 module TypeLetPrint where
 
 type F a = let b {- bind -} = G a
@@ -12,3 +12,12 @@ type Layout a =
 type Braced a =
   let { first = G a {- separator -}; next = H first first; {- close -} }
   in H next first
+
+type SignedLayout a =
+  let result {- signature -} :: Bool -- kind
+      result = G a
+  in H result result
+
+type SignedBraced a =
+  let { result ∷ Bool {- separator -}; {- binding -} result = G a; {- close -} }
+  in H result result

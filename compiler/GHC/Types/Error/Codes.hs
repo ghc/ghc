@@ -288,6 +288,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "PsErrNoSingleWhereBindInPatSynDecl"            = 65536
   GhcDiagnosticCode "PsErrDeclSpliceNotAtTopLevel"                  = 08451
   GhcDiagnosticCode "PsErrMultipleNamesInStandaloneKindSignature"   = 42569
+  GhcDiagnosticCode "PsErrTypeLetSignatureMismatch"                = 58217
   GhcDiagnosticCode "PsErrIllegalExplicitNamespace"                 = 47007
   GhcDiagnosticCode "PsErrUnsupportedExplicitNamespace"             = 04611
   GhcDiagnosticCode "PsErrPlainWildcardImport"                      = 96821

@@ -20,13 +20,33 @@ capture :: let { saved = a; a = Bool } in saved -> a -> saved
 capture saved _ = saved
 HS
 "${g[@]}" -fomit-interface-pragmas -c SignatureLet.hs
-cp TypeLet.hi PackedVecLibrary.hi SignatureLet.hi "$out/client/"
+cat >SignedLets.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, KindSignatures #-}
+module SignedLets (Braced, Layout) where
+
+type Braced (b :: Bool) = let { tag = Bool; tag :: tag; tag = b } in tag
+
+type Layout (b :: Bool) =
+  let tag = Bool
+      tag :: tag
+      tag = b
+  in tag
+HS
+"${g[@]}" -fomit-interface-pragmas -ddump-parsed -c SignedLets.hs >parsed.txt
+{
+  head -n 1 SignedLets.hs
+  sed -n '/^module /,$p' parsed.txt
+} >Pretty.hs
+test "$(grep -c 'tag :: tag' Pretty.hs)" = 2
+"${g[@]}" -fforce-recomp -fno-code -c Pretty.hs
+cp TypeLet.hi PackedVecLibrary.hi SignatureLet.hi SignedLets.hi "$out/client/"
 cd "$out/client"
 cat >OrdinaryLet.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
 module OrdinaryLet where
 import Data.Type.Equality ((:~:)(Refl))
 import qualified SignatureLet
+import SignedLets (Braced, Layout)
 import TypeLet
 
 roadmap :: F Bool :~: Ordering
@@ -49,6 +69,12 @@ capture = Refl
 
 forward :: a -> Bool -> a
 forward = SignatureLet.capture
+
+braced :: Braced 'True :~: 'True
+braced = Refl
+
+layout :: Layout 'False :~: 'False
+layout = Refl
 
 yes :: CaseResult 'True :~: Either Bool Bool
 yes = Refl
@@ -130,6 +156,27 @@ module UnusedGroup where
 type Bad (a :: Bool) = let { b = a; ignored = Maybe b } in Int
 HS
 reject UnusedGroup 3:53 83865 'Expected a type'
+
+cat >SignedKind.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, KindSignatures #-}
+module SignedKind where
+type Bad = let { width :: Bool; width = 0 } in Int
+HS
+reject SignedKind 3:41 83865 'Expected kind'
+
+cat >SignedName.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, KindSignatures #-}
+module SignedName where
+type Bad = let { width :: Bool; height = 'True } in height
+HS
+reject SignedName 3:18 58217 'must immediately precede its binding'
+
+cat >SignedForward.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, KindSignatures #-}
+module SignedForward where
+type Bad = let { width :: later; width = 'True; later = Bool } in width
+HS
+reject SignedForward 3:27 76037 'Not in scope: type variable'
 
 # The infix operator can be a captured type variable.
 cd "$out/provider"
