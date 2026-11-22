@@ -147,7 +147,7 @@ Record GADT constructor signatures have a separate grammar.
   tv_bndrs_spec ::= <empty> | tv_bndr_spec tv_bndrs_spec
 
   tv_bndr      ::= tyvar | '(' tyvar '::' ctype ')'
-  tv_bndr_spec ::= tv_bndr | '{' tv_bndr '}'
+  tv_bndr_spec ::= tv_bndr | '{' tyvar '}' | '{' tyvar '::' ctype '}'
 
   ctxt_arrow ::= btype '=>'
                |  '(' ctxt ')' '=>'
@@ -160,8 +160,11 @@ Record GADT constructor signatures have a separate grammar.
   opt_ctxt ::= <empty> | ctxt_arrow
   fielddecls ::= <empty> | fields
   fields ::= fielddecl | fielddecl ',' fields
-  fielddecl ::= sig_vars '::' fieldtype
-              |  sig_vars mult '::' fieldtype
+  fielddecl ::= sig_vars '::' record_fieldtype
+              |  sig_vars mult '::' record_fieldtype
+
+  record_fieldtype ::= opt_unpack ctype
+                     |  opt_unpack strictness_sigil atype
 
   fieldtype ::= opt_unpack btype
               |  opt_unpack strictness_sigil atype
@@ -175,7 +178,14 @@ contain a ``ctype``. For example, ``Int -> (forall a. a -> a) -> S``
 has two fields, the second of which has a polymorphic type. ``sig_vars``
 is a comma-separated list of field names. ``mult`` is a multiplicity
 annotation such as ``%1``. The same annotation syntax applies to record
-fields before ``::``.
+fields before ``::``. Braces mark inferred binders, for example
+``forall {k} {a :: k}.``.
+
+Record braces delimit the field types. GHC preserves its existing
+acceptance of a ``ctype`` in a record field, including ``f :: a -> a``.
+Proposal #402 describes record field types with the narrower ``btype``
+production. Prefix field types use that narrower form because the
+outer arrow separates fields.
 
 - In a prefix signature, fields, foralls, and contexts may appear in any
   order. A type binder scopes over the rest of the signature. A pattern
