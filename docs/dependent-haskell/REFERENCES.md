@@ -5951,9 +5951,10 @@ and [ordinary structural count](examples/open-evaluation/PreludeMapLengthSize.hs
 Agda's `length-zipWith` quantifies over the combining function. Its
 proof never applies that function. The Haskell proof accepts a runtime
 `f :: a -> b -> c` and uses the same induction. It can return `Refl`
-even when applying or evaluating `f` would diverge. GHC proposal #302
-supplies the two-argument `\cases` used to match the list spines after
-binding `f`.
+even when applying or evaluating `f` would diverge. The earlier version
+bound `f` before a two-argument `\cases` as specified by GHC proposal
+#302. The fork now checks the three function clauses directly. Each
+clause binds its own callback name and inspects the same two list columns.
 [Agda's proof](https://agda.github.io/agda-stdlib/v2.3/Data.List.Properties.html#length-zipWith),
 [GHC proposal #302](https://ghc-proposals.readthedocs.io/en/latest/proposals/0302-cases.html)
 and [runtime callback proof](examples/open-evaluation/PreludeZipRuntime.hs).

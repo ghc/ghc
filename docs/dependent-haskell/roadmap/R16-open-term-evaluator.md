@@ -1842,6 +1842,9 @@ result is `size (zipWith f xs ys) :~: minSize (size xs) (size ys)`.
 The Showcase reads all three inputs from IO. It runs the proof a
 second time with an undefined callback. The proof inspects the list
 spines and leaves the callback and elements unevaluated.
+The ordinary clauses also work with two callbacks. `lengthZipMap`
+proves the same length law for `zipWith combine (map pre xs) ys`.
+The cons case uses the inductive equality for the two tails.
 [Runtime proofs](../examples/open-evaluation/PreludeZipRuntime.hs) and
 [ordinary interface client](../../../testsuite/tests/dependent/should_run/NativeZipWithRuntimeClient.hs).
 

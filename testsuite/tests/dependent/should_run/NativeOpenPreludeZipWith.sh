@@ -33,7 +33,7 @@ for opt in -O0 -O2; do
     "${ghc[@]}" "$opt" -fforce-recomp -c "$src/NativeZipWithRuntimeClient.hs" -outputdir .
     "${ghc[@]}" Main.o PreludeZipRuntime.o ../provider/PreludeMapLengthSize.o -o client
     ./client >client.stdout
-    grep -Fxq '(True,True)' client.stdout
+    grep -Fxq '(True,True,True)' client.stdout
 done
 
 reject() {

@@ -1924,6 +1924,11 @@ main = do
         , HaskLib.lengthZipWith zipCallback zipLeft zipRight
         , HaskLib.lengthZipWith unusedCallback zipLeft zipRight
         )
+    beforeZip <- newIORef not >>= readIORef
+    observe "prove the result length after map and zipWith"
+        ( zipWith zipCallback (map beforeZip zipLeft) zipRight
+        , PreludeZipRuntime.lengthZipMap beforeZip zipCallback zipLeft zipRight
+        )
     observe "use the Prelude.zipWith cons equation with both tails unevaluated"
         PreludeZipWithProof.firstPair
     observe "compose two checked traversals without forcing the inner callback"
