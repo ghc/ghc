@@ -67,7 +67,8 @@ import GHC.Tc.Types.ErrCtxt( ReportRedundantConstraints(..) )
 
 import GHC.Builtin.WiredIn.Types ( oneDataConTy, unitTy, makeRecoveryTyCon
                                , boolTy, promotedTrueDataCon, promotedFalseDataCon
-                               , manyDataConTy, unmatchableDataConTy, matchabilityTy )
+                               , manyDataConTy, unmatchableDataConTy, matchabilityTy
+                               , liftedTypeKindTyConName )
 
 import GHC.Rename.Env( lookupConstructorFields )
 
@@ -1553,9 +1554,12 @@ inferArrowIndices metadata decls tc
   | isLiftedTypeKind (tyConResKind tc)
   , not (any inferredMatchabilityIndex (tyConBinders tc))
   , [FamDecl { tcdFam = FamilyDecl
-       { fdInfo = ClosedTypeFamily _ (Just eqns), fdInjectivityAnn = Nothing } }] <-
+       { fdInfo = ClosedTypeFamily _ (Just eqns), fdInjectivityAnn = injectivity } }] <-
       [d | L _ d <- decls, tcdName d == tyConName tc]
   , not (null (tyConVisibleTyVars tc)) || (tyConArity tc == 0 && isSingleton eqns)
+  , isNothing injectivity ||
+      (isSingleton (tyConVisibleTyVars tc) &&
+       all (structuralKindResult (tyConName tc) . caseAliasBody . feqn_rhs . unLoc) eqns)
   , any (matchabilityArrow . caseAliasBody . feqn_rhs . unLoc) eqns = do
       ma <- newFlexiTyVar matchabilityTy
       pure (prefix [mkTyVar (getName ma) matchabilityTy], Nothing)
@@ -1566,6 +1570,46 @@ inferArrowIndices metadata decls tc
       (foldr (\v -> mkForAllTy unmatchableDataConTy (Bndr v Inferred)) (tyConKind tc) indices)
       (mkNamedTyConBinders Inferred indices ++ tyConBinders tc)
       0 (tyConResKind tc) (tcTyConScopedTyVars tc) True (tyConFlavour tc)
+
+-- | Select results whose constructor shape is independent of matchability.
+-- See Note [Inferred injective kind family results].
+structuralKindResult :: Name -> LHsType GhcRn -> Bool
+structuralKindResult owner rhs
+  | L _ (HsFunTy _ (HsModifiedFunArr _ [] HsStandardArr{}) domain result) <- ignoreParens rhs
+  = operand domain && operand result
+  | otherwise = liftedType rhs
+  where
+    operand ty
+      | L _ (HsAppTy _ f arg) <- ignoreParens ty
+      , L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ name))) <- ignoreParens f
+      , L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ var))) <- ignoreParens arg
+      = name == owner && isTyVarName var
+      | otherwise = liftedType ty
+
+    liftedType ty = case unLoc (ignoreParens ty) of
+      HsStarTy{} -> True
+      HsTyVar _ NotPromoted (L _ (WithUserRdr _ name)) -> name == liftedTypeKindTyConName
+      _ -> False
+
+{- Note [Inferred injective kind family results]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An injective closed family can use arrow matchability to distinguish
+equations. For example:
+
+  Select False = Bool -> Bool
+  Select True  = Bool %M -> Bool
+
+The first ordinary RHS has U. Adding an index would let that branch
+also return M and violate the written injectivity.
+
+Infer an index only for Type leaves and bare arrows whose operands
+are Type or recursive applications to pattern variables. Type is
+apart from every arrow. Every produced arrow uses the same index at
+its root, so changing the index preserves the structural distinctions
+between results. A caller's kind or type can then constrain that
+index. The ordinary injectivity checker still verifies the variables
+named by the user. No annotation names the new index.
+-}
 
 {- Note [Matchability schemes for open families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

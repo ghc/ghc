@@ -162,3 +162,27 @@ if "${ghc[@]}" -c WrongFamilyParent.hs > failure.log 2>&1; then
 fi
 grep -Fq 'WrongFamilyParent.hs:6:3: error: [GHC-83865]' failure.log
 grep -Fq 'with actual type ‘Other’' failure.log
+
+# The implicit U and the explicit M make these results apart.
+cat >MixedInjectiveArrows.hs <<'HS'
+{-# LANGUAGE DataKinds, GADTs, Modifiers, TypeFamilyDependencies, TypeOperators #-}
+module MixedInjectiveArrows where
+import Data.Kind (Type)
+import Data.Type.Equality ((:~:)(Refl))
+import GHC.Exts (M, Matchability, U)
+
+type family Select (b :: Bool) = (r :: Type) | r -> b where
+    Select False = Bool -> Bool
+    Select True = Bool %M -> Bool
+
+type family ArrowMatchability (t :: Type) :: Matchability where
+    ArrowMatchability (a %M -> b) = M
+    ArrowMatchability (a %U -> b) = U
+
+ordinary :: ArrowMatchability (Select False) :~: U
+ordinary = Refl
+
+annotated :: ArrowMatchability (Select True) :~: M
+annotated = Refl
+HS
+"${ghc[@]}" -c MixedInjectiveArrows.hs
