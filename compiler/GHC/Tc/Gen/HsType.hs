@@ -179,7 +179,7 @@ import GHC.Data.Bag( unitBag, mapBagM_ )
 import Data.Function ( on )
 import Data.List.NonEmpty ( NonEmpty(..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
-import Data.List ( intercalate, mapAccumL )
+import Data.List ( intercalate, isPrefixOf, mapAccumL )
 import Control.Monad
 import Data.Data (Data, cast, gmapQ)
 import Data.Tuple( swap )
@@ -1616,7 +1616,7 @@ tcCheckInferredFamilyRhs rhs kind = do
   let arrows
         | experimental && poly_kinds = InferUnsignedFamilyArrows
         | otherwise = DefaultUnsignedFamilyArrows
-  addTypeCtxt rhs $
+  addTypeCtxt (familyRhsForContext rhs) $
     tc_check_lhs_type (typeLevelMode {mode_callback_arrow = arrows}) rhs kind
 
 -- | Check a family equation without generalising a new arrow modifier.
@@ -1625,9 +1625,17 @@ tcCheckFamilyRhs :: LHsType GhcRn -> TcKind -> TcM TcType
 tcCheckFamilyRhs rhs kind = do
   experimental <- xoptM LangExt.ExperimentalDependentTypes
   if experimental
-     then addTypeCtxt rhs $
+     then addTypeCtxt (familyRhsForContext rhs) $
           tc_check_lhs_type (typeLevelMode {mode_callback_arrow = CheckFamilyRhsArrows}) rhs kind
      else tcCheckLHsTypeInContext rhs (TheKind kind)
+
+-- | Display the source branch inside its generated alias bindings.
+familyRhsForContext :: LHsType GhcRn -> LHsType GhcRn
+familyRhsForContext (L _ (XHsType (HsTypeLetRn Nothing _ rhs body)))
+  | Just (L _ (WithUserRdr _ name)) <- hsTyGetAppHead_maybe rhs
+  , "$case-let-rhs:" `isPrefixOf` occNameString (nameOccName name)
+  = familyRhsForContext body
+familyRhsForContext rhs = rhs
 
 {- Note [Inferred closed family callback arrows]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

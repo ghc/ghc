@@ -60,6 +60,8 @@ import GHC.Core.FamInstEnv ( FamInst(..), famInstAxiom, pprFamInst )
 import GHC.Core.InstEnv
 import qualified GHC.Core.TyCo.Compare as TypeCompare
 import GHC.Core.TyCo.Rep (Type(..), scaledThing)
+import GHC.Core.TyCo.Make (TyCoMapper(..), mapTyCo)
+import GHC.Core.TyCo.Subst (runSubstM, substTyCoMapper, substVarBndrUsing)
 import GHC.Core.TyCo.Ppr (pprWithInvisibleBitsWhen, pprSourceTyCon,
                           pprTyVars, pprWithTYPE, pprTyVar, pprTidiedType, pprForAllWithMatchability)
 import GHC.Core.PatSyn ( patSynName, pprPatSynType, PatSyn )
@@ -108,6 +110,7 @@ import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Fixity (defaultFixity)
+import GHC.Utils.Monad.StrictReader (StrictReaderT(..))
 
 import GHC.Iface.Errors.Types
 import GHC.Iface.Errors.Ppr
@@ -5422,14 +5425,33 @@ pprKindMismatchMsg :: TypedThing -> Type -> Type -> SDoc
 pprKindMismatchMsg thing exp act
   = hang (text "Expected" <+> kind_desc <> comma)
       2 (text "but" <+> quotes (ppr thing) <+> text "has kind" <+>
-        quotes (ppr act))
+        quotes (ppr_kind act))
   where
+    ppr_kind kind = ifPprDebug (ppr kind) (ppr (expandCaseLetKind kind))
     kind_desc | isConstraintLikeKind exp = text "a constraint"
               | Just arg <- kindRep_maybe exp  -- TYPE t0
               , tcIsTyVarTy arg = sdocOption sdocPrintExplicitRuntimeReps $ \case
-                                   True  -> text "kind" <+> quotes (ppr exp)
+                                   True  -> text "kind" <+> quotes (ppr_kind exp)
                                    False -> text "a type"
-              | otherwise       = text "kind" <+> quotes (ppr exp)
+              | otherwise       = text "kind" <+> quotes (ppr_kind exp)
+
+-- | Expand private case-let aliases for display. Keep ordinary synonyms.
+expandCaseLetKind :: Type -> Type
+expandCaseLetKind kind = walk (mkEmptySubst (mkInScopeSet (tyCoVarsOfType kind))) kind
+  where
+    (walk_ty, _, _, _) = mapTyCo substTyCoMapper
+      { tcm_tcapp_ty = visit
+      , tcm_tycobinder = \tv _ check -> StrictReaderT $ \subst ->
+          let (subst', tv') = substVarBndrUsing walk subst tv
+          in runStrictReaderT (check tv') subst'
+      }
+    walk = runSubstM walk_ty
+
+    visit ty tc args
+      | Just _ <- liftedTypeOwner "$case-let-rhs:" (tyConName tc)
+      , Just rhs <- expandSynTyConApp_maybe tc args = walk_ty rhs
+      | null args = pure ty
+      | otherwise = pure (TyConApp tc args)
 
 -- | Whether to print explicit kinds (with @-fprint-explicit-kinds@)
 -- in an 'SDoc' when a type mismatch occurs to due invisible parts of the types.
