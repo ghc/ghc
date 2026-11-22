@@ -2561,6 +2561,9 @@ Publish only the rows from the checked Core of the exported definition.
 Compare the exact row order, constructor fields, and recursive calls with
 the final owner before publishing the interface. At use sites, require an
 empty set of active rewrite rules for this owner.
+
+Ignore debugger breakpoints in both checks. Keep coverage ticks because
+they record evaluation.
 -}
 
 {- Note [Nullary indexed source projections]
@@ -3804,7 +3807,8 @@ checkedTwoListCaseWith specialized public owner rhs = do
 checkedTwoStructuralCase :: (TyCon -> Bool) -> Id -> Core.CoreExpr
                          -> Maybe (ConstructorCaseType, [ConstructorCaseRow])
 checkedTwoStructuralCase public owner rhs = do
-    checked@(signature, rows) <- checkedConstructorCase public (const Nothing) owner rhs
+    checked@(signature, rows) <-
+      checkedConstructorCase public (const Nothing) owner (stripTicksE isSourceBreakpoint rhs)
     guard (isTwoStructuralCase signature && any checks_right rows)
     pure checked
   where
