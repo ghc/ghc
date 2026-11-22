@@ -17,13 +17,15 @@ import GHC.Core.DataCon
   ( dataConName, dataConTyCon, dataConUnivTyVars, dataConInstOrigArgTys
   , dataConSourceArity, dataConRepArgBinders, isVanillaDataCon )
 import GHC.Core.TyCo.Rep (Coercion(AxiomCo), Type(TyVarTy), scaledThing)
-import GHC.Core.TyCo.Compare (eqType, eqTypes, eqScopedSigmaClosures, eqScopedLambdaClosures)
+import GHC.Core.TyCo.Compare
+  (eqType, eqTypeX, eqTypes, eqVarBndrs, eqScopedSigmaClosures, eqScopedLambdaClosures)
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Data.FastString
 import GHC.Data.Pair
 import GHC.Types.Basic (Boxity(Boxed), LeftOrRight(..))
 import GHC.Types.Var (ExistsTyFlag(..))
+import GHC.Types.Var.Env (emptyInScopeSet, mkRnEnv2)
 import GHC.Types.Var.Set
 import GHC.Types.Name (nameModule_maybe, nameOccName, stableNameCmp)
 import GHC.Types.Name.Occurrence (occNameString, sourceTableTermOcc)
@@ -31,7 +33,7 @@ import GHC.Types.Unique.FM (UniqFM, addToUFM)
 
 import GHC.Utils.Misc (equalLength, lengthIs, snocView)
 
-import Control.Monad (guard)
+import Control.Monad (guard, zipWithM)
 import Data.List (isPrefixOf, sortBy)
 
 -- | Resolve the stable names written to the interface by CoreToIface.
@@ -46,19 +48,25 @@ builtInCoAxiomRules =
       , (scopedSigmaClosureName, scopedSigmaClosureRule)
       , (scopedLambdaClosureName, scopedLambdaClosureRule)
       , (scopedEnumCaseName, scopedEnumCaseRule)
-      , (scopedConstructorCaseName, scopedConstructorCaseRule) ]
+      , (scopedConstructorCaseName, scopedConstructorCaseRule)
+      , (scopedCaseResultName, scopedCaseResultRule) ]
 
 scopedSigmaClosureRule, scopedLambdaClosureRule :: CoAxiomRule
 scopedSigmaClosureRule = scopedClosureRule scopedSigmaClosureName eqScopedSigmaClosures
 scopedLambdaClosureRule = scopedClosureRule scopedLambdaClosureName eqScopedLambdaClosures
 
-scopedEnumCaseRule, scopedConstructorCaseRule :: CoAxiomRule
-scopedEnumCaseRule = scopedClosureRule scopedEnumCaseName (eqScopedCasesUsing False)
-scopedConstructorCaseRule = scopedClosureRule scopedConstructorCaseName (eqScopedCasesUsing True)
+-- | The least interface requirement for this checked case equality.
+data ScopedCaseProof = EnumerationCases | IgnoredFieldCases | ScopedResultCases
+  deriving Eq
 
-eqScopedCasesUsing :: Bool -> Type -> Type -> Bool
-eqScopedCasesUsing ignored_fields lhs rhs =
-  checkedScopedCases lhs rhs == Just ignored_fields
+scopedEnumCaseRule, scopedConstructorCaseRule, scopedCaseResultRule :: CoAxiomRule
+scopedEnumCaseRule = scopedClosureRule scopedEnumCaseName (eqScopedCasesUsing EnumerationCases)
+scopedConstructorCaseRule = scopedClosureRule scopedConstructorCaseName (eqScopedCasesUsing IgnoredFieldCases)
+scopedCaseResultRule = scopedClosureRule scopedCaseResultName (eqScopedCasesUsing ScopedResultCases)
+
+eqScopedCasesUsing :: ScopedCaseProof -> Type -> Type -> Bool
+eqScopedCasesUsing proof lhs rhs =
+  checkedScopedCases lhs rhs == Just proof
 
 scopedClosureRule :: FastString -> (Type -> Type -> Bool) -> CoAxiomRule
 scopedClosureRule name equal = BuiltInEqRule name proves
@@ -86,14 +94,16 @@ proveScopedLambdaClosure lhs rhs
 -- | Produce nominal evidence for equal retained constructor cases.
 proveScopedConstructorCase :: Type -> Type -> Maybe Coercion
 proveScopedConstructorCase lhs rhs = do
-  ignored_fields <- checkedScopedCases lhs rhs
-  let rule | ignored_fields = scopedConstructorCaseRule
-           | otherwise = scopedEnumCaseRule
+  proof <- checkedScopedCases lhs rhs
+  let rule = case proof of
+        EnumerationCases -> scopedEnumCaseRule
+        IgnoredFieldCases -> scopedConstructorCaseRule
+        ScopedResultCases -> scopedCaseResultRule
   pure (AxiomCo rule [mkNomReflCo lhs, mkNomReflCo rhs])
 
--- | Check complete constructor cases. Return whether the proof uses ignored fields.
+-- | Check complete constructor cases and select the evidence that they require.
 -- See Note [Equality of retained constructor cases].
-checkedScopedCases :: Type -> Type -> Maybe Bool
+checkedScopedCases :: Type -> Type -> Maybe ScopedCaseProof
 checkedScopedCases lhs rhs
   | Just (tc1, as1) <- splitTyConApp_maybe lhs
   , Just (tc2, as2) <- splitTyConApp_maybe rhs
@@ -104,8 +114,12 @@ checkedScopedCases lhs rhs
   , as1 `eqTypes` as2
   , Just (fields1, rows1) <- checked_rows tc1
   , Just (fields2, rows2) <- checked_rows tc2
-  , fields1 == fields2, rows1 == rows2
-  = Just fields1
+  , fields1 == fields2, equalLength rows1 rows2
+  = do
+      scoped <- or <$> zipWithM same_row rows1 rows2
+      pure $ if scoped then ScopedResultCases
+             else if fields1 then IgnoredFieldCases
+             else EnumerationCases
   | otherwise = Nothing
   where
     is_signature_case tc
@@ -159,9 +173,25 @@ checkedScopedCases lhs rhs
       guard (all_vars `equalLength` cab_tvs branch)
       guard (sizeVarSet bound == length all_vars && all (`elemVarSet` bound) all_vars)
       guard (sizeVarSet (mkVarSet all_vars) == length all_vars)
-      (result, []) <- splitTyConAppNoView_maybe (cab_rhs branch)
+      let result = cab_rhs branch
+      guard (tyCoVarsOfType result `subVarSet` bound)
+      pure (con, (all_vars, result))
+
+    same_row (con1, (vars1, result1)) (con2, (vars2, result2)) = do
+      guard (con1 == con2)
+      case (bare_result result1, bare_result result2) of
+        (Just tycon1, Just tycon2) -> do
+          guard (tycon1 == tycon2)
+          pure False
+        _ -> do
+          env <- eqVarBndrs (mkRnEnv2 emptyInScopeSet) vars1 vars2
+          guard (eqTypeX env result1 result2)
+          pure True
+
+    bare_result ty = do
+      (result, []) <- splitTyConAppNoView_maybe ty
       guard (isAlgTyCon result && isLiftedTypeKind (tyConKind result))
-      pure (con, result)
+      pure result
 
     checked_fields True _ _ _ _ [] _ = Just []
     checked_fields True _ _ _ _ _ _ = Nothing
@@ -193,13 +223,22 @@ and one exact constructor pattern. Its fields may each bind a distinct
 variable. Require a regular boxed datatype and ordinary constructors
 when a row binds a field. Check that the constructor parameters match the
 scrutinee kind and that each field variable has the instantiated field
-kind. Require a bare algebraic type constructor as the result, so the
-result cannot depend on a bound field. Distinct exact constructors
-establish disjointness. Do not force the pairwise overlap caches.
-Compare all results by constructor identity. Keep ScopedEnumCase for
-proofs the original nullary checker accepts. Use ScopedConstructorCase
-for ignored fields so an older reader rejects the proof at its interface
-version.
+kind. Distinct exact constructors establish disjointness. Do not force
+the pairwise overlap caches.
+
+Compare bare algebraic results by constructor identity as before.
+For another result, check that its free variables are bound by the
+row. Pair the capture binders in application order and the fields in
+constructor order. Check their kinds with eqVarBndrs and compare the
+results with eqTypeX. The order in cab_tvs need not be the pattern
+order. In particular, two fields with the same kind are still distinct
+positions.
+
+Keep ScopedEnumCase for proofs the original nullary checker accepts
+and ScopedConstructorCase for the original ignored-field proofs.
+Use ScopedCaseResult when comparison needs the scoped result rule.
+The distinct name and interface feature let old readers reject only a
+stored proof that requires the new rule.
 
 Recheck this shape when reading the coercion. A substitution can make
 the scrutinee known to both families. The same row then reduces on both
