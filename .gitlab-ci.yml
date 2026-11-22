@@ -415,7 +415,7 @@ lint-submods-branch:
     - _build/stageBoot/bin/lint-submodule-refs . $(git rev-list $CI_COMMIT_BEFORE_SHA..$CI_COMMIT_SHA)
   rules:
     - if: '$CI_COMMIT_BRANCH == "master"'
-    - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
+    - if: '$CI_COMMIT_BRANCH =~ /^ghc-[0-9]+\.[0-9]+$/'
     - *drafts-can-fail-lint
 
 ############################################################
