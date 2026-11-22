@@ -2473,6 +2473,20 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                 (mkTyConApp eqTyCon [boolTy, callAt callN, callAt callN]) splitRestored
             rejectsIface "a split wire application checks the callback result kind"
                 "Invalid type application containing a retained call" [intHead, callN] splitWire
+            let castCall co = IfaceCastTy callArg (toIfaceCoercion co)
+                resultCo = proof 9114 boolTy intTy
+            resultCast <- restore [callF, callN, resultCo] =<<
+                roundtrip compression (castCall (mkCoVarCo resultCo))
+            checkType dflags "a call result cast has the kind supplied by its proof"
+                intTy (typeKind resultCast)
+            lintAccepts dflags "a call result cast uses scoped nominal evidence"
+                [callF, callN, resultCo] (Coercion (mkNomReflCo resultCast))
+            rejectsIface "a cast checks the kind of its callback result"
+                "Invalid retained call result cast in interface" [intHead, callN]
+                =<< roundtrip compression (castCall (mkNomReflCo boolTy))
+            rejectsIface "a call result cast requires nominal evidence"
+                "Invalid retained call result cast in interface" [callF, callN]
+                =<< roundtrip compression (castCall (mkReflCo Representational boolTy))
             check "ordinary wire application uses the actual lexical head" $ case rawRestored of
                 TermAppTy head (TermVarTy arg) -> head == callF && arg == callN
                 _ -> False
