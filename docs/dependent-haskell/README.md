@@ -42,11 +42,6 @@ for just the list API.
 | `lengthZipWith f xs ys` | `minSize (size xs) (size ys)` |
 | `lengthZipMap pre combine xs ys` | `minSize (size xs) (size ys)` for `zipWith combine (map pre xs) ys` |
 
-`HaskLib.Size` exports `plusZero` and `plusSucc`. The
-[append-singleton client](hasklib-test/Client.hs) imports both lemmas
-and `lengthAppend` to prove that appending one element adds one cell.
-It reuses the proofs without recursing over its input list.
-
 An ordinary client can use the zip equality with lists read at runtime.
 A dependent client can also name it in its signature.
 
@@ -77,19 +72,37 @@ HaskLib imports that worker from `ghc-internal`. Clients can use
 [Package](hasklib.cabal), [list API](hasklib/HaskLib/List.hs) and
 [proof methods](REFERENCES.md#parametricity-and-the-list-length-laws).
 
-A client can also prove the pipeline law using two imports. Each
-`Refl` makes one equality available in its branch.
+### Compose equality proofs
+
+Use `trans` from `HaskLib` to join two proofs with a shared endpoint.
+The append-singleton client uses `plusSucc` to move the successor
+outside `plus`. Then `congSucc` applies that successor to both sides
+of `plusZero`. [Append-singleton proof](hasklib-test/Client.hs).
+
+Use `congFirst` to lift an equality through the first argument of a
+binary size function. In the zip-after-map proof, `@minSize` selects
+the function and `@(size ys)` fixes its second argument.
 
 ```haskell
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeApplications, TypeOperators #-}
+{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
+module Client where
+
+import HaskLib
+
 zipMapLaw :: forall a b c d. foreach (pre :: a -> b) -> foreach (combine :: b -> c -> d)
           -> foreach (xs :: [a]) -> foreach (ys :: [c])
           -> size (zipWith combine (map pre xs) ys) :~: minSize (size xs) (size ys)
 zipMapLaw pre combine xs ys =
-    case lengthZipWith combine (map pre xs) ys of
-        Refl -> case lengthMap pre xs of Refl -> Refl
+    lengthZipWith combine (map pre xs) ys
+        `trans` congFirst @minSize @(size ys) (lengthMap pre xs)
 ```
 
-The second proof traverses the left list. For example, if the left list
+HaskLib re-exports `trans` from `Data.Type.Equality`. It forces the
+proofs from left to right.
+[Congruence and transitivity references](REFERENCES.md#reusing-an-equality-under-a-size-function).
+
+The map proof traverses the left list. For example, if the left list
 is `True : undefined` and the right list is empty, forcing
 `lengthZipMap` returns `Refl`. Forcing `zipMapLaw` reaches the undefined
 tail. Both proofs typecheck. Their types describe the equality each

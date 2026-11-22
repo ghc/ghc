@@ -4,7 +4,6 @@
 module Client (zipLaw, lengthAppendSingleton, checkAppendSingleton, checkReverse, checkZipMap) where
 
 import qualified HaskLib as H
-import HaskLib.Size (plusSucc, plusZero)
 
 -- | Use the public functions and equality in a new dependent signature.
 zipLaw :: forall a b. foreach (xs :: [a]) -> foreach (ys :: [b])
@@ -15,10 +14,9 @@ zipLaw xs ys = H.lengthZip xs ys
 lengthAppendSingleton :: forall a. foreach (xs :: [a]) -> foreach (x :: a)
                       -> H.size (xs ++ '[x]) H.:~: 'H.Succ (H.size xs)
 lengthAppendSingleton xs x =
-    case H.lengthAppend xs [x] of
-        H.Refl -> case plusSucc (H.size xs) H.Zero of
-            H.Refl -> case plusZero (H.size xs) of
-                H.Refl -> H.Refl
+    H.lengthAppend xs [x]
+        `H.trans` H.plusSucc (H.size xs) H.Zero
+        `H.trans` H.congSucc (H.plusZero (H.size xs))
 
 -- | Check the proof without inspecting any list elements.
 checkAppendSingleton :: [Bool] -> Bool -> Bool
@@ -35,8 +33,8 @@ zipMapLaw :: forall a b c d. foreach (pre :: a -> b) -> foreach (combine :: b ->
            -> foreach (xs :: [a]) -> foreach (ys :: [c])
            -> H.size (zipWith combine (map pre xs) ys) H.:~: H.minSize (H.size xs) (H.size ys)
 zipMapLaw pre combine xs ys =
-    case H.lengthZipWith combine (map pre xs) ys of
-        H.Refl -> case H.lengthMap pre xs of H.Refl -> H.Refl
+    H.lengthZipWith combine (map pre xs) ys
+        `H.trans` H.congFirst @H.minSize @(H.size ys) (H.lengthMap pre xs)
 
 -- | Instantiate the pipeline with different intermediate and input types.
 checkZipMap :: (Bool -> Char) -> (Char -> Int -> Ordering) -> [Bool] -> [Int] -> Bool

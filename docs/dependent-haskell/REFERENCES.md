@@ -5965,15 +5965,24 @@ between them at `Refl`.
 Agda's `cong` takes an equality between arguments and produces an
 equality between the results of applying one function. Equality
 elimination permits the same substitution when a Haskell client matches
-`Refl`. In the HaskLib pipeline example, `lengthMap pre xs` gives
-`size (map pre xs) :~: size xs`. The client uses that equality in
-the first argument to `minSize`, after matching the zipWith proof.
-Neither step requires the size function to be injective.
-The compiler keeps the Given in its branch and uses its nominal
-coercion during family rewriting. See Note [Family Givens with rigid
-runtime indices] in GHC.Tc.Utils.Unify.
-[Agda equality congruence](https://github.com/agda/agda-stdlib/blob/v2.3/src/Relation/Binary/PropositionalEquality/Core.agda#L54-L55)
+`Refl`. In the HaskLib pipeline example, `congFirst @minSize` lifts the
+proof of `size (map pre xs) :~: size xs` through the first argument of
+`minSize`. The original zipWith proof and this
+lifted proof have a common endpoint, so the client joins them with
+`Data.Type.Equality.trans`. The append-singleton proof uses `congSucc`
+for the corresponding step under `Succ`.
+[Agda `cong` and `trans`](https://agda.github.io/agda-stdlib/v2.4/Relation.Binary.PropositionalEquality.Core.html),
+[Agda equality reasoning example](https://agda.github.io/agda-stdlib/v2.4/Relation.Binary.PropositionalEquality.html),
+[base equality operations](../../libraries/ghc-internal/src/GHC/Internal/Data/Type/Equality.hs),
 and [HaskLib client](hasklib-test/Client.hs).
+
+GHC's `QualifiedDo` can sequence ordinary equality witnesses when the
+qualified `(>>)` is `gcastWith`. Compiler `8d756d44da` reports untouchable
+proof endpoints for the retained calls in the HaskLib client. With
+`ApplicativeDo`, even the ordinary equality block asks for qualified
+operations such as `join` and `<*>`.
+[GHC proposal #216](https://ghc-proposals.readthedocs.io/en/latest/proposals/0216-qualified-do.html)
+and [QualifiedDo desugaring](../users_guide/exts/qualified_do.rst).
 
 ### The length of zip and demand in a case tree
 
