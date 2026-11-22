@@ -806,7 +806,7 @@ tcRetainedBinderDomain valid_domain mode domain
     infer_callback_kinds ty
       | FunTy { ft_arg = arg, ft_res = res } <- coreFullView ty
       , not (valid_domain ty)
-      , let flexible = filter (maybe False isMetaTyVarTy . getRuntimeRep_maybe) [arg, res]
+      , let flexible = filter (maybe False isMetaTyVarTy . kindRep_maybe . typeKind) [arg, res]
       , not (null flexible)
       = do { forM_ flexible $ \endpoint ->
                discardResult $ unifyKind (Just (HsTypeRnThing (unLoc domain)))
