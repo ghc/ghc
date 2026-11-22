@@ -9,7 +9,7 @@ ghc=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint -fdiagnostics-
 provider=NativeLiftedCallbackProvider
 client=NativeLiftedCallbackClient
 expected=$'(False,False,True)\nTrue\nTrue\nTrue\n(IsFalse,())\n(IsFalse,())\nTrue'
-expected+=$'\n(GT,LT,EQ)\nRefl\nRefl\n(GT,LT)\n(GT,LT,EQ)\nEQ\nTrue\nRefl'
+expected+=$'\n(GT,LT,EQ)\nRefl\nRefl\n(GT,LT)\n(GT,LT,EQ)\nEQ\nTrue\nRefl\n(GT,LT)\nEQ'
 
 for opt in O0 O2; do
     flags=("-$opt")
@@ -26,8 +26,9 @@ for opt in O0 O2; do
     "${ghc[@]}" "${flags[@]}" -c "$src/curried-callback/FamilyCallback.hs" -outputdir .
     cp "$provider.hi" RuntimeOrdering.hi CompareAt.hi FamilyCallback.hi "$src/$client.hs" ../client/
     cd ../client
+    "${ghc[@]}" "-$opt" -c "$src/CompareOptional.hs" -outputdir .
     "${ghc[@]}" "-$opt" -c "$client.hs"
-    "${ghc[@]}" "$client.o" "../provider/$provider.o" ../provider/{CompareAt,RuntimeOrdering,FamilyCallback}.o -o run
+    "${ghc[@]}" "$client.o" CompareOptional.o "../provider/$provider.o" ../provider/{CompareAt,RuntimeOrdering,FamilyCallback}.o -o run
     actual=$(./run True)
     [[ $actual == "$expected" ]] || { printf '%s\n' "$actual"; exit 1; }
 done

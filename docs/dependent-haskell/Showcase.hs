@@ -38,6 +38,7 @@ import qualified CharacterExport
 import qualified ClosedLengthProducer as Length
 import qualified ClosedTableLibrary as Table
 import qualified CompareAt
+import qualified CompareOptional
 import qualified ComputedPair as Computed
 import qualified ConstructorCallClient as Constructor
 import Control.Exception (ErrorCall, displayException, evaluate, try)
@@ -1889,6 +1890,10 @@ main = do
     observe "apply the comparison selected by a type family"
         [ familyComparison (flip compare) (not pivot) pivot
         , familyComparison (flip compare) pivot (not pivot) ]
+    let compareOptional x y = compare (maybe False id y) x
+    observe "compare a constructed Just without forcing an unused field"
+        [ CompareOptional.readJust compareOptional (not pivot) pivot
+        , CompareOptional.readJust (\_ _ -> EQ) pivot (error "forced Just field") ]
     let keepComparison :: (CompareAt.Result 'False -> Bool -> Ordering) -> Bool -> Bool -> String
         keepComparison cmp x y = show (CompareAt.keepFamilyCompare cmp x y)
     putStrLn ("keep a comparison proof without forcing the converted callback: " ++

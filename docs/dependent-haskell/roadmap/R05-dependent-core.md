@@ -599,6 +599,14 @@ at `-O2` with Core and STG Lint.
 [Source example](R03-dependent-products.md#zip-two-lists-at-a-common-length)
 and [CorePrep](../../../compiler/GHC/CoreToStg/Prep.hs).
 
+An inlined curried callback can take a constructor as its second argument.
+In `decideOptional cmp x (Just y)`, CorePrep gives `Just y` a lazy binding.
+The call's index proof must refer to that same binding. GHC lifts the
+operand proof through the application. It preserves the callback's input
+and result casts. A comparator that ignores the second argument can
+return `EQ` with an undefined field inside `Just`.
+[Ordinary client](../examples/open-evaluation/CompareOptional.hs).
+
 ## Open observation of the installed Maybe method
 
 At compiler revision `61785e1925`, the desugared call to `Prelude.fmap`

@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeFamilies, TypeOperators #-}
-module CompareAt (Witness(..), decideCompare, keepCompare, Result, decideFamilyCompare, keepFamilyCompare) where
+module CompareAt (Witness(..), decideCompare, keepCompare, Result, decideFamilyCompare, keepFamilyCompare, decideOptional) where
 
 import Data.Kind (Type)
 import Data.Type.Equality ((:~:)(Refl))
@@ -35,3 +35,15 @@ decideFamilyCompare cmp x y = case cmp x y of
 keepFamilyCompare :: foreach (cmp :: Bool -> Result 'True)
                   -> foreach (x :: Bool) -> foreach (y :: Bool) -> cmp x y :~: cmp x y
 keepFamilyCompare _ _ _ = Refl
+
+-- | Select an arrow whose input can contain a runtime field.
+type family Optional a :: Type where
+    Optional a = Maybe a -> Ordering
+
+{-# INLINE decideOptional #-}
+decideOptional :: foreach (cmp :: Bool -> Optional Bool)
+               -> foreach (x :: Bool) -> foreach (y :: Maybe Bool) -> Witness (cmp x y)
+decideOptional cmp x y = case cmp x y of
+    LT -> Less
+    EQ -> Equal
+    GT -> Greater

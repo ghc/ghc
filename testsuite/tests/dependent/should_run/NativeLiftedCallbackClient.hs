@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, TupleSections #-}
 module Main where
 
+import CompareOptional (readJust)
 import Control.Exception (ErrorCall(..), evaluate, try)
 import Data.Proxy (Proxy(..))
 import qualified FamilyCallback
@@ -95,3 +96,6 @@ main = do
   print (readFamily (\_ _ -> EQ) (error "unused first operand") (error "unused second operand"))
   print =<< forceFailure "forced family callback" (readFamily (error "forced family callback") truth truth == EQ)
   keepBoth (error "forced family callback") (error "forced first operand") (error "forced second operand")
+  let reverseOrder x y = compare (maybe False id y) x
+  print (readJust reverseOrder (not truth) truth, readJust reverseOrder truth (not truth))
+  print (readJust (\_ _ -> EQ) (error "forced first operand") (error "forced Just field"))
