@@ -1177,7 +1177,7 @@ tcRetainedVarMatches herald ctxt initial_ty source_pats = go [] initial_ty initi
       = setSrcSpanA (getLoc pat) $
         do { name <- case unLoc pat of
                VarPat _ (L _ name) -> return name
-               WildPat{} -> newSysName (mkVarOcc "_")
+               WildPat{} -> newSysName (getOccName binder)
                _ -> failWithTc (TcRnRetainedQuantificationError RetainedVariablePattern)
            ; let index = mkLocalId name ManyTy (varType binder)
                  pat_ty = mkCheckExpFunPatTy (Scaled ManyTy (varType binder))
@@ -1299,7 +1299,11 @@ allocate a second Id during desugaring.
 
 Bind a fresh system Name for each anonymous retained parameter in a
 single equation. Use that Name to open the function type and to check
-the variable pattern. A constructor row already has a shared index Id
+the variable pattern. Keep the signature binder's occurrence. A type
+error can then identify a mismatch between p x and q x when the
+equation used wildcard patterns for p, q and x. The fresh Unique keeps
+the wildcard distinct from any source binding with the same spelling.
+A constructor row already has a shared index Id
 for each retained column. Use that Id's Name for a wildcard in its
 column. A retained package field likewise needs the Id substituted into
 the remaining field types. No branch equality follows from a wildcard.
