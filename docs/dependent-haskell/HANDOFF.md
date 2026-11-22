@@ -34,16 +34,32 @@ published list proof. With the conflicting rewrite disabled, job 1171
 obtained matching counts. See the [R16 evidence](roadmap/R16-open-term-evaluator.md#an-imported-proof-and-a-client-rewrite-rule).
 
 Job 1181 reproduced both rewrite counterexamples on the exact 554
-compiler. Keep that checkpoint private. Job 1184 builds `1bef98f413`
-in `r03-r16-r21-r41-consolidated-20261122`. It includes the
-candidate solver fix from `952c7bbd6b` and the 555-line Showcase.
-Job 1187 checks the two active downstream rules, an ordinary caller,
-the same proof with rewrites disabled, 53 registrations and installed
-HaskLib. Inspect each gate separately. A terminal existential in the
-new constructor regression requires a subsequent R41 patch. The
-initial 555 pin also needs the maintained proof regression. Before
-publishing, check source-hidden forwarding and the upgrade path for
-proof providers compiled without dependency metadata.
+compiler. Keep that checkpoint private. Job 1184 built both stages
+from clean sources at `1bef98f413` in `r03-r16-r21-r41-consolidated-20261122`.
+Job 1187 passed the downstream list and tree rule checks. All 555
+Showcase lines matched at `-O0` and in GHCi. At default `-O2` the
+compiler rejected three uses of the installed filter proof. The new
+GADT test also rejected a terminal existential. The per-gate logs are
+in `qualification/tries`. See the [filter demand comparison](roadmap/R16-open-term-evaluator.md#optimized-clients-of-the-filter-proof).
+
+The successor checkout is `r16-r41-proof-upgrade-normal-20261123/source`.
+Job 1227 builds `6f12b4e3b3`. It has the terminal existential and declaration
+reification fixes from `39dccda474`, the boxed equality fix and
+`NativeOpenProofRules`. Job 1207 passed the source-hidden proof and
+forwarding cases. Job 1222 passed the three incremental builds for an
+ordinary home proof, including a proof that uses installed definitions.
+An old installed *proof* still needs a source rebuild. Job 1229 checks
+this compiler with 55 registrations and the incremental upgrade from
+normal 554. Inferred proof bindings have separate checks in progress. See the
+[ordinary proof upgrade](roadmap/R16-open-term-evaluator.md#upgrading-a-proof-whose-type-hides-the-equality).
+
+R41 has a separate release candidate at `acd48e3f3f` in
+`r41-only-normal-553-20261123`. Job 1242 builds it directly from the
+published branch plus the ordered GADT changes and their Showcase
+example. It includes the extension guard on the new empty visible
+suffix. Check its own tests and guide render before updating R41.
+The `r41-only-normal` and `r16-r41-review-normal` source refs are
+under `refs/archive/dependent-haskell/2026-11-23/`.
 
 The local archive refs `r19-r41-normal-552`, `r16-hasklib-tree-553`
 and `r27-legacy-transition-normal` are under

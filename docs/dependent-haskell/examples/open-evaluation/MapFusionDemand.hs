@@ -32,6 +32,22 @@ consumeZip :: Producer -> [Bool] -> Bool
 consumeZip (Producer produce) ys =
     foldr (\_ _ -> True) (error "empty seed") (zipWith (&&) (map not (build produce)) ys)
 
+-- | Inspect only the outer constructor of a filtered list.
+{-# NOINLINE emptySpine #-}
+emptySpine :: [a] -> Bool
+emptySpine [] = True
+emptySpine (_ : _) = False
+
+-- | Make the input producer visible at the filter call.
+{-# NOINLINE consumeFilter #-}
+consumeFilter :: Producer -> Bool -> Bool
+consumeFilter (Producer produce) accept = emptySpine (filter (const accept) (build produce))
+
+-- | Pass the same list across a call before applying the filter.
+{-# NOINLINE consumeFilterList #-}
+consumeFilterList :: [Bool] -> Bool -> Bool
+consumeFilterList xs accept = emptySpine (filter (const accept) xs)
+
 main :: IO ()
 main = do
     let withSeq = Producer (\c n -> n `seq` c True n)
@@ -41,6 +57,10 @@ main = do
     observe (consumeMap withoutSeq)
     observe (not (null (mapEscapes withSeq)))
     observe (consumeZip withSeq [False])
+    let checkCons c n = c False (error "filter tail") `seq` c True n
+    observe (consumeFilter (Producer checkCons) False)
+    observe (consumeFilterList (build checkCons) False)
+    observe (consumeFilter (Producer checkCons) True)
   where
     observe result = do
         value <- try (evaluate result) :: IO (Either ErrorCall Bool)

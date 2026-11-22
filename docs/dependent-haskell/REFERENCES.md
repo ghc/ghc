@@ -7390,6 +7390,16 @@ zipper control still returns `True` with the same producer.
 [Executable example](examples/open-evaluation/MapFusionDemand.hs)
 and [authors' paper, §8.2](https://janis-voigtlaender.eu/papers/TheImpactOfSeqOnFreeTheoremsBasedProgramTransformations.pdf#page=28).
 
+For `filter`, the producer can use `seq` to inspect the result of
+its cons argument. An ordinary list cell is defined even when its tail
+is bottom. With a rejecting predicate, the fused step returns the
+tail itself. Stock GHC 9.14.1 and the fork both evaluated that bottom
+at `-O2`. Passing the list through a separate call or disabling rewrite
+rules gave an empty result. This prevents using the producer's polymorphic
+type alone as evidence for filter fusion.
+[Maintained demand example](examples/open-evaluation/MapFusionDemand.hs)
+and [Theorem 8.2](https://janis-voigtlaender.eu/JV06.html).
+
 For `zip` and `zipWith`, the installed left-producer rule supplies
 a function as the accumulator of a two-list fold. Its nil branch
 returns a lambda. Its cons branch still awaits the right list. The
@@ -8104,6 +8114,16 @@ at the same source revision.
 [GHC rewrite rules](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/rewrite_rules.html),
 [Agda 2.8.0 rewriting](https://agda.readthedocs.io/en/v2.8.0/language/rewriting.html),
 and [R16 mapping proof](roadmap/R16-open-term-evaluator.md#a-rule-in-the-module-importing-a-mapping-proof).
+
+Agda checks the recorded hashes of imports before reusing a checked
+module. GHC records fingerprints for modules and individual declarations.
+The R16 upgrade uses GHC's declaration fingerprints to recheck a client
+when new proof dependencies change an export. A separate interface field
+records the first review of an older home module, including a review that
+leaves its exports unchanged.
+[Agda 2.8.0 interface reuse](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Interaction/Imports.hs),
+[GHC recompilation checker](https://downloads.haskell.org/ghc/9.14.1/docs/users_guide/separate_compilation.html#the-recompilation-checker)
+and [incremental proof example](roadmap/R16-open-term-evaluator.md#upgrading-a-proof-whose-type-hides-the-equality).
 
 ### Nested constructors with a runtime result index
 

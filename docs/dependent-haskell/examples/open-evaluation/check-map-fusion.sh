@@ -102,13 +102,13 @@ for mode in O0 O2 O2-no-rules; do
     echo "map demand $mode"
     cat "$mode.demand.out"
 done
-diff -u <(printf '%s\n' True True True True True) O0.demand.out
-diff -u <(printf '%s\n' 'empty seed' True True True True) O2.demand.out
+diff -u <(printf '%s\n' True True True True True True True False) O0.demand.out
+diff -u <(printf '%s\n' 'empty seed' True True True True 'filter tail' True False) O2.demand.out
 cmp O0.demand.out O2-no-rules.demand.out
 
 awk '
     /^SimplBind:normal / { binding = $2 }
-    /^[[:space:]]*Rule: (map|fold\/build|zipWith|foldr2\/left)$/ { print binding, $2 }
+    /^[[:space:]]*Rule: (map|filter|fold\/build|zipWith|foldr2\/left)$/ { print binding, $2 }
 ' O2.demand.rules >demand.firings
 grep -Fxq 'consumeMap map' demand.firings
 test "$(grep -Fxc 'consumeMap fold/build' demand.firings)" -eq 2
@@ -116,3 +116,5 @@ grep -Fxq 'mapEscapes map' demand.firings
 grep -Fxq 'mapEscapes fold/build' demand.firings
 grep -Fxq 'consumeZip zipWith' demand.firings
 grep -Fxq 'consumeZip foldr2/left' demand.firings
+grep -Fxq 'consumeFilter filter' demand.firings
+grep -Fxq 'consumeFilter fold/build' demand.firings

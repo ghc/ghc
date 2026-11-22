@@ -2335,5 +2335,81 @@ equations it uses to prove the equality. On rebuilt providers it
 rejects these two proof uses at GHC-83605. Job 1189 found that an
 unchanged home provider compiled before this metadata existed could
 still be reused. An old installed provider also admitted the conflicting
-rule. Rebuilding the provider restored the check. Proofs whose only
-dependency arises in their body need separate verification.
+rule. Rebuilding the provider restored the check.
+
+### Upgrading a proof whose type hides the equality
+
+A GADT constructor can require an equality that does not appear in its
+result type. An ordinary module constructed and exported such a value.
+A second ordinary module forwarded it. Both modules disabled
+`ExperimentalDependentTypes`.
+
+```haskell
+-- In the module that defines bit.
+data Evidence where
+    Evidence :: (bit 'True ~ 'Set) => Evidence
+
+-- In Box.
+parcel :: Evidence
+parcel = Evidence
+
+-- In Relay.
+forward :: Evidence
+forward = parcel
+```
+
+The private solver at `5ba932cb80` recorded the call to `bit` when it
+solved the constructor constraint. In job 1215 a fresh build rejected
+an active conflicting rule at both `parcel` and `forward`. An incremental
+build still accepted both uses through the old interfaces.
+
+The recompilation change at `d79000a42e` rechecks home modules that
+could have used source equations. Once `Box.parcel` gains its dependency,
+its declaration fingerprint changes and GHC rechecks `Relay`. Job 1222
+tested native code, `-fno-code -fwrite-interface`, and a home proof
+that used definitions from an installed package. All three rejected
+the active rule at the use, accepted a dormant rule, and reused the
+checked interfaces on the next build. The unrelated module kept the
+same interface bytes. The installed definitions kept the same interface
+and object files.
+
+These are component results for explicitly signed bindings. An old
+installed package that contains the *proof* still needs rebuilding.
+Job 1216 also found that removing an explicit signature could lose
+the dependency even in a fresh build. The combined compiler still
+requires qualification.
+
+### Optimized clients of the filter proof
+
+The normal compiler at `1bef98f413` rejected `keepIfTrue`, `skipIfFalse`
+and `filterLengthBound` in `PreludeFilterRuntime` at ordinary `-O2`.
+The producer of those proofs already disables rewrite rules locally.
+The new dependency reaches the consumer, which enables Prelude's
+filter fusion rules. At `-O0` all 555 Showcase outputs matched.
+
+The following producer distinguishes an ordinary list constructor from
+the step supplied by fusion.
+
+```haskell
+checkCons :: (Bool -> r -> r) -> r -> r
+checkCons c n = c False (error "filter tail") `seq` c True n
+```
+
+With the list constructor as `c`, the first cell reaches weak head
+normal form without inspecting its tail. With the step for
+`filter (const False)`, the step returns the tail. On both stock GHC
+9.14.1 and the fork, inspecting the result of the fused filter then
+raised the exception. Passing the list to a separate function gave
+`[]`. Disabling rewrites also gave `[]`. Jobs 1233 and 1236 checked
+the results and the `filter` and `fold/build` firings.
+
+This example places a limit on a general fusion certificate. In a
+separate comparison, the installed filter and its explicit cons
+equation agreed for all four predicate and head combinations tested,
+including the cases where both raised the exception. A check for a
+particular constructor equation still needs to account for its
+recursive tail and for visible rules on the helpers. The optimized
+Showcase remains a release check.
+[Demand example](../examples/open-evaluation/MapFusionDemand.hs),
+[replay](../examples/open-evaluation/check-map-fusion.sh) and
+[fusion references](../REFERENCES.md).
