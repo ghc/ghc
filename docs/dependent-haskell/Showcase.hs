@@ -194,7 +194,7 @@ import qualified PackedProjection
 import qualified PackageEquality
 import AppendLengthClient (appendTwoAndOne)
 import PackedVecLibrary
-import OrdinaryZipRows (zipReport)
+import OrdinaryZipRows (headerCountReport, zipReport)
 import qualified AppendByMethodClient
 import qualified RetainedSumOperator
 import RetainedNat (Retained(..), constantPackage, withRetained)
@@ -2068,6 +2068,7 @@ sourceAddition = do
     labels <- newIORef "abc" >>= readIORef
     flags <- newIORef [True, False] >>= readIORef
     putStrLn ("prove zip returns the smaller of two runtime lengths: " ++ zipReport labels flags)
+    putStrLn ("count records with a header, skip records without one: " ++ headerCountReport flags)
     observe "split the appended vector at its first length"
         (toList (fst split), toList (snd split))
     rebuilt <- CertifiedSplitClient.splitObservation
