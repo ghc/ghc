@@ -26,6 +26,13 @@ depend on others, so this count cannot estimate the remaining work time.
 | Declaration dependencies, families and GADTs | R21, R23, R24, R41 |
 | Namespace warnings | R36 |
 
+Seven open cards have no separate tested implementation counted here.
+R01 Dependent Haskell, R02 dependent retained
+quantifiers, R06 universal promotion and R20 language cleanup collect prerequisites. The other
+three are R27 deprecating CUSKs, R34 syntactic unification and R35 namespace
+management. The [checklist](#upstream-checklist-and-complete-dependency-index)
+lists their dependencies.
+
 The Showcase now includes proofs about two functions from the installed
 Prelude. An ordinary client proves that the length of `zip xs ys` and of
 `zipWith f xs ys` is the minimum of the two input lengths. The callback

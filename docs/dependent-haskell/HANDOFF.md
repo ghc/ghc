@@ -8,13 +8,13 @@ and its [expected output](Showcase.stdout) are the executable examples.
 
 ## Current checkpoint
 
-Updated 22 November 2026, 13:43 CET.
+Updated 22 November 2026, 13:56 CET.
 
 | Revision | What to recover | Verification |
 | --- | --- | --- |
 | `97f6622b03` | Last published checkpoint. An ordinary client opens a sample with a hidden calibration status. | Both compiler stages passed the 538-line Showcase at `-O0` and `-O2`. Stage 2 GHCi and 28 selected registered tests passed. [Record](CHECKPOINTS.md#erased-calibration-status). |
 | `70ded7e706` | CorePrep preserves the index of a constructed argument in a curried call. The evaluator checks the ordered equations of the installed `Prelude.zip` and `Prelude.zipWith`. | Pueue job `379` completed a clean two-stage build. Job `381` found both equations and the fusion rules in static and dynamic `GHC.Internal.List` interfaces. |
-| `3a4e5c237a` | Current compiler and tests. Includes the 542-line Showcase from `e62ddf4e9f` and the optimizer change from `9011965d43`. | Job `380` reproduced the callback cast regression on the baseline. The candidate optimizer passed the same test. Job `382` is building the combined compiler. |
+| `3a4e5c237a` | Current compiler and tests. Includes the 542-line Showcase from `e62ddf4e9f` and the optimizer change from `9011965d43`. | Job `380` reproduced the callback cast regression on the baseline. The candidate optimizer passed the same test. Job `383` resumed the combined compiler build after the second restart. |
 
 The Core optimizer keeps the lexical callback and its nominal evidence
 when it substitutes a cast argument into a dependent result proof.
@@ -25,8 +25,14 @@ gives the source tests and the selected testsuite command.
 The final build reuses the configured baseline checkout. Its
 `incremental.sh` builds the candidate and checks both compiler revisions.
 The normal area's `qualify.sh` records the combined results in
-`final-3a4e5c237a/results/qualification.tsv`. The branch will pause after
-qualification and the push. [Branch recovery ledger](BRANCHES.md#22-november-restart).
+`final-3a4e5c237a/results/qualification.tsv`. The VM is back in service. Push the verified checkpoint.
+Keep its compiler
+available while the R05 and R19 source tests use it. [Branch recovery ledger](BRANCHES.md#22-november-restart).
+
+R05 is testing a rewrite rule whose later argument mentions a nominally
+cast callback. R19 is testing a client that composes two separately
+compiled providers with the same type-level case at an unknown `Bool`.
+These two investigations use separate checkouts.
 
 ## Resume after a restart
 
@@ -34,7 +40,12 @@ qualification and the push. [Branch recovery ledger](BRANCHES.md#22-november-res
    Compare both revisions with the checkpoint table. Fetch the fork branch
    if this checkout predates the release.
 2. Check `env -u XDG_RUNTIME_DIR pueue status` and inspect the named job and
-   its checkout. The WSL restart erased `/tmp` while Git and Pueue retained
+   its checkout. On 22 November, Pueue recorded signal 15 (exit 143) for
+   job `382`. Its shell wrote a zero exit status during shutdown. The
+   missing `build.pass` and the unfinished Hadrian log confirmed the
+   interruption. Check Pueue, both compiler revisions and the success
+   record before reusing a result.
+   The earlier WSL restart erased `/tmp` while Git and Pueue retained
    records for its old paths. Keep active builds under `_build/on-demand/`.
 3. Restore the [shared WSL build queue](CHECKPOINTS.md#restore-the-shared-wsl-build-queue)
    before submitting work. The group has three slots. All GHC jobs share
