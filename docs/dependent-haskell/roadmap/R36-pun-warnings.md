@@ -116,3 +116,8 @@ Both warning flags are off by default and included in `-Weverything`.
 When `-Wpun-uses` and `-Wterm-variable-capture` are enabled together,
 each affected occurrence receives the pun-use warning alone. Disabling
 `-Wpun-uses` restores the legacy capture warning.
+
+Declarations inside Template Haskell quotes form their own scope. Both
+names in a punned declaration group compete inside the quote. An inner
+definition can shadow a name in the enclosing module.
+[Declaration quote regression](../../../testsuite/tests/rename/should_compile/DeclarationQuote.hs).

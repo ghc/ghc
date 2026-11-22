@@ -275,3 +275,4 @@ test('TypePatternPunUses', [extra_files(['PunUseData.hs', 'PunUseType.hs'])],
      multimod_compile, ['TypePatternPunUses', '-v0 -Wpun-uses'])
 test('GadtPunScope', [req_th, extra_files(['PunTypeSplice.hs'])],
      multimod_compile, ['GadtPunScope', '-v0 -Wpun-uses'])
+test('DeclarationQuote', req_th, compile, ['-Wpun-bindings -Wpun-uses'])

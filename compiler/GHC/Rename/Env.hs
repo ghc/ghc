@@ -1677,15 +1677,15 @@ warnPunUse loc_rdr@(L loc rdr) selected
           rank = localPunScope local_env name
           implicit = rank == Just 0
           competing
-            | Just other <- lookupLocalRdrEnv local_env other_ns
-            , other /= name
-            , implicit || closer (localPunScope local_env other)
-            = Just (mkLocalVanillaGRE NoParent other NE.:| [])
-            | implicit
-            = NE.nonEmpty (lookupGRE global_env (LookupRdrName other_ns SameNameSpace))
+            | Just other <- lookupLocalRdrEnv local_env other_ns = do
+                guard (other /= name && (implicit || closer (localPunScope local_env other)))
+                Just (mkLocalVanillaGRE NoParent other NE.:| [])
+            | isTyVarName name =
+                NE.nonEmpty (filter relevant_other (lookupGRE global_env (LookupRdrName other_ns SameNameSpace)))
             | otherwise = Nothing
+          relevant_other other = implicit || closer (localPunScope local_env (greName other))
           closer (Just other_rank) =
-            other_rank > 0 && (isExternalName name || maybe False (<= other_rank) rank)
+            other_rank > 0 && maybe (isExternalName name) (<= other_rank) rank
           closer Nothing = False
       case competing of
         Just others -> addDiagnosticAt (locA loc) (TcRnPunUse rdr selected others)
@@ -1700,7 +1700,6 @@ warnGlobalPunUse :: LocatedN RdrName -> GlobalRdrElt -> RnM ()
 warnGlobalPunUse (L loc rdr) selected
   | isUnqual rdr || isQual rdr
   , let name = greName selected
-  , isExternalName name
   , isTyConName name || isValName name
   = whenWOptM Opt_WarnPunUses $ do
       (global_env, local_env) <- getRdrEnvs
@@ -1709,7 +1708,7 @@ warnGlobalPunUse (L loc rdr) selected
         [chosen]
           | greName chosen == name
           , isNothing (lookupLocalRdrEnv local_env local_other_ns)
-          , other : rest <- filter (visible_with chosen) (globals other_ns)
+          , other : rest <- filter (visible_with local_env chosen) (globals other_ns)
           -> addDiagnosticAt (locA loc) (TcRnPunUse rdr chosen (other NE.:| rest))
         _ -> pure ()
   | otherwise = pure ()
@@ -1724,8 +1723,15 @@ warnGlobalPunUse (L loc rdr) selected
     local_other_ns
       | selected_term = setRdrNameSpace rdr tvName
       | otherwise = term_ns
-    visible_with chosen other =
-      isQual rdr || not (isLocalGRE chosen) || isLocalGRE other
+    visible_with env chosen other
+      | isQual rdr = True
+      | otherwise =
+          case compare (scope chosen) (scope other) of
+            LT -> True
+            GT -> False
+            EQ -> not (isLocalGRE chosen) || isLocalGRE other
+      where
+        scope = localPunScope env . greName
 
 {- Note [Global pun use warnings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1739,6 +1745,13 @@ For unqualified names a definition in this module takes precedence over
 imports. A selection in the imported scope still needs a warning if a
 local top-level definition in the other namespace would shadow it.
 Qualified paths use the qualifier to select their candidates.
+
+Top-level names in a declaration quote have InternalNames in the
+global reader environment. Check exact membership of the selected name
+in that environment. Declarations in an inner quote can shadow declarations
+in an enclosing scope, so rank them as one group when extending the global
+environment. See Note [Top-level Names in Template Haskell decl quotes]
+in GHC.Rename.Names.
 
 Proposal #682 section 3.4 keeps all import levels in name resolution.
 An import at a different level can still make a name ambiguous. Check
