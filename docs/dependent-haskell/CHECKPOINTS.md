@@ -8,10 +8,18 @@ increments.
 
 ## Local build capacity
 
-This workspace has two slots for GHC builds and compiler verification.
-Count a Hadrian build, a private compiler link, or a separate test job
-as one slot across all worktrees. A queued test starts when a slot is
-free. Source review and editing can continue while both slots are in use.
+On the shared WSL host, schedule GHC builds and compiler verification
+in the `ghc` group on the usual Pueue daemon. The group has three slots
+across all worktrees. Its jobs share twelve logical CPUs and a memory
+limit of 64,000,000,000 bytes in `ghcbuild.slice`. Use at most four
+Hadrian workers per job. A private compiler link or a separate test
+job also uses a slot.
+
+Runnable work in other groups has priority. The local priority watcher
+pauses the GHC queue and freezes its running processes until that work
+finishes. A frozen job keeps its allocated memory. After a daemon or
+host restart, verify the slice limits and priority watcher before
+resuming builds.
 
 ## Clean up after each experiment
 
@@ -119,6 +127,13 @@ provider. The source-hidden proof compiles. An ordinary saturated
 receiver and an instance with a dictionary premise keep their old
 interface bytes. Use the [two-compiler upgrade test](examples/open-evaluation/check-polymorphic-method-upgrade.sh)
 to repeat the warm and cold builds.
+
+The integrated build at `63cd0fb120` repaired the installed
+`GHC.Internal.Data.Either` interface in that same build directory.
+Both normal stages matched all 522 Showcase lines at `-O0` and `-O2`.
+The self-hosted GHCi run matched too. The self-hosted testsuite passed
+all 22 selected tests. Both stages passed the twelve warm family upgrade
+cases and the installed-provider and polymorphic-method upgrade checks.
 
 The v69 comparison compiler at `ae563bb342` matched all 517 Showcase
 lines at native `-O0` and `-O2` with both normal Hadrian stages.
