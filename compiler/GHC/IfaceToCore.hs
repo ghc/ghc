@@ -1988,8 +1988,8 @@ nativeDomainShapePossible use shape = go emptyTyConSet emptyTyConSet use shape
     go _ aliases mode (NativePiDomain mult arg res)
       = function_use mode
         && go emptyTyConSet aliases NativeManyMultUse mult
-        && go emptyTyConSet aliases (function_argument_use mode) arg
-        && go emptyTyConSet aliases NativeFunctionEndpointUse res
+        && go emptyTyConSet aliases (function_endpoint_use mode) arg
+        && go emptyTyConSet aliases (function_endpoint_use mode) res
     go seen _ mode (NativeDataDomain fields)
       = data_use mode && all field fields
       where
@@ -2001,14 +2001,14 @@ nativeDomainShapePossible use shape = go emptyTyConSet emptyTyConSet use shape
       = function_use mode
         && go seen aliases NativeUnmatchableUse ma
         && go seen aliases NativeManyMultUse mult
-        && go emptyTyConSet aliases (function_argument_use mode) arg
-        && go emptyTyConSet aliases NativeFunctionEndpointUse res
+        && go emptyTyConSet aliases (function_endpoint_use mode) arg
+        && go emptyTyConSet aliases (function_endpoint_use mode) res
     go seen aliases mode (NativeSynonymDomain rhs) = go seen aliases mode rhs
 
     data_use mode = mode == NativeScalarUse || mode == NativeFunctionEndpointUse
     function_use mode = mode == NativeFunctionUse || mode == NativeStructuralFunctionUse
-    function_argument_use NativeFunctionUse = NativeOpaqueUse
-    function_argument_use _ = NativeFunctionEndpointUse
+    function_endpoint_use NativeFunctionUse = NativeOpaqueUse
+    function_endpoint_use _ = NativeFunctionEndpointUse
 
 -- | Preserve the Id guards before inspecting its imported domain view.
 nativeIdDomainShapePossible :: NativeDomainUse -> Id -> Bool
@@ -2112,7 +2112,7 @@ tcIfaceType = go
            ; case fun_tys of
                Nothing ->
                  failIfM (text "Invalid retained call head in interface:" <+> ppr fun
-                          $$ text "Expected a local unrestricted function with a lifted argument and closed structural result."
+                          $$ text "Expected a local unrestricted function with lifted argument and result types."
                           $$ text "Actual type:" <+> ppr (varType f)
                           $$ text "Actual multiplicity:" <+> ppr (idMult f))
                Just (domain, _) ->
@@ -2190,11 +2190,11 @@ tcIfaceType = go
     go (IfaceTupleTy s i tks)    = tcIfaceTupleTy s i tks
     go (IfaceAppTy t ts)
       = do { t'  <- go t
-           ; ts' <- traverse go (appArgsIfaceTypes ts)
-           ; foldlM app t' ts' }
+           ; foldlM apply_arg t' (appArgsIfaceTypes ts) }
     go (IfaceTyConApp tc tks)
       = do { tc' <- tcIfaceTyCon tc
-           ; tks' <- mapM go (appArgsIfaceTypes tks)
+           ; let args = appArgsIfaceTypes tks
+           ; tks' <- mapM go args
            ; case (tks, tks') of
                (IA_Arg _ (IfaceForAllTyFlag vis) _, arg : _) ->
                  checkImportedMatchabilityPrefix tc' $
@@ -2225,6 +2225,8 @@ tcIfaceType = go
                       ; unless valid $
                           failIfM (text "Invalid retained constructor fields in interface:"
                                    <+> ppr tc) }
+               _ | any (call_operand False) args ->
+                     check_call_arg_kinds (ppr tc) (tyConKind tc') tks'
                _ -> return ()
            ; return (mkTyConApp tc' tks') }
     go (IfaceForAllTy ma bndr t)
@@ -2268,21 +2270,43 @@ tcIfaceType = go
            ; return (mkAppTy fun arg) }
     app fun arg = return (mkAppTy fun arg)
 
+    apply_arg fun raw = do { arg <- go raw
+                           ; when (call_operand False raw) $
+                               check_call_arg_kinds (ppr fun) (typeKind fun) [arg]
+                           ; app fun arg }
+
+    -- A call can also be encoded by applying a lexical term variable.
+    -- Inspect its serialized head without forcing ordinary decoded types.
+    call_operand _ IfaceTermAppTy{} = True
+    call_operand applied IfaceTermVar{} = applied
+    call_operand applied (IfaceCastTy ty _) = call_operand applied ty
+    call_operand _ (IfaceAppTy fun _) = call_operand True fun
+    call_operand _ _ = False
+
+    -- See Note [Opaque call indices in interfaces] in GHC.Iface.Type.
+    check_call_arg_kinds name = check_iface_arg_kinds name
+      (text "Invalid type application containing a retained call in interface:" <+> name)
+
     -- An interface can encode the same application in one TyConApp or
     -- append arguments using AppTy. Both forms use the promoted telescope.
     -- Stop at the end of the supplied arguments, so valid prefixes remain
     -- valid. Each preceding argument determines the next dependent kind.
-    check_iface_retained_args name kind args
-      = do { valid <- evaluateIfaceNativeDomain name (check kind args)
-           ; unless valid $
-               failIfM (text "Invalid retained constructor fields in interface:" <+> name) }
+    check_iface_retained_args name = check_iface_arg_kinds name
+      (text "Invalid retained constructor fields in interface:" <+> name)
+    check_iface_arg_kinds name diagnostic kind args
+      = do { failure <- evaluateIfaceNativeDomain name (check kind args)
+           ; forM_ failure $ \reason -> failIfM (diagnostic $$ reason) }
       where
-        check _ [] = True
+        check _ [] = Nothing
         check kind (arg : rest)
           | Just (_, binder, _) <- splitPiTy_maybe kind
-          , typeKind arg `eqType` piTyBinderType binder
-          = check (piResultTy kind arg) rest
-          | otherwise = False
+          , let expected = piTyBinderType binder
+                actual = typeKind arg
+          = if actual `eqType` expected
+            then check (piResultTy kind arg) rest
+            else Just (text "Expected argument kind:" <+> ppr expected
+                       $$ text "Actual argument kind:" <+> ppr actual)
+          | otherwise = Just (text "The type has no binder for this argument.")
 
 -- | Check a forall annotation before its binder enters scope.
 -- See Note [Forall interface metadata] in GHC.Iface.Type.

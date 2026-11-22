@@ -5589,6 +5589,15 @@ with this extension.
 [Agda standard library 2.4, Data.These.Base](https://agda.github.io/agda-stdlib/v2.4/Data.These.Base.html)
 and [GHC User's Guide, DeriveFunctor](https://downloads.haskell.org/ghc/9.14.1/docs/users_guide/exts/deriving_extra.html#deriving-functor-instances).
 
+Agda's `map₂` accepts any result type for the callback. Its application
+rule obtains the result type by substituting the argument in the function
+type. With an abstract `f :: a -> b`, this gives `f x :: b` even when
+the checker cannot inspect `x` or reduce the call. The R03 experiment
+uses the same rule for an opaque application. GHC also has to preserve
+the runtime calling convention, field demand and the scope of `f` after
+substitution. [Agda 2.8 function types](https://agda.readthedocs.io/en/v2.8.0/language/function-types.html)
+and [Agda standard library 2.4, Data.These.Base](https://agda.github.io/agda-stdlib/v2.4/Data.These.Base.html).
+
 For promotion the fork reads each equation from the selected instance's
 final Core worker. This applies to derived and hand-written instances.
 A constructor can hold both a fixed field and a field used by the

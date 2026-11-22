@@ -2596,7 +2596,7 @@ nativeIndexDataConTyArgs domain con
   = Just args
   | otherwise = Nothing
 
--- | Return the lifted argument and closed result domains of a native head.
+-- | Return the lifted argument and result domains of a native head.
 -- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
 nativeIndexFunctionTys_maybe :: Id -> Maybe (Type, Type)
 nativeIndexFunctionTys_maybe f
@@ -2613,10 +2613,10 @@ nativeIndexFunctionTypeTys_maybe ty
   | FunTy { ft_af = af, ft_ma = ma, ft_mult = mult, ft_arg = arg, ft_res = res }
       <- coreFullView ty
   , af == FTF_T_T, eqType ma unmatchableDataConTy, isManyTy mult
-  , noFreeVarsOfType ma, noFreeVarsOfType mult, noFreeVarsOfType res
-  , isNativeOpaqueValueType arg, isNativeClosedIndexType res
-  , let arg_vars = tyCoVarsOfType arg
-  , not (anyFreeVarsOfType (not . (`elemVarSet` arg_vars)) ty)
+  , noFreeVarsOfType ma, noFreeVarsOfType mult
+  , isNativeOpaqueValueType arg, isNativeOpaqueValueType res
+  , let endpoint_vars = tyCoVarsOfTypes [arg, res]
+  , not (anyFreeVarsOfType (not . (`elemVarSet` endpoint_vars)) ty)
   = Just (arg, res)
   | otherwise = Nothing
 
@@ -2629,7 +2629,9 @@ isNativeIndexFunctionId = isJust . nativeIndexFunctionTys_maybe
 isNativeStructuralFunctionType :: Type -> Bool
 isNativeStructuralFunctionType ty
   = noFreeVarsOfType ty
-    && maybe False (isNativeClosedIndexType . fst) (nativeIndexFunctionTypeTys_maybe ty)
+    && case nativeIndexFunctionTypeTys_maybe ty of
+         Just (arg, res) -> isNativeClosedIndexType arg && isNativeClosedIndexType res
+         Nothing -> False
 
 {- Note [Int# family pattern binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2844,10 +2846,12 @@ and forward evidence.
 A source foreach root can bind an opaque algebraic or abstract value,
 or an eligible opaque call head. Core retained value binders use the
 opaque Id judgment. See Note [Opaque runtime index values].
-The function head has an ordinary visible Many arrow A -> B. A has kind
-Type and can mention an outer erased binder. B is a closed structural index
-domain. The Id is local, unrestricted, and not a join point. Keep the head
-policy separate from structural schemas.
+The function head has an ordinary visible Many arrow A -> B. Both endpoints
+have kind Type and can mention outer binders. For example, given f :: a -> b,
+the opaque index f x has kind b. Substituting IO Int for b changes the kind
+of the index. It does not run an IO action or inspect the result. A structural
+function field checks both endpoints separately. The head Id is local,
+unrestricted, and not a join point.
 
 A bound function can occur in the head slot of TermAppTy or TermAppCo, or as
 a TermVarTy stored in an algebraic index. Application of that TermVarTy uses

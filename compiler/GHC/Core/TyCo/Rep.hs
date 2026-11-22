@@ -305,14 +305,14 @@ TermVarTy has the identifier's type as its kind. A DepFunTy result has kind
 Type. Constraint has a lifted representation but is not a supported result
 kind here.
 
-Source foreach roots keep a separate rule. They require a structural algebraic
-domain or an eligible native call head. Derive opaque parameter fields from
-the original constructor telescope before instantiation. Fixed concrete fields
+Source foreach roots keep a separate rule. They can bind a lifted type
+parameter, a supported algebraic value or an eligible call head. Derive opaque
+parameter fields from the original constructor telescope before instantiation. Fixed concrete fields
 keep their structural or eligible function-field checks. See Notes
 [Algebraic runtime index domains] and [Function-valued retained binders] in
 GHC.Core.Type. Opaque function-value identity does not grant call permission.
-Native calls use a visible U/Many function type with a lifted argument and
-a closed function-free structural result. Their application uses
+Native calls use a visible U/Many function type with lifted argument and
+result types. Their application uses
 TermAppTy/TermAppCo. See Note [Native function-value application] in
 GHC.Core.TyCo.Make.
 
@@ -379,9 +379,8 @@ and general optimization remain separate gates.
 {- Note [Opaque native call indices]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 TermAppTy f arg represents an opaque call to one local unrestricted non-join
-function. Its visible unrestricted arrow has a lifted domain A and a closed
-structural result B. The argument is a scoped Type of kind A. The call has
-kind B.
+function. Its visible unrestricted arrow has lifted argument and result types
+A and B. The argument is a scoped Type of kind A. The call has kind B.
 Do not unfold f or infer argument equality from equality of calls.
 
 TermAppCo f co lifts a nominal argument proof through the same checked head.
@@ -391,13 +390,12 @@ occurrence, not a binder. Substitution supports only eligible variable heads;
 the pipeline must retain bindings for other substitution ranges. Runtime
 reification is partial and has a narrower grammar than this Type constructor.
 
-An outer erased binder can occur in the head's argument domain. Apply the
+An outer erased binder can occur in either endpoint of the head. Apply the
 source substitution to the head's type before checking it against the
 target Id. The target Id is already in scope at the new type. See Note
-[Substituting runtime Id metadata] in GHC.Core.TyCo.Subst. Keep the result,
-matchability and multiplicities closed. Only the argument domain may
-account for free variables in the raw function type. A synonym cannot
-hide free metadata outside the checked argument domain.
+[Substituting runtime Id metadata] in GHC.Core.TyCo.Subst. Keep matchability
+and multiplicity closed. Only the two checked endpoints can account for
+free variables in the raw function type.
 
 TermVarTy can also record an eligible function value stored in a closed
 algebraic index. Applying this index through the smart makers produces the

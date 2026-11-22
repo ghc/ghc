@@ -693,6 +693,8 @@ retainedNatClosureDeclarations =
     , "applyCaptured n m f xs ys = f m xs ys"
     , "ignoreClosure :: foreach (n :: Nat) -> (foreach (m :: Nat) -> Vec Int m -> Vec Int m) -> Vec Int n -> Int"
     , "ignoreClosure n _ _ = 42"
+    , "ignoreIntCallback :: foreach (f :: Nat -> Int) -> Int"
+    , "ignoreIntCallback _ = 42"
     , "bottomClosure :: foreach (m :: Nat) -> Vec Int m -> Vec Int m"
     , "bottomClosure = bottomFunction"
     , "erasedRuntimeShadow :: forall (n :: Nat). foreach (n :: Nat) -> Vec Int n -> Vec Int n"
@@ -3779,9 +3781,9 @@ runNatContextSourceChecks = do
             ( "NativeSourceUnsupportedFunctionIndexDomain"
             , 83605
             , "unsupported function domain"
-            , []
+            , ["{-# LANGUAGE LinearTypes #-}"]
             ,
-                [ "badFunctionIndex :: foreach (f :: Nat -> Int) -> Int"
+                [ "badFunctionIndex :: foreach (f :: Nat %1 -> Int) -> Int"
                 , "badFunctionIndex f = 42"
                 ]
             )

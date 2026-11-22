@@ -2283,8 +2283,9 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             wireCall arg = IfaceTermAppTy (mkIfLclName (fsLit "cached_domain_head")) (toIfaceType (TermVarTy arg))
         cachedCall <- restore [cachedHead, cachedIndex] (wireCall cachedIndex)
         checkType dflags "cached raw view permits an opaque input" (TermAppTy cachedHead (TermVarTy cachedIndex)) cachedCall
-        rejectsIface "cached raw view rejects a structural result" "Unsupported retained domain shape." [cachedResultHead, uncachedIndex] $
-            wireCall uncachedIndex
+        cachedResult <- restore [cachedResultHead, uncachedIndex] (wireCall uncachedIndex)
+        checkType dflags "an opaque call result does not inspect its structural raw view"
+            (TermAppTy cachedResultHead (TermVarTy uncachedIndex)) cachedResult
         check "wired Bool has no imported raw view" $ case tyConNativeDomainShape boolTyCon of
             Nothing -> True
             _ -> False
@@ -2428,6 +2429,11 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             liftedArg = setIdType callN inputTy
             liftedCalls = mkForAllTy unmatchableDataConTy (Bndr erasedInput Specified) $
                 mkDepFunTy liftedHead (mkDepFunTy liftedArg (indexed (TermAppTy liftedHead (TermVarTy liftedArg))))
+            openResultHead = setIdType callF (mkVisFunTyManyU boolTy inputTy)
+            openResultCall = TermAppTy openResultHead (TermVarTy callN)
+            openResultCalls = mkForAllTy unmatchableDataConTy (Bndr erasedInput Specified) $
+                mkDepFunTy openResultHead (mkDepFunTy callN (mkFunctionType unmatchableDataConTy ManyTy
+                    (mkTyConApp eqTyCon [inputTy, openResultCall, openResultCall]) intTy))
             shadowErasedInput = mkVisFunTyManyU inputTy liftedCalls
             Reduction shadowCo shadowResult = normaliseType emptyFamInstEnvs Nominal shadowErasedInput
         checkType dflags "normalization preserves the lifted call's erased scope" shadowErasedInput shadowResult
@@ -2457,6 +2463,16 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                 argumentWire = toIfaceType (TermVarTy callN)
             rawRestored <- restore [callF, callN] =<< roundtrip compression (rawCall argumentWire)
             checkType dflags "ordinary wire application has a canonical native endpoint" (callAt callN) rawRestored
+            let callArg = rawCall argumentWire
+                boolEq = toIfaceType (mkTyConApp eqTyCon [boolTy])
+                splitEq = IfaceAppTy boolEq (argument callArg (argument callArg IA_Nil))
+                intHead = setIdType callF (mkVisFunTyManyU boolTy intTy)
+            splitWire <- roundtrip compression splitEq
+            splitRestored <- restore [callF, callN] splitWire
+            checkType dflags "a split wire application accepts a call at the expected kind"
+                (mkTyConApp eqTyCon [boolTy, callAt callN, callAt callN]) splitRestored
+            rejectsIface "a split wire application checks the callback result kind"
+                "Invalid type application containing a retained call" [intHead, callN] splitWire
             check "ordinary wire application uses the actual lexical head" $ case rawRestored of
                 TermAppTy head (TermVarTy arg) -> head == callF && arg == callN
                 _ -> False
@@ -2492,6 +2508,9 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             restoredLifted <- restore [] =<< roundtrip compression (toIfaceType (tidyTopType liftedCalls))
             checkType dflags "lifted call codec preserves erased scope" liftedCalls restoredLifted
             lintAccepts dflags "restored lifted call telescope" [] (Coercion (mkNomReflCo restoredLifted))
+            restoredResult <- restore [] =<< roundtrip compression (toIfaceType (tidyTopType openResultCalls))
+            checkType dflags "call result type remains bound in its telescope" openResultCalls restoredResult
+            lintAccepts dflags "restored abstract call result" [] (Coercion (mkNomReflCo restoredResult))
             let shadowHead = local 9110 "wire_call" (idType callF)
                 shadowCalls = mkDepFunTy callF (mkDepFunTy shadowHead (mkDepFunTy callN $
                     mkFunctionType unmatchableDataConTy ManyTy (mkTyConApp eqTyCon [boolTy, TermAppTy callF (TermVarTy callN), TermAppTy shadowHead (TermVarTy callN)]) intTy))
@@ -2508,7 +2527,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                         IfaceDepFunTy vis (toIfaceType OneTy, name, domain) body
                     rejectsIface "native call rejects an opaque inner linear arrow" "Invalid retained call head" [] $
                         badDomain (toIfaceType (mkFunctionType unmatchableDataConTy OneTy boolTy boolTy))
-                    rejectsIface "native call rejects an opaque unsupported result domain" "Invalid retained call head" [] $
+                    rejectsIface "an Int call result cannot inhabit a Bool argument" "Actual argument kind: Int" [] $
                         badDomain (toIfaceType (mkFunctionType unmatchableDataConTy ManyTy boolTy intTy))
                     rejectsIface "native call rejects an unlifted argument domain" "Invalid retained call head" [] $
                         badDomain (toIfaceType (mkVisFunTyManyU intPrimTy boolTy))
@@ -2522,7 +2541,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                         boundDomainPi = IfaceForAllTy (toIfaceType unmatchableDataConTy)
                             (mkIfaceForAllTvBndr Specified (boundDomainName, toIfaceType liftedTypeKind))
                             (badDomain nonclosedDomain)
-                    rejectsIface "native call rejects an in-scope nonclosed result" "Invalid retained call head" [] boundDomainPi
+                    rejectsIface "an abstract call result cannot inhabit a Bool argument" "Expected argument kind: Bool" [] boundDomainPi
                     rejectsIface "function-value index cannot be a retained function result" "Invalid retained function result" [] $
                         IfaceDepFunTy vis (mult, name, domain) (IfaceTermVar name)
                     rejectsIface "call argument cannot refer to a later scalar binder" "Iface id out of scope" [] $
@@ -3300,12 +3319,14 @@ runFunctionFieldChecks dflags = do
         [ ("M", mkVisFunTyManyM boolTy boolTy)
         , ("linear", mkVisFunTy unmatchableDataConTy OneTy boolTy boolTy)
         , ("polymorphic", poly)
-        , ("open", mkVisFunTyManyU boolTy (mkTyVarTy open))
         ]
         $ \(label, ty) -> do
             check ("parameter field accepts an opaque " ++ label ++ " value") (isNativeIndexType (maybeOf ty))
             check ("opaque " ++ label ++ " value retains identity") (isNativeOpaqueValueId (setIdType f ty))
             check ("opaque " ++ label ++ " value is not a fixed native call head") (not (isNativeIndexFunctionId (setIdType f ty)))
+    let openResult = mkVisFunTyManyU boolTy (mkTyVarTy open)
+    check "parameter field accepts a callback with an abstract result" (isNativeIndexType (maybeOf openResult))
+    check "a callback can return its scoped result type" (isNativeIndexFunctionId (setIdType f openResult))
     bounded <- timeout 1000000 (evaluate (isNativeIndexType (mkTyConTy loop)))
     check "a recursive function over its container is rejected without looping" (bounded == Just False)
     lintAccepts dflags "function-value index has its actual lexical binding" [f] (Coercion (mkNomReflCo (TermVarTy f)))
