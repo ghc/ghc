@@ -22,6 +22,7 @@ Updated 22 November 2026. The development branch is
 | `5292956a82` | HaskLib also exports right-zero and right-successor lemmas for addition. A downstream module combines them with `lengthAppend` to prove the length of a list with one element appended. |
 | `8e57520a14` | HaskLib's `lengthReverse` proves the length law for a runtime list. Its package test and separate clients passed. The public theorem mentions the installed Prelude function. Only HaskLib imports its accumulator worker. |
 | `8d756d44da` and `193e3f35d0` | Both normal compiler stages matched 546 native outputs at `-O0` and `-O2`. Stage 2 GHCi, all 31 selected normal tests, the package consumers and the selective upgrade checks passed. The public source at `999f0ed489` has the same Git tree as the tested fixture. |
+| `2d6368dd57` and `3ecc8d6fc9` | Both stages matched 546 native outputs at `-O0` and `-O2`. Stage 2 GHCi and all 31 selected normal tests passed. Installed clients used `zip` and `zipWith` proofs at ordinary `-O2`. A scoped equality with a runtime callback result rewrote the argument of `minSize`. |
 
 [HaskLib pipeline and parametricity](CHECKPOINTS.md#compose-installed-list-proofs), [Ordinary minimum](CHECKPOINTS.md#an-ordinary-minimum-in-the-zip-length-proof)
 and [previous release](CHECKPOINTS.md#direct-zip-proof-and-retained-callback-rules).
@@ -44,14 +45,16 @@ The `source` link in that area points to the actual checkout at
 `_build/on-demand/r16-normal-20261122/source`. Treat them as one build.
 The 543 comparison compiler is at `5fe06625c3`.
 R16 remains open for ordinary recursion beyond the checked case shapes.
-The zip proof uses the order in which the installed function inspects
-its lists and disables rewrite rules in the proof module.
+The proofs for Prelude's `zip` and `zipWith` now compile at standard
+`-O2`. The compiler verifies the installed fusion rules and the order
+in which both functions inspect their lists.
 [Open evaluator card](roadmap/R16-open-term-evaluator.md#prove-an-equation-for-preludezipwith).
 
 The 546-line Showcase uses HaskLib's direct proof of the length of
-`zipWith combine (map pre xs) ys`. A separate client proves the same
-equation by matching two imported equalities. Only the second proof
-needs the whole left spine. The proof module disables rewrite rules.
+`zipWith combine (map pre xs) ys`. The proof involving `map` still
+disables rewrite rules in its own module. A downstream client derives
+the same equation from `lengthZipWith` and `lengthMap`. Only that
+derivation requires the whole left spine.
 [Library guide](README.md#reuse-a-proof-with-hasklib) and
 [equality controls](roadmap/R11-homogeneous-equality.md#rewrite-a-size-in-a-downstream-proof).
 
@@ -66,8 +69,7 @@ Private candidates are recoverable under
 
 | Ref | Current evidence |
 | --- | --- |
-| `r11-nested-callback-given-checks` (`f232fb4f97`) | A client can use `size xs :~: measure xs` under `minSize`, with an already-bound callback `measure`. A different callback, a different argument, a cyclic premise and representational evidence each fail. |
-| `r11-r16-callback-and-zip-fusion` (`2d6368dd57`) | Combines that solver change with the installed fusion rules for ordinary `zip` and `zipWith`. The map pipeline still uses a separate proof module. Next step is joint normal-build qualification. |
+| `r23-structural-kind-inference` (`e5f37b3fce`) | An unannotated injective kind interpreter accepts the original `T13822`. A family that distinguishes its results by arrow matchability still passes. An older home provider needs a selective rebuild before a new client can rely on the improved kind. |
 | `r19-eight-constructor-selector` (`568979c39e`) | Separate providers agree on a case over an unknown enum with up to eight nullary constructors. The wider recursive alternative in `r19-selector-depth-comparison` (`732d9c5bb8`) exceeds the default reduction depth for the last of 1,610 constructors. |
 
 ## Resume after a restart
@@ -90,13 +92,12 @@ Private candidates are recoverable under
 
 ## Build and verify
 
-The 546-line qualification area is
-`_build/on-demand/r03-r16-normal-8d756d44da-20261122`. Its `source`
-link points to the configured compiler checkout. The next incremental
-build can change that checkout. For the qualified self-hosted compiler,
-use `_build/on-demand/r16-zip-fusion-inverse-20261122/preserved-8d/stage1/bin/ghc`
-and the sibling `stage1/lib` directory. The preceding clean
-build recipe is in `_build/on-demand/r03-r16-normal-546-20261122/build.sh`.
+The latest 546-line qualification area is
+`_build/on-demand/r16-zip-family-next-qualification-20261122`. Its
+`source` link points to the configured compiler checkout. The normal
+incremental build is recorded in
+`_build/on-demand/r16-zip-fusion-inverse-20261122/next-normal-intake`.
+Check the driver's `--info` revision against `2d6368dd57` before replay.
 On this host the bootstrap tools are GHC 9.14.1, Cabal 3.18.1.0, Happy 2.1.7
 and Alex 3.5.4.0. A fresh checkout needs the Git submodules at their recorded
 revisions. This build used five workers per job.
@@ -110,7 +111,7 @@ self-hosted stage 2 compiler in `_build/stage1/bin/ghc`. Both use the
 target libraries in `_build/stage1/lib`. For example, from the main checkout:
 
 ```sh
-stable="$PWD/_build/on-demand/r16-zip-fusion-inverse-20261122/preserved-8d/stage1"
+stable="$PWD/_build/on-demand/r16-zip-family-next-qualification-20261122/source/_build/stage1"
 queue="$PWD/docs/dependent-haskell/tools/ghc-build-job"
 check="$PWD/docs/dependent-haskell/check-showcase.sh"
 "$queue" showcase-stage2-ghci bash "$check" "$stable/bin/ghc" "$stable/lib" --ghci

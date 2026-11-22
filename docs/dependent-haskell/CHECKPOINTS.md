@@ -148,6 +148,26 @@ source revisions and rebuild commands, then remove both sets of outputs
 after the last live user finishes. The 200 GB threshold is a backup for
 this cleanup.
 
+## Optimized zippers and scoped callback equalities
+
+Job `668` built both normal compiler stages at `2d6368dd57`. Jobs
+`674` and `682` checked fixture `3ecc8d6fc9`. Both stages matched
+all 546 Showcase lines at `-O0` and `-O2`. Stage 2 GHCi, the
+interface-only clients and all 31 selected normal-way tests passed.
+The compiler accepted the installed zipper fusion rules and reported
+GHC-83605 for an additional active rule that changed the builder.
+The dormant rule and selective compiler-upgrade checks passed.
+[Zipper rules](roadmap/R16-open-term-evaluator.md#prove-an-equation-for-preludezipwith).
+
+Jobs `672` and `675` checked a source distribution, its package test
+and separate consumers. An ordinary `-O2` caller observed that an
+empty left list leaves the right list untouched. A left cons demands
+the right spine. The zip proofs leave the callbacks and elements
+unevaluated. A dependent client used a nominal witness
+`size xs :~: measure xs` to rewrite the result of an imported proof.
+Using representational evidence failed with GHC-05617.
+[Scoped family controls](../../testsuite/tests/dependent/should_run/NativeRetainedFamilyGiven.hs).
+
 ## Compose installed list proofs
 
 HaskLib's `lengthZipMap` proves the shorter-length law for
