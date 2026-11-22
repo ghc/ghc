@@ -195,3 +195,14 @@ identify a declaration for inspection. Rebuild with `-XNoCUSKs` and
 check the exported kind and client to establish the impact.
 [GHC's missing-signature diagnostics](../../users_guide/using-warnings.rst)
 and [the upstream flag change](https://github.com/ghc/ghc/commit/c8c660f678bd77fb9d0a855753a165c5a5d1f8e1).
+
+Job 1009 checked a migration one declaration at a time on the
+published fork. Adding the `TyEqImpl` signature and enabling
+`StandaloneKindSignatures` in `Fcf.Utils` disabled the inherited CUSK
+on `Case_`. The compiler reported GHC-25897 at the recursive use in
+`Case_`. Two builds passed with the same source-hidden client. In
+the first, the module temporarily enabled `CUSKs` after
+`StandaloneKindSignatures` and added only the `TyEqImpl` signature.
+In the second, it added both required signatures and left CUSKs off.
+Thus the advice to enable the extension affects the whole module,
+even when the diagnostic points at one declaration.

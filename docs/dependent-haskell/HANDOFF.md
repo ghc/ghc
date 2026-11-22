@@ -11,6 +11,17 @@ and its [expected output](Showcase.stdout) are the executable examples.
 Updated 22 November 2026. The development branch is
 `dependent-haskell`. Use the fork command below to find its latest commit.
 
+The R23/R41 candidate at `5833e38cbd` adds promoted callback
+inference and ordered constructors for lifted data family instances
+and boxed unlifted results. Job 988 builds this revision in the
+superseded R36 physical tree under `r36-combined-release-20261122`.
+Dependent job 1006 runs the 550-line Showcase, 30 registrations and
+the source-hidden checks. Read the receipts under
+`_build/on-demand/r23-r41-field-inference-20261122`. The previously
+published `2b64ffc406` compiler is the old reader. The candidate
+source is in the local recovery ref
+`refs/archive/dependent-haskell/2026-11-22/r23-r41-field-inference-550`.
+
 | Revision | Verified result |
 | --- | --- |
 | `5fe06625c3` | Clean two-stage build. Both stages matched the 543-line Showcase at `-O0` and `-O2`. Stage 2 GHCi and all 29 selected registered tests passed. The 542 and 543 compilers read each other's imported rule interfaces. |

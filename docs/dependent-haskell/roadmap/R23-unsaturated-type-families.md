@@ -427,8 +427,46 @@ lambda with GHC-83865. A standalone `Endo` with two
 matchability parameters accepts the same runtime term. The fork
 defaults the two omitted arguments of promoted `'Endo Echo` to U
 before it checks `Echo`. An explicit `'Endo @M @M Echo` works.
-The polymorphic declaration alone therefore leaves a promoted
-client migration.
+On the released compiler at `2b64ffc406`, the polymorphic declaration
+alone therefore leaves a promoted client migration.
+
+#### One constructor for term and promoted callbacks
+
+The candidate at `e7041d1b2d` checks a supplied callback before
+defaulting an omitted matchability argument of a promoted constructor.
+Thus `'Endo Echo` can infer M for both arrows, while the ordinary
+lambda still has U for both arrows. An unconstrained argument still
+defaults to U. This follows the solve-before-default rule in proposal
+#242. Agda's elaborator also uses an argument or expected type to
+recover an omitted argument. Matchability and its defaults here are
+specific to Haskell.
+[Proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#promotion),
+[proposal review](https://github.com/ghc-proposals/ghc-proposals/pull/242)
+and [Agda implicit arguments](https://agda.readthedocs.io/en/stable/language/implicit-arguments.html).
+
+Jobs 992 and 998 used the candidate to build all 17 modules of
+`first-class-families-0.8.2.0` with its published Cabal settings.
+The migration makes the two indices parameters of the package's
+`Endo` and specifies M on the patterns of its promoted operations.
+In `FoldrDefault_`, `Pure1 'Endo` passes the constructor without its
+callback. That use still requires `Pure1 ('Endo @M @M)`. Without it,
+the package failed in `Fcf.Class.Foldable` with GHC-83865.
+
+With that package change, its own test passed. Three clients then
+compiled with the provider sources hidden. The original promoted
+client printed `True`, and the unchanged term-level lambda also
+printed `True`. The third client proved the package's documentation
+example with `Refl`.
+
+```haskell
+example :: FoldrDefault_ (.<>) 'EQ '[ 'EQ, 'LT, 'GT ] :~: 'LT
+example = Refl
+```
+
+The three linker maps identify the migrated archive. Job 996 used
+the identical package source on the previous compiler. It rejected
+the `Endo` construction in the monoid instances with GHC-83865.
+[Published package source](https://hackage-content.haskell.org/package/first-class-families-0.8.2.0.tar.gz).
 
 ### Arrow patterns in family equations
 

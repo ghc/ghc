@@ -206,6 +206,13 @@ substitution.
 
 ### Matchability and multiplicity on arrows
 
+The [real-package comparison](roadmap/R23-unsaturated-type-families.md#one-constructor-for-term-and-promoted-callbacks)
+checks the promotion example in [proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#promotion)
+with both runtime and promoted uses of `Endo`. The comparison with
+[implicit arguments in Agda](https://agda.readthedocs.io/en/stable/language/implicit-arguments.html)
+concerns inference from supplied arguments. GHC's matchability
+indices, defaults and modifier syntax come from the Haskell proposals.
+
 Proposal #242 names `GHC.Matchability` as the public module for the
 `Matchability` kind and its `M` and `U` synonyms. The module re-exports
 the existing declarations. For example, importing only `U` lets a
