@@ -90,6 +90,32 @@ source revisions and rebuild commands, then remove both sets of outputs
 after the last live user finishes. The 200 GB threshold is a backup for
 this cleanup.
 
+## Indexed volumes and unsigned word patterns
+
+Both compiler stages at `e1c029d2a7` matched the 537-line Showcase at
+`-O0` and `-O2`. Self-hosted GHCi matched it in bytecode. All 28
+selected registered tests passed. Both stages also passed the type-let
+quotation, exact-printing and source-context checks.
+
+An ordinary client matches the first layer of a volume at a successor
+layer count. The nested vector pattern is exhaustive and preserves
+the other two dimensions. With an unknown layer count, omitting the
+empty vector still warns. A second client applies a retained comparator
+at both arguments when a family exposes the second arrow.
+[Volume reader](examples/packed-vector/IndexedMatrixClient.hs)
+and [callback example](examples/open-evaluation/CompareAt.hs).
+
+Closed type families can match an unsigned machine-word literal or a
+`Word#` field binder. The Showcase checks zero and the target maximum.
+An unknown word stays stuck. At both optimization levels the previous
+v80 reader accepted ordinary and signed-only interfaces and rejected
+the unsigned feature at the module import with GHC-47808. The first
+compatibility run used a regular expression for a marker containing a
+literal plus sign. The corrected literal comparison passed on the same
+compiler and interfaces. The global interface version stays at v80.
+[Word family](examples/open-evaluation/PrimitiveWordFields.hs)
+and [source and interface checks](examples/open-evaluation/check-word-prim-family.sh).
+
 ## Runtime tiles and curried comparisons
 
 Compiler `a6460bb784` passed the 534-line Showcase with its matching
