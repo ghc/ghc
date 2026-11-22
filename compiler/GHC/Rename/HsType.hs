@@ -1763,25 +1763,28 @@ bindHsOuterTyVarBndrs doc mb_cls implicit_vars outer_bndrs thing_inside =
 -- See Note [Term variable capture and implicit quantification]
 warn_term_var_capture :: FreeKiTyVars -> LocatedN RdrName -> Name -> RnM ()
 warn_term_var_capture occurrences lVar chosen = do
-    gbl_env <- getGlobalRdrEnv
-    local_env <- getLocalRdrEnv
+  pun_uses <- woptM Opt_WarnPunUses
+  legacy_capture <- woptM Opt_WarnTermVariableCapture
+  when (pun_uses || legacy_capture) $ do
+    (gbl_env, local_env) <- getRdrEnvs
     case demoteRdrNameTv $ unLoc lVar of
       Nothing           -> return ()
       Just demoted_name -> do
-        let global_vars = lookupGRE gbl_env (LookupRdrName demoted_name SameNameSpace)
-        let mlocal_var  = lookupLocalRdrEnv local_env demoted_name
-        case mlocal_var of
-          Just name -> warn (Right name) (mkLocalVanillaGRE NoParent name NE.:| [])
-          Nothing   -> for_ (NE.nonEmpty global_vars) $ warn (Left global_vars)
+        -- An in-scope selector function is an alternative for pun warnings.
+        -- Keep the legacy check aligned with RequiredTypeArguments.
+        let which | pun_uses = RelevantGREsFOS WantNormal
+                  | otherwise = SameNameSpace
+            global_vars = lookupGRE gbl_env (LookupRdrName demoted_name which)
+        case lookupLocalRdrEnv local_env demoted_name of
+          Just name -> warn pun_uses (Right name) (mkLocalVanillaGRE NoParent name NE.:| [])
+          Nothing   -> for_ (NE.nonEmpty global_vars) $ warn pun_uses (Left global_vars)
   where
-    warn captured alternatives = do
-      pun_uses <- woptM Opt_WarnPunUses
-      if pun_uses
-        then for_ occurrences $ \(L loc rdr) ->
+    warn pun_uses captured alternatives
+      | pun_uses = for_ occurrences $ \(L loc rdr) ->
           when (rdr == unLoc lVar) $
             addDiagnosticAt (locA loc)
               (TcRnPunUse rdr (mkLocalVanillaGRE NoParent chosen) alternatives)
-        else warnCapturedTerm lVar captured
+      | otherwise = warnCapturedTerm lVar captured
 
 bindHsForAllTelescope :: HsDocContext
                       -> HsForAllTelescope GhcPs

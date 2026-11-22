@@ -121,3 +121,10 @@ Declarations inside Template Haskell quotes form their own scope. Both
 names in a punned declaration group compete inside the quote. An inner
 definition can shadow a name in the enclosing module.
 [Declaration quote regression](../../../testsuite/tests/rename/should_compile/DeclarationQuote.hs).
+
+An in-scope record selector function can compete with an implicitly
+bound type variable. The warning lists the visible selectors once
+at each occurrence. `NoFieldSelectors`, hidden imports, and
+qualified-only imports leave an unqualified type variable quiet.
+[Selector regression](../../../testsuite/tests/rename/should_compile/RecordSelectorPunUses.hs)
+and [quiet controls](../../../testsuite/tests/rename/should_compile/HiddenSelectorPunUses.hs).

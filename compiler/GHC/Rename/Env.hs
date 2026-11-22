@@ -1681,8 +1681,9 @@ warnPunUse loc_rdr@(L loc rdr) selected
                 guard (other /= name && (implicit || closer (localPunScope local_env other)))
                 Just (mkLocalVanillaGRE NoParent other NE.:| [])
             | isTyVarName name =
-                NE.nonEmpty (filter relevant_other (lookupGRE global_env (LookupRdrName other_ns SameNameSpace)))
+                NE.nonEmpty (filter relevant_other (lookupGRE global_env global_other_ns))
             | otherwise = Nothing
+          global_other_ns = LookupRdrName other_ns (RelevantGREsFOS WantNormal)
           relevant_other other = implicit || closer (localPunScope local_env (greName other))
           closer (Just other_rank) =
             other_rank > 0 && maybe (isExternalName name) (<= other_rank) rank

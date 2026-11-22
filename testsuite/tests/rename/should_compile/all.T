@@ -276,3 +276,6 @@ test('TypePatternPunUses', [extra_files(['PunUseData.hs', 'PunUseType.hs'])],
 test('GadtPunScope', [req_th, extra_files(['PunTypeSplice.hs'])],
      multimod_compile, ['GadtPunScope', '-v0 -Wpun-uses'])
 test('DeclarationQuote', req_th, compile, ['-Wpun-bindings -Wpun-uses'])
+test('RecordSelectorPunUses', normal, compile, ['-Wpun-uses -Wterm-variable-capture'])
+test('HiddenSelectorPunUses', [extra_files(['SelectorOwner.hs'])],
+     multimod_compile, ['HiddenSelectorPunUses', '-v0 -Werror=pun-uses'])
