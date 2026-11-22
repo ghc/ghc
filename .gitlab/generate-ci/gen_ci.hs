@@ -870,7 +870,7 @@ validateRuleString :: ValidateRule -> Cond
 validateRuleString FullCI       = or_all [ labelString "full-ci"
                                          , labelString "marge_bot_batch_merge_job"
                                          , branchStringExact "master"
-                                         , branchStringLike "ghc-[0-9]+\\.[0-9]+"
+                                         , branchStringLike "^ghc-[0-9]+\\.[0-9]+$"
                                          ]
 validateRuleString FastCI       = true
 
