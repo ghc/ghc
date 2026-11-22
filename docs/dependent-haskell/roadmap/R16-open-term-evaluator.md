@@ -2373,8 +2373,10 @@ checked interfaces on the next build. The unrelated module kept the
 same interface bytes. The installed definitions kept the same interface
 and object files.
 
-These are component results for explicitly signed bindings. An old
-installed package that contains the *proof* still needs rebuilding.
+Job 1229 repeated all three upgrades from normal 554 to the two-stage
+compiler at `6f12b4e3b3`. The signed proof and its forwarder both
+rejected the conflicting rule at their use. An old installed package
+that contains the *proof* still needs rebuilding.
 Job 1216 also found that removing an explicit signature could lose
 the dependency even in a fresh build. The private follow-up at
 `4a119b07e1` attributes the use to the inferred binding that needs it.

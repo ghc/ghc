@@ -54,14 +54,16 @@ rewriting disabled. Results are in
 `r16-installed-proof-consumers-20261123/local-callbacks/results.tsv`.
 
 The successor checkout is `r16-r41-proof-upgrade-normal-20261123/source`.
-Job 1227 builds `6f12b4e3b3`. It has the terminal existential and declaration
+Job 1227 passed both normal compiler stages at `6f12b4e3b3`. This
+compiler has the terminal existential and declaration
 reification fixes from `39dccda474`, the boxed equality fix and
 `NativeOpenProofRules`. Job 1207 passed the source-hidden proof and
 forwarding cases. Job 1222 passed the three incremental builds for an
 ordinary home proof, including a proof that uses installed definitions.
-An old installed *proof* still needs a source rebuild. Job 1229 checks
-this compiler with 55 registrations and the incremental upgrade from
-normal 554. Inferred proof bindings have separate checks in progress. See the
+An old installed *proof* still needs a source rebuild. The early gates
+in job 1229 passed the list and tree rule checks and all three incremental
+upgrade cases from normal 554. The job also checks 55 registrations,
+the Showcase and HaskLib. Inferred proof bindings have separate checks. See the
 [ordinary proof upgrade](roadmap/R16-open-term-evaluator.md#upgrading-a-proof-whose-type-hides-the-equality).
 
 R41 has a separate release candidate at `acd48e3f3f` in
