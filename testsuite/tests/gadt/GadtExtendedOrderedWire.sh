@@ -29,6 +29,11 @@ data T where
     C :: forall a. Int -> Eq a => a -> T
 SOURCE
 
+cat >"$out/FIELDLESS" <<'SOURCE'
+data T a b where
+    C :: forall a. Eq a => forall b. T a b
+SOURCE
+
 cat >"$out/CONTROL" <<'SOURCE'
 data Tag a where
     Tag :: forall a -> Tag a
@@ -51,7 +56,7 @@ $(TH.reify ''T >> pure [])
 SOURCE
 
 for compression in 0 1 2; do
-    for shape in LEADING EXISTENTIAL CONTROL; do
+    for shape in LEADING EXISTENTIAL FIELDLESS CONTROL; do
         work="$out/$compression/$shape"
         mkdir -p "$work/"{new,read}
         cat "$out/header" "$out/$shape" > "$work/Provider.hs"
@@ -66,6 +71,12 @@ for compression in 0 1 2; do
                 fi
             else
                 grep -Fq "$marker" iface
+            fi
+            if [[ "$shape" == FIELDLESS ]]; then
+                grep -Fq 'fieldless-ordered-gadt-telescope' iface
+            elif grep -Fq 'fieldless-ordered-gadt-telescope' iface; then
+                echo "Unexpected fieldless-order version in $shape interface" >&2
+                exit 1
             fi
         )
         cp "$work/new/Provider.hi" "$work/read/"

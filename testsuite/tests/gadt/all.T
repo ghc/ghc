@@ -195,3 +195,6 @@ test('GadtLeadingRequiredTh',
 test('GadtExtendedOrderedWire',
      [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal'])],
      run_command, ['bash GadtExtendedOrderedWire.sh "{compiler}" "{libdir}"'])
+test('GadtPrefixSourceOrder',
+     [req_host_target_ghc, only_ways(['normal'])],
+     run_command, ['python3 GadtPrefixSourceOrder.py "{compiler}" "{libdir}"'])
