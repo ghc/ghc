@@ -25,6 +25,16 @@ or unlifted endpoint still fails at the callback binder.
 [predicate](../../../testsuite/tests/dependent/should_run/NativeLiftedCallbackProvider.hs)
 and [kind inference references](../REFERENCES.md#inferring-the-endpoint-kinds-of-a-retained-callback).
 
+With explicit `(a :: Type) (b :: Type)`, a separately compiled client
+has run the proof at `-O0` with function and `IO` results. Forcing the
+proof left the counter at zero. Executing the returned action advanced
+it to one. The earlier mapping compiler that required a closed structural
+result rejected the new interface at the callback binder.
+The unannotated signature, the revised cast reader, and
+the combined Showcase still need qualification with the normal compiler.
+[Source and demand checks](../../../testsuite/tests/dependent/should_run/NativeOpenTheseFmap.sh)
+and [interface checks](../../../testsuite/tests/ghc-api/NativeDependentCore.hs).
+
 A type synonym can name a dependent function over a lifted parameter.
 The ordinary caller can use `Consumer a p r` in a signature and supply a
 witness and its indexed payload. The Showcase instantiates the witness
