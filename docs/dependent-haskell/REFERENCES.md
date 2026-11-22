@@ -177,6 +177,28 @@ allocate their own helper.
 [GHC's lexical scoping rules](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/scoped_type_variables.html#overview)
 and [source signature and controls](roadmap/R19-type-level-cases.md#a-case-in-a-value-signature).
 
+### Complete cases from separate providers
+
+Eisenberg and Stolarek lower each case to a fresh closed family. R19
+keeps that lowering and records the owner of a flat signature case.
+For two applications with the same rigid index, a checked nominal
+coercion compares every exact constructor and its result. Distinct
+nullary constructors make the row order irrelevant in this fragment.
+Known inputs still use the ordinary closed-family equations.
+[Eisenberg and Stolarek, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf#page=5),
+[closed-family apartness](../users_guide/exts/type_families.rst#compatibility-and-apartness-of-type-family-equations),
+and [R19 provider and client checks](roadmap/R19-type-level-cases.md#separate-providers-at-an-unknown-index).
+
+An ordinary shared selector that discards eight rows per equation
+hit the default reduction depth on the last constructor of a
+1,610-row case. A direct selector with blocks of 32 rows used one
+reduction and allocated about 1,061 MB for that concrete client.
+The ordinary compiler and the checked-coercion prototype each used
+about 644 MB. The coercion checks the full case only when equality
+needs it. Core Lint rechecks the rule after interface loading and
+substitution.
+[GHC's coercion check](../../compiler/GHC/Builtin/CoercionRules.hs).
+
 ### Matchability and multiplicity on arrows
 
 Proposal #242 names `GHC.Matchability` as the public module for the
