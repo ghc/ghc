@@ -12,6 +12,7 @@ library
   exposed-modules:
     HaskLib
     HaskLib.List
+    HaskLib.Size
 
   other-modules:
     PreludeAppendLengthSource
