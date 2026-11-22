@@ -1,3 +1,7 @@
-T25127_fail_th_quote.hs:10:9: error: [GHC-65904]
-    Visible forall in data constructors not (yet) handled by Template Haskell
-
+T25127_fail_th_quote.hs:9:2: error: [GHC-51580]
+    • Illegal visible, dependent quantification in the type of a term:
+        forall {k}. forall (a :: k) -> VisProxy a
+    • In the definition of data constructor ‘VP’
+      In the data type declaration for ‘VisProxy’
+    Suggested fix:
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension

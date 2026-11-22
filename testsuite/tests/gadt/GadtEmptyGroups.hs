@@ -6,12 +6,17 @@
 
 module Main where
 
+import Data.Proxy (Proxy (..))
 import GadtEmptyGroupsProvider
 import qualified Language.Haskell.TH as TH
 
 $( [d|
      data Quoted where
        Quote :: Bool -> forall. () => Bool -> Quoted
+       QuoteRequired :: forall a. forall b -> a -> (Eq a) => Proxy b -> Quoted
+
+     data QuotedAt b where
+       QuoteTerminal :: forall a. (Eq a) => a -> () => forall b -> forall. QuotedAt b
      |]
  )
 
@@ -19,6 +24,7 @@ $( do
      trailing <- TH.reifyType 'Trailing
      between <- TH.reifyType 'Between
      ordered <- TH.reifyType 'Ordered
+     canonical <- TH.reifyType 'Canonical
      let groups :: TH.Type -> String
          groups (TH.ForallMatchT _ body) = groups body
          groups (TH.ForallT binders ctx body)
@@ -32,9 +38,9 @@ $( do
          groups (TH.AppT (TH.AppT TH.ArrowT _) body) = 'V' : groups body
          groups (TH.ConT _) = []
          groups _ = "?"
-     if map groups [trailing, between, ordered] == ["V", "VV", "IVRCV"]
+     if map groups [trailing, between, ordered, canonical] == ["V", "VV", "IVRCV", "IICRVV"]
        then pure []
-       else fail (show [trailing, between, ordered])
+       else fail (show [trailing, between, ordered, canonical])
  )
 
 inspect :: EmptyGroups -> Bool
@@ -42,16 +48,26 @@ inspect (Trailing x) = x
 inspect (Between x y) = x /= y
 inspect (Constrained x) = x == x
 inspect (Ordered x (type _) _) = x == x
+inspect (Canonical (type _) x _) = x == x
+
+inspectQuote :: Quoted -> Bool
+inspectQuote (Quote x y) = x /= y
+inspectQuote (QuoteRequired (type _) x _) = x == x
+
+inspectTerminal :: QuotedAt b -> Bool
+inspectTerminal (QuoteTerminal x (type _)) = x == x
 
 main :: IO ()
-main = case Quote False True of
-  Quote x y ->
-    print
-      ( and
-          [ x /= y
-          , inspect (Trailing True)
-          , inspect (Between True False)
-          , inspect (Constrained False)
-          , inspect (Ordered (1 :: Int) (type Bool) True)
-          ]
-      )
+main =
+  print
+    ( and
+        [ inspectQuote (Quote False True)
+        , inspectQuote (QuoteRequired @Int (type Bool) 1 Proxy)
+        , inspectTerminal (QuoteTerminal (1 :: Int) (type Bool))
+        , inspect (Trailing True)
+        , inspect (Between True False)
+        , inspect (Constrained False)
+        , inspect (Ordered (1 :: Int) (type Bool) True)
+        , inspect (Canonical @Int @() (type Bool) 1 Proxy)
+        ]
+    )
