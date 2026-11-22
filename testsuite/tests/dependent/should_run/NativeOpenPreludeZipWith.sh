@@ -61,8 +61,12 @@ for mode in UNKNOWN_LEFT_LENGTH DROP_SUCCESSOR; do
     reject '[GHC-83865]' "$length_proof" "-D$mode"
     reject '[GHC-83865]' "$pair_proof" "-D$mode"
 done
-reject '[GHC-83605]' "$proof" -O1 -fenable-rewrite-rules -DRULES_ON
-reject '[GHC-83605]' "$pair_proof" -O1 -fenable-rewrite-rules -DRULES_ON
+"${ghc[@]}" -O1 -fenable-rewrite-rules -DRULES_ON -fforce-recomp -c \
+    "$proof" "$pair_proof" -outputdir .
+for module in ZipMinimum PreludeZipRuntime; do
+    sed '/fno-enable-rewrite-rules/d' "$src/$module.hs" > "$module.hs"
+    "${ghc[@]}" -O2 -fforce-recomp -c "$module.hs" -outputdir .
+done
 
 # Load conflicting rules from a separate interface. The second rule can
 # rewrite an application introduced by the installed zip rule.
@@ -120,12 +124,20 @@ pairStep :: ((a, b) -> r -> s) -> a -> b -> r -> s
 pairStep k x y r = k (x, y) r
 EOF
 cat > "$out/ZipFoldRule.hs" <<'EOF'
+{-# LANGUAGE CPP #-}
 module ZipFoldRule () where
 import GHC.Exts (build)
 import ZipFoldProvider
 
 {-# RULES "probe zip fusion" [~1] forall xs ys. zipProbe xs ys =
     build (\cons nil -> foldZip (pairStep cons) nil xs ys) #-}
+#ifdef BAD_PHASE
+{-# RULES "probe inverse" [~1] foldZip (pairStep (:)) [] = zipProbe #-}
+#elif defined(BAD_RESULT)
+{-# RULES "probe inverse" [1] foldZip (pairStep (:)) [] = \_ _ -> [] #-}
+#else
+{-# RULES "probe inverse" [1] foldZip (pairStep (:)) [] = zipProbe #-}
+#endif
 EOF
 
 sed -e '/fno-enable-rewrite-rules/d' \
@@ -146,4 +158,23 @@ for mode in LAZY_SEED FORCE_SEED; do
         grep -Eq 'cannot use the checked equation for.*zipProbe' rejected.log
     fi
     "${ghc[@]}" -O2 -fno-enable-rewrite-rules -fforce-recomp -c ZipMinimum.hs -outputdir .
+done
+
+# Check the inverse with the lazy folder and without a build conflict.
+sed -i '/^import ZipFusionRule ()$/d' ZipMinimum.hs
+( cd "$out/provider"
+  "${ghc[@]}" -O2 -fwrite-source-equations -fforce-recomp -c "$out/ZipFoldProvider.hs" -outputdir .
+)
+cp ../provider/ZipFoldProvider.hi .
+for mode in CHECKED_INVERSE BAD_PHASE BAD_RESULT; do
+    ( cd "$out/provider"
+      "${ghc[@]}" -O2 -fforce-recomp "-D$mode" -c "$out/ZipFoldRule.hs" -outputdir .
+    )
+    cp ../provider/ZipFoldRule.hi .
+    if [[ $mode == CHECKED_INVERSE ]]; then
+        "${ghc[@]}" -O2 -fforce-recomp -c ZipMinimum.hs -outputdir .
+    else
+        reject '[GHC-83605]' ZipMinimum.hs -O2
+        grep -Eq 'A rewrite rule can change the result of.*foldZip' rejected.log
+    fi
 done
