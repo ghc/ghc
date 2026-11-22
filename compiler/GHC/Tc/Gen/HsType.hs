@@ -3008,9 +3008,14 @@ tc_app_ty_other mode rn_ty exp_kind
   | L _ (HsTyVar _ NotPromoted (L loc (WithUserRdr rdr name))) <- hs_fun_ty
   , isVarName name
   , isExternalName name
-  = setSrcSpanA loc $
-    do { env <- getGblEnv
-       ; if nameIsLocalOrFrom (tcg_semantic_mod env) name
+  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+       ; if enabled then setSrcSpanA loc (source_call rdr name)
+                    else tc_app_ty_generic mode rn_ty exp_kind }
+  where
+    -- See Note [Captured term names in ordinary types].
+    source_call rdr name =
+      do { env <- getGblEnv
+         ; if nameIsLocalOrFrom (tcg_semantic_mod env) name
            then case (lookupNameEnv (tcg_local_open_defs env) name, value_args) of
              (Just (fun, _), Just args)
                | isTypeLevel (mode_tyki mode), ordinary_call
@@ -3025,7 +3030,7 @@ tc_app_ty_other mode rn_ty exp_kind
                     "Closed type evaluation requires an imported definition. This function belongs to the module being compiled.")
              _ -> unsupported name
            else imported_call env rdr name }
-  where
+
     is_local_open_operand arg = isOpenTypeOperand arg || is_type_constructor_app arg
 
     -- The observer checks that the completed type is closed and family-free.
@@ -3238,6 +3243,16 @@ tc_app_ty_other mode rn_ty exp_kind
       result <- observe
       checkExpKind mode rn_ty result kind exp_kind
 tc_app_ty_other mode rn_ty exp_kind = tc_app_ty_generic mode rn_ty exp_kind
+
+{- Note [Captured term names in ordinary types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+RequiredTypeArguments can resolve a name in a type to a term. For
+example, in `a = 10; f :: a -> a`, the signature refers to the top-level
+term a. Use the ordinary type application checker in that case. It
+reports the captured term at its occurrence. Only modules that enable
+ExperimentalDependentTypes check source equations for an ordinary term
+head. Imported type synonyms keep their existing type-level names.
+-}
 
 -- | Add the written constraints to the scope of a promoted method call.
 sourceMethodContext :: TcTyMode -> [PredType] -> TcTyMode

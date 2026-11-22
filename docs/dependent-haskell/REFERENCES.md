@@ -2442,6 +2442,15 @@ File blob: `01d0688febd8cee4493a176fce13ed80e08fa72f`.
 The full baseline file is copied into `native-local-signature-prior-art`.
 Preserve that flag's existing behavior independently of M23's local extension.
 
+The [RequiredTypeArguments guide](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/required_type_arguments.html)
+uses `a = 42` and `f :: a -> a` to show why the term is in scope.
+When the module disables `ExperimentalDependentTypes`, the ordinary
+typechecker reports GHC-45510 at the captured term. The ten existing
+`T23740a`–`T23740j` registrations cover signatures, instances
+and Template Haskell. A client can still import a type synonym
+whose provider checked a promoted call. This follows the
+[opt-in principle in proposal #378](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#learnability-of-haskell).
+
 
 ## Direct do bind of a saved native action
 
