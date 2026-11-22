@@ -130,3 +130,7 @@ and the upstream `master`. To inspect the archived paths and revisions:
 git show refs/archive/dependent-haskell/2026-11-22/restart/ledger:checkouts.tsv
 git show refs/archive/dependent-haskell/2026-11-22/restart/ledger:branches.txt
 ```
+
+The recovered optimizer commit `9011965d43` is available as
+`refs/archive/dependent-haskell/2026-11-22/restart/r05-callback-regression`.
+Its compiler changes and Core API test match the integrated `3a4e5c237a`.

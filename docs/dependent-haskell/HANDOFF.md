@@ -8,40 +8,25 @@ and its [expected output](Showcase.stdout) are the executable examples.
 
 ## Current checkpoint
 
-Updated 22 November 2026, 13:37 CET.
+Updated 22 November 2026, 13:43 CET.
 
 | Revision | What to recover | Verification |
 | --- | --- | --- |
 | `97f6622b03` | Last published checkpoint. An ordinary client opens a sample with a hidden calibration status. | Both compiler stages passed the 538-line Showcase at `-O0` and `-O2`. Stage 2 GHCi and 28 selected registered tests passed. [Record](CHECKPOINTS.md#erased-calibration-status). |
-| `70ded7e706` | Consolidated compiler. A retained callback accepts nominally equal argument and result types. CorePrep preserves the index when it names a constructor in a curried call. The evaluator checks the ordered equations of the installed `Prelude.zip` and `Prelude.zipWith`. | Focused tests passed before the restart. The earlier 540-output two-stage run was interrupted. Rebuild this compiler for the combined checks. |
-| `e62ddf4e9f` | Same compiler and libraries, with the merged 542-line Showcase and zipper length proofs. The ordinary client proves that each zipper takes the shorter length. | Use these sources and expected output with the rebuilt compiler. Full combined verification is pending. |
+| `70ded7e706` | CorePrep preserves the index of a constructed argument in a curried call. The evaluator checks the ordered equations of the installed `Prelude.zip` and `Prelude.zipWith`. | Pueue job `379` completed a clean two-stage build. Job `381` found both equations and the fusion rules in static and dynamic `GHC.Internal.List` interfaces. |
+| `3a4e5c237a` | Current compiler and tests. Includes the 542-line Showcase from `e62ddf4e9f` and the optimizer change from `9011965d43`. | Job `380` reproduced the callback cast regression on the baseline. The candidate optimizer passed the same test. Job `382` is building the combined compiler. |
 
-Pueue job `379` is building `70ded7e706` in the normal checkout below.
-Verify that its label is `normal-70ded7e706` when inspecting the queue.
-The baseline started with four workers. After WSL exposed 24 CPUs, the
-active build gained affinity to CPUs 0–15. The shared slice reported
-`cpu.max = 1600000 100000`, a 64 GB memory limit and zero swap. The priority probe froze the slice while a job in another group
-ran, then resumed it. The local branch includes the 542-line fixture.
-[Branch recovery ledger](BRANCHES.md#22-november-restart).
+The Core optimizer keeps the lexical callback and its nominal evidence
+when it substitutes a cast argument into a dependent result proof.
+An ordinary client can prove that each installed zipper takes the shorter
+length. The [checkpoint](CHECKPOINTS.md#ordered-zippers-and-nominal-callback-casts)
+gives the source tests and the selected testsuite command.
 
-The final compiler candidate is `3a4e5c237a`. It includes the Core
-optimizer change from `9011965d43` and the 542-line fixture. When a
-retained function cast is applied to a nominally cast lexical callback,
-the optimizer can substitute that callback into the result proof. It checks
-the full binder type and preserves the callback's identity and evidence.
-Pueue job `380` ran the same Core API test before and after the optimizer
-change. The baseline failed at the forward cast. The candidate object
-passed the full fixture, including the reverse cast and the newtype
-control. Job `381` found both zipper equations and their fusion rules
-in the baseline's static and dynamic `GHC.Internal.List` interfaces.
-The combined compiler still needs its two-stage build and tests.
-
-The baseline reader has finished. The clean build owns the normal checkout.
-The recovery area's `core/verify.sh` records the focused before/after check.
-The normal area's `incremental.sh` rebuilds the same checkout at the final
-revision. `qualify.sh` records the final tests in
-`final-3a4e5c237a/results/qualification.tsv`. All three commands use the
-shared queue. The user requested a pause after the verified branch is pushed.
+The final build reuses the configured baseline checkout. Its
+`incremental.sh` builds the candidate and checks both compiler revisions.
+The normal area's `qualify.sh` records the combined results in
+`final-3a4e5c237a/results/qualification.tsv`. The branch will pause after
+qualification and the push. [Branch recovery ledger](BRANCHES.md#22-november-restart).
 
 ## Resume after a restart
 

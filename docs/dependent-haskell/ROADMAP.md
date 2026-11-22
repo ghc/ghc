@@ -26,25 +26,25 @@ depend on others, so this count cannot estimate the remaining work time.
 | Declaration dependencies, families and GADTs | R21, R23, R24, R41 |
 | Namespace warnings | R36 |
 
-The 538-output Showcase constructs a sample from a runtime calibration
-flag. Its type hides whether the sample is missing or carries a flag.
-An ordinary client opens the package and reads the payload only when
-the stored flag is true. The rejected sample has an undefined payload.
-Other examples read the first layer of an indexed volume and compare
-two runtime arguments through a callback with a family-defined result type.
-[Sample provider](examples/open-evaluation/DirectIndexedList.hs),
-[ordinary client](examples/open-evaluation/DirectIndexedListClient.hs)
-and [verification](CHECKPOINTS.md#erased-calibration-status).
+The Showcase now includes proofs about two functions from the installed
+Prelude. An ordinary client proves that the length of `zip xs ys` and of
+`zipWith f xs ys` is the minimum of the two input lengths. The callback
+can stay abstract. A separate example passes a constructed `Just` to a
+retained comparison and leaves an unused field unevaluated.
+[Pair and length proofs](examples/open-evaluation/PreludeZipProof.hs),
+[callback length proof](examples/open-evaluation/PreludeZipWithLengthProof.hs),
+[comparison](examples/open-evaluation/CompareOptional.hs) and
+[verification status](HANDOFF.md#current-checkpoint).
 
 Earlier [Showcase milestones and examples](CHECKPOINTS.md#showcase-history-through-502-outputs)
 record how each behavior was introduced.
 
 | Card | What works | Remaining gap |
 | --- | --- | --- |
-| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | A runtime case can inspect both arguments of a callback whose intermediate result reduces to an arrow. A promoted constructor in a result index can combine invisible type arguments with stored fields. Nested vector patterns use the known outer dimension for coverage. | Broaden callback conversion and inference. Determine hidden indices through more helper calls and abstract constructor shapes. |
-| [R05 dependent Core](roadmap/R05-dependent-core.md) | The standard `-O2` pipeline specializes a recursive consumer and keeps retained case proofs scoped. A provider and an interface-only client can match rules that construct or open an erased package. Source rules can have an imported head and a local anchor, or come from a visible orphan module. | Rules for retained functions and general dependent coercions remain open. |
+| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | A runtime case can inspect both arguments of a callback whose intermediate result reduces to an arrow. A caller can use nominal equality at both ends of a retained callback. A promoted constructor in a result index can combine invisible type arguments with stored fields. Nested vector patterns use the known outer dimension for coverage. | Broaden callback conversion and inference. Determine hidden indices through more helper calls and abstract constructor shapes. |
+| [R05 dependent Core](roadmap/R05-dependent-core.md) | CorePrep preserves the result index when it names a constructor in a curried call. The standard `-O2` pipeline specializes a recursive consumer and keeps retained case proofs scoped. A provider and an interface-only client can match rules that construct or open an erased package. Source rules can have an imported head and a local anchor, or come from a visible orphan module. | Rules for retained functions and general dependent coercions remain open. |
 | [R15 closed evaluator](roadmap/R15-closed-term-evaluator.md#read-independent-row-and-column-counts) | A client proves the labels and all cells of a compiled rectangular table with two hidden dimensions. Both dimensions of a square can share one hidden index. | Extend readback beyond the checked matrix and container shapes. |
-| [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The installed `filter not` handles a known Boolean head and an unknown tail. A separate ordinary client proves length preservation for the installed `map` by induction over a finite spine. | General open evaluation across arbitrary ordinary definitions. |
+| [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | An ordinary client proves that the installed `map` preserves length and that `zip` and `zipWith` return the shorter length. Reduction follows the order in which each function inspects the input lists. | General open evaluation across arbitrary ordinary definitions. |
 | [R19 type-level cases](roadmap/R19-type-level-cases.md) | Retained signatures can match a runtime index or an application of a checked function. Two qualified imports of the same checked function can share a case in one declaration group. The upgrade test rebuilds an affected home provider once. | Separately compiled modules still need a shared result type at an unknown index. Older installed providers need rebuilding to export a shared result. |
 | [R22 erased existentials](roadmap/R22-existential-quantification.md) | A constructor pattern can open a hidden vector length inside a tuple. A producer's declared argument type can fix a witness beneath a callback's `forall`. | Infer a witness when the callback has no declared type that determines it. |
 | [R23 unsaturated families](roadmap/R23-unsaturated-type-families.md) | An unsigned closed family can infer a callback that accepts constructors and partially applied families. A later GADT argument can fix a receiver's matchability. The original `KindEqualities2` checks across its declaration splice. | Extend higher-order inference beyond the tested closed-family cases and check compatibility of existing unannotated programs. |

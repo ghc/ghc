@@ -11,8 +11,9 @@ increments.
 On the shared WSL host, schedule GHC builds and compiler verification
 in the `ghc` group on the usual Pueue daemon. The group has three slots
 across all worktrees. Its jobs share sixteen logical CPUs and a memory
-limit of 64,000,000,000 bytes in `ghcbuild.slice`. Use up to five Hadrian workers per job. A private compiler link or a separate test
-job also uses a slot.
+limit of 64,000,000,000 bytes in `ghcbuild.slice`. Use up to five Hadrian
+workers per job. A private compiler link or a separate test job also uses
+a slot.
 
 Runnable work in other groups has priority. The local priority watcher
 pauses the GHC queue and freezes its running processes until that work
@@ -146,6 +147,45 @@ linker response file, package configuration or symlink. Record their
 source revisions and rebuild commands, then remove both sets of outputs
 after the last live user finishes. The 200 GB threshold is a backup for
 this cleanup.
+
+## Ordered zippers and nominal callback casts
+
+The compiler and the tests share revision `3a4e5c237a`. The ordinary
+zipper proofs use the equations exported by the installed
+`GHC.Internal.List`. The client can prove the cons equation and both
+empty-list equations, then prove the length law by induction. With an
+unknown left spine and an empty right list, reduction stays stuck.
+[Source proofs](examples/open-evaluation/PreludeZipProof.hs) and
+[demand and rule controls](../../testsuite/tests/dependent/should_run/NativeOpenPreludeZipWith.sh).
+
+The optimizer can push a retained function cast through an application
+when nominal equalities change both ends of a lexical callback. The
+result proof keeps the original callback and both equalities. A
+representational newtype cast alone cannot justify the substitution.
+The Core API regression failed on the baseline at `70ded7e706` with
+`push a mixed callback cast forward did not push explicit retained congruence`.
+Relinking the same fixture with the changed optimizer object produced
+`native-core-api-ok`. [Core API test](../../testsuite/tests/ghc-api/NativeDependentCore.hs).
+
+The following selection covers the changed compiler paths and their
+existing regression tests. From a normal configured checkout, set
+`hadrian` to its Hadrian executable and run this command through the
+[shared queue](#local-build-capacity).
+
+```sh
+tests='NativeDependentCore NativeDependentCoreRun NativeLiftedCallback
+NativeRetainedFunctionRules NativeDepFunCoWire NativeSimplifier NativeFunctionIndex
+NativeIndexedGadtFields NativeIndexedFin NativeIndexedConsProof NativeConstrainedFamily
+NativeConstrainedFamilyRules NativeDataFamilyRetainedDomain NativeGadtRetainedSum
+NativeNestedPackagePat NativeRetainedPackage NativeImplicitExistential NativeOpenInstalledMap
+NativeOpenInstalledAppend NativeOpenInstalledReverse NativeOpenConcreteGuardedList NativeOpenTheseFmap
+NativeOpenPreludeZipWith NativeOpenZipRows NativeHomeRuleRecomp NativeTypeLet
+NativeTypeLetQuote NativeTypeCase NativeTypeCaseRetainedTh'
+docs/dependent-haskell/tools/ghc-build-job dependent-regressions \
+    "$hadrian" -j5 --flavour=quick --docs=none test --test-compiler=stage2 \
+    --only="$(echo "$tests" | tr '\n' ' ')" --test-speed=fast --test-way=normal \
+    --skip-perf --config=config.timeout=900
+```
 
 ## Erased calibration status
 
