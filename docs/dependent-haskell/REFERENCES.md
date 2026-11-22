@@ -5882,10 +5882,10 @@ and [Haskell proof](examples/packed-vector/ZipRows.hs).
 
 The fork also checks that induction directly on two ordinary lists. A
 `foreach` binder lets the clauses refine each input as they match its
-constructors. The structural count is the ordinary function `size`. Its
-three minimum equations remain a closed family in this version. The
-ordinary `minSize` definition for the same Peano type still rejects on
-two open inputs. [Direct list proof](examples/open-evaluation/PreludeZipRuntime.hs)
+constructors. The structural count and minimum are the ordinary functions `size`
+and `minSize`. The earlier compiler at `5fe06625c3` required a
+handwritten minimum family. The new proof uses the checked equations
+of the Haskell function and the same induction on the lists. [Direct list proof](examples/open-evaluation/PreludeZipRuntime.hs)
 and [ordinary structural count](examples/open-evaluation/PreludeMapLengthSize.hs).
 
 A proposed length for zipping two ordinary lists tests the first spine,

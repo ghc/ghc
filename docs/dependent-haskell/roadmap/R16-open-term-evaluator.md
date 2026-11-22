@@ -1830,13 +1830,17 @@ minimum-length law directly for `Prelude.zip`. The Showcase runs `zip`
 on unequal lists and prints the pair-cons proof and the two length proofs.
 An extension-enabled proof takes the two runtime lists directly with
 `foreach`. Matching `[]` and `(:)` refines the lists in its result
-type. Its result type calls the ordinary `size` and `Prelude.zip`
-functions directly. The optimized Showcase reads two lists from IO, runs the installed
+type. The result type is
+`size (zip xs ys) :~: minSize (size xs) (size ys)`. All three functions
+are ordinary Haskell definitions. The optimized Showcase reads two lists from IO, runs the installed
 zipper, and calls the proof on those same lists. An extension-off proof
 uses `Spine xs` to refine an erased list index by pattern matching.
 
 `Count` names the ordinary structural function `size`, which counts in
-unbounded successors. `Minimum` compares two such counts. The installed
+unbounded successors. `Minimum` in the extension-off examples is a
+synonym for the same `minSize` that the direct proof uses. Matching two
+successors exposes a successor of the recursive call on their fields,
+so the proof for the tails discharges the inductive step. The installed
 `Prelude.length` returns a bounded `Int`. Its result can overflow.
 The two formulations also differ on partial inputs. For example,
 `length (zip [] undefined)` returns zero, but `min 0 (length undefined)`

@@ -1909,7 +1909,7 @@ main = do
         (ConsRuleMapProof.negateHead (Proxy @'[]), ConsRuleMapProof.lazySpine)
     zipLeft <- newIORef [True, False] >>= readIORef
     zipRight <- newIORef [False] >>= readIORef
-    observe "zip two lists and prove the pair and minimum-length laws"
+    observe "zip two lists and prove their result length with an ordinary minimum"
         ( zip zipLeft zipRight
         , PreludeZipProof.firstPair
         , PreludeZipRuntime.lengthZip zipLeft zipRight
