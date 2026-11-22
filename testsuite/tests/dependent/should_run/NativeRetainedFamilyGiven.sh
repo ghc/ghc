@@ -37,3 +37,20 @@ for opt in -O0 -O2; do
     grep -Fq 'from the context: F xs ~ G xs' "$out/continuation.log"
     grep -Fq 'In the second argument of ‘gcastWith’, namely ‘Refl’' "$out/continuation.log"
 done
+
+# Supply the boxed nominal Given when inferring a successor tail.
+for opt in -O0 -O2; do
+    build="$out/tail-${opt#-}"
+    mkdir "$build"
+    ghc=("$1" "-B$2" "$opt" -v0 -package-env - -dcore-lint -dstg-lint
+         -fdiagnostics-color=never -outputdir "$build")
+    "${ghc[@]}" --make -no-link NativeRetainedTailGiven.hs
+    if "${ghc[@]}" -i -i"$build" -fforce-recomp -ferror-spans -DWRONG_TAIL \
+         -c NativeRetainedTailGiven.hs >"$build/zero.log" 2>&1; then
+        echo 'Unexpected successor tail from a zero-length proof' >&2
+        exit 1
+    fi
+    grep -Fq 'error: [GHC-05617]' "$build/zero.log"
+    grep -Fq 'from the context: extent ~ Z' "$build/zero.log"
+    grep -Fq "In the first argument of ‘first’" "$build/zero.log"
+done

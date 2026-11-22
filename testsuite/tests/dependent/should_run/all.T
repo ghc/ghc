@@ -166,7 +166,9 @@ test('NativeOpenMinimum',
                     'ZipMinimum.hs']])],
      run_command, ['bash NativeOpenMinimum.sh "{compiler}" "{libdir}" ' + config.ghc_th_way_flags])
 test('NativeRetainedFamilyGiven',
-     [only_ways(['normal']), extra_files(['NativeRetainedFamilyGiven.hs'])],
+     [only_ways(['normal']),
+      extra_files(['NativeRetainedFamilyGiven.hs', 'NativeRetainedTailGiven.hs',
+                   '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs'])],
      run_command, ['bash NativeRetainedFamilyGiven.sh "{compiler}" "{libdir}"'])
 test('NativeOpenListFoldr',
      [only_ways(['normal']),
