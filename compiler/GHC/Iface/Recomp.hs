@@ -911,6 +911,12 @@ checkFlagHash hsc_env iface self_recomp = do
           | nullary_candidate, not checked_nullary =
               liftIO $ recheck "Compiler now infers matchability for nullary family results"
           | otherwise = pure UpToDate
+        check_injective_kind
+          | mi_hsc_src iface == HsSrcFile
+          , not (Map.member injectiveKindResultField (getExtensibleFields (mi_ext_fields iface)))
+          , couldInferInjectiveKindResult (map snd (mi_decls iface)) =
+              liftIO $ recheck "Compiler now infers matchability for injective kind results"
+          | otherwise = pure UpToDate
         check_mapping
           | mi_hsc_src iface == HsSrcFile
           , not (Map.member mappingField (getExtensibleFields (mi_ext_fields iface)))
@@ -955,6 +961,7 @@ checkFlagHash hsc_env iface self_recomp = do
                                      `recompThen` check_binary_enum
                                      `recompThen` check_retained_signature
                                      `recompThen` check_nullary_family
+                                     `recompThen` check_injective_kind
                                      `recompThen` check_liberal_synonym
                                      `recompThen` check_mapping
                                      `recompThen` check_source_proof_branches
@@ -1060,6 +1067,10 @@ mappingField = "checked-container-mapping-v1"
 -- Version 3 includes instances with closed receiver parameters.
 appliedMappingField :: String
 appliedMappingField = "checked-applied-container-mapping-v3"
+
+-- | Record the check for an injective family that retains its written kind.
+injectiveKindResultField :: String
+injectiveKindResultField = "injective-kind-result-v1"
 
 -- | Record that a potential old synonym provider was checked once.
 liberalSynonymCallbackField :: String
@@ -1804,6 +1815,57 @@ couldInferClosedMatchability = any candidate . mi_decls
 
     has_arrow IfaceAxBranch{ifaxbRHS = IfaceFunTy FTF_T_T _ _ _ _} = True
     has_arrow _ = False
+
+-- | Recognize the old interface form of a structural injective kind family.
+-- See Note [Recompiling injective kind results].
+couldInferInjectiveKindResult :: [IfaceDecl] -> Bool
+couldInferInjectiveKindResult = any candidate
+  where
+    candidate IfaceFamily{ifName = name, ifBinders = binders, ifFamInj = Injective _,
+                          ifResKind = kind, ifFamFlav = flavor}
+      | isIfaceLiftedTypeKind kind
+      , isSingleton (filter isVisibleTyConBinder binders)
+      , not (any inferred_matchability binders)
+      , Just (_, equations) <- ifaceClosedFamilyAxiom_maybe flavor
+      , let results = map ifaxbRHS equations
+      = any (arrow name) results && all (structural_result name) results
+    candidate _ = False
+
+    structural_result name rhs = lifted rhs || arrow name rhs
+
+    inferred_matchability (Bndr (IfaceTvBndr (_, IfaceTyConApp tc IA_Nil)) (NamedTCB Inferred)) =
+      ifaceTyConName tc == matchabilityTyConName
+    inferred_matchability _ = False
+
+    arrow name (IfaceFunTy FTF_T_T (IfaceTyConApp ma IA_Nil)
+                                (IfaceTyConApp mult IA_Nil) lhs rhs) =
+      ifaceTyConName ma == unmatchableDataConName &&
+      ifaceTyConName mult == manyDataConName &&
+      operand name lhs && operand name rhs
+    arrow name (IfaceCastTy ty _) = arrow name ty
+    arrow _ _ = False
+
+    operand name (IfaceTyConApp tc args)
+      | ifaceTyConName tc == name
+      , IfaceTyVar{} : _ <- reverse (appArgsIfaceTypes args) = True
+    operand name (IfaceCastTy ty _) = operand name ty
+    operand _ ty = lifted ty
+
+    lifted (IfaceCastTy ty _) = lifted ty
+    lifted ty = isIfaceLiftedTypeKind ty
+
+{- Note [Recompiling injective kind results]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The older interface fixes a structural bare-arrow result to U. Recheck
+a home provider once so it can publish an inferred matchability index.
+Its changed kind invalidates clients through ordinary dependency checks.
+
+The old interface can give a bare arrow and a written Unmatchable
+arrow the same representation. Record that the source was checked
+when the provider keeps this shape. The next build can reuse it.
+Installed providers retain their published equations until rebuilt.
+See Note [Inferred injective kind family results] in GHC.Tc.TyCl.
+-}
 
 -- | Select the old checked shape of a closed nullary bare-arrow equation.
 -- See Note [Recompiling nullary closed arrow families].
@@ -2997,6 +3059,8 @@ addFingerprints hsc_env iface0 = do
   let stamp_retained = couldExportRetainedSignatureCase (mi_semantic_module iface0)
                         (mi_exports iface0) (mi_decls iface0)
       stamp_nullary = couldInferNullaryClosedMatchability (mi_decls iface0)
+      stamp_injective_kind = mi_hsc_src iface0 == HsSrcFile &&
+                             couldInferInjectiveKindResult (mi_decls iface0)
       stamp_mapping = mi_hsc_src iface0 == HsSrcFile &&
                       couldSupplyMapping (mi_exports iface0) (mi_decls iface0)
       stamp_applied_mapping = mi_hsc_src iface0 == HsSrcFile &&
@@ -3021,6 +3085,7 @@ addFingerprints hsc_env iface0 = do
                          mi_self_recomp_info iface,
                          mi_deps iface0)
       checked_fields = [liberalSynonymCallbackField | stamp_liberal]
+                    ++ [injectiveKindResultField | stamp_injective_kind]
                     ++ [mappingField | stamp_mapping]
                     ++ [appliedMappingField | stamp_applied_mapping]
                     ++ [homeRuleClosuresField | stamp_home_rules]
