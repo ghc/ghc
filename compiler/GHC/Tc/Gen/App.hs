@@ -6409,14 +6409,14 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
         arity = length domains
         value_args = [arg | EValArg { ea_arg = arg } <- args]
         overapplied = arity < length value_args
-        equality_witness
-          | [witness, _] <- value_args
+        equality_first_arg
+          | [first_arg, _] <- value_args
           , hasNoConcreteTyVars fun
           , maybe False isTauTy expected
           , is_nominal_continuation domains result
-          = Just witness
+          = Just first_arg
           | otherwise = Nothing
-        equality_continuation = isJust equality_witness
+        equality_continuation = isJust equality_first_arg
         complete_choices = native_worker || equality_continuation
   , arity == length value_args
     || (overapplied && arity > 0 && hasNoConcreteTyVars fun)
@@ -6439,9 +6439,9 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
        ; index_prefixes <- if index_route && hasNoConcreteTyVars fun
                            then filterM (\(_, domain, arg) -> defer_callback False domain arg) arguments
                            else return []
-       ; eligible <- case equality_witness of
-           { Just witness ->
-             do { (inferable, anchor) <- tcRetainedInferableArg witness
+       ; eligible <- case equality_first_arg of
+           { Just first_arg ->
+             do { (inferable, anchor) <- tcRetainedInferableArg first_arg
                 ; return (if result_anchor || anchor
                           then Just [inferable, False] else Nothing) }
            ; Nothing -> if native_worker
@@ -6558,8 +6558,8 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
                  _ -> return (fun, sigma, cache, Nothing) } }
   where
     -- See Note [Checking a nominal equality continuation].
-    is_nominal_continuation [Scaled _ witness, Scaled _ continuation] result
-      | isTauTy witness
+    is_nominal_continuation [Scaled _ first_arg, Scaled _ continuation] result
+      | isTauTy first_arg
       , FunTy { ft_af = af, ft_arg = pred_ty, ft_res = body } <- coreFullView continuation
       , isInvisibleFunArg af
       , Just (tc, _) <- splitTyConApp_maybe pred_ty
@@ -6645,15 +6645,18 @@ constraint. An ordinary type metavariable cannot hold a type that mentions
 a retained index. Its use inside the continuation is also untouchable under
 the Given. See Note [Rigid retained indices] in GHC.Tc.Utils.Unify.
 
-For a saturated known head taking a witness and a continuation with one
-nominal equality, select the erased types from the inferred witness and
-the checked result. The continuation body must have the same tau type as
-the result. Never infer the continuation. Require every erased argument
-to have a scoped tau choice with no unfilled metavariables. Ordinary
-subsumption checks the continuation under
-its original Given. The same cache supplies the checked witness and its
-usage. The application retains its original head, arguments and evaluation
-order.
+For a saturated known head taking an ordinary argument and a continuation
+with one nominal equality, select the erased types from the first argument
+and the checked result. The head's signature supplies the continuation's
+equality. The first argument can be a witness, as in gcastWith, or have a
+type that is independent of the equality. The continuation must return the
+same tau type as the application.
+
+Check the continuation by ordinary subsumption under its original Given.
+Require each erased argument to have a scoped tau choice with no unfilled
+metavariables. Use NoQL and its existing argument cache. The cache supplies
+the checked first argument and its usage. The application keeps its head,
+arguments and evaluation order.
 -}
 
 {- Note [Matching a callback with an inferred multiplicity]
