@@ -38,6 +38,15 @@ The combined normal compiler build remains open.
 [Source and demand checks](../../../testsuite/tests/dependent/should_run/NativeOpenTheseFmap.sh)
 and [interface checks](../../../testsuite/tests/ghc-api/NativeDependentCore.hs).
 
+A curried callback can use abstract types at both arrows. The proof
+`mapAt` passes `f pivot` to `Prelude.fmap` and fixes the mapped field
+at `f pivot x`. A client can supply argument types as different as
+`Int` and `Char`. Swapping two arguments of the same type fails at
+`Refl`. Returning the partially applied function still permits a
+representation-polymorphic second domain.
+[Mapping proof](../examples/open-evaluation/TheseMapping.hs)
+and [source checks](../../../testsuite/tests/dependent/should_run/NativeLiftedCallback.sh).
+
 A type synonym can name a dependent function over a lifted parameter.
 The ordinary caller can use `Consumer a p r` in a signature and supply a
 witness and its indexed payload. The Showcase instantiates the witness

@@ -93,17 +93,20 @@ HS
 module Main where
 import Control.Exception (evaluate)
 import Data.IORef
-import OrdinaryTheseMapping (report)
+import OrdinaryTheseMapping (report, reportAt)
 import Row (Row(..))
 import qualified RowProof
 import These (These(..))
-import TheseMapping (mapBoth)
+import TheseMapping (mapAt, mapBoth)
 
 printProof :: (a -> Bool) -> Char -> a -> IO ()
 printProof p label x = print (mapBoth p label x)
 
 forceProof :: (a -> b) -> Char -> a -> IO ()
 forceProof f label x = evaluate (mapBoth f label x) >> pure ()
+
+keepAt :: (a -> b -> c) -> a -> Char -> b -> IO ()
+keepAt f pivot tag x = evaluate (mapAt f pivot tag x) >> pure ()
 
 rowProofs :: (Int -> Bool) -> Int -> Bool -> Int -> IO ()
 rowProofs p label flag x = do
@@ -115,10 +118,15 @@ main = do
     putStrLn (report (> (4 :: Int)) 'w' 5)
     putStrLn (report (replicate 4) 'w' 'a')
     putStrLn (report fromEnum 'w' True)
+    putStrLn (reportAt replicate (3 :: Int) True 'v')
+    putStrLn (reportAt (flip compare) False 'w' True)
+    keepAt (error "forced callback" :: Int -> Bool -> Ordering)
+           (error "forced pivot") (error "forced tag") (error "forced element")
     printProof (error "predicate") (error "label") (error "value" :: Int)
     ref <- newIORef (0 :: Int)
     let action _ = modifyIORef' ref (+ 1) >> readIORef ref
         above n = (> n) :: Int -> Bool
+    keepAt (\n _ -> modifyIORef' ref (+ n)) (3 :: Int) 'i' True
     forceProof action 'i' True
     print =<< readIORef ref
     case fmap action (These 'i' True) of
@@ -141,6 +149,8 @@ HS
 (These 'w' True,Refl)
 (These 'w' "aaaa",Refl)
 (These 'w' 1,Refl)
+(These True "vvv",Refl)
+(These 'w' GT,Refl)
 Refl
 0
 ('i',1)
@@ -166,7 +176,8 @@ HS
 cp "$src/TheseMapping.hs" .
 if "${ghc[@]}" -O2 -c TheseMapping.hs >rejected 2>&1; then exit 1; fi
 grep -Eq '^TheseMapping.hs:11:17-20: error: \[GHC-83865\]' rejected || { cat rejected >&2; exit 1; }
-sed -i "s/:~: 'These label (p x)/:~: 'This label/" TheseMapping.hs
+sed -i -e "s/:~: 'These label (p x)/:~: 'This label/" \
+       -e "s/:~: 'These tag (f pivot x)/:~: 'This tag/" TheseMapping.hs
 "${ghc[@]}" -O2 -c TheseMapping.hs
 
 cd "$out"

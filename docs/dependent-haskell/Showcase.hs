@@ -1788,6 +1788,8 @@ main = do
               ++ OrdinaryTheseMapping.report (> cutoff) 'w' 5)
     putStrLn ("map a runtime-sized string and prove the label is preserved: "
               ++ OrdinaryTheseMapping.report (replicate cutoff) 'w' 'a')
+    putStrLn ("map a partially applied comparator and prove its argument order: "
+              ++ OrdinaryTheseMapping.reportAt (flip compare) False 'w' True)
     let reportInstances :: (Int -> Bool) -> Bool -> Int -> String
         reportInstances p flag x =
             show ( fmap p (Row.Flagged flag x :: Row.Row Int Bool Int)
