@@ -2376,8 +2376,13 @@ and object files.
 These are component results for explicitly signed bindings. An old
 installed package that contains the *proof* still needs rebuilding.
 Job 1216 also found that removing an explicit signature could lose
-the dependency even in a fresh build. The combined compiler still
-requires qualification.
+the dependency even in a fresh build. The private follow-up at
+`4a119b07e1` attributes the use to the inferred binding that needs it.
+For example, a lazy local binding that mentions a proof and is never
+used adds no dependency to its enclosing function. A forced binding
+does. Job 1241 passed 32 cases across `-O0` and `-O2`. Jobs 1245 and
+1247 passed the maintained proof tests and strict-binding controls.
+The combined compiler still requires qualification.
 
 ### Optimized clients of the filter proof
 
@@ -2403,13 +2408,33 @@ raised the exception. Passing the list to a separate function gave
 `[]`. Disabling rewrites also gave `[]`. Jobs 1233 and 1236 checked
 the results and the `filter` and `fold/build` firings.
 
-This example places a limit on a general fusion certificate. In a
-separate comparison, the installed filter and its explicit cons
-equation agreed for all four predicate and head combinations tested,
-including the cases where both raised the exception. A check for a
-particular constructor equation still needs to account for its
-recursive tail and for visible rules on the helpers. The optimized
-Showcase remains a release check.
+Sharing the filtered tail also distinguishes the two sides of the cons
+equation. Bind `xs = build checkCons` and `rest = filter id xs`. Compare
+`filter id (False : xs)` with the false branch `rest`. In each program,
+return a pair containing the first element of this result and the
+same `rest`. Demand only the first component. At default `-O2`, the
+first program returned `True` and the second raised `filter tail`.
+With rules disabled, both returned `True`. Jobs 1252 and 1257 checked
+this context. A direct test that did not share `rest` had observed
+agreement on four inputs. An unrestricted rule for the cons equation
+would accept the distinguishing context. The empty-list equation
+needs its own analysis.
 [Demand example](../examples/open-evaluation/MapFusionDemand.hs),
 [replay](../examples/open-evaluation/check-map-fusion.sh) and
 [fusion references](../REFERENCES.md).
+
+Job 1251 tested each HaskLib law independently after Cabal installed
+the source distribution with this compiler. Each ordinary client read
+its input lists from `IORef`s and forced the equality witness. The
+callback arguments were local function parameters.
+
+| Installed law | Default `-O2` | `-O2 -fno-enable-rewrite-rules` |
+| --- | --- | --- |
+| `lengthZip`, `lengthZipWith`, `lengthReverse` | Passed | Passed |
+| `lengthMap`, `lengthAppend`, `lengthZipMap` | GHC-83605 at proof use | Passed |
+
+The separate installed `nodesMap` client passed at both `-O0` and
+default `-O2`. It counted two forks in a tree read from an `IORef`.
+The proof ignored a bottom-valued mapper and leaf payload and forced
+a missing subtree. The list-law package test remains red at default
+optimization.

@@ -38,9 +38,20 @@ compiler. Keep that checkpoint private. Job 1184 built both stages
 from clean sources at `1bef98f413` in `r03-r16-r21-r41-consolidated-20261122`.
 Job 1187 passed the downstream list and tree rule checks. All 555
 Showcase lines matched at `-O0` and in GHCi. At default `-O2` the
-compiler rejected three uses of the installed filter proof. The new
-GADT test also rejected a terminal existential. The per-gate logs are
-in `qualification/tries`. See the [filter demand comparison](roadmap/R16-open-term-evaluator.md#optimized-clients-of-the-filter-proof).
+compiler rejected three uses of the installed filter proof. The mixed
+interface check passed. Of 53 registered tests, 52 passed. The new
+GADT test rejected a terminal existential. Cabal installed HaskLib,
+then the `list-laws` test failed to compile at proofs that use `map`
+and `(++)` with the ordinary optimization rules. The separate installed
+tree client did not run in that job. The per-gate logs are in
+`qualification/tries`. See the [filter demand comparison](roadmap/R16-open-term-evaluator.md#optimized-clients-of-the-filter-proof).
+
+Job 1251 used the installed archive to run the tree and list clients
+independently. At default `-O2`, `nodesMap`, `lengthZip`, `lengthZipWith`
+and `lengthReverse` passed. The three list proofs involving `map` or
+`(++)` reported GHC-83605. All six list laws passed with client
+rewriting disabled. Results are in
+`r16-installed-proof-consumers-20261123/local-callbacks/results.tsv`.
 
 The successor checkout is `r16-r41-proof-upgrade-normal-20261123/source`.
 Job 1227 builds `6f12b4e3b3`. It has the terminal existential and declaration
@@ -58,8 +69,24 @@ R41 has a separate release candidate at `acd48e3f3f` in
 published branch plus the ordered GADT changes and their Showcase
 example. It includes the extension guard on the new empty visible
 suffix. Check its own tests and guide render before updating R41.
+Job 1246 checks 66 registered cases, the default optimized Showcase,
+constructor permutations and older interface readers. The two edited
+guide pages rendered with all six new internal links resolved. Use the
+guide-only descendant `a3d61239a2` when publishing. It corrects the
+grammar for an inferred binder with a kind annotation and an unparenthesized
+function type in a record field. Job 1266 checks both examples and the
+guide render on the exact release compiler.
 The `r41-only-normal` and `r16-r41-review-normal` source refs are
 under `refs/archive/dependent-haskell/2026-11-23/`.
+
+The next combined source is `4d10fdc35f` in
+`r03-r16-proof-attribution-intake-20261123/source`. It includes the
+single interface feature for a named callback as a value or in an
+application. It also includes inferred proof bindings at `4a119b07e1`.
+The 32 component cases passed at `-O0` and `-O2`. Job 1267 builds
+these changes after 1227. Job 1269 checks 59 registrations, proof
+upgrades and the Showcase. It reports the package archive, list-law
+test and installed tree client independently.
 
 The local archive refs `r19-r41-normal-552`, `r16-hasklib-tree-553`
 and `r27-legacy-transition-normal` are under

@@ -48,6 +48,27 @@ consumeFilter (Producer produce) accept = emptySpine (filter (const accept) (bui
 consumeFilterList :: [Bool] -> Bool -> Bool
 consumeFilterList xs accept = emptySpine (filter (const accept) xs)
 
+-- | Force the result of the supplied list step before producing one cell.
+{-# NOINLINE checkCons #-}
+checkCons :: (Bool -> r -> r) -> r -> r
+checkCons c n = c False (error "filter tail") `seq` c True n
+
+-- | Observe the filtered cons and also return the filtered tail.
+{-# NOINLINE sharedFilter #-}
+sharedFilter :: (Bool -> Bool) -> Bool -> (Bool, [Bool])
+sharedFilter p x =
+    let xs = build checkCons
+        rest = filter p xs
+    in (foldr (\y _ -> y) (error "empty seed") (filter p (x : xs)), rest)
+
+-- | Apply the cons equation with the same producer, fold, and shared tail.
+{-# NOINLINE sharedFilterStep #-}
+sharedFilterStep :: (Bool -> Bool) -> Bool -> (Bool, [Bool])
+sharedFilterStep p x =
+    let xs = build checkCons
+        rest = filter p xs
+    in (foldr (\y _ -> y) (error "empty seed") (if p x then x : rest else rest), rest)
+
 main :: IO ()
 main = do
     let withSeq = Producer (\c n -> n `seq` c True n)
@@ -57,10 +78,11 @@ main = do
     observe (consumeMap withoutSeq)
     observe (not (null (mapEscapes withSeq)))
     observe (consumeZip withSeq [False])
-    let checkCons c n = c False (error "filter tail") `seq` c True n
     observe (consumeFilter (Producer checkCons) False)
     observe (consumeFilterList (build checkCons) False)
     observe (consumeFilter (Producer checkCons) True)
+    observe (fst (sharedFilter id False))
+    observe (fst (sharedFilterStep id False))
   where
     observe result = do
         value <- try (evaluate result) :: IO (Either ErrorCall Bool)

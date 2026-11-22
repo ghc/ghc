@@ -15,6 +15,28 @@ The upstream graph relates R03 to R05 and the completed visible-forall card
 R39. Each local increment needs the relevant Core rule. It need not wait for
 all Core transformations. Normal optimization remains a broader release gate.
 
+## Private check for an imported function in an index
+
+A provider at `e6f8abad3b` can name an imported function in a result
+type, either as a value or applied to a retained argument.
+
+```haskell
+stored :: foreach (mapper :: Bool -> Char) -> Stored Left.mapper
+stored _ = store Alias.mapper
+
+called :: foreach (x :: Bool) -> Call (Left.mapper x)
+called x = call Alias.mapper x
+```
+
+Here `Alias.mapper` re-exports `Left.mapper`. A client checked both
+indices from compiled interfaces. A same-spelled function from a different
+package, or the lexical `mapper` in the first signature, failed to match.
+Both forms use one new interface feature for the defining name. A reader
+can then build an application with the usual interface syntax. Job 1243
+verified that the previous compiler rejects the new feature and reads
+unaffected interfaces. These component results still need a normal build.
+[Design sources](../REFERENCES.md#imported-functions-in-retained-indices).
+
 ## Supported subset and evidence
 
 A retained callback can use unannotated type parameters in a complete

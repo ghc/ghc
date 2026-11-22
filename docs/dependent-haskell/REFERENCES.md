@@ -7395,8 +7395,10 @@ its cons argument. An ordinary list cell is defined even when its tail
 is bottom. With a rejecting predicate, the fused step returns the
 tail itself. Stock GHC 9.14.1 and the fork both evaluated that bottom
 at `-O2`. Passing the list through a separate call or disabling rewrite
-rules gave an empty result. This prevents using the producer's polymorphic
-type alone as evidence for filter fusion.
+rules gave an empty result. Sharing the recursive filtered tail also
+distinguished the two sides of the cons equation at default optimization.
+This prevents using the producer's polymorphic type alone as evidence
+for filter fusion.
 [Maintained demand example](examples/open-evaluation/MapFusionDemand.hs)
 and [Theorem 8.2](https://janis-voigtlaender.eu/JV06.html).
 
@@ -8124,6 +8126,20 @@ leaves its exports unchanged.
 [Agda 2.8.0 interface reuse](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Interaction/Imports.hs),
 [GHC recompilation checker](https://downloads.haskell.org/ghc/9.14.1/docs/users_guide/separate_compilation.html#the-recompilation-checker)
 and [incremental proof example](roadmap/R16-open-term-evaluator.md#upgrading-a-proof-whose-type-hides-the-equality).
+
+### Imported functions in retained indices
+
+Proposal #378 describes referring to terms in types. Proposal #242
+explains why equality of two applications of an unmatchable function
+does not establish equality of their arguments. Agda's opaque
+definitions provide a precedent for using a name when conversion cannot
+unfold its definition. The R03 experiment uses GHC's defining name,
+including its unit, for that purpose. An interface can use the same name
+as the head of an application. The encoding is specific to this fork.
+[Proposal #378](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#term-variables-in-types),
+[#242 on matchability](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#matchability),
+[Agda 2.8.0 opaque definitions](https://agda.readthedocs.io/en/v2.8.0/language/opaque-definitions.html)
+and [R03 source example](roadmap/R03-dependent-products.md#private-check-for-an-imported-function-in-an-index).
 
 ### Nested constructors with a runtime result index
 

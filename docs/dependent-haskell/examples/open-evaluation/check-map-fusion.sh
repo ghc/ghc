@@ -102,8 +102,8 @@ for mode in O0 O2 O2-no-rules; do
     echo "map demand $mode"
     cat "$mode.demand.out"
 done
-diff -u <(printf '%s\n' True True True True True True True False) O0.demand.out
-diff -u <(printf '%s\n' 'empty seed' True True True True 'filter tail' True False) O2.demand.out
+diff -u <(printf '%s\n' True True True True True True True False True True) O0.demand.out
+diff -u <(printf '%s\n' 'empty seed' True True True True 'filter tail' True False True 'filter tail') O2.demand.out
 cmp O0.demand.out O2-no-rules.demand.out
 
 awk '
