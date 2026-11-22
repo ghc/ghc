@@ -39,6 +39,22 @@ for probe in NoInverse WrongOrder; do
     fi
 done
 
+grep -Fq '[GHC-83865]' WrongOrder.log
+grep -Eq "Couldn't match type: cmp[0-9]* x[0-9]* y[0-9]*" WrongOrder.log
+grep -Eq "with: cmp[0-9]* y[0-9]* x[0-9]*" WrongOrder.log
+
+cat >PartialResult.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes, GADTs, MagicHash, TypeOperators #-}
+module PartialResult where
+import Data.Type.Equality ((:~:)(Refl))
+import GHC.Exts (TYPE, RuntimeRep)
+
+keep :: forall (r :: RuntimeRep) (b :: TYPE r). foreach (f :: Bool -> b -> Int)
+     -> foreach (p :: Bool) -> f p :~: f p
+keep _ _ = Refl
+HS
+"${ghc[@]}" -c PartialResult.hs
+
 cat > WrongEndpoint.hs <<'HS'
 {-# LANGUAGE ExperimentalDependentTypes, GADTs, Modifiers #-}
 module WrongEndpoint where

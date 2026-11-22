@@ -805,22 +805,24 @@ tcRetainedBinderDomain :: (Type -> Bool) -> TcTyMode -> LHsType GhcRn -> TcM TcT
 tcRetainedBinderDomain valid_domain mode domain
   = do { domain_ty <- tc_check_lhs_type mode domain liftedTypeKind
        ; domain_ty <- liftZonkM $ zonkTcType domain_ty
-       ; domain_ty <- infer_callback_kinds domain_ty
-       ; unless (valid_domain domain_ty) $
-           failWithTc $ TcRnRetainedQuantificationError (RetainedUnsupportedDomain domain_ty)
-       ; return domain_ty }
-  where
-    -- See Note [Inferring the endpoint kinds of a retained callback].
-    infer_callback_kinds ty
-      | FunTy { ft_arg = arg, ft_res = res } <- coreFullView ty
-      , not (valid_domain ty)
-      , let flexible = filter (maybe False isMetaTyVarTy . kindRep_maybe . typeKind) [arg, res]
-      , not (null flexible)
-      = do { forM_ flexible $ \endpoint ->
-               discardResult $ unifyKind (Just (HsTypeRnThing (unLoc domain)))
-                                         (typeKind endpoint) liftedTypeKind
-           ; liftZonkM $ zonkTcType ty }
-      | otherwise = return ty
+       ; if valid_domain domain_ty then return domain_ty else
+         do { ty <- inferRetainedCallbackKinds domain domain_ty
+            ; unless (valid_domain ty) $
+                failWithTc $ TcRnRetainedQuantificationError (RetainedUnsupportedDomain ty)
+            ; return ty } }
+
+-- | Infer the lifted endpoint kinds required by one retained arrow.
+-- See Note [Inferring the endpoint kinds of a retained callback].
+inferRetainedCallbackKinds :: LHsType GhcRn -> TcType -> TcM TcType
+inferRetainedCallbackKinds source ty
+  | FunTy { ft_arg = arg, ft_res = res } <- coreFullView ty
+  , let flexible = filter (maybe False isMetaTyVarTy . kindRep_maybe . typeKind) [arg, res]
+  , not (null flexible)
+  = do { forM_ flexible $ \endpoint ->
+           discardResult $ unifyKind (Just (HsTypeRnThing (unLoc source)))
+                                     (typeKind endpoint) liftedTypeKind
+       ; liftZonkM $ zonkTcType ty }
+  | otherwise = return ty
 
 {- Note [Inferring the endpoint kinds of a retained callback]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -831,6 +833,11 @@ type, the source checker needs the callback's argument and result kinds
 now. Unify each flexible representation with the required lifted kind
 and check the complete domain. An explicit representation variable is
 rigid and keeps its declared kind.
+
+For f :: a -> b -> c, checking the binder fixes the kind of a. The
+result b -> c is already lifted. Check the kinds of b and c when a
+second argument is supplied in a type. A partial application f x
+can return an ordinary function with a representation-polymorphic domain.
 -}
 
 {- Note [Source retained signatures]
@@ -2955,10 +2962,11 @@ tc_app_ty_other mode rn_ty exp_kind
     apply checked HsArgPar{} = return checked
     apply _ (HsTypeArg _ arg) = setSrcSpanA (getLoc arg) invalid_call
     apply (fun, kind) (HsValArg _ arg) = setSrcSpanA (getLoc arg) $
-      case nativeIndexFunctionTypeTys_maybe kind of
-        Just (domain, result) -> do { ty <- tc_check_lhs_type mode arg domain
-                                    ; return (mkAppTy fun ty, result) }
-        Nothing -> invalid_call
+      do { kind' <- inferRetainedCallbackKinds arg kind
+         ; case nativeIndexFunctionTypeTys_maybe kind' of
+             Just (domain, result) -> do { ty <- tc_check_lhs_type mode arg domain
+                                         ; return (mkAppTy fun ty, result) }
+             Nothing -> invalid_call }
     invalid_call :: TcM a
     invalid_call = failWithTc $ TcRnRetainedQuantificationError RetainedCallIndex
     (hs_fun_ty, hs_args) = splitHsAppTys rn_ty

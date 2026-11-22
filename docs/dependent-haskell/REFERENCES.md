@@ -5777,6 +5777,15 @@ equality cannot supply an equality between the arguments.
 [GHC proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#matchability)
 and [Core checks](../../testsuite/tests/ghc-api/NativeDependentCore.hs).
 
+Agda checks `f p x` as two successive applications. The second
+argument is checked at the domain of the function returned by the first.
+GHC also distinguishes the representation of that function from the
+representations of its argument and result. R03 infers a lifted kind
+for an unknown endpoint when a retained call uses that arrow. A written
+rigid representation remains in scope when the program returns `f p`.
+[Agda 2.8.0 function types](https://agda.readthedocs.io/en/v2.8.0/language/function-types.html)
+and [GHC 9.14.1 representation inference](https://downloads.haskell.org/ghc/9.14.1/docs/users_guide/exts/representation_polymorphism.html#inference-and-defaulting).
+
 ### Upgrading checked method interfaces
 
 Agda checks the interface version before decoding a module. It also
