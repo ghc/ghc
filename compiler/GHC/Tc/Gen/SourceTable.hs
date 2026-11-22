@@ -1083,7 +1083,8 @@ checkedMapWorkers supply env binds = mapMaybe (uncurry selected) (zip dfuns (lis
       guard (not (idName owner `elemNameSet` exported) &&
              isNothing (sourceTableId_maybe owner) &&
              exprType field `eqType` classMethodInstTy selector [domain])
-      (sig, rows) <- checkedConstructorCase visible (const Nothing) owner (expandMappingDefaults slot_supply rhs)
+      let body = expandMappingDefaults slot_supply (stripTicksE isSourceBreakpoint rhs)
+      (sig, rows) <- checkedConstructorCase visible (const Nothing) owner body
       guard (isJust (checkedMapPrefix sig))
       pure (selector, (owner, sig, rows))
 
@@ -1125,7 +1126,10 @@ For equation checking, expose a DataAlt for each missing lazy constructor.
 Use dataConRepInstPat to bind its fields at their instantiated types. The
 DEFAULT body cannot refer to those fresh binders. The ordinary row checker
 still checks the visibility, constructor patterns, and result of each branch.
-The executable worker keeps its original case. See refineDefaultAlt in
+GHCi puts debugger breakpoints on constructor results and callback calls.
+Skip these ticks when reading the equations. A breakpoint does not force
+the variables that it captures. Keep coverage ticks and strict cases.
+The executable worker keeps its original case and ticks. See refineDefaultAlt in
 GHC.Core.Utils for the corresponding single-constructor transformation.
 -}
 
