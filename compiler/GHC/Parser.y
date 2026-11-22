@@ -2404,7 +2404,13 @@ typelet_binds :: { Located (NonEmpty (LocatedA HsTypeLetBind)) }
                             ; return (sLL $1 $> (b' :| bs)) } }
 
 typelet_bind :: { LocatedA HsTypeLetBind }
-        : tyvar '=' ctype                {% amsA' (sLL $1 $> (HsTypeLetBind $1 (epTok $2) $3)) }
+        : tyvar '=' ctype                {% amsA' (sLL $1 $> (HsTypeLetBind Nothing $1 (epTok $2) $3)) }
+        | tyvar '::' kind ';' tyvar '=' ctype
+                                         {% do { when (unLoc $1 /= unLoc $5) $
+                                                   addError $ mkPlainErrorMsgEnvelope (locA (getLoc $1)) $
+                                                     PsErrTypeLetSignatureMismatch (unLoc $1) (unLoc $5)
+                                               ; amsA' (sLL $1 $> (HsTypeLetBind
+                                                   (Just ($1, epUniTok $2, $3, mzEpTok $4)) $5 (epTok $6) $7)) } }
 
 typecase_alts :: { Located [LocatedA HsTypeCaseAlt] }
         : typecase_alt                   { sL1 $1 [$1] }

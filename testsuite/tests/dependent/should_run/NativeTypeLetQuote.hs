@@ -1,6 +1,7 @@
-{-# LANGUAGE ExperimentalDependentTypes, TemplateHaskell #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, KindSignatures, TemplateHaskell #-}
 module NativeTypeLetQuote (result) where
 
+import Data.Proxy (Proxy(..))
 import Language.Haskell.TH
 
 -- The first RHS in the group uses the enclosing binder. The second RHS
@@ -18,6 +19,17 @@ quoted :: $(do
     _ -> fail (show ty))
 quoted = Right (Just True)
 
+-- The signature uses the first tag. The let body uses the second tag.
+signed :: $(do
+  ty <- [t| let { tag = Bool; tag :: tag; tag = 'True } in Proxy tag |]
+  case ty of
+    LetT outer (ConT bool)
+      (LetT inner (SigT (PromotedT true) (VarT kind)) (AppT (ConT proxy) (VarT use)))
+      | outer == kind, inner == use, outer /= inner
+      , bool == ''Bool, true == 'True, proxy == ''Proxy -> pure ty
+    _ -> fail (show ty))
+signed = Proxy :: Proxy 'True
+
 -- A let can return a type constructor. The final argument applies to its result.
 applied :: $(do
   f <- newName "f"
@@ -27,4 +39,4 @@ applied = Just 'q'
 $([d| type QuotedPair a = let a = Maybe a in (a, a) |])
 
 result :: (Either (Maybe Bool) (Maybe Bool), Maybe Char, QuotedPair Int)
-result = (quoted, applied, (Just 3, Nothing))
+result = signed `seq` (quoted, applied, (Just 3, Nothing))

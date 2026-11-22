@@ -44,7 +44,8 @@ type CaseResult (flag :: Bool) =
 
 -- | A row with one additional value when the header flag is set.
 type Frame (n :: Nat) (b :: Bool) a =
-  let width = 1 + n
+  let width :: Nat
+      width = 1 + n
       withHeader = Vec a width
   in case b of { True -> withHeader; False -> Vec a n }
 

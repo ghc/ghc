@@ -4347,8 +4347,11 @@ instance ExactPrint HsTypeCaseAlt where
 instance ExactPrint HsTypeLetBind where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor bind _ _ _ = bind
-  exact (HsTypeLetBind var eq rhs) =
-    HsTypeLetBind <$> markAnnotated var <*> markEpToken eq <*> markAnnotated rhs
+  exact (HsTypeLetBind sig var eq rhs) =
+    HsTypeLetBind <$> traverse signature sig <*> markAnnotated var <*> markEpToken eq <*> markAnnotated rhs
+    where
+      signature (name, colon, kind, semi) =
+        (,,,) <$> markAnnotated name <*> markEpUniToken colon <*> markAnnotated kind <*> markEpToken semi
 
 instance ExactPrint (LocatedN RdrName) where
   getAnnotationEntry (L sann _) = fromAnn sann
