@@ -812,8 +812,12 @@ give the hypotheses of Johann and Voigtlaender, The Impact of seq on
 Free Theorems-Based Program Transformations, Theorem 8.2. The rank-2
 producer can use seq.
 
-Admission still needs a check of the complete rule set of the fold and
-the use of the helper unfoldings through optimization.
+Both zipper variants use the same fold. Check every rule on that fold.
+An inverse can return the original owner or another checked zipper
+on the same fold and builder. Verify that owner's forward rule and
+table before accepting its inverse. Check the builder, both steps and the
+left-producer adapter for additional rules. A rule for a helper can
+change the interpretation even if it has a different rule name.
 -}
 
 -- | Check final-Core rules and identify an introduced helper with an active rule.
@@ -825,17 +829,40 @@ finalCoreRuleConflict visible local owner
   , isTwoListCaseTable table || isListZipWithTable table
   , [rule] <- activeMapperRules visible owner
   , Just (phase, build, fold, step) <- zipFusionRuleHelpers owner table rule
-  , let fold_rules = activeMapperRules visible fold
-        adapters = mapMaybe (checkedZipLeftFusion fold build) fold_rules
-  = if idName fold `elemNameSet` local ||
-       any (\r -> usesStep step r && not (checkedZipInverse owner fold step phase r)) fold_rules
-    then Just (RetainedSourceRule (idName fold))
-    else Just (maybe fallback (RetainedSourceRule . idName) (find changed (build : step : adapters)))
+  = let fold_rules = activeMapperRules visible fold
+        inverse = checkedZipInverse owner fold step phase
+        dependencies = map (foldRuleDependencies inverse phase build fold) fold_rules
+        helper_conflict = find changed (build : step : concat (catMaybes dependencies))
+        fold_conflict = Just (RetainedSourceRule (idName fold))
+    in if idName fold `elemNameSet` local ||
+          any (\r -> usesStep step r && not (inverse r)) fold_rules
+       then fold_conflict
+       else case helper_conflict of
+         Just helper -> Just (RetainedSourceRule (idName helper))
+         Nothing
+           | any isNothing dependencies -> fold_conflict
+           | any inverse fold_rules -> Nothing
+           | otherwise -> Just fallback
   | otherwise = Just fallback
   where
     usesStep step Rule{ru_args = _ : _ : _ : arg : _}
       | (Core.Var fun, _) <- Core.collectArgs arg = fun == step
     usesStep _ _ = False
+    foldRuleDependencies inverse phase build fold rule
+      | inverse rule = Just []
+      | Just adapter <- checkedZipLeftFusion fold build rule = Just [adapter]
+      | Rule{ru_rhs = rhs} <- rule
+      , (Core.Var peer, _) <- Core.collectArgs rhs
+      , peer /= owner
+      , not (idName peer `elemNameSet` local)
+      , Just table <- sourceTableId_maybe peer
+      , isTwoListCaseTable table || isListZipWithTable table
+      , [forward] <- activeMapperRules visible peer
+      , Just (peer_phase, peer_build, peer_fold, peer_step) <- zipFusionRuleHelpers peer table forward
+      , phase == peer_phase, build == peer_build, fold == peer_fold
+      , checkedZipInverse peer fold peer_step phase rule
+      = Just [peer_step]
+      | otherwise = Nothing
     changed v = idName v `elemNameSet` local || not (null (activeMapperRules visible v))
     fallback = RetainedFinalCoreRulesEnabled (idName owner)
 
