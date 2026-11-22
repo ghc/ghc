@@ -12,13 +12,13 @@ import PreludeMapLengthSize (Size(..))
 -- | Adding zero on the right preserves the left operand.
 plusZero :: foreach (m :: Size) -> plus m 'Zero :~: m
 plusZero Zero = Refl
-plusZero (Succ m) = case plusZero m of Refl -> Refl
+plusZero (Succ m) = congSucc (plusZero m)
 
 -- | Move a successor from the right operand to the result.
 plusSucc :: foreach (m :: Size) -> foreach (n :: Size)
          -> plus m ('Succ n) :~: 'Succ (plus m n)
 plusSucc Zero _ = Refl
-plusSucc (Succ m) n = case plusSucc m n of Refl -> Refl
+plusSucc (Succ m) n = congSucc (plusSucc m n)
 
 -- | Equal sizes have equal successors.
 congSucc :: m :~: n -> 'Succ m :~: 'Succ n

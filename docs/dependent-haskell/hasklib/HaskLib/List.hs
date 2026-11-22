@@ -9,7 +9,7 @@ module HaskLib.List
 
 import Data.Type.Equality ((:~:)(Refl), trans)
 import qualified GHC.Internal.List as List
-import HaskLib.Size (plusSucc, plusZero)
+import HaskLib.Size (congSucc, plusSucc, plusZero)
 import Prelude ((++), map, reverse)
 import PreludeAppendLengthSource (plus)
 import PreludeMapLengthSize (Size(..), minSize, size)
@@ -20,13 +20,13 @@ lengthMap :: forall a b. foreach (f :: a -> b) -> foreach (xs :: [a])
           -> size (map f xs) :~: size xs
 lengthMap f = \case
     []     -> Refl
-    _ : xs -> case lengthMap f xs of Refl -> Refl
+    _ : xs -> congSucc (lengthMap f xs)
 
 -- | The length of an append is the sum of the input lengths.
 lengthAppend :: forall a. foreach (xs :: [a]) -> foreach (ys :: [a])
              -> size (xs ++ ys) :~: plus (size xs) (size ys)
 lengthAppend [] _ = Refl
-lengthAppend (_ : xs) ys = case lengthAppend xs ys of Refl -> Refl
+lengthAppend (_ : xs) ys = congSucc (lengthAppend xs ys)
 
 -- | Count the result of the reverse worker with any accumulator.
 lengthReverseOnto :: forall a. foreach (xs :: [a]) -> foreach (acc :: [a])

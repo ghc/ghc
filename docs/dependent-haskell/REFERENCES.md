@@ -7077,6 +7077,10 @@ the callback result in the head, and length ignores that field.
 [Agda's length-map proof](https://agda.github.io/agda-stdlib/v1.1/Data.List.Properties.html)
 and [Haskell 2010 PreludeList](https://www.haskell.org/onlinereport/haskell2010/haskellch9.html).
 
+HaskLib writes that successor step as `congSucc (lengthMap f xs)`.
+Its append proof uses the same lemma on the left tail.
+[HaskLib list proofs](hasklib/HaskLib/List.hs).
+
 The R16 proof applies the installed map equation and then matches
 the recursive `Refl` to lift the equality through successor.
 GHC checks that match with the ordinary equality GADT. The proof

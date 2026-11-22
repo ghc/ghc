@@ -65,6 +65,12 @@ derivation requires the whole left spine.
 [Library guide](README.md#reuse-a-proof-with-hasklib) and
 [equality controls](roadmap/R11-homogeneous-equality.md#rewrite-a-size-in-a-downstream-proof).
 
+The inductive steps of `lengthMap`, `lengthAppend`, `plusZero` and
+`plusSucc` now use `congSucc`. Job `792` ran the package client and
+compared nine demand observations before and after this change at
+`-O0` and `-O2`. Job `794` installed the source archive offline and
+repeated all nine checks from a client with only the installed package.
+
 Job `760` checks `oneCellHead` with the same 546-line output at native
 `-O0`, native `-O2` and in GHCi. It uses `gcastWith` to return a
 `Maybe Char` under the equality supplied by the runtime length test.

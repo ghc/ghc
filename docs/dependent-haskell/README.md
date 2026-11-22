@@ -90,6 +90,16 @@ Just proof -> gcastWith proof (Just (safeHead @Char @'Z (replicateNative count '
 
 The branch returns `Just 'x'`. [Value-returning example](Showcase.hs).
 
+In the inductive step of `lengthMap`, the recursive call proves equal
+lengths for the tails. Both whole lists have one more element, so
+`congSucc` lifts the tail equality through `Succ`.
+
+```haskell
+lengthMap f = \case
+    []     -> Refl
+    _ : xs -> congSucc (lengthMap f xs)
+```
+
 Use `congFirst` to lift an equality through the first argument of a
 binary size function. In the zip-after-map proof, `@minSize` selects
 the function and `@(size ys)` fixes its second argument.
