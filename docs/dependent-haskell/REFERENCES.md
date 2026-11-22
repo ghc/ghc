@@ -7967,3 +7967,16 @@ kind proof over a type-variable binder in an ordinary GADT index kind.
 [§6.1, proposition formation](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf#page=21),
 [§6.2, `Heq`](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf#page=22),
 [the R11 source example](roadmap/R11-homogeneous-equality.md#an-index-with-a-quantified-kind).
+
+
+### Full laziness and retained callbacks
+
+Peyton Jones, Partain and Santos describe floating Haskell bindings to
+increase sharing. The fork reuses GHC's existing transformation and its
+level assignment. A retained callback introduces a restriction on type
+abstraction because its local identity can appear in the result type.
+The private compiler checks this restriction against the program's
+typed Core. An ordinary callback can still float in the same module.
+[Let-floating: moving bindings to give faster programs](https://www.microsoft.com/en-us/research/publication/let-floating-moving-bindings-to-give-faster-programs/),
+[GHC full laziness](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/using-optimisation.html#ghc-flag-ffull-laziness)
+and [R05 example](roadmap/R05-dependent-core.md#keep-absent-polymorphic-callbacks-in-lexical-scope).

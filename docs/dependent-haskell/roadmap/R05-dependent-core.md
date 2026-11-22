@@ -304,27 +304,30 @@ and [rule-firing and demand checks](../examples/qualified-pi/check-retained-rule
 
 ### Keep absent polymorphic callbacks in lexical scope
 
-An independent float-out failure remains open. Use the provider from
-the callback example with `makeChoice _ _ = Choice`,
-`readKept _ _ (Choice value) = value`, and no user rule. Keep both
-`NOINLINE` pragmas. Compile the provider at `-O2` and give an ordinary
-client just its interface:
+An ordinary client can pass a polymorphic callback with local equality
+evidence to two functions that ignore it. Its type still names the callback.
 
 ```haskell
-check :: (a ~ Bool, r ~ Bool) => (a -> r) -> Bool -> Int -> Int
-check f x value = readKept f x (makeChoice f x value)
+readAbsent :: (a ~ Bool, r ~ Bool) => (a -> r) -> Bool -> Int -> Int
+readAbsent f x value = readKept f x (keepChoice f x value)
 ```
 
-On `3a4e5c237a`, the client passes at `-O0` with Core and STG Lint.
-It fails at `-O1` and `-O2` with `Unsupported retained runtime argument`.
-Worker/wrapper supplies a local absence thunk for the callback.
-Float-out abstracts the thunk over the callback's type parameters.
-The retained argument becomes a type application under a nominal cast.
-The matcher update reproduces the same failure. Compiling the provider with
-omitted interface pragmas lets both compilers accept the client at all
-three optimization levels. Preserve the local callback binding until
-erasure so that its retained index can still name it.
-[Callback provider](../examples/qualified-pi/CallbackRules.hs).
+On `3a4e5c237a`, a rule-free provider and an ordinary client passed
+Core Lint at `-O0`. With normal provider interfaces, Core Lint failed
+after full laziness at `-O1` and `-O2`. Worker/wrapper had replaced
+the absent callback with a lazy binding. Floating abstracted type
+variables from that binding, so the index contained a type application
+where it needed the callback's lexical identity.
+
+The candidate keeps those bindings in scope when floating would abstract
+variables. The same client passes Core and STG Lint at all three
+optimization levels. The Showcase returns `37` with an undefined callback
+and an undefined input. A separate ordinary polymorphic callback in the
+same module still floats. See Note [Floating index binders] in
+`GHC.Core.Opt.SetLevels`.
+[Provider](../examples/qualified-pi/CallbackRules.hs),
+[ordinary client](../examples/qualified-pi/CallbackRulesClient.hs) and
+[full laziness references](../REFERENCES.md#full-laziness-and-retained-callbacks).
 
 ### Standard `-O2` object code
 

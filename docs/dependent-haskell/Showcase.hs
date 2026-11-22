@@ -1905,6 +1905,7 @@ main = do
                              (error "forced second argument"))
     observe "read an indexed payload through a rule for a converted callback"
         CallbackRulesClient.observation
+    observe "read a payload with an absent polymorphic callback" CallbackRulesClient.absentObservation
     observe "use a checked cons rule without forcing the callback, head or tail"
         (ConsRuleMapProof.negateHead (Proxy @'[]), ConsRuleMapProof.lazySpine)
     zipLeft <- newIORef [True, False] >>= readIORef
