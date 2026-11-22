@@ -9,7 +9,7 @@ ghc=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint -fdiagnostics-
 provider=NativeLiftedCallbackProvider
 client=NativeLiftedCallbackClient
 expected=$'(False,False,True)\nTrue\nTrue\nTrue\n(IsFalse,())\n(IsFalse,())\nTrue'
-expected+=$'\n(GT,LT,EQ)\nRefl\nRefl\n(GT,LT)\nRefl'
+expected+=$'\n(GT,LT,EQ)\nRefl\nRefl\n(GT,LT)\nGT\nEQ\nTrue\nRefl'
 
 for opt in O0 O2; do
     flags=("-$opt")
@@ -33,6 +33,10 @@ for opt in O0 O2; do
 done
 
 for zap in -fzap-coercions -fno-zap-coercions; do
+    if "${ghc[@]}" "$zap" -DSWAPPED -fforce-recomp -fno-code -c \
+        "$src/curried-callback/FamilyCallback.hs" >swapped.log 2>&1; then exit 1; fi
+    grep -Fq '[GHC-83865]' swapped.log
+    grep -Fq 'In the expression: Less' swapped.log
     if "${ghc[@]}" "$zap" -DAMBIGUOUS -fno-code -fforce-recomp -c \
         "$src/curried-callback/FamilyCallback.hs" >ambiguity.log 2>&1; then exit 1; fi
     grep -Fq '[GHC-83865]' ambiguity.log

@@ -2815,12 +2815,24 @@ nativeIndexFunctionVar_maybe _ = Nothing
 -- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
 exprToNativeCaseIndex :: CoreExpr -> Maybe Type
 exprToNativeCaseIndex expr@App{}
-  | (Var f, args) <- collectArgs expr
-  , isNativeIndexFunctionId f
-  , Just indices <- traverse exprToNativeIndex args
-  , let call = mkAppTys (TermVarTy f) indices
-  , Just {} <- nativeCallSpine_maybe call
+  | Just call <- read_call expr
+  , Just{} <- nativeCallSpine_maybe call
   = Just call
+  where
+    -- See Note [Cases on a cast callback result] in GHC.Tc.Gen.Expr.
+    read_call (Var f) | isNativeIndexFunctionId f = Just (TermVarTy f)
+    read_call (App prefix arg) = do
+      fun <- read_call prefix
+      (domain, _) <- nativeIndexFunctionTypeTys_maybe (typeKind fun)
+      index <- exprToNativeIndex arg
+      mkAppTy fun index <$ guard (typeKind index `eqType` domain)
+    read_call (Cast prefix@App{} co) = do
+      fun <- read_call prefix
+      guard (coercionRole co == Representational)
+      delta <- setNominalRole_maybe Representational co
+      guard (coercionRole delta == Nominal && typeKind fun `eqType` coercionLKind delta)
+      mkCastTy fun delta <$ nativeIndexFunctionTypeTys_maybe (coercionRKind delta)
+    read_call _ = Nothing
 exprToNativeCaseIndex (Var v)
   | isNativeOpaqueValueId v = Just (TermVarTy v)
 exprToNativeCaseIndex expr

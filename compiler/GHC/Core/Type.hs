@@ -231,6 +231,7 @@ module GHC.Core.Type (
     ) where
 
 import GHC.Prelude
+import Control.Monad (guard)
 
 import GHC.Types.Basic
 
@@ -250,7 +251,7 @@ import GHC.Core.Coercion.Axiom
 
 import {-# SOURCE #-} GHC.Core.Coercion
    ( isReflexiveCo
-   , coercionRKind, coercionType
+   , coercionLKind, coercionRKind, coercionRole, coercionType
    , topNormaliseNewType_maybe
    )
 
@@ -2627,22 +2628,24 @@ isNativeIndexFunctionId = isJust . nativeIndexFunctionTys_maybe
 -- | Recover the lexical head, its checked arguments, and the final result kind.
 -- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
 nativeCallSpine_maybe :: Type -> Maybe (Id, [Type], Kind)
-nativeCallSpine_maybe ty = collect ty []
+nativeCallSpine_maybe ty = do
+    (f, args, result) <- collect ty
+    pure (f, reverse args, result)
   where
-    collect (AppTy fun arg) rest = collect fun (arg : rest)
-    collect (TermAppTy f arg) rest
+    collect (TermAppTy f arg)
       | Just (domain, result) <- nativeIndexFunctionTys_maybe f
       , typeKind arg `eqType` domain
-      = do { kind <- check result rest
-           ; return (f, arg : rest, kind) }
-    collect _ _ = Nothing
-
-    check result [] = Just result
-    check fun (arg : rest)
-      | Just (domain, result) <- nativeIndexFunctionTypeTys_maybe fun
-      , typeKind arg `eqType` domain
-      = check result rest
-      | otherwise = Nothing
+      = Just (f, [arg], result)
+    collect (AppTy fun arg) = do
+      (f, args, kind) <- collect fun
+      (domain, result) <- nativeIndexFunctionTypeTys_maybe kind
+      (f, arg : args, result) <$ guard (typeKind arg `eqType` domain)
+    collect (CastTy prefix co) = do
+      (f, args, kind) <- collect prefix
+      let target = coercionRKind co
+      guard (coercionRole co == Nominal && coercionLKind co `eqType` kind)
+      (f, args, target) <$ nativeIndexFunctionTypeTys_maybe target
+    collect _ = Nothing
 
 -- | Check a function field in a structural index schema.
 -- See Note [Function fields in native index domains].

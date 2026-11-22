@@ -1879,8 +1879,10 @@ main = do
         , observeComparison (flip compare) pivot (not pivot)
         , observeComparison (flip compare) pivot pivot ]
     let familyComparison :: (Bool -> CompareAt.Result 'True) -> Bool -> Bool -> Ordering
-        familyComparison cmp x y = case CompareAt.keepFamilyCompare cmp x y of
-            Refl -> cmp x y
+        familyComparison cmp x y = case CompareAt.decideFamilyCompare cmp x y of
+            CompareAt.Less -> LT
+            CompareAt.Equal -> EQ
+            CompareAt.Greater -> GT
     observe "apply the comparison selected by a type family"
         [ familyComparison (flip compare) (not pivot) pivot
         , familyComparison (flip compare) pivot (not pivot) ]

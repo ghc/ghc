@@ -157,6 +157,30 @@ runCurriedCallCoreChecks dflags = do
         optimized = optCoercion (OptCoercionOpts True Nothing) Subst.emptySubst chain
         scope = [cmp, x, y, z, xy, yz, whole]
     check "the comparator is a retained call head" (isNativeIndexFunctionId cmp)
+    let a = mkTyVar (mkSystemName (unique 11570) (mkTyVarOcc "a")) liftedTypeKind
+        source = mkTyVarTy a
+        f = local 11571 "f" (mkVisFunTyManyU boolTy source)
+        nominal = proof 11572 source step
+        repr = mkCoVar (mkSystemName (unique 11573) (mkVarOcc "repr")) (mkReprEqPred source step)
+        prefix = App (Var f) (Var x)
+        call co arg = App (Cast prefix co) (Var arg)
+        castIndex = mkCastTy (TermAppTy f (TermVarTy x)) (mkCoVarCo nominal)
+        expected = mkAppTy castIndex (TermVarTy y)
+    case exprToNativeCaseIndex (call (mkSubCo (mkCoVarCo nominal)) y) of
+        Just index -> do
+            checkType dflags "a cast callback result retains both operands" expected index
+            lintAccepts dflags "cast callback index has scoped nominal evidence"
+                [a, f, x, y, nominal] (Coercion (mkNomReflCo index))
+        Nothing -> fail "FAIL: case classifier lost the nominal cast on the callback result"
+    forM_ [ ("representational evidence", call (mkCoVarCo repr) y)
+          , ("malformed nominal wrapper", call (SubCo (mkCoVarCo repr)) y)
+          , ("reversed evidence", call (mkSubCo (mkSymCo (mkCoVarCo nominal))) y)
+          , ("wrong second operand", call (mkSubCo (mkCoVarCo nominal)) cmp)
+          , ("unapplied callback", App (Cast (Var f) (mkSubCo (mkCoVarCo nominal))) (Var x))
+          ] $ \(label, expr) ->
+        check ("case classifier rejects " ++ label) $ case exprToNativeCaseIndex expr of
+            Nothing -> True
+            Just{} -> False
     checkType dflags "the prefix has the second argument's arrow" step (typeKind partial)
     check "the second application uses ordinary AppTy" $ case result of
         AppTy (TermAppTy f (TermVarTy a)) (TermVarTy b) -> (f, a, b) == (cmp, x, y)

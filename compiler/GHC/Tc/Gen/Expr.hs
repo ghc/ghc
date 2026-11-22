@@ -47,6 +47,7 @@ import GHC.Tc.Gen.Match( tcBody, tcScopedRuntimeBody, tcLambdaMatches, tcCaseMat
                        , implicitPayloadType, matchesImplicitPayloadPat
                        , tcGRHSNE, tcDoStmts )
 import GHC.Tc.Instance.Family ( tcGetFamInstEnvs )
+import GHC.Tc.Solver.Monad ( bumpReductionDepthTcM, matchFamTcM )
 import GHC.Tc.Zonk.TcType
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType as TcType
@@ -56,6 +57,7 @@ import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic, hasFixedRuntimeRep 
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.CtLoc ( CtLoc )
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Errors.Types hiding (HoleError)
 
@@ -65,6 +67,7 @@ import GHC.Core.Dependent ( hasNativeDependentExpr, supportsQuickLookType )
 import GHC.Core.Utils (applyTypeToArgs)
 import GHC.Core.UsageEnv
 import GHC.Core.FamInstEnv    ( FamInstEnvs )
+import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.Class(classTyCon)
@@ -1842,6 +1845,7 @@ checkedNativeCallIndex expr result_ty
   | HsApp _ fun _ <- unLoc (stripParensLHsExpr expr)
   , local_head fun
   = do { core <- checkedNativeCallArgument emptyNameEnv expr
+       ; result_ty <- liftZonkM (zonkTcType result_ty)
        ; return $ do
            index <- core >>= Core.exprToNativeCaseIndex
            guard (typeKind index `eqType` result_ty)
@@ -1850,6 +1854,7 @@ checkedNativeCallIndex expr result_ty
   where
     local_head :: LHsExpr GhcTc -> Bool
     local_head fun = case unLoc (stripParensLHsExpr fun) of
+      XExpr (WrapExpr (WpCast _) inner) -> local_head (noLocA inner)
       HsApp _ inner _ -> local_head inner
       HsVar _ (L _ f) -> isNativeIndexFunctionId f
       _ -> False
@@ -1869,7 +1874,7 @@ checkedNativeCallArgument bound expr
         , Just domain_name <- simple_signature signature
         -> checked_beta domain_name inner arg
         | otherwise
-        -> do { fun' <- checkedNativeCallArgument bound fun
+        -> do { fun' <- checked_fun fun
               ; case fun' of
                   Nothing -> return Nothing
                   Just core_fun -> do
@@ -1890,6 +1895,40 @@ checkedNativeCallArgument bound expr
         -> checkedNativeCallArgument bound inner
       _ -> return Nothing
   where
+    -- See Note [Cases on a cast callback result].
+    checked_fun :: LHsExpr GhcTc -> TcM (Maybe Core.CoreExpr)
+    checked_fun fun
+      | XExpr (WrapExpr (WpCast co) inner) <- unLoc (stripParensLHsExpr fun)
+      = runMaybeT $ do
+          prefix@Core.App{} <- MaybeT (checkedNativeCallArgument bound (noLocA inner))
+          index <- MaybeT (pure (Core.exprToNativeCaseIndex prefix))
+          checked <- liftMaybeT (liftZonkM (zonkCo co))
+          let source = coercionLKind checked
+              target = coercionRKind checked
+          guard (coercionRole checked == Representational && typeKind index `eqType` source)
+          case setNominalRole_maybe Representational checked of
+            Just _ | isJust (nativeIndexFunctionTypeTys_maybe target) ->
+              pure (Core.Cast prefix checked)
+            _ -> do
+              loc <- liftMaybeT (getCtLocM PatCheckOrigin Nothing)
+              delta <- MaybeT (tryTcDiscardingErrs (pure Nothing) $
+                               runMaybeT (expose_arrow loc source))
+              let arrow = coercionRKind delta
+              _ <- liftMaybeT (unifyType Nothing arrow target)
+              target' <- liftMaybeT (liftZonkM (zonkTcType target))
+              Core.Cast prefix (mkSubCo delta) <$ guard (target' `eqType` arrow)
+      | otherwise = checkedNativeCallArgument bound fun
+
+    expose_arrow :: CtLoc -> TcType -> MaybeT TcM CoercionN
+    expose_arrow loc ty = do
+      (family, args) <- MaybeT (pure (tcSplitTyConApp_maybe ty))
+      guard (isTypeFamilyTyCon family && not (isConstrainedFamilyTyCon family))
+      Reduction step rhs <- MaybeT (matchFamTcM family args)
+      loc' <- liftMaybeT (bumpReductionDepthTcM loc ty)
+      if isJust (nativeIndexFunctionTypeTys_maybe rhs)
+        then pure step
+        else mkTransCo step <$> expose_arrow loc' rhs
+
     -- Read only erased type application wrappers, in application order.
     type_arguments WpHole = Just []
     type_arguments (WpTyApp ty) = Just [ty]
@@ -1983,6 +2022,26 @@ argument. Their blobs are 02991c9fa0085315cc854d2833a9080af14a7740 and
 not GHC multiplicity defaulting or Haskell demand laws. See
 docs/dependent-haskell/REFERENCES.md#checked-constructor-call-arguments-prior-art
 and Note [Source opaque call refinement] in GHC.Tc.Gen.Match.
+-}
+
+{- Note [Cases on a cast callback result]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose f :: Bool -> Result 'True and Result 'True reduces to
+Bool -> Ordering. In case f x y of ..., the checked scrutinee casts
+f x to that arrow before it applies y. The branch proof must use the
+same f, x and y, with a nominal cast on f x.
+
+The original cast can still have a coercion hole and unsolved argument
+multiplicity or result type. Follow nominal family equations at the
+head of its source until they expose the arrow. Unify that arrow with
+the original target and read the solved types. Keep the actual written
+scrutinee for execution. Core Lint and the interface reader recover the
+index from its cast and operands in GHC.Core.exprToNativeCaseIndex.
+
+A bare function variable still has its declared domain. Only the result
+of an existing application can carry this cast in a checked call.
+Agda's with-abstraction equality also relates a matched result to the
+original computation. See docs/dependent-haskell/REFERENCES.md.
 -}
 
 {- Note [Checked source call arguments]

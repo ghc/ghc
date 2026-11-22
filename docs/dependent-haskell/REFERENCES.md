@@ -5813,6 +5813,16 @@ coercion comes from GHC's treatment of family-defined arrow kinds.
 [GHC kind matching](../../compiler/GHC/Tc/Utils/Unify.hs)
 and [comparison example](examples/open-evaluation/CompareAt.hs).
 
+Agda's `with … in eq` retains the relationship between a computation
+and the value matched by a clause. DC uses explicit coercions for
+conversion. In this fork, matching `cmp x y` must also account for the
+cast on `cmp x` when its result type is a family. The compiler recovers
+a nominal proof for that cast. Evaluation uses the original scrutinee.
+Changing the scrutinee to `cmp y x` leaves the claimed index unproved.
+[Agda with-abstraction equality](https://agda.readthedocs.io/en/v2.8.0/language/with-abstraction.html#with-abstraction-equality),
+[Weirich et al., DC](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf)
+and [source and demand controls](../../testsuite/tests/dependent/should_run/NativeLiftedCallback.sh).
+
 ### Upgrading checked method interfaces
 
 Agda checks the interface version before decoding a module. It also

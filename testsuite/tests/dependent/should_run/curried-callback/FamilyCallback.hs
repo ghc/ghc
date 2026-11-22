@@ -1,9 +1,26 @@
-{-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, TypeFamilies, TypeOperators #-}
-module FamilyCallback (Result, law) where
+{-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, TypeFamilies, TypeOperators, UndecidableInstances #-}
+module FamilyCallback (Result, Via, decideVia, law) where
 
-import CompareAt (Result)
+import CompareAt (Result, Witness(..))
+import Data.Kind (Type)
 import Data.Proxy (Proxy)
 import Data.Type.Equality ((:~:)(Refl))
+
+-- | Expose the callback arrow through two family equations.
+type family Via (tag :: Bool) :: Type where
+    Via tag = Result tag
+
+{-# INLINE decideVia #-}
+decideVia :: foreach (cmp :: Bool -> Via 'True)
+          -> foreach (x :: Bool) -> foreach (y :: Bool) -> Witness (cmp x y)
+#ifdef SWAPPED
+decideVia cmp x y = case cmp y x of
+#else
+decideVia cmp x y = case cmp x y of
+#endif
+    LT -> Less
+    EQ -> Equal
+    GT -> Greater
 
 -- | Keep the callback and its argument unevaluated at a family result.
 #ifdef AMBIGUOUS

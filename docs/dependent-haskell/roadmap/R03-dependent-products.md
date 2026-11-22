@@ -61,6 +61,13 @@ write `f x y` in a result type. An ordinary client can force the
 equality proof while leaving all three arguments unevaluated. A second
 argument to `f x` gives GHC-83865 at that argument when the family
 returns `Bool` or its result is unknown.
+The provider can also match `cmp x y` and return a witness indexed by
+that same call. An ordinary client observes the ordering. A constant
+comparator leaves both arguments unevaluated, and a bottom comparator
+raises its exception when the client forces the witness.
+An optimized interface can retain the cast in an `INLINE` unfolding.
+The previous compiler rejects that unfolding when it reconstructs the
+case equality. The new reader checks it and compiles the ordinary client.
 [Example](../examples/open-evaluation/CompareAt.hs)
 and [source checks](../../../testsuite/tests/dependent/should_run/NativeLiftedCallback.sh).
 

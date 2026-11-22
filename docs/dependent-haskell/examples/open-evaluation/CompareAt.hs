@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeFamilies, TypeOperators #-}
-module CompareAt (Witness(..), decideCompare, keepCompare, Result, keepFamilyCompare) where
+module CompareAt (Witness(..), decideCompare, keepCompare, Result, decideFamilyCompare, keepFamilyCompare) where
 
 import Data.Kind (Type)
 import Data.Type.Equality ((:~:)(Refl))
@@ -22,6 +22,14 @@ keepCompare _ _ _ = Refl
 type family Result (tag :: Bool) :: Type where
     Result 'True = Bool -> Ordering
     Result 'False = Bool
+
+-- | Observe the result of the function selected by the family.
+decideFamilyCompare :: foreach (cmp :: Bool -> Result 'True)
+                    -> foreach (x :: Bool) -> foreach (y :: Bool) -> Witness (cmp x y)
+decideFamilyCompare cmp x y = case cmp x y of
+    LT -> Less
+    EQ -> Equal
+    GT -> Greater
 
 -- | Apply both arguments in the index without evaluating the comparison.
 keepFamilyCompare :: foreach (cmp :: Bool -> Result 'True)
