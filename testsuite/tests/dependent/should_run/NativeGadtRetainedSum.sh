@@ -94,6 +94,50 @@ HS
         grep -Eq "$expected" reject.log || { cat reject.log >&2; exit 1; }
     done
 
+    cat >WrongDirectIndex.hs <<'HS'
+{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}
+module WrongDirectIndex where
+import Data.Type.Equality ((:~:)(Refl))
+import NativeGadtRetainedSumProvider
+wrong :: DirectVec a n -> Maybe (n :~: 'Z)
+wrong (DirectVec (S _) _) = Just Refl
+wrong (DirectVec Z _) = Just Refl
+HS
+    if "${ghc[@]}" "${flags[@]}" -ferror-spans -c WrongDirectIndex.hs >reject.log 2>&1; then
+        echo "Accepted a zero proof for a successor index" >&2
+        exit 1
+    fi
+    grep -Fq 'WrongDirectIndex.hs:6:34-37: error: [GHC-05617]' reject.log ||
+        { cat reject.log >&2; exit 1; }
+
+    if [[ $mode == O0 ]]; then
+        cat >DirectIndexCoverage.hs <<'HS'
+{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}
+module DirectIndexCoverage where
+import NativeGadtRetainedSumProvider
+
+knownZero :: DirectVec a 'Z -> Bool
+knownZero (DirectVec Z _) = True
+
+knownSuccessor :: DirectVec a ('S n) -> a
+knownSuccessor (DirectVec (S _) (VCons x _)) = x
+
+unknownZero :: DirectVec a n -> Bool
+unknownZero (DirectVec Z _) = True
+
+knownUnreachable :: DirectVec a 'Z -> Bool
+knownUnreachable (DirectVec (S _) _) = False
+knownUnreachable (DirectVec Z _) = True
+HS
+        "${ghc[@]}" "${flags[@]}" -ferror-spans -Wincomplete-patterns -Woverlapping-patterns \
+            -c DirectIndexCoverage.hs >coverage.log 2>&1
+        for span in 6:1-32 9:1-48 12:1-34; do
+            grep -Fq "DirectIndexCoverage.hs:$span: warning: [GHC-62161]" coverage.log ||
+                { cat coverage.log >&2; exit 1; }
+        done
+        test "$(grep -c 'warning:' coverage.log)" -eq 3 || { cat coverage.log >&2; exit 1; }
+    fi
+
     cat >BadScope.hs <<'HS'
 {-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, RankNTypes #-}
 module BadScope where

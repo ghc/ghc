@@ -1692,6 +1692,23 @@ The source observations check those orders, proof demand, partial fields and
 ordinary row failure separately. These runtime observations do not prove
 preservation or totality for this fork.
 
+#### Refine the public index of a stored witness
+
+Agda's `Σ` record gives its second field the type `B fst`. The standard
+library's `uncurry` passes both fields to a dependent function.
+[Agda's `Σ` record](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#the-s-type)
+and [`uncurry`](https://agda.github.io/agda-stdlib/v2.4/Data.Product.Base.html#126).
+
+In the manual's `focusAt` example, an earlier equality lets a later
+`with` pattern open a pair and match the second vector with `focus ∷ after`.
+[Agda's `focusAt` example](https://agda.readthedocs.io/en/v2.8.0/language/with-abstraction.html#irrefutable-with).
+
+In `SomeVec (S _) (VCons x _)`, the match on `S` refines the payload's
+type. The constructor's result equality relates the stored length to
+the public index. The Haskell client can use both equalities in later
+argument patterns and in its result. The match compiler scopes their
+combined evidence after all the constructor fields.
+
 ## Source vector uncons
 
 Decision: inspect the stored runtime length before repackaging a vector tail.
