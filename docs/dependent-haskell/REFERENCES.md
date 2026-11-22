@@ -275,6 +275,18 @@ the rule's scope and types. The rule supplies no equality to the type checker.
 [Playing by the Rules](https://inst.eecs.berkeley.edu/~cs294-260/sp24/papers/haskell-rules.pdf)
 and [Agda rewriting](https://agda.readthedocs.io/en/latest/language/rewriting.html).
 
+Peyton Jones, Tolmach and Hoare describe Core rules as typed templates.
+The matcher can instantiate a callback before it matches the next
+argument. For a retained callback, the next argument's type can mention
+the instantiated call. The matcher reads the index with the same nominal
+cast check as dependent application. It substitutes the checked
+expression and preserves its proof. Dependent application in System DC
+substitutes the argument into the codomain. Here that substitution
+checks a rule match. The optimizer rule supplies no conversion evidence.
+[Playing by the Rules, §§2 and 6](https://inst.eecs.berkeley.edu/~cs294-260/sp24/papers/haskell-rules.pdf),
+[System DC, Figure 7](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf#page=15),
+and [Core rule matching](../../compiler/GHC/Core/Rules.hs).
+
 Agda distinguishes variables bound inside a rewrite pattern from the
 variables instantiated by a match. GHC's Core rule matcher already
 makes that distinction under lambdas. An existential opening adds two

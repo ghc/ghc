@@ -283,6 +283,25 @@ coercion is supported. Core Lint checks the role and the two endpoints.
 the element type under a given equality. GHC-59107 identifies a binding
 with other unsupported Core forms.
 
+### Rules on an indexed callback
+
+The rule `forall f x p. readKept f x p = readChoice p` takes a payload
+at `Choice (f x)`. The matcher first matches the callback and input.
+It checks the payload at that same call index. A nominal cast can come
+from family equations at both ends of the callback arrow, or from two
+local equality proofs. The matcher keeps the lexical callback and
+its proofs. A private class selector receiver still needs a bare variable.
+
+At `-O1` and `-O2`, the ordinary client fires the rule using just the
+provider's interface and object. A different callback in the payload
+index and a representational-only input conversion both fail to
+typecheck. At `-O0`, the client returns the same values without firing
+the rule. The positive input ignores the callback and its argument.
+For a negative input the result depends on the callback's Boolean.
+[Provider](../examples/qualified-pi/CallbackRules.hs),
+[ordinary client](../examples/qualified-pi/CallbackRulesClient.hs)
+and [rule-firing and demand checks](../examples/qualified-pi/check-retained-rules.sh).
+
 ### Standard `-O2` object code
 
 Liberate-case traverses a package and places the opened witness and value
