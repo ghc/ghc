@@ -101,6 +101,7 @@ import GHC.Tc.Gen.OpenTypeEval (OpenTypeFailure(InvalidInput), instantiateOpenMe
                                openTypeFailureReason, readOpenMethodWorker)
 import GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourceTableFamilyUse, sourceTableTypeUses,
                               sourceCaseKindUse, sourceTableReferenceUse, indexedProjectionSource, isSourceConstructorCase, monomorphicEnumCaseArity, sourceCaseVisibleArity, sourceTableOwner, sourcePairBuilderField,
+                              isFinalStructuralSource,
                               lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource,
                               lookupSourceBinaryMethod, sourceMapSelector, lookupSourceContainerMethod,
                               lookupSourceGroundDFun, lookupSourceCheckedMapMethod,
@@ -3201,7 +3202,7 @@ tc_app_ty_other mode rn_ty exp_kind
   , isTypeLevel (mode_tyki mode)
   , ordinary_call || (lengthIs args 1 && isQual rdr && ready_partial_call)
   = do { staging <- closedOperandStaging args
-       ; executable <- tcClosedCaseExecutableOwner rdr name args staging
+       ; executable <- tcClosedCaseExecutableOwner False rdr name args staging
        ; case executable of
            Just owner -> run loc (\hint -> tcPlanExecutableCase mode ordinary_call hint owner args)
            Nothing
@@ -3727,7 +3728,7 @@ tcPlanClosedTree mode ordinary hint root arguments = do
           table <- tcLookupTyCon child
           if admissibleFamilyOperands args staging && supportsClosedFamilyTree table args
             then do
-              executable <- tcClosedCaseExecutableOwner rdr child args staging
+              executable <- tcClosedCaseExecutableOwner True rdr child args staging
               case executable of
                 Just fun -> collect False fun (Just expected) args
                 Nothing -> collect_family table (Just expected) args
@@ -4045,7 +4046,7 @@ tcPlanClosedHead :: TcTyMode -> Bool -> Maybe Kind -> RdrName -> Name
 tcPlanClosedHead mode ordinary_call hint rdr name args
   | isSourceFamilyName name = do
       staging <- closedOperandStaging args
-      executable <- tcClosedCaseExecutableOwner rdr name args staging
+      executable <- tcClosedCaseExecutableOwner True rdr name args staging
       case executable of
         Just owner -> tcPlanExecutableCase mode ordinary_call hint owner args
         Nothing -> do
@@ -4076,8 +4077,9 @@ tcPlanExecutableCase mode False hint owner = tcPlanOrdinaryCall mode False hint 
 
 -- | Preserve the ordinary execution route for an existing staged constructor case call.
 -- See Note [Selecting the closed constructor case route].
-tcClosedCaseExecutableOwner :: RdrName -> Name -> [LHsType GhcRn] -> Maybe Bool -> TcM (Maybe Id)
-tcClosedCaseExecutableOwner rdr name args staging
+tcClosedCaseExecutableOwner :: Bool -> RdrName -> Name -> [LHsType GhcRn] -> Maybe Bool
+                            -> TcM (Maybe Id)
+tcClosedCaseExecutableOwner nested rdr name args staging
   | isQual rdr || isUnqual rdr
   , Just needs_execution <- staging
   = do
@@ -4088,9 +4090,11 @@ tcClosedCaseExecutableOwner rdr name args staging
           staged = needs_execution &&
                    (sourceCaseVisibleArity table == Just (length args) ||
                     (not nominal_prefix && any (isJust . bareClosedCallback) args))
-      owner <- if expect_eager || staged then sourceTableOwner table else pure Nothing
+          nested_case = nested && lengthIs args 2 && sourceCaseVisibleArity table == Just 2
+      owner <- if expect_eager || staged || nested_case then sourceTableOwner table else pure Nothing
       case owner of
-        Just fun | staged || sourceTableKeepsExecutable fun -> do
+        Just fun | staged || (expect_eager && sourceTableKeepsExecutable fun) ||
+                             (nested_case && isFinalStructuralSource fun) -> do
           imported <- isClosedOrdinaryImport rdr (getName fun)
           if imported
             then do
@@ -4208,6 +4212,12 @@ registering any nominal family use. This preserves existing staged calls
 even if later declarations add a rule for the projection. An imported
 constraint, a rigid operand, or an unavailable executable still uses the
 checked family. Never recover from a failed execution by trying an axiom.
+
+A checked case on two structural size operands can inspect its second
+operand. The nominal closed-tree planner only checks a carried second
+operand. In a nested ordinary call with closed operands, keep the existing
+executable route for the structural size owner. Direct nominal applications
+still use the checked table.
 
 A partial application that supplies only checked callbacks uses the
 nominal route even when object code is available. The staged evaluator
