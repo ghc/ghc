@@ -97,11 +97,19 @@ checked method. A rule that changes the selected method invalidates a
 proof that uses its result. A constant family can ignore the same
 argument. A warm build reviews eligible home providers once. An older
 installed provider needs its source rebuilt to recover omitted evidence.
-R13 verifies a zip with two different element types. Its first empty
-row leaves the second list unevaluated. Recursion that can decrease
-either list and local signatures in R18 type-level lets are under test.
 [Open evaluation](roadmap/R16-open-term-evaluator.md) and
 [upgrade checks](CHECKPOINTS.md#shared-r11-and-r16-rebuild).
+
+Four changes share one normal compiler build. The card totals above
+count the published results. Each change extends a card that is already
+partially implemented.
+
+| Card | Behavior under test | Regression to catch |
+| --- | --- | --- |
+| [R04 dependent sums](roadmap/R04-dependent-sums.md) | An ordinary caller matches the length stored in an indexed vector. | A known zero length should make the zero branch exhaustive. At an unknown length, omitting the successor branch should still warn. |
+| [R12 class promotion](roadmap/R12-promote-classes.md) | A client proves that derived `fmap` applies a runtime predicate and preserves the other field of `These`. | An instance that discards the field must reject the original proof. A warm build must recover the same checked equations as a clean build. |
+| [R13 function promotion](PLAN.md#constructor-specialization) | A recursive function can consume either list when the other list stays the same or also gets shorter. | Specialization at `-O2` must preserve the checked equations and which inputs each branch forces. |
+| [R18 type-level lets](roadmap/R18-type-level-lets.md) | An ordered type-level `let` can give a local binding its own kind signature. | Scope, diagnostics, exact printing and Template Haskell must agree with the source. |
 
 For the remaining work on each card, use the table below. The
 [previous queue](CHECKPOINTS.md#vector-split-and-package-checkpoints)
