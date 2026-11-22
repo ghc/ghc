@@ -2506,7 +2506,8 @@ of ``-W(no-)*``.
 
     Warn about uses of a global name when a name from the other namespace
     would conflict with it in a single namespace. A qualifier can avoid
-    the conflict if it selects only one of the competing names.
+    the conflict if it selects only one of the competing names. The check
+    uses name resolution across normal, quote and splice imports.
 
     Also warn about implicit type-variable uses that would capture a
     term name, and about list and boxed tuple type syntax that depends on

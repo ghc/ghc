@@ -85,6 +85,13 @@ scope tracking. The two reader namespaces retain the selected
 names but do not record which binding group is closer to a use.
 The annotation in `f @a = \(a :: a) -> a` is checked before its
 term variable is bound. A test for another same-spelled name in
-scope cannot distinguish these cases. The implementation also
-leaves explicitly staged imports, non-bare export items, and
-types inside type patterns outside the global-name check.
+scope cannot distinguish these cases. The global-name check still
+leaves non-bare export items and types inside type patterns open.
+
+Global pun-use checks include normal, quote and splice imports. Proposal
+#682 resolves names before checking their levels, so a conflicting name
+at another level can still make the unified namespace ambiguous. A
+qualifier selecting one namespace disambiguates the use. GHC checks
+the level of the name it actually selected as before.
+[Staged import regression](../../../testsuite/tests/rename/should_compile/StagedPunUses.hs)
+and [proposal #682, name resolution](https://ghc-proposals.readthedocs.io/en/latest/proposals/0682-explicit-level-imports.html#name-resolution-and-ambiguous-variables).
