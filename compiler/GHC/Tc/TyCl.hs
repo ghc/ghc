@@ -1799,7 +1799,6 @@ swizzleTcTyConBndrs tc_infos
     swizzleMapper :: TyCoMapper StrictIdentity
     swizzleMapper = TyCoMapper { tcm_tyvar = swizzle_tv
                                , tcm_termvar = \v -> pprPanic "swizzleMapper: native term index not implemented" (ppr v)
-                               , tcm_termfun = \v -> pprPanic "swizzleMapper: native call index not implemented" (ppr v)
                                , tcm_termbinder = \v _ -> pprPanic "swizzleMapper: native dependent binder not implemented" (ppr v)
                                , tcm_covar = swizzle_cv
                                , tcm_hole  = swizzle_hole

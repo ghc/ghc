@@ -37,7 +37,7 @@ module GHC.Core (
         exprToNativeIndex, normaliseNativeIndexExpr, mapNativeIndex, mapNativeIndexWithNatural,
         nativeSourceCallIndex, nativeComputedIndex, retainedArgIndex, nativeDeferredArgIndex,
         exprToNativeCaseIndex, isNativeCaseValueIndex, isNativeIndexedCaseScrutinee,
-        termVar_maybe, nativeIndexFunctionVar_maybe, nativeIndexArgKinds,
+        termVar_maybe, nativeIndexFunctionVar_maybe, nativeIndexFunctionArgIndex, nativeIndexArgKinds,
         nativeClassSelectorTys, nativeClassSelectorIndex, nativeIndexedConArgs,
         nativeIndexedConApp_maybe, splitNativeIndexedConApp, isNativeConstructedGadtIndex,
         nativeFamilyConHead_maybe, nativeFamilyPromotedCon_maybe,
@@ -2809,6 +2809,20 @@ nativeIndexFunctionVar_maybe :: CoreExpr -> Maybe Id
 nativeIndexFunctionVar_maybe (Var f)
   | isNativeIndexFunctionId f = Just f
 nativeIndexFunctionVar_maybe _ = Nothing
+
+-- | Reify a lexical callback and any checked nominal casts on its result.
+-- See Note [Function-valued retained binders] in GHC.Core.Type.
+nativeIndexFunctionArgIndex :: CoreExpr -> Maybe Type
+nativeIndexFunctionArgIndex (Cast body co) = do
+  delta <- nativeIndexCastCo_maybe co
+  let source = coercionLKind delta
+      target = coercionRKind delta
+  guard (not (source `eqType` target))
+  _ <- nativeIndexFunctionTypeTys_maybe target
+  index <- nativeIndexFunctionArgIndex body
+  guard (typeKind index `eqType` source)
+  return (mkCastTy index delta)
+nativeIndexFunctionArgIndex arg = TermVarTy <$> nativeIndexFunctionVar_maybe arg
 
 -- | Recover an index for an existing strict case, including an opaque call.
 -- This does not admit a call as a lazy retained application argument.

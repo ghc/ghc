@@ -62,7 +62,8 @@ import {-# SOURCE #-} GHC.Core.Coercion ( mkCoercionType, coVarTypesRole, mkTyCo
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprTyVar )
 import {-# SOURCE #-} GHC.Core.Ppr ( ) -- instance Outputable CoreExpr
 import {-# SOURCE #-} GHC.Core ( CoreExpr, retainedArgIndex, normaliseNativeIndexExpr,
-                                nativeComputedIndex, varToCoreExpr, termVar_maybe, nativeIndexFunctionVar_maybe )
+                                nativeComputedIndex, varToCoreExpr, termVar_maybe,
+                                nativeIndexFunctionArgIndex )
 import {-# SOURCE #-} GHC.Core.Subst ( substExpr )
 import {-# SOURCE #-} GHC.Core.Type( isCoercionTy, isNativeIndexFunctionId
                                  , typeKind, coreFullView )
@@ -88,6 +89,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Monad.StrictIdentity
 import GHC.Utils.Monad.StrictReader
 
+import Control.Applicative ((<|>))
 import Data.List (mapAccumL)
 
 {-
@@ -246,7 +248,7 @@ emptyCvSubstEnv = emptyVarEnv
 
 -- | Composes two substitutions, applying the second one provided first,
 -- like in function composition. Compose structural index expressions,
--- checked source calls and function-head variables in the Id environment.
+-- checked source calls and function operands in the Id environment.
 composeTCvSubst :: Subst -> Subst -> Subst
 composeTCvSubst subst1@(Subst is1 ids1 tenv1 cenv1) (Subst is2 ids2 tenv2 cenv2)
   = Subst is3 ids3 tenv3 cenv3
@@ -264,8 +266,7 @@ composeTCvSubst subst1@(Subst is1 ids1 tenv1 cenv1) (Subst is2 ids2 tenv2 cenv2)
     extended_subst1 = subst1 `setInScope` is3
 
     compose_index rhs
-      | Just f <- nativeIndexFunctionVar_maybe rhs
-      = varToCoreExpr (substNativeIndexFunction extended_subst1 f)
+      | Just _ <- nativeIndexFunctionArgIndex rhs = substExpr extended_subst1 rhs
       -- Keep the called Id when composing its arguments. See
       -- Note [Source calls in retained arguments] in GHC.Core.
       | Just (normal, _) <- normaliseNativeIndexExpr rhs = substExpr extended_subst1 normal
@@ -332,16 +333,13 @@ setInScope (Subst _ ids tvs cvs) in_scope = Subst in_scope ids tvs cvs
 -- substitution as a non-deterministic set.
 getSubstRangeTyCoFVs :: Subst -> VarSet
 getSubstRangeTyCoFVs (Subst _ ids tenv cenv)
-  = tenvFVs `unionVarSet` cenvFVs `unionVarSet` indexFVs `unionVarSet` functionFVs
+  = tenvFVs `unionVarSet` cenvFVs `unionVarSet` indexFVs
   where
     tenvFVs = tyCoVarsOfTyVarEnv tenv
     cenvFVs = tyCoVarsOfCoVarEnv cenv
     indexFVs = tyCoVarsOfTypes
-      [ index | rhs <- nonDetEltsUFM ids, Just index <- [retainedArgIndex rhs] ]
-    functionFVs = unionVarSets
-      [ unitVarSet f `unionVarSet` tyCoVarsOfType (varType f)
-                     `unionVarSet` tyCoVarsOfType (idMult f)
-      | rhs <- nonDetEltsUFM ids, Just f <- [nativeIndexFunctionVar_maybe rhs] ]
+      [ index | rhs <- nonDetEltsUFM ids
+              , Just index <- [nativeIndexFunctionArgIndex rhs <|> retainedArgIndex rhs] ]
 
 isInScope :: Var -> Subst -> Bool
 isInScope v (Subst in_scope _ _ _) = v `elemInScopeSet` in_scope
@@ -844,7 +842,6 @@ substTyCoMapper :: TyCoMapper SubstM
 substTyCoMapper
   = TyCoMapper { tcm_tyvar      = subst_tv
                , tcm_termvar    = subst_index
-               , tcm_termfun    = subst_fun
                , tcm_termbinder = index_bndr
                , tcm_covar      = subst_cv
                , tcm_hole       = subst_ch
@@ -860,8 +857,6 @@ substTyCoMapper
    subst_index v = StrictReaderT $ \subst ->
      return (substNativeIndexUsing substTy subst v)
 
-   subst_fun f = StrictReaderT $ \subst -> return (substNativeIndexFunction subst f)
-
    index_bndr :: Id -> (Id -> SubstM r) -> SubstM r
    index_bndr old k = StrictReaderT $ \subst ->
      let (subst', new) = substNativeIndexBndr subst old
@@ -873,23 +868,6 @@ substTyCoMapper
        let !(subst', tcv') = substVarBndrUnchecked subst tcv
            -- Sadly unchecked because subst_ty is used from substTyUnchecked
        in runStrictReaderT (k tcv') subst'
-
--- | Rename a checked function head. Return a stored range only once.
--- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
-substNativeIndexFunction :: Subst -> Id -> Id
-substNativeIndexFunction subst@(Subst in_scope ids _ _) f
-  | isNativeIndexFunctionId f, isNativeIndexFunctionId actual
-  , substTy subst (varType f) `eqType` varType actual
-  = actual
-  | otherwise = pprPanic "substTy: invalid native function head"
-                  (ppr f <+> ppr actual)
-  where
-    actual = case lookupVarEnv ids f of
-      Nothing -> lookupInScope in_scope f `orElse` f
-      Just rhs -> case nativeIndexFunctionVar_maybe rhs of
-        Just g -> g
-        Nothing -> pprPanic "substTy: unsupported native function range"
-                     (ppr f <+> text ":=" <+> ppr rhs)
 
 -- | Substitute a source index occurrence and return its target only once.
 -- See Note [Substituting runtime Id metadata].
@@ -905,16 +883,25 @@ substNativeIndexUsing subst_ty subst@(Subst in_scope ids _ _) v
         Nothing -> lookupInScope in_scope v `orElse` v
         _ -> pprPanic "substTy: unsupported experimental dictionary substitution" (ppr v)
   | isNativeIndexFunctionId v
-  = TermVarTy (substNativeIndexFunction subst v)
-    -- Keep the same Var-only ranges as a native call head.
-    -- See Note [Native function-value application] in GHC.Core.TyCo.Make.
+  = case lookupVarEnv ids v of
+      Nothing | isNativeIndexFunctionId actual -> check_function (TermVarTy actual)
+              | otherwise -> invalid_head (ppr actual)
+      Just rhs | Just index <- nativeIndexFunctionArgIndex rhs -> check_function index
+               | otherwise -> pprPanic "substTy: unsupported native function range"
+                                 (ppr v <+> text ":=" <+> ppr rhs)
   | otherwise
   = case lookupVarEnv ids v of
-      Nothing -> TermVarTy (lookupInScope in_scope v `orElse` v)
+      Nothing -> TermVarTy actual
       Just rhs -> case retainedArgIndex rhs of
-        Just index | typeKind index `eqType` subst_ty subst (varType v) -> index
+        Just index | typeKind index `eqType` expected -> index
         _ -> pprPanic "substTy: unsupported runtime index or changed domain"
                      (ppr v <+> text ":=" <+> ppr rhs)
+  where
+    actual = lookupInScope in_scope v `orElse` v
+    expected = subst_ty subst (varType v)
+    check_function index | typeKind index `eqType` expected = index
+                         | otherwise = invalid_head (ppr index)
+    invalid_head target = pprPanic "substTy: invalid native function head" (ppr v <+> target)
 
 -- | Substitute a runtime binder's metadata and mask its outer substitution.
 -- Use the resulting substitution only inside the binder's scope.
@@ -1215,7 +1202,6 @@ deepSubstTyCoMapper :: TyCoMapper SubstM
 deepSubstTyCoMapper
   = TyCoMapper { tcm_tyvar      = subst_tv
                , tcm_termvar    = subst_index
-               , tcm_termfun    = tcm_termfun substTyCoMapper
                , tcm_termbinder = index_bndr
                , tcm_covar      = subst_cv
                , tcm_hole       = subst_ch

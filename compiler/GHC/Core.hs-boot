@@ -17,5 +17,5 @@ normaliseNativeIndexExpr :: CoreExpr -> Maybe (CoreExpr, Type)
 nativeSourceCallIndex :: CoreExpr -> Maybe Type
 nativeComputedIndex :: CoreExpr -> Maybe Type
 termVar_maybe :: CoreExpr -> Maybe Id
-nativeIndexFunctionVar_maybe :: CoreExpr -> Maybe Id
+nativeIndexFunctionArgIndex :: CoreExpr -> Maybe Type
 mapNativeIndex :: (Type -> Type) -> CoreExpr -> CoreExpr

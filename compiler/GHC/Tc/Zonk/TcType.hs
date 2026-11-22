@@ -230,7 +230,6 @@ zonkCo      :: Coercion -> ZonkM Coercion
     zonkTcTypeMapper = TyCoMapper
       { tcm_tyvar = zonkTcTyVar
       , tcm_termvar = fmap TermVarTy . zonkId
-      , tcm_termfun = zonkId
       , tcm_termbinder = \v k -> zonkId v >>= k
           -- See Note [Zonking runtime index metadata]
       , tcm_covar = \cv -> mkCoVarCo <$> zonkTyCoVarKind cv

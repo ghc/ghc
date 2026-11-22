@@ -1220,13 +1220,13 @@ nameNativeConstructorArgs platform expr
         else nativeIndexTransportError "the domain of a computed retained argument"
       | DepFunTy _ index _ <- coreFullView ty
       , isNativeIndexFunctionId index
-      = case nativeIndexFunctionVar_maybe arg of
-          Just actual
-            | varType actual `eqType` varType index
-            -> build (applyTypeToArgs ty [Var actual]) (App app (Var actual))
+      = case nativeIndexFunctionArgIndex arg of
+          Just argument_index
+            | typeKind argument_index `eqType` varType index
+            -> build (applyTypeToArgs ty [arg]) (App app arg)
                      transport wrap rest
           _ -> throwGhcException (Sorry
-                 "Native dependent Core requires a retained function argument to be an eligible local variable of its fixed function type in CorePrep.")
+                 "Native dependent Core requires a checked local callback in CorePrep.")
       | DepFunTy _ index _ <- coreFullView ty
       -- See Note [Naming later retained domains].
       = do { domain_co <- liftNativeIndexTransport platform "a later retained domain" transport (varType index)

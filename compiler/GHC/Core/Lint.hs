@@ -46,6 +46,7 @@ import GHC.Platform
 import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Utils
+import GHC.Core.Dependent (isScopedSelectorReceiver)
 import GHC.Core.Stats ( coreBindsStats )
 import GHC.Core.Class (classMethods)
 import GHC.Core.DataCon
@@ -1758,16 +1759,20 @@ lintValApp arg fun_ty arg_ty fun_ue arg_ue
   where
     err2 = mkNonFunAppMsg fun_ty arg_ty arg
 
--- | Check the scalar or variable-only function operand of a retained binder.
+-- | Check a retained operand in the current scope.
 -- See Note [Function-valued retained binders] in GHC.Core.Type.
 lintRetainedArgument :: Id -> Type -> CoreExpr -> LintM ()
 lintRetainedArgument b body arg
   -- See Note [Vacuous retained applications] in GHC.Core.Utils.
   | isVacuousRetainedBinder b body
   = return ()
-  | isNativeIndexFunctionId b, Var f <- arg
-  = do { _ <- lintNativeIndexFunction f
-       ; ensureEqTys (varType b) (varType f) unsupported }
+  | isNativeIndexFunctionId b
+  , Just index <- nativeIndexFunctionArgIndex arg
+  = do { lintType index
+       ; ensureEqTys (varType b) (typeKind index) unsupported
+       ; case index of
+           TermVarTy{} -> return ()
+           _ -> lintL (not (isScopedSelectorReceiver b body)) unsupported }
   | not (isNativeIndexFunctionId b), isNativeOpaqueValueId b
   = do { lintL (isJust (retainedArgIndex arg)) unsupported
        ; lint_source_owners arg }

@@ -74,11 +74,12 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Core
+import GHC.Core.Dependent (isScopedSelectorReceiver)
 import GHC.Core.Ppr
 import GHC.Core.FVs( exprFreeVars, bindFreeVars )
 import GHC.Core.DataCon
 import GHC.Core.Type as Type
-import GHC.Core.TyCo.Rep ( Type(DepDictTy, DepFunTy) )
+import GHC.Core.TyCo.Rep ( Type(DepDictTy, DepFunTy, TermVarTy) )
 import GHC.Core.Predicate( isEqPred )
 import GHC.Core.Predicate( isUnaryClass )
 import GHC.Core.FamInstEnv
@@ -276,7 +277,7 @@ applyTypeToArgs op_ty args
     go op_ty (arg : args)
       | DepFunTy _ b res_ty <- coreFullView op_ty
       , isNativeOpaqueValueId b
-      , retained_arg b arg
+      , retained_arg b res_ty arg
       = let in_scope = mkInScopeSet (tyCoVarsOfType res_ty `unionVarSet` exprFreeVars arg)
         in go (substTy (Subst in_scope (unitVarEnv b arg) emptyVarEnv emptyVarEnv) res_ty) args
     -- See Note [Vacuous retained applications].
@@ -290,11 +291,14 @@ applyTypeToArgs op_ty args
 
     -- See Notes [Function-valued retained binders] and
     -- [Opaque runtime index values] in GHC.Core.Type.
-    retained_arg b arg
+    retained_arg b body arg
       | isNativeIndexFunctionId b
-      = case arg of
-          Var f -> isNativeIndexFunctionId f && varType f `eqType` varType b
-          _ -> False
+      = case nativeIndexFunctionArgIndex arg of
+          Just index -> typeKind index `eqType` varType b
+                        && case index of
+                             TermVarTy{} -> True
+                             _ -> not (isScopedSelectorReceiver b body)
+          Nothing -> False
       | isNativeOpaqueValueId b
       , Just index <- retainedArgIndex arg
       = typeKind index `eqType` varType b

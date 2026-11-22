@@ -188,8 +188,6 @@ data TyCoMapper m
   = TyCoMapper
       { tcm_tyvar :: TyVar -> m Type
       , tcm_termvar :: Id -> m Type
-      , tcm_termfun :: Id -> m Id
-          -- ^ Map a free native function head. See Note [Opaque native call indices].
       , tcm_termbinder :: forall r. Id -> (Id -> m r) -> m r
       , tcm_covar :: CoVar -> m Coercion
       , tcm_hole  :: CoercionHole -> m Coercion
@@ -225,7 +223,6 @@ mapTyCo :: forall m. Monad m
            , [Coercion] -> m [Coercion] )
 mapTyCo (TyCoMapper { tcm_tyvar = tyvar
                     , tcm_termvar = termvar
-                    , tcm_termfun = termfun
                     , tcm_termbinder = termbinder
                     , tcm_tycobinder = tycobinder
                     , tcm_tcapp_ty = tcapp_ty
@@ -240,7 +237,7 @@ mapTyCo (TyCoMapper { tcm_tyvar = tyvar
 
     go_ty (TyVarTy tv)    = tyvar tv
     go_ty (TermVarTy v)   = termvar v
-    go_ty (TermAppTy f arg) = TermAppTy <$> termfun f <*> go_ty arg
+    go_ty (TermAppTy f arg) = mkAppTy <$> termvar f <*> go_ty arg
     go_ty (ClassAppTy f inst dict operand kind)
       = do { dict' <- go_ty dict
            ; operand' <- go_ty operand
@@ -286,7 +283,12 @@ mapTyCo (TyCoMapper { tcm_tyvar = tyvar
     go_co (Refl ty)                  = Refl <$> go_ty ty
     go_co (GRefl r ty mco)           = mkGReflCo r <$> go_ty ty <*> go_mco mco
     go_co (AppCo c1 c2)              = mkAppCo <$> go_co c1 <*> go_co c2
-    go_co (TermAppCo f co)           = mkTermAppCo <$> termfun f <*> go_co co
+    go_co (TermAppCo f co) = do
+      head_ty <- termvar f
+      arg_co <- go_co co
+      return $ case head_ty of
+        TermVarTy f' -> mkTermAppCo f' arg_co
+        _ -> mkAppCo (mkNomReflCo head_ty) arg_co
     go_co (DepFunCo visL visR b domain co)
       = do { domain' <- go_mco domain
            ; termbinder b $ \b' ->

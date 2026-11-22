@@ -2891,14 +2891,18 @@ of the index. It does not run an IO action or inspect the result. A structural
 function field checks both endpoints separately. The head Id is local,
 unrestricted, and not a join point.
 
-A bound function can occur in the head slot of TermAppTy or TermAppCo, or as
-a TermVarTy stored in an algebraic index. Application of that TermVarTy uses
-the same opaque TermAppTy form. It is not a matchable function. Applying its
-retained binder requires an eligible local Var with exactly the same type.
-Use the existing head-only Id substitution. Do not unfold that Var or transport
-the function domain through a coercion. DepFunCo keeps eligible call-head domains
-unchanged. Value-domain conversion uses nominal evidence; see
-Note [Retained dependent function coercions] in GHC.Core.TyCo.Rep.
+A bound function can occur in TermAppTy, TermAppCo, or TermVarTy. Its
+argument is an eligible local Id, possibly cast with nominal evidence to
+change the result type of its arrow. The input type stays fixed. For
+example, a closed family equation can cast Bool -> Bool -> Ordering to
+Bool -> Result 'True. Preserve the actual Id and its complete type.
+Keep the cast on a whole function occurrence. For a call, mkAppTy uses
+decomposePiCos to move the cast to the call result. TermAppCo uses
+ordinary AppCo over the cast head and keeps the argument proof nominal.
+Scoped selector receivers still require a bare variable.
+
+DepFunCo keeps eligible call-head domains unchanged. See Note
+[Retained dependent function coercions] in GHC.Core.TyCo.Rep.
 
 The binder scopes over calls in the result and its proofs. Existing runtime
 binder renaming masks outer substitutions and avoids capture in both places.

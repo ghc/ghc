@@ -1107,16 +1107,25 @@ mkInstCo co arg = InstCo co arg
 %************************************************************************
 -}
 
--- | Recover nominal evidence for a runtime cast between closed scalar domains.
+-- | Recover nominal evidence for a retained value cast.
 -- See Note [Nominal native index casts] in GHC.Core.
 nativeIndexCastCo_maybe :: CoercionR -> Maybe CoercionN
 nativeIndexCastCo_maybe co
   | coercionRole co == Representational
   , Just delta <- setNominalRole_maybe Representational co
   , coercionRole delta == Nominal
-  , isNativeIndexDomainConversion (coercionLKind delta) (coercionRKind delta)
+  , nativeIndexCastEndpoints (coercionLKind delta) (coercionRKind delta)
   = Just delta
   | otherwise = Nothing
+
+-- | Check value casts and fixed-input callback result casts.
+-- See Note [Function-valued retained binders] in GHC.Core.Type.
+nativeIndexCastEndpoints :: Type -> Type -> Bool
+nativeIndexCastEndpoints source target
+  | Just (source_arg, _) <- nativeIndexFunctionTypeTys_maybe source
+  , Just (target_arg, _) <- nativeIndexFunctionTypeTys_maybe target
+  = source_arg `eqType` target_arg
+  | otherwise = isNativeIndexDomainConversion source target
 
 -- | Rewrite a value cast while retaining its recoverable nominal evidence.
 -- The callback preserves the role of its input. Ordinary casts use it directly.
@@ -1141,7 +1150,7 @@ mapNativeIndexCastCoM rewrite co
   = rewrite co
   where
     preserve delta
-      | isNativeIndexDomainConversion (coercionLKind delta) (coercionRKind delta)
+      | nativeIndexCastEndpoints (coercionLKind delta) (coercionRKind delta)
       = SubCo delta
       | otherwise
       = mkSubCo delta
@@ -1157,9 +1166,9 @@ See Note [Nominal native index casts] in GHC.Core.
 mkWpCastN therefore retains a raw SubCo until final zonking. At that point,
 mapNativeIndexCastCoM recovers the nominal proof before the generic zonker
 can rebuild SubCo with mkSubCo. It zonks the proof at Nominal, then checks
-the scalar domains. It retains raw SubCo for an admitted scalar conversion
-and uses the ordinary mkSubCo rule otherwise. R-only evidence follows the
-ordinary zonking path. This does not strengthen representational evidence.
+the endpoints. It retains raw SubCo for an admitted value conversion or a
+callback result cast. See Note [Function-valued retained binders] in
+GHC.Core.Type. R-only evidence follows the ordinary zonking path.
 
 The domain check must follow zonking. An assigned type metavariable can
 still occur syntactically in an endpoint before zonking. Checking that

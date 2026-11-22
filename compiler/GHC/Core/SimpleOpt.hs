@@ -375,10 +375,10 @@ demand restriction.
 
 Scalar beta reduction substitutes an optimized local variable or exact
 constructor into terms and types together. A retained function head substitutes
-only an eligible bare function variable of the same complete type. Its dedicated
-TermAppTy head slot cannot contain a constructor, cast, or arbitrary expression.
-Retain the redex for an unsupported producer. A lazy let for a retained argument
-could let its index escape through a partial application's result type.
+an eligible local callback with checked nominal result transport. See Note
+[Function-valued retained binders] in GHC.Core.Type. Retain the redex for an
+unsupported producer. A lazy let for a retained argument could let its index
+escape through a partial application's result type.
 Disable general compulsory unfolding too: unfolding a valid variable index can
 expose an unsupported producer. Do not push casts through native lambdas.
 
@@ -817,9 +817,10 @@ simple_app env e0@(Lam {}) as0@(_:_)
       | soe_native env
       , isNativeIndexFunctionId b'
       = let arg = simple_opt_clo (soeInScope env') a
-        in case nativeIndexFunctionVar_maybe arg of
-             Just actual
-               | idType b' `eqType` idType actual
+        in case nativeIndexFunctionArgIndex arg of
+             Just index
+               | idType b' `eqType` typeKind index
+               , selectorSafeIndexSubstitution body index
                -> do_beta (env' { soe_subst = extendIdSubst (soe_subst env') b arg })
                           body as
              _ -> rebuild_app env (simple_opt_expr env e) args
@@ -2013,7 +2014,7 @@ exprIsConAppFor_maybe mode ise@(ISE in_scope id_unf) expr
        , hasFreeVarInCoreAnnotations bndr body
        = do let (_, bndr') = subst_bndr subst bndr
             index <- if isNativeIndexFunctionId bndr'
-                     then TermVarTy <$> nativeIndexFunctionVar_maybe arg
+                     then nativeIndexFunctionArgIndex arg
                      else exprToNativeIndex arg
             guard (typeKind index `eqType` idType bndr')
             guard (selectorSafeIndexSubstitution body index)

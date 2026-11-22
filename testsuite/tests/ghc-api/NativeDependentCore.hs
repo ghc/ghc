@@ -12,7 +12,7 @@ import GHC (DynFlags, InteractiveImport (IIDecl), getSession, getSessionDynFlags
 import GHC.Builtin.WiredIn.Prim (fUNTyCon, intPrimTy, realWorldStatePrimTy)
 import GHC.Builtin.WiredIn.Types
 import GHC.Core
-import GHC.Core.Coercion (MCoercion (..), abstractNativeIndices, coercionLKind, coercionRKind, coercionRole, emptyLiftingContext, eqCoercion, extendLiftingContext, isReflCo, liftCoSubst, mkAppCo, mkAxInstCo, mkCoercionType, mkCoVarCo, mkDepFunCo, mkDepFunCoWithDomain, mkDepFunCoWithVis, mkForAllCo, mkFunCoNoFTF, mkKindCo, mkInstCo, mkLiftingContext, mkNomReflCo, mkPhantomCo, mkPiCo, mkReflCo, mkSelCo, mkSubCo, mkSymCo, mkTermAppCo, mkTransCo, mkTyConAppCo, prepareNativeLiftingContext, setNominalRole_maybe, splitAppCo_maybe)
+import GHC.Core.Coercion (MCoercion (..), abstractNativeIndices, coercionLKind, coercionRKind, coercionRole, emptyLiftingContext, eqCoercion, extendLiftingContext, isReflCo, liftCoSubst, mkAppCo, mkAxInstCo, mkCoercionType, mkCoVarCo, mkDepFunCo, mkDepFunCoWithDomain, mkDepFunCoWithVis, mkForAllCo, mkFunCoNoFTF, mkGReflRightCo, mkKindCo, mkInstCo, mkLiftingContext, mkNomReflCo, mkPhantomCo, mkPiCo, mkReflCo, mkSelCo, mkSubCo, mkSymCo, mkTermAppCo, mkTransCo, mkTyConAppCo, prepareNativeLiftingContext, setNominalRole_maybe, splitAppCo_maybe)
 import GHC.Core.Coercion.Opt (OptCoercionOpts (..), optCoercion)
 import GHC.Core.Coercion.Axiom (Branched, ClosedTyFam (..), CoAxiom, CoAxiomRule (..), Role (..))
 import GHC.Core.ConLike (ConLike (RealDataCon))
@@ -116,6 +116,7 @@ main = do
             runOpaqueCallChecks dflags
             runRetainedOccursChecks
             runCurriedCallCoreChecks dflags
+            runCastCallbackChecks dflags
             runScopedDictionaryOccursChecks libdir
             runFunctionBinderChecks dflags
             runFunctionFieldChecks dflags
@@ -225,6 +226,95 @@ runCurriedCallCoreChecks dflags = do
         case match [] otherCall of
             Nothing -> True
             _ -> False
+
+-- | Substitute a local callback using a closed family result equation.
+runCastCallbackChecks :: DynFlags -> IO ()
+runCastCallbackChecks dflags = do
+    let ordering = mkTyConTy orderingTyCon
+        step = mkVisFunTyManyU boolTy ordering
+        parameter = mkTyVar (mkSystemName (unique 11600) (mkTyVarOcc "flag")) boolTy
+        binders = [mkAnonTyConBinder parameter]
+        family = mkFamilyTyCon (mkSystemName (unique 11601) (mkTcOcc "CallbackResult"))
+            (mkTyConKindWithMatchability unmatchableDataConTy binders liftedTypeKind)
+            binders 1 liftedTypeKind Nothing (ClosedTypeFamilyTyCon (CTF (Just axiom))) Nothing NotInjective
+        axiom = mkBranchedCoAxiom Nominal (mkSystemName (unique 11602) (mkTcOcc "CallbackResultAx")) family
+            [mkCoAxBranch [] [] [] [constructorIndex trueDataCon] step [] noSrcSpan]
+        familyResult = mkTyConApp family [constructorIndex trueDataCon]
+        familyCo = mkAxInstCo Nominal (BranchedAxiom axiom 0) [] []
+        actualTy = mkVisFunTyManyU boolTy step
+        formalTy = mkVisFunTyManyU boolTy familyResult
+        Reduction reduction _ = normaliseType emptyFamInstEnvs Nominal formalTy
+        delta = mkSymCo reduction
+        actual = local 11603 "actual" actualTy
+        formal = local 11604 "formal" formalTy
+        x = local 11605 "x" boolTy
+        y = local 11606 "y" boolTy
+        z = local 11607 "z" boolTy
+        xy = proof 11608 (TermVarTy x) (TermVarTy y)
+        yz = proof 11609 (TermVarTy y) (TermVarTy z)
+        castHead = mkCastTy (TermVarTy actual) delta
+        operand = Cast (Var actual) (mkSubCo delta)
+        occurrence a = TermAppTy formal (TermVarTy a)
+        expected a = mkCastTy (TermAppTy actual (TermVarTy a)) (mkSymCo familyCo)
+        full a b = mkAppTy (TermAppTy actual (TermVarTy a)) (TermVarTy b)
+        rawFull a b = mkAppTy (mkCastTy (occurrence a) familyCo) (TermVarTy b)
+        whole = mkTyConApp eqTyCon [formalTy, TermVarTy formal, TermVarTy formal]
+        partial = mkTyConApp eqTyCon [familyResult, occurrence x, occurrence y]
+        applied = mkTyConApp eqTyCon [ordering, rawFull x y, rawFull y z]
+        result = mkVisFunTyManyU whole (mkVisFunTyManyU partial (mkVisFunTyManyU applied whole))
+        capture = local 11610 "capture" whole
+        part = local 11611 "partial" partial
+        both = local 11612 "applied" applied
+        worker = Lam formal (Lam capture (Lam part (Lam both (Var capture))))
+        scope = [actual, x, y, z, xy, yz]
+        subst = CoreSubst.extendIdSubst (CoreSubst.mkEmptySubst (mkInScopeSet (mkVarSet scope))) formal operand
+        proofSubst = CoreSubst.substCo subst (mkTermAppCo formal (mkCoVarCo xy))
+        fullProof = mkAppCo (mkTransCo (mkSymCo (mkGReflRightCo Nominal (occurrence x) familyCo))
+            (mkTransCo (mkTermAppCo formal (mkCoVarCo xy)) (mkGReflRightCo Nominal (occurrence y) familyCo)))
+            (mkCoVarCo yz)
+        rep = mkCoVar (mkSystemName (unique 11614) (mkVarOcc "rep")) (mkReprEqPred actualTy formalTy)
+        missing = proof 11613 actualTy formalTy
+        scopedOperand = Cast (Var actual) (mkSubCo (mkCoVarCo missing))
+        scopedSubst names = CoreSubst.extendIdSubst (CoreSubst.mkEmptySubst (mkInScopeSet (mkVarSet names)))
+            formal scopedOperand
+    check "callback cast uses a nonreflexive nominal family proof" $
+        not (isReflCo delta) && coercionRole delta == Nominal
+    checkType dflags "the cast smart constructor transports a native call" (expected x) $
+        mkAppTy castHead (TermVarTy x)
+    lintAccepts dflags "ordinary congruence over the cast head checks" scope $
+        Coercion (mkAppCo (mkNomReflCo castHead) (mkCoVarCo xy))
+    lintAccepts dflags "a retained application accepts nominal callback result transport" scope (App worker operand)
+    checkType dflags "retained expression application returns its substituted result"
+        (CoreSubst.substTy subst result) (applyTypeToArgs (mkDepFunTy formal result) [operand])
+    let simplified = simpleOptNativeExpr (App worker operand)
+    lintAccepts dflags "beta reduction keeps nominal callback result transport" scope simplified
+    checkType dflags "the simplified application preserves its type"
+        (CoreSubst.substTy subst result) (exprType simplified)
+    checkType dflags "the whole function keeps its cast and lexical identity" castHead $
+        CoreSubst.substTy subst (TermVarTy formal)
+    checkType dflags "a single call keeps its result cast" (expected x) $
+        CoreSubst.substTy subst (occurrence x)
+    checkType dflags "two applications cancel the result casts in operand order" (full x y) $
+        CoreSubst.substTy subst (rawFull x y)
+    lintAccepts dflags "substitution preserves the argument proof on the cast head" scope (Coercion proofSubst)
+    checkType dflags "first application proof left endpoint" (expected x) (coercionLKind proofSubst)
+    checkType dflags "first application proof right endpoint" (expected y) (coercionRKind proofSubst)
+    let fullProofSubst = CoreSubst.substCo subst fullProof
+        optimizedProof = optCoercion (OptCoercionOpts True Nothing) Subst.emptySubst fullProofSubst
+    forM_ [fullProofSubst, optimizedProof] $ \converted -> do
+        lintAccepts dflags "substituted proof checks at both curried operands" scope (Coercion converted)
+        checkType dflags "curried proof keeps left operands in order" (full x y) (coercionLKind converted)
+        checkType dflags "curried proof keeps right operands in order" (full y z) (coercionRKind converted)
+        check "curried proof keeps the actual callback and both operand proofs" $
+            all (`elemVarSet` tyCoVarsOfCo converted) [actual, xy, yz]
+    lintRejects dflags "a representation-only runtime cast is insufficient evidence" (rep : scope) $
+        App worker (Cast (Var actual) (mkCoVarCo rep))
+    lintAccepts dflags "a callback cast may use a nominal proof in scope" (missing : scope) (App worker scopedOperand)
+    lintRejects dflags "a runtime cast cannot use an out-of-scope nominal proof" scope (App worker scopedOperand)
+    check "the callback substitution tracks the cast proof's scope" $
+        Subst.isValidTCvSubst (scopedSubst (missing : scope)) && not (Subst.isValidTCvSubst (scopedSubst scope))
+    lintRejects dflags "a runtime cast cannot forge the lexical head's type" scope $
+        App worker (Var (setIdType actual formalTy))
 
 -- | Follow the types of runtime variables when checking for recursive substitutions.
 runRetainedOccursChecks :: IO ()
