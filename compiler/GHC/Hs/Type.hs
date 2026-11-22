@@ -1792,7 +1792,7 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
         <+> text "in" <+> ppr_mono_lty body
 
 -- | Parenthesize a lowered kind signature on a type let RHS.
-ppr_typelet_rhs :: OutputableBndrId p => LHsType p -> SDoc
+ppr_typelet_rhs :: OutputableBndrId p => LHsType (GhcPass p) -> SDoc
 ppr_typelet_rhs rhs@(L _ HsKindSig{}) = parens (ppr_mono_lty rhs)
 ppr_typelet_rhs rhs = ppr_mono_lty rhs
 
