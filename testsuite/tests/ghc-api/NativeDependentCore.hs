@@ -114,6 +114,7 @@ main = do
             runOccurrenceChecks dflags
             runAliasChecks dflags
             runOpaqueCallChecks dflags
+            runRetainedOccursChecks
             runFunctionBinderChecks dflags
             runFunctionFieldChecks dflags
             runArrowMatchabilityChecks dflags
@@ -133,6 +134,27 @@ main = do
             runIfaceChecks libdir
             putStrLn "native-core-api-ok"
         _ -> fail "Usage: NativeDependentCore GHC_LIBDIR"
+
+-- | Follow the types of runtime variables when checking for recursive substitutions.
+runRetainedOccursChecks :: IO ()
+runRetainedOccursChecks = do
+    let variable n name = mkTyVar (mkSystemName (unique n) (mkTyVarOcc name)) liftedTypeKind
+        a = mkTyVarTy (variable 11510 "a")
+        b = mkTyVarTy (variable 11511 "b")
+        x = local 11512 "x" a
+        f = local 11513 "f" (mkVisFunTyManyU a boolTy)
+        rho = indexed (TermAppTy f (TermVarTy x))
+        unify = tcUnifyTysFG alwaysBindFam alwaysBindTv
+        occurs lhs rhs = case unify lhs rhs of
+            MaybeApart MARInfinite _ -> True
+            _ -> False
+    check "a occurs in a retained predicate through its runtime arguments" $
+        occurs [a] [rho]
+    check "the retained occurs check follows an earlier substitution" $
+        occurs [b, a] [rho, b]
+    check "an independent variable can still bind to the indexed type" $ case unify [b] [rho] of
+        Unifiable{} -> True
+        _ -> False
 
 -- | Create a stable test unique without a global unique supply.
 unique :: Int -> Unique
