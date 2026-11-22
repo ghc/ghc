@@ -901,11 +901,27 @@ repC (L l (ConDeclGADT { con_names  = cons
           ((mkHsForAllInvisTele noAnn tvs) { hsf_matchability = ma })) : teles)
   where
     con nodes
-      | PrefixConGADT _ [] <- args
-      , Just (groups, result) <- HsDecls.splitGadtInterior args res_ty
-      = do names <- mapM lookupLOcc cons
-           repOrderedGadt (nonEmptyCoreList' names) result [] (map Left nodes ++ groups)
+      | PrefixConGADT _ fields <- args
+      = let nonempty = [g | g@(L _ group) <- nodes, not (HsDecls.isEmptyGadtGroup group)]
+        in if (null fields && isJust interior || any required nonempty) &&
+              not (hsHasForEachTy (unLoc res_ty))
+           then do names <- mapM lookupLOcc cons
+                   let groups = map Left nonempty ++ map Right fields ++ suffix
+                   repOrderedGadt (nonEmptyCoreList' names) result [] groups
+           else repConTelescope (locA l) nonempty (repGadtDataCons cons args res_ty)
       | otherwise = repConTelescope (locA l) nodes (repGadtDataCons cons args res_ty)
+
+    -- ForallC cannot carry a required binder. Use the explicit argument
+    -- list for all groups when a required binder precedes the fields.
+    required (L _ (HsGadtForAll _ HsForAllVis{})) = True
+    required _ = False
+
+    interior = HsDecls.splitGadtInterior args res_ty
+    (suffix, result) = case interior of
+      Just groups -> groups
+      Nothing -> case HsDecls.splitGadtTerminal args res_ty of
+        Just (groups, _, body) -> (map Left groups, body)
+        Nothing -> ([], res_ty)
 
 -- | Quote constructor prefix nodes in order. Combine only an adjacent
 -- forall and context. See Note [Constructor telescope contexts] in GHC.Hs.Decls.

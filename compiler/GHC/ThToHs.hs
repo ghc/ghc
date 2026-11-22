@@ -792,7 +792,8 @@ cvtRetainedGadtArgs type_data args result = do
         | otherwise = ([], [], body)
       all_fields = fields ++ extra_fields
       prefix_fields = PrefixConGADT noExtField all_fields
-      supported_interior = isJust (HsDecls.splitGadtInterior prefix_fields interior)
+      supported_suffix = isJust (HsDecls.splitGadtInterior prefix_fields interior) ||
+                         isJust (HsDecls.splitGadtTerminal prefix_fields interior)
       -- A quote omits groups with no binders or predicates. The result
       -- can be the ordinary field prefix with no ordered suffix.
       ordinary_result = case unLoc (ignoreParens interior) of
@@ -801,9 +802,8 @@ cvtRetainedGadtArgs type_data args result = do
         HsFunTy{} -> False
         HsQualTy{} -> False
         _ -> True
-  when (not supported_interior && not ordinary_result &&
-        (any explicit_group binders ||
-         (null binders && isNothing (HsDecls.splitGadtTerminal prefix_fields interior)))) $
+  when (not supported_suffix && not ordinary_result &&
+        (null binders || any explicit_group binders)) $
     failWith (MalformedType TypeLevel result)
   pure (telescope, all_fields, interior)
   where
@@ -863,10 +863,9 @@ Keep the matchability annotation when present. A ForallC wraps the leading
 invisible binders and context.
 
 Use the same shape check as for source declarations. A grouped argument list
-can start with value fields or with leading foralls that include a required
-binder. In the second case, split off the leading foralls as in the parser.
-The remaining groups must form an interior telescope. A suffix stored as a
-Type can contain an interior or terminal telescope.
+can start with fields or leading binders. Recover the same leading groups
+and fields as the parser. The remaining groups must form an interior or
+terminal telescope, or the ordinary result if no groups remain.
 -}
 
 -- | Constructor arrows can default to One. Keep a Many annotation explicit.
