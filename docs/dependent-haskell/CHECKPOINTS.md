@@ -90,6 +90,25 @@ source revisions and rebuild commands, then remove both sets of outputs
 after the last live user finishes. The 200 GB threshold is a backup for
 this cleanup.
 
+## Erased calibration status
+
+Both compiler stages at `6dd45e0d08` matched the 538-line Showcase at
+`-O0` and `-O2`. Self-hosted GHCi matched the same output. All 28
+selected registered tests passed. Both stages passed the nested type-let
+quotation, exact-printing and source-context checks. The signed and
+unsigned machine-word interface checks passed, including bidirectional
+reads between this compiler and the previous v80 compiler at `e1c029d2a7`.
+
+An ordinary client constructs a value of type `SomeSample a` from a
+runtime flag. The constructor result fixes its hidden index to
+`'Just calibrated`. The client opens the package and returns
+`[Just 37,Nothing,Nothing]` without forcing the rejected sample's payload.
+Other checks cover predecessor inference under a known equality, strict
+cases on a curried callback, and the written kinds in type-case diagnostics.
+[Provider](examples/open-evaluation/DirectIndexedList.hs),
+[client](examples/open-evaluation/DirectIndexedListClient.hs)
+and [callback](examples/open-evaluation/CompareAt.hs).
+
 ## Indexed volumes and unsigned word patterns
 
 Both compiler stages at `e1c029d2a7` matched the 537-line Showcase at

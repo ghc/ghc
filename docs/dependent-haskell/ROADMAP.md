@@ -23,24 +23,22 @@ depend on others, so this count cannot estimate the remaining work time.
 | Declaration dependencies, families and GADTs | R21, R23, R24, R41 |
 | Namespace warnings | R36 |
 
-The 537-output Showcase reads the top layer of a volume. The layer
-count is a successor, so the ordinary client can match a nonempty
-vector in the constructor pattern. The returned layer has the volume's
-row and column counts. Its second layer stays unevaluated. Another
-ordinary client uses two closed family equations to obtain different
-result types at zero and at the target's maximum machine word.
-The comparison example applies a runtime callback whose intermediate
-result type reduces to a function.
-[Volume client](examples/packed-vector/IndexedMatrixClient.hs),
-[word client](examples/open-evaluation/PrimitiveWordFieldsClient.hs)
-and [comparison](examples/open-evaluation/CompareAt.hs).
+The 538-output Showcase constructs a sample from a runtime calibration
+flag. Its type hides whether the sample is missing or carries a flag.
+An ordinary client opens the package and reads the payload only when
+the stored flag is true. The rejected sample has an undefined payload.
+Other examples read the first layer of an indexed volume and compare
+two runtime arguments through a callback with a family-defined result type.
+[Sample provider](examples/open-evaluation/DirectIndexedList.hs),
+[ordinary client](examples/open-evaluation/DirectIndexedListClient.hs)
+and [verification](CHECKPOINTS.md#erased-calibration-status).
 
 Earlier [Showcase milestones and examples](CHECKPOINTS.md#showcase-history-through-502-outputs)
 record how each behavior was introduced.
 
 | Card | What works | Remaining gap |
 | --- | --- | --- |
-| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | A callback index can apply a second operand after a family reduces to an arrow. The promoted constructor of a shape can use multiple direct stored fields. Nested vector patterns use the known outer dimension for coverage. | Broaden callback conversion and inference. Determine hidden indices through helper calls and handle erased shape arguments. |
+| [R03 dependent products](roadmap/R03-dependent-products.md) and [R04 dependent sums](roadmap/R04-dependent-sums.md) | A runtime case can inspect both arguments of a callback whose intermediate result reduces to an arrow. A promoted constructor in a result index can combine invisible type arguments with stored fields. Nested vector patterns use the known outer dimension for coverage. | Broaden callback conversion and inference. Determine hidden indices through more helper calls and abstract constructor shapes. |
 | [R05 dependent Core](roadmap/R05-dependent-core.md) | The standard `-O2` pipeline specializes a recursive consumer and keeps retained case proofs scoped. A provider and an interface-only client can match rules that construct or open an erased package. Source rules can have an imported head and a local anchor, or come from a visible orphan module. | Rules for retained functions and general dependent coercions remain open. |
 | [R15 closed evaluator](roadmap/R15-closed-term-evaluator.md#read-independent-row-and-column-counts) | A client proves the labels and all cells of a compiled rectangular table with two hidden dimensions. Both dimensions of a square can share one hidden index. | Extend readback beyond the checked matrix and container shapes. |
 | [R16 open evaluator](roadmap/R16-open-term-evaluator.md) | The installed `filter not` handles a known Boolean head and an unknown tail. A separate ordinary client proves length preservation for the installed `map` by induction over a finite spine. | General open evaluation across arbitrary ordinary definitions. |
