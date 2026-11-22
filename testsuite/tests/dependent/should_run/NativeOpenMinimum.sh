@@ -12,9 +12,11 @@ cp "$src"/{NativeLocalMinSizeRule,PreludeMapLengthSize,PreludeZipRuntime,ZipMini
 for module in PreludeZipRuntime ZipMinimum; do
     "${ghc[@]}" "$@" --interactive -ignore-dot-ghci -fbyte-code -O0 \
         "*$module.hs" >actual 2>interactive.log <<'END'
+:set -XGADTs
 import Prelude
-let check xs ys = lengthZip xs ys `seq` True
-print (check [True,False] [()], check ([] :: [()]) (error "forced right list" :: [Bool]))
+import Data.Type.Equality ((:~:)(Refl))
+let check :: [Bool] -> [()] -> Bool; check xs ys = case lengthZip xs ys of Refl -> True
+print (check [True,False] [()], check [] (error "forced right list"))
 END
     grep -Fxq '(True,True)' actual || { cat interactive.log actual >&2; exit 1; }
 done
