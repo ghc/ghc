@@ -6665,7 +6665,7 @@ checkValidDataCon dflags existential_ok tc con
                      (_, ex_tvs, eq_spec, theta, _, _) = dataConFullSig con
                      res_kind = tyConResKind tc
                      valid_res_kind
-                       | isNewTyCon tc = isFixedRuntimeRepKind res_kind
+                       | isNewTyCon tc = True
                        | otherwise = maybe False isBoxedRuntimeRep (kindRep_maybe res_kind)
                      prefix_theta = if dataConHasTrailingContext con then [] else theta
                      prefix_types = map (varType . binderVar) early ++ prefix_theta ++
