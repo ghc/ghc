@@ -33,7 +33,7 @@ import GHC.Rename.Doc
 import GHC.Rename.Env
 import GHC.Rename.Utils ( mapFvRn, bindLocalNames
                         , checkDupRdrNames, bindLocalNamesFV
-                        , warnUnusedTypePatterns, warnPunBindings
+                        , warnUnusedTypePatterns, warnPunBindingsAgainst
                         , noNestedForallsContextsErr
                         , addNoNestedForallsContextsErr, checkInferredVars
                         , makeRnValBinds)
@@ -42,6 +42,7 @@ import GHC.Rename.Unbound ( notInScopeErr, WhereLooking(WL_Global)
 import GHC.Rename.Names
 
 import GHC.Tc.Errors.Types
+import GHC.Tc.Utils.Env (isBrackLevel)
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Origin ( TypedThing(..) )
 
@@ -1648,6 +1649,16 @@ rnSrcDeclsWithLambdas sigma named_wildcards lift_cases early_hidden early_scopes
    --     See Note [Top-level fixity signatures in an HsGroup] in GHC.Hs.Decls
    local_fix_env <- makeMiniFixityEnv $ hsGroupTopLevelFixitySigs group ;
 
+   -- See Note [Pun binding warnings] in GHC.Rename.Utils.
+   warn_puns <- woptM Opt_WarnPunBindings ;
+   earlier_pun_scope <- if warn_puns
+     then do { level <- getThLevel
+             ; interactive <- getIsGHCi
+             ; if interactive || isBrackLevel level
+               then pure Nothing
+               else Just <$> getGlobalRdrEnv }
+     else pure Nothing ;
+
    -- (B) Bring top level binders (and their fixities) into scope,
    --     *except* for the value bindings, which get done in step (D)
    --     with collectHsIdBinders. However *do* include
@@ -1689,9 +1700,8 @@ rnSrcDeclsWithLambdas sigma named_wildcards lift_cases early_hidden early_scopes
                     -- They are already in scope
    traceRn "rnSrcDecls" (ppr id_bndrs) ;
    (gbl_env, lcl_env) <- extendGlobalRdrEnvRn (map (mkLocalVanillaGRE NoParent) id_bndrs) local_fix_env ;
-   -- Use the names from this group. Imports and binders from an enclosing
-   -- quotation scope can be shadowed.
-   warnPunBindings (nonDetEltsUniqSet (tc_bndrs `unionNameSet` mkNameSet (pat_syn_bndrs ++ id_bndrs))) ;
+   warnPunBindingsAgainst earlier_pun_scope
+     (nonDetEltsUniqSet (tc_bndrs `unionNameSet` mkNameSet (pat_syn_bndrs ++ id_bndrs))) ;
    -- See Note [Ordering local source tables].
    dependent <- xoptM LangExt.ExperimentalDependentTypes ;
    tables <- if dependent then localSourceTableBinders binds' sigs' else pure [] ;

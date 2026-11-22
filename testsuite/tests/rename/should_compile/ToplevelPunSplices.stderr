@@ -1,0 +1,7 @@
+ToplevelPunSplices.hs:10:14: warning: [GHC-59431] [-Wpun-bindings]
+    ‘Light’ is declared in both the type and term namespaces.
+    Other declaration at ToplevelPunSplices.hs:8:1
+
+ToplevelPunSplices.hs:14:1: warning: [GHC-59431] [-Wpun-bindings]
+    ‘Shade’ is declared in both the type and term namespaces.
+    Other declaration at ToplevelPunSplices.hs:12:15

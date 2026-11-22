@@ -1,6 +1,6 @@
 # R36. Pun warnings
 
-- [x] Report same-spelled type and term definitions in one top-level group.
+- [x] Report same-spelled type and term definitions in one module scope.
 - [x] Report same-spelled explicit type and term binders in one match.
 - [x] Check implicitly introduced type binders for binding puns.
 - [x] Report punned global term, type, and bare export uses.
@@ -23,7 +23,13 @@ invisible @a a = a
 ```
 
 [Proposal #765](https://ghc-proposals.readthedocs.io/en/latest/proposals/0765-pun-warnings.html)
-checks names introduced in the same scope. Appendix A groups the
+checks names introduced in the same scope. A top-level declaration
+splice divides renaming and type checking into batches. Definitions
+across those batches still share the module scope, so the later
+declaration gets the warning.
+[Declaration-splice regression](../../../testsuite/tests/rename/should_compile/ToplevelPunSplices.hs).
+
+Appendix A groups the
 arguments of the invisible example as binders that can shadow enclosing
 names. The [review](https://github.com/ghc-proposals/ghc-proposals/pull/765#discussion_r3738449381)
 distinguishes this group from a nested scope. With

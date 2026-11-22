@@ -13,6 +13,7 @@ module GHC.Rename.Utils (
         checkTupSize, checkCTupSize,
         addFvRn, mapFvRn, mapMaybeFvRn,
         warnUnusedMatches, warnUnusedTypePatterns, warnPunBindings,
+        warnPunBindingsAgainst,
         warnUnusedTopBinds, warnUnusedLocalBinds,
         DeprecationWarnings(..), warnIfDeprecated,
         checkUnusedRecordWildcard,
@@ -57,6 +58,7 @@ import GHC.Types.Name.Env
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.SourceFile
 import GHC.Types.SourceText ( SourceText(..) )
+import GHC.Utils.Lexeme (isLexVar)
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Unit.Module.ModIface
@@ -189,26 +191,50 @@ checkDupAndShadowedNames envs names
 -- | Report type and term binders with the same spelling in one scope.
 -- See Note [Pun binding warnings].
 warnPunBindings :: [Name] -> RnM ()
-warnPunBindings binders = whenWOptM Opt_WarnPunBindings $
+warnPunBindings = warnPunBindingsAgainst Nothing
+
+-- | Check a binding group and any earlier batches in the same module scope.
+warnPunBindingsAgainst :: Maybe GlobalRdrEnv -> [Name] -> RnM ()
+warnPunBindingsAgainst earlier binders = whenWOptM Opt_WarnPunBindings $
   forM_ (equivClasses compareSpelling names) $ \same_spelling ->
     case partition (not . isValOcc . nameOccName) (sortBy byLocation (toList same_spelling)) of
       (type_name : _, term_name : _) ->
-        let (first_name, second_name)
-              | byLocation type_name term_name == GT = (term_name, type_name)
-              | otherwise = (type_name, term_name)
-        in addDiagnosticAt (nameSrcSpan second_name) (TcRnPunBinding second_name first_name)
-      _ -> pure ()
+        if byLocation type_name term_name == GT
+        then report type_name term_name
+        else report term_name type_name
+      (type_name : _, []) -> warnEarlier type_name (termNamespace type_name)
+      ([], term_name : _) -> warnEarlier term_name tcClsName
+      ([], []) -> pure ()
   where
     names = filter (isGoodSrcSpan . nameSrcSpan) binders
     spelling = occNameFS . nameOccName
     compareSpelling a b = lexicalCompareFS (spelling a) (spelling b)
     byLocation a b = leftmost_smallest (nameSrcSpan a) (nameSrcSpan b)
 
+    report new old = addDiagnosticAt (nameSrcSpan new) (TcRnPunBinding new old)
+
+    termNamespace name
+      | isLexVar (spelling name) = varName
+      | otherwise = dataName
+
+    warnEarlier new namespace = for_ earlier $ \env ->
+      let occ = setOccNameSpace namespace (nameOccName new)
+          earlier_names = map greName
+                        $ filter isLocalGRE
+                        $ lookupGRE env (LookupOccName occ SameNameSpace)
+      in for_ (listToMaybe (sortBy byLocation earlier_names)) (report new)
+
 {- Note [Pun binding warnings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Proposal #765 diagnoses same-spelled type and term binders that would
 conflict in a single namespace. Check each group of simultaneous
 binders separately. A binder can shadow a name in an enclosing scope.
+
+A top-level splice divides a module into declaration batches for renaming
+and type checking. The module's declarations still share one scope.
+Compare each newly introduced spelling with earlier local definitions.
+Report at the new declaration. The global reader environment still
+distinguishes imported names from local definitions.
 
 For example, `id (type a) a = a` binds both names in one group.
 In `f @a = \(a :: a) -> a`, the annotation uses the outer type variable.

@@ -2479,9 +2479,9 @@ of ``-W(no-)*``.
     :reverse: -Wno-pun-bindings
     :default: off
 
-    Warn about type and term definitions with the same name in one top-level
-    declaration group, such as ``data T = T``. This also applies when the type
-    and term definitions are in separate declarations in that group.
+    Warn about type and term definitions with the same name in a module's
+    top-level scope, such as ``data T = T``. A top-level declaration splice
+    can separate the two declarations. The later declaration still warns.
     A local declaration can shadow an imported name without producing this
     warning.
 
