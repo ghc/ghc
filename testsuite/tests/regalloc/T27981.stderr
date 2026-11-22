@@ -1,0 +1,22 @@
+
+==================== Asm code ====================
+.section .text
+.align 8
+.globl f
+.type f, @function
+f:
+.Lc6:
+	movq %rbx,%rax
+	movq (%rbx),%rbx
+	jmp .Lc3
+.Lc5:
+	movq 8(%rax),%rbx
+.Lc3:
+	incq %rbx
+	testq %rbx,%rbx
+	je .Lc5
+.Lc4:
+	jmp g
+	.size f, .-f
+
+

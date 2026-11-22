@@ -94,20 +94,11 @@ joinToTargets' block_live new_blocks block_id instr (dest:dests)
         let still_live uniq _   = uniq `elemUniqSet_Directly` getRegs live_set
         let adjusted_assig      = filterUFM_Directly still_live assig
 
-        -- and free up those registers which are now free.
-        let to_free =
-                [ r     | (reg, Loc loc _locFmt) <- nonDetUFMToList assig
-                        -- This is non-deterministic but we do not
-                        -- currently support deterministic code-generation.
-                        -- See Note [Unique Determinism and code generation]
-                        , not (elemUniqSet_Directly reg $ getRegs live_set)
-                        , r          <- regsOfLoc loc ]
-
         case lookupBlockAssignment  dest block_assig of
          Nothing
           -> joinToTargets_first
                         block_live new_blocks block_id instr dest dests
-                        block_assig adjusted_assig to_free
+                        block_assig adjusted_assig
 
          Just (_, dest_assig)
           -> joinToTargets_again
@@ -116,7 +107,8 @@ joinToTargets' block_live new_blocks block_id instr (dest:dests)
 
 
 -- this is the first time we jumped to this block.
-joinToTargets_first :: (FR freeRegs, Instruction instr)
+joinToTargets_first :: forall freeRegs instr.
+                       (FR freeRegs, Instruction instr)
                     => BlockMap Regs
                     -> [NatBasicBlock instr]
                     -> BlockId
@@ -125,20 +117,28 @@ joinToTargets_first :: (FR freeRegs, Instruction instr)
                     -> [BlockId]
                     -> BlockAssignment freeRegs
                     -> RegMap Loc
-                    -> [RealReg]
                     -> RegM freeRegs ([NatBasicBlock instr], instr)
-joinToTargets_first block_live new_blocks block_id instr dest dests
+joinToTargets_first block_live new_blocks block_id_src instr dest dests
         block_assig src_assig
-        to_free
 
- = do   -- free up the regs that are not live on entry to this block.
-        freeregs        <- getFreeRegsR
-        let freeregs' = foldl' (flip frReleaseReg) freeregs to_free
+ = do   platform <- getPlatform
+        let !live_set = expectJust (mapLookup dest block_live)
 
-        -- remember the current assignment on entry to this block.
-        setBlockAssigR (updateBlockAssignment dest (freeregs', src_assig) block_assig)
+        let !free_init_regs = initBlockFreeFromLive platform live_set :: freeRegs
 
-        joinToTargets' block_live new_blocks block_id instr dests
+        let allocRegsOfLoc :: VLoc -> freeRegs -> freeRegs
+            allocRegsOfLoc loc fregs = foldl' (flip frAllocateReg) fregs (regsOfLoc loc)
+        -- The target block's initially allocated regs are the live real regs
+        -- plus the allocated vregs.
+        -- Determinism: As deterministic as the assignments of src_assign, as we build a set.
+        -- See Note [Unique Determinism and code generation]
+        let freeregs_add = nonDetStrictFoldUFM
+                                    (\(Loc loc _fmt) regs -> allocRegsOfLoc loc regs )
+                                    free_init_regs
+                                    src_assig
+
+        setBlockAssigR (updateBlockAssignment dest (freeregs_add, src_assig) block_assig)
+        joinToTargets' block_live new_blocks block_id_src instr dests
 
 -- we've jumped to this block before
 joinToTargets_again :: (Instruction instr, FR freeRegs)

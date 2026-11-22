@@ -1,0 +1,16 @@
+#include "Cmm.h"
+
+// #27981: Tests that we don't create a fixup block when using R1.
+
+f (W_ p)
+{
+    W_ x;
+    x = W_[p];
+loop:
+    R1 = x + 1;
+    if (R1 == 0) goto again;
+    jump g [R1];
+again:
+    x = W_[p + 8];
+    goto loop;
+}

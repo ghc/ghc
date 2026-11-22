@@ -1,7 +1,8 @@
 module GHC.CmmToAsm.Reg.Linear.FreeRegs (
     FR(..),
     allFreeRegs,
-    maxSpillSlots
+    maxSpillSlots,
+    initBlockFreeFromLive
 )
 where
 
@@ -13,7 +14,12 @@ import qualified GHC.Platform.Reg.Class.Unified   as Unified
 import qualified GHC.Platform.Reg.Class.Separate  as Separate
 import qualified GHC.Platform.Reg.Class.NoVectors as NoVectors
 
-import GHC.CmmToAsm.Config
+import           GHC.CmmToAsm.Format (takeRealRegs)
+import           GHC.CmmToAsm.Reg.Liveness (Regs)
+import           GHC.CmmToAsm.Reg.Regs (getRegs)
+import           GHC.CmmToAsm.Config
+
+import GHC.Types.Unique.Set
 import GHC.Utils.Panic
 import GHC.Platform
 
@@ -112,3 +118,13 @@ maxSpillSlots config = case platformArch (ncgPlatform config) of
    ArchJavaScript-> panic "maxSpillSlots ArchJavaScript"
    ArchWasm32    -> panic "maxSpillSlots ArchWasm32"
    ArchUnknown   -> panic "maxSpillSlots ArchUnknown"
+
+{-# INLINABLE initBlockFreeFromLive #-}
+initBlockFreeFromLive :: FR freeRegs => Platform -> Regs -> freeRegs
+initBlockFreeFromLive platform live_on_entry =
+                -- Order independent, so as deterministic as the live_on input
+                -- See Note [Unique Determinism and code generation]
+                nonDetStrictFoldUniqSet
+                        frAllocateReg
+                        (frInitFreeRegs platform)
+                        (takeRealRegs $ getRegs live_on_entry)

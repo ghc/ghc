@@ -130,6 +130,7 @@ import GHC.Cmm.Dataflow.Label
 import GHC.Cmm
 
 import GHC.Data.Graph.Directed
+import GHC.Data.Maybe (expectJust)
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSM
@@ -247,6 +248,7 @@ linearRegAlloc'
         -> freeRegs
         -> [BlockId]                    -- ^ entry points
         -> BlockMap Regs              -- ^ live regs on entry to each basic block
+                                      --   one entry for *every* block.
         -> [SCC (LiveBasicBlock instr)] -- ^ instructions annotated with "deaths"
         -> UniqDSM ([NatBasicBlock instr], RegAllocStats, Int)
 
@@ -361,22 +363,16 @@ initBlock id block_live
                 -- virtual regs (presumably this is part of a loop,
                 -- and we'll iterate again).  The assignment begins
                 -- empty.
-                Nothing
-                 -> do  -- pprTrace "initFreeRegs" (text $ show initFreeRegs) (return ())
-                        case mapLookup id block_live of
-                          Nothing ->
-                            setFreeRegsR    (frInitFreeRegs platform)
-                          Just live ->
-                            setFreeRegsR $ foldl' (flip frAllocateReg) (frInitFreeRegs platform)
-                                                  (nonDetEltsUniqSet $ takeRealRegs $ getRegs live)
-                            -- See Note [Unique Determinism and code generation]
+                Nothing -> do
+                        let !free_regs = initBlockFreeFromLive platform (expectJust $ mapLookup id block_live)
+                        -- pprTrace "initFreeRegs" (text $ show free_regs) (return ())
+                        setFreeRegsR free_regs
                         setAssigR       emptyRegMap
 
                 -- load info about register assignments leading into this block.
                 Just (freeregs, assig)
                  -> do  setFreeRegsR    freeregs
                         setAssigR       assig
-
 
 -- | Do allocation for a sequence of instructions.
 linearRA
