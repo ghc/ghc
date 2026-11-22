@@ -50,8 +50,13 @@ Here ``Result`` reduces to ``Either String Int``. A module importing the
 synonym can use that equality without enabling the extension. The
 unmatchable arrow in ``WithError`` uses :extension:`Modifiers`.
 
-A type-level let binds one variable in the body. GHC checks its
-right-hand side in the enclosing scope, even if the body ignores it.
+A type-level let checks its bindings in source order. Each right-hand
+side sees the enclosing scope and the preceding bindings. Each binding
+must kind-check, even if the body ignores it. A kind signature for one
+name can immediately precede that name's binding. For example,
+``let { b :: Type; b = Maybe a } in (b, b)`` checks ``Maybe a`` at
+kind ``Type``.
+
 The lambda and case forms currently require a top-level synonym on the
 outside. A case alternative can bind distinct fields of a constructor.
 A variable or wildcard at the root accepts the scrutinee when matching

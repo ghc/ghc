@@ -7718,11 +7718,13 @@ zipRows (x : xs) (y : ys) = VCons (x, y) (zipRows xs ys)
 ```
 
 The source checker verifies coverage at each inspected constructor.
-It requires the first list to decrease in a recursive call. For the
-second recursive operand it uses the unchanged argument or a smaller
-field from that operand's own pattern. It compares every provisional
-equation with the corresponding final Core equation before writing
-the interface.
+For each recursive operand it accepts the unchanged argument or a
+proper subterm from that operand's own pattern. At least one operand
+must decrease on every call. For example, the checker can preserve
+the original first cons while recursing on the second tail. It compares
+each provisional equation with the corresponding final Core equation
+before writing the interface. Constructor specialization can replace
+a self-call with a new worker. Final validation then drops the table.
 
 `zipLength '[] ys` reduces with an unknown `ys`. The empty-second
 equation requires a known first cons. An attempted equality for an
@@ -7736,7 +7738,10 @@ Its first row uses a wildcard to leave the second list uninspected.
 `NativeOpenZipRows` checks the stripped interface, separate client,
 two concrete element kinds, runtime demand, and recompilation after a
 changed equation. It also checks that a rule which changes the final
-result removes the provisional table.
+result removes the provisional table. The recursion controls cover
+each single-operand decrease and a function that decreases different
+operands in different branches. They reject calls that leave both
+operands unchanged, swap positions, or grow an operand.
 
 `zipMinimum` proves that the result index equals
 `Min (sourceLength xs) (sourceLength ys)`. Its first empty-list
@@ -7746,6 +7751,35 @@ recursive call. An [ordinary client](examples/packed-vector/OrdinaryZipRows.hs)
 prints the rows and the proof in one tuple. The test also prints
 `([],Refl)` with an empty first list and an undefined second list.
 [Case-tree and demand references](REFERENCES.md#the-length-of-zip-and-demand-in-a-case-tree).
+
+### Constructor specialization
+
+An ordinary `countRight` that keeps its matched first cons can use
+`{-# NOINLINE countRight #-}` at standard `-O2`. This keeps the exact
+self-call in final Core. A no-code reader can use the complete interface
+with rewrite rules enabled. A matching user rule still blocks the proof.
+
+The first unannotated case uses two independently quantified list
+element types. SpecConstr fixes the first list to a cons. The checker
+reads the generated local rule and checks the order and type of each
+captured field. It compares the worker's second-list case and each
+recursive call with the original first-cons equations. The wrapper must
+still check the first list before the second. Tidy must leave both
+captured fields lazy.
+
+An independent client can check the open equation at standard `-O2`.
+It must match the active rule to the exact worker required by the
+owner's vanilla unfolding. Tidy derives that unfolding from final
+Core. The client compares all wrapper equations, checks that the
+captured arguments remain lazy, and requires that the worker have no
+active rules. A user rule with the same name and argument shape
+still reports GHC-83605.
+
+The check uses the existing interface. A previous reader can still use
+the table with rewriting disabled. A producer without a checked table
+cannot supply this evidence. A missing or stable source unfolding leaves
+the specialization rule unchecked. Specialization to a known second cons
+still needs its own demand check.
 
 ## M99: evaluate an imported closed call
 

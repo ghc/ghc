@@ -1692,6 +1692,32 @@ The source observations check those orders, proof demand, partial fields and
 ordinary row failure separately. These runtime observations do not prove
 preservation or totality for this fork.
 
+#### Refine the public index of a stored witness
+
+Agda's `Σ` record gives its second field the type `B fst`. The standard
+library's `uncurry` passes both fields to a dependent function.
+[Agda's `Σ` record](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#the-s-type)
+and [`uncurry`](https://agda.github.io/agda-stdlib/v2.4/Data.Product.Base.html#126).
+
+In the manual's `focusAt` example, an earlier equality lets a later
+`with` pattern open a pair and match the second vector with `focus ∷ after`.
+[Agda's `focusAt` example](https://agda.readthedocs.io/en/v2.8.0/language/with-abstraction.html#irrefutable-with).
+
+In `SomeVec (S _) (VCons x _)`, the match on `S` refines the payload's
+type. The constructor's result equality relates the stored length to
+the public index. The Haskell client can use both equalities in later
+argument patterns and in its result. The match compiler scopes their
+combined evidence after all the constructor fields.
+
+Agda checks an absurd pattern by testing each constructor's result index
+for a conflict. In the manual, `Even 1` conflicts with both constructors
+of `Even`. GHC checks whether a nominal equality rules out a constructor
+of the stored witness. A Haskell witness can be bottom. The coverage
+checker can report an inaccessible right-hand side while preserving the
+demand of the pattern that precedes it.
+[Agda's absurd patterns](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#absurd-patterns)
+and [the Haskell 2010 Report, §3.17.2](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html).
+
 ## Source vector uncons
 
 Decision: inspect the stored runtime length before repackaging a vector tail.
@@ -5680,8 +5706,30 @@ documents the same demand issue for fusion. A type-level reduction
 must preserve that choice of discriminator. The equation for an empty
 second list can require a known cons in the first position. Neither
 coverage nor structural recursion makes all Haskell spines finite.
-[GHC.Internal.List, Note [Fusion for foldrN] and zip](../../libraries/ghc-internal/src/GHC/Internal/List.hs)
-and [Agda 2.8.0 structural recursion](https://agda.readthedocs.io/en/v2.8.0/language/termination-checking.html#primitive-recursion).
+[GHC.Internal.List, Note [Fusion for foldrN] and zip](../../libraries/ghc-internal/src/GHC/Internal/List.hs).
+
+Agda's structural recursion allows descent into a proper subexpression.
+Its lexicographic examples also show that a later operand can supply the
+decrease while an earlier operand stays unchanged. The two-list
+certificate checks each operand against its own original value. Require
+each operand to stay unchanged or decrease, and require a strict
+decrease in at least one position. On finite constructor trees their
+total size decreases in every recursive call. The checked Core case
+tree determines demand independently of that decrease.
+[Agda 2.8.0 structural recursion](https://agda.readthedocs.io/en/v2.8.0/language/termination-checking.html#structural-recursion).
+
+SpecConstr specializes a recursive call for a known constructor shape.
+The observed right-decreasing worker takes the first cons fields and
+the remaining second spine. It inspects that spine, returns `Z` for nil,
+and recurses on the tail for cons. Its wrapper has already inspected
+the first spine. The left-decreasing worker has the corresponding
+second-cons specialization. Standard `-O2` exports both rewrite rules.
+The existing two-list check requires the same final owner and rejects
+an active rule at proof use. The `NOINLINE` probe keeps both original
+calls, and the `OPAQUE` probe also keeps both.
+[Call-pattern specialisation for Haskell programs](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/07/spec-constr.pdf),
+[GHC SpecConstr, Note [Good arguments] and Note [SpecConstr: rule activation]](../../compiler/GHC/Core/Opt/SpecConstr.hs),
+and [GHC proposal 415](https://ghc-proposals.readthedocs.io/en/latest/proposals/0415-opaque-pragma.html).
 
 ## Executing closed calls and reducing open calls
 

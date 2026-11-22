@@ -410,6 +410,9 @@ data PsMessage
    -- | Multiple names in standalone kind signatures
    | PsErrMultipleNamesInStandaloneKindSignature [LIdP GhcPs]
 
+   -- | A type let signature names a different binding from the next equation.
+   | PsErrTypeLetSignatureMismatch !RdrName !RdrName
+
    -- | Illegal import bundle form
    | PsErrIllegalImportBundleForm
 

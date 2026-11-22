@@ -1608,8 +1608,6 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
            PrefixCon ann pats -> return (ann, pats)
            _ -> bad_pattern
        ; check_con_pat_arity con_like (length pats)
-       ; unless (null eq_spec || all isRetainedVarPat
-                   [pat | (Just _, pat) <- zipEqual binders pats]) bad_pattern
        ; let tc = dataConTyCon con
        ; expected <- readExpType_maybe (scaledThing pat_ty_scaled)
        ; family_result <- maybe (pure Nothing) (match_family_result tc) expected
@@ -1837,7 +1835,10 @@ scope. matchExpectedConTy checks the parent and instantiates its universal
 arguments. Keep the checks for no existentials or context, and require an
 identity result wrapper for the ordinary constructor match. Check a retained
 result's EqSpec after the source field Id enters scope. See Note [Retained
-constructor result equality] in GHC.Core.DataCon.
+constructor result equality] in GHC.Core.DataCon. An index constructor pattern
+can refine that field. Later argument patterns and the RHS can use the result
+equality and this refinement together. See Note [Trailing constructor evidence] in
+GHC.HsToCore.Match.Constructor.
 Match compilation keeps each equation's actual source field Ids in a separate
 case, including when its family has other constructors.
 See Note [Retained package equation scope] in GHC.HsToCore.Match.Constructor.

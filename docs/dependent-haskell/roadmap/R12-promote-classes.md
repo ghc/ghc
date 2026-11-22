@@ -89,6 +89,13 @@ under the two-constructor restriction.
 [warm upgrade test](../examples/open-evaluation/check-applied-mapping-upgrade.sh)
 and [Agda and GHC precedents](../REFERENCES.md#mapping-the-second-field-of-these).
 
+An instance can fix more than one receiver parameter. For
+`data Row e t a = Empty | Failed e | Both e t a`, the checked interface
+records the method for `Functor (Row e t)` and `Functor (Row Type Type)`.
+The same worker under `Functor (Row Int Bool)` compiles as ordinary
+Haskell, but its interface omits the checked method. The constructor-case
+checker currently accepts a type variable or `Type` in each fixed position.
+
 If the equation uses `p` to map the field but claims the result is
 `q x`, GHC reports GHC-83865 at `Refl`. The detailed expected type can
 still display the instance worker as `These.$cfmap`. To display a selector

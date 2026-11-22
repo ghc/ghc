@@ -105,6 +105,26 @@ Eisenberg closed the draft without acceptance.
 [Gundry's suggestion](https://github.com/ghc-proposals/ghc-proposals/pull/523#issuecomment-1350590569)
 and [Eisenberg's decision](https://github.com/ghc-proposals/ghc-proposals/pull/523#issuecomment-1372209793).
 
+## Local kind signatures
+
+A single-name kind signature can immediately precede its binding in a
+layout or braced group. For example, `let { width :: Nat; width = 1 + n }
+in Vec a width` checks the right-hand side at kind `Nat`. The signature
+and right-hand side see the same preceding bindings. In
+`let { tag = Bool; tag :: tag; tag = 'True } in tag`, the signature
+uses the first `tag` and the body uses the second. An unused binding must
+still match its signature.
+
+The fork uses the same checks as a kind ascription on the right-hand
+side. Agda also permits optional signatures before local definitions in
+source order. Haskell 2010 term `let` permits signatures as declarations
+throughout a mutually recursive group. The closed `ExtendedLet` draft
+specified binding equations for type `let`. The adjacent signature is a
+fork design. [Agda](https://agda.readthedocs.io/en/v2.8.0/language/let-and-where.html#let-expressions),
+[Haskell 2010 §3.12](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-440003.12),
+[Haskell 2010 §4.4](https://www.haskell.org/onlinereport/haskell2010/haskellch4.html#x10-780004.4),
+and [ExtendedLet](https://github.com/ghc-proposals/ghc-proposals/pull/523/files).
+
 ## Type quotations and splices
 
 A type quotation represents `let a = rhs in body` as `LetT a rhs body`.
@@ -118,6 +138,7 @@ to the second binder.
 ```
 
 Splicing the quotation checks the type at the splice site.
+A local kind signature appears as `SigT` on the right-hand side of `LetT`.
 An ordinary client can import a value with that type and observe
 `Right (Just True)`. Reification of a checked type can expand the
 abbreviation. The TH constructor and `letT` smart constructor are
@@ -131,7 +152,7 @@ and [review discussion](https://github.com/ghc-proposals/ghc-proposals/pull/378#
 
 ## A vector with an optional header
 
-`Frame n b a` binds `width = 1 + n` before matching the flag `b`.
+`Frame n b a` checks `width = 1 + n` at kind `Nat` before matching `b`.
 The header branch returns a `Vec a width`. The other branch returns a
 `Vec a n`. An ordinary client passes the same runtime flag to `frameRow` and
 `frameToList`. It obtains `":xy"` or `"xy"` from the same two cells.

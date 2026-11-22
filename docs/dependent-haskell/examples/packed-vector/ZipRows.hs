@@ -1,10 +1,10 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeFamilies, TypeOperators #-}
 
-module ZipRows (Min, zipMinimum, zipRows) where
+module ZipRows (Min, countWithHeaderStep, zipMinimum, zipRows) where
 
 import Data.Type.Equality ((:~:)(Refl))
 import PackedVecLibrary (Nat(..), Vec(..), sourceLength)
-import ZipLengthSource (zipLength)
+import ZipLengthSource (countWithHeader, zipLength)
 
 -- | Pair the elements up to the end of the shorter list.
 zipRows :: forall a b. foreach (xs :: [a]) -> foreach (ys :: [b])
@@ -25,3 +25,9 @@ zipMinimum :: forall a b. foreach (xs :: [a]) -> foreach (ys :: [b]) ->
 zipMinimum [] _ = Refl
 zipMinimum (_ : _) [] = Refl
 zipMinimum (_ : xs) (_ : ys) = case zipMinimum xs ys of Refl -> Refl
+
+-- | Prove the count for one record and the same header list.
+countWithHeaderStep :: forall a b. foreach (h :: a) -> foreach (hs :: [a])
+                    -> foreach (r :: b) -> foreach (rs :: [b])
+                    -> countWithHeader (h ': hs) (r ': rs) :~: S (countWithHeader (h ': hs) rs)
+countWithHeaderStep _ _ _ _ = Refl

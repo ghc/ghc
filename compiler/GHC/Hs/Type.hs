@@ -590,22 +590,28 @@ data HsTypeGhcPsExt
                (LocatedN RdrName) (LHsType GhcPs) (LHsType GhcPs)
 
 -- | One abbreviation in a source type let.
-data HsTypeLetBind = HsTypeLetBind (LocatedN RdrName) (EpToken "=") (LHsType GhcPs)
+data HsTypeLetBind = HsTypeLetBind
+  (Maybe (LocatedN RdrName, TokDcolon, LHsKind GhcPs, EpToken ";"))
+  (LocatedN RdrName) (EpToken "=") (LHsType GhcPs)
 
 -- | Construct one binding during renaming or TH conversion.
 mkHsSingleTypeLet :: (EpToken "let", EpToken "in") -> LocatedN RdrName
                   -> LHsType GhcPs -> LHsType GhcPs -> HsTypeGhcPsExt
 mkHsSingleTypeLet ann name rhs body =
-  HsTypeLet ann Nothing (noLocA (HsTypeLetBind name noAnn rhs) :| []) body
+  HsTypeLet ann Nothing (noLocA (HsTypeLetBind Nothing name noAnn rhs) :| []) body
 
 -- | Expose the first binding and its scope. See Note [Ordered type let bindings].
 splitHsTypeLet :: NonEmpty (LocatedA HsTypeLetBind) -> LHsType GhcPs
                -> (LocatedN RdrName, LHsType GhcPs, LHsType GhcPs)
-splitHsTypeLet (L _ (HsTypeLetBind name _ rhs) :| binds) body =
-  (name, rhs, case binds of
+splitHsTypeLet (L _ (HsTypeLetBind signature name _ rhs) :| binds) body =
+  (name, ascribed_rhs, case binds of
     [] -> body
     b : bs -> L (noAnnSrcSpan (getLocA b `combineSrcSpans` getLocA body))
                 (XHsType (HsTypeLet noAnn Nothing (b :| bs) body)))
+  where
+    ascribed_rhs = case signature of
+      Nothing -> rhs
+      Just (_, colon, kind, _) -> L (getLoc rhs) (HsKindSig colon rhs kind)
 
 {- Note [Ordered type let bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -622,6 +628,10 @@ at a time to free-variable collection, declaration lifting and renaming.
 This gives each of them the same scope, including in signatures with
 implicit quantification. The renamed tree already represents nested lets,
 so kind checking and Template Haskell use their existing single-binder rules.
+
+The parser keeps an adjacent signature with its binding. When splitting the
+group, put the signature on the RHS as an HsKindSig. The kind and RHS then
+use the same scope and checks as a written RHS kind ascription.
 -}
 
 -- | A parsed constructor alternative in a type case.
@@ -1760,9 +1770,10 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
     HsTypeCaseAlias _ _ body -> ppr_mono_lty body
     HsTypeExists (_, sep_tok) b body -> pprExistsTy (hsExistsTyFlag sep_tok) (ppr b) (ppr_mono_lty body)
     HsTypeLet _ brackets binds body ->
-      let binding (L _ (HsTypeLetBind v _ rhs)) =
-            ppr v <+> equals <+> ppr_mono_lty rhs
-          bindings = map binding (NE.toList binds)
+      let binding (L _ (HsTypeLetBind signature v _ rhs)) =
+            [ppr sig <+> dcolon <+> ppr_mono_lty kind | (sig, _, kind, _) <- maybeToList signature]
+              ++ [ppr v <+> equals <+> ppr_typelet_rhs rhs]
+          bindings = concatMap binding (NE.toList binds)
           group = case brackets of
             Nothing -> vcat bindings
             Just _  -> vcat (zipWith (<+>) (lbrace : repeat semi) bindings ++ [rbrace])
@@ -1777,8 +1788,13 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
                                        | (_, pat, rhs) <- rows]))
     HsTypeExistsRn flag b body -> pprExistsTy flag (ppr b) (ppr_mono_lty body)
     HsTypeLetRn v rhs body ->
-      text "let" <+> ppr v <+> equals <+> ppr_mono_lty rhs
+      text "let" <+> ppr v <+> equals <+> ppr_typelet_rhs rhs
         <+> text "in" <+> ppr_mono_lty body
+
+-- | Parenthesize a lowered kind signature on a type let RHS.
+ppr_typelet_rhs :: OutputableBndrId p => LHsType (GhcPass p) -> SDoc
+ppr_typelet_rhs rhs@(L _ HsKindSig{}) = parens (ppr_mono_lty rhs)
+ppr_typelet_rhs rhs = ppr_mono_lty rhs
 
 -- | Classify the parsed existential separator.
 hsExistsTyFlag :: Either (EpToken "|") (EpToken ".") -> ExistsTyFlag

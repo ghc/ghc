@@ -269,6 +269,11 @@ instance Diagnostic PsMessage where
                   2 (pprWithCommas ppr vs)
                 , text "See https://gitlab.haskell.org/ghc/ghc/issues/16754 for details."
                 ]
+    PsErrTypeLetSignatureMismatch sig binder
+      -> mkSimpleDecorated $
+           text "The signature for" <+> quotes (ppr sig)
+           <+> text "must immediately precede its binding."
+           $$ text "The next binding is for" <+> quotes (ppr binder) <> dot
     PsErrIllegalExplicitNamespace kw
       -> mkSimpleDecorated $
            text "Illegal keyword" <+> quotes kw_doc
@@ -637,6 +642,7 @@ instance Diagnostic PsMessage where
     PsErrNoSingleWhereBindInPatSynDecl{}          -> ErrorWithoutFlag
     PsErrDeclSpliceNotAtTopLevel{}                -> ErrorWithoutFlag
     PsErrMultipleNamesInStandaloneKindSignature{} -> ErrorWithoutFlag
+    PsErrTypeLetSignatureMismatch{}               -> ErrorWithoutFlag
     PsErrIllegalExplicitNamespace{}               -> ErrorWithoutFlag
     PsErrUnsupportedExplicitNamespace{}           -> ErrorWithoutFlag
     PsErrPlainWildcardImport{}                    -> ErrorWithoutFlag
@@ -784,6 +790,7 @@ instance Diagnostic PsMessage where
     PsErrNoSingleWhereBindInPatSynDecl{}          -> noHints
     PsErrDeclSpliceNotAtTopLevel{}                -> noHints
     PsErrMultipleNamesInStandaloneKindSignature{} -> noHints
+    PsErrTypeLetSignatureMismatch{}               -> noHints
     PsErrIllegalExplicitNamespace{}               -> [suggestExtension LangExt.ExplicitNamespaces]
     PsErrUnsupportedExplicitNamespace{}           -> noHints
     PsErrPlainWildcardImport{}                    -> [SuggestRemoveImportList]

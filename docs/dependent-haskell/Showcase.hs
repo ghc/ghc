@@ -195,7 +195,7 @@ import qualified PackedProjection
 import qualified PackageEquality
 import AppendLengthClient (appendTwoAndOne)
 import PackedVecLibrary
-import OrdinaryZipRows (zipReport)
+import OrdinaryZipRows (headerCountReport, zipReport)
 import qualified AppendByMethodClient
 import qualified RetainedSumOperator
 import RetainedNat (Retained(..), constantPackage, withRetained)
@@ -1804,6 +1804,7 @@ main = do
     IndexedPrefixClient.matchIndex >>= observe "match the stored list equality with an unevaluated head and tail"
     DirectIndexedListClient.firstCell >>= observe "read the first cell of a directly indexed list"
     DirectIndexedVectorClient.firstCells >>= observe "read the first cells of polymorphic directly indexed vectors"
+    observe "match the stored length of directly indexed vectors" DirectIndexedVectorClient.firstCellsByLength
     observe "adjust a reading while preserving its calibration index"
         (DirectIndexedListClient.readingFields enabled 36)
     runtimeList <- newIORef [False, True, False]
@@ -2074,6 +2075,7 @@ sourceAddition = do
     labels <- newIORef "abc" >>= readIORef
     flags <- newIORef [True, False] >>= readIORef
     putStrLn ("prove zip returns the smaller of two runtime lengths: " ++ zipReport labels flags)
+    putStrLn ("count records with a header, skip records without one: " ++ headerCountReport flags)
     observe "split the appended vector at its first length"
         (toList (fst split), toList (snd split))
     rebuilt <- CertifiedSplitClient.splitObservation
