@@ -4660,10 +4660,13 @@ tcRetainedFunctionVar expected actual
     else do
       co <- unifyType (Just (NameThing (idName actual))) actual_ty expected
       nominal <- liftZonkM (zonkCo co)
-      let range = Core.Cast (Core.Var actual) (SubCo nominal)
-      case Core.nativeIndexFunctionArgIndex range of
-        Just index | typeKind index `tcEqType` expected -> pure range
-        _ -> mismatch
+      if isReflCo nominal
+        then pure (Core.Var (setVarType actual (coercionLKind nominal)))
+        else do
+          let range = Core.Cast (Core.Var actual) (SubCo nominal)
+          case Core.nativeIndexFunctionArgIndex range of
+            Just index | typeKind index `tcEqType` expected -> pure range
+            _ -> mismatch
   | otherwise = failWithTc $ TcRnRetainedQuantificationError RetainedFunctionArgument
   where
     actual_ty = varType actual
@@ -4677,6 +4680,11 @@ the provider expects Bool -> Result 'True. A type family can also
 determine the input type. The ordinary unifier must prove the nominal
 equality of the arrows. Use its coercion for both the retained index
 and the value argument. Both refer to the same local Id.
+
+Unification can also fix erased metavariables in the expected arrow.
+If the coercion zonks to reflexivity, keep the local Id at the resolved
+type. The Core judgment for callback casts requires non-reflexive
+evidence. See Note [Wildcards in retained operand domains].
 -}
 
 -- | Resolve a retained argument at its known domain without checking its value.
