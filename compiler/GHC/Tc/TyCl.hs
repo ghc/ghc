@@ -4294,7 +4294,7 @@ kcTyFamInstEqn tc_fam_tc
 
        ; checkTyFamInstEqn tc_fam_tc eqn_tc_name hs_pats
 
-       ; raw_kinds <- intPrimFamilyPatKinds tc_fam_tc hs_pats
+       ; raw_kinds <- primFamilyPatKinds tc_fam_tc hs_pats
        ; discardResult $
          bindOuterFamEqnTKBndrs_Q_Tv raw_kinds outer_bndrs $
          do { (fam_app, res_kind) <- tcFamTyPats tc_fam_tc hs_pats
@@ -4946,7 +4946,7 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
        -- By now, for type families (but not data families) we should
        -- have checked that the number of patterns matches tyConArity
        ; skol_info <- mkSkolemInfo FamInstSkol
-       ; raw_kinds <- intPrimFamilyPatKinds fam_tc hs_pats
+       ; raw_kinds <- primFamilyPatKinds fam_tc hs_pats
 
        -- This code is closely related to the code
        -- in GHC.Tc.Gen.HsType.kcCheckDeclHeader_cusk

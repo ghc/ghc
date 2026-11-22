@@ -64,7 +64,7 @@ module GHC.Core.Type (
         mkPiTy, mkPiTys, DepFunTyFlag(..), mkDepFunTy, mkDepFunTyWithVis, isBoolIndexId,
         mkPiTysM, mkPiTysU,
         isNativeIndexId, isNativeIndexType, isNativeClosedIndexType, nativeIndexDataConTyArgs,
-        isIntPrimFamilyPatBinder,
+        primFamilyPatFieldKind, isPrimFamilyPatBinderKind, isPrimFamilyPatBinder,
         isNativeIndexFunctionId, nativeIndexFunctionTys_maybe,
         nativeIndexFunctionTypeTys_maybe, nativeCallSpine_maybe,
         isNativeOpaqueValueId, isNativeOpaqueValueType, isNativeClassDictionaryId,
@@ -2653,29 +2653,43 @@ isNativeStructuralFunctionType ty
          Just (arg, res) -> isNativeClosedIndexType arg && isNativeClosedIndexType res
          Nothing -> False
 
-{- Note [Int# family pattern binders]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A closed type family equation can match the field of promoted I#. The
-equation binds an erased Int# index only where its pattern has the form
-'I# x. The binder cannot occur in the right-hand side. These rules preserve
-the match at a known constructor application and leave a neutral Int stuck.
+{- Note [Primitive family pattern binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A closed type family equation can match the field of promoted I# or W#.
+It binds an erased Int# or Word# index only in the matching immediate
+constructor field. The binder cannot occur in the right-hand side.
+These rules permit matching a known constructor application and leave a
+neutral Int or Word stuck.
 
 The axiom binds the variable without introducing a ForAllTy. The ordinary
 FORALL1 rule and runtime index readback keep their existing scope. See
 GHC.Tc.Gen.HsType for source binding and GHC.Core.Lint for axiom checking.
 -}
 
+-- | Return the scope-restricted field kind of a promoted constructor.
+-- See Note [Primitive family pattern binders].
+primFamilyPatFieldKind :: Name -> Maybe Kind
+primFamilyPatFieldKind con
+  | con `hasKey` intDataConKey  = Just intPrimTy
+  | con `hasKey` wordDataConKey = Just wordPrimTy
+  | otherwise = Nothing
+
+-- | Test the kinds that require the closed-family field scope check.
+isPrimFamilyPatBinderKind :: Kind -> Bool
+isPrimFamilyPatBinderKind kind = kind `eqType` intPrimTy || kind `eqType` wordPrimTy
+
 -- | Check the scope of a raw field variable in a closed family axiom.
-isIntPrimFamilyPatBinder :: [Type] -> Type -> TyVar -> Bool
-isIntPrimFamilyPatBinder pats rhs var
-  = isTyVar var && varType var `eqType` intPrimTy
-    && any int_pattern pats
-    && all (\pat -> int_pattern pat || not (occurs_in pat)) pats
+isPrimFamilyPatBinder :: [Type] -> Type -> TyVar -> Bool
+isPrimFamilyPatBinder pats rhs var
+  = isTyVar var && any prim_pattern pats
+    && all (\pat -> prim_pattern pat || not (occurs_in pat)) pats
     && not (occurs_in rhs)
   where
     occurs_in ty = var `elemVarSet` tyCoVarsOfType ty
-    int_pattern (TyConApp tc [TyVarTy field]) = tc `hasKey` intDataConKey && field == var
-    int_pattern _ = False
+    prim_pattern (TyConApp tc [TyVarTy field])
+      | Just kind <- primFamilyPatFieldKind (tyConName tc)
+      = field == var && varType var `eqType` kind
+    prim_pattern _ = False
 
 -- | Test whether a type can classify an opaque runtime value index.
 -- See Note [Opaque runtime index values].
@@ -3112,6 +3126,7 @@ returnsConstraintKind kind                    = isConstraintLikeKind kind
 typeLiteralKind :: TyLit -> Kind
 typeLiteralKind (NumTyLit {}) = naturalTy
 typeLiteralKind (IntPrimTyLit {}) = intPrimTy
+typeLiteralKind (WordPrimTyLit {}) = wordPrimTy
 typeLiteralKind (StrTyLit {}) = typeSymbolKind
 typeLiteralKind (CharTyLit {}) = charTy
 

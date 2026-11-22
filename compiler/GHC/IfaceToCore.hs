@@ -2510,6 +2510,7 @@ tcIfaceCtxt sts = mapM tcIfaceType sts
 tcIfaceTyLit :: IfaceTyLit -> IfL TyLit
 tcIfaceTyLit (IfaceNumTyLit n) = return (NumTyLit n)
 tcIfaceTyLit (IfaceIntPrimTyLit n) = return (IntPrimTyLit n)
+tcIfaceTyLit (IfaceWordPrimTyLit n) = return (WordPrimTyLit n)
 tcIfaceTyLit (IfaceStrTyLit n) = return (StrTyLit (getLexicalFastString n))
 tcIfaceTyLit (IfaceCharTyLit n) = return (CharTyLit n)
 

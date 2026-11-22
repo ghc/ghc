@@ -1516,6 +1516,7 @@ Note [Opaque existential matching] in GHC.Core.Unify.
 getDFunTyLitKey :: TyLit -> OccName
 getDFunTyLitKey (NumTyLit n) = mkOccName Name.varName (show n)
 getDFunTyLitKey (IntPrimTyLit n) = mkOccName Name.varName (show n ++ "#")
+getDFunTyLitKey (WordPrimTyLit n) = mkOccName Name.varName (show n ++ "##")
 getDFunTyLitKey (StrTyLit n) = mkOccName Name.varName (show n)  -- hm
 getDFunTyLitKey (CharTyLit n) = mkOccName Name.varName (show n)
 

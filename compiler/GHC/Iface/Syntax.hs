@@ -55,7 +55,7 @@ import GHC.Iface.Recomp.Binary
 
 import GHC.Builtin( mkUnboundName )
 import GHC.Builtin.KnownKeys ( unrestrictedFunTyConKey, liftedTypeKindTyConKey
-                             , constraintKindTyConKey, manyDataConKey, intPrimTyConKey )
+                             , constraintKindTyConKey, manyDataConKey, intPrimTyConKey, wordPrimTyConKey )
 
 import GHC.Core( IsOrphan, isOrphan, UnfoldingCache(..) )
 import GHC.Core.Class
@@ -2895,8 +2895,10 @@ instance Binary IfaceAT where
 
 instance Binary IfaceAxBranch where
     put_ bh (IfaceAxBranch a1 a2 a3 a4 a5 a6 a7) = do
-        when (any raw_int_binder a1) $
+        when (any (primitive_binder intPrimTyConKey) a1) $
           requireIfaceEvidenceVersion bh ExperimentalIntPrimIndexEvidence
+        when (any (primitive_binder wordPrimTyConKey) a1) $
+          requireIfaceEvidenceVersion bh ExperimentalWordPrimIndexEvidence
         put_ bh a1
         put_ bh a2
         put_ bh a3
@@ -2905,8 +2907,8 @@ instance Binary IfaceAxBranch where
         put_ bh a6
         put_ bh a7
       where
-        raw_int_binder (_, IfaceTyConApp tc IA_Nil) = ifaceTyConName tc `hasKey` intPrimTyConKey
-        raw_int_binder _ = False
+        primitive_binder key (_, IfaceTyConApp tc IA_Nil) = ifaceTyConName tc `hasKey` key
+        primitive_binder _ _ = False
     get bh = do
         a1 <- get bh
         a2 <- get bh

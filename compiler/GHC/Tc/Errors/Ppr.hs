@@ -1219,9 +1219,9 @@ instance Diagnostic TcRnMessage where
                      TermVariablePE -> text "term variables cannot be promoted"
                      TypeVariablePE -> text "type variables bound in a kind signature cannot be used in the type"
           same_rec_group_msg = text "it is defined and used in the same recursive group"
-    TcRnEscapingIntPrimFamilyBinder binders
+    TcRnEscapingPrimFamilyBinder binders
       -> mkSimpleDecorated $
-           hang (text "An Int# binder may occur only in the promoted I# field of a closed family pattern:")
+           hang (text "A primitive field binder may occur only in its promoted constructor field in a closed family pattern:")
                 2 (pprWithCommas ppr binders)
     TcRnUnpromotableLit lit
       -> mkSimpleDecorated $
@@ -2555,7 +2555,7 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnUnpromotableThing{}
       -> ErrorWithoutFlag
-    TcRnEscapingIntPrimFamilyBinder{}
+    TcRnEscapingPrimFamilyBinder{}
       -> ErrorWithoutFlag
     TcRnUnpromotableLit{}
       -> ErrorWithoutFlag
@@ -3284,7 +3284,7 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnUnpromotableThing{}
       -> noHints
-    TcRnEscapingIntPrimFamilyBinder{}
+    TcRnEscapingPrimFamilyBinder{}
       -> noHints
     TcRnUnpromotableLit{}
       -> noHints

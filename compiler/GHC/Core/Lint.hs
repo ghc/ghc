@@ -2624,6 +2624,10 @@ lintTyLit (IntPrimTyLit n)
   = do { platform <- getPlatform
        ; lintL (platformInIntRange platform n)
            (text "Machine integer type literal out of range:" <+> integer n) }
+lintTyLit (WordPrimTyLit n)
+  = do { platform <- getPlatform
+       ; lintL (platformInWordRange platform n)
+           (text "Machine word type literal out of range:" <+> integer n) }
 
 -----------------
 lint_ty_app :: Type -> Kind -> [Type] -> LintM ()
@@ -3560,7 +3564,7 @@ lint_branch ax_tc (CoAxBranch { cab_tvs = tvs, cab_cvs = cvs
   where
     lint_pattern_binder tv inside
       | ClosedTypeFamilyFlavour <- tyConFlavour ax_tc
-      , isIntPrimFamilyPatBinder lhs_args rhs tv
+      , isPrimFamilyPatBinder lhs_args rhs tv
       = lintType (varType tv) >> addInScopeTyCoVar tv inside
       | otherwise = lintTyCoBndr tv inside
 

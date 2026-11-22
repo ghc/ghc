@@ -351,7 +351,8 @@ evidenceSuffix requirements
     || needs RetainedUserUnfoldingEvidence || needs LinearUnpackEvidence
     || needs RetainedCharOperandEvidence || needs MatchableProjectionEvidence
     || needs RetainedNaturalOperandEvidence
-    || needs ExperimentalIntPrimIndexEvidence || needs ExperimentalScopedDictionaryEvidence
+    || needs ExperimentalIntPrimIndexEvidence || needs ExperimentalWordPrimIndexEvidence
+    || needs ExperimentalScopedDictionaryEvidence
     || needs ExperimentalScopedDictionaryCoreEvidence || needs RetainedDataFamilyConOperandEvidence
     || needs TerminalGadtForAllEvidence || needs TerminalGadtContextEvidence
     || needs TerminalGadtTrailingContextEvidence || needs TerminalGadtContextOnlyEvidence
@@ -380,6 +381,7 @@ evidenceSuffix requirements
 
 legacyEvidenceSuffix :: IfaceEvidence -> String
 legacyEvidenceSuffix ExperimentalIntPrimIndexEvidence = featureSetPrefix ++ "experimental-int-prim-index"
+legacyEvidenceSuffix ExperimentalWordPrimIndexEvidence = featureSetPrefix ++ "experimental-word-prim-index"
 legacyEvidenceSuffix PartialSynonymEvidence = featureSetPrefix ++ "partial-synonym-v2"
 legacyEvidenceSuffix ErasedUserRuleEvidence = featureSetPrefix ++ "user-rule"
 legacyEvidenceSuffix LexicalPackageRuleEvidence = featureSetPrefix ++ "lexical-rule"
@@ -458,6 +460,7 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("matchable-projection", MatchableProjectionEvidence)
                       , ("retained-natural-operand", RetainedNaturalOperandEvidence)
                       , ("experimental-int-prim-index", ExperimentalIntPrimIndexEvidence)
+                      , ("experimental-word-prim-index", ExperimentalWordPrimIndexEvidence)
                       , ("experimental-scoped-dictionary", ExperimentalScopedDictionaryEvidence)
                       , ("experimental-scoped-dictionary-core-v3", ExperimentalScopedDictionaryCoreEvidence)
                       , ("retained-data-family-constructor-operand", RetainedDataFamilyConOperandEvidence)

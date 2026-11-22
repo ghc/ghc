@@ -49,7 +49,6 @@ import GHC.Builtin.Modules( gHC_CLASSES )
 import GHC.Builtin.Uniques  ( mkAlphaTyVarUnique )
 
 import GHC.Core.Type
-import GHC.Builtin.WiredIn.Prim (intPrimTy)
 import GHC.Core.Unify ( typesAreApart, tcMatchTyX_BM, BindFlag(..) )
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom
@@ -3101,10 +3100,10 @@ checkValidTyFamEqn fam_tc typats rhs
   = do { checkValidTypePats (const (pure ())) fam_tc typats
        ; case tyConFlavour fam_tc of
            ClosedTypeFamilyFlavour -> do
-             let raw_binders = filter (\tv -> isTyVar tv && varType tv `eqType` intPrimTy)
+             let raw_binders = filter (\tv -> isTyVar tv && isPrimFamilyPatBinderKind (varType tv))
                                       (tyCoVarsOfTypesList typats)
-                 invalid = filter (not . isIntPrimFamilyPatBinder typats rhs) raw_binders
-             unless (null invalid) $ addErrTc (TcRnEscapingIntPrimFamilyBinder invalid)
+                 invalid = filter (not . isPrimFamilyPatBinder typats rhs) raw_binders
+             unless (null invalid) $ addErrTc (TcRnEscapingPrimFamilyBinder invalid)
            _ -> return ()
 
          -- Check for oversaturated visible kind arguments in a type family
