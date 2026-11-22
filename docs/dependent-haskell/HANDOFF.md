@@ -71,7 +71,8 @@ Private candidates are recoverable under
 
 | Ref | Current evidence |
 | --- | --- |
-| `r23-structural-kind-inference` (`e5f37b3fce`) | An unannotated injective kind interpreter accepts the original `T13822`. A family that distinguishes its results by arrow matchability still passes. An older home provider needs a selective rebuild before a new client can rely on the improved kind. |
+| `r23-structural-kind-rebuild` (`9f33902199`) | The original `T13822` compiles. An earlier home provider rebuilds once to export its inferred result kind. The warm build reuses its interface. A separately installed old provider still needs a rebuild. The cases that depend on a written matchability remain distinct. Clean two-stage job `712` uses `_build/on-demand/r23-injective-kind-normal-20261122`. |
+| `r03-r11-equality-continuation` (`90b0103fd0`) | In a private compiler, `gcastWith` can infer the retained equality endpoints from a supplied proof and the result type from the caller. The continuation receives the original equality. A wrong-list proof still fails at `Refl`. Jobs `721` and `722` check the accepted types, errors and evaluation order against the explicitly typed program. Check normal-build status before using this compiler. |
 | `r19-eight-constructor-selector` (`568979c39e`) | Separate providers agree on a case over an unknown enum with up to eight nullary constructors. The wider recursive alternative in `r19-selector-depth-comparison` (`732d9c5bb8`) exceeds the default reduction depth for the last of 1,610 constructors. |
 
 ## Resume after a restart

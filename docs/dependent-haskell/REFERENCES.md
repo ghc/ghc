@@ -7265,6 +7265,15 @@ unrestricted fusion rule outside conversion.
 [Fusion and definedness reading](papers/README.md#short-cut-fusion-and-definedness)
 and [ordinary GHC counterexample](examples/open-evaluation/check-map-fusion.sh).
 
+The stock-rule test uses a rank-2 producer that evaluates its seed
+before emitting one list cell. The unfused fold returns `True` without
+evaluating its own seed. At ordinary `-O2`, one `map` rewrite followed
+by two `fold/build` rewrites passes the fold's undefined seed to the
+producer. This seed fails the definedness condition in Theorem 8.2. The
+zipper control still returns `True` with the same producer.
+[Executable example](examples/open-evaluation/MapFusionDemand.hs)
+and [authors' paper, §8.2](https://janis-voigtlaender.eu/papers/TheImpactOfSeqOnFreeTheoremsBasedProgramTransformations.pdf#page=28).
+
 For `zip` and `zipWith`, the installed left-producer rule supplies
 a function as the accumulator of a two-list fold. Its nil branch
 returns a lambda. Its cons branch still awaits the right list. The
