@@ -5643,6 +5643,16 @@ are checked separately.
 [Runtime proof](examples/open-evaluation/TheseMapping.hs)
 and [instance and demand checks](../../testsuite/tests/dependent/should_run/NativeOpenTheseFmap.sh).
 
+Agda's printer looks up an abstract qualified name in the current scope.
+It checks that a local binder does not hide the chosen name. GHC's
+`mkQualName` also checks the reader environment to select a qualifier.
+For a checked mapping call, the type checker has both the class selector
+and the instance worker at the use site. Two selectors can share a worker.
+A diagnostic that prints the source method needs the selector identity
+before it can choose a qualifier.
+[Agda 2.8.0 name lookup](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Syntax/Translation/AbstractToConcrete.hs#L327-L361)
+and [GHC name qualification](../../compiler/GHC/Types/Name/Ppr.hs).
+
 ### Inferring the endpoint kinds of a retained callback
 
 Agda permits an unannotated binder after `forall`. Its type stands for
