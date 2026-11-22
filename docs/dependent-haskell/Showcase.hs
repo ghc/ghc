@@ -360,9 +360,18 @@ booleans = do
         )
     observe "compose retained type cases from separate modules"
         (renderIndependent b, renderIndependent other)
+    maybeCell <- newIORef Nothing
+    absent <- renderIndependentMaybe <$> readIORef maybeCell
+    writeIORef maybeCell (Just bottomB)
+    present <- renderIndependentMaybe <$> readIORef maybeCell
+    observe "compose retained type cases with an ignored field" (absent, present)
   where
     renderIndependent :: Bool -> String
     renderIndependent flag = NativeRetainedTH.renderCase flag (NativeCase.retainedPick flag)
+
+    renderIndependentMaybe :: Maybe Bool -> String
+    renderIndependentMaybe m =
+        NativeRetainedTH.renderMaybeCase m (NativeCase.retainedMaybePick m)
 
     -- Return a result at the selected Boolean type.
     choose :: foreach (b :: Bool) -> Select b
