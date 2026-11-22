@@ -5627,7 +5627,9 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
                                                     | L _ (HsGadtContext ctxt) <- inner_bndrs]
                              initial = ConTypeArgs (length tvbndrs' - late_count) :
                                [ConContextArgs leading_context | leading_context /= 0]
-                         in OrderedConArgs (initial ++ prefix_group hs_args ++ encoded_suffix)
+                             (leading_types, rest) = span is_type_group
+                               (initial ++ prefix_group hs_args ++ encoded_suffix)
+                         in OrderedConArgs (ConTypeArgs (sum [n | ConTypeArgs n <- leading_types]) : rest)
                      | otherwise = LegacyConOrder terminal_order
              ; buildDataConWithTelescope order [] fam_envs bang_opts name is_infix
                             rep_nm stricts field_lbls
@@ -5669,7 +5671,10 @@ A nested forall can bind no variables, and a context can have no
 predicates. Keep those groups in the source telescope. They consume no
 arguments, so the quoted and compiled constructor omit them. If only
 fields remain after omitting empty groups, use the ordinary worker. A real group after a field, or a real binder after
-a leading context, still needs the ordered constructor layout.
+a leading context, still needs the ordered constructor layout. An empty
+leading context can leave adjacent type groups. Combine those groups in
+the initial binder count so that the interface starts its ordered groups
+at the first field or real context.
 -}
 
 -- | Check the syntax admitted for a retained constructor field telescope.
