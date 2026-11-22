@@ -47,7 +47,7 @@ import GHC.Driver.Ppr( showSDoc )
 
 import GHC.Core         -- All of it
 import GHC.Core.Subst
-import GHC.Core.Dependent (hasNativeDependentExprRhs)
+import GHC.Core.Dependent (hasNativeDependentExprRhs, isScopedSelectorReceiver)
 import GHC.Core.Predicate (isDictId, tyCoVarsOfTypeWellScoped)
 import GHC.Core.SimpleOpt ( exprIsLambda_maybe )
 import GHC.Core.FVs       ( exprFreeVars, bindFreeVars
@@ -1780,8 +1780,10 @@ match_ty (RV { rv_tmpls = tmpls, rv_lcl = rn_env })
       = do { let actual = lookupVarEnv id_subst renamed `orElse` Var renamed
                  domain = Type.substTy s (varType v)
            ; if isNativeIndexFunctionId v
-             then do { f <- nativeIndexFunctionVar_maybe actual
-                     ; guard (varType f `eqType` domain) }
+             then do { index <- nativeIndexFunctionArgIndex actual
+                     ; guard (typeKind index `eqType` domain)
+                     ; guard (isJust (termVar_maybe actual)
+                              || not (isScopedSelectorReceiver v ty1)) }
              else do { index <- retainedArgIndex actual
                      ; guard (typeKind index `eqType` domain) }
            ; return (extendIdSubst s v actual) }
@@ -1801,6 +1803,11 @@ substitution with the renamed binder. Apply the left renaming and the
 matched arguments together, in dependency order, so each index has its
 instantiated domain. The resulting type contains target occurrences.
 Clear the left renaming before matching it against the target type.
+
+A callback substitution can carry a nominal cast. Read its index with
+the same check as a retained application, and substitute the original
+expression so the later type keeps the lexical head and its proof.
+A private class selector still requires a bare variable as its receiver.
 -}
 
 {- Note [Matching variable types]

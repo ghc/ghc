@@ -26,6 +26,7 @@ import GHC.Core.Map.Type (LooseTypeMap, TypeMap, emptyTypeMap)
 import GHC.Core.Opt.Arity (etaExpand, pushCoArg, pushCoTyArg)
 import GHC.Core.Predicate (mkNomEqPred, mkReprEqPred, scopedSortWith)
 import GHC.Core.Reduction (Reduction (..))
+import GHC.Core.Rules (matchExprs)
 import GHC.Core.SimpleOpt (simpleOptNativeExpr)
 import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.TyCo.Compare (eqType, nonDetCmpType)
@@ -120,7 +121,7 @@ main = do
             runCurriedCallCoreChecks dflags
             runCastCallbackChecks dflags libdir
             runCastCallbackInputChecks dflags libdir
-            runScopedDictionaryOccursChecks libdir
+            runScopedDictionaryChecks libdir
             runFunctionBinderChecks dflags
             runFunctionFieldChecks dflags
             runArrowMatchabilityChecks dflags
@@ -533,9 +534,9 @@ runRetainedOccursChecks = do
         Unifiable{} -> True
         _ -> False
 
--- | Check recursive substitutions through well-typed scoped dictionary types.
-runScopedDictionaryOccursChecks :: FilePath -> IO ()
-runScopedDictionaryOccursChecks libdir = runGhc (Just libdir) $ do
+-- | Check substitutions through well-typed scoped dictionary types.
+runScopedDictionaryChecks :: FilePath -> IO ()
+runScopedDictionaryChecks libdir = runGhc (Just libdir) $ do
     flags <- getSessionDynFlags
     _ <- setSessionDynFlags flags
     imports <- traverse parseImportDecl ["import Prelude", "import Data.Proxy"]
@@ -594,6 +595,38 @@ runScopedDictionaryOccursChecks libdir = runGhc (Just libdir) $ do
             case unify [index, aTy] [mkListTy aTy, familyInBody] of
                 MaybeApart MARTypeFamily subst ->
                     maybe False (eqType familyInBody) (Subst.lookupTyVar subst a)
+                _ -> False
+        let callbackTy = mkVisFunTyManyU boolTy boolTy
+            template = local 11528 "callback" callbackTy
+            receiver = local 11529 "receiver" callbackTy
+            callback = local 11530 "actual" (mkVisFunTyManyU boolTy aTy)
+            resultCo = proof 11531 aTy boolTy
+            cast = mkFunCoNoFTF Nominal (mkNomReflCo unmatchableDataConTy)
+                (mkNomReflCo ManyTy) (mkNomReflCo boolTy) (mkCoVarCo resultCo)
+            actual = Cast (Var callback) (mkSubCo cast)
+            dict = dictionary 11532 "showCallback" callbackTy
+            usesReceiver r =
+                mkTyConApp proxy [stringTy, ClassAppTy showMethod callbackTy (TermVarTy dict) (TermVarTy r) stringTy]
+            scope = [a, resultCo, receiver, callback, dict]
+            match = matchExprs (ISE (mkInScopeSetList scope) (const noUnfolding)) [template]
+            operand = constructorIndex trueDataCon
+            templateType = indexed (TermAppTy template operand)
+            actualType = indexed (mkAppTy (mkCastTy (TermVarTy callback) cast) operand)
+        lintAccepts flags "a nominal callback cast uses an in-scope proof" scope actual
+        lintAccepts flags "the indexed type retains the callback proof" scope (identity 11533 actualType)
+        check "a rule match keeps its scoped callback proof" $
+            case match [Var template, Type templateType] [actual, Type actualType] of
+                Just ([replacement], _) ->
+                    cheapEqExpr replacement actual && resultCo `elemVarSet` exprFreeVars replacement
+                _ -> False
+        forM_ [template, receiver] $ \r ->
+            check "a private selector at a bare callback is well typed" $
+                case lintScopedDictionaryType (initLintConfig flags (r : scope)) (usesReceiver r) of
+                    Nothing -> True
+                    _ -> False
+        check "a rule cannot substitute a cast into a private selector receiver" $
+            case match [Var template, Type (usesReceiver template)] [actual, Type (usesReceiver receiver)] of
+                Nothing -> True
                 _ -> False
 
 -- | Create a stable test unique without a global unique supply.
