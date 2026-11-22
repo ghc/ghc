@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
-{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
 module ZipMinimum where
 
 import Data.Type.Equality ((:~:)(Refl))

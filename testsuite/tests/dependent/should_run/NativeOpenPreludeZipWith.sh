@@ -30,11 +30,13 @@ length_proof="$src/PreludeZipWithLengthProof.hs"
 pair_proof="$src/PreludeZipProof.hs"
 for opt in -O0 -O2; do
     "${ghc[@]}" "$opt" -fno-enable-rewrite-rules -fforce-recomp -c \
-        "$proof" "$length_proof" "$pair_proof" "$src/PreludeZipRuntime.hs" "$src/ZipMinimum.hs" -outputdir .
+        "$proof" "$length_proof" "$pair_proof" -outputdir .
+    "${ghc[@]}" "$opt" -fforce-recomp -c "$src/PreludeZipMapRuntime.hs" \
+        "$src/PreludeZipRuntime.hs" "$src/ZipMinimum.hs" -outputdir .
     "${ghc[@]}" "$opt" -fforce-recomp -c "$src/NativeZipWithRuntimeClient.hs" -outputdir .
-    "${ghc[@]}" Main.o PreludeZipRuntime.o ../provider/PreludeMapLengthSize.o -o client
+    "${ghc[@]}" Main.o PreludeZipRuntime.o PreludeZipMapRuntime.o ../provider/PreludeMapLengthSize.o -o client
     ./client >client.stdout
-    grep -Fxq '(True,True,True)' client.stdout
+    grep -Fxq '(True,True,True,True)' client.stdout
 done
 
 reject() {
@@ -63,10 +65,6 @@ for mode in UNKNOWN_LEFT_LENGTH DROP_SUCCESSOR; do
 done
 "${ghc[@]}" -O1 -fenable-rewrite-rules -DRULES_ON -fforce-recomp -c \
     "$proof" "$pair_proof" -outputdir .
-for module in ZipMinimum PreludeZipRuntime; do
-    sed '/fno-enable-rewrite-rules/d' "$src/$module.hs" > "$module.hs"
-    "${ghc[@]}" -O2 -fforce-recomp -c "$module.hs" -outputdir .
-done
 
 # Load conflicting rules from a separate interface. The second rule can
 # rewrite an application introduced by the installed zip rule.

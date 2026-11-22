@@ -26,7 +26,7 @@ fi
 sha256sum PreludeMapLengthSize.hs Unrelated.hi >unchanged.sha256
 
 # Add only the proof. The ordinary provider must now publish its equations.
-cp "$src/PreludeZipRuntime.hs" .
+cp "$src"/{PreludeZipMapRuntime,PreludeZipRuntime}.hs .
 "$new" "-B$newlib" "${flags[@]}" --make -no-link PreludeZipRuntime.hs Unrelated.hs >upgrade.log 2>&1
 grep -Eq 'Compiling +PreludeMapLengthSize ' upgrade.log
 if grep -Eq 'Compiling +Unrelated ' upgrade.log; then exit 1; fi

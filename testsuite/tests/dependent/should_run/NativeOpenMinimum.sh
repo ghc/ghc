@@ -6,7 +6,7 @@ src=$PWD
 out=$(mktemp -d)
 trap 'rm -rf -- "$out"' EXIT
 cd "$out"
-cp "$src"/{NativeLocalMinSizeRule,PreludeMapLengthSize,PreludeZipRuntime,ZipMinimum}.hs .
+cp "$src"/{NativeLocalMinSizeRule,PreludeMapLengthSize,PreludeZipMapRuntime,PreludeZipRuntime,ZipMinimum}.hs .
 
 # Read both proofs in bytecode with debugger breakpoints enabled.
 for module in PreludeZipRuntime ZipMinimum; do

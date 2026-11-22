@@ -17,6 +17,7 @@ library
   other-modules:
     PreludeAppendLengthSource
     PreludeMapLengthSize
+    PreludeZipMapRuntime
     PreludeZipRuntime
 
   hs-source-dirs:

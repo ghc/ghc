@@ -155,14 +155,15 @@ test('NativeOpenPreludeZipWith',
                                                'PreludeZipWithLengthProof.hs', 'PreludeMapLengthSize.hs',
                                                'PreludeMapLengthSource.hs', 'PreludeMapLengthProof.hs',
                                                'PreludeZipSource.hs', 'PreludeZipProof.hs', 'PreludeZipRuntime.hs',
-                                               'ZipMinimum.hs']]
+                                               'PreludeZipMapRuntime.hs', 'ZipMinimum.hs']]
                   + ['NativeOpenZipDemandControls.hs', 'NativeOpenZipWrongMinimum.hs',
                      'NativeZipWithRuntimeClient.hs'])],
      run_command, ['bash NativeOpenPreludeZipWith.sh "{compiler}" "{libdir}"'])
 test('NativeOpenMinimum',
      [req_interp, req_rts_linker, only_ways(['normal']),
       extra_files(['NativeLocalMinSizeRule.hs'] + [open_eval_dir + f for f in
-                   ['PreludeMapLengthSize.hs', 'PreludeZipRuntime.hs', 'ZipMinimum.hs']])],
+                   ['PreludeMapLengthSize.hs', 'PreludeZipMapRuntime.hs', 'PreludeZipRuntime.hs',
+                    'ZipMinimum.hs']])],
      run_command, ['bash NativeOpenMinimum.sh "{compiler}" "{libdir}" ' + config.ghc_th_way_flags])
 test('NativeRetainedFamilyGiven',
      [only_ways(['normal']), extra_files(['NativeRetainedFamilyGiven.hs'])],

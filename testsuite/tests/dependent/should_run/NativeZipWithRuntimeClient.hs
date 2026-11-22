@@ -3,7 +3,11 @@ module Main where
 
 import Data.IORef (newIORef, readIORef)
 import Data.Type.Equality ((:~:)(Refl))
-import PreludeZipRuntime (lengthZipMap, lengthZipWith)
+import PreludeZipRuntime (lengthZip, lengthZipMap, lengthZipWith)
+
+-- | Force the pair-length proof from an ordinary caller.
+paired :: [Bool] -> [Int] -> Bool
+paired xs ys = case lengthZip xs ys of Refl -> True
 
 -- | Force the proof from an ordinary caller.
 proved :: (Bool -> Bool -> Bool) -> [Bool] -> [Bool] -> Bool
@@ -19,7 +23,10 @@ mapped pre combine = do
 main :: IO ()
 main = do
     let bad = error "forced callback"
+    xs <- readIORef =<< newIORef [True, False]
+    ys <- readIORef =<< newIORef [1]
     composite <- mapped (error "forced map callback") (error "forced zip callback")
-    print (proved bad [] (error "forced right spine"),
+    print (paired xs ys,
+           proved bad [] (error "forced right spine"),
            proved bad [error "forced left element"] [error "forced right element"],
            composite)
