@@ -120,8 +120,19 @@ and [the separate 158-registration compatibility comparison](CHECKPOINTS.md#comp
 
 The cumulative source `91fd7365bf` adds R19 and the first R36 warning
 fixes. Its clean build uses `r03-r19-r36-normal-91fd7365bf-20261122`.
-It contains the same R03 change. Qualify the corrected Lint behavior
-before publishing the callback and successor-inference changes.
+It contains the same R03 change. The repair at `1e81b08715` and its
+API test at `f753d0b089` passed the two registered tests in a relinked
+compiler. The tests check ordinary storage and reject a named callback
+with a certificate from the wrong binding. The corrected cumulative
+source and its 548-line fixture are at `4f2fc1146f` in
+`r03-r19-r36-repair-source-20261122/source`. Qualify this pin in the
+normal compiler before publishing the callback and successor-inference
+changes.
+
+Job 838 independently builds the full R36 warning candidate at
+`e3d6d94481` in `r36-pun-normal-20261122/source`. It uses the released
+R19 compiler sources as its base. Compare its diagnostics and quiet
+controls with proposal #765 before marking the card complete on the fork.
 
 The [release-readiness assessment](ROADMAP.md#release-readiness) identifies
 R36 as the next full-card target.
