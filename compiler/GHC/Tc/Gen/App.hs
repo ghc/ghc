@@ -6409,14 +6409,27 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
         arity = length domains
         value_args = [arg | EValArg { ea_arg = arg } <- args]
         overapplied = arity < length value_args
+        equality_witness
+          | [witness, _] <- value_args
+          , hasNoConcreteTyVars fun
+          , maybe False isTauTy expected
+          , is_nominal_continuation domains result
+          = Just witness
+          | otherwise = Nothing
+        equality_continuation = isJust equality_witness
+        complete_choices = native_worker || equality_continuation
   , arity == length value_args
     || (overapplied && arity > 0 && hasNoConcreteTyVars fun)
-  , if native_worker
-    then hasNoConcreteTyVars fun && isRetainedValueType tau
-    else isTauTy tau && not (isFunTy result)
+  , equality_continuation || if native_worker
+      then hasNoConcreteTyVars fun && isRetainedValueType tau
+      else isTauTy tau && not (isFunTy result)
   = do { expected_ty <- mapM (liftZonkM . zonkTcType) expected
-       ; let index_route = not native_worker && not (null index_tvs)
-             initial_subst | overapplied = Subst.emptySubst
+       ; let index_route = not complete_choices && not (null index_tvs)
+             initial_subst | equality_continuation
+                           , Just rho <- expected_ty
+                           = fromMaybe Subst.emptySubst
+                               (matchRetainedAppType tvs Subst.emptySubst result rho)
+                           | overapplied = Subst.emptySubst
                            | otherwise = result_subst expected_ty index_route native_worker tvs result
              result_anchor = any (hasNativeDependentExpr . Core.Type)
                                [ty | tv <- tvs, Just ty <- [Subst.lookupTyVar initial_subst tv]]
@@ -6426,7 +6439,12 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
        ; index_prefixes <- if index_route && hasNoConcreteTyVars fun
                            then filterM (\(_, domain, arg) -> defer_callback False domain arg) arguments
                            else return []
-       ; eligible <- if native_worker
+       ; eligible <- case equality_witness of
+           { Just witness ->
+             do { (inferable, anchor) <- tcRetainedInferableArg witness
+                ; return (if result_anchor || anchor
+                          then Just [inferable, False] else Nothing) }
+           ; Nothing -> if native_worker
                      then do { shapes <- mapM tcRetainedInferableArg (take arity value_args)
                              ; let eligible domain (inferable, anchor)
                                      = (inferable && isTauTy (scaledThing domain)
@@ -6455,7 +6473,7 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
                                             then Just (zipWith (\shape defer -> fst shape && not defer)
                                                                shapes deferred)
                                             else Nothing) }
-                          else return Nothing
+                          else return Nothing }
        ; case eligible of
            Nothing -> return (fun, sigma, [], Nothing)
            Just inferable -> do
@@ -6499,7 +6517,7 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
                                   _ -> return (fst <$> extra, cache, views ++ maybe [] snd extra) }
                          | otherwise -> return (Just subst, initial_cache, views) }
                  else do
-                   { initial_match <- if native_worker
+                   { initial_match <- if complete_choices
                        then return (case match_worker initial_subst of
                                       Nothing -> match_worker Subst.emptySubst
                                       other -> other)
@@ -6508,13 +6526,13 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
                                    Nothing -> tcRetainedMatchArgs tvs Subst.emptySubst initial_pairs
                                    other -> return other }
                    ; (m, cache) <- case initial_match of
-                       Just subst | not native_worker ->
+                       Just subst | not complete_choices ->
                          tcRetainedCallbackArgs tvs arguments subst initial_cache
                        _ -> return (initial_match, initial_cache)
                    ; pairs <- mapM (fmap snd . matching_arg) cache
                    ; return (m, cache, pairs) }
              ; choices <- case matched of
-                            Just subst | native_worker
+                            Just subst | complete_choices
                               -> return $ do { inst_tys <- traverse (Subst.lookupTyVar subst) tvs
                                              ; return (subst, inst_tys) }
                             Just subst -> tcRetainedArgChoices index_route tvs subst
@@ -6523,7 +6541,11 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
                  Just (subst, inst_tys)
                    | index_route || any (hasNativeDependentExpr . Core.Type) inst_tys
                    , not nested || any (hasNativeDependentExpr . Core.Type) inst_tys
-                   , not native_worker || not (any (`elemVarSet` tyCoVarsOfTypes inst_tys) tvs)
+                   , not complete_choices || not (any (`elemVarSet` tyCoVarsOfTypes inst_tys) tvs)
+                   , not equality_continuation
+                     || (all isTauTy inst_tys
+                         && not (any isMetaTyVar (tyCoVarsOfTypesList inst_tys))
+                         && maybe False (eqType (Subst.substTy subst result)) expected_ty)
                    , and (zipWith (kind_agrees subst) tvs inst_tys)
                    , all (\(formal, actual) -> eqType (Subst.substTy subst formal) actual) pairs
                    -> do { valid <- tcRetainedInstScope inst_tys
@@ -6535,6 +6557,16 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
                            else return (fun, sigma, cache, Nothing) }
                  _ -> return (fun, sigma, cache, Nothing) } }
   where
+    -- See Note [Checking a nominal equality continuation].
+    is_nominal_continuation [Scaled _ witness, Scaled _ continuation] result
+      | isTauTy witness
+      , FunTy { ft_af = af, ft_arg = pred_ty, ft_res = body } <- coreFullView continuation
+      , isInvisibleFunArg af
+      , Just (tc, _) <- splitTyConApp_maybe pred_ty
+      , tc `hasKey` eqTyConKey
+      = isTauTy body && eqType body result
+    is_nominal_continuation _ _ = False
+
     is_type_arg ETypeArg{} = True
     is_type_arg _ = False
 
@@ -6605,6 +6637,24 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
     infer_args tvs inferable domains pos (_ : args)
       = infer_args tvs inferable domains pos args
 tcRetainedArgInstCached _ _ _ _ _ fun sigma = return (fun, sigma, [], Nothing)
+
+{- Note [Checking a nominal equality continuation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+gcastWith consumes a proof and a continuation with the corresponding (~)
+constraint. An ordinary type metavariable cannot hold a type that mentions
+a retained index. Its use inside the continuation is also untouchable under
+the Given. See Note [Rigid retained indices] in GHC.Tc.Utils.Unify.
+
+For a saturated known head taking a witness and a continuation with one
+nominal equality, select the erased types from the inferred witness and
+the checked result. The continuation body must have the same tau type as
+the result. Never infer the continuation. Require every erased argument
+to have a scoped tau choice with no unfilled metavariables. Ordinary
+subsumption checks the continuation under
+its original Given. The same cache supplies the checked witness and its
+usage. The application retains its original head, arguments and evaluation
+order.
+-}
 
 {- Note [Matching a callback with an inferred multiplicity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
