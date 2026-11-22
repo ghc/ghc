@@ -5,9 +5,13 @@ type. The compiler tracks that argument through Core and generates native
 code. Enable `ExperimentalDependentTypes` to write the new syntax. An
 ordinary Haskell module can import and call a checked function.
 
+The example library exports `replicateNative`. Its client defines
+`safeHead` by matching the first cell.
+
 ```haskell
 replicateNative :: forall a. foreach (n :: Nat) -> a -> Vec a n
 safeHead        :: Vec a (1 + n) -> a
+safeHead (VCons x _) = x
 ```
 
 A caller can take `safeHead (replicateNative (1 + n) x)` even when `n`

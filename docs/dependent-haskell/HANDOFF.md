@@ -29,11 +29,14 @@ substitutes a cast argument into a dependent result proof.
 - **R05.** The local candidate at `56dd0a2099` lets a rewrite rule fire when it
   matches a nominally cast callback. Its isolated compiler passed the
   rule tests and the 543-line Showcase. The normal two-stage build uses
-  the integrated candidate at `5fe06625c3`.
+  the integrated candidate at `5fe06625c3` in Pueue job `416`.
   A separate rule-free program on the 542-line compiler exposes a Core Lint
   failure at `-O1` and `-O2`. Full laziness floats a binding for an unused
   polymorphic callback that is still needed in a type. The program passes
-  at `-O0` and with the provider's optimization pragmas omitted.
+  at `-O0` and with the provider's optimization pragmas omitted. In job
+  `414`, a private compiler preserved the callback binding and passed Core
+  and STG Lint on the reproducer at all three optimization levels. The
+  ordinary optimization and run-time demand controls are still in progress.
 - **R19.** Two independent signatures can share a named case result at an
   unknown index. Two separately written anonymous cases can still disagree.
   The next experiment checks whether exhaustive cases for a nullary
