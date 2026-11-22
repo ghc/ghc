@@ -21,6 +21,13 @@ finishes. A frozen job keeps its allocated memory. After a daemon or
 host restart, verify the slice limits and priority watcher before
 resuming builds.
 
+The testsuite timeout continues to count elapsed time while the slice is
+frozen. The first run on `bb45f2d668` reported 25 passes and two 300-second
+timeouts across a priority pause. The affected tests were
+`NativeIndexedFin` and `NativeImplicitExistential`. Keep the first summary.
+Rerun the timed-out tests on the same compiler and allow for the pause in
+the wall-time limit. Record the rerun separately.
+
 ## Clean up after each experiment
 
 Use Git to recover finished experiments. Before cleanup, commit the source
@@ -89,7 +96,11 @@ The normal compiler at `bb45f2d668` integrates indexed vector patterns
 (R04), a derived mapping method (R12), recursion on either list (R13),
 and local kind signatures in type-level lets (R18). Both compiler stages
 matched all 525 Showcase lines at `-O0` and `-O2`. The self-hosted GHCi
-run also matched.
+run also matched. All 27 selected tests passed on the same self-hosted
+compiler. The first run passed 25 and timed out on two during a priority
+pause. The two timed-out tests passed on their own rerun. The twelve
+family-branch upgrade cases and both mapping upgrades passed. Exact
+printing reproduced the signed type-let fixture byte for byte.
 
 The previous normal compiler at `63cd0fb120` classified two recursive
 substitutions as unifiable. One referred to the type variable through a
@@ -98,6 +109,11 @@ substitution. After the repair, the direct and indirect cases report
 `MARInfinite`, and an independent substitution remains unifiable.
 [Core controls](../../testsuite/tests/ghc-api/NativeDependentCore.hs)
 and [unifier](../../compiler/GHC/Core/Unify.hs).
+
+A separate Core API probe exposed missing occurs-check cases for an
+experimental dictionary binder and a class-selector application.
+Unifying with these forms can raise a non-exhaustive-pattern exception.
+This remains an open R05/R12 issue in this checkpoint.
 
 ## R11 retained vector equality
 
