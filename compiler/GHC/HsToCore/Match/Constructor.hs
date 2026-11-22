@@ -24,7 +24,7 @@ import GHC.Core.ConLike
 import GHC.Core.Coercion ( MCoercion(..), coercionLKind, mkUnbranchedAxInstCo )
 import GHC.Core.DataCon ( DataCon, dataConRepType, dataConTyCon, dataConTag
                        , dataConRepArgBinders, dataConRepArity, dataConContextFieldCount
-                       , dataConHasRetainedResult )
+                       , dataConHasRetainedResult, dataConSourceArity )
 import GHC.Core.Type ( coreFullView, isManyTy, isNativeIndexType, mkTyConApp, piResultTys, splitInvisPiTys )
 import GHC.Core.TyCon ( isNewTyCon, newTyConCo, tyConDataCons )
 import GHC.Core.FVs ( exprFreeVars )
@@ -405,7 +405,9 @@ matchOneConLike scrut vars ty (eqn1 :| eqns)   -- All eqns for a single construc
                     row <- scope_contexts 0 fields ordered_binds
                     return (wrap . mkCoreLets early, row)
                 | RealDataCon con <- con1
-                , Just n <- dataConContextFieldCount con
+                , Just n <- if dataConHasRetainedResult con
+                            then Just (dataConSourceArity con)
+                            else dataConContextFieldCount con
                 , (before, after) <- splitAt n fields
                 = dsHsWrapper pat_wrap $ \early_wrap ->
                   dsTcEvBinds bind $ \ds_bind ->
@@ -574,6 +576,12 @@ For a context after fields without a late forall, early existential binders
 are in scope during field checking. Check the fields under those skolems
 and bring in the trailing Givens in a separate implication. The pattern
 wrapper binds evidence from field checking before matching the fields.
+
+A retained result binds its nominal equality after the fields. It relates
+the public index to the retained field Id. A pattern on that field can
+supply a second equality, for example when it matches Z. Evidence that
+combines the two equalities can only enter scope after the field patterns.
+Use the same trailing scope for this evidence.
 -}
 
 -- | Rename a later row's retained fields to the fields bound by the shared case.

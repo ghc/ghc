@@ -206,9 +206,9 @@ bound inside a field cannot escape into that result. A constructor can
 use one retained field directly as a result index. The other result
 arguments must be distinct, unchanged erased parameters. The retained
 field is lazy and its domain is a supported closed structural type such
-as `[Bool]`, `Ordering`, or `Nat`. Match the field with a variable or
-wildcard. The constructor pattern introduces the nominal index equality
-after the field binder. Code generation erases the equality.
+as `[Bool]`, `Ordering`, or `Nat`. A variable or wildcard leaves the
+field unevaluated. The constructor pattern introduces the nominal index
+equality after the field binder. Code generation erases the equality.
 An ordinary client can rebuild the constructor at its original index and
 read the first cell of a runtime list with an unevaluated tail.
 In `rebuild (IndexedList xs)`, the nested constructor supplies the
@@ -234,6 +234,26 @@ written result type.
 [Direct constructor](../examples/packed-vector/DirectIndexedVector.hs),
 [ordinary client](../examples/packed-vector/DirectIndexedVectorClient.hs),
 and [source-hidden check](../../../testsuite/tests/dependent/should_run/NativeGadtRetainedSum.sh).
+
+An ordinary client can match the stored length before reading the
+vector. In the successor branch, the vector's index is a successor.
+
+```haskell
+firstDirect :: SomeVec a n -> Maybe a
+firstDirect (SomeVec Z _) = Nothing
+firstDirect (SomeVec (S _) (VCons x _)) = Just x
+```
+
+The outer constructor also relates its public index to the stored
+length. The zero branch can return `n :~: 'Z` without evaluating the
+payload. A later argument of type `Vec b n` can use the same refinement.
+[Ordinary client](../../../testsuite/tests/dependent/should_run/NativeGadtRetainedSumClient.hs)
+and [Agda pattern precedent](../REFERENCES.md#refine-the-public-index-of-a-stored-witness).
+
+A single zero clause is exhaustive at `SomeVec a 'Z`. At `SomeVec a n`,
+GHC warns about a missing successor clause. An explicit successor clause
+at the known zero index has an inaccessible right-hand side. Its pattern
+can still force the stored witness.
 
 An explicit equality can also describe the exact stored value.
 For example, the constructor

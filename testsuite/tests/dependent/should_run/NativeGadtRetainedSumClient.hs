@@ -6,6 +6,7 @@ import Control.Monad (unless)
 import Data.IORef (newIORef, readIORef)
 import Data.List (isPrefixOf)
 import Data.Maybe (isJust)
+import Data.Type.Equality ((:~:)(Refl))
 import GHC.Sigma (Sigma(Pair))
 import NativeGadtRetainedSumProvider
 
@@ -25,6 +26,21 @@ openDirect :: Packed a -> [a]
 openDirect (Pair n xs) =
     let wrapped = DirectVec n xs
     in case rebuildDirect wrapped of DirectVec _ ys -> cells ys
+
+-- | Read the first cell only when the stored length is a successor.
+firstDirect :: DirectVec a n -> Maybe a
+firstDirect (DirectVec Z _) = Nothing
+firstDirect (DirectVec (S _) (VCons x _)) = Just x
+
+-- | Use the public index to check a later argument at the same length.
+firstAtIndex :: DirectVec a n -> Vec b n -> Maybe b
+firstAtIndex (DirectVec Z _) _ = Nothing
+firstAtIndex (DirectVec (S _) _) (VCons x _) = Just x
+
+-- | Relate the public index to the zero branch of the stored length.
+zeroIndex :: DirectVec a n -> Maybe (n :~: 'Z)
+zeroIndex (DirectVec Z _) = Just Refl
+zeroIndex (DirectVec (S _) _) = Nothing
 
 phantomPayload :: Phantom -> Bool
 phantomPayload (Pair _ xs) = sameLength xs empty
@@ -62,6 +78,22 @@ main = do
     unused <- newIORef (error "direct length" :: Nat) >>= readIORef
     let vector = DirectVec n (error "direct vector")
         atLength = DirectAtLength unused (AtLength 37)
+    require (firstDirect (DirectVec (S Z) (VCons True (error "refined tail"))) == Just True)
+        "a direct successor pattern checks the vector without demanding its tail"
+    require (firstAtIndex (DirectVec (S Z) (error "unused first vector"))
+        (VCons 'r' (error "later tail")) == Just 'r')
+        "the public successor index scopes over a later argument"
+    let emptyDirect = DirectVec Z (error "zero payload")
+    require (firstDirect emptyDirect == (Nothing :: Maybe Bool))
+        "the zero branch leaves the payload unevaluated"
+    require (firstAtIndex emptyDirect (error "later zero vector") == (Nothing :: Maybe Char))
+        "the zero branch leaves the later vector unevaluated"
+    case zeroIndex emptyDirect of
+        Just Refl -> pure ()
+        Nothing -> fail "the zero branch did not prove the public index"
+    require (not (isJust (zeroIndex vector))) "the successor branch leaves the vector unevaluated"
+    throws "direct vector" (firstDirect vector)
+    throws "direct length" (firstDirect (DirectVec unused (error "unexpected direct payload")))
     require ((case rebuildDirect vector of DirectVec len _ -> lengthValue len) == 1)
         "a direct result leaves the vector unevaluated"
     require ((case atLength of DirectAtLength _ (AtLength value) -> value) == 37)
