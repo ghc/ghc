@@ -1773,7 +1773,9 @@ lintRetainedArgument b body arg
        ; case index of
            TermVarTy{} -> return ()
            _ -> do { lintL (not (isScopedSelectorReceiver b body)) unsupported
-                   ; lint_source_owners arg } }
+                   ; case (index, collectArgs arg) of
+                       (TyConApp{}, (Var fun, _)) -> lint_source_owner fun
+                       _ -> return () } }
   | not (isNativeIndexFunctionId b), isNativeOpaqueValueId b
   = do { lintL (isJust (retainedArgIndex arg)) unsupported
        ; lint_source_owners arg }
@@ -1782,19 +1784,36 @@ lintRetainedArgument b body arg
     lint_source_owners (Tick HpcTick{} body) = lint_source_owners body
     lint_source_owners (Cast body _) = lint_source_owners body
     lint_source_owners expr = case collectArgs expr of
-      (Var fun, args) -> do
-        case sourceTableId_maybe fun of
-          Just fam -> do
-            env <- getInVarEnv
-            case lookupVarEnv env fun of
-              Just (bound, _) -> lintL (sourceTableId_maybe bound == Just fam)
-                (text "Retained source call has different equations at its binding:" <+> ppr fun)
-              Nothing -> return ()
-          Nothing -> return ()
+      -- See Note [Linting source certificate owners].
+      (Var fun, args@(_:_)) -> do
+        lint_source_owner fun
         mapM_ lint_source_owners args
       _ -> return ()
 
+    lint_source_owner fun = case sourceTableId_maybe fun of
+      Just fam -> do
+        env <- getInVarEnv
+        case lookupVarEnv env fun of
+          Just (bound, _) -> lintL (sourceTableId_maybe bound == Just fam)
+            (text "Retained source call has different equations at its binding:" <+> ppr fun)
+          Nothing -> return ()
+      Nothing -> return ()
+
     unsupported = text "Unsupported retained runtime argument:" <+> ppr arg
+
+{- Note [Linting source certificate owners]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A scalar index can use a certified call under a constructor. Check its
+source table against the binding in scope. An unapplied function in a
+field contributes its identity to the index, so its equations do not
+take part in this check.
+
+A named retained callback can use its source table with no value
+arguments. Here nativeIndexFunctionArgIndex gives a TyConApp for the
+source table. Check its head even with no arguments, or with only erased
+type arguments. A lexical callback gives a variable index or a cast of
+one, so it does not use a source table.
+-}
 
 lintTyKind :: OutTyVar -> Type -> LintM ()
 -- If you edit this function, you may need to update the GHC formalism
