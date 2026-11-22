@@ -18,7 +18,8 @@ for opt in 0 2; do
     (
         cd "$work/O$opt"
         cp "$area"/ParametricFilter{,Adapters}.hs .
-        "${ghc[@]}" "-O$opt" -fomit-interface-pragmas -fno-write-if-simplified-core \
+        # Keep dynamic objects for closed evaluation after hiding the sources.
+        "${ghc[@]}" "-O$opt" -dynamic-too -fomit-interface-pragmas -fno-write-if-simplified-core \
             -c ParametricFilterAdapters.hs ParametricFilter.hs
         mv ParametricFilterAdapters.hs adapters.source
         mv ParametricFilter.hs proof.source
@@ -72,6 +73,16 @@ True
 bottom predicate: bottom, empty
 OUT
         diff -u expected actual
+
+        cp "$area/ParametricFilterByType.hs" .
+        "${ghc[@]}" "-O$opt" -c ParametricFilterByType.hs
+        if "${ghc[@]}" "-O$opt" -DWRONG -fforce-recomp -c ParametricFilterByType.hs > by-type.log 2>&1; then
+            exit 1
+        fi
+        grep -Fq 'error: [GHC-83865]' by-type.log
+        grep -Fq "Couldn't match type: '[]" by-type.log
+        grep -Fq "with: '[GT]" by-type.log
+        grep -Fq 'In the expression: Refl' by-type.log
 
         cat > NoDerivation.hs <<'HS'
 {-# LANGUAGE AllowAmbiguousTypes, ExperimentalDependentTypes, RankNTypes #-}

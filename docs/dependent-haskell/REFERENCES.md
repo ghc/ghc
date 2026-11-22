@@ -5950,6 +5950,16 @@ callback is a separate open compiler feature.
 [Statement and checked proof](examples/open-evaluation/ParametricFilter.hs)
 and [positive, negative and runtime controls](examples/open-evaluation/check-parametric-filter.sh).
 
+`ByType` is a closed type family of exactly `FilterKind`. It returns the
+input list at `Bool` and returns `[]` at `Ordering`. With `[True]`, the
+left side maps to `[GT]` before the family returns `[]`. The right side
+keeps `[True]` and then maps to `[GT]`. The conversion is strict and
+total and both predicates are defined. Dispatch on the element type
+puts this family outside the theorem's parametricity hypothesis. The
+check proves the two results separately and rejects an equality
+between them at `Refl`.
+[Element-type counterexample](examples/open-evaluation/ParametricFilterByType.hs).
+
 ### Reusing an equality under a size function
 
 Agda's `cong` takes an equality between arguments and produces an
