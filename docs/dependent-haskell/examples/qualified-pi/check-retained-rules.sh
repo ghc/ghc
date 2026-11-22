@@ -44,6 +44,31 @@ for opt in 0 1 2; do
     "$ghc" "${flags[@]}" "${options[@]}" -c Main.hs
     "$ghc" "${flags[@]}" "${options[@]}" Main.o RetainedRulesClient.o ../provider/RetainedRules.o -o observe
     [[ $(./observe) == '(7,0,11,19,7,0)' ]]
+
+    cd "$dir/provider"
+    cp "$src/CallbackRules.hs" .
+    "$ghc" "${flags[@]}" "${options[@]}" -c CallbackRules.hs
+    for variant in BARE FAMILY GIVEN; do
+        mkdir -p "$dir/$variant"
+        cd "$dir/$variant"
+        cp ../provider/CallbackRules.hi "$src/CallbackRulesClient.hs" .
+        "$ghc" "${flags[@]}" "${options[@]}" "-D$variant" -fno-zap-coercions \
+            -main-is CallbackRulesClient -ddump-rule-firings -c CallbackRulesClient.hs >firings
+        if [[ $opt == 0 ]]; then
+            if grep -Fq 'Rule fired: read/callback (CallbackRules)' firings; then exit 1; fi
+        else
+            grep -Fq 'Rule fired: read/callback (CallbackRules)' firings || { cat firings; exit 1; }
+        fi
+        "$ghc" "${flags[@]}" "${options[@]}" -main-is CallbackRulesClient \
+            CallbackRulesClient.o ../provider/CallbackRules.o -o observe
+        [[ $(./observe) == '(19,23,1,0)' ]]
+    done
+done
+
+cd "$out/O2/FAMILY"
+for variant in WRONG NEWTYPE; do
+    if "$ghc" "${flags[@]}" -O2 "-D$variant" -c CallbackRulesClient.hs >wrong.log 2>&1; then exit 1; fi
+    grep -Fq '[GHC-83865]' wrong.log || { cat wrong.log; exit 1; }
 done
 
 cd "$out"

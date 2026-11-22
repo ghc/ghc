@@ -34,6 +34,7 @@
 module Main (main) where
 
 import qualified BetaCallClient as Beta
+import qualified CallbackRulesClient
 import qualified CharacterExport
 import qualified ClosedLengthProducer as Length
 import qualified ClosedTableLibrary as Table
@@ -1902,6 +1903,8 @@ main = do
     putStrLn ("keep a comparison proof without forcing the converted callback: " ++
               keepComparison (error "forced comparator") (error "forced first argument")
                              (error "forced second argument"))
+    observe "read an indexed payload through a rule for a converted callback"
+        CallbackRulesClient.observation
     observe "use a checked cons rule without forcing the callback, head or tail"
         (ConsRuleMapProof.negateHead (Proxy @'[]), ConsRuleMapProof.lazySpine)
     zipLeft <- newIORef [True, False] >>= readIORef
