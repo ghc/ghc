@@ -376,9 +376,8 @@ as a use of its import. A shadowed variable keeps the identity of its
 own runtime binder. A different checked definition with the same
 spelling has a different identity.
 
-Across modules, export a named case result to give both signatures the
-same family. Infix calls, explicit kind applications and local callable
-heads remain outside this lifting rule.
+Infix calls, explicit kind applications and local callable heads remain
+outside this lifting rule.
 
 An old home module can still have separate private families for two
 equivalent retained signatures. GHC rechecks the provider when an
@@ -390,6 +389,93 @@ even when calls at known constructors work. Rebuild and reinstall an
 older installed provider to publish its shared family. A client build
 cannot rebuild the installed package.
 [Two-compiler upgrade check](../examples/open-evaluation/check-retained-case-upgrade.sh).
+
+### Separate providers at an unknown index
+
+Put these signatures in two modules and compile each provider separately.
+
+```haskell
+choose :: foreach (b :: Bool) -> () ->
+  (case b of { True -> Int; False -> Char })
+
+render :: foreach (b :: Bool) ->
+  (case b of { True -> Int; False -> Char }) -> String
+```
+
+An ordinary client with only the stripped interfaces can compose
+these functions at `True` and `False`. Its definition
+`atRuntime b = render b (choose b ())` fails with GHC-83865 at the
+second argument of `render`. The two interfaces name different
+private families. The diagnostic shows identical case text and
+names the two source signatures. If both providers use a single
+exported `Select b`, the client can pass a Boolean from an IORef
+to `atRuntime`. A named `Data.Type.Bool.If b Int Char` works too.
+[Example of an exported case result](../examples/open-evaluation/NativeRetainedTH.hs),
+[Eisenberg and Stolarek, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf),
+and [Agda's fresh pattern-lambda helpers](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html#internal-representation-of-pattern-lambdas).
+
+The same test works with a user-defined `Mode = Cold | Hot | Standby`
+and a single closed family `ByMode` in `Mode`'s module. At `-O0` and
+`-O2`, a source-hidden client prints `["19","q","True"]` using the
+shared family. Changing just the consumer's `Standby` result from
+`Bool` to `Ordering` rejects the unknown-index application. Concrete
+`Cold` and `Hot` calls still work. The solver also rejects
+`ByMode m Int Int Int :~: Int` at a rigid `m`. Reordering the data
+constructors recompiles both providers and the client. The following
+build reuses all four interfaces.
+
+One possible first slice for automatic sharing is a common selector
+for complete cases over non-indexed nullary datatypes. The source
+prototype uses an ordinary closed family over constructor and result
+pairs. It passes the same `Mode` controls.
+
+```haskell
+type family PickRows (key :: s) (rows :: [(s, k)]) :: k where
+  PickRows key ('(key, result) ': rest) = result
+  PickRows key (other ': rest) = PickRows key rest
+```
+
+The first equation stays possible at an unknown key, so the second
+equation cannot skip it. Two providers that write the same rows in
+opposite orders still fail when their `PickRows` lists follow their
+written orders. Sorting the pairs by constructor identity in the
+explicit prototype lets the client compose them. The separate `Mode`
+owner in this test uses `NoExperimentalDependentTypes` and supplies only
+its ordinary interface.
+
+For automatic sharing, the compiler would check for exactly one
+written row per constructor before it sorts the pairs. Exact names
+distinguish constructors from different modules and remain meaningful
+after a change to their ordinals. The first slice could require a
+fixed result kind and family-free branch results. Passing a branch
+as an argument can otherwise expose it to solver reduction before
+selection.
+
+- A compiler-owned selector can use the existing family application and
+  nominal equality representations. It needs a stable family name and
+  checked equations available during bootstrap and interface loading.
+  This lets it use the ordinary constructor information even when
+  another package compiled the datatype with the extension off.
+  Case syntax already works with `base` hidden and only the known
+  names from `GHC.Internal.Types` in scope. The printer must recover
+  the source cases and their owners when the solver reports unequal
+  selector applications.
+- A selector per datatype can derive its name from the datatype's
+  defining module and occurrence. GHC already derives names for
+  constructor workers and publishes private closed axioms in ordinary
+  interfaces. Each datatype owner must publish its selector before a
+  consumer can use it. This also applies to the bootstrap owner of
+  `Bool`. An installed owner without a selector needs a rebuild.
+- A first-class neutral case in Core could represent the scrutinee
+  and ordered branches directly. It needs type and coercion rules,
+  substitution, normalization, Core Lint and an interface encoding.
+  Constructor fields and indexed branches also need scopes for their
+  binders and their equality evidence.
+
+Automatic sharing would need an interface upgrade check for affected
+home providers. A client with only an older installed provider's
+private family cannot recover the shared result from that interface
+under the current rules.
 
 ## A case in a function arrow
 
