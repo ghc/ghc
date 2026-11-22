@@ -148,6 +148,39 @@ source revisions and rebuild commands, then remove both sets of outputs
 after the last live user finishes. The 200 GB threshold is a backup for
 this cleanup.
 
+## An ordinary minimum in the zip length proof
+
+The [single-file example](examples/open-evaluation/ZipMinimum.hs) uses
+ordinary recursive definitions of `size` and `minSize`. It proves
+`size (zip xs ys) :~: minSize (size xs) (size ys)` by matching the two
+input lists. The [separate-module version](examples/open-evaluation/PreludeZipRuntime.hs)
+uses the same equations from the provider interface. The empty-left case
+returns `Refl` without inspecting the right list. Adding an extra
+`Succ` to the recursive minimum changes its checked equation and GHC
+rejects the unchanged induction step with GHC-05617.
+
+The first clean two-stage build used `f984b0369f`. All four native
+Showcase runs matched the 543 expected lines. GHCi exposed debugger
+breakpoints in the Core inspected for the imported minimum. The checker
+now ignores those ticks during inspection. The no-code map regression
+also exposed an unnecessary dependency on the minimum's Core equations.
+The zipper proof now owns that type synonym.
+
+The independent runtime check covers 81 pairs of finite lengths. The
+rule checks include a declaration after a splice and a consumer with
+only the provider interface. Changing the compiled function with a rule
+invalidates its original equation. The [compiler upgrade check](examples/open-evaluation/check-minimum-upgrade.sh)
+rebuilds the affected home provider once and reuses it on the next build.
+
+Job `499` rebuilt both compiler stages at `6d442d71b8`. Job `503`
+matched all 543 Showcase lines at `-O0` and `-O2` on both stages and
+in stage 2 GHCi with debugger breakpoints enabled. It also checked both
+installed list interfaces and the two-compiler provider upgrade.
+All 30 selected tests passed in the normal way, including the existing
+no-code map check and the new local minimum and GHCi test. The test
+fixture at `dcaa2a244a` gives the interactive caller a concrete
+signature. Its compiler sources match `6d442d71b8`.
+
 ## Direct zip proof and retained callback rules
 
 Both normal compiler stages at `5fe06625c3` matched the 543-line

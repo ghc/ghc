@@ -8,32 +8,39 @@ and its [expected output](Showcase.stdout) are the executable examples.
 
 ## Current checkpoint
 
-Verified 22 November 2026, 15:06 CET. The development branch is
+Updated 22 November 2026, 16:07 CET. The development branch is
 `dependent-haskell`. Use the fork command below to find its latest commit.
 
 | Revision | Verified result |
 | --- | --- |
 | `5fe06625c3` | Clean two-stage build. Both stages matched the 543-line Showcase at `-O0` and `-O2`. Stage 2 GHCi and all 29 selected registered tests passed. The 542 and 543 compilers read each other's imported rule interfaces. |
 | `c88606fe92` | Same compiler with the proof over the two runtime lists. Both stages passed the updated zipper tests and Showcase. The proof uses `size (zip xs ys) :~: Minimum (size xs) (size ys)`. |
+| `6d442d71b8` | Both normal compiler stages matched 543 native outputs at `-O0` and `-O2`. Stage 2 GHCi matched the same output with breakpoints enabled. An ordinary recursive `minSize` works in the same module as the zip proof or in a library. |
+| `dcaa2a244a` | All 30 selected normal-way tests passed on that compiler, including the single-file proof, imported proof, rule controls and no-code map regression. Both compiler-upgrade checks passed. |
 
-[Qualification record](CHECKPOINTS.md#direct-zip-proof-and-retained-callback-rules).
+[Ordinary minimum](CHECKPOINTS.md#an-ordinary-minimum-in-the-zip-length-proof)
+and [previous release](CHECKPOINTS.md#direct-zip-proof-and-retained-callback-rules).
 
-## Current priority
+## Current R16 result
 
-**R16 open evaluation.** Replace the handwritten `Minimum` family with
-an ordinary recursive Haskell function, `minSize :: Size -> Size -> Size`.
-The theorem is `size (zip xs ys) :~: minSize (size xs) (size ys)`.
-The three induction clauses stay the same. Compiler `5fe06625c3`
-reports GHC-70565 at the inner `size xs` when checking the right side.
-The private compiler in job `460` accepted that source at both `-O0` and
-`-O2`. Verification of final Core, incorrect equations, ordinary
-interfaces and the combined normal compiler must precede publication.
+**R16 open evaluation.** The [single-file example](examples/open-evaluation/ZipMinimum.hs)
+defines `size`, `minSize` and the proof together. The result type is
+`size (zip xs ys) :~: minSize (size xs) (size ys)`. The
+[importing example](examples/open-evaluation/PreludeZipRuntime.hs) reads
+the equations from the provider interface. An earlier home provider
+rebuilds once. Rebuild an older installed provider to obtain its equations.
 
-The reference compiler is under
-`_build/on-demand/r05-normal-543-20261122/source`. The R16 compiler
-experiment is under `_build/on-demand/r16-recursive-minimum-20261122`.
-The independent controls under `_build/on-demand/r16-minsize-20261122/acceptance`
-cover 81 finite pairs, partial spines, demand and a changed definition.
+Job `499` built both normal compiler stages at `6d442d71b8`. The
+registered tests use `dcaa2a244a`, which adds a signature to the
+interactive test caller. The compiler sources are identical at both pins.
+Job `503` completed qualification. Its results are in
+`_build/on-demand/r16-normal-6d442d71b8-20261122/verification`.
+The `source` link in that area points to the actual checkout at
+`_build/on-demand/r16-normal-20261122/source`. Treat them as one build.
+The 543 comparison compiler is at `5fe06625c3`.
+R16 remains open for ordinary recursion beyond the checked case shapes.
+The zip proof uses the order in which the installed function inspects
+its lists and disables rewrite rules in the proof module.
 [Open evaluator card](roadmap/R16-open-term-evaluator.md#prove-an-equation-for-preludezipwith).
 
 Other local candidates are recoverable from Git. Each name is relative
@@ -65,9 +72,10 @@ to `refs/archive/dependent-haskell/2026-11-22/`.
 
 ## Build and verify
 
-The current normal checkout is
-`_build/on-demand/r05-normal-543-20261122/source`. Its sibling
-`build.sh` records the commands and writes logs in the parent directory.
+The current normal build area is
+`_build/on-demand/r16-normal-6d442d71b8-20261122`. The scripts
+`build.sh` and `incremental.sh` in `_build/on-demand/r16-normal-20261122`
+record the clean and incremental build commands.
 On this host the bootstrap tools are GHC 9.14.1, Cabal 3.18.1.0, Happy 2.1.7
 and Alex 3.5.4.0. A fresh checkout needs the Git submodules at their recorded
 revisions. This build used five workers per job.
@@ -81,7 +89,7 @@ self-hosted stage 2 compiler in `_build/stage1/bin/ghc`. Both use the
 target libraries in `_build/stage1/lib`. For example, from the main checkout:
 
 ```sh
-area="$PWD/_build/on-demand/r05-normal-543-20261122"
+area="$PWD/_build/on-demand/r16-normal-6d442d71b8-20261122"
 queue="$PWD/docs/dependent-haskell/tools/ghc-build-job"
 check="$PWD/docs/dependent-haskell/check-showcase.sh"
 lib="$area/source/_build/stage1/lib"
