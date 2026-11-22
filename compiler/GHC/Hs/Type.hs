@@ -628,9 +628,10 @@ splitHsTypeLet (first :| binds) body = case unLoc first of
       named = [(field, selector) | (Right field, selector) <- [(left, first_field), (right, second_field)]]
       fields | null named = [(pair, first_field)]
              | otherwise = named
+      tyvar :: LocatedN RdrName -> LHsType GhcPs
       tyvar name = L loc (HsTyVar noAnn NotPromoted name)
       bindField (field, selector) result =
-        let projected = L loc (HsAppTy noAnn (tyvar (L name_loc selector)) (tyvar pair))
+        let projected = L loc (HsAppTy noExtField (tyvar (L name_loc selector)) (tyvar pair))
         in L loc (XHsType (mkHsSingleTypeLet noAnn field projected result))
   where
     rest = case binds of
