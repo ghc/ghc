@@ -403,6 +403,10 @@ reader opens the v80 interface. The diagnostic names the expected and actual
 versions. A v80 provider and client passed both optimization levels
 with a component compiler that could read the installed v79 libraries.
 A normal build must rebuild the compiler and its libraries for v80.
+The [two-compiler check](../examples/r11-heq-pair/check-quantified-gadt-upgrade.sh)
+uses each compiler with its own libraries. It checks an import in both
+directions and rebuilds an ordinary module from source. The next build must
+reuse its interface.
 Rebuild providers and clients together with that compiler.
 [Worker evidence](../../../compiler/GHC/Core/DataCon.hs),
 [interface version](../../../compiler/GHC/Settings/Constants.hs).
