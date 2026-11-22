@@ -23,13 +23,18 @@ depend on others, so this count cannot estimate the remaining work time.
 | Declaration dependencies, families and GADTs | R21, R23, R24, R41 |
 | Namespace warnings | R36 |
 
-The 519-output Showcase proves that filtering a finite list with a
-runtime predicate cannot increase its length. The predicate computes a
-cutoff from rows read from an `IORef`. An erased package can infer its witness from
-a declared rank-n callback. A consumer can reverse the proof that a
-vector with an unknown length is empty. [Filter bound](examples/open-evaluation/PreludeFilterRuntime.hs),
-[erased callback](examples/erased-existentials/RankedPackageClient.hs)
-and [empty-vector proof](roadmap/R11-homogeneous-equality.md#an-equality-with-the-empty-vector).
+The 522-output Showcase includes a proof that zipping two runtime lists
+returns exactly as many pairs as the length of the shorter list.
+An ordinary client prints the pairs and the proof in the same tuple.
+The filtering example bounds the result of a predicate that captures a
+runtime cutoff. The mapping example proves both equations for
+`Prelude.fmap` on `Either`. An erased package can infer its witness
+through a lambda that forwards a declared rank-n callback.
+[Zip proof](examples/packed-vector/ZipRows.hs),
+[ordinary zip client](examples/packed-vector/OrdinaryZipRows.hs),
+[filter bound](examples/open-evaluation/PreludeFilterRuntime.hs),
+[Either equations](examples/open-evaluation/PreludeFmapEitherProof.hs)
+and [erased callback](examples/erased-existentials/RankedPackageClient.hs).
 
 Earlier [Showcase milestones and examples](CHECKPOINTS.md#showcase-history-through-502-outputs)
 record how each behavior was introduced.
@@ -87,12 +92,14 @@ R16 records the method and arguments used by a checked proof. A
 client with a conflicting rewrite rule receives GHC-83605 at the
 proof use. An explicitly opaque, closed observation computed in a
 rules-off provider can be used by an optimized ordinary client.
-The next R12/R16 check uses a method inside a nested family application.
-A rule that changes the selected method must invalidate a proof that
-uses its result. A family equation that ignores the method result must
-still compile. R13 is testing two-list recursion with different element
-types. The first empty list must determine the result even when the
-second spine is undefined.
+R12/R16 tracks which branch of a nested family application used a
+checked method. A rule that changes the selected method invalidates a
+proof that uses its result. A constant family can ignore the same
+argument. A warm build reviews eligible home providers once. An older
+installed provider needs its source rebuilt to recover omitted evidence.
+R13 verifies a zip with two different element types. Its first empty
+row leaves the second list unevaluated. Recursion that can decrease
+either list and local signatures in R18 type-level lets are under test.
 [Open evaluation](roadmap/R16-open-term-evaluator.md) and
 [upgrade checks](CHECKPOINTS.md#shared-r11-and-r16-rebuild).
 

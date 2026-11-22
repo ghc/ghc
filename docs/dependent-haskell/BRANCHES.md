@@ -20,8 +20,9 @@ also left tested changes on branches outside that history.
 
 The R04 Quick Look prototype `35ead97235` already has a published
 implementation at `10bf2b0c4b`. The two-list zip at `3d5c46ec69` supplies a
-test case. Its own commit adds no compiler support. The current
-evaluator reports GHC-68947 at `zipLength xs ys`.
+test case. Its own commit adds no compiler support. At consolidation
+the evaluator reported GHC-68947 at `zipLength xs ys`. The later R13
+implementation checks the ordinary provider and the [zip proof](examples/packed-vector/ZipRows.hs).
 
 ## Branch and source inventory
 

@@ -70,6 +70,12 @@ this cleanup.
 
 ## R11 retained vector equality
 
+At `48bb9fa5bd`, both normal Hadrian stages produced the 519 expected
+Showcase lines at `-O0` and `-O2`. The self-hosted GHCi run matched
+them too. The 17 selected normal tests passed. Each stage also ran the
+reachable and impossible vector equality examples through the native
+pipeline. The warning-disabled case passed Core and STG Lint.
+
 On `5f70c2bdfc` and both normal stages of `2aacad1cf1`, matching
 `HRefl` between a successor-length vector and `VNil` reached Core Lint
 with a mixed-kind coercion binder. The same error occurred on a reachable
@@ -91,6 +97,21 @@ and 388,285,656 bytes after it.
 [Design and source example](roadmap/R11-homogeneous-equality.md#an-equality-with-the-empty-vector).
 
 ## Shared R11 and R16 rebuild
+
+The combined compiler at `9a1ce603f2` exposed a warm R12 upgrade
+failure. Hadrian invoked GHC on `GHC.Internal.Data.Either`, and GHC
+reused an interface that had passed the older ground-instance check.
+The `Functor (Either e)` dictionary omitted its checked `fmap`
+method. Both `6bfd1279a5` and `9a1ce603f2` accepted the source proof
+when given the earlier, freshly built library. Both reported GHC-70565
+at the same open callback when given the reused library.
+
+The fix at `18fbc8a25b` checks eligible polymorphic dictionary providers
+once. The warm provider then supplies the same evidence as a fresh
+provider. The source-hidden proof compiles. An ordinary saturated
+receiver and an instance with a dictionary premise keep their old
+interface bytes. Use the [two-compiler upgrade test](examples/open-evaluation/check-polymorphic-method-upgrade.sh)
+to repeat the warm and cold builds.
 
 The v69 comparison compiler at `ae563bb342` matched all 517 Showcase
 lines at native `-O0` and `-O2` with both normal Hadrian stages.
