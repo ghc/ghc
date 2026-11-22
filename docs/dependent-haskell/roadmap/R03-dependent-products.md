@@ -172,7 +172,9 @@ cutoff. The proof index keeps that function's identity. [Captured cutoff](R16-op
 
 - Application checking can infer the erased arguments of `gcastWith` from
   a retained proof and the expected result. The equality scopes over the
-  continuation. See [R11](R11-homogeneous-equality.md#infer-the-type-arguments-of-an-equality-eliminator).
+  continuation. It can also determine the successor tail of a vector
+  passed to a call inside that continuation.
+  [Checked successor tail](R11-homogeneous-equality.md#infer-the-checked-successor-tail).
 
 The published M60 checkpoint appends five observations to M59's 79-line prefix
 and passes all 84 with both compilers. Its separate evidence audit passes.
@@ -819,3 +821,28 @@ passed for a three-argument call in two interface encodings.
 [two-argument source example](../examples/open-evaluation/CompareAt.hs),
 [inverse-equality control](../../../testsuite/tests/dependent/should_run/curried-callback/NoInverse.hs)
 and [application and equality precedents](../REFERENCES.md#applying-a-retained-callback-to-two-arguments).
+
+
+## Pass a named function with checked equations
+
+In `measureReverseLength HaskLib.size xs Refl`, the retained callback
+is an ordinary unary function. The provider requires
+`measure xs :~: HaskLib.size xs` and uses that equality to express the
+existing reversal law in terms of the supplied measurement. The
+Showcase checks the law and reads the measured size of a runtime list.
+
+GHC selects the checked source family of the exact function binder.
+Its erased type arguments instantiate both the ordinary call and the
+family. The callback's index is that family with its value argument
+unsupplied. Substituting into a call to the callback supplies the value
+argument. The ordinary function supplies the runtime value. Two
+qualified imports of the same binder share its checked family.
+
+GHC checks the certificate and its rewrite-rule dependencies. A
+different certified function of the same type gives a different
+family and fails at `Refl`. A name without checked equations
+fails at the argument. A local callback keeps its lexical index.
+[Showcase](../Showcase.hs), [source-hidden controls](../../../testsuite/tests/dependent/should_run/NativeNamedCallback.sh),
+[Agda function types](https://agda.readthedocs.io/en/v2.8.0/language/function-types.html),
+[GHC retained application](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#dependent-application-and-the-static-subset)
+and [partial type family applications](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#arity-of-type-families).

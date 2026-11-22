@@ -1780,7 +1780,7 @@ match_ty (RV { rv_tmpls = tmpls, rv_lcl = rn_env })
       = do { let actual = lookupVarEnv id_subst renamed `orElse` Var renamed
                  domain = Type.substTy s (varType v)
            ; if isNativeIndexFunctionId v
-             then do { index <- nativeIndexFunctionArgIndex actual
+             then do { index <- nativeLocalFunctionArgIndex actual
                      ; guard (typeKind index `eqType` domain)
                      ; guard (isJust (termVar_maybe actual)
                               || not (isScopedSelectorReceiver v ty1)) }

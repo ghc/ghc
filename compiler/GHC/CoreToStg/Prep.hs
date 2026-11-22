@@ -1381,7 +1381,7 @@ prepareNativeCaseScrutinee ty scrut
            (prefix', proof, wrap) <- prepare
            pure (Cast prefix' co, castNativeIndexCo nominal proof, wrap))
     prepare_call head_expr
-      | Just index <- nativeIndexFunctionArgIndex head_expr
+      | Just index <- nativeLocalFunctionArgIndex head_expr
       = Just (False, pure (head_expr, mkNomReflCo index, id))
       | otherwise = Nothing
 

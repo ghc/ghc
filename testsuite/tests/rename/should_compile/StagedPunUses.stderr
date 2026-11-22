@@ -1,0 +1,7 @@
+StagedPunUses.hs:9:10: warning: [GHC-41293] [-Wpun-uses]
+    ‘T’ depends on separate type and term namespaces.
+    This use resolves to ‘T’ imported from ‘PunUseData’ at StagedPunUses.hs:4:20-23
+                             (and originally defined at PunUseData.hs:3:10)
+    Same-spelled names in the other namespace:
+      ‘T’ imported at level -1 from ‘PunUseType’ at StagedPunUses.hs:6:27
+          (and originally defined at PunUseType.hs:3:1-10)

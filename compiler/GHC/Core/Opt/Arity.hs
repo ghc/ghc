@@ -2995,7 +2995,7 @@ pushCoRetainedArg = go
 
     valid_argument b body arg
       | isNativeIndexFunctionId b
-      = case nativeIndexFunctionArgIndex arg of
+      = case nativeLocalFunctionArgIndex arg of
           Just index -> typeKind index `eqType` varType b
                         && case index of
                              TermVarTy{} -> True

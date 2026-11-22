@@ -1002,7 +1002,11 @@ constructor result. A bang there is subject to the ordinary type rules.
 -}
 
 rnHsTyKi env listTy@(HsListTy x ty)
-  = do { when (isRnKindLevel env) $
+  = do { case x of
+           (EpTok (EpaSpan (RealSrcSpan _ _)), _) ->
+             addDiagnostic (TcRnPunnedTypeSyntax (ppr listTy))
+           _ -> pure ()
+       ; when (isRnKindLevel env) $
            checkDataKinds env listTy
        ; (ty', fvs) <- rnLHsTyKi env ty
        ; return (HsListTy x ty', fvs) }

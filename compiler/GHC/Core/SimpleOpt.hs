@@ -817,7 +817,7 @@ simple_app env e0@(Lam {}) as0@(_:_)
       | soe_native env
       , isNativeIndexFunctionId b'
       = let arg = simple_opt_clo (soeInScope env') a
-        in case nativeIndexFunctionArgIndex arg of
+        in case nativeLocalFunctionArgIndex arg of
              Just index
                | idType b' `eqType` typeKind index
                , selectorSafeIndexSubstitution body index
@@ -2014,7 +2014,7 @@ exprIsConAppFor_maybe mode ise@(ISE in_scope id_unf) expr
        , hasFreeVarInCoreAnnotations bndr body
        = do let (_, bndr') = subst_bndr subst bndr
             index <- if isNativeIndexFunctionId bndr'
-                     then nativeIndexFunctionArgIndex arg
+                     then nativeLocalFunctionArgIndex arg
                      else exprToNativeIndex arg
             guard (typeKind index `eqType` idType bndr')
             guard (selectorSafeIndexSubstitution body index)

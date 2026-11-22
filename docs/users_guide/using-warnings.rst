@@ -2506,12 +2506,14 @@ of ``-W(no-)*``.
 
     Warn about uses of a global name when a name from the other namespace
     would conflict with it in a single namespace. A qualifier can avoid
-    the conflict if it selects only one of the competing names.
+    the conflict if it selects only one of the competing names. The check
+    uses name resolution across normal, quote and splice imports.
 
     Also warn about implicit type-variable uses that would capture a
-    term name, and about ``[]`` as a type constructor and boxed tuple
-    type syntax. For implicit type-variable uses, this warning takes
-    precedence over :ghc-flag:`-Wterm-variable-capture`.
+    term name, and about list and boxed tuple type syntax that depends on
+    :extension:`ListTuplePuns`. This includes the list type ``[a]`` and the
+    list type constructor ``[]``. For implicit type-variable uses, this
+    warning takes precedence over :ghc-flag:`-Wterm-variable-capture`.
 
     :ghc-flag:`-Weverything` enables this warning.
 

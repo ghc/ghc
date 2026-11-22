@@ -37,7 +37,8 @@ module GHC.Core (
         exprToNativeIndex, normaliseNativeIndexExpr, mapNativeIndex, mapNativeIndexWithNatural,
         nativeSourceCallIndex, nativeComputedIndex, retainedArgIndex, nativeDeferredArgIndex,
         exprToNativeCaseIndex, isNativeCaseValueIndex, isNativeIndexedCaseScrutinee,
-        termVar_maybe, nativeIndexFunctionVar_maybe, nativeIndexFunctionArgIndex, nativeIndexArgKinds,
+        termVar_maybe, nativeIndexFunctionVar_maybe, nativeIndexFunctionArgIndex,
+        nativeLocalFunctionArgIndex, nativeIndexArgKinds,
         nativeClassSelectorTys, nativeClassSelectorIndex, nativeIndexedConArgs,
         nativeIndexedConApp_maybe, splitNativeIndexedConApp, isNativeConstructedGadtIndex,
         nativeFamilyConHead_maybe, nativeFamilyPromotedCon_maybe,
@@ -126,7 +127,7 @@ import GHC.Core.Rules.Config ( RuleOpts )
 import GHC.Core.Class (classMethods)
 import GHC.Core.Predicate (getClassPredTys_maybe)
 import GHC.Core.DataCon
-import GHC.Core.TyCon ( isPromotedDataCon_maybe, isVanillaAlgTyCon,
+import GHC.Core.TyCon ( TyCon, isPromotedDataCon_maybe, isVanillaAlgTyCon,
                         tyConTyVars, tyConResKind, tyConKind, tyConSingleDataCon_maybe,
                         isBoxedDataTyCon, isTypeDataTyCon, tyConDataFamCoercion_maybe )
 import GHC.Unit.Module
@@ -137,7 +138,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Var.Env( InScopeSet, IdEnv, emptyVarEnv, lookupVarEnv, extendVarEnv, mapVarEnv, mkInScopeSet )
 import GHC.Types.Var.Set ( unionVarSet )
 import GHC.Types.Var
-import {-# SOURCE #-} GHC.Types.Id ( isDataConWorkId_maybe, isDataConWrapId_maybe, sourceTableId_maybe )
+import {-# SOURCE #-} GHC.Types.Id ( isDataConWorkId_maybe, isDataConWrapId_maybe, idName, sourceTableId_maybe )
 import GHC.Types.Literal
 import GHC.Types.Tickish
 import GHC.Types.Basic
@@ -2704,17 +2705,9 @@ computedIndexExpr = nativeIndexExprWith False extra
     extra expr
       | (Var fun, args@(_:_)) <- collectArgs expr
       , Just family <- sourceTableId_maybe fun
-      , let (erased, body) = splitForAllInvisTyBinders (varType fun)
-            tvs = map (binderVar . snd) erased
-            (type_args, values) = splitAt (length tvs) args
-            (family_tvs, binders) = splitAt (length tvs) (tyConTyVars family)
-      , type_args `equalLength` tvs, family_tvs `equalLength` tvs
-      , Just tys <- traverse type_arg type_args
-      , let subst = TyCoSubst.zipTvSubst tvs tys
-            family_subst = TyCoSubst.zipTvSubst family_tvs tys
-            (_, domains, result) = splitFunTys (TyCoSubst.substTy subst body)
-      , and (zipWith (has_kind subst) tvs tys)
-      , and (zipWith (has_kind family_subst) family_tvs tys)
+      , let (type_args, values) = span isTypeArg args
+      , Just (tys, body, family_subst, binders) <- sourceIndexHead fun family type_args
+      , let (_, domains, result) = splitFunTys body
       , values `equalLength` domains, values `equalLength` binders
       , result `sameNativeIndexDomain` TyCoSubst.substTy family_subst (tyConResKind family)
       = do { indices <- traverse (fmap snd . computedIndexExpr) values
@@ -2723,15 +2716,31 @@ computedIndexExpr = nativeIndexExprWith False extra
              else Nothing }
       | otherwise = Nothing
 
+    has_domain subst (Scaled mult domain) binder index =
+      isManyTy mult && sameNativeIndexDomain domain (TyCoSubst.substTy subst (tyVarKind binder))
+                    && sameNativeIndexDomain domain (typeKind index)
+
+-- | Match the erased arguments to both the term and its checked family.
+-- See Note [Source calls in retained arguments].
+sourceIndexHead :: Id -> TyCon -> [CoreExpr]
+                -> Maybe ([Type], Type, TyCoSubst.Subst, [TyVar])
+sourceIndexHead fun family args = do
+  let (erased, body) = splitForAllInvisTyBinders (varType fun)
+      tvs = map (binderVar . snd) erased
+      (family_tvs, binders) = splitAt (length tvs) (tyConTyVars family)
+  guard (args `equalLength` tvs && family_tvs `equalLength` tvs)
+  tys <- traverse type_arg args
+  let subst = TyCoSubst.zipTvSubst tvs tys
+      family_subst = TyCoSubst.zipTvSubst family_tvs tys
+  guard (and (zipWith (has_kind subst) tvs tys) &&
+         and (zipWith (has_kind family_subst) family_tvs tys))
+  return (tys, TyCoSubst.substTy subst body, family_subst, binders)
+  where
     type_arg (Type ty) = Just ty
     type_arg _ = Nothing
 
     has_kind subst binder ty =
       TyCoSubst.substTy subst (tyVarKind binder) `eqType` typeKind ty
-
-    has_domain subst (Scaled mult domain) binder index =
-      isManyTy mult && sameNativeIndexDomain domain (TyCoSubst.substTy subst (tyVarKind binder))
-                    && sameNativeIndexDomain domain (typeKind index)
 
 -- | Interpret a checked argument at a retained application.
 retainedArgIndex :: CoreExpr -> Maybe Type
@@ -2810,19 +2819,34 @@ nativeIndexFunctionVar_maybe (Var f)
   | isNativeIndexFunctionId f = Just f
 nativeIndexFunctionVar_maybe _ = Nothing
 
--- | Reify a lexical callback and checked nominal casts between its arrow types.
+-- | Reify a lexical callback and its checked nominal casts.
 -- See Note [Function-valued retained binders] in GHC.Core.Type.
-nativeIndexFunctionArgIndex :: CoreExpr -> Maybe Type
-nativeIndexFunctionArgIndex (Cast body co) = do
+nativeLocalFunctionArgIndex :: CoreExpr -> Maybe Type
+nativeLocalFunctionArgIndex (Cast body co) = do
   delta <- nativeIndexCastCo_maybe co
   let source = coercionLKind delta
       target = coercionRKind delta
   guard (not (source `eqType` target))
   _ <- nativeIndexFunctionTypeTys_maybe target
-  index <- nativeIndexFunctionArgIndex body
+  index <- nativeLocalFunctionArgIndex body
   guard (typeKind index `eqType` source)
   return (mkCastTy index delta)
-nativeIndexFunctionArgIndex arg = TermVarTy <$> nativeIndexFunctionVar_maybe arg
+nativeLocalFunctionArgIndex arg = TermVarTy <$> nativeIndexFunctionVar_maybe arg
+
+-- | Reify the argument of a checked retained function application.
+-- See Note [Named retained callbacks] in GHC.Tc.Gen.App.
+nativeIndexFunctionArgIndex :: CoreExpr -> Maybe Type
+nativeIndexFunctionArgIndex arg
+  | Just local <- nativeLocalFunctionArgIndex arg = Just local
+  | (Var fun, args) <- collectArgs arg
+  , isExternalName (idName fun)
+  , Just family <- sourceTableId_maybe fun
+  , Just (tys, body, _, [_]) <- sourceIndexHead fun family args
+  , Just _ <- nativeIndexFunctionTypeTys_maybe body
+  , let index = mkTyConApp family tys
+  , typeKind index `eqType` body
+  = Just index
+  | otherwise = Nothing
 
 -- | Recover an index for an existing strict case, including an opaque call.
 -- This does not admit a call as a lazy retained application argument.
@@ -2845,7 +2869,7 @@ exprToNativeCaseIndex expr@App{}
       delta <- setNominalRole_maybe Representational co
       guard (coercionRole delta == Nominal && typeKind fun `eqType` coercionLKind delta)
       mkCastTy fun delta <$ nativeIndexFunctionTypeTys_maybe (coercionRKind delta)
-    read_call head_expr = nativeIndexFunctionArgIndex head_expr
+    read_call head_expr = nativeLocalFunctionArgIndex head_expr
 exprToNativeCaseIndex (Var v)
   | isNativeOpaqueValueId v = Just (TermVarTy v)
 exprToNativeCaseIndex expr

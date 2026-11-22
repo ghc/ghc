@@ -263,4 +263,6 @@ test('PunUses', [extra_files(['PunUseData.hs', 'PunUseType.hs'])],
      multimod_compile, ['PunUses', '-v0 -Wpun-uses'])
 test('DisambiguatedPunUses', [extra_files(['PunUseData.hs', 'PunUseType.hs'])],
      multimod_compile, ['DisambiguatedPunUses', '-v0 -Werror=pun-uses'])
+test('StagedPunUses', [extra_files(['PunUseData.hs', 'PunUseType.hs'])],
+     multimod_compile, ['StagedPunUses', '-v0 -Wpun-uses'])
 test('ImplicitPunUses', normal, compile, ['-Wpun-uses -Wterm-variable-capture'])

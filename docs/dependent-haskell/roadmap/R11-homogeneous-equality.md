@@ -34,6 +34,20 @@ different list `ys` fails with GHC-05617 at the continuation.
 [Registered test](../../../testsuite/tests/dependent/should_run/NativeRetainedFamilyGiven.hs)
 and [application and equality provenance](../REFERENCES.md#checking-a-retained-equality-continuation).
 
+### Infer the checked successor tail
+
+In the Showcase, `sameNat count (S Z)` supplies a proof about
+the actual runtime count. The continuation of HaskLib's
+`withEquality` uses that proof to call
+`safeHead (replicateNative count 'x')`. Its
+argument type requires `1 + n`. The checker reads the constructor
+`S Z` from the scoped Given and selects `Z` for `n`. The
+original vector type still goes through ordinary subsumption.
+An equality to zero cannot supply a successor tail.
+[Showcase source](../Showcase.hs),
+[registered test](../../../testsuite/tests/dependent/should_run/NativeRetainedTailGiven.hs)
+and [application provenance](../REFERENCES.md#checking-a-retained-equality-continuation).
+
 ## An equality with the empty vector
 
 An ordinary `HRefl` pattern can refine the length of a retained vector.

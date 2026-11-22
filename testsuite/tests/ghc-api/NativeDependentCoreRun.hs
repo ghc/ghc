@@ -6282,6 +6282,10 @@ runSourceCallIndexChecks = do
         , "stayNative :: Bool -> Bool"
         , "stayNative False = False"
         , "stayNative True = True"
+        , "polyNative :: [a] -> Bool"
+        , "polyNative [] = False"
+        , "polyNative (_:_) = True"
+        , "type CheckedPoly = polyNative '[ 'False]"
         ]
     checked <- GHC.typecheckModule GHC.StartAndKeepRunningTcMPlugins parsed
     desugared <- GHC.desugarModule checked
@@ -6292,6 +6296,7 @@ runSourceCallIndexChecks = do
             Nothing -> fail ("FAIL: missing source-call fixture binding " ++ name)
     (certified, rhs) <- binding "flipNative"
     (outer, outerRhs) <- binding "stayNative"
+    (poly, polyRhs) <- binding "polyNative"
     family <- case sourceTableId_maybe certified of
         Just table -> pure table
         Nothing -> fail "FAIL: checked source function lost its equation certificate"
@@ -6396,6 +6401,36 @@ runSourceCallIndexChecks = do
             (expression renamed rhs renamed operand)
         reject "source-call family domain mismatch" "Unsupported retained runtime argument"
             (expression wrongDomain wrongRhs wrongDomain listOperand)
+        let checkNamed label owner ownerRhs callback inputType = do
+                let callbackType = exprType callback
+                    function = local 17907 "callback" callbackType
+                    input = local 17908 "callback_input" inputType
+                    result = TermAppTy function (TermVarTy input)
+                    proof = local 17909 "callback_proof" (mkTyConApp eqTyCon [boolTy, result, result])
+                    consumer = mkLams [function, input, proof] (mkIntExpr (targetPlatform flags) 42)
+                    plainOwner = setIdDetails (GHC.Types.Id.setIdNotExported (localiseId owner)) VanillaId
+                    lexical = local 17910 "lexical_callback" callbackType
+                    actualInput = local 17911 "actual_input" inputType
+                    lexicalResult = TermAppTy lexical (TermVarTy actualInput)
+                    reflexiveCallback = mkCoreConApps eqDataCon
+                        [Type boolTy, Type lexicalResult, Type lexicalResult, Coercion (mkNomReflCo lexicalResult)]
+                case nativeIndexFunctionArgIndex callback of
+                    Just TyConApp{} -> pure ()
+                    _ -> fail ("FAIL: " ++ label ++ " did not reify a named callback")
+                lintNative flags (label ++ " genuine named callback") (App consumer callback)
+                reject (label ++ " counterfeit named callback") "different equations at its binding"
+                    (Let (NonRec plainOwner ownerRhs) (App consumer callback))
+                lintNative flags (label ++ " lexical callback") $
+                    Lam actualInput $
+                    Let (NonRec lexical callback) $
+                    mkApps consumer [Var lexical, Var actualInput, reflexiveCallback]
+        checkNamed "monomorphic" certified rhs (Var (globaliseId certified)) boolTy
+        let instantiated = App (Var (globaliseId poly)) (Type boolTy)
+            partiallyAppliedField = mkCoreConApps justDataCon [Type (exprType instantiated), instantiated]
+        -- Erased arguments alone cannot saturate a unary scalar source call.
+        unless (isNothing (retainedArgIndex partiallyAppliedField)) $
+            fail "FAIL: scalar index admitted a stored polymorphic callback application"
+        checkNamed "erased type application" poly polyRhs instantiated (mkListTy boolTy)
         let simplified = simpleOptNativeExpr baseline
         lintNative flags "computed source-call beta after SimpleOpt" simplified
         unless (exprType baseline `eqType` exprType simplified) $

@@ -1674,8 +1674,7 @@ warnGlobalPunUse (L loc rdr) selected
   , let name = greName selected
   , isExternalName name
   , isTyConName name || isValName name
-  = whenWOptM Opt_WarnPunUses $
-    unlessXOptM LangExt.ExplicitLevelImports $ do
+  = whenWOptM Opt_WarnPunUses $ do
       (global_env, local_env) <- getRdrEnvs
       let globals r = lookupGRE global_env (LookupRdrName r (RelevantGREsFOS WantNormal))
       case globals same_ns of
@@ -1713,10 +1712,15 @@ imports. A selection in the imported scope still needs a warning if a
 local top-level definition in the other namespace would shadow it.
 Qualified paths use the qualifier to select their candidates.
 
+Proposal #682 section 3.4 keeps all import levels in name resolution.
+An import at a different level can still make a name ambiguous. Check
+the hypothetical unified namespace before any staging check. Leave
+the actual selected name and staging diagnostic unchanged.
+
 A term binder and a type binder can be introduced in separate local
 scopes. Their presence alone does not determine which is visible in a
 unified namespace. This check uses global selections only and leaves
-local alternatives and ExplicitLevelImports to their scope checks.
+local alternatives to their scope checks.
 -}
 
 lookupGlobalOccRn_maybe :: WhichGREs GREInfo -> RdrName -> RnM (Maybe GlobalRdrElt)

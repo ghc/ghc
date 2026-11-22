@@ -3881,7 +3881,9 @@ pprRetainedQuantificationError reason = case reason of
     vcat [ text "A retained argument must have unrestricted multiplicity Many."
          , text "This argument has multiplicity:" <+> ppr mult ]
   RetainedFunctionArgument ->
-    text "A function-valued retained argument must be an already-bound unrestricted local function variable of its declared domain."
+    vcat [ text "GHC cannot use this function-valued retained argument."
+         , text "Pass an unrestricted local function or a named unary function"
+           <+> text "with checked source equations at the required type." ]
   RetainedCallIndex ->
     text "An opaque call index requires a local unrestricted function applied to value arguments of its declared domains."
   RetainedSelectorReceiver ->
