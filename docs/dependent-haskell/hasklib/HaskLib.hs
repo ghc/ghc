@@ -1,12 +1,16 @@
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE GADTs, PolyKinds, RankNTypes, TypeOperators #-}
 
 -- | List length laws and their equality witness.
 module HaskLib
     ( module HaskLib.List
     , plusZero, plusSucc, congSucc, congFirst
-    , (:~:) (Refl), trans
+    , (:~:) (Refl), trans, withEquality
     ) where
 
-import Data.Type.Equality ((:~:) (Refl), trans)
+import Data.Type.Equality ((:~:) (Refl), gcastWith, trans)
 import HaskLib.List
 import HaskLib.Size (congFirst, congSucc, plusSucc, plusZero)
+
+-- | Use an equality witness to bring @a ~ b@ into scope for the second argument.
+withEquality :: (a :~: b) -> ((a ~ b) => r) -> r
+withEquality = gcastWith

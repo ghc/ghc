@@ -79,7 +79,7 @@ import Data.List (isInfixOf)
 import qualified Data.List
 import qualified Data.Maybe
 import Data.Proxy (Proxy(..))
-import Data.Type.Equality ((:~:) (Refl), (:~~:) (HRefl), gcastWith)
+import Data.Type.Equality ((:~:) (Refl), (:~~:) (HRefl))
 import qualified FiniteTree
 import qualified FunctionFieldClient
 import qualified FunctionFieldLibrary as FunctionFields
@@ -2115,7 +2115,7 @@ oneCellHead extent =
         count = 1 + extent
     in case sameNat count (S Z) of
          Just proof ->
-             gcastWith proof (Just (safeHead @Char @'Z (replicateNative count 'x')))
+             HaskLib.withEquality proof (Just (safeHead @Char @'Z (replicateNative count 'x')))
          Nothing -> Nothing
 
 -- | Return equality with the empty constructor after inspecting the vector.
