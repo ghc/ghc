@@ -1824,6 +1824,15 @@ stuck when the left spine is abstract. See the
 and [Agda's length proof](https://agda.github.io/agda-stdlib/v2.3/Data.List.Properties.html#length-zipWith).
 
 The same checker reads the ordered cases of the installed `Prelude.zip`.
+The runtime `zip` and `zipWith` length proofs now compile with the
+standard fusion rules at `-O2`. The checker verifies the forward
+and inverse rules, the shared fold and the adapter that fuses a
+producer in the left input. It rejects a reachable rule that changes
+the checked equations. Promotion of `map` under its fusion rules
+remains open for the pipeline.
+[Source proofs](../examples/open-evaluation/PreludeZipRuntime.hs)
+and [definedness conditions](../papers/README.md#short-cut-fusion-and-definedness).
+
 The existing constructor checker verifies the lazy pair in its cons
 equation. An independent induction on the two list spines proves the
 minimum-length law directly for `Prelude.zip`. The Showcase runs `zip`

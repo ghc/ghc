@@ -52,7 +52,6 @@ A dependent client can also name it in its signature.
 
 ```haskell
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
-{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
 module Client where
 
 import HaskLib
@@ -61,6 +60,12 @@ zipLaw :: forall a b. foreach (xs :: [a]) -> foreach (ys :: [b])
        -> size (zip xs ys) :~: minSize (size xs) (size ys)
 zipLaw xs ys = lengthZip xs ys
 ```
+
+This proof and the corresponding `zipWith` proof compile at ordinary
+`-O2`. The compiler checks the installed zipper fusion rules against
+the functions' equations. The proof involving `map` still disables
+rewrite rules in its own module. [Zipper proofs](examples/open-evaluation/PreludeZipRuntime.hs)
+and [map pipeline](examples/open-evaluation/PreludeZipMapRuntime.hs).
 
 The proofs use the ordinary definitions of `size`, `plus` and `minSize`.
 Forcing a proof can traverse the list spines. The empty-left zip case

@@ -7256,6 +7256,17 @@ unrestricted fusion rule outside conversion.
 [Fusion and definedness reading](papers/README.md#short-cut-fusion-and-definedness)
 and [ordinary GHC counterexample](examples/open-evaluation/check-map-fusion.sh).
 
+For `zip` and `zipWith`, the installed left-producer rule supplies
+a function as the accumulator of a two-list fold. Its nil branch
+returns a lambda. Its cons branch still awaits the right list. The
+compiler checks these definedness conditions on the actual helpers
+before accepting the fusion rule. It also checks the inverse rule and
+the ordering of the two list cases. A fold that forces the seed too
+early would change which programs terminate.
+See Note [List interpretation of zipper fusion] in GHC.Tc.Gen.SourceTable.
+[Johann and Voigtländer, Theorem 8.2](https://janis-voigtlaender.eu/JV06.html)
+and [zipper rule and demand checks](../../testsuite/tests/dependent/should_run/NativeOpenPreludeZipWith.sh).
+
 ## Right fold after map
 
 The Agda standard library proves `foldr-map` by induction on the input
