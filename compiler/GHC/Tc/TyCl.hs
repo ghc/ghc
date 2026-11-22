@@ -4421,7 +4421,7 @@ hasCasePattern VI{vi_case_pattern = Just _} = True
 hasCasePattern _ = False
 
 -- | Keep the owner of an elaborated signature case with flat constructor rows.
--- See Note [Equality of retained enumeration cases] in GHC.Builtin.CoercionRules.
+-- See Note [Equality of retained constructor cases] in GHC.Builtin.CoercionRules.
 flatSignatureCaseOwner :: [TyFamEqnValidityInfo] -> Maybe Name
 flatSignatureCaseOwner infos = do
   ((owner, column) : rest) <- traverse flat infos
@@ -4429,8 +4429,8 @@ flatSignatureCaseOwner infos = do
   guard (all (== (owner, column)) rest)
   pure owner
   where
-    flat VI{vi_case_pattern = Just (owner, column, CasePatternConstructor _ _ [], _)} =
-      Just (owner, column)
+    flat VI{vi_case_pattern = Just (owner, column, pat@CasePatternConstructor{}, _)}
+      | not (nestedTypeCasePattern pat) = Just (owner, column)
     flat _ = Nothing
 
 hasOrderedPattern :: TyFamEqnValidityInfo -> Bool

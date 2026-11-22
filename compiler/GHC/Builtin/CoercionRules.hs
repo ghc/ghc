@@ -4,7 +4,7 @@ module GHC.Builtin.CoercionRules
   , boxedPairCompositionRule, matchBoxedPairComposition
   , boxedPairReconstructionRule
   , proveBoxedPairProjection, proveScopedSigmaClosure, proveScopedLambdaClosure
-  , proveScopedEnumCase
+  , proveScopedConstructorCase
   ) where
 
 import GHC.Prelude
@@ -13,8 +13,10 @@ import GHC.Builtin.WiredIn.TypeLits (typeNatCoAxiomRules)
 import GHC.Builtin.WiredIn.Types (promotedTupleDataCon, tupleTyCon)
 import GHC.Core.Coercion (existsCoRule, matchableAppProjectionRule, mkNomReflCo, mkSymCo)
 import GHC.Core.Coercion.Axiom
-import GHC.Core.DataCon (dataConName, dataConTyCon)
-import GHC.Core.TyCo.Rep (Coercion(AxiomCo), Type(TyVarTy))
+import GHC.Core.DataCon
+  ( dataConName, dataConTyCon, dataConUnivTyVars, dataConInstOrigArgTys
+  , dataConSourceArity, dataConRepArgBinders, isVanillaDataCon )
+import GHC.Core.TyCo.Rep (Coercion(AxiomCo), Type(TyVarTy), scaledThing)
 import GHC.Core.TyCo.Compare (eqType, eqTypes, eqScopedSigmaClosures, eqScopedLambdaClosures)
 import GHC.Core.TyCon
 import GHC.Core.Type
@@ -43,14 +45,20 @@ builtInCoAxiomRules =
       , matchableAppProjectionRule CLeft, matchableAppProjectionRule CRight
       , (scopedSigmaClosureName, scopedSigmaClosureRule)
       , (scopedLambdaClosureName, scopedLambdaClosureRule)
-      , (scopedEnumCaseName, scopedEnumCaseRule) ]
+      , (scopedEnumCaseName, scopedEnumCaseRule)
+      , (scopedConstructorCaseName, scopedConstructorCaseRule) ]
 
 scopedSigmaClosureRule, scopedLambdaClosureRule :: CoAxiomRule
 scopedSigmaClosureRule = scopedClosureRule scopedSigmaClosureName eqScopedSigmaClosures
 scopedLambdaClosureRule = scopedClosureRule scopedLambdaClosureName eqScopedLambdaClosures
 
-scopedEnumCaseRule :: CoAxiomRule
-scopedEnumCaseRule = scopedClosureRule scopedEnumCaseName eqScopedEnumCases
+scopedEnumCaseRule, scopedConstructorCaseRule :: CoAxiomRule
+scopedEnumCaseRule = scopedClosureRule scopedEnumCaseName (eqScopedCasesUsing False)
+scopedConstructorCaseRule = scopedClosureRule scopedConstructorCaseName (eqScopedCasesUsing True)
+
+eqScopedCasesUsing :: Bool -> Type -> Type -> Bool
+eqScopedCasesUsing ignored_fields lhs rhs =
+  checkedScopedCases lhs rhs == Just ignored_fields
 
 scopedClosureRule :: FastString -> (Type -> Type -> Bool) -> CoAxiomRule
 scopedClosureRule name equal = BuiltInEqRule name proves
@@ -75,17 +83,18 @@ proveScopedLambdaClosure lhs rhs
   = Just (AxiomCo scopedLambdaClosureRule [mkNomReflCo lhs, mkNomReflCo rhs])
   | otherwise = Nothing
 
--- | Produce nominal evidence for equal retained enumeration cases.
-proveScopedEnumCase :: Type -> Type -> Maybe Coercion
-proveScopedEnumCase lhs rhs
-  | eqScopedEnumCases lhs rhs
-  = Just (AxiomCo scopedEnumCaseRule [mkNomReflCo lhs, mkNomReflCo rhs])
-  | otherwise = Nothing
+-- | Produce nominal evidence for equal retained constructor cases.
+proveScopedConstructorCase :: Type -> Type -> Maybe Coercion
+proveScopedConstructorCase lhs rhs = do
+  ignored_fields <- checkedScopedCases lhs rhs
+  let rule | ignored_fields = scopedConstructorCaseRule
+           | otherwise = scopedEnumCaseRule
+  pure (AxiomCo rule [mkNomReflCo lhs, mkNomReflCo rhs])
 
--- | Check a nominal equality of two complete retained enumeration cases.
--- See Note [Equality of retained enumeration cases].
-eqScopedEnumCases :: Type -> Type -> Bool
-eqScopedEnumCases lhs rhs
+-- | Check complete constructor cases. Return whether the proof uses ignored fields.
+-- See Note [Equality of retained constructor cases].
+checkedScopedCases :: Type -> Type -> Maybe Bool
+checkedScopedCases lhs rhs
   | Just (tc1, as1) <- splitTyConApp_maybe lhs
   , Just (tc2, as2) <- splitTyConApp_maybe rhs
   , tc1 /= tc2
@@ -93,10 +102,11 @@ eqScopedEnumCases lhs rhs
   , as1 `lengthIs` tyConArity tc1, as2 `lengthIs` tyConArity tc2
   , tyConKind tc1 `eqType` tyConKind tc2
   , as1 `eqTypes` as2
-  , Just rows1 <- checked_rows tc1
-  , Just rows2 <- checked_rows tc2
-  = rows1 == rows2
-  | otherwise = False
+  , Just (fields1, rows1) <- checked_rows tc1
+  , Just (fields2, rows2) <- checked_rows tc2
+  , fields1 == fields2, rows1 == rows2
+  = Just fields1
+  | otherwise = Nothing
   where
     is_signature_case tc
       | Just (owner, False) <- closedFamilyScope_maybe tc
@@ -113,41 +123,64 @@ eqScopedEnumCases lhs rhs
       let kinds = map (tyVarKind . binderVar) (tyConBinders tc)
       guard (all (isEmptyVarSet . tyCoVarsOfType) kinds)
       (captures, scrutinee_kind) <- snocView kinds
-      (enum, []) <- splitTyConAppNoView_maybe scrutinee_kind
-      guard (isEnumerationTyCon enum)
-      constructors <- tyConDataCons_maybe enum
+      (parent, parent_args) <- splitTyConAppNoView_maybe scrutinee_kind
+      let enumeration = null parent_args && isEnumerationTyCon parent
+      guard (enumeration || (isVanillaAlgTyCon parent && isBoxedDataTyCon parent
+                             && not (isGadtSyntaxTyCon parent)
+                             && null (tyConStupidTheta parent)
+                             && isLiftedTypeKind (typeKind scrutinee_kind)))
+      guard (parent_args `lengthIs` tyConArity parent)
+      constructors <- tyConDataCons_maybe parent
       ax <- closedFamilyTyConCoAxiom_maybe tc
       guard (coAxiomTyCon ax == tc && coAxiomRole ax == Nominal)
       guard (null (co_ax_source_proof_rules ax))
       let branches = fromBranches (coAxiomBranches ax)
       guard (equalLength branches constructors)
-      rows <- traverse (checked_row enum captures) branches
+      let fields_of = checked_fields enumeration parent_args scrutinee_kind
+      rows <- traverse (checked_row parent captures fields_of) branches
       let sorted_rows = sortBy (compare_names (dataConName . fst)) rows
       guard (map fst sorted_rows == sortBy (compare_names dataConName) constructors)
-      pure sorted_rows
+      -- Keep the old wire format for cases which the old checker accepts.
+      guard (enumeration || any ((> 0) . dataConSourceArity) constructors)
+      pure (not enumeration, sorted_rows)
 
-    checked_row enum captures branch = do
+    checked_row parent captures fields_of branch = do
       guard (null (cab_cvs branch) && null (cab_eta_tvs branch))
       guard (equalLength (cab_roles branch) (cab_tvs branch) && all (== Nominal) (cab_roles branch))
       (parameters, pattern_ty) <- snocView (cab_lhs branch)
       vars <- traverse plain_var parameters
-      guard (equalLength vars (cab_tvs branch) && equalLength vars captures)
-      let bound = mkVarSet (cab_tvs branch)
-      guard (sizeVarSet bound == length vars && all (`elemVarSet` bound) vars)
-      guard (sizeVarSet (mkVarSet vars) == length vars)
       guard (map tyVarKind vars `eqTypes` captures)
-      (pattern_tc, []) <- splitTyConAppNoView_maybe pattern_ty
+      (pattern_tc, arguments) <- splitTyConAppNoView_maybe pattern_ty
       con <- isPromotedDataCon_maybe pattern_tc
-      guard (dataConTyCon con == enum)
+      guard (dataConTyCon con == parent)
+      fields <- fields_of con pattern_tc arguments pattern_ty
+      let all_vars = vars ++ fields
+          bound = mkVarSet (cab_tvs branch)
+      guard (all_vars `equalLength` cab_tvs branch)
+      guard (sizeVarSet bound == length all_vars && all (`elemVarSet` bound) all_vars)
+      guard (sizeVarSet (mkVarSet all_vars) == length all_vars)
       (result, []) <- splitTyConAppNoView_maybe (cab_rhs branch)
       guard (isAlgTyCon result && isLiftedTypeKind (tyConKind result))
       pure (con, result)
+
+    checked_fields True _ _ _ _ [] _ = Just []
+    checked_fields True _ _ _ _ _ _ = Nothing
+    checked_fields False parent_args scrutinee_kind con pattern_tc arguments pattern_ty = do
+      guard (isVanillaDataCon con && null (dataConRepArgBinders con))
+      guard (dataConUnivTyVars con `equalLength` parent_args)
+      guard (arguments `lengthIs` tyConArity pattern_tc)
+      let (parameters, fields) = splitAt (length parent_args) arguments
+      guard (parameters `eqTypes` parent_args && typeKind pattern_ty `eqType` scrutinee_kind)
+      vars <- traverse plain_var fields
+      let field_kinds = map scaledThing (dataConInstOrigArgTys con parent_args)
+      guard (map tyVarKind vars `eqTypes` field_kinds)
+      pure vars
 
     plain_var (TyVarTy var) = Just var
     plain_var _ = Nothing
     compare_names get_name a b = stableNameCmp (get_name a) (get_name b)
 
-{- Note [Equality of retained enumeration cases]
+{- Note [Equality of retained constructor cases]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The checker records the signature-case owner from the renamed source
 rows. Each family retains its ordinary reduction axioms. The additional
@@ -155,11 +188,18 @@ nominal rule can compare two such families with the same scrutinee when
 ordinary rewriting leaves their applications stuck.
 
 Read the immutable axioms on demand. Require one exhaustive split over
-the same unindexed enumeration. Each row has only unrelated capture
-variables and one exact constructor pattern. Check that each result is
-a bare algebraic type constructor. Distinct exact constructors
+the same unindexed datatype. Each row has unrelated capture variables
+and one exact constructor pattern. Its fields may each bind a distinct
+variable. Require a regular boxed datatype and ordinary constructors
+when a row binds a field. Check that the constructor parameters match the
+scrutinee kind and that each field variable has the instantiated field
+kind. Require a bare algebraic type constructor as the result, so the
+result cannot depend on a bound field. Distinct exact constructors
 establish disjointness. Do not force the pairwise overlap caches.
-Compare all results by constructor identity.
+Compare all results by constructor identity. Keep ScopedEnumCase for
+proofs the original nullary checker accepts. Use ScopedConstructorCase
+for ignored fields so an older reader rejects the proof at its interface
+version.
 
 Recheck this shape when reading the coercion. A substitution can make
 the scrutinee known to both families. The same row then reduces on both
