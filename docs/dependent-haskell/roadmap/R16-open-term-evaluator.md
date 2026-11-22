@@ -1799,6 +1799,22 @@ pragmas are available. The proof disables rewrite rules for the list worker.
 [class promotion roadmap](https://ghc.serokell.io/dh#promote-classes), and
 [GHC's lexical scoping principle](https://github.com/ghc-proposals/ghc-proposals/blob/master/principles.rst#221lexical-scoping-principle-lsp).
 
+### Prove an equation for `Prelude.zipWith`
+
+When both lists start with a cons, the result starts with the callback
+applied to those heads. The callback and both tails can stay abstract.
+The installed function checks the left list first. A left nil returns nil
+immediately. A right nil returns nil after the left cons is known. An
+abstract left spine and a right nil leave the reduction stuck.
+
+The compiler checks these three paths before optimization and checks
+the same equations against final Core. The ordinary client uses a
+separately compiled alias and disables rules because the installed
+function has a fusion rule. The Showcase applies the proof and reads
+the first result with undefined tails. See the [alias](../examples/open-evaluation/PreludeZipWithSource.hs),
+[ordinary proof](../examples/open-evaluation/PreludeZipWithProof.hs), and
+[Agda list equations](https://agda.github.io/agda-stdlib/v2.3/Data.List.Base.html#zipWith).
+
 ### Fold a mapped list
 
 Induction on a finite list spine proves that `foldr k z (map f xs)` equals

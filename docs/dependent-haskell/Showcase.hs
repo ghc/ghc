@@ -157,6 +157,7 @@ import qualified Row
 import qualified RowProof
 import qualified OrdinaryFamilyBranches
 import qualified PreludeFoldrProof
+import qualified PreludeZipWithProof
 import qualified PreludeFilterLengthProof
 import qualified PreludeFilterProof
 import qualified IndexedPrefix
@@ -1895,6 +1896,8 @@ main = do
                              (error "forced second argument"))
     observe "use a checked cons rule without forcing the callback, head or tail"
         (ConsRuleMapProof.negateHead (Proxy @'[]), ConsRuleMapProof.lazySpine)
+    observe "use the Prelude.zipWith cons equation with both tails unevaluated"
+        PreludeZipWithProof.firstPair
     observe "compose two checked traversals without forcing the inner callback"
         (ConsRuleMapProof.twiceHead (Proxy @'[]), ConsRuleMapProof.composedHead (undefined : undefined))
     observe "collect row heads with an ordinary polymorphic callback"

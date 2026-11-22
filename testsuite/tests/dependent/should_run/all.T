@@ -149,6 +149,10 @@ test('NativeOpenZipRows',
       extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/' + f
                    for f in ['PackedVecLibrary.hs', 'ZipLengthSource.hs', 'ZipRows.hs', 'OrdinaryZipRows.hs']])],
      run_command, ['bash NativeOpenZipRows.sh "{compiler}" "{libdir}"'])
+test('NativeOpenPreludeZipWith',
+     [only_ways(['normal']),
+      extra_files([open_eval_dir + f for f in ['PreludeZipWithSource.hs', 'PreludeZipWithProof.hs']])],
+     run_command, ['bash NativeOpenPreludeZipWith.sh "{compiler}" "{libdir}"'])
 test('NativeOpenListFoldr',
      [only_ways(['normal']),
       extra_files([open_eval_dir + f for f in ['ListFoldrSource.hs', 'ListFoldrProof.hs', 'PreludeFoldrProof.hs',

@@ -533,6 +533,7 @@ witness a runtime comparator at both of its arguments: [GT,LT,EQ]
 apply the comparison selected by a type family: [GT,LT]
 keep a comparison proof without forcing the converted callback: Refl
 use a checked cons rule without forcing the callback, head or tail: (Refl,True)
+use the Prelude.zipWith cons equation with both tails unevaluated: [(True,False)]
 compose two checked traversals without forcing the inner callback: (Refl,True)
 collect row heads with an ordinary polymorphic callback: Refl
 regroup both partitions at the original length: (4,[3,4,1,2])
