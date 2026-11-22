@@ -344,15 +344,17 @@ runCastCallbackInputChecks :: DynFlags -> FilePath -> IO ()
 runCastCallbackInputChecks dflags libdir = do
     let ordering = mkTyConTy orderingTyCon
         step = mkVisFunTyManyU boolTy ordering
-        flag = mkTyVar (mkSystemName (unique 11620) (mkTyVarOcc "flag")) boolTy
-        binders = [mkAnonTyConBinder flag]
-        family = mkFamilyTyCon (mkSystemName (unique 11621) (mkTcOcc "CallbackInput"))
-            (mkTyConKindWithMatchability unmatchableDataConTy binders liftedTypeKind)
-            binders 1 liftedTypeKind Nothing (ClosedTypeFamilyTyCon (CTF (Just axiom))) Nothing NotInjective
-        axiom = mkBranchedCoAxiom Nominal (mkSystemName (unique 11622) (mkTcOcc "CallbackInputAx")) family
-            [mkCoAxBranch [] [] [] [constructorIndex trueDataCon] boolTy [] noSrcSpan]
-        input = mkTyConApp family [constructorIndex trueDataCon]
-        inputCo = mkAxInstCo Nominal (BranchedAxiom axiom 0) [] []
+        equation key label rhs = (mkTyConApp family [true], mkAxInstCo Nominal (BranchedAxiom axiom 0) [] [])
+          where
+            true = constructorIndex trueDataCon
+            flag = mkTyVar (mkSystemName (unique key) (mkTyVarOcc "flag")) boolTy
+            binders = [mkAnonTyConBinder flag]
+            family = mkFamilyTyCon (mkSystemName (unique (key + 1)) (mkTcOcc label))
+                (mkTyConKindWithMatchability unmatchableDataConTy binders liftedTypeKind)
+                binders 1 liftedTypeKind Nothing (ClosedTypeFamilyTyCon (CTF (Just axiom))) Nothing NotInjective
+            axiom = mkBranchedCoAxiom Nominal (mkSystemName (unique (key + 2)) (mkTcOcc (label ++ "Ax"))) family
+                [mkCoAxBranch [] [] [] [true] rhs [] noSrcSpan]
+        (input, inputCo) = equation 11620 "CallbackInput" boolTy
         actual = local 11623 "actual" (mkVisFunTyManyU boolTy step)
         formal = local 11624 "formal" (mkVisFunTyManyU input step)
         x = local 11625 "x" input
@@ -404,6 +406,37 @@ runCastCallbackInputChecks dflags libdir = do
         checkType dflags "cast input congruence right endpoint" (expected y q) (coercionRKind co)
         check "cast input congruence keeps the callback and both operand proofs" $
             all (`elemVarSet` tyCoVarsOfCo co) [actual, xy, pq]
+
+    let (result, resultCo) = equation 11640 "MixedCallbackResult" step
+        mixed = local 11643 "mixed" (mkVisFunTyManyU input result)
+        Reduction mixedReduction _ = normaliseType emptyFamInstEnvs Nominal (varType mixed)
+        mixedOperand = Cast (Var actual) (mkSubCo (mkSymCo mixedReduction))
+        mixSubst = indexSubst scope mixed mixedOperand
+        openCall a = TermAppTy mixed (TermVarTy a)
+        expose a = mkGReflRightCo Nominal (openCall a) resultCo
+        congruence a b first second = Subst.substCo mixSubst $
+            mkAppCo (mkTransCo (mkSymCo (expose a)) (mkTransCo (mkTermAppCo mixed first) (expose b))) second
+        mixedProof = congruence x y (mkCoVarCo xy) (mkCoVarCo pq)
+        mixedOptimized = optCoercion (OptCoercionOpts True Nothing) Subst.emptySubst mixedProof
+        requireMixed = Lam (proof 11644 (expected x p) (expected y q)) answer
+    forM_ [mixedProof, mixedOptimized] $ \co -> do
+        lintAccepts dflags "mixed callback congruence proves the selected call endpoints" scope $
+            App requireMixed (Coercion co)
+        check "mixed callback congruence retains the independent operand proofs" $
+            all (`elemVarSet` tyCoVarsOfCo co) [actual, xy, pq]
+    forM_ [congruence x x (mkNomReflCo (TermVarTy x)) (mkCoVarCo pq),
+           congruence x y (mkCoVarCo xy) (mkNomReflCo (TermVarTy p))] $ \wrong -> do
+        lintAccepts dflags "proof for a different mixed callback result is itself valid" scope (Coercion wrong)
+        lintRejects dflags "mixed callback proof must name both selected operands" scope $
+            App requireMixed (Coercion wrong)
+    let callResult = mkAppTy (mkCastTy (openCall x) resultCo) (TermVarTy p)
+        keep = mkLams [mixed, proof 11645 callResult callResult] answer
+        ignored = simpleOptNativeExpr (App keep mixedOperand)
+    lintAccepts dflags "unused mixed callback remains in erased annotations" scope ignored
+    case ignored of
+        Lam cv (Var value) -> check "mixed cast preserves callback laziness" $
+            isCoVar cv && value == dataConWorkId trueDataCon
+        _ -> fail "FAIL: simplifying an unused mixed callback kept its runtime operand"
 
     (env, identity) <- runGhc (Just libdir) $ do
         flags <- getSessionDynFlags
