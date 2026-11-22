@@ -92,6 +92,9 @@ before binding the term variable, so it stays quiet. In a match that
 introduces an explicit type and term binder with the same spelling,
 both names compete in its right-hand side.
 [Lexical regression](../../../testsuite/tests/rename/should_compile/LocalScopedPunUses.hs).
+A GADT constructor starts a fresh lexical scope. A constructor-local
+`forall` can affect the name used by a splice in its signature.
+[Constructor scope regression](../../../testsuite/tests/rename/should_compile/GadtPunScope.hs).
 
 An unmarked parent in `T(..)` or `T(X)` still depends on the choice of
 namespace. An explicit `type T(..)` selects the type namespace. Child

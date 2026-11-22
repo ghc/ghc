@@ -4177,8 +4177,14 @@ rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = cond
         -- in the GADT case, where the type variables in the declaration
         -- do not scope over the constructor signatures
         -- data T a where { T1 :: forall b. b-> b }
-        ; let { zap_lcl_env | h98_style = \ thing -> thing
-                            | otherwise = setLocalRdrEnv emptyLocalRdrEnv }
+        ; let zap_lcl_env thing
+                | h98_style = thing
+                | otherwise = do
+                    -- Start tracking again for the constructors' own binders.
+                    warn_puns <- woptM Opt_WarnPunUses
+                    let rdr_env | warn_puns = trackPunScopes emptyLocalRdrEnv
+                                | otherwise = emptyLocalRdrEnv
+                    setLocalRdrEnv rdr_env thing
         ; (condecls', con_fvs) <- zap_lcl_env $ rnConDecls condecls
            -- No need to check for duplicate constructor decls
            -- since that is done by GHC.Rename.Names.extendGlobalRdrEnvRn
