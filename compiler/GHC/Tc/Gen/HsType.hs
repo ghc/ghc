@@ -797,9 +797,32 @@ tcRetainedBinderDomain :: (Type -> Bool) -> TcTyMode -> LHsType GhcRn -> TcM TcT
 tcRetainedBinderDomain valid_domain mode domain
   = do { domain_ty <- tc_check_lhs_type mode domain liftedTypeKind
        ; domain_ty <- liftZonkM $ zonkTcType domain_ty
+       ; domain_ty <- infer_callback_domain domain_ty
        ; unless (valid_domain domain_ty) $
            failWithTc $ TcRnRetainedQuantificationError (RetainedUnsupportedDomain domain_ty)
        ; return domain_ty }
+  where
+    -- See Note [Inferring the input kind of a retained callback].
+    infer_callback_domain ty
+      | FunTy { ft_arg = arg } <- coreFullView ty
+      , Just rep <- getRuntimeRep_maybe arg
+      , isMetaTyVarTy rep
+      , not (valid_domain ty)
+      = do { discardResult $ unifyKind (Just (HsTypeRnThing (unLoc domain)))
+                                       (typeKind arg) liftedTypeKind
+           ; liftZonkM $ zonkTcType ty }
+      | otherwise = return ty
+
+{- Note [Inferring the input kind of a retained callback]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In forall a. foreach (p :: a -> Bool) -> ..., the ordinary arrow checker
+infers a :: TYPE r, where r is a fresh representation variable.
+The source checker needs the callback's domain before it can check a
+result such as Decision (p x). Signature generalisation has not yet
+defaulted r. Use the callback's required lifted input kind to solve r,
+then check the complete domain. An explicit representation variable
+is rigid and keeps its declared kind.
+-}
 
 {- Note [Source retained signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
