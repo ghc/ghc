@@ -1458,9 +1458,9 @@ tcIfaceDataCons tycon_name tycon if_cons
         valid_result
           | wrapper
           , not (null spec)
-          = pairs `equalLength` spec && pairs `equalLength` names
+          = pairs `equalLength` spec
             && length result_names == length (nub result_names)
-            && length result_fields == length (nub result_fields)
+            && length names == length (nub result_fields)
             && all (`elem` univ_names) result_names
             && all (`elem` names) result_fields
             && matching_users (filter (`notElem` result_names) univ_names)

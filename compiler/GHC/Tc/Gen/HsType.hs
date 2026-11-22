@@ -771,10 +771,9 @@ tcCheckRetainedConType validate_domain allow_result tc_field_mult
       | Just (_, args) <- tcSplitTyConApp_maybe ty
       , Just fields <- traverse result_field (filter (isNothing . getTyVar_maybe) args)
       , let binders = nonDetNameEnvElts (mode_indices mode)
-            binder_set = mkVarSet binders
-      = fields `equalLength` binders
-        && sizeVarSet (mkVarSet fields) == length fields
-        && all (`elemVarSet` binder_set) fields
+            field_set = mkVarSet fields
+      = sizeVarSet field_set == length binders
+        && field_set `subVarSet` mkVarSet binders
       | otherwise = False
 
     result_field (TermVarTy field)

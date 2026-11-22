@@ -119,7 +119,7 @@ data RepeatedMatrix a (rows :: Nat) (columns :: Nat) where
                    -> Vec (Vec a columns) rows -> RepeatedMatrix a rows rows
 HS
     if "${ghc[@]}" "${flags[@]}" -ferror-spans -c RepeatedMatrix.hs >reject.log 2>&1; then
-        echo "Accepted a retained dimension twice in a constructor result" >&2
+        echo "Accepted a constructor result that omits a retained dimension" >&2
         exit 1
     fi
     grep -Fq 'RepeatedMatrix.hs:6:51-76: error: [GHC-83605]' reject.log ||
@@ -150,6 +150,9 @@ knownMatrix (MatrixByColumns (S _) Z _) = True
 
 knownMarked :: MarkedRows a ('S rows) 'True -> a
 knownMarked (MarkedRows True (S _) (VCons x _)) = x
+
+knownSquare :: SquareMatrix a 'Z 'Z -> Bool
+knownSquare (Square Z _) = True
 HS
         "${ghc[@]}" "${flags[@]}" -ferror-spans -Wincomplete-patterns -Woverlapping-patterns \
             -c DirectIndexCoverage.hs >coverage.log 2>&1

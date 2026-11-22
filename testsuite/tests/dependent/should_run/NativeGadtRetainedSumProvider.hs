@@ -121,6 +121,10 @@ data Matrix a (rows :: Nat) (columns :: Nat) where
     MatrixByColumns :: foreach (columns :: Nat) (rows :: Nat)
                     -> Vec (Vec a columns) rows -> Matrix a rows columns
 
+-- | Store one dimension for both axes of a square matrix.
+data SquareMatrix a (rows :: Nat) (columns :: Nat) where
+    Square :: foreach (side :: Nat) -> Vec (Vec a side) side -> SquareMatrix a side side
+
 -- | Store a flag and a row length in the opposite order from the result.
 data MarkedRows a (rows :: Nat) (marked :: Bool) where
     MarkedRows :: foreach (marked :: Bool) (rows :: Nat)

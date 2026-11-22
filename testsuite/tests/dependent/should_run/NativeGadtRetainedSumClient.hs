@@ -52,6 +52,10 @@ matrixCells :: Matrix a rows columns -> Vec (Vec a columns) rows
 matrixCells (Matrix _ _ xs) = xs
 matrixCells (MatrixByColumns _ _ xs) = xs
 
+-- | Use both result equalities to prove the dimensions agree.
+squareDimensions :: SquareMatrix a rows columns -> rows :~: columns
+squareDimensions (Square _ _) = Refl
+
 -- | Return the vector from a marked row.
 markedCells :: MarkedRows a rows 'True -> Vec a rows
 markedCells (MarkedRows True _ xs) = xs
@@ -131,6 +135,8 @@ main = do
     throws "matrix payload" (cells (matrixCells badRow))
     require (cells (markedCells (MarkedRows True (S Z) one)) == [True])
         "different retained kinds follow the result parameter order"
+    case squareDimensions (Square unused (error "square payload")) of
+        Refl -> pure ()
     require (storedLengths value == (1, 2)) "stored lengths"
     require (innerCells value == [False, True]) "inner cells"
     require (paired value == aligned) "shared outer index"

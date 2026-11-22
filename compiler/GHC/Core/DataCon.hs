@@ -2073,14 +2073,13 @@ dataConHasRetainedResult :: DataCon -> Bool
 dataConHasRetainedResult con
   = not (null (dcOrigArgBinders con)) && not (null (dcEqSpec con))
 
--- | Check that the result equalities pair distinct universals with all retained fields.
+-- | Check that the result uses all retained fields and each refined universal once.
 -- See Note [Retained constructor result equality].
 validRetainedResultEqSpec :: [TyVar] -> [Id] -> [EqSpec] -> Bool
 validRetainedResultEqSpec univs fields eq_spec
-  = eq_spec `equalLength` fields
-    && pairs `equalLength` eq_spec
+  = pairs `equalLength` eq_spec
     && sizeVarSet (mkVarSet (map fst pairs)) == length pairs
-    && sizeVarSet (mkVarSet (map snd pairs)) == length pairs
+    && sizeVarSet (mkVarSet (map snd pairs)) == length fields
     && all valid_pair pairs
   where
     pairs = [(tv, field) | EqSpec tv (TermVarTy field) <- eq_spec]
@@ -2113,8 +2112,8 @@ would be out of scope there. Keep the same order when copying alternative
 binders in GHC.Core.Utils and when checking them in GHC.Core.Lint. An
 interface decodes the proof's type in the scope of the decoded field.
 
-Each retained field has a closed structural index type and occurs once
-as a direct result argument. The other arguments are unchanged universal
+Each retained field has a closed structural index type and occurs as a
+direct result argument. The other arguments are unchanged universal
 variables. There are no contexts or existentials. The wrapper binds the
 unchanged variables. An ordinary field type can refer to earlier retained
 fields. Its multiplicity must be independent of the retained fields.
@@ -2122,7 +2121,9 @@ fields. Its multiplicity must be independent of the retained fields.
 The EqSpecs follow the result argument order. The fields follow the
 constructor telescope. For example, the telescope can bind columns before
 rows and return Matrix a rows columns. Validate the association by field Id.
-All result equalities enter scope together after the fields.
+A square can use one field for two different result parameters. Its
+worker still binds that field once. Each EqSpec has a distinct universal
+on the left. All result equalities enter scope together after the fields.
 -}
 
 -- | Rebuild a constructor field telescope without erasing runtime binders.

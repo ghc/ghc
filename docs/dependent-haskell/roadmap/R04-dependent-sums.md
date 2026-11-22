@@ -203,8 +203,9 @@ Lifting stops at shadowing on the constructor's own argument spine.
 
 The constructor result has the enclosing telescope scope. A witness
 bound inside a field cannot escape into that result. A constructor can
-use each retained field directly as a distinct result index. The other
-result arguments must be distinct, unchanged erased parameters. A
+use each retained field directly as a result index. More than one result
+parameter can use the same field. The other result arguments must be
+distinct, unchanged erased parameters. A
 retained field is lazy and has a supported closed structural domain such
 as `[Bool]`, `Ordering`, or `Nat`. A variable or wildcard leaves the
 field unevaluated. The constructor pattern introduces the nominal index
@@ -228,8 +229,8 @@ An ordinary field can refer to the retained field that determines the
 result index. `SomeVec` stores a vector at that length and leaves its
 element type polymorphic. An ordinary client opens a runtime vector
 package and reads the first element at two element types. Both vector
-tails stay unevaluated. GHC reports compound indices, repeated or omitted
-retained fields, and specialized erased arguments at the written result
+tails stay unevaluated. GHC reports compound indices, omitted retained
+fields, and specialized erased arguments at the written result
 type.
 [Direct constructor](../examples/packed-vector/DirectIndexedVector.hs),
 [ordinary client](../examples/packed-vector/DirectIndexedVectorClient.hs),
@@ -277,6 +278,20 @@ evaluating the other length or the cells. At zero rows and a successor
 column count, the matching patterns are exhaustive.
 [Source-hidden check](../../../testsuite/tests/dependent/should_run/NativeGadtRetainedSum.sh)
 and [Agda indexed datatypes](../REFERENCES.md#store-two-direct-result-indices).
+
+A square stores one side length. Both result parameters use this length.
+
+```haskell
+data SquareMatrix a (rows :: Nat) (columns :: Nat) where
+    Square :: foreach (side :: Nat)
+           -> Vec (Vec a side) side -> SquareMatrix a side side
+```
+
+An ordinary client can return `rows :~: columns` from `Square _ _`.
+The match needs the outer constructor. It leaves the side length and
+the cells unevaluated. At type `SquareMatrix a 'Z ('S 'Z)`, a case with
+no alternatives still warns about a missing `Square` pattern.
+[Source-hidden check](../../../testsuite/tests/dependent/should_run/NativeGadtRetainedSum.sh).
 
 An explicit equality can also describe the exact stored value.
 For example, the constructor
