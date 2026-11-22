@@ -1,8 +1,10 @@
 {-# LANGUAGE GADTs, RequiredTypeArguments, TypeFamilies, UnliftedDatatypes #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 module GadtRefinedOrderedProvider where
 
+import Data.Kind (Type)
 import Data.Proxy
-import GHC.Exts (UnliftedType)
+import GHC.Exts (Levity, RuntimeRep(..), TYPE, UnliftedType)
 
 data Refined x y where
   Same :: forall a. Eq a => !a -> forall b -> Proxy b -> Refined a a
@@ -27,3 +29,7 @@ data Box x y :: UnliftedType where
 data family UnliftedFamily tag b :: UnliftedType
 data instance UnliftedFamily Int b where
   End :: Bool -> forall b -> UnliftedFamily Int b
+
+type LevityBox :: forall (l :: Levity). Type -> Type -> TYPE (BoxedRep l)
+data LevityBox a b where
+  LevityBox :: forall (l :: Levity) a. a -> forall b -> LevityBox @l a b
