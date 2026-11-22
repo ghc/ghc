@@ -6,22 +6,18 @@ module PreludeZipWithLengthProof (Minimum, lengthZipWith, shorterLeft, shorterRi
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
 import PreludeMapLengthProof (Count, Spine(..))
+import PreludeMapLengthSource (Minimum)
 import PreludeMapLengthSize (Size(..))
 import PreludeZipWithSource (PairHeads, Zipped)
 
 {- Note [Minimum length for ordinary zippers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Both length proofs share Minimum and Spine. Each proof uses the checked
-equations of its own installed zipper. An empty left list returns an
+An ordinary client uses Spine for induction and Minimum as a synonym for
+the term function minSize. PreludeZipRuntime matches the input lists
+directly. Each proof uses the checked equations of its own installed zipper. An empty left list returns an
 empty result for any right list. An empty right list needs a left cons
 because both zippers inspect the left list first.
 -}
-
--- | Compare two sizes, starting with the left size.
-type family Minimum (left :: Size) (right :: Size) :: Size where
-    Minimum 'Zero _ = 'Zero
-    Minimum ('Succ _) 'Zero = 'Zero
-    Minimum ('Succ left) ('Succ right) = 'Succ (Minimum left right)
 
 -- | The result has the length of the shorter list, for any callback.
 lengthZipWith :: Proxy f -> Spine xs -> Spine ys

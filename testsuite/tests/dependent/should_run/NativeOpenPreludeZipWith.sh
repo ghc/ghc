@@ -13,8 +13,10 @@ for module in PreludeMapLengthSize PreludeMapLengthSource PreludeMapLengthProof 
     "${ghc[@]}" "${strip[@]}" -c "$src/$module.hs" -outputdir .
 done
 for opt in -O0 -O2; do
-    "${ghc[@]}" "$opt" -fforce-recomp -c "$src/NativeOpenZipDemandControls.hs" -outputdir .
+    "${ghc[@]}" "$opt" -fwrite-source-equations -fforce-recomp -c "$src/NativeOpenZipDemandControls.hs" -outputdir .
     "${ghc[@]}" --show-iface NativeOpenZipDemandControls.hi >demand.iface
+    grep -Fq 'FinalCoreSourceTable T:twiceMinimum' demand.iface
+    cp NativeOpenZipDemandControls.hi "$out/demand-$opt.hi"
     if grep -E 'T:(rightFirstPair|strictPair|strictResult)\b' demand.iface; then
         exit 1
     fi
@@ -39,6 +41,11 @@ reject() {
     fi
     grep -Fq "$code" rejected.log || { cat rejected.log >&2; exit 1; }
 }
+for opt in -O0 -O2; do
+    cp "$out/demand-$opt.hi" NativeOpenZipDemandControls.hi
+    reject '[GHC-05617]' "$src/NativeOpenZipWrongMinimum.hs" "$opt"
+    grep -Fq 'Refl' rejected.log
+done
 for mode in UNKNOWN_LEFT DROP_CONS; do
     reject '[GHC-83865]' "$proof" -fno-enable-rewrite-rules "-D$mode"
     reject '[GHC-83865]' "$pair_proof" -fno-enable-rewrite-rules "-D$mode"

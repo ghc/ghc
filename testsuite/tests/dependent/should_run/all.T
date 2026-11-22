@@ -155,7 +155,7 @@ test('NativeOpenPreludeZipWith',
                                                'PreludeZipWithLengthProof.hs', 'PreludeMapLengthSize.hs',
                                                'PreludeMapLengthSource.hs', 'PreludeMapLengthProof.hs',
                                                'PreludeZipSource.hs', 'PreludeZipProof.hs', 'PreludeZipRuntime.hs']]
-                  + ['NativeOpenZipDemandControls.hs'])],
+                  + ['NativeOpenZipDemandControls.hs', 'NativeOpenZipWrongMinimum.hs'])],
      run_command, ['bash NativeOpenPreludeZipWith.sh "{compiler}" "{libdir}"'])
 test('NativeOpenListFoldr',
      [only_ways(['normal']),
