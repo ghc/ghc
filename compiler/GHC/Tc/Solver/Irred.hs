@@ -28,6 +28,7 @@ import GHC.Utils.Panic
 import GHC.Data.Bag
 
 import Control.Applicative ( (<|>) )
+import Data.Maybe ( listToMaybe )
 import Data.Void( Void )
 
 
@@ -84,8 +85,7 @@ try_inert_irreds inerts irred_w@(IrredCt { ir_ev = ev_w, ir_reason = reason })
   | CtWanted (WantedCt { ctev_dest = dest }) <- ev_w
   , EqPred NomEq lhs rhs <- classifyPredType (ctEvPred ev_w)
   , isOpaqueTermIndex lhs || isOpaqueTermIndex rhs
-  , not (typeKind lhs `tcEqType` typeKind rhs)
-  , Just co <- findCastedIndexGiven (inert_irreds inerts) lhs rhs
+  , Just co <- findCastedIndexProof (inert_irreds inerts) lhs rhs
   = do { let holes = foldr (flip addRewriter) emptyCoHoleSet
                           (univCoDepsHoles (mkUnivCoDeps [co]))
        ; setWantedEq dest (CPH co holes)
@@ -102,26 +102,44 @@ isOpaqueTermIndex :: Type -> Bool
 isOpaqueTermIndex (TermVarTy v) = isNativeOpaqueValueId v
 isOpaqueTermIndex _ = False
 
--- | Recover the nominal index equality from a homogeneous Given.
+-- | Recover a nominal index equality from scoped homogeneous Givens.
 -- See Note [Using casted index Givens].
-findCastedIndexGiven :: InertIrreds -> Type -> Type -> Maybe Coercion
-findCastedIndexGiven irreds lhs rhs =
-    foldIrreds (\irred rest -> match irred <|> rest) irreds Nothing
+findCastedIndexProof :: InertIrreds -> Type -> Type -> Maybe Coercion
+findCastedIndexProof irreds lhs rhs = direct <|> chained
   where
-    match irred
+    direct
+      | typeKind lhs `tcEqType` typeKind rhs = Nothing
+      | otherwise = listToMaybe
+          [ co
+          | (left, right, co) <- edges
+          , left `sameEndpoint` lhs
+          , right `sameEndpoint` rhs ]
+
+    chained = listToMaybe
+      [ mkTransCo from_lhs to_rhs
+      | (left, middle, from_lhs) <- edges
+      , left `sameEndpoint` lhs
+      , isOpaqueTermIndex middle
+      , (middle', to_rhs) <- right_edges
+      , middle `sameEndpoint` middle' ]
+
+    right_edges = [ (middle, co) | (middle, right, co) <- edges, right `sameEndpoint` rhs ]
+
+    sameEndpoint left right = left `tcEqType` right && typeKind left `tcEqType` typeKind right
+
+    edges = foldIrreds addEdges irreds []
+
+    addEdges irred rest
       | ev@CtGiven {} <- irredCtEvidence irred
       , EqPred NomEq left right <- classifyPredType (ctEvPred ev)
       = let co = ctEvCoercion ev
-        in orient left right co <|> orient right left (mkSymCo co)
-      | otherwise = Nothing
+        in addEdge left right co (addEdge right left (mkSymCo co) rest)
+      | otherwise = rest
 
-    orient (CastTy ty kind_co) other co
-      | ty `tcEqType` lhs, other `tcEqType` rhs
-      = Just (mkGReflRightCo Nominal ty kind_co `mkTransCo` co)
-    orient other (CastTy ty kind_co) co
-      | other `tcEqType` lhs, ty `tcEqType` rhs
-      = Just (co `mkTransCo` mkSymCo (mkGReflRightCo Nominal ty kind_co))
-    orient _ _ _ = Nothing
+    addEdge (CastTy ty kind_co) other co rest =
+      let uncast_co = mkGReflRightCo Nominal ty kind_co `mkTransCo` co
+      in (ty, other, uncast_co) : (other, ty, mkSymCo uncast_co) : rest
+    addEdge _ _ _ rest = rest
 
 {- Note [Using casted index Givens]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -131,7 +149,13 @@ Reconstructing HRefl can still ask for the original heterogeneous
 index equality. First try the ordinary matching rule. If it fails,
 use the scoped Given with one endpoint cast and compare the endpoints
 before transport, including their kinds. Apply the kind coercion in
-the Wanted proof. No new Given or runtime index assignment is needed.
+the Wanted proof.
+
+A retained package can carry xs :~~: 'VNil and ys :~~: xs. Matching both
+proofs supplies two Givens. The Wanted ys :~~: 'VNil can use their
+composition. Undo the kind cast in each proof, match the shared opaque
+index and its kind, and compose the resulting coercion expressions.
+The two Givens stay homogeneous in their original scopes.
 
 See Note [Opaque runtime index equalities] in GHC.Tc.Solver.Equality.
 -}
