@@ -1,11 +1,11 @@
-{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
 
 module IndexedMatrixClient (observeDimensions, observeTile) where
 
 import Data.IORef (newIORef, readIORef)
 import Data.Type.Equality ((:~:)(Refl))
-import IndexedMatrix (Matrix(Rectangle, Square), Tile(Tile), TileShape(Rectangular))
-import PackedVecLibrary (Nat(S, Z), Vec(VCons, VNil), natToInt, toList)
+import IndexedMatrix (HiddenTile, Matrix(Rectangle, Square), Tile(Tile))
+import PackedVecLibrary (Nat(S, Z), natToInt, replicateNative, toList)
 
 -- | Read the rectangle's rows and prove the square's dimensions equal.
 observeDimensions :: IO (Int, Bool)
@@ -26,12 +26,23 @@ observeDimensions = do
     equalDimensions (Square _ _) = Just Refl
     equalDimensions (Rectangle _ _ _) = Nothing
 
--- | Read the dimensions and the cells of a tile at its public shape.
-observeTile :: ((Int, Int), [[Bool]])
-observeTile = (dimensions, map toList (toList cells))
+-- | Open two runtime tiles and read columns and cells only for nonempty rows.
+observeTile :: IO [((Int, Maybe Int), [[Bool]])]
+observeTile = do
+    rows <- newIORef (S Z) >>= readIORef
+    columns <- newIORef (S (S Z)) >>= readIORef
+    zero <- newIORef Z >>= readIORef
+    unused <- newIORef (error "forced empty tile columns") >>= readIORef
+    pure [readTile (fillTile rows columns True), readTile (emptyTile zero unused)]
   where
-    (dimensions, cells) =
-        readTile (Tile (S Z) (S (S Z)) (VCons (VCons True (VCons False VNil)) VNil))
+    fillTile :: Nat -> Nat -> a -> HiddenTile a
+    fillTile rows columns cell =
+        Tile rows columns (replicateNative rows (replicateNative columns cell))
 
-    readTile :: Tile a ('Rectangular rows columns) -> ((Int, Int), Vec (Vec a columns) rows)
-    readTile (Tile rows columns payload) = ((natToInt rows, natToInt columns), payload)
+    emptyTile :: Nat -> Nat -> HiddenTile Bool
+    emptyTile rows columns = Tile rows columns (error "forced empty tile cells")
+
+    readTile :: Tile a shape -> ((Int, Maybe Int), [[a]])
+    readTile (Tile Z _ _) = ((0, Nothing), [])
+    readTile (Tile rows columns payload) =
+        ((natToInt rows, Just (natToInt columns)), map toList (toList payload))

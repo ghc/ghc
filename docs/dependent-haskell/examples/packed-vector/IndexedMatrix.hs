@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
 
-module IndexedMatrix (Matrix(Rectangle, Square), TileShape(Rectangular), Tile(Tile)) where
+module IndexedMatrix (Matrix(Rectangle, Square), TileShape(Rectangular), Tile(Tile), HiddenTile) where
 
 import PackedVecLibrary (Nat, Vec)
 
@@ -18,3 +18,6 @@ data TileShape = Rectangular Nat Nat
 data Tile a (shape :: TileShape) where
     Tile :: foreach (rows :: Nat) (columns :: Nat)
          -> Vec (Vec a columns) rows -> Tile a ('Rectangular rows columns)
+
+-- | Hide the public shape of a runtime tile.
+type HiddenTile a = exists (shape :: TileShape). Tile a shape

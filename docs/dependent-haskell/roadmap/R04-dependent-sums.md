@@ -328,7 +328,9 @@ An ordinary client can return `Tile rows columns xs` at that package type
 when both dimensions come from runtime inputs. Its expected result fixes
 the element type. The actual tile fixes the hidden shape. An ordinary
 reader can open the package and match `Tile Z _ _` to return an empty
-result with the columns and cells unevaluated.
+result with the columns and cells unevaluated. The Showcase reads the
+dimensions and cells of a 1-by-2 tile and opens a zero-row tile without
+evaluating either missing field.
 [Implicit package inference](R22-existential-quantification.md#an-implicit-package-in-an-application)
 and [Agda dependent pairs](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#the-s-type).
 
