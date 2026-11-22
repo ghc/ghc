@@ -16,6 +16,10 @@ instance Functor (Row Int Bool) where
 
 -- Give the second instance a different result for the same constructor.
 instance Functor (Row Bool Bool) where
+#ifdef FORCE_ROW_ONLY
+  fmap _ row = row `seq` Empty
+#else
   fmap _ Empty = Empty
   fmap _ (Flagged _ _) = Empty
   fmap f (Both e t a) = Both e t (f a)
+#endif

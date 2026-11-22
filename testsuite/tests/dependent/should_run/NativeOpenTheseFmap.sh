@@ -29,6 +29,22 @@ for opt in -O0 -O2; do
     if "${ghc[@]}" "$opt" -fno-code -c "$src/concrete-mapping/UnknownRow.hs" >unknown-row 2>&1; then exit 1; fi
     grep -Fq 'UnknownRow.hs:10:19-22: error:' unknown-row
     grep -Fq 'In the expression: Refl' unknown-row
+    (
+        mkdir -p "$stage"/{uniform,uniform-client}
+        cd "$stage/uniform"
+        "${ghc[@]}" "$opt" -DFORCE_ROW_ONLY -fomit-interface-pragmas -fno-write-if-simplified-core \
+            -c "$src/concrete-mapping/Row.hs" -outputdir .
+        cd "$stage/uniform-client"
+        cp ../uniform/Row.hi .
+        "${ghc[@]}" "$opt" -c "$src/concrete-mapping/UniformRows.hs" -outputdir .
+        if "${ghc[@]}" "$opt" -fno-code -c "$src/concrete-mapping/UnknownRow.hs" >unknown-row 2>&1; then exit 1; fi
+        grep -Fq 'UnknownRow.hs:10:19-22: error:' unknown-row
+        grep -Fq 'In the expression: Refl' unknown-row
+        "${ghc[@]}" "$opt" -c "$src/concrete-mapping/UniformClient.hs" -o Main.o
+        "${ghc[@]}" Main.o ../uniform/Row.o -o uniform
+        ./uniform >actual
+        grep -Fxq True actual
+    )
     cat >OneField.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, ScopedTypeVariables, TypeOperators #-}
 module OneField where
