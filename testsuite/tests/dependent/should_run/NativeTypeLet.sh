@@ -251,7 +251,7 @@ import PairBindings (Rebuild)
 bad :: Proxy dimensions -> Rebuild dimensions :~: dimensions
 bad _ = Refl
 HS
-reject PairEta 8:9 83865 'Refl'
+reject PairEta 8:9 25897 'Refl'
 
 # The infix operator can be a captured type variable.
 cd "$out/provider"
