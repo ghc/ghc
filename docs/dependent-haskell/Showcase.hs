@@ -1819,6 +1819,7 @@ main = do
     DirectIndexedListClient.firstCell >>= observe "read the first cell of a directly indexed list"
     DirectIndexedVectorClient.firstCells >>= observe "read the first cells of polymorphic directly indexed vectors"
     observe "match the stored length of directly indexed vectors" DirectIndexedVectorClient.firstCellsByLength
+    observe "read a payload at the predecessor of its public index" DirectIndexedVectorClient.successorPayload
     IndexedMatrixClient.observeDimensions >>= observe "read a rectangle's rows and compare a square's dimensions"
     observe "adjust a reading while preserving its calibration index"
         (DirectIndexedListClient.readingFields enabled 36)

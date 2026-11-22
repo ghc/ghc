@@ -275,7 +275,9 @@ predecessor (SuccVec _ xs) = xs
 It can return the payload without evaluating the stored predecessor.
 At `SuccVec a ('S 'Z)`, a zero predecessor pattern is exhaustive.
 At an unknown result index it needs a successor predecessor pattern too.
-[Source-hidden check](../../../testsuite/tests/dependent/should_run/NativeGadtRetainedSum.sh)
+[Showcase constructor](../examples/packed-vector/DirectIndexedVector.hs),
+[ordinary client](../examples/packed-vector/DirectIndexedVectorClient.hs),
+[source-hidden check](../../../testsuite/tests/dependent/should_run/NativeGadtRetainedSum.sh)
 and [Agda successor indices](../REFERENCES.md#put-a-stored-witness-under-a-promoted-constructor).
 
 A rectangular matrix stores the row and column lengths independently.

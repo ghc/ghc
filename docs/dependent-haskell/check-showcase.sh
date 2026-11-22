@@ -43,12 +43,14 @@ for module in Main PackedVecLibrary ClosedTableLibrary ErasedPackage ForgetWitne
     test -s "$out/hie/$module.hie"
 done
 
-mkdir "$out/matrix-client"
-cp "$out/native/IndexedMatrix.hi" "$out/native/PackedVecLibrary.hi" "$out/matrix-client/"
-cp "$examples/packed-vector/IndexedMatrixClient.hs" "$out/matrix-client/"
+mkdir "$out/indexed-client"
+cp "$out/native"/{DirectIndexedVector,IndexedMatrix,PackedVecLibrary}.hi "$out/indexed-client/"
+cp "$examples/packed-vector"/{DirectIndexedVectorClient,IndexedMatrixClient}.hs "$out/indexed-client/"
 (
-    cd "$out/matrix-client"
-    "${ghc[@]}" "$native_opt" "${native_interfaces[@]}" -i -i. -dcore-lint -dstg-lint -c IndexedMatrixClient.hs
+    cd "$out/indexed-client"
+    for module in DirectIndexedVectorClient IndexedMatrixClient; do
+        "${ghc[@]}" "$native_opt" "${native_interfaces[@]}" -i -i. -dcore-lint -dstg-lint -c "$module.hs"
+    done
 )
 
 if "$interactive"; then

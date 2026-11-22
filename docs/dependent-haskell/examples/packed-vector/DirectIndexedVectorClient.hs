@@ -1,10 +1,10 @@
-{-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
+{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}
 
-module DirectIndexedVectorClient (firstCells, firstCellsByLength) where
+module DirectIndexedVectorClient (firstCells, firstCellsByLength, successorPayload) where
 
 import Data.IORef (newIORef, readIORef)
-import DirectIndexedVector (SomeVec(SomeVec))
-import PackedVecLibrary (Nat(Z, S), PackedVec(PackVec), Vec(VCons), packList, toList)
+import DirectIndexedVector (SomeVec(SomeVec), SuccVec(SuccVec))
+import PackedVecLibrary (Nat(Z, S), PackedVec(PackVec), Vec(VCons, VNil), packList, toList)
 
 -- | Read the first cell of two vectors at their original runtime lengths.
 firstCells :: IO ([Bool], [Char])
@@ -32,3 +32,10 @@ firstCellsByLength =
     firstDirect :: SomeVec a n -> Maybe a
     firstDirect (SomeVec Z _) = Nothing
     firstDirect (SomeVec (S _) (VCons x _)) = Just x
+
+-- | Read a payload at the predecessor of its public index.
+successorPayload :: [Bool]
+successorPayload = toList (payload (SuccVec (S Z) (VCons True VNil)))
+  where
+    payload :: SuccVec a ('S n) -> Vec a n
+    payload (SuccVec _ xs) = xs
