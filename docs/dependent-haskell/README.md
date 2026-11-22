@@ -36,6 +36,7 @@ for just the list API.
 | Lemma | Length of the result |
 | --- | --- |
 | `lengthMap f xs` | `size xs` |
+| `lengthReverse xs` | `size xs` |
 | `lengthAppend xs ys` | `plus (size xs) (size ys)` |
 | `lengthZip xs ys` | `minSize (size xs) (size ys)` |
 | `lengthZipWith f xs ys` | `minSize (size xs) (size ys)` |
@@ -64,6 +65,9 @@ The proofs use the ordinary definitions of `size`, `plus` and `minSize`.
 Forcing a proof can traverse the list spines. The empty-left zip case
 leaves the right list unevaluated. The list elements and the `zipWith`
 callback can remain unevaluated throughout.
+The reverse proof checks the accumulator used by this GHC's `reverse`.
+HaskLib imports that worker from `ghc-internal`. Clients can use
+`lengthReverse` with only `base` and `hasklib` in their dependencies.
 [Package](hasklib.cabal), [list API](hasklib/HaskLib/List.hs) and
 [proof methods](REFERENCES.md#parametricity-and-the-list-length-laws).
 

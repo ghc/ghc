@@ -177,6 +177,14 @@ the new public module and matched all 545 lines in stage 2 native
 code and GHCi.
 [Arithmetic lemmas](hasklib/HaskLib/Size.hs) and [consumer proof](hasklib-test/Client.hs).
 
+Job `581` installed the source distribution with `lengthReverse` and
+ran its package test. A separate module used the theorem with only
+`base` and `hasklib` exposed at `-O0` and `-O2`. Forcing the proof
+evaluated the list spine and left the elements unevaluated. Job `595`
+ran the 545-line Showcase with the public theorem on an IO-supplied list
+at both native optimization levels and in stage 2 GHCi.
+[Reverse proof](hasklib/HaskLib/List.hs).
+
 ## An ordinary minimum in the zip length proof
 
 The [single-file example](examples/open-evaluation/ZipMinimum.hs) uses

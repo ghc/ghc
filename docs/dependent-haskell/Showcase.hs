@@ -176,7 +176,6 @@ import qualified PreludeMapCompositionProof
 import qualified PreludeSpanRuntime
 import qualified PreludeTakeWhile
 import qualified PreludeMapLengthProof
-import qualified PreludeReverseLengthProof
 import qualified PreludeMapLengthSize as Size
 import qualified PreludeMapProof
 import qualified ConsRuleMapProof
@@ -1807,8 +1806,9 @@ main = do
               ++ reportInstances (> cutoff) True 5)
     putStrLn ("prove the checked and literal Either family branches: " ++ OrdinaryFamilyBranches.example)
     putStrLn ("prove that folding a mapped list composes the step: " ++ PreludeFoldrProof.showFoldMap)
-    putStrLn ("prove that reverse preserves list length: "
-              ++ PreludeReverseLengthProof.showPreludeReverseLength)
+    reverseInput <- newIORef [error "forced reverse element", False] >>= readIORef
+    observe "prove that reverse preserves list length"
+        (HaskLib.lengthReverse reverseInput, HaskLib.size (reverse reverseInput))
     putStrLn ("prove that map distributes over append: "
               ++ PreludeMapAppendProof.showPreludeMapAppend)
     putStrLn ("prove that two maps compose on a finite list: "

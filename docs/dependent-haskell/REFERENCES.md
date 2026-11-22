@@ -5919,6 +5919,16 @@ one new element.
 [Agda natural-number properties](https://agda.github.io/agda-stdlib/v2.3/Data.Nat.Properties.html),
 [HaskLib.Size](hasklib/HaskLib/Size.hs) and [client](hasklib-test/Client.hs).
 
+The HaskLib reverse proof follows Agda's accumulator-length invariant.
+Moving one element to the accumulator uses right successor. Starting
+the worker with an empty accumulator then uses right identity.
+HaskLib composes these equalities with `Data.Type.Equality.trans`.
+The public theorem mentions the ordinary `reverse` function. Only its
+implementation imports `GHC.Internal.List.reverseOnto`, the worker
+whose equations the fork has checked.
+[Agda list properties](https://agda.github.io/agda-stdlib/v2.4/Data.List.Properties.html#length-reverse)
+and [HaskLib implementation](hasklib/HaskLib/List.hs).
+
 ### The length of zip and demand in a case tree
 
 Agda's `length-zipWith` proves that the length of a zip is the minimum
