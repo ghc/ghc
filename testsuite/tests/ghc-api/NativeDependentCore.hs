@@ -36,7 +36,7 @@ import GHC.Core.TyCo.Tidy (tidyTopType)
 import GHC.Core.TyCon (AlgTyConFlav (VanillaAlgTyCon), FamTyConFlav (..), Injectivity (..), PromDataConInfo (NoPromInfo), NativeDomainShape (NativeInvalidDomain), TyCon, mkAlgTyCon, mkAnonTyConBinder, mkNamedTyConBinder, mkDataTyConRhs, mkFamilyTyCon, mkSynonymTyCon, mkTyConKind, mkTyConKindWithMatchability, setTyConNativeDomainShape, tyConDataCons, tyConNativeDomainShape, tyConSingleDataCon)
 import GHC.Core.Type
 import GHC.Core.Unfold.Make (mkCoreUnfolding)
-import GHC.Core.Unify (BindFlag (..), MaybeApartReason (..), UnifyResultM (..), alwaysBindFam, alwaysBindTv, tcMatchRetainedTyX_BM, tcMatchTy, tcMatchTyKi, tcMatchTyX_BM, tcMatchTys, tcUnifyTysFG)
+import GHC.Core.Unify (BindFlag (..), MaybeApartReason (..), UnifyResultM (..), alwaysBindFam, alwaysBindTv, ruleMatchTyKiX, tcMatchRetainedTyX_BM, tcMatchTy, tcMatchTyKi, tcMatchTyX_BM, tcMatchTys, tcUnifyTysFG)
 import GHC.Core.Utils (applyTypeToArgs, cheapEqExpr, dataConRepFSInstPat, dataConRepInstPat, exprType)
 import GHC.CoreToIface (toIfaceAlt, toIfaceCoercion, toIfaceCoercionX, toIfaceExpr, toIfaceType, toIfaceTypeX)
 import GHC.Data.Bag (bagToList)
@@ -179,6 +179,27 @@ runCurriedCallCoreChecks dflags = do
     forM_ [CLeft, CRight] $ \side ->
         lintRejects dflags "call-result equality cannot be projected" scope
             (Coercion (LRCo side (mkCoVarCo whole)))
+    let slot = mkTyVar (mkSystemName (unique 11507) (mkTyVarOcc "slot")) boolTy
+        allArgs = mkTyVar (mkSystemName (unique 11508) (mkTyVarOcc "index")) order
+        otherCmp = local 11509 "cmp" (varType cmp)
+        otherCall = mkAppTys (TermVarTy otherCmp) [TermVarTy x, TermVarTy y]
+        renaming = mkRnEnv2 (mkInScopeSet (mkVarSet (slot : allArgs : otherCmp : scope)))
+        match vars lhs = ruleMatchTyKiX (mkVarSet vars) renaming emptyVarEnv lhs result
+    check "a rule matches an identical curried application" $ case match [] result of
+        Just{} -> True
+        _ -> False
+    check "a rule can bind the whole comparison result" $
+        case match [allArgs] (mkTyVarTy allArgs) >>= (\env -> lookupVarEnv env allArgs) of
+            Just actual -> actual `eqType` result
+            _ -> False
+    check "a rule cannot recover the second operand from the result" $
+        case match [slot] (mkAppTy partial (mkTyVarTy slot)) of
+            Nothing -> True
+            _ -> False
+    check "a rule cannot identify distinct comparators with the same spelling" $
+        case match [] otherCall of
+            Nothing -> True
+            _ -> False
 
 -- | Follow the types of runtime variables when checking for recursive substitutions.
 runRetainedOccursChecks :: IO ()
