@@ -244,6 +244,10 @@ firstDirect (SomeVec Z _) = Nothing
 firstDirect (SomeVec (S _) (VCons x _)) = Just x
 ```
 
+The Showcase calls this function at zero and at a successor. The zero
+case leaves its payload unevaluated. The successor case reads a cell
+without evaluating its tail.
+
 The outer constructor also relates its public index to the stored
 length. The zero branch can return `n :~: 'Z` without evaluating the
 payload. A later argument of type `Vec b n` can use the same refinement.
