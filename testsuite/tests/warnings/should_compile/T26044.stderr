@@ -1,0 +1,4 @@
+[1 of 2] Compiling T26044a          ( T26044a.hs, T26044a.o )
+[2 of 2] Compiling T26044           ( T26044.hs, T26044.o )
+T26044.hs:8:13: warning: [GHC-68441] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of ‘todo’ (imported from T26044a): Deprecated: ""
