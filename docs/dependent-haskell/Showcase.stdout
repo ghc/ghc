@@ -288,6 +288,7 @@ installed Prelude.length converted to a Nat index: 3
 ordinary identity applied to a type variable: 42
 uppercase character and digit proof from Data.Char: ('X',Refl)
 match the Int# field in a closed type family: Refl
+match zero and the target maximum in a Word# family: (False,'M')
 Prelude.const selects the first type variable: 'x'
 Prelude.sum in a type: 10
 title case after the pattern determines the character: 'A'

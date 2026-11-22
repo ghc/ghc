@@ -55,6 +55,7 @@ import qualified RetainedFamilyTuple
 import qualified ForgetWitness
 import qualified ImplicitVector
 import qualified PartitionChoices
+import qualified PrimitiveWordFieldsClient
 import qualified ErasedStream
 import qualified StreamFold
 import qualified StreamPreview
@@ -1227,6 +1228,7 @@ main = do
     observe "ordinary identity applied to a type variable" (openIdentity @Int)
     observe "uppercase character and digit proof from Data.Char" checkedCharacters
     observe "match the Int# field in a closed type family" machineIntProof
+    observe "match zero and the target maximum in a Word# family" PrimitiveWordFieldsClient.wordFieldResults
     observe "Prelude.const selects the first type variable" (openLeft 'x' (undefined :: Bool))
     observe "Prelude.sum in a type" (TypeNats.natVal (Proxy @(Prelude.sum '[2, 3, 5])))
     observe "title case after the pattern determines the character"
