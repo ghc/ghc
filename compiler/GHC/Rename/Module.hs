@@ -1291,6 +1291,12 @@ polymorphic recursion. Copy the written kind of the scrutinee from its
 binder. A kind annotation on the case also gives the family its result
 kind. See Note [Result kinds of dependent type cases] in GHC.Tc.TyCl.
 
+An ordinary case can use a written result kind, including a kind
+signature on a let RHS. Copy that kind to the family so its equations
+check at the written kind. Use the actual declaration dependencies
+so a result kind with a captured variable can generalize before use.
+The kind must refer only to captures in the family header.
+
 A named scrutinee can also depend on an earlier binder of the synonym.
 Generalize the family before checking the synonym when the captures
 form a telescope. Its initial monomorphic kind would leave the capture
@@ -1331,13 +1337,13 @@ liftTypeCases group =
       | Just patterns <- traverse checkAlt alts
       , Just scrut_kind <- caseScrutineeKind independent captures scrutinee
       = liftCase owner independent captures aliases loc (scrutinee, scrut_kind) Nothing patterns salt
-    liftRhs owner True captures aliases (L loc (HsKindSig ann body kind)) salt
+    liftRhs owner independent captures [] (L loc (HsKindSig ann body kind)) salt
       | L case_loc (XHsType (HsTypeCase _ _ scrutinee alts)) <- ignoreParens body
       , Just patterns <- traverse checkAlt alts
-      , Just scrut_kind <- caseScrutineeKind True captures scrutinee
+      , Just scrut_kind <- caseScrutineeKind independent captures scrutinee
       , Just mentions <- lexicalNames kind
       , all (`elem` [unLoc name | (_, name, _) <- captures]) mentions
-      = let (body', cases, next) = liftCase owner True captures aliases case_loc
+      = let (body', cases, next) = liftCase owner independent captures [] case_loc
                                    (scrutinee, scrut_kind) (Just kind) patterns salt
         in (L loc (HsKindSig ann body' kind), cases, next)
     liftRhs owner independent captures aliases
@@ -1408,7 +1414,8 @@ liftTypeCases group =
                      Prefix (L (l2l loc) (maybe (NoSig noExtField) (KindSig noExtField) result_kind)) Nothing))
           (scrutinee', nested, next) = liftRhs owner independent captures aliases scrutinee (salt + 1)
           result = applyType loc name ([typeName v | (_, _, v) <- captures] ++ [scrutinee'])
-          separate = independent || (null aliases && dependentScrutinee captures scrutinee)
+          separate = independent || (null aliases &&
+                       (isJust result_kind || dependentScrutinee captures scrutinee))
       in (result, (fam, (occ, if separate then Nothing else Just owner_occ)) : nested, next)
 
     dependentScrutinee captures scrutinee
