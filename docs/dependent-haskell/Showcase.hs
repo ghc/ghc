@@ -1779,6 +1779,8 @@ main = do
     cutoff <- newIORef (4 :: Int) >>= readIORef
     putStrLn ("map a runtime predicate and prove the label is preserved: "
               ++ OrdinaryTheseMapping.report (> cutoff) 'w' 5)
+    putStrLn ("map a runtime-sized string and prove the label is preserved: "
+              ++ OrdinaryTheseMapping.report (replicate cutoff) 'w' 'a')
     putStrLn ("prove the checked and literal Either family branches: " ++ OrdinaryFamilyBranches.example)
     putStrLn ("prove that folding a mapped list composes the step: " ++ PreludeFoldrProof.showFoldMap)
     putStrLn ("prove that reverse preserves list length: "

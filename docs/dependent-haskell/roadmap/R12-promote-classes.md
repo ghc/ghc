@@ -63,14 +63,19 @@ reuses the interface.
 
 An ordinary module can declare `data These e a = This e | That a | These e a`
 and derive `Functor`. A dependent client can check a property of the
-derived instance for a predicate and two fields supplied at runtime.
+derived instance for a function and two fields supplied at runtime.
 
 ```haskell
-mapBoth :: forall (a :: Type). foreach (p :: a -> Bool)
+mapBoth :: forall (a :: Type) (b :: Type). foreach (p :: a -> b)
         -> foreach (label :: Char) -> foreach (x :: a)
         -> fmap p ('These label x) :~: 'These label (p x)
 mapBoth _ _ _ = Refl
 ```
+
+The result type `b` can be a list, a function or an IO action. Forcing
+the proof leaves a counter unchanged when the callback returns an action
+that increments it. Running the mapped action increments the counter.
+The open application `p x` represents the result without evaluating it.
 
 The two-field equation comes from the selected mapping worker. If a
 hand-written instance returns `This label` for that branch, the displayed
@@ -83,6 +88,12 @@ under the two-constructor restriction.
 [ordinary client](../examples/open-evaluation/OrdinaryTheseMapping.hs),
 [warm upgrade test](../examples/open-evaluation/check-applied-mapping-upgrade.sh)
 and [Agda and GHC precedents](../REFERENCES.md#mapping-the-second-field-of-these).
+
+If the equation uses `p` to map the field but claims the result is
+`q x`, GHC reports GHC-83865 at `Refl`. The detailed expected type can
+still display the instance worker as `These.$cfmap`. To display a selector
+in that position, the printer needs its identity at the source use. Two
+modules can export different selectors with the same spelling.
 
 ## A method in a retained result type
 
