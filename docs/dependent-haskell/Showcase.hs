@@ -370,6 +370,9 @@ booleans = do
     writeIORef maybeCell (Just bottomB)
     fieldPresent <- renderIndependentField <$> readIORef maybeCell
     observe "compose retained type cases with a field-dependent result" (fieldAbsent, fieldPresent)
+    nested <- mapM (\m -> writeIORef maybeCell m >> readIORef maybeCell)
+                   [Nothing, Just True, Just False]
+    observe "compose nested type cases from separate modules" (map renderNested nested)
   where
     renderIndependent :: Bool -> String
     renderIndependent flag = NativeRetainedTH.renderCase flag (NativeCase.retainedPick flag)
@@ -377,6 +380,9 @@ booleans = do
     renderIndependentMaybe :: Maybe Bool -> String
     renderIndependentMaybe m =
         NativeRetainedTH.renderMaybeCase m (NativeCase.retainedMaybePick m)
+
+    renderNested :: Maybe Bool -> String
+    renderNested m = NativeRetainedTH.renderNestedMaybe m (NativeCase.retainedNestedMaybe m)
 
     renderIndependentField :: Maybe Bool -> String
     renderIndependentField m =
