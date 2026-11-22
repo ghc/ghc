@@ -79,7 +79,7 @@ import Data.List (isInfixOf)
 import qualified Data.List
 import qualified Data.Maybe
 import Data.Proxy (Proxy(..))
-import Data.Type.Equality ((:~:) (Refl), (:~~:) (HRefl))
+import Data.Type.Equality ((:~:) (Refl), (:~~:) (HRefl), gcastWith)
 import qualified FiniteTree
 import qualified FunctionFieldClient
 import qualified FunctionFieldLibrary as FunctionFields
@@ -2108,13 +2108,14 @@ localHead rows cols = safeHead (replicateNative total 'x')
     cells = rows * cols
 
 -- | Accept a length computed by the caller if a runtime test finds one cell.
--- Match S Z because the caller supplies the meaning of a term literal here.
+-- Compare with S Z because the caller supplies the meaning of a term literal.
 oneCellHead :: Num Nat => foreach (extent :: Nat) -> Maybe Char
 oneCellHead extent =
     let count :: Nat
         count = 1 + extent
     in case sameNat count (S Z) of
-         Just Refl -> Just (safeHead (replicateNative count 'x'))
+         Just proof ->
+             gcastWith proof (Just (safeHead @Char @'Z (replicateNative count 'x')))
          Nothing -> Nothing
 
 -- | Return equality with the empty constructor after inspecting the vector.
