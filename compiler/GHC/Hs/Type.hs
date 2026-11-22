@@ -1772,7 +1772,7 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
     HsTypeLet _ brackets binds body ->
       let binding (L _ (HsTypeLetBind signature v _ rhs)) =
             [ppr sig <+> dcolon <+> ppr_mono_lty kind | (sig, _, kind, _) <- maybeToList signature]
-              ++ [ppr v <+> equals <+> ppr_mono_lty (parenthesizeHsType sigPrec rhs)]
+              ++ [ppr v <+> equals <+> ppr_typelet_rhs rhs]
           bindings = concatMap binding (NE.toList binds)
           group = case brackets of
             Nothing -> vcat bindings
@@ -1788,8 +1788,13 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
                                        | (_, pat, rhs) <- rows]))
     HsTypeExistsRn flag b body -> pprExistsTy flag (ppr b) (ppr_mono_lty body)
     HsTypeLetRn v rhs body ->
-      text "let" <+> ppr v <+> equals <+> ppr_mono_lty (parenthesizeHsType sigPrec rhs)
+      text "let" <+> ppr v <+> equals <+> ppr_typelet_rhs rhs
         <+> text "in" <+> ppr_mono_lty body
+
+-- | Parenthesize a lowered kind signature on a type let RHS.
+ppr_typelet_rhs :: OutputableBndrId p => LHsType p -> SDoc
+ppr_typelet_rhs rhs@(L _ HsKindSig{}) = parens (ppr_mono_lty rhs)
+ppr_typelet_rhs rhs = ppr_mono_lty rhs
 
 -- | Classify the parsed existential separator.
 hsExistsTyFlag :: Either (EpToken "|") (EpToken ".") -> ExistsTyFlag
