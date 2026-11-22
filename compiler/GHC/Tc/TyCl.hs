@@ -6615,7 +6615,6 @@ checkValidDataCon dflags existential_ok tc con
                              all isTyVar ex_tvs))
                           && (is_ordered || null eq_spec)
                           && null (dataConStupidTheta con)
-                          && not (isDataFamInstTyCon tc)
                           && not (isTypeDataCon con)
                           && isLiftedTypeKind (tyConResKind tc)
                           && scope_ok)
