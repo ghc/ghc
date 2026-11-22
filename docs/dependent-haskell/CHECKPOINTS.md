@@ -90,6 +90,40 @@ source revisions and rebuild commands, then remove both sets of outputs
 after the last live user finishes. The 200 GB threshold is a backup for
 this cleanup.
 
+## Runtime tiles and curried comparisons
+
+Compiler `a6460bb784` passed the 534-line Showcase with its matching
+libraries. Stage 1 and self-hosted stage 2 ran native code at `-O0`
+and `-O2`. Stage 2 also ran the complete source in GHCi bytecode.
+All 27 selected registered tests passed. The testsuite reported no
+framework failures or warnings.
+
+An ordinary client packs and opens a tile whose shape records two
+runtime dimensions. The zero-row case accepts an undefined column
+count and undefined cells. A second client observes a runtime
+comparator at both arguments. An equality proof can mention the
+same call without evaluating the comparator or its operands.
+[Tile client](examples/packed-vector/IndexedMatrixClient.hs),
+[comparison](examples/open-evaluation/CompareAt.hs)
+and [callback and demand checks](../../testsuite/tests/dependent/should_run/NativeLiftedCallback.sh).
+
+The preceding compiler passed the native Showcase but rejected a
+valid mapping proof in bytecode. GHCi adds debugger breakpoints to
+the constructor result and the callback call. The compiler now
+checks the equations through these ticks. A strict instance still
+rejects a proof that would discard demand on its label.
+[Instance and control](../../testsuite/tests/dependent/should_run/NativeOpenTheseFmap.sh).
+
+Both stages checked nested tuple lets with provider sources hidden,
+type quotations, exact printing, and source diagnostics. A bad
+nested pattern points to the inner pattern and prints the written
+let in context. The primary kind error can still name an internal
+projection. The v79 and v80 readers rejected incompatible quantified
+GADT interfaces in both directions. The home-module control rebuilt
+the affected provider and reused it on its next build.
+[Let patterns](roadmap/R18-type-level-lets.md)
+and [interface upgrade](examples/r11-heq-pair/check-quantified-gadt-upgrade.sh).
+
 ## Four roadmap cards and the Core occurs check
 
 The normal compiler at `bb45f2d668` integrates indexed vector patterns
