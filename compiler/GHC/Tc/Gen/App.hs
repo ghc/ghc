@@ -6772,13 +6772,45 @@ tcSourceLetHead value = do
     if not (eqType declared (TermVarTy value))
       then return (Just declared)
       else do
-        views <- tcl_source_let_views . tcl_lcl_ctxt <$> getLclEnv
-        case lookupVarEnv views value of
-          Nothing -> return Nothing
-          Just rhs -> do
-            fam_envs <- tcGetFamInstEnvs
-            limit <- reductionDepth <$> getDynFlags
-            return (sourceLetHead fam_envs limit (delVarEnv views value) rhs)
+        givens <- mapM (liftZonkM . zonkId) =<< getNativeGivens
+        case mapMaybe (constructor_given . varType) givens of
+          view : rest | all (eqType view) rest -> return (Just view)
+          _ -> do
+            views <- tcl_source_let_views . tcl_lcl_ctxt <$> getLclEnv
+            case lookupVarEnv views value of
+              Nothing -> return Nothing
+              Just rhs -> do
+                fam_envs <- tcGetFamInstEnvs
+                limit <- reductionDepth <$> getDynFlags
+                return (sourceLetHead fam_envs limit (delVarEnv views value) rhs)
+  where
+    -- See Note [Nominal Givens in retained argument selection].
+    constructor_given pred_ty = do
+      (tc, [kind, lhs, rhs]) <- tcSplitTyConApp_maybe pred_ty
+      guard (tc `hasKey` eqTyConKey && isNativeIndexId value
+             && kind `eqType` varType value)
+      view <- if lhs `eqType` TermVarTy value then Just rhs
+              else if rhs `eqType` TermVarTy value then Just lhs
+              else Nothing
+      TyConApp promoted _ <- pure (coreFullView view)
+      dc <- isPromotedDataCon_maybe promoted
+      _ <- nativeIndexDataConTyArgs kind dc
+      return view
+
+{- Note [Nominal Givens in retained argument selection]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A GADT pattern can introduce count ~# S Z. The continuation of gcastWith
+binds the corresponding boxed constraint count ~ S Z. Both can determine
+the missing tail of an argument declared as Vec a (1 + n). Choose the
+constructor stated in the scoped Given before exposing a source let
+definition such as count = 1 + extent.
+
+Use a direct homogeneous nominal Given with the same runtime Id and a
+constructor in its index domain. Require agreement when several boxed
+Givens apply. This view only selects the erased type arguments. The cached
+value retains its original type. Ordinary subsumption still uses the
+actual Given to build the argument coercion.
+-}
 
 -- | Find a constructor by following local definitions and checked source families.
 sourceLetHead :: FamInstEnvs -> IntWithInf -> VarEnv Type -> Type -> Maybe Type
