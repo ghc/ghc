@@ -7,6 +7,7 @@ module NativeCase
   , NestedLetCase, NestedLetShadow, NestedLetKind
   , TupleKindLet, AliasTupleKindLet, NestedTupleKindLet, PolyNestedTupleKindLet
   , AscribedCaseKind, SignedCaseRhs
+  , CaseRhsAliasKind, CaseBodyAliasKind
   , caseIdentity, nestedCaseIdentity, retainedPick, renderRetainedPick, retainedKeep
   , retainedDoubleNot, renderRetainedDoubleNot, retainedPermission
   ) where
@@ -238,3 +239,20 @@ type SignedCaseRhs (b :: Bool) =
         'True -> 'Nothing
         'False -> 'Nothing
   in Proxy result
+
+-- | The result signature uses both the original and the shadowing kind.
+type CaseRhsAliasKind (payload :: Type) (b :: Bool) =
+  let base = Maybe payload
+      payload = Bool
+      result :: (base, Maybe payload)
+      result = case b of
+        'True -> '( 'Nothing, 'Just 'True)
+        'False -> '( 'Nothing, 'Nothing)
+  in Proxy result
+
+-- | The constructor field can use the same name in its own branch.
+type CaseBodyAliasKind (input :: Maybe Bool) =
+  let payload = Bool in
+  ((case input of
+    'Just payload -> 'Just payload
+    'Nothing -> 'Nothing) :: Maybe payload)

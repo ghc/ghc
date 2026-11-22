@@ -65,7 +65,8 @@ applied = Just 'q'
 $([d| type QuotedPair a = let a = Maybe a in (a, a) |])
 
 $([d| type QuotedCase (b :: Bool) =
-        let result :: Maybe Bool
+        let payload = Bool
+            result :: Maybe payload
             result = case b of
               'True -> 'Nothing
               'False -> 'Nothing

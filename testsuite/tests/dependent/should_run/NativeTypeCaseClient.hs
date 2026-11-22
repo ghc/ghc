@@ -130,6 +130,16 @@ signedCaseRhs ::
   , SignedCaseRhs 'False :~: Proxy ('Nothing :: Maybe Bool) )
 signedCaseRhs = (Refl, Refl)
 
+caseRhsAliasKind ::
+  ( CaseRhsAliasKind Ordering 'True :~: Proxy ('( 'Nothing, 'Just 'True) :: (Maybe Ordering, Maybe Bool))
+  , CaseRhsAliasKind Char 'False :~: Proxy ('( 'Nothing, 'Nothing) :: (Maybe Char, Maybe Bool)) )
+caseRhsAliasKind = (Refl, Refl)
+
+caseBodyAliasKind ::
+  ( CaseBodyAliasKind ('Just 'False) :~: 'Just 'False
+  , CaseBodyAliasKind 'Nothing :~: ('Nothing :: Maybe Bool) )
+caseBodyAliasKind = (Refl, Refl)
+
 nested :: ( N.Pick ('Just ('Just 'True)) :~: Proxy 'True
           , N.Pick ('Just 'Nothing) :~: Int
           , N.SameFallback ('Just 'Nothing) :~: Int )

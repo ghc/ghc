@@ -439,9 +439,14 @@ and [Agda function types](https://agda.readthedocs.io/en/v2.8.0/language/functio
 An ordinary type synonym can ascribe a result kind to a case. In
 `(case input of { Just k -> 'Nothing; Nothing -> 'Nothing }) :: Maybe k`,
 both branches use the enclosing result kind. The branch pattern's
-`k` is local to that branch. A kind signature on the first let binding
-can also check a case in that binding's RHS. Both forms supply the
-written kind to the private case family.
+`k` is local to that branch. A local kind signature can also check a
+case in its binding's RHS. With `let { payload = Bool; result :: Maybe payload;
+result = case … } in result`, the result kind uses the preceding alias.
+For an ascription in the let body, write
+`let payload = Bool in ((case …) :: Maybe payload)`.
+The compiler checks the preceding aliases before the private family's
+result kind. A later binding is outside the signature's scope, as in
+[Agda's ordered let definitions](https://agda.readthedocs.io/en/v2.8.0/language/let-and-where.html#let-expressions).
 [Haskell 2010 expression signatures, §3.16](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html)
 and [Agda's pattern lambda result type](https://agda.readthedocs.io/en/v2.8.0/language/with-abstraction.html#pattern-lambdas).
 
