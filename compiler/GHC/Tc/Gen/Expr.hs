@@ -2038,8 +2038,10 @@ the original target and read the solved types. Keep the actual written
 scrutinee for execution. Core Lint and the interface reader recover the
 index from its cast and operands in GHC.Core.exprToNativeCaseIndex.
 
-A bare function variable still has its declared domain. Only the result
-of an existing application can carry this cast in a checked call.
+After inlining, the lexical callback can also have a nominal result
+conversion supplied at its call site. GHC.Core.nativeIndexFunctionArgIndex
+checks that head before the first argument. See Note [Checking a cast
+retained callback] in GHC.Tc.Gen.App.
 Agda's with-abstraction equality also relates a matched result to the
 original computation. See docs/dependent-haskell/REFERENCES.md.
 -}

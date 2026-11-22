@@ -9,7 +9,7 @@ ghc=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint -fdiagnostics-
 provider=NativeLiftedCallbackProvider
 client=NativeLiftedCallbackClient
 expected=$'(False,False,True)\nTrue\nTrue\nTrue\n(IsFalse,())\n(IsFalse,())\nTrue'
-expected+=$'\n(GT,LT,EQ)\nRefl\nRefl\n(GT,LT)\nGT\nEQ\nTrue\nRefl'
+expected+=$'\n(GT,LT,EQ)\nRefl\nRefl\n(GT,LT)\n(GT,LT,EQ)\nEQ\nTrue\nRefl'
 
 for opt in O0 O2; do
     flags=("-$opt")
@@ -30,6 +30,17 @@ for opt in O0 O2; do
     "${ghc[@]}" "$client.o" "../provider/$provider.o" ../provider/{CompareAt,RuntimeOrdering,FamilyCallback}.o -o run
     actual=$(./run True)
     [[ $actual == "$expected" ]] || { printf '%s\n' "$actual"; exit 1; }
+done
+
+for probe in WRONG_INPUT WRONG_RESULT ABSTRACT_TAG; do
+    if "${ghc[@]}" -ferror-spans "-D$probe" -fforce-recomp -fno-code -c \
+        "$src/curried-callback/WrongDomain.hs" >"$probe.log" 2>&1; then exit 1; fi
+    case $probe in
+        WRONG_INPUT)  grep -Fq 'WrongDomain.hs:9:38: error: [GHC-83605]' "$probe.log"
+                      grep -Fq 'Actual: Bit -> Bool -> Ordering' "$probe.log" ;;
+        WRONG_RESULT) grep -Fq 'WrongDomain.hs:12:38: error: [GHC-83865]' "$probe.log" ;;
+        ABSTRACT_TAG) grep -Fq 'WrongDomain.hs:15:40: error: [GHC-83865]' "$probe.log" ;;
+    esac
 done
 
 for zap in -fzap-coercions -fno-zap-coercions; do

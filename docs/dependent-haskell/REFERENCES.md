@@ -5823,6 +5823,18 @@ Changing the scrutinee to `cmp y x` leaves the claimed index unproved.
 [Weirich et al., DC](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf)
 and [source and demand controls](../../testsuite/tests/dependent/should_run/NativeLiftedCallback.sh).
 
+The same nominal equality can justify passing a local function at a
+family-defined result type. In DC, An-Push relates applying a cast
+function to applying its original value with transported arguments and
+result. GHC's `mkAppTy` already implements this operation with
+`decomposePiCos`. The fork uses the ordinary unifier's evidence in the
+index and the value argument. Substitution retains the lexical callback
+and GHCi or native code evaluates the ordinary call. The source test
+covers both conversion directions and an abstract result with a Given.
+[DC, An-Push](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf),
+[Core application](../../compiler/GHC/Core/TyCo/Make.hs)
+and [ordinary caller](../../testsuite/tests/dependent/should_run/NativeLiftedCallbackClient.hs).
+
 ### Upgrading checked method interfaces
 
 Agda checks the interface version before decoding a module. It also

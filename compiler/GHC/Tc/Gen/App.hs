@@ -4394,8 +4394,9 @@ retainedVariableCast :: Core.CoreExpr -> LHsExpr GhcRn -> TcM (Maybe CoercionN)
 retainedVariableCast (Core.Cast (Core.Var index) (SubCo co)) arg
   | HsVar _ name <- unLoc (stripParensLHsExpr arg)
   , unLocWithUserRdr name == getName index
-  = do { givens <- getNativeGivens
-       ; return (if anyFreeVarsOfCo (`elem` givens) co then Just co else Nothing) }
+  = if isNativeIndexFunctionId index then return (Just co)
+    else do { givens <- getNativeGivens
+            ; return (if anyFreeVarsOfCo (`elem` givens) co then Just co else Nothing) }
 retainedVariableCast _ _ = return Nothing
 
 -- | Use the same domain for index checking and codomain substitution.
@@ -4635,28 +4636,49 @@ a second dictionary. M81's source-call check verifies saturation and
 operand kinds and preserves the lazy call through erasure.
 -}
 
--- | Resolve one already-bound local function at its exact retained domain.
--- Read existing assignments without instantiating or checking the value again.
--- See Note [Function-valued retained binders] in GHC.Core.Type.
+-- | Resolve one already-bound local function at the retained domain.
+-- See Note [Checking a cast retained callback].
 tcRetainedFunctionArg :: Type -> LHsExpr GhcRn -> TcM Core.CoreExpr
-tcRetainedFunctionArg domain arg
-  = setSrcSpanA (getLoc arg) $
-    case unLoc (stripParensLHsExpr arg) of
-      HsVar _ lname
-        -> do { thing <- tcLookupLcl_maybe (unLocWithUserRdr lname)
-              ; case thing of
-                  Just (ATcId { tct_id = actual }) ->
-                    do { actual <- liftZonkM (zonkId actual)
-                       ; if not (isExternalName (getName actual))
-                            && isNativeIndexFunctionId actual
-                            && varType actual `eqType` domain
-                         then return (Core.Var actual)
-                         else unsupported }
-                  _ -> unsupported }
-      _ -> unsupported
+tcRetainedFunctionArg domain arg = setSrcSpanA (getLoc arg) $
+  case unLoc (stripParensLHsExpr arg) of
+    HsVar _ lname -> do
+      thing <- tcLookupLcl_maybe (unLocWithUserRdr lname)
+      case thing of
+        Just (ATcId { tct_id = actual }) -> liftZonkM (zonkId actual) >>= tcRetainedFunctionVar domain
+        _ -> unsupported
+    _ -> unsupported
   where
-    unsupported = failWithTc $
-      TcRnRetainedQuantificationError RetainedFunctionArgument
+    unsupported = failWithTc $ TcRnRetainedQuantificationError RetainedFunctionArgument
+
+-- | Check the nominal equality for the actual lexical callback.
+tcRetainedFunctionVar :: TcType -> Id -> TcM Core.CoreExpr
+tcRetainedFunctionVar expected actual
+  | not (isExternalName (getName actual))
+  , Just (input, _) <- nativeIndexFunctionTys_maybe actual
+  , Just (expected_input, _) <- nativeIndexFunctionTypeTys_maybe expected
+  = if actual_ty `tcEqType` expected then pure (Core.Var actual)
+    else if input `tcEqType` expected_input then do
+      co <- unifyType (Just (NameThing (idName actual))) actual_ty expected
+      nominal <- liftZonkM (zonkCo co)
+      let range = Core.Cast (Core.Var actual) (SubCo nominal)
+      case Core.nativeIndexFunctionArgIndex range of
+        Just index | typeKind index `tcEqType` expected -> pure range
+        _ -> mismatch
+    else mismatch
+  | otherwise = failWithTc $ TcRnRetainedQuantificationError RetainedFunctionArgument
+  where
+    actual_ty = varType actual
+    mismatch = failWithTc $ TcRnRetainedQuantificationError $
+                 RetainedIndexArgumentCast actual_ty expected
+
+{- Note [Checking a cast retained callback]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An ordinary caller can declare cmp :: Bool -> Bool -> Ordering while
+the provider expects Bool -> Result 'True. The first argument has the
+same type. The ordinary unifier must prove the nominal equality of the
+arrows. Use its coercion for both the retained index and the value
+argument. Both refer to the actual local Id and preserve its demand.
+-}
 
 -- | Resolve a retained argument at its known domain without checking its value.
 -- See Note [Retained argument application].
@@ -5009,11 +5031,7 @@ checks the full domain, scope and multiplicity of the operand.
 -- See Note [Retained argument application].
 tcRetainedArgVar :: CtOrigin -> TcType -> Id -> TcM Core.CoreExpr
 tcRetainedArgVar origin expected arg_id
-  | isNativeIndexFunctionId arg_id
-  = if not (isExternalName (getName arg_id))
-       && varType arg_id `tcEqType` expected
-    then return (Core.Var arg_id)
-    else failWithTc $ TcRnRetainedQuantificationError RetainedFunctionArgument
+  | isNativeIndexFunctionId arg_id = tcRetainedFunctionVar expected arg_id
   | varType arg_id `tcEqType` expected = return (Core.Var arg_id)
   | otherwise
   = do { branch_co <- tcRetainedDomainConversion origin (varType arg_id) expected

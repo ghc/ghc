@@ -51,9 +51,11 @@ For a callback `f :: Bool -> Result tag`, a noninjective family cannot
 determine `tag`. The ambiguity check reports GHC-83865 at the signature
 when no other argument determines it. Supplying `Proxy tag` determines
 the tag. A client can then obtain `Refl` without forcing the callback
-or its argument. The consumer currently needs the declared callback
-domain. Writing its reduced function type in the consumer still fails
-at the retained argument.
+or its argument. A caller can declare `cmp :: Bool -> Bool -> Ordering`
+and supply it where the provider expects `Bool -> Result 'True`.
+The reverse conversion also works. The ordinary type checker proves
+the equality. A local Given can supply it when the result type is abstract.
+The first argument must have the same type in both function arrows.
 [Family callback control](../../../testsuite/tests/dependent/should_run/curried-callback/FamilyCallback.hs).
 
 When `Result 'True` reduces to `Bool -> Ordering`, the provider can

@@ -2834,7 +2834,6 @@ exprToNativeCaseIndex expr@App{}
   = Just call
   where
     -- See Note [Cases on a cast callback result] in GHC.Tc.Gen.Expr.
-    read_call (Var f) | isNativeIndexFunctionId f = Just (TermVarTy f)
     read_call (App prefix arg) = do
       fun <- read_call prefix
       (domain, _) <- nativeIndexFunctionTypeTys_maybe (typeKind fun)
@@ -2846,7 +2845,7 @@ exprToNativeCaseIndex expr@App{}
       delta <- setNominalRole_maybe Representational co
       guard (coercionRole delta == Nominal && typeKind fun `eqType` coercionLKind delta)
       mkCastTy fun delta <$ nativeIndexFunctionTypeTys_maybe (coercionRKind delta)
-    read_call _ = Nothing
+    read_call head_expr = nativeIndexFunctionArgIndex head_expr
 exprToNativeCaseIndex (Var v)
   | isNativeOpaqueValueId v = Just (TermVarTy v)
 exprToNativeCaseIndex expr
