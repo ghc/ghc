@@ -45,8 +45,12 @@ interactive test caller. The compiler sources are identical at both pins.
 Job `503` completed qualification. Its results are in
 `_build/on-demand/r16-normal-6d442d71b8-20261122/verification`.
 The `source` link in that area points to the actual checkout at
-`_build/on-demand/r16-normal-20261122/source`. Treat them as one build.
-The 543 comparison compiler is at `5fe06625c3`.
+`_build/on-demand/r16-normal-20261122/source`. Rebuild this compiler
+from the checkout to repeat job `503`. The 543 and 544 comparison
+compilers at `5fe06625c3` and `c24ffa9ca0` still run. After removal
+of their intermediate build products, job `785` verified both compiler
+hash manifests, compiled and ran native programs at `-O0` and `-O2`,
+and passed the 543-to-current minimum-equation upgrade and warm rebuild.
 R16 remains open for ordinary recursion beyond the checked case shapes.
 The proofs for Prelude's `zip` and `zipWith` now compile at standard
 `-O2`. The compiler verifies the installed fusion rules and the order
