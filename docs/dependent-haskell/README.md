@@ -79,6 +79,17 @@ The append-singleton client uses `plusSucc` to move the successor
 outside `plus`. Then `congSucc` applies that successor to both sides
 of `plusZero`. [Append-singleton proof](hasklib-test/Client.hs).
 
+A continuation can also use an equality to return an ordinary value.
+In the Showcase, `sameNat count (S Z)` returns a witness when the
+runtime count is one. Inside that branch, the vector has the length
+that `safeHead @Char @'Z` requires. The tail length is explicitly zero.
+
+```haskell
+Just proof -> gcastWith proof (Just (safeHead @Char @'Z (replicateNative count 'x')))
+```
+
+The branch returns `Just 'x'`. [Value-returning example](Showcase.hs).
+
 Use `congFirst` to lift an equality through the first argument of a
 binary size function. In the zip-after-map proof, `@minSize` selects
 the function and `@(size ys)` fixes its second argument.

@@ -61,6 +61,10 @@ derivation requires the whole left spine.
 [Library guide](README.md#reuse-a-proof-with-hasklib) and
 [equality controls](roadmap/R11-homogeneous-equality.md#rewrite-a-size-in-a-downstream-proof).
 
+Job `760` checks `oneCellHead` with the same 546-line output at native
+`-O0`, native `-O2` and in GHCi. It uses `gcastWith` to return a
+`Maybe Char` under the equality supplied by the runtime length test.
+
 The standalone [filter example](examples/open-evaluation/ParametricFilter.hs)
 states a free theorem at two element types. For Prelude's filter, the
 client can import a proof by induction. For an arbitrary erased
