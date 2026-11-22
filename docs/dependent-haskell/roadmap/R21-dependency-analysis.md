@@ -440,3 +440,17 @@ The client counted two forks and obtained `Refl` without forcing the
 callback. The 555 compiler includes this source. The separate
 [imported-rule check](R16-open-term-evaluator.md#an-imported-proof-and-a-client-rewrite-rule)
 applies when another module uses the proof.
+
+Job 1268 compared the published 552 compiler with normal 555 at
+`1bef98f413`. It placed the same declarations in eight orders,
+including a complete reversal and separate signatures and definitions.
+At both `-O0` and default `-O2`, 552 rejected all eight proofs at
+`nodes` with GHC-68947. Both compilers accepted the workers alone.
+Normal 555 accepted all eight proofs. It also accepted a splice after
+the datatypes or after all workers. Moving a worker needed by the proof
+past a splice still failed. The 20 successful provider builds each
+linked a client using only compiled interfaces and objects. Each client
+counted two forks and returned `Refl` with a bottom leaf payload and a
+bottom callback.
+[Declaration group boundaries](https://serokell.io/blog/dependency-analysis-haskell#template-haskell-splices)
+and [proposal #378 on lexical scoping](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#lexical-scoping-term-syntax-and-type-syntax-and-renaming).
