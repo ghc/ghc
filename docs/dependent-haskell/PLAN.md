@@ -7767,12 +7767,19 @@ recursive call with the original first-cons equations. The wrapper must
 still check the first list before the second. Tidy must leave both
 captured fields lazy.
 
-A client can check the open equation with rewriting disabled. A stripped
-interface also lets a client check the equation with rewriting enabled.
-An active specialization rule in a full interface still reports
-GHC-83605. To accept that rule, the consumer must validate its exact
-argument mapping and its dependency on the checked worker. The
-specialization to a known second cons also needs its own demand check.
+An independent client can check the open equation at standard `-O2`.
+It must match the active rule to the exact worker required by the
+owner's vanilla unfolding. Tidy derives that unfolding from final
+Core. The client compares all wrapper equations, checks that the
+captured arguments remain lazy, and requires that the worker have no
+active rules. A user rule with the same name and argument shape
+still reports GHC-83605.
+
+The check uses the existing interface. A previous reader can still use
+the table with rewriting disabled. A producer without a checked table
+cannot supply this evidence. A missing or stable source unfolding leaves
+the specialization rule unchecked. Specialization to a known second cons
+still needs its own demand check.
 
 ## M99: evaluate an imported closed call
 

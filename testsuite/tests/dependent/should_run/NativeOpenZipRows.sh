@@ -270,8 +270,7 @@ step :: forall (x :: Char) (xs :: [Char]) (y :: Bool) (ys :: [Bool]).
 step = Refl
 HS
 "${ghc[@]}" -fno-enable-rewrite-rules -c Specialized.hs
-reject '^Specialized.hs:8:8-11: error: \[GHC-83605\]' -fforce-recomp \
-    -fno-ignore-interface-pragmas -fenable-rewrite-rules Specialized.hs
+"${ghc[@]}" -O2 -fforce-recomp -c Specialized.hs
 reject '^RightDemand.hs:7:9-12: error: \[GHC-83865\]' -fno-enable-rewrite-rules RightDemand.hs
 
 cd "$out/specialized-provider"
@@ -289,6 +288,56 @@ cp ../specialized-provider/ZipVariants.hi .
     ../provider/{PackedVecLibrary,ZipLengthSource}.o ../specialized-provider/ZipVariants.o -o run
 ./run >actual
 diff -u ../reader/actual actual
+
+# A rule with the same printed name and shape changes the result and demand.
+cd "$out/specialized-provider"
+cat >RuleSpoof.hs <<'HS'
+{-# OPTIONS_GHC -Wno-inline-rule-shadowing #-}
+module RuleSpoof (handCount) where
+import PackedVecLibrary (Nat(..))
+import ZipVariants (countRight)
+
+{-# OPAQUE wrongCount #-}
+wrongCount :: a -> [a] -> [b] -> Nat
+wrongCount x _ _ = x `seq` S (S (S Z))
+
+handCount :: forall a b. [a] -> [b] -> Nat
+handCount [] _ = Z
+handCount (_ : _) [] = Z
+handCount (x : xs) (_ : ys) = S (wrongCount x xs ys)
+
+{-# RULES "SC:countRight0" forall x xs. countRight (x : xs) = wrongCount x xs #-}
+HS
+"${ghc[@]}" -O2 -c RuleSpoof.hs
+cd "$out/specialized-reader"
+cp ../specialized-provider/RuleSpoof.hi .
+sed -e 's/module Specialized/module SpoofProof/' \
+    -e '/^import ZipVariants /a import RuleSpoof ()' Specialized.hs >SpoofProof.hs
+reject '^SpoofProof.hs:9:8-11: error: \[GHC-83605\]' -O2 SpoofProof.hs
+sed -e 's/Specialized/HandProof/' -e 's/ZipVariants (countRight)/RuleSpoof (handCount)/' \
+    -e 's/countRight/handCount/g' Specialized.hs >HandProof.hs
+reject '^HandProof.hs:7:19-27: error: \[GHC-70565\]' -O2 HandProof.hs
+cat >SpoofRun.hs <<'HS'
+module Main where
+import Control.Exception (ErrorCall, evaluate, try)
+import PackedVecLibrary (natToInt)
+import RuleSpoof (handCount)
+import ZipVariants (countRight)
+main :: IO ()
+main = do
+    print (natToInt (countRight (True : []) [True]), natToInt (handCount "a" [True]))
+    demand <- try (evaluate (natToInt (countRight [error "head"] [True])))
+    print (either (const True :: ErrorCall -> Bool) (const False) demand)
+HS
+"${ghc[@]}" -O2 -ddump-rule-firings -c SpoofRun.hs >spoof.log
+grep -Fq 'Rule fired: SC:countRight0 (RuleSpoof)' spoof.log
+"${ghc[@]}" SpoofRun.o ../specialized-provider/{ZipVariants,RuleSpoof}.o \
+    ../provider/PackedVecLibrary.o -o spoof
+./spoof >spoof.actual
+diff -u - spoof.actual <<'OUT'
+(3,4)
+True
+OUT
 
 cd "$out/reader"
 

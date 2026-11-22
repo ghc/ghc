@@ -74,10 +74,11 @@ import GHC.Tc.Utils.Monad (TcM, addErr, failWithTc, getEps, getGblEnv, getGlobal
 import GHC.Tc.Utils.TcType (isTyFamFree)
 import GHC.Tc.Zonk.TcType (zonkTcType, zonkTcTypes)
 import GHC.Types.Avail (availNames, availsToNameSet)
-import GHC.Types.Basic (Origin(..), LeftOrRight(..), SourceTableOrigin(..), isMarkedCbv, pickLR)
+import GHC.Types.Basic (Origin(..), LeftOrRight(..), SourceTableOrigin(..), UnfoldingSource(VanillaSrc),
+                        isMarkedCbv, pickLR)
 import GHC.Types.Error (errorsFound)
 import GHC.Types.Id.Info (IdDetails(DFunId, SourceTableId, VanillaId), SourceDFun(..), setSourceProofRuleInfo)
-import GHC.Types.Id (globaliseId, idCbvMarks_maybe, idCoreRules, idInfo, idName, setIdInfo, idInlinePragma, isClassOpId_maybe, isDataConId_maybe, isDataConWorkId_maybe, idUnfolding, mkVanillaGlobal, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe,
+import GHC.Types.Id (globaliseId, idCbvMarks_maybe, idCoreRules, idInfo, idName, setIdInfo, idInlinePragma, isClassOpId_maybe, isDataConId_maybe, isDataConWorkId_maybe, idUnfolding, realIdUnfolding, mkVanillaGlobal, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe,
                      setIdExported, setSourceMethodIds, sourceMethodAliases, sourceMethodTarget_maybe,
                      sourceMethodDFunClass)
 import GHC.Types.InlinePragma (isNeverActive, isOpaquePragma)
@@ -478,8 +479,10 @@ localSourceRuleApart owner checked (L _ HsRule{rd_lhs = lhs})
 -- | Check that every visible rule of a certified mapper preserves its two list equations.
 -- See Note [Checked list traversal rules].
 checkedMapperRules :: RuleEnv -> Id -> Bool
-checkedMapperRules env owner = case filter (not . isNeverActive . ruleActivation)
-                                         (getRules env (globaliseId owner)) of
+checkedMapperRules env owner = case activeMapperRules env owner of
+    [rule] | Just table <- sourceTableId_maybe owner
+           , isTwoListCaseTable table
+           -> isJust (checkedImportedSpecConstr env owner table rule)
     rules | Just table <- sourceTableId_maybe owner
           , isListFoldTable table || isReverseWorkerTable table ||
             isJust (reverseWrapperWorker table) ||
@@ -544,6 +547,10 @@ checkedMapperRules env owner = case filter (not . isNeverActive . ruleActivation
       (Core.Var mapper, [Core.Type input, Core.Type output, callback, spine])
         | mapper == owner -> Just (input, output, callback, spine)
       _ -> Nothing
+
+activeMapperRules :: RuleEnv -> Id -> [CoreRule]
+activeMapperRules env =
+    filter (not . isNeverActive . ruleActivation) . getRules env . globaliseId
 
 {- Note [Checked list traversal rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3510,9 +3517,36 @@ Tidy uses demand information to choose the call-by-value arguments.
 Check the two captured fields with the same Tidy computation. A strict
 second list agrees with the checked first case of the worker.
 
-This check validates the compiled binding. The imported rule check
-still applies to every active rule, including the specialization rule.
+The importer can recover the same worker from the owner's vanilla
+unfolding. Tidy regenerates that unfolding from the final binding.
+The direct check must fail and the check with the rule's worker must
+succeed. Thus the final binding contains a call to this exact worker.
+The producer could only keep the table after checking this worker
+and its equations. An older producer with the direct check alone
+cannot export a table for this wrapper.
+
+Check the imported worker's call-by-value marks and every visible
+rule for the worker. A missing vanilla unfolding leaves the rule
+unchecked. A stable source unfolding can differ from the final
+binding, so it cannot provide this evidence.
 -}
+
+-- | Recover the checked worker from the final wrapper's vanilla unfolding.
+-- See Note [Checked constructor specialization].
+checkedImportedSpecConstr :: RuleEnv -> Id -> TyCon -> CoreRule -> Maybe ()
+checkedImportedSpecConstr env owner table rule = do
+    worker <- checkSpecConstrRule owner rule
+    guard (worker /= owner &&
+           nameModule_maybe (idName worker) == nameModule_maybe (idName owner) &&
+           lazySpecConstrFields worker && null (activeMapperRules env worker))
+    Core.CoreUnfolding { Core.uf_src = VanillaSrc, Core.uf_tmpl = rhs } <-
+      pure (realIdUnfolding owner)
+    guard (isNothing (checkedTwoListCase (const True) owner rhs))
+    (signature, rows) <- checkedTwoListCaseWith (Just worker) (const True) owner rhs
+    guard (matchesConstructorCase table signature rows)
+
+lazySpecConstrFields :: Id -> Bool
+lazySpecConstrFields = all (not . isMarkedCbv) . take 2 . fromMaybe [] . idCbvMarks_maybe
 
 -- | Validate a local worker specialized to a known cons in the first position.
 -- See Note [Checked constructor specialization].
@@ -3521,7 +3555,8 @@ checkedSpecConstrWorker bindings table owner = do
     ConstructorCaseType telescope _ _ [left, right] 0 result <- constructorCaseType (varType owner)
     [Bndr a _, Bndr b _] <- pure telescope
     guard (eqTypes [left, right] (map (mkListTy . mkTyVarTy) [a, b]))
-    [rule] <- pure (filter (not . isNeverActive . ruleActivation) (idCoreRules owner))
+    [rule@Rule{ru_local = True}] <-
+      pure (filter (not . isNeverActive . ruleActivation) (idCoreRules owner))
     target <- checkSpecConstrRule owner rule
     (worker, rhs) <- find ((== target) . fst) bindings
     guard (worker /= owner && not (isExternalName (idName worker)) &&
@@ -3535,8 +3570,7 @@ checkedSpecConstrWorker bindings table owner = do
         pattern = CaseConstructor consDataCon [mkTyVarTy x] [CaseField hd, CaseField tl]
     guard (eqTypes (map varType fields) (map instantiate [mkTyVarTy a, left, right]) &&
            maybe True null (idCbvMarks_maybe worker))
-    let marks = fromMaybe [] (idCbvMarks_maybe (tidyCbvInfoTop emptyNameSet worker rhs))
-    guard (not (any isMarkedCbv (take 2 marks)))
+    guard (lazySpecConstrFields (tidyCbvInfoTop emptyNameSet worker rhs))
     rows <- checkedConstructorRows True (const True) (const Nothing)
               (checkedSpecializedCall worker other parameters)
               parameters (instantiate result) [pattern, CaseField other] other body
@@ -3551,7 +3585,7 @@ checkedSpecConstrWorker bindings table owner = do
 
 -- | Read the generated rule for that one specialization.
 checkSpecConstrRule :: Id -> CoreRule -> Maybe Id
-checkSpecConstrRule owner Rule{ru_fn = fn, ru_origin = origin, ru_auto = True, ru_local = True,
+checkSpecConstrRule owner Rule{ru_fn = fn, ru_origin = origin, ru_auto = True,
                                ru_bndrs = binders, ru_args = lhs, ru_rhs = rhs} = do
     guard (fn == idName owner && Just origin == nameModule_maybe (idName owner))
     (Core.Type left : Core.Type right : first : rest) <- pure lhs
