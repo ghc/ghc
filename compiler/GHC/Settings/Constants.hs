@@ -8,8 +8,8 @@ import GHC.Settings.Config
 hiVersion :: Integer
 -- The suffix changes when the fork changes a common interface payload.
 -- Reject old HEq# applications and heq_sel references before decoding Core.
--- This generation combines the scoped workers with the public evidence payloads.
-hiVersion = read (cProjectVersionInt ++ cProjectPatchLevel ++ "79") :: Integer
+-- Version 80 also gates scoped workers for GADTs with quantified index kinds.
+hiVersion = read (cProjectVersionInt ++ cProjectPatchLevel ++ "80") :: Integer
 
 -- All pretty arbitrary:
 
