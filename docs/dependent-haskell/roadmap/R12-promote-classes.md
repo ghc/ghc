@@ -99,7 +99,9 @@ the instance head. A worker can copy a field at one of those types.
 Inspecting or constructing a value still checks the constructor.
 The source checks compare two instances with different results for the
 same `Flagged` constructor. Normal compiler qualification is pending.
-[Warm upgrade check](../examples/open-evaluation/check-applied-mapping-upgrade.sh).
+[Instance equations](../../../testsuite/tests/dependent/should_run/concrete-mapping/Row.hs),
+[separately compiled proofs](../../../testsuite/tests/dependent/should_run/concrete-mapping/RowProof.hs)
+and [warm upgrade check](../examples/open-evaluation/check-applied-mapping-upgrade.sh).
 
 If the equation uses `p` to map the field but claims the result is
 `q x`, GHC reports GHC-83865 at `Refl`. The detailed expected type can

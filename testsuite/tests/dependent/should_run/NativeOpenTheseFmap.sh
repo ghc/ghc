@@ -14,10 +14,18 @@ for opt in -O0 -O2; do
     "${ghc[@]}" "$opt" -fomit-interface-pragmas -fno-write-if-simplified-core -c "$src/These.hs" -outputdir .
     "${ghc[@]}" --show-iface These.hi >provider.iface
     grep -Fq 'DFunId SourceMethods [(GHC.Internal.Base.fmap,' provider.iface
+    "${ghc[@]}" "$opt" -fomit-interface-pragmas -fno-write-if-simplified-core -c "$src/concrete-mapping/Row.hs" -outputdir .
+    "${ghc[@]}" --show-iface Row.hi >row.iface
+    test "$(grep -c 'DFunId SourceMethods.*GHC.Internal.Base.fmap' row.iface)" = 2
 
     cd "$stage/proof"
-    cp ../provider/These.hi .
+    cp ../provider/{These,Row}.hi .
     "${ghc[@]}" "$opt" -fomit-interface-pragmas -fno-write-if-simplified-core -c "$src/TheseMapping.hs" -outputdir .
+    "${ghc[@]}" "$opt" -c "$src/concrete-mapping/RowProof.hs" -outputdir .
+    sed -e 's/module RowProof where/module WrongInstance where/' \
+        -e 's/:: Row Int Bool a/:: Row Bool Bool a/' "$src/concrete-mapping/RowProof.hs" >WrongInstance.hs
+    if "${ghc[@]}" "$opt" -fno-code -c WrongInstance.hs >wrong-instance 2>&1; then exit 1; fi
+    grep -Fq 'WrongInstance.hs:11:16-19: error: [GHC-83865]' wrong-instance || { cat wrong-instance >&2; exit 1; }
     cat >OneField.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, ScopedTypeVariables, TypeOperators #-}
 module OneField where
@@ -55,7 +63,7 @@ HS
     fi
 
     cd "$stage/reader"
-    cp ../proof/{These,TheseMapping}.hi .
+    cp ../proof/{These,TheseMapping,Row,RowProof}.hi .
     "${ghc[@]}" "$opt" -c "$src/OrdinaryTheseMapping.hs" -outputdir .
     cat >Main.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes #-}
@@ -63,6 +71,8 @@ module Main where
 import Control.Exception (evaluate)
 import Data.IORef
 import OrdinaryTheseMapping (report)
+import Row (Row(..))
+import qualified RowProof
 import These (These(..))
 import TheseMapping (mapBoth)
 
@@ -90,9 +100,16 @@ main = do
     case fmap above (These 'f' (4 :: Int)) of
         These label p -> print (label, p 3, p 5)
         _ -> fail "fmap discarded the function"
+    let row = Both (error "first field") (error "second field") (11 :: Int) :: Row Int Bool Int
+    case fmap odd row of
+        Both _ _ x -> print x
+        _ -> fail "fmap discarded the row"
+    print (fmap odd (Flagged False 11 :: Row Bool Bool Int),
+           RowProof.discarded odd (error "flag") (error "element" :: Int))
+    print (RowProof.both odd (error "first field") (error "second field") (error "element" :: Int))
 HS
     "${ghc[@]}" "$opt" -c Main.hs
-    "${ghc[@]}" Main.o OrdinaryTheseMapping.o ../proof/TheseMapping.o ../provider/These.o -o run
+    "${ghc[@]}" Main.o OrdinaryTheseMapping.o ../proof/{TheseMapping,RowProof}.o ../provider/{These,Row}.o -o run
     ./run >actual
     diff -u - actual <<'EXPECTED'
 (These 'w' True,Refl)
@@ -102,6 +119,9 @@ Refl
 0
 ('i',1)
 ('f',False,True)
+True
+(Empty,Refl)
+Refl
 EXPECTED
 done
 

@@ -5643,6 +5643,15 @@ are checked separately.
 [Runtime proof](examples/open-evaluation/TheseMapping.hs)
 and [instance and demand checks](../../testsuite/tests/dependent/should_run/NativeOpenTheseFmap.sh).
 
+Agda's `map₂` uses the same first type parameter in its input and output.
+The caller can instantiate that parameter with a concrete type. In
+Haskell the fixed parameters also select the instance. The R12 control
+uses `Row Int Bool` and `Row Bool Bool`. Their methods return different
+constructors on the same input shape. Each proof needs the equation from
+its own instance.
+[Agda mapping clauses](https://github.com/agda/agda-stdlib/blob/v2.4/src/Data/These/Base.agda#L40-L49)
+and [Haskell instance equations](../../testsuite/tests/dependent/should_run/concrete-mapping/Row.hs).
+
 Agda's printer looks up an abstract qualified name in the current scope.
 It checks that a local binder does not hide the chosen name. GHC's
 `mkQualName` also checks the reader environment to select a qualifier.

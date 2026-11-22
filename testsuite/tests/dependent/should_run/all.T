@@ -178,7 +178,8 @@ test('NativeOpenEitherFmapDownstream',
      run_command, ['bash NativeOpenEitherFmapDownstream.sh "{compiler}" "{libdir}"'])
 test('NativeOpenTheseFmap',
      [only_ways(['normal']),
-      extra_files([open_eval_dir + f for f in ['These.hs', 'TheseMapping.hs', 'OrdinaryTheseMapping.hs']])],
+      extra_files(['concrete-mapping'] +
+                  [open_eval_dir + f for f in ['These.hs', 'TheseMapping.hs', 'OrdinaryTheseMapping.hs']])],
      run_command, ['bash NativeOpenTheseFmap.sh "{compiler}" "{libdir}"'])
 test('NativeOpenInstalledPair',
      [req_interp, req_rts_linker, only_ways(['normal']),
