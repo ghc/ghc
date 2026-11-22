@@ -1766,7 +1766,7 @@ sourceCaseTables binds = do
                         (directListAppend owner body <|> directListReverseWorker owner (prepare body) <|>
                          checkedTwoListCase public owner (prepare body))) <|>
                       (guard (fold_candidate owner) *> directListFold owner (prepare body)) <|>
-                      (guard (zip_candidate owner) *> directListZipWith owner (prepare body)) -> do
+                      (guard (zip_candidate owner) *> checkedListZip public owner (prepare body)) -> do
             table <- publishConstructorCase owner signature rows
             pure (Just (finalOwner owner table, table), [])
           Nothing | indexed_candidate owner
@@ -2910,7 +2910,7 @@ listZipWithType ty = do
     (right, result) <- caseArrow rest'
     guard (callback `eqType` mkVisFunTyManyU a (mkVisFunTyManyU b c) &&
            eqTypes [left, right, result] (map mkListTy [a, b, c]))
-    pure (ConstructorCaseType binders listTyCon [a, b, c] [callback, left, right] 1 result)
+    pure (ConstructorCaseType binders listTyCon [a] [callback, left, right] 1 result)
 
 -- | Identify a nominal family backed by a checked zipper.
 isListZipWithTable :: TyCon -> Bool
@@ -2924,15 +2924,17 @@ isListZipWithTable table = isJust $ do
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Check the left list first. The left nil branch leaves the right list
 and the callback alone. Only the left cons branch checks the right
-list. The two-cons branch constructs a lazy cons with the original
-head application and recursive call on both original tails.
+list. Check the two-cons result with the ordinary lazy constructor
+checker. It may build a pair from the heads or apply the carried
+callback to both heads. The tail calls the same function on both
+original tails.
 
 The recursion can use the owner directly or a single local worker with
 the callback in scope. In the local form, check that the owner applies
 the worker to its exact list operands, allowing eta reduction. The
 recursive call must use that exact worker and both original tails.
-Recheck the rows against the axiom after optimization. Require no
-active rules when using the table, as for a right list fold.
+Recheck the rows against the axiom after optimization. Use the
+existing final Core rule policy for the owner's signature.
 
 The desugarer can put a pattern-failure join around the cases and
 test an operand again in a default alternative. Select the reachable
@@ -2942,29 +2944,35 @@ inspect an operand already forced on that path. Thus no checked path
 can reach the failure join, and the left nil path never tests the right.
 -}
 
--- | Read the three ordered equations of a checked list zipper.
-directListZipWith :: Id -> Core.CoreExpr -> Maybe (ConstructorCaseType, [ConstructorCaseRow])
-directListZipWith owner original = do
+-- | Read the three ordered equations of a list zipper, with or without a callback.
+checkedListZip :: (TyCon -> Bool) -> Id -> Core.CoreExpr
+               -> Maybe (ConstructorCaseType, [ConstructorCaseRow])
+checkedListZip visible owner original = do
     let rhs = stripTicksE isSourceBreakpoint original
         rhs_type = exprType rhs
     guard (rhs_type `eqType` varType owner)
-    ConstructorCaseType telescope root [a, b, c] domains position result <- listZipWithType rhs_type
-    ConstructorCaseType declared _ _ _ _ _ <- listZipWithType (varType owner)
+    ConstructorCaseType telescope root [a] domains position result <- signature rhs_type
+    ConstructorCaseType declared _ _ _ _ _ <- signature (varType owner)
     let (bindings, body) = Core.collectBinders rhs
         (parameters, operands) = splitAt (length telescope) bindings
+        (carried, supplied) = splitAt position operands
         types = mkTyVarTys parameters
+    [left_kind, right_kind] <- pure (drop position domains)
+    (right_tc, [b]) <- caseDatatype right_kind
+    (result_tc, [c]) <- caseDatatype result
+    guard (right_tc == listTyCon && result_tc == listTyCon)
     guard (parameters == binderVars telescope)
-    callback : supplied <- pure operands
     ([left, right], cases, selfCall) <- case (supplied, body) of
       (_, Core.Let (Core.Rec [(worker, worker_rhs)]) invoke)
         | exactCall worker [] supplied invoke ->
             let (inputs, branches) = Core.collectBinders worker_rhs
             in pure (inputs, branches, \xs ys -> exactCall worker [] [xs, ys])
       ([_, _], _) ->
-        pure (supplied, body, \xs ys -> exactCall owner types [callback, xs, ys])
+        pure (supplied, body, \xs ys -> exactCall owner types (carried ++ [xs, ys]))
       _ -> Nothing
-    guard (all isId [callback, left, right] &&
-           eqTypes (map varType [callback, left, right]) domains)
+    guard (all isId (carried ++ [left, right]) &&
+           eqTypes (map varType carried) (take position domains) &&
+           eqTypes (map varType [left, right]) [left_kind, right_kind])
     let outer = case cases of
           Core.Let (Core.NonRec j _) rest | isJoinId j -> rest
           _ -> cases
@@ -2982,20 +2990,30 @@ directListZipWith owner original = do
     (right_fields, rest) <- listAlt result right_cons inner
     ([(_, [x, xs]), (_, [y, ys])], nonempty) <-
       followCases result [(left_cons, left_fields), (right_cons, right_fields)] rest
-    (Core.Var cons, [Core.Type element, hd, tl]) <- pure (Core.collectArgs nonempty)
-    guard (cons == dataConWorkId consDataCon && element `eqType` c &&
-           exactCall callback [] [x, y] hd && selfCall xs ys tl)
     let binders = zipWith (\v (Bndr _ vis) -> Bndr v vis) parameters declared
         nil element_kind = CaseConstructor nilDataCon [element_kind] []
         cell element_kind h t = CaseConstructor consDataCon [element_kind] [CaseField h, CaseField t]
-        row left_pat right_pat = ConstructorCaseRow [CaseField callback, left_pat, right_pat]
-        head_value = CaseApply callback [CaseField x, CaseField y]
-        tail_value = CaseSelf types [CaseField callback, CaseField xs, CaseField ys]
-    pure (ConstructorCaseType binders root [a, b, c] domains position result,
+        row left_pat right_pat = ConstructorCaseRow (map CaseField carried ++ [left_pat, right_pat])
+        scoped v = v <$ guard (v `elem` [x, xs, y, ys])
+        call expr =
+          CaseSelf types (map CaseField (carried ++ [xs, ys])) <$ guard (selfCall xs ys expr) <|>
+          do [callback] <- pure carried
+             guard (exactCall callback [] [x, y] expr)
+             pure (CaseApply callback (map CaseField [x, y]))
+    value@(CaseConstructor cons _ [_, CaseSelf{}]) <-
+      checkCaseResult public (casePublicKind public types) (const Nothing) scoped call result nonempty
+    guard (cons == consDataCon)
+    pure (ConstructorCaseType binders root [a] domains position result,
            [ row (nil a) (CaseField right) (nil c)
            , row (cell a x xs) (nil b) (nil c)
-           , row (cell a x xs) (cell b y ys) (CaseConstructor consDataCon [c] [head_value, tail_value]) ])
+           , row (cell a x xs) (cell b y ys) value ])
   where
+    signature ty = listZipWithType ty <|> do
+      ordinary <- constructorCaseType ty
+      ordinary <$ guard (isTwoListCase ordinary)
+
+    public tc = visible tc || tc == listTyCon || isBoxedTupleTyCon tc
+
     exactCall fun kinds operands expression =
       case Core.collectArgs expression of
         (Core.Var callee, arguments)
@@ -3682,7 +3700,7 @@ checkedFinalListTable bindings table = isJust $ do
         directListReverseWorker callee worker_rhs
       Nothing | isListFoldTable table -> directListFold owner rhs
               | isListZipWithTable table -> do
-                  (signature, rows) <- directListZipWith owner rhs
+                  (signature, rows) <- checkedListZip (const True) owner rhs
                   guard (matchesConstructorCase table signature rows)
                   pure (signature, rows)
               | isTwoListCaseTable table -> do
@@ -3709,8 +3727,10 @@ checkedTwoListCase = checkedTwoListCaseWith Nothing
 checkedTwoListCaseWith :: Maybe Id -> (TyCon -> Bool) -> Id -> Core.CoreExpr
                        -> Maybe (ConstructorCaseType, [ConstructorCaseRow])
 checkedTwoListCaseWith specialized public owner rhs = do
-    (signature, rows) <- checkedConstructorCaseWith specialized public (const Nothing) owner
-                           (stripTicksE isSourceBreakpoint rhs)
+    (signature, rows) <-
+      checkedConstructorCaseWith specialized public (const Nothing) owner
+        (stripTicksE isSourceBreakpoint rhs) <|>
+      (guard (isNothing specialized) *> checkedListZip public owner rhs)
     guard (isTwoListCase signature)
     pure (signature, rows)
 
