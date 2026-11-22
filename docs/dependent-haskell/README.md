@@ -25,6 +25,43 @@ The `Just` branch gets a `Vec a 1` and can use `safeHead` directly.
 For the current compiler revision, test results and restart procedure, see
 the [project handoff](HANDOFF.md).
 
+## Reuse a proof with HaskLib
+
+The `hasklib` Cabal package lives in this directory. Add this directory
+to the `packages` field of your `cabal.project`, add `hasklib` to your
+component's `build-depends`, and select this fork's compiler. Import
+`HaskLib` for the list laws and `Refl`, or import `HaskLib.List`
+for just the list API.
+
+| Lemma | Length of the result |
+| --- | --- |
+| `lengthMap f xs` | `size xs` |
+| `lengthAppend xs ys` | `plus (size xs) (size ys)` |
+| `lengthZip xs ys` | `minSize (size xs) (size ys)` |
+| `lengthZipWith f xs ys` | `minSize (size xs) (size ys)` |
+
+An ordinary client can use the zip equality with lists read at runtime.
+A dependent client can also name it in its signature.
+
+```haskell
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
+{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
+module Client where
+
+import HaskLib
+
+zipLaw :: forall a b. foreach (xs :: [a]) -> foreach (ys :: [b])
+       -> size (zip xs ys) :~: minSize (size xs) (size ys)
+zipLaw xs ys = lengthZip xs ys
+```
+
+The proofs use the ordinary definitions of `size`, `plus` and `minSize`.
+Forcing a proof can traverse the list spines. The empty-left zip case
+leaves the right list unevaluated. The list elements and the `zipWith`
+callback can remain unevaluated throughout.
+[Package](hasklib.cabal), [list API](hasklib/HaskLib/List.hs) and
+[proof methods](REFERENCES.md#parametricity-and-the-list-length-laws).
+
 ## Run the showcase
 
 From the repository root, run the checked example with this fork’s compiler

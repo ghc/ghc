@@ -5881,6 +5881,36 @@ source, those bytes cannot identify the original method. The R16
 upgrade instructions describe how to rebuild a local Cabal dependency.
 [Method proofs in family equations](roadmap/R16-open-term-evaluator.md#a-proof-whose-method-is-reduced-in-a-type-synonym).
 
+### Parametricity and the list length laws
+
+Relational parametricity relates two instantiations of a polymorphic
+function at related inputs. In a total parametric language, a function
+`r :: forall a. [a] -> [a]` commutes with `map h`. Both reversal and
+the function that always returns an empty list satisfy that law. The
+signature does not determine which list length `r` returns. Similarly,
+an implementation with the type of `zipWith` can always return `[]`.
+HaskLib proves the shorter-length law by induction on the actual
+implementation's equations.
+[Wadler, *Theorems for free!*](https://doi.org/10.1145/99370.99404) and
+[HaskLib list laws](hasklib/HaskLib/List.hs).
+
+In lazy Haskell, `seq` can observe whether an argument is defined.
+For example, define `r [] = []` and `r (x:xs) = seq x (x:xs)`.
+With `h = const True` and `xs = [undefined]`, evaluating
+`r (map h xs)` produces a cons. Evaluating `map h (r xs)` diverges.
+Johann and Voigtländer give a relational interpretation for a calculus
+with recursion, algebraic types and `seq`. Each free theorem must
+carry the applicable conditions on its relations. The fork checks the
+provider's Core or typed clauses for the HaskLib list proofs.
+[Johann and Voigtländer, *Free Theorems in the Presence of seq*](https://janis-voigtlaender.eu/JV04.html)
+and [paper notes](papers/README.md#free-theorems-and-seq-popl-2004).
+
+HaskLib groups public lemmas by subject. Agda's standard library puts
+these list results in `Data.List.Properties`. Lean's mathlib collects
+reusable theorems in an importable library with subject modules.
+[Agda list properties](https://agda.github.io/agda-stdlib/v2.3/Data.List.Properties.html)
+and [Lean mathlib](https://github.com/leanprover-community/mathlib4).
+
 ### The length of zip and demand in a case tree
 
 Agda's `length-zipWith` proves that the length of a zip is the minimum

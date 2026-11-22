@@ -1,0 +1,37 @@
+cabal-version: 3.0
+name: hasklib
+version: 0.1.0.0
+synopsis: Checked proofs for Dependent Haskell
+description: List length laws for ordinary Haskell functions and runtime lists.
+category: Data
+license: BSD-3-Clause
+license-file: hasklib/LICENSE
+build-type: Simple
+
+library
+  exposed-modules:
+    HaskLib
+    HaskLib.List
+
+  other-modules:
+    PreludeAppendLengthSource
+    PreludeMapLengthSize
+    PreludeZipRuntime
+
+  hs-source-dirs:
+    hasklib
+    examples/open-evaluation
+
+  build-depends: base >=4.23 && <5
+  default-language: GHC2024
+
+test-suite list-laws
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules: Client
+  hs-source-dirs: hasklib-test
+  build-depends:
+    base >=4.23 && <5,
+    hasklib,
+
+  default-language: GHC2024
