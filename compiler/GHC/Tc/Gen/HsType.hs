@@ -3038,7 +3038,7 @@ tc_app_ty_other mode rn_ty exp_kind
               fmap (checkTableMethod fun) <$> lookupSourceContainerMethod fun (mkTyConTy tc)
             _ -> pure Nothing
     checkedClassMethod fun args@[left, right]
-      | sourceMapSelector fun, any isOpenTypeOperand args
+      | sourceMapSelector fun, any open_mapping_operand args
       , Just cls <- isClassOpId_maybe fun = do
           (receiver, kind) <- tc_infer_lhs_type mode right
           actual <- liftZonkM (zonkTcType kind)
@@ -3062,6 +3062,11 @@ tc_app_ty_other mode rn_ty exp_kind
       = do actual <- liftZonkM (zonkTcType domain)
            fmap (checkTableMethod fun) <$> lookupSourceBinaryMethod fun actual
     checkedClassMethod _ _ = pure Nothing
+
+    -- A foreach-bound callback or constructor field also selects the open path.
+    -- See Note [Erased arguments in a checked source dictionary] in GHC.Tc.Gen.SourceTable.
+    open_mapping_operand = isOpenTypeOperandWith (\(WithUserRdr _ n) -> indexed_variable n)
+                                                (\(WithUserRdr _ n) -> isDataConName n)
 
     checkTableMethod fun selected@(dfun, _, _) =
       checkInstantiatedMethod fun (varType dfun) selected
