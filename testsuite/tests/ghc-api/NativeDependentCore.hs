@@ -20,7 +20,7 @@ import GHC.Core.DataCon (DataCon, DataConRep (NoDataConRep), HsImplBang (HsLazy)
 import GHC.Core.Dependent
 import GHC.Core.FVs (exprFreeVars)
 import GHC.Core.FamInstEnv (emptyFamInstEnvs, mkBranchedCoAxiom, mkCoAxBranch, normaliseType)
-import GHC.Core.Lint (lintExpr)
+import GHC.Core.Lint (lintExpr, lintScopedDictionaryType)
 import GHC.Core.Make (mkIntExprInt)
 import GHC.Core.Map.Type (LooseTypeMap, TypeMap, emptyTypeMap)
 import GHC.Core.Opt.Arity (etaExpand, pushCoArg, pushCoTyArg)
@@ -116,6 +116,7 @@ main = do
             runOpaqueCallChecks dflags
             runRetainedOccursChecks
             runCurriedCallCoreChecks dflags
+            runScopedDictionaryOccursChecks libdir
             runFunctionBinderChecks dflags
             runFunctionFieldChecks dflags
             runArrowMatchabilityChecks dflags
@@ -221,6 +222,69 @@ runRetainedOccursChecks = do
     check "an independent variable can still bind to the indexed type" $ case unify [b] [rho] of
         Unifiable{} -> True
         _ -> False
+
+-- | Check recursive substitutions through well-typed scoped dictionary types.
+runScopedDictionaryOccursChecks :: FilePath -> IO ()
+runScopedDictionaryOccursChecks libdir = runGhc (Just libdir) $ do
+    flags <- getSessionDynFlags
+    _ <- setSessionDynFlags flags
+    imports <- traverse parseImportDecl ["import Prelude", "import Data.Proxy"]
+    setContext (map IIDecl imports)
+    proxyName :| otherProxyNames <- parseName "Proxy"
+    proxies <- traverse lookupName (proxyName : otherProxyNames)
+    [proxy] <- pure [tc | Just (ATyCon tc) <- proxies]
+    showClassName :| _ <- parseName "Show"
+    Just (ATyCon showClass) <- lookupName showClassName
+    showName :| _ <- parseName "show"
+    Just (AnId showMethod) <- lookupName showName
+    let variable n name = mkTyVar (mkSystemName (unique n) (mkTyVarOcc name)) liftedTypeKind
+        a = variable 11520 "a"
+        b = variable 11521 "b"
+        aTy = mkTyVarTy a
+        bTy = mkTyVarTy b
+        dictionary n name ty = local n name (mkTyConApp showClass [ty])
+        showA = dictionary 11522 "showA" aTy
+        showBool = dictionary 11523 "showBool" boolTy
+        x = local 11524 "x" aTy
+        call = ClassAppTy showMethod aTy (TermVarTy showA) (TermVarTy x) stringTy
+        selectorRange = mkTyConApp proxy [stringTy, call]
+        predicateRange = DepDictTy showA boolTy
+        bodyRange = DepDictTy showBool selectorRange
+        shadowed = mkForAllTy unmatchableDataConTy (Bndr a Specified) predicateRange
+        unify = tcUnifyTysFG alwaysBindFam alwaysBindTv
+        occurs lhs rhs = case unify lhs rhs of
+            MaybeApart MARInfinite _ -> True
+            _ -> False
+        binds tv ty = case unify [mkTyVarTy tv] [ty] of
+            Unifiable subst -> maybe False (eqType ty) (Subst.lookupTyVar subst tv)
+            _ -> False
+        familyArg = mkAnonTyConBinder (variable 11525 "index")
+        family = mkFamilyTyCon (mkSystemName (unique 11526) (mkTcOcc "EvidenceIndex"))
+            (mkTyConKindWithMatchability unmatchableDataConTy [familyArg] liftedTypeKind)
+            [familyArg] 1 liftedTypeKind Nothing OpenTypeFamilyTyCon Nothing NotInjective
+        index = mkTyConApp family [boolTy]
+        familyInBody = DepDictTy showBool index
+        familyInPredicate = DepDictTy (dictionary 11527 "showIndex" index) boolTy
+    liftIO $ do
+        let selectorScope = [a, showA, x]
+        forM_ [("dictionary predicate", [a], predicateRange),
+               ("selector application", selectorScope, selectorRange),
+               ("dictionary body", selectorScope, bodyRange)] $ \(label, scope, rhs) -> do
+            check (label ++ " is a valid scoped dictionary type") $
+                case lintScopedDictionaryType (initLintConfig flags scope) rhs of
+                    Nothing -> True
+                    _ -> False
+            check (label ++ " rejects a direct cyclic binding") $ occurs [aTy] [rhs]
+            check (label ++ " rejects a transitive cyclic binding") $ occurs [bTy, aTy] [rhs, bTy]
+            check (label ++ " permits an independent type variable") $ binds b rhs
+        check "a forall shadows a variable in a dictionary predicate" $ binds a shadowed
+        check "the dictionary predicate sees an earlier family substitution" $
+            occurs [index, aTy] [mkListTy aTy, familyInPredicate]
+        check "the dictionary body does not apply the earlier family substitution" $
+            case unify [index, aTy] [mkListTy aTy, familyInBody] of
+                MaybeApart MARTypeFamily subst ->
+                    maybe False (eqType familyInBody) (Subst.lookupTyVar subst a)
+                _ -> False
 
 -- | Create a stable test unique without a global unique supply.
 unique :: Int -> Unique

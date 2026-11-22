@@ -2335,6 +2335,13 @@ uOccursCheck (UMState { um_tv_env = tv_env, um_fam_env = fam_env }) bvs lhs ty
     go :: TyCoVarSet   -- Bound by enclosing foralls; see (OCU1)
        -> Type -> Bool
     go bvs ty | Just ty' <- coreView ty = go bvs ty'
+    go bvs (ClassAppTy _ inst dict operand kind)
+      = go bvs inst || go bvs dict || go bvs operand || go bvs kind
+    go bvs (DepDictTy evidence body)
+      = go_id bvs evidence ||
+        (case lhs of
+           TyVarLHS {} -> go (bvs `extendVarSet` evidence) body
+           TyFamLHS {} -> False)
     go bvs (TermAppTy f arg) = go_id bvs f || go bvs arg
     go bvs (TermVarTy v) = go_id bvs v
     go bvs (ExistsTy _ v body)
@@ -2404,6 +2411,12 @@ The proposed binding a := ((f x ~ f x) => Int) would still put a in its
 own substitution range, through the types of f and x. Check the type and
 multiplicity of each retained Id with the same substitutions as the
 enclosing type. A fresh b can bind to the same range.
+
+Check the instantiated type, dictionary index, operand index and result kind
+of a ClassAppTy. The method is a fixed global selector. The predicate of a
+DepDictTy uses the enclosing scope. The dictionary Id scopes over the body,
+where family substitutions are inactive, as for DepFunTy.
+See Note [Scoped selector applications] in GHC.Core.TyCo.Rep.
 
 So (uOccursCheck substs lhs ty) returns True iff extending `substs` with `lhs :-> ty`
 could lead to a loop. That is, could there by a type `s` such that
