@@ -30,13 +30,13 @@ capture a b = \cases
     Neither -> Proxy @a
     (Both _ _) -> Proxy @b
 
-nested :: foreach (d :: Choice) ->
-    Maybe (case d of { Neither -> Char; Both True r -> Int; Both False r -> Int })
-nested _ = Nothing
+nested :: foreach (a :: Bool) -> foreach (d :: Choice) ->
+    Maybe (case d of { Neither -> Proxy a; Both True r -> Proxy r; Both False r -> Proxy a })
+nested _ _ = Nothing
 HS
 cat >Consume.hs <<'HS'
 {-# LANGUAGE ExperimentalDependentTypes #-}
-module Consume (sameField, otherField, sameCapture, otherCapture, nested) where
+module Consume (sameField, otherField, sameCapture, otherCapture, nested, nestedOther) where
 
 import Data.Proxy (Proxy(..))
 import Domain (Choice(..))
@@ -60,9 +60,13 @@ otherCapture :: foreach (x :: Bool) -> foreach (y :: Bool) -> foreach (d :: Choi
     (case d of { Both l r -> Proxy x; Neither -> Proxy y }) -> String
 otherCapture _ _ _ _ = "wrong capture"
 
-nested :: foreach (d :: Choice) ->
-    Maybe (case d of { Both False r -> Int; Neither -> Char; Both True r -> Int }) -> String
-nested _ _ = "nested"
+nested :: foreach (a :: Bool) -> foreach (d :: Choice) ->
+    Maybe (case d of { Both False t -> Proxy a; Neither -> Proxy a; Both True t -> Proxy t }) -> String
+nested _ _ _ = "nested"
+
+nestedOther :: foreach (a :: Bool) -> foreach (d :: Choice) ->
+    Maybe (case d of { Both False t -> Proxy t; Neither -> Proxy a; Both True t -> Proxy a }) -> String
+nestedOther _ _ _ = "wrong nested result"
 HS
 cat >Main.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes #-}
@@ -80,10 +84,12 @@ main :: IO ()
 main = do
     cell <- newIORef Neither
     let check = observe (error "forced first capture") (error "forced second capture")
+        nested a d = C.nested a d (P.nested a d)
     before <- check <$> readIORef cell
     writeIORef cell (Both (error "forced first field") (error "forced second field"))
     after <- check <$> readIORef cell
-    print (before, after)
+    nestedResult <- nested (error "forced nested capture") <$> readIORef cell
+    print (before, after, nestedResult)
 HS
 cat >Reject.hs <<'HS'
 {-# LANGUAGE CPP, NoExperimentalDependentTypes #-}
@@ -105,9 +111,12 @@ bad a b d = C.sameCapture a b d (P.capture b a d)
 #elif defined(INDEX)
 bad :: Choice -> Choice -> String
 bad d e = C.sameField d (P.field e)
+#elif defined(NESTED_INDEX)
+bad :: Bool -> Choice -> Choice -> String
+bad a d e = C.nested a d (P.nested a e)
 #else
-bad :: Choice -> String
-bad d = C.nested d (P.nested d)
+bad :: Bool -> Choice -> String
+bad a d = C.nestedOther a d (P.nested a d)
 #endif
 HS
 
@@ -122,9 +131,9 @@ for opt in -O0 -O2; do
     "${ghc[@]}" "$opt" -c Main.hs
     "${ghc[@]}" "$opt" Main.o Domain.o Provide.o Consume.o -o run
     ./run > actual
-    printf '(("neither","neither"),("both","both"))\n' | diff -u - actual
+    printf '(("neither","neither"),("both","both"),"nested")\n' | diff -u - actual
 
-    for control in FIELD CAPTURE CAPTURE_ARG INDEX NESTED; do
+    for control in FIELD CAPTURE CAPTURE_ARG INDEX NESTED_INDEX NESTED_RESULT; do
         if "${ghc[@]}" "$opt" "-D$control" -c Reject.hs > "$control.log" 2>&1 ||
            ! grep -Fq 'error: [GHC-83865]' "$control.log"; then
             cat "$control.log" >&2
