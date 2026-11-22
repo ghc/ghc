@@ -26,6 +26,7 @@ Updated 22 November 2026. The development branch is
 | `6765da7957` | HaskLib exports `trans`, `congSucc` and `congFirst`. A single-import client uses them to prove the append-singleton and zip-after-map laws. Job `692` passed the final package and demand checks with the normal `2d6368dd57` compiler at both optimization levels. |
 | `1011998c82` | The Showcase calls the direct and composed proofs on the same lists from IO. It prints `([False],Refl,Refl)`. Job `704` matched all 546 lines at native `-O0`, native `-O2` with stripped and ordinary interfaces, and GHCi. |
 | `a395eea233` and `f73e659381` | Both stages built and matched 546 native Showcase lines at `-O0` and `-O2`. Stage 2 GHCi, installed HaskLib and the selective-upgrade checks passed. The official normal-way selection passed 39 of 40 tests. Unchanged `T15874` failed with the same GHC-45219 as on the preceding released compiler. |
+| `d41294266d` and `a7088dd69f` | R19 composes type-level cases across two modules at a runtime enum index. The compiler sources match the normal two-stage build at `4e0c9b393a`. Job `828` passed `NativeDependentCoreRun` and the 547-line Showcase at stage 2 in native `-O0`, native `-O2` and GHCi. |
 
 [Equality continuations and kind inference](CHECKPOINTS.md#equality-continuations-and-structural-kind-inference), [HaskLib pipeline and parametricity](CHECKPOINTS.md#compose-installed-list-proofs), [Ordinary minimum](CHECKPOINTS.md#an-ordinary-minimum-in-the-zip-length-proof)
 and [previous release](CHECKPOINTS.md#direct-zip-proof-and-retained-callback-rules).
@@ -87,10 +88,10 @@ polymorphic function, a bare `Refl` fails at the proof expression.
 [Hypotheses and controls](REFERENCES.md#filter-naturality-in-the-presence-of-seq).
 
 The earlier R19 selector designs are recoverable under
-`refs/archive/dependent-haskell/2026-11-22/`. The current R19
-candidate compares the generated case equations directly. Its private
+`refs/archive/dependent-haskell/2026-11-22/`. The published R19
+implementation compares the generated case equations directly. Its private
 compiler passed both known and unknown scrutinees at 1,610 constructors.
-Job 802 checks that implementation in a normal build.
+Jobs 802 and 815 built and tested that implementation in a normal compiler.
 
 | Ref | Current evidence |
 | --- | --- |
@@ -120,7 +121,7 @@ and [the separate 158-registration compatibility comparison](CHECKPOINTS.md#comp
 The cumulative source `91fd7365bf` adds R19 and the first R36 warning
 fixes. Its clean build uses `r03-r19-r36-normal-91fd7365bf-20261122`.
 It contains the same R03 change. Qualify the corrected Lint behavior
-before publishing those compiler changes.
+before publishing the callback and successor-inference changes.
 
 The [release-readiness assessment](ROADMAP.md#release-readiness) identifies
 R36 as the next full-card target.
@@ -145,11 +146,11 @@ R36 as the next full-card target.
 
 ## Build and verify
 
-The current 546-line qualification area is
-`_build/on-demand/r23-r03-normal-20261122`. Its `source` link points to
-the configured checkout from the R23 clean build. Its `build.sh`
-records the incremental build. Check that the driver's `--info`
-revision is `a395eea233` before replay.
+The current 547-line Showcase uses the normal two-stage compiler in
+`_build/on-demand/r19-closure-normal-20261122`. Its driver's
+`--info` revision is `4e0c9b393a`. Job 828 used the published
+HaskLib and the fixture at `a7088dd69f`. The preceding 546-line
+compiler at `a395eea233` is in `_build/on-demand/r23-r03-normal-20261122`.
 On this host the bootstrap tools are GHC 9.14.1, Cabal 3.18.1.0, Happy 2.1.7
 and Alex 3.5.4.0. A fresh checkout needs the Git submodules at their recorded
 revisions. This build used five workers per job.
@@ -163,7 +164,7 @@ self-hosted stage 2 compiler in `_build/stage1/bin/ghc`. Both use the
 target libraries in `_build/stage1/lib`. For example, from the main checkout:
 
 ```sh
-stable="$PWD/_build/on-demand/r23-r03-normal-20261122/source/_build/stage1"
+stable="$PWD/_build/on-demand/r19-closure-normal-20261122/source/_build/stage1"
 queue="$PWD/docs/dependent-haskell/tools/ghc-build-job"
 check="$PWD/docs/dependent-haskell/check-showcase.sh"
 "$queue" showcase-stage2-ghci bash "$check" "$stable/bin/ghc" "$stable/lib" --ghci

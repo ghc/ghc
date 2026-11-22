@@ -148,6 +148,27 @@ source revisions and rebuild commands, then remove both sets of outputs
 after the last live user finishes. The 200 GB threshold is a backup for
 this cleanup.
 
+## Compose independent type-level cases
+
+The published R19 compiler compares the equations of two generated
+cases on the same enumeration. Each constructor must occur once and
+select the same named result type in both cases. The order of independent
+rows may differ. The client can then pass the selected value between
+modules while its index is unknown. The ordinary function
+`renderIndependent :: Bool -> String` in the Showcase calls
+`NativeRetainedTH.renderCase flag (NativeCase.retainedPick flag)`.
+The Showcase applies it to two Booleans read from IO and prints
+`("7","f")`.
+
+The normal two-stage build at `4e0c9b393a` passed the four registered
+R19 checks. An older compiler could use the new providers at known
+indices. It rejected an interface that stored the new coercion.
+Changing one result in one provider invalidated the consumer's proof.
+Job 828 then checked the public fixture at `a7088dd69f`, including
+the separate Core API regression and the 547-line Showcase.
+[R19 test and scope](roadmap/R19-type-level-cases.md#a-case-in-a-value-signature)
+and [Showcase source](Showcase.hs).
+
 ## Compatibility of the named callback and successor inference changes
 
 The preceding normal compiler at `a395eea233` and the combined normal
