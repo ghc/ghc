@@ -23,7 +23,7 @@ import {-# SOURCE #-} GHC.Rename.Splice ( rnSpliceDecl, rnTopSpliceDecls, rnSpli
 
 import GHC.Hs
 import qualified GHC.Hs.Decls as HsDecls
-import GHC.Hs.Type (mkHsImplicitSigType, HsTypeGhcPsExt(HsTypeCase, HsTypeCaseAlias, HsTypeLet, HsTypeSome), HsTypeCaseAlt(..), mkHsSingleTypeLet, splitHsTypeLet)
+import GHC.Hs.Type (mkHsImplicitSigType, HsTypeGhcPsExt(HsTypeCase, HsTypeCaseAlias, HsTypeLet, HsTypeSome), HsTypeCaseAlt(..), mkHsSingleTypeLet, splitHsTypeLet, preserveTypeLetSource)
 import GHC.Hs.Decls.Overlap ( OverlapMode(..) )
 import GHC.Iface.Env ( lookupOrig )
 
@@ -315,7 +315,7 @@ liftTypeLambdas sigma group = do
     liftRhs lift_sum scoped owner captures (L loc (HsKindSig ann body kind)) salt =
       let (body', families, next) = liftRhs lift_sum scoped owner captures body salt
       in (L loc (HsKindSig ann body' kind), families, next)
-    liftRhs _ scoped owner captures (L loc (XHsType (HsTypeLet ann _ binds result_ty))) salt =
+    liftRhs _ scoped owner captures (L loc (XHsType let_ty@(HsTypeLet ann _ _ binds result_ty))) salt =
       let (binder, rhs, body) = splitHsTypeLet binds result_ty
           (rhs', rhs_families, next) = liftRhs False scoped owner captures rhs salt
           saved = privateName "let-outer" next 0 binder
@@ -329,7 +329,7 @@ liftTypeLambdas sigma group = do
           result | not (null body_families), any shadowed captures
                  = L loc (XHsType (mkHsSingleTypeLet noAnn saved (typeName binder) local))
                  | otherwise = local
-      in (result, rhs_families ++ body_families, if null body_families then next else end)
+      in (preserveTypeLetSource let_ty result, rhs_families ++ body_families, if null body_families then next else end)
     liftRhs _ scoped owner captures (L loc (XHsType (HsTypeLambda _ vars body))) salt =
       liftLambdaRhs scoped Nothing owner captures loc vars body salt Nothing
     liftRhs True scoped owner captures (L loc (XHsType (HsTypeSome _ binder domain body))) salt =
@@ -1341,7 +1341,7 @@ liftTypeCases group =
                                    (scrutinee, scrut_kind) (Just kind) patterns salt
         in (L loc (HsKindSig ann body' kind), cases, next)
     liftRhs owner independent captures aliases
-      (L loc (XHsType (HsTypeLet ann _ binds result_ty))) salt
+      (L loc (XHsType let_ty@(HsTypeLet ann _ _ binds result_ty))) salt
       | not independent
       , let (binder, rhs, body) = splitHsTypeLet binds result_ty
       , letCaseBody body
@@ -1366,11 +1366,11 @@ liftTypeCases group =
             result'
               | any shadowed captures = letTy loc ann saved (typeName binder) result
               | otherwise = result
-        in (result', (helper, (occ, Just owner_occ)) : generated, next)
-    liftRhs owner False captures aliases (L loc (XHsType (HsTypeLet ann _ binds result_ty))) salt =
+        in (preserveTypeLetSource let_ty result', (helper, (occ, Just owner_occ)) : generated, next)
+    liftRhs owner False captures aliases (L loc (XHsType let_ty@(HsTypeLet ann _ _ binds result_ty))) salt =
       let (v, rhs, body) = splitHsTypeLet binds result_ty
           (rhs', cases, next) = liftRhs owner False captures aliases rhs salt
-      in (letTy loc ann v rhs' body, cases, next)
+      in (preserveTypeLetSource let_ty (letTy loc ann v rhs' body), cases, next)
     liftRhs owner independent captures aliases (L loc (HsFunTy ann arrow domain result)) salt =
       let (domain', domain_cases, next) = liftRhs owner independent captures aliases domain salt
           (result', result_cases, end) = liftRhs owner independent captures aliases result next
@@ -1432,7 +1432,7 @@ liftTypeCases group =
     -- Follow a chain of nonrecursive lets to the ordered case.
     letCaseBody ty = case unLoc (ignoreParens ty) of
       XHsType (HsTypeCase _ _ _ alts) -> all (isJust . checkAlt) alts
-      XHsType (HsTypeLet _ _ binds result_ty) ->
+      XHsType (HsTypeLet _ _ _ binds result_ty) ->
         let (_, rhs, body) = splitHsTypeLet binds result_ty
         in isJust (lexicalNames rhs) && letCaseBody body
       _ -> False

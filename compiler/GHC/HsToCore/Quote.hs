@@ -1509,7 +1509,7 @@ repLTyAt tyki (L _ (XHsType (HsTypeCaseRn scrutinee rows))) = do
       rep2 typeCaseAltName [pat', rhs']
 repLTyAt _ (L loc (XHsType HsTypeCaseAliasRn{})) =
   notHandledL (locA loc) ThTypeCase
-repLTyAt tyki (L _ (XHsType (HsTypeLetRn (L _ name) rhs body))) = do
+repLTyAt tyki (L _ (XHsType (HsTypeLetRn _ (L _ name) rhs body))) = do
   MkC rhs' <- repLTyAt tyki rhs
   addSimpleTyVarBinds FreshNamesOnly [name] $ do
     MkC name' <- lookupOcc name

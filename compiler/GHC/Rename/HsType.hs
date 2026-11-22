@@ -55,7 +55,7 @@ import GHC.Driver.Flags
 import GHC.Data.List.SetOps (findDupsEq)
 import GHC.Parser.PostProcess (setRdrNameSpace)
 
-import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLet, HsTypeCase, HsTypeCaseAlias, HsTypeCaseHead, HsTypeSome), HsTypeGhcRnExt(..), HsTypeCaseAlt(..), splitHsTypeLet)
+import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLet, HsTypeCase, HsTypeCaseAlias, HsTypeCaseHead, HsTypeSome), HsTypeGhcRnExt(..), HsTypeCaseAlt(..), splitHsTypeLet, typeLetSource)
 import GHC.Hs
 
 import GHC.Rename.Env
@@ -1119,7 +1119,7 @@ rnHsTyKi env (XHsType (HsTypeCaseAlias generated (owner, index, alias) body)) = 
   (body', fvs) <- bindLocalNamesFV (maybeToList (unLoc <$> alias')) (rnLHsTyKi env body)
   pure (XHsType (HsTypeCaseAliasRn (unLoc owner', index, alias') body'), extendNameSetList fvs generated_names)
 
-rnHsTyKi env (XHsType (HsTypeLet (let_kw, _) _ binds result)) = do
+rnHsTyKi env (XHsType let_ty@(HsTypeLet (let_kw, _) _ _ binds result)) = do
   let (binder, rhs, body) = splitHsTypeLet binds result
   enabled <- xoptM LangExt.ExperimentalDependentTypes
   unless enabled $
@@ -1127,7 +1127,7 @@ rnHsTyKi env (XHsType (HsTypeLet (let_kw, _) _ binds result)) = do
   (rhs', rhs_fvs) <- rnLHsTyKi env rhs
   name <- newLocalBndrRn binder
   (body', body_fvs) <- bindLocalNamesFV [name] (rnLHsTyKi env body)
-  return (XHsType (HsTypeLetRn (fmap (const name) binder) rhs' body'),
+  return (XHsType (HsTypeLetRn (typeLetSource let_ty) (fmap (const name) binder) rhs' body'),
           rhs_fvs `plusFN` body_fvs)
 
 rnHsTyKi env (XHsType (HsTypeCase (case_kw, _) _ scrutinee alts)) = do
@@ -2836,7 +2836,7 @@ extract_lty (L _ ty) acc
         filter (\v -> Just (unLoc v) /= (unLoc <$> alias)) (extract_lty body []) ++ acc
       XHsType (HsTypeLambda _ binders body)
                                   -> extract_body (map unLoc binders) body acc
-      XHsType (HsTypeLet _ _ binds result) ->
+      XHsType (HsTypeLet _ _ _ binds result) ->
         let (binder, rhs, body) = splitHsTypeLet binds result
         in extract_lty rhs (extract_body [unLoc binder] body acc)
       XHsType (HsTypeSome _ binder domain body)

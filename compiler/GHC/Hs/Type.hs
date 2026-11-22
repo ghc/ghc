@@ -21,8 +21,8 @@ module GHC.Hs.Type (
 
         HsType(..), HsCoreTy, LHsType, HsKind, LHsKind,
         HsTypeGhcPsExt(..), HsTypeCaseAlt(..), HsTypeLetBind(..), HsTypeLetPair(..), HsTypeLetPat(..),
-        HsTypeGhcRnExt(..), hsExistsTyFlag,
-        mkHsSingleTypeLet, splitHsTypeLet, isTypeLetPairOcc,
+        HsTypeGhcRnExt(..), HsTypeLetSource, hsExistsTyFlag,
+        mkHsSingleTypeLet, splitHsTypeLet, isTypeLetPairOcc, typeLetSource, preserveTypeLetSource,
         HsForAllTelescope(..), EpAnnForallVis, EpAnnForallInvis,
         HsTyVarBndr(..), LHsTyVarBndr, AnnTyVarBndr(..),
         HsBndrKind(..),
@@ -127,13 +127,13 @@ import GHC.Types.Basic
 import GHC.Types.SrcLoc
 import GHC.Data.FastString
 import GHC.Utils.Outputable
-import GHC.Utils.Misc (count)
+import GHC.Utils.Misc (abstractConstr, count, mkNoRepType)
 
 import Data.Maybe
 import Data.List (isPrefixOf)
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
-import Data.Data (Data)
+import Data.Data (Data(..))
 
 import qualified Data.Semigroup as S
 import GHC.Data.Bag
@@ -547,7 +547,7 @@ data HsTypeGhcRnExt
   | HsGadtFieldRn (HsConDeclField GhcRn)
     -- See Note [Late GADT field annotations] in GHC.Rename.HsType.
   | HsTypeExistsRn !ExistsTyFlag (LHsTyVarBndr Specificity GhcRn) (LHsType GhcRn)
-  | HsTypeLetRn (LocatedN Name) (LHsType GhcRn) (LHsType GhcRn)
+  | HsTypeLetRn (Maybe HsTypeLetSource) (LocatedN Name) (LHsType GhcRn) (LHsType GhcRn)
   | HsTypeCaseAliasRn (Name, Int, Maybe (LocatedN Name)) (LHsType GhcRn)
   | HsTypeCaseRn (LHsType GhcRn) [([Name], LHsType GhcRn, LHsType GhcRn)]
     -- Quoted case. Each row carries its pattern binders, pattern and result.
@@ -574,7 +574,7 @@ data HsTypeGhcPsExt
   | HsTypeExists (EpToken "exists", Either (EpToken "|") (EpToken "."))
       (LHsTyVarBndr Specificity GhcPs) (LHsType GhcPs)
   | HsTypeLet (EpToken "let", EpToken "in") (Maybe (EpToken "{", EpToken "}"))
-              (NonEmpty (LocatedA HsTypeLetBind)) (LHsType GhcPs)
+              (Maybe HsTypeLetSource) (NonEmpty (LocatedA HsTypeLetBind)) (LHsType GhcPs)
 
   | HsTypeCase (EpToken "case", EpToken "of")
                (Maybe (EpToken "{", EpToken "}"))
@@ -613,7 +613,33 @@ data HsTypeLetPat
 mkHsSingleTypeLet :: (EpToken "let", EpToken "in") -> LocatedN RdrName
                   -> LHsType GhcPs -> LHsType GhcPs -> HsTypeGhcPsExt
 mkHsSingleTypeLet ann name rhs body =
-  HsTypeLet ann Nothing (noLocA (HsTypeLetBind Nothing name noAnn rhs) :| []) body
+  HsTypeLet ann Nothing Nothing (noLocA (HsTypeLetBind Nothing name noAnn rhs) :| []) body
+
+-- | Written type let used for display. Generic traversals skip this copy.
+newtype HsTypeLetSource = HsTypeLetSource (HsType GhcPs)
+
+instance Data HsTypeLetSource where
+  toConstr _ = abstractConstr "HsTypeLetSource"
+  gunfold _ _ = error "gunfold:HsTypeLetSource"
+  dataTypeOf _ = mkNoRepType "HsTypeLetSource"
+
+-- | Find the written pair let for display. See Note [Ordered type let bindings].
+typeLetSource :: HsTypeGhcPsExt -> Maybe HsTypeLetSource
+typeLetSource (HsTypeLet _ _ source@(Just _) _ _) = source
+typeLetSource source@(HsTypeLet (let_kw, _) _ Nothing binds _)
+  | isGoodSrcSpan (getEpTokenSrcSpan let_kw)
+  , any is_pair binds = Just (HsTypeLetSource (XHsType source))
+  where
+    is_pair (L _ HsTypeLetPairBind{}) = True
+    is_pair _ = False
+typeLetSource _ = Nothing
+
+-- | Preserve the source when lifting a type case or lambda through a pair let.
+preserveTypeLetSource :: HsTypeGhcPsExt -> LHsType GhcPs -> LHsType GhcPs
+preserveTypeLetSource original (L loc (XHsType (HsTypeLet ann braces _ binds body)))
+  | Just source <- typeLetSource original =
+      L loc (XHsType (HsTypeLet ann braces (Just source) binds body))
+preserveTypeLetSource _ result = result
 
 typeLetPairPrefix :: String
 typeLetPairPrefix = "$type-let-pair:"
@@ -671,7 +697,7 @@ splitHsTypeLet (first :| binds) body = case unLoc first of
     rest = case binds of
       [] -> body
       b : bs -> L (noAnnSrcSpan (getLocA b `combineSrcSpans` getLocA body))
-                  (XHsType (HsTypeLet noAnn Nothing (b :| bs) body))
+                  (XHsType (HsTypeLet noAnn Nothing Nothing (b :| bs) body))
     ascribe signature rhs = case signature of
       Nothing -> rhs
       Just (_, colon, kind, _) -> L (getLoc rhs) (HsKindSig colon rhs kind)
@@ -703,6 +729,14 @@ The internal closed families select fields only when they see the promoted
 pair constructor. An unknown pair can remain in the type. With two
 wildcards, keep a private projection. It checks the pair kind when
 Template Haskell splices the ordinary LetT binders.
+
+Keep the written group when lifting a type case or lambda through a pair
+let. These passes can replace the pattern with private bindings before
+renaming. The renamed let displays the source in error contexts. Kind
+checking, scoping and quotation still use the lowered bindings. Check
+for a pair only at a source let token. The generated single binds and
+the tails of binding groups need no search for the written group. Keep
+this copy out of generic traversals so they see only the lowered syntax.
 -}
 
 -- | A parsed constructor alternative in a type case.
@@ -1840,7 +1874,7 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
         <+> char '|' <+> ppr_mono_lty body
     HsTypeCaseAlias _ _ body -> ppr_mono_lty body
     HsTypeExists (_, sep_tok) b body -> pprExistsTy (hsExistsTyFlag sep_tok) (ppr b) (ppr_mono_lty body)
-    HsTypeLet _ brackets binds body ->
+    HsTypeLet _ brackets _ binds body ->
       let binding (L _ (HsTypeLetBind signature v _ rhs)) =
             [ppr sig <+> dcolon <+> ppr_mono_lty kind | (sig, _, kind, _) <- maybeToList signature]
               ++ [ppr v <+> equals <+> ppr_typelet_rhs rhs]
@@ -1864,9 +1898,12 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
         <+> braces (sep (punctuate semi [ppr_mono_lty pat <+> arrow <+> ppr_mono_lty rhs
                                        | (_, pat, rhs) <- rows]))
     HsTypeExistsRn flag b body -> pprExistsTy flag (ppr b) (ppr_mono_lty body)
-    HsTypeLetRn v rhs body ->
-      text "let" <+> ppr v <+> equals <+> ppr_typelet_rhs rhs
-        <+> text "in" <+> ppr_mono_lty body
+    HsTypeLetRn source v rhs body ->
+      let lowered = text "let" <+> ppr v <+> equals <+> ppr_typelet_rhs rhs
+                      <+> text "in" <+> ppr_mono_lty body
+      in case source of
+           Just (HsTypeLetSource original) -> ifPprDebug lowered (ppr_mono_ty original)
+           Nothing -> lowered
 
 -- | Parenthesize a lowered kind signature on a type let RHS.
 ppr_typelet_rhs :: OutputableBndrId p => LHsType (GhcPass p) -> SDoc

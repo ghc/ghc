@@ -2371,11 +2371,11 @@ type :: { LHsType GhcPs }
                                                 $2 (reverse (unLoc $5)))) }
         | 'let' vocurly typelet_binds close 'in' ctype
                                        {% amsA' (sLL $1 $> $ XHsType
-                                            (HsTypeLet (epTok $1, epTok $5) Nothing
+                                            (HsTypeLet (epTok $1, epTok $5) Nothing Nothing
                                                (NE.reverse (unLoc $3)) $6)) }
         | 'let' '{' typelet_binds '}' 'in' ctype
                                        {% amsA' (sLL $1 $> $ XHsType
-                                            (HsTypeLet (epTok $1, epTok $5) (Just (epTok $2, epTok $4))
+                                            (HsTypeLet (epTok $1, epTok $5) (Just (epTok $2, epTok $4)) Nothing
                                                (NE.reverse (unLoc $3)) $6)) }
         | btype '->' ctype             {% let arr = HsModifiedFunArr noExtField
                                                                      []

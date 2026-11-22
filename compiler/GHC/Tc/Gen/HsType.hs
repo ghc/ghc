@@ -2234,7 +2234,7 @@ tcHsType _ (XHsType HsTypeCaseAliasRn{}) _ = failWithTc TcRnTypeCaseContext
 tcHsType _ (XHsType HsTypeCaseRn{}) _ = failWithTc TcRnTypeCaseContext
 
 -- See Note [Typechecking type lets].
-tcHsType mode (XHsType (HsTypeLetRn (L _ binder) rhs body)) exp_kind = do
+tcHsType mode (XHsType (HsTypeLetRn _ (L _ binder) rhs body)) exp_kind = do
   (rhs_ty, rhs_kind) <- tcInferTypeLetRhs mode rhs
   (checked_rhs, checked_kind) <-
     if isTypeLetPairOcc (nameOccName binder)

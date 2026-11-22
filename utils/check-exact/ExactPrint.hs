@@ -4164,7 +4164,7 @@ instance ExactPrint (HsType GhcPs) where
     body' <- markAnnotated body
     return (XHsType (HsTypeExists (exists', sep_tok') binder' body'))
 
-  exact (XHsType (HsTypeLet (let_tok, in_tok) braces binds body)) = setLayoutBoth $ do
+  exact (XHsType (HsTypeLet (let_tok, in_tok) braces source binds body)) = setLayoutBoth $ do
     let' <- markEpToken let_tok
     (braces', binds') <- case braces of
       Nothing -> (Nothing,) <$> setLayoutBoth (traverse markAnnotated binds)
@@ -4175,7 +4175,7 @@ instance ExactPrint (HsType GhcPs) where
         return (Just (open', close'), binds')
     in' <- markEpToken in_tok
     body' <- markAnnotated body
-    return (XHsType (HsTypeLet (let', in') braces' binds' body'))
+    return (XHsType (HsTypeLet (let', in') braces' source binds' body'))
   exact (XHsType (HsBangTy ann (HsSrcBang mt up str) ty)) = do
     (ann', mt') <- exactBang (ann, mt) str
     ty' <- markAnnotated ty
