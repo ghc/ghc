@@ -310,7 +310,9 @@ lifted argument and result types, and the kind of the index argument.
 The result kind comes from the head that was actually decoded. When a
 call supplies a type argument, check that kind against the application's
 telescope. Replacing a Bool result with a scoped type variable cannot
-make the call a valid argument of Bool kind. Constructor fields can refer
+make the call a valid argument of Bool kind. A cast reports the right kind
+of its coercion. Before constructing the cast, check that its nominal
+coercion starts at the actual kind of the call. Constructor fields can refer
 only to earlier fields. An IfaceDepFunTy binder can hold an opaque lifted
 value. Check its arrow when an IfaceTermAppTy uses it as a call head.
 See Note [Exported function-valued retained signatures]

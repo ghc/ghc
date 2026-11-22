@@ -2248,7 +2248,9 @@ tcIfaceType = go
                         failIfM (text "A retained function-value cast changes its fixed domain:"
                                  <+> ppr f)
                     ; return (mkCastTy ty' co') }
-               _ -> return (CastTy ty' co') }
+               _ ->
+                 do { when (call_operand False ty) (check_call_result_cast ty' co')
+                    ; return (CastTy ty' co') } }
     go (IfaceCoercionTy co)  = CoercionTy <$> tcIfaceCo co
 
     -- A raw ordinary application can expose a native function-value head.
@@ -2286,6 +2288,18 @@ tcIfaceType = go
     -- See Note [Opaque call indices in interfaces] in GHC.Iface.Type.
     check_call_arg_kinds name = check_iface_arg_kinds name
       (text "Invalid type application containing a retained call in interface:" <+> name)
+
+    check_call_result_cast ty co = do
+      let call_kind = typeKind ty
+          co_kind = coercionLKind co
+          role = coercionRole co
+      valid <- evaluateIfaceNativeDomain (ppr ty) $
+                 role == Nominal && call_kind `eqType` co_kind
+      unless valid $
+        failIfM (text "Invalid retained call result cast in interface:" <+> ppr ty
+                 $$ text "Expected nominal evidence from kind:" <+> ppr call_kind
+                 $$ text "Actual role:" <+> ppr role
+                 $$ text "Actual left kind:" <+> ppr co_kind)
 
     -- An interface can encode the same application in one TyConApp or
     -- append arguments using AppTy. Both forms use the promoted telescope.
