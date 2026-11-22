@@ -47,8 +47,10 @@ reject() {
 }
 for opt in -O0 -O2; do
     cp "$out/demand-$opt.hi" NativeOpenZipDemandControls.hi
-    reject '[GHC-05617]' "$src/NativeOpenZipWrongMinimum.hs" "$opt"
-    grep -Fq 'Refl' rejected.log
+    reject 'NativeOpenZipWrongMinimum.hs:14:13-16: error: [GHC-83865]' \
+        "$src/NativeOpenZipWrongMinimum.hs" "$opt" -ferror-spans
+    grep -Fq 'with: PreludeMapLengthSize.Succ (twiceMinimum (size xs) (size ys))' rejected.log
+    grep -Fq 'In a case alternative: Refl -> Refl' rejected.log
 done
 for mode in UNKNOWN_LEFT DROP_CONS; do
     reject '[GHC-83865]' "$proof" -fno-enable-rewrite-rules "-D$mode"
