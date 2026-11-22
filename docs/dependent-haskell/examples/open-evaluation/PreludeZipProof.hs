@@ -1,12 +1,13 @@
-{-# LANGUAGE CPP, DataKinds, GADTs, NoExperimentalDependentTypes, PolyKinds, TypeOperators #-}
+{-# LANGUAGE CPP, DataKinds, GADTs, NoExperimentalDependentTypes, PolyKinds, TypeApplications, TypeOperators #-}
 #ifndef RULES_ON
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
 #endif
 module PreludeZipProof where
 
-import Data.Proxy (Proxy)
+import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
 import PreludeMapLengthProof (Count, Spine(..))
+import PreludeMapLengthSize (Size(..))
 import PreludeZipSource (ZipPairs)
 import PreludeZipWithLengthProof (Minimum)
 
@@ -29,6 +30,15 @@ lengthZip Empty _ = Refl
 lengthZip (Cons _) Empty = Refl
 lengthZip (Cons xs) (Cons ys) = case lengthZip xs ys of
     Refl -> Refl
+
+-- | Discharge the cons equation here so optimized clients can use the witness.
+firstPair :: '[ '( 'True, 'False)] :~: '[ '( 'True, 'False)]
+firstPair = pairCons (Proxy @'True) (Proxy @'[ 'False]) (Proxy @'False) (Proxy @'[])
+
+-- | The two input lists produce one pair.
+shorterRight :: 'Succ 'Zero :~: 'Succ 'Zero
+shorterRight = lengthZip (Cons (Cons Empty) :: Spine '[ 'True, 'False])
+                        (Cons Empty :: Spine '[ 'False])
 
 #if defined(UNKNOWN_LEFT)
 unknownLeft :: Proxy xs -> ZipPairs xs '[] :~: '[]

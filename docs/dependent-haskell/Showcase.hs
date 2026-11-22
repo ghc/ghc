@@ -1903,14 +1903,10 @@ main = do
                              (error "forced second argument"))
     observe "use a checked cons rule without forcing the callback, head or tail"
         (ConsRuleMapProof.negateHead (Proxy @'[]), ConsRuleMapProof.lazySpine)
-    let shortSpine = PreludeMapLengthProof.Cons PreludeMapLengthProof.Empty
-            :: PreludeMapLengthProof.Spine '[ 'False]
-        longSpine = PreludeMapLengthProof.Cons shortSpine
-            :: PreludeMapLengthProof.Spine '[ 'True, 'False]
     observe "zip two lists and prove the pair and minimum-length laws"
         ( zip [True, False] [False]
-        , PreludeZipProof.pairCons (Proxy @'True) (Proxy @'[ 'False]) (Proxy @'False) (Proxy @'[])
-        , PreludeZipProof.lengthZip longSpine shortSpine
+        , PreludeZipProof.firstPair
+        , PreludeZipProof.shorterRight
         , PreludeZipWithLengthProof.shorterRight
         )
     observe "use the Prelude.zipWith cons equation with both tails unevaluated"

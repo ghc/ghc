@@ -1828,6 +1828,9 @@ The existing constructor checker verifies the lazy pair in its cons
 equation. An independent induction on the two list spines proves the
 minimum-length law directly for `Prelude.zip`. The Showcase runs `zip`
 on unequal lists and prints the pair-cons proof and the two length proofs.
+The proof module specializes its witnesses at concrete inputs. Their
+exported types contain only the resulting list or length. The optimized
+Showcase can print them with its usual rewrite rules enabled.
 Both functions must recur on the original tails. A function that checks
 the right spine first or forces a head before returning a cons does not
 get these equations. See the
