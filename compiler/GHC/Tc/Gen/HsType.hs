@@ -4870,6 +4870,18 @@ tcInferTyApps_nosat index_level expected_kind mode orig_hs_ty fun orig_hs_args
                           Just (owner, _) ->
                             bind <$> fresh_kind_arrow (mode_tyki mode) owner
                           Nothing -> default_binder tv }
+          -- See Note [Omitted matchability in higher-order arguments].
+          | Specified <- flag
+          , TypeLevel <- mode_tyki mode
+          , Nothing <- mode_holes mode
+          , tyVarKind tv `tcEqType` matchabilityTy
+          , Just (tc, _) <- tcSplitTyConApp_maybe fun
+          , isPromotedDataCon tc
+          , any (curried_callback_index tv) (take supplied_args (visible_domains inner_ki))
+          = do { owner <- tcl_kind_arrow_defaults <$> getLclEnv
+               ; case owner of
+                   Just (defaults, _) -> bind <$> fresh_kind_arrow TypeLevel defaults
+                   Nothing -> default_binder tv }
           | Specified <- flag
           , TypeLevel <- mode_tyki mode
           , Nothing <- mode_holes mode
@@ -4895,6 +4907,11 @@ tcInferTyApps_nosat index_level expected_kind mode orig_hs_ty fun orig_hs_args
 
         callback_arrow tv domain
           | Just (arrow, _, _) <- tcSplitFunTy_maybe domain = getTyVar_maybe arrow == Just tv
+          | otherwise = False
+
+        curried_callback_index tv domain
+          | Just (arrow, _, result) <- tcSplitFunTy_maybe domain
+          = getTyVar_maybe arrow == Just tv || curried_callback_index tv result
           | otherwise = False
 
         supplied_args = length [() | HsValArg{} <- all_args]
@@ -5095,6 +5112,13 @@ When an argument is checked against a function kind, allow its omitted
 index to agree with the expected kind. This also checks the inner family
 prefix in the example. The enclosing declaration solver collects those
 equalities and defaults any remaining index to U.
+
+A promoted constructor can quantify over the matchability of a callback
+field. For example, a constructor with a field of kind `a %m -> b` can
+take a matchable type constructor after promotion. Defer an omitted
+specified `m` if a supplied field has an arrow annotated with it. Its
+checked argument may determine the index. Keep the ordinary U default
+when the enclosing solver cannot determine it.
 
 An isolated partial application with an inferred kind keeps its original
 default. Otherwise its synonym kind could gain an extra invisible binder.
