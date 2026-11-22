@@ -5993,6 +5993,17 @@ proof. [Agda built-in equality](https://agda.readthedocs.io/en/v2.8.0/language/b
 [Agda standard library 2.4, `subst`](https://agda.github.io/agda-stdlib/v2.4/Relation.Binary.PropositionalEquality.Core.html)
 and [base equality operations](../../libraries/ghc-internal/src/GHC/Internal/Data/Type/Equality.hs).
 
+The proof-theory term for using the witness this way is *equality
+elimination*. Agda's `rewrite` clause matches the witness against
+`refl` and rewrites the goal from left to right. In Haskell, the body
+of `gcastWith proof body` can use the equality in either direction.
+The `constraints` package has the same calling convention. Its
+`withDict` accepts an `a :~: b` witness and checks the body with
+`a ~ b` in scope.
+[Agda equality eliminator `J`](https://agda.github.io/agda-stdlib/v2.1/Relation.Binary.PropositionalEquality.Properties.html),
+[Agda rewrite clauses](https://agda.readthedocs.io/en/latest/language/with-abstraction.html#rewrite)
+and [`Data.Constraint.withDict` and its equality instance](https://github.com/ekmett/constraints/blob/master/src/Data/Constraint.hs).
+
 The fork selects complete, scoped type arguments from the first argument
 and the expected result before checking a nominal equality continuation.
 On the earlier compiler, retained indices could reach mutable type
