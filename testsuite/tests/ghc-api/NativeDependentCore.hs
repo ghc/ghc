@@ -114,6 +114,7 @@ main = do
             runOccurrenceChecks dflags
             runAliasChecks dflags
             runOpaqueCallChecks dflags
+            runRetainedOccursChecks
             runCurriedCallCoreChecks dflags
             runFunctionBinderChecks dflags
             runFunctionFieldChecks dflags
@@ -150,7 +151,9 @@ runCurriedCallCoreChecks dflags = do
         xy = proof 11504 (TermVarTy x) (TermVarTy y)
         yz = proof 11505 (TermVarTy y) (TermVarTy z)
         forward = mkAppCo (mkTermAppCo cmp (mkCoVarCo xy)) (mkCoVarCo yz)
-        whole = proof 11506 result (apply x z)
+        whole = proof 11506 (apply y z) (apply z x)
+        chain = mkTransCo forward (mkCoVarCo whole)
+        optimized = optCoercion (OptCoercionOpts True Nothing) Subst.emptySubst chain
         scope = [cmp, x, y, z, xy, yz, whole]
     check "the comparator is a retained call head" (isNativeIndexFunctionId cmp)
     checkType dflags "the prefix has the second argument's arrow" step (typeKind partial)
@@ -162,6 +165,12 @@ runCurriedCallCoreChecks dflags = do
     lintAccepts dflags "forward congruence in both arguments" scope (Coercion forward)
     checkType dflags "left endpoint of curried congruence" result (coercionLKind forward)
     checkType dflags "right endpoint of curried congruence" (apply y z) (coercionRKind forward)
+    lintAccepts dflags "optimized curried congruence and a whole-result equality"
+        scope (Coercion optimized)
+    checkType dflags "optimization preserves the initial call" result (coercionLKind optimized)
+    checkType dflags "optimization preserves the final call" (apply z x) (coercionRKind optimized)
+    check "optimization keeps the comparator and all three equality premises" $
+        all (`elemVarSet` tyCoVarsOfCo optimized) [cmp, xy, yz, whole]
     forM_ [apply x z, apply z y] $ \other ->
         check "different inputs to an unknown comparator remain possibly equal" $
             case tcUnifyTysFG alwaysBindFam alwaysBindTv [result] [other] of
@@ -170,6 +179,27 @@ runCurriedCallCoreChecks dflags = do
     forM_ [CLeft, CRight] $ \side ->
         lintRejects dflags "call-result equality cannot be projected" scope
             (Coercion (LRCo side (mkCoVarCo whole)))
+
+-- | Follow the types of runtime variables when checking for recursive substitutions.
+runRetainedOccursChecks :: IO ()
+runRetainedOccursChecks = do
+    let variable n name = mkTyVar (mkSystemName (unique n) (mkTyVarOcc name)) liftedTypeKind
+        a = mkTyVarTy (variable 11510 "a")
+        b = mkTyVarTy (variable 11511 "b")
+        x = local 11512 "x" a
+        f = local 11513 "f" (mkVisFunTyManyU a boolTy)
+        rho = indexed (TermAppTy f (TermVarTy x))
+        unify = tcUnifyTysFG alwaysBindFam alwaysBindTv
+        occurs lhs rhs = case unify lhs rhs of
+            MaybeApart MARInfinite _ -> True
+            _ -> False
+    check "a occurs in a retained predicate through its runtime arguments" $
+        occurs [a] [rho]
+    check "the retained occurs check follows an earlier substitution" $
+        occurs [b, a] [rho, b]
+    check "an independent variable can still bind to the indexed type" $ case unify [b] [rho] of
+        Unifiable{} -> True
+        _ -> False
 
 -- | Create a stable test unique without a global unique supply.
 unique :: Int -> Unique
