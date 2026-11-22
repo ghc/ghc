@@ -5598,6 +5598,22 @@ are checked separately.
 [Runtime proof](examples/open-evaluation/TheseMapping.hs)
 and [instance and demand checks](../../testsuite/tests/dependent/should_run/NativeOpenTheseFmap.sh).
 
+### Inferring the input kind of a retained callback
+
+Agda permits an unannotated binder after `forall`. Its type stands for
+an inference hole. GHC specifies a more concrete rule for an ordinary
+signature such as `forall a b. (a -> b) -> a -> b`. Both variables have
+kind `Type` unless the program specifies another representation.
+[Agda 2.8 function types](https://agda.readthedocs.io/en/v2.8.0/language/function-types.html#notational-conventions)
+and [GHC 9.14.1 representation inference](https://downloads.haskell.org/ghc/9.14.1/docs/users_guide/exts/representation_polymorphism.html#inference-and-defaulting).
+
+The fork uses the lifted input required by a retained callback to
+determine a still-unknown representation in `forall a. foreach (p :: a -> Bool)`.
+A declared `r` in `a :: TYPE r` stays rigid. The source checker needs this
+distinction before it checks an application such as `p x` in the result
+type. [Provider](../../testsuite/tests/dependent/should_run/NativeLiftedCallbackProvider.hs)
+and [kind and demand checks](../../testsuite/tests/dependent/should_run/NativeLiftedCallback.sh).
+
 ### Upgrading checked method interfaces
 
 Agda checks the interface version before decoding a module. It also

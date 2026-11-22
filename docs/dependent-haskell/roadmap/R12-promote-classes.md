@@ -66,7 +66,7 @@ and derive `Functor`. A dependent client can check a property of the
 derived instance for a predicate and two fields supplied at runtime.
 
 ```haskell
-mapBoth :: forall (a :: Type). foreach (p :: a -> Bool)
+mapBoth :: forall a. foreach (p :: a -> Bool)
         -> foreach (label :: Char) -> foreach (x :: a)
         -> fmap p ('These label x) :~: 'These label (p x)
 mapBoth _ _ _ = Refl

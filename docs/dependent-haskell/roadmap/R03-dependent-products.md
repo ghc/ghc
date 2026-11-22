@@ -17,6 +17,13 @@ all Core transformations. Normal optimization remains a broader release gate.
 
 ## Supported subset and evidence
 
+A retained predicate can use an unannotated type parameter in a complete
+signature, as in `forall a. foreach (p :: a -> Bool) -> foreach (x :: a) -> Decision (p x)`.
+The predicate takes a lifted input. An explicitly representation-polymorphic
+or unlifted input still fails at the callback binder.
+[Source example](../../../testsuite/tests/dependent/should_run/NativeLiftedCallbackProvider.hs)
+and [kind inference references](../REFERENCES.md#inferring-the-input-kind-of-a-retained-callback).
+
 A type synonym can name a dependent function over a lifted parameter.
 The ordinary caller can use `Consumer a p r` in a signature and supply a
 witness and its indexed payload. The Showcase instantiates the witness
@@ -120,6 +127,12 @@ M58 and M59 expose those rules through source checking.
 
 ## Next increments
 
+- [ ] Accept a retained callback `p :: a -> b` whose result has an arbitrary
+      lifted type. Preserve an application `p x` across substitution and an
+      interface. Check the same source proof with `b` instantiated to a
+      datatype and to a function. An equality about the call alone must
+      leave its result unevaluated. Pattern matching on its result still
+      needs the result type's constructors.
 - [x] Finish M59's final audit and prepare publication. Preserve the existing
       compiler and fixture identities when documentation changes.
 - [x] Measure closed-list safe indexing:
