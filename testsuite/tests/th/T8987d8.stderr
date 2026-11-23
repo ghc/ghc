@@ -1,6 +1,0 @@
-T8987d8.hs:1:1: error: [GHC-87897]
-    Exception when trying to run compile-time code:
-      Prelude.undefined
-    Code: (do void $ qAddForeignFilePath undefined "foo"
-              pure [])
-
