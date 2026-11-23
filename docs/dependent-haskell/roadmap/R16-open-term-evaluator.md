@@ -2751,3 +2751,33 @@ ghc -O2 -package hasklib -i -i"$src" -outputdir "$out" \
 
 To run the unfused control, add `-fno-enable-rewrite-rules` after `-O2`,
 then run `"$out/observe"`.
+
+### Proof dependencies in the rebuilt HaskLib interface
+
+The private compiler at `8bed8f549b` records checked equations used to
+construct a nominal equality. Job 1995 used the same compiler for every
+client. It compared the published HaskLib interface with a package
+rebuilt from the same source distribution. The rebuilt `lengthMapZip`
+interface records `map`, `zip`, `minSize` and `size`. The published
+interface has no proof-dependency entry for this binding.
+
+| Client at default `-O2` | Published interface | Rebuilt interface |
+| --- | --- | --- |
+| Proof with the producer that uses `seq` | Returned `Refl`. Independent counts gave `Zero / bottom`. | GHC-83605 at `lengthMapZip`. |
+| Proof with `cons False nil` | Returned `Refl`. Independent counts gave `Zero / Zero`. | GHC-83605 at `lengthMapZip`. |
+| Proof with two empty list literals | GHC-83605 at the `Refl` pattern. | Same diagnostic at the pattern. |
+| Counts without the proof | Ran. | Ran. |
+
+All eight corresponding clients compiled and ran with rewrite rules
+disabled. At the empty lists the client printed `empty proof` and left
+the callback unevaluated. With rewrite rules enabled, both package
+variants rejected the pattern at line 8, column 5. The test originally
+expected only the rebuilt package to reject the closed proof. The
+classifier in `r16-proof-provenance-current-hasklib-20261123/check-results.py`
+checks the saved compiler outputs and all runtime results.
+
+The interface check catches the producer that changes demand. It also
+rejects a producer that constructs one cell without inspecting its step.
+The fork still needs a rule policy that can distinguish these uses.
+[Producer and counts](../examples/open-evaluation/MapZipFusionCounts.hs)
+and [source law and fusion conditions](../REFERENCES.md#map-length-after-filter-and-build).
