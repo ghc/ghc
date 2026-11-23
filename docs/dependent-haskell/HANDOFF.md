@@ -41,10 +41,13 @@ compiler revisions have separate qualification directories.
   The matching interpreter accepted the spliced local type variable
   that the earlier compiler rejected. Read `cohorts/gates.tsv` for
   the focused suite. Two original incremental checks failed because
-  `GHC.Essentials` changed. Job 1914 runs the real library upgrade
-  and a compiler-only comparison with the libraries held fixed.
-  The receipts are in `r17-essentials-warm-upgrade-578-20261123/results`.
-  Check both before publication.
+  `GHC.Essentials` changed. Job 1914 passed all four corrected comparisons.
+  With one library database, only the old length worker and its new client
+  rebuilt. Across the actual library upgrade, the unchanged control module
+  also rebuilt once. Both native and typecheck-only upgrades reused all
+  artifacts on the next invocation. The receipts are in
+  `r17-essentials-warm-upgrade-578-20261123/results`. Also check the
+  optimized proof control below before publication.
 - **581**, `156cd84633`, in
   `_build/on-demand/r04-r19-following-quoted-578-20261123`.
   This source combines named dependent record fields, wildcard patterns
@@ -55,16 +58,33 @@ compiler revisions have separate qualification directories.
 
 | Area | Component evidence and remaining work |
 | --- | --- |
-| R04 named records | Jobs 1901 and 1907 passed native, typecheck-only and Template Haskell checks. An ordinary client zips both generated fields and rejects a field from a different record. A warm typecheck-only run reused the provider interfaces. A retained witness variable, field puns and record wildcards passed in job 1909. The separate omitted-payload candidate is `2c36fdea26` in job 1915. Its source requires the length field. |
+| R04 named records | Jobs 1901 and 1907 passed native, typecheck-only and Template Haskell checks. An ordinary client zips both generated fields and rejects a field from a different record. A warm typecheck-only run reused the provider interfaces. A retained witness variable, field puns and record wildcards passed in job 1909. The separate omitted-payload candidate is `2c36fdea26` in job 1915. Its source requires the length field. It compiled and the first runtime demand checks passed. The warning-as-error check expected a different rendering of the flag. Job 1944 replays that check and job 1946 checks the missing-witness diagnostic after it passes. |
 | R17 and R19 quotations | Job 1902 checked the old and new encoders. Shared payloads had identical bytes and decoded in both directions. The old reader rejected the new `LamT` tag. Jobs 1897 and 1904 qualified wildcard patterns in quoted type synonyms. In job 1905 an ordinary client read a spliced row of named and missing sensors. |
-| R17 visible type arguments | Compiler `0076e5167b` passed the source-hidden comparison in job 1912. Named, annotated, closed, captured and spliced callbacks returned the same row. Job 1925 compares an enclosing type variable in a spliced visible argument on the separate compilers. The combined registration is `NativeTypeLambdaTypeAppCapture`. |
-| R16 list proofs | HaskLib built from its source distribution with `zip xs ys` in the composed proof. The installed law ran with rewrite rules disabled at both optimization levels. Job 1911 found different outer results for the independently optimized mapped count and minimum on stock GHC with a `seq`-sensitive producer. Job 1916 binds the producer arguments locally to check the published witness. Inspect `r16-zip-map-demand-20261123/locals/results.tsv`. |
+| R17 visible type arguments | Compiler `0076e5167b` passed the source-hidden comparison in job 1912. Named, annotated, closed, captured and spliced callbacks returned the same row. Job 1925 compares an enclosing type variable in a spliced visible argument on the separate compilers. Both separate compilers rejected the exact combined capture in job 1925. The combined registration is `NativeTypeLambdaTypeAppCapture`. |
+| R16 list proofs | HaskLib built from its source distribution with `zip xs ys` in the composed proof. The installed law ran with rewrite rules disabled at both optimization levels. Job 1911 found different outer results for the independently optimized mapped count and minimum on stock GHC with a `seq`-sensitive producer. On 577, job 1916 observed `Zero/Zero/Refl` at `-O0` and at `-O2` with rewrite rules disabled. At default `-O2`, specialization exposed a fused `build` operand that Core Lint rejected. Job 1945 compares ordinary counts and optimized proof callers on 577 and 578. See `r16-zip-map-demand-20261123/locals/published/O2/compile.log` and `optimized/results.tsv` in the same experiment. Job 1940 tests a private rule-dependency check for signed primitive proofs. |
 | R23 matchability | The private prototype `99bfde4ec4` passed the original transformer test and 32 Template Haskell reification cases. An old installed provider still needs rebuilding. The published compiler retains the existing matchability policy. |
 
 The GHC queue has two slots. Other benchmark jobs take priority and
 freeze the GHC slice. Use Pueue task labels and the live cgroup state
 when resuming. Pueue's `switch` command exchanges the task contents
 at two IDs. Job 1914 is the warm comparison, and 1937 is the 581 build.
+
+Job 1948 tests a change to the Specialise pass on the published 577 compiler.
+It applies the in-scope substitution to an operand that determines a result
+type. It also checks an ordinary caller and a vacuous retained binder.
+See `r05-specialise-retained-zip-20261123` under `_build/on-demand`.
+A successful Core Lint check only establishes that the operand is well typed.
+The independent demand comparison and the R16 proof check are still required.
+
+Job 1947 compares the runtime allocation of `zipRows` with an ordinary
+recursive zip that has the same two constructor fields. Each implementation
+runs in a separate process. Both must return the expected checksum and pass
+the prefix-demand checks. See `opencode-go-20261123/ziprows-pilot` under
+`_build/on-demand` for the driver and results. Keep compiler allocation,
+runtime allocation and regression review independent of the feature builds.
+Job 1949 measures whole-compiler allocation on 32, 128 and 256 shared
+bindings. The ordinary and retained inputs use the same arithmetic worker.
+The two performance jobs use the existing GHC queue.
 
 The generated compiler trees for checkpoints 549, 564, 566, 567, 568,
 569, the first quotation compiler, its superseded row compiler, and
