@@ -4543,8 +4543,13 @@ rnTyClDecl _ (DataDecl
        ; traceRn "rntycl-data" (ppr tycon <+> ppr kvs)
        ; bindHsQTyVars doc Nothing kvs tyvars $ \ tyvars' free_rhs_kvs ->
     do { let record_parent
-               | null (hsq_explicit tyvars) && null mods = Just (unLoc tycon')
+               | null mods
+               , Just parameters <- traverse required_parameter (hsq_explicit tyvars')
+               = Just (foldl' nlHsAppTy (nlHsTyVar NotPromoted (unLoc tycon'))
+                           (map (nlHsTyVar NotPromoted) parameters))
                | otherwise = Nothing
+             required_parameter binder@(L _ HsTvb{tvb_flag = HsBndrRequired{}}) = hsLTyVarName binder
+             required_parameter _ = Nothing
        ; (defn', fvs) <- rnDataDefn record_parent doc defn
        ; cusk <- data_decl_has_cusk tyvars' new_or_data (null free_rhs_kvs) kind_sig
        ; let rn_info = DataDeclRn { tcdDataCusk = cusk
@@ -4669,7 +4674,7 @@ the broader picture of UnliftedNewtypes.
 rnTySyn :: HsDocContext -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeNames)
 rnTySyn doc rhs = rnLHsType doc rhs
 
-rnDataDefn :: Maybe Name -> HsDocContext -> HsDataDefn GhcPs
+rnDataDefn :: Maybe (LHsType GhcRn) -> HsDocContext -> HsDataDefn GhcPs
            -> RnM (HsDataDefn GhcRn, FreeNames)
 rnDataDefn record_parent doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = condecls
                            , dd_kindSig = m_sig, dd_derivs = derivs })
@@ -5237,11 +5242,11 @@ are no data constructors we allow h98_style = True
 ***************************************************** -}
 
 -----------------
-rnConDecls :: Maybe Name -> DataDefnCons (LConDecl GhcPs)
+rnConDecls :: Maybe (LHsType GhcRn) -> DataDefnCons (LConDecl GhcPs)
             -> RnM (DataDefnCons (LConDecl GhcRn), FreeNames)
 rnConDecls parent = mapFvRn (wrapLocFstMA (rnConDecl parent))
 
-rnConDecl :: Maybe Name -> ConDecl GhcPs -> RnM (ConDecl GhcRn, FreeNames)
+rnConDecl :: Maybe (LHsType GhcRn) -> ConDecl GhcPs -> RnM (ConDecl GhcRn, FreeNames)
 rnConDecl parent decl@(ConDeclH98 { con_name = name, con_telescope = teles
                            , con_args = args
                            , con_doc = mb_doc
