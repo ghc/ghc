@@ -1137,7 +1137,6 @@ data InteriorCount a where
 readInteriorCount :: InteriorCount a -> Int
 readInteriorCount (InteriorCount _ (CountField (type Int) n)) = n
 
--- | Hide the field type and retain both dictionaries for its consumer.
 -- | A type-only key with a required type argument after its Boolean field.
 type data PayloadKey a where
     ChoosePayload :: Bool -> forall a -> PayloadKey a
@@ -1146,6 +1145,7 @@ type data PayloadKey a where
 keyedPayload :: Proxy (key :: PayloadKey a) -> a -> a
 keyedPayload _ value = value
 
+-- | Hide the field type and retain both dictionaries for its consumer.
 data PrintablePair where
     PrintablePair :: forall a. Eq a => (Show a => a -> a -> PrintablePair)
 
