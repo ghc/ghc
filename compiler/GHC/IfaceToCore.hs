@@ -2789,6 +2789,11 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
             failIfM (text "Invalid indexed constructor proof in interface alternative:"
                      <+> ppr dc <+> ppr names)
           return (DataAlt dc)
+        native_data_alt siblings name names = do
+          dc <- tcIfaceDataCon name
+          unless (isNativeIndexDataAlt dc names && dataConHasPromotedRetainedSiblings dc == siblings) $
+            failIfM (text "Missing or unsupported constructor proof in interface alternative:" <+> ppr dc <+> ppr names)
+          return (DataAlt dc)
     resolved <- forM alts $ \ (IfaceAlt con names rhs) -> do
       alt_con <- case con of
         IfaceDefaultAlt   -> return DEFAULT
@@ -2805,11 +2810,8 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
           indexed_data_alt (\dc -> dataConSourceArity dc > 0) name names
         IfaceIndexedExistentialAltWithProof name ->
           indexed_data_alt (\dc -> dataConSourceArity dc == 0 && not (null (dataConExTyCoVars dc))) name names
-        IfaceDataAltWithProof name -> do
-          dc <- tcIfaceDataCon name
-          unless (isNativeIndexDataAlt dc names) $
-            failIfM (text "Missing or unsupported constructor proof in interface alternative:" <+> ppr dc <+> ppr names)
-          return (DataAlt dc)
+        IfaceDataAltWithProof name -> native_data_alt False name names
+        IfaceRetainedSiblingsAltWithProof name -> native_data_alt True name names
       return (alt_con, names, rhs)
     let native_alt (DataAlt con, names, _) = isNativeIndexDataAlt con names
         native_alt _ = False
@@ -3395,7 +3397,7 @@ tcIfaceGlobal name
             Succeeded thing -> return thing }
 
 tcIfaceTyCon :: IfaceTyCon -> IfL TyCon
-tcIfaceTyCon (IfaceTyCon name _info)
+tcIfaceTyCon (IfaceTyCon name info)
   = do { thing <- tcIfaceGlobal name
        ; case thing of
               ATyCon tc -> return tc
@@ -3403,6 +3405,8 @@ tcIfaceTyCon (IfaceTyCon name _info)
                 -> do { unless (null (dataConRepArgBinders dc) || dataConHasPromotedRetained dc) $
                           failIfM (text "Invalid retained constructor fields in interface:"
                                     <+> ppr name $$ text "This retained constructor has no supported promoted field telescope.")
+                      ; unless ((ifaceTyConSort info == IfaceRetainedSiblings) == dataConHasPromotedRetainedSiblings dc) $
+                          failIfM (text "Invalid retained sibling-field tag in interface:" <+> ppr name)
                       ; return (promoteDataCon dc) }
               _ -> pprPanic "tcIfaceTyCon" (ppr thing) }
 

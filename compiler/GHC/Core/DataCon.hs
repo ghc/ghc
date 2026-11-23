@@ -67,7 +67,7 @@ module GHC.Core.DataCon (
         specialPromotedDc,
 
         -- ** Promotion related functions
-        promoteDataCon, dataConHasPromotedRetained
+        promoteDataCon, dataConHasPromotedRetained, dataConHasPromotedRetainedSiblings
     ) where
 
 import GHC.Prelude
@@ -117,7 +117,7 @@ import qualified Data.ByteString.Lazy    as LBS
 import qualified Data.Data as Data
 import Data.Char
 import Data.List( find, mapAccumL )
-import Data.Maybe ( isJust )
+import Data.Maybe ( isJust, isNothing )
 
 {-
 Note [Data constructor representation]
@@ -1511,12 +1511,12 @@ mkDataConWithTelescope source_order arg_binders name declared_infix prom_info
       | null arg_binders
       = mkPromotedDataCon con name prom_info prom_bndrs
                          prom_res_kind (roles Representational) rep_info
-      | Just (witness, payload) <- promotedRetainedFields con
-      , witness_name : payload_name : _ <- fresh_names
+      | Just (witness, payloads) <- promotedRetainedFields con
+      , witness_name : payload_names <- fresh_names
       = let index = mkTyVar witness_name (varType witness)
-            payload_binder = mkTyVar payload_name (payload (mkTyVarTy index))
-            binders = prom_tv_bndrs ++ [ mkNamedTyConBinder Required index
-                                      , mkAnonTyConBinder payload_binder ]
+            payload_binder n payload = mkAnonTyConBinder (mkTyVar n (payload (mkTyVarTy index)))
+            binders = prom_tv_bndrs ++
+                      (mkNamedTyConBinder Required index : zipWith payload_binder payload_names payloads)
         in mkPromotedDataCon con name prom_info binders
                              prom_res_kind (roles Nominal) rep_info
       | otherwise
@@ -1538,13 +1538,13 @@ mkDataConWithTelescope source_order arg_binders name declared_infix prom_info
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Keep the runtime witness as an Id in the worker and in patterns. The
 promoted constructor instead binds a fresh required type variable of
-the witness's domain. The payload argument kind uses this variable.
-Ordinary kind application substitutes the first argument into the
-second argument kind.
+the witness's domain. All the payload argument kinds use this variable.
+Ordinary kind application substitutes the first argument into each
+following argument kind.
 
 The source and interface readers use the same shape check. This
 subset admits one direct occurrence of the witness in the final
-argument of the payload type. The head can be a type constructor, as
+argument of each payload type. The head can be a type constructor, as
 in `Vec a n`, or a universal parameter, as in `p n`. In the latter
 case, the domain of `p` must match the witness type and its result
 must be lifted. Other arguments and the result contain no runtime Ids.
@@ -1558,22 +1558,32 @@ that a runtime scrutinee equals this promoted constructor.
 dataConHasPromotedRetained :: DataCon -> Bool
 dataConHasPromotedRetained = isJust . promotedRetainedFields
 
+-- | Does the promoted constructor need the sibling-field interface feature?
+dataConHasPromotedRetainedSiblings :: DataCon -> Bool
+dataConHasPromotedRetainedSiblings con =
+    dataConSourceArity con > 2 && dataConHasPromotedRetained con
+
 -- | Keep the runtime Id separate from the required binder in the promoted kind.
--- This prototype handles one final index argument in an ordinary payload type.
-promotedRetainedFields :: DataCon -> Maybe (Id, Type -> Type)
+-- Each ordinary payload has the same witness as its final index argument.
+promotedRetainedFields :: DataCon -> Maybe (Id, [Type -> Type])
 promotedRetainedFields con
-  | [Just witness, Nothing] <- dataConRepArgBinders con
-  , (univs, [], [], [], [Scaled witness_mult witness_ty, Scaled payload_mult body], result) <- dataConFullSig con
+  | Just witness : binders <- dataConRepArgBinders con
+  , (univs, [], [], [], Scaled witness_mult witness_ty : fields@(_ : _), result) <- dataConFullSig con
+  , all isNothing binders
   , map binderVar (dataConUserTyVarBinders con) == univs
-  , isManyTy witness_mult, isOneTy payload_mult || isManyTy payload_mult
+  , isManyTy witness_mult
   , isNativeClosedIndexType witness_ty
     || maybe False (`elem` univs) (getTyVar_maybe witness_ty)
   , witness_ty `eqType` varType witness
   , not (anyFreeVarsOfType isId result)
-  , Just payload <- abstract_payload univs witness body
-  = Just (witness, payload)
+  , Just payloads <- traverse (payload_field univs witness) fields
+  = Just (witness, payloads)
   | otherwise = Nothing
   where
+    payload_field univs witness (Scaled mult body)
+      | isOneTy mult || isManyTy mult = abstract_payload univs witness body
+      | otherwise = Nothing
+
     abstract_payload univs witness (AppTy head_ty@(TyVarTy family) (TermVarTy v))
       | family `elem` univs
       , witness == v

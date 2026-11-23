@@ -1533,15 +1533,16 @@ tcRetainedCon domain source_pat = case unLoc (retainedConPat source_pat) of
   where
     check_fields con args pats
       | dataConHasPromotedRetained con
-      , [witness_pat, payload_pat] <- pats
-      , [Just template, Nothing] <- dataConRepArgBinders con
-      , (univs, [], [], [], [witness_ty, payload_ty], _) <- dataConFullSig con
+      , witness_pat : payload_pats <- pats
+      , Just template : _ <- dataConRepArgBinders con
+      , (univs, [], [], [], witness_ty : payload_tys, _) <- dataConFullSig con
+      , payload_pats `equalLength` payload_tys
       = do { let subst = mkTvSubstPrs (zip univs args)
            ; witness <- field witness_pat (mapScaledType (substTy subst) witness_ty)
            ; let dep_subst = CoreSubst.extendIdSubst (extendSubstInScope subst witness)
                                                   template (Var witness)
-           ; payload <- field payload_pat (mapScaledType (substTy dep_subst) payload_ty)
-           ; return (Just (con, [witness, payload])) }
+           ; payloads <- zipWithM field payload_pats (map (mapScaledType (substTy dep_subst)) payload_tys)
+           ; return (Just (con, witness : payloads)) }
       | null (dataConRepArgBinders con)
       , let field_tys = dataConInstOrigArgTys con args
       , pats `equalLength` field_tys

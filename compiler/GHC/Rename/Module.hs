@@ -2470,8 +2470,8 @@ values. Keep such bindings in the regular pass.
 
 An independent retained package can also be checked in the early group.
 Require a single nullary datatype declaration and a constructor with
-one retained binder and one ordinary payload field. The result is the
-declared datatype. Restrict the field to simple type applications and
+one retained binder and at least one ordinary payload field. The result
+is the declared datatype. Restrict fields to simple type applications and
 references to the retained binder. Reject source table names in this
 form. The SCC has no other type declarations or standalone signatures
 to schedule. The ordinary checker still checks the constructor and the
@@ -2744,10 +2744,15 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
           <- unLoc (ignoreParens sig)
       , isJust (type_name domain)
       , HsFunTy _ (HsModifiedFunArr _ [] HsStandardArr{}) field result <- unLoc (ignoreParens body)
-      , type_name result == Just t
       , retained_field_type witness field
+      , retained_payloads t witness result
       = Just c
     retained_constructor _ _ = Nothing
+
+    retained_payloads t witness ty
+      | HsFunTy _ (HsModifiedFunArr _ [] HsStandardArr{}) field result <- unLoc (ignoreParens ty)
+      = retained_field_type witness field && retained_payloads t witness result
+      | otherwise = type_name ty == Just t
 
     retained_field_type witness ty = case unLoc (ignoreParens ty) of
       HsAppTy _ fun arg -> retained_field_type witness fun && retained_field_type witness arg

@@ -880,6 +880,7 @@ data IfaceConAlt = IfaceDefaultAlt
                  | IfaceIndexedDataAltWithProof IfExtName
                  | IfaceIndexedFieldsAltWithProof IfExtName
                  | IfaceIndexedExistentialAltWithProof IfExtName
+                 | IfaceRetainedSiblingsAltWithProof IfExtName
 
 type IfaceBinding b = IfaceBindingX IfaceExpr b
 
@@ -2100,6 +2101,7 @@ instance Outputable IfaceConAlt where
     ppr (IfaceLitAlt l)   = ppr l
     ppr (IfaceDataAlt d)  = ppr d
     ppr (IfaceDataAltWithProof d) = ppr d
+    ppr (IfaceRetainedSiblingsAltWithProof d) = ppr d
     ppr (IfaceIndexedDataAltWithProof d) = ppr d
     ppr (IfaceIndexedFieldsAltWithProof d) = ppr d
     ppr (IfaceIndexedExistentialAltWithProof d) = ppr d
@@ -2464,6 +2466,7 @@ freeNamesIfExpr (IfaceCase s _ alts)
     fn_cons (IfaceAlt IfaceDefaultAltWithProof _ _ : xs) = fn_cons xs
     fn_cons (IfaceAlt (IfaceDataAlt con) _ _ : _ ) = unitNameSet con
     fn_cons (IfaceAlt (IfaceDataAltWithProof con) _ _ : _) = unitNameSet con
+    fn_cons (IfaceAlt (IfaceRetainedSiblingsAltWithProof con) _ _ : _) = unitNameSet con
     fn_cons (IfaceAlt (IfaceIndexedDataAltWithProof con) _ _ : _) = unitNameSet con
     fn_cons (IfaceAlt (IfaceIndexedFieldsAltWithProof con) _ _ : _) = unitNameSet con
     fn_cons (IfaceAlt (IfaceIndexedExistentialAltWithProof con) _ _ : _) = unitNameSet con
@@ -3650,6 +3653,10 @@ instance Binary IfaceConAlt where
         requireIfaceEvidenceVersion bh ConstructorCaseEvidence
         putByte bh 3
         put_ bh con
+    put_ bh (IfaceRetainedSiblingsAltWithProof con) = do
+        requireIfaceEvidenceVersion bh RetainedSiblingFieldsEvidence
+        putByte bh 8
+        put_ bh con
     put_ bh (IfaceIndexedDataAltWithProof con) = do
         requireIfaceEvidenceVersion bh IndexedConstructorCaseEvidence
         putByte bh 5
@@ -3669,6 +3676,7 @@ instance Binary IfaceConAlt where
             1 -> liftM IfaceDataAlt $ get bh
             2 -> liftM IfaceLitAlt  $ get bh
             3 -> liftM IfaceDataAltWithProof $ get bh
+            8 -> liftM IfaceRetainedSiblingsAltWithProof $ get bh
             4 -> return IfaceDefaultAltWithProof
             5 -> liftM IfaceIndexedDataAltWithProof $ get bh
             6 -> liftM IfaceIndexedFieldsAltWithProof $ get bh
@@ -3946,6 +3954,7 @@ instance NFData IfaceConAlt where
     IfaceDefaultAltWithProof -> ()
     IfaceDataAlt nm -> rnf nm
     IfaceDataAltWithProof nm -> rnf nm
+    IfaceRetainedSiblingsAltWithProof nm -> rnf nm
     IfaceIndexedDataAltWithProof nm -> rnf nm
     IfaceIndexedFieldsAltWithProof nm -> rnf nm
     IfaceIndexedExistentialAltWithProof nm -> rnf nm

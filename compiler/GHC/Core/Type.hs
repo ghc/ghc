@@ -2559,9 +2559,10 @@ nativeIndexType structural_fields = go []
       , substTyWith univs args res `eqType` domain
       , null (dataConStupidTheta con)
       , Nothing <- dataConWrapId_maybe con
-      , [witness, payload] <- rep_args
+      , witness : payloads <- rep_args
       = let field_type = substTyWith univs args . scaledThing
-        in Just [(is_parameter (scaledThing witness), field_type witness), (True, field_type payload)]
+        in Just ((is_parameter (scaledThing witness), field_type witness)
+                 : [(True, field_type payload) | payload <- payloads])
       | null (dataConRepArgBinders con)
       , (univs, [], [], [], orig_args, res) <- dataConFullSig con
       , univs `equalLength` args

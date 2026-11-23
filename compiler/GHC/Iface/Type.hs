@@ -499,6 +499,8 @@ data IfaceTyConSort = IfaceNormalTyCon          -- ^ a regular tycon
 
                     | IfacePartialBuiltinFamily
                       -- ^ A built-in family applied below its arity.
+                    | IfaceRetainedSiblings
+                      -- ^ A promoted witness with several dependent payload fields.
                     deriving (Eq, Ord)
 
 instance Outputable IfaceTyConSort where
@@ -508,6 +510,7 @@ instance Outputable IfaceTyConSort where
   ppr IfaceEqualityTyCon       = text "equality"
   ppr IfacePartialSynonym      = text "partial synonym"
   ppr IfacePartialBuiltinFamily = text "partial built-in family"
+  ppr IfaceRetainedSiblings    = text "retained sibling fields"
 
 {- Note [Free TyVars and CoVars in IfaceType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2796,6 +2799,9 @@ instance Binary IfaceTyConSort where
    put_ bh IfacePartialBuiltinFamily    = do
      requireIfaceEvidenceVersion bh PartialBuiltinFamilyEvidence
      putByte bh 5
+   put_ bh IfaceRetainedSiblings       = do
+     requireIfaceEvidenceVersion bh RetainedSiblingFieldsEvidence
+     putByte bh 6
 
    get bh = do
        n <- getByte bh
@@ -2806,6 +2812,7 @@ instance Binary IfaceTyConSort where
          3 -> return IfaceEqualityTyCon
          4 -> return IfacePartialSynonym
          5 -> return IfacePartialBuiltinFamily
+         6 -> return IfaceRetainedSiblings
          _ -> panic "get IfaceTyConSort"
 
 instance Binary IfaceTyConInfo where
@@ -3143,6 +3150,7 @@ data IfaceEvidence
   | PartialBuiltinFamilyEvidence
   | ScopedSumDomainEvidence
   | ComposedScopedSumDomainEvidence
+  | RetainedSiblingFieldsEvidence
   deriving (Bounded, Enum, Eq, Ord)
 
 -- | Requirements of an interface payload. See Note [Versioning retained evidence]
@@ -3453,6 +3461,7 @@ instance NFData IfaceTyConSort where
     IfaceEqualityTyCon -> ()
     IfacePartialSynonym -> ()
     IfacePartialBuiltinFamily -> ()
+    IfaceRetainedSiblings -> ()
 
 instance NFData IfLclName where
   rnf (IfLclName lfs) = rnf lfs

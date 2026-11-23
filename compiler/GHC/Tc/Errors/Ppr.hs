@@ -3950,7 +3950,7 @@ pprRetainedQuantificationError reason = case reason of
                 , quotes (text ":~:") <+> text "from" <+> quotes (text "Data.Type.Equality") <> dot ] ]
   RetainedPackagePromotion ->
     vcat [ text "This retained constructor has no supported promoted field telescope."
-         , text "Promotion requires one witness followed by a field whose final type argument is that witness." ]
+         , text "Promotion requires one witness followed by fields whose final type argument is that witness." ]
   RetainedPackagePattern ->
     vcat [ text "A retained package pattern requires prefix constructor syntax and unrestricted multiplicity."
          , text "Retained fields require variables, wildcards, or constructor patterns for their index domain."

@@ -275,6 +275,17 @@ toIfaceTyVar = mkIfLclName . occNameFS . getOccName
 toIfaceCoVar :: CoVar -> IfLclName
 toIfaceCoVar = mkIfLclName . occNameFS . getOccName
 
+{- Note [Versioning retained sibling evidence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The ordinary data declaration already stores the list of retained and
+ordinary fields. Old readers can use that list without promoting the
+constructor. A promoted type reference or a native constructor proof
+requires the precise promoted telescope. Old readers only accept one
+payload. Mark both uses at serialization and check the tag against the
+constructor in the reader. This keeps ordinary data interfaces and
+single-payload evidence in their existing format.
+-}
+
 -- | Mark a partial synonym or built-in family in types and coercions.
 -- See Note [Partial type family applications] in GHC.Core.Type.
 toIfaceAppliedTyCon :: TyCon -> [a] -> IfaceTyCon
@@ -312,6 +323,10 @@ toIfaceTyCon tc
       | Just dcon <- isPromotedDataCon_maybe tc
       , let tc' = dataConTyCon dcon
       , Just tsort <- tupleSort tc'          = tsort
+
+      | Just dcon <- isPromotedDataCon_maybe tc
+      , dataConHasPromotedRetainedSiblings dcon = IfaceRetainedSiblings
+        -- See Note [Versioning retained sibling evidence].
 
       | isUnboxedSumTyCon tc
       , Just cons <- tyConDataCons_maybe tc  = IfaceSumTyCon (length cons)
@@ -796,6 +811,9 @@ toIfaceAlt alt@(Alt (DataAlt con) bs rhs)
   = case splitAt (dataConRepArity con) bs of
       (fields, [cv]) | all isNativeOpaqueValueId fields && isCoVar cv && isLocalId cv ->
         let iface_con | dataConTyCon con == boolTyCon = IfaceDataAlt (getName con)
+                      | dataConHasPromotedRetainedSiblings con =
+                          IfaceRetainedSiblingsAltWithProof (getName con)
+                        -- See Note [Versioning retained sibling evidence].
                       | otherwise = IfaceDataAltWithProof (getName con)
         in IfaceAlt iface_con (map (mkIfLclName . getOccFS) bs) (toIfaceExpr rhs)
       _ -> pprPanic "toIfaceAlt: invalid native constructor proof binder" (ppr alt)

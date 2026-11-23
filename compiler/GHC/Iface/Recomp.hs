@@ -1573,7 +1573,7 @@ retainedCaseReviewField :: String
 retainedCaseReviewField = "retained-case-workers-reviewed"
 
 retainedCaseReviewGeneration :: Word8
-retainedCaseReviewGeneration = 2
+retainedCaseReviewGeneration = 3
 
 -- | Find a possible source worker that has no equation and needs review.
 -- See Note [Recompiling retained package workers].
@@ -1627,14 +1627,16 @@ couldExportRetainedCase reviewed iface decls usages = anyM candidate decls
       , name `elemNameSet` names, ifConName con `elemNameSet` names
       , not (ifConWrapper con), null (ifConExTCvs con), null (ifConEqSpec con)
       , null (ifConCtxt con)
-      , [Just witness, Nothing] <- ifConArgBinders con
-      , [(mult, witness_kind), (_, payload)] <- ifConArgTys con
+      , Just witness : binders <- ifConArgBinders con
+      , all isNothing binders
+      , (mult, witness_kind) : payloads@(_ : _) <- ifConArgTys con
       , case witness_kind of
           IfaceTyVar var -> lookup var (zip (map ifaceBndrName (ifConUnivTvs con)) actuals) == Just result
           _ -> witness_kind == result
       , nullaryName mult == Just manyDataConName
-      , payloadUsesWitness con witness payload
-      , reviewed < retainedCaseReviewGeneration
+      , all (payloadUsesWitness con witness . snd) payloads
+      , let generation = if lengthIs payloads 1 then 2 else retainedCaseReviewGeneration
+      , reviewed < generation
       = Just (ifConName con)
     package _ _ _ _ _ = Nothing
 

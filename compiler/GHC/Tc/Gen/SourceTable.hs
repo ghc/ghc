@@ -2643,7 +2643,7 @@ sourceCaseVisibleArity table
         Nothing
           | Just (expected, _) <- monomorphicRetainedWitnessType kind -> do
               [branch] <- pure branches
-              (con, [witness, _]) <- caseBranch [] branch
+              (con, witness : _) <- caseBranch [] branch
               guard (con == expected && coAxBranchRHS branch `eqType` witness)
               pure 1
           | otherwise -> case constructorCaseType kind <|> monomorphicGuardedListCaseType kind of
@@ -2879,7 +2879,7 @@ monomorphicRetainedWitnessType ty = do
     (tc, []) <- caseDatatype domain
     [con] <- pure (tyConDataCons tc)
     guard (isRetainedCaseRoot domain tc)
-    [witness, _] <- pure (dataConOrigArgTys con)
+    witness : _ <- pure (dataConOrigArgTys con)
     guard (result `eqType` scaledThing witness)
     pure (con, ConstructorCaseType [] tc [] [domain] 0 result)
 
@@ -2937,7 +2937,7 @@ kinds again before classifying the table as a constructor case.
 A nullary package can supply an exact projection of its witness. Keep
 this rule separate from ordinary constructor cases with no domain type
 parameters. Check that the Core case returns its first field directly.
-The second field remains a variable in the checked alternative, even
+Each payload field remains a variable in the checked alternative, even
 when its type depends on the witness. Check that the sole imported
 equation also returns the first variable of this same constructor.
 Only the package constructor occurs in the equation. Require the
@@ -4553,15 +4553,18 @@ checkedConstructorCaseWith specialized visible helper owner rhs = do
     rows <- checkedConstructorRows (multipleCaseOperands signature) public witness_root
                                   helper recursive kinds result (map CaseField terms) scrutinee body
     forM_ witness_root $ \con -> do
-      [ConstructorCaseRow [CaseConstructor actual [] [CaseField witness, CaseField _]]
+      [ConstructorCaseRow [CaseConstructor actual [] (CaseField witness : payloads)]
                           (CaseField value)] <- pure rows
-      guard (actual == con && value == witness)
+      guard (actual == con && value == witness && all is_field payloads)
     -- The patterns use types from the Core binders. Use the same telescope
     -- for substitution. Keep the owner's declared visibility in the interface.
     ConstructorCaseType declared _ _ _ _ _ <- signature_type (varType owner)
     let binders = zipWith (\(Bndr v _) (Bndr _ vis) -> Bndr v vis) telescope declared
     pure (ConstructorCaseType binders tc args domains position result, rows)
   where
+    is_field CaseField{} = True
+    is_field _ = False
+
     signature_type ty = constructorCaseType ty <|> (snd <$> monomorphicRetainedWitnessType ty)
     checked_signature = signature_type (exprType rhs)
 
