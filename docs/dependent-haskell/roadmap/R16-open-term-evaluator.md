@@ -2614,3 +2614,23 @@ ghc -O2 -idocs/dependent-haskell/hasklib -i"$examples" -outputdir "$out" \
 [Count expressions](../examples/open-evaluation/MapLengthFusionDemand.hs),
 [proof client](../examples/open-evaluation/MapLengthFusionWitness.hs)
 and [source law and fusion theorem](../REFERENCES.md#map-length-after-filter-and-build).
+
+### What an old package interface can tell the reader
+
+The private compiler at `ae28f52fc6` checks an imported proof whose
+public type mentions a checked source family. If the old interface lacks
+the review flag, the compiler names the defining module and package
+to rebuild. With the old HaskLib, calling a re-exported `lengthMap`
+points to `HaskLib.List` in `hasklib-0.1.0.0`. A module that only
+re-exports the name still compiles. After rebuilding HaskLib, the
+candidate accepts the tested client with rewrite rules disabled. At
+default `-O2` it reports the rule conflict. Job 1512 also compiled a
+client of ordinary `map`, `reverse` and `HaskLib.size` from old packages.
+
+Two old modules exported a closed observation at the same ordinary
+type. One used the proof inside its body. The other computed the
+result without it. With their unfoldings and recompilation data omitted,
+their interface files were byte-identical. The reader cannot use those
+files alone to distinguish the two bodies. The component check covers
+proof information that the old interface exposes. The published
+compiler still uses the source-equation policy.

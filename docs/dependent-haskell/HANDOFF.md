@@ -170,6 +170,17 @@ The published `lengthMap` witness still returned `Refl`. Job 1477
 checked the runnable example in all three optimization modes.
 [Source, controls and proof boundary](roadmap/R16-open-term-evaluator.md#map-length-and-sharing-under-stock-fusion).
 
+The private R16 package review is `ae28f52fc6`. Job 1512 identifies
+the old defining module when a client calls a re-exported proof. A pair
+of byte-identical old interfaces bounds what the reader can recover.
+The decision about enforcing optimized proof-use checks is pending.
+[Package controls](roadmap/R16-open-term-evaluator.md#what-an-old-package-interface-can-tell-the-reader).
+
+The R04 coverage follow-up is `1f95088890` on top of the 558 candidate.
+Job 1508 passed the source-hidden diagnostic regression on its component.
+The warning names the supplied sum alias, such as `Packed Bool`.
+The frozen 558 compiler reproduces the generated-family name.
+
 The local archive refs `r19-r41-normal-552`, `r16-hasklib-tree-553`
 and `r27-legacy-transition-normal` are under
 `refs/archive/dependent-haskell/2026-11-22/`. The `normal-sources/`
@@ -401,7 +412,7 @@ defaults and an opt-in migration warning.
 3. Restore the [shared WSL build queue](CHECKPOINTS.md#restore-the-shared-wsl-build-queue)
    before submitting work. Use at most two subagents. The coordinator
    reviews and integrates their results. The current assignments are
-   R04 dependent-pair diagnostics and R16 imported proof compatibility.
+   R23 matchability inference and R21 declaration order for parameterized datatypes.
    The group has two slots. All GHC jobs share
    16 logical CPUs, 64,000,000,000 bytes of memory and zero swap.
    Higher-priority jobs pause the queue and freeze the GHC slice.
@@ -448,4 +459,9 @@ After the 554-line release, the completed R27 package experiment
 released 2,784,550,912 allocated bytes across 3,045 native products
 and linker maps. Its sources, patches and comparison results remain.
 See `retirement-r27-products-20261123/retired.tsv` for the file list.
+The superseded `9202568aae` compiler released 892,313,600 allocated bytes
+in 5,873 loose compilation objects. Job 1516 ran native programs with both
+preserved stages and GHCi with stage 2. The bootstrap driver's interactive
+mode matched the untrimmed 556 control. See
+`retirement-554-checked-callbacks-20261123/retired.tsv`.
 [Retention rules](CHECKPOINTS.md#clean-up-after-each-experiment).
