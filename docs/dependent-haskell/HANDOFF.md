@@ -21,6 +21,13 @@ registrations after the fixture and test-helper replays. The five other
 failures matched the earlier compiler.
 [Release evidence](CHECKPOINTS.md#ordered-gadt-signatures-and-required-type-arguments).
 
+Four of the five inherited registrations now pass on the same compiler.
+`NativeTypeCaseQuote` proves the result of splicing a quoted type case.
+Three tests now check the diagnostic details that the compiler emits.
+The remaining case, `NativeFamilyIndexEvidence`, showed a generated
+wildcard binder as a relevant source binding. Its compiler correction
+is part of the independent R03 release candidate below.
+
 The preceding 552 compiler at `f42ebe4659` matches normal build
 `00115859a5` in `r19-r41-next-20261122`. Keep it while an active
 interface comparison uses it.

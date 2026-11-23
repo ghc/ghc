@@ -30,6 +30,14 @@ failures are `NativeFamilyIndexEvidence`, `NativeIrredIndexEvidence`,
 `NativeTypeNumeralWrong`. Each matched the prior compiler. Three separate
 duplicate-root framework reports did not correspond to test executions.
 
+Job 1349 replaced the obsolete expected failure for `NativeTypeCaseQuote`
+with a proof that the spliced case selects `Int`. A `Bool` result
+still fails at `Refl`. Job 1353 passed the revised expectations for
+`NativeIrredIndexEvidence`, `NativeRetainedPromotedIface` and
+`NativeTypeNumeralWrong`. The controls preserve rejection of distinct
+values, malformed interfaces and the wrong successor addition.
+`NativeFamilyIndexEvidence` has a separate compiler fix.
+
 The User's Guide resolved all six new links and the extension implication.
 It has 28 warnings and three errors, compared with 29 warnings and the
 same three errors on the published comparison. The corrected heading
