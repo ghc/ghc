@@ -129,6 +129,19 @@ HS
     printf '%s\n' '[True]' 'namedLetters' '1' 'namedLetters' 'namedFlags' | cmp - actual
     reject 'GHC-20125.*-Werror=missing-fields' -fforce-recomp -Werror=missing-fields MissingPayloads.hs
 
+    cat > MissingAtVariable.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes #-}
+module MissingAtVariable where
+import NamedSiblingColumns
+import PackedVecLibrary (Nat, Vec)
+
+onlyFlags :: foreach (n :: Nat) -> Vec Bool n -> NamedColumns
+onlyFlags n flags = NamedColumns { storedLength = n, namedFlags = flags }
+HS
+    "${ghc[@]}" "$opt" -Wmissing-fields -c MissingAtVariable.hs > missing-variable.log 2>&1 ||
+        { cat missing-variable.log >&2; exit 1; }
+    grep -Fq -- '[-Wmissing-fields]' missing-variable.log
+
     cat > MissingWitness.hs <<'HS'
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
 module MissingWitness where

@@ -92,6 +92,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Set (extendNameSet)
+import GHC.Types.SourceText (SourceText(NoSourceText))
 import GHC.Types.SrcLoc
 
 import GHC.Types.Var.Env (emptyVarEnv)
