@@ -1794,7 +1794,7 @@ data TcTyMode
              , mode_dictionaries :: [EvVar]
              , mode_pending_calls :: Maybe (NameEnv TcTyVar, PendingSigCalls, TcRef [TcPendingTypeCall])
                -- See Note [Pending calls in partial signatures] in GHC.Tc.Solver.
-             , mode_synonym_metadata :: Maybe (Name -> [Bool] -> TcM [Type], Maybe (TcM Matchability))
+             , mode_synonym_metadata :: Maybe (Name -> [Bool] -> TcM [Type], Maybe (TypeOrKind -> TcM Matchability))
              , mode_source_proof_owner :: Maybe Name
              , mode_complete_type_arg :: Maybe Bool }
                -- Nothing outside a visible type argument. Just records
@@ -2685,7 +2685,7 @@ synonymCallbackIndex _ _ = False
 
 -- | Check a synonym RHS with controlled instantiation of metadata.
 -- The flag for each index records whether it occurs on a callback arrow.
-tcCheckSynonymMetadata :: Maybe Name -> (Name -> [Bool] -> TcM [Type]) -> Maybe (TcM Matchability)
+tcCheckSynonymMetadata :: Maybe Name -> (Name -> [Bool] -> TcM [Type]) -> Maybe (TypeOrKind -> TcM Matchability)
                        -> LHsType GhcRn -> TcKind -> TcM TcType
 tcCheckSynonymMetadata owner get_indices callback_arrow rhs kind =
   addTypeCtxt rhs $
@@ -4761,7 +4761,12 @@ tcInferTyApps_nosat index_level expected_kind mode orig_hs_ty fun orig_hs_args
     -- Dispatch on all_args first, for performance reasons
     go n fun subst fun_ki all_args checked_arg = case (all_args, tcSplitPiTy_maybe fun_ki) of
 
-      ---------------- No user-written args left. We're done!
+      ---------------- No user-written args left
+      ([], Just (_, Named (Bndr kv flag), inner_ki))
+        | isInvisibleForAllTyFlag flag
+        , expects_promoted_callback fun
+        -> instantiate kv flag inner_ki
+
       ([], _) -> return (fun, substTy subst fun_ki)
 
       ---------------- HsArgPar: We don't care about parens here
@@ -4911,11 +4916,15 @@ tcInferTyApps_nosat index_level expected_kind mode orig_hs_ty fun orig_hs_args
           , tyVarKind tv `tcEqType` matchabilityTy
           , Just (tc, _) <- tcSplitTyConApp_maybe fun
           , isPromotedDataCon tc
-          , any (curried_callback_index tv) (take supplied_args (visible_domains inner_ki))
-          = do { owner <- tcl_kind_arrow_defaults <$> getLclEnv
-               ; case owner of
-                   Just (defaults, _) -> bind <$> fresh_kind_arrow TypeLevel defaults
-                   Nothing -> default_binder tv }
+          , let from_expected = null all_args && expects_promoted_callback fun
+                visible = if from_expected then 1 else supplied_args
+          , any (curried_callback_index tv) (take visible (visible_domains inner_ki))
+          = case mode_synonym_metadata mode of
+              Just (_, Just outer_arrow) | from_expected -> bind <$> outer_arrow TypeLevel
+              _ -> do { owner <- tcl_kind_arrow_defaults <$> getLclEnv
+                      ; case owner of
+                          Just (defaults, _) -> bind <$> fresh_kind_arrow TypeLevel defaults
+                          Nothing -> default_binder tv }
           | Specified <- flag
           , TypeLevel <- mode_tyki mode
           , Nothing <- mode_holes mode
@@ -5020,6 +5029,16 @@ tcInferTyApps_nosat index_level expected_kind mode orig_hs_ty fun orig_hs_args
     is_par HsArgPar{} = True
     is_par _ = False
 
+    -- See Note [Omitted matchability in higher-order arguments].
+    expects_promoted_callback ty
+      | TypeLevel <- mode_tyki mode
+      , Nothing <- mode_holes mode
+      , Just expected <- expected_kind
+      , Just {} <- tcSplitFunTy_maybe expected
+      , Just (tc, _) <- tcSplitTyConApp_maybe ty
+      = isPromotedDataCon tc
+      | otherwise = False
+
     check_arrows defaults (L _ (HsParTy _ arg)) expected =
       check_arrows defaults arg expected
     check_arrows defaults (L loc (HsFunTy _ mult domain range)) expected =
@@ -5048,7 +5067,7 @@ tcInferTyApps_nosat index_level expected_kind mode orig_hs_ty fun orig_hs_args
           Just (newFlexiTyVarTy matchabilityTy)
       | Just (_, callback_arrow) <- mode_synonym_metadata mode
       , L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ name))) <- ignoreParens orig_hs_ty
-      , isTyVarName name = callback_arrow
+      , isTyVarName name = ($ KindLevel) <$> callback_arrow
       | otherwise = Nothing
 
     fresh_kind_arrow level defaults =
@@ -5151,8 +5170,17 @@ A promoted constructor can quantify over the matchability of a callback
 field. For example, a constructor with a field of kind `a %m -> b` can
 take a matchable type constructor after promotion. Defer an omitted
 specified `m` if a supplied field has an arrow annotated with it. Its
-checked argument may determine the index. Keep the ordinary U default
-when the enclosing solver cannot determine it.
+checked argument may determine the index. A receiver such as `Pure1`
+can also take the promoted constructor itself. When the expected kind
+is an arrow, instantiate the remaining invisible binders here, so the
+callback domain can use the same deferred default. The equality between
+the actual and expected kinds may determine the index, including through
+another argument of the receiver. In the first pass over a synonym RHS,
+register these choices with the enclosing declaration solver. The inner
+solver leaves unresolved metadata for synonym generalisation, but
+`type Lift = Pure1 'Endo` must default the omitted constructor indices
+to U. The enclosing solver applies this default after solving the
+kind equalities.
 
 An isolated partial application with an inferred kind keeps its original
 default. Otherwise its synonym kind could gain an extra invisible binder.
@@ -8506,7 +8534,7 @@ tcLHsFamilyResultKindSig = tc_lhs_kind_sig
   (kindLevelMode { mode_synonym_metadata = familyKindMetadata })
 
 -- | Give each checked kind application its own metadata variables.
-familyKindMetadata :: Maybe (Name -> [Bool] -> TcM [Type], Maybe (TcM Matchability))
+familyKindMetadata :: Maybe (Name -> [Bool] -> TcM [Type], Maybe (TypeOrKind -> TcM Matchability))
 familyKindMetadata = Just (indices, Nothing)
   where
     indices _ callbacks = do

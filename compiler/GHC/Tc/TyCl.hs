@@ -2718,9 +2718,9 @@ kcLTyClDecl collect_metadata (L loc decl)
              outer_owner <- tcl_kind_arrow_defaults <$> getLclEnv
              liberal <- xoptM LangExt.LiberalTypeSynonyms
              -- See Note [Callback arrows in inferred synonym kinds]
-             let callback_arrow = fmap (\(defaults, _) -> do
+             let callback_arrow = fmap (\(defaults, _) level -> do
                    ma <- newFlexiTyVar matchabilityTy
-                   unless liberal $ updTcRef defaults ((ma, KindLevel) :)
+                   unless (liberal && level == KindLevel) $ updTcRef defaults ((ma, level) :)
                    pure (mkTyVarTy ma)) outer_owner
              inferSynonymMatchabilities $ do
                ref <- newTcRef []
