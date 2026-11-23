@@ -51,23 +51,17 @@ sendTHComputation
   -> (forall b. Binary b => (forall a. IO a -> IO a) -> THMessage b -> IO (Bool, b))
   -- ^ Handle one message. Return True to end the loop.
   -> IO a
-sendTHComputation i mkMsg reqHandler = mask $ \ restore -> do
-  mbox <- newMailbox (pipeAsyncMngr (interpPipe proc))
-  let msg = mkMsg mbox
-  res <- remoteCallInterleaving (interpPipe proc) msg
-     -- handle reverse requests until done
-     (restore $ handlerLoop mbox)
-     (dispose msg mbox)
-  disposeMailbox mbox
-  either throwIO pure res
+sendTHComputation i mkMsg reqHandler = mask $ \ restore ->
+  withMailbox (pipeAsyncMngr (interpPipe proc)) $ \ mbox -> do
+    let msg = mkMsg mbox
+    res <- remoteCallInterleaving (interpPipe proc) msg
+       -- handle reverse requests until done
+       (restore $ handlerLoop mbox)
+       (dispose msg)
+    either throwIO pure res
   where
-    disposeMailbox mbox = do
-      -- non-blocking
-      -- ext. interp. will cleanup on error response, so we don't need reqs.
-      _reqs <- closeMailbox (interpPipe proc) mbox
-      pure ()
-    dispose msg mbox res = do
-      disposeMailbox mbox
+    withMailbox am = bracket (newMailbox am) (closeMailbox (interpPipe proc))
+    dispose msg res = do
       case res of
         -- rethrown elsewhere where relevant.
         Left _   -> pure ()
