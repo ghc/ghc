@@ -210,9 +210,9 @@ can diagnose unused binders at the source.
 -}
 -- | Lift type lambdas and sum payloads from declaration right-hand sides.
 -- See Note [Lifting type lambdas].
-liftTypeLambdas :: RdrName -> HsGroup GhcPs
+liftTypeLambdas :: Bool -> RdrName -> HsGroup GhcPs
                 -> RnM (HsGroup GhcPs, [(OccName, OccName)], OccEnv (OccName, Bool))
-liftTypeLambdas sigma group = do
+liftTypeLambdas lift_lambdas sigma group = do
   (groups, hidden, scopes) <- unzip3 <$> traverse liftGroup (hs_tyclds group)
   return (group { hs_tyclds = groups }, concat hidden, mkOccEnv (concat scopes))
   where
@@ -299,7 +299,8 @@ liftTypeLambdas sigma group = do
         local = mapMaybe capture (familyEquationBinders outer lhs)
 
     liftRhs _ scoped owner captures (L loc (HsKindSig ann body kind)) salt
-      | L _ HsForAllTy{} <- stripParens kind
+      | lift_lambdas
+      , L _ HsForAllTy{} <- stripParens kind
       , closedSpliceFreeKind kind
       , Just capture_kinds <- traverse (closedCaptureKind . fst) captures
       , L lam_loc (XHsType (HsTypeLambda _ vars rhs)) <- stripParens body
@@ -339,8 +340,8 @@ liftTypeLambdas sigma group = do
                  = L loc (XHsType (mkHsSingleTypeLet noAnn saved (typeName binder) local))
                  | otherwise = local
       in (preserveTypeLetSource let_ty result, rhs_families ++ body_families, if null body_families then next else end)
-    liftRhs _ scoped owner captures (L loc (XHsType (HsTypeLambda _ vars body))) salt =
-      liftLambdaRhs scoped Nothing owner captures loc vars body salt Nothing
+    liftRhs _ scoped owner captures (L loc (XHsType (HsTypeLambda _ vars body))) salt
+      | lift_lambdas = liftLambdaRhs scoped Nothing owner captures loc vars body salt Nothing
     liftRhs True scoped owner captures (L loc (XHsType (HsTypeSome _ binder domain body))) salt =
       let signature = sumPayloadKind captures domain
           (schema, families, next) = liftLambdaRhs scoped (Just domain) owner captures loc [binder] body salt signature
@@ -469,14 +470,19 @@ liftTypeLambdas sigma group = do
             | splice_free, not (unLoc v `Set.member` free)
             = L (l2l (getLoc v)) (HsWildCardTy (HoleVar (noLocA unnamedHoleRdrName)))
             | otherwise = typeName v
-          family = L loc (FamDecl noExtField
+          -- A quoted capture has an exact name in the original scope.
+          -- Give the generated family a separate parameter.
+          copied = [(unLoc v, unLoc (privateName "quoted-capture" salt index v))
+                   | (index, (_, v)) <- zip [0..] captures
+                   , isJust (rdrNameExactName_maybe (unLoc v))]
+          family = renameCaptures copied $ L loc (FamDecl noExtField
                    (FamilyDecl noAnn (ClosedTypeFamily noAnn (Just equations)) TopLevel
                        name (HsQTvs noExtField (map fst equation_scope)) Prefix
                        (L (l2l loc) (NoSig noExtField)) Nothing))
           applied = foldl' (\f (_, n) -> L loc (HsAppTy noExtField f (typeName n)))
                            (typeName name) captures
           sig kind = L loc (StandaloneKindSig noAnn name
-                       (L (getLoc kind) (mkHsImplicitSigType kind)))
+                       (L (getLoc kind) (mkHsImplicitSigType (renameCaptures copied kind))))
       in (applied, (family, (occ, owner_occ), sig <$> signature, Just (occ, (root, is_sum))))
 
     lambdaOcc owner salt scoped =
@@ -1944,8 +1950,10 @@ rnSrcDecls group = do
       sigma_mod = mkModule (RealUnit (Definite (baseUnitId dflags))) (mkModuleName "GHC.Sigma")
       sigma = mkOrig sigma_mod (mkTcOcc "Sigma")
       (with_cases, case_names) = if lift_cases then liftTypeCases group else (group, [])
+  -- Keep written lambdas in untyped declaration quotes.
+  -- See Note [Quoting type lambdas] in GHC.HsToCore.Quote.
   (expanded, lambda_names, scopes) <-
-    if enabled then liftTypeLambdas sigma with_cases else return (group, [], emptyOccEnv)
+    if enabled then liftTypeLambdas lift_cases sigma with_cases else return (group, [], emptyOccEnv)
   rnSrcDeclsWithLambdas sigma named_wildcards lift_cases
                         (case_names ++ [(fam, Just owner) | (fam, owner) <- lambda_names])
                         scopes expanded
@@ -2040,7 +2048,7 @@ rnSrcDeclsWithLambdas sigma named_wildcards lift_cases early_hidden early_scopes
                    (updated, anchors, aliases, uses, unbound, _) =
                      liftDeclarationTypes heads [] show lift_cases named_wildcards Nothing input
                    (cases, case_names) = liftTypeCases emptyRdrGroup{hs_tyclds = anchors}
-             ; (late, lambdas, late_scopes) <- liftTypeLambdas sigma cases
+             ; (late, lambdas, late_scopes) <- liftTypeLambdas True sigma cases
              ; let late_hidden = aliases ++ case_names ++ [(fam, Just owner) | (fam, owner) <- lambdas]
              ; forM_ unbound $ \v ->
                  forM_ (demoteRdrNameTv (unLoc v)) $ \term ->
@@ -2079,7 +2087,7 @@ rnSrcDeclsWithLambdas sigma named_wildcards lift_cases early_hidden early_scopes
      then do { splice_types <- newTcRef []
              ; splice_cases <- newTcRef (0, [])
              ; local_lambdas <- newTcRef (0 :: Int)
-             ; let rename_splice = rnSplicedSignatureCases sigma named_wildcards local_fix_env splice_types splice_cases
+             ; let rename_splice = rnSplicedSignatureTypes sigma named_wildcards local_fix_env splice_types splice_cases
                    lift_local = rnLocalSignatureLambdas sigma named_wildcards local_fix_env splice_types local_lambdas
              ; binds <- updGblEnv (\env -> env{tcg_rn_local_lambdas = Just ([], lift_local)}) $
                           rnValBindsRHSWith (rnHsSigWcTypeWithSplice rename_splice)
@@ -2229,7 +2237,7 @@ rnLocalSignatureLambdas sigma named_wildcards fix_env generated local_lambdas ki
             liftDeclarationTypes [] [] suffix True named_wildcards (Just (scope, map fst ambient)) input
       case (anchors, hs_valds updated) of
         (_ : _, ValBinds _ [VbSig (L _ (TypeSig _ _ _ result))]) -> do
-          (late, lambdas, scopes) <- liftTypeLambdas sigma emptyRdrGroup{hs_tyclds = anchors}
+          (late, lambdas, scopes) <- liftTypeLambdas True sigma emptyRdrGroup{hs_tyclds = anchors}
           let hidden = aliases ++ [(fam, Just owner) | (fam, owner) <- lambdas]
               declarations = hs_tyclds late
           (envs, _) <- getLocalNonValBinders fix_env emptyRdrGroup{hs_tyclds = declarations}
@@ -2281,19 +2289,19 @@ localSignatureCaptures local formals = catMaybes . snd . mapAccumL copy emptyNam
         -> pure (L loc (HsTyVar noAnn promoted (mkRdrUnqual (nameOccName name) <$ var)))
       kind -> namedSpliceType kind
 
--- | Lift cases from the parsed result of a top-level signature splice.
+-- | Lift cases and lambdas from the parsed result of a top-level signature splice.
 -- See Note [Lifting cases from signature splices].
-rnSplicedSignatureCases
+rnSplicedSignatureTypes
   :: RdrName -> Bool -> MiniFixityEnv -> TcRef [([TyClGroup GhcRn], FreeNames)]
   -> TcRef (Int, [(RetainedCaseKey, Name)])
   -> SignatureSpliceSite -> HsDocContext -> HsUntypedSplice GhcPs
   -> RnM (HsType GhcRn, FreeNames)
-rnSplicedSignatureCases sigma named_wildcards fix_env generated splice_cases site doc =
+rnSplicedSignatureTypes sigma named_wildcards fix_env generated splice_cases site doc =
   rnSpliceTypeWith indices $ \raw -> do
     local <- getLocalRdrEnv
     case doc of
       TypeSigCtx names@(_:_)
-        | contains_case raw
+        | contains_lifted_type raw
         , Just (outer, retained) <- splice_scope local raw
         -> do
         let rename ty = rnLHsType (SpliceTypeCtx raw) ty
@@ -2312,7 +2320,7 @@ rnSplicedSignatureCases sigma named_wildcards fix_env generated splice_cases sit
           (_:_, ValBinds _ [VbSig (L _ (TypeSig _ _ _ HsWC{hswc_body = L _ HsSig{sig_body = ty}}))])
             | Just result <- unwrap_retained retained ty -> do
             let (cases, case_names) = liftTypeCases emptyRdrGroup{hs_tyclds = anchors}
-            (late, lambdas, scopes) <- liftTypeLambdas sigma cases
+            (late, lambdas, scopes) <- liftTypeLambdas True sigma cases
             let hidden = aliases ++ case_names ++ [(fam, Just owner) | (fam, owner) <- lambdas]
                 declarations = hs_tyclds late
             forM_ uses $ \(loc, gre) -> setSrcSpanA (getLoc loc) (addUsedGRE AllDeprecationWarnings gre)
@@ -2347,11 +2355,11 @@ rnSplicedSignatureCases sigma named_wildcards fix_env generated splice_cases sit
     unwrap_retained _ (L _ HsForEachTy{hst_body = body}) = Just body
     unwrap_retained _ _ = Nothing
 
-    contains_case :: Data a => a -> Bool
-    contains_case node
-      | Just (L _ (XHsType HsTypeCase{})) <- cast node :: Maybe (LHsType GhcPs)
-      = True
-      | otherwise = or (gmapQ contains_case node)
+    contains_lifted_type :: Data a => a -> Bool
+    contains_lifted_type node = case cast node :: Maybe (LHsType GhcPs) of
+      Just (L _ (XHsType HsTypeCase{})) -> True
+      Just (L _ (XHsType HsTypeLambda{})) -> True
+      _ -> or (gmapQ contains_lifted_type node)
 
     splice_scope local raw = case site of
       CompleteSignatureSplice -> Just (mkHsOuterImplicit, [])
@@ -2411,7 +2419,7 @@ retainedSpliceDomain ty = case ignoreParens ty of
 
 {- Note [Lifting cases from signature splices]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A splice at the root of a value signature can return a type case. The
+A splice at the root of a value signature can return a type case or lambda. The
 initial declaration lifting pass has only the source splice. Run the splice
 in the ordinary signature renamer. Use its parsed result to construct the
 same private declarations as for a written signature. Register the names

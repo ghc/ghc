@@ -38,7 +38,7 @@ import qualified GHC.Boot.TH.Syntax as TH
 
 import GHC.Hs
 import qualified GHC.Hs.Decls as HsDecls
-import GHC.Hs.Type (HsTypeGhcRnExt(HsTypeLetRn, HsTypeCaseAliasRn, HsTypeCaseRn), isTypeLetPairOcc)
+import GHC.Hs.Type (HsTypeGhcRnExt(HsTypeLetRn, HsTypeCaseAliasRn, HsTypeCaseRn, HsTypeLambdaQuoteRn), isTypeLetPairOcc)
 import GHC.Hs.Decls.Overlap ( OverlapMode(..) )
 
 import GHC.Tc.Utils.TcType
@@ -1531,7 +1531,24 @@ repLTyAt tyki (L _ (XHsType (HsTypeLetRn _ (L _ name) rhs body))) = do
     MkC name' <- lookupOcc name
     MkC body' <- repLTyAt tyki body
     rep2 letTName [name', rhs', body']
+repLTyAt tyki (L _ (XHsType (HsTypeLambdaQuoteRn binders body))) =
+  addSimpleTyVarBinds FreshNamesOnly (map unLoc binders) $ do
+    MkC names <- repList nameTyConOcc (lookupOcc . unLoc) binders
+    MkC body' <- repLTyAt tyki body
+    rep2 lamTName [names, body']
 repLTyAt tyki ty = repTy tyki (unLoc ty)
+
+{- Note [Quoting type lambdas]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An untyped quotation keeps the lambda in its source position. A lifted
+family belongs to the declaration group that checks the type. The quote
+might be spliced into a different module or inspected as TH syntax.
+
+Emit LamT with a fresh TH Name for each binder, as for a term lambda.
+The body uses those names and the names of any enclosing binders in the
+quotation. The converter preserves their identities. The splice site
+then applies the same lifting and kind checks as for a written lambda.
+-}
 
 -- | Quote a type without merging its source forall groups.
 repTy :: Maybe TypeOrKind -> HsType GhcRn -> MetaM (Core (M TH.Type))

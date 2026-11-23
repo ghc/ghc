@@ -2004,6 +2004,11 @@ cvtTypeKindOnGadtSpine in_gadt typeOrKind ty
              body' <- cvtTypeKind typeOrKind body
              mk_apps (XHsType (mkHsSingleTypeLet noAnn name' rhs' body')) tys'
 
+           LamT binders@(_:_) body -> do
+             binders' <- traverse tNameN binders
+             body' <- cvtTypeKind typeOrKind body
+             mk_apps (XHsType (HsTypeLambda (noEpTok, noEpUniTok) binders' body')) tys'
+
            SigT ty ki
              -> do { ty' <- cvtType ty
                    ; ki' <- cvtKind ki

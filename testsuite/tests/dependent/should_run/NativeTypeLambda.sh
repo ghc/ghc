@@ -415,12 +415,7 @@ quoted = [d|
   type QuotedCase = (\tag -> case tag of { Nothing -> Proxy tag; Just _ -> Proxy tag }) 'Nothing
   |]
 HS
-if "${g[@]}" -c Quoted.hs >quote.log 2>&1 ||
-   ! grep -Fq 'Quoted.hs:7:30: error: [GHC-65904]' quote.log ||
-   ! grep -Fq 'Type case syntax' quote.log || grep -Fq '$lambda' quote.log; then
-    cat quote.log >&2
-    exit 1
-fi
+"${g[@]}" -c Quoted.hs
 
 cat >WrongIndex.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeApplications, TypeOperators #-}

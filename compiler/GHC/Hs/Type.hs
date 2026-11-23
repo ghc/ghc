@@ -552,6 +552,7 @@ data HsTypeGhcRnExt
   | HsTypeCaseRn (LHsType GhcRn) [([Name], LHsType GhcRn, LHsType GhcRn)]
     -- Quoted case. Each row carries its pattern binders, pattern and result.
   | HsTypeLetProductCheckRn (LocatedN Name) !Int (LHsType GhcRn)
+  | HsTypeLambdaQuoteRn [LocatedN Name] (LHsType GhcRn)
   | HsTypeLambdaCheckRn [LocatedN Name] (LHsType GhcRn) (LHsType GhcRn)
     -- Original body and lowered application. See Note [Checking local lambda captures]
     -- in GHC.Tc.Gen.HsType.
@@ -1959,6 +1960,7 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
     HsCoreTyRn ty -> ppr ty
     HsGadtFieldRn field -> pprHsConDeclFieldNoMult field
     HsTypeCaseAliasRn _ body -> ppr_mono_lty body
+    HsTypeLambdaQuoteRn vars body -> char '\\' <> hsep (map ppr vars) <+> arrow <+> ppr_mono_lty body
     HsTypeLambdaCheckRn vars body _ -> char '\\' <> hsep (map ppr vars) <+> arrow <+> ppr_mono_lty body
     HsTypeLetProductCheckRn _ _ body -> ppr_mono_lty body
     HsTypeCaseRn scrutinee rows ->
@@ -2059,6 +2061,7 @@ hsTypeNeedsParens p = go_hs_ty
         HsCoreTyRn ty -> go_core_ty ty
         HsGadtFieldRn{} -> False
         HsTypeCaseAliasRn{} -> p >= topPrec
+        HsTypeLambdaQuoteRn{} -> p >= topPrec
         HsTypeLambdaCheckRn{} -> p >= topPrec
         HsTypeLetProductCheckRn _ _ body -> hsTypeNeedsParens p (unLoc body)
         HsTypeCaseRn{} -> p >= topPrec

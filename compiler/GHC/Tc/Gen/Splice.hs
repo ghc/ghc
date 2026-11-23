@@ -3145,6 +3145,7 @@ lookupThInstName th_type = do
     inst_cls_name TH.IndexVarT{}              = inst_cls_name_err
     inst_cls_name TH.CaseT{}                  = inst_cls_name_err
     inst_cls_name TH.LetT{}                   = inst_cls_name_err
+    inst_cls_name TH.LamT{}                   = inst_cls_name_err
     inst_cls_name (TH.ForallMatchT _ _)      = inst_cls_name_err
     inst_cls_name (TH.AppKindT _ _)          = inst_cls_name_err
     inst_cls_name (TH.TupleT _)              = inst_cls_name_err

@@ -929,6 +929,9 @@ pprType p (LetT name rhs body) =
   parensIf (p >= funPrec) $
     text "let" <+> pprName' Applied name <+> equals <+> pprType noPrec rhs
       <+> text "in" <+> pprType noPrec body
+pprType p (LamT names body) =
+  parensIf (p >= funPrec) $
+    (char '\\' <> hsep (map (pprName' Applied) names)) <+> text "->" <+> pprType noPrec body
 pprType p (CaseT scrutinee rows) =
   parensIf (p >= funPrec) $
     text "case" <+> pprType noPrec scrutinee <+> text "of"
