@@ -335,6 +335,14 @@ distinction. [GHC's family patterns](https://downloads.haskell.org/ghc/latest/do
 [Agda's pattern coverage](https://agda.readthedocs.io/en/v2.8.0/language/coverage-checking.html),
 and [quotation tests](../../../testsuite/tests/dependent/should_run/NativeTypeLambdaQuote.sh).
 
+The sensor example uses `Nothing -> ()` and `Just _ -> Int` to choose
+the type of each reading from its label. The type of a missing slot
+therefore rejects a Boolean value. Jobs 1897 and 1904 checked the case
+patterns and their quotation diagnostics. In job 1905, the old compiler
+rejected the wildcard. A source-hidden client of the new compiler read
+`(21,(),54)` at both optimization levels.
+[Sensor row](../examples/open-evaluation/QuotedSensorRow.hs).
+
 A nested type splice can also use an enclosing retained variable by its
 exact `IndexVarT` name. A direct quotation and `lookupValueName` both
 identify the original runtime binder. The case lifter can copy a closed

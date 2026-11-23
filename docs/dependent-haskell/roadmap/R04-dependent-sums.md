@@ -395,6 +395,20 @@ constructor representation does not carry record labels.
 [Agda record types](https://agda.readthedocs.io/en/v2.8.0/language/record-types.html)
 and [GHC proposal #23](https://ghc-proposals.readthedocs.io/en/latest/proposals/0023-overloaded-record-fields.html).
 
+Jobs 1901 and 1907 checked generated selectors in native code and
+through typecheck-only interfaces. In an ordinary source-hidden client,
+`zipVec (namedLetters p) (namedFlags p)` retained the one length shared
+by both fields. Using `namedFlags q` from another record failed.
+A warm typecheck-only invocation reused the provider interfaces. Job
+1908 built the Showcase's ordinary client at both optimization levels.
+[Ordinary client](../examples/packed-vector/NamedSiblingColumnsClient.hs).
+
+Construction with a retained variable, field puns and record wildcards
+passed in job 1909. Omitting a payload or the witness failed with
+GHC-83605. For an ordinary Haskell record, an omitted lazy field
+receives a bottom value. A supplied field remains readable. The next
+experiment applies this rule to a lazy payload when its witness is
+present. [Field omission and witness inference](../REFERENCES.md#omitted-fields-in-a-dependent-record).
 
 ## Sums in constructor fields
 

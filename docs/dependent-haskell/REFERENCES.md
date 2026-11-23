@@ -8586,3 +8586,15 @@ proof, the declarations of `xs` and `ys` supply those types when
 [Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html),
 [GHC visible type application](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_applications.html)
 and [R16 list proof](roadmap/R16-open-term-evaluator.md#map-over-the-result-of-zip).
+
+### Omitted fields in a dependent record
+
+Haskell 2010 assigns an omitted lazy field a bottom value. It requires
+a strict field in a record construction. Agda's `VList` uses an
+implicit length inferred from its vector. The Haskell example declares
+its length as a visible runtime field. The field-omission experiment
+checks whether a caller who supplies that length can leave one of the
+two vectors undefined and still read the other vector.
+[Haskell 2010 Report, §3.15.2](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html),
+[Agda's VList example](https://agda.readthedocs.io/en/v2.8.0/language/record-types.html#record-update)
+and [the R04 source cases](roadmap/R04-dependent-sums.md#named-fields-at-one-stored-length).
