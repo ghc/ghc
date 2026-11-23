@@ -229,6 +229,7 @@ type Bad = let Some _ _ = 'Some 2 3 in Bool
 HS
 reject RefutableProduct 5:16-19 12838 \
     'A type let pattern requires the sole constructor of a regular data type.' -ferror-spans
+cat error.log >&2
 
 cat >WrongProductArity.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}

@@ -1,0 +1,8 @@
+RefutableProduct.hs:5:16-19: error: [GHC-12838]
+    * The data constructor `Some' cannot be used in a type let pattern.
+      A type let pattern requires the sole constructor of a regular data type.
+    * In the type `let Some _ _ = 'Some 2 3 in Bool'
+      In the type synonym declaration for `Bad'
+  |
+5 | type Bad = let Some _ _ = 'Some 2 3 in Bool
+  |                ^^^^
