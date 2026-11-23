@@ -859,7 +859,7 @@ checkFlagHash hsc_env iface self_recomp = do
                 else pure UpToDate
           | otherwise = pure UpToDate
         check_retained_case
-          | checkStructuralCases dflags iface = do
+          | mi_hsc_src iface == HsSrcFile = do
               reviewed <- liftIO $ readField retainedCaseReviewField (mi_ext_fields iface)
               let generation = fromMaybe 0 reviewed
               candidate <- if generation >= retainedCaseReviewGeneration
@@ -1690,10 +1690,10 @@ source and final Core checks decide whether the constructor is visible
 and the body and RULES permit a certificate. The metadata can only
 request a source rebuild. It supplies no equation.
 
-Mark the review even if the source cannot publish a table. Only mark
-candidate source modules that generate code. Include the generation
-in the full interface hash so a rejected worker writes the review
-marker. The marker changes no declaration ABI. Later widening of the
+Mark the review even if the source cannot publish a table. Retained
+source equations are checked in the typechecker, including when
+writing interfaces without generating code. Include the generation in
+the full interface hash so a rejected worker writes the review marker. The marker changes no declaration ABI. Later widening of the
 eligible telescope can use a newer generation for the new shapes and
 retain the older review for shapes it already checked.
 -}
@@ -3157,7 +3157,7 @@ addFingerprints hsc_env iface0 = do
   stamp_structural_cases <- stamp_source_case StructuralCase
   stamp_size_list_cases <- stamp_source_case SizeListCase
   stamp_retained_workers <- case mi_self_recomp_info iface0 of
-    Just info | checkStructuralCases (hsc_dflags hsc_env) iface0 ->
+    Just info | mi_hsc_src iface0 == HsSrcFile ->
       initIfaceLoad hsc_env $
         couldExportRetainedCase 0 iface0 (map snd decls_w_hashes) (mi_sr_usages info)
     _ -> pure False
