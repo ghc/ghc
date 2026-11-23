@@ -11,39 +11,51 @@ and its [expected output](Showcase.stdout) are the executable examples.
 Updated 23 November 2026. The development branch is
 `dependent-haskell`. Use the fork command below to find its latest commit.
 
-The current compiler is `203245e124`. A local type lambda can capture
-the error type from an enclosing signature. A dependent pair can store
-a `Maybe` or tuple whose fields use associated families. Job 1748
-verified the combination through a source-hidden ordinary client at
-`-O0` and `-O2`. Reading the tag left an undefined payload unevaluated.
-Job 1739 qualified both stages, all 571 Showcase observations in
-three modes, 22 selected registrations, and 234 compatibility cases.
-The focused suite passed 137 of 138 with the existing `MTrans` failure.
-If a warm build stops during package registration, check the exact
-package DB path. The 571 recovery configured the affected packages with
-`-j1` and resumed the same build tree. [Release evidence](CHECKPOINTS.md#local-row-callbacks-and-composed-dependent-pair-payloads).
+The 574-observation compiler is `c11b29a399`. Job 1853 built both
+stages. All nine selected registrations passed. The 574 Showcase
+observations matched at `-O0`, default `-O2` and in GHCi. The installed
+HaskLib and first-class-families checks passed. Native and typecheck-only
+upgrades from 571 recovered the missing equation for an unchanged length
+worker. A second invocation reused every output. All 234 compatibility
+cases passed. The focused suite passed 137 of 138 with the existing
+`MTrans` diagnostic in `deriving-via-compile`. Job 1858 also passed
+the maintained `--retained-worker` check with the narrower imports.
+[Runtime replacement and upgrade evidence](CHECKPOINTS.md#replace-a-vector-after-comparing-runtime-lengths).
 
-Job 1756 qualified both stages of the private compiler `3d95b04b27`.
-All 572 Showcase observations matched in three modes. All 24 selected
-registrations and 234 compatibility cases passed. The focused suite
-passed 137 of 138 with the existing `MTrans` failure. Job 1837 ran the
-ordinary replacement client at both optimization levels on this compiler.
+An ordinary caller can replace a vector when a runtime comparison
+proves that the two lengths agree. A local signature can also use an
+inferred capture kind in a type lambda. A reader built from 572
+consumed the resulting row from a stripped interface at both
+optimization levels.
 
-Hold this checkpoint for the incremental-build fix. Job 1818 upgraded
-a 571 build with an unchanged ordinary length worker. GHC reused its
-interface without the new equation and rejected the dependent consumer
-with GHC-68947. Rebuilding the worker repaired the client. The same
-failure occurred with `-fno-code -fwrite-interface`. Jobs 1843 and 1848
-tested the correction. Three eligible workers acquired equations, three
-ineligible workers recorded the review, and six other modules kept their
-objects and interfaces. The second build reused all twelve modules.
+The private sibling candidate adds a second vector at the same stored
+length. Job 1855 passed the historical-reader and warm upgrade checks
+on the component compiler. Its ordinary source-hidden caller zipped
+the two vectors and rejected a field from another package. Its
+consolidated source is `95066da452`. Job 1863 checks a mixed module
+that already carries the preceding recompilation marker.
 
-The next combined source is `e1e824d935`. The runner is
-`_build/on-demand/r04-r17-r21-normal-after-572-20261123`. Job 1799
-checked type lambdas inside expression annotations. Jobs 1793 and 1801
-checked the installed abstract vector and ordinary vector replacement.
-See the [checkpoint](CHECKPOINTS.md#a-vector-projection-indexed-by-an-ordinary-length-function).
-Private recovery refs are under `refs/archive/dependent-haskell/2026-11-23/`.
+R17 job 1859 built the quoted-lambda compiler and its libraries. The
+first quote failed because `GHC.KnownKeys` did not export `lamT`. Job
+1871 checks the export correction and its scope controls. Job 1865
+ran a heterogeneous row with two fields at one retained length. A
+named index alias worked. Capturing the record directly in the inline
+lambda failed with GHC-27185. Job 1869 checks the proposed repair. R23 job 1866
+tests the reification of legacy transformer kind synonyms on a private
+prototype. R04 job 1868 tests generated named selectors. Read each
+job's receipt before using its candidate. The two GHC slots share a
+16-core, 64,000,000,000-byte slice and yield to the benchmark queues.
+After the sibling upgrade passed, retiring its superseded build tree
+released 3,911,356,416 bytes. The template sources and recipes remain.
+The [queue recovery procedure](CHECKPOINTS.md#restore-the-shared-wsl-build-queue)
+restores those limits after a distribution restart.
+
+Job 1756 qualified the private 572 compiler. Job 1818 found its stale
+length interface before publication. Jobs 1843 and 1848 verified the
+targeted repair. The 571 release at `203245e124` remains the baseline
+for the incremental check. Its 571 Showcase observations matched in
+three modes, all 234 compatibility cases passed, and the focused suite
+retained its existing `MTrans` failure.
 
 The preceding R04 compiler is `aba28b367f`. A dependent pair can select
 its payload type with an associated family. Reading the tag leaves
@@ -570,8 +582,8 @@ defaults and an opt-in migration warning.
 
 ## Build and verify
 
-The 571-line Showcase uses the normal two-stage compiler at
-`203245e124` in `r04-r17-normal-571-20261123`.
+The 574-line Showcase uses the normal two-stage compiler at
+`c11b29a399` in `r04-r17-r21-normal-after-572-20261123`.
 On this host the bootstrap tools are GHC 9.14.1, Cabal 3.18.1.0, Happy 2.1.7
 and Alex 3.5.4.0. A fresh checkout needs the Git submodules at their recorded
 revisions. This build copied the preceding build tree, ran `./boot`
@@ -584,7 +596,7 @@ self-hosted stage 2 compiler in `_build/stage1/bin/ghc`. Both use the
 target libraries in `_build/stage1/lib`. For example, from the main checkout:
 
 ```sh
-stable="$PWD/_build/on-demand/r04-r17-normal-571-20261123/source/_build/stage1"
+stable="$PWD/_build/on-demand/r04-r17-r21-normal-after-572-20261123/source/_build/stage1"
 queue="$PWD/docs/dependent-haskell/tools/ghc-build-job"
 check="$PWD/docs/dependent-haskell/check-showcase.sh"
 "$queue" showcase-stage2-ghci bash "$check" "$stable/bin/ghc" "$stable/lib" --ghci

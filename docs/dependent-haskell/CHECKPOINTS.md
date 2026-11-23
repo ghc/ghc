@@ -6,6 +6,42 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Replace a vector after comparing runtime lengths
+
+The 574-observation compiler at `c11b29a399` accepts an ordinary client
+that uses a runtime equality test to replace a vector. The target length
+and source vector may come from separately read packages.
+
+```haskell
+replaceCells :: CharVector -> CharVector -> Maybe CharVector
+replaceCells target source = case sameNat (lengthOf target) (lengthOf source) of
+    Nothing -> Nothing
+    Just Refl -> Just (CharVector (lengthOf target) (cellsOf source))
+```
+
+The provider defines the datatype and its projections in one module.
+An unequal length returned `Nothing` without forcing either payload.
+When the lengths matched, the result contained the source vector.
+Without the equality test, GHC-83865 identified the source projection.
+[Showcase client](examples/packed-vector/RetainedCharClient.hs).
+
+Job 1853 built the bootstrap and self-hosted compilers. Upgrading a 571
+build recompiled the ordinary length worker and checked the newly added
+consumer. This worked for native code and `-fno-code -fwrite-interface`.
+The unrelated module retained its files. A second invocation recompiled
+nothing, and the file hashes and timestamps matched in both modes.
+All nine selected registrations passed. The R17 older reader, ordinary
+replacement, field visibility, first-class-families and installed HaskLib
+checks also passed. All 574 Showcase observations matched at native
+`-O0`, default `-O2` and in GHCi.
+
+All 234 compatibility cases passed (231 normal and three GHCi). The
+focused suite passed 137 of 138. Its one failure was the known
+`deriving-via-compile` transformer-kind diagnostic. Job 1858 ran the
+maintained `--retained-worker` test against the 571 and 574 normal
+compilers. It also checked the stale interface in isolation.
+[Two-compiler regression](examples/closed-evaluation/check-readback-upgrade.sh).
+
 ## A vector projection indexed by an ordinary length function
 
 The R04/R21 candidate `3d95b04b27` checks the following two definitions

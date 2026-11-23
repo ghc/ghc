@@ -279,6 +279,13 @@ module. A dependent client could return `Vec Char (witness p)` from
 `CharVector -> Vec Char 'Z` fails with GHC-83865 at `storedCells p`.
 The test registers a package that exposes only the public module.
 
+The 574-observation compiler checks the datatype and both handwritten
+projections in one module that exports the constructor. A length worker
+only needs the `Nat` type and the package constructor in scope. It can
+leave the constructors of the stored vector and its elements private.
+This passed all sixteen import combinations in job 1853.
+[Same-module projections](../examples/packed-vector/RetainedCharVector.hs).
+
 Still open is defining the datatype and both projections in a single
 module that hides the constructor. A caller needs only the signature
 `localCells :: foreach (r :: CharVector) -> Vec Char (localLength r)`.

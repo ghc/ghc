@@ -171,7 +171,15 @@ kinds. An early prototype accepted this type and failed only if a client
 tried to reduce the function. Job 1743 found the same failure with an
 ascription, a dependent constructor and a dependent family. Checking
 the callback only on application missed all three formation errors.
-The published compiler retains the written-kind restriction for captures.
+The 574-observation compiler also accepts an inferred capture kind in
+`taggedCell :: forall k tag. Proxy (tag :: k) -> Bool -> Fields '[(Proxy tag, Bool)]`.
+Its local row signature uses both `k` and `tag`. A current and a 572
+reader both consumed the stripped provider at `-O0` and `-O2`.
+The same formation check applies to an expression annotation. In
+`Proxy (\cell -> (At k tag, cell))`, an inner signature that shadows
+`k` with an incompatible kind gives GHC-25897 at `tag`, even though the
+program never applies the lambda.
+[Formation test](../../../testsuite/tests/dependent/should_run/NativeTypeLambdaFormation.hs).
 
 ### Forwarding the same callback
 
