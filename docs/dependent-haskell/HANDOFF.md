@@ -11,15 +11,19 @@ and its [expected output](Showcase.stdout) are the executable examples.
 Updated 23 November 2026. The development branch is
 `dependent-haskell`. Use the fork command below to find its latest commit.
 
-The published compiler at `f42ebe4659` matches normal build
-`00115859a5`. Jobs 1087 and 1101 passed both build stages and all 12
-qualification checks. The 552 Showcase outputs matched at native
-`-O0`, native `-O2` and in GHCi. All 40 selected registrations passed.
-The build, stage hashes and `qualification/qualification.pass` are in
-`_build/on-demand/r19-r41-next-20261122`. Its `source/_build/stage1`
-holds the Stage 2 installation. For the previous 551 compiler use
-`r19-r23-r27-r41-integration-20261122/physical-source.path` and the
-hashes in that experiment directory.
+The published R41 merge is `61fd13f735`. Its compiler and libraries
+match normal two-stage build `71e5215115`. The stage 2 installation is
+`_build/on-demand/r41-required-normal-553-20261123/source/_build/stage1`.
+All 553 Showcase outputs matched at native `-O0`, default `-O2` and in
+GHCi. All 84 focused registrations passed across the initial run and
+the corrected GHC API test. The broader comparison passed 229 of 234
+registrations after the fixture and test-helper replays. The five other
+failures matched the earlier compiler.
+[Release evidence](CHECKPOINTS.md#ordered-gadt-signatures-and-required-type-arguments).
+
+The preceding 552 compiler at `f42ebe4659` matches normal build
+`00115859a5` in `r19-r41-next-20261122`. Keep it while an active
+interface comparison uses it.
 
 | Next check | Source and verification |
 | --- | --- |
@@ -66,38 +70,14 @@ three upgrades from normal 554, mixed interfaces and the Showcase at
 still failed at imported proof uses. Inferred proof bindings have separate checks. See the
 [ordinary proof upgrade](roadmap/R16-open-term-evaluator.md#upgrading-a-proof-whose-type-hides-the-equality).
 
-R41 has a separate release candidate at `acd48e3f3f` in
-`r41-only-normal-553-20261123`. Job 1242 built both normal stages from the
-published branch plus the ordered GADT changes and their Showcase
-example. Job 1246 passed all 66 registered tests, the 553-line Showcase
-at native `-O0`, native `-O2` and in GHCi, the constructor permutations
-and the older interface readers. Job 1266 checked the inferred binder
-and record-field examples from guide revision `a3d61239a2`. Both pages
-rendered with all six new links resolved.
-
-The release still needs the [required type argument policy](REFERENCES.md#required-type-arguments-in-gadt-signatures).
-An empty visible `forall` in a GADT signature requires
-`RequiredTypeArguments`, including in the first position.
-`ExperimentalDependentTypes` implies it. A later explicit
-`NoRequiredTypeArguments` overrides the implication. Job 1276 found that
-a hand-built splice could lose the empty binder during conversion.
-The correction preserves the group on the constructor's result spine.
-Job 1284 passed all 16 selected registrations on the component,
-including the matrix of source, quotation, splice and flag-order cases.
-Records still reject a quantified result under either setting.
-The evidence is in `r41-required-flag-20261123/POLICY-EVIDENCE.md`.
-Job 1285 built both normal stages at `71e5215115`. Job 1286 matched
-all 553 Showcase outputs at native `-O0`, default `-O2` and in GHCi.
-It also checks 84 registered tests, interface readers and the guide.
-Resume these jobs from
-`r41-required-normal-553-20261123` and the local `r41-required-normal` ref.
-Job 1290 checks the other registrations that use the experimental extension.
-Two existing TH printer tests now include their required-binder example.
-The published 552 compiler rejected it with GHC-65904. Both tests passed
-on the R41 component. Job 1291 repeats them on the normal compiler.
-Their test-only revision is `57e02189b9`, archived as `r41-printer-tests`.
-The `r41-only-normal` and `r16-r41-review-normal` source refs are
-under `refs/archive/dependent-haskell/2026-11-23/`.
+The earlier R41 comparison is `acd48e3f3f` in
+`r41-only-normal-553-20261123`. It passed 66 registrations before the
+new flag policy. The final release source and tests are archived under
+`refs/archive/dependent-haskell/2026-11-23/r41-verified`.
+Jobs 1286 and 1319 provide the focused results on the final compiler.
+The former has one failed diagnostic expectation. The latter checks
+the same source examples with both flag settings. Job 1322 passed all
+four updated compatibility registrations together.
 
 The next combined source is `4d10fdc35f` in
 `r03-r16-proof-attribution-intake-20261123/source`. It includes the
@@ -126,12 +106,13 @@ The keyed-tree series ends at `3f82769e48` in
 declaration orders, both legal splice boundaries and the negative
 controls. Job 1299 matched the 556-line Showcase at native `-O0`
 and in GHCi on this component. The keyed-tree regression also passed
-at `-O2`. The combined checkout at `08b54eee13` in
+at `-O2`. The combined checkout at `fc2186e9cb` in
 `r03-r21-r41-integration-20261123/source` includes the tree series,
-the R03 CorePrep correction and the R41 flag and printer tests.
-Job 1304 builds both stages after R41 job 1286. Job 1305 checks 95
-registrations, the 556-line Showcase, proof clients and interface readers.
-The local source ref is `r03-r21-r41-normal-556` under the 23 November archive.
+the R03 CorePrep correction and the R41 scoping fixtures. Job 1320
+builds both stages. Job 1321 checks 99 registrations, the 556-line
+Showcase, proof clients and interface readers. Jobs 1304 and 1305
+ended before starting when their prerequisite failed. The source ref
+is `r03-r21-r41-scoping-556` under the 23 November archive.
 
 The local archive refs `r19-r41-normal-552`, `r16-hasklib-tree-553`
 and `r27-legacy-transition-normal` are under
@@ -345,8 +326,8 @@ and `r36-r41-r19-r13-549-normal`.
 The compiler sources remain available there after generated builds expire.
 
 The [release-readiness assessment](ROADMAP.md#release-readiness) records
-R35 and R36 as complete on the fork. R27 has a published declaration warning
-and an open decision on legacy language defaults.
+R35, R36 and R41 as complete on the fork. R27 keeps the legacy CUSK
+defaults and an opt-in migration warning.
 
 ## Resume after a restart
 
@@ -363,9 +344,8 @@ and an open decision on legacy language defaults.
    records for its old paths. Keep active builds under `_build/on-demand/`.
 3. Restore the [shared WSL build queue](CHECKPOINTS.md#restore-the-shared-wsl-build-queue)
    before submitting work. Use at most two subagents. The coordinator
-   reviews and integrates their results. R41 is checking constructor
-   signatures. R21 is checking whether the compiler can export the
-   branch-count equation for a tree with two type parameters. See the
+   reviews and integrates their results. R41 has landed. R03 and R21
+   share the next two-stage build. See the
    [two-parameter comparison](roadmap/R21-dependency-analysis.md#a-tree-with-two-type-parameters).
    The group has two slots. All GHC jobs share
    16 logical CPUs, 64,000,000,000 bytes of memory and zero swap.

@@ -18,7 +18,7 @@
 - [x] Match an existential field under a context between two prefix fields.
 - [x] Place a context and a later inferred and specified group after a leading required binder.
 - [x] Quote, reify, and splice that leading-required telescope with its field bangs.
-- [ ] Support the remaining orders of fields, contexts, and quantifiers in prefix constructors.
+- [x] Support the remaining orders of fields, contexts, and quantifiers in prefix constructors.
 
 The [Showcase](../Showcase.hs) defines a constructor with fields of
 types `a :~: Int` and `a`, followed by `forall b ->`. The function
@@ -373,8 +373,42 @@ the external interpreter.
 A bare alias of an ordered constructor also typechecks when its
 expected type quantifies after the field. The tests compare both
 shallow and deep subsumption with ordinary higher-rank functions.
-The remaining prefix grammar checks include ordered `type data` and
+The [release check](#release-check) covers ordered `type data` and
 empty contexts or quantifiers after a field.
 [Provider](../../../testsuite/tests/gadt/GadtOrderedNewtypeProvider.hs),
 [client](../../../testsuite/tests/gadt/GadtOrderedNewtype.hs)
 and [newtype representation](../REFERENCES.md#newtype-casts-and-ordered-fields).
+
+## Release check
+
+Merge `61fd13f735` completes the prefix grammar on this fork. The Showcase
+uses a type-only constructor whose second argument is a required type.
+
+```haskell
+type data PayloadKey a where
+    ChoosePayload :: Bool -> forall a -> PayloadKey a
+
+keyedPayload :: Proxy (key :: PayloadKey a) -> a -> a
+keyedPayload _ value = value
+```
+
+`keyedPayload (Proxy @(ChoosePayload 'True Int)) 47` returns `47`.
+A visible `forall` in a prefix constructor requires
+`RequiredTypeArguments`, even when it binds no names.
+`ExperimentalDependentTypes` implies the extension. A later
+`NoRequiredTypeArguments` overrides it. A generated record and its
+source equivalent both reject a visible result telescope. Proposal #402
+defers flexible record quantification and pattern-synonym signatures.
+[Proposal #402](https://ghc-proposals.readthedocs.io/en/latest/proposals/0402-gadt-syntax.html#future-work)
+and [flag decision](../REFERENCES.md#required-type-arguments-in-gadt-signatures).
+
+Job 1285 built both stages of `71e5215115`. The source-order matrices,
+refined results, stripped-interface clients, older readers and three
+Showcase modes passed on that compiler. All 84 selected registrations
+passed across jobs 1286 and 1319. Two additional printer registrations
+checked a quoted visible binder. In a separate 234-registration
+comparison, 229 passed after four test-helper replays and four fixture
+updates. Five failures matched the earlier compiler. The guide renders
+the implication link and adds no diagnostics. The whole guide retains
+three pre-existing Sphinx errors.
+[Diagnostic and compatibility results](../CHECKPOINTS.md#ordered-gadt-signatures-and-required-type-arguments).

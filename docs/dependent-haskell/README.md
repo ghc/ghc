@@ -22,6 +22,12 @@ The `Just` branch gets a `Vec a 1` and can use `safeHead` directly.
 [Vector library](examples/packed-vector/PackedVecLibrary.hs) and
 [working examples](Showcase.hs).
 
+A prefix GADT can take a field before a required type argument.
+For example, `ChoosePayload :: Bool -> forall a -> PayloadKey a` is a
+`type data` constructor in the Showcase. Applying `ChoosePayload 'True Int`
+selects a key for an `Int` payload.
+[Ordered constructor example](roadmap/R41-nested-quantification-in-gadts.md#release-check).
+
 For the current compiler revision, test results and restart procedure, see
 the [project handoff](HANDOFF.md).
 

@@ -16,9 +16,9 @@ the checked list laws for reuse by other modules.
 ## Where this fork stands
 
 Serokell marks **23 of 50 cards complete**. Of its **27 open cards**,
-the fork now completes **2**, partially implements **20** and has **5**
+the fork now completes **3**, partially implements **19** and has **5**
 with no separate implementation on the published branch. Counting the
-inherited 23 gives **25 of 50 complete** on the roadmap. These figures
+inherited 23 gives **26 of 50 complete** on the roadmap. These figures
 count cards. They do not estimate the effort left or certify all inherited
 GHC behavior on the fork.
 
@@ -26,13 +26,13 @@ GHC behavior on the fork.
 | --- | --- |
 | Dependent binders, Core and equality | R03, R04, R05, R11, R22 |
 | Promotion and evaluation | R07, R10, R12, R13, R14, R15, R16, R17, R18, R19 |
-| Declaration dependencies, families and GADTs | R21, R23, R24, R41 |
+| Declaration dependencies, families and GADTs | R21, R23, R24, plus R41, complete on the fork |
 | Namespace management and warnings | R27, plus R35 and R36, both complete on the fork |
 
 ### Release readiness
 
-Two cards meet their documented scope on the normal compiler at
-`2b64ffc406`. The upstream review and release decisions are separate.
+Three cards meet their documented scope on the fork. R35 and R36 were
+qualified on normal compiler `2b64ffc406`. R41 was qualified on `71e5215115`.
 
 - [x] **[R36 Pun warnings](roadmap/R36-pun-warnings.md).** All eight
   checklist entries and all 16 registered warning cases passed. These
@@ -44,12 +44,14 @@ Two cards meet their documented scope on the normal compiler at
   re-export through compiled interfaces. The negative case identifies
   both imports. All 25 namespace registrations passed.
 
-R41 remains partial. Its normal compiler accepts all 24 tested orders
-of a prefix GADT constructor with both field multiplicities. Boxed datatypes can also quantify over levity.
-Ordered newtypes now accept a representation-polymorphic field. Clients
-can construct and match them at a fixed representation, including one
-specified by a type family. Ordered `type data` constructors and empty
-quantifier groups after a field remain open on the published compiler.
+- [x] **[R41 Nested quantification in GADTs](roadmap/R41-nested-quantification-in-gadts.md#release-check).**
+  Prefix constructors accept fields, contexts and visible or invisible
+  `forall` groups in source order. This includes empty groups and
+  `type data`. Both normal compiler stages built. All 84 focused tests
+  passed across the initial run and replay. All 553 Showcase outputs
+  matched at native `-O0`, default `-O2` and in GHCi. Record constructors
+  retain their fixed order.
+
 R23 now supports both the ordinary
 and promoted uses of a polymorphic `Endo` in real library clients.
 A bare higher-order use in `FoldrDefault_` still needs explicit
@@ -91,7 +93,7 @@ which proof steps still require the function's definition.
 Earlier [Showcase milestones and examples](CHECKPOINTS.md#showcase-history-through-502-outputs)
 record how each behavior was introduced.
 
-### Evidence for the 20 partial cards
+### Evidence for the 19 partial cards
 
 Each row links to the test or card that supports it. The last column
 identifies an outstanding obligation or a test that can expose it.
@@ -122,7 +124,6 @@ continue to follow Serokell's published status.
 | [R23 Unsaturated families](roadmap/R23-unsaturated-type-families.md) | A supplied promoted callback can determine its arrow matchabilities. The real `first-class-families` package supports the plain lambda and `'Endo Echo` in separate clients. | Complete higher-order inference and settle compatibility of existing unannotated programs. The unmodified `T15874` still fails on the released compiler. |
 | [R24 Constrained families](roadmap/R24-constrained-type-families.md) | An associated family such as `Elem c` can require the owning dictionary. A source-hidden client rejects a missing premise before reduction. | Settle the general representation of domain evidence, including partial applications, and how the source formation rule corresponds to Core. |
 | [R27 Deprecate CUSKs](roadmap/R27-deprecate-cusks.md) | The opt-in `-Wcusks` warning supplies checked edits or explains a kind. Fourteen standalone signatures preserved all 215 printed kinds in a three-package migration on the fork. | The fork deliberately retains the Haskell98 and Haskell2010 defaults. Disabling and retiring CUSKs as proposed upstream is deferred. |
-| [R41 Nested GADT quantifiers](roadmap/R41-nested-quantification-in-gadts.md) | Prefix constructors can interleave several groups of fields, contexts and quantifiers. Boxed data supports unknown levity. An ordered newtype constructor erases to a cast even with a representation-polymorphic field. | Qualify ordered `type data` constructors and empty groups after a field under the [prefix grammar](roadmap/R41-nested-quantification-in-gadts.md#which-prefix-orders-work). |
 
 The published evaluator work covers closed calls such as `Prelude.sum` and
 open equations such as mapping `Prelude.not` over a list with a known head
@@ -139,12 +140,11 @@ source examples. General promotion remains open.
 
 | Card | Next result | Acceptance check |
 | --- | --- | --- |
-| [R41 Ordered GADT signatures](roadmap/R41-nested-quantification-in-gadts.md) | Publish the remaining prefix forms, including empty groups and ordered `type data`. | Build both compiler stages from the independent R41 source. Check construction and matching through a compiled interface, declaration quotation and reification, extension diagnostics, guide examples and the optimized Showcase. Check that `ExperimentalDependentTypes` implies `RequiredTypeArguments` and that an explicit override rejects a leading or trailing visible `forall`. |
 | [R16 Open evaluation](roadmap/R16-open-term-evaluator.md#optimized-clients-of-the-filter-proof) | Use HaskLib's `lengthMap` proof with default optimization. | Check the specific observation `size (map f xs)` against the installed rules. A client must still reject a rule that drops a cell or changes the observer. Verify that a separately compiled forwarder preserves the check. |
 | [R03 Dependent products](roadmap/R03-dependent-products.md#private-check-for-an-imported-function-in-an-index) | Export a retained index that names an ordinary imported function, either alone or applied to an argument. | Run the normal compiler with a source-hidden client. A re-export must preserve identity. A lexical binder and a same-spelled function in a different unit must remain distinct. Check old readers on changed and unaffected interfaces. |
 | [R21 Declaration dependencies](roadmap/R21-dependency-analysis.md#a-tree-with-two-type-parameters) | Qualify the two-parameter tree proof on a normal compiler. Both declaration orders and separately compiled workers pass on a private compiler component. | Repeat the keyed-tree client, wrong proof and splice boundaries on the integrated compiler. Compare the native and GHCi Showcase output. |
 
-R41 is in release testing. R21 and the R03 CorePrep correction share
+R41 is complete on the fork. R21 and the R03 CorePrep correction share
 the next normal build. R16's installed
 `lengthMap` experiment is on hold. Use the [handoff](HANDOFF.md#current-checkpoint)
 for the pinned compilers and test jobs.
@@ -376,7 +376,7 @@ still require substantial research.
 - [x] **R38 [No list or tuple puns](https://ghc.serokell.io/dh#no-list-or-tuple-puns)** — Completed. Needs/includes: no outgoing graph edge.
 - [x] **R39 [Visible forall](https://ghc.serokell.io/dh#visible-forall)** — Completed. Needs/includes: R34 (loose end), R40, R41 (loose end), R43.
 - [x] **R40 [Visibility coercions](https://ghc.serokell.io/dh#visibility-coercions)** — Completed. Needs/includes: no outgoing graph edge.
-- [ ] **R41 [Nested quantification in GADTs](https://ghc.serokell.io/dh#nested-quantification-in-gadts)** — Accepted. Needs/includes: no outgoing graph edge. Prefix constructors accept consecutive constraint groups before the first field ([GHC proposal #402](https://ghc-proposals.readthedocs.io/en/latest/proposals/0402-gadt-syntax.html), [#27424](https://gitlab.haskell.org/ghc/ghc/-/issues/27424)). An ordinary prefix constructor can end with a required forall after its last field. Its wrapper and pattern keep written argument order. A context before the fields can refer to the earlier type binders. Its constraints are available when checking the field and terminal type patterns. The promoted kind keeps written argument order when the constructor is promotable. Template Haskell can round-trip terminal-group prefix declarations with field bangs and multiplicities. A prefix constructor can also use `Int -> forall a. Eq a => T a`. Its caller supplies the field before the type argument and dictionary. A context can also follow the fields directly, as in `K :: a -> Eq a => F`. Pattern matching introduces the existential field type before checking the field and the dictionary afterward. Several specified `forall` groups can occur between value fields. The ordinary client supplies each type argument after the preceding field. Lifted prefix constructors can interleave class or equality contexts with fields and `forall` groups. A leading required binder can precede a context and a later group with inferred and specified binders. Template Haskell preserves that order and any field bangs. The worker keeps its representation order. Some terminal combinations and other constructor forms remain open ([#27425](https://gitlab.haskell.org/ghc/ghc/-/issues/27425), [#27426](https://gitlab.haskell.org/ghc/ghc/-/issues/27426)). [Checklist and source example](roadmap/R41-nested-quantification-in-gadts.md).
+- [ ] **R41 [Nested quantification in GADTs](https://ghc.serokell.io/dh#nested-quantification-in-gadts)** — Accepted. Needs/includes: no outgoing graph edge. Prefix constructors accept consecutive constraint groups before the first field ([GHC proposal #402](https://ghc-proposals.readthedocs.io/en/latest/proposals/0402-gadt-syntax.html), [#27424](https://gitlab.haskell.org/ghc/ghc/-/issues/27424)). An ordinary prefix constructor can end with a required forall after its last field. Its wrapper and pattern keep written argument order. A context before the fields can refer to the earlier type binders. Its constraints are available when checking the field and terminal type patterns. The promoted kind keeps written argument order when the constructor is promotable. Template Haskell can round-trip terminal-group prefix declarations with field bangs and multiplicities. A prefix constructor can also use `Int -> forall a. Eq a => T a`. Its caller supplies the field before the type argument and dictionary. A context can also follow the fields directly, as in `K :: a -> Eq a => F`. Pattern matching introduces the existential field type before checking the field and the dictionary afterward. Several specified `forall` groups can occur between value fields. The ordinary client supplies each type argument after the preceding field. Lifted prefix constructors can interleave class or equality contexts with fields and `forall` groups. A leading required binder can precede a context and a later group with inferred and specified binders. Template Haskell preserves that order and any field bangs. The worker keeps its representation order. The fork also supports the remaining prefix combinations, including ordered `type data` and empty groups. The upstream implementation issues remain tracked ([#27425](https://gitlab.haskell.org/ghc/ghc/-/issues/27425), [#27426](https://gitlab.haskell.org/ghc/ghc/-/issues/27426)). [Checklist and source example](roadmap/R41-nested-quantification-in-gadts.md).
 - [x] **R42 [Embed types](https://ghc.serokell.io/dh#embed-types)** — Completed. Needs/includes: no outgoing graph edge.
 - [x] **R43 [Term variable capture](https://ghc.serokell.io/dh#term-variable-capture)** — Completed. Needs/includes: no outgoing graph edge.
 - [x] **R44 [No star kind syntax](https://ghc.serokell.io/dh#no-star-kind-syntax)** — Completed. Needs/includes: R50.

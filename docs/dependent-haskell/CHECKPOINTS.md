@@ -6,6 +6,38 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Ordered GADT signatures and required type arguments
+
+Merge `61fd13f735` contains the compiler and libraries from the
+two-stage build of `71e5215115` (job 1285). Job 1286 matched all 553
+Showcase outputs in three modes. It passed the constructor order and
+refinement matrices, interface readers and flag checks. Of the 84 focused
+registrations, 83 passed on the first run. Job 1319 passed the final
+`NativeDependentCoreRun` with the same compiler. Its ten scoping examples
+now run both with the implied extension and with an explicit override.
+The older implicit-quantification ABI check uses the override. The two
+additional TH printer registrations passed on the normal compiler. The
+552 compiler rejected the same quoted constructor with GHC-65904.
+
+The compatibility run selected another 234 registrations, including
+seven interpreter tests. The first pass recorded 221 successes.
+Four printer tests passed with their build helpers present. Job 1322
+passed all four migrated fixtures. Explicit type binders preserve the
+meaning of `id`, `pick` and an expression annotation. The strict field
+projection still rejects with either scoping rule. The five inherited
+failures are `NativeFamilyIndexEvidence`, `NativeIrredIndexEvidence`,
+`NativeRetainedPromotedIface`, `NativeTypeCaseQuote` and
+`NativeTypeNumeralWrong`. Each matched the prior compiler. Three separate
+duplicate-root framework reports did not correspond to test executions.
+
+The User's Guide resolved all six new links and the extension implication.
+It has 28 warnings and three errors, compared with 29 warnings and the
+same three errors on the published comparison. The corrected heading
+removed one warning. Qualification receipts are under
+`r41-required-normal-553-20261123`, `r41-th-printers-20261123` and
+`r41-required-compatibility-20261123` in `_build/on-demand`.
+[Card and example](roadmap/R41-nested-quantification-in-gadts.md#release-check).
+
 ## Nested case decisions and representation-polymorphic newtypes
 
 Job 1087 built both stages of `00115859a5` from clean sources. Merge

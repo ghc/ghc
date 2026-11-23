@@ -8296,7 +8296,7 @@ Proposal #402 requires `RequiredTypeArguments` for visible `forall`
 in a GADT constructor signature. Stock GHC 9.14.1 still accepts
 `K :: forall -> T` with the extension disabled. On 23 November the fork
 chose to apply the requirement to that empty leading group as well.
-`ExperimentalDependentTypes` will imply `RequiredTypeArguments` through
+`ExperimentalDependentTypes` implies `RequiredTypeArguments` through
 GHC's ordinary flag mechanism. This also enables #281's scoping rules
 for terms in types. A module can override the implication with a later
 `NoRequiredTypeArguments`.
