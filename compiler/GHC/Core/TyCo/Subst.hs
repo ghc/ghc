@@ -873,6 +873,9 @@ substTyCoMapper
 -- See Note [Substituting runtime Id metadata].
 substNativeIndexUsing :: (Subst -> Type -> Type) -> Subst -> Id -> Type
 substNativeIndexUsing subst_ty subst@(Subst in_scope ids _ _) v
+  -- A named imported head has a closed type and no lexical substitution.
+  | isGlobalId v
+  = TermVarTy v
   | TyConApp tc _ <- coreFullView (varType v)
   , Just _ <- tyConClass_maybe tc
   = TermVarTy $!

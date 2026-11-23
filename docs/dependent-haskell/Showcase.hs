@@ -35,6 +35,7 @@ module Main (main) where
 
 import qualified BetaCallClient as Beta
 import qualified CallbackRulesClient
+import qualified CharacterDecision
 import qualified CharacterExport
 import qualified ClosedLengthProducer as Length
 import qualified ClosedTableLibrary as Table
@@ -1297,6 +1298,9 @@ main = do
     observe "odd applied directly to the literal 5" (Refl :: odd 5 :~: 'True)
     observe "an exported character equality at a mapped and a default input"
         [CharacterExport.p3 (Proxy @'x'), CharacterExport.p3 (Proxy @'!')]
+    text <- newIORef " x\t" >>= readIORef
+    observe "classify whitespace in a runtime string"
+        [characterDecisionValue (CharacterDecision.spaceDecision c) | c <- text]
     observe "Unicode code points from an exported Data.Char.toUpper equality"
         (map fromEnum [UnicodeExport.p3 (Proxy @'é'), UnicodeExport.p3 (Proxy @'\x1e943')])
     observe "written character indices and a lazy later element"
@@ -2064,6 +2068,11 @@ openIdentity = 42
 -- | Reflect an upper-case character and prove that seven is a digit.
 checkedCharacters :: (Char, Data.Char.isDigit '7' :~: 'True)
 checkedCharacters = (charVal (Proxy @(Data.Char.toUpper 'x')), Refl)
+
+-- | Read the outcome from the decision constructor.
+characterDecisionValue :: CharacterDecision.Decision predicate result -> Bool
+characterDecisionValue CharacterDecision.Yes = True
+characterDecisionValue CharacterDecision.No = False
 
 type family MatchInt (i :: Int) :: () where
     MatchInt ('I# x) = '()

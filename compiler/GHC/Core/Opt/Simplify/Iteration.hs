@@ -1987,6 +1987,13 @@ simplArg env mb_arg_info fun_ty (UnSimplified arg_se) arg mco
   where
     keep_retained_operand = case coreFullView fun_ty of
       DepDictTy{} -> True
+      DepFunTy _ binder body
+        | Var fun <- arg
+        , isNativeNamedOpaqueFunctionId fun
+        , isNothing (sourceTableId_maybe fun)
+        , isNativeIndexFunctionId binder
+        , not (isVacuousRetainedBinder binder body)
+        -> True
       DepFunTy{} -> isJust (nativeComputedIndex arg) || isJust (nativeClassSelectorIndex arg)
       _ -> False
 
@@ -2003,6 +2010,9 @@ For a retained application such as `booleanResult (not x)`, the result
 type mentions the checked source family for `not x`. Inlining `not`
 replaces the call with a case. The case has no index in the operand
 grammar, so Core Lint can no longer instantiate the result type.
+
+An imported callback can also determine the result type by its Name. Keep
+that operand as the original Id. Inlining its body would change the index.
 
 Apply the lexical substitution, but leave the checked call tree in place.
 This includes calls nested in constructor arguments. The ordinary

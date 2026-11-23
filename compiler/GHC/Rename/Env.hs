@@ -1253,6 +1253,15 @@ lookupTypeOcc position rdr_name
           return gre { gre_name = table, gre_par = NoParent
                      , gre_info = IAmTyCon ClosedTypeFamilyFlavour }
         [(gre, Nothing)]
+          -- See Note [Qualified callback values in source types].
+          | BareTypeOccurrence <- position
+          , isQual term_rdr
+          , isImportedGRE gre
+          , any ((== NotBoot) . is_isboot . is_decl) (gre_imp gre)
+          , isVarOcc (greOccName gre)
+          -> do { addUsedGRE AllDeprecationWarnings gre
+                ; return gre }
+        [(gre, Nothing)]
           | Just open_operands <- ordinaryPosition position
           , isVarOcc (greOccName gre)
           -> do { this_mod <- tcg_semantic_mod <$> getGblEnv
@@ -1308,6 +1317,18 @@ lookupTypeOcc position rdr_name
             AnId v | isFinalCoreReverseWrapper v -> (gre, Nothing)
             _ -> candidate
     preserveClosedReverse candidate = pure candidate
+
+{- Note [Qualified callback values in source types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Stored Provider.mapper uses the existing grammar for a qualified type name.
+Keep ordinary type lookup and source-table lookup first. If neither finds a
+type, keep the imported term Name. The typechecker checks the Id and requires
+a closed unrestricted function type. A lexical variable with the same spelling
+continues to use the lexical environment for an unqualified occurrence.
+
+This path does not request an unfolding or execute the function. OPAQUE is an
+optimizer pragma and is not part of this lookup rule.
+-}
 
 -- | Find the in-scope term bindings and their finite source tables.
 -- The flag keeps the ordinary term for a final Core identity.

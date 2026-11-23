@@ -4643,10 +4643,16 @@ tcRetainedFunctionArg domain arg = setSrcSpanA (getLoc arg) $
   case retainedSourceHead arg of
     Just (name, written)
       | isExternalName name -> do
-          mb_owner <- tcLookupIdMaybe name >>= maybe (pure Nothing) tcLookupSourceTableId
-          case mb_owner of
-            Just owner -> instantiate_named owner written
-            Nothing -> failWithTc (TcRnRetainedQuantificationError (RetainedUncheckedSourceCall name))
+          mb_actual <- tcLookupIdMaybe name
+          mb_owner <- maybe (pure Nothing) tcLookupSourceTableId mb_actual
+          case (mb_owner, mb_actual) of
+            (Just owner, _) -> instantiate_named owner written
+            (Nothing, Just actual)
+              | null written, isNativeNamedOpaqueFunctionId actual
+              -> do { expected <- liftZonkM (zonkTcType domain)
+                    ; if varType actual `tcEqType` expected then pure (Core.Var actual)
+                      else unsupported }
+            _ -> failWithTc (TcRnRetainedQuantificationError (RetainedUncheckedSourceCall name))
       | null written -> do
           thing <- tcLookupLcl_maybe name
           case thing of
@@ -7438,6 +7444,11 @@ tcRetainedInstScope tys
                         [actual] -> isNativeClassDictionaryId actual
                                  && varType occurrence `eqType` varType actual
                         _ -> False }
+               | isNativeNamedOpaqueFunctionId v
+               = do { actual <- tcLookupIdMaybe (getName v)
+                    ; return (maybe False (\binding -> binding == v
+                                             && isNativeNamedOpaqueFunctionId binding
+                                             && varType binding `eqType` varType v) actual) }
                | not (isNonCoVarId v) = return True
                | otherwise
                = do { occurrence <- liftZonkM (zonkId v)

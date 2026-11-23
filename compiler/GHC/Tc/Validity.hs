@@ -1326,7 +1326,7 @@ check_type ve (TermAppTy head_id arg)
            Just (domain, _) | typeKind arg `eqType` domain -> return ()
            _ -> failWithTc $ TcRnRetainedQuantificationError RetainedCallIndex }
 check_type ve (TermVarTy v)
-  = do { unless (isNativeOpaqueValueId v) $
+  = do { unless (isNativeOpaqueValueId v || isNativeNamedOpaqueFunctionId v) $
            failWithTc $ TcRnRetainedQuantificationError (RetainedInvalidBinder v)
        ; check_retained_index ve v }
 check_type ve (DepFunTy _ v body)
@@ -1446,7 +1446,11 @@ check_retained_index ve v
        ; case level of
            Comp -> return ()
            _ -> failWithTc $ TcRnRetainedQuantificationError RetainedStaging
-       ; unless (maybe False valid_bound (lookupVarSet (ve_indices ve) v)) $
+       ; if isNativeNamedOpaqueFunctionId v
+         then do { actual <- tcLookupId (getName v)
+                 ; unless (actual == v && isNativeNamedOpaqueFunctionId actual
+                           && varType actual `eqType` varType v) out_of_scope }
+         else unless (maybe False valid_bound (lookupVarSet (ve_indices ve) v)) $
          do { mb_thing <- tcLookupLcl_maybe (getName v)
             ; case mb_thing of
                 Just (ATcId { tct_id = v' }) ->
@@ -1458,6 +1462,7 @@ check_retained_index ve v
     valid_bound binding = isNativeOpaqueValueId binding
                        && eqType (varType v) (varType binding)
     eligible index = isNativeIndexId index
+                  || isNativeNamedOpaqueFunctionId index
                   || (not (isExternalName (getName index)) && isNativeOpaqueValueId index)
     out_of_scope = failWithTc $ TcRnRetainedQuantificationError (RetainedIndexOutOfScope v)
 

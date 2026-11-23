@@ -623,10 +623,12 @@ irType = go
     go lcls ty                 | Just ty' <- coreView ty -- #14101
                                = go lcls ty'
     go lcls ty@(TermAppTy f arg)
-      | f `elemVarSet` lcls, isNativeIndexFunctionId f
+      | isNativeIndexFunctionId f
+      , isNativeNamedOpaqueFunctionId f || f `elemVarSet` lcls
       = markNominal lcls (varType f) >> markNominal lcls arg
       | otherwise = pprPanic "irType: invalid native call scope" (ppr ty)
     go lcls ty@(TermVarTy v)
+      | isNativeNamedOpaqueFunctionId v = pure ()
       | v `elemVarSet` lcls, isNativeRetainedBinder v = markNominal lcls (varType v)
       | otherwise = pprPanic "irType: invalid runtime index scope" (ppr ty)
     go lcls ty@(DepFunTy _ v body)
@@ -683,10 +685,12 @@ markNominal lcls ty = mapM_ (updateRole Nominal) $
     get_ty_vars :: VarSet -> Type -> VarSet
     get_ty_vars scope t | Just t' <- coreView t = get_ty_vars scope t' -- #20999
     get_ty_vars scope ty@(TermAppTy f arg)
-      | f `elemVarSet` scope, isNativeIndexFunctionId f
+      | isNativeIndexFunctionId f
+      , isNativeNamedOpaqueFunctionId f || f `elemVarSet` scope
       = get_ty_vars scope (varType f) `unionVarSet` get_ty_vars scope arg
       | otherwise = pprPanic "markNominal: invalid native call scope" (ppr ty)
     get_ty_vars scope ty@(TermVarTy v)
+      | isNativeNamedOpaqueFunctionId v = emptyVarSet
       | v `elemVarSet` scope, isNativeRetainedBinder v = get_ty_vars scope (varType v)
       | otherwise = pprPanic "markNominal: invalid runtime index scope" (ppr ty)
     get_ty_vars scope ty@(DepFunTy _ v body)

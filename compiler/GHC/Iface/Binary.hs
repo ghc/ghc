@@ -370,7 +370,8 @@ evidenceSuffix requirements
     || needs SourceProofRuleBranchesEvidence || needs ScopedEnumCaseEvidence
     || needs ScopedConstructorCaseEvidence || needs ScopedCaseResultEvidence
     || needs OrderedNewtypeTelescopeEvidence || needs ScopedOrderedCaseEvidence
-    || needs OrderedRepPolyNewtypeEvidence || needs OrderedTypeDataTelescopeEvidence = feature_set
+    || needs OrderedRepPolyNewtypeEvidence || needs OrderedTypeDataTelescopeEvidence
+    || needs NamedRetainedCallbackEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -436,6 +437,7 @@ legacyEvidenceSuffix SourceProofRuleArgumentsEvidence = featureSetPrefix ++ "sou
 legacyEvidenceSuffix PolymorphicSourceMethodEvidence = featureSetPrefix ++ "polymorphic-source-method"
 legacyEvidenceSuffix SourceProofRuleBranchesEvidence = featureSetPrefix ++ "source-proof-rule-branches"
 legacyEvidenceSuffix GeneralIndexedConstructorOperandEvidence = featureSetPrefix ++ "general-indexed-constructor-operand"
+legacyEvidenceSuffix NamedRetainedCallbackEvidence = featureSetPrefix ++ "named-retained-callback-v1"
 legacyEvidenceSuffix DepFunCoEvidence           = "-retained-depfunco-v1"
 legacyEvidenceSuffix ConstructorCaseEvidence   = "-retained-constructor-case-v1"
 legacyEvidenceSuffix RetainedSpecRuleEvidence  = "-retained-specialisation-rule-v1"
@@ -507,7 +509,8 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("ordered-newtype-telescope", OrderedNewtypeTelescopeEvidence)
                       , ("scoped-ordered-case-v1", ScopedOrderedCaseEvidence)
                       , ("ordered-rep-poly-newtype", OrderedRepPolyNewtypeEvidence)
-                      , ("ordered-type-data-telescope", OrderedTypeDataTelescopeEvidence) ]
+                      , ("ordered-type-data-telescope", OrderedTypeDataTelescopeEvidence)
+                      , ("named-retained-callback-v1", NamedRetainedCallbackEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion

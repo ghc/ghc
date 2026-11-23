@@ -54,7 +54,7 @@ import GHC.Core.Lint.SubstTypeLets( substTypeLets )
 import GHC.Core.Ppr
 import GHC.Core.Coercion
 import GHC.Core.Type as Type
-import GHC.Core.Predicate( getClassPredTys_maybe, isCoVarType, mkNomEqPred )
+import GHC.Core.Predicate( getClassPredTys_maybe, getEqPredTys_maybe, isCoVarType, mkNomEqPred )
 import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Core.TyCo.Rep   -- checks validity of types/coercions
@@ -1858,7 +1858,15 @@ lintCaseExpr scrut case_bndr alt_ty alts
                              && not (case_bndr `elemInScopeSet` in_scope))
                        (text "Native index alias case requires a fresh unrestricted local index binder:"
                         <+> ppr case_bndr)
-                   ; return (exprToNativeCaseIndex alias_scrut) }
+                   ; let alias_rhs = case alts of
+                           [Alt DEFAULT [cv] _]
+                             | isCoVar cv
+                             , Just (Nominal, _, rhs) <- getEqPredTys_maybe (varType cv)
+                             -> Just rhs
+                           _ -> Nothing
+                   ; return $ if after_prep
+                       then exprToPreparedNativeCaseIndex alias_rhs alias_scrut
+                       else exprToNativeCaseIndex alias_scrut }
            else return (exprToNativeCaseIndex scrut)
 
        -- Lint the case-binder. Must do this after linting the scrutinee
@@ -2390,9 +2398,10 @@ lintNativeIndexFunction :: Id -> LintM (Type, Type)
 lintNativeIndexFunction f
   = do { in_scope <- getInScope
        ; lintL (isNativeIndexFunctionId f
-                 && maybe False (\actual -> isNativeIndexFunctionId actual
-                                   && varType actual `eqType` varType f)
-                                (lookupInScope in_scope f))
+                 && (isNativeNamedOpaqueFunctionId f
+                     || maybe False (\actual -> isNativeIndexFunctionId actual
+                                         && varType actual `eqType` varType f)
+                                    (lookupInScope in_scope f)))
            (text "Invalid opaque runtime call head:" <+> ppr f
             <+> dcolon <+> ppr (varType f))
        ; lintVarOcc f
@@ -2417,6 +2426,8 @@ lintType (TyVarTy tv)
   = lintVarOcc tv
 
 lintType (TermVarTy v)
+  | isNativeNamedOpaqueFunctionId v = lintVarOcc v
+  | otherwise
   = do { in_scope <- getInScope
        ; allow_dicts <- lintScopedDictionaryMode
        ; let eligible b = isNativeOpaqueValueId b || (allow_dicts && isNativeClassDictionaryId b)

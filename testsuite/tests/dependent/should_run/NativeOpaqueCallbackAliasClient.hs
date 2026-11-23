@@ -10,8 +10,11 @@ import qualified NativeOpaqueCallbackAliasProvider as Provider
 import qualified NativeOpaqueCallbackAliasProvider as SameProvider
 
 main :: IO ()
-#if defined(DIRECT_GLOBAL)
-main = print (accepts Provider.mapper True (token Provider.mapper True))
+#if defined(DIRECT_LOCAL)
+main = print (accepts localMapper True (token localMapper True))
+
+localMapper :: Bool -> Char
+localMapper _ = error "forced local callback"
 #elif defined(DIFFERENT_FUNCTION)
 main = let f = Provider.mapper; g = Provider.otherMapper
        in print (accepts f True (token g True))

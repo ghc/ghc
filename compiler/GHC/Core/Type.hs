@@ -66,6 +66,7 @@ module GHC.Core.Type (
         isNativeIndexId, isNativeIndexType, isNativeClosedIndexType, nativeIndexDataConTyArgs,
         primFamilyPatFieldKind, isPrimFamilyPatBinderKind, isPrimFamilyPatBinder,
         isNativeIndexFunctionId, nativeIndexFunctionTys_maybe,
+        isNativeNamedOpaqueFunctionId,
         nativeIndexFunctionTypeTys_maybe, nativeCallSpine_maybe,
         isNativeOpaqueValueId, isNativeOpaqueValueType, isNativeClassDictionaryId,
         isNativeIndexDomainConversion,
@@ -269,7 +270,8 @@ import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
    , manyDataConTy, oneDataConTy, matchableDataConTy, unmatchableDataConTy
    , liftedRepTy )
 
-import GHC.Types.Name( Name, hasKnownKey )
+import GHC.Types.Name( Name, hasKnownKey, nameModule_maybe )
+import GHC.Unit.Types (isInteractiveModule)
 import GHC.Builtin.KnownKeys
 
 import {-# SOURCE #-} GHC.Tc.Utils.TcType ( isConcreteTyVar )
@@ -2601,11 +2603,20 @@ nativeIndexDataConTyArgs domain con
 -- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
 nativeIndexFunctionTys_maybe :: Id -> Maybe (Type, Type)
 nativeIndexFunctionTys_maybe f
+  | isNativeNamedOpaqueFunctionId f = nativeIndexFunctionTypeTys_maybe (varType f)
   | isLocalId f, not (isCoVar f), isManyTy (idMult f)
   , not (isJoinIdDetails (idDetails f))
   , noFreeVarsOfType (idMult f)
   = nativeIndexFunctionTypeTys_maybe (varType f)
   | otherwise = Nothing
+
+-- | Check a closed, compiled function head without inspecting its body.
+isNativeNamedOpaqueFunctionId :: Id -> Bool
+isNativeNamedOpaqueFunctionId f
+  = isGlobalId f && isManyTy (idMult f)
+    && maybe False (not . isInteractiveModule) (nameModule_maybe (varName f))
+    && noFreeVarsOfType (varType f)
+    && isJust (nativeIndexFunctionTypeTys_maybe (varType f))
 
 -- | Check the ordinary function type shared by heads and retained binders.
 -- See Note [Function-valued retained binders].

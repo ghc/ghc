@@ -205,6 +205,7 @@ toIfaceTypeX fr (TyVarTy tv)   -- See Note [Free TyVars and CoVars in IfaceType]
   | tv `elemVarSet` fr         = IfaceFreeTyVar tv
   | otherwise                  = IfaceTyVar (toIfaceTyVar tv)
 toIfaceTypeX fr (TermVarTy var)
+  | isNativeNamedOpaqueFunctionId var = IfaceNamedTermVar (idName var)
   | var `elemVarSet` fr = IfaceFreeTermVar var
   | otherwise = IfaceTermVar (mkIfLclName (occNameFS (getOccName var)))
 toIfaceTypeX fr (DepDictTy var body)
@@ -215,6 +216,9 @@ toIfaceTypeX fr (ClassAppTy method inst dict arg _)
                    (toIfaceTypeX fr dict) (toIfaceTypeX fr arg)
 toIfaceTypeX fr (TermAppTy fun arg)
   -- See Note [Opaque call indices in interfaces] in GHC.Iface.Type.
+  | isNativeNamedOpaqueFunctionId fun
+  = let head = TermVarTy fun
+    in IfaceAppTy (toIfaceTypeX fr head) (toIfaceAppTyArgsX fr head [arg])
   | fun `elemVarSet` fr = IfaceFreeTermAppTy fun arg'
   | otherwise = IfaceTermAppTy (mkIfLclName (occNameFS (getOccName fun))) arg'
   where

@@ -383,10 +383,12 @@ and general optimization remain separate gates.
 
 {- Note [Opaque native call indices]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-TermAppTy f arg represents an opaque call to one local unrestricted non-join
+TermAppTy f arg represents an opaque call to an unrestricted non-join
 function. Its visible unrestricted arrow has lifted argument and result types
 A and B. The argument is a scoped Type of kind A. The call has kind B.
-Do not unfold f or infer argument equality from equality of calls.
+The head is either a lexical Id or a checked imported Id with a closed type.
+Only the lexical form participates in binder substitution. Do not unfold f
+or infer argument equality from equality of calls.
 
 For a curried call f x y, use AppTy (TermAppTy f x) y. Check y against
 the domain of the next unrestricted arrow. AppCo lifts forward equality

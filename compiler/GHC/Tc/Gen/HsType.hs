@@ -2976,6 +2976,13 @@ tc_app_ty_other mode rn_ty exp_kind
   | L _ (HsTyVar _ _ (L _ (WithUserRdr _ name))) <- hs_fun_ty
   , Just head_id <- lookupNameEnv (mode_indices mode) name
   , isNativeIndexFunctionId head_id
+  = tc_app_ty_runtime_head mode rn_ty exp_kind head_id
+  where (hs_fun_ty, _) = splitHsAppTys rn_ty
+tc_app_ty_other mode rn_ty exp_kind
+  = tc_app_ty_external mode rn_ty exp_kind
+
+tc_app_ty_runtime_head :: TcTyMode -> HsType GhcRn -> ExpKind -> Id -> TcM TcType
+tc_app_ty_runtime_head mode rn_ty exp_kind head_id
   = do { (ty, kind) <- foldM apply (TermVarTy head_id, varType head_id) hs_args
        ; checkExpKind mode rn_ty ty kind exp_kind }
     -- See Note [Source opaque call indices].
@@ -3003,8 +3010,10 @@ tc_app_ty_other mode rn_ty exp_kind
                      | otherwise -> invalid_call }
     invalid_call :: TcM a
     invalid_call = failWithTc $ TcRnRetainedQuantificationError RetainedCallIndex
-    (hs_fun_ty, hs_args) = splitHsAppTys rn_ty
-tc_app_ty_other mode rn_ty exp_kind
+    (_, hs_args) = splitHsAppTys rn_ty
+
+tc_app_ty_external :: TcTyMode -> HsType GhcRn -> ExpKind -> TcM TcType
+tc_app_ty_external mode rn_ty exp_kind
   | L _ (HsTyVar _ NotPromoted (L loc (WithUserRdr rdr name))) <- hs_fun_ty
   , isVarName name
   , isExternalName name
@@ -3048,6 +3057,10 @@ tc_app_ty_other mode rn_ty exp_kind
              -> do { thing <- tcLookupGlobal name
                    ; case thing of
                        AnId fun
+                         | ordinary_call, null args, isQual rdr
+                         , isNativeNamedOpaqueFunctionId fun
+                         , Nothing <- sourceTableId_maybe fun
+                         -> checkExpKind mode rn_ty (TermVarTy fun) (varType fun) exp_kind
                          | ordinary_call
                          , [left, _] <- args
                          , Just (table, nullary : recursive) <- indexedProjectionSource fun
@@ -3081,6 +3094,7 @@ tc_app_ty_other mode rn_ty exp_kind
                          , all isOpenTypeOperand args
                          -> do { result <- tcOpenTypeCall mode name instantiated result_kind (zip args domains)
                                ; checkExpKind mode rn_ty result result_kind exp_kind }
+                         -- See Note [Function values and executable type calls].
                          | not (null args)
                          , ordinary_call || (isQual rdr && ready_partial_call && length args == 1)
                          -> do { selected <- if ordinary_call then checkedClassMethod fun args else pure Nothing
@@ -3199,7 +3213,7 @@ tc_app_ty_other mode rn_ty exp_kind
       , isNativeOpaqueValueId index
       = Just (varType index)
       | otherwise = Nothing
-tc_app_ty_other mode rn_ty exp_kind
+tc_app_ty_external mode rn_ty exp_kind
   | L _ (HsTyVar _ NotPromoted (L loc (WithUserRdr rdr name))) <- hs_fun_ty
   , isSourceFamilyName name
   , Just args <- traverse value_arg (filterOut is_par hs_args)
@@ -3242,7 +3256,7 @@ tc_app_ty_other mode rn_ty exp_kind
       observe <- prepareClosedCallResult kind value
       result <- observe
       checkExpKind mode rn_ty result kind exp_kind
-tc_app_ty_other mode rn_ty exp_kind = tc_app_ty_generic mode rn_ty exp_kind
+tc_app_ty_external mode rn_ty exp_kind = tc_app_ty_generic mode rn_ty exp_kind
 
 {- Note [Captured term names in ordinary types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3300,6 +3314,21 @@ tc_app_ty_with_head mode rn_ty exp_kind fun_ty
        ; checkExpKind mode rn_ty ty inferred_kind exp_kind }
   where
     (hs_fun_ty, hs_args) = splitHsAppTys rn_ty
+
+{- Note [Function values and executable type calls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An ordinary call keeps the checked or executable path. In particular, do not
+select an opaque TermAppTy only because an operand contains a variable.
+Substituting a literal would leave a TermAppTy, while elaborating the same
+ordinary call with that literal would produce a value.
+
+A kind ascription on the head selects function-value application. The
+renamer still prefers a checked source family for the name, when available.
+An eligible imported value without a source family keeps its nominal identity
+under application, even when every operand is closed. See Note [Qualified
+callback values in source types] in GHC.Rename.Env and Note [Opaque native
+call indices] in GHC.Core.TyCo.Rep.
+-}
 
 -- | Check named rigid operands and record definitions used to reduce the call.
 -- See Note [Open source calls] in GHC.Tc.Gen.OpenTypeEval.

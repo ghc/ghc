@@ -44,7 +44,7 @@ for opt in 0 2; do
             exit 1
         fi
     }
-    reject GHC-83605 -DDIRECT_GLOBAL
+    reject GHC-83605 -DDIRECT_LOCAL
     reject GHC-83865 -DDIFFERENT_FUNCTION
     reject GHC-83865 -DDIFFERENT_ALIAS
     reject GHC-83865 -DGUESSED_REDUCTION

@@ -986,6 +986,7 @@ rnIfaceType (IfaceFreeTyVar n) = pure (IfaceFreeTyVar n)
 rnIfaceType (IfaceFreeTermVar n) = pure (IfaceFreeTermVar n)
 rnIfaceType (IfaceTyVar   n)   = pure (IfaceTyVar n)
 rnIfaceType (IfaceTermVar n)   = pure (IfaceTermVar n)
+rnIfaceType (IfaceNamedTermVar n) = IfaceNamedTermVar <$> rnIfaceGlobal n
 rnIfaceType (IfaceTermAppTy fun arg) = IfaceTermAppTy fun <$> rnIfaceType arg
 rnIfaceType (IfaceFreeTermAppTy fun arg) = IfaceFreeTermAppTy fun <$> rnIfaceType arg
 rnIfaceType (IfaceExistsTy flag bndr body)

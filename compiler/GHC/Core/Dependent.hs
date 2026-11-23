@@ -26,6 +26,7 @@ import GHC.Core.FVs (orphNamesOfExprs)
 import GHC.Core.Class (classOpItems)
 import GHC.Core.Predicate (getClassPredTys_maybe)
 import GHC.Core.Type (coreFullView, isNativeIndexType, isNativeIndexFunctionId
+                     , isNativeNamedOpaqueFunctionId
                      , isNativeClassDictionaryId, isNativeOpaqueValueId
                      , isNativeRetainedBinder, isNativeIndexDomainConversion
                      , splitForAllTyCoVars, splitFunTy_maybe)
@@ -520,7 +521,9 @@ scanType (ClassAppTy _ inst (TermVarTy dict) arg@(TermVarTy receiver) kind) =
 scanType ClassAppTy{} = NativeScan (pure True)
 scanType (TyVarTy tv) = scanVarKind tv
 scanType (TermVarTy v) =
-    dictionaryOperandForm (unsupportedShape (not (isNativeOpaqueValueId v)) <> scanVarKind v)
+    dictionaryOperandForm
+      (unsupportedShape (not (isNativeOpaqueValueId v || isNativeNamedOpaqueFunctionId v)) <>
+       scanVarKind v)
 scanType (TermAppTy f arg) = gentleForm (scanCallHead f <> scanType arg)
 -- The type binder itself is safe for Quick Look. Check its kind and payload.
 scanType (ExistsTy _ binder body) = erasedForm (scanType (varType binder) <> scanType body)

@@ -36,7 +36,8 @@ module GHC.Core (
         varToCoreExpr, varsToCoreExprs, exprToBoolIndex,
         exprToNativeIndex, normaliseNativeIndexExpr, mapNativeIndex, mapNativeIndexWithNatural,
         nativeSourceCallIndex, nativeComputedIndex, retainedArgIndex, nativeDeferredArgIndex,
-        exprToNativeCaseIndex, isNativeCaseValueIndex, isNativeIndexedCaseScrutinee,
+        exprToNativeCaseIndex, exprToPreparedNativeCaseIndex,
+        isNativeCaseValueIndex, isNativeIndexedCaseScrutinee,
         termVar_maybe, nativeIndexFunctionVar_maybe, nativeIndexFunctionArgIndex,
         nativeLocalFunctionArgIndex, nativeIndexArgKinds,
         nativeClassSelectorTys, nativeClassSelectorIndex, nativeIndexedConArgs,
@@ -2816,22 +2817,25 @@ termVar_maybe _ = Nothing
 
 nativeIndexFunctionVar_maybe :: CoreExpr -> Maybe Id
 nativeIndexFunctionVar_maybe (Var f)
-  | isNativeIndexFunctionId f = Just f
+  | isLocalId f, isNativeIndexFunctionId f = Just f
 nativeIndexFunctionVar_maybe _ = Nothing
 
 -- | Reify a lexical callback and its checked nominal casts.
 -- See Note [Function-valued retained binders] in GHC.Core.Type.
 nativeLocalFunctionArgIndex :: CoreExpr -> Maybe Type
-nativeLocalFunctionArgIndex (Cast body co) = do
+nativeLocalFunctionArgIndex = nativeFunctionArgIndex nativeIndexFunctionVar_maybe
+
+nativeFunctionArgIndex :: (CoreExpr -> Maybe Id) -> CoreExpr -> Maybe Type
+nativeFunctionArgIndex read_var (Cast body co) = do
   delta <- nativeIndexCastCo_maybe co
   let source = coercionLKind delta
       target = coercionRKind delta
   guard (not (source `eqType` target))
   _ <- nativeIndexFunctionTypeTys_maybe target
-  index <- nativeLocalFunctionArgIndex body
+  index <- nativeFunctionArgIndex read_var body
   guard (typeKind index `eqType` source)
   return (mkCastTy index delta)
-nativeLocalFunctionArgIndex arg = TermVarTy <$> nativeIndexFunctionVar_maybe arg
+nativeFunctionArgIndex read_var arg = TermVarTy <$> read_var arg
 
 -- | Reify the argument of a checked retained function application.
 -- See Note [Named retained callbacks] in GHC.Tc.Gen.App.
@@ -2846,13 +2850,45 @@ nativeIndexFunctionArgIndex arg
   , let index = mkTyConApp family tys
   , typeKind index `eqType` body
   = Just index
+  | Var fun <- arg
+  , isNativeNamedOpaqueFunctionId fun
+  = Just (TermVarTy fun)
   | otherwise = Nothing
 
 -- | Recover an index for an existing strict case, including an opaque call.
 -- This does not admit a call as a lazy retained application argument.
 -- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
 exprToNativeCaseIndex :: CoreExpr -> Maybe Type
-exprToNativeCaseIndex expr@App{}
+exprToNativeCaseIndex = exprToNativeCaseIndexWith nativeLocalFunctionArgIndex
+
+-- | Recover the right endpoint of a prepared native alias. See Note [Named
+-- heads in prepared native cases].
+exprToPreparedNativeCaseIndex :: Maybe Type -> CoreExpr -> Maybe Type
+exprToPreparedNativeCaseIndex expected expr
+  | Just rhs <- expected
+  , (Var fun, _) <- collectArgs expr
+  , isNativeNamedOpaqueFunctionId fun
+  , Just index <- nativeSourceCallIndex expr
+  , index `eqType` rhs
+  = Just index
+  | otherwise = exprToNativeCaseIndexWith (nativeFunctionArgIndex read_var) expr
+  where
+    read_var (Var f) | isNativeIndexFunctionId f = Just f
+    read_var _ = Nothing
+
+{- Note [Named heads in prepared native cases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A strict case can carry nominal evidence for a call to a lexical callback.
+CorePrep can replace a local top-level Id with its global Id. The prepared
+alias can refer to the exact named call. For a certified source function,
+substitution can instead give that alias the checked family application.
+Reconstruct the family application from the actual Id and operands before
+accepting it as the right endpoint. Lint still checks the entire nominal
+equality. Other uses of the strict-case reader keep their lexical policy.
+-}
+
+exprToNativeCaseIndexWith :: (CoreExpr -> Maybe Type) -> CoreExpr -> Maybe Type
+exprToNativeCaseIndexWith read_head expr@App{}
   | Just call <- read_call expr
   , Just{} <- nativeCallSpine_maybe call
   = Just call
@@ -2869,10 +2905,10 @@ exprToNativeCaseIndex expr@App{}
       delta <- setNominalRole_maybe Representational co
       guard (coercionRole delta == Nominal && typeKind fun `eqType` coercionLKind delta)
       mkCastTy fun delta <$ nativeIndexFunctionTypeTys_maybe (coercionRKind delta)
-    read_call head_expr = nativeLocalFunctionArgIndex head_expr
-exprToNativeCaseIndex (Var v)
+    read_call head_expr = read_head head_expr
+exprToNativeCaseIndexWith _ (Var v)
   | isNativeOpaqueValueId v = Just (TermVarTy v)
-exprToNativeCaseIndex expr
+exprToNativeCaseIndexWith _ expr
   | Just index <- exprToNativeIndex expr
   , isNativeIndexType (typeKind index) || isNativeCaseValueIndex index
     || isJust (isCharLitTy index) || isJust (isNumLitTy index)

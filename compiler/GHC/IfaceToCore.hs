@@ -2156,6 +2156,11 @@ tcIfaceType = go
                                  $$ text "Expected kind:" <+> ppr domain
                                  $$ text "Actual kind:" <+> ppr (typeKind arg'))
                     ; return (TermAppTy f arg') } }
+    go (IfaceNamedTermVar name)
+      = do { thing <- tcIfaceGlobal name
+           ; case thing of
+               AnId v | isNativeNamedOpaqueFunctionId v -> return (TermVarTy v)
+               _ -> failIfM (text "Invalid named retained callback in interface:" <+> ppr name) }
     go (IfaceTermVar n)
       = do { v <- tcIfaceLclId n
            ; precheckIfaceNativeDomain
@@ -2321,10 +2326,11 @@ tcIfaceType = go
                                         check_call_arg_kinds (ppr fun) (typeKind fun) [arg]
                                     ; app retained fun arg }
 
-    -- A call can also be encoded by applying a lexical term variable.
+    -- A call can also be encoded by applying a lexical or named term variable.
     -- Inspect its serialized head without forcing ordinary decoded types.
     call_operand _ IfaceTermAppTy{} = True
     call_operand applied IfaceTermVar{} = applied
+    call_operand applied IfaceNamedTermVar{} = applied
     call_operand applied (IfaceCastTy ty _) = call_operand applied ty
     call_operand _ (IfaceAppTy fun _) = call_operand True fun
     call_operand _ _ = False

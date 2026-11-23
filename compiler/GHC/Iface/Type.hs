@@ -221,6 +221,7 @@ data IfaceType
   | IfaceDepDictTy IfaceIdBndr IfaceType
   | IfaceClassAppTy Name IfaceType IfaceType IfaceType
       -- See Note [Scoped class selectors in interfaces].
+  | IfaceNamedTermVar Name
   deriving (Eq, Ord)
   -- See Note [Ord instance of IfaceType]
 
@@ -319,6 +320,12 @@ only to earlier fields. An IfaceDepFunTy binder can hold an opaque lifted
 value. Check its arrow when an IfaceTermAppTy uses it as a call head.
 See Note [Exported function-valued retained signatures]
 in GHC.Tc.Gen.HsType. This encoding adds no runtime call or function equality.
+
+A compiled callback uses IfaceNamedTermVar. Store its defining Name, including
+the unit, and use IfaceAppTy for each application. The reader resolves the
+imported Id, checks the argument kind, and uses mkAppTy to form TermAppTy.
+The same named reference can stand alone or be used in a coercion. Only the
+named node requires NamedRetainedCallbackEvidence. Keep the lexical tags.
 
 An open diagnostic head must keep its actual Id. CoreToIface selects
 IfaceFreeTermAppTy when the head belongs to its free-variable set. Keep the
@@ -890,6 +897,7 @@ ifTypeIsVarFree ty = go ty
     go (IfaceTyVar {})         = False
     go (IfaceFreeTyVar {})     = False
     go (IfaceTermVar {})       = False
+    go (IfaceNamedTermVar {})  = False
     go (IfaceFreeTermVar {})   = False
     go (IfaceTermAppTy {})     = False
     go (IfaceFreeTermAppTy {}) = False
@@ -920,6 +928,7 @@ visibleTypeVarOccurencies = go
     go (IfaceTyVar var)         = Set.singleton var
     go (IfaceFreeTyVar {})      = mempty
     go (IfaceTermVar {})        = mempty
+    go (IfaceNamedTermVar {})   = mempty
     go (IfaceFreeTermVar {})    = mempty
     go (IfaceTermAppTy _ arg)   = go arg
     go (IfaceFreeTermAppTy _ arg) = go arg
@@ -967,6 +976,7 @@ substIfaceType env ty
   where
     go (IfaceFreeTyVar tv)    = IfaceFreeTyVar tv
     go ty@(IfaceTermVar {})  = ty
+    go ty@(IfaceNamedTermVar {}) = ty
     go ty@(IfaceFreeTermVar {}) = ty
     go (IfaceTermAppTy fun arg) = IfaceTermAppTy fun (go arg)
     go (IfaceFreeTermAppTy fun arg) = IfaceFreeTermAppTy fun (go arg)
@@ -1036,6 +1046,7 @@ ifaceLocalNames = go
     go = \case
       IfaceTyVar var -> one var
       IfaceTermVar var -> one var
+      IfaceNamedTermVar{} -> Set.empty
       IfaceTermAppTy fun arg -> one fun `union` go arg
       IfaceFreeTermAppTy _ arg -> go arg
       IfaceExistsTy _ (var, arg) body -> names [one var, go arg, go body]
@@ -1470,6 +1481,7 @@ ppr_ty _         (IfaceForAllTy {})     = panic "ppr_ty"  -- Covered by not.isIf
 ppr_ty _         (IfaceFreeTyVar tyvar) = ppr tyvar  -- This is the main reason for IfaceFreeTyVar!
 ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar  -- See Note [Free TyVars and CoVars in IfaceType]
 ppr_ty _         (IfaceTermVar var)     = ppr var
+ppr_ty _         (IfaceNamedTermVar name) = ppr name
 ppr_ty _         (IfaceFreeTermVar var) = ppr var
 ppr_ty ctxt_prec (IfaceTermAppTy fun arg)
   = maybeParen ctxt_prec appPrec (ppr fun <+> ppr_ty appPrec arg)
@@ -1680,6 +1692,7 @@ defaultIfaceTyVarsOfKind def_rep def_mult ty = go emptyFsEnv True ty
       = IfaceClassAppTy method (go subs rank1 inst) dict arg
 
     go _ _ ty@(IfaceTermVar {}) = ty
+    go _ _ ty@(IfaceNamedTermVar {}) = ty
     go _ _ ty@(IfaceFreeTermVar {}) = ty
     go subs rank1 (IfaceTermAppTy fun arg) = IfaceTermAppTy fun (go subs rank1 arg)
     go subs rank1 (IfaceFreeTermAppTy fun arg) = IfaceFreeTermAppTy fun (go subs rank1 arg)
@@ -2966,6 +2979,9 @@ putIfaceType _ ty@IfaceClassAppTy{}
   = pprPanic "Cannot serialise an unscoped class selector" (ppr ty)
 putIfaceType bh (IfaceTermVar var)
   = do { putByte bh 11; put_ bh var }
+putIfaceType bh (IfaceNamedTermVar name)
+  = do { requireIfaceEvidenceVersion bh NamedRetainedCallbackEvidence
+       ; putByte bh 17; put_ bh name }
 
 putIfaceType bh (IfaceForAllTy ma aa ab) = do
         putByte bh 0
@@ -3039,6 +3055,7 @@ getIfaceType bh = do
               14 -> IfaceExistsTy ImplicitExists <$> get bh <*> get bh
               15 -> IfaceDepDictTy <$> get bh <*> get bh
               16 -> IfaceClassAppTy <$> get bh <*> get bh <*> get bh <*> get bh
+              17 -> IfaceNamedTermVar <$> get bh
               _  -> ioError (userError ("getIfaceType: invalid type tag " ++ show h))
 
 instance Binary IfLclName where
@@ -3110,6 +3127,7 @@ data IfaceEvidence
   | ScopedOrderedCaseEvidence
   | OrderedRepPolyNewtypeEvidence
   | OrderedTypeDataTelescopeEvidence
+  | NamedRetainedCallbackEvidence
   deriving (Bounded, Enum, Eq, Ord)
 
 -- | Requirements of an interface payload. See Note [Versioning retained evidence]
@@ -3341,6 +3359,7 @@ instance NFData IfaceType where
     IfaceDepDictTy bndr res -> rnf bndr `seq` rnf res
     IfaceClassAppTy method inst dict arg -> rnf method `seq` rnf inst `seq` rnf dict `seq` rnf arg
     IfaceTermVar var -> rnf var
+    IfaceNamedTermVar name -> rnf name
     IfaceFreeTermVar var -> var `seq` ()
     IfaceTermAppTy fun arg -> rnf fun `seq` rnf arg
     IfaceFreeTermAppTy fun arg -> fun `seq` rnf arg

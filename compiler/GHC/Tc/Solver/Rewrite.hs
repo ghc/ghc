@@ -858,6 +858,10 @@ rewrite_one ty@(TermAppTy f arg)
   = liftTcS $ failTcS $ TcRnRetainedQuantificationError (RetainedSolverType ty)
 
 rewrite_one ty@(TermVarTy v)
+  -- The imported function keeps its identity without a source equation.
+  | isNativeNamedOpaqueFunctionId v
+  = do { role <- getRole
+       ; return $! mkReflRedn role ty }
   | isNativeOpaqueValueId v
   = do { role <- getRole
        ; env <- getRewriteEnv

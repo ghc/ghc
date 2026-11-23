@@ -2149,6 +2149,8 @@ prepareNativeLiftingContext initial template = foldl' prepare initial (runtime_v
 -- | Lift one runtime source occurrence without inferring its variable sort.
 liftCoSubstNative :: LiftingContext -> Role -> Id -> Coercion
 liftCoSubstNative lc@(LC _ _ native) role source
+  | isNativeNamedOpaqueFunctionId source
+  = mkReflCo role (TermVarTy source)
   | not (isNativeOpaqueValueId source)
   = pprPanic "liftCoSubstNative: invalid source Id" (ppr source)
   | Just (NativeBndrLift original target delta) <- lookupVarEnv native source

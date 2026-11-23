@@ -106,7 +106,8 @@ import Data.Semigroup
 Definitions
 
 Runtime index identifiers are also free variables of types. These occurrences
-record scope dependencies. They do not record runtime usage.
+record scope dependencies. They do not record runtime usage. A named global
+call has no lexical scope dependency. The interface tracks its defining Name.
 
 * Shallow free variables of a type: the variables
   affected by substitution. Specifically, the (TyVarTy tv)
@@ -295,7 +296,7 @@ deepFolder :: Monoid fv
 deepFolder occ fvs_of_type add_bndr
   = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]
                , tcf_tyvar = occ, tcf_covar = occ
-               , tcf_termvar = occ
+               , tcf_termvar = scopedTermOccurrence occ
                , tcf_hole  = fvs_of_type . coHoleCoVar
                      -- We don't collect the CoercionHole itself, but we /do/
                      -- need to collect the free variables of its /kind/
@@ -303,6 +304,13 @@ deepFolder occ fvs_of_type add_bndr
                , tcf_lit   = const mempty
                , tcf_tycobinder = add_bndr
                , tcf_termbinder = add_bndr }
+
+-- | Collect a lexical index occurrence. A global head has a closed type.
+{-# INLINE scopedTermOccurrence #-}
+scopedTermOccurrence :: Monoid fv => (Id -> fv) -> Id -> fv
+scopedTermOccurrence occ v
+  | isGlobalId v = mempty
+  | otherwise = occ v
 
 deepUnitFV :: (TyCoVar -> TyCoFV) -- ^ the free variables of a variable's type
            -> TyCoVar -> TyCoFV
@@ -350,7 +358,7 @@ shallowCosFV   :: [Coercion] -> TyCoFV
 shallowTcvFolder :: TyCoFolder TyCoFV
 shallowTcvFolder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]
                               , tcf_tyvar = do_tcv, tcf_covar = do_tcv
-                              , tcf_termvar = do_tcv
+                              , tcf_termvar = scopedTermOccurrence do_tcv
                               , tcf_hole  = do_hole, tcf_lit = const mempty
                               , tcf_tycobinder = addBndrFV
                               , tcf_termbinder = addBndrFV }
@@ -650,7 +658,7 @@ selectiveTcvFolder :: TyCoFolder SelectiveDFV
 selectiveTcvFolder
   = TyCoFolder { tcf_view  = noView  -- See Note [Free vars and synonyms]
                , tcf_tyvar = shallowSelUnitFV, tcf_covar = shallowSelUnitFV
-               , tcf_termvar = shallowSelUnitFV
+               , tcf_termvar = scopedTermOccurrence shallowSelUnitFV
                , tcf_hole  = do_hole, tcf_lit = const mempty
                , tcf_tycobinder = addBndrSelectiveFV
                , tcf_termbinder = addBndrSelectiveFV }
@@ -1013,7 +1021,8 @@ visVarsOfType orig_ty = Pair invis_vars vis_vars
     go (ClassAppTy _ inst dict operand kind) = invisible (tyCoVarsOfTypes [inst, dict, kind]) `mappend` go operand
     go (DepDictTy v ty) = ((`delVarSet` v) <$> go ty) `mappend` invisible (tyCoVarsOfType (varType v))
     go (TermAppTy f arg) = go (TermVarTy f) `mappend` go arg
-    go (TermVarTy v)     = Pair (tyCoVarsOfType $ varType v) (unitVarSet v)
+    go (TermVarTy v)     = scopedTermOccurrence
+                            (\i -> Pair (tyCoVarsOfType (varType i)) (unitVarSet i)) v
     go (ExistsTy _ v ty)
       = ((`delVarSet` v) <$> go ty) `mappend`
         invisible (tyCoVarsOfType $ varType v)
@@ -1159,7 +1168,7 @@ inj_vars_of_type look_under_tfs = go
     go ClassAppTy{}                     = mempty
     go DepDictTy{}                      = mempty
     go (TermAppTy {})                   = mempty
-    go (TermVarTy v)                    = deepUnitFV (go . varType) v
+    go (TermVarTy v)                    = scopedTermOccurrence (deepUnitFV (go . varType)) v
     go (ExistsTy {})                    = mempty
     go (DepFunTy _ v ty)                  = go (varType v) `mappend`
                                           addBndrFV v (go ty)
@@ -1283,7 +1292,7 @@ afvFolder :: TyCoFolder (FV (BoundVars, TyCoVar -> Bool) DM.Any)
 afvFolder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]
                        , tcf_tyvar = do_tcv
                        , tcf_covar = do_tcv
-                       , tcf_termvar = do_tcv
+                       , tcf_termvar = scopedTermOccurrence do_tcv
                        , tcf_hole  = do_hole
                        , tcf_lit   = const mempty
                        , tcf_tycobinder = addBndrSelectiveFV

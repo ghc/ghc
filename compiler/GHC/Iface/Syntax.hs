@@ -2322,6 +2322,7 @@ freeNamesIfType :: IfaceType -> NameSet
 freeNamesIfType (IfaceFreeTyVar _)    = emptyNameSet
 freeNamesIfType (IfaceFreeTermVar _)  = emptyNameSet
 freeNamesIfType (IfaceTermVar _)      = emptyNameSet
+freeNamesIfType (IfaceNamedTermVar name) = unitNameSet name
 freeNamesIfType (IfaceTermAppTy _ arg) = freeNamesIfType arg
 freeNamesIfType (IfaceFreeTermAppTy _ arg) = freeNamesIfType arg
 freeNamesIfType (IfaceDepFunTy _vis (w, _, arg) res)

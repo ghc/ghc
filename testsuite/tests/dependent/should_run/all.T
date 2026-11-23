@@ -461,6 +461,21 @@ test('NativeOpaqueCallbackAlias',
                    'NativeOpaqueCallbackAliasProvider.hs', 'NativeOpaqueCallbackAliasProof.hs'])],
      run_command, ['bash NativeOpaqueCallbackAlias.sh "{compiler}" "{libdir}"'])
 
+test('NativeNamedOpaqueCallback',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['NativeNamedOpaqueCallbackProvider.hs', 'NativeNamedOpaqueCallbackAlias.hs',
+                   'NativeNamedOpaqueCallbackPublic.hs', 'NativeNamedOpaqueCallbackClient.hs'])],
+     run_command, ['bash NativeNamedOpaqueCallback.sh "{compiler}" "{libdir}"'])
+
+test('NativeNamedOpaqueCharacter',
+     [req_host_target_ghc, only_ways(['normal']),
+      unless(config.have_interp and config.have_RTS_linker, skip),
+      extra_files(['NativeNamedOpaqueCharacterClient.hs', open_eval_dir + 'CharacterDecision.hs'])],
+     run_command, ['bash NativeNamedOpaqueCharacter.sh "{compiler}" "{libdir}"'])
+
+test('NativeStrictNamedCase', only_ways(['normal']),
+     compile_and_run, ['-dcore-lint -dstg-lint'])
+
 test('NativeRetainedMatchability',
      [req_host_target_ghc, only_ways(['normal'])],
      run_command, ['bash NativeRetainedMatchability.sh "{compiler}" "{libdir}"'])
