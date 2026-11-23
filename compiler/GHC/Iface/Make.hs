@@ -27,7 +27,7 @@ import GHC.StgToCmm.Types (CmmCgInfos (..))
 
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Monad
-import GHC.Tc.Validity (hasScopedSumDomain)
+import GHC.Tc.Validity (ScopedSumDomainRequirement(..), scopedSumDomainRequirement)
 
 import GHC.Iface.Warnings
 import GHC.Iface.Decl
@@ -371,10 +371,11 @@ mkIface_ hsc_env
 
     let scoped_roots = mkNameSet (map ifName decls ++ concatMap availNames exports)
           `unionNameSet` unionNameSets (map freeNamesIfDecl decls ++ map freeNamesIfRule iface_rules)
-    needs_scoped_sum_domains <- ifaceNeedsScopedSumDomains hsc_env type_env scoped_roots
-    fields <- if needs_scoped_sum_domains
-      then writeField scopedSumDomainField () emptyExtensibleFields
-      else pure emptyExtensibleFields
+    scoped_sum_domains <- ifaceScopedSumDomainRequirement hsc_env type_env scoped_roots
+    fields <- case scoped_sum_domains of
+      Just DirectScopedSumDomain -> writeField scopedSumDomainField () emptyExtensibleFields
+      Just ComposedScopedSumDomain -> writeField composedScopedSumDomainField () emptyExtensibleFields
+      Nothing -> pure emptyExtensibleFields
 
     pure $ emptyPartialModIface this_mod
           -- Need to record this because it depends on the -instantiated-with flag
@@ -433,22 +434,29 @@ mkIface_ hsc_env
      ifFamInstTcName = ifFamInstFam
 
 -- | Check types and re-exports for the exact generated payload families.
-ifaceNeedsScopedSumDomains :: HscEnv -> TypeEnv -> NameSet -> IO Bool
-ifaceNeedsScopedSumDomains env local roots = go emptyNameSet (nameSetElemsStable roots)
+ifaceScopedSumDomainRequirement :: HscEnv -> TypeEnv -> NameSet -> IO (Maybe ScopedSumDomainRequirement)
+ifaceScopedSumDomainRequirement env local roots =
+  go Nothing emptyNameSet (nameSetElemsStable roots)
   where
-    go _ [] = pure False
-    go seen (name : rest)
+    go requirement _ [] = pure requirement
+    go requirement seen (name : rest)
       | not (isExternalName name) || isWiredInName name || name `elemNameSet` seen =
-          go seen rest
+          go requirement seen rest
       | otherwise = do
           thing <- case lookupTypeEnv local name of
             Just thing -> pure (Just thing)
             Nothing -> lookupImported name
           let next = extendNameSet seen name
           case thing of
-            Just (ATyCon tc) | hasScopedSumDomain tc -> pure True
-            Just thing -> go next (declarationNames thing ++ rest)
-            Nothing -> go next rest
+            Just decl ->
+              let declared = case decl of
+                    ATyCon tc -> scopedSumDomainRequirement tc
+                    _ -> Nothing
+                  required = max requirement declared
+              in case required of
+                   Just ComposedScopedSumDomain -> pure required
+                   _ -> go required next (declarationNames decl ++ rest)
+            Nothing -> go requirement next rest
 
     -- Imported declarations cannot expose a checked payload unless their
     -- producer records the requirement. Avoid descending into ordinary imports.
@@ -456,7 +464,8 @@ ifaceNeedsScopedSumDomains env local roots = go emptyNameSet (nameSetElemsStable
       iface <- lookupIfaceByModuleHsc env (nameModule name)
       case iface of
         Just imported
-          | Map.notMember scopedSumDomainField (getExtensibleFields (mi_ext_fields imported)) ->
+          | let fields = getExtensibleFields (mi_ext_fields imported)
+          , all (\(field, _) -> Map.notMember field fields) scopedSumDomainFields ->
               pure Nothing
         _ -> lookupType env name
 

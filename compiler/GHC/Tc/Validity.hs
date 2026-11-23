@@ -13,7 +13,7 @@ module GHC.Tc.Validity (
   checkValidCoAxiom, checkValidCoAxBranch,
   checkFamPatBinders, checkTyFamEqnValidityInfo, typeCasePatternView,
   checkValidTyFamEqn, checkValidAssocTyFamDeflt, checkConsistentFamInst,
-  checkTyConTelescope, hasScopedSumDomain,
+  checkTyConTelescope, ScopedSumDomainRequirement(..), scopedSumDomainRequirement,
   ) where
 
 import GHC.Prelude
@@ -684,14 +684,22 @@ checkNoConstrainedFamilyApps ty
 unsupportedFamilySite :: SDoc
 unsupportedFamilySite = text "Use the family in a value signature, type synonym, expression annotation, constructor field, or explicit type argument."
 
--- | Does this private payload family impose a domain on its enclosing sum?
-hasScopedSumDomain :: TyCon -> Bool
-hasScopedSumDomain = isJust . scopedSumDomain
+-- | The interface requirement for checking the class domains of a sum.
+data ScopedSumDomainRequirement
+  = DirectScopedSumDomain
+  | ComposedScopedSumDomain
+  deriving (Eq, Ord)
 
--- | Read a class domain that can be checked on formation of a retained sum.
+-- | The reader required by the class domains of this private payload family.
+scopedSumDomainRequirement :: TyCon -> Maybe ScopedSumDomainRequirement
+scopedSumDomainRequirement tc = do
+  (requirement, _, _) <- scopedSumDomains tc
+  pure requirement
+
+-- | Read the class domains to check on formation of a retained sum.
 -- See Note [Class domains in generated sum payloads].
-scopedSumDomain :: TyCon -> Maybe (TyCon, [TyVar], PredType)
-scopedSumDomain tc = do
+scopedSumDomains :: TyCon -> Maybe (ScopedSumDomainRequirement, [TyVar], [(TyCon, PredType)])
+scopedSumDomains tc = do
     (_, True) <- closedFamilyScope_maybe tc
     axiom <- closedFamilyTyConCoAxiom_maybe tc
     [branch] <- pure (fromBranches (coAxiomBranches axiom))
@@ -703,12 +711,25 @@ scopedSumDomain tc = do
            length parameters == sizeVarSet (mkVarSet parameters) &&
            all (`elem` bound) parameters)
     witness : captures <- pure (reverse parameters)
-    TyConApp fam args <- pure (coAxBranchRHS branch)
-    guard (isConstrainedFamilyTyCon fam && all plain args)
-    Right (0, predicate) <- pure (associatedFamilyDomain fam args)
-    guard (not (witness `elemVarSet` tyCoVarsOfType predicate))
-    pure (fam, reverse captures, predicate)
+    let rhs = coAxBranchRHS branch
+        requirement = case rhs of
+          TyConApp fam _ | isConstrainedFamilyTyCon fam -> DirectScopedSumDomain
+          _ -> ComposedScopedSumDomain
+    domains <- collect witness rhs
+    guard (not (null domains))
+    pure (requirement, reverse captures, domains)
   where
+    collect witness (TyConApp con args)
+      | isConstrainedFamilyTyCon con = do
+          guard (all plain args)
+          Right (0, predicate) <- pure (associatedFamilyDomain con args)
+          guard (not (witness `elemVarSet` tyCoVarsOfType predicate))
+          pure [(con, predicate)]
+      | isAlgTyCon con, not (isClassTyCon con) =
+          concat <$> traverse (collect witness) args
+    collect _ ty | plain ty = Just []
+    collect _ _ = Nothing
+
     plain TyVarTy{} = True
     plain (TyConApp tc []) | tyConName tc == liftedTypeKindTyConName = True
     plain (TyConApp tc args) = not (isFamilyTyCon tc || isTypeSynonymTyCon tc) && all plain args
@@ -718,21 +739,21 @@ scopedSumDomain tc = do
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A written retained sum has a private family for its payload. Its
 equation does not carry the class scope of the written sum. For a
-single variable-only equation whose result is a direct constrained
-family application, recover its domain from the checked equation.
-The domain must use only the captured parameters. It must not depend
-on the witness, and the payload arguments may contain no further
-type family applications or user synonyms. This lets the formation checker
-check the payload domain even though the sum applies the private
-family to its captures only.
+single variable-only equation, recover constrained family domains from
+the checked equation. Walk ordinary algebraic type constructors in its
+result. A domain must use only the captured parameters. It must not
+depend on the witness. Family arguments may contain no further family
+applications or user synonyms. If the collector cannot check every
+part of the result, leave the branch on the existing validity path.
 
 Check the domain where the program forms the sum type. An ordinary
 type synonym uses the existing signature check. A marked associated
 equation uses its owning class and the existing Given-only check.
-Inspect the private family when finding constrained applications and
-when collecting obligations. The check also covers inferred types
-that contain the private payload family directly. All other family
-branches keep their existing checks.
+The same collector finds constrained applications, provides obligations
+and determines the interface requirement. It preserves the direct
+requirement for a result that is a single constrained family application.
+The check also covers inferred types that contain the private payload
+family directly. All other family branches keep their existing checks.
 -}
 
 -- Find marked families without substituting or allocating scoped predicates.
@@ -741,8 +762,8 @@ constrainedFamilyApps ty = State.evalState (go ty) emptyUniqSet
   where
     go (TyConApp tc args) = do
       nested <- descend args
-      case scopedSumDomain tc of
-        Just (fam, _, _) -> pure (fam : nested)
+      case scopedSumDomains tc of
+        Just (_, _, domains) -> pure (map fst domains ++ nested)
         Nothing
           | isConstrainedFamilyTyCon tc -> pure (tc : nested)
           | isFamFreeTyCon tc -> pure nested
@@ -823,13 +844,15 @@ familyDomainObligations ty = State.evalStateT (go ty) emptyUFM
   where
     go (TyConApp tc args) = do
       written <- children args
-      case scopedSumDomain tc of
-        Just (fam, captures, predicate) ->
+      case scopedSumDomains tc of
+        Just (_, captures, domains) ->
           let (actuals, _) = splitAtList captures args
-              use | equalLength captures actuals =
-                      ScopedFamily fam 0 (substTyWith captures actuals predicate)
-                  | otherwise = UnsupportedFamily fam unsupportedFamilySite
-          in pure (use : written)
+              instantiate (fam, predicate) = (fam, substTyWith captures actuals predicate)
+              uses | equalLength captures actuals =
+                       [ScopedFamily fam 0 predicate |
+                         (fam, predicate) <- nubBy (eqType `on` snd) (map instantiate domains)]
+                   | otherwise = [UnsupportedFamily fam unsupportedFamilySite | (fam, _) <- domains]
+          in pure (uses ++ written)
         Nothing
           | isConstrainedFamilyTyCon tc -> pure (domain tc args : written)
           | isFamFreeTyCon tc -> pure written
@@ -3206,7 +3229,7 @@ checkTyFamEqnWithSelectors selectors fam_tc typats rhs
 -- See Note [Class evidence in associated family equations].
 checkEquationFamilyDomains :: TyCon -> [Type] -> Type -> TcM ()
 checkEquationFamilyDomains family pats rhs
-  | isJust (scopedSumDomain family) = pure ()
+  | isJust (scopedSumDomains family) = pure ()
   | null (constrainedFamilyApps rhs) = pure ()
   | not (isConstrainedFamilyTyCon family) = checkNoConstrainedFamilyApps rhs
   | otherwise = do

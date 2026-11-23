@@ -18,7 +18,8 @@ module GHC.Iface.Binary (
         TraceBinIFace(..),
         getIfaceWithExtFields,
         putIfaceWithExtFields,
-        sourceTableLocations, scopedSumDomainField,
+        sourceTableLocations,
+        scopedSumDomainField, composedScopedSumDomainField, scopedSumDomainFields,
         couldInferLiberalSynonymMatchability,
         getWithUserData,
         putWithUserData,
@@ -373,7 +374,8 @@ evidenceSuffix requirements
     || needs ScopedConstructorCaseEvidence || needs ScopedCaseResultEvidence
     || needs OrderedNewtypeTelescopeEvidence || needs ScopedOrderedCaseEvidence
     || needs OrderedRepPolyNewtypeEvidence || needs OrderedTypeDataTelescopeEvidence
-    || needs NamedRetainedCallbackEvidence || needs ScopedSumDomainEvidence = feature_set
+    || needs NamedRetainedCallbackEvidence || needs ScopedSumDomainEvidence
+    || needs ComposedScopedSumDomainEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -441,6 +443,7 @@ legacyEvidenceSuffix PolymorphicSourceMethodEvidence = featureSetPrefix ++ "poly
 legacyEvidenceSuffix SourceProofRuleBranchesEvidence = featureSetPrefix ++ "source-proof-rule-branches"
 legacyEvidenceSuffix GeneralIndexedConstructorOperandEvidence = featureSetPrefix ++ "general-indexed-constructor-operand"
 legacyEvidenceSuffix ScopedSumDomainEvidence = featureSetPrefix ++ "scoped-sum-domain-v1"
+legacyEvidenceSuffix ComposedScopedSumDomainEvidence = featureSetPrefix ++ "scoped-sum-domain-v2"
 legacyEvidenceSuffix NamedRetainedCallbackEvidence = featureSetPrefix ++ "named-retained-callback-v1"
 legacyEvidenceSuffix DepFunCoEvidence           = "-retained-depfunco-v1"
 legacyEvidenceSuffix ConstructorCaseEvidence   = "-retained-constructor-case-v1"
@@ -516,7 +519,8 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("ordered-type-data-telescope", OrderedTypeDataTelescopeEvidence)
                       , ("named-retained-callback-v1", NamedRetainedCallbackEvidence)
                       , ("partial-builtin-family-v1", PartialBuiltinFamilyEvidence)
-                      , ("scoped-sum-domain-v1", ScopedSumDomainEvidence) ]
+                      , ("scoped-sum-domain-v1", ScopedSumDomainEvidence)
+                      , ("scoped-sum-domain-v2", ComposedScopedSumDomainEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion
@@ -584,7 +588,10 @@ A generated retained-sum payload can have a class domain. Record its
 independent requirement even when interface pragmas are omitted. An
 older reader can decode the existing family shape but cannot check
 that domain. A re-export or inferred type can expose the affected
-payload without declaring the private family again.
+payload without declaring the private family again. A payload that
+uses a constrained family under an ordinary algebraic constructor
+requires the second version. A reader of the first version can
+check only a direct constrained family application.
 
 A retained-sum codomain uses a scoped family tag. A consumer can also
 publish a proof that refers to the scoped equality rule. Either feature
@@ -742,10 +749,9 @@ putIfaceWithExtFields traceBinIface compressionLevel bh mod_iface =
             if any home_rule_interface_usage (mi_sr_usages info)
               then Set.singleton HomeRuleInterfaceEvidence
               else Set.empty
-          scoped_sum_version
-            | Map.member scopedSumDomainField (getExtensibleFields fields) =
-                Set.insert ScopedSumDomainEvidence usage_version
-            | otherwise = usage_version
+          scoped_sum_version = usage_version `Set.union` Set.fromList
+            [requirement | (field, requirement) <- scopedSumDomainFields
+                         , Map.member field (getExtensibleFields fields)]
       found <- newIORef scoped_sum_version
       let notify _ required = modifyIORef' found (Set.insert required)
           feature_bh = addWriterToUserData (mkWriter notify) bh
@@ -776,6 +782,15 @@ in GHC.Iface.Recomp.
 -- | The semantic interface requirement for checking generated payload domains.
 scopedSumDomainField :: String
 scopedSumDomainField = "ghc.scoped-sum-domain.v1"
+
+-- | The requirement for class domains under ordinary algebraic constructors.
+composedScopedSumDomainField :: String
+composedScopedSumDomainField = "ghc.scoped-sum-domain.v2"
+
+-- | Map checked payload requirements to their interface extension fields.
+scopedSumDomainFields :: [(String, IfaceEvidence)]
+scopedSumDomainFields = [(scopedSumDomainField, ScopedSumDomainEvidence),
+                         (composedScopedSumDomainField, ComposedScopedSumDomainEvidence)]
 
 sourceTableField :: String
 sourceTableField = "ghc.source-table-locations.v1"
