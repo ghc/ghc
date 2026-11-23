@@ -902,6 +902,13 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
 
     liftedAnchor SignatureTypeSite _ ty@(L _ (XHsType HsTypeLambda{}))
       | lift_cases, copyable ty = Just ("$signature-lambda:", Nothing)
+    liftedAnchor SignatureTypeSite _ ty@(L _ (XHsType (HsTypeLet _ _ _ binds result)))
+      | lift_cases
+      , let (binder, rhs, body) = splitHsTypeLet binds result
+      , isCaseRhs rhs
+      , usesTypeCaseResult (unLoc binder) body
+      , copyableLetCases ty
+      = Just ("$signature-case:", Nothing)
     liftedAnchor site _ ty@(L _ (XHsType HsTypeSome{}))
       | fieldSite site, copyable ty = Just ("$field-sum:", Nothing)
     liftedAnchor SignatureTypeSite _ ty@(L _ (XHsType HsTypeSome{}))
@@ -909,12 +916,24 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
     liftedAnchor site scope (L _ (XHsType (HsTypeCase _ _ scrutinee alts)))
       | lift_cases
       , caseScrutinee site scope scrutinee
-      , copyable scrutinee
-      , all copyableAlt alts
+      , copyableCase scrutinee alts
       = if fieldSite site
           then Just ("$field-case:", Nothing)
           else Just ("$signature-case:", signatureCaseKey scrutinee alts)
     liftedAnchor _ _ _ = Nothing
+
+    isCaseRhs rhs = case unLoc (ignoreParens rhs) of
+      XHsType HsTypeCase{} -> True
+      HsKindSig _ body _ | L _ (XHsType HsTypeCase{}) <- ignoreParens body -> True
+      _ -> False
+
+    copyableLetCases ty = case unLoc (ignoreParens ty) of
+      XHsType (HsTypeLet _ _ _ binds result) ->
+        let (_, rhs, body) = splitHsTypeLet binds result
+        in copyableLetCases rhs && copyableLetCases body
+      HsKindSig _ body kind -> copyableLetCases body && copyable kind
+      XHsType (HsTypeCase _ _ scrutinee alts) -> copyableCase scrutinee alts
+      _ -> copyable ty
 
     fieldSite FieldTypeSite = True
     fieldSite RetainedFieldTypeSite{} = True
@@ -954,8 +973,12 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
     retainedNames (RetainedFieldTypeSite names) = names
     retainedNames _ = []
 
-    copyableAlt (L _ (HsTypeCaseAlt pat _ rhs)) =
-      isJust (classifyTypeCasePattern pat) && copyable rhs
+    -- A case pattern can contain a wildcard. Keep the ordinary copy check
+    -- for the scrutinee and row expressions.
+    copyableCase scrutinee alts = copyable scrutinee && all copyableAlt alts
+      where
+        copyableAlt (L _ (HsTypeCaseAlt pat _ rhs)) =
+          isJust (classifyTypeCasePattern pat) && copyable rhs
 
     forallCaptures HsForAllInvis{hsf_invis_bndrs = binders} = writtenCaptures binders
     forallCaptures HsForAllVis{hsf_vis_bndrs = binders} = writtenCaptures binders
@@ -1275,6 +1298,11 @@ function kind. Include variables from arrow modifiers when collecting
 the captures of that kind or of a function RHS.
 See Note [Checked RHSs for cases in type lets] in GHC.Tc.TyCl.
 
+A case result needed by a later case is a visible argument of the later
+family. Leave the first application in the original let. A checked RHS
+synonym would have to expose that application before the same
+kind-checking group publishes the first family's equations.
+
 Both sides of a function arrow have the arrow's lexical scope.
 Lift each side with the same captures. Keep the original arrow and
 its modifiers for the arrow checker.
@@ -1356,9 +1384,14 @@ liftTypeCases group =
       , orderedCase rhs || annotatedCase rhs
       , isJust (letCaseBody body)
       , let (rhs', rhs_cases, rhs_end) = liftRhs owner False captures aliases rhs salt
-            (body', body_cases, next) = liftRhs owner False captures aliases body rhs_end
+            captures_result = usesTypeCaseResult (unLoc binder) body
+      , Just outer <-
+          if captures_result
+          then caseResultCaptures captures aliases binder
+          else Just captures
+      , let (body', body_cases, next) = liftRhs owner False outer aliases body rhs_end
       , not (null body_cases)
-      , all (not . mentionsBinder (unLoc binder) . fst) body_cases
+      , captures_result || all (not . mentionsBinder (unLoc binder) . fst) body_cases
       = (preserveTypeLetSource let_ty (letTy loc ann binder rhs' body'),
           rhs_cases ++ body_cases, next)
     liftRhs owner independent captures aliases
@@ -1452,12 +1485,23 @@ liftTypeCases group =
     letTy loc ann v rhs body = L loc (XHsType (mkHsSingleTypeLet ann v rhs body))
     applyType loc name = foldl' (\f x -> L loc (HsAppTy noExtField f x)) (typeName name)
 
-    -- A let-bound name can remain in a later scrutinee argument. Do not
-    -- hoist a declaration that uses that name under its own binders.
+    -- A name used only as a scrutinee argument need not be in the family.
+    -- A branch that uses the name needs an explicit capture.
     mentionsBinder :: Data a => RdrName -> a -> Bool
     mentionsBinder name node
       | Just rdr <- cast node = name == rdr
       | otherwise = or (gmapQ (mentionsBinder name) node)
+
+    -- The earlier RHS uses the original scope. The later family can drop a
+    -- shadowed capture if no remaining kind or alias depends on it.
+    caseResultCaptures captures aliases binder = do
+      guard (all (\(_, v, _, _) -> unLoc v /= unLoc binder) aliases)
+      let (hidden, outer) = partition (\(_, v, _) -> unLoc v == unLoc binder) captures
+      unless (null hidden) $ do
+        guard (null aliases)
+        kinds <- concat <$> traverse captureKindNames outer
+        guard (unLoc binder `notElem` kinds)
+      pure (outer ++ [(liftedTypeVarBinder binder, binder, binder)])
 
     -- Follow an ordered chain to a case, including cases in binding RHSs.
     -- A written result kind needs the preceding helpers before checking the
@@ -1582,6 +1626,27 @@ liftTypeCases group =
             | otherwise = rest
       in L loc (FamEqn ([], [], noAnn) name mkHsOuterImplicit
                        (map (HsValArg noExtField) pats) Prefix body)
+
+-- | Find a free use in a case equation or result kind in a let chain.
+-- The scrutinee itself remains an argument at the original scope.
+usesTypeCaseResult :: RdrName -> LHsType GhcPs -> Bool
+usesTypeCaseResult name source = case unLoc (ignoreParens source) of
+  XHsType (HsTypeCase _ _ scrutinee alts) ->
+    any usesAlt alts || usesTypeCaseResult name scrutinee
+  XHsType (HsTypeLet _ _ _ binds result) ->
+    let (binder, rhs, body) = splitHsTypeLet binds result
+    in usesTypeCaseResult name rhs ||
+       (unLoc binder /= name && usesTypeCaseResult name body)
+  HsKindSig _ ty kind
+    | L _ (XHsType HsTypeCase{}) <- ignoreParens ty ->
+        freeIn kind || usesTypeCaseResult name ty
+  _ -> False
+  where
+    freeIn ty = any ((== name) . unLoc) (extractHsTyRdrTyVars ty)
+    usesAlt (L _ (HsTypeCaseAlt pat _ rhs))
+      | Just (_, bound) <- classifyTypeCasePattern pat =
+          name `notElem` bound && freeIn rhs
+      | otherwise = False
 
 -- | Visit type expression children that share their enclosing lexical scope.
 -- The caller handles binders and kind annotations. Thread its state

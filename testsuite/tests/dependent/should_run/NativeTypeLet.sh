@@ -13,11 +13,19 @@ cd "$out/provider"
 cp "$src/"{PackedVecLibrary,TypeLet}.hs .
 "${g[@]}" -c PackedVecLibrary.hs
 "${g[@]}" -c TypeLet.hs
+"${g[@]}" -fno-code "$src/NativeTypeLetContexts.hs"
 cat >SignatureLet.hs <<'HS'
-{-# LANGUAGE ExperimentalDependentTypes #-}
-module SignatureLet (capture) where
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeApplications #-}
+module SignatureLet (capture, selected) where
+import Data.Proxy (Proxy(..))
+
 capture :: let { saved = a; a = Bool } in saved -> a -> saved
 capture saved _ = saved
+
+selected :: Proxy (let first = case 'True of { True -> Bool; False -> Char }
+                       result = case 'False of { True -> Int; False -> first }
+                   in result)
+selected = Proxy @Bool
 HS
 "${g[@]}" -fomit-interface-pragmas -c SignatureLet.hs
 cat >SignedLets.hs <<'HS'
@@ -146,6 +154,9 @@ capture = Refl
 forward :: a -> Bool -> a
 forward = SignatureLet.capture
 
+signatureCase :: Proxy Bool
+signatureCase = SignatureLet.selected
+
 braced :: Braced 'True :~: 'True
 braced = Refl
 
@@ -157,6 +168,15 @@ caseChain = Refl
 
 knownPair :: DimensionSum '(2, 3) :~: 5
 knownPair = Refl
+
+chosenWidth :: DimensionWithOverride 'False 'Nothing :~: 2
+chosenWidth = Refl
+
+inlineDefaultWidth :: Proxy 3
+inlineDefaultWidth = defaultWidth
+
+explicitWidth :: Proxy width -> DimensionWithOverride width ('Just 7) :~: 7
+explicitWidth _ = Refl
 
 knownProduct :: GridTotal ('Grid 2 3) :~: 5
 knownProduct = Refl
@@ -208,6 +228,16 @@ no = Refl
 HS
 "${g[@]}" -c OrdinaryLet.hs
 
+cat >UnknownWidth.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
+module UnknownWidth where
+import Data.Proxy (Proxy)
+import Data.Type.Equality ((:~:)(Refl))
+import TypeLet (DimensionWithOverride)
+unknown :: Proxy width -> DimensionWithOverride width 'Nothing :~: 2
+unknown _ = Refl
+HS
+
 reject() {
     local file=$1 location=$2 code=$3 message=$4 status=0
     shift 4
@@ -219,6 +249,8 @@ reject() {
         exit 1
     fi
 }
+
+reject UnknownWidth 7:13 83865 'Refl'
 
 cat >RefutableProduct.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}
