@@ -124,16 +124,16 @@ a local or imported value and splice the signature into another declaration.
 [Source](../examples/open-evaluation/TypeLambda.hs) and
 [ordinary client](../../../testsuite/tests/dependent/should_run/NativeTypeLambda.sh).
 
-Two different signatures still generate separate families for their
-lambdas. At an unknown `xs`, forwarding `withErrors` at a second
-signature that repeats its lambda reports GHC-83865. The diagnostic
-names both signatures and shows their captures. A named family lets
-both signatures refer to the same callback. The fork has a checked
-alpha-equivalence rule for retained sum payloads. Extending that rule
-to ordinary type lambdas requires Core evidence that an interface
-reader can recheck. Agda compares lambdas up to renaming their binders.
-[Retained sum equality](R04-dependent-sums.md#payload-families-for-the-some-binder)
-and [Agda function equality](https://agda.readthedocs.io/en/v2.8.0.2/language/lambda-abstraction.html).
+The source-hidden `forwardErrors` client repeats the callback with
+a fresh binder name. The two signatures generate separate private
+families. The checked closure equality rule accepts the forwarding
+call even with `xs` unknown. Reversing the arguments of `Either`
+changes its result and gives GHC-83865. The diagnostic names both
+source signatures. Agda likewise identifies lambdas up to renaming
+a bound variable.
+[Client](../examples/open-evaluation/TypeLambdaClient.hs),
+[equality evidence](../../../compiler/GHC/Builtin/CoercionRules.hs) and
+[Agda function equality](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html).
 
 ## Capturing a closed family pattern
 
