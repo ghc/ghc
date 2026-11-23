@@ -5,7 +5,7 @@ src=$(cd "$(dirname "$0")" && pwd)
 out=$(mktemp -d)
 trap 'rm -rf -- "$out"' EXIT
 ghc=("$1" "-B$2" -v0 -package-env - -i -i.
-     -fdiagnostics-color=never -dcore-lint -dstg-lint)
+     -fexternal-interpreter -fdiagnostics-color=never -dcore-lint -dstg-lint)
 
 cd "$out"
 cat > Ordinary.hs <<'HS'
