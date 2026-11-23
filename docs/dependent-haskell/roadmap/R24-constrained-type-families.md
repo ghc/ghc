@@ -506,6 +506,16 @@ that synonym's right-hand side using its written premises.
 [Eisenberg's 2019 review](https://github.com/ghc-proposals/ghc-proposals/pull/177#issuecomment-549766671),
 and [proposal #547](https://ghc-proposals.readthedocs.io/en/latest/proposals/0547-no-kind-equalities.html#proposed-change-specification).
 
+### Class domains in dependent pairs
+
+In `some (tag :: Bool) | Body a tag`, the class required by `Body` can
+depend on `a`. A caller can supply it through an instance or by matching
+a GADT constructor. Reading the tag leaves the payload lazy. If a more
+specific instance in the client requires a missing constraint, the error
+points to the client's use of the pair. This holds for written and
+inferred types and for typechecking without code generation.
+[Formation rule and interface version](R04-dependent-sums.md#use-an-associated-family-for-the-payload).
+
 ### Domain evidence and termination
 
 An opted-in provider with `UndecidableInstances` can define

@@ -6,6 +6,51 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Associated families as dependent pair payloads
+
+```haskell
+instance PayloadFormat Bool where
+    type Body Bool False = Int
+    type Body Bool True  = Char
+    type Packet Bool = some (tag :: Bool) | Body Bool tag
+```
+
+On compiler `aba28b367f`, an ordinary client pattern-matches a runtime
+tag and uses the payload as an `Int` or a `Char`. Another client obtains
+the required class from a GADT pattern. Both can read the stored tag
+with an undefined payload. The Showcase prints
+`((True,"x"),True,((False,"43"),False))`.
+[Provider](examples/packed-vector/AssociatedPayloadSum.hs)
+and [ordinary client](examples/packed-vector/AssociatedPayloadSumClient.hs).
+
+The 567 and 568 readers reject a provider, an inferred binding or a
+re-export whose interface requires `scoped-sum-domain-v1`. They accept
+an unrelated sum. They can open a re-export of an unrelated `Bool` from
+a marked provider. A client that uses that binding still has to load
+its marked defining module. The current compiler links that client and
+prints `True`. With `-fno-code -fwrite-interface`, a client needs only
+the provider's interface. It accepts the valid program. A more specific
+instance with an unsatisfied premise produces GHC-39999 at the written
+signature or inferred binding. Jobs 1703 and 1716 cover the component
+and normal compiler respectively.
+[Formation and reader rules](roadmap/R04-dependent-sums.md#use-an-associated-family-for-the-payload).
+
+Job 1701 built both stages. All 569 Showcase observations matched at
+native `-O0`, default `-O2` and in GHCi. All 21 selected registrations
+and all 234 compatibility cases passed. The focused suite passed 137 of
+138. The `deriving-via-compile` diagnostic for `MTrans` matched its
+baseline. The seven polykinds regressions from the 566 checkpoint remain
+outside these runs. The installed HaskLib clients and the pinned 566
+prefix-upgrade checks passed.
+
+The original driver exited 1. Its `first-class-families` check lacked
+the package source fixture and stopped before invoking GHC. Job 1721
+restored all 23 fixture files from the preceding qualified build,
+verified their checksums, then built the package, ran its tests and ran
+all three clients on the same compiler. Job 1716 checked the separate
+typecheck-only path. The combined receipt is
+`r04-normal-569-20261123/post-review/verified.pass`.
+
 ## Type lambdas in record fields and ranked row readers
 
 ```haskell

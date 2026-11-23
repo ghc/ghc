@@ -11,7 +11,26 @@ and its [expected output](Showcase.stdout) are the executable examples.
 Updated 23 November 2026. The development branch is
 `dependent-haskell`. Use the fork command below to find its latest commit.
 
-The current compiler is `c4d702c7f4`. A record field can use a type
+The current compiler is `aba28b367f`. A dependent pair can select
+its payload type with an associated family. Reading the tag leaves
+the payload lazy. An ordinary client that only typechecks a provider
+interface gets the same missing-class error as one that builds an
+object. Job 1701 built both stages. All 569 Showcase observations
+matched in three modes. All 234 compatibility cases passed. The
+focused suite passed 137 of 138 with the existing `MTrans` failure.
+The original driver exited 1 because its package fixture was missing.
+Job 1721 verified the fixture and passed the package checks on the same
+compiler. Use `r04-normal-569-20261123/post-review/verified.pass` for the
+combined results. [Release evidence](CHECKPOINTS.md#associated-families-as-dependent-pair-payloads).
+
+Two component results are ready for combined qualification. R17 accepts
+a lambda in a local row mapper's signature. The enclosing signature
+supplies the kinds of the captured variables. R04 accepts
+`Maybe (Body a tag)` and checks class obligations for tuple components.
+The combined build must check local scope, class domains, the earlier
+readers, and the Showcase.
+
+The preceding R17 compiler is `c4d702c7f4`. A record field can use a type
 lambda that captures the record's error type. Family instance equations
 can use a lambda under an arrow. A row reader can capture indices from
 explicitly kinded erased `forall` binders. The field, instance and ranked
@@ -27,12 +46,6 @@ cases and 137 of 138 focused cases passed. The existing `MTrans`
 diagnostic matched its baseline. Use `review/qualified.pass` for the
 combined results. The original job exited 1.
 [Release evidence](CHECKPOINTS.md#type-lambdas-in-record-fields-and-ranked-row-readers).
-
-R17 remains open for local value signatures and for conversion between
-a named callback and a lambda over an unknown list. The R04 candidate
-checks the owning class of a retained pair's associated-family payload.
-An ordinary client can inspect the tag and leave the payload unevaluated.
-That candidate still needs normal qualification.
 
 The preceding R13 compiler is `687b465aad`. HaskLib exports `lengthTakeSize`,
 a proof that taking a prefix of a list gives the smaller of the bound
@@ -530,8 +543,8 @@ defaults and an opt-in migration warning.
 
 ## Build and verify
 
-The 568-line Showcase uses the normal two-stage compiler at
-`c4d702c7f4` in `r17-normal-568-20261123`.
+The 569-line Showcase uses the normal two-stage compiler at
+`aba28b367f` in `r04-normal-569-20261123`.
 On this host the bootstrap tools are GHC 9.14.1, Cabal 3.18.1.0, Happy 2.1.7
 and Alex 3.5.4.0. A fresh checkout needs the Git submodules at their recorded
 revisions. This build copied the preceding build tree, ran `./boot`
@@ -544,7 +557,7 @@ self-hosted stage 2 compiler in `_build/stage1/bin/ghc`. Both use the
 target libraries in `_build/stage1/lib`. For example, from the main checkout:
 
 ```sh
-stable="$PWD/_build/on-demand/r17-normal-568-20261123/source/_build/stage1"
+stable="$PWD/_build/on-demand/r04-normal-569-20261123/source/_build/stage1"
 queue="$PWD/docs/dependent-haskell/tools/ghc-build-job"
 check="$PWD/docs/dependent-haskell/check-showcase.sh"
 "$queue" showcase-stage2-ghci bash "$check" "$stable/bin/ghc" "$stable/lib" --ghci
@@ -590,4 +603,10 @@ clients while four older compiler trees were absent. Removing the trees
 recovered 15,574,077,440 bytes. Eight historical run names referred to
 these four trees. Their source revisions, recipes and test logs remain.
 See `retirement-four-archived-compilers-20261123/retired.tsv`.
+Job 1711 tested six native and interactive compilers and three package
+clients with the 561 and standalone R23 build trees removed. Cleanup
+recovered 7,806,869,504 bytes. The archived source pins and recipes remain.
+Replaying 562's original warm build requires rebuilding its standalone R23
+donor first. The live reader tests use the existing 562 compiler directly.
+See `retirement-561-standalone-20261123/retired.tsv`.
 [Retention rules](CHECKPOINTS.md#clean-up-after-each-experiment).

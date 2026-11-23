@@ -41,6 +41,18 @@ in kinds. The R24 card links the review questions to the interface test.
 [Disallow constraints in kinds](https://ghc-proposals.readthedocs.io/en/latest/proposals/0547-no-kind-equalities.html)
 and [R24 source syntax](roadmap/R24-constrained-type-families.md#source-syntax-and-separate-compilation).
 
+R04 uses Serokell's dependent sum syntax. In
+`some (tag :: Bool) | Body a tag`, an associated family selects the payload type. Agda's built-in sum gives
+the second field a type indexed by the first field. The additional
+requirement that the enclosing Haskell context supply the class of
+`Body` follows Morris and Eisenberg's formation rule. The fork checks
+the requirement when it forms the sum, including in a client that has
+only the provider interface.
+[Serokell dependent sums](https://ghc.serokell.io/dh#dependent-sums),
+[Agda's built-in Sigma type](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#the-s-type),
+[Constrained Type Families, §7](https://richarde.dev/papers/2017/partiality/partiality.pdf)
+and [R04 payload example](roadmap/R04-dependent-sums.md#use-an-associated-family-for-the-payload).
+
 Morris and Eisenberg require the typing context to entail the domain of a
 family application at its occurrence. Agda searches the instances in scope
 for the requested type. For the fork's retained `foreach`, this means
