@@ -2542,3 +2542,15 @@ Default `-O2` raised the fold seed exception. The recursive HaskLib
 element in the singleton. A check that admits this particular use of
 `size` must account for the consuming function as well as the right
 list.
+
+The private compiler at `502e466bd4` can identify the consumer from
+the solved equality in `lengthAppend`. It checks the defining binding
+in final Core. The empty case must return zero. The cons case must put
+the count of the tail under a lazy successor. The proof interface
+records the defining name of that consumer together with the seed
+position. Job 1423 recovered both in a source-hidden client. Replacing
+the consumer's interface with one that lacked the final-Core check
+caused the unchanged client to recompile. It then retained only the
+seed position. A strict successor, an unrelated function with the same
+name, and an arbitrary outer fold supplied no count evidence.
+The rule guard still rejects a default-`-O2` proof call.

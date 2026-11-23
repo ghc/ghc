@@ -6597,6 +6597,19 @@ constructor identities. User functions operate on the ordinary value.
 [Dependently Typed Programming with Singletons](https://richarde.dev/papers/2012/singletons/paper.pdf)
 and [fork tree example](examples/closed-evaluation/FiniteTree.hs).
 
+### Checked character equations in a declaration group
+
+Agda's interleaved mutual declarations distinguish when a type is
+available from when its defining equations are available. In GHC,
+a top-level declaration splice ends a declaration group. The R21
+experiment follows GHC's dependency order inside the group. It uses
+the equations of a demanded local function after checking that function's
+bindings. A later group can use those bindings too. Pending typed
+splices and cycles remain subject to the existing checks.
+[Agda 2.8 mutual declarations](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html#interleaved-mutual-blocks),
+[GHC Template Haskell declaration groups](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/template_haskell.html)
+and [R21 source example](roadmap/R21-dependency-analysis.md#checked-character-equations-in-their-defining-module).
+
 ### Scheduling helpers and reifying an indexed result
 
 The dependency graph for a type-level call includes the definition

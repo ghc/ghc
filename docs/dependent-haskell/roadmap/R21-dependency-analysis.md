@@ -505,3 +505,29 @@ Its 556-line Showcase ran at native `-O0` and in GHCi. The keyed-tree
 observation returned `(1,Refl,Just (9,'y','n'))`. It kept the branch
 key while mapping both leaf values. The combined compiler is awaiting
 the separate optimized list-proof work.
+
+## Checked character equations in their defining module
+
+The private compiler at `fc3023245a` accepts the following declarations
+in one group. The proof may also precede the producer in source order.
+
+```haskell
+flag :: Char -> Bool
+flag 'x' = True
+flag _   = False
+
+type Flag (c :: Char) = flag c
+
+proof :: Flag 'x' :~: 'True
+proof = Refl
+```
+
+GHC checks the producer's dependencies before using its equations.
+An exact alias keeps those dependencies. A source-hidden reader can
+use the exported synonym. Job 1431 checked direct and aliased calls in
+both source orders at `-O0` and `-O2`. It also rejected a type/value
+cycle, a pending typed splice, and a conflicting rule in a later group.
+A declaration before a splice still cannot refer to a name first bound
+after it. Jobs 1434 and 1435 used the same-module synonym in the full
+556-line Showcase and in the separate reader.
+[Declaration groups and prior art](../REFERENCES.md#checked-character-equations-in-a-declaration-group).

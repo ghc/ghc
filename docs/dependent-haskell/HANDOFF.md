@@ -11,15 +11,19 @@ and its [expected output](Showcase.stdout) are the executable examples.
 Updated 23 November 2026. The development branch is
 `dependent-haskell`. Use the fork command below to find its latest commit.
 
-The published R03 checkpoint is `ce1c89c534`. Its normal two-stage
-compiler is `9202568aae` in
-`_build/on-demand/r03-explicit-function-normal-554-20261123/source/_build/stage1`.
-The only compiler source change after this build explains function-value
-application in a Note. All 554 Showcase lines matched at native `-O0`,
-default `-O2` and in GHCi. All 95 focused registrations and all 234
-compatibility cases passed. The five inherited failures from the
-553-line release are resolved.
-[Release checks](CHECKPOINTS.md#imported-function-identity-in-retained-indices).
+The published Unicode checkpoint is `16de21824a`. Its compiler and
+libraries match normal two-stage build `1659c10b23` in
+`_build/on-demand/r03-r15-unicode-normal-555-20261123/source/_build/stage1`.
+The installed title-case, upper-case and lower-case functions all
+publish their checked equations. Native `-O0`, default `-O2` and GHCi
+matched the 555-line Showcase. All 109 focused registrations and all
+234 compatibility cases passed across normal job 1398 and the two
+corrected diagnostics in job 1451.
+[Unicode release checks](CHECKPOINTS.md#installed-unicode-case-mappings).
+
+The preceding 554-line release is `ce1c89c534`. It added imported
+function identity and qualified the staged wildcard diagnostic.
+[Callback release checks](CHECKPOINTS.md#imported-function-identity-in-retained-indices).
 
 The previous R41 release is `61fd13f735`. Keep its normal compiler
 at `71e5215115` while the callback interface tests use the earlier reader.
@@ -128,16 +132,15 @@ though ordinary runtime clients passed. The published fix lets a
 client give `spaceDecision 'x'` the type `Decision Char.isSpace (Space 'x')`.
 [Substitution example](roadmap/R03-dependent-products.md#specializing-an-imported-call).
 
-The next source pin is `1659c10b23` in
-`r03-r15-unicode-normal-555-20261123/source`. Job 1382 checked the
-generated title-case and lower-case equations through package interfaces.
-Job 1384 changed one title-case equation. GHC rechecked the unchanged
-client and rejected its previous proof. Job 1390 separately checked that
-an executable call still tracks its object file. Job 1391 passed all 555
-Showcase outputs at `-O0` with the experimental package interfaces.
-Job 1397 rebuilds Hadrian and the normal installation. Job 1398 checks
-109 focused registrations, the 234-case comparison and all three Showcase
-modes.
+The next normal build is `54c4c62287` in
+`r16-r21-char-predicate-normal-556-20261123/source`. It combines
+strict character predicates, local aliases and checked calls from
+the same declaration group. Its compiler matches component `fc3023245a`.
+Jobs 1434 and 1435 passed the 556-line Showcase and its four focused
+registrations on that component. Job 1454 builds the normal compiler.
+Job 1455 checks three Showcase modes, 111 focused registrations, the
+234-case compatibility set and the external character-case generator.
+[Same-module example](roadmap/R21-dependency-analysis.md#checked-character-equations-in-their-defining-module).
 
 Job 1335 used installed HaskLib on `4d10fdc35f` to check the
 [append counterexample](roadmap/R16-open-term-evaluator.md#append-fusion-and-an-undefined-right-list).
@@ -149,8 +152,10 @@ This supersedes stashed job 1273.
 On the private R16 compiler, job 1375 verified that the recursive
 `lengthAppend` proof passes the same right operand at each use.
 Jobs 1392 and 1393 checked that a source-hidden client can recover
-that position at `492fe1285a`. The optimized caller still needs the
-rewrite-rule check.
+that position at `492fe1285a`. Job 1423 also recovered the defining
+name of the count after checking its recursive equations in final Core.
+Stock fusion can introduce stricter intermediate folds. The guarded
+compiler still checks the active rules at the optimized proof use.
 
 The local archive refs `r19-r41-normal-552`, `r16-hasklib-tree-553`
 and `r27-legacy-transition-normal` are under
@@ -390,8 +395,8 @@ defaults and an opt-in migration warning.
 
 ## Build and verify
 
-The published 554-line Showcase uses the normal two-stage compiler at
-`9202568aae` in `r03-explicit-function-normal-554-20261123`.
+The published 555-line Showcase uses the normal two-stage compiler at
+`1659c10b23` in `r03-r15-unicode-normal-555-20261123`.
 On this host the bootstrap tools are GHC 9.14.1, Cabal 3.18.1.0, Happy 2.1.7
 and Alex 3.5.4.0. A fresh checkout needs the Git submodules at their recorded
 revisions. This build used five workers per job.
@@ -405,7 +410,7 @@ self-hosted stage 2 compiler in `_build/stage1/bin/ghc`. Both use the
 target libraries in `_build/stage1/lib`. For example, from the main checkout:
 
 ```sh
-stable="$PWD/_build/on-demand/r03-explicit-function-normal-554-20261123/source/_build/stage1"
+stable="$PWD/_build/on-demand/r03-r15-unicode-normal-555-20261123/source/_build/stage1"
 queue="$PWD/docs/dependent-haskell/tools/ghc-build-job"
 check="$PWD/docs/dependent-haskell/check-showcase.sh"
 "$queue" showcase-stage2-ghci bash "$check" "$stable/bin/ghc" "$stable/lib" --ghci
@@ -426,4 +431,8 @@ superseded build products after their final consumer finishes. The main
 4,672,086,016 bytes of archived comparison-build intermediates. Job 1341
 checked native linking and GHCi on both preserved installations.
 See `retirement-r41-release-20261123` for paths and receipts.
+After the 554-line release, the completed R27 package experiment
+released 2,784,550,912 allocated bytes across 3,045 native products
+and linker maps. Its sources, patches and comparison results remain.
+See `retirement-r27-products-20261123/retired.tsv` for the file list.
 [Retention rules](CHECKPOINTS.md#clean-up-after-each-experiment).

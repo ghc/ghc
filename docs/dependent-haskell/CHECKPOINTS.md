@@ -6,6 +6,37 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Installed Unicode case mappings
+
+The 555-line release is `16de21824a`. A type synonym can name
+`Data.Char.toTitle c` or `Data.Char.toLower c` while `c` is unknown.
+The installed worker supplies checked literal equations and an identity
+default. A client with only interfaces can prove the specialized result.
+For U+01C6, title case is U+01C5 and upper case is U+01C4.
+[Exported synonyms](examples/open-evaluation/UnicodeExport.hs) and
+[Showcase](Showcase.hs).
+
+Job 1397 rebuilt Hadrian and both normal compiler stages at
+`1659c10b23`. It checked the installed interfaces of the three workers
+and their three public forwarding bindings. Job 1398 passed the
+555-line Showcase at native `-O0`, default `-O2` and in GHCi,
+34 specialization cases and both package-identity checks.
+
+The initial runs passed 108 of 109 focused registrations and 232
+of 234 compatibility cases. The private interface setup had recorded
+a loader error for `NativeOpenRetryQuote`. The normal compiler
+reports GHC-70565 at the executable call inside the quotation.
+`NativeClosedLazyParcelKind` now uses the executable `isSpace` to
+check a rejected `Parcel` operand. Its old `toTitle` call reaches the
+ordinary kind checker through the new equations. Job 1451 passed both
+corrected registrations on the same normal compiler. Together the
+runs cover all 109 focused and 234 compatibility registrations.
+
+Job 1384 changed one worker equation and invalidated an unchanged
+interface-only proof. Job 1390 changed only the object of an
+executable wrapper and invalidated its staged call. These component
+checks cover both dependency paths.
+
 ## Imported function identity in retained indices
 
 The 554-line release is `ce1c89c534`. An index can refer to a

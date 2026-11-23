@@ -95,8 +95,9 @@ installed upper-case worker. With only interfaces, the client checked
 `Title 'x' :~: Data.Char.toTitle 'x'` and `Title 'x' :~: 'X'`.
 It also distinguished the title case of U+01C6 (U+01C5) from its
 upper case (U+01C4). An unknown input still blocked the catch-all.
-This was a package experiment. The normal build currently publishes
-only the upper-case table of these three.
+Job 1397 installed all three tables in the normal build.
+The [555-line release](../CHECKPOINTS.md#installed-unicode-case-mappings)
+includes the three source-level specialization proofs.
 [Installed upper-case example](R16-open-term-evaluator.md#the-installed-unicode-function).
 
 ## Supported subset and evidence
