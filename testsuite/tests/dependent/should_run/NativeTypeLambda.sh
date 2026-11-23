@@ -161,7 +161,7 @@ import Data.Type.Equality ((:~:)(Refl))
 import Ordinary (capturedRow, independentRow, scopedRow)
 import Data.Proxy (Proxy(..))
 import TypeLambda (Columns, Fields(..), Optional, Prefixes, ScopedRow)
-import SchemaColumns (Checked)
+import SchemaColumns (Callable, Checked)
 import TypeLambdaClient (forwardErrors)
 
 withError :: Fields (Prefixes ('Just Ordering) '[Char, Bool])
@@ -169,6 +169,12 @@ withError = case capturedRow of Refl -> Field (Left GT) (Field (Right True) End)
 
 withoutError :: Fields (Prefixes 'Nothing '[Char, Bool])
 withoutError = case independentRow of Refl -> Field (Just 'a') (Field (Just True) End)
+
+callable :: Fields (Columns (Callable String) '[Bool])
+callable = Field wrap End
+  where
+    wrap :: Fields '[Bool] -> Fields '[Either String Bool]
+    wrap (Field x End) = Field (Right x) End
 
 main :: IO ()
 main = case (capturedRow, independentRow, withError, withoutError) of
@@ -186,11 +192,15 @@ main = case (capturedRow, independentRow, withError, withoutError) of
         checked = Field (Left "missing") End
     case (optional, checked) of
       (Field x End, Field y End) -> print (x, y)
+    case callable of
+      Field wrap End -> case wrap (Field True End) of
+        Field x End -> print x
 HS
 "${g[@]}" -c RowsMain.hs
 "${g[@]}" RowsMain.o Ordinary.o TypeLambdaClient.o ../provider/TypeLambda.o \
     ../provider/SchemaColumns.o ../provider/NativeTypeLambdaScope.o -o rows
-printf '%s\n' "(Left GT,Right True,Just 'a',Just True)" "(Just 'x',Right True)" "Right 'x'" '(Just 42,Left "missing")' >rows.expected
+printf '%s\n' "(Left GT,Right True,Just 'a',Just True)" "(Just 'x',Right True)" "Right 'x'" \
+    '(Just 42,Left "missing")' "Right True" >rows.expected
 ./rows >rows.actual
 cmp rows.expected rows.actual
 
