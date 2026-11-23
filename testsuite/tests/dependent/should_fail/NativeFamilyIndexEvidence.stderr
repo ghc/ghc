@@ -4,7 +4,7 @@ NativeFamilyIndexEvidence.hs:18:37: error: [GHC-25897]
         bound by the type signature for:
                    wrong :: forall (p :: Bool) (q :: Bool).
                             (Width p ~ Width q) =>
-                            foreach (x :: Proxy p) -> Proxy q -> Proxy (Hide x)
+                            foreach (x1 :: Proxy p) -> Proxy q -> Proxy (Hide x1)
         at NativeFamilyIndexEvidence.hs:(16,1)-(17,76)
       Expected: Proxy p
         Actual: Proxy q
@@ -12,13 +12,13 @@ NativeFamilyIndexEvidence.hs:18:37: error: [GHC-25897]
         the type signature for:
           wrong :: forall (p :: Bool) (q :: Bool).
                    (Width p ~ Width q) =>
-                   foreach (x :: Proxy p) -> Proxy q -> Proxy (Hide x)
+                   foreach (x1 :: Proxy p) -> Proxy q -> Proxy (Hide x1)
         at NativeFamilyIndexEvidence.hs:(16,1)-(17,76)
       ‘p’ is a rigid type variable bound by
         the type signature for:
           wrong :: forall (p :: Bool) (q :: Bool).
                    (Width p ~ Width q) =>
-                   foreach (x :: Proxy p) -> Proxy q -> Proxy (Hide x)
+                   foreach (x1 :: Proxy p) -> Proxy q -> Proxy (Hide x1)
         at NativeFamilyIndexEvidence.hs:(16,1)-(17,76)
     • In the expression: retain @(Width p) (Hide y)
       In an equation for ‘wrong’: wrong _ y = retain @(Width p) (Hide y)

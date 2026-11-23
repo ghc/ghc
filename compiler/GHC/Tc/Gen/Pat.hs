@@ -687,10 +687,10 @@ tc_pat scaled_exp_pat_ty@(Scaled w_pat exp_pat_ty) penv ps_pat thing_inside =
 
     VarPat x (L l name) -> do
       { (wrap, id) <- tcPatBndr penv name scaled_exp_pat_ty
-      ; let extend | isSystemName name, isEvId id = tcExtendGeneratedIdEnv id
+      ; let extend | isSystemName name, name == idName id = tcExtendGeneratedIdEnv id
                    | otherwise = tcExtendIdEnv1 name id
-            -- Implicit dictionary patterns have no source binder to report.
-            -- See Note [Retained constructor matrices] in GHC.Tc.Gen.Match.
+            -- Generated patterns have no source binder to report.
+            -- See Note [Wildcard retained binders] in GHC.Tc.Gen.Match.
       ; res <- tcCheckUsage name w_pat (extend thing_inside)
       ; pat_ty <- readExpType exp_pat_ty
       ; return (mkHsWrapPat wrap (VarPat x (L l id)) pat_ty, res) }
