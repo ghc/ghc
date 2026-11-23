@@ -721,6 +721,49 @@ instance with a new premise. The current reader reports that premise
 in both a signature naming the sum and an inferred result that refers
 to its payload family.
 
+## Compose the associated payload under a type constructor
+
+A sum can contain `Maybe (Body key tag)` or a pair of payload types.
+The generated family must still have one variable-only equation.
+The checker follows ordinary algebraic type constructors to find each
+constrained associated family. It requires every owner predicate at sum
+formation and checks equal predicates once. Each owner parameter must
+be determined by the family application. The predicates must stay
+independent of the retained witness. An associated equation checks
+them from its owner and superclasses.
+
+The named synonym and named associated equation already accept these
+payloads. A retained GADT field using a global instance also accepts
+them. A retained GADT constructor context with a class constraint
+still fails even with a direct payload.
+
+Morris and Eisenberg use qualified types to check the domains of
+type-family applications during type formation. Agda's standard
+library lets a dependent pair's codomain use `Maybe` and ordinary
+products. Here the checker combines class obligations under those
+constructors and the runtime client reads `Nothing` without
+evaluating its stored tag.
+[Constrained Type Families, §4.2](https://jgbm.github.io/pubs/morris-icfp2017-families-extended.pdf).
+[Agda dependent products](https://agda.github.io/agda-stdlib/master/Data.Product.Base.html).
+[Agda optional values](https://agda.github.io/agda-stdlib/master/Data.Maybe.Base.html).
+
+The component check passes at `-O0` and `-O2` with a source-hidden
+ordinary client. The provider includes two families with distinct
+owners and a payload that uses the same family twice. The client
+checks `Nothing` with an undefined witness and reads both pair
+payloads. Separate controls remove each owner and preserve the
+localized diagnostic. Repeated owner evidence gives one obligation.
+[Provider](../examples/packed-vector/ComposedPayloadSum.hs).
+[Ordinary client](../examples/packed-vector/ComposedPayloadSumClient.hs).
+[Regression](../../../testsuite/tests/dependent/should_run/NativeComposedPayloadSum.sh).
+
+A direct payload keeps `scoped-sum-domain-v1`. The 569 reader and
+the component reader exchange direct interfaces and run both
+clients. A composed payload requires `scoped-sum-domain-v2`. The
+normal 569 reader rejects the composed producer, a client that
+exports an inferred type using the payload, and an affected
+re-export at their interface headers.
+
 ## Partition at the original length
 
 The [vector partition](../examples/packed-vector/ConservedPartition.hs) returns

@@ -461,6 +461,12 @@ test('NativeAssociatedPayloadSum',
                    for f in ['AssociatedPayloadSum.hs', 'AssociatedPayloadSumClient.hs']])],
      run_command, ['bash NativeAssociatedPayloadSum.sh "{compiler}" "{libdir}"'])
 
+test('NativeComposedPayloadSum',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/' + f
+                   for f in ['ComposedPayloadSum.hs', 'ComposedPayloadSumClient.hs']])],
+     run_command, ['bash NativeComposedPayloadSum.sh "{compiler}" "{libdir}"'])
+
 test('NativeAlternatingBinders',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['NativeAlternatingBindersProvider.hs', 'NativeAlternatingBindersClient.hs'])],

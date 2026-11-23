@@ -105,6 +105,7 @@ import qualified IndexedVec
 import qualified CertifiedSplitClient
 import qualified CursorClient
 import qualified AssociatedPayloadSumClient
+import qualified ComposedPayloadSumClient
 import qualified RuntimeMessageClient
 import qualified RuntimeTypeColumn as Column
 import qualified FinitePositionClient
@@ -429,6 +430,8 @@ vectors = do
     mode <- readIORef modeCell
     observe "package a runtime mode with its associated payload" (RuntimeMessageClient.observeMessage mode)
     observe "read runtime tags with undefined associated payloads" (AssociatedPayloadSumClient.observePayload mode)
+    missingTag <- readIORef =<< newIORef (error "forced tag of Nothing")
+    observe "read a composed sum payload with an undefined tag" (ComposedPayloadSumClient.observePayloads missingTag)
     case unconsPacked package of
         Nothing -> fail "expected a nonempty package"
         Just (x, rest) -> observe "uncons retains the runtime predecessor" (x, renderPacked rest)
