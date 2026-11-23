@@ -472,7 +472,7 @@ test('NativeMonomorphicRetainedProjection',
       extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/' + f
                    for f in ['PackedVecLibrary.hs', 'RetainedCharVector.hs',
                              'RetainedCharLength.hs', 'RetainedCharProjection.hs',
-                             'RetainedCharClient.hs']])],
+                             'RetainedCharLocal.hs', 'RetainedCharClient.hs']])],
      run_command, ['bash NativeMonomorphicRetainedProjection.sh "{compiler}" "{libdir}"'])
 
 test('NativeAlternatingBinders',

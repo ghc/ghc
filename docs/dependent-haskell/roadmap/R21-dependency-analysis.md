@@ -104,7 +104,11 @@ cycles. A pending typed splice does not run while deriving the
 equation. A rewrite rule that changes the worker invalidates its use.
 The source-hidden ordinary client reads each field without forcing the
 other. This check uses a monomorphic worker and an independently
-checked package declaration.
+checked package declaration. The Showcase uses these two definitions
+without a splice. The maintained regression also uses a separate
+length worker and checks the length of a known package with `Refl`.
+[Local projections](../examples/packed-vector/RetainedCharLocal.hs).
+[Ordinary client](../examples/packed-vector/RetainedCharClient.hs).
 
 ## Local synonyms in a retained field worker
 

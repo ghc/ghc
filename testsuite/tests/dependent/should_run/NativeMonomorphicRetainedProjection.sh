@@ -14,26 +14,41 @@ for opt in -O0 -O2; do
     "${ghc[@]}" "$opt" --make -no-link RetainedCharLength.hs
     "${ghc[@]}" --show-iface RetainedCharLength.hi > first.iface
     grep -Fq 'SourceTable T:storedLength' first.iface
-    cp ./*.hi "$src/RetainedCharProjection.hs" ../projection/
+    cp ./*.hi "$src/"{RetainedCharProjection,RetainedCharLocal}.hs ../projection/
 
     cd ../projection
     test ! -e RetainedCharLength.hs
     "${ghc[@]}" "$opt" -c RetainedCharProjection.hs
+    "${ghc[@]}" "$opt" -c RetainedCharLocal.hs
+    cat > KnownLength.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
+module KnownLength where
+import Data.Type.Equality ((:~:)(Refl))
+import PackedVecLibrary (Nat(..), Vec(..))
+import RetainedCharLength (storedLength)
+import RetainedCharVector (CharVector(..))
+
+knownLength :: storedLength ('CharVector ('S 'Z) ('VCons 'r' 'VNil)) :~: 'S 'Z
+knownLength = Refl
+HS
+    "${ghc[@]}" "$opt" -c KnownLength.hs
     cp ./*.hi "$src/RetainedCharClient.hs" ../client/
 
     cd ../client
     test ! -e RetainedCharProjection.hs
     cat > Main.hs <<'HS'
 module Main where
-import RetainedCharClient (observeProjection)
+import RetainedCharClient (observeProjection, observeSeparateProjection)
 main :: IO ()
-main = observeProjection >>= print
+main = do
+    observeProjection >>= print
+    observeSeparateProjection >>= print
 HS
     "${ghc[@]}" "$opt" -c RetainedCharClient.hs
     "${ghc[@]}" "$opt" -c Main.hs
-    "${ghc[@]}" Main.o RetainedCharClient.o ../projection/RetainedCharProjection.o ../owner/*.o -o observe
+    "${ghc[@]}" Main.o RetainedCharClient.o ../projection/{RetainedCharProjection,RetainedCharLocal}.o ../owner/*.o -o observe
     timeout 15 ./observe > actual
-    grep -Fxq '(1,"r",True)' actual
+    printf '%s\n' '(1,"r",True)' '(1,"r",True)' | cmp - actual
 
     if [[ "$opt" = -O0 ]]; then
         cd ../projection
