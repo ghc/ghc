@@ -3,8 +3,9 @@
 -- | Bind an intermediate result in a type synonym.
 module TypeLet (F, Shadow, Reuse, Outer, Nested, CaptureBeforeShadow, CaseResult, Frame,
                 DimensionSum, Dimensions(..), ProductDimensionSum, UnknownDepth,
-                DimensionWithOverride,
+                DimensionWithOverride, defaultWidth,
                 frameRow, frameToList, frameValues, roadmap) where
+import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
 import qualified GHC.TypeNats as TypeNats
 import PackedVecLibrary (Nat, Vec(..), toList, type (+))
@@ -66,6 +67,13 @@ type DimensionWithOverride (width :: Bool) (override :: Maybe TypeNats.Nat) =
   let width = case width of { True -> 3; False -> 2 }
       result = case override of { Nothing -> width; Just width -> width }
   in result
+
+-- | Use the width computed by the first case when there is no override.
+defaultWidth :: Proxy (let width = case 'True of { True -> 3; False -> 2 }
+                           result = case ('Nothing :: Maybe TypeNats.Nat) of
+                             { Just provided -> provided; _ -> width }
+                       in result)
+defaultWidth = Proxy @3
 
 -- | A row with one additional value when the header flag is set.
 type Frame (n :: Nat) (b :: Bool) a =

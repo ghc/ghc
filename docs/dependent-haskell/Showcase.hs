@@ -1723,6 +1723,8 @@ main = do
         (Refl :: NativeCase.NestedLetShadow 'True ('Just 'False) :~: (Proxy 'False, Proxy ('Just 'True)))
     observe "bind the result of a constructor case"
         (Right True :: TypeLet.CaseResult 'True, Left 'c' :: TypeLet.CaseResult 'False)
+    observe "use a default width from a preceding type case"
+        (TypeNats.natVal TypeLet.defaultWidth)
     observe "select the result type by a constructor" NativeCase.roadmap
     observe "repeat a type case in a function argument and result"
         (NativeCase.caseIdentity (Proxy @'True) 42, NativeCase.caseIdentity (Proxy @'False) False)

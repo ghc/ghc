@@ -908,7 +908,7 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
       , let (binder, rhs, body) = splitHsTypeLet binds result
       , isCaseRhs rhs
       , usesTypeCaseResult (unLoc binder) body
-      , copyable ty
+      , copyableLetCases ty
       = Just ("$signature-case:", Nothing)
     liftedAnchor site _ ty@(L _ (XHsType HsTypeSome{}))
       | fieldSite site, copyable ty = Just ("$field-sum:", Nothing)
@@ -917,8 +917,7 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
     liftedAnchor site scope (L _ (XHsType (HsTypeCase _ _ scrutinee alts)))
       | lift_cases
       , caseScrutinee site scope scrutinee
-      , copyable scrutinee
-      , all copyableAlt alts
+      , copyableCase scrutinee alts
       = if fieldSite site
           then Just ("$field-case:", Nothing)
           else Just ("$signature-case:", signatureCaseKey scrutinee alts)
@@ -928,6 +927,14 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
       XHsType HsTypeCase{} -> True
       HsKindSig _ body _ | L _ (XHsType HsTypeCase{}) <- ignoreParens body -> True
       _ -> False
+
+    copyableLetCases ty = case unLoc (ignoreParens ty) of
+      XHsType (HsTypeLet _ _ _ binds result) ->
+        let (_, rhs, body) = splitHsTypeLet binds result
+        in copyableLetCases rhs && copyableLetCases body
+      HsKindSig _ body kind -> copyableLetCases body && copyable kind
+      XHsType (HsTypeCase _ _ scrutinee alts) -> copyableCase scrutinee alts
+      _ -> copyable ty
 
     fieldSite FieldTypeSite = True
     fieldSite RetainedFieldTypeSite{} = True
@@ -967,8 +974,12 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
     retainedNames (RetainedFieldTypeSite names) = names
     retainedNames _ = []
 
-    copyableAlt (L _ (HsTypeCaseAlt pat _ rhs)) =
-      isJust (classifyTypeCasePattern pat) && copyable rhs
+    -- A case pattern can contain a wildcard. Keep the ordinary copy check
+    -- for the scrutinee and row expressions.
+    copyableCase scrutinee alts = copyable scrutinee && all copyableAlt alts
+      where
+        copyableAlt (L _ (HsTypeCaseAlt pat _ rhs)) =
+          isJust (classifyTypeCasePattern pat) && copyable rhs
 
     forallCaptures HsForAllInvis{hsf_invis_bndrs = binders} = writtenCaptures binders
     forallCaptures HsForAllVis{hsf_vis_bndrs = binders} = writtenCaptures binders

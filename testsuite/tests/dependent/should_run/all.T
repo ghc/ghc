@@ -508,7 +508,8 @@ test('NativeTypeLetQuote',
      run_command, ['bash NativeTypeLetQuote.sh "{compiler}" "{libdir}"'])
 
 test('NativeTypeLet',
-     [only_ways(['normal']), extra_files([open_eval_dir + 'TypeLet.hs',
+     [only_ways(['normal']), extra_files(['NativeTypeLetContexts.hs',
+                                       open_eval_dir + 'TypeLet.hs',
                                        '../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs'])],
      run_command, ['bash NativeTypeLet.sh "{compiler}" "{libdir}"'])
 

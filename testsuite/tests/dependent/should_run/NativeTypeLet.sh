@@ -13,6 +13,7 @@ cd "$out/provider"
 cp "$src/"{PackedVecLibrary,TypeLet}.hs .
 "${g[@]}" -c PackedVecLibrary.hs
 "${g[@]}" -c TypeLet.hs
+"${g[@]}" -fno-code "$src/NativeTypeLetContexts.hs"
 cat >SignatureLet.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeApplications #-}
 module SignatureLet (capture, selected) where
@@ -168,8 +169,11 @@ caseChain = Refl
 knownPair :: DimensionSum '(2, 3) :~: 5
 knownPair = Refl
 
-defaultWidth :: DimensionWithOverride 'False 'Nothing :~: 2
-defaultWidth = Refl
+chosenWidth :: DimensionWithOverride 'False 'Nothing :~: 2
+chosenWidth = Refl
+
+inlineDefaultWidth :: Proxy 3
+inlineDefaultWidth = defaultWidth
 
 explicitWidth :: Proxy width -> DimensionWithOverride width ('Just 7) :~: 7
 explicitWidth _ = Refl

@@ -472,6 +472,7 @@ capture an outer type in a let group before shadowing its name: Refl
 select a vector header with a runtime flag and a computed width: (":xy","xy")
 refer to an outer type let before shadowing it in a case: Refl
 bind the result of a constructor case: (Right True,Left 'c')
+use a default width from a preceding type case: 3
 select the result type by a constructor: (7,False)
 repeat a type case in a function argument and result: (42,False)
 select through nested type case patterns: (Proxy,7)
