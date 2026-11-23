@@ -1705,7 +1705,8 @@ main = do
     observe "capture a type before and after a local let"
         (Refl :: TypeLambda.ScopedRow Char '[Bool] :~: '[(Maybe Char, Either Char Bool)])
     let fields = TypeLambda.Field 'x' (TypeLambda.Field True TypeLambda.End)
-    case TypeLambda.withErrors (Proxy @String) fields of
+    case (TypeLambda.withErrors (Proxy @String) fields
+          :: TypeLambda.Fields (TypeLambda.Map (\cell -> Either String cell) '[Char, Bool])) of
         TypeLambda.Field x (TypeLambda.Field y TypeLambda.End) ->
             observe "give every field in a row the same error type" (x, y)
     case TypeLambda.withScopedErrors (Proxy @Ordering) fields of
