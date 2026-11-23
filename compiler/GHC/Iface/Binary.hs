@@ -363,7 +363,7 @@ evidenceSuffix requirements
     || needs InferredOrderedGadtBindersEvidence
     || needs ExtendedOrderedGadtTelescopeEvidence || needs FieldlessOrderedGadtTelescopeEvidence
     || needs RefinedOrderedGadtTelescopeEvidence
-    || needs ScopedLambdaEvidence
+    || needs ScopedLambdaEvidence || needs ScopedLambdaEtaEvidence
     || needs RetainedConstructorContextEvidence
     || needs HomeRuleInterfaceEvidence || needs PartialSynonymEvidence
     || needs PartialBuiltinFamilyEvidence
@@ -433,6 +433,7 @@ legacyEvidenceSuffix ExtendedOrderedGadtTelescopeEvidence = featureSetPrefix ++ 
 legacyEvidenceSuffix FieldlessOrderedGadtTelescopeEvidence = featureSetPrefix ++ "fieldless-ordered-gadt-telescope"
 legacyEvidenceSuffix RefinedOrderedGadtTelescopeEvidence = featureSetPrefix ++ "refined-ordered-gadt-telescope"
 legacyEvidenceSuffix ScopedLambdaEvidence = featureSetPrefix ++ "scoped-lambda"
+legacyEvidenceSuffix ScopedLambdaEtaEvidence = featureSetPrefix ++ "scoped-lambda-eta-v1"
 legacyEvidenceSuffix RetainedConstructorContextEvidence = featureSetPrefix ++ "retained-constructor-context"
 legacyEvidenceSuffix HomeRuleInterfaceEvidence = featureSetPrefix ++ "home-rule-interfaces"
 legacyEvidenceSuffix SourceProofRuleEvidence = featureSetPrefix ++ "source-proof-rules"
@@ -503,6 +504,7 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("fieldless-ordered-gadt-telescope", FieldlessOrderedGadtTelescopeEvidence)
                       , ("refined-ordered-gadt-telescope", RefinedOrderedGadtTelescopeEvidence)
                       , ("scoped-lambda", ScopedLambdaEvidence)
+                      , ("scoped-lambda-eta-v1", ScopedLambdaEtaEvidence)
                       , ("retained-constructor-context", RetainedConstructorContextEvidence)
                       , ("home-rule-interfaces", HomeRuleInterfaceEvidence)
                       , ("partial-synonym-v2", PartialSynonymEvidence)

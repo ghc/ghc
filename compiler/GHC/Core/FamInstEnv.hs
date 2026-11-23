@@ -46,7 +46,8 @@ import GHC.Core.Reduction
 import GHC.Core.RoughMap
 import GHC.Core.FVs( orphNamesOfAxiomLHS )
 
-import GHC.Builtin.CoercionRules( proveScopedSigmaClosure, proveScopedLambdaClosure )
+import GHC.Builtin.CoercionRules
+  ( proveScopedSigmaClosure, proveScopedLambdaClosure, proveScopedLambdaEta )
 import GHC.Builtin.WiredIn.TypeLits( tryMatchFam )
 
 import GHC.Types.Var.Set
@@ -1331,6 +1332,8 @@ generated sum codomains or type lambdas. The checked nominal proof
 identifies them only if their lexical closures agree. See Note
 [Scoped retained sum codomains] in
 GHC.Core.TyCo.Compare.
+It can also match a forwarding lambda with the family that it calls.
+See Note [Eta for a forwarding type lambda] in GHC.Builtin.CoercionRules.
 
 Try that proof only for a repeated template variable. If matching used
 it, instantiate the entire pattern and prove each argument equality.
@@ -1368,6 +1371,7 @@ scopedMatchCo lhs rhs
   | not (eqType (typeKind lhs) (typeKind rhs)) = Nothing
   | Just co <- proveScopedSigmaClosure lhs rhs = Just co
   | Just co <- proveScopedLambdaClosure lhs rhs = Just co
+  | Just co <- proveScopedLambdaEta lhs rhs = Just co
   | Just (tc, as) <- splitTyConApp_maybe lhs
   , Just (tc', bs) <- splitTyConApp_maybe rhs
   , tc == tc', isGenerativeTyCon tc Nominal
