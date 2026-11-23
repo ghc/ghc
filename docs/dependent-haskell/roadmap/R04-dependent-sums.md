@@ -381,15 +381,17 @@ With `ExperimentalDependentTypes`, the two payload types refer to the
 stored value of the first field. The generated selector has type
 `foreach (p :: NamedColumns) -> Vec Char (storedLength p)`. An ordinary
 client can call both payload selectors on the same record and zip the
-results. It can also construct the record by naming every field.
+results. To construct the record, supply the witness field. An omitted
+lazy payload uses the supplied witness in its type. GHC issues the
+ordinary missing-field warning and raises the ordinary missing-field
+exception if evaluation demands that payload.
 [Example](../examples/packed-vector/NamedSiblingColumns.hs).
 
 The declaration uses one constructor, no datatype parameters, and lazy
 fields. Each payload uses the witness as its final type argument. Named
 patterns list the selected fields in declaration order. Payload selection
 uses the generated function. The `HasField` result type depends on the
-label and record type, which do not supply a record value. Construct a
-new record to replace its witness or payloads.
+label and record type, which do not supply a record value.
 Template Haskell rejects reification of this datatype. Its retained
 constructor representation does not carry record labels.
 [Agda record types](https://agda.readthedocs.io/en/v2.8.0/language/record-types.html)
@@ -404,11 +406,22 @@ A warm typecheck-only invocation reused the provider interfaces. Job
 [Ordinary client](../examples/packed-vector/NamedSiblingColumnsClient.hs).
 
 Construction with a retained variable, field puns and record wildcards
-passed in job 1909. Omitting a payload or the witness failed with
-GHC-83605. For an ordinary Haskell record, an omitted lazy field
-receives a bottom value. A supplied field remains readable. The next
-experiment applies this rule to a lazy payload when its witness is
-present. [Field omission and witness inference](../REFERENCES.md#omitted-fields-in-a-dependent-record).
+passed in job 1909. Job 1946 checked construction with a supplied
+witness and one or two omitted lazy payloads. A supplied field remains
+readable. Omitting the witness gives GHC-83605 at the constructor and
+names the required field.
+[Field omission and witness inference](../REFERENCES.md#omitted-fields-in-a-dependent-record).
+
+An ordinary caller can replace one payload at the original witness.
+The Showcase sets the first flag to `False` and keeps the rest of the
+vector. The update checks the replacement at `storedLength p` for
+receiver `p`. Job 1968 passed the source-hidden test at `-O0` and `-O2`.
+It checked the unchanged length, the laziness of the fields, and the
+GHC-83865 error for a vector at a separate record's witness.
+The receiver must be a supported retained operand, such as a local
+variable. To change the witness or replace several fields, construct
+a new record.
+[Record update in Haskell and Agda](../REFERENCES.md#updating-a-payload-at-its-stored-witness).
 
 ## Sums in constructor fields
 
