@@ -369,9 +369,10 @@ mkIface_ hsc_env
         icomplete_matches = map mkIfaceCompleteMatch complete_matches
         !rdrs = mkIfaceTopEnv rdr_env
 
-    let scoped_roots = mkNameSet (map ifName decls ++ concatMap availNames exports)
-          `unionNameSet` unionNameSets (map freeNamesIfDecl decls ++ map freeNamesIfRule iface_rules)
-    scoped_sum_domains <- ifaceScopedSumDomainRequirement hsc_env type_env scoped_roots
+    let declared = mkNameSet (map ifName decls)
+        roots = unionNameSets (declared : mkNameSet (concatMap availNames exports)
+                              : map freeNamesIfDecl decls ++ map freeNamesIfRule iface_rules)
+    scoped_sum_domains <- ifaceScopedSumDomainRequirement hsc_env type_env declared roots
     fields <- case scoped_sum_domains of
       Just DirectScopedSumDomain -> writeField scopedSumDomainField () emptyExtensibleFields
       Just ComposedScopedSumDomain -> writeField composedScopedSumDomainField () emptyExtensibleFields
@@ -434,8 +435,9 @@ mkIface_ hsc_env
      ifFamInstTcName = ifFamInstFam
 
 -- | Check types and re-exports for the exact generated payload families.
-ifaceScopedSumDomainRequirement :: HscEnv -> TypeEnv -> NameSet -> IO (Maybe ScopedSumDomainRequirement)
-ifaceScopedSumDomainRequirement env local roots =
+ifaceScopedSumDomainRequirement
+  :: HscEnv -> TypeEnv -> NameSet -> NameSet -> IO (Maybe ScopedSumDomainRequirement)
+ifaceScopedSumDomainRequirement env local declared roots =
   go Nothing emptyNameSet (nameSetElemsStable roots)
   where
     go requirement _ [] = pure requirement
@@ -449,12 +451,14 @@ ifaceScopedSumDomainRequirement env local roots =
           let next = extendNameSet seen name
           case thing of
             Just decl ->
-              let declared = case decl of
+              let declaration_requirement = case decl of
                     ATyCon tc -> scopedSumDomainRequirement tc
                     _ -> Nothing
-                  required = max requirement declared
+                  required = max requirement declaration_requirement
               in case required of
                    Just ComposedScopedSumDomain -> pure required
+                   -- The roots include the free names of every emitted declaration.
+                   _ | name `elemNameSet` declared -> go required next rest
                    _ -> go required next (declarationNames decl ++ rest)
             Nothing -> go requirement next rest
 
