@@ -861,7 +861,7 @@ pprApp app
             | otherwise -> go fun' (Right (char '@' <> braces (pprLExpr arg)) : args)
           _                              -> ppr_app fun args
 
-    ppr_type_arg :: XAppTypeE (GhcPass p) -> LHsWcType (GhcPass p) -> SDoc
+    ppr_type_arg :: XAppTypeE (GhcPass p) -> LHsWcType (NoGhcTc (GhcPass p)) -> SDoc
     ppr_type_arg ext arg
       | GhcRn <- ghcPass @p
       , Just (HsAppTypeSource written) <- ext
