@@ -488,6 +488,12 @@ test('NativeRetainedSiblingFields',
                    for f in ['PackedVecLibrary.hs', 'SiblingColumns.hs']])],
      run_command, ['bash NativeRetainedSiblingFields.sh "{compiler}" "{libdir}"'])
 
+test('NativeZipSiblingFields',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/' + f
+                   for f in ['PackedVecLibrary.hs', 'SiblingColumns.hs', 'SiblingColumnsClient.hs']])],
+     run_command, ['bash NativeZipSiblingFields.sh "{compiler}" "{libdir}"'])
+
 test('NativeAlternatingBinders',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['NativeAlternatingBindersProvider.hs', 'NativeAlternatingBindersClient.hs'])],

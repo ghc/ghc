@@ -223,6 +223,8 @@ import qualified DependentPair as Pair
 import qualified DependentProjection as Pair
 import qualified RetainedProjection
 import qualified RetainedCharClient
+import qualified SiblingColumns
+import qualified SiblingColumnsClient
 import qualified QualifiedPiLibrary as Qualified
 import qualified QuantifiedGadtIndex as QuantifiedIndex
 import qualified ReadNatural
@@ -2457,6 +2459,10 @@ listBoundaries = do
         (toList (PackedProjection.payload p))
     RetainedCharClient.observeProjection >>= observe "project each field using a local retained witness"
     RetainedCharClient.observeReplacement >>= observe "replace a vector after checking the stored lengths"
+    let columns = SiblingColumns.Columns (S (S Z))
+            (VCons 'r' (VCons 's' VNil))
+            (VCons True (VCons False VNil))
+    observe "zip two vectors at their shared stored length" (SiblingColumnsClient.readPairs columns)
     observe "project the length of a known dependent package in a type"
         (Refl :: PackedProjection.Length PackedProjection.One :~: 'S 'Z)
     let vector = Retain n (replicateNative n 'x') :: Retained (Vec Char)
