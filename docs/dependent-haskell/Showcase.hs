@@ -2489,6 +2489,12 @@ listBoundaries = do
             , Named.namedLetters = VCons 'x' VNil
             }
     observe "zip two named fields at their stored length" (NamedSiblingColumnsClient.readPairs named)
+    let flagsOnly = Named.NamedColumns
+            { Named.storedLength = S Z
+            , Named.namedFlags = VCons True VNil
+            }
+    observe "read a supplied field when its sibling is omitted"
+        (toList (Named.namedFlags flagsOnly))
     let unpack :: forall len. TypeLambda.Fields '[Vec Char len, Vec Bool len] -> (String, [Bool])
         unpack (TypeLambda.Field xs (TypeLambda.Field ys TypeLambda.End)) = (toList xs, toList ys)
     observe "put two columns in a row indexed by the record length"

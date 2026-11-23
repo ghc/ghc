@@ -155,6 +155,16 @@ HS
     grep -Fq 'MissingWitness.hs:7:9:' rejected.log
     grep -Eq 'NamedColumns.*requires witness field.*storedLength' rejected.log
 
+    cat > OrdinaryStrict.hs <<'HS'
+module OrdinaryStrict where
+
+data Ordinary = Ordinary { strictField :: !Bool, lazyField :: Int }
+
+value :: Ordinary
+value = Ordinary { lazyField = 0 }
+HS
+    reject 'GHC-95909' OrdinaryStrict.hs
+
     cat > ForeignField.hs <<'HS'
 {-# LANGUAGE NoDisambiguateRecordFields, NoExperimentalDependentTypes #-}
 module ForeignField where
