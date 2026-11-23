@@ -153,6 +153,18 @@ definition compiles. Replacing only `WithError e` with
 `(\x -> Either e x)` reports GHC-27185 at the backslash. Job 1679
 checked both spellings on normal 567 and the erased-forall component.
 
+Moving the inner callback to a top-level synonym isolates a second
+issue. With `type Inline e = \x -> Either e x`, the inner helper can
+return `Fields (Map (Inline e) xs)`. At `go row`, GHC-83865 reports
+that this result does not match `Fields (Map (WithError e) xs)` for
+unknown `xs`. Job 1683 checked that using `Inline e` in both signatures
+works, as does a separately written alpha-renamed lambda in the outer
+signature. Agda has definitional function eta. GHC's existing rule
+for shortening a partial synonym checks that the remaining arrow has
+the same kind and matchability.
+[Agda function equality](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html#lambda-expressions)
+and [GHC's partial synonym rule](../../../compiler/GHC/Core/Type.hs).
+
 ## Rows under an erased forall
 
 ```haskell
@@ -227,13 +239,13 @@ GHC-25897 points to the selector in its definition.
 
 ## Earlier interface reader
 
-Normal 566 reads stripped interfaces for the new ordinary fields and
-instances. Its ordinary clients can construct the fields and call the
-row readers. With `UnsaturatedTypeFamilies`, Template Haskell on 566
-can reify and splice the open and associated instance RHSs. It can
-reify the new field selector. Splicing that selector's reified type
-reports GHC-55017 for its private field alias on 566. The current
-converter accepts the same splice.
+Normal 566 and 567 read stripped interfaces for the new fields and
+family instances. Their ordinary clients can construct the fields and
+call the row readers at both `-O0` and `-O2`. With
+`UnsaturatedTypeFamilies`, Template Haskell on both readers can reify
+and splice the open and associated instance right-hand sides. Both can
+also reify the field selector. Splicing its reified type reports
+GHC-55017 for the private field alias. Normal 568 accepts that splice.
 
 ## Matching a lambda argument
 

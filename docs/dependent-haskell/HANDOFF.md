@@ -11,7 +11,30 @@ and its [expected output](Showcase.stdout) are the executable examples.
 Updated 23 November 2026. The development branch is
 `dependent-haskell`. Use the fork command below to find its latest commit.
 
-The current compiler is `687b465aad`. HaskLib exports `lengthTakeSize`,
+The current compiler is `c4d702c7f4`. A record field can use a type
+lambda that captures the record's error type. Family instance equations
+can use a lambda under an arrow. A row reader can capture indices from
+explicitly kinded erased `forall` binders. The field, instance and ranked
+examples work with the provider source hidden.
+
+Job 1670 built both compiler stages. All 568 Showcase observations
+matched at native `-O0`, default `-O2` and in GHCi. The prefix upgrade
+driver checked the wrong comparison pin before invoking either compiler.
+Job 1698 passed the upgrade and cross-version checks on the same binaries
+with the original 566 reader. Job 1694 passed the extended selector
+recompilation regression on the normal compiler. All 234 compatibility
+cases and 137 of 138 focused cases passed. The existing `MTrans`
+diagnostic matched its baseline. Use `review/qualified.pass` for the
+combined results. The original job exited 1.
+[Release evidence](CHECKPOINTS.md#type-lambdas-in-record-fields-and-ranked-row-readers).
+
+R17 remains open for local value signatures and for conversion between
+a named callback and a lambda over an unknown list. The R04 candidate
+checks the owning class of a retained pair's associated-family payload.
+An ordinary client can inspect the tag and leave the payload unevaluated.
+That candidate still needs normal qualification.
+
+The preceding R13 compiler is `687b465aad`. HaskLib exports `lengthTakeSize`,
 a proof that taking a prefix of a list gives the smaller of the bound
 and the list length. Its producer is ordinary Haskell. Job 1650 built
 both compiler stages. All 567 Showcase observations matched at native
@@ -20,13 +43,6 @@ focused cases passed. The existing `MTrans` diagnostic matched its
 baseline. The previous reader needs rewrite
 rules disabled to check the direct zero-prefix equation through a new
 provider interface. [Qualification and reader checks](CHECKPOINTS.md#size-bounded-list-prefixes-in-hasklib).
-
-R17 is the next integration. Its candidate handles type lambdas in
-constructor fields, beneath arrows in family instances, and inside
-explicitly kinded erased `forall` binders. The 566 reader can use a new
-field through an ordinary compiled interface. It reports GHC-55017 when
-Template Haskell splices the reified selector type. The candidate passes
-that round trip. These are component results.
 
 The preceding R18/R19 compiler is `b6ddbb4ce8`. It qualifies R18 local
 type-level definitions, including scope through intervening aliases and
@@ -514,8 +530,8 @@ defaults and an opt-in migration warning.
 
 ## Build and verify
 
-The 567-line Showcase uses the normal two-stage compiler at
-`687b465aad` in `r13-hasklib-prefix-normal-567-20261123`.
+The 568-line Showcase uses the normal two-stage compiler at
+`c4d702c7f4` in `r17-normal-568-20261123`.
 On this host the bootstrap tools are GHC 9.14.1, Cabal 3.18.1.0, Happy 2.1.7
 and Alex 3.5.4.0. A fresh checkout needs the Git submodules at their recorded
 revisions. This build copied the preceding build tree, ran `./boot`
@@ -528,7 +544,7 @@ self-hosted stage 2 compiler in `_build/stage1/bin/ghc`. Both use the
 target libraries in `_build/stage1/lib`. For example, from the main checkout:
 
 ```sh
-stable="$PWD/_build/on-demand/r13-hasklib-prefix-normal-567-20261123/source/_build/stage1"
+stable="$PWD/_build/on-demand/r17-normal-568-20261123/source/_build/stage1"
 queue="$PWD/docs/dependent-haskell/tools/ghc-build-job"
 check="$PWD/docs/dependent-haskell/check-showcase.sh"
 "$queue" showcase-stage2-ghci bash "$check" "$stable/bin/ghc" "$stable/lib" --ghci

@@ -6,6 +6,45 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Type lambdas in record fields and ranked row readers
+
+```haskell
+data CheckedRow e (xs :: [Type]) = CheckedRow
+  { checkedCells :: Fields (Map (\a -> Either e a) xs) }
+```
+
+On normal compiler `c4d702c7f4`, the Showcase reads a successful
+Boolean and a missing count from the same row. The result is
+`(Right True,Left "missing count")`. GHC also checks lambdas under
+arrows in open and associated family instances, and under checked
+erased `forall` binders in a synonym or signature.
+[Row and record definitions](examples/open-evaluation/TypeLambda.hs)
+and [instance example](examples/open-evaluation/SchemaColumns.hs).
+
+Job 1670 built both compiler stages. All 568 observations matched
+at native `-O0`, default `-O2` and in GHCi. All 20 selected registrations
+passed. Ordinary clients on 568, 567 and 566 read stripped interfaces,
+linked and ran at both optimization levels. Template Haskell on all
+three readers reified the record and could splice the family instances
+with `UnsaturatedTypeFamilies`. On 568 it also spliced the reified field
+selector. Versions 566 and 567 reported GHC-55017 at that splice.
+
+The prefix-upgrade check stopped before compilation because the driver
+compared the pinned 566 reader to the 567 build donor. Job 1698 ran the
+upgrade and reader matrix with the intended 566 and 568 binaries. All
+ten outcomes matched the preceding qualification. Job 1694 ran the
+amended `NativeTypeLambda` test on the 568 compiler. Changing the field
+callback recompiled its ordinary client and reported GHC-25897 at the
+selector. [Regression](../../testsuite/tests/dependent/should_run/NativeTypeLambda.sh).
+
+The compatibility suite passed 234 of 234 registrations, including
+three GHCi cases. The focused suite passed 137 of 138. The complete
+`deriving-via-compile` diagnostic for `MTrans` matched its previous
+failure. The seven older polykinds regressions documented under the
+566 checkpoint remain outside these suites. Job 1670 exited 1 for the
+comparison-pin error. The combined record for jobs 1670, 1694 and 1698
+is in `r17-normal-568-20261123/review/qualified.pass`.
+
 ## Size-bounded list prefixes in HaskLib
 
 Compiler `687b465aad` checks the three source equations of the ordinary
