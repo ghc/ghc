@@ -42,7 +42,7 @@ the new kind.
 | Matchability inference | `NativeLaterMatchability` checks one inferred synonym with a data constructor and a type family. The migrated `first-class-families` package exercises a bare promoted constructor in its actual fold. |
 | Spelling, reflection and linear arrows | The fork uses proposal #370's modifier position for the indices from #242. The percent-arrow tests cover both multiplicity and matchability. A TH client can copy the full inferred kind with `reifyType`. |
 | Standalone opt-in | `NativeStandaloneUnsaturation` checks partial application with the umbrella off. The flag implies `TypeFamilies`. An ordinary client can use the exported result. |
-| Built-in type functions | The compiler still excludes built-in closed families from its partial-application check. Applying a user family to every list element and passing built-in addition to the same receiver need separate checks. |
+| Built-in type functions | `NativeUnsaturatedFamily` checks `(+)`, `CmpNat` and `AppendSymbol`, and an ordinary module reads their results through an interface. |
 | Existing unannotated source | Stock GHC accepts the transformer kind synonym in `deriving-via-compile`. The fork requires explicit matchable arrows. The default for these ordinary modules remains open. |
 
 [Proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#proposed-change-specification),
@@ -52,31 +52,34 @@ and [the stock transformer case](#a-transformer-kind-synonym).
 
 ## Passing built-in arithmetic to Map
 
-On public 561 a user-defined closed family can pass built-in arithmetic
-to a higher-order type function. `Map` here takes an unmatchable
-type function and applies it to each element of a type-level list.
-This example uses `UndecidableInstances` for the wrapper equation.
+`Map` takes an unmatchable type function and applies it to each element
+of a type-level list. The callback can be a partially applied built-in
+family.
 
 ```haskell
-type family AddOne (n :: Nat) :: Nat where
-  AddOne n = 1 + n
-
-addProof :: Map AddOne '[2, 3, 4] :~: '[3, 4, 5]
+addProof :: Map ((+) 1) '[2, 3, 4] :~: '[3, 4, 5]
 addProof = Refl
 ```
 
-The same test covers comparison with `CmpNat 3 n` and string prefixes
-with `AppendSymbol "ghc-" s`. Job 1601 compiled all three proofs at
-`-O0` and `-O2` with Core and STG Lint. Replacing the closed families
-with ordinary type synonyms exposed a compiler defect at both levels.
-Core Lint reported an unsaturated `AppendSymbol "ghc-"` in the type
-of the string-list proof.
+The same check covers `CmpNat 3` and `AppendSymbol "ghc-"`, both directly
+and through type synonym wrappers. With an unknown natural `n`, mapping
+`(+) 1` over `'[n]` gives `'[1 + n]`. GHC rewrites the supplied arguments
+by congruence before saturation. At saturation it uses the existing
+rules for reduction and improvement. A partial family in an equation
+pattern or an injectivity claim from its arguments still fails.
 
-Job 1595 also checked direct `Map ((+) 1)`, `Map (CmpNat 3)` and
-`Map (AppendSymbol "ghc-")` on the private standalone-flag compiler
-at `4215377781`. All three produced GHC-27346. The current arity
-check excludes built-in families from partial application. This
-limitation applies even when the built-in has an unmatchable arrow.
+An interface records `partial-builtin-family-v1` when it stores a partial
+built-in in a type or coercion. Job 1605 checked that a separate ordinary
+client can use the result at O0 and O2. The older normal compiler
+reports GHC-47808 when it imports the interface. It reads interfaces
+that contain only saturated built-ins.
+
+Public 561 accepts the closed family wrapper
+`type family AddOne n where AddOne n = 1 + n` with
+`UndecidableInstances`. That release rejects the direct application
+with GHC-27346. Its ordinary synonym wrapper for `AppendSymbol` also
+exposes the partial built-in during Core Lint and fails there.
+[Registered check](../../../testsuite/tests/dependent/should_run/NativeUnsaturatedFamily.sh) ·
 [Arithmetic and arity references](../REFERENCES.md#built-in-arithmetic-as-a-higher-order-argument).
 
 ## Matchability on a source arrow

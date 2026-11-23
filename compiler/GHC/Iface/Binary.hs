@@ -364,6 +364,7 @@ evidenceSuffix requirements
     || needs ScopedLambdaEvidence
     || needs RetainedConstructorContextEvidence
     || needs HomeRuleInterfaceEvidence || needs PartialSynonymEvidence
+    || needs PartialBuiltinFamilyEvidence
     || needs SourceProofRuleEvidence || needs SourceProofRuleAliasEvidence
     || needs SourceProofRuleAxiomEvidence || needs SourceProofRuleInfoEvidence
     || needs SourceProofRuleArgumentsEvidence || needs PolymorphicSourceMethodEvidence
@@ -396,6 +397,7 @@ legacyEvidenceSuffix ScopedOrderedCaseEvidence = featureSetPrefix ++ "scoped-ord
 legacyEvidenceSuffix OrderedRepPolyNewtypeEvidence = featureSetPrefix ++ "ordered-rep-poly-newtype"
 legacyEvidenceSuffix OrderedTypeDataTelescopeEvidence = featureSetPrefix ++ "ordered-type-data-telescope"
 legacyEvidenceSuffix PartialSynonymEvidence = featureSetPrefix ++ "partial-synonym-v2"
+legacyEvidenceSuffix PartialBuiltinFamilyEvidence = featureSetPrefix ++ "partial-builtin-family-v1"
 legacyEvidenceSuffix ErasedUserRuleEvidence = featureSetPrefix ++ "user-rule"
 legacyEvidenceSuffix LexicalPackageRuleEvidence = featureSetPrefix ++ "lexical-rule"
 legacyEvidenceSuffix OrphanErasedUserRuleEvidence = featureSetPrefix ++ "orphan-user-rule"
@@ -510,7 +512,8 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("scoped-ordered-case-v1", ScopedOrderedCaseEvidence)
                       , ("ordered-rep-poly-newtype", OrderedRepPolyNewtypeEvidence)
                       , ("ordered-type-data-telescope", OrderedTypeDataTelescopeEvidence)
-                      , ("named-retained-callback-v1", NamedRetainedCallbackEvidence) ]
+                      , ("named-retained-callback-v1", NamedRetainedCallbackEvidence)
+                      , ("partial-builtin-family-v1", PartialBuiltinFamilyEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion

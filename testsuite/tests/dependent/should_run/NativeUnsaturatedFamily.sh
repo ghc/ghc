@@ -192,16 +192,23 @@ EOF
         fi
     done
 
-    # The extension cannot enable a partial built-in family or make a family
-    # application legal in an instance head.
-    cat >BadArity.hs <<'EOF'
+    # A partial built-in follows the same opt-in rule as other families.
+    cat >BuiltinArity.hs <<'EOF'
 {-# LANGUAGE DataKinds #-}
-module BadArity where
+module BuiltinArity where
 import Data.Proxy
 import GHC.TypeNats (CmpNat)
-bad :: Proxy (CmpNat 1)
-bad = Proxy
+prefix :: Proxy (CmpNat 1)
+prefix = Proxy
 EOF
+    if "${ghc[@]}" -XNoExperimentalDependentTypes -XNoUnsaturatedTypeFamilies -c BuiltinArity.hs >builtin.log 2>&1 ||
+       ! grep -Fq '[GHC-27346]' builtin.log || ! grep -Fq 'UnsaturatedTypeFamilies' builtin.log; then
+        cat builtin.log
+        exit 1
+    fi
+    "${ghc[@]}" -XUnsaturatedTypeFamilies -c BuiltinArity.hs
+
+    # Family applications are still illegal in instance heads.
     cat >BadPattern.hs <<'EOF'
 {-# LANGUAGE DataKinds, FlexibleInstances, TypeApplications #-}
 module BadPattern where
@@ -210,15 +217,40 @@ import NativeUnsaturatedReexport (Select)
 class C (f :: FUN @U 'Many Bool Bool)
 instance C (Select 'True)
 EOF
-    for file in BadArity BadPattern; do
-        if "${ghc[@]}" -XNoExperimentalDependentTypes -c "$file.hs" >bad.log 2>&1 ||
-           ! grep -Fq '[GHC-27346]' bad.log ||
-           grep -Eq 'ExperimentalDependentTypes|UnsaturatedTypeFamilies' bad.log; then
-            cat bad.log
-            exit 1
-        fi
-    done
+    if "${ghc[@]}" -XNoExperimentalDependentTypes -c BadPattern.hs >bad.log 2>&1 ||
+       ! grep -Fq '[GHC-27346]' bad.log ||
+       grep -Eq 'ExperimentalDependentTypes|UnsaturatedTypeFamilies' bad.log; then
+        cat bad.log
+        exit 1
+    fi
 )
+
+cp "$src/NativeBuiltinTypeFunctions.hs" producer/
+cat >client/BuiltinClient.hs <<'EOF'
+{-# LANGUAGE DataKinds, GADTs, TypeOperators #-}
+module BuiltinClient where
+
+import Data.Type.Equality ((:~:)(Refl))
+import NativeBuiltinTypeFunctions (Added, Compared, Prefixed, added, compared, prefixed)
+
+checked :: (Added :~: '[3, 4, 5], Compared :~: '[ 'GT, 'EQ, 'LT ],
+            Prefixed :~: '["ghc-one", "ghc-two"])
+checked = case (added, compared, prefixed) of
+    (Refl, Refl, Refl) -> (Refl, Refl, Refl)
+EOF
+for wrapper in -UWRAPPED -DWRAPPED; do
+    (
+        cd producer
+        "${ghc[@]}" -XNoExperimentalDependentTypes -XUnsaturatedTypeFamilies "$wrapper" \
+            "${stripped[@]}" -fforce-recomp -c NativeBuiltinTypeFunctions.hs
+        cp NativeBuiltinTypeFunctions.hi ../client/
+    )
+    (
+        cd client
+        "${ghc[@]}" -XNoExperimentalDependentTypes -XNoUnsaturatedTypeFamilies \
+            -fforce-recomp -c BuiltinClient.hs
+    )
+done
 
 # A direct partial family needs the extension when the named binder accepts U.
 cat >client/DirectCallback.hs <<'HS'

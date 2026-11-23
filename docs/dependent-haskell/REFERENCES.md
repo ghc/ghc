@@ -6963,8 +6963,9 @@ primitive addition operation to that definition. Its list `map` accepts
 an ordinary function. The corresponding R23 acceptance case applies
 `Map ((+) 1)` to a list of type-level naturals. GHC implements this
 addition as a built-in type family. Under proposal #242, a type family
-can be passed before all its arguments are supplied. On this fork an
-additional check currently admits only user families and type synonyms.
+can be passed before all its arguments are supplied. The fork checks
+the remaining binders for unmatchability, including for built-in families.
+Its built-in reduction rules apply once the family receives all its arguments.
 [Agda built-in natural-number functions](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#natural-numbers),
 [Agda list map](https://agda.github.io/agda-stdlib/v2.3/Data.List.Base.html),
 [GHC type-level literals](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_literals.html),

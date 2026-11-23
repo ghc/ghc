@@ -496,6 +496,9 @@ data IfaceTyConSort = IfaceNormalTyCon          -- ^ a regular tycon
                       -- that is actually being applied to two types
                       -- of the same kind.  This affects pretty-printing
                       -- only: see Note [Equality predicates in IfaceType]
+
+                    | IfacePartialBuiltinFamily
+                      -- ^ A built-in family applied below its arity.
                     deriving (Eq, Ord)
 
 instance Outputable IfaceTyConSort where
@@ -504,6 +507,7 @@ instance Outputable IfaceTyConSort where
   ppr (IfaceSumTyCon n)        = text "sum:" <> ppr n
   ppr IfaceEqualityTyCon       = text "equality"
   ppr IfacePartialSynonym      = text "partial synonym"
+  ppr IfacePartialBuiltinFamily = text "partial built-in family"
 
 {- Note [Free TyVars and CoVars in IfaceType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2785,6 +2789,9 @@ instance Binary IfaceTyConSort where
    put_ bh IfacePartialSynonym          = do
      requireIfaceEvidenceVersion bh PartialSynonymEvidence
      putByte bh 4
+   put_ bh IfacePartialBuiltinFamily    = do
+     requireIfaceEvidenceVersion bh PartialBuiltinFamilyEvidence
+     putByte bh 5
 
    get bh = do
        n <- getByte bh
@@ -2794,6 +2801,7 @@ instance Binary IfaceTyConSort where
          2 -> IfaceSumTyCon <$> get bh
          3 -> return IfaceEqualityTyCon
          4 -> return IfacePartialSynonym
+         5 -> return IfacePartialBuiltinFamily
          _ -> panic "get IfaceTyConSort"
 
 instance Binary IfaceTyConInfo where
@@ -3128,6 +3136,7 @@ data IfaceEvidence
   | OrderedRepPolyNewtypeEvidence
   | OrderedTypeDataTelescopeEvidence
   | NamedRetainedCallbackEvidence
+  | PartialBuiltinFamilyEvidence
   deriving (Bounded, Enum, Eq, Ord)
 
 -- | Requirements of an interface payload. See Note [Versioning retained evidence]
@@ -3437,6 +3446,7 @@ instance NFData IfaceTyConSort where
     IfaceSumTyCon arity -> rnf arity
     IfaceEqualityTyCon -> ()
     IfacePartialSynonym -> ()
+    IfacePartialBuiltinFamily -> ()
 
 instance NFData IfLclName where
   rnf (IfLclName lfs) = rnf lfs

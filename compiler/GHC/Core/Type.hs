@@ -1965,13 +1965,13 @@ coAxNthLHS ax ind =
 isUnsaturatedUserFamily :: TyCon -> [Type] -> Bool
 isUnsaturatedUserFamily tc args
   | TypeSynonymFlavour <- tyConFlavour tc = False
+  | Just _ <- builtInClosedTyFamTyCon_maybe tc = False
   | otherwise = isPartialTypeFunction tc args
 
 -- | A family or type synonym before all of its unmatchable arguments are supplied.
 isPartialTypeFunction :: TyCon -> [Type] -> Bool
 isPartialTypeFunction tc args
   | type_function (tyConFlavour tc)
-  , Nothing <- builtInClosedTyFamTyCon_maybe tc
   , let missing = tyConArity tc - length args
   , missing > 0 =
       unmatchable missing (piResultTys (tyConKind tc) args)
@@ -2000,6 +2000,8 @@ Each Flip xs can pass Flip as a function. The family axiom for Flip
 expects an argument. Until the application reaches its arity, rewrite
 its arguments by congruence and leave its head intact. Only a saturated
 application can be a TyFamLHS or enter the family reduction cache.
+This includes built-in families. Their axioms and solver improvement
+rules receive only saturated applications.
 Data family representation axioms have their own eta-reduced arity.
 
 Check each missing binder in the instantiated kind, including its
@@ -2015,8 +2017,10 @@ a legal partial application obtained from an imported interface.
 The same rule applies to a type synonym before it has enough arguments
 to expand. Its TyConAppCo may carry forward equality of its supplied
 arguments. At saturation mkTyConAppCo expands the synonym as usual.
-The interface marks each partial synonym in a type or coercion. An
-older reader can otherwise treat its supplied arguments as injective.
+The interface marks partial synonyms and built-in families in both
+types and coercions. An older reader can treat a partial synonym's
+supplied arguments as injective, or reject a partial built-in in Core
+Lint after it has read the interface.
 See proposal #242 and the R23 card in docs/dependent-haskell/roadmap.
 -}
 
