@@ -779,6 +779,7 @@ data RnTyKiEnv
     }
 
 data RnTyKiWhat = RnTypeBody
+                | RnTypeCasePat     -- A classified type-case pattern in a quote
                 | RnGadtSuffix      -- The right spine of an ordered GADT signature
                 | RnTopConstraint   -- Top-level context of HsSigWcTypes
                 | RnConstraint      -- All other constraints
@@ -792,6 +793,7 @@ instance Outputable RnTyKiEnv where
 
 instance Outputable RnTyKiWhat where
   ppr RnTypeBody      = text "RnTypeBody"
+  ppr RnTypeCasePat   = text "RnTypeCasePat"
   ppr RnGadtSuffix    = text "RnGadtSuffix"
   ppr RnTopConstraint = text "RnTopConstraint"
   ppr RnConstraint    = text "RnConstraint"
@@ -1214,7 +1216,8 @@ rnHsTyKi env (XHsType (HsTypeCase (case_kw, _) _ scrutinee alts)) = do
     rn_row (pat, rhs) = do
       names <- mapM newLocalBndrRn (extractHsTyRdrTyVars pat)
       bindLocalNamesFV names $ do
-        (pat', pat_fvs) <- rnLHsTyKi env pat
+        -- See Note [Wildcards in quoted type case patterns].
+        (pat', pat_fvs) <- rnLHsTyKi (env { rtke_what = RnTypeCasePat }) pat
         (rhs', rhs_fvs) <- rnLHsTyKi env rhs
         pure ((names, pat', rhs'), pat_fvs `plusFN` rhs_fvs)
 
@@ -1267,6 +1270,18 @@ classifyTypeCasePattern pat = do
       | isRdrTc (unLoc name) || isRdrDataCon (unLoc name)
       = Just (L loc (if isPromoted promotion then pat else XHsType (HsTypeCaseHead name)), [])
     constructorPattern _ = Nothing
+
+{- Note [Wildcards in quoted type case patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An ordinary type case becomes a family equation before renaming its
+pattern. A quotation keeps the case as written. Its pattern can occur
+in a type synonym, where a wildcard in a type expression is illegal.
+
+Classify the pattern first. Rename only that pattern with RnTypeCasePat.
+An anonymous wildcard binds nothing. The branch variables enter scope
+through bindLocalNamesFV. The scrutinee and branch RHS use the original
+context, including its wildcard rules.
+-}
 
 {-
 Note [Strict level checks with ExplicitLevelImports]
@@ -1481,14 +1496,13 @@ checkAnonWildCard env
   = checkWildCard env Nothing mb_bad
   where
     mb_bad :: Maybe BadAnonWildcardContext
-    mb_bad | not (wildCardsAllowed env)
-           = Just WildcardsNotAllowedAtAll
-           | otherwise
-           = case rtke_what env of
-               RnTypeBody      -> Nothing
-               RnGadtSuffix    -> Nothing
-               RnTopConstraint -> Just WildcardNotLastInConstraint
-               RnConstraint    -> Just WildcardNotLastInConstraint
+    mb_bad = case rtke_what env of
+      RnTypeCasePat -> Nothing
+      _ | not (wildCardsAllowed env) -> Just WildcardsNotAllowedAtAll
+      RnTypeBody      -> Nothing
+      RnGadtSuffix    -> Nothing
+      RnTopConstraint -> Just WildcardNotLastInConstraint
+      RnConstraint    -> Just WildcardNotLastInConstraint
 
 checkNamedWildCard :: RnTyKiEnv -> Name -> RnM ()
 -- Report an error if a named wildcard is illegal here
@@ -1502,6 +1516,7 @@ checkNamedWildCard env name
            | otherwise
            = case rtke_what env of
                RnTypeBody      -> Nothing   -- Allowed
+               RnTypeCasePat   -> Just WildcardsNotAllowedAtAll
                RnGadtSuffix    -> Nothing
                RnTopConstraint -> Nothing   -- Allowed; e.g.
                   -- f :: (Eq _a) => _a -> Int
