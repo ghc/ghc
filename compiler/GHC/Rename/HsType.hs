@@ -55,7 +55,6 @@ import GHC.Driver.Flags
 import GHC.Data.List.SetOps (findDupsEq)
 import GHC.Parser.PostProcess (setRdrNameSpace)
 
-import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLet, HsTypeCase, HsTypeCaseAlias, HsTypeCaseHead, HsTypeSome, HsTypeLetProductCheck), HsTypeGhcRnExt(..), HsTypeCaseAlt(..), splitHsTypeLet, typeLetSource)
 import GHC.Hs
 
 import GHC.Rename.Env
