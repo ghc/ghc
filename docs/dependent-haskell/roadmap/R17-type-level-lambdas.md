@@ -36,9 +36,12 @@ arrow, and the module's implicit export list.
 
 A lambda can bind one or more ordinary type variables. An enclosing
 synonym can infer its parameter kinds. The renamer accepts lambdas in
-supported positions in a synonym body or a closed type family equation.
-These include the right-hand-side root, applications, parentheses, kind
-ascriptions, and list and tuple elements. Other positions report GHC-27185.
+synonym bodies and family equation right-hand sides. It descends into
+applications, parentheses, kind ascriptions, list and tuple elements,
+and both operands of an arrow. Constructor fields and top-level value
+signatures can also contain a lambda. The [ranked row example](#rows-under-an-erased-forall)
+shows which quantified binders it can capture. A local value signature
+still reports GHC-27185 at the backslash.
 With the extension disabled, the diagnostic is GHC-27184 at the lambda.
 
 Adjacent lambdas share one family telescope. A lambda nested in an
@@ -200,6 +203,12 @@ GHC still rejects an overlapping instance with a different result.
 [Schema library](../examples/open-evaluation/TypeLambda.hs),
 [instance module](../examples/open-evaluation/SchemaColumns.hs) and
 [GHC open type families](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_families.html#open-type-synonym-families).
+
+A client can also use `checkedCells` with result type
+`Fields '[Either e Bool]`. Changing only the field callback from
+`Either e a` to `Either a e` recompiles the unchanged client.
+GHC-25897 points to the selector in its definition.
+[Recompilation regression](../../../testsuite/tests/dependent/should_run/NativeTypeLambda.sh).
 
 ## Earlier interface reader
 

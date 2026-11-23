@@ -87,13 +87,15 @@ module Ordinary where
 import Data.Kind (Type)
 import Data.Type.Equality ((:~:)(Refl))
 import NativeTypeLambdaScope
-import TypeLambda (Fields(..), L, Captured, Shadowed, WithError, Prefixes, ScopedRow, Mixed, Held, CaseShadow, Rebuild,
+import TypeLambda (CheckedRow(..), Fields(..), L, Captured, Shadowed, WithError, Prefixes, ScopedRow, Mixed, Held, CaseShadow, Rebuild,
                    IndexedTag(..), IndexedCase, IndexedCaseInferred, rankedReader, rankedReaderAt)
 import Data.Proxy (Proxy(..))
 result :: L :~: '[Maybe Int, Either String Int, IO Int]
 result = Refl
 capture :: Captured Ordering :~: '[Either Ordering Bool, Either Ordering Char]
 capture = Refl
+readCells :: CheckedRow e '[Bool] -> Fields '[Either e Bool]
+readCells = checkedCells
 shadowed :: Shadowed Bool 'True :~: '[Either Char (Proxy 'True)]
 shadowed = Refl
 partial :: WithError Char :~: Either String Char
@@ -521,5 +523,17 @@ if "${g[@]}" -v1 --make -no-link Ordinary.hs >changed.log 2>&1 ||
    ! grep -Fq 'Compiling Ordinary' changed.log ||
    ! grep -Eq "^Ordinary[.]hs:$(awk '/^capture = Refl$/ {print NR}' Ordinary.hs):[0-9]+: error: " changed.log; then
     cat changed.log >&2
+    exit 1
+fi
+
+# The record selector exposes a field's hidden family through its interface.
+cp "$src/TypeLambda.hs" TypeLambda.hs
+"${g[@]}" --make -no-link Ordinary.hs
+sed '/{ checkedCells ::/s/Either e a/Either a e/' TypeLambda.hs >changed.hs
+mv changed.hs TypeLambda.hs
+if "${g[@]}" -v1 --make -no-link Ordinary.hs >field-changed.log 2>&1 ||
+   ! grep -Fq 'Compiling Ordinary' field-changed.log ||
+   ! grep -Fq "Ordinary.hs:$(awk '/^readCells = checkedCells$/ {print NR}' Ordinary.hs):13: error: [GHC-25897]" field-changed.log; then
+    cat field-changed.log >&2
     exit 1
 fi
