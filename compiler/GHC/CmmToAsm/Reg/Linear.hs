@@ -311,10 +311,6 @@ process entry_ids block_live =
 
     go [] next_round accum madeProgress
       | not madeProgress
-          {- BUGS: There are so many unreachable blocks in the code the warnings are overwhelming.
-             pprTrace "RegAlloc.Linear.Main.process: no progress made, bailing out."
-                (  text "Unreachable blocks:"
-                $$ vcat (map ppr next_round)) -}
       = return $ reverse accum
 
       | otherwise
@@ -861,12 +857,9 @@ allocateRegsAndSpill reading keep spills alloc (r@(VirtualRegWithFormat vr vrFmt
                    | otherwise -> doSpill WriteMem
                 Nothing | reading   ->
                    pprPanic "allocateRegsAndSpill: Cannot read from uninitialized register" (ppr vr)
-                   -- NOTE: if the input to the NCG contains some
-                   -- unreachable blocks with junk code, this panic
-                   -- might be triggered.  Make sure you only feed
-                   -- sensible code into the NCG.  In GHC.Cmm.Pipeline we
-                   -- call removeUnreachableBlocks at the end for this
-                   -- reason.
+                   -- NOTE: unreachable blocks with junk code could
+                   -- trigger this panic, so sccBlocks in
+                   -- GHC.CmmToAsm.Reg.Liveness discards them (#7574).
 
                         | otherwise -> doSpill WriteNew
 

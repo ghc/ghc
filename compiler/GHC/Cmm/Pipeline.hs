@@ -79,6 +79,8 @@ cpsTop logger platform cfg dus proc =
       -- later passes by removing lots of empty blocks, so we do it
       -- even when optimisation isn't turned on.
       --
+      -- NB: It may leave unreachable blocks behind!
+      -- See Note [Unreachable blocks in the Cmm pipeline]
       CmmProc h l v g <- {-# SCC "cmmCfgOpts(1)" #-}
            return $ cmmCfgOptsProc splitting_proc_points proc
       dump Opt_D_dump_cmm_cfg "Post control-flow optimisations (1)" l g
@@ -173,7 +175,7 @@ cpsTop logger platform cfg dus proc =
                     then map (cmmCfgOptsProc splitting_proc_points) g
                     else g
       g <- return $ map (removeUnreachableBlocksProc platform) g
-           -- See Note [unreachable blocks]
+           -- See Note [Unreachable blocks in the Cmm pipeline]
       dumps Opt_D_dump_cmm_cfg "Post control-flow optimisations (2)" g
 
       return (dus, Left (cafEnv, g))
@@ -351,12 +353,18 @@ _GLOBAL_OFFSET_TABLE_, regardless of which entry point we arrived via.
 
 -}
 
-{- Note [unreachable blocks]
-   ~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Unreachable blocks in the Cmm pipeline]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The control-flow optimiser sometimes leaves unreachable blocks behind
 containing junk code.  These aren't necessarily a problem, but
 removing them is good because it might save time in the native code
 generator later.
+
+Passes in cpsTop must not assume that every block is reachable.  Stack
+layout and sinking drop unreachable blocks as a side effect of
+rebuilding the graph from revPostorder, but both can be skipped.
+removeUnreachableBlocksProc at the end of cpsTop removes those that
+remain, along with their info tables.
 
 To make unreachable blocks visible in -ddump-cmm-* output, add -dppr-debug.
 -}
