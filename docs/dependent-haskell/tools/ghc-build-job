@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 # Submit one build to the shared WSL queue.
 set -euo pipefail
-if (( $# < 2 )); then
-    echo "Usage: ghc-build-job LABEL COMMAND [ARG ...]" >&2
+after=()
+if [[ ${1:-} == --after && ${2:-} =~ ^[0-9]+$ ]]; then
+    after=(--after "$2")
+    shift 2
+fi
+if (( $# < 2 )) || [[ $1 == --after ]]; then
+    echo "Usage: ghc-build-job [--after JOB_ID] LABEL COMMAND [ARG ...]" >&2
     exit 2
 fi
 label=$1
@@ -11,7 +16,7 @@ runtime=/run/user/$(id -u)
 mem=${CAPPED_MEM:-16G}
 peaks=${HEAVY_PEAKS:-"$HOME/.local/state/heavy/peaks"}
 record="$HOME/Code/heavy-management/bin/capped-record"
-exec env -u XDG_RUNTIME_DIR pueue add --print-task-id --escape --group ghc --label "$label" -- \
+exec env -u XDG_RUNTIME_DIR pueue add "${after[@]}" --print-task-id --escape --group ghc --label "$label" -- \
     /usr/bin/env "XDG_RUNTIME_DIR=$runtime" "DBUS_SESSION_BUS_ADDRESS=unix:path=$runtime/bus" \
     "CAPPED_LABEL=$label" "CAPPED_MEM=$mem" "HEAVY_PEAKS=$peaks" \
     /usr/bin/systemd-run --user --scope --quiet --slice=ghcbuild.slice \
