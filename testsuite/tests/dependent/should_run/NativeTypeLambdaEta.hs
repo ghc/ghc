@@ -38,4 +38,20 @@ discardForward = Refl
 reverseMap :: forall tag xs. Proxy xs -> Map (Stamp tag) xs :~: Map (\cell -> Stamp tag cell) xs
 {-# INLINE reverseMap #-}
 reverseMap _ = Refl
+
+partialStage :: forall tag. Proxy tag
+             -> Stage (Stamp tag) :~: Stage (\cell -> Stamp tag cell)
+{-# INLINE partialStage #-}
+partialStage _ = Refl
+
+overRoute :: forall tag flag. Proxy '(tag, flag)
+          -> Route (Stamp tag) flag Bool :~: Route (\cell -> Stamp tag cell) flag Bool
+{-# INLINE overRoute #-}
+overRoute _ = Refl
+
+throughStage :: forall tag. Ticket (Stage (Stamp tag)) -> Int
+throughStage ticket = choose @(Stage (\cell -> Stamp tag cell)) ticket
+
+routed :: Int
+routed = throughStage @Int (Ticket 42)
 #endif
