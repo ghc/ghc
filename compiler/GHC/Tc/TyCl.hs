@@ -1961,10 +1961,10 @@ generaliseTcTyCon (tc, tc_kind, skol_info, scoped_prs, tc_res_kind)
        -- Step 2a: find all the Inferred variables we want to quantify over
        ; let arg_kinds = map tyVarKind spec_req_tvs
        ; dvs1 <- candidateQTyVarsOfKinds (tc_res_kind : arg_kinds)
-       ; liberal <- xoptM LangExt.LiberalTypeSynonyms
+       ; generalise_callbacks <- generaliseSynonymCallbackArrows
        ; let dvs2 = dvs1 `delCandidates` spec_req_tvs
              callback_indices
-               | liberal, TypeSynonymFlavour <- tyConFlavour tc
+               | generalise_callbacks, TypeSynonymFlavour <- tyConFlavour tc
                = [tv | tv <- tyCoVarsOfTypesList arg_kinds
                      , tv `elemVarSet` candidateKindVars dvs2
                      , tyVarKind tv `eqType` matchabilityTy
@@ -2691,17 +2691,25 @@ synonym solver still handles RHS metadata separately. An arrow whose
 shape is already known needs no variable. Rechecking the RHS uses the
 inferred kind, including the selected matchability.
 
-With LiberalTypeSynonyms, `type Apply f = f ()` can accept either a
-constructor or a partial synonym that becomes saturated after expansion.
-Keep unresolved matchability indices in its inferred argument kinds.
+When ExperimentalDependentTypes enables unsaturation, `type Apply f a = f a`
+can accept either a constructor or a type family. Proposal #242 generalises
+an unresolved matchability in an inferred higher-order argument kind.
+LiberalTypeSynonyms already does this for calls that become saturated after
+expansion. Preserve that behavior when unsaturation is disabled.
+Use the same flag check when collecting defaults and generalising binders.
 These indices have the closed kind Matchability, independent of
 PolyKinds. Quantify them before the other inferred kind variables.
 At a use site, kind-check the argument against the instantiated kind.
-When a synonym without LiberalTypeSynonyms applies this scheme to a
-callback, use the existing default for an unresolved argument index.
-The ordinary validity check still rejects a partial synonym that
-survives expansion.
+Keep the existing M default when both flags are off. Written kind
+signatures and TypeLevel defaults keep their own rules.
 -}
+
+-- | Enable inference of a synonym's higher-order argument matchability.
+generaliseSynonymCallbackArrows :: TcM Bool
+generaliseSynonymCallbackArrows = do
+  experimental <- xoptM LangExt.ExperimentalDependentTypes
+  liberal <- xoptM LangExt.LiberalTypeSynonyms
+  pure (experimental || liberal)
 
 ------------------------------------------------------------------------
 kcLTyClDecl :: Bool -> LTyClDecl GhcRn -> TcM (Maybe (Name, SynonymMetadata))
@@ -2716,11 +2724,12 @@ kcLTyClDecl collect_metadata (L loc decl)
          case decl of
            SynDecl{tcdRhs = rhs} | collect_metadata -> tcExtendNameTyVarEnv (tcTyConScopedTyVars tycon) $ do
              outer_owner <- tcl_kind_arrow_defaults <$> getLclEnv
-             liberal <- xoptM LangExt.LiberalTypeSynonyms
+             generalise_callbacks <- generaliseSynonymCallbackArrows
              -- See Note [Callback arrows in inferred synonym kinds]
              let callback_arrow = fmap (\(defaults, _) level -> do
                    ma <- newFlexiTyVar matchabilityTy
-                   unless (liberal && level == KindLevel) $ updTcRef defaults ((ma, level) :)
+                   unless (generalise_callbacks && level == KindLevel) $
+                     updTcRef defaults ((ma, level) :)
                    pure (mkTyVarTy ma)) outer_owner
              inferSynonymMatchabilities $ do
                ref <- newTcRef []
@@ -2729,7 +2738,7 @@ kcLTyClDecl collect_metadata (L loc decl)
                      owner <- tcl_kind_arrow_defaults <$> getLclEnv
                      forM_ (zip callbacks indices) $ \(callback, ma) -> do
                        let (default_owner, level)
-                             | callback && not liberal = (outer_owner, KindLevel)
+                             | callback && not generalise_callbacks = (outer_owner, KindLevel)
                              | otherwise = (owner, TypeLevel)
                        forM_ default_owner $ \(defaults, _) -> updTcRef defaults ((ma, level) :)
                      let vars = mkTyVarTys indices
