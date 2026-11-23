@@ -55,6 +55,16 @@ annotation still fixes the matchability at that position.
 [Ordinary client](../examples/open-evaluation/LiberalCallback.hs)
 and [proposal #242 on higher-order arguments](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#higher-order-arguments).
 
+With `ExperimentalDependentTypes`, an unsigned `type Apply f a = f a`
+also generalizes the matchability of its callback. One declaration can
+use `Apply Maybe Bool` and `Apply (ListOf 'True) Bool`. An ordinary client
+can import `Apply` and use it with an exported alias for the partial
+family. A written callback kind keeps its matchability. With both
+extensions off, an inferred callback arrow still defaults to M.
+[Provider](../examples/open-evaluation/LaterMatchability.hs) ·
+[Ordinary client](../examples/open-evaluation/LaterMatchabilityClient.hs) ·
+[Regression](../../../testsuite/tests/dependent/should_run/NativeLaterMatchability.sh).
+
 An installed library compiled with fixed matchable parameters needs a
 rebuild to admit the partial synonym. A home build checks the provider
 and recompiles clients if its exported kind changes. A warm build

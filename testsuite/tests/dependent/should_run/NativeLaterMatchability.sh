@@ -14,12 +14,13 @@ cp "$src/"{AnchorReceiver,PromotedEndo}.hs provider/
 (cd provider && "${ghc[@]}" -c AnchorReceiver.hs)
 cp provider/{AnchorReceiver,PromotedEndo}.hi "$src/LaterMatchability.hs" client/
 cd client
-"${ghc[@]}" -c LaterMatchability.hs
+"${ghc[@]}" -XNoLiberalTypeSynonyms -c LaterMatchability.hs
 "${ghc[@]}" -fprint-explicit-kinds -dppr-cols=250 --show-iface LaterMatchability.hi >client.iface
 grep -Eq 'Receiver @.*Matchable .*Select @.*Matchable ' client.iface
 grep -Eq 'Receiver @.*Unmatchable .*Select @.*Unmatchable ' client.iface
 grep -Eq 'type DefaultPrefix = AnchorReceiver.Select @.*Unmatchable ' client.iface
 grep -Eq 'type FamilyBox :: forall \{.*:: .*Matchability\}' client.iface
+grep -Eq 'type Apply :: forall \{.*:: .*Matchability\}' client.iface
 
 # An ordinary client checks the result using only interfaces.
 rm LaterMatchability.hs
@@ -31,14 +32,55 @@ cat >Main.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes #-}
 module Main where
 
-import LaterMatchabilityClient (barePromotedEndo, flippedCallbacks, inferredEndo, rankedMap)
+import LaterMatchabilityClient (appliedSynonym, barePromotedEndo, flippedCallbacks, inferredEndo, rankedMap)
 
 main :: IO ()
-main = print (rankedMap, flippedCallbacks, inferredEndo, barePromotedEndo)
+main = print (rankedMap, flippedCallbacks, inferredEndo, barePromotedEndo, appliedSynonym)
 HS
 "${ghc[@]}" -c Main.hs
 "${ghc[@]}" Main.o LaterMatchabilityClient.o ../provider/{AnchorReceiver,LaterMatchability,PromotedEndo}.o -o ranked-map
-test "$(./ranked-map)" = '((Just True,[False]),(Just False,[True]),(True,Refl),Refl)'
+test "$(./ranked-map)" = '((Just True,[False]),(Just False,[True]),(True,Refl),Refl,(Just True,[False]))'
+
+cat >SynonymChoice.hs <<'HS'
+{-# LANGUAGE CPP, KindSignatures, Modifiers, NoLiberalTypeSynonyms, PolyKinds #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+#if defined(EXTENSION_OFF) || defined(ORDINARY)
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+#else
+{-# LANGUAGE ExperimentalDependentTypes #-}
+#endif
+module SynonymChoice where
+
+import Data.Kind (Type)
+import GHC.Matchability (U)
+import LaterMatchability (KnownListCallback)
+
+#if defined(EXTENSION_OFF) || defined(ORDINARY)
+type Apply f a = f a
+#elif defined(SIGNED_M)
+type Apply :: (Type -> Type) -> Type -> Type
+type Apply f a = f a
+#else
+type Apply (f :: Type %U -> Type) a = f a
+#endif
+
+#if defined(ORDINARY) || defined(SIGNED_U)
+type Use = Apply Maybe Bool
+#else
+type Use = Apply KnownListCallback Bool
+#endif
+HS
+"${ghc[@]}" -DORDINARY -c SynonymChoice.hs
+"${ghc[@]}" -fprint-explicit-kinds -dppr-cols=250 --show-iface SynonymChoice.hi >ordinary-synonym.iface
+grep -Eq 'type Apply :: forall .* -> @\(.*\.Matchable\)' ordinary-synonym.iface
+for which in EXTENSION_OFF SIGNED_M SIGNED_U; do
+    if "${ghc[@]}" -fforce-recomp -D"$which" -c SynonymChoice.hs >synonym-choice.log 2>&1 ||
+       ! grep -Fq '[GHC-83865]' synonym-choice.log ||
+       ! grep -Fq 'In the first argument of' synonym-choice.log; then
+        cat synonym-choice.log >&2
+        exit 1
+    fi
+done
 
 cat >BareEndo.hs <<'HS'
 {-# LANGUAGE CPP, DataKinds, GADTs, Modifiers, NoExperimentalDependentTypes,

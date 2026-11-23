@@ -73,6 +73,13 @@ type ListCallback enabled = ListOf enabled
 type KnownListCallback :: Type %U -> Type
 type KnownListCallback = ListCallback 'True
 
+-- | Apply a constructor or family at its inferred matchability.
+type Apply f a = f a
+
+-- | Use both matchabilities of the synonym in one declaration.
+applyLocally :: (Apply Maybe Bool, Apply (ListOf 'True) Bool)
+applyLocally = (Just True, [False])
+
 -- | Apply an unmatchable callback at Bool.
 type family ApplyBool (f :: Type %U -> Type) where
   ApplyBool f = f Bool

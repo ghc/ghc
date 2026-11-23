@@ -4,6 +4,7 @@
 module LaterMatchabilityClient
   ( laterMatchability, forwardedMap, annotatedMap, nestedCallback, appliedCallback
   , boxedCallbacks, rankedMap, flippedCallbacks, computedDictionary, inferredEndo, barePromotedEndo
+  , appliedSynonym
   ) where
 
 import Data.Kind (Type)
@@ -11,7 +12,7 @@ import Data.Proxy (Proxy(Proxy))
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Matchability (U)
 import PromotedEndo (Endo(Endo), Eval, Exp, Pure1, UnEndo)
-import LaterMatchability (AtBool, CallbackResult(CallbackResult), ForwardMap,
+import LaterMatchability (Apply, AtBool, CallbackResult(CallbackResult), ForwardMap, applyLocally,
                            computedTag, FamilyBox(FamilyBox), FlippedMatch, FlippedUnmatch, ForwardBox, KnownListCallback, ListBox,
                            ListCallback, ListRecipe, MatchResult, Recipe(Recipe), UnmatchResult)
 
@@ -82,3 +83,7 @@ inferredEndo = (callable, Refl)
 -- | Pass the promoted constructor itself to a higher-order function.
 barePromotedEndo :: Eval (UnEndo (Eval (Pure1 'Endo Echo)) 'True) :~: 'True
 barePromotedEndo = Refl
+
+-- | Read both results using the imported higher-order synonym.
+appliedSynonym :: (Apply Maybe Bool, Apply KnownListCallback Bool)
+appliedSynonym = applyLocally
