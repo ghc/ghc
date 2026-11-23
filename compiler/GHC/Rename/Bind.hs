@@ -693,16 +693,6 @@ depAnalBinds binds_w_dus
 -- | The erased names, retained names, and written kinds scoped over a definition.
 type ScopedSignatureBinders = ([Name], [(VisArity, [Name])], LocalSignatureKinds)
 
--- | Scope kinds only while the corresponding signature binds the variables.
-withWrittenSignatureKinds :: LocalSignatureKinds -> RnM a -> RnM a
-withWrittenSignatureKinds [] action = action
-withWrittenSignatureKinds kinds action = do
-  scoped <- xoptM LangExt.ScopedTypeVariables
-  if scoped
-    then updGblEnv (\env -> env { tcg_rn_local_lambdas =
-          (\(scope, lift_sig) -> (scope ++ kinds, lift_sig)) <$> tcg_rn_local_lambdas env }) action
-    else action
-
 -- | Find erased and invisible retained names that scope over a definition.
 -- See Note [Invisible retained definitions].
 mkScopedSigBndrs :: [LSig GhcRn] -> Name -> ScopedSignatureBinders
@@ -714,18 +704,10 @@ mkScopedSigBndrs sigs = \n -> lookupNameEnv env n `orElse` ([], [], [])
       = Just (names, (hsScopedTvs sig_ty, [], []))
     get_scoped (L _ (TypeSig _ _ names sig_ty@HsWC{hswc_body = sig}))
       = let scoped = hsWcScopedTvs sig_ty
-        in Just (names, (scoped, after_context (hsSigWcType sig_ty), written scoped sig))
+        in Just (names, (scoped, after_context (hsSigWcType sig_ty), signatureWrittenKinds scoped sig))
     get_scoped (L _ (PatSynSig _ names sig_ty))
       = Just (names, (hsScopedTvs sig_ty, [], []))
     get_scoped _ = Nothing
-
-    written scoped (L _ HsSig{sig_bndrs = HsOuterExplicit{hso_bndrs = binders}}) =
-      [(v, writtenKind kind) | L _ HsTvb{tvb_var = HsBndrVar _ v, tvb_kind = kind} <- binders
-                            , unLoc v `elem` scoped]
-    written _ _ = []
-
-    writtenKind (HsBndrKind _ kind) = Just kind
-    writtenKind _ = Nothing
 
     after_context ty
       | L _ (HsQualTy _ _ body) <- ignoreParens ty = after_context body

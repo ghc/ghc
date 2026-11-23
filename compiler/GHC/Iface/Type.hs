@@ -2253,7 +2253,9 @@ stripLiftedTypeOwner prefix occurrence = do
 pprLiftedTypeLambdaSite :: String -> Maybe SDoc
 pprLiftedTypeLambdaSite occurrence
   | Just value <- stripLiftedTypeOwner "$signature-lambda:" owner
-  = Just (text "type lambda in the signature for" <+> quotes (text value))
+  = Just $ if value == "$expression"
+           then text "type lambda in an expression annotation"
+           else text "type lambda in the signature for" <+> quotes (text value)
   | Just constructor <- stripLiftedTypeOwner "$field-lambda:" owner
   = Just (text "type lambda in a field of" <+> quotes (text constructor))
   | Just family <- stripLiftedTypeOwner "R:$callback:" owner

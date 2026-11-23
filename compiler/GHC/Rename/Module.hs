@@ -2143,8 +2143,11 @@ body so that the signature checker can check the actual capture kinds.
 See Note [Checking local lambda captures] in GHC.Tc.Gen.HsType.
 
 Emit the helpers in the current declaration group, using the same
-accumulator as signature splices. The local signature hook runs only
-during ordinary compilation. It does not execute or copy splices.
+accumulator as signature splices. Expression annotations use the same
+scope and accumulator. An annotation's explicit forall can supply kind
+information to an annotation inside its expression. The generated owner
+label denotes the annotation in diagnostics. Only the ordinary compiler
+path can lift these signatures. It does not execute or copy splices.
 -}
 
 -- | Lift a local type lambda after its lexical scope has entered the renamer.
@@ -2154,8 +2157,12 @@ rnLocalSignatureLambdas
   -> TcRef Int -> LocalSignatureKinds -> HsDocContext -> LHsSigWcType GhcPs
   -> RnM (LHsSigWcType GhcRn, FreeNames)
 rnLocalSignatureLambdas sigma named_wildcards fix_env generated local_lambdas kinds
-  doc@(TypeSigCtx names@(_:_)) ty@HsWC{hswc_body = L _ HsSig{sig_bndrs = outer, sig_body = body}}
-  | hasLambda body && copyable ty && no_named_hole
+  doc ty@HsWC{hswc_body = L sig_loc HsSig{sig_bndrs = outer, sig_body = body}}
+  | let names = case doc of
+          TypeSigCtx binders -> binders
+          ExprWithTySigCtx -> [L (l2l sig_loc) (mkRdrUnqual (mkVarOcc "$expression"))]
+          _ -> []
+  , not (null names), hasLambda body && copyable ty && no_named_hole
   = do
       local <- getLocalRdrEnv
       ordinal <- readTcRef local_lambdas
@@ -2187,6 +2194,7 @@ rnLocalSignatureLambdas sigma named_wildcards fix_env generated local_lambdas ki
           updTcRef local_lambdas (+ 1)
           restoreEnvs envs (rnHsSigWcType doc result)
         _ -> rnHsSigWcType doc ty
+  | otherwise = rnHsSigWcType doc ty
   where
     occurrences = extractHsTyRdrTyVars body
     no_named_hole = not named_wildcards ||
@@ -2196,7 +2204,6 @@ rnLocalSignatureLambdas sigma named_wildcards fix_env generated local_lambdas ki
     hasLambda node
       | Just (L _ (XHsType HsTypeLambda{})) <- cast node :: Maybe (LHsType GhcPs) = True
       | otherwise = or (gmapQ hasLambda node)
-rnLocalSignatureLambdas _ _ _ _ _ _ doc ty = rnHsSigWcType doc ty
 
 -- | Bind the visible captures in their original dependency order.
 localSignatureCaptures :: LocalRdrEnv -> [RdrName] -> LocalSignatureKinds

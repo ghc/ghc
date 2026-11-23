@@ -516,7 +516,7 @@ outer = witness where
 HS
 if "${g[@]}" -c Signature.hs >context.log 2>&1 ||
    ! grep -Eq '^Signature[.]hs:5:38: error: \[GHC-27185\]' context.log ||
-   ! grep -Fq 'A local value signature can use a type lambda during ordinary compilation' context.log; then
+   ! grep -Fq 'A local signature can use a type lambda during ordinary compilation' context.log; then
     cat context.log >&2
     exit 1
 fi

@@ -582,8 +582,10 @@ rnExpr (RecordUpd { rupd_expr = L l expr, rupd_flds = rbinds })
 
 
 rnExpr (ExprWithTySig _ expr pty)
-  = do  { (pty', fvTy)    <- rnHsSigWcType ExprWithTySigCtx pty
-        ; (expr', fvExpr) <- bindSigTyVarsFV (hsWcScopedTvs pty') $
+  = do  { (pty', fvTy) <- rnScopedHsSigWcType ExprWithTySigCtx pty
+        ; let scoped = hsWcScopedTvs pty'
+        ; (expr', fvExpr) <- bindSigTyVarsFV scoped $
+                             withWrittenSignatureKinds (signatureWrittenKinds scoped (hswc_body pty')) $
                              rnLExpr expr
         ; return (ExprWithTySig noExtField expr' pty', fvExpr `plusFN` fvTy) }
 

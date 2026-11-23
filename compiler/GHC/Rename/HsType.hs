@@ -15,6 +15,7 @@ module GHC.Rename.HsType (
         rnLHsKind, rnLHsTypeArgs,
         rnHsSigType, rnHsWcType, rnHsTypeApp, rnHsModifiedFunArrWith,
         HsPatSigTypeScoping(..), rnHsSigWcType, rnLocalHsSigWcType,
+        rnScopedHsSigWcType, signatureWrittenKinds, withWrittenSignatureKinds,
         rnHsPatSigType, rnHsPatSigKind,
         newTyVarNameRn,
         rnHsConDeclRecFields,
@@ -156,11 +157,37 @@ rnLocalHsSigWcType :: NameSet -> HsDocContext -> LHsSigWcType GhcPs
 rnLocalHsSigWcType bound_names doc ty@(HsWC { hswc_body = sig_ty })
   = do { free_vars <- filterInScopeM (extract_lhs_sig_ty sig_ty)
        ; rnWithRetainedAliases bound_names RetainedPartialSignature free_vars sig_ty $
-           do { level <- getThLevel
-              ; lift_lambdas <- tcg_rn_local_lambdas <$> getGblEnv
-              ; case (level, lift_lambdas) of
-                  (Comp, Just (scope, lift_sig)) -> lift_sig scope doc ty
-                  _ -> rnHsSigWcType doc ty } }
+           rnScopedHsSigWcType doc ty }
+
+-- | Use the local type-lambda lifter in the current declaration group.
+rnScopedHsSigWcType :: HsDocContext -> LHsSigWcType GhcPs
+                    -> RnM (LHsSigWcType GhcRn, FreeNames)
+rnScopedHsSigWcType doc ty = do
+  level <- getThLevel
+  lift_lambdas <- tcg_rn_local_lambdas <$> getGblEnv
+  case (level, lift_lambdas) of
+    (Comp, Just (scope, lift_sig)) -> lift_sig scope doc ty
+    _ -> rnHsSigWcType doc ty
+
+-- | Get the optional written kinds of explicitly scoped erased binders.
+signatureWrittenKinds :: [Name] -> LHsSigType GhcRn -> LocalSignatureKinds
+signatureWrittenKinds scoped (L _ HsSig{sig_bndrs = HsOuterExplicit{hso_bndrs = binders}}) =
+  [(v, writtenKind kind) | L _ HsTvb{tvb_var = HsBndrVar _ v, tvb_kind = kind} <- binders
+                        , unLoc v `elem` scoped]
+  where
+    writtenKind (HsBndrKind _ kind) = Just kind
+    writtenKind _ = Nothing
+signatureWrittenKinds _ _ = []
+
+-- | Scope kinds only while the corresponding signature binds the variables.
+withWrittenSignatureKinds :: LocalSignatureKinds -> RnM a -> RnM a
+withWrittenSignatureKinds [] action = action
+withWrittenSignatureKinds kinds action = do
+  scoped <- xoptM LangExt.ScopedTypeVariables
+  if scoped
+    then updGblEnv (\env -> env { tcg_rn_local_lambdas =
+          (\(scope, lift_sig) -> (scope ++ kinds, lift_sig)) <$> tcg_rn_local_lambdas env }) action
+    else action
 
 -- | Rename a visible type argument with aliases for lexical runtime indices.
 -- See Note [Runtime indices in visible type arguments].
