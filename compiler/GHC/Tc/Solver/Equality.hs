@@ -891,6 +891,9 @@ The same check can compare a forwarding lambda with its named family.
 Build nominal congruence only when every argument already has a proof.
 Use the same family head on both sides, whether the family is open or
 closed. Ordinary matching and apartness still select its equations.
+Family arity controls reduction. Nominal congruence also applies with
+arguments beyond the arity, or when both applications form valid
+partial user families. Core Lint checks the same partial-kind invariant.
 Compare the arguments before testing reflexivity of a family application.
 This visits the arguments of nested family applications once. Use
 reflexivity for an argument whose types already agree. Leave a wholly
@@ -910,7 +913,9 @@ proveLambdaCongruence = prove False
       , Just (tc', bs) <- splitTyConApp_maybe rhs
       , tc == tc'
       , isOpenTypeFamilyTyCon tc || isJust (closedFamilyTyConCoAxiom_maybe tc)
-      , lengthIs as (tyConArity tc), equalLength as bs
+      , equalLength as bs
+      , as `lengthAtLeast` tyConArity tc
+        || (isUnsaturatedUserFamily tc as && isUnsaturatedUserFamily tc bs)
       = do cos <- zipWithM (prove True) as bs
            if all isReflCo cos
              then mkNomReflCo lhs <$ guard allow_refl
