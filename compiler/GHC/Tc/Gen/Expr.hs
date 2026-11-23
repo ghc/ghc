@@ -76,7 +76,7 @@ import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep (Type(DepFunTy, ExistsTy, ForAllTy, TermVarTy, TyConApp))
 import GHC.Core.Coercion
-import GHC.Core.Predicate( decomposeIPPred, mkNomEqPred )
+import GHC.Core.Predicate( decomposeIPPred, getEqPredTys_maybe, mkNomEqPred )
 
 import GHC.Types.Basic
 import GHC.Types.Unique.FM
@@ -2971,25 +2971,59 @@ expandRetainedWitnessUpd :: DataCon -> Id -> [Type -> Type] -> FieldLabel -> [Fi
                          -> LHsExpr GhcRn -> [Name]
                          -> TcM (HsExpr GhcRn, TcType, HsCtxt)
 expandRetainedWitnessUpd con witness payload_types witness_field payload_fields witness_bind supplied record_expr updated = do
-    let (missing, payloads) = partitionWith lookup_payload payload_fields
-        lookup_payload field = case lookupNameEnv supplied (flSelector field) of
-          Just binding -> Right (hfbRHS (unLoc binding))
-          Nothing -> Left (flLabel field)
+    let fields = [(field, lookupNameEnv supplied (flSelector field)) | field <- payload_fields]
+        missing = [flLabel field | (field, Nothing) <- fields]
+        payload_value (_, Just binding) = hfbRHS (unLoc binding)
+        payload_value (field, Nothing) = wrapGenSpan (genHsApps (flSelector field) [record_expr])
+        payload_pat name (_, Just _) = genVarPat name
+        payload_pat name (_, Nothing) = wrapGenSpan (LazyPat noExtField (genVarPat name))
         con_name = dataConName con
+        written = hfbRHS (unLoc witness_bind)
         witness_label = flLabel witness_field
         result_ty = mkTyConTy (dataConTyCon con)
-    unless (null missing) $
-      setSrcSpanA (getLoc (hfbLHS (unLoc witness_bind))) $
-        failWithTc (TcRnRetainedQuantificationError
-          (RetainedRecordUpdateWitness con_name witness_label missing))
-    names <- mapM (newSysName . nameOccName . flSelector) (witness_field : payload_fields)
-    let old_pat = genSimpleConPat con_name (map (const genWildPat) names)
+    witness_value <- if null missing then pure written else do
+      reusable <- checkRetainedRecordWitness (idType witness) witness_field record_expr written
+      case reusable of
+        Just value -> pure value
+        Nothing -> setSrcSpanA (getLoc (hfbLHS (unLoc witness_bind))) $
+          failWithTc (TcRnRetainedQuantificationError
+            (RetainedRecordUpdateWitness con_name witness_label missing))
+    witness_name <- newSysName (nameOccName (flSelector witness_field))
+    names <- mapM (newSysName . nameOccName . flSelector) payload_fields
+    let old_pat = genSimpleConPat con_name (replicate (1 + length names) genWildPat)
         signature = mkVisFunTyManyU result_ty $
           mkDepFunTy witness (mkVisFunTysManyU [ty (TermVarTy witness) | ty <- payload_types] result_ty)
-        arguments = record_expr : hfbRHS (unLoc witness_bind) : payloads
-    expanded <- genRetainedRecordUpd signature (old_pat : map genVarPat names)
-                  (genHsApps con_name (map genLHsVar names)) arguments
+        arguments = record_expr : witness_value : map payload_value fields
+        patterns = old_pat : genVarPat witness_name : zipWith payload_pat names fields
+    expanded <- genRetainedRecordUpd signature patterns
+                  (genHsApps con_name (map genLHsVar (witness_name : names))) arguments
     pure (expanded, result_ty, RecordUpdCtxt (RealDataCon con NE.:| []) updated [])
+
+-- | Check a written witness projection before reusing an omitted payload.
+-- See Note [Replacing a retained record witness].
+checkRetainedRecordWitness :: TcType -> FieldLabel -> LHsExpr GhcRn -> LHsExpr GhcRn
+                           -> TcM (Maybe (LHsExpr GhcRn))
+checkRetainedRecordWitness domain field record_expr written
+  | HsVar{} <- unLoc (stripParensLHsExpr record_expr)
+  , HsApp _ selector _ <- unLoc (stripParensLHsExpr written)
+  , XExpr (HsRecSelRn occurrence) <- unLoc (stripParensLHsExpr selector)
+  , let field_name = flSelector field
+  , unLoc (foLabel occurrence) == field_name
+  = tryTcDiscardingErrs (pure Nothing) $ runMaybeT $ do
+      let old = wrapGenSpan (genHsApps field_name [record_expr])
+      (old_core, _) <- liftMaybeT (tcRetainedArg domain old)
+      (new_core, value) <- liftMaybeT (tcRetainedArg domain written)
+      old_index <- MaybeT (pure (Core.retainedArgIndex old_core))
+      new_index <- MaybeT (pure (Core.retainedArgIndex new_core))
+      givens <- liftMaybeT getNativeGivens
+      let matches given
+            | Just (Nominal, left, right) <- getEqPredTys_maybe (varType given)
+            = (left `tcEqType` old_index && right `tcEqType` new_index) ||
+              (right `tcEqType` old_index && left `tcEqType` new_index)
+            | otherwise = False
+      guard (old_index `tcEqType` new_index || any matches givens)
+      pure value
+  | otherwise = pure Nothing
 
 -- | Apply a generated updater with its checked retained signature.
 genRetainedRecordUpd :: TcType -> [LPat GhcRn] -> HsExpr GhcRn -> [LHsExpr GhcRn]
@@ -3022,10 +3056,9 @@ Note [Replacing a retained record witness] for updates of the witness.
 
 {- Note [Replacing a retained record witness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When the update writes the witness, require a replacement for every
-payload. The old payload types use the old witness. No evidence relates
-the old witness to the new one. For a record with two payloads, generate
-the following function and apply it to the receiver and replacements:
+When the update writes the witness, check each payload at the new
+witness. For a record with two payloads, generate the following function
+and apply it to the receiver and replacements:
 
   update :: NamedColumns -> foreach (n :: Nat)
          -> Vec Char n -> Vec Bool n -> NamedColumns
@@ -3037,6 +3070,16 @@ at the new witness. The old constructor pattern demands the receiver
 but keeps its fields lazy. The replacement patterns follow ordinary
 argument demand, including Strict. Keep the arguments unrestricted, as
 in the ordinary record update path.
+
+An omitted payload can use its old projection when the new witness is
+the resolved witness selector and the two elaborated indices agree. A
+scoped nominal Given can also establish this equality. The retained
+argument checker validates the selector's source table. Pass the actual
+written witness to the reconstruction. Check each old payload projection
+at its new type through ordinary argument checking. Use a lazy pattern
+for an omitted field, including under Strict. Restrict the receiver to
+a variable so the old projections share the original record. If this
+check cannot reuse the old fields, report them at the written witness.
 -}
 
 

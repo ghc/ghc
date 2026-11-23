@@ -4938,7 +4938,11 @@ tcRetainedArg domain arg
            ; return (Core.App (Core.Lam binder core_body) core_arg,
                      L loc (HsLam x LamSingle matches'), arg') }
     resolve_app env expected later fun arg
-      = do { (core_fun, fun') <- case retainedSourceHead fun of
+      -- See Note [Record selectors in retained operands].
+      = do { let source_head = case unLoc fun of
+                   XExpr (HsRecSelRn field) -> Just (unLoc (foLabel field), [])
+                   _ -> retainedSourceHead fun
+           ; (core_fun, fun') <- case source_head of
                Just (n, written) -> do
                      certified <- if isExternalName n
                        then tcLookupIdMaybe n >>= maybe (pure Nothing) tcLookupSourceTableId
@@ -4946,8 +4950,9 @@ tcRetainedArg domain arg
                      case certified of
                        Just v -> do { core <- instantiate_source v written (arg : later)
                                     ; pure (core, fun) }
-                       _ -> setSrcSpanA (getLoc fun) $
-                              failWithTc (TcRnRetainedQuantificationError (RetainedUncheckedSourceCall n))
+                       _ -> setSrcSpanA (getLoc fun) $ case unLoc fun of
+                              XExpr (HsRecSelRn{}) -> unsupported
+                              _ -> failWithTc (TcRnRetainedQuantificationError (RetainedUncheckedSourceCall n))
                Nothing -> resolve_with_args env expected (arg : later) fun
            ; (app, arg') <- apply env core_fun arg
            ; return (app, fun', arg') }
@@ -5081,6 +5086,15 @@ check that match and read its result. An ordinary metavariable cannot stand
 for a type containing a runtime index. The existing immutable instantiation
 path handles those types. The operand check still validates each field and
 its usage. A bare local variable retains its lexical conversion evidence.
+-}
+
+{- Note [Record selectors in retained operands]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The renamer uses HsRecSelRn for a record selector. A selector application
+must look up the resolved selector's own checked source table, just like
+a named function call. This also records any rewrite-rule dependencies.
+Keep the written selector for the ordinary argument check. If it has no
+source table, report an unsupported retained expression at the selector.
 -}
 
 {- Note [Erased arguments of certified source operands]

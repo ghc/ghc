@@ -21,10 +21,17 @@ for opt in -O0 -O2; do
 import Control.Exception (ErrorCall, evaluate, try)
 import Data.Char (toUpper)
 import NamedSiblingColumns
-import PackedVecLibrary (Nat(..), Vec(..), natToInt, toList, zipVec)
+import qualified NamedSiblingColumns as Named
+import PackedVecLibrary (Nat(..), Vec(..), natToInt, previous, replicateNative, toList, zipVec)
 
 readPairs :: NamedColumns -> [(Char, Bool)]
 readPairs p = toList (zipVec (namedLetters p) (namedFlags p))
+
+fillFromWitness :: NamedColumns -> [Char]
+fillFromWitness p = toList (replicateNative (Named.storedLength p) '-')
+
+fillFromPrevious :: NamedColumns -> [Char]
+fillFromPrevious p = toList (replicateNative (previous (storedLength p)) '-')
 
 readOnlyFlags :: NamedColumns -> [Bool]
 readOnlyFlags NamedColumns{namedFlags = xs} = toList xs
@@ -44,6 +51,13 @@ updateOnlyDemanded :: NamedColumns -> NamedColumns
 updateOnlyDemanded p = p { namedLetters = undefined
                          , namedFlags = mapVector not (namedFlags p) }
 
+writeSameWitness :: NamedColumns -> NamedColumns
+writeSameWitness p = p { Named.storedLength = Named.storedLength p
+                       , namedFlags = mapVector not (namedFlags p) }
+
+writeOnlyWitness :: NamedColumns -> NamedColumns
+writeOnlyWitness p = p { storedLength = (storedLength (p)) }
+
 omitFlags :: NamedColumns -> NamedColumns
 omitFlags p = p { namedFlags = undefined }
 
@@ -56,6 +70,8 @@ main = do
                          , storedLength = S Z
                          , namedLetters = VCons 'r' VNil }
     print (readPairs p)
+    let unusedPayloads = NamedColumns (S (S Z)) undefined undefined
+    print (fillFromWitness unusedPayloads, fillFromPrevious unusedPayloads)
     print (natToInt ((NamedColumns Z undefined undefined).storedLength))
     print (readOnlyFlags (NamedColumns { namedFlags = VCons True VNil
                                        , storedLength = S Z
@@ -68,6 +84,12 @@ main = do
     let both = updateBoth p
     print (natToInt (storedLength both), readPairs both)
     print (readOnlyFlags (updateOnlyDemanded p))
+    let same = writeSameWitness p
+    print (natToInt (storedLength same), readPairs same)
+    print (readPairs (writeOnlyWitness p))
+    let lazyLength :: Nat
+        lazyLength = undefined
+    print (writeOnlyWitness (NamedColumns lazyLength undefined undefined) `seq` True)
     let empty = emptyRecord p
     print (natToInt (storedLength empty), readPairs empty)
     let noOldPayloads = emptyRecord (NamedColumns (S Z) undefined undefined)
@@ -78,23 +100,32 @@ HS
     "${ghc[@]}" "$opt" -c Main.hs
     "${ghc[@]}" Main.o ../provider/{PackedVecLibrary,NamedSiblingColumns}.o -o observe
     timeout 15 ./observe > actual
-    printf '%s\n' "[('r',True)]" "0" '[True]' "(1,[('r',False)])" '[False]' '"r"' \
-        "(1,[('R',False)])" '[False]' '(0,[])' '[]' 'True' | cmp - actual
+    printf '%s\n' "[('r',True)]" '("--","-")' "0" '[True]' "(1,[('r',False)])" '[False]' '"r"' \
+        "(1,[('R',False)])" '[False]' "(1,[('r',False)])" "[('r',True)]" 'True' \
+        '(0,[])' '[]' 'True' | cmp - actual
 
     cat > ProjectionType.hs <<'HS'
-{-# LANGUAGE ExperimentalDependentTypes #-}
+{-# LANGUAGE ExperimentalDependentTypes, GADTs, TypeOperators #-}
 module ProjectionType where
+import Data.Type.Equality ((:~:)(Refl))
 import NamedSiblingColumns
-import PackedVecLibrary (Nat, Vec)
+import PackedVecLibrary (Nat, Vec, replicateNative)
 
 checked :: foreach (p :: NamedColumns) -> Vec Char (storedLength p)
 checked p = namedLetters p
+
+fillAtWitness :: foreach (p :: NamedColumns) -> Vec Char (storedLength p)
+fillAtWitness p = replicateNative (storedLength p) '-'
 
 replaceFlags :: foreach (p :: NamedColumns) -> Vec Bool (storedLength p) -> NamedColumns
 replaceFlags p flags = p { namedFlags = flags }
 
 replaceAll :: NamedColumns -> foreach (n :: Nat) -> Vec Char n -> Vec Bool n -> NamedColumns
 replaceAll p n letters flags = p { storedLength = n, namedLetters = letters, namedFlags = flags }
+
+updateWithProof :: foreach (p :: NamedColumns) (q :: NamedColumns)
+                -> (storedLength p :~: storedLength q) -> NamedColumns
+updateWithProof p q Refl = p { storedLength = storedLength q, namedFlags = namedFlags q }
 HS
     "${ghc[@]}" "$opt" -c ProjectionType.hs
 
@@ -129,6 +160,52 @@ HS
             exit 1
         fi
     }
+
+    cat > OrdinarySelectorOperand.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module OrdinarySelectorOperand where
+import PackedVecLibrary (Nat, replicateNative, toList)
+
+data Plain = Plain { counted :: Nat }
+
+fill :: Plain -> [Char]
+fill p = toList (replicateNative (counted p) '-')
+HS
+    reject 'GHC-83605' OrdinarySelectorOperand.hs
+    grep -Fq 'GHC cannot use this expression as a retained index' rejected.log
+
+    cat > ShadowSelectorOperand.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module ShadowSelectorOperand where
+import NamedSiblingColumns (NamedColumns)
+import PackedVecLibrary (Nat(..), replicateNative, toList)
+
+fill :: NamedColumns -> [Char]
+fill p = let storedLength _ = Z in toList (replicateNative (storedLength p) '-')
+HS
+    reject 'GHC-83605' ShadowSelectorOperand.hs
+    grep -Fq 'No checked source equations' rejected.log
+
+    cat > PreviousRule.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+{-# OPTIONS_GHC -Wno-orphans -Wno-inline-rule-shadowing #-}
+module PreviousRule where
+import PackedVecLibrary (Nat(..), previous)
+{-# RULES "previous/reset" forall n. previous n = Z #-}
+HS
+    "${ghc[@]}" "$opt" -fenable-rewrite-rules -fno-omit-interface-pragmas -c PreviousRule.hs
+    cat > RuleSelectorOperand.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module RuleSelectorOperand where
+import NamedSiblingColumns
+import PackedVecLibrary (previous, replicateNative, toList)
+import PreviousRule ()
+
+fill :: NamedColumns -> [Char]
+fill p = toList (replicateNative (previous (storedLength p)) '-')
+HS
+    reject 'GHC-83605' -fenable-rewrite-rules -fno-ignore-interface-pragmas RuleSelectorOperand.hs
+    grep -Eq 'A rewrite rule can change the result of.*previous' rejected.log
 
     cat > MissingPayloads.hs <<'HS'
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
@@ -273,6 +350,33 @@ HS
         grep -Fq 'NamedColumns'
     grep -Eq 'requires replacement for field .*namedLetters' rejected.log
 
+    cat > OtherWitness.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module OtherWitness where
+import NamedSiblingColumns
+
+wrong :: NamedColumns -> NamedColumns -> NamedColumns
+wrong p q =
+  p { storedLength = storedLength q, namedFlags = namedFlags q }
+HS
+    reject 'GHC-83605' OtherWitness.hs
+    grep -Fq 'OtherWitness.hs:7:7:' rejected.log
+    grep -Eq 'requires replacement for field .*namedLetters' rejected.log
+
+    cat > ShadowWitness.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module ShadowWitness where
+import NamedSiblingColumns
+import PackedVecLibrary (Nat(..), Vec(..))
+
+wrong :: NamedColumns -> NamedColumns
+wrong p =
+  let storedLength _ = Z
+  in p { storedLength = storedLength p, namedFlags = VNil }
+HS
+    reject 'GHC-83605' ShadowWitness.hs
+    grep -Eq 'requires replacement for field .*namedLetters' rejected.log
+
     cat > WrongNewPayload.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes #-}
 module WrongNewPayload where
@@ -297,6 +401,9 @@ import PackedVecLibrary (Nat(..), Vec(..))
 clear :: NamedColumns -> NamedColumns
 clear p = p { storedLength = Z, namedLetters = undefined, namedFlags = VNil }
 
+writeWitness :: NamedColumns -> NamedColumns
+writeWitness p = p { storedLength = storedLength p }
+
 data Ordinary = Ordinary { field :: ~Bool }
 update :: Ordinary -> Ordinary
 update p = p { field = undefined }
@@ -310,11 +417,15 @@ main :: IO ()
 main = do
     checkDemand (clear (NamedColumns Z VNil VNil))
     checkDemand (update (Ordinary False))
+    checkDemand (writeWitness (NamedColumns Z undefined undefined))
+    let missingLength :: Nat
+        ~missingLength = undefined
+    checkDemand (writeWitness (NamedColumns missingLength undefined undefined))
 HS
     "${ghc[@]}" "$opt" -c StrictUpdate.hs
     "${ghc[@]}" StrictUpdate.o ../provider/{PackedVecLibrary,NamedSiblingColumns}.o -o strict-update
     timeout 15 ./strict-update > actual
-    printf '%s\n' 'True' 'True' | cmp - actual
+    printf '%s\n' 'True' 'True' 'False' 'True' | cmp - actual
 
     cat > BadPayloadUpdate.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes #-}
