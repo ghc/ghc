@@ -562,7 +562,7 @@ tcTyClGroup open_indices (TyClGroup { group_tyclds = tyclds
               ; kisig_env <- mkNameEnv <$> traverse check_kisig kisigs
               ; tcTyClDecls open_indices tyclds kisig_env role_annots }
        ; let tyclss = map fst tyclss_with_validity_infos
-             selectors = caseSelectorOwners tyclss_with_validity_infos
+             cases = caseHelperOwners tyclss_with_validity_infos
 
            -- Step 2: Perform the validity check on those types/classes
            -- We can do this now because we are done with the recursive knot
@@ -589,11 +589,11 @@ tcTyClGroup open_indices (TyClGroup { group_tyclds = tyclds
                            VI{vi_loc = loc, vi_pats = pats, vi_rhs = rhs} ->
                              setSrcSpan loc $ checkValidTyFamEqn tycls pats rhs
                            NoVI -> pure ()
-                       ; setXOptM LangExt.UndecidableInstances (checkValidTyCl emptyNameSet tycls) }
-               else checkValidTyCl (mkNameSet [helper | (owner, helper) <- selectors
-                                                        , owner == tyConName tycls]) tycls }
+                       ; setXOptM LangExt.UndecidableInstances (checkValidTyCl emptyNameEnv tycls) }
+               else checkValidTyCl (mkNameEnv [(helper, rows) | (owner, helper, rows) <- cases
+                                                             , owner == tyConName tycls]) tycls }
 
-       ; setXOptM LangExt.UndecidableInstances (mapM_ (checkValidTyCl emptyNameSet) decision_helpers)
+       ; setXOptM LangExt.UndecidableInstances (mapM_ (checkValidTyCl emptyNameEnv) decision_helpers)
        ; let tyclss_and_helpers = tyclss ++ decision_helpers
        ; traceTc "Done validity check" (ppr tyclss)
        ; mapM_ (recoverM (return ()) . checkValidRoleAnnots role_annots) tyclss
@@ -4501,27 +4501,34 @@ group when both the actual arguments and every branch result contain
 only constructor types, variables and literals. The result kind must
 also be constructor-headed, so a later argument cannot apply a
 returned function. This call selects a row and reuses parts of its
-arguments. It introduces no family call. A variable in function
-position could introduce a family call, so it is outside this check.
+arguments. It introduces no family call.
 
-Keep ordinary termination checking when a branch contains a call.
-Checking that call against the helper's patterns cannot prove it
-decreases relative to the source equation. The helper can have more
-arguments than that equation.
+For a direct recursive result, specialize the original LHS and all
+the helper arguments to each case pattern. Use those arguments to
+instantiate the checked branch. Then compare its recursive call
+with the specialized source LHS. For example, refining the LHS of
+`F ('S n) = case n of { S _ -> F ('S n); ... }` gives another `S`
+in the LHS. The call must receive that same refinement through the
+captured `n`. Its size stays equal to the LHS.
+
+Use a source LHS variable of closed kind as the scrutinee. Match
+a flat promoted constructor pattern or a variable pattern. Keep
+the check on the generated equation too. Both comparisons use the
+normal Paterson checks. See 'refineCaseCall' in GHC.Tc.Validity.
 -}
 
--- | Identify the source owner and private Name of each checked selector.
+-- | Collect original checked case rows by source owner and private Name.
 -- See Note [Termination of lifted case selectors].
-caseSelectorOwners :: [(TyCon, [TyFamEqnValidityInfo])] -> [(Name, Name)]
-caseSelectorOwners declarations =
-  [ (owner, tyConName helper)
+caseHelperOwners :: [(TyCon, [TyFamEqnValidityInfo])]
+                 -> [(Name, Name, [TyFamEqnValidityInfo])]
+caseHelperOwners declarations =
+  [ (owner, tyConName helper, rows)
   | (helper, rows) <- declarations
-  , Just (owner, column) : rest <- [map selectorRow rows]
+  , Just (owner, column) : rest <- [map caseRow rows]
   , all (== Just (owner, column)) rest ]
   where
-    selectorRow VI{vi_case_pattern = Just (owner, column, _, _), vi_rhs = rhs}
-      | isConstructorCaseType rhs = Just (owner, column)
-    selectorRow _ = Nothing
+    caseRow VI{vi_case_pattern = Just (owner, column, _, _)} = Just (owner, column)
+    caseRow _ = Nothing
 
 -- | Keep the owner of an elaborated retained signature case.
 -- See Note [Equality of ordered retained case trees] in GHC.Builtin.CoercionRules.
@@ -6387,7 +6394,7 @@ Validity checking is done once the mutually-recursive knot has been
 tied, so we can look at things freely.
 -}
 
-checkValidTyCl :: NameSet -> TyCon -> TcM [TyCon]
+checkValidTyCl :: NameEnv [TyFamEqnValidityInfo] -> TyCon -> TcM [TyCon]
 -- The returned list is either a singleton (if valid)
 -- or a list of "fake tycons" (if not); the fake tycons
 -- include any implicits, like promoted data constructors
@@ -6524,9 +6531,9 @@ are validity checking, so they need to be in the environment.
 -}
 
 checkValidTyCon :: TyCon -> TcM ()
-checkValidTyCon = checkValidTyConWithSelectors emptyNameSet
+checkValidTyCon = checkValidTyConWithSelectors emptyNameEnv
 
-checkValidTyConWithSelectors :: NameSet -> TyCon -> TcM ()
+checkValidTyConWithSelectors :: NameEnv [TyFamEqnValidityInfo] -> TyCon -> TcM ()
 checkValidTyConWithSelectors selectors tc
   | isPrimTyCon tc   -- Happens when Haddock'ing GHC.Prim
   = return ()

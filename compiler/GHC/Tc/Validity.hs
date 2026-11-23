@@ -13,7 +13,6 @@ module GHC.Tc.Validity (
   checkValidCoAxiom, checkValidCoAxBranch,
   checkFamPatBinders, checkTyFamEqnValidityInfo, typeCasePatternView,
   checkValidTyFamEqn, checkValidAssocTyFamDeflt, checkConsistentFamInst,
-  isConstructorCaseType,
   checkTyConTelescope,
   ) where
 
@@ -50,7 +49,7 @@ import GHC.Builtin.Modules( gHC_CLASSES )
 import GHC.Builtin.Uniques  ( mkAlphaTyVarUnique )
 
 import GHC.Core.Type
-import GHC.Core.Unify ( typesAreApart, tcMatchTyX_BM, BindFlag(..) )
+import GHC.Core.Unify ( typesAreApart, tcMatchTyKis, tcMatchTyX_BM, BindFlag(..) )
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Class
@@ -76,8 +75,8 @@ import GHC.Types.Basic   ( TypeOrKind(..), UnboxedTupleOrSum(..)
 import GHC.Types.Id (isNaughtyRecordSelector)
 import GHC.Types.FieldLabel (flSelector)
 import GHC.Types.Name
+import GHC.Types.Name.Env
 import GHC.Types.Name.Reader (unLocWithUserRdr)
-import GHC.Types.Name.Set
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Var     ( Id, ExistsTyFlag(ImplicitExists), VarBndr(..)
@@ -3025,7 +3024,7 @@ GHC.Tc.Validity) that does not expand type synonyms.
 ************************************************************************
 -}
 
-checkValidCoAxiom :: NameSet -> CoAxiom Branched -> TcM ()
+checkValidCoAxiom :: NameEnv [TyFamEqnValidityInfo] -> CoAxiom Branched -> TcM ()
 checkValidCoAxiom selectors ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
   = do { mapM_ (checkCoAxBranchWithSelectors selectors fam_tc) branch_list
        ; foldlM_ check_branch_compat [] branch_list }
@@ -3087,9 +3086,9 @@ checkValidCoAxiom selectors ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_branches = br
 -- (It's separate because it expects 'TyFamEqnValidityInfo', which comes from a
 -- separate place e.g. for associated type defaults.)
 checkValidCoAxBranch :: TyCon -> CoAxBranch -> TcM ()
-checkValidCoAxBranch = checkCoAxBranchWithSelectors emptyNameSet
+checkValidCoAxBranch = checkCoAxBranchWithSelectors emptyNameEnv
 
-checkCoAxBranchWithSelectors :: NameSet -> TyCon -> CoAxBranch -> TcM ()
+checkCoAxBranchWithSelectors :: NameEnv [TyFamEqnValidityInfo] -> TyCon -> CoAxBranch -> TcM ()
 checkCoAxBranchWithSelectors selectors fam_tc
                              (CoAxBranch { cab_lhs = typats
                                          , cab_rhs = rhs, cab_loc = loc })
@@ -3108,9 +3107,9 @@ checkValidTyFamEqn :: TyCon    -- ^ of the type family
                    -> [Type]   -- ^ Type patterns
                    -> Type     -- ^ Rhs
                    -> TcM ()
-checkValidTyFamEqn = checkTyFamEqnWithSelectors emptyNameSet
+checkValidTyFamEqn = checkTyFamEqnWithSelectors emptyNameEnv
 
-checkTyFamEqnWithSelectors :: NameSet -> TyCon -> [Type] -> Type -> TcM ()
+checkTyFamEqnWithSelectors :: NameEnv [TyFamEqnValidityInfo] -> TyCon -> [Type] -> Type -> TcM ()
 checkTyFamEqnWithSelectors selectors fam_tc typats rhs
   = do { checkValidTypePats (const (pure ())) fam_tc typats
        ; case tyConFlavour fam_tc of
@@ -3254,7 +3253,7 @@ checkValidAssocTyFamDeflt fam_tc pats =
                           $ AssocDefaultDuplicateTyVars d)
         dups
 
-checkFamInstRhs :: NameSet                 -- generated case selectors
+checkFamInstRhs :: NameEnv [TyFamEqnValidityInfo] -- original rows of generated cases
                 -> TyCon -> [Type]         -- LHS
                 -> [(TyCon, [Type])]       -- type family calls in RHS
                 -> [TcRnMessage]
@@ -3267,25 +3266,37 @@ checkFamInstRhs :: NameSet                 -- generated case selectors
 --          - mentions no type variable more often than the lhs, and
 --          - does not contain any further type family applications
 checkFamInstRhs selectors lhs_tc lhs_tys famInsts
-  = mapMaybe check famInsts
+  = concatMap check famInsts
   where
    lhs_size = pSizeTypes lhs_tys
    check (tc, tys)
       | not (isStuckTypeFamily tc)                                   -- (TF1)
       , Just pc_failure <- pSizeTypes tys `ltPatersonSize` lhs_size  -- (TF2)
-      , not (case_selector tc tys)
-      , not (forwards_payload pc_failure tc tys)
-      = Just $ TcRnPatersonCondFailure pc_failure InTyFamEquation (TyConApp lhs_tc lhs_tys) (TyConApp tc tys)
+      = case case_calls tc tys of
+          Just errors -> errors
+          Nothing | forwards_payload pc_failure tc tys -> []
+          Nothing -> [TcRnPatersonCondFailure pc_failure InTyFamEquation
+                        (TyConApp lhs_tc lhs_tys) (TyConApp tc tys)]
       | otherwise
-      = Nothing
+      = []
 
    -- See Note [Termination of lifted case selectors] in GHC.Tc.TyCl.
-   case_selector tc tys
-      | tyConName tc `elemNameSet` selectors
-      , tyConArity tc == length tys
-      , kind@TyConApp{} <- coreFullView (typeKind (mkTyConApp tc tys))
-      = all isConstructorCaseType (kind : tys)
-      | otherwise = False
+   case_calls tc tys = do
+      rows <- lookupNameEnv selectors (tyConName tc)
+      guard (tyConArity tc == length tys)
+      kind@TyConApp{} <- pure (coreFullView (typeKind (mkTyConApp tc tys)))
+      guard (all isConstructorCaseType (kind : tys))
+      if all constructor_row rows
+        then pure []
+        else do
+          guard (all isConstructorCaseType lhs_tys)
+          refined <- traverse (refineCaseCall lhs_tc lhs_tys tys) rows
+          pure (concatMap check_branch refined)
+
+   constructor_row VI{vi_rhs = rhs} = isConstructorCaseType rhs
+   constructor_row _ = False
+
+   check_branch (lhs, rhs) = checkFamInstRhs emptyNameEnv lhs_tc lhs (tcTyFamInsts rhs)
 
    forwards_payload PCF_Size tc tys
       | Just (root, True) <- closedFamilyScope_maybe lhs_tc
@@ -3311,6 +3322,43 @@ checkFamInstRhs selectors lhs_tc lhs_tys famInsts
             calls = nonDetEltsUniqSet (tyConsOfTypes rhs)
         in cannot_return (extendTyConSet seen tc) (calls ++ rest)
       | otherwise = False
+
+-- | Substitute a selected constructor into the original family LHS and
+-- all actual case arguments. Match the original checked branch against
+-- those arguments to recover the branch field and capture substitutions.
+-- See Note [Termination of lifted case selectors] in GHC.Tc.TyCl.
+refineCaseCall :: TyCon -> [Type] -> [Type] -> TyFamEqnValidityInfo -> Maybe ([Type], Type)
+refineCaseCall owner lhs args VI{vi_pats = pats, vi_rhs = rhs,
+                                 vi_case_pattern = Just (_, column, shape, pat)} = do
+  actual : _ <- pure (drop column args)
+  scrutinee <- getTyVar_maybe actual
+  let scope = tyCoVarsOfTypes (pat : lhs ++ args)
+      scrutinee_kind = varType scrutinee
+  guard (scrutinee `elemVarSet` tyCoVarsOfTypes lhs)
+  guard (isEmptyVarSet (tyCoVarsOfType scrutinee_kind)
+         && scrutinee_kind `eqType` typeKind pat)
+  guard (allVarSet (not . elemVarSet scrutinee . tyCoVarsOfType . varType) scope)
+  let initial = mkEmptySubst (mkInScopeSet scope)
+  refine <- case (shape, coreFullView pat) of
+    (CasePatternField, TyVarTy _) -> pure initial
+    (CasePatternConstructor{}, TyConApp tc fields)
+      | isPromotedDataCon tc, all isTyVarTy fields ->
+          pure (extendTvSubst initial scrutinee pat)
+    _ -> Nothing
+  let lhs' = substTys refine lhs
+      args' = substTys refine args
+  matched <- tcMatchTyKis pats args'
+  guard (eqTypes (substTys matched pats) args')
+  let rhs' = substTyUnchecked matched rhs
+  guard (tyCoVarsOfType rhs' `subVarSet` tyCoVarsOfTypes lhs')
+  guard (isConstructorCaseType rhs' || direct_call rhs')
+  pure (lhs', rhs')
+  where
+    direct_call ty
+      | TyConApp callee actuals <- coreFullView ty =
+          callee == owner && length actuals == tyConArity owner
+      | otherwise = False
+refineCaseCall _ _ _ _ = Nothing
 
 -- | A case selector permits only constructor types, variables and literals.
 -- In particular, an application of a captured variable can call a family.

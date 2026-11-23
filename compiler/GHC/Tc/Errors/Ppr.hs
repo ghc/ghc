@@ -8450,6 +8450,11 @@ pprPatersonCondFailure  (PCF_TyFam tc) InInstanceDecl lhs _rhs =
   hang (text "Illegal use of type family" <+> quotes (ppr tc))
     2 (text "in the constraint" <+> quotes (ppr lhs))
 pprPatersonCondFailure  (PCF_TyFam tc) InTyFamEquation _lhs rhs
+  | Just owner <- liftedTypeOwner "$case:" (tyConName tc)
+  , TyConApp outer _ <- rhs
+  , Just owner == liftedTypeOwner "$case:" (tyConName outer)
+  = hang (text "One type case supplies an argument to another")
+      2 (text "in" <+> quotes (text owner))
   | Just _ <- liftedTypeOwner "$lambda:" (tyConName tc)
   , not ("-sigma" `isSuffixOf` occNameString (getOccName tc))
   = text "An argument to a type family contains a type lambda."
