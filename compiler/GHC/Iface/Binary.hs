@@ -375,7 +375,8 @@ evidenceSuffix requirements
     || needs OrderedNewtypeTelescopeEvidence || needs ScopedOrderedCaseEvidence
     || needs OrderedRepPolyNewtypeEvidence || needs OrderedTypeDataTelescopeEvidence
     || needs NamedRetainedCallbackEvidence || needs ScopedSumDomainEvidence
-    || needs ComposedScopedSumDomainEvidence || needs RetainedSiblingFieldsEvidence = feature_set
+    || needs ComposedScopedSumDomainEvidence || needs RetainedSiblingFieldsEvidence
+    || needs RetainedNamedRecordEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -445,6 +446,7 @@ legacyEvidenceSuffix GeneralIndexedConstructorOperandEvidence = featureSetPrefix
 legacyEvidenceSuffix ScopedSumDomainEvidence = featureSetPrefix ++ "scoped-sum-domain-v1"
 legacyEvidenceSuffix ComposedScopedSumDomainEvidence = featureSetPrefix ++ "scoped-sum-domain-v2"
 legacyEvidenceSuffix RetainedSiblingFieldsEvidence = featureSetPrefix ++ "retained-sibling-fields-v1"
+legacyEvidenceSuffix RetainedNamedRecordEvidence = featureSetPrefix ++ "retained-named-record-v1"
 legacyEvidenceSuffix NamedRetainedCallbackEvidence = featureSetPrefix ++ "named-retained-callback-v1"
 legacyEvidenceSuffix DepFunCoEvidence           = "-retained-depfunco-v1"
 legacyEvidenceSuffix ConstructorCaseEvidence   = "-retained-constructor-case-v1"
@@ -522,7 +524,8 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("partial-builtin-family-v1", PartialBuiltinFamilyEvidence)
                       , ("scoped-sum-domain-v1", ScopedSumDomainEvidence)
                       , ("scoped-sum-domain-v2", ComposedScopedSumDomainEvidence)
-                      , ("retained-sibling-fields-v1", RetainedSiblingFieldsEvidence) ]
+                      , ("retained-sibling-fields-v1", RetainedSiblingFieldsEvidence)
+                      , ("retained-named-record-v1", RetainedNamedRecordEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion

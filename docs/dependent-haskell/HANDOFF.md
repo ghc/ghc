@@ -8,6 +8,65 @@ and its [expected output](Showcase.stdout) are the executable examples.
 
 ## Current checkpoint
 
+Both stages built from `db2586fdc2`. All 585 Showcase observations
+matched at native `-O0`, default `-O2` and in GHCi. An ordinary client
+can change a record's stored length and supply both dependent vectors.
+[Working example](CHECKPOINTS.md#change-the-length-of-a-dependent-record).
+
+Job 1997 passed all 18 selected registrations and four warm upgrade checks.
+The focused suite passed 137 of 138, including `NativeDependentCoreRun`.
+The remaining failure was the existing `MTrans` diagnostic. The package
+and compatibility runners encountered output from the previous compiler.
+Jobs 2011 and 2016 ran them on the same binary with fresh output.
+The package, its three downstream clients and all 234 compatibility cases
+passed. Under `_build/on-demand`, run
+`r04-r05-r17-repaired-qualification-20261123/verify-publication.py`
+to check the original results and both replays.
+
+## Next compiler work
+
+Read [PLFH-NOTES.md](../../PLFH-NOTES.md) on resuming work and after each
+compiler batch. Reply with the compiler revision and the result of running
+the PLFH author's example.
+
+The next private assembly lives in `r04-r16-r17-post-585-20261123`.
+It combines simultaneous payload updates, equality for a lambda that
+forwards to a named family, and R16 constructor apartness.
+
+| Area | Verified result and next step |
+| --- | --- |
+| R04 | Jobs 2002 and 2015 checked simultaneous payload updates and updates under a nominal witness equality. Job 2021 checked generated witness selectors in retained operands. |
+| R17 | Jobs 1992 and 1993 verified exact family forwarding. Job 2012 checked source spelling in visible-argument diagnostics. The nested splice typechecking context is under review. |
+| R16 proof validity | Independent count expressions can produce `Zero` and bottom under stock fusion. Both shared counts produced `Zero`. The private Specialise repair leaves that distinction observable. In job 1957, rebuilding HaskLib with private `4c4cc16244` recorded the `map` dependency on the composed proof. The optimized client then reported GHC-83605 at the call to `lengthMapZip`. The same diagnostic occurred with a producer that simply constructs one cell. The old installed interface still reached Core Lint. The consumer-side policy remains open. |
+| R23 matchability | The private prototype `99bfde4ec4` passed the original transformer test and 32 Template Haskell reification cases. An old installed provider still needs rebuilding. The published compiler retains the existing matchability policy. |
+
+For R16, job 1995 compared the same HaskLib source built with two
+compilers. Its original assertion missed a GHC-83605 at the closed
+`Refl` pattern. The [16-case comparison](roadmap/R16-open-term-evaluator.md#proof-dependencies-in-the-rebuilt-hasklib-interface)
+records the diagnostics and runtime results. Job 1996 verified the
+separate constructor comparison at `7f56212d49`. The four disjoint
+local and imported rules allowed the proof. All four matching rules
+still blocked it. Job 1999 passed the extended maintained regression.
+
+The GHC queue has two slots. Other benchmark jobs take priority and freeze
+the GHC slice. Jobs 1947 and 1949 were exploratory allocation measurements.
+Both pilot harnesses are retired. Their prompts, draft code and measurements
+are archived for reference under `_build/reference-only`. Active performance
+work needs independently written benchmarks. OpenCode reviews stopped on 24 November 2026. The coordinator and the
+two compiler owners handle implementation, review and testing.
+
+The previous 577 compiler was `893d2ebc06`. Its qualified records are
+in `r04-r16-r17-normal-after-574-20261123/published-qualification.tsv`.
+The 581 compiler, the omitted-field component and the first display
+component now require rebuilding for a binary replay. Their Git sources,
+logs and results remain available. The exact three generated trees are in
+`retirement-four-finished-warm-trees-20261123/sizes.tsv`.
+The 585 qualification reuses the previous 584 build tree.
+
+## Previous checkpoints
+
+### The 578 compiler
+
 Compiler `1efc4bcaf2` passed all 578 Showcase observations in native
 `-O0`, default `-O2` and GHCi. A spliced declaration can capture the
 error type in a row schema. HaskLib can infer both element types of
@@ -37,62 +96,6 @@ Job 1965 passed the independently written worker regression in all four
 combinations of native or typecheck-only compilation and fixed or
 upgraded libraries. The [compiled count and witness example](roadmap/R16-open-term-evaluator.md#the-optimized-client-of-the-composed-proof)
 records that failure on both 577 and 578.
-
-## Next compiler work
-
-Job 1997 builds the 585 candidate `db2586fdc2` in
-`_build/on-demand/r04-r05-r17-combined-584-20261123`. It reuses the
-configured tree. The previous 584 compiler's receipts are under
-`attempt-0d7904b831` in that directory. Check the new
-`qualification/gates.tsv`, `cohorts/gates.tsv` and `run-all.exit` before
-publishing. The source merge and build recipe are in
-`r04-r05-r17-repaired-qualification-20261123`.
-
-Job 1976 built both stages of 584. All 584 Showcase outputs matched at
-`-O0`, default `-O2` and in GHCi. All 18 selected registrations and
-234 compatibility cases passed. The focused suite passed 136 of 138.
-It reported the known `MTrans` diagnostic and the same Core regression
-as the 581 compiler. A localised source function lost its checked
-equation. Job 1985 reproduced this failure and then ran the complete
-Core test with repair `f821efb9cd`. A localised function or selector
-kept its original equation. A binder with a fresh Unique could not
-reuse it. The 585 candidate includes the repair. Job 1989 also passed
-the corrected 581 rigid-variable test against the original compiler.
-
-| Area | Verified result and next step |
-| --- | --- |
-| R04, R17 and R19 | Both stages of 581 built at `3744f3820d` after the Haddock fix. The normal 584 candidate incorporated its named fields, quoted case and type-argument changes. |
-| R04 omitted record fields | Job 1946 qualified `f2ab5c36a1` at both optimization levels. A supplied witness permits an omitted lazy sibling. Omitting the witness reports GHC-83605 at the constructor and names the required field. An omitted ordinary strict field still reports GHC-95909. Job 1954 exercised the exact additional Showcase row from `322b680d53` with the component compiler. The combined source still needs its normal build. |
-| R04 record update | Job 1988 accepted a change to the stored length when the update supplied both payloads. A missing payload produced GHC-83605 at the witness and an ill-typed payload produced GHC-83865 at its replacement. Job 1991 ran the Showcase row at both optimization levels. The 585 candidate includes it. |
-| R17 visible type arguments | The 584 compiler passed the quoted two-argument lambda in a visible type argument. Separately, jobs 1992 and 1993 tested exact forwarding to a named family and a source-hidden optimized proof client. The private source is `1b9ce49594`. The 585 candidate contains the quoted lambda. |
-| R05 Specialise | On both 577 and 578, default `-O2` replaced an indexed `zip` operand with `build`. Job 1948 preserved the checked operand, passed Core and STG Lint, and returned `Refl`. Job 1956 reproduced the repair with only `base`, a retained `Proxy` result and a vacuous binder. See `r05-specialise-retained-zip-20261123`. |
-| R16 proof validity | Independent count expressions can produce `Zero` and bottom under stock fusion. Both shared counts produced `Zero`. The private Specialise repair leaves that distinction observable. In job 1957, rebuilding HaskLib with private `4c4cc16244` recorded the `map` dependency on the composed proof. The optimized client then reported GHC-83605 at the call to `lengthMapZip`. The same diagnostic occurred with a producer that simply constructs one cell. The old installed interface still reached Core Lint. The consumer-side policy remains open. |
-| R23 matchability | The private prototype `99bfde4ec4` passed the original transformer test and 32 Template Haskell reification cases. An old installed provider still needs rebuilding. The published compiler retains the existing matchability policy. |
-
-For R16, job 1995 compared the same HaskLib source built with two
-compilers. Its original assertion missed a GHC-83605 at the closed
-`Refl` pattern. The [16-case comparison](roadmap/R16-open-term-evaluator.md#proof-dependencies-in-the-rebuilt-hasklib-interface)
-records the diagnostics and runtime results. Job 1996 verified the
-separate constructor comparison at `7f56212d49`. The four disjoint
-local and imported rules allowed the proof. All four matching rules
-still blocked it. Job 1999 passed the extended maintained regression.
-
-The GHC queue has two slots. Other benchmark jobs take priority and freeze
-the GHC slice. Jobs 1947 and 1949 were exploratory allocation measurements.
-Both pilot harnesses are retired. Their prompts, draft code and measurements
-are archived for reference under `_build/reference-only`. Active performance
-work needs independently written benchmarks. External reviews supply prose
-findings. The compiler owners write the implementation, tests and benchmarks.
-
-The previous 577 compiler was `893d2ebc06`. Its qualified records are
-in `r04-r16-r17-normal-after-574-20261123/published-qualification.tsv`.
-The 581 compiler, the omitted-field component and the first display
-component now require rebuilding for a binary replay. Their Git sources,
-logs and results remain available. The exact three generated trees are in
-`retirement-four-finished-warm-trees-20261123/sizes.tsv`.
-The 585 qualification reuses the previous 584 build tree.
-
-## Previous checkpoints
 
 Updated 23 November 2026. The development branch is
 `dependent-haskell`. Use the fork command below to find its latest commit.

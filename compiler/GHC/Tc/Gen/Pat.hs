@@ -43,6 +43,7 @@ import GHC.Types.FieldLabel
 import GHC.Types.Id
 import GHC.Types.Var
 import GHC.Types.Name
+import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
 import GHC.Core.Multiplicity
 import GHC.Core (Expr(Var), isNativeIndexedGadtCon, nativeIndexedCon_maybe)
@@ -1609,6 +1610,17 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
            LetPat{} -> bad_pattern
        ; (ann, pats) <- case arg_pats of
            PrefixCon ann pats -> return (ann, pats)
+           RecCon _ fields
+             | let names = map flSelector (dataConFieldLabels con)
+             , notNull names ->
+                 do { let supplied =
+                            [(unLoc (foLabel (unLoc (hfbLHS fld))), hfbRHS fld)
+                            | L _ fld <- rec_flds fields]
+                          by_name = mkNameEnv supplied
+                    ; unless (map fst supplied == filter (`elemNameEnv` by_name) names) $
+                        failWithTc (TcRnRetainedQuantificationError RetainedRecordPatternOrder)
+                    ; pure (noExtField, map (\name -> fromMaybe genWildPat
+                                               (lookupNameEnv by_name name)) names) }
            _ -> bad_pattern
        ; check_con_pat_arity con_like (length pats)
        ; let tc = dataConTyCon con

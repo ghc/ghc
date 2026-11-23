@@ -315,9 +315,33 @@ fragments and written cases in the same signature keep distinct helpers.
 A quotation or `lookupTypeName` can also refer to an outer erased `forall`
 binder by its exact name. Its kind must be written as a resolved type name
 or promoted constructor. A name from `mkName` supplies only its spelling.
-Use a named family for other enclosing type binders. Cases inside quoted type
-lambdas still produce a source diagnostic. Reification describes the
-checked signature and its family applications.
+Use a named family for other enclosing type binders. Reification describes
+the checked signature and its family applications.
+
+A declaration quote can use a wildcard in a type-case pattern, including a
+case inside a quoted type lambda.
+
+```haskell
+$([d|
+  type IsPresent = \m -> case m of { Nothing -> 'False; Just _ -> 'True }
+  |])
+```
+
+The pattern wildcard matches a value without binding a name. The quotation
+records it as `WildCardT` in the row pattern. An underscore in
+the branch result follows the usual rules for a type expression. GHC's
+family-pattern wildcards and Agda's wildcard patterns make the same
+distinction. [GHC's family patterns](https://downloads.haskell.org/ghc/latest/docs/users_guide/exts/type_families.html#type-family-instances),
+[Agda's pattern coverage](https://agda.readthedocs.io/en/v2.8.0/language/coverage-checking.html),
+and [quotation tests](../../../testsuite/tests/dependent/should_run/NativeTypeLambdaQuote.sh).
+
+The sensor example uses `Nothing -> ()` and `Just _ -> Int` to choose
+the type of each reading from its label. The type of a missing slot
+therefore rejects a Boolean value. Jobs 1897 and 1904 checked the case
+patterns and their quotation diagnostics. In job 1905, the old compiler
+rejected the wildcard. A source-hidden client of the new compiler read
+`(21,(),54)` at both optimization levels.
+[Sensor row](../examples/open-evaluation/QuotedSensorRow.hs).
 
 A nested type splice can also use an enclosing retained variable by its
 exact `IndexVarT` name. A direct quotation and `lookupValueName` both

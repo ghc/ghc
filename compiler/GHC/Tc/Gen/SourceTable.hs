@@ -1,5 +1,5 @@
 -- | Closed type families for checked functions that match one constructor.
-module GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourceTableTyCons, sourceCaseTables, sourceCharacterTables, sourceRetainedWitnessTables, checkLocalRetainedWitnessExports, isMonomorphicRetainedWitness, finalCoreMappers, verifyFinalCoreMapper, failedFinalListTables, finalCoreSourceFamilies, isFinalCoreIdentity, indexedProjectionSource, isFinalCoreReverseWrapper, sourcePairBuilderField, lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
+module GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourceTableTyCons, sourceCaseTables, sourceCharacterTables, sourceRetainedWitnessTables, publishRetainedRecordWitness, checkLocalRetainedWitnessExports, isMonomorphicRetainedWitness, finalCoreMappers, verifyFinalCoreMapper, failedFinalListTables, finalCoreSourceFamilies, isFinalCoreIdentity, indexedProjectionSource, isFinalCoreReverseWrapper, sourcePairBuilderField, lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
                               sourceTableCallees, sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
                               sourceTableFamilyAppUse, sourceTableReferenceUse, sourceCaseKindUse, sourceCaseVisibleArity, isSourceConstructorCase, sourceTableOwner, monomorphicEnumCaseArity, groundFirstHead,
                               isFinalStructuralSource, isStructuralSourceTable, isNominalStructuralSource,
@@ -87,7 +87,7 @@ import GHC.Types.Id (globaliseId, idArity, idCbvMarks_maybe, idCoreRules, idInfo
 import GHC.Types.InlinePragma (ActivationX(ActiveAfter, ActiveBefore), PhaseNum,
                                isNeverActive, isOpaquePragma)
 import GHC.Types.Name (Name, OccName, isExternalName, mkSourceTableOcc, mkSourceFstOcc, mkSourceSndOcc, mkInstTyCoOcc, mkTcOcc,
-                       isVarOcc, mkTyVarOcc, mkVarOcc, nameModule_maybe, nameOccName, nameSrcSpan, occNameString, setOccNameSpace, sourceTableTermOcc, stableNameCmp, nameStableString, tvName, SourceProofRule, SourceProofArgs, SourceProofArg(..))
+                       isFieldOcc, isVarOcc, mkTyVarOcc, mkVarOcc, nameModule_maybe, nameOccName, nameSrcSpan, occNameString, setOccNameSpace, sourceTableTermOcc, stableNameCmp, nameStableString, tvName, SourceProofRule, SourceProofArgs, SourceProofArg(..))
 import GHC.Core.Opt.Pipeline (pairObservationOcc, pairObservationType, scalarRecipeTableOcc)
 import GHC.Types.Name.Reader (GlobalRdrEnv, gre_imp, is_decl, is_isboot, isLocalGRE, lookupGRE_Name)
 import GHC.Types.Name.Env (NameEnv, delFromNameEnv, elemNameEnv, extendNameEnv, extendNameEnv_C, isEmptyNameEnv,
@@ -119,8 +119,8 @@ import GHC.Types.Var.Env (mkInScopeSet)
 import GHC.Types.Var.Set (elemVarSet)
 import GHC.Utils.Misc (equalLength, lengthAtLeast, lengthIs)
 import GHC.Utils.Monad (allM, anyM, whenM)
-import GHC.Utils.Outputable (text)
-import GHC.Utils.Panic (panic)
+import GHC.Utils.Outputable (ppr, text)
+import GHC.Utils.Panic (panic, pprPanic)
 
 import Control.Monad (filterM, foldM, forM, forM_, guard, unless, void, when, zipWithM)
 import Control.Monad.IO.Class (liftIO)
@@ -1709,7 +1709,8 @@ checkOptionalSourceUses env = do
 checkSourceMethodUsesWithPending :: TcGblEnv -> TcM ()
 checkSourceMethodUsesWithPending env = do
     commitOptionalSourceUses env
-    uses <- filterNameSet (isVarOcc . nameOccName) <$> readTcRef (tcg_source_table_uses env)
+    let source_owner name = let occ = nameOccName name in isVarOcc occ || isFieldOcc occ
+    uses <- filterNameSet source_owner <$> readTcRef (tcg_source_table_uses env)
     unfolded <- readTcRef (tcg_evaluated_term_uses env)
     rewriting <- goptM Opt_EnableRewriteRules
     let uses_final_core v = finalCoreMapperOwner v
@@ -1789,6 +1790,7 @@ sourceRuleOwnersWith zonk arg rules = unionNameSets <$> sequence
   where
     headOf :: HsExpr GhcTc -> Maybe (Name, Maybe Type)
     headOf (HsVar _ (L _ f)) = Just (varName f, Nothing)
+    headOf (XExpr (HsRecSelTc (FieldOcc _ (L _ f)))) = Just (varName f, Nothing)
     headOf (HsApp _ f _) = headOf (unLoc f)
     headOf (HsAppType ty f _) = add_app (Just ty) <$> headOf (unLoc f)
     headOf (HsPar _ f) = headOf (unLoc f)
@@ -1869,7 +1871,10 @@ After checking the rows, keep the public Id and its closed family together.
 Install SourceTableId on this Id in the global type environment. Desugaring
 copies these details to the matching binder and occurrences. The original
 external Name identifies the owner even if Tidy makes its name internal.
-A fresh binder with copied details has a different Unique.
+A record selector stores this external Name in its FieldLabel. Compare
+the current Id with the stored Name by Unique. Read the defining module
+from the stored Name. A fresh binder with copied details has a different
+Unique.
 
 Store the family Name in the function's interface declaration. This makes
 its ABI depend on the equations. The typechecker reads the same declaration
@@ -2313,6 +2318,19 @@ sourceRetainedWitnessTables definitions = do
         Just (signature, rows) -> Just . (owner,) <$> publishConstructorCase owner signature rows
         Nothing -> pure Nothing
       else pure Nothing
+
+-- | Publish the equation of the generated first selector of a retained record.
+-- The generated match returns the first field of this exact constructor.
+publishRetainedRecordWitness :: DataCon -> Id -> TcM TyCon
+publishRetainedRecordWitness con owner
+  | Just (expected, signature) <- monomorphicRetainedWitnessType (varType owner)
+  , con == expected
+  , Just witness : _ <- dataConRepArgBinders con
+  , _ : payloads <- dataConOrigArgTys con
+  = do { fields <- mapM (mkSysLocalM (fsLit "field") ManyTy . scaledThing) payloads
+       ; let lhs = CaseConstructor con [] (map CaseField (witness : fields))
+       ; publishConstructorCase owner signature [ConstructorCaseRow [lhs] (CaseField witness)] }
+  | otherwise = pprPanic "publishRetainedRecordWitness: invalid selector" (ppr owner)
 
 -- | Validate the exports that were unavailable when checking local witnesses.
 -- See Note [Retained field kinds in source equations].

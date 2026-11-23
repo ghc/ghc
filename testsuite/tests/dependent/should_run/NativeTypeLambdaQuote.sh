@@ -76,6 +76,70 @@ if "${g[@]}" -c UnavailableKind.hs >kind.log 2>&1 ||
     exit 1
 fi
 
+cat >WildcardQuote.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TemplateHaskell, TypeFamilies, TypeOperators #-}
+module WildcardQuote where
+
+import Data.Type.Equality ((:~:)(Refl))
+
+$([d|
+  type Direct = case 'Just 'True of { Nothing -> Char; Just _ -> Bool }
+  type Nested = (\tag -> case tag of { Nothing -> Char; Just _ -> Bool }) ('Just 'True)
+  type CatchAll = case ('Nothing :: Maybe Bool) of { _ -> Int }
+  type family Family (tag :: Maybe Bool) where
+    Family ('Just _) = Bool
+    Family _ = Char
+  |])
+
+evidence :: (Direct :~: Bool, Nested :~: Bool, CatchAll :~: Int, Family 'Nothing :~: Char)
+evidence = (Refl, Refl, Refl, Refl)
+HS
+"${g[@]}" -c WildcardQuote.hs
+
+cat >WildcardRhs.hs <<'HS'
+{-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, TemplateHaskell, TypeFamilies #-}
+module WildcardRhs where
+import Data.Proxy (Proxy)
+import Language.Haskell.TH (Dec, Q)
+
+bad :: Q [Dec]
+bad = [d|
+#ifdef FAMILY
+  type family Bad (tag :: Maybe Bool) where
+    Bad ('Just _) = Proxy _
+#else
+  type Bad = case ('Nothing :: Maybe Bool) of { _ -> Proxy _ }
+#endif
+  |]
+HS
+for mode in CASE FAMILY; do
+    if "${g[@]}" "-D$mode" -c WildcardRhs.hs >wildcard-rhs.log 2>&1 ||
+       [[ $(grep -c 'error: \[GHC-65507\]' wildcard-rhs.log) != 1 ]] ||
+       ! grep -Fq 'Proxy _' wildcard-rhs.log; then
+        cat wildcard-rhs.log >&2
+        exit 1
+    fi
+done
+
+cat >WildcardScope.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, TemplateHaskell #-}
+module WildcardScope where
+import Data.Proxy (Proxy)
+import Language.Haskell.TH (Dec, Q)
+
+bad :: Q [Dec]
+bad = [d|
+  type Bad = \tag -> case tag of { Just field -> Proxy field; _ -> Proxy field }
+  |]
+HS
+if "${g[@]}" -c WildcardScope.hs >wildcard-scope.log 2>&1 ||
+   ! grep -Fq 'error: [GHC-76037]' wildcard-scope.log ||
+   ! grep -Eq "Not in scope: type variable .field." wildcard-scope.log ||
+   grep -Fq 'error: [GHC-65507]' wildcard-scope.log; then
+    cat wildcard-scope.log >&2
+    exit 1
+fi
+
 cat >WrongKind.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, TemplateHaskell #-}
 module WrongKind where

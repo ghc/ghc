@@ -597,11 +597,12 @@ toIfaceIdDetails name (DFunId _ (Just source))
 toIfaceIdDetails _ (DFunId {})                    = IfDFunId
 toIfaceIdDetails _ (RecSelId { sel_naughty = n
                              , sel_tycon = tc
-                             , sel_fieldLabel = fl }) =
+                             , sel_fieldLabel = fl
+                             , sel_sourceTable = source_table }) =
   let (iface, first_con) = case tc of
                 RecSelData ty_con    -> ( Left (toIfaceTyCon ty_con), dataConName $ head $ tyConDataCons ty_con)
                 RecSelPatSyn pat_syn -> ( Right (patSynToIfaceDecl pat_syn), patSynName pat_syn)
-  in IfRecSelId iface first_con n fl
+  in IfRecSelId iface first_con n fl (tyConName <$> source_table)
 
   -- NB: we deliberately handle every remaining 'IdDetails' constructor below,
   --     so that anyone adding a new 'IdDetails' constructor gets an incomplete

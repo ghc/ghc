@@ -138,8 +138,10 @@ import LaterMatchabilityClient (annotatedMap, appliedCallback, appliedSynonym, b
                                 inferredEndo, laterMatchability, nestedCallback, rankedMap)
 import qualified SchemaColumns
 import qualified TypeLambda
+import qualified TypeLambdaArgument
 import qualified TypeLambdaClient
 import qualified TypeLambdaQuote
+import qualified QuotedSensorRow
 import qualified TypeLet
 import qualified FamilyCasePayload as FamilyCase
 import qualified NativeCase
@@ -227,6 +229,8 @@ import qualified RetainedCharClient
 import qualified SiblingColumnRow
 import qualified SiblingColumns
 import qualified SiblingColumnsClient
+import qualified NamedSiblingColumns as Named
+import qualified NamedSiblingColumnsClient
 import qualified QualifiedPiLibrary as Qualified
 import qualified QuantifiedGadtIndex as QuantifiedIndex
 import qualified ReadNatural
@@ -1723,6 +1727,18 @@ main = do
         (TypeLambda.Field count (TypeLambda.Field flag TypeLambda.End),
          TypeLambda.Field label TypeLambda.End) ->
             observe "splice a column schema and attach a caller-supplied label" (count, flag, label)
+    observe "read two named sensors with a missing slot" QuotedSensorRow.readings
+    let reported :: TypeLambda.Fields '[Either Ordering Int, Either Ordering Bool]
+        reported = TypeLambdaArgument.rowFor @(\cell -> Either Ordering cell) Proxy (Right 42) (Left LT)
+    case reported of
+        TypeLambda.Field count (TypeLambda.Field flag TypeLambda.End) ->
+            observe "pass a row schema as a visible type argument" (count, flag)
+    let quotedReport :: TypeLambda.Fields '[Either String Int, Either String Bool]
+        quotedReport = TypeLambdaArgument.rowFor @($([t| \err cell -> Either err cell |]) String)
+            Proxy (Right 42) (Left "missing flag")
+    case quotedReport of
+        TypeLambda.Field count (TypeLambda.Field flag TypeLambda.End) ->
+            observe "splice a two-binder row schema into a visible type argument" (count, flag)
     let lazyFields = TypeLambda.Field 'x' (TypeLambda.Field (error "unused field" :: Bool) TypeLambda.End)
     case TypeLambdaClient.forwardErrors (Proxy @String) lazyFields of
         TypeLambda.Field first _ ->
@@ -2473,6 +2489,32 @@ listBoundaries = do
             (VCons 'r' (VCons 's' VNil))
             (VCons True (VCons False VNil))
     observe "zip two vectors at their shared stored length" (SiblingColumnsClient.readPairs columns)
+    let named = Named.NamedColumns
+            { Named.namedFlags = VCons True VNil
+            , Named.storedLength = S Z
+            , Named.namedLetters = VCons 'x' VNil
+            }
+    observe "zip two named fields at their stored length" (NamedSiblingColumnsClient.readPairs named)
+    let flagsOnly = Named.NamedColumns
+            { Named.storedLength = S Z
+            , Named.namedFlags = VCons True VNil
+            }
+    observe "read a supplied field when its sibling is omitted"
+        (toList (Named.namedFlags flagsOnly))
+    let updated = named
+            { Named.namedFlags = case Named.namedFlags named of
+                VNil -> VNil
+                VCons _ rest -> VCons False rest
+            }
+    observe "replace a named field at the original stored length"
+        (natToInt (Named.storedLength updated), NamedSiblingColumnsClient.readPairs updated)
+    let emptied = updated
+            { Named.storedLength = Z
+            , Named.namedLetters = VNil
+            , Named.namedFlags = VNil
+            }
+    observe "replace the stored length and both named payloads"
+        (natToInt (Named.storedLength emptied), NamedSiblingColumnsClient.readPairs emptied)
     let unpack :: forall len. TypeLambda.Fields '[Vec Char len, Vec Bool len] -> (String, [Bool])
         unpack (TypeLambda.Field xs (TypeLambda.Field ys TypeLambda.End)) = (toList xs, toList ys)
     observe "put two columns in a row indexed by the record length"

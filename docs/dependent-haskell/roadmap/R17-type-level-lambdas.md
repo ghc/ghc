@@ -201,6 +201,49 @@ comparing their results on a fresh argument.
 [#242 review of arity and apartness](https://github.com/ghc-proposals/ghc-proposals/pull/242#issuecomment-503360362)
 and [GHC's partial synonym rule](../../../compiler/GHC/Core/Type.hs).
 
+## A lambda in a visible type argument
+
+```haskell
+messageCells :: forall (e :: Type). e -> Fields '[Either e Int, Either e Bool]
+messageCells msg = rowFor @(\cell -> Either e cell) Proxy (Right 42) (Left msg)
+```
+
+`rowFor` has an explicit parameter `f :: Type %U -> Type`. The visible
+argument chooses the error type for both columns. Its lambda captures
+`e` from the enclosing signature. An untyped expression splice can use
+the same syntax. The lifter copies complete, splice-free arguments
+and preserves the scope of each capture. A free name in a visible type
+argument cannot introduce a binder. An ordinary `@_` still selects an
+inferred argument. [Row builder](../examples/open-evaluation/TypeLambdaArgument.hs)
+and [source-hidden tests](../../../testsuite/tests/dependent/should_run/NativeTypeLambdaTypeApp.sh).
+
+The syntax extends GHC's visible type argument with an anonymous type
+function. Agda also allows a caller to pass an anonymous function as an
+explicit argument. [GHC TypeApplications](https://downloads.haskell.org/ghc/9.14.1/docs/users_guide/exts/type_applications.html),
+[Agda lambda expressions](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html#lambda-expressions)
+and [Agda application of implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html).
+
+### A type splice in a visible argument
+
+```haskell
+messageCells :: forall (e :: Type). e -> Fields '[Either e Int, Either e Bool]
+messageCells msg =
+    rowFor @($([t| \err cell -> Either err cell |]) e)
+        Proxy (Right 42) (Left msg)
+```
+
+The quote binds `err` and `cell` in that order. The visible argument
+applies the resulting lambda to `e` and passes the remaining function
+to `rowFor`. The splice runs once and keeps its finalizer. An unknown
+name in the quote is reported there. An ill-kinded body is reported at
+the splice. [Source-hidden regression](../../../testsuite/tests/dependent/should_run/NativeTypeLambdaTypeApp.sh).
+
+Proposal #242 supplies the unmatchable arrows for partial application.
+Proposal #378 supplies the lexical scoping principle. The two-binder
+lambda itself is experimental syntax from the roadmap. [GHC proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html),
+[GHC proposal #378](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html)
+and [Serokell's type-level lambda card](https://ghc.serokell.io/dh#type-level-lambdas).
+
 ## Rows under an erased forall
 
 ```haskell
