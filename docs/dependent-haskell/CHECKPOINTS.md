@@ -6,6 +6,29 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## A spliced row schema and inferred zip arguments
+
+The declaration quotation for `CheckedColumns` captures the error type
+in a type lambda. Splicing it produces the same column types as writing
+the lambda in the client signature. The separate `labelledColumn`
+example captures a type variable bound by its enclosing function.
+[Quoted column definitions](examples/open-evaluation/TypeLambdaQuote.hs).
+
+An installed HaskLib client can use this proof with unknown lists.
+
+```haskell
+lengthMapZip f xs ys =
+    trans (lengthMap f (zip xs ys)) (lengthZip xs ys)
+```
+
+The declarations of the two lists determine the two erased type
+arguments of `zip`. An empty left list leaves the right list unevaluated.
+An undefined left list raises its exception, even if the right list
+is empty. The callback stays unevaluated in those checks. Job 1889
+installed HaskLib from its source distribution and ran the client with
+rewrite rules disabled at `-O0` and `-O2`.
+[Proof and its optimization conditions](roadmap/R16-open-term-evaluator.md#map-over-the-result-of-zip).
+
 ## Two vector fields at one stored length
 
 A `Columns` constructor stores one length and two vectors. Their
