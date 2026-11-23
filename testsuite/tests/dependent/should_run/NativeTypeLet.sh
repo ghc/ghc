@@ -22,7 +22,7 @@ HS
 "${g[@]}" -fomit-interface-pragmas -c SignatureLet.hs
 cat >SignedLets.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, KindSignatures #-}
-module SignedLets (Braced, Layout) where
+module SignedLets (Braced, Layout, CaseChain) where
 
 type Braced (b :: Bool) = let { tag = Bool; tag :: tag; tag = b } in tag
 
@@ -31,6 +31,11 @@ type Layout (b :: Bool) =
       tag :: tag
       tag = b
   in tag
+
+type CaseChain (b :: Bool) =
+  let first = case b of { True -> 'False; False -> 'True }
+      second = case first of { True -> 'True; False -> 'False }
+  in '(first, second)
 HS
 "${g[@]}" -fomit-interface-pragmas -ddump-parsed -c SignedLets.hs >parsed.txt
 {
@@ -91,7 +96,7 @@ import Data.Proxy (Proxy)
 import PairBindings (AliasCount, Held, KnownPrefix, ShadowCount,
                      NestedCount, NestedRight, NestedHeight)
 import qualified SignatureLet
-import SignedLets (Braced, Layout)
+import SignedLets (Braced, Layout, CaseChain)
 import TypeLet
 
 roadmap :: F Bool :~: Ordering
@@ -120,6 +125,9 @@ braced = Refl
 
 layout :: Layout 'False :~: 'False
 layout = Refl
+
+caseChain :: CaseChain 'True :~: '( 'False, 'False)
+caseChain = Refl
 
 knownPair :: DimensionSum '(2, 3) :~: 5
 knownPair = Refl

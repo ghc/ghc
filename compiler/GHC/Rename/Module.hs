@@ -1354,6 +1354,18 @@ liftTypeCases group =
       (L loc (XHsType let_ty@(HsTypeLet ann _ _ binds result_ty))) salt
       | not independent
       , let (binder, rhs, body) = splitHsTypeLet binds result_ty
+      , orderedCase rhs || annotatedCase rhs
+      , isJust (letCaseBody body)
+      , let (rhs', rhs_cases, rhs_end) = liftRhs owner False captures aliases rhs salt
+            (body', body_cases, next) = liftRhs owner False captures aliases body rhs_end
+      , not (null body_cases)
+      , all (not . mentionsBinder (unLoc binder) . fst) body_cases
+      = (preserveTypeLetSource let_ty (letTy loc ann binder rhs' body'),
+          rhs_cases ++ body_cases, next)
+    liftRhs owner independent captures aliases
+      (L loc (XHsType let_ty@(HsTypeLet ann _ _ binds result_ty))) salt
+      | not independent
+      , let (binder, rhs, body) = splitHsTypeLet binds result_ty
       , Just annotated <- letCaseBody body
       , Just (used, references) <- rhsCaptures captures aliases rhs
       , let owner_occ = rdrNameOcc (unLoc owner)
@@ -1441,16 +1453,26 @@ liftTypeCases group =
     letTy loc ann v rhs body = L loc (XHsType (mkHsSingleTypeLet ann v rhs body))
     applyType loc name = foldl' (\f x -> L loc (HsAppTy noExtField f x)) (typeName name)
 
-    -- Follow an ordered chain to a case. A written result kind needs
-    -- the preceding helpers before checking the family's header.
+    -- A let-bound name can remain in a later scrutinee argument. Do not
+    -- hoist a declaration that uses that name under its own binders.
+    mentionsBinder :: Data a => RdrName -> a -> Bool
+    mentionsBinder name node
+      | Just rdr <- cast node = name == rdr
+      | otherwise = or (gmapQ (mentionsBinder name) node)
+
+    -- Follow an ordered chain to a case, including cases in binding RHSs.
+    -- A written result kind needs the preceding helpers before checking the
+    -- family's header.
     letCaseBody ty
       | orderedCase ty = Just False
       | annotatedCase ty = Just True
       | L _ (XHsType (HsTypeLet _ _ _ binds result_ty)) <- ignoreParens ty
       = let (_, rhs, body) = splitHsTypeLet binds result_ty
-        in if annotatedCase rhs
-           then Just True
-           else lexicalNames rhs >> letCaseBody body
+        in if orderedCase rhs
+           then Just False
+           else if annotatedCase rhs
+                then Just True
+                else lexicalNames rhs >> letCaseBody body
       | otherwise = Nothing
 
     orderedCase ty
