@@ -86,7 +86,7 @@ import Data.List ( elemIndex, find, mapAccumL, nub, partition, unzip4 )
 import Data.List.NonEmpty ( NonEmpty(..), head, nonEmpty )
 import Data.Data (Data, cast, gmapQ, gmapT)
 import Data.Maybe (catMaybes,  isJust, isNothing, fromMaybe, mapMaybe, maybeToList )
-import qualified Data.Set as Set ( delete, difference, disjoint, empty, fromList, member, null, toList, union )
+import qualified Data.Set as Set ( Set, delete, difference, disjoint, empty, fromList, member, null, toList, union )
 
 {- Note [Lifting type lambdas]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -556,6 +556,15 @@ liftedTypeVarBinder v =
   L (l2l (getLoc v)) (HsTvb noAnn (HsBndrRequired noExtField)
     (HsBndrVar noExtField v) (HsBndrNoKind noExtField))
 
+-- | Rename occurrences whose binding sites the caller has identified.
+renameCaptures :: Data a => [(RdrName, RdrName)] -> a -> a
+renameCaptures [] node = node
+renameCaptures copied node
+  | Just rdr <- cast node
+  , Just replacement <- lookup rdr copied
+  = fromMaybe node (cast replacement)
+  | otherwise = gmapT (renameCaptures copied) node
+
 {- Note [Lifting types from signatures and fields]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Give each lifted expression a private synonym. For a retained sum,
@@ -902,11 +911,9 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
 
     liftedAnchor SignatureTypeSite _ ty@(L _ (XHsType HsTypeLambda{}))
       | lift_cases, copyable ty = Just ("$signature-lambda:", Nothing)
-    liftedAnchor SignatureTypeSite _ ty@(L _ (XHsType (HsTypeLet _ _ _ binds result)))
+    liftedAnchor SignatureTypeSite _ ty@(L _ (XHsType HsTypeLet{}))
       | lift_cases
-      , let (binder, rhs, body) = splitHsTypeLet binds result
-      , isCaseRhs rhs
-      , usesTypeCaseResult (unLoc binder) body
+      , snd (caseCaptureUses ty)
       , copyableLetCases ty
       = Just ("$signature-case:", Nothing)
     liftedAnchor site _ ty@(L _ (XHsType HsTypeSome{}))
@@ -921,11 +928,6 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
           then Just ("$field-case:", Nothing)
           else Just ("$signature-case:", signatureCaseKey scrutinee alts)
     liftedAnchor _ _ _ = Nothing
-
-    isCaseRhs rhs = case unLoc (ignoreParens rhs) of
-      XHsType HsTypeCase{} -> True
-      HsKindSig _ body _ | L _ (XHsType HsTypeCase{}) <- ignoreParens body -> True
-      _ -> False
 
     copyableLetCases ty = case unLoc (ignoreParens ty) of
       XHsType (HsTypeLet _ _ _ binds result) ->
@@ -1089,14 +1091,6 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
           | null exact_retained = []
           | Just rdr <- cast node = [rdr | rdr `elem` exact_retained]
           | otherwise = concat (gmapQ exactUses node)
-
-    renameCaptures :: Data a => [(RdrName, RdrName)] -> a -> a
-    renameCaptures [] node = node
-    renameCaptures copied node
-      | Just rdr <- cast node
-      , Just replacement <- lookup rdr copied
-      = fromMaybe node (cast replacement)
-      | otherwise = gmapT (renameCaptures copied) node
 
     copyable :: Data a => a -> Bool
     copyable node = case cast node :: Maybe (LHsType GhcPs) of
@@ -1302,6 +1296,13 @@ A case result needed by a later case is a visible argument of the later
 family. Leave the first application in the original let. A checked RHS
 synonym would have to expose that application before the same
 kind-checking group publishes the first family's equations.
+Follow free uses through ordinary alias RHSs. This also finds a case
+result that a later row uses through several local names. A shadowed
+capture can still be needed by a preceding alias. Give it a private
+name and keep its argument position for that alias. Also keep it when
+a later capture's kind uses it. Rename that occurrence in the copied
+kind before adding the new binder. The written RHS still uses the
+enclosing scope.
 
 Both sides of a function arrow have the arrow's lexical scope.
 Lift each side with the same captures. Keep the original arrow and
@@ -1381,18 +1382,20 @@ liftTypeCases group =
       (L loc (XHsType let_ty@(HsTypeLet ann _ _ binds result_ty))) salt
       | not independent
       , let (binder, rhs, body) = splitHsTypeLet binds result_ty
-      , orderedCase rhs || annotatedCase rhs
+            captures_result = Set.member (unLoc binder) (fst (caseCaptureUses body))
+            body_aliases = filter (\(_, v, _, _) -> unLoc v /= unLoc binder) aliases
+      , orderedCase rhs || annotatedCase rhs || not captures_result
       , isJust (letCaseBody body)
       , let (rhs', rhs_cases, rhs_end) = liftRhs owner False captures aliases rhs salt
-            captures_result = usesTypeCaseResult (unLoc binder) body
-      , Just outer <-
-          if captures_result
-          then caseResultCaptures captures aliases binder
-          else Just captures
-      , let (body', body_cases, next) = liftRhs owner False outer aliases body rhs_end
+      , Just (outer, saved) <- caseBodyCaptures captures body_aliases binder captures_result salt
+      , let (body', body_cases, next) = liftRhs owner False outer body_aliases body rhs_end
       , not (null body_cases)
       , captures_result || all (not . mentionsBinder (unLoc binder) . fst) body_cases
-      = (preserveTypeLetSource let_ty (letTy loc ann binder rhs' body'),
+      = let result = letTy loc ann binder rhs' body'
+            scoped = case saved of
+              Nothing -> result
+              Just (name, previous) -> letTy loc ann name (typeName previous) result
+        in (preserveTypeLetSource let_ty scoped,
           rhs_cases ++ body_cases, next)
     liftRhs owner independent captures aliases
       (L loc (XHsType let_ty@(HsTypeLet ann _ _ binds result_ty))) salt
@@ -1492,16 +1495,31 @@ liftTypeCases group =
       | Just rdr <- cast node = name == rdr
       | otherwise = or (gmapQ (mentionsBinder name) node)
 
-    -- The earlier RHS uses the original scope. The later family can drop a
-    -- shadowed capture if no remaining kind or alias depends on it.
-    caseResultCaptures captures aliases binder = do
-      guard (all (\(_, v, _, _) -> unLoc v /= unLoc binder) aliases)
-      let (hidden, outer) = partition (\(_, v, _) -> unLoc v == unLoc binder) captures
-      unless (null hidden) $ do
-        guard (null aliases)
-        kinds <- concat <$> traverse captureKindNames outer
-        guard (unLoc binder `notElem` kinds)
-      pure (outer ++ [(liftedTypeVarBinder binder, binder, binder)])
+    caseBodyCaptures captures aliases binder captures_result salt =
+      case break shadows captures of
+        (_, []) -> Just (withResult captures, Nothing)
+        (earlier, (L loc header@HsTvb{tvb_var = HsBndrVar ann _}, _, current) : later)
+          | all (not . shadows) later -> do
+              -- The kind fragment checked here has no local binders.
+              kinds <- concat <$> traverse captureKindNames later
+              if null aliases && unLoc binder `notElem` kinds
+                then Just (withResult (earlier ++ later), Nothing)
+                else do
+                  let saved = L (getLoc binder)
+                        (mkRdrUnqual (mkTyVarOcc ("$case-let-shadow:" ++ show salt)))
+                      save = unLoc current == unLoc binder
+                      actual = if save then saved else current
+                      binding = if save then Just (saved, current) else Nothing
+                      renamed = (L loc header{tvb_var = HsBndrVar ann saved}, saved, actual)
+                      rest = map (renameCaptureKind saved) later
+                  pure (withResult (earlier ++ (renamed : rest)), binding)
+        _ -> Nothing
+      where
+        shadows (_, v, _) = unLoc v == unLoc binder
+        withResult cs = cs ++ [(liftedTypeVarBinder binder, binder, binder) | captures_result]
+        renameCaptureKind saved (L loc header@HsTvb{tvb_kind = kind}, name, actual) =
+          (L loc header{tvb_kind = renameCaptures [(unLoc binder, unLoc saved)] kind}, name, actual)
+        renameCaptureKind _ capture = capture
 
     -- Follow an ordered chain to a case, including cases in binding RHSs.
     -- A written result kind needs the preceding helpers before checking the
@@ -1627,26 +1645,40 @@ liftTypeCases group =
       in L loc (FamEqn ([], [], noAnn) name mkHsOuterImplicit
                        (map (HsValArg noExtField) pats) Prefix body)
 
--- | Find a free use in a case equation or result kind in a let chain.
--- The scrutinee itself remains an argument at the original scope.
-usesTypeCaseResult :: RdrName -> LHsType GhcPs -> Bool
-usesTypeCaseResult name source = case unLoc (ignoreParens source) of
+-- | Find the names needed by lifted declarations and whether one of the
+-- cases needs the result of an earlier case in this let chain.
+caseCaptureUses :: LHsType GhcPs -> (Set.Set RdrName, Bool)
+caseCaptureUses source = case unLoc (ignoreParens source) of
   XHsType (HsTypeCase _ _ scrutinee alts) ->
-    any usesAlt alts || usesTypeCaseResult name scrutinee
+    let (names, capture) = caseCaptureUses scrutinee
+    in (foldr (Set.union . rowNames) names alts, capture)
   XHsType (HsTypeLet _ _ _ binds result) ->
     let (binder, rhs, body) = splitHsTypeLet binds result
-    in usesTypeCaseResult name rhs ||
-       (unLoc binder /= name && usesTypeCaseResult name body)
+        name = unLoc binder
+        (rhs_names, rhs_capture) = caseCaptureUses rhs
+        (body_names, body_capture) = caseCaptureUses body
+        needed = Set.member name body_names
+        case_rhs = isCaseRhs rhs
+        aliases | needed && not case_rhs = freeNames rhs
+                | otherwise = Set.empty
+        names = rhs_names `Set.union` aliases `Set.union` Set.delete name body_names
+    in (names, rhs_capture || body_capture || (needed && case_rhs))
   HsKindSig _ ty kind
     | L _ (XHsType HsTypeCase{}) <- ignoreParens ty ->
-        freeIn kind || usesTypeCaseResult name ty
-  _ -> False
+        let (names, capture) = caseCaptureUses ty
+        in (freeNames kind `Set.union` names, capture)
+  _ -> (Set.empty, False)
   where
-    freeIn ty = any ((== name) . unLoc) (extractHsTyRdrTyVars ty)
-    usesAlt (L _ (HsTypeCaseAlt pat _ rhs))
+    freeNames = Set.fromList . map unLoc . extractHsTyRdrTyVars
+    rowNames (L _ (HsTypeCaseAlt pat _ rhs))
       | Just (_, bound) <- classifyTypeCasePattern pat =
-          name `notElem` bound && freeIn rhs
-      | otherwise = False
+          freeNames rhs `Set.difference` Set.fromList bound
+      | otherwise = Set.empty
+
+    isCaseRhs rhs = case unLoc (ignoreParens rhs) of
+      XHsType HsTypeCase{} -> True
+      HsKindSig _ body _ | L _ (XHsType HsTypeCase{}) <- ignoreParens body -> True
+      _ -> False
 
 -- | Visit type expression children that share their enclosing lexical scope.
 -- The caller handles binders and kind annotations. Thread its state

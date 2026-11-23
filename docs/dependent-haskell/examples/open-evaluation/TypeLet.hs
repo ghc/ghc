@@ -64,8 +64,11 @@ type CaseResult (flag :: Bool) =
 
 -- | Use the selected width unless the caller supplies an override.
 type DimensionWithOverride (width :: Bool) (override :: Maybe TypeNats.Nat) =
-  let width = case width of { True -> 3; False -> 2 }
-      result = case override of { Nothing -> width; Just width -> width }
+  let selected = width
+      selected = case selected of { True -> 3; False -> 2 }
+      saved = selected
+      fallback = saved
+      result = case override of { Nothing -> fallback; Just selected -> selected }
   in result
 
 -- | Use the width computed by the first case when there is no override.
