@@ -6,6 +6,32 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Change the length of a dependent record
+
+An ordinary importing module can clear both vectors of a nonempty
+record and set their shared length to zero.
+
+```haskell
+clearColumns :: NamedColumns -> NamedColumns
+clearColumns p = p { storedLength = Z, namedLetters = VNil, namedFlags = VNil }
+```
+
+The result has length zero and contains no pairs. Evaluating the new
+record inspects the old record's outer constructor and leaves its vector
+fields unevaluated. If an update changes the witness and omits a dependent
+field, GHC-83605 names that field. Giving a nonempty vector at `Z`
+produces GHC-83865 at the replacement expression.
+[Dependent record](roadmap/R04-dependent-sums.md#named-fields-at-one-stored-length)
+and [runnable example](Showcase.hs).
+
+Both stages built from `db2586fdc2`. All 585 Showcase observations matched
+at native `-O0`, default `-O2` and in GHCi. The focused suite passed
+137 of 138, including the repaired Core test for localised function and
+selector identities. The remaining failure was the existing `MTrans`
+diagnostic. All 18 selected registrations and 234 compatibility cases
+passed. The package and compatibility checks used fresh output directories
+after the original run encountered output from the 584 compiler.
+
 ## A spliced row schema and inferred zip arguments
 
 The declaration quotation for `CheckedColumns` captures the error type
