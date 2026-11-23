@@ -2634,3 +2634,17 @@ their interface files were byte-identical. The reader cannot use those
 files alone to distinguish the two bodies. The component check covers
 proof information that the old interface exposes. The published
 compiler still uses the source-equation policy.
+
+### Map over the result of zip
+
+An installed HaskLib client can prove the length of `map f (zip xs ys)`
+by induction on the two lists. The recursive case applies `congSucc`
+to the proof for their tails. Job 1870 checked the client with rewrite
+rules disabled at `-O0` and `-O2`. An empty left list left an undefined
+right list unevaluated. An undefined left list raised its exception even
+when the right list was empty. The proof did not force the callback.
+
+Direct composition still needs compiler work. Job 1860 rejected
+`lengthMap f (zip xs ys)` with GHC-83605 at the retained argument.
+Job 1870 gave the intermediate list a local name. The resulting
+composition failed with GHC-83865. [List laws](../hasklib/HaskLib/List.hs).

@@ -4,14 +4,14 @@
 -- | Length laws for the installed Prelude functions on ordinary lists.
 module HaskLib.List
     ( Size(..), size, plus, minSize, takeSize
-    , lengthMap, lengthAppend, lengthZip, lengthZipWith, lengthZipMap, lengthReverse, lengthTakeSize
+    , lengthMap, lengthAppend, lengthZip, lengthZipWith, lengthZipMap, lengthMapZip, lengthReverse, lengthTakeSize
     ) where
 
 import Data.Type.Equality ((:~:)(Refl), trans)
 import qualified GHC.Internal.List as List
 import HaskLib.List.Prefix (takeSize)
 import HaskLib.Size (congSucc, plusSucc, plusZero)
-import Prelude ((++), map, reverse)
+import Prelude ((++), map, reverse, zip)
 import PreludeAppendLengthSource (plus)
 import PreludeMapLengthSize (Size(..), minSize, size)
 import PreludeZipRuntime (lengthZip, lengthZipMap, lengthZipWith)
@@ -58,6 +58,14 @@ lengthTakeSize :: forall a. foreach (n :: Size) -> foreach (xs :: [a])
 lengthTakeSize Zero _ = Refl
 lengthTakeSize (Succ _) [] = Refl
 lengthTakeSize (Succ n) (_ : xs) = congSucc (lengthTakeSize n xs)
+
+-- | Mapping the pairs preserves the length of the shorter list.
+lengthMapZip :: forall a b c. foreach (f :: (a, b) -> c)
+             -> foreach (xs :: [a]) -> foreach (ys :: [b])
+             -> size (map f (zip xs ys)) :~: minSize (size xs) (size ys)
+lengthMapZip _ [] _ = Refl
+lengthMapZip _ (_ : _) [] = Refl
+lengthMapZip f (_ : xs) (_ : ys) = congSucc (lengthMapZip f xs ys)
 
 -- | Count the result of the reverse worker with any accumulator.
 lengthReverseOnto :: forall a. foreach (xs :: [a]) -> foreach (acc :: [a])
