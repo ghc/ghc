@@ -5,6 +5,7 @@ interfacePlugin: Language.Haskell.TH
 interfacePlugin: Language.Haskell.TH.Quote
 interfacePlugin: Data.Version
 interfacePlugin: System.IO
+interfacePlugin: GHC.Boot.TH.Syntax
 interfacePlugin: GHC.Internal.Base
 interfacePlugin: GHC.Internal.Data.NonEmpty
 interfacePlugin: GHC.Internal.Float

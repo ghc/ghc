@@ -1,5 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables, StandaloneDeriving, DeriveGeneric,
-    TupleSections, RecordWildCards, InstanceSigs, CPP, RankNTypes #-}
+    TupleSections, RecordWildCards, InstanceSigs, CPP, RankNTypes,
+    OverloadedRecordDot #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
 -- |
@@ -10,6 +11,7 @@ module GHCi.TH
   , runModFinalizerRefs
   , runTH
   , GHCiQException(..)
+  , forceMetaHandlersArgs
   ) where
 
 {- Note [Remote Template Haskell]
@@ -95,6 +97,7 @@ import GHCi.Message
 import GHCi.RemoteTypes
 import GHC.Serialized
 
+import Control.DeepSeq
 import Control.Exception
 import Control.Monad.IO.Class (MonadIO (..))
 import Data.Binary
@@ -188,8 +191,46 @@ runQinGHCiQ (TH.Q m) = GHCiQ $ \sRef -> m (metaHandlersGHCiQ (runInIO sRef))
     runInIO :: IORef QState -> GHCiQ a -> IO a
     runInIO sRef (GHCiQ m) = m sRef
 
+-- See Note [Exceptions in TH]
+forceMetaHandlersArgs :: TH.MetaHandlers -> TH.MetaHandlers
+forceMetaHandlersArgs mh = TH.MetaHandlers
+  { mLiftIO = TH.mLiftIO mh
+  , mFail = deepseqArg (TH.mFail mh)
+  , mNewName = deepseqArg mh.mNewName
+  , mReport = deepseqArg (deepseqArg . mh.mReport)
+
+  , mRecover = TH.mRecover mh
+  , mLookupName = deepseqArg (deepseqArg . mh.mLookupName)
+  , mReify = deepseqArg mh.mReify
+  , mReifyFixity = deepseqArg mh.mReifyFixity
+  , mReifyType = deepseqArg mh.mReifyType
+  , mReifyInstances = deepseqArg (deepseqArg . mh.mReifyInstances)
+  , mReifyRoles = deepseqArg mh.mReifyRoles
+
+  , mReifyAnnotations = deepseqArg (TH.mReifyAnnotations mh)
+  , mReifyModule = deepseqArg mh.mReifyModule
+  , mReifyConStrictness = deepseqArg mh.mReifyConStrictness
+  , mLocation = mh.mLocation
+  , mGetPackageRoot = mh.mGetPackageRoot
+  , mAddDependentFile = deepseqArg mh.mAddDependentFile
+  , mAddDependentDirectory = deepseqArg mh.mAddDependentDirectory
+  , mAddTempFile = deepseqArg mh.mAddTempFile
+  , mAddTopDecls = deepseqArg mh.mAddTopDecls
+  , mAddForeignFilePath = deepseqArg (deepseqArg . mh.mAddForeignFilePath)
+  , mAddModFinalizer = \ f -> seq f $ mh.mAddModFinalizer f
+  , mAddCorePlugin = deepseqArg mh.mAddCorePlugin
+  , mGetQ = TH.mGetQ mh
+  , mPutQ = \ k -> seq k (TH.mPutQ mh k)
+  , mIsExtEnabled = deepseqArg mh.mIsExtEnabled
+  , mExtsEnabled = mh.mExtsEnabled
+  , mPutDoc = deepseqArg (deepseqArg . mh.mPutDoc)
+  , mGetDoc = deepseqArg mh.mGetDoc
+  }
+  where
+    deepseqArg f x = deepseq x (f x)
+
 metaHandlersGHCiQ :: (forall x. GHCiQ x -> IO x) -> TH.MetaHandlers
-metaHandlersGHCiQ runInIO = TH.MetaHandlers {
+metaHandlersGHCiQ runInIO = forceMetaHandlersArgs $ TH.MetaHandlers {
     mLiftIO = id
   , mFail = runInIO . fail
   , mNewName = \str -> runInIO $ ghcCmd (NewName str)

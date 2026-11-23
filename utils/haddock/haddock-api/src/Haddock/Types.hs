@@ -657,8 +657,6 @@ instance NFData name => NFData (HaddockModInfo name) where
                     hmi_extensions `deepseq`
                       ()
 
-instance NFData LangExt.Extension
-
 data HaddockModInfo name = HaddockModInfo
   { hmi_description :: Maybe (Doc name)
   , hmi_copyright :: Maybe Text

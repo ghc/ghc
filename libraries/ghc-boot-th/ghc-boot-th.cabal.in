@@ -50,7 +50,8 @@ Library
 
     build-depends:
         base       >= 4.7 && < 4.24,
-        pretty     == 1.1.*
+        pretty     == 1.1.*,
+        deepseq
 
     if flag(bootstrap)
         cpp-options: -DBOOTSTRAP_TH

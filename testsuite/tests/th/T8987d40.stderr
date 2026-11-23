@@ -1,0 +1,7 @@
+T8987d40.hs:1:1: error: [GHC-87897]
+    Exception when trying to run compile-time code:
+      exception so compile_fail passes
+    Code: (do void
+                $ getQ ... >> error "exception so compile_fail passes"
+              pure [])
+

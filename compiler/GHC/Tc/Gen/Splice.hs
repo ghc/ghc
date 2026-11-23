@@ -81,6 +81,7 @@ import GHC.Iface.Load
 
 import GHCi.Message
 import GHCi.RemoteTypes
+import GHCi.TH (forceMetaHandlersArgs)
 import GHC.Runtime.Interpreter
 
 import GHC.Rename.Splice( traceSplice, SpliceInfo(..) )
@@ -1146,6 +1147,13 @@ convertAnnotationWrapper fhv = do
 runQinTcM :: TH.Q a -> TcM a
 runQinTcM (TH.Q act) = withRunInIO $ \runInIO -> act (metaHandlersTcM runInIO)
 
+-- | Like 'runQinTcM' but forcing methods' arguments, to trigger exceptions
+--   originating from the splice.
+--
+-- See Note [Exceptions in TH]
+runQinTcM' :: TH.Q a -> TcM a
+runQinTcM' (TH.Q act) = withRunInIO $ \runInIO -> act (forceMetaHandlersArgs $ metaHandlersTcM runInIO)
+
 runRemoteModFinalizers :: ThModFinalizers -> TcM ()
 runRemoteModFinalizers (ThModFinalizers finRefs) = do
   let withForeignRefs [] f = f []
@@ -1157,7 +1165,7 @@ runRemoteModFinalizers (ThModFinalizers finRefs) = do
 #if defined(HAVE_INTERNAL_INTERPRETER)
     InternalInterp -> do
       qs <- liftIO (withForeignRefs finRefs $ mapM localRef)
-      runQinTcM $ sequence_ qs
+      runQinTcM' $ sequence_ qs
 #endif
 
     ExternalInterp ext -> withExtInterp ext $ \inst -> do
@@ -1441,17 +1449,23 @@ like that.  Here's how it's processed:
     (qReport True s) by using addErr to add an error message to the bag of errors.
     The 'fail' in TcM raises an IOEnvFailure exception
 
- * 'qReport' forces the message to ensure any exception hidden in unevaluated
-   thunk doesn't get into the bag of errors. Otherwise the following splice
-   will trigger panic (#8987):
+  * 'qReport' forces the message to ensure any exception hidden in unevaluated
+    thunk doesn't get into the bag of errors. Otherwise the following splice
+    will trigger panic (#8987):
         $(fail undefined)
-   See also Note [Concealed TH exceptions]
+    See also Note [Concealed TH exceptions]
 
   * So, when running a splice, we catch all exceptions; then for
         - an IOEnvFailure exception, we assume the error is already
                 in the error-bag (above)
         - other errors, we add an error to the bag
     and then fail
+
+  * The 'MetaHandlers' force (to nf where possible) their arguments so any
+    exceptions are caught as part of evaluating the splice rather than deeper
+    into the processing where the compiler's implementation could be throwing
+    exceptions too. We skip this while handling a 'THMessage', because we just
+    deserialized those (the forcing already happened on the sender side).
 
 Note [Concealed TH exceptions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1472,11 +1486,9 @@ when showing an error message.
 To call runQ in the Tc monad, we need to make TcM an instance of Quasi:
 -}
 
--- 'msg' is forced to ensure exceptions don't escape,
--- see Note [Exceptions in TH]
 report :: Bool -> [Char] -> TcM ()
-report True msg  = seqList msg $ addErr        $ TcRnTHError $ ReportCustomQuasiError True  msg
-report False msg = seqList msg $ addDiagnostic $ TcRnTHError $ ReportCustomQuasiError False msg
+report True msg  = addErr        $ TcRnTHError $ ReportCustomQuasiError True  msg
+report False msg = addDiagnostic $ TcRnTHError $ ReportCustomQuasiError False msg
 
 addTopDecls :: [TH.Dec] -> TcM ()
 addTopDecls thds = do
@@ -1815,7 +1827,7 @@ runTH ty fhv = do
     InternalInterp -> do
        -- Run it in the local TcM
       hv <- liftIO $ wormhole interp0 fhv
-      r <- runQinTcM (unsafeCoerce hv :: TH.Q a)
+      r <- runQinTcM' (unsafeCoerce hv :: TH.Q a)
       return r
 #endif
 
