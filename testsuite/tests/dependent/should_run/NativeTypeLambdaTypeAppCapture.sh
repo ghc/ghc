@@ -52,11 +52,15 @@ fi
 # Only the result type supplies the conflicting String index.
 mkdir conflict
 cp Captured.hs RowBuilder.hi TypeLambda.hi conflict/
-if (cd conflict && "${ghc[@]}" -DCONFLICT -c Captured.hs) >conflict.log 2>&1 ||
-   ! grep -Fq 'Captured.hs:14:17: error: [GHC-25897]' conflict.log ||
-   ! grep -Eq ".err. is a rigid type variable" conflict.log ||
-   ! grep -Fq 'rowFor @(\cell -> Either err cell)' conflict.log ||
-   grep -Fq '$signature-lambda:' conflict.log; then
+if (cd conflict && "${ghc[@]}" -DCONFLICT -c Captured.hs) >conflict.log 2>&1; then
+    status=1
+fi
+# The source excerpt also contains the written lambda. Check the diagnostic body.
+sed '/^[[:space:]]*|/,$d' conflict.log >conflict.body
+if ! grep -Fq 'Captured.hs:14:17: error: [GHC-25897]' conflict.body ||
+   ! grep -Eq ".err. is a rigid type variable" conflict.body ||
+   ! grep -Fq '@(\cell -> Either err cell)' conflict.body ||
+   grep -Fq '$signature-lambda:' conflict.body; then
     cat conflict.log >&2
     status=1
 fi
