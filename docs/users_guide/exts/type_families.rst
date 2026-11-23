@@ -106,17 +106,25 @@ matchability on an arrow, enable :extension:`Modifiers` and annotate the
 arrow with ``%M`` or ``%U`` from ``GHC.Matchability``. The extension turns
 on :ghc-flag:`-fprint-explicit-matchabilities`.
 
-Built-in type families such as ``(+)`` still require all their arguments.
-To pass addition by one to a higher-order family, define a closed family
-that supplies both arguments::
+Built-in type families can also fill an unmatchable callback parameter.
+Here ``Map`` takes the partial application ``(+) 1``. Each element supplies
+its second argument, so GHC can reduce the addition::
 
-    type family AddOne (n :: Nat) :: Nat where
-        AddOne n = 1 + n
+    {-# LANGUAGE DataKinds, ExplicitNamespaces, Modifiers, PolyKinds #-}
+    {-# LANGUAGE StandaloneKindSignatures, TypeOperators, UnsaturatedTypeFamilies #-}
+    module Arithmetic where
 
-Import ``Nat`` and ``type (+)`` from ``GHC.TypeNats``. This example uses
-:extension:`DataKinds`, :extension:`TypeOperators` and
-:extension:`UndecidableInstances` in addition to :extension:`UnsaturatedTypeFamilies`.
-With a list-mapping family, ``Map AddOne '[2, 3, 4]`` reduces to ``'[3, 4, 5]``.
+    import Data.Type.Equality ((:~:)(Refl))
+    import GHC.Matchability (U)
+    import GHC.TypeNats (type (+))
+
+    type Map :: (a %U -> b) -> [a] -> [b]
+    type family Map f xs where
+        Map f '[] = '[]
+        Map f (x ': xs) = f x ': Map f xs
+
+    addOne :: Map ((+) 1) '[2, 3, 4] :~: '[3, 4, 5]
+    addOne = Refl
 
 :extension:`ExperimentalDependentTypes` also permits partial applications
 through its existing checks. It has independent implications. In

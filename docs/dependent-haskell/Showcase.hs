@@ -1645,7 +1645,9 @@ main = do
     observe "apply Prelude.map to Prelude.not at a known list"
         (Refl :: Prelude.map Prelude.not '[ 'True, 'False] :~: '[ 'False, 'True])
     observe "pass an unapplied type family to another family"
-        (Refl :: MapFlags FlipFlag '[ 'True, 'False] :~: '[ 'False, 'True])
+        (Refl :: Map FlipFlag '[ 'True, 'False] :~: '[ 'False, 'True])
+    observe "map partially applied type-level addition over a list"
+        (Refl :: Map ((TypeNats.+) 1) '[2, 3, 4] :~: '[3, 4, 5])
     observe "replace an equal callback before supplying the input list"
         (sameMapping (Refl :: FlipFlag :~: FlipFlag))
     observe "pass a type family with an unapplied invisible binder"
@@ -2028,14 +2030,14 @@ type family FlipFlag (b :: Bool) :: Bool where
     FlipFlag 'False = 'True
     FlipFlag 'True = 'False
 
--- | Apply an unmatchable Boolean function to each list element.
-type MapFlags :: (Bool %U -> Bool) -> [Bool] -> [Bool]
-type family MapFlags f xs where
-    MapFlags f '[] = '[]
-    MapFlags f (x ': xs) = f x ': MapFlags f xs
+-- | Apply an unmatchable type function to each list element.
+type Map :: (a %U -> b) -> [a] -> [b]
+type family Map f xs where
+    Map f '[] = '[]
+    Map f (x ': xs) = f x ': Map f xs
 
 -- | Equal callbacks give equal traversals before either traversal receives a list.
-sameMapping :: (f :: Bool %U -> Bool) :~: g -> MapFlags f :~: MapFlags g
+sameMapping :: (f :: Bool %U -> Bool) :~: g -> Map f :~: Map g
 sameMapping Refl = Refl
 
 -- | Prove the first output cell without supplying the input tail.
