@@ -4,7 +4,7 @@
 module TypeLambda
   ( L, Captured, Shadowed, WithError, Prefixes, ScopedRow, Mixed, Held, CaseShadow, Rebuild
   , Fields(..), CheckedRow(..), Map, Columns, Optional, withErrors, IndexedTag(..), IndexedCase, IndexedCaseInferred
-  , withScopedErrors, RankedReader, rankedReader, rankedReaderAt
+  , withScopedErrors, taggedCell, RankedReader, rankedReader, rankedReaderAt
   , roadmap, partial, optionalColumns, sameColumnReader, prefixes, mixed, indexedFields
   ) where
 
@@ -49,6 +49,13 @@ withScopedErrors witness = go
     go :: Fields xs -> Fields (Map (\cell -> Either e cell) xs)
     go End = End
     go (Field x rest) = Field (Right x) (withScopedErrors witness rest)
+
+-- | Tag a row cell with the index from the enclosing signature.
+taggedCell :: forall k tag. Proxy (tag :: k) -> Bool -> Fields '[(Proxy tag, Bool)]
+taggedCell proxy value = row
+  where
+    row :: Fields (Map (\cell -> (Proxy (tag :: k), cell)) '[Bool])
+    row = Field (proxy, value) End
 
 -- | Give a cell the table and column indices.
 type RankedReader (k :: Type) (table :: k) =

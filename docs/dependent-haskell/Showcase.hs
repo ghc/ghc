@@ -1711,6 +1711,9 @@ main = do
     case TypeLambda.withScopedErrors (Proxy @Ordering) fields of
         TypeLambda.Field x (TypeLambda.Field y TypeLambda.End) ->
             observe "map row cells with a lambda in a local signature" (x, y)
+    case TypeLambda.taggedCell (Proxy @'True) True of
+        TypeLambda.Field (Proxy, value) TypeLambda.End ->
+            observe "tag a row cell with a local type lambda that infers the capture kind" value
     let lazyFields = TypeLambda.Field 'x' (TypeLambda.Field (error "unused field" :: Bool) TypeLambda.End)
     case TypeLambdaClient.forwardErrors (Proxy @String) lazyFields of
         TypeLambda.Field first _ ->
