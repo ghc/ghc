@@ -215,6 +215,66 @@ if [[ $without != '(False,False)' || $with != '(False,True)' ]]; then
     exit 1
 fi
 
+# An independent local producer can supply an associated equation before
+# the normal instance pass checks the method.
+mkdir "$out"/{associated-provider,associated-reader}
+cat > "$out/associated-reader/Main.hs" <<'HS'
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes, TypeFamilies, TypeOperators #-}
+module Main where
+import AssociatedLocal
+import Data.Type.Equality ((:~:) (Refl))
+
+result :: Payload Token :~: Bool
+result = Refl
+
+main :: IO ()
+main = case result of Refl -> print (value Token :: Bool)
+HS
+(
+    cd "$out/associated-provider"
+    cat > header <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes, TypeFamilies #-}
+module AssociatedLocal where
+class Has t where
+    type Payload t
+    value :: t -> Payload t
+
+data Token = Token
+HS
+    cat > worker <<'HS'
+keep :: a -> a
+keep x = x
+HS
+    cat > instance <<'HS'
+instance Has Token where
+    type Payload Token = AssociatedLocal.keep Bool
+    value _ = True
+HS
+    for order in worker-first equation-first; do
+        if [[ $order == worker-first ]]; then
+            cat header worker instance > AssociatedLocal.hs
+        else
+            cat header instance worker > AssociatedLocal.hs
+        fi
+        "${ghc[@]}" -fforce-recomp -fomit-interface-pragmas             -fno-write-if-simplified-core -c AssociatedLocal.hs
+        cp AssociatedLocal.hi "$out/associated-reader/"
+        ( cd "$out/associated-reader"
+          "${ghc[@]}" -fforce-recomp -c Main.hs
+          "${ghc[@]}" Main.o ../associated-provider/AssociatedLocal.o -o read-associated
+          test "$(./read-associated)" = True )
+    done
+
+    # Typechecking this producer would require the instance it supplies.
+    sed -i 's/^keep x = x$/keep x = const x (value Token)/' AssociatedLocal.hs
+    site=$(awk '/^    type Payload Token/ {print NR ":" index($0, "AssociatedLocal.keep")}' AssociatedLocal.hs)
+    if "${ghc[@]}" -fforce-recomp -c AssociatedLocal.hs > cycle.log 2>&1 ||
+       ! grep -Eq "^AssociatedLocal\.hs:$site(-[0-9]+)?: error: \[GHC-70566\]" cycle.log ||
+       ! grep -Fq 'An associated type equation requires the unfinished local function keep.' cycle.log; then
+        cat cycle.log >&2
+        exit 1
+    fi
+)
+
 # With the same signature, the provider can choose the other opaque type.
 cd ../producer
 sed 's/^importedFirst x _ = x$/importedFirst _ y = y/' ImportedFamilyProvider.hs > changed

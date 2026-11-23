@@ -113,6 +113,7 @@ import qualified LocalOpen
 import qualified LocalAliasField
 import qualified LocalInstance
 import qualified LocalAssociated
+import qualified LocalDerivedAssociated
 import qualified IndependentFamily
 import qualified FamilySignature
 import qualified ImportedFamily
@@ -1602,6 +1603,9 @@ main = do
         (LocalInstance.passValue 'x', LocalInstance.passValue True)
     observe "check an associated type equation before a dependent producer"
         LocalAssociated.result
+    observe "show a local result checked by an associated equation"
+        (Refl :: LocalDerivedAssociated.Flipped 'LocalDerivedAssociated.Stop :~: 'LocalDerivedAssociated.Go,
+         LocalDerivedAssociated.sample ())
     observe "build an optional head when a client supplies the spine constructor"
         (Refl :: FirstMaybe ('Spine.Empty :: Spine.Spine Bool) :~: 'Nothing,
          Refl :: FirstMaybe ('Spine.More 'x' 'Spine.Empty) :~: 'Just 'x')

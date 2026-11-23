@@ -1962,8 +1962,8 @@ inside the solved scope and uses the terms already in scope. Record family
 use through the usual rule checks so a later rule can invalidate the proof.
 -}
 
--- | Check only a closed producer fragment before imported family equations.
--- See Note [Independent imported-family producers].
+-- | Check only an independent producer fragment before family equations.
+-- See Note [Independent producers for family equations].
 tcIndependentFamilyProducers :: [(Name, SrcSpan)] -> HsGroup GhcRn
                              -> ((TcGblEnv, TcLclEnv) -> TcM (TcGblEnv, TcLclEnv))
                              -> TcM (TcGblEnv, TcLclEnv)
@@ -1972,11 +1972,17 @@ tcIndependentFamilyProducers demands group@HsGroup
     env <- getGblEnv
     plugins <- readTcRef (tcg_plugins env)
     let roots = mkNameSet (map fst demands)
-        pending = [(getLocA inst, localUses roots equation)
-                  | tg <- groups, inst <- group_instds tg,
-                    TyFamInstD {tfid_inst = equation@TyFamInstDecl
-                      {tfid_eqn = FamEqn {feqn_tycon = L _ family}}} <- [unLoc inst],
-                    not (nameIsLocalOrFrom (tcg_semantic_mod env) family)]
+        pending = concatMap instance_uses (concatMap group_instds groups)
+        instance_uses inst = case unLoc inst of
+          TyFamInstD {tfid_inst = equation@TyFamInstDecl
+            {tfid_eqn = FamEqn {feqn_tycon = L _ family}}}
+            | not (nameIsLocalOrFrom (tcg_semantic_mod env) family) ->
+                [(getLocA inst, localUses roots equation)]
+          ClsInstD {cid_inst = ClsInstDecl
+            {cid_ext = (_, HsNestedGroup {ng_tyfam_insts = equations})}} ->
+              [(getLocA rhs, localUses roots rhs)
+              | L _ TyFamInstDecl {tfid_eqn = FamEqn {feqn_rhs = rhs}} <- equations]
+          _ -> []
         in_equation (name, loc) (inst_loc, uses) = loc `isSubspanOf` inst_loc && name `elem` uses
         selected = [d | d <- demands, any (in_equation d) pending]
         ordinary_solver = null (solverTcMPlugins plugins) && null (defaultingTcMPlugins plugins) &&
@@ -2312,8 +2318,8 @@ independentConstant expected actual
       left == right && equalLength xs ys && and (zipWith independentConstant xs ys)
   | otherwise = False
 
-{- Note [Independent imported-family producers]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Independent producers for family equations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 An imported family can be named by an imported signature or a class
 instance. A renamed name closure alone cannot justify moving an ordinary
 producer ahead of that family's equation. Check a separate early batch
@@ -2353,6 +2359,12 @@ group_ext. An imported family in a field can depend on the pending
 equation. Reject it before moving any group. The regular source checker
 then receives the remaining type groups and all instances, methods,
 defaults and deriving declarations.
+
+An associated equation can also use an independent local producer.
+Select calls in the right-hand side only. Keep the entire class instance
+in the regular pass. That pass checks its head and equations before
+its methods. The early producer cannot use a dictionary that would
+depend on the pending equation.
 A signed producer can name a closed type family in an input or result.
 Use those resolved names as additional roots of the same type SCC
 closure. Check the family's declaration, its standalone kind signature

@@ -47,9 +47,12 @@ mkdir "$out/indexed-client"
 cp "$out/native"/{DirectIndexedList,DirectIndexedVector,IndexedMatrix,PackedVecLibrary,PrimitiveWordFields}.hi "$out/indexed-client/"
 cp "$examples/packed-vector"/{DirectIndexedVectorClient,IndexedMatrixClient}.hs \
     "$examples/open-evaluation"/{DirectIndexedListClient,PrimitiveWordFieldsClient}.hs "$out/indexed-client/"
+cp "$out/native/LocalDerivedAssociated.hi" \
+    "$examples/open-evaluation/LocalDerivedAssociatedClient.hs" "$out/indexed-client/"
 (
     cd "$out/indexed-client"
-    for module in DirectIndexedListClient DirectIndexedVectorClient IndexedMatrixClient PrimitiveWordFieldsClient; do
+    for module in DirectIndexedListClient DirectIndexedVectorClient IndexedMatrixClient PrimitiveWordFieldsClient \
+                  LocalDerivedAssociatedClient; do
         "${ghc[@]}" "$native_opt" "${native_interfaces[@]}" -i -i. -dcore-lint -dstg-lint -c "$module.hs"
     done
 )

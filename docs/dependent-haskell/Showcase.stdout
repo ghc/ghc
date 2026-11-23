@@ -409,6 +409,7 @@ infer the element type of a nested empty list from its sibling: Refl
 supply the inner constructor to a deferred nested match: (Refl,Refl)
 use a local instance whose method checks a dependent input type: ('x',True)
 check an associated type equation before a dependent producer: True
+show a local result checked by an associated equation: (Refl,Go)
 build an optional head when a client supplies the spine constructor: (Refl,Refl)
 test the selected field of a pair whose other field throws: Refl
 run associated and standalone data instances from a dependent module: (True,False,"StampToken {marked = False}")
