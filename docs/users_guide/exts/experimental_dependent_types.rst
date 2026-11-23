@@ -53,6 +53,25 @@ Here ``Result`` reduces to ``Either String Int``. A module importing the
 synonym can use that equality without enabling the extension. The
 unmatchable arrow in ``WithError`` uses :extension:`Modifiers`.
 
+A closed type family can use ``case`` on the right-hand side of an
+equation. In this example, a local binding computes a default width.
+A second case selects that width or an explicit override::
+
+    {-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeFamilies #-}
+    module WidthGuide where
+    import GHC.TypeNats (Nat)
+
+    type family Width (wide :: Bool) (override :: Maybe Nat) :: Nat where
+      Width wide override =
+        let defaultWidth = case wide of { True -> 3; False -> 2 }
+        in case override of { Nothing -> defaultWidth; Just n -> n }
+
+``Width 'False 'Nothing`` reduces to ``2``. With an unknown ``wide``,
+``Width wide ('Just 7)`` still reduces to ``7``. With an unknown
+``override``, neither branch can be selected. The example uses the
+ordinary type-family termination checks with :extension:`UndecidableInstances`
+disabled.
+
 A type-level let checks its bindings in source order. Each right-hand
 side sees the enclosing scope and the preceding bindings. Each binding
 must kind-check, even if the body ignores it. A kind signature for one
