@@ -301,7 +301,7 @@ and [Agda abstract definitions](https://agda.readthedocs.io/en/v2.8.0/language/a
 
 ### Two vector fields at one length
 
-A next positional case has two vector fields with a common index.
+A positional constructor can store two vectors with one runtime length.
 
 ```haskell
 data Columns where
@@ -317,11 +317,28 @@ flags :: foreach (p :: Columns) -> Vec Bool (size p)
 flags (Columns _ _ bs) = bs
 ```
 
-Each projection should preserve the index of its own input. Reading either vector should leave the other
-unevaluated. A separate client claiming `Vec Bool (S (size p))` should
-fail at the returned field. Check both projections through an interface
-and ensure an older reader reports an unsupported interface before it
-uses evidence that needs the extended constructor kind.
+An ordinary client can use both projections as arguments to `zipVec`.
+
+```haskell
+readPairs :: Columns -> [(Char, Bool)]
+readPairs p = toList (zipVec (letters p) (flags p))
+```
+
+With the provider source hidden, the client returned
+`[('r',True),('s',False)]` at `-O0` and `-O2`. Reading one field left
+the other unevaluated. Using `flags q` as the second argument failed
+there. GHC reported both `size p` and `size q`. A projection claiming
+`Vec Bool ('S (size p))` also failed.
+[Client](../examples/packed-vector/SiblingColumnsClient.hs) and
+[positive and negative cases](../../../testsuite/tests/dependent/should_run/NativeRetainedSiblingFields.sh).
+
+Job 1855 checked upgrades with the component compiler and the 572
+libraries. Both native and typecheck-only builds recompiled the old
+ordinary length worker once. A second build reused every output.
+The older reader ran a stripped interface with an ordinary exported
+signature. It rejected an interface containing an inline unfolding
+that uses the extended constructor. The component compiler inlined
+that unfolding and returned `[True]` with the other field undefined.
 
 In Agda, the types of later bindings in a telescope may refer to an
 earlier binding. This permits both fields to use the same length.

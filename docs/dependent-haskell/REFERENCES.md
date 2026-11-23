@@ -44,7 +44,8 @@ and [R24 source syntax](roadmap/R24-constrained-type-families.md#source-syntax-a
 R04 uses an ordered telescope for a record with several indexed fields.
 One stored length can occur in the types of two later vectors. Instantiate
 both field types with that same binder when opening the package.
-[Agda telescopes](https://agda.readthedocs.io/en/v2.8.0/language/telescopes.html)
+[Agda telescopes](https://agda.readthedocs.io/en/v2.8.0/language/telescopes.html),
+[GHC proposal 378 on retained dependent arguments](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html)
 and [two vector fields at one length](roadmap/R04-dependent-sums.md#two-vector-fields-at-one-length).
 
 R04 also needs projections of an abstract package. Haskell permits
