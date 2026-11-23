@@ -236,10 +236,20 @@ function set_toolchain_paths() {
   fi
 }
 
-function cabal_update() {
+function cabal_update_once() {
   # In principle -w shouldn't be necessary here but with
   # cabal-install 3.8.1.0 it is, due to cabal#8447.
   run "$CABAL" update -w "$GHC" "hackage.haskell.org,${HACKAGE_INDEX_STATE}"
+}
+
+function cabal_update() {
+  local delay
+  for delay in 60 120; do
+    cabal_update_once && return
+    info "Retrying cabal update in $delay seconds"
+    sleep "$delay"
+  done
+  cabal_update_once
 }
 
 
