@@ -138,6 +138,21 @@ a bound variable.
 [equality evidence](../../../compiler/GHC/Builtin/CoercionRules.hs) and
 [Agda function equality](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html).
 
+A local value signature exposes a remaining placement restriction.
+For example, a row mapper can take its error type `e` from the
+enclosing signature and recurse on the row inside a `where` clause.
+
+```haskell
+    go :: forall (ys :: [Type]). Fields ys -> Fields (Map (WithError e) ys)
+    go End = End
+    go (Field x rest) = Field (Right x) (go rest)
+```
+
+With the top-level synonym `type WithError e a = Either e a`, this
+definition compiles. Replacing only `WithError e` with
+`(\x -> Either e x)` reports GHC-27185 at the backslash. Job 1679
+checked both spellings on normal 567 and the erased-forall component.
+
 ## Rows under an erased forall
 
 ```haskell
