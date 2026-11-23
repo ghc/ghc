@@ -31,8 +31,10 @@ selected = Proxy @Bool
 HS
 "${g[@]}" -fomit-interface-pragmas -c SignatureLet.hs
 cat >SignedLets.hs <<'HS'
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, KindSignatures #-}
-module SignedLets (Braced, Layout, CaseChain) where
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, KindSignatures, PolyKinds #-}
+module SignedLets (Braced, Layout, CaseChain, DependentCase) where
+import Data.Kind (Type)
+import Data.Proxy (Proxy)
 
 type Braced (b :: Bool) = let { tag = Bool; tag :: tag; tag = b } in tag
 
@@ -46,6 +48,13 @@ type CaseChain (b :: Bool) =
   let first = case b of { True -> 'False; False -> 'True }
       second = case first of { True -> 'True; False -> 'False }
   in '(first, second)
+
+type DependentCase (k :: Type) (x :: k) (flag :: Bool) (use :: Bool) =
+  let k :: Type
+      k = case flag of { True -> Bool; False -> Char }
+      result :: Type
+      result = case use of { True -> (Proxy x, Maybe k); False -> (Proxy x, Ordering) }
+  in result
 HS
 "${g[@]}" -fomit-interface-pragmas -ddump-parsed -c SignedLets.hs >parsed.txt
 {
@@ -132,7 +141,7 @@ import PairBindings (AliasCount, Held, KnownPrefix, ShadowCount,
                      Axis(..), AxisLength, Volume(..), VolumeRows, VolumeFields,
                      Grid(..), GridTotal, GridRows, GridHeld, OpaqueGrid, OpaqueColumn)
 import qualified SignatureLet
-import SignedLets (Braced, Layout, CaseChain)
+import SignedLets (Braced, Layout, CaseChain, DependentCase)
 import TypeLet
 
 roadmap :: F Bool :~: Ordering
@@ -167,6 +176,14 @@ layout = Refl
 
 caseChain :: CaseChain 'True :~: '( 'False, 'False)
 caseChain = Refl
+
+dependentCapture :: DependentCase (Maybe Bool) ('Just 'True) 'True 'True
+                 :~: (Proxy ('Just 'True), Maybe Bool)
+dependentCapture = Refl
+
+dependentUnused :: Proxy flag -> DependentCase (Maybe Bool) ('Just 'True) flag 'False
+                :~: (Proxy ('Just 'True), Ordering)
+dependentUnused _ = Refl
 
 knownPair :: DimensionSum '(2, 3) :~: 5
 knownPair = Refl
@@ -252,6 +269,17 @@ reject() {
 }
 
 reject UnknownWidth 7:13 83865 'Refl'
+
+cat >DependentMismatch.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
+module DependentMismatch where
+import Data.Proxy (Proxy)
+import Data.Type.Equality ((:~:)(Refl))
+import SignedLets (DependentCase)
+mismatch :: DependentCase (Maybe Bool) ('Just 'True) 'True 'True :~: (Proxy ('Just 'False), Maybe Bool)
+mismatch = Refl
+HS
+reject DependentMismatch 7:12 83865 'Refl'
 
 cat >RefutableProduct.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}

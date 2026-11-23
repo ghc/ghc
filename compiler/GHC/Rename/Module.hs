@@ -557,6 +557,15 @@ liftedTypeVarBinder v =
   L (l2l (getLoc v)) (HsTvb noAnn (HsBndrRequired noExtField)
     (HsBndrVar noExtField v) (HsBndrNoKind noExtField))
 
+-- | Rename occurrences whose binding sites the caller has identified.
+renameCaptures :: Data a => [(RdrName, RdrName)] -> a -> a
+renameCaptures [] node = node
+renameCaptures copied node
+  | Just rdr <- cast node
+  , Just replacement <- lookup rdr copied
+  = fromMaybe node (cast replacement)
+  | otherwise = gmapT (renameCaptures copied) node
+
 {- Note [Lifting types from signatures and fields]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Give each lifted expression a private synonym. For a retained sum,
@@ -1084,14 +1093,6 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
           | Just rdr <- cast node = [rdr | rdr `elem` exact_retained]
           | otherwise = concat (gmapQ exactUses node)
 
-    renameCaptures :: Data a => [(RdrName, RdrName)] -> a -> a
-    renameCaptures [] node = node
-    renameCaptures copied node
-      | Just rdr <- cast node
-      , Just replacement <- lookup rdr copied
-      = fromMaybe node (cast replacement)
-      | otherwise = gmapT (renameCaptures copied) node
-
     copyable :: Data a => a -> Bool
     copyable node = case cast node :: Maybe (LHsType GhcPs) of
       Just (L _ HsSpliceTy{}) -> False
@@ -1299,7 +1300,10 @@ kind-checking group publishes the first family's equations.
 Follow free uses through ordinary alias RHSs. This also finds a case
 result that a later row uses through several local names. A shadowed
 capture can still be needed by a preceding alias. Give it a private
-name and keep its argument position for that alias.
+name and keep its argument position for that alias. Also keep it when
+a later capture's kind uses it. Rename that occurrence in the copied
+kind before adding the new binder. The written RHS still uses the
+enclosing scope.
 
 Both sides of a function arrow have the arrow's lexical scope.
 Lift each side with the same captures. Keep the original arrow and
@@ -1493,31 +1497,30 @@ liftTypeCases group =
       | otherwise = or (gmapQ (mentionsBinder name) node)
 
     caseBodyCaptures captures aliases binder captures_result salt =
-      case hidden of
-        [] -> Just (withResult captures, Nothing)
-        [(_, _, current)] -> do
-          kinds <- concat <$> traverse captureKindNames outer
-          guard (unLoc binder `notElem` kinds)
-          if null aliases
-            then Just (withResult outer, Nothing)
-            else do
-              let saved = L (getLoc binder)
-                    (mkRdrUnqual (mkTyVarOcc ("$case-let-shadow:" ++ show salt)))
-                  save = unLoc current == unLoc binder
-                  actual = if save then saved else current
-                  binding = if save then Just (saved, current) else Nothing
-              renamed <- traverse (renameShadowed saved actual) captures
-              pure (withResult renamed, binding)
+      case break shadows captures of
+        (_, []) -> Just (withResult captures, Nothing)
+        (earlier, (L loc header@HsTvb{tvb_var = HsBndrVar ann _}, _, current) : later)
+          | all (not . shadows) later -> do
+              -- The kind fragment checked here has no local binders.
+              kinds <- concat <$> traverse captureKindNames later
+              if null aliases && unLoc binder `notElem` kinds
+                then Just (withResult (earlier ++ later), Nothing)
+                else do
+                  let saved = L (getLoc binder)
+                        (mkRdrUnqual (mkTyVarOcc ("$case-let-shadow:" ++ show salt)))
+                      save = unLoc current == unLoc binder
+                      actual = if save then saved else current
+                      binding = if save then Just (saved, current) else Nothing
+                      renamed = (L loc header{tvb_var = HsBndrVar ann saved}, saved, actual)
+                      rest = map (renameCaptureKind saved) later
+                  pure (withResult (earlier ++ (renamed : rest)), binding)
         _ -> Nothing
       where
         shadows (_, v, _) = unLoc v == unLoc binder
-        (hidden, outer) = partition shadows captures
         withResult cs = cs ++ [(liftedTypeVarBinder binder, binder, binder) | captures_result]
-        renameShadowed saved actual capture
-          | not (shadows capture) = Just capture
-          | (L loc header@HsTvb{tvb_var = HsBndrVar ann _}, _, _) <- capture =
-              Just (L loc header{tvb_var = HsBndrVar ann saved}, saved, actual)
-          | otherwise = Nothing
+        renameCaptureKind saved (L loc header@HsTvb{tvb_kind = kind}, name, actual) =
+          (L loc header{tvb_kind = renameCaptures [(unLoc binder, unLoc saved)] kind}, name, actual)
+        renameCaptureKind _ capture = capture
 
     -- Follow an ordered chain to a case, including cases in binding RHSs.
     -- A written result kind needs the preceding helpers before checking the
