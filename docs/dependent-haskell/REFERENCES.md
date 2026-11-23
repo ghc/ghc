@@ -7624,6 +7624,21 @@ See Note [List interpretation of zipper fusion] in GHC.Tc.Gen.SourceTable.
 [Johann and Voigtländer, Theorem 8.2](https://janis-voigtlaender.eu/JV06.html)
 and [zipper rule and demand checks](../../testsuite/tests/dependent/should_run/NativeOpenPreludeZipWith.sh).
 
+### List fusion at two empty inputs
+
+Agda registers a propositional equality as a computation rule with
+`REWRITE`. GHC allows a programmer to supply an optimizer rule and
+assumes that its two sides have the same meaning. In the R16 control,
+the program supplies a deliberately false rule for a list builder.
+Stock fusion introduces that builder while rewriting `map f (zip [] [])`.
+The optimized program then returns one character. A checker that uses
+the source equation to establish a length must account for rules on
+the introduced builder as well as on the source functions.
+[Agda rewrite rules](https://agda.readthedocs.io/en/v2.8.0/language/rewriting.html#general-shape-of-rewrite-rules),
+[GHC rule semantics](../users_guide/exts/rewrite_rules.rst),
+[the fork's specialiser fix](https://github.com/Tritlo/ghc/commit/bc3798ad63) and
+[the stock and fork measurements](roadmap/R16-open-term-evaluator.md#a-rule-can-change-the-result-even-when-both-lists-are-empty).
+
 ### Append fusion with a strict producer
 
 Agda's `length-++` uses induction on the left list. HaskLib follows

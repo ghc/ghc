@@ -2802,3 +2802,40 @@ rejects a producer that constructs one cell without inspecting its step.
 The fork still needs a rule policy that can distinguish these uses.
 [Producer and counts](../examples/open-evaluation/MapZipFusionCounts.hs)
 and [source law and fusion conditions](../REFERENCES.md#map-length-after-filter-and-build).
+
+#### A rule can change the result even when both lists are empty
+
+```haskell
+observe :: String
+observe = map label (zip ([] :: [Bool]) ([] :: [()]))
+```
+
+Here `label` raises an error if called. The source equation for `zip`
+returns `[]`, and `map` returns `[]` without calling `label`. Job 2029
+compiled the observer separately from the module that prints its result.
+That module also supplies an opaque replacement string.
+
+Job 2045 ran the same five cases with fresh objects on each compiler.
+
+| Observer at `-O2` | Fork `db2586fdc2` | Released GHC 9.14.1 |
+| --- | --- | --- |
+| Stock rules | `""` | `""` |
+| Stock rules with `-fno-enable-rewrite-rules` | `""` | `""` |
+| A rule that replaces `build @Char g` with `"X"` | `"X"` | `"X"` |
+| Replacement rule and `-fno-enable-rewrite-rules` | `""` | `"X"` |
+| Same flags plus `-fno-specialise` | `""` | `""` |
+
+The firing log records `zip`, `map`, `fold/build` and the replacement
+rule. The source of `observe` contains no call to `build`. Checking only
+the two list constructors or the rules on `map` would admit a proof
+when the replacement rule fires. The closed proof still fails with the stock rules in
+the 16-case comparison above. The open task is to admit that case
+while rejecting the replacement.
+
+Job 2041 captured Core before and after specialisation. With rewrite
+rules disabled, GHC 9.14.1 entered the specialiser with
+`map label (zip [] [])` and left it with `replacement`. The fork
+preserved the input expression at that pass. This exercises the fork's
+existing fix for disabled rewrite rules in the specialiser.
+[Replay](../examples/open-evaluation/observe-closed-map-zip.sh) and
+[rewrite rule provenance](../REFERENCES.md#list-fusion-at-two-empty-inputs).

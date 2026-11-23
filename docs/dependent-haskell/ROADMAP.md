@@ -12,6 +12,9 @@ For the active checkout, combined build and next verification step, see
 the [project handoff](HANDOFF.md).
 The [HaskLib package](README.md#reuse-a-proof-with-hasklib) collects
 the checked list laws for reuse by other modules.
+The [PLFH notebook](../../PLFH-NOTES.md) tracks which proofs from
+*Programming Language Foundations in Agda* can be stated and checked
+with the same hypotheses in the fork.
 
 ## Where this fork stands
 
@@ -154,14 +157,14 @@ source examples. General promotion remains open.
 
 | Card | Next result | Acceptance check |
 | --- | --- | --- |
-| [R17 Type-level lambdas](roadmap/R17-type-level-lambdas.md#type-lambdas-in-untyped-quotations) | Compare an inline callback in a visible type argument with the same callback in an expression signature. | Check closed, captured and spliced type arguments against the named callback. A free name must retain its scope error. |
+| [R17 Type-level lambdas](roadmap/R17-type-level-lambdas.md) | Qualify equality between a named family callback and a lambda that forwards its argument to that family. Check whether users can substitute one for the other inside a partially applied family. | Use a list of unknown shape. Read the proof through an interface. Check that two different captures still fail and that the equality cannot be used to infer an argument from a family result. |
 | [R23 Unsaturated families](roadmap/R23-unsaturated-type-families.md#passing-built-in-arithmetic-to-map) | Direct and synonym-wrapped built-ins work in ordinary clients. The previous reader gives GHC-47808 for an interface containing a partial built-in. | Resolve the default matchability of unannotated transformer kind synonyms in ordinary modules. |
 | [R16 Open evaluation](roadmap/R16-open-term-evaluator.md#map-length-and-sharing-under-stock-fusion) | Determine when a source-hidden client can use `lengthMap` with default optimization. The published proof has a stock fusion counterexample. | Preserve rejection when the mapped and plain counts have different definedness. An accepted use must account for rewrites exposed on either side, including rules on `filter`. Verify the same condition through a re-export. |
-| [R16 Proofs over zip](roadmap/R16-open-term-evaluator.md#map-over-the-result-of-zip) | Both element types can be inferred from the lists. The source equation now composes in an installed HaskLib client. | Check the mapped count and the minimum at independently optimized call sites, including a producer that inspects its fold step. |
+| [R16 Proofs over zip](roadmap/R16-open-term-evaluator.md#a-rule-can-change-the-result-even-when-both-lists-are-empty) | Admit the proof for two literal empty lists under stock optimization. The private compiler still rejects it with both the old and rebuilt HaskLib interfaces. | Keep rejecting a rule that changes the empty result by rewriting the list builder introduced by fusion. Also check independent counts for a producer that inspects its fold step. |
 | [R03 Dependent products](roadmap/R03-dependent-products.md#using-an-imported-function-in-an-index) and [R15 Closed evaluation](roadmap/R15-closed-term-evaluator.md) | The 554-line release preserves the identity of imported functions in a retained index. The 555-line release publishes the checked lower-case and title-case equations. The 556-line release checks a local character predicate in its defining module and exports the synonym to ordinary clients. | An ordinary client must specialize an imported synonym at a Unicode literal. Changing a producer equation must invalidate its proof. An executable-only call must still track its object dependency. |
 | [R16 Append proofs](roadmap/R16-open-term-evaluator.md#append-fusion-and-an-undefined-right-list) | Check which consumer observes the appended list in a source-hidden proof. | Distinguish the recursive cell count from a strict outer fold. Check the seed position, the consumer equations and the reachable rewrite rules. |
 | [R21 Declaration dependencies](roadmap/R21-dependency-analysis.md#deriving-and-associated-equations) | A local producer can supply an associated equation. Its result datatype can have an attached deriving clause. The keyed-tree proof still awaits the cross-module proof guard. | Compare the instance and deriving diagnostics in both source orders and check a reader that imports only the interface. |
-| [R04 Dependent sums](roadmap/R04-dependent-sums.md#separate-named-fields-and-dependent-projections) and [R21 Declaration dependencies](roadmap/R21-dependency-analysis.md) | Two hand-written projections can share a stored length. Try the same declaration with named record fields and generated selectors. | Check construction, field selection, field demand and a reader of the compiled interface. Preserve existing field scoping in ordinary GADT declarations. |
+| [R04 Dependent sums](roadmap/R04-dependent-sums.md#separate-named-fields-and-dependent-projections) and [R21 Declaration dependencies](roadmap/R21-dependency-analysis.md) | The published compiler supports generated selectors and updates that replace the length and both payloads. Qualify an ordinary client that compares two stored lengths before copying one payload. | Test equal and unequal lengths through compiled interfaces. The comparison must provide the witness for an omitted payload. Keep the laziness and unequal-index controls. |
 
 R41 is complete on the fork. R03 remains partial after the 554-line release.
 R16 has a stock-compiler counterexample to unconditional append fusion.

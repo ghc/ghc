@@ -118,3 +118,7 @@ grep -Fxq 'consumeZip zipWith' demand.firings
 grep -Fxq 'consumeZip foldr2/left' demand.firings
 grep -Fxq 'consumeFilter filter' demand.firings
 grep -Fxq 'consumeFilter fold/build' demand.firings
+
+bash "$examples/observe-closed-map-zip.sh" "$1" "$2" >closed-zip.out
+diff -u <(printf '%s\t%s\n' stock '""' disabled '""' helper '"X"' \
+    helper-disabled '""' helper-disabled-no-specialise '""') closed-zip.out
