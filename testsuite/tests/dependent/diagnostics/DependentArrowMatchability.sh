@@ -63,8 +63,16 @@ HS
 
     sed 's/^module DependentArrowMatchability/module Rejected/' \
         DependentArrowMatchability.hs > Rejected.hs
-    printf '\ntype BadAppliedDefault = AppliedDefault P.Abstract\n' >> Rejected.hs
-    reject "$(wc -l < Rejected.hs | tr -d ' ')" '[GHC-83865]' -X"$mode"
+    printf '\ntype AppliedAbstract = AppliedDefault P.Abstract\n' >> Rejected.hs
+    if [[ $mode == NoExperimentalDependentTypes ]]; then
+        reject "$(wc -l < Rejected.hs | tr -d ' ')" '[GHC-83865]' -X"$mode"
+    else
+        cat >> Rejected.hs <<'HS'
+appliedAbstract :: AppliedAbstract :~: (Proxy P.Abstract, P.Abstract Bool)
+appliedAbstract = Refl
+HS
+        "${ghc[@]}" -fforce-recomp -X"$mode" -c Rejected.hs
+    fi
 
     sed 's/^module DependentArrowMatchability/module Rejected/' \
         DependentArrowMatchability.hs > Rejected.hs

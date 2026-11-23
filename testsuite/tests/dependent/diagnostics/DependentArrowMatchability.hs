@@ -38,7 +38,7 @@ mixedUses = Refl
 mixedUsesReversed :: BareFirst P.Abstract :~: (P.D (Type %U -> Type) P.Abstract, P.Abstract Bool)
 mixedUsesReversed = Refl
 
--- | Keep M if the RHS requires an arrow but leaves matchability open.
+-- | Infer the callback index with unsaturation. Otherwise it defaults to M.
 type AppliedDefault f = (Proxy f, f Bool)
 
 appliedDefault :: AppliedDefault Maybe :~: (Proxy Maybe, Maybe Bool)
