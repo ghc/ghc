@@ -223,6 +223,7 @@ import qualified DependentPair as Pair
 import qualified DependentProjection as Pair
 import qualified RetainedProjection
 import qualified RetainedCharClient
+import qualified SiblingColumnRow
 import qualified SiblingColumns
 import qualified SiblingColumnsClient
 import qualified QualifiedPiLibrary as Qualified
@@ -2467,6 +2468,10 @@ listBoundaries = do
             (VCons 'r' (VCons 's' VNil))
             (VCons True (VCons False VNil))
     observe "zip two vectors at their shared stored length" (SiblingColumnsClient.readPairs columns)
+    let unpack :: TypeLambda.Fields '[Vec Char n, Vec Bool n] -> (String, [Bool])
+        unpack (TypeLambda.Field xs (TypeLambda.Field ys TypeLambda.End)) = (toList xs, toList ys)
+    observe "put two columns in a row indexed by the record length"
+        (unpack (SiblingColumnRow.packRow columns))
     observe "project the length of a known dependent package in a type"
         (Refl :: PackedProjection.Length PackedProjection.One :~: 'S 'Z)
     let vector = Retain n (replicateNative n 'x') :: Retained (Vec Char)
