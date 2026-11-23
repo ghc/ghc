@@ -2670,10 +2670,10 @@ is the left side of `lengthZip`, so `trans` can join the two proofs.
 
 ```haskell
 lengthMapZip f xs ys =
-    trans (lengthMap f (zip @a @b xs ys)) (lengthZip xs ys)
+    trans (lengthMap f (zip xs ys)) (lengthZip xs ys)
 ```
 
-Job 1876 checked the exported proof from a fresh package installation
+Job 1876 checked the explicitly instantiated proof from a fresh package installation
 at both optimization levels with rewrite rules disabled. It observed
 the same list and callback demand as the inductive proof.
 [List laws](../hasklib/HaskLib/List.hs).
@@ -2684,3 +2684,18 @@ with GHC-83605 at the retained argument. The first list fixes `a`.
 The declaration of the second list supplies `b`. Giving the
 intermediate list a local name also failed with GHC-83865 in job 1870.
 [Implicit arguments and visible type applications](../REFERENCES.md#inferring-the-element-types-of-zip).
+
+
+Job 1883 checked the implicit form, an explicit first argument, and
+both explicit arguments. All three preserved the list and callback
+demand at `-O0` and `-O2` with rewrite rules disabled. Job 1888
+also checked grouped and infix applications. Job 1889 built HaskLib
+from its source distribution with the implicit proof shown above,
+installed it and linked fresh clients at both optimization levels.
+
+The independent vector append test passed at its declared length at
+`-O0`, including the conflict and missing-information controls. At
+`-O2` a rewrite rule on the provider blocks the checked vector call
+even with all type arguments supplied. Replacing the declared addition
+by its normalized result also fails with explicit type arguments.
+Jobs 1891 and 1894 distinguish these cases from argument inference.

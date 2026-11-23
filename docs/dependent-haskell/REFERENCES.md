@@ -8579,10 +8579,10 @@ and [R41 implementation](roadmap/R41-nested-quantification-in-gadts.md#a-newtype
 
 Agda's implicit arguments let an ordinary operand determine an omitted
 parameter. In Haskell, visible type application supplies a specified
-parameter in the order given by an explicit `forall`. The HaskLib proof
-uses that spelling for the two element types of `zip`. The inference
-experiment asks whether the declarations of `xs` and `ys` supply the
-same two types when `zip xs ys` occurs in a retained operand.
+parameter in the order given by an explicit `forall`. The explicit HaskLib control
+uses that spelling for the two element types of `zip`. In the implicit
+proof, the declarations of `xs` and `ys` supply those types when
+`zip xs ys` occurs in a retained operand.
 [Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html),
 [GHC visible type application](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_applications.html)
 and [R16 list proof](roadmap/R16-open-term-evaluator.md#map-over-the-result-of-zip).
