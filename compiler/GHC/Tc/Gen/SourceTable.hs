@@ -1871,7 +1871,10 @@ After checking the rows, keep the public Id and its closed family together.
 Install SourceTableId on this Id in the global type environment. Desugaring
 copies these details to the matching binder and occurrences. The original
 external Name identifies the owner even if Tidy makes its name internal.
-A fresh binder with copied details has a different Unique.
+A record selector stores this external Name in its FieldLabel. Compare
+the current Id with the stored Name by Unique. Read the defining module
+from the stored Name. A fresh binder with copied details has a different
+Unique.
 
 Store the family Name in the function's interface declaration. This makes
 its ABI depend on the equations. The typechecker reads the same declaration

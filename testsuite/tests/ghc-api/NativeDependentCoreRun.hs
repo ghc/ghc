@@ -6295,6 +6295,8 @@ runSourceCallIndexChecks = do
     parsed <- parseSourceTarget "NativeSourceCallIndices" $ unlines
         [ "{-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}"
         , "module NativeSourceCallIndices where"
+        , "import Data.Proxy (Proxy)"
+        , "data Packed = Packed { flag :: Bool, token :: Proxy flag }"
         , "flipNative :: Bool -> Bool"
         , "flipNative False = True"
         , "flipNative True = False"
@@ -6317,6 +6319,7 @@ runSourceCallIndexChecks = do
     (certified, rhs) <- binding "flipNative"
     (outer, outerRhs) <- binding "stayNative"
     (poly, polyRhs) <- binding "polyNative"
+    (selector, _) <- binding "flag"
     family <- case sourceTableId_maybe certified of
         Just table -> pure table
         Nothing -> fail "FAIL: checked source function lost its equation certificate"
@@ -6345,6 +6348,11 @@ runSourceCallIndexChecks = do
                 Just actual | actual `eqType` expected -> pure ()
                 _ -> fail ("FAIL: " ++ label ++ "; source call selected another index")
         checkIndex "source call" (nativeSourceCallIndex (call bound operand))
+        case sourceTableId_maybe selector of
+            Just table
+              | sourceTableId_maybe (localiseId selector) == Just table
+              , isNothing (sourceTableId_maybe (setIdUnique selector (unique 17999))) -> pure ()
+            _ -> fail "FAIL: retained record selector lost its owner or accepted a fresh owner"
         checkIndex "retained source call" (retainedArgIndex (call bound operand))
         let sourceCall = call bound operand
             trueWorker = dataConWorkId trueDataCon

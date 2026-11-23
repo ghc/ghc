@@ -134,6 +134,7 @@ import GHC.Prelude
 
 import GHC.Types.Id.Info
 import GHC.Types.Basic
+import GHC.Types.FieldLabel (flSelector)
 
 -- Imported and re-exported
 import GHC.Types.Var( Id, CoVar, JoinId,
@@ -217,18 +218,18 @@ idName    = Var.varName
 -- See Note [Source table Ids] in GHC.Tc.Gen.SourceTable.
 sourceTableId_maybe :: Id -> Maybe TyCon
 sourceTableId_maybe fun
-  | Just table <- case idDetails fun of
-                    SourceTableId owner table _ | owner == name -> Just table
-                    RecSelId{sel_sourceTable = table} -> table
-                    _ -> Nothing
-  , Just mod <- nameModule_maybe name
+  | Just (owner, table) <- case idDetails fun of
+        SourceTableId name tbl _ -> Just (name, tbl)
+        RecSelId{sel_fieldLabel = field, sel_sourceTable = Just tbl}
+          -> Just (flSelector field, tbl)
+        _ -> Nothing
+  , owner == idName fun
+  , Just mod <- nameModule_maybe owner
   , nameModule_maybe (tyConName table) == Just mod
-  , nameOccName (tyConName table) == mkSourceTableOcc (nameOccName name)
+  , nameOccName (tyConName table) == mkSourceTableOcc (nameOccName owner)
   , Just _ <- closedFamilyTyConCoAxiom_maybe table
   = Just table
   | otherwise = Nothing
-  where
-    name = idName fun
 
 -- | Test the origin of an already validated source table owner.
 sourceTableKeepsExecutable :: Id -> Bool
