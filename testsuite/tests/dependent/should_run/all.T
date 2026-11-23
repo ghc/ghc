@@ -35,6 +35,11 @@ test('NativeLocalOpen',
                    open_eval_dir + 'LocalAliasField.hs', open_eval_dir + 'PreludeMapLengthSize.hs'])],
      run_command, ['bash NativeLocalOpen.sh "{compiler}" "{libdir}" '
                    + config.ghc_th_way_flags])
+test('NativeKeyTree',
+     [req_interp, req_rts_linker, only_ways(['normal']),
+      extra_files(['SameGroupKeyTreeProof.hs'])],
+     run_command, ['bash NativeKeyTree.sh "{compiler}" "{libdir}" '
+                   + config.ghc_th_way_flags])
 test('NativeImportedFamily',
      [only_ways(['normal']),
       extra_files([open_eval_dir + 'ImportedFamilyProvider.hs', open_eval_dir + 'ImportedFamily.hs',
