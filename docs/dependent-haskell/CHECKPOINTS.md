@@ -6,6 +6,41 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Size-bounded list prefixes in HaskLib
+
+Compiler `687b465aad` checks the three source equations of the ordinary
+list function `takeSize`. The proof in a separate module recurses on the
+smaller bound and list tail. An installed client can import it from
+`HaskLib`. [Proof](hasklib/HaskLib/List.hs) and [producer](hasklib/HaskLib/List/Prefix.hs).
+
+```haskell
+lengthTakeSize :: forall a. foreach (n :: Size) -> foreach (xs :: [a])
+               -> size (takeSize n xs) :~: minSize n (size xs)
+```
+
+Job 1650 built both stages. All 567 Showcase observations matched at
+native `-O0`, default `-O2` and in GHCi. All 18 selected registrations
+passed. Cabal built and tested the source distribution offline. Two
+independent clients used the installed package. The demand checks cover
+a zero bound with an undefined list and a finite prefix of an infinite
+list. Even for an empty list the producer must inspect the bound first.
+[Package checks](hasklib-test/Main.hs).
+
+All 234 compatibility cases passed (231 normal test registrations and
+three GHCi registrations). The focused suite passed 137 of 138. The
+remaining `deriving-via-compile` diagnostic for `MTrans` matched the
+saved baseline byte for byte. The seven polykinds cases listed under
+the preceding checkpoint remain outside these suites.
+
+With a 567 provider and reader, a separate optimized client proved the
+zero-prefix equation and rejected the false successor result at `Refl`
+(GHC-83865). The 566 reader reported GHC-83605 for both direct claims at
+default `-O2`. With rewrite rules disabled it accepted the true claim
+and rejected the false one. A 567 reader of a 566 provider reported
+GHC-70565 because the older interface lacked the checked equations.
+Upgrading recompiled the unchanged provider once and preserved the
+unrelated interface. The next warm build reused both.
+
 ## Lexical type lets and cases in closed family equations
 
 Normal compiler `b6ddbb4ce8` preserves the result of inserting an

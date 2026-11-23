@@ -11,7 +11,24 @@ and its [expected output](Showcase.stdout) are the executable examples.
 Updated 23 November 2026. The development branch is
 `dependent-haskell`. Use the fork command below to find its latest commit.
 
-The current compiler is `b6ddbb4ce8`. It qualifies R18 local
+The current compiler is `687b465aad`. HaskLib exports `lengthTakeSize`,
+a proof that taking a prefix of a list gives the smaller of the bound
+and the list length. Its producer is ordinary Haskell. Job 1650 built
+both compiler stages. All 567 Showcase observations matched at native
+`-O0`, default `-O2` and in GHCi. All 234 compatibility cases and 137 of 138
+focused cases passed. The existing `MTrans` diagnostic matched its
+baseline. The previous reader needs rewrite
+rules disabled to check the direct zero-prefix equation through a new
+provider interface. [Qualification and reader checks](CHECKPOINTS.md#size-bounded-list-prefixes-in-hasklib).
+
+R17 is the next integration. Its candidate handles type lambdas in
+constructor fields, beneath arrows in family instances, and inside
+explicitly kinded erased `forall` binders. The 566 reader can use a new
+field through an ordinary compiled interface. It reports GHC-55017 when
+Template Haskell splices the reified selector type. The candidate passes
+that round trip. These are component results.
+
+The preceding R18/R19 compiler is `b6ddbb4ce8`. It qualifies R18 local
 type-level definitions, including scope through intervening aliases and
 shadowed kind binders. R19 now supports a case in a closed family
 equation, including a decreasing recursive call. The two-stage build
@@ -20,14 +37,6 @@ compatibility cases and 136 of 137 focused cases. The remaining
 failure is the existing `MTrans` diagnostic. The initial source-case
 driver exited 1. Corrected job 1649 verified all 42 O0/O2 source-case
 statuses on the same binary. [Release evidence](CHECKPOINTS.md#lexical-type-lets-and-cases-in-closed-family-equations).
-
-The next normal build is job 1650 at `687b465aad` in
-`r13-hasklib-prefix-normal-567-20261123`. Recover its source from
-`refs/archive/dependent-haskell/2026-11-23/r13-prefix-normal-567`.
-The ordinary function `takeSize` computes a bounded list prefix and
-the HaskLib witness proves its length is `minSize n (size xs)`. The
-component passed the Cabal package build and source-hidden client
-checks. The other active card is R17 type-level lambdas.
 
 The preceding compiler is `049ac2c031`. It accepts
 `Map ((+) 1) '[2, 3, 4]` and can use a previous type-level case result
@@ -505,8 +514,8 @@ defaults and an opt-in migration warning.
 
 ## Build and verify
 
-The 566-line Showcase uses the normal two-stage compiler at
-`b6ddbb4ce8` in `r18-r19-combined-normal-20261123`.
+The 567-line Showcase uses the normal two-stage compiler at
+`687b465aad` in `r13-hasklib-prefix-normal-567-20261123`.
 On this host the bootstrap tools are GHC 9.14.1, Cabal 3.18.1.0, Happy 2.1.7
 and Alex 3.5.4.0. A fresh checkout needs the Git submodules at their recorded
 revisions. This build copied the preceding build tree, ran `./boot`
@@ -519,7 +528,7 @@ self-hosted stage 2 compiler in `_build/stage1/bin/ghc`. Both use the
 target libraries in `_build/stage1/lib`. For example, from the main checkout:
 
 ```sh
-stable="$PWD/_build/on-demand/r18-r19-combined-normal-20261123/source/_build/stage1"
+stable="$PWD/_build/on-demand/r13-hasklib-prefix-normal-567-20261123/source/_build/stage1"
 queue="$PWD/docs/dependent-haskell/tools/ghc-build-job"
 check="$PWD/docs/dependent-haskell/check-showcase.sh"
 "$queue" showcase-stage2-ghci bash "$check" "$stable/bin/ghc" "$stable/lib" --ghci
@@ -560,4 +569,9 @@ build trees removed. All five linked and ran a native program and
 evaluated the same expression in GHCi. Cleanup recovered
 11,673,653,248 bytes. The source revisions and build recipes remain.
 See `retirement-555-556-558-20261123/retired.tsv`.
+Job 1665 tested seven native and interactive compilers and three package
+clients while four older compiler trees were absent. Removing the trees
+recovered 15,574,077,440 bytes. Eight historical run names referred to
+these four trees. Their source revisions, recipes and test logs remain.
+See `retirement-four-archived-compilers-20261123/retired.tsv`.
 [Retention rules](CHECKPOINTS.md#clean-up-after-each-experiment).
