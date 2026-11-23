@@ -161,7 +161,7 @@ unqualified x = x
 qualified :: forall a. a -> P.id a
 qualified x = x
 
-implicit :: Proxy (id a)
+implicit :: forall id a. Proxy (id a)
 implicit = Proxy
 
 keepScope :: Proxy (Maybe Int)

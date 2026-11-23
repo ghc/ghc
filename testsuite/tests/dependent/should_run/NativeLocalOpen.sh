@@ -125,7 +125,7 @@ module NativeLocalOpenNames where
 pick x = x
 explicit :: forall a. a -> pick a
 explicit x = x
-implicit :: pick a -> pick a
+implicit :: forall pick a. pick a -> pick a
 implicit x = x
 twoBinders :: Maybe Bool
 twoBinders = implicit @Maybe @Bool (Just True)
