@@ -8606,6 +8606,21 @@ same library before and after.
 [GHC's account of the implicit dependency](../../compiler/GHC/Builtin.hs)
 and [the helper exported by base](../../libraries/base/src/GHC/Essentials.hs).
 
+### Forwarding one type argument to a named family
+
+Agda's definitional eta rule identifies a function with the lambda
+that passes its argument to that function. The R17 experiment checks
+one instance of this rule. The generated type lambda must pass its
+last binder unchanged to the named family. The binder must be absent
+from the earlier arguments. The checker compares those arguments after
+substituting the captures. It can therefore compare the two schemas
+in `forwardRowSchema` while the list of column groups is unknown.
+A non-injective family still gives no way to recover its argument from
+its result.
+[Agda function eta](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html#lambda-expressions),
+[proposal #242 on apartness](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#apartness-of-type-families),
+and [the row proof](examples/open-evaluation/TypeLambdaSchema.hs).
+
 ### Specialisation of an indexed zip operand
 
 In `lengthMap f (zip xs ys)` the source call `zip xs ys` determines a

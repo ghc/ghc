@@ -141,6 +141,7 @@ import qualified TypeLambda
 import qualified TypeLambdaArgument
 import qualified TypeLambdaClient
 import qualified TypeLambdaQuote
+import qualified TypeLambdaSchema
 import qualified QuotedSensorRow
 import qualified TypeLet
 import qualified FamilyCasePayload as FamilyCase
@@ -1710,6 +1711,8 @@ main = do
     observe "compare two column readers before choosing the cell type" TypeLambda.sameColumnReader
     observe "partially apply a two-argument type lambda" TypeLambda.partial
     observe "map a callback that captures a closed family pattern" TypeLambda.prefixes
+    observe "forward a list of column groups to the named error schema"
+        (TypeLambdaSchema.forwardRowSchema (Proxy @String) (Proxy @'[ '[Int], '[Bool, Char]]))
     observe "capture a type before and after a local let"
         (Refl :: TypeLambda.ScopedRow Char '[Bool] :~: '[(Maybe Char, Either Char Bool)])
     let fields = TypeLambda.Field 'x' (TypeLambda.Field True TypeLambda.End)
@@ -2508,6 +2511,15 @@ listBoundaries = do
             }
     observe "replace a named field at the original stored length"
         (natToInt (Named.storedLength updated), NamedSiblingColumnsClient.readPairs updated)
+    let fillVector :: a -> Vec a len -> Vec a len
+        fillVector _ VNil = VNil
+        fillVector x (VCons _ xs) = VCons x (fillVector x xs)
+        defaults = named
+            { Named.namedLetters = fillVector '-' (Named.namedLetters named)
+            , Named.namedFlags = fillVector False (Named.namedFlags named)
+            }
+    observe "reset both columns at their stored length"
+        (natToInt (Named.storedLength defaults), NamedSiblingColumnsClient.readPairs defaults)
     let emptied = updated
             { Named.storedLength = Z
             , Named.namedLetters = VNil
