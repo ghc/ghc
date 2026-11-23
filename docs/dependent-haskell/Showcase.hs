@@ -138,7 +138,7 @@ import qualified SchemaColumns
 import qualified TypeLambda
 import qualified TypeLambdaClient
 import qualified TypeLet
-import qualified FamilyCasePayload
+import qualified FamilyCasePayload as FamilyCase
 import qualified NativeCase
 import qualified NativeNestedCase
 import qualified NativeRetainedTH
@@ -1732,8 +1732,10 @@ main = do
     observe "use a default width from a preceding type case"
         (TypeNats.natVal TypeLet.defaultWidth)
     observe "choose a payload type inside a closed family equation"
-        ('q' :: FamilyCasePayload.ChoosePayload Char 'Nothing,
-         True :: FamilyCasePayload.ChoosePayload Char ('Just Bool))
+        ('q' :: FamilyCase.ChoosePayload Char 'Nothing,
+         True :: FamilyCase.ChoosePayload Char ('Just Bool))
+    observe "recurse on a smaller input in a type case"
+        (Refl :: FamilyCase.Down ('FamilyCase.S ('FamilyCase.S 'FamilyCase.Z)) :~: 'True)
     observe "select the result type by a constructor" NativeCase.roadmap
     observe "repeat a type case in a function argument and result"
         (NativeCase.caseIdentity (Proxy @'True) 42, NativeCase.caseIdentity (Proxy @'False) False)

@@ -93,6 +93,14 @@ next implementation obligations:
 | [R19: type-level cases](roadmap/R19-type-level-cases.md) | Pass the scrutinee and lexical captures to a private closed family. For nested patterns, compare the demand in [Agda case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees) with [GHC's closed family compatibility rule](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_families.html#compatibility-and-apartness-of-type-family-equations). [Eisenberg and Stolarek, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf). |
 | [R23: unsaturated type families](roadmap/R23-unsaturated-type-families.md#prior-art-and-current-boundary) | Proposal #242, the higher-order type-level paper and the pinned 2024 implementation. Read the native integration correction with the draft. |
 
+For a case inside a closed family equation, the fork follows the case
+translation in section 4.5. Each branch becomes an equation and its
+lexical variables become parameters. The fork checks a recursive call
+against the size of the programmer's equation after refining the input
+with the case pattern.
+[Eisenberg and Stolarek on case lifting](https://richarde.dev/papers/2014/promotion/promotion.pdf#page=5)
+and [the source and termination checks](roadmap/R19-type-level-cases.md#a-case-in-a-closed-type-family-equation).
+
 Agda's as-patterns let a clause refer to the entire value matched by
 a constructor pattern. The name reduces to the matched pattern in that
 clause. R17/R19 uses the checked constructor argument for the same purpose

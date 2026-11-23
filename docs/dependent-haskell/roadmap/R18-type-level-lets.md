@@ -275,10 +275,17 @@ type Width (flag :: Bool) (override :: Maybe Nat) =
   in result
 ```
 
-Both spellings should give `7` for a `'Just 7` override with `flag`
-still abstract. On component `437cc2779a`, the direct spelling
-compiled. Adding `saved` gave GHC-97233 at a case expression.
-The same difference occurred in a value signature. Introducing a name
-for an existing result must preserve its scope across the later case.
-This open check concerns R18 itself. Both cases already work in the
-same positions when the branch refers directly to `width`.
+Both spellings give `7` for a `'Just 7` override with `flag` still
+abstract on private component `453eab5058`. Job 1615 also checked two
+successive aliases and a branch binder that shadows an earlier name.
+The 564 release rejects the intervening alias with GHC-97233. The
+renamer now follows references through each right-hand side in scope
+order when it determines which values to pass to the lifted case.
+
+Scope also matters for a kind. In `(k :: Type) (x :: k)`, a local
+binding named `k` may change what a branch means by `Maybe k`.
+The `k` in the previously declared kind of `x` must still refer to
+the enclosing parameter. Job 1619 checked both the original spelling
+and the version with a fresh name for the local binding. An ordinary
+client could select the known result and GHC rejected a wrong equality.
+[Source and client](../../../testsuite/tests/dependent/should_run/NativeTypeLet.sh).
