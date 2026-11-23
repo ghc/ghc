@@ -10,17 +10,19 @@ ghc=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint
 for opt in -O0 -O2; do
     mkdir -p "$out/$opt"/{provider,client}
     cd "$out/$opt/provider"
-    cp "$src/"{PackedVecLibrary,SiblingColumns}.hs .
-    "${ghc[@]}" "$opt" --make -no-link SiblingColumns.hs
+    cp "$src/"{PackedVecLibrary,SiblingColumns,TypeLambda}.hs .
+    "${ghc[@]}" "$opt" --make -no-link SiblingColumns.hs TypeLambda.hs
     "${ghc[@]}" --show-iface SiblingColumns.hi > columns.iface
     grep -Fq 'SourceTable T:size' columns.iface
     grep -Fq 'retained-sibling-fields-v1' columns.iface
-    cp ./*.hi "$src/SiblingColumnsClient.hs" ../client/
+    cp ./*.hi "$src/"{SiblingColumnsClient,SiblingColumnRow}.hs ../client/
 
     cd ../client
     test ! -e SiblingColumns.hs
     test ! -e PackedVecLibrary.hs
     "${ghc[@]}" "$opt" -c SiblingColumnsClient.hs
+    "${ghc[@]}" "$opt" -c SiblingColumnRow.hs
+    mv SiblingColumnRow.hs SiblingColumnRow.hidden
     cat > KnownLength.hs <<'HS'
 {-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, TypeOperators #-}
 module KnownLength where
@@ -41,8 +43,10 @@ HS
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Data.List (isPrefixOf)
 import PackedVecLibrary (Nat(..), Vec(..), natToInt, toList)
+import SiblingColumnRow (packRow)
 import SiblingColumns (Columns(..), bottomFields, flags, letters, size)
 import SiblingColumnsClient (readPairs)
+import TypeLambda (Fields(..))
 
 readLetters :: Columns -> String
 readLetters p = toList (letters p)
@@ -67,11 +71,15 @@ main = do
             (VCons 'r' (VCons 's' VNil))
             (VCons True (VCons False VNil))
     print (readPairs columns)
+    case packRow columns of
+        Field xs (Field ys End) -> print (toList xs, toList ys)
 HS
     "${ghc[@]}" "$opt" -c Main.hs
-    "${ghc[@]}" Main.o SiblingColumnsClient.o ../provider/{PackedVecLibrary,SiblingColumns}.o -o observe
+    "${ghc[@]}" Main.o SiblingColumnsClient.o SiblingColumnRow.o \
+        ../provider/{PackedVecLibrary,SiblingColumns,TypeLambda}.o -o observe
     timeout 15 ./observe > actual
-    printf '%s\n' '(1,"r",[True],True,True)' "[('r',True),('s',False)]" | cmp - actual
+    printf '%s\n' '(1,"r",[True],True,True)' "[('r',True),('s',False)]" \
+        '("rs",[True,False])' | cmp - actual
 
     reject() {
         local code=$1
@@ -95,6 +103,20 @@ HS
     grep -Fq 'size p' rejected.log
     grep -Fq 'size q' rejected.log
     grep -Eiq "second argument of .*zipVec.*flags q" rejected.log
+
+    cat > WrongRow.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeFamilies #-}
+module WrongRow where
+import PackedVecLibrary (Vec)
+import SiblingColumns (Columns, flags, letters, size)
+import TypeLambda (Fields(..), Map)
+
+wrong :: foreach (p :: Columns) -> foreach (q :: Columns) ->
+         Fields (Map (\a -> Vec a (size p)) '[Char, Bool])
+wrong p q = Field (letters p) (Field (flags q) End)
+HS
+    reject 'GHC-(05617|83865)' WrongRow.hs
+    grep -Fq 'flags q' rejected.log
 
     reject 'GHC-(05617|83865)' -DWRONG KnownLength.hs
     cat > WrongFlags.hs <<'HS'

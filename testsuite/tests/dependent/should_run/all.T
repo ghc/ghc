@@ -485,7 +485,9 @@ test('NativeRetainedVectorFacade',
 test('NativeRetainedSiblingFields',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/' + f
-                   for f in ['PackedVecLibrary.hs', 'SiblingColumns.hs', 'SiblingColumnsClient.hs']])],
+                   for f in ['PackedVecLibrary.hs', 'SiblingColumns.hs', 'SiblingColumnsClient.hs',
+                             'SiblingColumnRow.hs']]
+                  + [open_eval_dir + 'TypeLambda.hs'])],
      run_command, ['bash NativeRetainedSiblingFields.sh "{compiler}" "{libdir}"'])
 
 test('NativeAlternatingBinders',

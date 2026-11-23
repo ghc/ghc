@@ -699,6 +699,16 @@ runtime indices. Ordinary source calls in the copied tree use the
 existing checked source equations.
 See Note [Source retained signatures] in GHC.Tc.Gen.HsType.
 
+A type lambda in a retained value signature uses the same capture
+parameters. For example, `\\a -> Vec a (size p)` can close over a
+written `foreach (p :: Columns)`. The lifted family has an erased
+parameter of kind Columns and uses the checked source equation for
+size. The application in the original signature passes p. This keeps
+its nominal identity when two record arguments have the same domain.
+Restrict this lifting to a body with no inner binders. Resolve source
+call heads in the declaration scope and respect lambda binders that
+shadow those names.
+
 Check copied runtime domains for forms whose checking differs between
 types and kinds. A bare arrow defaults to unmatchable in a retained
 domain and can default to matchable in an erased binder kind. Leave
@@ -1012,6 +1022,8 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
 
     liftedAnchor site _ ty@(L _ (XHsType HsTypeLambda{}))
       | lift_cases, signatureLambdaSite site, copyable ty = Just ("$signature-lambda:", Nothing)
+    liftedAnchor RetainedTypeSite{} _ ty@(L _ (XHsType (HsTypeLambda _ _ body)))
+      | lift_cases, ordinaryLambdaBody body, copyable ty = Just ("$signature-lambda:", Nothing)
     liftedAnchor LocalLambdaTypeSite{} _ _ = Nothing
     liftedAnchor FieldTypeSite _ ty@(L _ (XHsType HsTypeLambda{}))
       | lift_cases, copyable ty = Just ("$field-lambda:", Nothing)
@@ -1077,12 +1089,16 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
 
     retainedHeadUses site scope (L _ (XHsType (HsTypeCase _ _ scrutinee _)))
       | not (null (retainedNames site)) =
-          let heads = [(v, entry) | v <- sourceCallHeads scrutinee
-                                  , Just entry <- [resolveHead scope (unLoc v)]]
-          in ( [(v, gre) | (v, Just (gre, _)) <- heads]
-             , [v | RetainedFieldTypeSite{} <- [site], (v, Nothing) <- heads
-                  , not (namedWildcard (unLoc v))] )
+          retainedUses site scope (sourceCallHeads scrutinee)
+    retainedHeadUses site@RetainedTypeSite{} scope (L _ (XHsType (HsTypeLambda _ binders body))) =
+      retainedUses site scope (lambdaCallHeads binders body)
     retainedHeadUses _ _ _ = ([], [])
+
+    retainedUses site scope calls =
+      let heads = [(v, entry) | v <- calls, Just entry <- [resolveHead scope (unLoc v)]]
+      in ( [(v, gre) | (v, Just (gre, _)) <- heads]
+         , [v | RetainedFieldTypeSite{} <- [site], (v, Nothing) <- heads
+              , not (namedWildcard (unLoc v))] )
 
     retainedNames (RetainedTypeSite names) = names
     retainedNames (RetainedFieldTypeSite names) = names
@@ -1187,20 +1203,6 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
         inferred name = isJust (lookup name (localLambdaArguments local))
     localLambdaCheck _ _ _ = Just id
 
-    ordinaryLambdaBody (L _ ty) = case ty of
-      HsTyVar{} -> True
-      HsTyLit{} -> True
-      HsAppTy _ fun arg -> ordinaryLambdaBody fun && ordinaryLambdaBody arg
-      HsAppKindTy _ fun kind -> ordinaryLambdaBody fun && ordinaryLambdaBody kind
-      HsOpTy _ lhs _ rhs -> ordinaryLambdaBody lhs && ordinaryLambdaBody rhs
-      HsParTy _ body -> ordinaryLambdaBody body
-      HsKindSig _ body kind -> ordinaryLambdaBody body && ordinaryLambdaBody kind
-      HsListTy _ elt -> ordinaryLambdaBody elt
-      HsTupleTy _ _ fields -> all ordinaryLambdaBody fields
-      HsExplicitListTy _ _ fields -> all ordinaryLambdaBody fields
-      HsExplicitTupleTy _ _ fields -> all ordinaryLambdaBody fields
-      _ -> False
-
     applyAnchor site loc occ captures =
       applyCaseAlias loc (mkRdrUnqual occ) $ case site of
         LocalLambdaTypeSite local ->
@@ -1235,9 +1237,12 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
 
     copyableCapture site (L _ ty) (binder, name) =
       copyable binder && case ty of
-        XHsType HsTypeCase{}
-          | unLoc name `elem` retainedNames site -> hasWrittenKind binder && copyableDomain binder
+        XHsType HsTypeCase{} -> copyableRetainedKind
+        XHsType HsTypeLambda{} -> copyableRetainedKind
         _ -> True
+      where
+        copyableRetainedKind = unLoc name `notElem` retainedNames site
+                            || hasWrittenKind binder && copyableDomain binder
 
     copyableDomain :: Data a => a -> Bool
     copyableDomain node = case cast node :: Maybe (LHsType GhcPs) of
@@ -1267,6 +1272,35 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
         _ -> False
 
     typeName n = L (l2l (getLoc n)) (HsTyVar noAnn NotPromoted n)
+
+-- | Check the type forms allowed in a lambda body with no inner binders.
+ordinaryLambdaBody :: LHsType GhcPs -> Bool
+ordinaryLambdaBody (L _ ty) = case ty of
+  HsTyVar{} -> True
+  HsTyLit{} -> True
+  HsAppTy _ fun arg -> ordinaryLambdaBody fun && ordinaryLambdaBody arg
+  HsAppKindTy _ fun kind -> ordinaryLambdaBody fun && ordinaryLambdaBody kind
+  HsOpTy _ lhs _ rhs -> ordinaryLambdaBody lhs && ordinaryLambdaBody rhs
+  HsParTy _ body -> ordinaryLambdaBody body
+  HsKindSig _ body kind -> ordinaryLambdaBody body && ordinaryLambdaBody kind
+  HsListTy _ elt -> ordinaryLambdaBody elt
+  HsTupleTy _ _ fields -> all ordinaryLambdaBody fields
+  HsExplicitListTy _ _ fields -> all ordinaryLambdaBody fields
+  HsExplicitTupleTy _ _ fields -> all ordinaryLambdaBody fields
+  _ -> False
+
+-- | Find application heads that a binder-free lambda body can inherit.
+lambdaCallHeads :: [LocatedN RdrName] -> LHsType GhcPs -> [LocatedN RdrName]
+lambdaCallHeads binders = walk
+  where
+    walk :: Data a => a -> [LocatedN RdrName]
+    walk node = here ++ concat (gmapQ walk node)
+      where
+        here
+          | Just (L _ (HsAppTy _ fun _)) <- cast node :: Maybe (LHsType GhcPs)
+          , L _ (HsTyVar _ NotPromoted name) <- ignoreParens fun
+          , unLoc name `notElem` map unLoc binders = [name]
+          | otherwise = []
 
 -- | The case syntax compared within a single signature.
 data SignatureCasePart
@@ -1318,7 +1352,8 @@ retainedSourceHeads :: [LSig GhcPs] -> [TyClGroup GhcPs]
 retainedSourceHeads sigs type_groups = do
   envs@(global, local) <- getRdrEnvs
   let signature_heads = Set.fromList
-        [unLoc v | L _ (TypeSig _ _ _ sig) <- sigs, v <- caseCallHeads sig]
+        [unLoc v | L _ (TypeSig _ _ _ sig) <- sigs
+                 , v <- caseCallHeads sig ++ retainedLambdaCallHeads False sig]
       field_heads = Set.fromList
         [unLoc v | grp <- type_groups
                  , L _ DataDecl{tcdDataDefn = HsDataDefn{dd_cons = cs}} <- group_tyclds grp
@@ -1356,6 +1391,16 @@ caseCallHeads node = here ++ concat (gmapQ caseCallHeads node)
     here = case cast node :: Maybe (LHsType GhcPs) of
       Just (L _ (XHsType (HsTypeCase _ _ scrutinee _))) -> sourceCallHeads scrutinee
       _ -> []
+
+-- | Collect call heads in supported lambda syntax below a retained telescope.
+retainedLambdaCallHeads :: Data a => Bool -> a -> [LocatedN RdrName]
+retainedLambdaCallHeads retained node = case cast node :: Maybe (LHsType GhcPs) of
+  Just (L _ HsForEachTy{hst_body = body}) -> retainedLambdaCallHeads True body
+  Just (L _ HsSpliceTy{}) -> []
+  Just (L _ (XHsType (HsTypeLambda _ binders body)))
+    | retained && ordinaryLambdaBody body -> lambdaCallHeads binders body
+    | otherwise -> []
+  _ -> concat (gmapQ (retainedLambdaCallHeads retained) node)
 
 -- | The scrutinee followed by the pattern and result in each source row.
 type SignatureCaseKey = (SignatureCasePart, [(SignatureCasePart, SignatureCasePart)])

@@ -319,6 +319,26 @@ checked alternatives, with the other lambda arguments substituted. A type
 lambda does not in general determine its arguments from its result.
 [Diagnostic and scope checks](../../../testsuite/tests/dependent/should_run/NativeTypeLambda.sh).
 
+## Row callbacks under a retained binder
+
+```haskell
+packRow :: foreach (p :: Columns) -> Fields (Map (\a -> Vec a (size p)) '[Char, Bool])
+packRow p = Field (letters p) (Field (flags p) End)
+```
+
+The lambda captures `p` from the retained signature. Its helper takes
+an erased parameter of kind `Columns`. The signature passes the
+original record index, so both fields use the same `size p` equation.
+Using `flags q` from a separate record reports an index mismatch.
+[Row example](../examples/packed-vector/SiblingColumnRow.hs) and
+[source-hidden checks](../../../testsuite/tests/dependent/should_run/NativeRetainedSiblingFields.sh).
+
+The supported body has no inner binders. The lambda parameters and
+enclosing retained arguments keep their lexical scope. A captured
+retained domain must also check as an erased binder kind.
+[GHC proposal 378 on term variables in types](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#term-variables-in-types) ·
+[Agda lambda abstraction](https://agda.readthedocs.io/en/v2.8.0.2/language/lambda-abstraction.html).
+
 ## Prior art
 
 Agda uses ordinary lambda syntax and accepts unannotated binders when
