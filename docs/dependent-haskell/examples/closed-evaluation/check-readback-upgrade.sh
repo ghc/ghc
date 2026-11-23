@@ -7,15 +7,16 @@ export LC_ALL=C
 # supplies the old boot interfaces for the original GHC.Internal.Err source.
 upgrade=
 case ${1:-} in
-    --family-kinds|--family-results|--family-stages|--family-forwarding|--packed-projections|--abstract-witness) upgrade=$1; shift ;;
+    --family-kinds|--family-results|--family-stages|--family-forwarding|--packed-projections|--retained-worker|--abstract-witness) upgrade=$1; shift ;;
 esac
-if (( $# < 4 || $# > 5 )) || { [[ $upgrade == --family-* || $upgrade == --abstract-witness ]] && (( $# != 4 )); }; then
+if (( $# < 4 || $# > 5 )) || { [[ $upgrade == --family-* || $upgrade == --abstract-witness || $upgrade == --retained-worker ]] && (( $# != 4 )); }; then
     echo "Usage: $0 OLD_GHC OLD_LIB NEW_GHC NEW_LIB [OLD_GHC_INTERNAL_BUILD]" >&2
     echo "       $0 --family-stages OLD_GHC OLD_LIB NEW_GHC NEW_LIB" >&2
     echo "       $0 --family-forwarding OLD_GHC OLD_LIB NEW_GHC NEW_LIB" >&2
     echo "       $0 --family-kinds M177_GHC M177_LIB NEW_GHC NEW_LIB" >&2
     echo "       $0 --family-results INTERMEDIATE_GHC INTERMEDIATE_LIB NEW_GHC NEW_LIB" >&2
     echo "       $0 --packed-projections OLD_GHC OLD_LIB NEW_GHC NEW_LIB [NEW_GHC_PKG]" >&2
+    echo "       $0 --retained-worker OLD_GHC OLD_LIB NEW_GHC NEW_LIB" >&2
     echo "       $0 --abstract-witness PAIR_GHC PAIR_LIB NEW_GHC NEW_LIB" >&2
     exit 2
 fi
@@ -95,6 +96,49 @@ HS
     if grep -F 'Compiling ' warm.log; then exit 1; fi
     sha256sum -c warm.sha --quiet
     echo 'The abstract witness equation is available, and the next build reused every output.'
+    exit 0
+fi
+
+if [[ $upgrade == --retained-worker ]]; then
+    cd "$work/home"
+    packed="$repo/docs/dependent-haskell/examples/packed-vector"
+    flags=(-v1 -i -i. -O0 -fhide-source-paths -fomit-interface-pragmas -fno-write-if-simplified-core "${sanity[@]}")
+    cp "$packed"/{PackedVecLibrary,RetainedCharLength,RetainedCharProjection}.hs .
+    # The old compiler needs the datatype in its own declaration group.
+    cat >RetainedCharVector.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes, GADTs #-}
+module RetainedCharVector (CharVector(..)) where
+import PackedVecLibrary (Nat, Vec)
+data CharVector where
+    CharVector :: foreach (n :: Nat) -> Vec Char n -> CharVector
+HS
+    printf '%s\n' 'module Unrelated where' 'increment :: Int -> Int' 'increment n = n + 1' >Unrelated.hs
+    "${old[@]}" "${flags[@]}" --make -no-link RetainedCharVector.hs RetainedCharLength.hs Unrelated.hs
+    "${old[@]}" --show-iface RetainedCharLength.hi >worker.old
+    if grep -F 'SourceTable T:storedLength' worker.old; then
+        echo 'The old worker already has a projection equation.' >&2
+        exit 1
+    fi
+    mkdir stale
+    cp {PackedVecLibrary,RetainedCharVector,RetainedCharLength}.hi RetainedCharProjection.hs stale/
+    if (cd stale && "${new[@]}" "${flags[@]}" -c RetainedCharProjection.hs) >stale.log 2>&1 ||
+       ! grep -Fq '[GHC-68947]' stale.log; then cat stale.log >&2; exit 1; fi
+    sha256sum {Unrelated,RetainedCharVector}.{hi,o} >untouched.sha
+    roots=(RetainedCharProjection.hs Unrelated.hs)
+    "${new[@]}" "${flags[@]}" --make -no-link "${roots[@]}" >upgrade.log 2>&1 ||
+        { cat upgrade.log >&2; exit 1; }
+    grep -Eq 'Compiling RetainedCharLength( |$)' upgrade.log
+    grep -Eq 'Compiling RetainedCharProjection( |$)' upgrade.log
+    if grep -E 'Compiling (RetainedCharVector|Unrelated)( |$)' upgrade.log; then exit 1; fi
+    sha256sum -c untouched.sha --quiet
+    "${new[@]}" "${flags[@]}" --show-iface RetainedCharLength.hi >worker.new
+    grep -Fq 'SourceTable T:storedLength' worker.new
+    sha256sum ./*.hi ./*.o >warm.sha
+    "${new[@]}" "${flags[@]}" --make -no-link "${roots[@]}" >warm.log 2>&1 ||
+        { cat warm.log >&2; exit 1; }
+    if grep -F 'Compiling ' warm.log; then exit 1; fi
+    sha256sum -c warm.sha --quiet
+    echo 'The retained worker upgraded under --make, and the next build reused every output.'
     exit 0
 fi
 
