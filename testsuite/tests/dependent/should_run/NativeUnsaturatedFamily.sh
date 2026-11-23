@@ -225,16 +225,8 @@ EOF
     fi
 )
 
-(
-    cd producer
-    cp "$src/NativeBuiltinTypeFunctions.hs" .
-    "${ghc[@]}" -XNoExperimentalDependentTypes -XUnsaturatedTypeFamilies \
-        "${stripped[@]}" -c NativeBuiltinTypeFunctions.hs
-    cp NativeBuiltinTypeFunctions.hi ../client/
-)
-(
-    cd client
-    cat >BuiltinClient.hs <<'EOF'
+cp "$src/NativeBuiltinTypeFunctions.hs" producer/
+cat >client/BuiltinClient.hs <<'EOF'
 {-# LANGUAGE DataKinds, GADTs, TypeOperators #-}
 module BuiltinClient where
 
@@ -246,8 +238,19 @@ checked :: (Added :~: '[3, 4, 5], Compared :~: '[ 'GT, 'EQ, 'LT ],
 checked = case (added, compared, prefixed) of
     (Refl, Refl, Refl) -> (Refl, Refl, Refl)
 EOF
-    "${ghc[@]}" -XNoExperimentalDependentTypes -XNoUnsaturatedTypeFamilies -c BuiltinClient.hs
-)
+for wrapper in -UWRAPPED -DWRAPPED; do
+    (
+        cd producer
+        "${ghc[@]}" -XNoExperimentalDependentTypes -XUnsaturatedTypeFamilies "$wrapper" \
+            "${stripped[@]}" -fforce-recomp -c NativeBuiltinTypeFunctions.hs
+        cp NativeBuiltinTypeFunctions.hi ../client/
+    )
+    (
+        cd client
+        "${ghc[@]}" -XNoExperimentalDependentTypes -XNoUnsaturatedTypeFamilies \
+            -fforce-recomp -c BuiltinClient.hs
+    )
+done
 
 # A direct partial family needs the extension when the named binder accepts U.
 cat >client/DirectCallback.hs <<'HS'
