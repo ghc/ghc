@@ -1354,6 +1354,8 @@ tcExpr expr@(RecordCon { rcon_con = L loc qcon@(WithUserRdr _ con_name)
             | L _ field <- rec_flds rbinds]
           fields = dataConFieldLabels con
           supplied fld = lookupNameEnv values (flSelector fld)
+          missing_witness field = setSrcSpanA loc $
+            failWithTc (TcRnRetainedQuantificationError (RetainedRecordConstruction con_name field))
       forM_ (hsRecFields rbinds) $ \name ->
         unless (any ((== name) . flSelector) fields) $
           failWithTc (badFieldConErr con_name
@@ -1370,7 +1372,8 @@ tcExpr expr@(RecordCon { rcon_con = L loc qcon@(WithUserRdr _ con_name)
           result <- tcExpr (genHsApps con_name args) res_ty
           checkMissingFields (RealDataCon con) rbinds (dataConOrigArgTys con)
           pure (mkExpandedExprTc expr result)
-        _ -> failWithTc (TcRnRetainedQuantificationError RetainedRecordConstruction)
+        witness : _ -> missing_witness (Just (flLabel witness))
+        [] -> missing_witness Nothing
 
     tc_ordinary_record con_like
       = do { (con_expr, con_sigma) <- tcInferConLike con_like

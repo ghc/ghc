@@ -151,7 +151,9 @@ import PackedVecLibrary (Vec(..))
 wrong :: NamedColumns
 wrong = NamedColumns { namedLetters = VNil, namedFlags = VNil }
 HS
-    reject 'Supply the witness field' MissingWitness.hs
+    reject 'GHC-83605' MissingWitness.hs
+    grep -Fq 'MissingWitness.hs:7:9:' rejected.log
+    grep -Eq 'NamedColumns.*requires witness field.*storedLength' rejected.log
 
     cat > ForeignField.hs <<'HS'
 {-# LANGUAGE NoDisambiguateRecordFields, NoExperimentalDependentTypes #-}

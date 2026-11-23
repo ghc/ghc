@@ -3956,8 +3956,11 @@ pprRetainedQuantificationError reason = case reason of
          , text "Retained fields require variables, wildcards, or constructor patterns for their index domain."
          , text "A retained variable or wildcard can be parenthesized or have a bang. Fields of an index constructor must be bare variables or wildcards."
          , text "Lazy patterns and pattern bindings are not supported yet." ]
-  RetainedRecordConstruction ->
-    text "Supply the witness field when constructing a retained record."
+  RetainedRecordConstruction con (Just witness) ->
+    fsep [text "Constructor" <+> quotes (ppr con),
+          text "requires witness field" <+> quotes (ppr witness) <> dot]
+  RetainedRecordConstruction con Nothing ->
+    text "Supply positional arguments to constructor" <+> quotes (ppr con) <> dot
   RetainedRecordDeclaration ->
     text "Each payload field of a retained record must use the first field as its final type argument."
   RetainedRecordPatternOrder ->

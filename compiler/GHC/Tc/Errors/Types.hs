@@ -5457,7 +5457,7 @@ data RetainedQuantificationError
   | RetainedPackagePromotion
   | RetainedPackagePattern
   | RetainedRecordDeclaration
-  | RetainedRecordConstruction
+  | RetainedRecordConstruction Name (Maybe FieldLabelString)
   | RetainedRecordPatternOrder
   | RetainedRecordUpdate
   | RetainedUncoveredConstructors Name [Name]
