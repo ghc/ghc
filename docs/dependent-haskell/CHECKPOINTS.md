@@ -6,6 +6,38 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Built-in arithmetic callbacks and type-let case results
+
+The normal compiler at `049ac2c031` accepts
+`Map ((+) 1) '[2, 3, 4] :~: '[3, 4, 5]` with `Refl`.
+Job 1608 checked addition, comparison and string prefixes at `-O0`
+and `-O2`. Ordinary clients imported both direct and synonym-wrapped
+applications without the provider source. A 562 reader rejected a
+partial built-in with GHC-47808. Both compilers could read a provider
+that used only saturated built-ins. The arithmetic example in the
+User's Guide also compiled under Haskell2010 with its written pragmas.
+[Arithmetic example](roadmap/R23-unsaturated-type-families.md#passing-built-in-arithmetic-to-map)
+and [registered test](../../testsuite/tests/dependent/should_run/NativeBuiltinTypeFunctions.hs).
+
+A wildcard branch in a type-level `let` can now return a width
+computed by an earlier case. An explicit override can determine the
+result even when the input to the earlier case is unknown. The
+ordinary client proves the override and rejects a guessed default.
+The same registration checks simple type-level abbreviations in six
+source contexts with an abstract parameter.
+[Provider and client](roadmap/R18-type-level-lets.md#using-a-previous-case-result-as-a-default).
+
+Job 1608 built both compiler stages. The 564-line Showcase matched at
+native `-O0`, default `-O2` and in GHCi. All 17 initial registrations
+passed. The migrated `first-class-families` package passed its suite
+and its three clients.
+
+The same job then passed all 234 compatibility registrations, including
+three GHCi runs. Of 137 focused tests, 136 passed. Stock GHC accepts
+the remaining `deriving-via-compile` case. The fork produced the same
+`MTrans` diagnostic as 562. The focused driver exited with status 1.
+[Transformer kind](roadmap/R23-unsaturated-type-families.md#a-transformer-kind-synonym).
+
 ## Standalone unsaturated type families
 
 A module can enable `UnsaturatedTypeFamilies` to pass a type family
