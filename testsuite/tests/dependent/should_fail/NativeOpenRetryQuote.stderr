@@ -1,11 +1,12 @@
 NativeOpenRetryQuote.hs:9:31: error: [GHC-70565]
-    • Cannot evaluate ‘Data.Char.toTitle’ in a type.
+    • Cannot evaluate ‘RetryCharacters.title’ in a type.
         Closed calls in types are only supported outside quotations and splices.
-    • In the first argument of ‘Proxy’, namely ‘(Data.Char.toTitle _c)’
+    • In the first argument of ‘Proxy’, namely
+        ‘(RetryCharacters.title _c)’
       In the type signature:
-        upper :: Proxy _c -> Proxy (Data.Char.toTitle _c)
+        upper :: Proxy _c -> Proxy (RetryCharacters.title _c)
       In the Template Haskell typed quotation:
         [|| let
-              upper :: Proxy _c -> Proxy (Data.Char.toTitle _c)
+              upper :: Proxy _c -> Proxy (RetryCharacters.title _c)
               upper (_ :: Proxy 'a') = Proxy @'A'
             in upper (Proxy @'a') ||]

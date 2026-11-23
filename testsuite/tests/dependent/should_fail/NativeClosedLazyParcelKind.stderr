@@ -1,5 +1,5 @@
 NativeClosedLazyParcelKind.hs:7:25: error: [GHC-70565]
-    • Cannot evaluate ‘C.toTitle’ in a type.
+    • Cannot evaluate ‘C.isSpace’ in a type.
         The operand has kind Parcel, which does not match the declared input type Char.
-    • In the first argument of ‘Proxy’, namely ‘(C.toTitle (P.make 7))’
-      In the type signature: bad :: Proxy (C.toTitle (P.make 7))
+    • In the first argument of ‘Proxy’, namely ‘(C.isSpace (P.make 7))’
+      In the type signature: bad :: Proxy (C.isSpace (P.make 7))

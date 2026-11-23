@@ -36,6 +36,7 @@ module Main (main) where
 import qualified BetaCallClient as Beta
 import qualified CallbackRulesClient
 import qualified CharacterDecision
+import qualified RetryCharacters
 import qualified CharacterExport
 import qualified ClosedLengthProducer as Length
 import qualified ClosedTableLibrary as Table
@@ -2086,7 +2087,7 @@ openLeft :: forall a b. a -> b -> const a b
 openLeft x _ = x
 
 -- | The argument pattern fixes the wildcard before GHC checks the result.
-titleFromPattern :: Proxy _c -> Proxy (Data.Char.toTitle _c)
+titleFromPattern :: Proxy _c -> Proxy (RetryCharacters.title _c)
 titleFromPattern (_ :: Proxy 'a') = Proxy @'A'
 
 -- | Use the same imported function at runtime and in a result type.

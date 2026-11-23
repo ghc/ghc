@@ -1,6 +1,6 @@
 NativeClosedCharWildcard.hs:8:14: error: [GHC-70565]
-    • Cannot evaluate ‘Data.Char.toTitle’ in a type.
+    • Cannot evaluate ‘Data.Char.isDigit’ in a type.
         A visible type argument containing a closed call must be complete. Replace its wildcards with types.
-    • In the type ‘'(Data.Char.toTitle 'x', _)’
-      In the expression: Proxy @'(Data.Char.toTitle 'x', _)
-      In an equation for ‘p’: p = Proxy @'(Data.Char.toTitle 'x', _)
+    • In the type ‘'(Data.Char.isDigit '7', _)’
+      In the expression: Proxy @'(Data.Char.isDigit '7', _)
+      In an equation for ‘p’: p = Proxy @'(Data.Char.isDigit '7', _)

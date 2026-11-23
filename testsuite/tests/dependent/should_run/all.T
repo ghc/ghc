@@ -234,11 +234,13 @@ test('NativeRetainedNatural',
                    for f in ['RetainedNaturals.hs', 'RetainedNaturalClient.hs']])],
      run_command, ['bash NativeRetainedNatural.sh "{compiler}" "{libdir}"'])
 test('NativeOpenRetry',
-     [req_interp, req_rts_linker, only_ways(['normal']), extra_files(['NativeOpenRetryLib.hs'])],
+     [req_interp, req_rts_linker, only_ways(['normal']),
+      extra_files(['NativeOpenRetryLib.hs', open_eval_dir + 'RetryCharacters.hs'])],
      multimod_compile_and_run,
      ['NativeOpenRetry', '-Wno-partial-type-signatures ' + config.ghc_th_way_flags])
 test('NativeOpenRetryInterface',
-     [req_interp, req_rts_linker, only_ways(['normal'])],
+     [req_interp, req_rts_linker, only_ways(['normal']),
+      extra_files([open_eval_dir + 'RetryCharacters.hs'])],
      run_command, ['bash NativeOpenRetryInterface.sh "{compiler}" "{libdir}" '
                    + config.ghc_th_way_flags])
 test('NativeClosedLength',

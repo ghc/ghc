@@ -267,7 +267,7 @@ ghcInternalArgs = package ghcInternal ? do
             -- compiler. See the producer checks in GHC.Tc.Gen.SourceTable.
           , notStage0 ? builder (Ghc CompileHs) ?
             inputs [ "**/GHC/Internal/Unicode.hs"
-                   , "**/GHC/Internal/Unicode/Char/UnicodeData/SimpleUpperCaseMapping.hs"
+                   , "**/GHC/Internal/Unicode/Char/UnicodeData/Simple*CaseMapping.hs"
                    , "**/GHC/Internal/Data/Tuple.hs"
                    ] ? arg "-XExperimentalDependentTypes"
 

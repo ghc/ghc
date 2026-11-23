@@ -13,10 +13,14 @@ out=$(mktemp -d)
 trap 'rm -rf -- "$out"' EXIT
 cd "$out"
 mkdir producer interfaces client
-cp "$src/$producer.hs" producer/
+cp "$src/$producer.hs" "$src/RetryCharacters.hs" producer/
 cp "$src/$client.hs" client/
-(cd producer && "${ghc[@]}" -fomit-interface-pragmas -c "$producer.hs")
-cp "producer/$producer.hi" interfaces/
+(
+    cd producer
+    "${ghc[@]}" -fomit-interface-pragmas -i. -c RetryCharacters.hs
+    "${ghc[@]}" -fomit-interface-pragmas -i. -c "$producer.hs"
+)
+cp "producer/$producer.hi" producer/RetryCharacters.hi interfaces/
 
 cd client
 "${ghc[@]}" -i../interfaces -c "$client.hs"

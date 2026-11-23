@@ -2,8 +2,8 @@
 {-# LANGUAGE PartialTypeSignatures, ScopedTypeVariables, TypeApplications #-}
 module NativeOpenRetryInterfaceProducer (upper) where
 
-import qualified Data.Char
+import qualified RetryCharacters
 import Data.Proxy (Proxy(..))
 
-upper :: Proxy _c -> Proxy (Data.Char.toTitle _c)
+upper :: Proxy _c -> Proxy (RetryCharacters.title _c)
 upper (_ :: Proxy 'a') = Proxy @'A'
