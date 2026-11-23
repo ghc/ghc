@@ -268,10 +268,7 @@ liftTypeLambdas sigma group = do
     liftDecl decl = return (decl, [])
 
     liftEquation inherited owner salt (L loc eqn@FamEqn{feqn_rhs = rhs}) =
-      let captures = equationCaptures inherited eqn
-          free = Set.fromList (map unLoc (extractHsTyRdrTyVars rhs))
-          used | spliceFree rhs = fst (foldr selectCapture ([], free) captures)
-               | otherwise = captures
+      let used = usedEquationCaptures rhs (equationCaptures inherited eqn)
           (rhs', families, next) = liftRhs (sumResult rhs) Nothing owner used rhs salt
       in (next, (L loc eqn{feqn_rhs = rhs'}, families))
 
@@ -287,19 +284,7 @@ liftTypeLambdas sigma group = do
       where
         without_splice = spliceFree rhs
         lhs = nubN (extractHsTyArgRdrKiTyVars pats)
-        local = case outer of
-          HsOuterImplicit{} -> [(liftedTypeVarBinder v, v) | v <- lhs]
-          HsOuterExplicit{hso_bndrs = binders} ->
-            mapMaybe (capture . fmap (setHsTyVarBndrFlag (HsBndrRequired noExtField))) binders
-
-    selectCapture c@(binder, v) (used, free)
-      | Set.member (unLoc v) free =
-          let kinds = case unLoc binder of
-                HsTvb{tvb_kind = HsBndrKind _ kind} ->
-                  Set.fromList (map unLoc (extractHsTyRdrTyVars kind))
-                _ -> Set.empty
-          in (c : used, Set.union kinds (Set.delete (unLoc v) free))
-      | otherwise = (used, free)
+        local = mapMaybe capture (familyEquationBinders outer lhs)
 
     liftRhs _ scoped owner captures (L loc (HsKindSig ann body kind)) salt
       | L _ HsForAllTy{} <- stripParens kind
@@ -353,11 +338,6 @@ liftTypeLambdas sigma group = do
     -- A copied kind must not cause another execution of a source splice.
     closedSpliceFreeKind kind =
       null (extractHsTyRdrTyVars kind) && spliceFree kind
-
-    spliceFree :: Data a => a -> Bool
-    spliceFree node
-      | Just (L _ HsSpliceTy{}) <- (cast node :: Maybe (LHsType GhcPs)) = False
-      | otherwise = and (gmapQ spliceFree node)
 
     -- See Note [Lifting type lambdas]. Bind only captures that occur in a
     -- later kind. Check closure after binding the captures in source order.
@@ -555,6 +535,37 @@ liftedTypeVarBinder :: LocatedN RdrName -> LHsTyVarBndr (HsBndrVis GhcPs) GhcPs
 liftedTypeVarBinder v =
   L (l2l (getLoc v)) (HsTvb noAnn (HsBndrRequired noExtField)
     (HsBndrVar noExtField v) (HsBndrNoKind noExtField))
+
+-- | Select the equation's lexical binders as in 'rnFamEqn'.
+familyEquationBinders :: HsOuterFamEqnTyVarBndrs GhcPs -> [LocatedN RdrName]
+                      -> [LHsTyVarBndr (HsBndrVis GhcPs) GhcPs]
+familyEquationBinders HsOuterImplicit{} lhs = map liftedTypeVarBinder lhs
+familyEquationBinders HsOuterExplicit{hso_bndrs = binders} _ =
+  map (fmap (setHsTyVarBndrFlag (HsBndrRequired noExtField))) binders
+
+-- | Keep the RHS's free captures and the binders needed by their kinds.
+-- A splice can return references that are absent from the source.
+usedEquationCaptures
+  :: LHsType GhcPs -> [(LHsTyVarBndr (HsBndrVis GhcPs) GhcPs, LocatedN RdrName)]
+  -> [(LHsTyVarBndr (HsBndrVis GhcPs) GhcPs, LocatedN RdrName)]
+usedEquationCaptures rhs captures
+  | spliceFree rhs = fst (foldr select ([], freeNames rhs) captures)
+  | otherwise = captures
+  where
+    freeNames = Set.fromList . map unLoc . extractHsTyRdrTyVars
+    select c@(binder, v) (used, free)
+      | Set.member (unLoc v) free =
+          let kinds = case unLoc binder of
+                HsTvb{tvb_kind = HsBndrKind _ kind} -> freeNames kind
+                _ -> Set.empty
+          in (c : used, Set.union kinds (Set.delete (unLoc v) free))
+      | otherwise = (used, free)
+
+-- | A copied capture kind must not run a type splice a second time.
+spliceFree :: Data a => a -> Bool
+spliceFree node
+  | Just (L _ HsSpliceTy{}) <- (cast node :: Maybe (LHsType GhcPs)) = False
+  | otherwise = and (gmapQ spliceFree node)
 
 {- Note [Lifting types from signatures and fields]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1247,8 +1258,14 @@ becomes one equation. A constructor pattern tests the scrutinee. A
 variable or wildcard accepts it when the earlier tests permit that row.
 See Note [Publishing ordered type cases] in GHC.Tc.TyCl. Keep lexical captures as
 additional arguments. Hide a captured argument's name in any branch
-where a pattern binds that spelling. Put the family and its owning
-synonym in the same kind-checking SCC.
+where a pattern binds that spelling. Put the family and its owner in
+the same kind-checking SCC when they need to share kind inference.
+
+Lift a case from the RHS of a closed family equation using the
+equation's binders. An implicit equation binds the variables in its
+patterns. An explicit forall supplies its own scope. Give each
+equation fresh helpers. Leave the original patterns in place so the
+usual scoping, overlap and termination checks still apply.
 
 An untyped declaration quote keeps the case in its source signature,
 synonym or field. The quote emits CaseT with its local names. Lift the
@@ -1335,7 +1352,24 @@ liftTypeCases group =
       | Just captures <- traverse capture params
       = let (rhs', cases, _) = liftRhs owner False captures [] rhs (0 :: Int)
         in (L loc syn{tcdRhs = rhs'}, cases)
+    liftDecl (L loc decl@FamDecl{tcdFam = family@FamilyDecl
+                  { fdLName = owner, fdInfo = ClosedTypeFamily ann (Just rows) }}) =
+      let (_, results) = mapAccumL (liftEquation owner) (0 :: Int) rows
+          (rows', lifted) = unzip results
+      in (L loc decl{tcdFam = family{fdInfo = ClosedTypeFamily ann (Just rows')}},
+          concat lifted)
     liftDecl decl = (decl, [])
+
+    liftEquation owner salt (L loc eqn@FamEqn{feqn_bndrs = outer, feqn_pats = pats,
+                                              feqn_rhs = rhs})
+      | let binders = familyEquationBinders outer (nubN (extractHsTyArgRdrKiTyVars pats))
+      , Just scoped <- traverse capture binders
+      , all (\(binder, _, _) -> spliceFree binder) scoped
+      = let used = usedEquationCaptures rhs [(binder, name) | (binder, name, _) <- scoped]
+            (rhs', cases, next) = liftRhs owner False
+                                    [(binder, name, name) | (binder, name) <- used] [] rhs salt
+        in (next, (L loc eqn{feqn_rhs = rhs'}, cases))
+    liftEquation _ salt row = (salt, (row, []))
 
     liftRhs owner independent captures aliases (L loc (XHsType (HsTypeCase _ _ scrutinee alts))) salt
       | Just patterns <- traverse checkAlt alts
@@ -1566,14 +1600,17 @@ liftTypeCases group =
 
     branch owner name captures aliases (loc, pat, bound, rhs) =
       let alias_names = [unLoc v | (_, v, _, _) <- aliases]
-          pat_capture index (_, n@(L name_loc var), _)
+          capture_name index (_, n@(L name_loc var), _)
             | var `elem` bound || var `elem` alias_names =
-                typeName (L name_loc (mkRdrUnqual (mkTyVarOcc ("$case-capture:" ++ show index))))
-            | otherwise = typeName n
-          captured = zipWith pat_capture [0 :: Int ..] captures
+                L name_loc (mkRdrUnqual (mkTyVarOcc ("$case-capture:" ++ show index)))
+            | otherwise = n
+          capture_names = zipWith capture_name [0 :: Int ..] captures
+          captured = map typeName capture_names
           pats = captured ++ [pat]
           branch_rhs = foldr restore rhs aliases
-          body = L (getLoc branch_rhs) (XHsType (HsTypeCaseAlias [] (owner, length captures, Nothing) branch_rhs))
+          body = L (getLoc branch_rhs)
+                   (XHsType (HsTypeCaseAlias (map unLoc capture_names)
+                             (owner, length captures, Nothing) branch_rhs))
           restore (ann, binder, helper, indices) rest
             | unLoc binder `notElem` bound =
                 letTy (getLoc rhs) ann binder
