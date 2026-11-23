@@ -176,6 +176,13 @@ the new extension hint. With the standalone flag alone, a module can
 use partial type functions. It does not also gain `foreach` or `some`.
 The ordinary `MTrans` default is a separate open decision.
 
+Jobs 1595 and 1601 identified another R23 limit. User-defined closed
+family wrappers passed the higher-order arithmetic checks. With ordinary
+type synonyms in their place, public 561 failed Core Lint on a partial
+built-in family. A private change is being checked against older
+interface readers. The public branch still uses the previous arity rule.
+[Reproducer](roadmap/R23-unsaturated-type-families.md#passing-built-in-arithmetic-to-map).
+
 Job 1335 used installed HaskLib on `4d10fdc35f` to check the
 [append counterexample](roadmap/R16-open-term-evaluator.md#append-fusion-and-an-undefined-right-list).
 The private guard rejected the proof at default `-O2`. The public R41

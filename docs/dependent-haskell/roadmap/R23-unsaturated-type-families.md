@@ -34,6 +34,35 @@ stamp allows that provider to stay warm after the one recheck. An
 installed provider keeps its interface and needs a rebuild to export
 the new kind.
 
+## Passing built-in arithmetic to Map
+
+On public 561 a user-defined closed family can pass built-in arithmetic
+to a higher-order type function. `Map` here takes an unmatchable
+type function and applies it to each element of a type-level list.
+This example uses `UndecidableInstances` for the wrapper equation.
+
+```haskell
+type family AddOne (n :: Nat) :: Nat where
+  AddOne n = 1 + n
+
+addProof :: Map AddOne '[2, 3, 4] :~: '[3, 4, 5]
+addProof = Refl
+```
+
+The same test covers comparison with `CmpNat 3 n` and string prefixes
+with `AppendSymbol "ghc-" s`. Job 1601 compiled all three proofs at
+`-O0` and `-O2` with Core and STG Lint. Replacing the closed families
+with ordinary type synonyms exposed a compiler defect at both levels.
+Core Lint reported an unsaturated `AppendSymbol "ghc-"` in the type
+of the string-list proof.
+
+Job 1595 also checked direct `Map ((+) 1)`, `Map (CmpNat 3)` and
+`Map (AppendSymbol "ghc-")` on the private standalone-flag compiler
+at `4215377781`. All three produced GHC-27346. The current arity
+check excludes built-in families from partial application. This
+limitation applies even when the built-in has an unmatchable arrow.
+[Arithmetic and arity references](../REFERENCES.md#built-in-arithmetic-as-a-higher-order-argument).
+
 ## Matchability on a source arrow
 
 Import `U` from `GHC.Matchability` and enable `Modifiers` to write the
