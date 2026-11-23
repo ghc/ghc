@@ -562,6 +562,7 @@ tcTyClGroup open_indices (TyClGroup { group_tyclds = tyclds
               ; kisig_env <- mkNameEnv <$> traverse check_kisig kisigs
               ; tcTyClDecls open_indices tyclds kisig_env role_annots }
        ; let tyclss = map fst tyclss_with_validity_infos
+             selectors = caseSelectorOwners tyclss_with_validity_infos
 
            -- Step 2: Perform the validity check on those types/classes
            -- We can do this now because we are done with the recursive knot
@@ -588,10 +589,11 @@ tcTyClGroup open_indices (TyClGroup { group_tyclds = tyclds
                            VI{vi_loc = loc, vi_pats = pats, vi_rhs = rhs} ->
                              setSrcSpan loc $ checkValidTyFamEqn tycls pats rhs
                            NoVI -> pure ()
-                       ; setXOptM LangExt.UndecidableInstances (checkValidTyCl tycls) }
-               else checkValidTyCl tycls }
+                       ; setXOptM LangExt.UndecidableInstances (checkValidTyCl emptyNameSet tycls) }
+               else checkValidTyCl (mkNameSet [helper | (owner, helper) <- selectors
+                                                        , owner == tyConName tycls]) tycls }
 
-       ; setXOptM LangExt.UndecidableInstances (mapM_ checkValidTyCl decision_helpers)
+       ; setXOptM LangExt.UndecidableInstances (mapM_ (checkValidTyCl emptyNameSet) decision_helpers)
        ; let tyclss_and_helpers = tyclss ++ decision_helpers
        ; traceTc "Done validity check" (ppr tyclss)
        ; mapM_ (recoverM (return ()) . checkValidRoleAnnots role_annots) tyclss
@@ -4486,6 +4488,41 @@ hasCasePattern :: TyFamEqnValidityInfo -> Bool
 hasCasePattern VI{vi_case_pattern = Just _} = True
 hasCasePattern _ = False
 
+{- Note [Termination of lifted case selectors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A closed type family equation can dispatch through a fresh case helper.
+The helper can repeat a capture as its scrutinee, so the call can fail
+the size check even when each alternative is just a constructor type.
+
+Use the original checked rows, before any ordered case decision nodes
+replace them. Every row must have the same source owner and scrutinee
+column. Permit a saturated call from that owner in the same checking
+group when both the actual arguments and every branch result contain
+only constructor types, variables and literals. The result kind must
+also be constructor-headed, so a later argument cannot apply a
+returned function. This call selects a row and reuses parts of its
+arguments. It introduces no family call. A variable in function
+position could introduce a family call, so it is outside this check.
+
+Keep ordinary termination checking when a branch contains a call.
+Checking that call against the helper's patterns cannot prove it
+decreases relative to the source equation. The helper can have more
+arguments than that equation.
+-}
+
+-- | Identify the source owner and private Name of each checked selector.
+-- See Note [Termination of lifted case selectors].
+caseSelectorOwners :: [(TyCon, [TyFamEqnValidityInfo])] -> [(Name, Name)]
+caseSelectorOwners declarations =
+  [ (owner, tyConName helper)
+  | (helper, rows) <- declarations
+  , Just (owner, column) : rest <- [map selectorRow rows]
+  , all (== Just (owner, column)) rest ]
+  where
+    selectorRow VI{vi_case_pattern = Just (owner, column, _, _), vi_rhs = rhs}
+      | isConstructorCaseType rhs = Just (owner, column)
+    selectorRow _ = Nothing
+
 -- | Keep the owner of an elaborated retained signature case.
 -- See Note [Equality of ordered retained case trees] in GHC.Builtin.CoercionRules.
 signatureCaseOwner :: Bool -> [TyFamEqnValidityInfo] -> Maybe Name
@@ -6350,17 +6387,17 @@ Validity checking is done once the mutually-recursive knot has been
 tied, so we can look at things freely.
 -}
 
-checkValidTyCl :: TyCon -> TcM [TyCon]
+checkValidTyCl :: NameSet -> TyCon -> TcM [TyCon]
 -- The returned list is either a singleton (if valid)
 -- or a list of "fake tycons" (if not); the fake tycons
 -- include any implicits, like promoted data constructors
 -- See Note [Recover from validity error]
-checkValidTyCl tc
+checkValidTyCl selectors tc
   = setSrcSpan (getSrcSpan tc) $
     addTyConCtxt tc            $
     recoverM recovery_code     $
     do { traceTc "Starting validity for tycon" (ppr tc)
-       ; checkValidTyCon tc
+       ; checkValidTyConWithSelectors selectors tc
        ; checkTyConConsistentWithBoot tc -- See Note [TyCon boot consistency checking]
        ; traceTc "Done validity for tycon" (ppr tc)
        ; return [tc] }
@@ -6487,7 +6524,10 @@ are validity checking, so they need to be in the environment.
 -}
 
 checkValidTyCon :: TyCon -> TcM ()
-checkValidTyCon tc
+checkValidTyCon = checkValidTyConWithSelectors emptyNameSet
+
+checkValidTyConWithSelectors :: NameSet -> TyCon -> TcM ()
+checkValidTyConWithSelectors selectors tc
   | isPrimTyCon tc   -- Happens when Haddock'ing GHC.Prim
   = return ()
 
@@ -6511,7 +6551,7 @@ checkValidTyCon tc
                { ClosedTypeFamilyTyCon ctf ->
                  case ctf of
                    { _ | Just ax <- closedTyFamCoAxiom_maybe ctf ->
-                       addErrCtxt (ClosedFamEqnCtxt tc) $ checkValidCoAxiom ax
+                       addErrCtxt (ClosedFamEqnCtxt tc) $ checkValidCoAxiom selectors ax
                    ; CTF_Abstract ->
                      do { hsBoot <- tcIsHsBootOrSig
                         ; checkTc hsBoot $ TcRnAbstractClosedTyFamDecl }

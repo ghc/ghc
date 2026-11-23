@@ -57,6 +57,58 @@ cp NativeCase.hi NativeNestedCase.hi OpenMapWorker.hi NativeTypeCaseFallback.hi 
    grep -Eq 'the type case in .*ArrowDomain' bad.log &&
    ! grep -Eq '\$(case(-node)?|lambda):' bad.log &&
    reject NativeTypeCaseLetWrong 8:9 'GHC-83865')
+# Check a closed family RHS and a type-let RHS in ordinary separate clients.
+cp "$area/FamilyCasePayload.hs" .
+"${g[@]}" -Werror=unused-type-patterns -fomit-interface-pragmas -c FamilyCasePayload.hs
+cp FamilyCasePayload.{hi,o} interfaces/
+(
+    cd interfaces
+    test ! -e FamilyCasePayload.hs
+    cat >FamilyCaseClient.hs <<'HS'
+{-# LANGUAGE DataKinds, GADTs, TypeOperators #-}
+module Main where
+
+import FamilyCasePayload
+import Data.Type.Equality ((:~:)(Refl))
+
+fallback :: ChoosePayload Bool 'Nothing
+fallback = True
+
+found :: ChoosePayload Bool ('Just Char)
+found = 'q'
+
+keep :: KeepPayload 'False Char
+keep = "kept"
+
+first :: Dispatch 'True ('Just Char) :~: Char
+first = Refl
+
+second :: Dispatch 'False ('Just Char) :~: Maybe Char
+second = Refl
+
+main :: IO ()
+main = case (first, second) of
+  (Refl, Refl) -> print (fallback, found, keep)
+HS
+    "${g[@]}" -XNoExperimentalDependentTypes -XNoUnsaturatedTypeFamilies -c FamilyCaseClient.hs
+    "${g[@]}" FamilyCaseClient.o FamilyCasePayload.o -o family-case
+    test "$(./family-case)" = "(True,'q',\"kept\")"
+    cat >FamilyCaseRigid.hs <<'HS'
+{-# LANGUAGE DataKinds, GADTs, ScopedTypeVariables, TypeOperators #-}
+module FamilyCaseRigid where
+
+import FamilyCasePayload
+import Data.Kind (Type)
+import Data.Proxy (Proxy)
+import Data.Type.Equality ((:~:)(Refl))
+
+bad :: forall (input :: Maybe Type). Proxy input -> ChoosePayload Bool input :~: Bool
+bad _ = Refl
+HS
+    reject FamilyCaseRigid 10:9 '[GHC-83865]'
+    grep -Fq 'ChoosePayload Bool input :~: Bool' bad.log
+)
+
 "${g[@]}" -fomit-interface-pragmas -c NativeTypeCaseHeadProvider.hs
 cp NativeTypeCaseHeadProvider.hi NativeTypeCaseHeads.hs NativeTypeCaseSynonymCatchAll.hs interfaces/
 (cd interfaces && "${g[@]}" -Werror=unused-imports -c NativeTypeCaseHeads.hs)

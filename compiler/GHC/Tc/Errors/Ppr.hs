@@ -1178,7 +1178,7 @@ instance Diagnostic TcRnMessage where
         text "Use GHC.Exists.Pack in an explicit existential application or a sole case alternative with a fresh type variable or _ for the witness, followed by a payload pattern."
     TcRnTypeCaseContext
       -> mkSimpleDecorated $
-           text "A type case needs a supported position in a top-level type synonym, a top-level value signature, or a constructor field."
+           text "A type case needs a supported position in a top-level type synonym, a closed type family equation RHS, a top-level value signature, or a constructor field."
     TcRnTypeLambdaContext
       -> mkSimpleDecorated $
            text "A type lambda needs a supported position in a top-level type synonym, the right-hand side of a type family equation, or a top-level value signature."
@@ -8438,6 +8438,10 @@ pprPatersonCondFailure PCF_Size InInstanceDecl lhs rhs =
   hang (text "The constraint" <+> quotes (ppr lhs))
     2 (sep [ text "is no smaller than", pp_rhs ])
   where pp_rhs = text "the instance head" <+> quotes (ppr rhs)
+pprPatersonCondFailure PCF_Size InTyFamEquation lhs (TyConApp tc _)
+  | Just _ <- liftedTypeOwner "$case:" (tyConName tc)
+  = hang (text "The type case introduces a type-family application")
+      2 (text "that is no smaller than the LHS of the family equation" <+> quotes (ppr lhs))
 pprPatersonCondFailure PCF_Size InTyFamEquation lhs rhs =
   hang (text "The type-family application" <+> quotes (ppr rhs))
     2 (sep [ text "is no smaller than", pp_lhs ])

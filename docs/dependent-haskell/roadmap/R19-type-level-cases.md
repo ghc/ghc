@@ -38,6 +38,41 @@ For example, `case b of { True -> Int; _ -> Int }` stays stuck for an
 unknown `b`. A first row `_ -> Int` returns `Int` immediately.
 Case expressions inside arbitrary types remain open.
 
+## A case in a closed type family equation
+
+A closed family equation can inspect an argument on its right-hand
+side. The match can use variables bound by the equation, including
+an explicit `forall`. A type let can supply the scrutinee.
+
+```haskell
+type family ChoosePayload (fallback :: Type) (input :: Maybe Type) :: Type where
+  ChoosePayload fallback input = case input of
+    Nothing -> fallback
+    Just field -> field
+```
+
+The client can use `ChoosePayload Bool 'Nothing` as `Bool` and
+`ChoosePayload Bool ('Just Char)` as `Char` from the provider's
+interface. At a rigid `input`, the result still needs a constructor
+to select a branch. The original family patterns still undergo the
+ordinary scope and validity checks.
+
+A generated selector in the same checking group needs no
+`UndecidableInstances` when its checked arguments, branch results,
+and constructor-headed result kind contain only constructor types,
+variables, and literals. It can return a part of an argument or build
+a constructor type from those parts. Cases with family calls or
+variable-headed applications still use the ordinary termination check.
+For example, a recursive branch can still require
+`UndecidableInstances` when the corresponding hand-written equations
+pass. Checking a branch call against the case helper's left-hand
+side alone can count duplicate captures and overestimate the size of
+the original equation.
+
+[Provider](../examples/open-evaluation/FamilyCasePayload.hs) ·
+[Source-hidden client and rigid control](../../../testsuite/tests/dependent/should_run/NativeTypeCase.sh) ·
+[Closed-family translation, §4.5](https://richarde.dev/papers/2014/promotion/promotion.pdf#page=5).
+
 ## Type constructors in case patterns
 
 An unquoted head first resolves as a data constructor. If no data
