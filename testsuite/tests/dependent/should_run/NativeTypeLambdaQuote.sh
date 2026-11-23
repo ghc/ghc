@@ -83,8 +83,9 @@ import Data.Proxy (Proxy(..))
 wrong = $([| Proxy :: Proxy ((\a -> Either 'True a) Bool) |])
 HS
 if "${g[@]}" -c WrongKind.hs >wrong.log 2>&1 ||
-   ! grep -Fq 'error: [GHC-25897]' wrong.log ||
-   ! grep -Fq 'has kind' wrong.log; then
+   ! grep -Fq 'WrongKind.hs:4:10: error: [GHC-83865]' wrong.log ||
+   ! grep -Fq 'has kind' wrong.log ||
+   ! grep -Fq 'In the type lambda in an expression annotation' wrong.log; then
     cat wrong.log >&2
     exit 1
 fi
