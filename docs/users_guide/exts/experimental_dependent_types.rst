@@ -15,14 +15,15 @@ Experimental dependent types
 This flag is local to the native dependent Haskell experiment.
 This extension is disabled by default. It enables ``foreach`` in types and
 checks a restricted subset of explicit value signatures. To override the
-implication, put ``NoRequiredTypeArguments`` after ``ExperimentalDependentTypes``. The experiment uses a
-native dependent Core representation. The restricted module path supports
-native top-level signatures and local retained functions. Interfaces encode
+implication, put ``NoRequiredTypeArguments`` after ``ExperimentalDependentTypes``.
+The experiment uses a native dependent Core representation. The restricted
+module path supports native top-level signatures and local retained functions.
+Interfaces encode
 retained binders with scoped local Id names. GHCi can load these modules as
 interpreted source and keep local declarations between commands.
 
 Local definitions and functions in types
----------------------------------------
+----------------------------------------
 
 A type synonym can name an intermediate type with ``let``, select a
 type by matching a constructor, or partially apply a type lambda::

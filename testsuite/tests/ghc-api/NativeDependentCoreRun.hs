@@ -4172,7 +4172,8 @@ runPackageSourceRejectChecks = do
         , ("PiOperandLinearOuterIndexCaptureRejected", 83605, "already-bound unrestricted local value", ["TypeFamilies", "FlexibleContexts", "LinearTypes"], [], ["consumeNat :: Nat %1 -> Int", "consumeNat Z = 42", "consumeNat (S rest) = consumeNat rest", "bad :: Nat %1 -> Int", "bad k = let { keep :: forall value. value ~ (foreach (n :: Nat) -> (Vec Int k, Vec Bool n)) => value -> value; keep f = f } in consumeNat k"])
         , ("PiOperandUnsupportedPiDomainRejected", 83605, "A retained value argument requires a lifted type parameter or a supported algebraic type.", ["TypeFamilies", "FlexibleContexts"], [], ["newtype Wrapped = Wrapped Int", "bad :: forall value. value ~ (foreach (n :: Wrapped) -> Int) => value -> Int -> Int", "bad f = f"])
         , ("PiOperandPartialPiOperandRejected", 83605, "complete type signature", ["TypeFamilies", "FlexibleContexts", "PartialTypeSignatures"], [], ["bad :: forall value. value ~ (foreach (n :: Nat) -> Vec _ n) => value -> (foreach (n :: Nat) -> Vec Int n)", "bad f = f"])
-        , ("PiOperandQuotedPiOperandCaptureRejected", 83605, "Template Haskell", ["TypeFamilies", "FlexibleContexts", "TemplateHaskell"], ["import Language.Haskell.TH (Q, Exp)"], ["bad :: Nat -> Q Exp", "bad k = [| let { keep :: forall value. value ~ (foreach (n :: Nat) -> (Vec Int k, Vec Bool n)) => value -> value; keep f = f } in (42 :: Int) |]"])
+        , ("PiOperandQuotedPiOperandCaptureRejected", 28914, "bound at level 0", ["TypeFamilies", "FlexibleContexts", "TemplateHaskell"], ["import Language.Haskell.TH (Q, Exp)"], quotedPiCapture)
+        , ("PiOperandQuotedPiOperandCaptureLegacy", 83605, "Template Haskell", ["TypeFamilies", "FlexibleContexts", "TemplateHaskell", "NoRequiredTypeArguments"], ["import Language.Haskell.TH (Q, Exp)"], quotedPiCapture)
         , ("PiOperandEqualityOperandKindMismatch", 83865, "Expected kind", ["TypeFamilies", "FlexibleContexts"], [], ["bad :: forall (value :: Nat). value ~ (foreach (n :: Nat) -> Vec Int n) => Int", "bad = 42"])
         , ("PiOperandErasedForallArgumentUnchanged", 91510, "Illegal polymorphic type", ["TypeFamilies", "FlexibleContexts", "TypeApplications"], [], ["bad :: Maybe (forall a. a -> a) -> Int", "bad _ = 42"])
         , ("PiOperandPiKindUnchanged", 43582, "not supported in this type position", ["TypeFamilies", "FlexibleContexts", "TypeApplications"], ["import Data.Proxy (Proxy(..))"], ["bad :: forall (a :: foreach (n :: Nat) -> Vec Int n). Proxy a", "bad = Proxy"])
@@ -4540,6 +4541,11 @@ runPackageSourceRejectChecks = do
         , ("KnownArgumentCacheOwnershipFailure", Just (83865, "Couldn't match type"), ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["bad :: QPi -> (foreach (n :: Nat) -> Eq Int => Vec Bool n) -> QPi", "bad f wrong = bothQ Refl (prefixProbe f ()) wrong"])
         , ("KnownArgumentLinearDeclaredTwice", Just (18872, "multiplicity"), ["ImpredicativeTypes", "LinearTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["data LinearBox value where", "  LinearBox :: value %1 -> LinearBox value", "linearHold :: forall value. value %1 -> LinearBox value", "linearHold value = LinearBox value", "bad :: QPi %1 -> (QPi,QPi)", "bad f = (case linearHold f of LinearBox g -> g, f)"])
         ]
+    quotedPiCapture =
+        [ "bad :: Nat -> Q Exp"
+        , "bad k = [| let { keep :: forall value. value ~ (foreach (n :: Nat) -> (Vec Int k, Vec Bool n)) => value -> value; keep f = f } in (42 :: Int) |]"
+        ]
+
     qualifiedPiExtensions = ["TypeFamilies", "FlexibleContexts", "ConstraintKinds", "AllowAmbiguousTypes", "ImpredicativeTypes"]
     declaration signature = ["data PackedVec a where", "  PackVec :: " ++ signature]
     package = declaration "foreach (n :: Nat) -> Vec a n -> PackedVec a"
