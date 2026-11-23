@@ -380,6 +380,10 @@ test('NativeLaterMatchability',
       extra_files([open_eval_dir + f for f in ['AnchorReceiver.hs', 'LaterMatchability.hs',
                                               'LaterMatchabilityClient.hs', 'PromotedEndo.hs']])],
      run_command, ['bash NativeLaterMatchability.sh "{compiler}" "{libdir}"'])
+test('NativeSynonymReify',
+     [req_interp, req_rts_linker, only_ways(['normal'])],
+     run_command, ['bash NativeSynonymReify.sh "{compiler}" "{libdir}" '
+                   + config.ghc_th_way_flags])
 test('NativeIndexedClassReceiver',
      [only_ways(['normal']),
       extra_files([open_eval_dir + 'IndexedMap.hs', open_eval_dir + 'IndexedMapClient.hs',

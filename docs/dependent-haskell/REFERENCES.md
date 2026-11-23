@@ -6919,6 +6919,19 @@ inference to the default written in the class.
 [GHC User’s Guide, associated type synonym defaults](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_families.html#assoc-decl-defs)
 and [class example](examples/open-evaluation/DefaultCallback.hs).
 
+### Reifying the kind of a callback synonym
+
+GHC's `reify` omits invisible declaration binders, as recorded in Note
+[Reifying invisible type variable binders] and issue #22828. In
+`type Apply f a = f a`, the inferred matchability variable can still
+occur in the kind of `f`. A plain `TySynD` splice implicitly binds
+that variable as specified. A `KiSigD` from `reifyType` instead preserves
+the inferred binder. This also applies if `LiberalTypeSynonyms` alone
+generalizes the provider.
+[GHC #22828](https://gitlab.haskell.org/ghc/ghc/-/issues/22828) ·
+[GHC reifier source](https://downloads.haskell.org/ghc/9.14.2-rc1/docs/libraries/ghc-9.14.1.20260728/src/GHC.Tc.Gen.Splice.html) ·
+[Regression](../../testsuite/tests/dependent/should_run/NativeSynonymReify.sh).
+
 ### Applications at a computed arrow kind
 
 Kiss, Field, Eisenbach and Peyton Jones allow type application at

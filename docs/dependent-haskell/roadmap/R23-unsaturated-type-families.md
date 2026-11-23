@@ -65,6 +65,17 @@ extensions off, an inferred callback arrow still defaults to M.
 [Ordinary client](../examples/open-evaluation/LaterMatchabilityClient.hs) ·
 [Regression](../../../testsuite/tests/dependent/should_run/NativeLaterMatchability.sh).
 
+Template Haskell's `reify ''Apply` leaves the inferred matchability
+binder out of `TySynD`. Its callback kind still refers to that binder.
+Splicing the declaration alone binds the variable as specified. An omitted
+specified matchability defaults to U in an ordinary client, so
+`Copied Maybe Bool` fails. To retain the inferred binder, emit
+`reifyType ''Apply` as a `KiSigD` with the copied synonym. Omit the
+redundant parameter kind annotations. Tests use `Maybe` in an ordinary
+module and an unsaturated family in a separate experimental module.
+[Regression](../../../testsuite/tests/dependent/should_run/NativeSynonymReify.sh) ·
+[Template Haskell binder reference](../REFERENCES.md#reifying-the-kind-of-a-callback-synonym).
+
 An installed library compiled with fixed matchable parameters needs a
 rebuild to admit the partial synonym. A home build checks the provider
 and recompiles clients if its exported kind changes. A warm build
