@@ -57,8 +57,10 @@ and promoted uses of a polymorphic `Endo` in real library clients.
 The expected kind also fixes the omitted matchabilities in the bare
 `Pure1 'Endo` use in `FoldrDefault_`. An unsigned `Apply` synonym can
 accept both a data constructor and a type family. R23 remains partial.
-The stock transformer kind synonym still needs a source migration, and
-the standalone proposal flag is under investigation.
+The standalone proposal flag now works without the umbrella. Direct
+partial applications of built-in families and the stock transformer
+kind synonym remain open.
+[562 flag and interface checks](CHECKPOINTS.md#standalone-unsaturated-type-families).
 [560 verification](CHECKPOINTS.md#inferred-matchability-in-type-synonyms).
 [R23 package check](roadmap/R23-unsaturated-type-families.md#one-constructor-for-term-and-promoted-callbacks)
 and [R41 scope](roadmap/R41-nested-quantification-in-gadts.md).
@@ -144,7 +146,8 @@ source examples. General promotion remains open.
 
 | Card | Next result | Acceptance check |
 | --- | --- | --- |
-| [R18 Type-level lets](roadmap/R18-type-level-lets.md#a-named-product-binding) | The 561 compiler accepts flat named-constructor patterns on regular products. The follow-up supplies structured diagnostics for arity and constructor shape. | Check the written constructor span and both field counts. Keep rejecting a refutable constructor even when every field is a wildcard. |
+| [R18 Type-level lets](roadmap/R18-type-level-lets.md#a-named-product-binding) | The 562 compiler reports a wrong arity or a refutable named constructor at the written name. The next candidate lets a later case use an earlier case result. | Check a wildcard fallback in a value signature, a shadowed branch binder and a rejected guess about an unknown input. |
+| [R23 Unsaturated families](roadmap/R23-unsaturated-type-families.md#passing-built-in-arithmetic-to-map) | The standalone flag and the ordinary importing client passed. The next candidate admits built-in arithmetic as a callback. | Check direct and synonym-wrapped callbacks in an ordinary client. An older reader must reject interfaces that use a partial built-in and still accept saturated ones. |
 | [R16 Open evaluation](roadmap/R16-open-term-evaluator.md#map-length-and-sharing-under-stock-fusion) | Determine when a source-hidden client can use `lengthMap` with default optimization. The published proof has a stock fusion counterexample. | Preserve rejection when the mapped and plain counts have different definedness. An accepted use must account for rewrites exposed on either side, including rules on `filter`. Verify the same condition through a re-export. |
 | [R03 Dependent products](roadmap/R03-dependent-products.md#using-an-imported-function-in-an-index) and [R15 Closed evaluation](roadmap/R15-closed-term-evaluator.md) | The 554-line release preserves the identity of imported functions in a retained index. The 555-line release publishes the checked lower-case and title-case equations. The 556-line release checks a local character predicate in its defining module and exports the synonym to ordinary clients. | An ordinary client must specialize an imported synonym at a Unicode literal. Changing a producer equation must invalidate its proof. An executable-only call must still track its object dependency. |
 | [R16 Append proofs](roadmap/R16-open-term-evaluator.md#append-fusion-and-an-undefined-right-list) | Check which consumer observes the appended list in a source-hidden proof. | Distinguish the recursive cell count from a strict outer fold. Check the seed position, the consumer equations and the reachable rewrite rules. |
