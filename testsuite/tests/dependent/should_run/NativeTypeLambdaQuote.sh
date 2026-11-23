@@ -116,7 +116,8 @@ main = case (checkedColumns, labelledColumn 'a') of
   (Field count (Field flag End), Field label End) ->
     print (count, flag, label, shadowed 'b')
 HS
-"${g[@]}" Main.hs TypeLambda.o TypeLambdaQuote.o QuotedShadow.o -o run
+"${g[@]}" -c Main.hs
+"${g[@]}" Main.o TypeLambda.o TypeLambdaQuote.o QuotedShadow.o -o run
 printf '%s\n' "(Right 42,Left \"missing flag\",('a',True),('b',GT,True))" >expected
 ./run >result
 cmp expected result
