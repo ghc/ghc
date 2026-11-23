@@ -138,6 +138,7 @@ import LaterMatchabilityClient (annotatedMap, appliedCallback, appliedSynonym, b
                                 inferredEndo, laterMatchability, nestedCallback, rankedMap)
 import qualified SchemaColumns
 import qualified TypeLambda
+import qualified TypeLambdaArgument
 import qualified TypeLambdaClient
 import qualified TypeLambdaQuote
 import qualified QuotedSensorRow
@@ -1727,6 +1728,11 @@ main = do
          TypeLambda.Field label TypeLambda.End) ->
             observe "splice a column schema and attach a caller-supplied label" (count, flag, label)
     observe "read two named sensors with a missing slot" QuotedSensorRow.readings
+    let reported :: TypeLambda.Fields '[Either Ordering Int, Either Ordering Bool]
+        reported = TypeLambdaArgument.rowFor @(\cell -> Either Ordering cell) Proxy (Right 42) (Left LT)
+    case reported of
+        TypeLambda.Field count (TypeLambda.Field flag TypeLambda.End) ->
+            observe "pass a row schema as a visible type argument" (count, flag)
     let lazyFields = TypeLambda.Field 'x' (TypeLambda.Field (error "unused field" :: Bool) TypeLambda.End)
     case TypeLambdaClient.forwardErrors (Proxy @String) lazyFields of
         TypeLambda.Field first _ ->
