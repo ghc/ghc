@@ -124,6 +124,26 @@ still needs a representation and evidence before it could enter Core.
 [Evaluator](../../../compiler/GHC/Core/OpenWhnf.hs) and
 [type elaboration](../../../compiler/GHC/Tc/Gen/OpenTypeEval.hs).
 
+## Composing length proofs with a retained call
+
+```haskell
+lengthAfterZip :: forall a b c. foreach (f :: (a, b) -> c)
+               -> foreach (xs :: [a]) -> foreach (ys :: [b])
+               -> size (map f (zip xs ys)) :~: minSize (size xs) (size ys)
+lengthAfterZip f xs ys = trans (lengthMap f (zip xs ys)) (lengthZip xs ys)
+```
+
+The retained operand `zip xs ys` gets its erased arguments from the
+declared types of both lists. `zip @a xs ys` uses the declaration of
+`ys` to supply the remaining argument. The same selection applies to
+`appendVec xs ys`, where both domains contain the element type and
+each supplies a separate length. The checker still validates the call
+and each instantiated domain. [Vector operand test](../../../testsuite/tests/dependent/should_run/NativeInferredSourceOperands.sh).
+
+Quick Look also uses later operands when an earlier one provides
+insufficient information. This pass uses immutable matching and reads
+only declared monomorphic types. [Serrano et al., §5.3](https://www.microsoft.com/en-us/research/wp-content/uploads/2020/01/quick-look-icfp20.pdf).
+
 ## Evidence required
 
 - [x] Reduce an ordinary polymorphic identity applied to a rigid variable.

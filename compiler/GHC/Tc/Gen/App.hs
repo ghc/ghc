@@ -4670,7 +4670,11 @@ tcRetainedFunctionArg domain arg = setSrcSpanA (getLoc arg) $
       (core, sigma) <- foldM (applyRetainedSourceType unsupported owner)
                              (Core.Var owner, varType owner) written
       let (binders, body) = tcSplitForAllInvisTyVars sigma
-      choices <- chooseRetainedSourceTypes unsupported owner sigma (map snd binders) body expected
+      choices <- case binders of
+        [] | eqType body expected -> return []
+           | otherwise -> unsupported
+        _ -> chooseRetainedSourceTypes unsupported owner sigma (map snd binders)
+                                       [(body, pure (Just expected))]
       let arg = Core.mkTyApps core choices
       case Core.nativeIndexFunctionArgIndex arg of
         Just index | typeKind index `tcEqType` expected -> return arg
@@ -4772,22 +4776,29 @@ tcRetainedArg domain arg
                   | otherwise   = DontBindMe
 
     resolve :: NameEnv Id -> Type -> LHsExpr GhcRn -> TcM (Core.CoreExpr, LHsExpr GhcRn)
-    resolve env expected original = do
-      result@(core, checked) <- tcRetainedValueOperand (resolve_expr env expected) expected original
+    resolve env expected = resolve_with_args env expected []
+
+    -- The other operands belong to the current application spine.
+    -- See Note [Erased arguments of certified source operands].
+    resolve_with_args :: NameEnv Id -> Type -> [LHsExpr GhcRn] -> LHsExpr GhcRn
+                      -> TcM (Core.CoreExpr, LHsExpr GhcRn)
+    resolve_with_args env expected later original = do
+      result@(core, checked) <- tcRetainedValueOperand (resolve_expr env expected later) expected original
       case Core.splitNativeIndexedConApp core of
         Just _ | let actual = exprType core, not (actual `tcEqType` expected) -> do
           co <- unifyType Nothing actual expected
           return (Core.Cast core (SubCo co), checked)
         _ -> return result
 
-    resolve_expr :: NameEnv Id -> Type -> LHsExpr GhcRn -> TcM (Core.CoreExpr, LHsExpr GhcRn)
-    resolve_expr env expected original@(L loc expr)
+    resolve_expr :: NameEnv Id -> Type -> [LHsExpr GhcRn] -> LHsExpr GhcRn
+                 -> TcM (Core.CoreExpr, LHsExpr GhcRn)
+    resolve_expr env expected later original@(L loc expr)
       = setSrcSpanA loc $ case expr of
           HsPar x arg -> do
-            (core, arg') <- resolve env expected arg
+            (core, arg') <- resolve_with_args env expected later arg
             return (core, L loc (HsPar x arg'))
           XExpr (ExpandedThingRn (HSE ctxt arg)) -> do
-            (core, arg') <- resolve env expected arg
+            (core, arg') <- resolve_with_args env expected later arg
             return (core, L loc (XExpr (ExpandedThingRn (HSE ctxt arg'))))
           HsLit _ (HsChar _ c)
             | charTy `tcEqType` expected
@@ -4816,10 +4827,10 @@ tcRetainedArg domain arg
                   ; (core, operand') <- resolve env expected' operand
                   ; return (core, L loc (mkExpandedLExpr expr operand')) }
           HsApp x fun arg -> do
-            (core, fun', arg') <- resolve_app env expected fun arg
+            (core, fun', arg') <- resolve_app env expected later fun arg
             return (core, L loc (HsApp x fun' arg'))
           OpApp x left op right -> do
-            (partial, op', left') <- resolve_app env expected op left
+            (partial, op', left') <- resolve_app env expected (right : later) op left
             (core, right') <- apply env partial right
             return (core, L loc (OpApp x left' op' right'))
           ExplicitList x elements
@@ -4896,15 +4907,15 @@ tcRetainedArg domain arg
               (prefix, _) <- Core.nativeIndexedConArgs dc tys
               return (Core.mkApps (Core.Var (dataConWorkId dc)) prefix)
 
-    resolve_app :: NameEnv Id -> Type -> LHsExpr GhcRn -> LHsExpr GhcRn
+    resolve_app :: NameEnv Id -> Type -> [LHsExpr GhcRn] -> LHsExpr GhcRn -> LHsExpr GhcRn
                 -> TcM (Core.CoreExpr, LHsExpr GhcRn, LHsExpr GhcRn)
-    resolve_app env expected (L loc (HsPar x fun)) arg = do
-        (core, fun', arg') <- resolve_app env expected fun arg
+    resolve_app env expected later (L loc (HsPar x fun)) arg = do
+        (core, fun', arg') <- resolve_app env expected later fun arg
         return (core, L loc (HsPar x fun'), arg')
-    resolve_app env expected (L loc (XExpr (ExpandedThingRn (HSE ctxt fun)))) arg = do
-        (core, fun', arg') <- resolve_app env expected fun arg
+    resolve_app env expected later (L loc (XExpr (ExpandedThingRn (HSE ctxt fun)))) arg = do
+        (core, fun', arg') <- resolve_app env expected later fun arg
         return (core, L loc (XExpr (ExpandedThingRn (HSE ctxt fun'))), arg')
-    resolve_app env expected (L loc (HsLam x LamSingle matches)) arg
+    resolve_app env expected _ (L loc (HsLam x LamSingle matches)) arg
       | L alts_loc [L match_loc match@Match
           { m_pats = L _ [L _ (VarPat _ lname)]
           , m_grhss = rhss@GRHSs { grhssGRHSs = grhss
@@ -4924,37 +4935,39 @@ tcRetainedArg domain arg
                  matches' = matches { mg_alts = L alts_loc [L match_loc match'] }
            ; return (Core.App (Core.Lam binder core_body) core_arg,
                      L loc (HsLam x LamSingle matches'), arg') }
-    resolve_app env expected fun arg
+    resolve_app env expected later fun arg
       = do { (core_fun, fun') <- case retainedSourceHead fun of
                Just (n, written) -> do
                      certified <- if isExternalName n
                        then tcLookupIdMaybe n >>= maybe (pure Nothing) tcLookupSourceTableId
                        else pure Nothing
                      case certified of
-                       Just v -> do { core <- instantiate_source v written arg
+                       Just v -> do { core <- instantiate_source v written (arg : later)
                                     ; pure (core, fun) }
                        _ -> setSrcSpanA (getLoc fun) $
                               failWithTc (TcRnRetainedQuantificationError (RetainedUncheckedSourceCall n))
-               Nothing -> resolve env expected fun
+               Nothing -> resolve_with_args env expected (arg : later) fun
            ; (app, arg') <- apply env core_fun arg
            ; return (app, fun', arg') }
 
     -- See Note [Erased arguments of certified source operands].
-    instantiate_source :: Id -> [LHsWcType GhcRn] -> LHsExpr GhcRn -> TcM Core.CoreExpr
-    instantiate_source owner written arg = do
+    instantiate_source :: Id -> [LHsWcType GhcRn] -> [LHsExpr GhcRn] -> TcM Core.CoreExpr
+    instantiate_source owner written args = do
       owner <- liftZonkM (zonkId owner)
       (core, sigma) <- foldM (applyRetainedSourceType unsupported owner)
                              (Core.Var owner, varType owner) written
       let (binders, body) = tcSplitForAllInvisTyVars sigma
       if null binders
         then return core
-        else do
-          actual <- tcRetainedDeclaredArgType pure arg
-          case (splitFunTy_maybe body, actual) of
-            (Just (_, _, _, formal, _), Just actual) ->
-              Core.mkTyApps core <$>
-                chooseRetainedSourceTypes unsupported owner sigma (map snd binders) formal actual
-            _ -> unsupported
+        else Core.mkTyApps core <$>
+               chooseRetainedSourceTypes unsupported owner sigma (map snd binders)
+                                           (declared_operands body args)
+
+    declared_operands ty (arg : args)
+      | Just (af, _, _, formal, result) <- splitFunTy_maybe ty
+      , isVisibleFunArg af
+      = (formal, tcRetainedDeclaredArgType pure arg) : declared_operands result args
+    declared_operands _ _ = []
 
     -- Resolve the witness before checking the dependent payload. The next
     -- application reads its domain from the type of this partial Core call.
@@ -5019,24 +5032,38 @@ applyRetainedSourceType unsupported owner (core, sigma) ty
          else unsupported }
   | otherwise = unsupported
 
--- | Determine erased type arguments from a known type.
+-- | Determine erased type arguments from known operand types.
 -- See Note [Erased arguments of certified source operands].
 chooseRetainedSourceTypes :: TcM [Type] -> Id -> Type -> [TyVar]
-                          -> Type -> Type -> TcM [Type]
-chooseRetainedSourceTypes unsupported owner sigma tvs formal actual
-  | null tvs, eqType formal actual
-  = return []
-  | isEmptyNameEnv (idConcreteTvs owner)
-  , Just subst <- matchRetainedAppType tvs Subst.emptySubst formal actual
-  , Just choices <- traverse (Subst.lookupTyVar subst) tvs
-  , not (any (`elemVarSet` tyCoVarsOfTypes choices) tvs)
-  , and (zipWith (\tv ty -> eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty))
-                 tvs choices)
-  , eqType (Subst.substTy subst formal) actual
-  , all noQuickLookVars (sigma : actual : choices)
-  = do { valid <- tcRetainedInstScope (sigma : actual : choices)
-       ; if valid then return choices else unsupported }
+                          -> [(Type, TcM (Maybe Type))] -> TcM [Type]
+chooseRetainedSourceTypes unsupported owner sigma tvs operands
+  | isEmptyNameEnv (idConcreteTvs owner) = go Subst.emptySubst [] operands
   | otherwise = unsupported
+  where
+    go subst matched rest
+      | Just choices <- traverse (Subst.lookupTyVar subst) tvs
+      = validate subst matched choices
+      | (formal, declared) : later <- rest
+      = do
+          actual <- declared
+          case actual of
+            Nothing -> go subst matched later
+            Just ty
+              | Just next <- matchRetainedAppType tvs subst formal ty
+              -> go next ((formal, ty) : matched) later
+              | otherwise -> unsupported
+      | otherwise = unsupported
+
+    validate subst matched choices
+      | not (any (`elemVarSet` tyCoVarsOfTypes choices) tvs)
+      , and (zipWith (\tv ty -> eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty))
+                     tvs choices)
+      , all (\(formal, actual) -> eqType (Subst.substTy subst formal) actual) matched
+      , let checked = sigma : choices ++ map snd matched
+      , all noQuickLookVars checked
+      = do { valid <- tcRetainedInstScope checked
+           ; if valid then return choices else unsupported }
+      | otherwise = unsupported
 
 {- Note [Inferred domains of written retained constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -5061,12 +5088,18 @@ parameter. For example, sourceLength xs has type Nat when xs has a declared
 type [a]. Its certified head still has type forall a. [a] -> Nat. Instantiate
 that erased binder before reading the first runtime argument's domain.
 
-Read only the operand's existing monomorphic declaration. Match kinds and
-types with an immutable substitution. Every unwritten erased binder must be
-determined by this first argument. Check the substituted domain, binder kinds,
-lexical scope, and concreteness requirements before constructing Core type arguments.
-Do not allocate inference variables or check the operand to obtain advice.
-Keep the written expression for the later ordinary check and usage recording.
+For zip xs ys, the declaration of xs fixes the first erased argument and
+the declaration of ys fixes the second. Keep the remaining operands of this
+application while resolving its head. Read their monomorphic declarations
+in order. An operand with no known type supplies no match. Stop when every
+unwritten erased binder has a choice, so sourceLength still needs only xs.
+
+Match kinds and types with one immutable substitution. Check the substituted
+domains, binder kinds, lexical scope, and concreteness requirements before
+constructing Core type arguments. A conflict or missing choice rejects the
+call. This pass allocates no inference variables and checks no occurrences.
+Keep the written expression for ordinary argument checking and usage
+recording. Each operand must still match its instantiated domain.
 
 A written prefix such as sourceLength @a xs uses tcVTA at each leading
 specified binder. Require known types after zonking. Do not apply tcVTA to
