@@ -64,8 +64,8 @@ registrations passed.
 [Character-predicate checks](CHECKPOINTS.md#checked-character-predicates-in-the-defining-module).
 
 The preceding Unicode checkpoint is `16de21824a`. Its compiler and
-libraries match normal two-stage build `1659c10b23` in
-`_build/on-demand/r03-r15-unicode-normal-555-20261123/source/_build/stage1`.
+libraries matched normal two-stage build `1659c10b23`. The historical
+compiler can be rebuilt from `refs/archive/dependent-haskell/2026-11-23/r03-r15-unicode-555`.
 The installed title-case, upper-case and lower-case functions all
 publish their checked equations. Native `-O0`, default `-O2` and GHCi
 matched the 555-line Showcase. All 109 focused registrations and all
@@ -532,4 +532,10 @@ After 561, four superseded 543, 544, 546 and 554 build trees released
 Their build recipes and test results remain. The R18 and standalone R23
 compilers ran their reader checks while those trees were absent.
 See `retirement-legacy-normal-products-20261123/retired.tsv`.
+After 562, job 1614 checked the 560, 561, standalone R23 and 562
+compilers and the R18 wildcard component with the 555, 556 and 558
+build trees removed. All five linked and ran a native program and
+evaluated the same expression in GHCi. Cleanup recovered
+11,673,653,248 bytes. The source revisions and build recipes remain.
+See `retirement-555-556-558-20261123/retired.tsv`.
 [Retention rules](CHECKPOINTS.md#clean-up-after-each-experiment).
