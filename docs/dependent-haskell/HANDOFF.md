@@ -29,14 +29,16 @@ Read [PLFH-NOTES.md](../../PLFH-NOTES.md) on resuming work and after each
 compiler batch. Reply with the compiler revision and the result of running
 the PLFH author's example.
 
-The next private assembly lives in `r04-r16-r17-post-585-20261123`.
-It combines simultaneous payload updates, equality for a lambda that
-forwards to a named family, and R16 constructor apartness.
+Job 2027 builds and tests private compiler `d15cbd41fe` in
+`_build/on-demand/r04-r16-r17-post-585-20261123`. Git retains the
+source at `refs/spikes/r04-r16-r17-normal-588`. Check `build.exit`,
+`qualification/gates.tsv`, `cohorts/gates.tsv` and `run-all.exit`
+before publishing. PLFH can keep using the qualified 585 compiler.
 
 | Area | Verified result and next step |
 | --- | --- |
-| R04 | Jobs 2002 and 2015 checked simultaneous payload updates and updates under a nominal witness equality. Job 2021 checked generated witness selectors in retained operands. |
-| R17 | Jobs 1992 and 1993 verified exact family forwarding. Job 2012 checked source spelling in visible-argument diagnostics. The nested splice typechecking context is under review. |
+| R04 | Job 2025 compiled an ordinary client against interfaces alone. It copied flags when two stored lengths compared equal and returned `Nothing` for different lengths at `-O0` and `-O2`. Jobs 2002, 2015 and 2021 cover the record update, equality and selector operations used by this example. |
+| R17 | Jobs 1992 and 1993 verified exact family forwarding. Jobs 2012 and 2020 checked the source spelling of visible type arguments, including a nested type splice. The two ordinary control diagnostics matched the baseline byte for byte. |
 | R16 proof validity | Independent count expressions can produce `Zero` and bottom under stock fusion. Both shared counts produced `Zero`. The private Specialise repair leaves that distinction observable. In job 1957, rebuilding HaskLib with private `4c4cc16244` recorded the `map` dependency on the composed proof. The optimized client then reported GHC-83605 at the call to `lengthMapZip`. The same diagnostic occurred with a producer that simply constructs one cell. The old installed interface still reached Core Lint. The consumer-side policy remains open. |
 | R23 matchability | The private prototype `99bfde4ec4` passed the original transformer test and 32 Template Haskell reification cases. An old installed provider still needs rebuilding. The published compiler retains the existing matchability policy. |
 
