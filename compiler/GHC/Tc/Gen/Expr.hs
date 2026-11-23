@@ -2935,7 +2935,7 @@ expandRetainedRecordUpd con receiver payload_ty sel record_expr value = do
     names <- mapM fresh (dataConFieldLabels con)
     let con_name = dataConName con
         result_ty = idType receiver
-        signature = mkDepFunTy receiver (mkVisFunTyMany payload_ty result_ty)
+        signature = mkDepFunTy receiver (mkVisFunTyManyU payload_ty result_ty)
         update_id = mkLocalId update ManyTy signature
         field_arg fld name
           | flSelector fld == idName sel = (genWildPat, genLHsVar replacement)
