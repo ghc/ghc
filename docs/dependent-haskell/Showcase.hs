@@ -1282,6 +1282,7 @@ main = do
     observe "installed Prelude.length converted to a Nat index" (TypeNats.natVal installedLength)
     observe "ordinary identity applied to a type variable" (openIdentity @Int)
     observe "uppercase character and digit proof from Data.Char" checkedCharacters
+    observe "certified Unicode title, upper, and lower case" certifiedCaseMappings
     observe "match the Int# field in a closed type family" machineIntProof
     observe "match zero and the target maximum in a Word# family" PrimitiveWordFieldsClient.wordFieldResults
     observe "Prelude.const selects the first type variable" (openLeft 'x' (undefined :: Bool))
@@ -2069,6 +2070,20 @@ openIdentity = 42
 -- | Reflect an upper-case character and prove that seven is a digit.
 checkedCharacters :: (Char, Data.Char.isDigit '7' :~: 'True)
 checkedCharacters = (charVal (Proxy @(Data.Char.toUpper 'x')), Refl)
+
+-- | Check the three case equations and reflect their result code points.
+certifiedCaseMappings :: [Int]
+certifiedCaseMappings =
+    case ( Refl :: UnicodeExport.Title '\x1c6' :~: '\x1c5'
+         , Refl :: Data.Char.toUpper '\x1c6' :~: '\x1c4'
+         , Refl :: UnicodeExport.Lower '\x1c4' :~: '\x1c6'
+         ) of
+        (Refl, Refl, Refl) ->
+            map fromEnum
+                [ charVal (Proxy @(UnicodeExport.Title '\x1c6'))
+                , charVal (Proxy @(Data.Char.toUpper '\x1c6'))
+                , charVal (Proxy @(UnicodeExport.Lower '\x1c4'))
+                ]
 
 -- | Read the outcome from the decision constructor.
 characterDecisionValue :: CharacterDecision.Decision predicate result -> Bool
