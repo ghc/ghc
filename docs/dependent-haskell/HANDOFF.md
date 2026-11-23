@@ -11,7 +11,23 @@ and its [expected output](Showcase.stdout) are the executable examples.
 Updated 23 November 2026. The development branch is
 `dependent-haskell`. Use the fork command below to find its latest commit.
 
-The published R18 implementation is `9daa85cf02`. A type-level `let`
+The R18/R23 compiler is `f030369687`. It supports the standalone
+`UnsaturatedTypeFamilies` extension and reports constructor-pattern
+errors in type lets at the written constructor. Job 1582 built both
+stages. All 562 Showcase lines matched at native `-O0`, default
+`-O2` and in GHCi. The 17 targeted registrations and the migrated
+`first-class-families` package passed. Job 1607 passed all 234
+compatibility cases and 136 of 137 focused tests. The existing
+`deriving-via-compile` failure matched the 561 diagnostic.
+[Release checks](CHECKPOINTS.md#standalone-unsaturated-type-families).
+
+The next combined compiler pin is `049ac2c031`. Recover it from
+`refs/archive/dependent-haskell/2026-11-23/r18-r23-normal-564`.
+It adds direct built-in arithmetic callbacks and lets a wildcard case
+branch use an earlier type-level case result. The two component runs
+passed. Qualify both changes together on the normal compiler.
+
+The preceding R18 implementation is `9daa85cf02`. A type-level `let`
 can bind the fields of a named product. The Showcase adds two dimensions
 while leaving a third unknown. Normal job 1572 built both stages and
 matched 561 outputs at native `-O0`, default `-O2` and in GHCi.
@@ -171,8 +187,7 @@ though ordinary runtime clients passed. The published fix lets a
 client give `spaceDecision 'x'` the type `Decision Char.isSpace (Space 'x')`.
 [Substitution example](roadmap/R03-dependent-products.md#specializing-an-imported-call).
 
-The next integration combines structured R18 constructor diagnostics
-with the standalone R23 flag. Normal job 1574 built the separate flag
+Before integration, normal job 1574 built the separate flag
 candidate at `4215377781`. Jobs 1576 and 1578 checked its real enum,
 flag order, the old interface reader, changes to the provider flag, and
 the new extension hint. With the standalone flag alone, a module can
@@ -468,14 +483,13 @@ defaults and an opt-in migration warning.
 
 ## Build and verify
 
-The published 561-line Showcase uses the normal two-stage compiler at
-`9daa85cf02` in `r18-product-let-normal-561-20261123`.
+The 562-line Showcase uses the normal two-stage compiler at
+`f030369687` in `r18-r23-standalone-normal-562-20261123`.
 On this host the bootstrap tools are GHC 9.14.1, Cabal 3.18.1.0, Happy 2.1.7
 and Alex 3.5.4.0. A fresh checkout needs the Git submodules at their recorded
-revisions. This build used five workers per job.
-The normal build runs `./boot`, `./configure`, builds Hadrian
-from `hadrian/cabal.project`, and runs Hadrian with
-`-j5 --flavour=quick --docs=none`. Reuse the configured checkout and Hadrian
+revisions. This build copied the preceding build tree, ran `./boot`
+and `./configure`, and reused the preceding Hadrian executable with
+`-j4 --flavour=quick --docs=none`. Reuse the configured checkout and Hadrian
 binary if a build stops partway. Keep each compiler with its own libraries.
 
 Hadrian puts the stage 1 compiler in `_build/stage0/bin/ghc` and the
@@ -483,7 +497,7 @@ self-hosted stage 2 compiler in `_build/stage1/bin/ghc`. Both use the
 target libraries in `_build/stage1/lib`. For example, from the main checkout:
 
 ```sh
-stable="$PWD/_build/on-demand/r18-product-let-normal-561-20261123/source/_build/stage1"
+stable="$PWD/_build/on-demand/r18-r23-standalone-normal-562-20261123/source/_build/stage1"
 queue="$PWD/docs/dependent-haskell/tools/ghc-build-job"
 check="$PWD/docs/dependent-haskell/check-showcase.sh"
 "$queue" showcase-stage2-ghci bash "$check" "$stable/bin/ghc" "$stable/lib" --ghci

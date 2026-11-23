@@ -6,6 +6,39 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Standalone unsaturated type families
+
+A module can enable `UnsaturatedTypeFamilies` to pass a type family
+to a higher-order type synonym. An ordinary Haskell2010 client imports
+the inferred synonym `Apply` and the provider's `FamilyResult`.
+It uses `Apply Maybe Char` and `FamilyResult` in the same signature.
+The Showcase evaluates the call to `(Just 'q',[False,True])`.
+[Provider](examples/open-evaluation/StandaloneCallback.hs) and
+[client](examples/open-evaluation/StandaloneCallbackClient.hs).
+
+Job 1582 built both stages from `f030369687`. All 562 Showcase lines
+matched at native `-O0`, default `-O2` and in GHCi. All 17 focused
+registrations passed. They include the R18 constructor diagnostic
+checks for the written name, its source span and the number of fields.
+The same compiler built the migrated `first-class-families` library,
+passed its test suite and checked three clients with the provider
+source hidden.
+
+Template Haskell reported the standalone flag through both interpreters.
+Changing the flag recompiled the provider. A build with the same flags
+reused its interface. The previous reader could read the new provider.
+The standalone flag implies `TypeFamilies`. The umbrella retains its
+existing behavior, including local generalisation in Haskell2010
+modules. [Flag and interface tests](../../testsuite/tests/dependent/should_run/NativeStandaloneUnsaturation.sh)
+and [R23 scope](roadmap/R23-unsaturated-type-families.md#release-scope-against-proposal-242).
+
+Job 1607 used the same compiler. All 234 compatibility registrations
+passed, with 231 in the normal way and three in GHCi. Of 137 distinct
+focused registrations, 136 passed. The upstream `deriving-via-compile`
+test still failed on the fork. Its `MTrans` diagnostic matched 561
+byte for byte. Stock GHC 9.14.1 accepts that source.
+[Transformer kind and migration](roadmap/R23-unsaturated-type-families.md#a-transformer-kind-synonym).
+
 ## Constructor patterns in type-level lets
 
 A source type can unpack a regular, single-constructor product in a
