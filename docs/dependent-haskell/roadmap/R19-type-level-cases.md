@@ -63,6 +63,16 @@ and constructor-headed result kind contain only constructor types,
 variables, and literals. It can return a part of an argument or build
 a constructor type from those parts.
 
+A selector can also take another constructor-only selector from the
+same source family. In `Width`, a type let computes a default from a
+Boolean flag. A second case uses the default for `Nothing` and uses
+the supplied number for `Just n`. The second case can choose the
+supplied number while the flag is still abstract. With `Nothing`,
+the result stays stuck until the flag is known. The compiler checks
+that each nested selector is saturated and uses only constructor
+results or captured arguments. Other nested family applications
+still use the ordinary termination checks.
+
 A direct recursive call can also pass. In `Down ('S n)`, a case
 on `n` selects the pattern `S prior`. The compiler checks the call
 `Down ('S prior)` against the refined source LHS

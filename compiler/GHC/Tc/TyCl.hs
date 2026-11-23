@@ -4496,12 +4496,16 @@ the size check even when each alternative is just a constructor type.
 
 Use the original checked rows, before any ordered case decision nodes
 replace them. Every row must have the same source owner and scrutinee
-column. Permit a saturated call from that owner in the same checking
-group when both the actual arguments and every branch result contain
-only constructor types, variables and literals. The result kind must
-also be constructor-headed, so a later argument cannot apply a
-returned function. This call selects a row and reuses parts of its
-arguments. It introduces no family call.
+column. A selector's branch results must contain only constructor
+types, variables and literals. Its actual arguments can also contain
+saturated selectors of the same owner in the same checking group.
+For example, a type let can pass one case result to a second case.
+
+Check each nested call in the argument syntax. Each selector can
+reuse parts of an argument, but its checked branches introduce no
+family calls of their own. Thus the nested calls come from the
+finite argument expression. Require a constructor-headed result
+kind at each call, so a later argument cannot apply a returned function.
 
 For a direct recursive result, specialize the original LHS and all
 the helper arguments to each case pattern. Use those arguments to
@@ -4512,9 +4516,10 @@ in the LHS. The call must receive that same refinement through the
 captured `n`. Its size stays equal to the LHS.
 
 Use a source LHS variable of closed kind as the scrutinee. Match
-a flat promoted constructor pattern or a variable pattern. Keep
-the check on the generated equation too. Both comparisons use the
-normal Paterson checks. See 'refineCaseCall' in GHC.Tc.Validity.
+a flat promoted constructor pattern or a variable pattern. The
+recursive check requires constructor-only actuals and reuses the
+normal Paterson checks for the source and generated equations.
+See 'refineCaseCall' in GHC.Tc.Validity.
 -}
 
 -- | Collect original checked case rows by source owner and private Name.

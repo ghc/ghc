@@ -69,6 +69,7 @@ cp FamilyCasePayload.{hi,o} interfaces/
 module Main where
 
 import FamilyCasePayload
+import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
 
 fallback :: ChoosePayload Bool 'Nothing
@@ -89,9 +90,15 @@ second = Refl
 decreases :: Down ('S ('S ('S 'Z))) :~: 'True
 decreases = Refl
 
+defaultWidth :: Width 'False 'Nothing :~: 2
+defaultWidth = Refl
+
+overrideWidth :: Proxy flag -> Width flag ('Just 7) :~: 7
+overrideWidth _ = Refl
+
 main :: IO ()
-main = case (first, second, decreases) of
-  (Refl, Refl, Refl) -> print (fallback, found, keep)
+main = case (first, second, decreases, defaultWidth, overrideWidth (Proxy :: Proxy 'True)) of
+  (Refl, Refl, Refl, Refl, Refl) -> print (fallback, found, keep)
 HS
     "${g[@]}" -XNoExperimentalDependentTypes -XNoUnsaturatedTypeFamilies -c FamilyCaseClient.hs
     "${g[@]}" FamilyCaseClient.o FamilyCasePayload.o -o family-case
@@ -110,11 +117,16 @@ bad _ = Refl
 
 blocked :: forall (n :: Count). Proxy n -> Down ('S n) :~: 'True
 blocked _ = Refl
+
+unknownWidth :: forall (flag :: Bool). Proxy flag -> Width flag 'Nothing :~: 2
+unknownWidth _ = Refl
 HS
     reject FamilyCaseRigid 10:9 '[GHC-83865]'
     grep -Fq 'ChoosePayload Bool input :~: Bool' bad.log
     grep -Fq 'FamilyCaseRigid.hs:13:13: error: [GHC-83865]' bad.log
     grep -Fq 'Down (S n) :~: True' bad.log
+    grep -Fq 'FamilyCaseRigid.hs:16:18: error: [GHC-83865]' bad.log
+    grep -Fq 'Width flag Nothing :~: 2' bad.log
 
     cat >FamilyCaseRecursion.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeFamilies #-}
@@ -130,11 +142,20 @@ type family Growing (n :: Count) :: Bool where
   Growing ('S n) = case n of
     Z -> 'True
     S prior -> Growing ('S ('S ('S prior)))
+
+type family ReadFlag (flag :: Bool) :: Bool where
+  ReadFlag 'True = 'False
+  ReadFlag 'False = 'True
+
+type family UserNested (flag :: Bool) :: Bool where
+  UserNested flag = case ReadFlag flag of { True -> 'False; False -> 'True }
 HS
     reject FamilyCaseRecursion 6:3 '[GHC-22979]'
     grep -Fq 'FamilyCaseRecursion.hs:11:3: error: [GHC-22979]' bad.log
     grep -Fq 'Same (S (S _))' bad.log
     grep -Fq 'Growing (S (S (S prior)))' bad.log
+    grep -Fq 'FamilyCaseRecursion.hs:20:3: error: [GHC-22979]' bad.log
+    grep -Fq 'ReadFlag flag' bad.log
 )
 
 "${g[@]}" -fomit-interface-pragmas -c NativeTypeCaseHeadProvider.hs
