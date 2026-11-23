@@ -6956,6 +6956,21 @@ The one-step kind lookup is an implementation choice.
 [proposal 242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html)
 and [checked source](roadmap/R23-unsaturated-type-families.md#applying-a-type-at-a-family-defined-arrow-kind).
 
+### Built-in arithmetic as a higher-order argument
+
+Agda declares addition as a function on natural numbers and binds the
+primitive addition operation to that definition. Its list `map` accepts
+an ordinary function. The corresponding R23 acceptance case applies
+`Map ((+) 1)` to a list of type-level naturals. GHC implements this
+addition as a built-in type family. Under proposal #242, a type family
+can be passed before all its arguments are supplied. On this fork an
+additional check currently admits only user families and type synonyms.
+[Agda built-in natural-number functions](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#natural-numbers),
+[Agda list map](https://agda.github.io/agda-stdlib/v2.3/Data.List.Base.html),
+[GHC type-level literals](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_literals.html),
+[proposal #242 on arity](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#arity-of-type-families)
+and [the fork's arity check](../../compiler/GHC/Core/Type.hs).
+
 ### Inferring the matchability of a bare promoted constructor
 
 Agda can use an expected type to infer an omitted argument. Proposal

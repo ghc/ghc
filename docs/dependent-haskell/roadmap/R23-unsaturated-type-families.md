@@ -34,6 +34,38 @@ stamp allows that provider to stay warm after the one recheck. An
 installed provider keeps its interface and needs a rebuild to export
 the new kind.
 
+## Release scope against proposal #242
+
+| Requirement | Evidence or remaining gap |
+| --- | --- |
+| Partial user families and synonyms | `NativeUnsaturatedFamily` and `NativeUnsaturatedInvisible` check arity, higher-order application and compiled interfaces. They also reject partial family applications in instance heads and family patterns. |
+| Matchability inference | `NativeLaterMatchability` checks one inferred synonym with a data constructor and a type family. The migrated `first-class-families` package exercises a bare promoted constructor in its actual fold. |
+| Spelling, reflection and linear arrows | The fork uses proposal #370's modifier position for the indices from #242. The percent-arrow tests cover both multiplicity and matchability. A TH client can copy the full inferred kind with `reifyType`. |
+| Standalone opt-in | `NativeStandaloneUnsaturation` checks partial application with the umbrella off. The flag implies `TypeFamilies`. An ordinary client can use the exported result. |
+| Built-in type functions | The compiler still excludes built-in closed families from its partial-application check. Applying a user family to every list element and passing built-in addition to the same receiver need separate checks. |
+| Existing unannotated source | Stock GHC accepts the transformer kind synonym in `deriving-via-compile`. The fork requires explicit matchable arrows. The default for these ordinary modules remains open. |
+
+[Proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#proposed-change-specification),
+[arrow syntax decision](../REFERENCES.md#matchability-and-multiplicity-on-arrows),
+[built-in arithmetic](../REFERENCES.md#built-in-arithmetic-as-a-higher-order-argument)
+and [the stock transformer case](#a-transformer-kind-synonym).
+
+### Built-in arithmetic callbacks
+
+On the standalone flag compiler `4215377781`, job 1595 checked
+`Map ((+) 1) '[2, 3, 4]`, `Map (CmpNat 3) '[2, 3, 4]` and a
+list mapped with `AppendSymbol "ghc-"`. All three direct uses
+reported GHC-27346. Passing a user-defined closed family that
+saturates the operation proved all three results with `Refl`.
+
+Job 1601 checked those wrappers on public 561 at `-O0` and `-O2`
+with Core and STG Lint. The family wrappers passed. With type synonyms in their place, Core
+Lint found
+`AppendSymbol "ghc-"` unsaturated in the type of the symbol-list proof.
+The fix must cover partial functions reconstructed from type synonyms
+as well as direct source applications.
+[Built-in arithmetic references](../REFERENCES.md#built-in-arithmetic-as-a-higher-order-argument).
+
 ## Matchability on a source arrow
 
 Import `U` from `GHC.Matchability` and enable `Modifiers` to write the
