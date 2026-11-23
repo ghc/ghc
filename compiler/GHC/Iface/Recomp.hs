@@ -876,6 +876,15 @@ checkFlagHash hsc_env iface self_recomp = do
                 then liftIO $ recheck "Compiler now checks cases on two structural size operands"
                 else pure UpToDate
           | otherwise = pure UpToDate
+        check_size_list_case
+          | checkStructuralCases dflags iface
+          , not (Map.member sizeListCasesField (getExtensibleFields (mi_ext_fields iface)))
+          = do
+              candidate <- couldExportSourceSignature (isOneShot (ghcMode dflags)) iface SizeListCase
+              if candidate
+                then liftIO $ recheck "Compiler now checks cases on a structural size and a list"
+                else pure UpToDate
+          | otherwise = pure UpToDate
         check_family_uses
           | old_fp `elem` (staged_fp : class_generations) = pure UpToDate
           | otherwise = do
@@ -971,6 +980,7 @@ checkFlagHash hsc_env iface self_recomp = do
                                      `recompThen` check_monomorphic_fold
                                      `recompThen` check_guarded_pair
                                      `recompThen` check_structural_case
+                                     `recompThen` check_size_list_case
                                      `recompThen` check_source_provider
                                      `recompThen` check_family_uses
                                      `recompThen` check_forwarded_result
@@ -1174,6 +1184,10 @@ equations.
 -- | Extensible field for interfaces reviewed for structural size equations.
 structuralCasesField :: String
 structuralCasesField = "structural-size-cases-reviewed-v1"
+
+-- | Extensible field for interfaces reviewed for cases on a size and a list.
+sizeListCasesField :: String
+sizeListCasesField = "size-list-cases-reviewed-v1"
 
 -- | Check ordinary source modules that generate code.
 checkStructuralCases :: DynFlags -> ModIface_ phase -> Bool
@@ -2036,7 +2050,7 @@ data SourceIfaceType = SourceIfaceType IfaceType [(IfLclName, Either Int SourceI
 -- | The signature shapes used to find producers with missing source equations.
 data SourceSignature
   = GuardedListFilter | GuardedListPair | PolymorphicIdentity | ListAppend
-  | ListFold | ListFoldMethod | MonomorphicListFold | StructuralCase
+  | ListFold | ListFoldMethod | MonomorphicListFold | StructuralCase | SizeListCase
 
 -- | Check whether an interface signature could supply the requested equation.
 -- See Note [Looking through type synonyms for checked source signatures].
@@ -2075,6 +2089,9 @@ couldExportSourceDecls one_shot iface declarations signature =
           StructuralCase
             | IfSourceTableId{} <- details -> pure False
             | otherwise -> check structural_case_arrows
+          SizeListCase
+            | IfSourceTableId{} <- details -> pure False
+            | otherwise -> check (size_list_arrows 0)
       where
         check shape = isJust <$> runMaybeT (shape (SourceIfaceType ty []))
     candidate _ = pure False
@@ -2163,10 +2180,24 @@ couldExportSourceDecls one_shot iface declarations signature =
     structural_case_arrows ty = do
       (left, rest) <- ordinary_arrow ty
       (right, result) <- ordinary_arrow rest
-      root <- structural_head left
+      root <- structural_size_type left
       right_root <- structural_head right
       result_root <- structural_head result
       guard (right_root == root && result_root == root)
+
+    size_list_arrows depth ty = lift (view ty) >>= \case
+      Just (SourceIfaceType (IfaceForAllTy _ _ _) _) ->
+        lifted_parameter depth (size_list_arrows (depth + 1)) ty
+      _ -> do
+        (bound, rest) <- ordinary_arrow ty
+        (input, output) <- ordinary_arrow rest
+        void (structural_size_type bound)
+        Just _ <- list_argument input
+        Just _ <- list_argument output
+        pure ()
+
+    structural_size_type ty = do
+      root <- structural_head ty
       Just IfaceData{ifBinders = [], ifCtxt = [], ifParent = IfNoParent,
                      ifResKind = kind, ifCons = IfDataTyCon False [first, second]}
         <- lift (declaration root)
@@ -2176,7 +2207,7 @@ couldExportSourceDecls one_shot iface declarations signature =
       fields <- traverse structural_fields [first, second]
       [child] <- pure (concat fields)
       child_root <- structural_head (SourceIfaceType child [])
-      guard (child_root == root)
+      root <$ guard (child_root == root)
 
     structural_head ty = do
       Just (SourceIfaceType (IfaceTyConApp tc IA_Nil) _) <- lift (view ty)
@@ -3085,12 +3116,14 @@ addFingerprints hsc_env iface0 = do
     Just info | checkRuleClosures (hsc_dflags hsc_env) iface0 ->
       initIfaceLoad hsc_env (usesFinalCoreSourceTable (mi_sr_usages info))
     _ -> pure False
-  stamp_structural_cases <-
-    if checkStructuralCases (hsc_dflags hsc_env) iface0
-      then initIfaceLoad hsc_env $
-        couldExportSourceDecls (isOneShot (ghcMode (hsc_dflags hsc_env)))
-          iface0 (map snd decls_w_hashes) StructuralCase
-      else pure False
+  let stamp_source_case signature
+        | checkStructuralCases (hsc_dflags hsc_env) iface0 =
+            initIfaceLoad hsc_env $
+              couldExportSourceDecls (isOneShot (ghcMode (hsc_dflags hsc_env)))
+                iface0 (map snd decls_w_hashes) signature
+        | otherwise = pure False
+  stamp_structural_cases <- stamp_source_case StructuralCase
+  stamp_size_list_cases <- stamp_source_case SizeListCase
 
    -- put the declarations in a canonical order, sorted by OccName
   let sorted_decls :: [(Fingerprint, IfaceDecl)]
@@ -3155,6 +3188,7 @@ addFingerprints hsc_env iface0 = do
                     ++ [appliedMappingField | stamp_applied_mapping]
                     ++ [homeRuleClosuresField | stamp_home_rules]
                     ++ [structuralCasesField | stamp_structural_cases]
+                    ++ [sizeListCasesField | stamp_size_list_cases]
                     ++ [sourceProofBranchesField | stamp_source_proof_branches]
       checked_hash = foldl' (\fp field -> computeFingerprint putNameLiterally (fp, field))
                             base_hash checked_fields
