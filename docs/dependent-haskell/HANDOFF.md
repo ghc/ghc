@@ -11,7 +11,16 @@ and its [expected output](Showcase.stdout) are the executable examples.
 Updated 23 November 2026. The development branch is
 `dependent-haskell`. Use the fork command below to find its latest commit.
 
-The published character-predicate implementation is `1b5c5a9676`.
+The published runtime-message implementation is `b963ccfaad`. Both
+normal stages built at `3dd34e5327`. Its 558-line Showcase matched
+at `-O0`, default `-O2` and in GHCi. All 234 compatibility cases and
+125 of 126 focused registrations passed. The remaining upstream
+`deriving-via-compile` case gives the same errors on public 556.
+Stock 9.14.1 accepts its transformer kind synonym. Job 1531 checked
+the explicit matchability migration on both fork compilers.
+[Full results](CHECKPOINTS.md#runtime-payload-selection-through-an-associated-family).
+
+The preceding character-predicate implementation is `1b5c5a9676`.
 A type synonym can use a checked character predicate in the same
 declaration group. An importing module can prove its result from the
 interface. Jobs 1454 and 1455 qualified normal two-stage build
@@ -141,12 +150,13 @@ though ordinary runtime clients passed. The published fix lets a
 client give `spaceDecision 'x'` the type `Decision Char.isSpace (Space 'x')`.
 [Substitution example](roadmap/R03-dependent-products.md#specializing-an-imported-call).
 
-The next normal build is `3dd34e5327` in
-`r04-r21-runtime-sigma-normal-558-20261123/source`. Job 1493 builds
-both compiler stages. Job 1494 qualifies the 558-line Showcase. The
-candidate checks a dependent pair with a runtime tag. It also handles
-attached deriving clauses and associated equations that use a local
-producer. These checks use the published R16 proof policy.
+The next integration combines R04's named coverage diagnostic with
+R23 matchability inference. Job 1519 compiled all 17 modules of the
+migrated `first-class-families-0.8.2.0` with `Pure1 'Endo`, passed its
+test and ran three ordinary clients. Component job 1532 checked an
+unsigned type synonym with both a data constructor and a type family.
+Use `r04-r23-bare-callback-normal-560-20261123` for the combined
+two-stage build and the external package replay.
 
 Job 1335 used installed HaskLib on `4d10fdc35f` to check the
 [append counterexample](roadmap/R16-open-term-evaluator.md#append-fusion-and-an-undefined-right-list).
@@ -411,16 +421,15 @@ defaults and an opt-in migration warning.
    records for its old paths. Keep active builds under `_build/on-demand/`.
 3. Restore the [shared WSL build queue](CHECKPOINTS.md#restore-the-shared-wsl-build-queue)
    before submitting work. Use at most two subagents. The coordinator
-   reviews and integrates their results. The current assignments are
-   R23 matchability inference and R21 declaration order for parameterized datatypes.
-   The group has two slots. All GHC jobs share
+   reviews and integrates their results. Check the live assignments and
+   queue before resuming a roadmap card. The group has two slots. All GHC jobs share
    16 logical CPUs, 64,000,000,000 bytes of memory and zero swap.
    Higher-priority jobs pause the queue and freeze the GHC slice.
 
 ## Build and verify
 
-The published 556-line Showcase uses the normal two-stage compiler at
-`54c4c62287` in `r16-r21-char-predicate-normal-556-20261123`.
+The published 558-line Showcase uses the normal two-stage compiler at
+`3dd34e5327` in `r04-r21-runtime-sigma-normal-558-20261123`.
 On this host the bootstrap tools are GHC 9.14.1, Cabal 3.18.1.0, Happy 2.1.7
 and Alex 3.5.4.0. A fresh checkout needs the Git submodules at their recorded
 revisions. This build used five workers per job.
@@ -434,7 +443,7 @@ self-hosted stage 2 compiler in `_build/stage1/bin/ghc`. Both use the
 target libraries in `_build/stage1/lib`. For example, from the main checkout:
 
 ```sh
-stable="$PWD/_build/on-demand/r16-r21-char-predicate-normal-556-20261123/source/_build/stage1"
+stable="$PWD/_build/on-demand/r04-r21-runtime-sigma-normal-558-20261123/source/_build/stage1"
 queue="$PWD/docs/dependent-haskell/tools/ghc-build-job"
 check="$PWD/docs/dependent-haskell/check-showcase.sh"
 "$queue" showcase-stage2-ghci bash "$check" "$stable/bin/ghc" "$stable/lib" --ghci

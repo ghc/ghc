@@ -1343,3 +1343,33 @@ Modern GHC also preserves higher-rank invisible binders and uses representationa
 nominal through that bridge. Family saturation is an arity rule; a zero-arity
 family can retain a forall result kind. That fact alone does not establish a
 noninjective inhabitant or a current exploit.
+
+## A transformer kind synonym
+
+The upstream `deriving-via-compile` test defines a kind for monad
+transformers. Its source enables neither `Modifiers` nor
+`ExperimentalDependentTypes`.
+
+```haskell
+type MTrans = (Type -> Type) -> (Type -> Type)
+
+class LiftingMonad (trans :: MTrans) where
+    proof :: Monad m :- Monad (trans m)
+```
+
+Job 1531 compiled the unchanged module with stock GHC 9.14.1. Public
+556 and normal 558 both reported GHC-83865 at `trans m`. The full
+diagnostics were byte-identical. With `Modifiers` and
+`import GHC.Matchability (M)`, the following declaration compiled
+on both fork versions.
+
+```haskell
+type MTrans = (Type %M -> Type) %M -> (Type %M -> Type)
+```
+
+Proposal #242 documents the compatibility cost of interpreting an
+ordinary arrow on a synonym right-hand side as unmatchable. Here a
+program without the experimental extension encounters that cost.
+The original registration remains a compatibility failure on the fork.
+[Upstream test](../../../testsuite/tests/deriving/should_compile/deriving-via-compile.hs)
+and [proposal #242 on synonym right-hand sides](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#rhs-of-type-synonyms).

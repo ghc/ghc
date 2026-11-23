@@ -143,7 +143,8 @@ source examples. General promotion remains open.
 | [R16 Open evaluation](roadmap/R16-open-term-evaluator.md#map-length-and-sharing-under-stock-fusion) | Determine when a source-hidden client can use `lengthMap` with default optimization. The published proof has a stock fusion counterexample. | Preserve rejection when the mapped and plain counts have different definedness. An accepted use must account for rewrites exposed on either side, including rules on `filter`. Verify the same condition through a re-export. |
 | [R03 Dependent products](roadmap/R03-dependent-products.md#using-an-imported-function-in-an-index) and [R15 Closed evaluation](roadmap/R15-closed-term-evaluator.md) | The 554-line release preserves the identity of imported functions in a retained index. The 555-line release publishes the checked lower-case and title-case equations. The 556-line release checks a local character predicate in its defining module and exports the synonym to ordinary clients. | An ordinary client must specialize an imported synonym at a Unicode literal. Changing a producer equation must invalidate its proof. An executable-only call must still track its object dependency. |
 | [R16 Append proofs](roadmap/R16-open-term-evaluator.md#append-fusion-and-an-undefined-right-list) | Check which consumer observes the appended list in a source-hidden proof. | Distinguish the recursive cell count from a strict outer fold. Check the seed position, the consumer equations and the reachable rewrite rules. |
-| [R21 Declaration dependencies](roadmap/R21-dependency-analysis.md#checked-character-equations-in-their-defining-module) | The 556-line release checks character predicates in either declaration order. The next build checks attached deriving clauses and associated equations that depend on a local producer. | Compare derived instances with stock GHC and run a separate reader of the associated equation. The keyed-tree proof still awaits the cross-module proof guard. |
+| [R21 Declaration dependencies](roadmap/R21-dependency-analysis.md#deriving-and-associated-equations) | A local producer can supply an associated equation. Its result datatype can have an attached deriving clause. The keyed-tree proof still awaits the cross-module proof guard. | Compare the instance and deriving diagnostics in both source orders and check a reader that imports only the interface. |
+| [R04 Dependent sums](roadmap/R04-dependent-sums.md#construct-a-retained-pair-in-an-ordinary-argument) | An ordinary caller can package a runtime flag and its payload through an associated result type. The coverage follow-up names the written package alias in an incomplete pattern warning. | Check a global instance and a dictionary from a GADT pattern. Keep the payload lazy when only the flag is requested. |
 
 R41 is complete on the fork. R03 remains partial after the 554-line release.
 R16 has a stock-compiler counterexample to unconditional append fusion.
@@ -389,10 +390,10 @@ still require substantial research.
 - [x] **R49 [Unify type and kind variables](https://ghc.serokell.io/dh#unify-type-and-kind-variables)** — Completed. Needs/includes: R50.
 - [x] **R50 [Unify types and kinds](https://ghc.serokell.io/dh#unify-types-and-kinds)** — Completed. Needs/includes: no outgoing graph edge.
 
-`R39 -> R34` and `R39 -> R41` are the two loose-end edges. Required type
-arguments already exist while syntax unification and nested GADT quantifiers
-remain incomplete. Do not infer completion by propagating checkmarks through
-the graph.
+Serokell marks `R39 -> R34` and `R39 -> R41` as loose-end edges.
+Required type arguments already exist upstream. On this fork, R41 meets
+its release checks and R34 remains open. The checklist above records
+Serokell’s own status for each card.
 
 ### R34 function arrows in required type patterns
 

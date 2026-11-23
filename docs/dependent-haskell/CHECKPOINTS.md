@@ -6,6 +6,41 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Runtime payload selection through an associated family
+
+The ordinary client in this example reads a Boolean from an `IORef`
+and constructs `Pair flag (make flag)`. The `True` payload contains
+text and the `False` payload contains an integer. The client can also
+read the tag when the payload is `error "unused message payload"`.
+The package type comes from an associated family. One call uses an
+instance in scope. Another gets its dictionary by matching `Permit`.
+[Provider](examples/packed-vector/RuntimeMessage.hs) and
+[ordinary client](examples/packed-vector/RuntimeMessageClient.hs).
+
+The same compiler checks a local function used by an associated type
+equation in either source order. It derives `Show` for the result datatype
+with the regular instances in scope. A separate client uses the exposed
+equation and the derived instance.
+[Example](examples/open-evaluation/LocalDerivedAssociated.hs) and
+[deriving checks](roadmap/R21-dependency-analysis.md#deriving-and-associated-equations).
+
+Job 1493 built both compiler stages at `3dd34e5327`. Its compiler,
+libraries, tests and Showcase match implementation `b963ccfaad`.
+Job 1494 passed the 558-line Showcase at native `-O0`, default `-O2`
+and in GHCi. It also passed all 234 compatibility registrations, 34
+specialization checks, both package identity checks, the GHC API
+producer-change check and the guide build.
+
+The original focus list included a fixture, `NativePackageOperand.hs`,
+under its own name as well as under its registered test,
+`NativeRetainedPackage`. Job 1526 ran all 126 distinct registrations.
+125 passed, including the retained-package tests. The unchanged upstream
+`deriving-via-compile` registration failed at the type synonym `MTrans`.
+Job 1531 checked that source on stock 9.14.1, public 556 and
+normal 558. Stock passed. Both fork compilers reported byte-identical
+errors. Both compiled the explicit matchability migration.
+[R23 reproducer](roadmap/R23-unsaturated-type-families.md#a-transformer-kind-synonym).
+
 ## Checked character predicates in the defining module
 
 Implementation `1b5c5a9676` accepts `type Flag (c :: Char) = flag c`
