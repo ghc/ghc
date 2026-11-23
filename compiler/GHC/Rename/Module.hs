@@ -4788,6 +4788,7 @@ rnConDecl (ConDeclGADT { con_names   = names
         ; envs <- getRdrEnvs
         ; implicit_bndrs <- filterSourceTableNames envs free_vars
         ; let ctxt = ConDeclCtx (toList new_names)
+        ; checkEmptyGadtRequiredGroups ctxt inner_bndrs res_ty
 
         ; bindHsOuterTyVarBndrs ctxt Nothing implicit_bndrs outer_bndrs $ \outer_bndrs' ->
           bindHsGadtTelescopes ctxt inner_bndrs $ \inner_bndrs' ->
@@ -4823,6 +4824,32 @@ rnConDecl (ConDeclGADT { con_names   = names
                               , con_g_args = new_args, con_res_ty = new_res_ty
                               , con_doc = new_mb_doc, con_modifiers = mods' },
                   all_fvs) } }
+
+-- | Check empty visible groups before they disappear from the constructor type.
+-- The validity check on the constructor type handles nonempty groups.
+checkEmptyGadtRequiredGroups :: HsDocContext -> [LHsGadtTelescope GhcPs]
+                             -> LHsType GhcPs -> RnM ()
+checkEmptyGadtRequiredGroups ctxt prefix suffix =
+  unlessXOptM LangExt.RequiredTypeArguments $ do
+    for_ prefix $ \case
+      L l (HsGadtForAll _ tele) -> check_group (locA l) tele
+      _ -> pure ()
+    check_suffix suffix
+  where
+    check_group :: SrcSpan -> HsForAllTelescope GhcPs -> RnM ()
+    check_group loc HsForAllVis{hsf_vis_bndrs = []} =
+      addErrAt loc $ TcRnWithHsDocContext ctxt $ TcRnVDQInTermType Nothing
+    check_group _ _ = pure ()
+
+    check_suffix :: LHsType GhcPs -> RnM ()
+    check_suffix (L l ty) = case ty of
+      HsForAllTy{hst_tele = tele, hst_body = body} ->
+        check_group (locA l) tele >> check_suffix body
+      HsForEachTy{hst_body = body} -> check_suffix body
+      HsQualTy{hst_body = body} -> check_suffix body
+      HsFunTy _ _ _ body -> check_suffix body
+      HsParTy _ body -> check_suffix body
+      _ -> pure ()
 
 rnConDeclH98Details ::
       Name

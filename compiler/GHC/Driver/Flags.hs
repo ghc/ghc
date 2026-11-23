@@ -374,6 +374,7 @@ impliedXFlags
 
     , (LangExt.ExplicitLevelImports, Off LangExt.ImplicitStagePersistence)
     , (LangExt.LinearTypes, On LangExt.Modifiers)
+    , (LangExt.ExperimentalDependentTypes, On LangExt.RequiredTypeArguments)
   ]
 
 

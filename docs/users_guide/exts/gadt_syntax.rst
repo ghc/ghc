@@ -193,8 +193,9 @@ outer arrow separates fields.
   its constraints available to the patterns that follow it and to the
   branch body.
 
-  With :extension:`RequiredTypeArguments`, write a required binder after
-  a field as follows. ::
+  A visible forall at any position requires
+  :extension:`RequiredTypeArguments`. This includes the empty group
+  ``forall ->``, which adds no type arguments. For example: ::
 
     data G a b where
       After :: forall a. Int -> forall b -> G a b

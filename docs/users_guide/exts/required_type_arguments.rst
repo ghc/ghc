@@ -490,7 +490,9 @@ restrictions on where the data constructor may occur.  Examples:
       type T3 = Typed (Type -> Constraint) Num
 
 Prefix GADT signatures can place a required forall among fields and
-contexts. For example: ::
+contexts. The extension is required for every visible forall in a
+constructor signature, including an empty ``forall ->``. An empty group
+adds no type arguments. For example: ::
 
   data D x where
     MkD :: forall a -> a -> forall b -> b -> D (a, b)
