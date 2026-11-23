@@ -18,7 +18,7 @@ module GHC.Rename.HsType (
         rnScopedHsSigWcType, signatureWrittenKinds, withWrittenSignatureKinds,
         rnHsPatSigType, rnHsPatSigKind,
         newTyVarNameRn,
-        rnHsConDeclRecFields,
+        rnHsConDeclRecFields, rnRetainedHsRecordFields,
         lookupField, mkHsOpTyRn,
         rnLTyVar, classifyTypeCasePattern, warnPunnedTypeSyntax, warnPunnedTyConSyntax,
 
@@ -407,9 +407,9 @@ rnRetainedSigTypeWith env ty = rnLHsTyKi env ty
 -- Scope each fresh runtime Name over subsequent binders and the body only.
 -- See Note [Retained Pi type formation] below.
 rnRetainedTelescope :: RnTyKiEnv
-                    -> (RnTyKiEnv -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeNames))
-                    -> [LHsTyVarBndr () GhcPs] -> LHsType GhcPs
-                    -> RnM (([LHsTyVarBndr () GhcRn], LHsType GhcRn), FreeNames)
+                    -> (RnTyKiEnv -> a -> RnM (b, FreeNames))
+                    -> [LHsTyVarBndr () GhcPs] -> a
+                    -> RnM (([LHsTyVarBndr () GhcRn], b), FreeNames)
 rnRetainedTelescope env rn_body bndrs body
   = do { experimental <- xoptM LangExt.ExperimentalDependentTypes
        ; unless (experimental && not (isRnKindLevel env)) $
@@ -2112,6 +2112,70 @@ rnHsConDeclRecFields ctxt fls fields
   where
     env    = mkTyKiEnv ctxt TypeLevel RnTypeBody
     fl_env = mkFsEnv [ (mkFastStringShortText (field_label $ flLabel fl), fl) | fl <- fls ]
+
+-- | Rename the record fields under the name of their stored witness.
+-- See Note [Named retained record fields].
+rnRetainedHsRecordFields :: Name -> HsDocContext -> [FieldLabel] -> [LHsConDeclRecField GhcPs]
+                         -> RnM (Maybe (LHsType GhcRn, [LHsConDeclRecField GhcRn], FreeNames))
+rnRetainedHsRecordFields owner ctxt fls
+    (L loc (HsConDeclRecField _ fields@[L _ (FieldOcc _ name)] first_field) : rest@(_ : _))
+  | all (plain_field . cdrf_spec . unLoc) rest
+  , plain_field first_field
+  , let witness = mkRdrUnqual (setOccNameSpace tvName (rdrNameOcc (unLoc name)))
+  , all (uses_witness witness) rest
+  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+       ; field_selectors <- xoptM LangExt.FieldSelectors
+       ; strict <- xoptM LangExt.StrictData
+       ; duplicate_fields <- xoptM LangExt.DuplicateRecordFields
+       ; locals <- getLocalRdrEnv
+       ; if enabled && field_selectors && not (strict || duplicate_fields)
+              && not (elemLocalRdrEnv witness locals)
+           then do { let binder = L loc (HsTvb noAnn () (HsBndrVar noExtField name)
+                                            (HsBndrKind noExtField (cdf_type first_field)))
+                   ; ((binders, payloads), fvs) <- rnRetainedTelescope env
+                       (\e -> mapFvRn (rnField fl_env e)) [binder] rest
+                   ; doc <- traverse rnLHsDoc (cdf_doc first_field)
+                   ; let domain = case binders of
+                           [L _ (HsTvb{tvb_kind = HsBndrKind _ ty})] -> ty
+                           _ -> panic "rnRetainedHsRecordFields: expected one witness"
+                         field = first_field
+                           { cdf_multiplicity = HsModifiedFunArr noExtField []
+                               (HsStandardArr noExtField)
+                           , cdf_type = domain
+                           , cdf_doc = doc }
+                         witness_field = L loc (HsConDeclRecField noExtField
+                                               (map (fmap (lookupField fl_env)) fields) field)
+                         result = nlHsTyVar NotPromoted owner
+                         body = foldr (nlHsFunTy . cdf_type . cdrf_spec . unLoc) result payloads
+                         sig = L loc (HsForEachTy (noEpTok, Left noEpUniTok) binders body)
+                   ; pure (Just (sig, witness_field : payloads, fvs)) }
+           else pure Nothing }
+  where
+    env = mkTyKiEnv ctxt TypeLevel RnTypeBody
+    fl_env = mkFsEnv [(mkFastStringShortText (field_label (flLabel fl)), fl) | fl <- fls]
+
+    plain_field CDF{cdf_bang = NoSrcStrict, cdf_unpack = NoSrcUnpack,
+                    cdf_multiplicity = HsModifiedFunArr _ [] (HsStandardArr _)} = True
+    plain_field _ = False
+
+    uses_witness witness (L _ (HsConDeclRecField _ [_] field)) =
+      any ((== witness) . unLoc) (extractHsTyRdrTyVars (cdf_type field))
+    uses_witness _ _ = False
+rnRetainedHsRecordFields _ _ _ _ = pure Nothing
+
+{- Note [Named retained record fields]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+With ExperimentalDependentTypes, the first field of a closed Haskell98
+record can bind its stored value in later field types. Use the same
+renaming scope as foreach. The first field's type is outside that scope.
+An existing type variable takes precedence. GADT records retain their
+existing implicit quantification rules.
+Check the local type scope directly. The global scope already contains
+the field selector, and implicit quantification also checks term names.
+
+Keep the renamed fields for the record syntax. Save a retained arrow
+telescope in the Haskell98 declaration extension for constructor checking.
+-}
 
 rnField :: FastStringEnv FieldLabel -> RnTyKiEnv -> LHsConDeclRecField GhcPs
         -> RnM (LHsConDeclRecField GhcRn, FreeNames)

@@ -3151,6 +3151,7 @@ data IfaceEvidence
   | ScopedSumDomainEvidence
   | ComposedScopedSumDomainEvidence
   | RetainedSiblingFieldsEvidence
+  | RetainedNamedRecordEvidence
   deriving (Bounded, Enum, Eq, Ord)
 
 -- | Requirements of an interface payload. See Note [Versioning retained evidence]

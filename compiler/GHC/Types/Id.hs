@@ -217,14 +217,18 @@ idName    = Var.varName
 -- See Note [Source table Ids] in GHC.Tc.Gen.SourceTable.
 sourceTableId_maybe :: Id -> Maybe TyCon
 sourceTableId_maybe fun
-  | SourceTableId owner table _ <- idDetails fun
-  , idName fun == owner
-  , Just mod <- nameModule_maybe owner
+  | Just table <- case idDetails fun of
+                    SourceTableId owner table _ | owner == name -> Just table
+                    RecSelId{sel_sourceTable = table} -> table
+                    _ -> Nothing
+  , Just mod <- nameModule_maybe name
   , nameModule_maybe (tyConName table) == Just mod
-  , nameOccName (tyConName table) == mkSourceTableOcc (nameOccName owner)
+  , nameOccName (tyConName table) == mkSourceTableOcc (nameOccName name)
   , Just _ <- closedFamilyTyConCoAxiom_maybe table
   = Just table
   | otherwise = Nothing
+  where
+    name = idName fun
 
 -- | Test the origin of an already validated source table owner.
 sourceTableKeepsExecutable :: Id -> Bool

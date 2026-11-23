@@ -498,6 +498,12 @@ test('NativeRetainedSiblingFields',
                   + [open_eval_dir + 'TypeLambda.hs'])],
      run_command, ['bash NativeRetainedSiblingFields.sh "{compiler}" "{libdir}"'])
 
+test('NativeNamedRetainedSiblingFields',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/' + f
+                   for f in ['PackedVecLibrary.hs', 'NamedSiblingColumns.hs']])],
+     run_command, ['bash NativeNamedRetainedSiblingFields.sh "{compiler}" "{libdir}"'])
+
 test('NativeAlternatingBinders',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['NativeAlternatingBindersProvider.hs', 'NativeAlternatingBindersClient.hs'])],

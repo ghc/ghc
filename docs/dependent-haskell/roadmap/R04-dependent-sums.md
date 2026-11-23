@@ -367,6 +367,33 @@ named-field syntax or overloading is needed.
 [Agda record types](https://agda.readthedocs.io/en/v2.8.0/language/record-types.html)
 and [the Serokell card](https://ghc.serokell.io/dh#dependent-sums).
 
+### Named fields at one stored length
+
+```haskell
+data NamedColumns = NamedColumns
+  { storedLength :: Nat
+  , namedLetters :: Vec Char storedLength
+  , namedFlags :: Vec Bool storedLength
+  }
+```
+
+With `ExperimentalDependentTypes`, the two payload types refer to the
+stored value of the first field. The generated selector has type
+`foreach (p :: NamedColumns) -> Vec Char (storedLength p)`. An ordinary
+client can call both payload selectors on the same record and zip the
+results. It can also construct the record by naming every field.
+[Example](../examples/packed-vector/NamedSiblingColumns.hs).
+
+The declaration uses one constructor, no datatype parameters, and lazy
+fields. Each payload uses the witness as its final type argument. Named
+patterns list the selected fields in declaration order. Payload selection
+uses the generated function. The `HasField` result type depends on the
+label and record type, which do not supply a record value. Construct a
+new record to replace its witness or payloads.
+[Agda record types](https://agda.readthedocs.io/en/v2.8.0/language/record-types.html)
+and [GHC proposal #23](https://ghc-proposals.readthedocs.io/en/latest/proposals/0023-overloaded-record-fields.html).
+
+
 ## Sums in constructor fields
 
 [StoredVector](../examples/packed-vector/StoredVector.hs) uses one strict

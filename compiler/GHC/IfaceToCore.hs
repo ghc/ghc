@@ -1389,6 +1389,11 @@ tcIfaceDataCons tycon_name tycon if_cons
                                      ; return tys }
                             ; return ([], arg_tys) }
                     else tc_retained_args dc_name emptyVarSet arg_binders args
+                ; when (not (null arg_binders) && not (null lbl_names)) $
+                    do { valid <- evaluateIfaceNativeDomain (ppr dc_name)
+                           (validRetainedRecordFields retained_binders arg_tys)
+                       ; unless valid $
+                           failIfM (text "Invalid retained record fields in interface:" <+> ppr dc_name) }
                 ; let retained_fields = [field | Just field <- retained_binders]
                 ; eq_spec <- extendIfaceIdEnv retained_fields $ tcIfaceEqSpec spec
                 ; when (not (null arg_binders) && not (null spec)) $
@@ -1458,7 +1463,7 @@ tcIfaceDataCons tycon_name tycon if_cons
                 && all type_binder univs && all (\(Bndr b _) -> type_binder b) users
                 && length univ_names == length (nub univ_names)
                 && length user_names == length (nub user_names)
-                && valid_result && null exs && null fields
+                && valid_result && null exs && valid_record
                 && (null ctxt || (not wrapper && null spec && user_names == univ_names))
                 && ordinary_data
                 && (null bangs || bangs `equalLength` args)
@@ -1467,12 +1472,19 @@ tcIfaceDataCons tycon_name tycon if_cons
                 && all lazy_src_bang src_bangs) $
           failIfM (text "Invalid retained constructor fields in interface:" <+> ppr name
                    $$ text "Expected aligned distinct field names and a lazy data constructor"
-                   $$ text "without an existential or record field."
+                   $$ text "without existential fields."
                    $$ text "User type binders must match the universal binders outside the result equalities.")
       where
         names = [n | Just n <- binders]
         univ_names = map ifaceBndrName univs
         user_names = [ifaceBndrName b | Bndr b _ <- users]
+        valid_record
+          | null fields = True
+          | IfDataTyCon False [_] <- if_cons
+          , Just _ : rest@(_ : _) <- binders
+          = all isNothing rest && not wrapper && null univs && null ctxt
+            && null spec && fields `equalLength` args && length fields == length (nub fields)
+          | otherwise = False
         valid_result
           | wrapper
           , not (null spec)
@@ -3115,19 +3127,27 @@ tcIdDetails owner ty (IfSourceDFunId methods literal) =
       Just details -> return details
       Nothing -> failIfM (text "Invalid source methods for dictionary" <+> ppr owner)
 
-tcIdDetails nm _ (IfRecSelId tc _first_con naughty fl)
+tcIdDetails nm ty (IfRecSelId tc _first_con naughty fl table_name)
   = do { tc' <- either (fmap RecSelData . tcIfaceTyCon)
                        (fmap (RecSelPatSyn . tyThingPatSyn) . tcIfaceDecl False)
                        tc
        ; let all_cons         = recSelParentCons tc'
              cons_partitioned = conLikesRecSelInfo all_cons [flLabel fl]
-       ; return (RecSelId
-                   { sel_tycon      = tc'
-                   , sel_naughty    = naughty
-                   , sel_fieldLabel = fl { flSelector = nm }
-                   , sel_cons       = cons_partitioned }
-                       -- Reconstructed here since we don't want Uniques in the Iface file
-                ) }
+             details table = RecSelId
+               { sel_tycon      = tc'
+               , sel_naughty    = naughty
+               , sel_fieldLabel = fl { flSelector = nm }
+               , sel_cons       = cons_partitioned
+               , sel_sourceTable = table }
+       ; table <- forM table_name $ \name ->
+           forkM (text "Source table of record selector" <+> ppr nm) $ do
+             thing <- tcIfaceGlobal name
+             case thing of
+               ATyCon family
+                 | let fun = mkGlobalId (details (Just family)) nm ty vanillaIdInfo
+                 , Just _ <- sourceTableId_maybe fun -> pure family
+               _ -> failIfM (text "Invalid source table for record selector" <+> ppr nm <+> ppr name)
+       ; return (details table) }
   where
     tyThingPatSyn (AConLike (PatSynCon ps)) = ps
     tyThingPatSyn _ = panic "tcIdDetails: expecting patsyn"

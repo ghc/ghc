@@ -5456,6 +5456,10 @@ data RetainedQuantificationError
   | RetainedPackageDeclaration
   | RetainedPackagePromotion
   | RetainedPackagePattern
+  | RetainedRecordDeclaration
+  | RetainedRecordConstruction
+  | RetainedRecordPatternOrder
+  | RetainedRecordUpdate
   | RetainedUncoveredConstructors Name [Name]
   | RetainedMissingEquation Name
   | RetainedTypeOperandContext (Maybe Type)

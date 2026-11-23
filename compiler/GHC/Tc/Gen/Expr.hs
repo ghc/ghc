@@ -1335,9 +1335,28 @@ It remains erased and requires no Typeable dictionary.
 
 tcExpr expr@(RecordCon { rcon_con = L loc qcon@(WithUserRdr _ con_name)
                        , rcon_flds = rbinds }) res_ty
-  = do  { con_like <- tcLookupConLike qcon
+  = do { con_like <- tcLookupConLike qcon
+       ; case con_like of
+           RealDataCon con
+             | not (null (dataConRepArgBinders con)) -> tc_retained_record con
+           _ -> tc_ordinary_record con_like }
+  where
+    orig = OccurrenceOf con_name
 
-        ; (con_expr, con_sigma) <- tcInferConLike con_like
+    -- Use the dependent application checker in declaration order. A
+    -- retained argument supplies the types of the fields that follow.
+    tc_retained_record con = do
+      let values = mkNameEnv
+            [(unLoc (foLabel (unLoc (hfbLHS field))), hfbRHS field)
+            | L _ field <- rec_flds rbinds]
+          fields = map flSelector (dataConFieldLabels con)
+      args <- case traverse (lookupNameEnv values) fields of
+        Just args | notNull fields, args `equalLength` rec_flds rbinds -> pure args
+        _ -> failWithTc (TcRnRetainedQuantificationError RetainedRecordConstruction)
+      mkExpandedExprTc expr <$> tcExpr (genHsApps con_name args) res_ty
+
+    tc_ordinary_record con_like
+      = do { (con_expr, con_sigma) <- tcInferConLike con_like
         ; (con_wrap, con_tau)   <- topInstantiate orig con_sigma
               -- a shallow instantiation should really be enough for
               -- a data constructor.
@@ -1367,8 +1386,6 @@ tcExpr expr@(RecordCon { rcon_con = L loc qcon@(WithUserRdr _ con_name)
         ; checkMissingFields con_like rbinds arg_tys
 
         ; return ret }
-  where
-    orig = OccurrenceOf con_name
 
 -- Record updates via dot syntax are replaced by expanded expressions
 -- in the renamer. See Note [Overview of record dot syntax] in
@@ -2720,6 +2737,10 @@ expandRecordUpd record_expr@(L lspan _) possible_parents rbnds res_ty
        -- See Note [Disambiguating record updates] in GHC.Rename.Pat.
        ; (cons, rbinds)
            <- disambiguateRecordBinds record_expr record_rho possible_parents rbnds res_ty
+       ; let retained_record (RealDataCon con) = not (null (dataConRepArgBinders con))
+             retained_record _ = False
+       ; when (any retained_record (nonDetEltsUniqSet cons)) $
+           failWithTc (TcRnRetainedQuantificationError RetainedRecordUpdate)
        ; let sel_ids       = map (unLoc . foLabel . unLoc . hfbLHS . unLoc) rbinds
              upd_fld_names = map idName sel_ids
              relevant_cons@(relevant_con NE.:| _) =

@@ -3546,7 +3546,7 @@ rnDataFamInstDecl :: AssocTyFamInfo
 rnDataFamInstDecl atfi (DataFamInstDecl { dfid_eqn =
                     eqn@(FamEqn { feqn_tycon = tycon })})
   = do { (eqn', fvs) <-
-           rnFamEqn (TyDataCtx tycon) atfi eqn rnDataDefn
+           rnFamEqn (TyDataCtx tycon) atfi eqn (rnDataDefn Nothing)
        ; return (DataFamInstDecl { dfid_eqn = eqn' }, fvs) }
 
 -- Renaming of the associated types in instances.
@@ -4540,7 +4540,10 @@ rnTyClDecl _ (DataDecl
              new_or_data = dataDefnConsNewOrData cons
        ; traceRn "rntycl-data" (ppr tycon <+> ppr kvs)
        ; bindHsQTyVars doc Nothing kvs tyvars $ \ tyvars' free_rhs_kvs ->
-    do { (defn', fvs) <- rnDataDefn doc defn
+    do { let record_parent
+               | null (hsq_explicit tyvars) && null mods = Just (unLoc tycon')
+               | otherwise = Nothing
+       ; (defn', fvs) <- rnDataDefn record_parent doc defn
        ; cusk <- data_decl_has_cusk tyvars' new_or_data (null free_rhs_kvs) kind_sig
        ; let rn_info = DataDeclRn { tcdDataCusk = cusk
                                   , tcdFVs      = fvs }
@@ -4664,9 +4667,9 @@ the broader picture of UnliftedNewtypes.
 rnTySyn :: HsDocContext -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeNames)
 rnTySyn doc rhs = rnLHsType doc rhs
 
-rnDataDefn :: HsDocContext -> HsDataDefn GhcPs
+rnDataDefn :: Maybe Name -> HsDocContext -> HsDataDefn GhcPs
            -> RnM (HsDataDefn GhcRn, FreeNames)
-rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = condecls
+rnDataDefn record_parent doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = condecls
                            , dd_kindSig = m_sig, dd_derivs = derivs })
   = do  { -- DatatypeContexts (i.e., stupid contexts) can't be combined with
           -- GADT syntax. See Note [The stupid context] in GHC.Core.DataCon.
@@ -4696,7 +4699,12 @@ rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = cond
                     let rdr_env | warn_uses || warn_bindings = trackPunScopes emptyLocalRdrEnv
                                 | otherwise = emptyLocalRdrEnv
                     setLocalRdrEnv rdr_env thing
-        ; (condecls', con_fvs) <- zap_lcl_env $ rnConDecls condecls
+        ; let retained_parent
+                | DataTypeCons False [_] <- condecls
+                , isNothing cType, isNothing context, isNothing m_sig, null derivs
+                = record_parent
+                | otherwise = Nothing
+        ; (condecls', con_fvs) <- zap_lcl_env $ rnConDecls retained_parent condecls
            -- No need to check for duplicate constructor decls
            -- since that is done by GHC.Rename.Names.extendGlobalRdrEnvRn
 
@@ -5227,11 +5235,12 @@ are no data constructors we allow h98_style = True
 ***************************************************** -}
 
 -----------------
-rnConDecls :: DataDefnCons (LConDecl GhcPs) -> RnM (DataDefnCons (LConDecl GhcRn), FreeNames)
-rnConDecls = mapFvRn (wrapLocFstMA rnConDecl)
+rnConDecls :: Maybe Name -> DataDefnCons (LConDecl GhcPs)
+            -> RnM (DataDefnCons (LConDecl GhcRn), FreeNames)
+rnConDecls parent = mapFvRn (wrapLocFstMA (rnConDecl parent))
 
-rnConDecl :: ConDecl GhcPs -> RnM (ConDecl GhcRn, FreeNames)
-rnConDecl decl@(ConDeclH98 { con_name = name, con_telescope = teles
+rnConDecl :: Maybe Name -> ConDecl GhcPs -> RnM (ConDecl GhcRn, FreeNames)
+rnConDecl parent decl@(ConDeclH98 { con_name = name, con_telescope = teles
                            , con_args = args
                            , con_doc = mb_doc
                            , con_modifiers = mods })
@@ -5249,7 +5258,15 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_telescope = teles
 
         ; let ctxt = ConDeclCtx [new_name]
         ; bindHsGadtTelescopes ctxt teles $ \ new_teles ->
-    do  { (new_args,    fvs2) <- rnConDeclH98Details (unLoc new_name) ctxt args
+    do  { (retained, new_args, fvs2) <- case (parent, teles, mods, args) of
+             (Just owner, [], [], RecCon ann (L loc fields))
+               -> do { fls <- lookupConstructorFields (noUserRdr (unLoc new_name))
+                     ; result <- rnRetainedHsRecordFields owner ctxt fls fields
+                     ; case result of
+                         Just (ty, fields', fvs) ->
+                           pure (Just ty, RecCon ann (L loc fields'), fvs)
+                         Nothing -> ordinary_args new_name ctxt }
+             _ -> ordinary_args new_name ctxt
         ; (mods', mods_fvs) <- rnModifiersContextAndWarn ctxt mods
         ; let all_fvs  = fvs2 `plusFN` mods_fvs
         ; traceRn "rnConDecl (ConDeclH98)" (ppr name <+> vcat
@@ -5257,14 +5274,18 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_telescope = teles
              , text "renamed telescopes:" <+> ppr new_teles ])
 
         ; mb_doc' <- traverse rnLHsDoc mb_doc
-        ; return (decl { con_ext = noExtField
+        ; return (decl { con_ext = retained
                        , con_name = new_name, con_telescope = new_teles
                        , con_args = new_args
                        , con_doc = mb_doc'
                        , con_modifiers = mods' },
                   all_fvs) }}
+  where
+    ordinary_args new_name ctxt = do
+      (new_args, fvs) <- rnConDeclH98Details (unLoc new_name) ctxt args
+      pure (Nothing, new_args, fvs)
 
-rnConDecl (ConDeclGADT { con_names   = names
+rnConDecl _ (ConDeclGADT { con_names   = names
                        , con_outer_bndrs = L outer_bndrs_loc outer_bndrs
                        , con_telescope = inner_bndrs
                        , con_g_args  = args

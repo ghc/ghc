@@ -67,7 +67,8 @@ module GHC.Core.DataCon (
         specialPromotedDc,
 
         -- ** Promotion related functions
-        promoteDataCon, dataConHasPromotedRetained, dataConHasPromotedRetainedSiblings
+        promoteDataCon, promotedRetainedFields, dataConHasPromotedRetained,
+        dataConHasPromotedRetainedSiblings, validRetainedRecordFields
     ) where
 
 import GHC.Prelude
@@ -1385,13 +1386,20 @@ mkDataConWithTelescope source_order arg_binders name declared_infix prom_info
         && (null theta || case source_order of
               LegacyConOrder 0 -> null eq_spec
               _ -> False)
-        && null fields && isVanillaAlgTyCon rep_tycon
+        && valid_record && isVanillaAlgTyCon rep_tycon
         && not (isTypeDataTyCon rep_tycon)
         && isLiftedTypeKind (tyConResKind rep_tycon)
         && all lazy_src arg_stricts
         && all lazy_impl impl_bangs && not (any isMarkedStrict str_marks)
         && valid_fields emptyVarSet arg_binders orig_arg_tys
         && valid_result
+
+    valid_record
+      | null fields = True
+      | Just _ : rest@(_ : _) <- arg_binders
+      = all isNothing rest && fields `equalLength` orig_arg_tys
+        && null univ_tvs && null eq_spec && null theta
+      | otherwise = False
 
     valid_result
       | null eq_spec
@@ -1576,23 +1584,33 @@ promotedRetainedFields con
     || maybe False (`elem` univs) (getTyVar_maybe witness_ty)
   , witness_ty `eqType` varType witness
   , not (anyFreeVarsOfType isId result)
-  , Just payloads <- traverse (payload_field univs witness) fields
+  , Just payloads <- traverse (promotedRetainedPayload univs witness) fields
   = Just (witness, payloads)
   | otherwise = Nothing
-  where
-    payload_field univs witness (Scaled mult body)
-      | isOneTy mult || isManyTy mult = abstract_payload univs witness body
-      | otherwise = Nothing
 
-    abstract_payload univs witness (AppTy head_ty@(TyVarTy family) (TermVarTy v))
+-- | Check that the record has a closed first witness and promoted payloads.
+-- See Note [Retained constructor field telescopes].
+validRetainedRecordFields :: [Maybe Id] -> [Scaled Type] -> Bool
+validRetainedRecordFields (Just witness : binders) (_ : fields@(_ : _)) =
+  all isNothing binders && isNativeClosedIndexType (varType witness) &&
+  all (isJust . promotedRetainedPayload [] witness) fields
+validRetainedRecordFields _ _ = False
+
+-- | Abstract the final witness argument of one checked payload type.
+promotedRetainedPayload :: [TyVar] -> Id -> Scaled Type -> Maybe (Type -> Type)
+promotedRetainedPayload univs witness (Scaled mult body)
+  | isOneTy mult || isManyTy mult = abstract_payload body
+  | otherwise = Nothing
+  where
+    abstract_payload (AppTy head_ty@(TyVarTy family) (TermVarTy v))
       | family `elem` univs
       , witness == v
       , Just (_, _, _, domain, range) <- splitFunTy_maybe (tyVarKind family)
       , domain `eqType` varType witness
       , range `eqType` liftedTypeKind
       = Just (mkAppTy head_ty)
-    abstract_payload _ witness body
-      | Just (head_tc, args) <- splitTyConAppNoView_maybe body
+    abstract_payload ty
+      | Just (head_tc, args) <- splitTyConAppNoView_maybe ty
       , TermVarTy v : reverse_prefix <- reverse args
       , witness == v
       , let prefix = reverse reverse_prefix
@@ -2226,7 +2244,7 @@ exactly the universal type variables, with no duplicates. A retained result
 uses a wrapper and its own EqSpec. See Note [Retained constructor result
 equality].
 
-Neither form permits existential or context binders, record selectors,
+Neither form permits existential binders,
 data families, newtypes, type data, strict fields, or unpacked fields.
 The parent and all fields are lifted. A named field has a supported closed
 domain and multiplicity Many. Its Id must be fresh. Only earlier retained
@@ -2234,6 +2252,12 @@ fields can occur free in a field type. Rebuild the worker and wrapper types
 with DepFunTy at each dependent field. Each runtime field remains an ordinary
 lazy constructor payload slot.
 See Note [Retained constructor equality contexts].
+
+A monomorphic retained package can have record fields. The labels must
+align with the arguments. The first field is the only retained binder,
+and every later field must use it as the final argument of its type.
+Check the payload types after the parent TyCon is available.
+See Note [Source retained constructor declarations] in GHC.Tc.TyCl.
 
 A function field uses the existing retained-binder policy. Its closed ordinary
 Many arrow has independently supported scalar domains. The actual field Id

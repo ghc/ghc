@@ -3956,6 +3956,15 @@ pprRetainedQuantificationError reason = case reason of
          , text "Retained fields require variables, wildcards, or constructor patterns for their index domain."
          , text "A retained variable or wildcard can be parenthesized or have a bang. Fields of an index constructor must be bare variables or wildcards."
          , text "Lazy patterns and pattern bindings are not supported yet." ]
+  RetainedRecordConstruction ->
+    text "Supply every field when constructing a record with a retained witness."
+  RetainedRecordDeclaration ->
+    text "Each payload field of a retained record must use the first field as its final type argument."
+  RetainedRecordPatternOrder ->
+    text "Match the fields of a retained record in declaration order."
+  RetainedRecordUpdate ->
+    vcat [ text "Record update is unavailable for a record with a retained witness."
+         , text "Construct a new record with its witness and payload fields." ]
 
 pprTcRnBadlyLevelled :: LevelCheckReason -> Set.Set ThLevelIndex -> ThLevelIndex -> Maybe ErrorItem -> DecoratedSDoc
 pprTcRnBadlyLevelled reason bind_lvls use_lvl lift_attempt = mkDecorated $

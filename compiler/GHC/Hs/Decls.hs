@@ -841,7 +841,7 @@ type instance XConDeclGADT GhcRn = NoExtField
 type instance XConDeclGADT GhcTc = NoExtField
 
 type instance XConDeclH98  GhcPs = NoExtField
-type instance XConDeclH98  GhcRn = NoExtField
+type instance XConDeclH98  GhcRn = Maybe (LHsType GhcRn)
 type instance XConDeclH98  GhcTc = NoExtField
 
 type instance XXConDecl (GhcPass _) = DataConCantHappen
