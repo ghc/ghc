@@ -139,6 +139,7 @@ import LaterMatchabilityClient (annotatedMap, appliedCallback, appliedSynonym, b
 import qualified SchemaColumns
 import qualified TypeLambda
 import qualified TypeLambdaClient
+import qualified TypeLambdaQuote
 import qualified TypeLet
 import qualified FamilyCasePayload as FamilyCase
 import qualified NativeCase
@@ -1718,6 +1719,10 @@ main = do
     case TypeLambda.taggedCell (Proxy @'True) True of
         TypeLambda.Field (Proxy, value) TypeLambda.End ->
             observe "tag a row cell with a local type lambda that infers the capture kind" value
+    case (TypeLambdaQuote.checkedColumns, TypeLambdaQuote.labelledColumn "column") of
+        (TypeLambda.Field count (TypeLambda.Field flag TypeLambda.End),
+         TypeLambda.Field label TypeLambda.End) ->
+            observe "splice a column schema and attach a caller-supplied label" (count, flag, label)
     let lazyFields = TypeLambda.Field 'x' (TypeLambda.Field (error "unused field" :: Bool) TypeLambda.End)
     case TypeLambdaClient.forwardErrors (Proxy @String) lazyFields of
         TypeLambda.Field first _ ->

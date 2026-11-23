@@ -156,10 +156,9 @@ checkRow _ = go
 
 The renamer captures `e` by its lexical name. Its written kind comes
 from the enclosing signature. A row index that appears only outside the
-lambda needs no written kind. In the current compiler, omitting the kind
+lambda needs no written kind. In the original implementation, omitting the kind
 of `e` reports GHC-27185 at the backslash and names `e`. A shadowed kind
-that a capture needs can also prevent lifting. Quoted local signatures
-still reject the lambda.
+that a capture needs can also prevent lifting.
 [Maintained row mapper](../examples/open-evaluation/TypeLambda.hs)
 and [scope checks](../../../testsuite/tests/dependent/should_run/NativeTypeLambda.sh).
 
@@ -357,6 +356,42 @@ enclosing retained arguments keep their lexical scope. A captured
 retained domain must also check as an erased binder kind.
 [GHC proposal 378 on term variables in types](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#term-variables-in-types) ·
 [Agda lambda abstraction](https://agda.readthedocs.io/en/v2.8.0.2/language/lambda-abstraction.html).
+
+## Type lambdas in untyped quotations
+
+A declaration quote can generate a schema with an inline callback.
+
+```haskell
+$([d|
+  type CheckedColumns e xs = Map (\cell -> Either e cell) xs
+  |])
+```
+
+The callback captures the schema's error type `e`. The quote produces
+`LamT` with fresh binder names. The splice lifts and checks the callback
+in the group that defines `CheckedColumns`. A type quote spliced into a
+top-level value signature and an expression quote spliced into a value
+binding can also contain inline lambdas. In the example, the type quote
+proves that the generated schema agrees with a directly mapped row.
+The expression quote produces the row with that type.
+The declaration quote for `labelledColumn` uses a lambda in a local
+signature. It captures the enclosing function's label type by its
+exact name.
+[Source and executable example](../examples/open-evaluation/TypeLambdaQuote.hs).
+
+Job 1902 compared the published 577 reader and the quoted-lambda
+reader in separate executables. The shared examples had identical
+bytes. Both readers decoded each other's examples. Only the newer
+reader decoded the additional `LamT` example. The old reader returned
+`Unknown encoding for constructor`. The ordinary quote checks use the
+external interpreter that matches the compiler.
+[Binary samples](../../../testsuite/tests/dependent/should_run/NativeTypeCaseRetainedThWire.hs).
+
+This follows the Template Haskell translation of a quoted binder
+into a fresh name in the quotation monad. The callback's kind stays
+subject to the ordinary checks at the splice site.
+[Sheard and Peyton Jones, Template Meta-programming for Haskell, §5](https://doi.org/10.1145/636517.636528).
+
 
 ## Prior art
 

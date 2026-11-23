@@ -412,13 +412,16 @@ import Data.Proxy
 import Language.Haskell.TH
 quoted :: Q [Dec]
 quoted = [d|
-  type QuotedCase = (\tag -> case tag of { Nothing -> Proxy tag; Just _ -> Proxy tag }) 'Nothing
+  type QuotedCase = (\tag -> case tag of { Nothing -> Proxy tag; Just field -> Proxy field }) 'Nothing
   |]
 HS
-if "${g[@]}" -c Quoted.hs >quote.log 2>&1 ||
-   ! grep -Fq 'Quoted.hs:7:30: error: [GHC-65904]' quote.log ||
-   ! grep -Fq 'Type case syntax' quote.log || grep -Fq '$lambda' quote.log; then
-    cat quote.log >&2
+"${g[@]}" -c Quoted.hs
+
+# Declaration quotations use the existing wildcard rules for type synonyms.
+sed 's/Just field -> Proxy field/Just _ -> Proxy tag/' Quoted.hs >QuotedWildcard.hs
+if "${g[@]}" -c QuotedWildcard.hs >quoted-pattern.log 2>&1 ||
+   ! grep -Fq 'QuotedWildcard.hs:7:71: error: [GHC-65507]' quoted-pattern.log; then
+    cat quoted-pattern.log >&2
     exit 1
 fi
 

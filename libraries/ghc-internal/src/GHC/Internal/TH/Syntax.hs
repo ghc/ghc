@@ -1459,6 +1459,7 @@ data Type = ForallT [TyVarBndr Specificity] Cxt Type -- ^ @forall \<vars\>. \<ct
           | IndexVarT Name                 -- ^ A retained term variable used in a type.
           | CaseT Type [TypeCaseAlt]       -- ^ @case t of { p -> r; ... }@
           | LetT Name Type Type            -- ^ @let v = rhs in body@. The scope of @v@ is @body@.
+          | LamT [Name] Type               -- ^ @\<vars\> -> body@. Binds one or more variables in @body@.
       deriving( Show, Eq, Ord, Generic )
 
 -- | A row in an ordered type case. Type variable occurrences in the

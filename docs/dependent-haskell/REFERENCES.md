@@ -8579,13 +8579,25 @@ and [R41 implementation](roadmap/R41-nested-quantification-in-gadts.md#a-newtype
 
 Agda's implicit arguments let an ordinary operand determine an omitted
 parameter. In Haskell, visible type application supplies a specified
-parameter in the order given by an explicit `forall`. The HaskLib proof
-uses that spelling for the two element types of `zip`. The inference
-experiment asks whether the declarations of `xs` and `ys` supply the
-same two types when `zip xs ys` occurs in a retained operand.
+parameter in the order given by an explicit `forall`. The explicit HaskLib control
+uses that spelling for the two element types of `zip`. In the implicit
+proof, the declarations of `xs` and `ys` supply those types when
+`zip xs ys` occurs in a retained operand.
 [Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html),
 [GHC visible type application](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_applications.html)
 and [R16 list proof](roadmap/R16-open-term-evaluator.md#map-over-the-result-of-zip).
+
+### Recompilation after adding a quotation helper
+
+GHC resolves compiler-known library entities through `GHC.Essentials`.
+Eligible modules record an implicit dependency on its exports. The R17
+quotation needs `lamT` in those exports. When the library changes, an
+unchanged ordinary module can therefore recompile once. This dependency
+also applies to modules that contain no quotes. The warm-upgrade checks
+compare an installed library change with a compiler change that uses the
+same library before and after.
+[GHC's account of the implicit dependency](../../compiler/GHC/Builtin.hs)
+and [the helper exported by base](../../libraries/base/src/GHC/Essentials.hs).
 
 ### Specialisation of an indexed zip operand
 

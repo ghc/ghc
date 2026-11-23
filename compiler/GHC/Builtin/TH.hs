@@ -292,7 +292,7 @@ forallTName, forallVisTName, forallMatchTName, forEachTName, indexVarTName,
     unboxedTupleTName, unboxedSumTName, arrowTName, mulArrowTName, listTName,
     appTName, appKindTName, sigTName, equalityTName, litTName, promotedTName,
     promotedTupleTName, promotedNilTName, promotedConsTName,
-    wildCardTName, implicitParamTName, caseTName, typeCaseAltName, letTName :: KnownOcc
+    wildCardTName, implicitParamTName, caseTName, typeCaseAltName, letTName, lamTName :: KnownOcc
 forallTName         = mkVarOcc "forallT"
 forallVisTName      = mkVarOcc "forallVisT"
 forallMatchTName    = mkVarOcc "forallMatchT"
@@ -300,6 +300,7 @@ forEachTName        = mkVarOcc "forEachT"
 indexVarTName       = mkVarOcc "indexVarT"
 caseTName           = mkVarOcc "caseT"
 letTName            = mkVarOcc "letT"
+lamTName            = mkVarOcc "lamT"
 typeCaseAltName     = mkVarOcc "typeCaseAlt"
 varTName            = mkVarOcc "varT"
 conTName            = mkVarOcc "conT"

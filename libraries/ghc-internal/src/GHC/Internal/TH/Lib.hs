@@ -827,6 +827,10 @@ caseT scrutinee rows = CaseT <$> scrutinee <*> sequenceA rows
 letT :: Quote m => Name -> m Type -> m Type -> m Type
 letT name rhs body = LetT name <$> rhs <*> body
 
+-- | An anonymous type-level function with one or more bound variables.
+lamT :: Quote m => [Name] -> m Type -> m Type
+lamT names body = LamT names <$> body
+
 -- | Construct one pattern and result of an ordered type case.
 typeCaseAlt :: Quote m => m Type -> m Type -> m TypeCaseAlt
 typeCaseAlt pat rhs = TypeCaseAlt <$> pat <*> rhs

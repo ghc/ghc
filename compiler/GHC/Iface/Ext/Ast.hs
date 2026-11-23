@@ -2064,6 +2064,11 @@ instance ToHie (LocatedA (HsType GhcRn)) where
         [ toHie $ tvScopes (ResolvedScopes [mkScope (getLocA body)]) NoScope [binder]
         , toHie body
         ]
+      XHsType (HsTypeLambdaQuoteRn binders body) ->
+        [ concatM [toHie $ C (TyVarBind (mkScope body) (ResolvedScopes [])) binder
+                  | binder <- binders]
+        , toHie body
+        ]
       XHsType _ -> []
 
 instance (Data (HsModifierOf ty (GhcPass p)), ToHie ty) => ToHie (LocatedA (HsModifierOf ty (GhcPass p))) where

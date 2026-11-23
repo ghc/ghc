@@ -1117,9 +1117,18 @@ rnHsTyKi env ty@(XHsType (HsBangTy _ bang (L _ inner))) = do
       TcRnUnexpectedAnnotation ty bang
   rnHsTyKi env inner
 
-rnHsTyKi _ (XHsType HsTypeLambda{}) = do
+rnHsTyKi env (XHsType (HsTypeLambda _ binders body)) = do
   enabled <- xoptM LangExt.ExperimentalDependentTypes
-  failWithTc (if enabled then TcRnTypeLambdaContext else TcRnTypeLambdaDisabled)
+  unless enabled $ failWithTc TcRnTypeLambdaDisabled
+  level <- getThLevel
+  case level of
+    -- See Note [Quoting type lambdas] in GHC.HsToCore.Quote.
+    UntypedBrack{} -> do
+      checkDupRdrNames binders
+      binders' <- traverse (\binder -> L (getLoc binder) <$> newLocalBndrRn binder) binders
+      (body', fvs) <- bindLocalNamesFV (map unLoc binders') (rnLHsTyKi env body)
+      pure (XHsType (HsTypeLambdaQuoteRn binders' body'), fvs)
+    _ -> failWithTc TcRnTypeLambdaContext
 
 -- See Note [Checking local lambda captures] in GHC.Tc.Gen.HsType.
 rnHsTyKi env (XHsType (HsTypeLambdaCheck binders body helper)) = do

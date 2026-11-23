@@ -22,8 +22,8 @@ main = do
       new = [ForEachT BndrReq v (ConT (mkName "Bool")) ix, ix,
              ForEachT BndrInvis v (ConT (mkName "Bool")) ix,
              CaseT ix [TypeCaseAlt t (ConT v), TypeCaseAlt WildCardT t],
-             LetT v StarT (AppT (VarT v) (VarT v))]
-  unless (map (Bytes.head . encode) new == [29, 30, 29, 31, 32])
-    (fail "Unexpected retained-type Binary tags")
+             LetT v StarT (AppT (VarT v) (VarT v)), LamT [v] t]
+  unless (map (Bytes.head . encode) new == [29, 30, 29, 31, 32, 33])
+    (fail "Unexpected dependent-type Binary tags")
   unless (map (decode . encode) (old ++ new) == old ++ new)
     (fail "Template Haskell Binary round-trip changed a type")

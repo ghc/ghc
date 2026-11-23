@@ -2248,6 +2248,7 @@ tcHsType mode (XHsType (HsGadtFieldRn field)) exp_kind =
   tcLHsType mode (cdf_type field) exp_kind
 tcHsType _ (XHsType HsTypeCaseAliasRn{}) _ = failWithTc TcRnTypeCaseContext
 tcHsType _ (XHsType HsTypeCaseRn{}) _ = failWithTc TcRnTypeCaseContext
+tcHsType _ (XHsType HsTypeLambdaQuoteRn{}) _ = failWithTc TcRnTypeLambdaContext
 
 tcHsType mode src@(XHsType (HsTypeLambdaCheckRn binders body helper)) exp_kind = do
   (ty, kind) <- tc_infer_lhs_type mode helper

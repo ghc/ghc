@@ -8,92 +8,54 @@ and its [expected output](Showcase.stdout) are the executable examples.
 
 ## Current checkpoint
 
-Compiler `893d2ebc06` and Showcase `09b855305e` passed the 577-observation
-checkpoint. A heterogeneous row now takes its two vector lengths from
-one retained record. HaskLib also exports `lengthMapZip`; its proof uses
-`trans`, `lengthMap` and `lengthZip`.
+Compiler `1efc4bcaf2` passed all 578 Showcase observations in native
+`-O0`, default `-O2` and GHCi. A spliced declaration can capture the
+error type in a row schema. HaskLib can infer both element types of
+`zip xs ys` in the composed length proof. The installed proof passed
+at both optimization levels with rewrite rules disabled.
+[Examples and qualification](CHECKPOINTS.md#a-spliced-row-schema-and-inferred-zip-arguments).
 
-Job 1881 built the bootstrap and self-hosted compilers and passed all
-ten selected registrations. Both warm upgrade tests, both package tests
-and all 234 compatibility cases passed. The focused suite passed 137
-of 138. The remaining failure is the existing `MTrans` diagnostic in
-`deriving-via-compile`. Job 1893 ran all 577 observations at native
-`-O0`, default `-O2` and in GHCi after the local row signature gained
-an explicit `forall len`. The installed list-law client ran at both
-optimization levels with rewrite rules disabled.
-[Code and qualification](CHECKPOINTS.md#two-vector-fields-at-one-stored-length).
+Job 1900 built both compiler stages. All 13 selected registrations and
+234 compatibility cases passed. The focused suite passed 137 of 138.
+Four tests timed out during the benchmark suspension. Job 1950 reran
+those four against the same compiler, and all passed. The remaining
+`MTrans` diagnostic matched the earlier compiler. Job 1914 passed all
+four incremental checks. Across a real library upgrade the unchanged
+control rebuilt because `GHC.Essentials` changed. With a fixed library
+database it reused its interface. Both cases reused all artifacts on
+the next invocation.
 
-For a restart, verify `published-qualification.tsv` in
-`_build/on-demand/r04-r16-r17-normal-after-574-20261123` with
-`python3 accept-publication.py` from that directory. Job 1881's original
-exit code is 1. Its three Showcase runs found the scoping error. The
-receipt includes the corrected Showcase and the original test suites.
+Run `accept-publication.py` in
+`_build/on-demand/r04-r17-combined-quoted-columns-20261123` to check
+the original and replay receipts. The original job exits with status 1.
+The verifier checks both sets of evidence, including the known optimized
+proof failure. The [compiled count and witness example](roadmap/R16-open-term-evaluator.md#the-optimized-client-of-the-composed-proof)
+records that failure on both 577 and 578.
 
 ## Next compiler work
 
-The published source above has 577 Showcase observations. Two later
-compiler revisions have separate qualification directories.
-
-- **578**, `1efc4bcaf2`, in
-  `_build/on-demand/r04-r17-combined-quoted-columns-20261123`.
-  Job 1900 built both stages. All 13 selected registrations, 578
-  Showcase outputs in three modes and 234 compatibility cases passed.
-  The matching interpreter accepted the spliced local type variable
-  that the earlier compiler rejected. Read `cohorts/gates.tsv` for
-  the focused suite. Two original incremental checks failed because
-  `GHC.Essentials` changed. Job 1914 passed all four corrected comparisons.
-  With one library database, only the old length worker and its new client
-  rebuilt. Across the actual library upgrade, the unchanged control module
-  also rebuilt once. Both native and typecheck-only upgrades reused all
-  artifacts on the next invocation. The receipts are in
-  `r17-essentials-warm-upgrade-578-20261123/results`. Also check the
-  optimized proof control below before publication.
-- **581**, `156cd84633`, in
-  `_build/on-demand/r04-r19-following-quoted-578-20261123`.
-  This source combines named dependent record fields, wildcard patterns
-  in quoted type cases, and inline lambdas in visible type arguments.
-  Job 1937 depends on the exact Showcase test in 1934. Check
-  `qualification/gates.tsv`, `cohorts/gates.tsv` and `run-all.exit`.
-  The unstarted 580 job was superseded.
-
-| Area | Component evidence and remaining work |
+| Area | Verified result and next step |
 | --- | --- |
-| R04 named records | Jobs 1901 and 1907 passed native, typecheck-only and Template Haskell checks. An ordinary client zips both generated fields and rejects a field from a different record. A warm typecheck-only run reused the provider interfaces. A retained witness variable, field puns and record wildcards passed in job 1909. The separate omitted-payload candidate is `2c36fdea26` in job 1915. Its source requires the length field. It compiled and the first runtime demand checks passed. The warning-as-error check expected a different rendering of the flag. Job 1944 replays that check and job 1946 checks the missing-witness diagnostic after it passes. |
-| R17 and R19 quotations | Job 1902 checked the old and new encoders. Shared payloads had identical bytes and decoded in both directions. The old reader rejected the new `LamT` tag. Jobs 1897 and 1904 qualified wildcard patterns in quoted type synonyms. In job 1905 an ordinary client read a spliced row of named and missing sensors. |
-| R17 visible type arguments | Compiler `0076e5167b` passed the source-hidden comparison in job 1912. Named, annotated, closed, captured and spliced callbacks returned the same row. Job 1925 compares an enclosing type variable in a spliced visible argument on the separate compilers. Both separate compilers rejected the exact combined capture in job 1925. The combined registration is `NativeTypeLambdaTypeAppCapture`. |
-| R16 list proofs | HaskLib built from its source distribution with `zip xs ys` in the composed proof. The installed law ran with rewrite rules disabled at both optimization levels. Job 1911 found different outer results for the independently optimized mapped count and minimum on stock GHC with a `seq`-sensitive producer. On 577, job 1916 observed `Zero/Zero/Refl` at `-O0` and at `-O2` with rewrite rules disabled. At default `-O2`, specialization exposed a fused `build` operand that Core Lint rejected. Job 1945 compares ordinary counts and optimized proof callers on 577 and 578. See `r16-zip-map-demand-20261123/locals/published/O2/compile.log` and `optimized/results.tsv` in the same experiment. Job 1940 tests a private rule-dependency check for signed primitive proofs. |
+| R04, R17 and R19 | The 581 source `156cd84633` combines named dependent record fields, wildcard patterns in quoted type cases and inline lambdas in visible type arguments. Job 1937 builds it in `r04-r19-following-quoted-578-20261123`. Check `qualification/gates.tsv`, `cohorts/gates.tsv` and `run-all.exit`. |
+| R04 omitted record fields | Job 1946 qualified `f2ab5c36a1` at both optimization levels. A supplied witness permits an omitted lazy sibling. Omitting the witness reports GHC-83605 at the constructor and names the required field. An omitted ordinary strict field still reports GHC-95909. Job 1954 exercised the exact additional Showcase row from `322b680d53` with the component compiler. The combined source still needs its normal build. |
+| R05 Specialise | On both 577 and 578, default `-O2` replaced an indexed `zip` operand with `build`. Job 1948 preserved the checked operand, passed Core and STG Lint, and returned `Refl`. Job 1956 reproduced the repair with only `base`, a retained `Proxy` result and a vacuous binder. See `r05-specialise-retained-zip-20261123`. |
+| R16 proof validity | Independent count expressions can produce `Zero` and bottom under stock fusion. Both shared counts produced `Zero`. The private Specialise repair leaves that distinction observable. In job 1957, rebuilding HaskLib with private `4c4cc16244` recorded the `map` dependency on the composed proof. The optimized client then reported GHC-83605 at the call to `lengthMapZip`. The same diagnostic occurred with a producer that simply constructs one cell. The old installed interface still reached Core Lint. The consumer-side policy remains open. |
 | R23 matchability | The private prototype `99bfde4ec4` passed the original transformer test and 32 Template Haskell reification cases. An old installed provider still needs rebuilding. The published compiler retains the existing matchability policy. |
 
-The GHC queue has two slots. Other benchmark jobs take priority and
-freeze the GHC slice. Use Pueue task labels and the live cgroup state
-when resuming. Pueue's `switch` command exchanges the task contents
-at two IDs. Job 1914 is the warm comparison, and 1937 is the 581 build.
+The GHC queue has two slots. Other benchmark jobs take priority and freeze
+the GHC slice. In job 1947, `zipRows` allocated 48 more bytes per process
+than the ordinary two-field zip at each of 10,000, 100,000 and 500,000
+inputs. Both returned the same checksums and passed the prefix-demand
+controls. Job 1949 measured the whole compiler. At 256 shared arithmetic
+bindings it allocated 6.45 GB for the ordinary module and 28.18 GB for
+the module with a retained result index. Attribution to a particular pass
+requires profiling. The inputs and results are in the two pilot
+directories under `_build/on-demand/opencode-go-20261123`.
 
-Job 1948 tests a change to the Specialise pass on the published 577 compiler.
-It applies the in-scope substitution to an operand that determines a result
-type. It also checks an ordinary caller and a vacuous retained binder.
-See `r05-specialise-retained-zip-20261123` under `_build/on-demand`.
-A successful Core Lint check only establishes that the operand is well typed.
-The independent demand comparison and the R16 proof check are still required.
-
-Job 1947 compares the runtime allocation of `zipRows` with an ordinary
-recursive zip that has the same two constructor fields. Each implementation
-runs in a separate process. Both must return the expected checksum and pass
-the prefix-demand checks. See `opencode-go-20261123/ziprows-pilot` under
-`_build/on-demand` for the driver and results. Keep compiler allocation,
-runtime allocation and regression review independent of the feature builds.
-Job 1949 measures whole-compiler allocation on 32, 128 and 256 shared
-bindings. The ordinary and retained inputs use the same arithmetic worker.
-The two performance jobs use the existing GHC queue.
-
-The generated compiler trees for checkpoints 549, 564, 566, 567, 568,
-569, the first quotation compiler, its superseded row compiler, and
-the completed R23 prototype have been retired. Sources, recipes and
-test receipts remain. See the `retired.tsv` manifests in
-`retirement-completed-r19-r23-20261123`,
-`retirement-r17-before-578-20261123`,
-`retirement-normal-564-566-20261123` and
-`retirement-normal-567-569-20261123`.
+The previous 577 compiler was `893d2ebc06`. Its qualified records are
+in `r04-r16-r17-normal-after-574-20261123/published-qualification.tsv`.
+Recent build retirement manifests are in `retirement-completed-r19-r23-20261123`
+and `retirement-r17-before-578-20261123`.
 
 ## Previous checkpoints
 
