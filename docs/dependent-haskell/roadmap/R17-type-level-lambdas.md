@@ -333,6 +333,25 @@ Using `flags q` from a separate record reports an index mismatch.
 [Row example](../examples/packed-vector/SiblingColumnRow.hs) and
 [source-hidden checks](../../../testsuite/tests/dependent/should_run/NativeRetainedSiblingFields.sh).
 
+An ordinary client can consume a record of unknown length. Give the
+row eliminator the shared index in its signature.
+
+```haskell
+unpack :: Fields '[Vec Char n, Vec Bool n] -> (String, [Bool])
+unpack (Field xs (Field ys End)) = (toList xs, toList ys)
+
+readRow :: Columns -> (String, [Bool])
+readRow p = unpack (packRow p)
+```
+
+Jobs 1877 and 1880 compared a named schema and the inline lambda at
+`-O0` and `-O2`. The unannotated nested pattern worked with a directly
+constructed record. For a let-bound record or a caller-supplied record,
+both schemas needed the eliminator signature above.
+The signature fixes the row and result types before GHC checks the
+nested pattern. The length `n` can still be unknown.
+[GHC's rules for pattern matching on GADTs](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/gadt.html).
+
 The supported body has no inner binders. The lambda parameters and
 enclosing retained arguments keep their lexical scope. A captured
 retained domain must also check as an erased binder kind.

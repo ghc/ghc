@@ -2644,13 +2644,23 @@ rules disabled at `-O0` and `-O2`. An empty left list left an undefined
 right list unevaluated. An undefined left list raised its exception even
 when the right list was empty. The proof did not force the callback.
 
-Direct composition still needs compiler work. Job 1860 rejected
-`lengthMap f (zip xs ys)` with GHC-83605 at the retained argument.
-Job 1870 gave the intermediate list a local name. The resulting
-composition failed with GHC-83865. [List laws](../hasklib/HaskLib/List.hs).
+HaskLib now proves the same law from two existing equalities.
+`lengthMap` removes the map from the length expression. Its result
+is the left side of `lengthZip`, so `trans` can join the two proofs.
 
-Job 1875 supplied the missing element types directly. With
-`ScopedTypeVariables` and `TypeApplications`, the same client compiled
-`trans (lengthMap f (zip @a @b xs ys)) (lengthZip xs ys)`. Supplying
-only `@a` still failed. The first list fixes `a`. The second list has
-the information needed for `b`.
+```haskell
+lengthMapZip f xs ys =
+    trans (lengthMap f (zip @a @b xs ys)) (lengthZip xs ys)
+```
+
+Job 1876 checked the exported proof from a fresh package installation
+at both optimization levels with rewrite rules disabled. It observed
+the same list and callback demand as the inductive proof.
+[List laws](../hasklib/HaskLib/List.hs).
+
+The 574 compiler needs both visible type arguments in this proof.
+Job 1875 omitted both, then supplied only `@a`. Both calls failed
+with GHC-83605 at the retained argument. The first list fixes `a`.
+The declaration of the second list supplies `b`. Giving the
+intermediate list a local name also failed with GHC-83865 in job 1870.
+[Implicit arguments and visible type applications](../REFERENCES.md#inferring-the-element-types-of-zip).

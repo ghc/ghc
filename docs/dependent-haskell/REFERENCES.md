@@ -84,6 +84,14 @@ dependent projection before designing dot selection for it.
 [GHC field selector polymorphism](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/hasfield.html)
 and [R04 record projections](roadmap/R04-dependent-sums.md#what-record-dot-would-need).
 
+Agda expands a record update into a new record before type checking.
+An omitted explicit field uses its projection from the original record.
+If an explicit length changes, each reused vector must therefore also
+typecheck at the new length. Agda's `VList` example uses an implicit
+length field that the checker can infer from the replacement vector.
+These are distinct controls for a future Haskell record update.
+[Agda record update and the VList example](https://agda.readthedocs.io/en/v2.8.0/language/record-types.html#record-update).
+
 R04 uses Serokell's dependent sum syntax. In
 `some (tag :: Bool) | Body a tag`, an associated family selects the payload type. Agda's built-in sum gives
 the second field a type indexed by the first field. The additional
@@ -8566,3 +8574,15 @@ the extended constructor representation.
 [GHC proposal #98, proposed change](https://ghc-proposals.readthedocs.io/en/latest/proposals/0098-unlifted-newtypes.html#proposed-change-specification),
 [GHC proposal #402, prefix grammar](https://ghc-proposals.readthedocs.io/en/latest/proposals/0402-gadt-syntax.html#grammar-specification)
 and [R41 implementation](roadmap/R41-nested-quantification-in-gadts.md#a-newtype-with-an-unknown-field-representation).
+
+### Inferring the element types of zip
+
+Agda's implicit arguments let an ordinary operand determine an omitted
+parameter. In Haskell, visible type application supplies a specified
+parameter in the order given by an explicit `forall`. The HaskLib proof
+uses that spelling for the two element types of `zip`. The inference
+experiment asks whether the declarations of `xs` and `ys` supply the
+same two types when `zip xs ys` occurs in a retained operand.
+[Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html),
+[GHC visible type application](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_applications.html)
+and [R16 list proof](roadmap/R16-open-term-evaluator.md#map-over-the-result-of-zip).
