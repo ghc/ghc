@@ -11,7 +11,16 @@ and its [expected output](Showcase.stdout) are the executable examples.
 Updated 23 November 2026. The development branch is
 `dependent-haskell`. Use the fork command below to find its latest commit.
 
-The published Unicode checkpoint is `16de21824a`. Its compiler and
+The published character-predicate implementation is `1b5c5a9676`.
+A type synonym can use a checked character predicate in the same
+declaration group. An importing module can prove its result from the
+interface. Jobs 1454 and 1455 qualified normal two-stage build
+`54c4c62287`. All 556 Showcase lines matched at native `-O0`,
+default `-O2` and in GHCi. All 111 focused and 234 compatibility
+registrations passed.
+[Character-predicate checks](CHECKPOINTS.md#checked-character-predicates-in-the-defining-module).
+
+The preceding Unicode checkpoint is `16de21824a`. Its compiler and
 libraries match normal two-stage build `1659c10b23` in
 `_build/on-demand/r03-r15-unicode-normal-555-20261123/source/_build/stage1`.
 The installed title-case, upper-case and lower-case functions all
@@ -132,15 +141,12 @@ though ordinary runtime clients passed. The published fix lets a
 client give `spaceDecision 'x'` the type `Decision Char.isSpace (Space 'x')`.
 [Substitution example](roadmap/R03-dependent-products.md#specializing-an-imported-call).
 
-The next normal build is `54c4c62287` in
-`r16-r21-char-predicate-normal-556-20261123/source`. It combines
-strict character predicates, local aliases and checked calls from
-the same declaration group. Its compiler matches component `fc3023245a`.
-Jobs 1434 and 1435 passed the 556-line Showcase and its four focused
-registrations on that component. Job 1454 builds the normal compiler.
-Job 1455 checks three Showcase modes, 111 focused registrations, the
-234-case compatibility set and the external character-case generator.
-[Same-module example](roadmap/R21-dependency-analysis.md#checked-character-equations-in-their-defining-module).
+The next normal build is `3dd34e5327` in
+`r04-r21-runtime-sigma-normal-558-20261123/source`. Job 1493 builds
+both compiler stages. Job 1494 qualifies the 558-line Showcase. The
+candidate checks a dependent pair with a runtime tag. It also handles
+attached deriving clauses and associated equations that use a local
+producer. These checks use the published R16 proof policy.
 
 Job 1335 used installed HaskLib on `4d10fdc35f` to check the
 [append counterexample](roadmap/R16-open-term-evaluator.md#append-fusion-and-an-undefined-right-list).
@@ -394,16 +400,16 @@ defaults and an opt-in migration warning.
    records for its old paths. Keep active builds under `_build/on-demand/`.
 3. Restore the [shared WSL build queue](CHECKPOINTS.md#restore-the-shared-wsl-build-queue)
    before submitting work. Use at most two subagents. The coordinator
-   reviews and integrates their results. One agent owns the R03
-   substitution check. The other owns the R16 append proof check.
+   reviews and integrates their results. The current assignments are
+   R04 dependent-pair diagnostics and R16 imported proof compatibility.
    The group has two slots. All GHC jobs share
    16 logical CPUs, 64,000,000,000 bytes of memory and zero swap.
    Higher-priority jobs pause the queue and freeze the GHC slice.
 
 ## Build and verify
 
-The published 555-line Showcase uses the normal two-stage compiler at
-`1659c10b23` in `r03-r15-unicode-normal-555-20261123`.
+The published 556-line Showcase uses the normal two-stage compiler at
+`54c4c62287` in `r16-r21-char-predicate-normal-556-20261123`.
 On this host the bootstrap tools are GHC 9.14.1, Cabal 3.18.1.0, Happy 2.1.7
 and Alex 3.5.4.0. A fresh checkout needs the Git submodules at their recorded
 revisions. This build used five workers per job.
@@ -417,7 +423,7 @@ self-hosted stage 2 compiler in `_build/stage1/bin/ghc`. Both use the
 target libraries in `_build/stage1/lib`. For example, from the main checkout:
 
 ```sh
-stable="$PWD/_build/on-demand/r03-r15-unicode-normal-555-20261123/source/_build/stage1"
+stable="$PWD/_build/on-demand/r16-r21-char-predicate-normal-556-20261123/source/_build/stage1"
 queue="$PWD/docs/dependent-haskell/tools/ghc-build-job"
 check="$PWD/docs/dependent-haskell/check-showcase.sh"
 "$queue" showcase-stage2-ghci bash "$check" "$stable/bin/ghc" "$stable/lib" --ghci

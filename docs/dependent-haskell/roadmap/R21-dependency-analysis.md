@@ -508,7 +508,7 @@ the separate optimized list-proof work.
 
 ## Checked character equations in their defining module
 
-The private compiler at `fc3023245a` accepts the following declarations
+The published implementation at `1b5c5a9676` accepts the following declarations
 in one group. The proof may also precede the producer in source order.
 
 ```haskell
@@ -529,5 +529,7 @@ both source orders at `-O0` and `-O2`. It also rejected a type/value
 cycle, a pending typed splice, and a conflicting rule in a later group.
 A declaration before a splice still cannot refer to a name first bound
 after it. Jobs 1434 and 1435 used the same-module synonym in the full
-556-line Showcase and in the separate reader.
-[Declaration groups and prior art](../REFERENCES.md#checked-character-equations-in-a-declaration-group).
+556-line Showcase and in the separate reader. Jobs 1454 and 1455
+qualified the normal two-stage compiler.
+[Release checks](../CHECKPOINTS.md#checked-character-predicates-in-the-defining-module) and
+[declaration groups and prior art](../REFERENCES.md#checked-character-equations-in-a-declaration-group).

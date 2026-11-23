@@ -6,6 +6,25 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Checked character predicates in the defining module
+
+Implementation `1b5c5a9676` accepts `type Flag (c :: Char) = flag c`
+in the declaration group that defines the ordinary function `flag`.
+Either source order works. A separate module can import the synonym
+and prove `Flag 'x' :~: 'True` with `Refl`. The Showcase checks two
+literal branches and the default. It prints `[True,True,False]`.
+[Predicate](examples/open-evaluation/CharacterCase.hs),
+[exported synonym](examples/open-evaluation/CharacterExport.hs) and
+[declaration order](roadmap/R21-dependency-analysis.md#checked-character-equations-in-their-defining-module).
+
+Job 1454 built both normal stages from `54c4c62287`. Job 1455
+matched all 556 Showcase lines at native `-O0`, default `-O2` and in
+GHCi. It passed 111 focused registrations and 234 compatibility
+registrations (231 native and three GHCi). The specialization and package
+identity checks passed. The separate GHC API example recovered nominal
+equality evidence from ordinary interfaces. Changing its producer changed
+the result seen by the unchanged client.
+
 ## Installed Unicode case mappings
 
 The 555-line release is `16de21824a`. A type synonym can name
