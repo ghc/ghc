@@ -1895,6 +1895,10 @@ main = do
     observe "pass size as a callback and check the reversed list length"
         (case measureReverseLength HaskLib.size reverseInput Refl of
              (n, Refl) -> n)
+    prefixBound <- newIORef (HaskLib.Succ HaskLib.Zero) >>= readIORef
+    prefixInput <- newIORef (True : error "forced the list beyond the prefix") >>= readIORef
+    observe "take a runtime-bounded prefix and prove its length"
+        (HaskLib.takeSize prefixBound prefixInput, HaskLib.lengthTakeSize prefixBound prefixInput)
     putStrLn ("prove that map distributes over append: "
               ++ PreludeMapAppendProof.showPreludeMapAppend)
     putStrLn ("prove that two maps compose on a finite list: "
