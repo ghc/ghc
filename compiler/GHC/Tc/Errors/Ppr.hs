@@ -3957,7 +3957,7 @@ pprRetainedQuantificationError reason = case reason of
          , text "A retained variable or wildcard can be parenthesized or have a bang. Fields of an index constructor must be bare variables or wildcards."
          , text "Lazy patterns and pattern bindings are not supported yet." ]
   RetainedRecordConstruction ->
-    text "Supply every field when constructing a record with a retained witness."
+    text "Supply the witness field when constructing a retained record."
   RetainedRecordDeclaration ->
     text "Each payload field of a retained record must use the first field as its final type argument."
   RetainedRecordPatternOrder ->

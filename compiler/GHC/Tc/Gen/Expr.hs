@@ -67,6 +67,7 @@ import GHC.Core.Dependent ( hasNativeDependentExpr, supportsQuickLookType )
 import GHC.Core.Utils (applyTypeToArgs)
 import GHC.Core.UsageEnv
 import GHC.Core.FamInstEnv    ( FamInstEnvs )
+import GHC.Core.Make (rEC_CON_ERROR_ID)
 import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.ConLike
 import GHC.Core.DataCon
@@ -101,6 +102,7 @@ import GHC.Builtin.KnownOccs
 import GHC.Builtin.Uniques ( mkBuiltinUnique )
 
 import GHC.Driver.Config.HsToCore.Ticks (initTicksConfig)
+import GHC.Driver.Ppr (showSDoc)
 import GHC.Driver.Session (sccProfilingEnabled)
 import GHC.HsToCore.Ticks (TicksConfig(ticks_passes), TickishType(Breakpoints))
 import GHC.Driver.DynFlags
@@ -111,7 +113,7 @@ import GHC.Utils.Panic
 
 import GHC.Data.List.SetOps
 import GHC.Data.Maybe
-import GHC.Data.FastString (fastStringToShortText, fsLit)
+import GHC.Data.FastString (bytesFS, fastStringToShortText, fsLit, mkFastString)
 
 import Control.Monad
 import Data.List (transpose)
@@ -1349,11 +1351,25 @@ tcExpr expr@(RecordCon { rcon_con = L loc qcon@(WithUserRdr _ con_name)
       let values = mkNameEnv
             [(unLoc (foLabel (unLoc (hfbLHS field))), hfbRHS field)
             | L _ field <- rec_flds rbinds]
-          fields = map flSelector (dataConFieldLabels con)
-      args <- case traverse (lookupNameEnv values) fields of
-        Just args | notNull fields, args `equalLength` rec_flds rbinds -> pure args
+          fields = dataConFieldLabels con
+          supplied fld = lookupNameEnv values (flSelector fld)
+      forM_ (hsRecFields rbinds) $ \name ->
+        unless (any ((== name) . flSelector) fields) $
+          failWithTc (badFieldConErr con_name
+            (FieldLabelString (fastStringToShortText (occNameFS (nameOccName name)))))
+      case fields of
+        witness : payloads | Just value <- supplied witness -> do
+          dflags <- getDynFlags
+          site <- getSrcSpanM
+          -- See Note [Desugaring record construction] in GHC.HsToCore.Expr.
+          let missing fld = wrapGenSpan $ genHsApps (idName rEC_CON_ERROR_ID)
+                [genLHsLit (HsStringPrim NoSourceText (bytesFS (mkFastString message)))]
+                where message = showSDoc dflags (hcat [ppr site, vbar, ppr (flLabel fld)])
+              args = value : map (\fld -> fromMaybe (missing fld) (supplied fld)) payloads
+          result <- tcExpr (genHsApps con_name args) res_ty
+          checkMissingFields (RealDataCon con) rbinds (dataConOrigArgTys con)
+          pure (mkExpandedExprTc expr result)
         _ -> failWithTc (TcRnRetainedQuantificationError RetainedRecordConstruction)
-      mkExpandedExprTc expr <$> tcExpr (genHsApps con_name args) res_ty
 
     tc_ordinary_record con_like
       = do { (con_expr, con_sigma) <- tcInferConLike con_like

@@ -140,6 +140,19 @@ wrong = NamedColumns { namedLetters = VNil, namedFlags = VNil }
 HS
     reject 'Supply the witness field' MissingWitness.hs
 
+    cat > ForeignField.hs <<'HS'
+{-# LANGUAGE NoDisambiguateRecordFields, NoExperimentalDependentTypes #-}
+module ForeignField where
+import NamedSiblingColumns
+import PackedVecLibrary (Nat(..))
+
+data Other = Other { foreignField :: Bool }
+
+wrong :: NamedColumns
+wrong = NamedColumns { storedLength = Z, foreignField = True }
+HS
+    reject 'GHC-53822' ForeignField.hs
+
     cat > BadConstruction.hs <<'HS'
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
 module BadConstruction where

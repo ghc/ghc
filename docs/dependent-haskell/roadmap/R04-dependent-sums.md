@@ -381,7 +381,10 @@ With `ExperimentalDependentTypes`, the two payload types refer to the
 stored value of the first field. The generated selector has type
 `foreach (p :: NamedColumns) -> Vec Char (storedLength p)`. An ordinary
 client can call both payload selectors on the same record and zip the
-results. It can also construct the record by naming every field.
+results. To construct the record, supply the witness field. An omitted
+lazy payload uses the supplied witness in its type. GHC issues the
+ordinary missing-field warning and raises the ordinary missing-field
+exception if evaluation demands that payload.
 [Example](../examples/packed-vector/NamedSiblingColumns.hs).
 
 The declaration uses one constructor, no datatype parameters, and lazy
