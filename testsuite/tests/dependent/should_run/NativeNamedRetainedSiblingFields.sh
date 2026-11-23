@@ -360,6 +360,7 @@ main :: IO ()
 main = do
     checkDemand (clear (NamedColumns Z VNil VNil))
     checkDemand (update (Ordinary False))
+    checkDemand (writeWitness (NamedColumns Z undefined undefined))
     let missingLength :: Nat
         ~missingLength = undefined
     checkDemand (writeWitness (NamedColumns missingLength undefined undefined))
@@ -367,7 +368,7 @@ HS
     "${ghc[@]}" "$opt" -c StrictUpdate.hs
     "${ghc[@]}" StrictUpdate.o ../provider/{PackedVecLibrary,NamedSiblingColumns}.o -o strict-update
     timeout 15 ./strict-update > actual
-    printf '%s\n' 'True' 'True' 'True' | cmp - actual
+    printf '%s\n' 'True' 'True' 'False' 'True' | cmp - actual
 
     cat > BadPayloadUpdate.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes #-}
