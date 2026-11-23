@@ -2017,8 +2017,10 @@ a legal partial application obtained from an imported interface.
 The same rule applies to a type synonym before it has enough arguments
 to expand. Its TyConAppCo may carry forward equality of its supplied
 arguments. At saturation mkTyConAppCo expands the synonym as usual.
-The interface marks each partial synonym in a type or coercion. An
-older reader can otherwise treat its supplied arguments as injective.
+The interface marks partial synonyms and built-in families in both
+types and coercions. An older reader can treat a partial synonym's
+supplied arguments as injective, or reject a partial built-in in Core
+Lint after it has read the interface.
 See proposal #242 and the R23 card in docs/dependent-haskell/roadmap.
 -}
 

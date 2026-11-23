@@ -275,12 +275,16 @@ toIfaceTyVar = mkIfLclName . occNameFS . getOccName
 toIfaceCoVar :: CoVar -> IfLclName
 toIfaceCoVar = mkIfLclName . occNameFS . getOccName
 
--- | Mark a synonym prefix in both types and coercions.
+-- | Mark a partial synonym or built-in family in types and coercions.
 -- See Note [Partial type family applications] in GHC.Core.Type.
 toIfaceAppliedTyCon :: TyCon -> [a] -> IfaceTyCon
 toIfaceAppliedTyCon tc args
-  | isTypeSynonymTyCon tc, args `lengthLessThan` tyConArity tc
+  | args `lengthLessThan` tyConArity tc
+  , isTypeSynonymTyCon tc
   = IfaceTyCon (tyConName tc) (mkIfaceTyConInfo NotPromoted IfacePartialSynonym)
+  | args `lengthLessThan` tyConArity tc
+  , Just _ <- builtInClosedTyFamTyCon_maybe tc
+  = IfaceTyCon (tyConName tc) (mkIfaceTyConInfo NotPromoted IfacePartialBuiltinFamily)
   | otherwise = toIfaceTyCon tc
 
 ----------------
