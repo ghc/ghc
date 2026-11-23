@@ -1,5 +1,13 @@
 # Dependent Haskell references
 
+PLFH uses Philip Wadler and Wen Kokke’s *Programming Language Foundations
+in Agda*, edition 19.08, to compare source-level proofs. Its first target
+is addition associativity on arbitrary natural numbers. Progress and
+preservation for the typed lambda calculus are later milestones.
+[Edition contents](https://plfa.inf.ed.ac.uk/19.08/),
+[pinned Agda sources](https://github.com/plfa/plfa.github.io/tree/63fcbbe25ec3686ff4c6df2c5b58a96b3a2054f3/src/plfa)
+and [PLFH starting prompt](plfh/PROMPT.md).
+
 The original survey was checked on 2026-11-11. The Agda and Haskell evaluation
 references were checked on 2026-11-12. The GHC source baseline is
 [`19ff36f2aede0ca2e554016ff22c71e73aa9803b`](https://github.com/ghc/ghc/commit/19ff36f2aede0ca2e554016ff22c71e73aa9803b).
