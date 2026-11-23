@@ -81,7 +81,7 @@ import GHC.Core (CoreExpr)
 import qualified GHC.Core as Core
 import GHC.Core.Utils (exprType)
 import GHC.Data.OrdList (fromOL)
-import GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceCaseTables, sourceCharacterTables, sourceRetainedWitnessTables, isMonomorphicRetainedWitness,
+import GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceCaseTables, sourceCharacterTables, sourceRetainedWitnessTables, checkLocalRetainedWitnessExports, isMonomorphicRetainedWitness,
                                isStructuralSourceTable, isNominalStructuralSource, sourceRuleOwners, sourceRuleOwnersAt, visibleSourceMethodRules,
                                hasSourceMethodRule, hasSourceMethodRuleAt, sourceLiteralWorkers, checkSourceMethodUses,
                                checkOptionalSourceUses, checkAndInstallSourceProofs,
@@ -717,9 +717,12 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
                 | tables_enabled = tables
                 | otherwise = filter (\(owner, _) -> not (idName owner `elemNameSet` case_owners)) tables
           with_fields <- if null fields then getGblEnv else fst <$> addTyConsToGblEnv fields
-          let early_structural = [(fun, table) | fun <- typeEnvIds (tcg_type_env with_fields)
+          let installed = typeEnvIds (tcg_type_env with_fields)
+              early_structural = [(fun, table) | fun <- installed
                                                , isNominalStructuralSource fun
                                                , Just table <- [sourceTableId_maybe fun]]
+          checkLocalRetainedWitnessExports with_fields installed
+          failIfErrsM
           env <- setGblEnv with_fields (installSourceTables (early_structural ++ new_tables ++ cases))
           installSourceMethods (\sel -> tables_enabled || sourceMapSelector sel) env }
 

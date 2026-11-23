@@ -2461,6 +2461,15 @@ same declaration group. See Note [Deriving for early source tables] in
 GHC.Tc.Module. A SPECIALISE pragma can mention arbitrary local types and
 values. Keep such bindings in the regular pass.
 
+An independent retained package can also be checked in the early group.
+Require a single nullary datatype declaration and a constructor with
+one retained binder and one ordinary payload field. The result is the
+declared datatype. Restrict the field to simple type applications and
+references to the retained binder. Reject source table names in this
+form. The SCC has no other type declarations or standalone signatures
+to schedule. The ordinary checker still checks the constructor and the
+source equation.
+
 A worker signature can name a saturated type synonym. GHC.Tc.Module checks
 the written applications against the synonym arity. A same-group synonym
 can refer to a bare type constructor or one of its own parameters. Follow
@@ -2713,9 +2722,32 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
                      [L _ DataDecl{tcdLName = L _ t, tcdModifiers = [],
                                    tcdTyVars = HsQTvs{hsq_explicit = []},
                                    tcdDataDefn = HsDataDefn{dd_ctxt = Nothing, dd_kindSig = Nothing,
-                                     dd_cons = DataTypeCons False cs}}]} <- tycls
+                                     dd_cons = DataTypeCons False cs, dd_derivs = derivs}}]} <- tycls
                   , isEmptyNameSet deps
-                  , Just cons <- [traverse prefix_con cs] ]
+                  , Just cons <- [early_constructors t cs derivs] ]
+
+    early_constructors t [con] [] | Just c <- retained_constructor t con = Just [c]
+    early_constructors _ cs _ = traverse prefix_con cs
+
+    retained_constructor t (L _ ConDeclGADT
+      { con_names = L _ c :| [], con_modifiers = [], con_telescope = []
+      , con_outer_bndrs = L _ (HsOuterImplicit []), con_g_args = PrefixConGADT _ []
+      , con_res_ty = sig })
+      | HsForEachTy _ [L _ (HsTvb _ () (HsBndrVar _ (L _ witness)) (HsBndrKind _ domain))] body
+          <- unLoc (ignoreParens sig)
+      , isJust (type_name domain)
+      , HsFunTy _ (HsModifiedFunArr _ [] HsStandardArr{}) field result <- unLoc (ignoreParens body)
+      , type_name result == Just t
+      , retained_field_type witness field
+      = Just c
+    retained_constructor _ _ = Nothing
+
+    retained_field_type witness ty = case unLoc (ignoreParens ty) of
+      HsAppTy _ fun arg -> retained_field_type witness fun && retained_field_type witness arg
+      HsTyVar _ NotPromoted (L _ (WithUserRdr _ name)) ->
+        name == witness || isJust (type_name ty)
+      _ -> False
+
     prefix_con :: LConDecl GhcRn -> Maybe Name
     prefix_con (L _ ConDeclH98{con_name = L _ c, con_modifiers = [], con_telescope = [],
                                con_args = PrefixCon _ fields})

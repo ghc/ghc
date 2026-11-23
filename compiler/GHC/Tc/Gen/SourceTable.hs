@@ -1,5 +1,5 @@
 -- | Closed type families for checked functions that match one constructor.
-module GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourceTableTyCons, sourceCaseTables, sourceCharacterTables, sourceRetainedWitnessTables, isMonomorphicRetainedWitness, finalCoreMappers, verifyFinalCoreMapper, failedFinalListTables, finalCoreSourceFamilies, isFinalCoreIdentity, indexedProjectionSource, isFinalCoreReverseWrapper, sourcePairBuilderField, lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
+module GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourceTableTyCons, sourceCaseTables, sourceCharacterTables, sourceRetainedWitnessTables, checkLocalRetainedWitnessExports, isMonomorphicRetainedWitness, finalCoreMappers, verifyFinalCoreMapper, failedFinalListTables, finalCoreSourceFamilies, isFinalCoreIdentity, indexedProjectionSource, isFinalCoreReverseWrapper, sourcePairBuilderField, lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
                               sourceTableCallees, sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
                               sourceTableFamilyAppUse, sourceTableReferenceUse, sourceCaseKindUse, sourceCaseVisibleArity, isSourceConstructorCase, sourceTableOwner, monomorphicEnumCaseArity, groundFirstHead,
                               isFinalStructuralSource, isStructuralSourceTable, isNominalStructuralSource,
@@ -89,7 +89,7 @@ import GHC.Types.InlinePragma (ActivationX(ActiveAfter, ActiveBefore), PhaseNum,
 import GHC.Types.Name (Name, OccName, isExternalName, mkSourceTableOcc, mkSourceFstOcc, mkSourceSndOcc, mkInstTyCoOcc, mkTcOcc,
                        isVarOcc, mkTyVarOcc, mkVarOcc, nameModule_maybe, nameOccName, nameSrcSpan, occNameString, setOccNameSpace, sourceTableTermOcc, stableNameCmp, nameStableString, tvName, SourceProofRule, SourceProofArgs, SourceProofArg(..))
 import GHC.Core.Opt.Pipeline (pairObservationOcc, pairObservationType, scalarRecipeTableOcc)
-import GHC.Types.Name.Reader (GlobalRdrEnv, gre_imp, is_decl, is_isboot, lookupGRE_Name)
+import GHC.Types.Name.Reader (GlobalRdrEnv, gre_imp, is_decl, is_isboot, isLocalGRE, lookupGRE_Name)
 import GHC.Types.Name.Env (NameEnv, delFromNameEnv, elemNameEnv, extendNameEnv, extendNameEnv_C, isEmptyNameEnv,
                            lookupNameEnv, mkNameEnv, nonDetNameEnvElts, plusNameEnv_C)
 import GHC.Types.Name.Set (NameSet, emptyNameSet, elemNameSet, extendNameSet, extendNameSetList, filterNameSet,
@@ -2300,8 +2300,11 @@ sourceRetainedWitnessTables :: NameEnv (Id, Core.CoreExpr) -> TcM [(Id, TyCon)]
 sourceRetainedWitnessTables definitions = do
   env <- getGblEnv
   rdr_env <- getGlobalRdrEnv
-  let exported = availsToNameSet (tcg_exports env)
-      public = publicCaseType env exported (ordinaryImport rdr_env)
+  let available name
+        | nameModule_maybe name == Just (tcg_semantic_mod env) =
+            maybe False isLocalGRE (lookupGRE_Name rdr_env name)
+        | otherwise = ordinaryImport rdr_env name
+      public = visibleCaseType available
       candidates = sortBy (\(left, _) (right, _) -> stableNameCmp (idName left) (idName right))
                    (nonDetNameEnvElts definitions)
   fmap catMaybes $ forM candidates $ \(owner, rhs) ->
@@ -2311,18 +2314,44 @@ sourceRetainedWitnessTables definitions = do
         Nothing -> pure Nothing
       else pure Nothing
 
+-- | Validate the exports that were unavailable when checking local witnesses.
+-- See Note [Retained field kinds in source equations].
+checkLocalRetainedWitnessExports :: TcGblEnv -> [Id] -> TcM ()
+checkLocalRetainedWitnessExports env owners = do
+    let exported = availsToNameSet (tcg_exports env)
+    forM_ owners $ \owner ->
+      case sourceTableId_maybe owner of
+        Just table
+          | Just (con, _) <- monomorphicRetainedWitnessType (varType owner)
+          , let tc = dataConTyCon con
+          , nameModule_maybe (tyConName tc) == Just (tcg_semantic_mod env)
+          , not (publicCaseType env exported (const False) tc) -> do
+              let name = idName owner
+                  uses = [ idName consumer | consumer <- owners
+                         , table `elem` sourceFamilyTyCons [varType consumer] ]
+                  dependent = listToMaybe (sortBy stableNameCmp uses)
+                  reason = "The dependent type needs this equation. Export the matched constructor "
+                           ++ occNameString (nameOccName (dataConName con)) ++ " to make it available."
+              setSrcSpan (nameSrcSpan (fromMaybe name dependent)) $
+                addErr (TcRnOpenTypeEval name dependent reason)
+        _ -> pure ()
+
 -- | The early witness path only considers signatures accepted by this rule.
 isMonomorphicRetainedWitness :: Id -> Bool
 isMonomorphicRetainedWitness = isJust . monomorphicRetainedWitnessType . varType
 
 -- | Require the case datatype and all of its constructors to be visible.
 publicCaseType :: TcGblEnv -> NameSet -> (Name -> Bool) -> TyCon -> Bool
-publicCaseType env exported imported tc =
-  all available (tyConName tc : map dataConName (tyConDataCons tc))
+publicCaseType env exported imported = visibleCaseType available
   where
     available name
       | nameModule_maybe name == Just (tcg_semantic_mod env) = name `elemNameSet` exported
       | otherwise = imported name
+
+-- | Check the identities of the case datatype and its constructors.
+visibleCaseType :: (Name -> Bool) -> TyCon -> Bool
+visibleCaseType available tc =
+    all available (tyConName tc : map dataConName (tyConDataCons tc))
 
 -- | A constructor-case certificate cannot depend on a boot-only import.
 ordinaryImport :: GlobalRdrEnv -> Name -> Bool
@@ -2915,6 +2944,12 @@ Only the package constructor occurs in the equation. Require the
 ordinary kind grammar for its fields and the result. Their types can
 hide their constructors because both fields are variables. Still
 check the exact field kinds against the promoted constructor telescope.
+
+The early typechecker cannot use the module's export list. Later
+splices and finalizers can add declarations to it. Use the local
+constructor's GRE to check the witness in the current scope, then
+validate installed witnesses against the final exports before publishing.
+Imported packages already need the constructor in ordinary scope.
 -}
 
 -- | Check the retained constructor and its actual structural root domain.
