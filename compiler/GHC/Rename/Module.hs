@@ -1555,7 +1555,6 @@ liftTypeCases group =
         withResult cs = cs ++ [(liftedTypeVarBinder binder, binder, binder) | captures_result]
         renameCaptureKind saved (L loc header@HsTvb{tvb_kind = kind}, name, actual) =
           (L loc header{tvb_kind = renameCaptures [(unLoc binder, unLoc saved)] kind}, name, actual)
-        renameCaptureKind _ capture = capture
 
     -- Follow an ordered chain to a case, including cases in binding RHSs.
     -- A written result kind needs the preceding helpers before checking the
