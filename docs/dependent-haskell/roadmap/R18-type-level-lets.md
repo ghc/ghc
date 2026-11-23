@@ -47,6 +47,36 @@ a value of the resulting row type. General local patterns and cases remain open.
 [Scoped row](../examples/open-evaluation/TypeLambda.hs)
 and [client](../../../testsuite/tests/dependent/should_run/NativeTypeLambda.sh).
 
+## Release check
+
+Serokell defines the feature as naming a computed type and using it
+again in the same type expression. The fork checks these source
+properties before marking R18 complete.
+
+- [x] Keep the parameter abstract in `let b = G a in Either b b`.
+  Both uses of `b` must refer to the same type in a signature, field,
+  GADT result, synonym, closed family equation and open instance.
+  [Six source contexts](../../../testsuite/tests/dependent/should_run/NativeTypeLetContexts.hs).
+- [x] Check an unused right-hand side and diagnose a forward reference.
+  Resolve an earlier binding in the scope where it was defined after a
+  later binding shadows its name. Use the exported result in an ordinary
+  client with the provider source hidden. Reject an unfounded equality.
+  [Scope and diagnostic checks](../../../testsuite/tests/dependent/should_run/NativeTypeLet.sh).
+- [x] Preserve the result of inserting an intermediate alias and of
+  renaming a local binder that shadows an enclosing kind. Jobs 1615
+  and 1619 checked these on compiler components.
+  [Intervening abbreviation](#an-intervening-abbreviation).
+- [ ] Run all of these checks on the combined two-stage compiler,
+  together with quotation, exact printing and the Showcase. Record the
+  tested revision here before changing the roadmap count.
+
+The fork also supports projection patterns for pairs and regular named
+products. The latter have a separate quotation restriction. The
+upstream dependency graph also tracks dependent Core and open
+evaluation. Each has its own release criteria.
+[Product patterns](#a-named-product-binding) and
+[Serokell's card and dependencies](https://ghc.serokell.io/dh#type-level-let-bindings).
+
 ## Ordered binding groups
 
 The fork accepts a nonempty group of simple bindings under
