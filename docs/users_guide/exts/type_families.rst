@@ -106,6 +106,18 @@ matchability on an arrow, enable :extension:`Modifiers` and annotate the
 arrow with ``%M`` or ``%U`` from ``GHC.Matchability``. The extension turns
 on :ghc-flag:`-fprint-explicit-matchabilities`.
 
+Built-in type families such as ``(+)`` still require all their arguments.
+To pass addition by one to a higher-order family, define a closed family
+that supplies both arguments::
+
+    type family AddOne (n :: Nat) :: Nat where
+        AddOne n = 1 + n
+
+Import ``Nat`` and ``type (+)`` from ``GHC.TypeNats``. This example uses
+:extension:`DataKinds`, :extension:`TypeOperators` and
+:extension:`UndecidableInstances` in addition to :extension:`UnsaturatedTypeFamilies`.
+With a list-mapping family, ``Map AddOne '[2, 3, 4]`` reduces to ``'[3, 4, 5]``.
+
 :extension:`ExperimentalDependentTypes` also permits partial applications
 through its existing checks. It has independent implications. In
 particular, ``NoUnsaturatedTypeFamilies`` disables the standalone flag
