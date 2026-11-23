@@ -87,9 +87,9 @@ module Ordinary where
 import Data.Kind (Type)
 import Data.Type.Equality ((:~:)(Refl))
 import NativeTypeLambdaScope
-import TypeLambda (L, Captured, Shadowed, WithError, Prefixes, ScopedRow, Mixed, Held, CaseShadow, Rebuild,
+import TypeLambda (Fields(..), L, Captured, Shadowed, WithError, Prefixes, ScopedRow, Mixed, Held, CaseShadow, Rebuild,
                    IndexedTag(..), IndexedCase, IndexedCaseInferred)
-import Data.Proxy (Proxy)
+import Data.Proxy (Proxy(..))
 result :: L :~: '[Maybe Int, Either String Int, IO Int]
 result = Refl
 capture :: Captured Ordering :~: '[Either Ordering Bool, Either Ordering Char]
@@ -145,6 +145,10 @@ ordinaryCases :: OrdinaryCases 'True :~: ([Bool], Maybe Char)
 ordinaryCases = Refl
 consed :: Consed 'False :~: '[Ordering, Int]
 consed = Refl
+checkedField :: CheckedField String '[Bool]
+checkedField = CheckedField { checkedFields = Field (Right True) End }
+indexedField :: IndexedField Bool 'True
+indexedField = IndexedField (Field (Right Proxy) End)
 ordinaryLambda :: a -> b -> a
 ordinaryLambda x = (\_ -> x)
 HS
@@ -184,7 +188,8 @@ main = case (capturedRow, independentRow, withError, withoutError) of
       (Field x End, Field y End) -> print (x, y)
 HS
 "${g[@]}" -c RowsMain.hs
-"${g[@]}" RowsMain.o Ordinary.o TypeLambdaClient.o ../provider/TypeLambda.o ../provider/SchemaColumns.o -o rows
+"${g[@]}" RowsMain.o Ordinary.o TypeLambdaClient.o ../provider/TypeLambda.o \
+    ../provider/SchemaColumns.o ../provider/NativeTypeLambdaScope.o -o rows
 printf '%s\n' "(Left GT,Right True,Just 'a',Just True)" "(Just 'x',Right True)" "Right 'x'" '(Just 42,Left "missing")' >rows.expected
 ./rows >rows.actual
 cmp rows.expected rows.actual
@@ -219,6 +224,25 @@ if "${g[@]}" -c WrongCallback.hs >callback.log 2>&1 ||
    ! grep -Eq "type lambda in the signature for .reversed." callback.log ||
    grep -Fq '$signature-lambda:' callback.log; then
     cat callback.log >&2
+    exit 1
+fi
+
+cat >FieldCallback.hs <<'HS'
+{-# LANGUAGE ExperimentalDependentTypes #-}
+module FieldCallback where
+import NativeTypeLambdaScope (CheckedField(..))
+import TypeLambda (Fields, Map)
+forward :: Fields (Map (\value -> Either e value) xs) -> CheckedField e xs
+forward = CheckedField
+HS
+"${g[@]}" -c FieldCallback.hs
+sed -e 's/module FieldCallback/module WrongFieldCallback/' \
+    -e 's/Either e value/Either value e/' FieldCallback.hs >WrongFieldCallback.hs
+if "${g[@]}" -c WrongFieldCallback.hs >wrong-field.log 2>&1 ||
+   ! grep -Fq 'WrongFieldCallback.hs:6:11: error: [GHC-83865]' wrong-field.log ||
+   ! grep -Eq "type lambda in a field of .CheckedField." wrong-field.log ||
+   grep -Fq '$field-lambda:' wrong-field.log; then
+    cat wrong-field.log >&2
     exit 1
 fi
 

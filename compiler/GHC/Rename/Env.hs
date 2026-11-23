@@ -544,7 +544,8 @@ lookupLocalOrigGRE name = do
   case exact of
     Left NoExactName{}
       | any (`isPrefixOf` occNameString (nameOccName name))
-            ["$signature-lambda:", "$signature-sum:", "$signature-case:", "$field-sum:", "$field-case:"] -> do
+            [ "$signature-lambda:", "$signature-sum:", "$signature-case:"
+            , "$field-lambda:", "$field-sum:", "$field-case:" ] -> do
         env <- getGblEnv
         return $ case lookupNameEnv (tcg_type_env env) name of
           Just thing@(ATyCon tc) | isTypeSynonymTyCon tc ->

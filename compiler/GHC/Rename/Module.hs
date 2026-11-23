@@ -606,11 +606,11 @@ requires the kind of each selected variable to refer to earlier
 captures. If that requires a shadowed variable, leave the case in the
 source so the normal context check rejects it.
 
-For a lambda in a top-level value signature, give the lambda expression
-its own private synonym. Its parameters are the free variables of the
-lambda and the variables in their kinds. Keep the application of the
-synonym in the signature. The existing lambda pass then lifts the
-synonym body. See Note [Lifting type lambdas].
+Give a lambda in a top-level value signature or ordinary constructor
+field its own private synonym. Its parameters are the free variables
+of the lambda and the variables in their kinds. Keep the application
+of the synonym at the written occurrence. The existing lambda pass
+then lifts the synonym body. See Note [Lifting type lambdas].
 
 A foreach telescope starts a new table too. Lift a case on an
 application tree with retained variables among its operands. Each
@@ -922,6 +922,8 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
 
     liftedAnchor SignatureTypeSite _ ty@(L _ (XHsType HsTypeLambda{}))
       | lift_cases, copyable ty = Just ("$signature-lambda:", Nothing)
+    liftedAnchor FieldTypeSite _ ty@(L _ (XHsType HsTypeLambda{}))
+      | lift_cases, copyable ty = Just ("$field-lambda:", Nothing)
     liftedAnchor SignatureTypeSite _ ty@(L _ (XHsType HsTypeLet{}))
       | lift_cases
       , snd (caseCaptureUses ty)
