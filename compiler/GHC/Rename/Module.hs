@@ -2069,10 +2069,12 @@ The early group cannot depend on the rest of the group. An H98 datatype
 with no parameters may refer to itself in a field, as in data Nat = Z | S Nat.
 Require each field type to be a single type constructor. A dependency on
 another type in this group appears in group_ext. A private source-table
-name does not, so exclude it explicitly. Keep deriving clauses in the
-original group because they can use instances from later groups. A SPECIALISE
-pragma can also mention arbitrary local types and values. Keep such bindings
-in the original group.
+name does not, so exclude it explicitly. Keep explicit instances in the
+regular pass. Save each early datatype's attached deriving clauses as
+DerivInfo for that pass. Deriving can use other instances from the
+same declaration group. See Note [Deriving for early source tables] in
+GHC.Tc.Module. A SPECIALISE pragma can mention arbitrary local types and
+values. Keep such bindings in the regular pass.
 
 A worker signature can name a saturated type synonym. GHC.Tc.Module checks
 the written applications against the synonym arity. A same-group synonym
@@ -2228,7 +2230,15 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
         early_bind (_, [L _ FunBind{fun_id = L _ b}]) = b `elemNameSet` early_names
         early_bind _ = False
         (first_sigs, rest_sigs) = partition (any (`elemNameSet` early_names) . sig_names . unLoc) sigs
-        (first_tys, rest_tys) = partition (any ((`elemNameSet` early_types) . tcdName . unLoc) . group_tyclds) tycls
+        early_ty tg = any ((`elemNameSet` early_types) . tcdName . unLoc) (group_tyclds tg)
+        (first_tys, rest_tys) = case use of
+          TableInTerm -> partition early_ty tycls
+          TableInType{} ->
+            ([tg { group_instds = [] } | tg <- tycls, early_ty tg], mapMaybe rest_ty tycls)
+        rest_ty tg
+          | not (early_ty tg) = Just tg
+          | null (group_instds tg) = Nothing
+          | otherwise = Just tg { group_tyclds = [], group_kisigs = [], group_roles = [] }
         first = emptyRnGroup { hs_valds = XValBindsLR (HsVBG first_binds first_sigs), hs_tyclds = first_tys }
         rest = group { hs_valds = XValBindsLR (HsVBG rest_binds rest_sigs), hs_tyclds = rest_tys }
     in case use of
@@ -2317,8 +2327,8 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
       [ (t, cons) | TyClGroup{group_ext = deps, group_kisigs = [], group_tyclds =
                      [L _ DataDecl{tcdLName = L _ t, tcdModifiers = [],
                                    tcdTyVars = HsQTvs{hsq_explicit = []},
-                                   tcdDataDefn = HsDataDefn{dd_derivs = [], dd_ctxt = Nothing,
-                                     dd_kindSig = Nothing, dd_cons = DataTypeCons False cs}}]} <- tycls
+                                   tcdDataDefn = HsDataDefn{dd_ctxt = Nothing, dd_kindSig = Nothing,
+                                     dd_cons = DataTypeCons False cs}}]} <- tycls
                   , isEmptyNameSet deps
                   , Just cons <- [traverse prefix_con cs] ]
     prefix_con :: LConDecl GhcRn -> Maybe Name

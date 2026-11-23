@@ -20,7 +20,7 @@ test('NativeLocalOpen',
       extra_files(['NativeLocalOpenProducer.hs', 'NativeLocalOpenSibling.hs', 'NativeLocalOpenDerived.hs',
                    open_eval_dir + 'LocalInstance.hs', open_eval_dir + 'LocalAssociated.hs',
                    open_eval_dir + 'LocalDataFamily.hs', open_eval_dir + 'IndependentFamily.hs',
-                   open_eval_dir + 'LocalAliasField.hs'])],
+                   open_eval_dir + 'LocalAliasField.hs', open_eval_dir + 'PreludeMapLengthSize.hs'])],
      run_command, ['bash NativeLocalOpen.sh "{compiler}" "{libdir}" '
                    + config.ghc_th_way_flags])
 test('NativeImportedFamily',

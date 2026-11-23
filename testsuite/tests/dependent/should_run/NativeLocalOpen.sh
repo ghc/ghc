@@ -328,6 +328,68 @@ choose x = const x (show (undefined :: Payload))
 SOURCE
 expect_rejection DerivingCycle 5 '\[GHC-70566\]' 'whose declaration uses the local function choose'
 
+# Attached deriving uses the ordinary instance environment after the
+# structural equations have become available to the rest of the group.
+mkdir "$out"/{count-provider,count-reader}
+cat > "$out/count-reader/ReadCount.hs" <<'SOURCE'
+{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, TypeOperators #-}
+module Main where
+import Data.Type.Equality ((:~:) (Refl))
+import DerivedCount
+
+seen :: Count '[ 'True, 'False] :~: 'Succ ('Succ 'Zero)
+seen = Refl
+
+main :: IO ()
+main = print (show (size [True]), seen)
+SOURCE
+(
+    cd "$out/count-provider"
+    cat >header <<'SOURCE'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
+module DerivedCount where
+import Data.Type.Equality ((:~:) (Refl))
+SOURCE
+    cat >proof <<'SOURCE'
+type Count (xs :: [Bool]) = size xs
+count :: Count '[ 'True, 'False] :~: 'Succ ('Succ 'Zero)
+count = Refl
+SOURCE
+    sed -n '/^data Size/,$p' "$src/PreludeMapLengthSize.hs" >worker
+    for order in worker-first proof-first; do
+        if [[ $order == worker-first ]]; then
+            cat header worker proof >DerivedCount.hs
+        else
+            cat header proof worker >DerivedCount.hs
+        fi
+        "${ghc[@]}" -fforce-recomp -fomit-interface-pragmas             -fno-write-if-simplified-core -c DerivedCount.hs
+        cp DerivedCount.hi "$out/count-reader/"
+        ( cd "$out/count-reader"
+          "${ghc[@]}" -fforce-recomp -c ReadCount.hs
+          "${ghc[@]}" ReadCount.o ../count-provider/DerivedCount.o -o read-count
+          ./read-count > actual
+          grep -Fxq '("Succ Zero",Refl)' actual )
+    done
+
+    cat > Atom.hs <<'SOURCE'
+module Atom where
+data Atom = Atom
+SOURCE
+    "${ghc[@]}" -c Atom.hs
+    sed -e '/^import /a import Atom (Atom)'         -e 's/^data Size = Zero | Succ Size$/data Size = Zero | Succ Size | Marked Atom/'         DerivedCount.hs >with-field
+    mv with-field DerivedCount.hs
+    cat >>DerivedCount.hs <<'SOURCE'
+instance Show Atom where
+    show _ = case count of Refl -> "Atom"
+SOURCE
+    "${ghc[@]}" -fforce-recomp -c DerivedCount.hs
+    cat >>DerivedCount.hs <<'SOURCE'
+instance Show Size where show _ = "Duplicate"
+SOURCE
+    line=$(grep -n '^    deriving Show$' DerivedCount.hs | cut -d: -f1)
+    expect_rejection DerivedCount "$line" '\[GHC-43085\]' 'Overlapping instances for Show Size'
+)
+
 cat > NativeLocalOpenStrict.hs <<'SOURCE'
 {-# LANGUAGE BangPatterns, ExperimentalDependentTypes, StandaloneKindSignatures #-}
 module NativeLocalOpenStrict where

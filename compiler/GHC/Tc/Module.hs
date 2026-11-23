@@ -86,6 +86,7 @@ import GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceCaseTables, sourceCharac
                                checkOptionalSourceUses, checkAndInstallSourceProofs,
                                sourceMapSelector, sourceTableDependencies)
 import GHC.Tc.Gen.Foreign
+import GHC.Tc.Deriv (DerivInfo)
 import GHC.Tc.TyCl.Instance
 import GHC.Tc.TyCl.Utils ( addTyConsToGblEnv )
 import GHC.Tc.Utils.TcMType
@@ -1006,8 +1007,8 @@ tcRnHsBootDecls boot_or_sig decls
 
                 -- Typecheck type/class/instance decls
         ; traceTc "Tc2 (boot)" empty
-        ; (tcg_env, inst_infos, _deriv_binds, _th_bndrs)
-             <- tcTyClsInstDecls tycl_decls deriv_decls def_decls val_binds
+        ; (tcg_env, inst_infos, _th_bndrs, _deriv_binds, _)
+             <- tcTyClsInstDecls (Just []) tycl_decls deriv_decls def_decls val_binds
         ; setGblEnv tcg_env     $ do {
 
         -- Emit (signatures for) Typeable bindings
@@ -2386,7 +2387,9 @@ tcTopSrcTables group = do
     case if enabled then splitLocalSourceTables use (tcg_dus env) group else Nothing of
       Nothing -> tcTopSrcDeclGroup group
       Just (needed, early, rest) -> do
-        (envs@(early_env, _), wanteds) <- captureTopConstraints (tcTopSrcDeclGroup early)
+        -- See Note [Deriving for early source tables].
+        ((envs@(early_env, _), _, deriving_info), wanteds) <- captureTopConstraints $
+          tcTopSrcDeclGroupWithMethods False Nothing early
         restoreEnvs envs $ do
           evs <- simplifyTop wanteds
           let names = mkNameSet (collectHsValBinders CollNoDictBinders (hs_valds early))
@@ -2398,7 +2401,24 @@ tcTopSrcTables group = do
           failIfErrsM
           addTopEvBinds evs $ do
             tables_env <- installSourceTables tables
-            setGblEnv tables_env (tcTopSrcDeclGroup rest)
+            setGblEnv tables_env $ do
+              (rest_envs, _, _) <- tcTopSrcDeclGroupWithMethods False (Just deriving_info) rest
+              pure rest_envs
+
+{- Note [Deriving for early source tables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A checked source worker can use a local datatype before the rest of its
+declaration group. Check the datatype and worker first, then install the
+worker's equations. Keep the datatype's DerivInfo for the regular instance
+pass. The ordinary deriving code needs the explicit instances, defaults
+and other deriving declarations in the same group. Run it once with all
+the DerivInfo.
+
+For example, deriving Show for a datatype with an imported field can use
+a local Show instance for the field type. The source certificate checks
+the early worker without this instance environment. It accepts only
+checked matches and constructor equations without dictionary evidence.
+-}
 
 -- | Follow the same-group types needed by a source-table signature.
 -- See Note [Ordering local source tables] in GHC.Rename.Module.
@@ -2550,8 +2570,8 @@ tcLocalOpenGroup demands group@HsGroup
           rest = group { hs_valds = XValBindsLR (HsVBG rest_binds rest_sigs)
                        , hs_tyclds = rest_tys ++ map (uncurry make_instance_group) late
                        , hs_derivds = [], hs_defds = [] }
-      ((envs@(early_env, _), methods), wanted) <- captureTopConstraints $
-        tcTopSrcDeclGroupWithMethods (not (null instances)) early
+      ((envs@(early_env, _), methods, _), wanted) <- captureTopConstraints $
+        tcTopSrcDeclGroupWithMethods (not (null instances)) (Just []) early
       restoreEnvs envs $ do
         evs <- checkNoErrs (simplifyTop wanted)
         let checked_demands = reverse ready
@@ -2921,12 +2941,15 @@ tcSourceValueBinds group = do
     check_group _ = panic "tcSourceValueBinds: expected renamed value bindings"
 
 tcTopSrcDeclGroup :: HsGroup GhcRn -> TcM (TcGblEnv, TcLclEnv)
-tcTopSrcDeclGroup group = fst <$> tcTopSrcDeclGroupWithMethods False group
+tcTopSrcDeclGroup group = do
+    (envs, _, _) <- tcTopSrcDeclGroupWithMethods False (Just []) group
+    pure envs
 
--- | Check a source batch, optionally saving the instance method pass.
-tcTopSrcDeclGroupWithMethods :: Bool -> HsGroup GhcRn
-  -> TcM ((TcGblEnv, TcLclEnv), Maybe ([LTyClDecl GhcRn], [InstInfo GhcRn]))
-tcTopSrcDeclGroupWithMethods defer_methods group@(HsGroup { hs_tyclds = tycl_decls,
+-- | Check a source batch. If deriving info is absent, save the attached
+-- deriving clauses for a later batch. The instance method pass can also wait.
+tcTopSrcDeclGroupWithMethods :: Bool -> Maybe [DerivInfo] -> HsGroup GhcRn
+  -> TcM ((TcGblEnv, TcLclEnv), Maybe ([LTyClDecl GhcRn], [InstInfo GhcRn]), [DerivInfo])
+tcTopSrcDeclGroupWithMethods defer_methods previous_deriving group@(HsGroup { hs_tyclds = tycl_decls,
                          hs_derivds = deriv_decls,
                          hs_fords  = foreign_decls,
                          hs_defds  = default_decls,
@@ -2942,8 +2965,8 @@ tcTopSrcDeclGroupWithMethods defer_methods group@(HsGroup { hs_tyclds = tycl_dec
                 -- and import the supporting declarations
         traceTc "Tc3" empty ;
         (tcg_env, inst_infos, th_bndrs,
-         XValBindsLR (HsVBG deriv_binds deriv_sigs))
-            <- tcTyClsInstDecls tycl_decls deriv_decls default_decls val_binds ;
+         XValBindsLR (HsVBG deriv_binds deriv_sigs), deferred_deriving)
+            <- tcTyClsInstDecls previous_deriving tycl_decls deriv_decls default_decls val_binds ;
 
         updLclCtxt (\tcl_env -> tcl_env { tcl_th_bndrs = th_bndrs `plusNameEnv` tcl_th_bndrs tcl_env }) $
         setGblEnv tcg_env       $ do {
@@ -3013,13 +3036,14 @@ tcTopSrcDeclGroupWithMethods defer_methods group@(HsGroup { hs_tyclds = tycl_dec
         -- See Note [Newtype constructor usage in foreign declarations]
         addUsedGREs NoDeprecationWarnings (bagToList fo_gres) ;
 
-        return ((tcg_env', tcl_env), pending_methods)
+        return ((tcg_env', tcl_env), pending_methods, deferred_deriving)
     }}}}}
 
-tcTopSrcDeclGroupWithMethods _ _ = panic "tcTopSrcDeclGroup: ValBindsIn"
+tcTopSrcDeclGroupWithMethods _ _ _ = panic "tcTopSrcDeclGroup: ValBindsIn"
 
 ---------------------------
-tcTyClsInstDecls :: [TyClGroup GhcRn]
+tcTyClsInstDecls :: Maybe [DerivInfo]  -- Nothing defers attached deriving
+                 -> [TyClGroup GhcRn]
                  -> [LDerivDecl GhcRn]
                  -> [LDefaultDecl GhcRn]
                  -> [(RecFlag, LHsBinds GhcRn)]
@@ -3028,10 +3052,10 @@ tcTyClsInstDecls :: [TyClGroup GhcRn]
                                               -- process; contains all dfuns for
                                               -- this module
                           ThBindEnv,          -- TH binding levels
-                          HsValBinds GhcRn)   -- Supporting bindings for derived
-                                              -- instances
+                          HsValBinds GhcRn,  -- Supporting bindings for derived instances
+                         [DerivInfo])        -- Attached deriving for a later batch
 
-tcTyClsInstDecls tycl_decls deriv_decls default_decls binds
+tcTyClsInstDecls previous_deriving tycl_decls deriv_decls default_decls binds
  = tcAddDataFamConPlaceholders (tycl_decls >>= group_instds) $
    tcAddPatSynPlaceholders (getPatSynBinds binds) $
    do { (tcg_env, inst_info, deriv_info, th_bndrs)
@@ -3051,12 +3075,15 @@ tcTyClsInstDecls tycl_decls deriv_decls default_decls binds
           -- Careful to quit now in case there were instance errors, so that
           -- the deriving errors don't pile up as well.
           ; failIfErrsM
-          ; (tcg_env', inst_info', val_binds)
-              <- tcInstDeclsDeriv deriv_info deriv_decls
-          ; setGblEnv tcg_env' $ do {
-                failIfErrsM
-              ; pure ( tcg_env', inst_info' ++ inst_info, th_bndrs, val_binds )
-      }}}}
+          ; case previous_deriving of
+              Nothing -> pure (tcg_env, inst_info, th_bndrs, emptyValBindsRn, deriv_info)
+              Just earlier -> do
+                (tcg_env', inst_info', val_binds)
+                    <- tcInstDeclsDeriv (deriv_info ++ earlier) deriv_decls
+                setGblEnv tcg_env' $ do
+                  failIfErrsM
+                  pure (tcg_env', inst_info' ++ inst_info, th_bndrs, val_binds, [])
+      }}}
 
 {- *********************************************************************
 *                                                                      *
