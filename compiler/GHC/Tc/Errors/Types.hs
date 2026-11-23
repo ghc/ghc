@@ -7398,6 +7398,7 @@ data UnrepresentableTypeDescr
   | RetainedFunctionType
   | RetainedRuntimeIndex
   | InteriorConstructorContext
+  | NamedRetainedRecordCon
 
 -- FFI error types
 data IllegalForeignTypeReason

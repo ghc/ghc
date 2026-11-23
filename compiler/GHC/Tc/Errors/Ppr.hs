@@ -8244,6 +8244,7 @@ pprTHReifyError = \case
            FirstClassExistential   -> (False, text "first-class existential type")
            MachineIntTypeLiteral   -> (False, text "machine integer type literal")
            InteriorConstructorContext -> (False, text "constructor with an interior context")
+           NamedRetainedRecordCon  -> (False, text "a named retained record constructor")
 
 pprTypedTHError :: TypedTHError -> DecoratedSDoc
 pprTypedTHError = \case

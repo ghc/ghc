@@ -3756,6 +3756,10 @@ reifyTyCon tc
 
 reifyDataCon :: Bool -> [Type] -> DataCon -> TcM TH.Con
 reifyDataCon isGadtDataCon tys dc
+  -- RetainedGadtC has no field labels.
+  | not (null (dataConRepArgBinders dc)), not (null (dataConFieldLabels dc))
+  = noTH NamedRetainedRecordCon (dataConWrapperType dc)
+  | otherwise
   = do { let -- used for H98 data constructors
              (ex_tvs, theta, arg_tys)
                  = dataConInstSig dc tys

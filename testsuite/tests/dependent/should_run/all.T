@@ -504,6 +504,12 @@ test('NativeNamedRetainedSiblingFields',
                    for f in ['PackedVecLibrary.hs', 'NamedSiblingColumns.hs']])],
      run_command, ['bash NativeNamedRetainedSiblingFields.sh "{compiler}" "{libdir}"'])
 
+test('NativeNamedRetainedRecordReify',
+     [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal']),
+      extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/' + f
+                   for f in ['PackedVecLibrary.hs', 'NamedSiblingColumns.hs']])],
+     run_command, ['bash NativeNamedRetainedRecordReify.sh "{compiler}" "{libdir}"'])
+
 test('NativeAlternatingBinders',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['NativeAlternatingBindersProvider.hs', 'NativeAlternatingBindersClient.hs'])],

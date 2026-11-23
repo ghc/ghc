@@ -390,6 +390,8 @@ patterns list the selected fields in declaration order. Payload selection
 uses the generated function. The `HasField` result type depends on the
 label and record type, which do not supply a record value. Construct a
 new record to replace its witness or payloads.
+Template Haskell rejects reification of this datatype. Its retained
+constructor representation does not carry record labels.
 [Agda record types](https://agda.readthedocs.io/en/v2.8.0/language/record-types.html)
 and [GHC proposal #23](https://ghc-proposals.readthedocs.io/en/latest/proposals/0023-overloaded-record-fields.html).
 
