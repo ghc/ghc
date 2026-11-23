@@ -6,6 +6,29 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Imported function identity in retained indices
+
+The 554-line release is `ce1c89c534`. An index can refer to a
+qualified imported function by its defining name, including its package.
+The Showcase uses this to classify runtime characters. Its ordinary
+client prints `[True,False,True]` for a space, an `x` and a tab.
+[Source](examples/open-evaluation/CharacterDecision.hs) and
+[specialization behavior](roadmap/R03-dependent-products.md#specializing-an-imported-call).
+
+Job 1371 built both normal stages at `9202568aae`. Job 1377 compared
+all 554 outputs at native `-O0`, default `-O2` and in GHCi. The 95
+focused registrations passed. The wider compatibility run passed all
+231 normal cases and all three GHCi cases. It reported zero missing
+libraries, framework errors or unexpected results.
+
+The same job checked 34 specialization outcomes at `-O0` and `-O2`,
+the older interface readers, and two installed packages with the same
+module and function names. Job 1381 ran the two maintained callback
+registrations on the normal compiler. The nominal callback test also
+passed with each interpreter capability disabled in the test driver.
+The public compiler differs from the normal build only in comments
+in `GHC.Tc.Gen.HsType`. Its final fixtures match `10f627f3a7`.
+
 ## Ordered GADT signatures and required type arguments
 
 Merge `61fd13f735` contains the compiler and libraries from the

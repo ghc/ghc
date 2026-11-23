@@ -8168,7 +8168,7 @@ as the head of an application. The encoding is specific to this fork.
 [Proposal #378](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#term-variables-in-types),
 [#242 on matchability](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#matchability),
 [Agda 2.8.0 opaque definitions](https://agda.readthedocs.io/en/v2.8.0/language/opaque-definitions.html)
-and [R03 source example](roadmap/R03-dependent-products.md#private-check-for-an-imported-function-in-an-index).
+and [R03 source example](roadmap/R03-dependent-products.md#using-an-imported-function-in-an-index).
 
 Agda 2.8 implements `primIsSpace` with `Data.Char.isSpace`. Its unary
 primitive reducer first tries to read the argument as a character. A

@@ -15,16 +15,16 @@ The upstream graph relates R03 to R05 and the completed visible-forall card
 R39. Each local increment needs the relevant Core rule. It need not wait for
 all Core transformations. Normal optimization remains a broader release gate.
 
-## Private check for an imported function in an index
+## Using an imported function in an index
 
-A provider at `e6f8abad3b` can name an imported function in a result
+A provider on the published compiler can name an imported function in a result
 type, either as a value or applied to a retained argument.
 
 ```haskell
 stored :: foreach (mapper :: Bool -> Char) -> Stored Left.mapper
 stored _ = store Alias.mapper
 
-called :: foreach (x :: Bool) -> Call (Left.mapper x)
+called :: foreach (x :: Bool) -> Call ((Left.mapper :: Bool %U -> Char) x)
 called x = call Alias.mapper x
 ```
 
@@ -36,8 +36,8 @@ can then build an application with the usual interface syntax. Job 1243
 verified that the previous compiler rejects the new feature and reads
 unaffected interfaces. The combined normal compiler at `fc2186e9cb`
 passed the named-callback registrations and the strict callback
-client. The independent release candidate checks
-`spaceDecision :: foreach (c :: Char) -> Decision Char.isSpace (Char.isSpace c)`.
+client. The public release at `ce1c89c534` checks
+`spaceDecision :: foreach (c :: Char) -> Decision Char.isSpace (Space c)`.
 An ordinary source-hidden client classified a space, an `x` and a tab.
 It printed `[True,False,True]` at `-O0` and default `-O2`. The interface
 records the same defining name in both index positions.
@@ -66,7 +66,7 @@ A closed family with an `'X'` branch and a catch-all stays stuck on
 three cases. Keep this candidate private until substituting a literal
 agrees with writing the literal at the original call.
 
-The successor at `9202568aae` drops the rule that selected opaque
+The published compiler, built at `9202568aae`, drops the rule that selected opaque
 application solely because an operand was open. Its provider exports
 the following synonym alongside `spaceDecision`.
 

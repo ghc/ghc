@@ -11,22 +11,19 @@ and its [expected output](Showcase.stdout) are the executable examples.
 Updated 23 November 2026. The development branch is
 `dependent-haskell`. Use the fork command below to find its latest commit.
 
-The published R41 merge is `61fd13f735`. Its compiler and libraries
-match normal two-stage build `71e5215115`. The stage 2 installation is
-`_build/on-demand/r41-required-normal-553-20261123/source/_build/stage1`.
-All 553 Showcase outputs matched at native `-O0`, default `-O2` and in
-GHCi. All 84 focused registrations passed across the initial run and
-the corrected GHC API test. The broader comparison passed 229 of 234
-registrations after the fixture and test-helper replays. The five other
-failures matched the earlier compiler.
-[Release evidence](CHECKPOINTS.md#ordered-gadt-signatures-and-required-type-arguments).
+The published R03 checkpoint is `ce1c89c534`. Its normal two-stage
+compiler is `9202568aae` in
+`_build/on-demand/r03-explicit-function-normal-554-20261123/source/_build/stage1`.
+The only compiler source change after this build explains function-value
+application in a Note. All 554 Showcase lines matched at native `-O0`,
+default `-O2` and in GHCi. All 95 focused registrations and all 234
+compatibility cases passed. The five inherited failures from the
+553-line release are resolved.
+[Release checks](CHECKPOINTS.md#imported-function-identity-in-retained-indices).
 
-Four of the five inherited registrations now pass on the same compiler.
-`NativeTypeCaseQuote` proves the result of splicing a quoted type case.
-Three tests now check the diagnostic details that the compiler emits.
-The remaining case, `NativeFamilyIndexEvidence`, showed a generated
-wildcard binder as a relevant source binding. Its compiler correction
-is part of the independent R03 release candidate below.
+The previous R41 release is `61fd13f735`. Keep its normal compiler
+at `71e5215115` while the callback interface tests use the earlier reader.
+[R41 verification](CHECKPOINTS.md#ordered-gadt-signatures-and-required-type-arguments).
 
 The preceding 552 compiler at `f42ebe4659` matches normal build
 `00115859a5` in `r19-r41-next-20261122`. Keep it while an active
@@ -126,29 +123,10 @@ as `r03-r21-r41-verified-tests-556`. Default `-O2` still rejects the
 filter proof in the Showcase and the `map` and append proofs in the
 HaskLib package test. Keep this combined compiler private.
 
-The independent R03 release candidate is `b2cda4061d` in
-`r03-named-callbacks-normal-554-20261123/source`, archived as
-`r03-named-callbacks-normal-554`. It starts from the published R41
-compiler. Its new example records `Data.Char.isSpace` and its result
-in a decision type. It also contains the tested diagnostic correction
-for an implicit wildcard binder. Job 1345 built both stages. Job 1352
-distinguished functions with the same module and occurrence name in two
-packages. Job 1346 passed 95 focused registrations and the 554-line
-Showcase at native `-O0`, default `-O2` and in GHCi. Job 1358 passed
-233 of 234 compatibility registrations.
-The candidate accepted the open call in `NativeClosedCharRigid`. Job
-1360 then found that substituting a literal into that call differs from
-writing the literal directly. Keep the candidate private. See the
-[source and interface examples](roadmap/R03-dependent-products.md#specializing-an-imported-call).
-
-Its successor is `9202568aae` in
-`r03-explicit-function-normal-554-20261123/source`. Its exported
-`Space c` synonym lets a client specialize the decision at a literal.
-Jobs 1365 and 1372 checked opaque and source-backed functions with
-the compiler component. Job 1371 built both normal stages. Job 1377
-checks the Showcase, 95 focused registrations, the 234-case cohort,
-specialization and package identity. Job 1381 runs the maintained
-regressions at `10f627f3a7` and checks the interpreter-off selection.
+The earlier R03 candidate at `b2cda4061d` failed specialization even
+though ordinary runtime clients passed. The published fix lets a
+client give `spaceDecision 'x'` the type `Decision Char.isSpace (Space 'x')`.
+[Substitution example](roadmap/R03-dependent-products.md#specializing-an-imported-call).
 
 The next source pin is `1659c10b23` in
 `r03-r15-unicode-normal-555-20261123/source`. Job 1382 checked the
@@ -412,8 +390,8 @@ defaults and an opt-in migration warning.
 
 ## Build and verify
 
-The published 553-line Showcase uses the normal two-stage compiler at
-`71e5215115` in `r41-required-normal-553-20261123`.
+The published 554-line Showcase uses the normal two-stage compiler at
+`9202568aae` in `r03-explicit-function-normal-554-20261123`.
 On this host the bootstrap tools are GHC 9.14.1, Cabal 3.18.1.0, Happy 2.1.7
 and Alex 3.5.4.0. A fresh checkout needs the Git submodules at their recorded
 revisions. This build used five workers per job.
@@ -427,7 +405,7 @@ self-hosted stage 2 compiler in `_build/stage1/bin/ghc`. Both use the
 target libraries in `_build/stage1/lib`. For example, from the main checkout:
 
 ```sh
-stable="$PWD/_build/on-demand/r41-required-normal-553-20261123/source/_build/stage1"
+stable="$PWD/_build/on-demand/r03-explicit-function-normal-554-20261123/source/_build/stage1"
 queue="$PWD/docs/dependent-haskell/tools/ghc-build-job"
 check="$PWD/docs/dependent-haskell/check-showcase.sh"
 "$queue" showcase-stage2-ghci bash "$check" "$stable/bin/ghc" "$stable/lib" --ghci
