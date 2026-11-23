@@ -2777,14 +2777,23 @@ expandRecordUpd record_expr@(L lspan _) possible_parents rbnds res_ty
              , Just witness_bind <- lookupNameEnv supplied (flSelector witness_field)
              -> expandRetainedWitnessUpd con witness payload_types witness_field payload_fields
                   witness_bind supplied record_expr (map idName sel_ids)
-           (RealDataCon con NE.:| [], [(sel, L _ field)])
+           (RealDataCon con NE.:| [], fields@((first, _) : _))
              | retained_record relevant_con
-             , DepFunTy DepFunVisible receiver payload_ty <- coreFullView (idType sel)
-             -> expandRetainedRecordUpd con receiver payload_ty sel record_expr (hfbRHS field)
+             , DepFunTy DepFunVisible receiver _ <- coreFullView (idType first)
+             , Just replacements <- traverse (retained_payload receiver) fields
+             -> expandRetainedRecordUpd con receiver replacements record_expr
            _ | any retained_record relevant_cons
              -> failWithTc (TcRnRetainedQuantificationError RetainedRecordUpdate)
            _ -> expand_ordinary relevant_cons (map idName sel_ids) rbinds }
   where
+    retained_payload :: Id -> (Id, LHsRecUpdField GhcTc GhcRn)
+                     -> Maybe (Name, TcType, LHsExpr GhcRn)
+    retained_payload receiver (sel, L _ field)
+      | DepFunTy DepFunVisible binder _ <- coreFullView (idType sel)
+      , idType binder `tcEqType` idType receiver
+      = Just (idName sel, applyTypeToArgs (idType sel) [Core.Var receiver], hfbRHS field)
+      | otherwise = Nothing
+
     expand_ordinary relevant_cons@(relevant_con NE.:| _) upd_fld_names rbinds = do {
 
       -- STEP 2: expand the record update.
@@ -2933,26 +2942,27 @@ expandRecordUpd record_expr@(L lspan _) possible_parents rbnds res_ty
                  ]
         ; return (ds_expr, ds_res_ty, RecordUpdCtxt relevant_cons upd_fld_names ex_tvs) }
 
--- | Expand a one-field update at the receiver's stored witness.
+-- | Expand payload updates at the receiver's stored witness.
 -- See Note [Updating a retained record payload].
-expandRetainedRecordUpd :: DataCon -> Id -> TcType -> Id
-                        -> LHsExpr GhcRn -> LHsExpr GhcRn
+expandRetainedRecordUpd :: DataCon -> Id -> [(Name, TcType, LHsExpr GhcRn)] -> LHsExpr GhcRn
                         -> TcM (HsExpr GhcRn, TcType, HsCtxt)
-expandRetainedRecordUpd con receiver payload_ty sel record_expr value = do
-    replacement <- newSysName (mkVarOcc "replacement")
-    let fresh fld = newSysName (nameOccName (flSelector fld))
-    names <- mapM fresh (dataConFieldLabels con)
+expandRetainedRecordUpd con receiver replacements record_expr = do
+    let (fields, payload_types, values) = unzip3 replacements
+    names <- mapM (newSysName . nameOccName) fields
+    let updated = mkNameEnv (zip fields names)
+        field_arg fld = case lookupNameEnv updated (flSelector fld) of
+          Just name -> pure (genWildPat, genLHsVar name)
+          Nothing -> do
+            name <- newSysName (nameOccName (flSelector fld))
+            pure (genVarPat name, genLHsVar name)
+    (pats, args) <- mapAndUnzipM field_arg (dataConFieldLabels con)
     let con_name = dataConName con
         result_ty = idType receiver
-        signature = mkDepFunTy receiver (mkVisFunTyManyU payload_ty result_ty)
-        field_arg fld name
-          | flSelector fld == idName sel = (genWildPat, genLHsVar replacement)
-          | otherwise = (genVarPat name, genLHsVar name)
-        (pats, args) = zipWithAndUnzip field_arg (dataConFieldLabels con) names
+        signature = mkDepFunTy receiver (mkVisFunTysManyU payload_types result_ty)
     expanded <- genRetainedRecordUpd signature
-                  [genSimpleConPat con_name pats, genVarPat replacement]
-                  (genHsApps con_name args) [record_expr, value]
-    pure (expanded, result_ty, RecordUpdCtxt (RealDataCon con NE.:| []) [idName sel] [])
+                  (genSimpleConPat con_name pats : map genVarPat names)
+                  (genHsApps con_name args) (record_expr : values)
+    pure (expanded, result_ty, RecordUpdCtxt (RealDataCon con NE.:| []) fields [])
 
 -- | Check every replacement payload at the new witness.
 -- See Note [Replacing a retained record witness].
@@ -2994,19 +3004,19 @@ genRetainedRecordUpd signature pats rhs args = do
 
 {- Note [Updating a retained record payload]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The selector type gives the type of a replacement at the receiver's
-witness. For example, expand @p { namedFlags = ys }@ as @update p ys@,
-with a generated local binding of the following shape:
+Use the same receiver to instantiate all selected payload types. For
+example, expand @p { namedFlags = ys, namedLetters = xs }@ as
+@update p ys xs@, with a generated local binding of the following shape:
 
-  update :: foreach (r :: NamedColumns) -> Vec Bool (storedLength r) -> NamedColumns
-  update (NamedColumns n xs _) ys = NamedColumns n xs ys
+  update :: foreach (r :: NamedColumns)
+         -> Vec Bool (storedLength r) -> Vec Char (storedLength r) -> NamedColumns
+  update (NamedColumns n _ _) ys xs = NamedColumns n xs ys
 
-Check the replacement before opening the receiver's constructor pattern.
-The retained match then refines the replacement type to the constructor's
-witness. The update reuses the other fields without forcing their values.
-Use the selector's checked type after field disambiguation, so the receiver
-in the replacement type has the same witness projection as source code.
-This rule handles one payload field at the old witness. See
+Check the replacements at the caller's receiver. The retained match then
+refines each replacement type to the constructor's witness. Reuse the
+witness and any untouched fields without forcing their values. Read the
+checked selector types after field disambiguation to use the same witness
+projection as source code. See
 Note [Replacing a retained record witness] for updates of the witness.
 -}
 
