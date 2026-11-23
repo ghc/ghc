@@ -15,9 +15,12 @@ for opt in -O0 -O2; do
     "${ghc[@]}" --show-iface SiblingColumns.hi > columns.iface
     grep -Fq 'SourceTable T:size' columns.iface
     grep -Fq 'retained-sibling-fields-v1' columns.iface
-    cp ./*.hi ../client/
+    cp ./*.hi "$src/SiblingColumnsClient.hs" ../client/
 
     cd ../client
+    test ! -e SiblingColumns.hs
+    test ! -e PackedVecLibrary.hs
+    "${ghc[@]}" "$opt" -c SiblingColumnsClient.hs
     cat > KnownLength.hs <<'HS'
 {-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, TypeOperators #-}
 module KnownLength where
@@ -39,6 +42,7 @@ import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Data.List (isPrefixOf)
 import PackedVecLibrary (Nat(..), Vec(..), natToInt, toList)
 import SiblingColumns (Columns(..), bottomFields, flags, letters, size)
+import SiblingColumnsClient (readPairs)
 
 readLetters :: Columns -> String
 readLetters p = toList (letters p)
@@ -59,11 +63,15 @@ main = do
            readLetters (Columns (S Z) (VCons 'r' VNil) undefined),
            readFlags (Columns (S Z) undefined (VCons True VNil)),
            ls, bs)
+    let columns = Columns (S (S Z))
+            (VCons 'r' (VCons 's' VNil))
+            (VCons True (VCons False VNil))
+    print (readPairs columns)
 HS
     "${ghc[@]}" "$opt" -c Main.hs
-    "${ghc[@]}" Main.o ../provider/{PackedVecLibrary,SiblingColumns}.o -o observe
+    "${ghc[@]}" Main.o SiblingColumnsClient.o ../provider/{PackedVecLibrary,SiblingColumns}.o -o observe
     timeout 15 ./observe > actual
-    printf '%s\n' '(1,"r",[True],True,True)' | cmp - actual
+    printf '%s\n' '(1,"r",[True],True,True)' "[('r',True),('s',False)]" | cmp - actual
 
     reject() {
         local code=$1
@@ -74,6 +82,20 @@ HS
             exit 1
         fi
     }
+    cat > WrongPairs.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module WrongPairs where
+import PackedVecLibrary (toList, zipVec)
+import SiblingColumns (Columns, flags, letters)
+
+readPairs :: Columns -> Columns -> [(Char, Bool)]
+readPairs p q = toList (zipVec (letters p) (flags q))
+HS
+    reject 'GHC-(05617|83865)' WrongPairs.hs
+    grep -Fq 'size p' rejected.log
+    grep -Fq 'size q' rejected.log
+    grep -Eiq "second argument of .*zipVec.*flags q" rejected.log
+
     reject 'GHC-(05617|83865)' -DWRONG KnownLength.hs
     cat > WrongFlags.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
