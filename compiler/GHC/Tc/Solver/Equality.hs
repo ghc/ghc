@@ -681,6 +681,14 @@ can_eq_nc ces _rdr_env _envs ev eq_rel ty1 _ ty2 _
   , ces_rwR ces || generative_2
   = canTyConApp ev eq_rel (generative_1 && generative_2) (ty1,tc1,tys1) (ty2,tc2,tys2)
 
+-- Try forward congruence before splitting an over-applied family.
+-- See Note [Congruence for generated type lambdas].
+can_eq_nc ces _ _ ev eq_rel lhs _ rhs _
+  | bothRewritten ces, isWanted ev
+  , Just co <- proveLambdaCongruence lhs rhs
+  = do { setEqIfWanted ev (CPH (downgradeRole (eqRelRole eq_rel) Nominal co) emptyCoHoleSet)
+       ; stopWith ev "Checked scoped type lambda" }
+
 -- (EQNC4) AppTy
 -- Decompose applications
 can_eq_nc ces _rdr_env _envs ev eq_rel ty1 _ ty2 _
@@ -810,13 +818,6 @@ can_eq_nc ces _ _ ev eq_rel lhs _ rhs _
   = do { setEqIfWanted ev (CPH (downgradeRole (eqRelRole eq_rel) Nominal co) emptyCoHoleSet)
        ; stopWith ev "Checked scoped sum codomain" }
 
--- See Note [Congruence for generated type lambdas].
-can_eq_nc ces _ _ ev eq_rel lhs _ rhs _
-  | bothRewritten ces, isWanted ev
-  , Just co <- proveLambdaCongruence lhs rhs
-  = do { setEqIfWanted ev (CPH (downgradeRole (eqRelRole eq_rel) Nominal co) emptyCoHoleSet)
-       ; stopWith ev "Checked scoped type lambda" }
-
 -- Try a certified strict pair composition before choosing a canonical LHS.
 -- See Note [Strict boxed pair composition] in GHC.Builtin.CoercionRules.
 can_eq_nc ces _ _ ev NomEq lhs _ rhs _
@@ -894,6 +895,8 @@ closed. Ordinary matching and apartness still select its equations.
 Family arity controls reduction. Nominal congruence also applies with
 arguments beyond the arity, or when both applications form valid
 partial user families. Core Lint checks the same partial-kind invariant.
+Check this before splitting an over-applied family. The application
+solver treats two distinct unmatchable heads as opaque.
 Compare the arguments before testing reflexivity of a family application.
 This visits the arguments of nested family applications once. Use
 reflexivity for an argument whose types already agree. Leave a wholly
