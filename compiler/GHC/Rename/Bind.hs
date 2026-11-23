@@ -720,9 +720,12 @@ mkScopedSigBndrs sigs = \n -> lookupNameEnv env n `orElse` ([], [], [])
     get_scoped _ = Nothing
 
     written scoped (L _ HsSig{sig_bndrs = HsOuterExplicit{hso_bndrs = binders}}) =
-      [(v, kind) | L _ HsTvb{tvb_var = HsBndrVar _ v, tvb_kind = HsBndrKind _ kind} <- binders
-                 , unLoc v `elem` scoped]
+      [(v, writtenKind kind) | L _ HsTvb{tvb_var = HsBndrVar _ v, tvb_kind = kind} <- binders
+                            , unLoc v `elem` scoped]
     written _ _ = []
+
+    writtenKind (HsBndrKind _ kind) = Just kind
+    writtenKind _ = Nothing
 
     after_context ty
       | L _ (HsQualTy _ _ body) <- ignoreParens ty = after_context body

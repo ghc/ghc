@@ -1092,7 +1092,7 @@ rnHsTyKi env ty@(XHsType (HsBangTy _ bang (L _ inner))) = do
 
 rnHsTyKi _ (XHsType HsTypeLambda{}) = do
   enabled <- xoptM LangExt.ExperimentalDependentTypes
-  failWithTc (if enabled then TcRnTypeLambdaContext else TcRnTypeLambdaDisabled)
+  failWithTc (if enabled then TcRnTypeLambdaContext Nothing else TcRnTypeLambdaDisabled)
 
 rnHsTyKi _ (XHsType HsTypeSome{}) =
   failWithTc (mkTcRnUnknownMessage (mkPlainError []

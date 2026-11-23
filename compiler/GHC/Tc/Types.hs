@@ -302,8 +302,8 @@ type IfL        = IfM IfLclEnv                --    Nested
 -- | Historical "renaming monad" (now it's just 'TcRn').
 type RnM  = TcRn
 
--- | Written kinds of erased binders in enclosing value signatures.
-type LocalSignatureKinds = [(LocatedN Name, LHsType GhcRn)]
+-- | Erased binders and their optional written kinds in enclosing value signatures.
+type LocalSignatureKinds = [(LocatedN Name, Maybe (LHsType GhcRn))]
 
 -- | Historical "type-checking monad" (now it's just 'TcRn').
 type TcM  = TcRn
