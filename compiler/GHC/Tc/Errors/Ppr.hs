@@ -5094,6 +5094,7 @@ liftedTypeHeadContext (L _ ty) = case ty of
   HsAppTy _ f _ -> liftedTypeHeadContext f
   HsAppKindTy _ f _ -> liftedTypeHeadContext f
   HsParTy _ f -> liftedTypeHeadContext f
+  HsSpliceTy (HsUntypedSpliceTop _ result) _ -> liftedTypeHeadContext result
   _ -> Nothing
 
 -- | Restore the public synonym at an occurrence of its exact expansion.
@@ -8602,8 +8603,9 @@ pprHsCtxt = \case
     text "When checking the rewrite rule" <+> doubleQuotes (ftext rule_name)
   FieldCtxt field_name ->
     text "In the" <+> quotes (ppr field_name) <+> text "field of a record"
-  TypeCtxt ty ->
-    text "In the type" <+> quotes (ppr ty)
+  TypeCtxt source ty ->
+    text "In the type" <+> quotes (ifPprDebug lowered (maybe lowered ppr source))
+    where lowered = ppr ty
   KindCtxt ki ->
     text "In the kind" <+> quotes (ppr ki)
   SubTypeCtxt ty_expected ty_actual ->

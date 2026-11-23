@@ -3533,7 +3533,7 @@ tcValArg :: QLFlag                  -- ^ Are we typechecking with Quick Look tur
          -> HsExprArg 'TcpInst      -- ^ Actual argument
          -> TcM (HsExprArg 'TcpTc)  -- ^ Resulting argument
 tcValArg _ _ _ (EPrag l p)         = return (EPrag l (tcExprPrag p))
-tcValArg _ _ _ (ETypeArg l hty ty) = return (ETypeArg l hty ty)
+tcValArg _ _ _ (ETypeArg l hty source ty) = return (ETypeArg l hty source ty)
 tcValArg _ _ _ (EWrap (EHsWrap w)) = return (EWrap (EHsWrap w))
 tcValArg _ _ _ (EWrap ew)          = return (EWrap ew)
 
@@ -4083,10 +4083,12 @@ tcInstFunWithPrefix look_arg prefix_only prefix vta_cache expected_rho inst_plan
       = go1 plan fun_orig pos (EPrag sp prag : acc) fun_ty args
 
     -- Rule ITYARG from Fig 4 of the QL paper
-    go1 plan fun_orig pos acc fun_ty ( ETypeArg { ea_loc_span = ctxt, ea_hs_ty = hs_ty }
+    go1 plan fun_orig pos acc fun_ty ( ETypeArg { ea_loc_span = ctxt, ea_hs_ty = hs_ty
+                                             , ea_ty_source = source }
                                   : rest_args )
-      = do { (ty_arg, inst_ty) <- tcVTA fun_conc_tvs fun_ty hs_ty
-           ; let arg' = ETypeArg { ea_loc_span = ctxt, ea_hs_ty = hs_ty, ea_ty_arg = ty_arg }
+      = do { (ty_arg, inst_ty) <- tcVTA fun_conc_tvs fun_ty source hs_ty
+           ; let arg' = ETypeArg { ea_loc_span = ctxt, ea_hs_ty = hs_ty
+                                 , ea_ty_source = source, ea_ty_arg = ty_arg }
            ; go plan fun_orig pos (arg' : acc) inst_ty rest_args }
 
     -- Rule IVAR from Fig 4 of the QL paper:
@@ -4442,7 +4444,7 @@ tcRetainedValueOperand resolve domain arg@(L loc original)
                   , noFreeVarsOfType domain, typeKind domain `tcEqType` tyVarKind tv -> return ()
                 _ -> unchecked
               forM_ type_arg $ \ty -> do
-                (supplied, _) <- tcVTA (idConcreteTvs sel) (varType sel) ty
+                (supplied, _) <- tcVTA (idConcreteTvs sel) (varType sel) Nothing ty
                 unless (supplied `tcEqType` domain) unchecked
               dfun <- tcRetainedDFun name cls domain >>= maybe unchecked return
               platform <- getPlatform
@@ -5028,7 +5030,7 @@ applyRetainedSourceType :: TcM (Core.CoreExpr, TcSigmaType) -> Id
 applyRetainedSourceType unsupported owner (core, sigma) ty
   | Just (_, binder, _) <- tcSplitForAllTyVarBinder_maybe sigma
   , isSpecifiedForAllTyFlag (binderFlag binder)
-  = do { (choice, body) <- tcVTA (idConcreteTvs owner) sigma ty
+  = do { (choice, body) <- tcVTA (idConcreteTvs owner) sigma Nothing ty
        ; choice <- liftZonkM (zonkTcType choice)
        ; body <- liftZonkM (zonkTcType body)
        ; valid <- tcRetainedInstScope [choice, body]
@@ -7771,14 +7773,15 @@ tcVTA :: ConcreteTyVars
          -- See Note [Representation-polymorphism checking built-ins]
          -- in GHC.Tc.Utils.Concrete.
       -> TcType            -- ^ Function type
+      -> Maybe HsAppTypeSource  -- ^ Written argument, if lifted
       -> LHsWcType GhcRn   -- ^ Argument type
       -> TcM (TcType, TcType)
 -- Deal with a visible type application
 -- The function type has already had its Inferred binders instantiated
-tcVTA conc_tvs fun_ty hs_ty
+tcVTA conc_tvs fun_ty source hs_ty
   | Just (ma, tvb, inner_ty) <- tcSplitForAllTyVarBinder_maybe fun_ty
   , isSpecifiedForAllTyFlag (binderFlag tvb)
-  = do { tc_inst_forall_arg conc_tvs (ma, tvb, inner_ty) hs_ty }
+  = do { tc_inst_forall_arg conc_tvs (ma, tvb, inner_ty) source hs_ty }
 
   | otherwise
   = do { (_, fun_ty) <- liftZonkM $ zonkTidyTcType emptyTidyEnv fun_ty
@@ -7791,7 +7794,7 @@ tcVDQ :: ConcreteTyVars              -- See Note [Representation-polymorphism ch
       -> TcM (TcType, TcType)
 tcVDQ conc_tvs (ma, tvb, inner_ty) arg
   = do { hs_wc_ty <- expr_to_type arg
-       ; tc_inst_forall_arg conc_tvs (ma, tvb, inner_ty) hs_wc_ty }
+       ; tc_inst_forall_arg conc_tvs (ma, tvb, inner_ty) Nothing hs_wc_ty }
 
 -- Convert a HsExpr into the equivalent HsType.
 -- See [RequiredTypeArguments and the T2T mapping]
@@ -8033,14 +8036,15 @@ want that, use a `(type ty)` argument instead.
 
 tc_inst_forall_arg :: ConcreteTyVars            -- See Note [Representation-polymorphism checking built-ins]
                    -> (Matchability, ForAllTyBinder, TcType)  -- Function type
+                   -> Maybe HsAppTypeSource                -- Written argument, if lifted
                    -> LHsWcType GhcRn           -- Argument type
                    -> TcM (TcType, TcType)
-tc_inst_forall_arg conc_tvs (ma, tvb, inner_ty) hs_ty
+tc_inst_forall_arg conc_tvs (ma, tvb, inner_ty) source hs_ty
   = do { let tv   = binderVar tvb
              kind = tyVarKind tv
              tv_nm   = tyVarName tv
              mb_conc = lookupNameEnv conc_tvs tv_nm
-       ; ty_arg0 <- tcHsTypeApp hs_ty kind
+       ; ty_arg0 <- tcHsTypeAppWithSource source hs_ty kind
 
        -- Is this type variable required to be instantiated to a concrete type?
        -- If so, ensure that that is the case.

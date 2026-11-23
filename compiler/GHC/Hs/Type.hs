@@ -21,7 +21,7 @@ module GHC.Hs.Type (
 
         HsType(..), HsCoreTy, LHsType, HsKind, LHsKind,
         HsTypeGhcPsExt(..), HsTypeCaseAlt(..), HsTypeLetBind(..), HsTypeLetPair(..), HsTypeLetPat(..),
-        HsTypeGhcRnExt(..), HsTypeLetSource, hsExistsTyFlag,
+        HsTypeGhcRnExt(..), HsTypeLetSource, HsAppTypeSource(..), hsExistsTyFlag,
         mkHsSingleTypeLet, splitHsTypeLet, isTypeLetPairOcc, typeLetSource, preserveTypeLetSource,
         HsForAllTelescope(..), EpAnnForallVis, EpAnnForallInvis,
         HsTyVarBndr(..), LHsTyVarBndr, AnnTyVarBndr(..),
@@ -632,6 +632,18 @@ instance Data HsTypeLetSource where
   toConstr _ = abstractConstr "HsTypeLetSource"
   gunfold _ _ = error "gunfold:HsTypeLetSource"
   dataTypeOf _ = mkNoRepType "HsTypeLetSource"
+
+-- | The visible type argument before lifting. Generic traversals skip this copy.
+newtype HsAppTypeSource = HsAppTypeSource (LHsWcType GhcPs)
+
+instance Data HsAppTypeSource where
+  toConstr _ = abstractConstr "HsAppTypeSource"
+  gunfold _ _ = error "gunfold:HsAppTypeSource"
+  dataTypeOf _ = mkNoRepType "HsAppTypeSource"
+
+instance Outputable HsAppTypeSource where
+  ppr (HsAppTypeSource written) =
+    updSDocContext (\ctx -> ctx { sdocSuppressUniques = True }) (ppr written)
 
 -- | Find the written pair let for display. See Note [Ordered type let bindings].
 typeLetSource :: HsTypeGhcPsExt -> Maybe HsTypeLetSource

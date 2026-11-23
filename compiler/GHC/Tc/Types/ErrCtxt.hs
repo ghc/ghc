@@ -16,7 +16,7 @@ module GHC.Tc.Types.ErrCtxt
 import GHC.Prelude
 import {-# SOURCE #-} GHC.Hs.Expr (SplicePointName, HsMatchContextRn, HsStmtContextRn)
 import {-# SOURCE #-} GHC.Hs.Expr () -- for outputable instances
-import GHC.Hs.Type () -- for outputable instances
+import GHC.Hs.Type (HsAppTypeSource)
 import GHC.Hs.Extension
 
 import GHC.Parser.Annotation ( LocatedN, SrcSpanAnnA )
@@ -305,7 +305,7 @@ data HsCtxt
   -- | In a record field.
   | FieldCtxt !FieldLabelString
   -- | In a type.
-  | TypeCtxt !(LHsType GhcRn)
+  | TypeCtxt !(Maybe HsAppTypeSource) !(LHsType GhcRn)
   -- | In a kind.
   | KindCtxt !(LHsKind GhcRn)
   -- | In an ambiguity check.

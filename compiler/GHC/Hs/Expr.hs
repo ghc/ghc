@@ -245,14 +245,6 @@ type instance XAppTypeE      GhcPs = EpToken "@"
 type instance XAppTypeE      GhcRn = Maybe HsAppTypeSource
 type instance XAppTypeE      GhcTc = Type
 
--- | The visible type argument before lifting. Generic traversals skip this copy.
-newtype HsAppTypeSource = HsAppTypeSource (LHsWcType GhcPs)
-
-instance Data HsAppTypeSource where
-  toConstr _ = abstractConstr "HsAppTypeSource"
-  gunfold _ _ = error "gunfold:HsAppTypeSource"
-  dataTypeOf _ = mkNoRepType "HsAppTypeSource"
-
 type instance XAppRetained   GhcPs = (EpToken "@", EpToken "{", EpToken "}")
 type instance XAppRetained   GhcRn = NoExtField
 type instance XAppRetained   GhcTc = (DepFunTyFlag, Type)
@@ -864,9 +856,8 @@ pprApp app
     ppr_type_arg :: XAppTypeE (GhcPass p) -> LHsWcType (NoGhcTc (GhcPass p)) -> SDoc
     ppr_type_arg ext arg
       | GhcRn <- ghcPass @p
-      , Just (HsAppTypeSource written) <- ext
-      = ifPprDebug (ppr arg) $
-          updSDocContext (\ctx -> ctx { sdocSuppressUniques = True }) (ppr written)
+      , Just written <- ext
+      = ifPprDebug (ppr arg) (ppr written)
       | otherwise = ppr arg
 
     ppr_app fun args
