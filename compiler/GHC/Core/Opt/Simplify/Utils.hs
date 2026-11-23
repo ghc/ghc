@@ -1251,7 +1251,8 @@ updModeForRuleRHS rule_act current_mode =
 
 updModeForNoInline :: SimplMode -> SimplMode
 -- See Note [noinlineId magic] in GHC.Builtin.WiredIn.Ids
-updModeForNoInline mode = mode { sm_inline = False }
+updModeForNoInline mode = mode { sm_inline    = False     -- (NOI0-a)
+                               , sm_case_case = False }   -- (NOI8)
 
 -- | `phaseForRuleOrUnf` computes the phase range to use when
 -- simplifying the RHS of a rule or of a stable unfolding.

@@ -1821,8 +1821,15 @@ simplArg :: SimplEnvIS              -- ^ Used only for its InScopeSet
                                     --   continuation passed to 'simplExprC'
          -> OutType                 -- ^ Type of the function applied to this arg
          -> StaticEnv -> CoreExpr   -- ^ Expression with its static envt
-         -> MOutCoercion            -- Wrap this around the result
+         -> MOutCoercion            -- ^ Wrap this around the result
          -> SimplM OutExpr
+-- Simplify a function argument
+--
+-- DO NOT float anything outside, hence simplExprC. Doing sio is no benefit (unlike
+-- in a let-binding), and we'd have to be very careful about
+--     f (let x*=e in b)
+-- If we floated that let out, and f was lazy, the demand info on `x` would be
+-- unsound, so (a) we'd have to zap it and (b) it'd be unsound
 simplArg _ _ _ (Simplified {}) arg mco
   = -- See Note [Avoid repeated simplification]
     return (mkCastMCo arg mco)  -- Handles the very common case of mco=MRefl
@@ -2379,6 +2386,7 @@ simplOutId env noinline_fun cont
   , ApplyToVal { sc_cont = outer_cont, sc_arg = the_call, sc_cast = call_mco
                , sc_env = UnSimplified arg_se } <- cont2
   = do { let -- encl_app_cont collects any /arguments/ from `outer_cont`
+             -- This implements (NOI0-b) in Note [noinlineId magic]
              (encl_app_cont, new_outer_cont) = splitContArgs outer_cont
              new_call_ty                     = contHoleType new_outer_cont
 
@@ -2400,15 +2408,14 @@ simplOutId env noinline_fun cont
                    do { let call_stop = addCastMCo call_mco (mkBoringStop call_ty)
                       ; return (the_call, call_stop, call_ty, outer_cont) }
 
-       -- Now simplify the function itself, in call_cont, crucially setting
-       -- sm_inline = False. The /arguments/ in `call_cont` will be simplified
-       -- with their own flags, captured in `arg_se`
+       -- Now simplify the function itself, in call_cont,
+       --   crucially setting sm_inline=False and sm_case_case=False.
+       -- The /arguments/ in `call_cont` will be simplified
+       --   with their own flags, captured in `arg_se`
        ; let call_env = updMode updModeForNoInline $
                         arg_se `setInScopeFromE` env
-       ; (floats1, call1) <- wrapJoinFloatsX $
-                             simplExprF call_env inner_fun call_cont
-             -- wrapJoinFloatsX: any floating join bindings must stay
-             --                  around the call, not be floated out
+       ; call1 <- simplExprC call_env inner_fun call_cont
+             -- simplExprC: don't float anthing out of a `noinline` call
 
        -- Now `rebuild` does the rest, wrapping in final_outer_cont
        ; let (new_noinline_fun, rep) = getNoinlineId final_call_ty
@@ -2416,9 +2423,8 @@ simplOutId env noinline_fun cont
                              `App` Type rep
                              `App` Type final_call_ty
                              `App` call1
-       ; (floats2, res) <- rebuild (env `setInScopeFromF` floats1)
-                                   noinline_expr final_outer_cont
-       ; return (floats1 `addFloats` floats2 , res) }
+       ; rebuild (env `setInScopeFromF` floats1)
+                 noinline_expr final_outer_cont }
 
   where
     var_at_head :: CoreExpr -> Bool
@@ -2537,10 +2543,6 @@ rebuildCall env fun_info
                 -- Note [Shadowing in the Simplifier]
 
   | otherwise      -- Lazy, or already simplified arguments
-  -- DO NOT float anything outside, hence simplExprC
-  -- There is no benefit (unlike in a let-binding), and we'd
-  -- have to be very careful about bogus strictness through
-  -- floating a demanded let.
   = do  { arg' <- simplArg env (Just fun_info) fun_ty arg_se arg arg_mco
         ; rebuildCall env (addValArgTo fun_info  arg' fun_ty) cont }
 

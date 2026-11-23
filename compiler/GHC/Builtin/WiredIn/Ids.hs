@@ -616,15 +616,15 @@ Here are the moving parts:
 * In the Simplifier, see the `isNoInlineId` case of `simplOutId`.
   When we encounter    noinline (f e1 e2) e3 e4:
 
-  * We switch off inlining before simplifying `f` (#18995)
+  * (NOI0-a) We switch off inlining before simplifying `f` (#18995)
     See `GHC.Core.Opt.Simplify.Unils.updModeForNoInline`.
 
-  * We slide `e3` and `e4` under the `noinline` to give
+  * (NOI0-b) We slide `e3` and `e4` under the `noinline` to give
          noinline (f e1 e2 e3 e4)
     See wrinkle (NOI1)
 
-* In GHC.CoreToStg.Prep.cpe_app, we discard the `noinline`, so that
-  there is no runtime overhead.
+* (NOI0-c)  In GHC.CoreToStg.Prep.cpe_app, we discard the `noinline`,
+  so that there is no runtime overhead.
 
 Wrinkles
 
@@ -697,6 +697,13 @@ Wrinkles
   The bit inside the `noinline` isn't a plain variable-headed application, so
   we just simplify the whole `noinline` argument with inlining switched off,
   like let/case.
+
+(NOI8) We must also be careful of
+            noinline (f (case x of (a,b) -> blah))
+  where `f` is strict.  We do not want to get
+            noinline (case x of (a,b) -> f blah)
+  because that doesn't look like a plain call any more.  So we switch off
+  `sm_case_case` when simplifying the function, as well as switching off `sm_inline`.
 
 Note [nospecId magic]
 ~~~~~~~~~~~~~~~~~~~~~
