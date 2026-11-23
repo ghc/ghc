@@ -6,6 +6,42 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Inferred matchability in type synonyms
+
+With `ExperimentalDependentTypes`, the inferred synonym
+`type Apply f a = f a` accepts both `Apply Maybe Bool` and
+`Apply Identity Bool` when `Identity` is a type family. A separate
+ordinary client can use the exported synonym with `Maybe`. A package
+can also pass the promoted constructor `'Endo` to `Pure1` without
+explicit matchability arguments.
+[Source and ordinary client](examples/open-evaluation/LaterMatchabilityClient.hs)
+and [package migration](roadmap/R23-unsaturated-type-families.md#one-constructor-for-term-and-promoted-callbacks).
+
+Job 1533 built both normal stages from `5d6ac951f6`. Job 1534
+matched all 560 Showcase lines at native `-O0`, default `-O2` and in
+GHCi. It compiled all 17 modules of the migrated
+`first-class-families-0.8.2.0`, passed its test suite and ran three
+interface-only clients. Their results were `True`, `True` and `Refl`.
+The 34 specialization checks, package identity checks, GHC API
+producer-change check and guide build passed.
+
+The first compatibility run passed 233 of 234 registrations.
+`DependentArrowMatchability` still expected an inferred synonym to reject
+an abstract family with the extension enabled. Job 1568 ran the corrected
+registration on the same compiler. It proved the result with the extension
+on and checked the original rejection with the extension off. Together
+the runs cover all 234 registrations. Of 127 focused registrations, 126
+passed. The full `deriving-via-compile` failure matched 558 byte for byte.
+The additional `NativeSynonymReify` registration passed in job 1561,
+bringing the focused total to 127 of 128.
+
+A plain Template Haskell copy of an inferred synonym can lose binder
+specificity. Copying its kind with `reifyType` and emitting a standalone
+kind signature preserves it. Jobs 1554 and 1558 compared both forms on
+the normal compiler. The exact copy accepted a constructor and a family
+and rejected explicit application of the inferred index.
+[Registered regression](../../testsuite/tests/dependent/should_run/NativeSynonymReify.sh).
+
 ## Runtime payload selection through an associated family
 
 The ordinary client in this example reads a Boolean from an `IORef`

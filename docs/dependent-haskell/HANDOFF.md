@@ -11,7 +11,17 @@ and its [expected output](Showcase.stdout) are the executable examples.
 Updated 23 November 2026. The development branch is
 `dependent-haskell`. Use the fork command below to find its latest commit.
 
-The published runtime-message implementation is `b963ccfaad`. Both
+The published compiler implementation is `5d6ac951f6`. An inferred
+type synonym can take both a data constructor and a type family.
+All 560 Showcase outputs matched at native `-O0`, default `-O2`
+and in GHCi. The migrated `first-class-families` package compiled
+with the bare `Pure1 'Endo` expression. Across the normal suite and
+two focused replays, 127 of 128 focused registrations and all 234
+compatibility registrations passed. The sole open failure is
+`deriving-via-compile`, already present in 556 and 558.
+[Detailed results](CHECKPOINTS.md#inferred-matchability-in-type-synonyms).
+
+The preceding runtime-message implementation is `b963ccfaad`. Both
 normal stages built at `3dd34e5327`. Its 558-line Showcase matched
 at `-O0`, default `-O2` and in GHCi. All 234 compatibility cases and
 125 of 126 focused registrations passed. The remaining upstream
@@ -150,13 +160,11 @@ though ordinary runtime clients passed. The published fix lets a
 client give `spaceDecision 'x'` the type `Decision Char.isSpace (Space 'x')`.
 [Substitution example](roadmap/R03-dependent-products.md#specializing-an-imported-call).
 
-The next integration combines R04's named coverage diagnostic with
-R23 matchability inference. Job 1519 compiled all 17 modules of the
-migrated `first-class-families-0.8.2.0` with `Pure1 'Endo`, passed its
-test and ran three ordinary clients. Component job 1532 checked an
-unsigned type synonym with both a data constructor and a type family.
-Use `r04-r23-bare-callback-normal-560-20261123` for the combined
-two-stage build and the external package replay.
+The next normal build is for R18 product patterns in type-level
+`let` expressions. The private source at `e9c33bede8` checks a
+user-defined constructor and projects fields without forcing ignored
+fields. The source archive is `2026-11-23/r18-general-product-let`.
+See `r18-product-let-normal-561-20261123` for the integration.
 
 Job 1335 used installed HaskLib on `4d10fdc35f` to check the
 [append counterexample](roadmap/R16-open-term-evaluator.md#append-fusion-and-an-undefined-right-list).
@@ -186,10 +194,10 @@ of byte-identical old interfaces bounds what the reader can recover.
 The decision about enforcing optimized proof-use checks is pending.
 [Package controls](roadmap/R16-open-term-evaluator.md#what-an-old-package-interface-can-tell-the-reader).
 
-The R04 coverage follow-up is `1f95088890` on top of the 558 candidate.
-Job 1508 passed the source-hidden diagnostic regression on its component.
-The warning names the supplied sum alias, such as `Packed Bool`.
-The frozen 558 compiler reproduces the generated-family name.
+The 560 compiler includes the R04 coverage correction. Incomplete
+patterns on a source sum now show the source alias, such as
+`Packed Bool`, and the missing pattern. Job 1508 compared the new
+warning with 558. The maintained regression passed again on 560.
 
 The local archive refs `r19-r41-normal-552`, `r16-hasklib-tree-553`
 and `r27-legacy-transition-normal` are under
@@ -428,8 +436,8 @@ defaults and an opt-in migration warning.
 
 ## Build and verify
 
-The published 558-line Showcase uses the normal two-stage compiler at
-`3dd34e5327` in `r04-r21-runtime-sigma-normal-558-20261123`.
+The published 560-line Showcase uses the normal two-stage compiler at
+`5d6ac951f6` in `r04-r23-bare-callback-normal-560-20261123`.
 On this host the bootstrap tools are GHC 9.14.1, Cabal 3.18.1.0, Happy 2.1.7
 and Alex 3.5.4.0. A fresh checkout needs the Git submodules at their recorded
 revisions. This build used five workers per job.
@@ -443,7 +451,7 @@ self-hosted stage 2 compiler in `_build/stage1/bin/ghc`. Both use the
 target libraries in `_build/stage1/lib`. For example, from the main checkout:
 
 ```sh
-stable="$PWD/_build/on-demand/r04-r21-runtime-sigma-normal-558-20261123/source/_build/stage1"
+stable="$PWD/_build/on-demand/r04-r23-bare-callback-normal-560-20261123/source/_build/stage1"
 queue="$PWD/docs/dependent-haskell/tools/ghc-build-job"
 check="$PWD/docs/dependent-haskell/check-showcase.sh"
 "$queue" showcase-stage2-ghci bash "$check" "$stable/bin/ghc" "$stable/lib" --ghci

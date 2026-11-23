@@ -55,7 +55,11 @@ qualified on normal compiler `2b64ffc406`. R41 was qualified on `71e5215115`.
 R23 now supports both the ordinary
 and promoted uses of a polymorphic `Endo` in real library clients.
 The expected kind also fixes the omitted matchabilities in the bare
-`Pure1 'Endo` use in `FoldrDefault_`.
+`Pure1 'Endo` use in `FoldrDefault_`. An unsigned `Apply` synonym can
+accept both a data constructor and a type family. R23 remains partial.
+The stock transformer kind synonym still needs a source migration, and
+the standalone proposal flag is under investigation.
+[560 verification](CHECKPOINTS.md#inferred-matchability-in-type-synonyms).
 [R23 package check](roadmap/R23-unsaturated-type-families.md#one-constructor-for-term-and-promoted-callbacks)
 and [R41 scope](roadmap/R41-nested-quantification-in-gadts.md).
 
